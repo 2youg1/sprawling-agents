@@ -124,6 +124,23 @@ export interface Band {
   readonly runs: readonly RunBelief[];
 }
 
-export function bandsOf(_runs: readonly RunBelief[], _now: number): readonly Band[] {
-  return [];
+const MINUTES_MS = 10 * 60_000;
+const HOUR_MS = 60 * 60_000;
+
+// The rows sorted newest first, then cut into bands. A run with no
+// start time has no age to read and falls in "earlier", after the rest.
+export function bandsOf(runs: readonly RunBelief[], now: number): readonly Band[] {
+  const held: Record<Recency, RunBelief[]> = { minutes: [], hour: [], earlier: [] };
+  for (const run of [...runs].sort(newestFirst)) held[recencyOf(run.started, now)].push(run);
+  return RECENCIES.filter((recency) => held[recency].length > 0).map((recency) => ({
+    recency,
+    runs: held[recency],
+  }));
+}
+
+function recencyOf(started: number | null, now: number): Recency {
+  if (started === null) return "earlier";
+  const age = now - started;
+  if (age < MINUTES_MS) return "minutes";
+  return age < HOUR_MS ? "hour" : "earlier";
 }

@@ -256,6 +256,6 @@ const HIDDEN: usize = 0;
 
 <Case label="room · results only, what a finished run produced">
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={changed}>
-    <Produced base={OPENED} head={FENCED} />
+    <Produced base={OPENED} head={FENCED} place="divider" />
   </Stand>
 </Case>

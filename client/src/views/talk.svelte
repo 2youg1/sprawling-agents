@@ -309,7 +309,7 @@
             <Thread {run} {who} onFork={doFork} onRetry={send} />
           {/each}
           {#if !drawsCalls($held.showing) && producedFrom !== null}
-            <Produced base={producedFrom} head={producedTo === producedFrom ? null : producedTo} />
+            <Produced base={producedFrom} head={producedTo === producedFrom ? null : producedTo} place="divider" />
           {/if}
           <Waiting />
         {/if}
