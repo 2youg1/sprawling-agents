@@ -137,6 +137,22 @@ proptest! {
             }
         }
 
+        let ascending: Vec<Seq> = oracle.entries.keys().copied().collect();
+        prop_assert_eq!(folded.seqs().collect::<Vec<_>>(), ascending.clone());
+        prop_assert_eq!(
+            folded.seqs().rev().collect::<Vec<_>>(),
+            ascending.iter().rev().copied().collect::<Vec<_>>()
+        );
+        // Both ends taken in turn meet in the middle without losing or
+        // repeating a seq.
+        let mut from_both = Vec::new();
+        let mut seqs = folded.seqs();
+        while let Some(low) = seqs.next() {
+            from_both.push(low);
+            from_both.extend(seqs.next_back());
+        }
+        from_both.sort();
+        prop_assert_eq!(from_both, ascending);
         prop_assert_eq!(folded.tail_seq(), oracle.entries.keys().next_back().copied());
         prop_assert_eq!(folded.len(), oracle.entries.len());
         prop_assert_eq!(folded.is_empty(), oracle.entries.is_empty());

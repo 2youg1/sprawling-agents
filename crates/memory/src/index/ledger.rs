@@ -208,7 +208,7 @@ impl LedgerIndex {
 
     /// Every seq the index holds, ascending: the walk a reader takes
     /// to read the whole ledger forwards, which is its fast direction.
-    pub fn seqs(&self) -> &[Seq] {
+    pub fn seqs(&self) -> impl DoubleEndedIterator<Item = Seq> + '_ {
         self.folded.seqs()
     }
 

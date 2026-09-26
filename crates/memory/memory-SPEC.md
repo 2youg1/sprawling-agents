@@ -282,8 +282,8 @@ rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_di
 ### 8-4 memory::index（形状 7）
 
 ```rust
-pub struct LedgerIndex { /* folded: Folded —— entries 三列（seqs: Vec<Seq> 严格递增、segs: Vec<String> 段名字典、
-                            locs: Vec<(字典 id, 行首字节偏移)>）、runs: Vec<RunSpans>（run→连续 seq 值区间表，按 run 排序）、scanned；
+pub struct LedgerIndex { /* folded: Folded —— entries（base: Seq 起点、column: Vec<u64> 隐式 seq 列，每行一字＝高 16 位段名字典 id＋低 48 位行首字节偏移、
+                            outliers: BTreeMap<Seq, (字典 id, 偏移)> 列外行、segs: Vec<String> 段名字典）、runs: Vec<RunSpans>（run→连续 seq 值区间表，按 run 排序）、scanned；
                             vfs: Mutex<Box<dyn Vfs>> —— 内缝，私有（谁在缝外见 8-15） */ }
 impl LedgerIndex {
     /// 扫描账本目录建索引（本就是唯一建表入口，无库外旁挂物可信）。
@@ -299,6 +299,7 @@ impl LedgerIndex {
         -> impl Iterator<Item = Seq> + '_;
     pub fn len(&self) -> usize;  pub fn is_empty(&self) -> bool;                   // 重建后自证条数
     pub fn tail_seq(&self) -> Option<Seq>;
+    pub fn seqs(&self) -> impl DoubleEndedIterator<Item = Seq> + '_;               // 全部 seq，升序；两端都可取
 }
 /// 一次查询期间的取行游标：持有当前段的句柄与它的逻辑位置。私有字段。
 pub struct LineReader<'index> { /* index、dir、Option<段名＋BufReader<File>＋下一行偏移> */ }
@@ -308,6 +309,7 @@ impl LineReader<'_> {
 ```
 
 - **索引不落盘，只有一段常驻内存**：唯一建表入口是 `rebuild`，扫描账本目录；`Views` 持有它并在每次查询前 `refresh`。此前那份 `index.cache` 旁挂物已整体删除：`persist` 在 `db3a342` 之后的树里零生产调用者，读取方因此是在读一份没人写的文件，而「一份没人写的旁挂物」既是永不命中的空转，又是第二个可失效的“答案来源”。删掉的是写与读两半，`Folded`、`fold_segment`、`rebuild` 与 `refresh` 全部保留，故 `rebuild` 仍是「从段重建」。
+- **seq 是隐式的，每行只存一个 `u64`**：内核给行连续编号，所以一行的 seq 就是它在列里的位置加 `base`，列里只存段名字典 id 与偏移拼成的一个字。五万行的账本在索引里占 400 KB，显式 seq 列加 (id, 偏移) 对的布局要 1.2 MB（每行 24 B，`a_contiguous_ledger_costs_eight_bytes_per_record` 钉住 8 B）。损坏的账本仍要能索引，因为修复路径靠它：低于 `base` 的 seq、远到要让空洞多于行数才够得着的 seq（越过列尾的距离不小于 `max(列长, 64)`）、段 id 超过 16 位或偏移超过 48 位的位置，都进 `outliers`；一个 seq 只在两处之一，重复写保留最后的位置，`seqs()` 把两处按序归并。**被否：只留列、把列外行丢掉**——被丢的行对每个读者都不可见；**被否：空洞无上限地拉长列**——一个被写坏成 2^60 的 seq 会让索引去分配 2^63 字节。`fold/tests.rs` 的 map 形 oracle 对全部查询（含 `seqs()` 正反两向与两端交替）判等。
 - **取行走游标，而不是每行一次 open ＋逐字节 read**：一次 `History`／`RunHistory` 查询要取一段连续的 seq，而每一行重开段文件、再一次一个字节 `read` 到换行的读法，系统调用数与行长同阶。句柄因此住进 `LineReader`：段名不变即不重开，读用 `BufReader::read_until(b'\n')`，一次填充服务多行。
   - **实测**（5 万条账本，windows-x86_64 NVMe，每种模式 200 行）：顺序读（`history`）**0.89 µs／行**；逆序读（`run_history`）**5.82 µs／行**；随机跳读 **14.9 µs／行**。
   - **位置自持**：游标记住下一行的偏移，与所求偏移相同即不 seek（顺序读全程零 seek），不同则绝对 seek 并弃缓冲。`run_history` 逆序读每行付一次 seek 与一次缓冲填充，仍是常数次系统调用。
