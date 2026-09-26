@@ -122,7 +122,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
         )
     })?;
     let now = now_ms()?;
-    let (mut ledger, _report) =
+    let (mut ledger, report) =
         JsonlLedger::open(&dir, now).map_err(memory::MemoryError::into_ax)?;
     let genesis = ledger.append(EventDraft {
         run: RunId::CITY,
@@ -183,7 +183,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
         city_root,
         vault,
         runtime::diagnostics::Diagnostics::off(),
-        ledger,
+        (ledger, report),
     )?;
     let plan = city::CityPlan::new(None)?;
     let (hall, template) = plan.hall();
@@ -312,6 +312,7 @@ impl RunWorker {
             closed = closed.saturating_add(1);
         }
         Ok(ScanReport {
+            opening: self.opening,
             lines: verified.raw_lines().len(),
             closed_calls: closed,
             waiting_approvals: self.governance.pending.len(),

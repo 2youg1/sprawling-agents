@@ -17,7 +17,46 @@ use std::path::Path;
 use std::sync::Arc;
 
 use kernel::{AxError, EventKind, Locator};
-use memory::{Cas, JsonlLedger};
+use memory::{Cas, JsonlLedger, OpenReport};
+
+/// What opening the ledger repaired before this worker read a line of
+/// it (sprawling-SPEC.md 8-86). The ledger records the cut as
+/// `log_truncated`, but no page draws that line, so the worker keeps
+/// this value to tell the person at the two doors a city opens through.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum LedgerOpening {
+    /// Every byte on disk was a whole, chained line.
+    Intact,
+    /// A crash left the last line half-written; opening cut these bytes.
+    TailDropped { bytes: u64 },
+}
+
+impl From<OpenReport> for LedgerOpening {
+    fn from(report: OpenReport) -> Self {
+        match report.recovered {
+            None => LedgerOpening::Intact,
+            Some(cut) => LedgerOpening::TailDropped {
+                bytes: cut.dropped_bytes,
+            },
+        }
+    }
+}
+
+impl LedgerOpening {
+    /// The one sentence a person reads about the cut: what, why, and
+    /// what to do. `None` when nothing was cut.
+    pub(crate) fn notice(self) -> Option<String> {
+        match self {
+            LedgerOpening::Intact => None,
+            LedgerOpening::TailDropped { bytes } => Some(format!(
+                "the ledger's last line was half-written when the city last stopped, so \
+                 opening cut {bytes} byte(s) from its tail and recorded log_truncated; every \
+                 earlier line verified. Check whether the last action before that stop needs \
+                 doing again"
+            )),
+        }
+    }
+}
 
 impl RunWorker {
     /// # Errors
@@ -29,13 +68,13 @@ impl RunWorker {
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
     ) -> Result<Self, AxError> {
-        let dir = ledger_dir(city_root);
-        let (ledger, _report) =
-            JsonlLedger::open(&dir, now_ms()?).map_err(memory::MemoryError::into_ax)?;
-        RunWorker::over(city_root, vault, log, ledger)
+        let opened = JsonlLedger::open(&ledger_dir(city_root), now_ms()?)
+            .map_err(memory::MemoryError::into_ax)?;
+        RunWorker::over(city_root, vault, log, opened)
     }
 
-    /// Builds a worker around a ledger somebody else opened (LOADING; UNLOADING: `close_city`).
+    /// Builds a worker around a ledger somebody else opened, together
+    /// with what that open repaired (LOADING; UNLOADING: `close_city`).
     ///
     /// Where the history comes from is not this worker's decision to
     /// make, and taking it as a parameter is the same correction
@@ -53,7 +92,7 @@ impl RunWorker {
         city_root: &Path,
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
-        ledger: JsonlLedger,
+        (ledger, report): (JsonlLedger, OpenReport),
     ) -> Result<Self, AxError> {
         let now = now_ms()?;
         let dir = ledger_dir(city_root);
@@ -76,6 +115,7 @@ impl RunWorker {
             city_root: city_root.to_path_buf(),
             city: std::sync::OnceLock::new(),
             ledger,
+            opening: LedgerOpening::from(report),
             cas,
             book,
             vault: Arc::new(std::sync::Mutex::new(vault)),
@@ -99,6 +139,11 @@ impl RunWorker {
             backlog: runtime::Backlog::new(),
             flight: Flight::open(),
         })
+    }
+
+    /// What opening this worker's ledger repaired.
+    pub(crate) fn opening(&self) -> LedgerOpening {
+        self.opening
     }
 
     /// Closes the city in the record, so a stop somebody chose and a

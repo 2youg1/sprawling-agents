@@ -126,13 +126,11 @@ mod tests {
     /// A worker over an empty city, which is all this verb needs: it
     /// refuses before it touches the machine.
     fn worker(city_root: &std::path::Path) -> RunWorker {
-        let (ledger, _opened) =
-            memory::JsonlLedger::open(&ledger_dir(city_root), now_ms().unwrap()).unwrap();
         RunWorker::over(
             city_root,
             gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
-            ledger,
+            memory::JsonlLedger::open(&ledger_dir(city_root), now_ms().unwrap()).unwrap(),
         )
         .unwrap()
     }

@@ -66,6 +66,7 @@ use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 pub(crate) use folds::{Standing, rebuild_views};
 use genesis::city_segment;
 pub use genesis::{Adopt, InitReport, form_city, has_history, init_city};
+use lifetime::LedgerOpening;
 pub(crate) use mcp::McpLink;
 use mcp::{connect_mcp, mounts_under, transport_site};
 use naming::{building_of, governed_of, mode_of, name_of, not_built, plan_node_of, scope_of};
@@ -123,6 +124,8 @@ pub(crate) fn ledger_dir(city_root: &Path) -> PathBuf {
 
 /// What the startup scan found and repaired.
 pub struct ScanReport {
+    /// What opening the ledger cut, told after the counts.
+    pub(crate) opening: LedgerOpening,
     pub(crate) lines: usize,
     pub(crate) closed_calls: usize,
     /// The one count a caller branches on rather than prints: `resume`
@@ -132,14 +135,19 @@ pub struct ScanReport {
 }
 
 impl ScanReport {
-    /// One line a person reads: what was verified, what was closed, and
-    /// what is still owed an answer.
+    /// What a person reads: what was verified, what was closed, what is
+    /// still owed an answer, and, on a second line, what opening the
+    /// ledger cut from a torn tail.
     #[must_use]
     pub fn summary(&self) -> String {
-        format!(
+        let counts = format!(
             "{} line(s) verified; {} unknown-outcome call(s) closed; {} approval(s) waiting",
             self.lines, self.closed_calls, self.waiting_approvals
-        )
+        );
+        match self.opening.notice() {
+            None => counts,
+            Some(notice) => format!("{counts}\n{notice}"),
+        }
     }
 }
 
@@ -177,6 +185,8 @@ pub struct RunWorker {
     /// legal state.
     city: std::sync::OnceLock<kernel::B3Hash>,
     ledger: JsonlLedger,
+    /// What opening `ledger` repaired, kept until a person is told.
+    opening: LedgerOpening,
     cas: Cas,
     /// Every endpoint the person attached and every model they chose,
     /// folded from the ledger. The worker keeps its own copy because a
