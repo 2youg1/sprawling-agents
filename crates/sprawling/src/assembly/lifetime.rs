@@ -138,6 +138,7 @@ impl RunWorker {
             fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
             backlog: runtime::Backlog::new(),
             flight: Flight::open(),
+            index: memory::LedgerIndex::empty(),
         })
     }
 

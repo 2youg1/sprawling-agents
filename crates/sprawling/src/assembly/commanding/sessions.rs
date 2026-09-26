@@ -103,20 +103,20 @@ impl RunWorker {
     /// person is standing there when they ask for it: a branch that
     /// cannot be rebuilt is a refusal now, in words about the line they
     /// named, rather than a run that starts and finds nothing.
-    fn origin_is_real(&self, origin: kernel::Origin) -> Result<(), AxError> {
-        let ledger = runtime::replay::verify_ledger_dir(&ledger_dir(&self.city_root))?;
-        let index = usize::try_from(origin.at_seq.value()).map_err(|_| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "branch a session",
-                format!("seq {} does not fit this platform", origin.at_seq.value()),
-            )
-            .with_recovery("branch from a lower line of that run")
-        })?;
-        let owner = ledger.lines().get(index).and_then(|line| match line {
-            runtime::replay::VerifiedLine::Known { record, .. } => Some(record.run()),
-            runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
-        });
+    fn origin_is_real(&mut self, origin: kernel::Origin) -> Result<(), AxError> {
+        let dir = ledger_dir(&self.city_root);
+        self.index
+            .refresh(&dir)
+            .map_err(memory::MemoryError::into_ax)?;
+        let owner = match self.index.reader(&dir).line_at(origin.at_seq) {
+            // A line this build cannot read as a record is not a line of
+            // that run's conversation, which is the refusal below.
+            Ok(line) => kernel::EventRecord::parse_line(&line)
+                .map(|record| record.run())
+                .ok(),
+            Err(memory::MemoryError::SeqMissing { .. }) => None,
+            Err(other) => return Err(other.into_ax()),
+        };
         if owner != Some(origin.run) {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,

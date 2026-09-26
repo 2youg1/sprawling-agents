@@ -277,6 +277,10 @@ pub struct RunWorker {
     /// home. One per city, so the number of runs a city drives at once
     /// has one answer (sprawling-SPEC.md 8-46-2).
     flight: Flight,
+    /// Where each line of the history sits, folded once and refreshed
+    /// with what was appended since, so a question about one line reads
+    /// that line rather than the whole history (sprawling-SPEC.md 8-82).
+    pub(in crate::assembly) index: memory::LedgerIndex,
 }
 
 impl RunWorker {
