@@ -18,7 +18,8 @@ use serde_json::Value;
 
 use crate::dialect;
 
-use super::config::{Endpoint, ProviderFailure, provider_err};
+use super::config::Endpoint;
+use super::failure::{ProviderFailure, provider_err};
 
 impl Endpoint {
     /// One call, with the body read as it arrives.
