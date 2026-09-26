@@ -146,7 +146,7 @@ fn sessioned_server(
     (format!("http://{addr}/mcp"), handle)
 }
 
-/// The whole reason this card exists: a session id handed out at
+/// A session id handed out at
 /// initialization has to travel on every later request, and so does
 /// the negotiated protocol version. Without them a server that
 /// keeps state answers 400 to everything after the handshake.

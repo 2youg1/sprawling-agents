@@ -63,10 +63,10 @@ impl OpenRequest {
     /// The `pr_merged` record: the request as it was judged, plus what
     /// the merge produced.
     ///
-    /// Two commits, two keys. The merge commit used to be written under
-    /// `commit`, on top of the commit that was reviewed, so the ledger
-    /// held one key for two facts and the audit chain from "what was
-    /// verified" to "what landed" broke at the merge.
+    /// Two commits, two keys. Writing the merge commit under `commit`,
+    /// on top of the commit that was reviewed, would hold one key for two
+    /// facts and break the audit chain from "what was verified" to "what
+    /// landed" at the merge.
     ///
     /// # Errors
     /// Propagates the payload's refusal to hold what it was given.

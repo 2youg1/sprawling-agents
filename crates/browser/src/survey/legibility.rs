@@ -11,11 +11,11 @@
 //! needs a contrast model. This repository has one, in `xtask::color`,
 //! calibrated for pairs of declared tokens on the single hue axis
 //! rather than for two colours off a screen; wiring the painted pair
-//! into it is one visibility change in a file this change does not own,
+//! into it is one visibility change in `xtask::color`,
 //! and writing a second contrast formula here would be the second
 //! authority the whole instrument exists to prevent. So this module
-//! measures the first, and the second is a named debt rather than a
-//! duplicate.
+//! measures the first, and the second is an open question in
+//! browser-SPEC §3 rather than a duplicate.
 //!
 //! **A cut a person can see is not a defect.** A box that draws an
 //! ellipsis says that it is holding something back, and a person can

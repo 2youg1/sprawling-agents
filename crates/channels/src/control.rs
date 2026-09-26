@@ -11,8 +11,7 @@
 //! place - the result envelope - so the model only ever learns one shape.
 //!
 //! This module decides and returns; it holds no Ledger handle and writes
-//! nothing. The obligation it reports is discharged by the assembly layer,
-//! and the closing card asserts the obligation was met.
+//! nothing. The obligation it reports is discharged by the assembly layer.
 
 use kernel::{AxCode, AxError, RunId};
 

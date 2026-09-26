@@ -171,8 +171,8 @@ pub enum ServerFrame {
     /// A session that reads slower than the city writes loses the
     /// middle of the stream: the buffer behind a subscription has a
     /// fixed capacity, and one slow reader is left behind rather than
-    /// holding the writer up. Losing it in silence was the defect - a
-    /// page drew a history with a hole in it and nothing said so. The
+    /// holding the writer up. Losing it in silence would let a page draw
+    /// a history with a hole in it while nothing said so. The
     /// range is answered from the Ledger, which is the one home of what
     /// happened.
     ///

@@ -24,12 +24,13 @@
 
 - **假设**：起进程归 `bin::browser_bidi`；本库恒不拉起浏览器进程、恒不持套接字、恒不下载驱动。
 - **假设（附着）**：连一个已经开着的浏览器也归装配层——本库只把帧交给缝。装配层的 `AttachedBrowser` 与 `LazyEngine` 是同一缝上的第二个实现：前者只连、不启动、不结束进程；后者的 `running`／`Drop` 假定进程归自己，两者因此不能合成一个类型。
-- **假设（未核验的协议形状，离线无法查）**：`input.performActions` 的 `pointer`／`wheel` 源动作字段、元素 origin 的 `SharedReference`、以及 `script.evaluate` 返回节点时 `sharedId` 的嵌套位置，据 W3C 草案写成；`input::shared_id_of` 在回复里按有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`。第一次对着真浏览器跑时要先核这三处。
+- **协议形状**：`input.performActions` 的 `pointer`／`wheel` 源动作字段与元素 origin 的 `SharedReference` 据 W3C 草案写成；`script.evaluate` 回复里 `sharedId` 的位置、空能力集、`image/png` 拼写已对 Gecko 真会话核过（§19-7）。`input::shared_id_of` 在回复里按有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`。
+- **未定**：`-headless` 这一位由哪一面提供（楼的 `CONFIG.toml` 还是派活帧的一个字段）；某个具体 Firefox fork 是否接受本 crate 的启动参数与会话形态；行容器的交叉轴怎么扫（§19-10）；画出来的一对颜色是否可读：接进 `xtask::color` 的对比度模型要把它开放给本 crate，另写一条对比度公式就是第二个权威（`survey::legibility`）。
 - **歧义已定**：BiDi 的 `session.new` 能力集合本版本只请求空能力＋按需 `network` 事件；更多能力等到有消费者再加，因为每一项能力都是远端因此获得的一项许可。
 
 ## 4 现状分析
 
-P4 之前 `crates/browser/src/` 只有 `lib.rs` 一行文档。无既有代码要迁移。
+纯判定与值类型：`session`、`snapshot`、`act`、`verb`、`input`、`shot`、`diff`、`devloop`、`profile`、`geometry`、`survey` 与缝 `port`。生产消费者是 `crates/sprawling`：`browser_bidi` 持套接字并实现 `BrowserPort`，`browser_tool` 把动作面接成 `browser` 与 `usersbrowser` 两件工具；`xtask render` 读 `survey`。
 
 ## 5 权威信源
 
@@ -40,13 +41,11 @@ P4 之前 `crates/browser/src/` 只有 `lib.rs` 一行文档。无既有代码�
 | `script` 模块 | <https://developer.mozilla.org/en-US/docs/Web/WebDriver/Reference/BiDi/Modules/script> |
 | `input` 模块（指针、滚轮；`performActions` 的源动作与元素 origin） | <https://w3c.github.io/webdriver-bidi/#module-input> |
 
-2026-08-22 复核：规范仍是 W3C 工作草案；本库只用 `session`／`browsingContext`／`script` 三个模块，`network` 仅作为可选订阅出现。
+规范是 W3C 工作草案；本库用 `session`／`browsingContext`／`script`／`input` 四个模块，`network` 仅作为可选订阅出现。
 
 ## 6 命名统一
 
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
-
-`BrowserPort`｜`PageSnapshot`｜login state per Building——三者均取自词汇表，恒不自造同义词。「快照」在本 crate 恒指 `PageSnapshot`，与 `web::Snapshot`（界面前进式 fold）不同物，故跨 crate 引用时写全名。
+`BrowserPort`｜`PageSnapshot`｜login state per Building——三者均取自词汇表，恒不自造同义词。「快照」在本 crate 恒指 `PageSnapshot`，与客户端的界面 fold 不同物，故跨 crate 引用时写全名。
 
 ## 7 模块边界
 
@@ -133,13 +132,13 @@ impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn
 
 **第二对（ref 是什么）**：ref ＝ 页面里的稳定标识（落选）vs ref ＝ 本次快照里的位置（选中）。前者要求页面配合（`id` 属性、`data-testid`），而页面是别人写的；后者把「页面动过了」变成一个可判定事实——ref 携 generation，陈旧即拒。代价：每次动作前必须先看一眼，这正是我们要的顺序。
 
-## 8.6 port 缝的决定（推翻 §8.5 第一对里「录制回放是真的第二适配器」一句）
+## 8.6 port 缝的决定
 
-**决定（§8-1，推翻旧决定「两个适配器过同一套 conformance 断言」）**：`assert_port_conformance` 删除，`BrowserPort` 保留。
+**决定**：`BrowserPort` 是 trait，缝上没有 conformance 套件。录制回放（`Recording`）是重放证据，不是传输层的证据。
 
-- trait 保留的理由是 AGENTS.md「一个 trait 只在已有第二个实现的缝上引入」：缝上有两个生产实现——`crates/sprawling/src/browser_bidi/socket.rs:61` 的 `BidiSocket` 与 `lazy.rs:113` 的 `LazyEngine`（按需起引擎、首帧才连），加上本 crate 的 `Recording`。撤 trait 会让懒起与直连两条路合成一个类型。
-- 套件删除的理由是它的证据为零：唯一调用点在 `session.rs` 的测试里，被测者 `Recording` 按构造就回 `frame.id()` 且回答不消费条目，两条断言恒真；两个生产适配器从不跑它，因为 CI 没有浏览器驱动（ARCHITECTURE.md §11 已具名的四个缺口之一）。留着它，读者会把「过了 conformance」读成「传输层被验过」。
-- **重开参数**：当回复路由规则（读过无 id 的事件、按 id 认领答案）从 `socket.rs` 的 async 循环搬进本 crate 成为纯函数，且 `crates/sprawling` 的测试能用一对本地 socket 驱动它时，套件与它的调用方在同一次改动里回来。那是一次跨两个 crate 的改动，不属于本叶子。
+- trait 的理由是 AGENTS.md「一个 trait 只在已有第二个实现的缝上引入」：缝上有三个生产实现——`crates/sprawling/src/browser_bidi` 的 `BidiSocket`（直连）、`LazyEngine`（按需起引擎、首帧才连）与 `AttachedBrowser`（连人自己的浏览器），加上本 crate 的 `Recording`。撤 trait 会让这几条路合成一个类型。
+- 不设套件的理由是它的证据为零：被测者 `Recording` 按构造就回 `frame.id()` 且回答不消费条目，断言恒真；生产适配器跑不了它，因为 CI 没有浏览器驱动（ARCHITECTURE.md §11 具名的缺口之一）。这样的套件会让读者把「过了 conformance」读成「传输层被验过」。
+- **重开参数**：回复路由规则（读过无 id 的事件、按 id 认领答案）从 `socket.rs` 的 async 循环搬进本 crate 成为纯函数，且 `crates/sprawling` 的测试能用一对本地 socket 驱动它。那时套件与它的调用方在同一次改动里出现。
 
 ## 9 工作流程
 
@@ -150,9 +149,8 @@ impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn
 1. **帧先于传输**：`Frame::to_wire` 手写字段序而不用 `serde_json::to_string`，因为录制回放要按字节比对，而 map 的迭代序不是契约。
 2. **回复分两层**：传输失败是 `Err`，远端拒绝是 `Reply::Error`——「这个节点没了」是答案，不是故障；把两者混同会让调用方对着一个错误码猜是谁的问题。
 3. **快照用白名单不用黑名单**：角色词汇十四项闭合。「除了 X 都放行」会在平台新增角色时静默变宽，而它变宽的终点就是原始 DOM。
-   - **词汇只有一个家（B-27）**：`snapshot::ROLE_MAP`（`(标签, 可选 type) → 角色`，27 行）是权威；采树脚本的映射表由 `role_lookup_js()` 从它生成，过滤器 `shown()` 也从它取值。
-     此前脚本把角色定义为「显式 role 属性，否则小写标签名」，而过滤器查的是 ARIA 角色表，两者只在 button/table/form/option/dialog 上重合：
-     不手写 `role=` 的页面快照里**没有链接也没有输入框**，`to_text()` 几乎是空的，act/measure 拿不到 ref。夹具手填角色绕过了脚本，所以测试曾经全绿。
+   - **词汇只有一个家**：`snapshot::ROLE_MAP`（`(标签, 可选 type) → 角色`，27 行）是权威；采树脚本的映射表由 `role_lookup_js()` 从它生成，过滤器 `shown()` 也从它取值。
+     脚本与过滤器若各持一张表，两张表只要不重合，不手写 `role=` 的页面快照里就**没有链接也没有输入框**，act/measure 拿不到 ref；手填角色的夹具绕过脚本，测不出这一点，所以表只有一张。
    - **两条派生断言**：`ROLE_MAP` 产得出的每个角色都在词汇里；词汇里除 `tab` 与 `alert`（无元素隐含，只能由页面显式声明）之外的每一项都至少有一个标签映射到它。
    - **`<input>` 的 type 缺席读作 `text`**（HTML 默认值）；`hidden`／`file` 等无行可查的 type 不得角色，因而不过河。
 4. **动作里页面文本恒是数据**：`quote` 是页面内容成为代码的唯一位置，逐字符转义，含 U+2028／U+2029（JS 里它们是行终止符）。
@@ -173,7 +171,7 @@ impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn
 
 ## 13 依赖选型
 
-`kernel`（错误、地址）＋`serde_json`。**恒不引入** WebSocket 客户端、异步运行时、HTML 解析器：前两者归装配层，第三者会把原始 DOM 请回本 crate。
+`kernel`（错误、地址）＋`serde`／`serde_json`（帧与探针的三串）＋`base64`／`png`（截图解码与量尺寸，§19-4）。**恒不引入** WebSocket 客户端、异步运行时、HTML 解析器：前两者归装配层，第三者会把原始 DOM 请回本 crate。
 
 ## 14 硬编码声明
 
@@ -181,7 +179,7 @@ impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn
 
 ## 15 影响面
 
-新增 crate，无既有调用方。装配层将来接线时波及：连接管理、`kernel::tool` 缝上的浏览器工具、`city::policy` 的 confidential 读取。
+改 `BrowserPort` 或 `Verb` 波及 `crates/sprawling` 的 `browser_bidi` 与 `browser_tool`；改 `survey` 波及 `xtask render`；`city::policy` 的 confidential 读取决定一栋楼有没有这两件工具。
 
 ## 16 测试与约束
 
@@ -193,9 +191,7 @@ impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn
 
 ## 18 文档同步
 
-`ARCHITECTURE.md` §6 browser 六行与 §3 缝清单｜`docs/glossary.md` 若新增词汇｜装配层接线时同步 §6 末接线台账。
-
-**`conformance` feature 作废**：本 crate 不再有 conformance 套件（§8-1 决定），`crates/browser/Cargo.toml` 的 `conformance = []` 应随之删除（跨文件，见交付报告）。`cargo xtask artifact` 的规则不变，它辖的另外四套 conformance 与本 crate 无关。
+`ARCHITECTURE.md` 模块表的 browser 各行与 §3 缝清单｜`docs/glossary.md` 若新增词汇。本 crate 没有 `conformance` feature（§8.6）。
 
 ## 19 工具的动作面，与截图成为证据
 
@@ -207,7 +203,7 @@ impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn
 
 这不放宽本 crate 的任何约束：纯的那一半仍然纯，「谁按下启动键」住在装配层（§7 第一条）。
 
-### 19-2 `browser::verb`（新模块，形状 1 判定）
+### 19-2 `browser::verb`（形状 1 判定）
 
 工具 `browser` 的每一个动作，读成一个穷尽枚举，再变成帧。**一个动作可能要一帧以上**，所以出口是 `Vec<Frame>` 而不是 `Frame`：`open` 要先导航再装上控制台录音器，`screenshot` 带 `scale` 时要先改 devicePixelRatio。
 
@@ -234,7 +230,7 @@ impl Verb {
 
 三条判定写在这里而不是调用方：`act` 没有快照即拒（对没看过的页面动手不可拼写，§8.5 第二对的直接后果）；`measure` 的每个 ref 都过 `PageSnapshot::resolve`，因此「我编了一个 ref」在出网前就被报出；`console` 读的是 `open` 时装上的录音数组，因为本 crate 的缝只运请求-应答，而 BiDi 的 `log.entryAdded` 是无 id 的事件，归装配层路由——用一个页面内数组换一条事件订阅，是拿已有机制复用而非新开一条通路。
 
-### 19-3 `browser::shot`（新模块，形状 2 值类型）
+### 19-3 `browser::shot`（形状 2 值类型）
 
 截图的选项与回来的字节。`quality` 是 **0..=100 的整数**而不是浮点：浮点不进判定路径，而 BiDi 要的 `0.85` 只在最后一刻由 `format!("0.{q:02}")` 解析成 JSON 数，于是本仓库里没有一个 f64 变量。`scale` 同样是百分比整数，`100` 表示不改。
 
@@ -270,23 +266,21 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 `Shot::read` 解 base64 并把字节交给 `png` 读出尺寸：**本版本只在 PNG 上给出尺寸**，其他格式回 `E_WIRE_MISMATCH` 而不是猜。理由是 `ImageRef` 的 width／height 是模型看图前唯一的尺度，猜错的尺寸比没有尺寸更坏；而默认格式本就是 PNG，所以这条拒绝挡的是有人显式要了别的格式又要尺寸。
 
-`Shot::read` 解 base64 并把字节交给 `png` 读出尺寸：**本版本只在 PNG 上给出尺寸**，其他格式回 `E_WIRE_MISMATCH` 而不是猜。理由是 `ImageRef` 的 width／height 是模型看图前唯一的尺度，猜错的尺寸比没有尺寸更坏；而默认格式本就是 PNG，所以这条拒绝挡的是有人显式要了别的格式又要尺寸。
-
-### 19-4 `browser::diff`（新模块，形状 1 判定）
+### 19-4 `browser::diff`（形状 1 判定）
 
 `diff(a, b)` 回答两件事：变了百分之几，以及变的地方在哪几个框里。百分比是**万分比整数**（`changed_ppm`／`ratio_q4`），框是像素坐标的整数矩形，因为这两个数会进账本载荷。尺寸不同的两张图不比较，回 `E_INVALID_ARGS`——把一张缩放到另一张上再比，比出来的差异是缩放算法的，不是页面的。
 
 解码后的字节短于自己头部声明的尺寸时回 `E_WIRE_MISMATCH`，并且**说出是哪一张短了**：先拍的、后拍的、还是两张都短。三种情况的下一步动作不同——要重拍的是哪一张，拒绝语直接给出，读的人不必两张都重来。判定对 `(前, 后)` 两个像素取值穷尽匹配，没有兜底臂。
 
-**一个矩形类型**：差异的框与截图覆盖的区域、以及元素报出的框，是同一个四整数形状，所以全 crate 只有一个 `shot::Rect`（`covers` 与 `covering` 是它的方法）；`diff` 从 `shot` 读它，本模块不再自备一个 `Box2`。两个名字曾经同时存在且取值相同，那正是本仓称之为缺陷的状态。
+**一个矩形类型**：差异的框与截图覆盖的区域、以及元素报出的框，是同一个四整数形状，所以全 crate 只有一个 `shot::Rect`（`covers` 与 `covering` 是它的方法），`diff` 从 `shot` 读它：同一个形状两个名字，就是两个会漂开的定义。
 
-依赖 `png` 0.18（MIT OR Apache-2.0，`deny.toml` 的 allow 列表已含两者）：产品路径只解码，测试用它的编码器造夹具，于是断言比的是真 PNG 字节而不是一份没人能复核的固定串。
+依赖 `png`（MIT OR Apache-2.0，`deny.toml` 的 allow 列表已含两者）：产品路径只解码，测试用它的编码器造夹具，于是断言比的是真 PNG 字节而不是一份没人能复核的固定串。
 
 ### 19-5 `browser::devloop` 消费 `look` 的判定
 
 `DevLoop::observe` 已经吃 `Observation { text, complained }`；要的是**接线而非新判定**：`browser` 工具的 `snapshot` 动作产出的那段文本就是 `text`，`console` 里出现过 error 级别的条目就是 `complained`，于是「改一处、看一眼、再决定」在工具层闭合，`Step` 作为工具结果回给模型。判定本身一个字不改——已有机制复用是这里的正解。
 
-### 19-6 验收（追加到 §2）
+### 19-6 动作面的验收
 
 | 单元 | 完成的定义 |
 |---|---|
@@ -297,34 +291,22 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 | usersbrowser | 工具名取 `ToolName::USER_BROWSER` 一个权威；未声明地址的楼每次调用都得到门的问题；声明了地址的楼其 effect 带该主机；`usersbrowser` 与 `browser` 是两个设置；confidential 楼在 `city::policy` 即拒 |
 
 
-### 19-7 尚未验证的部分
+### 19-7 对真浏览器核过的部分
 
-**一次真会话已经跑过，§19-2 里那三条疑问全部关闭**（对 Gecko）：`session.new` 接受空能力集；`script.evaluate` 的回复是 `result.result = { type, handle, sharedId, value }`，`sharedId` 就在这一层，`shared_id_of` 的有界查找找到它；`browsingContext.captureScreenshot` 的 `format.type` 收 `image/png` 这一拼写。元素裁剪也随之落地：`clip.type = "element"` 收由 `script.evaluate` 回复里取出的 `sharedId`，回来的图正好是该元素的框。
+**对 Gecko 的一次真会话核过了 §3 的协议形状**：`session.new` 接受空能力集；`script.evaluate` 的回复是 `result.result = { type, handle, sharedId, value }`，`sharedId` 就在这一层，`shared_id_of` 的有界查找找到它；`browsingContext.captureScreenshot` 的 `format.type` 收 `image/png` 这一拼写。元素裁剪也随之落地：`clip.type = "element"` 收由 `script.evaluate` 回复里取出的 `sharedId`，回来的图正好是该元素的框。
 
-**仍然未定的一件事**：上界怎么在不拒的情况下生效。那次会话量到的 `imageSize` 行为是**原样忽略**（§19-3），所以今天超上界是一句拒绝。要不拒就只能在捕获前改 `devicePixelRatio`，而那要先把"页面可能因它重排"当作已知代价写下；另一个方向是先把区域量准（矩形臂已知，元素臂要页面报框），再据此算比例。两者的参数都写在 §19-3 那两条里。
+同一次会话量到驱动**原样忽略** `imageSize`，所以上界靠 §19-3 的重拍生效：超界时按实测长边算比例重拍一次，仍超界才拒。
 
-- **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`。这一位由哪一面提供尚未定：候选是楼的 `CONFIG.toml` 与派活帧的一个字段。
+- **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`；由哪一面提供见 §3。
 - **引擎的名字不止一个，而且已经是查表**：`host::firefox` 走的是 `doctor` 的 `gecko` 条目（`Need::OneOf(Group::BrowserEngine)`），家族表里有 firefox、zen、librewolf、waterfox、floorp、firefox-developer、firefox-nightly、tor-browser 八行，`SPRAWLING_BROWSER` 可压过其一；`Engine::choose` 的参数只是叫 `firefox`，取的是这条答案的路径——所以一个只有 fork、没有 Firefox 的机器是可起的。**仍未定的只是：某个具体 fork 是否接受本 crate 的启动参数与会话形态**，而那要在那个 fork 上真的起一次会话才算数。
 
-### 19-8 `browser::input`（新模块，形状 1 判定）
+### 19-8 `browser::input`（形状 1 判定）
 
 BiDi 的 `input` 是 `script` 之外的另一个协议模块，本 crate 之前全走 `script.evaluate`。指针动作要说明它从哪开始，而 BiDi 的元素 origin 用页面自己的 shared id 而不是选择器，于是元素起点的拖拽在线上是**两帧**：`act::resolve_frame` 让页面报出元素，`input::shared_id_of` 从回复里读出 id，`input::pointer_frame` 再发 `input.performActions`。`Verb::frames` 只发第一帧，工具在 `invoke` 里补第二帧——判定仍在纯代码里，`Recording` 能逐帧重放。
 
 `Scroll` 与 point 起点的 `Drag` 都没有元素，不进 `Action::reference()` 的形状；那个方法因此是 `Option<&str>`，`resolves_element()` 说明哪一臂要多一帧。
 
 **与 `desktop.act` 同一份词汇**：`drag` 从 ref 或 point 到 point、`scroll` 用 `to` 表示滚多远、`steps` 为中间移动次数；两侧字段名与含义逐字相同（`desktop-SPEC.md` §8-4 指向本节）。同一个动作在浏览器侧与桌面侧各有一个家会立刻漂开，所以拖拽的形状只有一份。
-
-### 19-10 `browser::survey`（量具毕业进工具，形状 1 判定）
-
-一页哪里画错了，由**一份测量、一套判决**回答，而这一份同时是 `xtask render` 这道门和 `browser` 工具的 `survey` 动作所读的东西。它先在 `xtask` 里长成，在那里把自身的假阳性从 24 条清到 0；毕业进产品 crate 的理由不是它变好了，而是**门与工具原本会各留一份**，而两份会分叉到「门说页面是干净的、住户说页面是坏的」而二者各自诚实。
-
-- **一份测量，两种取回**。`survey::probe::body` 是那段注入页面的 ES5，返回三个字符串（元素、声明的词、绘制条件）。门渲染一次并 dump 整个 DOM，所以它把三串写进三个 `<pre>`；住户勘察的是人自己打开的页面，**不许往那页面上加任何东西**，所以 `probe::evaluated` 把同一段包进一个 promise，三串作为一次 `script.evaluate` 的值回来（`awaitPromise` 本就是开着的）。两条路读的是同一个 `probe::Read`。
-- **`Verb::Survey` 是新的一臂，不是 `Measure` 的扩展**。`Measure { references }` 回答「我点名的这几个节点在哪」，取的是调用方给的引用；survey 不接引用、读整页、返回判决。合成一个臂会让 `references` 在一半调用里恒为空，那是「一个参数被接受然后丢掉」。
-- **主题由调用方决定，而住户不决定**。`body` 收 `Option<&str>`：门为每一个 pass 强制一个主题并据此断言页面照办，住户传 `None`——勘察一个别人打开的页面时强制主题，报的就是没人看过的那一页。同理 `PaintSource`：门按它要求的 pass 给，住户按页面自陈的 `forced-colors` 给。
-- **源码索引在有源码树的那一侧**。`Sources` 的查找（最长字面量匹配）随判决进产品 crate，**走一遍源码树的那一步留在 `xtask`**——产品二进制身边没有仓库。住户得到的每条发现因此只点名盒子、不点名行号，而这是诚实的空状态，不是缺陷：`Sources::default()` 正是为这一天实现的。
-- **答一个字符串，不拆成载荷**。`survey` 动作的结果是 tagged 形态的整份报告（一个 `<edit>` 一处修复、一个 `<at>` 一个落点）。把它拆成结构化载荷等于给同一份报告第二种渲染。
-- **量具自身的两条真缺陷记在这里**，免得下一个人重新发现：`SLACK` 在 observed 路径上从未被应用（十一条假阳性出自这一个 off-by-one）；群体定义有范畴错误——它对所有 holder 都比左右缘，而一行里并排的盒子右缘近似相等纯属巧合，现在先从几何读出容器的堆叠方向，只比容器不分发的那一轴。
-- **一条没做的，明写**：行容器的**交叉轴没有扫**。一行把子元素约束在一条带里，但带里的位置由 `align-items` 决定，本库到处用居中，于是两个不同行高的子元素**按设计**就有不同顶缘。扫过一次，5 条假阳性变 15 条。要正确读它得比较顶／中／底里多数实际持有的那一个，**那是这把尺子还没有的读数**。
 
 ### 19-9 `usersbrowser`（工具，装配层）
 
@@ -334,3 +316,15 @@ BiDi 的 `input` 是 `script` 之外的另一个协议模块，本 crate 之前�
 - **恒不关人的浏览器**：附着的端口（`bin::browser_bidi::attach::AttachedBrowser`）只连、不启动、不结束进程；`Verb::Close` 结束的是一次会话，进程还在。附着是会话级、绑一个 run，run 一结束套接字随工具一起 drop。
 - **入账**：附着是工具的第一次调用，与之后每个动作一样写 `tool_called`／`tool_result`；`disclosure` 写明它需要人先批准并引导先用 `browser`，`params` 给出动作的读法（§19-6 的 usersbrowser 行）。
 - **平台的门就是授权**：Firefox 走 `--remote-debugging-port`、Chromium 走驱动，两者都要求人的动作；这不是我们加的仪式，是平台留下的授权面。地址是否 loopback 由 `gate::attach` 判：非 loopback 的声明被拒，因为那会把登录态读过一个网络。
+
+### 19-10 `browser::survey`（量具，形状 1 判定）
+
+一页哪里画错了，由**一份测量、一套判决**回答，而这一份同时是 `xtask render` 这道门和 `browser` 工具的 `survey` 动作所读的东西。它住产品 crate，因为门与工具各留一份就会分叉到「门说页面是干净的、住户说页面是坏的」而二者各自诚实。
+
+- **一份测量，两种取回**。`survey::probe::body` 是那段注入页面的 ES5，返回三个字符串（元素、声明的词、绘制条件）。门渲染一次并 dump 整个 DOM，所以它把三串写进三个 `<pre>`；住户勘察的是人自己打开的页面，**不许往那页面上加任何东西**，所以 `probe::evaluated` 把同一段包进一个 promise，三串作为一次 `script.evaluate` 的值回来（`awaitPromise` 本就是开着的）。两条路读的是同一个 `probe::Read`。
+- **`Verb::Survey` 是新的一臂，不是 `Measure` 的扩展**。`Measure { references }` 回答「我点名的这几个节点在哪」，取的是调用方给的引用；survey 不接引用、读整页、返回判决。合成一个臂会让 `references` 在一半调用里恒为空，那是「一个参数被接受然后丢掉」。
+- **主题由调用方决定，而住户不决定**。`body` 收 `Option<&str>`：门为每一个 pass 强制一个主题并据此断言页面照办，住户传 `None`——勘察一个别人打开的页面时强制主题，报的就是没人看过的那一页。同理 `PaintSource`：门按它要求的 pass 给，住户按页面自陈的 `forced-colors` 给。
+- **源码索引在有源码树的那一侧**。`Sources` 的查找（最长字面量匹配）随判决进产品 crate，**走一遍源码树的那一步留在 `xtask`**——产品二进制身边没有仓库。住户得到的每条发现因此只点名盒子、不点名行号，而这是诚实的空状态，不是缺陷：`Sources::default()` 正是为这一天实现的。
+- **答一个字符串，不拆成载荷**。`survey` 动作的结果是 tagged 形态的整份报告（一个 `<edit>` 一处修复、一个 `<at>` 一个落点）。把它拆成结构化载荷等于给同一份报告第二种渲染。
+- **量具的两条规则**：容差 `SLACK`（1 px）在每一次缘比较上都加；群体先从几何读出容器的堆叠方向，只比容器不分发的那一轴，因为一行里并排的盒子右缘近似相等纯属巧合。
+- **行容器的交叉轴不扫**：一行把子元素约束在一条带里，但带里的位置由 `align-items` 决定，本库到处用居中，于是两个不同行高的子元素**按设计**就有不同顶缘；按左右缘的读法去扫会报出一批假阳性。要正确读它得比较顶／中／底里多数实际持有的那一个，这把尺子还没有这个读数（§3）。

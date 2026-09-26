@@ -582,9 +582,8 @@ fn a_query_never_carries_an_idempotency_key() {
 /// Narrowing history to one session survives the wire, and stays a
 /// different frame from the unfiltered slice.
 ///
-/// The two used to be one question, and the consequence was a page:
-/// four sessions divided one bounded slice between them, so a session
-/// older than that slice opened blank.
+/// Asked as one question, four sessions would divide one bounded slice
+/// between them, and a session older than that slice would open blank.
 #[test]
 fn asking_for_one_session_is_a_different_frame_from_asking_for_the_city() {
     let run = kernel::RunId::from_bytes([4u8; 16]);

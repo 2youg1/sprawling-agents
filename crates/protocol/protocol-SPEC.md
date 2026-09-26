@@ -25,7 +25,7 @@
 
 ## 4 现状分析
 
-此前 `crates/protocol/src/` 只有 `lib.rs`。`kernel::tool` 缝与 taint 环已在，本 crate 只需落在它们上面。
+两个模块：`mcp`（出站：握手、工具表、三种传输、消息上限、broker）与 `acp`（入站：外部编辑器的请求文法）。生产消费者是 `crates/sprawling`：`assembly::mcp` 按楼的配置连 server 并把连接留给后来的派活（常驻连接），`assembly::workbench::servers` 把工具注册进 bench，`views::mcp_health` 用同一个 `McpLink` 探一台 server 的健康。
 
 ## 5 权威信源
 
@@ -37,8 +37,6 @@
 | 删除协议级 session、新增 `server/discover` | <https://modelcontextprotocol.io/specification/2026-07-28/changelog> |
 
 ## 6 命名统一
-
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
 
 `Connector` 是词汇表里这层的统称；代码里出现的是它的两个具体面 `McpTool` 与 `Incoming`。**恒不**把 MCP server 叫作 endpoint——`Endpoint` 在本库专指 external provider 网关。
 
@@ -60,10 +58,11 @@
 // 而一个不回答的 server 是把整个 Run 挂死的最短路径。
 // `notify`：一条通知没有答案。HTTP 上它被 202 加空体应答，
 // 把它当请求读的客户端会因为对侧「什么都没说」而拒掉一台正确的 server。
-pub trait Outbound {
+pub trait Outbound: Send {
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError>;
     fn notify(&mut self, line: &str, patience: TimeoutMs) -> Result<(), AxError>;
 }
+pub const EXTERNAL_CALL_PATIENCE: TimeoutMs = TimeoutMs(60_000);
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
 pub struct Handshake { pub protocol_version: String, pub server: String }
 pub fn handshake(out: &mut dyn Outbound, rpc: &mut Rpc, patience: TimeoutMs)
@@ -73,19 +72,24 @@ pub fn digits_for_floats(value: Value) -> Value;
 // 一个类型两条导入路径就是一个类型两个住址。
 pub struct Rpc { /* next: u64 私有 */ }
 impl Rpc {
-    pub fn initialize(&mut self) -> String;      // 取代 discover
+    pub fn new() -> Rpc;
+    pub fn initialize(&mut self) -> String;
     pub fn initialized() -> String;              // 通知，无 id
     pub fn list_tools(&mut self) -> String;
     pub fn call_tool(&mut self, name: &str, arguments: &Value) -> Result<String, AxError>;
     pub fn read(line: &str) -> Result<Value, AxError>;
 }
-pub fn tools_from(server: &ServerLabel, result: &Value) -> Result<Vec<ToolMeta>, AxError>;
-pub struct McpTool { /* 私有 */ }
+pub struct Listed { pub remote: String, pub meta: ToolMeta } // 一件工具的两个名字，一起走
+pub fn tools_from(server: &ServerLabel, result: &Value) -> Result<Vec<Listed>, AxError>;
+pub struct McpTool { /* 私有：meta、remote、patience、Mutex<Link>（Rpc 与 Outbound） */ }
 impl McpTool {
     // 无期限的 meta 在构造点即拒——一件没有期限的出站工具就是一件可以挂死 Run 的工具。
     pub fn new(meta: ToolMeta, remote: String, outbound: Box<dyn Outbound>, confidential: bool)
         -> Result<McpTool, AxError>;
+    pub fn remote(&self) -> &str;
 }
+// Tool::invoke 取 &self：Rpc 的 id 与它编号的连接是同一把锁，
+// 答案从请求出去的那条连接上读回，所以同一台 server 的两次调用轮流走。
 pub struct ScriptedOutbound { /* 私有 */ }                                          // 第二适配器
 
 // 8-1b 外部输入的消息上限（形状 1 判定；见 §8-15）
@@ -103,19 +107,17 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 8-3 生命周期与会话
 
-**缺陷所在**：本 crate 开场发的是 `server/discover`——**MCP 根本没有这个方法**。一台托管 server 对这座城说的第一句话回的是 `-32601: Method not found`。
-
-按规范改正（引 2025-06-18 Transports 与 Lifecycle 两篇的规范句）：
+依据是 2025-06-18 修订版 Transports 与 Lifecycle 两篇的规范句：
 
 - **开场必须是 `initialize`**，携 `protocolVersion`、`capabilities`、`clientInfo` 三项；随后必须发 `notifications/initialized`，之后才能问别的。故 `handshake()` 是这条生命周期的**唯一权威**，坐在两个传输之上——两个传输各写一遍就是两份会漂的生命周期。
 - **`capabilities` 故意为空**：roots／sampling／elicitation 是 server 反过来向**我们**要的能力；声明一项本城没实现的能力，等于招来一个随后只能拒的请求。
 - **会话住传输层，不住本 crate**，因为规范把它写在 Transports 而不是 Lifecycle：server **可选**在 `initialize` 应答的头里发 `Mcp-Session-Id`；一旦发了，客户端 **MUST** 在此后每一次请求带回。404 意味着 server 结束了会话，**MUST** 重开一个——故 `protocol::mcp::http` 遇 404 丢掉 id，而不是拿一个已死的 id 永远碰下去。带着会话 id 的 404 标 `retriable`：按规范 server 对已结束会话的请求一律答 404，调用没有被执行，下一次派遣先重开会话；不带会话 id 的 404 标不可重试，它说的是地址不对，再问只得到同一个答。
 - **已知的向前变化**：更新的修订正在把会话去掉（SEP-2575）。本客户端协商的是 `2025-06-18` 并按那一版行事；一台忽略该头的 server 不会因此变得不可用。
-- **实测得到的一条**：一台在 CDN 后面的托管 server 对**不报名的客户端**回 403 `browser_signature_banned`，早于任何 MCP 消息。故 HTTP 传输带自己的 User-Agent。
+- **HTTP 传输带自己的 User-Agent**：CDN 后面的托管 server 可能对不报名的客户端回 403 `browser_signature_banned`，早于任何 MCP 消息。
 
 ### 入向浮点：治我们发的，适应我们收的
 
-`digits_for_floats` 把对侧答案里的小数**原样写成字符串**。真机证据：第一台被接上的搜索 server 连续四次调用全部死在一个相关度分 `1249.4` 上，模型随后开始乱抓工具。三条理由：① 禁浮点是 **Ledger 的**规矩（确定性第 6 条），不得放松；② 拒掉整个答案等于声明本城接不了任何真实的搜索 server；③ 丢掉该字段是隐形地删别人的数据。写成字符串**不丢一位数字、不做任何算术**，且在 Ledger 里看得见（带引号的数）。与 `call_tool` 拒掉携浮点的**入参**并不矛盾：本城治自己发出去的，适应自己收回来的。
+`digits_for_floats` 把对侧答案里的小数**原样写成字符串**。搜索类 server 的答案常带相关度分之类的小数；Ledger 不收浮点，照搬就会让每一次调用都以 `E_INVALID_ARGS` 失败。三条理由：① 禁浮点是 **Ledger 的**规矩（确定性第 6 条），不得放松；② 拒掉整个答案等于声明本城接不了任何真实的搜索 server；③ 丢掉该字段是隐形地删别人的数据。写成字符串**不丢一位数字、不做任何算术**，且在 Ledger 里看得见（带引号的数）。与 `call_tool` 拒掉携浮点的**入参**并不矛盾：本城治自己发出去的，适应自己收回来的。
 
 ## 8.5 两个设计
 
@@ -125,7 +127,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 9 工作流程
 
-**出站**：装配层拉起 server 子进程 → `Rpc::discover` → `Rpc::list_tools` → `tools_from` → catalog 与 bench 各注册一次（工具表随 Run 冻结）→ 模型调用 → `McpTool::invoke` → `call_tool`（浮点检查）→ `Outbound::call` → `Rpc::read` → `ToolOutcome`（污染态）→ 装配层落 `tool_called`／`tool_result`。
+**出站**：装配层按楼的配置取一条 `McpLink`（先找常驻的，子进程已退出时 `McpLink::open` 新开）→ `handshake`（`initialize` → `notifications/initialized`）→ `Rpc::list_tools` → `tools_from` → catalog 与 bench 各注册一次（工具表随 Run 冻结）→ 模型调用 → `McpTool::invoke` → `call_tool`（浮点检查）→ `Outbound::call` → `Rpc::read` → `ToolOutcome`（污染态）→ 装配层落 `tool_called`／`tool_result`。
 
 **入站**：`channels` 的入站中间件先与这座城的配对令牌常数时间比对（`channels::auth`，未配对即在路由层被拒）→ 装配层收 HTTP／stdio 请求 → `Incoming::parse` → `admit` → `Admitted::Dispatch` → 走与人相同的 `Command::Dispatch` 路径 → 期间回 `Progress`。
 
@@ -165,7 +167,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 15 影响面
 
-新增 crate，无既有调用方。装配层接线时波及：子进程管理、catalog／bench 注册、`city::policy` 的 confidential 与 egress 允许表、`channels::auth` 的配对比对。
+改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/sprawling` 的 `assembly::mcp`、`assembly::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `channels::auth` 的配对比对。
 
 ## 16 测试与约束
 
@@ -177,19 +179,25 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 18 文档同步
 
-`ARCHITECTURE.md` §3 缝清单（`Outbound` 一行）与 §6 protocol 两行｜`docs/third-party.md` §二（服务外挂的四条边界）｜装配层接线时同步 §6 末接线台账。
+`ARCHITECTURE.md` §3 缝清单（`Outbound` 一行）与模块表的 protocol 各行｜`docs/third-party.md` §二（服务外挂的四条边界）。
 
-### 8-15 外部输入通道的消息上限（K-06／F-18）
+### 8-15 外部输入通道的消息上限
 
 **缺陷所在**：stdio reader 用 `BufReader::lines()`，遇到换行前无限增长一个 `String`；承载答案的 `mpsc::channel()` 又是无界的。MCP server 是 `CONFIG.toml` 指进来的外部方，其输出是不受信任的输入，而读它的进程同时是这座城**唯一的写者**——内存耗尽等于历史中断，不是一次工具调用失败。
 
 三条决定：
 
-1. **上限不是参数。** 路线图 K-06 记的签名是 `read_one_message(reader, ceiling)`；本 SPEC 改为 `read_one_message(source, server)`，上限取自 `MESSAGE_CEILING`。理由：一个可以由调用方选的上限，就是每个传输各选一个的上限，而拒词必须对每一台 server 报出同一个数字。测试用真实大小的输入压两边边界，不靠注入一个小上限。
+1. **上限不是参数。** 签名是 `read_one_message(source, server)`，上限取自 `MESSAGE_CEILING`，不由调用方传入。理由：一个可以由调用方选的上限，就是每个传输各选一个的上限，而拒词必须对每一台 server 报出同一个数字。测试用真实大小的输入压两边边界，不靠注入一个小上限。
 2. **数值是推导来的，不是拍的。** `IMAGE_MAX_BYTES` 是 2 MiB，base64 后 2,796,203 B；8 MiB 让一次工具答案装得下这样一张图、它的文字与 JSON-RPC 信封，对本城已接受的最大载荷留 3 倍余量。读数与推导记在 `xtask/budgets.toml` 的 `[mcp_message_ceiling]`，值本身只有 `MESSAGE_CEILING` 一个家。
-3. **拒绝是终止性的，不是跳过一条。** 超限消息未读完的尾巴与下一条消息在字节上无从分辨，所以拒绝之后调用方**恒不**再从同一个 source 读；装配层回收子进程。`Received` 是穷尽枚举而非 `Option<String>`：「对侧关了输出」是调用方要据以停读的状态，用缺席表示它就等于让每个调用点各自重推一遍。
+3. **拒绝是终止性的，不是跳过一条。** 超限消息未读完的尾巴与下一条消息在字节上无从分辨，所以拒绝之后调用方**恒不**再从同一个 source 读；传输回收子进程。`Received` 是穷尽枚举而非 `Option<String>`：「对侧关了输出」是调用方要据以停读的状态，用缺席表示它就等于让每个调用点各自重推一遍。
 
 **同集的另一半住传输**（`mcp::stdio`、`mcp::http`、`mcp::sse`）：reader 线程改调 `read_one_message`，`mpsc::channel()` 换 `sync_channel(N)`——无界队列在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态；HTTP 那条用 `take(MESSAGE_CEILING)` 包住响应体。
+
+### 8-16 常驻连接
+
+一次连接的开销是每台 server 两次有应答的请求（`initialize`、`tools/list`）加一条通知（`notifications/initialized`），由 `mcp::handshake` 的 `opening_one_connection_costs_two_round_trips_and_one_notification` 用一个计数 `Outbound` 钉住。断言的是条数而不是时间：条数在每台机器上相同。本 crate 为这三条消息花的 CPU 远小于子进程启动与两次往返，而后两者属于传输。
+
+所以本 crate 不持连接表：`McpLink` 可 clone，寿命由持有者决定。持有者是装配层的 `assembly::mcp::Residents`，它把一台 server 的连接与工具表留给后来的派活，子进程退出（`McpLink::has_ended`）时才重开。派活在这一步花的时间记在 `xtask/budgets.toml` 的 `[prepare_dispatch_ms]`。
 
 ### 8-17 三种传输与 `McpLink`（形状 4 适配器；实现 `Outbound`）
 
@@ -201,6 +209,7 @@ impl McpLink {
     pub fn open(transport: &kernel::McpTransport, write_root: &Path,
                 resolve: &gateway::SecretResolver) -> Result<McpLink, AxError>;
     pub fn site(transport: &kernel::McpTransport) -> &'static str; // 出事时该打开的模块
+    pub fn has_ended(&self) -> bool; // 子进程已退出：持有者据此重开
 }
 impl Outbound for McpLink { /* 逐传输转发 call／notify */ }
 // mcp::stdio::StdioServer、mcp::http::HttpServer、mcp::sse::SseServer：pub(crate)
@@ -209,6 +218,8 @@ impl Outbound for McpLink { /* 逐传输转发 call／notify */ }
 pub fn echoing(answer: &str) -> (String, Vec<String>); // 对每行都回同一个结果的子进程
 #[cfg(feature = "conformance")] // 只有装配层的测试用它
 pub fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>); // 握手在 gate 文件出现前不作答
+#[cfg(feature = "conformance")]
+pub fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>); // 每次启动在 starts 里记一笔
 ```
 
 - **传输住协议旁边，不住组合根**：三种传输与握手说同一个协议，差别只在字节去哪。放在装配层时，`protocol` 定义了 `Outbound` 缝却看不见它的生产实现；组合根只剩「一栋楼按配置连哪几台 server」（`bin::assembly::mcp`）。拒绝的另一方案是把传输留在 `sprawling`、只搬 `McpLink`：那样 `McpLink` 的三个分支仍指向另一个 crate 的私有类型，搬不动。
@@ -238,23 +249,3 @@ pub enum Connection { Absent, Awaiting { consent_url: String }, Connected { alia
 - **只有一家 broker，所以没有 trait**：第二家外包服务才是这条缝的第二个实现。
 - 失败码：401／403 抬 `E_CREDENTIAL_MISSING`；408／429／5xx 抬可重试的 `E_PROVIDER`；连接阶段超时抬可重试的 `E_PROVIDER`（请求还没离开这台电脑）；请求发出之后等答超时抬 `effect_unknown` 的 `E_PROVIDER`，因为 `connect` 会在 broker 那边建一份 auth config，重发可能建出第二份；2xx 之后 body 读不完（连接在答案中途断开）同样抬 `effect_unknown` 的 `E_PROVIDER`，subject 带读不出的原因——broker 已经照做了，丢的只是答案；非 2xx 的 body 读不出时，读不出的原因代替 body 作附近文字；其余状态、读不出的答案与接不上 base 的路径抬 `E_PROVIDER`。接不上的路径在 recovery 里报出本模块的路径（`module_path!()`），模块再搬家也不漂。
 - 字段按防御方式读：缺一个字段少一行，不毁整张答案；测试里的假 server 是本 crate 对 broker 所发内容的陈述。
-
-### 8-14 protocol 目录化（形状：主类型居索引，方法按簇归文件）
-
-`mcp.rs`（823）→ `mcp/handshake.rs`（`Handshake`／`Rpc`／`handshake`＋`PROTOCOL_VERSION`）／
-`mcp/tools.rs`（`Listed`／`McpTool`／`tools_from`，`float_at` 开 `pub(crate)` 供 handshake 用）／
-`mcp/outbound.rs`（`Outbound`／`ScriptedOutbound`／`digits_for_floats`＋`EXTERNAL_CALL_PATIENCE`）。
-跨文件私有项开 `pub(crate)`，对外签名逐字节不变。
-
-### 8-16 一次连接要花什么，以及常驻连接表要等哪个数字（K-05）
-
-**先量，再决定。** 路线图 K-05 主张 `RunWorker` 持一张常驻 `McpLink` 表，理由是每一次派活都重拉子进程并重做握手。本 crate 能量的那一半已经量了，记在此处，另一半不在本 crate。
-
-| 读数 | 值 | 怎么来的 |
-|---|---|---|
-| 每台 server 每次连接的消息数 | 2 次有应答的请求（`initialize`、`tools/list`）＋1 条通知（`notifications/initialized`） | `mcp::handshake` 的 `opening_one_connection_costs_two_round_trips_and_one_notification`，用一个计数 `Outbound` 数出来 |
-| 本 crate 为这三条消息花的 CPU | debug 33 µs／release 7 µs（每次连接，100 次取均值，Windows 11 开发机） | 一次性测量：在同一条测试里临时用 `Instant` 计时，读数记在此处后撤走。**计时不留在树里**——`clippy.toml` 对测试也禁 `Instant::now`，而跨机器可复现的读数是消息条数，不是微秒 |
-
-**这两个数字说明的事**：常驻连接表要省的不是本 crate 的时间。拼一行 JSON-RPC 与读一行答案在 release 下是 7 µs，一台 server 三条消息合计仍不到 10 µs；省下来的是**子进程启动**与**两次 stdio 往返**，两者都属于传输（见 §7），而是否常驻由持有连接的装配层决定。
-
-**因此本 crate 不动**：`Outbound` 缝已经允许一条连接活得比一次 drive 长（`McpLink` 可 clone，寿命由持有者决定），常驻表是持有者的决定，不是文法的决定。要不要做这张表，取决于装配层量出的那个数字——在 `crates/sprawling/src/assembly/dispatching/running.rs` 的 `prepare_dispatch` 里记一次 `mcp_tools` 的耗时，写进 `xtask/budgets.toml` 的 `prepare_dispatch_ms`（K-07 已为它留了行）。**没有那个数字之前，连接表不做。**

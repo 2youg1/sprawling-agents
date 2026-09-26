@@ -63,7 +63,7 @@ pub enum Command<Secret = Sealed<String>> {
         /// model the city registered under some tag, so it arrives with
         /// the endpoint and the window it was registered with; an id the
         /// city never registered is refused before anything is written
-        /// (channels-SPEC.md section 8-48).
+        /// (channels-SPEC.md section 8-48c).
         model: Option<String>,
     },
     /// One step of a subscription login. Which step is named rather
@@ -77,9 +77,9 @@ pub enum Command<Secret = Sealed<String>> {
     },
     /// Asks a base URL what it serves, and attaches nothing.
     ///
-    /// A person cannot choose from a list they have not seen, and the
-    /// list used to arrive only as a side effect of attaching - so
-    /// looking at what a key buys meant registering it first. The answer
+    /// A person cannot choose from a list they have not seen, and a list
+    /// that arrived only as a side effect of attaching would mean
+    /// registering a key before looking at what it buys. The answer
     /// lands as `endpoint_probed`, which the page folds like any other
     /// fact about this city.
     ///

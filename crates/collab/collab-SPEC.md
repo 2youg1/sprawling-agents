@@ -6,37 +6,41 @@
 
 ## 1 需求分解
 
-本 crate 是「两个 Agent 在同一栋楼里干活而不互相踩」的机械层。每个模块落地时先补齐本文对应章节（接口先行）：
+本 crate 是「两个 Agent 在同一栋楼里干活而不互相踩」的机械层。
 
 | 模块 | 这个模块回答的问题 |
 |---|---|
-| `inbox`、`steer` | 一条消息怎么从一个 Agent 到另一个，而重复投递不会变成重复副作用 |
-| `workshop`、`fanin` | 一件活拆成多个节点后，谁按什么序跑、结果怎么收回来 |
-| `pr` | 写代码的人不验自己的代码，这件事由什么强制 |
+| `inbox`、`steer` | 一条消息怎么从一个 Agent 到另一个，而重复投递不会变成重复副作用（§8-1、§8-2） |
+| `workshop`、`fanin` | 一件活拆成多个节点后，谁按什么序跑、结果怎么收回来（§8-4、§8-5） |
+| `pr` | 写代码的人不验自己的代码，这件事由什么强制（§8-6） |
 | `arbiter` | 两个 Agent 不同意时，升到哪里（§8-7） |
-| `signal_tool`、`goal_tool` | 上面六个机制怎么变成 Agent 手里真能调的东西（§8-8、§8-9） |
+| `delegate_tool`、`handback` | 派一个代理去一个房间，以及它的结果怎么回到父房间（§8-8b、§8-8c） |
+| `signal_tool`、`goal_tool`、`workshop_tool` | 上面的机制怎么变成 Agent 手里真能调的东西（§8-8、§8-9、§8-4b） |
 | `pr_tool` | 开 PR 与 worktree 为根的 Run（§8-10） |
 | `triage` | 一条外来信号该送到哪个 Address（§8-11） |
+| `claim_tool`、`claim_effect` | 认领、结项、拆分 `Roadmap.md` 上的一个节点（§8-12、§8-21） |
+| `archive_tool` | 把一条偏好、决定、更正或事实记上书架（§8-20） |
+| `citation` | 一条引文是否仍然指着被钉住的那份原文（§8-22） |
 
 ## 2 验收标准
 
-验收标准写在 ARCHITECTURE.md §10 的收口栏，本文在模块落地时把它展开成断言名。**本节现在空着是事实而非疏漏**：一个未施工模块的验收标准写在接口存在之前，只会在施工时被改掉。
+每个模块的验收是它 §8 小节里的规则，各由模块旁的 `tests.rs` 经生产入口断言；两条判负线（`Artifact` 无公开构造子、未验证的 PR 合不进来）由 `tests/ui/` 的编译失败反例钉住，`tests/pr_flow.rs` 从外面走一遍开 PR、被拒、合并。
 
 ## 3 假设与歧义
 
 一层深（delegate 值上无 delegate 方法）已在 `kernel::delegation` 定谳，本 crate 只把它当作前提，不重议它。
 
+**未定：验证节点**。今天 `Handback::of` 收一个 `done_check_passed: bool` 与验证者的名字，装配层以 `CITY_VERIFIER` 为验证者（`crates/sprawling/src/assembly/dispatching/handback.rs`）。要定的是：验证是否改由另一地址上一个全新会话跑 `done_check` 后才铸 `Artifact`；验证者是否不得是图中任何实现者、改了代码须第三方再验；JOB 是否钉住被审文档的 Locator。能定下它的证据是一条测试：子 run 以 Done 结束而 `done_check` 失败时不铸 `Artifact`。
+
 ## 4 现状分析
 
-`collab` 目前是空壳（只有 `lib.rs` 的 crate 文档）。它要消费的 kernel 判定面已建已测而仍无生产消费者：`kernel::goal`（同资源相斥）、`kernel::repair`（repair lease）、`kernel::delegation`（delegate 两类）。接线台账（ARCHITECTURE.md §6 末）指名本 crate 为它们的消费者。
+十七个模块（§1）。本 crate 消费 kernel 的判定面：`kernel::gate::spawn`（经 `delegate_tool`）、`kernel::goal::detect_conflict`（经 `arbiter`）、`kernel::delegation`、`kernel::PlanTree`（经 `claim_tool`）。生产消费者是 `crates/sprawling` 的装配层：`assembly::collaborating` 按房间保存 join、图与目标表，工人把各张桌子借给工具，在一轮活落地时取走效应并写账。
 
 ## 5 权威信源
 
 「多 Agent」的语义（一层深、干预五动词、**实现者不自测**、为什么赌多 Agent 的六条及其判负条件）；`architecture.toml` 里 collab 那些条目与 §9 七形状；`kernel-SPEC.md` 的 goal／repair／delegation 章。
 
 ## 6 命名统一
-
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。
 
 Signal｜Inbox｜Steer｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitration｜Triage。概念名一律英文原词；该用什么词见 `docs/glossary.md`，不该用什么词见 `xtask/lexicon.toml`。
 
@@ -48,11 +52,11 @@ Signal｜Inbox｜Steer｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitrati
 - **人的干预动词归 `channels::control`**：`Steer`／`Cancel`／`Halt`／`Release` 从人那侧进城已有入口；本 crate 的 `steer` 只管 **Agent 发给 Agent** 那一条通道——两条通道入口不同而落点相同。
 - **处置与监护归 `runtime::watchdog`**：停滞依据与纠正→冻结的升级梯已在那里，本 crate 不建第二套。
 
-**L2 工具为什么住在本 crate**：一件工具是 `kernel::tool` 缝的适配器，而适配器必须能命名它暴露的机制。依赖法写着 `runtime: kernel, memory, gateway`（ARCHITECTURE.md §2）——**runtime 恒不得指名 collab**，所以 `Signal` 与 `GoalEntry` 的工具面拼不进 `runtime::tools/`；放进 bin 则把四百行判定塞进全图最脏的那个文件且 citysim 测不到。故 L0 三件在 runtime，L2 协作三件在 collab；§3 缝清单的「生产适配器」列随之加一项。
+**L2 工具为什么住在本 crate**：一件工具是 `kernel::tool` 缝的适配器，而适配器必须能命名它暴露的机制。依赖法写着 `runtime: kernel, memory, gateway`（ARCHITECTURE.md §2）——**runtime 恒不得指名 collab**，所以 `Signal` 与 `GoalEntry` 的工具面拼不进 `runtime::tools/`；放进 bin 则把四百行判定塞进全图最脏的那个文件且 citysim 测不到。故 L0 三件在 runtime，L2 协作工具在 collab。
 
 ## 8 接口先行
 
-每个模块落地前先在本节开一个 `### 8-n <模块>（形状）` 子节，给出类型签名与它们为什么是这个形状，写法同 `city-SPEC.md` §8。
+每个模块一个 `### 8-n <模块>（形状）` 子节，给出类型签名与它们为什么是这个形状。
 
 ### 8-1 collab::inbox（形状 2 值类型＋形状 7 投影）
 
@@ -82,12 +86,12 @@ impl Inbox {
 - **读不回来的载荷在这条路上丢弃而不报错**，并写进了契约：调用点是一次 Run 的安全点，在那里除了“继续”的唯一替代选项是为别人的一条损坏条目停掉这一跑；同一条载荷仍然会在 `pull`（模型自己那扇门）上大声报错，所以事实不会消失。
 
 - **去重先于副作用**：去重由 `memory::EventQueue` 的 `seen` 给（IdemKey 由 `SignalId` 派生），而不在本模块再建一张表——一条规则一个权威。此事要成立，同一个 id 就必须恒落同一条 lane，**所以 lane 由 kind 推出、不由调用方给**。
-- **`SignalKind` 四值而非三值**（早先的设计记三值）：紧急与否必须是 Signal 自己的属性，否则同一件 Signal 从两个调用点进来会落入两条 lane，去重就有了两个权威。
+- **`SignalKind` 四值**：紧急与否必须是 Signal 自己的属性，否则同一件 Signal 从两个调用点进来会落入两条 lane，去重就有了两个权威。
 - **插队首＝一条先被排干的 lane**，不是队内优先级字段：一个结构里共存两种顺序，就会有人读错其中一种。
 - **pull bandwidth 在接收方**：发送方推不动接收方的上下文窗口；一次 `pull` 最多取 bandwidth 件，Signal 在 prefix 里恒占零字节，常驻的只是 `status` 的 `signals_pending`。
 - **洪水交给 backpressure**：`deliver` 返回 `kernel::Admission`，削峰判定住 `kernel::backpressure`，计数住队列；本模块不自定义第二套限流。
-- **`E_SIGNAL_UNKNOWN` 已定义掉**：本模块自写自读载荷，kind 是穷尽枚举，一个本版本不认的 kind 只能来自更新的二进制写的 Ledger，而那已由版本方向门（`E_LOG_VERSION_UNSUPPORTED`）拒在外面；同一句话里不认的 kind 在本版本写入面也拼不出来（`SignalKind::parse` 拒它，报 `E_INVALID_ARGS`）。实测佐证：删除前全仓只有 `kernel::error` 自己提到它，零生产者。实施：删 `AxCode::SignalUnknown`，AxCode 36 → 35，kernel-SPEC §8-1 表随之删行。
-- **两条线上形状各有一个 serde 结构（7.7）**：`signal_enqueued` 的键住 kernel 的 `SignalEnqueued`，`signal_consumed` 的两个键住 kernel 的 `SignalConsumed`，写经 `Payload::of`、读经 `Payload::read`，与其余 EventKind 的载荷同住一处；`Lane` 的推导（`Signal::lane`）留在本 crate。`lane` 仍然写出去给 crate 外的读者，但**回读时不采信**——它由 `kind` 推出，读一份存下来的副本就会让一条行说它走了另一条 lane。写在旧行上的读法不变：`lane` 缺席即照旧推出。
+- **`E_SIGNAL_UNKNOWN` 已定义掉**：本模块自写自读载荷，kind 是穷尽枚举，一个本版本不认的 kind 只能来自更新的二进制写的 Ledger，而那已由版本方向门（`E_LOG_VERSION_UNSUPPORTED`）拒在外面；同一句话里不认的 kind 在本版本写入面也拼不出来（`SignalKind::parse` 拒它，报 `E_INVALID_ARGS`）。所以 `AxCode` 没有 signal-unknown 这一码。
+- **两条线上形状各有一个 serde 结构**：`signal_enqueued` 的键住 kernel 的 `SignalEnqueued`，`signal_consumed` 的两个键住 kernel 的 `SignalConsumed`，写经 `Payload::of`、读经 `Payload::read`，与其余 EventKind 的载荷同住一处；`Lane` 的推导（`Signal::lane`）留在本 crate。`lane` 仍然写出去给 crate 外的读者，但**回读时不采信**——它由 `kind` 推出，读一份存下来的副本就会让一条行说它走了另一条 lane。写在旧行上的读法不变：`lane` 缺席即照旧推出。
 - **`Signal::from_payload` 是 `enqueued_payload` 的逆**：没有它，投影重建就要在仓库里长出第二份 Signal 解析器。重建方式是**先筛后送**：从 Ledger 收齐 `signal_enqueued` 与 `signal_consumed` 两组 id，只把未被消费的按原序 `deliver` 一遍——于是队列不需要「按 id 删除」这个不属于队列的动作。
 
 ### 8-2 collab::steer（形状 2 值类型）
@@ -111,21 +115,8 @@ impl AgentSteer {
 - **两个入口、一个落点**：人的 Steer 只从 control surface 进城，恒不走 Inbox；Agent 的 Steer 是一件插队首的 Signal。两者都追在下一次工具结果末尾，因为模型只需要认识一种形状。
 - **`user` 前缀只有一个构造子写得出**：`AgentSteer` 的 source 由它自己的 id 拼成 `@id`，故一件自称来自人的注入内容拼不出 `user`——入口分立是安全要求，类型把它变成判定。
 - **Steer 不打断动作**：它在安全点被消费并推进（`runtime::turn` 已定）；同一边界上 Cancel 压过 Steer，因为停是不可撤销的那个。本模块只产出落点形状，不重建中断梯。
-- **中断源先问人、再问本屋信箱**（`SignalDesk::take_steer`），**人压过居民**：装配层的 `interrupt_for` 曾只读人的命令队列，那时 `Steer::from_signal` 与整个 `AgentSteer` 是一套写好、测过却永远不会发生的机制。
+- **中断源先问人、再问本屋信箱**（`SignalDesk::take_steer`），**人压过居民**：只读人的命令队列的中断源会让 `Steer::from_signal` 与整个 `AgentSteer` 永远不会发生。
 - **属名就是回信地址，这是 `@id` 不能改成别的什么的理由**：模型在窗口里读到 `@market/hana:` 时，它读到的既是“这句话不是人说的”，也是 `signal` 的 `to` 参数该填什么。一个只标注“来自另一个 agent”而不给地址的前缀，会让回信变成猜测。
-
-### 8-3 collab::draft——已注销（H-05，本条不再有实现）
-
-本条原定义 `Draft`／`Return`／`HoldToken`／`Submission`／`Resolution`／`Drafts`：一条发言携着作者所见的 `room_version` 进房间，房间若已前进则退回作者，四路之一由作者选，`ForceInformed` 消费一枚绑定版本的服务端 hold token。实现连同它自己的测试模块一并删除，公开面 `collab::Draft`／`Drafts`／`HoldToken`／`Resolution`／`Return`／`Submission` 六项从 `lib.rs` 撤出。
-
-**注销的理由不是「没人调用」，而是它要防的那次冲突已经由两处各自解决，本条会成为第三个权威**：
-
-- **同一份文件的并发写**，由 `memory` 的 `base_version` 乐观并发与 worktree 隔离解决——那条路径有真实写者，且冲突落在文件而非发言上。
-- **同一件事的并发认领**，由 `kernel::goal` 的同资源相斥与 `collab::arbiter`（§8-7）的升级梯解决——两个 Agent 撞上时得到的是一条判定，而非一次重写机会。
-
-房间从未带过版本，这一点在代码里是可读的事实而非推测：`Signal` 的 `room_version` 在两个生产写点（`signal_tool`、`handback`）恒为 `Version::FIRST`，故本条的退回分支在生产里不可达。`Signal.room_version` 与 `kernel::consts_policy::DRAFT_HELD_ESCALATE` 在本次改动后失去唯一读者，清除它们要动 wire 键与 kernel 常量表，属另一条改动。
-
-**重开条件**：出现一个真的会前进的房间版本——即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值。届时正确的做法是让退回从那个写点长出来，而不是把本条原样恢复。
 
 ### 8-4 collab::workshop（形状 2 值类型＋形状 1 判定）
 
@@ -156,8 +147,8 @@ impl Underway {
 - **调度确定性是判负与重放的前提**：有序集合＋按 id 破平，故交付顺序不同也排出同一序。环在构造点拒并点名——一个存在的 Workshop 是一个跑得完的 Workshop。
 - **契约即 JOB.md**：被派入节点的 Agent 的任务权威就是这份契约本身，机制在 prefix 零常驻。
 - **四个字段不许空**（goal／owner／done_check／stop）：空的停止条件是一个不会停的 Run。
-- **图的权威是 `Roadmap.md`**，本模块不为节点图另设存储；从路线图行生成契约的那一步未建（四列表不携 `depends_on`）。
-- **生产者是 8-4b `workshop_tool`**：在此之前 `NodeContract` 与 `Workshop` 除自身文件外零调用者。
+- **图的权威是 `Roadmap.md`**，本模块不为节点图另设存储；从路线图行生成契约的那一步没有：路线图的表格不携 `depends_on`。
+- **生产者是 8-4b `workshop_tool`**。
 
 ### 8-4b collab::workshop_tool（形状 4 适配器）
 
@@ -182,7 +173,8 @@ pub struct WorkshopTool { /* 模型那一面：op ∈ {lay_out, question, judge}
 - **只派就绪集，`depends_on` 在运行时生效**：`lay_out` 交给派生台的是 `Underway::hand_next(done)`，即 `Workshop::ready(done)` 中这个房间尚未派过的节点，`done` 是这个房间的 join 已收下 Artifact 的节点。一个依赖未汇合的节点若也立刻派出，它读到的是还不存在的产出。工具的回答里 `schedule` 是整张图的序，`handed` 是这次真正派出去的那一组，其余节点在 `waiting` 里。
 - **下一组就绪集在 handback 到达时派出**：`lay_out` 摆出的 `Underway` 在 run 结束时由装配层收走，与这个房间的 join 并排按房间保存（`Collaborating.workshops`）。一个节点的 handback 汇入父房间的 join 之后，装配层对同一个 `Underway` 调 `hand_next`，新就绪的节点按上一个兄弟节点的派法（同一个父 run、同一个 mode）派进 lane；所有节点都汇合后这张图即删去。于是后来的 session 不必再摆一次图，工作也会继续。再摆同一张图仍然允许，但桌子带着这个房间的已派集开张，在飞的节点不会被再派一次；再摆出的 `Underway` 取代旧的那张。图只在内存里：进程重启后它不在了，这时由这个房间后来的某个 Run 再摆一次，join 已收下的节点被跳过。
 - **一个 Run 一张图**：第二次 `lay_out` 即拒，因为一个 session 里两张图是「这次在造什么」的两个答案。
-- **join 属房间而不属 Run**：子在父冻结之后才开，故 `FanIn` 由装配层按房间保存（`RunWorker.joins`），并与 inbox 折自同一批 `signal_enqueued` 行。`judge` 的围栏见 8-5：答案是 artifact 的全文，拒词恒不回显答案。
+- **动词是穷尽枚举**（`workshop_tool::op::Op`：`lay_out`／`question`／`judge`）：一个本版本不认的动词被拒绝，而不是舍入到无害的那个，因为这里无害的那个会静静丢掉一张有人要跑的图。两张桌子（`desk` 与 `delegates`）取锁失败时的拒词只有 `poisoned(which)` 一个家。
+- **join 属房间而不属 Run**：子在父冻结之后才开，故 `FanIn` 由装配层按房间保存（`Collaborating` 的 joins），并与 inbox 折自同一批 `signal_enqueued` 行。`judge` 的围栏见 8-5：答案是 artifact 的全文，拒词恒不回显答案。
 
 ### 8-5 collab::fanin（形状 2 值类型）
 
@@ -201,7 +193,7 @@ impl FanIn {
 
 - **只收已验证 Artifact**：未验证的产出是 Claim；`Artifact` 无公开构造子，故「Claim 进汇合」在类型层拼不出来。
 - **实现者不自测**（判负线之一）：`verified` 的 verifier 等于生产者即拒。
-- **private-info question 是围栏不是证明**：答案由 artifact 内容派生，只有打开过才答得出；能断言的只是「一眼未看就判」被拒。**拒词恒不回显正确答案**——回显即教会那条捷径。
+- **private-info question 是围栏不是证明**：答案是 artifact 的内容，只有打开过才答得出；能断言的只是「一眼未看就判」被拒。**拒词恒不回显正确答案**——回显即教会那条捷径。
 - **答案是 artifact 的全文，按 digest 核对**：题面必须给出 artifact 的 locator，读者才找得到它；而 `cas:b3-…` locator 本身就拼出了内容 digest，handback 信号里也带着同一个 locator。所以任何由 digest 派生的答案（例如 digest 前八位）都写在题面上，抄题面即可过关。`decide` 因此要全文：把答案按字节求 BLAKE3，等于 artifact 的 digest 才放行。答案末尾缺的那个换行按原文补回一次再比，因为工具参数经 JSON 传递时常被去掉结尾换行，而这不说明读者没打开过。代价是长 artifact 的答案也长；被否决的方案是按 digest 另派一个秘密的问题，它需要 artifact 在城里另存内容，而 `Artifact` 只持 locator 与 digest。
 
 ### 8-6 collab::pr（形状 5 typestate）
@@ -218,8 +210,8 @@ impl Pr<Verified> { pub fn verified_by(&self) -> &str; }
 
 - **判负线做成类型**：`Pr<Open>` 拿不到验证者的名字，`Artifact` 没有公开构造子；两条都由 `tests/ui/` 的编译失败反例钉住，不靠评审记得。
 - **不重判验证**：`Artifact` 已携「非生产者跑过 done_check」这个事实；本模块只补「这份产出是不是这个节点的」与「验证者不是实现者」这道兜底（近乎不可达，保留是因为「近乎」正在替一场没人做的评审干活）。
-- **记录不在这里写（H-05 改此条）**：`pr_opened` 的唯一权威是 `pr_tool::request::OpenRequest`（§8-10），它带 `commit` 而本模块原来的 `record()` 只拼 `node`／`implementer`／`branch` 三字段——用后者写一行，`OpenRequest::from_payload` 会因缺 `commit` 拒绝重建，两个家今天就持不同形状。故删 `opened_payload`／`rejected_payload`／`merged_payload`／`record` 与 `struct Merged`，本模块只留 `Open→Verified` 这一段判定。
-- **`Merged` 相位随记录一起走**：它除了承载已被否决的那份 payload 之外不做任何判定，生产路径从未到达它；落地事实由 `EventKind::PrMerged` 与 `memory::worktree` 记，判定梯到 `Verified` 为止。
+- **记录不在这里写**：`pr_opened`／`pr_merged`／`pr_rejected` 的唯一权威是 `pr_tool::request`（§8-10），它的键里有被审的 `commit`；本模块只有 `Open→Verified` 这一段判定。
+- **没有 `Merged` 相位**：落地事实由 `EventKind::PrMerged` 与 `memory::worktree` 记，一个只承载 payload 而不做判定的相位就是记录的第二个家。判定梯到 `Verified` 为止。
 - **物理 merge 归 `memory::worktree`**：本 crate 决定，那个 crate 搬文件。merge 只走 fast-forward——trunk 动过即退回重做。
 
 ### 8-7 collab::arbiter（形状 1 判定）
@@ -234,7 +226,7 @@ pub fn conflict_payload(candidate: &GoalEntry, level: &Level) -> Result<Payload,
 - **检测进 kernel，仲裁不进**：`kernel::goal::detect_conflict` 只答「撞没撞」；本模块答「谁来裁」。
 - **判序固定**（机械 → 读）：同一对目标恒落同一级，重放才可比。
 - **机械可判的只有一种形状**：双方都 claim 路径，且常设性一高一低——「常设的先走」不需要任何判断。其余（两个常设、外部资源同名）都要读目标陈述，那是模型的活。
-- **两级而不是三级（H-08＋§12「默认 YOLO」这条规则）**：第三级 `Level::Owner` 连同 `Escalation` 与 `Circumstance` 一并删去。三个 bool 的唯一生产调用点 `goal_tool` 恒传 `false`，于是这一级在生产里从来到不了；`GateRefused` 这个理由更是没了来源——门只答 Allow 或 Deny，被门拒掉的那个 run 不占任何地盘，也就无从与人相撞。一个居民读不定的冲突是一个设计问题，它按设计问题进Inbox，而不是变成一个悄悄没登记上的目标。
+- **两级而不是三级**（§12.1 的 ruling）：没有「升到人」这一级，因为门只答 Allow 或 Deny，被门拒掉的那个 run 不占任何地盘，也就无从与人相撞。一个居民读不定的冲突是一个设计问题，它按设计问题进 Inbox，而不是变成一个悄悄没登记上的目标。
 
 ### 8-8b collab::delegate_tool（形状 4 适配器）
 
@@ -251,8 +243,8 @@ impl DelegateDesk {
 pub struct DelegateTool { /* 模型的那一面：{room, task, goal, kind?} */ }
 ```
 
-- **`kernel::gate::spawn` 早已建好，本模块是它的第一个生产调用者**。「一层深」不是本模块的判定，本模块只是把问题递给它；拒绝文字也是门自己的三段式，不在这里重写。判决按 `GateOutcome` 两臂穷尽 match，不用 `if let`：门将来多一种答复，编译器必须当场找上这里。
-- **面向模型的那句话不提人**（§12「默认 YOLO」这条规则）：派活不再等任何人点头，`disclosure` 因此说「要么给出房间，要么被拒」；`workshop` 的那一句同改，两处都不得再写「the person is asked」。
+- **本模块是 `kernel::gate::spawn` 的生产调用者**。「一层深」不是本模块的判定，本模块只是把问题递给它；拒绝文字也是门自己的三段式，不在这里重写。判决按 `GateOutcome` 两臂穷尽 match，不用 `if let`：门将来多一种答复，编译器必须当场找上这里。
+- **面向模型的那句话不提人**：派活不等任何人点头，`disclosure` 因此说「要么给出房间，要么被拒」，`workshop` 的那一句同样如此。
 - **深度是被携入的，不是被推算的**：`DelegateDesk::new` 收 `Depth`。一个自己推算深度的 Run，错一次就是一个孙代理。
 - **一次请求不是一个 Run**。工具答的是「在哪个房间开」，不是结果：在工具调用里驱一个 Run，等于在另一个 Run 的 tool bench 里驱 Run。装配层在父回合落定后取走并派活，子 Run 自己的 `run_started` 携着那个房间。
 - **不新增 EventKind**：父的 `tool_called{name:"delegate"}` 与子的 `run_started{addr}` 已经把这件事记了两遍，再加一个事件种类就是第三遍。
@@ -277,9 +269,9 @@ impl Handback {
 
 - **父拿得到子的结果，而那不是下一回合**。子 Run 在父 Run 冻结之后才开（`bin::assembly` 是唯一能造 Run 的地方，而它在驱完父才拿得回控制权），所以「父的下一回合」实际上是**父房间的下一个 Run**。跨 Run 递事实的门已经存在，就是房间的 `Inbox`；再造一扇就是两个权威。故回程走 `Signal`，`status.signals_pending` 自动报数，`signal` 工具自动取得。
 - **城市做验证者，不是子自己**：`Claim::verified` 拒绝生产者自验，而 `Completion::Done(Evidence)` 是城市观察到的事实、不是子声明的事实。两者合起来才使 `Artifact` 在这条路上造得出来。
-- **一个拒不是一个错误**：验不过也要告诉父，否则父只能靠超时判断。`of` 把 `verified` 的 `Err` 收成 `Unverified` 而不往上抛，是因为在这条路上它是一个**结果**而不是一个故障。
+- **一个拒不是一个错误**：验不过也要告诉父，否则父只能靠超时判断。`of` 把 `verified` 的 `Err` 收成 `Stopped`（`because` 携拒词原文）而不往上抛，是因为在这条路上它是一个**结果**而不是一个故障。
 - **不新增 EventKind**：回程落在 `signal_enqueued` 里，与一切其他住房间信号同一形状。
-- **`from_signal` 是 `signal` 的唯一逆（M-20）**：载荷的键住一个内部标签枚举 `HandbackBody`，写读两端同经它。此前装配层另写了一份读法，它只认 `Finished` 一支、把 `Stopped` 的 `because` 连同读不懂的行一起答成 `None`，于是「子停了」与「这一行本 build 读不懂」在父那里是同一种沉默。现在不是 handback 的信号答 `None`，是 handback 而读不出的答 `E_WIRE_MISMATCH`。
+- **`from_signal` 是 `signal` 的唯一逆**：载荷的键住一个内部标签枚举 `HandbackBody`，写读两端同经它。不是 handback 的信号答 `None`，是 handback 而读不出的答 `E_WIRE_MISMATCH`：把两者都答成 `None`，「子停了」与「这一行本 build 读不懂」在父那里就是同一种沉默。
 - **为什么不叫 `Verified`**：本 crate 已有 `pr::Verified`（PR 的一个相）。两个同名项一出现，rustc 就不再把路径剪短，`tests/ui/merge_without_verification.stderr` 的预期输出当场变红——**编译器拿一个反例把「一个概念一个名字」执行了一次**。
 
 ### 8-8 collab::signal_tool（形状 4 适配器）
@@ -288,19 +280,20 @@ impl Handback {
 pub enum SignalEffect { Enqueued(Signal), Consumed { signal: Signal, by: String } }
 pub struct SignalDesk { /* run、room、who、reach、inbox、effects、minted —— 私有 */ }
 impl SignalDesk {
-    pub fn new(run: RunId, room: Address, who: String, reach: Address, inbox: Inbox) -> SignalDesk;
+    pub fn new(run: RunId, room: Address, who: String, reach: Address, at: TimeMs, inbox: Inbox)
+        -> SignalDesk;                                // at：本 run 的时刻，工具面没有时钟
     pub fn pending(&self) -> u32;                     // 借出前读，status.signals_pending 的真值
     pub fn take_effects(&mut self) -> Vec<SignalEffect>;
     pub fn take_steer(&mut self) -> Result<Option<Steer>, AxError>;  // 一件插队信（已属名为 `@发件人地址`），或没有；读不懂的信是 Err
     pub fn take_inbox(&mut self) -> Inbox;            // 归还借出的 Inbox
 }
-pub struct SignalTool { /* meta、desk: Rc<RefCell<SignalDesk>> —— 私有 */ }
-impl SignalTool { pub fn new(desk: Rc<RefCell<SignalDesk>>) -> Result<SignalTool, AxError>; }
+pub struct SignalTool { /* meta、desk: Arc<Mutex<SignalDesk>> —— 私有 */ }
+impl SignalTool { pub fn new(desk: Arc<Mutex<SignalDesk>>) -> Result<SignalTool, AxError>; }
 impl Tool for SignalTool { /* 两个 action：send｜pull */ }
 ```
 
-- **Inbox 是借出的，不是拷贝的**：工具在 bench 里被 `Box<dyn Tool>` 包起来，工人再也摸不到它，所以共享句柄走 `Rc<RefCell<..>>`——与 `assembly` 里那个接待批项的 `raised` 同一个手法。整个 Run 期间该房间的 Inbox **恰存一份**，住在 desk 里；驱动返回后无论成败都归还。理由与 `interrupts` 那行注释同字：“a source that stayed behind would be a second one”——两份队列就是两个权威，而漂开的总是没人看的那个。
-- **`send` 只入队不投递**：工具只把 Signal 放进 `effects`，真正 `deliver` 到收件房间发生在驱动返回之后、且恒在 `signal_enqueued` 落账之后。因为投影只允许因一条已追加的事件而改变（同 `RunWorker::record`：“the book states what the history says, never what the process hoped to write”）。
+- **Inbox 是借出的，不是拷贝的**：工具在 bench 里被 `Box<dyn Tool>` 包起来，工人再也摸不到它，所以工人与工具共享一个 `Arc<Mutex<..>>` 句柄；多条 lane 同时驱动，句柄因此要能跨线程。整个 Run 期间该房间的 Inbox **恰存一份**，住在 desk 里；驱动返回后无论成败都归还。理由与 `interrupts` 那行注释同字：“a source that stayed behind would be a second one”——两份队列就是两个权威，而漂开的总是没人看的那个。
+- **`send` 只入队不投递**：工具只把 Signal 放进 `effects`，真正 `deliver` 到收件房间发生在驱动返回之后、且恒在 `signal_enqueued` 落账之后。因为投影只允许因一条已追加的事件而改变（the book states what the history says, never what the process hoped to write）。
 - **发件范围由 `reach` 定界**：`reach` 是发件人所属楼的地址，由装配层经 `city::Building::of` 算好传入——**「一个地址归哪栋楼管」的权威在 city，collab 只执行交给它的边界**。越楼发件恒拒，报 `E_CROSS_BUILDING_DENIED` 且三段完整。`ToolMeta.effect` 是静态的（申报为 `Write { domain: room }`），所以逐件目标判定必须在工具内——工具拥有自己的策略。
 - **id 不采时钟不取随机**：`{run}-s{n}`，`n` 是 desk 自己的计数器。重放同一段历史得到同一批 id，去重才有意义（确定性第七条）。
 - **`take_steer` 取走一件就当场记 `Consumed`，包括那件读不成插队信的**：一件离队的信就是已读，不论模型拿它做了什么——否则同一句话会在下一个安全点再落一次，而发件人从历史里看不出它到没到。它与 `pull` 共用同一张队列与同一条 `signal_consumed` 形状，故两扇门没有第二份已读账。**而空队列与读不懂的信不合成一件事**：前者是 `Ok(None)`，后者是 `Err`（`Steer::from_signal` 拒绝非 steer 型的、以及载荷里没有文字的）。读不懂的那件被 `.ok()?` 折成空队列时，一件已离队的信在历史里读作从未到达，而发件人看到的是「已入队」；故那件信无论读得读不懂都入册，两件事各占一个返回值。安全点怎么处理这个拒绝由那一侧决定（`assembly::driving::lane`，sprawling-SPEC §8-73），desk 不替它决定。
@@ -326,7 +319,7 @@ impl GoalTool { pub fn new(room: Address, desk: Arc<Mutex<GoalDesk>>) -> Result<
 - **三层各守其职，一层不多**：`kernel::goal::detect_conflict` 答撞没撞（纯判定）→ `collab::arbitrate` 答谁来裁（两级）→ 本模块只把条目拼好交给 `GoalBooking`。它恒不自己判冲突，也恒不自己定级。
 - **登记在调用时由 `GoalBooking` 判定，桌子不留副本**：并排派出的两轮活读的是同一份目标表，只凭桌子自己的副本，两轮都会登记同一片地。所以桌子只铸 id、拼条目，然后问 `GoalBooking`；权威按队列次序对着全城的目标表 `arbitrate`，先写账（`goal_registered` 或 `goal_conflict`）再回答。`GoalBooking` 的 `Err` 原样交给模型，桌子不排任何效应——两种结局在回答之前都已经在账上。
 - **撞了就不登记**：冲突返回 `conflict_refusal` 拼出的 `E_GOAL_CONFLICT` 三段式拒，第三段是仲裁给的那一级的可执行说法（串行等完某一件｜跟某人商量）。拒词只在本模块拼一次，权威调它，于是撞的原因只有一种说法。一个只说「不行」的拒绝会让模型换个说法再试一次。
-- **工具只走得到两条路**：机械可判的串行化，与交给居民读。原先那三个「调用方才知道」的 bool 已随 `Level::Owner` 删去（8-7）——一个恒传 `false` 的参数不是入参，是一句没人读的话。
+- **工具只走得到两条路**：机械可判的串行化，与交给居民读（8-7）。
 - **同一 Run 内的第二次登记看得见第一次**：第一次的 `goal_registered` 在回答之前已经进了权威的目标表，所以第二次撞上它。
 - **不写第三种 `arbitration_verdict`**：`conflict_payload` 已携着那一级，再写一条就是同一件事的第二个权威；该事件留给真正跑过一场仲裁的 Run。
 
@@ -364,14 +357,15 @@ impl PrDesk {
     pub fn take_effects(&mut self) -> Vec<PrEffect>;
 }
 pub struct PrTool { /* meta、desk */ }
-impl PrTool { pub fn new(room: Address, desk: Rc<RefCell<PrDesk>>) -> Result<PrTool, AxError>; }
+impl PrTool { pub fn new(room: Address, desk: Arc<Mutex<PrDesk>>) -> Result<PrTool, AxError>; }
 // 三个 action：open｜list｜check
 ```
 
 - **验证与 merge 是一次调用的两个结果**，不是两个 action。一个 `Verified` 而无人 merge 的请求是第三种要人去追的状态；而 merge 不是第二个决定，它就是「验证通过」的含义。拒绝是同一次调用的另一个结果（`passed: false` 携 `why`）。
 - **typestate 是走过的不是相信的**：`check` 内部真的造 `Claim` → `verified(true, self.who)` → `Pr::open(..).verified(&artifact)`。于是「实现者不自测」被检查两次：工具先拒（三段式，`E_GATE_DENIED`），类型再拒（`Claim::verified` 的 verifier ≠ 生产者）。
 - **被判的是一个 commit 而不是一条分支**：`OpenRequest.commit` 记下开请求那一刻分支站在哪里，Artifact 的 digest 由它派生——**看过一个 commit 的人没有为后一个背书**。
-- **两个 commit 两个键（M-19）**：`pr_merged` 同时携 `reviewed_commit`（被审的）与 `commit`（落地的）。此前装配层把 merge commit 盖在 `commit` 上，一个键装两个事实，Ledger 的链就断在 merge 这一步。`merged_payload` 是这一行的唯一成形处，`verified_by` 与 attribution 一并由它写出；旧行没有 `reviewed_commit`，读作缺席。
+- **两个 commit 两个键**：`pr_merged` 同时携 `reviewed_commit`（被审的）与 `commit`（落地的）。一个键装两个事实，Ledger 的链就断在 merge 这一步。`merged_payload` 是这一行的唯一成形处，`verified_by` 与 attribution 一并由它写出；没有 `reviewed_commit` 的行读作缺席。
+- **三条记录的形状留在 collab**：`OpenRequest`／`MergedRequest`／`RejectedRequest` 住 `pr_tool::request` 而不进 `kernel::event::record`，因为它们的键里有 `NodeId`，那是 collab 的类型。
 - **没有树的 Run 说得出自己没有**：`open` 在无树时报 `E_TOOL_UNAVAILABLE` 并指向「要审查的楼」，而不是把城里的文件当作自己的产出递出去。
 - **谁得到树：楼说了算**（`RULES.toml` 的 `review = true`，见 `city-SPEC.md`）。默认不开：一个人派一个 Agent 去一个房间干活并盯着看，应当看得到文件变化；为它强制第二个 Agent 是没人要求过的纪律。
 
@@ -426,15 +420,15 @@ impl ClaimDesk {
 pub struct Booking(Box<dyn FnMut(&ClaimEffect) -> Result<(), AxError> + Send>);
 impl Booking { pub fn new(ask: impl FnMut(&ClaimEffect) -> Result<(), AxError> + Send + 'static) -> Booking; }
 pub fn still_true(text: &str, effect: &ClaimEffect) -> bool;
-pub struct ClaimTool { /* meta、Rc<RefCell<ClaimDesk>> —— 私有 */ }
-impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, AxError>; }
+pub struct ClaimTool { /* meta、Arc<Mutex<ClaimDesk>> —— 私有 */ }
+impl ClaimTool { pub fn new(desk: Arc<Mutex<ClaimDesk>>) -> Result<ClaimTool, AxError>; }
 ```
 
 六个动作：`list`（就绪的、在做的、卡住的）、`claim`（认领一个节点）、`finish`（携证据结项）、`block`（携原因报卡住）、`release`（携原因交回）、`split`（拆成子节点）。
 
 - **`Roadmap.md` 是唯一权威，不另立认领登记表**。第二份登记表就是第二个「这一个节点归谁」的答案，而漂移的恒是没人读的那一份。文件本身既被人读、被 `PlanTree::progress` 数、又被这个工具改——一处事实，三个读者。
 - **六个动作长在同一条 catalog 行上，不新开工具**。模型每一轮读的**行数**是成本，一行背后的**动词数**不是。
-- **收口是字节数，量出来的**：四个动作的 `plan` 条目是 **548 B**（disclosure ＋ schema 的紧凑 JSON），六个动作是 **546 B**，一条断言钉住它不超过 548。disclosure 里那句 *Must this be expanded?* 是 LLM First（`ARCHITECTURE.md` §9）的提醒：它在缓存前缀里，零延迟、零花费；不追问、不设深度上限、不设审批。省下的字节来自把 Locator 文法从 schema 移进拒词——**一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节**。schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
+- **收口是字节数**：六个动作的 `plan` 条目（disclosure ＋ schema 的紧凑 JSON）由一条断言钉住不超过 548 B。disclosure 里那句 *Must this be expanded?* 是 LLM First（`ARCHITECTURE.md` §9）的提醒：它在缓存前缀里，零延迟、零花费；不追问、不设深度上限、不设审批。省下的字节来自把 Locator 文法从 schema 移进拒词——**一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节**。schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
 - **状态迁移由 `kernel::PlanTree` 从计划自身判，不由调用者声明**：`claim` 只从就绪集里取（叶子、无人认领、依赖全绿），`finish`／`block`／`release` 只能作用于**本次 drive 认领的那个节点**。拒词报出此刻的状态并指向一个真能拿的节点——「不行」会教模型改写参数再试，「2.3 在做，2.4 就绪」不会。
 - **认领在调用时由 `Booking` 判定，桌子的副本先答**：桌子持有派活那一刻的文件，并排派出的另一轮活读的是同一份，
   所以 `claim` 先让 `PlanTree::claim` 在副本上判（它的拒词能指向一个就绪节点），再问 `Booking`；`Booking` 拒绝时，
@@ -442,7 +436,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
   只活到那轮活落地为止，落地之后回答这个问题的仍是文件——所以它不是第二份认领登记表。
   `Booking` 拿到的是整条 `ClaimEffect::Claimed` 而不只是节点号，因为权威在登记的同时把这条认领记进账本，
   而那一行的种类与载荷只由 `ClaimEffect::kind`／`payload` 定义。
-- **一次 drive 只持有一个节点**，理由与旧版同：一个 Run 同时占两个节点，两个节点的进度都读不出来。
+- **一次 drive 只持有一个节点**：一个 Run 同时占两个节点，两个节点的进度都读不出来。
 - **计划门禁就是那个 `Held` 值**：它由 `PlanTree::claim` 铸出，只能花在 `finish`（绿）或 `stop`（红／交回）上。**没有第三个出口**——一个只是结束了的 run 由 `abandon` 把它花在 `FrozeWithoutEvidence` 上，于是「认领了却没交代」这一态在冻结之后不可达。这正是 `blockage` 里红色的来处。
 - **`split` 之后本次 drive 不再持有那根枝**：它拿到的那件活现在是几片，它接下来该拿其中一片。写盘前先把新文本重新解析并 `PlanTree::build` 一次，**拆不出合法树就一个字节都不写**。拆分结果除 `node` 与 `children` 外带 `unfinished`：该节点下尚未 `Done` 的子节点数，由拆完的树数出，不由调用者声明。
 - **`block` 与 `release` 都必须带一句原因**，且原因**随记录走而不是随表格走**：表格只有位置说「Blocked」，一句话该住在 `roadmap_blocked` 的载荷里，在表里再放一份就是同一句话的第二个权威。
@@ -464,23 +458,33 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 ## 9 工作流程
 
+装配层为一轮活造桌子（`SignalDesk`、`GoalDesk`、`PrDesk`、`ClaimDesk`、`DelegateDesk`、`WorkshopDesk`、`ArchiveDesk`），把 `Arc<Mutex<..>>` 句柄交给对应工具注册进 bench → 模型调工具，桌子判定并排效应（登记与认领在调用时问记账线程的 `GoalBooking`／`Booking`）→ 这轮活落地时工人取走效应，先写账再改投影 → 派出的代理在父回合落定后开 run，结束时经 `Handback::signal` 回到父房间的 Inbox，并汇入那个房间的 `FanIn` 与 `Underway`。
+
 ## 10 实现逻辑
+
+每个模块的实现规则写在它的 §8 小节里。
 
 ## 11 边界枚举
 
+每个模块在构造点或调用点拒绝的输入写在它的 §8 小节里，拒词各自报出三段式。
+
 ## 12 Decisions
 
-（逐码回答「能否让它不可能发生」——设计规则十。）
+### 12.1 仲裁只有两级（ruling）
 
-### 12.1 定规：仲裁降为两级
+**决定**：`Level` 只有 `Serialize` 与 `Arbitrate`，`arbitrate` 收两个入参。这是人的 ruling。
 
-`Verdict: user-approved`（Roadmap §6 定规 2 与 §19.3 第 6 条；H-08 第三行）
+**理由**：第三级「升到人」在生产里不可达：唯一的生产调用点没有能让它成立的输入，而门只答 Allow 或 Deny，被门拒掉的 run 不占地盘，也就无从与人相撞。一个不可达的级别仍会散布在公共面、账本载荷与恢复语里。
 
-**决定**：删 `Level::Owner`、`Escalation` 与 `Circumstance`，`arbitrate` 收两个入参。
+**被否**：用一个穷尽的 `Occasion` 枚举描述何时升到人——那会把一个到不了的级别保留成一个更整齐的到不了的级别。
 
-**理由**：三个 bool 的唯一生产调用点恒传 `false`，第三级在生产里不可达，却按三级的形状散布在公共面、账本载荷与恢复语里。门只答 Allow 或 Deny 之后，`GateRefused` 连来源都没有了。
+### 12.2 没有草稿退回机制
 
-**被否**：把三个 bool 换成一个穷尽的 `Occasion` 枚举——那会把一个到不了的级别保留成一个更整齐的到不了的级别。
+**决定**：房间没有版本，发言不带「作者所见的房间版本」进房间，也就没有退回作者、四路择一与 hold token。
+
+**理由**：它要防的两种冲突各有权威。同一份文件的并发写由 `memory` 的 `base_version` 乐观并发与 worktree 隔离解决；同一件事的并发认领由 `kernel::goal` 的同资源相斥与 `arbiter`（§8-7）解决。第三套机制就是第三个权威。`Signal` 的 `room_version` 在生产写点（`signal_tool`、`handback`）恒为 `Version::FIRST`。
+
+**重开参数**：出现一个真的会前进的房间版本，即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值。那时退回从那个写点长出来。
 
 ## 13 依赖选型
 
@@ -488,99 +492,25 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 ## 14 硬编码声明
 
+`ARCHIVE_KINDS` 四类（§8-20）；`plan` 条目的 548 B 上限（§8-12）。
+
 ## 15 影响面
+
+改一张桌子或一件工具的构造签名，波及 `crates/sprawling` 装配层造这张桌子的地方；改记录的形状（`Signal`、`OpenRequest` 一族、`ClaimEffect::payload`）波及读 Ledger 的折叠与视图。
 
 ## 16 测试与约束
 
+逐模块 `tests.rs`；`tests/ui/` 钉住两条判负线；`tests/pr_flow.rs` 走一遍 PR。**约束**：本 crate 无 I/O，时间只作为参数进来。
+
 ## 17 模型体验
 
-（入窗什么｜token 代价｜对 prefix 缓存的影响；无贡献则写「零字节，因为……」。）
+每件工具在 catalog 里占一行，坐在缓存前缀里，所以一行背后的动词数不增加常驻成本，行数与字节数才增加（§8-12）。Signal 在 prefix 里占零字节，常驻的只有 `status` 的 `signals_pending`（§8-1）。拒词报出此刻的状态与一条可执行的下一步，因为只说「不行」的拒绝会让模型换个说法再试。
 
 ## 18 文档同步
 
-## 附记：`NodeId` 的定义模块变了，接口没变
-
-本 crate 的 API 基线里 `kernel::plan::NodeId` 变成 `kernel::node_id::NodeId`。
-**这不是一次接口变更**：公开路径仍是 `kernel::NodeId`，字段与签名一字未动，
-变的只是 `cargo public-api` 记录的定义模块——`NodeId` 从 `kernel::plan` 搬进了自己的文件（kernel-SPEC §8-N）。
-记在这里是因为 `apisync` 判的是「基线动了就要有一份 SPEC 同行」，而基线确实动了。
-
-### 8-13 collab::claim_tool 目录化
-
-`claim_tool.rs` 原有 913 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
-
-- `claim_tool.rs`（325 行）——`ClaimDesk` 与它的六个动作实现：计划文本、本次 drive 的 `Held`、`effects`，以及 `list`／`claim`／`finish`／`put_down`／`split`／`take_held`。它同时是索引位置，声明 `mod tool;` 并 `pub use tool::ClaimTool;`，因此 crate 内其它文件与 `lib.rs` 的 `use` 一行未改。
-- `claim_tool/tool.rs`（224 行）——`ClaimTool` 本身：工具元数据与参数 schema、`Tool` 实现的动作路由，以及读参数的 `node_of`／`reason_of`／`parts_of` 与 `ACTIONS` 常量。它是 `claim_tool` 的子模块，因此照旧直接调用 `ClaimDesk` 的私有方法与私有字段 `room`，无需放宽任何字段可见性。
-- `claim_tool/tests.rs`（392 行）——原内联 `mod tests` 原样迁出，断言、名字与 16 个 `#[test]` 一个未动。
-
-**无字段开放。** 唯一改动可见性的项是 `ACTIONS`：它由 `tool.rs` 定义、由同目录的 `tests.rs` 断言，故写作 `pub(super) const ACTIONS`，仍不出 `claim_tool` 模块。
-
-**apisync 未重写基线。** `ClaimTool` 的定义模块虽从 `claim_tool` 移到 `claim_tool::tool`，但两者都是私有模块，公开路径仍是 `collab::ClaimTool`，`cargo xtask apisync` 对 collab 无差异。
-
-### 8-14 collab::pr_tool 目录化
-
-`pr_tool.rs` 原有 561 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
-
-- `pr_tool.rs`（354 行）——`PrEffect`、`PrDesk` 与它的 `open`／`list`／`check`／`take_effects`、`PrTool` 及其 `Tool` 实现，以及读参数的 `text`。它同时是索引位置，声明 `mod request;` 并 `pub use request::OpenRequest;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `PrDesk::new` 留在本文件。
-- `pr_tool/request.rs`——`OpenRequest` 及其 `payload`／`from_payload`／`merged_payload`／`rejected_payload` 与 `MergedRequest`／`RejectedRequest`：`pr_opened`、`pr_merged` 与 `pr_rejected` 三条记录的形状与回读。三者留在 collab 而不进 `kernel::event::record`：它们的键里有 `NodeId`，那是 collab 的类型。
-- `pr_tool/tests.rs`（152 行）——原内联 `mod tests` 原样迁出，断言、名字与 6 个 `#[test]` 一个未动。
-
-**无字段开放。** `OpenRequest` 的四个字段本来就是 `pub`，切分未放宽任何可见性。
-
-**apisync 未重写基线。** `OpenRequest` 的定义模块从 `pr_tool` 移到私有的 `pr_tool::request`，公开路径仍是 `collab::OpenRequest`，`cargo xtask apisync` 对 collab 无差异。
-
-### 8-15 collab::inbox 的文件
-
-- `inbox.rs`——`Signal` 及其构造、访问器、`lane`、两条记录 `enqueued_payload`／`consumed_payload` 与逆 `from_payload`，以及接收侧 `Inbox` 的 `new`／`deliver`／`pull`／`take_steer`／`pending`。带参数豁免的 `Signal::new` 留在本文件。
-- `inbox/tests.rs`——去重、lane 次序、bandwidth 与两条记录，经生产入口。
-
-`SignalId`、`SignalKind`、`Lane` 不在本 crate：它们是 `signal_enqueued`／`signal_consumed` 两行的字段类型，与行的 struct 同住 `kernel::event::record`，于是折叠与视图读这两行时只依赖 kernel。本 crate 不再转出它们，调用方写 `kernel::event::record::SignalId`，路径只有一条。
-
-### 8-16 collab::workshop_tool 目录化
-
-`workshop_tool.rs` 按「一个文件回答一个问题」切成三份：
-
-- `workshop_tool.rs`——`WorkshopDesk` 与它的 `lay_out`／`question`／`judge`／`accept`、`WorkshopTool` 与它的元数据和 `Tool` 实现、两张桌子共用的中毒拒词 `poisoned`，以及读参数的 `text`／`contract_of`。它同时是子模块的父模块，声明 `mod op;`／`mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。
-- `workshop_tool/op.rs`——这个工具答应哪几个动词：穷尽枚举 `Op`（`lay_out`／`question`／`judge`）与它的 `parse`。一个本版本不认的动词被拒绝，而不是舍入到无害的那个，因为这里无害的那个会静静丢掉一张有人要跑的图。两项都是 `pub(super)`，不出 `workshop_tool`。
-- `workshop_tool/tests.rs`——断言、名字与 5 个 `#[test]` 一个未动；`#[allow(...)]` 列表在父文件的 `mod tests;` 声明上。
-
-**两张桌子的中毒拒词只写一遍。** `desk` 与 `delegates` 取锁失败时说的是同一句话、只换主语，先前是两处字面重复的构造；现在它们只有 `poisoned(which)` 一个家，对调用方说出的字句逐字节不变。
-
-**无字段开放。** 测试文件是 `workshop_tool` 的子模块，`use super::*` 之外不需要任何新的可见性；`Op` 移出后仍经 `use op::Op;` 在父模块作用域内。
-
-**apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::WorkshopDesk`／`collab::WorkshopTool`，`cargo xtask apisync` 对 collab 无差异。
-
-### 8-17 collab::signal_tool 目录化
-
-`signal_tool.rs` 原有 498 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
-
-- `signal_tool.rs`（352 行）——`SignalEffect`、`SignalDesk` 与它的 `pending`／`take_steer`／`take_effects`／`take_inbox`／`mint`／`send`／`pull`、`SignalTool` 与它的元数据和 `Tool` 实现，以及读参数的 `text`。它同时是子模块的父模块，声明 `mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `SignalDesk::new` 留在本文件。
-- `signal_tool/tests.rs`（150 行）——原内联 `mod tests` 原样迁出，断言、名字与 5 个 `#[test]` 一个未动；原 `mod tests` 上的 `#[allow(...)]` 列表原样落在父文件的 `mod tests;` 声明上。
-
-**无字段开放。** 测试文件是 `signal_tool` 的子模块，`SignalDesk` 的私有字段（含 `inbox`）对它照旧可见，`use super::*` 之外不需要任何新的可见性。
-
-**apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::SignalDesk`／`collab::SignalTool`／`collab::SignalEffect`，`cargo xtask apisync` 对 collab 无差异。
-
-### 8-18 collab::draft 目录化——已随 §8-3 注销
-
-`draft.rs` 与它的测试模块已删除，本条记录的文件切分不再有对象。切分本身是对的（原 466 行超出 400 行上限），删除的理由见 §8-3。
-
-**apisync 基线随本次重算。** `collab::Draft`／`Drafts`／`HoldToken`／`Resolution`／`Return`／`Submission` 与 `collab::Merged` 及 `Pr<Merged>` 的方法一并退出公开面，`xtask/api-baselines/collab.txt` 必须在同一次改动里重算。
-
-### 8-19 collab::workshop 目录化
-
-`workshop.rs` 原有 445 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成两份：
-
-- `workshop.rs`（330 行）——`NodeId`、`NodeContract` 与它的九个读取器及 `job_text`、`Workshop` 与它的 `schedule`／`ready`／`contract`／`len`／`is_empty` 及私有的 `order`。它同时是子模块的父模块，声明 `mod tests;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `NodeContract::new` 留在本文件。
-- `workshop/tests.rs`（119 行）——原内联 `mod tests` 原样迁出，断言、名字与 7 个 `#[test]` 一个未动；原 `mod tests` 上的 `#[allow(...)]` 列表原样落在父文件的 `mod tests;` 声明上。
-
-**无字段开放。** 测试文件是 `workshop` 的子模块，`NodeId`、`NodeContract` 与 `Workshop` 的私有字段对它照旧可见，`use super::*` 之外不需要任何新的可见性。
-
-**apisync 未重写基线。** 本次未移动任何类型的定义模块，公开路径仍是 `collab::NodeId`／`collab::NodeContract`／`collab::Workshop`，`cargo xtask apisync` 对 collab 无差异。
+`ARCHITECTURE.md` 模块表的 collab 各行与 §3 缝清单｜`docs/glossary.md` 的 Signal、Inbox、Workshop 等词条。
 
 ### 8-20 collab::archive_tool（形状 4 适配器）
-
-模块表的 `Spec` 列要求每个在册模块指向定义它的那一节，而这个模块自建成起就没有节。本节按它已落地的形状补记，不追加要求。
 
 `ARCHIVE_KINDS` 是封闭的四类：`preference`／`decision`／`correction`／`fact`。第五类要有理由，而「它不属于前四类」正是让分类腐烂的那个理由，所以拒词点名四类并问这是哪一类。
 
@@ -588,8 +518,6 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 - **效应而非副作用**：`ArchiveEffect::Recorded` 是桌子交回的值，落盘与记账都归装配层，故本模块无 I/O。
 
 ### 8-21 collab::claim_effect（形状 2 值类型）
-
-同上：本节补记一个已落地却无 SPEC 节的模块。
 
 `ClaimDesk` 判定，`ClaimEffect` 描述并复核，两个形状故两个文件（ARCHITECTURE.md §9）。
 
@@ -620,4 +548,4 @@ pub enum Reading {
 - **验证 run 逐条调用 `against`**，非 `Holds` 的每一条都进它的报告；方法（查什么、怎么查）仍归模型，本模块只供机制。
 - **为什么是 `Reading` 而不是 `Result`**：一条对不上的引文是验证的**结果**，与 `Handback::Stopped` 同理；它要被报告，而不是让调用方的 `?` 把它当故障抛掉。
 
-仍未落地（同属本包）：验证节点在另一地址以全新会话跑 `done_check` 之后才铸 `Artifact`；验证者不得是图中任何实现者、改了代码须第三方再验；JOB 钉住被审文档的 Locator；删掉 `handback.rs` 的 `matches!(Done)` + `CITY_VERIFIER` 与 `Claim::verified(bool)`。证据：子 run 以 Done 结束而 `done_check` 失败时不铸 `Artifact` 的测试。
+验证节点怎么跑仍未定，见 §3。

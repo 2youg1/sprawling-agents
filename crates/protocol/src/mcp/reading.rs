@@ -23,7 +23,7 @@
 //! A refusal ends the connection rather than skipping one message. The
 //! unread remainder of an oversized line is indistinguishable from the
 //! next message, so a caller that read again would take the tail of a
-//! refused message for a fresh one; the assembly layer reclaims the
+//! refused message for a fresh one; the transport reclaims the
 //! child instead.
 
 use std::io::BufRead;

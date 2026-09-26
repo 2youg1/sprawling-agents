@@ -97,8 +97,8 @@ pub enum Verb {
 impl Verb {
     /// The host this call's bytes would leave for, when it names one.
     ///
-    /// The tool's own grammar answers this; the bench no longer reads an
-    /// argument name by hand (M-17). A URL with no authority —
+    /// The tool's own grammar answers this, so the bench reads no
+    /// argument name by hand. A URL with no authority —
     /// `about:blank`, a `file:` path — names no host, so there is no
     /// egress to judge.
     ///

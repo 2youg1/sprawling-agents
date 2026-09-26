@@ -6,15 +6,14 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-# The listener. Off for `web`, which needs this crate's vocabulary and must
-# not drag a TCP stack into WebAssembly - tokio's mio does not build for
-# wasm32, and a browser has no sockets to listen on anyway.
+# The listener. Off for the crates that need this crate's vocabulary and
+# not a TCP stack (accounting, xtask, fuzz).
 default = ["server"]
 server = ["dep:tokio", "dep:axum"]
 # The JSON Schema of the whole envelope, which `cargo xtask wire-ts` turns
 # into the TypeScript client's types (channels-SPEC.md section 8-16). Off
-# for the product binary and for `web`: neither asks what its frames look
-# like, and the answer must not travel to a browser.
+# for the product binary: it does not ask what its frames look like, and
+# the answer must not travel to a browser.
 schema = ["dep:schemars", "kernel/schema"]
 
 [dependencies]

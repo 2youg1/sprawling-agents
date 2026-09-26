@@ -54,10 +54,9 @@ pub enum Pairing {
 
 /// Decides whether one HTTP request may reach the work behind a door.
 ///
-/// **The one place an HTTP caller's pairing token is judged.** Before
-/// it existed, `/ws` and `/acp` judged the token and `/transcribe` and
-/// `/enroll` judged nothing, so an exposed city let anyone who could
-/// reach the port spend money at a provider (roadmap S-03).
+/// **The one place an HTTP caller's pairing token is judged.** A door
+/// that judged nothing would let anyone who could reach the port of an
+/// exposed city spend money at a provider.
 ///
 /// The rule is the face's, which is why the face is what arrives: a face
 /// that demands no credential is the loopback face of a city nobody

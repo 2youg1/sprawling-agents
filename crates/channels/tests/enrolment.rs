@@ -12,10 +12,11 @@
 //! The enrolment route answers what happened to the credential, not what
 //! happened to the request.
 //!
-//! It used to answer 201 the moment the command reached the desk, so a
-//! vault that refused told nobody and a person watched a success message
-//! for a key that was never stored. Three outcomes now, each with its own
-//! status: stored, refused, and neither within a bounded wait.
+//! Answering 201 the moment the command reached the desk would let a
+//! vault that refused tell nobody while a person watched a success
+//! message for a key that was never stored. So there are three outcomes,
+//! each with its own status: stored, refused, and neither within a
+//! bounded wait.
 //!
 //! The three are told apart by a worker this test stands in for, which
 //! is what makes this a white-box check: it drives the router in

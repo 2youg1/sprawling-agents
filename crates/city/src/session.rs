@@ -11,9 +11,9 @@
 //! `CONFIG.toml`, and every later run in that room refuses to move them,
 //! because a provider caches a conversation's prefix only for as long as
 //! the shape of the calls behind it stays put (`city-SPEC.md` 8-14).
-//! That refusal is right, and until now it had no counterweight: a person
-//! who changed the model could no longer dispatch into that room at all.
-//! Starting a new session is that counterweight.
+//! That refusal is right, and it needs a counterweight, or a person who
+//! changed the model could never dispatch into that room again. Starting
+//! a new session is that counterweight.
 //!
 //! **Two files, one decision.** What a new session inherits is a single
 //! question, so it is answered in a single call: the frozen shape is
