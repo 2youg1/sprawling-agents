@@ -96,10 +96,13 @@ fn unlinked(path: &Path) -> Result<Metadata, AxError> {
 /// Reads a package whole: every item under it, in canonical order, and
 /// [`reading::SKILL_FILE`] among them as text the scan can read.
 fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
+    let root = std::fs::canonicalize(dir).map_err(|err| source_io(dir, &err))?;
     let mut found = Vec::new();
     let mut open = vec![(dir.to_path_buf(), String::new())];
     while let Some((at, prefix)) = open.pop() {
-        for entry in reading::read_dir(&at)? {
+        let listed = reading::read_dir(&at)?;
+        stays_under(&root, &at, &prefix)?;
+        for entry in listed {
             let path = format!("{prefix}{}", reading::spelled(&entry)?);
             let meta = unlinked(&entry)?;
             if meta.is_dir() {
@@ -114,7 +117,9 @@ fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
     let mut stored = PACKAGE_HEADER.to_vec();
     let mut items = Vec::with_capacity(found.len());
     for (path, entry, meta) in found {
-        items.push(append_item(&mut stored, path, &entry, &meta)?);
+        let item = append_item(&mut stored, path.clone(), &entry, &meta)?;
+        stays_under(&root, &entry, &path)?;
+        items.push(item);
     }
     let document = items.iter().find_map(|item| match item {
         Item::File(path, bytes) if path == reading::SKILL_FILE => Some(bytes.clone()),
@@ -182,6 +187,24 @@ fn inspect_document(file: &Path) -> Result<Inspected, AxError> {
         stored,
         hash,
     })
+}
+
+/// Refuses when `path` no longer resolves to `relative` beneath the
+/// package's canonical `root`: a directory on the way swapped for a link
+/// after its judgement sends the listing or the read somewhere else, and
+/// resolving every component again after the listing or the read finds
+/// it, unless the swap is undone inside that window.
+fn stays_under(root: &Path, path: &Path, relative: &str) -> Result<(), AxError> {
+    let expected = relative
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .fold(root.to_path_buf(), |at, segment| at.join(segment));
+    let resolved = std::fs::canonicalize(path).map_err(|err| source_io(path, &err))?;
+    if resolved == expected {
+        Ok(())
+    } else {
+        Err(refuses_link(path))
+    }
 }
 
 /// Reads a file judged not to be a link, and refuses when what the open

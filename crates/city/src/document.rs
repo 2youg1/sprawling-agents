@@ -109,6 +109,11 @@ pub(crate) fn place_tree(target: &Path, entries: &[TreeEntry<'_>]) -> Result<(),
             TreeEntry::File(path, body) => stage(&beneath(&staged, path), body)?,
         }
     }
+    for entry in entries {
+        if let TreeEntry::Directory(path) = entry {
+            settle(&beneath(&staged, path))?;
+        }
+    }
     settle(&staged)?;
     std::fs::rename(&staged, target).map_err(|err| {
         storage(
