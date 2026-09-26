@@ -209,33 +209,7 @@ impl Laying {
                 admitted.push(Box::new(city::CityTool::new(&self.city_root)?));
             }
         }
-        // The browsers this building's rules ask for: its own, then the
-        // person's when they declared one. Last of the built-ins for the
-        // reason above - what keeps their position keeps the cache.
-        // `city::policy` refuses both settings on a confidential
-        // building, so neither is ever reached there.
-        for tool in (self.browsers)(
-            &self.city_root,
-            &memory::BlockOrigin {
-                run: site.run_id,
-                building: site.building.addr().clone(),
-            },
-            &site.rules,
-        )? {
-            admitted.push(tool);
-        }
-        // External tools, for a building whose configuration names a
-        // server. They join the table here, before the catalogue is
-        // rendered, because the tool table is frozen with the run: what
-        // the model is told exists is decided once.
-        for server in self.mcp_tools(
-            &site.config,
-            &site.write_root,
-            site.rules.policy().confidential,
-        ) {
-            let tool: Box<dyn kernel::Tool> = Box::new(server);
-            admitted.push(tool);
-        }
+        admitted.extend(self.outside_tools(site)?);
         for tool in admitted {
             held(&catalog, "lay out the catalog")?.admit_tool(tool.meta())?;
             bench.register(Box::new(kept::Kept::new(
@@ -255,6 +229,41 @@ impl Laying {
 }
 
 impl Laying {
+    /// The tools that reach outside the city, in the order they join the
+    /// table after the built-ins: the browsers, then the MCP servers.
+    ///
+    /// # Errors
+    /// Propagates a browser the building's rules ask for and that will
+    /// not start.
+    fn outside_tools(&self, site: &Site) -> Result<Vec<Box<dyn kernel::Tool>>, AxError> {
+        // The browsers this building's rules ask for: its own, then the
+        // person's when they declared one. They follow the built-ins,
+        // because a provider caches the tool array by position.
+        // `city::policy` refuses both settings on a confidential
+        // building, so neither is ever reached there.
+        let mut outside = (self.browsers)(
+            &self.city_root,
+            &memory::BlockOrigin {
+                run: site.run_id,
+                building: site.building.addr().clone(),
+            },
+            &site.rules,
+        )?;
+        // External tools, for a building whose configuration names a
+        // server. They join the table here, before the catalogue is
+        // rendered, because the tool table is frozen with the run: what
+        // the model is told exists is decided once.
+        for server in self.mcp_tools(
+            &site.config,
+            &site.write_root,
+            site.rules.policy().confidential,
+        ) {
+            let tool: Box<dyn kernel::Tool> = Box::new(server);
+            outside.push(tool);
+        }
+        Ok(outside)
+    }
+
     /// What this run's building may read by a path its model chose: the read bound, closed over
     /// the building and this city's rules (city-SPEC 8-2).
     ///

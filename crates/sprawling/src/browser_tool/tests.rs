@@ -14,7 +14,7 @@ mod recordings;
 
 use browser::{BrowserPort, Frame, Recording, Reply, SessionRequest};
 use recordings::*;
-use serde_json::json;
+use serde_json::{Map, json};
 
 /// One red pixel, as a real PNG.
 ///
