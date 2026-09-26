@@ -32,7 +32,7 @@ import { LOG_WINDOW, merged } from "./belief/shape";
 import { runTable } from "./belief/runs.svelte";
 import { livened, liveOf } from "./belief/live";
 import { roomed, roomsOf } from "./belief/rooms";
-import { cancelledOf } from "./belief/cancelled";
+import { cancelledOf, recounted } from "./belief/cancelled";
 export type { Belief, Notice, RunBelief } from "./belief/shape";
 
 function unseen(run: RunId, at: Seq): RunBelief {
@@ -328,9 +328,11 @@ export function createBelief(now: () => number): BeliefStore {
   // reading of the run, so the words written into it in place reach a
   // reader of the index too.
   function folded(held: Belief, run: RunId, next: RunBelief): void {
-    const rooms = roomed(held, held.runs[run], next);
+    const was = held.runs[run];
+    const rooms = roomed(held, was, next);
+    const cancelled = recounted(held.cancelled, was, next);
     held.runs[run] = next;
-    written({ ...held, live: livened(held.live, held.runs[run] ?? next), rooms, cancelled: cancelledOf(held.runs) });
+    written({ ...held, live: livened(held.live, held.runs[run] ?? next), rooms, cancelled });
   }
 
   // One piece of what the model is producing. A page that joins in the

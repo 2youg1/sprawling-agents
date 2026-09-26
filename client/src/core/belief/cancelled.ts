@@ -7,7 +7,7 @@
 // one halt froze, so this counts the runs whose own freeze says
 // `cancelled`, which is what a halt writes; belief keeps the count as it
 // folds, so the page's halt line does not walk the table on every
-// record (client-SPEC 12-5).
+// record.
 
 import type { RunBelief } from "./shape";
 
@@ -18,4 +18,9 @@ function cancelled(run: RunBelief | undefined): boolean {
 // The count over the whole table, for a write that replaces the table.
 export function cancelledOf(runs: Readonly<Record<string, RunBelief>>): number {
   return Object.values(runs).filter((run) => cancelled(run)).length;
+}
+
+// The count after one run read `run` where it read `was` before.
+export function recounted(count: number, was: RunBelief | undefined, run: RunBelief): number {
+  return count - Number(cancelled(was)) + Number(cancelled(run));
 }
