@@ -52,8 +52,146 @@ fn level(offset: u64, span: u64) -> Option<char> {
 /// reading and its last `curve_width` points; empty with no samples.
 #[must_use]
 pub fn screen(samples: &[Sample], curve_width: usize) -> String {
-    let _ = (samples, curve_width);
-    String::new()
+    let Some(latest) = samples.last() else {
+        return String::new();
+    };
+    ROWS.iter()
+        .map(|row| {
+            let label = row.label;
+            let reading = row.unit.reading((row.read)(latest));
+            let curve = sparkline(samples.iter().map(row.read), curve_width);
+            format!("{label:<24}{reading:>10}  {curve}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// One counter as the screen shows it.
+struct Row {
+    label: &'static str,
+    read: fn(&Sample) -> u64,
+    unit: Unit,
+}
+
+/// What a counter's integer counts, which decides how it is written.
+enum Unit {
+    Permille,
+    Bytes,
+    Nanos,
+    Count,
+}
+
+/// The counters in [`Sample`] field order.
+const ROWS: [Row; 13] = [
+    Row {
+        label: "core cpu",
+        read: |s| s.core_cpu_permille,
+        unit: Unit::Permille,
+    },
+    Row {
+        label: "core private",
+        read: |s| s.core_private_bytes,
+        unit: Unit::Bytes,
+    },
+    Row {
+        label: "core working set",
+        read: |s| s.core_working_set_bytes,
+        unit: Unit::Bytes,
+    },
+    Row {
+        label: "core read",
+        read: |s| s.core_read_bytes,
+        unit: Unit::Bytes,
+    },
+    Row {
+        label: "core written",
+        read: |s| s.core_written_bytes,
+        unit: Unit::Bytes,
+    },
+    Row {
+        label: "machine cpu",
+        read: |s| s.machine_cpu_permille,
+        unit: Unit::Permille,
+    },
+    Row {
+        label: "machine available",
+        read: |s| s.machine_available_bytes,
+        unit: Unit::Bytes,
+    },
+    Row {
+        label: "volume free",
+        read: |s| s.volume_free_bytes,
+        unit: Unit::Bytes,
+    },
+    Row {
+        label: "ledger queue depth",
+        read: |s| s.ledger_queue_depth,
+        unit: Unit::Count,
+    },
+    Row {
+        label: "durable lag",
+        read: |s| s.durable_lag,
+        unit: Unit::Count,
+    },
+    Row {
+        label: "relay p50",
+        read: |s| s.relay_p50_nanos,
+        unit: Unit::Nanos,
+    },
+    Row {
+        label: "event to screen p50",
+        read: |s| s.event_to_screen_p50_nanos,
+        unit: Unit::Nanos,
+    },
+    Row {
+        label: "queued runs",
+        read: |s| s.queued_runs,
+        unit: Unit::Count,
+    },
+];
+
+impl Unit {
+    /// `value` in this unit, one decimal truncated where a larger unit
+    /// applies.
+    fn reading(&self, value: u64) -> String {
+        match self {
+            Self::Permille => format!("{}%", tenths(u128::from(value))),
+            Self::Bytes => scaled(value, 1024, &["B", "KiB", "MiB", "GiB", "TiB"]),
+            Self::Nanos => scaled(value, 1000, &["ns", "µs", "ms", "s"]),
+            Self::Count => value.to_string(),
+        }
+    }
+}
+
+/// `value` in the largest of `units` (each `base` times the one before)
+/// that it reaches at least 1 of; the first unit is written whole.
+fn scaled(value: u64, base: u64, units: &[&str]) -> String {
+    let value = u128::from(value);
+    let (divisor, unit) = units
+        .iter()
+        .scan(1_u128, |divisor, &unit| {
+            let this = *divisor;
+            *divisor = divisor.saturating_mul(u128::from(base));
+            Some((this, unit))
+        })
+        .take_while(|&(divisor, _)| divisor == 1 || value >= divisor)
+        .last()
+        .unwrap_or((1, ""));
+    if divisor == 1 {
+        format!("{value} {unit}")
+    } else {
+        let whole_tenths = value.saturating_mul(10).checked_div(divisor).unwrap_or(0);
+        format!("{} {unit}", tenths(whole_tenths))
+    }
+}
+
+/// A count of tenths as a number with one decimal, `123` as `12.3`.
+fn tenths(count: u128) -> String {
+    format!(
+        "{}.{}",
+        count.checked_div(10).unwrap_or(0),
+        count.checked_rem(10).unwrap_or(0)
+    )
 }
 
 #[cfg(test)]
