@@ -30,7 +30,7 @@ import type { Endpoint, Pair, Tuning, WireApi } from "../../../core/commands";
 import { referenceFor, referenceText } from "../../../core/enrol";
 import type { Key } from "../../../core/lang";
 import { get } from "svelte/store";
-import { preferences } from "../../../core/prefs";
+import { PROXYING_RULES, preferences } from "../../../core/prefs";
 import type { Proxying, TuningDefaults } from "../../../wire";
 import type { Choice, Group } from "../../parts/segmented";
 
@@ -157,15 +157,19 @@ export function referenceOf(id: string): string {
   return referenceText(referenceFor(id === "" ? "<id>" : id));
 }
 
-// The three settings, each with the word it is offered under and the
-// sentence that says which machine it is right for. A table rather than
-// three branches: the control draws itself from it, and a fourth
-// setting would be a row.
-export const PROXYINGS: readonly (readonly [Proxying, Key, Key])[] = [
-  ["except_local", "setup_proxying_except_local", "setup_proxying_note_except_local"],
-  ["always", "setup_proxying_always", "setup_proxying_note_always"],
-  ["never", "setup_proxying_never", "setup_proxying_note_never"],
-];
+// Each proxy rule with the word it is offered under and the sentence
+// that says which machine it is right for. Keyed by the wire's own
+// type, so a rule the city adds is a compile error here until it has
+// its words; the order is the wire's.
+const PROXYING_WORDS: Readonly<Record<Proxying, readonly [Key, Key]>> = {
+  except_local: ["setup_proxying_except_local", "setup_proxying_note_except_local"],
+  always: ["setup_proxying_always", "setup_proxying_note_always"],
+  never: ["setup_proxying_never", "setup_proxying_note_never"],
+};
+
+export const PROXYINGS: readonly (readonly [Proxying, Key, Key])[] = PROXYING_RULES.map(
+  (rule) => [rule, ...PROXYING_WORDS[rule]] as const,
+);
 
 // The sentence that says which machine one rule is right for, which
 // the network screen and this form both draw under the control.
