@@ -26,7 +26,9 @@
 use crate::assembly::fixture::*;
 use crate::assembly::*;
 
-fn addr(raw: &str) -> Address {
+mod origin;
+
+pub(super) fn addr(raw: &str) -> Address {
     Address::parse(raw).unwrap()
 }
 
@@ -267,60 +269,6 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
     assert!(
         !next[after].contains("the meter says 42"),
         "the inheritance is spent by the run that began the session"
-    );
-}
-
-/// Checking a branch's origin reads the line it names, not the history:
-/// the history was verified when the city opened, and a check that
-/// verified it again would cost the whole ledger on every branch.
-///
-/// A chain broken after genesis is the witness: a verify refuses it, and
-/// the check, which never reads that line, answers as it would on an
-/// intact ledger.
-#[test]
-fn checking_a_branch_origin_does_not_verify_the_history() {
-    let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
-    let (base_url, _provider) =
-        fake_openai(&["m-local"], vec![completion("the meter says 42", None)]);
-    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    worker
-        .handle(channels::Command::Dispatch {
-            addr: addr("lab/room2"),
-            task: "measure the meter".to_owned(),
-            goal: "a number is written down".to_owned(),
-            model: None,
-            mode: kernel::Mode::PlanGoal,
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
-            session: None,
-            effort: None,
-        })
-        .unwrap();
-    let verified =
-        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
-            .unwrap();
-    let started = verified
-        .lines()
-        .iter()
-        .find_map(|line| match line {
-            runtime::replay::VerifiedLine::Known { record, .. }
-                if record.kind() == EventKind::RunStarted =>
-            {
-                Some(kernel::Origin {
-                    run: record.run(),
-                    at_seq: record.seq(),
-                })
-            }
-            runtime::replay::VerifiedLine::Known { .. }
-            | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
-        })
-        .expect("the mother ran");
-    break_the_chain_after_genesis(dir.path());
-
-    let checked = worker.origin_is_real(started);
-    assert!(
-        checked.is_ok(),
-        "a branch check verified the history: {checked:?}"
     );
 }
 

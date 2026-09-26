@@ -37,13 +37,9 @@ impl LedgerAsk {
     /// not read ends the slice rather than emptying it - what was read is
     /// still true.
     pub(super) fn records_of(&self, run: RunId) -> Vec<EventRecord> {
-        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        let Ok(mut index) = self.index.lock() else {
+        let Some((index, dir)) = self.indexed() else {
             return Vec::new();
         };
-        if index.refresh(&dir).is_err() {
-            return Vec::new();
-        }
         let want = usize::try_from(channels::HISTORY_MAX).unwrap_or(1);
         let mut newest: Vec<kernel::Seq> = index.run_seqs_before(run, None).take(want).collect();
         newest.reverse();

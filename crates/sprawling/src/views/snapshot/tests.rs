@@ -9,7 +9,7 @@
 use kernel::{Address, EventKind, RunId};
 
 use super::*;
-use crate::views::tests::view_record;
+use crate::views::tests::{Place, view_record};
 
 /// A view folded from records that fill the inbox, the discard bin and
 /// the registry, so a field added, removed or reordered among them
@@ -48,7 +48,7 @@ fn fixture(city_root: &Path) -> Views {
             panic!("each fixture payload is an object");
         };
         views
-            .apply(&view_record(seq, run, kind, &room, data))
+            .apply(&view_record(Place { seq, run }, kind, &room, data))
             .unwrap();
     }
     views

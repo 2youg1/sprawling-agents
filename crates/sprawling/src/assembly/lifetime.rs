@@ -133,7 +133,6 @@ impl RunWorker {
         RunWorker::holding(city_root, vault, log, (ledger, report, standing))
     }
 
-    ///
     /// `holding` takes a ledger already opened, its writer lock held, and
     /// what opening it repaired, and the standing folded from it under
     /// that lock.
