@@ -1480,9 +1480,10 @@ export const GateRefusal = Schema.Struct({
 export type GateRefusal = typeof GateRefusal.Type;
 
 /**
- * The unified error shape: seven wire fields, serialized in declaration
- * order (determinism rule 6). The model is the recovery subject: `nearby`
- * and `recovery` must hold directly executable information, not apologies.
+ * The unified error shape: seven wire fields and one that is left out
+ * when absent, serialized in declaration order (determinism rule 6).
+ * The model is the recovery subject: `nearby` and `recovery` must hold
+ * directly executable information, not apologies.
  * 
  * Everything but `code` sits behind one Box so the type stays cheap in
  * every seam's return slot (`result_large_err`); serde flatten keeps the
