@@ -2479,6 +2479,8 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 折叠本身逐字从 `web::turn::rounds` 搬来，一条不改：`model_called` 开一个回合；`tool_called` 挂进当前回合并按 runtime 给的 id 记下等答；`model_returned` 落到最近一个回合上；`tool_result` 按 id 找回它自己的那次调用——**恒不按位置配对**，因为两个调用可以先后发出而后发的先答；其余记录按 `channels::reading::note_of` 判是否成为一条 `Note`。`opened_at` 是本会话第一条 `Fenced` 的 oid：那是这份活开始时的树，取最新的一道栅栏答的是另一个问题（「上一波动了什么」）。
 
+**等人的终点从城自己的 run 里配回来**：`approval_resolved` 记在 `RunId::CITY` 下，不在这次会话的记录里，所以折完回合之后 `answer_waits` 按 approval id 把答复的 `t` 写回 `Note::Waiting.answered`。只有这次会话的窗口里有 `approval_requested` 时才读城的那一段（同样最新的 `HISTORY_MAX` 条）——没等过人的会话不多付一次读。请求或答复落在各自窗口外、或载荷读不回来时，`answered` 为 `None`，页面把请求之后整段画给人，而不是猜一个终点。备选是让治理折叠常驻一张 id→答复时刻的表：它随城一生里答过的每一件批准只增不减，而这里的读只在打开一个等过人的会话时才付。
+
 ### 8-50-2 `bin::views::evidence`——写下来的证据，不携字节
 
 同一份记录再走一遍，只认两种：`tool_result` 载荷 `result.image` 是 `cas:` 定位符的，成 `EvidenceKind::Screenshot`（连同 `width`／`height`／`media_type` 三项，缺一则 `picture` 为 `None` 而行仍在）；`roadmap_finished` 载荷 `evidence` 能读成定位符的，成 `EvidenceKind::Finished`。定位符读不回来的记录**不成行**——发明一条指不到任何东西的证据比少一行糟。

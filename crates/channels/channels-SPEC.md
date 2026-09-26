@@ -1316,7 +1316,8 @@ pub struct Turn {
 }
 pub enum Note {
     // …
-    Waiting { at: Seq, t: TimeMs },  // approval_requested 那条记录的 t
+    Waiting { at: Seq, t: TimeMs, answered: Option<TimeMs> },
+    // t：approval_requested 那条记录的 t；answered：按 approval id 配上的 approval_resolved 的 t
 }
 ```
 
@@ -1325,7 +1326,7 @@ pub enum Note {
 - **被否：只带一个时长**。时长丢了起点，页面画不出调用在时间轴上的位置，也就排不出并发的两次调用。
 - **模型名挂在回合上，不挂在答案上**：`model_called` 每问一次记一次 `model`，一次 run 中途换模型（降级、换端点）时，逐回合的名字才是账本写下的事实；run 页统计栏的「模型」格取最后一个回合的名字，前后不同时列出各个名字。读法与 `Call.subject` 同：取那一键的文本，读不出为 `None`，页面不画名字而不猜。
 - **被否：`RoundsAnswer.model` 一个字段**。那得在折叠里挑一个回合的名字当整次 run 的名字，换过模型的 run 上它说错一半。
-- **等人从哪一刻开始，读自请求记录**：`Note::Waiting.t` 是 `approval_requested` 那条记录的 `t`，与 `Call.called` 同理不是 `Option`。等到哪一刻结束不在这里：`approval_resolved` 记在城自己的 run 下，这个 run 的记录里没有它，按 approval id 把答复配回请求要治理折叠记下答复时刻，那一半今天不上线。
+- **等人从哪一刻开始，读自请求记录**：`Note::Waiting.t` 是 `approval_requested` 那条记录的 `t`，与 `Call.called` 同理不是 `Option`。等到哪一刻结束是 `answered`：`approval_resolved` 记在城自己的 run 下，服务端按 approval id 把它配回请求（sprawling-SPEC §8-50-1），配不上为 `None`，不猜。
 
 ### 8-46 先占住端口，再交出城：`bind` 与 `serve` 分成两步
 

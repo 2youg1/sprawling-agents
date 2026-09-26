@@ -20,7 +20,10 @@ mod reading_tests;
 #[cfg(test)]
 mod tests;
 
+use std::collections::BTreeMap;
+
 use channels::{EventKind, EventRecord, RunId, UsdMicros};
+use kernel::event::record::ApprovalResolved;
 
 use super::holding::Views;
 
@@ -59,7 +62,13 @@ impl Views {
     /// One session, folded into the rounds a person reads.
     pub(super) fn rounds_answer(&mut self, run: RunId) -> channels::RoundsAnswer {
         let records = self.records_of(run);
-        let turns = turns(records.iter());
+        let mut turns = turns(records.iter());
+        if records
+            .iter()
+            .any(|record| record.kind() == EventKind::ApprovalRequested)
+        {
+            answer_waits(&mut turns, &records, &self.records_of(RunId::CITY));
+        }
         channels::RoundsAnswer {
             opened_at: opened_at(&turns),
             opening: opening(&records),
@@ -91,6 +100,39 @@ fn opened_at(turns: &[channels::Turn]) -> Option<kernel::GitOid> {
             | channels::Note::Discarded { .. }
             | channels::Note::Unreadable { .. } => None,
         })
+}
+
+/// Writes onto each wait in `turns` when its answer was recorded.
+///
+/// `approval_resolved` is recorded under the city's own run, not under
+/// the session that asked, so `asked` (the session's records) gives each
+/// request's approval id and `city` gives each answer's time. A request
+/// or answer outside its window, or a payload that will not read back,
+/// leaves `answered` at `None` rather than a guessed end.
+fn answer_waits(turns: &mut [channels::Turn], asked: &[EventRecord], city: &[EventRecord]) {
+    let ids: BTreeMap<kernel::Seq, String> = asked
+        .iter()
+        .filter(|record| record.kind() == EventKind::ApprovalRequested)
+        .filter_map(
+            |record| match record.data().read::<kernel::ApprovalItem>() {
+                Ok(item) => Some((record.seq(), item.id.as_str().to_owned())),
+                Err(_) => None,
+            },
+        )
+        .collect();
+    let answers: BTreeMap<String, kernel::TimeMs> = city
+        .iter()
+        .filter(|record| record.kind() == EventKind::ApprovalResolved)
+        .filter_map(|record| match record.data().read::<ApprovalResolved>() {
+            Ok(ruled) => Some((ruled.id.as_str().to_owned(), record.t())),
+            Err(_) => None,
+        })
+        .collect();
+    for note in turns.iter_mut().flat_map(|turn| turn.notes.iter_mut()) {
+        if let channels::Note::Waiting { at, answered, .. } = note {
+            *answered = ids.get(at).and(None);
+        }
+    }
 }
 
 /// How the session opened, from the first `run_started` in the window.

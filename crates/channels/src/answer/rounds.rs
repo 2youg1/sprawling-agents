@@ -72,10 +72,15 @@ pub enum Note {
     Fenced { oid: GitOid, at: Seq },
     /// This turn stopped for a person. What waits and who answers is the
     /// approval queue's; copying it here would be a third authority.
-    /// `t` is when the Ledger recorded the request, so the wait is cut
-    /// where it began; when it ended is recorded under the city's own
-    /// run and is not on this note.
-    Waiting { at: Seq, t: TimeMs },
+    /// `t` is when the Ledger recorded the request and `answered` when
+    /// it recorded the answer, paired back by approval id from the
+    /// city's own run; `None` when the answer is outside that window or
+    /// has not come, and the page then draws no guessed end.
+    Waiting {
+        at: Seq,
+        t: TimeMs,
+        answered: Option<TimeMs>,
+    },
     /// A word arrived - from the person watching, or from another
     /// address that reached this one.
     Arrived { from: String, said: String, at: Seq },
