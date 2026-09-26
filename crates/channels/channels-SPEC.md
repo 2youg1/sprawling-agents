@@ -1317,3 +1317,14 @@ pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
 - **失败码不变**：判定拒绝仍是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定仍是 `E_CONFIG_INVALID`，recovery 仍是「换一个空闲端口，或者停掉占着它的进程」。
 - **被否：先试绑一次再放掉，然后在 `serve` 里真绑**。试绑与真绑之间，别的进程可以把端口拿走，那样原来的缺陷只是窗口变窄了，并没有消失。
 - **两者住 `server::listener`**，不住 `server::socket`：它们管的是监听器本身，先占、再服务；`server::socket` 管的是连上之后的会话、资产与上传。`Bound` 带 `#[must_use]`：占住端口而不服务，得到的是一个谁也不应答的端口。
+
+### 8-47 `WIRE_V` 39：查询按它回答的东西命名：`Query::NewestRelease`
+
+```rust
+pub enum Query { /* … */ NewestRelease }   // 线上拼作 "newest_release"
+```
+
+- **名字说出答的是什么**：这条查询回答「这座城是哪一版、npm 上最新的是哪一版」（§8-36 的五条口径不变）。它原来叫 `Release`，与释放一个关停范围的 `Command::Release` 同名；控制台把 socket 能带的动词与查询列在一处，一个人看到两个 `release`，分不清哪个放开关停、哪个去问注册表。
+- **只改查询，不改答复**：`Answer::Release` 与 `ReleaseAnswer` 保持原名。答复不出现在人能输入的地方，没有同名的歧义；改它只会多一次无人受益的线上换形。
+- **`WIRE_V` 38→39**：变体名进 `QUERY_NAMES`，于是 §8-1 的 golden 随之改变，旧页面在握手时被拒，而不是发出一条城不认识的查询。旧拼法 `Query::Release` 登记在 `xtask/lexicon.toml`，由 `lexicon` 门拒绝它再出现。
+- **被否：保留 `release` 作别名**。一条查询两个拼法，就是同一个名字有两个家；握手已经把旧页面挡在门外，别名没有读者。
