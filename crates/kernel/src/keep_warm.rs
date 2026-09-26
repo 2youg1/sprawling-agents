@@ -11,7 +11,7 @@
 //! is observed where every request's usage is recorded; this decision
 //! reads no balance and refuses nothing.
 
-use kernel::consts_external::PROMPT_CACHE_TTL_SECS;
+use crate::consts_external::PROMPT_CACHE_TTL_SECS;
 use serde::{Deserialize, Serialize};
 
 /// Whether this city renews a warm prompt cache before it expires.
