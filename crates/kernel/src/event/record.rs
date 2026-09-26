@@ -40,6 +40,7 @@
 
 mod adviser;
 mod checkpoint;
+mod discard;
 mod governance;
 mod log;
 mod modality;
@@ -51,6 +52,7 @@ pub use adviser::{
     AdviserAnswer, AdviserAnswered, AdviserAsk, AdviserAsked, AdviserFailure, AdviserFellBack,
 };
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
+pub use discard::{AssetArchived, DiscardRestored, FileDiscarded};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     GoverningDocument, RulesChanged, SpineDocumentWritten, autonomy_word,

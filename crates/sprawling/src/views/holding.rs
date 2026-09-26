@@ -30,7 +30,9 @@ use kernel::{Address, AxError, EventKind, EventRecord};
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
 use super::lines::verdict_line;
-use super::lines::{buildings_of, discard_lines, pursuit_from, registry_line, signal_line};
+use super::lines::{
+    buildings_of, discard_lines, pursuit_from, registry_line, restored_paths, signal_line,
+};
 use crate::assembly::{ledger_dir, rebuild_views};
 
 /// Answers one query out of a city's own history, without serving it.
@@ -233,8 +235,8 @@ impl Views {
                 }
             }
             EventKind::DiscardRestored => {
-                for line in discard_lines(record) {
-                    if let Some(held) = self.discards.get_mut(&line.path) {
+                for path in restored_paths(record) {
+                    if let Some(held) = self.discards.get_mut(&path) {
                         held.restored = true;
                     }
                 }

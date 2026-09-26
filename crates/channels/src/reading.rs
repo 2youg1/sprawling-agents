@@ -17,7 +17,7 @@
 //! rather than an error, because a view that hid a record it could not
 //! parse would be a view that lies about what happened.
 
-use kernel::event::record::CheckpointCommitted;
+use kernel::event::record::{CheckpointCommitted, FileDiscarded};
 use kernel::{EventKind, EventRecord, Seq};
 
 use crate::answer::{Note, Output, Used};
@@ -189,12 +189,12 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
             said: text(map.get("text")).unwrap_or_default(),
             at,
         }),
-        EventKind::FileDiscarded => Some(Note::Discarded {
-            count: map
-                .get("paths")
-                .and_then(serde_json::Value::as_array)
-                .map_or(1, Vec::len),
-            at,
+        EventKind::FileDiscarded => Some(match record.data().read::<FileDiscarded>() {
+            Ok(discarded) => Note::Discarded {
+                count: discarded.paths.len(),
+                at,
+            },
+            Err(err) => unreadable(kind, &err, at),
         }),
         _ => None,
     }

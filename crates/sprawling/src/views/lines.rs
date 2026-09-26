@@ -24,6 +24,7 @@
 
 use std::path::Path;
 
+use kernel::event::record::{AssetArchived, DiscardRestored, FileDiscarded};
 use kernel::{Address, EventRecord, RunId};
 
 // Where a city keeps its ledger and how a building reads off disk are
@@ -195,42 +196,41 @@ pub(crate) fn signal_line(record: &EventRecord) -> Option<(Address, channels::Si
     ))
 }
 
-/// The rows one discard record states. A record carries the paths it
-/// discarded and one restoration per path.
+/// The rows one `file_discarded` record states: one per path, each with
+/// the record's way back. A record this version cannot read states no
+/// rows, for the reason [`signal_line`] gives.
 pub(crate) fn discard_lines(record: &EventRecord) -> Vec<channels::DiscardLine> {
-    let map = record.data().as_map();
-    // The plan travels as itself. It was written by serialising a
-    // `Restoration`, so it reads back as one; a scheme this build cannot
-    // name comes through as `None` and the row still appears.
-    let restoration = map
-        .get("restoration")
-        .cloned()
-        .and_then(|way| serde_json::from_value::<channels::Restoration>(way).ok());
-    map.get("paths")
-        .and_then(serde_json::Value::as_array)
-        .map(|paths| {
-            paths
-                .iter()
-                .filter_map(|path| {
-                    Some(channels::DiscardLine {
-                        path: path.as_str()?.to_owned(),
-                        restoration: restoration.clone(),
-                        at: record.t(),
-                        restored: false,
-                    })
-                })
-                .collect()
+    let Ok(FileDiscarded { paths, restoration }) = record.data().read() else {
+        return Vec::new();
+    };
+    paths
+        .into_iter()
+        .map(|path| channels::DiscardLine {
+            path,
+            restoration: restoration.clone(),
+            at: record.t(),
+            restored: false,
         })
-        .unwrap_or_default()
+        .collect()
 }
 
+/// The paths one `discard_restored` record put back; none when this
+/// version cannot read it.
+pub(crate) fn restored_paths(record: &EventRecord) -> Vec<String> {
+    record
+        .data()
+        .read::<DiscardRestored>()
+        .map_or_else(|_| Vec::new(), |restored| restored.paths)
+}
+
+/// One shelf entry, as the registry shows it. `None` for a record with
+/// no room or one this version cannot read.
 pub(crate) fn registry_line(record: &EventRecord) -> Option<channels::RegistryLine> {
-    let map = record.data().as_map();
-    let text = |key: &str| map.get(key).and_then(serde_json::Value::as_str);
+    let AssetArchived { kind, subject, .. } = record.data().read().ok()?;
     Some(channels::RegistryLine {
         addr: record.addr().cloned()?,
-        kind: text("kind").unwrap_or("fact").to_owned(),
-        subject: text("subject").unwrap_or_default().to_owned(),
+        kind,
+        subject,
         at: record.t(),
     })
 }

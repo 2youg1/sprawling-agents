@@ -417,6 +417,11 @@ pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
 pub struct RulesChanged { pub scope: Scope, pub which: GoverningDocument,
                           pub before: Option<B3Hash>, pub after: B3Hash, pub bytes: usize }
 pub enum GoverningDocument { Rules, Config }     // serde: "RULES.toml" | "CONFIG.toml"
+pub struct FileDiscarded { pub paths: Vec<String>,            // `file:<path>`，git 认的名字 Address 未必认
+                           pub restoration: Option<Restoration> } // 缺或方案不识：None，paths 照读
+pub struct DiscardRestored { pub paths: Vec<String> }
+pub struct AssetArchived { #[serde(default = "fact")] pub kind: String,
+                           #[serde(default)] pub day: u64, #[serde(default)] pub subject: String }
 pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
                              pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }
 pub struct RerankCalled { pub model: String, pub passages: u64, pub ranks: u64,

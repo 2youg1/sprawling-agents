@@ -1940,6 +1940,9 @@ pub kernel::event::record::AdviserFellBack::subject: alloc::string::String
 pub kernel::event::record::ApprovalResolved::cluster: kernel::approval::ClusterKey
 pub kernel::event::record::ApprovalResolved::id: kernel::approval::ApprovalId
 pub kernel::event::record::ApprovalResolved::verdict: kernel::approval::Ruling
+pub kernel::event::record::AssetArchived::day: u64
+pub kernel::event::record::AssetArchived::kind: alloc::string::String
+pub kernel::event::record::AssetArchived::subject: alloc::string::String
 pub kernel::event::record::AutonomyChanged::autonomy: kernel::approval::Autonomy
 pub kernel::event::record::AutonomyChanged::scope: kernel::event::Scope
 pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
@@ -1954,6 +1957,7 @@ pub kernel::event::record::Commit::scope: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::CommitAttribution::effort: core::option::Option<kernel::Effort>
 pub kernel::event::record::CommitAttribution::model: alloc::string::String
 pub kernel::event::record::CommitAttribution::predecessor: core::option::Option<kernel::RunId>
+pub kernel::event::record::DiscardRestored::paths: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::EmbeddingCalled::dimensions: core::option::Option<u64>
 pub kernel::event::record::EmbeddingCalled::inputs: u64
 pub kernel::event::record::EmbeddingCalled::model: alloc::string::String
@@ -1961,6 +1965,8 @@ pub kernel::event::record::EmbeddingCalled::prompt_tokens: core::option::Option<
 pub kernel::event::record::EmbeddingCalled::vectors: u64
 pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
 pub kernel::event::record::EvidenceCite::seq: kernel::Seq
+pub kernel::event::record::FileDiscarded::paths: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::FileDiscarded::restoration: core::option::Option<kernel::Restoration>
 pub kernel::event::record::GovernedDocumentWritten::bytes: usize
 pub kernel::event::record::GovernedDocumentWritten::which: alloc::string::String
 pub kernel::event::record::GoverningDocument::Config
@@ -2511,12 +2517,15 @@ pub struct kernel::event::record::AdviserAnswered
 pub struct kernel::event::record::AdviserAsked
 pub struct kernel::event::record::AdviserFellBack
 pub struct kernel::event::record::ApprovalResolved
+pub struct kernel::event::record::AssetArchived
 pub struct kernel::event::record::AutonomyChanged
 pub struct kernel::event::record::CityHalted
 pub struct kernel::event::record::Commit
 pub struct kernel::event::record::CommitAttribution
+pub struct kernel::event::record::DiscardRestored
 pub struct kernel::event::record::EmbeddingCalled
 pub struct kernel::event::record::EvidenceCite
+pub struct kernel::event::record::FileDiscarded
 pub struct kernel::event::record::GovernedDocumentWritten
 pub struct kernel::event::record::LogTruncated
 pub struct kernel::event::record::ModelCalled
