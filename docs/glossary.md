@@ -58,6 +58,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **EventDraft** | An event that has not yet been given a `seq` and a `prev`. Only the Ledger port turns one into an EventRecord. |
 | **EventRef** | A reference to an event. **Privately minted**: no public constructor and no serde, so a forged reference cannot be spelled. |
 | **Locator** | The retrieval grammar, `cas:` or `file:`. Fail-closed: a shape that does not match is refused rather than guessed. |
+| **Citation** | A quote paired with the `cas:` or `file:` Locator range it claims to come from. A verification run compares it, after collapsing whitespace, against the version pinned for review; a citation that names another version does not hold even when the words match. |
 | **CAS** | Content-addressed store (BLAKE3). Identical content is stored once for its lifetime. |
 | **projection** | A view rebuilt from the event stream. **Disposable**: deleting the table and rebuilding from the Ledger gives byte-identical results. |
 | **Snapshot** | The same idea inside the browser (`client/src/core/belief.ts`): equally disposable, equally forward-only. |
