@@ -12,6 +12,7 @@ use super::*;
 // The desk produces the effects; whether one still holds is
 // `claim_effect`'s question, asked here against a real desk run.
 use crate::claim_effect::{evidence_of, still_true};
+use kernel::spine::set_roadmap_status;
 
 const PLAN: &str = "\
 # Roadmap

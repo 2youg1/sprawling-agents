@@ -47,8 +47,13 @@ pub(crate) enum Then {
     Deliver(Vec<collab::Signal>),
     /// Hold this ground in the city's goal register.
     Hold(Vec<kernel::GoalEntry>),
-    /// Write the shared plan back, as the desk left it.
-    Roadmap { path: PathBuf, text: String },
+    /// Replace the shared plan with `text`, the run's effects replayed
+    /// onto `base`, only while the file still reads `base`.
+    Roadmap {
+        path: PathBuf,
+        base: String,
+        text: String,
+    },
     /// Put these on the building's shelf.
     Shelf(Vec<Filing>),
 }
@@ -240,9 +245,9 @@ impl Landing {
 }
 
 /// What a run's claims on the shared plan came to. Two answers and no
-/// third, because the plan is written whole: either every effect still
-/// matches the file as it stands and the lines take the rows, or one of
-/// them does not and nothing at all is written.
+/// third: either every effect still matches the file as it stands and
+/// all of them are replayed onto it, or one of them does not and nothing
+/// at all is written.
 pub(crate) enum Claims {
     Landed(Box<Landing>),
     /// The nodes that moved, so a person can be told which.
@@ -257,12 +262,16 @@ impl Claims {
     /// that claimed from its old copy a node somebody had since landed,
     /// whose claim is dropped rather than written over that row.
     ///
+    /// The effects are replayed onto `on_disk` rather than the desk's
+    /// dispatch-time copy written back, so a row another run landed
+    /// since this one was dispatched is kept.
+    ///
     /// # Errors
-    /// Propagates a claim whose payload cannot be built.
+    /// Propagates a claim whose payload cannot be built, or an effect
+    /// the plan on disk refuses to take.
     pub(crate) fn of(
         effects: &[collab::ClaimEffect],
         on_disk: &str,
-        text: String,
         path: PathBuf,
         room: &Address,
         who: &str,
@@ -285,7 +294,9 @@ impl Claims {
             return Ok(Claims::Stale(stale));
         }
         let mut lines = Vec::new();
+        let mut text = on_disk.to_owned();
         for effect in effects {
+            text = effect.apply(&text)?;
             lines.push(Line {
                 who: who.to_owned(),
                 addr: room.clone(),
@@ -298,7 +309,11 @@ impl Claims {
         }
         Ok(Claims::Landed(Box::new(Landing {
             lines,
-            then: Then::Roadmap { path, text },
+            then: Then::Roadmap {
+                path,
+                base: on_disk.to_owned(),
+                text,
+            },
         })))
     }
 }
@@ -379,18 +394,8 @@ mod tests {
     fn landed(desk: &std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>, on_disk: &str) -> String {
         let mut desk = desk.lock().unwrap();
         let effects = desk.take_effects();
-        let text = desk.roadmap().unwrap().to_owned();
         let room = Address::parse("lab/room1").unwrap();
-        match Claims::of(
-            &effects,
-            on_disk,
-            text,
-            "Roadmap.md".into(),
-            &room,
-            "potter",
-        )
-        .unwrap()
-        {
+        match Claims::of(&effects, on_disk, "Roadmap.md".into(), &room, "potter").unwrap() {
             Claims::Landed(landing) => match landing.then {
                 Then::Roadmap { text, .. } => text,
                 _ => panic!("a claim lands on the plan"),

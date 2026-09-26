@@ -12,7 +12,6 @@ use crate::effect;
 use super::super::{
     Assignment, Dispatched, Ending, Handover, Landed, Owed, Owing, RunWorker, Site, held,
 };
-use super::desks::write_plan;
 
 /// The action an `AxError` names when one of the two hand-down desks
 /// cannot be read. Written here rather than at the call site, where the
@@ -81,20 +80,10 @@ impl RunWorker {
                 self.goals.extend(entries);
                 Ok(())
             }
-            effect::Then::Roadmap { path, text } => {
-                let before = std::fs::read_to_string(&path).ok();
-                // The rollback is best effort by construction: the
-                // error a person must see is the one from the write,
-                // and a rollback that also failed cannot be reported
-                // here without replacing it.
-                write_plan(&path, &text).inspect_err(|_| match before {
-                    Some(text) => {
-                        drop(std::fs::write(&path, text));
-                    }
-                    None => {
-                        drop(std::fs::remove_file(&path));
-                    }
-                })
+            // The replacement is whole or not at all, so a refusal
+            // leaves the file at `base` with nothing to roll back.
+            effect::Then::Roadmap { path, base, text } => {
+                city::edit_against(&path, base.as_bytes(), text.as_bytes())
             }
             effect::Then::Shelf(filings) => {
                 let mut written = Vec::new();

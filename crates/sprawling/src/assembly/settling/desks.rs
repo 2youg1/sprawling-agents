@@ -5,26 +5,11 @@
 
 //! What a drive left, on the ledger before it is made true.
 
-use kernel::{AxCode, AxError};
+use kernel::AxError;
 
 use crate::effect;
 
 use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held, now_ms};
-
-/// Writes the plan back, creating nothing that was not there: a
-/// building without a plan is a building whose residents have nothing
-/// to claim, and inventing one here would put a denominator on screen
-/// that no person wrote.
-pub(in crate::assembly) fn write_plan(path: &std::path::Path, text: &str) -> Result<(), AxError> {
-    std::fs::write(path, text).map_err(|err| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "write the plan",
-            format!("{}: {err}", path.display()),
-        )
-        .with_recovery("fix the file's permissions; the claim was not recorded")
-    })
-}
 
 impl RunWorker {
     /// Settles the four desks that leave lines behind, in the order the
@@ -119,21 +104,15 @@ impl RunWorker {
         // still held here was neither finished nor stopped, and the
         // `Held` dies with the desk, so it is spent on its one exit now
         // or the row stays `In progress` for ever.
-        let (claim_effects, plan_after) = {
+        let (claim_effects, plan_changed) = {
             let mut desk = held(&desks.plan, "settle the plan desk")?;
             desk.abandon()?;
-            (desk.take_effects(), desk.roadmap().map(str::to_owned))
+            (desk.take_effects(), desk.roadmap().is_some())
         };
-        if let Some(text) = plan_after {
+        if plan_changed {
             let on_disk = city::roadmap(&self.city_root, building.addr())?;
-            match effect::Claims::of(
-                &claim_effects,
-                &on_disk,
-                text,
-                desks.plan_path.clone(),
-                addr,
-                who,
-            )? {
+            match effect::Claims::of(&claim_effects, &on_disk, desks.plan_path.clone(), addr, who)?
+            {
                 effect::Claims::Landed(taken) => {
                     self.settle(at, run_id, *taken, conversations)?;
                     self.tell_whoever_is_behind(

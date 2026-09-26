@@ -13,8 +13,8 @@
 //! says it made it say. `ClaimDesk` decides; this describes and checks.
 //! Two shapes, so two files (ARCHITECTURE.md section 9).
 
-use kernel::spine::check_roadmap_shape;
-use kernel::{AxCode, AxError, EvidenceCell, Locator, NodeId, Payload, PlanExit};
+use kernel::spine::{check_roadmap_shape, insert_children, set_roadmap_status};
+use kernel::{AxCode, AxError, EvidenceCell, Locator, NewChild, NodeId, Payload, PlanExit};
 use kernel::{RoadmapShape, RoadmapStatus};
 use serde_json::{Map, Value};
 
@@ -37,9 +37,12 @@ pub enum ClaimEffect {
         item: String,
         exit: PlanExit,
     },
+    /// Carries each child's weight as well as its item, because the
+    /// worker replays the split onto the plan it reads at landing and a
+    /// name alone does not rebuild the row the desk wrote.
     Split {
         parent: NodeId,
-        children: Vec<String>,
+        children: Vec<NewChild>,
     },
 }
 
@@ -64,6 +67,27 @@ impl ClaimEffect {
             // A split does not move the parent, so what must still hold
             // is only that the parent is where it was.
             ClaimEffect::Split { .. } => RoadmapStatus::InProgress,
+        }
+    }
+
+    /// The plan text with this effect written into it. The one
+    /// definition of how an effect edits the plan: the desk edits its
+    /// copy through it when the model calls, and the worker replays the
+    /// same effects onto the file as it stands when the run lands, so a
+    /// row another run landed meanwhile is kept rather than reverted.
+    ///
+    /// # Errors
+    /// Propagates the plan's refusal to take the edit: a node that is
+    /// not in the text, or a split that would not fit.
+    pub fn apply(&self, text: &str) -> Result<String, AxError> {
+        match self {
+            ClaimEffect::Claimed { id, .. } => {
+                set_roadmap_status(text, id, RoadmapStatus::InProgress, None)
+            }
+            ClaimEffect::PutDown { id, exit, .. } => {
+                set_roadmap_status(text, id, exit.status(), exit.evidence())
+            }
+            ClaimEffect::Split { parent, children } => insert_children(text, parent, children),
         }
     }
 
@@ -101,7 +125,7 @@ impl ClaimEffect {
                     Value::Array(
                         children
                             .iter()
-                            .map(|text| Value::String(text.clone()))
+                            .map(|child| Value::String(child.item.clone()))
                             .collect(),
                     ),
                 );

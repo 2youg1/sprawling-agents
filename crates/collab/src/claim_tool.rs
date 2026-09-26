@@ -25,7 +25,7 @@
 //! while "2.3 is being worked on, 2.4 is ready" does not.
 
 use crate::claim_effect::ClaimEffect;
-use kernel::spine::{check_roadmap_shape, insert_children, set_roadmap_status};
+use kernel::spine::check_roadmap_shape;
 use kernel::{
     Address, AxCode, AxError, Held, Locator, NewChild, NodeId, Payload, PlanExit, PlanTree,
     RoadmapShape, RoadmapStatus, StopCause,
@@ -157,13 +157,19 @@ impl ClaimDesk {
         let item = tree
             .get(exit.id())
             .map_or_else(String::new, |node| node.row.item.clone());
-        self.text = set_roadmap_status(&self.text, exit.id(), exit.status(), exit.evidence())?;
-        self.changed = true;
-        self.effects.push(ClaimEffect::PutDown {
+        self.take(ClaimEffect::PutDown {
             id: exit.id().clone(),
             item,
             exit,
-        });
+        })
+    }
+
+    /// Writes an effect into the desk's copy and queues it for the
+    /// worker, which replays the same effect onto the file at landing.
+    fn take(&mut self, effect: ClaimEffect) -> Result<(), AxError> {
+        self.text = effect.apply(&self.text)?;
+        self.changed = true;
+        self.effects.push(effect);
         Ok(())
     }
 
@@ -230,12 +236,10 @@ impl ClaimDesk {
         let item = tree
             .get(id)
             .map_or_else(String::new, |node| node.row.item.clone());
-        self.text = set_roadmap_status(&self.text, id, RoadmapStatus::InProgress, None)?;
-        self.changed = true;
-        self.effects.push(ClaimEffect::Claimed {
+        self.take(ClaimEffect::Claimed {
             id: id.clone(),
             item: item.clone(),
-        });
+        })?;
         self.held = Some(held);
         let mut result = Map::new();
         result.insert("node".to_owned(), Value::String(id.to_string()));
@@ -281,7 +285,17 @@ impl ClaimDesk {
             )
             .with_recovery("list the plan first and use an index it carries"));
         }
-        let grown = insert_children(&self.text, id, children)?;
+        let effect = ClaimEffect::Split {
+            parent: id.clone(),
+            children: children
+                .iter()
+                .map(|child| NewChild {
+                    item: child.item.trim().to_owned(),
+                    weight: child.weight,
+                })
+                .collect(),
+        };
+        let grown = effect.apply(&self.text)?;
         // Built before it is written: a split that would not parse, or
         // that would push the plan past its depth, is refused with the
         // file untouched rather than repaired afterwards.
@@ -302,19 +316,16 @@ impl ClaimDesk {
                 .filter(|child| child.row.status != RoadmapStatus::Done)
                 .count()
         });
-        self.text = grown;
-        self.changed = true;
-        if self.holding() == Some(id) {
-            self.held = None;
-        }
         let names: Vec<String> = children
             .iter()
             .map(|child| child.item.trim().to_owned())
             .collect();
-        self.effects.push(ClaimEffect::Split {
-            parent: id.clone(),
-            children: names.clone(),
-        });
+        self.text = grown;
+        self.changed = true;
+        self.effects.push(effect);
+        if self.holding() == Some(id) {
+            self.held = None;
+        }
         let mut result = Map::new();
         result.insert("node".to_owned(), Value::String(id.to_string()));
         result.insert(
