@@ -54,3 +54,21 @@ fn a_release_that_attaches_an_unattested_archive_is_reported() {
     }
     assert_eq!(findings("jobs:\n  build:\n    runs-on: x\n").len(), 1);
 }
+
+/// A comment in an earlier job that names the command does not make that
+/// job the one that attaches, and the glob may sit on a line the command
+/// continues onto with a trailing `\`.
+#[test]
+fn the_attaching_job_is_the_one_that_runs_the_command_through_its_continuations() {
+    let commented = ATTESTED.replace(
+        "  archive:\n",
+        "  archive:\n    # `gh release create` runs in publish, below\n",
+    );
+    let continued = ATTESTED.replace(
+        "assets/*.zip --prerelease",
+        "\\\n            assets/*.zip \\\n            --prerelease",
+    );
+    assert_ne!(continued, ATTESTED);
+    assert_eq!(findings(&commented), Vec::<String>::new());
+    assert_eq!(findings(&continued), Vec::<String>::new());
+}
