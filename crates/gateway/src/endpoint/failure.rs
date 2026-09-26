@@ -136,12 +136,29 @@ mod tests {
             "call provider",
             &ProviderFailure::Refused {
                 url: "http://house/v1",
-                status: reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+                status: reqwest::StatusCode::BAD_REQUEST,
             },
         );
         assert!(!refused.is_retriable(), "it would answer the same way");
-        assert!(refused.subject().contains("answered 500"));
+        assert!(refused.subject().contains("answered 400"));
         let shape = ProviderFailure::Unreadable("no data array".to_owned());
         assert!(!provider_err("read the model list", &shape).is_retriable());
+    }
+    #[test]
+    fn a_provider_that_says_busy_or_broken_is_asked_again_and_one_that_refuses_is_not() {
+        let asked_again = |code: u16| {
+            let status = reqwest::StatusCode::from_u16(code).unwrap();
+            provider_err(
+                "call provider",
+                &ProviderFailure::Refused {
+                    url: "http://house/v1",
+                    status,
+                },
+            )
+            .is_retriable()
+        };
+        let statuses = [400, 401, 403, 404, 408, 422, 429, 500, 502, 503, 504, 529];
+        let retried: Vec<u16> = statuses.into_iter().filter(|&c| asked_again(c)).collect();
+        assert_eq!(retried, [408, 429, 500, 502, 503, 504, 529]);
     }
 }
