@@ -109,6 +109,24 @@ impl Sieving {
     }
 }
 
+impl Sieving {
+    /// What the model reads of one connector answer: the pipeline's
+    /// window over it, with the original stored where it had to be cut.
+    pub(super) fn package_connector(
+        &mut self,
+        outcome: kernel::ToolOutcome,
+    ) -> Result<kernel::ToolOutcome, AxError> {
+        runtime::package_connector(
+            outcome,
+            runtime::offload::OffloadSite {
+                cas: &mut self.cas,
+                city_root: &self.city_root,
+                room: &self.room,
+            },
+        )
+    }
+}
+
 /// What one drive left behind, beside the run it froze.
 ///
 /// Every field is written by a hook while the driver owns the ledger and

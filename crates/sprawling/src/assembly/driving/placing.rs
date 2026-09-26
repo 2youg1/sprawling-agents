@@ -110,6 +110,25 @@ impl<'f> Placing<'f> {
         self.ran
     }
 
+    /// What the model reads of a result no command produced: a
+    /// connector's answer is packaged for the window
+    /// (runtime-SPEC.md 8-27-10); every other tool shapes its own.
+    fn unsieved(&mut self, call: &ToolCall, outcome: ToolOutcome) -> Result<ToolOutcome, AxError> {
+        match self.bench.meta_of(&call.name).map(|meta| &meta.effect) {
+            Some(Effect::Connector { .. }) => self.sieving.package_connector(outcome),
+            Some(
+                Effect::Read
+                | Effect::Write { .. }
+                | Effect::Spawn
+                | Effect::Govern
+                | Effect::Spend
+                | Effect::Egress
+                | Effect::AttachUserBrowser { .. },
+            )
+            | None => Ok(outcome),
+        }
+    }
+
     /// What the model reads back for what the bench decided.
     fn answered(&mut self, call: &ToolCall, decided: BenchOutcome) -> Result<ToolOutcome, AxError> {
         match decided {
@@ -123,7 +142,7 @@ impl<'f> Placing<'f> {
                 }
                 self.fencing.add(wrote);
                 if call.name.as_str() != kernel::ToolName::EXEC {
-                    return Ok(outcome);
+                    return self.unsieved(call, outcome);
                 }
                 // Absence of `exit_code` is a failure, not a success: a
                 // command a signal stopped returns no code at all, and
@@ -154,7 +173,7 @@ impl<'f> Placing<'f> {
                 if call.name.as_str() == kernel::ToolName::EXEC {
                     self.sieving.package(call, outcome)
                 } else {
-                    Ok(outcome)
+                    self.unsieved(call, outcome)
                 }
             }
         }

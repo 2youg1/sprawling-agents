@@ -181,6 +181,28 @@ Mail, GitHub, Figma, Discord: writing an integration for each is a weekly chore 
 
 A confidential building constructs none of them: data may enter and may not leave.
 
+#### Documents as Markdown: `markitdown-mcp`
+
+[MarkItDown](https://github.com/microsoft/markitdown) turns PDF, Word, Excel, PowerPoint, HTML and similar files into Markdown, which a model reads far more cheaply than the original bytes. It joins a building as one more stdio MCP server, so the kernel gains no converter and no dependency on Python: the server is a child process the building's configuration names, and removing the entry removes the tools.
+
+Install it on the machine the city runs on with `pip install markitdown-mcp`, then add one entry to the building's `.sprawling/CONFIG.toml`:
+
+```toml
+[[mcp]]
+label = "docs"
+command = "markitdown-mcp"
+```
+
+A `command` entry is stdio by definition, so it carries no `transport` key, and the configuration refuses one. The server offers one tool, `convert_to_markdown(uri)`, which reaches a run as `docs_convert_to_markdown`. Its `uri` may be `file:`, `data:`, `http:` or `https:`, so the same tool that converts a file in the building also fetches a page from the network.
+
+Three limits apply today, and each is a fact about the code rather than a choice this entry can change:
+
+- A call that has not answered within `protocol::mcp::EXTERNAL_CALL_PATIENCE` (60 s) is refused and the child is stopped. The deadline is the same for every server; `[[mcp]]` has no key to lengthen it for a slow conversion.
+- One answer is at most `protocol::mcp::MESSAGE_CEILING` (8 MiB), and an answer above it ends the connection.
+- An answer whose text exceeds `runtime::CONNECTOR_CAP_BYTES` (16 KiB) goes through `runtime::pipeline::package`, the same step that shapes an `exec` result (runtime-SPEC §8-27-10). Plain text is stored whole and the model reads a window with the path it pages with `read`. Markdown is the exception, and it is what this server returns: the pipeline shortens a long Markdown document to its section outline and stores nothing, so the text it drops is not reachable from that call. Convert one document, or one part of one, per call.
+
+**A confidential building starts no MCP server at all**, `markitdown-mcp` included, because the city cannot tell a server that only converts local files from one that also fetches URLs, and the tool itself accepts `https:`. Local conversion there goes through `exec` with the command-line converter on a file inside the building (`pip install markitdown`, then `markitdown report.pdf`): that result passes through the same `runtime::pipeline::package`. The same caveat as every `exec` applies: nothing yet stops a host command from reaching the network (city-SPEC, the execution points still missing), so this stays safe only while the converter is given local paths.
+
 ### The rest
 
 | Part | Seam or surface | Note |

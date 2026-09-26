@@ -1216,7 +1216,7 @@ tee（原文钉进 CAS ＋ 实体化 rest 文件）
 
 #### 8-27-3 作用范围
 
-**只作用于 `exec` 结果。** 命令感知的东西对没有命令的工具无可感知：`read` 结果、模型输出、MCP 结果各自走既有的 `compaction`／`redact` 路径，本节不动它们。
+**只作用于 `exec` 结果。** 命令感知的东西对没有命令的工具无可感知：`read` 结果、模型输出、MCP 结果各自走既有的 `compaction`／`redact` 路径，本节不动它们。MCP 结果不过 sieve，但过同一个 `package` 的落盘一步，见 8-27-10。
 
 #### 8-27-4 七条不变量
 
@@ -1381,6 +1381,22 @@ pub struct PackContext<'a> { /* 既有五字段 */ pub sieve: Option<SieveReques
 **citysim 侧**：`Scenario` 增 `sieve: Option<SieveWorld>`（CAS＋environment＋过滤表＋本 run 的 history）；有它时执行器把名为 `exec` 的工具结果经 `package_exec` 走带 `SieveRequest` 的 `package`，模型看到 `{content, exit_code, sieve:[载荷]}`。`citysim/tests/sieve.rs`：同一目录同一表跑两遍账本逐字节相同；第二次同命令只出新错误与 `[unchanged: N lines…]`。
 
 **已知未接**：生产路径 `bin::assembly::driving` 今天不经 `pipeline::package`（工具结果原样交模型）；sieve 接进 `package` 与 citysim 执行器，生产接线随 backlog（§8-28）落表时一并走 `package`。
+
+#### 8-27-10 连接器结果：`runtime::pipeline::connector`
+
+形状：decision（与 `pipeline::exec` 同形）。一台 MCP server 的一次回答 `{ content: [块…], … }` 进窗口之前，文本块合起来量一次长度：
+
+```rust
+pub const CONNECTOR_CAP_BYTES: u64 = 16_384;
+pub fn package_connector(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Result<ToolOutcome, AxError>;
+```
+
+- 文本合计不超过 `CONNECTOR_CAP_BYTES`，或回答没有 `content` 数组：原样返回，一个字节不动。
+- 超过：全部文本块按原顺序以换行连成一份，交 `package`（`sieve: None`，带落盘处）；`content` 换成**一个**文本块，装 `package` 给出的替身（开头一段加 `read` 可分窗读的路径），非文本块（图片等）按原顺序留在其后；`package` 记下的 `ResultOffloaded` 放进结果的 `offload` 字段，与 `exec` 的 `sieve` 字段同一种账。
+- 替身是什么由 `package` 一处决定，本模块不另判：`Markup`（Markdown 一类）按 8-7 走节标题骨架而不入 store，故一份转换出来的长 Markdown 进窗口的是骨架，没有可翻的路径，`offload` 为空表；其余文本按 `OFFLOAD_MIN_BYTES` 入 store。
+- 失败只有 `package` 自己的失败（`E_INVALID_ARGS`，原样上抛）。
+
+**上限与 `exec` 同值、各有其名**：两者今天取同一个数，是因为窗口里一件工具答案的代价与来源无关；分开命名，是因为改其中一个不该悄悄改另一个。**决定**：交 `package` 而不是在这里另写一套截法——截多少、存不存由它一处决定，连接器答案与 `exec` 答案在窗口里守同一条规则；不包装时一次回答可以把整整 `MESSAGE_CEILING`（8 MiB）送进窗口。备选「让 `protocol::McpTool` 自己截」被否：协议层没有 CAS 也没有 room，落盘处只有装配层有。调用点只有一个：`bin::assembly` 的 `Placing` 对 effect 为 `Connector` 的调用（首答与重放同样）调它。
 
 ### 8-28 runtime::backlog（形状 4 适配器＋形状 6 数据面）
 

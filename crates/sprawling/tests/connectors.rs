@@ -193,3 +193,163 @@ fn a_run_is_offered_the_tools_the_worker_was_handed() {
         offered.lock().unwrap()
     );
 }
+
+const CALL: &str = "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"tools/call\",\"params\":{\"name\":\"ping\",\"arguments\":{}}}";
+
+/// A server whose one tool answers with a long converted document.
+struct Answering(String);
+
+impl accounting::Connectors for Answering {
+    fn connect(
+        &mut self,
+        server: &kernel::McpServer,
+        _write_root: &std::path::Path,
+        confidential: bool,
+        _resolve: &gateway::SecretResolver,
+    ) -> Result<(Vec<protocol::McpTool>, accounting::Reached), AxError> {
+        let answer = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 0,
+            "result": { "content": [{ "type": "text", "text": self.0 }], "isError": false },
+        })
+        .to_string();
+        let tools = protocol::tools_from(&server.label, &protocol::Rpc::read(LISTING)?)?
+            .into_iter()
+            .map(|entry| {
+                let mut outbound = protocol::ScriptedOutbound::new();
+                outbound.answer(CALL, &answer)?;
+                protocol::McpTool::new(entry.meta, entry.remote, Box::new(outbound), confidential)
+            })
+            .collect::<Result<Vec<_>, AxError>>()?;
+        let opened = protocol::Handshake {
+            protocol_version: protocol::PROTOCOL_VERSION.to_owned(),
+            server: "scripted".to_owned(),
+        };
+        Ok((tools, accounting::Reached::Connected(opened)))
+    }
+}
+
+/// Calls the offered tool once, then records what it read back.
+struct Calling(Arc<Mutex<Vec<String>>>);
+
+impl Model for Calling {
+    fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        let results: Vec<String> = req
+            .chat
+            .messages
+            .iter()
+            .flat_map(|message| &message.content)
+            .filter_map(|block| match block {
+                ContentBlock::ToolResult { content, .. } => Some(content.clone()),
+                _ => None,
+            })
+            .collect();
+        if !results.is_empty() {
+            self.0.lock().unwrap().extend(results);
+            return Ok(ModelReturn::bare(
+                kernel::model::message_payload(&[ContentBlock::Text {
+                    text: "done".to_owned(),
+                }])?,
+                Vec::new(),
+            ));
+        }
+        let name = kernel::ToolName::parse(OFFERED)?;
+        let input = kernel::Payload::new(serde_json::Map::new())?;
+        Ok(ModelReturn::bare(
+            kernel::model::message_payload(&[ContentBlock::ToolUse {
+                id: "call-1".to_owned(),
+                name: name.clone(),
+                input: input.clone(),
+            }])?,
+            vec![kernel::ToolCall {
+                id: "call-1".to_owned(),
+                name,
+                args: input,
+            }],
+        ))
+    }
+}
+
+struct Callers(Arc<Mutex<Vec<String>>>);
+
+impl accounting::ModelFactory for Callers {
+    fn build(
+        &self,
+        _chosen: &gateway::Chosen<'_>,
+        _redemption: gateway::Redemption,
+    ) -> Result<Box<dyn Model + Send>, AxError> {
+        Ok(Box::new(Calling(Arc::clone(&self.0))))
+    }
+}
+
+/// A converted document longer than the window reaches the model as
+/// the pipeline's window over it, not whole (runtime-SPEC.md 8-27-10).
+#[test]
+fn a_long_connector_answer_reaches_the_model_packaged() {
+    let document = "The quarter closed with every account reconciled. ".repeat(1_000);
+    let dir = tempfile::tempdir().unwrap();
+    assembly::init_city(dir.path()).unwrap();
+    let read = Arc::new(Mutex::new(Vec::new()));
+    let mut worker = assembly::RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap()
+    .with_models(Box::new(Callers(Arc::clone(&read))))
+    .with_connectors(Box::new(Answering(document.clone())));
+    let endpoint = channels::ProviderName::parse("dead").unwrap();
+    worker
+        .handle(channels::Command::AttachEndpoint {
+            name: endpoint.clone(),
+            base_url: refusing_url(),
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            admit: vec![MODEL.to_owned()],
+            tuning: channels::EndpointTuning::default(),
+            idem: idem(b"attach"),
+        })
+        .unwrap();
+    worker
+        .handle(channels::Command::SelectModel {
+            endpoint,
+            model: MODEL.to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: kernel::Window::new(32_768),
+            max_output_tokens: kernel::Ceiling::new(1_024),
+            idem: idem(b"select"),
+        })
+        .unwrap();
+    worker
+        .handle(channels::Command::CreateBuilding {
+            addr: Address::parse(LAB).unwrap(),
+            template: channels::TemplateName::parse("minimal").unwrap(),
+            idem: idem(b"create"),
+        })
+        .unwrap();
+    name_an_absent_server(dir.path());
+    let dispatched = worker.handle(channels::Command::Dispatch {
+        addr: Address::parse(LAB).unwrap(),
+        task: "Convert.".to_owned(),
+        goal: "one call to the server's tool".to_owned(),
+        mode: kernel::Mode::PlanGoal,
+        idem: idem(b"dispatch"),
+        session: Some(kernel::SessionName::parse("s1").unwrap()),
+        effort: None,
+        model: None,
+    });
+
+    let read = read.lock().unwrap();
+    assert_eq!(
+        read.len(),
+        1,
+        "one result read back; the dispatch answered {dispatched:?}"
+    );
+    assert!(
+        read[0].len() < document.len(),
+        "the model read {} bytes of a {}-byte document",
+        read[0].len(),
+        document.len()
+    );
+}
