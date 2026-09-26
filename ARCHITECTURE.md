@@ -187,10 +187,13 @@ repository readable:
 | Assembly | run time, only in `bin::assembly` | the upload sink in `channels::server` receiving `memory::cas` |
 | Event | anywhere a `kernel::Ledger` handle is held | writing `tool_result` after a tool runs |
 
-`runtime` has the widest fan-out — three crates at once. It may **use**
-their interfaces and nothing more; the moment a runtime module starts
-passing concrete types between `memory` and `gateway`, that edge moves up
-into the assembly layer.
+Below the binary no crate depends on more than two others: `runtime` and
+`collab` each use `kernel` and `memory`, and `sprawling` is the only crate
+that depends on most of the workspace. The `depmap` block above also lets `runtime` use
+`gateway`, and the code does not take that edge yet. A crate may **use**
+the interfaces of what it depends on and nothing more; the moment a
+module starts passing concrete types between two of them, that edge
+moves up into the assembly layer.
 
 `xtask` and `citysim` are workspace members outside the product graph.
 **citysim drives the turn loop a second time**: `runtime::run::drive` with
@@ -521,7 +524,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review; the two exceptions are runtime's concurrent wave, with structured cancellation, and the driving lanes in `bin::serving::pool`, each of which lives exactly as long as the run it drives |
+| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
 | 4 | Seeded RNG handed out from one place | assembly derives per session |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -556,7 +559,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2192<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2193<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
@@ -613,7 +616,7 @@ than typed.
 | The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->11,523,584 B<!-- xtask:end -->, client included | yes |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:resident_empty_idle -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:resident_empty_idle -->2,469,888 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤5 ms, p99 ≤20 ms | 0.97 ms / 1.61 ms on one NVMe machine | no |
-| Projection rebuild | ≥50,000 records/s | about 493,000 records/s on the same machine | no |
+| Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->2,759<!-- xtask:end --> ms for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
 | Prefix assembly | ≤1 ms | 0.022 ms for 16.5 KB over four slots | no |
 | Runs driving at once | 4 lanes | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
 | Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
@@ -631,7 +634,7 @@ only goes down.
 |---|---|---|
 | multi-run parallel, `harness` | 5 / 9 / 24 µs per append | general: windows-x86_64, 16 cores, NVMe |
 | multi-run parallel, `persist` | 730 / 953 / 4,326 µs per append | general: windows-x86_64, 16 cores, NVMe |
-| large-ledger fold, `harness` | 2,759 / 3,765 / 3,765 ms per rebuild | general: windows-x86_64, 16 cores, NVMe |
+| large-ledger fold, `harness` | <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->2,759<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p95_ms -->3,765<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p99_ms -->3,765<!-- xtask:end --> ms per rebuild, from `[views_rebuild_per_mb]` | general: windows-x86_64, 16 cores, NVMe |
 | large-worktree placement, `whole` | 10,503 / 11,052 / 11,052 ms per claim | general: windows-x86_64, 16 cores, NVMe |
 | long-session forwarding, `harness` | 4 / 4 / 4 µs per event | general: windows-x86_64, 16 cores, NVMe |
 

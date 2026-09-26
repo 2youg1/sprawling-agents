@@ -39,7 +39,7 @@ pub(super) struct Fact {
 }
 
 /// Every fact a managed span may name.
-const FACTS: [Fact; 17] = [
+const FACTS: [Fact; 18] = [
     Fact {
         key: "wire_v",
         home: "channels::WIRE_V",
@@ -141,6 +141,12 @@ const FACTS: [Fact; 17] = [
         home: "the budget over the reading, both from xtask/budgets.toml",
         takes: Some("the register row"),
         recount: recount::headroom,
+    },
+    Fact {
+        key: "budget_figure",
+        home: "the named integer field of that row in xtask/budgets.toml",
+        takes: Some("the register row and its field, as `row.field`"),
+        recount: recount::figure,
     },
 ];
 
