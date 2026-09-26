@@ -259,3 +259,66 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
         "a transcript is history: nobody edits it in place"
     );
 }
+
+/// The handoff a run is frozen with is the one its room holds: the
+/// sections the last session wrote, and the file's own bytes pinned as
+/// something the successor must read, rather than a line that points at
+/// a roadmap the file never mentioned.
+#[test]
+fn the_frozen_handoff_carries_the_rooms_own_sections_and_pins_its_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+    let written = "# Handoff - lab/room1\n\n<must-read>\nlab/room1/probe.log, the last reading\n</must-read>\n\n\
+                   <overall>\nMeasure the drift of the probe.\n</overall>\n\n\
+                   <current-progress>\nThree of five readings taken.\n</current-progress>\n\n\
+                   <context>\nThe second sensor is broken; ignore it.\n</context>\n\n\
+                   <next-step>\nTake reading four.\n</next-step>\n";
+    std::fs::write(city::handoff_path(dir.path(), &room), written).unwrap();
+    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: room,
+            task: "measure the thing".to_owned(),
+            goal: "a number with a unit, then stop".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+    drop(provider);
+
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let handoff = verified
+        .raw_lines()
+        .iter()
+        .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+        .find(|value| value["kind"] == "handoff_written")
+        .expect("a run that freezes writes its handoff");
+    let data = &handoff["data"];
+    let pinned = kernel::B3Hash::digest(written.as_bytes()).to_string();
+    assert_eq!(
+        (
+            data["overview"].as_str(),
+            data["progress"].as_str(),
+            data["next_step"].as_str(),
+            data["context"]
+                .as_str()
+                .is_some_and(|context| context.contains("The second sensor is broken")),
+            data["must_read"]
+                .as_array()
+                .is_some_and(|list| list.iter().any(|entry| entry.to_string().contains(&pinned))),
+        ),
+        (
+            Some("Measure the drift of the probe."),
+            Some("Three of five readings taken."),
+            Some("Take reading four."),
+            true,
+            true,
+        ),
+        "{data}"
+    );
+}
