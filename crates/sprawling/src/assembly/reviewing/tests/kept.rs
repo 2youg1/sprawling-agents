@@ -81,7 +81,7 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
     drop(
         memory::Worktrees::open(dir.path())
             .unwrap()
-            .claim(&name)
+            .claim(&name, &["lab".to_owned()])
             .unwrap(),
     );
 
