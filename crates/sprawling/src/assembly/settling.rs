@@ -34,7 +34,8 @@ pub(super) struct Settling<'a> {
     pub(super) sweep: Sweep<'a>,
     pub(super) conversations: u32,
     /// The claims booked at call time that this landing has yet to
-    /// close; the plan step closes them (sprawling-SPEC.md 8-42-8).
+    /// close; the plan step closes each as its closing line reaches the
+    /// ledger (sprawling-SPEC.md 8-42-8).
     pub(super) open_claims: &'a mut crate::serving::booking::OpenClaims,
 }
 

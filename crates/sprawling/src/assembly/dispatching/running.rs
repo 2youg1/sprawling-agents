@@ -208,8 +208,9 @@ impl RunWorker {
     /// wrong took the room's mail and a tree's lease with it
     /// (sprawling-SPEC.md 8-46-9).
     ///
-    /// The plan step closes `open_claims`; on any failure before it the
-    /// caller still owes the history their put-back lines.
+    /// The plan step closes each node of `open_claims` as that node's
+    /// closing line reaches the ledger; the caller still owes the history
+    /// a put-back line for every node it did not close.
     ///
     /// # Errors
     /// Propagates the drive's own failure to open a checkpoint, and
