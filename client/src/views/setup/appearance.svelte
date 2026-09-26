@@ -39,15 +39,8 @@
 
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
-  import {
-    BODY_PX,
-    CHROMAS,
-    DENSITIES,
-    FACES,
-    LIGHTINGS,
-    MOTIONS,
-    sizingOf,
-  } from "../../core/prefs";
+  import { CHROMAS, DENSITIES, FACES, LIGHTINGS, MOTIONS } from "../../core/prefs";
+  import { BODY_PX, sizingOf } from "../../core/sizing";
   import type { Appearance } from "../../core/prefs";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";

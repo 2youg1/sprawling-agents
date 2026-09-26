@@ -1707,7 +1707,7 @@ fn call_speculating(&mut self, req: &ModelRequest, onto: Increments<'_>, early: 
 
 **提前交出的调用不是历史。** 账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，这扇门返回失败，调用方把据提前交出的调用得出的结果一并丢弃。调用方能据它做什么由 `adversary/design/Speculating.lean` 定：只提前启动排在第一个写调用之前的只读调用，结果按调用位置缓存，结算后按发出顺序记账。
 
-**默认实现落回 `call_streaming`、什么也不提前交出。** 这对没有流、或其方言在结算前说不出一个调用何时完整的适配器是诚实的：调用方只是没有提前量，拿到的 `ModelReturn` 不变。落选的是给 `call_streaming` 加第三个参数：那会让每个适配器与每个调用点都改签名，而只有一个方言说得出块何时结束。
+**默认实现落回 `call_streaming`、什么也不提前交出。** 这对没有流、或其兼容格式在结算前说不出一个调用何时完整的适配器是诚实的：调用方只是没有提前量，拿到的 `ModelReturn` 不变。落选的是给 `call_streaming` 加第三个参数：那会让每个适配器与每个调用点都改签名，而只有一个兼容格式说得出块何时结束。
 
 ## 8-48 `kernel::node_id`：`NodeId` 搬出 `plan`，成为自己的模块
 

@@ -21,7 +21,7 @@
   import type { Readable } from "svelte/store";
 
   import { readAnswer } from "../core/answered";
-  import { adopted } from "../core/belief";
+  import { adopted } from "../core/belief/adopted";
   import { cancel, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
   import { fill, say } from "../core/lang";

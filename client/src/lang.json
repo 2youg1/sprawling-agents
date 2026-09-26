@@ -3110,11 +3110,11 @@
   },
   "setup_editor_vscode": {
     "en": "VS Code",
-    "zh": "VS Code"
+    "zh": "VS Code 正式版"
   },
   "setup_editor_vscode_insiders": {
     "en": "VS Code Insiders",
-    "zh": "VS Code Insiders"
+    "zh": "VS Code 预览版（Insiders）"
   },
   "setup_editor_folder": {
     "en": "The city's folder on this computer",

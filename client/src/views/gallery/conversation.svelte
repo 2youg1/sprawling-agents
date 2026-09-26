@@ -34,6 +34,7 @@
   import { motherName } from "../talk/forking";
   import type { Utterance } from "./served";
   import { CALLS, EARLIER_SEGMENT, ONE_QUESTION, ROUND, TURNS, WAITING } from "./served";
+  import { SAYING } from "./saying";
 
   // The question the rail's dot counts stays reachable under the name
   // it always had, for the presences fixture that reads it.
@@ -46,29 +47,6 @@
     { kind: "waiting" },
     { kind: "frozen", completion: "done" },
     { kind: "unknown" },
-  ];
-
-  // A live turn at several lengths, drawn by the thread's own `Saying`:
-  // the faint edge at the growing end, and - in the last - a list, a
-  // table and a code block already closed and laid out while the
-  // paragraph after them is still arriving.
-  const SAYING = [
-    "on",
-    "on it — reading the city",
-    "on it — reading the city, then writing the plan it asks for",
-    [
-      "- `crates/kernel`",
-      "- **Ledger**",
-      "",
-      "| step | what |",
-      "|---|---|",
-      "| 1 | read |",
-      "",
-      "```rust",
-      "fn main() {}",
-      "```",
-      "then the plan it asks",
-    ].join("\n"),
   ];
 
   // The mother run the forked segment branches from: an id in the

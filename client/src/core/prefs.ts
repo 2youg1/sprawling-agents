@@ -37,6 +37,7 @@ import { EDITORS, type Opening } from "./editor";
 import type { Lang } from "./lang";
 import { langOf } from "./lang";
 import { browserRows } from "./rows";
+import { sizingOf } from "./sizing";
 import type { Rows } from "./rows";
 import type { Proxying } from "../wire";
 import type { Notifying } from "./notify";
@@ -125,11 +126,6 @@ export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
 const PROXYINGS: readonly Proxying[] = ["except_local", "always", "never"];
 export const NOTIFYINGS: readonly Notifying[] = ["off", "on"];
 
-// The sizes a person may ask for. The floor is the smallest size the
-// colour gate has to hold its contrast tiers at, and the ceiling is
-// where a line of body text stops being body text.
-export const BODY_PX = { min: 12, max: 20 } as const;
-
 // What a person may write into a font stack: the characters a family
 // name and its punctuation are made of, and nothing that could close
 // the declaration it lands in. A stack with anything else in it is not
@@ -148,25 +144,6 @@ export interface Appearance {
   readonly density: Density;
   readonly chroma: Chroma;
   readonly motion: Motion;
-}
-
-// What a box of digits says about the body size. Three outcomes rather
-// than a number and a flag: an empty box and a refused box lead to
-// different acts, and only one of them changes the page.
-export type Sizing =
-  // Nothing in the box: the page goes back to the size `theme.css` draws.
-  | { readonly kind: "cleared" }
-  | { readonly kind: "sized"; readonly px: number }
-  // Not a whole number in range. The field says so and the page holds
-  // the size it already has.
-  | { readonly kind: "refused" };
-
-export function sizingOf(text: string): Sizing {
-  const trimmed = text.trim();
-  if (trimmed === "") return { kind: "cleared" };
-  if (!/^[0-9]+$/.test(trimmed)) return { kind: "refused" };
-  const px = Number.parseInt(trimmed, 10);
-  return px >= BODY_PX.min && px <= BODY_PX.max ? { kind: "sized", px } : { kind: "refused" };
 }
 
 // ---------------------------------------------------------- the reading

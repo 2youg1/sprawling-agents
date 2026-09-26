@@ -44,6 +44,7 @@
   import { ui } from "../ui";
   import { Address } from "../wire";
   import Empty from "./parts/empty.svelte";
+  import { SECTIONS, SECTION_WORD, sectionOf } from "./palette/sections";
   import { Kbd } from "./parts/kbd.svelte";
 
   interface Entry {
@@ -56,37 +57,6 @@
     // Present means the verb cannot run here, and names why.
     readonly why?: Key | undefined;
   }
-
-  // The three sections a verb falls under, and the word for each,
-  // decided by the spelling both halves of the slash seam already
-  // share.
-  const SECTIONS = ["actions", "navigation", "sessions"] as const;
-  type Section = (typeof SECTIONS)[number];
-  const SECTION_WORD: Readonly<Record<Section, Key>> = {
-    actions: "palette_group_actions",
-    navigation: "palette_group_navigation",
-    sessions: "palette_group_sessions",
-  };
-  const SECTION: Readonly<Record<string, Section>> = {
-    "/dispatch": "sessions",
-    "/steer": "sessions",
-    "/new": "sessions",
-    "/fork": "sessions",
-    "/go": "navigation",
-    "/mcp": "navigation",
-    "/doctor": "navigation",
-    "/stop": "actions",
-    "/release": "actions",
-    "/raise": "actions",
-    "/model": "actions",
-    "/effort": "actions",
-    "/help": "actions",
-    "/clear": "actions",
-  };
-  // A verb `core/slash.ts` grew before this screen classified it lands
-  // with the actions - visible and runnable, which is how its section
-  // gets named next time.
-  const sectionOf = (spelling: string): Section => SECTION[spelling] ?? "actions";
 
   const u = ui();
   const { lang } = u;

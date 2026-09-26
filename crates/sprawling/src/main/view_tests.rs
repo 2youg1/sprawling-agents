@@ -125,7 +125,7 @@ fn grepped(lines: &[Vec<u8>], keep: impl Fn(&Value, &[u8]) -> bool, tail: usize)
     let skip = kept.len().saturating_sub(tail);
     kept.into_iter()
         .skip(skip)
-        .flat_map(|line| line.iter().copied().chain([b'\n']))
+        .flat_map(|line| line.iter().copied().chain(*b"\n"))
         .collect()
 }
 
