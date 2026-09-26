@@ -41,7 +41,9 @@ use super::reply::{Reply, refusal_text};
 
 mod enrolment;
 
-use super::socket::{accept_acp, accept_recording, serve_asset, serve_index, upgrade};
+use super::bundle::{serve_asset, serve_index};
+use super::socket::upgrade;
+use super::uploads::{accept_acp, accept_recording};
 use enrolment::accept_enrolment;
 /// Answers a query from the city's derived views, with the ledger
 /// position the answer was read at. Synchronous: a query reads a

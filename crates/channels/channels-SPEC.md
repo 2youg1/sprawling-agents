@@ -578,8 +578,9 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 `command.rs`（576）→ `command/kind.rs`（`COMMAND_NAMES`／`NoSecret`／`LoginStep`／`HaltScope`／
 `PursuitStep`／`Command`）／`command/wire.rs`（`WireCommand`＋`impl`＋`From`，单测试住此）；
 `server.rs`（652）→ `server/config.rs`（`ServeConfig`／路由／`ShellState` 字段开 `pub(crate)`）／
-`server/reply.rs`（`Delivered`／`Reply`）／`server/socket.rs`（`upgrade` 由 reply 迁入此，
-handlers 开 `pub(crate)` 供 config 挂载，单测试住此）。
+`server/reply.rs`（`Delivered`／`Reply`）／`server/socket.rs`（一条 WebSocket 会话，`upgrade` 在此）／
+`server/bundle.rs`（客户端包的 HTTP 应答）／`server/uploads.rs`（`/acp` 与录音两个 POST 体）；
+handlers 开 `pub(crate)` 供 config 挂载。
 跨文件私有项开 `pub(crate)`，对外签名逐字节不变。
 
 **跨 crate 记法**：下游 `sprawling`／`web` 基线记 `channels` 内定义位簇路径

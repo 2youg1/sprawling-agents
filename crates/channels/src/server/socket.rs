@@ -3,19 +3,27 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The listening end, and the humble half of it (ARCHITECTURE section
-//! 9). Every branch here is a send, a receive, or the end of a session;
-//! the judgements it applies are `channels::reception`'s and the bytes
-//! it serves are `channels::assets`'.
-//!
-//! Five jobs and no policy: serve the client bundle, upgrade a
-//! WebSocket, take a credential from a caller on this
-//! machine, and let an outside editor drive the city.
+//! One WebSocket session, from the upgrade to its end: the shell around
+//! [`decide_frame`]. Every branch is a send, a receive, or the end of
+//! the session; the judgements are `channels::reception`'s.
 //!
 //! A refusal made minutes later has no way home, which is why a command
 //! carries the [`Reply`] address of whoever sent it.
 
-//! Sockets: sessions and assets.
+use std::sync::Arc;
+
+use axum::extract::State;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::response::Response;
+use kernel::{AxCode, AxError, Seq};
+use tokio::sync::broadcast;
+
+use crate::reception::inbound::Inbound;
+use crate::reception::{SessionState, SessionStep, Stream, WelcomeFacts, decide_frame};
+use crate::wire::{Answered, Ask, AskOutcome, Sample, ServerFrame};
+
+use super::config::ShellState;
+use super::reply::{Delivered, Reply};
 
 pub(crate) async fn upgrade(
     State(state): State<Arc<ShellState>>,
@@ -24,32 +32,10 @@ pub(crate) async fn upgrade(
     ws.on_upgrade(move |socket| session(socket, state))
 }
 
-use std::sync::Arc;
-
-use axum::Json;
-use axum::body::Bytes;
-use axum::extract::State;
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::http::{HeaderMap, StatusCode, header};
-use axum::response::{IntoResponse, Response};
-use kernel::{AxCode, AxError, Seq};
-use tokio::sync::broadcast;
-
-use crate::assets::AssetReply;
-use crate::reception::inbound::Inbound;
-use crate::reception::{
-    Admission, Door, SessionState, SessionStep, Stream, WelcomeFacts, decide_admission,
-    decide_frame,
-};
-use crate::wire::{Answered, Ask, AskOutcome, Sample, ServerFrame};
-
-use super::config::ShellState;
-
-use super::reply::{Delivered, Reply, refusal_text};
 /// The shell around [`decide_frame`]: it moves bytes and holds no policy.
 /// Every judgement here is the pure function's; every branch below is
 /// either a send, a receive, or the end of the session.
-pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
+async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     let mut phase = SessionState::AwaitingHello;
     let mut inbound = Inbound::new();
     let mut events = state.events.subscribe();
@@ -284,7 +270,7 @@ async fn next_sample(
     }
 }
 
-pub(crate) async fn send(socket: &mut WebSocket, frame: &ServerFrame) -> Result<(), ()> {
+async fn send(socket: &mut WebSocket, frame: &ServerFrame) -> Result<(), ()> {
     let Ok(text) = serde_json::to_string(frame) else {
         return Err(());
     };
@@ -292,113 +278,4 @@ pub(crate) async fn send(socket: &mut WebSocket, frame: &ServerFrame) -> Result<
         .send(Message::Text(text.into()))
         .await
         .map_err(|_| ())
-}
-
-pub(crate) async fn serve_index(State(state): State<Arc<ShellState>>) -> Response {
-    asset_response(state.client.lookup("index.html"))
-}
-
-pub(crate) async fn serve_asset(
-    State(state): State<Arc<ShellState>>,
-    axum::extract::Path(asset): axum::extract::Path<String>,
-) -> Response {
-    asset_response(state.client.lookup(&asset))
-}
-
-/// The shell around [`ClientAssets::lookup`]: headers on, policy out.
-pub(crate) fn asset_response(reply: AssetReply) -> Response {
-    match reply {
-        AssetReply::Found {
-            bytes,
-            content_type,
-            gzipped: true,
-        } => (
-            StatusCode::OK,
-            [
-                (header::CONTENT_TYPE, content_type),
-                (header::CONTENT_ENCODING, "gzip"),
-            ],
-            bytes,
-        )
-            .into_response(),
-        AssetReply::Found {
-            bytes,
-            content_type,
-            gzipped: false,
-        } => (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, content_type)],
-            bytes,
-        )
-            .into_response(),
-        AssetReply::Miss(err) => (StatusCode::NOT_FOUND, refusal_text(&err)).into_response(),
-    }
-}
-
-/// An outside editor's request. The token is judged here and the
-/// verdict travels inward; an unauthenticated request still reaches the
-/// admission, because what it may learn is that admission's to decide.
-///
-/// The body is read as JSON and passed on unread. Which keys make a
-/// request, and what each of them must hold, is `protocol::Incoming`'s
-/// single answer; a second reading here would be a second grammar, and
-/// the two would first disagree about an empty field.
-pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes) -> Response {
-    let Ok(request) = serde_json::from_slice::<serde_json::Value>(&body) else {
-        return (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "send {\"token\":..,\"addr\":..,\"task\":..,\"goal\":..}",
-        )
-            .into_response();
-    };
-    // The token is judged by `decide_admission`, which is the same
-    // judgement the acting doors are layered with; this door differs
-    // only in where the token is written (a body key, because that is
-    // what an editor sends) and in admitting an unpaired caller so the
-    // admission can word what it may learn.
-    let pairing = match decide_admission(
-        Door::Acp,
-        request.get("token").and_then(serde_json::Value::as_str),
-        &state.face,
-    ) {
-        Admission::Admit(pairing) => pairing,
-        Admission::Refuse(err) => {
-            return (StatusCode::FORBIDDEN, refusal_text(&err)).into_response();
-        }
-    };
-    match (state.acp)(&request, pairing) {
-        Ok(progress) => (StatusCode::ACCEPTED, Json(progress)).into_response(),
-        Err(err) => (StatusCode::FORBIDDEN, refusal_text(&err)).into_response(),
-    }
-}
-
-/// One recording in, one line of text back.
-///
-/// The media type is read off the request rather than guessed from the
-/// bytes: a browser records into whatever container it has, and it is
-/// the only party that knows which. A request with none is refused by
-/// name, because a container nobody declared cannot be sent on.
-pub(crate) async fn accept_recording(
-    State(state): State<Arc<ShellState>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
-    let Some(media) = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-    else {
-        return (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "send the recording with the content-type it was recorded in",
-        )
-            .into_response();
-    };
-    // The parameters a browser appends (`; codecs=opus`) name the codec
-    // inside the container, and what the audio wire routes on is the
-    // container.
-    let media = media.split(';').next().unwrap_or(media).trim().to_owned();
-    match (state.transcribe_sink)(body.to_vec(), media) {
-        Ok(text) => (StatusCode::OK, text).into_response(),
-        Err(err) => (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response(),
-    }
 }
