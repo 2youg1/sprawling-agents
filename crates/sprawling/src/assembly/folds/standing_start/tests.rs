@@ -113,3 +113,66 @@ fn a_worker_refuses_a_line_rewritten_before_the_snapshot_in_a_sealed_segment() {
 
     assert_eq!(refused, Err(memory::LineFault::ChainBreak.into_ax(2)));
 }
+
+/// Folds filled from records that put a signal in the collaboration
+/// fold's queue and a claim in its plan holders, so a field added,
+/// removed or reordered among them changes the bytes.
+fn encoding_fixture() -> StandingFolds {
+    let room = Address::parse("lab/room1").unwrap();
+    let signal = collab::Signal::new(
+        kernel::event::record::SignalId::parse("sig-1").unwrap(),
+        kernel::event::record::SignalKind::Thread,
+        "lab/room2".to_owned(),
+        room.clone(),
+        kernel::Version::new(1),
+        kernel::Payload::new(serde_json::Map::new()).unwrap(),
+        kernel::TimeMs::new(1_000),
+    )
+    .unwrap();
+    let claimed = kernel::Payload::of(&kernel::event::record::RoadmapMoved {
+        by: room.as_str().to_owned(),
+        node: kernel::NodeId::parse("1").unwrap(),
+        step: kernel::event::record::RoadmapStep::Claimed {
+            item: "parse the input".to_owned(),
+        },
+    })
+    .unwrap();
+    let records = [
+        (
+            kernel::EventKind::SignalEnqueued,
+            signal.enqueued_payload().unwrap(),
+        ),
+        (kernel::EventKind::RoadmapClaimed, claimed),
+    ];
+    let mut folds = StandingFolds::empty(Path::new("."));
+    for (seq, (kind, data)) in (1..).zip(records) {
+        let record = EventRecord::from_draft(
+            kernel::EventDraft {
+                run: RunId::from_bytes([7u8; 16]),
+                t: kernel::TimeMs::new(1_000),
+                who: room.as_str().to_owned(),
+                addr: Some(room.clone()),
+                kind,
+                data,
+                ig: false,
+            },
+            Seq::new(seq),
+            B3Hash::digest(b"prev"),
+        );
+        folds.absorb(&record).unwrap();
+    }
+    folds
+}
+
+#[test]
+fn the_fold_rules_name_carries_the_digest_of_the_standing_encoding() {
+    let digest = B3Hash::digest(&encoding_fixture().encode().unwrap()).to_string();
+
+    let expected = format!("standing-fold-{}", digest.get(..16).unwrap());
+
+    assert_eq!(
+        STANDING_FOLD_RULES, expected,
+        "the encoding of the standing folds changed: set STANDING_FOLD_RULES to the expected \
+         value, so every snapshot cut under the old encoding is refused"
+    );
+}
