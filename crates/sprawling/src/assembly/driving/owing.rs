@@ -26,7 +26,7 @@
 //! neither of those has to know why a run exists.
 
 use std::sync::Arc;
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use kernel::{Address, AxCode, AxError, NodeId};
 
@@ -152,6 +152,20 @@ impl Relays {
                 conversation_refused(format!(
                     "a conversation already {} knocks deep",
                     self.conversation.hops
+                ))
+            })?;
+        // Counted after the depth, so a knock refused for depth takes
+        // nothing from the width every other branch still draws on.
+        self.conversation
+            .woken
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |woken| {
+                woken
+                    .checked_add(1)
+                    .filter(|next| *next <= CONVERSATION_RUNS_MAX)
+            })
+            .map_err(|woken| {
+                conversation_refused(format!(
+                    "a conversation that has already woken {woken} runs"
                 ))
             })?;
         Ok(Relays {
