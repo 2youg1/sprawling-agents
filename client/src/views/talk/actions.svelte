@@ -35,7 +35,7 @@
 
 <div class="flex shrink-0 items-center gap-snug">
   {#if !empty}
-    <span class="hidden text-note text-text-faint @md/page:inline">{say($lang, "talk_enter_hint")}</span>
+    <span class="hidden text-note text-text-faint @lg/page:inline">{say($lang, "talk_enter_hint")}</span>
   {/if}
   {#if hearing}
     <Record {onWords} />

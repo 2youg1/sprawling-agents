@@ -62,7 +62,7 @@
       </span>
       <span aria-hidden="true">·</span>
     {/each}
-    <span class="min-w-0 truncate font-mono">
+    <span class={["min-w-0 truncate", run === undefined ? "" : "font-mono"]}>
       {run === undefined ? say($lang, "talk_context_none") : fill(say($lang, "talk_context_run"), { run: run.slice(0, 8) })}
     </span>
   </button>
