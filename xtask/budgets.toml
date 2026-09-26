@@ -113,7 +113,10 @@ badge_label = "client"
 [release_binary]
 what = "the single binary a person installs, with the execution engine its sandbox needs and the web client already inside it"
 budget_bytes = 134217728
-best_bytes = 11523584
+# The reading rose by 1.3 MB when the console, the health readings and
+# the sandbox's file capabilities arrived: crossterm, sysinfo, cap-std
+# and memory-stats, with about 28,000 lines of Rust around them.
+best_bytes = 12857344
 slack_bytes = 1048576
 measured_by = "just build-web, cargo build --release, then just gates"
 status = "gated"
