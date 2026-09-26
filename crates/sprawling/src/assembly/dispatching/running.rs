@@ -192,7 +192,7 @@ impl RunWorker {
             fence_scope,
             run_id: site.run_id,
             of: site.provenance(self.city_hash()?, &at.addr),
-            sieving: self.sieving_for(&site, &at.addr)?,
+            sieving: super::super::driving::Sieving::for_run(&self.city_root, &site, &at.addr)?,
             member,
             plan,
             handoff,
