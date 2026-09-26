@@ -129,7 +129,6 @@ pub fn gateway::EndpointBook::select(&self, kernel::model::wire::ModelTag, &kern
 pub fn gateway::EndpointTuning::applied_overrides(&self) -> alloc::vec::Vec<(alloc::string::String, serde_json::value::Value)>
 pub fn gateway::EndpointTuning::call_timeout_ms(&self) -> u64
 pub fn gateway::EndpointTuning::idle_timeout_ms(&self) -> core::option::Option<u64>
-pub fn gateway::EndpointTuning::is_plain(&self) -> bool
 pub fn gateway::FormPost::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn gateway::HeaderValue::parse(&str, &str) -> core::result::Result<gateway::HeaderValue, kernel::error::shape::AxError>
 pub fn gateway::HeaderValue::spelled(&self) -> alloc::string::String

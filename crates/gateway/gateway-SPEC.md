@@ -189,7 +189,7 @@ impl Endpoint { pub fn new(config: EndpointConfig, redemption: Redemption) -> Re
 本地模型与远端模型走同一个 `Endpoint`：`adapter_for` 对每个 chosen 只造一种适配器。回环与否在 `Endpoint::new` 里判定一次——它经 `client_for(proxying, base_url)` 建客户端，回环地址默认绕开代理，人给这个端点另定的 `proxying` 照样生效。
 
 - **本地模型也流式输出**：`call_streaming` 是 `Endpoint` 的门，回环端点因此请求里带 `stream: true`，delta 帧逐帧交给调用方。另设一个只实现 `call` 的本地适配器，等于让最朴素的那类端点（回环、无凭证、无覆盖）的回答在模型写完后才一次涌到页面上。
-- **机密楼的拒绝不因回环而放宽**：`Endpoint` 的两扇门对 `confidential` 一律拒绝（§8-2）。早先的本地适配器同样委托给 `Endpoint::call`，所以删掉它不改变哪栋楼能调哪个模型。
+- **机密楼的拒绝不因回环而放宽**：`Endpoint` 的两扇门对 `confidential` 一律拒绝（§8-2），回环端点走的也是这两扇门，所以没有哪条路能让机密楼绕过它。
 - 否决的方案：保留一个包着 `Endpoint` 的本地类型只为在构造时断言回环。它唯一的读者是 `adapter_for` 里那道 `is_local()` 判断——同一个判定两处写，而它什么都不多拦：凭证、头覆盖、体覆盖本来就让回环端点走通用路径。
 
 ### 8-4 gateway::credential（形状 4＋内缝 Vault）
@@ -536,7 +536,6 @@ impl EndpointTuning {
     pub const DEFAULTS: TuningDefaults;                        // 三个默认值的唯一住处
     pub fn call_timeout_ms(&self) -> u64;                      // 人设的，否则 DEFAULTS
     pub fn idle_timeout_ms(&self) -> Option<u64>;
-    pub fn is_plain(&self) -> bool;                            // 无自定义头也无覆盖
     pub fn applied_overrides(&self) -> Vec<(String, Value)>;   // 文本读成 JSON 的唯一权威
 }
 pub struct AttachedEndpoint { …, pub tuning: EndpointTuning }
@@ -555,7 +554,6 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 
 - **`EndpointConfig` 已有 `extra_headers` 与 `overrides`，`apply_override` 已实现并有测试**，所以这一条接的是既有机制而不是第二套：缺的只是「人填的那份设置」与「一周以后发出的那次调用」之间的存放处，它现在在 `AttachedEndpoint` 上，随 `endpoint_attached` 进账本、随重放回到书里。
 - **覆盖以文本入账**：账本不收浮点。`applied_overrides` 是文本变 JSON 的唯一一处，规则为「解析得出即那个 JSON，否则即它看上去的字符串」。
-- **自定义头或覆盖存在时，回环端点也走通用适配器**（`is_plain`）：本地适配器发不出自定义头，也写不进覆盖；悄悄丢掉它们就是用另一种方式去调用那个端点，而表单刚刚给人看的是这一种。
 - **人写的头顶掉兼容格式自己的同名头**（按 ASCII 大小写不敏感比较），不是并列两行：两条 `anthropic-version` 是一条没有供应方承诺按谁的意思读的请求。
 - **`stream_idle_timeout_ms` 是一次沉默的上限，不是整次应答的期限**（叶子 7.2 / G-02）。三层一个名字：线上、本 crate 与文案都叫 `stream_idle_timeout_ms`，装配层不再翻译它。**实现与名字一致**：`reqwest::blocking` 把一个请求的 timeout 当整体期限执行（异步层的 total timeout 覆盖整个 body），所以流式请求发出前把 `timeout` 清成 `None`，正文在一条自己的线程上逐行读，调用侧用 `recv_timeout(idle)` 计时，每收到一行重置。缺席则取 `timeout_ms`：一条没单独设过界的流也不允许永远安静。**代价写在这里而不是藏着**：对侧不说话又不断连时，那条读线程阻到对侧断连为止；结束这次调用是人要的，结束那条连接是对侧的。拒词报出越过的那个界（`no byte arrived for N ms`）而不是传输的原句。**败给的方案**：把线上字段改名 `stream_deadline_ms`——那会让一段写了六分钟的长回答在五分钟整被切，而那正是人抱怨的那件事。
 - **重试只有一个家，就是 `Retries`**（叶子 7.1 / G-01）。`Endpoint::call` 仍然一次调用一个来回，这一条没变；变的是「人没填」的意思：字段不再是 `Option<u32>`，缺席就是 `Retries::UntilHalted`，读者拼不出第二种答案。没有刹车的地方（设置页上的探测，人正等着，`Halt` 按不下去）读 `Retries::without_a_brake()`，它把 `UntilHalted` 兑成 **1 次**重试——这个读法住在设置自身上，而不是调用点的第二个默认值。账本里仍然只写已设的数字，缺键即无上限（`Retries::stated()`／`Retries::of()` 一对）。
@@ -578,7 +576,7 @@ pub fn is_local(base_url: &str) -> bool;                                        
 - **全城的 HTTP 客户端都在 `reach::proxy` 里造**（`client_for`）。同一条规则写在五处就是五条规则，它们一直一致到其中一处被改为止；更要紧的是，分段读数若自己再判一次，它报出的就是一条请求不会走的路——而那正是看报告的人唯一无法自己核实的东西。**这个缺陷真实存在过**：客户端已经 `no_proxy` 了，而读数还在按环境变量报 `Environment` 并把解名与套接字两段记成 `ProxiedAway`／`Skipped`。
 - **默认把打到这台电脑的调用摘出代理，但那是默认而不是定理**（`Proxying::ExceptLocal`）：跑起来才现形——开了 system-proxy 之后，一台配了代理的机器把回环也送进代理，本地推理服务器由别人的网关代答 502。但把它写死就是替所有人做了一个只对大多数人成立的决定，而这一类决定失效时没有任何一屏能告诉人到底发生了什么。现在它是 `EndpointTuning.proxying` 的默认值，另两个值各自对应一类真实的机器（kernel-SPEC.md 8-50），而无论哪一个，读数都会把结论写在 `through` 那一格里。
 - **工具服务器与订阅登录用默认值，且是显式地用**（`bin::mcp_http`、`bin::mcp_sse`、`credential::oauth::flow`）：两者都没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
-- **`is_local` 是全城唯一的那一条判断**：本地适配器拒一个不属于这台电脑的 URL、代理决定、设置页上那个 `local` 标记，读的是同一个函数。它曾经是两个（`native::is_loopback` 只认 `localhost`／`127.0.0.1`／`::1`，而 `reach::is_local` 按 `IpAddr::is_loopback` 判），于是 `127.0.0.2` 在一处算这台电脑、在另一处不算。
+- **`is_local` 是全城唯一的那一条判断**：`client_for` 的代理豁免（`Through::LocalAddress`）、地址规整时缺省的 scheme 与兼容格式提示、设置页上那个 `local` 标记，读的是同一个函数。回环按 `IpAddr::is_loopback` 判，外加 `localhost` 与 `*.localhost`，所以 `127.0.0.2` 在每一处都算这台电脑；两份判断只会在某一处先被改掉时各说各的。
 - **5 秒一段**：设置页上有人在等，一个在这个时间里答不出来的主机，人要的是知道，而不是继续等。
 
 ### 8-17 `gateway::provider`：厂商文档写下来一次，与输出上限的事实梯（形状 6 数据面 ＋ 形状 1 判定）
