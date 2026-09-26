@@ -10,10 +10,10 @@
   // the window. The span and its reason are
   // `kernel::config::SecondThreshold`'s one construction point - thirty
   // through ninety, so the line about a handoff can still be said
-  // before the window closes - and this page states the span rather
-  // than judging it: the city's refusal comes back carrying the span,
-  // and a page that enforced it here would be the second place the
-  // rule lives.
+  // before the window closes - and this page states the span the city
+  // answers with rather than judging it: the city's refusal comes back
+  // carrying the span, and a page that enforced it here, or spelled it
+  // itself, would be the second place the rule lives.
   //
   // A box left empty is the city's own default, written as nothing at
   // all. What is in force is what `Query::Config` answers - the file's
@@ -27,7 +27,7 @@
   import { configureContext } from "../core/commands";
   import { fill, say } from "../core/lang";
   import { ui } from "../ui";
-  import type { Address } from "../wire";
+  import type { Address, SettledSecond } from "../wire";
   import Button from "./parts/button.svelte";
   import Field from "./parts/field.svelte";
 
@@ -39,8 +39,6 @@
   const u = ui();
   const lang = u.lang;
 
-  const SECOND_MIN = 30;
-  const SECOND_MAX = 90;
 
   let box = $state("");
   let edited = $state(false);
@@ -67,10 +65,10 @@
     was = at;
   });
 
-  const span = (): string =>
+  const span = (domain: SettledSecond["domain"]): string =>
     fill(say($lang, "context_second_range"), {
-      min: String(SECOND_MIN),
-      max: String(SECOND_MAX),
+      min: String(domain.min),
+      max: String(domain.max),
     });
 
   function save(): void {
@@ -106,6 +104,8 @@
       {...(edited ? {} : { why: say($lang, "context_second_unchanged") })}
       onPress={save}
     />
-    <span class="text-note text-text-faint">{span()}</span>
+    {#if settled !== undefined}
+      <span class="text-note text-text-faint">{span(settled.domain)}</span>
+    {/if}
   </div>
 </div>

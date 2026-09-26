@@ -140,8 +140,9 @@ use serde::{Deserialize, Serialize};
 ///    meet a variant it cannot decode.
 /// 39: the default is a layer. `Query::Config` answers the second
 ///    context rung whether or not a file states it, naming
-///    `ConfigLayer::Default` when none does, so a page draws the city's
-///    figure instead of keeping a copy of it.
+///    `ConfigLayer::Default` when none does, and with the domain a file
+///    may state, so a page draws the city's figures instead of keeping
+///    copies of them.
 pub const WIRE_V: u32 = 39;
 mod query;
 

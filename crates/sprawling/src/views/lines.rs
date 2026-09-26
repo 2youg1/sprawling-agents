@@ -47,6 +47,10 @@ pub(crate) fn config_answer(
     addr: &Address,
 ) -> Result<channels::ConfigAnswer, kernel::AxError> {
     let defaults = gateway::EndpointTuning::DEFAULTS;
+    let domain = channels::SecondDomain {
+        min: kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
+        max: kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
+    };
     Ok(channels::ConfigAnswer {
         addr: addr.clone(),
         effort: city::settled_effort(city_root, addr)?.map(|(effort, layer)| {
@@ -59,10 +63,12 @@ pub(crate) fn config_answer(
             channels::SettledSecond {
                 percent: kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT,
                 from: channels::ConfigLayer::Default,
+                domain,
             },
             |(threshold, layer)| channels::SettledSecond {
                 percent: u64::from(threshold),
                 from: rung_of(layer),
+                domain,
             },
         ),
         tuning: channels::TuningDefaults {

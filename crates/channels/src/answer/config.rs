@@ -54,6 +54,18 @@ pub struct SettledSecond {
     /// `kernel::config::SecondThreshold`'s one construction point.
     pub percent: u64,
     pub from: ConfigLayer,
+    pub domain: SecondDomain,
+}
+
+/// The whole percents a file may state for the second rung, both ends
+/// included: the two figures `kernel::config::SecondThreshold`'s one
+/// construction point reads, answered so a page that states the span
+/// does not spell it a second time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SecondDomain {
+    pub min: u64,
+    pub max: u64,
 }
 
 /// What an endpoint that settled nothing is called with.
