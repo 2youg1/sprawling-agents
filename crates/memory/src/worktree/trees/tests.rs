@@ -29,7 +29,7 @@ fn landing(t: u64, of: &Provenance, reviewed_by_person: bool) -> Landing<'_> {
     }
 }
 
-fn city(dir: &Path) -> Worktrees {
+pub(crate) fn city(dir: &Path) -> Worktrees {
     std::fs::create_dir_all(dir.join("lab")).unwrap();
     std::fs::write(dir.join("lab").join("notes.md"), b"first\n").unwrap();
     let mut checkpoint = Checkpoint::open(dir).unwrap();

@@ -19,12 +19,12 @@ use super::weight::measure;
 /// Where the trees live: inside the reserved subtree, because they are
 /// the city's own machinery rather than anybody's writable space. What a
 /// run may write is judged against the tree it works in.
-const WORKTREE_DIR: &str = "worktrees";
+pub(super) const WORKTREE_DIR: &str = "worktrees";
 
 /// The city's trees.
 pub struct Worktrees {
-    repo: git2::Repository,
-    home: PathBuf,
+    pub(super) repo: git2::Repository,
+    pub(super) home: PathBuf,
     ceiling: ByteLen,
 }
 
@@ -52,11 +52,16 @@ impl Worktrees {
             op: "open the city repository",
             detail: format!("{}: {err}", city_root.display()),
         })?;
-        Ok(Worktrees {
+        Ok(Worktrees::over(repo, city_root))
+    }
+
+    /// The trees of a repository already open at `city_root`.
+    pub(super) fn over(repo: git2::Repository, city_root: &Path) -> Worktrees {
+        Worktrees {
             repo,
             home: city_root.join(kernel::RESERVED_PREFIX).join(WORKTREE_DIR),
             ceiling: ByteLen::new(WORKTREE_MAX_BYTES),
-        })
+        }
     }
 
     /// Opens a tree for one node.
@@ -288,7 +293,7 @@ impl Worktrees {
     ///
     /// A repository that has already forgotten the tree is the end
     /// state this asks for, so it is not a failure.
-    fn forget(&self, name: &WorktreeName) -> Result<(), MemoryError> {
+    pub(super) fn forget(&self, name: &WorktreeName) -> Result<(), MemoryError> {
         let tree = match self.repo.find_worktree(name.as_str()) {
             Ok(tree) => tree,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
