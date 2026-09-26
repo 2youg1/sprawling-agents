@@ -37,11 +37,11 @@
   import type { Boundary, ForkPlan } from "./talk/forking";
   import Thread from "./talk/thread.svelte";
   import Showing from "./shared/showing.svelte";
-  import Produced from "./talk/produced.svelte";
+  import Stream from "./talk/stream.svelte";
   import { drawsCalls } from "../core/results";
   import { anchorAt, footOf } from "./talk/anchoring";
   import type { Anchoring } from "./talk/anchoring";
-  import { NOTHING, artifactsIn, lastFenceIn } from "./talk/trace";
+  import { NOTHING, artifactsIn } from "./talk/trace";
   import Waiting from "./talk/waiting.svelte";
 
   interface Props {
@@ -93,13 +93,6 @@
     });
   });
 
-  // Where the produced line measures from: the tree the run opened at,
-  // once the run has closed, up to the tree it last fenced, as the run
-  // page measures. An open run has produced nothing final yet.
-  const producedFrom = $derived(
-    answer?.closing === null || answer?.closing === undefined ? null : (answer.opened_at ?? null),
-  );
-  const producedTo = $derived(answer === undefined ? null : lastFenceIn(answer.turns));
   const artifacts = $derived(answer === undefined ? NOTHING : artifactsIn(answer.turns));
   // Whether there is a card to draw at all. Any one of the three panes
   // is enough; a run that read nothing, changed nothing and ran nothing
@@ -304,12 +297,13 @@
           </div>
         {:else}
           <div class="mb-base flex justify-end"><Showing /></div>
-          <Divider {earlier} {who} boundary={story} onFork={doFork} onRetry={send} />
-          {#each shown as run (run.run)}
-            <Thread {run} {who} onFork={doFork} onRetry={send} />
-          {/each}
-          {#if !drawsCalls($held.showing) && producedFrom !== null}
-            <Produced base={producedFrom} head={producedTo === producedFrom ? null : producedTo} place="divider" />
+          {#if drawsCalls($held.showing)}
+            <Divider {earlier} {who} boundary={story} onFork={doFork} onRetry={send} />
+            {#each shown as run (run.run)}
+              <Thread {run} {who} onFork={doFork} onRetry={send} />
+            {/each}
+          {:else}
+            <Stream {shown} {earlier} boundary={story} />
           {/if}
           <Waiting />
         {/if}

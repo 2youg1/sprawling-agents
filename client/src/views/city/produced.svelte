@@ -32,5 +32,5 @@
 </script>
 
 {#if span !== null}
-  <Produced base={span.base} head={span.head} place="row" />
+  <Produced base={span.base} head={span.head} />
 {/if}

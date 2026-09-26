@@ -42,6 +42,7 @@
   import Presences from "./gallery/presence.svelte";
   import Produced from "./gallery/produced.svelte";
   import Resulted from "./gallery/resulted.svelte";
+  import Streamed from "./gallery/streamed.svelte";
   import Screens from "./gallery/screens.svelte";
   import Settings from "./gallery/settings.svelte";
   import Shelved from "./gallery/shelved.svelte";
@@ -87,4 +88,5 @@
   <Switches />
   <Timed />
   <Resulted />
+  <Streamed />
 </div>

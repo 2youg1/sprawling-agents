@@ -12,7 +12,8 @@
   // count, so the page costs the same for a city of ten runs as for a
   // city of thousands (core/results.ts).
   import Glyph from "../parts/glyph.svelte";
-  import type { GlyphName } from "../parts/glyph";
+  import { OUTCOME_GLYPH, OUTCOME_INK } from "../shared/outcome";
+  import { hhmm } from "../../core/time";
   import Segmented from "../parts/segmented.svelte";
   import type { Choice } from "../parts/segmented";
   import Produced from "./produced.svelte";
@@ -54,17 +55,6 @@
     ),
   );
 
-  const GLYPH: Record<Outcome, GlyphName> = { waiting: "hand", failed: "cross", done: "check", ended: "ring" };
-  const INK: Record<Outcome, string> = {
-    waiting: "text-alert",
-    failed: "text-alert",
-    done: "text-text-quiet",
-    ended: "text-text-faint",
-  };
-
-  function hhmm(at: number): string {
-    return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  }
 </script>
 
 <div class="mx-auto w-full max-w-page">
@@ -100,7 +90,7 @@
             >
               <span class="w-figure shrink-0 font-mono text-text-faint">{run.started === null ? "" : hhmm(run.started)}</span>
               {#if outcome !== null}
-                <span class="shrink-0 self-center {INK[outcome]}"><Glyph name={GLYPH[outcome]} size="sm" /></span>
+                <span class="shrink-0 self-center {OUTCOME_INK[outcome]}"><Glyph name={OUTCOME_GLYPH[outcome]} size="sm" /></span>
               {/if}
               <span class="w-output shrink-0 truncate font-mono text-text-quiet">{run.addr ?? ""}</span>
               <span class="min-w-0 flex-1 truncate text-body text-text">{run.task ?? run.run}</span>
