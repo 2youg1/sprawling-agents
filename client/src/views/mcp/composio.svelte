@@ -50,12 +50,14 @@
   import { get } from "svelte/store";
 
   import type { ToolkitLine, ToolkitSlug } from "../../wire";
+  import { QUERIES } from "../../core/asking";
   import { enrol } from "../../core/enrol";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
   import { EMPTY, WHY, encode } from "./draft";
   import { consentUrl, shelfOf } from "./shelf.svelte";
 
@@ -66,7 +68,8 @@
   const shelf = shelfOf();
   // What the shelf last answered, read once per redraw so the four
   // directory arms below narrow one value rather than re-reading it.
-  const answer = $derived(shelf.answer());
+  const read = $derived(shelf.answer());
+  const answer = $derived(read.kind === "held" ? read.value : undefined);
 
   let key = $state("");
   let reference = $state<string | null>(null);
@@ -201,7 +204,9 @@
   {/if}
 
   <!-- The directory, or the one sentence that stands in for it. -->
-  {#if answer === undefined}
+  {#if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={QUERIES.toolkits} />
+  {:else if answer === undefined}
     <p class="text-note text-text-faint">{say($lang, "mcp_shelf_asking")}</p>
   {:else if answer === "unenrolled"}
     <p class="text-note text-text-faint">{say($lang, "mcp_shelf_needs_key")}</p>

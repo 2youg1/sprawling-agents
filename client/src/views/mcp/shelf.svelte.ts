@@ -21,14 +21,17 @@
 // asked for this shelf.
 
 import type { ToolkitLine, ToolkitSlug, ToolkitsAnswer } from "../../wire";
+import { readAnswer } from "../../core/answered";
+import type { Answered } from "../../core/answered";
 import { QUERIES } from "../../core/asking";
 import { connectToolkit } from "../../core/commands";
 import { ui } from "../../ui";
 
 export interface Shelf {
-  // What the city last answered. `undefined` until the first answer
-  // lands, which the page draws as waiting rather than as empty.
-  readonly answer: () => ToolkitsAnswer | undefined;
+  // What the city last answered: asking until the first answer lands,
+  // which the page draws as waiting rather than as empty, and
+  // unavailable when the city could not look.
+  readonly answer: () => Answered<ToolkitsAnswer>;
   readonly rows: () => readonly ToolkitLine[];
   // Ask the broker again. Explicit rather than folded into a record's
   // arrival: this read costs a round trip to somebody else, and a
@@ -39,10 +42,10 @@ export interface Shelf {
 
 export function shelfOf(): Shelf {
   const u = ui();
-  let answer = $state<ToolkitsAnswer | undefined>(undefined);
+  let answer = $state<Answered<ToolkitsAnswer>>({ kind: "asking" });
 
   $effect(() => u.conn.asking.ask(QUERIES.toolkits).subscribe((held) => {
-    answer = held !== undefined && "toolkits" in held ? held.toolkits : undefined;
+    answer = readAnswer(held, (each) => ("toolkits" in each ? each.toolkits : undefined));
   }));
 
   const recheck = (): void => {
@@ -69,8 +72,8 @@ export function shelfOf(): Shelf {
     answer: () => answer,
     rows: () => {
       const held = answer;
-      return held !== undefined && held !== "unenrolled" && "shelf" in held
-        ? held.shelf.toolkits
+      return held.kind === "held" && held.value !== "unenrolled" && "shelf" in held.value
+        ? held.value.shelf.toolkits
         : [];
     },
     recheck,
