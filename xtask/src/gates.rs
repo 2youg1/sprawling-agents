@@ -208,8 +208,33 @@ mod tests {
         check: record,
     };
 
+    fn explode(_: &Path) -> Result<Vec<Violation>, XtaskError> {
+        panic!("the fixture could not be read")
+    }
+
+    static EXPLODES: Gate = Gate {
+        name: "explodes",
+        check: explode,
+    };
+
+    #[test]
+    fn a_gate_that_panics_reports_the_panic_message_in_its_verdict() {
+        let verdicts: Vec<(&str, String)> = judge(&[&EXPLODES], Path::new("."))
+            .into_iter()
+            .map(|(name, verdict)| (name, verdict.unwrap_err().to_string()))
+            .collect();
+        assert_eq!(
+            verdicts,
+            [(
+                "explodes",
+                "run gate `explodes`: the gate panicked with \"the fixture could not be read\" (gate-panicked); run `cargo xtask gates explodes` to see the panic alone".to_owned()
+            )]
+        );
+    }
+
     #[test]
     fn gates_judge_off_the_calling_thread_and_report_in_roster_order() {
+        JUDGED_ON.lock().unwrap().clear();
         let names: Vec<&str> = judge(&[&FIRST, &SECOND], Path::new("."))
             .into_iter()
             .map(|(name, _)| name)
