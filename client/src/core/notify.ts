@@ -25,7 +25,9 @@ export type Notifying = "off" | "on";
 export type Focus = "focused" | "blurred";
 
 // What this page has already accounted for. Before the first answer
-// there is no snapshot; the first answer becomes it whole.
+// there is no snapshot; the first answer becomes it whole. A query the
+// city has not answered yet is `undefined`, never an empty list, because
+// an empty snapshot would let everything already waiting through.
 export type Heard =
   | { readonly snapshot: "pending" }
   | { readonly snapshot: "taken"; readonly ids: ReadonlySet<ApprovalId> };
@@ -46,9 +48,10 @@ export interface Scene {
 // item passed over once is never raised later.
 export function notices(
   heard: Heard,
-  items: readonly ApprovalItem[],
+  items: readonly ApprovalItem[] | undefined,
   scene: Scene,
 ): readonly [Heard, readonly ApprovalItem[]] {
+  if (items === undefined) return [heard, []];
   const ids = new Set(items.map((item) => item.id));
   const next: Heard = { snapshot: "taken", ids };
   switch (heard.snapshot) {
