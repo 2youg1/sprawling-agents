@@ -80,7 +80,7 @@
   const label = $derived(`rail-label truncate ${posture === "named" ? "block" : "hidden"}`);
 
   const active = $derived($belief.live.length);
-  const waiting = $derived($approvals.length);
+  const waiting = $derived($approvals?.length ?? 0);
   const halted = $derived(cityIsShut($belief.halted));
 
   // The name each page goes by is the name its key goes by, so the rail,

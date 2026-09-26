@@ -13,12 +13,6 @@
   //
   // A line that begins with `/` is a command rather than a message, and
   // the menu over the box is the same list the Ctrl-K palette reads.
-  //
-  // **The send control is drawn here rather than in `parts/button.svelte`
-  // for one reason: its second face.** After Enter it briefly reads
-  // "handed to <room>" beside a check, so a person sees the send land
-  // (ux A3), and the button part has no slot for a glyph. The paint is
-  // the primary tier's, restated in tokens.
 
   // How long the send receipt holds its words.
   const RECEIPT_MS = 400;
@@ -34,20 +28,20 @@
   import { newestWorking } from "../../core/belief/live";
   import { MODES, openSession, selectModel } from "../../core/commands";
   import type { Sending } from "../../core/doing";
-  import { fill, say } from "../../core/lang";
+  import { say } from "../../core/lang";
   import { current } from "../../core/route";
   import { completed } from "../../core/completion";
   import { find } from "../../core/slash";
-  import type { Slash } from "../../core/slash";
-  import { canRecord, dictation } from "../../core/speaking";
+  import type { Slash } from "../../core/slash_hands";
+  import { canRecord } from "../../core/speaking";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
   import Button from "../parts/button.svelte";
   import PillView from "./pill.svelte";
-  import Glyph from "../parts/glyph.svelte";
+  import Record from "./record.svelte";
+  import Send from "./send.svelte";
   import Popover from "../parts/popover.svelte";
   import {
-    SPELLING,
     decodeRoom,
     draftAt,
     effortLevel,
@@ -297,13 +291,10 @@
 
   // ---------------------------------------------------------- speaking
 
-  const heard = dictation(u.origin, u.pairing, (words) => {
+  function heardWords(words: string): void {
     const before = text;
     write(before === "" ? words : `${before} ${words}`);
-  });
-  const taking = heard.taking;
-  const transcribing = heard.hearing;
-  const refused = heard.refused;
+  }
 
   onMount(() => {
     // A draft restored on mount is taller than one row.
@@ -362,26 +353,10 @@
       <PillView spec={specs[2]} />
       <PillView spec={specs[3]} />
       {#if hearing === true && canRecord()}
-        <button
-          type="button"
-          class={[
-            "relative flex h-control-sm shrink-0 items-center gap-tight rounded-pill px-base text-note before:absolute before:-inset-snug before:content-['']",
-            $taking ? "bg-alert text-on-accent" : $transcribing ? "bg-raised aria-disabled:text-text-disabled" : "bg-raised text-text-quiet hover:bg-raised-hover",
-          ]}
-          aria-disabled={$transcribing}
-          onclick={() => {
-            if ($transcribing) return;
-            heard.speak();
-          }}
-        >
-          {$transcribing ? say($lang, "talk_hearing") : $taking ? say($lang, "talk_recording") : say($lang, "talk_record")}
-        </button>
+        <Record onWords={heardWords} />
       {/if}
       {#if kept}
         <span class="text-alert">{say($lang, "talk_not_live")}</span>
-      {/if}
-      {#if $refused}
-        <span class="text-alert">{say($lang, "link_refused")}</span>
       {/if}
     </div>
     <div class="ml-auto flex shrink-0 items-center gap-base">
@@ -394,27 +369,7 @@
           }}
         />
       {/if}
-      <button
-        type="submit"
-        class={[
-          "flex h-control-lg items-center gap-snug rounded-control px-base text-label transition-[background-color,color,opacity,transform]",
-          "duration-100 ease-standard active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100",
-          text.trim() === "" && !handed ? "bg-raised aria-disabled:text-text-disabled" : "bg-accent text-on-accent hover:bg-accent-hover",
-        ]}
-        aria-disabled={text.trim() === ""}
-        onclick={(event) => {
-          if (text.trim() === "") event.preventDefault();
-        }}
-      >
-        <span role="status" class="flex items-center gap-tight">
-          {#if handed}
-            <Glyph name="check" size="sm" />
-            {fill(say($lang, "talk_handed"), { room: here ?? "" })}
-          {:else}
-            {say($lang, SPELLING[sending])}
-          {/if}
-        </span>
-      </button>
+      <Send {sending} {handed} {here} empty={text.trim() === ""} />
     </div>
   </div>
   {#if text !== ""}

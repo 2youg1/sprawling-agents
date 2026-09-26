@@ -40,7 +40,21 @@ describe("the recovery table", () => {
   // person round a loop, and fetching the client this city was built
   // with is the one thing that ends it.
   test("a wire mismatch offers a reload, never a reconnect", () => {
-    expect(recoveryFor("E_WIRE_MISMATCH").map((recovery) => recovery.kind)).toEqual(["reload"]);
+    expect(recoveryFor({ code: "E_WIRE_MISMATCH", subject: "" }).map((recovery) => recovery.kind)).toEqual(["reload"]);
+  });
+});
+
+// `/stop` cancels the run a refusal names and nothing wider, so it is
+// offered only where the subject is a run: on a room it could never run.
+describe("stopping from a notice", () => {
+  test("a refusal about a run offers /stop", () => {
+    expect(recoveryFor({ code: "E_BUSY", subject: "00000000-0000-4000-8000-000000000001" })).toEqual([
+      { kind: "command", spelled: "/stop" },
+    ]);
+  });
+
+  test("a refusal about a room offers nothing to stop", () => {
+    expect(recoveryFor({ code: "E_BUSY", subject: "hall/room" })).toEqual([]);
   });
 });
 
@@ -49,7 +63,7 @@ describe("the recovery table", () => {
 // mayor's composer, filled with a request the person still sends.
 describe("a standing goal without a plan", () => {
   test("offers a form that asks the mayor to write the plan", () => {
-    expect(recoveryFor("E_PLAN_MISSING")).toEqual([
+    expect(recoveryFor({ code: "E_PLAN_MISSING", subject: "hall: ship it" })).toEqual([
       { kind: "form", label: "act_ask_plan", words: "form_ask_plan", room: "mayor" },
     ]);
   });

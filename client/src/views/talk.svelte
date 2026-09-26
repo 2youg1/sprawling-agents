@@ -138,15 +138,21 @@
 
   // The last dispatch sent from this room, and where its run started:
   // a bare building's work opens a room of its own (client-SPEC 12-4).
+  // The line saying so is about the dispatch, so a steer sent after it
+  // or the run it started ending takes the line away.
   let sent = $state<Sent | null>(null);
-  const landing = $derived<Landing>(
-    sent?.from !== address ? { kind: "pending" } : landingOf(sent, $belief.runs),
-  );
+  const landing = $derived.by((): Landing => {
+    if (sent?.from !== address) return { kind: "pending" };
+    const found = landingOf(sent, $belief.runs);
+    return found.kind === "elsewhere" && $belief.runs[found.run]?.doing.kind === "frozen" ? { kind: "pending" } : found;
+  });
 
   function send(text: string): boolean {
     const going = live;
     if (going !== undefined) {
-      return u.send(steer(going.run, text));
+      const steered = u.send(steer(going.run, text));
+      if (steered) sent = null;
+      return steered;
     }
     const went = u.send(
       dispatch({ addr: address, task: text, goal: say($lang, "talk_goal"), effort: $effort, mode: $mode }),

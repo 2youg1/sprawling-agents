@@ -20,10 +20,20 @@
 
   const WORDS: Readonly<Record<Notifying, Key>> = { off: "notify_off", on: "notify_on" };
 
+  // A switch that reads `on` while the browser refuses every
+  // notification promises what never happens, so a browser that has no
+  // notifications, or that says no, puts the switch back.
   function pick(next: Notifying): void {
     u.prefs.setNotifying(next);
-    if (next === "on" && typeof Notification !== "undefined" && Notification.permission === "default") {
-      void Notification.requestPermission();
+    if (next === "off") return;
+    if (typeof Notification === "undefined" || Notification.permission === "denied") {
+      u.prefs.setNotifying("off");
+      return;
+    }
+    if (Notification.permission === "default") {
+      void Notification.requestPermission().then((answer) => {
+        if (answer !== "granted") u.prefs.setNotifying("off");
+      });
     }
   }
 </script>

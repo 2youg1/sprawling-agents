@@ -30,7 +30,6 @@ const at = (n: number): Seq => Seq.make(n);
 const exec = turn(1, [
   {
     at: 11,
-    called: 1010,
     tool: "exec",
     outcome: "answered",
     called: 1000,

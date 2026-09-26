@@ -8,7 +8,8 @@
   // `Notification`: it follows the approval queue, asks the decision
   // which items to raise, and raises them only where the browser has
   // granted the permission. It draws nothing.
-  import { QUERIES } from "../core/asking";
+  import { get } from "svelte/store";
+
   import { say } from "../core/lang";
   import { notices, UNHEARD, type Heard } from "../core/notify";
   import type { View } from "../core/route";
@@ -19,17 +20,12 @@
   const u = ui();
   const held = u.prefs.held;
   const lang = u.lang;
-  // The raw answer, not `u.approvals`: that store stands `[]` in for an
-  // unanswered query, and `[]` would become the snapshot.
-  const answer = u.conn.asking.ask(QUERIES.approvals);
-  const items = $derived(
-    $answer !== undefined && "approvals" in $answer ? $answer.approvals.items : undefined,
-  );
+  const items = u.approvals;
   const opened = Date.now();
   let heard: Heard = UNHEARD;
 
   $effect(() => {
-    const [next, raised] = notices(heard, items, {
+    const [next, raised] = notices(heard, $items, {
       notifying: $held.notifying,
       focus: document.hasFocus() ? "focused" : "blurred",
       elapsed: Date.now() - opened,
@@ -38,7 +34,9 @@
     heard = next;
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     for (const item of raised) {
-      new Notification(say($lang, "notify_approval"), { body: item.action_desc, tag: item.id });
+      // Read, not subscribed: a language change raises nothing, so it
+      // should not rerun the queue.
+      new Notification(say(get(lang), "notify_approval"), { body: item.action_desc, tag: item.id });
     }
   });
 </script>
