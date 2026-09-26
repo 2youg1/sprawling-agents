@@ -75,9 +75,7 @@
   // and this file decides only the pinned case.
   const label = $derived(`rail-label truncate ${posture === "named" ? "block" : "hidden"}`);
 
-  const active = $derived(
-    Object.values($belief.runs).filter((run) => run.doing.kind !== "frozen").length,
-  );
+  const active = $derived($belief.live.length);
   const waiting = $derived($approvals.length);
   const halted = $derived(cityIsShut($belief.halted));
 

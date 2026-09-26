@@ -177,14 +177,7 @@
     const at = Option.getOrNull(current(u.bar));
     return at !== null && at.kind === "talk" ? at.address : null;
   });
-  const live = $derived.by((): Reached | null =>
-    reached(
-      Object.values($belief.runs)
-        .filter((run) => run.doing.kind !== "frozen")
-        .sort((a, b) => (b.started ?? 0) - (a.started ?? 0))
-        .at(0),
-    ),
-  );
+  const live = $derived(reached($belief.live.at(-1)));
 
   function newest(room: string): Reached | null {
     return reached(
