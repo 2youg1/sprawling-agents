@@ -276,7 +276,11 @@ fn the_generations_held_stay_bounded_and_refuse_the_reads_they_forget() {
     view.apply(&record(EventKind::RoadmapSplit, split.clone()));
     let (_, fresh) = view.ask(&addr()).read(dir.path(), &addr());
     for n in 0..GENERATIONS_HELD {
-        view.apply(&record_in(&format!("b{n}"), EventKind::RoadmapSplit, split.clone()));
+        view.apply(&record_in(
+            &format!("b{n}"),
+            EventKind::RoadmapSplit,
+            split.clone(),
+        ));
     }
     view.apply(&record(EventKind::RoadmapSplit, split));
     let asked = fresh.unwrap();

@@ -120,6 +120,9 @@ impl PlanView {
             return;
         };
         if !matches!(reach, PlanReach::Untouched) {
+            if self.moved.len() >= GENERATIONS_HELD && !self.moved.contains_key(&building) {
+                self.forget_generations();
+            }
             let moved = self.moved.entry(building.clone()).or_default();
             *moved = moved.wrapping_add(1);
         }
@@ -174,6 +177,14 @@ impl PlanView {
         if self.generation(&fresh.addr) == fresh.asked_at {
             self.read.insert(fresh.addr, fresh.reading);
         }
+    }
+
+    /// Folds every building's generation into the city-wide one, which
+    /// moves so that a read asked for before cannot match again once its
+    /// building's count restarts from zero.
+    fn forget_generations(&mut self) {
+        self.moved.clear();
+        self.moved_all = self.moved_all.wrapping_add(1);
     }
 
     fn generation(&self, addr: &Address) -> Generation {
@@ -234,8 +245,7 @@ impl PlanView {
         shared.lock().unwrap_or_else(|poisoned| {
             let mut view = poisoned.into_inner();
             view.read.clear();
-            view.moved.clear();
-            view.moved_all = view.moved_all.wrapping_add(1);
+            view.forget_generations();
             shared.clear_poison();
             view
         })
