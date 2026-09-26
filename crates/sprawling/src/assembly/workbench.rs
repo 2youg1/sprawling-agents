@@ -165,7 +165,7 @@ impl Site {
     /// refuse.
     pub(super) fn fence_scope(&self) -> Result<Vec<String>, AxError> {
         if self.lease.is_some() {
-            return Ok(vec![self.building.addr().as_str().to_owned()]);
+            return Ok(tree_scope(&self.building));
         }
         Ok(self
             .rules
@@ -174,6 +174,14 @@ impl Site {
             .map(|prefix| prefix.as_str().to_owned())
             .collect())
     }
+}
+
+/// What a building under review writes in its tree: its own subtree.
+/// The tree is claimed, fenced and offered over this one scope, so a
+/// claim that checked out less than the fence stages, or an offer that
+/// staged more than the claim checked out, cannot happen.
+fn tree_scope(building: &city::Building) -> Vec<String> {
+    vec![building.addr().as_str().to_owned()]
 }
 
 /// The desks one dispatch lends out, and takes back when the drive ends.

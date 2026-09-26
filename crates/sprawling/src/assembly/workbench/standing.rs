@@ -182,7 +182,7 @@ impl RunWorker {
             let trees =
                 memory::Worktrees::open(&self.city_root).map_err(memory::MemoryError::into_ax)?;
             let claimed = trees
-                .claim(&tree_of(addr)?)
+                .claim(&tree_of(addr)?, &super::tree_scope(&building))
                 .map_err(memory::MemoryError::into_ax)?;
             self.record_for(
                 run_id,

@@ -50,7 +50,7 @@ fn a_node_reaches_the_building_only_through_someone_elses_verification() {
     let trees = city(dir.path());
     let node = NodeId::parse("node-1").unwrap();
     let tree = trees
-        .claim(&WorktreeName::parse("node-1").unwrap())
+        .claim(&WorktreeName::parse("node-1").unwrap(), &["lab".to_owned()])
         .unwrap();
 
     // The implementer works in its own tree and commits there. The
@@ -59,7 +59,12 @@ fn a_node_reaches_the_building_only_through_someone_elses_verification() {
     std::fs::write(tree.path().join("lab").join("notes.md"), produced).unwrap();
     Checkpoint::open(tree.path())
         .unwrap()
-        .land(TimeMs::new(2_000), &of("lab/room1"), "offer: lab")
+        .land(
+            &["lab".to_owned()],
+            TimeMs::new(2_000),
+            &of("lab/room1"),
+            "offer: lab",
+        )
         .unwrap();
     assert_eq!(
         std::fs::read_to_string(dir.path().join("lab").join("notes.md")).unwrap(),

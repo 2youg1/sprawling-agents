@@ -310,6 +310,7 @@ impl Checkpoint {
     /// Propagates staging, the staged-secret scan, and the commit.
     pub fn land(
         &mut self,
+        _scopes: &[String],
         t: TimeMs,
         of: &Provenance,
         subject: &str,

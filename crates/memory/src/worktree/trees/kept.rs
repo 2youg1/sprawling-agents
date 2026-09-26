@@ -108,6 +108,7 @@ impl Worktrees {
         &self,
         name: &WorktreeName,
         tree: &git2::Worktree,
+        _scopes: &[String],
     ) -> Result<WorktreeLease, MemoryError> {
         let refuse = |op: &'static str, err: git2::Error| MemoryError::Worktree {
             op,
@@ -172,9 +173,116 @@ impl Worktrees {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
+    use super::super::Landing;
     use super::super::tests::{city, name, owner};
     use crate::checkpoint::Checkpoint;
     use kernel::TimeMs;
+    use std::path::Path;
+
+    fn read(path: &Path) -> String {
+        std::fs::read_to_string(path).unwrap()
+    }
+
+    /// A kept tree claimed again writes only its scope, and what the node
+    /// offers from it moves only that scope: the trunk's work elsewhere,
+    /// which this tree never checked out, lands in the city untouched.
+    #[test]
+    fn a_kept_tree_claimed_again_checks_out_only_its_scope_and_offers_only_that() {
+        let dir = tempfile::tempdir().unwrap();
+        let trees = city(dir.path());
+        let city_docs = dir.path().join("docs").join("plan.md");
+        let land_city = |t: u64| {
+            Checkpoint::open(dir.path())
+                .unwrap()
+                .land(&[], TimeMs::new(t), &owner(), "checkpoint: city")
+                .unwrap()
+        };
+        std::fs::create_dir_all(city_docs.parent().unwrap()).unwrap();
+        std::fs::write(
+            &city_docs, b"v1
+",
+        )
+        .unwrap();
+        land_city(1_500);
+        let lab = ["lab".to_owned()];
+        trees
+            .release(trees.claim(&name("node-1"), &lab).unwrap())
+            .unwrap();
+        std::fs::write(
+            &city_docs, b"v2
+",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("lab").join("notes.md"),
+            b"second
+",
+        )
+        .unwrap();
+        let trunk = land_city(2_000);
+
+        let again = trees.claim(&name("node-1"), &lab).unwrap();
+        assert_eq!(
+            (
+                read(&again.path().join("lab").join("notes.md")),
+                read(&again.path().join("docs").join("plan.md"))
+            ),
+            (
+                "second
+"
+                .to_owned(),
+                "v1
+"
+                .to_owned()
+            ),
+            "the scope follows the trunk and nothing outside it is written"
+        );
+
+        std::fs::write(
+            again.path().join("lab").join("notes.md"),
+            b"from the node
+",
+        )
+        .unwrap();
+        Checkpoint::open(again.path())
+            .unwrap()
+            .land(&lab, TimeMs::new(3_000), &owner(), "offer: lab")
+            .unwrap();
+        let of = owner();
+        trees
+            .plan_merge(again.name())
+            .unwrap()
+            .apply(&Landing {
+                t: TimeMs::new(4_000),
+                of: &of,
+                subject: "merge: node-1",
+                reviewed_by_person: false,
+            })
+            .unwrap();
+        let repo = git2::Repository::open(dir.path()).unwrap();
+        let before = repo
+            .find_commit(git2::Oid::from_str(&trunk).unwrap())
+            .unwrap()
+            .tree()
+            .unwrap();
+        let after = repo.head().unwrap().peel_to_tree().unwrap();
+        let moved: Vec<String> = repo
+            .diff_tree_to_tree(Some(&before), Some(&after), None)
+            .unwrap()
+            .deltas()
+            .filter_map(|delta| delta.new_file().path().map(|p| p.display().to_string()))
+            .collect();
+        assert_eq!(
+            (moved, read(&city_docs)),
+            (
+                vec!["lab/notes.md".to_owned()],
+                "v2
+"
+                .to_owned()
+            ),
+            "the merge moves the scope alone"
+        );
+    }
 
     /// A node's next run finds its tree where it left it: releasing gives
     /// the lease back and keeps the files, so the next claim neither
@@ -183,7 +291,7 @@ mod tests {
     fn a_released_tree_stays_on_disk_for_the_nodes_next_run() {
         let dir = tempfile::tempdir().unwrap();
         let trees = city(dir.path());
-        let lease = trees.claim(&name("node-1")).unwrap();
+        let lease = trees.claim(&name("node-1"), &[]).unwrap();
         let path = lease.path().to_path_buf();
         let notes = path.join("lab").join("notes.md");
         let written = std::fs::metadata(&notes).unwrap().modified().unwrap();
@@ -192,7 +300,7 @@ mod tests {
         assert!(notes.exists(), "a released tree keeps its files");
         assert_eq!(trees.live().unwrap(), vec![name("node-1")]);
 
-        let again = trees.claim(&name("node-1")).unwrap();
+        let again = trees.claim(&name("node-1"), &[]).unwrap();
         assert_eq!(again.path(), path.as_path());
         assert_eq!(
             std::fs::metadata(&notes).unwrap().modified().unwrap(),
@@ -211,7 +319,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let trees = city(dir.path());
         trees
-            .release(trees.claim(&name("node-1")).unwrap())
+            .release(trees.claim(&name("node-1"), &[]).unwrap())
             .unwrap();
         std::fs::write(
             dir.path().join("lab").join("notes.md"),
@@ -221,10 +329,10 @@ mod tests {
         .unwrap();
         Checkpoint::open(dir.path())
             .unwrap()
-            .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+            .land(&[], TimeMs::new(2_000), &owner(), "checkpoint: lab")
             .unwrap();
 
-        let again = trees.claim(&name("node-1")).unwrap();
+        let again = trees.claim(&name("node-1"), &[]).unwrap();
         assert_eq!(
             std::fs::read_to_string(again.path().join("lab").join("notes.md")).unwrap(),
             "second
