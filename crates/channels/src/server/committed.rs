@@ -28,7 +28,8 @@ impl Committed {
     ///
     /// # Errors
     /// `WireMismatch` when the record does not serialise; that record
-    /// reaches no socket, and a page recovers it through `Lagged`.
+    /// reaches no socket, and the gap in `seq` it leaves makes each live
+    /// session send `Lagged` at the next record (channels-SPEC.md 8-41).
     pub fn new(record: EventRecord) -> Result<Self, AxError> {
         let unframed = |detail: String| {
             AxError::failure(AxCode::WireMismatch, "frame a committed record", detail)
