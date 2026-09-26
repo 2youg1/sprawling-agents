@@ -37,6 +37,7 @@
   import Conversation from "./gallery/conversation.svelte";
   import Filed from "./gallery/filed.svelte";
   import FirstRun from "./gallery/first_run.svelte";
+  import Followed from "./gallery/followed.svelte";
   import Hints from "./gallery/hints.svelte";
   import Keepers from "./gallery/kept.svelte";
   import RefusedLine from "./gallery/refused_line.svelte";
@@ -77,6 +78,7 @@
   <Presences />
   <Conversation />
   <RefusedLine />
+  <Followed />
   <Anchored />
   <Produced />
   <Filed />

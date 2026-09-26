@@ -2384,6 +2384,10 @@
     "zh": "听写中…"
   },
 
+  "talk_landed": {
+    "en": "this run went to",
+    "zh": "这次 run 去了"
+  },
   "talk_no_model": {
     "en": "no model chosen",
     "zh": "还没有选模型"

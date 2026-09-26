@@ -25,6 +25,8 @@
   import { sendingInto } from "../core/doing";
   import type { RunBelief } from "../core/belief";
   import { fill, say } from "../core/lang";
+  import { landingOf, sentFrom } from "../core/landing";
+  import type { Landing, Sent } from "../core/landing";
   import { MAYOR, roomOf } from "../core/route";
   import { forkAsked } from "../core/forking";
   import type { Snippet } from "svelte";
@@ -34,6 +36,7 @@
   import Composer from "./talk/composer.svelte";
   import Divider from "./talk/divider.svelte";
   import Forking from "./talk/forking.svelte";
+  import Landed from "./talk/landed.svelte";
   import type { Boundary, ForkPlan } from "./talk/forking";
   import Thread from "./talk/thread.svelte";
   import { anchorAt, footOf } from "./talk/anchoring";
@@ -131,14 +134,23 @@
     story = { kind: "opened", at: u.now() };
   });
 
+  // The last dispatch sent from this room, and where its run started:
+  // a bare building's work opens a room of its own (client-SPEC 12-4).
+  let sent = $state<Sent | null>(null);
+  const landing = $derived<Landing>(
+    sent?.from !== address ? { kind: "pending" } : landingOf(sent, $belief.runs),
+  );
+
   function send(text: string): boolean {
     const going = live;
     if (going !== undefined) {
       return u.send(steer(going.run, text));
     }
-    return u.send(
+    const went = u.send(
       dispatch({ addr: address, task: text, goal: say($lang, "talk_goal"), effort: $effort }),
     );
+    if (went) sent = sentFrom(address, text, $belief.runs);
+    return went;
   }
 
   // One branch, from wherever a person pointed: the words a message
@@ -214,6 +226,7 @@
 </script>
 
 {#snippet drawComposer()}
+  <Landed {landing} />
   <Composer
     {placeholder}
     sending={sendingInto(live?.doing)}
