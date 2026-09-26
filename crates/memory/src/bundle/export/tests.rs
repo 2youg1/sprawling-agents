@@ -304,7 +304,7 @@ fn log_of(root: &std::path::Path) -> Vec<String> {
 /// The history is part of the city: a restored city that lost its
 /// commits has lost every checkpoint a rollback could reach.
 /// Makes `root` a repository of two commits and returns its log.
-fn committed_twice(root: &std::path::Path) -> Vec<String> {
+pub(super) fn committed_twice(root: &std::path::Path) -> Vec<String> {
     let repo = git2::Repository::init(root).unwrap();
     let who = git2::Signature::new("owner", "owner@city", &git2::Time::new(1, 0)).unwrap();
     let mut parents = Vec::new();
@@ -352,7 +352,7 @@ fn the_git_history_comes_back_commit_for_commit() {
     );
 }
 
-fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> u64 {
+pub(super) fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> u64 {
     std::fs::create_dir_all(to).unwrap();
     let mut copied = 0;
     for entry in std::fs::read_dir(from).unwrap() {

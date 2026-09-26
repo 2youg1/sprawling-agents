@@ -164,6 +164,18 @@ impl History {
             };
             (pack, text, at)
         } else {
+            let borrowed = whole.join("objects").join("info").join("alternates");
+            // `open_bare` would read objects through it from stores the
+            // bundle never carried, so its presence alone refuses.
+            if borrowed.symlink_metadata().is_ok() {
+                return Err(MemoryError::Bundle {
+                    op: "restore",
+                    detail: format!(
+                        "{} borrows objects from outside the bundle",
+                        borrowed.display()
+                    ),
+                });
+            }
             let repo = git2::Repository::open_bare(&whole).map_err(|err| MemoryError::Bundle {
                 op: "restore",
                 detail: format!(
