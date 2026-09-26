@@ -314,7 +314,7 @@ sit above these in the shipped drawer and keep their own fixture. -->
             count={entry.count}
           >
             {#snippet actions()}
-              {#each recoveryFor(entry.code) as recovery (wordOf($lang, recovery))}
+              {#each recoveryFor(entry) as recovery (wordOf($lang, recovery))}
                 <Button label={wordOf($lang, recovery)} tone="quiet" />
               {/each}
             {/snippet}
@@ -342,7 +342,7 @@ rather than into a taller corner. -->
         count={toast.count}
       >
         {#snippet actions()}
-          {#each recoveryFor(toast.code) as recovery (wordOf($lang, recovery))}
+          {#each recoveryFor(toast) as recovery (wordOf($lang, recovery))}
             <Button label={wordOf($lang, recovery)} tone="quiet" />
           {/each}
         {/snippet}

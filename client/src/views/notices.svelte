@@ -257,7 +257,7 @@ second mark next to it. -->
                 count={notice.count}
               >
                 {#snippet actions()}
-                  {#each recoveryFor(notice.error.code) as recovery (recoveryLabel(recovery, $lang))}
+                  {#each recoveryFor(notice.error) as recovery (recoveryLabel(recovery, $lang))}
                     {@const why = recoveryWhy(u, recovery, notice)}
                     <Button
                       tone="quiet"
