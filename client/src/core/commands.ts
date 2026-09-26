@@ -31,6 +31,7 @@ import type {
   ModelTag,
   PreferencePatch,
   PursuitStep,
+  Restoration,
   RunId,
   SessionName,
   ToolkitSlug,
@@ -119,6 +120,12 @@ export function release(scope: HaltScope): Command {
 // the guard on the other side: nothing outside the city can be spelled.
 export function reveal(at: Address): Command {
   return { reveal: { at, idem: mintIdem() } };
+}
+
+// Put one recycle-bin row back. The row's own way back travels whole,
+// because a path can be discarded twice and the row knows which time.
+export function restoreDiscard(restoration: Restoration): Command {
+  return { restore_discard: { restoration, idem: mintIdem() } };
 }
 
 // Install one thing this machine lacks, by the name the city answered

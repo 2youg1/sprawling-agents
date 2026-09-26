@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 39 as const;
+export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94" as const;
+export const WIRE_HASH = "b657b960ad1afa312327040e71e29ce542a75386e70ed11bb3f09efcfe1e8f01" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -2584,6 +2584,12 @@ export const Command = Schema.Union(
     reveal: Schema.Struct({
       at: Address,
       idem: IdemKey,
+    }),
+  }),
+  Schema.Struct({
+    restore_discard: Schema.Struct({
+      idem: IdemKey,
+      restoration: Restoration,
     }),
   }),
   Schema.Struct({

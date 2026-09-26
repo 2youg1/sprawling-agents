@@ -141,7 +141,10 @@ use serde::{Deserialize, Serialize};
 /// 39: `rules_changed` joins the event kinds, carrying which governing
 ///    document moved as a closed word; an older page would meet a kind
 ///    it cannot decode in the history it folds.
-pub const WIRE_V: u32 = 39;
+/// 40: `RestoreDiscard` joins the commands. A recycle-bin row goes
+///    back by the restoration it carries, and an older page would offer
+///    no control for a verb this city now answers.
+pub const WIRE_V: u32 = 40;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

@@ -8,7 +8,7 @@
 use std::path::Path;
 
 use kernel::event::record::{CheckpointCommitted, Commit};
-use kernel::{GitOid, Payload, TimeMs};
+use kernel::{Address, GitOid, Payload, TimeMs};
 use serde_json::{Map, Value};
 
 use crate::error::MemoryError;
@@ -249,6 +249,46 @@ impl Checkpoint {
             payloads.push(Payload::new(map).map_err(|source| MemoryError::Draft { source })?);
         }
         Ok(payloads)
+    }
+
+    /// The way back a `file_discarded` names: the blob at `address` in
+    /// commit `oid`, written to the same path under the working tree.
+    ///
+    /// Neither the index nor HEAD moves: putting a file back is not a
+    /// commit, and a person who restored one file should not find a new
+    /// line in their own branch's history. `Address` cannot climb out of
+    /// the city, so the path it spells needs no second check.
+    ///
+    /// # Errors
+    /// A commit the repository no longer holds (the fence reference is
+    /// what keeps one), a path that commit does not hold as a file, a
+    /// bare repository, and a write the file system refuses.
+    pub fn restore(&self, address: &Address, oid: &GitOid) -> Result<(), MemoryError> {
+        let refused = |detail: String| MemoryError::Checkpoint {
+            op: "restore a discarded file",
+            detail,
+        };
+        let commit = git2::Oid::from_str(&oid.to_string())
+            .and_then(|oid| self.repo.find_commit(oid))
+            .map_err(git_err("find the restoration commit"))?;
+        let blob = commit
+            .tree()
+            .and_then(|tree| tree.get_path(Path::new(address.as_str())))
+            .and_then(|entry| entry.to_object(&self.repo))
+            .map_err(git_err("find the discarded file in its commit"))?
+            .into_blob()
+            .map_err(|_| refused(format!("{address}@{oid} is not a file")))?;
+        let target = self
+            .repo
+            .workdir()
+            .ok_or_else(|| refused("the city repository is bare".to_owned()))?
+            .join(address.as_str());
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|err| refused(format!("{}: {err}", parent.display())))?;
+        }
+        std::fs::write(&target, blob.content())
+            .map_err(|err| refused(format!("{address}: {err}")))
     }
 }
 #[cfg(test)]

@@ -220,6 +220,9 @@ impl RunWorker {
             } => self.put_spine(at, which, base, body),
             channels::Command::Halt { scope, .. } => self.set_admission(&scope, Admittance::Halted),
             channels::Command::Reveal { at, .. } => crate::revealing::reveal(&self.city_root, &at),
+            channels::Command::RestoreDiscard {
+                ref restoration, ..
+            } => self.restore_discard(restoration),
             channels::Command::DoctorInstall { ref item, .. } => self.doctor_install(item),
             channels::Command::DoctorRefresh { .. } => {
                 self.look_at_this_machine();
