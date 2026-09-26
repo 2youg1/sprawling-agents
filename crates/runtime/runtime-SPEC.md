@@ -1397,6 +1397,19 @@ pub(super) fn open_in_package(catalog: &Catalog, asked: &str) -> Option<Result<A
 - **相对路径逐段判形，不做规范化**：空段、`.`、`..`、带反斜杠或冒号的段一律 `E_INVALID_ARGS`，恢复语说出「包内相对路径，只用普通段」。规范化会把一条爬出包的路径「修」成另一条，而拒绝让写错的那一方看见自己写了什么。
 - **没有 catalog 锁就没有包**：锁中毒时整名命中一样落空，两条路同一个口径。
 
+#### 8-29-4 没命中时给出 `nearby`（`runtime::tools::read::miss`）
+
+```rust
+// read::miss
+pub(super) fn unread(city_root: &Path, asked: &str, path: &Path, err: &std::io::Error) -> AxError;
+const NEARBY_CAP: usize = 16;
+```
+
+- **文件不在＝`E_INVALID_ARGS`，`nearby` 携最近一层存在的目录里的条目**：从被问路径往上找第一个存在的目录（不出城根），逐项拼成城内相对路径，保留区里的项不列——模型本来就读不到它们。按与缺失文件名的共同前缀长度（不分大小写）降序、再按路径排，截到 `NEARBY_CAP`。上限界定的是一次拒绝花掉多少窗口，不是目录多大；被截掉的是最不像的那些。
+- **文件在而打不开＝`E_STORAGE_FATAL`，不给 `nearby`**：名字是对的，候选只会误导。
+- **列目录是尽力而为**：目录列不出或名字不是 Unicode 时 `nearby` 为空，调用方要的拒因是「没命中」本身。
+- **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（city-SPEC §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
+
 ### 8-30 runtime::tools::search（形状 1 判定＋形状 4 适配器）
 
 **问题**：十三件工具里没有一件能找东西。找一个符号只有两条路——写 Python（要可选的 CPython-WASI 构件，很多机器上根本没有），或走 shell（Windows 上是 `findstr`，而 shell 本身是楼级配置可以关掉的）。旧对话有了一个地址，而**没有检索的地址比没有地址更糟**：模型被告知那里有东西，却够不着。

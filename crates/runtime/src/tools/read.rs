@@ -39,6 +39,7 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
+mod miss;
 mod package;
 
 use super::chosen_path::ReadBound;
@@ -346,20 +347,8 @@ impl Tool for ReadTool {
             })?;
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
-            Found::File(path) => std::fs::read_to_string(&path).map_err(|err| {
-                #[expect(
-                    clippy::wildcard_enum_match_arm,
-                    reason = "std::io::ErrorKind is an upstream open enum; a file that exists and will not open is storage"
-                )]
-                let code = match err.kind() {
-                    std::io::ErrorKind::NotFound => AxCode::InvalidArgs,
-                    _ => AxCode::StorageFatal,
-                };
-                AxError::failure(code, "read", format!("{asked}: {err}")).with_recovery(
-                    "check the name against what the catalog lists, or list the \
-                                    directory with `exec` first",
-                )
-            })?,
+            Found::File(path) => std::fs::read_to_string(&path)
+                .map_err(|err| miss::unread(&self.city_root, asked, &path, &err))?,
         };
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));

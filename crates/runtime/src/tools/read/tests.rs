@@ -376,3 +376,16 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
         assert_eq!(err.code(), &AxCode::InvalidArgs, "{climbing} was opened");
     }
 }
+
+/// A miss names what is there instead, and points at a tool every
+/// building has rather than at `exec`, which City Hall does not.
+#[test]
+fn a_miss_offers_the_nearest_directorys_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join(".sprawling")).unwrap();
+    std::fs::write(dir.path().join("lab").join("Memo.md"), "x\n").unwrap();
+    let (mut tool, _catalog) = tool(dir.path());
+    let err = tool.invoke(&call("lab/notes/Memo.mb")).unwrap_err();
+    assert_eq!(err.nearby(), ["lab/Memo.md"]);
+    assert!(!err.recovery().contains("exec"), "{}", err.recovery());
+}
