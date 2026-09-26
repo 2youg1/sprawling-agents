@@ -71,8 +71,9 @@ pub fn schema_hash() -> B3Hash {
 ///
 /// This is what `cargo xtask wire-ts` generates the client from. It is
 /// not what the handshake compares: [`schema_hash`] reads the version,
-/// the two frame name tables and the event kind names and nothing else, so a doc comment edited here
-/// moves this document and leaves every connected page connected. Pure:
+/// the two frame name tables and the event kind names and nothing else,
+/// so a doc comment edited here moves this document and leaves every
+/// connected page connected. Pure:
 /// same build, same bytes.
 #[cfg(feature = "schema")]
 #[must_use]

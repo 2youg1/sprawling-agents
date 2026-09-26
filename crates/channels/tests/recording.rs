@@ -137,3 +137,13 @@ async fn a_city_with_no_transcription_endpoint_says_what_to_do() {
     assert_eq!(status, 422, "{said}");
     assert!(said.contains("transcribe"), "{said}");
 }
+
+/// A content-type that carries only parameters names no container, so
+/// it is refused the way a missing one is, rather than handing the city
+/// an empty media type to route the audio on.
+#[tokio::test]
+async fn a_content_type_with_only_parameters_is_refused_as_undeclared() {
+    let (status, said) = send(Hearing::Answers, Some("; codecs=opus"), b"...").await;
+    assert_eq!(status, 422, "{said}");
+    assert!(said.contains("content-type"), "{said}");
+}

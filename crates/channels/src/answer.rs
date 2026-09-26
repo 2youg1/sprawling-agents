@@ -14,8 +14,8 @@
 //! returning an empty result a reader would mistake for an empty city.
 
 use kernel::{
-    Address, ApprovalItem, Autonomy, Ceiling, ClusterKey, DialectKind, EventKind, FileChange,
-    GitOid, ModelTag, Restoration, Ruling, RunId, Seq, TimeMs, UsdMicros,
+    Address, ApprovalItem, Autonomy, ClusterKey, EventKind, FileChange, GitOid, Restoration,
+    Ruling, RunId, Seq, TimeMs, UsdMicros,
 };
 use serde::{Deserialize, Serialize};
 
@@ -28,6 +28,7 @@ mod config;
 mod cost_of;
 mod doctor;
 mod document;
+mod endpoints;
 mod evidence;
 mod git_status;
 mod history;
@@ -54,6 +55,7 @@ pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCus
 pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use document::DocumentAnswer;
+pub use endpoints::{ChosenSummary, EndpointSummary, EndpointsAnswer};
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use git_status::{Drift, GitStatusAnswer};
 pub use history::{HistoryAnswer, HistoryRangeAnswer};
@@ -113,58 +115,6 @@ pub struct RunSummary {
     /// What the run waits for the person to allow. Present exactly when
     /// `last_kind` is `approval_requested`.
     pub ask: Option<String>,
-}
-
-/// What the settings page reads back: what is attached, and what each
-/// tag currently points at.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct EndpointsAnswer {
-    pub endpoints: Vec<EndpointSummary>,
-    pub chosen: Vec<ChosenSummary>,
-}
-
-/// One attached endpoint, as a reader may see it. No credential appears
-/// here in any form; `has_credential` answers the only question a page
-/// needs, which is whether one was enrolled at all.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct EndpointSummary {
-    pub name: String,
-    /// What to call it on screen. The id it was filed under when the
-    /// person gave it no other name, so a page never has to decide what
-    /// to show when a label is missing.
-    pub label: String,
-    pub base_url: String,
-    pub dialect: DialectKind,
-    /// How this endpoint is connected, as one flat word:
-    /// `openai_compat`, `responses`, `anthropic_native`, or the name of
-    /// the first-party harness whose subscription pays for it.
-    ///
-    /// Resolved once when the endpoint was attached and read back
-    /// here. `dialect` beside it answers a narrower question - which
-    /// request writer runs - and two connections can share a writer
-    /// while being different registrations, so a page given only the
-    /// writer cannot say which one a person set up. The word's one
-    /// authority is `gateway::provider::registry::ConnectionKind`.
-    pub connection_kind: String,
-    /// The models this endpoint serves, with what it said about each.
-    pub models: Vec<ModelFactsSummary>,
-    /// Whether calls to it stay on this machine, which is the only thing
-    /// a confidential building may use.
-    pub local: bool,
-    pub has_credential: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct ChosenSummary {
-    pub tag: ModelTag,
-    pub endpoint: String,
-    pub model: String,
-    /// Absent when no row states this model's ceiling — which the
-    /// settings page shows as a field to fill rather than as a number.
-    pub max_output_tokens: Option<Ceiling>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

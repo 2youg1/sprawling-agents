@@ -317,7 +317,7 @@ pub fn echoing(answer: &str) -> (String, Vec<String>) {
 /// The server [`counting_starts`] builds, which after its start line
 /// reads nothing until `gate` exists, so a test holds a handshake open
 /// for as long as it needs and sees, from `starts`, that it has begun.
-#[cfg(any(test, feature = "conformance"))]
+#[cfg(feature = "conformance")]
 pub fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>) {
     let (command, mut args) = counting_starts(answer, starts);
     let wait = if cfg!(windows) {
@@ -341,7 +341,7 @@ pub fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>) 
 /// The server [`echoing`] builds, which also writes one line to
 /// `starts` each time it is started, so a test can count how many
 /// children a sequence of dispatches cost.
-#[cfg(any(test, feature = "conformance"))]
+#[cfg(feature = "conformance")]
 pub fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>) {
     let (command, mut args) = echoing(answer);
     let mark = if cfg!(windows) {

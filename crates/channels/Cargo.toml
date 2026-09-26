@@ -26,7 +26,6 @@ axum = { workspace = true, features = ["ws"], optional = true }
 schemars = { workspace = true, optional = true }
 
 [dev-dependencies]
-proptest = { workspace = true }
 trybuild = { workspace = true }
 tower = { workspace = true }
 

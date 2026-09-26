@@ -356,8 +356,19 @@ fn read(sent: reqwest::Result<reqwest::blocking::Response>, path: &str) -> Resul
         draft.with_recovery("check this machine's connection, then try again")
     })?;
     let status = response.status();
-    let body = response.text().unwrap_or_default();
+    let body = response.text();
     if status.is_success() {
+        // The broker did what was asked and only its answer was lost, so
+        // asking again could make a second auth config.
+        let body = body.map_err(|cut| {
+            AxError::failure(
+                AxCode::Provider,
+                format!("read the broker's answer to {path}"),
+                format!("the answer's body could not be read: {cut}"),
+            )
+            .effect_unknown()
+            .with_recovery("check the broker's own pages for what this request made")
+        })?;
         return serde_json::from_str(&body).map_err(|bad| {
             AxError::failure(
                 AxCode::Provider,
@@ -367,7 +378,8 @@ fn read(sent: reqwest::Result<reqwest::blocking::Response>, path: &str) -> Resul
             .with_recovery("try again, and report this if it keeps happening")
         });
     }
-    Err(refusal_for(status, path, &body))
+    let nearby = body.unwrap_or_else(|cut| cut.to_string());
+    Err(refusal_for(status, path, &nearby))
 }
 
 /// One refused status, as the code and recovery a person acts on.

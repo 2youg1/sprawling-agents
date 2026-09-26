@@ -157,7 +157,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 13 依赖选型
 
-`kernel`＋`serde_json`＋`gateway`＋`reqwest`。HTTP 客户端只在 `gateway::client_for` 一处构造，本 crate 取它构造好的 builder，只加 user agent；`secret:realm/name` 引用经 `gateway::SecretResolver` 兑付。**恒不引入**异步运行时与任何一家服务商的 SDK：前者会让一次同步的工具调用变成异步库，后者会把「本体不认识任何一家」这条承诺作废。
+`kernel`＋`serde_json`＋`gateway`＋`reqwest`。HTTP 客户端只在 `gateway::client_for` 一处构造，本 crate 取它构造好的 builder，只加 user agent 与整请求时限（`mcp::http::WholeRequest`）；`secret:realm/name` 引用经 `gateway::SecretResolver` 兑付。**恒不引入**异步运行时与任何一家服务商的 SDK：前者会让一次同步的工具调用变成异步库，后者会把「本体不认识任何一家」这条承诺作废。
 
 ## 14 硬编码声明
 
@@ -207,13 +207,13 @@ impl Outbound for McpLink { /* 逐传输转发 call／notify */ }
 // mcp::redeeming：一栋楼写在 server 旁边的成对表，引用已兑付；三种传输共用
 #[cfg(any(test, feature = "conformance"))]
 pub fn echoing(answer: &str) -> (String, Vec<String>); // 对每行都回同一个结果的子进程
-#[cfg(any(test, feature = "conformance"))]
+#[cfg(feature = "conformance")] // 只有装配层的测试用它
 pub fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>); // 握手在 gate 文件出现前不作答
 ```
 
 - **传输住协议旁边，不住组合根**：三种传输与握手说同一个协议，差别只在字节去哪。放在装配层时，`protocol` 定义了 `Outbound` 缝却看不见它的生产实现；组合根只剩「一栋楼按配置连哪几台 server」（`bin::assembly::mcp`）。拒绝的另一方案是把传输留在 `sprawling`、只搬 `McpLink`：那样 `McpLink` 的三个分支仍指向另一个 crate 的私有类型，搬不动。
 - **`site()` 由传输的拥有者给出**：报错地址是「哪个模块到达了这台 server」，只有拥有这三个模块的 crate 能不漂地说出它。
-- **HTTP 与 SSE 共用一个客户端构造**（`mcp::http::client_for`）：两者的代理规则、user agent 与拒词原本各写一份。
+- **HTTP 与 SSE 共用一个客户端构造**（`mcp::http::client_for`）：代理规则、user agent 与构造失败的拒词只写一处。两者唯一的差别是整请求时限，作为参数 `WholeRequest` 递进去：HTTP 取 `DefaultTimeout`（一次 post 与它的回答），SSE 取 `Unbounded`，因为 SSE 的 body 就是整段对话，reqwest 的整请求时限会把流掐断。被否：SSE 自留一份构造只为多一行 `timeout(None)`——两份构造一旦有一份改了代理规则，另一份就静默地走另一条出网路径。
 - **子进程回收逻辑原样搬移**：期限到即杀子进程，理由见 `mcp::stdio` 的模块文档。
 - **`echoing` 在 `conformance` 后面**：装配层的测试要起同一个假 server；产品二进制不带它（`xtask artifact`）。
 - **调用发出之后丢了答，效果未知，不可重试**：SSE 的 POST 被对侧收下（2xx）之后，流上在期限内没有答案——server 已经拿到那条消息，可能已经做了，再发一次同一调用就可能把一次写做两遍。故这一刻抬 `E_TIMEOUT` 并标 `effect_unknown`（`Retry::Unknown`，kernel-SPEC 的三态），由看得见这次调用的人决定要不要再问。POST 本身失败时对侧没有收下，照旧按 `unreachable`／`refused` 的口径。
@@ -236,7 +236,7 @@ pub enum Connection { Absent, Awaiting { consent_url: String }, Connected { alia
 - **住 `protocol::mcp`，不住 `gateway`**：它回答的是「连哪台 MCP server 上的哪个应用」，与三种传输同属一件事；出网的两条政策（代理规则、HTTP 客户端的构造）仍只在 `gateway::client_for` 一处，broker 经它取客户端，测试的 `Broker::at` 也一样（`Proxying::ExceptLocal` 对回环地址不走代理），所以本库之内没有第二个构造点。拒绝的另一方案是留在 `gateway`：那样 MCP 一分为二，`gateway` 要知道一家 MCP 服务的目录形状。
 - **返回自己的词汇，不返回线上形状**：装配层把 `Toolkit`／`Connection` 映成 `channels::ToolkitLine`，与它把握手映成 `McpState` 同一做法。
 - **只有一家 broker，所以没有 trait**：第二家外包服务才是这条缝的第二个实现。
-- 失败码：401／403 抬 `E_CREDENTIAL_MISSING`；408／429／5xx 抬可重试的 `E_PROVIDER`；连接阶段超时抬可重试的 `E_PROVIDER`（请求还没离开这台电脑）；请求发出之后等答超时抬 `effect_unknown` 的 `E_PROVIDER`，因为 `connect` 会在 broker 那边建一份 auth config，重发可能建出第二份；其余状态、读不出的答案与接不上 base 的路径抬 `E_PROVIDER`。接不上的路径在 recovery 里报出本模块的路径（`module_path!()`），模块再搬家也不漂。
+- 失败码：401／403 抬 `E_CREDENTIAL_MISSING`；408／429／5xx 抬可重试的 `E_PROVIDER`；连接阶段超时抬可重试的 `E_PROVIDER`（请求还没离开这台电脑）；请求发出之后等答超时抬 `effect_unknown` 的 `E_PROVIDER`，因为 `connect` 会在 broker 那边建一份 auth config，重发可能建出第二份；2xx 之后 body 读不完（连接在答案中途断开）同样抬 `effect_unknown` 的 `E_PROVIDER`，subject 带读不出的原因——broker 已经照做了，丢的只是答案；非 2xx 的 body 读不出时，读不出的原因代替 body 作附近文字；其余状态、读不出的答案与接不上 base 的路径抬 `E_PROVIDER`。接不上的路径在 recovery 里报出本模块的路径（`module_path!()`），模块再搬家也不漂。
 - 字段按防御方式读：缺一个字段少一行，不毁整张答案；测试里的假 server 是本 crate 对 broker 所发内容的陈述。
 
 ### 8-14 protocol 目录化（形状：主类型居索引，方法按簇归文件）

@@ -405,7 +405,6 @@ version = "0.0.6"
 dependencies = [
  "axum",
  "kernel",
- "proptest",
  "schemars",
  "serde",
  "serde_json",
