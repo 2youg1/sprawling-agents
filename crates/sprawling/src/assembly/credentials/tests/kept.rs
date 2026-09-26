@@ -138,10 +138,10 @@ fn a_subscription_token_keeps_its_bearer_header_when_the_settings_are_saved_agai
         .collect();
     assert_eq!(asked.len(), 2, "one model list per attach");
     assert!(
-        asked
-            .iter()
-            .all(|head| head.contains("authorization: bearer sk-ant-oat01-held")
-                && !head.contains("x-api-key")),
+        asked.iter().all(
+            |head| head.contains("authorization: bearer sk-ant-oat01-held")
+                && !head.contains("x-api-key")
+        ),
         "a subscription token is a bearer token on every ask; heads were:\n{asked:#?}"
     );
     let kept = worker
@@ -150,7 +150,10 @@ fn a_subscription_token_keeps_its_bearer_header_when_the_settings_are_saved_agai
         .find(|endpoint| endpoint.name == "anthropic")
         .expect("the endpoint stayed attached");
     let gateway::AuthSpec::Bearer(reference) = &kept.auth else {
-        panic!("a subscription token travels as a bearer token, not {:?}", kept.auth);
+        panic!(
+            "a subscription token travels as a bearer token, not {:?}",
+            kept.auth
+        );
     };
     assert_eq!(
         reference,
