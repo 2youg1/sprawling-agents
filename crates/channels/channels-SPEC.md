@@ -303,7 +303,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 
 **`Login` 携穷尽枚举 `LoginStep { Begin, Code { code } }`，WIRE_V 1→2**。两步之间站着一个人：provider 在它自己的页面上把 code 显示给他，他再带回来。用枚举而不是 `Option<String>`——「开始登录」与「兑付这个 code」是两个动作、两种失败。`COMMAND_NAMES` 未变故 schema 哈希单靠名字表不会动，这正是 `WIRE_V` 存在的那种情形。**恒不开回环监听端口**：该 provider 的 redirect 就是它自己的页面。
 
-**五个查询各有自己的答**（`InboxView`／`DiscardView`／`RegistryView`／`ArchiveSearch`／`Metrics`），WIRE_V 2→3。此前它们一律答 `Unavailable`，界面据此什么都画不出来。三条口径：①**队列折叠着看不消费着看**（`Inbox::pull` 要拿走才给内容，看一眼就取走的视图会改变它所报告的对象）；②归档在被问的那一刻读盘（同 `BuildingView`，文件是权威）；③**`Metrics` 恒不携钱**——钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。
+**五个查询各有自己的答**（`InboxView`／`DiscardView`／`RegistryView`／`ArchiveSearch`／`Metrics`）。三条口径：①**队列折叠着看不消费着看**（`Inbox::pull` 要拿走才给内容，看一眼就取走的视图会改变它所报告的对象）；②归档在被问的那一刻读盘（同 `BuildingView`，文件是权威）；③**`Metrics` 恒不携钱**——钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。
 
 **`DiscardLine.restoration` 携 `Option<Restoration>` 而非一个句子，WIRE_V 3→4**。回收站那一行的「怎么拿回来」原本在服务端被拼成 `"tracked: file:…"`，而客户端早已持有它的唯一措辞处（`web::approval::ReturnPath::sentence`）——**一件事两个渲染权威**，而服务端那个还拼不出可执行的那句话。现在计划以它自己的形状上线（载荷本来就是 `Restoration` 序列化出来的，故读得回去）；`None` 的意思是**这一条记录用了本构建读不懂的方案**，界面据此画一行而不给动作（`ReturnPath::Undescribed`）——行恒不隐藏，因为藏起一件被删的东西比承认读不懂它的方案更糟。`QUERY_NAMES` 与 `COMMAND_NAMES` 未动，故哈希只因 `WIRE_V` 而变——又一例「语法换形而名字没换」。
 
@@ -329,7 +329,7 @@ pub fn verify(presented: Option<&str>, expected: &B3Hash) -> bool;  // 常数时
 
 （a）**熵入参不采样**——使铸造可重演、可测，与「种子 RNG 单点发放」一致。
 
-（b）**`PairingToken` 不持明文**（由 `xtask secret` 门逆推出的修正）。初版写的是 `Sealed<String>` 加一个 `display_form()` 里的 `.expose()`，门咬住。候选的应对是把该点加进兑付点白名单——那是修门。**实际修的是因**：本模块真的不需要明文，`mint` 把配对码直接交给调用方去展示，自己只留摘要。封一个值再在下一行解封是表演；**根本不持才是我们想要的性质**。
+（b）**`PairingToken` 不持明文**：`expose` 只得出现在兑付点（`xtask secret`），而把展示点加进兑付点白名单是修门不修因。本模块不需要明文，`mint` 把配对码直接交给调用方去展示，自己只留摘要。封一个值再在下一行解封是表演；**根本不持才是我们想要的性质**。
 
 （c）**字母表剔除可混淆字符**（0／O／1／l／I／5／S），29 符号×四组五位≈ 97 位熵。理由不是审美：配对码要被人读出来、在另一台机器上手敲进去，一个口述会错的码，代价由用户在另一台机器前承担。
 
@@ -829,7 +829,7 @@ EndpointSummary { name, label, base_url, dialect, models, local, has_credential 
 - **覆盖的值走文本，不走 `serde_json::Value`**。`Command` 派生 `Eq`，而 JSON 没有全序相等；更要紧的是 `/temperature` → `0.2` 一旦成为值就是一个浮点，而它随 `endpoint_attached` 进账本——这座城把浮点挡在账本之外。文本原样往返，「这段文本作为 JSON 是什么」只有一个权威：`gateway::EndpointTuning::applied_overrides`，规则是「解析得出就是那个 JSON，解析不出就是它看上去的那个字符串」，于是 `/reasoning/effort` → `high` 不必要求人自己加引号。**败给的方案**：帧上直接放 `Value`——那要求 `Command` 放弃 `Eq`，并把浮点写进账本。
 - **零即缺省**。清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成；装配层把零读成「没说」（`bin::assembly::credentials::tuning_of`），于是清空一个框等于回到城自己的值，而不是让此后每一次调用立刻失败。
 - **`stream_idle_timeout_ms` 在线上保留 Codex 的名字，在 gateway 里叫 `stream_deadline_ms`**：阻塞传输交回的是一个没有分块钩子的 body reader，城因此能限定一次应答总共多久，限定不了其中某一次沉默多久。线上用人在自己 `config.toml` 里写熟的那个词，gateway 用它真正做到的那件事命名，装配层是唯一的翻译点。**败给的方案**：在 gateway 里也叫 idle——那会让一个读代码的人以为分块之间有计时器。
-- **`Turn` 长出 `thought`**（WIRE_V 28→29）。thinking 块此前被读数挡在页面之外，理由是它们为供应方的签名校验端到端携带、属于传输而不属于内容；这条理由对一个把大部分调用花在推理上的模型不再成立——人先对着空线程等几分钟，再读到两句话。现在推理以自己的字段作答，页面把它折起来放在散文旁边，两者永不混进同一个缓冲区。`RedactedThinking` 仍然不出现：它的载荷是加密的，里面没有人能读的东西。
+- **`Turn` 携 `thought`**。thinking 块为供应方的签名校验端到端携带，看起来属于传输；但对一个把大部分调用花在推理上的模型，挡住它就是让人先对着空线程等几分钟，再读到两句话。所以推理以自己的字段作答，页面把它折起来放在散文旁边，两者永不混进同一个缓冲区。`RedactedThinking` 仍然不出现：它的载荷是加密的，里面没有人能读的东西。
 - **`EndpointSummary` 长出 `label`**：缺省即 `name`，所以页面永远不必替一个没写显示名的端点决定显示什么。
 - **`proxying` 跟着 tuning 走，因而探测与调用恒用同一个决定**（WIRE_V 27→28）。一个只在调用时生效的代理设置，会让表单上那份分段读数描述一条真正的调用不会走的路，而那份读数存在的全部意义就是告诉人调用停在了哪一段。`Option` 而非值：线上的缺席是「没人定过」，装配层把它翻成城的默认值（`ExceptLocal`），于是 `gateway` 一侧拿到的是一个已经定下来的值，没有第三种状态要每一个调用方再答一次。
 
@@ -876,7 +876,7 @@ Command::DoctorRefresh { idem: IdemKey }                 // 重新探一遍，�
 
 ### 8-34 一台工具服务器带着 `claude mcp add` 允许写的东西上线，`McpHealth` 答它站在哪
 
-`McpTransport` 先前只拼得出「命令＋参数」与「地址＋至多一个 header」，于是 MCP 页上环境变量表、多行请求头、`sse` 三样控件各挂一句「线上没有这个字段」。三支取值补齐，且**关掉 `#[non_exhaustive]`**（G-22 把这条推广到全库）：本枚举的读者全在这一个二进制里，通配臂什么也换不来，却会把下一种 transport 从必须表态的三个模块面前藏起来。
+`McpTransport` 的三支携 MCP 页的环境变量表、多行请求头与 `sse`，且**不标 `#[non_exhaustive]`**（全库如此）：本枚举的读者全在这一个二进制里，通配臂什么也换不来，却会把下一种 transport 从必须表态的三个模块面前藏起来。
 
 ```rust
 pub enum McpTransport {
@@ -910,7 +910,7 @@ pub struct McpToolLine { pub remote: String, pub name: String,
 
 ### 8-35 四条读：一个 agent 被告知了什么、一栋楼会做什么、它那里还有什么没提交
 
-先前线上没有任何一帧答得出「这个 agent 收到的 system prompt 是什么」。`prompt_assembled` 只记四段的哈希与来源注记，而其中两段根本没有落进内容仓库，于是哈希指向不存在的字节——一个人拿着哈希也读不回原文。技能同理：`Query::RegistryView` 的书里没有 skill，楼页没有一栏画得出「这栋楼会做什么」。工作树同理：`Query::Changes` 比的是两个检查点，而没有一帧答得出分支名、与上游的距离、以及此刻哪些文件还没进检查点。
+这四条读回答三个问题：「这个 agent 收到的 system prompt 是什么」（`prompt_assembled` 只记四段的哈希与来源注记，拿着哈希读不回原文）；「这栋楼会做什么」（`Query::RegistryView` 的书里没有 skill）；「此刻工作树在哪」（`Query::Changes` 比的是两个检查点，答不出分支名、与上游的距离、以及哪些文件还没进检查点）。
 
 ```rust
 // Query 第 25–28 条（声明序，QUERY_NAMES 同序追加）
@@ -951,13 +951,13 @@ pub struct GitStatusAnswer { pub building: Address, pub branch: Option<String>,
 5. **`Drift` 整个可缺席，而不是两个零。** 没有上游的分支与和上游齐平的分支不是一回事，读成 `0/0` 的页面会告诉人「你的工作已经推上去了」。
 6. **`GitStatusAnswer.checkpoint` 携整条 `CommitAnswer`。** 变更栏旁边那一行要说出 run、房间、模型与花费，而这四样已经有了唯一形状；另造一个摘要类型就是第二个「一次提交是什么」。
 
-**`CommitAnswer` 随本线长出 `spent: UsdMicros`**：一行提交上先前画得出 run、房间与模型，独独没有钱，于是「这次改动花了多少」必须另开一页去查。携的是**那次 run 的总额**而不是这条提交的份额——栅栏不被计价，把一次 run 的钱按栅栏分摊会得到一个没有人测量过的数字。
+**`CommitAnswer` 携 `spent: UsdMicros`**：一行提交画得出 run、房间与模型，也要画得出钱，「这次改动花了多少」才不必另开一页去查。携的是**那次 run 的总额**而不是这条提交的份额——栅栏不被计价，把一次 run 的钱按栅栏分摊会得到一个没有人测量过的数字。
 
 **被否**：把 skill 与工作树的状态折进 `BuildingView`。楼页的那一帧是在每一次记录之后都会失效的读，而扫书架要走盘、读工作树要开仓库；合成一帧会让这两件慢事按城里的心跳重复发生，而它们各自只在有人打开那一栏时才需要一次。
 
 ### 8-35b 外包服务的目录与一键连接：`Query::Toolkits` 与 `Command::ConnectToolkit`
 
-MCP 页先前把 Composio 画成三个标识符——一把 key，加上人自己去对方控制台取回来的 server id 与 user id——连接按钮旁挂着「城里没有这个命令」。`docs/third-party.md` 记过一条拒做的理由，本轮推翻并改写了那条记录：建 auth config 不必访问对方后台（`POST /api/v3/auth_configs` 可建托管配置），而正在退役的是 `initiate` 而非 `link`。
+人给出一把 key，城替他列出目录并建连接，不要他去对方控制台取回 server id 与 user id：建 auth config 不必访问对方后台（`POST /api/v3/auth_configs` 可建托管配置），而正在退役的是 `initiate` 而非 `link`（`docs/third-party.md`）。
 
 ```rust
 Query::Toolkits,                                        // 不带参数，也不带 key
@@ -981,7 +981,7 @@ pub enum Standing {
 
 **六条口径：**
 
-1. **目录不由本仓库持有。** 先前 `client/src/views/mcp/toolkits.ts` 里硬写着一份应用清单，它自己的注释就承认「Composio 每周在变」——那是一份保证会过期的第二权威，本线删除，目录改由 `GET /api/v3/toolkits` 出。
+1. **目录不由本仓库持有。** 目录由 `GET /api/v3/toolkits` 出；客户端里硬写一份应用清单就是一份保证会过期的第二权威。
 2. **三态穷尽，而不是一个可能为空的列表。** 「你还没给这座城 key」「问不到对方」「对方确实没有可连的」是人接下来要做的三件不同的事，而一个空 `Vec` 把三句话说成了一句。
 3. **`Standing` 四态，每一态对应一个不同的下一步**，且每一态都是对方此刻的读数，不是城记住的东西——昨天打开过一个同意页面，不构成今天已经连上的证据。
 4. **不进账本的是状态，进账本的是请求。** `EventKind::ToolkitLinkOpened` 只记「谁在何时请求连接哪个应用」；站位属于 §8-31 判过的「关于此刻的事实」，而 consent URL 是一张能力凭证——记进可重放的账本就等于把它发给每一个重放的人。
@@ -1029,7 +1029,7 @@ pub enum ReleaseAnswer {
 
 **规则**：`Query` 与 `Command` 的变体表是这个 crate 里唯一拼写帧名的地方；`name()` 与 `QUERY_NAMES`／`COMMAND_NAMES` 由 `channels::named_frames!` 从同一份变体表生成。
 
-**被删掉的三个家**。此前一个 `Query` 的拼写写在三处：变体自身、`name()` 的手写臂、`QUERY_NAMES` 数组；`Command` 同法。握手赖以成立的 `schema_hash()` 只读第三个。穷尽 `match` 挡得住「新变体不写 `name()`」，挡不住「新变体不进名表」——挡那一条的是 `wire.rs` 里把 31 个变体第四次抄一遍的样本测试，和 `tests/wire_contract.rs` 里两个写成字面量的计数。生成之后，名表就是变体表本身，它不能与枚举不一致，因为它没有第二份内容可以不一致。
+**一个拼写，一个家**。手写时一个 `Query` 的拼写写在三处：变体自身、`name()` 的手写臂、`QUERY_NAMES` 数组；握手赖以成立的 `schema_hash()` 只读第三个。穷尽 `match` 挡得住「新变体不写 `name()`」，挡不住「新变体不进名表」。生成之后，名表就是变体表本身，它不能与枚举不一致，因为它没有第二份内容可以不一致。
 
 **为什么它值一次升版**。名字一个没改、字段一个没动、语义一个没变，但生成出来的两张表按**声明顺序**排，而 `COMMAND_NAMES` 的手写顺序不是声明顺序（`Wake` 手写在第 2 位，声明在第 25 位）。`schema_hash()` 按表的顺序混入名字，于是哈希变了。**哈希变即旧页面必须被拒绝**，这正是 `WIRE_V` 存在的理由，故 31→32 与本次同集。客户端侧只有 `client/src/wire.ts` 由 `xtask wire-ts --write` 重生，没有手改。
 
@@ -1109,9 +1109,9 @@ pub enum ServerFrame { …, Lagged(Lagged) }
 | 增量 | broadcast 256 | 一言不发 | 增量不落账本、不可重放，为它报一个区间等于报一段不存在的记录；settled 文本随后作为记录到达 |
 | 日志 | broadcast 深度见 `serving::journal` | 一言不发 | 日志是诊断不是历史，且它携的位置是账本的位置而不是自己的序号，所以任何区间都放不回读者原来的地方 |
 
-**`Closed` 的两种语义合成一种：会话结束。** 此前事件路 `return`、增量与日志路 `{}`——而一个已关闭的 broadcast 接收端**立刻**返回 `Closed`，于是那两条臂在 `select!` 里变成热转。发端全没了就是城要走了，四条臂一律 `return`。
+**`Closed` 只有一种语义：会话结束。** 一个已关闭的 broadcast 接收端**立刻**返回 `Closed`，把它当空转处理的臂在 `select!` 里会变成热转。发端全没了就是城要走了，四条臂一律 `return`。
 
-**「重连从账本补」只在事件一路成立**，SPEC 此前把它写成了三路共用的一句话（`Delta` 的 doc 明写 never written to the Ledger, cannot be replayed，日志同理）；现在它在事件一路兑现，另两路的静默在表里各自有理由。
+**「重连从账本补」只在事件一路成立**（`Delta` 的 doc 明写 never written to the Ledger, cannot be replayed，日志同理）；另两路的静默在表里各自有理由。
 
 **还没被欢迎的会话不报区间。** 它没有给对端看过任何一条记录，它的视角从 welcome 开始——而欢迎之前发生的事，页面要的话是一个提问（`Query::History`），不是一帧。
 
@@ -1148,7 +1148,7 @@ impl BindFace { pub fn token_digest(&self) -> Option<&B3Hash>; }
 - **以前是什么样**：`decide_bind` 收一个 `token_configured: bool`，`serve` 只 `match` 掉 `Refuse` 而把 `Serve(BindFace)` 丢掉；然后每一道门各自去读 `config.token_digest`。「暴露面必须有凭证」因此靠一句话与一个 bool 维持，而 `router()` 是 pub：第二个入口可以造出一个暴露着却不要求任何东西的壳。
 - **现在是什么样**：`Exposed` 里**没有** `Option`——「暴露着却不要求任何东西」是一个类型上不存在的状态。这个不变量在测试里以四种格钉住（回环有无令牌、暴露有无令牌、以及 `BindingFace` 索要的摘要是不是判定它的那一个）。
 - **令牌摘要是 `bind` 的入参**：它是配置说的话（谁配了令牌），面是绑定判定给出的判决。判决只在 `bind` 里产生一次，面随 `Bound` 走到壳里，故这不是同一个事实的两个家。
-- **`decide_admission` 的那句注释同时兑现**：「没有配令牌的城只可能是回环城」此前由启动时的 `decide_bind` 保证，现在由面的形状保证——它拿到的是一个不可能要求空的东西。
+- **`decide_admission` 的那句注释同时兑现**：「没有配令牌的城只可能是回环城」由面的形状保证——它拿到的是一个不可能要求空的东西。
 
 #### 四 `/enroll` 等待里的第四个静默臂
 
@@ -1172,7 +1172,7 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 
 **客户端那侧的两处消费也归一处**：`core/scope.ts` 是两种拼法唯一的接缝（`scopeOf`／`sameScope`／`buildingIsShut`／`cityIsShut`），`city_halted` 记录折进 `halted` 时经它转一次；其余每个比较点都比较类型。
 
-**顺带记下一条曾被误判的事**：`city_halted` 的载荷里 `scope` 是 `kernel::Scope`，经 `schemars(with = "String")` 在 schema 上呈现为字符串。答案面改用 `HaltScope` 与那条覆盖不冲突——两者是不同的帧，各写各的读者。
+**与事件载荷不冲突**：`city_halted` 的载荷里 `scope` 是 `kernel::Scope`，经 `schemars(with = "String")` 在 schema 上呈现为字符串。答案面改用 `HaltScope` 与那条覆盖不冲突——两者是不同的帧，各写各的读者。
 
 ### 8-43 新的会话是一个动词，不是一个开关
 
