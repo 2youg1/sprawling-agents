@@ -827,6 +827,102 @@
     "en": "not asked",
     "zh": "没能问到"
   },
+  "machine_enables_bun": {
+    "en": "the JavaScript and TypeScript work beside this workspace",
+    "zh": "本工作区旁边的 JavaScript 与 TypeScript 工作"
+  },
+  "machine_enables_cargo-audit": {
+    "en": "cargo audit, which reads this lockfile against the RustSec advisories",
+    "zh": "cargo audit，按 RustSec 公告检查本仓库的 lockfile"
+  },
+  "machine_enables_cargo-deny": {
+    "en": "cargo deny check, which just gates runs over deny.toml when it is here",
+    "zh": "cargo deny check；装了它时，just gates 用它检查 deny.toml"
+  },
+  "machine_enables_cargo-fuzz": {
+    "en": "just fuzz <target>, which needs a nightly toolchain as well",
+    "zh": "just fuzz <target>，另外还需要一个 nightly 工具链"
+  },
+  "machine_enables_cargo-llvm-cov": {
+    "en": "a coverage reading of this workspace, which no gate asks for",
+    "zh": "本工作区的覆盖率读数，没有哪道门要求它"
+  },
+  "machine_enables_cargo-mutants": {
+    "en": "just mutants, which asks whether the tests notice a changed kernel",
+    "zh": "just mutants，检验内核被改动后测试能否发现"
+  },
+  "machine_enables_cargo-nextest": {
+    "en": "the test runner every gate in this repository calls",
+    "zh": "本仓库每道门都调用的测试运行器"
+  },
+  "machine_enables_chromedriver": {
+    "en": "the browser tool against Chrome, Brave, Chromium or Vivaldi",
+    "zh": "对 Chrome、Brave、Chromium 或 Vivaldi 使用浏览器工具"
+  },
+  "machine_enables_chromium": {
+    "en": "the browser tool through chromedriver or msedgedriver, whose major version must match the browser found here",
+    "zh": "经 chromedriver 或 msedgedriver 使用浏览器工具；驱动的主版本号须与这里找到的浏览器一致"
+  },
+  "machine_enables_clippy": {
+    "en": "cargo clippy -D warnings, where this workspace's lints take effect",
+    "zh": "cargo clippy -D warnings，本工作区的 lint 在这里生效"
+  },
+  "machine_enables_elan": {
+    "en": "the adversary: property checks that drive the shipped binary over the wire",
+    "zh": "adversary：经线上协议驱动发布版二进制的性质检查"
+  },
+  "machine_enables_ffmpeg": {
+    "en": "an mp4 from the desktop connector's recorder; without it, a frame sequence",
+    "zh": "让桌面连接器的录制器产出 mp4；没有它，只产出逐帧图片"
+  },
+  "machine_enables_gecko": {
+    "en": "the browser tool, with no driver between the city and the browser; Firefox, Zen, LibreWolf, Waterfox, Floorp and Firefox Developer answer here, and Tor Browser answers too but wants confirming by hand",
+    "zh": "浏览器工具，城与浏览器之间不隔驱动；Firefox、Zen、LibreWolf、Waterfox、Floorp 与 Firefox Developer 都算，Tor Browser 也算，但要人亲手确认"
+  },
+  "machine_enables_git": {
+    "en": "restoration: a discarded file points at a checkpoint commit",
+    "zh": "恢复：丢弃的文件指向一个检查点提交"
+  },
+  "machine_enables_just": {
+    "en": "just check, the check every change here closes on",
+    "zh": "just check，这里每一处改动都以它收尾"
+  },
+  "machine_enables_kani": {
+    "en": "proving a property against real MIR, on Linux only",
+    "zh": "对真实的 MIR 证明性质，只在 Linux 上可用"
+  },
+  "machine_enables_msedgedriver": {
+    "en": "the browser tool against Edge, which every Windows machine already has",
+    "zh": "对 Edge 使用浏览器工具，每台 Windows 机器都自带 Edge"
+  },
+  "machine_enables_python-wasi": {
+    "en": "the exec tool's python arm, which runs in the sandbox with no socket",
+    "zh": "exec 工具的 python 一支，在沙箱里运行，没有套接字"
+  },
+  "machine_enables_rustfmt": {
+    "en": "cargo fmt --check, the first half of just check",
+    "zh": "cargo fmt --check，just check 的前一半"
+  },
+  "machine_enables_rustup": {
+    "en": "the toolchain rust-toolchain.toml pins, installed when first needed",
+    "zh": "rust-toolchain.toml 指定的工具链，第一次用到时安装"
+  },
+  "machine_enables_sandbox-engine": {
+    "en": "the exec tool's program and python arms, fuel-metered and with no socket",
+    "zh": "exec 工具的 program 与 python 两支：按燃料计量，没有套接字"
+  },
+  "machine_enables_shell": {
+    "en": "the exec tool's shell arm, where a building's CONFIG.toml asks for it",
+    "zh": "exec 工具的 shell 一支，用于 CONFIG.toml 要求它的楼"
+  },
+  "machine_enables_sprawling-desktop": {
+    "en": "the desktop connector, for a building whose rules declare it",
+    "zh": "桌面连接器，用于规则里声明了它的楼"
+  },
+  "machine_enables_webkit": {
+    "en": "the browser tool against Safari, experimentally: BiDi support is partial and safaridriver --enable has to be run once",
+    "zh": "对 Safari 使用浏览器工具，尚属试验：BiDi 支持不全，且须先运行一次 safaridriver --enable"
+  },
   "machine_install": {
     "en": "install",
     "zh": "安装"

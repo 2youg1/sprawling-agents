@@ -35,7 +35,6 @@ impl accounting::Machine for OneItem {
                 name: "scripted".to_owned(),
                 tier: channels::DoctorTier::Use,
                 need: channels::DoctorNeed::Optional,
-                enables: "nothing a host has".to_owned(),
                 homepage: None,
                 state: channels::DoctorState::Absent {
                     absence: channels::DoctorAbsence::NotOnSearchPath,

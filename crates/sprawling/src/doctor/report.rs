@@ -168,7 +168,6 @@ fn item(found: &Finding, platform: Option<Platform>) -> channels::DoctorItem {
             Need::Required | Need::OneOf(_) => channels::DoctorNeed::Required,
             Need::Optional => channels::DoctorNeed::Optional,
         },
-        enables: found.requirement.enables.to_owned(),
         homepage: homepage(found),
         state: state(&found.presence),
         install: match platform {

@@ -1033,7 +1033,6 @@ export type DoctorTier = typeof DoctorTier.Type;
  * One item, and this machine's answer about it.
  */
 export const DoctorItem = Schema.Struct({
-  enables: Schema.String,
   homepage: Schema.optional(Schema.NullOr(Schema.String)),
   install: DoctorInstall,
   name: Schema.String,

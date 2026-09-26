@@ -79,7 +79,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   import { say } from "../../core/lang";
   import type { DoctorAnswer } from "../../wire";
   import { ui } from "../../ui";
-  import { absenceOf, offerOf, outstanding, recommended, required, spelledOf, standing, stateKey, versionOf } from "../setup/dependencies";
+  import { absenceOf, enablesKey, offerOf, outstanding, recommended, required, spelledOf, standing, stateKey, versionOf } from "../setup/dependencies";
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
   import Progress from "../parts/progress.svelte";
@@ -112,6 +112,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   {@const said = versionOf(item.state)}
   {@const how = spelledOf(item.install)}
   {@const offer = OFFER[offerOf(item)]}
+  {@const enables = enablesKey(item.name)}
   <li class="flex min-w-0 flex-col gap-snug rounded-card bg-raised p-base">
     <div class="flex min-w-0 flex-wrap items-center gap-snug">
       {#if item.homepage === undefined || item.homepage === null}
@@ -143,7 +144,9 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
         <span class="min-w-0 truncate text-note text-text-quiet">{said}</span>
       {/if}
     </div>
-    <p class="text-note text-text-faint">{item.enables}</p>
+    {#if enables !== null}
+      <p class="text-note text-text-faint">{say($lang, enables)}</p>
+    {/if}
     {#if how === null}
       <span class="text-note text-text-faint">{say($lang, "machine_no_recipe")}</span>
     {:else}

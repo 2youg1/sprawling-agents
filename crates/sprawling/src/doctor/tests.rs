@@ -402,3 +402,26 @@ fn the_default_checks_and_installs_nothing() {
         "the default asks nothing: {shown}"
     );
 }
+
+/// The page says what an item enables in its own words, looked up by the
+/// item's name (sprawling-SPEC §12): a row the table gains without a
+/// clause in both languages would reach a reader as a bare name.
+#[test]
+fn every_item_has_the_page_clause_in_both_languages() {
+    let words: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../client/src/lang.json"
+    )))
+    .unwrap();
+    let unworded: Vec<&str> = REQUIREMENTS
+        .iter()
+        .map(|requirement| requirement.name)
+        .filter(|name| {
+            let entry = &words[format!("machine_enables_{name}")];
+            ["en", "zh"]
+                .iter()
+                .any(|lang| entry[lang].as_str().is_none_or(str::is_empty))
+        })
+        .collect();
+    assert_eq!(unworded, Vec::<&str>::new());
+}

@@ -17,6 +17,12 @@ export const LANGS: readonly Lang[] = ["en", "zh"];
 
 export type Key = keyof typeof table;
 
+// Whether the table holds `text`, for a key built from an id the wire
+// carries, which the compiler cannot check.
+export function isKey(text: string): text is Key {
+  return Object.hasOwn(table, text);
+}
+
 // The word for one message in one language.
 export function say(lang: Lang, key: Key): string {
   return table[key][lang];
