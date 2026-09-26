@@ -41,6 +41,7 @@ mod credentials;
 mod desk;
 mod dispatching;
 mod doorstep;
+mod dropping;
 mod driving;
 mod folds;
 mod freezing;

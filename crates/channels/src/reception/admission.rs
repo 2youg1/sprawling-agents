@@ -138,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn the_two_acting_doors_refuse_a_stranger_and_the_editor_door_carries_the_bit() {
+    fn the_acting_doors_refuse_a_stranger_and_the_editor_door_carries_the_bit() {
         for door in [Door::Transcribe, Door::Enroll, Door::Drop] {
             let Admission::Refuse(err) = decide_admission(door, None, &exposed()) else {
                 panic!("{door:?} acts on a request, so it refuses an unpaired one");

@@ -98,9 +98,19 @@ pub(crate) async fn accept_recording(
 /// header value carries ASCII reliably and a person's file names are
 /// often not ASCII (channels-SPEC.md 8-49).
 pub(crate) async fn accept_drop(
-    State(_state): State<Arc<ShellState>>,
-    Query(_params): Query<HashMap<String, String>>,
-    _body: Bytes,
+    State(state): State<Arc<ShellState>>,
+    Query(params): Query<HashMap<String, String>>,
+    body: Bytes,
 ) -> Response {
-    StatusCode::NOT_IMPLEMENTED.into_response()
+    let Some(name) = params.get("name") else {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "send the file's name as `?name=`, percent-encoded",
+        )
+            .into_response();
+    };
+    match (state.drop_sink)(name, &body) {
+        Ok(path) => (StatusCode::OK, path).into_response(),
+        Err(err) => (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response(),
+    }
 }
