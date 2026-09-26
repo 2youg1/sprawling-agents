@@ -276,6 +276,19 @@ thread's question is what this turn did or waits on. -->
     <div class="my-snug text-note text-text-faint">
       {fill(say($lang, "talk_discarded"), { n: String(note.discarded.count) })}
     </div>
+  {:else if "unreadable" in note}
+    <!-- A record that did not read back stays in the turn with what
+         stopped the reading, and the page offers the Ledger, where the
+         record itself can still be read. -->
+    <div class="my-snug rounded-card border border-alert/40 px-base py-snug text-note text-text-quiet">
+      <span class="text-alert">{fill(say($lang, "talk_unreadable"), { at: String(note.unreadable.at) })}</span>
+      · {note.unreadable.cause}
+      <div class="mt-tight">
+        <a href={toFragment({ kind: "record", lens: "ledger" })} class="text-text-faint hover:text-text-quiet">
+          {say($lang, "talk_unreadable_read")}
+        </a>
+      </div>
+    </div>
   {/if}
 {/snippet}
 

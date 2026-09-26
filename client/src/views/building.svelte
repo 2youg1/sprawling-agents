@@ -44,16 +44,18 @@
 </script>
 
 <script lang="ts">
+  import { readAnswer } from "../core/answered";
   import { QUERIES } from "../core/asking";
   import { halt, pursue, release } from "../core/commands";
   import { fill, say } from "../core/lang";
   import { roomOf, toFragment } from "../core/route";
   import { buildingIsShut } from "../core/scope";
   import { ui } from "../ui";
-  import type { Address, BuildingAnswer } from "../wire";
+  import type { Address, BuildingAnswer, Query } from "../wire";
   import { Address as AddressSchema } from "../wire";
   import Badge from "./parts/badge.svelte";
   import Button from "./parts/button.svelte";
+  import Unanswered from "./parts/unanswered.svelte";
   import Commits from "./building/commits.svelte";
   import Directory from "./building/directory.svelte";
   import FileView from "./building/file.svelte";
@@ -77,11 +79,10 @@
   let treeOpen = $state(false);
   let goal = $state("");
 
-  const asked = $derived(u.conn.asking.ask({ building_view: { addr: address } }));
-  const building = $derived.by((): BuildingAnswer | undefined => {
-    const held = $asked;
-    return held !== undefined && "building" in held ? held.building : undefined;
-  });
+  const question = $derived<Query>({ building_view: { addr: address } });
+  const asked = $derived(u.conn.asking.ask(question));
+  const read = $derived(readAnswer($asked, (answer) => ("building" in answer ? answer.building : undefined)));
+  const building = $derived(read.kind === "held" ? read.value : undefined);
 
   const city = u.conn.asking.ask(QUERIES.city);
   const pursuit = $derived.by(() => {
@@ -312,8 +313,10 @@
     </aside>
     <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-pane py-base">
       {#if shown.kind === "plan"}
-        {#if building !== undefined}
-          <Plan answer={building} />
+        {#if read.kind === "held"}
+          <Plan answer={read.value} />
+        {:else if read.kind === "unavailable"}
+          <Unanswered query={read.query} asked={question} />
         {:else}
           <p class="text-text-disabled">…</p>
         {/if}
