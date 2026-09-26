@@ -162,7 +162,7 @@ impl Profile { pub fn of(building: &Address) -> Result<Profile, AxError>; pub fn
 
 空 method／非对象 params／无 id 的回复／`type` 未知／`contexts` 缺失／节点无 role／label 超长／label 含控制符／ref 非 `e<n>`／`e0`／陈旧 generation／回路超预算／房间地址当楼名／reserved prefix 当楼名。
 
-## 12 错误处理
+## 12 Decisions
 
 | 码 | 何时 | 能否让它不可能发生 |
 |---|---|---|

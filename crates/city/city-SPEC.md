@@ -582,7 +582,7 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 
 无文件（→Ephemeral）｜文件存在但无读权限（→报错）｜空文件（→Resident，段为空字节；空描述是作者的选择，不是缺陷）｜地址含多段（`lab/room1`，逐段 push）。
 
-## 12 错误处理
+## 12 Decisions
 
 `E_STORAGE_FATAL`（读不动一个存在的描述）：不可定义掉——文件系统权限是外部世界的事实，而静默降级是被明拒的替代。
 

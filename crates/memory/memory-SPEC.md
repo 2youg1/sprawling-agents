@@ -763,7 +763,7 @@ impl Vfs for RealFs { … }
 
 空目录首开（新 Ledger）；末段恰好整段损坏（截空删段、退至前段）；首段首行即损坏（Envelope 错误——创世行不可断尾，宁停不脏）；波跨滚动边界（两段各一次 sync）；`append_all(vec![])`（no-op，Ok(空)）；同内容并发 put（tmp 同名幂等）；get_range 恰触界（`B` 端点＝len-1 合法）；`L` 范围起于超出总行数（越界拒）；v 低于当前（v<1 不存在，按 Envelope 拒）；夹具目录只读（A16 只读不写回）。
 
-## 12 错误处理（逐码答「能否定义掉」）
+## 12 Decisions
 
 - `VersionAhead`→`E_LOG_VERSION_UNSUPPORTED`：不可定义掉——二进制升级与数据寿命天然错位；方向感知拒绝即其最小语义。
 - `CasCorrupt`→`E_CAS_CORRUPT`：不可定义掉——位腐烂与外部改动在本设计边界外；能定义掉的部分（写路径半成品）已由 tmp+rename 定义掉。

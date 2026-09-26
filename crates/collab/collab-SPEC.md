@@ -438,7 +438,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 ## 11 边界枚举
 
-## 12 错误处理
+## 12 Decisions
 
 （逐码回答「能否让它不可能发生」——设计规则十。）
 

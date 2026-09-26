@@ -1021,7 +1021,7 @@ impl PlanView {
 
 资产文件缺失（build 期即红，不是运行期惊喜）；OUT_DIR 缺失（同上）；无参调用（用法＋退出 2）。
 
-## 12 错误处理
+## 12 Decisions
 
 build.rs 内 `Result<(), String>` 汇到 `cargo::error`；运行期无可失败路径（S0）。逐码消解：无新增码。
 
