@@ -268,3 +268,23 @@ fn the_views_answer_as_of_the_first_seq_they_have_not_folded() {
         .unwrap();
     assert_eq!(views.next_unfolded(), kernel::Seq::FIRST.next().unwrap());
 }
+
+/// The views a rebuild hands over hold the index the rebuild read the
+/// history into, so the first question after it refreshes nothing. An
+/// index left behind would still answer, because `refresh` fills an empty
+/// index before every read, but only by scanning the whole ledger again.
+#[test]
+fn the_views_a_rebuild_hands_over_hold_the_index_it_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::assembly::init_city(dir.path()).unwrap();
+    let views = Views::rebuild(&report.ledger_dir).unwrap();
+    assert_eq!(
+        views
+            .index
+            .lock()
+            .unwrap()
+            .refresh(&report.ledger_dir)
+            .unwrap(),
+        memory::Refreshed::Unchanged
+    );
+}
