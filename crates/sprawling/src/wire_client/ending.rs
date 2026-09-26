@@ -20,7 +20,7 @@ pub(super) enum Ending {
 impl Ending {
     /// A query is answered once, and a greeting on a live session is
     /// refused once (`channels::reception`), so both have one reply.
-    pub(super) fn of(sent: &channels::ClientFrame) -> Self {
+    pub(super) fn of(sent: &channels::ClientFrame, _until: super::Until) -> Self {
         match sent {
             channels::ClientFrame::Query(_) | channels::ClientFrame::Hello(_) => Self::OnReply,
             channels::ClientFrame::Command(_) => Self::OnQuiet,
