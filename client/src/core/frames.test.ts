@@ -31,23 +31,9 @@ const bySchema = (text: string): ServerFrame | null => {
   return Either.isRight(read) ? read.right : null;
 };
 
-// The fastest of several batches: the floor the decoder reaches, which a
-// busy neighbour on the machine can slow but not lower.
-function floorMicros(run: () => unknown): number {
-  const batch = 2000;
-  let best = Number.POSITIVE_INFINITY;
-  for (let round = 0; round < 15; round += 1) {
-    const start = performance.now();
-    for (let i = 0; i < batch; i += 1) run();
-    best = Math.min(best, ((performance.now() - start) * 1000) / batch);
-  }
-  return best;
-}
-
-test("an event frame decodes within three microseconds", () => {
-  expect(floorMicros(() => decodeFrame(eventText))).toBeLessThanOrEqual(3);
-});
-
+// What the hot decoder costs is a reading, not a verdict: the
+// `client_frame_decode` row of xtask/budgets.toml, taken by
+// client/scripts/frame_cost.ts.
 test("the hot frames read exactly what the schema reads", () => {
   expect(decodeFrame(eventText)).toEqual(bySchema(eventText));
   expect(decodeFrame(deltaText)).toEqual(bySchema(deltaText));
