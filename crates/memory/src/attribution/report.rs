@@ -37,7 +37,7 @@ use serde_json::Value;
 
 use crate::error::MemoryError;
 
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct Attribution {
     by_run: BTreeMap<String, u64>,
     by_actor: BTreeMap<String, u64>,

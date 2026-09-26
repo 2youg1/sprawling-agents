@@ -948,7 +948,7 @@ pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, MemoryError>;
 - **核对只看一行。** 启动时按 `seq` 做一次定位读，`fit` 比较那一行的 `chain_hash` 与 `line_hash`：相等时，在摘要单射的前提下（`adversary` 的 `Sprawling.Chain` 持有这条假设），快照所折的行就是盘上账本的前缀；`Stale` 时调用方丢弃快照，全量折叠。`fold_version` 不等同样丢弃：折叠规则变了，旧状态不再是新规则折出来的。
 - **「快照加尾部 ≡ 全量折叠」** 由 `adversary/src/Sprawling/Snapshot.lean` 对任意折叠、任意切点证明（`snapshotPlusTailIsWhole`、`resumeIsWhole`）；Rust 侧由 proptest 在随机账本与随机切点上持有同一性质，折叠取链检查本身：从 `resume()` 出发走尾部，接受的行与终态都等于从创世走全程。
 - **被否：只存 `seq` 不存 `line_hash`。** 账本被换成另一条同长的链时，只比 `seq` 会把别人的视图接到这条链的尾部上；多 32 字节换来的是一次定位读就能拒绝。
-- 仍未落地的阶段：`Views` 的字节编码，以及启动路径在 8-28 的判定之上只折尾部。
+- `Views` 从这里起步并由服务起步时切快照（sprawling-SPEC 8-91）；`Standing` 仍从创世折叠。
 
 ### 8-27 `memory::chain_audit`：全链审计与写者停机（形状 7 投影：把整条链折成一个判定）
 

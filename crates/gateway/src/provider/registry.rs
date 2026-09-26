@@ -46,7 +46,7 @@ use crate::router::DialectHint;
 /// city writes itself. The city installs none of these clients, spawns
 /// none of them, and carries none of their source — it follows their
 /// published facts, which is what `docs/third-party.md` §1 records.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Family {
     /// OpenAI's own client; signs in by device flow, answers on the
     /// responses face.
@@ -105,7 +105,7 @@ impl Family {
 /// Exhaustive and closed: a fifth way to connect is a compile error at
 /// every reader, which is how a new one is kept from being approximated
 /// with the nearest of the four already written.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ConnectionKind {
     /// The OpenAI-compatible chat face — what most relays, most local
     /// servers and most other laboratories serve.

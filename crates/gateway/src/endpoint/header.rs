@@ -21,7 +21,7 @@ use kernel::{AxCode, AxError, SecretRef};
 /// Exhaustive and closed: a third kind of value would have to state how
 /// it reaches the wire, which is the question this type exists to
 /// answer once.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum HeaderValue {
     /// A literal, sent verbatim. It has passed
     /// [`kernel::secret::scan`], so it is text a person meant to be

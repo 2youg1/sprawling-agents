@@ -1,0 +1,130 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! A start from a snapshot folds only the tail into the views a start
+//! from genesis builds; a snapshot that fails verification is refused.
+
+use std::path::{Path, PathBuf};
+
+use kernel::{Address, RunId};
+use memory::StoredSnapshot;
+
+use super::*;
+use crate::assembly::{RunWorker, init_city};
+
+fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
+    for n in names {
+        worker
+            .handle(channels::Command::CreateBuilding {
+                addr: Address::parse(&format!("lab{n}")).unwrap(),
+                template: channels::TemplateName::parse("minimal").unwrap(),
+                idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, &[n]),
+            })
+            .unwrap();
+    }
+}
+
+fn snapshots(city: &Path) -> PathBuf {
+    kernel::layout::CityLayout::new(city).snapshot()
+}
+
+/// A city with three buildings, a snapshot cut after them, then `more`
+/// buildings the snapshot has not seen.
+fn cut_then_raise(city: &Path, more: std::ops::Range<u8>) -> (PathBuf, RunWorker) {
+    let ledger = init_city(city).unwrap().ledger_dir;
+    let mut worker = RunWorker::new(
+        city,
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    raise(&mut worker, 0..3);
+    cut_views_snapshot(&ledger, &start_views(&ledger).unwrap()).unwrap();
+    let cut = memory::read_snapshot(&snapshots(city)).unwrap();
+    assert!(matches!(cut, StoredSnapshot::Present(_)), "{cut:?}");
+    raise(&mut worker, more);
+    (ledger, worker)
+}
+
+fn from_genesis(city: &Path, ledger: &Path) -> Vec<u8> {
+    std::fs::remove_dir_all(snapshots(city)).unwrap();
+    let whole = start_views(ledger).unwrap();
+    assert_eq!(whole.from, ViewsStart::Whole(WholeFold::NoSnapshot));
+    whole.views.encode().unwrap()
+}
+
+#[test]
+fn a_start_after_a_cut_folds_only_the_tail_into_the_same_views() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ledger, _worker) = cut_then_raise(dir.path(), 3..6);
+    let lines = memory::read_raw_lines_at(&ledger).unwrap().len();
+    let StoredSnapshot::Present(cut) = memory::read_snapshot(&snapshots(dir.path())).unwrap()
+    else {
+        panic!("the snapshot is still there");
+    };
+    let tail = lines - usize::try_from(cut.seq().value()).unwrap() - 1;
+
+    let resumed = start_views(&ledger).unwrap();
+
+    assert_eq!(resumed.from, ViewsStart::Resumed { tail });
+    assert_eq!(
+        resumed.views.encode().unwrap(),
+        from_genesis(dir.path(), &ledger)
+    );
+}
+
+#[test]
+fn a_tampered_snapshot_is_refused_and_the_whole_history_is_folded() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ledger, _worker) = cut_then_raise(dir.path(), 3..5);
+    let file = std::fs::read_dir(snapshots(dir.path()))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let mut bytes = std::fs::read(&file).unwrap();
+    *bytes.last_mut().unwrap() ^= 1;
+    std::fs::write(&file, bytes).unwrap();
+
+    let refused = start_views(&ledger).unwrap();
+
+    assert!(
+        matches!(refused.from, ViewsStart::Whole(WholeFold::Damaged(_))),
+        "{:?}",
+        refused.from
+    );
+    assert_eq!(
+        refused.views.encode().unwrap(),
+        from_genesis(dir.path(), &ledger)
+    );
+}
+
+#[test]
+fn views_a_snapshot_cannot_decode_are_folded_from_genesis() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ledger, _worker) = cut_then_raise(dir.path(), 3..4);
+    let lines = memory::read_raw_lines_at(&ledger).unwrap();
+    let seq = Seq::new(u64::try_from(lines.len()).unwrap() - 1);
+    let snapshot = memory::ChainSnapshot::cut(
+        crate::views::views_fold_version(),
+        seq,
+        lines.last().unwrap(),
+        b"not the views".to_vec(),
+    );
+    memory::write_snapshot(&snapshots(dir.path()), &snapshot).unwrap();
+
+    let refused = start_views(&ledger).unwrap();
+
+    assert!(
+        matches!(refused.from, ViewsStart::Whole(WholeFold::Damaged(_))),
+        "{:?}",
+        refused.from
+    );
+    assert_eq!(
+        refused.views.encode().unwrap(),
+        from_genesis(dir.path(), &ledger)
+    );
+}

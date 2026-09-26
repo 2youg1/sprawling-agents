@@ -21,10 +21,12 @@ use super::{Entrance, Expiries};
 
 mod collaboration;
 mod session;
+mod views_start;
 
 use collaboration::CollaborationFold;
 pub(super) use collaboration::{Collaboration, INBOX_CAPACITY, new_inbox};
 pub(super) use session::SessionOrigins;
+pub(crate) use views_start::{cut_views_snapshot, start_views};
 
 /// Everything a worker inherits from a history it did not write.
 ///

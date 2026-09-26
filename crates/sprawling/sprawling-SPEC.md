@@ -3503,7 +3503,34 @@ impl RunWorker {
 
 **被拒：审计放在启动路径上同步做完再开端口。** 那正是要去掉的全链读取；审计的价值在于它不挡首字节。
 
-**本节接口的当前状态**：启动仍由 `rebuild_views` 与 `Standing::fold` 全量校验并折叠，所以审计目前只抓启动之后才坏掉的行。启动改走 `memory::start_from_snapshot`（memory-SPEC 8-28）只折尾部，需要先有 `Views` 与 `Standing` 的字节编码：它们持有 `memory::HotView`、`memory::Attribution`、`gateway::EndpointBook` 等字段私有的类型，所以编码要由各自的 crate 各给一份，而不是在这个 crate 里写第二份。那时一个没读完的审计也要停写，因为快照在审计通过之前没有被证明。
+**本节接口的当前状态**：`Views` 已从快照起步（8-91），只折尾部；`Standing::fold` 仍全量校验并折叠。快照之前的行在启动时不再校验，所以一个没读完的审计（读账本失败）也要停写，因为快照在审计通过之前没有被证明；这一步尚未落地。
+
+### 8-91 视图从快照起步：编码、切快照、只折尾部（`bin::views::snapshot`、`bin::assembly::folds::views_start`）
+
+```rust
+// bin::views::snapshot —— shape: projection
+impl Views {
+    pub(crate) fn encode(&self) -> Result<Vec<u8>, AxError>;                         // StorageFatal「encode the views」
+    pub(crate) fn decode(city_root: &Path, bytes: &[u8]) -> Result<Views, AxError>;  // CasCorrupt「decode the views」
+}
+pub(crate) fn views_fold_version() -> u32;
+
+// bin::assembly::folds::views_start —— shape: projection
+pub(crate) struct StartedViews { pub(crate) views: Views, pub(crate) from: ViewsStart, /* 最后一行：切快照用 */ }
+pub(crate) enum ViewsStart { Resumed { tail: usize }, Whole(memory::WholeFold) }
+pub(crate) fn start_views(ledger_dir: &Path) -> Result<StartedViews, AxError>;
+pub(crate) fn cut_views_snapshot(ledger_dir: &Path, started: &StartedViews) -> Result<(), AxError>;
+```
+
+**编码由各类型自己的 crate 给出。** `memory::HotView`、`memory::Attribution`、`gateway::EndpointBook` 与本 crate 的 `Governance`、`PlanView`、`CommitFacts` 各在定义处派生 `serde::Serialize`／`Deserialize`，`Views` 本身也派生，字节格式是 postcard。`city_root`、`index`（side cache 的 seq→偏移表）、`machine` 与 `vault` 不进快照：前两个由 `Views::new` 从盘上重建（`decode` 用结构更新语法取 `Views::new` 的这两个值，所以重建规则只有一处），后两个本来就不是从账本折出来的。`PlanView` 只存 `causes`，已解析的计划是缓存，下一次提问时重新读。**被否：JSON。** `skill_pins` 以 `(String, B3Hash)` 为键，JSON 的键只能是字符串；而且 JSON 读写都比 postcard 慢、体积更大，这些都记在首字节上。**被否：手写逐字段编码。** 那是每个字段的第二份拼写，加一个字段就要改两处。
+
+**`fold_version` 不靠人记得改。** `views_fold_version()` 取 blake3(`CARGO_PKG_VERSION` ‖ `VIEWS_FOLD_RULES`) 的前四字节（LE）：换一个版本的二进制就丢弃旧快照、从创世折一次；同一版本内改了折叠规则或 `Views` 的字段，改 `VIEWS_FOLD_RULES` 这个常量。字节解不开（postcard 报错）同样按 `WholeFold::Damaged` 退回全量折叠。
+
+**起步只折尾部。** `start_views` 调 `memory::start_from_snapshot(ledger_dir, <city>/.sprawling/snapshot/, views_fold_version())`（memory-SPEC 8-28）。`Resume`：解码快照里的 views，再用 `ChainSnapshot::resume()` 给出的 `LineCheck` 逐行核对并折尾部——尾部仍然过同一个逐行检查，行号从 `seq + 1` 数起。`Whole`：与没有快照时完全相同，`runtime::replay::verify_lines` 从创世核对并折叠。快照之前的行在起步时不再逐行核对：切快照时它们已经过一次完整的核对（从创世或从上一份快照起），`fit` 用一行的链哈希证明它们还是那些行；之后被改坏的行由后台的 `audit_chain`（8-90）抓住。**快照校验失败绝不信任它**：任何一种 `WholeFold` 都走全量折叠，原因放在 `from` 里；`serve` 把它作为一条 `Effect` 诊断写进日志，说明这次从哪里起步、为什么。
+
+**切快照：服务起步时，折叠越过快照就切一次。** `serve` 的写线程在 `start_views` 之后调 `cut_views_snapshot`：从创世折过至少一行、或尾部非空时，在最后一行切一份新快照；尾部为空（快照已在最后一行）时什么也不写。这个频率不含常数：切一次的代价是一次编码加一次 `sync`，与视图大小成正比；它省下的是下一次起步重折这段尾部的时间，与尾部长度成正比，而尾部只在上次起步之后增长。一次性的查询（`views::ask`）经 `rebuild_views` 只读快照，不切：读命令不写盘。写不下快照让 `serve` 失败，与写不下账本一样。
+
+**本节接口的当前状态**：`Standing::fold` 还没有从快照起步（`Collaboration`、`Entrance`、`Expiries`、`SessionOrigins` 的编码尚未给出）；长时间运行中的城只在起步时切快照，运行中按测得的折叠成本切快照尚未落地；`from` 的原因尚未作为诊断推给页面；40 万行城首字节 ≤ 150 ms 的读数留在延后的测量里。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 

@@ -53,7 +53,13 @@ pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer
 /// The derived views a query reads. They are rebuilt from the ledger at
 /// startup and folded forward by the write observer, so deleting them
 /// costs nothing but the rebuild — the ledger remains the only history.
+///
+/// The encoding a snapshot holds (sprawling-SPEC 8-91) leaves out the
+/// four fields that are not folded from the ledger; `Views::decode`
+/// takes them from `Views::new`.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct Views {
+    #[serde(skip)]
     pub(super) city_root: PathBuf,
     pub(super) hot: memory::HotView,
     pub(super) attribution: memory::Attribution,
@@ -102,6 +108,7 @@ pub(crate) struct Views {
     /// How many records this view has folded. The one number a page
     /// cannot derive from any other answer.
     pub(super) events: u64,
+    #[serde(skip, default = "memory::LedgerIndex::empty")]
     /// seq to byte offset, held rather than rebuilt.
     ///
     /// Rebuilding it read the whole side cache and allocated a `String`
@@ -137,12 +144,14 @@ pub(crate) struct Views {
     /// a city nobody has asked yet - every city that has just been
     /// served - and it answers `Unavailable` rather than an empty
     /// machine.
+    #[serde(skip)]
     pub(super) machine: Option<channels::DoctorAnswer>,
     /// The vault the worker opened; set by `views::served`. `None` is a
     /// `Views` nobody served - a rebuild, a test - and a server wanting
     /// a credential then reports that it could not be redeemed rather
     /// than reaching out with the reference as though it were the
     /// value.
+    #[serde(skip)]
     pub(super) vault: Option<std::sync::Arc<std::sync::Mutex<gateway::Custodian>>>,
 }
 

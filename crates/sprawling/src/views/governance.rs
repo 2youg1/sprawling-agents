@@ -18,7 +18,7 @@ use kernel::event::record::{Admittance, AutonomyChanged, CityHalted};
 use kernel::{Address, AxError, EventKind, Payload, RunId};
 
 /// The work an answered item was holding up.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct BlockedJob {
     pub(crate) addr: Address,
     pub(crate) task: String,
@@ -27,7 +27,7 @@ pub(crate) struct BlockedJob {
 
 /// What a run was sent out to do. Read back from `run_started`, which is
 /// the record that carries both halves.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Sent {
     pub(crate) task: String,
     pub(crate) goal: String,
@@ -41,6 +41,7 @@ pub(crate) struct Sent {
 /// running city writes. These were once two implementations that
 /// happened to agree, and `set_admission` and `answer_approval` each
 /// held a third by writing a field directly.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct Governance {
     pub(crate) pending: std::collections::BTreeMap<String, kernel::ApprovalItem>,
     pub(crate) autonomy: kernel::Autonomy,

@@ -22,7 +22,7 @@ use super::header::HeaderValue;
 use super::redemption::Redemption;
 use crate::market::ModelEntry;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AuthSpec {
     Bearer(SecretRef),
     Header { name: String, value: SecretRef },

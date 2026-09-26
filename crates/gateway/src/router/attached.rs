@@ -26,7 +26,7 @@ use crate::provider::registry::ConnectionKind;
 use super::payload::auth_reference;
 use super::tuning::EndpointTuning;
 /// One endpoint the person attached, as the book holds it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AttachedEndpoint {
     pub name: String,
     /// The base URL the person entered, without a path of its own; the

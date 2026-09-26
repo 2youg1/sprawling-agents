@@ -29,7 +29,7 @@ pub enum InputKinds {
 
 /// One catalog row. Prices are USD micros per one million tokens —
 /// integers end to end (decision paths ban floats).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModelEntry {
     pub id: String,
     pub context_tokens: u64,

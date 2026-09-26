@@ -34,14 +34,14 @@ pub struct Chosen<'b> {
     pub entry: &'b ModelEntry,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Choice {
     pub(crate) endpoint: String,
     pub(crate) entry: ModelEntry,
 }
 
 /// Every endpoint and every choice, rebuilt from the event stream.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct EndpointBook {
     endpoints: BTreeMap<String, AttachedEndpoint>,
     chosen: BTreeMap<ModelTag, Choice>,
