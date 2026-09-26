@@ -29,7 +29,7 @@ fn landing(t: u64, of: &Provenance, reviewed_by_person: bool) -> Landing<'_> {
     }
 }
 
-fn city(dir: &Path) -> Worktrees {
+pub(super) fn city(dir: &Path) -> Worktrees {
     std::fs::create_dir_all(dir.join("lab")).unwrap();
     std::fs::write(dir.join("lab").join("notes.md"), b"first\n").unwrap();
     let mut checkpoint = Checkpoint::open(dir).unwrap();
@@ -38,7 +38,7 @@ fn city(dir: &Path) -> Worktrees {
         .unwrap();
     Worktrees::open(dir).unwrap()
 }
-fn name(raw: &str) -> WorktreeName {
+pub(super) fn name(raw: &str) -> WorktreeName {
     WorktreeName::parse(raw).unwrap()
 }
 
@@ -111,62 +111,6 @@ fn a_registered_tree_with_no_directory_is_taken_back_rather_than_locked_away() {
 
     let again = trees.claim(&name("node-1")).unwrap();
     assert!(again.path().join("lab").join("notes.md").exists());
-}
-
-/// A node's next run finds its tree where it left it: releasing gives
-/// the lease back and keeps the files, so the next claim neither
-/// measures the city nor checks the whole tree out again.
-#[test]
-fn a_released_tree_stays_on_disk_for_the_nodes_next_run() {
-    let dir = tempfile::tempdir().unwrap();
-    let trees = city(dir.path());
-    let lease = trees.claim(&name("node-1")).unwrap();
-    let path = lease.path().to_path_buf();
-    let notes = path.join("lab").join("notes.md");
-    let written = std::fs::metadata(&notes).unwrap().modified().unwrap();
-
-    trees.release(lease).unwrap();
-    assert!(notes.exists(), "a released tree keeps its files");
-    assert_eq!(trees.live().unwrap(), vec![name("node-1")]);
-
-    let again = trees.claim(&name("node-1")).unwrap();
-    assert_eq!(again.path(), path.as_path());
-    assert_eq!(
-        std::fs::metadata(&notes).unwrap().modified().unwrap(),
-        written,
-        "a file the node's branch already holds is not written again"
-    );
-    assert!(dir.path().join("lab").join("notes.md").exists());
-}
-
-/// A kept tree whose node has nothing unmerged follows the trunk: a
-/// node that starts from where the city was when it last ran would do
-/// its next work on files somebody has since changed, and every merge
-/// of it would be refused as stale.
-#[test]
-fn a_kept_tree_with_nothing_unmerged_starts_from_the_trunk_as_it_now_stands() {
-    let dir = tempfile::tempdir().unwrap();
-    let trees = city(dir.path());
-    trees
-        .release(trees.claim(&name("node-1")).unwrap())
-        .unwrap();
-    std::fs::write(
-        dir.path().join("lab").join("notes.md"),
-        b"second
-",
-    )
-    .unwrap();
-    Checkpoint::open(dir.path())
-        .unwrap()
-        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
-        .unwrap();
-
-    let again = trees.claim(&name("node-1")).unwrap();
-    assert_eq!(
-        std::fs::read_to_string(again.path().join("lab").join("notes.md")).unwrap(),
-        "second
-"
-    );
 }
 
 #[test]
