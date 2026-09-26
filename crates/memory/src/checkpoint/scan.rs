@@ -144,6 +144,10 @@ impl Checkpoint {
     /// outside the scope are never touched — the write domain is the
     /// boundary, and a wider `add` would stage what the Run never held.
     ///
+    /// One `add_all`, which stages removals as well: libgit2 walks the
+    /// index against the working tree once and skips each unchanged file
+    /// by its stat data, and a second `update_all` walk repaid nothing.
+    ///
     /// **A session slice is never staged.** It is a disposable
     /// projection the city's own accounting thread appends to while the
     /// wave runs, and a fence that staged it would ask git to read a
@@ -172,9 +176,6 @@ impl Checkpoint {
                     Some(&mut admit),
                 )
                 .map_err(git_err("stage scope"))?;
-            index
-                .update_all(specs.iter(), Some(&mut admit))
-                .map_err(git_err("stage deletions"))?;
         }
         filter.refused()?;
         write_index(&mut index)?;
@@ -214,9 +215,6 @@ impl Checkpoint {
             index
                 .add_all(["*"], git2::IndexAddOption::DEFAULT, Some(&mut admit))
                 .map_err(git_err("stage the tree"))?;
-            index
-                .update_all(["*"], Some(&mut admit))
-                .map_err(git_err("stage deletions"))?;
         }
         filter.refused()?;
         write_index(&mut index)
