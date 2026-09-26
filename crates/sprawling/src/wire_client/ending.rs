@@ -67,11 +67,14 @@ impl Heard {
     /// Refusal first, because a refusal that also carried events is
     /// still a refusal; silence last, because it is only silence when
     /// nothing at all arrived.
+    /// A run's wait that heard frames but stopped on silence before its
+    /// milestone is unfinished rather than answered.
     pub(crate) fn spoken(&self) -> Spoken {
-        match (self.refusals, self.answers) {
-            (0, 0) => Spoken::Quiet,
-            (0, _) => Spoken::Answered,
-            _ => Spoken::Refused,
+        match (self.refusals, self.answers, self.watch) {
+            (0, 0, Watch::NotAsked | Watch::Reached | Watch::Unreached) => Spoken::Quiet,
+            (0, _, Watch::Unreached) => Spoken::Unfinished,
+            (0, _, Watch::NotAsked | Watch::Reached) => Spoken::Answered,
+            (_, _, Watch::NotAsked | Watch::Reached | Watch::Unreached) => Spoken::Refused,
         }
     }
 }
