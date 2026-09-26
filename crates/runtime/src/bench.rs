@@ -24,7 +24,7 @@
 //! it is a port, so what this module owns is the ordering rather than
 //! the effect.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use kernel::{
     Address, AxCode, AxError, DiscardForecast, Effect, EgressOutcome, EgressTarget, GateOutcome,
@@ -67,7 +67,7 @@ pub struct CheckpointNet {
 /// the refusal rather than ending the turn: the model that asked for
 /// something it may not have should learn that, and continue.
 pub struct ToolBench {
-    tools: BTreeMap<String, Box<dyn Tool>>,
+    tools: BTreeMap<ToolName, Box<dyn Tool>>,
     domain: WriteDomain,
     taint: TaintSet,
     /// The floor's limits, which decide whether a connector may reach
@@ -157,7 +157,7 @@ impl ToolBench {
     /// Registers a tool under its own declared name. A second tool
     /// claiming a taken name is refused rather than shadowing the first.
     pub fn register(&mut self, tool: Box<dyn Tool>) -> Result<(), AxError> {
-        let name = tool.meta().name.as_str().to_owned();
+        let name = tool.meta().name.clone();
         if self.tools.contains_key(&name) {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -179,7 +179,7 @@ impl ToolBench {
 
     /// The registered tool's declaration. Callers packaging a result
     /// need its `temporal` to decide whether a clock line is due.
-    pub fn meta_of(&self, name: &str) -> Option<&kernel::ToolMeta> {
+    pub fn meta_of(&self, name: &ToolName) -> Option<&kernel::ToolMeta> {
         self.tools.get(name).map(|tool| tool.meta())
     }
 
@@ -191,13 +191,10 @@ impl ToolBench {
         key: &IdemKey,
         now: kernel::TimeMs,
     ) -> Result<BenchOutcome, AxError> {
-        // Before any unreplayable effect (8.2). The judgement is the
-        // kernel's and reads a set of keys; what this bench keeps beside
-        // each key is the answer it gave.
-        let mut keys: BTreeSet<IdemKey> = self.seen.keys().copied().collect();
-        if kernel::idem::claim(&mut keys, *key).is_err()
-            && let Some(answered) = self.seen.get(key)
-        {
+        // Before any unreplayable effect (8.2). `seen` holds a key only
+        // once the tool answered it, so its keys are the claimed set and
+        // a second copy of them would be a second authority.
+        if let Some(answered) = self.seen.get(key) {
             return match answered {
                 Ok(outcome) => Ok(BenchOutcome::Duplicate {
                     outcome: outcome.clone(),
@@ -205,8 +202,8 @@ impl ToolBench {
                 Err(refused) => Err(refused.clone()),
             };
         }
-        let name = call.name.as_str().to_owned();
-        let Some(tool) = self.tools.get(&name) else {
+        let name = call.name.as_str();
+        let Some(tool) = self.tools.get(&call.name) else {
             return Err(AxError::failure(
                 AxCode::ToolUnavailable,
                 "invoke tool",
@@ -255,18 +252,18 @@ impl ToolBench {
                 .map(str::to_owned);
         }
 
-        if let Some(answered) = self.admit(call, &name, &effect, &subject)? {
+        if let Some(answered) = self.admit(call, name, &effect, &subject)? {
             return Ok(answered);
         }
 
         // Re-borrowed here: the forecast fence needed `self` mutably.
-        let Some(tool) = self.tools.get_mut(&name) else {
+        let Some(tool) = self.tools.get_mut(&call.name) else {
             return Err(AxError::failure(
                 AxCode::ToolUnavailable,
                 "invoke tool",
                 format!("no tool named `{name}` is registered"),
             )
-            .with_nearby(self.tools.keys().cloned().collect())
+            .with_nearby(self.tools.keys().map(ToString::to_string).collect())
             .with_recovery(
                 "call one of the tools listed beside this error; those are the tools \
                  this run holds",
