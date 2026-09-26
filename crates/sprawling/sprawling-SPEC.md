@@ -2528,10 +2528,11 @@ impl DrivingPool {
 /// 一个 `Driven` 不说自己属于哪一轮，一个 run id 也不说要归位什么。
 pub(crate) struct Arrival { run: RunId, driven: Result<Driven, AxError> }
 
-pub(crate) struct DrivingPool { /* lanes、一个 mpsc 的两头、每条车道的 JoinHandle */ }
+pub(crate) struct DrivingPool { /* lanes、回家的那一头、每条车道的 JoinHandle、排着的活、read_memory */ }
 impl DrivingPool {
-    pub(crate) fn open(lanes: u32) -> DrivingPool;
-    pub(crate) fn full(&self, memory: Memory) -> bool;
+    /// `read_memory` 是池判断内存紧不紧时唯一的读数来源；生产交 `bin::monitor::memory::read`。
+    pub(crate) fn open(lanes: u32, home: mpsc::Sender<Wake>, read_memory: fn() -> Memory) -> DrivingPool;
+    pub(crate) fn full(&self) -> bool;
     pub(crate) fn in_flight(&self) -> u32;
     /// 交出一次驾驶：起一条车道。run id 取自 `driving` 自己，不另传一份——
     /// 两处说同一件事就有两处说错的机会。
@@ -2554,7 +2555,7 @@ impl DrivingPool {
 需要重算 api-baseline，那是一次独立的卡，不该塞进这一张。**在它落地之前，比天花板大的车道数只会让线程停在
 admission 上排队**——§8-42-3 早就写下这句话，这里把它从设计变成一个带理由的常量。
 
-**内存紧时计划的下一行排队**：`full` 在车道都占满时为真，另外在已有 run 在跑、而整机可用内存低于物理内存的十分之一时也为真（`admits(in_flight, lanes, memory)` 是这一条规则的唯一出处）。读数是 `bin::monitor::memory::read()`，由 `bin::assembly` 的 `Flight::full` 在计划推进循环（`assembly::plans::pursuing`）每次决定是否起下一行时读一次，所以跟着实时的可用内存走；读一次的耗时还没有测过，只发生在起一行之前。`full` 只有这一个调用者：人的派遣（`dispatch_into_lane`）与排程、外来到达、刚解除阻塞的工作（`start_unasked`）经 `Flight::take` 直接进 `DrivingPool::start`，不问 `admits`，所以内存紧时它们照样与在跑的 run 并排起跑，车道上限对它们也同样不设防。这是本接口的现状；把 `admits` 挪进每轮都经过的那一道门（`DrivingPool::start` 或 `Flight::take`），并定下被拒的一轮是等还是带重试地被拒，才让这条规则覆盖每一个新 run。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/sprawling/src/serving/pool.rs` 的 `a_new_run_waits_while_memory_is_tight`。
+**内存紧时计划的下一行排队**：`full` 在车道都占满时为真，另外在已有 run 在跑、而整机可用内存低于物理内存的十分之一时也为真（`admits(in_flight, lanes, memory)` 是这一条规则的唯一出处）。读数来自 `open` 时交给池的 `read_memory`，池自己不碰主机：生产交 `bin::monitor::memory::read`，worker 搬进 `accounting` 时 `monitor` 留在 `sprawling`、经这个 `fn` 指针进来（accounting-SPEC.md §7、§12-10），脚本场景交一个自己的读数就能造出内存紧的机器。`full` 每次被问都读一次，所以跟着实时的可用内存走；问它的有三处：`DrivingPool::start`（每一轮进车道都经过的门，满了就排队）、`start_waiting`（一轮回家后按到达顺序起排着的活）与 `Flight::full`（计划推进循环 `assembly::plans::pursuing` 每次决定是否起下一行）。读一次的耗时还没有测过，只发生在起一轮之前。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/sprawling/src/assembly/pool.rs` 的 `a_new_run_waits_while_memory_is_tight` 与 `a_pool_judges_memory_by_the_reader_it_was_handed`。
 
 ### 8-46-4 `pursue` 拿走整个 ready set（`bin::assembly::plans::pursuing`）
 
