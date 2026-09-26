@@ -7,10 +7,10 @@
 // tab shows whether the city is idle, working, or waiting for the
 // person, or whether the page is not being told at all. Each state is a
 // shape of its own and a colour the page uses, because a tab strip is
-// small and a hue alone is lost on a person who cannot tell two apart. No colour is spelled
-// here - each is read back from the stylesheet through an element, so
-// the coloured tokens' chroma coefficient resolves the way it does on
-// the page.
+// small and a hue alone is lost on a person who cannot tell two apart.
+// No colour is spelled here - each is read back from the stylesheet
+// through an element, so the coloured tokens' chroma coefficient
+// resolves the way it does on the page.
 
 import type { LinkState } from "./link";
 

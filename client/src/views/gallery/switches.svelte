@@ -34,7 +34,7 @@
   import { WIRE_APIS } from "../../core/commands";
   import type { WireApi } from "../../core/commands";
   import { say } from "../../core/lang";
-  import type { Chroma, Lighting, Motion } from "../../core/prefs";
+  import type { Chroma, Lighting, Motion } from "../../core/appearance";
   import { ui } from "../../ui";
   import Segmented from "../parts/segmented.svelte";
   import Case from "./case.svelte";

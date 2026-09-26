@@ -12,7 +12,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { freshDraft, tuningOf } from "./draft";
+import { freshDraft, tuningHints, tuningOf } from "./draft";
+import type { TuningDefaults } from "../../../wire";
 
 // Bun's `navigator` carries no language, and the preference record a
 // fresh draft reads its proxy rule from is opened with one.
@@ -25,6 +26,36 @@ describe("an untouched endpoint form", () => {
       timeoutMs: null,
       requestMaxRetries: null,
       streamIdleTimeoutMs: null,
+    });
+  });
+});
+
+// The boxes the person left empty show the figure the city would use,
+// and that figure has to be the one the city derives: an idle timeout
+// nobody set falls back to the call timeout, the typed one when the box
+// holds it (`crates/gateway/src/endpoint/stream.rs`).
+describe("the figures an empty tuning box shows", () => {
+  const DEFAULTS: TuningDefaults = {
+    from: "default",
+    proxying: "except_local",
+    timeout_ms: 120_000,
+    request_max_retries: null,
+    stream_idle_timeout_ms: null,
+  };
+
+  test("an untouched form shows the city's timeout for the idle box too", () => {
+    expect(tuningHints(freshDraft(), DEFAULTS, "until halted")).toEqual({
+      timeoutMs: "120000",
+      requestRetries: "until halted",
+      streamIdleMs: "120000",
+    });
+  });
+
+  test("a typed call timeout is what the idle box falls back to", () => {
+    expect(tuningHints({ ...freshDraft(), timeoutMs: "30000" }, DEFAULTS, "until halted")).toEqual({
+      timeoutMs: "120000",
+      requestRetries: "until halted",
+      streamIdleMs: "30000",
     });
   });
 });

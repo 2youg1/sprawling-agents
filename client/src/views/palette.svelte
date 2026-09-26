@@ -39,8 +39,9 @@
   import type { View } from "../core/route";
   import { cityIsShut, CITY } from "../core/scope";
   import { completed } from "../core/completion";
-  import { SECTIONS, offered, reached } from "../core/slash";
-  import type { Reached, Section, Slash, SlashHands } from "../core/slash";
+  import { offered } from "../core/slash";
+  import { SECTIONS, reached } from "../core/slash_hands";
+  import type { Reached, Section, Slash, SlashHands } from "../core/slash_hands";
   import { ui } from "../ui";
   import { Address } from "../wire";
   import Empty from "./parts/empty.svelte";
@@ -170,7 +171,12 @@
   function whyFor(spelling: string): Key | undefined {
     switch (spelling) {
       case "/dispatch":
+      case "/new":
+      case "/clear":
         return here === null ? NEEDS_ROOM : undefined;
+      // The run in hand, or else the newest run of the room in hand.
+      case "/diff":
+        return live === null && here === null ? NEEDS_ROOM : undefined;
       case "/steer":
       case "/stop":
         return live === null ? NEEDS_RUN : undefined;
@@ -181,21 +187,34 @@
     }
   }
 
-  // A verb runs, and the box closes unless the verb put words back in
-  // it - which is what `/help` does, and the one reason to stay open.
+  // A verb runs, and the box closes once it has done something. It stays
+  // open when the verb put words back in it - which is what `/help`
+  // does - and when it did nothing at all, as a verb given an address it
+  // cannot read does: the line stays for the person to correct, as it
+  // does in the composer (client-SPEC 4-39).
   function runSlash(chosen: Slash): void {
-    // A record rather than a bare variable, because the closure below
-    // writes it and only the caller reads it back.
-    const written: { line: string | null } = { line: null };
+    // A record rather than bare variables, because the closures below
+    // write it and only the caller reads it back.
+    const written: { line: string | null; acted: boolean } = { line: null, acted: false };
     const hands: SlashHands = {
-      command: u.send,
-      go: u.go,
+      command: (command) => {
+        const sent = u.send(command);
+        if (sent) written.acted = true;
+        return sent;
+      },
+      go: (view) => {
+        written.acted = true;
+        u.go(view);
+      },
       here,
       live,
       newest,
       models,
       effort: $effort,
-      setEffort: u.chooseEffort,
+      setEffort: (level) => {
+        written.acted = true;
+        u.chooseEffort(level);
+      },
       mode: $mode,
       goal: say($lang, "talk_goal"),
       write: (line) => {
@@ -215,7 +234,7 @@
       return;
     }
     chosen.run(hands, { verb, words: rest === "" ? [] : rest.split(/\s+/), rest });
-    if (written.line === null || written.line === "") {
+    if (written.line === "" || (written.line === null && written.acted)) {
       onClose();
     }
   }

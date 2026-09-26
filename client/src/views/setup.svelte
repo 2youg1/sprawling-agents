@@ -44,74 +44,8 @@
   import EffortSection from "./shared/effort.svelte";
   import GovernedSection from "./setup/governed.svelte";
   import ProviderDoor from "./shared/provider.svelte";
-
-  const GROUPS = [
-    "accounts", "run", "network", "tools", "skills", "appearance", "keys", "advanced", "about",
-  ] as const;
-
-  type Group = (typeof GROUPS)[number];
-
-  // What each group is called and how wide its body may grow
-  // (client-SPEC 4-33, 4-36), one table per fact.
-  const HEADING: Record<Group, Key> = {
-    accounts: "setup_group_accounts",
-    run: "setup_group_run",
-    network: "setup_group_network",
-    tools: "setup_group_tools",
-    skills: "setup_group_skills",
-    appearance: "setup_group_appearance",
-    keys: "setup_group_keys",
-    advanced: "setup_group_advanced",
-    about: "release_title",
-  };
-
-  // The line under the heading, saying what the group governs - the one
-  // kind of sentence this page is allowed (client-SPEC 4-10).
-  const HINT: Record<Group, Key | null> = {
-    accounts: "setup_group_hint_accounts",
-    run: "setup_group_hint_run",
-    network: "setup_group_hint_network",
-    tools: "setup_group_hint_tools",
-    skills: "setup_group_hint_skills",
-    appearance: "setup_group_hint_appearance",
-    keys: "setup_group_hint_keys",
-    advanced: "setup_group_hint_advanced",
-    about: null,
-  };
-
-  // The one width table: accounts, tools and skills take the page tier,
-  // the rest the measure; the account group's two exceptions are in its
-  // own body below.
-  const WIDTH: Record<Group, string> = {
-    accounts: "max-w-page",
-    run: "max-w-measure",
-    network: "max-w-measure",
-    tools: "max-w-page",
-    skills: "max-w-page",
-    appearance: "max-w-measure",
-    keys: "max-w-measure",
-    advanced: "max-w-measure",
-    about: "max-w-measure",
-  };
-
-  // The groups whose answers `core/prefs.ts` keeps (client-SPEC 4-29).
-  const PREFERRED: readonly Group[] = ["network", "appearance", "keys"];
-
-  // What the navigation holds: the groups in their own order, with the
-  // MCP door standing where its group stood. The door leaves this page,
-  // so it is a link and carries no `aria-current`.
-  type NavEntry = { readonly kind: "group"; readonly group: Group } | { readonly kind: "door" };
-
-  const NAV: readonly NavEntry[] = GROUPS.flatMap((each): readonly NavEntry[] =>
-    each === "run" ? [{ kind: "door" }, { kind: "group", group: each }] : [{ kind: "group", group: each }]);
-
-  // One drawing for a navigation row; the 2px accent bar says which row
-  // is this page's current group (client-SPEC 7B).
-  const NAV_WEAR =
-    "flex h-bar shrink-0 items-center border-b-2 px-base text-left text-label " +
-    "hover:bg-chrome hover:text-text @lg/page:h-auto @lg/page:border-b-0 @lg/page:border-l-2 @lg/page:py-snug";
-  const NAV_HERE = "border-accent text-text";
-  const NAV_THERE = "border-transparent text-text-faint";
+  import { HEADING, HINT, NAV, NAV_HERE, NAV_THERE, NAV_WEAR, PREFERRED, WIDTH } from "./setup/groups";
+  import type { Group } from "./setup/groups";
 
   type Setting = "proxying" | "autonomy" | "language";
 
