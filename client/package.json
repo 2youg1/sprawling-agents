@@ -11,6 +11,16 @@
     "test": "bun test --conditions=browser"
   },
   "dependencies": {
+    "@lezer/cpp": "1.1.6",
+    "@lezer/css": "1.3.8",
+    "@lezer/go": "1.0.1",
+    "@lezer/highlight": "1.2.4",
+    "@lezer/java": "1.1.4",
+    "@lezer/javascript": "1.5.5",
+    "@lezer/json": "1.0.3",
+    "@lezer/python": "1.1.19",
+    "@lezer/rust": "1.0.3",
+    "@lezer/yaml": "1.0.4",
     "effect": "3.22.1",
     "svelte": "5.57.1"
   },

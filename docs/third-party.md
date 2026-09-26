@@ -174,7 +174,7 @@ Seven skills under `skills/` travel with this tree, and they are the first files
 
 ## 6 What the client follows, and what it only watches
 
-**No component library is a dependency of this client, and the ruling that keeps it that way is `client/client-SPEC.md` section 7.** The controls under `client/src/views/parts/` are this repository's own, and `cargo xtask npm` holds the client's runtime dependencies to exactly `effect` and `svelte`, so adding one would mean editing that gate first.
+**No component library is a dependency of this client, and the ruling that keeps it that way is `client/client-SPEC.md` section 7.** The controls under `client/src/views/parts/` are this repository's own, and `cargo xtask npm` holds the client's runtime dependencies to exactly the list its `RUNTIME` names — `effect`, `svelte`, and the `@lezer` highlighter and grammars (MIT, Marijn Haverbeke), which draw code and are not controls — so adding one would mean editing that gate first.
 
 What is followed instead is the same kind of thing section 1 follows for provider login, and for the same reason: **behaviour somebody else wrote down is a fact, and a fact carries no licence obligation.** Which pattern a control implements, what each key does, which `aria-*` value goes where, and when the focus returns to whatever opened the control - that is the useful half of a component library, and all of it is published as prose.
 

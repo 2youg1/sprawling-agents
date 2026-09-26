@@ -43,6 +43,13 @@
 # 311,050 B recorded here. The ratchet is not being loosened: the slack
 # stays at 20 KB, so the next gradual regression is caught exactly as
 # before, against a figure that describes what ships today.
+# The syntax highlighter (client-SPEC 4-26) is weighed here too, though
+# the first screen never downloads it: the directory holds it, and the
+# binary embeds every byte the directory holds. It adds 166,127 B
+# gzipped - the highlighter chunk 9,918 B and ten grammar chunks from
+# 1,067 B to 32,840 B - while the entry chunk lost about 660 B with the
+# lexer it replaced. The best reading moves by that difference and the
+# slack stays at 20 KB.
 [frontend_artifact]
 what = "the client the browser downloads, gzipped, the two shipped faces included"
 budget_bytes = 2097152
@@ -51,7 +58,7 @@ budget_bytes = 2097152
 # the client on the `#/gallery` route (client-SPEC §6), and this is
 # what the client weighs with them. The register is a ratchet: a
 # number may improve freely and drift only within slack_bytes.
-best_bytes = 358360
+best_bytes = 523827
 slack_bytes = 20480
 measured_by = "just build-web, then just gates (the whole dist directory, recursive)"
 status = "gated"

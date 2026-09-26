@@ -18,6 +18,7 @@
   // never wraps per character - it scrolls inside its own box.
   import { blocks, inline as inlineOf } from "../core/prose";
   import type { Inline } from "../core/prose";
+  import Inked from "./parts/inked.svelte";
 
   interface Props {
     readonly text: string;
@@ -69,7 +70,7 @@
         {/each}
       </ul>
     {:else if block.kind === "code"}
-      <pre class="my-snug overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-relaxed text-text-quiet">{block.text}</pre>
+      <pre class="my-snug overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-relaxed text-text-quiet"><Inked text={block.text} source={block.lang} /></pre>
     {:else if block.kind === "quote"}
       <blockquote class="my-snug border-l-2 border-edge-input pl-base text-text-quiet">
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
