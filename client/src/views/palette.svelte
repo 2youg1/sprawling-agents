@@ -171,7 +171,12 @@
   function whyFor(spelling: string): Key | undefined {
     switch (spelling) {
       case "/dispatch":
+      case "/new":
+      case "/clear":
         return here === null ? NEEDS_ROOM : undefined;
+      // The run in hand, or else the newest run of the room in hand.
+      case "/diff":
+        return live === null && here === null ? NEEDS_ROOM : undefined;
       case "/steer":
       case "/stop":
         return live === null ? NEEDS_RUN : undefined;
