@@ -103,7 +103,11 @@ fn a_pursuit_line_the_build_cannot_read_stops_the_fold() {
         kernel::EventKind::PursuitChanged,
         serde_json::json!({ "step": "abandon", "goal": "read the meter" }),
     );
-    assert!(CollaborationFold::default().absorb(&line).is_err());
+    assert!(
+        super::super::collaboration::CollaborationFold::default()
+            .absorb(&line)
+            .is_err()
+    );
 }
 
 fn unreadable(kind: kernel::EventKind, data: serde_json::Value) -> EventRecord {

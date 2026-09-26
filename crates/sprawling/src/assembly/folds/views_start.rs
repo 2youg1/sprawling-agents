@@ -8,54 +8,46 @@
 
 use std::path::Path;
 
-use kernel::layout::CityLayout;
-use kernel::{AxError, RunId, Seq};
-use memory::{
-    ChainSnapshot, CheckedLine, JsonlLedger, MemoryError, OpenReport, SnapshotStart, WholeFold,
-};
+use kernel::{AxError, EventRecord, RunId, Seq};
+use memory::{JsonlLedger, LedgerIndex, OpenReport};
 use runtime::diagnostics::{Diagnostics, Level, Site};
-use runtime::replay::fold_ledger_dir;
 
 use crate::views::{Views, views_fold_version};
 
-use super::{Standing, city_root_of, epoch_of, fold_city};
+use super::snapshot_start::{SnapshotFold, cut_at};
+use super::{Standing, epoch_of, fold_city};
 
-/// How a start began.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum ViewsStart {
-    /// From the snapshot, folding the `tail` lines after it.
-    Resumed { tail: usize },
-    /// From genesis, and why the snapshot was not used.
-    Whole(WholeFold),
-}
+impl SnapshotFold for Views {
+    const DIR: &'static str = "views";
 
-/// The views of the ledger in `ledger_dir` and how the start began:
-/// from its snapshot when one fits and from genesis otherwise; a
-/// snapshot that fails verification or does not decode is never
-/// trusted.
-///
-/// # Errors
-/// A tail or a whole history that does not verify, a record a view
-/// cannot read, and an I/O failure reading the ledger or the snapshot.
-pub(crate) fn start_views(ledger_dir: &Path) -> Result<(Views, ViewsStart), AxError> {
-    let city_root = city_root_of(ledger_dir);
-    let snapshots = CityLayout::new(city_root).snapshot();
-    match memory::start_from_snapshot(ledger_dir, &snapshots, views_fold_version())
-        .map_err(MemoryError::into_ax)?
-    {
-        SnapshotStart::Resume { snapshot, tail } => {
-            match Views::decode(city_root, snapshot.views()) {
-                Ok(views) => resume(views, &snapshot, tail),
-                Err(undecodable) => whole(ledger_dir, WholeFold::Damaged(undecodable.to_string())),
-            }
-        }
-        // The lines are folded again as a stream rather than held: a
-        // whole history in memory at once is what the streaming fold
-        // exists to avoid.
-        SnapshotStart::Whole { lines, because } => {
-            drop(lines);
-            whole(ledger_dir, because)
-        }
+    fn fold_version() -> u32 {
+        views_fold_version()
+    }
+
+    fn empty(city_root: &Path) -> Views {
+        Views::new(city_root)
+    }
+
+    fn decode(city_root: &Path, bytes: &[u8]) -> Result<Views, AxError> {
+        Views::decode(city_root, bytes)
+    }
+
+    fn encode(&self) -> Result<Vec<u8>, AxError> {
+        Views::encode(self)
+    }
+
+    fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        self.apply(record)
+    }
+
+    /// The views answer later questions through the index, and name the
+    /// history by the epoch read from its genesis line. After a resume
+    /// the index starts empty and is refreshed by the first question
+    /// that reads the ledger.
+    fn keep_index(&mut self, index: LedgerIndex, ledger_dir: &Path) -> Result<(), AxError> {
+        self.adopt_epoch(epoch_of(&index, ledger_dir)?);
+        self.hold_index(index);
+        Ok(())
     }
 }
 
@@ -64,9 +56,9 @@ pub(crate) fn start_views(ledger_dir: &Path) -> Result<(Views, ViewsStart), AxEr
 /// arrives after it (sprawling-SPEC 8-91).
 ///
 /// `serve` itself folds the whole history rather than resuming: the
-/// worker's standing is folded on the same pass and needs every record,
-/// so starting the views from a snapshot would add a second read rather
-/// than remove one.
+/// worker's standing is folded on the same pass, and the two snapshots
+/// are cut at different moments, so starting the views from their
+/// snapshot would add a second read rather than remove one.
 ///
 /// A cut that fails is a `Refuse` line in `log`, not an error: the
 /// snapshot only shortens a later read, which folds from the older
@@ -89,7 +81,7 @@ pub(crate) fn start_served_views(
             .unwrap_or(Seq::FIRST),
         module: "bin::assembly",
     };
-    let cut = last.and_then(|last| cut_views_snapshot(ledger_dir, &views, last.as_ref()));
+    let cut = last.and_then(|last| cut_at(ledger_dir, &views, last.as_ref()));
     if let Err(fault) = cut {
         log.write(
             Level::Refuse,
@@ -100,58 +92,6 @@ pub(crate) fn start_served_views(
         );
     }
     Ok((views, held))
-}
-
-/// Cut a snapshot of `views` at `last`, the last line they folded;
-/// nothing when they have folded nothing.
-///
-/// # Errors
-/// An encoding failure and an I/O failure writing the snapshot.
-fn cut_views_snapshot(
-    ledger_dir: &Path,
-    views: &Views,
-    last: Option<&(Seq, Vec<u8>)>,
-) -> Result<(), AxError> {
-    let Some((seq, line)) = last else {
-        return Ok(());
-    };
-    let snapshot = ChainSnapshot::cut(views_fold_version(), *seq, line, views.encode()?);
-    memory::write_snapshot(
-        &CityLayout::new(city_root_of(ledger_dir)).snapshot(),
-        &snapshot,
-    )
-    .map_err(MemoryError::into_ax)
-}
-
-/// The snapshot's views with the tail folded on, each tail line through
-/// the same per-line check a whole history passes. The index starts
-/// empty and is refreshed by the first question that reads the ledger.
-fn resume(
-    mut views: Views,
-    snapshot: &ChainSnapshot,
-    tail: Vec<Vec<u8>>,
-) -> Result<(Views, ViewsStart), AxError> {
-    let mut check = snapshot.resume()?;
-    for raw in &tail {
-        let seq = check.expected();
-        let checked = check
-            .advance(raw)
-            .map_err(|fault| fault.into_ax(seq.value().saturating_add(1)))?;
-        match checked {
-            CheckedLine::Known(record) => views.apply(&record)?,
-            CheckedLine::IgnoredUnknown(_) => {}
-        }
-    }
-    Ok((views, ViewsStart::Resumed { tail: tail.len() }))
-}
-
-/// The views folded from genesis, streamed and verified line by line.
-fn whole(ledger_dir: &Path, because: WholeFold) -> Result<(Views, ViewsStart), AxError> {
-    let mut views = Views::new(city_root_of(ledger_dir));
-    let index = fold_ledger_dir(ledger_dir, |record| views.apply(record))?;
-    views.adopt_epoch(epoch_of(&index, ledger_dir)?);
-    views.hold_index(index);
-    Ok((views, ViewsStart::Whole(because)))
 }
 
 #[cfg(test)]

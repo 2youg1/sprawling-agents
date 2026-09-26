@@ -39,7 +39,7 @@ use kernel::{Address, AxError, EventKind, Origin, RunId};
 
 /// What each room's current session branched from, and whether the run
 /// that begins it has been started yet.
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(in crate::assembly) struct SessionOrigins {
     pending: BTreeMap<Address, Origin>,
     /// The run each room started last.

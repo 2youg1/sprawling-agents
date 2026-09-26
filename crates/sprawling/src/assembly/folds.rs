@@ -8,7 +8,6 @@
 use std::path::Path;
 
 use kernel::AxError;
-use kernel::EventRecord;
 use memory::{JsonlLedger, OpenReport};
 use runtime::replay::fold_ledger_dir;
 
@@ -22,13 +21,16 @@ use super::{Entrance, Expiries};
 
 mod collaboration;
 mod session;
+mod snapshot_start;
+mod standing_start;
 mod views_start;
 
-use collaboration::CollaborationFold;
 pub(super) use collaboration::{Collaboration, INBOX_CAPACITY, new_inbox};
 pub(super) use session::SessionOrigins;
+use snapshot_start::SnapshotFold;
+use standing_start::StandingFolds;
+pub(super) use standing_start::{as_json_text, from_json_text};
 pub(crate) use views_start::start_served_views;
-use views_start::start_views;
 
 /// Everything a worker inherits from a history it did not write.
 ///
@@ -51,77 +53,39 @@ pub(crate) struct Standing {
     /// What each room's current session branched from, until the run
     /// that begins it is written.
     pub(super) origins: SessionOrigins,
+    /// Whether the snapshot of these folds was cut. Not an error of the
+    /// fold: a snapshot only shortens the next start.
+    pub(super) cut: Result<(), AxError>,
 }
 
 impl Standing {
-    /// One verified pass, three folds.
+    /// The folds of one pass over the history, from the standing
+    /// snapshot when one fits and from genesis otherwise, with a new
+    /// snapshot cut at the last line folded (sprawling-SPEC 8-92).
     ///
-    /// Until this existed the three were three functions, and opening a
-    /// worker read, parsed and chain-verified the same bytes three times
-    /// over to answer three questions about them. The answers never
-    /// disagreed, which `what_a_worker_holds_is_what_a_restart_rebuilds`
-    /// is what now holds, so the two extra passes bought nothing but the
-    /// time and the memory of reading a whole history twice more.
-    ///
-    /// A line is parsed once, by the per-line check, and shown to each fold
-    /// before the next line is read. Verification
-    /// stays where it was: a history that does not verify is not one any
-    /// of these three views may be built from.
+    /// One pass for all six folds: recognising a repeat, an expiry or a
+    /// session's origin across a restart must not cost a second read of
+    /// the history, which `what_a_worker_holds_is_what_a_restart_rebuilds`
+    /// holds. A snapshot that fails verification or does not decode is
+    /// never trusted; the whole history is verified and folded instead.
+    /// The whole chain is audited first, so a start from the snapshot
+    /// never accepts a chain a whole fold would refuse: the snapshot's fit
+    /// checks only the line at its seq, the ledger open scans only the last
+    /// segment, and `fork` and `adopt` open a worker with no chain watch
+    /// beside it.
     ///
     /// # Errors
-    /// Propagates chain verification and whatever a fold says about a
-    /// payload it cannot read.
+    /// The audit's reason when the chain is broken or cannot be read,
+    /// chain verification of what is folded, and whatever a fold says
+    /// about a payload it cannot read; a cut that fails is in `cut`, not
+    /// here.
     pub(crate) fn fold(ledger_dir: &Path) -> Result<Standing, AxError> {
-        let mut standing = StandingFold::new();
-        if ledger_dir.exists() {
-            fold_ledger_dir(ledger_dir, |record| standing.absorb(record))?;
+        if !ledger_dir.exists() {
+            return StandingFolds::empty(ledger_dir).settle(Ok(()));
         }
-        standing.settle()
-    }
-}
-
-/// The folds a `Standing` is made of, part way through a history.
-struct StandingFold {
-    book: gateway::EndpointBook,
-    governance: Governance,
-    collaboration: CollaborationFold,
-    entrance: Entrance,
-    expiries: Expiries,
-    origins: SessionOrigins,
-}
-
-impl StandingFold {
-    fn new() -> StandingFold {
-        StandingFold {
-            book: gateway::EndpointBook::new(),
-            governance: Governance::empty(),
-            collaboration: CollaborationFold::default(),
-            entrance: Entrance::default(),
-            expiries: Expiries::default(),
-            origins: SessionOrigins::default(),
-        }
-    }
-
-    fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
-        self.book.apply(record)?;
-        self.governance
-            .absorb(record.kind(), record.run(), record.addr(), record.data())?;
-        self.collaboration.absorb(record)?;
-        self.entrance.absorb(record.data());
-        self.expiries.absorb(record.kind(), record.data())?;
-        self.origins
-            .absorb(record.kind(), record.run(), record.addr(), record.data())
-    }
-
-    fn settle(self) -> Result<Standing, AxError> {
-        Ok(Standing {
-            book: self.book,
-            governance: self.governance,
-            collaboration: self.collaboration.settle()?,
-            entrance: self.entrance,
-            expiries: self.expiries,
-            origins: self.origins,
-        })
+        let started = snapshot_start::start_audited::<StandingFolds>(ledger_dir)?;
+        let cut = snapshot_start::cut(ledger_dir, &started);
+        started.folded.settle(cut)
     }
 }
 
@@ -139,6 +103,11 @@ impl StandingFold {
 /// ledger travels with what opening it repaired and the standing it was
 /// folded under.
 ///
+/// A standing snapshot is cut at the last line folded, as every worker
+/// open cuts one (sprawling-SPEC 8-92), so a worker opened over this city
+/// later folds only what arrives after it; a cut that fails is in
+/// `Standing.cut`, not here.
+///
 /// # Errors
 /// Propagates opening the ledger, chain verification, and whatever a fold
 /// says about a payload it cannot read.
@@ -147,15 +116,17 @@ pub(crate) fn fold_city(
 ) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
     let (ledger, report) =
         JsonlLedger::open(ledger_dir, super::now_ms()?).map_err(memory::MemoryError::into_ax)?;
-    let mut views = Views::new(city_root_of(ledger_dir));
-    let mut standing = StandingFold::new();
+    let city_root = city_root_of(ledger_dir);
+    let mut views = Views::new(city_root);
+    let mut standing = StandingFolds::empty(city_root);
     let index = fold_ledger_dir(ledger_dir, |record| {
         views.apply(record)?;
         standing.absorb(record)
     })?;
-    views.adopt_epoch(epoch_of(&index, ledger_dir)?);
-    views.hold_index(index);
-    Ok((views, (ledger, report, standing.settle()?)))
+    let cut = snapshot_start::last_line(&index, ledger_dir)
+        .and_then(|last| snapshot_start::cut_at(ledger_dir, &standing, last.as_ref()));
+    views.keep_index(index, ledger_dir)?;
+    Ok((views, (ledger, report, standing.settle(cut)?)))
 }
 
 /// The views of the ledger on disk, from its snapshot when one fits
@@ -172,10 +143,7 @@ pub(crate) fn fold_city(
 /// the verification failures of the lines it folds; a city whose history
 /// does not verify is not one whose views should be served.
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
-    match memory::audit_chain(ledger_dir).map_err(memory::MemoryError::into_ax)? {
-        memory::ChainAudit::Whole { .. } => start_views(ledger_dir).map(|(views, _)| views),
-        memory::ChainAudit::Broken(reason) => Err(reason),
-    }
+    snapshot_start::start_audited::<Views>(ledger_dir).map(|started| started.folded)
 }
 
 /// The city a ledger directory belongs to, two levels up.

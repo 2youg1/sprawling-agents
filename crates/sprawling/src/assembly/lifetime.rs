@@ -134,7 +134,7 @@ impl RunWorker {
     pub(crate) fn holding(
         city_root: &Path,
         vault: gateway::Custodian,
-        log: runtime::diagnostics::Diagnostics,
+        mut log: runtime::diagnostics::Diagnostics,
         (ledger, report, standing): (JsonlLedger, OpenReport, Standing),
     ) -> Result<Self, AxError> {
         let now = now_ms()?;
@@ -149,7 +149,21 @@ impl RunWorker {
             entrance,
             expiries,
             origins,
+            cut,
         } = standing;
+        if let Err(fault) = cut {
+            log.write(
+                runtime::diagnostics::Level::Refuse,
+                runtime::diagnostics::Site {
+                    run: kernel::RunId::CITY,
+                    seq: kernel::Seq::FIRST,
+                    module: "bin::assembly",
+                },
+                &format!(
+                    "the standing snapshot was not cut: {fault}; the city goes on, and the next start folds from the older snapshot or from genesis"
+                ),
+            );
+        }
         let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
         // The one place a `Delegator` is minted in this process, which
