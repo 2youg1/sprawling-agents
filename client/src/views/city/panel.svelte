@@ -11,6 +11,7 @@
   // one component either way, so the three widths cannot drift apart.
 
   import type { RunBelief } from "../../core/belief";
+  import { within } from "../../core/belief/live";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock } from "../../core/time";
@@ -42,7 +43,7 @@
   const pursuit = $derived(city.pursuits.find((line) => line.addr === addr));
   const runs = $derived.by((): readonly RunBelief[] => {
     const held = Object.values($belief.runs)
-      .filter((run) => run.addr !== null && (run.addr === addr || run.addr.startsWith(`${addr}/`)))
+      .filter((run) => within(run, addr))
       .sort((a, b) => (b.started ?? 0) - (a.started ?? 0));
     return held.slice(0, 8);
   });

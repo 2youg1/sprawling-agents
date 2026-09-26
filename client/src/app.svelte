@@ -97,7 +97,7 @@
   let arrived = false;
 
   const waiting = $derived($approvals.length);
-  const working = $derived(Object.values($belief.runs).some((run) => run.doing.kind !== "frozen"));
+  const working = $derived($belief.live.length > 0);
   const halted = $derived(cityIsShut($belief.halted));
   // How many runs this city cancelled. The wire carries no count of
   // what one halt froze, so this counts the runs whose own freeze says

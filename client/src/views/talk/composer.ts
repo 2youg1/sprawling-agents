@@ -259,20 +259,13 @@ export function pickSlash(chosen: Slash, line: string, hands: SlashHands): strin
 
 // -------------------------------------------------------- the run in reach
 
-// The newest run of a room - still going, or whatever finished last.
-// One derivation for the run a steer lands on and the run a `/stop`
-// reaches, so the box and the page cannot name two runs.
-//
-// `moving` asks for one still going, which is what a message typed now
-// steers; `any` is what a verb that names a room wants.
-export function newestRun(
-  runs: Iterable<RunBelief>,
-  room: string | null,
-  posture: "moving" | "any",
-): RunBelief | undefined {
+// The newest run of a room, still going or whatever finished last: what
+// a verb that names a room wants. The newest one still going, which a
+// message typed now steers, is belief's `newestWorking`.
+function newestRun(runs: Iterable<RunBelief>, room: string | null): RunBelief | undefined {
   if (room === null) return undefined;
   return [...runs]
-    .filter((run) => run.addr === room && (posture === "any" || run.doing.kind !== "frozen"))
+    .filter((run) => run.addr === room)
     .sort((a, b) => (b.started ?? 0) - (a.started ?? 0))
     .at(0);
 }
@@ -299,7 +292,7 @@ export function slashHands(reach: Reach): SlashHands {
     go: reach.go,
     here: reach.here,
     live: reached(reach.live),
-    newest: (room) => reached(newestRun(reach.runs, room, "any")),
+    newest: (room) => reached(newestRun(reach.runs, room)),
     models: reach.models.map((each) => ({ endpoint: each.endpoint, model: each.model })),
     effort: reach.effort,
     setEffort: reach.setEffort,
