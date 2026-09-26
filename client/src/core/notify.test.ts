@@ -49,3 +49,11 @@ describe("notices", () => {
     }
   });
 });
+
+describe("an unanswered query", () => {
+  test("is not taken as the snapshot, so what was waiting stays unraised", () => {
+    const [waiting, none] = notices(UNHEARD, undefined, AWAY);
+    const [, raised] = notices(waiting, [OLD], AWAY);
+    expect([waiting, none, raised]).toEqual([UNHEARD, [], []]);
+  });
+});
