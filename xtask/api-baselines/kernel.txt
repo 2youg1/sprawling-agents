@@ -284,8 +284,8 @@ pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
 pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
 pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
-pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
-pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
+pub const kernel::AxCode::ALL: [kernel::AxCode; 39]
+pub const kernel::AxCode::ALL: [kernel::AxCode; 39]
 pub const kernel::DOORS: [kernel::gate::DoorId; 9]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
@@ -1170,6 +1170,7 @@ pub kernel::AxCode::LogVersionUnsupported
 pub kernel::AxCode::LoopSuspected
 pub kernel::AxCode::OutsideWriteDomain
 pub kernel::AxCode::PathNotFound
+pub kernel::AxCode::PlanMissing
 pub kernel::AxCode::Provider
 pub kernel::AxCode::RepairBusy
 pub kernel::AxCode::SandboxDenied
@@ -1822,6 +1823,7 @@ pub kernel::error::AxCode::LogVersionUnsupported
 pub kernel::error::AxCode::LoopSuspected
 pub kernel::error::AxCode::OutsideWriteDomain
 pub kernel::error::AxCode::PathNotFound
+pub kernel::error::AxCode::PlanMissing
 pub kernel::error::AxCode::Provider
 pub kernel::error::AxCode::RepairBusy
 pub kernel::error::AxCode::SandboxDenied

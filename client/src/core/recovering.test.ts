@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { Option } from "effect";
 
-import { formOf } from "./recovering";
+import { formOf, recoveryFor } from "./recovering";
 import { MAYOR } from "./route";
 import { Address } from "../wire";
 
@@ -31,5 +31,16 @@ describe("a form recovery", () => {
     for (const subject of ["district/east", "district/east:  ", ": nightly-report", "a/b : x"]) {
       expect(formOf("mayor", subject, WORDS), subject).toEqual(Option.none());
     }
+  });
+});
+
+// A standing goal set on a building without a plan is refused, and the
+// refusal offers the one form that gets the building a plan: the
+// mayor's composer, filled with a request the person still sends.
+describe("a standing goal without a plan", () => {
+  test("offers a form that asks the mayor to write the plan", () => {
+    expect(recoveryFor("E_PLAN_MISSING")).toEqual([
+      { kind: "form", label: "act_ask_plan", words: "form_ask_plan", room: "mayor" },
+    ]);
   });
 });

@@ -2960,6 +2960,14 @@
     "en": "this refusal names nothing to act on",
     "zh": "这次拒绝没有指名对象"
   },
+  "act_ask_plan": {
+    "en": "ask the mayor for a plan",
+    "zh": "让市长写计划"
+  },
+  "form_ask_plan": {
+    "en": "Write a plan for {building} whose ready steps work towards: {name}",
+    "zh": "为 {building} 写一份计划，让它的就绪步骤朝向：{name}"
+  },
   "palette_group_actions": {
     "en": "actions",
     "zh": "动作"

@@ -172,6 +172,21 @@ impl RunWorker {
         };
         let name = match step {
             channels::PursuitStep::Set { goal } => {
+                // A pursuit works through the plan's ready steps, so on a
+                // building with no plan it would finish at once having
+                // done nothing. The subject is `<building>: <goal>`, the
+                // shape the client's form recovery reads to prefill the
+                // mayor's request for a plan (client-SPEC 4-35a).
+                if self.plan_of(addr).is_none_or(|plan| plan.is_empty()) {
+                    return Err(AxError::failure(
+                        AxCode::PlanMissing,
+                        "set a standing goal",
+                        format!("{}: {goal}", addr.as_str()),
+                    )
+                    .with_recovery(
+                        "ask the mayor to write this building's plan, then set the goal again",
+                    ));
+                }
                 // Declared through the depth-zero position this worker
                 // holds. That is the runtime half of the guard the type
                 // already carries: a sub-agent has no `Delegator`, and
