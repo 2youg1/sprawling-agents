@@ -969,7 +969,7 @@ impl JsonlLedger { pub fn halt_on(&mut self, halt: ChainHalt); }
 - **审计是查询，停机是命令。** `audit_chain` 不改任何状态；调用方（后台线程，唯一的起点在 `bin::assembly`）拿到 `Broken` 后调 `ChainHalt::trip`。停机值在写者与视图之间共享：写者经 `halt_on` 接上同一个值，之后每次 `append_all` 在组帧之前先问它，已跳闸就返回 `MemoryError::ChainHalted`，`into_ax` 原样交出那条审计原因，所以被拒的写与页面诊断说的是同一句话。
 - **只能跳闸，不能复位。** `OnceLock` 让「停机后又恢复写」在类型上不可表达：链断了，接在断链后面的每一行都是在错的历史上写的；复位要人修好账本后重开这座城，那时是一个新的 `ChainHalt`。**被否：`AtomicBool`**——它能被写回 `false`，而且带不出原因。
 - **被否：审计一失败就 panic 退出进程。** 进程没了，页面也就收不到原因；停写不停读，人还能看见城停在哪、为什么停。
-- 仍未落地的阶段：`bin::assembly` 在快照启动后起后台线程跑 `audit_chain`，把结果作为诊断推给页面，并把同一个 `ChainHalt` 交给视图，使视图也停止接受新工作。
+- 服务中的城由 `bin::assembly::chain_watch`（sprawling-SPEC 8-90）起这条后台线程并接上停机值；视图只折写者写下的记录，所以不另接停机值。
 
 ### 8-28 `memory::snapshot::start`：从快照起步还是从创世起步（形状 7 投影：决定折叠从哪一行起）
 

@@ -29,6 +29,7 @@
 //! stated once, here, and reads as a list rather than as a graph.
 
 mod building_page;
+mod chain_watch;
 mod commanding;
 mod credentials;
 mod dispatching;
