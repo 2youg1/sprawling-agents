@@ -223,10 +223,11 @@ impl Run<Active> {
             fold_steer(conversation, &arrived);
             arrived
         };
-        let turn = match turn.execute(wave, ledger, &mut *hooks.invoke, &mut still_going)? {
-            PhaseOutcome::Advanced(next) => next,
-            PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
-        };
+        let turn =
+            match turn.execute_concurrent(wave, ledger, &mut *hooks.invoke, &mut still_going)? {
+                PhaseOutcome::Advanced(next) => next,
+                PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
+            };
 
         let settling = (hooks.interrupt)(SafePoint::BeforeSpawn { turn: index });
         fold_steer(&mut self.state.conversation, &settling);

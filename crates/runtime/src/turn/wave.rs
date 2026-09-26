@@ -195,30 +195,6 @@ impl Turn<ToolWave> {
         Ok(self.recorded(calls, exchange))
     }
 
-    /// Boundary 3 with every call serial.
-    pub fn execute(
-        mut self,
-        interrupt: Interrupt,
-        ledger: &mut dyn Ledger,
-        tools: &mut dyn ConcurrentInvoke,
-        still_going: &mut dyn FnMut(u32) -> Interrupt,
-    ) -> Result<PhaseOutcome<Turn<Recording>>, AxError> {
-        if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
-            return Ok(PhaseOutcome::Cancelled(cancelled));
-        }
-        let calls = std::mem::take(&mut self.state.calls);
-        let t = self.journal.stamp();
-        let mut exchange = self.open_exchange();
-        for (index, call) in (0..=u32::MAX).zip(&calls) {
-            if let Some(cancelled) = self.consume_boundary(still_going(index), ledger)? {
-                return Ok(PhaseOutcome::Cancelled(cancelled));
-            }
-            let answered = alone(tools, call, t);
-            self.account(ledger, &mut exchange, call, answered)?;
-        }
-        Ok(self.recorded(calls, exchange))
-    }
-
     fn open_exchange(&mut self) -> Exchange {
         let mut exchange = Exchange::new();
         exchange.push_assistant(std::mem::take(&mut self.state.assistant));
