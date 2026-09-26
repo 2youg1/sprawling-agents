@@ -3051,9 +3051,10 @@ city 段与 building 段同时携上它们的来源文档（`Assembled`：字节
 ```rust
 // views::prefix
 fn prefix_answer(&mut self, run: RunId) -> Option<channels::PrefixAnswer>;
-fn content_answer(&self, locator: &Locator) -> Option<channels::ContentAnswer>;
+fn content_answer(city_root: &Path, locator: &Locator) -> Option<channels::ContentAnswer>; // 锁外：读内容仓库（8-92）
 // views::skills
-fn skills_answer(&self, building: &Address) -> Option<channels::SkillsAnswer>;
+type SkillPins = BTreeMap<(String, B3Hash), Vec<RunId>>;
+fn skills_answer(city_root: &Path, building: &Address, pins: &SkillPins) -> Option<channels::SkillsAnswer>; // 锁外：扫书架（8-92）
 // views::git_status
 fn git_status_ask(&self, building: &Address) -> GitStatusAsk; // 锁内：城根、楼、最近一次围栏
 impl GitStatusAsk { fn read(self) -> channels::Answer; } // 锁外：读工作树（8-92）
@@ -3063,7 +3064,7 @@ impl GitStatusAsk { fn read(self) -> channels::Answer; } // 锁外：读工作�
 
 1. **`prefix_answer` 取该 run 最早的一条 `prompt_assembled`。** prefix 一次冻结管一次 run 的一生，之后每一轮记的是同样四个哈希；取最早的那一条，一次没走过第一轮的 run 也仍有答案。
 2. **字节的可读性判定只有一处。** `views::document` 的 `read_bytes` 同时服务树上的文件与仓库里的对象——什么样的字节算文本，不取决于它被存在哪里。
-3. **技能的书架在被问的那一刻扫盘，而 pin 出自历史。** `city::Library` 是书架的权威，旁边再留一份索引就是磁盘说法的第二份副本；而「哪些 run 用过」折自 `run_started` 里那张 `skills` 表（`Views::skill_pins`，键为名字与哈希成对），不是第二次扫盘。
+3. **技能的书架在被问的那一刻扫盘，而 pin 出自历史。** `city::Library` 是书架的权威，旁边再留一份索引就是磁盘说法的第二份副本；而「哪些 run 用过」折自 `run_started` 里那张 `skills` 表（`Views::skill_pins`，键为名字与哈希成对），不是第二次扫盘。pin 表在锁内复制出来，扫盘在锁外对着这份副本做（8-92）。
 4. **`git_status_ask` 的比较基准取自历史而不是 HEAD。** 该楼最近一条 `checkpoint_committed`／`pr_merged` 就是基准，它由 `commits_answer(Some(building), None, 1)` 给出——变更栏旁边显示的那一行，正是提交列表打开时的第一行。
 5. **仓库句柄按次打开。** 这是投影里唯一一处伸向它不拥有的目录的读；跨重建留着的句柄会活得比开它的那座城还长。
 
