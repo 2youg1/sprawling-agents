@@ -2399,7 +2399,7 @@ admission 上排队**——§8-42-3 早就写下这句话，这里把它从设�
    那些活由主循环接，一个追求等它们就是把两件不相干的事捕到一起。
 
 **账本上的写者仍然只有一个**：车道线程手上唯一的 `kernel::Ledger` 是 `Relay`，`JsonlLedger` 一步不离记账线程。
-`RelayGate` 由 `pursue` 自己开一扇，发出去的 `Relay` 与它一一对应；`assembly/listening.rs` 主循环里那一扇仍在，
+`RelayGate` 由 `pursue` 自己开一扇，发出去的 `Relay` 与它一一对应；`assembly::attending` 主循环服务的那一扇仍在，
 属于同一张 `Flight`（8-46-2），于是 desk 派的活与追求派的活在同一批车道里排队。
 
 **评审楼一轮活一个 worktree 是既有事实，只验证不重做**：`stand_up` 用 `WorktreeName::parse(&run_id.to_string())`
