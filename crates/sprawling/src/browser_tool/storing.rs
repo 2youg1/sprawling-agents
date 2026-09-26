@@ -16,7 +16,7 @@ use kernel::{AxError, ImageRef, Locator, ToolOutcome};
 use serde_json::Value;
 
 use super::Browser;
-use super::payload;
+use super::answering::payload;
 use browser::{SHOT_MAX_EDGE_PX, Shot, ShotRequest};
 
 impl Browser {

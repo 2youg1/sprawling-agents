@@ -9,9 +9,7 @@ use kernel::{AxError, Completion, RunId};
 
 use accounting::effect;
 
-use super::super::{
-    Assignment, Dispatched, Ending, Handover, Landed, Owed, Owing, RunWorker, Site, held,
-};
+use super::super::{Assignment, Dispatched, Ending, Handover, Landed, RunWorker, Site, held};
 
 /// The action an `AxError` names when one of the two hand-down desks
 /// cannot be read. Written here rather than at the call site, where the
@@ -31,6 +29,7 @@ pub(super) struct Filing<'a> {
     pub(super) tainted: bool,
 }
 
+mod discharging;
 mod filing;
 
 impl RunWorker {
@@ -172,29 +171,7 @@ impl RunWorker {
         )?;
         let frozen = driven?;
         let ending = frozen.completion().clone();
-        // What the model saw, beside the room it worked in. The freeze
-        // is already on the ledger, so a room that will not take the
-        // file is noted rather than turned into a failed run: the
-        // transcript is the run's copy, not its record.
-        match frozen
-            .transcript()
-            .and_then(|transcript| transcript.materialise(&mut self.cas, &self.city_root, &addr))
-        {
-            Ok(record) => self.note(
-                runtime::diagnostics::Level::Effect,
-                "runtime::transcript",
-                &format!(
-                    "{} written, {} spans redacted",
-                    record.address.as_str(),
-                    record.redacted
-                ),
-            ),
-            Err(err) => self.note(
-                runtime::diagnostics::Level::Refuse,
-                "runtime::transcript",
-                &format!("transcript not written: {err}"),
-            ),
-        }
+        self.keep_transcript(&frozen, &addr);
         // What it actually did, for the person reading afterwards. The
         // ledger holds the detail; this line is the pointer into it.
         self.note(
@@ -352,52 +329,33 @@ impl RunWorker {
         )
     }
 
-    /// Pays what the city owed the run that has just ended.
-    ///
-    /// The one place an entrance's obligation is settled, which is why
-    /// every entrance can share one dispatch path: what differs between
-    /// a person's command, a scheduled job, a knock and a delegate is
-    /// this match and nothing else.
-    ///
-    /// # Errors
-    /// Propagates a handback the parent's room will not take.
-    fn discharge(
+    /// Writes what the model saw beside the room it worked in. The freeze
+    /// is already on the ledger, so a room that will not take the file is
+    /// noted rather than turned into a failed run: the transcript is the
+    /// run's copy, not its record.
+    fn keep_transcript(
         &mut self,
-        owing: Owing,
-        at: &Assignment,
-        done: &Dispatched,
-    ) -> Result<Landed, AxError> {
-        match owing.owed() {
-            Owed::Asked => Ok(Landed::Elsewhere),
-            // Nobody typed a command for this one, so the history is
-            // the only place the reason can appear. A run an operator
-            // did not start is the run they most need a reason for.
-            Owed::Unasked(because) => {
-                let because = because.because();
-                self.note(
-                    runtime::diagnostics::Level::Effect,
-                    "bin::assembly",
-                    &format!("a run the city started itself landed, because {because}"),
-                );
-                Ok(Landed::Elsewhere)
-            }
-            Owed::Row { addr, node } => Ok(Landed::Row {
-                addr: addr.clone(),
-                node: node.clone(),
-            }),
-            Owed::Child { parent } => {
-                let parent = parent.clone();
-                let handback = self.deliver_handback(&parent, done)?;
-                self.hand_down_what_is_ready(&parent, at, &owing)?;
-                // The asker is woken by the decision every signal takes,
-                // once its graph has nothing left out: each node that is
-                // still out comes back on its own (sprawling-SPEC.md
-                // 8-46-12).
-                if !self.collaborating.workshops.contains_key(&parent) {
-                    self.knock(&handback, &done.addr, at.mode, owing.knock_chain())?;
-                }
-                Ok(Landed::Elsewhere)
-            }
+        frozen: &runtime::Run<runtime::run::Frozen>,
+        addr: &kernel::Address,
+    ) {
+        match frozen
+            .transcript()
+            .and_then(|transcript| transcript.materialise(&mut self.cas, &self.city_root, addr))
+        {
+            Ok(record) => self.note(
+                runtime::diagnostics::Level::Effect,
+                "runtime::transcript",
+                &format!(
+                    "{} written, {} spans redacted",
+                    record.address.as_str(),
+                    record.redacted
+                ),
+            ),
+            Err(err) => self.note(
+                runtime::diagnostics::Level::Refuse,
+                "runtime::transcript",
+                &format!("transcript not written: {err}"),
+            ),
         }
     }
 }

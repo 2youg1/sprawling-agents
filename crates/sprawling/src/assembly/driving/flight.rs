@@ -22,7 +22,7 @@ use std::sync::mpsc;
 
 use kernel::{Address, AxCode, AxError, NodeId, RunId};
 
-use super::super::{Continuation, Owed, Owing, RunWorker, Unasked};
+use super::super::{Continuation, Owed, Owing, RunWorker};
 use super::lane::DriveContext;
 use crate::assembly::booking::OpenClaims;
 use crate::assembly::dispatching::preparing::{Flown, Staged};
@@ -31,9 +31,9 @@ use crate::assembly::relay::{Drained, Patience, Relay, RelayGate, Wake};
 
 /// One run in a lane: everything the city does once the drive is home,
 /// and what that landing is owed.
-struct InLane {
-    continuation: Continuation,
-    owing: Owing,
+pub(super) struct InLane {
+    pub(super) continuation: Continuation,
+    pub(super) owing: Owing,
 }
 
 /// What one pass over the crossing and the lanes did.
@@ -124,7 +124,7 @@ impl Flight {
     /// # Errors
     /// Propagates the pool's refusal to start a thread, and its refusal
     /// of a run that is already driving.
-    fn take(
+    pub(super) fn take(
         &mut self,
         staged: Staged,
         context: DriveContext,
@@ -323,105 +323,5 @@ impl RunWorker {
             self.serve_flight(Patience::Unbounded)?;
         }
         Ok(())
-    }
-
-    /// Stages one dispatch on this thread and takes it into a lane, which
-    /// prepares and drives it, so the desk is free again before a tree is
-    /// placed or a server has shaken hands (sprawling-SPEC.md 8-93).
-    ///
-    /// This is the person's entrance. What continues is the run, not the
-    /// command, which is why the idempotency key settles at take-off
-    /// (sprawling-SPEC.md 8-46-2).
-    ///
-    /// # Errors
-    /// Propagates every refusal a dispatch can owe before it costs
-    /// anything, and the pool's refusal to start a lane.
-    pub(in crate::assembly) fn dispatch_into_lane(
-        &mut self,
-        at: super::super::Assignment,
-        task: String,
-        goal: String,
-        owing: Owing,
-    ) -> Result<RunId, AxError> {
-        let (staged, continuation) = self.stage_dispatch(at, task, goal)?;
-        let context = self.drive_context();
-        self.flight.take(
-            staged,
-            context,
-            InLane {
-                continuation,
-                owing,
-            },
-        )
-    }
-
-    /// Starts a run the city asked for itself, and says why in the log
-    /// when it cannot be started.
-    ///
-    /// The three entrances nobody types a command at take this door:
-    /// the schedule, an arrival from outside, and work a person just
-    /// unblocked. None of them has a person waiting on the answer, so a
-    /// refusal is noted against the reason the run existed rather than
-    /// failing whatever was running at the time.
-    pub(in crate::assembly) fn start_unasked(
-        &mut self,
-        addr: Address,
-        task: String,
-        goal: String,
-        because: Unasked,
-    ) -> Option<RunId> {
-        let at = super::super::Assignment {
-            addr: addr.clone(),
-            // A row in a plan is not a session's first run: whatever the
-            // room branched from was spent by the run that began it.
-            origin: None,
-            session: None,
-            effort: None,
-            model: None,
-            mode: kernel::Mode::PlanGoal,
-            parent: None,
-            succession: None,
-            taint: because.taint(),
-            dispatched_by: kernel::event::Who::City,
-        };
-        let reason = because.because();
-        match self.dispatch_into_lane(at, task, goal, Owing::unasked(because)) {
-            Ok(run) => Some(run),
-            Err(err) => {
-                self.note(
-                    runtime::diagnostics::Level::Refuse,
-                    "bin::assembly",
-                    &format!(
-                        "no run started at {} although {}: {}",
-                        addr.as_str(),
-                        reason,
-                        err.subject()
-                    ),
-                );
-                None
-            }
-        }
-    }
-
-    /// Puts a staged dispatch into a lane on a pursuit's behalf.
-    ///
-    /// # Errors
-    /// Propagates the pool's refusal to start a lane.
-    pub(in crate::assembly) fn take_row_into_lane(
-        &mut self,
-        staged: Staged,
-        addr: Address,
-        node: NodeId,
-        continuation: Continuation,
-    ) -> Result<RunId, AxError> {
-        let context = self.drive_context();
-        self.flight.take(
-            staged,
-            context,
-            InLane {
-                continuation,
-                owing: Owing::row(addr, node),
-            },
-        )
     }
 }

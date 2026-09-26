@@ -1,0 +1,107 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! Consent is asked one item at a time: a no installs nothing, and the
+//! default checks and installs nothing.
+
+use super::ScriptedMachine;
+use crate::doctor::paint::Ink;
+use crate::doctor::screen::{Asked, run};
+use crate::doctor::{Platform, REQUIREMENTS};
+
+/// Consent is asked item by item, and a no installs nothing.
+///
+/// The command is on the screen before the question, so nobody agrees to
+/// a command they were not shown.
+#[test]
+fn nothing_is_installed_without_a_yes_to_that_one_item() {
+    let Some(platform) = Platform::current() else {
+        return;
+    };
+    let machine = ScriptedMachine::missing(&["just"]);
+    let mut refused = std::io::Cursor::new(b"n\n".to_vec());
+    let mut screen: Vec<u8> = Vec::new();
+    let ready = run(
+        &Asked {
+            install: true,
+            city: None,
+            explain: None,
+            ink: Ink::Plain,
+        },
+        &machine,
+        &mut refused,
+        &mut screen,
+    )
+    .unwrap();
+    assert!(!ready, "a missing required item is not ready");
+    let shown = String::from_utf8(screen).unwrap();
+    let command = REQUIREMENTS
+        .iter()
+        .find(|item| item.name == "just")
+        .expect("the table carries just")
+        .recipe
+        .at(platform)
+        .spelled();
+    assert!(
+        shown.contains(&command),
+        "the command was not shown: {shown}"
+    );
+    assert!(
+        machine.asked.lock().unwrap().is_empty(),
+        "a no installed something"
+    );
+
+    let machine = ScriptedMachine::missing(&["just", "git"]);
+    let mut agreed = std::io::Cursor::new(b"y\nn\n".to_vec());
+    let mut screen: Vec<u8> = Vec::new();
+    run(
+        &Asked {
+            install: true,
+            city: None,
+            explain: None,
+            ink: Ink::Plain,
+        },
+        &machine,
+        &mut agreed,
+        &mut screen,
+    )
+    .unwrap();
+    assert_eq!(
+        machine.asked.lock().unwrap().as_slice(),
+        ["just".to_owned()],
+        "exactly the item that was answered yes is installed"
+    );
+}
+
+/// Checking is what the default does, and it changes nothing.
+#[test]
+fn the_default_checks_and_installs_nothing() {
+    let machine =
+        ScriptedMachine::missing(&["just", "gecko", "webkit", "chromedriver", "msedgedriver"]);
+    let mut nobody = std::io::Cursor::new(Vec::new());
+    let mut screen: Vec<u8> = Vec::new();
+    run(
+        &Asked {
+            install: false,
+            city: None,
+            explain: None,
+            ink: Ink::Plain,
+        },
+        &machine,
+        &mut nobody,
+        &mut screen,
+    )
+    .unwrap();
+    assert!(machine.asked.lock().unwrap().is_empty());
+    let shown = String::from_utf8(screen).unwrap();
+    assert!(
+        shown.contains("not ready to use: missing a browser engine"),
+        "{shown}"
+    );
+    assert!(
+        !shown.contains("[y/N]"),
+        "the default asks nothing: {shown}"
+    );
+}
