@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The second half of a query that reads the disk, git or the network:
-//! what `Views::prepare` copied out under the view lock, and the read
-//! [`Prepared::finish`] does once the lock is released.
+//! what `Views::prepare` copied out of a snapshot of the views, and the
+//! read [`Prepared::finish`] does once the snapshot is let go.
 //!
 //! Apart from `answering` because the two change for different reasons:
 //! that module decides what a query takes while the fold waits, and this
@@ -40,9 +40,9 @@ pub(super) fn unavailable(query: String) -> channels::Answer {
     channels::Answer::Unavailable { query }
 }
 
-/// A query's answer split at the view lock: what the views settled while
-/// held, or the small data a read of the disk, git or network needs,
-/// copied out so that read can run with the lock released.
+/// A query's answer split at the snapshot: what the views settled while
+/// it was held, or the small data a read of the disk, git or network
+/// needs, copied out so that read runs with the snapshot let go.
 pub(crate) enum Prepared {
     /// Answered from the views alone.
     Held(channels::Answer),
@@ -131,7 +131,7 @@ pub(crate) enum Prepared {
     Evidence { ledger: LedgerAsk, run: RunId },
 }
 
-/// The ledger as a history reader carries it out of the view lock: where
+/// The ledger as a history reader carries it out of the snapshot: where
 /// it lives, and its index, which has a lock of its own that only
 /// readers wait on (sprawling-SPEC.md 8-92).
 pub(crate) struct LedgerAsk {
@@ -140,7 +140,7 @@ pub(crate) struct LedgerAsk {
 }
 
 impl Prepared {
-    /// Does the read the views left for after the lock, and answers.
+    /// Does the read the views left for after the snapshot, and answers.
     pub(crate) fn finish(self) -> channels::Answer {
         match self {
             Self::Held(answer) => answer,

@@ -112,8 +112,8 @@ pub(crate) struct Views {
     /// actually new.
     ///
     /// Behind a lock of its own because the fold never touches it: a
-    /// query carries the `Arc` out of the view lock and reads the
-    /// ledger with only readers waiting on it (sprawling-SPEC.md 8-92).
+    /// query carries the `Arc` out of its snapshot of the views and
+    /// reads the ledger with only readers waiting on it (sprawling-SPEC.md 8-92).
     pub(super) index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
     /// Where each run's first `prompt_assembled` record sits, so the
     /// prompt a page asks for is one ledger line rather than a walk

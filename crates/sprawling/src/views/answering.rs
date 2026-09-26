@@ -119,7 +119,7 @@ impl Views {
         }
     }
 
-    /// The ledger as a history reader takes it out of the view lock.
+    /// The ledger as a history reader takes it out of the snapshot.
     pub(super) fn ledger_ask(&self) -> LedgerAsk {
         LedgerAsk {
             city_root: self.city_root.clone(),
