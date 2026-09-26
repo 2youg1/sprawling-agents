@@ -6,7 +6,7 @@
 //! Boundary 3: the tool wave, executed in call order.
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
-use kernel::{AxCode, AxError, ContentBlock, Ledger, Payload, ToolCall, ToolOutcome};
+use kernel::{AxCode, AxError, ContentBlock, Ledger, ModelUsage, Payload, ToolCall, ToolOutcome};
 
 use crate::compaction::Exchange;
 
@@ -27,6 +27,11 @@ impl Turn<ToolWave> {
     /// The calls this wave is about to make, in call order.
     pub(crate) fn calls(&self) -> &[ToolCall] {
         &self.state.calls
+    }
+
+    /// What the provider counted for the call that asked for this wave.
+    pub(crate) fn usage(&self) -> Option<&ModelUsage> {
+        self.state.usage.as_ref()
     }
 
     /// Boundary 3 (before tool execution). Serial: parallel execution

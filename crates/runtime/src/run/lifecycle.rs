@@ -190,6 +190,11 @@ impl Run<Active> {
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };
 
+        // Recorded before the wave, so a `status` call in it reports the
+        // count of the very call that asked for it.
+        if let Some(usage) = turn.usage() {
+            self.plan.context.record(usage.input_tokens);
+        }
         // The fence goes up before the wave, not before a suspicious call:
         // anything the wave deletes then has a commit to come back from.
         let decided = self.state.fence.for_wave(turn.calls());
