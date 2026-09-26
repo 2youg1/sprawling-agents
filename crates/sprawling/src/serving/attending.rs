@@ -30,6 +30,7 @@ use std::time::Duration;
 use kernel::{AxCode, AxError, EventRecord, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
+use super::folding::{Folding, spawn_folding};
 use super::relay::Patience;
 use super::serve::Opening;
 use crate::assembly::{RunWorker, Serving, now_ms};
@@ -74,6 +75,14 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         to_clients,
         to_watchers,
     } = outward;
+    // The views are folded beside the writer rather than on it, so a
+    // reader holding them never delays the next record
+    // (sprawling-SPEC.md 8-85).
+    let Folding {
+        observer,
+        machine,
+        thread: fold_thread,
+    } = spawn_folding(views, to_clients)?;
     // The one sanctioned thread besides the runtime's own. The ledger is
     // opened *inside* it and never leaves: a city has one writer, and the
     // type never has to cross a thread boundary to prove it.
@@ -96,7 +105,6 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             // in progress can be interrupted. One call, because a
             // worker that streamed to a page unable to interrupt it
             // would be the state this type exists to make unsayable.
-            let examined = Arc::clone(&views);
             let interrupt_desk = Arc::clone(&worker_desk);
             worker.serve(Serving {
                 deltas: std::sync::Arc::new(move |delta: channels::Delta| {
@@ -104,28 +112,20 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                     // browser open is a city doing its work.
                     drop(to_watchers.send(delta));
                 }),
-                machine: Arc::new(move |found: channels::DoctorAnswer| {
-                    if let Ok(mut views) = examined.lock() {
-                        views.found_on_this_machine(found);
-                    }
-                }),
+                machine,
                 interrupts: Arc::new(move |run: RunId| interrupt_desk.interrupt_for(run)),
             });
-            worker.observe(Box::new(move |record: &EventRecord| {
-                if let Ok(mut views) = views.lock() {
-                    // A record the views refuse to fold is reported and
-                    // skipped: the ledger already has it, and a view that
-                    // crashed the writer would make history hostage to a
-                    // projection.
-                    if let Err(err) = views.apply(record) {
-                        eprintln!("view fold refused {}: {err}", record.seq().value());
-                    }
-                }
-                // A send with no subscribers is not a failure: a city with
-                // no browser open is a city doing its work.
-                drop(to_clients.send(record.clone()));
-            }));
+            worker.observe(observer);
             attend(&mut worker, &worker_desk);
+            // Dropping the worker drops the observer, which closes the
+            // fold's channel; what is still in it is folded and
+            // broadcast before the thread ends.
+            drop(worker);
+            if fold_thread.join().is_err() {
+                eprintln!(
+                    "the view fold ended in a panic; restart the server to rebuild the views"
+                );
+            }
         })
         .map_err(|source| {
             AxError::failure(
