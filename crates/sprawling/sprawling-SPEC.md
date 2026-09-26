@@ -3479,6 +3479,7 @@ impl Credentials {
 pub(in crate::assembly) struct Collaborating {
     pub(in crate::assembly) rooms: RoomQueues,                                   // 每个房间的队列，以及哪个 run 借着它
     pub(in crate::assembly) joins: BTreeMap<Address, collab::FanIn>,             // 每个房间从下派的工作收回了什么
+    pub(in crate::assembly) workshops: BTreeMap<Address, collab::Underway>,      // 每个房间摆出、尚未全部汇合的图及其已派集；handback 到达时由它派下一组
     pub(in crate::assembly) requests: Vec<collab::OpenRequest>,                  // 等人检查的 pull request
     pub(in crate::assembly) goals: Vec<kernel::GoalEntry>,                       // 居民认领的地盘，按认领顺序
 }

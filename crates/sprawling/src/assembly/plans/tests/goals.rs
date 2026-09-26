@@ -71,6 +71,10 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
 /// joins - so the next run in that room can be asked a question only
 /// somebody who opened the results can answer.
 ///
+/// The graph is laid out once. The node that waits is handed down when
+/// what it waits on hands back, so no later run in the room has to lay
+/// the same graph out again for the work to go on.
+///
 /// `collab::workshop` and `collab::fanin` had no callers outside
 /// their own files before this; the whole layer was a set of types
 /// nobody had run.
@@ -103,9 +107,9 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             ("the page exists", vec![completion("done", None)]),
         ],
         vec![
-            completion_with("splitting it up", "workshop", "tu_1", graph.clone()),
+            completion_with("splitting it up", "workshop", "tu_1", graph),
             completion("waiting on a person", None),
-            completion_with("splitting it up", "workshop", "tu_2", graph),
+            completion("not laying it out again", None),
             completion("done", None),
         ],
     );
