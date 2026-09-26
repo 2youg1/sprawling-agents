@@ -605,7 +605,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 需要新 `EventKind` 与账本版本，故记录在此而不在此处做。
 
 - 序列化细节：`addr` 为 None 与 `ig` 为 false 时省略键；其余八键恒在；键序＝声明序 `v,run,seq,prev,t,who,addr,kind,data,ig`。此即 V8 跨平台字节一致的规范。
-- 铸造纪律：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
+- 铸造纪律：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有，所以在 crate 外写不出 `EventRef` 的字面量。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
 **EventKind 全集与二分（specalign 数据面；「入窗」＝InWindow）**：
