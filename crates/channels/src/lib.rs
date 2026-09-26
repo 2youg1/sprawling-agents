@@ -88,7 +88,7 @@ pub use server::{AcpProgress, AcpSink, TranscribeSink};
 pub use server::{Bound, Delivered, Reply, ServeConfig, bind, router, serve};
 #[cfg(feature = "schema")]
 pub use wire::wire_schema;
-pub use wire::{ClientFrame, Delta, ServerFrame};
+pub use wire::{ClientFrame, Delta, LiveOutput, OutputStream, ServerFrame};
 pub use wire::{Hello, Query, Welcome};
 pub use wire::{Lagged, LogLevel, LogLine};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};

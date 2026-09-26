@@ -138,7 +138,7 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-pub const WIRE_V: u32 = 39;
+pub const WIRE_V: u32 = 40;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
@@ -272,6 +272,31 @@ pub enum ServerFrame {
     /// records that do not exist, and a reader that missed one has lost
     /// nothing it could have acted on.
     Lagged(Lagged),
+    /// What a command still running has written so far. Discardable by
+    /// the rule `Delta` follows: the call's result in the Ledger is the
+    /// authority on that output, and a page drops this once it lands.
+    Output(LiveOutput),
+}
+
+/// Which of a command's two outputs a piece came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum OutputStream {
+    Out,
+    Err,
+}
+
+/// One piece of a running command's output, on its way to a page.
+///
+/// `text` is decoded lossily: a piece ends at a byte bound, which can
+/// fall inside a character, and the settled result is what a page keeps.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct LiveOutput {
+    pub run: RunId,
+    pub stream: OutputStream,
+    pub text: String,
 }
 
 /// Ledger records that never reached a peer, named by both ends.

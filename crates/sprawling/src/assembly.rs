@@ -145,7 +145,7 @@ impl ScanReport {
 
 /// Where a served city listens, installed once by whoever serves it.
 ///
-/// The three sinks are one fact — *somebody is watching this city* —
+/// The four sinks are one fact — *somebody is watching this city* —
 /// and a worker that has any of them has all of them. A worker driven
 /// one command at a time has none, and that absence is the switch: its
 /// runs ask their provider for no stream at all, so replay and citysim
@@ -153,6 +153,8 @@ impl ScanReport {
 pub(crate) struct Serving {
     /// Where a model's text goes while it is still arriving.
     pub(crate) deltas: Arc<dyn Fn(channels::Delta) + Send + Sync>,
+    /// Where a running command's output goes while it is still written.
+    pub(crate) outputs: Arc<dyn Fn(channels::LiveOutput) + Send + Sync>,
     /// Where a fresh look at this machine goes: the one place the
     /// doctor's answer is replaced after the look taken at start-up.
     pub(crate) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
@@ -186,12 +188,12 @@ pub struct RunWorker {
     /// The vault. Shared because a redemption closure outlives the call
     /// that builds it; the lock is held for one resolve at a time.
     vault: Arc<std::sync::Mutex<gateway::Custodian>>,
-    /// The three places a live control surface listens, or `None` in a
+    /// The four places a live control surface listens, or `None` in a
     /// worker driven one command at a time.
     ///
-    /// **One `Option`, not three.** The three sinks are installed by
+    /// **One `Option`, not four.** The four sinks are installed by
     /// one caller in one breath and are absent together in every other
-    /// worker; as three fields the type admitted eight states of which
+    /// worker; as four fields the type admitted sixteen states of which
     /// two were reachable, and adding a fourth sink meant remembering a
     /// fourth setter (sprawling-SPEC.md 8-46-10).
     serving: Option<Serving>,
@@ -300,7 +302,7 @@ impl RunWorker {
         self.ledger.observe(sink);
     }
 
-    /// Takes the three places a served city listens.
+    /// Takes the four places a served city listens.
     ///
     /// Separate from [`Self::observe`] because the two carry different
     /// kinds of thing: that one carries history, and these carry a view

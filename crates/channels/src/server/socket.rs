@@ -54,6 +54,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     let mut events = state.events.subscribe();
     let mut deltas = state.deltas.subscribe();
     let mut logs = state.logs.subscribe();
+    let mut outputs = state.outputs.subscribe();
     // This session's own refusals, which the worker posts into long
     // after the command was accepted. Unbounded because a refusal must
     // not be dropped and because its rate is the rate at which one
@@ -209,6 +210,20 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                     Ok(line) => {
                         if phase == SessionState::Live
                             && send(&mut socket, &ServerFrame::Log(line)).await.is_err() {
+                            return;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Closed) => return,
+                }
+            }
+            // Running commands' output. A skipped piece is not stated: the
+            // whole output arrives with the call's result either way.
+            written = outputs.recv() => {
+                match written {
+                    Ok(piece) => {
+                        if phase == SessionState::Live
+                            && send(&mut socket, &ServerFrame::Output(piece)).await.is_err() {
                             return;
                         }
                     }

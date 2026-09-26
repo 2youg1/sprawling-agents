@@ -47,6 +47,7 @@ pub(super) struct Outward {
     pub(super) views: Arc<std::sync::Mutex<Views>>,
     pub(super) to_clients: tokio::sync::broadcast::Sender<EventRecord>,
     pub(super) to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
+    pub(super) to_readers: tokio::sync::broadcast::Sender<channels::LiveOutput>,
 }
 
 /// The thread, and the one thing it opens that something else needs.
@@ -74,6 +75,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         views,
         to_clients,
         to_watchers,
+        to_readers,
     } = outward;
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
@@ -111,6 +113,9 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                     // No subscribers is not a failure: a city with no
                     // browser open is a city doing its work.
                     drop(to_watchers.send(delta));
+                }),
+                outputs: std::sync::Arc::new(move |piece: channels::LiveOutput| {
+                    drop(to_readers.send(piece));
                 }),
                 machine,
                 interrupts: Arc::new(move |run: RunId| interrupt_desk.interrupt_for(run)),

@@ -141,6 +141,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // channel would let a talkative model push records out of a slow
     // reader's window.
     let (deltas, _watching) = tokio::sync::broadcast::channel(256);
+    // Running commands' output, on a fourth channel for the same reason.
+    let (outputs, _reading) = tokio::sync::broadcast::channel(256);
     // The process log, on the third channel. Its sender was made before
     // the `Diagnostics` was, because the sink is what writes into it.
     let logs = journal.lines();
@@ -195,6 +197,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             views: Arc::clone(&views),
             to_clients: events.clone(),
             to_watchers: deltas.clone(),
+            to_readers: outputs.clone(),
         },
     )?;
 
@@ -218,6 +221,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         events,
         deltas,
         logs,
+        outputs,
         city: city_name,
         secrets: Arc::new(move |command: channels::Command, reply: channels::Reply| {
             // The route waits for whichever comes first, so the
