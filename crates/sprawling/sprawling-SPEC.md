@@ -1074,7 +1074,7 @@ justfile／CI 无涉；S4 前端框架结论书将改写 build.rs 拷贝源与 `
 
 ### 不搬走什么，以及这件事本身的发现
 
-`NAME_THE_WORK`、`NAME_TOKENS`、`mode_of`、`not_built`、`Reporter`、`building_of`、`plan_node_of`
+`mode_of`、`not_built`、`Reporter`、`building_of`、`plan_node_of`
 在原文件里**物理上坐在 `Views` 那一簇的中间**，而它们的使用者是 `RunWorker` 与 `CollaborationFold`：
 `not_built` 六处、`Reporter` 三处、`mode_of` 一处，`Views` 一处都不用。
 **这就是那个文件长成这样的机制**——没有边界的地方，新东西落在光标所在的行，而不是落在它属于的地方。
@@ -3135,13 +3135,6 @@ impl RunWorker { fn halted_by(&self, addr: &Address) -> Option<kernel::event::Sc
 
 **本章测试**：`an_unreadable_approval_item_stops_the_fold`（`assembly::folds::tests`）、`an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted`（`kernel::event::record::governance`）。
 
-### 8-75 给活取名失败时，人被告知的是真正的原因（`assembly::dispatching::session::name_the_work`；Roadmap B-54）
-
-- **缺陷**：七处 `.ok()?` 把凭据兑不出、适配器造不出、调用没回来、回复读不懂全部折成一个 `None`，而调用方把 `None` 一律翻成「自己给房间取个名字」。一个 provider 连不上的人被指去填一个字段。
-- **改法**：`name_the_work` 返回 `Result<Option<SessionName>, AxError>`。`Ok(None)` 只留给「模型答了，而它答的不是一个合法的会话名」——包括回复里一个字都没有。其余每一条按它本来的错误上抛，`session_for` 的三段式拒绝因此只在真的该由人补名字时出现。
-
-**本章测试**：类型即判定依据——`Ok(None)` 只有一个来源，编译器守住其余每一条错误路径；既有的 `a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine`（`assembly::dispatching::tests`）仍钉住「该由人补名字」那一条走到三段式拒绝。
-
 ### 8-76 哪些记录会动计划，是一张穷尽表（`plan_view::may_move_plan`；Roadmap B-55）
 
 ```rust
@@ -3311,7 +3304,7 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 | 仪表 | 场景 | 读数 |
 |---|---|---|
 | `instrument_relay_round_trip` | 一轮活停在它的第一次模型调用上（provider 不作答），于是循环处在「有车道在跑」的那个形状里；另一条线程拿 `measuring_relay` 连续追加 200 条，逐条计时 | `store=disk`：城自己的 `JsonlLedger`，每条一道屏障；`store=memory`：同一个 `JsonlLedger` 开在 `memory::FaultFs` 上，屏障是一次内存拷贝；另给 `store=memory` 不过河时自己的追加耗时，两者之差就是过河本身 |
-| `instrument_dispatch_gap` | 移植自 perf-latency 的双派活场景：run A 在 `lab/east` 跑 30 个 `status` 回合；A 的第五次模型调用到达时，往楼 `lab`（不带房间，于是要请 digest 模型取名）派 run B，provider 把取名那次调用压 3 s | A 相邻两条记录 `t` 之差的最大值与中位数，单位 ms |
+| `instrument_dispatch_gap` | 移植自 perf-latency 的双派活场景：run A 在 `lab/east` 跑 30 个 `status` 回合；A 的第五次模型调用到达时，往楼 `lab`（不带房间，按 8-86 的规则取名）派 run B；provider 把任何含取名提示的调用压 3 s，所以一旦派活重新向模型要名字，读数会显示出来 | A 相邻两条记录 `t` 之差的最大值与中位数，单位 ms |
 
 `instrument_relay_round_trip` 另断言内存存储过河的 p50 不超过 1 ms（`ROUND_TRIP_P50`）：那条往返里除了一次内存拷贝全是 harness，所以它量的就是 harness。磁盘存储只报读数不断言：它的中位数是设备的 fsync，这是物理下限，因机器而异，一个写死的毫秒数只对一类机器成立；它与内存那一行之差才是磁盘的份额。目标还有一条没写成断言：内存存储过河的 p50 不超过 10 µs，它只在 `--release` 下有意义，而 `crossing=none` 那一行在调试构建里已是 20 µs 量级。
 
@@ -3341,31 +3334,22 @@ pub(super) fn model_note(city_root: &Path, provider: &str, model: &str) -> Resul
 
 **本章测试**：`freezing::tests::model_note::a_note_for_the_chosen_model_ends_the_system_prompt`——为 `house/m-local` 放一个文件，派活发出的请求里最后一条 system 消息以这段文字结尾；`freezing::tests::model_note::a_note_for_another_model_is_not_sent`——别的模型的那段话不出现。
 
-### 8-86 取名的那次模型调用不在记账线程上（`bin::assembly::dispatching::asking_name`）
+### 8-86 房间名按规则取，起名不调用模型（`bin::assembly::dispatching::session`）
 
 ```rust
-// bin::assembly::dispatching::asking_name —— shape: adapter
-pub(in crate::assembly) struct Namings;                 // 还在等的名字，以及名字回家的那条通道
-impl Namings { fn open() -> Namings; fn pending(&self) -> bool; }
-impl RunWorker {
-    /// 先 agree_to_work（什么都不写），在记账线程上建好 digest 调用，再把调用本身放到自己的线程上。
-    fn name_then_dispatch(&mut self, at: Assignment, task: String, goal: String, reply: channels::Reply) -> Result<(), AxError>;
-    /// 名字回家的派活逐个进车道；拒绝交还给发起人。
-    fn dispatch_the_named(&mut self);
-}
-// bin::assembly::dispatching::session
-pub(super) fn needs_a_name(addr: &Address, session: Option<&SessionName>) -> bool;
-pub(super) fn unnamed(addr: &Address) -> AxError;          // E_INVALID_ARGS，恢复句指向 `building/name`
-pub(super) struct NamingCall;                               // 适配器、模型 id、楼的 policy；fn name(self, task) 在任意线程上调用
+// bin::assembly::dispatching::session —— shape: decision（`session_for`、`rule_name`）
+/// 人给了名字、或地址已含房间时原样返回；地址只有一段且没有名字时返回 `rule_name(task)`。不调用模型。
+pub(super) fn session_for(addr: &Address, session: Option<SessionName>, task: &str) -> Result<Option<SessionName>, AxError>;
+/// 任务原文里前四个 ASCII 字母数字词，小写，用 `-` 连起来；一个也没有、或拼出保留名时是 `work`。
+/// 结果总是合法的 session 名；`SessionName::parse` 仍是判定者，所以签名带着它的错误。
+pub(super) fn rule_name(task: &str) -> Result<SessionName, AxError>;
 ```
 
-**为什么**：记账线程替每一条正在跑的 run 过河追加。取名要等 provider 几秒，放在这条线程上时，另一条 run 在这几秒里一条记录也写不进去：`instrument_dispatch_gap` 在 digest 调用压 3 s 时量出 run A 的最大空档约 3,044 ms。现在调用本身在一条自己的线程上等，名字写进 `Namings` 的通道，再用 `Wake::Command` 敲一次记账线程的那一个队列；`serve_flight` 在服务完 relay 之后调用 `dispatch_the_named`，于是名字回家的派活与其它醒来的理由走同一张嘴。仪表断言 A 的最大空档小于取名调用本身（`NAMING`，3 s）：A 的最大空档里还有它自己每回合的围栏（每波 20–90 ms，调试构建下 100–340 ms），那是 A 自己的工作，不是 B 造成的停顿，所以几毫秒的上限量不到这件事。
+**规则**：派到一栋楼（地址只有一段、旁边没有 session）上的活，房间名由 `rule_name` 从任务原文里取：按非 ASCII 字母数字字符切词，丢掉空词，取前四个，转小写，用 `-` 连起来；每个词最多留前 15 个字符（`RULE_WORD_MAX`），所以四个词加三个连字符最长 63 个字符，总在 `SessionName::parse` 的上限 64 之内，规则名永远是合法的 session 名。一个 ASCII 词也没有、或这些词拼出城自己保留的名字而被 `SessionName::parse` 拒绝时，名字是 `work`。重名由 `city::open_room` 加序号（`work`、`work-2`……），规则本身不查盘。
 
-**顺序不变**：ARCHITECTURE §5 第 3 步「开房间是 dispatch 在盘上的第一件事」照旧成立。名字回来之前这次派活什么都没写；名字回来后走 `dispatch_into_lane`，它重新 `agree_to_work`（等名字期间城可能被 halt），然后才开房间。`adversary/design/Attending.lean` 的 `opening_the_room_is_the_first_write`、`nothing_is_written_before_the_name_is_home`、`the_naming_wait_is_off_the_accounting_thread` 持有这三条。幂等键在取名线程起飞时就结清，所以等名字期间重发的同一帧仍然只算一次。`RunWorker::driving` 把还在等的名字算作在飞，`land_the_rest` 与 `handle` 因此会等它们回家。
+**为什么**：模型的回答不受字符集约束，而 `SessionName::parse` 接受任何不含分隔符的文字：一个回了「收到。」的模型会让 run 落进人找不到的房间 `shop/收到。`。问模型要名字还挡在首字前面：派活要先等一次完整的非流式调用，再发出 run 的请求。规则名在记账线程上用几微秒算出，不读 book、不读 vault、不起线程，派活帧到达后发出的第一条 provider 请求就是 run 本身（`a_bare_building_is_named_by_rule_and_the_run_is_the_first_call`）。机密楼的任务原文也不会为了起名离开这台机器。
 
-**决定**：取名线程由 `name_then_dispatch` 自己起，不借 `DrivingPool`。车道的 run id 此刻还不存在（它由开房间之后的 `stand_up` 派生），池子的表按 run id 记账。**败给的方案**：把取好的名字作为一条新的 `Dispatch` 帧重新投进 desk。desk 门口的 `entrance` 记得这个幂等键，会把它当作重复帧丢掉。
-
-**还没移走的**：计划节点（`plans::pursuing`）与城自己发起的派活（`start_unasked`）仍经 `prepare_dispatch` 里的 `session_for` 在记账线程上取名；`renew_if_stale` 与 `DoctorRefresh`/`DoctorInstall` 仍在记账线程上阻塞。
+**决定**：完全不调用模型起名。**败给的方案**：保留模型起名，放到 run 开始之后，再校验长度与字符集、失败时回落到规则名。那样房间要么在 run 开始后改名（房间是 dispatch 在盘上写的第一件事，ARCHITECTURE §5 第 3 步，run 的文件已经在里面），要么多出一个只为改名存在的线程与在飞计数；一个人要一个好找的名字时，发到 `building/name` 就有。只含非 ASCII 文字的任务都叫 `work`、`work-2`，这是这条规则的代价；让它重新值得调用模型的参数是：一个名字能在 run 开始前、不增加首字延迟地取到。
 
 ### 8-87 粘进派活里的 key 进 vault，文字里只留引用（`bin::assembly::dispatching::custody`）
 
