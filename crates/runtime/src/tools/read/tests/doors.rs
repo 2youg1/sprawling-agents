@@ -101,6 +101,42 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
     );
 }
 
+/// A single-document skill is read where the shelf spells it: a link on
+/// the way to its document leads the read nowhere, as a link inside a
+/// package does.
+#[test]
+fn a_shelved_document_behind_a_link_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("SKILL.md"), "elsewhere\n").unwrap();
+    let library = dir.path().join(".sprawling").join("library");
+    std::fs::create_dir_all(library.join("kept")).unwrap();
+    std::fs::write(library.join("kept").join("SKILL.md"), "on the shelf\n").unwrap();
+    make_link(&library.join("notes"), outside.path());
+    let (tool, catalog) = tool(dir.path());
+    for name in ["kept", "notes"] {
+        catalog
+            .lock()
+            .unwrap()
+            .admit_skill(CatalogEntry {
+                name: name.to_owned(),
+                disclosure: format!("the {name} skill"),
+                expansion: format!(".sprawling/library/{name}/SKILL.md"),
+                hash: None,
+                package: None,
+            })
+            .unwrap();
+    }
+
+    let kept = tool.invoke(&call("kept")).unwrap();
+    assert_eq!(kept.result.as_map()["text"], "on the shelf\n");
+    let refused = tool.invoke(&call("notes"));
+    assert!(
+        matches!(&refused, Err(err) if err.code() == &AxCode::GateDenied),
+        "a shelved document was read through a link: {refused:?}"
+    );
+}
+
 /// A file that was not there when the path was judged is not opened
 /// afterwards: a link placed at the absent segment between the check
 /// and the open would lead the open wherever it points.
