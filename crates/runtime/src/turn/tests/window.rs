@@ -113,3 +113,37 @@ fn tool_results_after_an_empty_reply_reach_the_window() {
         ]
     );
 }
+
+/// Results that rewrote a sent message leave it open again: a steer
+/// that arrives before the next assembly joins it after those results
+/// instead of waiting one more wave.
+#[test]
+fn a_steer_after_results_on_a_sent_message_joins_them() {
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("find it", "found", Opening::FromJob);
+    conversation.mark_sent();
+    conversation.push_assistant(Vec::new());
+    let result = ContentBlock::ToolResult {
+        tool_use_id: "call-1".to_owned(),
+        content: "{}".to_owned(),
+        is_error: false,
+        attachments: Vec::new(),
+    };
+    conversation.push_tool_results(vec![result.clone()]);
+    conversation.push_steer("user", "narrow the search");
+    let tail: Vec<&ContentBlock> = conversation
+        .messages()
+        .iter()
+        .flat_map(|message| message.content.iter())
+        .skip(1)
+        .collect();
+    assert_eq!(
+        tail,
+        [
+            &result,
+            &ContentBlock::Text {
+                text: "user: narrow the search".to_owned()
+            }
+        ]
+    );
+}
