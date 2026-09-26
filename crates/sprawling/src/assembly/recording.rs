@@ -196,12 +196,19 @@ impl RunWorker {
         Ok((kind, addr, data))
     }
 
-    /// Shows one line this worker wrote to every fold it holds, whoever
-    /// the line was written for: a restart folds every line into every
-    /// fold, so a live fold that skipped some writer's lines would
-    /// disagree with the restart until the process restarted
-    /// (sprawling-SPEC.md 8-90). Each fold's own `absorb` decides which
-    /// kinds it reads.
+    /// Shows one line this worker wrote to the origins, governance,
+    /// planning and credentials folds, whoever the line was written for:
+    /// a restart folds every line into every fold, so a live fold that
+    /// skipped some writer's lines would disagree with the restart until
+    /// the process restarted (sprawling-SPEC.md 8-90). Each fold's own
+    /// `absorb` decides which kinds it reads. The collaboration fields
+    /// and the entrance are not shown the line here: the effect handler
+    /// that wrote it and `entrance.stamp` keep them in step.
+    ///
+    /// # Errors
+    /// The first fold's failure, returned only after every fold has seen
+    /// the line: it is already on the ledger, so a fold that missed it
+    /// would answer differently from a restart.
     fn absorb(
         &mut self,
         kind: EventKind,
@@ -209,9 +216,13 @@ impl RunWorker {
         addr: Option<&Address>,
         data: &Payload,
     ) -> Result<(), AxError> {
-        self.origins.absorb(kind, run, addr, data)?;
-        self.governance.absorb(kind, run, addr, data)?;
-        self.planning.absorb(kind, addr, data)?;
-        self.credentials.absorb(kind, data)
+        [
+            self.origins.absorb(kind, run, addr, data),
+            self.governance.absorb(kind, run, addr, data),
+            self.planning.absorb(kind, addr, data),
+            self.credentials.absorb(kind, data),
+        ]
+        .into_iter()
+        .collect()
     }
 }

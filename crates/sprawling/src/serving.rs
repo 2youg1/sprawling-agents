@@ -31,6 +31,6 @@ mod tests;
 
 pub(crate) use door::random_token;
 pub use door::{Keyed, key_for, open_vault};
-pub use journal::Journal;
+pub use journal::{Clock, Journal};
 pub use serve::Serving;
 pub use standing::{CorePriority, serving_runtime, setting_telling_a_refusal};

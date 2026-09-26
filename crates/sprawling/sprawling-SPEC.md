@@ -156,8 +156,8 @@ fn random_token(bytes: usize) -> Result<String, AxError>;          // OS 熵，�
 | 查询 | 出处 | 口径 |
 |---|---|---|
 | `InboxView` | 折 `signal_enqueued` 减 `signal_consumed`：前者经 `collab::Signal::from_payload` 读、按它的 `room` 入队，后者经 `collab::SignalConsumed::from_payload` 读、按 `id` 从每个房间的队列里出队，与 `CollaborationFold` 同一种读法（`signal_consumed` 只写 `id` 与 `by`；行的 `addr` 是取走它的房间，没有什么强制它等于入队时的房间，按 `addr` 出队的视图会在两者不同时让已取走的信号一直等着）；读不回的一行让折叠报错而不是被跳过 | **看队列不靠消费**：`Inbox::pull` 要拿走才给得出内容，一个看一眼就把东西取走的视图会改变它所报告的对象。**与写者同一把尺**：视图自己按键名读这两行时，消费行里没有 `room`，被取走的信号在视图里永远等着 |
-| `DiscardView` | 折 `file_discarded`／`discard_restored`，按路径归键 | 每行自带回去的路（`restoration`）；还原是**关掉它开的那一行**，不是另开一行 |
-| `RegistryView` | 折 `asset_archived` | 「这座城认定值得留下的东西」；空表就是空表，与「本版本答不了」在类型上已经不可混淆 |
+| `DiscardView` | 折 `file_discarded`／`discard_restored`，按路径归键；本版本读不回的一行整行跳过，不以空路径或空还原顶替 | 每行自带回去的路（`restoration`）；还原是**关掉它开的那一行**，不是另开一行 |
+| `RegistryView` | 折 `asset_archived`；没有房间或本版本读不回的一行整行跳过，`kind` 与 `subject` 不以默认值顶替 | 「这座城认定值得留下的东西」；空表就是空表，与「本版本答不了」在类型上已经不可混淆 |
 | `ArchiveSearch` | 被问的那一刻读盘（同 `BuildingView`） | 文件是权威，另存索引就是第二个权威 |
 | `Metrics` | 上面几份＋`hot`＋`read_spine` | **恒不携钱**：钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。这里每个数都已被别的视图证明过，它存在只为让画一条读数花一次问答；唯一自有的数是 `events`（本视图折过多少条），因为没有别的答案能推出它 |
 
@@ -3427,7 +3427,7 @@ fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<Strin
 ```
 
 - **一条规则一个家**：`endpoint_of` 是 probe 与 attach 共用的那道门，空引用的读法因此只有它一处，`ProbeEndpoint` 与 `AttachEndpoint` 不可能对同一个空框给出两种答案。
-- **空不是删，删是另一个动词**：`DetachEndpoint` 已在，它说的才是「拿掉」。一个既能表示「不改」又能表示「删掉」的字段，会让每一次不相干的编辑都带着删除凭据的风险。
+- **空不是删，删是另一个动词**：拿掉一个端点的凭据要一个自己的命令，现在还没有（见 8-46-11 撤销 attach 那一格）；空着的框永远不承担这个意思。一个既能表示「不改」又能表示「删掉」的字段，会让每一次不相干的编辑都带着删除凭据的风险。
 - **留引用、重算头**：归档的是 `AuthSpec`（头 + 引用），沿用的只是引用，头按这次进来的接口形态重算——同一把 key 从 chat 面挪到 messages 面要从 `Authorization: Bearer` 变成 `x-api-key`，照抄旧头会对一把好 key 答 401。人自己命名的头仍然压过推导，`Credential::Absent` 因此带着 `header`。
 - **订阅令牌只走 `Authorization: Bearer`**：头由引用的种类与接口形态一处推出（`bin::assembly::credentials::subscription::auth_for`），`Absent`、`Key`、`Subscription` 三条路都经过它。引用名为 `oauth` 的是某家订阅的 access token，厂商只认 Bearer，所以它不随 messages 面改成 `x-api-key`；否则只改了超时的一次重存就会让 Claude 订阅开始答 401，手工填 `secret:anthropic/oauth` 接上也会落到同一个错头。人自己命名的头照旧压过推导。被否决的备选：按归档的头原样沿用——那会让 API key 在换面时带着旧头 401。
 - **前端说的话此后是真话**：`lang.json` 的 `setup_key_stored`（「此名下已有密钥，留空则沿用」）先前只在表单自己还记得引用时出现，而城当时并不沿用。现在城沿用，那句话改为在**城说这个 id 有凭据**时出现——一句话一个家，不新增第二个键。
@@ -4090,7 +4090,7 @@ impl RunWorker {
 
 `RunWorker` 拆成六个对象：凭据、治理、协作、计划、入口、飞行中的 run。每个对象带走自己的字段、方法与测试，`RunWorker` 只持有这六个对象和账本、CAS、日志这些整城共用的东西。凭据一组是 `book`、`vault`、`expiries`、`logins` 四个字段：它们回答同一个问题——这座城能以谁的身份去叫哪个模型——而且改动它们的是同一族记录（`endpoint_attached`、`model_selected`、`endpoint_lost`、`secret_captured`）。协作一组是 `rooms`、`joins`、`requests`、`goals` 四个字段：它们都从信号、handback、pull request 与 `goal_registered` 这几族记录折出，回答的是「居民之间正在交接什么」。`pursuits`、`plan_holders` 与 `delegator` 虽然也由协作折叠（`folds::Collaboration`）折出，却回答「每栋楼在朝什么推进」，属于计划一组，不归这里。治理早已是一个对象（`views::Governance`），判定面与读面共用那一个定义，这一步不动它。计划、入口、飞行中的 run 三组见 8-91。
 
-**worker 写下的每一行，它持有的每一份折叠都要看到，不论这行以城的名义还是以某个 run 的名义写。** 重启走 `Standing::fold`，那条路把账本上每一行都交给每一份折叠，不问是谁写的；活着的 worker 若只在以城的名义写时才折凭据与会话起点，一行由 run 写下的 `endpoint_attached` 就在账本上、却不在 worker 的 `book` 里，直到进程重启——这正是 8-17 已经排除的那类「活城与重启折出两份」。所以 `record_where` 与 `record_for` 都经过同一个 `RunWorker::absorb`，它依次交给会话起点、治理、凭据、计划四份折叠；哪份折叠看哪几种记录由各自的 `absorb` 决定，这里不再筛。
+**worker 写下的每一行，会话起点、治理、计划、凭据四份折叠都要看到，不论这行以城的名义还是以某个 run 的名义写。** 重启走 `Standing::fold`，那条路把账本上每一行都交给每一份折叠，不问是谁写的；活着的 worker 若只在以城的名义写时才折凭据与会话起点，一行由 run 写下的 `endpoint_attached` 就在账本上、却不在 worker 的 `book` 里，直到进程重启——这正是 8-17 已经排除的那类「活城与重启折出两份」。所以 `record_where` 与 `record_for` 都经过同一个 `RunWorker::absorb`，它把这一行交给会话起点、治理、计划、凭据四份折叠，每份都看过之后才交出第一份的错误：行已经在账本上，一份折叠出错不该让排在它后面的折叠漏看这一行、在重启之前与重启折出两份。哪份折叠看哪几种记录由各自的 `absorb` 决定，这里不再筛。协作一组与入口不经过 `absorb`：协作由写下那一行的效果处理器当场改，入口由 `entrance.stamp` 改；重启时 `Standing::fold` 把每一行也交给这两份折叠。
 
 **红**：一个 run 以自己的名义写下一行 `endpoint_attached`（`record_for`），随后 worker 的 `book` 与从同一账本重折出来的 `book` 应当列出同样的端点。改动之前，worker 的 `book` 为空而重折的那份有这一端点。
 

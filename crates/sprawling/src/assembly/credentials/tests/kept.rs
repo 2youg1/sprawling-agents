@@ -18,7 +18,7 @@ use crate::assembly::*;
 /// Reading that as "no credential" asks the provider with no
 /// `Authorization` header at all - which answers 401, and a person
 /// reads that as their key being wrong - and then writes the endpoint
-/// back with its key gone. Clearing one is `DetachEndpoint`.
+/// back with its key gone.
 #[test]
 fn an_empty_key_keeps_the_credential_this_city_has_archived() {
     let dir = tempfile::tempdir().unwrap();
