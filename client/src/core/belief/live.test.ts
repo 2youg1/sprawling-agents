@@ -10,7 +10,7 @@ import { createBelief } from "../belief";
 import { newestWorking } from "./live";
 import type { RunBelief } from "./shape";
 import type { CityAnswer, EventKind, EventRecord, RunSummary } from "../../wire";
-import { B3Hash, RunId, Seq, TimeMs } from "../../wire";
+import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
 
 const RUNS = 10_000;
 // The runs still working in that city: the concurrency a city drives,
@@ -28,7 +28,7 @@ function runId(index: number): RunId {
   return RunId.make(`00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`);
 }
 
-function listed(index: number, addr: string | null = null): RunSummary {
+function listed(index: number, addr: Address | null = null): RunSummary {
   return {
     run: runId(index),
     addr,
@@ -89,7 +89,7 @@ test("the newest working run of a room costs the working runs, not the city", ()
   const store = createBelief(() => 0);
   // Every run of the city stood in the one room, so a reader that walks
   // the table to find the room's runs walks the whole city.
-  const room = "hall/mayor";
+  const room = Address.make("hall/mayor");
   store.adoptCity({
     active: WORKING,
     buildings: [],

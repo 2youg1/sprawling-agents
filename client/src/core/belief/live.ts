@@ -45,8 +45,8 @@ export function within(run: RunBelief, room: string): boolean {
 // steers, a `/stop` there reaches, and the room's page shows as going,
 // so the box and the page cannot name two runs.
 export function newestWorking(belief: Belief, room: string): RunBelief | undefined {
-  return Object.values(belief.runs)
-    .filter((run) => run.addr === room && working(run))
-    .sort((a, b) => (b.started ?? 0) - (a.started ?? 0))
-    .at(0);
+  return belief.live.reduce<RunBelief | undefined>(
+    (newest, run) => (run.addr === room ? run : newest),
+    undefined,
+  );
 }
