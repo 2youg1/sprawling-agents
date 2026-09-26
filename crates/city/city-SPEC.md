@@ -256,11 +256,10 @@ impl Ladder {
 ### 8-5 city::spine_files（形状 6 数据面＋落盘动作）
 
 ```rust
-pub const ROADMAP_FILE: &str = "Roadmap.md";
-pub const JOB_FILE: &str = "JOB.md";
+pub const ROADMAP_FILE: &str = kernel::ROADMAP_FILE;
 pub const CITY_FILE: &str = "City.md";
-pub(crate) const MEMO_FILE: &str = "Memo.md";      // 尚无外部读者
-pub const HANDOFF_FILE: &str = "Handoff.md";                      // 红测要点名它
+pub const MEMO_FILE: &str = "Memo.md";
+pub const HANDOFF_FILE: &str = kernel::layout::HANDOFF_FILE;      // 红测要点名它
 pub const AGENTS_FILE: &str = "AGENTS.md";                        // 项目自带的约定；城不写也不拥有
 
 pub struct JobBrief<'a> { pub task: &'a str, pub goal: &'a str, pub budget: &'a str }
@@ -654,7 +653,7 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 
 ## 14 硬编码声明
 
-城里每一份文件叫什么、落在哪，权威是 `kernel::layout`：`ARCHIVE_DIR`、`BUILDING_SHELF`、`CONFIG_FILE`、`LIBRARY_DIR`、`URBANITE_FILE` 由本 crate `pub use` 转出而不复述，路径由 `CityLayout` 的十一个方法给出而不逐段 push。`spine_files` 的 `HANDOFF_FILE` 与 `JOB_FILE` 同样只是 `kernel::layout` 那一份的别名。本 crate 自己定义的文件名只剩没进布局表的那几份：`RULES_FILE`、`DESKTOP_SCOPE_FILE`、`PREFERENCES_FILE`、`SCHEDULE_FILE`、`WATCH_FILE`、`GITIGNORE_FILE` 与 spine 剩下的那一组。
+城里每一份文件叫什么、落在哪，权威是 `kernel::layout`：`ARCHIVE_DIR`、`BUILDING_SHELF`、`CONFIG_FILE`、`LIBRARY_DIR`、`URBANITE_FILE` 由本 crate `pub use` 转出而不复述，路径由 `CityLayout` 的十一个方法给出而不逐段 push。`spine_files` 的 `HANDOFF_FILE` 同样只是 `kernel::layout` 那一份的别名；房间的 `JOB.md` 只经 `job_path` 取，文件名留在 `kernel::layout::JOB_FILE` 一处。本 crate 自己定义的文件名只剩没进布局表的那几份：`RULES_FILE`、`DESKTOP_SCOPE_FILE`、`PREFERENCES_FILE`、`SCHEDULE_FILE`、`WATCH_FILE`、`GITIGNORE_FILE` 与 spine 剩下的那一组。
 
 Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第一句话）。
 

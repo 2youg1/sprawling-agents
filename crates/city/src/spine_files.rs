@@ -49,9 +49,6 @@ pub const MEMO_FILE: &str = "Memo.md";
 /// `kernel::layout` beside the path it is laid down at, and spelled
 /// here for the same reason `ROADMAP_FILE` is.
 pub const HANDOFF_FILE: &str = kernel::layout::HANDOFF_FILE;
-/// The task of one session, in the room it is run from. Named in
-/// `kernel::layout`, spelled here.
-pub const JOB_FILE: &str = kernel::layout::JOB_FILE;
 /// What this building is and the decisions it holds, written before the
 /// code that follows them. The one spine document that is committed:
 /// a promise a clone cannot read is not a promise.
