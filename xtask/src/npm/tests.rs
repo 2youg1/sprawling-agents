@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 
 use super::lockfile::{allowed, document, lock_of, manifest_of, permitted, read_jsonc};
-use super::{check, judge_lockfile, judge_runtime};
+use super::{RUNTIME, check, judge_lockfile, judge_runtime};
 
 /// What `bun.lock` actually looks like: trailing commas after the last
 /// entry of every object. A reader that handed this to `serde_json`
@@ -78,35 +78,35 @@ fn every_way_the_lockfile_and_the_manifest_disagree_is_named() {
 /// half a person would notice last.
 #[test]
 fn the_runtime_allowlist_is_judged_in_both_directions() {
-    let extra = manifest_of(
-        &document(
-            "package.json",
-            r#"{"dependencies": {"effect": "1", "svelte": "1", "lodash": "1"}}"#,
-        )
-        .unwrap(),
-    );
-    let mut out = Vec::new();
-    judge_runtime(&extra, &mut out);
+    let judged = |names: &[&str]| {
+        let listed: Vec<String> = names
+            .iter()
+            .map(|name| format!(r#""{name}": "1""#))
+            .collect();
+        let body = format!(r#"{{"dependencies": {{{}}}}}"#, listed.join(", "));
+        let mut out = Vec::new();
+        judge_runtime(
+            &manifest_of(&document("package.json", &body).unwrap()),
+            &mut out,
+        );
+        out
+    };
+
+    let extra: Vec<&str> = RUNTIME.iter().copied().chain(["lodash"]).collect();
+    let out = judged(&extra);
     assert_eq!(out.len(), 1);
     assert!(out[0].violation.contains("lodash"));
 
-    let missing =
-        manifest_of(&document("package.json", r#"{"dependencies": {"effect": "1"}}"#).unwrap());
-    let mut out = Vec::new();
-    judge_runtime(&missing, &mut out);
+    let missing: Vec<&str> = RUNTIME
+        .iter()
+        .copied()
+        .filter(|name| *name != "svelte")
+        .collect();
+    let out = judged(&missing);
     assert_eq!(out.len(), 1);
     assert!(out[0].violation.contains("svelte"));
 
-    let exact = manifest_of(
-        &document(
-            "package.json",
-            r#"{"dependencies": {"effect": "1", "svelte": "1"}}"#,
-        )
-        .unwrap(),
-    );
-    let mut out = Vec::new();
-    judge_runtime(&exact, &mut out);
-    assert!(out.is_empty());
+    assert!(judged(&RUNTIME).is_empty());
 }
 
 /// An `OR` offers a choice and an `AND` imposes all of it. Reading them
