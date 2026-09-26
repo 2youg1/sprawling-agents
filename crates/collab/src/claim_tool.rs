@@ -223,6 +223,10 @@ impl ClaimDesk {
         }
         let tree = self.tree()?;
         let held = tree.claim(id)?;
+        // The desk's copy answers first because its refusal names a
+        // ready node; the booking answers for every run dispatched beside
+        // this one, and nothing is written until it has.
+        (self.booking.0)(id)?;
         let item = tree
             .get(id)
             .map_or_else(String::new, |node| node.row.item.clone());
