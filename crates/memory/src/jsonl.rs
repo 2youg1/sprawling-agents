@@ -25,6 +25,7 @@
 //! `Box<dyn Vfs>`.
 
 mod append;
+mod barrier;
 mod first_line;
 mod ledger;
 mod open;
