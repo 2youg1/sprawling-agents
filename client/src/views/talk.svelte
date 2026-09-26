@@ -37,6 +37,8 @@
   import type { Boundary, ForkPlan } from "./talk/forking";
   import Thread from "./talk/thread.svelte";
   import Showing from "./shared/showing.svelte";
+  import Produced from "./talk/produced.svelte";
+  import { drawsCalls } from "../core/results";
   import { anchorAt, footOf } from "./talk/anchoring";
   import type { Anchoring } from "./talk/anchoring";
   import { NOTHING, artifactsIn } from "./talk/trace";
@@ -91,6 +93,11 @@
     });
   });
 
+  // Where the produced line measures from: the tree the run opened at,
+  // once the run has closed. An open run has produced nothing final yet.
+  const producedFrom = $derived(
+    answer?.closing === null || answer?.closing === undefined ? null : (answer.opened_at ?? null),
+  );
   const artifacts = $derived(answer === undefined ? NOTHING : artifactsIn(answer.turns));
   // Whether there is a card to draw at all. Any one of the three panes
   // is enough; a run that read nothing, changed nothing and ran nothing
@@ -299,6 +306,9 @@
           {#each shown as run (run.run)}
             <Thread {run} {who} onFork={doFork} onRetry={send} />
           {/each}
+          {#if !drawsCalls($held.showing) && producedFrom !== null}
+            <Produced base={producedFrom} />
+          {/if}
           <Waiting />
         {/if}
       </div>

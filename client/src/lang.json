@@ -3056,6 +3056,10 @@
     "en": "what it produced",
     "zh": "产出"
   },
+  "results_produced_line": {
+    "en": "changed {files} files · +{added} −{removed}",
+    "zh": "改了 {files} 个文件 · +{added} −{removed}"
+  },
   "showing_note": {
     "en": "Results only draws a room's words, answers, endings and what they produced, and the city's waiting, failed and finished runs. The switch on either page changes this too.",
     "zh": "只看结果时，房间只画人的话、回答、结局与产出，城只列等你、失败、刚完成三类。两页上的开关也会改这一项。"

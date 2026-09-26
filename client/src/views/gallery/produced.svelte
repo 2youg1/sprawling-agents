@@ -15,8 +15,8 @@
   // wants. A fold that counted one set of calls while the panel drew
   // another would be two answers to "what did this run just do".
 
-  import type { Call, Output, Turn } from "../../wire";
-  import { RunId, Seq, TimeMs } from "../../wire";
+  import type { Answer, Call, Output, Query, Turn } from "../../wire";
+  import { GitOid, RunId, Seq, TimeMs } from "../../wire";
   import type { Artifacts } from "../talk/trace";
 
   // The run every fixture here speaks for. One id, because the link a
@@ -158,6 +158,25 @@ const HIDDEN: usize = 0;
   // No path at all, which is what a call that named no file hands
   // over: no trail is drawn and nothing is coloured, and the line
   // numbers are the only thing left to read by.
+  // The tree a finished run opened at, and what the building's working
+  // tree says moved since: the answer the results-only line sums.
+  const OPENED: GitOid = GitOid.make("3f2a9c1e7b4d5a6f8e0c1b2d3a4f5e6d7c8b9a01");
+  export function changed(query: Query): Answer | undefined {
+    return typeof query === "object" && "changes" in query
+      ? {
+          changes: {
+            base: OPENED,
+            head: null,
+            files: [
+              { path: "crates/kernel/src/ledger.rs", how: "modified", lines: { counted: { added: 42, removed: 7 } } },
+              { path: "crates/kernel/src/ledger/tests.rs", how: "added", lines: { counted: { added: 18, removed: 0 } } },
+              { path: "docs/ledger.png", how: "modified", lines: "binary" },
+            ],
+          },
+        }
+      : undefined;
+  }
+
   const UNNAMED = `error: the city refused to start
   because: CONFIG.toml names a provider with no key filed for it
   try: sprawling attach --provider zenmux
@@ -168,7 +187,9 @@ const HIDDEN: usize = 0;
   import Artifact from "../talk/artifact.svelte";
   import Calls from "../talk/calls.svelte";
   import Code from "../parts/code.svelte";
+  import Produced from "../talk/produced.svelte";
   import Case from "./case.svelte";
+  import Stand from "./stand.svelte";
 </script>
 
 {#snippet card(artifacts: Artifacts)}
@@ -230,4 +251,10 @@ const HIDDEN: usize = 0;
 <Case label="code · no file was named, so no trail and no colour">
   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
   {@render framed("", UNNAMED)}
+</Case>
+
+<Case label="room · results only, what a finished run produced">
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={changed}>
+    <Produced base={OPENED} />
+  </Stand>
 </Case>

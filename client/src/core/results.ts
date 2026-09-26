@@ -99,5 +99,12 @@ export interface Produced {
 }
 
 export function producedOf(files: readonly FileChange[]): Produced {
-  return { files: 0, added: 0, removed: 0 };
+  let added = 0;
+  let removed = 0;
+  for (const file of files) {
+    if (typeof file.lines === "string") continue;
+    added += file.lines.counted.added;
+    removed += file.lines.counted.removed;
+  }
+  return { files: files.length, added, removed };
 }
