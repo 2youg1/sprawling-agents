@@ -840,3 +840,22 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **决定**：模块方向写在 ARCHITECTURE.md 与 crate 边同一节，由同一道门读。**败给的方案**：一个在 sprawling 里扫自己源码的测试——它判的是树的形状而不是行为，放在被判的 crate 里会让产品 crate 知道自己的源码路径；也败给新开一道门，因为方向就是依赖图的一部分，门名册不必为它多一行。**重议条件**：某个 crate 的模块要按图而不是按禁止表来判（例如要求整个 crate 无环），那时改为从 `use` 解析出模块图。
 
+
+### 8-34 `unused`：清单里声明、源码里从不点名的依赖（形状 1 判定）
+
+**接口**：`unused::check(root) -> Result<Vec<Violation>, XtaskError>`，在 `GATES` 里，随 `just gates` 进 `just check`。两条断言：
+
+- **包的依赖有人点名**：`docnum::facts::packages` 列出的每个包（根清单的 `members` 与 `exclude`），它的 `[dependencies]`、`[dev-dependencies]`、`[build-dependencies]` 以及各 `[target.*]` 下同名三表里的每个键，把 `-` 换成 `_` 之后，至少在这个包目录下某个 `.rs` 文件里作为一个完整标识符出现一次。违例的 `location` 是 `<包目录>/Cargo.toml`，`violation` 点名表与键。
+- **工作区依赖有人继承**：根清单 `[workspace.dependencies]` 的每个键，至少是某个包的某张依赖表里的键。违例的 `location` 是 `Cargo.toml`。
+
+清单不解析或某个包的清单读不到，是 `XtaskError::Doc`／`Io`，退出码 2，不当作「没有依赖」。
+
+**读法**：按词读文本，不解析 Rust。键在代码里的名字就是键本身（`package = "…"` 改名时，代码写的也是键），所以不读 `package`。一个包的全部 `.rs` 文件合成一份文本判三张表：dev 依赖只在测试里点名、build 依赖只在 `build.rs` 里点名，这两条细分不判。这是有意放宽：它挡的缺陷是「依赖留在清单里而代码早已不用」，一个依赖被错放在哪张表里由 cargo 的编译错误来挡。
+
+**为什么**：`-D warnings` 下 rustc 的 `dead_code` 已经挡住 crate 私有的死函数与死类型，`unused_crate_dependencies` 却会对每个只在测试或 bench 里用到的依赖误报，工作区因此不开它；清单里的死依赖于是没有任何一道检查看见，而它每次都多编译一整棵依赖树。死代码里能机械判定、编译器又不判的，就是这一类。
+
+**败给的方案**：`cargo machete` 或 `cargo +nightly udeps`。前者判的正是同一件事，但要多装一个工具，并且 `just prereqs` 在缺它的机器上只能跳过——一道会被跳过的门挡不住回归；后者要 nightly 并且整仓编译一次，判一次要几分钟，不能进每次的 `just check`。本门只读文本，一次在毫秒量级。
+
+**已知的限**：只被 feature 打开、代码里从不点名的依赖（例如只为给传递依赖开一个 feature 而声明的包）会被判红；树上今天没有这种依赖。出现时在该包清单里加注释说明理由，并给本门加一张从 `[package.metadata]` 读的豁免表——在那之前不预先造豁免机制。宏展开出来的名字（`#[derive(Serialize)]` 而全文从不写 `serde`）同样判红；把 `use serde::Serialize` 写出来即可。
+
+**本节属门禁机具，与产品代码分开提交。**

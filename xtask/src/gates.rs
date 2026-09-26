@@ -18,13 +18,13 @@ use std::thread;
 use crate::report::{self, Violation, XtaskError};
 use crate::{
     artifact, boundary, budget, color, depmap, docnum, guard, header, length, lexicon, modmap, npm,
-    proof, release, render, secret, specalign, wire_ts, wiring, wording,
+    proof, release, render, secret, specalign, unused, wire_ts, wiring, wording,
 };
 
 /// How many gates run. The array below is typed by it, so the number and
 /// the list are one token apart and cannot disagree; `vocabulary` reads
 /// it so no document has to hold a copy.
-pub(crate) const COUNT: usize = 20;
+pub(crate) const COUNT: usize = 21;
 
 /// One gate: the name a person types, and the check it runs.
 pub(crate) struct Gate {
@@ -62,6 +62,10 @@ pub(crate) const GATES: [Gate; COUNT] = [
     Gate {
         name: "depmap",
         check: depmap::check,
+    },
+    Gate {
+        name: "unused",
+        check: unused::check,
     },
     Gate {
         name: "npm",

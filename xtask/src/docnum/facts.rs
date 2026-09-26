@@ -205,7 +205,7 @@ fn split(key: &str) -> (&str, Option<&str>) {
 /// The repository root is not among them. It holds the workspace table
 /// rather than a package, and counting from it as well as from each
 /// member would count every file in the tree twice.
-pub(super) fn packages(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
+pub(crate) fn packages(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
     let parsed = root_manifest(root)?;
     let mut out = BTreeSet::new();
     for list in ["members", "exclude"] {
@@ -231,7 +231,7 @@ pub(super) fn packages(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
 
 /// The root manifest, which states the workspace's package roster and
 /// the versions every member inherits.
-pub(super) fn root_manifest(root: &Path) -> Result<toml::Value, XtaskError> {
+pub(crate) fn root_manifest(root: &Path) -> Result<toml::Value, XtaskError> {
     let text = walk::read_text(&root.join("Cargo.toml"))?;
     toml::from_str(&text).map_err(|err| XtaskError::Doc {
         file: "Cargo.toml".to_owned(),
