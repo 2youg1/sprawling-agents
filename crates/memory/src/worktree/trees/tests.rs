@@ -139,6 +139,30 @@ fn a_released_tree_stays_on_disk_for_the_nodes_next_run() {
     assert!(dir.path().join("lab").join("notes.md").exists());
 }
 
+/// A kept tree whose node has nothing unmerged follows the trunk: a
+/// node that starts from where the city was when it last ran would do
+/// its next work on files somebody has since changed, and every merge
+/// of it would be refused as stale.
+#[test]
+fn a_kept_tree_with_nothing_unmerged_starts_from_the_trunk_as_it_now_stands() {
+    let dir = tempfile::tempdir().unwrap();
+    let trees = city(dir.path());
+    trees.release(trees.claim(&name("node-1")).unwrap()).unwrap();
+    std::fs::write(dir.path().join("lab").join("notes.md"), b"second
+").unwrap();
+    Checkpoint::open(dir.path())
+        .unwrap()
+        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+        .unwrap();
+
+    let again = trees.claim(&name("node-1")).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(again.path().join("lab").join("notes.md")).unwrap(),
+        "second
+"
+    );
+}
+
 #[test]
 fn a_node_that_comes_back_finds_what_it_committed_and_not_what_it_did_not() {
     let dir = tempfile::tempdir().unwrap();
