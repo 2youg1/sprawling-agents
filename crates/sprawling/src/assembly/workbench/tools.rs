@@ -56,8 +56,6 @@ impl RunWorker {
         // what this run admits, and until it was set here the mode's own
         // catalog entry reached no model.
         held(&catalog, "lay out the catalog")?.set_mode(mode);
-        // Custody stands in front of the one door residents write text
-        // through, so a key never reaches a file (sprawling-SPEC.md 8-85).
         let edit = kept::KeptEdit::new(
             EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?,
             self.vault_handle(),
