@@ -1712,8 +1712,8 @@
     "zh": "这个界面看起来怎样"
   },
   "setup_group_hint_advanced": {
-    "en": "the record itself, and the doors out of it",
-    "zh": "账本本身，以及离开它的路径"
+    "en": "the welcome walk, from its first step",
+    "zh": "从第一步重走欢迎页"
   },
   "setup_group_hint_accounts": {
     "en": "who the city may call, and with which key",
@@ -2080,8 +2080,8 @@
     "zh": "请求重试上限"
   },
   "setup_rerun": {
-    "en": "run again",
-    "zh": "再走一遍"
+    "en": "walk the welcome again",
+    "zh": "再走一遍欢迎页"
   },
   "setup_select_all": {
     "en": "choose all",
