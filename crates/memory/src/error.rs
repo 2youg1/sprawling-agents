@@ -98,6 +98,13 @@ pub enum MemoryError {
     /// or a second ledger in this one (memory-SPEC 8-1).
     #[error("the ledger at {dir} is held by another writer")]
     LedgerHeld { dir: PathBuf },
+    /// A whole-chain audit found a broken line, so this writer stopped
+    /// taking new lines; `source` is the audit's own reason (8-27).
+    #[error("the ledger stopped taking writes because its chain failed verification")]
+    ChainHalted {
+        #[source]
+        source: AxError,
+    },
 }
 
 impl MemoryError {
@@ -129,7 +136,7 @@ impl MemoryError {
             .with_recovery(format!(
                 "non-tail damage cannot be auto-repaired ({source}); inspect the segment"
             )),
-            MemoryError::Draft { source } => source,
+            MemoryError::Draft { source } | MemoryError::ChainHalted { source } => source,
             MemoryError::Worktree { op, detail } => {
                 AxError::failure(AxCode::StorageFatal, op, detail).with_recovery(
                     "the repository or the filesystem refused; fix that, then claim again",
