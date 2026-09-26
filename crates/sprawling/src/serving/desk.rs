@@ -10,6 +10,7 @@ use kernel::RunId;
 use runtime::Interrupt;
 
 use super::relay::Wake;
+use crate::assembly::Closing;
 
 /// Where commands wait between the socket and the worker.
 ///
@@ -24,10 +25,10 @@ pub(crate) struct CommandDesk {
     /// desk. A post rings it so that thread wakes on the post itself
     /// rather than on a timer.
     bell: std::sync::Mutex<Option<std::sync::mpsc::Sender<Wake>>>,
-    /// Set once, by whoever decided the city stops. Read at the same
-    /// point the queue is read, so a close lands between commands and
-    /// never inside one.
-    closing: std::sync::atomic::AtomicBool,
+    /// Set once, by whoever decided the city stops, with the reason
+    /// they stopped it. Read at the same point the queue is read, so a
+    /// close lands between commands and never inside one.
+    closing: std::sync::OnceLock<Closing>,
 }
 
 /// What the desk holds, under one lock.
@@ -99,10 +100,10 @@ pub(crate) enum DeskWait<'desk> {
     /// like this one is returned by every idle tick as well.
     Command(Box<Posted>, Underway<'desk>),
     Idle,
-    /// A person chose to stop. Distinct from `Gone`, which is the desk
-    /// itself breaking: one of these deserves a handoff and the other is
-    /// a city that can no longer write one.
-    Close,
+    /// The city is stopping, for the reason it carries. Distinct from
+    /// `Gone`, which is the desk itself breaking: one of these deserves
+    /// a handoff and the other is a city that can no longer write one.
+    Close(&'desk Closing),
     Gone,
 }
 
@@ -127,7 +128,7 @@ impl CommandDesk {
                 keys: std::collections::BTreeSet::new(),
             }),
             bell: std::sync::Mutex::new(None),
-            closing: std::sync::atomic::AtomicBool::new(false),
+            closing: std::sync::OnceLock::new(),
         }
     }
 
@@ -137,10 +138,10 @@ impl CommandDesk {
     /// it is the process's own end, and a wire frame that could spell it
     /// would be a stranger's way to stop somebody's city. The worker
     /// reads it where it reads the queue, so whatever is running
-    /// finishes first.
-    pub(crate) fn close(&self) {
-        self.closing
-            .store(true, std::sync::atomic::Ordering::Release);
+    /// finishes first. The first reason given stands: a second close
+    /// does not rewrite why the city stopped.
+    pub(crate) fn close(&self, why: Closing) {
+        self.closing.get_or_init(|| why);
         self.ring(Wake::Close);
     }
 
@@ -215,8 +216,10 @@ impl CommandDesk {
         let first = waiting.queue.iter().position(|posted| !for_a_lane(posted));
         match first.and_then(|at| waiting.queue.remove(at)) {
             Some(posted) => self.carrying(posted),
-            None if self.closing.load(std::sync::atomic::Ordering::Acquire) => DeskWait::Close,
-            None => DeskWait::Idle,
+            None => match self.closing.get() {
+                Some(why) => DeskWait::Close(why),
+                None => DeskWait::Idle,
+            },
         }
     }
 

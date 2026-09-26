@@ -28,7 +28,7 @@ fn a_city_whose_norms_cannot_be_read_refuses_to_say_it_wrote_them_down() {
     std::fs::create_dir_all(&norms).unwrap();
 
     let err = worker
-        .close_city()
+        .close_city(&Closing::Chosen)
         .expect_err("a close that cannot name the norms is not an orderly close");
     assert!(
         err.to_string().contains(city::CITY_FILE),
@@ -277,7 +277,7 @@ fn a_city_that_is_closed_says_so_before_it_stops() {
         runtime::diagnostics::Diagnostics::off(),
     )
     .unwrap();
-    worker.close_city().unwrap();
+    worker.close_city(&Closing::Chosen).unwrap();
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let last = verified

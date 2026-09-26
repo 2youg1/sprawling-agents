@@ -171,7 +171,7 @@ fn a_closing_city_lands_the_runs_still_driving() {
     assert!(worker.driving(), "a lane is going");
     worker.land_the_rest().unwrap();
     assert!(!worker.driving(), "the closing city waited for it");
-    worker.close_city().unwrap();
+    worker.close_city(&Closing::Chosen).unwrap();
     drop(provider);
 
     let lines = history(&report.ledger_dir);
@@ -306,7 +306,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
         assert!(looked < looks, "the run never froze");
         std::thread::sleep(LOOK);
     }
-    desk.close();
+    desk.close(Closing::Chosen);
     attending.join().unwrap();
     drop(provider);
     let run = run.to_string();

@@ -24,7 +24,7 @@ use super::attending::{Outward, Started, spawn_worker};
 use super::desk::CommandDesk;
 use super::serve::Opening;
 use super::serve::Serving;
-use crate::assembly::{acp_dispatch, ledger_dir, rebuild_views};
+use crate::assembly::{Closing, acp_dispatch, ledger_dir, rebuild_views};
 use crate::views::Views;
 
 /// One recording in, one line of text back.
@@ -296,7 +296,7 @@ impl Listening {
                 })
             }
         };
-        desk.close();
+        desk.close(Closing::of(&served));
         // Joined rather than left to the process exit: the handoff is
         // written by that thread, and a main that returned first would end
         // the process before the line it exists to write.

@@ -224,14 +224,14 @@ pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
                     SCHEDULE_TICK_MS.saturating_sub(since),
                 ))
             }
-            DeskWait::Close => {
+            DeskWait::Close(why) => {
                 // The lanes are waited for rather than abandoned: a lane
                 // left blocked on an append loses lines this city had
                 // already told it were durable.
                 if let Err(err) = worker.land_the_rest() {
                     eprintln!("a run could not be landed as the city closed: {err}");
                 }
-                if let Err(err) = worker.close_city() {
+                if let Err(err) = worker.close_city(why) {
                     eprintln!("the city could not write its handoff: {err}");
                 }
                 break;

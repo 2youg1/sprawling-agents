@@ -116,13 +116,52 @@ fn a_close_lands_between_commands_and_never_inside_one() {
         },
         channels::Reply::nowhere(),
     );
-    desk.close();
+    desk.close(Closing::Chosen);
 
     assert!(
         matches!(desk.next(|_| false), DeskWait::Command(..)),
         "the queued command was dropped by the close"
     );
-    assert!(matches!(desk.next(|_| false), DeskWait::Close));
+    assert!(matches!(
+        desk.next(|_| false),
+        DeskWait::Close(Closing::Chosen)
+    ));
+}
+
+/// A serve that failed used to close the city through the same door
+/// Ctrl-C uses, and the handoff then said the person had closed it: a
+/// choice nobody made, and a failure the next session never heard of.
+#[test]
+fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    let desk = CommandDesk::new();
+    desk.close(Closing::Broken {
+        cause: "the listener is gone".to_owned(),
+    });
+    crate::serving::attending::attend(&mut worker, &desk);
+
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let last = verified
+        .raw_lines()
+        .last()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .expect("the ledger has a last line");
+    assert!(last.contains("handoff_written"), "{last}");
+    assert!(
+        !last.contains("closed by the person"),
+        "a failure is recorded as a choice: {last}"
+    );
+    assert!(
+        last.contains("the listener is gone"),
+        "the next session is not told what failed: {last}"
+    );
 }
 
 /// One job in a window used to take the rest of that window with it:

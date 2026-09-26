@@ -66,6 +66,7 @@ use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 pub(crate) use folds::{Standing, rebuild_views};
 use genesis::city_segment;
 pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
+pub(crate) use lifetime::Closing;
 use lifetime::LedgerOpening;
 pub(crate) use mcp::McpLink;
 use mcp::{connect_mcp, mounts_under, transport_site};

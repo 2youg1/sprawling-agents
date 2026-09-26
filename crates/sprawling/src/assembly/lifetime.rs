@@ -58,6 +58,35 @@ impl LedgerOpening {
     }
 }
 
+/// Why the city is closing, carried from whoever decided it to the
+/// line that records it.
+///
+/// Exhaustive rather than a flag, because the handoff says a different
+/// thing for each: a close the person chose and a close serving forced
+/// are different facts for the next session, and a record that spelled
+/// both as the first would claim a choice nobody made.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Closing {
+    /// The person stopped the city from the keyboard.
+    Chosen,
+    /// Serving failed and took the city down; `cause` is what failed.
+    Broken { cause: String },
+}
+
+impl Closing {
+    /// The one reading of how serving ended: a serve that returned cleanly
+    /// was ended by the person's Ctrl-C, and a serve that failed names its
+    /// failure, so a failed serve is never recorded as the person's choice.
+    pub(crate) fn of(served: &Result<(), AxError>) -> Self {
+        match served {
+            Ok(()) => Self::Chosen,
+            Err(failure) => Self::Broken {
+                cause: failure.to_string(),
+            },
+        }
+    }
+}
+
 impl RunWorker {
     /// # Errors
     /// Propagates whatever opening the ledger or the store reports, and
@@ -146,9 +175,9 @@ impl RunWorker {
         self.opening
     }
 
-    /// Closes the city in the record, so a stop somebody chose and a
-    /// stop that was a crash are different lines rather than the same
-    /// silence.
+    /// Closes the city in the record, so a stop somebody chose, a stop
+    /// serving forced, and a crash are three different records rather
+    /// than one line and one silence.
     ///
     /// The five sections are the city's own: what the next session must
     /// read is the city's norms, and where it left off is the position
@@ -159,7 +188,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates the handoff's refusal of an empty must-read list, and
     /// the ledger's refusal to take the line.
-    pub(crate) fn close_city(&mut self) -> Result<(), AxError> {
+    pub(crate) fn close_city(&mut self, why: &Closing) -> Result<(), AxError> {
         // The city's own norm, not a building's: `city::norms` answers
         // for a run at an address, and this line belongs to the city.
         // Through the same reader the prefix uses. What this city's
@@ -171,12 +200,24 @@ impl RunWorker {
         let hash = self.cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
         must_read.push(Locator::cas(hash));
         let standing = self.ledger.position();
+        let (overview, context, next_step) = match why {
+            Closing::Chosen => (
+                "the city was closed by the person running it".to_owned(),
+                "an orderly close, not a crash: nothing was interrupted mid-command".to_owned(),
+                "`sprawling serve` on this directory continues from here".to_owned(),
+            ),
+            Closing::Broken { cause } => (
+                format!("the city stopped because serving failed: {cause}"),
+                "not a choice: serving failed, and the command in hand finished first".to_owned(),
+                "fix what the failure names, then `sprawling serve` on this directory".to_owned(),
+            ),
+        };
         let handoff = runtime::handoff::Handoff::new(
             must_read,
-            "the city was closed by the person running it".to_owned(),
+            overview,
             format!("the ledger stands at {}", standing.value()),
-            "an orderly close, not a crash: nothing was interrupted mid-command".to_owned(),
-            "`sprawling serve` on this directory continues from here".to_owned(),
+            context,
+            next_step,
         )?;
         self.note(
             runtime::diagnostics::Level::Effect,
@@ -190,7 +231,9 @@ impl RunWorker {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
+    use super::Closing;
     use crate::assembly::{RunWorker, init_city, ledger_dir};
+    use kernel::{AxCode, AxError};
     use std::io::Write;
 
     /// A crash mid-write leaves half a line; the next open cuts it and
@@ -222,6 +265,21 @@ mod tests {
         assert!(
             summary.contains(&format!("{} byte(s)", torn.len())),
             "the scan must say how much of the tail was cut: {summary}"
+        );
+    }
+
+    #[test]
+    fn a_failed_serve_closes_broken_and_a_clean_one_closes_chosen() {
+        let failure = AxError::failure(AxCode::StorageFatal, "serve the city", "port taken")
+            .with_recovery("choose another port");
+        assert_eq!(
+            [Closing::of(&Err(failure.clone())), Closing::of(&Ok(()))],
+            [
+                Closing::Broken {
+                    cause: failure.to_string()
+                },
+                Closing::Chosen
+            ]
         );
     }
 }
