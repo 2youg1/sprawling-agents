@@ -44,6 +44,9 @@ publish = false
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# The person's face of `sprawling view` reads keys and draws frames in a raw
+# terminal; no colour, clipboard or paste features, so it links the least.
+crossterm = { version = "0.29", default-features = false, features = ["events", "windows"] }
 toml = "1.1"
 # Stage 1 pins: blake3 is the library-wide sole hash;
 # uuid v7 is human-readable identity only (parse/format; no generation in kernel).
