@@ -256,5 +256,7 @@ mod frame;
 mod frame_tests;
 #[path = "view/keys.rs"]
 mod keys;
+#[path = "view/rounds.rs"]
+mod rounds;
 #[path = "view/terminal.rs"]
 mod terminal;

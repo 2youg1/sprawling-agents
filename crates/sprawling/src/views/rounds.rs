@@ -140,7 +140,7 @@ fn closing(records: &[EventRecord]) -> Option<channels::Closing> {
     clippy::wildcard_enum_match_arm,
     reason = "the kinds that open, close and fill a turn are named; every other kind is a note"
 )]
-pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<channels::Turn> {
+pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<channels::Turn> {
     let mut folded: Vec<channels::Turn> = Vec::new();
     // Which turn each outstanding call sits in, by the id the runtime
     // gave it. Answers arrive after other calls have been made, so the

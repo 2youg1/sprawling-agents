@@ -40,4 +40,4 @@ mod person;
 mod plan_view;
 mod views;
 
-pub use views::ask;
+pub use views::{ask, turns};

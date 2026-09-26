@@ -19,6 +19,12 @@ pub(super) fn json_lines(value: &Value) -> Vec<String> {
     lines
 }
 
+/// A Ledger line drawn as [`json_lines`] draws its JSON; a line that is
+/// not JSON is drawn as the one string it is.
+pub(super) fn line_lines(line: &str) -> Vec<String> {
+    json_lines(&serde_json::from_str(line).unwrap_or_else(|_| Value::String(line.to_owned())))
+}
+
 fn push_members(value: &Value, indent: &str, lines: &mut Vec<String>) {
     match value {
         Value::Object(members) => {

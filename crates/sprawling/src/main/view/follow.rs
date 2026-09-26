@@ -10,17 +10,24 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use kernel::{EventRecord, Seq};
+use kernel::{EventRecord, RunId, Seq};
 use memory::{LedgerIndex, Refreshed};
 use sprawling::lineage::{Lineage, RunLine};
 
 use super::ViewError;
-use super::frame::Row;
 
 /// How long the viewer waits for a key before it looks at the ledger
 /// again; a run that starts in a serving city is on the tree within one
 /// tick and one fold.
 pub(super) const FOLLOW_TICK: Duration = Duration::from_millis(100);
+
+/// One Ledger line of the `records` lens.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Row {
+    pub(super) seq: Seq,
+    pub(super) run: RunId,
+    pub(super) line: String,
+}
 
 /// A resident index and lineage fold over one city's ledger.
 pub(super) struct Follow {

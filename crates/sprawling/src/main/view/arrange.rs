@@ -4,14 +4,17 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The lineage of a city arranged as the tree the person reads:
-//! city › building › room › session › run, a fork under the run it
-//! forked from (sprawling-SPEC.md 8-91). Every node has one parent.
+//! city › building › room › session › run › round › call, a fork under
+//! the run it forked from (sprawling-SPEC.md 8-91). Every node has one
+//! parent.
 
 use std::collections::BTreeMap;
 
 use kernel::{Address, RunId, Seq};
 use serde_json::json;
 use sprawling::lineage::RunLine;
+
+use super::rounds::{Rounds, append_below};
 
 /// Which node an entry is; two entries never share a key.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -21,6 +24,8 @@ pub(super) enum NodeKey {
     Room(Address),
     Session(Address, Option<Seq>),
     Run(RunId),
+    Round(RunId, u32),
+    Call(RunId, Seq),
 }
 
 /// One node, in display order.
@@ -36,8 +41,9 @@ pub(super) struct Entry {
 }
 
 /// The tree of `runs` flattened depth first, the city at index 0;
-/// children in the order their earliest run started.
-pub(super) fn arrange(runs: &[RunLine]) -> Vec<Entry> {
+/// children in the order their earliest run started, a folded run's
+/// rounds before its forks.
+pub(super) fn arrange(runs: &[RunLine], rounds: &Rounds) -> Vec<Entry> {
     let mut ordered: Vec<&RunLine> = runs.iter().collect();
     ordered.sort_by_key(|line| line.first_seq);
     let known: BTreeMap<RunId, &RunLine> = ordered.iter().map(|line| (line.run, *line)).collect();
@@ -85,6 +91,11 @@ pub(super) fn arrange(runs: &[RunLine]) -> Vec<Entry> {
                 .rev()
                 .map(|child| (child.clone(), below, Some(at))),
         );
+        let folded = if let NodeKey::Run(run) = &key {
+            rounds.get(run)
+        } else {
+            None
+        };
         entries.push(Entry {
             key,
             depth,
@@ -93,6 +104,9 @@ pub(super) fn arrange(runs: &[RunLine]) -> Vec<Entry> {
             label,
             detail,
         });
+        if let Some(folded) = folded {
+            append_below(&mut entries, at, folded);
+        }
     }
     entries
 }
@@ -124,6 +138,7 @@ fn describe(
             || (run.to_string(), json!({ "run": run.to_string() })),
             |line| (run_label(line), line.to_json()),
         ),
+        NodeKey::Round(..) | NodeKey::Call(..) => (String::new(), serde_json::Value::Null),
     }
 }
 

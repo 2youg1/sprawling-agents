@@ -9,23 +9,17 @@
 
 use std::collections::BTreeSet;
 
-use kernel::{RunId, Seq};
+use kernel::RunId;
 use sprawling::lineage::RunLine;
 
 use super::arrange::{Entry, NodeKey, arrange};
-use super::detail::json_lines;
+use super::detail::{json_lines, line_lines};
+use super::follow::Row;
 use super::keys::Action;
+use super::rounds::{Rounds, fold};
 
 /// From this many columns on, the detail pane stays open on the right.
 pub(super) const SIDE_PANE_MIN_WIDTH: usize = 110;
-
-/// One Ledger line of the `records` lens.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Row {
-    pub(super) seq: Seq,
-    pub(super) run: RunId,
-    pub(super) line: String,
-}
 
 /// The terminal's size in character cells.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,6 +54,8 @@ enum Life {
 }
 
 pub(super) struct Face {
+    runs: Vec<RunLine>,
+    rounds: Rounds,
     entries: Vec<Entry>,
     records: Vec<Row>,
     lens: Lens,
@@ -76,7 +72,7 @@ impl Face {
     /// the latest run waiting on the person's answer, else the latest
     /// active run, else the latest run, else the city.
     pub(super) fn open(runs: &[RunLine], records: Vec<Row>, size: Size) -> Face {
-        let entries = arrange(runs);
+        let entries = arrange(runs, &Rounds::new());
         let latest = |keep: fn(&RunLine) -> bool| {
             runs.iter()
                 .filter(|line| keep(line))
@@ -94,6 +90,8 @@ impl Face {
             })
             .unwrap_or(0);
         let mut face = Face {
+            runs: runs.to_vec(),
+            rounds: Rounds::new(),
             entries,
             records,
             lens: Lens::Tree,
@@ -130,10 +128,26 @@ impl Face {
         self.size = size;
     }
 
-    /// Takes the lineage and the lines appended since the last look: the
-    /// same node stays selected and the same nodes stay open, and every
-    /// run the tree did not have opens its ancestors so it can be seen.
+    /// Takes the lineage and the lines appended since the last look, and
+    /// folds again every opened run the new lines belong to.
     pub(super) fn follow(&mut self, runs: &[RunLine], appended: Vec<Row>) {
+        let stale: BTreeSet<RunId> = appended
+            .iter()
+            .map(|row| row.run)
+            .filter(|run| self.rounds.contains_key(run))
+            .collect();
+        self.records.extend(appended);
+        for run in stale {
+            self.rounds.insert(run, fold(run, &self.records));
+        }
+        self.runs = runs.to_vec();
+        self.rearrange();
+    }
+
+    /// Arranges the tree again: the same node stays selected and the same
+    /// nodes stay open, and every run the tree did not have opens its
+    /// ancestors so it can be seen.
+    fn rearrange(&mut self) {
         let selected = self
             .entries
             .get(self.tree_at)
@@ -149,8 +163,7 @@ impl Face {
             .filter(|entry| matches!(entry.key, NodeKey::Run(_)))
             .map(|entry| entry.key.clone())
             .collect();
-        self.entries = arrange(runs);
-        self.records.extend(appended);
+        self.entries = arrange(&self.runs, &self.rounds);
         self.expanded = self
             .entries
             .iter()
@@ -243,7 +256,16 @@ impl Face {
 
     /// Unfolds a folded node; on an open one, descends to its first child.
     fn expand(&mut self) {
-        if self.lens == Lens::Records || !self.has_children(self.tree_at) {
+        if self.lens == Lens::Records {
+            return;
+        }
+        if let Some(&NodeKey::Run(run)) = self.entries.get(self.tree_at).map(|entry| &entry.key)
+            && !self.rounds.contains_key(&run)
+        {
+            self.rounds.insert(run, fold(run, &self.records));
+            self.rearrange();
+        }
+        if !self.has_children(self.tree_at) {
             return;
         }
         if !self.expanded.insert(self.tree_at) {
@@ -367,12 +389,7 @@ impl Face {
             Lens::Records => self
                 .records
                 .get(self.record_at)
-                .map(|row| {
-                    json_lines(
-                        &serde_json::from_str(&row.line)
-                            .unwrap_or_else(|_| serde_json::Value::String(row.line.clone())),
-                    )
-                })
+                .map(|row| line_lines(&row.line))
                 .unwrap_or_default(),
         }
     }

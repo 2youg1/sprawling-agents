@@ -3571,7 +3571,6 @@ pub(super) fn append_below(entries: &mut Vec<Entry>, at: usize, folded: &Result<
 // sprawling（库）
 pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<channels::Turn>;
 // bin::main::view::frame
-pub(super) struct Row { seq: Seq, run: RunId, line: String }
 pub(super) struct Size { columns: usize, rows: usize }
 pub(super) struct Face;
 impl Face {
@@ -3584,6 +3583,7 @@ impl Face {
 }
 // bin::main::view::follow
 pub(super) const FOLLOW_TICK: Duration; // 100 ms
+pub(super) struct Row { seq: Seq, run: RunId, line: String }
 pub(super) struct Follow;
 impl Follow {
     pub(super) fn open(dir: &Path) -> Result<(Follow, Vec<RunLine>, Vec<Row>), ViewError>;
@@ -3591,6 +3591,7 @@ impl Follow {
 }
 // bin::main::view::detail
 pub(super) fn json_lines(value: &serde_json::Value) -> Vec<String>;
+pub(super) fn line_lines(line: &str) -> Vec<String>; // 不是 JSON 的行画成一个字符串
 // bin::main::view::terminal
 pub(super) fn show(dir: &Path) -> Result<(), ViewError>;
 ```

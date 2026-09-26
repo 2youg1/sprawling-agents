@@ -12,7 +12,8 @@
     reason = "test code"
 )]
 
-use super::frame::{Face, Row, Size};
+use super::follow::Row;
+use super::frame::{Face, Size};
 use super::keys::{Action, Key, action_for};
 use kernel::{Address, RunId, Seq};
 use sprawling::lineage::RunLine;
