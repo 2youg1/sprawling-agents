@@ -115,8 +115,10 @@ pub channels::BuildingProgress::blocked: alloc::vec::Vec<channels::BlockedLine>
 pub channels::BuildingProgress::problems: alloc::vec::Vec<alloc::string::String>
 pub channels::BuildingProgress::progress: kernel::completion::Progress
 pub channels::BuildingProgress::ready: u32
+pub channels::Call::answered: core::option::Option<kernel::event::identity::TimeMs>
 pub channels::Call::arguments: core::option::Option<channels::Output>
 pub channels::Call::at: kernel::event::identity::Seq
+pub channels::Call::called: kernel::event::identity::TimeMs
 pub channels::Call::outcome: channels::Outcome
 pub channels::Call::output: core::option::Option<channels::Output>
 pub channels::Call::subject: core::option::Option<alloc::string::String>
@@ -563,8 +565,11 @@ pub channels::Note::Unreadable
 pub channels::Note::Unreadable::at: kernel::event::identity::Seq
 pub channels::Note::Unreadable::cause: alloc::string::String
 pub channels::Note::Waiting
+pub channels::Note::Waiting::answered: core::option::Option<kernel::event::identity::TimeMs>
 pub channels::Note::Waiting::at: kernel::event::identity::Seq
+pub channels::Note::Waiting::t: kernel::event::identity::TimeMs
 pub channels::Opening::at: kernel::event::identity::TimeMs
+pub channels::Opening::dispatched_by: core::option::Option<kernel::event::who::Who>
 pub channels::Opening::goal: alloc::string::String
 pub channels::Opening::task: alloc::string::String
 pub channels::Outcome::Answered
@@ -793,6 +798,7 @@ pub channels::TuningDefaults::request_max_retries: core::option::Option<u32>
 pub channels::TuningDefaults::stream_idle_timeout_ms: core::option::Option<u64>
 pub channels::TuningDefaults::timeout_ms: u64
 pub channels::Turn::calls: alloc::vec::Vec<channels::Call>
+pub channels::Turn::model: core::option::Option<alloc::string::String>
 pub channels::Turn::notes: alloc::vec::Vec<channels::Note>
 pub channels::Turn::number: u32
 pub channels::Turn::opened: kernel::event::identity::Seq
