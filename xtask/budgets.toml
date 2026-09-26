@@ -623,3 +623,13 @@ status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized b
 what = "one animation frame of 50 token deltas folded into a belief of R runs, one subscriber reading the run table"
 measured_by = "bun test --conditions=browser client/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds R=1e4 to 4000 us)"
 status = "measured, not gated here: per frame with the `$state` run table 30-37 us at R=1e3 and 30-54 us at R=1e4, and 30 us at R=1e2 once warm (the first size measured pays the runes runtime warm-up, 94-330 us), against 29-34 us, 58-73 us and 471-539 us with belief.batch alone, interleaved on the same instrument (bun 1.4, x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"
+
+# What the page pays to read one event frame off the socket. Event and
+# delta frames arrive once per ledger record and once per token, so they
+# skip the Effect schema for JSON.parse and a narrow guard taken from it
+# (client-SPEC 4-6); the schema path is measured beside it so the gap the
+# guard buys stays visible.
+[client_frame_decode]
+what = "one event frame decoded from its text, by the hot decoder and by the Effect schema it stands in for"
+measured_by = "cd client && bun scripts/frame_cost.ts (prints one client_frame_decode line: the fastest of 15 batches of 2000 decodes, per path)"
+status = "measured, not gated: hot 1.8-3.9 us against 16-28 us for the schema path, interleaved on the same instrument (bun 1.4, x86_64 desktop class, 16 cores). The same floor read 3.7-8.6 us with 32 busy loops beside it, so a wall-clock bound held as a unit test failed on a loaded machine; the register records the reading and nothing gates it"
