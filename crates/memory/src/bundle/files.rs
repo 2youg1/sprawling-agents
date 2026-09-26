@@ -335,6 +335,26 @@ mod tests {
         );
     }
 
+    /// A read-only city file already in the bundle is replaced like any
+    /// other, so an export can be repeated over the bundle it made.
+    #[test]
+    fn an_export_repeats_over_a_bundle_holding_a_read_only_file() {
+        let home = tempfile::tempdir().unwrap();
+        city_with(1, home.path());
+        let kept = home.path().join("kept.md");
+        std::fs::write(&kept, b"do not touch").unwrap();
+        let mut bits = std::fs::metadata(&kept).unwrap().permissions();
+        bits.set_readonly(true);
+        std::fs::set_permissions(&kept, bits).unwrap();
+
+        let carried = tempfile::tempdir().unwrap();
+        Bundle::export(home.path(), carried.path()).unwrap();
+        let again = Bundle::export(home.path(), carried.path())
+            .map(|_| ())
+            .map_err(|err| err.to_string());
+        assert_eq!(again, Ok(()));
+    }
+
     /// The city root is the person's choice, so a link above it is
     /// where they keep the city rather than a write a run redirected.
     #[test]

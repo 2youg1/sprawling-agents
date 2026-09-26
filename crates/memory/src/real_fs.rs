@@ -155,7 +155,14 @@ impl Vfs for RealFs {
     fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()> {
         self.release(from);
         self.release(to);
-        std::fs::rename(from, to)
+        match std::fs::rename(from, to) {
+            #[cfg(windows)]
+            Err(refused) if refused.kind() == io::ErrorKind::PermissionDenied => {
+                clear_read_only(to, refused)?;
+                std::fs::rename(from, to)
+            }
+            done => done,
+        }
     }
 
     #[cfg(windows)]
@@ -181,6 +188,23 @@ impl Vfs for RealFs {
     fn exists(&self, path: &Path) -> bool {
         path.is_file()
     }
+}
+
+/// Windows refuses to rename over a read-only file, which a replace
+/// must do; the target loses its read-only bit so the rename can be
+/// tried once more. A refusal with any other cause is returned as it was.
+#[cfg(windows)]
+fn clear_read_only(to: &Path, refused: io::Error) -> io::Result<()> {
+    let mut bits = match std::fs::metadata(to) {
+        Ok(held) if held.permissions().readonly() => held.permissions(),
+        Ok(_) | Err(_) => return Err(refused),
+    };
+    #[expect(
+        clippy::permissions_set_readonly_false,
+        reason = "Windows only: this clears the read-only attribute and grants nothing else"
+    )]
+    bits.set_readonly(false);
+    std::fs::set_permissions(to, bits)
 }
 
 #[cfg(test)]
