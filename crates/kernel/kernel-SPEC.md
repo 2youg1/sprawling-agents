@@ -409,6 +409,9 @@ pub mod autonomy_word {                          // owner | delegate:<resident>
     pub fn read(word: &str) -> Result<Autonomy, AxError>;
 }
 pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
+pub struct RulesChanged { pub scope: Scope, pub which: GoverningDocument,
+                          pub before: Option<B3Hash>, pub after: B3Hash, pub bytes: usize }
+pub enum GoverningDocument { Rules, Config }     // serde: "RULES.toml" | "CONFIG.toml"
 pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
                              pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }
 pub struct RerankCalled { pub model: String, pub passages: u64, pub ranks: u64,
@@ -479,7 +482,6 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
 **EventKind 74 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
-**EventKind 72 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
@@ -550,6 +552,7 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 | 隐私与 Discard | `autonomy_changed` | record-only |
 | 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 | 治理与设施 | `spine_document_written` | record-only（人写下某楼自己的 spine 文档之一，载荷携 building、which 与字节数，恒不携正文。与上一行分开是因为这几份有第二个写者，写入携起手正文并可能被拒） |
+| 治理与设施 | `rules_changed` | record-only（一次派发所站的规则文档之一换了内容（城的 `CONFIG.toml`，楼的 `CONFIG.toml` 与 `RULES.toml`）：载荷携 scope、which（`RULES.toml`／`CONFIG.toml`，枚举 `GoverningDocument`）、前后两枚摘要与字节数，恒不携正文。在准入（`agree_to_work`）之后、第一次读规则之前落账——先落账再生效；准入拒绝的派发与不存在的楼不记。`before` 缺席即开账行；本行的 `after` 等于同一文档下一行的 `before`，断链本身说明有人绕过一切门改了文件） |
 | 治理与设施 | `toolkit_link_opened` | record-only（人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（channels-SPEC §8-31）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人） |
 | 供应商与模态 | `embedding_called` | record-only（一次嵌入调用入账：模型、请求多少条、回来多少个向量、调用方要的维度与 provider 自报的 token。向量本身不在此处——与 `model_called` 不携请求体同理，它是可从记录的输入重算的派生值，存两份就是同一件事有两个家） |
 | 供应商与模态 | `rerank_called` | record-only（同形：passages 与 ranks 各记一个数。服务端排好的名次就是答案，不在本城重排，故不在此处再写一份序） |

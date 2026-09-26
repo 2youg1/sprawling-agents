@@ -125,6 +125,12 @@ pub enum EventKind {
     GovernedDocumentWritten,
     /// A person wrote one of a building's own spine documents.
     SpineDocumentWritten,
+    /// One of the documents a dispatch stands under — the city's
+    /// `CONFIG.toml`, or a building's `CONFIG.toml` or `RULES.toml` —
+    /// holds other bytes than the last line booked. Booked after the city
+    /// agreed to the work and before the run reads a rule, so a replay
+    /// names the entry the change reached the city in.
+    RulesChanged,
     /// A person asked to connect an outside application, and the broker
     /// that holds its OAuth opened a consent session.
     ///
@@ -176,7 +182,7 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 73] = [
+    pub const ALL: [EventKind; 74] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -244,6 +250,7 @@ impl EventKind {
         EventKind::AutonomyChanged,
         EventKind::GovernedDocumentWritten,
         EventKind::SpineDocumentWritten,
+        EventKind::RulesChanged,
         EventKind::ToolkitLinkOpened,
         EventKind::EmbeddingCalled,
         EventKind::RerankCalled,
@@ -344,7 +351,8 @@ impl EventKind {
             // move itself is written.
             | EventKind::AdviserFellBack
             | EventKind::GovernedDocumentWritten
-            | EventKind::SpineDocumentWritten => WindowClass::RecordOnly,
+            | EventKind::SpineDocumentWritten
+            | EventKind::RulesChanged => WindowClass::RecordOnly,
         }
     }
 }
