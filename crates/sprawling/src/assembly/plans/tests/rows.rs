@@ -205,6 +205,74 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
     );
 }
 
+/// A booking lasts as long as the run that holds it, and no longer.
+///
+/// The first run takes node 1 and hands it back, so the plan on disk
+/// reads node 1 as free again when the second run is dispatched; the
+/// only thing left that could refuse the second run is a booking the
+/// first run never gave up when it came home, which would keep the
+/// node from every later run until the city restarted.
+#[test]
+fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(&plan, PLAN_ONE_FREE_ROW).unwrap();
+    let take = serde_json::json!({ "action": "claim", "node": "1" });
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion("taking a row", "tu_1", "plan", take.clone()),
+            tool_completion(
+                "handing it back",
+                "tu_2",
+                "plan",
+                serde_json::json!({ "action": "release", "node": "1", "reason": "not mine" }),
+            ),
+            completion("handed back", None),
+            tool_completion("taking the freed row", "tu_3", "plan", take),
+            completion("took it", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    for (n, room) in ["lab/room1", "lab/room2"].into_iter().enumerate() {
+        worker
+            .handle(channels::Command::Dispatch {
+                addr: Address::parse(room).unwrap(),
+                task: "take a row from the plan".to_owned(),
+                goal: "claim one row".to_owned(),
+                mode: kernel::Mode::PlanGoal,
+                idem: kernel::IdemKey::derive(
+                    &RunId::CITY,
+                    kernel::Seq::new(u64::try_from(n).unwrap()),
+                    b"dispatch",
+                ),
+                session: None,
+                effort: None,
+            })
+            .unwrap();
+    }
+    drop(provider);
+
+    let history: String = runtime::replay::verify_ledger_dir(&report.ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .collect();
+    assert_eq!(
+        (
+            history.matches("roadmap_claimed").count(),
+            std::fs::read_to_string(&plan)
+                .unwrap()
+                .contains("| 1 | wire the kiln | 1 |  | In progress |  |"),
+        ),
+        (2, true),
+        "the second run takes the node the first handed back"
+    );
+}
+
 #[test]
 fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
     let dir = tempfile::tempdir().unwrap();
