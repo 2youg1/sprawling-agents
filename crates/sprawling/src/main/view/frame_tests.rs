@@ -32,6 +32,7 @@ fn line(n: u8, addr: &str, seqs: (u64, u64), state: Option<memory::RunPhase>) ->
         first_seq: Seq::new(seqs.0),
         last_seq: Seq::new(seqs.1),
         state,
+        unanswered: 0,
     }
 }
 
@@ -89,6 +90,24 @@ fn cursor_line(face: &Face) -> String {
 
 const R1: &str = "0198f6a2-7c4a-7bbb-9d1e-000000000001";
 const R2: &str = "0198f6a2-7c4a-7bbb-9d1e-000000000002";
+const R3: &str = "0198f6a2-7c4a-7bbb-9d1e-000000000003";
+
+/// A frozen run still waiting on an answer outranks a younger active run.
+#[test]
+fn opens_on_the_run_waiting_for_the_person_before_any_active_run() {
+    let runs = vec![
+        RunLine {
+            unanswered: 1,
+            ..line(3, "lab/a", (1, 2), Some(memory::RunPhase::Frozen))
+        },
+        line(2, "yard/b", (3, 8), Some(memory::RunPhase::Active)),
+    ];
+    let face = Face::open(&runs, Vec::new(), NARROW);
+    assert_eq!(
+        cursor_line(&face),
+        format!(">          run {R3} frozen #1..2")
+    );
+}
 
 #[test]
 fn opens_on_the_latest_active_run_with_only_its_ancestors_open() {

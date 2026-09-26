@@ -37,6 +37,10 @@ pub struct RunLine {
     pub first_seq: Seq,
     pub last_seq: Seq,
     pub state: Option<memory::RunPhase>,
+    /// The `approval_requested` lines this run raised that no
+    /// `approval_resolved` has answered yet: how many questions it is
+    /// waiting on the person for.
+    pub unanswered: usize,
 }
 
 impl RunLine {
@@ -102,6 +106,7 @@ impl Lineage {
             first_seq: seq,
             last_seq: seq,
             state: None,
+            unanswered: 0,
         });
         line.last_seq = seq;
         match record.kind() {
