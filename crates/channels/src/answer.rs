@@ -195,10 +195,12 @@ pub struct ApprovalsAnswer {
     pub items: Vec<ApprovalItem>,
 }
 
-/// The five cuts of one authoritative total. Each dimension sums to
-/// `total` exactly; the interface renders shares against `total` rather
-/// than normalising its own rows, so an unattributed remainder stays
-/// visible instead of being divided away.
+/// The five cuts of one authoritative total. The actor, segment, tool
+/// and skill cuts each sum to `total` exactly; `by_run` names every
+/// active run and the few billed most, so it may sum to less. The
+/// interface renders shares against `total` rather than normalising its
+/// own rows, so an unattributed remainder stays visible instead of being
+/// divided away.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostAnswer {

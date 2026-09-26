@@ -141,7 +141,9 @@ use serde::{Deserialize, Serialize};
 /// 39: a city view is bounded. `CityAnswer.runs` carries every active
 ///    run and only the most recently frozen ones, while `frozen` still
 ///    counts them all; an older page that read the list as the whole
-///    city would draw a city that had forgotten its history.
+///    city would draw a city that had forgotten its history. A cost
+///    view's `by_run` is bounded the same way, to the active runs and
+///    the few billed most, so it may sum to less than `total`.
 pub const WIRE_V: u32 = 39;
 mod query;
 

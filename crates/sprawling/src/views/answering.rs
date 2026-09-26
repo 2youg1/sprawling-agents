@@ -23,6 +23,10 @@
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
+use std::collections::BTreeSet;
+
+use kernel::UsdMicros;
+
 use super::holding::Views;
 
 mod history;
@@ -125,7 +129,7 @@ impl Views {
                 let report = self.attribution.report();
                 channels::Answer::Cost(Box::new(channels::CostAnswer {
                     total: report.total,
-                    by_run: report.by_run,
+                    by_run: top_billed(report.by_run, &self.active_names()),
                     by_actor: report.by_actor,
                     by_segment: report.by_segment,
                     by_tool: report.by_tool,
@@ -278,6 +282,44 @@ impl Views {
 /// The ledger keeps `Scope` and its own spelling; a page is answered in
 /// the vocabulary it would use to ask, so nothing on the other side has
 /// to take a string apart to know which building it is looking at.
+/// The rows of a cost view's `by_run`: every run `active` names, and
+/// the [`TOP_BILLED`] other runs billed most (a tie goes to the lower
+/// name), in name order like the report they come from.
+///
+/// The cut is one `select_nth_unstable_by` over the other runs, so
+/// asking costs O(runs) and never sorts them all.
+fn top_billed(
+    by_run: Vec<(String, UsdMicros)>,
+    active: &BTreeSet<String>,
+) -> Vec<(String, UsdMicros)> {
+    let (mut shown, mut others): (Vec<_>, Vec<_>) = by_run
+        .into_iter()
+        .partition(|(run, _)| active.contains(run));
+    if let Some(last) = TOP_BILLED.checked_sub(1)
+        && others.len() > TOP_BILLED
+    {
+        others.select_nth_unstable_by(last, |(left, paid_left), (right, paid_right)| {
+            paid_right.cmp(paid_left).then_with(|| left.cmp(right))
+        });
+        others.truncate(TOP_BILLED);
+    }
+    shown.append(&mut others);
+    shown.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    shown
+}
+
+impl Views {
+    /// The active runs under the name the attribution keys them by,
+    /// their own display form.
+    fn active_names(&self) -> BTreeSet<String> {
+        self.hot
+            .runs()
+            .filter(|(_, hot)| hot.phase == memory::RunPhase::Active)
+            .map(|(run, _)| run.to_string())
+            .collect()
+    }
+}
+
 fn named(scope: &kernel::event::Scope) -> channels::HaltScope {
     match scope {
         kernel::event::Scope::City => channels::HaltScope::City,
