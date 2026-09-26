@@ -135,6 +135,7 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     case "digest_invalidated": case "eval_run": case "asset_archived":
     case "toolkit_link_opened": case "credential_lent": case "secret_captured":
     case "secret_egress_blocked": case "file_discarded": case "discard_restored":
+    case "went_back": case "file_restored":
     case "autonomy_changed": case "taint_promoted": case "cross_building_transfer":
     case "governed_document_written":
     case "spine_document_written": case "rules_changed":

@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "4b965ecb31eb6df800833e690f3e2102379e97d714013dd12eea5aebe8612c13" as const;
+export const WIRE_HASH = "9ecd2cc20afe1c5e2ac9a99fa27e4622f0ea5b3202940631a4fe3b251d77b554" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -532,7 +532,7 @@ export type PursuitLine = typeof PursuitLine.Type;
  * The closed event vocabulary.
  */
 export const EventKind = Schema.Union(
-  Schema.Literal("city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "login_started", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed"),
+  Schema.Literal("city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "login_started", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed", "went_back", "file_restored"),
   Schema.Literal("building_configured"),
   Schema.Literal("building_removed"),
   Schema.Literal("session_opened"),

@@ -123,6 +123,9 @@ pub enum EventKind {
     FileDiscarded,
     DiscardRestored,
     AutonomyChanged,
+    // Unified history (2).
+    WentBack,
+    FileRestored,
     /// One of the three documents that govern a city was written by a
     /// person. Recorded because what governs a city decides what every
     /// later run is given, and "who changed this, and when" has to be
@@ -188,7 +191,7 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 75] = [
+    pub const ALL: [EventKind; 77] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -255,6 +258,8 @@ impl EventKind {
         EventKind::FileDiscarded,
         EventKind::DiscardRestored,
         EventKind::AutonomyChanged,
+        EventKind::WentBack,
+        EventKind::FileRestored,
         EventKind::GovernedDocumentWritten,
         EventKind::SpineDocumentWritten,
         EventKind::RulesChanged,
@@ -342,6 +347,8 @@ impl EventKind {
             | EventKind::FileDiscarded
             | EventKind::DiscardRestored
             | EventKind::AutonomyChanged
+            | EventKind::WentBack
+            | EventKind::FileRestored
             // Connecting an application changes which tools a later run
             // is offered, and the tool table is assembled from the
             // configuration rather than from this line, so nothing here

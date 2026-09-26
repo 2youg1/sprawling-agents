@@ -1000,7 +1000,7 @@ pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, MemoryError>;   
 
 - **别名族全不穿透（junction／symlink／硬链接）。** junction 与 symlink 都是重解析点、`file_type().is_symlink()` 对两者同真，故合为 `Link`，在每一扇门**字面拒绝**。硬链接在 Unix 由 `nlink>1` 判定、同样字面拒绝；在 Windows 稳定版 `std` 读不到链接计数（§3.5），由**写入恒落新 entry** 的落盘纪律兜住：写前移除该名再建，其它名字保有旧字节，穿透在结构上不可能。**被否：跳过并报数**（对照组 “skipped N files”）——部分落盘破坏全成/全拒，且一行计数无法让重放方复现跳过了哪几个。
 - **`WriteTarget` 是形状 2 值：不变量在唯一构造点，字段私有。** 「未经检查的写目标拼不出来」由 trybuild 编译失败反例钉住（`tests/ui/`，M8 惯例）。它的证明范围是「检查那一刻这个名与它的父级都不是链接」；检查与落盘之间的替换窗口属效果面，故两个采样点（walk 与写入）都过同一判定。Unix 上硬链接在判定内被拒；Windows 上判定读不到链接计数，落盘纪律另兜该臂。
-- **消费面是三个写域加一个工具写面**：checkpoint 暂存回调（8-8）、bundle 的 `landing::land`（8-12）、worktree 放置，加上 `runtime::tools::edit` 的物理写入（运行的写域）——经链接写保留路径在每一扇门恒拒。
+- **消费面是三个写域加一个工具写面**：checkpoint 暂存回调（8-8）、bundle 的 `landing::land`（8-12；`worktree::back::restore_file` 也经它落盘，8-27）、worktree 放置，加上 `runtime::tools::edit` 的物理写入（运行的写域）——经链接写保留路径在每一扇门恒拒。
 - **proptest 族「别名永不落盘」**：对别名种类 × 目标（受保护／普通）× 落点（名上／父目录）的组合，凡该平台造得出的别名（junction 无需特权即可创建；symlink 需特权；硬链接随处可造）：链接臂与 Unix 硬链接臂写入被拒，Windows 硬链接臂写入落新 entry；各臂同一断言——目标字节不变、别名带不出新字节；该平台造不出的退化为断言「放置失败时盘上无任何变化」，各臂同性质。
 
 ### 8-26 `memory::snapshot`：链哈希快照（形状 7 投影）
@@ -1063,3 +1063,28 @@ pub fn start_from_snapshot(ledger_dir: &Path, snapshot_dir: &Path, fold_version:
 - **一次读既核对又取尾部。** 快照的 `seq` 按段名（`segment_first_seq`）定位到含它的那一段：它之前的段一个字节也不读；从这一段起逐段取完整行，第 `seq - 段首 seq` 行交给 `ChainSnapshot::fit`，它之后的行就是尾部。所以起步的读量是「尾部加一段的前缀」，与账本总长无关；整条链的核对留给后台的 `audit_chain`（8-27）。
 - **不能用快照时一律退回全量折叠，并带上原因。** 没有快照（`NoSnapshot`）、字节不是快照（`Damaged`，原样带出 8-26 的原因）、`fold_version` 不等（`OtherFoldVersion`）、那一行的链哈希不同（`Stale`）、账本里根本没有那一行（`Missing`，账本比快照短）——都是 `Whole`，行取自 `read_raw_lines_at`，与没有快照时的起步完全相同。原因给调用方写诊断用；它们都不是错误，因为快照只是投影。I/O 本身失败才是 `MemoryError`。
 - **被否：在快照里再存该行的字节偏移，做真正的单次 `pread`。** 偏移指向的是字节，不是链：换过的账本在同一偏移可能正好有一行，核对仍要看链哈希；而尾部本来就要从那一段读，省下的只是一段内的前缀扫描，却让 8-26 的格式多一个会随段滚动失效的字段。
+- 仍未落地的阶段：`Views` 的字节编码与启动路径接入（定位读核对后只折尾部）；后台线程按段流式做全链校验并把结果作为诊断推给页面；校验失败时写者与视图停止接受新工作并给出人读得懂的原因。
+
+### 8-27 `memory::worktree::back`：回到过去，与从某一点取回一个文件（形状 4 适配器；git2）
+
+```rust
+impl Worktrees {
+    /// 从 point 分叉：一棵新树，分支 `name` 起于 point；城的 HEAD 与干线不动。
+    pub fn claim_at(&self, name: &WorktreeName, point: &GitOid) -> Result<WorktreeLease, MemoryError>;
+    /// 把 point 上的 path 取回 lease 这棵树；point 上没有这个文件即删掉它。
+    /// 返回调用者要追加进账本的 `file_restored` 记录。
+    pub fn restore_file(&self, lease: &WorktreeLease, point: &GitOid, path: &Path) -> Result<FileRestored, MemoryError>;
+}
+```
+
+**统一历史不另建存储。** 城的历史只有两份已有的东西：只追加的账本，与城仓库里写下就不再变的 git 对象。log 是血缘树，diff 是两点之间对话与文件一起的差别，blame 是 `whose`，合并走已有的 PR 流（8-9）；本节只管其中两个会写盘的动作。
+
+**性质由 Lean 模型定。** `adversary/design/GoingBack.lean`（`lake build Design`）规定的性质分两处守。本模块守树的四条：回到过去得到的树恰是那一点的文件（`goBack_opens_at_the_point`）；名字已被一棵活树占着即拒，调用者自己的树也不被替换（`goBack_refuses_a_live_tree`）；回到过去、写、取回都只动发起它的那个 run 的树，从不动干线，于是一个 run 写下的内容在任何只含别的 run 的步骤序列之后原样还在（`others_never_touch_a_tree`、`a_write_survives_other_runs`）。账本的两条——每一步给账本追加恰好一条记录，撤销即取回、也是追加（`the_ledger_only_grows`、`undo_is_an_appended_restore`）——归调用者：本模块不写账本，但 `restore_file` 把它那一步的记录作为返回值交出（kernel 的 `FileRestored`，path 取 git 树的写法，所以同一次取回在任何机器上记成同样的字节），调用者追加它即是 `restored` 那一条；`claim_at` 那一步的记录是 kernel 的 `WentBack`（名字加 point）。
+
+**回到过去不移动 HEAD。** 选「新 session ＋ 一棵停在那一点提交上的独立工作区」，否决「把城的 HEAD 检出到那一点」：后者会在别的 run 正写着的时候改掉它们落地的基线，而 Lean 模型里干线恒不被任何一步改动，正是这条的形式化。分支在那一点上新建，名字就是 `WorktreeName`，与 `claim` 同一套名字。
+
+**拒绝，不覆盖。** `claim_at` 在三种情况下拒：名字登记着一棵活树，或者已有同名分支（那是一条已有的工作线，覆盖它就是冲掉别人的写入）→ `WorktreeBusy`（`E_WORKTREE_BUSY`，恢复：换一个名字）；point 不是城仓库里的提交 → `Worktree{op:"find the point to go back to"}`。城的工作树超过上限 → `WorktreeBusy`，与 `claim` 同一个预检（`refuse_oversized`）。拒后城内文件、干线与所有分支都不变；分支建好而检出失败时，这条专为它新建的分支随即删掉，否则它会以一条没人开始的工作线占住这个名字。检出与 `claim` 走同一个 `add_tree`，放树的位置与别名判定只有一处。它不像 `claim` 那样自愈一个目录已丢的登记：回到过去总取新名字，碰上旧名字就是调用方的错。
+
+**取回只写自己的树。** `restore_file` 只接受相对路径且不含 `..`，不接受 `RESERVED_PREFIX` 之下的路径，也不接受任何以 `.` 或空格结尾、或含 `:` 的段——Win32 把这些拼写折叠到另一个名字上（`.git.`、`.git `、`.git::$DATA` 都指向树的 `.git` 链接），逐段比较挡不住它们；写入目标是 `lease.path()` 下的那个文件，经 `alias::WriteTarget` 判定（8-25）。point 上是 blob 即按原字节经 `bundle::landing::land` 落盘（同目录暂存、`sync_data`、抄原权限、`rename` 覆盖、`sync_dir`，8-25），所以经硬链接指向别的树或干线的名字只被换掉目录项，那一头的字节不动，崩溃也不留半个文件；point 上没有即删除，这就是「恢复到那一点」的含义；目录与子模块不是一个文件，拒。
+
+**现状。** 本模块是统一历史的第一段。「分叉」与「取回」的事件种类（`went_back`、`file_restored`）已在 kernel 事件表里。其余几段尚不存在：服务端把账本加 git 投影成一棵血缘树的读者面，以及网页上把楼页的提交、改动、回收站与对话页的分叉合成一页的「历史」页。它们到来之前，`claim_at` 与 `restore_file` 没有生产调用者。

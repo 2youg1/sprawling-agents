@@ -307,6 +307,8 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::FileDiscarded
         | EventKind::DiscardRestored
         | EventKind::AutonomyChanged
+        | EventKind::WentBack
+        | EventKind::FileRestored
         | EventKind::GovernedDocumentWritten
         | EventKind::RulesChanged
         | EventKind::ToolkitLinkOpened

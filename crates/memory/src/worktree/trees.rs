@@ -87,6 +87,28 @@ impl Worktrees {
 
     /// Places a new tree for `name`, locked from the moment it exists.
     fn place(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError> {
+        self.refuse_oversized(name)?;
+        if self.repo.head().is_err() {
+            return Err(MemoryError::Worktree {
+                op: "branch a worktree",
+                detail: "the city has no checkpoint yet, and a tree branches from a commit"
+                    .to_owned(),
+            });
+        }
+        // A node that has held a tree before still has its branch: the
+        // tree is a materialization, the branch is the line of work.
+        // Reattaching is what makes releasing a tree cheap enough to do
+        // between sessions.
+        let branch = self
+            .repo
+            .find_branch(name.as_str(), git2::BranchType::Local)
+            .ok();
+        self.add_tree(name, branch.as_ref().map(git2::Branch::get))
+    }
+
+    /// Refuses a tree before it exists when the city working tree it
+    /// copies is over the ceiling.
+    pub(super) fn refuse_oversized(&self, name: &WorktreeName) -> Result<(), MemoryError> {
         let source = self.repo.workdir().ok_or_else(|| MemoryError::Worktree {
             op: "find the city working tree",
             detail: "the repository is bare".to_owned(),
@@ -102,13 +124,16 @@ impl Worktrees {
                 ),
             });
         }
-        if self.repo.head().is_err() {
-            return Err(MemoryError::Worktree {
-                op: "branch a worktree",
-                detail: "the city has no checkpoint yet, and a tree branches from a commit"
-                    .to_owned(),
-            });
-        }
+        Ok(())
+    }
+
+    /// Checks out the tree for `name` on `reference` when one is given
+    /// and on a new branch from the trunk otherwise.
+    pub(super) fn add_tree(
+        &self,
+        name: &WorktreeName,
+        reference: Option<&git2::Reference<'_>>,
+    ) -> Result<WorktreeLease, MemoryError> {
         std::fs::create_dir_all(&self.home).map_err(|source| MemoryError::Io {
             op: "create the worktree home",
             path: self.home.clone(),
@@ -118,19 +143,9 @@ impl Worktrees {
         // The checkout lands at this name, and a name that is an alias
         // would write the whole tree through it (memory-SPEC 8-25).
         crate::alias::WriteTarget::at("place a worktree", &path)?;
-        // A node that has held a tree before still has its branch: the
-        // tree is a materialization, the branch is the line of work.
-        // Reattaching is what makes releasing a tree cheap enough to do
-        // between sessions.
-        let branch = self
-            .repo
-            .find_branch(name.as_str(), git2::BranchType::Local)
-            .ok();
         let mut opts = git2::WorktreeAddOptions::new();
         opts.lock(true);
-        if let Some(branch) = branch.as_ref() {
-            opts.reference(Some(branch.get()));
-        }
+        opts.reference(reference);
         self.repo
             .worktree(name.as_str(), &path, Some(&opts))
             .map_err(|err| MemoryError::Worktree {
@@ -139,8 +154,8 @@ impl Worktrees {
             })?;
         Ok(WorktreeLease {
             name: name.clone(),
-            path: path.clone(),
             disk: measure(&path)?,
+            path,
         })
     }
 

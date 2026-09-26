@@ -427,6 +427,8 @@ pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pu
 pub struct EvalRun { pub probe: String, pub version: u32, pub predecessor: RunId,  // eval_run：交接探针的一次读数
                     pub kept: u32, pub lost: Vec<u32>,       // lost 是答案不同的题号
                     pub before: Vec<String>, pub after: Vec<String> }   // 全部必填，空亦写出
+pub struct WentBack { pub name: String, pub point: GitOid }            // 回到过去：一棵新树起于 point
+pub struct FileRestored { pub name: String, pub path: String, pub point: GitOid } // path 取 git 树的写法
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
@@ -578,7 +580,7 @@ pub struct GateChecked {}               // 无生产写方：结构是决定
 pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked，无写方：结构是决定
 ```
 
-已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`tool_called`／`tool_result`、
+已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`went_back`／`file_restored`、`tool_called`／`tool_result`、
 `checkpoint_committed`、`approval_resolved`、`autonomy_changed`、`city_halted`、
 `governed_document_written`、`embedding_called`／`rerank_called`、
 `adviser_asked`／`adviser_answered`／`adviser_fell_back`；
@@ -629,7 +631,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 - 铸造纪律（15.3-1）：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
-**EventKind 75 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
+**EventKind 77 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
@@ -699,6 +701,8 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 隐私与 Discard | `file_discarded` | record-only |
 | 隐私与 Discard | `discard_restored` | record-only |
 | 隐私与 Discard | `autonomy_changed` | record-only |
+| 统一历史 | `went_back` | record-only（回到过去：名为 name 的新树起于提交 point；干线不动。与 `worktree_opened` 分开，因为只有这条说出这棵树停在历史的哪一点） |
+| 统一历史 | `file_restored` | record-only（从 point 取回 path 到名为 name 的树；point 上没有这个文件即删掉它。撤销就是追加这一条，账本不删任何行。path 取 git 树的写法（`/` 分隔、相对），不随写下它的机器变） |
 | 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 | 治理与设施 | `spine_document_written` | record-only（人写下某楼自己的 spine 文档之一，载荷携 building、which 与字节数，恒不携正文。与上一行分开是因为这几份有第二个写者，写入携起手正文并可能被拒） |
 | 治理与设施 | `rules_changed` | record-only（一次派发所站的规则文档之一换了内容（城的 `CONFIG.toml`，楼的 `CONFIG.toml` 与 `RULES.toml`）：载荷携 scope、which（`RULES.toml`／`CONFIG.toml`，枚举 `GoverningDocument`）、前后两枚摘要与字节数，恒不携正文。在准入（`agree_to_work`）之后、第一次读规则之前落账——先落账再生效；准入拒绝的派发与不存在的楼不记。`before` 缺席即开账行；本行的 `after` 等于同一文档下一行的 `before`，断链本身说明有人绕过一切门改了文件） |
