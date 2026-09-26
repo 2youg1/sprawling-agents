@@ -22,7 +22,7 @@ use std::ffi::OsString;
 
 use kernel::AxError;
 
-use crate::serving::standing::Standing;
+use crate::serving::standing::{Held, Standing};
 
 use super::explain::{Explanation, explain, explanation_lines};
 use super::needs::{lack_line, lacks};
@@ -161,8 +161,28 @@ pub(crate) fn run<R: BufRead, W: Write>(
 }
 
 /// The part that says where this machine lets the core's threads stand.
-fn priority_lines(_core: &Result<Standing, AxError>) -> Vec<String> {
-    Vec::new()
+/// A thread the valve lowered is a serving city's, never the doctor's,
+/// but the arm keeps the words for every standing in this one place.
+fn priority_lines(core: &Result<Standing, AxError>) -> [String; 4] {
+    let level = match core {
+        Ok(Standing::Raised) => "one step above normal".to_owned(),
+        Ok(Standing::Normal(Held::ByTheSetting)) => {
+            "normal, as config.toml [core] priority asks".to_owned()
+        }
+        Ok(Standing::Normal(Held::Refused(reason))) => {
+            format!("normal, the platform refused: {reason}")
+        }
+        Ok(Standing::Normal(Held::ByTheValve)) => {
+            "normal, lowered after keeping a core busy".to_owned()
+        }
+        Err(err) => format!("unknown: {err}"),
+    };
+    [
+        "  priority - where the core's threads stand".to_owned(),
+        String::new(),
+        format!("    core threads    {level}"),
+        String::new(),
+    ]
 }
 
 /// One line per building that asked for what this machine lacks, and
