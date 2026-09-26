@@ -135,7 +135,16 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
     /// # Errors
     /// The model's failure, unchanged.
     pub fn renew_due(&mut self, now_ms: u64) -> Result<Vec<ModelReturn>, AxError> {
-        self.warmth.renew_due(self.model.as_mut(), now_ms)
+        let left = (self.clock)()?;
+        let answers = self.warmth.renew_due(self.model.as_mut(), now_ms)?;
+        let back = (self.clock)()?;
+        // A renewal asks for one token, so its round trip is the closest
+        // reading of the lead. Several in one wake are timed together,
+        // which can only send the next ones earlier, never late.
+        if !answers.is_empty() {
+            self.warmth.lead_ms = back.value().saturating_sub(left.value());
+        }
+        Ok(answers)
     }
 
     /// Makes one real call through `send` and, when the provider
@@ -145,8 +154,12 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
         request: &ModelRequest,
         send: impl FnOnce(&mut dyn Model) -> Result<ModelReturn, AxError>,
     ) -> Result<ModelReturn, AxError> {
-        let _ = &mut self.clock;
-        send(self.model.as_mut())
+        let left = (self.clock)()?;
+        let answer = send(self.model.as_mut())?;
+        let back = (self.clock)()?;
+        self.warmth.lead_ms = back.value().saturating_sub(left.value());
+        self.warmth.sent(request, left.value());
+        Ok(answer)
     }
 }
 
@@ -264,7 +277,9 @@ mod tests {
         (warmed, seen)
     }
 
-    fn wake_door_through_two_lifetimes(warmed: &mut Warmed<impl FnMut() -> Result<TimeMs, AxError>>) {
+    fn wake_door_through_two_lifetimes(
+        warmed: &mut Warmed<impl FnMut() -> Result<TimeMs, AxError>>,
+    ) {
         for now in (USED_AT..=USED_AT + 2 * TTL_MS).step_by(1_000) {
             warmed.renew_due(now).unwrap();
         }
