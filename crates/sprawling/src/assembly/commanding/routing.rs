@@ -197,7 +197,8 @@ impl RunWorker {
             channels::Command::HandOff { item, .. } => Err(not_built(
                 "hand a question to somebody else",
                 item.as_str().to_owned(),
-                "answer it yourself, or appoint that resident as the delegate; handing one                  question on is not built",
+                "answer it yourself, or appoint that resident as the delegate; handing one \
+                 question on is not built",
             )),
             // Nothing is written into the ledger: this is the person's
             // own layer and no run can observe it, so a record of it

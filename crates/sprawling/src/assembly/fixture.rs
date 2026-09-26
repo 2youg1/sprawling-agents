@@ -291,9 +291,6 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
         "a dropped connection cost a handdown: the call was never asked again;
          the requests named {said:?};
 {}",
-        ends.join(
-            "
-"
-        )
+        ends.join("\n")
     );
 }

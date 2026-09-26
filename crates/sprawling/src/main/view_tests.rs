@@ -179,16 +179,7 @@ fn follow_takes_a_run_that_started_after_the_viewer_opened() {
         .append(true)
         .open(dir.path().join("ledger-00000000000000000000.jsonl"))
         .unwrap();
-    std::io::Write::write_all(
-        &mut segment,
-        &[
-            started.as_slice(),
-            b"
-",
-        ]
-        .concat(),
-    )
-    .unwrap();
+    std::io::Write::write_all(&mut segment, &[started.as_slice(), b"\n"].concat()).unwrap();
     let Some(super::follow::Polled::Appended((runs, rows))) = follow.poll().unwrap() else {
         panic!("the appended run never arrived");
     };

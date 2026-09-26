@@ -8,11 +8,12 @@
 //!
 //! Thin on purpose. The exit a child leaves is read by `Closing::of`
 //! and judged by `CrashBudget::after`; this file only spawns, waits,
-//! samples the clock, and prints what the person needs to see.
+//! measures elapsed time, and prints what the person needs to see.
 
 use super::{CrashBudget, Next};
-use crate::assembly::{Closing, SystemClock};
-use kernel::{AxCode, AxError};
+use crate::assembly::Closing;
+use crate::serving::standing::monotonic_now;
+use kernel::{AxCode, AxError, TimeMs};
 use std::path::Path;
 use std::process::Command;
 
@@ -65,19 +66,25 @@ pub enum Console {
 /// `child` carries what the unsupervised run would have decided.
 ///
 /// # Errors
-/// Returns the failure to find this binary, to start a child, or to read
-/// the clock; a child that fails is a crash, not an error.
+/// Returns the failure to find this binary or to start a child; a child
+/// that fails is a crash, not an error.
 pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxError> {
     let exe = std::env::current_exe().map_err(|err| {
         AxError::failure(AxCode::PathNotFound, "find this binary", err.to_string())
             .with_recovery("run the binary by its path rather than through a shim")
     })?;
+    // Crashes are counted against elapsed time, not the wall clock: a
+    // clock the system steps back would keep an old crash in the window,
+    // and one stepped forward would drop a recent one.
+    let supervised = monotonic_now();
     let mut budget = CrashBudget::fresh();
     let mut launch = Launch::First;
     loop {
         let served = run(&exe, &serve_line(city, addr, child, launch))?;
         launch = Launch::Again;
-        match budget.after(&Closing::of(&served), accounting::Clock::now(&SystemClock)?) {
+        let since = monotonic_now().saturating_duration_since(supervised);
+        let at = TimeMs::new(u64::try_from(since.as_millis()).unwrap_or(u64::MAX));
+        match budget.after(&Closing::of(&served), at) {
             Next::Stop => return Ok(Ended::Chosen),
             Next::Restart(kept) => {
                 budget = kept;
@@ -102,10 +109,18 @@ pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxErro
     }
 }
 
-/// Whether the person pressed Enter; end of input means nobody is there.
+/// Whether the person pressed Enter; end of input means nobody is there,
+/// and a terminal that cannot be read is said out loud before the city
+/// stays down.
 fn lifted() -> bool {
     let mut answer = String::new();
-    matches!(std::io::stdin().read_line(&mut answer), Ok(read) if read > 0)
+    match std::io::stdin().read_line(&mut answer) {
+        Ok(read) => read > 0,
+        Err(err) => {
+            eprintln!("supervise: the terminal could not be read ({err}); the city stays down");
+            false
+        }
+    }
 }
 
 /// Runs one child to its end and reads its exit as served or failed.

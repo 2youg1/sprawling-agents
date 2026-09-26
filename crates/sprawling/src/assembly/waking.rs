@@ -102,8 +102,12 @@ impl RunWorker {
         // Labelled the way the bench labels every other outside source
         // (`mcp:<server>`, `web`), so the door that refuses the run's
         // exec names where the text came from.
-        let arrived_from =
-            kernel::TaintSource::new(format!("arrival:{source}")).ok_or_else(|| {
+        // The source is checked, not the label: `arrival:` alone is not
+        // empty, and would name no source at all.
+        let arrived_from = Some(source)
+            .filter(|named| !named.is_empty())
+            .and_then(|named| kernel::TaintSource::new(format!("arrival:{named}")))
+            .ok_or_else(|| {
                 AxError::failure(
                     kernel::AxCode::ConfigInvalid,
                     "mark the taint of an arrival",

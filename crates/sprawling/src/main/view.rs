@@ -212,10 +212,7 @@ fn write_walk(
                 let line = reader.line_at(seq)?;
                 if chosen.admits(&line)? {
                     out.write_all(&line)?;
-                    out.write_all(
-                        b"
-",
-                    )?;
+                    out.write_all(b"\n")?;
                 }
             }
         }
@@ -232,10 +229,7 @@ fn write_walk(
             }
             for line in kept.iter().rev() {
                 out.write_all(line)?;
-                out.write_all(
-                    b"
-",
-                )?;
+                out.write_all(b"\n")?;
             }
         }
     }

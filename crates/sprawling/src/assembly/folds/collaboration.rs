@@ -99,14 +99,6 @@ impl CollaborationFold {
                 self.consumed.insert(taken.id.as_str().to_owned());
             }
             EventKind::GoalRegistered => self.goals.push(record.data().read()?),
-            EventKind::RoadmapClaimed
-            | EventKind::RoadmapFinished
-            | EventKind::RoadmapReleased
-            | EventKind::RoadmapSplit
-            | EventKind::RoadmapBlocked => {
-                self.plan_holders
-                    .absorb(record.kind(), record.addr(), record.data())?;
-            }
             EventKind::PursuitChanged => {
                 let addr = pursued(record)?;
                 match record.data().read::<PursuitChanged>()?.held()? {
@@ -137,7 +129,11 @@ impl CollaborationFold {
                     .branch;
                 self.requests.retain(|held| held.branch != branch);
             }
-            _ => {}
+            // `PlanHolders` alone decides which kinds move a claim, so
+            // this fold cannot list one kind fewer than the live table.
+            _ => self
+                .plan_holders
+                .absorb(record.kind(), record.addr(), record.data())?,
         }
         Ok(())
     }

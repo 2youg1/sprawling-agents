@@ -99,18 +99,14 @@ fn work_offered_in_up_mode_without_a_test_does_not_land() {
         .iter()
         .map(|line| String::from_utf8_lossy(line).into_owned())
         .collect::<Vec<String>>()
-        .join(
-            "
-",
-        );
+        .join("\n");
     assert!(
         history.contains("pr_opened"),
         "the work was offered: {history}"
     );
     assert_eq!(
         std::fs::read_to_string(&note).unwrap(),
-        "before
-",
+        "before\n",
         "an improvement with no test of its own does not become the building's"
     );
 }

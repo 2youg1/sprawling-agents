@@ -31,13 +31,15 @@ impl RunWorker {
             ) => {
                 return Err(refused(
                     whole.to_string(),
-                    "restore the whole file: a way back that names a part of one,                      or no file, is not one the recycle bin writes",
+                    "restore the whole file: a way back that names a part of one, \
+                     or no file, is not one the recycle bin writes",
                 ));
             }
             Restoration::Interred(interred) => {
                 return Err(refused(
                     interred.to_string(),
-                    "fetching a row back from the content store is not wired yet;                      read its bytes from the content store by the locator it names",
+                    "fetching a row back from the content store is not wired yet; \
+                     read its bytes from the content store by the locator it names",
                 ));
             }
             Restoration::Rebuildable { reason } => {
@@ -61,14 +63,11 @@ impl RunWorker {
             (
                 "restoration".to_owned(),
                 serde_json::to_value(restoration).map_err(|err| {
-                    AxError::failure(
-                        AxCode::InvalidArgs,
-                        "encode a restoration",
-                        err.to_string(),
-                    )
-                    .with_recovery(
-                        "report this against sprawling::assembly::commanding::restoring:                          a restoration is text only",
-                    )
+                    AxError::failure(AxCode::InvalidArgs, "encode a restoration", err.to_string())
+                        .with_recovery(
+                            "report this against sprawling::assembly::commanding::restoring: \
+                             a restoration is text only",
+                        )
                 })?,
             ),
         ]))?;
