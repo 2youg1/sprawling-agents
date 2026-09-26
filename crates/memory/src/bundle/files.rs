@@ -187,8 +187,15 @@ fn present(
     }
 }
 
-/// Copies every file under `from` into `to`, keeping relative paths.
-pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64, MemoryError> {
+/// Copies every file under `from` into `to`, keeping relative paths;
+/// `root` is the directory the person named, which bounds the alias
+/// check on every write.
+pub(crate) fn copy_tree(
+    vfs: &mut dyn Vfs,
+    root: &Path,
+    from: &Path,
+    to: &Path,
+) -> Result<u64, MemoryError> {
     let mut copied = 0u64;
     let files = walk(vfs, from)?;
     if files.is_empty() {
@@ -204,7 +211,7 @@ pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64
         // Cleared before any directory is made: making a parent through
         // a link would land a directory inside what the link reaches,
         // before the file write is refused (memory-SPEC 8-25).
-        let cleared = WriteTarget::at("copy a bundle file", &target)?;
+        let cleared = WriteTarget::within("copy a bundle file", root, &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)
                 .map_err(io_err("make a bundle directory", parent))?;
@@ -218,9 +225,11 @@ pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64
     Ok(copied)
 }
 
-/// The city's own files: everything outside the reserved prefix.
+/// The city's own files: everything outside the reserved prefix, bounded
+/// by `root` as [`copy_tree`] is.
 pub(crate) fn copy_city_files(
     vfs: &mut dyn Vfs,
+    root: &Path,
     city_root: &Path,
     to: &Path,
 ) -> Result<u64, MemoryError> {
@@ -244,7 +253,7 @@ pub(crate) fn copy_city_files(
         let target = to.join(&relative);
         // Cleared before any directory is made, for the reason the
         // sibling walk gives.
-        let cleared = WriteTarget::at("copy a city file", &target)?;
+        let cleared = WriteTarget::within("copy a city file", root, &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)
                 .map_err(io_err("make a bundle directory", parent))?;

@@ -56,9 +56,9 @@ impl Bundle {
         let cas_dir = layout.cas();
         let (dest_ledger, dest_cas, dest_city) =
             (dest.join(LEDGER), dest.join(CAS), dest.join(CITY));
-        let ledger_files = copy_tree(vfs.as_mut(), &ledger_dir, &dest_ledger)?;
-        let cas_copied = copy_tree(vfs.as_mut(), &cas_dir, &dest_cas)?;
-        let city_copied = copy_city_files(vfs.as_mut(), city_root, &dest_city)?;
+        let ledger_files = copy_tree(vfs.as_mut(), dest, &ledger_dir, &dest_ledger)?;
+        let cas_copied = copy_tree(vfs.as_mut(), dest, &cas_dir, &dest_cas)?;
+        let city_copied = copy_city_files(vfs.as_mut(), dest, city_root, &dest_city)?;
         history::export(vfs.as_mut(), city_root, dest)?;
         // Every number in the manifest is read back from the bundle, so
         // the manifest states what a reader of the bundle will find.
@@ -90,7 +90,7 @@ impl Bundle {
                 ),
             });
         }
-        let target = WriteTarget::at("write a bundle manifest", &dest.join(MANIFEST))?;
+        let target = WriteTarget::within("write a bundle manifest", dest, &dest.join(MANIFEST))?;
         land(
             vfs.as_mut(),
             target,
@@ -157,9 +157,9 @@ impl Bundle {
             });
         }
         let history = History::read(vfs.as_ref(), bundle, city_root)?;
-        copy_tree(vfs.as_mut(), &bundle.join(LEDGER), &ledger_dir)?;
-        copy_tree(vfs.as_mut(), &bundle.join(CAS), &cas_dir)?;
-        copy_city_files(vfs.as_mut(), &bundle.join(CITY), city_root)?;
+        copy_tree(vfs.as_mut(), city_root, &bundle.join(LEDGER), &ledger_dir)?;
+        copy_tree(vfs.as_mut(), city_root, &bundle.join(CAS), &cas_dir)?;
+        copy_city_files(vfs.as_mut(), city_root, &bundle.join(CITY), city_root)?;
         if let Some(history) = history {
             history.land(city_root)?;
         }

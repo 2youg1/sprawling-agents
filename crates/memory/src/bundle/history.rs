@@ -56,10 +56,10 @@ pub(crate) fn export(vfs: &mut dyn Vfs, city_root: &Path, dest: &Path) -> Result
     vfs.create_dir_all(&dir)
         .map_err(io_err("make a bundle directory", &dir))?;
     if let Some(bytes) = pack {
-        let target = WriteTarget::at("write a history pack", &dir.join(PACK))?;
+        let target = WriteTarget::within("write a history pack", dest, &dir.join(PACK))?;
         land(vfs, target, &bytes, Bits::OfReplaced)?;
     }
-    let target = WriteTarget::at("write the history refs", &dir.join(REFS))?;
+    let target = WriteTarget::within("write the history refs", dest, &dir.join(REFS))?;
     land(vfs, target, refs.as_bytes(), Bits::OfReplaced)
 }
 

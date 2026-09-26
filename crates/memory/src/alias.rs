@@ -137,6 +137,29 @@ impl WriteTarget {
         Ok(WriteTarget(path.to_path_buf()))
     }
 
+    /// Clears `path` for a write inside `root`, the directory the person
+    /// chose: `path` and every directory between it and `root` are
+    /// examined, and `root` and everything above it are not, because
+    /// where a person keeps a city is their placement rather than a
+    /// write a run could redirect (memory-SPEC 8-12). A `path` outside
+    /// `root` is examined up to the filesystem root, as [`WriteTarget::at`]
+    /// does.
+    ///
+    /// # Errors
+    /// As [`WriteTarget::at`], for an alias at or below the bound.
+    pub(crate) fn within(
+        op: &'static str,
+        root: &Path,
+        path: &Path,
+    ) -> Result<WriteTarget, MemoryError> {
+        for at in path.ancestors().take_while(|at| *at != root) {
+            if let Some(kind) = kind_at(at)? {
+                return Err(refused(op, at, kind));
+            }
+        }
+        Ok(WriteTarget(path.to_path_buf()))
+    }
+
     #[must_use]
     pub fn as_path(&self) -> &Path {
         &self.0
