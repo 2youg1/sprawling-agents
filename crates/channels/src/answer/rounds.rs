@@ -175,6 +175,12 @@ pub struct Turn {
     /// case. An `Option` here would be a state no fold can produce and
     /// every reader would still have to answer.
     pub t: TimeMs,
+    /// The endpoint's model id the `model_called` that opened this turn
+    /// recorded. Per turn because a session can change model midway,
+    /// and a name for the whole session would be wrong for half of it.
+    /// `None` when that record carries no model name as text; the page
+    /// then draws no name rather than a guessed one.
+    pub model: Option<String>,
     /// What the model said in this turn: its prose, without the
     /// reasoning that produced it.
     pub said: Option<String>,

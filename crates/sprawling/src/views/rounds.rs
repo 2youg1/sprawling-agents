@@ -154,6 +154,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                     number,
                     opened: record.seq(),
                     t: record.t(),
+                    model: None,
                     said: None,
                     thought: None,
                     spent: None,
