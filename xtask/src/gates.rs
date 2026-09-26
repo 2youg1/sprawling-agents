@@ -173,13 +173,26 @@ fn judge(
             .map(|(name, verdict)| {
                 (
                     name,
-                    verdict
-                        .join()
-                        .unwrap_or(Err(XtaskError::GatePanicked { name })),
+                    verdict.join().unwrap_or_else(|payload| {
+                        Err(XtaskError::GatePanicked {
+                            name,
+                            message: panic_message(payload.as_ref()),
+                        })
+                    }),
                 )
             })
             .collect()
     })
+}
+
+/// The text a panic carried: `panic!` with a literal leaves a `&str`,
+/// with format arguments a `String`; any other payload has no words.
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<&str>()
+        .map(|text| (*text).to_owned())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "a payload that is not text".to_owned())
 }
 
 #[cfg(test)]
