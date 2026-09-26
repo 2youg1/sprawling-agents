@@ -224,3 +224,15 @@ pub(super) fn write_runs(dir: &Path, out: &mut impl Write) -> Result<(), ViewErr
 #[cfg(test)]
 #[path = "view_tests.rs"]
 mod tests;
+
+#[path = "view/arrange.rs"]
+mod arrange;
+#[path = "view/detail.rs"]
+mod detail;
+#[path = "view/frame.rs"]
+mod frame;
+#[cfg(test)]
+#[path = "view/frame_tests.rs"]
+mod frame_tests;
+#[path = "view/keys.rs"]
+mod keys;
