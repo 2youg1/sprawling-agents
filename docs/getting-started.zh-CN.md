@@ -28,6 +28,14 @@ irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex
 
 跑的过程里它会告诉你四件事：这次取的是哪个发布 tag、匹配到哪个平台、下载进行到哪里（一行里刷新的兆字节数与百分比），以及归档与发布方公布的 sha256 是否对得上。对不上就既不解压也不安装。交给 `sprawling install` 之前，它最后打印二进制自报的版本，你可以拿它跟你要的那个 tag 对一对。
 
+sha256 对得上，说明下载完整无损，不说明归档是谁构建的；`install.sh` 与 `install.ps1` 都不验签名。发布页上的每份归档都带一份构件来源证明（build provenance attestation），由构建它的那次发布流水线经 Sigstore 签出。想自己验，先下载归档，再用 [GitHub CLI](https://cli.github.com) 跑：
+
+```sh
+gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
+```
+
+只有当这份归档的摘要确实由本仓库的某次流水线运行证明过，它才通过，并打印出是哪个工作流文件、哪个提交构建了它。
+
 把 `SPRAWLING_VERSION` 设成某个发布 tag，装的就是那一版，而不是最新的一版。
 
 这两样运行时都不是必需品；但你若已经装了 [bun](https://bun.sh) 或 node，一条命令就能取到同一个二进制：

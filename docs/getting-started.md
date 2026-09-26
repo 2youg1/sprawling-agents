@@ -28,6 +28,14 @@ The script fetches the newest release archive for your platform and unpacks it; 
 
 While it runs it tells you four things: the release tag, the platform it matched, the download as it arrives — megabytes and percent, on one line that rewrites itself — and the result of checking the archive against the sha256 the release publishes. An archive that does not match is not unpacked and nothing is installed. Last, before it hands over to `sprawling install`, it prints the version the binary itself reports, which is what you can compare against the tag you asked for.
 
+The sha256 check shows that the download arrived whole; it does not show who built the archive, and neither `install.sh` nor `install.ps1` checks a signature. Each archive on a release carries a build-provenance attestation, signed through Sigstore by the release workflow that built it. To check one yourself, download the archive and run, with the [GitHub CLI](https://cli.github.com):
+
+```sh
+gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
+```
+
+It passes only when the archive's digest was attested by a workflow run in this repository, and it prints which workflow file and which commit built it.
+
 Set `SPRAWLING_VERSION` to a release tag to install that release rather than the newest one.
 
 Neither runtime is needed to run this, but if you already have [bun](https://bun.sh) or node, one command fetches the same binary:

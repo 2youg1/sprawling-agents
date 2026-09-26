@@ -14,7 +14,8 @@ const ATTESTED: &str = "jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/attest-build-provenance@v3
+      # the glob `gh release create` attaches below
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: assets/*.zip
       - name: attach the archives to the tag
@@ -27,7 +28,8 @@ const ATTESTED: &str = "jobs:
 ";
 
 /// A job that attests the glob it attaches, with both permissions,
-/// before it attaches it, is the shape every release must have.
+/// before it attaches it, is the shape every release must have; a
+/// comment that names the command is not where the command runs.
 #[test]
 fn a_release_that_attests_what_it_attaches_is_accepted() {
     assert_eq!(findings(ATTESTED), Vec::<String>::new());
@@ -46,7 +48,7 @@ fn a_release_that_attaches_an_unattested_archive_is_reported() {
     let late = format!(
         "{head}      - name: attach{attach}      - uses: actions/attest{step}  channel:{channel}"
     );
-    let missing = ATTESTED.replace("actions/attest-build-provenance@v3", "actions/checkout@v7");
+    let missing = ATTESTED.replace("actions/attest-build-provenance@v4", "actions/checkout@v7");
     for text in [&without_permission, &wrong_glob, &late, &missing] {
         assert_eq!(findings(text).len(), 1, "{text}");
     }
