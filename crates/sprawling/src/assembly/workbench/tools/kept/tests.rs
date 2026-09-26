@@ -217,3 +217,59 @@ fn a_key_in_any_tool_argument_reaches_the_vault_and_not_the_tool() {
         "the vault holds the key itself"
     );
 }
+
+/// The same key handed to tools twice in one run is kept once: both calls
+/// hand the tool one reference, and a different key gets its own.
+#[test]
+fn one_key_seen_twice_is_kept_under_one_reference() {
+    use super::{Keeper, Kept};
+    use kernel::Tool;
+    let key = written();
+    let other = ["sk-", "ant-", &"Pk7x".repeat(10)].concat();
+    let vault = std::sync::Arc::new(std::sync::Mutex::new(gateway::Custodian::in_memory()));
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let meta = kernel::ToolMeta {
+        name: kernel::ToolName::parse("exec").unwrap(),
+        disclosure: String::new(),
+        params: kernel::Payload::new(serde_json::Map::new()).unwrap(),
+        effect: kernel::Effect::Read,
+        cost_tier: kernel::CostTier::Light,
+        timeout: None,
+        render: kernel::RenderIntent::Generic,
+        temporal: kernel::Temporal::Timeless,
+    };
+    let kept = Kept::new(
+        Box::new(Recording {
+            meta,
+            seen: seen.clone(),
+        }),
+        std::sync::Arc::new(Keeper::new(vault, 7)),
+    );
+    for text in [&key, &key, &other] {
+        let args = serde_json::json!({ "text": text })
+            .as_object()
+            .unwrap()
+            .clone();
+        kept.invoke(&kernel::ToolCall {
+            id: "tu_1".to_owned(),
+            name: kernel::ToolName::parse("exec").unwrap(),
+            args: kernel::Payload::new(args).unwrap(),
+        })
+        .unwrap();
+    }
+
+    let handed: Vec<String> = seen
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|args| args.as_map()["text"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        handed,
+        [
+            "secret:written/anthropic-7-1",
+            "secret:written/anthropic-7-1",
+            "secret:written/anthropic-7-2",
+        ],
+    );
+}

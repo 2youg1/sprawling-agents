@@ -3583,7 +3583,7 @@ impl kernel::Tool for Kept {
 - 同一段替换逻辑：派活文字、工具参数和工具结果都经过 `custody::kept_text`，所以认什么、怎么切、切歪了怎么报错只有一处。
 - **参数**：`edit` 的 `new`、`exec` 的命令行，以及其它工具的每一个字符串参数，工具收到的都是引用。所以 `edit` 写进文件的、`exec` 命令行里 `echo … > f` 写进文件的，都只有引用；回给模型的 diff 里也只有引用。
 - **结果**：`read` 读到的文件、`exec` 打印的输出里的 key，在回到模型之前换成引用，所以下一个发给模型的请求里没有原文。
-- **引用是 `secret:written/<provider>-<pos>-<n>`（参数）和 `secret:output/<provider>-<pos>-<n>`（结果）**：`<pos>` 是装配台摆出时账本的位置，每次派活在摆台之前都写过记录，所以两次派活的 `<pos>` 不同；`<n>` 是这次派活里第几把，一次派活的所有工具共用一个计数，所以两件工具不会把 key 存到同一个名字下。工具运行在 drive 里，拿不到 `&mut RunWorker`，写不了账本，所以不能像派活那样用存 key 时的下一个序号。
+- **引用是 `secret:written/<provider>-<pos>-<n>`（参数）和 `secret:output/<provider>-<pos>-<n>`（结果）**：`<pos>` 是装配台摆出时账本的位置，每次派活在摆台之前都写过记录，所以两次派活的 `<pos>` 不同；`<n>` 是这次派活里第几把不同的 key，一次派活的所有工具共用一份记录，所以两件工具不会把两把 key 存到同一个名字下。同一把 key 在同一侧再次出现时交回第一次的引用，不再写 vault：记录按 key 的 BLAKE3 摘要（`kernel::B3Hash::digest`）找到它的引用，所以 vault 随一次派活里不同 key 的个数增长，而不是随工具调用的次数增长；摘要只留在这次派活的内存里，不进账本也不进 vault，`<n>` 就是记录里已有的条数加一，不会绕回。工具运行在 drive 里，拿不到 `&mut RunWorker`，写不了账本，所以不能像派活那样用存 key 时的下一个序号。
 - 没有命中的参数和结果原样交出，不复制。
 - vault 拒绝写入时这次调用失败：参数里的 key 存不进去，工具就不运行，文件不动；结果里的 key 存不进去，结果不交给模型。
 - 账本里的 `tool_called`、`tool_result`、`model_returned` 本来就经过 `runtime::turn::ledger::Journal::append_redacted`，key 在写进账本之前已换成指纹标记；这一层管的是工具本身和模型看到的东西。
@@ -3591,7 +3591,7 @@ impl kernel::Tool for Kept {
 
 **尚未覆盖**：① 工具存下的 key 没有 `secret_captured` 记录，因为工具拿不到账本；要补就得把引用放进一张 desk，drive 结束后由装配层补记。② `exec` 的命令自己取到的 key（比如从城外的文件复制进来）写进文件时不经过这一层，只有它打印出来的部分会被换掉。③ 模型回复里的工具参数原样回到后续请求：模型只可能写出它自己编出来的 key，因为它看到的都是引用。
 
-**本章测试**：`assembly::dispatching::custody::tests::a_pasted_key_reaches_the_vault_and_nothing_else`——任务文字里夹一把 `sk-ant-` 形状的 key 派活，断言：模型收到的每个请求、城目录下的每个文件（账本和 `JOB.md` 都在其中）都不含原文；请求里带着 `secret:pasted/anthropic-…` 引用；vault 按这个引用解出的正是原文。`assembly::workbench::tools::kept::tests::a_written_key_reaches_the_vault_and_not_the_file`——模型用 `edit` 新建一个含 key 的文件，断言：文件里没有原文，只有 `secret:written/anthropic-…` 引用，vault 按这个引用解出原文。`assembly::workbench::tools::kept::tests::a_key_a_tool_reads_reaches_the_vault_and_not_the_model`——城里的文件里有一把 key，模型用 `read` 读它，断言：之后发给模型的请求里没有原文，只有 `secret:output/anthropic-…` 引用，vault 按这个引用解出原文。
+**本章测试**：`assembly::dispatching::custody::tests::a_pasted_key_reaches_the_vault_and_nothing_else`——任务文字里夹一把 `sk-ant-` 形状的 key 派活，断言：模型收到的每个请求、城目录下的每个文件（账本和 `JOB.md` 都在其中）都不含原文；请求里带着 `secret:pasted/anthropic-…` 引用；vault 按这个引用解出的正是原文。`assembly::workbench::tools::kept::tests::a_written_key_reaches_the_vault_and_not_the_file`——模型用 `edit` 新建一个含 key 的文件，断言：文件里没有原文，只有 `secret:written/anthropic-…` 引用，vault 按这个引用解出原文。`assembly::workbench::tools::kept::tests::a_key_a_tool_reads_reaches_the_vault_and_not_the_model`——城里的文件里有一把 key，模型用 `read` 读它，断言：之后发给模型的请求里没有原文，只有 `secret:output/anthropic-…` 引用，vault 按这个引用解出原文。`assembly::workbench::tools::kept::tests::one_key_seen_twice_is_kept_under_one_reference`——同一把 key 两次交给工具、再交另一把，断言：前两次工具收到同一个引用，第三次收到下一个编号。
 
 ## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
 
