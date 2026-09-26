@@ -72,7 +72,7 @@ impl RunWorker {
     /// the door that honours the `IdemKey` every state-changing Command
     /// carries, and it judges before any effect
     /// (`commanding::entrance`, sprawling-SPEC.md 8-41).
-    pub(crate) fn serve_one(&mut self, posted: Posted) {
+    pub(in crate::assembly) fn serve_one(&mut self, posted: Posted) {
         let Posted { command, reply } = posted;
         let key = command.idem().copied();
         if let Some(first) = key.and_then(|key| self.doorstep.entrance.answered(&key)) {
