@@ -17,7 +17,7 @@ use std::path::Path;
 use crate::error::MemoryError;
 
 use super::name::WorktreeName;
-use super::trees::Worktrees;
+use super::trees::{WORKTREE_DIR, Worktrees};
 
 impl Worktrees {
     /// Takes back every tree under `<city>/.sprawling/worktrees/` that
@@ -31,8 +31,137 @@ impl Worktrees {
         city_root: &Path,
         held: &[WorktreeName],
     ) -> Result<Vec<WorktreeName>, MemoryError> {
-        drop((city_root, held));
-        Ok(Vec::new())
+        // A city that has never checkpointed has no repository, and so
+        // no tree to leave behind.
+        let repo = match git2::Repository::open(city_root) {
+            Ok(repo) => repo,
+            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Vec::new()),
+            Err(err) => {
+                return Err(MemoryError::Worktree {
+                    op: "open the city repository",
+                    detail: format!("{}: {err}", city_root.display()),
+                });
+            }
+        };
+        let trees = Worktrees::over(repo, city_root);
+        let mut swept = trees.sweep_registered(held)?;
+        swept.extend(trees.sweep_unregistered(held)?);
+        swept.sort();
+        swept.dedup();
+        Ok(swept)
+    }
+
+    /// Unregisters every tree of the city's own that nobody holds, and
+    /// the lease branch that goes with it.
+    fn sweep_registered(&self, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, MemoryError> {
+        let mut swept = Vec::new();
+        for name in self.live()? {
+            if held.contains(&name) || !self.made_here(&name)? {
+                continue;
+            }
+            self.forget(&name)?;
+            self.drop_lease_branch(&name)?;
+            swept.push(name);
+        }
+        Ok(swept)
+    }
+
+    /// Whether git's registration of `name` points into the city's own
+    /// subtree. A tree the person added with `git worktree add` lives
+    /// anywhere else. Compared by trailing components, because the city
+    /// root this process was given may be spelled differently from the
+    /// one the tree was claimed under.
+    fn made_here(&self, name: &WorktreeName) -> Result<bool, MemoryError> {
+        let tree = self
+            .repo
+            .find_worktree(name.as_str())
+            .map_err(|err| MemoryError::Worktree {
+                op: "find a worktree",
+                detail: format!("{}: {err}", name.as_str()),
+            })?;
+        Ok(tree.path().ends_with(
+            Path::new(kernel::RESERVED_PREFIX)
+                .join(WORKTREE_DIR)
+                .join(name.as_str()),
+        ))
+    }
+
+    /// Deletes the branch git made for the tree `name`, unless its tip
+    /// carries a commit the trunk does not have: that is a run's landed
+    /// offer, and the pull request names it.
+    fn drop_lease_branch(&self, name: &WorktreeName) -> Result<(), MemoryError> {
+        let git_err = |op: &'static str| {
+            move |err: git2::Error| MemoryError::Worktree {
+                op,
+                detail: format!("{}: {err}", name.as_str()),
+            }
+        };
+        let mut branch = match self
+            .repo
+            .find_branch(name.as_str(), git2::BranchType::Local)
+        {
+            Ok(branch) => branch,
+            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
+            Err(err) => return Err(git_err("find a lease branch")(err)),
+        };
+        let trunk = self
+            .repo
+            .head()
+            .and_then(|head| head.peel_to_commit())
+            .map_err(git_err("read the trunk"))?
+            .id();
+        let tip = branch
+            .get()
+            .peel_to_commit()
+            .map_err(git_err("read a lease branch"))?
+            .id();
+        let reached = tip == trunk
+            || self
+                .repo
+                .graph_descendant_of(trunk, tip)
+                .map_err(git_err("judge a lease branch"))?;
+        if reached {
+            branch.delete().map_err(git_err("delete a lease branch"))?;
+        }
+        Ok(())
+    }
+
+    /// Removes every directory under the city's tree home that git has
+    /// no registration for and nobody holds: a claim or a release the
+    /// process died inside. The whole subtree is the city's machinery,
+    /// so nothing in it is the person's.
+    fn sweep_unregistered(&self, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, MemoryError> {
+        let io_err = |op: &'static str, path: &Path| {
+            let path = path.to_path_buf();
+            move |source| MemoryError::Io { op, path, source }
+        };
+        let entries = match std::fs::read_dir(&self.home) {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(err) => return Err(io_err("list the worktree home", &self.home)(err)),
+        };
+        let registered = self.live()?;
+        let mut swept = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(io_err("list the worktree home", &self.home))?;
+            // A name this module could not have written is not one it
+            // may remove.
+            let Some(name) = entry
+                .file_name()
+                .to_str()
+                .and_then(|raw| WorktreeName::parse(raw).ok())
+            else {
+                continue;
+            };
+            if held.contains(&name) || registered.contains(&name) {
+                continue;
+            }
+            let path = entry.path();
+            std::fs::remove_dir_all(&path)
+                .map_err(io_err("remove an abandoned worktree", &path))?;
+            swept.push(name);
+        }
+        Ok(swept)
     }
 }
 
