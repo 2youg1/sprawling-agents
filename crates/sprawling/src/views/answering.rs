@@ -26,8 +26,8 @@
 use super::holding::Views;
 
 mod history;
+use super::building_page::read_building;
 use super::lines::{buildings_of, config_answer, endpoints_answer, summarize};
-use crate::assembly::read_building;
 
 /// The answer to a question this city could not look up.
 ///

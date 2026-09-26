@@ -7,14 +7,6 @@
 
 use kernel::{Address, AxCode, AxError};
 
-/// What this agent is called: the last segment of its address, which is
-/// the word a person typed into `call it` when they started the
-/// session. Never the whole address — an agent addressed as its own
-/// name reads more like somebody than like a path.
-pub(super) fn name_of(addr: &Address) -> &str {
-    addr.as_str().rsplit('/').next().unwrap_or(addr.as_str())
-}
-
 /// Which governed document a wire frame names. Total: the two sets have
 /// the same three members and neither owns the other, so the translation
 /// is written once here rather than guessed at each call site.

@@ -271,9 +271,11 @@ impl Address {
     pub fn is_within(&self, prefix: &Address) -> bool;  // 段边界字节前缀；WriteDomain 原语
     pub fn is_reserved(&self) -> bool;                  // 任一段 ASCII 大小写不敏感命中 PROTECTED_METADATA 之一（C17，见 8-28、8-55、8-73）
     pub fn as_str(&self) -> &str;
+    pub fn name(&self) -> &str;                         // 最后一段：人起名时打下的那个词
 }
 ```
 
+- `name` 是地址的最后一段。一个居民、一个房间在名册与页面上以它称呼，而不以整条路径称呼：整条路径读起来像路径，最后一段读起来像某个人。语法保证至少一段且段非空，所以它总有答案。这件事写在类型上一处，城的名册、楼的页面与 prefix 里的「你的名字」读的是同一个定义。
 - 派生：`Clone/Debug/Display/PartialEq/Eq/PartialOrd/Ord/Hash`（BTreeMap 键）。
 - serde：呈现为字符串；`Deserialize` 经 `parse` 复验（fail-closed 读盘）。
 - 同一性按字节：`Eq`、`Ord` 与 `is_within` 在所有平台上逐字节比较，大小写不同的两个地址因而是两个地址；`is_within` 自反（`a.is_within(a)`）。**只有 `is_reserved` 折叠 ASCII 大小写**，因为它是一道只允许多拒的门，而它守的目录名在文件系统那边是大小写不敏感的（8-55）。

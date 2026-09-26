@@ -211,15 +211,6 @@ pub(super) fn dialect_headers(dialect: kernel::DialectKind) -> Vec<(String, gate
 /// <https://platform.claude.com/docs/en/api/messages>
 pub(super) const ANTHROPIC_VERSION: &str = "2023-06-01";
 
-pub(super) fn poisoned_vault() -> AxError {
-    AxError::failure(
-        AxCode::StorageFatal,
-        "reach the vault",
-        "the vault lock is poisoned",
-    )
-    .with_recovery("restart the server; enrolled credentials are unaffected")
-}
-
 /// What one tag already points at, when it points at this same model
 /// behind this same endpoint.
 ///

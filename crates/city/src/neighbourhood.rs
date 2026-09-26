@@ -119,7 +119,7 @@ impl Neighbourhood {
                 Identity::Ephemeral { .. } => Occupancy::Empty,
             };
             here.push(Neighbour {
-                name: name_of(&addr).to_owned(),
+                name: addr.name().to_owned(),
                 waiting: waiting(&addr),
                 addr,
                 occupancy,
@@ -167,13 +167,6 @@ impl Neighbourhood {
             .count();
         u32::try_from(count).unwrap_or(u32::MAX)
     }
-}
-
-/// What a place is called: the last segment of its address, which is
-/// the word a person typed when they made it. The whole address reads
-/// like a path; the last segment reads like somebody.
-fn name_of(addr: &Address) -> &str {
-    addr.as_str().rsplit('/').next().unwrap_or(addr.as_str())
 }
 
 /// The one line a roster shows for a resident.

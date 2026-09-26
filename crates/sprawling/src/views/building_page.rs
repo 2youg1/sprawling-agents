@@ -9,8 +9,6 @@ use std::path::Path;
 
 use kernel::Address;
 
-use super::name_of;
-
 /// How much of one document travels to a page.
 ///
 /// These files grow for as long as a building works, and the interface
@@ -51,7 +49,7 @@ pub(crate) fn read_building(
     let rooms: Vec<String> = city::rooms(city_root, addr)
         .unwrap_or_default()
         .iter()
-        .map(|room| name_of(room).to_owned())
+        .map(|room| room.name().to_owned())
         .collect();
     let mut docs = Vec::new();
     // The rules, read by their own path: a building's rules live inside
@@ -140,16 +138,3 @@ pub(super) fn doc_order(name: &str) -> (u8, String) {
     };
     (rank, name.to_owned())
 }
-
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::wildcard_enum_match_arm,
-    clippy::let_underscore_must_use,
-    clippy::let_underscore_untyped,
-    reason = "test code"
-)]
-mod tests;

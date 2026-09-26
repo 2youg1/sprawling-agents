@@ -48,7 +48,7 @@ fn hearing(
                 )
                 .with_recovery("restart the server; its views rebuild from the ledger")
             })?;
-            held.transcriber(crate::assembly::resolving(Arc::clone(&vault)))?
+            held.transcriber(crate::held_vault::resolving(Arc::clone(&vault)))?
         };
         speaking.transcribe(&recording)
     })

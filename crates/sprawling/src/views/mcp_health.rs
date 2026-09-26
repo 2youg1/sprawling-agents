@@ -21,7 +21,7 @@
 use kernel::{Address, AxCode, AxError, TimeoutMs};
 
 use super::holding::Views;
-use crate::assembly::McpLink;
+use crate::mcp_link::McpLink;
 
 /// How long one server is given to finish `initialize` and list what it
 /// offers. Shorter than a tool call's patience, because a person is
@@ -101,7 +101,7 @@ impl Views {
             )
             .with_recovery("this city has no vault open; serve it and ask again")
         })?;
-        let resolve = crate::assembly::resolving(std::sync::Arc::clone(vault));
+        let resolve = crate::held_vault::resolving(std::sync::Arc::clone(vault));
         // A server is reached from the city root rather than from a
         // run's worktree: nothing is running, and the tree a run would
         // have does not exist yet.
