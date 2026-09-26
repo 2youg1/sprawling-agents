@@ -125,6 +125,10 @@ impl Views {
                     by_segment: report.by_segment,
                     by_tool: report.by_tool,
                     by_skill: report.by_skill,
+                    unpriced: channels::UnpricedCalls {
+                        calls: report.unpriced.calls,
+                        tokens: report.unpriced.tokens,
+                    },
                 }))
             }
             channels::Query::History { before, limit } => {

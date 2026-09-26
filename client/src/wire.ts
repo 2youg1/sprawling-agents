@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 40 as const;
+export const WIRE_V = 41 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "655d38fee9b266e84681324441296e8106975927f9c6939fa1e5c2620320e72c" as const;
+export const WIRE_HASH = "c4a706cc4bcb1ff98458fc905bbb6c6838b8a79ad39e7676a4afade62d02fdc5" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -741,6 +741,18 @@ export const ContentAnswer = Schema.Struct({
 export type ContentAnswer = typeof ContentAnswer.Type;
 
 /**
+ * The model calls that came back with no authoritative amount, and the
+ * tokens they used. A city whose provider never prices a call has a
+ * zero `total` after any number of runs; this is what tells that city
+ * apart from one where nothing ran.
+ */
+export const UnpricedCalls = Schema.Struct({
+  calls: Schema.Int,
+  tokens: Schema.Int,
+}).annotations({ identifier: "UnpricedCalls" });
+export type UnpricedCalls = typeof UnpricedCalls.Type;
+
+/**
  * The five cuts of one authoritative total. Each dimension sums to
  * `total` exactly; the interface renders shares against `total` rather
  * than normalising its own rows, so an unattributed remainder stays
@@ -753,6 +765,7 @@ export const CostAnswer = Schema.Struct({
   by_skill: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
   by_tool: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
   total: UsdMicros,
+  unpriced: UnpricedCalls,
 }).annotations({ identifier: "CostAnswer" });
 export type CostAnswer = typeof CostAnswer.Type;
 
