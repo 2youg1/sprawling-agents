@@ -32,16 +32,21 @@ import { createAsking } from "./asking";
 import type { Asking } from "./asking";
 import { createBelief } from "./belief";
 import type { Belief } from "./belief";
+import { NO_TAIL, appended } from "./live_output";
+import type { Tail } from "./live_output";
 import { decodeFrame, encodeFrame } from "./frames";
 import { langOf, say } from "./lang";
 import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
-import type { Command, HistoryRangeAnswer, Query, Seq, ServerFrame } from "../wire";
+import type { Command, HistoryRangeAnswer, Query, RunId, Seq, ServerFrame } from "../wire";
 
 export interface Connection {
   readonly state: Readable<LinkState>;
   readonly belief: Readable<Belief>;
   readonly asking: Asking;
+  // Each run's running command, as far as it has written, until the
+  // call's result lands (core/live_output.ts).
+  readonly live: Readable<Readonly<Partial<Record<RunId, Tail>>>>;
   // Sends one command; false when the link is not live, in which case
   // nothing was sent and the person should be told rather than left to
   // wonder.
@@ -103,6 +108,7 @@ export function openConnection(
   const now = () => Date.now();
   const state = writable<LinkState>(link.state);
   const store = createBelief(now);
+  const live = writable<Readonly<Partial<Record<RunId, Tail>>>>({});
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
@@ -220,6 +226,9 @@ export function openConnection(
         // still speaking this wire, so it goes where every other refusal
         // goes, and the rest of the record has already been folded.
         const bad = store.apply(action.event);
+        if (action.event.kind === "tool_result") {
+          live.update(({ [action.event.run]: _settled, ...rest }) => rest);
+        }
         asking.invalidate(action.event);
         if (bad !== null) store.refused(unreadableRecord(lang, bad));
         return;
@@ -243,6 +252,11 @@ export function openConnection(
       case "logged":
         store.logged(action.line);
         return;
+      case "writing": {
+        const { piece } = action;
+        live.update((tails) => ({ ...tails, [piece.run]: appended(tails[piece.run] ?? NO_TAIL, piece) }));
+        return;
+      }
       case "lagged":
         gaps.push({ at: action.from, to: action.to });
         askGap();
@@ -346,6 +360,7 @@ export function openConnection(
     state,
     belief: store.belief,
     asking,
+    live,
     command(command) {
       return isLive(link) && sendText(encodeFrame({ command }));
     },

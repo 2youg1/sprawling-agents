@@ -26,16 +26,19 @@
   import type { Turn } from "../../wire";
   import CodeColumn from "./code_column.svelte";
   import Terminal from "./terminal.svelte";
+  import type { Tail } from "../../core/live_output";
   import { traceOf } from "./trace";
   import type { Target } from "./trace";
 
   interface Props {
     readonly turns: readonly Turn[];
+    // What the running command has written so far; `NO_TAIL` when none runs.
+    readonly tail: Tail;
     readonly onDraft: (text: string) => void;
     readonly onSteer: (text: string) => void;
   }
 
-  const { turns, onDraft, onSteer }: Props = $props();
+  const { turns, tail, onDraft, onSteer }: Props = $props();
   const { lang } = ui();
 
   type Following = "following" | "paused";
@@ -153,7 +156,7 @@
         ontouchmove={() => (following = "paused")}
         onkeydown={scrolledBy}
       >
-        <Terminal entries={trace.entries} />
+        <Terminal entries={trace.entries} {tail} />
       </div>
     {/if}
   </div>

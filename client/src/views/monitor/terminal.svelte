@@ -21,12 +21,16 @@
   import { INK, rows } from "./ansi";
   import type { Span } from "./ansi";
   import type { Ending, Entry } from "./trace";
+  import type { Tail } from "../../core/live_output";
 
   interface Props {
     readonly entries: readonly Entry[];
+    // The running command's output so far, drawn under the entry still
+    // running until its result replaces it.
+    readonly tail: Tail;
   }
 
-  const { entries }: Props = $props();
+  const { entries, tail }: Props = $props();
   const { lang } = ui();
 
   const MARK: Record<Ending["kind"], GlyphName> = { code: "check", stopped: "cross", running: "pulse", unread: "ring" };
@@ -76,13 +80,13 @@
         </span>
       </div>
       <div class="px-snug">
-        {#each drawn([[entry.stdout, false], [entry.stderr, true]]) as line, r (r)}
+        {#each drawn(entry.ending.kind === "running" ? [[tail.out, false], [tail.err, true]] : [[entry.stdout, false], [entry.stderr, true]]) as line, r (r)}
           <div class="ps-[2ch] -indent-[2ch] whitespace-pre-wrap wrap-break-word">{#each line.row as piece, p (p)}<span
                 class="{line.alert ? 'text-alert' : INK[piece.tone]} {piece.bold ? 'font-semibold' : ''}">{piece.text}</span
               >{/each}</div>
         {/each}
-        {#if entry.cut > 0}
-          <div class="text-text-faint">{fill(say($lang, "mon_lines_cut"), { n: String(entry.cut) })}</div>
+        {#if (entry.ending.kind === "running" ? tail.cut : entry.cut) > 0}
+          <div class="text-text-faint">{fill(say($lang, "mon_lines_cut"), { n: String(entry.ending.kind === "running" ? tail.cut : entry.cut) })}</div>
         {/if}
       </div>
     {:else}

@@ -47,6 +47,7 @@
   import type { Lens } from "./parts/tabs.svelte";
   import Head from "./run/head.svelte";
   import Monitor from "./monitor/monitor.svelte";
+  import { NO_TAIL } from "../core/live_output";
   import type { Share } from "./run/lanes";
   import { figuresOf } from "./run/lanes";
   import Prompt from "./run/prompt.svelte";
@@ -84,6 +85,7 @@
   const u = ui();
   const lang = u.lang;
   const belief = u.conn.belief;
+  const tails = u.conn.live;
 
   const roundsStore = $derived(u.conn.asking.ask({ rounds: { run } }));
   const rounds = $derived.by((): RoundsAnswer | undefined => {
@@ -250,7 +252,7 @@
     </div>
   {:else if eye.id === "monitor"}
     <div class="flex h-[70vh] min-h-0 flex-col rounded-card border border-edge">
-      <Monitor {turns} onDraft={draftSteer} onSteer={(text: string) => u.send(steer(run, text))} />
+      <Monitor {turns} tail={$tails[run] ?? NO_TAIL} onDraft={draftSteer} onSteer={(text: string) => u.send(steer(run, text))} />
     </div>
   {:else if eye.id === "prompt"}
     <Prompt {run} />

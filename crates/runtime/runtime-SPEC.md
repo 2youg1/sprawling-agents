@@ -1345,7 +1345,7 @@ impl Backlog {
 
 **红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
-#### 8-28-3 exec 输出的实时流（读增量、装配点注入与线上帧已接，服务端缓冲与页面缓冲未接）
+#### 8-28-3 exec 输出的实时流（读增量、装配点注入、线上帧与页面缓冲已接，服务端缓冲未接）
 
 **现状**：一个 `exec` 调用的 stdout／stderr 只在调用结束时随工具结果进账本，页面（client 的监视器）在那之前只看得到「运行中」。第 2 条让输出写进 scratch 下的 `out`／`err` 两个文件，所以实时流不需要改子进程怎么写，只需要有人在它还在写时读这两个文件的增量。
 
@@ -1368,7 +1368,9 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 
 **已接的第二段——装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `channels::LiveOutput`（channels-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
 
-**待接**：服务端每个 run 的环形缓冲（后来打开 run 页的会话先拿到它）；页面环形缓冲。设计如下。
+**已接的第三段——页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
+
+**待接**：服务端每个 run 的环形缓冲，让后来打开 run 页的会话先拿到它。设计如下。
 
 **设计**：
 

@@ -14,6 +14,7 @@ import type {
   ClientFrame,
   Delta,
   EventRecord,
+  LiveOutput,
   LogLine,
   Seq,
   ServerFrame,
@@ -62,6 +63,9 @@ export type LinkAction =
   // its own, it is never written down, and a page that missed one has
   // lost nothing.
   | { readonly kind: "logged"; readonly line: LogLine }
+  // A piece of what a running command has written. Discardable, like
+  // an increment: the call's result is what the Ledger keeps.
+  | { readonly kind: "writing"; readonly piece: LiveOutput }
   // A range of ledger records the event stream skipped. Its own action
   // rather than a report: the page can do something about it, and what
   // it does is ask the Ledger for the range.
@@ -258,11 +262,8 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   if ("lagged" in frame) {
     return [link, { kind: "lagged", from: frame.lagged.from, to: frame.lagged.to }];
   }
-  // A running command's output. Discardable, like an increment, and not
-  // yet drawn: the page's bounded ring is runtime-SPEC 8-28-3's next
-  // stage, and until it lands the call's settled result is what shows.
   if ("output" in frame) {
-    return [link, { kind: "nothing" }];
+    return [link, { kind: "writing", piece: frame.output }];
   }
   return unhandled(link, frame);
 }

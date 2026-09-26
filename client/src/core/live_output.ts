@@ -30,6 +30,9 @@ export function appended(tail: Tail, piece: LiveOutput, cap: number = LIVE_LINES
     : { ...tail, err: text, cut: tail.cut + cut };
 }
 
-function bounded(text: string, _cap: number): [string, number] {
-  return [text, 0];
+// The newest `cap` lines of `text`, and how many older ones went.
+function bounded(text: string, cap: number): [string, number] {
+  const lines = text.split("\n");
+  const cut = Math.max(0, lines.length - cap);
+  return cut === 0 ? [text, 0] : [lines.slice(cut).join("\n"), cut];
 }
