@@ -3095,5 +3095,33 @@
   "notify_approval": {
     "en": "An approval waits for you",
     "zh": "有一件事等你批准"
+  },
+  "setup_editor": {
+    "en": "Open in my editor",
+    "zh": "用我的编辑器打开"
+  },
+  "setup_editor_note": {
+    "en": "A file the monitor shows opens at its line in the editor this computer has. The browser hands the link to the editor; the city starts nothing.",
+    "zh": "监视器里的文件会在这台电脑的编辑器里打开，并跳到那一行。链接由浏览器交给编辑器，城不启动任何程序。"
+  },
+  "setup_editor_none": {
+    "en": "None",
+    "zh": "不用"
+  },
+  "setup_editor_vscode": {
+    "en": "VS Code",
+    "zh": "VS Code"
+  },
+  "setup_editor_vscode_insiders": {
+    "en": "VS Code Insiders",
+    "zh": "VS Code Insiders"
+  },
+  "setup_editor_folder": {
+    "en": "The city's folder on this computer",
+    "zh": "城在这台电脑上的文件夹"
+  },
+  "setup_editor_folder_help": {
+    "en": "An absolute path. Only a file inside it gets a link.",
+    "zh": "填绝对路径。只有这个文件夹里的文件会有链接。"
   }
 }
