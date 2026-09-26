@@ -11,7 +11,6 @@ memory = { path = "../crates/memory" }
 collab = { path = "../crates/collab" }
 runtime = { path = "../crates/runtime" }
 gateway = { path = "../crates/gateway" }
-collab = { path = "../crates/collab" }
 channels = { path = "../crates/channels" }
 sprawling = { path = "../crates/sprawling" }
 serde_json.workspace = true
