@@ -970,6 +970,6 @@ impl Worktrees {
 
 **拒绝，不覆盖。** `claim_at` 在三种情况下拒：名字登记着一棵活树，或者已有同名分支（那是一条已有的工作线，覆盖它就是冲掉别人的写入）→ `WorktreeBusy`（`E_WORKTREE_BUSY`，恢复：换一个名字）；point 不是城仓库里的提交 → `Worktree{op:"find the point to go back to"}`。城的工作树超过上限 → `WorktreeBusy`，与 `claim` 同一个预检（`refuse_oversized`）。拒后城内文件、干线与所有分支都不变；分支建好而检出失败时，这条专为它新建的分支随即删掉，否则它会以一条没人开始的工作线占住这个名字。检出与 `claim` 走同一个 `add_tree`，放树的位置与别名判定只有一处。它不像 `claim` 那样自愈一个目录已丢的登记：回到过去总取新名字，碰上旧名字就是调用方的错。
 
-**取回只写自己的树。** `restore_file` 只接受相对路径且不含 `..`，不接受 `RESERVED_PREFIX` 之下的路径；写入目标是 `lease.path()` 下的那个文件，经 `alias::WriteTarget` 判定（8-25）。point 上是 blob 即按原字节经 `bundle::landing::land` 落盘（同目录暂存、`sync_data`、抄原权限、`rename` 覆盖、`sync_dir`，8-25），所以经硬链接指向别的树或干线的名字只被换掉目录项，那一头的字节不动，崩溃也不留半个文件；point 上没有即删除，这就是「恢复到那一点」的含义；目录与子模块不是一个文件，拒。
+**取回只写自己的树。** `restore_file` 只接受相对路径且不含 `..`，不接受 `RESERVED_PREFIX` 之下的路径，也不接受任何以 `.` 或空格结尾、或含 `:` 的段——Win32 把这些拼写折叠到另一个名字上（`.git.`、`.git `、`.git::$DATA` 都指向树的 `.git` 链接），逐段比较挡不住它们；写入目标是 `lease.path()` 下的那个文件，经 `alias::WriteTarget` 判定（8-25）。point 上是 blob 即按原字节经 `bundle::landing::land` 落盘（同目录暂存、`sync_data`、抄原权限、`rename` 覆盖、`sync_dir`，8-25），所以经硬链接指向别的树或干线的名字只被换掉目录项，那一头的字节不动，崩溃也不留半个文件；point 上没有即删除，这就是「恢复到那一点」的含义；目录与子模块不是一个文件，拒。
 
 **现状。** 本模块是统一历史的第一段。「分叉」与「取回」的事件种类（`went_back`、`file_restored`）已在 kernel 事件表里。其余几段尚不存在：服务端把账本加 git 投影成一棵血缘树的读者面，以及网页上把楼页的提交、改动、回收站与对话页的分叉合成一页的「历史」页。它们到来之前，`claim_at` 与 `restore_file` 没有生产调用者。

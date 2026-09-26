@@ -153,12 +153,16 @@ impl Worktrees {
 }
 
 /// `path` in the spelling a git tree uses, or `None` when it is empty,
-/// leaves the tree, or names the reserved subtree.
+/// leaves the tree, names the reserved subtree, or holds a segment Win32
+/// folds onto another name (a trailing `.` or space, or a `:` stream
+/// suffix), because `.git.` there names the tree's `.git` link.
 fn in_tree(path: &Path) -> Option<String> {
     let segments = path
         .components()
         .map(|component| match component {
-            Component::Normal(segment) => segment.to_str(),
+            Component::Normal(segment) => segment
+                .to_str()
+                .filter(|segment| !segment.ends_with(['.', ' ']) && !segment.contains(':')),
             Component::Prefix(_)
             | Component::RootDir
             | Component::CurDir

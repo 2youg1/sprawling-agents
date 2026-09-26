@@ -157,6 +157,20 @@ fn restoring_refuses_a_path_that_climbs_out_of_the_tree() {
 }
 
 #[test]
+fn restoring_refuses_every_spelling_windows_folds_onto_the_git_link() {
+    let dir = tempfile::tempdir().unwrap();
+    let (trees, first, _) = city(dir.path());
+    let mine = trees.claim(&name("node-1")).unwrap();
+
+    for alias in [".git.", ".git ", ".git::$DATA"] {
+        let refused = trees.restore_file(&mine, &first, Path::new(alias));
+
+        assert!(refused.is_err(), "{alias:?}: {refused:?}");
+        assert!(mine.path().join(".git").exists(), "{alias:?} removed .git");
+    }
+}
+
+#[test]
 fn restoring_through_a_hard_link_leaves_the_linked_file_untouched() {
     let dir = tempfile::tempdir().unwrap();
     let (trees, first, _) = city(dir.path());
