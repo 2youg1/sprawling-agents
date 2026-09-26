@@ -241,29 +241,72 @@ pub(crate) struct Finding {
 
 /// Asks this machine about every item in the table at once, and answers
 /// in table order.
+pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding> {
+    match examine_each(machine, |_answered, _finding| {
+        Ok::<(), std::convert::Infallible>(())
+    }) {
+        Ok(findings) => findings,
+        Err(never) => match never {},
+    }
+}
+
+/// Asks this machine about every item in the table at once, hands each
+/// finding to `answered` with its table index the moment it arrives,
+/// and returns every finding in table order.
 ///
 /// One scoped thread per item, because each probe spends its time
 /// waiting on a child process rather than on a core: the report then
 /// costs the slowest item instead of the sum of all of them.
-pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding> {
+///
+/// # Errors
+/// The first failure `answered` returns; the probes still out finish
+/// and their answers are dropped, because nobody is left to show them.
+pub(crate) fn examine_each<E>(
+    machine: &dyn Machine,
+    mut answered: impl FnMut(usize, &Finding) -> Result<(), E>,
+) -> Result<Vec<Finding>, E> {
+    let (arrived, arrivals) = std::sync::mpsc::channel();
     std::thread::scope(|scope| {
-        let looking: Vec<_> = REQUIREMENTS
-            .iter()
-            .map(|requirement| (requirement, scope.spawn(move || machine.look(requirement))))
-            .collect();
-        looking
-            .into_iter()
-            .map(|(requirement, look)| Finding {
-                requirement,
+        for (index, requirement) in REQUIREMENTS.iter().enumerate() {
+            let arrived = arrived.clone();
+            scope.spawn(move || {
                 // A probe that stopped without answering is reported as
                 // such, rather than taking the other rows down with it.
-                presence: look.join().unwrap_or_else(|_stopped| Presence::Broken {
-                    at: std::path::PathBuf::new(),
-                    fault: Fault::Unreadable("its probe stopped before it answered".to_owned()),
-                }),
+                let presence = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    machine.look(requirement)
+                }))
+                .unwrap_or_else(|_stopped| stopped_probe());
+                arrived.send((index, requirement, presence))
+            });
+        }
+        drop(arrived);
+        let mut presences: Vec<Option<Presence>> = REQUIREMENTS.iter().map(|_| None).collect();
+        for (index, requirement, presence) in arrivals {
+            let finding = Finding {
+                requirement,
+                presence,
+            };
+            answered(index, &finding)?;
+            if let Some(slot) = presences.get_mut(index) {
+                *slot = Some(finding.presence);
+            }
+        }
+        Ok(REQUIREMENTS
+            .iter()
+            .zip(presences)
+            .map(|(requirement, presence)| Finding {
+                requirement,
+                presence: presence.unwrap_or_else(stopped_probe),
             })
-            .collect()
+            .collect())
     })
+}
+
+fn stopped_probe() -> Presence {
+    Presence::Broken {
+        at: std::path::PathBuf::new(),
+        fault: Fault::Unreadable("its probe stopped before it answered".to_owned()),
+    }
 }
 
 /// Whether one tier is reachable on this machine.

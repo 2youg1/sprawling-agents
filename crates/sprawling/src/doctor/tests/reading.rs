@@ -97,7 +97,7 @@ fn the_report_is_grouped_into_required_and_recommended() {
     let findings = examine(&ScriptedMachine::missing(&[]));
     let required: Vec<&str> = findings
         .iter()
-        .filter(|found| Part::of(found) == Part::Required)
+        .filter(|found| Part::of(found.requirement) == Part::Required)
         .map(|found| found.requirement.name)
         .collect();
     assert_eq!(
@@ -109,7 +109,7 @@ fn the_report_is_grouped_into_required_and_recommended() {
         findings
             .iter()
             .filter(|found| found.requirement.tier == Tier::Develop)
-            .all(|found| Part::of(found) == Part::Recommended),
+            .all(|found| Part::of(found.requirement) == Part::Recommended),
         "a person who only wants to run a city is not told they are short a fuzzer"
     );
 }
@@ -212,6 +212,95 @@ fn the_heading_is_written_before_any_item_is_asked() {
     assert!(
         !machine.asked_in_silence.load(Ordering::SeqCst),
         "an item was asked about while the screen was still empty"
+    );
+}
+
+/// The first row is on the screen once its own probe answers, while the
+/// other probes are still out: every other probe here waits for that row
+/// to appear, and gives up after a second when it never does.
+#[test]
+fn the_first_row_is_written_while_the_other_items_are_still_asked() {
+    use crate::doctor::{Absence, Machine, Requirement};
+    use accounting::Runnable;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
+
+    struct Waiting {
+        first: &'static str,
+        screen: Arc<Mutex<String>>,
+        waited_in_vain: AtomicBool,
+    }
+    impl Waiting {
+        fn first_row_shown(&self) -> bool {
+            self.screen
+                .lock()
+                .unwrap()
+                .lines()
+                .any(|line| line.trim_start().starts_with(&format!("{} ", self.first)))
+        }
+    }
+    impl Machine for Waiting {
+        fn look(&self, requirement: &Requirement) -> Presence {
+            if requirement.name != self.first {
+                let giving_up = Instant::now() + Duration::from_secs(1);
+                while !self.first_row_shown() {
+                    if Instant::now() > giving_up {
+                        self.waited_in_vain.store(true, Ordering::SeqCst);
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+            }
+            Presence::Absent(Absence::NotOnSearchPath)
+        }
+        fn core_standing(&self) -> Result<Standing, kernel::AxError> {
+            Ok(Standing::Raised)
+        }
+    }
+    impl accounting::Machine for Waiting {
+        fn report(&self) -> channels::DoctorAnswer {
+            crate::doctor::answer(self)
+        }
+        fn install(&self, _name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
+            Ok(())
+        }
+    }
+    struct Screen(Arc<Mutex<String>>);
+    impl std::io::Write for Screen {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0
+                .lock()
+                .unwrap()
+                .push_str(&String::from_utf8_lossy(bytes));
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let first = REQUIREMENTS
+        .iter()
+        .find(|requirement| Part::of(requirement) == Part::Required)
+        .unwrap()
+        .name;
+    let screen = Arc::new(Mutex::new(String::new()));
+    let machine = Waiting {
+        first,
+        screen: Arc::clone(&screen),
+        waited_in_vain: AtomicBool::new(false),
+    };
+    run(
+        &crate::doctor::screen::asked(&[], None),
+        &machine,
+        &mut std::io::empty(),
+        &mut Screen(screen),
+    )
+    .unwrap();
+    assert!(
+        !machine.waited_in_vain.load(Ordering::SeqCst),
+        "the row for {first} waited until every item had answered"
     );
 }
 
