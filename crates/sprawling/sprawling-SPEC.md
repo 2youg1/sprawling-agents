@@ -471,6 +471,9 @@ struct CollaborationFold { … }   // 暂存 enqueued／consumed，`settle` 产 
 
 `rebuild_book`／`rebuild_governance`／`rebuild_collaboration` 三个函数删除。
 
+- `Standing::fold` 与 `rebuild_views` 折叠的是 `runtime::replay::VerifiedLedger::lines()` 里那份已解析的记录，不再对原始行调第二次 `EventRecord::parse_line`。理由有二：同一行只解析一次；更要紧的是，逐行检查放行的 `ig: true` 未知种类行（`VerifiedLine::IgnoredUnknown`）在第二次解析时会失败，于是一份能通过验证的历史却起不了城。两个折叠对 `IgnoredUnknown` 都跳过，与 `runtime::fork` 的读法一致。由 `a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary` 判定。
+- 尚未落地的部分：`Views`、`Standing` 与 `LedgerIndex` 合成一个 `CityFold`，在同一遍里建立，并让 `Governance` 与 `EndpointBook` 各只留一份；验收是 5 万条记录时首字节 ≤ 500 ms、l100k 启动峰值 ≤ 稳定值 + 8 MiB。这需要 `serving::attending::spawn_worker` 把 serve 线程上折好的 `Standing` 交给 `RunWorker`，而不是让 `RunWorker::new` 再读一遍。
+
 - **这不是缺陷修复**。三处实现漂移的假设（`rebuild_governance` 管 `granted` 与 `CityHalted`，`govern` 不管，`answer_approval`／`set_admission` 各自直改字段）不成立：新测试 `what_a_worker_holds_is_what_a_restart_rebuilds` 否定了它——派一次活、发一条信号之后，活 worker 与重建结果逐项相等。那条测试因此不是这次的红，而是让合并安全的护栏；它同时把一条四处代码都依赖、却从未被断言过的形状-7 性质变成了可红的。
 - **以测量收口而非以红转绿收口**，理由写在上一条：没有可咬的红，因为没有缺陷。实测（windows-x86_64、16 核，release，外部探针经 `sprawling` 的 lib 门驱动 `RunWorker::new`）：
 
