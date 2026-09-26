@@ -73,6 +73,16 @@ pub(crate) struct CoreThread {
     /// What puts the thread back at normal: the platform, or in a test a
     /// platform that refuses.
     lower: fn() -> Result<Standing, thread_priority::Error>,
+    lowering: Lowering,
+}
+
+/// Whether the valve may still ask the platform to lower the thread.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Lowering {
+    Owed,
+    /// The platform refused once; asking every turn would only repeat
+    /// the refusal on stderr.
+    Refused,
 }
 
 impl CoreThread {
@@ -88,6 +98,7 @@ impl CoreThread {
             standing,
             valve: Valve::new(BUSY_LIMIT, now),
             lower: lower_this_thread,
+            lowering: Lowering::Owed,
         }
     }
 
@@ -99,6 +110,7 @@ impl CoreThread {
             standing: Standing::Raised,
             valve: Valve::new(BUSY_LIMIT, now),
             lower,
+            lowering: Lowering::Owed,
         }
     }
 
@@ -106,14 +118,17 @@ impl CoreThread {
     /// the thread stands raised, lowers the thread and tells the person.
     pub(crate) fn record_turn_lowering_when_busy(&mut self, woke: Instant, slept: Instant) {
         self.valve.record(woke, slept);
-        if self.standing == Standing::Raised && self.valve.verdict() == Verdict::Lower {
-            self.standing = self.lowered_telling_the_person();
+        if self.standing == Standing::Raised
+            && self.lowering == Lowering::Owed
+            && self.valve.verdict() == Verdict::Lower
+        {
+            self.lower_telling_the_person();
         }
     }
 
     /// Lowers the calling thread and says so on stderr; a refusal leaves
-    /// it raised, and the next turn tries again.
-    fn lowered_telling_the_person(&self) -> Standing {
+    /// it raised and is not asked again.
+    fn lower_telling_the_person(&mut self) {
         match (self.lower)() {
             Ok(standing) => {
                 eprintln!(
@@ -121,7 +136,7 @@ impl CoreThread {
                     self.name,
                     BUSY_LIMIT.as_secs()
                 );
-                standing
+                self.standing = standing;
             }
             Err(err) => {
                 eprintln!(
@@ -129,7 +144,7 @@ impl CoreThread {
                     self.name,
                     BUSY_LIMIT.as_secs()
                 );
-                Standing::Raised
+                self.lowering = Lowering::Refused;
             }
         }
     }
