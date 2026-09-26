@@ -40,6 +40,7 @@ import { browserRows } from "./rows";
 import { sizingOf } from "./sizing";
 import type { Rows } from "./rows";
 import { Proxying } from "../wire";
+import type { PreferencePatch } from "../wire";
 import type { Notifying } from "./notify";
 import { SHOWINGS } from "./results";
 import type { Showing } from "./results";
@@ -214,6 +215,10 @@ export interface PreferenceDoor {
   // first paint draws it rather than the shipped postures, and it is
   // the only thing that makes `keeper` say `city`.
   readonly adopt: (stated: Preferences) => void;
+  // Where each named change is told once it is made: the city's
+  // `PutPreferences`, joined by `core/prefs_city.ts`. Until then a
+  // change stays in this browser alone.
+  readonly tell: (send: (patch: PreferencePatch) => void) => void;
   readonly setLang: (lang: Lang) => void;
   readonly setWelcomed: (done: boolean) => void;
   readonly setPanel: (open: boolean) => void;
@@ -343,6 +348,7 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
       settle(stated);
       keeper.set("city");
     },
+    tell() {},
     setLang(lang) {
       settle({ ...get(held), lang });
     },
