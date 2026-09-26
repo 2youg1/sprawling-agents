@@ -245,7 +245,7 @@ describe("asking", () => {
     const driver = driven();
     const watching = driver.ask.ask(QUERIES.city).subscribe(() => undefined);
     driver.ask.invalidate(record(5));
-    driver.ask.answered(nth(driver, 0), Seq.make(6), answer({
+    driver.ask.answered(nth(driver, 0), Seq.make(7), answer({
       city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
     }));
     driver.ask.invalidate(record(6));

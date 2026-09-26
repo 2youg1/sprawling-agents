@@ -2243,9 +2243,10 @@ export type AskOutcome = typeof AskOutcome.Type;
 /**
  * The reply to one [`Ask`].
  * 
- * `as_of` is the ledger position sampled before the read, so the answer
- * reflects at least every record up to it: a record folded during the
- * read can only make a page ask once more, never keep a stale answer.
+ * `as_of` is the first seq the answer does not reflect: the answer holds
+ * every record before it and none from it on. It and the answer are read
+ * under the same view lock, and a view that has folded nothing answers
+ * with `Seq::FIRST`, so genesis is never mistaken for already folded.
  */
 export const Answered = Schema.Struct({
   as_of: Seq,

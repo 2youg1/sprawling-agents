@@ -102,8 +102,11 @@ pub(crate) struct Views {
     /// How many records this view has folded. The one number a page
     /// cannot derive from any other answer.
     pub(super) events: u64,
-    /// The last record folded, which dates every answer read from here.
-    pub(super) folded_to: kernel::Seq,
+    /// The first seq not yet folded, which dates every answer read from
+    /// here: the answer reflects every record before it. `Seq::FIRST`
+    /// until genesis is folded, so "nothing folded" never reads as
+    /// "genesis folded".
+    pub(super) next_unfolded: kernel::Seq,
     /// seq to byte offset, held rather than rebuilt.
     ///
     /// Rebuilding it read the whole side cache and allocated a `String`
@@ -165,7 +168,7 @@ impl Views {
             predecessors: std::collections::BTreeMap::new(),
             skill_pins: std::collections::BTreeMap::new(),
             events: 0,
-            folded_to: kernel::Seq::FIRST,
+            next_unfolded: kernel::Seq::FIRST,
             // An unreadable ledger directory is not a reason to refuse to
             // start: the index is disposable, every refresh tries again,
             // and a city with no ledger yet is the ordinary first run.
@@ -180,10 +183,10 @@ impl Views {
         }
     }
 
-    /// The last record this view folded: an answer read from here
-    /// reflects every record up to it.
-    pub(crate) fn folded_to(&self) -> kernel::Seq {
-        self.folded_to
+    /// The first seq this view has not folded: an answer read from here
+    /// reflects every record before it.
+    pub(crate) fn next_unfolded(&self) -> kernel::Seq {
+        self.next_unfolded
     }
 
     /// Folds one record into every view that cares about it.
@@ -208,7 +211,7 @@ impl Views {
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
         self.plans.apply(record);
         self.events = self.events.saturating_add(1);
-        self.folded_to = record.seq();
+        self.next_unfolded = record.seq().next()?;
         match record.kind() {
             EventKind::CityInitialized => {
                 self.city = record.addr().cloned();

@@ -79,10 +79,10 @@ interface Held {
   reported: boolean;
   stale: boolean;
   // The newest record that marked this answer stale while its question
-  // was out: an answer read at or past it already holds it.
+  // was out: an answer read past it already holds it.
   staleAt: number;
-  // The ledger position the held answer was read at; a record at or
-  // before it is already in the answer.
+  // The first seq the held answer does not reflect; a record before it
+  // is already in the answer.
   asOf: Seq | null;
   inflight: boolean;
   watchers: number;
@@ -297,7 +297,7 @@ export function createAsking(
     }
     slot.reported = false;
     slot.asOf = asOf;
-    if (slot.stale && slot.staleAt <= asOf) slot.stale = false;
+    if (slot.stale && slot.staleAt < asOf) slot.stale = false;
     slot.value.set(outcome.answer);
     const query = parsed.get(key);
     if (slot.stale && slot.watchers > 0 && query !== undefined) schedule(key, query, slot);
@@ -311,7 +311,7 @@ export function createAsking(
         const slot = held.get(key);
         const query = parsed.get(key);
         if (slot === undefined || query === undefined || !reaches(reach, key, record.run)) continue;
-        if (slot.asOf !== null && record.seq <= slot.asOf) continue;
+        if (slot.asOf !== null && record.seq < slot.asOf) continue;
         slot.stale = true;
         slot.staleAt = Math.max(slot.staleAt, record.seq);
         if (slot.watchers > 0) schedule(key, query, slot);

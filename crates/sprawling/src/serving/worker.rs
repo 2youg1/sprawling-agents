@@ -160,10 +160,10 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // terminal are two ways into one city, and this is the read half of
     // what makes that literally true rather than a claim.
     // The answer is dated under the same lock it is read under, so the
-    // date is exactly the last record the answer reflects.
+    // date is exactly the first record the answer does not reflect.
     let answering: crate::console::Answering =
         Arc::new(move |query: channels::Query| match query_views.lock() {
-            Ok(mut views) => (views.folded_to(), Ok(views.answer(&query))),
+            Ok(mut views) => (views.next_unfolded(), Ok(views.answer(&query))),
             Err(_) => (
                 kernel::Seq::FIRST,
                 Err(AxError::failure(
