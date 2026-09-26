@@ -154,17 +154,20 @@ describe("asking", () => {
     expect(driver.reports, "a late answer is not an unplaceable one").toHaveLength(1);
   });
 
-  // Two rounds of matching, both missed: before this the answer was
-  // dropped without a word, which is the silence a page waiting for
-  // ever is made of.
-  test("an answer that matches no question is reported", () => {
+  // Two rounds of matching, both missed. Nothing a person can do about
+  // an answer no question waits for, and it is not a protocol mismatch:
+  // a page and a city from one build said "the versions differ" while
+  // they were connected. The question that still waits is what a
+  // person meets, once, when its patience runs out.
+  test("an answer that matches no question is not a refusal", () => {
     const driver = driven();
     driver.ask.ask(QUERIES.doctor);
 
     driver.ask.answered({ mcp_health: { addr: Address.make("hall/mayor"), servers: [] } });
-    expect(driver.reports).toHaveLength(1);
-    expect(driver.reports[0]?.[0]).toBe("ask_unfiled");
-    expect(driver.reports[0]?.[1].code).toBe("E_WIRE_MISMATCH");
+    expect(driver.reports).toEqual([]);
+
+    driver.pass(16_000);
+    expect(driver.reports.map(([phrase, error]) => [phrase, error.code])).toEqual([["ask_late", "E_TIMEOUT"]]);
   });
 
   // A page somebody is looking at asks again after the patience runs
