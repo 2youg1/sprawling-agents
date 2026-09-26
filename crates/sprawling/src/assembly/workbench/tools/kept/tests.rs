@@ -133,3 +133,85 @@ fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
         "the vault holds the key itself"
     );
 }
+
+/// A tool that records the arguments it was handed, standing for exec,
+/// delegate, an MCP tool or any other tool on the bench that is not edit.
+struct Recording {
+    meta: kernel::ToolMeta,
+    seen: std::sync::Arc<std::sync::Mutex<Vec<kernel::Payload>>>,
+}
+
+impl kernel::Tool for Recording {
+    fn meta(&self) -> &kernel::ToolMeta {
+        &self.meta
+    }
+
+    fn invoke(&mut self, call: &kernel::ToolCall) -> Result<kernel::ToolOutcome, kernel::AxError> {
+        self.seen.lock().unwrap().push(call.args.clone());
+        Ok(kernel::ToolOutcome {
+            result: kernel::Payload::new(serde_json::Map::new()).unwrap(),
+            attachments: Vec::new(),
+        })
+    }
+}
+
+/// A key nested anywhere in the arguments of a tool other than edit,
+/// such as the command line exec would run to write a file, reaches the
+/// tool as the reference that resolves to it.
+#[test]
+fn a_key_in_any_tool_argument_reaches_the_vault_and_not_the_tool() {
+    use super::{Keeper, Kept};
+    use kernel::Tool;
+    let key = written();
+    let vault = std::sync::Arc::new(std::sync::Mutex::new(gateway::Custodian::in_memory()));
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let meta = kernel::ToolMeta {
+        name: kernel::ToolName::parse("exec").unwrap(),
+        disclosure: String::new(),
+        params: kernel::Payload::new(serde_json::Map::new()).unwrap(),
+        effect: kernel::Effect::Read,
+        cost_tier: kernel::CostTier::Light,
+        timeout: None,
+        render: kernel::RenderIntent::Generic,
+        temporal: kernel::Temporal::Timeless,
+    };
+    let mut kept = Kept::new(
+        Box::new(Recording {
+            meta,
+            seen: seen.clone(),
+        }),
+        std::sync::Arc::new(Keeper::new(vault.clone(), 7)),
+    );
+    let args = serde_json::json!({
+        "argv": ["sh", "-c", format!("echo {key} > f")],
+    })
+    .as_object()
+    .unwrap()
+    .clone();
+    kept.invoke(&kernel::ToolCall {
+        id: "tu_1".to_owned(),
+        name: kernel::ToolName::parse("exec").unwrap(),
+        args: kernel::Payload::new(args).unwrap(),
+    })
+    .unwrap();
+
+    let handed = serde_json::to_string(&seen.lock().unwrap()[0]).unwrap();
+    assert!(
+        !handed.contains(&key),
+        "the tool was handed the key: {handed}"
+    );
+    let at = handed
+        .find("secret:written/")
+        .expect("the tool was handed the reference in the key's place");
+    let reference: String = handed[at..]
+        .chars()
+        .take_while(|c| !c.is_whitespace() && *c != '"')
+        .collect();
+    let reference = kernel::SecretRef::parse(&reference).unwrap();
+    let held = vault.lock().unwrap().resolve(&reference).unwrap();
+    assert_eq!(
+        *held.into_vault_value(),
+        key,
+        "the vault holds the key itself"
+    );
+}
