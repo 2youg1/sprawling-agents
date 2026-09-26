@@ -306,7 +306,10 @@ fn a_link_that_does_not_resolve_is_counted_as_unread() {
     let unread = map["unread"].as_array().unwrap();
     assert_eq!(unread[0]["path"], "lab/knot");
     assert!(
-        unread[0]["why"].as_str().unwrap().contains("E_STORAGE_FATAL"),
+        unread[0]["why"]
+            .as_str()
+            .unwrap()
+            .contains("E_STORAGE_FATAL"),
         "{}",
         unread[0]["why"]
     );
