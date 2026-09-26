@@ -218,6 +218,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         events,
         deltas,
         logs,
+        monitor: watched(),
         city: city_name,
         secrets: Arc::new(move |command: channels::Command, reply: channels::Reply| {
             // The route waits for whichever comes first, so the
@@ -304,5 +305,21 @@ impl Listening {
             eprintln!("the run worker ended abnormally: {panicked:?}");
         }
         served
+    }
+}
+
+/// The monitor a session watches over the socket (sprawling-SPEC.md
+/// 8-90). Whether anybody watches is the monitor's count; a session holds
+/// its [`crate::monitor::Watch`] for as long as it watches.
+fn watched() -> channels::MonitorFeed {
+    let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
+    channels::MonitorFeed {
+        watch: Arc::new(move || {
+            // The count is an atomic, so a poisoned lock guards no
+            // half-written state and the watcher still counts.
+            let held = monitor.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            Box::new(held.watch())
+        }),
+        samples: tokio::sync::broadcast::channel(1).0,
     }
 }

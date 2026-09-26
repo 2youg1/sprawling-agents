@@ -87,6 +87,10 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
     let config = ServeConfig {
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
+        monitor: channels::MonitorFeed {
+            watch: Arc::new(|| Box::new(())),
+            samples: tokio::sync::broadcast::channel(1).0,
+        },
         client: Arc::new(channels::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
         transcribe_sink: Arc::new(|_, _| {

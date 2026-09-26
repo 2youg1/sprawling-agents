@@ -16,6 +16,8 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+pub use channels::Sample;
+
 /// Samples kept: one a second for five minutes.
 pub const CAPACITY: usize = 300;
 
@@ -29,25 +31,6 @@ const _: () = assert!(
     },
     "the monitor history outgrew HISTORY_BUDGET"
 );
-
-/// One reading of every counter the monitor shows, in integers because
-/// it travels on the wire.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize)]
-pub struct Sample {
-    pub core_cpu_permille: u64,
-    pub core_private_bytes: u64,
-    pub core_working_set_bytes: u64,
-    pub core_read_bytes: u64,
-    pub core_written_bytes: u64,
-    pub machine_cpu_permille: u64,
-    pub machine_available_bytes: u64,
-    pub volume_free_bytes: u64,
-    pub ledger_queue_depth: u64,
-    pub durable_lag: u64,
-    pub relay_p50_nanos: u64,
-    pub event_to_screen_p50_nanos: u64,
-    pub queued_runs: u64,
-}
 
 /// The watcher count and the history it gates.
 #[derive(Debug, Default)]

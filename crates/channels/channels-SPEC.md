@@ -1317,3 +1317,17 @@ pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
 - **失败码不变**：判定拒绝仍是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定仍是 `E_CONFIG_INVALID`，recovery 仍是「换一个空闲端口，或者停掉占着它的进程」。
 - **被否：先试绑一次再放掉，然后在 `serve` 里真绑**。试绑与真绑之间，别的进程可以把端口拿走，那样原来的缺陷只是窗口变窄了，并没有消失。
 - **两者住 `server::listener`**，不住 `server::socket`：它们管的是监听器本身，先占、再服务；`server::socket` 管的是连上之后的会话、资产与上传。`Bound` 带 `#[must_use]`：占住端口而不服务，得到的是一个谁也不应答的端口。
+
+### 8-47 `WIRE_V` 39：性能监视器的一对帧（`channels::wire::monitor`，形状：值类型）
+
+监视页和 `sprawling top` 读同一份历史（sprawling-SPEC.md 8-90），它们从线上拿到它。线协议为此加一种帧，两个方向各一个变体：
+
+- `ClientFrame::Monitor(Monitoring)`：`Monitoring` 是 `Watch` 或 `Release`。`Watch` 让这个会话算作一个在看的人，`Release` 让它不再算；会话结束等于 `Release`。
+- `ServerFrame::Monitor(Sample)`：一次读数，只发给正在看的会话。`Sample` 的字段即 8-90 列出的 13 个 `u64`；它定义在 `channels::wire::monitor`，`bin::monitor` 用的就是这一个类型，不再另写一份。
+- `decide_frame` 把一个已打开会话的 `Monitor(Watch)` 答成 `SessionStep::Watch`，`Monitor(Release)` 答成 `SessionStep::Release`；未打开的会话照旧拒绝并关闭。外壳收到 `Watch` 时调用 `ServeConfig::monitor` 的 `watch` 拿一个看的凭据并订阅 `samples`，收到 `Release` 时把两者都丢掉；重复的 `Watch` 不叠加计数。
+
+**决定。**
+
+1. 看与不看是会话里的两个帧，而不是一个 `Query`。`Query` 问一次答一次，而监视是一段持续的订阅：它的结束（`Release` 或断开）必须让城停止采样，这件事只有持有会话的外壳能保证。另一种做法是每秒一个 `Query`，它让每个看的人每秒多一次往返，且城无法知道人已经走了。
+2. `watch` 是一个返回不透明凭据的函数，而不是把计数器交给本 crate。有没有人在看由 `bin::monitor::Monitor` 一处决定；外壳只持有凭据，丢掉它就是不看。
+3. 读数经 `broadcast` 发出，与 `deltas`、`logs` 同形：错过的一次读数不必补，下一秒还有一个。

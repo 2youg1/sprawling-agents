@@ -210,6 +210,10 @@ pub enum SessionStep {
     Deliver(Box<WireCommand>),
     /// Evaluate this query and answer it.
     Answer(Box<Query>),
+    /// Count this session as watching the monitor and send it readings.
+    Watch,
+    /// Stop counting this session and stop sending it readings.
+    Release,
     /// Send this refusal; `close` ends the session afterwards.
     Refuse { error: Box<AxError>, close: bool },
 }
@@ -257,6 +261,7 @@ pub fn decide_frame(
         },
         (SessionState::Live, ClientFrame::Command(command)) => SessionStep::Deliver(command),
         (SessionState::Live, ClientFrame::Query(query)) => SessionStep::Answer(Box::new(query)),
+        (SessionState::Live, ClientFrame::Monitor(_)) => SessionStep::Release,
         (SessionState::Live, ClientFrame::Hello(_)) => SessionStep::Refuse {
             error: Box::new(
                 AxError::failure(
