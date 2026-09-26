@@ -188,4 +188,57 @@ mod tests {
         assert_eq!(err.code(), &AxCode::GateDenied);
         assert!(err.recovery().contains("local model"));
     }
+
+    /// **A tool call reaches the caller while the model is still
+    /// writing.** The provider sends a complete `read` call, then waits
+    /// to hear that the caller has it before it writes the text that
+    /// follows; a door that handed the call over only after the answer
+    /// settled would leave the server waiting, and it answers `false`.
+    #[test]
+    fn a_tool_call_is_handed_over_before_the_answer_settles() {
+        let frame = |value: serde_json::Value| value.to_string();
+        let opening = vec![
+            frame(serde_json::json!({"type": "message_start",
+                                      "message": {"usage": {"input_tokens": 3}}})),
+            frame(
+                serde_json::json!({"type": "content_block_start", "index": 0,
+                "content_block": {"type": "tool_use", "id": "t1", "name": "read", "input": {}}}),
+            ),
+            frame(
+                serde_json::json!({"type": "content_block_delta", "index": 0,
+                "delta": {"type": "input_json_delta", "partial_json": "{\"path\":\"a.md\"}"}}),
+            ),
+            frame(serde_json::json!({"type": "content_block_stop", "index": 0})),
+        ];
+        let closing = vec![
+            frame(
+                serde_json::json!({"type": "content_block_start", "index": 1,
+                "content_block": {"type": "text", "text": ""}}),
+            ),
+            frame(
+                serde_json::json!({"type": "content_block_delta", "index": 1,
+                "delta": {"type": "text_delta", "text": "reading"}}),
+            ),
+            frame(serde_json::json!({"type": "content_block_stop", "index": 1})),
+            frame(serde_json::json!({"type": "message_delta",
+                "delta": {"stop_reason": "tool_use"}, "usage": {"output_tokens": 2}})),
+        ];
+        let (holding, waiting) = std::sync::mpsc::channel();
+        let (url, server) = super::super::fakes::fake_stream_provider(opening, waiting, closing);
+        let mut endpoint = Endpoint::new(config(&url), redemption()).unwrap();
+
+        let mut early = Vec::new();
+        let ret = endpoint
+            .call_speculating(&request(), &mut |_: &kernel::Increment| {}, &mut |call| {
+                early.push(call.clone());
+                holding.send(()).unwrap();
+            })
+            .unwrap();
+
+        assert!(
+            server.join().unwrap(),
+            "the call was handed over only after the provider finished writing"
+        );
+        assert_eq!(early, ret.calls);
+    }
 }

@@ -1679,6 +1679,23 @@ pub trait Model {
 
 **覆盖它的适配器欠同一个 `ModelReturn`，包括同样的失败。** 流被切断是一次读取错误，永远不是一个变短的回答——`ModelReturn` 恒不由增量拼出来。写进账本的那句话只从 `ModelReturn` 来，一次，在调用结算之后。
 
+### 模型端口第三扇门：提前交出的调用
+
+```rust
+pub type EarlyCalls<'a> = &'a mut dyn FnMut(&ToolCall);
+
+fn call_speculating(&mut self, req: &ModelRequest, onto: Increments<'_>, early: EarlyCalls<'_>)
+    -> Result<ModelReturn, AxError> { self.call_streaming(req, onto) }
+```
+
+**一个工具调用的块一结束它就是完整的，这扇门在那一刻把它交给调用方**，好让只读工具在模型还在生成时就开跑。交出的调用与结算后 `ModelReturn` 里那一条逐字段相等（gateway §8）。
+
+**它与 `Increments` 分开，因为它是要据以执行的。** 增量只供人看，谁都不得据它分支；提前交出的调用恰恰要据以启动工具。并进同一个 sink 就是让「看的东西」变成「决定的东西」。
+
+**提前交出的调用不是历史。** 账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，这扇门返回失败，调用方把据提前交出的调用得出的结果一并丢弃。调用方能据它做什么由 `adversary/design/Speculating.lean` 定：只提前启动排在第一个写调用之前的只读调用，结果按调用位置缓存，结算后按发出顺序记账。
+
+**默认实现落回 `call_streaming`、什么也不提前交出。** 这对没有流、或其方言在结算前说不出一个调用何时完整的适配器是诚实的：调用方只是没有提前量，拿到的 `ModelReturn` 不变。落选的是给 `call_streaming` 加第三个参数：那会让每个适配器与每个调用点都改签名，而只有一个方言说得出块何时结束。
+
 ## 8-48 `kernel::node_id`：`NodeId` 搬出 `plan`，成为自己的模块
 
 `kernel::plan` 的模块表行是 `decision`：树判定什么可以开工、一个枝值多少、一个持有节点走两个出口里的哪一个。

@@ -24,6 +24,7 @@ pub use wire::{
 };
 
 use crate::error::AxError;
+use crate::tool::ToolCall;
 
 /// Text arriving from a provider before the call has finished.
 ///
@@ -39,6 +40,18 @@ use crate::error::AxError;
 /// settled text wins, and that rule is held on the far side of the wire
 /// by `web::app`.
 pub type Increments<'a> = &'a mut dyn FnMut(&Increment);
+
+/// A tool call handed over the moment its block is complete, before the
+/// call it belongs to has settled.
+///
+/// Separate from [`Increments`] because a caller acts on it: it may start
+/// a read-only tool while the model is still generating. **What arrives
+/// here is not history either.** The ledger records tool calls from
+/// [`ModelReturn`] after the call settles; when the call fails, a caller
+/// discards whatever it derived from these. What a caller may start, and
+/// in which order it records the results, is fixed by
+/// `adversary/design/Speculating.lean`.
+pub type EarlyCalls<'a> = &'a mut dyn FnMut(&ToolCall);
 
 /// The model port. Production adapters: gateway::native, gateway::endpoint;
 /// second adapter: citysim scripted model. Implementations never sample
@@ -64,6 +77,27 @@ pub trait Model {
         _onto: Increments<'_>,
     ) -> Result<ModelReturn, AxError> {
         self.call(req)
+    }
+
+    /// The streaming call, also handing over each tool call as soon as it
+    /// is complete.
+    ///
+    /// The default hands nothing over and answers with
+    /// [`Model::call_streaming`], which is honest for an adapter whose
+    /// wire cannot say when a call is complete: the caller simply gets no
+    /// head start. An adapter that overrides this owes the same
+    /// `ModelReturn` and failures as `call_streaming`, and every call it
+    /// hands over equals the one in that `ModelReturn`.
+    ///
+    /// # Errors
+    /// Whatever [`Model::call_streaming`] would fail with.
+    fn call_speculating(
+        &mut self,
+        req: &ModelRequest,
+        onto: Increments<'_>,
+        _early: EarlyCalls<'_>,
+    ) -> Result<ModelReturn, AxError> {
+        self.call_streaming(req, onto)
     }
 }
 
