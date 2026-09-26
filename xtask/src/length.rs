@@ -84,7 +84,7 @@ use crate::walk;
 mod measurement;
 mod register;
 
-use measurement::{Found, measure};
+use measurement::{Found, measure, production_lines};
 use register::{ARG_ROW, FILE_ROW, PREDATING, ROW, excused, key, limit, predating};
 
 /// Where first-party Rust lives. `tests/` and `benches/` are absent on
@@ -149,11 +149,12 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         }
         let text = walk::read_text(&file)?;
         seen.insert(rel.clone());
-        judge_file(&files, &rel, &text, &mut violations);
         let parsed = syn::parse_file(&text).map_err(|err| XtaskError::Doc {
             file: rel.clone(),
             msg: format!("this file does not parse as Rust: {err}"),
         })?;
+        let lines = production_lines(&text, &parsed.items);
+        judge_file(&files, &rel, lines, &mut violations);
         for found in measure(&parsed.items) {
             if found.lines > body_limit {
                 violations.push(over(&rel, &found, body_limit));
@@ -174,7 +175,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             continue;
         }
         seen.insert(rel.clone());
-        judge_file(&files, &rel, &text, &mut violations);
+        judge_file(&files, &rel, text.lines().count(), &mut violations);
     }
     // A row naming a file that is no longer measured - renamed, split
     // away, or deleted - is a pin nothing holds. Left alone it would
@@ -232,8 +233,7 @@ fn spent_signatures(
 /// the register does not name stays inside the budget, a file it names
 /// may only get smaller, and a file back inside the budget loses its
 /// row.
-fn judge_file(rule: &FileRule, rel: &str, text: &str, out: &mut Vec<Violation>) {
-    let lines = text.lines().count();
+fn judge_file(rule: &FileRule, rel: &str, lines: usize, out: &mut Vec<Violation>) {
     match rule.predating.get(rel) {
         None => {
             if lines > rule.limit {
