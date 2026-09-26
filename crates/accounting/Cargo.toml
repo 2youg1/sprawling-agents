@@ -9,6 +9,8 @@ publish.workspace = true
 kernel = { path = "../kernel" }
 gateway = { path = "../gateway" }
 protocol = { path = "../protocol" }
+# The vocabulary only: the port hands back a wire answer and never listens.
+channels = { path = "../channels", default-features = false }
 
 [lints]
 workspace = true

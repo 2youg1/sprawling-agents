@@ -11,6 +11,8 @@ mod reading;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
+use accounting::Runnable;
+
 use super::paint::Ink;
 use super::screen::{Asked, run};
 use super::*;

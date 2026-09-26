@@ -31,9 +31,10 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
 
+use accounting::Runnable;
 use kernel::AxError;
 
-use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Runnable, Version};
+use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Version};
 
 /// What is asked of the machine under this city. Two implementations:
 /// `ThisMachine`, and the scripted one the tests drive, which is what

@@ -252,6 +252,10 @@ pub struct RunWorker {
     /// Connects the MCP servers a building's configuration names
     /// (`mcp`). Received for the same reason `models` is.
     connectors: Box<dyn accounting::Connectors + Send>,
+    /// Looks at the machine this city runs on and installs onto it
+    /// (`commanding::machine`). Received for the same reason `models`
+    /// is.
+    machine: Box<dyn accounting::Machine + Send>,
     /// What time it is, for this worker and every lane it drives
     /// (`SystemClock`). Shared, because a lane reads it while the
     /// worker does.

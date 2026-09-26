@@ -12,6 +12,7 @@
 //! reader asking "what does a restart find" and "what does a close
 //! leave" is asking one question from two ends.
 
+use super::commanding::machine::Doctor;
 use super::{
     Collaborating, Credentials, Doorstep, Flight, GatewayModels, McpServers, Planning, RoomQueues,
     RunWorker, Standing, SystemClock, city_segment,
@@ -100,6 +101,7 @@ impl RunWorker {
             flight: Flight::open(),
             models: Box::new(GatewayModels),
             connectors: Box::new(McpServers),
+            machine: Box::new(Doctor),
             clock: std::sync::Arc::new(SystemClock),
         })
     }

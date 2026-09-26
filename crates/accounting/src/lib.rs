@@ -13,8 +13,10 @@
 
 mod clock;
 mod connectors;
+mod machine;
 mod models;
 
 pub use clock::Clock;
 pub use connectors::Connectors;
+pub use machine::{Machine, Recipe, Runnable};
 pub use models::ModelFactory;
