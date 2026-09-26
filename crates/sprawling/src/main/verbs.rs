@@ -19,6 +19,7 @@ pub(super) enum Verb {
     Serve,
     Resume,
     Call,
+    Dispatch,
     Enrol,
     Whose,
     Fork,
@@ -165,6 +166,24 @@ pub(super) const VERBS: &[Row] = &[
             ),
         ],
         says: "send one wire frame, print every frame back",
+        effect: Effect::Changes,
+    },
+    Row {
+        verb: Verb::Dispatch,
+        name: "dispatch",
+        aliases: &[],
+        positionals: &[("addr", Required), ("task", Required)],
+        flags: &[
+            AT,
+            flag("--token", Value("token"), "the pairing token"),
+            flag(
+                "--quiet-ms",
+                Value("n"),
+                "how long a silent city ends the wait",
+            ),
+            flag("--detach", Nothing, "print the run id once it starts"),
+        ],
+        says: "send one task, print its events until the run freezes",
         effect: Effect::Changes,
     },
     Row {

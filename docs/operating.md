@@ -106,10 +106,10 @@ The template already wrote `confidential = false` above it. The two settings are
 **Send it to look at the first city.**
 
 ```bash
-sprawling call '{"command":{"dispatch":{"addr":"watchtower","session":"first-look","task":"open http://127.0.0.1:8787/, take a snapshot, press the button that starts work, screenshot what happened, and write what you saw into Memo.md","goal":"a screenshot of the first city with work running, and a paragraph about what the page does","mode":"build","idem":"idem1-00000000000000000000000000000002","effort":null}}}' --at 127.0.0.1:8788 --quiet-ms 60000
+sprawling dispatch watchtower 'open http://127.0.0.1:8787/, take a snapshot, press the button that starts work, screenshot what happened, and write what you saw into Memo.md' --at 127.0.0.1:8788
 ```
 
-A city with no provider attached answers that in one frame — `E_CONFIG_INVALID`, "no model is chosen for this tag" — so attach one on the second city's settings page first. Otherwise the exit code is the answer, as it is for every `sprawling call` (the table above), and the second city's own live page at `http://127.0.0.1:8788/` shows the eight actions going out one at a time.
+A city with no provider attached answers that in one frame — `E_CONFIG_INVALID`, "no model is chosen for this tag" — so attach one on the second city's settings page first. Otherwise `dispatch` mints its own idempotency key, prints every frame until the run freezes, and exits by the same table as `sprawling call` (above); `--detach` prints the run id alone once the run starts. The city names the room, because `watchtower` is a building. Meanwhile the second city's own live page at `http://127.0.0.1:8788/` shows the eight actions going out one at a time.
 
 **What the resident is holding.** The browser starts on the first action and stops when the run ends. Firefox is preferred because it speaks WebDriver BiDi itself and needs no driver; Chromium works when `chromedriver` is on the search path, and `sprawling doctor` says which of the two this machine has. The profile is `~/cities/watcher/.sprawling/browser-profiles/watchtower`, so a login the watchtower performs belongs to the watchtower and to no other building — and it sits in the reserved subtree, which no write domain reaches, so a run cannot edit its own stored credentials.
 

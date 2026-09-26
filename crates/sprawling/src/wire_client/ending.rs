@@ -71,6 +71,7 @@ pub(crate) enum Ending {
 }
 
 /// Which point in a dispatched run's life ends the wait.
+#[derive(Clone, Copy)]
 pub(crate) enum Milestone {
     /// `--detach`: the run exists.
     Started,
@@ -98,7 +99,26 @@ impl Ending {
             (Self::OnReply, Reply::Other | Reply::Run { .. })
             | (Self::OnQuiet, Reply::Answer | Reply::Refusal | Reply::Other | Reply::Run { .. })
             | (Self::OnRun { .. }, Reply::Answer | Reply::Other) => false,
-            (Self::OnRun { .. }, Reply::Run { .. }) => false,
+            (
+                Self::OnRun { under, until, run },
+                Reply::Run {
+                    reached,
+                    run: seen,
+                    addr,
+                },
+            ) => match (*run, reached) {
+                (None, Milestone::Started) if addr.as_ref().is_some_and(|a| within(a, under)) => {
+                    *run = Some(*seen);
+                    match until {
+                        Milestone::Started => true,
+                        Milestone::Frozen => false,
+                    }
+                }
+                (Some(ours), Milestone::Frozen) => ours == *seen,
+                (None, Milestone::Started | Milestone::Frozen) | (Some(_), Milestone::Started) => {
+                    false
+                }
+            },
         }
     }
 
@@ -122,6 +142,14 @@ impl Ending {
     }
 }
 
+/// Whether `addr` is `under` or a room beneath it: a dispatch to a
+/// building runs in a room the city names.
+fn within(addr: &Address, under: &Address) -> bool {
+    addr.as_str()
+        .strip_prefix(under.as_str())
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
 /// The stream every frame heard is printed on.
 pub(super) enum Echo {
     Stdout,
@@ -136,9 +164,9 @@ pub(super) enum Echo {
 pub(super) enum Reply {
     Answer,
     Refusal,
-    /// A run's `run_started` or `run_frozen`, with where it ran.
+    /// A run reached a milestone, with where it ran.
     Run {
-        kind: EventKind,
+        reached: Milestone,
         run: RunId,
         addr: Option<Address>,
     },
@@ -146,18 +174,25 @@ pub(super) enum Reply {
 }
 
 impl Reply {
+    fn run(reached: Milestone, record: &kernel::EventRecord) -> Self {
+        Self::Run {
+            reached,
+            run: record.run(),
+            addr: record.addr().cloned(),
+        }
+    }
+
     pub(super) fn of(text: &str) -> Self {
         match serde_json::from_str::<channels::ServerFrame>(text) {
             Ok(channels::ServerFrame::Answer(_)) => Self::Answer,
             Ok(channels::ServerFrame::Refusal(_)) => Self::Refusal,
-            Ok(channels::ServerFrame::Event(record))
-                if matches!(record.kind(), EventKind::RunStarted | EventKind::RunFrozen) =>
-            {
-                Self::Run {
-                    kind: record.kind(),
-                    run: record.run(),
-                    addr: record.addr().cloned(),
-                }
+            // Two kinds out of the whole event vocabulary end a wait;
+            // every other event is printed and passed over.
+            Ok(channels::ServerFrame::Event(record)) if record.kind() == EventKind::RunStarted => {
+                Self::run(Milestone::Started, &record)
+            }
+            Ok(channels::ServerFrame::Event(record)) if record.kind() == EventKind::RunFrozen => {
+                Self::run(Milestone::Frozen, &record)
             }
             Ok(
                 channels::ServerFrame::Welcome(_)
@@ -176,11 +211,11 @@ impl Reply {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
-    use super::{Address, Ending, EventKind, Milestone, Reply, RunId};
+    use super::{Address, Ending, Milestone, Reply, RunId};
 
-    fn run_event(kind: EventKind, run: RunId, addr: &str) -> Reply {
+    fn run_event(reached: Milestone, run: RunId, addr: &str) -> Reply {
         Reply::Run {
-            kind,
+            reached,
             run,
             addr: Some(Address::parse(addr).unwrap()),
         }
@@ -198,10 +233,10 @@ mod tests {
             run: None,
         };
         let heard = [
-            run_event(EventKind::RunStarted, theirs, "elsewhere/room"),
-            run_event(EventKind::RunStarted, ours, "watchtower/first-look"),
-            run_event(EventKind::RunFrozen, theirs, "elsewhere/room"),
-            run_event(EventKind::RunFrozen, ours, "watchtower/first-look"),
+            run_event(Milestone::Started, theirs, "elsewhere/room"),
+            run_event(Milestone::Started, ours, "watchtower/first-look"),
+            run_event(Milestone::Frozen, theirs, "elsewhere/room"),
+            run_event(Milestone::Frozen, ours, "watchtower/first-look"),
         ]
         .iter()
         .map(|reply| ending.ends_on(reply))
@@ -220,7 +255,7 @@ mod tests {
             run: None,
         };
         let ended = ending.ends_on(&run_event(
-            EventKind::RunStarted,
+            Milestone::Started,
             ours,
             "watchtower/first-look",
         ));

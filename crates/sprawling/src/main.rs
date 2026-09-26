@@ -31,6 +31,8 @@ const DEPENDENCIES: &str = include_str!(concat!(env!("OUT_DIR"), "/deps.txt"));
 mod city;
 #[path = "main/data.rs"]
 mod data;
+#[path = "main/dispatch.rs"]
+mod dispatch;
 #[path = "main/grammar.rs"]
 mod grammar;
 #[path = "main/router.rs"]
