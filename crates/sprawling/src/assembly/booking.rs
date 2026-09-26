@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn two_runs_claiming_one_node_through_the_served_gate_leave_one_holder() {
         use kernel::Tool;
-        let mut gate = crate::serving::relay::RelayGate::open();
+        let mut gate = crate::assembly::relay::RelayGate::open();
         let (first, second) = (plan_tool(gate.bell(), 1), plan_tool(gate.bell(), 2));
         let call = kernel::ToolCall {
             id: "tu_1".to_owned(),
@@ -314,7 +314,7 @@ mod tests {
         let (mut homes, mut ledger) = (std::collections::VecDeque::new(), Kept::default());
         while !lanes.is_finished() {
             gate.serve(
-                crate::serving::relay::Patience::For(std::time::Duration::from_millis(5)),
+                crate::assembly::relay::Patience::For(std::time::Duration::from_millis(5)),
                 &mut ledger,
                 &mut homes,
             );

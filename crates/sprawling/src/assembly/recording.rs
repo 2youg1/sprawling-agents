@@ -12,8 +12,8 @@
 
 use kernel::{Address, AxError, EventDraft, EventKind, Ledger, Payload, RunId};
 
+use crate::assembly::booking::OpenClaims;
 use crate::effect;
-use crate::serving::booking::OpenClaims;
 
 use super::RunWorker;
 

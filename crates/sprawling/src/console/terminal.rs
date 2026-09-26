@@ -146,7 +146,7 @@ pub(crate) fn web_url(terminal: &Terminal) -> String {
 /// typing would have made interaction a condition of service.
 pub(crate) fn start(
     terminal: Terminal,
-    desk: Arc<crate::serving::CommandDesk>,
+    desk: Arc<crate::assembly::CommandDesk>,
     answering: Answering,
     mut watching: tokio::sync::broadcast::Receiver<channels::Committed>,
 ) {
@@ -188,7 +188,7 @@ fn say<W: Write>(out: &mut W, line: &str) {
 /// The loop, over any reader and writer so a test can drive it.
 pub(super) fn drive<R: BufRead, W: Write>(
     terminal: &Terminal,
-    desk: &crate::serving::CommandDesk,
+    desk: &crate::assembly::CommandDesk,
     answering: &Answering,
     input: &mut R,
     out: &mut W,
@@ -271,7 +271,7 @@ pub(super) fn drive<R: BufRead, W: Write>(
 /// One frame, onto the same desk a browser's frames land on, or into the
 /// same answering function a browser's questions reach.
 fn post<W: Write>(
-    desk: &crate::serving::CommandDesk,
+    desk: &crate::assembly::CommandDesk,
     answering: &Answering,
     frame: channels::ClientFrame,
     out: &mut W,

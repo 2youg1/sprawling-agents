@@ -14,10 +14,10 @@ use crate::views::Views;
 
 /// The two places the writer thread hands the views what it wrote, and
 /// the thread that folds it.
-pub(super) struct Folding {
-    pub(super) observer: Box<dyn FnMut(&EventRecord) + Send>,
-    pub(super) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
-    pub(super) thread: std::thread::JoinHandle<()>,
+pub(crate) struct Folding {
+    pub(crate) observer: Box<dyn FnMut(&EventRecord) + Send>,
+    pub(crate) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    pub(crate) thread: std::thread::JoinHandle<()>,
 }
 
 /// What the writer thread hands the view fold, in the order it wrote it.
@@ -29,9 +29,9 @@ enum Fold {
 /// Where a folded record goes next: the clients watching the city, and
 /// the head every welcome names, moved before the record is sent so a
 /// session that reads the head has already subscribed to what follows it.
-pub(super) struct Broadcast {
-    pub(super) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
-    pub(super) head: Arc<channels::LedgerHead>,
+pub(crate) struct Broadcast {
+    pub(crate) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
+    pub(crate) head: Arc<channels::LedgerHead>,
 }
 
 /// Whether the views still follow the ledger. Once a panic has poisoned
@@ -49,7 +49,7 @@ enum Following {
 ///
 /// # Errors
 /// `StorageFatal` when the thread cannot be started.
-pub(super) fn spawn_folding(
+pub(crate) fn spawn_folding(
     views: Arc<Mutex<Views>>,
     broadcast: Broadcast,
 ) -> Result<Folding, AxError> {

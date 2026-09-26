@@ -27,14 +27,37 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, RunId};
+use kernel::{AxCode, AxError, Payload, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
-use super::folding::{Broadcast, Folding, spawn_folding};
 use super::relay::Patience;
-use super::serve::Opening;
-use crate::assembly::{RunWorker, Serving};
+use super::{RunWorker, Serving};
+use crate::serving::folding::{Broadcast, Folding, spawn_folding};
 use crate::views::Views;
+
+/// What a worker is opened with: where the city is, whose keys it may
+/// redeem, what the vault turned out to be, where its diagnostics go,
+/// and what the history already says.
+///
+/// Five values that always travel together and are never chosen
+/// independently - `listen` settles all five before it has a thread to
+/// hand them to - so they travel as one, as `Reporter` does.
+pub(super) struct Opening {
+    pub(super) city_root: std::path::PathBuf,
+    pub(super) vault: gateway::Custodian,
+    /// What the vault probe found, on its way to the ledger as a
+    /// disclosure. Consumed by the first `open_for_service`.
+    pub(super) notice: Option<Payload>,
+    pub(super) log: runtime::diagnostics::Diagnostics,
+    /// The opened ledger and what its history already says, folded on the
+    /// serve thread under its writer lock in the same pass as the views,
+    /// so the worker neither opens nor reads it again.
+    pub(super) held: (memory::JsonlLedger, memory::OpenReport, super::Standing),
+    /// The chain audit's own voice: the same sink and the same floor as
+    /// `log`, held apart because the audit thread never touches the
+    /// writer (sprawling-SPEC.md 8-90).
+    pub(super) audit_log: runtime::diagnostics::Diagnostics,
+}
 
 /// Where a worker's work goes, and where it comes from.
 ///

@@ -229,7 +229,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         "the disk went away",
     )
     .with_recovery("this is the failure the test is about");
-    let mut open_claims = crate::serving::booking::ClaimBook::default().release(RunId::CITY);
+    let mut open_claims = crate::assembly::booking::ClaimBook::default().release(RunId::CITY);
     let err = worker
         .land(
             continuation,

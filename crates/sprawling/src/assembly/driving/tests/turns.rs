@@ -18,9 +18,9 @@
 )]
 
 use super::super::*;
+use crate::assembly::CommandDesk;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
-use crate::serving::CommandDesk;
 
 #[test]
 fn a_socket_that_carried_no_request_spends_no_scripted_reply() {

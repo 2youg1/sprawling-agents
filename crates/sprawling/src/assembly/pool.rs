@@ -23,7 +23,7 @@ use std::sync::mpsc;
 use kernel::{AxCode, AxError, RunId};
 
 use super::relay::{Relay, Wake};
-use crate::assembly::{DriveContext, Driven, Driving, drive_run};
+use super::{DriveContext, Driven, Driving, drive_run};
 
 /// How many runs a city drives at once, whichever entrance started
 /// them: past it, a prepared drive waits in the pool for a lane.

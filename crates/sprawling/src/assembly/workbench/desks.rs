@@ -82,9 +82,9 @@ impl RunWorker {
             site.who.clone(),
             addr.clone(),
             plan_text,
-            crate::serving::booking::booking(
+            crate::assembly::booking::booking(
                 self.bell(),
-                crate::serving::booking::Claimant {
+                crate::assembly::booking::Claimant {
                     building: site.building.addr().clone(),
                     room: addr.clone(),
                     run: site.run_id,

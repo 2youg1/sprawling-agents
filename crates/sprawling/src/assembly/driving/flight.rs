@@ -24,9 +24,9 @@ use kernel::{Address, AxCode, AxError, NodeId, RunId};
 
 use super::super::{Continuation, Driven, Owed, Owing, RunWorker, Unasked};
 use super::{Driving, lane::DriveContext};
-use crate::serving::booking::OpenClaims;
-use crate::serving::pool::{Arrival, DRIVING_LANES, DrivingPool};
-use crate::serving::relay::{Patience, Relay, RelayGate, Wake};
+use crate::assembly::booking::OpenClaims;
+use crate::assembly::pool::{Arrival, DRIVING_LANES, DrivingPool};
+use crate::assembly::relay::{Patience, Relay, RelayGate, Wake};
 
 /// One run in a lane: everything the city does once the drive is home,
 /// and what that landing is owed.
@@ -248,7 +248,7 @@ impl RunWorker {
                 if let Err(lost) = given_back {
                     self.note(
                         runtime::diagnostics::Level::Refuse,
-                        "serving::booking",
+                        "bin::assembly::booking",
                         &format!("a claim of a run whose landing failed stays open: {lost}"),
                     );
                 }

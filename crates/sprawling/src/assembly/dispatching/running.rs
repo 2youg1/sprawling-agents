@@ -220,7 +220,7 @@ impl RunWorker {
         continuation: Continuation,
         driven: Result<Driven, AxError>,
         owing: Owing,
-        open_claims: &mut crate::serving::booking::OpenClaims,
+        open_claims: &mut crate::assembly::booking::OpenClaims,
     ) -> Result<Landed, AxError> {
         let Continuation {
             at,

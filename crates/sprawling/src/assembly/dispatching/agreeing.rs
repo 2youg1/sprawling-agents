@@ -12,7 +12,7 @@ use kernel::event::record::{GoverningDocument, RulesChanged};
 use kernel::{Address, AxCode, AxError, EventKind, Payload};
 use kernel::{Locator, RunId, TimeMs};
 
-use crate::serving::CommandDesk;
+use crate::assembly::CommandDesk;
 
 use super::super::RunWorker;
 use super::{Agreed, Assignment};

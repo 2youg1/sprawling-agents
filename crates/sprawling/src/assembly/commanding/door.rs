@@ -20,7 +20,7 @@
 use kernel::AxError;
 
 use super::super::RunWorker;
-use crate::serving::Posted;
+use crate::assembly::Posted;
 
 impl RunWorker {
     /// Carries out one command and waits for whatever it started.

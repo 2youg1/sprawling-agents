@@ -90,7 +90,7 @@ fn the_screen_keeps_the_listener_half_when_the_city_does_not_answer() {
 
 /// Runs the console loop and returns every Command it posted.
 fn posted(script: &str) -> Vec<channels::Command> {
-    let desk = crate::serving::CommandDesk::new();
+    let desk = crate::assembly::CommandDesk::new();
     let mut out: Vec<u8> = Vec::new();
     super::super::terminal::drive(
         &terminal("127.0.0.1:8787", None),

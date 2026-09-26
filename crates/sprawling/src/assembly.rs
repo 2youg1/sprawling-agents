@@ -21,7 +21,10 @@
 //! clock sample, the two hooks a live control surface installs, and the
 //! door a `Command` enters by. The lines it appends live in
 //! `recording`; opening and closing in `lifetime`; the test fixtures in
-//! `fixture`.
+//! `fixture`. The thread the worker runs on is started here too: the
+//! port is taken and the writer opened in `listening`, the writer's loop
+//! is `attending`, commands wait on the `desk`, and runs are driven on
+//! the lanes of the `pool` and write back through the `relay`.
 //!
 //! The `use` block below is where the submodules see each other. A
 //! submodule imports from `super`, so what one part of the assembly
@@ -29,10 +32,13 @@
 //! than as a graph; the one sibling reach is `credentials::dialect_headers`,
 //! which the dispatching modules read where the credentials module keeps it.
 
+mod attending;
+mod booking;
 mod chain_watch;
 mod collaborating;
 mod commanding;
 mod credentials;
+mod desk;
 mod dispatching;
 mod doorstep;
 mod driving;
@@ -41,12 +47,15 @@ mod freezing;
 mod genesis;
 mod keeping_warm;
 mod lifetime;
+mod listening;
 mod mcp;
 mod models;
 mod naming;
 mod plans;
+mod pool;
 mod probing;
 mod recording;
+mod relay;
 mod reviewing;
 mod rooms;
 mod settling;
@@ -59,6 +68,7 @@ use commanding::entrance::Entrance;
 use credentials::held::Credentials;
 use credentials::subscription::Expiries;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
+pub(crate) use desk::{CommandDesk, Posted};
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
@@ -74,6 +84,7 @@ use genesis::city_segment;
 pub use genesis::{Adopt, InitReport, form_city, init_city};
 pub(crate) use lifetime::Closing;
 use lifetime::LedgerOpening;
+pub use listening::{Listening, listen};
 use mcp::mounts_under;
 use models::GatewayModels;
 use naming::{building_of, governed_of, not_built, scope_of};
@@ -101,8 +112,9 @@ use std::path::Path;
 /// The wall clock: the single sanctioned sampling point (clippy.toml
 /// disallowed-methods), and the production `accounting::Clock`
 /// (accounting-SPEC.md 8-3). Everything below it takes `TimeMs` as a
-/// parameter or reads the clock it was handed.
-pub(crate) struct SystemClock;
+/// parameter or reads the clock it was handed; what samples it outside
+/// this module is handed it at construction, as the process log is.
+pub struct SystemClock;
 
 impl accounting::Clock for SystemClock {
     fn now(&self) -> Result<TimeMs, AxError> {
