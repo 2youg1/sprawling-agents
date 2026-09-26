@@ -48,7 +48,6 @@ mod specalign;
 // The session-slice path gate: only its writer names the path
 // (memory-SPEC 8-24). Declared here because a module lives where the
 // crate root says it does.
-mod slices;
 // The grid instrument (xtask-SPEC.md section 8-26). It is declared here
 // because a module lives where the crate root says it does; it is not a
 // subcommand, and `cargo xtask render --survey` is how a person reaches
@@ -192,7 +191,6 @@ fn main() -> ExitCode {
         Some("lexicon") => report::finish("lexicon", lexicon::check(&root)),
         Some("length") => report::finish("length", length::check(&root)),
         Some("boundary") => report::finish("boundary", boundary::check(&root)),
-        Some("slices") => report::finish("slices", slices::check(&root)),
         Some("artifact") => report::finish("artifact", artifact::check(&root)),
         Some("modmap") => report::finish("modmap", modmap::check(&root)),
         Some("npm") => report::finish("npm", npm::check(&root)),
