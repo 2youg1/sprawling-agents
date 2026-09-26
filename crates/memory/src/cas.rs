@@ -7,9 +7,12 @@
 //!
 //! Three engineering facts owned here:
 //! - writes go tmp + rename: power loss leaves half-done temp files only,
-//!   never a corrupt named object (A3 point 2). Temp names derive from
-//!   the content hash — concurrent writers of the same bytes converge,
-//!   no randomness anywhere.
+//!   never a corrupt named object (A3 point 2). A temp name carries the
+//!   content hash, the writing process and that process's put count, so
+//!   two handles writing the same bytes at once each rename a whole file
+//!   of their own, and opening a handle sweeps only what another process
+//!   left: the tmp files of this process may belong to a put still in
+//!   flight on another handle. No randomness anywhere.
 //! - dedup is existence: a second put of the same bytes returns the hash
 //!   without re-materializing.
 //! - range retrieval follows the Locator grammar: `L` 1-based closed
@@ -27,6 +30,7 @@ mod ranges;
 pub use origin::BlockOrigin;
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use kernel::{B3Hash, Range};
 
@@ -53,10 +57,13 @@ impl Cas {
             .map_err(io_err("create cas dir", &objects))?;
         vfs.create_dir_all(&tmp)
             .map_err(io_err("create cas tmp dir", &tmp))?;
-        // Sweep crash residue: rename is atomic, so anything in tmp is a
-        // half-done write whose put never returned Ok.
+        // Sweep crash residue: rename is atomic, so a tmp file another
+        // process wrote is a half-done write whose put never returned Ok.
         let leftovers = vfs.list(&tmp).map_err(io_err("list cas tmp", &tmp))?;
-        for leftover in leftovers {
+        for leftover in leftovers
+            .into_iter()
+            .filter(|leftover| !TmpName::written_here(leftover))
+        {
             vfs.remove_file(&leftover)
                 .map_err(io_err("sweep cas tmp", &leftover))?;
         }
@@ -85,7 +92,7 @@ impl Cas {
         self.vfs
             .create_dir_all(&shard_dir)
             .map_err(io_err("create cas shard", &shard_dir))?;
-        let tmp = self.dir.join("tmp").join(format!("{hash}.part"));
+        let tmp = self.dir.join("tmp").join(TmpName::next(&hash).0);
         if self.vfs.exists(&tmp) {
             self.vfs
                 .truncate(&tmp, 0)
@@ -152,6 +159,30 @@ impl Cas {
     }
 }
 
+/// The puts this process has begun, across every handle it holds.
+static PUTS_BEGUN: AtomicU64 = AtomicU64::new(0);
+
+/// A put's temp file name: `<hex64>.<pid>.<put count>.part`.
+struct TmpName(String);
+
+impl TmpName {
+    /// A name no other put in this process has used or will use.
+    fn next(hash: &B3Hash) -> TmpName {
+        let count = PUTS_BEGUN.fetch_add(1, Ordering::Relaxed);
+        TmpName(format!("{hash}.{}.{count}.part", std::process::id()))
+    }
+
+    /// Whether this process wrote the temp file at `path`, which makes
+    /// it possibly a put in flight on another handle rather than residue.
+    fn written_here(path: &Path) -> bool {
+        let pid = std::process::id().to_string();
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| name.split('.').nth(1))
+            .is_some_and(|writer| writer == pid)
+    }
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -188,6 +219,30 @@ mod tests {
         assert_eq!(first, second);
         let tmp_entries = fs::read_dir(dir.path().join("tmp")).unwrap().count();
         assert_eq!(tmp_entries, 0, "no leftover temp files after clean puts");
+    }
+
+    /// A second handle opened while the first is between writing its
+    /// temp file and renaming it leaves that file alone, and still
+    /// sweeps what another process left behind.
+    #[test]
+    fn opening_a_handle_sweeps_only_what_another_process_left() {
+        let dir = tempfile::tempdir().unwrap();
+        Cas::open(dir.path()).unwrap();
+        let hash = kernel::B3Hash::from_bytes(*blake3::hash(b"in flight").as_bytes());
+        let tmp = dir.path().join("tmp");
+        let in_flight = tmp.join(TmpName::next(&hash).0);
+        let residue = tmp.join(format!(
+            "{hash}.{}.0.part",
+            std::process::id().wrapping_add(1)
+        ));
+        fs::write(&in_flight, b"in flight").unwrap();
+        fs::write(&residue, b"half").unwrap();
+        Cas::open(dir.path()).unwrap();
+        let left: Vec<PathBuf> = fs::read_dir(&tmp)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect();
+        assert_eq!(left, vec![in_flight]);
     }
 
     #[test]
