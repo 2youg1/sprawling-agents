@@ -303,12 +303,17 @@ pub enum GateSubject {
 /// `Send`, because a bench of tools is driven on a pool thread rather
 /// than on the thread that built it (sprawling-SPEC 8-44). A tool that
 /// holds something a thread cannot give up has no place on a bench.
-pub trait Tool: Send {
+///
+/// `Sync`, and `invoke` takes `&self`, because the read-only calls at
+/// the head of a wave run at the same time (runtime-SPEC 8-3), so one
+/// tool can be inside `invoke` on several threads at once. A tool with
+/// state of its own keeps that state behind its own lock.
+pub trait Tool: Send + Sync {
     fn meta(&self) -> &ToolMeta;
 
     /// Fail-closed identity: a call whose name differs from `meta().name`
     /// must return `E_INVALID_ARGS`, never route silently.
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
 
     /// What this call is about, read by the grammar this tool already
     /// parses its arguments with.

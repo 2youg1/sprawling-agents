@@ -94,7 +94,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     // whatever settles after the short window is collected here rather
     // than read back out of the call that outlived it.
     let backlog = Backlog::new();
-    let mut tool = ExecTool::new(setup, Box::new(EchoSandbox::new()), backlog.clone()).unwrap();
+    let tool = ExecTool::new(setup, Box::new(EchoSandbox::new()), backlog.clone()).unwrap();
 
     let mut args = serde_json::Map::new();
     args.insert(

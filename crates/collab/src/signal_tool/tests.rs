@@ -27,7 +27,7 @@ fn call(args: Value) -> ToolCall {
 #[test]
 fn sending_queues_an_effect_and_delivers_nothing_yet() {
     let shared = desk("lab/room1", "lab");
-    let mut tool = SignalTool::new(Arc::clone(&shared)).unwrap();
+    let tool = SignalTool::new(Arc::clone(&shared)).unwrap();
     tool.invoke(&call(serde_json::json!({
         "action": "send",
         "to": "lab/room2",
@@ -58,7 +58,7 @@ fn sending_queues_an_effect_and_delivers_nothing_yet() {
 #[test]
 fn a_signal_addressed_outside_the_building_is_refused_with_somewhere_to_go() {
     let shared = desk("lab/room1", "lab");
-    let mut tool = SignalTool::new(Arc::clone(&shared)).unwrap();
+    let tool = SignalTool::new(Arc::clone(&shared)).unwrap();
     let refusal = tool
         .invoke(&call(serde_json::json!({
             "action": "send",
@@ -95,7 +95,7 @@ fn pulling_takes_what_is_waiting_and_says_what_is_left() {
         .unwrap();
         shared.lock().unwrap().inbox.deliver(&signal).unwrap();
     }
-    let mut tool = SignalTool::new(Arc::clone(&shared)).unwrap();
+    let tool = SignalTool::new(Arc::clone(&shared)).unwrap();
     let outcome = tool
         .invoke(&call(serde_json::json!({ "action": "pull" })))
         .unwrap();
@@ -116,7 +116,7 @@ fn pulling_takes_what_is_waiting_and_says_what_is_left() {
 #[test]
 fn an_action_this_tool_does_not_have_is_refused_by_name() {
     let shared = desk("lab/room1", "lab");
-    let mut tool = SignalTool::new(Arc::clone(&shared)).unwrap();
+    let tool = SignalTool::new(Arc::clone(&shared)).unwrap();
     let refusal = tool
         .invoke(&call(serde_json::json!({ "action": "broadcast_all" })))
         .unwrap_err();

@@ -106,7 +106,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
         env_passthrough: vec![kernel::EnvVarName::parse(&name).unwrap()],
         ..setup(chamber.path(), None, None)
     };
-    let mut tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), Backlog::new()).unwrap();
+    let tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), Backlog::new()).unwrap();
     let outcome = tool
         .invoke(&call(serde_json::json!({
             "program": { "path": path.clone(), "args": args.clone() }
@@ -125,7 +125,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
 
     // The same command in a building that declared nothing sees nothing.
     let bare_chamber = tempfile::tempdir().unwrap();
-    let mut bare = a_tool(
+    let bare = a_tool(
         bare_chamber.path(),
         None,
         Box::new(EchoSandbox::new()),
@@ -148,7 +148,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
 #[test]
 fn a_missing_component_refuses_and_names_the_alternative() {
     let chamber = tempfile::tempdir().unwrap();
-    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     let err = match tool.invoke(&call(
         serde_json::json!({ "python": { "code": "print(1)" } }),
     )) {
@@ -174,7 +174,7 @@ fn the_python_arm_runs_in_the_sandbox_and_reports_its_own_exit() {
     let chamber = tempfile::tempdir().unwrap();
     let mut echo = EchoSandbox::new();
     echo.queue_stdout(b"42\n".to_vec());
-    let mut tool = a_tool(
+    let tool = a_tool(
         chamber.path(),
         Some(PathBuf::from("python.wasm")),
         Box::new(echo),
@@ -200,7 +200,7 @@ fn exhaustion_and_traps_reach_the_caller_as_themselves() {
             message: "unreachable".to_owned(),
         },
     ]);
-    let mut tool = a_tool(
+    let tool = a_tool(
         chamber.path(),
         Some(PathBuf::from("python.wasm")),
         Box::new(sandbox),
@@ -226,7 +226,7 @@ fn exhaustion_and_traps_reach_the_caller_as_themselves() {
 #[test]
 fn an_unrecognised_arm_is_refused_not_guessed() {
     let chamber = tempfile::tempdir().unwrap();
-    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     let err = match tool.invoke(&call(serde_json::json!({ "bash": { "text": "ls" } }))) {
         Err(err) => err,
         Ok(_) => panic!("an unknown arm must refuse"),
@@ -237,7 +237,7 @@ fn an_unrecognised_arm_is_refused_not_guessed() {
 #[test]
 fn the_program_arm_runs_a_real_child_with_a_scrubbed_environment() {
     let chamber = tempfile::tempdir().unwrap();
-    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     // A program every supported host has, printing nothing useful:
     // the assertion is that it ran and reported its own exit code.
     let (path, args) = if cfg!(windows) {
@@ -285,7 +285,7 @@ fn writes_beside_itself(name: &str) -> (String, Vec<String>) {
 fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
     let chamber = tempfile::tempdir().unwrap();
     std::fs::write(chamber.path().join("kept.txt"), b"the person's own\n").unwrap();
-    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     let (path, args) = writes_beside_itself("made.txt");
     let outcome = tool
         .invoke(&call(serde_json::json!({
@@ -311,7 +311,7 @@ fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
     // The same command with the host placement is what reaches the tree,
     // which is what makes the assertion above a capability decision
     // rather than a command that never wrote anything.
-    let mut host = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let host = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     let (path, args) = writes_beside_itself("made.txt");
     host.invoke(&call_at(
         serde_json::json!({
@@ -329,7 +329,7 @@ fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
 #[test]
 fn the_python_arm_has_no_sandbox_host_form() {
     let chamber = tempfile::tempdir().unwrap();
-    let mut tool = a_tool(
+    let tool = a_tool(
         chamber.path(),
         Some(PathBuf::from("python.wasm")),
         Box::new(EchoSandbox::new()),

@@ -36,7 +36,7 @@ fn call(args: Value) -> ToolCall {
 
 #[test]
 fn the_resident_who_wrote_it_cannot_be_the_one_who_checks_it() {
-    let (mut tool, desk) = tool(
+    let (tool, desk) = tool(
         "lab/room1",
         Some("tree-a"),
         vec![request("tree-a", "lab/room1")],
@@ -58,7 +58,7 @@ fn the_resident_who_wrote_it_cannot_be_the_one_who_checks_it() {
 
 #[test]
 fn a_check_that_passes_merges_and_one_that_fails_records_why() {
-    let (mut checker, desk) = tool("lab/tests", None, vec![request("tree-a", "lab/room1")]);
+    let (checker, desk) = tool("lab/tests", None, vec![request("tree-a", "lab/room1")]);
     let outcome = checker
         .invoke(&call(serde_json::json!({
             "action": "check",
@@ -77,7 +77,7 @@ fn a_check_that_passes_merges_and_one_that_fails_records_why() {
     let effects = desk.lock().unwrap().take_effects();
     assert!(matches!(effects[0], PrEffect::Merged { .. }));
 
-    let (mut second, desk) = tool("lab/tests", None, vec![request("tree-b", "lab/room1")]);
+    let (second, desk) = tool("lab/tests", None, vec![request("tree-b", "lab/room1")]);
     second
         .invoke(&call(serde_json::json!({
             "action": "check",
@@ -95,7 +95,7 @@ fn a_check_that_passes_merges_and_one_that_fails_records_why() {
 
 #[test]
 fn a_run_without_a_tree_has_nothing_to_offer_and_says_so() {
-    let (mut tool, _desk) = tool("lab/room1", None, Vec::new());
+    let (tool, _desk) = tool("lab/room1", None, Vec::new());
     let refusal = tool
         .invoke(&call(serde_json::json!({ "action": "open" })))
         .unwrap_err();
@@ -105,7 +105,7 @@ fn a_run_without_a_tree_has_nothing_to_offer_and_says_so() {
 
 #[test]
 fn one_branch_carries_one_request() {
-    let (mut tool, _desk) = tool(
+    let (tool, _desk) = tool(
         "lab/room1",
         Some("tree-a"),
         vec![request("tree-a", "lab/room1")],
@@ -125,7 +125,7 @@ fn a_request_reads_back_as_the_request_that_was_made() {
 
 #[test]
 fn listing_says_which_ones_are_yours() {
-    let (mut tool, _desk) = tool(
+    let (tool, _desk) = tool(
         "lab/room1",
         Some("tree-a"),
         vec![

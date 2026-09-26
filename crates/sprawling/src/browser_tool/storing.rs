@@ -15,11 +15,11 @@
 use kernel::{AxError, ImageRef, Locator, ToolOutcome};
 use serde_json::Value;
 
-use super::BrowserTool;
+use super::Browser;
 use super::payload;
 use browser::{SHOT_MAX_EDGE_PX, Shot, ShotRequest};
 
-impl BrowserTool {
+impl Browser {
     /// A screenshot, put where it becomes evidence.
     ///
     /// Three things happen together or none does: the bytes land in the

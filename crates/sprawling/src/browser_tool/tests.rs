@@ -96,7 +96,7 @@ fn a_screenshot_past_the_cap_is_taken_again_and_the_smaller_one_kept() {
             json!({ "data": ONE_RED_PIXEL }),
         ],
     };
-    let mut tool = BrowserTool::new(Role::Building, Box::new(port), cas).expect("the tool builds");
+    let tool = BrowserTool::new(Role::Building, Box::new(port), cas).expect("the tool builds");
     let shot = tool
         .invoke(&call(json!({ "action": "screenshot" })))
         .expect("the shot is taken again and kept");
@@ -110,7 +110,7 @@ fn a_screenshot_past_the_cap_is_taken_again_and_the_smaller_one_kept() {
 #[test]
 fn a_screenshot_by_reference_set_covers_every_element_it_named() {
     let dir = tempfile::tempdir().expect("a temporary directory");
-    let mut tool = tool_with(&dir.path().join("cas"), recorded_by_union());
+    let tool = tool_with(&dir.path().join("cas"), recorded_by_union());
     tool.invoke(&call(json!({ "action": "snapshot" })))
         .expect("the page is looked at");
     let shot = tool
@@ -129,7 +129,7 @@ fn a_screenshot_by_reference_set_covers_every_element_it_named() {
 #[test]
 fn a_screenshot_by_reference_covers_the_element_the_page_named() {
     let dir = tempfile::tempdir().expect("a temporary directory");
-    let mut tool = tool_with(&dir.path().join("cas"), recorded_by_reference());
+    let tool = tool_with(&dir.path().join("cas"), recorded_by_reference());
     tool.invoke(&call(json!({ "action": "snapshot" })))
         .expect("the page is looked at");
     let shot = tool
@@ -156,7 +156,7 @@ fn text(outcome: &ToolOutcome) -> String {
 #[test]
 fn one_conversation_replays_from_open_to_a_screenshot_that_is_evidence() {
     let dir = tempfile::tempdir().expect("a temporary directory");
-    let mut tool = tool(&dir.path().join("cas"));
+    let tool = tool(&dir.path().join("cas"));
 
     let opened = tool
         .invoke(&call(
@@ -213,7 +213,7 @@ fn one_conversation_replays_from_open_to_a_screenshot_that_is_evidence() {
 #[test]
 fn acting_before_looking_is_refused_and_leaves_the_tool_usable() {
     let dir = tempfile::tempdir().expect("a temporary directory");
-    let mut tool = tool(&dir.path().join("cas"));
+    let tool = tool(&dir.path().join("cas"));
     let err = tool
         .invoke(&call(
             json!({ "action": "act", "generation": 1, "ref": "e1", "kind": "click" }),
@@ -227,7 +227,7 @@ fn acting_before_looking_is_refused_and_leaves_the_tool_usable() {
 #[test]
 fn a_call_bearing_another_tools_name_is_refused() {
     let dir = tempfile::tempdir().expect("a temporary directory");
-    let mut tool = tool(&dir.path().join("cas"));
+    let tool = tool(&dir.path().join("cas"));
     let err = tool
         .invoke(&ToolCall {
             id: "tu_2".to_owned(),
@@ -241,7 +241,7 @@ fn a_call_bearing_another_tools_name_is_refused() {
 #[test]
 fn a_second_look_at_the_same_page_settles_the_development_loop() {
     let dir = tempfile::tempdir().expect("a temporary directory");
-    let mut tool = tool(&dir.path().join("cas"));
+    let tool = tool(&dir.path().join("cas"));
     let _ = tool.invoke(&call(json!({ "action": "snapshot" })));
     let mut steps = Vec::new();
     for _ in 0..3 {
@@ -259,13 +259,13 @@ fn a_second_look_at_the_same_page_settles_the_development_loop() {
 #[test]
 fn the_tab_is_opened_once_and_the_frames_keep_one_numbering() {
     let dir = tempfile::tempdir().expect("a temporary directory");
-    let mut tool = tool(&dir.path().join("cas"));
+    let tool = tool(&dir.path().join("cas"));
     for _ in 0..2 {
         tool.invoke(&call(json!({ "action": "snapshot" })))
             .expect("a page is looked at");
     }
     assert!(
-        tool.context.is_some(),
+        tool.browser.lock().unwrap().context.is_some(),
         "the session a tool opened is the session it keeps"
     );
 }
@@ -274,7 +274,7 @@ fn the_tab_is_opened_once_and_the_frames_keep_one_numbering() {
 fn the_person_tool_asks_before_it_connects_and_names_itself() {
     let dir = tempfile::tempdir().expect("a temporary directory");
     let cas = Cas::open(&dir.path().join("cas")).expect("a cas opens in a fresh directory");
-    let mut waiting = BrowserTool::new(
+    let waiting = BrowserTool::new(
         Role::PersonWaiting,
         Box::new(crate::browser_bidi::AttachedBrowser::waiting()),
         cas,

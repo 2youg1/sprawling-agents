@@ -6,6 +6,7 @@
 //! A key a resident writes into a file goes to the vault, and the file
 //! holds its `secret:` reference instead (sprawling-SPEC.md 8-87).
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use kernel::{
@@ -32,7 +33,7 @@ pub(in crate::assembly) struct KeptEdit {
     /// runs share it, because each writes before its bench is laid out.
     run: u64,
     /// How many keys this run has written so far.
-    written: u64,
+    written: AtomicU64,
 }
 
 impl KeptEdit {
@@ -45,23 +46,27 @@ impl KeptEdit {
             edit,
             vault,
             run,
-            written: 0,
+            written: AtomicU64::new(0),
         }
     }
 
     /// Puts one written key in the vault under a name no earlier key of
     /// this run or of any other run holds.
-    fn keep(&mut self, provider: &str, key: &str) -> Result<SecretRef, AxError> {
-        self.written = self.written.checked_add(1).ok_or_else(|| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "keep a written key",
-                "this run has written more keys than a counter holds".to_owned(),
-            )
-            .with_recovery("start a new run and write the key there")
-        })?;
-        let reference =
-            SecretRef::new(REALM, &format!("{provider}-{}-{}", self.run, self.written))?;
+    fn keep(&self, provider: &str, key: &str) -> Result<SecretRef, AxError> {
+        let earlier = self
+            .written
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::InvalidArgs,
+                    "keep a written key",
+                    "this run has written more keys than a counter holds".to_owned(),
+                )
+                .with_recovery("start a new run and write the key there")
+            })?;
+        // `fetch_update` has just shown `earlier + 1` fits.
+        let written = earlier.saturating_add(1);
+        let reference = SecretRef::new(REALM, &format!("{provider}-{}-{written}", self.run))?;
         self.vault
             .lock()
             .map_err(|_| poisoned_vault())?
@@ -78,7 +83,7 @@ impl Tool for KeptEdit {
     /// # Errors
     /// Everything `edit` refuses, and the vault refusing a key: then the
     /// file is left as it was, because writing the key is the leak.
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         let Some(Value::String(new)) = call.args.as_map().get("new") else {
             return self.edit.invoke(call);
         };

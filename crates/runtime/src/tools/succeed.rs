@@ -118,7 +118,7 @@ impl Tool for SucceedTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -198,7 +198,7 @@ mod tests {
     #[test]
     fn asking_lands_on_the_desk_and_the_last_reason_wins() {
         let desk = std::sync::Arc::new(std::sync::Mutex::new(SuccessionDesk::new()));
-        let mut tool = SucceedTool::new(std::sync::Arc::clone(&desk)).unwrap();
+        let tool = SucceedTool::new(std::sync::Arc::clone(&desk)).unwrap();
         tool.invoke(&call(serde_json::json!({ "reason": "first" })))
             .unwrap();
         tool.invoke(&call(serde_json::json!({ "reason": "second" })))
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn a_missing_reason_is_refused_and_nothing_lands() {
         let desk = std::sync::Arc::new(std::sync::Mutex::new(SuccessionDesk::new()));
-        let mut tool = SucceedTool::new(std::sync::Arc::clone(&desk)).unwrap();
+        let tool = SucceedTool::new(std::sync::Arc::clone(&desk)).unwrap();
         let err = tool.invoke(&call(serde_json::json!({}))).unwrap_err();
         assert_eq!(err.code(), &AxCode::InvalidArgs);
         assert!(desk.lock().unwrap().asked().is_none());

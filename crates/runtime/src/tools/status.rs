@@ -95,7 +95,7 @@ pub struct StatusSnapshot {
 
 pub struct StatusTool {
     snapshot: StatusSnapshot,
-    children: Box<dyn Fn() -> Vec<ChildStatus> + Send>,
+    children: Box<dyn Fn() -> Vec<ChildStatus> + Send + Sync>,
     /// The table this run's background commands stand in. `None` in a
     /// tool built without one, which reports `backlog: none` truthfully:
     /// nothing was started through a table that does not exist.
@@ -125,7 +125,7 @@ impl StatusTool {
     /// Propagates a malformed parameter schema.
     pub fn watching(
         snapshot: StatusSnapshot,
-        children: Box<dyn Fn() -> Vec<ChildStatus> + Send>,
+        children: Box<dyn Fn() -> Vec<ChildStatus> + Send + Sync>,
     ) -> Result<StatusTool, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
@@ -256,7 +256,7 @@ impl Tool for StatusTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,

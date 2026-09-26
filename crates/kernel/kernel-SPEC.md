@@ -1276,11 +1276,11 @@ impl ToolRoute {
 }
 pub struct ToolOutcome { pub result: Payload, #[serde(default)] pub attachments: Vec<ImageRef> }
 
-pub trait Tool: Send {
+pub trait Tool: Send + Sync {
     fn meta(&self) -> &ToolMeta;
     /// Fail-closed identity: a call whose name differs from meta().name
     /// must return E_INVALID_ARGS, never route silently.
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError>;   // 默认 `GateSubject::None`
 }
 #[cfg(feature = "conformance")]
@@ -1290,6 +1290,7 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
                                     // 三臂恒三（L0 冻结面），故穷尽不标 non_exhaustive；discard::forecast 的入参
 ```
 
+- **`invoke` 取 `&self`，trait 要求 `Send + Sync`。** 一波里开头连续的只读调用由 `Turn::execute_concurrent` 同时起跑（runtime-SPEC §8-3），同一张工作台上的工具因此会被几个线程同时借用；`&self` 加 `Sync` 让「这件工具能被并行调用」由类型回答，而不是由调用方记住。有内部状态的工具把状态放在自己的锁后面（`Mutex`），锁只罩住那份状态，不罩整次调用。**被否**：①保留 `&mut self`，由工作台给每件工具套一把锁——同名的两条只读调用（两次 `read`）会在这把锁上排队，并行只剩不同名的调用；②每次调用克隆一件工具——持有子进程、连接或目录的工具克隆不出同一件东西。
 - **`params` 复用 `Payload`**：键序 BTreeMap＋拒浮点白拿；schema 约定属 S3 工具实珰。
 - **`ToolRoute`（预编译路由表，A1）**：登记时按名排序一次（预编译点），此后每次调用一次二分探测即得处理器——替掉 `ToolBench` 里 `BTreeMap<String,_>` 的一次调用两次探测与每次探测的 `String` 分配。**被否**：①`phf`／`matchers` 类 const 期完美哈希——名册不是编译期常量，connector 工具名（`{label}_{tool}`）由楼的 `CONFIG.toml` 在登记时到达，而 phf 表会把内建名的拼写再抄一份，正是本模块用 `ToolName` 常量消灭的那种第二家；②维持 BTreeMap 双探测——fx 反例（线性扫描且一次调用查两次）在本仓的对应物就是这两次探测。排序数组二分（`slice::binary_search_by`）是任务允许的 const fn 排序数组二分形：名表建在 const 不可行的部分（名册动态）已由①说明，探测算法本身即那条二分。
 - **`ToolName::EXEC`**：`"exec"` 曾逐字写在 `runtime::bench`（discard 预报）、`bin::assembly::driving::lane`（两处：命令计数与 sieve）与 `citysim::executor`（两处）——一个事实五个家。`BROWSER` 的先例同理；拼写收进本模块后五处读者共用一常量。

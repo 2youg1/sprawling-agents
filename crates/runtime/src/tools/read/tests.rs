@@ -42,7 +42,7 @@ fn a_file_in_the_city_comes_back_with_its_own_length() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let outcome = tool.invoke(&call("lab/Memo.md")).unwrap();
     let map = outcome.result.as_map();
@@ -56,7 +56,7 @@ fn a_file_in_the_city_comes_back_with_its_own_length() {
 #[test]
 fn a_model_chosen_path_cannot_reach_a_reserved_subtree() {
     let dir = tempfile::tempdir().unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
     for asked in [
         ".sprawling/ledger/0001.jsonl",
         "lab/.sprawling/RULES.toml",
@@ -80,7 +80,7 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
     let shelf = dir.path().join(".sprawling").join("library");
     std::fs::create_dir_all(&shelf).unwrap();
     std::fs::write(shelf.join("review.md"), "check the diff first\n").unwrap();
-    let (mut tool, catalog) = tool(dir.path());
+    let (tool, catalog) = tool(dir.path());
     catalog
         .lock()
         .unwrap()
@@ -105,7 +105,7 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
 #[test]
 fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
     let dir = tempfile::tempdir().unwrap();
-    let (mut tool, catalog) = tool(dir.path());
+    let (tool, catalog) = tool(dir.path());
     catalog.lock().unwrap().set_mode(kernel::Mode::Experiment);
 
     let mode = tool.invoke(&call("mode:experiment")).unwrap();
@@ -121,7 +121,7 @@ fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
 #[test]
 fn a_missing_file_is_the_callers_mistake_not_the_disks() {
     let dir = tempfile::tempdir().unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
     let err = tool.invoke(&call("lab/nowhere.md")).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
 }
@@ -143,7 +143,7 @@ fn a_wide_file_is_cut_on_a_line_end_and_continues_without_a_gap() {
         .map(|n| format!("{n:04}{}\n", "x".repeat(1_019)))
         .collect();
     std::fs::write(dir.path().join("lab").join("Wide.md"), &wide).unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let first = tool.invoke(&call("lab/Wide.md")).unwrap();
     let map = first.result.as_map();
@@ -184,7 +184,7 @@ fn a_single_line_past_the_budget_still_makes_progress() {
     let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
     let body = format!("{}\nsecond\n", "y".repeat(cap.saturating_mul(2)));
     std::fs::write(dir.path().join("lab").join("OneLine.md"), &body).unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let answer = tool.invoke(&call("lab/OneLine.md")).unwrap();
     let map = answer.result.as_map();
@@ -202,7 +202,7 @@ fn a_long_file_answers_with_the_cap_a_total_and_the_next_offset() {
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     let body: String = (0..700).map(|n| format!("line {n}\n")).collect();
     std::fs::write(dir.path().join("lab").join("Long.md"), &body).unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let first = tool.invoke(&call("lab/Long.md")).unwrap();
     let map = first.result.as_map();
@@ -233,7 +233,7 @@ fn a_limit_over_the_cap_is_clamped_and_a_short_file_stays_whole() {
     let body: String = (0..600).map(|n| format!("line {n}\n")).collect();
     std::fs::write(dir.path().join("lab").join("Long.md"), &body).unwrap();
     std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let capped = tool
         .invoke(&interval("lab/Long.md", 0, Some(9_000)))
@@ -256,7 +256,7 @@ fn an_offset_past_the_end_answers_empty_with_the_total() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let outcome = tool.invoke(&interval("lab/Memo.md", 40, None)).unwrap();
     let map = outcome.result.as_map();
@@ -270,7 +270,7 @@ fn an_interval_that_cannot_be_counted_is_refused_rather_than_guessed() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     for bad in [
         Value::String("12".to_owned()),
@@ -328,7 +328,7 @@ fn a_link_is_judged_by_where_it_lands() {
         }
     });
     let catalog = Arc::new(Mutex::new(Catalog::new()));
-    let mut tool = ReadTool::new(dir.path(), catalog, only_lab).unwrap();
+    let tool = ReadTool::new(dir.path(), catalog, only_lab).unwrap();
 
     for asked in [
         "lab/to-vault/secret.md",

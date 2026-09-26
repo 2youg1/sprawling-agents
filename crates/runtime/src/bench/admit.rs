@@ -316,7 +316,7 @@ mod tests {
             &self.0
         }
 
-        fn invoke(&mut self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
+        fn invoke(&self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
             Ok(ToolOutcome {
                 result: kernel::Payload::empty(),
                 attachments: Vec::new(),

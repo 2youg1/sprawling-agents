@@ -51,7 +51,7 @@ fn node(room: &str, depends_on: &[&str]) -> Value {
 
 #[test]
 fn a_graph_is_handed_down_in_dependency_order_and_each_node_carries_its_contract() {
-    let (mut tool, _desk, delegates) = tool();
+    let (tool, _desk, delegates) = tool();
     let outcome = tool
         .invoke(&lay_out(serde_json::json!([
             node("lab/writer", &["lab/reader"]),
@@ -80,7 +80,7 @@ fn a_graph_is_handed_down_in_dependency_order_and_each_node_carries_its_contract
 /// cycle never becomes half a workshop.
 #[test]
 fn a_cycle_is_refused_and_nothing_is_handed_down() {
-    let (mut tool, _desk, delegates) = tool();
+    let (tool, _desk, delegates) = tool();
     let err = tool
         .invoke(&lay_out(serde_json::json!([
             node("lab/a", &["lab/b"]),
@@ -93,7 +93,7 @@ fn a_cycle_is_refused_and_nothing_is_handed_down() {
 
 #[test]
 fn one_run_lays_out_one_graph() {
-    let (mut tool, _desk, _delegates) = tool();
+    let (tool, _desk, _delegates) = tool();
     tool.invoke(&lay_out(serde_json::json!([node("lab/a", &[])])))
         .unwrap();
     let err = tool
@@ -106,7 +106,7 @@ fn one_run_lays_out_one_graph() {
 /// have been written without opening anything is refused.
 #[test]
 fn the_join_will_not_take_a_verdict_from_somebody_who_read_nothing() {
-    let (mut tool, desk, _delegates) = tool();
+    let (tool, desk, _delegates) = tool();
     let content = b"what the node produced";
     let digest = B3Hash::digest(content);
     let artifact = Claim::new(
@@ -156,7 +156,7 @@ fn the_join_will_not_take_a_verdict_from_somebody_who_read_nothing() {
 
 #[test]
 fn an_unknown_verb_is_refused_rather_than_rounded_to_the_harmless_one() {
-    let (mut tool, _desk, _delegates) = tool();
+    let (tool, _desk, _delegates) = tool();
     let mut args = Map::new();
     args.insert("op".to_owned(), Value::String("close".to_owned()));
     let err = tool

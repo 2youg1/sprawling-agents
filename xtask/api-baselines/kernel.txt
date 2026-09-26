@@ -741,7 +741,7 @@ pub fn kernel::TimeMs::new(u64) -> Self
 pub fn kernel::TimeMs::new(u64) -> Self
 pub fn kernel::TimeMs::value(&self) -> u64
 pub fn kernel::TimeMs::value(&self) -> u64
-pub fn kernel::Tool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::AxError>
+pub fn kernel::Tool::invoke(&self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::AxError>
 pub fn kernel::Tool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn kernel::Tool::subject(&self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::GateSubject, kernel::AxError>
 pub fn kernel::Window::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -1087,7 +1087,7 @@ pub fn kernel::tool::ServerLabel::parse(&str) -> core::result::Result<kernel::to
 pub fn kernel::tool::ServerLabel::parse(&str) -> core::result::Result<kernel::tool::ServerLabel, kernel::AxError>
 pub fn kernel::tool::ServerLabel::try_from(alloc::string::String) -> core::result::Result<kernel::tool::ServerLabel, kernel::AxError>
 pub fn kernel::tool::ServerLabel::try_from(alloc::string::String) -> core::result::Result<kernel::tool::ServerLabel, kernel::AxError>
-pub fn kernel::tool::Tool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::AxError>
+pub fn kernel::tool::Tool::invoke(&self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::AxError>
 pub fn kernel::tool::Tool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn kernel::tool::Tool::subject(&self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::GateSubject, kernel::AxError>
 pub fn kernel::tool::ToolCall::action(&self) -> core::result::Result<alloc::vec::Vec<u8>, kernel::AxError>
@@ -2693,10 +2693,10 @@ pub struct kernel::write_domain::DomainPrefixes
 pub struct kernel::write_domain::EditSample
 pub trait kernel::Ledger
 pub trait kernel::Model
-pub trait kernel::Tool: core::marker::Send
+pub trait kernel::Tool: core::marker::Send + core::marker::Sync
 pub trait kernel::ledger::Ledger
 pub trait kernel::model::Model
-pub trait kernel::tool::Tool: core::marker::Send
+pub trait kernel::tool::Tool: core::marker::Send + core::marker::Sync
 pub type kernel::Increments<'a> = &'a mut dyn core::ops::function::FnMut(&kernel::Increment)
 pub type kernel::config::EnvVarName::Error = kernel::AxError
 pub type kernel::config::EnvVarName::Error = kernel::AxError

@@ -200,7 +200,7 @@ mod tests {
         let listed = tools_from(&label(), &listing()).unwrap().remove(0);
         let meta = listed.meta;
         let name = meta.name.clone();
-        let mut tool = McpTool::new(
+        let tool = McpTool::new(
             meta,
             "GITHUB_CREATE_ISSUE".to_owned(),
             Box::new(scripted),
