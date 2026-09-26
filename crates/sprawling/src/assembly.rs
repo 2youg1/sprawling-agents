@@ -72,8 +72,9 @@ use genesis::city_segment;
 pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
 pub(crate) use mcp::McpLink;
 use mcp::{connect_mcp, mounts_under, transport_site};
-use naming::{building_of, governed_of, name_of, not_built, plan_node_of, scope_of};
+use naming::{building_of, governed_of, name_of, not_built, scope_of};
 use plans::Reporter;
+use plans::held::{PlanHolders, Planning};
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
 pub(crate) use toolkits::broker_for;
@@ -82,13 +83,13 @@ use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use kernel::{Address, AxCode, AxError, EventRecord, RunId, TimeMs};
+use kernel::{AxCode, AxError, EventRecord, RunId, TimeMs};
 // What the test fixtures below reach through `super::*`, now that the
 // lines this worker appends live in `recording`.
 #[cfg(test)]
 use crate::effect;
 #[cfg(test)]
-use kernel::{EventDraft, EventKind, Payload};
+use kernel::{Address, EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};
 use runtime::Interrupt;
 
@@ -202,16 +203,9 @@ pub struct RunWorker {
     governance: Governance,
     /// What residents are handing one another (`collaborating`).
     collaborating: Collaborating,
-    /// What each building is working towards, and the depth-zero
-    /// position that lets one be declared. Held by the worker because
-    /// the worker is what acts on it; rebuilt from the records on open,
-    /// like the endpoint book and the goal register beside it.
-    pursuits: std::collections::BTreeMap<Address, kernel::Pursuit>,
-    delegator: kernel::Delegator,
-    /// Which room holds each node of each building's plan, folded from
-    /// the claim records and kept up to date as this worker writes them.
-    plan_holders:
-        std::collections::BTreeMap<Address, std::collections::BTreeMap<kernel::NodeId, String>>,
+    /// What each building is working towards and who holds which part
+    /// of its plan (`plans::held`).
+    planning: Planning,
     /// The instant the schedule was last read against. Set when the
     /// worker opens, so a city that was off owes nothing for the time it
     /// was off.

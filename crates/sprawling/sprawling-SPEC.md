@@ -3488,10 +3488,38 @@ impl RunWorker {
 }
 ```
 
-`RunWorker` 拆成六个对象：凭据、治理、协作、计划、入口、飞行中的 run。每个对象带走自己的字段、方法与测试，`RunWorker` 只持有这六个对象和账本、CAS、日志这些整城共用的东西。凭据一组是 `book`、`vault`、`expiries`、`logins` 四个字段：它们回答同一个问题——这座城能以谁的身份去叫哪个模型——而且改动它们的是同一族记录（`endpoint_attached`、`model_selected`、`endpoint_lost`、`secret_captured`）。协作一组是 `rooms`、`joins`、`requests`、`goals` 四个字段：它们都从信号、handback、pull request 与 `goal_registered` 这几族记录折出，回答的是「居民之间正在交接什么」。`pursuits`、`plan_holders` 与 `delegator` 虽然也由协作折叠（`folds::Collaboration`）折出，却回答「每栋楼在朝什么推进」，属于计划一组，不归这里。治理早已是一个对象（`views::Governance`），判定面与读面共用那一个定义，这一步不动它。计划、入口、飞行中的 run 的拆分是本节接口的下一步，在那之前这些字段仍直接挂在 `RunWorker` 上。
+`RunWorker` 拆成六个对象：凭据、治理、协作、计划、入口、飞行中的 run。每个对象带走自己的字段、方法与测试，`RunWorker` 只持有这六个对象和账本、CAS、日志这些整城共用的东西。凭据一组是 `book`、`vault`、`expiries`、`logins` 四个字段：它们回答同一个问题——这座城能以谁的身份去叫哪个模型——而且改动它们的是同一族记录（`endpoint_attached`、`model_selected`、`endpoint_lost`、`secret_captured`）。协作一组是 `rooms`、`joins`、`requests`、`goals` 四个字段：它们都从信号、handback、pull request 与 `goal_registered` 这几族记录折出，回答的是「居民之间正在交接什么」。`pursuits`、`plan_holders` 与 `delegator` 虽然也由协作折叠（`folds::Collaboration`）折出，却回答「每栋楼在朝什么推进」，属于计划一组，不归这里。治理早已是一个对象（`views::Governance`），判定面与读面共用那一个定义，这一步不动它。计划一组见 8-91。入口与飞行中的 run 的拆分是本节接口的下一步，在那之前 `entrance`、`knocks`、`namings`、`flight`、`fence_gate`、`backlog` 仍直接挂在 `RunWorker` 上。
 
-**worker 写下的每一行，它持有的每一份折叠都要看到，不论这行以城的名义还是以某个 run 的名义写。** 重启走 `Standing::fold`，那条路把账本上每一行都交给每一份折叠，不问是谁写的；活着的 worker 若只在以城的名义写时才折凭据与会话起点，一行由 run 写下的 `endpoint_attached` 就在账本上、却不在 worker 的 `book` 里，直到进程重启——这正是 8-17 已经排除的那类「活城与重启折出两份」。所以 `record_where` 与 `record_for` 都经过同一个 `RunWorker::absorb`，它依次交给会话起点、治理、凭据三份折叠；哪份折叠看哪几种记录由各自的 `absorb` 决定，这里不再筛。
+**worker 写下的每一行，它持有的每一份折叠都要看到，不论这行以城的名义还是以某个 run 的名义写。** 重启走 `Standing::fold`，那条路把账本上每一行都交给每一份折叠，不问是谁写的；活着的 worker 若只在以城的名义写时才折凭据与会话起点，一行由 run 写下的 `endpoint_attached` 就在账本上、却不在 worker 的 `book` 里，直到进程重启——这正是 8-17 已经排除的那类「活城与重启折出两份」。所以 `record_where` 与 `record_for` 都经过同一个 `RunWorker::absorb`，它依次交给会话起点、治理、凭据、计划四份折叠；哪份折叠看哪几种记录由各自的 `absorb` 决定，这里不再筛。
 
 **红**：一个 run 以自己的名义写下一行 `endpoint_attached`（`record_for`），随后 worker 的 `book` 与从同一账本重折出来的 `book` 应当列出同样的端点。改动之前，worker 的 `book` 为空而重折的那份有这一端点。
 
 **为何字段仍是 `pub(in crate::assembly)`**：这一步是纯搬移，读写这些字段的调用只把 `self.book` 改拼为 `self.credentials.book`、`self.rooms` 改拼为 `self.collaborating.rooms`；把它们收进 `Credentials` 的方法是另一次改动，混进来会让搬移与行为变化无法分开审。
+
+### 8-91 计划一组离开 `RunWorker`（`bin::assembly::plans::held`），形状 1 数据
+
+```rust
+// bin::assembly::plans::held —— shape: data
+pub(in crate::assembly) struct Planning {
+    pub(in crate::assembly) pursuits: BTreeMap<Address, kernel::Pursuit>, // 每栋楼在朝什么推进
+    pub(in crate::assembly) delegator: kernel::Delegator,                // 深度零的位置：只有它能宣布一个 pursuit
+    pub(in crate::assembly) holders: PlanHolders,                        // 每栋楼的计划里，哪个节点由哪个房间认领着
+}
+impl Planning {
+    pub(in crate::assembly) fn absorb(&mut self, kind: EventKind, addr: Option<&Address>, data: &Payload);
+}
+pub(in crate::assembly) struct PlanHolders(BTreeMap<Address, BTreeMap<kernel::NodeId, String>>);
+impl PlanHolders {
+    pub(in crate::assembly) fn absorb(&mut self, kind: EventKind, addr: Option<&Address>, data: &Payload);
+    pub(in crate::assembly) fn in_building(&self, building: &Address) -> BTreeMap<kernel::NodeId, String>;
+}
+```
+
+计划一组是 `pursuits`、`delegator` 与认领表三样：它们回答「每栋楼在朝什么推进、谁在做哪一块」，而 `pursuit_changed` 与 `roadmap_*` 这几族记录只改动它们。`delegator` 跟着 `pursuits` 走，因为宣布一个 pursuit 只能经过深度零的位置，而这个位置只在开城时铸一次（`lifetime`）。
+
+**认领表只有一份定义。** `roadmap_claimed` 把房间记进它所属楼的表，`roadmap_finished`、`roadmap_released`、`roadmap_blocked` 把节点移出；房间就是这行记录的 `addr`，楼是 `addr` 的第一段，节点是载荷的 `node`。重启的协作折叠与活着的 worker 调用同一个 `PlanHolders::absorb`，所以两边不会各写一份规则。一行读不出楼或节点的记录不进表：认领表只记确知的持有者，不去猜。
+
+**红**：一个 run 落下一行 `roadmap_claimed`（`record_for`，认领效果正是这样落地的），随后 worker 读到的持有者（`holders_in`）应当与从同一账本重折出来的一样。改动之前，worker 的表在开城之后再不更新：左边是空表，右边是 `{2: "lab/room1"}`。
+
+**`pursuits` 仍由 `plans` 直接改写**：宣布、暂停、恢复、撤下一个 pursuit 时，`plans` 先改 `Planning::pursuits`，再从改过的表读出 `goal` 写进 `pursuit_changed`。让 `Planning::absorb` 在追加之后折 `pursuit_changed`，要把判定挪到写之后、由记录铸回 `Pursuit`，这是行为变化而不是搬移，所以这一步不改这条路径。
+

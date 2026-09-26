@@ -138,6 +138,7 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         self.origins.absorb(kind, addr, data)?;
         self.governance.absorb(kind, run, addr, data)?;
+        self.planning.absorb(kind, addr, data);
         self.credentials.absorb(kind, data)
     }
 }
