@@ -10,6 +10,8 @@
 //! holds no memory. Where the counters come from is the caller's
 //! reading function; this module touches no platform interface.
 
+pub mod top;
+
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
