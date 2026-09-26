@@ -15,7 +15,7 @@
 //! looks like.
 //!
 //! **What it deliberately does not hold.** The plans are
-//! `crate::plan_view`'s and are read through it; a second parse here
+//! `accounting::plan_view`'s and are read through it; a second parse here
 //! would be a second answer to "what is stuck and why", and only one of
 //! them would be folding the records that say why. What waits in a room
 //! is folded from signal records rather than read off a queue, because a

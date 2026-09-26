@@ -9,7 +9,7 @@ use kernel::event::record::{PursuitChanged, PursuitMove};
 use kernel::{Address, AxCode, AxError, EventKind};
 use kernel::{Payload, RunId};
 
-use crate::effect;
+use accounting::effect;
 
 use super::{Assignment, RunWorker};
 

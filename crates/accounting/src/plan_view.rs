@@ -46,19 +46,19 @@ enum Reading {
 
 /// The plans of a city.
 #[derive(Default)]
-pub(crate) struct PlanView {
+pub struct PlanView {
     read: BTreeMap<Address, Reading>,
     /// Why each red node is red, folded from the records that said so.
     causes: BTreeMap<Address, BTreeMap<NodeId, StopCause>>,
 }
 
 /// What a page is told about one building's plan.
-pub(crate) struct PlanReading {
-    pub(crate) progress: Progress,
-    pub(crate) problems: Vec<String>,
-    pub(crate) rows: Vec<channels::PlanRow>,
-    pub(crate) blocked: Vec<channels::BlockedLine>,
-    pub(crate) ready: Vec<NodeId>,
+pub struct PlanReading {
+    pub progress: Progress,
+    pub problems: Vec<String>,
+    pub rows: Vec<channels::PlanRow>,
+    pub blocked: Vec<channels::BlockedLine>,
+    pub ready: Vec<NodeId>,
 }
 
 impl PlanView {
@@ -71,7 +71,7 @@ impl PlanView {
     /// edited the table with the edit tool leaves no `roadmap_*` record,
     /// and a cache that ignored the wave would go on reporting the plan
     /// as it was before the edit.
-    pub(crate) fn apply(&mut self, record: &EventRecord) {
+    pub fn apply(&mut self, record: &EventRecord) {
         let reach = may_move_plan(record.kind());
         let Some(building) = record.addr().and_then(building_of) else {
             // A record with no address could belong to any building, so
@@ -106,7 +106,7 @@ impl PlanView {
 
     /// What one building's plan says, reading the file only when the
     /// fold says it may have moved.
-    pub(crate) fn of(&mut self, city_root: &Path, addr: &Address) -> PlanReading {
+    pub fn of(&mut self, city_root: &Path, addr: &Address) -> PlanReading {
         if !self.read.contains_key(addr) {
             let reading = match city::roadmap(city_root, addr) {
                 // A plan that cannot be opened is not a plan somebody

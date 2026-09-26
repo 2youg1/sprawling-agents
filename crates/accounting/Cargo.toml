@@ -9,6 +9,14 @@ publish.workspace = true
 kernel = { path = "../kernel" }
 gateway = { path = "../gateway" }
 protocol = { path = "../protocol" }
+city = { path = "../city" }
+collab = { path = "../collab" }
+serde_json = { workspace = true }
+# The vocabulary only: the port hands back a wire answer and never listens.
+channels = { path = "../channels", default-features = false }
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true

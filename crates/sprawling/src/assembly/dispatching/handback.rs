@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 
 use kernel::{Address, EventKind, Locator};
 
-use crate::effect;
+use accounting::effect;
 
 use super::super::{Assignment, CITY_VERIFIER, Owing, RunWorker};
 use super::Dispatched;

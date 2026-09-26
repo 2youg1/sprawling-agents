@@ -13,7 +13,7 @@
 use kernel::{Address, AxError, EventDraft, EventKind, Ledger, Payload, RunId};
 
 use crate::assembly::booking::OpenClaims;
-use crate::effect;
+use accounting::effect;
 
 use super::RunWorker;
 

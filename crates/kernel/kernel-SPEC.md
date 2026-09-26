@@ -1057,7 +1057,7 @@ pub enum WriteMoment { BeforeReport, AfterFeedback, OnPlanChange }
 - **拼写单套且不区分大小写**：运行时文档全面英文化后，中英两套拼写会成为「一个 Resident 允许写什么」的第二个权威；而大小写不入契约是因为 `done` 这类行表达的事实表装得下，把它判成 Malformed 等于拿一个读者不接受的理由把该行逐出分母。**线上拼写另有一套**（`snake_case` 标识符）：线帧是给程序读的，表格是给人读的，让客户端硬编码 `Awaiting approval` 正是短语表存在要防的事。
 - **写者与读者同住**：`set_roadmap_status` 与 `insert_children` 是这张表仅有的两个编辑入口，两者共用同一段「哪几行是这张表」的判定（`locate_table`／`body_row`）。三条契约不变：只改首个表；输出行规范化，故**同一次改写两次得到同一字节**；`Done` 缺证据恒拒（`E_EVIDENCE_MISSING`）。
 - **`insert_children` 只往后编号，不补空位**：一个计划索引是一个名字，复用它等于悄悄搬走别人的证据。子节点落在父节点**最后一个后代之后**，于是阅读顺序不变、昨天看到的编号今天仍指同一件活。
-- **`WriteMoment` 有消费者**：正因为可写时刻是封闭的，读者才可以在两次写之间**持有已解析的树**而不是每问一次就把每栋楼的文件重解析一遍（`bin::plan_view`）。
+- **`WriteMoment` 有消费者**：正因为可写时刻是封闭的，读者才可以在两次写之间**持有已解析的树**而不是每问一次就把每栋楼的文件重解析一遍（`accounting::plan_view`）。
 
 ### 8-32 kernel::share（形状 2 value）
 

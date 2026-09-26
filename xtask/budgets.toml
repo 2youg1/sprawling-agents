@@ -195,8 +195,8 @@ names = [
   "crates/collab/src/inbox.rs::new",               # 7
   "crates/collab/src/signal_tool.rs::new",         # 6
   "crates/runtime/src/turn.rs::assemble",          # 6
-  "crates/sprawling/src/effect.rs::of",            # 6
-  "crates/sprawling/src/effect.rs::shelf",         # 6
+  "crates/accounting/src/effect.rs::of",            # 6
+  "crates/accounting/src/effect.rs::shelf",         # 6
   "crates/browser/src/act.rs::frame_for",          # 5
   "crates/city/src/archive.rs::entry",             # 5
   "crates/collab/src/pr_tool.rs::new",             # 5

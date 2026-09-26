@@ -16,6 +16,7 @@ use super::{
     Collaborating, Credentials, Doorstep, Flight, GatewayModels, Planning, RoomQueues, RunWorker,
     Standing, SystemClock, city_segment,
 };
+use crate::doctor::{PATIENCE, Platform, ThisMachine};
 use std::path::Path;
 
 use kernel::{AxError, EventKind, Locator};
@@ -193,6 +194,7 @@ impl RunWorker {
             warm: super::keeping_warm::Kept::default(),
             models: Box::new(GatewayModels),
             connectors: Box::new(super::mcp::Residents::default()),
+            machine: Box::new(ThisMachine::new(Platform::current(), PATIENCE)),
             clock: std::sync::Arc::new(SystemClock),
         };
         worker.sweep_abandoned_trees();

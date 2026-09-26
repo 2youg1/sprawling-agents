@@ -243,7 +243,7 @@ fn offer<R: BufRead, W: Write>(
             writeln!(out, "  skipped")?;
             continue;
         }
-        match machine.install(name, &runnable) {
+        match accounting::Machine::install(machine, name, &runnable) {
             Ok(()) => installed.push(name),
             Err(err) => {
                 writeln!(out, "  {err}")?;

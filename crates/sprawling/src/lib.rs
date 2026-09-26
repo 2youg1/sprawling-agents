@@ -31,11 +31,9 @@ pub mod supervising;
 
 mod browser_bidi;
 mod browser_tool;
-mod effect;
 mod held_vault;
 mod keying;
 mod person;
-mod plan_view;
 mod toolkit_broker;
 mod views;
 

@@ -165,7 +165,7 @@ city: kernel
 browser: kernel
 protocol: kernel, gateway
 channels: kernel
-accounting: kernel, gateway, protocol
+accounting: kernel, gateway, protocol, channels, city, collab
 sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels, accounting
 ```
 
@@ -217,8 +217,9 @@ moves up into the assembly layer.
 simulated adapters — a scripted model, scripted tools, an in-memory Ledger
 — which is how a script reproduces a run. It stops below `bin::assembly`:
 `RunWorker` receives its model adapters through `accounting::ModelFactory`,
-its MCP servers through `accounting::Connectors` and its time through
-`accounting::Clock`, and integration tests
+its MCP servers through `accounting::Connectors`, its time through
+`accounting::Clock` and the machine it runs on through
+`accounting::Machine`, and integration tests
 drive a dispatch against scripted ones by the same door `channels::server`
 uses, but the worker itself still lives in
 `sprawling`, which citysim does not depend on. Moving the worker into
@@ -245,6 +246,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `accounting::models` | crates/accounting/src/models.rs | `bin::assembly::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
 | `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::SystemClock`: the wall clock, the one sampling point | the stopped clock in `crates/sprawling/tests/clock.rs` |
 | `accounting::connectors` | crates/accounting/src/connectors.rs | `bin::assembly::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
+| `accounting::machine` | crates/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner | the scripted machine in `crates/sprawling/tests/machine.rs` |
 
 The *second adapter* column has no checker: a seam whose double was
 deleted would still read as real here. That is a known hole, not a

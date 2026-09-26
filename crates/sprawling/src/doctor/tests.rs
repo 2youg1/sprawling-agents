@@ -11,6 +11,8 @@ mod reading;
 use std::collections::BTreeSet;
 use std::sync::Mutex;
 
+use accounting::Runnable;
+
 use super::paint::Ink;
 use super::screen::{Asked, run};
 use super::*;
@@ -44,6 +46,12 @@ impl Machine for ScriptedMachine {
                 version: Version::Said("9.9.9".to_owned()),
             }
         }
+    }
+}
+
+impl accounting::Machine for ScriptedMachine {
+    fn report(&self) -> channels::DoctorAnswer {
+        super::answer(self)
     }
 
     fn install(&self, name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {

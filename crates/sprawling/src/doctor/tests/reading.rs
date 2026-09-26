@@ -154,7 +154,8 @@ fn a_family_of_browsers_counts_once_in_the_summary() {
 /// a person waiting on a slow tool is never looking at an empty terminal.
 #[test]
 fn the_heading_is_written_before_any_item_is_asked() {
-    use crate::doctor::{Absence, Machine, Requirement, Runnable};
+    use crate::doctor::{Absence, Machine, Requirement};
+    use accounting::Runnable;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -168,6 +169,11 @@ fn the_heading_is_written_before_any_item_is_asked() {
                 self.asked_in_silence.store(true, Ordering::SeqCst);
             }
             Presence::Absent(Absence::NotOnSearchPath)
+        }
+    }
+    impl accounting::Machine for Watched {
+        fn report(&self) -> channels::DoctorAnswer {
+            crate::doctor::answer(self)
         }
         fn install(&self, _name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
             Ok(())

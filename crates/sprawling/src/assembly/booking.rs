@@ -25,7 +25,7 @@ use std::sync::mpsc;
 use kernel::{Address, AxCode, AxError, EventDraft, Ledger, NodeId, RunId};
 
 use super::relay::Wake;
-use crate::effect;
+use accounting::effect;
 
 /// Who a run's claims are made for, and the clock their lines are
 /// stamped by. The five travel together from the run's dispatch to
@@ -242,7 +242,7 @@ mod tests {
                     data: claim.payload("potter").unwrap(),
                     ig: false,
                 },
-                put_back: crate::effect::handed_back(
+                put_back: accounting::effect::handed_back(
                     &claim,
                     "came home",
                     &Address::parse("lab/room1").unwrap(),

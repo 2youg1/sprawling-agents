@@ -630,7 +630,7 @@ pub fn key_for(bind: SocketAddr, configured: Option<String>) -> Result<Keyed, Ax
 
 **红（三条，每条咬住一段）**：`Keying::decide` 对四格（回环／暴露 × 配置过／没有）给出的枚举——改动之前 `keying` 不存在，是编译红；`token_in` 对 `?token=abc`、`?a=1&token=abc`、`?token=`、空串的四个答案；以及 `web::socket` 那条握手测试，断言 `Link::new(token_in(...))` 发出的 `Hello.token` 非空——改动之前 `Link::new(None)` 使它恒 `None`。端到端那一段（真浏览器对真暴露端口）落在 V9，是人跑的命令而非门禁，如 ARCHITECTURE.md §11 所记。
 
-## 8-24 一条效应先成为账本行，再成为这座城
+## 8-24 一条效应先成为账本行，再成为这座城（`accounting::effect`）
 
 ```rust
 // crates/sprawling/src/effect.rs —— `architecture.toml` 的 bin::effect，形状 2（值类型）
@@ -688,6 +688,7 @@ self.record_for(…, EventKind::AssetArchived, …)?;          // 后落账
 **影面**：`city` 公开面换一项、增一项（`file_archive` 改签名，新增 `archive_entry`），基线与 city-SPEC 同提交更新；`sprawling` 公开面不变（`effect` 是 `mod`，不是 `pub mod`）。
 
 **尺寸**：`dispatch_in` 1069 → 983 行。搬走的结结实实是五段共 ≈150 行，其中 60 行以 `RunWorker::settle` 的形式回到本文件——那是五张桌子共用的那一扇门，不是 `dispatch_in` 的一段。**尺寸门要等这个数字降到门限以下才能开，这只是第一次拆分**；剩下最大的两块是驱动块（≈150）与目录及工具准入（≈120）。
+效应的值类型、`Landing` 与 `Claims` 住在 `accounting`，规格见 accounting-SPEC.md 8-5；本 crate 留下的是写它们的桌子与 `RunWorker::settle` 那一扇门。
 
 ## 8-25 一个答复接上的活，不靠重读全部历史找到，也不丢掉它的天花板
 
@@ -806,7 +807,7 @@ impl RunWorker {
 
 ## 8-30 合并也排到它那条行后面
 
-§8-24 把五张桌子搬进 `bin::effect` 时，把 `PrEffect::Merged` 留在原地，理由写得很清楚：`trees.merge` 确实先动世界，但「先落账在这里更坏」——`merge` 有一条可达的失败臂 `MergeStale`，先落账就是把一句谎写进历史里的可达路径。它同时写下了解法：`memory::Worktrees` 得先能答「这一合并会落在哪个 commit」且能先验干线。这里做的就是那一条（memory-SPEC §8-2），于是两头不再互斥：
+§8-24 把五张桌子搬进 `accounting::effect` 时，把 `PrEffect::Merged` 留在原地，理由写得很清楚：`trees.merge` 确实先动世界，但「先落账在这里更坏」——`merge` 有一条可达的失败臂 `MergeStale`，先落账就是把一句谎写进历史里的可达路径。它同时写下了解法：`memory::Worktrees` 得先能答「这一合并会落在哪个 commit」且能先验干线。这里做的就是那一条（memory-SPEC §8-2），于是两头不再互斥：
 
 ```rust
 let planned = trees.plan_merge(&name)?;    // 全部拒绝在此，世界未动
@@ -1007,30 +1008,9 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **它以什么收口**：一条会咬的红。`a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work` 首跑即红——今天两帧都进队列，第二次 `wait` 交出第二条命令而不是 `Idle`；实现后转绿，并在同一条测试里证明另一半：办完之后同一把键再来照常受理。既有测试 `a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end` 原先给三条不同命令共用一把 `b"i"` 键（图省事的夹具，真实客户端不会这么铸），改为一条一把——它测的路由与优先级不变。
 
-## 8-34 计划从每问一次重解析，变成一次投影（`bin::plan_view`）
+## 8-34 计划的投影（`accounting::plan_view`）
 
-`CityView` 与 `Metrics` 过去每被问一次，就把每栋楼的 `Roadmap.md` 从盘上读出来重新解析一遍。页面是轮询的，而一份计划一小时改不了几次——这是**为一个几乎不变的答案，按提问频率付钱**。
-
-```rust
-pub(crate) struct PlanView { /* read、causes —— 私有 */ }
-pub(crate) struct PlanReading {
-    pub(crate) progress: Progress,
-    pub(crate) problems: Vec<String>,
-    pub(crate) rows: Vec<channels::PlanRow>,
-    pub(crate) blocked: Vec<channels::BlockedLine>,
-    pub(crate) ready: Vec<NodeId>,
-}
-impl PlanView {
-    pub(crate) fn apply(&mut self, record: &EventRecord);
-    pub(crate) fn of(&mut self, city_root: &Path, addr: &Address) -> PlanReading;
-}
-```
-
-- **文件仍然是计划**。变的只是谁去读：`kernel::WriteMoment` 说这张表只在三个时刻被写，而每一个时刻都是一条记录，于是折叠记录、只在有记录点到那栋楼时才回去读文件。
-- **失效由两类记录触发，理由不同**。`roadmap_*` 说一个 run 动了计划——既是忘掉已解析副本的理由，也是一件本身值得留着的事实（红的原因）。`checkpoint_committed` 只说一波工具写过文件——**用 edit 工具改了表的 agent 不留 `roadmap_*` 记录**，一个忽略工具波的缓存会继续报改动之前的计划。
-- **它是投影不是副本**：这里不存计划说了什么，只存**上一次读到的时候它是什么**，并在任何可能改变它的事情发生时丢掉。删掉整个它、把同一批记录再折一遍，得到同样的字节——因为它做的全部事情就是折叠。
-- **它折的唯一一件文件装不下的事，是节点为什么红**。表格有位置说 `Blocked`；人需要的那句话在 `roadmap_blocked` 的记录里，在表里再放一份就是同一句话的第二个权威。没有记录撑着的 `Blocked` 行仍然算红，措辞退回状态词本身——一个人手改的行仍然是一行说着活停了的行。
-- **`BuildingView` 也走这一份**：楼的对象页从这里拿计划，只有文档、房间与档案仍在被问的那一刻读盘。让对象页自己再解析一次，就是「什么卡住了、为什么」有两个答案，而只有一个在折记录。
+`PlanView` 与 `PlanReading` 住在 `accounting`，规格见 accounting-SPEC.md 8-6；`views` 与 `RunWorker.plan_holders` 从那里读。
 
 ## 8-35 谁在追一个目标，谁替它派活（`RunWorker.pursuits`）
 
@@ -1103,7 +1083,7 @@ justfile／CI 无涉；S4 前端框架结论书将改写 build.rs 拷贝源与 `
 `bin::assembly` 的行是 `adapter`：装配点、最脏、唯一全知。而 `Views` 折账本、答每一个 `Query`、删掉重折得到同样的字节——
 **那是 `projection`，§9 的形状 7。** 一个文件里两个形状，正是那一行说的依据。
 
-**先例已经在这个 crate 里**：§8-34 把 `assembly::read_spine` 搬成 `bin::plan_view`，同样是从装配点里取出一个投影。
+**先例已经在这个 crate 里**：§8-34 把 `assembly::read_spine` 搬成 `accounting::plan_view`，同样是从装配点里取出一个投影。
 沿用它的落法：**兄弟模块，不是 `assembly/` 子目录**——理由是形状：`Views` 是投影，不是 `RunWorker` 的一部分。
 
 ### 搬走什么
@@ -1708,8 +1688,7 @@ pub(crate) enum Need { Required, OneOf(Group), Optional }   // 一组任一即�
 pub enum Platform { Windows, MacOs, Linux }            // `bin::install` 经它进入，遵 lib.rs 的约定：二进制进入即公开
 pub(crate) struct PerPlatform<T> { windows: T, macos: T, linux: T }
 pub(crate) enum Detection { Program { program, version_arg, places }, Environment { variable } }
-pub(crate) enum Recipe { Command { program, args }, Print(&'static str), Manual(&'static str) }
-pub(crate) struct Requirement { name, tier, need, enables, detect, homepage, recipe }
+pub(crate) struct Requirement { name, tier, need, enables, detect, homepage, recipe }   // recipe: PerPlatform<accounting::Recipe>（accounting-SPEC 8-4）
 pub(crate) enum Presence { Present(String), Absent }
 pub(crate) struct Finding { requirement: &'static Requirement, presence: Presence }
 pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding>;
@@ -1728,8 +1707,9 @@ pub(crate) fn run<R: BufRead, W: Write>(asked: &Asked, machine: &dyn Machine, in
 pub(crate) fn verb(args: &[String]) -> ExitCode;              // 必需项有缺则退 1
 
 // bin::doctor::probe（形状 4 adapter：运行中的机器）
-pub(crate) trait Machine { fn look(&self, r: &Requirement) -> Presence; fn install(&self, name: &str, recipe: &Recipe) -> Result<(), AxError>; }
+pub(crate) trait Machine: accounting::Machine { fn look(&self, r: &Requirement) -> Presence; }   // 安装经父 trait 的 install（accounting-SPEC.md 8-4）
 pub(crate) struct ThisMachine { platform: Option<Platform>, patience: Duration }
+pub(crate) fn answer(machine: &dyn Machine) -> channels::DoctorAnswer;   // bin::doctor::report：一页答案，ThisMachine 的 report 就是它
 pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .exe／.cmd／.bat 在先，无扩展名在后
 ```
 
@@ -1742,7 +1722,7 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 - **Windows 上先找带扩展名的那个文件**：`bun` 若由 npm 装出来，同一目录下既有无扩展名的 shell 脚本 `bun`（Windows 起不动）又有 `bun.cmd`。先取无扩展名的那个，报出来的是「装了但不说版本」——一个装好的工具被报成半坏的。故 `names_of` 在 Windows 上按 `.exe`／`.cmd`／`.bat`／无扩展名的次序找，这条次序有它自己的测试。
 - **一项是环境变量而不是程序**：exec 工具 python 臂要的 CPython-WASI 组件由 `PYTHON_WASM_ENV` 指路（`bin::assembly::workbench::tools`），故它的探测是「那个变量指的文件在不在」，安装那一栏是 `Manual`——没有包管理器发它。它是 `Optional`，行尾说明它开启的是什么。
 - **终端里的词是英文，这不违反 wording 门**：AGENTS.md 的语言表把词表的管辖写在客户端上，`xtask wording` 扫的目录是 `client/src`（见 `xtask/src/wording.rs` 的 `CLIENT` 常量）。控制台是操作者的，与 `install`／`console`／`firstrun` 同一口径。
-- **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它记下的安装请求）。判定因此不需要测试机上真装着什么就能被咬。
+- **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它经 `accounting::Machine::install` 记下的安装请求）。终端与 worker 的安装走同一个 `accounting::Machine::install`，所以测试记下的就是终端真正会启动的那一次。判定因此不需要测试机上真装着什么就能被咬。
 
 **本章测试**：表的完整性（每一项都有探测方法，且三个平台各自要么给出命令要么明说 `manual`；每一个 `Optional` 项都说出它开启什么）；`verdict` 对「全在」「缺一个必需项」「只缺一个可选项」三类输入给出正确的穷尽枚举（可选项缺失不拖垮该层）；`finding_line` 的三种写法；`--install` 在答 `n` 时**一件也不装**、答 `y` 时只装被问的那一件（由 `ScriptedMachine` 记账）。
 
@@ -1874,7 +1854,7 @@ socket 上的一次对话与 HTTP 上的一次托管是两件事，同处一个�
 |---|---|
 | `JsonlLedger` | `RunWorker.ledger` |
 | 端点书 `EndpointBook` | `RunWorker.book` |
-| 计划（`plan_holders`／`bin::plan_view`） | `RunWorker.plan_holders` |
+| 计划（`plan_holders`／`accounting::plan_view`） | `RunWorker.plan_holders` |
 | 追求 `pursuits` | `RunWorker.pursuits` |
 | 治理 `Governance`（待批、放行、停摆） | `RunWorker.governance` |
 | 五张桌子（inbox／join／pr／goal／shelf 的**归位**那一半） | `RunWorker.inboxes`／`joins`／`requests`／`goals` |
@@ -3133,15 +3113,15 @@ impl Journal {
 `Query::Doctor` 答的是开城那一刻的快照（§8-53）。于是机器页只能把一行命令复制到终端，装完还要重启城才看得见结果。两条命令补上这段，执行点是 `bin::assembly::commanding::machine`。
 
 ```rust
-// bin::doctor（Recipe 的唯一拒绝语）
+// accounting::machine（Recipe 的唯一拒绝语；Runnable 只由它造，accounting-SPEC 8-4）
 impl Recipe {
-    pub(crate) fn command(&self, item: &str) -> Result<Runnable<'_>, AxError>;
+    pub fn command(&self, item: &str) -> Result<Runnable<'_>, AxError>;
 }
+pub struct Runnable<'a> { /* 私有：program、args */ }
 // bin::doctor::running（本二进制起安装程序的唯一一处）
 pub(crate) const PATIENCE: u32 = 3_600; // knocks, TICK apart
-pub(crate) struct Runnable<'a> { /* 私有：program、args */ }
-pub(crate) fn run(item: &str, runnable: &Runnable, deadline: Duration) -> Result<(), AxError>;
-// bin::assembly::commanding::machine
+pub(crate) fn run(item: &str, runnable: &accounting::Runnable, patience: u32) -> Result<(), AxError>;
+// bin::assembly::commanding::machine：worker 经 RunWorker.machine（accounting::Machine）探与装，生产实现是 doctor::ThisMachine；终端的 --install 经同一个 accounting::Machine::install
 impl RunWorker {
     pub(in crate::assembly) fn doctor_install(&mut self, item: &str) -> Result<(), AxError>;
     pub(in crate::assembly) fn look_at_this_machine(&mut self);

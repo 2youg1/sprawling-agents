@@ -101,7 +101,7 @@ use kernel::{AxCode, AxError, EventRecord, RunId, TimeMs};
 // What the test fixtures below reach through `super::*`, now that the
 // lines this worker appends live in `recording`.
 #[cfg(test)]
-use crate::effect;
+use accounting::effect;
 #[cfg(test)]
 use kernel::{Address, EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};
@@ -266,6 +266,10 @@ pub struct RunWorker {
     /// keeps them connected between runs (`mcp::Residents`). Received
     /// for the same reason `models` is.
     connectors: Box<dyn accounting::Connectors + Send>,
+    /// Looks at the machine this city runs on and installs onto it
+    /// (`doctor::ThisMachine`). Received for the same reason `models`
+    /// is.
+    machine: Box<dyn accounting::Machine + Send>,
     /// What time it is, for this worker and every lane it drives
     /// (`SystemClock`). Shared, because a lane reads it while the
     /// worker does.

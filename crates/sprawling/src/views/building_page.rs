@@ -27,13 +27,13 @@ pub(crate) const DOC_BYTES_MAX: usize = 64 * 1024;
 pub(crate) fn read_building(
     city_root: &Path,
     addr: &Address,
-    plan: crate::plan_view::PlanReading,
+    plan: accounting::plan_view::PlanReading,
 ) -> Option<channels::BuildingAnswer> {
     let root = city_root.join(addr.as_str());
     if !root.is_dir() {
         return None;
     }
-    let crate::plan_view::PlanReading {
+    let accounting::plan_view::PlanReading {
         progress,
         problems,
         rows: plan,
