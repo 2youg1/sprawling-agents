@@ -24,7 +24,7 @@
   import { keymap } from "./core/keys";
   import type { Action } from "./core/keys";
   import { fill, say } from "./core/lang";
-  import { paintMark } from "./core/mark";
+  import { markOf, paintMark } from "./core/mark";
   import { RAILS } from "./core/prefs";
   import { cityIsShut, CITY } from "./core/scope";
   import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
@@ -32,10 +32,13 @@
   import { setUi, ui } from "./ui";
   import type { Opening } from "./ui";
   import Building from "./views/building.svelte";
+  import Banner from "./views/parts/banner.svelte";
+  import Button from "./views/parts/button.svelte";
   import Cheatsheet from "./views/parts/kbd.svelte";
   import City from "./views/city.svelte";
   import Cost from "./views/cost.svelte";
   import Facts from "./views/facts.svelte";
+  import LinkBanner from "./views/link_banner.svelte";
   import Mcp from "./views/mcp.svelte";
   import Palette from "./views/palette.svelte";
   import Rail from "./views/rail.svelte";
@@ -59,6 +62,7 @@
   const lang = u.lang;
   const approvals = u.approvals;
   const belief = u.conn.belief;
+  const linkState = u.conn.state;
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const bindings = keymap();
 
@@ -99,6 +103,16 @@
   const waiting = $derived($approvals.length);
   const working = $derived(Object.values($belief.runs).some((run) => run.doing.kind !== "frozen"));
   const halted = $derived(cityIsShut($belief.halted));
+  const unsent = u.conn.unsent;
+  // The attempt the ladder is on since the link was lost, held through
+  // each `opening` between two waits so the banner does not blink off
+  // for every try; null while the page is live or has never been.
+  let lostAttempt = $state<number | null>(null);
+  $effect(() => {
+    const now = $linkState;
+    if (now.kind === "backoff") lostAttempt = now.attempt + 1;
+    else if (now.kind === "live" || now.kind === "refused") lostAttempt = null;
+  });
   // How many runs this city cancelled. The wire carries no count of
   // what one halt froze, so this counts the runs whose own freeze says
   // `cancelled`, which is what a halt writes.
@@ -284,7 +298,7 @@
   });
 
   $effect(() => {
-    paintMark(document, waiting > 0 ? "waiting" : working ? "live" : "quiet");
+    paintMark(document, markOf({ waiting, working, link: $linkState.kind }));
   });
 
   onMount(follow);
@@ -303,24 +317,19 @@
     <Rail {view} posture={$held.rail} onToggle={cycleRail} onPalette={() => (paletteOpen = true)} />
   {/if}
   <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+    {#if lostAttempt !== null}
+      <LinkBanner attempt={lostAttempt} unsent={$unsent} onRetry={u.conn.retry} />
+    {/if}
     {#if halted}
-      <div
-        class="drop flex shrink-0 flex-wrap items-center gap-base border-b border-edge bg-chrome px-pane py-snug text-label"
-        role="status"
+      <Banner
+        text={say($lang, "halt_title")}
+        {...frozen > 0 ? { detail: fill(say($lang, "halt_frozen"), { n: String(frozen) }) } : {}}
+        weight="alert"
       >
-        <span class="inline-block size-dot shrink-0 rounded-pill bg-alert"></span>
-        <span class="text-text">{say($lang, "halt_title")}</span>
-        {#if frozen > 0}
-          <span class="text-text-quiet">{fill(say($lang, "halt_frozen"), { n: String(frozen) })}</span>
-        {/if}
-        <button
-          type="button"
-          class="ml-auto rounded-control px-base py-tight font-mono text-label text-accent hover:bg-raised"
-          onclick={() => u.send(release(CITY))}
-        >
-          {say($lang, "city_release")}
-        </button>
-      </div>
+        {#snippet action()}
+          <Button label={say($lang, "city_release")} tone="secondary" onPress={() => u.send(release(CITY))} />
+        {/snippet}
+      </Banner>
     {/if}
     <main
       id="main"

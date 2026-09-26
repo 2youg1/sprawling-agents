@@ -6,8 +6,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
+import { steer } from "./commands";
 import { openConnection } from "./socket";
-import { WIRE_HASH, WIRE_V } from "../wire";
+import { RunId, WIRE_HASH, WIRE_V } from "../wire";
 
 // One fake socket per `new WebSocket(...)`, kept so a test can deliver
 // a frame and read whether the browser half closed it.
@@ -70,7 +71,38 @@ const realTimers = {
   clearTimeout: globalThis.clearTimeout,
   requestAnimationFrame: globalThis.requestAnimationFrame,
   WebSocket: globalThis.WebSocket,
+  document: globalThis.document,
 };
+
+// A page the browser has hidden: it never calls an animation frame, and
+// it tells the page when it is shown again through the one listener kept
+// here.
+function hide(): { show: () => void } {
+  const heard: (() => void)[] = [];
+  const page = {
+    visibilityState: "hidden",
+    documentElement: { lang: "en" },
+    addEventListener: (_type: string, listener: () => void): void => {
+      heard.push(listener);
+    },
+  };
+  Object.assign(globalThis, {
+    document: page,
+    requestAnimationFrame: (): number => 0,
+  });
+  return {
+    show: () => {
+      page.visibilityState = "visible";
+      for (const listener of heard) listener();
+    },
+  };
+}
+
+function runBooked(): void {
+  for (const entry of booked.splice(0)) {
+    if (!entry.cancelled) entry.run();
+  }
+}
 
 afterEach(() => {
   Object.assign(globalThis, realTimers);
@@ -138,5 +170,75 @@ describe("the browser half", () => {
       updates: 2,
       saying: "abc",
     });
+  });
+  // A browser stops calling animation frames in a hidden tab, so a page
+  // that drained only on a paint held every frame - an approval request
+  // included - until the person came back to the tab.
+  test("drains on a timer while the page is hidden", () => {
+    install();
+    hide();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    const first = FakeSocket.opened[0];
+    first?.onopen?.();
+    const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null };
+    first?.onmessage?.({ data: JSON.stringify({ welcome }) });
+    const run = "00000000-0000-4000-8000-000000000001";
+    first?.onmessage?.({ data: JSON.stringify({ delta: { run, increment: { said: "a" } } }) });
+    runBooked();
+
+    expect(get(conn.belief).runs[run]?.saying).toBe("a");
+  });
+
+  // A tab shown again while the ladder waits tries at once: the person is
+  // looking now, and the rung's remaining seconds are seconds of a blank
+  // page.
+  test("retries at once when a hidden page in backoff is shown", () => {
+    install();
+    const page = hide();
+    openConnection("ws://city.invalid/ws", null, "en");
+    const first = FakeSocket.opened[0];
+    first?.onopen?.();
+    first?.onclose?.();
+    page.show();
+
+    expect({ opened: FakeSocket.opened.length, waiting: booked.filter((entry) => !entry.cancelled).length })
+      .toEqual({ opened: 2, waiting: 0 });
+  });
+  // Words said while the link is down are the person's, not the socket's:
+  // they wait for the city and go out, in order, once it greets again,
+  // and the banner counts them meanwhile.
+  test("holds words said off the link and sends them on the welcome", () => {
+    install();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    const welcome = JSON.stringify({ welcome: { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null } });
+    FakeSocket.opened[0]?.onopen?.();
+    FakeSocket.opened[0]?.onclose?.();
+    const words = steer(RunId.make("00000000-0000-4000-8000-000000000001"), "and the tests");
+    const accepted = conn.command(words);
+    const held = get(conn.unsent);
+    runBooked();
+    const second = FakeSocket.opened[1];
+    second?.onopen?.();
+    second?.onmessage?.({ data: welcome });
+
+    expect({ accepted, held, after: get(conn.unsent), sent: second?.sent.slice(1) }).toEqual({
+      accepted: true,
+      held: 1,
+      after: 0,
+      sent: [JSON.stringify({ command: words })],
+    });
+  });
+  // A refused link reaches no welcome until the person acts, and the
+  // only lever some refusals offer is a reload, which drops the queue:
+  // so the words are not taken, and the composer keeps the draft.
+  test("refuses to hold words while the link is refused", () => {
+    install();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    FakeSocket.opened[0]?.onopen?.();
+    FakeSocket.opened[0]?.onmessage?.({ data: "{\"welcome\":" });
+    const accepted = conn.command(steer(RunId.make("00000000-0000-4000-8000-000000000001"), "and the tests"));
+
+    expect({ state: get(conn.state).kind, accepted, held: get(conn.unsent) })
+      .toEqual({ state: "refused", accepted: false, held: 0 });
   });
 });

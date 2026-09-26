@@ -130,6 +130,10 @@ export function recover(u: Ui, recovery: Recovery, about: About): void {
     u.go({ kind: "setup" });
     return;
   }
+  if (recovery.kind === "reload") {
+    location.reload();
+    return;
+  }
   const target = targetFor(u, about);
   switch (recovery.spelled) {
     case "/new":

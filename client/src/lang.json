@@ -3055,5 +3055,25 @@
   "act_go_settings": {
     "en": "go to settings",
     "zh": "去设置"
+  },
+  "link_reload": {
+    "en": "reload",
+    "zh": "重新载入"
+  },
+  "link_lost": {
+    "en": "lost the city",
+    "zh": "和城断开了"
+  },
+  "link_lost_detail": {
+    "en": "reconnecting · attempt {n}",
+    "zh": "正在重连 · 第 {n} 次"
+  },
+  "link_unsent": {
+    "en": "{n} held until the city is back",
+    "zh": "{n} 条话等连上后发出"
+  },
+  "link_retry_now": {
+    "en": "retry now",
+    "zh": "现在重试"
   }
 }
