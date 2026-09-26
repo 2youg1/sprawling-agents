@@ -1803,5 +1803,6 @@ impl Conversation {
 - **规则**：`Conversation` 记下上次组装发出了几条消息（`sent`）。user 文本（steer、提醒）只并入**尚未发出**的最后一条 User 消息；最后一条 User 消息已经发出时，文本进一个待投槽（`held`），由下一次 `push_tool_results` 接在这一波结果之后，即词汇表里 Steer 的落点「下一份工具结果的末尾」。待投槽不在 `messages()` 里，所以它永远不会出现在一条它到达之前就已组好的请求中。
 - **调用点**：活的 run 在 `Turn::assemble` 答出 `Advanced` 之后调一次（`run::lifecycle`）；`fork` 在读到本 run 的 `prompt_assembled` 时调一次。两边的标记来自同一个事实（这一回合的请求组好了），所以分支按同一规则重放出同样的字节。
 - **理由**：`BeforeCall`／`BeforeWave`／`BeforeToolCall`／`BeforeSpawn` 四个安全点都在组装之后，那时窗口最后一条仍是刚随请求发出的 User 消息。把 steer 并进去，下一次请求里 steer 排在一条没读过它的助手回复之前：模型看到的时间顺序是假的，而且已发出消息的字节变了，provider 的前缀缓存从这条消息起全部失效。
+- **字节**：`fixtures/golden-p0` 的剧本在第 0 回合收到 steer，第二次请求的 run 区域因此换了字节，账本自 `prompt_shape_compared` 起重生（`GOLDEN_WRITE=1`）。
 - **一条回复没有任何调用时**：run 就此结束（8-37），待投文字不再有下一次组装；它已由 `steer_received` 入账，账本仍是它的来历。
 - **被否**：①在已发出的 User 消息之后另开一条 User 消息——两条相邻的 User 消息正是本模块入口不变量要排除的形状；②由执行器在工具结果之后再调一次 `push_steer`——待投状态会住在 `Conversation` 之外，`fork` 要复刻第二份同样的记忆，两个家会漂移。
