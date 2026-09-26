@@ -184,13 +184,33 @@ impl ToolBench {
     }
 
     /// Routes one call: dedup, then the door its Effect names, then the
-    /// tool itself.
+    /// tool itself: `clear`, then the tool `tool_for` names, then
+    /// `account`, in order, on one thread.
     pub fn invoke(
         &mut self,
         call: &ToolCall,
         key: &IdemKey,
         now: kernel::TimeMs,
     ) -> Result<BenchOutcome, AxError> {
+        match self.clear(call, key, now)? {
+            Clearance::Answered(outcome) => Ok(outcome),
+            Clearance::Cleared(ticket) => {
+                let answered = self.tool_for(&ticket).and_then(|tool| tool.invoke(call));
+                self.account(ticket, answered)
+            }
+        }
+    }
+
+    /// Dedup, the doors, and the discard forecast's fence: everything
+    /// that decides whether a call may run, and reads or writes what
+    /// the calls before it left. A concurrent wave clears its calls one
+    /// at a time, in call order.
+    pub fn clear(
+        &mut self,
+        call: &ToolCall,
+        key: &IdemKey,
+        now: kernel::TimeMs,
+    ) -> Result<Clearance, AxError> {
         // Before any unreplayable effect (8.2). The judgement is the
         // kernel's and reads a set of keys; what this bench keeps beside
         // each key is the answer it gave.
@@ -199,9 +219,9 @@ impl ToolBench {
             && let Some(answered) = self.seen.get(key)
         {
             return match answered {
-                Ok(outcome) => Ok(BenchOutcome::Duplicate {
+                Ok(outcome) => Ok(Clearance::Answered(BenchOutcome::Duplicate {
                     outcome: outcome.clone(),
-                }),
+                })),
                 Err(refused) => Err(refused.clone()),
             };
         }
@@ -225,7 +245,7 @@ impl ToolBench {
         if name == "exec"
             && let Some(answered) = self.settled(kernel::gate::command(&self.taint))
         {
-            return Ok(answered);
+            return Ok(Clearance::Answered(answered));
         }
 
         // exec is forecast first. A hit does not refuse: it fences.
@@ -256,15 +276,30 @@ impl ToolBench {
         }
 
         if let Some(answered) = self.admit(call, &name, &effect, &subject)? {
-            return Ok(answered);
+            return Ok(Clearance::Answered(answered));
         }
+        Ok(Clearance::Cleared(Ticket {
+            key: *key,
+            name,
+            effect,
+            fenced,
+        }))
+    }
 
-        // Re-borrowed here: the forecast fence needed `self` mutably.
-        let Some(tool) = self.tools.get_mut(&name) else {
+    /// The tool a cleared call runs on. What comes back is the tool
+    /// rather than the bench, because the bench is not `Sync` (its
+    /// checkpoint holds a git repository handle) while a tool is: the
+    /// calls of one wave invoke their tools on several threads at once,
+    /// and none of them touches the dedup table or the taint.
+    ///
+    /// # Errors
+    /// A ticket naming a tool this bench does not hold.
+    pub fn tool_for(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError> {
+        let Some(tool) = self.tools.get(&ticket.name) else {
             return Err(AxError::failure(
                 AxCode::ToolUnavailable,
                 "invoke tool",
-                format!("no tool named `{name}` is registered"),
+                format!("no tool named `{}` is registered", ticket.name),
             )
             .with_nearby(self.tools.keys().cloned().collect())
             .with_recovery(
@@ -272,20 +307,60 @@ impl ToolBench {
                  this run holds",
             ));
         };
-        // The key is recorded with the answer it earned, so a retry after
-        // a gate refusal is not a replay, and a call the tool itself
-        // failed answers its replay the same way it answered the first
-        // time rather than running again. Outside content enters the run
-        // here and nowhere else, so every later call's doors read the
-        // taint it brought.
-        let answered = tool.invoke(call).and_then(|outcome| {
-            self.taint = outside::entered(&effect, &self.taint)?;
+        Ok(tool.as_ref())
+    }
+
+    /// Records what a cleared call answered. A concurrent wave accounts
+    /// its calls in call order, so the dedup table and the taint grow
+    /// in the order a serial wave grows them.
+    ///
+    /// The key is recorded with the answer it earned, so a retry after
+    /// a gate refusal is not a replay, and a call the tool itself
+    /// failed answers its replay the same way it answered the first
+    /// time rather than running again. Outside content enters the run
+    /// here and nowhere else, so every later call's doors read the
+    /// taint it brought.
+    ///
+    /// # Errors
+    /// The tool's own refusal, and outside content whose source label
+    /// is empty.
+    pub fn account(
+        &mut self,
+        ticket: Ticket,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<BenchOutcome, AxError> {
+        let answered = answered.and_then(|outcome| {
+            self.taint = outside::entered(&ticket.effect, &self.taint)?;
             Ok(outcome)
         });
-        self.seen.insert(*key, answered.clone());
+        self.seen.insert(ticket.key, answered.clone());
         let outcome = answered?;
-        Ok(BenchOutcome::Ran { outcome, fenced })
+        Ok(BenchOutcome::Ran {
+            outcome,
+            fenced: ticket.fenced,
+        })
     }
+}
+
+/// What `clear` decided about one call.
+#[derive(Debug)]
+pub enum Clearance {
+    /// The bench answered without running the tool: a replay, or a door
+    /// that refused or asked.
+    Answered(BenchOutcome),
+    /// The call may run; `tool_for` and then `account` take the ticket.
+    Cleared(Ticket),
+}
+
+/// A call `clear` let through: the tool `tool_for` names, and what
+/// `account` records the answer under.
+#[derive(Debug)]
+pub struct Ticket {
+    key: IdemKey,
+    name: String,
+    effect: Effect,
+    /// The commit the discard forecast fenced this call against.
+    fenced: Option<String>,
 }
 
 /// The memory crate owns its own error root; the turn layer speaks

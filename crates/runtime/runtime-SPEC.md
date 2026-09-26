@@ -197,7 +197,7 @@ impl Turn<Recording> {
 - **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名那条今天走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
 - **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
 - **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行与并行两个入口共用，所以账本字节与串行执行完全一致（`turn/tests/concurrent.rs` 对拍）。第一条非只读调用就是 fence：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
-- **生产驱动仍走串行 `execute`，因为生产的 invoke 还不是 `Sync`。** 最里一层已经是：`kernel::Tool::invoke` 取 `&self`，trait 要求 `Send + Sync`（kernel-SPEC 的工具面），`ExecTool` 把沙盒与 confinement、`BrowserTool` 把整张 tab、`McpTool` 把请求编号与连接各自放进自己的 `Mutex`，`KeptEdit` 的计数是一个原子数。仍挡着的两层，由里到外：`ToolBench::invoke` 取 `&mut self`，它在一次调用里先查后写去重表 `seen`，调用之后再并入 `taint`；`bin::assembly::driving::lane` 的 invoke 持有 `Cell`／`RefCell`（按位置派生 `IdemKey` 的计数、fence 记录、exec 计数）。换成 `execute_concurrent` 依次要：(1) `ToolBench::invoke` 拆成串行的「放行」（去重、各道门、forecast fence，取 `&mut self`，交出一张指向工具的放行单）与可并行的「执行」（`&self`），执行的答案按调用序回到串行的「记账」（写 `seen`、并入 `taint`）；(2) lane 在起跑前按调用序预分配 `IdemKey` 的位置，fence 记录与 exec 计数随答案按调用序累加；(3) `RunHooks::invoke` 换成 `ConcurrentInvoke`，`lifecycle` 改调 `execute_concurrent`，删掉串行入口。
+- **生产驱动仍走串行 `execute`，因为生产的 invoke 还不是 `Sync`。** 最里一层已经是：`kernel::Tool::invoke` 取 `&self`，trait 要求 `Send + Sync`（kernel-SPEC 的工具面），`ExecTool` 把沙盒与 confinement、`BrowserTool` 把整张 tab、`McpTool` 把请求编号与连接各自放进自己的 `Mutex`，`KeptEdit` 的计数是一个原子数。`ToolBench` 已拆成串行的 `clear`、交出工具供并行调用的 `tool_for`（`&self`）与串行的 `account`。仍挡着的一层是 `bin::assembly::driving::lane` 的 invoke 持有 `Cell`／`RefCell`（按位置派生 `IdemKey` 的计数、fence 记录、exec 计数）。换成 `execute_concurrent` 依次要：(1) lane 在起跑前按调用序预分配 `IdemKey` 的位置，fence 记录与 exec 计数随答案按调用序累加，一波开头的只读调用先逐条 `clear`、再经 `tool_for` 并行调工具、再按调用序 `account`——只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；(2) `RunHooks::invoke` 换成 `ConcurrentInvoke`，`lifecycle` 改调 `execute_concurrent`，删掉串行入口。
 
 #### 8-4-1 一句恢复语只许指向线上真有的动词（`prefix::segment::ANOTHER_ADDRESS`）
 
@@ -693,6 +693,19 @@ impl ToolBench {
     /// Govern → govern 门（同形；提案正文由调用的 `text` 参数取，进 action_desc 供人过目）；
     /// Deny → 以 refusal 作 tool_result 回流（不吞掉回合）；Escalate → BenchOutcome::Pending 回流（S3 无应答面）。
     pub fn invoke(&mut self, call: &ToolCall, key: &IdemKey, ctx: &GateContext)
+        -> Result<BenchOutcome, AxError>;
+    // invoke 是下面三段按序串起来的一条调用，三段各自公开，供并行的工具波分开用：
+    /// 串行的放行：去重、各道门、exec 的 forecast fence。答得出的（重放、门拒、门问）当场答，
+    /// 否则交出放行单 `Ticket`（键、工具名、效果、fence 的 oid —— 私有）。
+    pub fn clear(&mut self, call: &ToolCall, key: &IdemKey, now: TimeMs) -> Result<Clearance, AxError>;
+    pub enum Clearance { Answered(BenchOutcome), Cleared(Ticket) }
+    /// 可并行的执行：交出放行单指向的工具本身，调用方在任意线程上调它的 `invoke`，
+    /// 不碰 `seen` 与 `taint`。交出工具而不交出 bench：bench 不是 `Sync`（checkpoint 持有
+    /// git 仓库句柄），工具是。
+    pub fn tool_for(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError>;
+    /// 串行的记账：成功的答案先并入 taint，再连同失败一起记进 `seen`，返回 `Ran`。
+    /// 并行波按调用序逐条调它，所以 `seen` 与 `taint` 的写入次序与串行波相同。
+    pub fn account(&mut self, ticket: Ticket, answered: Result<ToolOutcome, AxError>)
         -> Result<BenchOutcome, AxError>;
     // T15 预编译路由（A1）：名字→处理器由 `kernel::tool::route::ToolRoute` 在登记时排序一次，
     // 每次调用**一次**二分探测即得处理器（meta/subject/invoke 同一把借用）；
