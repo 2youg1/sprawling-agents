@@ -82,6 +82,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     violations.extend(product_features(root)?);
     violations.extend(crate::bundle::restated(root)?);
     violations.extend(crate::platform::restated(root)?);
+    violations.extend(crate::attestation::unattested(root)?);
     Ok(violations)
 }
 

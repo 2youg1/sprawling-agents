@@ -122,7 +122,7 @@ pub(crate) fn with_suffix(suffix: &str) -> Option<&'static Platform> {
 }
 
 /// The workflow whose matrix builds one archive per row.
-const WORKFLOW: &str = ".github/workflows/release.yml";
+pub(crate) const WORKFLOW: &str = ".github/workflows/release.yml";
 
 /// The shim that picks a package for the machine running it.
 const SHIM: &str = "npm/shim.js";
