@@ -16,9 +16,11 @@ const RUNS = 10_000;
 const WORKING = 4;
 const RECORDS = 2_000;
 // What one record folded and one read of the working runs may spend in
-// a city of `RUNS` runs. A read that walks the table is linear in the
-// city, and at this size that is most of a frame per record.
-const BUDGET_US = 20;
+// a city of `RUNS` runs. A read that walks the `$state` table is linear
+// in the city, about 18 ms per record at this size; the fold itself
+// costs tens of microseconds of proxy traffic whatever the city holds,
+// so the budget is set well above that and far below the walk.
+const BUDGET_US = 500;
 
 function runId(index: number): RunId {
   return RunId.make(`00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`);
@@ -60,17 +62,23 @@ test("reading the working runs costs the working runs, not the city", () => {
     runs: Array.from({ length: RUNS }, (_, index) => listed(index)),
   };
   store.adoptCity(city);
+  // The first half warms the folds up, so the reading is the steady cost
+  // of a record rather than the engine compiling the path.
+  const records = Array.from({ length: 2 * RECORDS }, (_, each) =>
+    record(each % WORKING, each + 2, "tool_result"),
+  );
   let working = 0;
-  const start = performance.now();
-  for (let each = 0; each < RECORDS; each += 1) {
-    store.apply(record(each % WORKING, each + 2, "tool_result"));
+  let start = 0;
+  for (const [at, each] of records.entries()) {
+    if (at === RECORDS) start = performance.now();
+    store.apply(each);
     working += get(store.belief).live.length;
   }
   const perRecordUs = ((performance.now() - start) * 1000) / RECORDS;
-  store.apply(record(0, RECORDS + 2, "run_frozen"));
+  store.apply(record(0, 2 * RECORDS + 2, "run_frozen"));
   expect({
     working,
     after: get(store.belief).live.map((run) => run.run),
-  }).toEqual({ working: WORKING * RECORDS, after: [runId(1), runId(2), runId(3)] });
+  }).toEqual({ working: 2 * WORKING * RECORDS, after: [runId(1), runId(2), runId(3)] });
   expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
 });

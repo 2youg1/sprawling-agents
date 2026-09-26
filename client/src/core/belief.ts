@@ -30,7 +30,7 @@ import type { AxError, CityAnswer, Delta, EventRecord, LogLine, RunId, RunSummar
 import type { Belief, RunBelief } from "./belief/shape";
 import { LOG_WINDOW, merged } from "./belief/shape";
 import { runTable } from "./belief/runs.svelte";
-import { liveOf } from "./belief/live";
+import { livened, liveOf } from "./belief/live";
 export type { Belief, Notice, RunBelief } from "./belief/shape";
 
 function unseen(run: RunId, at: Seq): RunBelief {
@@ -202,8 +202,8 @@ export function createBelief(now: () => number): BeliefStore {
   let depth = 0;
 
   function written(next: Belief): void {
-    current = { ...next, live: liveOf(next.runs) };
-    if (depth === 0) store.set(current);
+    current = next;
+    if (depth === 0) store.set(next);
   }
 
   function batch(folds: () => void): void {
@@ -244,9 +244,11 @@ export function createBelief(now: () => number): BeliefStore {
       if (listed.has(run)) continue;
       if (was.local) runs[run] = { ...was, local: false };
     }
+    const table = runTable(runs);
     written({
       ...held,
-      runs: runTable(runs),
+      runs: table,
+      live: liveOf(table),
       halted: stated >= held.haltedAt ? [...city.halted] : held.halted,
       haltedAt: stated >= held.haltedAt ? stated : held.haltedAt,
     });
@@ -315,9 +317,13 @@ export function createBelief(now: () => number): BeliefStore {
   // holds; the table is the store's own, so the new top-level belief is
   // what tells a subscriber that something moved, and every run it holds
   // is a fresh object whenever its reading changed.
+  //
+  // The working runs move with it: the index holds the table's own
+  // reading of the run, so the words written into it in place reach a
+  // reader of the index too.
   function folded(held: Belief, run: RunId, next: RunBelief): void {
     held.runs[run] = next;
-    written({ ...held });
+    written({ ...held, live: livened(held.live, held.runs[run] ?? next) });
   }
 
   // One piece of what the model is producing. A page that joins in the
@@ -379,10 +385,12 @@ export function createBelief(now: () => number): BeliefStore {
     }
     const notices = merged(held.notices, error, TimeMs.make(now()));
     const run = error.action.startsWith("steer") ? held.runs[error.subject] : undefined;
-    if (run !== undefined && run.doing.kind !== "frozen") {
-      held.runs[error.subject] = { ...run, doing: PHASES.run_frozen };
-    }
-    written({ ...held, refusal: error, notices });
+    batch(() => {
+      if (run !== undefined && run.doing.kind !== "frozen") {
+        folded(held, run.run, { ...run, doing: PHASES.run_frozen });
+      }
+      written({ ...current, refusal: error, notices });
+    });
   }
 
   // The name the welcome carried: a page that only hears what happens
