@@ -9,8 +9,8 @@ use kernel::Locator;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site, Sweep,
-    Workbench, held,
+    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site,
+    Stamping, Sweep, Workbench, held,
 };
 use super::{Assignment, Given};
 
@@ -119,6 +119,19 @@ impl RunWorker {
         // row of locals every phase below would then have to be handed
         // one at a time.
         let mut site = self.stand_up(agreed, &at, &given)?;
+        site.place_tree(
+            &at.addr,
+            &super::super::workbench::Placing {
+                city_root: &self.city_root,
+                city: self.city_hash()?,
+                clock: &*self.clock,
+            },
+            &mut Stamping {
+                ledger: &mut self.ledger,
+                command: self.doorstep.entrance.carrying(),
+                clock: &*self.clock,
+            },
+        )?;
         let desks = self.open_desks(&site, &at.addr)?;
 
         // What the model may see, what routes the call it makes, and
@@ -128,13 +141,31 @@ impl RunWorker {
         // what to read to pick it up again: one phase, because the
         // handoff quotes the plan and the plan is what the prefix was
         // assembled for.
-        let (plan, handoff) = self.freeze_plan(&site, &workbench, &at, given)?;
+        let inherited = self.inherited(&at, site.run_id)?;
+        let (plan, handoff) = super::super::freezing::Freezing {
+            city_root: &self.city_root,
+            cas: &mut self.cas,
+            inherited,
+            carried_from: self.origins.carried_from(&at.addr),
+        }
+        .freeze_plan(&site, &workbench, &at, given)?;
+        // The freeze begins the room's session: what a carried session
+        // was owed is spent, and this run is the room's last.
+        self.origins.started(&at.addr, site.run_id);
         // The probe's second reading, over what this successor was
         // handed and before it takes a turn: the comparison with the
         // predecessor's answers is what says whether the handoff lost
         // something.
         if let Some(handed) = at.succession.as_ref() {
-            self.probe_after(&mut site, &plan, handed)?;
+            site.probe_after(
+                &plan,
+                handed,
+                &mut Stamping {
+                    ledger: &mut self.ledger,
+                    command: self.doorstep.entrance.carrying(),
+                    clock: &*self.clock,
+                },
+            )?;
         }
 
         let fence_scope = site.fence_scope()?;
@@ -177,7 +208,7 @@ impl RunWorker {
             fence_scope,
             run_id: site.run_id,
             of: site.provenance(self.city_hash()?, &at.addr),
-            sieving: self.sieving_for(&site, &at.addr)?,
+            sieving: super::super::driving::Sieving::for_run(&self.city_root, &site, &at.addr)?,
             member,
             plan,
             handoff,

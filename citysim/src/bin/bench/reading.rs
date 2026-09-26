@@ -35,20 +35,22 @@ impl MachineClass {
 }
 
 /// The heavy-load classes this bench Main measures, one scenario each.
-/// The fourth class, multi-run parallel, is `sprawling`'s relay
+/// The fifth class, multi-run parallel, is `sprawling`'s relay
 /// instrument (citysim-SPEC.md section 8-6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Load {
     LargeLedgerFold,
     LargeWorktreePlacement,
+    KeptWorktreeReclaim,
     LongSessionForwarding,
 }
 
 impl Load {
     /// Every variant, so a caller that walks the roster cannot leave one out.
-    pub(crate) const ALL: [Load; 3] = [
+    pub(crate) const ALL: [Load; 4] = [
         Load::LargeLedgerFold,
         Load::LargeWorktreePlacement,
+        Load::KeptWorktreeReclaim,
         Load::LongSessionForwarding,
     ];
 
@@ -57,6 +59,7 @@ impl Load {
         match self {
             Load::LargeLedgerFold => "large_ledger_fold",
             Load::LargeWorktreePlacement => "large_worktree_placement",
+            Load::KeptWorktreeReclaim => "kept_worktree_reclaim",
             Load::LongSessionForwarding => "long_session_forwarding",
         }
     }

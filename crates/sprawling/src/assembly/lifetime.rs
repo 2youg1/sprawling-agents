@@ -371,7 +371,7 @@ mod tests {
             .unwrap();
         let trees = memory::Worktrees::open(dir.path()).unwrap();
         let name = memory::WorktreeName::parse("run-1").unwrap();
-        drop(trees.claim(&name).unwrap());
+        drop(trees.claim(&name, &[]).unwrap());
 
         drop(
             RunWorker::new(

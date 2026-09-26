@@ -12,7 +12,7 @@ use kernel::{Address, AxCode, AxError};
 use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot, SegmentSource};
 use runtime::run::RunPlan;
 
-use super::{Assignment, Given, RunWorker, Site, Workbench, city_segment, held};
+use super::{Assignment, Given, Site, Workbench, city_segment, held};
 use model_note::model_note;
 use run_slot::{Predecessor, run_segment};
 
@@ -170,33 +170,26 @@ fn addressed(city_root: &Path, path: &Path) -> Result<Address, AxError> {
     Address::parse(&spelled)
 }
 
-impl RunWorker {
-    /// Puts one desk's effects on the ledger, and only then makes the
-    /// change they announce.
-    ///
-    /// This is the one door for all five of them. The change arrives as
-    /// the return value of `Landing::record`, which appends first, so
-    /// there is no expression in this file that reaches the city before
-    /// the history - and the match below is exhaustive, so a new kind of
-    /// change has to say here what it is.
-    ///
-    /// # Errors
-    /// Propagates the first line the ledger refuses, in which case
-    /// nothing changes; then whatever delivering, writing the plan or
-    /// filing an entry reports.
-    /// Freezes what this run is: the plan it drives on, and the handoff
-    /// that says what to read to pick it up again.
-    ///
-    /// One phase because the two are one decision. The prefix is
-    /// assembled for this plan and frozen with it, the handoff quotes
-    /// the plan's own task line, and the job locator ends up in both -
-    /// pinned in the store, so what a resumed run reads is the bytes the
-    /// run segment carried rather than a file somebody edited since.
-    ///
-    /// # Errors
-    /// Propagates a city or run segment that will not read, a norm on
-    /// the must-read list that will not open, a store that will not take
-    /// the bytes, and a handoff the runtime refuses.
+/// What freezing a plan reads from outside the run's own site, as
+/// values rather than as the worker that holds them, so a plan can be
+/// frozen on whichever thread prepares the run (sprawling-SPEC.md 8-93).
+pub(super) struct Freezing<'a> {
+    pub(super) city_root: &'a Path,
+    /// The store the prefix and the norms are pinned in. Content
+    /// addressed, so a second handle on the same store writes the same
+    /// files.
+    pub(super) cas: &'a mut memory::Cas,
+    /// The conversation this run opens with, rebuilt where the ledger
+    /// and its index are held, because that is also where its lineage
+    /// line is written.
+    pub(super) inherited: Vec<kernel::ChatMessage>,
+    /// The run a carried session continues from, when the room's last
+    /// session was carried rather than begun fresh; read from the
+    /// session origins where the ledger is held, as `inherited` is.
+    pub(super) carried_from: Option<kernel::RunId>,
+}
+
+impl Freezing<'_> {
     /// Puts every segment of a frozen prefix into the store, so the
     /// hashes `prompt_assembled` records can be read back as text.
     ///
@@ -235,7 +228,7 @@ impl RunWorker {
             brief,
             Predecessor {
                 room: &at.addr,
-                run: at.predecessor().or(self.origins.carried_from(&at.addr)),
+                run: at.predecessor().or(self.carried_from),
             },
         )?);
         if let Some(note) = model_note(&self.city_root, &site.provider, &site.model.id)? {
@@ -244,8 +237,21 @@ impl RunWorker {
         Ok(slot)
     }
 
+    /// Freezes what this run is: the plan it drives on, and the handoff
+    /// that says what to read to pick it up again.
+    ///
+    /// One phase because the two are one decision. The prefix is
+    /// assembled for this plan and frozen with it, the handoff quotes
+    /// the plan's own task line, and the job locator ends up in both -
+    /// pinned in the store, so what a resumed run reads is the bytes the
+    /// run segment carried rather than a file somebody edited since.
+    ///
+    /// # Errors
+    /// Propagates a city or run segment that will not read, a norm on
+    /// the must-read list that will not open, a store that will not take
+    /// the bytes, and a handoff the runtime refuses.
     pub(super) fn freeze_plan(
-        &mut self,
+        mut self,
         site: &Site,
         workbench: &Workbench,
         at: &Assignment,
@@ -279,7 +285,6 @@ impl RunWorker {
                 .render()
                 .as_bytes(),
         );
-        let inherited = self.inherited(at, site.run_id)?;
         let prefix = FrozenPrefix::assemble(
             city_segment(&self.city_root)?.freeze(SegmentSlot::City),
             building_segment(&self.city_root, addr, site.building.addr())?
@@ -305,7 +310,7 @@ impl RunWorker {
             job: job.clone(),
             parent: at.parent,
             predecessor: at.predecessor(),
-            inherited,
+            inherited: std::mem::take(&mut self.inherited),
             shape: runtime::turn::CallShape {
                 model: site.model.id.clone(),
                 // The model's own ceiling, not a number chosen here.
@@ -351,7 +356,6 @@ impl RunWorker {
         }
         must_read.push(job);
         let handoff = self.frozen_handoff(&plan, must_read)?;
-        self.origins.started(addr, site.run_id);
         Ok((plan, handoff))
     }
 }

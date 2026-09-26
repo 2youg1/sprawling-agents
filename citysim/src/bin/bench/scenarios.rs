@@ -3,10 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Three of the four load scenarios: large-ledger fold, large-worktree
-//! placement, and long-session streaming forward.
+//! Four of the five load scenarios: large-ledger fold, large-worktree
+//! placement, kept-worktree reclaim, and long-session streaming forward.
 //!
-//! The fourth, multi-run parallel, is measured inside `sprawling` by
+//! The fifth, multi-run parallel, is measured inside `sprawling` by
 //! `instrument_relay_round_trip`, which drives the accounting loop the
 //! city runs. Its relay face is `pub(crate)`, so a scenario here could
 //! only time a copy of that loop, and a copy reads what the copy costs
@@ -64,6 +64,7 @@ pub(crate) fn all(
         let of_load = match load {
             Load::LargeLedgerFold => large_ledger_fold(scratch, fixture, machine)?,
             Load::LargeWorktreePlacement => large_worktree_placement(scratch, fixture, machine)?,
+            Load::KeptWorktreeReclaim => kept_worktree_reclaim(scratch, fixture, machine)?,
             Load::LongSessionForwarding => long_session_forwarding(fixture, machine)?,
         };
         readings.extend(of_load);
@@ -110,7 +111,65 @@ fn large_worktree_placement(
     fixture: &Fixture,
     machine: MachineClass,
 ) -> Result<Vec<Reading>, String> {
-    let city_root = scratch.join("placement");
+    let trees = placement_city(&scratch.join("placement"), fixture)?;
+    let mut times = Vec::new();
+    for i in 0..fixture.placements {
+        let name = node(i)?;
+        let t0 = super::stamp();
+        let lease = trees
+            .claim(&name, &[])
+            .map_err(|why| format!("{}", why.into_ax()))?;
+        times.push(t0.elapsed());
+        trees
+            .release(lease)
+            .map_err(|why| format!("{}", why.into_ax()))?;
+    }
+    Ok(vec![Reading::of(
+        Load::LargeWorktreePlacement,
+        SubMetric::Whole,
+        machine,
+        times,
+    )?])
+}
+
+/// Kept-worktree reclaim: a node's second run takes back the tree its
+/// first run left, with the trunk unmoved in between. Priced whole for
+/// the same reason as the first placement.
+fn kept_worktree_reclaim(
+    scratch: &Path,
+    fixture: &Fixture,
+    machine: MachineClass,
+) -> Result<Vec<Reading>, String> {
+    let trees = placement_city(&scratch.join("reclaim"), fixture)?;
+    let name = node(0)?;
+    let first = trees
+        .claim(&name, &[])
+        .map_err(|why| format!("{}", why.into_ax()))?;
+    trees
+        .release(first)
+        .map_err(|why| format!("{}", why.into_ax()))?;
+    let mut times = Vec::new();
+    for _ in 0..fixture.placements {
+        let t0 = super::stamp();
+        let lease = trees
+            .claim(&name, &[])
+            .map_err(|why| format!("{}", why.into_ax()))?;
+        times.push(t0.elapsed());
+        trees
+            .release(lease)
+            .map_err(|why| format!("{}", why.into_ax()))?;
+    }
+    Ok(vec![Reading::of(
+        Load::KeptWorktreeReclaim,
+        SubMetric::Whole,
+        machine,
+        times,
+    )?])
+}
+
+/// A city of `fixture.tree_files` files under `bulk`, with the base
+/// commit every worktree branches from.
+fn placement_city(city_root: &Path, fixture: &Fixture) -> Result<Worktrees, String> {
     let bulk = city_root.join("bulk");
     std::fs::create_dir_all(&bulk).map_err(|why| format!("{why}"))?;
     let bytes = usize::try_from(fixture.tree_file_bytes).map_err(|why| format!("{why}"))?;
@@ -128,31 +187,15 @@ fn large_worktree_placement(
             effort: Some(Effort::Low),
         },
     );
-    let mut checkpoint =
-        Checkpoint::open(&city_root).map_err(|why| format!("{}", why.into_ax()))?;
-    checkpoint
+    Checkpoint::open(city_root)
+        .map_err(|why| format!("{}", why.into_ax()))?
         .ensure_base(&["bulk".to_owned()], TimeMs::new(1_700_000_000_000), &owner)
         .map_err(|why| format!("{}", why.into_ax()))?;
-    let trees = Worktrees::open(&city_root).map_err(|why| format!("{}", why.into_ax()))?;
-    let mut times = Vec::new();
-    for i in 0..fixture.placements {
-        let name = WorktreeName::parse(&format!("node-{i}"))
-            .map_err(|why| format!("{}", why.into_ax()))?;
-        let t0 = super::stamp();
-        let lease = trees
-            .claim(&name)
-            .map_err(|why| format!("{}", why.into_ax()))?;
-        times.push(t0.elapsed());
-        trees
-            .release(lease)
-            .map_err(|why| format!("{}", why.into_ax()))?;
-    }
-    Ok(vec![Reading::of(
-        Load::LargeWorktreePlacement,
-        SubMetric::Whole,
-        machine,
-        times,
-    )?])
+    Worktrees::open(city_root).map_err(|why| format!("{}", why.into_ax()))
+}
+
+fn node(i: u32) -> Result<WorktreeName, String> {
+    WorktreeName::parse(&format!("node-{i}")).map_err(|why| format!("{}", why.into_ax()))
 }
 
 /// Long-session streaming forward: every event of one long session,

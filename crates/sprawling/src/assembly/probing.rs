@@ -20,11 +20,11 @@
 //! which is the truth about a successor nobody could ask.
 
 use kernel::event::record::EvalRun;
-use kernel::{AxError, EventKind, Model, RunId};
+use kernel::{AxError, EventKind, Ledger, Model, RunId};
 
 use accounting::effect;
 
-use super::{Handover, RunWorker, Site};
+use super::{Handover, RunWorker, Site, Stamping};
 
 pub(super) mod probe;
 
@@ -148,24 +148,26 @@ impl RunWorker {
             }
         }
     }
+}
 
+impl Site {
     /// The second reading, over the successor's frozen prefix, and the
     /// `eval_run` line comparing it with the first.
     ///
     /// # Errors
     /// Propagates a ledger that refuses the line. The model call itself
     /// never fails this: an unanswerable successor reads as empty.
-    pub(super) fn probe_after(
+    pub(super) fn probe_after<L: Ledger>(
         &mut self,
-        site: &mut Site,
         plan: &runtime::RunPlan,
         handed: &Handover,
+        lines: &mut Stamping<'_, L>,
     ) -> Result<(), AxError> {
         let Ok(probe) = probe::handoff_probe() else {
             return Ok(());
         };
         let count = probe.questions().len();
-        let answered = site.adapter.as_mut().and_then(|model| {
+        let answered = self.adapter.as_mut().and_then(|model| {
             let request = kernel::ModelRequest {
                 policy: plan.policy.clone(),
                 segments: plan.prefix.segment_hashes(),
@@ -192,10 +194,10 @@ impl RunWorker {
         };
         let after = probe.answered(answers)?;
         let comparison = probe::compare(&handed.before, &after)?;
-        self.record_for(
+        lines.record_for(
             plan.run,
             effect::Line {
-                who: site.who.clone(),
+                who: self.who.clone(),
                 addr: plan.addr.clone(),
                 kind: EventKind::EvalRun,
                 data: kernel::Payload::of(&eval_payload(

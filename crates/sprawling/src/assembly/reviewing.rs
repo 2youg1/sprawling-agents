@@ -34,7 +34,8 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let (addr, who, run_id, mode) = (&at.addr, site.who.as_str(), site.run_id, at.mode);
         let write_root = site.write_root.as_path();
-        let fence_scope = site.fence_scope()?.join(" ");
+        let scopes = site.fence_scope()?;
+        let fence_scope = scopes.join(" ");
         let fence_scope = fence_scope.as_str();
         // What the run asked of the request register. Opening commits
         // the run's own tree first, because the record names the commit
@@ -58,7 +59,12 @@ impl RunWorker {
                         // merge (memory-SPEC 8-8).
                         let at = memory::Checkpoint::open(write_root)
                             .map_err(memory::MemoryError::into_ax)?
-                            .land(self.clock.now()?, &of, &format!("offer: {fence_scope}"))
+                            .land(
+                                &scopes,
+                                self.clock.now()?,
+                                &of,
+                                &format!("offer: {fence_scope}"),
+                            )
                             .map_err(memory::MemoryError::into_ax)?;
                         let request = collab::OpenRequest {
                             node: collab::NodeId::parse(&branch)?,

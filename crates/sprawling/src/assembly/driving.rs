@@ -5,7 +5,7 @@
 
 //! One drive, and what it leaves behind.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use kernel::RunId;
 use kernel::{Address, AxError};
@@ -127,7 +127,7 @@ pub(crate) struct Driven {
     pub(crate) raised: Vec<kernel::ApprovalItem>,
 }
 
-impl RunWorker {
+impl Sieving {
     /// What the sieve needs from this city for one run.
     ///
     /// The store is a second handle on the same CAS rather than a loan
@@ -140,12 +140,12 @@ impl RunWorker {
     ///
     /// # Errors
     /// Propagates a store that will not open.
-    pub(in crate::assembly) fn sieving_for(
-        &self,
+    pub(in crate::assembly) fn for_run(
+        city_root: &Path,
         site: &Site,
         addr: &Address,
     ) -> Result<Sieving, AxError> {
-        let cas = memory::Cas::open(&kernel::layout::CityLayout::new(&self.city_root).cas())
+        let cas = memory::Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
         Ok(Sieving {
             cas,
@@ -155,7 +155,9 @@ impl RunWorker {
             history: runtime::SieveHistory::default(),
         })
     }
+}
 
+impl RunWorker {
     /// The four handles a drive takes from this worker.
     ///
     /// Cloned rather than lent, so N drives can hold them at once and

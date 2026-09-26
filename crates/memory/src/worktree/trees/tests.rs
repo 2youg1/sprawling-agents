@@ -47,8 +47,8 @@ fn two_nodes_get_two_trees_and_neither_sees_the_others_work() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
 
-    let first = trees.claim(&name("node-1")).unwrap();
-    let second = trees.claim(&name("node-2")).unwrap();
+    let first = trees.claim(&name("node-1"), &[]).unwrap();
+    let second = trees.claim(&name("node-2"), &[]).unwrap();
     assert_ne!(first.path(), second.path());
 
     std::fs::write(first.path().join("lab").join("notes.md"), b"mine\n").unwrap();
@@ -62,16 +62,16 @@ fn two_nodes_get_two_trees_and_neither_sees_the_others_work() {
 fn one_node_holds_one_tree_and_the_second_claim_is_refused_by_name() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
-    let held = trees.claim(&name("node-1")).unwrap();
+    let held = trees.claim(&name("node-1"), &[]).unwrap();
 
-    let err = trees.claim(&name("node-1")).unwrap_err();
+    let err = trees.claim(&name("node-1"), &[]).unwrap_err();
     let ax = err.into_ax();
     assert_eq!(ax.code(), &kernel::AxCode::WorktreeBusy);
     assert!(ax.subject().contains("node-1"));
     assert!(ax.recovery().contains("release"));
 
     trees.release(held).unwrap();
-    trees.claim(&name("node-1")).unwrap();
+    trees.claim(&name("node-1"), &[]).unwrap();
 }
 
 /// The ceiling asks how big the work is, and a city's own bookkeeping
@@ -93,7 +93,7 @@ fn the_city_s_own_bookkeeping_does_not_count_against_the_ceiling() {
         "the ledger is not somebody's working tree: {} bytes",
         measured.get()
     );
-    trees.claim(&name("node-1")).unwrap();
+    trees.claim(&name("node-1"), &[]).unwrap();
 }
 
 /// A release interrupted between unregistering and deleting, or a
@@ -104,12 +104,12 @@ fn the_city_s_own_bookkeeping_does_not_count_against_the_ceiling() {
 fn a_registered_tree_with_no_directory_is_taken_back_rather_than_locked_away() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
-    let lease = trees.claim(&name("node-1")).unwrap();
+    let lease = trees.claim(&name("node-1"), &[]).unwrap();
     let path = lease.path().to_path_buf();
     std::fs::remove_dir_all(&path).unwrap();
     assert_eq!(trees.live().unwrap().len(), 1, "git still lists it");
 
-    let again = trees.claim(&name("node-1")).unwrap();
+    let again = trees.claim(&name("node-1"), &[]).unwrap();
     assert!(again.path().join("lab").join("notes.md").exists());
 }
 
@@ -117,16 +117,16 @@ fn a_registered_tree_with_no_directory_is_taken_back_rather_than_locked_away() {
 fn a_node_that_comes_back_finds_what_it_committed_and_not_what_it_did_not() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
-    let lease = trees.claim(&name("node-1")).unwrap();
+    let lease = trees.claim(&name("node-1"), &[]).unwrap();
     std::fs::write(lease.path().join("lab").join("notes.md"), b"committed\n").unwrap();
     Checkpoint::open(lease.path())
         .unwrap()
-        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+        .land(&[], TimeMs::new(2_000), &owner(), "checkpoint: lab")
         .unwrap();
     std::fs::write(lease.path().join("lab").join("draft.md"), b"uncommitted\n").unwrap();
     trees.release(lease).unwrap();
 
-    let again = trees.claim(&name("node-1")).unwrap();
+    let again = trees.claim(&name("node-1"), &[]).unwrap();
     assert_eq!(
         std::fs::read_to_string(again.path().join("lab").join("notes.md")).unwrap(),
         "committed\n",
@@ -149,7 +149,7 @@ fn a_city_with_no_checkpoint_is_told_why_it_cannot_have_a_tree() {
     git2::Repository::init(dir.path()).unwrap();
     let trees = Worktrees::open(dir.path()).unwrap();
 
-    let err = trees.claim(&name("node-1")).unwrap_err().into_ax();
+    let err = trees.claim(&name("node-1"), &[]).unwrap_err().into_ax();
     assert!(err.subject().contains("no checkpoint"));
 }
 
@@ -157,7 +157,7 @@ fn a_city_with_no_checkpoint_is_told_why_it_cannot_have_a_tree() {
 fn a_verified_node_lands_in_the_city_and_a_stale_one_is_sent_back() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
-    let lease = trees.claim(&name("node-1")).unwrap();
+    let lease = trees.claim(&name("node-1"), &[]).unwrap();
     std::fs::write(
         lease.path().join("lab").join("notes.md"),
         b"from the node\n",
@@ -165,7 +165,7 @@ fn a_verified_node_lands_in_the_city_and_a_stale_one_is_sent_back() {
     .unwrap();
     Checkpoint::open(lease.path())
         .unwrap()
-        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+        .land(&[], TimeMs::new(2_000), &owner(), "checkpoint: lab")
         .unwrap();
 
     trees
@@ -180,16 +180,16 @@ fn a_verified_node_lands_in_the_city_and_a_stale_one_is_sent_back() {
     );
 
     // A second node that branched before the merge is now behind.
-    let stale = trees.claim(&name("node-2")).unwrap();
+    let stale = trees.claim(&name("node-2"), &[]).unwrap();
     std::fs::write(dir.path().join("lab").join("other.md"), b"trunk moved\n").unwrap();
     Checkpoint::open(dir.path())
         .unwrap()
-        .land(TimeMs::new(3_000), &owner(), "checkpoint: lab")
+        .land(&[], TimeMs::new(3_000), &owner(), "checkpoint: lab")
         .unwrap();
     std::fs::write(stale.path().join("lab").join("notes.md"), b"stale work\n").unwrap();
     Checkpoint::open(stale.path())
         .unwrap()
-        .land(TimeMs::new(4_000), &owner(), "checkpoint: lab")
+        .land(&[], TimeMs::new(4_000), &owner(), "checkpoint: lab")
         .unwrap();
 
     let err = trees.plan_merge(stale.name()).unwrap_err().into_ax();
@@ -215,11 +215,11 @@ fn a_city_with_no_repository_is_refused_rather_than_given_one() {
 fn a_merge_lands_as_a_two_parent_commit_carrying_the_merging_runs_trailers() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
-    let lease = trees.claim(&name("node-1")).unwrap();
+    let lease = trees.claim(&name("node-1"), &[]).unwrap();
     std::fs::write(lease.path().join("lab").join("notes.md"), b"from node\n").unwrap();
     Checkpoint::open(lease.path())
         .unwrap()
-        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+        .land(&[], TimeMs::new(2_000), &owner(), "checkpoint: lab")
         .unwrap();
 
     trees
@@ -263,11 +263,11 @@ fn a_person_who_looked_is_named_from_the_repositorys_own_config() {
         config.set_str("user.name", "Ada Lovelace").unwrap();
         config.set_str("user.email", "ada@example.org").unwrap();
     }
-    let lease = trees.claim(&name("node-1")).unwrap();
+    let lease = trees.claim(&name("node-1"), &[]).unwrap();
     std::fs::write(lease.path().join("lab").join("notes.md"), b"from node\n").unwrap();
     Checkpoint::open(lease.path())
         .unwrap()
-        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+        .land(&[], TimeMs::new(2_000), &owner(), "checkpoint: lab")
         .unwrap();
     trees
         .plan_merge(lease.name())
@@ -304,7 +304,7 @@ fn a_tree_is_never_placed_through_a_link() {
     if !crate::alias::tests::place_link(true, &kept, &home.join("node-1")) {
         return;
     }
-    let err = trees.claim(&name("node-1")).unwrap_err();
+    let err = trees.claim(&name("node-1"), &[]).unwrap_err();
     assert_eq!(err.into_ax().code(), &kernel::AxCode::OutsideWriteDomain);
     assert_eq!(
         std::fs::read_dir(&kept).unwrap().count(),
@@ -317,7 +317,7 @@ fn a_tree_is_never_placed_through_a_link() {
 fn a_merge_keeps_the_persons_uncommitted_edit_and_names_it_in_the_refusal() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
-    let lease = trees.claim(&name("node-1")).unwrap();
+    let lease = trees.claim(&name("node-1"), &[]).unwrap();
     std::fs::write(
         lease.path().join("lab").join("notes.md"),
         b"from the node\n",
@@ -325,7 +325,7 @@ fn a_merge_keeps_the_persons_uncommitted_edit_and_names_it_in_the_refusal() {
     .unwrap();
     Checkpoint::open(lease.path())
         .unwrap()
-        .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")
+        .land(&[], TimeMs::new(2_000), &owner(), "checkpoint: lab")
         .unwrap();
     std::fs::write(
         dir.path().join("lab").join("notes.md"),

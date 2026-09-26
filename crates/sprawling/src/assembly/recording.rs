@@ -17,6 +17,48 @@ use accounting::effect;
 
 use super::RunWorker;
 
+/// A ledger a dispatch's preparation writes through, with the key of the
+/// command that dispatch answers, so a line written without the worker
+/// is stamped by the rule [`RunWorker::record_for`] follows and a restart
+/// still recognises the command from it (sprawling-SPEC.md 8-93).
+pub(in crate::assembly) struct Stamping<'a, L> {
+    pub(in crate::assembly) ledger: &'a mut L,
+    pub(in crate::assembly) command: Option<kernel::IdemKey>,
+    /// What time it is, for each line's stamp.
+    pub(in crate::assembly) clock: &'a (dyn accounting::Clock + Send + Sync),
+}
+
+impl<L: Ledger> Stamping<'_, L> {
+    /// Appends one line on behalf of `run`, stamped with the command's
+    /// key when there is one.
+    ///
+    /// # Errors
+    /// Propagates a payload that will not take the key, a clock this
+    /// machine will not read, and the ledger's refusal of the line.
+    pub(in crate::assembly) fn record_for(
+        &mut self,
+        run: RunId,
+        line: effect::Line,
+    ) -> Result<(), AxError> {
+        let effect::Line {
+            who,
+            addr,
+            kind,
+            data,
+        } = line;
+        self.ledger.append(EventDraft {
+            run,
+            t: self.clock.now()?,
+            who,
+            addr: Some(addr),
+            kind,
+            data: super::commanding::entrance::stamped(self.command, data)?,
+            ig: false,
+        })?;
+        Ok(())
+    }
+}
+
 impl RunWorker {
     /// Writes one diagnostic line, anchored to where the ledger stands.
     pub(super) fn note(&mut self, level: runtime::diagnostics::Level, module: &str, message: &str) {
@@ -82,7 +124,7 @@ impl RunWorker {
         // The key of the command in flight goes on the record it is
         // writing, and nowhere else: that is how a restarted city reads
         // out of its own history what it has already carried out.
-        let data = self.doorstep.entrance.stamp(data)?;
+        let data = super::commanding::entrance::stamped(self.doorstep.entrance.carrying(), data)?;
         let draft = EventDraft {
             run: RunId::CITY,
             t: self.clock.now()?,
@@ -141,7 +183,7 @@ impl RunWorker {
             kind,
             data,
         } = line;
-        let data = self.doorstep.entrance.stamp(data)?;
+        let data = super::commanding::entrance::stamped(self.doorstep.entrance.carrying(), data)?;
         self.ledger.append(EventDraft {
             run,
             t: self.clock.now()?,

@@ -74,13 +74,17 @@ impl Worktrees {
     /// # Errors
     /// Refuses a tree somebody holds, a city whose working tree exceeds
     /// the ceiling, and a repository with no commit to branch from.
-    pub fn claim(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError> {
+    pub fn claim(
+        &self,
+        name: &WorktreeName,
+        scopes: &[String],
+    ) -> Result<WorktreeLease, MemoryError> {
         match self.standing(name)? {
             Standing::Held => Err(MemoryError::WorktreeBusy {
                 name: name.as_str().to_owned(),
                 detail: "another node holds this tree".to_owned(),
             }),
-            Standing::Kept(tree) => self.reattach(name, &tree),
+            Standing::Kept(tree) => self.reattach(name, &tree, scopes),
             Standing::Absent => self.place(name),
         }
     }

@@ -10,7 +10,7 @@ use kernel::{AxError, Locator};
 use runtime::handoff::Handoff;
 use runtime::run::RunPlan;
 
-use super::super::RunWorker;
+use super::Freezing;
 use super::run_slot::task_line;
 
 /// What a section says when the room's handoff did not write it. Plain
@@ -18,7 +18,7 @@ use super::run_slot::task_line;
 /// and sends the successor looking for something nobody wrote.
 const NOT_RECORDED: &str = "not recorded: the room's Handoff.md does not say";
 
-impl RunWorker {
+impl Freezing<'_> {
     /// The handoff for `plan`, built from its room's `Handoff.md` when
     /// that file was filled in, and appending the file's bytes, pinned in
     /// the store, to `must_read`.
@@ -41,7 +41,7 @@ impl RunWorker {
             "dispatched from the control surface; transcript at {}",
             transcript.as_str()
         );
-        let Some(text) = city::handoff(&self.city_root, &plan.addr)? else {
+        let Some(text) = city::handoff(self.city_root, &plan.addr)? else {
             return Handoff::new(
                 must_read,
                 task_line(plan),

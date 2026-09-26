@@ -250,7 +250,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let trees = city(dir.path());
         // The process died holding the lease: nothing released it.
-        drop(trees.claim(&name("run-1")).unwrap());
+        drop(trees.claim(&name("run-1"), &[]).unwrap());
         drop(trees);
 
         let swept = Worktrees::sweep_abandoned(dir.path(), &[]).unwrap();
@@ -273,7 +273,7 @@ mod tests {
     fn a_fence_ref_survives_the_sweep() {
         let dir = tempfile::tempdir().unwrap();
         let trees = city(dir.path());
-        drop(trees.claim(&name("run-1")).unwrap());
+        drop(trees.claim(&name("run-1"), &[]).unwrap());
         drop(trees);
         std::fs::write(dir.path().join("lab").join("notes.md"), b"second\n").unwrap();
         Checkpoint::open(dir.path())
@@ -318,8 +318,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let elsewhere = tempfile::tempdir().unwrap();
         let trees = city(dir.path());
-        let live = trees.claim(&name("run-1")).unwrap();
-        drop(trees.claim(&name("run-2")).unwrap());
+        let live = trees.claim(&name("run-1"), &[]).unwrap();
+        drop(trees.claim(&name("run-2"), &[]).unwrap());
         drop(trees);
         let repo = git2::Repository::open(dir.path()).unwrap();
         repo.worktree("mine", &elsewhere.path().join("mine"), None)

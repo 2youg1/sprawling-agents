@@ -21,4 +21,4 @@ pub use mcp::{MESSAGE_CEILING, Received, read_one_message};
 pub use mcp::{PROTOCOL_VERSION, digits_for_floats, handshake};
 pub use mcp::{Rpc, ScriptedOutbound, tools_from};
 #[cfg(feature = "conformance")]
-pub use mcp::{counting_starts, echoing};
+pub use mcp::{counting_starts, echoing, gated};

@@ -207,6 +207,8 @@ impl Outbound for McpLink { /* 逐传输转发 call／notify */ }
 // mcp::redeeming：一栋楼写在 server 旁边的成对表，引用已兑付；三种传输共用
 #[cfg(any(test, feature = "conformance"))]
 pub fn echoing(answer: &str) -> (String, Vec<String>); // 对每行都回同一个结果的子进程
+#[cfg(any(test, feature = "conformance"))]
+pub fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>); // 握手在 gate 文件出现前不作答
 ```
 
 - **传输住协议旁边，不住组合根**：三种传输与握手说同一个协议，差别只在字节去哪。放在装配层时，`protocol` 定义了 `Outbound` 缝却看不见它的生产实现；组合根只剩「一栋楼按配置连哪几台 server」（`bin::assembly::mcp`）。拒绝的另一方案是把传输留在 `sprawling`、只搬 `McpLink`：那样 `McpLink` 的三个分支仍指向另一个 crate 的私有类型，搬不动。

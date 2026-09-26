@@ -67,25 +67,10 @@ impl Entrance {
         }
     }
 
-    /// Puts the key of the command in flight on the record it is
-    /// writing, so a restart reads back what this city has done.
-    ///
-    /// A record written outside a command - a schedule firing, a run
-    /// settling on its own - carries no key, because no client is
-    /// holding one for it.
-    ///
-    /// # Errors
-    /// Propagates the payload's own refusal of a value it cannot carry.
-    pub(in crate::assembly) fn stamp(&self, data: Payload) -> Result<Payload, AxError> {
-        let Some(key) = self.carrying else {
-            return Ok(data);
-        };
-        let mut map = data.as_map().clone();
-        map.insert(
-            IDEM_FIELD.to_owned(),
-            serde_json::Value::String(key.to_string()),
-        );
-        Payload::new(map)
+    /// The key of the command being carried out, which every record
+    /// that command writes carries, on whichever thread it is written.
+    pub(in crate::assembly) fn carrying(&self) -> Option<IdemKey> {
+        self.carrying
     }
 
     /// Folds one line of the history back in.
@@ -104,6 +89,31 @@ impl Entrance {
             self.seen.insert(key);
         }
     }
+}
+
+/// Puts the key of the command in flight on the record it is writing,
+/// so a restart reads back what this city has done.
+///
+/// A record written outside a command - a schedule firing, a run
+/// settling on its own - carries no key, because no client is holding
+/// one for it. A function of the key rather than of the entrance, so a
+/// record written off the accounting thread is stamped by the same rule.
+///
+/// # Errors
+/// Propagates the payload's own refusal of a value it cannot carry.
+pub(in crate::assembly) fn stamped(
+    key: Option<IdemKey>,
+    data: Payload,
+) -> Result<Payload, AxError> {
+    let Some(key) = key else {
+        return Ok(data);
+    };
+    let mut map = data.as_map().clone();
+    map.insert(
+        IDEM_FIELD.to_owned(),
+        serde_json::Value::String(key.to_string()),
+    );
+    Payload::new(map)
 }
 
 /// The diagnostic line a repeat leaves behind.

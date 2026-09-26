@@ -83,13 +83,70 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
     drop(
         memory::Worktrees::open(dir.path())
             .unwrap()
-            .claim(&name)
+            .claim(&name, &["lab".to_owned()])
             .unwrap(),
     );
 
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     dispatch(&mut worker, b"second").unwrap();
     assert_eq!(trees_opened(&report.ledger_dir).len(), 2);
+}
+
+/// A room under review whose rules were booked by an earlier run writes
+/// one line under the command's key before take-off, `worktree_opened`,
+/// and a restart recognises the command again from that line alone: the
+/// placement of the tree keeps stamping it wherever it runs
+/// (sprawling-SPEC.md 8-93).
+#[test]
+fn a_review_dispatch_sent_again_after_a_restart_is_answered_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+    lay_rules(
+        dir.path(),
+        "lab",
+        &ordinary_rules(
+            "review = true
+",
+        ),
+    );
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion("first", None),
+            completion("second", None),
+            completion("third", None),
+        ],
+    );
+    // Through the desk's door, which is the one that honours the key.
+    let dispatch = |worker: &mut RunWorker, idem: &[u8]| {
+        worker.serve_one(Posted {
+            command: channels::Command::Dispatch {
+                addr: Address::parse("lab/room1").unwrap(),
+                task: "work".to_owned(),
+                goal: "work".to_owned(),
+                mode: kernel::Mode::PlanGoal,
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
+                session: None,
+                effort: None,
+                model: None,
+            },
+            reply: channels::Reply::nowhere(),
+        });
+        worker.land_the_rest().unwrap();
+    };
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    dispatch(&mut worker, b"books the rules");
+    dispatch(&mut worker, b"sent twice");
+    drop(worker);
+
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    dispatch(&mut worker, b"sent twice");
+    assert_eq!(
+        trees_opened(&report.ledger_dir).len(),
+        2,
+        "the command sent again after the restart started no run"
+    );
 }
 
 /// The name of every tree a `worktree_opened` line records, in order.

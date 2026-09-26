@@ -90,6 +90,7 @@ use models::GatewayModels;
 use naming::{building_of, governed_of, not_built, scope_of};
 use plans::Reporter;
 use plans::held::{PlanHolders, Planning};
+use recording::Stamping;
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};

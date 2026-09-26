@@ -93,7 +93,7 @@ mod tests {
     fn the_tree_is_measured_rather_than_estimated() {
         let dir = tempfile::tempdir().unwrap();
         let trees = city(dir.path());
-        let lease = trees.claim(&name("node-1")).unwrap();
+        let lease = trees.claim(&name("node-1"), &[]).unwrap();
         assert!(
             lease.disk().get() >= 6,
             "the checked-out file has six bytes"

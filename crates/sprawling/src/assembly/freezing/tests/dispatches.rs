@@ -265,45 +265,35 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
 }
 
 /// Rebuilding a branch's conversation reads the mother's own lines, not
-/// the history: once the worker has indexed the ledger, a rebuild costs
-/// a small fraction of verifying the whole ledger, however much another
-/// run wrote into it.
+/// the history: the history was verified when the city opened, and a
+/// rebuild that verified it again would cost the whole ledger on every
+/// branch.
 ///
-/// The ratio against a verify of the same ledger is the instrument,
-/// because it holds on any disk and in any profile: a rebuild that still
-/// verifies the history is never ten times faster than a verify.
+/// A chain broken after genesis is the witness: a verify refuses it, and
+/// the rebuild, which never reads that line, inherits as it would from an
+/// intact ledger.
 #[test]
 fn inheriting_a_branch_does_not_verify_the_history() {
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
-    let long_answer = "another room's long answer. ".repeat(140_000);
-    let (base_url, _provider) = fake_openai(
-        &["m-local"],
-        vec![
-            completion("the meter says 42", None),
-            completion(&long_answer, None),
-        ],
-    );
+    let (base_url, _provider) =
+        fake_openai(&["m-local"], vec![completion("the meter says 42", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    for (room, task) in [("lab/room2", "mother"), ("lab/room3", "other")] {
-        worker
-            .handle(channels::Command::Dispatch {
-                addr: Address::parse(room).unwrap(),
-                task: task.to_owned(),
-                goal: "a number is written down".to_owned(),
-                model: None,
-                mode: kernel::Mode::PlanGoal,
-                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, task.as_bytes()),
-                session: None,
-                effort: None,
-            })
-            .unwrap();
-    }
-    let verify_started = std::time::Instant::now();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room2").unwrap(),
+            task: "mother".to_owned(),
+            goal: "a number is written down".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
     let verified =
         runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
             .unwrap();
-    let verify = verify_started.elapsed();
     let origin = verified
         .lines()
         .iter()
@@ -332,15 +322,14 @@ fn inheriting_a_branch_does_not_verify_the_history() {
         origin: Some(origin),
     };
 
-    worker.inherited(&at, RunId::from_bytes([7; 16])).unwrap();
-    let rebuild_started = std::time::Instant::now();
-    let messages = worker.inherited(&at, RunId::from_bytes([7; 16])).unwrap();
-    let rebuild = rebuild_started.elapsed();
+    break_the_chain_after_genesis(dir.path());
 
-    assert!(!messages.is_empty(), "the mother's task is inherited");
+    let inherited = worker.inherited(&at, RunId::from_bytes([7; 16]));
     assert!(
-        rebuild.saturating_mul(10) < verify,
-        "a warm rebuild took {rebuild:?}; verifying the ledger took {verify:?}"
+        inherited
+            .as_ref()
+            .is_ok_and(|messages| !messages.is_empty()),
+        "a branch rebuild verified the history, or inherited nothing: {inherited:?}"
     );
 }
 

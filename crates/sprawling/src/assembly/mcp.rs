@@ -19,15 +19,24 @@ use super::RunWorker;
 /// Keyed by the whole declaration and the run root the child started
 /// in: a changed field is another server, and a child cannot move to
 /// another working directory once it runs.
+///
+/// Each key has its own lock, and the table's lock is held only to find
+/// or add a key: a lane still shaking hands with one server holds up
+/// the lanes asking for that server and nobody else.
 #[derive(Default)]
 pub(crate) struct Residents {
-    held: Vec<Resident>,
+    keys: std::sync::Mutex<Vec<std::sync::Arc<Keyed>>>,
+}
+
+/// One server this worker was asked for, connected or not.
+struct Keyed {
+    server: kernel::McpServer,
+    root: std::path::PathBuf,
+    connected: std::sync::Mutex<Option<Resident>>,
 }
 
 /// One connected server and what it offered when it connected.
 struct Resident {
-    server: kernel::McpServer,
-    root: std::path::PathBuf,
     link: protocol::McpLink,
     /// Each tool under both its names, in the order the server listed
     /// them.
@@ -35,17 +44,6 @@ struct Resident {
 }
 
 impl accounting::Connectors for Residents {
-    /// The tools `server` offers, over the connection an earlier run left
-    /// when its child still runs, and over a new one otherwise.
-    ///
-    /// A child that has ended is dropped from the table and started
-    /// again here, which is how a server that died between two runs
-    /// comes back.
-    ///
-    /// # Errors
-    /// Propagates the transport's refusal to open, a failed handshake or
-    /// listing, and `protocol::McpTool::new`'s refusal on a confidential
-    /// building.
     fn connect(
         &mut self,
         server: &kernel::McpServer,
@@ -53,19 +51,69 @@ impl accounting::Connectors for Residents {
         confidential: bool,
         resolve: &gateway::SecretResolver,
     ) -> Result<(Vec<protocol::McpTool>, Reached), AxError> {
-        self.held
-            .retain(|held| !(held.serves(server, write_root) && held.link.has_ended()));
-        if let Some(held) = self
-            .held
-            .iter()
-            .find(|held| held.serves(server, write_root))
+        self.tools(server, write_root, confidential, resolve)
+    }
+}
+
+impl Residents {
+    /// The tools `server` offers, over the connection an earlier run left
+    /// when its child still runs, and over a new one otherwise.
+    ///
+    /// A child that has ended is dropped from the table and started
+    /// again here, which is how a server that died between two runs
+    /// comes back.
+    ///
+    /// Takes `&self`, so lanes preparing dispatches at once can share
+    /// one table; the port's `connect` reaches the same door.
+    ///
+    /// # Errors
+    /// Propagates the transport's refusal to open, a failed handshake or
+    /// listing, and `protocol::McpTool::new`'s refusal on a confidential
+    /// building.
+    pub(crate) fn tools(
+        &self,
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+        confidential: bool,
+        resolve: &gateway::SecretResolver,
+    ) -> Result<(Vec<protocol::McpTool>, Reached), AxError> {
+        let keyed = self.keyed(server, write_root)?;
+        let mut connected = super::workbench::held(&keyed.connected, "reach an mcp server")?;
+        if let Some(resident) = connected
+            .take()
+            .filter(|resident| !resident.link.has_ended())
         {
-            return Ok((held.tools(confidential)?, Reached::Resident));
+            let tools = resident.tools(confidential);
+            *connected = Some(resident);
+            return Ok((tools?, Reached::Resident));
         }
         let (resident, opened) = Resident::connect(server, write_root, resolve)?;
         let tools = resident.tools(confidential)?;
-        self.held.push(resident);
+        *connected = Some(resident);
         Ok((tools, Reached::Connected(opened)))
+    }
+
+    /// The entry for `server` started in `write_root`, added when this
+    /// is the first time it is asked for.
+    fn keyed(
+        &self,
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+    ) -> Result<std::sync::Arc<Keyed>, AxError> {
+        let mut keys = super::workbench::held(&self.keys, "find an mcp server's entry")?;
+        if let Some(found) = keys
+            .iter()
+            .find(|keyed| keyed.server == *server && keyed.root == write_root)
+        {
+            return Ok(std::sync::Arc::clone(found));
+        }
+        let added = std::sync::Arc::new(Keyed {
+            server: server.clone(),
+            root: write_root.to_path_buf(),
+            connected: std::sync::Mutex::new(None),
+        });
+        keys.push(std::sync::Arc::clone(&added));
+        Ok(added)
     }
 }
 
@@ -108,19 +156,7 @@ impl Resident {
             .into_iter()
             .map(|entry| (entry.meta, entry.remote))
             .collect();
-        Ok((
-            Resident {
-                server: server.clone(),
-                root: write_root.to_path_buf(),
-                link,
-                listed,
-            },
-            opened,
-        ))
-    }
-
-    fn serves(&self, server: &kernel::McpServer, write_root: &std::path::Path) -> bool {
-        self.server == *server && self.root == write_root
+        Ok((Resident { link, listed }, opened))
     }
 
     /// One handle per tool on the one connection: two connections would
@@ -340,6 +376,71 @@ mod tests {
             worker.mcp_tools(&config, dir.path(), false).is_empty(),
             "a service that is down today does not stop the building from working today"
         );
+    }
+
+    /// A stdio declaration under `label`, as a building's `[[mcp]]`
+    /// table would carry it.
+    fn stdio_server(label: &str, (command, args): (String, Vec<String>)) -> kernel::McpServer {
+        kernel::McpServer {
+            label: kernel::ServerLabel::parse(label).unwrap(),
+            transport: kernel::McpTransport::Stdio {
+                command,
+                args,
+                env: Vec::new(),
+            },
+        }
+    }
+
+    fn no_secrets() -> gateway::SecretResolver {
+        Box::new(|_| {
+            Err(AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "resolve a secret",
+                "this server declares none",
+            )
+            .with_recovery("give the test server no secret"))
+        })
+    }
+
+    /// How many tools `server` offered, and whether this call connected
+    /// it, in a shape a lane's thread can hand back.
+    fn reach(residents: &Residents, server: &kernel::McpServer, root: &Path) -> (usize, bool) {
+        let (tools, reached) = residents.tools(server, root, false, &no_secrets()).unwrap();
+        (tools.len(), matches!(reached, Reached::Connected(_)))
+    }
+
+    /// Two lanes reaching two servers share one table: a handshake that
+    /// has not been answered yet holds up the lanes asking for its own
+    /// server and nobody else (sprawling-SPEC.md 8-4).
+    #[test]
+    fn a_server_still_shaking_hands_keeps_no_other_server_waiting() {
+        let dir = tempfile::tempdir().unwrap();
+        let (starts, gate) = (dir.path().join("starts.txt"), dir.path().join("open"));
+        let slow = stdio_server("slow", protocol::gated(SERVER_ANSWER, &starts, &gate));
+        let quick = stdio_server("quick", protocol::echoing(SERVER_ANSWER));
+        let residents = Residents::default();
+
+        std::thread::scope(|scope| {
+            let waiting = scope.spawn(|| reach(&residents, &slow, dir.path()));
+            let patience = std::time::Instant::now() + std::time::Duration::from_secs(60);
+            while !starts.exists() && std::time::Instant::now() < patience {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            assert!(starts.exists(), "the gated server started");
+            let other = scope.spawn(|| reach(&residents, &quick, dir.path()));
+            let patience = std::time::Instant::now() + std::time::Duration::from_secs(30);
+            while !other.is_finished() && std::time::Instant::now() < patience {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            let answered_while_the_first_waited = other.is_finished() && !waiting.is_finished();
+            std::fs::write(&gate, "").unwrap();
+            assert_eq!(waiting.join().unwrap(), (1, true));
+            assert_eq!(other.join().unwrap(), (1, true));
+            assert!(
+                answered_while_the_first_waited,
+                "the second server was reached while the first still shook hands"
+            );
+        });
     }
 
     #[test]

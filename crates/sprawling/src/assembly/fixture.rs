@@ -117,6 +117,41 @@ pub(super) fn node_lines(city_root: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Breaks the history's hash chain at its second line, leaving every
+/// line a well-formed record: that line's `prev` no longer names the
+/// genesis line.
+///
+/// A reader that verifies the history refuses this ledger; a reader that
+/// reads only the lines it was asked about does not notice. That
+/// difference, rather than a timing, is what shows a query stayed off the
+/// verify path.
+pub(super) fn break_the_chain_after_genesis(city_root: &Path) {
+    let segment = memory::ledger_segments_at(&kernel::layout::CityLayout::new(city_root).ledger())
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+    let mut bytes = std::fs::read(&segment).unwrap();
+    let key = b"\"prev\":\"";
+    let second = bytes
+        .iter()
+        .position(|byte| *byte == b'\n')
+        .and_then(|end| end.checked_add(1))
+        .unwrap();
+    let digit = bytes[second..]
+        .windows(key.len())
+        .position(|window| window == key)
+        .and_then(|at| second.checked_add(at)?.checked_add(key.len()))
+        .unwrap();
+    bytes[digit] = if bytes[digit] == b'0' { b'1' } else { b'0' };
+    std::fs::write(&segment, bytes).unwrap();
+    assert!(
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(city_root).ledger())
+            .is_err(),
+        "the broken chain is refused by a verify"
+    );
+}
+
 /// One completion that calls a named tool with the given arguments.
 /// Separate from `completion` because that helper hard-codes the edit
 /// tool's shape, and a tool面 test is about a different tool.

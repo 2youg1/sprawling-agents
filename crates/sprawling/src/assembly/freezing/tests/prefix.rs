@@ -373,3 +373,82 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     };
     assert_eq!(content.text, building.text);
 }
+
+/// Dispatches one fixed job into a room under review in a new city and
+/// reads back the segments its prompt was assembled from, as
+/// `(slot, hash)`.
+fn segments_of_a_review_dispatch() -> Vec<(String, String)> {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+    lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "measure the thing".to_owned(),
+            goal: "a number with a unit, then stop".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let assembled = verified
+        .lines()
+        .iter()
+        .find_map(|line| match line {
+            runtime::replay::VerifiedLine::Known { record, .. }
+                if record.kind() == EventKind::PromptAssembled =>
+            {
+                Some(
+                    record
+                        .data()
+                        .read::<kernel::event::record::PromptAssembled>()
+                        .unwrap(),
+                )
+            }
+            _ => None,
+        })
+        .expect("a dispatch assembles a prompt");
+    assembled
+        .segments
+        .into_iter()
+        .map(|segment| (segment.slot, segment.hash.to_string()))
+        .collect()
+}
+
+/// Preparing a dispatch moves off the accounting thread without moving
+/// a byte of the prefix it freezes (sprawling-SPEC.md 8-93): the hashes
+/// below were taken from the path that prepares everything on the
+/// accounting thread, and a room under review is where the move reaches
+/// furthest, because its tree is placed in the lane. A change that means
+/// to alter what a fresh city's prefix says takes the new hashes from
+/// this test's failure; a change that only moves work between threads
+/// leaves them as they are.
+#[test]
+fn a_review_dispatch_freezes_the_prefix_it_froze_on_the_accounting_thread() {
+    let pinned = [
+        (
+            "city",
+            "35db44e818760f17dacd2e08adc49c5496aa8a8bc36404dde19ee7c5cda4739b",
+        ),
+        (
+            "building",
+            "955c58cf462564ab1f9a3194306e53ac7ccc65c2aa8c4ee847b8a15b6d4b48bd",
+        ),
+        (
+            "resident",
+            "e99b71e771a7f9820c27a16ea2405d71bc1dc91394c5887e266638a3f4ae8fa1",
+        ),
+        (
+            "run",
+            "c0198e5163ee2a90184955d1ce7384c99f520aa5339addfb13f83b3dc7159cb0",
+        ),
+    ]
+    .map(|(slot, hash)| (slot.to_owned(), hash.to_owned()));
+    assert_eq!(segments_of_a_review_dispatch(), pinned);
+}
