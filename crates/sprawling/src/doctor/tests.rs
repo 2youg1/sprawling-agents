@@ -109,6 +109,10 @@ fn every_row_is_detectable_and_per_platform_installable_or_manual() {
                     "{name} asks its version with {version_arg}"
                 );
             }
+            Detection::Listed { program, args, .. } => {
+                assert!(!program.is_empty(), "{name} names no program");
+                assert!(!args.is_empty(), "{name} asks its program for no listing");
+            }
             Detection::Component { variable, file } => {
                 assert!(!variable.is_empty(), "{name} names no environment variable");
                 assert!(!file.is_empty(), "{name} names no component file");
@@ -328,4 +332,20 @@ fn every_item_has_the_page_clause_in_both_languages() {
         })
         .collect();
     assert_eq!(unworded, Vec::<&str>::new());
+}
+
+/// `just prereqs` reads the develop tier out of `prereqs.tsv`, so the
+/// file is exactly what the table renders; when they differ this prints
+/// the file the table wants.
+#[test]
+fn the_prereqs_file_is_the_develop_tier_rendered() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/doctor/table/prereqs.tsv");
+    let rendered = table::prereqs();
+    let written = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(
+        written == rendered,
+        "{} is not what the table renders; write this into it:\n<<<\n{rendered}>>>",
+        path.display()
+    );
 }

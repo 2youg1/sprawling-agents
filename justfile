@@ -148,20 +148,27 @@ branch-tests base +packages:
         done
     fi | cat <(printf '%s\n' "$filters") - | sort -u | paste -sd'|' | sed 's/|/ | /g'
 
-# The one authority on what this repository's loop needs installed.
+# What this repository's loop needs installed, read from the doctor's
+# develop tier.
 #
-# AGENTS.md, docs/CONTRIBUTING.md and flake.nix all point here instead of
-# listing tools themselves: four lists of one fact is how a person
-# installed everything named and still met a red gate on the first
-# run. Each row is one `command -v`, so the whole recipe costs
-# milliseconds and `check` opens with it - a missing tool is named before
-# a compile rather than twenty minutes into one.
+# `crates/sprawling/src/doctor/table.rs` is the one list: `sprawling
+# doctor` and the settings page install from it, and a test there holds
+# `prereqs.tsv` beside it to exactly what the table renders
+# (sprawling-SPEC.md section 8-58). This recipe reads that file rather
+# than keeping a list of its own, because two lists of one fact is how a
+# person installed everything one of them named and still met a red
+# gate. Each row is one probe, so the whole recipe costs milliseconds and
+# `check` opens with it - a missing tool is named before a compile rather
+# than twenty minutes into one. A row whose probe is `-` is one only the
+# doctor can look for, a browser family, and the gate that needs it
+# names it itself.
 #
 # A required row missing fails this recipe; an optional one is printed
-# and passes, because the recipe that needs it says so itself.
-# `just prereqs list` prints one `class<TAB>name` line per row, which is
-# what flake.nix's `devshell-covers-just-check` compares its devshell
-# against, so a tool added here and not there turns that check red.
+# and passes, because `just check` skips it or a recipe run on purpose
+# needs it. `just prereqs list` prints one `class<TAB>name<TAB>probe`
+# line per row, which flake.nix's `devshell-covers-just-check` checks
+# its devshell against, so a tool added to the table and not to the
+# devshell turns that check red.
 prereqs mode="check":
     #!/usr/bin/env bash
     set -uo pipefail
@@ -170,52 +177,33 @@ prereqs mode="check":
         check|list) ;;
         *) echo "prereqs takes 'check' or 'list', not '$mode'" >&2; exit 2 ;;
     esac
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*) platform=windows ;;
+        Darwin) platform=macos ;;
+        *) platform=linux ;;
+    esac
     missing=0
-    need() {
-        class=$1; name=$2; probe=$3; recipe=$4; purpose=$5
+    while IFS=$'\t' read -r class name probe windows macos linux purpose; do
+        case "$class" in
+            '#'*|'') continue ;;
+        esac
         if [ "$mode" = list ]; then
-            printf '%s\t%s\n' "$class" "$name"
-            return 0
+            printf '%s\t%s\t%s\n' "$class" "$name" "$probe"
+            continue
         fi
-        if eval "$probe" >/dev/null 2>&1; then
-            return 0
+        if [ "$probe" = - ] || eval "$probe" >/dev/null 2>&1; then
+            continue
         fi
-        printf '%-8s %-17s %s\n         install: %s\n' "$class" "$name" "$purpose" "$recipe"
+        case "$platform" in
+            windows) install=$windows ;;
+            macos) install=$macos ;;
+            linux) install=$linux ;;
+        esac
+        printf '%-8s %-17s %s\n         install: %s\n' "$class" "$name" "$purpose" "$install"
         if [ "$class" = required ]; then
             missing=$((missing + 1))
         fi
-        return 0
-    }
-    need required cargo 'command -v cargo' \
-        'rustup from https://rustup.rs; rust-toolchain.toml then pins the version' \
-        'every recipe in this file'
-    need required rustfmt 'command -v rustfmt' \
-        'rustup component add rustfmt' \
-        'just fmt-check'
-    need required cargo-clippy 'command -v cargo-clippy' \
-        'rustup component add clippy' \
-        'just clippy, the zero-warning build'
-    need required cargo-nextest 'command -v cargo-nextest' \
-        'cargo install cargo-nextest --locked' \
-        'just test'
-    need required bun 'command -v bun' \
-        'https://bun.sh' \
-        'the client bundle, and the gates that judge artifacts'
-    need optional cargo-public-api 'command -v cargo-public-api' \
-        'cargo install cargo-public-api --locked' \
-        'cargo xtask apisync, which the nightly job runs'
-    need optional nightly-rustdoc 'rustup run nightly rustdoc --version' \
-        'rustup toolchain install nightly --profile minimal' \
-        'the rustdoc JSON cargo-public-api reads'
-    need optional cargo-deny 'command -v cargo-deny' \
-        'cargo install cargo-deny --locked' \
-        'the supply-chain read; CI runs it on every push either way'
-    need optional cargo-kani 'command -v cargo-kani' \
-        'cargo install --locked kani-verifier, then cargo kani setup' \
-        'just proof; kani has no Windows host, where CI proves instead'
-    need optional lake 'command -v lake' \
-        'https://github.com/leanprover/elan, which installs the toolchain lake comes from' \
-        'just models, and just adversary, which is never a gate'
+    done < '{{justfile_directory()}}/crates/sprawling/src/doctor/table/prereqs.tsv'
     if [ "$mode" = list ]; then
         exit 0
     fi

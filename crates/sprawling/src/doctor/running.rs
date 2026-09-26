@@ -8,7 +8,7 @@
 //!
 //! **A wait here is always bounded, and a child here can never wait on
 //! a person.** The three facts that make that true are in `run` and
-//! nowhere else: stdin, stdout and stderr are `Stdio::null()`, so a
+//! nowhere else: stdin is `Stdio::null()`, so a
 //! package manager asking for a source agreement or a password reads
 //! end of input and fails at once rather than sitting on a terminal
 //! nobody is attending; the wait is a poll of `try_wait` against a
@@ -28,10 +28,15 @@
 //! a wait without an end there stops `Halt` and `Cancel` from being
 //! read at all, which is the one moment a person most needs them.
 //!
+//! What the installer prints goes to the item's log file, both streams
+//! into one, because a failure the person cannot read is a failure
+//! they can only retry blind.
+//!
 //! `Runnable` is the recipe that passed the "may this city run it"
 //! question, so nothing below re-asks it: an unrunnable recipe cannot
 //! be spelled as this type (`Recipe::command`).
 
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
@@ -65,12 +70,18 @@ const TICK: Duration = Duration::from_millis(50);
 /// failure, and a program still running at the deadline. The last one
 /// carries the recovery that actually works: run the line yourself,
 /// where an installer that wants an answer can get one.
-pub(crate) fn run(item: &str, runnable: &Runnable, patience: u32) -> Result<(), AxError> {
+pub(crate) fn run(
+    item: &str,
+    runnable: &Runnable,
+    patience: u32,
+    log: &Path,
+) -> Result<(), AxError> {
+    let (stdout, stderr) = log_streams(item, log)?;
     let mut child = Command::new(runnable.program())
         .args(runnable.args())
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(stdout)
+        .stderr(stderr)
         .spawn()
         .map_err(|err| {
             AxError::failure(
@@ -90,7 +101,10 @@ pub(crate) fn run(item: &str, runnable: &Runnable, patience: u32) -> Result<(), 
                     "install a tool",
                     format!("{item}: {} ended in failure", runnable.spelled()),
                 )
-                .with_recovery("run this line yourself in a terminal to see what it reported"));
+                .with_recovery(format!(
+                    "read what it reported in {}, then run the line yourself in a terminal",
+                    log.display()
+                )));
             }
             Ok(None) => {}
             Err(err) => {
@@ -98,11 +112,38 @@ pub(crate) fn run(item: &str, runnable: &Runnable, patience: u32) -> Result<(), 
             }
         }
         let Some(left) = knocks.checked_sub(1) else {
-            return Err(overran(item, runnable, patience, &stop(&mut child)));
+            let waited = Waited { patience, log };
+            return Err(overran(item, runnable, &waited, &stop(&mut child)));
         };
         knocks = left;
         std::thread::sleep(TICK);
     }
+}
+
+/// A fresh log file for one install, opened once and handed to the
+/// child as both of its output streams.
+///
+/// # Errors
+/// Reports a log that cannot be created; the install does not start
+/// without one, because a failure nobody can read is what it replaces.
+fn log_streams(item: &str, log: &Path) -> Result<(Stdio, Stdio), AxError> {
+    let refused = |err: std::io::Error| {
+        AxError::failure(
+            AxCode::ToolUnavailable,
+            "install a tool",
+            format!(
+                "{item}: its log {} could not be written: {err}",
+                log.display()
+            ),
+        )
+        .with_recovery("free the temporary directory, or run the line yourself in a terminal")
+    };
+    if let Some(dir) = log.parent() {
+        std::fs::create_dir_all(dir).map_err(refused)?;
+    }
+    let file = std::fs::File::create(log).map_err(refused)?;
+    let second = file.try_clone().map_err(refused)?;
+    Ok((Stdio::from(file), Stdio::from(second)))
 }
 
 /// Ends the child and says what went wrong while ending it.
@@ -125,9 +166,16 @@ pub(super) fn stop(child: &mut Child) -> Option<String> {
     }
 }
 
+/// How long an install was given, and where what it printed meanwhile
+/// went: the two facts a person reads when the knocks ran out.
+struct Waited<'a> {
+    patience: u32,
+    log: &'a Path,
+}
+
 /// The knocks ran out with the program still running.
-fn overran(item: &str, runnable: &Runnable, patience: u32, stopping: &Option<String>) -> AxError {
-    let seconds = TICK.saturating_mul(patience).as_secs();
+fn overran(item: &str, runnable: &Runnable, waited: &Waited, stopping: &Option<String>) -> AxError {
+    let seconds = TICK.saturating_mul(waited.patience).as_secs();
     let aftermath = match stopping {
         None => "it was stopped".to_owned(),
         Some(trouble) => trouble.clone(),
@@ -140,10 +188,11 @@ fn overran(item: &str, runnable: &Runnable, patience: u32, stopping: &Option<Str
             runnable.spelled()
         ),
     )
-    .with_recovery(
-        "run this line yourself in a terminal: an installer that asks a question gets no answer \
-         from this city, because it is started without a terminal to ask on",
-    )
+    .with_recovery(format!(
+        "run this line yourself in a terminal, where it can take as long as it needs and ask \
+         what it wants to ask; what it printed before it was stopped is in {}",
+        waited.log.display()
+    ))
 }
 
 /// The child could not be watched, which is not the same as failing.
@@ -203,6 +252,11 @@ mod tests {
         }
     }
 
+    /// A log file nobody reads, for the tests about waiting.
+    fn scratch_log(test: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("sprawling-running-{test}.log"))
+    }
+
     enum Code {
         Success,
         Failure,
@@ -247,7 +301,7 @@ mod tests {
         let runnable = recipe.command("pretend").unwrap();
         // Forty knocks at 50 ms: the child runs for thirty seconds, so
         // returning at all is the assertion, and the test costs two.
-        let refused = run("pretend", &runnable, 40).unwrap_err();
+        let refused = run("pretend", &runnable, 40, &scratch_log("never_ends")).unwrap_err();
         assert_eq!(refused.code(), &AxCode::Timeout);
         assert!(
             refused.recovery().contains("run this line yourself"),
@@ -265,7 +319,7 @@ mod tests {
         let runnable = recipe.command("pretend").unwrap();
         // A hundred knocks is five seconds of patience; reading end of
         // input takes one. A `Timeout` here means stdin was not null.
-        let outcome = run("pretend", &runnable, 100);
+        let outcome = run("pretend", &runnable, 100, &scratch_log("asks"));
         assert!(
             outcome.as_ref().err().map(AxError::code) != Some(&AxCode::Timeout),
             "it read end of input rather than waiting for a person: {outcome:?}"
@@ -275,13 +329,27 @@ mod tests {
     #[test]
     fn a_program_that_succeeds_is_reported_as_done() {
         let recipe = ending(Code::Success);
-        assert!(run("pretend", &recipe.command("pretend").unwrap(), PATIENCE).is_ok());
+        assert!(
+            run(
+                "pretend",
+                &recipe.command("pretend").unwrap(),
+                PATIENCE,
+                &scratch_log("succeeds")
+            )
+            .is_ok()
+        );
     }
 
     #[test]
     fn a_program_that_fails_is_reported_with_the_line_a_person_can_rerun() {
         let recipe = ending(Code::Failure);
-        let refused = run("pretend", &recipe.command("pretend").unwrap(), PATIENCE).unwrap_err();
+        let refused = run(
+            "pretend",
+            &recipe.command("pretend").unwrap(),
+            PATIENCE,
+            &scratch_log("fails"),
+        )
+        .unwrap_err();
         assert_eq!(refused.code(), &AxCode::ToolUnavailable);
         assert!(refused.to_string().contains("ended in failure"));
     }
@@ -293,8 +361,45 @@ mod tests {
             args: &[],
         };
         let runnable = recipe.command("pretend").unwrap();
-        let refused = run("pretend", &runnable, PATIENCE).unwrap_err();
+        let refused = run("pretend", &runnable, PATIENCE, &scratch_log("absent")).unwrap_err();
         assert_eq!(refused.code(), &AxCode::ToolUnavailable);
+    }
+
+    /// What the installer printed is what a person reads when it fails,
+    /// so it lands in the item's log rather than nowhere.
+    #[test]
+    fn what_an_installer_prints_lands_in_its_log() {
+        let recipe = if cfg!(target_os = "windows") {
+            Recipe::Command {
+                program: "cmd",
+                args: &["/C", "echo fetched & echo refused 1>&2 & exit 3"],
+            }
+        } else {
+            Recipe::Command {
+                program: "sh",
+                args: &["-c", "echo fetched; echo refused >&2; exit 3"],
+            }
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("pretend.log");
+        let refused = run(
+            "pretend",
+            &recipe.command("pretend").unwrap(),
+            PATIENCE,
+            &log,
+        )
+        .unwrap_err();
+        let written = std::fs::read_to_string(&log).unwrap();
+        assert_eq!(
+            (
+                written.contains("fetched"),
+                written.contains("refused"),
+                refused.recovery().contains(&log.display().to_string())
+            ),
+            (true, true, true),
+            "the log holds both streams and the refusal names it: {written:?} / {}",
+            refused.recovery()
+        );
     }
 
     #[test]

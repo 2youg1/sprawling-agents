@@ -44,6 +44,18 @@ pub(crate) fn components_dir() -> Option<PathBuf> {
     }
 }
 
+/// The file one item's install writes its output to, fresh for every
+/// install (sprawling-SPEC.md section 8-64).
+///
+/// Under the system's temporary directory rather than the component
+/// directory, because a directory named for an item there is what
+/// `Detection::Component` looks for.
+pub(crate) fn install_log(item: &str) -> PathBuf {
+    std::env::temp_dir()
+        .join("sprawling-install")
+        .join(format!("{item}.log"))
+}
+
 /// The Gecko browser this machine has, whichever brand it is: Firefox,
 /// Zen, LibreWolf, Waterfox, Floorp or another fork (`doctor::family`).
 /// `SPRAWLING_BROWSER` names one over all of them.

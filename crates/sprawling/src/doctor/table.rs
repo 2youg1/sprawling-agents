@@ -77,6 +77,63 @@ pub(crate) fn recipe_for(item: &str) -> Result<&'static Recipe, AxError> {
     Ok(requirement.recipe.at(platform))
 }
 
+/// The develop tier as `just prereqs` reads it, which is the whole of
+/// `prereqs.tsv` beside this file (sprawling-SPEC.md section 8-58).
+///
+/// One line per row, in install order:
+/// `class<TAB>name<TAB>probe<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`,
+/// where `probe` is the shell line that succeeds when the row is here,
+/// or `-` for a row only this binary can look for. Called by the test
+/// that holds the file to it, which prints the file it wants.
+#[cfg(test)]
+pub(crate) fn prereqs() -> String {
+    let header = concat!(
+        "# generated from crates/sprawling/src/doctor/table.rs by `table::prereqs`; ",
+        "edit the table, not this file\n"
+    );
+    REQUIREMENTS
+        .iter()
+        .filter(|requirement| requirement.tier == Tier::Develop)
+        .fold(header.to_owned(), |mut file, requirement| {
+            let class = match requirement.need {
+                Need::Required | Need::OneOf(_) => "required",
+                Need::Optional => "optional",
+            };
+            let recipe = |platform| requirement.recipe.at(platform).spelled();
+            file.push_str(&format!(
+                "{class}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                requirement.name,
+                shell_probe(&requirement.detect),
+                recipe(Platform::Windows),
+                recipe(Platform::MacOs),
+                recipe(Platform::Linux),
+                requirement.enables
+            ));
+            file
+        })
+}
+
+/// The shell line that asks what `detect` asks, or `-` where only this
+/// binary can ask it.
+#[cfg(test)]
+fn shell_probe(detect: &Detection) -> String {
+    match detect {
+        Detection::Program { program, .. } => format!("command -v {program}"),
+        Detection::Listed {
+            program,
+            args,
+            line,
+        } => match *line {
+            "" => format!("{program} {} | grep -q .", args.join(" ")),
+            pin => format!("{program} {} | grep -q '^{pin}'", args.join(" ")),
+        },
+        Detection::Component { .. }
+        | Detection::Interpreter { .. }
+        | Detection::Built { .. }
+        | Detection::Family(_) => "-".to_owned(),
+    }
+}
+
 /// A program nobody installs outside the search path.
 const NOWHERE: PerPlatform<&[&str]> = PerPlatform {
     windows: &[],
@@ -233,156 +290,26 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             linux: Recipe::Print("sudo apt install ffmpeg"),
         },
     },
-    Requirement {
-        name: "rustup",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "the toolchain rust-toolchain.toml pins, installed on demand",
-        detect: Detection::Program {
-            program: "rustup",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        homepage: Some("https://rustup.rs/"),
-        recipe: PerPlatform {
-            windows: Recipe::Command {
-                program: "winget",
-                args: &["install", "--id", "Rustlang.Rustup", "-e"],
-            },
-            macos: Recipe::Print("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"),
-            linux: Recipe::Print("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"),
-        },
-    },
+    toolchain::GIT,
+    toolchain::RUSTUP,
     toolchain::RUSTFMT,
     toolchain::CLIPPY,
-    Requirement {
-        name: "just",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "`just check`, the closing condition of every change here",
-        detect: Detection::Program {
-            program: "just",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        homepage: Some("https://just.systems/"),
-        recipe: PerPlatform {
-            windows: CARGO_INSTALL_JUST,
-            macos: CARGO_INSTALL_JUST,
-            linux: CARGO_INSTALL_JUST,
-        },
-    },
-    Requirement {
-        name: "cargo-nextest",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "the test runner every gate in this repository calls",
-        detect: Detection::Program {
-            program: "cargo-nextest",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        homepage: Some("https://nexte.st/"),
-        recipe: PerPlatform {
-            windows: CARGO_INSTALL_NEXTEST,
-            macos: CARGO_INSTALL_NEXTEST,
-            linux: CARGO_INSTALL_NEXTEST,
-        },
-    },
-    Requirement {
-        name: "bun",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "the JavaScript and TypeScript work beside this workspace",
-        detect: Detection::Program {
-            program: "bun",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        homepage: Some("https://bun.sh/"),
-        recipe: PerPlatform {
-            windows: Recipe::Command {
-                program: "winget",
-                args: &["install", "--id", "Oven-sh.Bun", "-e"],
-            },
-            macos: Recipe::Command {
-                program: "brew",
-                args: &["install", "oven-sh/bun/bun"],
-            },
-            // Printed, never run: a script piped into a shell is code
-            // nobody read, and this city does not read it for anybody.
-            linux: Recipe::Print("curl -fsSL https://bun.sh/install | bash"),
-        },
-    },
-    Requirement {
-        name: "git",
-        tier: Tier::Develop,
-        need: Need::Required,
-        enables: "restoration: a discarded file points at a checkpoint commit",
-        detect: Detection::Program {
-            program: "git",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        homepage: Some("https://git-scm.com/"),
-        recipe: PerPlatform {
-            windows: Recipe::Command {
-                program: "winget",
-                args: &["install", "--id", "Git.Git", "-e"],
-            },
-            macos: Recipe::Command {
-                program: "brew",
-                args: &["install", "git"],
-            },
-            linux: Recipe::Print("sudo apt install git"),
-        },
-    },
+    toolchain::JUST,
+    toolchain::CARGO_NEXTEST,
+    toolchain::BUN,
+    toolchain::RENDER_BROWSER,
     toolchain::CARGO_DENY,
+    toolchain::ELAN,
+    toolchain::LEAN,
+    toolchain::UV,
+    toolchain::PYTHON,
     toolchain::CARGO_AUDIT,
     toolchain::CARGO_MUTANTS,
     toolchain::CARGO_FUZZ,
     toolchain::CARGO_LLVM_COV,
+    toolchain::CARGO_PUBLIC_API,
     toolchain::KANI,
-    Requirement {
-        name: "elan",
-        tier: Tier::Develop,
-        need: Need::Optional,
-        enables: "the adversary: property checks that drive the shipped binary over the wire",
-        // `elan` itself is a version manager a person may never call;
-        // what `just adversary` starts is `lake`, so that is what this
-        // machine is asked about.
-        detect: Detection::Program {
-            program: "lake",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        homepage: Some("https://github.com/leanprover/elan"),
-        recipe: PerPlatform {
-            windows: Recipe::Command {
-                program: "winget",
-                args: &["install", "--id", "LeanProver.elan", "-e"],
-            },
-            macos: Recipe::Command {
-                program: "brew",
-                args: &["install", "elan-init"],
-            },
-            linux: Recipe::Print(
-                "curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
-                 -sSf | sh",
-            ),
-        },
-    },
 ];
-
-const CARGO_INSTALL_JUST: Recipe = Recipe::Command {
-    program: "cargo",
-    args: &["install", "just", "--locked"],
-};
-
-const CARGO_INSTALL_NEXTEST: Recipe = Recipe::Command {
-    program: "cargo",
-    args: &["install", "cargo-nextest", "--locked"],
-};
 
 /// No package manager ships the component and python.org publishes no
 /// wasi binary, so the honest answer names the place this city looks

@@ -91,6 +91,23 @@ impl Machine for ThisMachine {
                     Some(path) => ask_version(&path, version_arg, self.patience),
                 }
             }
+            // A listing without the wanted line is reported as the
+            // program's absence: the item is not where it resolves.
+            Detection::Listed {
+                program,
+                args,
+                line,
+            } => match on_search_path(&search_path, program) {
+                None => Presence::Absent(Absence::NotOnSearchPath),
+                Some(path) => match ask(&path, args, Wanted::StartingWith(line), self.patience) {
+                    listed @ Presence::Present {
+                        version: Version::Said(_),
+                        ..
+                    } => listed,
+                    Presence::Present { .. } => Presence::Absent(Absence::NotOnSearchPath),
+                    unusable @ (Presence::Broken { .. } | Presence::Absent(_)) => unusable,
+                },
+            },
             Detection::Component { variable, file } => {
                 let dir = super::host::components_dir().map(|dir| dir.join(requirement.name));
                 component_at(variable, std::env::var_os(variable), dir, file)
@@ -145,7 +162,12 @@ impl accounting::Machine for ThisMachine {
     }
 
     fn install(&self, item: &str, runnable: &Runnable<'_>) -> Result<(), AxError> {
-        super::running::run(item, runnable, super::running::PATIENCE)
+        super::running::run(
+            item,
+            runnable,
+            super::running::PATIENCE,
+            &super::host::install_log(item),
+        )
     }
 }
 
@@ -294,8 +316,21 @@ fn built(carried: bool) -> Presence {
 /// deadline. A program that will not start is broken, not absent; one
 /// that starts and says nothing is present all the same.
 pub(super) fn ask_version(program: &Path, version_arg: &str, patience: Duration) -> Presence {
+    ask(program, &[version_arg], Wanted::First, patience)
+}
+
+/// Which line of a program's output answers the question.
+#[derive(Clone, Copy)]
+enum Wanted {
+    First,
+    StartingWith(&'static str),
+}
+
+/// Starts the program with `args` and takes the line `wanted` names,
+/// under a deadline; `ask_version` is the first-line case.
+fn ask(program: &Path, args: &[&str], wanted: Wanted, patience: Duration) -> Presence {
     let spawned = std::process::Command::new(program)
-        .arg(version_arg)
+        .args(args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -310,7 +345,7 @@ pub(super) fn ask_version(program: &Path, version_arg: &str, patience: Duration)
         }
     };
     let version = match child.stdout.take() {
-        Some(stdout) => first_line(stdout, patience),
+        Some(stdout) => line_of(stdout, wanted, patience),
         None => Version::Silent,
     };
     // The child is done with either way: a late line would be read as
@@ -333,13 +368,21 @@ pub(super) fn ask_version(program: &Path, version_arg: &str, patience: Duration)
     }
 }
 
-/// The first line a pipe yields before the deadline.
-fn first_line(stdout: std::process::ChildStdout, patience: Duration) -> Version {
+/// The wanted line a pipe yields before the deadline.
+fn line_of(stdout: std::process::ChildStdout, wanted: Wanted, patience: Duration) -> Version {
     let (sender, answers) = std::sync::mpsc::channel();
     let reader = std::thread::Builder::new()
         .name("doctor-version".to_owned())
         .spawn(move || {
-            let first = std::io::BufReader::new(stdout).lines().next();
+            let mut lines = std::io::BufReader::new(stdout).lines();
+            let first = match wanted {
+                Wanted::First => lines.next(),
+                Wanted::StartingWith(start) => lines.find(|line| {
+                    line.as_ref().map_or(true, |line| {
+                        !line.trim().is_empty() && line.starts_with(start)
+                    })
+                }),
+            };
             // Either end finishing ends the reader: a closed pipe means
             // the program is gone, a closed channel means nobody waits.
             drop(sender.send(first));

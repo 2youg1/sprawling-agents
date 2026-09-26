@@ -9,16 +9,18 @@
 use std::collections::BTreeSet;
 
 use crate::doctor::family::{Confidence, Family, member_at};
-use crate::doctor::{Detection, Platform, REQUIREMENTS};
+use crate::doctor::{Detection, Platform, REQUIREMENTS, Tier};
 
-/// Every family is a row, and every row that detects a family is a
-/// family: the two lists cannot drift apart, because the name a
-/// capability tries is the name the table carries.
+/// Every family is a row of the tier that runs a city, and every such
+/// row that detects a family is a family: the two lists cannot drift
+/// apart, because the name a capability tries is the name the table
+/// carries. The develop tier's render browser is a second reason to
+/// have a Chromium browser, not a fourth engine.
 #[test]
 fn every_family_is_a_row_and_every_member_says_where_it_is_installed() {
     let detected: BTreeSet<&str> = REQUIREMENTS
         .iter()
-        .filter(|item| matches!(item.detect, Detection::Family(_)))
+        .filter(|item| item.tier == Tier::Use && matches!(item.detect, Detection::Family(_)))
         .map(|item| item.name)
         .collect();
     assert_eq!(
