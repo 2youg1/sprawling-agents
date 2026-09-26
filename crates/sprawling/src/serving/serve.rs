@@ -64,5 +64,9 @@ pub(super) struct Opening {
     /// The opened ledger and what its history already says, folded on the
     /// serve thread under its writer lock in the same pass as the views,
     /// so the worker neither opens nor reads it again.
-    pub(super) held: (memory::JsonlLedger, crate::assembly::Standing),
+    pub(super) held: (
+        memory::JsonlLedger,
+        memory::OpenReport,
+        crate::assembly::Standing,
+    ),
 }

@@ -9,7 +9,7 @@ use std::path::Path;
 
 use kernel::AxError;
 use kernel::EventRecord;
-use memory::JsonlLedger;
+use memory::{JsonlLedger, OpenReport};
 use runtime::replay::{VerifiedLedger, VerifiedLine};
 
 // The governance fold lives in `views`, where the reading side keeps
@@ -135,13 +135,16 @@ impl StandingFold {
 /// The ledger is opened, and its writer lock taken, before the history is
 /// read: the standing is what the worker decides from, so no line another
 /// process appends may land between the fold and the lock. The opened
-/// ledger travels with the standing it was folded under.
+/// ledger travels with what opening it repaired and the standing it was
+/// folded under.
 ///
 /// # Errors
 /// Propagates opening the ledger, chain verification, and whatever a fold
 /// says about a payload it cannot read.
-pub(crate) fn fold_city(ledger_dir: &Path) -> Result<(Views, (JsonlLedger, Standing)), AxError> {
-    let (ledger, _report) =
+pub(crate) fn fold_city(
+    ledger_dir: &Path,
+) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
+    let (ledger, report) =
         JsonlLedger::open(ledger_dir, super::now_ms()?).map_err(memory::MemoryError::into_ax)?;
     let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
     let mut views = Views::new(city_root_of(ledger_dir));
@@ -150,7 +153,7 @@ pub(crate) fn fold_city(ledger_dir: &Path) -> Result<(Views, (JsonlLedger, Stand
         views.apply(record)?;
         standing.absorb(record)?;
     }
-    Ok((views, (ledger, standing.settle()?)))
+    Ok((views, (ledger, report, standing.settle()?)))
 }
 
 /// Rebuilds the views from the ledger on disk. This is the disposability

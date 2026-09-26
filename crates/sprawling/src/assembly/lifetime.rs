@@ -124,17 +124,18 @@ impl RunWorker {
         (ledger, report): (JsonlLedger, OpenReport),
     ) -> Result<Self, AxError> {
         let standing = Standing::fold(&ledger_dir(city_root))?;
-        RunWorker::holding(city_root, vault, log, (ledger, standing))
+        RunWorker::holding(city_root, vault, log, (ledger, report, standing))
     }
 
     ///
     /// `holding` takes a ledger already opened, its writer lock held, and
-    /// the standing folded from it under that lock.
+    /// what opening it repaired, and the standing folded from it under
+    /// that lock.
     pub(crate) fn holding(
         city_root: &Path,
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
-        (ledger, standing): (JsonlLedger, Standing),
+        (ledger, report, standing): (JsonlLedger, OpenReport, Standing),
     ) -> Result<Self, AxError> {
         let now = now_ms()?;
         let Standing {

@@ -110,7 +110,7 @@ impl Turn<Assembling> {
         // One plan decides every breakpoint: the system blocks, the tail
         // message and the record all read it, so the record names only
         // breakpoints this request carries.
-        let plan = crate::prefix::BreakpointPlan::for_conversation(window.messages());
+        let plan = crate::prefix::BreakpointPlan::for_conversation(conversation.messages());
         let prompt = prefix.prompt_payload(&plan)?;
         self.journal
             .append_authored(ledger, Authored::PromptAssembled, prompt)?;
