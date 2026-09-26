@@ -31,7 +31,7 @@ impl RunWorker {
     /// history does not hold, and a lineage line the ledger refuses.
     /// The last of those leaves a frozen run with no record of where it
     /// came from, which is why it is raised rather than noted.
-    pub(super) fn inherited(
+    pub(in crate::assembly) fn inherited(
         &mut self,
         at: &Assignment,
         run: RunId,

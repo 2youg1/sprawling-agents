@@ -137,7 +137,13 @@ impl RunWorker {
         // what to read to pick it up again: one phase, because the
         // handoff quotes the plan and the plan is what the prefix was
         // assembled for.
-        let (plan, handoff) = self.freeze_plan(&site, &workbench, &at, given)?;
+        let inherited = self.inherited(&at, site.run_id)?;
+        let (plan, handoff) = super::super::freezing::Freezing {
+            city_root: &self.city_root,
+            cas: &mut self.cas,
+            inherited,
+        }
+        .freeze_plan(&site, &workbench, &at, given)?;
         // The probe's second reading, over what this successor was
         // handed and before it takes a turn: the comparison with the
         // predecessor's answers is what says whether the handoff lost
