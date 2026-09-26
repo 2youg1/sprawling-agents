@@ -23,7 +23,7 @@ pub(crate) struct Residents {
 struct Resident {
     server: kernel::McpServer,
     root: std::path::PathBuf,
-    link: McpLink,
+    link: protocol::McpLink,
     /// Each tool under both its names, in the order the server listed
     /// them.
     listed: Vec<(kernel::ToolMeta, String)>,
@@ -89,7 +89,7 @@ impl Resident {
 
         // The run's own root, which exists whether or not this building
         // lends its runs a worktree.
-        let mut link = McpLink::open(&server.transport, write_root, resolve)?;
+        let mut link = protocol::McpLink::open(&server.transport, write_root, resolve)?;
         let mut rpc = protocol::Rpc::new();
         let opened = protocol::handshake(&mut link, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE)?;
         let listing = link.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)?;
@@ -126,99 +126,6 @@ impl Resident {
                 )
             })
             .collect()
-    }
-}
-
-/// Which module a reader should open when a server misbehaves.
-pub(super) fn transport_site(transport: &kernel::McpTransport) -> &'static str {
-    match *transport {
-        kernel::McpTransport::Stdio { .. } => "bin::mcp_stdio",
-        kernel::McpTransport::Http { .. } => "bin::mcp_http",
-        kernel::McpTransport::Sse { .. } => "bin::mcp_sse",
-    }
-}
-
-/// One reachable server, whichever way it is reached.
-///
-/// The three transports differ in where the bytes go and in nothing
-/// else, so the difference is spent here and the wiring above stays one
-/// path.
-#[derive(Clone)]
-pub(crate) enum McpLink {
-    Stdio(crate::mcp_stdio::StdioServer),
-    Http(crate::mcp_http::HttpServer),
-    Sse(crate::mcp_sse::SseServer),
-}
-
-impl McpLink {
-    /// Opens one server as its transport says it is reached.
-    ///
-    /// `write_root` is the run's own root, which exists whether or not
-    /// this building lends its runs a worktree; a child process starts
-    /// there and nowhere else.
-    ///
-    /// # Errors
-    /// Propagates each transport's own refusal to open, every one of
-    /// which names the server and what a person can do about it.
-    pub(crate) fn open(
-        transport: &kernel::McpTransport,
-        write_root: &std::path::Path,
-        resolve: &gateway::SecretResolver,
-    ) -> Result<McpLink, AxError> {
-        match *transport {
-            kernel::McpTransport::Stdio {
-                ref command,
-                ref args,
-                ref env,
-            } => {
-                let env = crate::mcp_redeeming::redeem(env, resolve, "start an mcp server")?;
-                Ok(McpLink::Stdio(crate::mcp_stdio::StdioServer::start(
-                    command, args, &env, write_root,
-                )?))
-            }
-            kernel::McpTransport::Http {
-                ref url,
-                ref headers,
-            } => Ok(McpLink::Http(crate::mcp_http::HttpServer::open(
-                url, headers, resolve,
-            )?)),
-            kernel::McpTransport::Sse {
-                ref url,
-                ref headers,
-            } => Ok(McpLink::Sse(crate::mcp_sse::SseServer::open(
-                url, headers, resolve,
-            )?)),
-        }
-    }
-}
-
-impl McpLink {
-    /// Whether the far end is known to be gone. Only a child process can
-    /// be asked; a host is reached one request at a time, and one that
-    /// has gone fails in the call that reaches it.
-    fn has_ended(&self) -> bool {
-        match *self {
-            McpLink::Stdio(ref held) => held.has_ended(),
-            McpLink::Http(_) | McpLink::Sse(_) => false,
-        }
-    }
-}
-
-impl protocol::Outbound for McpLink {
-    fn call(&mut self, line: &str, patience: kernel::TimeoutMs) -> Result<String, AxError> {
-        match *self {
-            McpLink::Stdio(ref mut held) => held.call(line, patience),
-            McpLink::Http(ref mut held) => held.call(line, patience),
-            McpLink::Sse(ref mut held) => held.call(line, patience),
-        }
-    }
-
-    fn notify(&mut self, line: &str, patience: kernel::TimeoutMs) -> Result<(), AxError> {
-        match *self {
-            McpLink::Stdio(ref mut held) => held.notify(line, patience),
-            McpLink::Http(ref mut held) => held.notify(line, patience),
-            McpLink::Sse(ref mut held) => held.notify(line, patience),
-        }
     }
 }
 
@@ -279,7 +186,7 @@ mod tests {
     fn a_configured_server_becomes_a_tool_the_model_is_told_about_and_can_call() {
         let dir = tempfile::tempdir().unwrap();
         let report = init_city(dir.path()).unwrap();
-        let (command, args) = crate::mcp_stdio::echoing(SERVER_ANSWER);
+        let (command, args) = protocol::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
 
         let (base_url, provider) = fake_openai(
@@ -394,7 +301,7 @@ mod tests {
     fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
-        let (command, args) = crate::mcp_stdio::echoing(SERVER_ANSWER);
+        let (command, args) = protocol::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
         let mut worker = RunWorker::new(
             dir.path(),
@@ -427,7 +334,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
         let starts = dir.path().join("starts.txt");
-        let (command, args) = crate::mcp_stdio::counting_starts(SERVER_ANSWER, &starts);
+        let (command, args) = protocol::counting_starts(SERVER_ANSWER, &starts);
         write_server_table(dir.path(), "lab", &command, &args);
         let mut worker = RunWorker::new(
             dir.path(),

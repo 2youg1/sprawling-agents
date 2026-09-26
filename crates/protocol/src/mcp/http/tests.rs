@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use protocol::Outbound as _;
+use crate::Outbound as _;
 
 /// A vault holding one credential, so a configured header that names
 /// one can be redeemed the way a real building's would be.
@@ -54,11 +54,11 @@ fn a_hosted_server_answers_and_the_configured_header_travels() {
     .unwrap();
     let answer = held
         .call(
-            &protocol::Rpc::new().list_tools(),
-            protocol::EXTERNAL_CALL_PATIENCE,
+            &crate::Rpc::new().list_tools(),
+            crate::EXTERNAL_CALL_PATIENCE,
         )
         .unwrap();
-    assert!(protocol::Rpc::read(&answer).is_ok());
+    assert!(crate::Rpc::read(&answer).is_ok());
     let sent = server.join().unwrap().to_ascii_lowercase();
     assert!(sent.contains("x-desk-key: opaque-value"));
     assert!(sent.contains("accept: application/json, text/event-stream"));
@@ -85,7 +85,7 @@ fn a_refusing_server_states_the_status_without_quoting_its_page() {
     let (url, server) = fake_server(502, "{\"error\":\"account suspended\"}".to_owned());
     let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
     let err = held
-        .call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
+        .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
         .unwrap_err();
     assert_eq!(err.code(), &AxCode::ToolUnavailable);
     assert!(err.subject().contains("502"));
@@ -103,7 +103,7 @@ fn a_server_wanting_an_account_refuses_with_the_credential_code() {
     let (url, server) = fake_server(401, "{\"error\":\"sign in\"}".to_owned());
     let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
     let err = held
-        .call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
+        .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
         .unwrap_err();
     assert_eq!(err.code(), &AxCode::CredentialMissing);
     assert!(err.recovery().contains("vault"), "{}", err.recovery());
@@ -155,11 +155,10 @@ fn a_session_handed_out_at_initialization_travels_on_every_later_request() {
     const OPENED: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{},\"serverInfo\":{\"name\":\"hosted\",\"version\":\"1\"},\"tools\":[]}}";
     let (url, server) = sessioned_server(3, "session-abc", OPENED);
     let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
-    let mut rpc = protocol::Rpc::new();
-    let opened =
-        protocol::handshake(&mut held, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE).unwrap();
+    let mut rpc = crate::Rpc::new();
+    let opened = crate::handshake(&mut held, &mut rpc, crate::EXTERNAL_CALL_PATIENCE).unwrap();
     assert_eq!(opened.protocol_version, "2025-03-26");
-    held.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)
+    held.call(&rpc.list_tools(), crate::EXTERNAL_CALL_PATIENCE)
         .unwrap();
 
     let sent = server.join().unwrap();
@@ -192,7 +191,7 @@ fn a_session_the_server_ended_is_forgotten_rather_than_kept() {
         session.id = Some("stale".to_owned());
     }
     let err = held
-        .call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
+        .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
         .unwrap_err();
     assert!(err.subject().contains("ended this session"));
     assert_eq!(
@@ -219,7 +218,7 @@ fn a_header_naming_a_credential_carries_the_key_and_never_the_reference() {
         &vault(),
     )
     .unwrap();
-    held.call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
+    held.call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
         .unwrap();
     let sent = server.join().unwrap();
     assert!(sent.contains("x-api-key: held-api"), "{sent}");

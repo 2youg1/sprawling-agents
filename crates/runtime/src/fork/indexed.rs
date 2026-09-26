@@ -16,7 +16,8 @@ use std::path::Path;
 use kernel::{AxCode, AxError, EventKind, Seq};
 use memory::{CheckedLine, LedgerIndex, MemoryError};
 
-use super::{Inherited, fold_run, no_start};
+use super::{Inherited, fold_run, forked_from, no_start};
+use crate::conversation::Conversation;
 
 /// Rebuilds the mother's conversation from the ledger, through `at_seq`
 /// or through the nearest safe point before it.
@@ -88,7 +89,15 @@ pub fn inherited_indexed(
         .iter()
         .position(|record| record.kind() == EventKind::RunStarted)
         .ok_or_else(|| no_start(owner))?;
-    fold_run(records.iter().skip(start))
+    // A mother that was herself a branch opened with her own mother's
+    // conversation, which lives on the grandmother's lines, not hers.
+    // The recursion ends because a branch point at or after its own
+    // run_forked line is refused.
+    let mut conversation = Conversation::new();
+    if let Some(origin) = forked_from(owner, &records)? {
+        conversation.push_inherited(&inherited_indexed(index, dir, origin)?.messages);
+    }
+    fold_run(conversation, records.iter().skip(start))
 }
 
 /// The refusal for a line the index does not hold, in the words a

@@ -5,10 +5,9 @@
 
 //! An MCP server run as a child process, spoken to one line at a time.
 //!
-//! The protocol crate knows what to say; this module knows where the
-//! bytes go, how long they may take, and who reclaims the process. All
-//! three belong to the assembly layer, because they are the parts that
-//! touch this machine.
+//! The handshake and the tool calls know what to say; this module knows
+//! where the bytes go, how long they may take, and who reclaims the
+//! process.
 //!
 //! Two decisions are worth reading before changing anything here.
 //!
@@ -34,7 +33,7 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
 
-use crate::mcp_redeeming::Redeemed;
+use super::redeeming::Redeemed;
 
 /// A handle on one running server. Cloning gives a second handle on the
 /// same process, which is what a server offering several tools needs:
@@ -152,7 +151,7 @@ impl std::fmt::Debug for StdioServer {
     }
 }
 
-impl protocol::Outbound for StdioServer {
+impl crate::Outbound for StdioServer {
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError> {
         let mut connection = self.inner.lock().map_err(|_| {
             AxError::failure(
@@ -280,10 +279,11 @@ fn pipes_missing(command: &str) -> AxError {
 ///
 /// One fixed answer is enough to drive discover, list and call, because
 /// what these tests hold is the transport rather than a server's
-/// judgment. It lives outside the test module so the assembly's own
-/// tests can start the same child; it exists in no other build.
-#[cfg(test)]
-pub(crate) fn echoing(answer: &str) -> (String, Vec<String>) {
+/// judgment. It lives outside the test module, behind `conformance`, so
+/// the assembly's own tests can start the same child; it exists in no
+/// other build.
+#[cfg(any(test, feature = "conformance"))]
+pub fn echoing(answer: &str) -> (String, Vec<String>) {
     // A notification is passed over in silence, because a real server
     // does not answer one. A fake that answered everything would leave
     // one unread line in the pipe, and every later call would read the
@@ -317,8 +317,8 @@ pub(crate) fn echoing(answer: &str) -> (String, Vec<String>) {
 /// The server [`echoing`] builds, which also writes one line to
 /// `starts` each time it is started, so a test can count how many
 /// children a sequence of dispatches cost.
-#[cfg(test)]
-pub(crate) fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>) {
+#[cfg(any(test, feature = "conformance"))]
+pub fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>) {
     let (command, mut args) = echoing(answer);
     let mark = if cfg!(windows) {
         format!("Add-Content -LiteralPath '{}' -Value s; ", starts.display())

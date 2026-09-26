@@ -7,10 +7,9 @@
 //! when a branch of that branch is rebuilt.
 
 use kernel::event::record::RunForked;
-use kernel::{Address, AxCode, AxError, EventDraft, EventKind, Payload, RunId, Seq, TimeMs};
-
-use super::known;
-use crate::replay::VerifiedLedger;
+use kernel::{
+    Address, AxCode, AxError, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs,
+};
 
 /// The `run_forked` draft for the city Ledger; the caller supplies the
 /// new run id, the room it lands in, and the clock reading.
@@ -44,17 +43,10 @@ pub fn fork_draft(
 /// it was. The cut must lie before that line: a lineage that pointed at
 /// or past itself is a damaged history, refused rather than followed,
 /// which is also what makes the rebuild's recursion end.
-pub(super) fn forked_from(
-    mother: &VerifiedLedger,
-    owner: RunId,
-    index: usize,
-) -> Result<Option<Seq>, AxError> {
-    let Some(line) = mother
-        .lines()
+pub(super) fn forked_from(owner: RunId, records: &[EventRecord]) -> Result<Option<Seq>, AxError> {
+    let Some(line) = records
         .iter()
-        .take(index)
-        .filter_map(known)
-        .find(|record| record.run() == owner && record.kind() == EventKind::RunForked)
+        .find(|record| record.kind() == EventKind::RunForked)
     else {
         return Ok(None);
     };

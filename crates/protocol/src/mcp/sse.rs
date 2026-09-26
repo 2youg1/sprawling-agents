@@ -38,7 +38,7 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
 
-use crate::mcp_redeeming::{Redeemed, redeem};
+use super::redeeming::{Redeemed, redeem};
 
 /// How long the stream is given to announce where messages go. Shorter
 /// than a call's patience on purpose: this is one line from a server
@@ -64,7 +64,7 @@ pub(crate) struct SseServer {
 
 impl std::fmt::Debug for SseServer {
     /// Names the headers but never their values, for the reason
-    /// `mcp_redeeming::Redeemed` gives.
+    /// `redeeming::Redeemed` gives.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SseServer")
             .field("messages", &self.messages)
@@ -141,7 +141,7 @@ impl SseServer {
     }
 }
 
-impl protocol::Outbound for SseServer {
+impl crate::Outbound for SseServer {
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError> {
         self.post(line, patience)?;
         let events = self.events.lock().map_err(|_| {
@@ -281,11 +281,11 @@ fn resolved_against(url: &str, announced: &str) -> Result<String, AxError> {
 }
 
 fn client_for(url: &str) -> Result<reqwest::blocking::Client, AxError> {
-    // The city's own rule, for the reason `bin::mcp_http` gives: a tool
+    // The city's own rule, for the reason `protocol::mcp::http` gives: a tool
     // server carries no setting of its own, and a proxy in front of a
     // server on this machine answers for something else entirely.
     gateway::client_for(kernel::Proxying::ExceptLocal, url)
-        // Named for the reason `bin::mcp_http` gives: a hosted server
+        // Named for the reason `protocol::mcp::http` gives: a hosted server
         // behind a content delivery network refuses a client that will
         // not say what it is.
         .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")))

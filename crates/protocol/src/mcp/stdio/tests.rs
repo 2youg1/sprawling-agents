@@ -8,7 +8,7 @@
 //! risking two answers swapped, and one process behind every handle.
 
 use super::*;
-use protocol::Outbound;
+use crate::Outbound;
 
 fn silent_server() -> (String, Vec<String>) {
     if cfg!(windows) {
@@ -33,12 +33,10 @@ fn a_real_child_answers_over_the_pipe_and_the_answer_reads_as_a_result() {
     let dir = tempfile::tempdir().unwrap();
     let (command, args) = echoing("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}");
     let mut server = StdioServer::start(&command, &args, &[], dir.path()).unwrap();
-    let mut rpc = protocol::Rpc::new();
+    let mut rpc = crate::Rpc::new();
     let line = rpc.list_tools();
-    let answer = server
-        .call(&line, protocol::EXTERNAL_CALL_PATIENCE)
-        .unwrap();
-    let result = protocol::Rpc::read(&answer).unwrap();
+    let answer = server.call(&line, crate::EXTERNAL_CALL_PATIENCE).unwrap();
+    let result = crate::Rpc::read(&answer).unwrap();
     assert!(result.get("tools").is_some(), "{result}");
 }
 
@@ -48,7 +46,7 @@ fn a_request_carrying_a_newline_is_refused_before_it_becomes_two_messages() {
     let (command, args) = echoing("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}");
     let mut server = StdioServer::start(&command, &args, &[], dir.path()).unwrap();
     let err = server
-        .call("{\"a\":\n\"b\"}", protocol::EXTERNAL_CALL_PATIENCE)
+        .call("{\"a\":\n\"b\"}", crate::EXTERNAL_CALL_PATIENCE)
         .unwrap_err();
     assert_eq!(err.code(), &AxCode::WireMismatch);
     assert!(err.subject().contains("newline"));
@@ -89,12 +87,12 @@ fn two_handles_are_two_tools_talking_to_one_process() {
     let mut second = server.clone();
     assert!(
         first
-            .call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
+            .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
             .is_ok()
     );
     assert!(
         second
-            .call("{\"id\":2}", protocol::EXTERNAL_CALL_PATIENCE)
+            .call("{\"id\":2}", crate::EXTERNAL_CALL_PATIENCE)
             .is_ok()
     );
 }
@@ -115,7 +113,7 @@ fn what_a_building_writes_beside_a_server_reaches_the_child() {
             )
             .with_recovery("store it first"))
         });
-    let env = crate::mcp_redeeming::redeem(
+    let env = crate::mcp::redeeming::redeem(
         &[("SPRAWLING_TEST_KEY".to_owned(), "opaque-value".to_owned())],
         &refuse_every_reference,
         "start an mcp server",
@@ -123,9 +121,9 @@ fn what_a_building_writes_beside_a_server_reaches_the_child() {
     .unwrap();
     let mut server = StdioServer::start(&command, &args, &env, dir.path()).unwrap();
     let answer = server
-        .call("{\"id\":1}", protocol::EXTERNAL_CALL_PATIENCE)
+        .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
         .unwrap();
-    let result = protocol::Rpc::read(&answer).unwrap();
+    let result = crate::Rpc::read(&answer).unwrap();
     assert_eq!(
         result.get("seen").and_then(serde_json::Value::as_str),
         Some("opaque-value")

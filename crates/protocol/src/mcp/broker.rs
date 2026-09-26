@@ -3,8 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Three calls and nothing else: what is on the shelf, an auth config
-//! to connect through, and the consent page to send a person to.
+//! The broker that holds an outside application's OAuth, in three calls
+//! and nothing else: what is on the shelf, an auth config to connect
+//! through, and the consent page to send a person to.
+//!
+//! The transports beside this module reach any tool server and have never
+//! heard of a particular one. This is the single module allowed to know
+//! that a given server is Composio's. How a call leaves this machine is
+//! still decided once, by `gateway::client_for`; one broker exists, so
+//! there is no trait here.
 //!
 //! **The field names below are read defensively on purpose.** They are
 //! this module's reading of somebody else's JSON, and a missing field
@@ -16,10 +23,9 @@
 
 use std::time::Duration;
 
+use gateway::client_for;
 use kernel::{AxCode, AxError, Proxying, Sealed};
 use serde_json::{Value, json};
-
-use crate::reach::client_for;
 
 #[cfg(test)]
 mod tests;
@@ -87,7 +93,17 @@ impl Broker {
     /// Binds a key to a client that reaches the broker the way this
     /// machine is configured to.
     pub fn new(key: Sealed<String>, rule: Proxying) -> Result<Self, AxError> {
-        let client = client_for(rule, BASE)
+        Self::built(key, rule, BASE)
+    }
+
+    /// The same broker, answering somewhere else. Test seam.
+    #[cfg(test)]
+    fn at(base: &str, key: Sealed<String>) -> Result<Self, AxError> {
+        Self::built(key, Proxying::ExceptLocal, base)
+    }
+
+    fn built(key: Sealed<String>, rule: Proxying, base: &str) -> Result<Self, AxError> {
+        let client = client_for(rule, base)
             .timeout(DEADLINE)
             .build()
             .map_err(|failed| {
@@ -100,27 +116,6 @@ impl Broker {
             })?;
         Ok(Broker {
             client,
-            key,
-            base: parsed(BASE)?,
-        })
-    }
-
-    /// The same broker, answering somewhere else. Test seam.
-    #[cfg(test)]
-    fn at(base: &str, key: Sealed<String>) -> Result<Self, AxError> {
-        Ok(Broker {
-            client: reqwest::blocking::Client::builder()
-                .timeout(DEADLINE)
-                .no_proxy()
-                .build()
-                .map_err(|failed| {
-                    AxError::failure(AxCode::Provider, "build a test client", failed.to_string())
-                        .with_recovery(
-                            "check the proxy settings this machine exports \
-                             (`HTTPS_PROXY`, `NO_PROXY`) and the TLS roots this build \
-                             was given",
-                        )
-                })?,
             key,
             base: parsed(base)?,
         })
@@ -327,8 +322,9 @@ impl Broker {
                 bad.to_string(),
             )
             .with_recovery(format!(
-                "report this against gateway::mcp::broker: the path `{path}` does not \
-                 join onto the broker's base url"
+                "report this against {}: the path `{path}` does not join onto the \
+                 broker's base url",
+                module_path!()
             ))
         })?;
         {

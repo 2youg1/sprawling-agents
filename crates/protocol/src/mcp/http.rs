@@ -29,7 +29,7 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
 
-use crate::mcp_redeeming::{Redeemed, redeem};
+use super::redeeming::{Redeemed, redeem};
 
 /// What the far end told us about itself, and what has to travel back.
 #[derive(Debug, Default)]
@@ -79,24 +79,7 @@ impl HttpServer {
         // key the vault does not hold is a configuration error and not a
         // server that happens to be down.
         let headers = redeem(headers, resolve, "reach an mcp server")?;
-        // The city's own rule: a server a person started on this machine
-        // is reached by address, and a proxy in front of it answers for
-        // something else entirely. A tool server carries no setting of
-        // its own, so the default is what applies here.
-        let client = gateway::client_for(kernel::Proxying::ExceptLocal, url)
-            // Named, because a hosted server sitting behind a content
-            // delivery network refuses a client that will not say what
-            // it is: reaching Exa's endpoint without this answers 403
-            // `browser_signature_banned` before any MCP message is read.
-            .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")))
-            .build()
-            .map_err(|err| {
-                AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
-                    .with_recovery(
-                        "check this server's url in the MCP settings and the proxy \
-                         settings this machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
-                    )
-            })?;
+        let client = client_for(url)?;
         Ok(HttpServer {
             url: url.to_owned(),
             headers,
@@ -228,7 +211,7 @@ struct Exchange {
     body: String,
 }
 
-impl protocol::Outbound for HttpServer {
+impl crate::Outbound for HttpServer {
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError> {
         let exchange = self.post(line, patience)?;
         if !(200..300).contains(&exchange.status) {
@@ -287,6 +270,30 @@ fn one_message(body: &str) -> Option<String> {
         .find_map(|line| line.strip_prefix("data:"))
         .map(|line| line.trim().to_owned())
         .filter(|line| line.starts_with('{'))
+}
+
+/// The client every MCP server reached over HTTP is spoken to through,
+/// by this transport and by `protocol::mcp::sse` alike.
+///
+/// The proxy rule is the city's own: a tool server carries no setting of
+/// its own, and a proxy in front of a server on this machine answers for
+/// something else entirely. The client says what it is, because a hosted
+/// server behind a content delivery network refuses one that will not:
+/// reaching Exa's endpoint without a user agent answers 403
+/// `browser_signature_banned` before any MCP message is read.
+///
+/// # Errors
+/// `AxCode::ConfigInvalid` when this machine cannot build the client.
+pub(super) fn client_for(url: &str) -> Result<reqwest::blocking::Client, AxError> {
+    gateway::client_for(kernel::Proxying::ExceptLocal, url)
+        .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|err| {
+            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+                .with_recovery(
+                    "check this server's url in the MCP settings and the proxy settings                      this machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
+                )
+        })
 }
 
 #[cfg(test)]

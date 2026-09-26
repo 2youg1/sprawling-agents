@@ -5,12 +5,13 @@
 
 //! The trees a crash left behind, swept when the city opens.
 //!
-//! A tree goes back only through [`Worktrees::release`], and its name is
-//! a run id that never comes back, so [`Worktrees::claim`]'s own repair
-//! never meets the tree of a run whose process died. What such a run
-//! leaves is three things: git's registration, the directory under the
-//! reserved subtree, and the branch git made for it. This module takes
-//! back each of them, and only what the city made (memory-SPEC 8-9).
+//! A released tree stays on disk for the next claim of its name within
+//! one serving; when the city opens, the ledger's writer lock means no
+//! run holds any tree, so every tree the city made is left over from an
+//! earlier serving, a crashed one included. What each leaves is three
+//! things: git's registration, the directory under the reserved subtree,
+//! and the branch git made for it. This module takes back each of them,
+//! and only what the city made (memory-SPEC 8-9).
 
 use std::path::{Path, PathBuf};
 

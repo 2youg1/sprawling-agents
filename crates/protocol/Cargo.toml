@@ -5,9 +5,22 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# A child that answers every line with one fixed result, for the tests of
+# a crate that wires MCP servers in. Off in every build a person runs.
+conformance = []
+
 [dependencies]
 kernel = { path = "../kernel" }
+# An MCP server reached over HTTP gets its client from
+# `gateway::client_for`, and a `secret:realm/name` reference beside a
+# server is redeemed through `gateway::SecretResolver`.
+gateway = { path = "../gateway" }
+reqwest = { workspace = true }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true

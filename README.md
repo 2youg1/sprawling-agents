@@ -212,7 +212,7 @@ I sell neither APIs nor account hosting, so everything external sits on a seam a
 |---|---|---|
 | Subscription-login intel (followed from the four harness families listed in [`docs/third-party.md`](docs/third-party.md) §1) | `gateway::oauth_profiles` (data only, zero branches), `gateway::credential` (flow & renewal) | Add one profile line. **Credential custody is never outsourced**: plaintext reaches only the local credential store. |
 | Model endpoint & dialect | `gateway::endpoint`, `gateway::dialect`; local inference via `gateway::native` | Enter base URL and dialect on the settings page; local models connect directly, bypassing the gateway. |
-| SaaS & external tools ([Composio](https://composio.dev) is one MCP server among others) | `protocol::mcp` `Outbound` seam, `bin::mcp_stdio` & `bin::mcp_http`, the building’s `CONFIG.toml` | Change one URL or one command to switch servers; confidential buildings start none. |
+| SaaS & external tools ([Composio](https://composio.dev) is one MCP server among others) | `protocol::mcp` `Outbound` seam, `protocol::mcp::stdio` & `protocol::mcp::http`, the building’s `CONFIG.toml` | Change one URL or one command to switch servers; confidential buildings start none. |
 | Sandbox | `runtime::sandbox` seam (current adapter is wasmtime fuel) | Implement the seam and pass its conformance assertion suite. |
 | Client | `channels::wire` is the sole API surface | Want a second client? Write against this wire format. |
 

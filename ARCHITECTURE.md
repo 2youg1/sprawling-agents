@@ -161,7 +161,7 @@ runtime: kernel, memory, gateway
 collab: kernel, memory
 city: kernel
 browser: kernel
-protocol: kernel
+protocol: kernel, gateway
 channels: kernel
 sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels
 ```
@@ -186,7 +186,9 @@ repository readable:
 | Event | anywhere a `kernel::Ledger` handle is held | writing `tool_result` after a tool runs |
 
 Below the binary no crate depends on more than two others: `runtime` and
-`collab` each use `kernel` and `memory`, and `sprawling` is the only crate
+`collab` each use `kernel` and `memory`, `protocol` uses `kernel` and
+`gateway` (an MCP server reached over HTTP gets its client from
+`gateway::client_for`, the one place a client is built), and `sprawling` is the only crate
 that depends on most of the workspace. The `depmap` block above also lets `runtime` use
 `gateway`, and the code does not take that edge yet. A crate may **use**
 the interfaces of what it depends on and nothing more; the moment a
@@ -524,6 +526,7 @@ there is no random source in the simulator today to seed.
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
 | 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader, and `runtime::turn::wave`, whose scoped threads run the read-only prefix of a tool wave and are all joined before the wave accounts a single result. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
+| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader, and `protocol::mcp::stdio` and `protocol::mcp::sse`, which give each MCP connection one reader that ends when the connection closes. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the console, first run, and the doctor's probe reader |
 | 4 | Seeded RNG handed out from one place | assembly derives per session |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |

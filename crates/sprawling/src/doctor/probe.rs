@@ -15,7 +15,7 @@
 //!
 //! **A version call has a deadline.** A tool installed half-way can hang
 //! on start-up, and a doctor that hangs is worse than a tool that is
-//! missing. The shape is `bin::mcp_stdio`'s: the read happens on a
+//! missing. The shape is `protocol::mcp::stdio`'s: the read happens on a
 //! thread, the wait happens on a channel that has a deadline, and a
 //! deadline that passes kills the child. The deadline itself arrives as
 //! a parameter, so no clock is sampled here.
