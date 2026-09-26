@@ -333,6 +333,7 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
                 "task": "plan the week",
                 "goal": "a roadmap",
                 "job": "file:hall/mayor@0123456789abcdef0123456789abcdef01234567",
+                "dispatched_by": "person",
             }),
             TimeMs::new(10),
         ),
@@ -366,10 +367,16 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
     let channels::Answer::Rounds(answer) = views.answer(&channels::Query::Rounds { run }) else {
         panic!("Rounds answers with rounds");
     };
-    let opening = answer.opening.expect("the window held run_started");
-    assert_eq!(opening.task, "plan the week");
-    assert_eq!(opening.goal, "a roadmap");
-    assert_eq!(opening.at, TimeMs::new(10));
+    assert_eq!(
+        answer.opening,
+        Some(channels::Opening {
+            task: "plan the week".to_owned(),
+            goal: "a roadmap".to_owned(),
+            at: TimeMs::new(10),
+            dispatched_by: Some(kernel::event::Who::Person),
+        }),
+        "the opening carries who dispatched the run, as run_started records it"
+    );
     let closing = answer.closing.expect("the window held run_frozen");
     assert_eq!(closing.completion, "done");
     assert_eq!(closing.at, TimeMs::new(12));

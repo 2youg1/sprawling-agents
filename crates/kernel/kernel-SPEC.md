@@ -387,6 +387,7 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub task: String, pub goal: String, pub job: Option<Locator>,
     pub parent: Option<RunId>, pub predecessor: Option<RunId>,
     pub skills: Vec<SkillPin>,          // 空亦写出
+    pub dispatched_by: Option<Who>,     // 由谁派来：person／city／派活的居民地址；缺键为 None
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录

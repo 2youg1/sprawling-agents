@@ -751,6 +751,7 @@ pub struct RunPlan {                 // 一个 Run 的全部常量，调用方�
     pub opening: Opening,                                 // 这一场是接了写下来的活，还是人在场
     pub parent: Option<RunId>,                            // 派活给它的那个 Run
     pub predecessor: Option<RunId>,                       // 把这场活交给它的前任，深度守恒
+    pub dispatched_by: Who,                               // 由谁派来，写进 run_started 的 dispatched_by
     pub shape: CallShape,
     pub prefix: FrozenPrefix, pub policy: BuildingPolicy, pub tools: Vec<ToolDef>,
     pub skills: Vec<SkillPin>,                            // 阅览室准进了什么，当时各是什么字节

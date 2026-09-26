@@ -217,6 +217,10 @@ pub struct Opening {
     pub task: String,
     pub goal: String,
     pub at: TimeMs,
+    /// Who dispatched the run, as its `run_started` records it; `None`
+    /// for a ledger written before the key existed.
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub dispatched_by: Option<kernel::event::Who>,
 }
 
 /// How a session ended, in the word the run froze with: `done`,
