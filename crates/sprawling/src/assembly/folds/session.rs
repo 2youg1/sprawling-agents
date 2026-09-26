@@ -22,6 +22,11 @@
 //!   from a line of it has inherited as much as there is to inherit, so
 //!   the room has nothing pending afterwards.
 //!
+//! A session opened with `--carry` is owed one more thing, the address
+//! of the previous run's transcript, and it is owed it the same way: the
+//! room's last `run_started` names the run, `session_opened` with
+//! `carried` marks it owed, and the next `run_started` there spends it.
+//!
 //! **The map is not a second authority for the lineage.** What run
 //! continues what is in the ledger, and stays there; this holds only
 //! the question a dispatch asks before it has a run to name - "is this
@@ -30,13 +35,17 @@
 
 use std::collections::BTreeMap;
 
-use kernel::{Address, AxError, EventKind, Origin};
+use kernel::{Address, AxError, EventKind, Origin, RunId};
 
 /// What each room's current session branched from, and whether the run
 /// that begins it has been started yet.
 #[derive(Default)]
 pub(in crate::assembly) struct SessionOrigins {
     pending: BTreeMap<Address, Origin>,
+    /// The run each room started last.
+    last_run: BTreeMap<Address, RunId>,
+    /// The run whose transcript a carried session's first run is told about.
+    carried: BTreeMap<Address, RunId>,
 }
 
 impl SessionOrigins {
@@ -51,10 +60,12 @@ impl SessionOrigins {
     /// Refuses a `session_opened` payload whose `from` cannot be read as
     /// an origin: a session whose beginning does not say what it branched
     /// from would otherwise be read as one that branched from nothing,
-    /// which is a different session.
+    /// which is a different session. A line written before `from`
+    /// existed reads as a session without a branch, which is what it was.
     pub(in crate::assembly) fn absorb(
         &mut self,
         kind: EventKind,
+        run: RunId,
         addr: Option<&Address>,
         data: &kernel::Payload,
     ) -> Result<(), AxError> {
@@ -63,14 +74,28 @@ impl SessionOrigins {
                 let Some(addr) = addr else {
                     return Ok(());
                 };
-                let opened = crate::views::session_opened(data)?;
-                match opened {
+                let opened = data.read::<kernel::event::record::SessionOpened>()?;
+                match opened.from {
                     Some(origin) => {
                         self.pending.insert(addr.clone(), origin);
                     }
                     None => {
                         self.pending.remove(addr);
                     }
+                }
+                match self.last_run.get(addr).filter(|_| opened.carried) {
+                    Some(last) => {
+                        self.carried.insert(addr.clone(), *last);
+                    }
+                    None => {
+                        self.carried.remove(addr);
+                    }
+                }
+                Ok(())
+            }
+            EventKind::RunStarted => {
+                if let Some(addr) = addr {
+                    self.started(addr, run);
                 }
                 Ok(())
             }
@@ -86,7 +111,6 @@ impl SessionOrigins {
             EventKind::CityInitialized
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured
-            | EventKind::RunStarted
             | EventKind::PromptAssembled
             | EventKind::PromptShapeCompared
             | EventKind::ModelCalled
@@ -161,6 +185,23 @@ impl SessionOrigins {
     /// What this room's session is still owed, if anything.
     pub(in crate::assembly) fn get(&self, addr: &Address) -> Option<Origin> {
         self.pending.get(addr).copied()
+    }
+
+    /// The run whose transcript this room's carried session has not yet
+    /// named to a run of its own, if any.
+    pub(in crate::assembly) fn carried_from(&self, addr: &Address) -> Option<RunId> {
+        self.carried.get(addr).copied()
+    }
+
+    /// Records `run` as the room's last run, which spends what a carried
+    /// session was owed.
+    ///
+    /// Called by the fold on `run_started` and directly by the freeze
+    /// that begins a run, because the runtime writes that line and the
+    /// worker is not shown it.
+    pub(in crate::assembly) fn started(&mut self, addr: &Address, run: RunId) {
+        self.carried.remove(addr);
+        self.last_run.insert(addr.clone(), run);
     }
 
     /// Marks the inheritance spent: the run that begins the session has

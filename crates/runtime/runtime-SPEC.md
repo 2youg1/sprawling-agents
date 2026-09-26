@@ -146,6 +146,9 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 **上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`fold_run` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
 
 **写账本的那一方走索引（`fork::indexed`）。** 持有账本的 worker 为一次分支重建只需要母 run 自己的那几行：`inherited_indexed` 用 `LedgerIndex::line_at` 读 `at_seq` 那一行定出母 run，再按 `run_seqs_before` 只读这条 run 的行，每一行先过 `memory::read_line`——它与验链门逐行所用的 `LineCheck::advance` 共用同一条分类规则：已知 kind 解析成记录，带 `ig` 的新 kind 跳过，其余（撕裂、不规范、无 `ig` 的未知 kind）以 `LineFault` 的码拒绝；切点与消息都由 `fold_run` 一处判定。它不验链：worker 是这本账唯一的写者，打开时已经过尾部恢复；而 `verify_ledger_dir` 为这一问把整本历史读进内存、逐行验链再解析（94 MB 的账本上是 +67 MiB 的瞬时内存）。拒绝写成人能照做的话：`at_seq` 不在索引里是 `outside`，恢复语给出母序列止于哪个 seq，母 run 在这之前没有 `run_started` 是同一条 `E_INVALID_ARGS`。
+**母亲自己是分支时，先重建她开场时继承的那段。** 流动循环里母亲的窗口以 `RunPlan::inherited` 开头，那段对话不在她自己的线上；她的 `run_forked`（`run` 是她、`from`／`at_seq` 指向祖母的切点）才是它的出处。所以 `inherited` 先找属主 run 的 `run_forked`，按其 `at_seq` 递归重建祖母的对话，经 `push_inherited` 放在最前，再折母亲自己的线——与 `Run::begin` 同一顺序。递归只往账本更早处走（`at_seq` 必须早于那条 `run_forked`，否则拒），所以一定终止。
+
+**上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`inherited` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
 
 **`addr` 落在 `run_forked` 的那一行上**：新 run 的 id 说的是「谁继续谁」，而地址说的是**哪个房间的这次继承已经用掉了**——`assembly::folds::session` 只用这两个字段回答「这个房间的当前一段是否还欠一段对话」。
 
@@ -300,7 +303,7 @@ pub struct Window { /* messages: Vec<ChatMessage> —— 私有；执行器持�
 impl Window { pub fn new() -> Window;
     pub fn push_steer(&mut self, source: &str, text: &str);          // 「user」或「@ID」前缀形
     pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening);  // 首轮，run_started 可重建
-pub enum Opening { FromJob, WithPerson }   // 穷尽两臂，城在写 brief 时已决定
+pub enum Opening { FromJob, Inherited, WithPerson }   // 穷尽三臂，城在写 brief 时已决定；Inherited 只由 fork 选
     pub fn push_assistant(&mut self, content: Vec<ContentBlock>);
     pub fn push_tool_results(&mut self, results: Vec<ContentBlock>); // ToolResult 块（pipeline 产出的成品文本）
     pub fn messages(&self) -> &[ChatMessage]; }
@@ -331,10 +334,7 @@ impl<'r> RunPrompt<'r> { pub fn new(prefix: &'r FrozenPrefix, recorded: &'r mut 
 **prefix 四段全量**（新增构建面；既有 FrozenSegment/assemble 不动）：
 
 ```rust
-pub struct SourceDoc { pub addr: Address, pub bytes: Option<Vec<u8>>,   // None＝缺失或不可读（跳过入账）
-                        pub producer: Option<SummaryProducer> }   // 本文档是压缩摘要时它的生产者指纹；非摘要＝None
-pub enum SummaryProducer { Written { model: String, generation: NonZeroU32 }, Unknown }
-    // 住 kernel::event::record（记录字段的类型归 kernel），随 `PromptSource` 行走；
+pub struct SourceDoc { pub addr: Address, pub bytes: Option<Vec<u8>> }   // None＝缺失或不可读（跳过入账）
     // `generation` 数的是摘要的代数（链上第一份＝1，摘要的摘要加一），`NonZeroU32`
     // 使「还没数」拼不出 0——零与未知是两件事，与 `ModelReturned` 缺席≠报零同族。
 pub struct SegmentCaps { pub city: u64, pub building: u64, pub resident: u64, pub run: u64 }  // 字节上限；来源＝调用方（`startup_default` 取 STARTUP_BUDGET_TOKENS × BYTES_PER_TOKEN ÷ PREFIX_SLOTS）
@@ -344,12 +344,11 @@ pub struct PrefixBuild { pub prefix: FrozenPrefix, pub notes: Payload }   // not
 pub fn build_prefix(plan: PrefixPlan) -> Result<PrefixBuild, AxError>;
 ```
 
-- **首轮不再指向任何东西**：`JOB.md` 的正文已是 Run 段，故 `FULL READ:` 那一行与它携的 `cas:b3-…` 一起取消——城里没有一个工具解析得了内容哈希，而溯源在 Ledger 里已记两遍。`Opening` 的两臂不是排版偏好：被派了一件活的会话与正在和人说话的会话要的第一句话不同，而把人那句话包成 `Task:`／`Goal:` 表单，换回来的也是一张表单。
+- **首轮不再指向任何东西**：`JOB.md` 的正文已是 Run 段，故 `FULL READ:` 那一行与它携的 `cas:b3-…` 一起取消——城里没有一个工具解析得了内容哈希，而溯源在 Ledger 里已记两遍。`Opening` 的两臂不是排版偏好：被派了一件活的会话与正在和人说话的会话要的第一句话不同，而把人那句话包成 `Task:`／`Goal:` 表单，换回来的也是一张表单。**`FromJob` 的开场行不复述任务**：它只写 `The task is in JOB.md above.` 与 `Goal: <goal>` 两行——任务正文已在 Run 段，再抄一遍，人贴的一段话每次请求就付两遍（Run 段不在缓存里，每回合全价）。Goal 仍写在这里，因为它是「什么时候停」，短，且是这一行唯一不重复的指令。**分叉重建的母亲开场用 `Inherited`**：母亲的 `JOB.md` 在她的房间里，不在分叉的 Run 段里，所以那一行写 `Task: <task>` 与 `Goal: <goal>`；若照搬 `FromJob`，分叉读到的「在上面的 JOB.md 里」指向一个它看不见的文件，母亲的任务就丢了。
 - **read 的两条路，差别在于谁选的**：**路径是模型选的，故受审**——`Address::parse` 杀穿越，`is_reserved` 杀保留子树（`E_GATE_DENIED`）；**catalog 里的名字是人选的**——楼的阅览室写下它时准入就已发生，故它解到的 skill 可以住在保留空间里。两条路共用一个参数，因为对模型而言它们是同一件事（把一份东西调到眼前）；**先问 catalog** ，一个同名文件不得遮蔽楼已经准入的 skill。
 - **`Catalog::expand` 改答 `Expansion { Skill { addr }, Said { text } }` 而不是 `String`**：skill 展开成一个可打开的地址，其余展开成目录自己持有的正文；两者压成一个字符串时，调用方只能拿它去试解析成地址，而一段恰好能解析成地址的正文就会被当成文件打开。
 - **正文不在 prompt 里，所以交出去而不是拒绝**：`render()` 只写每条的 disclosure，`expansion` 从未进过窗口。
 - **它是 `Catalog::expand` 的第一个调用者**：在它之前，一栋楼的阅览室能报出一个 skill 的名字而永远交不出它。
-- **压缩摘要的来源行携生产者指纹**：`SourceDoc.producer` 一路随文档走 `SegmentSource` → `PromptSource` 行，`prompt_assembled` 因此对每份压缩摘要标注生产模型与代数。**读取端恒答 `producer()`，键缺席即 `Unknown`，永不补猜**：一行没写这个键，是「这份记录没说」，而回放恰好跑在哪个模型上不构成答案。缺席与显式 `Unknown` 在读取端同归 `Unknown`，在写入端则不同——非摘要的行不写这个键，来源不明的摘要写 `"unknown"`，于是「不是摘要」与「摘要但不知谁写的」在账上可分。
 - 截断：文件超段位余额即截到边界，原处留 ASCII 标记（文本与切口规则属 `runtime::elision`，§8-42），恒不静默丢尾；标记字节从段预算先扣。
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读。
 - 断点只有一个作者：`prefix::BreakpointPlan`（`prefix/breakpoint.rs`，形状 1 判定，纯函数）。`BreakpointPlan::for_conversation(&[ChatMessage])` 决定一次请求实际发出的断点：前三段（city／building／resident）的段界各一个，对话非空时尾消息再一个，合计 ≤ `CACHE_BREAKPOINTS_MAX`（4）；run 段界不放，因为尾锚紧随其后已覆盖它。`FrozenPrefix::system_blocks()` 以 `BreakpointPlan::marks_edge(slot)` 标 system 块，`BreakpointPlan::mark` 标消息，`prompt_payload(&plan)` 把 `plan.breakpoints()` 逐个拼成 `breakpoints` 行（段界写 slot 名，尾写 `tail`）；`verified_system_hashes` 以同一个 `marks_edge` 核对线上的块。兼容格式只负责拼写（Anthropic：被标记消息的最后一块带 `cache_control`），不决定任何断点。
@@ -365,6 +364,10 @@ impl BreakpointPlan {
 ```
 - A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源的键以 `kernel::event::record::PromptSource` 为准：`{addr, kept, marker, dropped, producer}`，其中 `producer` 不参与对拍，因为哈希只盖段字节、指纹不是字节的一部分）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。拼接分隔符的唯一权威住 prefix.rs（`DOC_JOIN`），截断标记的唯一权威住 `runtime::elision`（§8-42），replay 同 crate 复用不另拷。
 - E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径（S4 serve；台账登记）。补写方经 `ToolCalled`／`ToolResult` 两个结构读写，读不懂即拒绝：若手挑 `id` 与 `name` 两个键、读不出就写下 `"unknown"`，一条这个 build 读不懂的调用就会被关在一个谁也答不上的 id 上。
+- 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读不再自定。
+- 断点：`FrozenPrefix::system_blocks()` 产四块、逐块 cache=true＝断点恒 4＝`CACHE_BREAKPOINTS_MAX`，断点只落段界。
+- A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源的键以 `kernel::event::record::PromptSource` 为准：`{addr, kept, marker, dropped}`）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。拼接分隔符的唯一权威住 prefix.rs（`DOC_JOIN`），截断标记的唯一权威住 `runtime::elision`（§8-42），replay 同 crate 复用不另拷。
+- E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径（S4 serve；台账登记）。补写方经 `ToolCalled`／`ToolResult` 两个结构读写：此前它手挑 `id` 与 `name` 两个键、任一读不出就写下 `"unknown"`，于是一条这个 build 读不懂的调用被关在一个谁也答不上的 id 上；现在读不懂就是一次拒绝。
 - handoff：形已全（五段＋构造点＋resume 消费），无改动；「下一步段首列用户指定动作」属生产者纪律（S3 执行器／P2 spine_files），类型不另加钩。
 - 第四取消点（派生前）：无派生生产者时推迟落地，理由是提前落地＝死入口＋不可测。`collab::delegate_tool` 是那个生产者：`SafePoint::BeforeSpawn` ＋ `Turn<Recording>::record(interrupt, ledger)`，装配层在 `Completion::Cancelled` 时清空派生台，**被取消的 Run 一件活也交不下去**。
 
@@ -417,14 +420,18 @@ impl Adviser { pub fn none() -> Adviser;
 ### 8-8 runtime::offload（形状 1；四不变量的独占定义处）
 
 ```rust
-pub struct OffloadSite<'a> { pub cas: &'a mut memory::Cas, pub environment: &'a std::path::Path }
-pub struct OffloadRecord { pub substitute: Vec<u8>, pub original: Locator, pub rest_path: std::path::PathBuf,
+pub const REST_DIR: &str = ".rest";
+pub struct OffloadSite<'a> { pub cas: &'a mut memory::Cas, pub city_root: &'a std::path::Path,
+                             pub room: &'a kernel::Address }
+pub struct OffloadRecord { pub substitute: Vec<u8>, pub original: Locator, pub rest_path: String,
                            pub original_len: u64 }
 pub fn offload(bytes: &[u8], cap_bytes: u64, site: &mut OffloadSite<'_>) -> Result<OffloadRecord, AxError>;
-pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<std::path::PathBuf, AxError>;
+pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<String, AxError>;
 ```
 
-- 四不变量逐条入断言：①先存后缩（入参恒为全量字节，cas.put 先于一切裁剪）；②替代体含提示句恒 ≤ 原件且 ≤ cap（提示句字节先扣）；③只有有损才存（调用者保证 len>cap 才进来；函数内再断言，违反＝E_INVALID_ARGS）；④替代体恒携 rest_path：物化只读文件于 environment，内容＝全量原件；命中既有 CAS 对象即直引（幂等）。
+- `rest_path` 是 rest 文件的城市地址 `<房间地址>/.rest/rest-<hash 尾 16 位>.dat`：以城市根为基、正斜杠、不含 `.` 段，每台机器上逐字节相同。模型的读工具先用 `Address::parse` 收下模型给的路径、再从城市根解析，所以这个地址它能直接读；站点因此携带房间的 `Address` 而不是一条房间 `Path`，物理位置由 `city_root` 与房间地址拼出，地址只有这一种拼法。`./` 起头的房间相对地址会被 `Address::parse` 以 `E_INVALID_ARGS` 拒掉；OS 绝对路径既会把一台机器的家目录写进账本，又让同一颗种子在两台机器上重放出不同的窗口。`REST_DIR` 是这个目录名的唯一定义处，目录由物化时建出。
+
+- 四不变量逐条入断言：①先存后缩（入参恒为全量字节，cas.put 先于一切裁剪）；②替代体含提示句恒 ≤ 原件且 ≤ cap（提示句字节先扣）；③只有有损才存（调用者保证 len>cap 才进来；函数内再断言，违反＝E_INVALID_ARGS）；④替代体恒携 rest_path：物化只读文件于房间的 `REST_DIR`，内容＝全量原件；命中既有 CAS 对象即直引（幂等）。
 - 替代体形：头部字节＋`\n[offloaded: total N bytes; rest at <rest_path>; original <locator>]`；提示句 ASCII。
 - rematerialize：rest_path 被外部清理后自 CAS 重建，字节一致（A7 第三断言）。
 
@@ -645,7 +652,7 @@ impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render
 // 创建住 edit 而非新工具，因为「文件变更＋乐观并发」已是本工具拥有的唯一权威，“absent”只是版本的一个取值。
 
 // tools/status.rs —— 十三字段
-pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode, pub ctx_used: Tokens,
+pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode,
     pub ctx_limit: Tokens, pub budget_usd: UsdMicros, pub budget_tokens: Tokens, pub trust: String,
     pub write_domain: String, pub locks: Vec<String>, pub worktree_path: String, pub worktree_disk: ByteLen,
     pub signals_pending: u32, pub children: Vec<ChildStatus>, pub now: Option<ClockStamp>,
@@ -656,12 +663,14 @@ pub struct StatusTool { /* snapshot＋ children: Box<dyn Fn() -> Vec<ChildStatus
 impl StatusTool {
     pub fn watching(snapshot: StatusSnapshot, children: Box<dyn Fn() -> Vec<ChildStatus> + Send>) -> Result<StatusTool, AxError>;
     pub fn reporting(self, backlog: Backlog) -> StatusTool;   // §8-28-2：末行 `backlog:` 从表里现读，与 children 同一理由
+    pub fn metering(self, context: ContextReading) -> StatusTool;   // `ctx:` 行的用量从运行的读数现读
 }
 impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timestamped、render=Generic；渲染序末尾追加 backlog 一行 */ }
 
 // ToolBench 住 turn.rs：按 Effect 过门是回合层职责，不另立 bench 模块。
 
 - **`children` 为何重塑**：旧形状 `{run, phase, ctx_used, ctx_lock}` 预设子已在跑。真实情形是子 Run 在父嚽结之后才开，故父自己那一跑里 **子既无 run id 也无上下文读数**——四个字段里三个只能填零，而零与未知是两件事。现形状只携得出口的两件：派到哪个房间、哪一类代理。
+- **`ctx` 的用量为何现读**：快照在派发时冻结，那时还没有任何一次调用，冻结的用量只能是零，而且整跑都是零——一个照 City.md 去问 `status` 的模型会被告知窗口是空的。用量住 `ContextReading`：Run 每回合把 provider 报的 `input_tokens` 写进去，`status` 被调用时读出，所以报的是本跑最近一次已完成调用的计数。上限 `ctx_limit` 仍在快照里，因为它整跑不变。
 - **`neighbours` 追加在末尾而不插入到 `signals_pending` 旁边**：冻结序存在的理由是字段表增长时居民的习惯仍可迁移，而一次插入会把前十二行里的一半挪位。它只报**人数**不报名单：名单长度随人口增长，而 `status` 是一份定长文本（`render_children` 已为同一条理由被压成一行）；详情归 `neighbours` 工具，city-SPEC §8-15b。
 - **数的是人，不是地址**：一间没人站着的房间没有读者，把它计入会让 `neighbours: 3` 读起来像「有三个人可以说话」而实际上一个都没有。空房间仍然在工具的答案里，因为它对 delegate 与搬入是真信息。
 - **`children` 是闭包而不是快照字段**：派活发生在 `status` 工具造好之后，一份开跑前拍的快照永远是空的。派生台住 `collab`，而 depmap 不允许 runtime 依赖 collab，故本模块只收一个答「现在派了哪些」的闭包，装配层把台接上去——与 `RunHooks` 四个闭包同一纪律：第二实现不存在时不引 trait。
@@ -672,18 +681,12 @@ pub enum Shrink { Keep, Cut(Strategy), MustOffload }
 pub fn detect(text: &str) -> Content;                       // 前几行上的前缀与计数，顺序即设计
 pub fn plan(content: Content, size: ByteLen, budget: ByteLen) -> Shrink;
 pub fn shorten(text: &str, strategy: Strategy, budget: ByteLen) -> elision::Cut;   // 标记与丢弃计数由 elision 一处产出（§8-42）
-// runtime::compaction::producer（形状 1 判定）——压缩摘要生产者指纹的唯一铸印处
-pub fn mint(model: &str, previous: Option<&SummaryProducer>) -> SummaryProducer;
-// 链上无前代＝第 1 代；前代已记＝代数加一（checked，数不下了记 Unknown）；
-// 模型名为空、或链上前代是 Unknown＝Unknown。**前代未知则代数未知**：给一份
-// 没人数过的链补一个代数就是补猜，而半张指纹（有模型、无代数）是另一半的猜测。
 // 硬不变量：结果恒不大于输入，且在出口再验一次（真长了就退回原文）。切口落在字符边界。
 // Structured 与 Unknown 恒不截断：被截断的 JSON 比缺席的 JSON 更糟；未知内容不拿猜测去丢东西。
 // Markup 由以下特征判定： `\documentclass`／`\begin{document}`，或首几行里两条 ATX 标题且无一行像代码
 // （源码文件的 `# ` 注释与标题同形，否则会保注释而丢代码）。检测先于 Table：LaTeX 的表格会让一行带 `|`。
 // `Sections` 保整节至预算尽，再保被丢各节的标题行（骨架）；少于两条标题即只有一个标题，退回首端裁。
 // 机制面（把大结果移出窗口）仍归 offload——本模块只答「缩不缩、留哪一头」。
-// 生产者指纹的判定（谁写的、第几代）住本模块的子模块 compaction::producer（§12.1）：一条规则一个家，别处不写这个阈值。
 
 // runtime::mode 的准入面（形状 1 判定）
 pub struct Produced { pub tests_passed: Option<bool>, pub contract_moved: bool,
@@ -905,17 +908,15 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 - `E_LOG_VERSION_UNSUPPORTED`（v 判向＋未知 kind 无 ig）：不可定义掉——数据比二进制长寿。
 - 链断/seq 洞/非规范字节：以 `E_CAS_CORRUPT` 报（存储完整性族；subject=行号与路径）——能否定义掉＝「介质位腐烂在设计边界外」，同 memory-SPEC §12。
 
-### 12.1 定规：压缩摘要的生产者指纹只在记录处答，缺失即显式未知
+### 12.1 定规：来源行不带摘要生产者指纹
 
-**决定**：每份压缩摘要在 `prompt_assembled` 的来源行标注生产模型与代数（`SummaryProducer::Written { model, generation }`），铸印判定唯一住 `runtime::compaction::producer::mint`（§8-14），读取端唯一答 `PromptSource::producer()`：键缺席即 `Unknown`，显式 `Unknown` 与缺席在读取端同归 `Unknown`。代数用 `NonZeroU32`，链上前代未知则新摘要也记 `Unknown`。
+**决定**：`prompt_assembled` 的来源行只记 `{addr, kept, marker, dropped}`；没有 `SummaryProducer`，也没有铸印它的 `compaction::producer::mint`。
 
-**理由**：换模型之后，一份旧摘要摆在新模型面前，「谁写的、隔了几代摘要」必须答得出或明说答不出，否则回放只能沉默。补猜的两条近路都通向错误答案：拿回放当下跑的模型答旧摘要的生产者，拿「链上大概只有一代」答代数。与 `ModelReturned` 缺席≠报零同族：0 代拼不出来，缺席也不等于 0 代。
+**理由**：本仓库不做 LLM 压缩，没有任何路径产出摘要文档，生产里每个 `SourceDoc` 的指纹恒为缺席；一个没有写入者的字段让读者以为账本记下了一件它从不记的事，而铸印函数只有测试调用。
 
-**落点**：判定住 `runtime::compaction::producer::mint`（`compaction.rs` 的子模块，模块图同变更集登记）而不是 `plan` 的形参。`plan(content, size, budget) -> Shrink` 答的是「缩不缩、留哪一头」，指纹答的是「谁写的、第几代」；把后者塞进前者的返回值，要么改 `Shrink` 的语义，要么让一条函数兼职两个互不相干的决定。判定仍然只在本模块内、只有一处，别处不写这个阈值——「一个家」要求的是唯一，不是与 `plan` 同一个函数。
+**被否**：保留字段与 `mint` 等将来接上——死机制照样要维护、要进公开面，而接上时的口径（谁写的、第几代）应由那时真实的摘要生产者决定，不是预先猜好。
 
-**被否**：①读取端从邻近 `model_called` 反推生产者——账本上两条线的相邻是排版事实不是生产事实，摘要跨会话携带后两者可以分属两个模型；②代数缺省 0——0 是一个断言（第零代），缺席是不知道，两种答案在同一字段里就是一种谎言；③把指纹并进 `compaction::plan` 的返回值——见上条落点，两个决定一个出口。
-
-**重开参数**：出现「摘要链上代数与实际压缩次数对不上」的实证（例如旁路直写摘要的生产者），重开的是 `mint` 的前代口径，不是缺失记未知这一条。
+**重开参数**：出现一条把模型写的摘要放进前缀的生产路径时，重开本条，指纹随那条路径一起设计。
 ### 12.1 定规：回合边界的压缩只在收尾边界换快照
 - **决定**：一回合的 exchange 只允许在 `Turn<Recording>::record` 的收尾边界被压缩替换，时机是工具波全落地之后、一回合一次；判定由 `compaction::plan` 一处给出（8-44），`turn.rs` 不写任何阈值比较；`runtime::fork` 在同一边界重放同一判定。
 - **理由**：压缩若在波中换快照，它看见的是半截波，分组与 `fork` 的逐回合重建不同，同一历史会折出两种字节，分支与母亲分叉——这正是确定性回放（ARCHITECTURE §10）要排除的失败。收尾边界是这一波的唯一完整分组点。
@@ -1228,7 +1229,7 @@ pub enum Sieved {
     Cut(SieveRecord),
 }
 pub enum PassReason { BelowFloor, NothingShrank }
-pub struct SieveRecord { pub text: String, pub original: Locator, pub rest_path: PathBuf, pub filter: String,
+pub struct SieveRecord { pub text: String, pub original: Locator, pub rest_path: String, pub filter: String,
                          pub lines_in: u64, pub lines_out: u64, pub bytes_in: u64, pub bytes_out: u64,
                          pub stages: Vec<StageReport> }
 impl SieveRecord { pub fn offloaded(&self) -> ResultOffloaded; }
@@ -1565,6 +1566,8 @@ impl Run<Frozen> { pub fn transcript(&self) -> Result<Transcript, AxError>; pub 
 
 ```rust
 pub struct ContextGauge { window: Tokens, second_at: u64, sounded: Sounded }
+pub struct ContextReading(Arc<AtomicU64>);   // Clone＋Default；Run 写、status 读的同一格
+impl ContextReading { pub fn tokens(&self) -> Tokens; pub(crate) fn record(&self, used: Tokens); }
 impl ContextGauge { pub fn new(window: Tokens, second: Option<SecondThreshold>) -> ContextGauge; pub fn observe(&mut self, used: Tokens) -> Option<ContextReminder>; }
 pub enum ContextReminder { Usage { used: Tokens, window: Tokens }, HandoverWindow { used: Tokens, window: Tokens } }
 impl ContextReminder { pub fn render(&self) -> String; }
@@ -1572,7 +1575,7 @@ impl ContextReminder { pub fn render(&self) -> String; }
 
 `second` 来自 `RunPlan.second_threshold`：配置梯子冻结的值，`None`＝没有一层说话，取 `CTX_REMINDER_SECOND_DEFAULT`，「缺席取默认」只在这一个构造点判定。`window == 0`（簿上没写）恒不响：没有分母就没有百分比，与 `UnplannedProgress` 同一条理。整数算术：`used * 100 / window` 用 checked 乘法。
 
-**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Window::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
+**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`RunPlan` 增 `context: ContextReading`，Run 在每回合观察之前把同一个 `input_tokens` 记进去，装配层把同一格交给 `StatusTool::metering`——只有一处写，窗口提醒与 `status` 读的是同一个数；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Window::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
 
 **改这一格的入口**：`channels::Command::ConfigureBuilding` 的 `context_second_threshold`（channels-SPEC §8-45）写的就是 `RunPlan.second_threshold` 读的那一格——写入落那一级的 `[context] second_threshold`，下一个 Run 起点冻结时读到；正在跑的那个 Run 不受影响（冻结的理由见 kernel-SPEC §8-22）。
 
@@ -1737,6 +1740,7 @@ pub fn splice(text: &str, front: usize, back: usize, place: Elided) -> Cut;
 ### 8-44 turn::recovery —— 模型调用恢复管线的段契约（形状 2 值＋形状 3 内缝）
 
 **错误分层三层各管一段。**「同一个请求还能不能再发一次」（`AxError::retry`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
+**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`is_retriable`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
 
 ```rust
 // turn/recovery.rs（形状 2 值＋形状 3 内缝；pub(super)：turn 之外没有第二个用户）

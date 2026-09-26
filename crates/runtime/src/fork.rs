@@ -13,18 +13,18 @@
 //! index by [`inherited_indexed`], because the ledger's only writer asks
 //! for it and verified the ledger when it opened it.
 
-use kernel::event::record::{
-    ModelReturned, RunForked, RunStarted, SteerReceived, ToolAnswer, ToolResult,
-};
+use kernel::event::record::{ModelReturned, RunStarted, SteerReceived, ToolAnswer, ToolResult};
 use kernel::model::content_from_message;
-use kernel::{
-    Address, AxCode, AxError, ChatMessage, ContentBlock, EventDraft, EventKind, EventRecord,
-    Payload, RunId, Seq, TimeMs,
-};
+use kernel::{AxCode, AxError, ChatMessage, ContentBlock, EventKind, EventRecord, RunId, Seq};
 
 use crate::compaction::Exchange;
 use crate::conversation::{Conversation, Opening};
 use crate::replay::VerifiedLedger;
+
+mod lineage;
+
+pub use lineage::fork_draft;
+use lineage::forked_from;
 
 /// The fork prefix: raw lines `0..=at_seq`, byte-exact. Past the tail is
 /// `E_INVALID_ARGS`, never a silent clamp.
@@ -82,8 +82,10 @@ fn no_start(owner: RunId) -> AxError {
 /// Folds one run's own records, from its `run_started` through the cut,
 /// into the conversation it sent. The one fold both doors share, so the
 /// verified door and the indexed one cut at the same line.
-fn fold_run<'a>(records: impl Iterator<Item = &'a EventRecord>) -> Result<Inherited, AxError> {
-    let mut conversation = Conversation::new();
+fn fold_run<'a>(
+    mut conversation: Conversation,
+    records: impl Iterator<Item = &'a EventRecord>,
+) -> Result<Inherited, AxError> {
     let mut at = Seq::FIRST;
     let mut open: Option<Wave> = None;
     for record in records {
@@ -94,7 +96,7 @@ fn fold_run<'a>(records: impl Iterator<Item = &'a EventRecord>) -> Result<Inheri
                     &started.task,
                     &started.goal,
                     if started.job.is_some() {
-                        Opening::FromJob
+                        Opening::Inherited
                     } else {
                         Opening::WithPerson
                     },
@@ -276,34 +278,6 @@ fn result_block(result: &ToolResult) -> Result<ContentBlock, AxError> {
         })?,
         is_error,
         attachments: Vec::new(),
-    })
-}
-
-/// The `run_forked` draft for the city Ledger; the caller supplies the
-/// new run id, the room it lands in, and the clock reading.
-pub fn fork_draft(
-    origin: kernel::Origin,
-    new_run: RunId,
-    addr: Address,
-    t: TimeMs,
-    who: String,
-) -> Result<EventDraft, AxError> {
-    let data = Payload::of(&RunForked {
-        from: origin.run,
-        at_seq: origin.at_seq,
-    })?;
-    Ok(EventDraft {
-        run: new_run,
-        t,
-        who,
-        // The room is on the line because a fold that rebuilds what each
-        // room's session still owes reads it here: the new run's id says
-        // which run continues which, and the address says whose session
-        // has been served.
-        addr: Some(addr),
-        kind: EventKind::RunForked,
-        data,
-        ig: false,
     })
 }
 

@@ -47,9 +47,14 @@ fn line(kind: EventKind, data: Payload) -> EventDraft {
 /// A run that made one turn: a task, a reply that asked for a call, the
 /// call, and its result.
 fn mother() -> Mother {
+    verified(mother_drafts())
+}
+
+/// A ledger on disk holding `drafts`, and its index.
+fn verified(drafts: Vec<EventDraft>) -> Mother {
     let dir = tempfile::tempdir().unwrap();
     let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
-    ledger.append_all(mother_drafts()).unwrap();
+    ledger.append_all(drafts).unwrap();
     drop(ledger);
     Mother::written(dir)
 }
@@ -198,6 +203,68 @@ fn a_branch_inherits_the_mother_window_message_for_message() {
     assert_eq!(inherited.messages[0].role, Role::User);
     assert_eq!(inherited.messages[1].role, Role::Assistant);
     assert_eq!(inherited.messages[2].role, Role::User);
+}
+
+/// A branch of a branch opened with only its mother's own turns: the
+/// conversation the mother had inherited from its own mother was folded
+/// into the mother's window but never into a rebuild of it.
+#[test]
+fn a_branch_of_a_branch_keeps_the_grandmother_conversation() {
+    let daughter = RunId::from_bytes([7; 16]);
+    let of_daughter = |mut draft: EventDraft| {
+        draft.run = daughter;
+        draft
+    };
+    let mut lines = mother_drafts();
+    lines.push(of_daughter(line(
+        EventKind::RunForked,
+        Payload::of(&kernel::event::record::RunForked {
+            from: RunId::CITY,
+            at_seq: Seq::new(3),
+        })
+        .unwrap(),
+    )));
+    lines.push(of_daughter(line(
+        EventKind::RunStarted,
+        Payload::of(&RunStarted {
+            task: "write it down twice".to_owned(),
+            goal: "two numbers".to_owned(),
+            ..RunStarted::default()
+        })
+        .unwrap(),
+    )));
+    lines.push(of_daughter(line(
+        EventKind::ModelReturned,
+        Payload::of(&ModelReturned {
+            message: kernel::model::message_payload(&[ContentBlock::Text {
+                text: "written".to_owned(),
+            }])
+            .unwrap(),
+            calls: 0,
+            usage: None,
+            stop: None,
+            billed_usd_micros: None,
+        })
+        .unwrap(),
+    )));
+    let history = verified(lines);
+
+    let grandmother = history.inherited(Seq::new(3)).unwrap();
+    let mut expected = crate::conversation::Conversation::new();
+    expected.push_inherited(&grandmother.messages);
+    expected.push_task_lines(
+        "write it down twice",
+        "two numbers",
+        crate::conversation::Opening::WithPerson,
+    );
+    expected.push_assistant(vec![ContentBlock::Text {
+        text: "written".to_owned(),
+    }]);
+    let granddaughter = history.inherited(Seq::new(6)).unwrap();
+    assert_eq!(
+        (granddaughter.at, granddaughter.messages),
+        (Seq::new(6), expected.messages().to_vec())
+    );
 }
 
 /// A cut inside a wave of calls moves back to the last line that is a

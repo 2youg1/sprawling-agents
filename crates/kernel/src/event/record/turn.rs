@@ -8,8 +8,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use std::num::NonZeroU32;
-
 use crate::address::Address;
 use crate::budget::UsdMicros;
 use crate::event::payload::Payload;
@@ -69,50 +67,6 @@ pub struct PromptSource {
     pub kept: u64,
     pub marker: bool,
     pub dropped: u64,
-    /// The producer fingerprint, when this document is a compressed
-    /// summary: which model wrote it, and which generation of summary it
-    /// is. A document that is not a summary writes no key at all.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub producer: Option<SummaryProducer>,
-}
-
-impl PromptSource {
-    /// The read end's one answer to who wrote this document.
-    ///
-    /// A row that recorded no producer is answered [`SummaryProducer::Unknown`],
-    /// and nothing here derives a better-looking answer: the model a
-    /// replay happens to run on is not who wrote an old summary, and a
-    /// missing key is a fact about the record rather than about the
-    /// document.
-    #[must_use]
-    pub fn producer(&self) -> SummaryProducer {
-        self.producer.clone().unwrap_or(SummaryProducer::Unknown)
-    }
-}
-
-/// Who wrote a compressed summary, and which generation of summary it is.
-///
-/// The generation counts summaries rather than turns: the first summary
-/// of a chain is generation 1, and a summary of a summary is one higher.
-/// It is a [`NonZeroU32`] so that "not counted yet" cannot be spelled as
-/// zero — the same honesty [`ModelReturned`] keeps between an absent
-/// usage and a reported zero.
-///
-/// `Unknown` is one of the answers, on purpose. Where a record states no
-/// producer, this is what it is answered with; inferring one from the
-/// lines around it would turn the ledger's silence into a claim.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum SummaryProducer {
-    /// Recorded: the model that wrote the summary text, and the
-    /// generation of summary it is.
-    Written {
-        model: String,
-        generation: NonZeroU32,
-    },
-    /// Nothing in the record says. Never inferred.
-    Unknown,
 }
 
 /// One document a slot was offered and left out, and why.
@@ -167,11 +121,12 @@ pub struct ModelReturned {
     pub message: Payload,
     /// How many tool calls the reply asked for.
     pub calls: u64,
-    /// Four token counts, as the provider reported them.
+    /// Four token counts in the one meaning `ModelUsage` states, the
+    /// dialect that reported them, and the meaning's version `v`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "schema",
-        schemars(with = "Option<std::collections::BTreeMap<String, u64>>")
+        schemars(with = "Option<std::collections::BTreeMap<String, serde_json::Value>>")
     )]
     pub usage: Option<ModelUsage>,
     /// Why the provider stopped, when it said.

@@ -10,9 +10,9 @@ use std::num::NonZeroU64;
 
 use serde::{Deserialize, Serialize};
 
-use crate::budget::Tokens;
 use crate::event::Payload;
 use crate::model::image::ImageRef;
+use crate::model::usage::ModelUsage;
 use crate::tool::ToolName;
 /// Building-level constraints riding along the call. S2 carries the one
 /// load-bearing bit; further fields only grow (14.3), and each one is
@@ -320,15 +320,6 @@ pub struct ChatRequest {
     /// Frozen at run start: changing it mid-run would start a new cached
     /// prompt prefix, so the value rides in from [`crate::FrozenConfig`].
     pub effort: Option<Effort>,
-}
-
-/// Provider-reported token counts; absent wire fields read as zero.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ModelUsage {
-    pub input_tokens: Tokens,
-    pub output_tokens: Tokens,
-    pub cache_read_tokens: Tokens,
-    pub cache_write_tokens: Tokens,
 }
 
 /// The canonical response: dialect output, endpoint input.

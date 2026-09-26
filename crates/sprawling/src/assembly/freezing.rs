@@ -14,7 +14,7 @@ use runtime::run::RunPlan;
 
 use super::{Assignment, Given, RunWorker, Site, Workbench, city_segment, held, name_of};
 use model_note::model_note;
-use run_slot::{Predecessor, run_segment, task_line};
+use run_slot::{Predecessor, run_segment};
 
 /// Bytes about to be frozen into one slot, and the documents they were
 /// read from.
@@ -42,7 +42,7 @@ impl Assembled {
     pub(super) fn of_one(addr: Address, bytes: Vec<u8>) -> Assembled {
         let kept = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         Assembled {
-            sources: vec![SegmentSource::whole(addr, kept, None)],
+            sources: vec![SegmentSource::whole(addr, kept)],
             bytes,
         }
     }
@@ -60,7 +60,6 @@ impl Assembled {
         self.sources.push(SegmentSource::whole(
             at,
             u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-            None,
         ));
     }
 
@@ -236,7 +235,7 @@ impl RunWorker {
             brief,
             Predecessor {
                 room: &at.addr,
-                run: at.predecessor(),
+                run: at.predecessor().or(self.origins.carried_from(&at.addr)),
             },
         )?);
         if let Some(note) = model_note(&self.city_root, &site.provider, &site.model.id)? {
@@ -322,6 +321,7 @@ impl RunWorker {
                 context_tokens: site.model.context_tokens,
             },
             second_threshold: site.config.second_threshold,
+            context: workbench.context.clone(),
             prefix,
             policy: site.rules.policy().clone(),
             tools,
@@ -350,21 +350,8 @@ impl RunWorker {
             must_read.push(Locator::cas(hash));
         }
         must_read.push(job);
-        // The address is a pure function of the room and the run, so
-        // the handoff can name the transcript before a turn is taken.
-        // It names the room's file and never the ledger: the ledger is
-        // one chain for the whole city, under a subtree `read` refuses.
-        let transcript = runtime::Transcript::address(addr, site.run_id)?;
-        let handoff = runtime::handoff::Handoff::new(
-            must_read,
-            task_line(&plan),
-            "see the city roadmap".to_owned(),
-            format!(
-                "dispatched from the control surface; transcript at {}",
-                transcript.as_str()
-            ),
-            "resume from the job locator".to_owned(),
-        )?;
+        let handoff = self.frozen_handoff(&plan, must_read)?;
+        self.origins.started(addr, site.run_id);
         Ok((plan, handoff))
     }
 }
@@ -374,6 +361,8 @@ impl RunWorker {
 mod inherited;
 mod model_note;
 mod run_slot;
+
+mod frozen_handoff;
 
 #[cfg(test)]
 #[allow(

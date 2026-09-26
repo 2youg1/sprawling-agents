@@ -9,8 +9,6 @@
 //! read off the Ledger afterwards. The payload holds integers and
 //! strings only.
 
-use std::path::PathBuf;
-
 use kernel::{AxError, Locator, Payload};
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +38,7 @@ pub enum Sieved {
 pub struct SieveRecord {
     pub text: String,
     pub original: Locator,
-    pub rest_path: PathBuf,
+    pub rest_path: String,
     pub filter: String,
     pub lines_in: u64,
     pub lines_out: u64,
@@ -142,7 +140,7 @@ impl SieveRecord {
             original: self.original.clone(),
             len: self.bytes_in,
             substitute_len: self.bytes_out,
-            rest_path: self.rest_path.display().to_string(),
+            rest_path: self.rest_path.clone(),
             sieve: Some(SieveAccount {
                 filter: self.filter.clone(),
                 lines_in: self.lines_in,

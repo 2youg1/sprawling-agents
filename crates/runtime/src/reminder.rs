@@ -19,6 +19,9 @@
 //! reading sounds the higher one only: two sentences stacked at once
 //! are noise, and the lower one has nothing left to say.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use kernel::Tokens;
 use kernel::config::SecondThreshold;
 use kernel::consts_policy::{CTX_REMINDER_FIRST_PERCENT, CTX_REMINDER_SECOND_DEFAULT};
@@ -71,6 +74,29 @@ fn percent(used: Tokens, window: Tokens) -> u64 {
         .checked_mul(100)
         .and_then(|scaled| scaled.checked_div(window.get()))
         .unwrap_or(if window.get() == 0 { 0 } else { u64::MAX })
+}
+
+/// The provider's count for the last call a run completed, shared with
+/// whoever reports it.
+///
+/// One cell with one writer: the run records each count before its gauge
+/// reads it, and `status` reads the cell when a model asks. A snapshot
+/// frozen at dispatch cannot carry this figure, because nothing has been
+/// called at dispatch and the figure moves every turn. Relaxed ordering
+/// is enough: the value is one word and nothing is ordered against it.
+#[derive(Debug, Clone, Default)]
+pub struct ContextReading(Arc<AtomicU64>);
+
+impl ContextReading {
+    /// The last count recorded; zero before the first call completes.
+    #[must_use]
+    pub fn tokens(&self) -> Tokens {
+        Tokens::new(self.0.load(Ordering::Relaxed))
+    }
+
+    pub(crate) fn record(&self, used: Tokens) {
+        self.0.store(used.get(), Ordering::Relaxed);
+    }
 }
 
 /// One run's gauge. Fed the provider's `input_tokens` after every call;

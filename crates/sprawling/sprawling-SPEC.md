@@ -897,6 +897,8 @@ fn freeze_plan(&mut self, site, workbench, addr, brief, task, goal, job, parent,
 
 **两个值而不是一个新类型**：`RunPlan` 与 `Handoff` 类型不同、谁也不会认错，再包一层只是给元组取个名字。它们同属一相位的理由是读一遍就看得见的：prefix 为这份 plan 而装配并与它一同冻结，handoff 引的是 plan 自己的 `task_line`，而 job locator 两边都在。
 
+**冻结的交接就是房间里那份**：房间的 `Handoff.md` 填过时（`city::handoff` 答 `Some`），它的原字节入 CAS 并排在 must-read 末尾，`overview`／`progress`／`next_step` 取 `city::handoff_sections` 读出的对应节，`context` 在派活来源与 transcript 地址之后接上该节。一节没写就写明「没有记录」（`NOT_RECORDED`），不再写「see the city roadmap」「resume from the job locator」这类指向别处的占位：那两句读起来像交接，其实一个字的信息也不带，而下一个读者会照着去找一份交接里从未提过的路线图。`overview` 在文件没写时仍取 plan 的 `task_line`，因为那是真事实。
+
 **尺寸**：`dispatch_in` 237 → **158**；`freeze_plan` 100。至此 `dispatch_in` 不再是本文件最长的函数（`drive_dispatch` 171 是），九次拆分合计 **975 → 158**。
 
 **它以什么收口**：纯结构，无可咬的红。prefix 四段的装配顺序、must-read 的入列顺序（先 norms 后 job）均逐字不变；两者一变即有多条盯 prefix 字节与交接件内容的测试发作。143 条全绿。
@@ -3311,6 +3313,8 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 - **继承进的是 window，不是 prefix**（S2 改写了路线图早先那句话，理由记在这里）。四段 prefix 各是一份**文档**（`PrefixPlan` 的 `SourceDoc`），由人写、可编辑、逐字节哈希；而一段对话是模型说了什么、工具答了什么，`Window` 自己的文档就写着「frozen prefix 的字节永不落在这里」。把历史塞进 prefix 要有第五个槽位（而 prefix 是四段的类型），会让 `prompt_assembled` 声称历史属于它并不属于的那一段，还会让被缓存的前缀每回合都长。**所以 `RunPlan.inherited` 是 window 的材料**（`run/lifecycle.rs` 在开场任务之前推入），而它可重建的证据不是段哈希而是 `run_forked { from, at_seq }` 加上母亲自己的那些行（runtime §8-2 的 `inherited`）。
 - **一份继承只属于开这一段的那一跑。** 房间的当前一段从 `session_opened` 带上来的 `from` 落在折叠里（`assembly::folds::session`），第一次派活取走它并写下 `run_forked`（这一行同时也把「用掉了」记进折叠）；同一段里的第二次派活不再继承。一个分支是一个开头，而开头的那一跑就是继承的那一跑。
 - **分支先验再清。** `from` 指的行必须是那条 run 自己的行（`origin_is_real`），否则 `E_INVALID_ARGS` 现在就到人手里——而不是先把这个房间的形状清掉，再让一跑扑空。这一验只读 `from` 指的那一行：worker 常驻一份 `memory::LedgerIndex`，验之前 `refresh`（只读上次之后追加的字节），再 `line_at(at_seq)` 取那一行、解出它属于哪条 run。不走 `runtime::replay::verify_ledger_dir`，因为那一步把整本历史读进内存、逐行验链再解析——94 MB 的账本上是一次 +67 MiB 的瞬时内存和几十毫秒，只为回答一行的归属；而 worker 是这本账唯一的写者，打开时已经验过它（`JsonlLedger::open` 的尾部恢复），整链的校验属于 replay 与 `verify`。被否决的备选：每次验前重建索引——它仍然扫全部段。
+- **`--carry` 带摘要，也带上一跑对话的地址。** 摘要说找到了什么，只有 transcript 说是怎么找到的；接手的 run 本来就在 run 槽位里读到 `Predecessor transcript: <room>/<run>.jsonl`，带过来的一段的第一跑同样读到，指向这个房间里最后开始的那一跑。这份「欠着的前任」与 `from` 同住 `assembly::folds::session`：折叠按 `run_started` 记下每个房间最后开始的 run（重建时读这一行，在世的 worker 在 `freeze_plan` 冻好一跑时自己记，因为 runtime 写的那一行它看不见），`session_opened { carried: true }` 把那一跑记为欠着的前任，`carried: false` 清掉它，这一段的第一跑开始即用掉。不往 `session_opened` 里加字段：前任是哪一跑已由历史里的 `run_started` 决定，payload 再写一份就是第二个家。被否决的备选：`/new` 时把整本账重验一遍去找最后一跑——一次人按下的命令，其代价随城的历史线性增长。
+- **分支先验再清。** `from` 指的行必须是那条 run 自己的行（`origin_is_real`），否则 `E_INVALID_ARGS` 现在就到人手里——而不是先把这个房间的形状清掉，再让一跑扑空。
 - **`Carry::Nothing` 必须真的清掉 `Handoff.md` 的槽位**：`assembly::freezing` 无条件读 `city::handoff(root, room)` 并把它折进下一个 run 的 prompt，只清配置而留着文件，新一段仍会继承上一段的摘要，于是开关不起作用（city-SPEC §8-14b 拥有那一步）。
 - **默认不带，理由是 `/new` 对人意味着什么** ——「在这个工作区新开一个会话」，：`/new` 对人意味着「在这个工作区新开一个会话」，带上上一段的摘要是需要说出来的例外；**没有交接时 `--carry` 不弹问、不拒绝**，事件里如实写 `carried: false`——一段新会话就是人要的那件事，没有理由因为交接槽位空着而拒他。被否决的备选：默认带、`--fresh` 不带（路线图早先的建议）——它把例外当成了常态，而且换模型后的新一段仍受旧摘要影响。
 - **拒绝只有一条**：地址上有活跃 run → `E_BUSY`，恢复语「先 `/stop`，再 `/new`」。一次派活正在写这一段的形状时把它换掉，等于让两个 run 各自以为冻的是同一份前缀。
@@ -3319,7 +3323,7 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 **本章测试**（路线图原先写的 citysim `session_rotates.toml` 没有落点：citysim 的场景是 Rust 结构体，不是 toml，而且这条链路——派活被拒、`/new`、再派活——属于动词所在的 `sprawling`，不属于 runtime 的回合循环；改记在这里）：
 - `assembly::dispatching::session_shape::tests::a_new_session_lets_the_room_use_the_model_chosen_since`：dispatch（模型 A）→ `select_model`（B）→ dispatch 被 `E_CONFIG_INVALID` 拒 → `open_session` → dispatch 成功，且房间这次冻的是 B。
-- `assembly::commanding::sessions::tests` 的四条：房间里有 run 工作时 `E_BUSY` 且房间一字未动；`Nothing` 清形状也清槽位、事件写 `carried: false`；`Handoff` 留摘要、照样清形状、事件写 `carried: true`；没有摘要时 `--carry` 不拒也不撒谎。
+- `assembly::commanding::sessions::tests` 的五条：房间里有 run 工作时 `E_BUSY` 且房间一字未动；`Nothing` 清形状也清槽位、事件写 `carried: false`；`Handoff` 留摘要、照样清形状、事件写 `carried: true`；没有摘要时 `--carry` 不拒也不撒谎；带过来的一段的第一跑读到上一跑 transcript 的地址（`a_carried_session_names_the_previous_runs_transcript`）。
 
 **本章验收**：`cargo nextest run -p sprawling -p city -p channels -p kernel` 绿；`cargo xtask wire-ts`、`wiring`、`specalign`、`apisync` 绿。
 

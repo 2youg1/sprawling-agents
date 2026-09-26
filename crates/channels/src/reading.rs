@@ -68,22 +68,18 @@ fn blocks_of(message: &serde_json::Value, kind: &str, field: &str) -> Option<Str
     (!found.is_empty()).then(|| found.join("\n"))
 }
 
-/// The counters `ModelUsage` carries. Absent when the provider sent no
-/// usage, which is a different fact from having spent nothing.
+/// The counters `ModelUsage` carries, read through its own
+/// deserialisation so a row written under an older meaning of
+/// `input_tokens` is converted by the one reader that knows the versions.
+/// Absent when the row carries no usage it can read, which is a
+/// different fact from having spent nothing.
 #[must_use]
 pub fn used_in(usage: &serde_json::Value) -> Option<Used> {
-    let map = usage.as_object()?;
-    let counter = |name: &str| {
-        map.get(name)
-            .and_then(serde_json::Value::as_u64)
-            .map(kernel::Tokens::new)
-    };
-    let input = counter("input_tokens")?;
-    let output = counter("output_tokens")?;
+    let usage = <kernel::ModelUsage as serde::Deserialize>::deserialize(usage).ok()?;
     Some(Used {
-        input,
-        output,
-        cached: counter("cache_read_tokens").unwrap_or_default(),
+        input: usage.input_tokens,
+        output: usage.output_tokens,
+        cached: usage.cache_read_tokens,
     })
 }
 

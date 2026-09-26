@@ -18,7 +18,6 @@ fn snapshot() -> StatusSnapshot {
         who: "alice".to_owned(),
         addr: Address::parse("work").unwrap(),
         mode: Mode::Up,
-        ctx_used: Tokens::new(1200),
         ctx_limit: Tokens::new(8000),
         trust: "trusted".to_owned(),
         write_domain: "work".to_owned(),
@@ -111,15 +110,6 @@ fn the_tool_reports_what_it_was_given_and_never_samples() {
         first.result, second.result,
         "two calls, one turn, one answer"
     );
-
-    let mut next = snapshot();
-    next.provider_mode = ProviderMode::Degraded;
-    next.signals_pending = 0;
-    tool.set_snapshot(next);
-    let after = serde_json::to_value(&tool.invoke(&call()).unwrap().result).unwrap();
-    let text = after["text"].as_str().unwrap();
-    assert!(text.contains("provider_mode: degraded"), "{text}");
-    assert!(text.contains("signals_pending: 0"), "{text}");
 }
 
 #[test]

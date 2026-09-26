@@ -412,6 +412,8 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub skills: Vec<SkillPin>,          // 空亦写出
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
+pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64 }
+    // prompt_assembled 的一行来源；不带摘要生产者指纹：没有路径产出摘要（runtime-SPEC §12.1）。旧行里多出的 producer 键读时忽略；本结构没有方法，读者直接读字段
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
@@ -1287,10 +1289,15 @@ pub struct Ceiling(NonZeroU64);  // 零不可表达：new(0) 即 None
 pub struct ChatRequest { pub model: String, pub max_tokens: Option<Ceiling>, pub system: Vec<SystemBlock>,
                          pub messages: Vec<ChatMessage>, pub tools: Vec<ToolDef> }
 pub struct ModelUsage { pub input_tokens: Tokens, pub output_tokens: Tokens,
-                        pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens }
+                        pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens,
+                        pub dialect: Option<DialectKind> }
 pub struct ChatResponse { pub content: Vec<ContentBlock>, pub stop: StopReason, pub usage: ModelUsage }
 pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError>;  // model_returned 载荷的唯一成形处
 ```
+
+`ModelUsage.input_tokens` 在每种兼容格式下都是**这次请求的全部输入 token，含缓存读与缓存写**。OpenAI 两个兼容格式本来就这样报；Anthropic 的 `input_tokens` 只数未缓存的部分，由它的解析器加上两个缓存数。选这个口径是因为上下文量表读的正是它（一次请求占了多大的窗口），而按价单结算时用 `input_tokens - cache_read_tokens - cache_write_tokens` 求未缓存部分只需一次减法。`dialect` 记下是哪个兼容格式报的；脚本模型与测试不经兼容格式，记 `None`。
+
+账本只追加：`model_returned.usage` 在写时带 `"v": 1`（本口径）与 `dialect`，旧行字节不改。读者一律经 `ModelUsage` 的 `Deserialize` 读这一格，版本换算只在那里做：没有 `v` 的旧行没有兼容格式可查，当 `cache_read_tokens + cache_write_tokens > input_tokens` 时它只可能是 Anthropic 的旧口径（全部输入不会小于其中的缓存部分），读成三者之和；否则照写的读。两种旧口径在没有缓存时一致，所以照读只会把「有缓存、且缓存部分不超过未缓存部分」的 Anthropic 旧行读小，这种行在带长前缀的会话里少见。
 
 浮点禁令只有一个家：`Payload::new`（及其 `Deserialize`）。wire 面把 `serde_json::Value` 转成
 `Payload` 即受判，故 seam 不再另设判定原语，拒绝理由与错误码也只有一处。
@@ -1784,7 +1791,7 @@ secret 门白名单随 `sealed.rs` 搬家）。完成检查：同 8-36。
 
 `model.rs`（516）切成四文件：`model/wire.rs` 收线上会话的词汇（dialect 无关的规范形）（`BuildingPolicy`／`Role`／
 `StopReason`／`SystemBlock`／`DialectKind`／`ModelTag`／`Effort`／`ContentBlock`／`ChatMessage`／
-`ToolDef`／`ChatRequest` 含 `empty`／`ModelUsage`／`ChatResponse`）；`model/seam.rs` 收一次调用两个方向
+`ToolDef`／`ChatRequest` 含 `empty`／`ChatResponse`）；`model/usage.rs` 收 `ModelUsage` 与它的行形（`UsageRow`，版本换算只在这里）；`model/seam.rs` 收一次调用两个方向
 所载之物与内容↔载荷两转换（`ModelRequest`／`ModelReturn` 含 `bare`／`from_response`、`message_payload`／
 `content_from_message`）；`model/conformance.rs` 收 feature 门后的一致性断言；
 `model/tests.rs` 收原 `mod tests`（6 个 `#[test]`，断言与名字不动，补 `AxCode`／`Payload`／`B3Hash`／

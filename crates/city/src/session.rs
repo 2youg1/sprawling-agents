@@ -28,9 +28,9 @@
 //! **The handoff slot is emptied, not annotated.** The file is removed
 //! rather than replaced by the blank form `city::spine_files` lays down
 //! when a room is opened: `handoff` answers `None` for both, and one
-//! state is fewer than two. Nothing is lost by removing it, because the
-//! bytes are in the ledger under `handoff_written` and a replay reads
-//! them back from there.
+//! state is fewer than two. Removing it discards the only copy: the
+//! file is gitignored, and `handoff_written` in the ledger holds the
+//! handoff the dispatcher filled in before the run, not this file.
 //!
 //! **Nothing here decides whether a handoff exists.** `city::handoff`'s
 //! own rule — no file, or a form still holding the template's guidance,

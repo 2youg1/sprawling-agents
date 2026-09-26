@@ -19,19 +19,23 @@ use crate::sieve::{
 struct World {
     _dir: tempfile::TempDir,
     cas: Cas,
-    env: std::path::PathBuf,
+    root: std::path::PathBuf,
+    room: std::path::PathBuf,
+    address: kernel::Address,
     history: SieveHistory,
 }
 
 fn world() -> World {
     let dir = tempfile::tempdir().unwrap();
     let cas = Cas::open(&dir.path().join("cas")).unwrap();
-    let env = dir.path().join("env");
-    std::fs::create_dir_all(&env).unwrap();
+    let room = dir.path().join("room");
+    std::fs::create_dir_all(&room).unwrap();
     World {
+        root: dir.path().to_path_buf(),
         _dir: dir,
         cas,
-        env,
+        room,
+        address: kernel::Address::parse("room").unwrap(),
         history: SieveHistory::default(),
     }
 }
@@ -39,7 +43,8 @@ fn world() -> World {
 fn run(world: &mut World, key: &CommandKey, code: Option<i64>, text: &str) -> Sieved {
     let mut tee = OffloadSite {
         cas: &mut world.cas,
-        environment: &world.env,
+        city_root: &world.root,
+        room: &world.address,
     };
     let input = SieveInput {
         key,
@@ -56,7 +61,7 @@ fn cut(sieved: Sieved) -> crate::sieve::SieveRecord {
     }
 }
 
-/// The rest path differs per machine; the golden holds everything else.
+/// The rest address carries a content hash; the golden holds everything else.
 fn stable(text: &str) -> String {
     text.lines()
         .map(|line| match line.find(", rest at ") {
@@ -208,7 +213,7 @@ fn below_the_floor_nothing_is_touched_and_nothing_is_stored() {
         }
         Sieved::Cut(record) => panic!("cut below the floor: {}", record.text),
     }
-    assert!(std::fs::read_dir(&world.env).unwrap().next().is_none());
+    assert!(std::fs::read_dir(&world.room).unwrap().next().is_none());
 }
 
 /// A result every stage accepted but none shortened comes back with its
@@ -279,9 +284,9 @@ fn every_filtered_result_says_where_the_original_is() {
         Some(101),
         &cargo_build_output(),
     ));
-    assert!(record.rest_path.exists());
+    assert!(world.root.join(&record.rest_path).exists());
     assert_eq!(
-        std::fs::read_to_string(&record.rest_path).unwrap(),
+        std::fs::read_to_string(world.root.join(&record.rest_path)).unwrap(),
         cargo_build_output()
     );
     assert!(record.text.ends_with(']'));
@@ -297,6 +302,32 @@ fn every_filtered_result_says_where_the_original_is() {
         payload.read::<ResultOffloaded>().unwrap(),
         account,
         "the account reads back as what was written"
+    );
+}
+
+#[test]
+fn the_footer_names_the_rest_file_by_its_address_in_the_room() {
+    let mut world = world();
+    let record = cut(run(
+        &mut world,
+        &cargo_key(),
+        Some(101),
+        &cargo_build_output(),
+    ));
+    let footer = record.text.lines().last().unwrap();
+    let at = footer
+        .split(", rest at ")
+        .nth(1)
+        .unwrap()
+        .trim_end_matches(']');
+    assert!(
+        at.starts_with("room/.rest/rest-") && at.ends_with(".dat"),
+        "{footer}"
+    );
+    assert_eq!(
+        record.offloaded().rest_path,
+        at,
+        "the ledger and the model read one address"
     );
 }
 

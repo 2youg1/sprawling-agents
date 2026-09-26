@@ -255,20 +255,22 @@ pub fn write_job(city_root: &Path, addr: &Address, brief: &JobBrief<'_>) -> Resu
 pub fn write_brief(city_root: &Path, addr: &Address, brief: &JobBrief<'_>) -> Result<RunBrief, AxError>;
 pub fn handoff_path(city_root: &Path, building_addr: &Address) -> PathBuf;
 pub fn handoff(city_root: &Path, building_addr: &Address) -> Result<Option<String>, AxError>;
+pub struct HandoffSections { pub overall: Option<String>, pub progress: Option<String>, pub context: Option<String>, pub next_step: Option<String> }
+pub fn handoff_sections(text: &str) -> HandoffSections;           // city::handoff_form
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError>;
 ```
 
 - **四文档三写一不写**：`lay_out` 写 Roadmap／Memo／Handoff；`RULES.toml` 归 `building::create`（它的含义归 `policy`）——同一份文件有两个写入者就是两个权威。
 - **已存在的文档恒不覆写**：一栋已在干活的楼的计划不得因为又跑了一次建楼而回到空白。
 - **模板的占位行不进新楼的 Roadmap**：`docs/templates/Roadmap.md` 里的两行 `Not started` 是给人看的例子；照抄进去，一栋新楼开局就有两件不存在的待办，而它们会进分母。实例化时删掉 Item 列为空的数据行，断言是「新楼的分母是 0」。
-- **JOB.md 先落盘，再产 `run_started`**（模板第一行就这么写）；内容同时进 CAS，于是盘上那份是现场、CAS 那份是历史——Agent 改了 JOB.md 也不会使「当时派的是什么活」不可考。同一个房间再派一件活即覆写它（JOB.md 是本次会话的任务，不是档案）。
+- **JOB.md 先落盘，再产 `run_started`**（模板第一行就这么写）；内容同时进 CAS，于是盘上那份是现场、CAS 那份是历史——Agent 改了 JOB.md 也不会使「当时派的是什么活」不可考。同一个房间再派一件活即覆写它（JOB.md 是本次会话的任务，不是档案）。**人那句话在表单里只出现一次**：标题只写 `# JOB.md`，任务正文只进 `<task>` 节——标题再插一遍，一段粘贴每次请求就多付一遍。
 - **机器只填它知道的段**：Task／Goal／Budget 三段有事实就写；Background／Delivery 无事实则不写——写一个 `(未知)` 占位，只是让模型每回合读一遍没信息的行。
 - **一次会话的 brief 只有两种，且由本次派活决定**：说得出 Goal 的就写 `JOB.md`（`RunBrief::Job`），说不出的就不写（`RunBrief::Principal`）。**依据选 Goal 而不选「盘上有没有 JOB.md」**：一个房间里上周留下的任务书仍在盘上，它可以被读，但不得冒充一次没人派任务的会话的 brief。Goal 是那份表单里唯一不可替代的一栏（什么时候停），它空着就等于告诉 Agent「停不停没定义」。
 - **`handoff` 不把空白表单当交接件**：一张没填过的 `Handoff.md` 与一张填过的占同样的 prefix 字节而一个字的信息也不带。识别靠模板自己的括号提示行。
 - **第三件事不再被并进 `None`**：原先 `.ok()?` 把「不在」「读不了」「空白表单」三件事归为一个 `None`。现在 `None` 只说「没有值得带走的东西」，读不了则以 `E_STORAGE_FATAL` 上报并带路径——与同模块的 `roadmap` 同形。下一次会话正是从这份文件装配的，静默省略等于告诉它上一次没留下任何东西。
 - **计划的路径与读法归本模块**：`roadmap_path` 与 `roadmap` 落在这里，因为 `ROADMAP_FILE` 在这里——在别处拼 `city_root/<addr>/Roadmap.md` 就是第二份「计划在哪里」的权威，它会在真正那份搬家后继续跑得好好的。
 - **「还没有」与「读不了」是两件事**：`roadmap` 仅对 `ErrorKind::NotFound` 答空串——一栋还没铺计划的楼确实没有计划；其余任何理由一律以 `E_STORAGE_FATAL` 上报并带上路径。这与同 crate 的 `archive::index` 已有的契约同形（目录不在→`Ok(空)`，真失败→`Err`），不新立一种读法。
-- **`handoff` 未改**：它的 `.ok()?` 同属一族，但它把「不在」「读不了」「空白表单」三件归为一个 `None`；这三件在 prefix 里各自应当怎么表现，尚未定。
+- **交接表单的读法归本模块**：`handoff_sections` 把 `<overall>`、`<current-progress>`、`<context>`、`<next-step>` 四节各读成一段正文；一节缺席、或只剩模板的括号提示行，即 `None`。括号提示行的判断与 `is_blank_form` 共用 `blank::is_guidance` 一处，因为「这一行是不是模板自己的话」只能有一个答案。`<must-read>` 节不读：它是写给下一个 Agent 的散文而不是 Locator，装配层把整份文件入 CAS，作为 must-read 的一条。被否决的备选：在装配层按标签切字符串——那是模板格式的第二个读者，模板改一个标签它就静默读到空。
 - **规范类 must-read 由 `norms` 给路径，不给 Locator**：Locator 需要 CAS 或 git oid，而 city 不认识落盘物（拓扑上也依赖不到 memory）。本模块答「哪几份是规范」，装配层把它们入 CAS 变成 Locator。这也是 must-read 最大失败模式的解：不让模型凭记忆重抄规范清单。
 
 ### 8-6 city::schedule（形状 1 判定＋形状 6 数据面）
@@ -496,7 +498,7 @@ pub fn forget_shape(city_root: &Path, addr: &Address) -> Result<(), AxError>;
 
 - **两条写，一个决定**：新的一段开始时，房间自己写下的 `[model] name` 与 `[model] effort` 删掉（`write_session` 的逆操作），房间的 `Handoff.md` 同时清空。放在一个函数里，是因为「这一段从这里开始」是一个判断：拆成两个调用，就有一个可能没被调到，而两种半清理的状态都是假话。
 - **交接槽位必须清，否则「不带」是假话**：`assembly::freezing` 无条件读 `city::handoff(root, room)` 并把它折进下一个 run 的 prompt；只清配置而留文件，新一段仍会继承上一段的摘要，于是开关不起作用。
-- **清的是槽位，不是内容**：`Handoff.md` 不在城的 git 里（`gitignore.rs` 列了它），而它的字节已经在账本里（`handoff_written` 的载荷），所以重放读得回来。**删文件而不写一张空白表**：`handoff` 对两者都答 `None`，而删掉少一个可被读到的中间状态。被否决的备选：保留文件、让装配器忽略「比本段起点更早」的那一份——那要求会话记住自己的起点，等于给「这份交接是不是我的」立第二个家。
+- **清的是槽位，不是内容**：`Handoff.md` 不在城的 git 里（`gitignore.rs` 列了它），账本的 `handoff_written` 记的是派活前填好的交接而不是这个文件，所以删掉的是上一段会话写的唯一一份；要带走它就用 `/new --carry`。**删文件而不写一张空白表**：`handoff` 对两者都答 `None`，而删掉少一个可被读到的中间状态。被否决的备选：保留文件、让装配器忽略「比本段起点更早」的那一份——那要求会话记住自己的起点，等于给「这份交接是不是我的」立第二个家。
 - **`[model]` 之外一个键都不动**：文件里其它键是人写的，读出来、改这几处、写回去，与 §8-14 同走那一条写路径；读不动或解析不了即拒绝，不覆盖。
 - **它不另立「有没有交接」的判断**：`city::handoff` 的「文件缺席，或是一张空白表，即 `None`」就是那条判断的唯一权威，`clear_session` 只把槽位清空，不重判它。
 

@@ -89,6 +89,8 @@ pub(super) struct Workbench {
     pub(super) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     /// Whether this run asked to be replaced, read when it concludes.
     pub(super) succession: std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
+    /// Where the run records the provider's count, which `status` reads.
+    pub(super) context: runtime::ContextReading,
 }
 
 /// Who this run can reach: the residents beside it, and the sub-agents
@@ -100,6 +102,7 @@ pub(super) struct Workbench {
 pub(super) struct Reach<'a> {
     pub(super) seen: &'a city::Neighbourhood,
     pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
+    pub(super) context: &'a runtime::ContextReading,
 }
 
 /// Takes a desk, or says why it cannot be taken.
@@ -211,9 +214,8 @@ pub(super) struct Desks {
 /// `status` for exactly those, so a model that obeyed got a row of
 /// noughts and learnt not to ask again.
 ///
-/// `ctx_used` and `children` stay at their empty values, and both are
-/// true: nothing has been read at dispatch, and this city cannot yet
-/// make a child. `worktree_disk` is zero because measuring a tree costs
+/// The context used and the children are not here: both move while the
+/// run goes on, so `status` reads them live. `worktree_disk` is zero because measuring a tree costs
 /// a walk of it, and a number nobody has asked for is not worth one.
 pub(super) struct Situation<'a> {
     pub(super) addr: &'a Address,
@@ -233,7 +235,6 @@ pub(super) fn status_snapshot(situation: Situation<'_>) -> runtime::StatusSnapsh
         who: situation.who.to_owned(),
         addr: situation.addr.clone(),
         mode: situation.mode,
-        ctx_used: kernel::Tokens::default(),
         ctx_limit: kernel::Tokens::new(situation.context_tokens),
         trust: autonomy_word::spell(situation.trust),
         write_domain: situation

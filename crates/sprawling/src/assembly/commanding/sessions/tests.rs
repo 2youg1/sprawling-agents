@@ -318,3 +318,66 @@ fn checking_a_branch_origin_does_not_verify_the_history() {
         "a warm origin check took {check:?}; verifying the ledger took {verify:?}"
     );
 }
+
+/// `--carry` keeps the conversation's address as well as the summary:
+/// the session's first run is told where the previous run's transcript
+/// is, as a successor handed the work down is, because the summary
+/// says what was found and only the transcript says how.
+#[test]
+fn a_carried_session_names_the_previous_runs_transcript() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![completion("first", None), completion("second", None)],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let room = addr("lab/room1");
+    let dispatch = |task: &str, key: &[u8]| channels::Command::Dispatch {
+        addr: room.clone(),
+        task: task.to_owned(),
+        goal: "done".to_owned(),
+        mode: kernel::Mode::PlanGoal,
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
+        session: None,
+        effort: None,
+    };
+    worker.handle(dispatch("measure", b"one")).unwrap();
+    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let previous = verified
+        .lines()
+        .iter()
+        .find_map(|line| match line {
+            runtime::replay::VerifiedLine::Known { record, .. }
+                if record.kind() == EventKind::RunStarted =>
+            {
+                Some(record.run())
+            }
+            runtime::replay::VerifiedLine::Known { .. }
+            | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
+        })
+        .expect("the first run started");
+    std::fs::write(
+        city::handoff_path(dir.path(), &room),
+        "<overall>\nMeasuring.\n</overall>\n",
+    )
+    .unwrap();
+    worker
+        .handle(channels::Command::OpenSession {
+            addr: room.clone(),
+            carry: channels::Carry::Handoff,
+            from: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"new"),
+        })
+        .unwrap();
+    let before = provider.bodies().len();
+    worker.handle(dispatch("carry on", b"two")).unwrap();
+
+    let pointer = format!("Predecessor transcript: lab/room1/{previous}.jsonl");
+    let first = &provider.bodies()[before];
+    assert!(
+        first.contains(&pointer),
+        "the carried session's first request names {pointer}: {}",
+        first.chars().take(600).collect::<String>()
+    );
+}

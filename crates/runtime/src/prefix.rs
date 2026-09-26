@@ -11,9 +11,7 @@
 use std::collections::BTreeSet;
 
 use kernel::consts_policy::{BYTES_PER_TOKEN, PREFIX_SLOTS, STARTUP_BUDGET_TOKENS};
-use kernel::event::record::{
-    PromptAssembled, PromptSegment, PromptSkip, SkipReason, SummaryProducer,
-};
+use kernel::event::record::{PromptAssembled, PromptSegment, PromptSkip, SkipReason};
 use kernel::{Address, AxCode, AxError, B3Hash, Payload, SystemBlock};
 
 use crate::elision::{self, Elided};
@@ -34,16 +32,10 @@ pub(crate) const DOC_JOIN: &str = "\n\n";
 
 /// One prefix source document: address plus its frozen bytes, `None`
 /// when missing or unreadable (the skip itself is accounted).
-///
-/// `producer` is the fingerprint when this document is a compressed
-/// summary — who wrote it and how many summaries deep it is — and is
-/// carried into the `prompt_assembled` row untouched. A document that is
-/// not a summary carries none.
 #[derive(Debug, Clone)]
 pub struct SourceDoc {
     pub addr: Address,
     pub bytes: Option<Vec<u8>>,
-    pub producer: Option<SummaryProducer>,
 }
 
 /// Per-slot byte budgets in bytes, converted from a token budget at
@@ -173,7 +165,6 @@ fn build_segment(
             sources.push(SegmentSource::whole(
                 doc.addr.clone(),
                 u64::try_from(body.len()).unwrap_or(u64::MAX),
-                doc.producer.clone(),
             ));
             continue;
         }
@@ -196,7 +187,6 @@ fn build_segment(
             addr: doc.addr.clone(),
             kept: u64::try_from(kept).unwrap_or(u64::MAX),
             dropped: cut.dropped.get(),
-            producer: doc.producer.clone(),
         });
     }
     Ok((

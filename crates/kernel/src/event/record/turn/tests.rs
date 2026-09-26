@@ -71,14 +71,12 @@ fn a_prompt_line_writes_the_bytes_the_hand_written_map_wrote() {
                     kept: 12,
                     marker: true,
                     dropped: 4,
-                    producer: None,
                 },
                 PromptSource {
                     addr: rules(),
                     kept: 25,
                     marker: false,
                     dropped: 0,
-                    producer: None,
                 },
             ],
             skipped: vec![PromptSkip {
@@ -193,6 +191,7 @@ fn a_reply_line_writes_the_bytes_the_hand_written_map_wrote() {
         output_tokens: Tokens::new(64),
         cache_read_tokens: Tokens::new(0),
         cache_write_tokens: Tokens::new(0),
+        dialect: None,
     };
     let returned = ModelReturned {
         message: message.clone(),
@@ -250,66 +249,4 @@ fn a_steer_line_writes_the_bytes_the_hand_written_map_wrote() {
     let typed = Payload::of(&steer).unwrap();
     assert_eq!(bytes(&typed), bytes(&hand));
     assert_eq!(typed.read::<SteerReceived>().unwrap(), steer);
-}
-
-/// The producer-less event the acceptance names: source rows written
-/// before the key existed. The read end answers `Unknown` — the model a
-/// replay happens to run on is not an answer to who wrote an old
-/// summary.
-#[test]
-fn a_source_row_without_a_producer_answers_unknown() {
-    let payload = hand_written_prompt(&B3Hash::digest(b"four frozen bytes"));
-    let read: PromptAssembled = payload.read().unwrap();
-    let answered: Vec<SummaryProducer> = read
-        .segments
-        .iter()
-        .flat_map(|segment| segment.sources.iter().map(PromptSource::producer))
-        .collect();
-    assert_eq!(
-        answered,
-        vec![SummaryProducer::Unknown, SummaryProducer::Unknown],
-        "a row that recorded no producer is answered as unknown, never guessed"
-    );
-}
-
-/// 换模型后回放可指出旧摘要的生产者：行上记了什么就答什么，与后来的模型无关。
-#[test]
-fn a_summary_row_keeps_its_producer_after_the_model_moves_on() {
-    let mut entry = Map::new();
-    entry.insert("slot".to_owned(), Value::String("run".to_owned()));
-    entry.insert(
-        "hash".to_owned(),
-        Value::String(B3Hash::digest(b"run bytes").to_string()),
-    );
-    entry.insert("len".to_owned(), Value::Number(10u64.into()));
-    entry.insert(
-        "sources".to_owned(),
-        Value::Array(vec![json!({
-            "addr": "city/Summary.md",
-            "kept": 6,
-            "marker": false,
-            "dropped": 0,
-            "producer": { "written": { "model": "model-a", "generation": 2 } }
-        })]),
-    );
-    entry.insert("skipped".to_owned(), Value::Array(vec![]));
-    let mut map = Map::new();
-    map.insert(
-        "segments".to_owned(),
-        Value::Array(vec![Value::Object(entry)]),
-    );
-    map.insert(
-        "breakpoints".to_owned(),
-        json!(["city", "building", "resident", "run"]),
-    );
-    let payload = Payload::new(map).unwrap();
-    let read: PromptAssembled = payload.read().unwrap();
-    let source = &read.segments[0].sources[0];
-    assert_eq!(
-        source.producer(),
-        SummaryProducer::Written {
-            model: "model-a".to_owned(),
-            generation: NonZeroU32::new(2).unwrap()
-        }
-    );
 }
