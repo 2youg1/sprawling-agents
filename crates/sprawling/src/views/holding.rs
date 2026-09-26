@@ -44,7 +44,8 @@ use crate::assembly::{ledger_dir, rebuild_views};
 /// looking at.
 ///
 /// # Errors
-/// Propagates folded lines that do not verify and a record that will not
+/// Propagates a chain the whole-ledger audit finds broken or cannot
+/// read, folded lines that do not verify, and a record that will not
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {

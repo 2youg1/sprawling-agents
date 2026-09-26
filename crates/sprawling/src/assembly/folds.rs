@@ -101,12 +101,20 @@ impl Standing {
 /// (sprawling-SPEC 8-91). A reader that serves nothing: it cuts no
 /// snapshot, so a one-shot query writes nothing to disk.
 ///
+/// The whole chain is audited first, because no background audit runs
+/// beside a one-shot read and the snapshot's fit checks only the line at
+/// its seq: without the audit a line edited before that seq would be
+/// answered from.
+///
 /// # Errors
-/// Propagates chain verification failures of the lines it folds; a city
-/// whose history does not verify is not one whose views should be
-/// served.
+/// The audit's reason when the chain is broken or cannot be read, and
+/// the verification failures of the lines it folds; a city whose history
+/// does not verify is not one whose views should be served.
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
-    start_views(ledger_dir).map(|started| started.views)
+    match memory::audit_chain(ledger_dir).map_err(memory::MemoryError::into_ax)? {
+        memory::ChainAudit::Whole { .. } => start_views(ledger_dir).map(|started| started.views),
+        memory::ChainAudit::Broken(reason) => Err(reason),
+    }
 }
 
 /// The records the per-line check already parsed, in ledger order.
