@@ -1907,6 +1907,7 @@ export const Note = Schema.Union(
   Schema.Struct({
     waiting: Schema.Struct({
       at: Seq,
+      t: TimeMs,
     }),
   }),
   Schema.Struct({

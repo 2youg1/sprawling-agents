@@ -170,10 +170,7 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
                 Err(err) => unreadable(kind, &err, at),
             })
         }
-        EventKind::ApprovalRequested => Some(Note::Waiting {
-            at,
-            t: kernel::TimeMs::new(0),
-        }),
+        EventKind::ApprovalRequested => Some(Note::Waiting { at, t: record.t() }),
         // The job pin that opens a dispatch is a `checkpoint_committed`
         // naming no commit, and the record type says so rather than
         // leaving this reader to infer it from a missing key.

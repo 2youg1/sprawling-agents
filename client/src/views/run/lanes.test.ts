@@ -35,7 +35,7 @@ describe("the time lens", () => {
     const turns = [
       turn(1, 0, []),
       turn(2, 10, [call(1, 10, 30)]),
-      turn(3, 30, [], [{ waiting: { at: Seq.make(9) } }]),
+      turn(3, 30, [], [{ waiting: { at: Seq.make(9), t: TimeMs.make(30) } }]),
       turn(4, 45, []),
     ];
     expect(stretchesOf(turns, 60, null)).toEqual([
@@ -57,6 +57,19 @@ describe("the time lens", () => {
       { share: "model", turn: 1, from: 22, to: 30 },
       { share: "model", turn: 2, from: 30, to: 31 },
       { share: "tool", turn: 2, from: 31, to: 40 },
+    ]);
+  });
+
+  // The request was recorded at 38, after one call ran 31..34; when the
+  // person answered is not on the wire, so the rest of the turn is theirs.
+  test("a turn that waited is cut where the request was recorded", () => {
+    const turns = [turn(1, 30, [call(1, 31, 34)], [{ waiting: { at: Seq.make(2), t: TimeMs.make(38) } }]), turn(2, 45, [])];
+    expect(stretchesOf(turns, 50, null)).toEqual([
+      { share: "model", turn: 1, from: 30, to: 31 },
+      { share: "tool", turn: 1, from: 31, to: 34 },
+      { share: "model", turn: 1, from: 34, to: 38 },
+      { share: "person", turn: 1, from: 38, to: 45 },
+      { share: "model", turn: 2, from: 45, to: 50 },
     ]);
   });
 

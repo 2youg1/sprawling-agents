@@ -56,10 +56,24 @@ export function stretchesOf(turns: readonly Turn[], end: number, tail: Share | n
     const to = Math.max(turn.t, turns[at + 1]?.t ?? end);
     const whole = (share: Share): Stretch[] => [{ share, turn: turn.number, from: turn.t, to }];
     if (at === turns.length - 1 && tail !== null) return whole(tail);
-    if (turn.notes.some((note) => "waiting" in note)) return whole("person");
-    if (turn.calls.length === 0) return whole("model");
-    return cut(turn.number, turn.t, to, turn.calls);
+    const asked = turn.notes.flatMap((note) => ("waiting" in note ? [note.waiting.t] : []));
+    if (asked.length > 0) return waited(turn, Math.min(to, Math.max(turn.t, Math.min(...asked))), to);
+    return worked(turn, to);
   });
+}
+
+// A turn that stopped for a person, cut where the request was recorded:
+// before it like any other turn, after it the person's to the end of
+// the turn, because when the answer came is not on the wire.
+function waited(turn: Turn, since: number, to: number): Stretch[] {
+  const before = { ...turn, calls: turn.calls.filter((call) => call.called < since) };
+  const person: Stretch = { share: "person", turn: turn.number, from: since, to };
+  return [...worked(before, since), person].filter((part) => part.to > part.from);
+}
+
+function worked(turn: Turn, to: number): Stretch[] {
+  if (turn.calls.length === 0) return [{ share: "model", turn: turn.number, from: turn.t, to }];
+  return cut(turn.number, turn.t, to, turn.calls);
 }
 
 // A turn that called tools, cut at the first call and the last answer;
