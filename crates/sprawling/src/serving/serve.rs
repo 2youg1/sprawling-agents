@@ -61,4 +61,8 @@ pub(super) struct Opening {
     /// disclosure. Consumed by the first `open_for_service`.
     pub(super) notice: Option<Payload>,
     pub(super) log: runtime::diagnostics::Diagnostics,
+    /// The chain audit's own voice: the same sink and the same floor as
+    /// `log`, held apart because the audit thread never touches the
+    /// writer (sprawling-SPEC.md 8-90).
+    pub(super) audit_log: runtime::diagnostics::Diagnostics,
 }

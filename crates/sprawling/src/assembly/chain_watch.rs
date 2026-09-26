@@ -29,6 +29,7 @@ impl RunWorker {
         log: Diagnostics,
     ) -> Result<std::thread::JoinHandle<()>, AxError> {
         let halt = memory::ChainHalt::default();
+        self.ledger.halt_on(halt.clone());
         let dir = ledger_dir(&self.city_root);
         let at = self.ledger.position();
         std::thread::Builder::new()
@@ -66,7 +67,10 @@ fn report_audit(dir: &Path, halt: &memory::ChainHalt, at: Seq, mut log: Diagnost
             let err = err.into_ax();
             (
                 Level::Refuse,
-                format!("the chain audit could not read the ledger: {err}; {}", err.recovery()),
+                format!(
+                    "the chain audit could not read the ledger: {err}; {}",
+                    err.recovery()
+                ),
             )
         }
     };
