@@ -13,8 +13,8 @@
 
 use std::path::Path;
 
-use kernel::{AxCode, AxError, EventKind, EventRecord, Seq};
-use memory::{LedgerIndex, MemoryError};
+use kernel::{AxCode, AxError, EventKind, Seq};
+use memory::{CheckedLine, LedgerIndex, MemoryError};
 
 use super::{Inherited, fold_run, no_start};
 
@@ -32,22 +32,29 @@ pub fn inherited_indexed(
 ) -> Result<Inherited, AxError> {
     let mut reader = index.reader(dir);
     let owner = match reader.line_at(at_seq) {
-        Ok(line) => EventRecord::parse_line(&line)
-            .map_err(|_| outside(index, at_seq))?
-            .run(),
+        Ok(line) => match memory::read_line(&line) {
+            Ok(CheckedLine::Known(record)) => record.run(),
+            Ok(CheckedLine::IgnoredUnknown(_)) => return Err(outside(index, at_seq)),
+            Err(fault) => return Err(fault.into_ax(at_seq.value().saturating_add(1))),
+        },
         Err(MemoryError::SeqMissing { .. }) => return Err(outside(index, at_seq)),
         Err(other) => return Err(other.into_ax()),
     };
     let mut seqs: Vec<Seq> = index.run_seqs_before(owner, Some(at_seq.next()?)).collect();
     seqs.reverse();
+    // A line of a newer kind is skipped and a malformed one refused, by
+    // the rule `memory::read_line` shares with the verified door.
     let records = seqs
         .into_iter()
         .map(|seq| {
-            reader
-                .line_at(seq)
-                .map_err(MemoryError::into_ax)
-                .and_then(|line| EventRecord::parse_line(&line))
+            let line = reader.line_at(seq).map_err(MemoryError::into_ax)?;
+            match memory::read_line(&line) {
+                Ok(CheckedLine::Known(record)) => Ok(Some(record)),
+                Ok(CheckedLine::IgnoredUnknown(_)) => Ok(None),
+                Err(fault) => Err(fault.into_ax(seq.value().saturating_add(1))),
+            }
         })
+        .filter_map(Result::transpose)
         .collect::<Result<Vec<_>, AxError>>()?;
     let start = records
         .iter()

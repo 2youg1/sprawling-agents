@@ -109,11 +109,14 @@ impl RunWorker {
             .refresh(&dir)
             .map_err(memory::MemoryError::into_ax)?;
         let owner = match self.index.reader(&dir).line_at(origin.at_seq) {
-            // A line this build cannot read as a record is not a line of
-            // that run's conversation, which is the refusal below.
-            Ok(line) => kernel::EventRecord::parse_line(&line)
-                .map(|record| record.run())
-                .ok(),
+            // A line of a newer kind is not a line of that run's
+            // conversation, which is the refusal below; a line that is no
+            // record at all is a damaged ledger, and says so.
+            Ok(line) => match memory::read_line(&line) {
+                Ok(memory::CheckedLine::Known(record)) => Some(record.run()),
+                Ok(memory::CheckedLine::IgnoredUnknown(_)) => None,
+                Err(fault) => return Err(fault.into_ax(origin.at_seq.value().saturating_add(1))),
+            },
             Err(memory::MemoryError::SeqMissing { .. }) => None,
             Err(other) => return Err(other.into_ax()),
         };
