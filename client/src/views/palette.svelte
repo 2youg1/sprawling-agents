@@ -70,6 +70,19 @@
 
   let query = $state("");
   let cursor = $state(0);
+
+  // Two names no command answers to, each answered by a reader of
+  // cities: David Harvey and Manfredo Tafuri.
+  const nothingFound = $derived.by((): Key => {
+    switch (query.trim().toLowerCase()) {
+      case "harvey":
+        return "palette_no_harvey";
+      case "tafuri":
+        return "palette_no_tafuri";
+      default:
+        return "part_no_match";
+    }
+  });
   let box = $state<HTMLInputElement | undefined>(undefined);
 
   onMount(() => {
@@ -390,7 +403,7 @@ rail would otherwise cover the left half of the box. -->
       {/if}
     </ul>
     {#if shown.length === 0}
-      <Empty missing="part_no_match" />
+      <Empty missing={nothingFound} />
     {/if}
   </div>
 </div>

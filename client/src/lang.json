@@ -3199,6 +3199,14 @@
     "en": "nothing is running to steer",
     "zh": "没有正在跑的 run"
   },
+  "palette_no_harvey": {
+    "en": "no command called harvey. The city is still yours to change.",
+    "zh": "没有叫 harvey 的命令。不过这座城，仍由你来改变。"
+  },
+  "palette_no_tafuri": {
+    "en": "no command called tafuri. There is no design here, only its critique.",
+    "zh": "没有叫 tafuri 的命令。这里没有设计，只有对设计的批判。"
+  },
   "welcome_card_work": {
     "en": "assign work",
     "zh": "派活"
