@@ -150,3 +150,21 @@ fn each_way_a_call_ends_has_its_own_exit_code() {
         .collect::<Vec<_>>();
     assert_eq!(observed, table.to_vec());
 }
+
+/// A refusal names the nearby names to a person, and reaches a program
+/// as the `AxError` it was, so neither reader loses a field.
+#[test]
+fn a_refusal_reads_the_same_to_a_person_and_to_a_program() {
+    use super::refusal::{written, Form};
+    use kernel::{AxCode, AxError};
+    let err = AxError::failure(AxCode::ToolUnknown, "call tool", "grep")
+        .with_nearby(vec!["exec".into(), "edit".into()])
+        .with_recovery("use one of the nearby tools");
+    let human = written(&err, Form::Human);
+    let json = written(&err, Form::Json);
+    let back: AxError = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        (human.lines().last(), json.lines().count(), back),
+        (Some("nearby: exec, edit"), 1, err)
+    );
+}
