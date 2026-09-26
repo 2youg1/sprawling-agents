@@ -3021,7 +3021,7 @@
     "zh": "已收尾"
   },
   "bld_halt_idle": {
-    "en": "nothing is running in this building",
-    "zh": "这栋楼里没有在跑的派活"
+    "en": "nothing runs here now; halting refuses new work",
+    "zh": "这栋楼现在没有在跑的派活；叫停会拒收新活"
   }
 }

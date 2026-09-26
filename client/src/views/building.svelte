@@ -224,22 +224,18 @@
         }}
       />
     {/if}
-    <!-- Stopping a building where nothing runs would change nothing a
-         person could see, so the control says so instead of acting. -->
+    <Button
+      label={fill(say($lang, halted ? "bld_release" : "bld_halt"), { addr: address })}
+      tone={halted ? "secondary" : "quiet"}
+      onPress={() => {
+        u.send(halted ? release({ building: address }) : halt({ building: address }));
+      }}
+    />
+    <!-- Halt still shuts an idle building to new work and ends its backlog
+         (glossary: Halt), so the control stays live and only says that
+         nothing runs here now. -->
     {#if !halted && livingIn(address) === 0}
-      <Button
-        label={fill(say($lang, "bld_halt"), { addr: address })}
-        tone="quiet"
-        why={say($lang, "bld_halt_idle")}
-      />
-    {:else}
-      <Button
-        label={fill(say($lang, halted ? "bld_release" : "bld_halt"), { addr: address })}
-        tone={halted ? "secondary" : "quiet"}
-        onPress={() => {
-          u.send(halted ? release({ building: address }) : halt({ building: address }));
-        }}
-      />
+      <span class="text-note text-text-quiet">{say($lang, "bld_halt_idle")}</span>
     {/if}
     <span class="@lg/page:hidden">
       <Button

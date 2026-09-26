@@ -70,13 +70,13 @@
   const belief = u.conn.belief;
   const approvals = u.approvals;
 
-  // What a name does while the rail is collapsed. Written on every name
-  // the rail can show, so one stylesheet rule reveals them all on hover
-  // and this file decides only the pinned case.
-  // Set by a click on a page link, cleared when the pointer leaves: the
+  // Set by a pointer click on a page link (not Enter), cleared when the pointer leaves: the
   // stylesheet keeps the hover-opened column shut while it is set.
   let tucked = $state(false);
 
+  // What a name does while the rail is collapsed. Written on every name
+  // the rail can show, so one stylesheet rule reveals them all on hover
+  // and this file decides only the pinned case.
   const label = $derived(`rail-label truncate ${posture === "named" ? "block" : "hidden"}`);
 
   const active = $derived(
@@ -94,7 +94,6 @@
     { key: "cost", view: { kind: "cost" }, action: "go.cost", glyph: "cost" },
     { key: "setup", view: { kind: "setup" }, action: "go.setup", glyph: "setup" },
   ]);
-
 
   function here(item: Item): "page" | undefined {
     return view.kind === item.key ? "page" : undefined;
@@ -163,8 +162,8 @@
           <a
             href={toFragment(item.view)}
             aria-current={here(item)}
-            onclick={() => {
-              tucked = true;
+            onclick={(e) => {
+              tucked = e.detail > 0;
             }}
             aria-labelledby={hint}
             class="relative flex h-rail w-full items-center gap-base px-base text-label text-text-faint hover:bg-chrome hover:text-text aria-[current=page]:text-text"
