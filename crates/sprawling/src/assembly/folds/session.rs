@@ -178,7 +178,8 @@ impl SessionOrigins {
             | EventKind::RerankCalled
             | EventKind::AdviserAsked
             | EventKind::AdviserAnswered
-            | EventKind::AdviserFellBack => Ok(()),
+            | EventKind::AdviserFellBack
+            | EventKind::CacheRenewed => Ok(()),
         }
     }
 

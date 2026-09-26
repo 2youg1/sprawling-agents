@@ -189,6 +189,7 @@ impl RunWorker {
             origins,
             flight: Flight::open(),
             index: memory::LedgerIndex::empty(),
+            warm: super::keeping_warm::Kept::default(),
         };
         worker.sweep_abandoned_trees();
         Ok(worker)

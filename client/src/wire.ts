@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "d6a99c1be4efa307d998a6b9a43daf67cf18f227d10afecf2edf8f593872742f" as const;
+export const WIRE_HASH = "da391c968471d1007df7edf67b48b158cd191e68ffd83b037a95c2e9980e50b0" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -523,6 +523,7 @@ export const EventKind = Schema.Union(
   Schema.Literal("adviser_asked"),
   Schema.Literal("adviser_answered"),
   Schema.Literal("adviser_fell_back"),
+  Schema.Literal("cache_renewed"),
 ).annotations({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 

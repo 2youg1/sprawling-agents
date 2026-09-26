@@ -154,6 +154,7 @@ impl kernel::idem::IdemGuard
 impl kernel::idem::IdemGuard
 impl kernel::idem::IdemKey
 impl kernel::idem::IdemKey
+impl kernel::keep_warm::CacheUse
 impl kernel::layout::CityLayout
 impl kernel::locator::B3Hash
 impl kernel::locator::B3Hash
@@ -419,6 +420,7 @@ pub enum kernel::GoalVerdict
 pub enum kernel::How
 pub enum kernel::ImageType
 pub enum kernel::Increment
+pub enum kernel::KeepWarm
 pub enum kernel::Lines
 pub enum kernel::Locator
 pub enum kernel::McpTransport
@@ -489,6 +491,7 @@ pub enum kernel::event::record::Admittance
 pub enum kernel::event::record::AdviserAnswer
 pub enum kernel::event::record::AdviserAsk
 pub enum kernel::event::record::AdviserFailure
+pub enum kernel::event::record::CacheRenewed
 pub enum kernel::event::record::CheckpointCommitted
 pub enum kernel::event::record::FiredAction
 pub enum kernel::event::record::GoverningDocument
@@ -502,6 +505,7 @@ pub enum kernel::gate::EgressTarget
 pub enum kernel::gate::GateOutcome
 pub enum kernel::goal::GoalResource
 pub enum kernel::goal::GoalVerdict
+pub enum kernel::keep_warm::KeepWarm
 pub enum kernel::locator::Locator
 pub enum kernel::locator::Range
 pub enum kernel::model::ContentBlock
@@ -890,6 +894,9 @@ pub fn kernel::idem::IdemKey::fmt(&self, &mut core::fmt::Formatter<'_>) -> core:
 pub fn kernel::idem::IdemKey::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn kernel::idem::IdemKey::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn kernel::idem::claim(&mut alloc::collections::btree::set::BTreeSet<kernel::idem::IdemKey>, kernel::idem::IdemKey) -> core::result::Result<kernel::idem::IdemGuard, kernel::idem::Duplicate>
+pub fn kernel::keep_warm::CacheUse::renewed(self, u64) -> kernel::keep_warm::CacheUse
+pub fn kernel::keep_warm::CacheUse::sent(u64) -> kernel::keep_warm::CacheUse
+pub fn kernel::keep_warm::renewal_due(kernel::keep_warm::KeepWarm, kernel::keep_warm::CacheUse, u64) -> core::option::Option<u64>
 pub fn kernel::layout::CityLayout::archive(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::building_skills(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::cas(&self) -> std::path::PathBuf
@@ -1342,6 +1349,7 @@ pub kernel::EventKind::BackpressureShed
 pub kernel::EventKind::BudgetLimit
 pub kernel::EventKind::BuildingConfigured
 pub kernel::EventKind::BuildingCreated
+pub kernel::EventKind::CacheRenewed
 pub kernel::EventKind::CancelReceived
 pub kernel::EventKind::CheckpointCommitted
 pub kernel::EventKind::CityHalted
@@ -1460,6 +1468,8 @@ pub kernel::ImageType::Webp
 pub kernel::Increment::Said(alloc::string::String)
 pub kernel::Increment::Thought(alloc::string::String)
 pub kernel::ItemMeta::cost: u64
+pub kernel::KeepWarm::FiveMinute
+pub kernel::KeepWarm::Off
 pub kernel::LayeredValue::building: core::option::Option<T>
 pub kernel::LayeredValue::city: core::option::Option<T>
 pub kernel::LayeredValue::resident: core::option::Option<T>
@@ -1863,6 +1873,7 @@ pub kernel::event::EventKind::BackpressureShed
 pub kernel::event::EventKind::BudgetLimit
 pub kernel::event::EventKind::BuildingConfigured
 pub kernel::event::EventKind::BuildingCreated
+pub kernel::event::EventKind::CacheRenewed
 pub kernel::event::EventKind::CancelReceived
 pub kernel::event::EventKind::CheckpointCommitted
 pub kernel::event::EventKind::CityHalted
@@ -1971,6 +1982,11 @@ pub kernel::event::record::BuildingConfigured::sandbox: bool
 pub kernel::event::record::BuildingCreated::addr: kernel::address::Address
 pub kernel::event::record::BuildingCreated::adopted: bool
 pub kernel::event::record::BuildingCreated::template: alloc::string::String
+pub kernel::event::record::CacheRenewed::Answered
+pub kernel::event::record::CacheRenewed::Answered::billed_usd_micros: core::option::Option<kernel::budget::UsdMicros>
+pub kernel::event::record::CacheRenewed::Answered::usage: core::option::Option<kernel::ModelUsage>
+pub kernel::event::record::CacheRenewed::Refused
+pub kernel::event::record::CacheRenewed::Refused::refused: kernel::AxError
 pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
 pub kernel::event::record::CheckpointCommitted::JobPinned
 pub kernel::event::record::CheckpointCommitted::JobPinned::job: kernel::locator::Locator
@@ -2126,6 +2142,8 @@ pub kernel::goal::GoalResource::Path(kernel::address::Address)
 pub kernel::goal::GoalVerdict::Clear
 pub kernel::goal::GoalVerdict::Conflict
 pub kernel::goal::GoalVerdict::Conflict::with: kernel::goal::GoalId
+pub kernel::keep_warm::KeepWarm::FiveMinute
+pub kernel::keep_warm::KeepWarm::Off
 pub kernel::locator::Locator::Cas
 pub kernel::locator::Locator::Cas::hash: kernel::locator::B3Hash
 pub kernel::locator::Locator::Cas::range: core::option::Option<kernel::locator::Range>
@@ -2399,6 +2417,7 @@ pub mod kernel::event::record::autonomy_word
 pub mod kernel::gate
 pub mod kernel::goal
 pub mod kernel::idem
+pub mod kernel::keep_warm
 pub mod kernel::layout
 pub mod kernel::ledger
 pub mod kernel::locator
@@ -2601,6 +2620,7 @@ pub struct kernel::goal::GoalId(_)
 pub struct kernel::idem::Duplicate
 pub struct kernel::idem::IdemGuard
 pub struct kernel::idem::IdemKey
+pub struct kernel::keep_warm::CacheUse
 pub struct kernel::layout::CityLayout
 pub struct kernel::locator::B3Hash(_)
 pub struct kernel::locator::GitOid(_)

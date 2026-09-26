@@ -21,12 +21,14 @@
 use std::path::{Path, PathBuf};
 
 use kernel::{
-    Address, AxError, Effort, FrozenConfig, LayeredValue, McpServer, McpTransport, SandboxLimits,
-    SecondThreshold, ServerLabel,
+    Address, AxError, Effort, FrozenConfig, KeepWarm, LayeredValue, McpServer, McpTransport,
+    SandboxLimits, SecondThreshold, ServerLabel,
 };
 use serde::Deserialize;
 
+use cache::CacheSection;
 use context::ContextSection;
+mod cache;
 mod context;
 mod ladder;
 mod refuse;
@@ -35,6 +37,7 @@ mod settled;
 mod shelves;
 mod write;
 
+pub use cache::keep_warm;
 pub use ladder::Layer;
 pub(crate) use session::forget as forget_session;
 pub use session::{own_layer, write_session};
@@ -68,6 +71,7 @@ pub struct ConfigLayer {
     mcp: Option<Vec<McpServer>>,
     /// The second context-reminder rung this layer states.
     second_threshold: Option<SecondThreshold>,
+    keep_warm: Option<KeepWarm>,
     shelves: Option<Vec<String>>,
 }
 
@@ -206,6 +210,7 @@ impl ConfigLayer {
             sandbox,
             mcp,
             second_threshold,
+            keep_warm: file.cache.map(|section| section.keep_warm),
             // The paths are kept as written: turning `~` into a
             // directory needs this person's home, which is not this
             // module's to read, and a value stored half-resolved would
@@ -231,6 +236,11 @@ impl ConfigLayer {
     #[must_use]
     pub fn second_threshold(&self) -> Option<SecondThreshold> {
         self.second_threshold
+    }
+
+    #[must_use]
+    pub fn keep_warm(&self) -> Option<KeepWarm> {
+        self.keep_warm
     }
 
     #[must_use]
@@ -295,6 +305,8 @@ pub(crate) struct ConfigFile {
     mcp: Option<Vec<McpSection>>,
     #[serde(default)]
     context: Option<ContextSection>,
+    #[serde(default)]
+    cache: Option<CacheSection>,
     #[serde(default)]
     skills: Option<SkillsSection>,
 }

@@ -97,7 +97,7 @@ impl RunWorker {
     /// build defect rather than a run's.
     pub(super) fn probe_before(
         &mut self,
-        adapter: Option<&mut (dyn Model + Send + 'static)>,
+        adapter: Option<&mut super::keeping_warm::Door>,
         frozen: &runtime::Run<runtime::run::Frozen>,
         who: &str,
     ) -> Result<probe::Answers, AxError> {

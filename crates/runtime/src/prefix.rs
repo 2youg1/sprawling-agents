@@ -20,6 +20,7 @@ mod breakpoint;
 mod segment;
 
 pub(crate) mod shape;
+pub mod warmth;
 
 pub use breakpoint::{Breakpoint, BreakpointPlan};
 

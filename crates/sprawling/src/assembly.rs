@@ -40,6 +40,7 @@ mod driving;
 mod folds;
 mod freezing;
 mod genesis;
+mod keeping_warm;
 mod lifetime;
 mod mcp;
 mod naming;
@@ -241,6 +242,9 @@ pub struct RunWorker {
     /// with what was appended since, so a question about one line reads
     /// that line rather than the whole history (sprawling-SPEC.md 8-82).
     pub(in crate::assembly) index: memory::LedgerIndex,
+    /// The keep-warm doors of runs that have landed, one per room
+    /// (`keeping_warm`); empty under the default setting.
+    warm: keeping_warm::Kept,
 }
 
 impl RunWorker {

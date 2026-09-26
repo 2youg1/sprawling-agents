@@ -15,7 +15,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxCode, AxError, Model, RunId};
+use kernel::{Address, AxCode, AxError, RunId};
 use runtime::bench::ToolBench;
 
 use kernel::event::record::autonomy_word;
@@ -49,7 +49,7 @@ pub(super) struct Site {
     pub(super) model: gateway::ModelEntry,
     /// The endpoint the model is reached through (sprawling-SPEC 8-85).
     pub(super) provider: String,
-    pub(super) adapter: Option<Box<dyn Model + Send>>,
+    pub(super) adapter: Option<super::keeping_warm::Door>,
     pub(super) identity: city::Identity,
     pub(super) who: String,
     pub(super) run_id: RunId,

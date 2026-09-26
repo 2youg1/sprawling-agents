@@ -216,7 +216,8 @@ fn fold_run<'a>(
             | EventKind::RerankCalled
             | EventKind::AdviserAsked
             | EventKind::AdviserAnswered
-            | EventKind::AdviserFellBack => {}
+            | EventKind::AdviserFellBack
+            | EventKind::CacheRenewed => {}
         }
     }
     // A wave the cut landed inside is dropped whole: the assistant
