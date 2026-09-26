@@ -60,10 +60,6 @@ fn a_watchdog_back_off_reads_as_the_failure_it_waits_out() {
     };
     assert_eq!(
         (error.code(), error.subject(), at),
-        (
-            &AxCode::Provider,
-            "the provider answered 503",
-            Seq::FIRST
-        )
+        (&AxCode::Provider, "the provider answered 503", Seq::FIRST)
     );
 }
