@@ -545,14 +545,8 @@ impl EndpointTuning {
 pub struct AttachedEndpoint { …, pub tuning: EndpointTuning }
 impl AttachedEndpoint { pub fn label(&self) -> &str }          // 缺省即 name
 
-pub struct ModelFacts {
-    pub id: String,
-    pub context_tokens: Option<u64>,
-    pub max_output_tokens: Option<Ceiling>,
-    pub input_modalities: Vec<String>,
-    pub input_price: Option<String>,
-    pub output_price: Option<String>,
-}
+pub use kernel::event::record::ModelFacts;   // endpoint_probed 行里的值，结构归 kernel
+pub(crate) fn facts_of(row: &Value) -> Option<ModelFacts>;   // endpoint::models：一行 /models 读成事实，无 id 即 None
 impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, AxError> }
 ```
 

@@ -472,6 +472,16 @@ pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u6
 // EndpointAttached 顶层的键则不然：probed、auth、connection_kind 在而读不懂，整行读不成（E_WIRE_MISMATCH），
 // 因为把一个没探到的端点读成探到过，是在书里放进一个没人够得着的端点。
 
+// record::probe：endpoint_probed，一次探测在挂上任何东西之前看到的。ModelFacts 随之归 kernel
+// （gateway::ModelFacts 是它的再导出，读一行 /models 的 gateway::endpoint::models::facts_of 仍归 gateway），
+// 因为账本行的值要用 kernel 自己的类型。
+pub struct ModelFacts { pub id: String, pub context_tokens: Option<u64>, pub max_output_tokens: Option<Ceiling>,
+                        pub input_modalities: Vec<String>, pub input_price: Option<String>,
+                        pub output_price: Option<String> }        // 缺席写 null，行没说就是没说
+pub struct EndpointProbed { pub name: String, pub base_url: String, pub reach: Reach,
+                            pub models: Vec<String>, pub facts: Vec<ModelFacts>,   // 读不到列表时两者都写空
+                            pub failed: Option<ProbeFailure> }                   // 缺席即省略
+pub struct ProbeFailure { pub code: String, pub subject: String }
 // record::provider：provider_degraded 有两个写方、两种形状，一个 untagged enum 让读者靠读来分，
 // 不靠猜键：E_PROVIDER 经 kernel::error 的 carrier 表平铺写成 AxError 本身；vault 启动探针退到
 // session memory 时写 VaultFellBack。两者都不是的行读不成（E_WIRE_MISMATCH）。

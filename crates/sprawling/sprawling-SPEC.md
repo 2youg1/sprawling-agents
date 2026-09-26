@@ -2896,7 +2896,7 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError>;
 ```rust
 pub(super) struct Probing { pub reach: kernel::Reach, pub served: Result<Vec<gateway::ModelFacts>, AxError> }
 pub(super) fn reach_of(base_url: &str) -> Result<kernel::Reach, AxError>;
-pub(super) fn probed_payload(name: &str, base_url: &str, found: &Probing) -> Result<Payload, AxError>;
+pub(super) fn probed_payload(name: &str, base_url: &str, found: Probing) -> Result<Payload, AxError>;   // 经 Payload::of(&kernel::event::record::EndpointProbed)
 pub(super) fn tuning_of(wire: channels::EndpointTuning) -> gateway::EndpointTuning;  // credentials.rs
 ```
 
