@@ -455,7 +455,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 ## 12 错误处理（逐码答「能否定义掉」）
 
 - `E_PROVIDER`：不可定义掉——网络与对端是本 crate 的本质失败面；subject 写状态码与端点名，恒不含请求体。
-- **「能否再试一次」只有一个家：`endpoint::failure::ProviderFailure`**。调用点只说它看见了哪一种失败，retriable 与恢复语由该枚举一处给出，恒不在调用点第二次判定。往返未完成（send／execute／读体／读帧／静默超时）＝`Exchange`／`Cut`／`Silence`，标 `retriable`。对端已答非 2xx＝`Refused`，按状态码分两类：408（对端等请求等到超时）、429（限流）、5xx（含 Anthropic 的 529 过载）是对端说「现在忙或坏了」，同一请求稍后可能成功，标 `retriable`，恢复语说由 watchdog 退避后再问；其余 4xx 是对端说「这个请求本身不对」，不标，恢复语指向端点的模型名、凭证与方言。body 形状不可读（`Unreadable`）与本侧 `.build()` 失败（`Unbuilt`，确定性重演同一失败）不标。retriable 只是 opt-in：退避节奏与上限住 runtime 的 watchdog，本 crate 不循环。
+- **「能否再试一次」只有一个家：`endpoint::failure::ProviderFailure`**。调用点只说它看见了哪一种失败，retriable 与恢复语由该枚举一处给出，恒不在调用点第二次判定。往返未完成（send／execute／读体／读帧／静默超时）＝`Exchange`／`Cut`／`Silence`，标 `retriable`。对端已答非 2xx＝`Refused`，按状态码分两类：408（对端等请求等到超时）、429（限流）、5xx（含 Anthropic 的 529 过载）是对端说「现在忙或坏了」，同一请求稍后可能成功，标 `retriable`，恢复语说由 watchdog 退避后再问；其余 4xx 是对端说「这个请求本身不对」，不标，恢复语指向端点的模型名、凭证与兼容格式。body 形状不可读（`Unreadable`）与本侧 `.build()` 失败（`Unbuilt`，确定性重演同一失败）不标。retriable 只是 opt-in：退避节奏与上限住 runtime 的 watchdog，本 crate 不循环。
 - `E_WIRE_MISMATCH`：不可定义掉——对端响应形状漂移是外部事实；subject 写键路径。
 - `E_ENDPOINT_DIALECT_UNSUPPORTED`：不可定义掉——用户可配任意 external provider，兼容格式探查失败必须可报。
 - `E_CREDENTIAL_MISSING`／`E_CONFIG_INVALID`：kernel 已有码，语义照 Custody 一节；不新增码。
