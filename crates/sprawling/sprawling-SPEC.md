@@ -3617,7 +3617,7 @@ kernel-SPEC 8-74 的 `degradation::admit_work` 判定卷低于地板时不接新
 **接口。**
 
 - `volume::space(disks: &sysinfo::Disks, city: &Path) -> Option<kernel::degradation::VolumeSpace>`：挂载点是城路径最长前缀的那块盘的剩余空间与总容量；没有一块盘的挂载点是它的前缀时为 `None`。「城在哪块盘上」只有这一个家：8-92 的 `Counters` 读卷的剩余空间也经它。
-- `volume::read(city: &Path) -> Option<kernel::degradation::VolumeSpace>`：列出一次盘再调用 `space`。生产的入口经它读卷。
+- `volume::read(city: &Path) -> Option<kernel::degradation::VolumeSpace>`：先以 `std::path::absolute` 把城的路径补成绝对路径（不碰盘），再列出一次盘、调用 `space`。生产的入口经它读卷。以相对路径打开的城若不补全，没有一个挂载点是它的前缀，读作 `None`，盘满时照常接活。
 - `RunWorker` 持有一个 `fn(&Path) -> Option<VolumeSpace>` 的读卷函数，生产时是 `volume::read`。人发来的 `Dispatch` 在命名房间、写下任何东西之前读一次卷并调用 `admit_work`；拒绝时回 `BackpressureShed`，subject 是城的根目录，recovery 给出至少要腾出的字节数（`Recovery::FreeDiskSpace`）。读不到卷（`None`）时照常接活：读不到不等于盘满，拒活要有读数作依据。
 
 **决定。**
@@ -3625,6 +3625,6 @@ kernel-SPEC 8-74 的 `degradation::admit_work` 判定卷低于地板时不接新
 1. 在入口读卷，而不是由一条常驻线程每秒读一次再把最近的读数放在入口：受理新活是人一次次发来的，一次读卷（`sysinfo` 列盘加刷新）远小于随后一次模型调用；常驻读取让每座没人发活的城都付一份开销。重新考虑的条件：实测一次读卷超过一次 `Dispatch` 在本机花掉时间的 10%。
 2. 读卷函数是函数指针，不是 trait：生产只有一种读法，测试给一个返回低剩余空间的函数即可注入「盘快满」。
 
-**测试。** `assembly::commanding::tests::shedding`：读卷函数报告卷低于地板时，`Dispatch` 被拒为 `BackpressureShed`，recovery 说出要腾出的字节数，房间与账本上没有这次 run。
+**测试。** `assembly::commanding::tests::shedding`：读卷函数报告卷低于地板时，`Dispatch` 被拒为 `BackpressureShed`，recovery 说出要腾出的字节数，房间没有被建起来。`monitor::volume::tests`：以相对路径 `.` 读卷，与以工作目录的绝对路径读到同一块盘。
 
 **本节接口的当前状态。** `Wake` 等不经人的入口尚未接入；事实条与 doctor 尚不显示降级；盘慢、内存紧、CPU 被占满三种状态还没有生产的读数（kernel-SPEC 8-74）。

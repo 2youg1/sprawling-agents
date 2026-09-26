@@ -29,3 +29,7 @@ pub(crate) fn space(disks: &Disks, city: &Path) -> Option<VolumeSpace> {
             total_bytes: disk.total_space(),
         })
 }
+
+#[cfg(test)]
+#[path = "volume/tests.rs"]
+mod tests;
