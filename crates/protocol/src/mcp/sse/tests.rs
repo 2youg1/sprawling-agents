@@ -93,3 +93,57 @@ fn a_server_wanting_an_account_refuses_with_the_credential_code() {
         &AxCode::ToolUnavailable
     );
 }
+
+/// A message the server took (202) and never answered may already have
+/// done its work, so the lost answer is marked as an effect nobody can
+/// see: a retryer that reads `retry()` does not send the call again.
+#[test]
+fn a_message_the_server_took_and_never_answered_is_not_sent_again() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (done, hold) = std::sync::mpsc::channel::<()>();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut buf = vec![0u8; 65536];
+        assert!(stream.read(&mut buf).unwrap() > 0);
+        stream
+            .write_all(
+                b"HTTP/1.1 200 OK
+content-type: text/event-stream
+connection: close
+
+event: endpoint
+data: /messages
+
+",
+            )
+            .unwrap();
+        stream.flush().unwrap();
+        let (mut post, _) = listener.accept().unwrap();
+        assert!(post.read(&mut buf).unwrap() > 0);
+        post.write_all(
+            b"HTTP/1.1 202 Accepted
+content-length: 0
+connection: close
+
+",
+        )
+        .unwrap();
+        hold.recv().unwrap();
+    });
+    let mut held = SseServer::open(&format!("http://{addr}/sse"), &[], &vault()).unwrap();
+
+    let lost = held
+        .call(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\"}",
+            TimeoutMs(200),
+        )
+        .unwrap_err();
+
+    done.send(()).unwrap();
+    server.join().unwrap();
+    assert_eq!(
+        (lost.code(), lost.retry()),
+        (&AxCode::Timeout, kernel::Retry::Unknown)
+    );
+}

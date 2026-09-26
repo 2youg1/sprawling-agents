@@ -109,7 +109,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 - **开场必须是 `initialize`**，携 `protocolVersion`、`capabilities`、`clientInfo` 三项；随后必须发 `notifications/initialized`，之后才能问别的。故 `handshake()` 是这条生命周期的**唯一权威**，坐在两个传输之上——两个传输各写一遍就是两份会漂的生命周期。
 - **`capabilities` 故意为空**：roots／sampling／elicitation 是 server 反过来向**我们**要的能力；声明一项本城没实现的能力，等于招来一个随后只能拒的请求。
-- **会话住传输层，不住本 crate**，因为规范把它写在 Transports 而不是 Lifecycle：server **可选**在 `initialize` 应答的头里发 `Mcp-Session-Id`；一旦发了，客户端 **MUST** 在此后每一次请求带回。404 意味着 server 结束了会话，**MUST** 重开一个——故 `protocol::mcp::http` 遇 404 丢掉 id 并标 `retriable`，而不是拿一个已死的 id 永远碰下去。
+- **会话住传输层，不住本 crate**，因为规范把它写在 Transports 而不是 Lifecycle：server **可选**在 `initialize` 应答的头里发 `Mcp-Session-Id`；一旦发了，客户端 **MUST** 在此后每一次请求带回。404 意味着 server 结束了会话，**MUST** 重开一个——故 `protocol::mcp::http` 遇 404 丢掉 id，而不是拿一个已死的 id 永远碰下去。带着会话 id 的 404 标 `retriable`：按规范 server 对已结束会话的请求一律答 404，调用没有被执行，下一次派遣先重开会话；不带会话 id 的 404 标不可重试，它说的是地址不对，再问只得到同一个答。
 - **已知的向前变化**：更新的修订正在把会话去掉（SEP-2575）。本客户端协商的是 `2025-06-18` 并按那一版行事；一台忽略该头的 server 不会因此变得不可用。
 - **实测得到的一条**：一台在 CDN 后面的托管 server 对**不报名的客户端**回 403 `browser_signature_banned`，早于任何 MCP 消息。故 HTTP 传输带自己的 User-Agent。
 
@@ -214,6 +214,7 @@ pub fn echoing(answer: &str) -> (String, Vec<String>); // 对每行都回同一�
 - **HTTP 与 SSE 共用一个客户端构造**（`mcp::http::client_for`）：两者的代理规则、user agent 与拒词原本各写一份。
 - **子进程回收逻辑原样搬移**：期限到即杀子进程，理由见 `mcp::stdio` 的模块文档。
 - **`echoing` 在 `conformance` 后面**：装配层的测试要起同一个假 server；产品二进制不带它（`xtask artifact`）。
+- **调用发出之后丢了答，效果未知，不可重试**：SSE 的 POST 被对侧收下（2xx）之后，流上在期限内没有答案——server 已经拿到那条消息，可能已经做了，再发一次同一调用就可能把一次写做两遍。故这一刻抬 `E_TIMEOUT` 并标 `effect_unknown`（`Retry::Unknown`，kernel-SPEC 的三态），由看得见这次调用的人决定要不要再问。POST 本身失败时对侧没有收下，照旧按 `unreachable`／`refused` 的口径。
 - 失败码不变：各传输沿用 §12 的 `E_TIMEOUT`／`E_WIRE_MISMATCH`／`E_TOOL_UNAVAILABLE`，HTTP 与 SSE 在 401／403 抬 `E_CREDENTIAL_MISSING`，客户端构造不成抬 `E_CONFIG_INVALID`。
 
 ### 8-18 外包 OAuth 的 broker（形状 4 适配器；三个调用，别无其它）
@@ -233,7 +234,7 @@ pub enum Connection { Absent, Awaiting { consent_url: String }, Connected { alia
 - **住 `protocol::mcp`，不住 `gateway`**：它回答的是「连哪台 MCP server 上的哪个应用」，与三种传输同属一件事；出网的两条政策（代理规则、HTTP 客户端的构造）仍只在 `gateway::client_for` 一处，broker 经它取客户端，测试的 `Broker::at` 也一样（`Proxying::ExceptLocal` 对回环地址不走代理），所以本库之内没有第二个构造点。拒绝的另一方案是留在 `gateway`：那样 MCP 一分为二，`gateway` 要知道一家 MCP 服务的目录形状。
 - **返回自己的词汇，不返回线上形状**：装配层把 `Toolkit`／`Connection` 映成 `channels::ToolkitLine`，与它把握手映成 `McpState` 同一做法。
 - **只有一家 broker，所以没有 trait**：第二家外包服务才是这条缝的第二个实现。
-- 失败码：401／403 抬 `E_CREDENTIAL_MISSING`；408／429／5xx 抬可重试的 `E_PROVIDER`；其余状态、读不出的答案与接不上 base 的路径抬 `E_PROVIDER`。接不上的路径在 recovery 里报出本模块的路径（`module_path!()`），模块再搬家也不漂。
+- 失败码：401／403 抬 `E_CREDENTIAL_MISSING`；408／429／5xx 抬可重试的 `E_PROVIDER`；连接阶段超时抬可重试的 `E_PROVIDER`（请求还没离开这台电脑）；请求发出之后等答超时抬 `effect_unknown` 的 `E_PROVIDER`，因为 `connect` 会在 broker 那边建一份 auth config，重发可能建出第二份；其余状态、读不出的答案与接不上 base 的路径抬 `E_PROVIDER`。接不上的路径在 recovery 里报出本模块的路径（`module_path!()`），模块再搬家也不漂。
 - 字段按防御方式读：缺一个字段少一行，不毁整张答案；测试里的假 server 是本 crate 对 broker 所发内容的陈述。
 
 ### 8-14 protocol 目录化（形状：主类型居索引，方法按簇归文件）
