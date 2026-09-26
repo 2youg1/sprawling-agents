@@ -247,6 +247,8 @@ mod tests;
 mod arrange;
 #[path = "view/detail.rs"]
 mod detail;
+#[path = "view/follow.rs"]
+mod follow;
 #[path = "view/frame.rs"]
 mod frame;
 #[cfg(test)]

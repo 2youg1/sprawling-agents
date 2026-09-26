@@ -143,6 +143,53 @@ fn write_city_ledger(dir: &Path) -> Vec<Vec<u8>> {
     lines
 }
 
+/// A run that starts after the viewer opened is in the next poll, with
+/// only the line that started it; a poll with nothing new takes nothing.
+#[test]
+fn follow_takes_a_run_that_started_after_the_viewer_opened() {
+    let dir = tempfile::tempdir().unwrap();
+    let lines = write_city_ledger(dir.path());
+    let (mut follow, (runs, rows)) = super::follow::Follow::open(dir.path()).unwrap();
+    assert_eq!((runs.len(), rows.len()), (4, lines.len()));
+    let draft = EventDraft {
+        run: run(5),
+        t: TimeMs::new(99),
+        who: "tester".to_owned(),
+        addr: Some(Address::parse("lab/c").unwrap()),
+        kind: EventKind::RunStarted,
+        data: Payload::new(serde_json::Map::new()).unwrap(),
+        ig: false,
+    };
+    let seq = Seq::new(u64::try_from(lines.len()).unwrap());
+    let prev = B3Hash::digest(lines.last().unwrap());
+    let started = EventRecord::from_draft(draft, seq, prev)
+        .canonical_line()
+        .unwrap();
+    let mut segment = std::fs::OpenOptions::new()
+        .append(true)
+        .open(dir.path().join("ledger-00000000000000000000.jsonl"))
+        .unwrap();
+    std::io::Write::write_all(
+        &mut segment,
+        &[
+            started.as_slice(),
+            b"
+",
+        ]
+        .concat(),
+    )
+    .unwrap();
+    let (runs, rows) = follow.poll().unwrap().expect("the appended run");
+    assert_eq!(runs.last().map(|line| line.run), Some(run(5)));
+    assert_eq!(
+        rows.iter()
+            .map(|row| (row.seq, row.line.as_bytes()))
+            .collect::<Vec<_>>(),
+        vec![(seq, started.as_slice())]
+    );
+    assert!(follow.poll().unwrap().is_none());
+}
+
 fn viewed(dir: &Path, chosen: &Selection) -> Vec<u8> {
     let mut out = Vec::new();
     write_records(dir, chosen, &mut out).unwrap();

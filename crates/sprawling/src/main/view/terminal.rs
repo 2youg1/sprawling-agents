@@ -4,8 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The terminal the person's face of `sprawling view` runs in
-//! (sprawling-SPEC.md 8-91): read the city once, then read keys, apply
-//! the action each names, and draw the frame the face returns. Every
+//! (sprawling-SPEC.md 8-91): read keys, apply the action each names, and
+//! draw the frame the face returns; between keys, take what the ledger
+//! grew by. Every
 //! decision is in `keys` and `frame`; this file only moves bytes.
 
 use std::io::{BufWriter, Write};
@@ -13,53 +14,39 @@ use std::path::Path;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::{cursor, execute, queue, style, terminal};
-use kernel::EventRecord;
-use sprawling::lineage::Lineage;
 
 use super::ViewError;
-use super::frame::{Face, Row, Size};
+use super::follow::{FOLLOW_TICK, Follow};
+use super::frame::{Face, Size};
 use super::keys::{Key, action_for};
 
 /// Shows the city whose ledger is kept in `dir` until the person quits.
 /// The terminal is given back as it was found, whether or not the loop
 /// failed.
 pub(super) fn show(dir: &Path) -> Result<(), ViewError> {
-    let (runs, records) = read_city(dir)?;
+    let (mut follow, (runs, records)) = Follow::open(dir)?;
     let (columns, rows) = terminal::size()?;
     let mut face = Face::open(&runs, records, size_of(columns, rows));
     let mut out = BufWriter::new(std::io::stdout());
     terminal::enable_raw_mode()?;
     let looped = execute!(out, terminal::EnterAlternateScreen, cursor::Hide)
-        .and_then(|()| run_loop(&mut face, &mut out));
+        .map_err(ViewError::Write)
+        .and_then(|()| run_loop(&mut face, &mut follow, &mut out));
     let restored = execute!(out, cursor::Show, terminal::LeaveAlternateScreen)
-        .and_then(|()| terminal::disable_raw_mode());
-    looped.and(restored).map_err(ViewError::Write)
+        .and_then(|()| terminal::disable_raw_mode())
+        .map_err(ViewError::Write);
+    looped.and(restored)
 }
 
-/// One pass over the ledger: the lineage fold and the `records` lens.
-fn read_city(dir: &Path) -> Result<(Vec<sprawling::lineage::RunLine>, Vec<Row>), ViewError> {
-    let index = memory::LedgerIndex::rebuild(dir)?;
-    let mut reader = index.reader(dir);
-    let mut lineage = Lineage::default();
-    let mut records = Vec::with_capacity(index.seqs().len());
-    for &seq in index.seqs() {
-        let line = reader.line_at(seq)?;
-        let record = EventRecord::parse_line(&line)?;
-        lineage.apply(&record)?;
-        records.push(Row {
-            seq,
-            run: record.run(),
-            // The line just parsed as JSON, which is UTF-8 by definition,
-            // so the lossy conversion never replaces a byte.
-            line: String::from_utf8_lossy(&line).into_owned(),
-        });
-    }
-    Ok((lineage.lines().collect(), records))
-}
-
-fn run_loop(face: &mut Face, out: &mut impl Write) -> std::io::Result<()> {
+fn run_loop(face: &mut Face, follow: &mut Follow, out: &mut impl Write) -> Result<(), ViewError> {
     while !face.is_closed() {
         draw(face, out)?;
+        while !crossterm::event::poll(FOLLOW_TICK)? {
+            if let Some((runs, appended)) = follow.poll()? {
+                face.follow(&runs, appended);
+                draw(face, out)?;
+            }
+        }
         match crossterm::event::read()? {
             Event::Key(pressed) => {
                 if let Some(action) = key_of(pressed).and_then(action_for) {
