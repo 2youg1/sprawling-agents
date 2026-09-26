@@ -7,11 +7,11 @@
 //! the arguments reaches the tool as its `secret:` reference, and a key
 //! in the result reaches the model the same way (sprawling-SPEC.md 8-87).
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 use kernel::{
-    AxCode, AxError, GateSubject, Payload, SecretRef, Tool, ToolCall, ToolMeta, ToolOutcome,
+    AxCode, AxError, B3Hash, GateSubject, Payload, SecretRef, Tool, ToolCall, ToolMeta, ToolOutcome,
 };
 use serde_json::{Map, Value};
 use zeroize::Zeroizing;
@@ -24,7 +24,7 @@ mod tests;
 
 /// Which side of a tool a key was found on, and so the realm it is kept
 /// under.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Side {
     /// The arguments the model wrote: what `edit` and `exec` would write.
     Written,
@@ -48,8 +48,9 @@ pub(in crate::assembly) struct Keeper {
     /// The ledger position when this run's bench was laid out: no two
     /// runs share it, because each writes before its bench is laid out.
     run: u64,
-    /// How many keys this run's tools have kept so far.
-    kept: AtomicU64,
+    /// The reference each distinct key this run's tools have kept holds,
+    /// found by the key's digest so that no plaintext outlives the call.
+    kept: Mutex<BTreeMap<(Side, B3Hash), SecretRef>>,
 }
 
 impl Keeper {
@@ -57,31 +58,36 @@ impl Keeper {
         Keeper {
             vault,
             run,
-            kept: AtomicU64::new(0),
+            kept: Mutex::new(BTreeMap::new()),
         }
     }
 
-    /// Puts one key in the vault under a name no earlier key of this run
-    /// or of any other run holds.
+    /// The reference `key` is kept under: the one it already holds in
+    /// this run, or a new vault entry under a name no other key of this
+    /// run or of any other run holds.
     fn keep(&self, side: Side, provider: &str, key: &str) -> Result<SecretRef, AxError> {
-        let earlier = self
-            .kept
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
-            .map_err(|_| {
+        let mut kept = self.kept.lock().map_err(|_| poisoned_vault())?;
+        let digest = (side, B3Hash::digest(key.as_bytes()));
+        if let Some(reference) = kept.get(&digest) {
+            return Ok(reference.clone());
+        }
+        let n = u64::try_from(kept.len())
+            .ok()
+            .and_then(|len| len.checked_add(1))
+            .ok_or_else(|| {
                 AxError::failure(
-                    AxCode::InvalidArgs,
+                    AxCode::BudgetExhausted,
                     "keep a key a tool carried",
                     "this run has kept more keys than a counter holds".to_owned(),
                 )
                 .with_recovery("start a new run and use the key there")
             })?;
-        // `fetch_update` has just shown `earlier + 1` fits.
-        let n = earlier.saturating_add(1);
         let reference = SecretRef::new(side.realm(), &format!("{provider}-{}-{n}", self.run))?;
         self.vault
             .lock()
             .map_err(|_| poisoned_vault())?
             .set(&reference, Zeroizing::new(key.to_owned()))?;
+        kept.insert(digest, reference.clone());
         Ok(reference)
     }
 
