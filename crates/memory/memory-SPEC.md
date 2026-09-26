@@ -130,6 +130,11 @@ pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, MemoryError>;
 /// 现在只有一个：`sprawling replay`，它的路径是人敲的（sprawling-SPEC §12）。
 /// 段名规则因此只住 `is_segment` 一处，不被谁再拼一遍。
 pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, MemoryError>;
+/// 一段的字节，只读、不走 open；`lines()` 给出该段完整且非空的行（撕裂尾不是行，留给 open 判）。
+/// crate 内的面：`read_raw_lines_at` 是它唯一的调用者，完整行的规则因此只住 `complete_lines` 一处。
+/// 库外的流式读者不逐段读，走 `LedgerIndex::folding`（8-4），那一遍同时建索引。三者住 `jsonl::reading`。
+pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, MemoryError>;
+impl SegmentBytes { pub(crate) fn lines(&self) -> impl Iterator<Item = &[u8]>; }
 impl kernel::Ledger for JsonlLedger { /* append = append_all(vec![d]) */ }
 #[cfg(feature = "conformance")] impl LedgerInspect for JsonlLedger { … }
 // 测试可调滚动阈：roll_bytes 字段＋#[cfg(test)] 设定器；生产恒为 SEGMENT_ROLL_BYTES。
@@ -289,9 +294,17 @@ pub struct LedgerIndex { /* folded: Folded —— entries 三列（seqs: Vec<Seq
 impl LedgerIndex {
     /// 扫描账本目录建索引（本就是唯一建表入口，无库外旁挂物可信）。
     pub fn rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError>;
+    /// 一遍读史，两件事：每条完整行按账本序借给 `each`，同时按它在段里的偏移入索引。
+    /// `each` 已读出这一行的 seq 与 run 时交回 `Some(Located)`，索引就不再解析它；交回 `None`
+    /// 则由索引自己 `locate`（与 `rebuild` 同一规则）。常驻的只有一段字节。`each` 报错即停，
+    /// 返回它的错，读盘错经 `MemoryError::into_ax`。`rebuild` 就是 `each` 恒答 `None` 的这一遍。
+    pub fn folding(dir: &Path, each: impl FnMut(&[u8]) -> Result<Option<Located>, AxError>)
+        -> Result<LedgerIndex, AxError>;
     pub fn empty() -> LedgerIndex;                                                 // 账本目录读不出时先要一个：可弃，refresh 会填上
     pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, MemoryError>;       // 只读长出来的字节
 }
+/// 一行在史中的位置：它的 seq，以及它读回来的 run（读不出 run 时仍按 seq 入索引）。
+pub struct Located { pub seq: Seq, pub run: Option<RunId> }
 /// 一次 refresh 做了什么，以及为此从盘上抬起了多少字节。
 pub enum Refreshed { Unchanged, Appended { bytes_read: u64 }, Rebuilt }
 impl LedgerIndex {
@@ -308,7 +321,7 @@ impl LineReader<'_> {
 }
 ```
 
-- **索引不落盘，只有一段常驻内存**：唯一建表入口是 `rebuild`，扫描账本目录；`Views` 持有它并在每次查询前 `refresh`。此前那份 `index.cache` 旁挂物已整体删除：`persist` 在 `db3a342` 之后的树里零生产调用者，读取方因此是在读一份没人写的文件，而「一份没人写的旁挂物」既是永不命中的空转，又是第二个可失效的“答案来源”。删掉的是写与读两半，`Folded`、`fold_segment`、`rebuild` 与 `refresh` 全部保留，故 `rebuild` 仍是「从段重建」。
+- **索引不落盘，只有一段常驻内存**：建表只有一遍扫描（`index/ledger.rs` 的 `walk`），两个入口共用它：`rebuild` 自己定位每一行，`folding` 让折叠交回它已读出的位置；`Views` 持有它并在每次查询前 `refresh`。此前那份 `index.cache` 旁挂物已整体删除：`persist` 在 `db3a342` 之后的树里零生产调用者，读取方因此是在读一份没人写的文件，而「一份没人写的旁挂物」既是永不命中的空转，又是第二个可失效的“答案来源”。删掉的是写与读两半，`Folded`、`fold_segment`、`rebuild` 与 `refresh` 全部保留，故 `rebuild` 仍是「从段重建」。
 - **取行走游标，而不是每行一次 open ＋逐字节 read**：一次 `History`／`RunHistory` 查询要取一段连续的 seq，而每一行重开段文件、再一次一个字节 `read` 到换行的读法，系统调用数与行长同阶。句柄因此住进 `LineReader`：段名不变即不重开，读用 `BufReader::read_until(b'\n')`，一次填充服务多行。
   - **实测**（5 万条账本，windows-x86_64 NVMe，每种模式 200 行）：顺序读（`history`）**0.89 µs／行**；逆序读（`run_history`）**5.82 µs／行**；随机跳读 **14.9 µs／行**。
   - **位置自持**：游标记住下一行的偏移，与所求偏移相同即不 seek（顺序读全程零 seek），不同则绝对 seek 并弃缓冲。`run_history` 逆序读每行付一次 seek 与一次缓冲填充，仍是常数次系统调用。
@@ -833,7 +846,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 `jsonl.rs`（812）→ `jsonl/ledger.rs`（类型＋段文法）／`open.rs`（打开与恢复，测试住 `open/tests.rs`）／
 `append.rs`（追加与读＋kernel::Ledger trait impl）；`index.rs`（783）→ `index/ledger.rs`
 （`LedgerIndex`，测试住 `index/ledger/tests.rs`）／`reader.rs`（`LineReader`＋`OpenSegment`）／
-`fold.rs`（折表与重建，`Folded`／`Located` 归此）；
+`fold.rs`（折表与一行怎样入表，`Folded`／`Located` 归此；扫描段的那一遍住 `ledger.rs`）；
 `worktree.rs`（622）→ `worktree/name.rs`／`lease.rs`／`trees.rs`（测试住 `trees/tests.rs`）；
 `bundle.rs`（532）→ `bundle/manifest.rs`（布局常量归此）／`export.rs`（避 `module_inception`）／
 `files.rs`；`checkpoint.rs`（480）→ `checkpoint/fence.rs`／`scan.rs`。
