@@ -91,6 +91,27 @@ pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError> {
     verify_lines(lines)
 }
 
+/// A2 folded instead of kept: each record the per-line check reads is
+/// lent to `each` and dropped, so what stays resident is one segment's
+/// bytes and one record rather than every raw line and every record.
+///
+/// # Errors
+/// The first line that does not verify, named as `verify_ledger_dir`
+/// names it, or the first error `each` returns. The records before that
+/// line were already shown to `each`, so the caller discards everything
+/// it folded.
+pub fn fold_ledger_dir(
+    dir: &Path,
+    mut each: impl FnMut(&EventRecord) -> Result<(), AxError>,
+) -> Result<(), AxError> {
+    for line in verify_ledger_dir(dir)?.lines() {
+        if let VerifiedLine::Known { record, .. } = line {
+            each(record)?;
+        }
+    }
+    Ok(())
+}
+
 /// A15: recompute the four segment hashes from a `prompt_assembled`
 /// payload plus the same source documents, and check them against the
 /// recorded ones. The concatenation rule (join separator, truncation

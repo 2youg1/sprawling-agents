@@ -55,6 +55,27 @@ fn unknown_kind_without_ig_speaks_direction() {
 }
 
 #[test]
+fn a_fold_reads_the_history_line_by_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = genesis_line();
+    let second = future_line(&first, 1, false);
+    let segment = [first, b"
+".to_vec(), second, b"
+".to_vec()].concat();
+    std::fs::write(dir.path().join("ledger-00000000000000000000.jsonl"), segment).unwrap();
+    let mut folded = Vec::new();
+    let refused = fold_ledger_dir(dir.path(), |record| {
+        folded.push(record.seq());
+        Ok(())
+    })
+    .unwrap_err();
+    assert_eq!(
+        (folded, refused.code()),
+        (vec![Seq::FIRST], &AxCode::LogVersionUnsupported)
+    );
+}
+
+#[test]
 fn higher_v_is_refused_before_anything_else() {
     let line = br#"{"v":2,"seq":0,"prev":"0000000000000000000000000000000000000000000000000000000000000000","kind":"x"}"#;
     let err = verify_lines(vec![line.to_vec()]).unwrap_err();
