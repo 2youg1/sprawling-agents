@@ -6,11 +6,13 @@
 //! The machine the city runs on, asked what it has and handed one
 //! install for the worker rather than by it (accounting-SPEC.md 8-4).
 //!
-//! **Holding a `Runnable` is the proof that the question was asked.**
-//! Its constructor is private to this crate, and `Recipe::command` is
-//! the one place that calls it, refusing a printed recipe and a manual
-//! one first. An implementation of `Machine` is therefore handed a
-//! command this city may run, never a program name somebody typed.
+//! **Holding a `Runnable` proves the recipe was a `Command`.** Its
+//! constructor is private to this crate, and `Recipe::command` is the
+//! one place that calls it, refusing a printed recipe and a manual one
+//! first. It does not prove permission: `Recipe::Command` has public
+//! fields, so what keeps a program outside the requirement table from
+//! running is the worker's `doctor_install`, which looks the name up in
+//! that table before it builds a `Runnable`.
 
 use kernel::{AxCode, AxError};
 
@@ -91,11 +93,12 @@ impl Recipe {
     }
 }
 
-/// A program and its arguments that this city is allowed to start.
+/// A program and its arguments from a recipe that is a command.
 ///
 /// Constructed only by `Recipe::command` and `Recipe::spelled`, which
-/// live beside it: a value of this type is a recipe that passed the
-/// "may this city run it" question.
+/// live beside it: a value of this type came from a `Command` recipe.
+/// Whether this city may run it is the requirement-table lookup the
+/// worker makes first.
 pub struct Runnable<'a> {
     program: &'a str,
     args: &'a [&'a str],
