@@ -31,15 +31,16 @@ import type { Key } from "../../core/lang";
 import type { DoctorItem } from "../../wire";
 import type { Weight } from "../parts/glyph";
 import type { Tone } from "../parts/button.svelte";
-import type { Offer } from "../setup/dependencies";
+import type { Absence, Offer } from "../setup/dependencies";
 
 // What the badge beside the name weighs. The word is what states the
 // answer; the weight only decides how loudly, and a broken or required
-// missing item is the one a person has to act on.
-function weightOf(item: DoctorItem): Weight {
+// missing item is the one a person has to act on - unless it is a spare
+// of a group another member already answers.
+function weightOf(item: DoctorItem, absence: Absence): Weight {
   if ("present" in item.state) return "quiet";
   if ("broken" in item.state) return "alert";
-  return item.need === "optional" ? "quiet" : "alert";
+  return item.need === "optional" || absence === "spare" ? "quiet" : "alert";
 }
 
 // The paint each offer carries, and the reason it carries when a press
@@ -60,7 +61,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   import { say } from "../../core/lang";
   import type { DoctorAnswer } from "../../wire";
   import { ui } from "../../ui";
-  import { offerOf, outstanding, recommended, required, spelledOf, standing, stateKey, versionOf } from "../setup/dependencies";
+  import { absenceOf, offerOf, outstanding, recommended, required, spelledOf, standing, stateKey, versionOf } from "../setup/dependencies";
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
   import Progress from "../parts/progress.svelte";
@@ -88,7 +89,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   // before installing it.
 </script>
 
-{#snippet card(item: DoctorItem)}
+{#snippet card(item: DoctorItem, absence: Absence)}
   {@const said = versionOf(item.state)}
   {@const how = spelledOf(item.install)}
   {@const offer = OFFER[offerOf(item)]}
@@ -112,9 +113,11 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
           {/snippet}
         </Tip>
       {/if}
-      <Badge text={say($lang, stateKey(item.state))} weight={weightOf(item)} dot />
+      <Badge text={say($lang, stateKey(item.state))} weight={weightOf(item, absence)} dot />
       {#if item.need === "optional"}
         <span class="text-note text-text-disabled">{say($lang, "machine_optional")}</span>
+      {:else if absence === "spare"}
+        <span class="text-note text-text-disabled">{say($lang, "machine_spare")}</span>
       {/if}
       <span class="min-w-0 flex-1"></span>
       {#if said !== null}
@@ -170,7 +173,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
     <ul class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-base">
       {#each items as item (item.name)}
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-        {@render card(item)}
+        {@render card(item, absenceOf(item, missing, items))}
       {/each}
     </ul>
   </section>

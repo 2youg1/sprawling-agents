@@ -3023,5 +3023,9 @@
   "bld_halt_idle": {
     "en": "nothing runs here now; halting refuses new work",
     "zh": "这栋楼现在没有在跑的派活；叫停会拒收新活"
+  },
+  "machine_spare": {
+    "en": "one of a kind that needs only one, and another is here",
+    "zh": "同类有一个即可，已经有了"
   }
 }
