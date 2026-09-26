@@ -18,10 +18,13 @@ fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
         runtime::diagnostics::Diagnostics::off(),
     )
     .unwrap();
-    let mut claim = serde_json::Map::new();
-    claim.insert("by".to_owned(), "lab/room1".into());
-    claim.insert("node".to_owned(), "2".into());
-    claim.insert("verb".to_owned(), "claimed".into());
+    let claim = kernel::event::record::RoadmapMoved {
+        by: "lab/room1".to_owned(),
+        node: kernel::NodeId::parse("2").unwrap(),
+        step: kernel::event::record::RoadmapStep::Claimed {
+            item: "the kiln notes".to_owned(),
+        },
+    };
     worker
         .record_for(
             RunId::from_bytes([7; 16]),
@@ -29,7 +32,7 @@ fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
                 who: "lab/room1".to_owned(),
                 addr: Address::parse("lab/room1").unwrap(),
                 kind: EventKind::RoadmapClaimed,
-                data: Payload::new(claim).unwrap(),
+                data: Payload::of(&claim).unwrap(),
             },
         )
         .unwrap();
