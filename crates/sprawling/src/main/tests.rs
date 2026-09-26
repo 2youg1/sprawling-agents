@@ -131,9 +131,18 @@ fn each_way_a_call_ends_has_its_own_exit_code() {
     let table = [
         (words(&["call"]), Exit::Line),
         (words(&["call", "{not json", "--at", &vacant]), Exit::Line),
-        (words(&["call", "{\"query\":\"no_such\"}", "--at", &vacant]), Exit::Line),
-        (words(&["call", "{\"query\":\"city_view\"}", "--quiet-ms", "soon"]), Exit::Line),
-        (words(&["call", "{\"query\":\"city_view\"}", "--at", &vacant]), Exit::NoCity),
+        (
+            words(&["call", "{\"query\":\"no_such\"}", "--at", &vacant]),
+            Exit::Line,
+        ),
+        (
+            words(&["call", "{\"query\":\"city_view\"}", "--quiet-ms", "soon"]),
+            Exit::Line,
+        ),
+        (
+            words(&["call", "{\"query\":\"city_view\"}", "--at", &vacant]),
+            Exit::NoCity,
+        ),
     ];
     let observed = table
         .iter()
