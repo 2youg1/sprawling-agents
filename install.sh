@@ -31,11 +31,15 @@
 # `sprawling` is the short name GitHub still resolves to this repository,
 # whose canonical path is `2youg1/sprawling-agents`. Set SPRAWLING_REPO if
 # that ever stops being true.
+#
+# SPRAWLING_API replaces the whole release-list address, for a mirror or
+# for the release workflow, which serves this run's archive from
+# 127.0.0.1 and installs it through this script before publishing it.
 
 set -eu
 
 REPO="${SPRAWLING_REPO:-2youg1/sprawling}"
-API="https://api.github.com/repos/${REPO}/releases"
+API="${SPRAWLING_API:-https://api.github.com/repos/${REPO}/releases}"
 RELEASES="https://github.com/${REPO}/releases"
 
 say() { printf '%s\n' "$*"; }

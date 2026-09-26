@@ -4083,3 +4083,19 @@ impl RunWorker {
 **还没落地的两个阶段，各自独立成立。** 几个前提已经成立：树的放置是 `Site::place_tree`、交接探针是 `Site::probe_after`，都不借 worker，经 `Stamping` 写进任何一个 `Ledger`；冻结是 `Freezing::freeze_plan`，`inherited` 在它之前、仍在记账线程上；筛子的准备是 `Sieving::for_run(city_root, site, addr)`，它开 CAS 的第二个句柄，也不借 worker；常驻表按键上锁（8-4），它仍只在记账线程上被调用，`a_server_still_shaking_hands_keeps_no_other_server_waiting` 用两条线程守着「一台握手未答的 server 不挡另一台」。
 1. 切出 `Staged`、`stage_dispatch` 与 `prepare_in_lane`；`prepare_dispatch` 暂时是二者在同一线程上的组合，直接调它的测试（`settling/tests/landing.rs`、`driving/tests/rules_account.rs`）不改。守护测试已经在前面落下。
 2. `Flight` 把 `prepare_in_lane` 放进 lane 的闭包、排在 `drive_run` 之前，`prepare_dispatch` 这个组合随之删除，调用它的两个入口（`driving::flight`、`plans::pursuing`）改为 `stage_dispatch` 加起飞。红测在这一阶段落下并转绿，`[prepare_dispatch_ms]` 的读数只剩记账线程那一半。
+
+## 8-94 发布前在回环地址上跑一遍 `install.sh`（`install.sh`、`.github/install-loopback.sh`、`release.yml` 的 `archive`）
+
+**形状：适配器的验收。** `install.sh` 是 `curl | sh` 那条通道：它向发布 API 要最新一版，按平台后缀挑归档，下载、比对 sha256、解包、问一句 `status`，再把二进制交给 `sprawling install` 落位。这一串里每一步都只在真的发布之后才被执行，所以它坏了，第一个知道的是下载的人。
+
+**接口。**
+- `install.sh` 读 `SPRAWLING_API`：发布列表的地址，缺省是 `https://api.github.com/repos/${SPRAWLING_REPO}/releases`。设了它，列表（`?per_page=1`）与单个 tag（`/tags/<tag>`）都从这个地址问；归档的下载地址仍然取自列表里每个资产的 `browser_download_url`，不由脚本拼。这个变量同样服务镜像与 GitHub Enterprise，它不是只为测试开的口子。
+- `.github/install-loopback.sh <archive-dir>`：`<archive-dir>` 里恰好一份 `.zip`（`just package` 在一个 matrix 行上产出的那份）。脚本在 `127.0.0.1` 上起 `python3 -m http.server`（端口取 0，由内核分配，从服务的第一行读出），写一份与 GitHub 同形的发布列表（`tag_name`；每个资产的 `name`、`size`、`digest: sha256:<hex>`、`browser_download_url`），然后以沙箱 `HOME` 跑 `install.sh`，最后执行 `sprawling install` 放进沙箱 `HOME` 的 `.local` 下 `bin` 里的那个文件的 `status`，打印第一行。
+- 判定，三条都成立才绿：`install.sh` 退出 0；落位的文件与归档里的 `sprawling` 逐字节相同（`cmp`）；落位的二进制的 `status` 第一行以 `sprawling ` 开头。任何一条不成立，脚本以非 0 退出并说出是哪一条。
+- 离机的请求一律失败：脚本给 `install.sh` 设 `https_proxy`／`http_proxy` 指向 `127.0.0.1:9`，`no_proxy=127.0.0.1`。所以一个不认 `SPRAWLING_API` 的 `install.sh` 不会偷偷装上 GitHub 上已发布的那一版，而是在第一次请求就红。
+- `release.yml` 的 `archive` job 在 `just package` 之后、上传之前对 macOS 与 Linux 两行调它；Windows 那一行走 `install.ps1`，不在本节。
+
+**决定。**
+1. **比字节，不比版本行。** 版本行只说版本与发布日，两次构建同一个 tag 的二进制说同一句话，GitHub 上已发布的那一版也可能说同一句话；落位的文件与本次归档逐字节相同，才证明装上的是本次构建的这一份。败给的方案：断言版本行含 tag——`status` 的第一行根本不印 tag。
+2. **端口由内核分配。** 固定端口在并行的 runner 或开发机上会撞；端口 0 在每台机器上都成立，不需要按机器调。
+3. **归档与列表都经 HTTP 提供，而不是 `file://`。** `install.sh` 真实走的是 `curl -fsSL` 的 HTTP 路径，`file://` 会绕开状态码与重定向的处理，测到的不是人跑的那条路。
