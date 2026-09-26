@@ -28,7 +28,7 @@
   // toggle if it wants one at all.
   const PAINT: Record<Seat, string> = {
     toast:
-      "rise w-[min(480px,calc(100vw_-_var(--spacing-rail-open)_-_2_*_var(--spacing-pane)))] " +
+      "rise w-[min(480px,calc(100vw_-_2_*_var(--spacing-pane)))] " +
       "rounded-panel border border-edge-panel bg-raised px-pane py-base shadow-float",
     inline: "fade mt-tight rounded-card border border-edge-input px-snug py-tight",
     drawer: "fade w-full border-b border-edge px-base py-snug",
@@ -108,11 +108,14 @@
 
 <div
   role={weight === "alert" ? "alert" : "status"}
-  class={[PAINT[seat], "flex min-w-0 items-start justify-between gap-base text-note"]}
+  class={[PAINT[seat], "flex min-w-0 flex-wrap items-start justify-between gap-base text-note"]}
 >
-  <div class="flex min-w-0 flex-col gap-tight">
-    <div class="flex min-w-0 items-baseline gap-snug">
-      <span class={["truncate font-label", weight === "alert" ? "text-alert" : "text-text"]}>
+  <!-- The words keep a readable measure and the buttons move under them
+  when the seat is narrower than both, rather than the words being
+  squeezed to one character a line beside buttons that never shrink. -->
+  <div class="flex min-w-0 grow basis-[16rem] flex-col gap-tight">
+    <div class="flex min-w-0 flex-wrap items-baseline gap-snug">
+      <span class={["min-w-0 font-label wrap-anywhere", weight === "alert" ? "text-alert" : "text-text"]}>
         {title}
       </span>
       {#if at !== undefined}
@@ -137,6 +140,6 @@
     </details>
   </div>
   {#if actions}
-    <div class="flex shrink-0 items-center gap-tight">{@render actions()}</div>
+    <div class="ml-auto flex shrink-0 items-center gap-tight">{@render actions()}</div>
   {/if}
 </div>

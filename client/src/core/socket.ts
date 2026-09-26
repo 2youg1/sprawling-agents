@@ -189,8 +189,8 @@ export function openConnection(
   const asking = createAsking(
     (query: Query) => (isLive(link) ? sendText(encodeFrame({ query })) : false),
     now,
-    // A question that never came back, and an answer that settles no
-    // question, both land where every other refusal lands: the corner
+    // A question that never came back lands where every other refusal
+    // lands: the corner
     // once, and the bell until the person has read it. The recovery
     // is the one part written for a person, so it is said here, in
     // the language `<html lang>` states - which `app.tsx` keeps equal

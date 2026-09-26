@@ -277,6 +277,12 @@
   --font-mono:
     var(--face-mono), ui-monospace, "Cascadia Mono", "SF Mono", Menlo,
     Consolas, "DejaVu Sans Mono", monospace;
+  /* Mono text is text a person copies: a command, a path, a code. Geist
+   * Mono's ligatures and contextual alternates draw ` --` and `->` as
+   * other shapes, so what the screen shows is not what the shell runs.
+   * Tailwind carries this to `font-mono` and to `code`, `kbd`, `samp`
+   * and `pre` alike. */
+  --font-mono--font-feature-settings: "liga" 0, "calt" 0;
 
   /* The type scale: a step is named for its job, not its size.
    *

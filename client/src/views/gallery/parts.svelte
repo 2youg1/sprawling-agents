@@ -88,6 +88,8 @@
   let key = $state(referenceText(referenceFor("zenmux")));
   let measured = $state("a million");
   let model = $state<string | null>(null);
+  const modelChoices = MODELS.map((each) => ({ value: each.id, label: each.id, note: each.context }));
+  const pickModel = (value: string): void => { model = value; };
   let rows = $state<readonly ModelRow[]>(MODELS);
   let picked = $state<readonly string[]>([CHOSEN.id]);
   let asking = $state(false);
@@ -223,17 +225,15 @@ and arrives red at once; `:user-invalid` is the browser reading
   </div>
 </Case>
 
+<!-- Stacked as the settings page stacks them: the open list covers the second trigger.
+The list is positioned and takes no room, so `pb-output` (the list's own max height) grows the section to hold it. -->
 <Case label="combobox · open on click, nothing chosen">
-  <Combobox
-    label={say($lang, "setup_models")}
-    placeholder={say($lang, "part_search")}
-    empty={say($lang, "part_no_match")}
-    choices={MODELS.map((each) => ({ value: each.id, label: each.id, note: each.context }))}
-    value={model}
-    onPick={(value) => {
-      model = value;
-    }}
-  />
+  <div class="flex flex-col gap-base pb-output">
+    <Combobox label={say($lang, "setup_main")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
+      choices={modelChoices} value={model} onPick={pickModel} starts="open" />
+    <Combobox label={say($lang, "setup_digest")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
+      choices={modelChoices} value={model} onPick={pickModel} />
+  </div>
 </Case>
 
 <Case label="table · partial selection, sortable, corrected in place">

@@ -135,7 +135,10 @@
   });
 </script>
 
-<ul class="fixed right-pane bottom-wide flex flex-col items-end gap-snug">
+<!-- Top right, where no page keeps a control a person needs at the
+moment a refusal arrives: in the bottom corner the stack sat over the
+composer's send button, which is the retry. -->
+<ul class="fixed top-wide right-pane flex flex-col items-end gap-snug">
   {#each toasts as toast (toast.id)}
     <li
       class={[
