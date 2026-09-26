@@ -3207,5 +3207,9 @@
   "gallery_runs_many": {
     "en": "the runs board with 1,200 runs: only the rows on screen are drawn",
     "zh": "1200 个 run 的全城 run 板：只画屏幕上的行"
+  },
+  "ask_late_title": {
+    "en": "no answer came back to the {query} question",
+    "zh": "{query} 这个问题没有等到回答"
   }
 }

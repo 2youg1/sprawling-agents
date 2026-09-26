@@ -11,7 +11,8 @@
 // silently chosen default sentence is one nobody does (`fill` leaves
 // its unfilled slots visible for the same reason).
 
-import { say } from "../../core/lang";
+import { askedIn } from "../../core/asking";
+import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import table from "../../lang.json";
 
@@ -19,7 +20,14 @@ function isKey(raw: string): raw is Key {
   return Object.hasOwn(table, raw);
 }
 
+//
+// One heading is more specific than its code: a question this page
+// asked and never heard back on names that question, because a page
+// asks several at once and a person reading the same words twice cannot
+// tell which of them the city left unanswered.
 export function noticeTitle(lang: Lang, code: string, subject: string): string {
+  const asked = code === "E_TIMEOUT" ? askedIn(subject) : null;
+  if (asked !== null) return fill(say(lang, "ask_late_title"), { query: asked });
   const key = `err_${code.toLowerCase()}`;
   return isKey(key) ? say(lang, key) : key;
 }
