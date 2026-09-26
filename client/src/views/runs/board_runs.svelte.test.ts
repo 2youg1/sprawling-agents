@@ -9,7 +9,7 @@ import { get } from "svelte/store";
 
 import { createBelief } from "../../core/belief";
 import type { CityAnswer } from "../../wire";
-import { RunId, Seq, TimeMs } from "../../wire";
+import { Address, RunId, Seq, TimeMs } from "../../wire";
 import { boardRuns } from "./lineage";
 
 // The city route rebuilds the board from the run table, and a model
@@ -25,7 +25,7 @@ test("the board reads what it draws from the run table and no token wakes it", (
     frozen: 0,
     halted: [],
     pursuits: [],
-    runs: [{ run, addr: "web/api", started: TimeMs.make(5), last_seq: Seq.make(1), last_kind: "run_started", frozen: false, who: "hall/mayor" }],
+    runs: [{ run, addr: Address.make("web/api"), started: TimeMs.make(5), last_seq: Seq.make(1), last_kind: "run_started", frozen: false, who: "hall/mayor" }],
   };
   store.adoptCity(city);
   const runs = get(store.belief).runs;

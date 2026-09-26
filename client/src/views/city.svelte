@@ -4,10 +4,12 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The city page: one information bar, then as many columns as the
-  // screen affords. The list of buildings arrives at the widest step,
-  // the drawing is always there, and what was picked stands beside the
-  // drawing when there is room and under it when there is not.
+  // The city page: one information bar, the drawing, and under it the
+  // runs board - every run in the city on the lineage tree, the runs
+  // waiting for the person first - which is the city's list: a building
+  // is a root of that tree, so a second list of buildings would say the
+  // same thing twice. What was picked in the drawing stands beside it
+  // when there is room and under it when there is not.
   //
   // The shell fills the viewport; `max-w-page` binds the legend, which
   // is prose, and never the drawing. The legend below the drawing is
@@ -17,29 +19,24 @@
   // own art rather than icons, so they stay hand-drawn here (4-12).
 
   import { QUERIES } from "../core/asking";
-  import { fill, say } from "../core/lang";
+  import { say } from "../core/lang";
   import { MAYOR, toFragment } from "../core/route";
-  import { percent } from "../core/share";
-  import type { Address, BuildingProgress, CityAnswer } from "../wire";
+  import type { Address, CityAnswer } from "../wire";
   import { ui } from "../ui";
   import Bar from "./city/bar.svelte";
   import Panel from "./city/panel.svelte";
   import Skyline from "./city/skyline.svelte";
   import EmptyState from "./parts/empty.svelte";
+  import Board from "./runs/board.svelte";
+  import { boardRuns } from "./runs/lineage";
 
   // The five marks the drawing carries, and the order a reader meets
   // them in.
   const MARKS = ["window", "figure", "flag", "lamp", "plinth"] as const;
 
-  interface Row {
-    readonly addr: Address;
-    // How far the plan has got, already in the person's language.
-    // `null` for a building with no plan, which has no share to show.
-    readonly done: string | null;
-  }
-
   const u = ui();
   const { lang } = u;
+  const belief = u.conn.belief;
   const answer = u.conn.asking.ask(QUERIES.city);
 
   let picked = $state.raw<Address | null>(null);
@@ -49,17 +46,9 @@
     return held !== undefined && "city" in held ? held.city : undefined;
   });
 
-  const rows = $derived.by((): Row[] =>
-    [...(city?.buildings ?? [])]
-      .sort((a, b) => a.addr.localeCompare(b.addr))
-      .map((building) => ({ addr: building.addr, done: share(building) })),
-  );
-
-  function share(building: BuildingProgress): string | null {
-    if (!("planned" in building.progress)) return null;
-    const done = String(percent(building.progress.planned.done_ppb));
-    return fill(say($lang, "city_done_percent"), { percent: done });
-  }
+  // The time is sampled when the run table changes shape or a run
+  // changes phase, which is when a bar's right-hand end moves.
+  const board = $derived({ runs: boardRuns($belief.runs), now: u.now() });
 </script>
 
 <!-- The legend below the drawing: one glyph and the word for it. The
@@ -69,30 +58,7 @@
 <div class="flex min-h-0 flex-1 flex-col">
   <Bar />
   <div class="relative flex min-h-0 flex-1 flex-col @lg/page:flex-row">
-    <nav
-      class="hidden shrink-0 overflow-y-auto border-r border-edge px-snug py-base @wide/page:block @wide/page:w-rail-open"
-      aria-label={say($lang, "city_buildings")}
-    >
-      {#each rows as row (row.addr)}
-        <button
-          type="button"
-          class={[
-            "flex h-control-sm w-full items-center gap-snug rounded-control px-snug text-left text-note leading-none",
-            picked === row.addr ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome",
-          ]}
-          aria-current={picked === row.addr ? "true" : undefined}
-          onclick={() => {
-            picked = row.addr;
-          }}
-        >
-          <span class="min-w-0 flex-1 truncate font-mono">{row.addr}</span>
-          {#if row.done !== null}
-            <span class="shrink-0 font-mono text-text-disabled">{row.done}</span>
-          {/if}
-        </button>
-      {/each}
-    </nav>
-    <section class="flex min-h-0 min-w-0 flex-1 flex-col justify-center overflow-auto px-pane py-base">
+    <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-pane py-base">
       {#if city === undefined}
         <p class="text-center text-text-disabled">…</p>
       {:else if city.buildings.length > 0}
@@ -144,6 +110,11 @@
             </a>
           {/snippet}
         </EmptyState>
+      {/if}
+      {#if board.runs.length > 0}
+        <div class="mt-wide">
+          <Board runs={board.runs} now={board.now} level={2} />
+        </div>
       {/if}
     </section>
     {#if picked !== null && city !== undefined}

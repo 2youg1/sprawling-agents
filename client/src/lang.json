@@ -267,10 +267,6 @@
     "en": "how the city stands",
     "zh": "这座城的状态栏"
   },
-  "city_buildings": {
-    "en": "buildings",
-    "zh": "楼"
-  },
   "city_done_percent": {
     "en": "{percent}% done",
     "zh": "完成 {percent}%"
