@@ -12,17 +12,19 @@ import { RunId, Seq } from "../../wire";
 
 const RUNS = 10_000;
 const DELTAS = 2_000;
-// The budget one token increment may spend folding into a city of
-// `RUNS` runs. A fold that copies the run table is linear in the city,
-// and at this size that is a frame's worth of work per token.
-const BUDGET_US = 20;
-// One animation frame of stream, and what folding it may spend with a
-// subscriber that reads the whole run table: a quarter of a 16 ms frame.
-// A delta into a run the table holds wakes only that run's readers, so
-// the subscriber hears the city's answer and no token after it.
+// A small city, the baseline a large one is measured against in the
+// same run: a bound in microseconds would be a constant tuned to one
+// machine, while a ratio holds on any machine that runs both. A fold
+// that copies the run table is linear in the city, which puts the
+// large city a hundred times over the small one; constant time puts
+// them within timer noise, and `SLOWER` is that noise with room.
+const BASELINE_RUNS = 100;
+const SLOWER = 5;
+// One animation frame of stream. A delta into a run the table holds
+// wakes only that run's readers, so a subscriber that reads the whole
+// run table hears the city's answer and no token after it.
 const FRAME_DELTAS = 50;
 const FRAMES = 40;
-const FRAME_BUDGET_US = 4000;
 
 function runId(index: number): RunId {
   return RunId.make(`00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`);
@@ -47,22 +49,27 @@ function listed(run: RunId): RunSummary {
 
 describe("fold cost", () => {
   test("one delta folds in constant time however many runs the city holds", () => {
-    const store = createBelief(() => 0);
-    store.adoptCity(adoptedCity(RUNS));
-    const target = runId(RUNS / 2);
-    const start = performance.now();
-    for (let each = 0; each < DELTAS; each += 1) {
-      store.say({ run: target, increment: { said: "x" } });
-    }
-    const perDeltaUs = ((performance.now() - start) * 1000) / DELTAS;
-    expect(get(store.belief).runs[target]?.saying.length).toBe(DELTAS);
-    expect(perDeltaUs).toBeLessThanOrEqual(BUDGET_US);
+    const [small, large] = [BASELINE_RUNS, RUNS].map((size) => {
+      const store = createBelief(() => 0);
+      store.adoptCity(adoptedCity(size));
+      const target = runId(size / 2);
+      const start = performance.now();
+      for (let each = 0; each < DELTAS; each += 1) {
+        store.say({ run: target, increment: { said: "x" } });
+      }
+      const perDeltaUs = ((performance.now() - start) * 1000) / DELTAS;
+      expect(get(store.belief).runs[target]?.saying.length).toBe(DELTAS);
+      return perDeltaUs;
+    });
+    expect(large).toBeLessThanOrEqual((small ?? 0) * SLOWER);
   });
 
   // Prints the reading per city size for `xtask/budgets.toml`'s
-  // `client_fold` row, and holds the largest to the frame budget.
+  // `client_fold` row, and holds the count every machine agrees on: the
+  // subscriber reads the table once when it subscribes, empty, and once
+  // for the city's answer, and never for a token.
   test("one frame of deltas tells a table-reading subscriber once", () => {
-    const readings = [100, 1_000, RUNS].map((size) => {
+    for (const size of [100, 1_000, RUNS]) {
       const store = createBelief(() => 0);
       let read = 0;
       const stop = store.belief.subscribe((belief) => {
@@ -81,8 +88,7 @@ describe("fold cost", () => {
       const perFrameUs = ((performance.now() - start) * 1000) / FRAMES;
       stop();
       console.log(`client_fold R=${String(size)} per-frame-us=${perFrameUs.toFixed(1)} read=${String(read)}`);
-      return perFrameUs;
-    });
-    expect(readings.at(-1)).toBeLessThanOrEqual(FRAME_BUDGET_US);
+      expect(read).toBe(size);
+    }
   });
 });
