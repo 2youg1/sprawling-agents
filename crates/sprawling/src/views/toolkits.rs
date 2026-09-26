@@ -17,10 +17,10 @@
 //! this city is to it are all `assembly::toolkits`'s to answer, because
 //! the command behind the button on this page has to agree with them.
 
-use super::holding::Views;
+use super::prepared::LiveAsk;
 use crate::assembly::broker_for;
 
-impl Views {
+impl LiveAsk {
     /// The shelf, or why there is no shelf to show.
     pub(super) fn toolkits_answer(&self) -> channels::ToolkitsAnswer {
         let held = match broker_for(self.vault.as_ref(), self.city.as_ref()) {

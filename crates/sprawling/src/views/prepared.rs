@@ -40,6 +40,15 @@ pub(super) fn unavailable(query: String) -> channels::Answer {
     channels::Answer::Unavailable { query }
 }
 
+/// What a read of now - a tool server's handshake, the broker's shelf -
+/// needs from the views, copied out so the read runs with the snapshot
+/// let go.
+pub(crate) struct LiveAsk {
+    pub(super) city_root: PathBuf,
+    pub(super) city: Option<Address>,
+    pub(super) vault: Option<Arc<Mutex<gateway::Custodian>>>,
+}
+
 /// A query's answer split at the snapshot: what the views settled while
 /// it was held, or the small data a read of the disk, git or network
 /// needs, copied out so that read runs with the snapshot let go.
@@ -81,6 +90,12 @@ pub(crate) enum Prepared {
         building: Address,
         pins: SkillPins,
     },
+    /// Where each tool server one address reaches stands: the
+    /// configuration read and every handshake run after the snapshot
+    /// is let go, because a handshake waits up to its patience.
+    McpHealth { live: LiveAsk, addr: Address },
+    /// The broker's shelf, read after the snapshot is let go.
+    Toolkits(LiveAsk),
     /// The vital signs: every figure the fold holds, and the building
     /// count, which only the directory can give, still to read.
     Metrics {
@@ -251,6 +266,10 @@ impl Prepared {
             // A count that cannot be expressed is reported as the largest
             // count this wire can carry, for the reason every figure of
             // `Views::metrics` is.
+            Self::McpHealth { live, addr } => {
+                channels::Answer::McpHealth(Box::new(live.mcp_health_answer(&addr)))
+            }
+            Self::Toolkits(live) => channels::Answer::Toolkits(Box::new(live.toolkits_answer())),
             Self::Metrics { city_root, held } => {
                 channels::Answer::Metrics(Box::new(channels::MetricsAnswer {
                     buildings: u64::try_from(buildings_of(&city_root).len()).unwrap_or(u64::MAX),

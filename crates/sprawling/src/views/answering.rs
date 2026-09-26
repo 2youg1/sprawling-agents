@@ -26,7 +26,7 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
 use super::holding::Views;
-use super::prepared::{LedgerAsk, Prepared, unavailable};
+use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
 
 mod history;
 use super::lines::{endpoints_answer, summarize};
@@ -124,6 +124,15 @@ impl Views {
         LedgerAsk {
             city_root: self.city_root.clone(),
             index: std::sync::Arc::clone(&self.index),
+        }
+    }
+
+    /// What a read of now needs, copied out of the snapshot.
+    fn live_ask(&self) -> LiveAsk {
+        LiveAsk {
+            city_root: self.city_root.clone(),
+            city: self.city.clone(),
+            vault: self.vault.clone(),
         }
     }
 
@@ -273,11 +282,12 @@ impl Views {
             }
             channels::Query::Doctor => self.doctor_or_unavailable(),
             channels::Query::McpHealth { addr } => {
-                channels::Answer::McpHealth(Box::new(self.mcp_health_answer(addr)))
+                return Prepared::McpHealth {
+                    live: self.live_ask(),
+                    addr: addr.clone(),
+                };
             }
-            channels::Query::Toolkits => {
-                channels::Answer::Toolkits(Box::new(self.toolkits_answer()))
-            }
+            channels::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
             channels::Query::Release => return Prepared::Release,
             channels::Query::BuildingView { addr } => {
                 return Prepared::Building {

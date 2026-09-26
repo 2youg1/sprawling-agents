@@ -3030,7 +3030,7 @@ impl protocol::Outbound for SseServer { /* call：先 POST 再等流；notify：
 ### 8-66 `bin::views::mcp_health`：一个地址够得到的每台 server 此刻站在哪（形状 7 投影）
 
 ```rust
-impl Views {
+impl LiveAsk {
     pub(super) fn mcp_health_answer(&self, addr: &Address) -> channels::McpHealthAnswer;
 }
 ```
@@ -3496,7 +3496,7 @@ pub(crate) fn rebuild_twin_views(ledger_dir: &Path) -> Result<(Views, Views), Ax
 
 **写线程只做一次 `send`。** 观察者（`observer`）、机器体检的落点（`machine`）与借出金库的 `lend` 都只把一份 `Fold`（一条已提交的记录、一份 `DoctorAnswer`，或工作线程打开的金库）放进无界 `mpsc` 通道，然后返回。名为 `sprawling-views` 的线程每次把通道里已到的全部取出为一批，按到达顺序折叠。被拒：观察者在写线程上直接锁视图——读者持锁多久，写线程的下一次落盘就晚多久。
 
-**两份视图轮换，读者拿快照。** 折叠线程持有备用的一份 `Views`，`Published` 持有发布出去的那份 `Arc<Views>`。每一批：折进备用份，用 `replace` 把它发布，广播这批记录，再收回换下来的那份（`Arc::try_unwrap`；读者还拿着就让出时间片再试），把同一批折进去，它成为下一批的备用份。读者用 `snapshot` 拷一只 `Arc`，锁只罩住这一次指针拷贝；`answer_outside_the_lock` 在快照上 `prepare`，放下快照再 `finish`。于是读者之间不互等，读者不等折叠，折叠在广播之前不等任何读者，收回时只等在换下之前拿到快照、还在做纯内存 `prepare` 的读者。两份由 `rebuild_twin_views` 在一趟验证里折出，共用同一只账本索引与计划缓存的 `Arc`（`Views::unfolded_twin`），所以多出的内存只是折叠本身的一份。被拒：每批克隆一份整的视图发布——每条记录一次整份拷贝，而且 `memory::HotView` 与 `memory::Attribution` 不是 `Clone`；`RwLock<Views>`——折叠的写锁要等每个在读的读者，新读者又排在写锁后面。代价是折叠常驻两份，每条记录折两次。
+**两份视图轮换，读者拿快照。** 折叠线程持有备用的一份 `Views`，`Published` 持有发布出去的那份 `Arc<Views>`。每一批：折进备用份，用 `replace` 把它发布，广播这批记录，再收回换下来的那份（`Arc::try_unwrap`；读者还拿着就让出时间片再试），把同一批折进去，它成为下一批的备用份。读者用 `snapshot` 拷一只 `Arc`，锁只罩住这一次指针拷贝；`answer_outside_the_lock` 在快照上 `prepare`，放下快照再 `finish`。于是读者之间不互等，读者不等折叠，折叠在广播之前不等任何读者，收回时只等在换下之前拿到快照、还在做纯内存 `prepare` 的读者。`prepare` 因此只做纯内存的事：连时间也要花在读盘、git 或网络上的查询在快照里只拷走它要的小数据，`finish` 在快照放下后才去读；`McpHealth` 的握手（每台服务器最多等 `HANDSHAKE_PATIENCE`）与 `Toolkits` 的中介书架都是这样，拷走的是 `LiveAsk`（城根、城地址、保管人的 `Arc`）。在快照里握手会让收回一直自旋到握手超时，其间没有一批能折叠或广播。两份由 `rebuild_twin_views` 在一趟验证里折出，共用同一只账本索引与计划缓存的 `Arc`（`Views::unfolded_twin`），所以多出的内存只是折叠本身的一份。被拒：每批克隆一份整的视图发布——每条记录一次整份拷贝，而且 `memory::HotView` 与 `memory::Attribution` 不是 `Clone`；`RwLock<Views>`——折叠的写锁要等每个在读的读者，新读者又排在写锁后面。代价是折叠常驻两份，每条记录折两次。
 
 **广播排在发布之后。** 客户端收到一条记录再去查询，拿到的快照已经含有这条记录。
 
