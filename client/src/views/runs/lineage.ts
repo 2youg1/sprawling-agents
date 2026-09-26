@@ -14,6 +14,7 @@
 // has to act on. The address is the directory tree, so its first
 // segment is the building and the rest is the room.
 
+import type { RunBelief } from "../../core/belief";
 import type { Doing } from "../../core/doing";
 
 // One run as the board needs it: what the belief already holds about
@@ -25,6 +26,14 @@ export interface BoardRun {
   readonly started: number | null;
   readonly ended: number | null;
   readonly doing: Doing;
+}
+
+// The board's runs, read from the belief's run table. A run's last
+// moment is not on the wire yet, so every run's bar reaches now. The
+// fields are named rather than spread: a streamed token writes the run's
+// `saying`, and a board that read it would be rebuilt for every token.
+export function boardRuns(runs: Readonly<Record<string, RunBelief>>): BoardRun[] {
+  return Object.values(runs).map(({ run, addr, task, started, doing }) => ({ run, addr, task, started, ended: null, doing }));
 }
 
 // The phase a run's bar is coloured by: whose turn it is.
