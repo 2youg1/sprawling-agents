@@ -1740,36 +1740,32 @@ impl ContextReminder { pub fn render(&self) -> String; }
 `Run<Active>::advance` 的收尾判定从「本回合没有工具调用」一条，改为三问：没有工具调用、**答里有内容**、且不是停在上限上——三条同时成立才是 `Completion::Done`，否则是 `Completion::Limit`。
 
 - **理由是证据**：`Completion::Done` 必须引一条 `model_returned` 作证据，而一条 `content` 为空的 `model_returned` 证明不了任何工作完成。判它做完，等于在「什么都没说」的那一刻告诉人「你的活干完了」，并且把那条空记录作为凭据写进账本。
-- **它是怎么被发现的**：目录不认识的模型拿到零上限（kernel-SPEC §8-24 那条 `Ceiling`），请求带 `max_tokens: 0` 上线，供应方生成十六个 token 后截断、`content: null`、流式路径把截断报成 `stop`。三条串起来，界面上就是「思考了三分半，然后说做完了，正文一个字没有」。类型那一半修掉了零上限，判定这一半修掉了「空回复算完成」——**两条独立的路各自足以造出假历史，所以两条都堵**。
-- **`stop` 上抬一层**：`StopReason` 此前只进 `model_returned` 载荷就被丢掉，`ToolWave` 与 `Recording` 两个 typestate 不带它。现在它随两个 typestate 到 `TurnReport::stop()`，判定读它而不是从内容去猜——一条被截断但**有内容**的回复同样不是完成，那件事只有 `stop` 说得清。
+- **`stop` 随回合走**：`StopReason` 随 `ToolWave` 与 `Recording` 两个 typestate 到 `TurnReport::stop()`，判定读它而不是从内容去猜——一条被截断但**有内容**的回复同样不是完成，那件事只有 `stop` 说得清。
 - **否决「只看内容空不空」**：`stop == MaxTokens` 而内容非空的回复是半句话，判它完成同样是假历史；只看内容会把它漏掉。
-- **citysim 随之改口**：靠「脚本用光后那一波空回复」收尾的剧本改为显式说一句话（`citysim::concluding`），因为它们要断言的一直是「跑到工作做完」，而不是「模型不说话了」。`fixtures/golden-p0` 随之重生（`GOLDEN_WRITE=1`）。新增剧本 `a_reply_that_says_nothing_freezes_as_limit_rather_than_done` 用**供应方真实报文**（`content: []`、`stop_reason: max_tokens`）经生产翻译喂进来，钉住这条规则。
+- **citysim**：剧本以显式说一句话收尾（`citysim::concluding`），因为它们要断言的是「跑到工作做完」，而不是「模型不说话了」。剧本 `a_reply_that_says_nothing_freezes_as_limit_rather_than_done` 用**供应方真实报文**（`content: []`、`stop_reason: max_tokens`）经生产翻译喂进来，钉住这条规则。
 
 ### 8-36 写域的两道闸各问一个问题（kernel-SPEC §8-46 末段）
 
 - **`bench::admit`** 对 `Effect::Write { domain: area }` 改调 `kernel::reach(&self.domain, area, &self.taint)`：工具声明的是一块区域，门口只问这块区域够不够得到。
 - **`tools::edit::invoke`** 解析出 `target` 后改调 `kernel::domain(&self.writable, &target, &TaintSet::empty())`：`Allow` 继续，`Deny { refusal }` 原样作 `Err`（三段式因此由 kernel 一处产出，工具不再自拼 `Outside` 的话术），`Escalate` 在写域门上不可能出现——`GateOutcome` 刻意穷尽，这一臂如实答一条 `E_INVALID_ARGS` 说明该不变量，而不是 `unreachable!`。空 `TaintSet`：taint 是 bench 的事实，工具这一层没有它，拒词因此少一句「派生自 N 个外部来源」——那句话仍由门口那道 `reach` 说。
-- **红→绿**：`tools/edit/tests.rs` 新增「Documents 域的工具创建 `<city>/hall/note.md` 成功、创建 `<city>/hall/note.rs` 被拒（`E_OUTSIDE_WRITE_DOMAIN`，主语是文件）」；`bench/tests.rs` 新增「Documents 域、声明区域为 `hall/mayor` 的 `Write` 效果在门口放行」——改前后者红在 `NotMarkdown`。
+- **验收**：`tools/edit/tests.rs` 钉住「Documents 域的工具创建 `<city>/hall/note.md` 成功、创建 `<city>/hall/note.rs` 被拒（`E_OUTSIDE_WRITE_DOMAIN`，主语是文件）」；`bench/tests.rs` 钉住「Documents 域、声明区域为 `hall/mayor` 的 `Write` 效果在门口放行」。
 
 ### 8-35 去重答的是第一次的结果，而不是一句「你已经问过了」（形状 1 判定）
 
-**旧行为**：`ToolBench::invoke` 认得重复的 `IdemKey`，回 `BenchOutcome::Duplicate`，而两个调用方（`bin::assembly::driving::lane`、`citysim::executor`）把它翻成 `E_INVALID_ARGS`。于是「同一次调用做两遍」的正确答案——**第一次的结果**——被换成了一个错误：重试的模型学到的是「这件事失败了」，而它其实成功了。这是幂等只做了一半：副作用被挡住，答案没有被记住。
+**「同一次调用做两遍」的正确答案是第一次的结果**：回一个错误，重试的模型学到的是「这件事失败了」，而它其实成功了——那是幂等只做了一半：副作用被挡住，答案没有被记住。所以 `ToolBench` 记住的是键与答，两个调用方（`bin::assembly::driving::lane`、`citysim::executor`）把 `Duplicate` 回成第一次的 `ToolOutcome`。
 
-**改法是把记住的东西从键变成键与答**：
+```rust
+seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>   // ToolBench 私有
+pub enum BenchOutcome { …, Duplicate { outcome: ToolOutcome } }   // 调用方回第一次的 ToolOutcome，fenced 为空
+```
 
-| 之前 | 之后 |
-|---|---|
-| `seen: BTreeSet<IdemKey>` | `seen: BTreeMap<IdemKey, ToolOutcome>` |
-| `BenchOutcome::Duplicate` | `BenchOutcome::Duplicate { outcome: ToolOutcome }` |
-| 调用方回 `E_INVALID_ARGS` | 调用方回第一次的 `ToolOutcome`，`fenced` 为空 |
-
-- **写入点不动**：键仍在过门之后、工具运行之前记下（被门拒的重试不算重放），答在工具返回后补齐。故一次「记了键但工具报错」的调用不会留下一个假答案——那条路径根本不入表。
+- **写入点**：键与答在工具答过之后一起写入（`account`），失败的答也记下；被门拒的调用不入表，所以被门拒后的重试不算重放。
 - **`Duplicate` 仍是一个独立变体而不是并进 `Ran`**：`fenced` 对重放恒为空，而 `Ran` 的调用方要按 `fenced` 决定波后清扫；把两者合并会让「这一波要不要扫」多出一个恒空的分支。
 - **代价写在明处**：一次运行期间每个成功调用的结果都留在内存里。这与 `seen` 本来就要活到运行结束是同一条寿命，多出来的是 payload 的字节；一次运行的工具调用数以百计而非以百万计。
 
 ### 8-38 sink 收到的是一条 entry，不是一行文本（形状 2 值类型）
 
-**旧接口**：`pub type Sink = Box<dyn FnMut(&str) + Send>`——渲染在库内，sink 只见最终那行 JSON。于是「把日志行推给浏览器」的装配层必须把刚渲染好的那行**再解析回来**才能拿到 `level`／`run`／`seq`／`module`：一条日志行由什么字段构成，从此有了写与读两个权威，而读的那个漂了也没人看得见。
+**sink 收的是 entry 而不是渲染好的行**：否则「把日志行推给浏览器」的装配层要把刚渲染好的那行**再解析回来**才能拿到 `level`／`run`／`seq`／`module`，一条日志行由什么字段构成就有写与读两个权威，而读的那个漂了也没人看得见。
 
 **改法**是把字段本身交给 sink，文本留作其中一种去处：
 
@@ -1786,7 +1782,7 @@ pub fn render(entry: Entry<'_>) -> String;   // 一行 JSON：文本的唯一产
 
 ### 8-39 一段 prefix 自带它的来源，`prompt_assembled` 因此只有一条分支
 
-`FrozenSegment` 先前只携 slot、字节与哈希，来源注记则由 `build_prefix` 另行拼出；于是同一件事有两个作者——照计划装配出来的 prefix 写一种行，在城里按手边字节装配出来的 prefix 写另一种（其实是不写）。`replay::rebuild_prefix` 只读得懂前者，而页面要读的恰好是后者。
+`FrozenSegment` 自带来源注记，而不由 `build_prefix` 另行拼出；否则同一件事有两个作者——照计划装配出来的 prefix 写一种行，在城里按手边字节装配出来的 prefix 写另一种（或不写）。`replay::rebuild_prefix` 只读得懂前者，而页面要读的恰好是后者。
 
 ```rust
 pub struct SegmentSource { pub addr: Address, pub kept: u64, pub dropped: u64 }
@@ -1820,13 +1816,13 @@ fn scratch_dir(&self, id: BacklogId) -> PathBuf;             // temp/sprawling-<
 
 **三条口径：**
 
-1. **`BacklogId` 与目录名回答的是两个问题。** id 在**一个** backlog 内部指认一个成员，下一个 backlog 的 id 又从 1 开始；而目录落在整台机器共用的临时目录里。旧名字是 `sprawling-<pid>-<id>`，等于假定那个计数器是进程全局的——它不是。同一进程开两个 backlog，两者的第一条命令必然撞同一个路径。
+1. **`BacklogId` 与目录名回答的是两个问题。** id 在**一个** backlog 内部指认一个成员，下一个 backlog 的 id 又从 1 开始；而目录落在整台机器共用的临时目录里。只用 `<pid>-<id>` 起名，等于假定那个计数器是进程全局的——它不是。同一进程开两个 backlog，两者的第一条命令必然撞同一个路径。
 2. **撞上之后是无声的。** `File::create` 截断另一方正在写的文件，`collect` 读完即 `remove_dir_all`，删掉另一方还在写的目录。人看到的是一条**退出码为 0、输出为空**的命令——既不报错也不重试，因为从每一方各自的角度看都一切正常。
-3. **生产今天只开一个 backlog，所以这是测试套件先撞上的。** `bin::assembly::lifetime` 全进程一个，而每个跑命令的测试各开一个、`cargo test` 又让它们同时跑。这不构成「只是测试问题」：把唯一性建立在「调用方只会开一个」之上，是把一条不变量交给调用方保管。`backlog::tests` 直接判目录名而不去赛跑两条命令——缺陷本身是确定的，只有损害是时序性的。
+3. **生产只开一个 backlog，唯一性照样不交给调用方。** `bin::assembly::lifetime` 全进程一个，而每个跑命令的测试各开一个、`cargo test` 又让它们同时跑。这不构成「只是测试问题」：把唯一性建立在「调用方只会开一个」之上，是把一条不变量交给调用方保管。`backlog::tests` 直接判目录名而不去赛跑两条命令——缺陷本身是确定的，只有损害是时序性的。
 
-### 8-41 回合带进账本的明文，必经打码那道门（S-02）
+### 8-41 回合带进账本的明文，必经打码那道门
 
-**不变量：`tool_called`、`tool_result`、`model_returned` 三类事件的载荷，在写进账本之前逐串跑过 `kernel::scan`，命中的区段换成 `secret:redacted/<b3-16>` 标记。** 此前只有 `model_returned` 受这条约束，工具参数与工具结果**逐字**入账：一次 `read` 读出的别人项目的 `.env` 正文、一次 `exec` 的 stdout，就此进入只增且可导出的历史。账本不可重写，所以这类损害不可逆——这是它排在安全清单最前的理由。
+**不变量：`tool_called`、`tool_result`、`model_returned` 三类事件的载荷，在写进账本之前逐串跑过 `kernel::scan`，命中的区段换成 `secret:redacted/<b3-16>` 标记。** 三类都要：工具参数与工具结果若**逐字**入账，一次 `read` 读出的别人项目的 `.env` 正文、一次 `exec` 的 stdout，就会进入只增且可导出的历史。账本不可重写，所以这类损害不可逆——这是它排在安全清单最前的理由。
 
 ```rust
 // turn/ledger.rs —— 本模块通往账本的唯一一道门
@@ -1885,9 +1881,7 @@ pub fn splice(text: &str, front: usize, back: usize, place: Elided) -> Cut;
 
 ### 8-49 turn::recovery —— 模型调用恢复管线的段契约（形状 2 值＋形状 3 内缝）
 
-**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`AxError::retry`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
-**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`is_retriable`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
-
+**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`AxError::retry`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语说由 watchdog 退避后再发同一个请求，段对那一族恒 `Skipped`。
 ```rust
 // turn/recovery.rs（形状 2 值＋形状 3 内缝；pub(super)：turn 之外没有第二个用户）
 pub(super) enum SegmentOutcome {
@@ -1928,16 +1922,16 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 
 **被否（各记理由与会重开它的参数）：**
 
-- **eve 的空响应 nudge 段**：「一条什么都没说的回复」意味着什么，§8-37 的 `concluded` 是唯一判定处（`Completion::Limit`），调用层再判一次就是第二个家，而 nudge 重发还会改写那条以供应方真实报文钉住的剧本。参数：有"空响应是瞬态"的实测数据时，与 §8-37 一同重开。
-- **eve 的「剔除被拒工具后重发」段**：本仓的 provider 拒绝从不回引 body（`ProviderFailure::Refused`），没有类型化触发点可依，靠错误文本嗅探即造脆弱权威；无声砍工具是能力的静默降级，与"拒答即声明"相悖。参数：gateway 的拒绝族带上类型化的拒绝面之后重开。
-- **eve 的「补悬空 tool_result 后重发」段**：回合窗口按构造无悬空调用（被取消的回合不入窗；`fold_run` 遇开波回退到上一安全点），触发点不存在；账本侧关帐的权威在 `replay::resume`，不写第二份。参数：出现能把悬空对话推进窗口的新入口时重开。
+- **空响应后追问一句的段**：「一条什么都没说的回复」意味着什么，§8-37 的 `concluded` 是唯一判定处（`Completion::Limit`），调用层再判一次就是第二个家，而 nudge 重发还会改写那条以供应方真实报文钉住的剧本。参数：有"空响应是瞬态"的实测数据时，与 §8-37 一同重开。
+- **「剔除被拒工具后重发」段**：本仓的 provider 拒绝从不回引 body（`ProviderFailure::Refused`），没有类型化触发点可依，靠错误文本嗅探即造脆弱权威；无声砍工具是能力的静默降级，与"拒答即声明"相悖。参数：gateway 的拒绝族带上类型化的拒绝面之后重开。
+- **「补悬空 tool_result 后重发」段**：回合窗口按构造无悬空调用（被取消的回合不入窗；`fold_run` 遇开波回退到上一安全点），触发点不存在；账本侧关帐的权威在 `replay::resume`，不写第二份。参数：出现能把悬空对话推进窗口的新入口时重开。
 - **盲重试段（对可重试失败原样重发）**：该判定属于 watchdog 与 `gateway::admission`（§8-9：watchdog 只判断还有没有下一次），段越权即第二个重试权威。
 - **`Skipped` 无载荷（unit 变体）**：结构上确实吞不掉错误，但"这一段转手的是哪个错误"也在答案里读不出来了，而谁把什么交给谁正是段契约要陈述的事实。
 - **段＝闭枚举（形状 6）**：多段场景只能靠触发点拼装，契约测不直接，且新修复进来即改枚举与全部 match。trait 的第二实现是测试里的记账段（本仓缝规则认可的替身一族：测试时钟、计数店）。
 
 ### 8-43 重试上限住 kernel
 
-两个 crate 互不依赖，而 gateway 决定要不要再发一次请求、`Watchdog` 决定要不要冻结这次运行，读的是同一个事实——所以 `Retries` 住 `kernel::retries`，两边都直接用 `kernel::Retries`，不再导出别名：别名让读者以为有两个类型，调用点于是写出一个两臂恒等的 `match` 去「转换」它们。
+两个 crate 互不依赖，而 gateway 决定要不要再发一次请求、`Watchdog` 决定要不要冻结这次运行，读的是同一个事实——所以 `Retries` 住 `kernel::retries`，两边都直接用 `kernel::Retries`，不导出别名：别名让读者以为有两个类型，调用点于是写出一个两臂恒等的 `match` 去「转换」它们。
 
 ### 8-44 runtime::compaction::exchange（形状 2 值＋形状 1 判定）：回合边界的压缩
 
@@ -1971,7 +1965,7 @@ pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes;   // 按声明的 Effect �
 - **波的分类**：没有调用 → `Empty`；每个调用的 `RunHooks::writes` 都答 `Nothing` → `ReadOnly`；否则 `MayWrite`。
 - **判定表**：`Changed`（上次 fence 后跑过可能写的调用）→ `Stage`，空波与只读波也一样；`Unfenced` 且 `MayWrite` → `Stage`；`Unfenced` 且 `Empty`／`ReadOnly` → `Skip`（树就是 run 开张时那棵）；`Fenced`（fence 之后没有可能写的调用跑过）→ `Skip`，上一个提交已经是这棵树。
 - **状态转移**：`MayWrite` → `Changed`（被取消打断的波也算，它的部分调用可能已经跑了）；`Empty`／`ReadOnly` 且立了 fence → `Fenced`；`Empty`／`ReadOnly` 且跳过 → 不变。只读波不改树，所以它既不需要自己的 fence，也不让下一波的 fence 多出一次提交。`Run<Active>` 持一个 `FencePolicy`，`advance` 只在 `Stage` 时调用 `RunHooks::fence` 并写 `checkpoint_committed`。
-- **为什么是一个模块**：「这一波要不要 fence」原本是 `advance` 里的一句 `if let Some(fence)`，答案恒为「要」。收成一个判定之后，后面两条规则（只读波、按写过的路径 stage）都只改这一处。
+- **为什么是一个模块**：「这一波要不要 fence」是一个判定，后面两条规则（只读波、按写过的路径 stage）都只改这一处。
 - **`Stage` 带什么由调用方定**：`RunHooks::fence` 仍只收时刻；stage 哪些路径，由持有 `ToolBench` 的一侧决定，因为只有 bench 知道每个调用的工具。`ToolBench::invoke` 在 `BenchOutcome::Ran.wrote` 里交回工具的 `Tool::writes`（kernel-SPEC `Writes`）；sprawling 的 lane 把上次 fence 以来各调用的 `wrote` 用 `Writes::and` 并起来，下一次 fence 只 stage 这些路径，并在 fence 后清零。run 的第一次 fence、以及并出来是 `Domain` 或 `Nothing` 的那次，stage 整个写域：第一次之前的树没有任何本 run 的提交担保；`Nothing` 出现在 run 的第一道 fence：那时还没有调用跑过。**失败的调用并入 `Domain`**：`ToolBench::invoke` 答 `Err` 时没有 `wrote`，而工具可能写到一半才失败，它自己对写了什么的说法不再可信；lane 于是把 `Domain` 并进去，下一次 fence stage 整个写域。只丢掉它、留下同波其他调用的 `Paths`，会让那半截写不进任何提交。**被否**：`RunHooks::fence` 收一个范围参数——run 驱动拿不到工具的 `Effect`，这个参数只能由 lane 填，等于把同一个并集在两层各拼一次。
 - **调用可能不可能写，由 `RunHooks::writes` 答**：`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里，所以 lane 在把 bench 借给 `invoke` 之前取出 `ToolBench::declared_writes`（名字到 `Writes::of(effect)` 的表），`writes` 查这张表。它按声明答，不按参数答：判定发生在波跑之前，而 `Tool::writes` 读的是一条跑完的调用。**被否**：`RunPlan` 带名字到 `Effect` 的表——`RunPlan` 是冻结的 run 描述，进账本的重放读它，而工具的 `Effect` 是 bench 注册时的事实，不该在两处各记一份。
 - **否决「空波一律跳过」**：结束回合的空波前那次 fence，是把上一波的写带进提交的唯一时机；跳过它，run 写下的文件就没有任何提交持有。
