@@ -61,7 +61,7 @@ impl PlanHolders {
     /// table holds known holders and guesses at none.
     #[expect(
         clippy::wildcard_enum_match_arm,
-        reason = "four kinds move a claim; the rest of the event vocabulary does not"
+        reason = "five kinds move a claim; the rest of the event vocabulary does not"
     )]
     pub(in crate::assembly) fn absorb(
         &mut self,
@@ -82,7 +82,13 @@ impl PlanHolders {
                     .or_default()
                     .insert(node, room.as_str().to_owned());
             }
-            EventKind::RoadmapFinished | EventKind::RoadmapReleased | EventKind::RoadmapBlocked => {
+            // A split is its parent's fate as much as a finish is: the
+            // run that split the node holds nothing afterwards
+            // (sprawling-SPEC.md 8-42-8).
+            EventKind::RoadmapFinished
+            | EventKind::RoadmapReleased
+            | EventKind::RoadmapSplit
+            | EventKind::RoadmapBlocked => {
                 self.0.entry(building).or_default().remove(&node);
             }
             _ => {}
