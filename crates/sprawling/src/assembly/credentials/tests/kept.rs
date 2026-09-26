@@ -151,14 +151,8 @@ fn a_subscription_token_keeps_its_bearer_header_when_the_settings_are_saved_agai
         .endpoints()
         .find(|endpoint| endpoint.name == "anthropic")
         .expect("the endpoint stayed attached");
-    let gateway::AuthSpec::Bearer(reference) = &kept.auth else {
-        panic!(
-            "a subscription token travels as a bearer token, not {:?}",
-            kept.auth
-        );
-    };
     assert_eq!(
-        reference,
-        &kernel::SecretRef::parse("secret:anthropic/oauth").unwrap()
+        kept.auth,
+        gateway::AuthSpec::Bearer(kernel::SecretRef::parse("secret:anthropic/oauth").unwrap())
     );
 }
