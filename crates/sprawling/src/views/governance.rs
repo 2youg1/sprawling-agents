@@ -52,7 +52,7 @@ pub(crate) struct Governance {
     /// What each run was sent to do, by run.
     ///
     /// Never pruned, and one short entry per run - the same growth class
-    /// as `memory::HotView`, which is also one entry per run. It cannot
+    /// as the tombstones `memory::HotView` keeps for evicted runs. It cannot
     /// be pruned on `run_frozen`: `freeze` writes inside the drive while
     /// the assembly records waiting items after it, so the ledger order
     /// is `run_started … run_frozen … approval_requested` and pruning

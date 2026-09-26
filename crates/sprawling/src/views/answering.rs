@@ -111,9 +111,16 @@ impl Views {
                     halted: self.governance.halted.iter().map(named).collect(),
                 })
             }
-            channels::Query::RunView { run } => {
-                channels::Answer::Run(self.hot.get(run).map(|hot| summarize(*run, hot)))
-            }
+            // An evicted run always has records in the Ledger, so a
+            // recall that cannot read them is "I could not look".
+            channels::Query::RunView { run } => match self.hot.get(run) {
+                Some(hot) => channels::Answer::Run(Some(summarize(*run, hot))),
+                None if self.hot.was_evicted(run) => match self.recalled(*run) {
+                    Some(summary) => channels::Answer::Run(Some(summary)),
+                    None => unavailable(format!("RunView({run})")),
+                },
+                None => channels::Answer::Run(None),
+            },
             channels::Query::ApprovalQueue => {
                 channels::Answer::Approvals(channels::ApprovalsAnswer {
                     items: self.governance.pending.values().cloned().collect(),

@@ -235,7 +235,12 @@ fn an_evicted_run_still_answers_its_run_view() {
         panic!("an evicted run is still a run the city holds");
     };
     assert_eq!(
-        (summary.frozen, summary.last_kind, summary.addr, summary.started),
+        (
+            summary.frozen,
+            summary.last_kind,
+            summary.addr,
+            summary.started
+        ),
         (
             true,
             EventKind::RunFrozen,
