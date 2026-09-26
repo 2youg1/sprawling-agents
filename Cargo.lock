@@ -526,6 +526,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpu-time"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9e393a7668fe1fad3075085b86c781883000b4ede868f43627b34a87c8b7ded"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1642,6 +1652,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "memory-stats"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c73f5c649995a115e1a0220b35e4df0a1294500477f97a91d0660fb5abeb574a"
+dependencies = [
+ "libc",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2655,6 +2675,7 @@ dependencies = [
  "channels",
  "city",
  "collab",
+ "cpu-time",
  "flate2",
  "futures-util",
  "gateway",
@@ -2662,6 +2683,7 @@ dependencies = [
  "git2",
  "kernel",
  "memory",
+ "memory-stats",
  "protocol",
  "reqwest",
  "runtime",

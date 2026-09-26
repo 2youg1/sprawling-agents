@@ -16,6 +16,8 @@ use sysinfo::{Disks, MemoryRefreshKind, Pid, ProcessRefreshKind, ProcessesToUpda
 
 use super::Sample;
 
+pub(crate) mod own_process;
+
 /// The open platform handles, and the volume whose free space is read.
 pub(crate) struct Counters {
     system: System,

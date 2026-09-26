@@ -3575,20 +3575,21 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 - `sampler::beat(monitor: &Mutex<Monitor>, samples: &broadcast::Sender<Sample>, read: impl FnOnce() -> Sample)`：一拍。调用 `Monitor::tick(read)`；这一拍读了计数器，就把这一个读数发到 `samples`（即 `channels::MonitorFeed::samples`）。没人在看时 `read` 不被调用，什么也不发。发送时一个订阅者也没有不是失败：看的会话在两拍之间走了，它没有错过自己要的东西。锁中毒时照常取用：计数是原子的，历史是完整的 `VecDeque`，中毒不留下写了一半的状态。
 - `sampler::spawn_sampler(monitor: Weak<Mutex<Monitor>>, samples: broadcast::Sender<Sample>) -> Result<(), AxError>`：起名为 `sprawling-monitor` 的线程，每秒一拍，读数来自 `counters::Counters`。线程只持 `Weak`：`ServeConfig` 连同 `MonitorFeed::watch` 被丢弃后 `upgrade` 失败，线程在下一拍结束。起不了线程时返回 `StorageFatal`，recovery 是检查进程的线程上限（与 `serving::folding` 相同）。
-- `counters::Counters::open(volume: PathBuf) -> Counters` 与 `Counters::read(&mut self) -> Sample`：核心进程的 CPU（千分比，按两次读数之间累计 CPU 时间与墙钟、核数算出）、private（Windows 上是 PrivateUsage，其他平台是虚拟内存）、工作集、累计读写字节；整机 CPU（千分比）、可用内存；城所在卷的剩余空间。第一次读数没有上一次可比，两项 CPU 为 0。`Counters` 只在有人看时存在：`beat` 之后历史为空（没人看）时采样线程丢掉它，平台句柄与进程表不常驻。
+- `counters::Counters::open(volume: PathBuf) -> Counters` 与 `Counters::read(&mut self) -> Sample`：核心进程的三项取自 `OwnProcess`；整机 CPU（千分比）、可用内存；城所在卷的剩余空间。第一次读数没有上一次可比，两项 CPU 为 0。
+- `counters::own_process::OwnProcess::new() -> OwnProcess` 与 `OwnProcess::read(&mut self) -> OwnReading`：只问本进程、不遍历进程表的读数。`OwnReading { cpu_permille, private_bytes, working_set_bytes }`：CPU 是两次读数之间本进程累计 CPU 时间的增量除以墙钟增量与核数（千分比，整数运算，截到 `0..=1000`），第一次为 0；private 在 Windows 上是 PagefileUsage（即 PrivateUsage），其他平台是虚拟内存；工作集是驻留内存。平台拒绝某一项时这一项读作 0，与尚未接入的项同样处理：`Sample` 是给人看的读数，没有携带失败的位置，而一秒后下一拍会再读一次。`Counters` 只在有人看时存在：`beat` 之后历史为空（没人看）时采样线程丢掉它，平台句柄与进程表不常驻。
 
 **定下的值。** 一拍的间隔 1 s（8-90 的「每秒一点」）；线程名 `sprawling-monitor`。
 
 **决定。**
 
-1. 计数器来源是 `sysinfo`，关掉默认特性、只开 `system` 与 `disk`。本工作区 `unsafe_code = forbid`，「只取需要的几个接口」在这里只能是另一个把平台调用包成安全接口的 crate，所以比较的是同一个 crate 的两种裁剪，以一个空的 release 探针（`lto`、`codegen-units = 1`、`strip`）实测：在 windows-msvc 的桌面级机器上（同时有别的编译在跑），空探针 123 904 字节，读齐本节这些计数器的探针 201 216 字节，多 77 312 字节（约 75.5 KiB）。启动时间不受影响：`Counters` 只在第一个人开始看时才打开，城的启动路径上没有它；打开一次（`System::new`、首次刷新进程与 CPU、列出磁盘）热缓存 0.42–0.56 s、冷缓存 2.8 s；之后每读一次 18–74 ms，其中本进程的刷新占 17–65 ms（`sysinfo` 在 Windows 上即使只问一个 pid 也遍历整张进程表），整机 CPU 0.7–8 ms，磁盘 0.2–0.8 ms，内存约 5 µs。所以这个来源满足了「读得全」，却远没有达到 8-90 的「采样一次 ≤ 50 µs、占 CPU ≤ 0.1%」：有人看时采样线程约占一个核的 2%–7%。默认特性的 `sysinfo` 在 LTO 之后并不更大（没用到的代码被去掉），裁掉特性省的是编译时间与依赖数。重新考虑的条件：出现只读本进程与整机计数、体积显著更小的安全接口 crate，或者 `unsafe_code` 的政策改变。
+1. 本进程的读数来自 `memory-stats`（工作集与 private）与 `cpu-time`（本进程 CPU 时间），整机与卷的读数来自 `sysinfo`，关掉默认特性、只开 `system` 与 `disk`。本工作区 `unsafe_code = forbid`，「只取需要的几个接口」在这里只能是另一个把平台调用包成安全接口的 crate，所以比较的是同一个 crate 的两种裁剪，以一个空的 release 探针（`lto`、`codegen-units = 1`、`strip`）实测：在 windows-msvc 的桌面级机器上（同时有别的编译在跑），空探针 123 904 字节，读齐本节这些计数器的探针 201 216 字节，多 77 312 字节（约 75.5 KiB）。启动时间不受影响：`Counters` 只在第一个人开始看时才打开，城的启动路径上没有它；打开一次（`System::new`、首次刷新进程与 CPU、列出磁盘）热缓存 0.42–0.56 s、冷缓存 2.8 s；之后每读一次 18–74 ms，其中本进程的刷新占 17–65 ms（`sysinfo` 在 Windows 上即使只问一个 pid 也遍历整张进程表），整机 CPU 0.7–8 ms，磁盘 0.2–0.8 ms，内存约 5 µs。本进程那一段因此换成只问本进程句柄的 `memory-stats` 加 `cpu-time`：同一类机器上的 release 探针读一次约 1.1 µs，比空探针多 1 024 字节，两者依赖的 `winapi` 与 `windows-sys` 已在依赖树里。代价是本进程的累计读写字节：没有找到以安全接口只读本进程 I/O 计数的 crate，这两项现在在所有平台上读作 0，而不是为它们留下每拍 17–65 ms 的整表刷新。默认特性的 `sysinfo` 在 LTO 之后并不更大（没用到的代码被去掉），裁掉特性省的是编译时间与依赖数。重新考虑的条件：出现以安全接口只读本进程 I/O 计数或整机 CPU、比 `sysinfo` 显著更快的 crate，或者 `unsafe_code` 的政策改变。
 2. 采样放在一条自己的线程上，而不是 tokio 任务：它每秒做一次阻塞的系统调用，放进异步运行时会占住一个工作线程；它与 `serving::folding` 一样是一条命名线程。没人看时线程每秒醒一次、读一个原子数，不读计数器也不留内存（8-90 决定 1）。
 3. 读数经 `Sample` 发出，不在这里换单位：换单位是 8-91 与 `client/src/core/monitor.ts` 的事。
 4. `f32` 的整机 CPU 负载是 `sysinfo` 唯一给出的形式，先截到 `0..=100` 再换成千分比；这一处 `as` 以 `#[expect]` 注明，它是本模块唯一的浮点。
 
-**测试。** `monitor::sampler::tests`：有人看时一拍把读到的那一个读数发给订阅者；没人看时不读、不发。`monitor::counters::tests`：读本进程得到非零的工作集、整机可用内存与卷剩余空间。
+**测试。** `monitor::sampler::tests`：有人看时一拍把读到的那一个读数发给订阅者；没人看时不读、不发。`monitor::counters::tests`：读本进程得到非零的工作集、整机可用内存与卷剩余空间。`monitor::counters::own_process::tests`：第一次读数的 CPU 为 0，本进程忙过一段之后第二次读数的 CPU 大于 0，工作集与 private 非零。
 
-**本节接口的当前状态。** 核心自己的健康（记账队列深度、持久水位线落后多少、relay 往返与事件到屏幕的 p50、排队的 run、S5.9M 的降级状态）与 Job Object 的汇总和逐进程明细尚未接入，这几项读数现为 0；磁盘延迟没有字段。本进程的读数要达到 ≤ 50 µs，得换一条只问本进程的路径（Windows 上是本进程句柄上的内存、CPU 时间与 I/O 计数，而不是整张进程表）：同一类机器上的 release 探针里，`memory-stats`（工作集与 private）加 `cpu-time`（本进程 CPU 时间）读一次约 1.1 µs，比空探针多 1 024 字节；本进程的读写字节没有找到安全接口的 crate，整机 CPU 仍由 `sysinfo` 读（0.7–8 ms），这两项决定换路径之后离 50 µs 还差多少；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
+**本节接口的当前状态。** 核心自己的健康（记账队列深度、持久水位线落后多少、relay 往返与事件到屏幕的 p50、排队的 run、S5.9M 的降级状态）与 Job Object 的汇总和逐进程明细尚未接入，这几项读数现为 0；磁盘延迟没有字段。本进程的累计读写字节读作 0（决定 1）。一拍里剩下的大头是 `sysinfo` 的整机 CPU（0.7–8 ms）与磁盘（0.2–0.8 ms），离「采样一次 ≤ 50 µs」还差这两项；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
 
 ## 8-93 `sprawling top`：经线协议看监视器（`bin::wire_client::watching`，形状：adapter）
 
