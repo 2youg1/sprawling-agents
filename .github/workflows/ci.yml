@@ -1,69 +1,53 @@
 # The gate a change closes on, run by a machine.
 #
-# `just check` is one command chain and CI used to run all of it in one
-# job, one after another. Two of its steps are full compiles of the same tree that
-# cannot share a single artifact: `cargo clippy` builds in check mode
-# (`--emit=metadata`) and `cargo nextest` needs real rlibs, which is
-# measurable rather than folklore - clean one crate, `cargo clippy -p
-# kernel` says "Checking kernel", and `cargo build -p kernel --lib`
-# immediately after says "Compiling kernel". So the job's wall clock was
-# the *sum* of two builds. Split across jobs that start together, it is
-# the slower of the two.
+# Every job calls the recipes `just check` is made of and spells no command
+# of its own, so the check a person runs at their desk and the check a pull
+# request gets are one set of commands rather than two copies that drift.
+# The jobs together are exactly `just check`, plus the two things a tree
+# alone cannot hold: the commit messages of the range under review, and the
+# kani proofs, which need a Linux host.
 #
-# Six verdict jobs, five of which wait on nothing. Together they are
-# exactly `just check` plus the supply-chain read and the proofs, and CI
-# must never be weaker than the local command: a green CI that implies
-# less than a green `just check` is worse than no CI.
+#   fast      fmt of both trees, the gates that read sources, the commit
+#             messages; compiles only xtask, so it answers first
+#   models    the Lean design models under `adversary/design/`
+#   clippy    the zero-warning build of every target and feature, and the
+#             feature combinations `just features` runs
+#   test      the suite
+#   gates     the gates that judge the built client bundle
+#   supply    licences, bans and sources; compiles nothing
+#   client    the client's own linter, typecheck and tests
+#   desktop   `desktop/`, which no workspace command compiles
+#   proof     the kernel propositions kani can hold; `changes` decides
+#             whether a change touched anything a proof is about
 #
-#   clippy   fmt, the zero-warning build of every target and feature,
-#            and the two feature combinations `just features` runs
-#   test     the suite; the only job that produces trybuild scratch
-#   gates    the machine gates (`cargo xtask gates` names them), the
-#            client bundle they judge
-#   client   the client's own linter, typecheck and tests
-#   proof    the kernel propositions kani can hold, against real MIR;
-#            the one job with a prerequisite, `changes` below
-#   supply   licences, bans and sources; compiles nothing
+# The order a red arrives in is fmt, then the source gates, then clippy,
+# then the suite, then the client, because every job starts in the first
+# second of the run and the cheap ones finish first. Chaining them with
+# `needs` would buy the same order and cost the sum of the jobs as wall
+# clock instead of the slowest one.
 #
-# All six are required checks on a pull request, which is a repository
-# setting rather than a line in this file. `changes` is deliberately not
-# required: it exists to let `proof` skip, and a skipped required check
-# counts as met while a required check that never starts blocks the
-# branch for ever.
+# Which jobs a pull request must pass is a repository setting rather than a
+# line in this file. `changes` is deliberately not required: it exists to
+# let `proof` skip, and a skipped required check counts as met while a
+# required check that never starts blocks the branch for ever.
 #
-# `changes` costs the other five jobs nothing. `needs` is declared per
-# job, and only `proof` declares it, so clippy, test, gates, client and
-# supply still start in the first second of the run.
+# Windows for everything a person can reproduce at their desk, because it is
+# the platform the project is developed on, so a red job is a red local run.
+# Three jobs run on ubuntu because the tool they drive runs better or only
+# there: `client` drives bun, `models` drives Lean, `proof` drives kani,
+# whose upstream builds for Linux only. macOS byte-identity and the Nix leg
+# are `platforms.yml`, nightly.
 #
-# Windows for everything a person can reproduce at their desk: it is the
-# platform the project is developed on, so a red job is a red local run.
-# macOS byte-identity is `platforms.yml`, nightly, and so is the Nix leg.
-# The release ships a static Linux archive, built natively by
-# `release.yml` (sprawling-SPEC.md section 8-9).
+# Every Rust cache is keyed on `Cargo.lock` and `rust-toolchain.toml` (the
+# two files that decide what a build produces), every bun cache on
+# `client/bun.lock`, and only the branch everyone builds on writes a cache:
+# a pull request's save is readable by that pull request alone, and it
+# pushes the shared entry out of the repository's cache budget by age.
 #
-# The two ubuntu jobs here are the exceptions that rule admits, and both
-# for the same reason: the tool runs nowhere else. `client` drives bun,
-# and `proof` drives kani, which upstream builds for Linux only. A
-# Windows desk cannot reproduce either failure no matter which workflow
-# holds the job, so putting them on the nightly schedule would buy no
-# reproducibility and would cost a day between a merge and its verdict.
-#
-# Every job carries `timeout-minutes: 20`. GitHub's default is six hours,
-# so a hung job used to burn a runner for a working day while the person
-# waited on a verdict that was never coming. Twenty minutes sits a little
-# above the cold-cache floor - a warm run is minutes - which turns
-# "fifteen minutes" from a wish into a promise a machine checks.
-#
-# Not done, because it was measured and did not pay: forcing debuginfo
-# off in CI. Dependencies already carry `debug = false` (root
-# `Cargo.toml`), which is where the mass was, and rebuilding plus
-# relinking the largest test binary with `CARGO_PROFILE_DEV_DEBUG=0`
-# moved 11.7s to 9.6s while the full workspace build moved the wrong way.
-# A second of noise is not a lever; leave the backtraces alone.
-#
-# C1 note: GitHub Actions infrastructure is not part of the artifact build
-# chain. The zero-js gate that asserted this was deleted: it excluded an
-# architecture rather than a defect.
+# Every job carries a timeout. GitHub's default is six hours, so a hung job
+# would burn a runner for a working day while the person waited on a
+# verdict that was never coming; twenty minutes sits a little above the
+# cold-cache floor.
 name: ci
 on:
   push:
@@ -91,15 +75,9 @@ jobs:
   # Which of this change's paths a proof could possibly be about.
   #
   # Installing kani and its own toolchain is minutes, and a pull request
-  # that edits a README has nothing for a solver to hold. This job reads
-  # the change's file list and `proof` below runs only when a path it
-  # judges moved: the kernel it proves over, this workflow, the xtask
-  # that owns the harness roster, and the pinned kani version.
-  #
-  # `dorny/paths-filter` rather than a hand-written `git diff` here: the
-  # range under review is already resolved once in this file, by the
-  # `gates` job, and a second resolver would be a second answer to one
-  # question the first time a push rewrote history.
+  # that edits a README has nothing for a solver to hold. `proof` below
+  # runs only when a path it judges moved: the kernel it proves over, this
+  # workflow, the xtask that owns the harness roster, and the kani pin.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -118,140 +96,14 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/workflows/kani-version.txt'
 
-  # fmt answers in two seconds and rides along here rather than in a job
-  # of its own: a whole runner, a whole toolchain download and a whole
-  # queue wait to save two seconds is not speed.
-  clippy:
+  # The verdicts that compile nothing but xtask, in the order they cost.
+  #
+  # `fetch-depth: 0` because the commit-message check judges every commit
+  # in the change-set, and a base branch can sit any distance back.
+  fast:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
-      # Without this every run compiles 494 packages from zero - including
-      # aws-lc-sys and libgit2, which are C. It is the single largest
-      # difference between a five-minute run and a twenty-minute one.
-      # A key per job, because check-mode metadata and real rlibs are
-      # different artifacts and one key would make two jobs overwrite each
-      # other's cache all day. Only the branch everyone builds on writes,
-      # and the reason is the repository's cache budget rather than this
-      # one entry: a pull request's save is scoped to its own merge ref,
-      # so it cannot overwrite what it restored - but it spends minutes
-      # writing bytes that only that pull request's re-runs can read, and
-      # those bytes push the shared entry out by age once the budget is
-      # full.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: clippy
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: fmt
-        run: cargo fmt --all --check
-      # --all-features is load-bearing and must match `just check` word for
-      # word: code behind a feature (runtime/wasm, */conformance) escapes
-      # the zero-warning gate without it.
-      - name: clippy
-        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: just
-      # The feature combinations `just features` runs: the default set,
-      # test targets included, and channels without `server`, which is the
-      # combination a wasm32 build needs and therefore the reason that
-      # feature exists. They ride in this job rather than in one of their
-      # own because a separate job pays a runner, a toolchain install and a
-      # cold cache - minutes - to run two check-mode passes that take
-      # seconds on the cache this job has already restored.
-      #
-      # The recipe is called rather than repeated here, the way `client` and
-      # `supply` below call `just check-client` and `just deny`: `--all-targets`
-      # is the token a copy in this file lost, and the tree `just features`
-      # rejects was green in this job.
-      - name: the feature combinations `just check` runs
-        run: just features
-
-  test:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: test
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest
-      # The four trybuild suites were the whole of this job's test phase:
-      # 369s of a 370s run. They are not slow, they were cold - one suite
-      # is 21.4s against an empty scratch and 0.9s against a warm one.
-      # The scratch is deleted below
-      # so that rust-cache can save, so it was cold on every run by
-      # construction, and this job paid the first build of it forever.
-      #
-      # Restored and saved explicitly rather than by a post-step, because
-      # the order is the whole point: save has to happen after the tests
-      # that fill the scratch and before the step that empties it, and a
-      # post-step cannot be placed between two ordinary ones.
-      - uses: actions/cache/restore@v6
-        id: trybuild-scratch
-        with:
-          path: target/tests
-          key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'crates/*/tests/**') }}
-          restore-keys: trybuild-${{ runner.os }}-
-      # What a test in this job judges: `xtask`'s npm gate reads the
-      # installed tree to check every licence, and refuses to report
-      # green when the tree is missing - which is what a bare runner
-      # has. The gate that fell silent here on twelve gates while
-      # claiming fourteen was the same shape, so this job pays the
-      # install rather than losing the assertion.
-      #
-      # The action bundles as well as installs, which this job does not
-      # need. That is the price of one home: a step here that installed
-      # only would be a second spelling of the preparation, and the two
-      # workflows that held their own spelling are exactly the ones that
-      # were never updated when these gates stopped skipping.
-      - uses: ./.github/actions/client-artifacts
-      # No `--doc` companion: this workspace has no doctest, which is a
-      # fact about it (`rg '///\s*```' crates/*/src` finds nothing), not
-      # an omission for somebody to fix later by adding a slower command.
-      - name: tests
-        run: cargo nextest run --workspace --locked --all-features
-
-      # Only the branch everyone builds on writes, for the reason the
-      # rust-cache block above gives: a pull request's save is readable
-      # only by that same pull request, and it crowds the shared entry out
-      # of the repository's cache budget by age.
-      - uses: actions/cache/save@v6
-        if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
-        with:
-          path: target/tests
-          key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'crates/*/tests/**') }}
-
-      # trybuild keeps its scratch tree under `target/tests`, including an
-      # entry that does not survive the cache's own pruning pass. The save
-      # step then walks target/ and stops on it - which is how a job whose
-      # every gate was green still reported failure (rust-cache#193). The
-      # scratch is a test artifact, so nothing is lost by clearing it, and
-      # this is the one job that runs tests and therefore creates it.
-      - name: clear the trybuild scratch before the cache is saved
-        if: always()
-        shell: bash
-        run: rm -rf target/tests
-
-  gates:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      # `guard` judges every commit in a range, and the range
-      # is the whole change-set under review. This step used to take
-      # `fetch-depth: 2` under a note saying no workflow passed a range.
-      # The note was true and it was the hole: guard judged the tip commit
-      # alone, so a pull request could carry a gate-loosening commit in the
-      # middle and still go green, while xtask-SPEC.md section 3 had
-      # promised the range all along. No fixed depth replaces this, because
-      # a base branch can sit any distance back.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -259,24 +111,27 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: gates
+          shared-key: fast
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      # The render and npm gates judge artifacts, not sources: without
-      # `target/web-dist` and `client/node_modules` they refuse rather
-      # than skip, and this job once reported green on twelve gates
-      # while claiming fourteen.
-      - uses: ./.github/actions/client-artifacts
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - name: fmt
+        run: just fmt-check fmt-check-desktop
+      - name: the gates that read sources
+        run: just gates-sources
       # base..head for a pull request, before..after for a push. A push
       # that rewrote history leaves `before` unreachable in a fresh clone,
-      # and a first push has no `before` at all; both fall back to HEAD and
-      # say which they did, because a range that cannot be resolved must
-      # not read as a range that was clean.
-      - name: xtask gates
+      # and a first push has no `before` at all; both judge the tip commit
+      # alone and say so, because a range that cannot be resolved must not
+      # read as a range that was clean.
+      - name: commit messages
         shell: bash
         run: |
           set -euo pipefail
           reachable() { git cat-file -e "$1^{commit}" 2>/dev/null; }
-          range=""
+          range='${{ github.sha }}^!'
           case "${{ github.event_name }}" in
             pull_request)
               base='${{ github.event.pull_request.base.sha }}'
@@ -295,25 +150,133 @@ jobs:
               fi
               ;;
           esac
-          if [ -n "$range" ]; then
-            echo "judging $range"
-            cargo xtask gates --range "$range"
-          else
-            echo "judging HEAD alone"
-            cargo xtask gates
-          fi
+          echo "judging $range"
+          just commits "$range"
 
-  # The client, which is the one part of this repository the Rust
-  # toolchain does not judge: its own linter forbids `any`, `as`, `throw`,
-  # `try` and a non-exhaustive switch, and its tests run here rather than
-  # inside the Rust job so that a bun install is cached on its own.
-  #
-  # `just` is installed rather than assumed. It is not on the runner
-  # image, and this job is the only one that reached for it without
-  # saying so - release.yml, which runs on the same image, has always
-  # named it. Spelling the four commands out here instead would give
-  # `just check-client` a second authority, free to drift from the one a
-  # person runs at their desk.
+  # The Lean design models. The checker in `adversary/` is not built here:
+  # it attacks the binary from outside and stays out of every required
+  # check (`adversary.yml` runs it nightly).
+  models:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - uses: ./.github/actions/lean
+      - name: the design models
+        run: just models
+
+  clippy:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      # Without this every run compiles the whole graph from zero, including
+      # aws-lc-sys and libgit2, which are C. A key per job, because
+      # check-mode metadata and real rlibs are different artifacts and one
+      # key would make two jobs overwrite each other's cache all day.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: clippy
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - name: clippy
+        run: just clippy
+      # Two check-mode passes, seconds on the cache this job already holds,
+      # so they ride here rather than paying a runner of their own.
+      - name: the feature combinations
+        run: just features
+
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,just
+      # The trybuild suites are cold rather than slow: one suite is 21.4s
+      # against an empty scratch and 0.9s against a warm one. The scratch
+      # is deleted below so that rust-cache can save, so it is restored and
+      # saved explicitly, around the tests that fill it and before the step
+      # that empties it; a post-step cannot be placed between two ordinary
+      # ones.
+      - uses: actions/cache/restore@v6
+        id: trybuild-scratch
+        with:
+          path: target/tests
+          key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          restore-keys: trybuild-${{ runner.os }}-
+      # xtask's npm gate has tests that read the installed client tree and
+      # refuse when it is missing, which is what a bare runner has.
+      - uses: ./.github/actions/client-artifacts
+      - name: tests
+        run: just test
+      - uses: actions/cache/save@v6
+        if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
+        with:
+          path: target/tests
+          key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+      # trybuild's scratch holds an entry that does not survive the cache's
+      # own pruning pass, and the save step then stops on it: a job whose
+      # every test was green reported failure (rust-cache#193).
+      - name: clear the trybuild scratch before the cache is saved
+        if: always()
+        shell: bash
+        run: rm -rf target/tests
+
+  # The three gates that judge the built client rather than a source.
+  # `just gates-artifacts` builds the bundle itself; the action before it
+  # installs bun and restores bun's cache.
+  gates:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gates
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: ./.github/actions/client-artifacts
+      - name: the gates that judge the client bundle
+        run: just gates-artifacts
+
+  # Licences, banned crates and where they came from. It reads `Cargo.lock`
+  # and compiles nothing. `advisories` is deliberately absent from
+  # `just deny`: an advisory published today against a dependency nobody
+  # touched would turn a pull request red for a reason its author did not
+  # write. It runs in `nightly.yml`, where red means "go and look".
+  supply:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,just
+      - name: licences, bans and sources
+        run: just deny
+
+  # The client, which is the one part of this repository the Rust toolchain
+  # does not judge: its own linter forbids `any`, `as`, `throw`, `try` and a
+  # non-exhaustive switch.
   client:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -323,12 +286,6 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just
-      # The cache the comment above promised and this job did not have:
-      # bun's global download directory, which `bun install` fills from
-      # the registry on every cold run. The lockfile is the key, because
-      # the same lockfile wants the same bytes - so an exact hit skips
-      # the save as well as the fetch, and a changed lockfile still
-      # starts from the last one rather than from nothing.
       - uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
@@ -337,45 +294,36 @@ jobs:
       - name: lint, typecheck and test the client
         run: just check-client
 
-  # V5: the propositions only a proof can hold, against real MIR.
+  # `desktop/` sits outside the workspace (desktop-SPEC.md section 8.5), so
+  # no job above compiles it; `just check` ends with it, and so does this.
+  # Its fmt runs again here, seconds, because the recipe depends on it.
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop -> target
+          shared-key: desktop
+          key: ${{ hashFiles('desktop/Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-deny,just
+      - name: clippy, tests and licences of desktop
+        run: just check-desktop
+
+  # The propositions only a proof can hold, against real MIR.
   #
-  # It moved here from `platforms.yml`, and the reason it was nightly is
-  # what dissolved: it was described there as "the one ubuntu build left
-  # in the pipeline", which stopped being true when `client` landed on
-  # ubuntu and `release.yml` grew a native Linux row. A proof that
-  # arrives up to a day after the merge it judges is a proof nobody is
-  # holding a change against, so it now gates the change.
-  #
-  # **Which harnesses run is not written here.** `cargo xtask proof`
-  # holds that list and `cargo xtask proof --list` prints it, so the
-  # roster has one home and a harness added to the kernel cannot be
-  # proved locally and forgotten in CI. What this comment keeps is the
-  # judgment the roster cannot carry: why several propositions in the
-  # kernel are deliberately out of reach of a solver.
-  #
-  # The arithmetic is what decides it. A harness that asserts something
-  # about one concrete address or one concrete taint source -
-  # `Address::parse(".sprawling/ledger")`, `TaintSource::new("web:x")` -
-  # is a unit test wearing a proof's clothing, and the file beside each
-  # already holds that proposition as a `#[test]` or as a proptest over a
-  # wider domain than the harness has. Those same harnesses build a
-  # `Vec`, a `String` or a `BTreeSet`, whose loops CBMC cannot bound:
-  # they spent six hours, then forty-five minutes under
-  # `--default-unwind 32`, and returned nothing either time. The entropy
-  # harness over short inputs is out for a third reason and is not
-  # forgotten: `entropy_millibits_per_char` calls `log2_q10` once per
-  # slot of a 256-slot count table and each call squares a u128 ten
-  # times, so the harness hands the solver some 2,560 symbolic
-  # non-linear multiplications and does not return inside fifteen
-  # minutes. Nothing about a bound fixes that; the arithmetic core is
-  # proved on its own, and proving the whole function needs a harness
-  # over one slot rather than over the table (kernel-SPEC.md section 2).
-  #
-  # What does run carries a domain sampling cannot reach - every u64,
-  # every four-byte input - with constant-bounded loops, so no global
-  # unwind is passed and CBMC derives the bounds (`log2_q10` iterates ten
-  # times). Each returned inside a minute when they were last timed, on
-  # 2026-08-29.
+  # Which harnesses run is not written here: `cargo xtask proof --list`
+  # prints the roster, so a harness added to the kernel cannot be proved
+  # locally and forgotten in CI. A harness over one concrete value, or one
+  # that builds a `Vec`, a `String` or a `BTreeSet` whose loops CBMC cannot
+  # bound, is held by a `#[test]` or a proptest instead; kernel-SPEC.md
+  # section 2 records which and why.
   proof:
     needs: changes
     # A change that touches nothing a proof is about skips this job, and
@@ -391,17 +339,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: proof
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      # `cargo kani setup` downloads kani's own toolchain, which is
-      # hundreds of megabytes and changes when the pinned version changes
-      # and at no other time. So the key is the pin file alone: keyed on
-      # this workflow instead, every edited comment in it would fetch the
-      # toolchain again.
-      #
-      # The pin is one line in `.github/workflows/kani-version.txt`,
-      # which `nightly.yml` reads as well - a floating install would let
-      # a kani release turn a pull request red for something its author
-      # did not write.
+      # kani's own toolchain is hundreds of megabytes and changes when the
+      # pin changes and at no other time, so the pin file is the whole key.
+      # `nightly.yml` reads the same pin.
       - uses: actions/cache@v6
         id: kani-cache
         with:
@@ -418,34 +360,13 @@ jobs:
           version=$(cat .github/workflows/kani-version.txt)
           cargo install --locked "kani-verifier@$version"
           cargo kani setup
-      # `cargo xtask proof` skips with one line and succeeds where kani is
-      # absent, which is right at a Windows desk and would be a silently
-      # empty verdict here. This step is what makes the skip impossible in
-      # CI: a broken install or a cache restored without the toolchain
-      # stops the job before the proof step can pass by proving nothing.
+      # `cargo xtask proof` skips with one line where kani is absent, which is
+      # right at a Windows desk and would be an empty verdict here: this
+      # step stops the job before the proof can pass by proving nothing.
       - name: kani answers, so the proof step cannot skip
         run: cargo kani --version
-      - name: xtask proof
+      # `cargo xtask proof`, which is the whole of `just proof`, spelled
+      # out because the `proof` gate reads this job for exactly that
+      # command (xtask/src/proof.rs).
+      - name: the proofs
         run: cargo xtask proof
-
-  # Licences, banned crates and where they came from. It compiles nothing
-  # - it reads `Cargo.lock` - so it is the verdict that arrives first.
-  #
-  # Which checks run is `just deny`'s to say, and this job calls it for
-  # the reason the `client` job calls `just check-client`: a list spelled
-  # out here is free to drift from the one a person runs at their desk.
-  # `advisories` is deliberately absent from that recipe - an advisory
-  # published today against a dependency nobody touched would turn a pull
-  # request red for a reason that has nothing to do with it, which is how
-  # people learn to ignore a red build. It runs in `nightly.yml`, where
-  # red means "go and look".
-  supply:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-deny,just
-      - name: licences, bans and sources
-        run: just deny

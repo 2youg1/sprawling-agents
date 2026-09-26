@@ -9,7 +9,7 @@ Read this file to the end before the first edit.
 ```bash
 cargo install just --locked   # once; a recipe cannot check for the tool that runs it
 just prereqs                  # every other tool the loop needs, with the install line for each one that is absent
-just check                    # fmt + clippy (-D warnings, --all-features) + two feature-combination checks + nextest + the client bundle + every machine gate + the client's own checks
+just check                    # fmt + clippy (-D warnings, --all-features) + two feature-combination checks + the Lean design models + nextest + the client bundle + every machine gate + the client's own checks
 ```
 
 The `prereqs` recipe is the only list of the tools the loop needs, and `just check` opens with it so that a missing tool is named in milliseconds. `build-web` runs inside `check` because `render` and `npm` judge the built client, and refuse when it is absent.
@@ -19,6 +19,8 @@ The `prereqs` recipe is the only list of the tools the loop needs, and `just che
 | `just check` | the whole check; *Verification* says when it runs |
 | `just gates` | the machine gates alone, then the supply-chain read |
 | `cargo xtask gates <name>...` | the named gates only; `cargo xtask gates --list` prints the roster, one name per line |
+| `just commits <base>..<tip>` | every commit subject and `Verdict:` trailer in that range, judged against *Commits* below; CI runs it on the change-set, and `just check` cannot, because a tree has no range |
+| `just models` | the Lean design models under `adversary/design/`, built with no `sorry`, `admit` or `axiom`; silent where Lean is absent |
 | `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `channels` without `server` |
 | `just check-client` | the client's lint, typecheck and tests |
 | `just build-web` | build the client bundle into `target/web-dist` |

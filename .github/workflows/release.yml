@@ -29,24 +29,6 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
 
-# Least privilege on the Actions cache, declared rather than inherited.
-#
-# A tag push is a trusted trigger, so by default every job here may write
-# into the *default branch's* cache scope - the entries ci.yml fills on
-# main and restores on every push. This workflow needs none of that, and
-# saying so is a speed change rather than only a safety one.
-#
-# Nothing here has a save worth keeping. A cache written under a tag ref
-# is restorable by that tag alone, and a tag is cut once, so the save was
-# always pure cost: compressing and uploading a Windows target directory
-# that no later run can read. Read-only deletes that work outright.
-#
-# And because the save is now impossible, `verify` can take the key the
-# `test` job fills on main and start warm instead of compiling 494
-# packages from zero - safely, since read-only is enforced by the cache
-# service rather than by each step remembering to ask for less.
-cache-mode: read
-
 jobs:
   # Nothing is built for release out of a tree that has not passed.
   #
@@ -78,43 +60,38 @@ jobs:
       # what arrives is the dependency graph and nothing that could be
       # stale about this tree.
       #
-      # `save-if: false` states in the action what `cache-mode: read`
-      # enforces at the service. The mode alone would deny the upload,
-      # but only after the archive had been built; this skips the work.
+      # `save-if: false` because a cache written under a tag ref is
+      # restorable by that tag alone, and a tag is cut once: the save
+      # would be pure cost. The key matches `ci.yml`'s `test` job.
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: test
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-deny
-      - name: fmt
-        run: cargo fmt --all --check
-      - name: clippy
-        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-      # See ci.yml: the four trybuild suites are the whole of the test
-      # phase, and they are cold rather than slow. Same cache, same key,
-      # so a release reuses whatever the last push to main filled.
+          tool: cargo-nextest,cargo-deny,just
+      # See ci.yml: the trybuild suites are cold rather than slow. Same
+      # cache, same key, so a release reuses whatever main last filled.
       - uses: actions/cache/restore@v6
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'crates/*/tests/**') }}
+          key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
           restore-keys: trybuild-${{ runner.os }}-
-      # What the npm and render gates judge, and what this job ran
-      # without: `tests` fails on the npm gate's own assertion and
-      # `xtask gates` fails on that one and render's. This is how v0.0.6
-      # was cut - the commit that made both gates refuse an absent tree
-      # moved ci.yml and left this file behind, so the claim above that
-      # a red release verify is a red local `just check` was not true of
-      # a bare runner, where `just check` builds the client and this job
-      # never had.
+      # bun and its cache for the client recipes, and the bundle the npm
+      # and render gates judge.
       - uses: ./.github/actions/client-artifacts
-      - name: tests
-        run: cargo nextest run --workspace --locked --all-features
-      - name: deny
-        run: cargo deny check
-      - name: xtask gates
-        run: cargo xtask gates
+      # Lean for `just models`, which would otherwise pass silently here.
+      - uses: ./.github/actions/lean
+      # The command itself rather than a list of its steps: a release
+      # verify that spelled them out once lost the client install and cut
+      # v0.0.6 on gates that had never judged it.
+      - name: just check
+        run: just check
+      # The one read `just check` leaves to the nightly: an advisory is
+      # news about a dependency, and a release is where it must be read.
+      - name: advisories
+        run: cargo deny check advisories
       # See ci.yml: the cache's save step cannot walk trybuild's scratch,
       # and a job whose every gate was green reported failure because of
       # it. It bites again whenever the step runs in PowerShell, where

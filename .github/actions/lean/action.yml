@@ -1,0 +1,35 @@
+# The Lean toolchain `adversary/lean-toolchain` pins, installed the one way
+# this repository states it, with `lake` on the PATH of every later step.
+#
+# `just models` and `just adversary` succeed silently where Lean is absent,
+# which is right at a desk and would be an empty verdict on a runner, so the
+# last step here asks `lake --version` and stops the job when the install
+# did not take.
+name: lean toolchain
+description: >-
+  Install elan and the Lean toolchain adversary/lean-toolchain pins, and
+  prove lake answers.
+runs:
+  using: composite
+  steps:
+    # `lean-toolchain` pins the one download, so it is the whole key. Build
+    # output is not cached: it takes seconds and a stale entry would be a
+    # red nobody could reproduce.
+    - uses: actions/cache@v6
+      with:
+        path: ~/.elan
+        key: elan-${{ runner.os }}-${{ hashFiles('adversary/lean-toolchain') }}
+    - name: install elan
+      shell: bash
+      run: |
+        if [ ! -x "$HOME/.elan/bin/elan" ]; then
+          curl -fsSL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+        fi
+        echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+    - name: fetch the pinned toolchain, so nothing that needs lake can skip
+      shell: bash
+      working-directory: adversary
+      run: |
+        elan toolchain install "$(cat lean-toolchain)"
+        lake --version

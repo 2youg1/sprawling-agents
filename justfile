@@ -18,8 +18,13 @@ default: check
 # line in `desktop/` used to surface only in `check-desktop`, the last
 # step, after the whole workspace had been built and tested. `just` runs
 # a dependency once per invocation, so `check-desktop` finds
-# `fmt-check-desktop` already done and does not repeat it.
-check: prereqs fmt-check fmt-check-desktop clippy features test build-web gates check-client check-desktop
+# `fmt-check-desktop` already done and does not repeat it. The source
+# gates and the Lean models follow for the same reason: each answers in
+# seconds, before clippy's minutes.
+#
+# `ci.yml` runs the same recipes, one job per slice of this line, so a
+# green pull request implies exactly this and no less.
+check: prereqs fmt-check fmt-check-desktop gates-sources models clippy features test build-web gates check-client check-desktop
 
 # The one authority on what this repository's loop needs installed.
 #
@@ -88,7 +93,7 @@ prereqs mode="check":
         'just proof; kani has no Windows host, where CI proves instead'
     need optional lake 'command -v lake' \
         'https://github.com/leanprover/elan, which installs the toolchain lake comes from' \
-        'just adversary alone, which is never a gate'
+        'just models, and just adversary, which is never a gate'
     if [ "$mode" = list ]; then
         exit 0
     fi
@@ -145,10 +150,57 @@ test:
 test-std:
     cargo test --workspace --locked
 
-# All machine gates (xtask), then the supply-chain read.
-gates:
-    cargo xtask gates
+# The three gates that judge a built artifact rather than a source:
+# `render` opens `target/web-dist`, `npm` reads `client/node_modules`,
+# `budget` weighs both. The one list of them; `gates-sources` runs every
+# other gate on the roster.
+artifact_gates := "render npm budget"
+
+# All machine gates (xtask), then the supply-chain read. Split in two so
+# `check` can run the source half before anything compiles; `just` runs a
+# dependency once per invocation, so every gate runs exactly once.
+gates: gates-sources gates-artifacts
     just deny
+
+# The gates that read sources alone, which answer in seconds, so `check`
+# runs them before clippy's minutes and a red arrives first.
+gates-sources:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}')
+
+# The gates that judge the client bundle, after it is built.
+gates-artifacts: build-web
+    cargo xtask gates {{artifact_gates}}
+
+# The Lean design models under `adversary/design/`: each proves what the
+# Rust module it names must hold (the formal-models rule in AGENTS.md).
+# `lakefile.toml` sets `warningAsError`, so a `sorry` or an `admit`, which
+# Lean reports as a warning, fails the build; an `axiom` raises no warning
+# at all, so it is refused here by its shape, since no model in this tree
+# has an axiom anybody reviewed. Only the `Design` library is built: the
+# checker beside it attacks the binary and stays out of every required
+# check.
+#
+# Without Lean this recipe prints nothing and succeeds, so `just check` on
+# a machine without Lean reads byte for byte as it does where
+# `adversary/` is absent; CI's `models` job asks `lake --version` first,
+# so there the skip cannot happen.
+models:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v lake >/dev/null 2>&1 && [ -d adversary/design ] || exit 0
+    if grep -nE '^[[:space:]]*(private[[:space:]]+)?axiom[[:space:]]' adversary/design/*.lean; then
+        echo "models: an axiom above is a proof obligation nobody discharged; prove it as a theorem"
+        exit 1
+    fi
+    cd adversary && lake build Design
+
+# Every commit subject and ruling trailer in a range of history
+# (xtask-SPEC.md section 8-35). Not in `check`, because a tree has no
+# range: CI names it, and at a desk it is `just commits main..HEAD`.
+commits range:
+    cargo xtask commits --range '{{range}}'
 
 # The supply-chain read: licences, banned crates, and where they came
 # from. This recipe is the one place that says which checks the daily
