@@ -43,7 +43,7 @@
   import type { Snippet } from "svelte";
 
   import type { LinkState } from "../../core/link";
-  import type { Answer, ApprovalItem, AxError, Query } from "../../wire";
+  import type { Answer, ApprovalItem, AxError, EventRecord, Query } from "../../wire";
 
   interface StandProps {
     // Where the socket stands, which is one of the three things that
@@ -57,6 +57,9 @@
     // fixture that needs a second answer writes the match itself,
     // because only it knows which question it meant.
     readonly answers?: (query: Query) => Answer | undefined;
+    // The records this made-up city has already folded, read once
+    // through the belief's own door, for a fixture of the runs it holds.
+    readonly records?: readonly EventRecord[];
     readonly children: Snippet;
   }
 </script>
@@ -70,7 +73,7 @@
   import type { Connection } from "../../core/socket";
   import { setUi, ui } from "../../ui";
 
-  const { link, unread, waiting, answers, children }: StandProps = $props();
+  const { link, unread, waiting, answers, records, children }: StandProps = $props();
 
   // The city as this fixture meets it: the real one, or the stand
   // before this one while several stands mount in turn.
@@ -113,6 +116,10 @@
     kept.refused(error);
   }
   kept.refused(null);
+  // The records are folded once, at initialisation, like the refusals.
+  kept.batch(() => {
+    for (const record of records ?? []) kept.apply(record);
+  });
 
   // The question every stand-in answers, and the fixture's own.
   // Anything neither of them names is `undefined`, which is what a
