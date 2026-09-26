@@ -22,6 +22,10 @@ use super::rounds::{Rounds, fold};
 /// From this many columns on, the detail pane stays open on the right.
 pub(super) const SIDE_PANE_MIN_WIDTH: usize = 110;
 
+/// The status line while the lines older than the first window are
+/// still being folded.
+pub(super) const FILLING: &str = "filling in the older ledger lines";
+
 /// The terminal's size in character cells.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Size {
@@ -106,6 +110,14 @@ impl Face {
         face.select_entry(tree_at);
         face
     }
+
+    /// The face over the newest lines only, while the whole fold runs.
+    pub(super) fn open_window(runs: &[RunLine], window: Vec<Row>, size: Size) -> Face {
+        Face::open(runs, window, size)
+    }
+
+    /// Takes the whole fold in place of the window.
+    pub(super) fn fill(&mut self, _runs: &[RunLine], _whole: Vec<Row>) {}
 
     pub(super) fn apply(&mut self, action: Action) {
         let page = self.size.rows.max(1);

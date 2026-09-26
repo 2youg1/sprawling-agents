@@ -13,7 +13,7 @@
 )]
 
 use super::follow::Row;
-use super::frame::{Face, Size};
+use super::frame::{FILLING, Face, Size};
 use super::keys::{Action, Key, action_for};
 use kernel::{Address, RunId, Seq};
 use sprawling::lineage::RunLine;
@@ -39,8 +39,8 @@ fn line(n: u8, addr: &str, seqs: (u64, u64), state: Option<memory::RunPhase>) ->
 
 /// Run 1 in lab/a, run 3 forked from it, run 4 taking over from run 1
 /// in a second stretch, and run 2, the only active one, in yard/b.
-fn city(size: Size) -> Face {
-    let runs = vec![
+fn city_runs() -> Vec<RunLine> {
+    vec![
         line(1, "lab/a", (1, 4), None),
         line(2, "yard/b", (3, 8), Some(memory::RunPhase::Active)),
         RunLine {
@@ -53,7 +53,11 @@ fn city(size: Size) -> Face {
             predecessor: Some(run(1)),
             ..line(4, "lab/a", (10, 11), None)
         },
-    ];
+    ]
+}
+
+fn city(size: Size) -> Face {
+    let runs = city_runs();
     let owners = [1, 1, 2, 1, 3, 2, 3, 2, 0, 4, 4];
     let records = (1_u64..)
         .zip(owners)
@@ -92,6 +96,7 @@ fn cursor_line(face: &Face) -> String {
 const R1: &str = "0198f6a2-7c4a-7bbb-9d1e-000000000001";
 const R2: &str = "0198f6a2-7c4a-7bbb-9d1e-000000000002";
 const R3: &str = "0198f6a2-7c4a-7bbb-9d1e-000000000003";
+const R4: &str = "0198f6a2-7c4a-7bbb-9d1e-000000000004";
 
 /// A frozen run still waiting on an answer outranks a younger active run.
 #[test]
@@ -344,5 +349,45 @@ fn a_run_whose_rounds_are_not_folded_yet_is_marked_openable() {
     assert_eq!(
         Face::open(&runs, records, NARROW).frame()[4],
         format!(">        + run {R2} active #3..3")
+    );
+}
+
+/// A first screen read from the tail says the older lines are being
+/// filled; the whole fold places them before the window and gives a
+/// run whose `run_started` lay outside it its address.
+#[test]
+fn a_window_from_the_tail_says_it_is_filling_until_the_whole_fold_arrives() {
+    let windowed = RunLine {
+        addr: None,
+        ..line(4, "lab/a", (11, 11), Some(memory::RunPhase::Active))
+    };
+    let rows = |from: u64| -> Vec<Row> {
+        (from..=11)
+            .map(|seq| Row {
+                seq: Seq::new(seq),
+                run: run(4),
+                line: format!(r#"{{"seq":{seq}}}"#),
+            })
+            .collect()
+    };
+    let mut face = Face::open_window(&[windowed], rows(11), NARROW);
+    let first = face.frame();
+    assert_eq!(
+        (first.len(), first.last().map(String::as_str)),
+        (NARROW.rows, Some(FILLING))
+    );
+    face.fill(&city_runs(), rows(1));
+    face.apply(Action::SwitchLens);
+    face.apply(Action::First);
+    let oldest = cursor_line(&face);
+    face.apply(Action::SwitchLens);
+    let run_line = cursor_line(&face);
+    assert_eq!(
+        (
+            oldest,
+            run_line.starts_with(&format!(">        + run {R4}")),
+            face.frame().contains(&FILLING.to_owned())
+        ),
+        (r#">{"seq":1}"#.to_owned(), true, false)
     );
 }
