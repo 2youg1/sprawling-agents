@@ -136,29 +136,21 @@ pub(crate) fn verdict_line(verdict: kernel::PursuitVerdict) -> String {
     }
 }
 
-/// What one `pursuit_changed` record says.
+/// The building a `pursuit_changed` record is about.
 ///
-/// `None` for a record this build cannot read as one, which a view skips
-/// rather than inventing a goal for.
-pub(crate) fn pursuit_from(
-    record: &EventRecord,
-) -> Option<(Address, Option<(String, kernel::PursuitState)>)> {
-    let map = record.data().as_map();
-    let addr = record.addr()?.clone();
-    let step = map.get("step")?.as_str()?;
-    let goal = map
-        .get("goal")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_owned();
-    let held = match step {
-        "set" => Some((goal, kernel::PursuitState::Running)),
-        "pause" => Some((goal, kernel::PursuitState::Paused)),
-        "resume" => Some((goal, kernel::PursuitState::Running)),
-        "clear" => None,
-        _ => return None,
-    };
-    Some((addr, held))
+/// # Errors
+/// Refuses a record with no address: the step it records belongs to no
+/// building, and a fold that skipped it would keep whatever goal the
+/// step changed.
+pub(crate) fn pursued(record: &EventRecord) -> Result<Address, kernel::AxError> {
+    record.addr().cloned().ok_or_else(|| {
+        kernel::AxError::failure(
+            kernel::AxCode::WireMismatch,
+            "read a pursuit_changed line",
+            format!("line {} names no building", record.seq().value()),
+        )
+        .with_recovery("replay with the build that wrote this record")
+    })
 }
 
 /// Every building the city has, in reading order.

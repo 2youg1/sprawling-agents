@@ -5,6 +5,7 @@
 
 //! One building's plan: who holds what, and how far red reaches.
 
+use kernel::event::record::{PursuitChanged, PursuitMove};
 use kernel::{Address, AxCode, AxError, EventKind};
 use kernel::{Payload, RunId};
 
@@ -170,7 +171,7 @@ impl RunWorker {
             )
             .with_recovery("set a goal first; there is nothing here to change")
         };
-        let name = match step {
+        let step = match step {
             channels::PursuitStep::Set { goal } => {
                 // Declared through the depth-zero position this worker
                 // holds. That is the runtime half of the guard the type
@@ -187,41 +188,38 @@ impl RunWorker {
                     ),
                 );
                 self.pursuits.insert(addr.clone(), declared);
-                "set"
+                PursuitMove::Set
             }
             channels::PursuitStep::Pause => {
                 self.pursuits
                     .get_mut(addr)
                     .ok_or_else(|| missing("pause a pursuit"))?
                     .pause();
-                "pause"
+                PursuitMove::Pause
             }
             channels::PursuitStep::Resume => {
                 self.pursuits
                     .get_mut(addr)
                     .ok_or_else(|| missing("resume a pursuit"))?
                     .resume();
-                "resume"
+                PursuitMove::Resume
             }
             channels::PursuitStep::Clear => {
                 self.pursuits
                     .remove(addr)
                     .ok_or_else(|| missing("clear a pursuit"))?;
-                "clear"
+                PursuitMove::Clear
             }
         };
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "step".to_owned(),
-            serde_json::Value::String(name.to_owned()),
-        );
-        if let Some(held) = self.pursuits.get(addr) {
-            map.insert(
-                "goal".to_owned(),
-                serde_json::Value::String(held.goal().to_owned()),
-            );
-        }
-        self.record_at(EventKind::PursuitChanged, addr.clone(), Payload::new(map)?)?;
+        let changed = PursuitChanged {
+            step,
+            goal: self.pursuits.get(addr).map(|held| held.goal().to_owned()),
+        };
+        self.record_at(
+            EventKind::PursuitChanged,
+            addr.clone(),
+            Payload::of(&changed)?,
+        )?;
         self.pursue(addr)
     }
 }
