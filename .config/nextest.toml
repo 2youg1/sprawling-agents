@@ -1,0 +1,12 @@
+# A test that hangs never fails: without a limit, nextest waits on it for
+# as long as its parent lives, and when the parent is killed the hung
+# test binary outlives it and holds the target directory open. Three
+# minutes is five times the slowest ordinary test on a slow four-core
+# machine; the trybuild suites compile counterexamples, and a cold cache
+# takes them past ten minutes, so they have their own limit.
+[profile.default]
+slow-timeout = { period = "60s", terminate-after = 3 }
+
+[[profile.default.overrides]]
+filter = 'binary(trybuild)'
+slow-timeout = { period = "120s", terminate-after = 10 }
