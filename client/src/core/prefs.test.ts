@@ -37,7 +37,7 @@ const STATED: Preferences = {
 describe("the cache in front of the city", () => {
   test("a record written by one door is read back whole by the next", () => {
     const rows = memory();
-    loadPreferences(rows, "en").adopt(STATED);
+    loadPreferences(rows, "en").adopt(STATED, []);
     // A second door over the same store is the next first paint: it
     // reads the cache and nothing else.
     expect(get(loadPreferences(rows, "en").held)).toEqual(STATED);
@@ -53,7 +53,7 @@ describe("the cache in front of the city", () => {
 
   test("a word this build no longer offers is dropped rather than repaired", () => {
     const rows = memory();
-    loadPreferences(rows, "en").adopt(STATED);
+    loadPreferences(rows, "en").adopt(STATED, []);
     rows.setItem("sprawling.appearance.lighting", "sepia");
     expect(get(loadPreferences(rows, "en").held).appearance.lighting).toBe("system");
   });
@@ -79,14 +79,14 @@ describe("who is keeping these", () => {
     const door = loadPreferences(memory(), "en");
     door.setLang("en");
     door.setPanel(true);
-    door.adopt(STATED);
+    door.adopt(STATED, []);
     expect(get(door.held)).toEqual(STATED);
     expect(get(door.keeper)).toBe("city");
   });
 
   test("a change made after the city answered leaves the city the keeper", () => {
     const door = loadPreferences(memory(), "en");
-    door.adopt(STATED);
+    door.adopt(STATED, []);
     door.setProxying("never");
     expect(get(door.keeper)).toBe("city");
     expect(get(door.held).proxying).toBe("never");

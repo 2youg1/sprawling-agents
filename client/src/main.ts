@@ -18,6 +18,7 @@ import { mount } from "svelte";
 import App from "./app.svelte";
 import { langOf } from "./core/lang";
 import { preferences } from "./core/prefs";
+import { keepWithCity } from "./core/prefs_city";
 import { openConnection, socketUrl, tokenIn } from "./core/socket";
 import type { Opening } from "./ui";
 import { applyAppearance, watchMachineLighting } from "./views/setup/appearance";
@@ -43,5 +44,6 @@ if (main !== null) {
     pairing: token,
     now: () => Date.now(),
   };
+  keepWithCity(prefs, opening.conn);
   mount(App, { target: main, props: { opening } });
 }
