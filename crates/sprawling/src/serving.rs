@@ -32,6 +32,7 @@ pub(crate) mod desk;
 pub(super) mod door;
 mod folding;
 pub(crate) mod journal;
+mod output_ring;
 pub(crate) mod pool;
 pub(crate) mod relay;
 pub(super) mod serve;
