@@ -107,10 +107,15 @@ impl Worktrees {
     /// the scope, so a node's second run costs what it left behind in
     /// its own scope, not the size of the city.
     ///
-    /// The index is read back whole before the narrowed checkout because
-    /// that checkout moves only the entries it writes: an entry outside
-    /// the scope left at the last run's commit would be committed again
-    /// by the next scoped offer, taking back what the trunk changed there.
+    /// The index is read back whole before the narrowed checkout, unless
+    /// it already writes the branch head's tree, because that checkout
+    /// moves only the entries it writes: an entry outside the scope that
+    /// names anything but the branch head - the last run's commit after
+    /// the branch followed the trunk, or a path a run staged and never
+    /// offered - would be committed by the next scoped offer. The
+    /// comparison comes first because reading back walks the whole tree,
+    /// and a reclaim that finds the branch and the index where the last
+    /// run left them is the common case.
     pub(super) fn reattach(
         &self,
         name: &WorktreeName,
@@ -131,10 +136,14 @@ impl Worktrees {
         let mut index = repo
             .index()
             .map_err(|err| refuse("read a kept worktree's index", err))?;
-        index
-            .read_tree(&head)
-            .and_then(|()| index.write())
-            .map_err(|err| refuse("reset a kept worktree's index", err))?;
+        if !index_writes_tree(&mut index, head.id())
+            .map_err(|err| refuse("compare a kept worktree's index", err))?
+        {
+            index
+                .read_tree(&head)
+                .and_then(|()| index.write())
+                .map_err(|err| refuse("reset a kept worktree's index", err))?;
+        }
         let mut checkout = git2::build::CheckoutBuilder::new();
         checkout.force().remove_untracked(true);
         for spec in crate::checkpoint::Checkpoint::pathspecs(scopes) {
@@ -186,6 +195,21 @@ impl Worktrees {
                 .map_err(|err| refuse("move a node branch", err))?;
         }
         Ok(())
+    }
+}
+
+/// Writes the tree `index` holds into the object store and says whether
+/// it is `tree`.
+///
+/// Where no entry changed since the index last wrote or read a tree, the
+/// index's own tree cache answers without hashing anything; otherwise
+/// only the subtrees whose entries changed are written. An index holding
+/// a conflict writes no tree, and so is not `tree`.
+fn index_writes_tree(index: &mut git2::Index, tree: git2::Oid) -> Result<bool, git2::Error> {
+    match index.write_tree() {
+        Ok(written) => Ok(written == tree),
+        Err(err) if err.code() == git2::ErrorCode::Unmerged => Ok(false),
+        Err(err) => Err(err),
     }
 }
 
@@ -300,6 +324,50 @@ mod tests {
                 .to_owned()
             ),
             "the merge moves the scope alone"
+        );
+    }
+
+    /// A path a run staged outside its scope and never offered does not
+    /// ride along with the node's next offer, although the trunk did not
+    /// move in between: the next claim finds an index that no longer
+    /// names the branch head, and reads it back.
+    #[test]
+    fn a_path_staged_outside_the_scope_does_not_ride_along_with_the_next_offer() {
+        let dir = tempfile::tempdir().unwrap();
+        let trees = city(dir.path());
+        let lab = ["lab".to_owned()];
+        let first = trees.claim(&name("node-1"), &lab).unwrap();
+        let stray = first.path().join("docs").join("stray.md");
+        std::fs::create_dir_all(stray.parent().unwrap()).unwrap();
+        std::fs::write(&stray, b"not this node's").unwrap();
+        let staging = git2::Repository::open(first.path()).unwrap();
+        let mut index = staging.index().unwrap();
+        index.add_path(Path::new("docs/stray.md")).unwrap();
+        index.write().unwrap();
+        trees.release(first).unwrap();
+
+        let again = trees.claim(&name("node-1"), &lab).unwrap();
+        std::fs::write(again.path().join("lab").join("notes.md"), b"from the node").unwrap();
+        Checkpoint::open(again.path())
+            .unwrap()
+            .land(&lab, TimeMs::new(3_000), &owner(), "offer: lab")
+            .unwrap();
+        let offered = git2::Repository::open(again.path()).unwrap();
+        let head = offered.head().unwrap().peel_to_commit().unwrap();
+        let moved: Vec<String> = offered
+            .diff_tree_to_tree(
+                Some(&head.parent(0).unwrap().tree().unwrap()),
+                Some(&head.tree().unwrap()),
+                None,
+            )
+            .unwrap()
+            .deltas()
+            .filter_map(|delta| delta.new_file().path().map(|p| p.display().to_string()))
+            .collect();
+        assert_eq!(
+            moved,
+            vec!["lab/notes.md".to_owned()],
+            "the offer moves the scope alone"
         );
     }
 
