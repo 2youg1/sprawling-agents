@@ -44,8 +44,6 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
     let config = ServeConfig {
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
-        addr: "127.0.0.1:0".parse().unwrap(),
-        token_digest: None,
         client: Arc::new(channels::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
         transcribe_sink: Arc::new(move |body: Vec<u8>, kind: String| match hearing {
@@ -76,7 +74,7 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
     // The face comes from the same verdict the listener uses, so the
     // route under test judges a caller by the rule the served city does.
     let channels::BindVerdict::Serve(face) =
-        channels::decide_bind(&config.addr, config.token_digest)
+        channels::decide_bind(&"127.0.0.1:0".parse().unwrap(), None)
     else {
         panic!("this test serves a loopback address");
     };

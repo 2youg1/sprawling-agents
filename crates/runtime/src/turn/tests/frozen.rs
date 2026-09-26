@@ -17,7 +17,7 @@
 
 use super::super::*;
 use super::helpers::*;
-use crate::window::Opening;
+use crate::conversation::Opening;
 
 /// The frozen prefix is a runtime invariant, not a laboratory one: the
 /// bytes a request will carry are rehashed every turn and compared with
@@ -26,8 +26,8 @@ use crate::window::Opening;
 #[test]
 fn a_prefix_whose_bytes_moved_is_refused_before_anything_is_assembled() {
     let mut ledger = TestLedger::new();
-    let mut window = Window::new();
-    window.push_task_lines("probe the city", "one probe", Opening::FromJob);
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob);
     let drifted = crate::prefix::FrozenPrefix::assemble(
         crate::prefix::FrozenSegment::mislabelled(
             crate::prefix::SegmentSlot::City,
@@ -44,7 +44,7 @@ fn a_prefix_whose_bytes_moved_is_refused_before_anything_is_assembled() {
         Interrupt::None,
         &mut ledger,
         &drifted,
-        &window,
+        &conversation,
         &[],
         &shape(),
     ) else {

@@ -43,9 +43,9 @@ pub use tools::{ExecSetup, ExecTool};
 pub use tools::{SucceedTool, Succession, SuccessionDesk};
 
 pub mod bench;
+pub mod conversation;
 mod sandbox;
 pub mod turn;
-pub mod window;
 
 pub use sandbox::AbsentSandbox;
 pub use sandbox::EchoSandbox;
@@ -67,10 +67,11 @@ mod watchdog;
 
 pub use catalog::{Catalog, CatalogEntry, Expansion, SkillPin};
 pub use clock::{ClockStamp, StampGate, ZoneEntry, stamp};
+pub use conversation::Opening;
 pub use digest::{Breaker, BreakerVerdict, Digest, DigestOutcome, StructureNode};
 pub use digest::{digest_once, structure_of};
 pub use handoff::{Handoff, ResumeSeed, resume};
-pub use mode::{Admission, Mode, Produced, admits};
+pub use mode::{Admission, Produced, admits};
 pub use offload::{OffloadRecord, OffloadSite, offload, rematerialize};
 pub use pipeline::exec::{EXEC_CAP_BYTES, SieveSite, package_exec};
 pub use pipeline::{PackContext, Packaged, SieveRequest, package};
@@ -83,5 +84,4 @@ pub use sieve::{CommandKey, FilterTable, SieveHistory, SieveRecord, Sieved, siev
 pub use transcript::{Transcript, TranscriptRecord};
 pub use turn::ConcurrentInvoke;
 pub use turn::{Interrupt, NextCall, PhaseOutcome, Turn, TurnCancelled, TurnReport};
-pub use watchdog::{Disposal, FreezeReason, Retries, Watchdog};
-pub use window::Opening;
+pub use watchdog::{Disposal, FreezeReason, Watchdog};

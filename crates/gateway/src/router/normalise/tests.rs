@@ -279,3 +279,44 @@ proptest! {
         }
     }
 }
+
+/// An OpenRouter-shaped key, which the city's own scanner recognises.
+fn router_key() -> String {
+    format!("sk-or-v1-{}", "ab".repeat(32))
+}
+
+fn assert_refused_without_echo(entered: &str, credential: &str) {
+    let refused = normalise(entered, DialectHint::Unset, &Presets).unwrap_err();
+    assert_eq!(*refused.code(), kernel::AxCode::ConfigInvalid);
+    assert!(
+        !format!("{refused:?}").contains(credential),
+        "the refusal travels to the socket, so it must not carry the credential it refused"
+    );
+}
+
+#[test]
+fn a_credential_written_as_userinfo_is_refused_before_it_is_stored() {
+    let key = router_key();
+    assert_refused_without_echo(&format!("http://x:{key}@127.0.0.1:1/v1"), &key);
+    assert_refused_without_echo(&format!("{key}@api.example.com/v1"), &key);
+}
+
+#[test]
+fn a_credential_in_the_query_is_refused_before_it_is_stored() {
+    let key = router_key();
+    assert_refused_without_echo(&format!("https://x.test/v1?token={key}"), &key);
+    assert_refused_without_echo(
+        "https://generativelanguage.googleapis.com/v1beta?key=opaque-value",
+        "opaque-value",
+    );
+}
+
+#[test]
+fn a_query_that_carries_no_credential_is_kept() {
+    assert_resolves(
+        "https://x.test/openai?api-version=2024-10-21",
+        DialectHint::Chat,
+        "https://x.test/openai?api-version=2024-10-21",
+        DialectHint::Chat,
+    );
+}

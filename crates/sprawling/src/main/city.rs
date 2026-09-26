@@ -9,9 +9,10 @@
 //! [`serve_city`] is the single definition of what serving means, and
 //! every route into a running city passes through it: refuse a
 //! directory that holds no history, settle the pairing key before
-//! anything binds, choose where the client bundle comes from, print the
-//! banner, build the diagnostics sink, attach the console, and hand one
-//! `serving::Serving` to the runtime. `up`, the first screen and `serve`
+//! anything binds, choose where the client bundle comes from, build the
+//! diagnostics sink, attach the console, hand one `serving::Serving` to
+//! `serving::listen`, and print the banner only once that has taken the
+//! port and the city's writer. `up`, the first screen and `serve`
 //! differ only in what they do before they arrive there and in whether
 //! they open a browser, so none of them re-derives the sequence.
 //!
@@ -28,9 +29,10 @@
 #[path = "city/opening.rs"]
 mod opening;
 
-use super::router::{
-    COMMANDS, client_summary, default_city_location, flag_value, log_floor, log_levels, named,
-};
+use super::exit::Exit;
+use super::grammar::Arguments;
+use super::refusal::{Form, written};
+use super::router::{client_summary, default_city_location, flag_value, log_floor, log_levels};
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
@@ -38,15 +40,11 @@ use std::process::ExitCode;
 
 use opening::{Open, opening};
 
-pub(super) fn up(args: &[String]) -> ExitCode {
-    let city = match args.get(1).filter(|a| !a.starts_with("--")) {
-        Some(dir) => std::path::PathBuf::from(dir),
-        None => default_city_location(),
-    };
-    let addr = args
-        .get(2)
-        .filter(|a| !a.starts_with("--"))
-        .map_or(DEFAULT_AT, String::as_str);
+pub(super) fn up(read: &Arguments, args: &[String]) -> ExitCode {
+    let city = read
+        .positional(1)
+        .map_or_else(default_city_location, std::path::PathBuf::from);
+    let addr = read.positional(2).map_or(DEFAULT_AT, String::as_str);
     up_at(&city, addr, args)
 }
 
@@ -132,13 +130,11 @@ pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitC
 
 /// The genesis write: a city is born when city_initialized becomes line
 /// zero of its ledger (walkthrough step 1).
-pub(super) fn init(args: &[String]) -> ExitCode {
-    let Some(dir) = named(args, 1) else {
-        eprintln!("usage: sprawling init <city-dir> [--adopt]");
-        eprintln!("--adopt turns every folder already there into a building");
+pub(super) fn init(read: &Arguments) -> ExitCode {
+    let Some(dir) = read.positional(1) else {
         return ExitCode::from(2);
     };
-    let adopt = if args.iter().any(|arg| arg == "--adopt") {
+    let adopt = if read.has("--adopt") {
         assembly::Adopt::EveryFolder
     } else {
         assembly::Adopt::Nothing
@@ -157,31 +153,18 @@ pub(super) fn init(args: &[String]) -> ExitCode {
 }
 
 pub(super) fn report(err: kernel::AxError) -> ExitCode {
-    eprintln!("{err}");
-    eprintln!("recovery: {}", err.recovery());
-    ExitCode::FAILURE
+    eprint!("{}", written(&err, Form::Human));
+    Exit::Refused.into()
 }
 
 /// Binds the control surface. Loopback unless an address says otherwise,
 /// and an address beyond this machine needs `SPRAWLING_PAIRING_TOKEN` -
 /// refused at startup, not at connect time.
 pub(super) fn serve(dir: Option<&String>, addr: Option<&String>, args: &[String]) -> ExitCode {
-    // `--help` after a subcommand asks about the subcommand, not for a
-    // city called `--help`; without this the storage layer reported that
-    // it could not list `--help\.sprawling\ledger`.
-    if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("{COMMANDS}");
-        return ExitCode::SUCCESS;
-    }
-    let Some(dir) = dir.filter(|a| !a.starts_with("--")) else {
-        eprintln!("usage: sprawling serve <city-dir> [addr] [--log <level>] [--web-dir <dir>]");
+    let Some(dir) = dir else {
         return ExitCode::from(2);
     };
-    // The address is the first non-flag argument after the city dir, so
-    // `serve city --log off` does not read `--log` as an address.
-    let raw = addr
-        .filter(|a| !a.starts_with("--"))
-        .map_or(DEFAULT_AT, String::as_str);
+    let raw = addr.map_or(DEFAULT_AT, String::as_str);
     let open = opening(args, Open::Nothing);
     serve_city(std::path::Path::new(dir), raw, args, open)
 }
@@ -252,7 +235,78 @@ pub(super) fn serve_city(
         }
         channels::ClientAssets::Embedded(_) => client_summary(),
     };
+    // The one sink a diagnostic line leaves this process through: the
+    // terminal, and the page that has the log lens open. Made before
+    // the `Diagnostics` because the sink is what writes into it.
+    let journal = serving::Journal::new();
+    let floor = match log_floor(args) {
+        Ok(floor) => floor,
+        Err(unknown) => {
+            eprintln!("not a log level: {unknown}");
+            eprintln!("recovery: {}", log_levels());
+            return ExitCode::from(2);
+        }
+    };
+    let log = match floor {
+        Some(level) => runtime::diagnostics::Diagnostics::new(level, journal.sink()),
+        None => runtime::diagnostics::Diagnostics::off(),
+    };
+    // The terminal this city runs in becomes its console when `up`
+    // started it, or when `serve` was asked. `--no-console` is the way
+    // out for a supervisor that wants the old blocking shape.
+    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
+        && !args.iter().any(|a| a == "--no-console");
+    let console = wanted.then(|| console::Terminal {
+        url: firstrun::local_url(bind),
+        token: token.clone(),
+        // The three facts the banner below prints. `/serving`
+        // reprints them on demand, because the event stream scrolls
+        // them away within seconds of a city getting busy.
+        city: city.display().to_string(),
+        client: client_line.clone(),
+        bind,
+    });
+    let (vault, vault_notice) = serving::open_vault();
+    // The port and the writer are both taken before a word is printed:
+    // a banner saying "running" over a port another process holds was a
+    // claim the city could not keep (sprawling-SPEC.md 8-88).
+    let listening = match runtime.block_on(serving::listen(serving::Serving {
+        city_root: city.to_path_buf(),
+        addr: bind,
+        token,
+        client,
+        vault,
+        vault_notice,
+        log,
+        journal,
+        console,
+    })) {
+        Ok(listening) => listening,
+        Err(err) => return report(err),
+    };
     let url = firstrun::local_url(bind);
+    print_banner(city, &url, &client_line, &keyed);
+    if let Some(level) = floor {
+        println!("log: {level}");
+    }
+    if wanted {
+        println!("  This terminal is the console. `/help` lists what it takes,");
+        println!("  and `/serving` says where this city listens and what is running in it.");
+        println!();
+    }
+    match open {
+        Open::Browser => firstrun::open_when_ready(bind, url),
+        Open::Nothing => {}
+    }
+    match runtime.block_on(listening.serve()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => report(err),
+    }
+}
+
+/// What a person reads once the city listens: where it is, where to
+/// open it, what client it serves, and the key when one was minted.
+fn print_banner(city: &std::path::Path, url: &str, client_line: &str, keyed: &serving::Keyed) {
     println!();
     println!("  sprawling is running.");
     println!();
@@ -260,7 +314,7 @@ pub(super) fn serve_city(
     println!("    WebUI    {url}");
     println!("    client   {client_line}");
     println!();
-    match &keyed {
+    match keyed {
         serving::Keyed::NothingToPresent => {}
         serving::Keyed::Adopted(_) => {
             println!("    key      the one you configured; this city will ask for it");
@@ -280,65 +334,6 @@ pub(super) fn serve_city(
     }
     println!("  Open the WebUI in a browser. Ctrl-C stops the city.");
     println!();
-    match open {
-        Open::Browser => firstrun::open_when_ready(bind, url),
-        Open::Nothing => {}
-    }
-    // The one sink a diagnostic line leaves this process through: the
-    // terminal, and the page that has the log lens open. Made before
-    // the `Diagnostics` because the sink is what writes into it.
-    let journal = serving::Journal::new();
-    let log = match log_floor(args) {
-        Ok(Some(level)) => {
-            println!("log: {level}");
-            runtime::diagnostics::Diagnostics::new(level, journal.sink())
-        }
-        Ok(None) => runtime::diagnostics::Diagnostics::off(),
-        Err(unknown) => {
-            eprintln!("not a log level: {unknown}");
-            eprintln!("recovery: {}", log_levels());
-            return ExitCode::from(2);
-        }
-    };
-    // The terminal this city runs in becomes its console when `up`
-    // started it, or when `serve` was asked. `--no-console` is the way
-    // out for a supervisor that wants the old blocking shape.
-    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
-        && !args.iter().any(|a| a == "--no-console");
-    let console = wanted.then(|| console::Terminal {
-        url: firstrun::local_url(bind),
-        token: token.clone(),
-        // The three facts the banner above just printed. `/serving`
-        // reprints them on demand, because the event stream scrolls
-        // them away within seconds of a city getting busy.
-        city: city.display().to_string(),
-        client: client_line.clone(),
-        bind,
-    });
-    if console.is_some() {
-        println!("  This terminal is the console. `/help` lists what it takes,");
-        println!("  and `/serving` says where this city listens and what is running in it.");
-        println!();
-    }
-    let (vault, vault_notice) = serving::open_vault();
-    match runtime.block_on(serving::serve(serving::Serving {
-        city_root: city.to_path_buf(),
-        addr: bind,
-        token,
-        client,
-        vault,
-        vault_notice,
-        log,
-        journal,
-        console,
-    })) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(err) => {
-            eprintln!("{err}");
-            eprintln!("recovery: {}", err.recovery());
-            ExitCode::FAILURE
-        }
-    }
 }
 
 /// The startup scan: verify the chain, close every tool call whose

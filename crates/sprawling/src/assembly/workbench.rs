@@ -47,6 +47,8 @@ pub(super) struct Site {
     /// the whole run.
     pub(super) config: kernel::FrozenConfig,
     pub(super) model: gateway::ModelEntry,
+    /// The endpoint the model is reached through (sprawling-SPEC 8-85).
+    pub(super) provider: String,
     pub(super) adapter: Option<Box<dyn Model + Send>>,
     pub(super) identity: city::Identity,
     pub(super) who: String,
@@ -66,7 +68,7 @@ pub(super) struct Site {
     pub(super) filters: runtime::FilterTable,
     /// Carried from the endpoint this run was given, frozen with
     /// everything else the run was set up with.
-    pub(super) retries: runtime::Retries,
+    pub(super) retries: kernel::Retries,
 }
 
 /// What the model may see, what routes what it calls, and who it may
@@ -217,7 +219,7 @@ pub(super) struct Situation<'a> {
     pub(super) addr: &'a Address,
     pub(super) who: &'a str,
     signals_pending: u32,
-    mode: runtime::Mode,
+    mode: kernel::Mode,
     write_domain: &'a kernel::WriteDomain,
     worktree: &'a Path,
     trust: &'a kernel::Autonomy,

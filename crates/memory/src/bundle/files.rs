@@ -17,6 +17,8 @@ use crate::error::{MemoryError, io_err};
 use crate::jsonl::JsonlLedger;
 use crate::vfs::Vfs;
 
+use super::landing::{Bits, land};
+
 use super::manifest::RESERVED;
 
 pub(crate) fn head_of(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<String, MemoryError> {
@@ -185,8 +187,15 @@ fn present(
     }
 }
 
-/// Copies every file under `from` into `to`, keeping relative paths.
-pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64, MemoryError> {
+/// Copies every file under `from` into `to`, keeping relative paths;
+/// `root` is the directory the person named, which bounds the alias
+/// check on every write.
+pub(crate) fn copy_tree(
+    vfs: &mut dyn Vfs,
+    root: &Path,
+    from: &Path,
+    to: &Path,
+) -> Result<u64, MemoryError> {
     let mut copied = 0u64;
     let files = walk(vfs, from)?;
     if files.is_empty() {
@@ -202,7 +211,7 @@ pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64
         // Cleared before any directory is made: making a parent through
         // a link would land a directory inside what the link reaches,
         // before the file write is refused (memory-SPEC 8-25).
-        let cleared = WriteTarget::at("copy a bundle file", &target)?;
+        let cleared = WriteTarget::within("copy a bundle file", root, &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)
                 .map_err(io_err("make a bundle directory", parent))?;
@@ -210,15 +219,17 @@ pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64
         let bytes = vfs
             .read(&path)
             .map_err(io_err("read a bundle file", &path))?;
-        write_file(vfs, &cleared, &bytes)?;
+        land(vfs, cleared, &bytes, Bits::Of(&path))?;
         copied = copied.saturating_add(1);
     }
     Ok(copied)
 }
 
-/// The city's own files: everything outside the reserved prefix.
+/// The city's own files: everything outside the reserved prefix, bounded
+/// by `root` as [`copy_tree`] is.
 pub(crate) fn copy_city_files(
     vfs: &mut dyn Vfs,
+    root: &Path,
     city_root: &Path,
     to: &Path,
 ) -> Result<u64, MemoryError> {
@@ -242,7 +253,7 @@ pub(crate) fn copy_city_files(
         let target = to.join(&relative);
         // Cleared before any directory is made, for the reason the
         // sibling walk gives.
-        let cleared = WriteTarget::at("copy a city file", &target)?;
+        let cleared = WriteTarget::within("copy a city file", root, &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)
                 .map_err(io_err("make a bundle directory", parent))?;
@@ -250,7 +261,7 @@ pub(crate) fn copy_city_files(
         let bytes = vfs
             .read(&path)
             .map_err(io_err("read a bundle file", &path))?;
-        write_file(vfs, &cleared, &bytes)?;
+        land(vfs, cleared, &bytes, Bits::Of(&path))?;
         copied = copied.saturating_add(1);
     }
     Ok(copied)
@@ -268,23 +279,6 @@ pub(crate) fn count_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryError
         count = count.saturating_add(1);
     }
     Ok(count)
-}
-
-/// Writes one bundle file under a target the alias rule has cleared.
-pub(crate) fn write_file(
-    vfs: &mut dyn Vfs,
-    target: &WriteTarget,
-    bytes: &[u8],
-) -> Result<(), MemoryError> {
-    let path = target.as_path();
-    if vfs.exists(path) {
-        vfs.remove_file(path)
-            .map_err(io_err("replace a bundle file", path))?;
-    }
-    vfs.append(path, bytes)
-        .map_err(io_err("write a bundle file", path))?;
-    vfs.sync_data(path)
-        .map_err(io_err("flush a bundle file", path))
 }
 
 /// Opens the restored ledger, so the city is one a writer can continue.
@@ -311,6 +305,55 @@ mod tests {
     use super::super::fixture::city_with;
     use super::super::manifest::CITY;
     use super::*;
+
+    /// The permission a city file carries is part of the file: a
+    /// read-only note (or, on Unix, an executable script) comes back
+    /// the way it left.
+    #[test]
+    fn a_read_only_city_file_comes_back_read_only() {
+        let home = tempfile::tempdir().unwrap();
+        city_with(1, home.path());
+        let kept = home.path().join("kept.md");
+        std::fs::write(&kept, b"do not touch").unwrap();
+        let mut bits = std::fs::metadata(&kept).unwrap().permissions();
+        bits.set_readonly(true);
+        std::fs::set_permissions(&kept, bits).unwrap();
+
+        let carried = tempfile::tempdir().unwrap();
+        Bundle::export(home.path(), carried.path()).unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        Bundle::restore(carried.path(), elsewhere.path()).unwrap();
+        let read_only = |at: &Path| std::fs::metadata(at).unwrap().permissions().readonly();
+        assert_eq!(
+            (
+                read_only(&carried.path().join(CITY).join("kept.md")),
+                read_only(&elsewhere.path().join("kept.md")),
+            ),
+            (true, true)
+        );
+    }
+
+    /// The city root is the person's choice, so a link above it is
+    /// where they keep the city rather than a write a run redirected.
+    #[test]
+    fn a_city_kept_under_a_link_exports_and_restores() {
+        let tmp = tempfile::tempdir().unwrap();
+        let real = tmp.path().join("real");
+        std::fs::create_dir_all(&real).unwrap();
+        let via = tmp.path().join("via");
+        if !crate::alias::tests::place_link(false, &real, &via) {
+            return;
+        }
+        let (city, carried, elsewhere) = (via.join("city"), via.join("bk"), via.join("back"));
+        std::fs::create_dir_all(&city).unwrap();
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        city_with(1, &city);
+        let outcome = Bundle::export(&city, &carried)
+            .and_then(|_| Bundle::restore(&carried, &elsewhere))
+            .map(|_| ())
+            .map_err(|err| err.to_string());
+        assert_eq!(outcome, Ok(()));
+    }
 
     #[test]
     fn nothing_under_the_reserved_prefix_travels_as_a_city_file() {

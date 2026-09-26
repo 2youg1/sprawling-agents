@@ -152,6 +152,9 @@
     ours = true;
     story = { kind: "forked", at: u.now(), turn: plan.turn, mother: plan.mother };
     picking = false;
+    // The branch is where the person just went: its divider sits at the
+    // foot, above the box, so the view follows there even from far back.
+    anchoring = anchorAt({ kind: "opened" });
   }
 
   // `/fork` with no argument cannot name a line from inside the verb
@@ -178,10 +181,10 @@
     const held = column;
     const box = scroller;
     if (held === undefined || box === undefined) return;
-    // The first judgement is measured rather than assumed: a scroller
-    // left mid-history must not be yanked to the foot by the first
-    // append after it.
-    anchoring = anchorAt(footOf(box));
+    // A room opens at its newest words; only the person's own scroll
+    // moves it to reading back.
+    anchoring = anchorAt({ kind: "opened" });
+    box.scrollTop = box.scrollHeight;
     const watcher = new ResizeObserver(() => {
       const now = scroller;
       if (anchoring === "follow" && now !== undefined) now.scrollTop = now.scrollHeight;
@@ -248,7 +251,7 @@
       bind:this={scroller}
       class="min-h-0 flex-1 overflow-y-auto"
       onscroll={(event) => {
-        anchoring = anchorAt(footOf(event.currentTarget));
+        anchoring = anchorAt({ kind: "scrolled", foot: footOf(event.currentTarget) });
       }}
     >
       <!-- An empty room opens with the box about a third of the way down
@@ -303,6 +306,11 @@
     </div>
     {#if runs.length > 0}
       <div class="relative mx-auto w-full max-w-talk px-pane pb-pane">
+        {#if story?.kind === "forked" && shown.length === 0}
+          <p class="mb-tight text-note text-text-faint" role="status">
+            {fill(say($lang, "fork_pending"), { turn: String(story.turn) })}
+          </p>
+        {/if}
         {#key story}
           {@render composer()}
         {/key}

@@ -22,6 +22,7 @@ use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, BuildingPolicy, EventKind, EventRecord, ModelTag, Payload};
 
+use crate::endpoint::Transport;
 use crate::market::ModelEntry;
 
 use super::attached::AttachedEndpoint;
@@ -32,6 +33,8 @@ use super::payload::{read_attached, read_choice, text};
 pub struct Chosen<'b> {
     pub endpoint: &'b AttachedEndpoint,
     pub entry: &'b ModelEntry,
+    /// The client every call to this endpoint shares.
+    pub(crate) transport: &'b Transport,
 }
 
 #[derive(Debug, Clone)]
@@ -43,8 +46,17 @@ pub(crate) struct Choice {
 /// Every endpoint and every choice, rebuilt from the event stream.
 #[derive(Debug, Clone, Default)]
 pub struct EndpointBook {
-    endpoints: BTreeMap<String, AttachedEndpoint>,
+    endpoints: BTreeMap<String, Held>,
     chosen: BTreeMap<ModelTag, Choice>,
+}
+
+/// One attached endpoint and the client its calls share. A second
+/// registration under the same name replaces both, because the tuning
+/// the client was built from may have changed.
+#[derive(Debug, Clone)]
+struct Held {
+    endpoint: AttachedEndpoint,
+    transport: Transport,
 }
 
 impl EndpointBook {
@@ -79,7 +91,13 @@ impl EndpointBook {
         match kind {
             EventKind::EndpointAttached => {
                 let attached = read_attached(data)?;
-                self.endpoints.insert(attached.name.clone(), attached);
+                self.endpoints.insert(
+                    attached.name.clone(),
+                    Held {
+                        endpoint: attached,
+                        transport: Transport::default(),
+                    },
+                );
                 Ok(())
             }
             EventKind::EndpointLost => {
@@ -114,7 +132,7 @@ impl EndpointBook {
             )
             .with_recovery("attach a provider on the settings page and pick a model for this tag")
         })?;
-        let endpoint = self.endpoints.get(&choice.endpoint).ok_or_else(|| {
+        let held = self.endpoints.get(&choice.endpoint).ok_or_else(|| {
             AxError::failure(
                 AxCode::ConfigInvalid,
                 format!("choose the {tag} model"),
@@ -122,6 +140,7 @@ impl EndpointBook {
             )
             .with_recovery("pick a model from an attached endpoint")
         })?;
+        let endpoint = &held.endpoint;
         if policy.confidential && !endpoint.is_local() {
             return Err(AxError::failure(
                 AxCode::GateDenied,
@@ -136,11 +155,12 @@ impl EndpointBook {
         Ok(Chosen {
             endpoint,
             entry: &choice.entry,
+            transport: &held.transport,
         })
     }
 
     pub fn endpoints(&self) -> impl Iterator<Item = &AttachedEndpoint> {
-        self.endpoints.values()
+        self.endpoints.values().map(|held| &held.endpoint)
     }
 
     /// What is chosen, tag by tag.

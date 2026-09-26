@@ -226,7 +226,7 @@ pub fn run_scenario_on(
         policy: BuildingPolicy::default(),
         tools: Vec::new(),
         skills: Vec::new(),
-        retries: runtime::Retries::UntilHalted,
+        retries: kernel::Retries::UntilHalted,
     };
 
     // Where this call sits in this run. It used to be the clock reading,

@@ -26,16 +26,18 @@
 //! process to touch each room lays its file down again, and the bytes are
 //! identical because every line came from the Ledger in the first place.
 //!
-//! The path comes from `kernel::layout::CityLayout::session_slice`, never
-//! from a call site. `xtask slices` holds that sentence: only this module
-//! may name the slice path.
+//! The path is derived here and nowhere else: [`session_slice`] is private
+//! to this module, so no other module can name where a slice lies, and a
+//! reader of a projection that is deleted and rebuilt cannot be written.
+//! The one fact another module needs - whether a path is a slice, so the
+//! checkpoint never stages one - is [`is_session_projection`].
 
 use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
-use kernel::{Address, EventRecord, Seq};
+use kernel::{Address, EventRecord, RESERVED_PREFIX, Seq};
 
 use crate::error::{MemoryError, io_err};
 use crate::jsonl::{complete_lines, segment_first_seq, segment_names};
@@ -108,7 +110,7 @@ impl Sessions {
         if self.city.as_ref().is_some_and(|city| city == addr) {
             return Ok(());
         }
-        let path = self.layout.session_slice(addr);
+        let path = session_slice(&self.layout, addr);
         if !self.open.contains_key(&path) {
             let open = self.attach(addr, &path, record.seq())?;
             self.open.insert(path.clone(), open);
@@ -323,8 +325,55 @@ fn parse_header(line: &[u8]) -> Option<Seq> {
     digits.parse::<u64>().ok().map(Seq::new)
 }
 
+/// One building's projection of the sessions run in it, under that
+/// building's reserved subtree.
+const SESSIONS_DIR: &str = "sessions";
+
+/// The projection of one session's records: the room address is the
+/// session's identity, and a building is its first segment.
+///
+/// An address below a building becomes one file under that building's
+/// sessions, its name the rooms below the building, so the nesting of
+/// rooms is the nesting of the files and no reader has to know which
+/// segment was a building. A run that named no session works at the
+/// building's own address, and its file then carries the building's name.
+fn session_slice(layout: &CityLayout, room: &Address) -> PathBuf {
+    let raw = room.as_str();
+    let (building, under) = raw.split_once('/').unwrap_or((raw, ""));
+    let name = if under.is_empty() { building } else { under };
+    let mut path = layout.root().join(building);
+    path.push(RESERVED_PREFIX);
+    path.push(SESSIONS_DIR);
+    path.push(format!("{name}.jsonl"));
+    path
+}
+
+/// Whether `relative` names a session slice: a file under some scope's
+/// reserved `sessions` directory.
+///
+/// The city appends to a slice while a wave runs, so the checkpoint never
+/// stages one: git reads a workdir file it believes it knows, and a file
+/// the city itself keeps writing makes that read refuse the whole wave.
+/// The reserved prefix is required immediately before `sessions`, so a
+/// person's own directory that happens to carry that name is not mistaken
+/// for the projection.
+pub(crate) fn is_session_projection(relative: &Path) -> bool {
+    let mut held = false;
+    for component in relative.components() {
+        let Some(name) = component.as_os_str().to_str() else {
+            held = false;
+            continue;
+        };
+        if name.eq_ignore_ascii_case(SESSIONS_DIR) {
+            return held;
+        }
+        held = name.eq_ignore_ascii_case(RESERVED_PREFIX);
+    }
+    false
+}
+
 /// The refusal for a slice path that has no directory, which a path from
-/// `session_slice` cannot be.
+/// [`session_slice`] cannot be.
 fn no_parent(path: &Path) -> MemoryError {
     MemoryError::Io {
         op: "lay a session slice",

@@ -25,8 +25,8 @@ use kernel::{
 };
 
 use crate::compaction::Exchange;
+use crate::conversation::Conversation;
 use crate::prefix::FrozenPrefix;
-use crate::window::Window;
 
 mod boundary;
 mod ledger;
@@ -96,7 +96,7 @@ impl Turn<Assembling> {
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
         prefix: &FrozenPrefix,
-        window: &Window,
+        conversation: &Conversation,
         tools: &[ToolDef],
         shape: &CallShape,
     ) -> Result<PhaseOutcome<Turn<Calling>>, AxError> {
@@ -115,7 +115,7 @@ impl Turn<Assembling> {
             model: shape.model.clone(),
             max_tokens: shape.max_tokens,
             system: prefix.system_blocks()?,
-            messages: window.messages().to_vec(),
+            messages: conversation.messages().to_vec(),
             tools: tools.to_vec(),
             effort: shape.effort,
         };

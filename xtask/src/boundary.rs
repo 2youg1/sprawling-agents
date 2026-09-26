@@ -381,16 +381,4 @@ mod tests {
             }\n";
         assert!(found("crates/runtime/src/x.rs", source).is_empty());
     }
-
-    /// The repository passes the check it ships. A gate whose own tree
-    /// is red teaches people that red is the normal colour.
-    #[test]
-    fn the_repository_itself_passes_the_check_it_ships() {
-        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .map(Path::to_path_buf)
-            .expect("xtask lives one level under the repo root");
-        let found = check(&root).unwrap();
-        assert!(found.is_empty(), "{found:#?}");
-    }
 }

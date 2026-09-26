@@ -102,13 +102,13 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
         cut_on_write: Some("pr_merged"),
         torn_tail: memory::TornTail::None,
     });
-    let (ledger, _report) =
+    let opened =
         memory::JsonlLedger::open_faulty(fs, &ledger_dir(dir.path()), now_ms().unwrap()).unwrap();
     let mut checker = RunWorker::over(
         dir.path(),
         gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
-        ledger,
+        opened,
     )
     .unwrap();
     checker

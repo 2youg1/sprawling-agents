@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 28 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`ec0edce8d6c76a2f93d3a8957bf92bb7fe9277d466d45dacbce9dd7c438cf510`；**WIRE_V ＝ 38**（回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 39**（事件种类 `rules_changed` → kernel-SPEC §8-4；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -33,11 +33,6 @@
 **扫描量没有第二个上限。** `memory::index` 持了 run 索引之后，一次 `RunHistory` 只取属于这个 run 的 seq，**扫描量与 `limit` 同阶**，而 `limit` 已由 `HISTORY_MAX` 封顶。再设一个不防任何事的上限，只会让下一个读代码的人以为它还在防什么。
 
 **`earlier` 的含义**：「从这条之前接着问」，`None` 即「到头了」；「答是空的而 `earlier` 是 `Some`」这一态**不存在**——服务端不需要把「我这一段没扫到」告诉客户端。
-
-**转出 `kernel::{Span, Token, markdown}`，线格式未动。** 客户端只看得见
-本 crate，而文档的词法器在 kernel（无 I/O、无时钟、输出穷举枚）。转出一个纯函数而不是
-新增一个 Query：分词在浏览器里跑就行，为一个几 KB 的词法器先把线格式撑大，
-是替尚不存在的第二实现造抽象。真需要语法引擎时它去服务端，线格式那时再长。
 
 **建 run→seq 的索引，理由是两组实测数字。** 其一，一次 `RunHistory` 在 5 万条账本上实测为 **2823 ms**，索引之后压到 **22.4 ms**，而这是「打开昨天的会话」这个动作的全部延迟。其二，那份要随账本同步的派生状态已经存在：`memory::LedgerIndex` 常驻于 `Views` 并每次查询 `refresh`，run 表只是它多一个字段，搭同一趟刷新、同一份 cache、同一条「存疑即重建」的反射，不新增同步义务。至于「第二个权威」：索引回答的是「在哪」，从不回答「是什么」，它可弃且存疑即重建；账本仍是唯一权威。接面与内存代价见 memory-SPEC §8-4。
 - **server**：默认绑定回环；绑非回环且 `auth` 未配置令牌时**拒绝启动**并回 `E_CONFIG_INVALID`（不是启动后再拒连——这是绑定面判定，不是请求面判定）。**暴露面必须有凭证是一条不变量，不是一句注释**：绑定判定把凭证本身装进 `BindFace::Exposed`，壳只持有这个面，于是「暴露着却不要求任何东西」是一个类型上不存在的状态（§8-41）。
@@ -60,7 +55,7 @@
 
 ## 5 权威信源
 
-wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；干预动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期五码白名单（kernel-SPEC §8-1，封闭且不得增长）。外部：axum 0.8.9（2026-04-14，内含 tokio-tungstenite 0.29）与 tokio。
+wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；干预动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期六码白名单（kernel-SPEC §8-1，封闭）。外部：axum 0.8.9（2026-04-14，内含 tokio-tungstenite 0.29）与 tokio。
 
 ## 6 命名统一
 
@@ -94,7 +89,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 ### 8-0 跨层名字的携带法（先于一切接口的决定）
 
 `PlanRow.status` 携 `kernel::RoadmapStatus`（经 `kernel` 重导出，住 `spine::row`，公共拼写不变）。
-`Dispatch` 携 `mode`、`Login` 携 `provider`、`CreateBuilding` 携 `template`——**这三个集合的权威分别住 `runtime::Mode`、`gateway`、`city`，而 channels 只依赖 kernel**（ARCHITECTURE §2 depmap）。
+`Dispatch` 携 `mode`、`Login` 携 `provider`、`CreateBuilding` 携 `template`——**这三个集合的权威分别住 `kernel::Mode`、`gateway`、`city`，而 channels 只依赖 kernel**（ARCHITECTURE §2 depmap）。
 
 取法：wire 携**无封闭列表的 newtype**（`ModeTag`、`ProviderName`、`TemplateName`），只断言「非空且无控制字符」，**不断言合法值集**。合法值集恒由上游单一权威回答，映射点在装配层（`bin::assembly`），未知值即报错不猜。
 
@@ -199,9 +194,12 @@ pub fn decide_handshake(hello: &Hello, expected: &Welcome, face: &BindFace) -> H
 // 路由表拿到的也是这个面：壳自己不再读配置里的令牌，因为那样“要求什么”就有两个家。
 pub fn router(config: &ServeConfig, face: BindFace) -> Router;
 
+// 先占住端口，再交出城：绑定判定与 bind 在任何 sink 存在之前做完（§8-46）。
+pub struct Bound { /* 已绑定的监听器与它的 BindFace —— 私有 */ }
+pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Bound, AxError>;
+pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
+
 pub struct ServeConfig {
-    pub addr: SocketAddr,
-    pub token_digest: Option<B3Hash>,   // 摘要，不是令牌
     pub client: Arc<ClientAssets>,      // 客户端资产源由装配层递入
 }
 
@@ -422,7 +420,7 @@ pub struct SessionName(String);                // 形状 2；一个构造点，�
 
 ## 12 错误处理（逐码答「能否定义掉」）
 
-- **`E_WIRE_MISMATCH`**：不可——它是装载期五码之一（封闭白名单），且它的存在理由就是「浏览器缓存旧前端」这一 WebUI 特有错配。类型无法定义掉跨版本的字节。握手之后解不出的帧同归此码、两侧的处置见 §8-37。
+- **`E_WIRE_MISMATCH`**：不可——它是装载期六码之一（封闭白名单），且它的存在理由就是「浏览器缓存旧前端」这一 WebUI 特有错配。类型无法定义掉跨版本的字节。握手之后解不出的帧同归此码、两侧的处置见 §8-37。
 - **`E_CONFIG_INVALID`**：不可——绑定非回环而无令牌必须在**启动时**拒绝，这是配置判定不是请求判定。
 - **`E_SIGNAL_UNKNOWN`**（ARCHITECTURE §11 点名的三条待消解之一，本 crate 须作答）：**部分定义掉**。形状未知的一半可以定义掉——握手的 schema 哈希保证同一连接的两端共享同一份 Signal 枚举，故「收到一个不认识的 Signal 种类」在单个连接内不可表示。语义未知的一半不可定义掉——一个 Resident 收到语法合法但自己不处理的 Signal 类别，这是真实结局，判定位置在消费端 `collab::inbox`，channels 只是 `Attach{notify}` 的产地。**结论：本码不在 channels 消解，其生产消费者住 `collab::inbox`；本条即 ARCHITECTURE §11 要求的作答，不是默认保留。**
 
@@ -1230,11 +1228,11 @@ pub fn decide_bind(addr: &SocketAddr, token: Option<B3Hash>) -> BindVerdict;
 impl BindFace { pub fn token_digest(&self) -> Option<&B3Hash>; }
 ```
 
-**强制点：`decide_bind` 是 `BindFace` 的唯一生产者，`serve` 是它的唯一调用者，`router(config, face)` 把面交给壳。** 壳（`ShellState.face`）此后是「这一面要求什么」的唯一读者：`decide_frame`、`decide_admission` 都拿 `&BindFace`，不再拿一个 `Option<&B3Hash>`。
+**强制点：`decide_bind` 是 `BindFace` 的唯一生产者，`bind` 是它的唯一调用者，`serve` 把 `Bound` 里的面经 `router(config, face)` 交给壳。** 壳（`ShellState.face`）此后是「这一面要求什么」的唯一读者：`decide_frame`、`decide_admission` 都拿 `&BindFace`，不再拿一个 `Option<&B3Hash>`。
 
 - **以前是什么样**：`decide_bind` 收一个 `token_configured: bool`，`serve` 只 `match` 掉 `Refuse` 而把 `Serve(BindFace)` 丢掉；然后每一道门各自去读 `config.token_digest`。「暴露面必须有凭证」因此靠一句话与一个 bool 维持，而 `router()` 是 pub：第二个入口可以造出一个暴露着却不要求任何东西的壳。
 - **现在是什么样**：`Exposed` 里**没有** `Option`——「暴露着却不要求任何东西」是一个类型上不存在的状态。这个不变量在测试里以四种格钉住（回环有无令牌、暴露有无令牌、以及 `BindingFace` 索要的摘要是不是判定它的那一个）。
-- **`ServeConfig.token_digest` 仍在**：它是配置说的话（谁配了令牌），面是绑定判定给出的判决。判决只此一处产生，故这不是同一个事实的两个家。
+- **令牌摘要是 `bind` 的入参**：它是配置说的话（谁配了令牌），面是绑定判定给出的判决。判决只在 `bind` 里产生一次，面随 `Bound` 走到壳里，故这不是同一个事实的两个家。
 - **`decide_admission` 的那句注释同时兑现**：「没有配令牌的城只可能是回环城」此前由启动时的 `decide_bind` 保证，现在由面的形状保证——它拿到的是一个不可能要求空的东西。
 
 #### 四 `/enroll` 等待里的第四个静默臂
@@ -1298,3 +1296,19 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 - **回答带 `SettledSecond { percent, from }`**：`from` 是说出这个值的那一级文件，理由与 `SettledEffort` 同（`Query::Config` 回答表那一条）；缺省不是缺口，而是城一级默认值在生效，页面据此把一个空框画成默认值。
 - **线的背面是同一件事**：写入经 `city::write_second_threshold` 落到那一级的 `CONFIG.toml` 的 `[context] second_threshold`，与 `write_effort` 同一扇门（读—改—写整份文件，别人的键原样保留）；`building_configured` 的载荷因此从三面到四面（`Written::context`）。
 - **`WIRE_V` 的路不单独走**：36→37 记的是这一次面变——给既有命名帧加字段是「语法换形而名字没换」那一类（字段名不进 `COMMAND_NAMES`），与 §8-44 的 35→36 无关；两次都在 §8-1 的 golden 里看得见。
+
+### 8-46 先占住端口，再交出城：`bind` 与 `serve` 分成两步
+
+```rust
+pub struct Bound { /* listener: tokio::net::TcpListener, face: BindFace —— 私有 */ }
+/// 判定绑定面，再绑定监听器。判定拒绝时不碰网络。
+pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Bound, AxError>;
+/// 在已经绑定的监听器上服务，直到 future 被丢弃。
+pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
+```
+
+- **次序是装配层要的**：一座城先占住它的端口，然后才打开写者、写下第一行（sprawling-SPEC §8-88）。`ServeConfig` 里的 sink 要等写者线程开好才造得出来（转写 sink 借的是写者打开的那个金库），所以「绑定」必须能在 sink 存在之前单独做完。原先的单个 `serve(config)` 把两件事绑在一起，装配层只能先开写者、再在 `serve` 里发现端口已被占用。
+- **`addr` 与 `token_digest` 离开 `ServeConfig`**，成为 `bind` 的两个入参。它们只被绑定判定读过；留在 `ServeConfig` 里，同一个地址就会有 `bind` 的入参和配置字段两个家。
+- **失败码不变**：判定拒绝仍是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定仍是 `E_CONFIG_INVALID`，recovery 仍是「换一个空闲端口，或者停掉占着它的进程」。
+- **被否：先试绑一次再放掉，然后在 `serve` 里真绑**。试绑与真绑之间，别的进程可以把端口拿走，那样原来的缺陷只是窗口变窄了，并没有消失。
+- **两者住 `server::listener`**，不住 `server::socket`：它们管的是监听器本身，先占、再服务；`server::socket` 管的是连上之后的会话、资产与上传。`Bound` 带 `#[must_use]`：占住端口而不服务，得到的是一个谁也不应答的端口。

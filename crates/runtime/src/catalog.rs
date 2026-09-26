@@ -19,7 +19,8 @@ pub use kernel::event::record::SkillPin;
 
 use kernel::{AxCode, AxError, B3Hash, ToolDef, ToolMeta};
 
-use crate::mode::Mode;
+use crate::mode::catalog_entry;
+use kernel::Mode;
 
 /// One disclosed row: "what it is + when to use it" resident-side, the
 /// "how to use it" expansion fetched on demand.
@@ -158,7 +159,7 @@ impl Catalog {
             out.push('\n');
         }
         if let Some(mode) = self.mode {
-            let entry = mode.catalog_entry();
+            let entry = catalog_entry(mode);
             out.push_str("- ");
             out.push_str(&entry.name);
             out.push_str(": ");
@@ -215,7 +216,7 @@ impl Catalog {
             });
         }
         if let Some(mode) = self.mode {
-            let entry = mode.catalog_entry();
+            let entry = catalog_entry(mode);
             if entry.name == name {
                 return Some(Expansion::Said {
                     text: entry.expansion,

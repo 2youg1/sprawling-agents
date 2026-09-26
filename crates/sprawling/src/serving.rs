@@ -8,9 +8,9 @@
 //!
 //! Four things happen here and nothing else: the key this listener will
 //! present at its door is settled before a socket exists, the vault is
-//! opened and asked what it really is, the one writer thread is started
-//! with the ledger inside it, and the socket is handed the four sinks it
-//! may reach the city through.
+//! opened and asked what it really is, the port is taken and only then
+//! the one writer thread is started with the ledger inside it, and the
+//! socket is handed the four sinks it may reach the city through.
 //!
 //! **The writer thread is the city's one writer.** The ledger is opened
 //! inside it and never leaves, so the type never has to cross a thread
@@ -30,6 +30,7 @@
 pub(crate) mod attending;
 pub(crate) mod desk;
 pub(super) mod door;
+mod folding;
 pub(crate) mod journal;
 pub(crate) mod pool;
 pub(crate) mod relay;
@@ -43,4 +44,4 @@ pub(crate) use door::random_token;
 pub use door::{Keyed, key_for, open_vault};
 pub use journal::Journal;
 pub use serve::Serving;
-pub use worker::serve;
+pub use worker::{Listening, listen};

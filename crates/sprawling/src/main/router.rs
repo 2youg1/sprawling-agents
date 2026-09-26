@@ -14,8 +14,11 @@
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::firstrun;
 
+use super::calling::call;
 use super::city::{init, resume, serve, up, up_at, use_folder};
-use super::data::{adopt, call, enrol, export, fork, install, replay, restore, status};
+use super::data::{adopt, enrol, export, fork, install, replay, restore, status};
+use super::grammar::{Arguments, Invocation, parse};
+use super::verbs::{self, Verb};
 use super::{CLIENT_COMPLETE, CLIENT_FILES};
 use std::process::ExitCode;
 
@@ -32,83 +35,52 @@ pub(super) fn client_summary() -> String {
     }
 }
 
-/// The command list, in one place. The refusal of an unknown subcommand
-/// and the first screen print the same text, so neither can fall behind
-/// what the binary actually accepts.
-pub(super) const COMMANDS: &str = "\
-commands:
-  up [dir] [addr]              raise a city here if needed, serve it, open the WebUI
-                               (--no-open leaves the screen alone, and so does
-                               SPRAWLING_OPEN=never, which also reaches the wizard)
-  install [--uninstall]        put this binary on your PATH, or take it back off
-  doctor [<city>] [--install]  what this machine has against what a city needs
-                               (<city>: judge each building's bits; --install: offer
-                               each missing item, one at a time; --explain <code>:
-                               connect a refusal code to this machine)
-  init <dir> [--adopt]         raise a city: writes the genesis record
-                               (--adopt: every folder there becomes a building)
-  serve <dir> [addr] [--open]  serve a city that already exists
-                               (--console enters it, --no-console does not;
-                               --no-open and SPRAWLING_OPEN=never are read here too)
-  resume <dir>                 after a restart: verify, close what was lost, report
-  version                      which release this binary is, and when it was cut
-  status [--deps] [--check]    this binary: version, client, what it is built from
-                               (--check: ask npm whether a newer release exists;
-                               the only command here that reaches the network)
-  fork <dir> <run> <seq>       branch a lineage from one step of a run
-  adopt <dir> <addr>           take an existing directory in as a building
-  call <frame|-> [--at a]      send one wire frame, print every frame back
-  enrol <realm>/<name>         read a credential from stdin, hand it to a city
-  replay <ledger-dir>          verify a chain offline, read-only
-  whose <city> <oid>           which run wrote a commit this city made
-  export <city> <dest>         pack a whole city
-  restore <bundle> <city>      unpack it on another machine";
-
 pub(super) fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    match args.first().map(String::as_str) {
-        // `version` is what a person types first, so it answers rather
-        // than landing in the refusal below. One implementation: the
-        // release a binary names cannot depend on which word asked.
-        Some("status" | "version" | "--version" | "-V") => status(&args),
-        Some("replay") => replay(named(&args, 1)),
-        Some("whose") => super::whose::verb(named(&args, 1), named(&args, 2)),
-        Some("init") => init(&args),
-        Some("up") => up(&args),
-        Some("install") => install(&args),
-        Some("doctor") => sprawling::doctor::verb(&args),
-        Some("call") => call(&args),
-        Some("enrol" | "enroll") => enrol(&args),
-        Some("serve") => serve(named(&args, 1), named(&args, 2), &args),
-        Some("export") => export(named(&args, 1), named(&args, 2)),
-        Some("restore") => restore(named(&args, 1), named(&args, 2)),
-        Some("resume") => resume(named(&args, 1)),
-        Some("fork") => fork(&args),
-        Some("adopt") => adopt(named(&args, 1), named(&args, 2)),
-        Some("help" | "--help" | "-h") => {
-            println!("{COMMANDS}");
+    match parse(&args) {
+        Ok(Invocation::FirstScreen) => first_screen(),
+        Ok(Invocation::Overview) => {
+            println!("{}", verbs::overview());
             ExitCode::SUCCESS
         }
-        Some(other) => {
-            eprintln!("unknown subcommand: {other}");
-            eprintln!("{COMMANDS}");
+        Ok(Invocation::Help(verb)) => {
+            if let Some(row) = verbs::row(verb) {
+                println!("{}", verbs::help(row));
+            }
+            ExitCode::SUCCESS
+        }
+        // One implementation: the release a binary names cannot depend
+        // on which word asked for it.
+        Ok(Invocation::Version) => status(&args),
+        Ok(Invocation::Run(verb, read)) => run(verb, &read, &args),
+        Err(refused) => {
+            eprintln!("sprawling: {refused}");
             ExitCode::from(2)
         }
-        None => first_screen(),
     }
 }
 
-/// The nth positional argument: a word that is not a flag.
-///
-/// Without this, `sprawling init --help` raises a city in a directory
-/// called `--help` - which is what the repository root of this project
-/// held for a day. A flag is never a path, and the subcommands that take
-/// a path all read it through here.
-pub(super) fn named(args: &[String], nth: usize) -> Option<&String> {
-    args.iter()
-        .skip(1)
-        .filter(|arg| !arg.starts_with("--"))
-        .nth(nth.saturating_sub(1))
+/// Hands a read command line to the verb that carries it out. `args` is
+/// the raw line for the verbs that still read their own flags.
+fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
+    let nth = |n| read.positional(n);
+    match verb {
+        Verb::Status => status(args),
+        Verb::Replay => replay(nth(1)),
+        Verb::Whose => super::whose::verb(nth(1), nth(2)),
+        Verb::Init => init(read),
+        Verb::Up => up(read, args),
+        Verb::Install => install(args),
+        Verb::Doctor => sprawling::doctor::verb(args),
+        Verb::Call => call(args).into(),
+        Verb::Enrol => enrol(read),
+        Verb::Serve => serve(nth(1), nth(2), args),
+        Verb::Export => export(nth(1), nth(2)),
+        Verb::Restore => restore(nth(1), nth(2)),
+        Verb::Resume => resume(nth(1)),
+        Verb::Fork => fork(args),
+        Verb::Adopt => adopt(nth(1), nth(2)),
+    }
 }
 
 /// What a launch with no command gets. Most of those come from a file
@@ -121,7 +93,7 @@ pub(super) fn first_screen() -> ExitCode {
         Ok(firstrun::FirstScreen::Start(city)) => up_at(&city, DEFAULT_AT, &[]),
         Ok(firstrun::FirstScreen::Use(folder)) => use_folder(&folder),
         Ok(firstrun::FirstScreen::Quit) => {
-            println!("{COMMANDS}");
+            println!("{}", verbs::overview());
             ExitCode::from(2)
         }
         Err(err) => {

@@ -21,10 +21,14 @@ use kernel::{AxCode, AxError};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 
+/// When a call stops listening is a decision about the wire's frames,
+/// with no socket in it, so it has its own file.
+mod ending;
 /// Enrolment is a credential handed to an HTTP route rather than a
 /// frame spoken on the socket, so it has its own file.
 mod enrolment;
 
+use ending::{Ending, Reply};
 pub(crate) use enrolment::{enrol, split_reference};
 
 /// What came back before the city went quiet.
@@ -52,6 +56,20 @@ pub(crate) enum Spoken {
     /// closed. Whether the city took the work is not knowable here, so
     /// this is neither of the other two.
     Quiet,
+}
+
+/// Why nothing was heard: the three failures `call` tells apart,
+/// because each asks the caller for a different next step.
+#[derive(Debug)]
+pub(crate) enum Unheard {
+    /// The frame is not one this wire can carry; nothing was sent.
+    Unreadable(AxError),
+    /// Nothing at the address completed the greeting, so no city heard
+    /// the frame.
+    NoCity(AxError),
+    /// The conversation started and then broke, or this process could
+    /// not start one.
+    Broken(AxError),
 }
 
 impl Heard {
@@ -93,10 +111,12 @@ fn malformed(what: &str, why: &str) -> AxError {
 }
 
 /// Sends one frame and prints every frame that comes back, as one JSON
-/// object per line, until nothing has arrived for `quiet`.
+/// object per line, until the frame's [`Ending`]: a query stops on its
+/// answer or refusal, a command once nothing has arrived for `quiet`.
 ///
 /// Quiet is a duration rather than a frame count because how many events
-/// one dispatch produces is the city's business, not this client's.
+/// one dispatch produces is the city's business, not this client's; for
+/// a query it only bounds an answer that never comes.
 ///
 /// # Errors
 /// Fails when the city cannot be reached, when the greeting is refused,
@@ -109,43 +129,64 @@ pub(crate) fn call(
     frame: &str,
     token: Option<&str>,
     quiet: Duration,
-) -> Result<Heard, AxError> {
+) -> Result<Heard, Unheard> {
     // The frame is parsed before the socket is opened: a typo should
     // cost nothing and should be reported against the text a person
     // wrote, not against whatever the server made of it.
-    let outgoing: channels::ClientFrame = serde_json::from_str(frame)
-        .map_err(|err| malformed("read the frame to send", &err.to_string()))?;
-    let body = serde_json::to_string(&outgoing)
-        .map_err(|err| malformed("encode the frame to send", &err.to_string()))?;
+    let outgoing: channels::ClientFrame = serde_json::from_str(frame).map_err(|err| {
+        Unheard::Unreadable(malformed("read the frame to send", &err.to_string()))
+    })?;
+    let body = serde_json::to_string(&outgoing).map_err(|err| {
+        Unheard::Unreadable(malformed("encode the frame to send", &err.to_string()))
+    })?;
     let greeting = serde_json::to_string(&hello(token))
-        .map_err(|err| malformed("encode the greeting", &err.to_string()))?;
+        .map_err(|err| Unheard::Broken(malformed("encode the greeting", &err.to_string())))?;
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|err| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "start the async runtime",
-                err.to_string(),
-            )
-            .with_recovery(
-                "close some programs and try again: this machine would not give the \
+            Unheard::Broken(
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "start the async runtime",
+                    err.to_string(),
+                )
+                .with_recovery(
+                    "close some programs and try again: this machine would not give the \
                  process the thread the connection needs",
+                ),
             )
         })?;
-    runtime.block_on(converse(at, &greeting, &body, quiet))
+    let sending = Sending {
+        body,
+        ending: Ending::of(&outgoing),
+    };
+    runtime.block_on(converse(at, &greeting, &sending, quiet))
 }
 
-async fn converse(at: &str, greeting: &str, body: &str, quiet: Duration) -> Result<Heard, AxError> {
+/// The frame on its way out, and when to stop listening for what it
+/// brings back; the second is read off the first, so they travel as one.
+struct Sending {
+    body: String,
+    ending: Ending,
+}
+
+async fn converse(
+    at: &str,
+    greeting: &str,
+    sending: &Sending,
+    quiet: Duration,
+) -> Result<Heard, Unheard> {
     let url = format!("ws://{at}/ws");
+    let no_city = |why: String| Unheard::NoCity(unreachable_city(at, &why));
     let (mut socket, _) = tokio_tungstenite::connect_async(&url)
         .await
-        .map_err(|err| unreachable_city(at, &err.to_string()))?;
+        .map_err(|err| no_city(err.to_string()))?;
     socket
         .send(Message::Text(greeting.into()))
         .await
-        .map_err(|err| unreachable_city(at, &err.to_string()))?;
+        .map_err(|err| no_city(err.to_string()))?;
 
     let mut heard = Heard {
         frames: 0,
@@ -155,24 +196,33 @@ async fn converse(at: &str, greeting: &str, body: &str, quiet: Duration) -> Resu
     // The greeting is answered before anything else is sent: a client
     // that shouted its command at a server which then refused the
     // handshake would have to guess whether the command was seen.
-    let welcome = next_frame(&mut socket, quiet).await?;
+    let welcome = next_frame(&mut socket, quiet)
+        .await
+        .map_err(Unheard::NoCity)?;
     match welcome {
         Some(text) => {
-            report(&text, &mut heard);
+            report(&text, &Reply::of(&text), &mut heard);
             if heard.refusals > 0 {
                 return Ok(heard);
             }
         }
-        None => return Err(unreachable_city(at, "no answer to the greeting")),
+        None => return Err(no_city("no answer to the greeting".to_owned())),
     }
 
     socket
-        .send(Message::Text(body.into()))
+        .send(Message::Text(sending.body.as_str().into()))
         .await
-        .map_err(|err| unreachable_city(at, &err.to_string()))?;
-    while let Some(text) = next_frame(&mut socket, quiet).await? {
-        report(&text, &mut heard);
+        .map_err(|err| Unheard::Broken(unreachable_city(at, &err.to_string())))?;
+    while let Some(text) = next_frame(&mut socket, quiet)
+        .await
+        .map_err(Unheard::Broken)?
+    {
+        let reply = Reply::of(&text);
+        report(&text, &reply, &mut heard);
         heard.answers = heard.answers.saturating_add(1);
+        if sending.ending.ends_on(&reply) {
+            break;
+        }
     }
     // Closing rather than dropping: a city that is told the peer has
     // gone stops holding a session open for it.
@@ -213,16 +263,12 @@ where
 /// Printed as it arrived rather than reformatted: inventing a display
 /// form here would be a second, drifting description of every type on
 /// the wire.
-fn report(text: &str, heard: &mut Heard) {
+fn report(text: &str, reply: &Reply, heard: &mut Heard) {
     println!("{text}");
     heard.frames = heard.frames.saturating_add(1);
-    // Read back through the wire's own type rather than by looking for
-    // a word in the text, so a payload that merely mentions refusal is
-    // not counted as one.
-    if let Ok(channels::ServerFrame::Refusal(_)) =
-        serde_json::from_str::<channels::ServerFrame>(text)
-    {
-        heard.refusals = heard.refusals.saturating_add(1);
+    match reply {
+        Reply::Refusal => heard.refusals = heard.refusals.saturating_add(1),
+        Reply::Answer | Reply::Other => {}
     }
 }
 
@@ -232,7 +278,8 @@ fn report(text: &str, heard: &mut Heard) {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
-    reason = "test code"
+    clippy::disallowed_methods,
+    reason = "test code: how long a call waited is read off the wall clock"
 )]
 mod tests {
     use super::{Duration, Message, SinkExt, Spoken, StreamExt, hello};
@@ -296,6 +343,56 @@ mod tests {
         assert!(
             matches!(heard.spoken(), Spoken::Quiet),
             "silence is its own answer, not the answer 'accepted'"
+        );
+        let _joined = scripted.join();
+    }
+
+    /// A query has exactly one reply, so `call` ends on it rather than
+    /// holding the process open for a quiet window that can bring
+    /// nothing more: the city's answer arrives in milliseconds and the
+    /// window used to add two whole seconds to every query.
+    #[test]
+    fn a_query_returns_on_its_answer_before_the_quiet_window_ends() {
+        let quiet = Duration::from_millis(1_000);
+        let (ready, port) = std::sync::mpsc::channel();
+        let scripted = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async move {
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                ready.send(listener.local_addr().unwrap().port()).unwrap();
+                let (stream, _from) = listener.accept().await.unwrap();
+                // boundary-ok: accept_async makes this a city double, not a client of one
+                let mut socket = tokio_tungstenite::accept_async(stream).await.unwrap();
+                let _greeting = socket.next().await;
+                for said in [
+                    channels::ServerFrame::Welcome(channels::Welcome {
+                        wire_v: channels::WIRE_V,
+                        schema: channels::schema_hash(),
+                        resume_from: None,
+                        city: None,
+                    }),
+                    channels::ServerFrame::Answer(Box::new(channels::Answer::Run(None))),
+                ] {
+                    let text = serde_json::to_string(&said).unwrap();
+                    socket.send(Message::Text(text.into())).await.unwrap();
+                }
+                // The session stays open past the window, as a served
+                // city's does, so only the answer can end the call early.
+                tokio::time::sleep(Duration::from_millis(1_500)).await;
+            });
+        });
+
+        let at = format!("127.0.0.1:{}", port.recv().unwrap());
+        let began = std::time::Instant::now();
+        let heard = super::call(&at, "{\"query\":\"city_view\"}", None, quiet).unwrap();
+        let waited = began.elapsed();
+        assert!(matches!(heard.spoken(), Spoken::Answered));
+        assert!(
+            waited < quiet,
+            "the answer ends the call; it took {waited:?} against a {quiet:?} window"
         );
         let _joined = scripted.join();
     }

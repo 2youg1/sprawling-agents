@@ -10,7 +10,7 @@ use kernel::{AxCode, AxError, ContentBlock, Effect, Ledger, Payload, ToolCall, T
 
 use crate::compaction::Exchange;
 
-use super::{Carried, Interrupt, NextCall, PhaseOutcome, Recording, ToolWave, Turn};
+use super::{Carried, Interrupt, PhaseOutcome, Recording, ToolWave, Turn};
 
 /// What the model reads back as the text of a tool result: the same
 /// payload the ledger keeps, printed once so the two cannot disagree.
@@ -55,13 +55,16 @@ impl Turn<ToolWave> {
     /// `still_going` is asked before every call, with that call's index.
     /// One question per wave left a halted scope running whatever the
     /// model asked for in one reply: eight edits are eight effects, and
-    /// the person who stopped the city waited for all of them.
+    /// the person who stopped the city waited for all of them. What it
+    /// answers is consumed through the one boundary consumer, so a steer
+    /// between two calls is recorded here, before the next assembly
+    /// hands it to the model.
     pub fn execute(
         mut self,
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
         invoke: &mut dyn FnMut(&ToolCall) -> Result<ToolOutcome, AxError>,
-        still_going: &mut dyn FnMut(u32) -> NextCall,
+        still_going: &mut dyn FnMut(u32) -> Interrupt,
     ) -> Result<PhaseOutcome<Turn<Recording>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
@@ -71,15 +74,11 @@ impl Turn<ToolWave> {
         for (index, call) in (0..=u32::MAX).zip(&calls) {
             // Asked before the call is written down, so a wave that was
             // stopped leaves no `tool_called` line for work nothing ever
-            // did.
-            match still_going(index) {
-                NextCall::Allowed => {}
-                // Through the same door a phase boundary takes, so a
-                // wave that stops leaves the one `cancel_received` line
-                // every other ending leaves.
-                NextCall::Halted => {
-                    return Ok(PhaseOutcome::Cancelled(self.cancel_here(ledger)?));
-                }
+            // did. Through the same door a phase boundary takes, so a
+            // wave that stops leaves the one `cancel_received` line every
+            // other ending leaves, and a steer its `steer_received`.
+            if let Some(cancelled) = self.consume_boundary(still_going(index), ledger)? {
+                return Ok(PhaseOutcome::Cancelled(cancelled));
             }
             let answered = invoke(call);
             self.account(ledger, &mut exchange, call, answered)?;
@@ -90,47 +89,56 @@ impl Turn<ToolWave> {
     /// Boundary 3 with the leading read-only calls run at once (see
     /// [`ConcurrentInvoke`]). `still_going` is asked for every call of
     /// that leading run before any of them starts, in call order, and a
-    /// halt starts only the calls before it: the calls a serial wave
-    /// would have made before the same halt.
+    /// cancel starts only the calls before it: the calls a serial wave
+    /// would have made before the same cancel. Each answer is consumed
+    /// just before its call is accounted, so a steer lands on the ledger
+    /// where the serial wave writes it.
     pub fn execute_concurrent(
         mut self,
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
         tools: &ConcurrentInvoke<'_>,
-        still_going: &mut dyn FnMut(u32) -> NextCall,
+        still_going: &mut dyn FnMut(u32) -> Interrupt,
     ) -> Result<PhaseOutcome<Turn<Recording>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
         let calls = std::mem::take(&mut self.state.calls);
         let mut exchange = self.open_exchange();
-        let mut asked = (0..=u32::MAX).map(still_going);
-        let mut standing = NextCall::Allowed;
-        let leading: Vec<&ToolCall> = calls
+        let reads = calls
             .iter()
             .take_while(|call| (tools.effect_of)(call) == Some(Effect::Read))
-            .take_while(|_| {
-                standing = asked.next().unwrap_or(NextCall::Halted);
-                matches!(standing, NextCall::Allowed)
-            })
-            .collect();
-        for (call, answered) in leading.iter().zip(all_at_once(&leading, tools.invoke)) {
+            .count();
+        let mut going = Vec::with_capacity(reads);
+        let mut halt = Interrupt::None;
+        for index in (0..=u32::MAX).take(reads) {
+            match still_going(index) {
+                Interrupt::Cancel => {
+                    halt = Interrupt::Cancel;
+                    break;
+                }
+                standing @ (Interrupt::None | Interrupt::Steer { .. }) => going.push(standing),
+            }
+        }
+        let leading: Vec<&ToolCall> = calls.iter().take(going.len()).collect();
+        let answers = all_at_once(&leading, tools.invoke);
+        for ((call, standing), answered) in leading.iter().zip(going).zip(answers) {
+            if let Some(cancelled) = self.consume_boundary(standing, ledger)? {
+                return Ok(PhaseOutcome::Cancelled(cancelled));
+            }
             self.account(ledger, &mut exchange, call, answered)?;
         }
-        for call in calls.iter().skip(leading.len()) {
-            if let NextCall::Halted = standing {
-                break;
-            }
-            standing = asked.next().unwrap_or(NextCall::Halted);
-            if let NextCall::Allowed = standing {
-                let answered = (tools.invoke)(call);
-                self.account(ledger, &mut exchange, call, answered)?;
-            }
+        if let Some(cancelled) = self.consume_boundary(halt, ledger)? {
+            return Ok(PhaseOutcome::Cancelled(cancelled));
         }
-        match standing {
-            NextCall::Allowed => Ok(self.recorded(calls, exchange)),
-            NextCall::Halted => Ok(PhaseOutcome::Cancelled(self.cancel_here(ledger)?)),
+        for (index, call) in (0..=u32::MAX).zip(&calls).skip(leading.len()) {
+            if let Some(cancelled) = self.consume_boundary(still_going(index), ledger)? {
+                return Ok(PhaseOutcome::Cancelled(cancelled));
+            }
+            let answered = (tools.invoke)(call);
+            self.account(ledger, &mut exchange, call, answered)?;
         }
+        Ok(self.recorded(calls, exchange))
     }
 
     fn open_exchange(&mut self) -> Exchange {

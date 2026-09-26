@@ -97,6 +97,40 @@ fn found(signature: &syn::Signature, body: proc_macro2::Span) -> Found {
     }
 }
 
+/// The lines of a Rust file the file budget counts: every line, less
+/// the lines a top-level `#[cfg(test)]` item spans, because a test
+/// module inline in a file is not production code the budget prices.
+pub(super) fn production_lines(text: &str, items: &[syn::Item]) -> usize {
+    let test_lines = items
+        .iter()
+        .filter(|item| skipped(attributes(item)))
+        .map(|item| {
+            let span = item.span();
+            span.end()
+                .line
+                .saturating_sub(span.start().line)
+                .saturating_add(1)
+        })
+        .fold(0_usize, usize::saturating_add);
+    text.lines().count().saturating_sub(test_lines)
+}
+
+/// The outer attributes of the item kinds a test marks; any other kind
+/// is counted as production.
+fn attributes(item: &syn::Item) -> &[syn::Attribute] {
+    match item {
+        syn::Item::Fn(item) => &item.attrs,
+        syn::Item::Mod(item) => &item.attrs,
+        syn::Item::Impl(item) => &item.attrs,
+        syn::Item::Use(item) => &item.attrs,
+        syn::Item::Const(item) => &item.attrs,
+        syn::Item::Static(item) => &item.attrs,
+        syn::Item::Struct(item) => &item.attrs,
+        syn::Item::Enum(item) => &item.attrs,
+        _ => &[],
+    }
+}
+
 /// Whether this item is the one kind the gate does not measure.
 fn skipped(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| {

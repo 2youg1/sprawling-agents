@@ -37,7 +37,7 @@ use crate::error::AxError;
 /// disagree — a provider may revise, and a cut stream leaves increments
 /// behind that no `ModelReturn` ever confirms. Where they disagree the
 /// settled text wins, and that rule is held on the far side of the wire
-/// by `web::app`.
+/// by the client.
 pub type Increments<'a> = &'a mut dyn FnMut(&Increment);
 
 /// The model port. Production adapters: gateway::native, gateway::endpoint;

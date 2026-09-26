@@ -42,7 +42,7 @@ pub(super) struct Assignment {
     /// caller said. It is written into the room's own configuration
     /// layer, so it cannot be answered before the room exists.
     pub(super) effort: Option<kernel::Effort>,
-    pub(super) mode: runtime::Mode,
+    pub(super) mode: kernel::Mode,
     /// The run that handed this work down, when somebody did.
     pub(super) parent: Option<RunId>,
     /// The run this one replaces, when it is a successor, and what that
@@ -72,7 +72,7 @@ pub(super) struct Assignment {
 /// without its first.
 pub(super) struct Handover {
     pub(super) predecessor: RunId,
-    pub(super) before: eval::Answers,
+    pub(super) before: super::probing::probe::Answers,
 }
 
 impl Assignment {
@@ -118,11 +118,14 @@ pub(super) struct Agreed {
     pub(super) building: city::Building,
     pub(super) rules: city::BuildingRules,
     pub(super) model: gateway::ModelEntry,
+    /// The name of the endpoint the model is reached through, which is
+    /// the provider a model's note is filed under (sprawling-SPEC 8-85).
+    pub(super) provider: String,
     pub(super) adapter: Box<dyn Model + Send>,
     /// How many times this run may make a failed call again, as the
     /// person set it on the endpoint that was chosen. Read here, where
     /// the endpoint is chosen, because nothing downstream sees the book.
-    pub(super) retries: runtime::Retries,
+    pub(super) retries: kernel::Retries,
 }
 
 pub(super) struct Knock {
@@ -131,7 +134,7 @@ pub(super) struct Knock {
     pub(super) from: String,
     /// The mode of the run that spoke. Carried rather than defaulted: an
     /// answer belongs to the same piece of work as the question.
-    pub(super) mode: runtime::Mode,
+    pub(super) mode: kernel::Mode,
     /// How many knocks deep the run that spoke was. The woken run is one
     /// hop further on, and the ceiling is read there
     /// (sprawling-SPEC.md 8-46-12).
@@ -148,23 +151,8 @@ pub(crate) struct Dispatched {
     pub(super) completion: kernel::Completion,
 }
 
-/// What the digest model is told when it is asked to name a piece of
-/// work.
-///
-/// Short on purpose, and it states the shape of a legal answer rather
-/// than trusting one: `SessionName::parse` is the authority and refuses
-/// anything with a separator in it, so a prompt that did not say "one
-/// segment" would spend a call to be refused.
-pub(super) const NAME_THE_WORK: &str = "Name this piece of work in two to four words, joined by hyphens, in \
-     lowercase ASCII. Answer with the name alone: no path, no quotes, no \
-     explanation. Example: refactor-ledger-reads";
-
-/// How many tokens a name is worth. Four words do not need more, and a
-/// ceiling is what stops a model that decided to explain itself from
-/// costing a person real money for a filename.
-pub(super) const NAME_TOKENS: Option<kernel::Ceiling> = kernel::Ceiling::new(32);
-
 pub(super) mod agreeing;
+pub(super) mod custody;
 pub(super) mod handback;
 pub(super) mod running;
 pub(super) mod session;

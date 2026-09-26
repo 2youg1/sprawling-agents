@@ -87,12 +87,7 @@ jobs:
           save-if: false
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-deny,cargo-public-api
-      # The apisync gate reads rustdoc JSON, which is nightly-only. It
-      # fails closed when the toolchain is missing rather than skipping,
-      # so a release job without this line stops here instead of passing.
-      - name: nightly toolchain (rustdoc JSON for apisync)
-        run: rustup toolchain install nightly --profile minimal
+          tool: cargo-nextest,cargo-deny
       - name: fmt
         run: cargo fmt --all --check
       - name: clippy

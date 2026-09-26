@@ -304,6 +304,7 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::DiscardRestored
         | EventKind::AutonomyChanged
         | EventKind::GovernedDocumentWritten
+        | EventKind::RulesChanged
         | EventKind::ToolkitLinkOpened
         // A call to an embeddings or rerank face, and every line an
         // adviser consultation writes, are about the window one run is
