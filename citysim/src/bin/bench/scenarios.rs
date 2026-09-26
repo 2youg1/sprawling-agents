@@ -213,7 +213,7 @@ fn large_worktree_placement(
             .map_err(|why| format!("{}", why.into_ax()))?;
         let t0 = super::stamp();
         let lease = trees
-            .claim(&name)
+            .claim(&name, &[])
             .map_err(|why| format!("{}", why.into_ax()))?;
         times.push(t0.elapsed());
         trees
