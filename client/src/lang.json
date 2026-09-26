@@ -2383,7 +2383,6 @@
     "en": "hearing…",
     "zh": "听写中…"
   },
-
   "talk_no_model": {
     "en": "no model chosen",
     "zh": "还没有选模型"
@@ -3019,5 +3018,65 @@
   "run_doing_frozen": {
     "en": "wrapped up",
     "zh": "已收尾"
+  },
+  "monitor_title": {
+    "en": "performance",
+    "zh": "性能"
+  },
+  "monitor_core_cpu": {
+    "en": "core cpu",
+    "zh": "核心 CPU"
+  },
+  "monitor_core_private": {
+    "en": "core private",
+    "zh": "核心私有内存"
+  },
+  "monitor_core_working_set": {
+    "en": "core working set",
+    "zh": "核心工作集"
+  },
+  "monitor_core_read": {
+    "en": "core read",
+    "zh": "核心读出"
+  },
+  "monitor_core_written": {
+    "en": "core written",
+    "zh": "核心写入"
+  },
+  "monitor_machine_cpu": {
+    "en": "machine cpu",
+    "zh": "整机 CPU"
+  },
+  "monitor_machine_available": {
+    "en": "machine available",
+    "zh": "整机可用内存"
+  },
+  "monitor_volume_free": {
+    "en": "volume free",
+    "zh": "卷剩余空间"
+  },
+  "monitor_ledger_queue_depth": {
+    "en": "ledger queue depth",
+    "zh": "记账队列深度"
+  },
+  "monitor_durable_lag": {
+    "en": "durable lag",
+    "zh": "持久水位落后"
+  },
+  "monitor_relay_p50": {
+    "en": "relay p50",
+    "zh": "relay 往返 p50"
+  },
+  "monitor_event_to_screen_p50": {
+    "en": "event to screen p50",
+    "zh": "事件到屏幕 p50"
+  },
+  "monitor_queued_runs": {
+    "en": "queued runs",
+    "zh": "排队的 run"
+  },
+  "monitor_waiting": {
+    "en": "waiting for the first sample",
+    "zh": "等待第一次采样"
   }
 }
