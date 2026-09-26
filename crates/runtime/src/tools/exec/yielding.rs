@@ -95,7 +95,7 @@ fn start_below_the_core() -> Command {
     if is_executable_on_path(std::ffi::OsStr::new("ionice"), None) {
         let mut both = Command::new("ionice");
         both.args(IO_BELOW_THE_CORE).arg("nice");
-        both.args(["-n", NICENESS_BELOW_THE_CORE]);
+        both.args(["-n", NICENESS_BELOW_THE_CORE, "--"]);
         return both;
     }
     nice_below_the_core()
@@ -107,10 +107,12 @@ fn start_below_the_core() -> Command {
     nice_below_the_core()
 }
 
+/// `--` ends `nice`'s options, so a program whose name starts with a
+/// dash is started rather than read as an option of `nice`.
 #[cfg(unix)]
 fn nice_below_the_core() -> Command {
     let mut nice = Command::new("nice");
-    nice.args(["-n", NICENESS_BELOW_THE_CORE]);
+    nice.args(["-n", NICENESS_BELOW_THE_CORE, "--"]);
     nice
 }
 

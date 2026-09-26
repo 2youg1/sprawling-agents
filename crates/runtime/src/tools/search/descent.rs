@@ -6,6 +6,8 @@
 //! Which directory entries a search walk descends into (runtime-SPEC,
 //! the `search` section).
 
+use std::path::PathBuf;
+
 use kernel::{Address, ReadVerdict};
 
 /// What the walk does with one directory entry.
@@ -20,6 +22,14 @@ pub(super) enum Entry {
         child: String,
         why: String,
     },
+}
+
+/// One item on the walk's stack. A building left unread waits on the
+/// stack beside the directories, so `unread` names it where the walk
+/// meets it: the SPEC lists `unread` in walk order.
+pub(super) enum Step {
+    Visit(PathBuf, String),
+    Unread { child: String, why: String },
 }
 
 /// The child address the walk may descend to, or why it may not.

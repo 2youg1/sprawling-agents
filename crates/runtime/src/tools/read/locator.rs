@@ -118,7 +118,8 @@ fn judged_at(
                 format!("cas:b3-{hash} was put for no building"),
             )
             .with_recovery(
-                "read the file the block was taken from as `file:<address>@<commit>`; a                  content block is read only at the building it was put for",
+                "read the file the block was taken from as `file:<address>@<commit>`; a \
+                 content block is read only at the building it was put for",
             )
         })
 }

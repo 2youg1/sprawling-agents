@@ -35,7 +35,8 @@ pub(super) enum Floor {
 
 impl Floor {
     /// The floor of a path the model chose: its first segment, so a miss
-    /// never climbs to the city root and lists the buildings there.
+    /// never climbs to the city root and lists the buildings there. A
+    /// floor that does not resolve only leaves the nearby list empty.
     pub(super) fn of_address(city_root: &Path, addr: &Address) -> Floor {
         let Some(first) = addr.as_str().split('/').next() else {
             return Floor::Document;

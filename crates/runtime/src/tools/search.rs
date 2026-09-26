@@ -32,7 +32,7 @@ mod descent;
 
 use super::chosen_path::{self, ReadBound, Walked};
 use crate::elision::{self, Elided};
-use descent::{Entry, admissible};
+use descent::{Entry, Step, admissible};
 
 /// How many hits one call may bring back. A search that filled the
 /// window would be a search nobody can afford to run twice.
@@ -199,11 +199,18 @@ impl SearchTool {
             unread: Vec::new(),
             truncated: false,
         };
-        let mut pending = vec![from];
-        while let Some((path, rel)) = pending.pop() {
+        let mut pending = vec![Step::Visit(from.0, from.1)];
+        while let Some(step) = pending.pop() {
             if found.truncated {
                 break;
             }
+            let (path, rel) = match step {
+                Step::Visit(path, rel) => (path, rel),
+                Step::Unread { child, why } => {
+                    found.could_not_look(&child, why);
+                    continue;
+                }
+            };
             let path = match chosen_path::walked(&self.city_root, path, &rel, &*self.bound) {
                 Ok(Walked::Directory(path)) => path,
                 Ok(Walked::File(path)) => {
@@ -222,8 +229,12 @@ impl SearchTool {
                     // pushed last and the answer is in name order.
                     for name in entries.into_iter().rev() {
                         match admissible(&rel, &name, &*self.bound) {
-                            Entry::Descend(child) => pending.push((path.join(&name), child)),
-                            Entry::Unread { child, why } => found.could_not_look(&child, why),
+                            Entry::Descend(child) => {
+                                pending.push(Step::Visit(path.join(&name), child));
+                            }
+                            Entry::Unread { child, why } => {
+                                pending.push(Step::Unread { child, why })
+                            }
                             Entry::Passed => {}
                         }
                     }

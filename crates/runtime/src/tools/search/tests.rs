@@ -346,3 +346,39 @@ fn a_building_whose_rules_do_not_read_is_named_among_the_unread() {
     assert_eq!(map["unreadable"], 1, "{:?}", map["unread"]);
     assert_eq!(map["unread"][0]["path"], "broken");
 }
+
+/// `unread` lists what was not looked at in the order the walk met it,
+/// so a building whose rules fail sits between the buildings named
+/// before and after it, not ahead of every file the walk read.
+#[test]
+fn the_unread_list_follows_the_walk_order() {
+    let dir = city();
+    for building in ["broken", "mill"] {
+        std::fs::create_dir_all(dir.path().join(building).join("room1")).unwrap();
+    }
+    std::fs::write(
+        dir.path().join("lab").join("Big.md"),
+        "the ledger\n".repeat(100_000),
+    )
+    .unwrap();
+    let bound: ReadBound = std::sync::Arc::new(|addr: &Address| {
+        if addr.as_str() == "lab" {
+            ReadVerdict::Open
+        } else {
+            ReadVerdict::RulesUnreadable(
+                AxError::failure(kernel::AxCode::InvalidArgs, "read the rules", addr.as_str())
+                    .with_recovery("fix the rules"),
+            )
+        }
+    });
+    let tool = SearchTool::new(dir.path(), bound).unwrap();
+
+    let whole = tool.invoke(&text("the ledger")).unwrap();
+    let paths: Vec<&Value> = whole.result.as_map()["unread"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| &entry["path"])
+        .collect();
+    assert_eq!(paths, ["broken", "lab/Big.md", "mill"]);
+}
