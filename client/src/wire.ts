@@ -735,6 +735,7 @@ export type Proxying = typeof Proxying.Type;
  * the form now draws what this carries, and the numbers have one home.
  */
 export const TuningDefaults = Schema.Struct({
+  from: ConfigLayer,
   proxying: Proxying,
   request_max_retries: Schema.optional(Schema.NullOr(Schema.Int)),
   stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),

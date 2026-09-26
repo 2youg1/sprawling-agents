@@ -73,6 +73,7 @@ pub(crate) fn config_answer(
             },
         ),
         tuning: channels::TuningDefaults {
+            from: channels::ConfigLayer::Default,
             timeout_ms: defaults.timeout_ms,
             request_max_retries: defaults.retries.stated(),
             stream_idle_timeout_ms: defaults.stream_idle_timeout_ms,
