@@ -387,9 +387,8 @@ pub(crate) fn drive_run<L: Ledger>(
 
 /// What the next fence stages: the paths the calls since the last fence
 /// said they wrote, or the whole write domain when one of them could not
-/// say (runtime-SPEC 8-45). `Nothing` means only reads ran, and the
-/// domain is what the fence staged before this rule existed; skipping
-/// that wave is the read-only rule's to decide.
+/// say (runtime-SPEC 8-45). `Nothing` is the run's first fence, before
+/// any call has run, and no commit of this run vouches for the tree yet.
 fn staged_scope(wrote: kernel::Writes, domain: &[String]) -> Vec<String> {
     match wrote {
         kernel::Writes::Paths(paths) => paths.iter().map(|path| path.as_str().to_owned()).collect(),
