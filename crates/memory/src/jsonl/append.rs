@@ -5,7 +5,7 @@
 
 //! Ledger appends: waves, reads, and the kernel Ledger face.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use kernel::ledger::chain_hash;
 use kernel::{
@@ -13,8 +13,6 @@ use kernel::{
 };
 
 use crate::error::{MemoryError, io_err};
-use crate::real_fs::RealFs;
-use crate::vfs::Vfs;
 
 use super::ledger::{JsonlLedger, WriteObserver, complete_lines, is_segment, segment_file_name};
 
@@ -212,6 +210,7 @@ impl kernel::ledger::conformance::LedgerInspect for JsonlLedger {
 mod tests {
     use super::*;
     use kernel::GENESIS_PREV;
+    use std::path::Path;
     use std::fs;
     fn draft(kind: EventKind, t: u64) -> EventDraft {
         EventDraft {

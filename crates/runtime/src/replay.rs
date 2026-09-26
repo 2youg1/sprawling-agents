@@ -17,7 +17,7 @@
 use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, B3Hash, EventRecord, EventRef, Seq};
-use memory::{CheckedLine, LineCheck};
+use memory::{CheckedLine, LedgerIndex, LineCheck};
 
 /// One verified line: a typed record with its ref echo, or an explicitly
 /// ignorable line from a future vocabulary.
@@ -103,7 +103,7 @@ pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError> {
 pub fn fold_ledger_dir(
     dir: &Path,
     mut each: impl FnMut(&EventRecord) -> Result<(), AxError>,
-) -> Result<(), AxError> {
+) -> Result<LedgerIndex, AxError> {
     let mut check = LineCheck::at_genesis();
     let mut line_no = 0u64;
     for segment in memory::ledger_segments_at(dir).map_err(memory::MemoryError::into_ax)? {
@@ -116,7 +116,7 @@ pub fn fold_ledger_dir(
             }
         }
     }
-    Ok(())
+    LedgerIndex::rebuild(dir).map_err(memory::MemoryError::into_ax)
 }
 
 /// A15: recompute the four segment hashes from a `prompt_assembled`
