@@ -115,7 +115,6 @@ impl RunWorker {
             })
             .unwrap_or_default();
         messages.push(kernel::ChatMessage {
-            cache: false,
             role: kernel::Role::User,
             content: vec![kernel::ContentBlock::Text {
                 text: questions_block(&probe),
@@ -129,8 +128,9 @@ impl RunWorker {
                     model: plan.shape.model.clone(),
                     max_tokens: PROBE_TOKENS,
                     system: plan.prefix.system_blocks().ok()?,
-                    messages,
-                    tools: Vec::new(),
+                    messages: std::borrow::Cow::Owned(messages),
+                    tools: std::borrow::Cow::Borrowed(&[]),
+                    breakpoint: kernel::MessageBreakpoint::Unmarked,
                     effort: plan.shape.effort,
                 },
             };
@@ -175,14 +175,14 @@ impl Site {
                     model: plan.shape.model.clone(),
                     max_tokens: PROBE_TOKENS,
                     system: plan.prefix.system_blocks().ok()?,
-                    messages: vec![kernel::ChatMessage {
-                        cache: false,
+                    messages: std::borrow::Cow::Owned(vec![kernel::ChatMessage {
                         role: kernel::Role::User,
                         content: vec![kernel::ContentBlock::Text {
                             text: questions_block(&probe),
                         }],
-                    }],
-                    tools: Vec::new(),
+                    }]),
+                    tools: std::borrow::Cow::Borrowed(&[]),
+                    breakpoint: kernel::MessageBreakpoint::Unmarked,
                     effort: plan.shape.effort,
                 },
             };

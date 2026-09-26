@@ -6,6 +6,7 @@
 //! The canonical conversation vocabulary: what a request and a response
 //! are made of, in the city dialect every adapter translates from.
 
+use std::borrow::Cow;
 use std::num::NonZeroU64;
 
 use serde::{Deserialize, Serialize};
@@ -283,17 +284,22 @@ pub enum ContentBlock {
 pub struct ChatMessage {
     pub role: Role,
     pub content: Vec<ContentBlock>,
-    /// An explicit prompt-cache breakpoint on this message.
-    ///
-    /// A request-side annotation, deliberately outside serde: the bytes
-    /// a ledger or a transcript records are the same with and without
-    /// it, which is what lets the marker move without the recorded
-    /// conversation moving. `runtime::prefix::BreakpointPlan` is the
-    /// only producer, and it anchors the tail - so everything a request
-    /// carries, trailing tool results included, sits inside the region a
-    /// later request can hit.
-    #[serde(skip)]
-    pub cache: bool,
+}
+
+/// Which message of a request carries an explicit prompt-cache
+/// breakpoint.
+///
+/// A request-side annotation rather than a mark on a message, so a
+/// request can borrow the conversation it carries: marking a message
+/// would need a writable copy of it. `runtime::prefix::BreakpointPlan`
+/// is the only producer, and it anchors the tail - so everything a
+/// request carries, trailing tool results included, sits inside the
+/// region a later request can hit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MessageBreakpoint {
+    #[default]
+    Unmarked,
+    Tail,
 }
 
 /// A tool as the provider sees it; sourced from catalog `tool_defs` only.
@@ -307,16 +313,24 @@ pub struct ToolDef {
 /// The canonical request conversation (city dialect = Anthropic Messages). Both production dialects and the scripted model
 /// consume this one shape — the seam carries it so replay, citysim and
 /// the real gateway argue about the same object.
+///
+/// `messages` and `tools` are borrowed on the turn's path, because a
+/// request lives for one call; a holder that keeps a request past the
+/// call (the keep-warm renewal) owns a `ChatRequest<'static>`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ChatRequest {
+pub struct ChatRequest<'a> {
     pub model: String,
     /// Absent when no catalogue row states this model's ceiling. The
     /// OpenAI wire then omits the field and takes the provider's own
     /// default; the Anthropic wire, which requires it, refuses.
     pub max_tokens: Option<Ceiling>,
     pub system: Vec<SystemBlock>,
-    pub messages: Vec<ChatMessage>,
-    pub tools: Vec<ToolDef>,
+    pub messages: Cow<'a, [ChatMessage]>,
+    pub tools: Cow<'a, [ToolDef]>,
+    /// Outside serde, like every request-side annotation: the bytes a
+    /// ledger or a transcript records are the same with and without it.
+    #[serde(skip)]
+    pub breakpoint: MessageBreakpoint,
     /// Frozen at run start: changing it mid-run would start a new cached
     /// prompt prefix, so the value rides in from [`crate::FrozenConfig`].
     pub effort: Option<Effort>,
@@ -330,17 +344,42 @@ pub struct ChatResponse {
     pub usage: ModelUsage,
 }
 
-impl ChatRequest {
+impl ChatRequest<'_> {
     /// An empty conversation shell for adapters and tests that argue
     /// about hashes, not content.
-    pub fn empty(model: &str, max_tokens: Ceiling) -> ChatRequest {
+    pub fn empty(model: &str, max_tokens: Ceiling) -> ChatRequest<'static> {
         ChatRequest {
             model: model.to_owned(),
             max_tokens: Some(max_tokens),
             system: Vec::new(),
-            messages: Vec::new(),
-            tools: Vec::new(),
+            messages: Cow::Borrowed(&[]),
+            tools: Cow::Borrowed(&[]),
+            breakpoint: MessageBreakpoint::Unmarked,
             effort: None,
+        }
+    }
+
+    /// Whether the message at `index` carries this request's breakpoint.
+    /// The one reading of [`MessageBreakpoint`]; a dialect only spells
+    /// the answer on its wire.
+    pub fn carries_breakpoint(&self, index: usize) -> bool {
+        match self.breakpoint {
+            MessageBreakpoint::Unmarked => false,
+            MessageBreakpoint::Tail => index.checked_add(1) == Some(self.messages.len()),
+        }
+    }
+
+    /// The same request, owning what it borrowed: for a holder that
+    /// keeps it past the call it was assembled for.
+    pub fn into_owned(self) -> ChatRequest<'static> {
+        ChatRequest {
+            model: self.model,
+            max_tokens: self.max_tokens,
+            system: self.system,
+            messages: Cow::Owned(self.messages.into_owned()),
+            tools: Cow::Owned(self.tools.into_owned()),
+            breakpoint: self.breakpoint,
+            effort: self.effort,
         }
     }
 }

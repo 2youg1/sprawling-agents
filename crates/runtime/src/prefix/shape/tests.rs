@@ -24,7 +24,6 @@ use super::*;
 fn message(role: Role, text: &str) -> ChatMessage {
     ChatMessage {
         role,
-        cache: false,
         content: vec![ContentBlock::Text {
             text: text.to_owned(),
         }],
@@ -34,7 +33,6 @@ fn message(role: Role, text: &str) -> ChatMessage {
 fn tool_results(text: &str) -> ChatMessage {
     ChatMessage {
         role: Role::User,
-        cache: false,
         content: vec![ContentBlock::ToolResult {
             tool_use_id: "tu_1".to_owned(),
             content: text.to_owned(),
@@ -138,20 +136,20 @@ fn a_moved_region_is_named_system_tools_or_run() {
 /// region instead of being paid for again on every request.
 #[test]
 fn the_tail_anchor_carries_the_trailing_tool_results_into_the_cache() {
-    let mut messages = vec![
+    let messages = vec![
         message(Role::User, "Task: dig"),
         message(Role::Assistant, "running it"),
         tool_results("ok"),
     ];
-    let plan = BreakpointPlan::for_conversation(&messages);
-    plan.mark(&mut messages);
-    assert!(
-        messages[2].cache,
-        "the tail anchor sits on the last message, tool results included"
-    );
-    assert!(
-        !messages[0].cache && !messages[1].cache,
-        "one anchor, at the tail"
+    let mut request = kernel::ChatRequest::empty("m", kernel::Ceiling::new(64).unwrap());
+    request.messages = std::borrow::Cow::Borrowed(&messages);
+    request.breakpoint = BreakpointPlan::for_conversation(&messages).message_breakpoint();
+    assert_eq!(
+        (0..messages.len())
+            .map(|index| request.carries_breakpoint(index))
+            .collect::<Vec<_>>(),
+        [false, false, true],
+        "one anchor, on the last message, tool results included"
     );
     assert!(
         messages[2]
@@ -159,29 +157,6 @@ fn the_tail_anchor_carries_the_trailing_tool_results_into_the_cache() {
             .iter()
             .any(|block| matches!(block, ContentBlock::ToolResult { .. })),
         "the anchored message is the one the trailing tool results ride in"
-    );
-}
-
-/// The invariant the marker lives by: it changes no recorded byte,
-/// so moving it can never move the history.
-#[test]
-fn the_breakpoint_marker_changes_no_recorded_byte() {
-    let mut anchored = tool_results("ok");
-    let plain = tool_results("ok");
-    assert_eq!(
-        serde_json::to_vec(&anchored).unwrap(),
-        serde_json::to_vec(&plain).unwrap(),
-        "the marker is outside serde"
-    );
-    anchored.cache = true;
-    assert_eq!(
-        serde_json::to_vec(&anchored).unwrap(),
-        serde_json::to_vec(&plain).unwrap()
-    );
-    assert_eq!(
-        shape(std::slice::from_ref(&plain)),
-        shape(&[anchored]),
-        "and outside the shape a cache compares"
     );
 }
 

@@ -11,7 +11,7 @@
 //! so a record cannot name a breakpoint the request does not carry. A
 //! dialect only spells the marks it is handed; it decides none of them.
 
-use kernel::ChatMessage;
+use kernel::{ChatMessage, MessageBreakpoint};
 
 use super::segment::SegmentSlot;
 
@@ -67,11 +67,12 @@ impl BreakpointPlan {
         }
     }
 
-    /// Sets each message's mark from the plan, clearing any other, so a
+    /// The message breakpoint a request carries under this plan, so a
     /// request carries exactly the message breakpoint the plan names.
-    pub fn mark(&self, messages: &mut [ChatMessage]) {
-        for (index, message) in messages.iter_mut().enumerate() {
-            message.cache = self.tail == Some(index);
+    pub fn message_breakpoint(&self) -> MessageBreakpoint {
+        match self.tail {
+            Some(_) => MessageBreakpoint::Tail,
+            None => MessageBreakpoint::Unmarked,
         }
     }
 

@@ -50,7 +50,7 @@ use kernel::{ChatMessage, ContentBlock, Payload, Role, SystemBlock, ToolDef, Too
     clippy::indexing_slicing,
     reason = "test helper"
 )]
-pub(crate) fn sample_seeing() -> (ChatRequest, ImageBytes) {
+pub(crate) fn sample_seeing() -> (ChatRequest<'static>, ImageBytes) {
     let seen = kernel::ImageRef {
         locator: kernel::Locator::parse(&format!("cas:b3-{}", "ab".repeat(32))).unwrap(),
         media_type: kernel::ImageType::Png,
@@ -64,10 +64,10 @@ pub(crate) fn sample_seeing() -> (ChatRequest, ImageBytes) {
         height: 4,
     };
     let mut chat = sample_request();
-    chat.messages[0]
+    chat.messages.to_mut()[0]
         .content
         .push(ContentBlock::Image(seen.clone()));
-    chat.messages[2].content = vec![ContentBlock::ToolResult {
+    chat.messages.to_mut()[2].content = vec![ContentBlock::ToolResult {
         tool_use_id: "tu_1".to_owned(),
         content: "ok".to_owned(),
         is_error: false,
@@ -91,7 +91,7 @@ use serde_json::Map;
     clippy::arithmetic_side_effects,
     reason = "test helper"
 )]
-pub(crate) fn sample_request() -> ChatRequest {
+pub(crate) fn sample_request() -> ChatRequest<'static> {
     let mut schema = Map::new();
     schema.insert("type".to_owned(), Value::String("object".to_owned()));
     let mut args = Map::new();
@@ -111,14 +111,12 @@ pub(crate) fn sample_request() -> ChatRequest {
         ],
         messages: vec![
             ChatMessage {
-                cache: false,
                 role: Role::User,
                 content: vec![ContentBlock::Text {
                     text: "Task: probe".to_owned(),
                 }],
             },
             ChatMessage {
-                cache: false,
                 role: Role::Assistant,
                 content: vec![
                     ContentBlock::Text {
@@ -132,7 +130,6 @@ pub(crate) fn sample_request() -> ChatRequest {
                 ],
             },
             ChatMessage {
-                cache: false,
                 role: Role::User,
                 content: vec![ContentBlock::ToolResult {
                     tool_use_id: "tu_1".to_owned(),
@@ -141,12 +138,15 @@ pub(crate) fn sample_request() -> ChatRequest {
                     attachments: Vec::new(),
                 }],
             },
-        ],
+        ]
+        .into(),
         tools: vec![ToolDef {
             name: ToolName::parse("exec").unwrap(),
             description: "run things".to_owned(),
             input_schema: Payload::new(schema).unwrap(),
-        }],
+        }]
+        .into(),
+        breakpoint: kernel::MessageBreakpoint::Unmarked,
         effort: None,
     }
 }
@@ -255,7 +255,7 @@ mod tests {
     fn anthropic_marked_message_carries_its_breakpoint_on_the_last_block() {
         let mut req = sample_request();
         let tail = req.messages.len() - 1;
-        req.messages[tail].cache = true;
+        req.breakpoint = kernel::MessageBreakpoint::Tail;
         let wire = request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap();
         let messages = wire["messages"].as_array().unwrap();
         let blocks = messages[tail]["content"].as_array().unwrap();

@@ -243,8 +243,7 @@ mod tests {
                 height: 8,
             }));
         }
-        req.chat.messages.push(kernel::ChatMessage {
-            cache: false,
+        req.chat.messages.to_mut().push(kernel::ChatMessage {
             role: kernel::Role::User,
             content,
         });

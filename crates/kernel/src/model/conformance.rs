@@ -52,8 +52,7 @@ fn assert_seeing_a_picture_answers<M: Model>(model: &mut M, benign: &ModelReques
         panic!("the conformance picture's locator is spelled by this file");
     };
     let mut seeing = benign.clone();
-    seeing.chat.messages.push(ChatMessage {
-        cache: false,
+    seeing.chat.messages.to_mut().push(ChatMessage {
         role: Role::User,
         content: vec![ContentBlock::Image(ImageRef {
             locator,
