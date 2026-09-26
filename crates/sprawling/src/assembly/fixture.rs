@@ -36,12 +36,15 @@ pub(super) fn worker_with_provider(
 }
 
 /// The same endpoint and model, attached to a worker somebody else
-/// opened - over a ledger on another `Vfs`, say.
+/// opened - over a ledger on another `Vfs`, say. The worker reads a
+/// roomy volume rather than the host's disk, so a dispatch test does not
+/// turn into `BackpressureShed` on a host below the free-space floor.
 pub(super) fn attach_provider(
     mut worker: RunWorker,
     base_url: &str,
     model: &str,
 ) -> Result<RunWorker, AxError> {
+    worker.read_volume_with(roomy_volume);
     worker.handle(channels::Command::AttachEndpoint {
         name: channels::ProviderName::parse("house").unwrap(),
         base_url: base_url.to_owned(),
@@ -61,6 +64,14 @@ pub(super) fn attach_provider(
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
     })?;
     Ok(worker)
+}
+
+/// A volume with far more free space than any floor asks for.
+fn roomy_volume(_city: &Path) -> Option<kernel::degradation::VolumeSpace> {
+    Some(kernel::degradation::VolumeSpace {
+        free_bytes: 1 << 50,
+        total_bytes: 1 << 51,
+    })
 }
 
 /// A worker over a ledger that loses the first append carrying `cut`,
