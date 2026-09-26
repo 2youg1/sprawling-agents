@@ -63,11 +63,11 @@ enum Kind {
 pub fn check(city_root: &Path) -> Result<Report, AxError> {
     let mut files = vec![(CityLayout::new(city_root).city_config(), Kind::Config)];
     for building in crate::building::all(city_root)? {
+        files.push((Layer::Building.file(city_root, &building)?, Kind::Config));
         files.push((
-            Layer::Building.file(city_root, &building)?,
-            Kind::Config,
+            rules_path(city_root, &building),
+            Kind::Rules(building.clone()),
         ));
-        files.push((rules_path(city_root, &building), Kind::Rules(building.clone())));
         for room in crate::room::all(city_root, &building)? {
             files.push((Layer::Resident.file(city_root, &room)?, Kind::Config));
         }
@@ -98,9 +98,6 @@ impl Kind {
 
     /// Where the shape this kind is read with stops reading `text`.
     fn locate(&self, text: &str) -> Option<Position> {
-        if !text.is_empty() {
-            return None;
-        }
         match self {
             Kind::Config => span_of::<ConfigFile>(text),
             Kind::Rules(_) => span_of::<RulesShape>(text),
@@ -113,7 +110,9 @@ impl Kind {
 fn span_of<Shape: DeserializeOwned>(text: &str) -> Option<Position> {
     let start = toml::from_str::<Shape>(text).err()?.span()?.start;
     let before = text.get(..start)?;
-    let line_start = before.rfind('\n').map_or(0, |newline| newline.saturating_add(1));
+    let line_start = before
+        .rfind('\n')
+        .map_or(0, |newline| newline.saturating_add(1));
     Some(Position {
         line: before.matches('\n').count().saturating_add(1),
         column: before.get(line_start..)?.chars().count().saturating_add(1),
@@ -136,5 +135,6 @@ fn read(path: &Path) -> Result<Option<String>, AxError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
 #[path = "check/tests.rs"]
 mod tests;

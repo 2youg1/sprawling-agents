@@ -43,10 +43,7 @@ fn each_kind_of_file_is_refused_at_the_line_and_column_of_its_error() {
     write(&city_config, "# the city\n  wrong = true\n");
     let lab_config = Layer::Building.file(root, &lab).unwrap();
     write(&lab_config, "\n\n[sandbox]\nmounts = []\nwat = 1\n");
-    write(
-        &schedule_path(root),
-        "[[job]]\nname = \"a\"\n    zap = 2\n",
-    );
+    write(&schedule_path(root), "[[job]]\nname = \"a\"\n    zap = 2\n");
     write(&watch_path(root), "\n[[source]]\nname = \"a\"\n\tzap = 1\n");
 
     let report = check(root).unwrap();
@@ -62,9 +59,9 @@ fn each_kind_of_file_is_refused_at_the_line_and_column_of_its_error() {
         vec![
             (city_config, at(2, 3), invalid),
             (lab_config, at(5, 1), invalid),
-            (rules, at(2, 4), found[2].2),
-            (schedule_path(root), at(3, 5), found[3].2),
-            (watch_path(root), at(4, 2), found[4].2),
+            (rules, at(2, 4), invalid),
+            (schedule_path(root), at(3, 5), invalid),
+            (watch_path(root), at(4, 2), invalid),
         ]
     );
     assert_eq!(report.read, 5);

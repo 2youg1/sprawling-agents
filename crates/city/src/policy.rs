@@ -40,9 +40,9 @@ mod reach;
 
 pub use cache::RulesCache;
 pub use desktop::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
-pub use evaluate::evaluate;
 /// The shape `evaluate` reads, for `check` to locate a refusal in.
 pub(crate) use evaluate::Written as RulesShape;
+pub use evaluate::evaluate;
 pub use reach::DomainReach;
 
 /// What a building is and what it may do: the one file this module

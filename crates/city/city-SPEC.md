@@ -944,7 +944,8 @@ pub fn install(city_root: &Path, slot: &Slot, package: &Path,
 // city::check
 pub struct Position { pub line: usize, pub column: usize }   // 都从 1 数；列按字符数，不按字节
 pub struct Finding { pub path: PathBuf, pub at: Option<Position>, pub error: AxError }
-pub fn check(city_root: &Path) -> Result<Vec<Finding>, AxError>;
+pub struct Report { pub read: usize, pub findings: Vec<Finding> }  // read：存在并读到的文件数
+pub fn check(city_root: &Path) -> Result<Report, AxError>;
 ```
 
 - **读哪些文件**：城层 `CONFIG.toml`；`building::all` 列出的每栋楼的楼层 `CONFIG.toml` 与 `RULES.toml`；`room::all` 列出的每个房间的居民层 `CONFIG.toml`；`SCHEDULE.toml`、`WATCH.toml`。不存在的文件不是错——城没写它就是默认。

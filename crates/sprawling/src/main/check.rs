@@ -63,7 +63,8 @@ mod tests {
         let finding = city::Finding {
             path: root.join(".sprawling").join("CONFIG.toml"),
             at: Some(city::Position { line: 2, column: 3 }),
-            error: kernel::AxError::failure(kernel::AxCode::ConfigInvalid, "read", "wrong"),
+            error: kernel::AxError::failure(kernel::AxCode::ConfigInvalid, "read", "wrong")
+                .with_recovery("fix it"),
         };
 
         assert_eq!(
