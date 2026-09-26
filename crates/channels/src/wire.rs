@@ -138,7 +138,11 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-pub const WIRE_V: u32 = 38;
+/// 39: the default is a layer. `Query::Config` answers the second
+///    context rung whether or not a file states it, naming
+///    `ConfigLayer::Default` when none does, so a page draws the city's
+///    figure instead of keeping a copy of it.
+pub const WIRE_V: u32 = 39;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

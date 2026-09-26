@@ -17,7 +17,10 @@
   //
   // A box left empty is the city's own default, written as nothing at
   // all. What is in force is what `Query::Config` answers - the file's
-  // word, read fresh - not this page's memory of a save.
+  // word, read fresh, and the layer it came from - not this page's
+  // memory of a save. The default is one of those layers, so the page
+  // draws the city's figure as the empty box's hint rather than keeping
+  // a copy of it.
 </script>
 
 <script lang="ts">
@@ -38,20 +41,20 @@
 
   const SECOND_MIN = 30;
   const SECOND_MAX = 90;
-  const SECOND_DEFAULT = 65;
 
   let box = $state("");
   let edited = $state(false);
 
   const config = $derived(u.conn.asking.ask({ config: { addr } }));
-  // What the file says, or an empty box for a building that states
-  // nothing - which is the default in force rather than a gap.
-  const onDisk = $derived.by((): string => {
+  // What is in force here and which layer said it, once the city has
+  // answered.
+  const settled = $derived.by(() => {
     const answer = $config;
-    if (answer === undefined || !("config" in answer)) return "";
-    const second = answer.config.second;
-    return second === null || second === undefined ? "" : String(second.percent);
+    return answer === undefined || !("config" in answer) ? undefined : answer.config.second;
   });
+  // What a file says, or an empty box where no file states the rung -
+  // which is the default in force rather than a gap.
+  const onDisk = $derived(settled === undefined || settled.from === "default" ? "" : String(settled.percent));
 
   let was: Address | undefined = undefined;
   $effect(() => {
@@ -68,7 +71,6 @@
     fill(say($lang, "context_second_range"), {
       min: String(SECOND_MIN),
       max: String(SECOND_MAX),
-      default: String(SECOND_DEFAULT),
     });
 
   function save(): void {
@@ -90,6 +92,7 @@
     step={1}
     suffix={say($lang, "context_second_unit")}
     mono
+    {...(settled?.from === "default" ? { placeholder: String(settled.percent) } : {})}
     value={box}
     onInput={(next: string) => {
       box = next;

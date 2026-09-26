@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 38 as const;
+export const WIRE_V = 39 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "ec0edce8d6c76a2f93d3a8957bf92bb7fe9277d466d45dacbce9dd7c438cf510" as const;
+export const WIRE_HASH = "7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -643,6 +643,7 @@ export type CommitsAnswer = typeof CommitsAnswer.Type;
  * disagree with the run about which file they are looking at.
  */
 export const ConfigLayer = Schema.Union(
+  Schema.Literal("default"),
   Schema.Literal("city"),
   Schema.Literal("building"),
   Schema.Literal("resident"),
@@ -717,7 +718,7 @@ export type TuningDefaults = typeof TuningDefaults.Type;
 export const ConfigAnswer = Schema.Struct({
   addr: Address,
   effort: Schema.optional(Schema.NullOr(SettledEffort)),
-  second: Schema.optional(Schema.NullOr(SettledSecond)),
+  second: SettledSecond,
   tuning: TuningDefaults,
 }).annotations({ identifier: "ConfigAnswer" });
 export type ConfigAnswer = typeof ConfigAnswer.Type;

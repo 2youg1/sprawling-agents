@@ -55,12 +55,16 @@ pub(crate) fn config_answer(
                 from: rung_of(layer),
             }
         }),
-        second: city::settled_second(city_root, addr)?.map(|(threshold, layer)| {
+        second: city::settled_second(city_root, addr)?.map_or(
             channels::SettledSecond {
+                percent: kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT,
+                from: channels::ConfigLayer::Default,
+            },
+            |(threshold, layer)| channels::SettledSecond {
                 percent: u64::from(threshold),
                 from: rung_of(layer),
-            }
-        }),
+            },
+        ),
         tuning: channels::TuningDefaults {
             timeout_ms: defaults.timeout_ms,
             request_max_retries: defaults.retries.stated(),
