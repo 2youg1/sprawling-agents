@@ -639,7 +639,7 @@ impl DigestCache {
 ### 8-12 memory::bundle（形状 4 适配器＋形状 2 值类型）
 
 ```rust
-pub struct Manifest { /* 私有；records、head、cas_objects、files */ }
+pub struct Manifest { /* 私有；records、head、cas_objects、files、history（包数与引用数） */ }
 impl Manifest {
     pub fn records(&self) -> u64;         pub fn head(&self) -> &str;   // 链头哈希
     pub fn cas_objects(&self) -> u64;     pub fn files(&self) -> u64;
@@ -660,6 +660,7 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 - **为何是目录而非单文件**：单文件要么自造容器格式（多一个要养的格式），要么引 tar／zip 依赖。目录两者都不要，且任何备份工具都能再打包一层——压缩不是本模块的职责。
 - **清单是完整性的依据**：`MANIFEST.json` 记下记录数、链头哈希、CAS 对象数与文件数；`restore` 恢复后重算并比对。不对即拒，而不是“恢复了但少了几条”——后者是历史失真。
 - **四个数由 `Manifest::of(vfs, ledger_dir, cas_dir, files_root)` 一处算出**（B-46）：导出量目的地、恢复量城本身、比较的两侧因此是同一种测量。
+- **清单也数随行的历史：`history_packs` 与 `history_refs`**，由 `history::Carried::of(vfs, bundle)` 一处量出 bundle 的 `history/` 里有几个包、几条引用。导出端量目的地写进清单；恢复端在复制任何东西之前量 bundle 本身再比，不等即整次拒绝（`MemoryError::Bundle { op: "restore" }`）——删掉包的 bundle 若照常恢复，文件与账本已落、引用却指向不存在的对象，全成或全不成就破了。清单没有这两个键时读作 0：v0.0.6 的导出不写 `history/`，于是一份被剥掉这两个键、却仍带 `history/` 的 bundle 照样被拒。被否：恢复后再从新仓库反查（那时城文件已经落下，拒绝只能留下半座城）。
   `walk` 返回 `Result`：不存在的目录算空（尚无 CAS 的城），读不动的目录停下并带路径上报——一个子目录静默贡献零个文件，正是一份短了的备份与它自己的清单相符的来路。
   `restore` 比四个字段而不是两个：丢了 CAS 对象的 bundle 链校全绿、Locator 全部指空，只有对象数说得出这件事。
 - **清单的四个数全部读自导出结果，因而不能自证**（B-46）：一次把半座城丢掉的拷贝与它自己的清单完全相符。故 `export` **另取源侧的五个数**——账本文件数、CAS 对象数、城内文件数、账本记录数、链头——与目的地逐项比，任一项不等即拒。源侧的数从 `copy_tree`／`copy_city_files` 的返回值来，那正是从前被 `let _ = records;` 丢掉的那个数。

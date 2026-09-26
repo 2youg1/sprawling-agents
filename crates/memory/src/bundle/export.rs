@@ -15,7 +15,7 @@ use crate::vfs::Vfs;
 use super::files::{
     copy_city_files, copy_tree, count_files, count_records, head_of, only_city_files, walk,
 };
-use super::history::{self, History};
+use super::history::{self, Carried, History};
 use super::landing::{Bits, land};
 use super::manifest::{CAS, CITY, LEDGER, MANIFEST, Manifest};
 
@@ -62,7 +62,10 @@ impl Bundle {
         history::export(vfs.as_mut(), city_root, dest)?;
         // Every number in the manifest is read back from the bundle, so
         // the manifest states what a reader of the bundle will find.
-        let manifest = Manifest::of(vfs.as_ref(), &dest_ledger, &dest_cas, &dest_city)?;
+        let manifest = Manifest {
+            history: Carried::of(vfs.as_ref(), dest)?,
+            ..Manifest::of(vfs.as_ref(), &dest_ledger, &dest_cas, &dest_city)?
+        };
         // A manifest read only from the bundle certifies itself: a copy
         // that silently dropped half the city agrees with its own
         // manifest. The source side is therefore counted separately and
@@ -156,6 +159,18 @@ impl Bundle {
                 detail: format!("{} already holds a ledger", ledger_dir.display()),
             });
         }
+        // Counted off the bundle before anything is copied: a pack that
+        // went missing is refused while the city root is still empty.
+        let carried = Carried::of(vfs.as_ref(), bundle)?;
+        if carried != claimed.history {
+            return Err(MemoryError::Bundle {
+                op: "restore",
+                detail: format!(
+                    "the bundle claims {} history pack(s) and {} ref(s), and holds {} and {}",
+                    claimed.history.packs, claimed.history.refs, carried.packs, carried.refs
+                ),
+            });
+        }
         let history = History::read(vfs.as_ref(), bundle, city_root)?;
         copy_tree(vfs.as_mut(), city_root, &bundle.join(LEDGER), &ledger_dir)?;
         copy_tree(vfs.as_mut(), city_root, &bundle.join(CAS), &cas_dir)?;
@@ -168,7 +183,10 @@ impl Bundle {
         // the history that points at them: the chain verifies, every
         // Locator resolves to nothing, and only the object count says
         // so.
-        let restored = Manifest::of(vfs.as_ref(), &ledger_dir, &cas_dir, city_root)?;
+        let restored = Manifest {
+            history: carried,
+            ..Manifest::of(vfs.as_ref(), &ledger_dir, &cas_dir, city_root)?
+        };
         if restored != claimed {
             return Err(MemoryError::Bundle {
                 op: "restore",
@@ -208,4 +226,4 @@ mod tests;
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod legacy_tests;
+mod history_tests;

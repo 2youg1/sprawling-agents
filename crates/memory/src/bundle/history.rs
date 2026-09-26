@@ -37,6 +37,39 @@ fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
     }
 }
 
+/// How much history a bundle's `history/` directory holds, the count
+/// its manifest states and a restore checks before it copies anything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct Carried {
+    pub(crate) packs: u64,
+    pub(crate) refs: u64,
+}
+
+impl Carried {
+    /// Counts the packs and ref lines under `bundle`'s history
+    /// directory; a bundle with none carries zero of each.
+    ///
+    /// # Errors
+    /// I/O failures naming the path.
+    pub(crate) fn of(vfs: &dyn Vfs, bundle: &Path) -> Result<Carried, MemoryError> {
+        let dir = bundle.join(HISTORY);
+        let at = dir.join(REFS);
+        let refs = match vfs.exists(&at) {
+            true => vfs
+                .read(&at)
+                .map_err(io_err("read the history refs", &at))?
+                .split(|byte| *byte == b'\n')
+                .filter(|line| !line.is_empty())
+                .count(),
+            false => 0,
+        };
+        Ok(Carried {
+            packs: u64::from(vfs.exists(&dir.join(PACK))),
+            refs: u64::try_from(refs).map_err(|_| malformed(&at))?,
+        })
+    }
+}
+
 /// Packs the history of the repository at `city_root` into `dest`.
 /// A city that is no repository has no history, and its bundle carries
 /// no history directory.

@@ -288,7 +288,7 @@ fn a_bundle_carrying_git_metadata_is_refused_rather_than_planted() {
 
 /// Every commit subject from `HEAD` back, newest first; a directory
 /// that is no repository has no history to list.
-fn log_of(root: &std::path::Path) -> Vec<String> {
+pub(super) fn log_of(root: &std::path::Path) -> Vec<String> {
     let Ok(repo) = git2::Repository::open(root) else {
         return Vec::new();
     };
@@ -366,35 +366,4 @@ pub(super) fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> u64 {
         }
     }
     copied
-}
-
-/// A v0.0.6 export copied the repository whole into `city/.git` and
-/// counted its files in the manifest; its objects and refs come back,
-/// its hooks and config do not.
-#[test]
-fn a_v006_bundle_brings_back_its_history_and_not_its_hooks() {
-    let home = tempfile::tempdir().unwrap();
-    city_with(1, home.path());
-    let before = committed_twice(home.path());
-    let hooks = home.path().join(".git").join("hooks");
-    std::fs::create_dir_all(&hooks).unwrap();
-    std::fs::write(hooks.join("post-checkout"), b"escalate").unwrap();
-    let carried = tempfile::tempdir().unwrap();
-    Bundle::export(home.path(), carried.path()).unwrap();
-    std::fs::remove_dir_all(carried.path().join(super::history::HISTORY)).unwrap();
-    let whole = copy_dir(
-        &home.path().join(".git"),
-        &carried.path().join(CITY).join(".git"),
-    );
-    let at = carried.path().join(MANIFEST);
-    let mut manifest = Manifest::from_json(&std::fs::read(&at).unwrap(), &at).unwrap();
-    manifest.files = manifest.files.saturating_add(whole);
-    std::fs::write(&at, manifest.to_json()).unwrap();
-
-    let elsewhere = tempfile::tempdir().unwrap();
-    let restored = Bundle::restore(carried.path(), elsewhere.path()).map_err(|e| e.to_string());
-    assert_eq!(restored.map(|_| ()), Ok(()));
-    assert_eq!(log_of(elsewhere.path()), before);
-    let git = elsewhere.path().join(".git");
-    assert!(!git.join("hooks").join("post-checkout").exists());
 }

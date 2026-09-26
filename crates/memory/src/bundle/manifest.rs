@@ -11,6 +11,7 @@ use crate::error::MemoryError;
 use crate::vfs::Vfs;
 
 use super::files::{count_files, count_records, head_of};
+use super::history::Carried;
 
 /// What a bundle claims to contain. Checked on restore, so a truncated
 /// or half-copied bundle is refused rather than restored quietly.
@@ -20,6 +21,7 @@ pub struct Manifest {
     pub(crate) head: String,
     pub(crate) cas_objects: u64,
     pub(crate) files: u64,
+    pub(crate) history: Carried,
 }
 
 impl Manifest {
@@ -49,6 +51,7 @@ impl Manifest {
             head: head_of(vfs, ledger_dir)?,
             cas_objects: count_files(vfs, cas_dir)?,
             files: count_files(vfs, files_root)?,
+            history: Carried::default(),
         })
     }
 
@@ -85,6 +88,8 @@ impl Manifest {
         );
         map.insert("cas_objects".to_owned(), self.cas_objects.into());
         map.insert("files".to_owned(), self.files.into());
+        map.insert("history_packs".to_owned(), self.history.packs.into());
+        map.insert("history_refs".to_owned(), self.history.refs.into());
         serde_json::Value::Object(map).to_string()
     }
 
@@ -103,6 +108,10 @@ impl Manifest {
                     detail: format!("{} has no {key}", at.display()),
                 })
         };
+        let carried = |key: &str| match value.get(key) {
+            Some(_) => number(key),
+            None => Ok(0),
+        };
         Ok(Manifest {
             records: number("records")?,
             head: value
@@ -115,6 +124,12 @@ impl Manifest {
                 .to_owned(),
             cas_objects: number("cas_objects")?,
             files: number("files")?,
+            // A v0.0.6 manifest predates these keys and its bundle has
+            // no history directory, which is what zero states.
+            history: Carried {
+                packs: carried("history_packs")?,
+                refs: carried("history_refs")?,
+            },
         })
     }
 }
