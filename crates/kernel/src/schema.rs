@@ -7,8 +7,8 @@
 //!
 //! Every other value on the wire derives its schema from the declaration
 //! serde reads, so the two cannot drift. These are the strings a grammar
-//! judges: `Address`, `RunId` and `SessionName` serialise through
-//! `Display` and read through their own constructor, so a derive would
+//! judges: `Address`, `RunId`, `SessionName` and `ServerLabel` read
+//! through their own constructor, so a derive would
 //! say a field is a string and nothing about what it must say. Each
 //! schema states that grammar as a pattern, which `cargo xtask wire-ts`
 //! turns into the client's own check (kernel-SPEC.md section 8-45).
@@ -27,6 +27,7 @@ use crate::address::{Address, SESSION_NAME_MAX, SessionName};
 use crate::error::AxCode;
 use crate::idem::IdemKey;
 use crate::locator::{B3Hash, GitOid, Locator};
+use crate::tool::ServerLabel;
 
 /// A string schema with a description and, where the grammar is one line
 /// long, the pattern that states it.
@@ -58,6 +59,11 @@ const ADDRESS_PATTERN: &str = concat!(
 /// `urn:uuid:` prefix and upper case; a city that took those would name
 /// runs in identities its own reader calls unknown.
 const RUN_ID_PATTERN: &str = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$";
+
+/// The grammar [`ServerLabel::parse`] enforces: one or more ascii
+/// lowercase letters and digits, and nothing else - no underscore, which
+/// would make the tool names built on the label split two ways.
+const SERVER_LABEL_PATTERN: &str = "^[a-z0-9]+$";
 
 /// The grammar [`SessionName::parse`] enforces, as a pattern: the
 /// whitespace the constructor trims from either end, one address segment
@@ -111,6 +117,18 @@ impl JsonSchema for Address {
              none `.` or `..`, no backslash, no `:`, no control character, and no segment \
              ending in a dot or whitespace, as `kernel::Address::parse` accepts it.",
             Some(ADDRESS_PATTERN),
+        )
+    }
+}
+
+impl JsonSchema for ServerLabel {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("ServerLabel")
+    }
+    fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
+        string_schema(
+            "How one external tool server is named inside this city: ascii lowercase letters              and digits, at least one, as `kernel::ServerLabel::parse` accepts it.",
+            Some(SERVER_LABEL_PATTERN),
         )
     }
 }
@@ -211,6 +229,8 @@ mod tests {
     static ADDRESS_MATCHER: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(ADDRESS_PATTERN).unwrap());
     static RUN_ID_MATCHER: LazyLock<Regex> = LazyLock::new(|| Regex::new(RUN_ID_PATTERN).unwrap());
+    static SERVER_LABEL_MATCHER: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(SERVER_LABEL_PATTERN).unwrap());
     static SESSION_NAME_MATCHER: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(&session_name_pattern()).unwrap());
 
@@ -373,6 +393,15 @@ mod tests {
         #[test]
         fn the_address_pattern_answers_what_the_constructor_answers(raw in boundary_text()) {
             prop_assert_eq!(ADDRESS_MATCHER.is_match(&raw), Address::parse(&raw).is_ok());
+        }
+
+        /// The same question for a server label, over the characters
+        /// either statement could get wrong: case, the underscore that
+        /// would split a tool name two ways, and the hyphen a page once
+        /// allowed.
+        #[test]
+        fn the_server_label_pattern_answers_what_the_constructor_answers(raw in "[a-zA-Z0-9_ -]{0,6}") {
+            prop_assert_eq!(SERVER_LABEL_MATCHER.is_match(&raw), ServerLabel::parse(&raw).is_ok(), "{}", raw);
         }
 
         /// The same question for run identity: the city takes the one

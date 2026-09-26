@@ -197,20 +197,9 @@ export const McpTransport = Schema.Union(
 export type McpTransport = typeof McpTransport.Type;
 
 /**
- * How one external server is named inside this city.
- * 
- * The label is the first segment of every tool that server offers
- * (`{label}_{tool}`), so two servers that both offer `search` stay two
- * tools rather than becoming one that sometimes does the wrong thing.
- * Its grammar is [`ToolName`]'s minus the underscore: allowing one
- * would let `apps_foo_bar` be read as two different splits, and this
- * name routes a call.
- * 
- * It lives here rather than beside the protocol that uses it because
- * the rule it enforces is a rule about tool names, and a rule written
- * in two crates is a rule with two authorities.
+ * How one external tool server is named inside this city: ascii lowercase letters and digits, at least one, as `kernel::ServerLabel::parse` accepts it.
  */
-export const ServerLabel = Schema.String.pipe(Schema.brand("ServerLabel"));
+export const ServerLabel = Schema.String.pipe(Schema.pattern(new RegExp("^[a-z0-9]+$", "u"))).pipe(Schema.brand("ServerLabel"));
 export type ServerLabel = typeof ServerLabel.Type;
 
 /**
