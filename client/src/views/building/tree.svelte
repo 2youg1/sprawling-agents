@@ -20,6 +20,7 @@
   // any other.
   import { Option } from "effect";
 
+  import { within } from "../../core/belief/live";
   import { say } from "../../core/lang";
   import { readRunId } from "../../core/run_id";
   import { kib } from "../../core/time";
@@ -104,12 +105,7 @@
   // frozen.
   function lit(isDir: boolean, here: Address, transcript: RunId | null): boolean {
     if (isDir) {
-      return Object.values($belief.runs).some(
-        (run) =>
-          run.doing.kind !== "frozen" &&
-          run.addr !== null &&
-          (run.addr === here || run.addr.startsWith(`${here}/`)),
-      );
+      return $belief.live.some((run) => within(run, here));
     }
     if (transcript === null) return false;
     const run = $belief.runs[transcript];

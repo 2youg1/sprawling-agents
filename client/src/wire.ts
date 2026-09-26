@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "655d38fee9b266e84681324441296e8106975927f9c6939fa1e5c2620320e72c" as const;
+export const WIRE_HASH = "1dbef54ae8af494c7f0ff3cff7c8753f9d797960f4876a3ea5a129c6ce6f90de" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -741,10 +741,9 @@ export const ContentAnswer = Schema.Struct({
 export type ContentAnswer = typeof ContentAnswer.Type;
 
 /**
- * The five cuts of one authoritative total. Each dimension sums to
- * `total` exactly; the interface renders shares against `total` rather
- * than normalising its own rows, so an unattributed remainder stays
- * visible instead of being divided away.
+ * The five cuts of one authoritative total. Four cuts sum to `total`;
+ * `by_run` names the active runs and the few billed most, so it may sum
+ * to less. Shares render against `total`, so a remainder stays visible.
  */
 export const CostAnswer = Schema.Struct({
   by_actor: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
@@ -1480,9 +1479,23 @@ export const GateRefusal = Schema.Struct({
 export type GateRefusal = typeof GateRefusal.Type;
 
 /**
- * The unified error shape: seven wire fields, serialized in declaration
- * order (determinism rule 6). The model is the recovery subject: `nearby`
- * and `recovery` must hold directly executable information, not apologies.
+ * Whether the same request may go out again, said together with
+ * whether its effect already landed. On the wire `"yes"`, `"no"` or
+ * `"unknown"`; a ledger record written as `retriable: true/false`
+ * reads as `Yes`/`No`.
+ */
+export const Retry = Schema.Union(
+  Schema.Literal("yes"),
+  Schema.Literal("no"),
+  Schema.Literal("unknown"),
+).annotations({ identifier: "Retry" });
+export type Retry = typeof Retry.Type;
+
+/**
+ * The unified error shape: seven wire fields and one that is left out
+ * when absent, serialized in declaration order (determinism rule 6).
+ * The model is the recovery subject: `nearby` and `recovery` must hold
+ * directly executable information, not apologies.
  * 
  * Everything but `code` sits behind one Box so the type stays cheap in
  * every seam's return slot (`result_large_err`); serde flatten keeps the
@@ -1494,7 +1507,8 @@ export const AxError = Schema.Struct({
   gate: Schema.optional(Schema.NullOr(GateRefusal)),
   nearby: Schema.Array(Schema.String),
   recovery: Schema.String,
-  retriable: Schema.Boolean,
+  retry: Retry,
+  retry_after_ms: Schema.optional(Schema.NullOr(Schema.Int)),
   subject: Schema.String,
 }).annotations({ identifier: "AxError" });
 export type AxError = typeof AxError.Type;
@@ -1975,6 +1989,15 @@ export const RoundsAnswer = Schema.Struct({
 export type RoundsAnswer = typeof RoundsAnswer.Type;
 
 /**
+ * What each run a `Query::RunCosts` named was billed.
+ */
+export const RunCostsAnswer = Schema.Struct({
+  asked: Schema.Array(RunId),
+  runs: Schema.Array(Schema.Tuple(RunId, UsdMicros)),
+}).annotations({ identifier: "RunCostsAnswer" });
+export type RunCostsAnswer = typeof RunCostsAnswer.Type;
+
+/**
  * Which shelf a holding sits on, and where its document is.
  * 
  * One value rather than a shelf name beside a path, because a holding
@@ -2170,6 +2193,9 @@ export const Answer = Schema.Union(
   }),
   Schema.Struct({
     cost_of: CostOfAnswer,
+  }),
+  Schema.Struct({
+    run_costs: RunCostsAnswer,
   }),
   Schema.Struct({
     listing: ListingAnswer,
@@ -2587,6 +2613,12 @@ export const Command = Schema.Union(
     }),
   }),
   Schema.Struct({
+    restore_discard: Schema.Struct({
+      idem: IdemKey,
+      restoration: Restoration,
+    }),
+  }),
+  Schema.Struct({
     doctor_install: Schema.Struct({
       idem: IdemKey,
       item: Schema.String,
@@ -2830,6 +2862,11 @@ export const Query = Schema.Union(
   Schema.Struct({
     config: Schema.Struct({
       addr: Address,
+    }),
+  }),
+  Schema.Struct({
+    run_costs: Schema.Struct({
+      runs: Schema.Array(RunId),
     }),
   }),
 ).annotations({ identifier: "Query" });

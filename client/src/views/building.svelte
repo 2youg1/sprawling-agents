@@ -49,6 +49,7 @@
   import { halt, pursue, release } from "../core/commands";
   import { fill, say } from "../core/lang";
   import { roomOf, toFragment } from "../core/route";
+  import { within } from "../core/belief/live";
   import { buildingIsShut } from "../core/scope";
   import { ui } from "../ui";
   import type { Address, BuildingAnswer, Query } from "../wire";
@@ -120,12 +121,7 @@
   // How many runs are working at or below a room, which is what the
   // rooms column lights its dots for.
   function livingIn(room: Address): number {
-    return Object.values($belief.runs).filter(
-      (run) =>
-        run.doing.kind !== "frozen" &&
-        run.addr !== null &&
-        (run.addr === room || run.addr.startsWith(`${room}/`)),
-    ).length;
+    return $belief.live.filter((run) => within(run, room)).length;
   }
 </script>
 

@@ -135,7 +135,12 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `answered.ts` | 1 判定 | `readAnswer(answer, pick) -> Answered<T>`，`Answered = asking \| held { value } \| unavailable { query }`：一个视图只画一种变体，槽里的其余答案仍是答案——`Answer::Unavailable` 带回城拼写的那一问，别的变体以自己的键名为 `query`；视图用 `views/parts/unanswered.svelte` 画它，恢复是 `asking.refresh` 再问一次。不折成「还在问」或「空」，因为那两种读法把「城没能看」说成「城在忙」或「城是空的」 |
 | `belief.ts` | 7 投影 | `createBelief() -> { belief, adoptCity, apply(record) -> string \| null, say(delta), logged(line), refused(error), named(city), noticesSeen, batch(folds) }`——`batch` 里的折叠只在最外层结束时 `set` 一次，`socket.ts` 的 `drain`（连同其中 `filled` 折的缺口页）与 welcome 各是一批，所以两帧之间的一串记录是一次更新、一次重绘；`Belief { runs, halted, haltedAt, refusal, notices, city, probed, logs }`；`RunBelief { run, addr, started, task, lastSeq, doing, local, saying, thinking }`；`Notice { error, seen, at: TimeMs, key: string, count: number, about: Address \| RunId \| null }`——`refused()` 按 `key`（`code + subject`）合并同文并计 `count`，`at` 取首见时刻；`adopted(summary, held)`。**`apply` 答的是它读不出的字段名**（如 `tool_called.name`），`null` 才是读全了：一份形状不对的载荷仍然推进位置，但静默当作缺席的读法已删 |
 | `belief/adopted.ts` | 1 判定 | `adopted(summary, held) -> RunBelief`：一行 `city_view` 读成一个 run 的信念，页面自己读到的更新时它胜出；城页与 run 页共用这一处。 |
+| `belief.ts` | 7 投影 | `createBelief() -> { belief, adoptCity, apply(record) -> string \| null, say(delta), logged(line), refused(error), named(city), noticesSeen, batch(folds) }`——`batch` 里的折叠只在最外层结束时 `set` 一次，`socket.ts` 的 `drain`（连同其中 `filled` 折的缺口页）与 welcome 各是一批，所以两帧之间的一串记录是一次更新、一次重绘；`Belief { runs, live, rooms, cancelled, halted, haltedAt, refusal, notices, city, probed, logs }`；`RunBelief { run, addr, started, task, lastSeq, doing, local, saying, thinking }`；`Notice { error, seen, at: TimeMs, key: string, count: number, about: Address \| RunId \| null }`——`refused()` 按 `key`（`code + subject`）合并同文并计 `count`，`at` 取首见时刻。**`apply` 答的是它读不出的字段名**（如 `tool_called.name`），`null` 才是读全了：一份形状不对的载荷仍然推进位置，但静默当作缺席的读法已删 |
+| `belief/adopted.ts` | 7 投影 | `adopted(summary, held) -> RunBelief`：一行 `city_view` 读成 belief，流已经知道而行没带的字段留着；`adoptCity` 与 run 页（经链接到达、从没流过的 run 只有这一行）共读 |
 | `belief/runs.svelte.ts` | 7 投影 | `runTable(held) -> Record<RunId, RunBelief>`：run 表是 `$state`，每个 run 是一个响应式对象。`say(delta)` 对已持有的 run 就地追加 `saying`／`thinking`，不重发 `belief`，只唤醒读这个 run 这个字段的读者；只有 delta 带来新 run（表的形状变了）才发布一次。记录的折叠与 `adoptCity` 仍整值写入并发布。测试经 `client/bunfig.toml` 预载的 `scripts/runes.ts` 用 `compileModule` 编 `.svelte.ts`（含 `*.svelte.test.ts`），与 vite 进产物同一编译器 |
+| `belief/live.ts` | 7 投影 | `Belief.live: readonly RunBelief[]`——没冻结的 run，按 `started` 从旧到新，是「哪些 run 在干活」的唯一权威；`livened(live, run) -> readonly RunBelief[]` 在每次折叠里按这一个 run 改写它，O(L)（L 为在干活的 run 数），`liveOf(runs)` 只在 `adoptCity` 整表换写时 O(R) 重建；`within(run, room) -> boolean` 与它读的 `inside(addr, room) -> boolean` 是「在这个房间或其下」的唯一拼写；`newestWorking(belief, room) -> RunBelief | undefined` 从 `live` 取这个房间最新的在干活的 run，是输入框 steer、`/stop` 与房间页「正在进行」三处共读的唯一答案，O(L)。视图读 `$belief.live` 而不再各自 `Object.values(runs).filter(…)`：R = 1e4 时一次记录折叠加一次读「在干活的 run」≤ 20 µs（`belief/live.test.ts`） |
+| `belief/rooms.ts` | 7 投影 | `Belief.rooms: ReadonlyMap<string, readonly RunId[]>`——每个房间持有过的 run（在干活的与已冻结的），按 `started` 从旧到新，只存 `RunId`，所以一次折叠只在 run 进表、换房间或换开始时刻时改写那一个房间的列表，O(k)（k 为该房间的 run 数），其余折叠不动索引；`adoptCity` 整表换写时 O(R log R) 重建。`heldIn(belief, room) -> RunBelief[]`（恰在这个房间）与 `heldWithin(belief, room) -> RunBelief[]`（这个房间及其下，按 `inside`）是房间页、目录、城市面板与天际线共读的答案，读者付 O(房间数 + k)：R = 1e4、百个房间时一次记录折叠加一次读一个房间 ≤ 500 µs（`belief/live.test.ts`）。同一开始时刻的两个 run 按进表先后排 |
+| `belief/cancelled.ts` | 7 投影 | `Belief.cancelled: number`——冻结原因是 `cancelled` 的 run 数（线协议不带一次停机冻结了多少，停机写的正是这个原因）。`recounted(count, was, run) -> number` 在每次折叠里只看这一个 run 的前后两次读数，O(1)；`cancelledOf(runs)` 只在 `adoptCity` 整表换写时 O(R) 重数。页面的停机行读它：R = 1e4 时一次记录折叠加一次读 ≤ 500 µs（`belief/live.test.ts`） |
 | `doing.ts` | 2 值 | `Doing = unknown \| thinking \| calling { tool: string \| null, subject } \| waiting \| frozen { completion }`、`Sending = dispatch \| steer \| queued`、`sendingInto(doing)`；`MOVING`／`moves(kind)`／`PHASES` 是「哪些 kind 陈述姿态、各自陈述什么」的独家表，流与答案两条路都读它 |
 | `landing.ts` | 1 判定 | `sentFrom(from, task, runs) -> Sent`（发出那一刻记下房间、任务原文与已知的 run）、`landingOf(sent, runs) -> Landing`，`Landing` 穷尽（`pending`／`here`／`elsewhere { run, addr }`）：`run_started` 之后第一个「发出时不认识、`task` 与原文相同、`addr` 是发出的房间或它下面任一层的房间」的 run 就是这次派的活；落在原房间时线程已经画出它，落在别处时 `talk/landed.svelte` 在原地留一行可点的去处（见 12-4） |
 | `reading.ts` | 4 适配器 | `taskOf(record)`、`toolCall(record)`、`completionOf(record)`、`haltOf(record)`，各答 `[值, 读不出的字段名 \| null]`；`kernel::event::record` 的字段名与 serde 属性（`Option` 与 `#[serde(default)]` 各是什么意思）在客户端只有这一处拼写 |
@@ -427,6 +432,20 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：两者给同样的逐键粒度——读 `runs[id].saying` 的 effect 只因这个 run 这个字段重跑，遍历表的读者只因 run 的增删重跑（`belief/grain.svelte.test.ts` 判定）。记录的写法让十余个按 `runs[id]`、`Object.values(runs)` 读表的视图一行不改。在 R = 1e4、一帧 50 个 delta、一个读全表的订阅者下，每帧折叠从约 470–540 µs 降到约 30–40 µs（`belief/fold_cost.test.ts`，同一仪表前后交错测），因为 delta 不再让订阅者走一遍表。
 - **被击败的备选**：`SvelteMap<RunId, RunBelief>`。粒度相同，但每个读者都得改成 `get`／`values()`，且对已有键 `set` 新值时，有遍历读者就会连带推进迭代版本。
 - **重开参数**：视图改由 belief 暴露的派生索引读表（不再直接下标）时，表的容器可以换，读者迁移的成本就不再存在。
+
+### 12-4 「在干活的 run」是 belief 维护的索引，不是每个视图的过滤
+
+- **决策**：belief 在折叠时维护 `Belief.live`（没冻结的 run，按开始时刻排），视图读它；「run 在房间或其下」只有 `within` 一个拼写。
+- **理由**：七个视图各自对整张 run 表过滤、排序来回答同一个问题，每次发布都付 O(R)，而且「在干活」与「在房间下」各有四份拼写，改一处不会带动其余。在干活的 run 受并发上限约束，远少于表里的 run，所以一次折叠只按那一个 run 改写 O(L) 的索引，读者付 O(L)。
+- **被击败的备选**：读时计算的 `$derived`（按表派生）。它仍在每次发布时走一遍表，只是把重复的代码收成一份，代价不变。
+- **重开参数**：在干活的 run 数与表的大小同阶时（L ≈ R），维护索引不再比读时过滤便宜。
+
+### 12-5 房间的 run 是 belief 维护的按房间索引，存 `RunId`
+
+- **决策**：belief 按房间维护 run 的 `RunId` 列表（`Belief.rooms`），房间页、目录、城市面板与天际线经 `heldIn`／`heldWithin` 读它。
+- **理由**：四个视图各自对整张 run 表过滤、排序，每次发布都付 O(R)；房间的历史含已冻结的 run，`live` 答不了。表里的 run 每次折叠都换成新对象，索引若存对象就得每次折叠改写列表；存 `RunId` 时，只有 run 进表、换房间或换开始时刻才动索引。
+- **被击败的备选**：存 `RunBelief` 对象的索引。每次折叠都要在列表里替换那个 run，O(k) 的复制发生在每个 token 上。
+- **重开参数**：run 表不再每次折叠换对象（就地改写）时，存对象的索引不再多付复制。
 
 ### 12-3 拒绝框的正文是城写的出路，不是按码查的原因
 

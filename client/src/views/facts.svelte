@@ -76,11 +76,7 @@
   // The run that is going. The strip speaks for one run because a
   // person watching a city is watching the thing that is moving; when
   // two are moving the newest is the one they just started.
-  const moving = derived(belief, (held): RunBelief | null => {
-    const going = Object.values(held.runs).filter((run) => run.doing.kind !== "frozen");
-    going.sort((a, b) => (a.started ?? 0) - (b.started ?? 0));
-    return going.at(-1) ?? null;
-  });
+  const moving = derived(belief, (held): RunBelief | null => held.live.at(-1) ?? null);
 
   // What boxes in the run that is going. A sandbox is a property of the
   // building the work happens in, so the question is asked of that

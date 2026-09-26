@@ -31,6 +31,9 @@ import type { Belief, RunBelief } from "./belief/shape";
 import { LOG_WINDOW, merged } from "./belief/shape";
 import { runTable } from "./belief/runs.svelte";
 import { adopted } from "./belief/adopted";
+import { livened, liveOf } from "./belief/live";
+import { roomed, roomsOf } from "./belief/rooms";
+import { cancelledOf, recounted } from "./belief/cancelled";
 export type { Belief, Notice, RunBelief } from "./belief/shape";
 
 function unseen(run: RunId, at: Seq): RunBelief {
@@ -151,6 +154,9 @@ export function createBelief(now: () => number): BeliefStore {
   // unsubscribing once per record.
   let current: Belief = {
     runs: runTable({}),
+    live: [],
+    rooms: new Map(),
+    cancelled: 0,
     halted: [],
     haltedAt: Seq.make(0),
     refusal: null,
@@ -215,9 +221,13 @@ export function createBelief(now: () => number): BeliefStore {
       if (listed.has(run)) continue;
       if (was.local) runs[run] = { ...was, local: false };
     }
+    const table = runTable(runs);
     written({
       ...held,
-      runs: runTable(runs),
+      runs: table,
+      live: liveOf(table),
+      rooms: roomsOf(table),
+      cancelled: cancelledOf(table),
       halted: stated >= held.haltedAt ? [...city.halted] : held.halted,
       haltedAt: stated >= held.haltedAt ? stated : held.haltedAt,
     });
@@ -286,9 +296,16 @@ export function createBelief(now: () => number): BeliefStore {
   // holds; the table is the store's own, so the new top-level belief is
   // what tells a subscriber that something moved, and every run it holds
   // is a fresh object whenever its reading changed.
+  //
+  // The working runs move with it: the index holds the table's own
+  // reading of the run, so the words written into it in place reach a
+  // reader of the index too.
   function folded(held: Belief, run: RunId, next: RunBelief): void {
+    const was = held.runs[run];
+    const rooms = roomed(held, was, next);
+    const cancelled = recounted(held.cancelled, was, next);
     held.runs[run] = next;
-    written({ ...held });
+    written({ ...held, live: livened(held.live, held.runs[run] ?? next), rooms, cancelled });
   }
 
   // One piece of what the model is producing. A page that joins in the
@@ -350,10 +367,12 @@ export function createBelief(now: () => number): BeliefStore {
     }
     const notices = merged(held.notices, error, TimeMs.make(now()));
     const run = error.action.startsWith("steer") ? held.runs[error.subject] : undefined;
-    if (run !== undefined && run.doing.kind !== "frozen") {
-      held.runs[error.subject] = { ...run, doing: PHASES.run_frozen };
-    }
-    written({ ...held, refusal: error, notices });
+    batch(() => {
+      if (run !== undefined && run.doing.kind !== "frozen") {
+        folded(held, run.run, { ...run, doing: PHASES.run_frozen });
+      }
+      written({ ...current, refusal: error, notices });
+    });
   }
 
   // The name the welcome carried: a page that only hears what happens

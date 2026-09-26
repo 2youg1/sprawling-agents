@@ -23,7 +23,8 @@
   // columns into a space that holds one.
   import { cancel, dispatch, openSession, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
-  import type { RunBelief } from "../core/belief";
+  import { newestWorking } from "../core/belief/live";
+  import { heldIn } from "../core/belief/rooms";
   import { fill, say } from "../core/lang";
   import { landingOf, sentFrom } from "../core/landing";
   import type { Landing, Sent } from "../core/landing";
@@ -58,12 +59,8 @@
 
   // The runs of this room, oldest first. A run whose room is not yet
   // known is not shown here rather than shown in the wrong room.
-  const runs = $derived.by((): RunBelief[] =>
-    Object.values($belief.runs)
-      .filter((run) => run.addr === address)
-      .sort((a, b) => (a.started ?? 0) - (b.started ?? 0) || a.lastSeq - b.lastSeq),
-  );
-  const live = $derived([...runs].reverse().find((run) => run.doing.kind !== "frozen"));
+  const runs = $derived(heldIn($belief, address));
+  const live = $derived(newestWorking($belief, address));
   const isMayor = $derived(address === MAYOR);
   const who = $derived(roomOf(address));
 

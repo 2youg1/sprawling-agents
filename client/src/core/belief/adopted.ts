@@ -6,7 +6,6 @@
 import { PHASES, moves } from "../doing";
 import type { Doing } from "../doing";
 import type { RunSummary } from "../../wire";
-
 import type { RunBelief } from "./shape";
 
 // What an answer says a frozen run's ending was. The completion is the

@@ -30,7 +30,7 @@ const REFUSED: Refused = {
     subject: SENTENCE,
     recovery: "open a new session or fork",
     nearby: [],
-    retriable: false,
+    retry: "no",
   },
   about: FOLDED,
 };

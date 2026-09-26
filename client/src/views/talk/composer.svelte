@@ -30,6 +30,7 @@
   import { get } from "svelte/store";
 
   import { QUERIES } from "../../core/asking";
+  import { newestWorking } from "../../core/belief/live";
   import { selectModel } from "../../core/commands";
   import type { Sending } from "../../core/doing";
   import { fill, say } from "../../core/lang";
@@ -50,7 +51,6 @@
     draftAt,
     effortLevel,
     menuColumns,
-    newestRun,
     pickSlash,
     pills,
     roomsKnown,
@@ -180,11 +180,11 @@
   const rooms = $derived(
     roomsKnown(
       $cityAnswer !== undefined && "city" in $cityAnswer ? $cityAnswer.city.buildings : [],
-      Object.values($belief.runs),
+      $belief.rooms.keys(),
     ),
   );
   // The run this box would steer: what a typed `/stop` reaches too.
-  const live = $derived(newestRun(Object.values($belief.runs), here, "moving"));
+  const live = $derived(here === null ? undefined : newestWorking($belief, here));
 
   const picks: Picks = { model: pickModel, workspace: pickRoom, effort: pickEffort };
   const specs = $derived(pills($lang, { served: models, chosen: main, rooms, here, effort: $effort }, picks));
@@ -227,7 +227,7 @@
         go: u.go,
         here,
         live,
-        runs: Object.values($belief.runs),
+        belief: get(belief),
         models,
         effort: get(effort),
         setEffort: (level) => {

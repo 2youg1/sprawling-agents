@@ -11,7 +11,8 @@
 
 import { Option, Schema } from "effect";
 
-import type { RunBelief } from "../../core/belief";
+import type { Belief, RunBelief } from "../../core/belief";
+import { heldIn } from "../../core/belief/rooms";
 import { EFFORTS } from "../../core/commands";
 import type { PreferenceDoor } from "../../core/prefs";
 import type { Key, Lang } from "../../core/lang";
@@ -146,16 +147,11 @@ export function decodeRoom(value: string): Address | null {
 }
 
 // Every room a person could move a conversation to: the buildings the
-// city knows, and the rooms runs have already opened.
-export function roomsKnown(
-  buildings: Iterable<{ readonly addr: string }>,
-  runs: Iterable<RunBelief>,
-): string[] {
-  const named = new Set<string>([MAYOR]);
+// city knows, and the rooms runs have already opened (the keys of
+// belief's rooms index).
+export function roomsKnown(buildings: Iterable<{ readonly addr: string }>, opened: Iterable<string>): string[] {
+  const named = new Set<string>([MAYOR, ...opened]);
   for (const building of buildings) named.add(building.addr);
-  for (const run of runs) {
-    if (run.addr !== null) named.add(run.addr);
-  }
   return [...named].sort((a, b) => a.localeCompare(b));
 }
 
@@ -259,24 +255,6 @@ export function pickSlash(chosen: Slash, line: string, hands: SlashHands): strin
 
 // -------------------------------------------------------- the run in reach
 
-// The newest run of a room - still going, or whatever finished last.
-// One derivation for the run a steer lands on and the run a `/stop`
-// reaches, so the box and the page cannot name two runs.
-//
-// `moving` asks for one still going, which is what a message typed now
-// steers; `any` is what a verb that names a room wants.
-export function newestRun(
-  runs: Iterable<RunBelief>,
-  room: string | null,
-  posture: "moving" | "any",
-): RunBelief | undefined {
-  if (room === null) return undefined;
-  return [...runs]
-    .filter((run) => run.addr === room && (posture === "any" || run.doing.kind !== "frozen"))
-    .sort((a, b) => (b.started ?? 0) - (a.started ?? 0))
-    .at(0);
-}
-
 // Everything a typed verb may reach for (`core/slash.ts` fills the same
 // shape from the palette), minus the one conversion this file owns: a
 // run belief becomes the run and position a verb acts on.
@@ -285,7 +263,7 @@ export interface Reach {
   readonly go: (view: View) => void;
   readonly here: Address | null;
   readonly live: RunBelief | undefined;
-  readonly runs: Iterable<RunBelief>;
+  readonly belief: Belief;
   readonly models: readonly Served[];
   readonly effort: Effort | null;
   readonly setEffort: (effort: Effort | null) => void;
@@ -299,7 +277,7 @@ export function slashHands(reach: Reach): SlashHands {
     go: reach.go,
     here: reach.here,
     live: reached(reach.live),
-    newest: (room) => reached(newestRun(reach.runs, room, "any")),
+    newest: (room) => reached(heldIn(reach.belief, room).at(-1)),
     models: reach.models.map((each) => ({ endpoint: each.endpoint, model: each.model })),
     effort: reach.effort,
     setEffort: reach.setEffort,

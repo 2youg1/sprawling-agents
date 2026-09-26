@@ -58,6 +58,14 @@ export interface Belief {
   // earlier sees later runs through it, so a reader that needs a run as
   // it stood keeps the `RunBelief`, which is never mutated.
   runs: Record<string, RunBelief>;
+  // The runs that have not frozen, oldest start first: the one answer
+  // to which runs are working (`live.ts`).
+  live: readonly RunBelief[];
+  // The ids of the runs each room has held, oldest start first
+  // (`rooms.ts`).
+  rooms: ReadonlyMap<string, readonly RunId[]>;
+  // How many runs froze cancelled (`cancelled.ts`).
+  cancelled: number;
   halted: HaltScope[];
   // The ledger position the list of shut scopes is current to. Two
   // writers touch the list - an answer states the whole of it and a

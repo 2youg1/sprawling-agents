@@ -17,6 +17,7 @@
   // the city does not promise: a room is where a job was written down or
   // a transcript was left.
   import type { Key } from "../../core/lang";
+  import { heldIn } from "../../core/belief/rooms";
   import { roomOf } from "../../core/route";
   import type { Address, Entry } from "../../wire";
 
@@ -74,11 +75,7 @@
 
   const cost = u.conn.asking.ask(QUERIES.cost);
 
-  const runs = $derived(
-    Object.values($belief.runs)
-      .filter((run) => run.addr === at)
-      .sort((left, right) => (right.started ?? 0) - (left.started ?? 0)),
-  );
+  const runs = $derived(heldIn($belief, at).reverse());
 
   // The cost view names the active runs and the few billed most; the
   // rest of this building's runs are asked for by name, newest first,
