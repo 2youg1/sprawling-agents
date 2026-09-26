@@ -220,7 +220,7 @@ impl ErrorDraft {
 
 **H-01 定案：取 typestate，不取四参**。路线图 §13.1 原定 `failure(code, action, subject, recovery)` 四参必填，此处改记为 typestate，理由三条：其一，`refusal` 已占满四参，再塞恢复语就是第五参，越过参数上限；其二，恢复语只剩 `ErrorDraft::with_recovery` 一个设定处，四参方案则要把 `with_recovery` 留作改写器，同一个名字两份职责；其三，四参要重写全部 641 个调用点，typestate 只动缺恢复语的那些，改动面恰好等于缺陷面。关门理由随之由「每处四实参」改为「编译通过」——恢复语必填这条现在由类型系统执行，grep 执行不了它。`AxError` 一经存在即已完工，`with_nearby`／`retriable` 只在 draft 上，故链式调用中 `with_recovery` 恒为最后一环。
 
-**`retry_after_ms` 是失败方对「再问之前至少等多久」的陈述**，读取处是 `AxError::retry_after_ms() -> Option<u64>`。它只能经 `retriable_after` 写入，而该方法同时置 `Retry::Yes`，故「不可重试却带等待」拼不出来。`None` 时字段不上线、不入账，旧的账本记录照读（`serde(default)`）。
+**`retry_after_ms` 是失败方对「再问之前至少等多久」的陈述**，读取处是 `AxError::retry_after_ms() -> Option<u64>`。它只能经 `retriable_after` 写入，而该方法同时置 `Retry::Yes`；`effect_unknown` 置 `Unknown` 时一并清掉它，所以无论构造器按什么次序调用，「不是 `Yes` 却带等待」都拼不出来。`None` 时字段不上线、不入账，旧的账本记录照读（`serde(default)`）。
 
 **`retry` 是三态信封，不是布尔。** 一个 `bool` 只能说「可以」与「不可以」，于是请求已经发出、回答却丢了的那一类失败（流中断、静默超时、发送途中断开）只能被说成「可以」，而那是假话：对端也许已经执行了它、计了费，一个有副作用的动作再发一次就是第二次副作用。第三态 `Unknown` 把「效果是否已经落地」说进信封，决定再发与否的是知道这个动作是否幂等的调用方（runtime 的 watchdog 对一次模型调用照样退避重问，因为它的效果只是一份城里从未收到的回答）。落选的是另加一个 `landed: bool` 字段：「可以」蕴含未落地、「不可以」与落地无关，两字段会拼出「可以且已落地」这样没有意义的组合。线上字段名随之由 `retriable` 改为 `retry`，`WIRE_V` 加一；旧账本记录里的 `retriable: true/false` 照读为 `Yes`／`No`。落选的是把等待时长写进 `recovery` 文本：那是给读者的一句话，重试节奏的持有者（runtime 的 watchdog）不该从句子里解析数字。
 
