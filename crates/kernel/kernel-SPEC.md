@@ -761,7 +761,7 @@ pub const SECRET_SHAPES: [SecretShape; N] = [ /* 公开 provider 令牌形状，
 
 ### 8-8 kernel::consts_policy
 
-政策常量（改它须 EVAL 证据）。比值以整数对表示（kernel 判定路径禁浮点，C10/16.3-6）：
+政策常量（改它须 EVAL 证据）。比值以整数对表示（kernel 判定路径禁浮点）：
 
 ```rust
 pub struct Ratio { pub num: u32, pub den: u32 }   // 分子/分母；恒不约简
@@ -781,6 +781,19 @@ pub const DISCARD_FILES_MAX: u32 = 16;
 pub const DISCARD_RETENTION_DAYS: u32 = 30;
 pub const CLOCK_ZONES_MAX: ClockZonesMax = ClockZonesMax::new(4);    // §8-73：拒因从类型给出
 pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;                   // 2 GiB
+```
+
+各章就近说明的常量也住本模块（`HALL_*` 三个见 §8-47）：
+
+```rust
+pub const BYTES_PER_TOKEN: u64 = 4;                                  // 字节到 token 的估算比
+pub const PREFIX_SLOTS: NonZeroU64 = 4;                              // 整份 prefix 预算均分的槽数
+pub const SANDBOX_FUEL_DEFAULT: u64 = 200_000_000;                   // §8-22 沙箱限额的缺省燃料
+pub const CREDENTIAL_NAME_MARKERS: [&str; 11];                       // §8-22 凭据形状名字的标记词
+pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;                       // 一回合输出上限的缺省（token）
+pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Off;
+pub const AUTONOMY_DEFAULT: Autonomy = Autonomy::Owner;
+pub const DEFAULT_AT: &str = "127.0.0.1:8787";                       // 服务缺省监听地址
 ```
 
 `INTERVAL_CAP_BYTES` 是 `usize` 而不是 `u64`：它的读者只有 `runtime::tools::read` 与 `search`，两者都拿它比内存里一段文本的字节长度，换算因此不存在，也就没有一处可以把换算失败读成「无上限」。

@@ -193,7 +193,7 @@ pub const IMAGE_QUALITY: crate::policy_limit::ImageQuality =
 /// run is read off the account rather than guessed at.
 pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;
 
-/// Off by default: zero window bytes until a Building opts in (4.3).
+/// Off by default: zero window bytes until a Building opts in.
 pub const CLOCK_STAMP_DEFAULT: crate::config::ClockStampGranularity =
     crate::config::ClockStampGranularity::Off;
 
