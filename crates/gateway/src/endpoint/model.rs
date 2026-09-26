@@ -184,8 +184,7 @@ mod tests {
         )
         .unwrap();
         let mut seeing = request();
-        seeing.chat.messages.push(kernel::ChatMessage {
-            cache: false,
+        seeing.chat.messages.to_mut().push(kernel::ChatMessage {
             role: kernel::Role::User,
             content: vec![kernel::ContentBlock::Image(kernel::ImageRef {
                 locator: kernel::Locator::parse(&format!("cas:b3-{}", "ab".repeat(32))).unwrap(),

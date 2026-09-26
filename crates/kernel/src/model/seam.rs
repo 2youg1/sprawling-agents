@@ -41,10 +41,23 @@ pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError> {
 /// prefix hashes (same source as `prompt_assembled`); `chat` is the full
 /// canonical conversation the dialect puts on the wire.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ModelRequest {
+pub struct ModelRequest<'a> {
     pub policy: BuildingPolicy,
     pub segments: [B3Hash; 4],
-    pub chat: ChatRequest,
+    pub chat: ChatRequest<'a>,
+}
+
+impl ModelRequest<'_> {
+    /// The same request, owning what it borrowed: for a holder that
+    /// keeps it past the call it was assembled for. Cloning a borrowed
+    /// request first copies only the borrow, so this is the one copy.
+    pub fn into_owned(self) -> ModelRequest<'static> {
+        ModelRequest {
+            policy: self.policy,
+            segments: self.segments,
+            chat: self.chat.into_owned(),
+        }
+    }
 }
 
 /// One assistant turn. `message` is the in-window content; `calls` is the

@@ -52,7 +52,7 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
             Interrupt::None,
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-            &Conversation::new(),
+            blank_conversation(),
             &[],
             &shape(),
         )
@@ -139,7 +139,7 @@ fn the_wave_result_block_keeps_what_the_ledger_drops() {
             Interrupt::None,
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-            &Conversation::new(),
+            blank_conversation(),
             &[],
             &shape(),
         )

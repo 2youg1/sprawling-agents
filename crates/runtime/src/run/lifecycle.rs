@@ -157,7 +157,6 @@ impl Run<Active> {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };
-        self.state.conversation.mark_sent();
         // What this request looks like to a prompt cache, and which of its
         // regions moved since the request before it. Written here, after the
         // turn has assembled, so the line describes a request that exists;
@@ -180,9 +179,8 @@ impl Run<Active> {
         })?;
         self.state.prior_shape = Some(shape);
         let calling = (hooks.interrupt)(SafePoint::BeforeCall { turn: index });
-        fold_steer(&mut self.state.conversation, &calling);
-        let turn = match turn.call(
-            calling,
+        let called = turn.call(
+            calling.clone(),
             ledger,
             model,
             &self.plan.policy,
@@ -192,7 +190,14 @@ impl Run<Active> {
                 deltas: hooks.deltas.as_deref_mut(),
                 tools: &*hooks.invoke,
             },
-        )? {
+        );
+        // The request borrowed the conversation until the call returned,
+        // so the conversation moves only now: what was assembled is on
+        // the wire, and a steer that arrived before the call joins the
+        // next request, whatever the call answered.
+        self.state.conversation.mark_sent();
+        fold_steer(&mut self.state.conversation, &calling);
+        let turn = match called? {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };

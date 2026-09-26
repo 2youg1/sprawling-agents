@@ -161,7 +161,7 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
     if let Some(system) = system_item(req) {
         input.push(system);
     }
-    for message in &req.messages {
+    for message in req.messages.iter() {
         match message.role {
             Role::User => user_items(&message.content, images, &mut input)?,
             Role::Assistant => assistant_items(&message.content, &mut input)?,

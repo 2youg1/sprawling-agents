@@ -58,7 +58,7 @@ fn provider_wobble() -> AxError {
     .with_recovery("the watchdog decides retry or failover; admission widens the interval")
 }
 
-fn request() -> ModelRequest {
+fn request() -> ModelRequest<'static> {
     ModelRequest {
         policy: BuildingPolicy::default(),
         segments: prefix().segment_hashes(),
@@ -294,7 +294,7 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
             Interrupt::None,
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-            &Conversation::new(),
+            blank_conversation(),
             &[],
             &shape(),
         )

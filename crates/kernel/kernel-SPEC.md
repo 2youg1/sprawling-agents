@@ -1446,8 +1446,12 @@ pub enum ContentBlock { Text{text} | Thinking{thinking, signature}
 pub struct ChatMessage { pub role: Role, pub content: Vec<ContentBlock> }
 pub struct ToolDef { pub name: ToolName, pub description: String, pub input_schema: Payload }
 pub struct Ceiling(NonZeroU64);  // 零不可表达：new(0) 即 None
-pub struct ChatRequest { pub model: String, pub max_tokens: Option<Ceiling>, pub system: Vec<SystemBlock>,
-                         pub messages: Vec<ChatMessage>, pub tools: Vec<ToolDef> }
+pub enum MessageBreakpoint { Unmarked, Tail }        // 请求侧注记，不进 serde；缺省 Unmarked
+pub struct ChatRequest<'a> { pub model: String, pub max_tokens: Option<Ceiling>, pub system: Vec<SystemBlock>,
+                         pub messages: Cow<'a, [ChatMessage]>, pub tools: Cow<'a, [ToolDef]>,
+                         pub breakpoint: MessageBreakpoint }
+impl ChatRequest<'_> { pub fn carries_breakpoint(&self, index: usize) -> bool; }  // 该下标的消息是否带断点：Tail 且为末条
+pub struct ModelRequest<'a> { pub policy: BuildingPolicy, pub segments: [B3Hash; 4], pub chat: ChatRequest<'a> }
 pub struct ModelUsage { pub input_tokens: Tokens, pub output_tokens: Tokens,
                         pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens,
                         pub dialect: Option<DialectKind> }
@@ -1818,6 +1822,16 @@ S2 激活的码（逐码答「能否定义掉」）：
 **被否**：①每种降级各自决定是否拒活——内存紧已由 S5.9L 的排队处理，再拒一次是同一决定两个家；②固定阈值——违背「不把常数调成某一类机器」；③经 `Admission::Shed { reason: DiskLow }` 拒绝——入口得再算一次地板才能说出恢复办法，同一个地板两个家。
 
 **重开参数**：实测显示某一类设备上 `DISK_SLOW_FACTOR` 让盘慢状态在无外部负载时出现，或地板不足以写下一次快照。
+
+### 12.6 定规：请求借用会话与工具表，断点是请求的注记
+
+**决定**：`ChatRequest<'a>` 的 `messages` 与 `tools` 是 `Cow<'a, [_]>`；回合组请求时借用 `Conversation` 与 catalog 的工具表，不复制。消息断点从 `ChatMessage` 挪到请求上的 `MessageBreakpoint`，兼容格式经 `ChatRequest::carries_breakpoint(index)` 问某条消息是否带断点。要跨调用留住请求的地方（保温续约）持 `ModelRequest<'static>`，自己付一次拷贝。
+
+**理由**：每一回合的请求原先把整段会话与整张工具表各复制一次，会话越长复制越多，而请求活不过这一次调用。断点标在消息上时，标记就得先拿到一份可写的拷贝；标在请求上，借用才成立。计划只锚尾消息，所以一个两值枚举就够，也写不出越界的下标。
+
+**被否**：①`Arc<Vec<ChatMessage>>` 共享——保温持有它时，下一次追加消息就要复制整段会话，只是把拷贝挪了地方；②`&'a [ChatMessage]` 纯借用——保温与测试构造的自有请求就写不出来；③在请求里记 `Option<usize>` 下标——能写出一个不存在的消息下标。
+
+**重开参数**：某个兼容格式需要把断点放在非末条消息上。
 
 ## 13 依赖选型
 
