@@ -3744,7 +3744,7 @@ pub(crate) struct LedgerAsk { city_root: PathBuf, index: Arc<Mutex<memory::Ledge
 impl PrefixAsk { pub(super) fn read(self) -> channels::Answer; } // 读不到那一行或内容仓库打不开：Unavailable
 ```
 
-**账本索引有自己的锁。** 索引是账本文件的缓存，折叠从不碰它（它在查询时才刷新），所以它不属于视图的锁：`Views` 持 `Arc<Mutex<memory::LedgerIndex>>`，`Prefix` 把这只 `Arc` 带出视图的锁，在 `finish` 里锁索引、刷新、读一行。读者之间仍为索引互等，折叠线程不等。索引的锁中毒时，读它的查询按「刷新失败」作答（`Prefix` 答 `Unavailable`，历史答空页），因为半刷新的偏移表会把别的行当成要找的那一行。被拒：`finish` 里另建一份索引——那是整本账本的一次扫描（五万条约 14 ms），比锁内那一段还长。
+**账本索引有自己的锁。** 索引是账本文件的缓存，折叠从不碰它（它在查询时才刷新），所以它不属于视图的锁：`Views` 持 `Arc<Mutex<memory::LedgerIndex>>`，`Prefix` 把这只 `Arc` 带出视图的锁，在 `finish` 里锁索引、刷新、读一行。读者之间仍为索引互等，折叠线程不等。取索引只有一道门，`LedgerAsk::indexed`：锁、刷新，交出持锁的索引。索引的锁中毒时，这道门把锁里的索引换成一份空索引、解除中毒，再照常刷新；空索引的刷新就是一次整本扫描，所以中毒只让下一个读者多扫一遍，之后回到增量刷新。中毒的那份不能照读，因为半刷新的偏移表会把别的行当成要找的那一行。刷新失败时读者照旧按读不到作答（`Prefix` 答 `Unavailable`，历史答空页）。被拒：中毒后一律按刷新失败作答——中毒在进程里不会自己消失，此后每个历史、轮次与 `Prefix` 问题都悄悄答空；被拒：`finish` 里每次另建一份索引——每问一次就是一次整本扫描（五万条约 14 ms），比锁内那一段还长。
 
 **第一条 `prompt_assembled` 的序号由折叠记下。** `apply` 为每个 run 记它第一条 `prompt_assembled` 的 `Seq`（每个 run 一个数），`finish` 只读这一行；原先是锁内倒着读这个 run 的每一行找它。整条记录不进折叠：四段的来源表随文档数增长，而每个会话多占的内存是这个进程要压低的量。
 

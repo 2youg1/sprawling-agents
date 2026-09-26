@@ -174,3 +174,33 @@ fn the_mcp_health_page_reads_its_servers_after_the_views_are_released() {
         .collect();
     assert_eq!(labels, vec!["apps".to_owned()]);
 }
+
+/// A reader that panics while it holds the ledger index leaves the lock
+/// poisoned for the life of the process. The next reader rebuilds the
+/// index from the segments instead of answering this and every later
+/// history question with an empty page.
+#[test]
+fn a_poisoned_ledger_index_is_rebuilt_rather_than_read_as_an_empty_history() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let mut views = Views::new(dir.path());
+    let query = channels::Query::History {
+        before: None,
+        limit: 50,
+    };
+    let before = views.answer(&query);
+    let channels::Answer::History(page) = &before else {
+        panic!("History answers with a page: {before:?}");
+    };
+    assert!(!page.records.is_empty(), "genesis is in the history");
+    let index = std::sync::Arc::clone(&views.index);
+    let died = std::thread::spawn(move || {
+        let _held = index.lock().unwrap();
+        panic!("a reader dies holding the index");
+    })
+    .join();
+    assert!(died.is_err() && views.index.is_poisoned());
+
+    assert_eq!(views.answer(&query), before);
+    assert!(!views.index.is_poisoned(), "the rebuild clears the poison");
+}
