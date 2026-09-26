@@ -473,4 +473,55 @@ mod tests {
             "two dispatches to one building started its server once"
         );
     }
+
+    /// A dispatch whose server has not answered its handshake yet leaves
+    /// the desk free: the command is answered on the accounting thread,
+    /// and the lane that will drive the run is the one that waits for
+    /// the server (sprawling-SPEC.md 8-93).
+    #[test]
+    fn a_dispatch_whose_server_still_shakes_hands_leaves_the_desk_free() {
+        let dir = tempfile::tempdir().unwrap();
+        init_city(dir.path()).unwrap();
+        let (starts, gate) = (dir.path().join("starts.txt"), dir.path().join("open"));
+        let (command, args) = protocol::gated(SERVER_ANSWER, &starts, &gate);
+        write_server_table(dir.path(), "lab", &command, &args);
+        let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+        let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+        // The gate opens on its own after a while, so a desk that waits
+        // for the handshake still returns and the assertion below fails
+        // rather than hangs.
+        let (answered, heard) = std::sync::mpsc::channel::<()>();
+        let opener = {
+            let gate = gate.clone();
+            std::thread::spawn(move || {
+                drop(heard.recv_timeout(std::time::Duration::from_secs(10)));
+                std::fs::write(&gate, "").unwrap();
+            })
+        };
+
+        worker.serve_one(crate::assembly::Posted {
+            command: channels::Command::Dispatch {
+                addr: Address::parse("lab/room1").unwrap(),
+                task: "ask the outside service".to_owned(),
+                goal: "one answer is enough".to_owned(),
+                mode: kernel::Mode::PlanGoal,
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+                session: None,
+                effort: None,
+                model: None,
+            },
+            reply: channels::Reply::nowhere(),
+        });
+        let answered_before_the_handshake = !gate.exists();
+        // An opener that already gave up has no ear left, and the gate
+        // it opened is all this test needs from it.
+        drop(answered.send(()));
+        opener.join().unwrap();
+        worker.land_the_rest().unwrap();
+
+        assert!(
+            answered_before_the_handshake,
+            "the desk answered the dispatch while its server still shook hands"
+        );
+    }
 }
