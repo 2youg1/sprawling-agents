@@ -74,6 +74,17 @@ impl TaintSet {
     }
 }
 
+/// The sources, comma-separated in the set's order: the one wording
+/// every C15 refusal uses to say where a run's content came from.
+impl std::fmt::Display for TaintSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.iter().enumerate().try_for_each(|(at, source)| {
+            let comma = if at == 0 { "" } else { ", " };
+            write!(f, "{comma}{}", source.as_str())
+        })
+    }
+}
+
 /// External content with its provenance welded on. The value is private;
 /// `peek` lends, `map`/`join` derive with automatic union, and nothing
 /// returns `T` by value.

@@ -41,10 +41,7 @@ pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutc
 fn outside(target: &Address, prefixes: Vec<String>, taint: &TaintSet) -> GateOutcome {
     let mut violation = format!("target {} is outside the write domain", target.as_str());
     if !taint.is_empty() {
-        violation.push_str(&format!(
-            "; the action derives from {} external source(s)",
-            taint.len()
-        ));
+        violation.push_str(&format!("; the action carries content from {taint}"));
     }
     let alternative = if prefixes.is_empty() {
         "this actor writes nowhere; read, or hand the change to an actor with a domain".to_owned()
@@ -164,13 +161,7 @@ mod tests {
         let GateOutcome::Deny { refusal } = outcome else {
             panic!("refusal shape asserted above")
         };
-        assert!(
-            refusal
-                .gate()
-                .unwrap()
-                .violation()
-                .contains("external source")
-        );
+        assert!(refusal.gate().unwrap().violation().contains("web:evil"));
     }
 
     /// City Hall's residents write Markdown and nothing else, and the
