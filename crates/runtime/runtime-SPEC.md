@@ -186,6 +186,9 @@ impl Turn<Calling> {
         -> Result<PhaseOutcome<Turn<ToolWave>>, AxError>;         // 产 model_called＋model_returned
 }
 /// 模型还在生成时，谁据它的回答行动：走哪扇门由这里一处定。
+/// 生产路径（run::lifecycle）每回合都传 Speculating，没有页面在看时 deltas 为 None；
+/// call_speculating 的默认实现落到 call_streaming，所以没人看的 run 也走流，ModelCall 的 streamed 为真，
+/// 流式失败的重发修复对它同样适用。Unwatched 与 Watched 今天只有测试调用。
 pub enum Generating<'a, 'sink> {
     Unwatched,                                            // 阻塞门 Model::call
     Watched(&'a mut (dyn FnMut(&Increment) + 'sink)),     // 流式门 call_streaming，增量给页面
@@ -197,6 +200,8 @@ impl Turn<ToolWave> {
     /// 开头连续的 Effect::Read 调用同时执行，结果进重排缓冲；
     /// 第一条非只读调用等它们全部收齐后再开始，此后串行。
     /// still_going 在每条 call 之前被问一次（B-70，见 §8-28-2）。
+    /// 一条入账失败即返回，排在它后面的已放行只读调用不入账：`admit` 对 Effect::Read
+    /// 不写去重表、taint 与检查点，所以它们没有留下账本不知道的状态。
     pub fn execute_concurrent(self, interrupt: Interrupt, ledger: &mut dyn Ledger,
                               tools: &mut dyn ConcurrentInvoke,
                               still_going: &mut dyn FnMut(u32) -> Interrupt)
@@ -418,8 +423,6 @@ impl BreakpointPlan {
 - E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径（S4 serve；台账登记）。补写方经 `ToolCalled`／`ToolResult` 两个结构读写，读不懂即拒绝：若手挑 `id` 与 `name` 两个键、读不出就写下 `"unknown"`，一条这个 build 读不懂的调用就会被关在一个谁也答不上的 id 上。
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读不再自定。
 - 断点：`FrozenPrefix::system_blocks()` 产四块、逐块 cache=true＝断点恒 4＝`CACHE_BREAKPOINTS_MAX`，断点只落段界。
-- A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源的键以 `kernel::event::record::PromptSource` 为准：`{addr, kept, marker, dropped}`）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。拼接分隔符的唯一权威住 prefix.rs（`DOC_JOIN`），截断标记的唯一权威住 `runtime::elision`（§8-42），replay 同 crate 复用不另拷。
-- E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径（S4 serve；台账登记）。补写方经 `ToolCalled`／`ToolResult` 两个结构读写：此前它手挑 `id` 与 `name` 两个键、任一读不出就写下 `"unknown"`，于是一条这个 build 读不懂的调用被关在一个谁也答不上的 id 上；现在读不懂就是一次拒绝。
 - handoff：形已全（五段＋构造点＋resume 消费），无改动；「下一步段首列用户指定动作」属生产者纪律（S3 执行器／P2 spine_files），类型不另加钩。
 - 第四取消点（派生前）：无派生生产者时推迟落地，理由是提前落地＝死入口＋不可测。`collab::delegate_tool` 是那个生产者：`SafePoint::BeforeSpawn` ＋ `Turn<Recording>::record(interrupt, ledger)`，装配层在 `Completion::Cancelled` 时清空派生台，**被取消的 Run 一件活也交不下去**。
 
