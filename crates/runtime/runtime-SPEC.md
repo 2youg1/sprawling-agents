@@ -165,14 +165,22 @@ impl Turn<Calling> {
                                                                   // 产 model_called＋model_returned
 }
 impl Turn<ToolWave> {
-    /// Boundary 3 (工具执行前). One wave, serial in S2; per call
-    /// tool_called + tool_result. Invoker is a plain closure — no second
-    /// dispatch trait until a second consumer exists (S3 catalog).
+    /// Boundary 3 (工具执行前)，串行；per call tool_called + tool_result。
     /// still_going 在每条 call 之前被问一次（B-70，见 §8-28-2）。
     pub fn execute(self, interrupt: Interrupt, ledger: &mut dyn Ledger,
                    invoke: &mut dyn FnMut(&ToolCall) -> Result<ToolOutcome, AxError>,
                    still_going: &mut dyn FnMut(u32) -> NextCall)
         -> Result<PhaseOutcome<Turn<Recording>>, AxError>;
+    /// 同一边界：开头连续的 Effect::Read 调用同时执行，结果进重排缓冲、按调用序入账；
+    /// 第一条非只读调用等它们全部收齐后再开始，此后串行。
+    pub fn execute_concurrent(self, interrupt: Interrupt, ledger: &mut dyn Ledger,
+                              tools: &ConcurrentInvoke<'_>,
+                              still_going: &mut dyn FnMut(u32) -> NextCall)
+        -> Result<PhaseOutcome<Turn<Recording>>, AxError>;
+}
+pub struct ConcurrentInvoke<'a> {
+    pub invoke: &'a (dyn Fn(&ToolCall) -> Result<ToolOutcome, AxError> + Sync),
+    pub effect_of: &'a dyn Fn(&ToolCall) -> Option<Effect>,   // None＝目录不认识的工具，按非只读处理
 }
 pub enum NextCall { Allowed, Halted }   // 比 Interrupt 窄：波内只有「停」可以立刻执行
 impl Turn<Recording> {
@@ -186,7 +194,8 @@ impl Turn<Recording> {
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。S3 接真 dialect 时只加字段。
 - **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名那条今天走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
 - **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
-- **工具波 S2 串行**：并行执行串行入账（确定性 5）属 S3 并发波；接口不预留并发参数，入账序＝calls 序。
+- **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行与并行两个入口共用，所以账本字节与串行执行完全一致（`turn/tests/concurrent.rs` 对拍）。第一条非只读调用就是 fence：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，停在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
+- **生产驱动仍走串行 `execute`**：`bin::assembly::driving::lane` 的 invoke 经 `Bench::invoke` 持有 `RefCell`／`Cell`（按位置派生的 `IdemKey`、fence 记录、exec 计数），不是 `Sync`。换成 `execute_concurrent` 需要先把这三样改成按调用序预分配（`IdemKey` 的位置在起跑前就定下），这是本接口剩下的一步；完成后删掉串行入口。
 
 #### 8-4-1 一句恢复语只许指向线上真有的动词（`prefix::segment::ANOTHER_ADDRESS`）
 
@@ -947,11 +956,12 @@ pub struct RunHooks<'a> {
 | `turn.rs` | typestate 载体 `Turn<S>` 与四个相类型，`assemble`／`call`／`record`，以及唯一的中断消费点 `consume_boundary`。`assemble` 与 `call` 带 `argument_count` 豁免，故留在原路径 |
 | `turn/boundary.rs` | 执行器在相变处交出什么、相变答什么：`Interrupt`、`PhaseOutcome`、`TurnCancelled` |
 | `turn/report.rs` | 一轮跑完交给 run loop 的东西与它被给定的调用形状：`TurnReport`、`CallShape` |
-| `turn/wave.rs` | 边界 3：`impl Turn<ToolWave>` 的工具波，按调用序串行 |
+| `turn/wave.rs` | 边界 3：`impl Turn<ToolWave>` 的工具波，只读前缀并行执行，按调用序入账 |
 | `turn/ledger.rs` | 本模块通往账本的唯一一道门：`Journal`、`Authored`、`Carried`（§8-41） |
-| `turn/tests.rs` | 纯索引（`mod helpers; mod phases; mod redaction; mod window;`） |
+| `turn/tests.rs` | 纯索引 |
 | `turn/tests/helpers.rs` | 三处共用的夹具：`TestLedger`、`OneShotModel`、`prefix`／`run_id`／`shape`／`advance`／`probe_call` |
 | `turn/tests/phases.rs` | 四个边界跑在真账本链上（5 个 `#[test]`） |
+| `turn/tests/concurrent.rs` | 只读前缀并行：墙钟是一条的时间，账本字节与串行一致，波内停下只起跑停点之前的调用（2 个 `#[test]`） |
 | `turn/tests/window.rs` | 开场白与 steer 在窗口里留下什么（3 个 `#[test]`） |
 | `turn/tests/redaction.rs` | 工具参数与工具结果里的密钥进不了账本，其余字段完好（2 个 `#[test]`） |
 

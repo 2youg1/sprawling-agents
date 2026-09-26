@@ -521,7 +521,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review; the two exceptions are runtime's concurrent wave, with structured cancellation, and the driving lanes in `bin::serving::pool`, each of which lives exactly as long as the run it drives |
+| 3 | One spawn point | review; the two exceptions are the read-only prefix of a tool wave in `runtime::turn::wave`, whose scoped threads are all joined before the wave accounts a single result, and the driving lanes in `bin::serving::pool`, each of which lives exactly as long as the run it drives |
 | 4 | Seeded RNG handed out from one place | assembly derives per session |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |

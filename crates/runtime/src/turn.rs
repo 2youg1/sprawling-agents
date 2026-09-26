@@ -38,6 +38,7 @@ use ledger::{Authored, Carried, Journal};
 
 pub use boundary::{Interrupt, NextCall, PhaseOutcome, TurnCancelled};
 pub use report::{CallShape, TurnReport};
+pub use wave::ConcurrentInvoke;
 
 /// The typestate carrier. Phase data lives in `S` and is private to this
 /// module: a phase literal cannot be forged, a phase cannot be skipped,
