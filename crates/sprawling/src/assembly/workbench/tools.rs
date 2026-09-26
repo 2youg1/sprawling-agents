@@ -56,11 +56,13 @@ impl RunWorker {
         // what this run admits, and until it was set here the mode's own
         // catalog entry reached no model.
         held(&catalog, "lay out the catalog")?.set_mode(mode);
-        let edit = kept::KeptEdit::new(
-            EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?,
+        let edit = EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?;
+        // Every tool shares one keeper, so no two of them keep two keys
+        // under one name (sprawling-SPEC.md 8-87).
+        let keeper = std::sync::Arc::new(kept::Keeper::new(
             self.vault_handle(),
             self.ledger.position().value(),
-        );
+        ));
         // Who this run can reach, frozen at dispatch: the assembly runs
         // one run at a time and a signal lands after the drive returns,
         // so nothing moves under it. It answers `neighbours` and `status`.
@@ -223,7 +225,10 @@ impl RunWorker {
         }
         for tool in admitted {
             held(&catalog, "lay out the catalog")?.admit_tool(tool.meta())?;
-            bench.register(tool)?;
+            bench.register(Box::new(kept::Kept::new(
+                tool,
+                std::sync::Arc::clone(&keeper),
+            )))?;
         }
         self.admit_reading_room(&catalog, &site.rules, &site.building, addr)?;
         Ok(Workbench {

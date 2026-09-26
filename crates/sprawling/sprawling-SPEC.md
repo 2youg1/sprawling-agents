@@ -3410,22 +3410,30 @@ impl RunWorker {
 - **失败**：vault 拒绝写入时整个派活失败，错误原样返回（`E_CONFIG_INVALID`，恢复语由 vault 给出）。此时房间和 `JOB.md` 都还没写；如果照原文继续派活，正是这一节要堵的泄露。
 - **被否决的备选**：① 在页面上拦下粘贴，让人先去设置页登记——人粘 key 的时候，多半就是要居民用它，拦下来只会让人换个地方再粘一次；② 在请求出门时替换——账本和 `JOB.md` 在出门之前就已写下原文。
 
-**居民写的文件**：居民往城里写文字只有一道门，`edit` 工具（`runtime::EditTool`）。装配台登记它时包上一层 `bin::assembly::workbench::tools::kept`：
+**居民手里的工具**：居民往城里写文字、读城里的文字，都经过工作台上的工具：`edit` 写文件，`exec` 的命令行可以写文件，`read`、`search`、`exec` 的输出回到模型。装配台把**每一件**工具登记上 bench 之前包上一层 `bin::assembly::workbench::tools::kept`：
 
 ```rust
 // bin::assembly::workbench::tools::kept（形状 4 适配器）
-pub(in crate::assembly) struct KeptEdit { /* runtime::EditTool, vault, 名字前缀, 计数 */ }
-impl kernel::Tool for KeptEdit { /* invoke: 先把 `new` 交给 custody，再交给 EditTool */ }
+pub(in crate::assembly) struct Keeper { /* vault, 摆台时账本的位置, 计数 */ }
+pub(in crate::assembly) struct Kept { /* Box<dyn kernel::Tool>, Arc<Keeper> */ }
+impl kernel::Tool for Kept {
+    /* invoke: 参数里每一个字符串先交给 custody，再交给工具；
+       工具的结果里每一个字符串交给 custody，再回到模型 */
+}
 ```
 
-- 同一段替换逻辑：派活文字和 `new` 参数都经过 `custody::kept_text`，所以认什么、怎么切、切歪了怎么报错只有一处。
-- **引用是 `secret:written/<provider>-<pos>-<n>`**：`<pos>` 是装配台摆出时账本的位置，每次派活在摆台之前都写过记录，所以两次派活的 `<pos>` 不同；`<n>` 是这次派活里第几把。工具运行在 drive 里，拿不到 `&mut RunWorker`，写不了账本，所以不能像派活那样用存 key 时的下一个序号。
-- 写进文件、回给模型的 diff 里只有引用；vault 拒绝写入时这次 `edit` 失败，文件不动。
-- **被否决的备选**：在 `runtime::EditTool` 里扫描——那要让 `runtime` 认得 vault，而 vault 属于装配层；包一层就不必改 `runtime` 的公开面。
+- 同一段替换逻辑：派活文字、工具参数和工具结果都经过 `custody::kept_text`，所以认什么、怎么切、切歪了怎么报错只有一处。
+- **参数**：`edit` 的 `new`、`exec` 的命令行，以及其它工具的每一个字符串参数，工具收到的都是引用。所以 `edit` 写进文件的、`exec` 命令行里 `echo … > f` 写进文件的，都只有引用；回给模型的 diff 里也只有引用。
+- **结果**：`read` 读到的文件、`exec` 打印的输出里的 key，在回到模型之前换成引用，所以下一个发给模型的请求里没有原文。
+- **引用是 `secret:written/<provider>-<pos>-<n>`（参数）和 `secret:output/<provider>-<pos>-<n>`（结果）**：`<pos>` 是装配台摆出时账本的位置，每次派活在摆台之前都写过记录，所以两次派活的 `<pos>` 不同；`<n>` 是这次派活里第几把，一次派活的所有工具共用一个计数，所以两件工具不会把 key 存到同一个名字下。工具运行在 drive 里，拿不到 `&mut RunWorker`，写不了账本，所以不能像派活那样用存 key 时的下一个序号。
+- 没有命中的参数和结果原样交出，不复制。
+- vault 拒绝写入时这次调用失败：参数里的 key 存不进去，工具就不运行，文件不动；结果里的 key 存不进去，结果不交给模型。
+- 账本里的 `tool_called`、`tool_result`、`model_returned` 本来就经过 `runtime::turn::ledger::Journal::append_redacted`，key 在写进账本之前已换成指纹标记；这一层管的是工具本身和模型看到的东西。
+- **被否决的备选**：① 在 `runtime::EditTool`、`ExecTool` 里各自扫描——那要让 `runtime` 认得 vault，而 vault 属于装配层，也会让每件工具各有一份规矩；包一层就不必改 `runtime` 的公开面。② 只包 `edit`——`exec` 的命令行和每件工具的输出照样把 key 带进文件和请求。
 
-**尚未覆盖**：① 居民写的 key 没有 `secret_captured` 记录，因为工具拿不到账本；要补就得把引用放进一张 desk，drive 结束后由装配层补记。② 工具输出（`runtime::tools` 的结果）还没经过 custody，它的入口是外部内容的那一道门。③ 模型回复里的工具参数原样进账本；`exec` 写的文件不经过 `edit`。
+**尚未覆盖**：① 工具存下的 key 没有 `secret_captured` 记录，因为工具拿不到账本；要补就得把引用放进一张 desk，drive 结束后由装配层补记。② `exec` 的命令自己取到的 key（比如从城外的文件复制进来）写进文件时不经过这一层，只有它打印出来的部分会被换掉。③ 模型回复里的工具参数原样回到后续请求：模型只可能写出它自己编出来的 key，因为它看到的都是引用。
 
-**本章测试**：`assembly::dispatching::custody::tests::a_pasted_key_reaches_the_vault_and_nothing_else`——任务文字里夹一把 `sk-ant-` 形状的 key 派活，断言：模型收到的每个请求、城目录下的每个文件（账本和 `JOB.md` 都在其中）都不含原文；请求里带着 `secret:pasted/anthropic-…` 引用；vault 按这个引用解出的正是原文。`assembly::workbench::tools::kept::tests::a_written_key_reaches_the_vault_and_not_the_file`——模型用 `edit` 新建一个含 key 的文件，断言：文件里没有原文，只有 `secret:written/anthropic-…` 引用，vault 按这个引用解出原文。
+**本章测试**：`assembly::dispatching::custody::tests::a_pasted_key_reaches_the_vault_and_nothing_else`——任务文字里夹一把 `sk-ant-` 形状的 key 派活，断言：模型收到的每个请求、城目录下的每个文件（账本和 `JOB.md` 都在其中）都不含原文；请求里带着 `secret:pasted/anthropic-…` 引用；vault 按这个引用解出的正是原文。`assembly::workbench::tools::kept::tests::a_written_key_reaches_the_vault_and_not_the_file`——模型用 `edit` 新建一个含 key 的文件，断言：文件里没有原文，只有 `secret:written/anthropic-…` 引用，vault 按这个引用解出原文。`assembly::workbench::tools::kept::tests::a_key_a_tool_reads_reaches_the_vault_and_not_the_model`——城里的文件里有一把 key，模型用 `read` 读它，断言：之后发给模型的请求里没有原文，只有 `secret:output/anthropic-…` 引用，vault 按这个引用解出原文。
 
 ## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
 
