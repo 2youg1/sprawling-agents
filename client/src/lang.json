@@ -2227,6 +2227,34 @@
     "en": "timeout_ms",
     "zh": "调用超时（毫秒）"
   },
+  "setup_governed": {
+    "en": "documents that govern the city",
+    "zh": "治理这座城的文件"
+  },
+  "setup_governed_note": {
+    "en": "each run reads these when it starts; a run already going keeps what it was given",
+    "zh": "每次 run 开始时读它们；已经在跑的 run 仍用开始时拿到的内容"
+  },
+  "setup_governed_save": {
+    "en": "save the document",
+    "zh": "保存这份文件"
+  },
+  "setup_governed_unchanged": {
+    "en": "nothing changed yet",
+    "zh": "还没有改动"
+  },
+  "governed_clerk": {
+    "en": "who the clerk is",
+    "zh": "clerk 是谁"
+  },
+  "governed_mayor": {
+    "en": "who the mayor is",
+    "zh": "市长是谁"
+  },
+  "governed_preferences": {
+    "en": "how you want the city run",
+    "zh": "你希望城怎么运转"
+  },
   "setup_toml": {
     "en": "the same in config.toml",
     "zh": "等价的 config.toml"

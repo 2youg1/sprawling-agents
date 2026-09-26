@@ -42,6 +42,7 @@
   import SkillsSection from "./setup/skills.svelte";
   import Toml from "./setup/toml.svelte";
   import EffortSection from "./shared/effort.svelte";
+  import GovernedSection from "./setup/governed.svelte";
   import ProviderDoor from "./shared/provider.svelte";
 
   const GROUPS = [
@@ -350,6 +351,7 @@
         {:else if shown === "run"}
           <div class="flex flex-col gap-wide">
             <EffortSection />
+            <GovernedSection />
             <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
               <span class="text-label font-label text-text">{say($lang, "setup_autonomy")}</span>
               <p class="text-note text-text-faint">{say($lang, "setup_autonomy_note")}</p>
