@@ -141,10 +141,8 @@ use serde::{Deserialize, Serialize};
 /// 39: `E_MODEL_UNCHOSEN` joins the error codes. A city with no model
 ///    chosen used to refuse with `E_CONFIG_INVALID`, whose recovery is a
 ///    new session; an older page would meet a code it cannot decode.
-/// 40: a pursuit's verdict is the kernel's kind, not an English clause,
-///    so a page takes its words from its own language table.
-/// 41: an `E_PROVIDER` error from a model call names the kind of failure
-///    (`provider`), so a page can say it in the reader's language.
+/// 40: a pursuit's verdict is its kind, never an English clause.
+/// 41: a model call's `E_PROVIDER` names its failure kind (`provider`).
 pub const WIRE_V: u32 = 41;
 mod query;
 

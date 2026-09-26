@@ -19,7 +19,6 @@
   import type { RunBelief } from "../../core/belief";
   import { keymap } from "../../core/keys";
   import { fill, say } from "../../core/lang";
-  import { providerClause } from "../../core/provider_failure";
   import { toFragment } from "../../core/route";
   import { clock, count, usd } from "../../core/time";
   import type { Snippet } from "svelte";
@@ -29,6 +28,7 @@
   import Prose from "../prose.svelte";
   import Calls from "./calls.svelte";
   import ForkButton from "./fork_button.svelte";
+  import RefusedNote from "./refused_note.svelte";
   import { callWord } from "./calls";
   import { planFork } from "./forking";
   import type { ForkEntry, ForkPlan } from "./forking";
@@ -264,23 +264,7 @@ thread's question is what this turn did or waits on. -->
       text: note.arrived.said,
     })}
   {:else if "refused" in note}
-    {@const error = note.refused.error}
-    <div class="my-snug rounded-card border border-alert/40 px-base py-snug text-note text-text-quiet">
-      <span class="text-alert">{error.code}</span> · {error.action} · {error.subject}
-      {#if error.provider !== undefined && error.provider !== null}
-        <!-- The kind is said in the reader's language; the city's own
-        sentence stays folded beneath it for whoever is debugging. -->
-        <div class="mt-tight text-text-faint">{providerClause($lang, error.provider)}</div>
-        {#if error.recovery !== ""}
-          <details class="mt-tight text-text-faint">
-            <summary class="cursor-pointer">{say($lang, "notices_detail")}</summary>
-            <div class="font-mono break-words">{error.recovery}</div>
-          </details>
-        {/if}
-      {:else if error.recovery !== ""}
-        <div class="mt-tight text-text-faint">{error.recovery}</div>
-      {/if}
-    </div>
+    <RefusedNote error={note.refused.error} />
   {:else if "waiting" in note}
     <div class="my-snug text-note text-alert">{say($lang, "talk_waiting_you")}</div>
   {:else if "discarded" in note}
