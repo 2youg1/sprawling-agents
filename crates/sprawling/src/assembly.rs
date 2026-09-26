@@ -309,7 +309,24 @@ impl RunWorker {
     /// of work in progress and of the machine under it. One call rather
     /// than three, so a worker cannot end up streaming to a page that
     /// cannot interrupt it.
+    ///
+    /// The backlog takes the output sink here, so a worker nobody serves
+    /// reads no command's output at all (runtime-SPEC 8-28-3).
     pub(crate) fn serve(&mut self, serving: Serving) {
+        let outputs = Arc::clone(&serving.outputs);
+        self.backlog =
+            self.backlog
+                .clone()
+                .with_sink(runtime::Sink::new(move |chunk: runtime::Chunk| {
+                    outputs(channels::LiveOutput {
+                        run: chunk.run,
+                        stream: match chunk.stream {
+                            runtime::Stream::Out => channels::OutputStream::Out,
+                            runtime::Stream::Err => channels::OutputStream::Err,
+                        },
+                        text: String::from_utf8_lossy(&chunk.bytes).into_owned(),
+                    });
+                }));
         self.serving = Some(serving);
     }
 }

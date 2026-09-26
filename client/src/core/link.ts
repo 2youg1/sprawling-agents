@@ -258,6 +258,12 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   if ("lagged" in frame) {
     return [link, { kind: "lagged", from: frame.lagged.from, to: frame.lagged.to }];
   }
+  // A running command's output. Discardable, like an increment, and not
+  // yet drawn: the page's bounded ring is runtime-SPEC 8-28-3's next
+  // stage, and until it lands the call's settled result is what shows.
+  if ("output" in frame) {
+    return [link, { kind: "nothing" }];
+  }
   return unhandled(link, frame);
 }
 

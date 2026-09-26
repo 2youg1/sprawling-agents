@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 39 as const;
+export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94" as const;
+export const WIRE_HASH = "05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -2903,6 +2903,25 @@ export const Lagged = Schema.Struct({
 export type Lagged = typeof Lagged.Type;
 
 /**
+ * Which of a command's two outputs a piece came from.
+ */
+export const OutputStream = Schema.Literal("out", "err").annotations({ identifier: "OutputStream" });
+export type OutputStream = typeof OutputStream.Type;
+
+/**
+ * One piece of a running command's output, on its way to a page.
+ * 
+ * `text` is decoded lossily: a piece ends at a byte bound, which can
+ * fall inside a character, and the settled result is what a page keeps.
+ */
+export const LiveOutput = Schema.Struct({
+  run: RunId,
+  stream: OutputStream,
+  text: Schema.String,
+}).annotations({ identifier: "LiveOutput" });
+export type LiveOutput = typeof LiveOutput.Type;
+
+/**
  * Who reads a log line, and when.
  * 
  * The five `docs/logging.md` names, spelled on the wire exactly as
@@ -2970,6 +2989,9 @@ export const ServerFrame = Schema.Union(
   }),
   Schema.Struct({
     lagged: Lagged,
+  }),
+  Schema.Struct({
+    output: LiveOutput,
   }),
 ).annotations({ identifier: "ServerFrame" });
 export type ServerFrame = typeof ServerFrame.Type;
