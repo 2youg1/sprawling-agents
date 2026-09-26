@@ -862,6 +862,28 @@ export const DiscardAnswer = Schema.Struct({
 export type DiscardAnswer = typeof DiscardAnswer.Type;
 
 /**
+ * The level this machine gives the core's threads under the person's
+ * setting (sprawling-SPEC 8-93). The dispatched commands are not here:
+ * they always start one level below, and lowering is never refused.
+ */
+export const DoctorCore = Schema.Union(
+  Schema.Literal("raised"),
+  Schema.Literal("held_by_setting"),
+  Schema.Struct({
+    refused: Schema.Struct({
+      said: Schema.String,
+    }),
+  }),
+  Schema.Literal("lowered_by_valve"),
+  Schema.Struct({
+    unasked: Schema.Struct({
+      said: Schema.String,
+    }),
+  }),
+).annotations({ identifier: "DoctorCore" });
+export type DoctorCore = typeof DoctorCore.Type;
+
+/**
  * How long a value the store keeps stays reachable.
  */
 export const DoctorCustodyLifetime = Schema.Literal("across_reboots", "with_passphrase", "until_reboot", "this_process").annotations({ identifier: "DoctorCustodyLifetime" });
@@ -1088,6 +1110,7 @@ export type DoctorVerdict = typeof DoctorVerdict.Type;
  * This machine, item by item, with a verdict for each tier.
  */
 export const DoctorAnswer = Schema.Struct({
+  core: DoctorCore,
   custody: DoctorCustody,
   items: Schema.Array(DoctorItem),
   sandbox: DoctorSandbox,
@@ -3149,7 +3172,7 @@ export type LogLine = typeof LogLine.Type;
 
 /**
  * One reading of every counter the monitor shows, in integers because
- * it travels on the wire (sprawling-SPEC.md 8-90).
+ * it travels on the wire (sprawling-SPEC.md 8-94).
  */
 export const Sample = Schema.Struct({
   core_cpu_permille: Schema.Int,

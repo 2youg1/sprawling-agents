@@ -1712,7 +1712,8 @@ pub(crate) fn run<R: BufRead, W: Write>(asked: &Asked, machine: &dyn Machine, in
 pub(crate) fn verb(args: &[String]) -> ExitCode;              // 必需项有缺则退 1
 
 // bin::doctor::probe（形状 4 adapter：运行中的机器）
-pub(crate) trait Machine { fn look(&self, r: &Requirement) -> Presence; fn install(&self, name: &str, recipe: &Recipe) -> Result<(), AxError>; }
+pub(crate) trait Machine { fn look(&self, r: &Requirement) -> Presence; fn install(&self, name: &str, recipe: &Recipe) -> Result<(), AxError>;
+                           fn core_standing(&self) -> Result<Standing, AxError>; } // §8-93 的档位，由平台实际给出
 pub(crate) struct ThisMachine { platform: Option<Platform>, patience: Duration }
 pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .exe／.cmd／.bat 在先，无扩展名在后
 ```
@@ -1726,6 +1727,7 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 - **Windows 上先找带扩展名的那个文件**：`bun` 若由 npm 装出来，同一目录下既有无扩展名的 shell 脚本 `bun`（Windows 起不动）又有 `bun.cmd`。先取无扩展名的那个，报出来的是「装了但不说版本」——一个装好的工具被报成半坏的。故 `names_of` 在 Windows 上按 `.exe`／`.cmd`／`.bat`／无扩展名的次序找，这条次序有它自己的测试。
 - **一项是环境变量而不是程序**：exec 工具 python 臂要的 CPython-WASI 组件由 `PYTHON_WASM_ENV` 指路（`bin::assembly::workbench::tools`），故它的探测是「那个变量指的文件在不在」，安装那一栏是 `Manual`——没有包管理器发它。它是 `Optional`，行尾说明它开启的是什么。
 - **终端里的词是英文，这不违反 wording 门**：AGENTS.md 的语言表把词表的管辖写在客户端上，`xtask wording` 扫的目录是 `client/src`（见 `xtask/src/wording.rs` 的 `CLIENT` 常量）。控制台是操作者的，与 `install`／`console`／`firstrun` 同一口径。
+- **核心线程实际站在哪一档（§8-93）**：报告在各层的判定之后多一段 `priority`，一行 `core threads`：`one step above normal`；`normal, as config.toml [core] priority asks`；`normal, the platform refused: <原因>`（Unix 上没有 `CAP_SYS_NICE`）；读不出设置时是 `unknown: <错误>`。`ThisMachine` 读人的设置，在一条临时线程上调 `raise_this_thread` 得到这一档，线程随即结束，所以 doctor 自己的线程不换档。报的是运行 doctor 的主机此刻会给核心的档位，而不是某座正在跑的城的线程被安全阀降回之后的档位。派出的命令总是低一档（runtime-SPEC §8-13-3，降档从不被拒），这一段不重复它。证据：`crates/sprawling/src/doctor/tests/reading.rs` 的 `the_doctor_says_where_the_platform_lets_the_core_stand`（平台拒绝升档的机器，报告里是那一行与平台给的原因）。页面读同一读数：`report::fold` 从同一个 `Machine::core_standing` 折出 `DoctorAnswer::core`（channels-SPEC §8-25），词由页面选；证据是 `doctor::report::tests` 的 `the_page_is_told_where_the_core_stands`。
 - **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它记下的安装请求）。判定因此不需要测试机上真装着什么就能被咬。
 
 **本章测试**：表的完整性（每一项都有探测方法，且三个平台各自要么给出命令要么明说 `manual`；每一个 `Optional` 项都说出它开启什么）；`verdict` 对「全在」「缺一个必需项」「只缺一个可选项」三类输入给出正确的穷尽枚举（可选项缺失不拖垮该层）；`finding_line` 的三种写法；`--install` 在答 `n` 时**一件也不装**、答 `y` 时只装被问的那一件（由 `ScriptedMachine` 记账）。
@@ -2425,7 +2427,7 @@ pub(crate) struct Arrival { run: RunId, driven: Result<Driven, AxError> }
 pub(crate) struct DrivingPool { /* lanes、一个 mpsc 的两头、每条车道的 JoinHandle */ }
 impl DrivingPool {
     pub(crate) fn open(lanes: u32) -> DrivingPool;
-    pub(crate) fn full(&self) -> bool;
+    pub(crate) fn full(&self, memory: Memory) -> bool;
     pub(crate) fn in_flight(&self) -> u32;
     /// 交出一次驾驶：起一条车道。run id 取自 `driving` 自己，不另传一份——
     /// 两处说同一件事就有两处说错的机会。
@@ -2447,6 +2449,8 @@ impl DrivingPool {
 两个数字今天相等是刻意的，而把 provider 的天花板变成一个可读的公开值会改动 `gateway` 的公开面、
 需要重算 api-baseline，那是一次独立的卡，不该塞进这一张。**在它落地之前，比天花板大的车道数只会让线程停在
 admission 上排队**——§8-42-3 早就写下这句话，这里把它从设计变成一个带理由的常量。
+
+**内存紧时计划的下一行排队**：`full` 在车道都占满时为真，另外在已有 run 在跑、而整机可用内存低于物理内存的十分之一时也为真（`admits(in_flight, lanes, memory)` 是这一条规则的唯一出处）。读数是 `bin::monitor::memory::read()`，由 `bin::assembly` 的 `Flight::full` 在计划推进循环（`assembly::plans::pursuing`）每次决定是否起下一行时读一次，所以跟着实时的可用内存走；读一次的耗时还没有测过，只发生在起一行之前。`full` 只有这一个调用者：人的派遣（`dispatch_into_lane`）与排程、外来到达、刚解除阻塞的工作（`start_unasked`）经 `Flight::take` 直接进 `DrivingPool::start`，不问 `admits`，所以内存紧时它们照样与在跑的 run 并排起跑，车道上限对它们也同样不设防。这是本接口的现状；把 `admits` 挪进每轮都经过的那一道门（`DrivingPool::start` 或 `Flight::take`），并定下被拒的一轮是等还是带重试地被拒，才让这条规则覆盖每一个新 run。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/sprawling/src/serving/pool.rs` 的 `a_new_run_waits_while_memory_is_tight`。
 
 ### 8-46-4 `pursue` 拿走整个 ready set（`bin::assembly::plans::pursuing`）
 
@@ -3928,6 +3932,9 @@ pub(crate) fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid
 **尚未做到的（本节接口的当前状态）**：阀只在一轮结束时判定（决定 2），所以一条持续有任务、从不停放的 worker 和一次不返回的折叠永远不会被降回，而这正是阀要防的情形；在忙的期间也作判定——tokio worker 按每次任务轮询记（`tokio_unstable` 下的 `on_before_task_poll`／`on_after_task_poll`），或在每次唤醒与任务边界处拿正在进行的一轮已走过的时间比窗口——是这一接口余下的一步。写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。doctor 还不报告每个平台实际站在哪一档。
 
 ## 8-90 性能监视器的历史：有人看才采样，每项 300 点（`bin::monitor`，形状：状态机）
+**尚未做到的（本节接口的当前状态）**：阀只在一轮结束时判定（决定 2），所以一条持续有任务、从不停放的 worker 和一次不返回的折叠永远不会被降回，而这正是阀要防的情形；在忙的期间也作判定——tokio worker 按每次任务轮询记（`tokio_unstable` 下的 `on_before_task_poll`／`on_after_task_poll`），或在每次唤醒与任务边界处拿正在进行的一轮已走过的时间比窗口——是这一接口余下的一步。写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。按任务边界记要 tokio 的 `on_before_task_poll`／`on_after_task_poll`，二者在 tokio 1.53 里只在 `--cfg tokio_unstable` 下编译，而这个 cfg 是整个构建的 rustflags，改它会让每条构建重编全部依赖；在唤醒时比较则看不到正在跑的那一轮（唤醒的线程刚结束等待），所以这一步不为它打开 `tokio_unstable`（每条构建都要全量重编依赖）；重开条件是 tokio 稳定这两个回调，或测得一个忙回合造成优先级倒挂（一条升档的核心线程在忙，人或 agent 等着的回答被它拖后）。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。
+
+## 8-94 性能监视器的历史：有人看才采样，每项 300 点（`bin::monitor`，形状：状态机）
 
 WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是同一份历史：每秒一个 `Sample`，最近 300 个（5 分钟）。`bin::monitor` 只管两件事：此刻有没有人在看，以及看的人读到的那 300 个点。计数器从哪里读（核心进程、Job Object、整机、城所在的卷、记账线程）由调用方传进来的读取函数决定，本模块不碰平台接口。
 
@@ -3938,6 +3945,8 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 - `Monitor::watch(&self, watched: Watched) -> Watch`：一个在看的人，看整页（`Watched::Everything`）或只看事实条摘要（`Watched::Summary`，`Watched` 定义在 `channels::wire::monitor`）。两类分开计数。`Watch` 被丢弃时这个人就不再算数；它可以跨线程持有（socket 线程持有，采样线程计数）。
 - `Monitor::tick(&mut self, read: impl FnOnce(Watched) -> Sample)`：每秒调用一次。有人看整页时以 `Watched::Everything` 调用 `read` 一次；只有看摘要的人时以 `Watched::Summary` 调用，读的一方只读本进程；把结果放进历史，满 300 个时丢掉最旧的。没人在看时不调用 `read`，并释放历史占的内存。
 - `Monitor::is_watched(&self) -> bool`：此刻有没有人持有 `Watch`，不论哪一类。
+- `Monitor::watch(&self) -> Watch`：一个在看的人。`Watch` 被丢弃时这个人就不再算数；它可以跨线程持有（socket 线程持有，采样线程计数）。
+- `Monitor::tick(&mut self, read: impl FnOnce() -> Sample)`：每秒调用一次。有人在看时调用 `read` 一次并把结果放进历史，满 300 个时丢掉最旧的；没人在看时不调用 `read`，并释放历史占的内存。
 - `Monitor::history(&self) -> impl Iterator<Item = &Sample>`：从最旧到最新。
 - 没有失败路径：计数是 `AtomicUsize` 的加减，历史的容量在第一次放入时一次预留。
 
@@ -3956,6 +3965,15 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 ## 8-91 `sprawling top` 的输出：一行 JSON 与一屏曲线（`bin::monitor::top`，形状：projection）
 
 `sprawling top <city>` 读 8-90 的历史，按 stdout 是不是终端选一种输出。本模块只把历史投影成文本，不碰终端、不碰 socket：判断 stdout 是不是终端、每秒重画一次、从城里取历史，都是调用方的事。
+**测试。** `monitor::tests`：没人看时 `read` 一次也不被调用、历史为空，人走了以后历史被释放；放入 301 个点后只剩最后 300 个、从旧到新。
+
+**本节接口的当前状态。** 监视器的其余部分尚未落地：生产的计数器读取（核心进程的 CPU、private、工作集、读写字节；Job Object 的汇总与逐进程明细并归到 run；整机 CPU、可用内存；卷的剩余空间与磁盘延迟），其余计数器的来源（内存已定为 `sysinfo`，见下；其余的是 `sysinfo` 还是只取需要的几个平台接口，按体积与启动时间实测后定在这里），每秒调用 `tick` 并把新读数发到 `MonitorFeed::samples` 的采样任务（线上的一对监视帧已在，channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计；在采样任务落地前，看的会话收不到读数），WebUI 监视页接到路由与监视帧上（面板本身 `client/src/views/monitor.svelte` 已在：打开时调用传入的 `watch`、关闭时调用它返回的释放函数，曲线按面板宽度取最近的点，读数与曲线由 `client/src/core/monitor.ts` 按 8-95 的规则算出；它还没有路由，也没有帧可读）与事实条摘要，`sprawling top <city>`（终端里是交互界面，stdout 不是终端时每秒一行 JSON）（两种输出的投影见 8-95；命令本身、终端的重画与交互尚未落地），以及采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
+
+**内存的读数**（`bin::monitor::memory`）：整机物理内存与可用内存经 `sysinfo`（只开 `system` 特性，只刷新 RAM）一次读出成 `Memory { physical, available }`，这是城里读内存的唯一一处；计划推进按它决定下一行是否排队（§8-46-3，只管计划行；其他入口的现状见那里）。平台不报时两项都是零，此时不算紧。取 `sysinfo`，因为它是对外只给安全接口的现成路，本 crate 不写 `unsafe`。
+
+## 8-95 `sprawling top` 的输出：一行 JSON 与一屏曲线（`bin::monitor::top`，形状：projection）
+
+`sprawling top <city>` 读 8-94 的历史，按 stdout 是不是终端选一种输出。本模块只把历史投影成文本，不碰终端、不碰 socket：判断 stdout 是不是终端、每秒重画一次、从城里取历史，都是调用方的事。
 
 **接口。**
 

@@ -4,13 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The performance monitor's history: whether anybody is watching, and
-//! the last [`CAPACITY`] samples they read (sprawling-SPEC.md 8-90).
+//! the last [`CAPACITY`] samples they read (sprawling-SPEC.md 8-94).
 //!
 //! Nobody watching costs nothing: no counter is read and the history
 //! holds no memory. Where the counters come from is the caller's
 //! reading function; this module touches no platform interface.
 
 pub(crate) mod counters;
+pub(crate) mod memory;
 pub(crate) mod sampler;
 pub mod top;
 pub(crate) mod volume;

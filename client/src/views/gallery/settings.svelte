@@ -43,6 +43,7 @@
   import type { DoctorAnswer } from "../../wire";
 
   const MACHINE: DoctorAnswer = {
+    core: "raised",
     custody: { keeps: "across_reboots", store: "platform_service" },
     sandbox: {
       arm: "windows_job_object",

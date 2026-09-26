@@ -12,8 +12,10 @@
 //! and what a tier needs are settled in `doctor` and in `table`.
 
 use super::{Absence, Fault, Version};
-use super::{Finding, Need, PATIENCE, Platform, Presence, ThisMachine, Tier, Verdict};
+use super::{Finding, Machine, Need, PATIENCE, Platform, Presence, ThisMachine, Tier, Verdict};
 use super::{examine, verdict};
+use crate::serving::standing::{Held, Standing};
+use kernel::AxError;
 
 /// Asks this machine once and folds what it said into the answer the
 /// wire carries.
@@ -25,8 +27,12 @@ use super::{examine, verdict};
 /// and the city holds the answer until they ask again.
 pub(crate) fn report() -> channels::DoctorAnswer {
     let platform = Platform::current();
-    let findings = examine(&ThisMachine::new(platform, PATIENCE));
-    fold(&findings, platform, confinement(), custody())
+    fold(
+        &ThisMachine::new(platform, PATIENCE),
+        platform,
+        confinement(),
+        custody(),
+    )
 }
 
 /// The findings, in the shape the wire carries. Separate from the ask
@@ -35,11 +41,12 @@ pub(crate) fn report() -> channels::DoctorAnswer {
 /// verdict is judged without a machine that has a keyring and a search
 /// path.
 fn fold(
-    findings: &[Finding],
+    machine: &dyn Machine,
     platform: Option<Platform>,
     sandbox: channels::DoctorSandbox,
     custody: channels::DoctorCustody,
 ) -> channels::DoctorAnswer {
+    let findings = &examine(machine);
     channels::DoctorAnswer {
         items: findings.iter().map(|found| item(found, platform)).collect(),
         tiers: Tier::ALL
@@ -54,6 +61,20 @@ fn fold(
             .collect(),
         sandbox,
         custody,
+        core: core_level(machine.core_standing()),
+    }
+}
+
+/// The level the terminal's priority part names, as the wire carries it.
+fn core_level(standing: Result<Standing, AxError>) -> channels::DoctorCore {
+    match standing {
+        Ok(Standing::Raised) => channels::DoctorCore::Raised,
+        Ok(Standing::Normal(Held::ByTheSetting)) => channels::DoctorCore::HeldBySetting,
+        Ok(Standing::Normal(Held::Refused(said))) => channels::DoctorCore::Refused { said },
+        Ok(Standing::Normal(Held::ByTheValve)) => channels::DoctorCore::LoweredByValve,
+        Err(err) => channels::DoctorCore::Unasked {
+            said: err.to_string(),
+        },
     }
 }
 
@@ -240,8 +261,9 @@ fn install(recipe: &super::Recipe) -> channels::DoctorInstall {
 mod tests {
     use super::axis_name;
     use super::fold;
+    use crate::doctor::Platform;
     use crate::doctor::tests::ScriptedMachine;
-    use crate::doctor::{Platform, examine};
+    use crate::serving::standing::{Held, Standing};
 
     /// The two machine-wide reads a fold is given, so that a verdict is
     /// judged without a machine that has a search path and a keyring.
@@ -280,12 +302,7 @@ mod tests {
         let machine =
             ScriptedMachine::missing(&["gecko", "webkit", "chromedriver", "msedgedriver"]);
         let (sandbox, custody) = stated();
-        let answer = fold(
-            &examine(&machine),
-            Some(Platform::Windows),
-            sandbox,
-            custody,
-        );
+        let answer = fold(&machine, Some(Platform::Windows), sandbox, custody);
 
         let gecko = answer
             .items
@@ -337,7 +354,7 @@ mod tests {
         let machine =
             ScriptedMachine::missing(&["gecko", "webkit", "chromedriver", "msedgedriver"]);
         let (sandbox, custody) = stated();
-        let answer = fold(&examine(&machine), None, sandbox, custody);
+        let answer = fold(&machine, None, sandbox, custody);
         assert!(
             answer
                 .items
@@ -355,12 +372,7 @@ mod tests {
     fn the_sandbox_rows_are_the_arms_own_assurances() {
         let machine = ScriptedMachine::missing(&[]);
         let (sandbox, custody) = stated();
-        let answer = fold(
-            &examine(&machine),
-            Some(Platform::Windows),
-            sandbox,
-            custody,
-        );
+        let answer = fold(&machine, Some(Platform::Windows), sandbox, custody);
         assert_eq!(answer.sandbox.arm, channels::DoctorSandboxArm::CopiedTree);
         assert_eq!(answer.sandbox.coverage.len(), 5, "one row per axis");
         let network = answer
@@ -373,6 +385,24 @@ mod tests {
             network.kept,
             channels::DoctorCoverage::NotKept,
             "the copied tree does not isolate the network, and the page is told so"
+        );
+    }
+
+    /// The page is told the level the terminal report names, from the
+    /// same reading, and the platform's reason with it: a machine that
+    /// refuses the raise is the one a person has to act on.
+    #[test]
+    fn the_page_is_told_where_the_core_stands() {
+        let machine = ScriptedMachine::missing(&[]).standing(Standing::Normal(Held::Refused(
+            "the raise needs CAP_SYS_NICE".to_owned(),
+        )));
+        let (sandbox, custody) = stated();
+        let answer = fold(&machine, None, sandbox, custody);
+        assert_eq!(
+            answer.core,
+            channels::DoctorCore::Refused {
+                said: "the raise needs CAP_SYS_NICE".to_owned(),
+            }
         );
     }
 }

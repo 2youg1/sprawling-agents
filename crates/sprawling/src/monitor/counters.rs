@@ -13,7 +13,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use sysinfo::{Disks, MemoryRefreshKind, System};
+use sysinfo::{Disks, System};
 
 use super::{Sample, Watched};
 use own_process::OwnProcess;
@@ -85,12 +85,11 @@ impl Machine {
     /// Refreshes the machine's counters into `own`.
     fn read(&mut self, volume: &std::path::Path, own: Sample) -> Sample {
         self.system.refresh_cpu_usage();
-        self.system
-            .refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
+        let memory = super::memory::refreshed(&mut self.system);
         self.disks.refresh(true);
         Sample {
             machine_cpu_permille: permille(self.system.global_cpu_usage()),
-            machine_available_bytes: self.system.available_memory(),
+            machine_available_bytes: memory.available,
             volume_free_bytes: super::volume::space(&self.disks, volume)
                 .map_or(0, |space| space.free_bytes),
             ..own

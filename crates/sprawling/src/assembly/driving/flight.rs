@@ -79,10 +79,11 @@ impl Flight {
         self.pool.in_flight()
     }
 
-    /// Whether every lane is taken. The concurrency wall a caller reads
-    /// before it prepares work it cannot start.
+    /// Whether a new run waits: every lane is taken, or memory is tight.
+    /// The concurrency wall a caller reads before it prepares work it
+    /// cannot start; the memory is read here, at the moment it decides.
     pub(in crate::assembly) fn full(&self) -> bool {
-        self.pool.full()
+        self.pool.full(crate::monitor::memory::read())
     }
 
     /// The plan rows one pursuit has in lanes: how many, and which

@@ -803,6 +803,30 @@
     "en": "checking",
     "zh": "检查中"
   },
+  "machine_core": {
+    "en": "core threads",
+    "zh": "核心线程"
+  },
+  "machine_core_held": {
+    "en": "normal, as config.toml [core] priority asks",
+    "zh": "正常档，按 config.toml 的 [core] priority"
+  },
+  "machine_core_lowered": {
+    "en": "normal, lowered after keeping a core busy",
+    "zh": "正常档，占满一个核之后被降回"
+  },
+  "machine_core_raised": {
+    "en": "one step above normal",
+    "zh": "比正常档高一档"
+  },
+  "machine_core_refused": {
+    "en": "normal, the platform refused the raise",
+    "zh": "正常档，平台拒绝了升档"
+  },
+  "machine_core_unasked": {
+    "en": "not asked",
+    "zh": "没能问到"
+  },
   "machine_install": {
     "en": "install",
     "zh": "安装"

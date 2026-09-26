@@ -327,7 +327,7 @@ impl Listening {
 }
 
 /// The monitor a session watches over the socket, and the thread that
-/// samples it once a second (sprawling-SPEC.md 8-90, 8-92). Whether
+/// samples it once a second (sprawling-SPEC.md 8-94, 8-96). Whether
 /// anybody watches is the monitor's count; a session holds its
 /// [`crate::monitor::Watch`] for as long as it watches.
 ///

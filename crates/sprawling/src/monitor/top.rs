@@ -5,7 +5,7 @@
 
 //! What `sprawling top` prints: one JSON line per sample when stdout is
 //! not a terminal, and one curve per counter when it is
-//! (sprawling-SPEC.md 8-91). Pure: the caller owns the terminal.
+//! (sprawling-SPEC.md 8-95). Pure: the caller owns the terminal.
 
 use super::Sample;
 

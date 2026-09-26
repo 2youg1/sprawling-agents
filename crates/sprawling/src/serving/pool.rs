@@ -23,6 +23,7 @@ use kernel::{AxCode, AxError, RunId};
 
 use super::relay::{Relay, Wake};
 use crate::assembly::{DriveContext, Driven, Driving, drive_run};
+use crate::monitor::memory::Memory;
 
 /// How many runs a city drives at once.
 ///
@@ -34,6 +35,11 @@ use crate::assembly::{DriveContext, Driven, Driving, drive_run};
 /// pool would only park lanes in admission — which moves the queue from
 /// somewhere that can count to somewhere that cannot.
 pub(crate) const DRIVING_LANES: u32 = 4;
+
+/// The share of physical memory a new run leaves free: one part in
+/// this many. A share rather than a byte count, because a byte count
+/// suits one class of machine (sprawling-SPEC.md 8-46-3).
+const RESERVE_SHARE: u64 = 10;
 
 /// One run, home from its lane: which run it was, and what its drive
 /// left behind. The two travel together because neither is anything
@@ -75,8 +81,10 @@ impl DrivingPool {
         u32::try_from(self.running.len()).unwrap_or(u32::MAX)
     }
 
-    pub(crate) fn full(&self) -> bool {
-        self.in_flight() >= self.lanes
+    /// Whether a new run waits: every lane is taken, or memory is
+    /// tight while another run is driving (sprawling-SPEC.md 8-46-3).
+    pub(crate) fn full(&self, memory: Memory) -> bool {
+        !admits(self.in_flight(), self.lanes, memory)
     }
 
     /// Takes one drive into a lane of its own.
@@ -145,5 +153,48 @@ impl DrivingPool {
             .with_recovery("restart this city; its history is verified on the way back up"));
         }
         Ok(arrival)
+    }
+}
+
+/// Whether one more run may start: a lane is free, and either no run is
+/// driving or the machine keeps a tenth of its physical memory free.
+fn admits(in_flight: u32, lanes: u32, memory: Memory) -> bool {
+    let tight = memory
+        .physical
+        .checked_div(RESERVE_SHARE)
+        .is_some_and(|reserve| memory.available < reserve);
+    in_flight < lanes && (in_flight == 0 || !tight)
+}
+
+#[cfg(test)]
+#[allow(clippy::arithmetic_side_effects)]
+mod tests {
+    use super::admits;
+    use crate::monitor::memory::Memory;
+
+    const GIB: u64 = 1 << 30;
+
+    /// A machine with a sixteenth of its memory left starts no second
+    /// run beside the first, and still starts the first, so a city on a
+    /// machine that stays tight keeps moving.
+    #[test]
+    fn a_new_run_waits_while_memory_is_tight() {
+        let tight = Memory {
+            physical: 16 * GIB,
+            available: GIB,
+        };
+        let roomy = Memory {
+            physical: 16 * GIB,
+            available: 8 * GIB,
+        };
+        assert_eq!(
+            [
+                admits(0, 4, tight),
+                admits(1, 4, tight),
+                admits(1, 4, roomy),
+                admits(4, 4, roomy)
+            ],
+            [true, false, true, false]
+        );
     }
 }
