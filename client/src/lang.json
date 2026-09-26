@@ -2595,6 +2595,50 @@
     "en": "effort",
     "zh": "effort"
   },
+  "talk_drop_refused": {
+    "en": "{name} was not kept: {why}",
+    "zh": "{name} 没有存下：{why}"
+  },
+  "talk_failed": {
+    "en": "no reply",
+    "zh": "没有回复"
+  },
+  "talk_failed_refused": {
+    "en": "the city did not take this message",
+    "zh": "城没有接下这条消息"
+  },
+  "talk_failed_cancelled": {
+    "en": "stopped before it answered",
+    "zh": "在回答之前停下了"
+  },
+  "talk_failed_model": {
+    "en": "no model is chosen to answer",
+    "zh": "还没有选回答用的模型"
+  },
+  "talk_failed_provider": {
+    "en": "the model provider refused the call",
+    "zh": "模型供应方拒绝了这次调用"
+  },
+  "talk_open_settings": {
+    "en": "open model settings",
+    "zh": "打开模型设置"
+  },
+  "talk_send_again": {
+    "en": "send again",
+    "zh": "再发一次"
+  },
+  "talk_context": {
+    "en": "context",
+    "zh": "上下文"
+  },
+  "talk_context_run": {
+    "en": "run {run}",
+    "zh": "本次 run {run}"
+  },
+  "talk_context_none": {
+    "en": "no run yet",
+    "zh": "还没有 run"
+  },
   "talk_empty_mayor": {
     "en": "the Mayor",
     "zh": "市长室"

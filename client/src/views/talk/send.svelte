@@ -8,11 +8,12 @@
   // The control that sends what the composer holds.
   //
   // **It is drawn here rather than in `parts/button.svelte` for one
-  // reason: its second face.** After Enter it briefly reads "handed to
-  // <room>" beside a check, so a person sees the send land (ux A3), and
-  // the button part has no slot for a glyph. The paint is the primary
-  // tier's, restated in tokens. An empty box leaves it drawn but inert,
-  // so the place a person reaches for does not move.
+  // reason: its second face.** After Enter the arrow becomes a check and
+  // a status line says "handed to <room>", so a person sees the send land
+  // (ux A3), and the button part has no slot for a glyph. It is a round
+  // arrow at the box's right edge, where every chat page puts it, and its
+  // name is the verb it sends. An empty box leaves it drawn but inert, so
+  // the place a person reaches for does not move.
   import type { Sending } from "../../core/doing";
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
@@ -34,21 +35,18 @@
 <button
   type="submit"
   class={[
-    "flex h-control-lg items-center gap-snug rounded-control px-base text-label transition-[background-color,color,opacity,transform]",
-    "duration-100 ease-standard active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100",
-    empty && !handed ? "bg-raised aria-disabled:text-text-disabled" : "bg-accent text-on-accent hover:bg-accent-hover",
+    "relative flex size-control shrink-0 items-center justify-center rounded-pill transition-[background-color,color,opacity,transform] before:absolute before:-inset-tight before:content-['']",
+    "duration-100 ease-standard active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100",
+    empty && !handed ? "bg-raised-hover aria-disabled:text-text-disabled" : "bg-accent text-on-accent hover:bg-accent-hover",
   ]}
+  aria-label={say($lang, SPELLING[sending])}
   aria-disabled={empty}
   onclick={(event) => {
     if (empty) event.preventDefault();
   }}
 >
-  <span role="status" class="flex items-center gap-tight">
-    {#if handed}
-      <Glyph name="check" size="sm" />
-      {fill(say($lang, "talk_handed"), { room: here ?? "" })}
-    {:else}
-      {say($lang, SPELLING[sending])}
-    {/if}
-  </span>
+  <Glyph name={handed ? "check" : "send"} />
 </button>
+<span role="status" class="sr-only">
+  {#if handed}{fill(say($lang, "talk_handed"), { room: here ?? "" })}{/if}
+</span>

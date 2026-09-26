@@ -51,7 +51,11 @@ export type GlyphName =
   // Two crossed strokes: refused.
   | "cross"
   // One stroke that lands: done.
-  | "check";
+  | "check"
+  // An arrow rising from the box: send what is written.
+  | "send"
+  // A square: stop what is going.
+  | "stop";
 
 export const GLYPHS: Record<GlyphName, string> = {
   talk: "M3 5.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2z",
@@ -68,6 +72,8 @@ export const GLYPHS: Record<GlyphName, string> = {
   pulse: "M2.5 10.5h3l2.5-5.5 3.5 10 2.5-4.5h3.5",
   cross: "M5.5 5.5l9 9M14.5 5.5l-9 9",
   check: "M4 10.5l4 4 8-9",
+  send: "M10 16V4M5 9l5-5 5 5",
+  stop: "M6 6h8v8H6z",
 };
 
 // The three paint tiers a mark may take (client-SPEC 4-32). They are
