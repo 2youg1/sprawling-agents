@@ -28,7 +28,6 @@ impl gateway::ImageBytes
 impl gateway::MarketSnapshot
 impl gateway::Modality
 impl gateway::ModelFacts
-impl gateway::Native
 impl gateway::OauthPending
 impl gateway::OutputCeiling
 impl gateway::Persistence
@@ -38,7 +37,6 @@ impl gateway::Redemption
 impl gateway::RerankRequest
 impl gateway::Transcriber
 impl kernel::model::Model for gateway::Endpoint
-impl kernel::model::Model for gateway::Native
 impl<'a> gateway::Ranks<'a>
 impl<'a> gateway::Vectors<'a>
 pub const fn gateway::CeilingSource::as_str(self) -> &'static str
@@ -145,8 +143,6 @@ pub fn gateway::MarketSnapshot::len(&self) -> usize
 pub fn gateway::MarketSnapshot::lookup(&self, &str) -> core::option::Option<&gateway::ModelEntry>
 pub fn gateway::MarketSnapshot::version(&self) -> u32
 pub fn gateway::ModelFacts::read(&serde_json::value::Value) -> core::option::Option<gateway::ModelFacts>
-pub fn gateway::Native::call(&mut self, &kernel::model::seam::ModelRequest) -> core::result::Result<kernel::model::seam::ModelReturn, kernel::error::shape::AxError>
-pub fn gateway::Native::new(gateway::NativeConfig) -> core::result::Result<gateway::Native, kernel::error::shape::AxError>
 pub fn gateway::OauthPending::open_url(&self) -> &str
 pub fn gateway::OauthPending::user_code(&self) -> core::option::Option<&str>
 pub fn gateway::OauthTokens::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -318,11 +314,6 @@ pub gateway::ModelPreset::id_prefix: &'static str
 pub gateway::ModelPreset::input: gateway::InputKinds
 pub gateway::ModelPreset::max_output_tokens: u64
 pub gateway::ModelPreset::source: &'static str
-pub gateway::NativeConfig::base_url: alloc::string::String
-pub gateway::NativeConfig::model: alloc::string::String
-pub gateway::NativeConfig::pricing: core::option::Option<gateway::ModelEntry>
-pub gateway::NativeConfig::proxying: kernel::reach::Proxying
-pub gateway::NativeConfig::timeout_ms: u64
 pub gateway::Normalised::base_url: alloc::string::String
 pub gateway::Normalised::dialect: gateway::DialectHint
 pub gateway::OauthPending::Device(gateway::DeviceLogin)
@@ -398,8 +389,6 @@ pub struct gateway::MarketSnapshot
 pub struct gateway::ModelEntry
 pub struct gateway::ModelFacts
 pub struct gateway::ModelPreset
-pub struct gateway::Native
-pub struct gateway::NativeConfig
 pub struct gateway::Normalised
 pub struct gateway::OauthProfile
 pub struct gateway::OauthTokens

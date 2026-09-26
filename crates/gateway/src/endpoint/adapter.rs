@@ -12,23 +12,15 @@
 
 use kernel::AxError;
 
-use crate::endpoint::{AuthSpec, Endpoint, EndpointConfig, HeaderValue, Redemption};
+use crate::endpoint::{Endpoint, EndpointConfig, HeaderValue, Redemption};
 use crate::router::Chosen;
 
 /// The adapter for one chosen model.
 ///
-/// A loopback endpoint speaking the OpenAI shape goes through the
-/// local adapter, which is loopback-only by construction; everything
-/// else goes through the general one, which refuses to carry a
-/// confidential building's bytes off this machine.
-///
-/// A credential decides the route too: the local adapter has no
-/// authentication surface, so a loopback endpoint that was attached
-/// with a secret (a local proxy, LiteLLM, a corporate gateway) must
-/// take the general path. So does a header or a body override the
-/// person set: the local adapter can send neither, and an adapter that
-/// quietly dropped them would call the endpoint a different way from
-/// the one the form showed.
+/// Every chosen model gets an [`Endpoint`], a loopback one included:
+/// the endpoint decides locality once, when it builds its client, and
+/// the stream door is the endpoint's, so a local model answers in
+/// increments like any other.
 pub fn adapter_for(
     chosen: &Chosen<'_>,
     redemption: Redemption,
@@ -36,23 +28,6 @@ pub fn adapter_for(
 ) -> Result<Box<dyn kernel::Model + Send>, AxError> {
     let endpoint = chosen.endpoint;
     let tuning = &endpoint.tuning;
-    // The tuning answers this, because the figure an untuned endpoint
-    // is called with is the tuning's own default and is stated there.
-    let timeout_ms = tuning.call_timeout_ms();
-    if endpoint.is_local()
-        && matches!(endpoint.dialect, kernel::DialectKind::OpenAi)
-        && matches!(endpoint.auth, AuthSpec::None)
-        && tuning.is_plain()
-    {
-        let native = crate::Native::new(crate::NativeConfig {
-            base_url: endpoint.chat_url(),
-            model: chosen.entry.id.clone(),
-            timeout_ms,
-            pricing: Some(chosen.entry.clone()),
-            proxying: tuning.proxying,
-        })?;
-        return Ok(Box::new(native));
-    }
     // A person who names a header the dialect also sets replaces it,
     // rather than adding a second line with the same name: two
     // `anthropic-version` headers is a request no provider promises to
@@ -79,7 +54,10 @@ pub fn adapter_for(
             auth: endpoint.auth.clone(),
             extra_headers,
             overrides: tuning.applied_overrides(),
-            timeout_ms,
+            // The tuning answers this, because the figure an untuned
+            // endpoint is called with is the tuning's own default and
+            // is stated there.
+            timeout_ms: tuning.call_timeout_ms(),
             stream_idle_timeout_ms: tuning.idle_timeout_ms(),
             pricing: Some(chosen.entry.clone()),
             proxying: tuning.proxying,
