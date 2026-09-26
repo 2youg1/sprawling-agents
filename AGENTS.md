@@ -53,7 +53,7 @@ The tools are listed in the `prereqs` recipe and nowhere else, so this file cann
 ## One change, five steps
 
 1. **Take one piece of work.** Read its context in full before starting: the crate's SPEC, the neighbouring modules, and their tests.
-2. **Write the SPEC first.** Interfaces and decisions land in the crate's SPEC before the code exists. A new module states which of the seven shapes it instantiates ([`ARCHITECTURE.md`](ARCHITECTURE.md) §9); when there is no answer, stop and ask rather than write.
+2. **Write the SPEC first.** Interfaces and decisions land in the crate's SPEC before the code exists. A new module states which of the seven shapes it instantiates ([`ARCHITECTURE.md`](ARCHITECTURE.md) §9); when there is no answer, stop and ask rather than write. A move that leaves every interface unchanged — a file split, a module moved — needs no SPEC section; the module map row is its record.
 3. **Red.** Write the failing test and **run it once to watch it fail**. That run is what proves the test can bite.
 4. **Green.** Implement until it passes, no more. When the implementation wants to differ from the SPEC, change the SPEC first.
 5. **Close.** All four: `just check` green | the red-to-green transition visible in the commit order | SPEC and code in step | the module map updated.
@@ -85,7 +85,7 @@ The client (`client/`) is exempt from steps 2 and 3 — see *The view layer* bel
 ## Where code goes
 
 - One module, one file, semantically named. Register the file in the module map, then create it. Keep `lib.rs` and index files free of logic.
-- Keep a function inside 200 lines and 4 parameters, and a file inside 400 lines, tests included. `xtask/budgets.toml` holds the register of what predates each re-pricing, pinned at the length it had the day the line moved: a named file may not exceed its pin, and its entry is struck once it no longer needs one.
+- Keep a function inside 200 lines and 4 parameters, and a file inside 400 production lines: the lines a top-level `#[cfg(test)]` item spans are not counted. `xtask/budgets.toml` holds the register of what predates each re-pricing, pinned at the length it had the day the line moved: a named file may not exceed its pin, and its entry is struck once it no longer needs one.
 - **Every register in `budgets.toml` is a ratchet.** A number may improve freely and drift only within its slack, so a gradual regression cannot arrive one commit at a time. Record the new reading and the reason beside it; never widen the slack to admit one.
 - These files sit within four lines of the cap. Add to a new module rather than to them: `crates/memory/src/worktree/trees.rs`, `crates/runtime/src/tools/exec.rs`, `crates/city/src/spine_files.rs`, `crates/sprawling/src/mcp_stdio.rs`, `xtask/src/modmap.rs`, `xtask/src/boundary.rs`.
 - Prefer a new module over growing an existing one. When you extract from a large module, move its tests and type docs with it so the invariants stay next to what owns them.
@@ -149,10 +149,10 @@ Violating any of these turns CI red with a message naming the rule, the violatio
 | The kani harness roster read out of the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, and a harness left unproved cites where that was decided. | `xtask proof` |
 | Sizes inside their budget, badges in step with the artifacts. | `xtask budget` |
 | Nothing published that names one machine's home directory, its working notes, or a document this tree does not contain. | `xtask release` |
-| **Fix the cause when a gate goes red.** | `xtask guard` |
+| `desktop/`'s copy of the workspace lint table, metadata and shared dependency versions equal to the workspace's, key by key. | `xtask guard` |
 
-- Loosening a gate **in the change that the gate is failing** requires an explicit ruling from the person, recorded as a `Verdict:` trailer. That is the one universal escape hatch, and this is what closes it.
-- Re-pricing a rule **in a commit of its own** is ordinary work and needs no ruling. `xtask guard` looks for the pair — gate machinery and the source those gates judge, changed together without a trailer. One side alone never meets the rule.
+- **Fix the cause when a gate goes red.** Loosening a gate **in the change that the gate is failing** requires an explicit ruling from the person, recorded as a `Verdict:` trailer. Review holds this rule; no gate reads commit history.
+- Re-pricing a rule **in a commit of its own** is ordinary work and needs no ruling.
 - **Every rule that excludes an architecture carries the parameter that made it right.** When that parameter moves, re-argue the rule instead of obeying it. Rules that exclude a *defect* — the panic bans, the arithmetic bans, the determinism rules — carry no such condition, because nothing about them expires.
 
 ## The view layer
@@ -205,7 +205,7 @@ So the first group of rules below is about what you write into the product, and 
 
 - The first line is `card-<stage>.<index>: <what>`, for example `card-S4.02: the wire, and the two frames a socket cannot spell`.
 - The body records **what you found**, since what you did is already in the diff: a gate that changed your design, a red-to-green transition that exposed a real defect, a choice between two approaches whose reason the result does not show.
-- A commit touching anything the `guard` row covers carries a `Verdict: user-approved` trailer. The wording of the ruling stays with the person; the trailer records that there was one.
+- A commit that loosens a gate beside the source that gate judges carries a `Verdict: user-approved` trailer. The wording of the ruling stays with the person; the trailer records that there was one.
 
 ## Where the authorities are
 

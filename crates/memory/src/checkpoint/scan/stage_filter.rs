@@ -45,7 +45,7 @@ impl StageFilter {
     }
 
     pub(super) fn admit(&mut self, relative: &std::path::Path) -> i32 {
-        if kernel::layout::CityLayout::is_session_projection(relative)
+        if crate::sessions::is_session_projection(relative)
             || !crate::reserved::outside_reserved(relative)
         {
             return 1;

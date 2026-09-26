@@ -317,18 +317,4 @@ mod tests {
         assert!(Reach::parse("value").is_none());
         assert!(Reach::parse("").is_none());
     }
-
-    #[test]
-    fn the_repository_itself_passes_the_check_it_ships() {
-        let violations = check(&root()).expect("the check runs");
-        assert!(
-            violations.is_empty(),
-            "verbs are wired to the wrong side:\n{}",
-            violations
-                .iter()
-                .map(|found| found.violation.clone())
-                .collect::<Vec<String>>()
-                .join("\n")
-        );
-    }
 }

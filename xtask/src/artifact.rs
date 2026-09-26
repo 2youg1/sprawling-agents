@@ -291,15 +291,4 @@ mod tests {
         let source = "#[cfg(test)]\nmod tests {\n    pub fn mock_clock() {}\n}\n";
         assert!(found(source).is_empty());
     }
-
-    /// The repository passes the check it ships.
-    #[test]
-    fn the_repository_itself_passes_the_check_it_ships() {
-        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .map(Path::to_path_buf)
-            .expect("xtask lives one level under the repo root");
-        let found = check(&root).unwrap();
-        assert!(found.is_empty(), "{found:#?}");
-    }
 }

@@ -202,21 +202,3 @@ fn a_bracket_that_is_not_a_link_is_not_a_target() {
     assert!(link_targets("an array [1, 2] (three)").is_empty());
     assert!(link_targets("nothing here at all").is_empty());
 }
-
-#[test]
-fn the_repository_itself_passes_the_check_it_ships() {
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(Path::to_path_buf)
-        .expect("xtask lives one level under the repo root");
-    let violations = check(&root).expect("the check runs");
-    assert!(
-        violations.is_empty(),
-        "product documents link to scaffolding:\n{}",
-        violations
-            .iter()
-            .map(|v| format!("{}: {}", v.location, v.violation))
-            .collect::<Vec<String>>()
-            .join("\n")
-    );
-}

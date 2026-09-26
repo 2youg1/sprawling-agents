@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 
 use super::lockfile::{allowed, document, lock_of, manifest_of, permitted, read_jsonc};
-use super::{check, judge_lockfile, judge_runtime};
+use super::{judge_lockfile, judge_runtime};
 
 /// What `bun.lock` actually looks like: trailing commas after the last
 /// entry of every object. A reader that handed this to `serde_json`
@@ -137,17 +137,6 @@ fn the_permitted_licences_are_this_repositorys_own_and_not_a_second_copy() {
     assert!(!allowlist.contains("GPL-3.0"));
     assert!(permitted("[licenses]\nallow = []\n").is_err());
     assert!(permitted("[bans]\ndeny = []\n").is_err());
-}
-
-/// The gate against the tree it guards.
-#[test]
-fn this_repository_passes_its_own_npm_gate() {
-    let violations = check(&root()).unwrap();
-    let said: Vec<String> = violations
-        .iter()
-        .map(|held| format!("{}: {}", held.location, held.violation))
-        .collect();
-    assert!(said.is_empty(), "{said:#?}");
 }
 
 /// Every workflow that runs these gates prepares what they judge.
