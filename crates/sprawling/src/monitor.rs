@@ -80,6 +80,15 @@ impl Monitor {
     /// and keeps its sample, dropping the oldest beyond [`CAPACITY`];
     /// while nobody does, calls nothing and releases the history.
     pub fn tick(&mut self, read: impl FnOnce() -> Sample) {
+        if self.watchers.load(Ordering::Relaxed) == 0 {
+            self.history = VecDeque::new();
+            return;
+        }
+        if self.history.len() == CAPACITY {
+            self.history.pop_front();
+        }
+        self.history
+            .reserve_exact(CAPACITY.saturating_sub(self.history.len()));
         self.history.push_back(read());
     }
 
