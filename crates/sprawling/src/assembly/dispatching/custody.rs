@@ -32,25 +32,13 @@ impl RunWorker {
     /// its `secret_captured` record. The caller must not go on with the
     /// original text, because that is the leak this exists to close.
     pub(in crate::assembly) fn take_custody(&mut self, text: String) -> Result<String, AxError> {
-        let keys: Vec<_> = kernel::secret::scan(text.as_bytes())
-            .into_iter()
-            .filter_map(|span| span.provider.map(|provider| (span, provider)))
-            .collect();
-        if keys.is_empty() {
-            return Ok(text);
+        match kept_text(&text, |provider, key| self.keep_pasted(provider, key))? {
+            Some(kept) => {
+                drop(Zeroizing::new(text));
+                Ok(kept)
+            }
+            None => Ok(text),
         }
-        let text = Zeroizing::new(text);
-        let mut kept = String::with_capacity(text.len());
-        let mut cursor = 0_usize;
-        for (span, provider) in keys {
-            let end = span.start.checked_add(span.len).ok_or_else(outside_text)?;
-            kept.push_str(text.get(cursor..span.start).ok_or_else(outside_text)?);
-            let key = text.get(span.start..end).ok_or_else(outside_text)?;
-            kept.push_str(&self.keep_pasted(provider, key)?.to_string());
-            cursor = end;
-        }
-        kept.push_str(text.get(cursor..).ok_or_else(outside_text)?);
-        Ok(kept)
     }
 
     /// Puts one pasted key in the vault under a name no earlier key
@@ -68,6 +56,39 @@ impl RunWorker {
         )?;
         Ok(reference)
     }
+}
+
+/// `text` with every provider-shaped key replaced by the reference
+/// `keep` stored it under, or `None` when `text` holds no such key.
+///
+/// Only shape-table hits are taken: an entropy hit is as often a commit
+/// hash the resident has to read as it is a credential.
+///
+/// # Errors
+/// Propagates `keep` refusing a key, and a span off the text's character
+/// boundaries.
+pub(in crate::assembly) fn kept_text(
+    text: &str,
+    mut keep: impl FnMut(&str, &str) -> Result<SecretRef, AxError>,
+) -> Result<Option<String>, AxError> {
+    let keys: Vec<_> = kernel::secret::scan(text.as_bytes())
+        .into_iter()
+        .filter_map(|span| span.provider.map(|provider| (span, provider)))
+        .collect();
+    if keys.is_empty() {
+        return Ok(None);
+    }
+    let mut kept = String::with_capacity(text.len());
+    let mut cursor = 0_usize;
+    for (span, provider) in keys {
+        let end = span.start.checked_add(span.len).ok_or_else(outside_text)?;
+        kept.push_str(text.get(cursor..span.start).ok_or_else(outside_text)?);
+        let key = text.get(span.start..end).ok_or_else(outside_text)?;
+        kept.push_str(&keep(provider, key)?.to_string());
+        cursor = end;
+    }
+    kept.push_str(text.get(cursor..).ok_or_else(outside_text)?);
+    Ok(Some(kept))
 }
 
 /// A span `scan` returned that does not fall on the text's character
