@@ -34,10 +34,11 @@ const _: () = assert!(
     "the monitor history outgrew HISTORY_BUDGET"
 );
 
-/// The watcher count and the history it gates.
+/// The two watcher counts and the history they gate.
 #[derive(Debug, Default)]
 pub struct Monitor {
-    watchers: Arc<AtomicUsize>,
+    page_watchers: Arc<AtomicUsize>,
+    summary_watchers: Arc<AtomicUsize>,
     history: VecDeque<Sample>,
 }
 
@@ -57,10 +58,14 @@ impl Monitor {
     /// Counts one more watcher of `watched` until the returned [`Watch`]
     /// is dropped.
     #[must_use]
-    pub fn watch(&self, _watched: Watched) -> Watch {
-        self.watchers.fetch_add(1, Ordering::Relaxed);
+    pub fn watch(&self, watched: Watched) -> Watch {
+        let watchers = match watched {
+            Watched::Everything => &self.page_watchers,
+            Watched::Summary => &self.summary_watchers,
+        };
+        watchers.fetch_add(1, Ordering::Relaxed);
         Watch {
-            watchers: Arc::clone(&self.watchers),
+            watchers: Arc::clone(watchers),
         }
     }
 
@@ -70,22 +75,35 @@ impl Monitor {
     /// keeps its sample, dropping the oldest beyond [`CAPACITY`]; while
     /// nobody does, calls nothing and releases the history.
     pub fn tick(&mut self, read: impl FnOnce(Watched) -> Sample) {
-        if self.watchers.load(Ordering::Relaxed) == 0 {
+        let Some(watched) = self.watched() else {
             self.history = VecDeque::new();
             return;
-        }
+        };
         if self.history.len() == CAPACITY {
             self.history.pop_front();
         }
         self.history
             .reserve_exact(CAPACITY.saturating_sub(self.history.len()));
-        self.history.push_back(read(Watched::Everything));
+        self.history.push_back(read(watched));
     }
 
     /// Whether anybody holds a [`Watch`] right now.
     #[must_use]
     pub fn is_watched(&self) -> bool {
-        self.watchers.load(Ordering::Relaxed) > 0
+        self.watched().is_some()
+    }
+
+    /// The most anybody watches right now: the whole page when anybody
+    /// does, else the summary when anybody watches that.
+    fn watched(&self) -> Option<Watched> {
+        let watching = |watchers: &AtomicUsize| watchers.load(Ordering::Relaxed) > 0;
+        if watching(&self.page_watchers) {
+            Some(Watched::Everything)
+        } else if watching(&self.summary_watchers) {
+            Some(Watched::Summary)
+        } else {
+            None
+        }
     }
 
     /// The kept samples, oldest first.

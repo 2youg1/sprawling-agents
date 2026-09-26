@@ -20,54 +20,89 @@ use own_process::OwnProcess;
 
 pub(crate) mod own_process;
 
-/// The open platform handles, and the volume whose free space is read.
+/// This process's handle, the machine's handles while the whole page is
+/// watched, and the volume whose free space is read.
 pub(crate) struct Counters {
-    system: System,
-    disks: Disks,
     own: OwnProcess,
+    machine: Option<Machine>,
     volume: PathBuf,
 }
 
+/// The `sysinfo` handles, which cost milliseconds a reading; only a
+/// watcher of the whole page pays for them.
+struct Machine {
+    system: System,
+    disks: Disks,
+}
+
 impl Counters {
-    /// Opens the handles. The first reading has no earlier one to
-    /// compare with, so both CPU figures read 0.
+    /// Opens this process's handle; the machine's wait for the first
+    /// reading of [`Watched::Everything`]. The first reading has no
+    /// earlier one to compare with, so both CPU figures read 0.
     pub(crate) fn open(volume: PathBuf) -> Self {
         Self {
-            system: System::new(),
-            disks: Disks::new_with_refreshed_list(),
             own: OwnProcess::new(),
+            machine: None,
             volume,
         }
     }
 
-    /// Refreshes every counter and reads one sample; `elapsed` is the
-    /// wall time since the previous reading. The core-health
-    /// fields and this process's read and written bytes are not read
-    /// here and stay 0 (8-92, decision 1 and current state).
-    pub(crate) fn read(&mut self, _watched: Watched, elapsed: Duration) -> Sample {
+    /// Reads one sample; `elapsed` is the wall time since the previous
+    /// reading. [`Watched::Summary`] reads this process alone and closes
+    /// the machine's handles. The core-health fields are not read here
+    /// and stay 0 (8-92, current state).
+    pub(crate) fn read(&mut self, watched: Watched, elapsed: Duration) -> Sample {
+        let core = self.own.read(elapsed);
+        let own = Sample {
+            core_cpu_permille: core.cpu_permille,
+            core_private_bytes: core.private_bytes,
+            core_working_set_bytes: core.working_set_bytes,
+            core_read_bytes: core.read_bytes,
+            core_written_bytes: core.written_bytes,
+            ..Sample::default()
+        };
+        match watched {
+            Watched::Summary => {
+                self.machine = None;
+                own
+            }
+            Watched::Everything => self
+                .machine
+                .get_or_insert_with(Machine::open)
+                .read(&self.volume, own),
+        }
+    }
+}
+
+impl Machine {
+    fn open() -> Self {
+        Self {
+            system: System::new(),
+            disks: Disks::new_with_refreshed_list(),
+        }
+    }
+
+    /// Refreshes the machine's counters into `own`.
+    fn read(&mut self, volume: &std::path::Path, own: Sample) -> Sample {
         self.system.refresh_cpu_usage();
         self.system
             .refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
         self.disks.refresh(true);
-        let core = self.own.read(elapsed);
         Sample {
-            core_cpu_permille: core.cpu_permille,
-            core_private_bytes: core.private_bytes,
-            core_working_set_bytes: core.working_set_bytes,
             machine_cpu_permille: permille(self.system.global_cpu_usage()),
             machine_available_bytes: self.system.available_memory(),
-            volume_free_bytes: self.volume_free_bytes(),
-            ..Sample::default()
+            volume_free_bytes: self.volume_free_bytes(volume),
+            ..own
         }
     }
 
     /// The free space of the disk whose mount point is the longest
     /// prefix of the city's path.
-    fn volume_free_bytes(&self) -> u64 {
+    fn volume_free_bytes(&self, volume: &std::path::Path) -> u64 {
         self.disks
             .list()
             .iter()
-            .filter(|disk| self.volume.starts_with(disk.mount_point()))
+            .filter(|disk| volume.starts_with(disk.mount_point()))
             .max_by_key(|disk| disk.mount_point().components().count())
             .map_or(0, sysinfo::Disk::available_space)
     }

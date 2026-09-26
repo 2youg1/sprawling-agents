@@ -11,12 +11,14 @@ use std::time::Duration;
 
 use cpu_time::ProcessTime;
 
-/// The three figures of this process one sample carries.
+/// The five figures of this process one sample carries.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct OwnReading {
     pub(crate) cpu_permille: u64,
     pub(crate) private_bytes: u64,
     pub(crate) working_set_bytes: u64,
+    pub(crate) read_bytes: u64,
+    pub(crate) written_bytes: u64,
 }
 
 /// The previous reading's CPU time, which the next reading's CPU share
@@ -43,12 +45,48 @@ impl OwnProcess {
         };
         self.previous = cpu;
         let memory = memory_stats::memory_stats();
+        let storage = storage_bytes();
         OwnReading {
             cpu_permille,
             private_bytes: memory.map_or(0, |stats| widen(stats.virtual_mem)),
             working_set_bytes: memory.map_or(0, |stats| widen(stats.physical_mem)),
+            read_bytes: storage.read,
+            written_bytes: storage.written,
         }
     }
+}
+
+/// The bytes this process has read from and written to storage.
+#[derive(Default)]
+struct StorageBytes {
+    read: u64,
+    written: u64,
+}
+
+/// Linux keeps them in `/proc/self/io`, a plain file std reads safely;
+/// a line the kernel does not offer reads 0.
+#[cfg(target_os = "linux")]
+fn storage_bytes() -> StorageBytes {
+    let Ok(io) = std::fs::read_to_string("/proc/self/io") else {
+        return StorageBytes::default();
+    };
+    let field = |name: &str| {
+        io.lines()
+            .find_map(|line| line.strip_prefix(name))
+            .and_then(|value| value.trim().parse().ok())
+            .unwrap_or(0)
+    };
+    StorageBytes {
+        read: field("read_bytes:"),
+        written: field("write_bytes:"),
+    }
+}
+
+/// Elsewhere the counter is reachable only through `unsafe`, which this
+/// workspace forbids, so both read 0 (sprawling-SPEC.md 8-92, decision 1).
+#[cfg(not(target_os = "linux"))]
+fn storage_bytes() -> StorageBytes {
+    StorageBytes::default()
 }
 
 /// CPU time spent over wall time elapsed, spread over every core, as

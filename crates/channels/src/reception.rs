@@ -263,10 +263,12 @@ pub fn decide_frame(
         },
         (SessionState::Live, ClientFrame::Command(command)) => SessionStep::Deliver(command),
         (SessionState::Live, ClientFrame::Query(query)) => SessionStep::Answer(Box::new(query)),
-        (
-            SessionState::Live,
-            ClientFrame::Monitor(Monitoring::Watch | Monitoring::WatchSummary),
-        ) => SessionStep::Watch(Watched::Everything),
+        (SessionState::Live, ClientFrame::Monitor(Monitoring::Watch)) => {
+            SessionStep::Watch(Watched::Everything)
+        }
+        (SessionState::Live, ClientFrame::Monitor(Monitoring::WatchSummary)) => {
+            SessionStep::Watch(Watched::Summary)
+        }
         (SessionState::Live, ClientFrame::Monitor(Monitoring::Release)) => SessionStep::Release,
         (SessionState::Live, ClientFrame::Hello(_)) => SessionStep::Refuse {
             error: Box::new(
