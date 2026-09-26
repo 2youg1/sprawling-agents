@@ -87,7 +87,12 @@ fn a15_rebuild_matches_the_recorded_segment_hashes() {
         caps: SegmentCaps::startup_default(),
     };
     let prefix = build_prefix(plan).unwrap();
-    let payload = serde_json::to_value(prefix.prompt_payload().unwrap()).unwrap();
+    let payload = serde_json::to_value(
+        prefix
+            .prompt_payload(&crate::prefix::BreakpointPlan::for_conversation(&[]))
+            .unwrap(),
+    )
+    .unwrap();
     let resolver = |addr: &Address| docs.get(addr.as_str()).map(|s| s.as_bytes().to_vec());
     let rebuilt = rebuild_prefix(&payload, &resolver).unwrap();
     assert_eq!(

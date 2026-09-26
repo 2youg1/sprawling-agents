@@ -13,9 +13,10 @@
 //! moved, which is what [`PromptShape::attribute`] answers and what
 //! `prompt_shape_compared` carries into the ledger.
 //!
-//! **The breakpoint marker is request-side only.** [`anchor_tail`] marks
-//! one message and that mark has no serde (kernel's `ChatMessage`), so
-//! the bytes any record holds are the same with and without it.
+//! **The breakpoint marker is request-side only.** The breakpoint plan
+//! marks one message and that mark has no serde (kernel's
+//! `ChatMessage`), so the bytes any record holds are the same with and
+//! without it.
 
 use kernel::event::record::{
     PartChange, PromptAssembled, PromptShapeCompared, ShapeChanged, ShapePart,
@@ -215,29 +216,6 @@ fn between(mine: ShapePart, theirs: ShapePart) -> PartChange {
         PartChange::Same
     } else {
         PartChange::Moved
-    }
-}
-
-/// The tail anchor: the request's last message carries the cache
-/// breakpoint, whatever its role.
-///
-/// Trailing tool results ride in that last message, so anchoring the tail
-/// is what keeps them inside the cached region. Anchoring the last
-/// *assistant* message instead leaves every tool result after it outside,
-/// and the run pays for them again on every request - the shape of a
-/// prompt cache that caps its own hit rate near half (runtime-SPEC.md
-/// section 12 records the rejected alternative and its reason).
-///
-/// Marks are cleared before the tail is marked, so a request carries
-/// exactly one message breakpoint and it is the tail. The marker itself
-/// is outside serde: nothing this function does can change a recorded
-/// byte.
-pub(crate) fn anchor_tail(messages: &mut [ChatMessage]) {
-    for message in messages.iter_mut() {
-        message.cache = false;
-    }
-    if let Some(tail) = messages.last_mut() {
-        tail.cache = true;
     }
 }
 

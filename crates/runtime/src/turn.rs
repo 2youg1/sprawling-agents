@@ -107,7 +107,11 @@ impl Turn<Assembling> {
         // comes before `prompt_assembled` is written: a refusal must not
         // leave a line describing a prefix the city will not send.
         let segments = prefix.verified_segment_hashes()?;
-        let prompt = prefix.prompt_payload()?;
+        // One plan decides every breakpoint: the system blocks, the tail
+        // message and the record all read it, so the record names only
+        // breakpoints this request carries.
+        let plan = crate::prefix::BreakpointPlan::for_conversation(window.messages());
+        let prompt = prefix.prompt_payload(&plan)?;
         self.journal
             .append_authored(ledger, Authored::PromptAssembled, prompt)?;
         let mut chat = ChatRequest {
@@ -118,10 +122,7 @@ impl Turn<Assembling> {
             tools: tools.to_vec(),
             effort: shape.effort,
         };
-        // The cache region ends at the tail of the conversation, so
-        // everything this request carries - trailing tool results
-        // included - is inside the region the next request can hit.
-        crate::prefix::shape::anchor_tail(&mut chat.messages);
+        plan.mark(&mut chat.messages);
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,
             state: Calling { segments, chat },

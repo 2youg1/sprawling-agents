@@ -17,6 +17,8 @@
 
 use kernel::{ContentBlock, Role};
 
+use crate::prefix::BreakpointPlan;
+
 use super::*;
 
 fn message(role: Role, text: &str) -> ChatMessage {
@@ -73,7 +75,12 @@ fn records(
     baseline: Option<&PromptShape>,
 ) -> (serde_json::Value, serde_json::Value) {
     let prefix = prefix();
-    let assembled = serde_json::to_value(prefix.prompt_payload().unwrap()).unwrap();
+    let assembled = serde_json::to_value(
+        prefix
+            .prompt_payload(&crate::prefix::BreakpointPlan::for_conversation(&[]))
+            .unwrap(),
+    )
+    .unwrap();
     let shape = PromptShape::of(&prefix, tools, messages).unwrap();
     let compared =
         serde_json::to_value(shape.recorded(shape.attribute(baseline)).unwrap()).unwrap();
@@ -136,7 +143,8 @@ fn the_tail_anchor_carries_the_trailing_tool_results_into_the_cache() {
         message(Role::Assistant, "running it"),
         tool_results("ok"),
     ];
-    anchor_tail(&mut messages);
+    let plan = BreakpointPlan::for_conversation(&messages);
+    plan.mark(&mut messages);
     assert!(
         messages[2].cache,
         "the tail anchor sits on the last message, tool results included"
