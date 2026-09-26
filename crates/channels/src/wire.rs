@@ -145,7 +145,7 @@ pub const WIRE_V: u32 = 39;
 mod monitor;
 mod query;
 
-pub use monitor::{Monitoring, Sample};
+pub use monitor::{Monitoring, Sample, Watched};
 pub use query::{QUERY_NAMES, Query};
 
 use crate::answer::Answer;

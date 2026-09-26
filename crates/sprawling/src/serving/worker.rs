@@ -324,13 +324,13 @@ fn watched(city_root: &std::path::Path) -> Result<channels::MonitorFeed, AxError
         city_root.to_path_buf(),
     )?;
     Ok(channels::MonitorFeed {
-        watch: Arc::new(move || -> Box<dyn Send> {
+        watch: Arc::new(move |watched| -> Box<dyn Send> {
             // The count is an atomic, so a poisoned lock guards no
             // half-written state and the watcher still counts.
             let held = monitor
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            Box::new(held.watch())
+            Box::new(held.watch(watched))
         }),
         samples,
     })

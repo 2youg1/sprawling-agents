@@ -153,7 +153,7 @@ pub(crate) struct ShellState {
 /// dropping that value is how it stops counting.
 #[derive(Clone)]
 pub struct MonitorFeed {
-    pub watch: Arc<dyn Fn() -> Box<dyn Send> + Send + Sync>,
+    pub watch: Arc<dyn Fn(crate::wire::Watched) -> Box<dyn Send> + Send + Sync>,
     /// One reading a second while anybody watches. A reading a slow
     /// session missed is not stated: the next one is a second away.
     pub samples: broadcast::Sender<crate::wire::Sample>,

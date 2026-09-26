@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use sysinfo::{Disks, MemoryRefreshKind, System};
 
-use super::Sample;
+use super::{Sample, Watched};
 use own_process::OwnProcess;
 
 pub(crate) mod own_process;
@@ -44,7 +44,7 @@ impl Counters {
     /// wall time since the previous reading. The core-health
     /// fields and this process's read and written bytes are not read
     /// here and stay 0 (8-92, decision 1 and current state).
-    pub(crate) fn read(&mut self, elapsed: Duration) -> Sample {
+    pub(crate) fn read(&mut self, _watched: Watched, elapsed: Duration) -> Sample {
         self.system.refresh_cpu_usage();
         self.system
             .refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());

@@ -18,7 +18,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub use channels::Sample;
+pub use channels::{Sample, Watched};
 
 /// Samples kept: one a second for five minutes.
 pub const CAPACITY: usize = 300;
@@ -54,19 +54,22 @@ impl Monitor {
         Self::default()
     }
 
-    /// Counts one more watcher until the returned [`Watch`] is dropped.
+    /// Counts one more watcher of `watched` until the returned [`Watch`]
+    /// is dropped.
     #[must_use]
-    pub fn watch(&self) -> Watch {
+    pub fn watch(&self, _watched: Watched) -> Watch {
         self.watchers.fetch_add(1, Ordering::Relaxed);
         Watch {
             watchers: Arc::clone(&self.watchers),
         }
     }
 
-    /// Called once a second. While somebody watches, calls `read` once
-    /// and keeps its sample, dropping the oldest beyond [`CAPACITY`];
-    /// while nobody does, calls nothing and releases the history.
-    pub fn tick(&mut self, read: impl FnOnce() -> Sample) {
+    /// Called once a second. While somebody watches, calls `read` once,
+    /// with [`Watched::Everything`] when anybody watches the whole page
+    /// and [`Watched::Summary`] when only summaries are watched, and
+    /// keeps its sample, dropping the oldest beyond [`CAPACITY`]; while
+    /// nobody does, calls nothing and releases the history.
+    pub fn tick(&mut self, read: impl FnOnce(Watched) -> Sample) {
         if self.watchers.load(Ordering::Relaxed) == 0 {
             self.history = VecDeque::new();
             return;
@@ -76,7 +79,7 @@ impl Monitor {
         }
         self.history
             .reserve_exact(CAPACITY.saturating_sub(self.history.len()));
-        self.history.push_back(read());
+        self.history.push_back(read(Watched::Everything));
     }
 
     /// Whether anybody holds a [`Watch`] right now.

@@ -52,10 +52,10 @@ fn sample_until_dropped(
         let Some(monitor) = monitor.upgrade() else {
             return;
         };
-        beat(&monitor, samples, || {
+        beat(&monitor, samples, |watched| {
             counters
                 .get_or_insert_with(|| Counters::open(volume.clone()))
-                .read(BEAT)
+                .read(watched, BEAT)
         });
         if !lock(&monitor).is_watched() {
             counters = None;
@@ -68,10 +68,10 @@ fn sample_until_dropped(
 pub(crate) fn beat(
     monitor: &Mutex<Monitor>,
     samples: &broadcast::Sender<Sample>,
-    read: impl FnOnce() -> Sample,
+    read: impl FnOnce(super::Watched) -> Sample,
 ) {
     let mut fresh = None;
-    lock(monitor).tick(|| *fresh.insert(read()));
+    lock(monitor).tick(|watched| *fresh.insert(read(watched)));
     if let Some(sample) = fresh {
         match samples.send(sample) {
             // No subscriber is not a failure: a session that stopped

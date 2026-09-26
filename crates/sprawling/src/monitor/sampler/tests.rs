@@ -26,11 +26,14 @@ fn a_watched_beat_sends_the_reading_it_took_and_an_unwatched_one_sends_nothing()
     let monitor = Mutex::new(Monitor::new());
     let (samples, mut received) = broadcast::channel(4);
 
-    beat(&monitor, &samples, || labelled(1));
+    beat(&monitor, &samples, |_| labelled(1));
     let unwatched = received.try_recv().ok();
 
-    let watch = monitor.lock().unwrap().watch();
-    beat(&monitor, &samples, || labelled(2));
+    let watch = monitor
+        .lock()
+        .unwrap()
+        .watch(crate::monitor::Watched::Everything);
+    beat(&monitor, &samples, |_| labelled(2));
     let watched = received.try_recv().ok();
     drop(watch);
 

@@ -277,10 +277,13 @@ fn an_unspecified_address_is_not_loopback() {
 
 #[test]
 fn a_live_session_watches_and_releases_the_monitor() {
-    let watch = ClientFrame::Monitor(crate::wire::Monitoring::Watch);
-    let release = ClientFrame::Monitor(crate::wire::Monitoring::Release);
+    use crate::wire::{Monitoring, Watched};
+    let watch = ClientFrame::Monitor(Monitoring::Watch);
+    let summary = ClientFrame::Monitor(Monitoring::WatchSummary);
+    let release = ClientFrame::Monitor(Monitoring::Release);
     let steps = (
         decide_frame(SessionState::Live, watch.clone(), &unpaired(), None),
+        decide_frame(SessionState::Live, summary, &unpaired(), None),
         decide_frame(SessionState::Live, release, &unpaired(), None),
         decide_frame(SessionState::AwaitingHello, watch, &unpaired(), None),
     );
@@ -288,7 +291,8 @@ fn a_live_session_watches_and_releases_the_monitor() {
         matches!(
             steps,
             (
-                SessionStep::Watch,
+                SessionStep::Watch(Watched::Everything),
+                SessionStep::Watch(Watched::Summary),
                 SessionStep::Release,
                 SessionStep::Refuse { close: true, .. }
             )

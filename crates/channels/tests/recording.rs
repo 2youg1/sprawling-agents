@@ -45,7 +45,7 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
         monitor: channels::MonitorFeed {
-            watch: Arc::new(|| -> Box<dyn Send> { Box::new(()) }),
+            watch: Arc::new(|_| -> Box<dyn Send> { Box::new(()) }),
             samples: tokio::sync::broadcast::channel(1).0,
         },
         client: Arc::new(channels::ClientAssets::Embedded(&[])),

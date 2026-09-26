@@ -129,10 +129,11 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                             return;
                         }
                     }
-                    SessionStep::Watch => {
-                        if watching.is_none() {
-                            watching = Some(((state.monitor.watch)(), state.monitor.samples.subscribe()));
-                        }
+                    SessionStep::Watch(watched) => {
+                        let samples = watching
+                            .take()
+                            .map_or_else(|| state.monitor.samples.subscribe(), |(_, samples)| samples);
+                        watching = Some(((state.monitor.watch)(watched), samples));
                     }
                     SessionStep::Release => watching = None,
                     SessionStep::Refuse { error, close } => {

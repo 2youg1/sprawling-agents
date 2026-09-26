@@ -13,8 +13,19 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Monitoring {
+    /// Watch the whole monitor page.
     Watch,
+    /// Watch only the fact bar's summary, which reads this process alone.
+    WatchSummary,
     Release,
+}
+
+/// What one watcher looks at, which decides how much the city reads for
+/// it. It does not travel: it is what `MonitorFeed::watch` is told.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Watched {
+    Everything,
+    Summary,
 }
 
 /// One reading of every counter the monitor shows, in integers because

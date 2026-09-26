@@ -90,7 +90,7 @@ pub use server::{Bound, Delivered, Reply, ServeConfig, bind, router, serve};
 pub use wire::wire_schema;
 pub use wire::{ClientFrame, Delta, ServerFrame};
 pub use wire::{Hello, Query, Welcome};
-pub use wire::{Lagged, LogLevel, LogLine, Monitoring, Sample};
+pub use wire::{Lagged, LogLevel, LogLine, Monitoring, Sample, Watched};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};
 
 pub use kernel::model::{Mode, Window};

@@ -5,13 +5,13 @@
 
 //! A reading of this very process is not empty.
 
-use super::Counters;
+use super::{Counters, Watched};
 
 #[test]
 fn a_reading_of_this_process_has_memory_and_free_space() {
     let mut counters = Counters::open(std::env::temp_dir());
-    counters.read(std::time::Duration::ZERO);
-    let second = counters.read(std::time::Duration::from_secs(1));
+    counters.read(Watched::Everything, std::time::Duration::ZERO);
+    let second = counters.read(Watched::Everything, std::time::Duration::from_secs(1));
 
     let nonzero = |value: u64| value > 0;
     assert_eq!(
