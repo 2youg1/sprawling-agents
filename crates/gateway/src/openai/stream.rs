@@ -13,6 +13,7 @@
 use kernel::{AxError, Increment};
 use serde_json::{Value, json};
 
+use crate::endpoint::failure::{ProviderFailure, provider_err};
 use crate::mismatch::{settled_tool_arguments, stream_cut};
 
 /// What one chunk carries, if it carries either stream. Absent on the
@@ -72,6 +73,18 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
             && !held.is_null()
         {
             usage = Some(held.clone());
+        }
+        // Rate limits name their reason in `code` and a bare category
+        // (`requests`, `tokens`) in `type`, so `code` is read first.
+        if let Some(error) = map.get("error").and_then(Value::as_object) {
+            let kind = ["code", "type"]
+                .into_iter()
+                .find_map(|key| error.get(key).and_then(Value::as_str))
+                .unwrap_or("an error without a type");
+            return Err(provider_err(
+                "read a streamed answer",
+                &ProviderFailure::Reported { kind },
+            ));
         }
         let Some(first) = map
             .get("choices")

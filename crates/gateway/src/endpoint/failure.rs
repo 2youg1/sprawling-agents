@@ -52,8 +52,8 @@ pub(crate) enum ProviderFailure<'e> {
     /// The provider answered 2xx and the body is not a shape this city
     /// can read.
     Unreadable(String),
-    /// A stream that already answered 2xx carried an `error` frame of
-    /// this type. Its message is not quoted, like a refusal's body.
+    /// A stream that already answered 2xx carried an error frame of
+    /// this type or code. Its message is not quoted, like a refusal's body.
     Reported { kind: &'e str },
     /// The request could not even be built — a URL, a header or a body
     /// this side wrote wrong. Deterministic: the identical build fails
@@ -100,7 +100,12 @@ impl ProviderFailure<'_> {
             ProviderFailure::Reported { kind }
                 if matches!(
                     *kind,
-                    "overloaded_error" | "api_error" | "rate_limit_error" | "timeout_error"
+                    "server_error"
+                        | "rate_limit_exceeded"
+                        | "overloaded_error"
+                        | "api_error"
+                        | "rate_limit_error"
+                        | "timeout_error"
                 ) =>
             {
                 Retry::Yes

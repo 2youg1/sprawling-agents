@@ -21,6 +21,7 @@
 use kernel::{AxError, Increment};
 use serde_json::Value;
 
+use crate::endpoint::failure::{ProviderFailure, provider_err};
 use crate::mismatch::stream_cut;
 
 /// The events this city acts on.
@@ -36,6 +37,9 @@ enum Event {
     /// The last event of a stream that produced an answer, whole or
     /// truncated, and the one that carries it.
     Settled,
+    /// The provider failed after answering 200; the event's top-level
+    /// `code` names why.
+    Reported,
     /// A frame this city does not act on.
     Unread,
 }
@@ -59,6 +63,7 @@ impl Event {
             // here and judged by `response_from`, which is where the
             // status is already read.
             "response.completed" | "response.incomplete" | "response.failed" => Event::Settled,
+            "error" => Event::Reported,
             _ => Event::Unread,
         }
     }
@@ -71,7 +76,7 @@ pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Incre
     match Event::of(word) {
         Event::TextDelta => Some(Increment::Said(delta.to_owned())),
         Event::ReasoningDelta => Some(Increment::Thought(delta.to_owned())),
-        Event::Settled | Event::Unread => None,
+        Event::Settled | Event::Reported | Event::Unread => None,
     }
 }
 
@@ -94,6 +99,16 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
                 if let Some(held) = map.get("response") {
                     answer = Some(held.clone());
                 }
+            }
+            Event::Reported => {
+                let kind = map
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .unwrap_or("an error without a code");
+                return Err(provider_err(
+                    "read a streamed answer",
+                    &ProviderFailure::Reported { kind },
+                ));
             }
             Event::TextDelta | Event::ReasoningDelta | Event::Unread => {}
         }
