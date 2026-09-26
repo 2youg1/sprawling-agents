@@ -186,11 +186,12 @@ mod tests {
             "usage": { "prompt_tokens": 105, "completion_tokens": 1,
                        "prompt_tokens_details": { "cached_tokens": 90 } },
         });
-        let input = |kind, wire| {
-            response_from_wire(kind, wire).unwrap().usage.input_tokens
-        };
+        let input = |kind, wire| response_from_wire(kind, wire).unwrap().usage.input_tokens;
         assert_eq!(
-            [input(DialectKind::Anthropic, &anthropic), input(DialectKind::OpenAi, &openai)],
+            [
+                input(DialectKind::Anthropic, &anthropic),
+                input(DialectKind::OpenAi, &openai)
+            ],
             [Tokens::new(105), Tokens::new(105)]
         );
     }
@@ -208,12 +209,22 @@ mod tests {
             }
         })
     }
-    fn usage_strategy(cache_write: bool) -> impl Strategy<Value = ModelUsage> {
-        (0u64..9999, 0u64..9999, 0u64..9999, 0u64..9999).prop_map(move |(i, o, r, w)| ModelUsage {
-            input_tokens: Tokens::new(i),
-            output_tokens: Tokens::new(o),
-            cache_read_tokens: Tokens::new(r),
-            cache_write_tokens: Tokens::new(if cache_write { w } else { 0 }),
+    /// A count a `dialect` wire can spell: the whole prompt is at least
+    /// its cached parts, and only Anthropic's wire has a cache-write slot.
+    fn usage_strategy(dialect: DialectKind) -> impl Strategy<Value = ModelUsage> {
+        (0u64..9999, 0u64..9999, 0u64..9999, 0u64..9999).prop_map(move |(i, o, r, w)| {
+            let write = if dialect == DialectKind::Anthropic {
+                w
+            } else {
+                0
+            };
+            ModelUsage {
+                input_tokens: Tokens::new(i + r + write),
+                output_tokens: Tokens::new(o),
+                cache_read_tokens: Tokens::new(r),
+                cache_write_tokens: Tokens::new(write),
+                dialect: Some(dialect),
+            }
         })
     }
     fn stop_strategy() -> impl Strategy<Value = StopReason> {
@@ -303,7 +314,7 @@ mod tests {
         fn anthropic_response_roundtrip(
             blocks in proptest::collection::vec(prop_oneof![text_block(), tool_use_block()], 0..4),
             stop in stop_strategy(),
-            usage in usage_strategy(true),
+            usage in usage_strategy(DialectKind::Anthropic),
         ) {
             let resp = ChatResponse { content: blocks, stop, usage };
             let wire = response_wire(DialectKind::Anthropic, &resp).unwrap();
@@ -318,7 +329,7 @@ mod tests {
             text in proptest::option::of(text_block()),
             tools in proptest::collection::vec(tool_use_block(), 0..3),
             stop in stop_strategy(),
-            usage in usage_strategy(false),
+            usage in usage_strategy(DialectKind::OpenAi),
         ) {
             let mut content = Vec::new();
             if let Some(t) = text { content.push(t); }
@@ -329,12 +340,14 @@ mod tests {
             prop_assert_eq!(back, resp);
         }
 
-        /// Usage integers survive both dialect wires verbatim.
+        /// Usage integers survive the Anthropic wire, whose `input_tokens`
+        /// is the part of the prompt that missed the cache.
         #[test]
-        fn usage_is_preserved_verbatim(usage in usage_strategy(true)) {
+        fn usage_is_preserved_verbatim(usage in usage_strategy(DialectKind::Anthropic)) {
             let resp = ChatResponse { content: vec![], stop: StopReason::EndTurn, usage };
             let wire = response_wire(DialectKind::Anthropic, &resp).unwrap();
-            prop_assert_eq!(wire["usage"]["input_tokens"].as_u64().unwrap(), usage.input_tokens.get());
+            let uncached = usage.input_tokens.get() - usage.cache_read_tokens.get() - usage.cache_write_tokens.get();
+            prop_assert_eq!(wire["usage"]["input_tokens"].as_u64().unwrap(), uncached);
             prop_assert_eq!(wire["usage"]["cache_creation_input_tokens"].as_u64().unwrap(), usage.cache_write_tokens.get());
             let back = response_from_wire(DialectKind::Anthropic, &wire).unwrap();
             prop_assert_eq!(back.usage, usage);

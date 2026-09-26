@@ -61,7 +61,15 @@ pub fn settle(
     }
     let mut total: u64 = 0;
     for (tokens, price, what) in [
-        (usage.input_tokens.get(), entry.input_price, "input"),
+        (
+            usage
+                .input_tokens
+                .get()
+                .saturating_sub(usage.cache_read_tokens.get())
+                .saturating_sub(usage.cache_write_tokens.get()),
+            entry.input_price,
+            "input",
+        ),
         (usage.output_tokens.get(), entry.output_price, "output"),
         (
             usage.cache_read_tokens.get(),
@@ -113,6 +121,7 @@ mod tests {
             output_tokens: Tokens::new(output),
             cache_read_tokens: Tokens::new(read),
             cache_write_tokens: Tokens::new(write),
+            dialect: None,
         }
     }
 

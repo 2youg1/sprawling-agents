@@ -25,7 +25,8 @@
 //!   <https://platform.claude.com/docs/en/build-with-claude/vision>
 
 use kernel::{
-    AxError, ChatRequest, ChatResponse, ContentBlock, Effort, ModelUsage, Role, StopReason,
+    AxError, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort, ModelUsage, Role,
+    StopReason, Tokens,
 };
 use serde_json::{Map, Value, json};
 
@@ -256,19 +257,25 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         "response.stop_reason",
     )?;
     let usage_value = require(wire, "response", "usage")?;
+    let cache_read_tokens =
+        tokens_or_zero(usage_value, "cache_read_input_tokens", "response.usage")?;
+    let cache_write_tokens =
+        tokens_or_zero(usage_value, "cache_creation_input_tokens", "response.usage")?;
+    // This wire's `input_tokens` counts only what missed the cache; the
+    // city's count is the whole prompt (kernel-SPEC, `ModelUsage`).
+    let input_tokens = [cache_read_tokens, cache_write_tokens]
+        .into_iter()
+        .try_fold(
+            tokens_or_zero(usage_value, "input_tokens", "response.usage")?,
+            Tokens::checked_add,
+        )
+        .ok_or_else(|| mismatch("response.usage", "input counts that overflow a token count"))?;
     let usage = ModelUsage {
-        input_tokens: tokens_or_zero(usage_value, "input_tokens", "response.usage")?,
+        input_tokens,
         output_tokens: tokens_or_zero(usage_value, "output_tokens", "response.usage")?,
-        cache_read_tokens: tokens_or_zero(
-            usage_value,
-            "cache_read_input_tokens",
-            "response.usage",
-        )?,
-        cache_write_tokens: tokens_or_zero(
-            usage_value,
-            "cache_creation_input_tokens",
-            "response.usage",
-        )?,
+        cache_read_tokens,
+        cache_write_tokens,
+        dialect: Some(DialectKind::Anthropic),
     };
     Ok(ChatResponse {
         content,
@@ -298,7 +305,9 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
         "content": content?,
         "stop_reason": stop_str(resp.stop),
         "usage": {
-            "input_tokens": resp.usage.input_tokens.get(),
+            "input_tokens": resp.usage.input_tokens.get()
+                .saturating_sub(resp.usage.cache_read_tokens.get())
+                .saturating_sub(resp.usage.cache_write_tokens.get()),
             "output_tokens": resp.usage.output_tokens.get(),
             "cache_read_input_tokens": resp.usage.cache_read_tokens.get(),
             "cache_creation_input_tokens": resp.usage.cache_write_tokens.get(),

@@ -119,11 +119,12 @@ pub struct ModelReturned {
     pub message: Payload,
     /// How many tool calls the reply asked for.
     pub calls: u64,
-    /// Four token counts, as the provider reported them.
+    /// Four token counts in the one meaning `ModelUsage` states, the
+    /// dialect that reported them, and the meaning's version `v`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "schema",
-        schemars(with = "Option<std::collections::BTreeMap<String, u64>>")
+        schemars(with = "Option<std::collections::BTreeMap<String, serde_json::Value>>")
     )]
     pub usage: Option<ModelUsage>,
     /// Why the provider stopped, when it said.

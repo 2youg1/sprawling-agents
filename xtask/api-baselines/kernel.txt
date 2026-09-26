@@ -1491,6 +1491,7 @@ pub kernel::ModelTag::Main
 pub kernel::ModelTag::Transcribe
 pub kernel::ModelUsage::cache_read_tokens: kernel::budget::Tokens
 pub kernel::ModelUsage::cache_write_tokens: kernel::budget::Tokens
+pub kernel::ModelUsage::dialect: core::option::Option<kernel::DialectKind>
 pub kernel::ModelUsage::input_tokens: kernel::budget::Tokens
 pub kernel::ModelUsage::output_tokens: kernel::budget::Tokens
 pub kernel::Named::NotFound
@@ -2154,6 +2155,7 @@ pub kernel::model::ModelTag::Main
 pub kernel::model::ModelTag::Transcribe
 pub kernel::model::ModelUsage::cache_read_tokens: kernel::budget::Tokens
 pub kernel::model::ModelUsage::cache_write_tokens: kernel::budget::Tokens
+pub kernel::model::ModelUsage::dialect: core::option::Option<kernel::DialectKind>
 pub kernel::model::ModelUsage::input_tokens: kernel::budget::Tokens
 pub kernel::model::ModelUsage::output_tokens: kernel::budget::Tokens
 pub kernel::model::Role::Assistant

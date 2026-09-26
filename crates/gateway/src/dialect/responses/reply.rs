@@ -6,7 +6,8 @@
 //! The responses face's answer, in both directions.
 
 use kernel::{
-    AxCode, AxError, ChatResponse, ContentBlock, ModelUsage, StopReason, Tokens, ToolName,
+    AxCode, AxError, ChatResponse, ContentBlock, DialectKind, ModelUsage, StopReason, Tokens,
+    ToolName,
 };
 use serde_json::{Value, json};
 
@@ -215,6 +216,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
             output_tokens: tokens_or_zero(usage_value, "output_tokens", "response.usage")?,
             cache_read_tokens: cache_read,
             cache_write_tokens: cache_write,
+            dialect: Some(DialectKind::OpenAiResponses),
         },
     })
 }
@@ -324,6 +326,7 @@ mod tests {
                 output_tokens: Tokens::new(7),
                 cache_read_tokens: Tokens::new(3),
                 cache_write_tokens: Tokens::new(2),
+                dialect: Some(DialectKind::OpenAiResponses),
             },
         };
         let back = response_from(&response_wire(&held).unwrap()).unwrap();
@@ -344,6 +347,7 @@ mod tests {
                 output_tokens: Tokens::new(1),
                 cache_read_tokens: Tokens::new(0),
                 cache_write_tokens: Tokens::new(0),
+                dialect: Some(DialectKind::OpenAiResponses),
             },
         };
         let wire = response_wire(&held).unwrap();
