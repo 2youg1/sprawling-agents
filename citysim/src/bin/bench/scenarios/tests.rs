@@ -11,8 +11,6 @@ use super::*;
 /// test pays milliseconds rather than the register's seconds.
 fn small() -> Fixture {
     Fixture {
-        lanes: 2,
-        records_per_lane: 3,
         fold_records: 40,
         fold_rounds: 1,
         tree_files: 3,
@@ -44,7 +42,7 @@ fn keys(line: &str) -> Vec<&str> {
 }
 
 #[test]
-fn the_four_load_scenarios_rerun_and_emit_the_stable_format() {
+fn every_load_scenario_reruns_and_emits_the_stable_format() {
     let fixture = small();
     for round in 0..2 {
         let dir = tempfile::tempdir().unwrap();
