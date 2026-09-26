@@ -3540,7 +3540,7 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 **测试。** `monitor::tests`：没人看时 `read` 一次也不被调用、历史为空，人走了以后历史被释放；放入 301 个点后只剩最后 300 个、从旧到新。
 
-**本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 8-92；线上的一对监视帧见 channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 8-91 的规则算出。`sprawling top` 经这对帧看监视器，见 8-93。其余尚未落地：事实条摘要（它在每个页面上，所以只要有页面开着就算有人在看；在 8-92 的一次读数降到 ≤ 50 µs 之前，这会让每个开着的页面都让采样线程占去一个核的 2%–7%，所以它排在本进程读数换路径之后），以及采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
+**本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 8-92；线上的一对监视帧见 channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 8-91 的规则算出。`sprawling top` 经这对帧看监视器，见 8-93。其余尚未落地：事实条摘要，以及采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。摘要在每个页面上，所以只要有页面开着就算有人在看；本进程的三项现在读一次约 1 µs（8-92 的 `OwnProcess`），但一拍里还有 `sysinfo` 的整机 CPU 与磁盘（合计 0.9–8.8 ms）。摘要要只花本进程那一段，线上得多一种看法：会话只看摘要时采样线程只读 `OwnProcess`，有人看整页时才读全部；也就是 channels-SPEC.md 8-47 的 `Monitoring` 多一个变体、`WIRE_V` 加一，`Monitor` 分两类计数。没有这一步就把摘要放上事实条，每个开着的页面都会让它的城每秒付出整机那一段。
 
 ## 8-91 `sprawling top` 的输出：一行 JSON 与一屏曲线（`bin::monitor::top`，形状：projection）
 
