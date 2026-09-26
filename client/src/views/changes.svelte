@@ -19,16 +19,21 @@
   import type { Readable } from "svelte/store";
 
   import { fill, say } from "../core/lang";
+  import { toFragment } from "../core/route";
   import { ui } from "../ui";
-  import type { Answer, FileChange, GitOid, HunksAnswer } from "../wire";
-  import { howWord, linesWord } from "./changes";
+  import type { Address, Answer, FileChange, GitOid, HunksAnswer } from "../wire";
+  import { howWord, linesWord, numbered, quoteLine } from "./changes";
+  import type { CodeLine } from "./changes";
 
   interface Props {
     readonly base: GitOid;
     readonly head: GitOid | null;
+    // Where a chosen line is sent: the conversation whose composer it
+    // prefills. Absent where the page has no conversation to talk to.
+    readonly talk?: Address | undefined;
   }
 
-  const { base, head }: Props = $props();
+  const { base, head, talk }: Props = $props();
 
   const u = ui();
   const lang = u.lang;
@@ -62,12 +67,19 @@
     open = open === path ? null : path;
   }
 
-  // A patch line reads by its first character, which is the only thing
-  // the diff format says about it.
-  function lineInk(text: string): string {
-    if (text.startsWith("+")) return "text-accent";
-    if (text.startsWith("-")) return "text-alert";
-    return "text-text-quiet";
+  const INK: Record<CodeLine["kind"], string> = {
+    added: "text-accent",
+    removed: "text-alert",
+    context: "text-text-quiet",
+  };
+
+  // A chosen line joins whatever the person had already started to
+  // write there; the link then opens that conversation, whose composer
+  // reads the draft door when it mounts.
+  function choose(to: Address, held: HunksAnswer, line: CodeLine): void {
+    const draft = u.prefs.draft(to);
+    const quote = quoteLine(held, line);
+    u.prefs.setDraft(to, draft === "" ? quote : [draft, quote].join("\n"));
   }
 </script>
 
@@ -96,12 +108,55 @@
             <p class="text-text-disabled">…</p>
           {:else}
             <div class="pb-base">
-              <!-- Tight against the tag on purpose: a `<pre>` renders
-                   its whitespace, so the indent of this block would
-                   become the first line of the patch. -->
-              <pre
-                class="overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-relaxed"
-              >{#each patch.lines as line (line.number)}<div class={lineInk(line.text)}>{line.text}</div>{/each}{#each patch.withheld as withheld (withheld.number)}<div class="text-text-disabled">{fill(say($lang, "run_withheld"), { n: String(withheld.number), reason: withheld.reason })}</div>{/each}</pre>
+              <!-- Rows rather than one `<pre>`: each line carries its
+                   two numbers in a gutter, and a gutter is a flex
+                   child; only the code itself keeps its whitespace. -->
+              <div
+                class="overflow-x-auto rounded-card border border-edge bg-page py-base font-mono text-note leading-relaxed"
+              >
+                {#each numbered(patch) as line (line.number)}
+                  {#if line.kind === "withheld"}
+                    <div class="px-base text-text-disabled">
+                      {fill(say($lang, "run_withheld"), { n: String(line.number), reason: line.reason })}
+                    </div>
+                  {:else if line.kind === "head"}
+                    <div class="px-base whitespace-pre text-text-faint">{line.text}</div>
+                  {:else if line.kind === "hunk"}
+                    <div class="my-tight flex gap-base bg-chrome px-base text-text-faint">
+                      {#if line.folded > 0}
+                        <span class="shrink-0">{fill(say($lang, "change_folded"), { n: String(line.folded) })}</span>
+                      {/if}
+                      <span class="whitespace-pre">{line.text}</span>
+                    </div>
+                  {:else}
+                    {@const old = line.kind === "added" ? null : line.old}
+                    {@const now = line.kind === "removed" ? null : line.new}
+                    <div class="flex {INK[line.kind]}">
+                      {#if talk === undefined}
+                        <span class="flex shrink-0 text-text-disabled select-none">
+                          <span class="w-[5ch] pr-tight text-right">{old ?? ""}</span>
+                          <span class="w-[5ch] pr-tight text-right">{now ?? ""}</span>
+                        </span>
+                      {:else}
+                        {@const to = talk}
+                        <a
+                          class="flex shrink-0 text-text-disabled select-none hover:bg-chrome hover:text-text-quiet"
+                          href={toFragment({ kind: "talk", address: to })}
+                          aria-label={fill(say($lang, "change_line_quote"), { n: String(now ?? old ?? line.number) })}
+                          onclick={() => {
+                            choose(to, patch, line);
+                          }}
+                        >
+                          <span class="w-[5ch] pr-tight text-right">{old ?? ""}</span>
+                          <span class="w-[5ch] pr-tight text-right">{now ?? ""}</span>
+                        </a>
+                      {/if}
+                      <!-- wording-ok: the diff format's own marks, not words. -->
+                      <span class="pr-base whitespace-pre">{line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " "}{line.text}</span>
+                    </div>
+                  {/if}
+                {/each}
+              </div>
             </div>
           {/if}
         {/if}

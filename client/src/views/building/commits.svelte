@@ -238,7 +238,7 @@
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
         {@render lineage(commit)}
         {#if older !== null}
-          <Changes base={older.oid} head={commit.oid} />
+          <Changes base={older.oid} head={commit.oid} talk={building} />
         {:else}
           <p class="text-text-disabled">{last ? say($lang, "commits_first") : "…"}</p>
         {/if}
