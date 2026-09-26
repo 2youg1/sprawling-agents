@@ -239,13 +239,6 @@ status = "gated, with a register of the files that predate the rule"
 # fact about the generator; the gate reads the exemption from the banner
 # the generator puts at the top rather than from a path written here.
 #
-# `crates/web/src/lang.rs` (3,444 lines) and `crates/web/src/theme.rs`
-# (1,019) are not here: their module-map rows state the shape `data`, and
-# the same exemption the function rule grants them holds for the file
-# rule, for the same reason. A table of every word the client says, and a
-# table of every colour it may produce, are looked things up in rather
-# than navigated.
-#
 # `xtask/src/length.rs` is on this list, which is correct: the gate that
 # states the rule is not exempt from it.
 #
