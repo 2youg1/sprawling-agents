@@ -17,6 +17,7 @@ use kernel::layout::SKILL_FILE;
 use kernel::{Address, AxCode, AxError};
 
 use crate::catalog::{Catalog, Expansion};
+use crate::tools::chosen_path::real_location;
 
 /// Where `<name>/<path>` lands when `name` is a package in the catalog.
 ///
@@ -47,32 +48,16 @@ pub(super) fn open_in_package(
     )
 }
 
-/// The written path when the file is absent, so the read reports the
-/// miss; otherwise its real location, provided that lies in the package.
+/// The file's real location, present or absent, provided that lies in
+/// the package.
 fn stays_inside(
     city_root: &Path,
     package: &str,
     target: &Address,
     asked: &str,
 ) -> Result<PathBuf, AxError> {
-    let written = under(city_root, target.as_str());
-    let unresolved = |err: std::io::Error| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "read",
-            format!("{asked}: its real location did not resolve ({err})"),
-        )
-        .with_recovery("a person has to repair the path or the link on it")
-    };
-    let real = match std::fs::canonicalize(&written) {
-        Ok(real) => real,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(written),
-        Err(err) => return Err(unresolved(err)),
-    };
-    let shelf = under(
-        &std::fs::canonicalize(city_root).map_err(unresolved)?,
-        package,
-    );
+    let real = real_location(&under(city_root, target.as_str()), "read", asked)?;
+    let shelf = under(&real_location(city_root, "read", asked)?, package);
     if real.starts_with(&shelf) {
         return Ok(real);
     }

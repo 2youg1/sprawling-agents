@@ -337,6 +337,8 @@ fn a_link_is_judged_by_where_it_lands() {
         "lab/to-vault/secret.md",
         "lab/to-reserved/secret.md",
         "lab/to-outside/secret.md",
+        "lab/to-vault/absent.md",
+        "lab/to-outside/absent.md",
     ] {
         let refused = tool.invoke(&call(asked));
         assert!(
@@ -370,17 +372,17 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
         .unwrap();
 
     super::super::chosen_path::make_link(&package.join("out"), &dir.path().join(".sprawling"));
-    let err = tool.invoke(&call("review/out/CONFIG.toml")).unwrap_err();
-    assert_eq!(
-        err.code(),
-        &AxCode::GateDenied,
-        "a link led out of the package"
-    );
     let outcome = tool.invoke(&call("review/scripts/check.sh")).unwrap();
     assert_eq!(outcome.result.as_map()["text"], "git diff\n");
-    for climbing in ["review/../../CONFIG.toml", "review/./SKILL.md", "review/"] {
-        let err = tool.invoke(&call(climbing)).unwrap_err();
-        assert_eq!(err.code(), &AxCode::InvalidArgs, "{climbing} was opened");
+    for (leaving, code) in [
+        ("review/out/CONFIG.toml", AxCode::GateDenied),
+        ("review/out/absent.md", AxCode::GateDenied),
+        ("review/../../CONFIG.toml", AxCode::InvalidArgs),
+        ("review/./SKILL.md", AxCode::InvalidArgs),
+        ("review/", AxCode::InvalidArgs),
+    ] {
+        let err = tool.invoke(&call(leaving)).unwrap_err();
+        assert_eq!(err.code(), &code, "{leaving} was opened");
     }
 }
 

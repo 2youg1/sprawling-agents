@@ -15,6 +15,8 @@ use std::path::Path;
 
 use kernel::{Address, AxCode, AxError};
 
+use crate::tools::chosen_path::real_location;
+
 /// How many entries a miss offers. A bound on what one refusal costs the
 /// context window, not on the directory: the closest names come first,
 /// so the ones cut are the least likely to be meant.
@@ -42,12 +44,21 @@ pub(super) fn unread(city_root: &Path, asked: &str, path: &Path, err: &std::io::
         )
 }
 
-/// The entries of the deepest directory above `missing` that exists,
-/// inside the city, as city-relative paths a model may read.
+/// The entries of the deepest directory above where `missing` really
+/// lands that exists, inside the city, as city-relative paths a model
+/// may read.
 ///
-/// Listing is best effort: a directory that will not list offers no
-/// candidates, because the refusal the caller needs is the miss itself.
+/// Listing is best effort: a path whose real location will not resolve,
+/// or a directory that will not list, offers no candidates, because the
+/// refusal the caller needs is the miss itself.
 fn nearby(city_root: &Path, missing: &Path) -> Vec<String> {
+    let (Ok(city_root), Ok(missing)) = (
+        real_location(city_root, "read", "the city root"),
+        real_location(missing, "read", "the missing file"),
+    ) else {
+        return Vec::new();
+    };
+    let city_root = city_root.as_path();
     let Some(dir) = missing
         .ancestors()
         .skip(1)
