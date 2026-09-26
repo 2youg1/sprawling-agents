@@ -15,8 +15,10 @@ fn calm() -> ResourceReadings {
     ResourceReadings {
         durable_lag: Duration::from_micros(300),
         commit_floor: Duration::from_micros(200),
-        free_bytes: 400 * GIB,
-        volume_bytes: 1000 * GIB,
+        volume: VolumeSpace {
+            free_bytes: 400 * GIB,
+            total_bytes: 1000 * GIB,
+        },
         queued_runs: 0,
         schedule_delay: Duration::from_micros(40),
     }
@@ -29,15 +31,16 @@ fn verdict(readings: &ResourceReadings) -> Vec<(Degradation, Recovery)> {
 #[test]
 fn calm_readings_show_no_degradation_and_admit_work() {
     assert_eq!(verdict(&calm()), vec![]);
-    assert_eq!(admit_work(&calm()), Admission::Admit);
+    assert_eq!(admit_work(calm().volume), Ok(()));
 }
 
 #[test]
 fn a_disk_below_its_floor_is_low_and_stops_new_work() {
-    let readings = ResourceReadings {
+    let volume = VolumeSpace {
         free_bytes: GIB,
-        ..calm()
+        total_bytes: 1000 * GIB,
     };
+    let readings = ResourceReadings { volume, ..calm() };
     assert_eq!(
         verdict(&readings),
         vec![(
@@ -51,10 +54,11 @@ fn a_disk_below_its_floor_is_low_and_stops_new_work() {
         )]
     );
     assert_eq!(
-        admit_work(&readings),
-        Admission::Shed {
-            reason: ShedReason::DiskLow,
-        }
+        admit_work(volume),
+        Err(Degradation::DiskLow {
+            free_bytes: GIB,
+            floor_bytes: 4 * GIB,
+        })
     );
 }
 
@@ -74,7 +78,7 @@ fn a_watermark_lagging_many_commit_floors_is_a_slow_disk_that_still_admits() {
             Recovery::ReduceDiskLoad,
         )]
     );
-    assert_eq!(admit_work(&readings), Admission::Admit);
+    assert_eq!(admit_work(readings.volume), Ok(()));
 }
 
 #[test]
@@ -100,7 +104,7 @@ fn a_queued_run_is_tight_memory_that_still_admits() {
             Recovery::FreeMemory,
         )]
     );
-    assert_eq!(admit_work(&readings), Admission::Admit);
+    assert_eq!(admit_work(readings.volume), Ok(()));
 }
 
 #[test]
@@ -118,15 +122,17 @@ fn a_scheduling_delay_past_one_frame_is_a_saturated_cpu_that_still_admits() {
             Recovery::ReduceCpuLoad,
         )]
     );
-    assert_eq!(admit_work(&readings), Admission::Admit);
+    assert_eq!(admit_work(readings.volume), Ok(()));
 }
 
 #[test]
 fn every_bottleneck_at_once_is_reported_in_declaration_order() {
     let readings = ResourceReadings {
         durable_lag: Duration::from_secs(1),
-        free_bytes: 0,
-        volume_bytes: 0,
+        volume: VolumeSpace {
+            free_bytes: 0,
+            total_bytes: 0,
+        },
         queued_runs: 1,
         schedule_delay: Duration::from_secs(1),
         ..calm()

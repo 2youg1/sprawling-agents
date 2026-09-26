@@ -7,12 +7,10 @@
 //! that show it, and what the person can do about it.
 //! Readings are sampled by the caller; this module only decides. The one
 //! state that stops the city taking on new work is a disk close to full,
-//! and it sheds through [`crate::backpressure::Admission`], never a second
-//! admission.
+//! and the refusal carries that [`Degradation::DiskLow`] so the door can
+//! say how much to free.
 
 use std::time::Duration;
-
-use crate::backpressure::{Admission, ShedReason};
 
 /// How many commit floors the durable watermark may lag before the disk
 /// counts as slow. Relative, so a spinning disk whose fsync is simply
@@ -37,12 +35,18 @@ pub struct ResourceReadings {
     pub durable_lag: Duration,
     /// The measured fsync median of the city's volume: this step's floor.
     pub commit_floor: Duration,
-    pub free_bytes: u64,
-    pub volume_bytes: u64,
+    pub volume: VolumeSpace,
     /// Runs waiting because available memory would not hold one more.
     pub queued_runs: u32,
     /// The accounting thread's median wake-to-run delay.
     pub schedule_delay: Duration,
+}
+
+/// The city's volume: free space and capacity, read together.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VolumeSpace {
+    pub free_bytes: u64,
+    pub total_bytes: u64,
 }
 
 /// A resource that is the bottleneck, carrying the readings that decided it.
@@ -94,7 +98,7 @@ impl Degradation {
 pub fn assess(readings: &ResourceReadings) -> impl Iterator<Item = Degradation> {
     [
         disk_slow(readings),
-        disk_low(readings),
+        disk_low(readings.volume),
         memory_tight(readings),
         cpu_saturated(readings),
     ]
@@ -102,15 +106,14 @@ pub fn assess(readings: &ResourceReadings) -> impl Iterator<Item = Degradation> 
     .flatten()
 }
 
-/// Whether the city takes on new work. A disk below its free-space floor
-/// sheds; every other degradation admits, because it only slows work down.
-pub fn admit_work(readings: &ResourceReadings) -> Admission {
-    match disk_low(readings) {
-        Some(_) => Admission::Shed {
-            reason: ShedReason::DiskLow,
-        },
-        None => Admission::Admit,
-    }
+/// Whether the city takes on new work. A volume below its free-space
+/// floor refuses with the [`Degradation::DiskLow`] it shows; every other
+/// degradation admits, because it only slows work down.
+///
+/// # Errors
+/// The `DiskLow` degradation when `volume` is below its floor.
+pub fn admit_work(volume: VolumeSpace) -> Result<(), Degradation> {
+    disk_low(volume).map_or(Ok(()), Err)
 }
 
 /// The free-space floor a volume of `volume_bytes` derives.
@@ -128,10 +131,10 @@ fn disk_slow(r: &ResourceReadings) -> Option<Degradation> {
     })
 }
 
-fn disk_low(r: &ResourceReadings) -> Option<Degradation> {
-    let floor_bytes = free_space_floor(r.volume_bytes);
-    (r.free_bytes < floor_bytes).then_some(Degradation::DiskLow {
-        free_bytes: r.free_bytes,
+fn disk_low(volume: VolumeSpace) -> Option<Degradation> {
+    let floor_bytes = free_space_floor(volume.total_bytes);
+    (volume.free_bytes < floor_bytes).then_some(Degradation::DiskLow {
+        free_bytes: volume.free_bytes,
         floor_bytes,
     })
 }
