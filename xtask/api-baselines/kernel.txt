@@ -573,6 +573,8 @@ pub fn kernel::AxError::recovery(&self) -> &str
 pub fn kernel::AxError::recovery(&self) -> &str
 pub fn kernel::AxError::refusal(kernel::AxCode, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, kernel::GateRefusal) -> kernel::ErrorDraft
 pub fn kernel::AxError::refusal(kernel::AxCode, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, kernel::GateRefusal) -> kernel::ErrorDraft
+pub fn kernel::AxError::retry_after_ms(&self) -> core::option::Option<u64>
+pub fn kernel::AxError::retry_after_ms(&self) -> core::option::Option<u64>
 pub fn kernel::AxError::rewrite_recovery(self, impl core::convert::Into<alloc::string::String>) -> Self
 pub fn kernel::AxError::rewrite_recovery(self, impl core::convert::Into<alloc::string::String>) -> Self
 pub fn kernel::AxError::subject(&self) -> &str
@@ -605,6 +607,8 @@ pub fn kernel::EgressAllowlist::new(alloc::vec::Vec<alloc::string::String>) -> k
 pub fn kernel::EgressAllowlist::new(alloc::vec::Vec<alloc::string::String>) -> kernel::EgressAllowlist
 pub fn kernel::ErrorDraft::retriable(self) -> Self
 pub fn kernel::ErrorDraft::retriable(self) -> Self
+pub fn kernel::ErrorDraft::retriable_after(self, u64) -> Self
+pub fn kernel::ErrorDraft::retriable_after(self, u64) -> Self
 pub fn kernel::ErrorDraft::with_nearby(self, alloc::vec::Vec<alloc::string::String>) -> Self
 pub fn kernel::ErrorDraft::with_nearby(self, alloc::vec::Vec<alloc::string::String>) -> Self
 pub fn kernel::ErrorDraft::with_recovery(self, impl core::convert::Into<alloc::string::String>) -> kernel::AxError
