@@ -30,6 +30,7 @@ import type { AxError, CityAnswer, Delta, EventRecord, LogLine, RunId, RunSummar
 import type { Belief, RunBelief } from "./belief/shape";
 import { LOG_WINDOW, merged } from "./belief/shape";
 import { runTable } from "./belief/runs.svelte";
+import { liveOf } from "./belief/live";
 export type { Belief, Notice, RunBelief } from "./belief/shape";
 
 function unseen(run: RunId, at: Seq): RunBelief {
@@ -187,6 +188,7 @@ export function createBelief(now: () => number): BeliefStore {
   // unsubscribing once per record.
   let current: Belief = {
     runs: runTable({}),
+    live: [],
     halted: [],
     haltedAt: Seq.make(0),
     refusal: null,
@@ -200,8 +202,8 @@ export function createBelief(now: () => number): BeliefStore {
   let depth = 0;
 
   function written(next: Belief): void {
-    current = next;
-    if (depth === 0) store.set(next);
+    current = { ...next, live: liveOf(next.runs) };
+    if (depth === 0) store.set(current);
   }
 
   function batch(folds: () => void): void {

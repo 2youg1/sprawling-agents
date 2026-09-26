@@ -1,0 +1,76 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+import { expect, test } from "bun:test";
+import { get } from "svelte/store";
+
+import { createBelief } from "../belief";
+import type { CityAnswer, EventKind, EventRecord, RunSummary } from "../../wire";
+import { B3Hash, RunId, Seq, TimeMs } from "../../wire";
+
+const RUNS = 10_000;
+// The runs still working in that city: the concurrency a city drives,
+// not the history it has kept.
+const WORKING = 4;
+const RECORDS = 2_000;
+// What one record folded and one read of the working runs may spend in
+// a city of `RUNS` runs. A read that walks the table is linear in the
+// city, and at this size that is most of a frame per record.
+const BUDGET_US = 20;
+
+function runId(index: number): RunId {
+  return RunId.make(`00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`);
+}
+
+function listed(index: number): RunSummary {
+  return {
+    run: runId(index),
+    addr: null,
+    started: TimeMs.make(index),
+    last_seq: Seq.make(1),
+    last_kind: "run_started",
+    frozen: index >= WORKING,
+    who: "hall/mayor",
+  };
+}
+
+function record(index: number, at: number, kind: EventKind): EventRecord {
+  return {
+    run: runId(index),
+    seq: Seq.make(at),
+    kind,
+    t: TimeMs.make(at),
+    who: "hall/mayor",
+    prev: B3Hash.make("0".repeat(64)),
+    v: 1,
+    data: {},
+  };
+}
+
+test("reading the working runs costs the working runs, not the city", () => {
+  const store = createBelief(() => 0);
+  const city: CityAnswer = {
+    active: WORKING,
+    buildings: [],
+    frozen: RUNS - WORKING,
+    halted: [],
+    pursuits: [],
+    runs: Array.from({ length: RUNS }, (_, index) => listed(index)),
+  };
+  store.adoptCity(city);
+  let working = 0;
+  const start = performance.now();
+  for (let each = 0; each < RECORDS; each += 1) {
+    store.apply(record(each % WORKING, each + 2, "tool_result"));
+    working += get(store.belief).live.length;
+  }
+  const perRecordUs = ((performance.now() - start) * 1000) / RECORDS;
+  store.apply(record(0, RECORDS + 2, "run_frozen"));
+  expect({
+    working,
+    after: get(store.belief).live.map((run) => run.run),
+  }).toEqual({ working: WORKING * RECORDS, after: [runId(1), runId(2), runId(3)] });
+  expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
+});
