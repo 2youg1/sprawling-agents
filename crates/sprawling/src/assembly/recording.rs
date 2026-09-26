@@ -96,11 +96,7 @@ impl RunWorker {
         // here, because the worker's own books are what its next decision
         // reads: a fold updated only on the rebuild path would answer a
         // dispatch about a session the process has already recorded.
-        self.origins
-            .absorb(kind, RunId::CITY, addr.as_ref(), &data)?;
-        self.governance.absorb(kind, RunId::CITY, None, &data)?;
-        self.expiries.absorb(kind, &data)?;
-        self.book.apply_payload(kind, &data)
+        self.absorb(kind, RunId::CITY, addr.as_ref(), &data)
     }
 
     /// Appends one line attributed to a run rather than to the city.
@@ -124,12 +120,24 @@ impl RunWorker {
             data: data.clone(),
             ig: false,
         })?;
-        // The book states what the history says, whoever wrote the line.
-        // Without this an approval a run raised was on the ledger and
-        // absent from `pending`, so the person could not answer it until
-        // the process restarted and folded the ledger again. It is the
-        // same fold a restart runs, shown the line this process wrote.
-        self.governance.absorb(kind, run, Some(&addr), &data)?;
-        Ok(())
+        self.absorb(kind, run, Some(&addr), &data)
+    }
+
+    /// Shows one line this worker wrote to every fold it holds, whoever
+    /// the line was written for: a restart folds every line into every
+    /// fold, so a live fold that skipped some writer's lines would
+    /// disagree with the restart until the process restarted
+    /// (sprawling-SPEC.md 8-90). Each fold's own `absorb` decides which
+    /// kinds it reads.
+    fn absorb(
+        &mut self,
+        kind: EventKind,
+        run: RunId,
+        addr: Option<&Address>,
+        data: &Payload,
+    ) -> Result<(), AxError> {
+        self.origins.absorb(kind, run, addr, data)?;
+        self.governance.absorb(kind, run, addr, data)?;
+        self.credentials.absorb(kind, data)
     }
 }

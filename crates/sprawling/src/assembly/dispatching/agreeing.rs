@@ -138,13 +138,13 @@ impl RunWorker {
         // follow-up without `-m` - continues on what the room froze.
         let own = city::own_layer(&self.city_root, addr)?;
         let tag = self.tag_for(at.model.as_deref().or(own.model()))?;
-        let chosen = self.book.select(tag, rules.policy())?;
+        let chosen = self.credentials.book.select(tag, rules.policy())?;
         // A subscription credential that expires mid-run is a run that
         // dies on its second turn, so it is renewed before the run
         // starts rather than after a call comes back refused. The
         // endpoint a login attached carries the provider's own name.
         self.renew_if_stale(&chosen.endpoint.name.clone())?;
-        let chosen = self.book.select(tag, rules.policy())?;
+        let chosen = self.credentials.book.select(tag, rules.policy())?;
         let model = chosen.entry.clone();
         let provider = chosen.endpoint.name.clone();
         let adapter = gateway::adapter_for(
@@ -234,7 +234,8 @@ impl RunWorker {
         let Some(id) = model else {
             return Ok(kernel::ModelTag::Main);
         };
-        self.book
+        self.credentials
+            .book
             .choices()
             .find_map(|(tag, _, entry)| (entry.id == id).then_some(tag))
             .ok_or_else(|| {

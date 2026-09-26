@@ -56,6 +56,7 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
 
     let rebuilt = Standing::fold(&report.ledger_dir).unwrap().collaboration;
     let live_queues: std::collections::BTreeMap<String, u32> = worker
+        .collaborating
         .rooms
         .queued()
         .into_iter()
@@ -72,12 +73,12 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
         "a queue the working city holds is a queue a restart finds"
     );
     assert_eq!(
-        worker.goals.len(),
+        worker.collaborating.goals.len(),
         rebuilt.goals.len(),
         "the ground claimed is folded from one rule"
     );
     assert_eq!(
-        worker.requests.len(),
+        worker.collaborating.requests.len(),
         rebuilt.requests.len(),
         "the register of open requests is folded from one rule"
     );
@@ -324,7 +325,7 @@ fn when_a_subscription_credential_expires_survives_a_restart() {
         )
         .unwrap();
     assert_eq!(
-        worker.expiries.of("anthropic"),
+        worker.credentials.expiries.of("anthropic"),
         Some(1_700_000_000_000),
         "the worker that wrote the line reads its own book"
     );
@@ -332,7 +333,7 @@ fn when_a_subscription_credential_expires_survives_a_restart() {
     let rebuilt = Standing::fold(&report.ledger_dir).unwrap().expiries;
     assert_eq!(
         rebuilt.of("anthropic"),
-        worker.expiries.of("anthropic"),
+        worker.credentials.expiries.of("anthropic"),
         "a restarted city renews on the schedule the provider stated"
     );
     assert_eq!(

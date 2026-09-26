@@ -75,7 +75,7 @@ impl RunWorker {
                                 data: request.payload()?,
                             },
                         )?;
-                        self.requests.push(request);
+                        self.collaborating.requests.push(request);
                     }
                     collab::PrEffect::Merged { request, by } => {
                         // The last gate before work becomes the
@@ -101,7 +101,9 @@ impl RunWorker {
                                     )?,
                                 },
                             )?;
-                            self.requests.retain(|held| held.branch != request.branch);
+                            self.collaborating
+                                .requests
+                                .retain(|held| held.branch != request.branch);
                             continue;
                         }
                         let name = memory::WorktreeName::parse(&request.branch)
@@ -145,7 +147,9 @@ impl RunWorker {
                                 reviewed_by_person: false,
                             })
                             .map_err(memory::MemoryError::into_ax)?;
-                        self.requests.retain(|held| held.branch != request.branch);
+                        self.collaborating
+                            .requests
+                            .retain(|held| held.branch != request.branch);
                     }
                     collab::PrEffect::Rejected { request, by, why } => {
                         self.record_for(
@@ -157,7 +161,9 @@ impl RunWorker {
                                 data: request.rejected_payload(by, why)?,
                             },
                         )?;
-                        self.requests.retain(|held| held.branch != request.branch);
+                        self.collaborating
+                            .requests
+                            .retain(|held| held.branch != request.branch);
                     }
                 }
             }

@@ -54,7 +54,7 @@ impl RunWorker {
                         // spelled once, there, because the line is
                         // already on the ledger and a line no queue
                         // holds is a torn city.
-                        self.rooms.deliver(signal)?;
+                        self.collaborating.rooms.deliver(signal)?;
                         // Somebody was spoken to. Whether that starts a run
                         // is decided in one place, so that the two ways of
                         // reaching a resident stay one decision. The
@@ -78,7 +78,7 @@ impl RunWorker {
                 }
             }
             effect::Then::Hold(entries) => {
-                self.goals.extend(entries);
+                self.collaborating.goals.extend(entries);
                 Ok(())
             }
             effect::Then::Roadmap { path, text } => {

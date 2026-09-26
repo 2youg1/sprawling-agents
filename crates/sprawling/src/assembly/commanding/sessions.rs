@@ -59,7 +59,7 @@ impl RunWorker {
         carry: channels::Carry,
         from: Option<kernel::Origin>,
     ) -> Result<(), AxError> {
-        if let Some(working) = self.rooms.worked_by(addr) {
+        if let Some(working) = self.collaborating.rooms.worked_by(addr) {
             return Err(AxError::failure(
                 AxCode::Busy,
                 "start a new session",

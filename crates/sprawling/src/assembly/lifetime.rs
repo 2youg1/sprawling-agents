@@ -12,9 +12,11 @@
 //! reader asking "what does a restart find" and "what does a close
 //! leave" is asking one question from two ends.
 
-use super::{Flight, RoomQueues, RunWorker, Standing, city_segment, ledger_dir, now_ms};
+use super::{
+    Collaborating, Credentials, Flight, RoomQueues, RunWorker, Standing, city_segment,
+    ledger_dir, now_ms,
+};
 use std::path::Path;
-use std::sync::Arc;
 
 use kernel::{AxError, EventKind, Locator};
 use memory::{Cas, JsonlLedger, OpenReport};
@@ -163,20 +165,19 @@ impl RunWorker {
             ledger,
             opening: LedgerOpening::from(report),
             cas,
-            book,
-            vault: Arc::new(std::sync::Mutex::new(vault)),
+            credentials: Credentials::opened(book, expiries, vault),
             serving: None,
             governance,
-            rooms: RoomQueues::folded(collaboration.inboxes),
-            joins: collaboration.joins,
+            collaborating: Collaborating {
+                rooms: RoomQueues::folded(collaboration.inboxes),
+                joins: collaboration.joins,
+                requests: collaboration.requests,
+                goals: collaboration.goals,
+            },
             pursuits,
             plan_holders: collaboration.plan_holders,
-            goals: collaboration.goals,
-            requests: collaboration.requests,
             delegator,
             last_tick: now,
-            expiries,
-            logins: std::collections::BTreeMap::new(),
             log,
             knocks: Vec::new(),
             mcp: super::mcp::Residents::default(),

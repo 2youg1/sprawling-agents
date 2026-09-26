@@ -65,7 +65,7 @@ fn a_run_working_in_the_room_refuses_a_new_session() {
     // What a dispatch does for the length of its run: take the room's
     // queue. Nothing else in the city says a room is being worked in.
     let running = kernel::RunId::from_bytes([9u8; 16]);
-    let _lent = worker.rooms.lend(&room, running);
+    let _lent = worker.collaborating.rooms.lend(&room, running);
 
     let refused = worker
         .open_session(&room, channels::Carry::Nothing, None)

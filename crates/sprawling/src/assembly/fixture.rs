@@ -206,7 +206,11 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
             model: None,
         })
         .unwrap();
-    let joined = worker.joins.get(&room).map_or(0, |j| j.artifacts().count());
+    let joined = worker
+        .collaborating
+        .joins
+        .get(&room)
+        .map_or(0, |j| j.artifacts().count());
     // Why a missing handback is worth a paragraph: the failure is a
     // race in what the provider was asked, so the answer is which
     // run got what, not which line the cell says is false.

@@ -50,7 +50,7 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
-    let held = worker.book.endpoints().next().unwrap().clone();
+    let held = worker.credentials.book.endpoints().next().unwrap().clone();
     assert_eq!(
         held.models
             .iter()
@@ -321,4 +321,52 @@ fn ledger_text(ledger_dir: &std::path::Path) -> String {
         .map(|line| String::from_utf8_lossy(line).into_owned())
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+/// The worker's book is the book a restart would fold, whoever wrote
+/// the line: a run's own line reaches it as a city line does.
+#[test]
+fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    let attached = kernel::event::record::EndpointAttached {
+        name: "by-a-run".to_owned(),
+        base_url: "http://127.0.0.1:9".to_owned(),
+        dialect: kernel::DialectKind::OpenAi,
+        auth: None,
+        auth_header: None,
+        models: vec!["m-1".to_owned()],
+        connection_kind: None,
+        probed: false,
+        tuning: None,
+    };
+    worker
+        .record_for(
+            kernel::RunId::from_bytes([7; 16]),
+            effect::Line {
+                who: "lab/room1".to_owned(),
+                addr: Address::parse("lab/room1").unwrap(),
+                kind: EventKind::EndpointAttached,
+                data: Payload::of(&attached).unwrap(),
+            },
+        )
+        .unwrap();
+    let names = |book: &gateway::EndpointBook| {
+        book.endpoints()
+            .map(|held| held.name.clone())
+            .collect::<Vec<String>>()
+    };
+    let rebuilt = Standing::fold(&report.ledger_dir).unwrap().book;
+    assert_eq!(names(&rebuilt), vec!["by-a-run".to_owned()]);
+    assert_eq!(
+        names(&worker.credentials.book),
+        names(&rebuilt),
+        "the live book and the restart's book are one fold"
+    );
 }

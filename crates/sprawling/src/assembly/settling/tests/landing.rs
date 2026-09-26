@@ -62,10 +62,9 @@ Trades in the market as {who}.
     let room = Address::parse("market/hana").unwrap();
     // One slot: the second delivery sheds, so the landing settles
     // halfway by construction rather than by luck.
-    worker.rooms = crate::assembly::RoomQueues::folded(std::collections::BTreeMap::from([(
-        room.clone(),
-        collab::Inbox::new(1, 1),
-    )]));
+    worker.collaborating.rooms = crate::assembly::RoomQueues::folded(
+        std::collections::BTreeMap::from([(room.clone(), collab::Inbox::new(1, 1))]),
+    );
     let knocks_mark = worker.knocks.len();
     let at = Assignment {
         addr: Address::parse("market/ito").unwrap(),
@@ -93,7 +92,7 @@ Trades in the market as {who}.
         "knocks pushed by landed signals are cut back on failure"
     );
     assert_eq!(
-        worker.rooms.pending(&room),
+        worker.collaborating.rooms.pending(&room),
         1,
         "only the first signal landed in the queue"
     );
@@ -192,10 +191,9 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
 
     let mut waiting = collab::Inbox::new(8, 4);
     waiting.deliver(&speaking_signal("s-kept", &room)).unwrap();
-    worker.rooms = crate::assembly::RoomQueues::folded(std::collections::BTreeMap::from([(
-        room.clone(),
-        waiting,
-    )]));
+    worker.collaborating.rooms = crate::assembly::RoomQueues::folded(
+        std::collections::BTreeMap::from([(room.clone(), waiting)]),
+    );
 
     let (driving, continuation) = worker
         .prepare_dispatch(
@@ -215,7 +213,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         )
         .unwrap();
     assert_eq!(
-        worker.rooms.pending(&room),
+        worker.collaborating.rooms.pending(&room),
         0,
         "the queue is out with the run that is driving"
     );
@@ -236,7 +234,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         .unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::StorageFatal);
     assert_eq!(
-        worker.rooms.pending(&room),
+        worker.collaborating.rooms.pending(&room),
         1,
         "the room still has what it was holding"
     );

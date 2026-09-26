@@ -316,7 +316,11 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let returned = held(&desks.signals, "settle the signal desk")?.take_inbox();
         match desks.tenure {
-            QueueTenure::TheRoomQueue => self.rooms.give_back(&at.addr, site.run_id, returned)?,
+            QueueTenure::TheRoomQueue => {
+                self.collaborating
+                    .rooms
+                    .give_back(&at.addr, site.run_id, returned)?
+            }
             QueueTenure::ASpare { held_by } => self.note(
                 runtime::diagnostics::Level::Refuse,
                 "collab::inbox",

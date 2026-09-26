@@ -174,6 +174,7 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
     );
     assert_eq!(
         worker
+            .collaborating
             .joins
             .get(&room)
             .map_or(0, |join| join.artifacts().count()),
