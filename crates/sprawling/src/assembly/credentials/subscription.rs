@@ -18,6 +18,7 @@
 //! nothing — and discovered each expiry as a 401 in the middle of a
 //! run, losing that turn (sprawling-SPEC.md 8-11).
 
+use kernel::event::record::SecretCaptured;
 use kernel::{AxError, EventKind, Payload, SecretRef};
 
 /// The name of an access token within its provider's realm.
@@ -68,18 +69,8 @@ pub(in crate::assembly) fn auth_for(
 /// A reference to anything else — another realm's key, or this
 /// provider's refresh token — answers `None`: this table holds access
 /// tokens, and the reader asks the grammar rather than trimming text.
-fn access_provider(reference: &str) -> Option<String> {
-    let place = match SecretRef::parse(reference) {
-        Ok(place) => place,
-        // A `ref` outside the grammar names no vault place, so it names
-        // no provider's token either, and this book has nothing to fold
-        // in from it.
-        Err(_) => return None,
-    };
-    if place.name() != OAUTH {
-        return None;
-    }
-    Some(place.realm().to_owned())
+fn access_provider(place: &SecretRef) -> Option<String> {
+    (place.name() == OAUTH).then(|| place.realm().to_owned())
 }
 
 /// When each provider's subscription credential stops working, in the
@@ -100,21 +91,26 @@ impl Expiries {
     /// A capture with no stated expiry leaves the table alone: not
     /// knowing when something expires is not a reason to renew it every
     /// time, and it is not a reason to forget an expiry either.
-    pub(in crate::assembly) fn absorb(&mut self, kind: EventKind, payload: &Payload) {
+    ///
+    /// # Errors
+    /// A `secret_captured` line this build cannot read, a `ref` outside
+    /// the reference grammar among them: a fold that skipped it would
+    /// renew nothing after a restart, and nothing would say why.
+    pub(in crate::assembly) fn absorb(
+        &mut self,
+        kind: EventKind,
+        payload: &Payload,
+    ) -> Result<(), AxError> {
         if kind != EventKind::SecretCaptured {
-            return;
+            return Ok(());
         }
-        let data = payload.as_map();
-        let Some(reference) = data.get("ref").and_then(serde_json::Value::as_str) else {
-            return;
-        };
-        let Some(provider) = access_provider(reference) else {
-            return;
-        };
-        let Some(at) = data.get("expires_at").and_then(serde_json::Value::as_u64) else {
-            return;
-        };
-        self.by_provider.insert(provider, at);
+        let captured: SecretCaptured = payload.read()?;
+        if let (Some(provider), Some(at)) =
+            (access_provider(&captured.reference), captured.expires_at)
+        {
+            self.by_provider.insert(provider, at);
+        }
+        Ok(())
     }
 
     /// When this provider's credential stops working, if the provider
@@ -151,10 +147,10 @@ mod tests {
     }
 
     /// The table keys on the access token's place and on nothing else.
-    /// A refresh token's capture, another realm's key, and a `ref`
-    /// outside the grammar all leave it alone: renewal asks the access
-    /// token's expiry, and a reader that guessed would renew the wrong
-    /// credential or leave a dead one alone.
+    /// A refresh token's capture and another realm's key leave it alone,
+    /// and a `ref` outside the grammar is refused: renewal asks the
+    /// access token's expiry, and a reader that guessed would renew the
+    /// wrong credential or leave a dead one alone.
     #[test]
     fn only_an_access_token_capture_enters_the_expiry_table() {
         let mut expiries = Expiries::default();
@@ -162,10 +158,20 @@ mod tests {
             ("secret:anthropic/oauth-refresh", 1_000),
             ("secret:anthropic/api-key", 2_000),
             ("secret:openai/oauth-refresh", 3_000),
+        ] {
+            expiries
+                .absorb(EventKind::SecretCaptured, &capture(reference, Some(at)))
+                .unwrap();
+        }
+        for (reference, at) in [
             ("anthropic/oauth", 4_000),
             ("secret:two words/oauth", 5_000),
         ] {
-            expiries.absorb(EventKind::SecretCaptured, &capture(reference, Some(at)));
+            assert!(
+                expiries
+                    .absorb(EventKind::SecretCaptured, &capture(reference, Some(at)))
+                    .is_err()
+            );
         }
         assert_eq!(
             expiries.of("anthropic"),
@@ -182,10 +188,30 @@ mod tests {
             ("secret:anthropic/oauth", 6_000),
             ("secret:openai/oauth", 7_000),
         ] {
-            expiries.absorb(EventKind::SecretCaptured, &capture(reference, Some(at)));
+            expiries
+                .absorb(EventKind::SecretCaptured, &capture(reference, Some(at)))
+                .unwrap();
         }
         assert_eq!(expiries.of("anthropic"), Some(6_000));
         assert_eq!(expiries.of("openai"), Some(7_000));
+    }
+
+    /// A capture this build cannot read is refused rather than skipped:
+    /// a fold that dropped it would renew nothing after a restart and
+    /// meet the expiry as a 401 mid-run, with no line saying why.
+    #[test]
+    fn a_capture_that_will_not_read_is_refused_rather_than_skipped() {
+        let mut map = capture("secret:anthropic/oauth", None).as_map().clone();
+        map.insert(
+            "expires_at".to_owned(),
+            serde_json::Value::String("soon".to_owned()),
+        );
+        let mut expiries = Expiries::default();
+        let said = format!(
+            "{:?}",
+            expiries.absorb(EventKind::SecretCaptured, &Payload::new(map).unwrap())
+        );
+        assert!(said.starts_with("Err("), "{said}");
     }
 
     /// A capture with no expiry leaves a stated one in place rather than
@@ -194,14 +220,18 @@ mod tests {
     #[test]
     fn a_capture_without_an_expiry_keeps_the_one_already_known() {
         let mut expiries = Expiries::default();
-        expiries.absorb(
-            EventKind::SecretCaptured,
-            &capture("secret:anthropic/oauth", Some(1_000)),
-        );
-        expiries.absorb(
-            EventKind::SecretCaptured,
-            &capture("secret:anthropic/oauth", None),
-        );
+        expiries
+            .absorb(
+                EventKind::SecretCaptured,
+                &capture("secret:anthropic/oauth", Some(1_000)),
+            )
+            .unwrap();
+        expiries
+            .absorb(
+                EventKind::SecretCaptured,
+                &capture("secret:anthropic/oauth", None),
+            )
+            .unwrap();
         assert_eq!(expiries.of("anthropic"), Some(1_000));
     }
 }

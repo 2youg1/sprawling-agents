@@ -40,12 +40,16 @@
 
 mod adviser;
 mod checkpoint;
-mod control;
-mod discard;
 mod collaboration;
+mod control;
+mod credential;
+mod discard;
+mod endpoint;
 mod governance;
 mod log;
 mod modality;
+mod probe;
+mod provider;
 mod roadmap;
 mod run;
 mod tool;
@@ -64,14 +68,18 @@ pub use collaboration::{
     ConflictLevel, GoalConflict, Lane, PursuitChanged, PursuitMove, SignalConsumed, SignalEnqueued,
     SignalId, SignalKind, WorktreeOpened,
 };
+pub use credential::{LoginStarted, SecretCaptured, ToolkitLinkOpened};
+pub use endpoint::{AttachedTuning, EndpointAttached, EndpointLost, InputKinds, ModelSelected};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     GoverningDocument, RulesChanged, SpineDocumentWritten, autonomy_word,
 };
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
+pub use probe::{EndpointProbed, ModelFacts, ProbeFailure};
+pub use provider::{ProviderDegraded, VaultFellBack};
 pub use roadmap::{RoadmapMoved, RoadmapStep};
-pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
+pub use run::{EvalRun, EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,

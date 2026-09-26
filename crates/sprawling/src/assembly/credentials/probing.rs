@@ -18,8 +18,8 @@
 //! find out is `gateway::reach`; what this module owns is the record
 //! the page folds.
 
+use kernel::event::record::{EndpointProbed, ProbeFailure};
 use kernel::{AxCode, AxError, Payload, Proxying, Reach};
-use serde_json::{Map, Value};
 
 use crate::assembly::now_ms;
 
@@ -76,63 +76,27 @@ pub(super) fn reach_of(base_url: &str, proxying: Proxying) -> Result<Reach, AxEr
 pub(super) fn probed_payload(
     name: &str,
     base_url: &str,
-    found: &Probing,
+    found: Probing,
 ) -> Result<Payload, AxError> {
-    let mut map = Map::new();
-    map.insert("name".to_owned(), Value::String(name.to_owned()));
-    map.insert("base_url".to_owned(), Value::String(base_url.to_owned()));
-    map.insert(
-        "reach".to_owned(),
-        serde_json::to_value(&found.reach).map_err(|err| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "encode a reach report",
-                err.to_string(),
-            )
-            .with_recovery(
-                "report this against sprawling::assembly::credentials::probing: a reach \
-                 report is a plain enum and JSON refuses none of its spellings",
-            )
-        })?,
-    );
-    match &found.served {
-        Ok(rows) => {
-            map.insert(
-                "models".to_owned(),
-                Value::Array(
-                    rows.iter()
-                        .map(|row| Value::String(row.id.clone()))
-                        .collect(),
-                ),
-            );
-            map.insert(
-                "facts".to_owned(),
-                serde_json::to_value(rows).map_err(|err| {
-                    AxError::failure(AxCode::InvalidArgs, "encode model facts", err.to_string())
-                        .with_recovery(
-                            "report this against sprawling::assembly::credentials::probing: \
-                             model facts are text and whole numbers only",
-                        )
-                })?,
-            );
-        }
-        Err(err) => {
-            // An empty list rather than no key: a page that reads
-            // `models` gets the same shape whether the list was empty or
-            // unreadable, and reads `failed` to tell the two apart.
-            map.insert("models".to_owned(), Value::Array(Vec::new()));
-            map.insert("facts".to_owned(), Value::Array(Vec::new()));
-            let mut why = Map::new();
-            why.insert(
-                "code".to_owned(),
-                Value::String(err.code().as_str().to_owned()),
-            );
-            why.insert(
-                "subject".to_owned(),
-                Value::String(err.subject().to_owned()),
-            );
-            map.insert("failed".to_owned(), Value::Object(why));
-        }
-    }
-    Payload::new(map)
+    // Empty lists rather than no keys: a page that reads `models` gets
+    // the same shape whether the list was empty or unreadable, and reads
+    // `failed` to tell the two apart.
+    let (facts, failed) = match found.served {
+        Ok(rows) => (rows, None),
+        Err(err) => (
+            Vec::new(),
+            Some(ProbeFailure {
+                code: err.code().as_str().to_owned(),
+                subject: err.subject().to_owned(),
+            }),
+        ),
+    };
+    Payload::of(&EndpointProbed {
+        name: name.to_owned(),
+        base_url: base_url.to_owned(),
+        reach: found.reach,
+        models: facts.iter().map(|row| row.id.clone()).collect(),
+        facts,
+        failed,
+    })
 }

@@ -42,7 +42,7 @@ impl RunWorker {
             reach: reach_of(&endpoint.base_url, endpoint.tuning.proxying)?,
             served: self.probe(&endpoint),
         };
-        let payload = probed_payload(&endpoint.name, &endpoint.base_url, &found)?;
+        let payload = probed_payload(&endpoint.name, &endpoint.base_url, found)?;
         self.record(EventKind::EndpointProbed, payload)
     }
 

@@ -99,7 +99,7 @@ impl RunWorker {
         self.origins
             .absorb(kind, RunId::CITY, addr.as_ref(), &data)?;
         self.governance.absorb(kind, RunId::CITY, None, &data)?;
-        self.expiries.absorb(kind, &data);
+        self.expiries.absorb(kind, &data)?;
         self.book.apply_payload(kind, &data)
     }
 

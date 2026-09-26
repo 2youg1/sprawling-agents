@@ -105,7 +105,7 @@ impl StandingFold {
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
         self.collaboration.absorb(record)?;
         self.entrance.absorb(record.data());
-        self.expiries.absorb(record.kind(), record.data());
+        self.expiries.absorb(record.kind(), record.data())?;
         self.origins
             .absorb(record.kind(), record.run(), record.addr(), record.data())
     }

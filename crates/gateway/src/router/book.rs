@@ -20,13 +20,14 @@
 
 use std::collections::BTreeMap;
 
+use kernel::event::record::EndpointLost;
 use kernel::{AxCode, AxError, BuildingPolicy, EventKind, EventRecord, ModelTag, Payload};
 
 use crate::endpoint::Transport;
 use crate::market::ModelEntry;
 
 use super::attached::AttachedEndpoint;
-use super::payload::{read_attached, read_choice, text};
+use super::payload::{read_attached, read_choice};
 /// The model that answers for one tag and the endpoint it lives
 /// behind.
 #[derive(Debug, Clone, Copy)]
@@ -101,7 +102,7 @@ impl EndpointBook {
                 Ok(())
             }
             EventKind::EndpointLost => {
-                let name = text(data, "name")?;
+                let EndpointLost { name } = data.read()?;
                 self.endpoints.remove(&name);
                 self.chosen.retain(|_, choice| choice.endpoint != name);
                 Ok(())

@@ -17,7 +17,9 @@
 //! rather than an error, because a view that hid a record it could not
 //! parse would be a view that lies about what happened.
 
-use kernel::event::record::{CheckpointCommitted, FileDiscarded, FiredAction, WatchdogFired};
+use kernel::event::record::{
+    CheckpointCommitted, FileDiscarded, FiredAction, ProviderDegraded, WatchdogFired,
+};
 use kernel::{AxCode, AxError, EventKind, EventRecord, Seq};
 
 use crate::answer::{Note, Output, Used};
@@ -162,13 +164,13 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
                 Err(err) => unreadable(kind, &err, at),
             })
         }
-        EventKind::ProviderDegraded => {
-            let value = serde_json::Value::Object(map.clone());
-            Some(match serde_json::from_value(value) {
-                Ok(error) => Note::Refused { error, at },
-                Err(err) => unreadable(kind, &err, at),
-            })
-        }
+        // The vault's fallback to session memory shares this kind and
+        // changed nothing a turn did.
+        EventKind::ProviderDegraded => match record.data().read() {
+            Ok(ProviderDegraded::Refused(error)) => Some(Note::Refused { error, at }),
+            Ok(ProviderDegraded::VaultFellBack(_)) => None,
+            Err(err) => Some(unreadable(kind, &err, at)),
+        },
         EventKind::WatchdogFired => match record.data().read::<WatchdogFired>() {
             Ok(fired) => backed_off(fired.action, at),
             Err(err) => Some(unreadable(kind, &err, at)),
