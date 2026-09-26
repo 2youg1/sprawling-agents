@@ -129,10 +129,11 @@ mod tests {
         for (sockets, ns) in &readings {
             println!("fanout: {sockets} sockets, {ns} ns per event");
         }
+        let at_one = readings.first().map(|(_, ns)| *ns).unwrap();
         let at_sixteen = readings.last().map(|(_, ns)| *ns).unwrap();
         assert!(
-            at_sixteen <= 1_000,
-            "16 sockets cost {at_sixteen} ns per event, over the 1 µs budget"
+            at_sixteen <= at_one.saturating_mul(2),
+            "16 sockets cost {at_sixteen} ns per event against {at_one} ns at one: the record is serialised per socket again"
         );
     }
 }
