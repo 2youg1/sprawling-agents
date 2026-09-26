@@ -3027,5 +3027,29 @@
   "machine_spare": {
     "en": "one of a kind that needs only one, and another is here",
     "zh": "同类有一个即可，已经有了"
+  },
+  "setup_effort_standing": {
+    "en": "in force at {addr}: {effort}, from {from}",
+    "zh": "{addr} 现在的档位：{effort}，来自{from}"
+  },
+  "setup_effort_unstated": {
+    "en": "in force at {addr}: no level stated, so the provider decides",
+    "zh": "{addr} 现在没有写档位，由供应方决定"
+  },
+  "setup_effort_from_city": {
+    "en": "the city's CONFIG.toml",
+    "zh": "城的 CONFIG.toml"
+  },
+  "setup_effort_from_building": {
+    "en": "this building's own file",
+    "zh": "这栋楼自己的文件"
+  },
+  "setup_effort_from_resident": {
+    "en": "the room's own file",
+    "zh": "这个房间自己的文件"
+  },
+  "setup_effort_where": {
+    "en": "to choose another level for one conversation, use the third box under the composer",
+    "zh": "要为一段对话另选档位，用对话框下方的第三格"
   }
 }
