@@ -181,8 +181,8 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
 
     let after = std::fs::read_to_string(&plan).unwrap();
     assert!(
-        after.contains("| 1 | wire the kiln | 1 |  | In progress |  |"),
-        "the plan on disk carries the claim: {after}"
+        after.contains("| 1 | wire the kiln | 1 |  | Blocked |  |"),
+        "the claim landed, and the run that ended holding it left it red: {after}"
     );
     assert!(
         after.contains("| 2 | glaze tests | 1 |  | Not started |  |"),
