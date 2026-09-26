@@ -34,11 +34,11 @@
 
 ## 3 假设与歧义
 
-- `views` 在读侧与写侧各有一份 `Governance`，搬进本 crate 时哪一侧拥有这个类型，取决于 `bin::views` 与 `bin::assembly` 之间的环断在哪里（sprawling-SPEC.md 8-92 的表）。
+- `RunWorker`、它的六个对象、全部用例与 `views` 还没有搬进本 crate，所以 citysim（不依赖 `sprawling`）仍驱动不了一次 dispatch。worker 除了经四个端口之外，还直接用到 `bin` 的这些模块：`views`、`effect`、`serving`、`doctor`、`console`、`plan_view`、`held_vault`、`toolkit_broker`、`mcp_stdio`、`mcp_link`、`revealing`、`person`、`home`、`browser_tool`。未定的是每一个随 worker 搬进本 crate，还是留在 `sprawling`、由装配根经一个端口交进来。能定下它的证据是该模块的形状：worker 的决定与读面（`views`、`effect`、`plan_view`、`person`）随之搬；通往主机、网络或终端的适配器（`mcp_stdio`、`mcp_link`、`console`、`browser_tool`、`serving`）留下，经端口进来。`views` 的 `Governance` 由读侧拥有，写侧从那里取用（sprawling-SPEC.md 8-92），所以它随 `views` 一起搬。
 
 ## 4 现状分析
 
-本 crate 现有三个端口。`ModelFactory` 的生产适配器在装配根（`bin::assembly::models`），第二实现在 `crates/sprawling/tests/model_factory.rs`；`Connectors` 的生产适配器是 `bin::assembly::mcp::McpServers`，第二实现在 `crates/sprawling/tests/connectors.rs`；`Clock` 的生产适配器是 `bin::assembly::SystemClock`，第二实现在 `crates/sprawling/tests/clock.rs`；`Machine` 的生产适配器是 `bin::assembly::commanding::machine::Doctor`，第二实现在 `crates/sprawling/tests/machine.rs`。
+本 crate 现有四个端口。`ModelFactory` 的生产适配器在装配根（`bin::assembly::models`），第二实现在 `crates/sprawling/tests/model_factory.rs`；`Connectors` 的生产适配器是 `bin::assembly::mcp::McpServers`，第二实现在 `crates/sprawling/tests/connectors.rs`；`Clock` 的生产适配器是 `bin::assembly::SystemClock`，第二实现在 `crates/sprawling/tests/clock.rs`；`Machine` 的生产适配器是 `bin::assembly::commanding::machine::Doctor`，第二实现在 `crates/sprawling/tests/machine.rs`。
 
 ## 5 权威信源
 
