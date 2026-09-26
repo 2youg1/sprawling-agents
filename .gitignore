@@ -1,6 +1,10 @@
 /target
 /local
 /adversary/.lake
+# `just mutants` writes its report and the previous run's beside the
+# workspace root.
+/mutants.out/
+/mutants.out.old/
 # svelte-check's generated transpiled project (its --tsgo lane and editor
 # tooling write it); it is build output, and ESLint's flat config lints
 # dot directories unless they are ignored (client/eslint.config.ts).
