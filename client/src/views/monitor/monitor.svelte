@@ -52,14 +52,22 @@
     if (following === "following" && trace.latest !== null) land(trace.latest);
   });
 
+  // Each pane scrolls itself and nothing around it: `scrollIntoView`
+  // would also move every scrolling ancestor, and the page a monitor
+  // sits in is not the agent's to scroll. The panes are `relative`, so
+  // an offset inside one is measured from its own top.
   function land(target: Target): void {
     switch (target.kind) {
-      case "file":
-        code?.querySelector(`[data-path="${CSS.escape(target.path)}"]`)?.scrollIntoView({ block: "start" });
+      case "file": {
+        const file = code?.querySelector<HTMLElement>(`[data-path="${CSS.escape(target.path)}"]`);
+        if (code !== undefined && file != null) code.scrollTop = file.offsetTop;
         return;
-      case "entry":
-        record?.querySelector(`[data-at="${String(target.at)}"]`)?.scrollIntoView({ block: "end" });
+      }
+      case "entry": {
+        const entry = record?.querySelector<HTMLElement>(`[data-at="${String(target.at)}"]`);
+        if (record !== undefined && entry != null) record.scrollTop = entry.offsetTop + entry.offsetHeight - record.clientHeight;
         return;
+      }
     }
   }
 
@@ -78,7 +86,7 @@
     following = "following";
   }
 
-  const PANE = "min-h-0 flex-1 overflow-y-auto focus-visible:outline-2 focus-visible:outline-accent";
+  const PANE = "relative min-h-0 flex-1 overflow-y-auto focus-visible:outline-2 focus-visible:outline-accent";
 </script>
 
 <svelte:window onkeydown={resumeBy} />
