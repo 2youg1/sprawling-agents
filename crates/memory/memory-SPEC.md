@@ -455,6 +455,11 @@ impl Checkpoint {
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
     pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, MemoryError>;
+    /// The way back a `file_discarded` names: the blob at `address` in commit
+    /// `oid`, written to the same path under the working tree, parents created.
+    /// 不移动 HEAD，不碰 index。oid 不是提交、提交里没有这条路径（或它不是
+    /// blob）、写盘失败，都是 `MemoryError::Checkpoint`（→ `E_WORKTREE_BUSY`）。
+    pub fn restore(&self, address: &Address, oid: &GitOid) -> Result<(), MemoryError>;
     /// 把工作树提交到**当前分支**（HEAD 移动），供一次评审运行
     /// 在自己的 worktree 里献出成果时使用。返回落地的 oid。
     pub fn land(&mut self, t: TimeMs, of: &Provenance, subject: &str) -> Result<String, MemoryError>;
@@ -471,6 +476,10 @@ impl Checkpoint {
   **dangling commit**（`update_ref = None`，父为当前 HEAD 提交，无 HEAD 时无父），
   再把引用 `refs/sprawling/runs/<run>/<oid>` 指向它。`git log HEAD` 因此跨波不增长，
   而 oid 可 checkout、`wave_post` 与 `memory::changes` 从 oid 工作。
+- **`restore` 只写工作区那一个文件。** 还原是把人丢掉的东西放回原处，不是一次提交：
+  写 index 或移动 HEAD 会让「人还原了一个文件」在他自己的分支历史里长出一格。
+  路径的语法就是守卫——`Address` 爬不出城，所以写的位置不需要第二道检查。
+  提交能被找到，靠的是上一条的引用；没有它，`git gc` 之后 `restore` 答「找不到提交」。
 - **被否的另一条路：把栅栏留在 HEAD。** 它让人的历史被机器的簿记淹没——一天的工作里
   几百个 `checkpoint:` 行，人自己的提交夹在中间找不到。留在 HEAD 唯一买到的是
   「不用写引用」，而写一个引用是一行。
