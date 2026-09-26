@@ -87,7 +87,8 @@ impl RunWorker {
             .select(kernel::ModelTag::Digest, policy)
             .map_err(|refused| {
                 refused.rewrite_recovery(
-                    "name the room yourself by sending the work to `building/name`, or choose a                      digest model that runs on this machine",
+                    "name the room yourself by sending the work to `building/name`, or choose a \
+                     digest model that runs on this machine",
                 )
             })?;
         let adapter = gateway::adapter_for(
