@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Two instruments over the accounting loop the city runs
-//! (sprawling-SPEC.md 8-83): a relay round trip, and the gap a second
+//! (sprawling-SPEC.md 8-84): a relay round trip, and the gap a second
 //! dispatch leaves in a run that is already going.
 //!
 //! Both drive `serving::attending::attend` on a thread of its own, send
@@ -51,7 +51,7 @@ const WITHIN: Duration = Duration::from_secs(60);
 /// The most a relay round trip over the memory store may take at its
 /// middle. Only that store is held to it: there the whole round trip is
 /// the harness, while on the disk store the middle is the device's fsync,
-/// a physical floor that differs by machine (sprawling-SPEC.md 8-83).
+/// a physical floor that differs by machine (sprawling-SPEC.md 8-84).
 const ROUND_TRIP_P50: Duration = Duration::from_millis(1);
 
 #[derive(Debug, Clone, Copy)]

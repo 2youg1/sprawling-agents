@@ -3258,7 +3258,7 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 **本章测试**：`main::tests::the_embedded_client_is_the_bundle_the_workspace_built`——工作区 `target/web-dist` 下有完整的包时，嵌入表的路径集合与盘上的文件集合相等，且 `CLIENT_COMPLETE` 为真；没有完整的包时，`CLIENT_COMPLETE` 为假。这条测试只在 `CARGO_TARGET_DIR` 指向工作区以外时才能区分对错。
 
-### 8-83 记账线程的循环是一个有名字的函数，两件仪表直接驱动它（`bin::serving::attending::attend`、`assembly::driving::tests::instruments`）
+### 8-84 记账线程的循环是一个有名字的函数，两件仪表直接驱动它（`bin::serving::attending::attend`、`assembly::driving::tests::instruments`）
 
 ```rust
 // bin::serving::attending —— shape: adapter

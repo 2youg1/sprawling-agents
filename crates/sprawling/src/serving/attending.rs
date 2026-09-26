@@ -165,7 +165,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
 /// A function of its own rather than the body of the thread's closure,
 /// because the instruments that time a relay round trip and the gap two
 /// dispatches leave in a run drive this loop and not a copy of it
-/// (sprawling-SPEC.md 8-83): a copy that waited differently would be
+/// (sprawling-SPEC.md 8-84): a copy that waited differently would be
 /// measured instead of the city.
 pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
     desk.ring_through(worker.bell());

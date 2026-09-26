@@ -520,6 +520,7 @@ fn a_run_that_calls_nothing_puts_up_no_fence() {
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
             invoke: &mut invoke,
+            wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
             deltas: None,
         };
         let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();

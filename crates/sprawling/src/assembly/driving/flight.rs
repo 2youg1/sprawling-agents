@@ -216,7 +216,7 @@ impl RunWorker {
 
     /// A write face issued by the same gate the lanes write through, for
     /// an instrument that times the crossing from outside a lane
-    /// (sprawling-SPEC.md 8-83).
+    /// (sprawling-SPEC.md 8-84).
     #[cfg(test)]
     pub(in crate::assembly) fn measuring_relay(&self) -> Relay {
         self.flight.issue()
