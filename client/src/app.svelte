@@ -351,7 +351,11 @@
         <!-- The storybook and its fixture tables are a chunk of their
              own, fetched only when a person opens `#/gallery`, so the
              page every other route loads does not carry them. -->
-        {#await import("./views/gallery.svelte") then gallery}
+        {#await import("./views/gallery.svelte")}
+          <!-- Pending until the chunk lands; the render gate waits for
+               this mark to go before it measures the page. -->
+          <div data-pending></div>
+        {:then gallery}
           <gallery.default />
         {/await}
       {/if}
