@@ -50,12 +50,15 @@ impl Worktrees {
         let branch = self
             .repo
             .branch(name.as_str(), &commit, false)
-            .map_err(|err| match err.code() {
-                git2::ErrorCode::Exists => busy("a line of work already has this name"),
-                _ => MemoryError::Worktree {
-                    op: "branch at the point to go back to",
-                    detail: format!("{point}: {err}"),
-                },
+            .map_err(|err| {
+                if err.code() == git2::ErrorCode::Exists {
+                    busy("a line of work already has this name")
+                } else {
+                    MemoryError::Worktree {
+                        op: "branch at the point to go back to",
+                        detail: format!("{point}: {err}"),
+                    }
+                }
             })?;
         match self.add_tree(name, Some(branch.get())) {
             Ok(lease) => Ok(lease),
@@ -157,4 +160,11 @@ fn in_tree(path: &Path) -> Option<PathBuf> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
 mod tests;
