@@ -257,14 +257,9 @@ fn three_waves_leave_three_fences_and_a_history_that_did_not_grow() {
         .map(str::to_owned)
         .collect();
     filed.sort();
-    assert_eq!(
-        filed,
-        vec![
-            format!("{prefix}0"),
-            format!("{prefix}1"),
-            format!("{prefix}2"),
-        ]
-    );
+    let mut expected: Vec<String> = fences.iter().map(|oid| format!("{prefix}{oid}")).collect();
+    expected.sort();
+    assert_eq!(filed, expected);
 
     // Each fence still checks out: a dangling commit reachable through
     // its reference is not collected.
@@ -286,4 +281,36 @@ fn head_len(root: &Path) -> usize {
     let mut walk = repo.revwalk().unwrap();
     walk.push_head().unwrap();
     walk.count()
+}
+
+/// A run fences through two handles - the lane's own and the bench's
+/// forecast net - and a `file_discarded` restoration points into
+/// whichever of them raised the fence. Each fence stays pinned, so a
+/// `git gc` that prunes every unreachable object keeps them both.
+#[test]
+fn every_fence_a_run_raises_survives_git_gc_whichever_handle_raised_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let of = resident();
+    let scope = ["work".to_owned()];
+    let mut fences = Vec::new();
+    for (step, body) in ["lane", "bench"].iter().enumerate() {
+        write(tmp.path(), "work/doomed.txt", body);
+        let mut handle = Checkpoint::open(tmp.path()).unwrap();
+        let t = TimeMs::new(1_000 + u64::try_from(step).unwrap());
+        fences.push(oid_of(&handle.wave_pre(&scope, t, &of).unwrap()));
+    }
+
+    let gc = std::process::Command::new("git")
+        .args(["gc", "--prune=now", "--quiet"])
+        .current_dir(tmp.path())
+        .status()
+        .unwrap();
+    assert!(gc.success());
+
+    let repo = git2::Repository::open(tmp.path()).unwrap();
+    let survivors: Vec<&String> = fences
+        .iter()
+        .filter(|oid| repo.find_commit(git2::Oid::from_str(oid).unwrap()).is_ok())
+        .collect();
+    assert_eq!(survivors, fences.iter().collect::<Vec<_>>());
 }
