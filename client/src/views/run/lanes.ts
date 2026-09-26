@@ -51,11 +51,16 @@ export const OVERSCAN = 8;
 // stretch; a run that is over passes `null`.
 export function stretchesOf(turns: readonly Turn[], end: number, tail: Share | null): readonly Stretch[] {
   return turns.map((turn, at) => ({
-    share: at === turns.length - 1 && tail !== null ? tail : "model",
+    share: at === turns.length - 1 && tail !== null ? tail : shareOf(turn),
     turn: turn.number,
     from: turn.t,
     to: Math.max(turn.t, turns[at + 1]?.t ?? end),
   }));
+}
+
+function shareOf(turn: Turn): Share {
+  if (turn.notes.some((note) => "waiting" in note)) return "person";
+  return turn.calls.length > 0 ? "tool" : "model";
 }
 
 // The stretches as boxes over `columns` columns spanning `from`..`to`:
@@ -63,11 +68,18 @@ export function stretchesOf(turns: readonly Turn[], end: number, tail: Share | n
 // columns of one share become one box. `stretches` is in time order.
 export function columnsOf(stretches: readonly Stretch[], from: number, to: number, columns: number): readonly Segment[] {
   const width = Math.max(1, to - from) / Math.max(1, columns);
-  return stretches.map((each) => ({
-    share: under(stretches, each.from) ?? each.share,
-    first: Math.floor((each.from - from) / width),
-    end: Math.ceil((each.to - from) / width),
-  }));
+  const out: Segment[] = [];
+  let open: { share: Share; first: number } | null = null;
+  for (let column = 0; column < columns; column += 1) {
+    const share = under(stretches, from + (column + 0.5) * width);
+    if (open !== null && open.share !== share) {
+      out.push({ share: open.share, first: open.first, end: column });
+      open = null;
+    }
+    if (open === null && share !== null) open = { share, first: column };
+  }
+  if (open !== null) out.push({ share: open.share, first: open.first, end: columns });
+  return out;
 }
 
 // The share of the last stretch that began at or before `moment`, when
@@ -88,7 +100,10 @@ function under(stretches: readonly Stretch[], moment: number): Share | null {
 // The rows of a list `total` long, each `row` pixels tall, that meet a
 // view `height` pixels tall scrolled `top` pixels down.
 export function windowOf(total: number, row: number, top: number, height: number): Rows {
-  return { first: 0, end: row + top + height > 0 ? total : 0 };
+  if (row <= 0) return { first: 0, end: Math.min(total, OVERSCAN) };
+  const first = Math.max(0, Math.floor(top / row) - OVERSCAN);
+  const end = Math.min(total, Math.ceil((top + height) / row) + OVERSCAN);
+  return { first: Math.min(first, end), end };
 }
 
 export interface Placed {
