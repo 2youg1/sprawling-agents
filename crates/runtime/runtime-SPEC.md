@@ -1067,39 +1067,30 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 
 ### 8-18 runtime::turn 目录化
 
-**919 行一个文件 → 334（`turn.rs`）＋44＋56＋100＋8＋109＋271＋81。** 切法是「测试迁出＋簇切」，逻辑一行未改，函数签名与公开面逐字节不变。
-
 | 文件 | 管什么 |
 |---|---|
 | `turn.rs` | typestate 载体 `Turn<S>` 与四个相类型，`assemble`／`call`／`record`，以及唯一的中断消费点 `consume_boundary`。`assemble` 与 `call` 带 `argument_count` 豁免，故留在原路径 |
 | `turn/boundary.rs` | 执行器在相变处交出什么、相变答什么：`Interrupt`、`PhaseOutcome`、`TurnCancelled` |
 | `turn/report.rs` | 一轮跑完交给 run loop 的东西与它被给定的调用形状：`TurnReport`、`CallShape` |
+| `turn/recovery.rs` | 模型调用的恢复管线（§8-49） |
+| `turn/prompt.rs` | 一次 run 的 prompt 材料 `RunPrompt`，`assemble` 的入参 |
+| `turn/speculation.rs` | 生成中起跑只读调用的门与缓存（§8-3） |
 | `turn/wave.rs` | 边界 3：`impl Turn<ToolWave>` 的工具波，只读前缀并行执行，按调用序入账 |
 | `turn/ledger.rs` | 本模块通往账本的唯一一道门：`Journal`、`Authored`、`Carried`（§8-41） |
 | `turn/tests.rs` | 纯索引 |
 | `turn/tests/helpers.rs` | 三处共用的夹具：`TestLedger`、`OneShotModel`、`prefix`／`run_id`／`shape`／`advance`／`probe_call` |
-| `turn/tests/phases.rs` | 四个边界跑在真账本链上（5 个 `#[test]`） |
-| `turn/tests/concurrent.rs` | 只读前缀并行：波内停下只起跑停点之前的调用，steer 落在串行波写它的位置，两者账本字节与串行一致（2 个 `#[test]`） |
-| `turn/tests/window.rs` | 开场白与 steer 在窗口里留下什么（3 个 `#[test]`） |
-| `turn/tests/redaction.rs` | 工具参数与工具结果里的密钥进不了账本，其余字段完好（2 个 `#[test]`） |
-
-**开放的字段（均为 `pub(super)`，仅供 `turn.rs` 构造）**：`TurnCancelled.refs`；`TurnReport.refs`、`TurnReport.model_returned`、`TurnReport.calls_made`、`TurnReport.assistant`、`TurnReport.wave_results`。构造点仍只有 `consume_boundary` 与 `Turn::<Recording>::record` 两处，getter 仍是唯一读法；`wave.rs` 不需要开任何字段，因为子模块本就能看见父模块的私有项。
-
-**api-baseline 重写了。** `Interrupt`／`PhaseOutcome`／`TurnCancelled`／`TurnReport` 的定义位置移进私有子模块后，`cargo public-api` 改印 `lib.rs` 的再导出路径（`runtime::TurnReport`），而非 `runtime::turn::TurnReport`。是同一项换了规范路径，不是公开面变化：`pub use turn::{…}` 与 `pub mod turn` 都没动，调用方一行 `use` 未改。
+| `turn/tests/phases.rs` | 四个边界跑在真账本链上 |
+| `turn/tests/concurrent.rs` | 只读前缀并行：波内停下只起跑停点之前的调用，steer 落在串行波写它的位置，两者账本字节与串行一致 |
+| `turn/tests/window.rs` | 开场白与 steer 在窗口里留下什么 |
+| `turn/tests/redaction.rs` | 工具参数与工具结果里的密钥进不了账本，其余字段完好 |
 
 ### 8-19 runtime::bench 目录化
 
-**740 → 254（`bench.rs`）＋215（`bench/admit.rs`）＋288（`bench/tests.rs`）。** 形状与 8-3 的 bench 行一致（形状 1 判定），三条必要前提次序未动。
-
 | 文件 | 管什么 |
 |---|---|
-| `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`grant`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_memory` |
+| `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_memory` |
 | `bench/admit.rs` | 门：`admit` 按 `Effect` 分派到 Write／Connector／Egress／Spawn／Govern 各门，`settled`／`crossed` 把一次判定翻译成 `BenchOutcome`，`scanned` 为两扇朝外的门备好密钥扫描的字节 |
-| `bench/tests.rs` | 去重、门、taint、fence 与注册冲突的夹具（8 个 `#[test]`） |
-
-**无字段开放。** 子模块本就能看见父模块的私有项，故 `ToolBench` 的字段一个都没动；唯一的可见性改动是 `fn admit` → `pub(super) fn admit`，因为它现在由父文件的 `invoke` 调用。
-
-**api-baseline 未重写。** 搬走的都是私有项，公开面逐字节不变。
+| `bench/tests.rs` | 去重、门、taint、fence 与注册冲突的夹具 |
 
 ### 8-20 runtime::replay 目录化
 
@@ -1109,79 +1100,47 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 |---|---|
 | `replay.rs` | `VerifiedLine`／`VerifiedLedger`／`Envelope`，以及 `verify_lines`／`verify_ledger_dir`／`fold_ledger_dir`／`rebuild_prefix`。它同时是子模块的父模块，声明 `mod resume;` 并 `pub use resume::{dangling_tool_calls, outcome_unknown_draft};`，因此 crate 内外的 `use` 一行未改 |
 | `replay/resume.rs` | 崩溃恢复这一条规则的两次读法：`dangling_tool_calls` 认出结果未知的调用，`outcome_unknown_draft` 写下关掉它的那一行（`E_TOOL_OUTCOME_UNKNOWN`）。什么算悬空决定关帐行说什么，故同一个文件 |
-| `replay/tests.rs` | 离线验证拒绝什么：更高的 `v`、无 `ig:true` 的未知 kind、漂移的 prefix 源文档、悬空的 tool_called（5 个 `#[test]`） |
-
-**无字段开放。** `resume.rs` 经 `use super::{VerifiedLedger, VerifiedLine}` 读父模块的公开类型，`VerifiedLedger` 的私有字段一处也没放宽；`mod tests` 上原有的 `#[allow(...)]` 清单仍落在 `mod tests;` 声明上。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+| `replay/tests.rs` | 离线验证拒绝什么：更高的 `v`、无 `ig:true` 的未知 kind、漂移的 prefix 源文档、悬空的 tool_called |
 
 ### 8-21 runtime::prefix 目录化
-
-**546 → 391（`prefix.rs`）＋159（`prefix/tests.rs`）。** 只做测试迁出：四段构建与冻结前缀的生产代码本就在 400 行以内，不需要簇切，函数签名、类型与公开面一行未改。
 
 | 文件 | 管什么 |
 |---|---|
 | `prefix.rs` | `SegmentSlot`／`FrozenSegment`／`SourceDoc`／`SegmentCaps`／`PrefixPlan`／`FrozenPrefix`，以及 `build_prefix`／`build_segment`／`truncation_marker`／`DOC_JOIN` 与 `system_blocks`／`segment_hashes`／`prompt_payload` |
-| `prefix/tests.rs` | 冻结前缀保证什么：槽位次序、同输入同哈希、跨段去重与跳过入账、截断标记与字符边界、账本只记计划里的断点（8 个 `#[test]`） |
-
-**无字段开放。** 子模块本就能看见父模块的私有项，`mod tests` 上原有的 `#[allow(...)]` 清单原样搬到 `mod tests;` 声明上。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+| `prefix/tests.rs` | 冻结前缀保证什么：槽位次序、同输入同哈希、跨段去重与跳过入账、截断标记与字符边界、账本只记计划里的断点 |
 
 ### 8-22 runtime::tools::edit 目录化
-
-**522 → 335（`tools/edit.rs`）＋191（`tools/edit/tests.rs`）。** 只做测试迁出：乐观并发、写域双闸、创建臂与最小 unified diff 的生产代码本就在 400 行以内，不需要簇切，函数签名、类型与公开面一行未改。
 
 | 文件 | 管什么 |
 |---|---|
 | `tools/edit.rs` | `EditTool` 与 `version_of`／`CREATES`：`new` 的参数模式声明、`Tool::invoke` 的判定次序（工具身份→地址→写域→版本→匹配数→落盘），创建臂 `create`，以及 `unified_diff`／`common_prefix`／`common_suffix` |
-| `tools/edit/tests.rs` | edit 拒绝什么、回显什么：版本相符的落盘与 diff、陈旧版本、创建臂两种冲突、写域外与非法地址、缺文件的恢复话术、零次与多次匹配、错路由（9 个 `#[test]`） |
-
-**无字段开放。** 子模块本就能看见父模块的私有项，`mod tests` 上原有的 `#[allow(...)]` 清单原样搬到 `mod tests;` 声明上。
-
-**api-baseline 未重写。** 公开项 `EditTool`／`version_of` 的定义位置未动，规范路径不变。
+| `tools/edit/tests.rs` | edit 拒绝什么、回显什么：版本相符的落盘与 diff、陈旧版本、创建臂两种冲突、写域外与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
 
 ### 8-23 runtime::run 目录化
-
-**468 行一个文件 → 225（`run.rs`）＋264（`run/lifecycle.rs`）。** run.rs 无测试，故做的是簇切：把 `impl Run<Active>` 整块搬进子模块，逻辑一行未改，函数签名与公开面逐字节不变。
 
 | 文件 | 管什么 |
 |---|---|
 | `run.rs` | 一个 Run 的常量与状态类型（`RunPlan`／`SafePoint`／`Advance`／`RunHooks`／`Active`／`Frozen`／`Run<S>`）、`impl Run<Frozen>` 的三个读法、载荷构造 `payload`，以及驱动循环 `drive`。`drive` 带 `argument_count` 豁免，故留在原路径 |
 | `run/lifecycle.rs` | 一个活着的 Run 在账本上做的三件事：`dispatch` 的调度对（job pin＋run_started）、`advance` 的一回合（四个安全点、波前围栏、报告前推入窗），以及唯一出口 `freeze`（handoff_written＋run_frozen）；连同只有 `advance` 用得上的 `fold_steer` |
 
-**无字段开放。** 子模块本就能看见父模块的私有项，故 `Run`／`Active`／`Frozen` 的字段与 `fn payload` 的可见性一个都没动。
-
-**`impl Run<Active>` 保持为一整块，不按 dispatch／advance／freeze 三分。** 先试过三个文件，`cargo public-api` 立刻按 impl 块计数印出六行 `impl runtime::run::Run<runtime::run::Active>`（原为两行）——那是公开面输出的变化而不是规范路径重拼，故收回为一个子模块一个 impl 块。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+**`impl Run<Active>` 保持为一整块，不按 dispatch／advance／freeze 三分**：`cargo public-api` 按 impl 块计数，三分会让公开面输出多出四行而规范路径不变。
 
 ### 8-24 runtime::digest 目录化
-
-**449 行一个文件 → 321（`digest.rs`）＋132（`digest/tests.rs`）。** 切法只用了「测试迁出」：非测试部分本就在 400 行以内，逻辑一行未改，函数签名与公开面逐字节不变。
 
 | 文件 | 管什么 |
 |---|---|
 | `digest.rs` | 摘要管线本身：`StructureNode`／`Digest`／`Breaker`／`BreakerVerdict`／`DigestOutcome`，纯函数 `structure_of` 与 `close_deeper`，以及唯一入口 `digest_once`。`digest_once` 带 `argument_count` 豁免，故留在原路径 |
-| `digest/tests.rs` | 摘要对读者的四个承诺：标题树跳过代码围栏、模型写下的散文永远 suspect、同一内容哈希一生只摘要一次、熔断器计次开合（5 个 `#[test]`，与切前相等） |
-
-**无字段开放。** 子模块本就能看见父模块的私有项，故 `Digest` 的 `source`／`origin`／`structure`／`prose` 可见性一个都没动。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+| `digest/tests.rs` | 摘要对读者的四个承诺：标题树跳过代码围栏、模型写下的散文永远 suspect、同一内容哈希一生只摘要一次、熔断器计次开合 |
 
 ### 8-25 runtime::sandbox 目录化
 
-**缝与唯一一个真适配器分家。** `sandbox.rs` 先前把 wasmtime 适配器整个内联成 `mod engine { … }`，两百余行 wasmtime 专属代码压在缝的定义下面，文件因而越过 400 行上限。现在缝留在父文件，适配器有自己的文件。
+**缝与唯一一个真适配器分家**：缝留在父文件，两百余行 wasmtime 专属代码在适配器自己的文件里。
 
 | 文件 | 管什么 |
 |---|---|
 | `sandbox.rs` | 执行边界本身：`Fuel`／`Mount`／`SandboxJob`／`SandboxOutcome`／`SandboxExit`／`Sandbox` 缝，缺席判词 `AbsentSandbox`，两个替身 `EchoSandbox`／`FaultSandbox`，以及 feature `conformance` 下的 `assert_sandbox_conformance`。它声明 `#[cfg(feature = "wasm")] mod engine;` 并原样保留 `pub use engine::WasmtimeSandbox;` |
 | `sandbox/engine.rs` | 唯一会真跑 guest 的适配器：`WasmtimeSandbox`（引擎配置、预开目录、燃料预算、stdio 管道）、host 侧拒词构造 `host_error`，以及把引擎的收场判成 `SandboxExit` 的 `classify` |
-| `sandbox/tests.rs` | 两个替身对调用方的承诺：直通替身回声 stdin 并记下 job、故障替身按序发脚本且发完即止（2 个 `#[test]`，与切前相等） |
-
-**无字段开放。** `engine.rs` 与内联时一样经 `use super::{…}` 取缝的类型，`EchoSandbox.scripted`／`FaultSandbox.scripted` 的可见性没动。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+| `sandbox/tests.rs` | 两个替身对调用方的承诺：直通替身回声 stdin 并记下 job、故障替身按序发脚本且发完即止 |
 
 ### 8-26 runtime::tools::exec 目录化
 
@@ -1191,11 +1150,7 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 |---|---|
 | `tools/exec.rs` | 三臂本身：`ExecTool`（`new` 与 `run_program`／`run_python`／`run_shell`／`through_the_backlog`／`inherited_environment`）、环境白名单 `ENV_ALLOWLIST`、臂解析 `parse_arm`，以及 `impl Tool for ExecTool` 的路由。它声明 `mod outcome;` 并 `use outcome::{backgrounded, exceptional, settled, with_backlog, with_environment};` |
 | `tools/exec/outcome.rs` | 这把工具能给出的每一种回答的形状：`settled`（原名 `outcome`，模块名占了这个词故改用动词过去式）、`backgrounded`、`exceptional` 三种载荷，以及 `with_backlog`／`with_environment` 两条尾巴。全部 `pub(super)`，不出 `tools::exec` |
-| `tools/exec/tests.rs` | 每条臂对调用方的承诺：缺件时点名替代方案而拒绝、python 臂在沙盒里跑并报自己的退出码、燃料耗尽与 trap 原样抵达、无法识别的臂只拒不猜、program 臂真起子进程且环境被洗（5 个 `#[test]`，与切前相等）|
-
-**无字段开放。** 结果构造函数全部 `pub(super)`；测试是子模块，父模块的私有字段与私有方法本就可见。
-
-**api-baseline 未重写。** 公开项 `ExecTool`／`parse_arm` 的定义位置未动，规范路径不变。
+| `tools/exec/tests.rs` | 每条臂对调用方的承诺：缺件时点名替代方案而拒绝、python 臂在沙盒里跑并报自己的退出码、燃料耗尽与 trap 原样抵达、无法识别的臂只拒不猜、program 臂真起子进程且环境被洗|
 
 ### 8-27 runtime::sieve（形状 1 判定＋形状 6 数据面；**本节是压缩器的唯一权威**）
 
