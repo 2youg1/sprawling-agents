@@ -141,12 +141,23 @@ fn a_call_carries_the_ledger_times_it_was_called_and_answered() {
 #[test]
 fn a_turn_carries_the_model_its_model_called_named() {
     let events = [
-        record(1, EventKind::ModelCalled, serde_json::json!({ "segments": [], "model": "big-1" })),
-        record(2, EventKind::ModelCalled, serde_json::json!({ "segments": [], "model": "small-2" })),
+        record(
+            1,
+            EventKind::ModelCalled,
+            serde_json::json!({ "segments": [], "model": "big-1" }),
+        ),
+        record(
+            2,
+            EventKind::ModelCalled,
+            serde_json::json!({ "segments": [], "model": "small-2" }),
+        ),
         asked(3),
     ];
     let models: Vec<_> = turns(&events).into_iter().map(|turn| turn.model).collect();
-    assert_eq!(models, [Some("big-1".to_owned()), Some("small-2".to_owned()), None]);
+    assert_eq!(
+        models,
+        [Some("big-1".to_owned()), Some("small-2".to_owned()), None]
+    );
 }
 
 #[test]
