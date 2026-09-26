@@ -94,6 +94,7 @@ impl RunWorker {
                     parent: None,
                     succession: None,
                     taint: kernel::TaintSet::empty(),
+                    dispatched_by: kernel::event::Who::Person,
                 },
                 Asked { task, goal },
                 reply,

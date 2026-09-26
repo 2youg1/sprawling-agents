@@ -89,6 +89,7 @@ fn plan(window: u64) -> RunPlan {
         job: Locator::parse(&format!("file:{}/JOB.md@{}", addr.as_str(), "a".repeat(40))).unwrap(),
         parent: None,
         predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
         inherited: Vec::new(),
         shape: CallShape {
             model: "metered".to_owned(),

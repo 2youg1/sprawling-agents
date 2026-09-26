@@ -42,13 +42,14 @@
         called: TimeMs.make(at + 1_000 + c * 600),
         answered: TimeMs.make(at + 1_400 + c * 600),
       }));
-      const notes: Note[] = n === 17 ? [{ waiting: { at: Seq.make(n * 100 + 99) } }] : [];
+      const notes: Note[] = n === 17 ? [{ waiting: { at: Seq.make(n * 100 + 99), t: TimeMs.make(at + 4_000), answered: TimeMs.make(at + 9_000) } }] : [];
       const turn: Turn = {
         calls,
         notes,
         number: n + 1,
         opened: Seq.make(n * 100),
         t: TimeMs.make(at),
+        model: n < 30 ? "large-1" : "small-2",
         used: { input: Tokens.make(12_000 + n * 400), output: Tokens.make(900 + n * 20), cached: Tokens.make(n * 300) },
         spent: UsdMicros.make(40_000 + n * 1_000),
       };
@@ -78,6 +79,7 @@
     doing={{ kind: "calling", tool: "exec", subject: "just check" }}
     closing={null}
     room={ROOM}
+    dispatchedBy="person"
     from={START}
     to={endOf(LIVE)}
   />
@@ -90,6 +92,7 @@
     doing={{ kind: "frozen", completion: "done" }}
     closing={{ at: TimeMs.make(endOf(LONG)), completion: "done" }}
     room={ROOM}
+    dispatchedBy="shop/planner"
     from={START}
     to={endOf(LONG)}
   />

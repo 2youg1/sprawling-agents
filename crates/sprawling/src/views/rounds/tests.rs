@@ -139,6 +139,28 @@ fn a_call_carries_the_ledger_times_it_was_called_and_answered() {
 }
 
 #[test]
+fn a_turn_carries_the_model_its_model_called_named() {
+    let events = [
+        record(
+            1,
+            EventKind::ModelCalled,
+            serde_json::json!({ "segments": [], "model": "big-1" }),
+        ),
+        record(
+            2,
+            EventKind::ModelCalled,
+            serde_json::json!({ "segments": [], "model": "small-2" }),
+        ),
+        asked(3),
+    ];
+    let models: Vec<_> = turns(&events).into_iter().map(|turn| turn.model).collect();
+    assert_eq!(
+        models,
+        [Some("big-1".to_owned()), Some("small-2".to_owned()), None]
+    );
+}
+
+#[test]
 fn a_call_still_running_says_so_rather_than_looking_finished() {
     let events = [asked(1), called(2, "a", "exec", "cargo build")];
     assert_eq!(turns(&events)[0].calls[0].outcome, Outcome::Waiting);
@@ -311,6 +333,7 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
                 "task": "plan the week",
                 "goal": "a roadmap",
                 "job": "file:hall/mayor@0123456789abcdef0123456789abcdef01234567",
+                "dispatched_by": "person",
             }),
             TimeMs::new(10),
         ),
@@ -344,10 +367,16 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
     let channels::Answer::Rounds(answer) = views.answer(&channels::Query::Rounds { run }) else {
         panic!("Rounds answers with rounds");
     };
-    let opening = answer.opening.expect("the window held run_started");
-    assert_eq!(opening.task, "plan the week");
-    assert_eq!(opening.goal, "a roadmap");
-    assert_eq!(opening.at, TimeMs::new(10));
+    assert_eq!(
+        answer.opening,
+        Some(channels::Opening {
+            task: "plan the week".to_owned(),
+            goal: "a roadmap".to_owned(),
+            at: TimeMs::new(10),
+            dispatched_by: Some(kernel::event::Who::Person),
+        }),
+        "the opening carries who dispatched the run, as run_started records it"
+    );
     let closing = answer.closing.expect("the window held run_frozen");
     assert_eq!(closing.completion, "done");
     assert_eq!(closing.at, TimeMs::new(12));

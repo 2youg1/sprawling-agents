@@ -54,6 +54,10 @@ pub struct RunPlan {
     /// fact folded from the ledger rather than inferred from two runs
     /// sharing an address.
     pub predecessor: Option<RunId>,
+    /// Who dispatched this run, written into `run_started`: the line's
+    /// author is always the city's desk, so only the dispatch site
+    /// knows whether the person, the city or a resident sent it.
+    pub dispatched_by: kernel::event::Who,
     /// The conversation this run starts from, when it is the first run of
     /// a session that branched off another. Empty for every other run.
     ///

@@ -48,6 +48,7 @@ fn plan() -> RunPlan {
         job,
         parent: None,
         predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
         inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),

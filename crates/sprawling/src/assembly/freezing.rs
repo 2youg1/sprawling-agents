@@ -305,6 +305,7 @@ impl RunWorker {
             job: job.clone(),
             parent: at.parent,
             predecessor: at.predecessor(),
+            dispatched_by: at.dispatched_by.clone(),
             inherited,
             shape: runtime::turn::CallShape {
                 model: site.model.id.clone(),

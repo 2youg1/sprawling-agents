@@ -2087,6 +2087,7 @@ pub kernel::event::record::RunForked::at_seq: kernel::Seq
 pub kernel::event::record::RunForked::from: kernel::RunId
 pub kernel::event::record::RunFrozen::completion: alloc::string::String
 pub kernel::event::record::RunFrozen::evidence: core::option::Option<alloc::vec::Vec<kernel::event::record::EvidenceCite>>
+pub kernel::event::record::RunStarted::dispatched_by: core::option::Option<kernel::event::Who>
 pub kernel::event::record::RunStarted::goal: alloc::string::String
 pub kernel::event::record::RunStarted::job: core::option::Option<kernel::locator::Locator>
 pub kernel::event::record::RunStarted::parent: core::option::Option<kernel::RunId>

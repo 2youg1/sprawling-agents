@@ -314,6 +314,7 @@ impl RunWorker {
             parent: None,
             succession: None,
             taint: because.taint(),
+            dispatched_by: kernel::event::Who::City,
         };
         let reason = because.because();
         match self.dispatch_into_lane(at, task, goal, Owing::unasked(because)) {

@@ -128,6 +128,7 @@ impl RunWorker {
                     origin: None,
                     succession: None,
                     taint: kernel::TaintSet::empty(),
+                    dispatched_by: kernel::event::Who::City,
                 },
                 format!("Plan node {next}: {item}"),
                 goal,

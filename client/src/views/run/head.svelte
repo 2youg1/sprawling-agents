@@ -19,21 +19,26 @@
   import { clock, count, lasted, usd } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, Closing, Turn } from "../../wire";
-  import { figuresOf } from "./lanes";
+  import { figuresOf, modelsOf } from "./lanes";
 
   interface Props {
     readonly turns: readonly Turn[];
     readonly doing: Doing | undefined;
     readonly closing: Closing | null;
     readonly room: Address | null;
+    // Who sent the run, as its run_started records it: `person`, `city`
+    // or the address of the resident that did; null when the ledger
+    // does not say.
+    readonly dispatchedBy: string | null;
     // The first and last moments the page knows of, in ms.
     readonly from: number | null;
     readonly to: number | null;
   }
 
-  const { turns, doing, closing, room, from, to }: Props = $props();
+  const { turns, doing, closing, room, dispatchedBy, from, to }: Props = $props();
   const lang = ui().lang;
   const figures = $derived(figuresOf(turns));
+  const models = $derived(modelsOf(turns));
 </script>
 
 <dl
@@ -64,6 +69,14 @@
     <dd class="font-mono text-text">{usd(figures.usd)}</dd>
     <dd class="text-text-quiet">{fill(say($lang, "run_head_turns"), { n: String(turns.length) })}</dd>
   </div>
+  {#if models.length > 0}
+    <div class="flex min-w-0 flex-wrap items-baseline gap-x-snug">
+      <dt class="text-text-quiet">{say($lang, "run_head_model")}</dt>
+      {#each models as model (model)}
+        <dd class="min-w-0 truncate font-mono text-text">{model}</dd>
+      {/each}
+    </div>
+  {/if}
   {#if room !== null}
     <div class="flex min-w-0 flex-wrap items-baseline gap-x-snug">
       <dt class="text-text-quiet">{say($lang, "run_head_origin")}</dt>
@@ -74,6 +87,12 @@
         <span class="text-text-disabled">/</span>
         <a href={toFragment({ kind: "talk", address: room })} class="text-text">{roomOf(room)}</a>
       </dd>
+    </div>
+  {/if}
+  {#if dispatchedBy !== null}
+    <div class="flex min-w-0 flex-wrap items-baseline gap-x-snug">
+      <dt class="text-text-quiet">{say($lang, "run_head_dispatched_by")}</dt>
+      <dd class="min-w-0 truncate font-mono text-text">{dispatchedBy}</dd>
     </div>
   {/if}
 </dl>

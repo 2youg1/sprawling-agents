@@ -28,6 +28,7 @@
   **当前 golden**：`1efcbe95ee51b1c9efaee07d21d95824d714604c1974e8b41b2ec3dfdbbe725a`；**WIRE_V ＝ 39**（`Dispatch` 可点名这一次的模型 → §8-48；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::NewestRelease` → §8-36、§8-47；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   **当前 golden**：`05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7`；**WIRE_V ＝ 40**（一行 run 带上结局、PR 分支与所等之事 `RunSummary.completion`／`pr`／`ask` → §8-48；一次工具调用的起止时刻 `Call.called`／`Call.answered` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 38**（回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43；性能监视器的一对帧 `ClientFrame::Monitor`／`ServerFrame::Monitor` → §8-47）。
+  **当前 golden**：`05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7`；**WIRE_V ＝ 40**（一次 run 由谁派来 `Opening.dispatched_by` → §8-48；一次工具调用的起止时刻 `Call.called`／`Call.answered` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -908,7 +909,8 @@ pub struct CityAnswer { ..., pub halted: Vec<String> }
 // RoundsAnswer 多开场与收场
 pub struct RoundsAnswer { pub run: RunId, pub turns: Vec<Turn>, pub opened_at: Option<GitOid>,
                           pub opening: Option<Opening>, pub closing: Option<Closing> }
-pub struct Opening { pub task: String, pub goal: String, pub at: TimeMs }
+pub struct Opening { pub task: String, pub goal: String, pub at: TimeMs,
+                     pub dispatched_by: Option<Who> }   // §8-48
 pub struct Closing { pub completion: String, pub at: TimeMs }
 
 // Query 第 21、22 条（声明序，QUERY_NAMES 同序追加）
@@ -1334,6 +1336,7 @@ impl Committed {
 - **读数**：`instrument_fanout_cpu_per_event`（`--release --run-ignored only`）在 1／4／16 个订阅者上量每事件的 CPU，门槛是 16 个订阅者的每事件代价不超过 1 个订阅者的两倍——即序列化只算一次，不随标签页数增长。门槛取比值而不取绝对值，因为绝对值随机器档次变；现在的每事件代价由那一次 `EventRecord` 序列化主导（约 10 µs 量级），16 个订阅者时 ≤ 1 µs 是下一条的目标，不是现在成立的性质。
 - 这份帧目前由 `EventRecord` 序列化而来；改为直接取 `append_all` 写下的账本行字节（使广播环只留一份字节，`Lagged` 补拉亦回账本字节）是本接口的下一步，前提是账本行与 `serde_json::to_vec(&EventRecord)` 逐字节相等——同一条守护夹具会判定它。
 ### 8-47 `WIRE_V` 39：一次工具调用带上它的起止时刻
+### 8-47 `WIRE_V` 39：一次工具调用带上它的起止时刻，一个回合带上它问的模型与它开始等人的时刻
 
 ```rust
 pub struct Call {
@@ -1341,11 +1344,36 @@ pub struct Call {
     pub called: TimeMs,            // tool_called 那条记录的 t
     pub answered: Option<TimeMs>,  // 配对上的 tool_result 那条记录的 t；未答为 None
 }
+pub struct Turn {
+    // …既有字段…
+    pub model: Option<String>,     // 开这个回合的 model_called 记下的 model
+}
+pub enum Note {
+    // …
+    Waiting { at: Seq, t: TimeMs, answered: Option<TimeMs> },
+    // t：approval_requested 那条记录的 t；answered：按 approval id 配上的 approval_resolved 的 t
+}
 ```
 
 - **时刻读自账本记录，不读此处的时钟**：与 `Turn.t` 同理，重放的会话报它当初的时刻。`called` 不是 `Option`：一次调用由一条 `EventRecord` 折出，它总带读数。`answered` 与 `outcome` 同时写、同一次配对——`outcome` 为 `Waiting` 时它必为 `None`，窗口外答的调用也是 `None`，不猜。
 - **为什么要上线**：run 页的时间透镜原本只能按回合着色，一个回合里模型说话与工具运行各占多久，线上没有数；有了这两个时刻，透镜画的是量出来的段，而不是按回合结局推断的整段。
 - **被否：只带一个时长**。时长丢了起点，页面画不出调用在时间轴上的位置，也就排不出并发的两次调用。
+- **模型名挂在回合上，不挂在答案上**：`model_called` 每问一次记一次 `model`，一次 run 中途换模型（降级、换端点）时，逐回合的名字才是账本写下的事实；run 页统计栏的「模型」格取最后一个回合的名字，前后不同时列出各个名字。读法与 `Call.subject` 同：取那一键的文本，读不出为 `None`，页面不画名字而不猜。
+- **被否：`RoundsAnswer.model` 一个字段**。那得在折叠里挑一个回合的名字当整次 run 的名字，换过模型的 run 上它说错一半。
+- **等人从哪一刻开始，读自请求记录**：`Note::Waiting.t` 是 `approval_requested` 那条记录的 `t`，与 `Call.called` 同理不是 `Option`。等到哪一刻结束是 `answered`：`approval_resolved` 记在城自己的 run 下，服务端按 approval id 把它配回请求（sprawling-SPEC §8-50-1），配不上为 `None`，不猜。
+
+### 8-48 `WIRE_V` 40：一次 run 的开头带上由谁派来
+
+```rust
+pub struct Opening {
+    // …既有字段…
+    pub dispatched_by: Option<Who>,  // run_started 的 dispatched_by；缺键为 None
+}
+```
+
+- **派活者写在 `run_started` 的载荷里，不读那条记录的作者**：`run_started` 的作者恒为 `city`——是城的派活台写下这一行——所以作者说不出这次 run 是人派的、城按日程与计划派的，还是一个居民委派、接替或敲门派的。派活处各自知道答案：人下的 `Dispatch` 写 `person`；计划节点、日程、外来到达与人刚放行的活写 `city`；委派写委派者的地址，接替写前任的地址，敲门叫醒写敲门者的地址。`runtime::RunPlan.dispatched_by` 把它从派活处带到 `run_started`，线上的 `Opening` 原样转述。
+- **旧账本里没有这个键**，读作 `None`，页面不画「由谁派来」而不猜。
+- **被否：从 `parent`／`predecessor` 推断**。那两个键只说明委派与接替，人派的与城派的在账本里长得一样，推断在最常见的两种派活上答不出来。
 
 ### 8-48 `WIRE_V` 40：一行 run 带上它的结局、它开的 PR 与它等的事
 

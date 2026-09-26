@@ -327,6 +327,7 @@ fn inheriting_a_branch_does_not_verify_the_history() {
         parent: None,
         succession: None,
         taint: kernel::TaintSet::empty(),
+        dispatched_by: kernel::event::Who::Person,
         origin: Some(origin),
     };
 

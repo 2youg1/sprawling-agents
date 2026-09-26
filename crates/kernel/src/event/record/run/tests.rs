@@ -70,6 +70,7 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
         job: Some(job()),
         parent,
         predecessor,
+        dispatched_by: None,
         skills: vec![
             SkillPin {
                 name: "read".to_owned(),

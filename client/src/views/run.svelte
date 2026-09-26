@@ -371,6 +371,7 @@
     {turns}
     doing={shown?.doing}
     closing={rounds?.closing ?? null}
+    dispatchedBy={rounds?.opening?.dispatched_by ?? null}
     {room}
     {from}
     {to}

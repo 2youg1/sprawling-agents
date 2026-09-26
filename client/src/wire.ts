@@ -1941,6 +1941,7 @@ export type Closing = typeof Closing.Type;
  */
 export const Opening = Schema.Struct({
   at: TimeMs,
+  dispatched_by: Schema.optional(Schema.NullOr(Schema.String)),
   goal: Schema.String,
   task: Schema.String,
 }).annotations({ identifier: "Opening" });
@@ -2014,7 +2015,9 @@ export const Note = Schema.Union(
   }),
   Schema.Struct({
     waiting: Schema.Struct({
+      answered: Schema.optional(Schema.NullOr(TimeMs)),
       at: Seq,
+      t: TimeMs,
     }),
   }),
   Schema.Struct({
@@ -2059,6 +2062,7 @@ export type Used = typeof Used.Type;
  */
 export const Turn = Schema.Struct({
   calls: Schema.Array(Call),
+  model: Schema.optional(Schema.NullOr(Schema.String)),
   notes: Schema.Array(Note),
   number: Schema.Int,
   opened: Seq,
