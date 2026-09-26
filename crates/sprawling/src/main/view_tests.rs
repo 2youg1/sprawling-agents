@@ -90,14 +90,14 @@ fn write_city_ledger(dir: &Path) -> Vec<Vec<u8>> {
     for (seq, (run, addr, kind, data)) in script.into_iter().enumerate() {
         let draft = EventDraft {
             run,
-            t: TimeMs::new(seq as u64),
+            t: TimeMs::new(u64::try_from(seq).unwrap()),
             who: "tester".to_owned(),
             addr,
             kind,
             data: Payload::new(data.as_object().cloned().unwrap()).unwrap(),
             ig: false,
         };
-        let line = EventRecord::from_draft(draft, Seq::new(seq as u64), prev)
+        let line = EventRecord::from_draft(draft, Seq::new(u64::try_from(seq).unwrap()), prev)
             .canonical_line()
             .unwrap();
         prev = B3Hash::digest(&line);

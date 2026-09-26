@@ -116,8 +116,25 @@ impl Selection {
     /// Whether one raw Ledger line passes the conditions that read its
     /// bytes; the run and the lower seq bound are settled by the walk.
     fn admits(&self, line: &[u8]) -> Result<bool, AxError> {
-        let _ = line;
-        Ok(true)
+        if let Some(text) = &self.grep
+            && !text.is_empty()
+            && !line
+                .windows(text.len())
+                .any(|window| window == text.as_bytes())
+        {
+            return Ok(false);
+        }
+        if self.kind.is_none() && self.who.is_none() {
+            return Ok(true);
+        }
+        let record = EventRecord::parse_line(line)?;
+        let kind_holds = self.kind.is_none_or(|kind| record.kind() == kind);
+        let who_holds = self.who.as_deref().is_none_or(|prefix| {
+            record
+                .addr()
+                .is_some_and(|addr| addr.as_str().starts_with(prefix))
+        });
+        Ok(kind_holds && who_holds)
     }
 }
 
