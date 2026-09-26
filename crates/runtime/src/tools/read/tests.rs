@@ -345,3 +345,34 @@ fn a_link_is_judged_by_where_it_lands() {
         );
     }
 }
+
+/// The reading room admits a package whole: `<name>/<path>` opens a file
+/// beside the package's `SKILL.md`, and a path that climbs out of the
+/// package is refused rather than resolved.
+#[test]
+fn a_package_the_reading_room_admits_opens_by_name_and_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let package = dir.path().join(".sprawling").join("library").join("review");
+    std::fs::create_dir_all(package.join("scripts")).unwrap();
+    std::fs::write(package.join("SKILL.md"), "check the diff first\n").unwrap();
+    std::fs::write(package.join("scripts").join("check.sh"), "git diff\n").unwrap();
+    std::fs::write(dir.path().join(".sprawling").join("CONFIG.toml"), "x\n").unwrap();
+    let (mut tool, catalog) = tool(dir.path());
+    catalog
+        .lock()
+        .unwrap()
+        .admit_skill(CatalogEntry {
+            name: "review".to_owned(),
+            disclosure: "how this building reviews".to_owned(),
+            expansion: ".sprawling/library/review/SKILL.md".to_owned(),
+            hash: None,
+        })
+        .unwrap();
+
+    let outcome = tool.invoke(&call("review/scripts/check.sh")).unwrap();
+    assert_eq!(outcome.result.as_map()["text"], "git diff\n");
+    for climbing in ["review/../../CONFIG.toml", "review/./SKILL.md", "review/"] {
+        let err = tool.invoke(&call(climbing)).unwrap_err();
+        assert_eq!(err.code(), &AxCode::InvalidArgs, "{climbing} was opened");
+    }
+}

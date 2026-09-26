@@ -1385,6 +1385,18 @@ const LINE_CAP: u16 = 512;
 
 `resolve` 里「`Address::parse` 后判 `is_reserved`」这一段移进 `runtime::tools::chosen_path`（§8-30-1），`read` 与新的 `search` 同调它。理由是一条硬约束：模型选的路径能不能到保留区，全城只允许有一个答案与一组测试。
 
+#### 8-29-3 一件藏品是一个目录：`<名>/<相对路径>`（`runtime::tools::read::package`）
+
+```rust
+// read::package
+pub(super) fn open_in_package(catalog: &Catalog, asked: &str) -> Option<Result<Address, AxError>>;
+```
+
+- **阅览室准入的是整个包**：catalog 条目的落点以 `/SKILL.md` 收尾时，它是一个包（city-SPEC §8-8），`<名>/<相对路径>` 打开包目录下的那个文件。准入是人写阅览室时做的，所以包内文件与 `SKILL.md` 一样不经读界与保留区判定——它们住在同一个被准入的目录里。
+- **名字在前、路径在后，名字先查 catalog**：与整名命中同一条理由（§8-29 起首），一个恰好同名的城内目录遮不住它。首段不是 catalog 里的包（没有这个名字，或它是单份文档）即返回 `None`，交回普通路径那条路。
+- **相对路径逐段判形，不做规范化**：空段、`.`、`..`、带反斜杠或冒号的段一律 `E_INVALID_ARGS`，恢复语说出「包内相对路径，只用普通段」。规范化会把一条爬出包的路径「修」成另一条，而拒绝让写错的那一方看见自己写了什么。
+- **没有 catalog 锁就没有包**：锁中毒时整名命中一样落空，两条路同一个口径。
+
 ### 8-30 runtime::tools::search（形状 1 判定＋形状 4 适配器）
 
 **问题**：十三件工具里没有一件能找东西。找一个符号只有两条路——写 Python（要可选的 CPython-WASI 构件，很多机器上根本没有），或走 shell（Windows 上是 `findstr`，而 shell 本身是楼级配置可以关掉的）。旧对话有了一个地址，而**没有检索的地址比没有地址更糟**：模型被告知那里有东西，却够不着。

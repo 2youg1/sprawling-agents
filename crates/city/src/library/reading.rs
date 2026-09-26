@@ -21,10 +21,7 @@ use crate::config_layers::SHELVES_KEY;
 use super::ShelfKey;
 use super::shelf::{Holding, OwnShelf, Shelf, holding_name, plain_name};
 
-/// What a skill on a shelf outside the city is filed as: one directory
-/// per skill, holding this file. It is the layout pi, claude and agents
-/// all use, and the one place this city states it.
-pub(super) const SKILL_FILE: &str = "SKILL.md";
+pub(super) use kernel::layout::SKILL_FILE;
 
 /// Reads one shelf into the map. A shelf that is not there is an empty
 /// shelf: most cities start with nothing settled, and most buildings
@@ -56,21 +53,17 @@ pub(super) fn shelve(
             continue;
         }
         for item in read_dir(&section)? {
-            if item.is_dir() {
-                continue;
-            }
-            let file = spelled(&item)?;
-            let Some(name) = holding_name(&file) else {
+            let Some((name, document)) = filed(&item)? else {
                 continue;
             };
             if !plain_name(&name) {
                 continue;
             }
-            let text = read_holding(&item)?;
+            let text = read_holding(&document)?;
             // The address is read back off the path the layout chose,
             // so a shelf that moves cannot leave the addresses of what
             // sits on it pointing at where it used to be.
-            let addr = address_of(city_root, &item)?;
+            let addr = address_of(city_root, &document)?;
             holdings.insert(
                 ShelfKey::of(&name),
                 Holding::of(name, section_name.clone(), &text, shelf.at(addr)),
@@ -78,6 +71,22 @@ pub(super) fn shelve(
         }
     }
     Ok(())
+}
+
+/// What one item on a section shelf holds, as its name and the document
+/// the catalog reads: `<name>.md` is the document itself, and a package
+/// `<name>/` is its [`SKILL_FILE`], the files beside which stay on the
+/// shelf for `read` to open. A directory without that file is not a
+/// holding, the same as on an external shelf.
+fn filed(item: &Path) -> Result<Option<(String, PathBuf)>, AxError> {
+    if item.is_dir() {
+        let document = item.join(SKILL_FILE);
+        return document
+            .is_file()
+            .then(|| spelled(item).map(|name| (name, document)))
+            .transpose();
+    }
+    Ok(holding_name(&spelled(item)?).map(|name| (name, item.to_path_buf())))
 }
 
 /// Reads one skill off a shelf the city does not keep: one directory per
@@ -224,3 +233,6 @@ pub(super) fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
     out.sort();
     Ok(out)
 }
+
+#[cfg(test)]
+mod tests;

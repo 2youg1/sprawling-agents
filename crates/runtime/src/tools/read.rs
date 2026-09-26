@@ -39,6 +39,8 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
+mod package;
+
 use super::chosen_path::ReadBound;
 use crate::catalog::{Catalog, Expansion};
 
@@ -284,6 +286,11 @@ impl ReadTool {
                 // so it is handed over rather than refused.
                 Expansion::Said { text } => Ok(Found::Text(text)),
             };
+        }
+        if let Ok(catalog) = self.catalog.lock()
+            && let Some(inside) = package::open_in_package(&catalog, asked)
+        {
+            return Ok(Found::File(self.under_city(&inside?)));
         }
         // The judgement every model-chosen path gets, in the one place
         // it is written. `search` asks the same function the same

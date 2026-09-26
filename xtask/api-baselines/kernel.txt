@@ -360,6 +360,7 @@ pub const kernel::layout::JOB_FILE: &str
 pub const kernel::layout::LEDGER_DIR: &str
 pub const kernel::layout::LIBRARY_DIR: &str
 pub const kernel::layout::SESSIONS_DIR: &str
+pub const kernel::layout::SKILL_FILE: &str
 pub const kernel::layout::URBANITE_FILE: &str
 pub const kernel::ledger::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::node_id::NODE_DEPTH_MAX: usize
