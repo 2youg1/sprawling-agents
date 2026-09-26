@@ -22,6 +22,7 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::event::record::{BuildingConfigured, BuildingCreated};
 use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, Payload};
 
@@ -224,16 +225,11 @@ pub fn created_payload(
     building: &Building,
     template: BuildingTemplate,
 ) -> Result<Payload, AxError> {
-    let mut map = serde_json::Map::new();
-    map.insert(
-        "addr".to_owned(),
-        serde_json::Value::String(building.addr().as_str().to_owned()),
-    );
-    map.insert(
-        "template".to_owned(),
-        serde_json::Value::String(template.name().to_owned()),
-    );
-    Payload::new(map)
+    Payload::of(&BuildingCreated {
+        addr: building.addr().clone(),
+        template: template.name().to_owned(),
+        adopted: false,
+    })
 }
 
 /// The ledger record for an adoption.
@@ -241,17 +237,11 @@ pub fn created_payload(
 /// # Errors
 /// Propagates the payload's own refusal to hold what it was given.
 pub fn adopted_payload(building: &Building) -> Result<Payload, AxError> {
-    let mut map = serde_json::Map::new();
-    map.insert(
-        "addr".to_owned(),
-        serde_json::Value::String(building.addr().as_str().to_owned()),
-    );
-    map.insert(
-        "template".to_owned(),
-        serde_json::Value::String(BuildingTemplate::Minimal.name().to_owned()),
-    );
-    map.insert("adopted".to_owned(), serde_json::Value::Bool(true));
-    Payload::new(map)
+    Payload::of(&BuildingCreated {
+        addr: building.addr().clone(),
+        template: BuildingTemplate::Minimal.name().to_owned(),
+        adopted: true,
+    })
 }
 
 /// Which faces of a building's own layer one reconfiguration wrote.
@@ -284,16 +274,13 @@ pub struct Written {
 /// # Errors
 /// Propagates the payload's own refusal to hold what it was given.
 pub fn configured_payload(building: &Building, wrote: Written) -> Result<Payload, AxError> {
-    let mut map = serde_json::Map::new();
-    map.insert(
-        "addr".to_owned(),
-        serde_json::Value::String(building.addr().as_str().to_owned()),
-    );
-    map.insert("sandbox".to_owned(), serde_json::Value::Bool(wrote.sandbox));
-    map.insert("mcp".to_owned(), serde_json::Value::Bool(wrote.mcp));
-    map.insert("desktop".to_owned(), serde_json::Value::Bool(wrote.desktop));
-    map.insert("context".to_owned(), serde_json::Value::Bool(wrote.context));
-    Payload::new(map)
+    Payload::of(&BuildingConfigured {
+        addr: building.addr().clone(),
+        sandbox: wrote.sandbox,
+        mcp: wrote.mcp,
+        desktop: wrote.desktop,
+        context: wrote.context,
+    })
 }
 
 fn storage(path: &Path, err: &std::io::Error) -> AxError {

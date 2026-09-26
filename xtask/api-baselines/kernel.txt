@@ -488,6 +488,7 @@ pub enum kernel::event::record::AdviserAnswer
 pub enum kernel::event::record::AdviserAsk
 pub enum kernel::event::record::AdviserFailure
 pub enum kernel::event::record::CheckpointCommitted
+pub enum kernel::event::record::FiredAction
 pub enum kernel::event::record::InputKinds
 pub enum kernel::event::record::PartChange
 pub enum kernel::event::record::ShapeChanged
@@ -1951,6 +1952,14 @@ pub kernel::event::record::AttachedTuning::stream_idle_timeout_ms: core::option:
 pub kernel::event::record::AttachedTuning::timeout_ms: core::option::Option<u64>
 pub kernel::event::record::AutonomyChanged::autonomy: kernel::approval::Autonomy
 pub kernel::event::record::AutonomyChanged::scope: kernel::event::Scope
+pub kernel::event::record::BuildingConfigured::addr: kernel::address::Address
+pub kernel::event::record::BuildingConfigured::context: bool
+pub kernel::event::record::BuildingConfigured::desktop: bool
+pub kernel::event::record::BuildingConfigured::mcp: bool
+pub kernel::event::record::BuildingConfigured::sandbox: bool
+pub kernel::event::record::BuildingCreated::addr: kernel::address::Address
+pub kernel::event::record::BuildingCreated::adopted: bool
+pub kernel::event::record::BuildingCreated::template: alloc::string::String
 pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
 pub kernel::event::record::CheckpointCommitted::JobPinned
 pub kernel::event::record::CheckpointCommitted::JobPinned::job: kernel::locator::Locator
@@ -1990,8 +1999,21 @@ pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
 pub kernel::event::record::EvidenceCite::seq: kernel::Seq
 pub kernel::event::record::FileDiscarded::paths: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::FileDiscarded::restoration: core::option::Option<kernel::Restoration>
+pub kernel::event::record::FiredAction::BackOff
+pub kernel::event::record::FiredAction::BackOff::code: alloc::string::String
+pub kernel::event::record::FiredAction::BackOff::subject: alloc::string::String
+pub kernel::event::record::FiredAction::BackOff::until_ms: u64
+pub kernel::event::record::FiredAction::Freeze
+pub kernel::event::record::FiredAction::Freeze::reason: alloc::string::String
+pub kernel::event::record::FiredAction::Steer
+pub kernel::event::record::FiredAction::Steer::text: alloc::string::String
 pub kernel::event::record::GovernedDocumentWritten::bytes: usize
 pub kernel::event::record::GovernedDocumentWritten::which: alloc::string::String
+pub kernel::event::record::HandoffWritten::context: alloc::string::String
+pub kernel::event::record::HandoffWritten::must_read: alloc::vec::Vec<kernel::locator::Locator>
+pub kernel::event::record::HandoffWritten::next_step: alloc::string::String
+pub kernel::event::record::HandoffWritten::overview: alloc::string::String
+pub kernel::event::record::HandoffWritten::progress: alloc::string::String
 pub kernel::event::record::InputKinds::Text
 pub kernel::event::record::InputKinds::TextImage
 pub kernel::event::record::LogTruncated::dropped_bytes: u64
@@ -2018,6 +2040,7 @@ pub kernel::event::record::ModelSelected::output_price: kernel::budget::UsdMicro
 pub kernel::event::record::ModelSelected::tag: kernel::ModelTag
 pub kernel::event::record::PartChange::Moved
 pub kernel::event::record::PartChange::Same
+pub kernel::event::record::PolicyChanged::id: alloc::string::String
 pub kernel::event::record::PromptAssembled::breakpoints: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::PromptAssembled::segments: alloc::vec::Vec<kernel::event::record::PromptSegment>
 pub kernel::event::record::PromptSegment::hash: kernel::locator::B3Hash
@@ -2088,6 +2111,9 @@ pub kernel::event::record::ToolResult::answer: kernel::event::record::ToolAnswer
 pub kernel::event::record::ToolResult::name: kernel::tool::ToolName
 pub kernel::event::record::ToolResult::tool_use_id: alloc::string::String
 pub kernel::event::record::ToolkitLinkOpened::toolkit: alloc::string::String
+pub kernel::event::record::WatchdogFired::action: kernel::event::record::FiredAction
+pub kernel::event::record::WatchdogFired::corrections: u32
+pub kernel::event::record::WatchdogFired::provider_failures: u32
 pub kernel::gate::ConnectorCall::label: &'a kernel::tool::ServerLabel
 pub kernel::gate::ConnectorCall::tool: &'a kernel::tool::ToolName
 pub kernel::gate::DoorId::Attach
@@ -2556,7 +2582,11 @@ pub struct kernel::event::record::ApprovalResolved
 pub struct kernel::event::record::AssetArchived
 pub struct kernel::event::record::AttachedTuning
 pub struct kernel::event::record::AutonomyChanged
+pub struct kernel::event::record::BuildingConfigured
+pub struct kernel::event::record::BuildingCreated
+pub struct kernel::event::record::CancelReceived
 pub struct kernel::event::record::CityHalted
+pub struct kernel::event::record::CityInitialized
 pub struct kernel::event::record::Commit
 pub struct kernel::event::record::CommitAttribution
 pub struct kernel::event::record::DiscardRestored
@@ -2566,12 +2596,15 @@ pub struct kernel::event::record::EndpointLost
 pub struct kernel::event::record::EvalRun
 pub struct kernel::event::record::EvidenceCite
 pub struct kernel::event::record::FileDiscarded
+pub struct kernel::event::record::GateChecked
 pub struct kernel::event::record::GovernedDocumentWritten
+pub struct kernel::event::record::HandoffWritten
 pub struct kernel::event::record::LogTruncated
 pub struct kernel::event::record::LoginStarted
 pub struct kernel::event::record::ModelCalled
 pub struct kernel::event::record::ModelReturned
 pub struct kernel::event::record::ModelSelected
+pub struct kernel::event::record::PolicyChanged
 pub struct kernel::event::record::PromptAssembled
 pub struct kernel::event::record::PromptSegment
 pub struct kernel::event::record::PromptShapeCompared
@@ -2590,6 +2623,7 @@ pub struct kernel::event::record::SteerReceived
 pub struct kernel::event::record::ToolCalled
 pub struct kernel::event::record::ToolResult
 pub struct kernel::event::record::ToolkitLinkOpened
+pub struct kernel::event::record::WatchdogFired
 pub struct kernel::gate::ConnectorCall<'a>
 pub struct kernel::gate::EgressAllowlist
 pub struct kernel::goal::GoalEntry

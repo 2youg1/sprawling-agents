@@ -41,6 +41,7 @@
 mod adviser;
 mod checkpoint;
 mod collaboration;
+mod control;
 mod credential;
 mod discard;
 mod endpoint;
@@ -58,6 +59,10 @@ pub use adviser::{
 };
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
 pub use collaboration::{ConflictLevel, GoalConflict, PursuitChanged, PursuitMove};
+pub use control::{
+    BuildingConfigured, BuildingCreated, CancelReceived, CityInitialized, FiredAction, GateChecked,
+    HandoffWritten, PolicyChanged, WatchdogFired,
+};
 pub use credential::{LoginStarted, SecretCaptured, ToolkitLinkOpened};
 pub use discard::{AssetArchived, DiscardRestored, FileDiscarded};
 pub use endpoint::{AttachedTuning, EndpointAttached, EndpointLost, InputKinds, ModelSelected};

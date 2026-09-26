@@ -510,12 +510,35 @@ pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
                         #[serde(flatten)] pub answer: ToolAnswer }
 #[serde(untagged)]
 pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
+
+pub struct CityInitialized {}           // 城名在信封的 addr
+pub struct BuildingCreated { pub addr: Address, pub template: String,
+                             pub adopted: bool }   // false 时不写出
+pub struct BuildingConfigured { pub addr: Address, pub sandbox: bool, pub mcp: bool,
+                                pub desktop: bool, pub context: bool }
+pub struct CancelReceived {}
+pub struct HandoffWritten { pub must_read: Vec<Locator>, pub overview: String,
+    pub progress: String, pub context: String, pub next_step: String }
+pub struct WatchdogFired { #[serde(flatten)] pub action: FiredAction,
+                           pub corrections: u32, pub provider_failures: u32 }
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum FiredAction { Steer { text: String },
+                       BackOff { until_ms: u64, code: String, subject: String },
+                       Freeze { reason: String } }
+pub struct GateChecked {}               // 无生产写方：结构是决定
+pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked，无写方：结构是决定
 ```
 
 已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`tool_called`／`tool_result`、
 `checkpoint_committed`、`approval_resolved`、`autonomy_changed`、`city_halted`、
 `governed_document_written`、`embedding_called`／`rerank_called`、
 `adviser_asked`／`adviser_answered`／`adviser_fell_back`；
+`city_initialized`、`building_created`、`building_configured`、`cancel_received`、
+`handoff_written`、`watchdog_fired`、`gate_checked`、`policy_created`／`policy_revoked`；
+`gate_denied`、`budget_limit` 的载荷是平铺的 `AxError`，`approval_requested` 的是 `ApprovalItem`，
+`result_offloaded` 的是 `runtime::sieve::ResultOffloaded`（它平铺筛子的账，筛子在 runtime），不另立结构；
+`watchdog_fired` 的读方 `channels::note_of` 把 `BackOff` 读成它等待的那次拒绝（码与主语照录），
+`Steer`／`Freeze` 不出 note——纠偏与冻结各有自己的行；
 `pr_merged` 借 `CommitAttribution` 记「谁做的这次提交」，其余键待该族迁移。
 未列入的 kind 仍由调用点手写读取。
 
