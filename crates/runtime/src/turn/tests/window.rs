@@ -80,3 +80,36 @@ fn the_window_folds_steer_into_the_open_user_message() {
         "steer after assistant opens a new message"
     );
 }
+
+/// A reply with no content pushes no assistant message, so the results
+/// that follow meet a user message already on the wire. They still land
+/// in the window, and a steer held since the send rides after them.
+#[test]
+fn tool_results_after_an_empty_reply_reach_the_window() {
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("find it", "found", Opening::FromJob);
+    conversation.mark_sent();
+    conversation.push_steer("user", "narrow the search");
+    conversation.push_assistant(Vec::new());
+    let result = ContentBlock::ToolResult {
+        tool_use_id: "call-1".to_owned(),
+        content: "{}".to_owned(),
+        is_error: false,
+        attachments: Vec::new(),
+    };
+    conversation.push_tool_results(vec![result.clone()]);
+    let blocks: Vec<&ContentBlock> = conversation
+        .messages()
+        .iter()
+        .flat_map(|message| message.content.iter())
+        .collect();
+    assert_eq!(
+        blocks[1..],
+        [
+            &result,
+            &ContentBlock::Text {
+                text: "user: narrow the search".to_owned()
+            }
+        ]
+    );
+}
