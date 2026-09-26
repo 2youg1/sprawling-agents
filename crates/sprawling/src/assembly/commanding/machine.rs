@@ -21,29 +21,14 @@
 //! read is answered on and would do it without anybody asking.
 //!
 //! **The worker reaches the machine through `accounting::Machine`**
-//! (accounting-SPEC.md 8-4); `Doctor` is the production one, and
-//! `with_machine` is the one door that swaps it.
+//! (accounting-SPEC.md 8-4); `doctor::ThisMachine` is the production
+//! one, and `with_machine` is the one door that swaps it.
 
 use kernel::{AxCode, AxError};
 
-use crate::doctor::{Machine, PATIENCE, Platform, REQUIREMENTS, ThisMachine};
+use crate::doctor::{Platform, REQUIREMENTS};
 
 use super::super::RunWorker;
-
-/// The machine this process runs on, as the doctor sees it: the one
-/// authority on what this machine has, and the one place this binary
-/// starts an install program.
-pub(in crate::assembly) struct Doctor;
-
-impl accounting::Machine for Doctor {
-    fn report(&self) -> channels::DoctorAnswer {
-        crate::doctor::report()
-    }
-
-    fn install(&self, item: &str, runnable: &accounting::Runnable<'_>) -> Result<(), AxError> {
-        ThisMachine::new(Platform::current(), PATIENCE).install(item, runnable)
-    }
-}
 
 impl RunWorker {
     /// The same worker, looking at and installing onto `machine`

@@ -12,20 +12,20 @@
 //! and what a tier needs are settled in `doctor` and in `table`.
 
 use super::{Absence, Fault, Version};
-use super::{Finding, Need, PATIENCE, Platform, Presence, ThisMachine, Tier, Verdict};
+use super::{Finding, Machine, Need, Platform, Presence, Tier, Verdict};
 use super::{examine, verdict};
 
-/// Asks this machine once and folds what it said into the answer the
-/// wire carries.
+/// Asks `machine` once and folds what it said into the answer the
+/// wire carries. `ThisMachine`'s `accounting::Machine::report` is this.
 ///
 /// Called from `DoctorRefresh` and nowhere else: every item but the
 /// browsers is a program started and asked its version, which is
 /// seconds rather than milliseconds, so neither a serve nor a query
 /// waits for it - a person opening the page that shows it asks for it,
 /// and the city holds the answer until they ask again.
-pub(crate) fn report() -> channels::DoctorAnswer {
+pub(crate) fn answer(machine: &dyn Machine) -> channels::DoctorAnswer {
     let platform = Platform::current();
-    let findings = examine(&ThisMachine::new(platform, PATIENCE));
+    let findings = examine(machine);
     fold(&findings, platform, confinement(), custody())
 }
 

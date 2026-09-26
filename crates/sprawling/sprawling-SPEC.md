@@ -2948,7 +2948,7 @@ pub struct Runnable<'a> { /* 私有：program、args */ }
 // bin::doctor::running（本二进制起安装程序的唯一一处）
 pub(crate) const PATIENCE: u32 = 3_600; // knocks, TICK apart
 pub(crate) fn run(item: &str, runnable: &accounting::Runnable, patience: u32) -> Result<(), AxError>;
-// bin::assembly::commanding::machine：worker 经 RunWorker.machine（accounting::Machine）探与装，生产实现是 Doctor
+// bin::assembly::commanding::machine：worker 经 RunWorker.machine（accounting::Machine）探与装，生产实现是 doctor::ThisMachine；终端的 --install 经同一个 accounting::Machine::install
 impl RunWorker {
     pub(in crate::assembly) fn doctor_install(&mut self, item: &str) -> Result<(), AxError>;
     pub(in crate::assembly) fn look_at_this_machine(&mut self);

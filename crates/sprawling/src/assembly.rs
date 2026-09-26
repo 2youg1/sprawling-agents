@@ -253,7 +253,7 @@ pub struct RunWorker {
     /// (`mcp`). Received for the same reason `models` is.
     connectors: Box<dyn accounting::Connectors + Send>,
     /// Looks at the machine this city runs on and installs onto it
-    /// (`commanding::machine`). Received for the same reason `models`
+    /// (`doctor::ThisMachine`). Received for the same reason `models`
     /// is.
     machine: Box<dyn accounting::Machine + Send>,
     /// What time it is, for this worker and every lane it drives

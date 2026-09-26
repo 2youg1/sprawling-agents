@@ -47,6 +47,12 @@ impl Machine for ScriptedMachine {
             }
         }
     }
+}
+
+impl accounting::Machine for ScriptedMachine {
+    fn report(&self) -> channels::DoctorAnswer {
+        super::answer(self)
+    }
 
     fn install(&self, name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
         self.asked.borrow_mut().push(name.to_owned());

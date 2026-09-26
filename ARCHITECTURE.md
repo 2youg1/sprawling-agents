@@ -245,7 +245,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `accounting::models` | crates/accounting/src/models.rs | `bin::assembly::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
 | `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::SystemClock`: the wall clock, the one sampling point | the stopped clock in `crates/sprawling/tests/clock.rs` |
 | `accounting::connectors` | crates/accounting/src/connectors.rs | `bin::assembly::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
-| `accounting::machine` | crates/accounting/src/machine.rs | `bin::assembly::commanding::machine`: the doctor's report and its one install runner | the scripted machine in `crates/sprawling/tests/machine.rs` |
+| `accounting::machine` | crates/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner | the scripted machine in `crates/sprawling/tests/machine.rs` |
 
 The *second adapter* column has no checker: a seam whose double was
 deleted would still read as real here. That is a known hole, not a

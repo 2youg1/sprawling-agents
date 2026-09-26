@@ -36,19 +36,18 @@ use kernel::AxError;
 
 use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Version};
 
-/// What is asked of the machine under this city. Two implementations:
-/// `ThisMachine`, and the scripted one the tests drive, which is what
-/// lets a verdict be judged without the machine that produced it.
-pub(crate) trait Machine {
+/// What is asked of the machine under this city, item by item. Two
+/// implementations: `ThisMachine`, and the scripted one the tests
+/// drive, which is what lets a verdict be judged without the machine
+/// that produced it.
+///
+/// **An install goes through the parent trait.** This trait adds only
+/// `look`, so the terminal and the worker start a package manager
+/// through the one `accounting::Machine::install` (accounting-SPEC.md
+/// 8-4), and a script that replaces it replaces every install.
+pub(crate) trait Machine: accounting::Machine {
     /// Whether this item is here, and in what condition.
     fn look(&self, requirement: &Requirement) -> Presence;
-
-    /// Runs one install command the person has just agreed to.
-    ///
-    /// # Errors
-    /// Reports a command this machine cannot start, one that ended in
-    /// failure, and one still running at the deadline.
-    fn install(&self, name: &str, runnable: &Runnable) -> Result<(), AxError>;
 }
 
 /// The machine this process is running on.
@@ -107,9 +106,15 @@ impl Machine for ThisMachine {
             Detection::Family(family) => super::family::look(*family, self.platform, &search_path),
         }
     }
+}
 
-    fn install(&self, name: &str, runnable: &Runnable) -> Result<(), AxError> {
-        super::running::run(name, runnable, super::running::PATIENCE)
+impl accounting::Machine for ThisMachine {
+    fn report(&self) -> channels::DoctorAnswer {
+        super::answer(self)
+    }
+
+    fn install(&self, item: &str, runnable: &Runnable<'_>) -> Result<(), AxError> {
+        super::running::run(item, runnable, super::running::PATIENCE)
     }
 }
 
