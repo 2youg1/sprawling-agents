@@ -11,6 +11,8 @@
 //! them is a `Shot` — bytes and two integer sides — so the decisions
 //! stay in the pure crate and the bytes stay here.
 
+use std::sync::Mutex;
+
 use browser::{
     BrowserPort, ContextId, DevLoop, Observation, PageSnapshot, ResolvedOrigin, SHOT_MAX_EDGE_PX,
     Session, SessionRequest, Shot, Verb,
@@ -37,6 +39,13 @@ use surveying::surveyed;
 /// The tool a building whose rules say `browser = true` gets.
 pub(crate) struct BrowserTool {
     meta: ToolMeta,
+    /// One tab, driven by one call at a time: two calls interleaving
+    /// their frames would each act on a page the other changed.
+    browser: Mutex<Browser>,
+}
+
+/// What driving the tab holds between calls.
+struct Browser {
     port: Box<dyn BrowserPort + Send>,
     session: Session,
     /// The tab this tool drives, opened on the first call rather than at
@@ -103,14 +112,16 @@ impl BrowserTool {
                 render: RenderIntent::Generic,
                 temporal: Temporal::Timestamped,
             },
-            port,
-            session: Session::new(),
-            context: None,
-            snapshot: None,
-            generation: 0,
-            cas,
-            devloop: DevLoop::new(),
-            complained: false,
+            browser: Mutex::new(Browser {
+                port,
+                session: Session::new(),
+                context: None,
+                snapshot: None,
+                generation: 0,
+                cas,
+                devloop: DevLoop::new(),
+                complained: false,
+            }),
         })
     }
 }
@@ -134,7 +145,7 @@ impl Tool for BrowserTool {
         }
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -146,6 +157,23 @@ impl Tool for BrowserTool {
                 self.meta.name
             )));
         }
+        self.browser
+            .lock()
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "drive a browser",
+                    "an earlier call left the tab locked when its thread died",
+                )
+                .with_recovery("dispatch the work again; the next run opens a fresh tab")
+            })?
+            .drive(call)
+    }
+}
+
+impl Browser {
+    /// One call against the tab, after `invoke` has checked the name.
+    fn drive(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         let verb = Verb::read(&call.args)?;
         let context = self.tab()?;
         let frames = verb.frames(&mut self.session, &context, self.snapshot.as_ref())?;
@@ -226,7 +254,7 @@ fn payload(fields: Vec<(&str, Value)>) -> Result<Payload, AxError> {
     Payload::new(map)
 }
 
-impl BrowserTool {
+impl Browser {
     /// The tab this tool drives, opening the session the first time.
     ///
     /// Both frames are minted by this tool's own `Session`, so the ids

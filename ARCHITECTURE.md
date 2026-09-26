@@ -221,6 +221,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `kernel::tool` | crates/kernel/src/tool.rs | runtime tools, collab tools, browser, protocol | citysim: scripted tools |
 | `kernel::model` | crates/kernel/src/model.rs | gateway: native and endpoint | citysim: scripted model |
 | `runtime::sandbox` | crates/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
+| `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `bin::assembly::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `protocol::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
 

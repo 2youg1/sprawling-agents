@@ -41,7 +41,7 @@ fn call() -> ToolCall {
 
 #[test]
 fn the_thirteen_fields_report_in_the_frozen_order() {
-    let mut tool = StatusTool::new(snapshot()).unwrap();
+    let tool = StatusTool::new(snapshot()).unwrap();
     let outcome = tool.invoke(&call()).unwrap();
     let value = serde_json::to_value(&outcome.result).unwrap();
     let text = value["text"].as_str().unwrap();
@@ -81,7 +81,7 @@ fn the_thirteen_fields_report_in_the_frozen_order() {
 fn the_children_line_says_where_the_work_went_and_which_kind_of_delegate() {
     let handed = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let seen = std::sync::Arc::clone(&handed);
-    let mut tool =
+    let tool =
         StatusTool::watching(snapshot(), Box::new(move || seen.lock().unwrap().clone())).unwrap();
 
     let before = serde_json::to_value(&tool.invoke(&call()).unwrap().result).unwrap();
@@ -103,7 +103,7 @@ fn the_children_line_says_where_the_work_went_and_which_kind_of_delegate() {
 
 #[test]
 fn the_tool_reports_what_it_was_given_and_never_samples() {
-    let mut tool = StatusTool::new(snapshot()).unwrap();
+    let tool = StatusTool::new(snapshot()).unwrap();
     let first = tool.invoke(&call()).unwrap();
     let second = tool.invoke(&call()).unwrap();
     assert_eq!(
@@ -114,7 +114,7 @@ fn the_tool_reports_what_it_was_given_and_never_samples() {
 
 #[test]
 fn a_call_for_another_tool_is_refused() {
-    let mut tool = StatusTool::new(snapshot()).unwrap();
+    let tool = StatusTool::new(snapshot()).unwrap();
     let mut wrong = call();
     wrong.name = ToolName::parse("edit").unwrap();
     assert_eq!(

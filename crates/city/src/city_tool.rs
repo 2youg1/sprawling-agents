@@ -173,7 +173,7 @@ impl Tool for CityTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn the_mayor_raises_a_building_and_then_sees_it_on_the_list() {
         let dir = tempfile::tempdir().unwrap();
-        let mut tool = CityTool::new(dir.path()).unwrap();
+        let tool = CityTool::new(dir.path()).unwrap();
         let raised = tool
             .invoke(&call(&[("action", "raise"), ("name", "lab")]))
             .unwrap();
@@ -291,7 +291,7 @@ mod tests {
     fn adoption_takes_a_directory_that_is_already_there_and_raising_refuses_it() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("imported")).unwrap();
-        let mut tool = CityTool::new(dir.path()).unwrap();
+        let tool = CityTool::new(dir.path()).unwrap();
         let adopted = tool
             .invoke(&call(&[("action", "adopt"), ("name", "imported")]))
             .unwrap();
@@ -306,7 +306,7 @@ mod tests {
     #[test]
     fn an_unknown_action_is_refused_and_says_which_three_exist() {
         let dir = tempfile::tempdir().unwrap();
-        let mut tool = CityTool::new(dir.path()).unwrap();
+        let tool = CityTool::new(dir.path()).unwrap();
         let err = tool.invoke(&call(&[("action", "demolish")])).unwrap_err();
         assert!(err.recovery().contains("raise"), "{err}");
         assert_eq!(tool.meta().name.as_str(), "city");

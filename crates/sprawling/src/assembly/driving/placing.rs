@@ -1,0 +1,149 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! A run's bench as the tool face a wave drives in three stages
+//! (runtime-SPEC.md 8-3): each call's key is placed by its position when
+//! it is admitted, and the commits it was fenced against and the
+//! commands that ran are counted when it is accounted. Both happen in
+//! call order, so a wave whose reads ran at once leaves the same keys,
+//! the same fence list and the same counts as one that ran them in turn.
+
+use std::cell::RefCell;
+
+use kernel::{AxError, Effect, IdemKey, RunId, Seq, TimeMs, Tool, ToolCall, ToolOutcome};
+use runtime::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
+use runtime::{Admitted, ConcurrentInvoke};
+
+use super::Sieving;
+
+pub(super) struct Placing<'f> {
+    bench: ToolBench,
+    sieving: Sieving,
+    run: RunId,
+    /// Where the next call sits in this run. The key used to derive from
+    /// the turn's millisecond stamp and the tool's name, which broke
+    /// twice over: it took a clock, which determinism rule 7 forbids
+    /// outright, and it ignored the arguments - so two `read`s of two
+    /// different files in one turn were one key, and the second came
+    /// back "this call was already made". A model reads that as a fault
+    /// in itself.
+    next: u64,
+    /// What the run's own commands did: (passed, failed). It is the only
+    /// evidence of "the tests passed" the city can observe without being
+    /// told, and being told is what a mode is supposed to check.
+    ran: (u32, u32),
+    /// The commits the run was fenced against, in the order they went
+    /// up. The wave fence writes the same list, so the sweep afterwards
+    /// reads the first commit a deleted file can be restored from.
+    fenced: &'f RefCell<Vec<String>>,
+}
+
+impl<'f> Placing<'f> {
+    pub(super) fn new(
+        bench: ToolBench,
+        sieving: Sieving,
+        run: RunId,
+        fenced: &'f RefCell<Vec<String>>,
+    ) -> Placing<'f> {
+        Placing {
+            bench,
+            sieving,
+            run,
+            next: 0,
+            ran: (0, 0),
+            fenced,
+        }
+    }
+
+    /// The commands this run ran: (passed, failed).
+    pub(super) fn ran(&self) -> (u32, u32) {
+        self.ran
+    }
+
+    /// What the model reads back for what the bench decided.
+    fn answered(&mut self, call: &ToolCall, decided: BenchOutcome) -> Result<ToolOutcome, AxError> {
+        match decided {
+            BenchOutcome::Ran { outcome, fenced } => {
+                if let Some(oid) = fenced {
+                    self.fenced.borrow_mut().push(oid);
+                }
+                if call.name.as_str() != kernel::ToolName::EXEC {
+                    return Ok(outcome);
+                }
+                // Absence of `exit_code` is a failure, not a success: a
+                // command a signal stopped returns no code at all, and
+                // reading that as zero would let a halted build count as
+                // tests that passed.
+                let failed = match outcome
+                    .result
+                    .as_map()
+                    .get("exit_code")
+                    .and_then(serde_json::Value::as_i64)
+                {
+                    Some(code) => code != 0,
+                    None => true,
+                };
+                if failed {
+                    self.ran.1 = self.ran.1.saturating_add(1);
+                } else {
+                    self.ran.0 = self.ran.0.saturating_add(1);
+                }
+                self.sieving.package(call, outcome)
+            }
+            BenchOutcome::Refused { refusal } => Err(*refusal),
+            // A replay is answered with what the first call answered,
+            // sieved the same way. An error here would tell the model its
+            // call failed when it succeeded (runtime-SPEC.md 8-35). The
+            // command counters are not touched: nothing ran this time.
+            BenchOutcome::Duplicate { outcome } => {
+                if call.name.as_str() == kernel::ToolName::EXEC {
+                    self.sieving.package(call, outcome)
+                } else {
+                    Ok(outcome)
+                }
+            }
+        }
+    }
+}
+
+impl ConcurrentInvoke for Placing<'_> {
+    fn effect_of(&self, call: &ToolCall) -> Option<Effect> {
+        self.bench
+            .meta_of(&call.name)
+            .map(|meta| meta.effect.clone())
+    }
+
+    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {
+        let at = self.next;
+        self.next = at.saturating_add(1);
+        // What the action is, is the tool face's to say (kernel-SPEC
+        // 8-23). Two identical calls at two positions are two keys and
+        // both run; the same position replayed is one key, which is what
+        // deduplication is for.
+        let key = match call.action() {
+            Ok(action) => IdemKey::derive(&self.run, Seq::new(at), &action),
+            Err(unreadable) => return Admitted::Answered(Err(unreadable)),
+        };
+        match self.bench.clear(call, &key, t) {
+            Ok(Clearance::Cleared(ticket)) => Admitted::Cleared(ticket),
+            Ok(Clearance::Answered(decided)) => Admitted::Answered(self.answered(call, decided)),
+            Err(refused) => Admitted::Answered(Err(refused)),
+        }
+    }
+
+    fn tool(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError> {
+        self.bench.tool_for(ticket)
+    }
+
+    fn account(
+        &mut self,
+        call: &ToolCall,
+        ticket: Ticket,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<ToolOutcome, AxError> {
+        let decided = self.bench.account(ticket, answered)?;
+        self.answered(call, decided)
+    }
+}

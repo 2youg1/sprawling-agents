@@ -48,10 +48,10 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
     );
     let mut invoked = 0u32;
     let turn = advance(
-        turn.execute(
+        turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut |_call| {
+            &mut |_call: &ToolCall, _: TimeMs| {
                 invoked += 1;
                 Ok(ToolOutcome {
                     result: Payload::empty(),
@@ -217,10 +217,10 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
         .unwrap(),
     );
     let turn = advance(
-        turn.execute(
+        turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut |call| {
+            &mut |call: &ToolCall, _: TimeMs| {
                 Err(AxError::failure(
                     AxCode::ToolUnavailable,
                     "invoke tool",
@@ -273,10 +273,10 @@ fn the_ledger_chain_stays_verifiable_after_a_turn() {
         .unwrap(),
     );
     let turn = advance(
-        turn.execute(
+        turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut |_call| panic!("empty wave must not invoke"),
+            &mut |_call: &ToolCall, _: TimeMs| panic!("empty wave must not invoke"),
             &mut |_| Interrupt::None,
         )
         .unwrap(),
@@ -326,10 +326,10 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
     );
     let mut invoked = 0u32;
     let outcome = turn
-        .execute(
+        .execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut |_call| {
+            &mut |_call: &ToolCall, _: TimeMs| {
                 invoked += 1;
                 Ok(ToolOutcome {
                     result: Payload::empty(),

@@ -64,11 +64,10 @@ impl Keeper {
     /// Puts one key in the vault under a name no earlier key of this run
     /// or of any other run holds.
     fn keep(&self, side: Side, provider: &str, key: &str) -> Result<SecretRef, AxError> {
-        let n = self
+        let earlier = self
             .kept
-            .fetch_add(1, Ordering::Relaxed)
-            .checked_add(1)
-            .ok_or_else(|| {
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+            .map_err(|_| {
                 AxError::failure(
                     AxCode::InvalidArgs,
                     "keep a key a tool carried",
@@ -76,6 +75,8 @@ impl Keeper {
                 )
                 .with_recovery("start a new run and use the key there")
             })?;
+        // `fetch_update` has just shown `earlier + 1` fits.
+        let n = earlier.saturating_add(1);
         let reference = SecretRef::new(side.realm(), &format!("{provider}-{}-{n}", self.run))?;
         self.vault
             .lock()
@@ -156,7 +157,7 @@ impl Tool for Kept {
     /// Everything the tool refuses, and the vault refusing a key: a key
     /// in the arguments then stops the tool before it runs, and a key in
     /// the result stops the result before the model reads it.
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         let outcome = match self.keeper.kept_payload(Side::Written, &call.args)? {
             Some(args) => self.tool.invoke(&ToolCall {
                 id: call.id.clone(),

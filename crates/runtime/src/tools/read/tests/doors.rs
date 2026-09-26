@@ -39,7 +39,7 @@ fn a_link_is_judged_by_where_it_lands() {
         }
     });
     let catalog = Arc::new(Mutex::new(Catalog::new()));
-    let mut tool = ReadTool::new(dir.path(), catalog, only_lab).unwrap();
+    let tool = ReadTool::new(dir.path(), catalog, only_lab).unwrap();
 
     for asked in [
         "lab/to-vault/secret.md",
@@ -67,7 +67,7 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
     std::fs::write(package.join("SKILL.md"), "check the diff first\n").unwrap();
     std::fs::write(package.join("scripts").join("check.sh"), "git diff\n").unwrap();
     std::fs::write(dir.path().join(".sprawling").join("CONFIG.toml"), "x\n").unwrap();
-    let (mut tool, catalog) = tool(dir.path());
+    let (tool, catalog) = tool(dir.path());
     catalog
         .lock()
         .unwrap()
@@ -127,7 +127,7 @@ fn a_file_absent_at_the_check_is_not_opened_later() {
             kernel::ReadVerdict::Open
         }
     });
-    let mut tool =
+    let tool =
         ReadTool::new(dir.path(), Arc::new(Mutex::new(Catalog::new())), between).unwrap();
 
     let refused = tool.invoke(&call("lab/door/sub/secret.md"));
@@ -167,7 +167,7 @@ fn a_directory_swapped_for_a_link_after_the_check_opens_nothing() {
             kernel::ReadVerdict::Open
         }
     });
-    let mut tool =
+    let tool =
         ReadTool::new(dir.path(), Arc::new(Mutex::new(Catalog::new())), between).unwrap();
 
     let refused = tool.invoke(&call("lab/door/sub/secret.md"));
@@ -186,7 +186,7 @@ fn a_document_named_like_a_package_opens_nothing_beside_it() {
     std::fs::create_dir_all(&section).unwrap();
     std::fs::write(section.join("SKILL.md"), "how ops works\n").unwrap();
     std::fs::write(section.join("deploy.md"), "not admitted\n").unwrap();
-    let (mut tool, catalog) = tool(dir.path());
+    let (tool, catalog) = tool(dir.path());
     catalog
         .lock()
         .unwrap()

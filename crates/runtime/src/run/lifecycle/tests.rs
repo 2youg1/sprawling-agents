@@ -6,7 +6,9 @@
 //! What opening a run costs before the model is asked anything.
 
 use kernel::ledger::chain_hash;
-use kernel::{Address, B3Hash, Ceiling, EventRef, GENESIS_PREV, Locator, Seq, ToolOutcome};
+use kernel::{
+    Address, B3Hash, Ceiling, EventRef, GENESIS_PREV, Locator, Seq, ToolCall, ToolOutcome,
+};
 
 use super::*;
 use crate::RunPlan;

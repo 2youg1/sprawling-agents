@@ -334,7 +334,7 @@ impl Tool for ReadTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,

@@ -8,19 +8,20 @@
 //! exhausted script is itself a failure (E_TOOL_UNAVAILABLE).
 
 use std::collections::{BTreeMap, VecDeque};
+use std::sync::Mutex;
 
 use kernel::{AxCode, AxError, Tool, ToolCall, ToolMeta, ToolOutcome};
 
 pub struct ScriptTool {
     meta: ToolMeta,
-    outcomes: VecDeque<Result<ToolOutcome, AxError>>,
+    outcomes: Mutex<VecDeque<Result<ToolOutcome, AxError>>>,
 }
 
 impl ScriptTool {
     pub fn new(meta: ToolMeta, outcomes: Vec<Result<ToolOutcome, AxError>>) -> Self {
         ScriptTool {
             meta,
-            outcomes: outcomes.into(),
+            outcomes: Mutex::new(outcomes.into()),
         }
     }
 }
@@ -30,7 +31,7 @@ impl Tool for ScriptTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -40,7 +41,21 @@ impl Tool for ScriptTool {
             .with_nearby(vec![self.meta.name.to_string()])
             .with_recovery("call this tool by its registered name"));
         }
-        self.outcomes.pop_front().unwrap_or_else(|| {
+        let next = self
+            .outcomes
+            .lock()
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "invoke scripted tool",
+                    call.name.to_string(),
+                )
+                .with_recovery(
+                    "an earlier scripted call died holding the script; rerun the scenario",
+                )
+            })?
+            .pop_front();
+        next.unwrap_or_else(|| {
             Err(AxError::failure(
                 AxCode::ToolUnavailable,
                 "invoke scripted tool",

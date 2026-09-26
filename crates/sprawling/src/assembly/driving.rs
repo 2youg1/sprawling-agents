@@ -18,6 +18,7 @@ use super::{RunWorker, Site};
 pub(crate) mod flight;
 pub(crate) mod lane;
 pub(in crate::assembly) mod owing;
+mod placing;
 
 /// What one drive is handed: the machinery it runs on, and the run it
 /// runs as.

@@ -148,7 +148,7 @@ impl kernel::Tool for Recording {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &kernel::ToolCall) -> Result<kernel::ToolOutcome, kernel::AxError> {
+    fn invoke(&self, call: &kernel::ToolCall) -> Result<kernel::ToolOutcome, kernel::AxError> {
         self.seen.lock().unwrap().push(call.args.clone());
         Ok(kernel::ToolOutcome {
             result: kernel::Payload::new(serde_json::Map::new()).unwrap(),
@@ -177,7 +177,7 @@ fn a_key_in_any_tool_argument_reaches_the_vault_and_not_the_tool() {
         render: kernel::RenderIntent::Generic,
         temporal: kernel::Temporal::Timeless,
     };
-    let mut kept = Kept::new(
+    let kept = Kept::new(
         Box::new(Recording {
             meta,
             seen: seen.clone(),

@@ -55,7 +55,7 @@ fn city() -> tempfile::TempDir {
 #[test]
 fn a_substring_comes_back_with_its_place_and_its_context() {
     let dir = city();
-    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool
         .invoke(&call(&[
@@ -79,7 +79,7 @@ fn a_substring_comes_back_with_its_place_and_its_context() {
 #[test]
 fn every_file_under_the_prefix_is_looked_at_and_nothing_above_it() {
     let dir = city();
-    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let whole = tool.invoke(&text("the ledger")).unwrap();
     assert_eq!(whole.result.as_map()["count"], 2, "two files, one each");
@@ -99,7 +99,7 @@ fn every_file_under_the_prefix_is_looked_at_and_nothing_above_it() {
 #[test]
 fn a_reserved_prefix_is_refused_and_a_reserved_file_is_never_matched() {
     let dir = city();
-    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let err = tool
         .invoke(&call(&[
@@ -122,7 +122,7 @@ fn a_reserved_prefix_is_refused_and_a_reserved_file_is_never_matched() {
 fn a_file_that_is_not_text_is_passed_over_rather_than_reported() {
     let dir = city();
     std::fs::write(dir.path().join("lab").join("blob.bin"), [0xff, 0xfe, 0x00]).unwrap();
-    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool.invoke(&text("the ledger")).unwrap();
     assert_eq!(outcome.result.as_map()["count"], 2);
@@ -131,7 +131,7 @@ fn a_file_that_is_not_text_is_passed_over_rather_than_reported() {
 #[test]
 fn an_empty_predicate_is_refused_because_it_would_match_everything() {
     let dir = city();
-    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let err = tool.invoke(&text("")).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
@@ -147,7 +147,7 @@ fn the_cap_stops_the_walk_and_the_answer_says_so() {
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     let body: String = (0..200).map(|n| format!("the ledger {n}\n")).collect();
     std::fs::write(dir.path().join("lab").join("Many.md"), body).unwrap();
-    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool.invoke(&text("the ledger")).unwrap();
     let map = outcome.result.as_map();
@@ -174,7 +174,7 @@ fn a_walk_from_the_root_does_not_enter_a_building_the_bound_closes() {
             ReadVerdict::Open
         }
     });
-    let mut tool = SearchTool::new(dir.path(), bound).unwrap();
+    let tool = SearchTool::new(dir.path(), bound).unwrap();
 
     let whole = tool.invoke(&text("the ledger")).unwrap();
     let map = whole.result.as_map();
@@ -208,7 +208,7 @@ fn a_file_past_the_byte_cap_is_reported_with_its_reason() {
     let dir = city();
     let big = "the ledger\n".repeat(100_000);
     std::fs::write(dir.path().join("lab").join("Big.md"), big).unwrap();
-    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool.invoke(&text("the ledger")).unwrap();
     let map = outcome.result.as_map();
@@ -233,7 +233,7 @@ fn a_first_hit_wider_than_the_budget_is_cut_to_it() {
     let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
     let wide = format!("the ledger {}\n", "x".repeat(cap.saturating_mul(2)));
     std::fs::write(dir.path().join("lab").join("Wide.md"), wide).unwrap();
-    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool.invoke(&text("the ledger")).unwrap();
     let map = outcome.result.as_map();
@@ -271,7 +271,7 @@ fn a_walk_does_not_follow_a_link_into_a_closed_building() {
             ReadVerdict::Open
         }
     });
-    let mut tool = SearchTool::new(dir.path(), only_lab).unwrap();
+    let tool = SearchTool::new(dir.path(), only_lab).unwrap();
 
     for asked in [None, Some("lab")] {
         let mut args = vec![("text", Value::String("ledger".to_owned()))];
@@ -300,7 +300,7 @@ fn a_link_that_does_not_resolve_is_counted_as_unread() {
     let dir = city();
     let knot = dir.path().join("lab").join("knot");
     super::super::chosen_path::make_link(&knot, &knot);
-    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool.invoke(&text("the ledger")).unwrap();
     let map = outcome.result.as_map();
@@ -338,7 +338,7 @@ fn a_building_whose_rules_do_not_read_is_named_among_the_unread() {
             ReadVerdict::Open
         }
     });
-    let mut tool = SearchTool::new(dir.path(), bound).unwrap();
+    let tool = SearchTool::new(dir.path(), bound).unwrap();
 
     let whole = tool.invoke(&text("the ledger")).unwrap();
     let map = whole.result.as_map();

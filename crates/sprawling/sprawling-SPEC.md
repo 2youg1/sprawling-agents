@@ -769,13 +769,13 @@ fn city_segment(city_root: &Path) -> Result<Vec<u8>, AxError>;  // NotFound → 
 ## 8-28 一次调用的键，只有一份读法
 
 ```rust
-// dispatch_in 驱动块内：六行手写的动作字节换成一个问句
-let key = kernel::IdemKey::derive(&run_id, kernel::Seq::new(at), &call.action()?);
+// driving::placing::Placing::admit 内：六行手写的动作字节换成一个问句
+let key = match call.action() { Ok(action) => IdemKey::derive(&self.run, Seq::new(at), &action), Err(e) => return Admitted::Answered(Err(e)) };
 ```
 
 **这里不修 `bin::assembly` 的缺陷，因为这里没有缺陷**。被修的是 citysim（citysim-SPEC §8-4）；本文件变的是「谁来回答动作字节」。原先这六行把 name 与 `serde_json::to_string(&call.args)` 拼起来，是全库两份实现中对的那一份；对的那一份待在装配层，正是另一份能静静漂走的原因。`kernel-SPEC §8-6` 早写着这条规则「属 S2 工具面」，而它一处也不在那里。现在它在（`ToolCall::action`，kernel-SPEC §8-23），本文件改为问它。
 
-**字节逐字不变**：`action()` 内部就是搬过去的同一句（name 字节接 args 的 JSON 字节），位次仍是本地 `placed` 计数器。唯一的行为差异是 `unwrap_or_default()` 换成 `?`：一个序列化失败以前产空串（于是两次参数不同的调用得同一把键），现在上报。`Payload` 拒浮点且键恒为字符串，故这一臂今天不可达。
+**字节逐字不变**：`action()` 内部就是搬过去的同一句（name 字节接 args 的 JSON 字节），位次是 `Placing` 在放行时按调用序数出的计数器。唯一的行为差异是 `unwrap_or_default()` 换成 `?`：一个序列化失败以前产空串（于是两次参数不同的调用得同一把键），现在上报。`Payload` 拒浮点且键恒为字符串，故这一臂今天不可达。
 
 **一个被推翻的假设**：「让 `ToolBench` 自己持 run 与位次、`invoke` 内部铸键」看上去是更好的形——传钟进来这件事就没有参数可传。它不成立：`ToolBench::seen` 恒从空集起，且键在过门之后才记入（runtime-SPEC §532），所以一个恒递增的内部位次会让键在一次驱动内永不重复，`BenchOutcome::Duplicate` 随之变成**任何门都达不到的变体**，`turn.rs` 那条 `dedup_runs_before_the_side_effect`（同键调两次、断言文件未再变）连同它守的不变量一起写不出来。**把一个可测的防御换成不可测的死代码，不是加固。** 位次因此留在调用方。
 
@@ -838,6 +838,19 @@ impl RunWorker {
 ```
 
 三个钩子住在一起，理由不是它们相邻，而是**它们是唯一在驱动器持有账本期间碰账本的代码**（`invoke` 里那句自述：「the ledger is the driver's for the length of the run」）。它们收集的三样东西也只在那段时间里可写，所以一并作为 `Driven` 返回，而不是留四个 `Rc<RefCell<…>>` 让调用方自己保持同步——四个单元格是四个可以忘记读的东西，一个值不是。
+
+工具面是 `bin::assembly::driving::placing::Placing`（形状：adapter），runtime-SPEC §8-3 的 `ConcurrentInvoke` 在装配层的实现：
+
+```rust
+pub(super) struct Placing<'f> { /* bench、sieving、run、next、ran —— 私有；fenced: &'f RefCell<Vec<String>> */ }
+impl<'f> Placing<'f> {
+    pub(super) fn new(bench: ToolBench, sieving: Sieving, run: RunId, fenced: &'f RefCell<Vec<String>>) -> Placing<'f>;
+    pub(super) fn ran(&self) -> (u32, u32);   // 本跑命令的 (通过, 失败)
+}
+impl ConcurrentInvoke for Placing<'_> { /* admit：定位次、派生键、bench.clear；tool：bench.tool_for；account：bench.account，再记 fence 与命令计数、exec 结果过筛 */ }
+```
+
+键的位次在 `admit` 里定、fence 记录与命令计数在 `account` 里记，两段都按调用序跑，所以一波开头的只读调用并行跑完之后，键、fence 列表与计数与串行波逐字相同。位次与计数是 `Placing` 的普通字段：先前它们是闭包捕获的 `Cell` 与 `Rc<RefCell<…>>`，因为闭包只能借不能拥有。`fenced` 仍是一个 `RefCell`，借给 `Placing` 与波前 fence 钩子两处写，因为清扫读的是**最早**立起的那道 fence（`settling::desks`），两份各自的列表合不出时间次序。失败码不新增：`admit` 与 `account` 的失败原样是 bench 与工具的失败，回给模型。
 
 `outcome` 刻意仍是 `Result` 而不在方法里 `?`：一跑失败了它的桌子照样要结，而结桌子正是把它最后几行放上历史的动作。把它提到方法边界上会静静跳过它们。
 
@@ -3856,7 +3869,6 @@ impl PlanHolders {
 pub(in crate::assembly) struct Doorstep {
     pub(in crate::assembly) entrance: Entrance,   // 这座城按 key 答过哪些命令、答了什么（8-41）
     pub(in crate::assembly) knocks: Vec<Knock>,   // 没人在家时被搭话的居民，等说话的 run 冻结后再叫醒
-    pub(in crate::assembly) namings: Namings,     // 等摘要模型给房间起名的派发（8-86）
 }
 impl Doorstep {
     pub(in crate::assembly) fn opened(entrance: Entrance) -> Doorstep;
@@ -3871,7 +3883,7 @@ pub(in crate::assembly) struct Flight {
 
 计划一组是 `pursuits`、`delegator` 与认领表三样：它们回答「每栋楼在朝什么推进、谁在做哪一块」，而 `pursuit_changed` 与 `roadmap_*` 这几族记录只改动它们。`delegator` 跟着 `pursuits` 走，因为宣布一个 pursuit 只能经过深度零的位置，而这个位置只在开城时铸一次（`lifetime`）。
 
-入口一组是 `entrance`、`knocks`、`namings`：三样都是「已经到了城门口、还没变成 run 的工作」——按 key 来的命令、居民之间的搭话、等名字的派发。名字取 `Doorstep` 而不是「入口」的直译，因为 `Entrance` 已经是其中按 key 去重的那一份（8-41）。飞行一组把 `fence_gate` 与 `backlog` 收进已有的 `Flight`：围栏是 lane 里的 run 轮流去过的那道门，`backlog` 是它们留下仍在跑的命令，两者和 `Flight` 一样一城一份、只随 run 的起落变化。这两组是纯搬移，读写处只把 `self.knocks` 改拼为 `self.doorstep.knocks`、`self.backlog` 改拼为 `self.flight.backlog`。
+入口一组是 `entrance` 与 `knocks`：两样都是「已经到了城门口、还没变成 run 的工作」——按 key 来的命令、居民之间的搭话。名字取 `Doorstep` 而不是「入口」的直译，因为 `Entrance` 已经是其中按 key 去重的那一份（8-41）。飞行一组把 `fence_gate` 与 `backlog` 收进已有的 `Flight`：围栏是 lane 里的 run 轮流去过的那道门，`backlog` 是它们留下仍在跑的命令，两者和 `Flight` 一样一城一份、只随 run 的起落变化。这两组是纯搬移，读写处只把 `self.knocks` 改拼为 `self.doorstep.knocks`、`self.backlog` 改拼为 `self.flight.backlog`。
 
 **认领表只有一份定义。** `roadmap_claimed` 把房间记进它所属楼的表，`roadmap_finished`、`roadmap_released`、`roadmap_blocked` 把节点移出；房间就是这行记录的 `addr`，楼是 `addr` 的第一段，节点是载荷的 `node`。重启的协作折叠与活着的 worker 调用同一个 `PlanHolders::absorb`，所以两边不会各写一份规则。一行读不出楼或节点的记录不进表：认领表只记确知的持有者，不去猜。
 
