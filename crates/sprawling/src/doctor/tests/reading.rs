@@ -149,3 +149,56 @@ fn a_family_of_browsers_counts_once_in_the_summary() {
         "a person who is short of one is told the command that offers it"
     );
 }
+
+/// The heading is on the screen before the first item is asked about, so
+/// a person waiting on a slow tool is never looking at an empty terminal.
+#[test]
+fn the_heading_is_written_before_any_item_is_asked() {
+    use crate::doctor::{Absence, Machine, Requirement, Runnable};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct Watched {
+        written: Arc<AtomicBool>,
+        asked_in_silence: AtomicBool,
+    }
+    impl Machine for Watched {
+        fn look(&self, _requirement: &Requirement) -> Presence {
+            if !self.written.load(Ordering::SeqCst) {
+                self.asked_in_silence.store(true, Ordering::SeqCst);
+            }
+            Presence::Absent(Absence::NotOnSearchPath)
+        }
+        fn install(&self, _name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
+            Ok(())
+        }
+    }
+    struct Screen(Arc<AtomicBool>);
+    impl std::io::Write for Screen {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.store(true, Ordering::SeqCst);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let written = Arc::new(AtomicBool::new(false));
+    let machine = Watched {
+        written: Arc::clone(&written),
+        asked_in_silence: AtomicBool::new(false),
+    };
+    let asked = crate::doctor::screen::asked(&[], None);
+    crate::doctor::screen::run(
+        &asked,
+        &machine,
+        &mut std::io::empty(),
+        &mut Screen(written),
+    )
+    .unwrap();
+    assert!(
+        !machine.asked_in_silence.load(Ordering::SeqCst),
+        "an item was asked about while the screen was still empty"
+    );
+}

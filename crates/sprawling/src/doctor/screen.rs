@@ -106,8 +106,8 @@ pub(crate) fn run<R: BufRead, W: Write>(
     input: &mut R,
     out: &mut W,
 ) -> std::io::Result<bool> {
-    let findings = examine(machine);
     if let Some(code) = &asked.explain {
+        let findings = examine(machine);
         let explanation = explain(code, &findings, Platform::current());
         writeln!(out)?;
         for line in explanation_lines(code, &explanation) {
@@ -123,6 +123,10 @@ pub(crate) fn run<R: BufRead, W: Write>(
   this machine ({platform}), against what this city needs:
 "
     )?;
+    // The heading is on the screen before the probes start, so a person
+    // waiting on a slow tool is not looking at an empty terminal.
+    out.flush()?;
+    let findings = examine(machine);
     for part in Part::ALL {
         writeln!(out, "{}\n", part.heading())?;
         for finding in findings.iter().filter(|found| Part::of(found) == part) {

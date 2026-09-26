@@ -38,7 +38,7 @@ use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Runnable
 /// What is asked of the machine under this city. Two implementations:
 /// `ThisMachine`, and the scripted one the tests drive, which is what
 /// lets a verdict be judged without the machine that produced it.
-pub(crate) trait Machine {
+pub(crate) trait Machine: Sync {
     /// Whether this item is here, and in what condition.
     fn look(&self, requirement: &Requirement) -> Presence;
 
