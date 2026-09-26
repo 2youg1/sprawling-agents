@@ -13,8 +13,9 @@
 //!
 //! A damaged ledger may say otherwise, and an index over a damaged
 //! ledger is exactly what a repair path needs. A seq below `base`, one
-//! so far past the end that reaching it would make holes outnumber
-//! lines, and a location too large to pack all go to `outliers`, an
+//! so far past the end that reaching it would leave the column more
+//! holes than `max(lines it holds, MIN_REACH)`, and a location too large
+//! to pack all go to `outliers`, an
 //! ordered map that answers the same questions. Each seq lives in at
 //! most one of the two, and a seq written twice keeps the last location.
 
@@ -30,10 +31,10 @@ const OFFSET_MASK: u64 = (1 << OFFSET_BITS) - 1;
 /// A slot no line has claimed. No packed word equals it, because
 /// [`pack`] refuses the one location that would spell it.
 const HOLE: u64 = u64::MAX;
-/// How far past the end a seq may land and still stretch the column,
-/// when the column is shorter than this. Past that the bound is the
-/// column's own length, so holes never cost more than the lines do.
-const MIN_REACH: u64 = 64;
+/// The holes a stretched column may hold when it holds fewer lines than
+/// this. Past that the bound is the lines it holds, so holes never cost
+/// more than the lines do.
+const MIN_REACH: usize = 64;
 
 pub(super) struct Entries {
     base: Seq,
@@ -78,16 +79,17 @@ impl Entries {
         if self.column.is_empty() && self.outliers.is_empty() {
             self.base = seq;
         }
-        let at = seq.value().checked_sub(self.base.value())?;
-        let len = u64::try_from(self.column.len()).ok()?;
-        let reach = len.max(MIN_REACH);
-        if at >= len.checked_add(reach)? {
+        let at = usize::try_from(seq.value().checked_sub(self.base.value())?).ok()?;
+        if at < self.column.len() {
+            return Some(at);
+        }
+        let new_len = at.checked_add(1)?;
+        let lines = self.in_column.checked_add(1)?;
+        let holes = new_len.checked_sub(lines)?;
+        if holes > lines.max(MIN_REACH) {
             return None;
         }
-        let at = usize::try_from(at).ok()?;
-        if at >= self.column.len() {
-            self.column.resize(at.checked_add(1)?, HOLE);
-        }
+        self.column.resize(new_len, HOLE);
         Some(at)
     }
 
