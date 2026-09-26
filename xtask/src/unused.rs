@@ -119,6 +119,7 @@ fn names(text: &str, ident: &str) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
     use super::*;
 
