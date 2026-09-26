@@ -147,9 +147,15 @@ fn a_released_tree_stays_on_disk_for_the_nodes_next_run() {
 fn a_kept_tree_with_nothing_unmerged_starts_from_the_trunk_as_it_now_stands() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
-    trees.release(trees.claim(&name("node-1")).unwrap()).unwrap();
-    std::fs::write(dir.path().join("lab").join("notes.md"), b"second
-").unwrap();
+    trees
+        .release(trees.claim(&name("node-1")).unwrap())
+        .unwrap();
+    std::fs::write(
+        dir.path().join("lab").join("notes.md"),
+        b"second
+",
+    )
+    .unwrap();
     Checkpoint::open(dir.path())
         .unwrap()
         .land(TimeMs::new(2_000), &owner(), "checkpoint: lab")

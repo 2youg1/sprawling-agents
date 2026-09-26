@@ -15,21 +15,14 @@ use super::landing::{CheckoutRun, Landing, PlannedMerge, check_out};
 use super::lease::WorktreeLease;
 use super::name::WorktreeName;
 use super::weight::measure;
+use kept::Standing;
+
+mod kept;
 
 /// Where the trees live: inside the reserved subtree, because they are
 /// the city's own machinery rather than anybody's writable space. What a
 /// run may write is judged against the tree it works in.
 const WORKTREE_DIR: &str = "worktrees";
-
-/// Why a tree is locked: a run holds it.
-const LEASE_REASON: &str = "held by a sprawling run";
-
-/// What [`Worktrees::claim`] finds under a name.
-enum Standing {
-    Held,
-    Kept(git2::Worktree),
-    Absent,
-}
 
 /// The city's trees.
 pub struct Worktrees {
@@ -85,69 +78,6 @@ impl Worktrees {
             Standing::Kept(tree) => self.reattach(name, &tree),
             Standing::Absent => self.place(name),
         }
-    }
-
-    /// Where `name` stands: held under a lock, kept on disk for its
-    /// node, or not there at all.
-    ///
-    /// A registration with no directory under it is what an interrupted
-    /// placement or a person deleting the tree by hand leaves, and it is
-    /// taken back here - the same reflex the index has about a cache it
-    /// doubts - so that `E_WORKTREE_BUSY` keeps meaning that somebody is
-    /// working.
-    fn standing(&self, name: &WorktreeName) -> Result<Standing, MemoryError> {
-        let tree = match self.repo.find_worktree(name.as_str()) {
-            Ok(tree) => tree,
-            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Standing::Absent),
-            Err(err) => {
-                return Err(MemoryError::Worktree {
-                    op: "find a worktree",
-                    detail: format!("{}: {err}", name.as_str()),
-                });
-            }
-        };
-        if !tree.path().exists() {
-            self.forget(name)?;
-            return Ok(Standing::Absent);
-        }
-        let lock = tree.is_locked().map_err(|err| MemoryError::Worktree {
-            op: "read a worktree lock",
-            detail: format!("{}: {err}", name.as_str()),
-        })?;
-        Ok(match lock {
-            git2::WorktreeLockStatus::Locked(_) => Standing::Held,
-            git2::WorktreeLockStatus::Unlocked => Standing::Kept(tree),
-        })
-    }
-
-    /// Takes a kept tree back into use: every tracked file forced to
-    /// the node's branch head, every untracked file removed, then the
-    /// lock. Git rewrites only the files that differ, so a node's second
-    /// run costs what it left behind, not the size of the city.
-    fn reattach(
-        &self,
-        name: &WorktreeName,
-        tree: &git2::Worktree,
-    ) -> Result<WorktreeLease, MemoryError> {
-        let refuse = |op: &'static str, err: git2::Error| MemoryError::Worktree {
-            op,
-            detail: format!("{}: {err}", name.as_str()),
-        };
-        git2::Repository::open_from_worktree(tree)
-            .map_err(|err| refuse("open a kept worktree", err))?
-            .checkout_head(Some(
-                git2::build::CheckoutBuilder::new()
-                    .force()
-                    .remove_untracked(true),
-            ))
-            .map_err(|err| refuse("reset a kept worktree", err))?;
-        tree.lock(Some(LEASE_REASON))
-            .map_err(|err| refuse("lock a worktree", err))?;
-        Ok(WorktreeLease {
-            name: name.clone(),
-            path: tree.path().to_path_buf(),
-            disk: measure(tree.path())?,
-        })
     }
 
     /// Places a new tree for `name`, locked from the moment it exists.
