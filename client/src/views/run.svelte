@@ -135,6 +135,11 @@
   const spent = $derived(figuresOf(turns).usd);
   const live = $derived(shown !== undefined && shown.doing.kind !== "frozen");
   const room = $derived(shown?.addr ?? null);
+  // Where the changes lens stops. A live run that has not fenced past
+  // its opening is read against the working tree, which is where its
+  // edits are; a closed run stops at its last fence, or at its opening
+  // when it never fenced, so edits made after it ended are not counted.
+  const changedTo = $derived(live ? (lastFence === fence ? null : lastFence) : (lastFence ?? fence));
 
   // The run's clock as the page knows it: from the opening (or the
   // first turn) to the closing, or to now while the run is live.
@@ -316,7 +321,7 @@
     </div>
   {:else if eye.id === "changes"}
     {#if fence !== null}
-      <Changes base={fence} head={lastFence === fence ? null : lastFence} />
+      <Changes base={fence} head={changedTo} />
     {:else}
       <EmptyState missing="run_no_fence" />
     {/if}
