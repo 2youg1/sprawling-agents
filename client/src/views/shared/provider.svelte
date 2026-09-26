@@ -46,12 +46,13 @@
 <script lang="ts">
   import { QUERIES } from "../../core/asking";
   import { loginBegin, loginCode } from "../../core/commands";
+  import { readAnswer } from "../../core/answered";
   import { say } from "../../core/lang";
-  import type { EndpointsAnswer } from "../../wire";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
   import { AttachForm, EndpointList } from "../setup/providers";
 
   const { onAttached }: ProviderDoorProps = $props();
@@ -62,10 +63,7 @@
   let code = $state("");
 
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
-  const answer = $derived.by((): EndpointsAnswer | undefined => {
-    const held = $endpoints;
-    return held !== undefined && "endpoints" in held ? held.endpoints : undefined;
-  });
+  const read = $derived(readAnswer($endpoints, (held) => ("endpoints" in held ? held.endpoints : undefined)));
 
   // The approval page the login opened, read out of the ledger: the
   // city writes `login_started` with the URL the browser must be sent
@@ -85,8 +83,10 @@
 </script>
 
 <div class="flex flex-col gap-base">
-  {#if answer !== undefined}
-    <EndpointList {answer} />
+  {#if read.kind === "held"}
+    <EndpointList answer={read.value} />
+  {:else if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={QUERIES.endpoints} />
   {/if}
   <Segmented
     label={say($lang, "setup_providers")}

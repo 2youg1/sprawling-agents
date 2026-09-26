@@ -15,6 +15,7 @@
   // own words, a reply, a call - carries the one fork action. Hovering
   // or focusing shows it; the `fork.here` chord answers for the entry
   // under the hand (roadmap S2, ux A7).
+  import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import type { RunBelief } from "../../core/belief";
   import { keymap } from "../../core/keys";
@@ -22,9 +23,10 @@
   import { toFragment } from "../../core/route";
   import { clock, count, usd } from "../../core/time";
   import type { Snippet } from "svelte";
-  import type { Note, RoundsAnswer, RunId, Turn } from "../../wire";
+  import type { Note, Query, RunId, Turn } from "../../wire";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
   import Prose from "../prose.svelte";
   import Calls from "./calls.svelte";
   import ForkButton from "./fork_button.svelte";
@@ -71,11 +73,10 @@
   // once for this run and follows this id for the thread's life.
   // svelte-ignore state_referenced_locally (the capture is the point: the question is minted once, for the run this thread is keyed to)
   const readRun: RunId = run.run;
-  const rounds = u.conn.asking.ask({ rounds: { run: readRun } });
-  const answer = $derived.by((): RoundsAnswer | undefined => {
-    const held = $rounds;
-    return held !== undefined && "rounds" in held ? held.rounds : undefined;
-  });
+  const question: Query = { rounds: { run: readRun } };
+  const rounds = u.conn.asking.ask(question);
+  const read = $derived(readAnswer($rounds, (held) => ("rounds" in held ? held.rounds : undefined)));
+  const answer = $derived(read.kind === "held" ? read.value : undefined);
   const turns = $derived(answer?.turns ?? []);
   const task = $derived(answer?.opening?.task ?? run.task ?? "");
   // The opening task is a person's words like any other, and rides the
@@ -346,6 +347,9 @@ said, and what that cost. -->
 <section aria-label={run.run} class={frozen ? "settled" : undefined}>
   {#if task !== ""}
     {@render person(task, say($lang, "talk_you"), run.started ?? undefined, taskEntry)}
+  {/if}
+  {#if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={question} />
   {/if}
   {#each turns as turn (turn.opened)}
     {@render turnView(turn, !emptyRun)}
