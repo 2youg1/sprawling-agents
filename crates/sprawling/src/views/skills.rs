@@ -64,7 +64,7 @@ pub(super) fn skills_answer(
     building: &Address,
     pins: &SkillPins,
 ) -> Option<channels::SkillsAnswer> {
-    let home = crate::home::Home::detect().ok()?;
+    let home = accounting::home::Home::detect().ok()?;
     let shelves = city::Library::scan(city_root, Some(building), home.path()).ok()?;
     // What this building's reading room admits, so a page can show
     // the stock and the choice in one list.

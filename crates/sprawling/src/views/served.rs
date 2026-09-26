@@ -41,4 +41,38 @@ impl Views {
     ) {
         self.vault = Some(vault);
     }
+
+    /// Takes the one way this city asks the registry which release is
+    /// newest, so a `NewestRelease` query reaches the network only
+    /// through what the served city handed in.
+    pub(crate) fn ask_the_registry_through(&mut self, newest: fn() -> channels::ReleaseAnswer) {
+        self.registry = Some(newest);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::Views;
+    use kernel::{AxCode, AxError};
+
+    /// What the scripted registry says, so the answer shows whose it is.
+    fn scripted() -> channels::ReleaseAnswer {
+        channels::ReleaseAnswer::Refused {
+            refusal: AxError::failure(AxCode::ToolUnavailable, "ask the registry", "scripted")
+                .with_recovery("nothing: this registry is a script"),
+        }
+    }
+
+    #[test]
+    fn a_newest_release_is_asked_of_the_registry_the_views_were_handed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut views = Views::new(dir.path());
+        views.ask_the_registry_through(scripted);
+
+        assert_eq!(
+            views.prepare(&channels::Query::NewestRelease).finish(),
+            channels::Answer::Release(Box::new(scripted()))
+        );
+    }
 }

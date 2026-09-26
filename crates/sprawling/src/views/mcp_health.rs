@@ -101,7 +101,7 @@ impl LiveAsk {
             )
             .with_recovery("this city has no vault open; serve it and ask again")
         })?;
-        let resolve = crate::held_vault::resolving(std::sync::Arc::clone(vault));
+        let resolve = accounting::held_vault::resolving(std::sync::Arc::clone(vault));
         // A server is reached from the city root rather than from a
         // run's worktree: nothing is running, and the tree a run would
         // have does not exist yet.

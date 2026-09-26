@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One vault held behind a lock, as the parts that read it reach it
-//! (sprawling-SPEC.md section 8-92).
+//! (accounting-SPEC.md section 8-9).
 //!
 //! The assembly point, the served worker and the MCP health view each
 //! need a resolver over the city's vault, and each must refuse the same
@@ -16,7 +16,7 @@ use kernel::{AxCode, AxError};
 
 /// The refusal when a thread panicked while holding the vault. What was
 /// enrolled is on disk and unaffected; only this process lost the lock.
-pub(crate) fn poisoned_vault() -> AxError {
+pub fn poisoned_vault() -> AxError {
     AxError::failure(
         AxCode::StorageFatal,
         "reach the vault",
@@ -27,7 +27,7 @@ pub(crate) fn poisoned_vault() -> AxError {
 
 /// One resolver over one vault. A fresh one per operation, because
 /// `SecretResolver` is spent by the endpoint it is handed to.
-pub(crate) fn resolving(vault: Arc<Mutex<gateway::Custodian>>) -> gateway::SecretResolver {
+pub fn resolving(vault: Arc<Mutex<gateway::Custodian>>) -> gateway::SecretResolver {
     Box::new(move |reference: &kernel::SecretRef| {
         let held = vault.lock().map_err(|_| poisoned_vault())?;
         held.resolve(reference)

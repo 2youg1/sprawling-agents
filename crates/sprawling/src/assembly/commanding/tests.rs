@@ -7,4 +7,5 @@ mod answering;
 mod clockwork;
 mod entrance;
 mod restoring;
+mod revealing;
 mod shedding;

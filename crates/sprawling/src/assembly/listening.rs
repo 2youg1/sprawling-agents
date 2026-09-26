@@ -42,7 +42,7 @@ fn hearing(
         let recording = gateway::Recording::new(bytes, gateway::AudioType::of_media_type(&media)?)?;
         let speaking = views
             .snapshot()
-            .transcriber(crate::held_vault::resolving(Arc::clone(&vault)))?;
+            .transcriber(accounting::held_vault::resolving(Arc::clone(&vault)))?;
         speaking.transcribe(&recording)
     })
 }
@@ -149,12 +149,13 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // A views snapshot is cut at the last line folded, so a one-shot
     // read afterwards folds only what arrives after it (sprawling-SPEC
     // 8-91).
-    let (rebuilt, held) = start_served_views(
+    let (mut rebuilt, held) = start_served_views(
         &kernel::layout::CityLayout::new(city_root).ledger(),
         &mut log,
     )?;
     // The fold thread alternates between two copies, so the second is
     // made here from the first (sprawling-SPEC.md 8-93).
+    rebuilt.ask_the_registry_through(crate::release::answer);
     let spare = rebuilt.twin()?;
     // This machine is not asked here (sprawling-SPEC.md 8-54): the
     // table is thirty-two items, most of them a program started and

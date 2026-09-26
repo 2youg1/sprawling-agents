@@ -210,7 +210,7 @@ impl RunWorker {
         // reason above - what keeps their position keeps the cache.
         // `city::policy` refuses both settings on a confidential
         // building, so neither is ever reached there.
-        for tool in crate::browser_tool::for_rules(
+        for tool in (self.browsers)(
             &self.city_root,
             &memory::BlockOrigin {
                 run: site.run_id,
@@ -218,7 +218,7 @@ impl RunWorker {
             },
             &site.rules,
         )? {
-            admitted.push(Box::new(tool));
+            admitted.push(tool);
         }
         // External tools, for a building whose configuration names a
         // server. They join the table here, before the catalogue is

@@ -5,14 +5,14 @@
 
 //! Connecting an outside application: the command behind the page's
 //! button. What the page and this command both need to know about the
-//! broker is `crate::toolkit_broker`'s.
+//! broker is `accounting::toolkit_broker`'s.
 
 use channels::ToolkitSlug;
 use kernel::event::record::ToolkitLinkOpened;
 use kernel::{AxCode, AxError, EventKind, Payload};
 
 use super::RunWorker;
-use crate::toolkit_broker::broker_for;
+use accounting::toolkit_broker::broker_for;
 
 impl RunWorker {
     /// Opens a consent session for one outside application.

@@ -142,6 +142,14 @@ impl accounting::Clock for SystemClock {
     }
 }
 
+/// The browser tools a building's rules ask for: its own browser, then
+/// the person's when they declared one (sprawling-SPEC.md 8-45-2).
+pub type Browsers = fn(
+    &Path,
+    &memory::BlockOrigin,
+    &city::BuildingRules,
+) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
+
 /// What the startup scan found and repaired.
 pub struct ScanReport {
     /// What opening the ledger cut, told after the counts.
@@ -278,6 +286,20 @@ pub struct RunWorker {
     /// Reads the city's volume at the door new work enters by
     /// (sprawling-SPEC.md 8-94).
     read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
+    /// Hands one of this city's paths to the desktop's file manager
+    /// (`revealing::reveal`). Received rather than called, because it
+    /// starts a program on the host (sprawling-SPEC.md 8-60).
+    reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,
+    /// Builds the browser tools a building's rules ask for
+    /// (`browser_tool::for_rules`). Received rather than called, because
+    /// a browser tool starts a browser on the host (sprawling-SPEC.md
+    /// 8-45-2).
+    browsers: Browsers,
+    /// How this build installs one named item on this platform
+    /// (`doctor::recipe_for`). Received rather than read, because the
+    /// requirement table stays with the doctor (sprawling-SPEC.md,
+    /// `doctor_install`).
+    recipe_for: fn(&str) -> Result<&'static accounting::Recipe, AxError>,
 }
 
 impl RunWorker {

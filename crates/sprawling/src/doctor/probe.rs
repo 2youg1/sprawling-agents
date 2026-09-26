@@ -121,7 +121,7 @@ impl Machine for ThisMachine {
     /// Asks on a thread of its own that ends with the answer, so the
     /// doctor's own threads keep their level.
     fn core_standing(&self) -> Result<Standing, AxError> {
-        let setting = crate::person::core_priority()?;
+        let setting = accounting::person::core_priority()?;
         let unasked = |cause: String| {
             AxError::failure(
                 AxCode::ToolUnavailable,

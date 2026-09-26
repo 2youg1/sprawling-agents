@@ -221,7 +221,7 @@ fn no_home() -> AxError {
 /// and `no_home` refuses when neither is there.
 fn dirs() -> (Option<PathBuf>, Option<PathBuf>) {
     let local_app_data = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
-    let home = match sprawling::home::Home::detect() {
+    let home = match accounting::home::Home::detect() {
         Ok(home) => Some(home.path().to_path_buf()),
         Err(_) => None,
     };

@@ -203,7 +203,7 @@ impl RunWorker {
             // own layer and no run can observe it, so a record of it
             // in the city's one history would travel to every machine
             // that city is copied to.
-            channels::Command::PutPreferences { patch, .. } => crate::person::put(patch),
+            channels::Command::PutPreferences { patch, .. } => accounting::person::put(patch),
             channels::Command::PutShelved { name, .. } => Err(not_built(
                 "write a shelved document",
                 name.clone(),
@@ -224,7 +224,7 @@ impl RunWorker {
                 ..
             } => self.put_spine(at, which, base, body),
             channels::Command::Halt { scope, .. } => self.set_admission(&scope, Admittance::Halted),
-            channels::Command::Reveal { at, .. } => crate::revealing::reveal(&self.city_root, &at),
+            channels::Command::Reveal { at, .. } => (self.reveal)(&self.city_root, &at),
             channels::Command::RestoreDiscard {
                 ref restoration, ..
             } => self.restore_discard(restoration),
@@ -309,5 +309,15 @@ impl RunWorker {
         // past jobs no lane ever took.
         self.last_tick = now;
         Ok(started)
+    }
+
+    /// Replaces the file manager, so a test can see what a reveal asks
+    /// for without starting a program on the host.
+    #[cfg(test)]
+    pub(in crate::assembly) fn reveal_with(
+        &mut self,
+        reveal: fn(&std::path::Path, &kernel::Address) -> Result<(), AxError>,
+    ) {
+        self.reveal = reveal;
     }
 }

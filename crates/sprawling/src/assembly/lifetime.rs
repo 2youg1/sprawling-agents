@@ -203,7 +203,7 @@ impl RunWorker {
             log,
             doorstep: Doorstep::opened(entrance),
             origins,
-            flight: Flight::open(),
+            flight: Flight::open(crate::monitor::memory::read),
             index: memory::LedgerIndex::empty(),
             warm: super::keeping_warm::Kept::default(),
             models: Box::new(GatewayModels),
@@ -211,6 +211,9 @@ impl RunWorker {
             machine: Box::new(ThisMachine::new(Platform::current(), PATIENCE)),
             clock: std::sync::Arc::new(SystemClock),
             read_volume: crate::monitor::volume::read,
+            reveal: crate::revealing::reveal,
+            browsers: crate::browser_tool::for_rules,
+            recipe_for: crate::doctor::recipe_for,
         };
         worker.sweep_abandoned_trees();
         Ok(worker)
@@ -311,6 +314,14 @@ impl RunWorker {
         clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
     ) -> RunWorker {
         RunWorker { clock, ..self }
+    }
+
+    /// The same worker, taking the browser tools a building's rules ask
+    /// for from `browsers` instead of starting a browser on this host
+    /// (sprawling-SPEC.md 8-45-2).
+    #[must_use]
+    pub fn with_browsers(self, browsers: super::Browsers) -> RunWorker {
+        RunWorker { browsers, ..self }
     }
 }
 

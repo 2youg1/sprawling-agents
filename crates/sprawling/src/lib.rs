@@ -22,7 +22,6 @@ pub mod assembly;
 pub mod console;
 pub mod doctor;
 pub mod firstrun;
-pub mod home;
 pub mod lineage;
 pub mod monitor;
 pub mod release;
@@ -32,10 +31,7 @@ pub mod supervising;
 
 mod browser_bidi;
 mod browser_tool;
-mod held_vault;
 mod keying;
-mod person;
-mod toolkit_broker;
 mod views;
 
 pub use views::{ask, turns};

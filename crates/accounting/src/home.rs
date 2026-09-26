@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! This person's home directory, and what this product keeps under it
-//! (sprawling-SPEC.md section 8-70).
+//! (accounting-SPEC.md section 8-7).
 //!
 //! Three callers derived the same directory before this module: the
 //! doctor looking for downloaded components, the installer looking for
@@ -44,14 +44,14 @@ const CITIES_DIR: &str = "sprawling";
 /// One name for both placements: `bin::firstrun` decides between the
 /// binary's own directory and the home directory, and a second
 /// spelling there would let the two answers drift apart.
-pub(crate) const CITY_DIR: &str = "city";
+pub const CITY_DIR: &str = "city";
 
 /// What this machine looks like when neither variable is set.
 ///
 /// `Home::detect` refuses with this sentence and the doctor reports it
 /// for `Absence::NoHome`, so the person reading the refusal and the
 /// person reading the report read one fact.
-pub(crate) const NO_HOME: &str = "neither USERPROFILE nor HOME is set";
+pub const NO_HOME: &str = "neither USERPROFILE nor HOME is set";
 
 /// This person's home directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,9 +72,7 @@ impl Home {
     pub fn detect() -> Result<Home, AxError> {
         let root = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));
         match root {
-            Some(root) => Ok(Home {
-                root: PathBuf::from(root),
-            }),
+            Some(root) => Ok(Home::at(root)),
             None => Err(AxError::failure(
                 AxCode::PathNotFound,
                 "find this person's home directory",
@@ -84,13 +82,12 @@ impl Home {
         }
     }
 
-    /// A home at a named directory, for tests that compare paths
-    /// rather than read this machine's environment.
-    #[cfg(test)]
-    pub(crate) fn at(root: &Path) -> Home {
-        Home {
-            root: root.to_path_buf(),
-        }
+    /// A home at a named directory: what [`Home::detect`] builds once it
+    /// has read the environment, and what a caller that compares paths
+    /// builds without reading it.
+    #[must_use]
+    pub fn at(root: impl Into<PathBuf>) -> Home {
+        Home { root: root.into() }
     }
 
     /// The home directory itself.

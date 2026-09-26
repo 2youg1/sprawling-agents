@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The three facts both sides of connecting an outside application need
-//! (sprawling-SPEC.md section 8-92).
+//! (accounting-SPEC.md section 8-9).
 //!
 //! A page reads the shelf and a command opens a consent session. They
 //! would otherwise each decide where the project key is enrolled, which
@@ -28,7 +28,7 @@ const KEY_REFERENCE: &str = "secret:mcp/composio";
 /// `Ok(None)` means nobody has enrolled a key yet, which is the
 /// ordinary state of a city nobody has configured and not a failure.
 /// `Err` means the vault itself could not answer, which is.
-pub(crate) fn broker_for(
+pub fn broker_for(
     vault: Option<&Arc<Mutex<gateway::Custodian>>>,
     city: Option<&Address>,
 ) -> Result<Option<(protocol::Broker, String)>, AxError> {

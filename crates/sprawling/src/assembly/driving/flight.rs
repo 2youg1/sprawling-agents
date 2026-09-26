@@ -72,10 +72,12 @@ pub(in crate::assembly) struct Flight {
 }
 
 impl Flight {
-    pub(in crate::assembly) fn open() -> Flight {
+    /// `read_memory` is where the pool reads how much memory is free
+    /// before it starts a run (sprawling-SPEC.md 8-46-3).
+    pub(in crate::assembly) fn open(read_memory: fn() -> crate::monitor::memory::Memory) -> Flight {
         let gate = RelayGate::open();
         Flight {
-            pool: DrivingPool::open(DRIVING_LANES, gate.bell()),
+            pool: DrivingPool::open(DRIVING_LANES, gate.bell(), read_memory),
             gate,
             driving: BTreeMap::new(),
             homes: VecDeque::new(),
@@ -93,7 +95,7 @@ impl Flight {
     /// The concurrency wall a caller reads before it prepares work it
     /// cannot start; the memory is read here, at the moment it decides.
     pub(in crate::assembly) fn full(&self) -> bool {
-        self.pool.full(crate::monitor::memory::read())
+        self.pool.full()
     }
 
     /// The plan rows one pursuit has in lanes: how many, and which

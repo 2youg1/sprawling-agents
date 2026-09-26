@@ -34,7 +34,7 @@ impl RunWorker {
         // thousand skills; what costs resident bytes is the list this
         // building's own file admits, and a name on that list which is
         // not on the shelves is left out rather than promised.
-        let home = crate::home::Home::detect()?;
+        let home = accounting::home::Home::detect()?;
         let shelves = city::Library::scan(&self.city_root, Some(building.addr()), home.path())?;
         for holding in shelves.reading_room(rules.reading_room()) {
             // A catalog entry is opened by an address, and a shelf
