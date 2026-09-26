@@ -11,9 +11,11 @@
 //! other than the node's own agent saying the done check passed.
 //!
 //! The second rule is that the judge must have read what it is judging.
-//! Before a verdict, the fan-in asks a question whose answer is derived
-//! from the artifacts themselves, so an answer can only come from having
-//! opened them. This is a fence rather than a proof - one read is not
+//! Before a verdict, the fan-in asks for an artifact's whole content and
+//! checks it against the digest, so an answer can only come from having
+//! opened it. A digest-derived answer would not do: the question has to
+//! name the artifact's `cas:b3-…` locator, and that locator spells the
+//! digest. This is a fence rather than a proof - one read is not
 //! all reading - and the honest claim is the narrow one: a judgment
 //! passed without opening anything is refused.
 
@@ -22,11 +24,6 @@ use std::collections::BTreeMap;
 use kernel::{AxCode, AxError, B3Hash, Locator};
 
 use crate::workshop::NodeId;
-
-/// How much of the digest the judge has to hand back. Eight hex
-/// characters cannot be guessed and can be copied by anyone who opened
-/// the artifact.
-const WITNESS_LEN: usize = 8;
 
 /// A node's result before anybody checked it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,13 +126,12 @@ impl Artifact {
         &self.verified_by
     }
 
-    fn witness(&self) -> String {
-        self.claim
-            .digest
-            .to_string()
-            .chars()
-            .take(WITNESS_LEN)
-            .collect()
+    /// Whether `content` is what this artifact stores. A final line break
+    /// lost on the way through a JSON argument is restored once, because
+    /// losing it does not mean the reader never opened the artifact.
+    fn holds(&self, content: &str) -> bool {
+        B3Hash::digest(content.as_bytes()) == self.claim.digest
+            || B3Hash::digest(format!("{content}\n").as_bytes()) == self.claim.digest
     }
 }
 
@@ -215,8 +211,8 @@ impl FanIn {
         Ok(PrivateQuestion {
             node: node.clone(),
             prompt: format!(
-                "before judging: give the first {WITNESS_LEN} characters of the content digest \
-                 of node {}'s artifact at {}",
+                "before judging: open node {}'s artifact at {} and give its whole content, \
+                 exactly as stored",
                 node.as_str(),
                 artifact.at()
             ),
@@ -231,12 +227,11 @@ impl FanIn {
     /// prevent.
     pub fn decide(&self, answer: &str) -> Result<Joined, AxError> {
         let question = self.question()?;
-        let expected = self
+        let read = self
             .artifacts
             .get(&question.node)
-            .map(Artifact::witness)
-            .unwrap_or_default();
-        if answer.trim().to_ascii_lowercase() != expected {
+            .is_some_and(|artifact| artifact.holds(answer));
+        if !read {
             return Err(AxError::failure(
                 AxCode::EvidenceMissing,
                 "judge a fan-in",
@@ -319,18 +314,13 @@ mod tests {
                 .unwrap(),
         );
 
-        let witness: String = B3Hash::digest(b"result")
-            .to_string()
-            .chars()
-            .take(WITNESS_LEN)
-            .collect();
         let err = join.decide("i had a look").unwrap_err();
         assert_eq!(err.code(), &AxCode::EvidenceMissing);
         assert!(
-            !err.to_string().contains(&witness),
+            !err.to_string().contains("result"),
             "a refusal that leaks the answer teaches the shortcut"
         );
-        let joined = join.decide(&witness).unwrap();
+        let joined = join.decide("result").unwrap();
         assert_eq!(joined.nodes().len(), 1);
     }
 
@@ -380,6 +370,6 @@ mod tests {
             "a",
             "the question is a function of what is in hand, not of the order it arrived"
         );
-        assert!(join.question().unwrap().prompt().contains("digest"));
+        assert!(join.question().unwrap().prompt().contains("whole content"));
     }
 }

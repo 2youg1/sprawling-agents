@@ -162,7 +162,7 @@ fn the_join_will_not_take_a_verdict_from_somebody_who_read_nothing() {
         asked.result.as_map()["question"]
             .as_str()
             .unwrap()
-            .contains("digest")
+            .contains("whole content")
     );
 
     let judge = |answer: &str| {
@@ -176,8 +176,7 @@ fn the_join_will_not_take_a_verdict_from_somebody_who_read_nothing() {
         }
     };
     assert!(tool.invoke(&judge("looks right to me")).is_err());
-    let witness: String = digest.to_string().chars().take(8).collect();
-    let joined = tool.invoke(&judge(&witness)).unwrap();
+    let joined = tool.invoke(&judge("what the node produced")).unwrap();
     assert_eq!(
         joined.result.as_map()["joined"].as_array().unwrap().len(),
         1
