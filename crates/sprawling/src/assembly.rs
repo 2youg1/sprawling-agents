@@ -89,6 +89,17 @@ use kernel::{EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};
 use runtime::Interrupt;
 
+/// The monotonic sampling point beside [`now_ms`]: how long a thread
+/// stayed busy is a span, and a wall clock that steps would misstate it
+/// (sprawling-SPEC.md 8-93).
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the one monotonic sampling point: a core thread's valve measures spans"
+)]
+pub(crate) fn monotonic_now() -> std::time::Instant {
+    std::time::Instant::now()
+}
+
 /// The single sanctioned sampling point (clippy.toml disallowed-methods). Everything below this call takes `TimeMs` as a
 /// parameter.
 pub(crate) fn now_ms() -> Result<TimeMs, AxError> {

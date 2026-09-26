@@ -3610,6 +3610,8 @@ impl CoreThread {
 }
 pub(crate) fn setting_telling_a_refusal() -> CorePriority; // 读不了就 Normal，并向标准错误说出拒绝
 pub(crate) fn serving_runtime(setting: CorePriority) -> std::io::Result<tokio::runtime::Runtime>;
+// bin::assembly
+pub(crate) fn monotonic_now() -> Instant; // 单调钟的唯一取样点，与 now_ms 并列；阀量的是时长，墙钟会跳
 // bin::person
 pub(crate) fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
 ```

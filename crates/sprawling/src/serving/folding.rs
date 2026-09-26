@@ -7,11 +7,11 @@
 //! reader (sprawling-SPEC.md 8-89).
 
 use std::sync::{Arc, Mutex, mpsc};
-use std::time::Instant;
 
 use kernel::{AxCode, AxError, EventRecord};
 
 use super::standing::{CorePriority, CoreThread};
+use crate::assembly::monotonic_now;
 use crate::views::Views;
 
 /// The two places the writer thread hands the views what it wrote, and
@@ -93,10 +93,10 @@ fn fold_until_closed(
     to_clients: &tokio::sync::broadcast::Sender<EventRecord>,
     setting: CorePriority,
 ) {
-    let mut core = CoreThread::raise("sprawling-views", setting, Instant::now());
+    let mut core = CoreThread::raise("sprawling-views", setting, monotonic_now());
     let mut following = Following::Live;
     for fold in arriving {
-        let woke = Instant::now();
+        let woke = monotonic_now();
         following = match following {
             Following::Live => fold_one(views, &fold),
             Following::Stopped => Following::Stopped,
@@ -106,7 +106,7 @@ fn fold_until_closed(
             // no browser open is a city doing its work.
             drop(to_clients.send(record));
         }
-        core.record_turn_lowering_when_busy(woke, Instant::now());
+        core.record_turn_lowering_when_busy(woke, monotonic_now());
     }
 }
 

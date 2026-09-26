@@ -11,6 +11,8 @@
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
+use crate::assembly::monotonic_now;
+
 /// How long a raised thread may stay busy before the valve lowers it.
 pub(crate) const BUSY_LIMIT: Duration = Duration::from_secs(10);
 
@@ -125,8 +127,8 @@ pub(crate) fn setting_telling_a_refusal() -> CorePriority {
 pub(crate) fn serving_runtime(setting: CorePriority) -> std::io::Result<tokio::runtime::Runtime> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .on_thread_unpark(move || worker_woke(setting, Instant::now()))
-        .on_thread_park(|| worker_slept(Instant::now()))
+        .on_thread_unpark(move || worker_woke(setting, monotonic_now()))
+        .on_thread_park(|| worker_slept(monotonic_now()))
         .build()
 }
 
