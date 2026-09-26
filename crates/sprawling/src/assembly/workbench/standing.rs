@@ -99,8 +99,8 @@ impl RunWorker {
     /// What the agreement answered arrives as `agreed` rather than being
     /// asked again: asking twice would put a second authority behind a
     /// credential renewal that may reach the network. What is left is
-    /// one phase because it interlocks - a lease is named after the run,
-    /// and the run's id is minted after that renewal - so cutting it
+    /// one phase because it interlocks - a lease is opened in the run's
+    /// name, and the run's id is minted after that renewal - so cutting it
     /// apart would move a clock sample, which a structural change may
     /// not relocate.
     ///
@@ -152,8 +152,9 @@ impl RunWorker {
         // from so the two cannot say different things.
         self.governance.sent(run_id, &given.task, &given.goal);
 
-        // A building under review gives every run its own tree, and the
-        // run writes there instead of in the city. Nothing it writes is
+        // A building under review gives every room its own tree, kept
+        // between the room's runs, and a run writes there instead of in
+        // the city. Nothing it writes is
         // visible until somebody else checks it — the losing line of the
         // design made physical rather than promised.
         //
@@ -180,9 +181,9 @@ impl RunWorker {
                 .map_err(memory::MemoryError::into_ax)?;
             let trees =
                 memory::Worktrees::open(&self.city_root).map_err(memory::MemoryError::into_ax)?;
-            let name = memory::WorktreeName::parse(&run_id.to_string())
+            let claimed = trees
+                .claim(&tree_of(addr)?)
                 .map_err(memory::MemoryError::into_ax)?;
-            let claimed = trees.claim(&name).map_err(memory::MemoryError::into_ax)?;
             self.record_for(
                 run_id,
                 effect::Line {
@@ -219,4 +220,17 @@ impl RunWorker {
             retries,
         })
     }
+}
+
+/// The tree a room under review works in, named after the room so that
+/// its next run takes the same tree back. An address may hold any
+/// character a tree name may not, so the name carries the leading 16
+/// hex digits of the address's digest rather than the address itself.
+fn tree_of(addr: &Address) -> Result<memory::WorktreeName, AxError> {
+    let digest: String = kernel::B3Hash::digest(addr.as_str().as_bytes())
+        .to_string()
+        .chars()
+        .take(16)
+        .collect();
+    memory::WorktreeName::parse(&format!("room-{digest}")).map_err(memory::MemoryError::into_ax)
 }
