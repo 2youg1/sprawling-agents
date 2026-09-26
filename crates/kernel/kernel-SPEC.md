@@ -140,6 +140,7 @@ gate ──▶ 上述全部（组合面）＋idem
 - 不做 I/O、不采样时钟、不生成随机数——RunId／时间戳／种子全部由调用方注入；`uuid` 依赖仅用于解析与格式化，恒不启用生成特性。
 - 不实现任何端口——`Ledger` 的实现住 memory 与 citysim；kernel 只声明 trait 与链语义纯函数。
 - 不认识文件系统、明文凭证与颜色——canonicalize、Vault、OKLCH 各归其效果面模块。
+- 不持 Markdown 词法器——界面读文档时由客户端 `client/src/core/prose.ts` 分词，Rust 侧没有调用者；在 kernel 再放一份只会与客户端那份悄悄分叉。服务端真要分词的那一天，词法器随它的第一个调用者一起进来。
 
 ## 8 接口先行（按模块分章）
 
@@ -313,6 +314,8 @@ impl Locator {
     /// Fail-closed: anything not exactly the grammar is E_LOCATOR_INVALID.
     /// Unknown scheme or algorithm tag is an error, never a fallback path.
     pub fn parse(raw: &str) -> Result<Self, AxError>;
+    /// The whole object behind a digest the caller already holds; no range.
+    pub const fn cas(hash: B3Hash) -> Self;
 }
 impl fmt::Display for Locator { /* 规范拼写往返：parse(x).to_string() == 规范形 */ }
 ```
@@ -322,6 +325,7 @@ impl fmt::Display for Locator { /* 规范拼写往返：parse(x).to_string() == 
 - 十六进制恒小写（规范字节唯一化）；大写拒。`b3-` 外的算法标签拒（对扩展开放：新标签＝新 variant，旧解析不宽容）。
 - `SecretRef`（`secret:`）恒不入本文法——`secret:` 前缀命中即 `E_LOCATOR_INVALID`，两套解析器分立（类型层理由）。
 - serde：字符串形（Display/parse 往返）。
+- `Locator::cas(hash)` 是手里已有 `B3Hash`（通常是 `Cas::put` 的回答）时的唯一构造法：一个 digest 本就合文法，拼成文本再 `parse` 回来只是多了一次分配、一次解析，外加一个恒不发生的错误分支，调用方还得为它写 `?`。
 - `B3Hash::from_bytes([u8;32])`／`to_hex()`；`Range` 构造校验 `from<=to`（Lines 另 `from>=1`）。
 - S2 增 `B3Hash::digest(bytes: &[u8]) -> B3Hash`（blake3 直算）：全库内容哈希的唯一产地——prefix 分段哈希与 stall 指纹均经此，不在 kernel 外直呼 blake3（一个哈希一个家）。`chain_hash` 保留为链语义专名（内部改经 digest）。
 
@@ -1437,35 +1441,6 @@ pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
 **没有任何字段能装补丁文本**：补丁文本就是文件内容，而文件内容离开运行中的机器是
 `secret::scan` 存在的理由。hunk 必须单独请求并同样受扫，所以它拼不进这个类型。
 
-### 8-31 kernel::highlight（形状 1 判定）
-
-```rust
-pub enum Token { Heading, Strong, Emphasis, Code, Fence, Meta, Link, Marker, Quote }
-pub struct Span { pub start: u32, pub len: u32, pub token: Token }
-pub fn markdown(text: &str) -> Vec<Span>;
-```
-
-**落点只有一个，而它全是 Markdown。** 界面唯一读文件的地方是 `BuildingDoc.text`，
-而 `read_building` 只收 `RULES.toml` 与楼根目录下的 `*.md`。agent 写给下一个 agent 的计划与
-交接就是这些文件，而人读它们时需要的是标题、列表、行内代码与围栏块彼此分开。
-
-**为什么不上线不上服务端。** 另一种方案是服务端分词、线上走 span，理由是 syntect 在 wasm 里太重。
-那条理由对 syntect 成立，对一个 Markdown 词法器不成立——它就几 KB。为一个尚不存在的第二实现
-先把线格式撑大，是 ARCHITECTURE 明禁的「以假想复用为理由的抽象」。
-**缝在 `markdown(&str) -> Vec<Span>` 这个签名上**：将来真需要语法引擎时，它去服务端、
-线格式那时再长。
-
-**在 kernel 而不在客户端**：同 `kernel::change` 的理由——无 I/O、无时钟、输出穷举枚，
-而且服务端有一天也要用它。`channels` 转出类型与函数；现在没有 Rust 调用者，客户端用自己的
-`client/src/core/prose.ts`。
-
-**偏移量恒在字符边界上**：切片由客户端拿着 `start`/`len` 去做，落在多字节字符中间的
-偏移会让一页中文文档直接炸。一条断言钉住：每一个 span 都切得出来。
-
-**Span 恒不重叠、按 `start` 升序**：重叠的 span 让渲染方必须自己决定谁赢，
-那就是把词法规则的一半搬到了视图里。围栏块内部整块是 `Code`，不再分词——
-本版没有语法引擎，而把 `**x**` 在 Rust 代码里读成粗体是在编造。
-
 ### 8-28 C17 从「首段」扩到「任一段」（形状 2 value 的一条原语）
 
 ```rust
@@ -1759,17 +1734,6 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 文法、`B3Hash`／`GitOid`／`Range`／`Locator` 四型与全部解析、呈现、十六进制原语都留在原路径，
 故规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／
 `clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
-
-### 8-41 kernel::highlight 目录化
-
-`highlight.rs`（437）只作一次切分：原内联 `mod tests` 整段迁到 `highlight/tests.rs`（12 个 `#[test]`，
-断言与名字一字不动，`use super::*` 原样保留，两个夹具 `cut`／`tokens` 随测试同迁、不复制），
-父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份含 `clippy::arithmetic_side_effects` 的
-`#[allow(...)]` 列表。`highlight.rs` 剩 304 行：`Token`／`Span` 两型、`markdown` 与全部行内词法
-原语（`read_line`／`marker_len`／`opens_fence`／`fence_len`／`inline`／`scan`／`links`／`claim`／
-`push`）都留在原路径 —— `scan` 带 `argument_count` 豁免，键 `crates/kernel/src/highlight.rs::scan`，
-因此不得搬家。规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：
-`cargo check`／`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
 
 ### 8-42 kernel::tool 目录化
 

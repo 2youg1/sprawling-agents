@@ -340,7 +340,7 @@ fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> 
 
 ```rust
 // bin::assembly
-struct Knock { addr: Address, from: String, mode: runtime::Mode, conversations: u32 }
+struct Knock { addr: Address, from: String, mode: kernel::Mode, conversations: u32 }
 impl RunWorker {
     fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
     fn answer_knocks(&mut self);   // 成波排干，循环而非递归
@@ -1074,9 +1074,9 @@ justfile／CI 无涉；S4 前端框架结论书将改写 build.rs 拷贝源与 `
 
 ### 不搬走什么，以及这件事本身的发现
 
-`NAME_THE_WORK`、`NAME_TOKENS`、`mode_of`、`not_built`、`Reporter`、`building_of`、`plan_node_of`
+`NAME_THE_WORK`、`NAME_TOKENS`、`not_built`、`Reporter`、`building_of`、`plan_node_of`
 在原文件里**物理上坐在 `Views` 那一簇的中间**，而它们的使用者是 `RunWorker` 与 `CollaborationFold`：
-`not_built` 六处、`Reporter` 三处、`mode_of` 一处，`Views` 一处都不用。
+`not_built` 六处、`Reporter` 三处，`Views` 一处都不用。
 **这就是那个文件长成这样的机制**——没有边界的地方，新东西落在光标所在的行，而不是落在它属于的地方。
 
 ### 验收
@@ -1289,7 +1289,7 @@ pub(super) struct Assignment {
     /// 那间房里的跑从此想多久，当调用方说了。写进房间自己的配置层，
     /// 所以它答不到房间存在之前去。
     effort: Option<kernel::Effort>,
-    mode: runtime::Mode,
+    mode: kernel::Mode,
     budget: kernel::BudgetCap,
     parent: Option<RunId>,
 }
@@ -2597,7 +2597,7 @@ impl Owing {
     /// 继任者接过的同一份义务：接力向前一跳，超上限即 `E_LOOP_SUSPECTED`。
     fn after_succession(&self) -> Result<Owing, AxError>;
 }
-struct Knock { addr: Address, from: String, mode: runtime::Mode, conversations: u32 }
+struct Knock { addr: Address, from: String, mode: kernel::Mode, conversations: u32 }
 fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
 ```
 
@@ -2902,7 +2902,7 @@ pub(super) fn tuning_of(wire: channels::EndpointTuning) -> gateway::EndpointTuni
 
 - **`probe_endpoint` 不再因读不出模型表而拒绝**。它记一条 `endpoint_probed`，里面是分段读数（`gateway::reach` 量出，时间由调用方戳，采样点仍只有 `bin::assembly`）、模型表、以及读不出时那条拒绝自己的 code 与 subject。理由是这四段对填表的人是四个不同的下一步，而作为一次拒绝返回时它们在界面上塌成传输库的一句话。**它仍会拒绝的两件事**：凭据引用拼不出来、载荷账本不收——两者都没走到发请求那一步，因此没有读数可报。
 - **`attach_endpoint` 的拒绝语义一个字没改**：probe 失败而人没点名任何模型，仍然是拒绝，因为那样的城连一个可调用的模型 id 都没有。
-- **probe 按调用时的那套头与期限发出**：一个需要自定义请求头的网关，在 probe 不带那个头时答 401，人于是读到「密钥无效」，而那把密钥是好的。`request_max_retries` 在这里被兑现一次——设置页上有人正在等这一个请求；模型调用的那一份由同一个数走另一条路兑现：`dispatching::agreeing` 在选定端点处把它读成 `runtime::Retries` 冻进 `RunPlan`，`runtime::run::drive` 据此决定一次可重试的失败之后还有没有下一次。
+- **probe 按调用时的那套头与期限发出**：一个需要自定义请求头的网关，在 probe 不带那个头时答 401，人于是读到「密钥无效」，而那把密钥是好的。`request_max_retries` 在这里被兑现一次——设置页上有人正在等这一个请求；模型调用的那一份由同一个数走另一条路兑现：`dispatching::agreeing` 在选定端点处把这个 `kernel::Retries` 原样冻进 `RunPlan`，`runtime::run::drive` 据此决定一次可重试的失败之后还有没有下一次。
 - **`tuning_of` 是线上词汇与 gateway 词汇之间唯一的翻译点**：零读成缺省（清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成），空名字的头与不以 `/` 开头的 pointer 被丢掉（表单在人打字时留着空行），`stream_idle_timeout_ms` 成为 `stream_deadline_ms`。
 - **`EndpointsAnswer` 的每一行带 `label`**，取 `AttachedEndpoint::label()`，缺省即 name。
 

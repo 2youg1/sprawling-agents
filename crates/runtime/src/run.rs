@@ -83,7 +83,7 @@ pub struct RunPlan {
     /// the reason every other setting here is: a number changed halfway
     /// through would make the account of what this run did depend on
     /// when somebody looked at a form.
-    pub retries: crate::Retries,
+    pub retries: kernel::Retries,
 }
 
 /// Where the driver stops to ask whether anything arrived. The turn layer

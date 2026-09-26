@@ -125,7 +125,7 @@ impl RunWorker {
         let mut must_read = Vec::new();
         let bytes = city_segment(&self.city_root)?.bytes;
         let hash = self.cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
-        must_read.push(Locator::parse(&format!("cas:b3-{hash}"))?);
+        must_read.push(Locator::cas(hash));
         let standing = self.ledger.position();
         let handoff = runtime::handoff::Handoff::new(
             must_read,

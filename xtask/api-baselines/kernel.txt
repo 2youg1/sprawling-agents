@@ -278,6 +278,8 @@ pub const fn kernel::budget::UsdMicros::new(u64) -> kernel::budget::UsdMicros
 pub const fn kernel::budget::UsdMicros::new(u64) -> kernel::budget::UsdMicros
 pub const fn kernel::locator::B3Hash::from_bytes([u8; 32]) -> Self
 pub const fn kernel::locator::B3Hash::from_bytes([u8; 32]) -> Self
+pub const fn kernel::locator::Locator::cas(kernel::locator::B3Hash) -> Self
+pub const fn kernel::locator::Locator::cas(kernel::locator::B3Hash) -> Self
 pub const fn kernel::retries::Retries::of(core::option::Option<u32>) -> kernel::retries::Retries
 pub const fn kernel::retries::Retries::of(core::option::Option<u32>) -> kernel::retries::Retries
 pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
@@ -447,7 +449,6 @@ pub enum kernel::StopCause
 pub enum kernel::StopReason
 pub enum kernel::Temporal
 pub enum kernel::Through
-pub enum kernel::Token
 pub enum kernel::VersionVerdict
 pub enum kernel::WindowClass
 pub enum kernel::WriteDomain
@@ -498,7 +499,6 @@ pub enum kernel::gate::EgressTarget
 pub enum kernel::gate::GateOutcome
 pub enum kernel::goal::GoalResource
 pub enum kernel::goal::GoalVerdict
-pub enum kernel::highlight::Token
 pub enum kernel::locator::Locator
 pub enum kernel::locator::Range
 pub enum kernel::model::ContentBlock
@@ -866,7 +866,6 @@ pub fn kernel::goal::GoalId::as_str(&self) -> &str
 pub fn kernel::goal::GoalId::new(impl core::convert::Into<alloc::string::String>) -> core::option::Option<kernel::goal::GoalId>
 pub fn kernel::goal::GoalId::new(impl core::convert::Into<alloc::string::String>) -> core::option::Option<kernel::goal::GoalId>
 pub fn kernel::goal::detect_conflict(&[kernel::goal::GoalEntry], &kernel::goal::GoalEntry) -> kernel::goal::GoalVerdict
-pub fn kernel::highlight::markdown(&str) -> alloc::vec::Vec<kernel::highlight::Span>
 pub fn kernel::idem::Duplicate::key(&self) -> &kernel::idem::IdemKey
 pub fn kernel::idem::Duplicate::key(&self) -> &kernel::idem::IdemKey
 pub fn kernel::idem::IdemGuard::key(&self) -> &kernel::idem::IdemKey
@@ -1601,9 +1600,6 @@ pub kernel::SecretSpan::len: usize
 pub kernel::SecretSpan::provider: core::option::Option<&'static str>
 pub kernel::SecretSpan::start: usize
 pub kernel::ShedReason::CapacityExhausted
-pub kernel::Span::len: u32
-pub kernel::Span::start: u32
-pub kernel::Span::token: kernel::highlight::Token
 pub kernel::StallVerdict::Ok
 pub kernel::StallVerdict::Stall
 pub kernel::StallVerdict::Stall::repeats: u32
@@ -1628,15 +1624,6 @@ pub kernel::Through::Disabled
 pub kernel::Through::Environment(alloc::string::String)
 pub kernel::Through::Excluded
 pub kernel::Through::LocalAddress
-pub kernel::Token::Code
-pub kernel::Token::Emphasis
-pub kernel::Token::Fence
-pub kernel::Token::Heading
-pub kernel::Token::Link
-pub kernel::Token::Marker
-pub kernel::Token::Meta
-pub kernel::Token::Quote
-pub kernel::Token::Strong
 pub kernel::ToolCall::args: kernel::Payload
 pub kernel::ToolCall::id: alloc::string::String
 pub kernel::ToolCall::name: kernel::tool::ToolName
@@ -2085,18 +2072,6 @@ pub kernel::goal::GoalResource::Path(kernel::address::Address)
 pub kernel::goal::GoalVerdict::Clear
 pub kernel::goal::GoalVerdict::Conflict
 pub kernel::goal::GoalVerdict::Conflict::with: kernel::goal::GoalId
-pub kernel::highlight::Span::len: u32
-pub kernel::highlight::Span::start: u32
-pub kernel::highlight::Span::token: kernel::highlight::Token
-pub kernel::highlight::Token::Code
-pub kernel::highlight::Token::Emphasis
-pub kernel::highlight::Token::Fence
-pub kernel::highlight::Token::Heading
-pub kernel::highlight::Token::Link
-pub kernel::highlight::Token::Marker
-pub kernel::highlight::Token::Meta
-pub kernel::highlight::Token::Quote
-pub kernel::highlight::Token::Strong
 pub kernel::locator::Locator::Cas
 pub kernel::locator::Locator::Cas::hash: kernel::locator::B3Hash
 pub kernel::locator::Locator::Cas::range: core::option::Option<kernel::locator::Range>
@@ -2368,7 +2343,6 @@ pub mod kernel::event::record
 pub mod kernel::event::record::autonomy_word
 pub mod kernel::gate
 pub mod kernel::goal
-pub mod kernel::highlight
 pub mod kernel::idem
 pub mod kernel::layout
 pub mod kernel::ledger
@@ -2466,7 +2440,6 @@ pub struct kernel::Seq(_)
 pub struct kernel::ServerLabel(_)
 pub struct kernel::SessionName(_)
 pub struct kernel::Share(_)
-pub struct kernel::Span
 pub struct kernel::SystemBlock
 pub struct kernel::TaintSet(_)
 pub struct kernel::TaintSource(_)
@@ -2558,7 +2531,6 @@ pub struct kernel::gate::ConnectorCall<'a>
 pub struct kernel::gate::EgressAllowlist
 pub struct kernel::goal::GoalEntry
 pub struct kernel::goal::GoalId(_)
-pub struct kernel::highlight::Span
 pub struct kernel::idem::Duplicate
 pub struct kernel::idem::IdemGuard
 pub struct kernel::idem::IdemKey

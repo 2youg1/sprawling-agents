@@ -395,7 +395,7 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<st
 
 ```rust
 pub struct Watchdog { /* corrections: u32、provider_failures: u32、retries: Retries —— 私有，逐 Run 一实例 */ }
-#[derive(Default)] pub enum Retries { #[default] UntilHalted, AtMost(u32) }
+// retries 的类型是 kernel::Retries（§8-43）
 pub enum Disposal { Proceed, CorrectiveSteer { text: String },
                                      BackOff { until: TimeMs, code: AxCode, subject: String },
                                      Freeze { reason: FreezeReason } }
@@ -489,10 +489,10 @@ pub fn dev_entry() -> CatalogEntry;   // 一行披露，全部细则归 expansio
 ### 8-12b runtime::mode 原有面
 
 ```rust
-pub enum Mode { PlanGoal, Up, Sc, Ud, Experiment }
-impl Mode { pub fn as_str(&self) -> &'static str;              // "plan_goal" | "up" | "sc" | "ud" | "experiment"
-            pub fn catalog_entry(&self) -> CatalogEntry }      // 含 PlanGoal 退出条件四列
+pub fn catalog_entry(mode: kernel::Mode) -> CatalogEntry;     // 含 PlanGoal 退出条件四列
 ```
+
+哪些 mode 存在、各自拼成什么词，只由 `kernel::Mode` 回答（线、账本与配置文件都读它）；本模块只持每个 mode 准入什么、目录里怎么介绍它。runtime 不再有自己的 `Mode`：两份同成员的枚举要靠装配层一个五臂恒等的 `match` 维系，新增一个 mode 时那是第二处必须同步改的地方。
 
 ### 8-13 runtime::sandbox（缝清单文件，形状 3＋4）
 
@@ -1749,7 +1749,7 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 
 ### 8-43 重试上限住 kernel
 
-`Retries` 曾经在 gateway 与 runtime 各有一份，两个臂相同、文档相同，而两个 crate 互不依赖——于是这个事实除了 kernel 无处可住。现在它住 `kernel::retries`：gateway 用它决定要不要再发一次请求，`Watchdog` 用它决定要不要冻结这次运行。`runtime::Retries` 是对它的再导出，不是第二份定义。
+两个 crate 互不依赖，而 gateway 决定要不要再发一次请求、`Watchdog` 决定要不要冻结这次运行，读的是同一个事实——所以 `Retries` 住 `kernel::retries`，两边都直接用 `kernel::Retries`，不再导出别名：别名让读者以为有两个类型，调用点于是写出一个两臂恒等的 `match` 去「转换」它们。
 
 ### 8-44 runtime::compaction::exchange（形状 2 值＋形状 1 判定）：回合边界的压缩
 

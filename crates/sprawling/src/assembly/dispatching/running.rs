@@ -108,7 +108,7 @@ impl RunWorker {
             .put(brief.segment_text().as_bytes())
             .map_err(memory::MemoryError::into_ax)?;
         let given = Given {
-            job: Locator::parse(&format!("cas:b3-{job_hash}"))?,
+            job: Locator::cas(job_hash),
             brief,
             task,
             goal,

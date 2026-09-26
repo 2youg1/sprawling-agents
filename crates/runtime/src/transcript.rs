@@ -158,7 +158,7 @@ impl Transcript {
     ) -> Result<TranscriptRecord, AxError> {
         let bytes = self.bytes();
         let hash = cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
-        let original = Locator::parse(&format!("cas:b3-{hash}"))?;
+        let original = Locator::cas(hash);
         let address = Transcript::address(room, self.run)?;
         let path = city_root.join(address.as_str());
         let io = |err: std::io::Error| {

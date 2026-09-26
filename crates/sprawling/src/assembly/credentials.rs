@@ -115,7 +115,7 @@ pub(super) fn tuning_of(
         timeout_ms: stated(wire.timeout_ms),
         request_max_retries: wire
             .request_max_retries
-            .map_or(gateway::Retries::UntilHalted, gateway::Retries::AtMost),
+            .map_or(kernel::Retries::UntilHalted, kernel::Retries::AtMost),
         stream_idle_timeout_ms: stated(wire.stream_idle_timeout_ms),
         extra_headers,
         overrides: wire
