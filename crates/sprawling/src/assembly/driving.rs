@@ -122,12 +122,14 @@ impl Sieving {
         &mut self,
         outcome: kernel::ToolOutcome,
     ) -> Result<kernel::ToolOutcome, AxError> {
+        let mut cas = super::held(&self.cas, "take the lanes' store")?;
         runtime::package_connector(
             outcome,
             runtime::offload::OffloadSite {
-                cas: &mut self.cas,
+                cas: &mut cas,
                 city_root: &self.city_root,
                 room: &self.room,
+                origin: self.origin.clone(),
             },
         )
     }

@@ -42,6 +42,8 @@ pub(in crate::assembly) struct Laying {
     pub(in crate::assembly) city: kernel::B3Hash,
     vault: std::sync::Arc<std::sync::Mutex<gateway::Custodian>>,
     connectors: std::sync::Arc<dyn accounting::Connectors + Send + Sync>,
+    /// The browser tools a building's rules ask for (`RunWorker::browsers`).
+    browsers: super::Browsers,
     backlog: runtime::Backlog,
     /// The city's one fence at a time (`driving::lane::DriveContext`).
     pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
@@ -95,6 +97,7 @@ impl super::RunWorker {
             city: self.city_hash()?,
             vault: self.vault_handle(),
             connectors: std::sync::Arc::clone(&self.connectors),
+            browsers: self.browsers,
             backlog: self.flight.backlog.clone(),
             fence_gate: std::sync::Arc::clone(&self.flight.fence_gate),
             store: std::sync::Arc::clone(&self.lane_store),
