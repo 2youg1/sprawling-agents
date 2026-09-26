@@ -168,4 +168,28 @@ mod tests {
         let refused = settled(&frames).expect_err("half an answer is not an answer");
         assert_eq!(refused.code(), &kernel::AxCode::Provider);
     }
+
+    /// The Responses stream reports a failure after 200 as an `error`
+    /// event whose reason is its top-level `code`.
+    #[test]
+    fn an_error_event_mid_stream_is_the_failure_it_reports() {
+        let reported = |code: &str| {
+            let frames = vec![
+                json!({"type": "response.output_text.delta", "delta": "hal"}),
+                json!({"type": "error", "code": code, "message": "m", "param": null}),
+            ];
+            let refused = settled(&frames).expect_err("an error event is not an answer");
+            (
+                refused.subject().to_owned(),
+                serde_json::to_value(&refused).unwrap()["retry"].clone(),
+            )
+        };
+        assert_eq!(
+            [reported("server_error"), reported("invalid_prompt")],
+            [
+                ("the stream reported server_error".to_owned(), json!("yes")),
+                ("the stream reported invalid_prompt".to_owned(), json!("no")),
+            ]
+        );
+    }
 }

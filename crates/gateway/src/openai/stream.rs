@@ -206,4 +206,44 @@ mod tests {
             refused.subject()
         );
     }
+
+    /// A provider that fails after answering 200 sends one chunk with an
+    /// `error` object and no `choices`; the rate limit names its reason
+    /// in `code` and a bare category in `type`.
+    #[test]
+    fn an_error_chunk_mid_stream_is_the_failure_it_reports() {
+        let reported = |error: serde_json::Value| {
+            let frames = vec![
+                json!({"choices": [{"delta": {"content": "hal"}}]}),
+                json!({ "error": error }),
+            ];
+            let refused = settled(&frames).expect_err("an error chunk is not an answer");
+            (
+                refused.subject().to_owned(),
+                serde_json::to_value(&refused).unwrap()["retry"].clone(),
+            )
+        };
+        assert_eq!(
+            [
+                reported(json!({"message": "m", "type": "server_error", "code": null})),
+                reported(
+                    json!({"message": "m", "type": "requests", "code": "rate_limit_exceeded"})
+                ),
+                reported(
+                    json!({"message": "m", "type": "insufficient_quota", "code": "insufficient_quota"})
+                ),
+            ],
+            [
+                ("the stream reported server_error".to_owned(), json!("yes")),
+                (
+                    "the stream reported rate_limit_exceeded".to_owned(),
+                    json!("yes")
+                ),
+                (
+                    "the stream reported insufficient_quota".to_owned(),
+                    json!("no")
+                ),
+            ]
+        );
+    }
 }
