@@ -78,7 +78,7 @@ pub(crate) struct Landing<L = Line> {
 }
 
 /// One line of a plan's landing and the node whose claim it closes; a
-/// split closes nothing.
+/// split closes its parent.
 pub(crate) struct Closing {
     pub(crate) line: Line,
     pub(crate) closes: Option<NodeId>,
