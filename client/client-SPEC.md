@@ -132,6 +132,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `belief.ts` | 7 投影 | `createBelief() -> { belief, adoptCity, apply(record) -> string \| null, say(delta), logged(line), refused(error), named(city), noticesSeen, batch(folds) }`——`batch` 里的折叠只在最外层结束时 `set` 一次，`socket.ts` 的 `drain`（连同其中 `filled` 折的缺口页）与 welcome 各是一批，所以两帧之间的一串记录是一次更新、一次重绘；`Belief { runs, halted, haltedAt, refusal, notices, city, probed, logs }`；`RunBelief { run, addr, started, task, lastSeq, doing, local, saying, thinking }`；`Notice { error, seen, at: TimeMs, key: string, count: number, about: Address \| RunId \| null }`——`refused()` 按 `key`（`code + subject`）合并同文并计 `count`，`at` 取首见时刻；`adopted(summary, held)`。**`apply` 答的是它读不出的字段名**（如 `tool_called.name`），`null` 才是读全了：一份形状不对的载荷仍然推进位置，但静默当作缺席的读法已删 |
 | `belief/runs.svelte.ts` | 7 投影 | `runTable(held) -> Record<RunId, RunBelief>`：run 表是 `$state`，每个 run 是一个响应式对象。`say(delta)` 对已持有的 run 就地追加 `saying`／`thinking`，不重发 `belief`，只唤醒读这个 run 这个字段的读者；只有 delta 带来新 run（表的形状变了）才发布一次。记录的折叠与 `adoptCity` 仍整值写入并发布。测试经 `client/bunfig.toml` 预载的 `scripts/runes.ts` 用 `compileModule` 编 `.svelte.ts`（含 `*.svelte.test.ts`），与 vite 进产物同一编译器 |
 | `doing.ts` | 2 值 | `Doing = unknown \| thinking \| calling { tool: string \| null, subject } \| waiting \| frozen { completion }`、`Sending = dispatch \| steer \| queued`、`sendingInto(doing)`；`MOVING`／`moves(kind)`／`PHASES` 是「哪些 kind 陈述姿态、各自陈述什么」的独家表，流与答案两条路都读它 |
+| `landing.ts` | 1 判定 | `sentFrom(from, task, runs) -> Sent`（发出那一刻记下房间、任务原文与已知的 run）、`landingOf(sent, runs) -> Landing`，`Landing` 穷尽（`pending`／`here`／`elsewhere { run, addr }`）：`run_started` 之后第一个「发出时不认识、`task` 与原文相同、`addr` 是发出的房间或其下一层」的 run 就是这次派的活；落在原房间时线程已经画出它，落在别处时 `talk/landed.svelte` 在原地留一行可点的去处（见 12-3） |
 | `reading.ts` | 4 适配器 | `taskOf(record)`、`toolCall(record)`、`completionOf(record)`、`haltOf(record)`，各答 `[值, 读不出的字段名 \| null]`；`kernel::event::record` 的字段名与 serde 属性（`Option` 与 `#[serde(default)]` 各是什么意思）在客户端只有这一处拼写 |
 | `scope.ts` | 4 适配器 | `scopeOf(spelled) -> HaltScope \| null`（Ledger 拼法→frame 拼法，唯一相遇点）、`sameScope`、`buildingIsShut`、`cityIsShut`、`CITY`；`CITY` 是两套拼法共同的那一个词，五个视图改读它，不再手写 `"city"` |
 | `run_id.ts` | 4 适配器 | `readRunId(raw) -> Option<RunId>`：`Schema.decodeOption` 于生成的 `RunId`，地址栏与转写文件名的唯一文法 |
@@ -401,3 +402,11 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：两者给同样的逐键粒度——读 `runs[id].saying` 的 effect 只因这个 run 这个字段重跑，遍历表的读者只因 run 的增删重跑（`belief/grain.svelte.test.ts` 判定）。记录的写法让十余个按 `runs[id]`、`Object.values(runs)` 读表的视图一行不改。在 R = 1e4、一帧 50 个 delta、一个读全表的订阅者下，每帧折叠从约 470–540 µs 降到约 30–40 µs（`belief/fold_cost.test.ts`，同一仪表前后交错测），因为 delta 不再让订阅者走一遍表。
 - **被击败的备选**：`SvelteMap<RunId, RunBelief>`。粒度相同，但每个读者都得改成 `get`／`values()`，且对已有键 `set` 新值时，有遍历读者就会连带推进迭代版本。
 - **重开参数**：视图改由 belief 暴露的派生索引读表（不再直接下标）时，表的容器可以换，读者迁移的成本就不再存在。
+
+### 12-3 派出去的活落在哪，由 `run_started` 的地址与任务原文认出
+
+- **决策**：页面在发出 `dispatch` 时记下房间、任务原文和当时已知的 run；随后第一个满足三条的 run——发出时不认识、`RunStarted::task` 等于原文、记录的 `addr` 是发出的房间或它下面的房间——就是这次派的活（`core/landing.ts`）。落在别的房间时，原地留一行「这次 run 去了 `<地址>`」，链到那间房（`talk/landed.svelte`），不自动跳走。
+- **理由**：`runtime::run::lifecycle` 写 `run_started` 时带上房间地址（`addr`）和原样的 `task`，所以不动线协议就能认出；在楼的地址上派活时，城按规则开 `<楼>/<房间>`，人若留在楼的对话页就会对着一间空房。留一行而不是跳走，是因为人可能正要在原房间里接着写，一次不请自来的跳转会把焦点和草稿带走。
+- **被击败的备选**：`run_started` 带上派活帧的 `IdemKey`，按键精确认领。它更严：两个页面同时往同一栋楼派同一句话时，今天的认法两边都会认第一个起来的 run（两个都是这个人自己派的，所以链接不会指向别人的活）。它要改线协议、`WIRE_V` 进位，归到改线协议的那一组。
+- **重开参数**：同一栋楼里同一句任务的并发派活成为常态（例如一个页面批量派活），或城开始改写任务原文（去空白、加前缀），就按被击败的备选改为按 `IdemKey` 认领。
+
