@@ -85,12 +85,16 @@ pub enum AxCode {
     BackpressureShed,
     // Unknown outcome (1).
     ToolOutcomeUnknown,
+    // Plan (1). A standing goal set on a building with no plan; the
+    // subject is always `<building address>: <goal>`, which is the shape
+    // the client's form recovery reads.
+    PlanMissing,
 }
 
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
     /// (from S2 on) `xtask specalign`.
-    pub const ALL: [AxCode; 39] = [
+    pub const ALL: [AxCode; 40] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
         AxCode::ToolUnavailable,
@@ -130,6 +134,7 @@ impl AxCode {
         AxCode::DiscardIrreversible,
         AxCode::BackpressureShed,
         AxCode::ToolOutcomeUnknown,
+        AxCode::PlanMissing,
     ];
 
     /// The wire spelling. Sole spelling authority; serde and Display reuse it.
@@ -174,6 +179,7 @@ impl AxCode {
             AxCode::BackpressureShed => "E_BACKPRESSURE_SHED",
             AxCode::DiscardIrreversible => "E_DISCARD_IRREVERSIBLE",
             AxCode::ToolOutcomeUnknown => "E_TOOL_OUTCOME_UNKNOWN",
+            AxCode::PlanMissing => "E_PLAN_MISSING",
         }
     }
 
@@ -228,7 +234,8 @@ impl AxCode {
             | AxCode::WorktreeBusy
             | AxCode::BrowserUnavailable
             | AxCode::ToolOutcomeUnknown
-            | AxCode::BackpressureShed => Carrier::Event(EventKind::ToolResult),
+            | AxCode::BackpressureShed
+            | AxCode::PlanMissing => Carrier::Event(EventKind::ToolResult),
         }
     }
 }
@@ -328,9 +335,9 @@ mod tests {
         // The length is the close of the table, so it is stated once:
         // a code added without a spelling, or two codes sharing one,
         // fails here rather than at a caller.
-        assert_eq!(AxCode::ALL.len(), 39);
+        assert_eq!(AxCode::ALL.len(), 40);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
-        assert_eq!(spellings.len(), 39);
+        assert_eq!(spellings.len(), 40);
         for s in &spellings {
             assert!(s.starts_with("E_"));
         }

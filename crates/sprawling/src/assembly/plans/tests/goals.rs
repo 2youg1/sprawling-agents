@@ -247,6 +247,71 @@ fn three_ready_nodes_drive_three_runs_at_once() {
     assert_eq!(frozen, 3, "every run the pursuit started has to freeze");
 }
 
+/// A standing goal on a building with no plan would find no ready step
+/// and finish at once having done nothing, so it is refused instead, with
+/// the subject the client's form recovery reads.
+#[test]
+fn a_standing_goal_on_a_building_without_a_plan_is_refused_with_the_building_and_the_goal() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+
+    let refusal = worker
+        .handle(channels::Command::Pursue {
+            addr: Address::parse("lab").unwrap(),
+            step: channels::PursuitStep::Set {
+                goal: "fire the kiln".to_owned(),
+            },
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"pursue"),
+        })
+        .unwrap_err();
+
+    assert_eq!(
+        (refusal.code().as_str(), refusal.subject()),
+        ("E_PLAN_MISSING", "lab: fire the kiln")
+    );
+}
+
+/// A plan that is there but does not parse is a different fact from no
+/// plan: the refusal names the broken line instead of asking the mayor
+/// to write a plan over the one the person already wrote.
+#[test]
+fn a_standing_goal_on_a_malformed_plan_is_refused_with_the_broken_line() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
+    std::fs::write(
+        dir.path().join("lab").join(city::ROADMAP_FILE),
+        "| id | two columns |
+",
+    )
+    .unwrap();
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+
+    let refusal = worker
+        .handle(channels::Command::Pursue {
+            addr: Address::parse("lab").unwrap(),
+            step: channels::PursuitStep::Set {
+                goal: "fire the kiln".to_owned(),
+            },
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"pursue"),
+        })
+        .unwrap_err();
+
+    assert_eq!(
+        (
+            refusal.code().as_str(),
+            refusal.subject().contains("line 1")
+        ),
+        ("E_INVALID_ARGS", true)
+    );
+}
+
 /// The ledger line around a byte offset, for an assertion that would
 /// otherwise fail with two numbers and no page to look at.
 ///

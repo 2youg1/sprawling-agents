@@ -180,8 +180,8 @@
     "zh": "提交"
   },
   "bld_goal_placeholder": {
-    "en": "standing goal…",
-    "zh": "常设目标…"
+    "en": "give {addr} a standing goal",
+    "zh": "给 {addr} 一个长期目标"
   },
   "bld_halt": {
     "en": "/stop {addr}",
@@ -208,8 +208,8 @@
     "zh": "{done}/{total}"
   },
   "bld_pursue": {
-    "en": "pursue",
-    "zh": "持续推进"
+    "en": "set as standing goal",
+    "zh": "设为常设目标"
   },
   "bld_release": {
     "en": "/release {addr}",
@@ -2975,6 +2975,14 @@
   "act_no_target": {
     "en": "this refusal names nothing to act on",
     "zh": "这次拒绝没有指名对象"
+  },
+  "act_ask_plan": {
+    "en": "ask the mayor for a plan",
+    "zh": "让市长写计划"
+  },
+  "form_ask_plan": {
+    "en": "Write a plan for {building} whose ready steps work towards: {name}",
+    "zh": "为 {building} 写一份计划，让它的就绪步骤朝向：{name}"
   },
   "palette_group_actions": {
     "en": "actions",

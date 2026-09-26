@@ -18,7 +18,7 @@
 // label on its control, the words it prefills and the room they land
 // in, and the refusal's subject supplies the building and the missing
 // name. A code joins a form row only when every subject it is raised
-// with has that shape.
+// with has that shape, as `E_PLAN_MISSING` does: `<building>: <goal>`.
 //
 // An empty row is a decision: most refusals name their own recovery in
 // the sentence the city wrote (`AxError.recovery`) and offer nothing a
@@ -71,6 +71,12 @@ const AGAIN: Recovery = { kind: "reconnect", verb: "link_retry" };
 // person there.
 const SETTINGS: Recovery = { kind: "settings", verb: "act_go_settings" };
 const RELOAD: Recovery = { kind: "reload", verb: "link_reload" };
+const ASK_PLAN: Recovery = {
+  kind: "form",
+  label: "act_ask_plan",
+  words: "form_ask_plan",
+  room: "mayor",
+};
 
 const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
   // The room's model is frozen against this session: leave the room, or
@@ -96,6 +102,9 @@ const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
   // Two ends that disagree about the wire disagree again on every
   // reconnect; only the client this city was built with settles it.
   E_WIRE_MISMATCH: [RELOAD],
+  // A standing goal needs a plan with a ready step; the mayor writes
+  // plans, so the form asks the mayor for one, and the person sends it.
+  E_PLAN_MISSING: [ASK_PLAN],
   // Everything else: the refusal's own sentence is the guidance, and
   // no command helps from the notice.
   E_PATH_NOT_FOUND: [],

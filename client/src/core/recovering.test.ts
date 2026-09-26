@@ -43,3 +43,14 @@ describe("the recovery table", () => {
     expect(recoveryFor("E_WIRE_MISMATCH").map((recovery) => recovery.kind)).toEqual(["reload"]);
   });
 });
+
+// A standing goal set on a building without a plan is refused, and the
+// refusal offers the one form that gets the building a plan: the
+// mayor's composer, filled with a request the person still sends.
+describe("a standing goal without a plan", () => {
+  test("offers a form that asks the mayor to write the plan", () => {
+    expect(recoveryFor("E_PLAN_MISSING")).toEqual([
+      { kind: "form", label: "act_ask_plan", words: "form_ask_plan", room: "mayor" },
+    ]);
+  });
+});

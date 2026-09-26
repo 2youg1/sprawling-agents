@@ -60,7 +60,7 @@ fn carrier_declarations_cover_every_code() {
     }
     assert_eq!(loadtime, 6, "loadtime whitelist is closed at six");
     assert_eq!(gate, 7);
-    assert_eq!(tool, 19, "`E_BUSY` joins the refusals a caller reads");
+    assert_eq!(tool, 21, "`E_BUSY` joins the refusals a caller reads");
     assert_eq!(
         AxCode::BudgetExhausted.carrier(),
         Carrier::Event(EventKind::BudgetLimit)

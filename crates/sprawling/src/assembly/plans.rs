@@ -145,6 +145,47 @@ impl RunWorker {
         }
     }
 
+    /// Refuses a standing goal on a building that has no plan to work
+    /// through, saying why.
+    ///
+    /// Only an absent or empty plan is `E_PLAN_MISSING`, because that
+    /// code's recovery asks the mayor to write one. A read failure keeps
+    /// its own code, and a plan that does not parse is `E_INVALID_ARGS`
+    /// naming its broken lines, so a plan the person wrote is never
+    /// offered to be written over.
+    fn require_plan_to_pursue(&self, addr: &Address, goal: &str) -> Result<(), AxError> {
+        const ACTION: &str = "set a standing goal";
+        let missing = || {
+            AxError::failure(
+                AxCode::PlanMissing,
+                ACTION,
+                format!("{}: {goal}", addr.as_str()),
+            )
+            .with_recovery("ask the mayor to write this building's plan, then set the goal again")
+        };
+        let text = city::roadmap(&self.city_root, addr)?;
+        if text.trim().is_empty() {
+            return Err(missing());
+        }
+        let plan = match kernel::spine::check_roadmap_shape(&text) {
+            kernel::RoadmapShape::WellFormed { rows } => kernel::PlanTree::build(rows)?,
+            kernel::RoadmapShape::Malformed { problems } => {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    ACTION,
+                    format!("{}: {}", addr.as_str(), problems.join("; ")),
+                )
+                .with_recovery(
+                    "repair the table in this building's plan, then set the goal again",
+                ));
+            }
+        };
+        if plan.is_empty() {
+            return Err(missing());
+        }
+        Ok(())
+    }
+
     /// Sets, pauses, resumes or clears a building's pursuit.
     ///
     /// **Held in the process and not written down.** A standing goal is
@@ -172,6 +213,12 @@ impl RunWorker {
         };
         let name = match step {
             channels::PursuitStep::Set { goal } => {
+                // A pursuit works through the plan's ready steps, so on a
+                // building with no plan it would finish at once having
+                // done nothing. The subject is `<building>: <goal>`, the
+                // shape the client's form recovery reads to prefill the
+                // mayor's request for a plan (client-SPEC 4-35a).
+                self.require_plan_to_pursue(addr, &goal)?;
                 // Declared through the depth-zero position this worker
                 // holds. That is the runtime half of the guard the type
                 // already carries: a sub-agent has no `Delegator`, and
