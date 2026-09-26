@@ -3460,3 +3460,31 @@ pub(super) fn spawn_folding(
 **线程随写线程结束。** `attend` 返回后写线程丢掉 `RunWorker`（连同观察者与 `machine`），通道随之关闭，折叠线程把通道里剩下的折完、广播完再退出；写线程 join 它之后才结束，所以 `serve` 对写线程的 join 也等到了最后一次广播。
 
 **尚未做到的（本节接口的当前状态）**：查询仍在锁内作答，`GitStatus` 等做 I/O 的查询仍在锁内做 I/O，所以读者之间、以及读者与折叠线程之间仍会互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取、把 I/O 移到锁外（锁内只取所需的小数据），是这一接口余下的两步。
+
+### 8-90 `RunWorker` 按所持状态拆开：凭据一组（`bin::assembly::credentials::held`，形状 1 数据）
+
+```rust
+// bin::assembly::credentials::held —— shape: data
+pub(in crate::assembly) struct Credentials {
+    pub(in crate::assembly) book: gateway::EndpointBook,        // 接了哪些端点、每个 tag 选了哪个模型
+    pub(in crate::assembly) vault: Arc<Mutex<gateway::Custodian>>,
+    pub(in crate::assembly) expiries: Expiries,                 // 每个 provider 的订阅凭据何时失效
+    pub(in crate::assembly) logins: BTreeMap<String, gateway::OauthPending>, // 只在内存：PKCE verifier 证明的是同一进程
+}
+impl Credentials {
+    pub(in crate::assembly) fn opened(book, expiries, vault: gateway::Custodian) -> Credentials;
+    pub(in crate::assembly) fn absorb(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
+}
+// bin::assembly::recording
+impl RunWorker {
+    fn absorb(&mut self, kind: EventKind, run: RunId, addr: Option<&Address>, data: &Payload) -> Result<(), AxError>;
+}
+```
+
+`RunWorker` 拆成六个对象：凭据、治理、协作、计划、入口、飞行中的 run。每个对象带走自己的字段、方法与测试，`RunWorker` 只持有这六个对象和账本、CAS、日志这些整城共用的东西。凭据一组是 `book`、`vault`、`expiries`、`logins` 四个字段：它们回答同一个问题——这座城能以谁的身份去叫哪个模型——而且改动它们的是同一族记录（`endpoint_attached`、`model_selected`、`endpoint_lost`、`secret_captured`）。治理早已是一个对象（`views::Governance`），判定面与读面共用那一个定义，这一步不动它。协作、计划、入口、飞行中的 run 的拆分是本节接口的下一步，在那之前这些字段仍直接挂在 `RunWorker` 上。
+
+**worker 写下的每一行，它持有的每一份折叠都要看到，不论这行以城的名义还是以某个 run 的名义写。** 重启走 `Standing::fold`，那条路把账本上每一行都交给每一份折叠，不问是谁写的；活着的 worker 若只在以城的名义写时才折凭据与会话起点，一行由 run 写下的 `endpoint_attached` 就在账本上、却不在 worker 的 `book` 里，直到进程重启——这正是 8-17 已经排除的那类「活城与重启折出两份」。所以 `record_where` 与 `record_for` 都经过同一个 `RunWorker::absorb`，它依次交给会话起点、治理、凭据三份折叠；哪份折叠看哪几种记录由各自的 `absorb` 决定，这里不再筛。
+
+**红**：一个 run 以自己的名义写下一行 `endpoint_attached`（`record_for`），随后 worker 的 `book` 与从同一账本重折出来的 `book` 应当列出同样的端点。改动之前，worker 的 `book` 为空而重折的那份有这一端点。
+
+**为何字段仍是 `pub(in crate::assembly)`**：这一步是纯搬移，读写这些字段的二十余处调用只把 `self.book` 改拼为 `self.credentials.book`；把它们收进 `Credentials` 的方法是另一次改动，混进来会让搬移与行为变化无法分开审。
