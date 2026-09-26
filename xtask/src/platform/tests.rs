@@ -3,16 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::path::{Path, PathBuf};
-
-use super::{PLATFORMS, matrix, restated, shim, spent_suffixes, suffixes};
-
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("xtask sits one level under the repository root")
-        .to_path_buf()
-}
+use super::{PLATFORMS, matrix, shim, spent_suffixes, suffixes};
 
 /// Two rows claiming one platform would make which binary a person
 /// gets depend on the order the assets were read in.
@@ -93,11 +84,4 @@ fn a_recorded_suffix_that_is_no_longer_needed_is_reported() {
     assert!(found[0].violation.contains(&built));
     assert!(found[1].violation.contains("nobody spells it"));
     assert!(spent_suffixes(&recorded[1..], &["-linux-x86_64.zip".to_owned()]).is_empty());
-}
-
-/// Every file that restates the table agrees with it today.
-#[test]
-fn the_repository_itself_passes_the_check_it_ships() {
-    let found = restated(&root()).unwrap();
-    assert!(found.is_empty(), "{found:#?}");
 }

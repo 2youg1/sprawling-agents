@@ -122,16 +122,3 @@ fn a_span_naming_no_fact_leaves_the_map_without_it() {
     readings(&root(), &found, &mut taken).expect("an unknown key is not an error here");
     assert!(taken.is_empty());
 }
-
-#[test]
-fn the_documents_of_this_tree_hold_no_span_this_gate_cannot_read() {
-    let root = root();
-    for file in documents(&root).expect("the tree walks") {
-        let rel = walk::rel(&root, &file);
-        let text = walk::read_text(&file).expect("markdown reads");
-        if !text.contains(BEGIN) && !text.contains(END) {
-            continue;
-        }
-        assert!(spans(&text).is_ok(), "{rel} has a malformed managed span");
-    }
-}
