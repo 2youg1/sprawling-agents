@@ -4155,7 +4155,7 @@ pub(in crate::assembly) struct Flight {
 |---|---|---|
 | 一个居民或房间叫什么 | `kernel::Address::name`（kernel-SPEC `Address`） | 地址的最后一段是地址自己的事实；城的名册与楼的页面原先各写一份 |
 | 一栋楼的页面、`DOC_BYTES_MAX` | `bin::views::building_page` | 页面是一个读面：按问的那一刻读盘，不持有第二份 |
-| 一台 MCP server 经哪种传输到达（`McpLink`） | `bin::mcp_link` | 三种传输（`mcp_stdio`、`mcp_http`、`mcp_sse`）各是一个顶层模块，把它们合成 `protocol::Outbound` 的那个枚举与它们同层；读面经 `protocol` 的握手与列工具说话 |
+| 一台 MCP server 经哪种传输到达（`McpLink`） | `protocol::mcp::link` | 三种传输（`protocol::mcp` 下的 `stdio`、`http`、`sse`）与把它们合成 `protocol::Outbound` 的那个枚举同住 `protocol`；读面与装配点都经 `protocol` 的握手与列工具说话 |
 | broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `accounting::toolkit_broker`（accounting-SPEC.md 8-9） | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是装配点的 |
 | 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `accounting::held_vault`（accounting-SPEC.md 8-9） | 装配点、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
 
