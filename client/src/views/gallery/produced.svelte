@@ -58,6 +58,15 @@
     call(1, "exec", "just check", said("21 gates, 21 green\n", 0)),
   ];
 
+  // A write carries what it was given as well as what it said, both cut
+  // the same way; the arguments here are cut so the count shows.
+  const GIVEN: readonly Call[] = [
+    {
+      ...call(1, "edit", "city/hall/PLAN.md", said("1 file changed\n", 0)),
+      arguments: said('{"path": "city/hall/PLAN.md", "old": "- [ ] gate", "new": "- [x] gate"', 212),
+    },
+  ];
+
   // The wave the fold was written for: seven files read, one written,
   // four commands run. Four clauses would be wrong here - a class of
   // work that did not happen contributes no clause - so this one
@@ -191,6 +200,10 @@ const HIDDEN: usize = 0;
 
 <Case label="calls · one command">
   <Calls calls={ONE_COMMAND} run={RUN} turn={turnOf(3, ONE_COMMAND)} onFork={() => undefined} />
+</Case>
+
+<Case label="calls · a write and what it was given">
+  <Calls calls={GIVEN} run={RUN} turn={turnOf(3, GIVEN)} onFork={() => undefined} />
 </Case>
 
 <Case label="calls · explored, wrote and ran">
