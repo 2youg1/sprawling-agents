@@ -5,3 +5,4 @@
 
 mod history;
 mod standing;
+mod vocabulary;
