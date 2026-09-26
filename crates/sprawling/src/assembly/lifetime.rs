@@ -12,7 +12,7 @@
 //! reader asking "what does a restart find" and "what does a close
 //! leave" is asking one question from two ends.
 
-use super::{Flight, Namings, RoomQueues, RunWorker, Standing, city_segment, ledger_dir, now_ms};
+use super::{Flight, RoomQueues, RunWorker, Standing, city_segment, ledger_dir, now_ms};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -98,7 +98,6 @@ impl RunWorker {
             fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
             backlog: runtime::Backlog::new(),
             flight: Flight::open(),
-            namings: Namings::open(),
         })
     }
 

@@ -54,7 +54,6 @@ use commanding::entrance::Entrance;
 pub(crate) use credentials::signing::resolving;
 use credentials::subscription::Expiries;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
-use dispatching::asking_name::Namings;
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
@@ -267,9 +266,6 @@ pub struct RunWorker {
     /// home. One per city, so the number of runs a city drives at once
     /// has one answer (sprawling-SPEC.md 8-46-2).
     flight: Flight,
-    /// Dispatches waiting on the digest model for a room name, off this
-    /// thread (sprawling-SPEC.md 8-86).
-    namings: Namings,
 }
 
 impl RunWorker {

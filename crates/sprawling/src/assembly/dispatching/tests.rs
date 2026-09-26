@@ -195,9 +195,14 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
         })
         .unwrap();
 
-    let first = provider.bodies().into_iter().find(|body| body.contains("messages"));
+    let first = provider
+        .bodies()
+        .into_iter()
+        .find(|body| body.contains("messages"));
     assert!(
-        first.as_deref().is_some_and(|body| body.contains("Task: [short]")),
+        first
+            .as_deref()
+            .is_some_and(|body| body.contains("Task: [short]")),
         "the first chat call is the run itself: {first:?}"
     );
     assert!(
@@ -207,80 +212,6 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
     assert!(
         !dir.path().join("shop").join("收到。").exists(),
         "a model's reply never becomes a room"
-    );
-}
-
-/// A confidential building's task text is not sent off this machine to
-/// be given a room name.
-///
-/// The main model is chosen on this machine, so the city takes the
-/// work; the digest model that names the room is not, and the address
-/// is a bare building — the shape the welcome flow teaches, and the one
-/// that asks for a name. The refusal must come from the book, under the
-/// building's own policy, before the task text reaches a socket.
-#[test]
-fn a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine() {
-    let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
-    lay_rules(dir.path(), "vault", &shut_rules(""));
-    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
-    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    // `.invalid` resolves nowhere on every machine, so the probe fails
-    // and the endpoint attaches on the id the person named. What makes
-    // it the endpoint this test needs is its host, which is not this
-    // machine.
-    worker
-        .handle(channels::Command::AttachEndpoint {
-            name: channels::ProviderName::parse("far").unwrap(),
-            base_url: "https://digest.invalid/v1".to_owned(),
-            dialect: kernel::DialectKind::OpenAi,
-            secret: None,
-            auth_header: None,
-            admit: vec!["m-far".to_owned()],
-            tuning: channels::EndpointTuning::default(),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach-far"),
-        })
-        .unwrap();
-    worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("far").unwrap(),
-            model: "m-far".to_owned(),
-            tag: kernel::ModelTag::Digest,
-            context_tokens: kernel::Window::new(32_768),
-            max_output_tokens: kernel::Ceiling::new(4_096),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select-far"),
-        })
-        .unwrap();
-
-    let refused = worker
-        .handle(channels::Command::Dispatch {
-            addr: Address::parse("vault").unwrap(),
-            task: "the kiln glaze formula nobody outside this house has".to_owned(),
-            goal: "it is written down".to_owned(),
-            mode: kernel::Mode::PlanGoal,
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
-            session: None,
-            effort: None,
-        })
-        .unwrap_err();
-
-    assert_eq!(
-        *refused.code(),
-        AxCode::GateDenied,
-        "the book refuses the choice under the building's own policy: {refused}"
-    );
-    assert!(
-        refused.recovery().contains("building/name"),
-        "the person is told the two ways out: {}",
-        refused.recovery()
-    );
-    assert!(
-        !dir.path().join("vault").join("glaze").exists(),
-        "a refused dispatch opened a room anyway"
-    );
-    assert!(
-        !provider.bodies().join("\n").contains("glaze formula"),
-        "no call carries the task text of a confidential building"
     );
 }
 
