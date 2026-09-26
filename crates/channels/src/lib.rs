@@ -83,7 +83,7 @@ pub use reception::{decide_admission, offered_pairing};
 #[cfg(feature = "server")]
 pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
-pub use server::{AcpProgress, AcpSink, Answering, MonitorFeed, TranscribeSink};
+pub use server::{AcpProgress, AcpSink, Answering, DROP_BYTES_MAX, DropSink, MonitorFeed, TranscribeSink};
 #[cfg(feature = "server")]
 pub use server::{Bound, Committed, Delivered, LedgerHead, Reply, ServeConfig};
 #[cfg(feature = "server")]

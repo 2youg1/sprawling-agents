@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use axum::Router;
-use axum::extract::{Request, State};
+use axum::extract::{DefaultBodyLimit, Request, State};
 use axum::http::{StatusCode, header};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
@@ -43,7 +43,7 @@ mod enrolment;
 
 use super::bundle::{serve_asset, serve_index};
 use super::socket::upgrade;
-use super::uploads::{accept_acp, accept_recording};
+use super::uploads::{accept_acp, accept_drop, accept_recording};
 use enrolment::accept_enrolment;
 /// Answers a query from the city's derived views, with the ledger
 /// position the answer was read at. Synchronous: a query reads a
@@ -86,6 +86,8 @@ pub struct ServeConfig {
     /// city cannot name has no media type to send, and the judgement of
     /// which containers exist belongs to whoever speaks the audio wire.
     pub transcribe_sink: TranscribeSink,
+    /// A file dropped onto the composer, kept by the city.
+    pub drop_sink: DropSink,
     /// Where a request from an outside editor goes. Separate from
     /// `commands` because it arrives over its own route, carries its own
     /// authentication, and gets an answer rather than an event stream.
@@ -195,6 +197,7 @@ pub(crate) struct ShellState {
     pub(crate) secrets: SecretSink,
     pub(crate) acp: AcpSink,
     pub(crate) transcribe_sink: TranscribeSink,
+    pub(crate) drop_sink: DropSink,
     /// Which face this listener presents, and the credential it demands.
     /// The value comes from [`decide_bind`] and is the only thing any
     /// door reads to judge a caller: a shell that held the configured
@@ -249,6 +252,15 @@ pub type AcpSink =
 /// recorded into, and the line of text that comes back.
 pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError> + Send + Sync>;
 
+/// Where a file dropped onto the composer goes: its name and its bytes
+/// in, the absolute path the city kept it at out (channels-SPEC.md 8-49).
+pub type DropSink = Arc<dyn Fn(&str, &[u8]) -> Result<String, AxError> + Send + Sync>;
+
+/// The largest file `/drop` takes. axum's own default of 2 MiB refuses an
+/// ordinary screenshot or PDF; the limit sits on that one route, because
+/// the others carry a line of text or a recording.
+pub const DROP_BYTES_MAX: usize = 64 * 1024 * 1024;
+
 /// The enrolment body: a realm, a name, and the value that will never be
 /// seen again outside the vault.
 ///
@@ -284,6 +296,7 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         secrets: Arc::clone(&config.secrets),
         acp: Arc::clone(&config.acp),
         transcribe_sink: Arc::clone(&config.transcribe_sink),
+        drop_sink: Arc::clone(&config.drop_sink),
         face,
         city: config.city.clone(),
         head: Arc::clone(&config.head),
@@ -302,6 +315,14 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         .route(
             "/enroll",
             paired(Door::Enroll, &state, post(accept_enrolment)),
+        )
+        .route(
+            "/drop",
+            paired(
+                Door::Drop,
+                &state,
+                post(accept_drop).layer(DefaultBodyLimit::max(DROP_BYTES_MAX)),
+            ),
         )
         // `/acp` judges the same token through the same function, from
         // inside the handler: an editor offers it as a body key rather

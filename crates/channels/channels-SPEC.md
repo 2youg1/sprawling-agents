@@ -69,7 +69,7 @@ Command／Query／Event（三分的原名，不译）；命令与查询的原名
 server（tokio＋axum）┤
   ├ WS 端点         ├── auth（令牌判定；常数时间比较）
   ├ 静态资源         └── control（干预动词入口；鉴权与幂等）
-  └ /enroll、/transcribe（HTTP）
+  └ /enroll、/transcribe、/drop（HTTP）
 aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query）
 ```
 
@@ -185,7 +185,7 @@ pub type SecretSink =
     Arc<dyn Fn(Command<Sealed<String>>, Reply) -> Result<(), AxError> + Send + Sync>;
 pub struct EnrollBody { pub realm: String, pub name: String, pub value: String }
 
-pub enum Door { Transcribe, Enroll, Acp }            // 三扇 HTTP 门，穷尽
+pub enum Door { Transcribe, Enroll, Acp, Drop }      // 四扇 HTTP 门，穷尽
 pub enum Pairing { Held, Absent }                    // 不是 bool
 pub enum Admission { Admit(Pairing), Refuse(AxError) }
 pub fn decide_admission(door: Door, offered: Option<&str>, face: &BindFace)
@@ -1071,7 +1071,7 @@ pub enum ReleaseAnswer {
 
 ```rust
 // 三扇门共用的那一问，壳里零策略（同 decide_bind／decide_frame 的切法）。
-decide_admission(Door::Transcribe | Door::Enroll, offered, face)  // 未配对即 E_GATE_DENIED
+decide_admission(Door::Transcribe | Door::Enroll | Door::Drop, offered, face)  // 未配对即 E_GATE_DENIED
 decide_admission(Door::Acp,        offered, face)  // 未配对仍进，携 Pairing::Absent
 ```
 
@@ -1396,6 +1396,21 @@ pub struct LiveOutput { pub run: RunId, pub stream: OutputStream, pub text: Stri
 - **`text` 是 UTF-8 有损解码**，因为一块在字节上界处切开，可能切在一个多字节字符中间；切口处画成替换字符只影响预览，结果以账本为准。**被否**：线上带字节数组——JSON 里一个字节要三四个字符，而页面最终画的是文本。
 - **`ServeConfig::outputs_so_far: Arc<dyn Fn() -> Vec<LiveOutput> + Send + Sync>`**：一个会话在送出 `Welcome` 之后、接实时帧之前调它一次，把还在跑的命令已经写出的字节按原来的次序作为 `Output` 帧送出，所以在命令跑到一半时打开页面的人先看到已经写出的部分。会话先订阅第四条通道再调它，所以一块可能送两遍而不会漏；预览里重复一块无害，漏一块则要等调用落账才补上。缓冲住在装配层（sprawling-SPEC §8-90），因为清空它要看账本里的 `tool_result`，而本 crate 不折叠账本。
 - **`OutputStream` 是 `runtime::Stream` 的第二处拼写而不是第二处权威**：本 crate 的依赖图够不到 `runtime`，映射住在装配层（`sprawling::assembly` 的 `serve`），与 `LogLevel`（§8-32）同一个安排。
+
+### 8-49 拖进对话框的文件：`/drop`
+
+```rust
+pub type DropSink = Arc<dyn Fn(&str, &[u8]) -> Result<String, AxError> + Send + Sync>;
+pub const DROP_BYTES_MAX: usize = 64 * 1024 * 1024;
+// POST /drop?name=<百分号编码的文件名>，body 是文件的字节；200 的 body 是城存下它的绝对路径。
+pub enum Door { Transcribe, Enroll, Acp, Drop }
+```
+
+- **是一条路由，不是一条 Command**：与 `/transcribe` 同一个理由，字节不进帧的文法，而答案（那条路径）必须回到拖文件的那个标签页。
+- **文件名走查询参数，不走请求头**：请求头的值只能可靠地携带 ASCII，而人的文件名常常不是。缺 `name` 即 422。
+- **`Door::Drop` 未配对即拒**：它往城的磁盘上写字节，与另外两扇会动作的门同一个判定（8-40）。
+- **正文上限 `DROP_BYTES_MAX`（64 MiB），只加在这一条路由上**：axum 的缺省上限是 2 MiB，一张截图或一份 PDF 就会超过；更大的正文答 413。上限不放宽到其余路由，因为它们收的是一行文字或一份录音。
+- 城怎么存、存在哪里、答出哪条路径是 sprawling-SPEC 8-119 的事；这里只把名字与字节交进去，把答案或拒绝原样交回来（拒绝是 422 加 `refusal_text`）。
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 

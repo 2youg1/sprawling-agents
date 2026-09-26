@@ -52,6 +52,7 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
         },
         client: Arc::new(channels::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
+        drop_sink: Arc::new(|_, _| Ok(String::new())),
         transcribe_sink: Arc::new(move |body: Vec<u8>, kind: String| match hearing {
             Hearing::Answers => Ok(format!("{} bytes of {kind}", body.len())),
             Hearing::Unattached => Err(AxError::failure(

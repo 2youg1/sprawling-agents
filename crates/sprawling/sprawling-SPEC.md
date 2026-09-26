@@ -4341,3 +4341,28 @@ pub(super) fn show(dir: &Path) -> Result<(), ViewError>;
 1. **比字节，不比版本行。** 版本行只说版本与发布日，两次构建同一个 tag 的二进制说同一句话，GitHub 上已发布的那一版也可能说同一句话；落位的文件与本次归档逐字节相同，才证明装上的是本次构建的这一份。败给的方案：断言版本行含 tag——`status` 的第一行根本不印 tag。
 2. **端口由内核分配。** 固定端口在并行的 runner 或开发机上会撞；端口 0 在每台机器上都成立，不需要按机器调。
 3. **归档与列表都经 HTTP 提供，而不是 `file://`。** `install.sh` 真实走的是 `curl -fsSL` 的 HTTP 路径，`file://` 会绕开状态码与重定向的处理，测到的不是人跑的那条路。
+
+## 8-119 拖进对话框的文件存进城里（`bin::assembly::dropping`，形状：adapter）
+
+浏览器不把被拖进页面的文件的绝对路径告诉页面。拖放携带 `file://` URI（`text/uri-list`）时页面直接用那条本地路径，不经过城；否则页面把字节经本页同源的 `POST /drop`（channels-SPEC 8-49）交给城，城存下它，答出它的绝对路径，页面把这条路径插进对话框。本节是城这一半。
+
+**接口。**
+
+```rust
+pub(super) const DROPPED_DIR: &str = "dropped";
+pub(super) fn keep_dropped(city_root: &Path, name: &str, bytes: &[u8]) -> Result<PathBuf, AxError>;
+pub(super) fn dropping(city_root: PathBuf) -> channels::DropSink;   // listening 把它装进 ServeConfig
+```
+
+- 存放处是 `<city>/dropped/<hash>/<name>`：`<hash>` 是字节的 blake3 前 16 个十六进制字符，`<name>` 是浏览器给的文件名的最后一段。答出的是 `std::path::absolute` 给出的绝对路径。
+- 名字由地址文法判：`dropped/<hash>/<name>` 必须能被 `kernel::Address::parse` 读出来，否则 `E_INVALID_ARGS`，recovery 说改个名字再拖。空名字、`..`、带路径分隔符的名字都在这一步被拒。
+- 同样的字节、同样的名字再拖一次，落在同一个文件上并答出同一条路径，文件只写一次；同名而字节不同的两个文件落在两个目录里，互不覆盖。
+- 写失败是 `E_STORAGE_FATAL`，subject 是那条路径。
+
+**决定。**
+
+1. **存在城根下的 `dropped/`，而不是保留子树 `.sprawling/` 或某栋楼里。** 居民的 `read` 只收城内相对地址，并且不进保留子树（runtime-SPEC `tools::chosen_path`）；放进 `.sprawling/` 的文件人能看见，市长却读不到。放进某栋楼则让那栋楼的仓库多出一个没人提交的文件。城根下一个不属于任何楼的目录，按 `kernel::address::may_read` 对每栋楼都是可读的（除非城的规则把它标为机密），而绝对路径的末尾就是那条相对地址。
+2. **目录按内容命名。** 用时间或序号命名，同一个文件拖两次就是两份；用名字命名，两个同名的文件互相覆盖。内容哈希让两件事都不发生，也不需要任何状态。
+3. **名字交给地址文法判，不另写一份清洗规则。** 一条存得下却不能被读成地址的路径，居民拿到了也打不开；地址文法已经是「城里什么路径合法」的唯一回答。
+
+**测试。** `assembly::dropping::tests`：一个文件存下后答出的路径在城根的 `dropped/` 之下、内容与拖进来的字节相同；同样的字节再存一次答出同一条路径；`..` 与带分隔符的名字被拒为 `E_INVALID_ARGS`，城里什么也没有写。

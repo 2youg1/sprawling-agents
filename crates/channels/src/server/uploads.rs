@@ -3,15 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two posted bodies: an outside editor's request and a recording.
-//! Each is read just far enough to hand inward, and the city's answer
-//! comes back as the response to the same request.
+//! The three posted bodies: an outside editor's request, a recording,
+//! and a file dropped onto the composer. Each is read just far enough to
+//! hand inward, and the city's answer comes back as the response to the
+//! same request.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::Json;
 use axum::body::Bytes;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 
@@ -88,4 +90,17 @@ pub(crate) async fn accept_recording(
         Ok(text) => (StatusCode::OK, text).into_response(),
         Err(err) => (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response(),
     }
+}
+
+/// One dropped file in, the absolute path the city kept it at back.
+///
+/// The name rides the query string rather than a header, because a
+/// header value carries ASCII reliably and a person's file names are
+/// often not ASCII (channels-SPEC.md 8-49).
+pub(crate) async fn accept_drop(
+    State(_state): State<Arc<ShellState>>,
+    Query(_params): Query<HashMap<String, String>>,
+    _body: Bytes,
+) -> Response {
+    StatusCode::NOT_IMPLEMENTED.into_response()
 }
