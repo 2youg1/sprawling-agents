@@ -155,18 +155,16 @@ const LIMIT: usize = 400;
 const HIDDEN: usize = 0;
 `;
 
-  // No path at all, which is what a call that named no file hands
-  // over: no trail is drawn and nothing is coloured, and the line
-  // numbers are the only thing left to read by.
-  // The tree a finished run opened at, and what the building's working
-  // tree says moved since: the answer the results-only line sums.
+  // The tree a finished run opened at, and what moved up to the tree it
+  // last fenced: the answer the results-only line sums.
   const OPENED: GitOid = GitOid.make("3f2a9c1e7b4d5a6f8e0c1b2d3a4f5e6d7c8b9a01");
+  const FENCED: GitOid = GitOid.make("9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c");
   export function changed(query: Query): Answer | undefined {
     return typeof query === "object" && "changes" in query
       ? {
           changes: {
             base: OPENED,
-            head: null,
+            head: FENCED,
             files: [
               { path: "crates/kernel/src/ledger.rs", how: "modified", lines: { counted: { added: 42, removed: 7 } } },
               { path: "crates/kernel/src/ledger/tests.rs", how: "added", lines: { counted: { added: 18, removed: 0 } } },
@@ -177,6 +175,9 @@ const HIDDEN: usize = 0;
       : undefined;
   }
 
+  // No path at all, which is what a call that named no file hands
+  // over: no trail is drawn and nothing is coloured, and the line
+  // numbers are the only thing left to read by.
   const UNNAMED = `error: the city refused to start
   because: CONFIG.toml names a provider with no key filed for it
   try: sprawling attach --provider zenmux
@@ -255,6 +256,6 @@ const HIDDEN: usize = 0;
 
 <Case label="room · results only, what a finished run produced">
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={changed}>
-    <Produced base={OPENED} />
+    <Produced base={OPENED} head={FENCED} />
   </Stand>
 </Case>

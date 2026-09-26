@@ -41,7 +41,7 @@
   import { drawsCalls } from "../core/results";
   import { anchorAt, footOf } from "./talk/anchoring";
   import type { Anchoring } from "./talk/anchoring";
-  import { NOTHING, artifactsIn } from "./talk/trace";
+  import { NOTHING, artifactsIn, lastFenceIn } from "./talk/trace";
   import Waiting from "./talk/waiting.svelte";
 
   interface Props {
@@ -94,10 +94,12 @@
   });
 
   // Where the produced line measures from: the tree the run opened at,
-  // once the run has closed. An open run has produced nothing final yet.
+  // once the run has closed, up to the tree it last fenced, as the run
+  // page measures. An open run has produced nothing final yet.
   const producedFrom = $derived(
     answer?.closing === null || answer?.closing === undefined ? null : (answer.opened_at ?? null),
   );
+  const producedTo = $derived(answer === undefined ? null : lastFenceIn(answer.turns));
   const artifacts = $derived(answer === undefined ? NOTHING : artifactsIn(answer.turns));
   // Whether there is a card to draw at all. Any one of the three panes
   // is enough; a run that read nothing, changed nothing and ran nothing
@@ -307,7 +309,7 @@
             <Thread {run} {who} onFork={doFork} onRetry={send} />
           {/each}
           {#if !drawsCalls($held.showing) && producedFrom !== null}
-            <Produced base={producedFrom} />
+            <Produced base={producedFrom} head={producedTo === producedFrom ? null : producedTo} />
           {/if}
           <Waiting />
         {/if}

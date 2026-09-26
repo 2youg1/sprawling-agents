@@ -24,7 +24,7 @@
 // the wire today. This table stands in for them and is deleted the day
 // `Call` carries them (client-SPEC 4-26).
 
-import type { Call, Turn } from "../../wire";
+import type { Call, GitOid, Turn } from "../../wire";
 
 // What a call did, in the words the fold uses. `other` is every tool
 // that governs, spawns, plans or reaches an outside server: real work,
@@ -135,4 +135,17 @@ export function artifactsIn(turns: readonly Turn[]): Artifacts {
     }
   }
   return { read, wrote, terminal };
+}
+
+// The tree the run last fenced, searched backwards from the last turn,
+// or nothing when it never fenced one. The run page and the room's
+// produced line both measure "what the run changed" up to here, so
+// neither counts an edit made after the run by someone else.
+export function lastFenceIn(turns: readonly Turn[]): GitOid | null {
+  for (let at = turns.length - 1; at >= 0; at -= 1) {
+    for (const note of turns[at]?.notes ?? []) {
+      if ("fenced" in note) return note.fenced.oid;
+    }
+  }
+  return null;
 }

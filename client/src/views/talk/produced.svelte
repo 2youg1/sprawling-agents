@@ -9,9 +9,10 @@
   // The line under a finished run's outcome divider in results-only
   // mode: how many files the run changed and how many lines moved,
   // measured from the tree the run opened at (`RoundsAnswer.opened_at`)
-  // to the building's working tree. The numbers are the `Changes`
-  // answer the run page draws file by file, summed once in
-  // `core/results.ts`, so the room and the run page cannot disagree.
+  // to the tree it last fenced (`lastFenceIn` in `trace.ts`, the same
+  // bound the run page asks with). The numbers are that `Changes`
+  // answer summed once in `core/results.ts`. A run that fenced nothing
+  // passes `head = null`, the working tree, exactly as the run page does.
   import { fill, say } from "../../core/lang";
   import { producedOf } from "../../core/results";
   import { ui } from "../../ui";
@@ -19,13 +20,14 @@
 
   interface Props {
     readonly base: GitOid;
+    readonly head: GitOid | null;
   }
 
-  const { base }: Props = $props();
+  const { base, head }: Props = $props();
   const u = ui();
   const { lang } = u;
 
-  const asked = $derived(u.conn.asking.ask({ changes: { base, head: null } }));
+  const asked = $derived(u.conn.asking.ask({ changes: { base, head } }));
   const produced = $derived.by(() => {
     const held = $asked;
     return held !== undefined && "changes" in held ? producedOf(held.changes.files) : null;

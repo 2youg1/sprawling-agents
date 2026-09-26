@@ -33,7 +33,6 @@
     Answer,
     EvidenceItem,
     EvidenceKind,
-    GitOid,
     RunId,
     RoundsAnswer,
     RunSummary,
@@ -52,6 +51,7 @@
   import River from "./run/river.svelte";
   import Composer from "./talk/composer.svelte";
   import Thread from "./talk/thread.svelte";
+  import { lastFenceIn } from "./talk/trace";
 
   interface Props {
     readonly run: RunId;
@@ -112,14 +112,7 @@
 
   const turns = $derived(rounds?.turns ?? []);
   const fence = $derived(rounds?.opened_at ?? null);
-  const lastFence = $derived.by((): GitOid | null => {
-    for (let at = turns.length - 1; at >= 0; at -= 1) {
-      for (const note of turns[at]?.notes ?? []) {
-        if ("fenced" in note) return note.fenced.oid;
-      }
-    }
-    return null;
-  });
+  const lastFence = $derived(lastFenceIn(turns));
 
   // The evidence question exists only while its lens is open: a
   // watched answer is refreshed when stale, and nobody is looking at
