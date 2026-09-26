@@ -3386,3 +3386,28 @@ impl Listening {
 - **重开参数**：如果出现一个在 `listen` 返回之后仍可能失败、失败时又需要收回横幅的步骤，就重新考虑这个切分。
 
 **本章测试**：`serving::tests::a_serve_refused_at_the_socket_writes_no_line`：测试自己先占住端口，`listen` 返回错误，账本的每一行与之前逐字节相同。锁的那一半由 memory 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go` 守住。
+
+### 8-85 视图在自己的线程上折叠，写线程不等读者（`bin::serving::folding`）
+
+```rust
+// bin::serving::folding —— shape: adapter
+pub(super) struct Folding {
+    pub(super) observer: Box<dyn FnMut(&EventRecord) + Send>,
+    pub(super) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    pub(super) thread: std::thread::JoinHandle<()>,
+}
+pub(super) fn spawn_folding(
+    views: Arc<Mutex<Views>>,
+    to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+) -> Result<Folding, AxError>; // StorageFatal「start the view fold」：线程起不来
+```
+
+**写线程只做一次 `send`。** 观察者（`observer`）与机器体检的落点（`machine`）都只把一份 `Fold`（一条已提交的记录，或一份 `DoctorAnswer`）放进无界 `mpsc` 通道，然后返回；名为 `sprawling-views` 的线程按到达顺序取出，锁住 `Views` 折叠，放锁之后才把记录广播给客户端。被拒：观察者在写线程上直接 `lock()`，读者（例如变更页的 `GitStatus` 在锁内跑 `git status`）持锁多久，写线程的下一次落盘就晚多久——一个 run 相邻事件的间隔被一个页面拉长。
+
+**广播排在折叠之后。** 客户端收到一条记录再去查询，查到的视图已经含有这条记录；把广播留在写线程上会让事件先于视图到达。代价是广播会等读者，写线程不会。
+
+**锁中毒要说出来。** 中毒之后视图不再折叠（半折的状态不可信），第一次遇到时向标准错误写一条诊断，指出从哪条记录起视图停在了哪里、以及恢复办法（重启服务，视图从 Ledger 重建）；此后的记录照常广播。只写一次，因为之后每条记录都是同一个事实。
+
+**线程随写线程结束。** `attend` 返回后写线程丢掉 `RunWorker`（连同观察者与 `machine`），通道随之关闭，折叠线程把通道里剩下的折完、广播完再退出；写线程 join 它之后才结束，所以 `serve` 对写线程的 join 也等到了最后一次广播。
+
+**尚未做到的（本节接口的当前状态）**：查询仍在锁内作答，`GitStatus` 等做 I/O 的查询仍在锁内做 I/O，所以读者之间、以及读者与折叠线程之间仍会互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取、把 I/O 移到锁外（锁内只取所需的小数据），是这一接口余下的两步。

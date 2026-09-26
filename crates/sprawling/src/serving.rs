@@ -30,6 +30,7 @@
 pub(crate) mod attending;
 pub(crate) mod desk;
 pub(super) mod door;
+mod folding;
 pub(crate) mod journal;
 pub(crate) mod pool;
 pub(crate) mod relay;
