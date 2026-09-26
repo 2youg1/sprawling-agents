@@ -261,8 +261,6 @@ fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
         .iter()
         .map(|line| String::from_utf8_lossy(line).into_owned())
         .collect();
-    // The second run ends still holding node 1, so its freeze spends
-    // the node on red: a Blocked row is one only a holder can leave.
     assert_eq!(
         (
             history.matches("roadmap_claimed").count(),
@@ -271,7 +269,7 @@ fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
                 .contains("| 1 | wire the kiln | 1 |  | Blocked |  |"),
         ),
         (2, true),
-        "the second run takes the node the first handed back"
+        "the second run takes the node the first handed back, and freezing while holding it leaves it Blocked"
     );
 }
 
