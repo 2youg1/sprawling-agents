@@ -1499,7 +1499,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 1. 全模块零 I/O、零时钟、零随机；BTreeMap/BTreeSet only（Payload 经 serde_json::Map 默认 BTreeMap 间接满足）。
 2. hex 编解码手写（16 行内，查表小写），不引 hex crate——C12 精神：依赖面只进钉版清单所列。
 3. `EventKind`/`AxCode` 的 serde 呈现名逐 variant `#[serde(rename = …)]`（AxCode）与 `#[serde(rename_all = "snake_case")]`（EventKind）；`as_str` 与 serde 用同一份拼写（单测对拍）。
-4. `Payload` 校验递归下降 serde_json::Value：`Number::is_i64 || is_u64` 之外即拒；数组与对象深入。递归深度由输入方（我们自己的写方）有界，读侧 parse_line 对深度不设限但对浮点恒拒。
+4. `Payload` 校验先判深度、再拒浮点：深度检查逐层迭代，不占调用栈；浮点检查递归下降 serde_json::Value，`Number::is_i64 || is_u64` 之外即拒，数组与对象深入。次序是这条递归的界：它只走深度检查已放行的至多 `PAYLOAD_DEPTH_MAX` 层，一个程序拼出的深嵌套值因此在深度处被拒，不会先把写方的栈耗尽。读侧 parse_line 的深度由 serde_json 的递归上限封住，对浮点恒拒。
 5. `canonical_line` 用 `serde_json::to_vec`；`addr`/`ig` 的省略由 `skip_serializing_if` 表达；无 pretty、无空格。
 
 ## 11 边界枚举
