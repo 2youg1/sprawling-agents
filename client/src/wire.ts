@@ -44,7 +44,7 @@ export type ApprovalId = typeof ApprovalId.Type;
  * The enum survives its own single arm on purpose. The cluster key is
  * wire data, and a class named in the payload keeps the day a second
  * kind of question appears a compile error at every reader rather than
- * a silent change of meaning for a field that used to say one thing.
+ * a silent change of meaning for a field that says one thing today.
  */
 export const ApprovalClass = Schema.Literal("question").annotations({ identifier: "ApprovalClass" });
 export type ApprovalClass = typeof ApprovalClass.Type;
@@ -284,7 +284,7 @@ export type Tokens = typeof Tokens.Type;
 
 /**
  * One micro-USD. Decimal price lists convert at the single accounting
- * entry point (S3 gateway::cost); decisions never touch floats.
+ * entry point (gateway::cost); decisions never touch floats.
  */
 export const UsdMicros = Schema.Int.pipe(Schema.brand("UsdMicros"));
 export type UsdMicros = typeof UsdMicros.Type;
@@ -729,10 +729,10 @@ export type Proxying = typeof Proxying.Type;
  * What an endpoint that settled nothing is called with.
  * 
  * **These are the gateway's figures, read out rather than restated.**
- * The endpoint form used to ship its own three numbers as placeholder
- * text, so an endpoint attached through the form and one attached by
- * import behaved differently while the person had filled in nothing;
- * the form now draws what this carries, and the numbers have one home.
+ * A form that shipped its own numbers as placeholder text would make
+ * an endpoint attached through the form and one attached by import
+ * behave differently while the person had filled in nothing; the form
+ * draws what this carries, and the numbers have one home.
  */
 export const TuningDefaults = Schema.Struct({
   from: ConfigLayer,
@@ -1178,10 +1178,10 @@ export type DialectKind = typeof DialectKind.Type;
  * The most tokens one model reads in a single call, prompt and reply
  * together.
  * 
- * **Zero is unrepresentable, and absence is not zero.** A window
- * nobody stated and a window of zero used to be the same byte, so the
- * context reminder measured a conversation against nothing and
- * reported every session as full. A figure nobody registered is
+ * **Zero is unrepresentable, and absence is not zero.** Were a window
+ * nobody stated and a window of zero the same value, the context
+ * reminder would measure a conversation against nothing and report
+ * every session as full. A figure nobody registered is
  * carried as `None` all the way to the reminder, which then stays
  * silent, and every layer in between is spared the rule that zero is
  * special.
@@ -1197,12 +1197,10 @@ export type Window = typeof Window.Type;
 /**
  * One model an endpoint serves, with what the endpoint said about it.
  * 
- * **An endpoint's list used to arrive as bare ids.** Everything the
- * provider stated beside each id — the window, the ceiling, what the
- * model accepts, what it costs — was read at attach, used once to
- * settle a ceiling, and then dropped, so a person choosing a model saw
- * a name and nothing to choose by. This is that statement, carried to
- * the page that shows the list.
+ * **An endpoint's list is more than bare ids.** Everything the
+ * provider states beside each id — the window, the ceiling, what the
+ * model accepts, what it costs — is what a person chooses a model by.
+ * This is that statement, carried to the page that shows the list.
  * 
  * **Every field is what the upstream said, not what this city
  * concluded.** Absence means the row said nothing; it never means
@@ -1321,7 +1319,7 @@ export type GitStatusAnswer = typeof GitStatusAnswer.Type;
 
 /**
  * Non-empty resident identity; the `role@building.n` grammar tightens
- * with city::resident (P1).
+ * with city::resident.
  */
 export const ResidentId = Schema.String.pipe(Schema.brand("ResidentId"));
 export type ResidentId = typeof ResidentId.Type;
@@ -2652,13 +2650,10 @@ export type LoginStep = typeof LoginStep.Type;
 /**
  * Which discipline a run works under. A run sits in exactly one.
  * 
- * Closed, and carried on the wire in this spelling. A dispatch used to
- * name its mode as free text that the assembly layer matched against
- * four words and answered every other word with [`Mode::PlanGoal`], so
- * a client that misspelled `experiment` got a planning run and no
- * refusal. There is now nothing to misspell: a word outside this set
- * fails to deserialize at the process boundary, which is where the
- * sender can still be told.
+ * Closed, and carried on the wire in this spelling. A word outside this
+ * set fails to deserialize at the process boundary, which is where the
+ * sender can still be told; read as a default, a misspelled
+ * `experiment` would become a planning run with no refusal.
  * 
  * Defined here rather than in `runtime` for the reason
  * [`DialectKind`](crate::DialectKind) is: the wire carries it and
