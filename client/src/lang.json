@@ -735,6 +735,14 @@
     "en": "the plinth is how much of the plan is done",
     "zh": "基座是计划完成了多少"
   },
+  "inbox_count": {
+    "en": "{n} signals waiting for a run here",
+    "zh": "{n} 条信号在等这里的 run 读"
+  },
+  "inbox_waiting": {
+    "en": "signals waiting here",
+    "zh": "在这里排队的信号"
+  },
   "legend_window": {
     "en": "a lit window is a run",
     "zh": "亮着的窗是一次 run"

@@ -46,6 +46,7 @@
   import { anchorAt, footOf } from "./talk/anchoring";
   import type { Anchoring } from "./talk/anchoring";
   import { NOTHING, artifactsIn } from "./talk/trace";
+  import Inbox from "./talk/inbox.svelte";
   import Waiting from "./talk/waiting.svelte";
 
   interface Props {
@@ -313,6 +314,7 @@
               to the mayor's room, which a person who only worked in a
               building has never spoken in. -->
           <Waiting />
+          <Inbox addr={address} />
         {:else}
           <div class="mb-base flex justify-end"><Showing /></div>
           {#if drawsCalls($held.showing)}
@@ -324,6 +326,7 @@
             <Stream {shown} {earlier} boundary={story} />
           {/if}
           <Waiting />
+          <Inbox addr={address} />
         {/if}
       </div>
     </div>
