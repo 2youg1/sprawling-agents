@@ -344,25 +344,29 @@ pub fn resume(handoff: &Handoff, new_run: RunId) -> ResumeSeed;
 - 「下一步」段首列用户指定动作、must-read 规范类机器填：内容约束属生产者（回合层与 spine 文件），类型只强制结构。
 - Run<Frozen> 无解冻：resume 不收 Run 值，只收 Handoff——「旧 Run 醒来」在签名上无法拼写。
 
-### 8-6 turn／prefix／handoff 完备化（形状不变，参数长入）
+### 8-6 turn／prefix／handoff 的会话面（形状不变，参数长入）
 
-「只加不改」的取义：typestate 四相、边界消费、事件序、私有字段三不变量不动；相变函数的入参按 S3 语义长入（assemble 增 window/tools），消费者（citysim）同集更新。被否替代：平行第二条 call 路径——同一相两个入口即两个权威，落选。
+typestate 四相、边界消费、事件序、私有字段三不变量不动；会话、工具与调用形状作为相变函数的入参进来。被否替代：平行第二条 call 路径——同一相两个入口即两个权威，落选。
 
 ```rust
-// kernel::model 增（缝上 canonical 会话类型，kernel-SPEC §8-24 同集改）：
+// kernel::model（缝上 canonical 会话类型，kernel-SPEC §8-24）：
 // ChatRequest<'a> { system: Vec<SystemBlock>, messages: Cow<'a, [ChatMessage]>, tools: Cow<'a, [ToolDef]>, breakpoint: MessageBreakpoint }
 // SystemBlock { text, cache }；ChatMessage { role, content: Vec<ContentBlock> }；Role { User, Assistant }
 // ContentBlock { Text{text} | ToolUse{id,name,input:Payload} | ToolResult{tool_use_id,content,is_error} }
 // ToolDef { name, description, input_schema: Payload }；ModelUsage 四整数；StopReason { EndTurn, ToolUse, MaxTokens }
-// ModelRequest<'a> 增 chat: ChatRequest<'a>；ModelReturn 增 usage: Option<ModelUsage>、stop: Option<StopReason>、billed: Option<UsdMicros>
+// ModelRequest<'a> 携 chat: ChatRequest<'a>；ModelReturn 携 usage: Option<ModelUsage>、stop: Option<StopReason>、billed: Option<UsdMicros>
 
-pub struct Window { /* messages: Vec<ChatMessage> —— 私有；执行器持有，逐回合推进 */ }
-impl Window { pub fn new() -> Window;
-    pub fn push_steer(&mut self, source: &str, text: &str);          // 「user」或「@ID」前缀形
-    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening);  // 首轮，run_started 可重建
+// runtime::conversation
 pub enum Opening { FromJob, Inherited, WithPerson }   // 穷尽三臂，城在写 brief 时已决定；Inherited 只由 fork 选
+pub struct Conversation { /* messages、sent、held —— 私有；执行器持有，逐回合推进 */ }
+impl Conversation { pub fn new() -> Conversation;
+    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening);  // 首轮，run_started 可重建
+    pub fn push_steer(&mut self, source: &str, text: &str);          // 「user」或「@ID」前缀形
+    pub fn push_reminder(&mut self, reminder: &ContextReminder);    // §8-34
+    pub fn push_inherited(&mut self, messages: &[ChatMessage]);     // 分支开场继承的那段（§8-2）
     pub fn push_assistant(&mut self, content: Vec<ContentBlock>);
     pub fn push_tool_results(&mut self, results: Vec<ContentBlock>); // ToolResult 块（pipeline 产出的成品文本）
+    pub fn mark_sent(&mut self);                                     // §8-47
     pub fn messages(&self) -> &[ChatMessage]; }
 
 pub struct CallShape { pub model: String, pub max_tokens: Option<Ceiling>, pub effort: Option<Effort>,
@@ -401,12 +405,11 @@ pub struct PrefixBuild { pub prefix: FrozenPrefix, pub notes: Payload }   // not
 pub fn build_prefix(plan: PrefixPlan) -> Result<PrefixBuild, AxError>;
 ```
 
-- **首轮不再指向任何东西**：`JOB.md` 的正文已是 Run 段，故 `FULL READ:` 那一行与它携的 `cas:b3-…` 一起取消——城里没有一个工具解析得了内容哈希，而溯源在 Ledger 里已记两遍。`Opening` 的两臂不是排版偏好：被派了一件活的会话与正在和人说话的会话要的第一句话不同，而把人那句话包成 `Task:`／`Goal:` 表单，换回来的也是一张表单。**`FromJob` 的开场行不复述任务**：它只写 `The task is in JOB.md above.` 与 `Goal: <goal>` 两行——任务正文已在 Run 段，再抄一遍，人贴的一段话每次请求就付两遍（Run 段不在缓存里，每回合全价）。Goal 仍写在这里，因为它是「什么时候停」，短，且是这一行唯一不重复的指令。**分叉重建的母亲开场用 `Inherited`**：母亲的 `JOB.md` 在她的房间里，不在分叉的 Run 段里，所以那一行写 `Task: <task>` 与 `Goal: <goal>`；若照搬 `FromJob`，分叉读到的「在上面的 JOB.md 里」指向一个它看不见的文件，母亲的任务就丢了。
+- **首轮不指向任何文件**：`JOB.md` 的正文已是 Run 段，所以开场行不携 `cas:b3-…` 一类的内容哈希——城里没有一个工具解析得了它，而溯源在 Ledger 里已记两遍。`Opening` 的两臂不是排版偏好：被派了一件活的会话与正在和人说话的会话要的第一句话不同，而把人那句话包成 `Task:`／`Goal:` 表单，换回来的也是一张表单。**`FromJob` 的开场行不复述任务**：它只写 `The task is in JOB.md above.` 与 `Goal: <goal>` 两行——任务正文已在 Run 段，再抄一遍，人贴的一段话每次请求就付两遍（Run 段不在缓存里，每回合全价）。Goal 仍写在这里，因为它是「什么时候停」，短，且是这一行唯一不重复的指令。**分叉重建的母亲开场用 `Inherited`**：母亲的 `JOB.md` 在她的房间里，不在分叉的 Run 段里，所以那一行写 `Task: <task>` 与 `Goal: <goal>`；若照搬 `FromJob`，分叉读到的「在上面的 JOB.md 里」指向一个它看不见的文件，母亲的任务就丢了。
 - **read 的两条路，差别在于谁选的**：**路径是模型选的，故受审**——`Address::parse` 杀穿越，`is_reserved` 杀保留子树（`E_GATE_DENIED`）；**catalog 里的名字是人选的**——楼的阅览室写下它时准入就已发生，故它解到的 skill 可以住在保留空间里。两条路共用一个参数，因为对模型而言它们是同一件事（把一份东西调到眼前）；**先问 catalog** ，一个同名文件不得遮蔽楼已经准入的 skill。
-- **`Catalog::expand` 改答 `Expansion { Skill { addr }, Said { text } }` 而不是 `String`**：skill 展开成一个可打开的地址，其余展开成目录自己持有的正文；两者压成一个字符串时，调用方只能拿它去试解析成地址，而一段恰好能解析成地址的正文就会被当成文件打开。
-- **`Catalog::expand` 改答 `Expansion { Skill { addr, package }, Said { text } }` 而不是 `String`**：skill 展开成一个可打开的地址，其余展开成目录自己持有的正文；两者压成一个字符串时，调用方只能拿它去试解析成地址，而一段恰好能解析成地址的正文就会被当成文件打开。这个错误真发生了，是一条红测试拿住的。
+- **`Catalog::expand` 答 `Expansion { Skill { addr, package }, Said { text } }` 而不是 `String`**：skill 展开成一个可打开的地址，其余展开成目录自己持有的正文；两者压成一个字符串时，调用方只能拿它去试解析成地址，而一段恰好能解析成地址的正文就会被当成文件打开。
 - **正文不在 prompt 里，所以交出去而不是拒绝**：`render()` 只写每条的 disclosure，`expansion` 从未进过窗口。
-- **它是 `Catalog::expand` 的第一个调用者**：在它之前，一栋楼的阅览室能报出一个 skill 的名字而永远交不出它。
+- **它是 `Catalog::expand` 的调用者**：没有它，一栋楼的阅览室能报出一个 skill 的名字而永远交不出它。
 - 截断：文件超段位余额即截到边界，原处留 ASCII 标记（文本与切口规则属 `runtime::elision`，§8-42），恒不静默丢尾；标记字节从段预算先扣。
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读。
 - 断点只有一个作者：`prefix::BreakpointPlan`（`prefix/breakpoint.rs`，形状 1 判定，纯函数）。`BreakpointPlan::for_conversation(&[ChatMessage])` 决定一次请求实际发出的断点：前三段（city／building／resident）的段界各一个，对话非空时尾消息再一个，合计 ≤ `CACHE_BREAKPOINTS_MAX`（4）；run 段界不放，因为尾锚紧随其后已覆盖它。`FrozenPrefix::system_blocks()` 以 `BreakpointPlan::marks_edge(slot)` 标 system 块，`BreakpointPlan::message_breakpoint` 标请求（回合借用会话，不复制它，kernel-SPEC §12.6），`prompt_payload(&plan)` 把 `plan.breakpoints()` 逐个拼成 `breakpoints` 行（段界写 slot 名，尾写 `tail`）；`verified_system_hashes` 以同一个 `marks_edge` 核对线上的块。兼容格式只负责拼写（Anthropic：被标记消息的最后一块带 `cache_control`），不决定任何断点。
@@ -425,7 +428,7 @@ impl BreakpointPlan {
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读不再自定。
 - 断点：`FrozenPrefix::system_blocks()` 产四块、逐块 cache=true＝断点恒 4＝`CACHE_BREAKPOINTS_MAX`，断点只落段界。
 - handoff：形已全（五段＋构造点＋resume 消费），无改动；「下一步段首列用户指定动作」属生产者纪律（S3 执行器／P2 spine_files），类型不另加钩。
-- 第四取消点（派生前）：无派生生产者时推迟落地，理由是提前落地＝死入口＋不可测。`collab::delegate_tool` 是那个生产者：`SafePoint::BeforeSpawn` ＋ `Turn<Recording>::record(interrupt, ledger)`，装配层在 `Completion::Cancelled` 时清空派生台，**被取消的 Run 一件活也交不下去**。
+- 第四取消点（派生前）：`collab::delegate_tool` 是它的生产者：`SafePoint::BeforeSpawn` ＋ `Turn<Recording>::record(interrupt, ledger)`，装配层在 `Completion::Cancelled` 时清空派生台，**被取消的 Run 一件活也交不下去**。
 
 ### 8-7 runtime::pipeline（形状 1＋组装处）
 
@@ -435,6 +438,7 @@ pub struct PackContext<'a> {
     pub stamp: Option<ClockStamp>,            // clock::StampGate 的产出；None＝不携
     pub net_notice: bool,                     // gate::egress 首次公网放行信号
     pub steer: Option<(String, String)>,      // (source, text)；上一边界消费到的 Steer
+    pub reminder: Option<ContextReminder>,    // 上下文提醒（§8-34）
     pub offload: Option<OffloadSite<'a>>,     // None＝无 CAS 可用（纯截断退路）
     pub sieve: Option<SieveRequest<'a>>,      // exec 结果才带；无站点即无 tee 即不压
     pub adviser: Option<Consultation>,        // 窗口顾问先跑，判断作参数从此入
@@ -457,28 +461,28 @@ impl Consultation { pub fn answer(&self) -> Option<&AdviserAnswer>;
                     pub fn payloads(&self) -> Result<Vec<Payload>, AxError>; }   // adviser_asked＋答或回落
 pub struct Adviser { /* answer —— 私有 */ }
 impl Adviser { pub fn none() -> Adviser;
-               pub fn with(answer: impl FnMut(&Ask, &Window) -> Result<AdviserAnswer, AdviserFailure>
+               pub fn with(answer: impl FnMut(&Ask, &Conversation) -> Result<AdviserAnswer, AdviserFailure>
                                  + Send + 'static) -> Adviser;
                pub fn consult(&mut self, ask: Ask, conversation: &Conversation, elapsed_ms: u64) -> Consultation; }
 ```
 
-- 定序（H-08 之后）：**判定由 `compaction::plan` 一处给出**，答 `Shrink { Keep, Cut(Strategy), MustOffload }`。`Keep` →原样；`MustOffload`（结构化、未知内容、以及非 UTF-8 字节）与「`Cut` 且 `len ≥ OFFLOAD_MIN_BYTES`」→ 有 `OffloadSite` 就 offload；`Cut` 而无站点或不够大 → `compaction::shorten` 按已定的 `Strategy` 裁。**`MustOffload` 而无站点是一次带恢复语的 `Err`，不是私自的字节切**：截半的结构化数据看上去仍可解析，那正是它比缺席更糟的理由，而旧的 `byte_cut` 让 pipeline 当场推翻 compaction 的定规——一条规则两个家。`byte_cut` 随之删除。标记仍由 `elision` 产出且只出现一次。
+- 定序：**判定由 `compaction::plan` 一处给出**，答 `Shrink { Keep, Cut(Strategy), MustOffload }`。`Keep` →原样；`MustOffload`（结构化、未知内容、以及非 UTF-8 字节）与「`Cut` 且 `len ≥ OFFLOAD_MIN_BYTES`」→ 有 `OffloadSite` 就 offload；`Cut` 而无站点或不够大 → `compaction::shorten` 按已定的 `Strategy` 裁。**`MustOffload` 而无站点是一次带恢复语的 `Err`，不是私自的字节切**：截半的结构化数据看上去仍可解析，那正是它比缺席更糟的理由；pipeline 若自己切字节，就当场推翻了 compaction 的定规——一条规则两个家。标记由 `elision` 产出且只出现一次。
 - **`Shrink::Cut(Strategy::Sections)` 不交给 offload。** 长文档的节标题骨架是该类存在的理由，而 offload 的替代体是文件头＋指向全文的指针，恰好把骨架丢掉；故 `Markup` 一律走 `shorten`，其余 `Cut` 仍按 `len ≥ OFFLOAD_MIN_BYTES` 入 store。
 - **非 UTF-8 的静默回落已登记**：`Err(_) => Content::Unknown` 丢掉 `Utf8Error` 的原因，把「二进制」折成「未知」；`Unknown` 的整块离窗使它的行为安全，但名字不对。修法需要一个新内容类与它的 plan／shorten 臂，不止一行，故只登记不改。
 - **顾问端口住 `runtime::pipeline::adviser`（形状 3 port＋1 判定），先于 `package` 跑。** 顾问装不进同步的 sieve 链（`Draft::step` 是 `impl FnOnce(&[String]) -> Vec<String>`，无 Result 无 async，而 sieve→package→package_exec 整链同步）；做法是顾问在链外先办，判断作 `PackContext.adviser` 喂进来。三条问法（`Noul` 是非＋概率／`Score` 有序打分／`Choice` 选一，后者仅用于开 session 选模型）与答案／回落载荷形状归 `kernel::event::record`，本模块只翻译与校验。
-- **顾问是窗口的顾问，不是前缀的顾问。** 端口签名只拿得到 `&Window`（与一个已拼好的 `Ask`）：拿不到 `FrozenConfig`，也拿不到 `FrozenPrefix`。逐轮换模型／effort 是前缀失效，不是窗口调整，故在本端口里写不出来；要挡它们得在 `CallShape` 上挡（§8-3）。
+- **顾问是窗口的顾问，不是前缀的顾问。** 端口签名只拿得到 `&Conversation`（与一个已拼好的 `Ask`）：拿不到 `FrozenConfig`，也拿不到 `FrozenPrefix`。逐轮换模型／effort 是前缀失效，不是窗口调整，故在本端口里写不出来；要挡它们得在 `CallShape` 上挡（§8-3）。
 - **顾问的影响只有两条臂，下界是「今天的每个数字」。** `Score { score_bp }` 按 basis points 缩放 cap 给能裁的内容类用；若缩放会把「本会整块保留」的 Structured／Unknown 变成 `MustOffload`，则沿城市自己的 plan 与预算（把一条密度分变成一次拒绝，正是 `Keep` 在防的那件事）。`Noul { keep: false, .. }` 只在「有 `OffloadSite` 且结果大于 cap」时把它移出窗口：offload 只存必须裁的东西，更小的结果没有放得下的去处。`Choice` 不进 `package`（只在开 session 选模型时用）。
 - **失败策略：无回答即无调整，且写进账本。** 未装顾问（`Adviser::none`）、端点不可用／超时、答非所问（问 `Noul` 答 `Score`、选择不在选项内、概率越界）一律回落，`Consultation::payloads()` 产出 `adviser_asked` 加 `adviser_answered`／`adviser_fell_back` 两条载荷随 `Packaged::events` 出去。**`answer()` 返回 `None` 时上面每一个数字在原地不动，所以最坏情况恰好等于今天的行为。**
 - **顾问端点走既有 `AttachEndpoint` 登记路径，不造第二套 provider 表。** 配置不新增 TOML 段（`ConfigLayer` 只有 effort／sandbox／mcp 且四处 `deny_unknown_fields`）；`gateway::adviser::AdviserClient` 收路由已产出的 `Chosen`，用 `adapter_for` 同一支笔、同一份凭证兑付与 deadline。`Choice` 问法在开 session 选模型时用，前缀成形之前。
 - 信封三附件一处组装：正文后依序追加 clock 行／net_notice 行（恒一次：正在连接互联网提醒，英文定句）／steer 行（`user:`／`@ID:` 前缀）；三行字节不计入 cap（附件与负载分账，附件有自己的封顶常数在实现内断言）。
-- 内容感知压缩分派表属 P3；本模块只持「原样／offload／截断」三臂，接口不预留分派参数。
+- 按内容分类的缩短判定住 `compaction`（八类内容、四种策略），sieve 住 §8-27；本模块只按它们的答案走「原样／offload／截断」三臂。
 
 ### 8-8 runtime::offload（形状 1；四不变量的独占定义处）
 
 ```rust
 pub const REST_DIR: &str = ".rest";
 pub struct OffloadSite<'a> { pub cas: &'a mut memory::Cas, pub city_root: &'a std::path::Path,
-                             pub room: &'a kernel::Address }
+                             pub room: &'a kernel::Address, pub origin: memory::BlockOrigin }   // origin：这块字节替哪个 run、哪栋楼写下（memory-SPEC）
 pub struct OffloadRecord { pub substitute: Vec<u8>, pub original: Locator, pub rest_path: String,
                            pub original_len: u64 }
 pub fn offload(bytes: &[u8], cap_bytes: u64, site: &mut OffloadSite<'_>) -> Result<OffloadRecord, AxError>;
@@ -511,13 +515,13 @@ impl Watchdog {
 }
 ```
 
-- 处置必分级：纠正 Steer 文本指名重复指纹；只有终局的处置被明拒。子 Run 监控：`Completion::Limit` 的呈现住 status.children（S3 类型已备，派生消费者 P2），本模块不重复存储子态。
+- 处置必分级：纠正 Steer 文本指名重复指纹；只有终局的处置被明拒。子 Run 监控：`Completion::Limit` 的呈现住 status.children，本模块不重复存储子态。
 - **provider 失败按 `AxError::retry` 的三态分类。** `No`→`Freeze { ProviderRefused }`，一次即止；`Yes` 与 `Unknown`→`BackOff { until }`（一次模型调用的效果只是一份城里从未收到的回答，效果是否落在对端只关乎计费，不关乎城里的状态，故「不知道」照样再问），`until = now + 退避`。**退避表只住 `Watchdog`**：自 provider 上次作答以来连续第 n 次失败的基准是 `500 ms × 2^(n-1)`，基准封顶 60 s（第 8 次起恒为 60 s）；实际等待是基准加一段抖动，抖动落在 `[0, 基准/2]`，所以第 n 次等待落在 `[基准, 1.5 × 基准]`，最长 90 s。起点 500 ms 与封顶 60 s 都是对端的尺度（一次过载的恢复时间），与所在机器的快慢无关，故不从机器的测量推导。落选的是「由调用层给 `until`」：调用层手里只有当前时刻，而 `gateway` 里并没有持 retry-after 的准入状态，结果是 `until` 恒等于「现在」，重试不隔一刻。**连续的计数在 provider 作答时归零**（`on_provider_answered`，`drive` 在每个走完的回合后调用）：一个已经恢复的 provider 不欠下一次故障一分钟的首等，而对重试的上限是对「同一个调用再问一次」的上限，不是对整个 Run 一生碰上几次故障的上限。`provider_failures` 仍是这个 Run 的总数，只作观察。**对端说了等多久时，等的是两者中较长的那个**：`until = now + max(退避表, AxError::retry_after_ms)`。对端的 `retry-after` 是它对自己何时恢复的陈述，早于它再问只会再收一次 429；退避表仍是下限，因为一个说「1 秒后」的对端连续失败时，连续计数照样该拉长间隔。对端给的等待不设上限：它可以很长，而停下一个在等的 Run 的是 `Halt`，`watchdog_fired` 里的 `until_ms` 让人看见它在等什么。**抖动以 `RunId` 为种子，同一个 Run 永远得到同一串等待。** 同一时刻被同一次故障打断的多个 Run 若按同一张表等待，会在同一毫秒一齐再问，把刚恢复的对端再压垮一次；抖动把它们错开。种子是 `RunId` 的 16 字节经 FNV-1a 折叠，与连续计数一起过一遍 splitmix64 的收尾混合，再对 `基准/2 + 1` 取余；不取随机源，因为一个 Run 的历史要能逐字节重放（citysim 与离线重放读的是同一张表），而 uuid v7 的末 74 位本身就是随机的，已经把同一毫秒启动的 Run 分开。抖动只往上加：退避表仍是下限，`retry-after` 取两者较长的规则不变。落选的是往下抖（`[基准/2, 基准]`）：那样第一次等待可以短于 500 ms，而表说的是「至少等这么久」。
-- **可重试的失败只对着人设的那个上限冻住**（`Retries`）。`UntilHalted` 下停它的是 `Halt`，城里唯一的刹车；`AtMost(n)` 下停它的是人在端点表单上填的那个数。**这两格是穷尽而不是一个带哨兵值的计数**：「一直试到有人喊停」与「试四次」是两种意图，一个数字拼不出前者。填进表单却没有任何东西去读的数字，比根本不给这个字段更糟——`request_max_retries` 此前正是如此，而 `Watchdog` 本身在生产代码里连一个调用方都没有。
+- **可重试的失败只对着人设的那个上限冻住**（`Retries`）。`UntilHalted` 下停它的是 `Halt`，城里唯一的刹车；`AtMost(n)` 下停它的是人在端点表单上填的那个数。**这两格是穷尽而不是一个带哨兵值的计数**：「一直试到有人喊停」与「试四次」是两种意图，一个数字拼不出前者。填进表单却没有任何东西去读的数字，比根本不给这个字段更糟，所以 `request_max_retries` 的读者就是 `Watchdog`，而它的调用方是下一条的 `drive`。
 - **`runtime::run::drive` 是那个调用方**：一次可重试的失败写一条 `watchdog_fired` 再重来，于是历史里第二条 `model_called` 就是人读到的那次重试，而不是一次无声的重复。节奏归 `Watchdog` 的退避表：`drive` 先把 `Watchdog` 给的 `until` 写进 `watchdog_fired`，再交给 `RunHooks::wait` 等到那一刻，于是历史许诺的「不早于 `until_ms`」与下一条 `model_called` 一致。**等待是 `Halt` 够得着一个没有回合在飞的 run 的地方**：`wait` 答 `Halted` 时 run 以 `Cancelled` 冻住，不再发下一次调用。落选的是「等完再问 `interrupt`」：退避长到一分钟，一个晚一分钟才生效的刹车不是刹车。装配层的 `wait` 以 50 ms 为片睡到 `until`，每片问一次是否停下；等待中到达的 steer 留到下一个安全点，不在等待里被吞掉。计数时钟（citysim、离线重放）答 `Allowed` 且不等，因为它重放的东西不在真实时间里等待。
-- **为什么删掉 `WATCHDOG_PROVIDER_RETRIES=2`。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。`retriable` 是产错处已经知道的事实（默认 false，fail-closed），拿它分类比在这里重新猜一遍强。
-- **`ProviderExhausted` 改名 `ProviderRefused`。** 既然没有重试预算了，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。载荷里的 `reason` 字串同改为 `provider_refused`。
-- fired_payload 的形状由 `kernel::event::record::WatchdogFired`（kernel-SPEC §8-4）独家拼出：`drive` 此前对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，于是一份历史里有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
+- **为什么按 `AxError::retry` 分类而不设固定次数。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。能否再试是产错处已经知道的事实（`Retry`，fail-closed），拿它分类比在这里重新猜一遍强。
+- **冻结原因叫 `ProviderRefused`**（载荷 `reason` 为 `provider_refused`）：没有重试预算，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。
+- fired_payload 的形状由 `kernel::event::record::WatchdogFired`（kernel-SPEC §8-4）独家拼出：`drive` 若对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，一份历史里就有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不是一个阀值。
 
 ### 8-10 runtime::clock（形状 1；纯格式化不采样）
 
