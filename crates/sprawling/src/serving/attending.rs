@@ -27,7 +27,7 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, EventRecord, RunId};
+use kernel::{AxCode, AxError, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
 use super::folding::{Folding, spawn_folding};
@@ -45,7 +45,7 @@ use crate::views::Views;
 pub(super) struct Outward {
     pub(super) desk: Arc<CommandDesk>,
     pub(super) views: Arc<std::sync::Mutex<Views>>,
-    pub(super) to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+    pub(super) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
     pub(super) to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
 }
 

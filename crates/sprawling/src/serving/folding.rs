@@ -43,7 +43,7 @@ enum Following {
 /// `StorageFatal` when the thread cannot be started.
 pub(super) fn spawn_folding(
     views: Arc<Mutex<Views>>,
-    to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+    to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
 ) -> Result<Folding, AxError> {
     let (committed, arriving) = mpsc::channel::<Fold>();
     let examined = committed.clone();
@@ -85,7 +85,7 @@ pub(super) fn spawn_folding(
 fn fold_until_closed(
     views: &Mutex<Views>,
     arriving: &mpsc::Receiver<Fold>,
-    to_clients: &tokio::sync::broadcast::Sender<EventRecord>,
+    to_clients: &tokio::sync::broadcast::Sender<channels::Committed>,
 ) {
     let mut following = Following::Live;
     for fold in arriving {
@@ -93,10 +93,18 @@ fn fold_until_closed(
             Following::Live => fold_one(views, &fold),
             Following::Stopped => Following::Stopped,
         };
+        // The frame is spelled here, once, whatever the number of
+        // sockets that will write it (channels-SPEC.md 8-47).
         if let Fold::Committed(record) = fold {
-            // A send with no subscribers is not a failure: a city with
-            // no browser open is a city doing its work.
-            drop(to_clients.send(record));
+            match channels::Committed::new(record) {
+                // A send with no subscribers is not a failure: a city
+                // with no browser open is a city doing its work.
+                Ok(committed) => drop(to_clients.send(committed)),
+                Err(unframed) => eprintln!(
+                    "a committed record has no frame and reaches no client: {}",
+                    unframed.subject()
+                ),
+            }
         }
     }
 }

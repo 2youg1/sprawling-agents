@@ -149,9 +149,9 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
             }
             event = events.recv() => {
                 match event {
-                    Ok(record) => {
+                    Ok(committed) => {
                         if phase == SessionState::Live {
-                            let seq = record.seq();
+                            let seq = committed.record().seq();
                             // The far end of a skipped range is only knowable
                             // here, at the record that ends it: the count the
                             // subscription reports says how many messages went
@@ -163,7 +163,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                             {
                                 return;
                             }
-                            if send(&mut socket, &ServerFrame::Event(Box::new(record))).await.is_err() {
+                            if socket.send(Message::Text(committed.frame())).await.is_err() {
                                 return;
                             }
                             stream = next;

@@ -41,7 +41,7 @@ fn the_writer_does_not_wait_for_a_reader_holding_the_views() {
     let folding = writer.join().unwrap();
     drop((folding.observer, folding.machine));
     folding.thread.join().unwrap();
-    assert_eq!(heard.try_recv().unwrap(), genesis);
+    assert_eq!(heard.try_recv().unwrap().record(), &genesis);
     let mut folded_here = Views::new(dir.path());
     folded_here.apply(&genesis).unwrap();
     let city = channels::Query::CityView;

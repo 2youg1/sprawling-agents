@@ -90,7 +90,7 @@ pub(super) async fn accept_enrolment(
                 },
                 record = records.recv() => match record {
                     Ok(record) => {
-                        if let Some(stored) = stored_reference(&record, &place) {
+                        if let Some(stored) = stored_reference(record.record(), &place) {
                             return Waited::Settled(Enrolled::Stored { reference: stored });
                         }
                     }
