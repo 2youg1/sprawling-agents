@@ -8,7 +8,7 @@
 //!
 //! Markdown is out of this gate's scope by ruling: a skill document
 //! carries its own licence in its frontmatter and in `skills/LICENSES.md`,
-//! and an MPL notice on a CC BY-NC or MIT document would misstate its
+//! and an MPL notice on one of the MIT adaptations would misstate its
 //! terms.
 //!
 //! The notice is what the licence asks for. The copyright line is not:

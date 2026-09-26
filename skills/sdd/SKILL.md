@@ -1,10 +1,10 @@
 ---
 name: sdd
 description: "Spec-first programming workflow: write the component's SPEC.md before its code, then implement exactly what the SPEC states and keep the two in step. Load before starting programming work that will be merged."
-license: CC BY-NC 4.0
+license: MPL-2.0
 ---
 
-> **Provenance and license.** The original of this skill is 2youg1's own Chinese-language open-source skill, published under AGPL-3.0-or-later. This file is its English translation and adaptation, and the license is changed **only within this project**: it carries CC BY-NC 4.0 here, while the original remains AGPL-3.0-or-later. Reuse owes credit to the author, and no commercial use without separate permission.
+> **Provenance and license.** The original of this skill is 2youg1's own Chinese-language open-source skill, published under AGPL-3.0-or-later. This file is its English translation and adaptation by the same author, and it carries MPL-2.0 here, the license of the rest of this repository; the original remains AGPL-3.0-or-later.
 
 # SDD Workflow
 

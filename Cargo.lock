@@ -2165,6 +2165,7 @@ dependencies = [
  "kernel",
  "memory",
  "proptest",
+ "same-file",
  "serde",
  "serde_json",
  "tempfile",

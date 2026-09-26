@@ -63,6 +63,7 @@ impl RunWorker {
                 // so a document that changes content behind the same
                 // name is a difference somebody can see later.
                 hash: Some(holding.hash),
+                package: holding.package.as_ref().map(|dir| dir.as_str().to_owned()),
             })?;
         }
         for absent in shelves.missing(rules.reading_room()) {

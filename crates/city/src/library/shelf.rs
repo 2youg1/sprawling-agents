@@ -175,6 +175,11 @@ pub struct Holding {
     /// Which shelf, and where on it. One value, so a reader opening the
     /// document and a page naming the shelf read one fact.
     pub shelf: Shelf,
+    /// The package directory, when the holding is filed as one: the
+    /// scan says so here, so a reader never guesses it from a document
+    /// that happens to be called `SKILL.md`. `None` for a single
+    /// document, and for a shelf outside the city, which has no address.
+    pub package: Option<Address>,
 }
 
 impl Holding {
@@ -189,6 +194,7 @@ impl Holding {
             disclosure: first_line(text),
             hash: B3Hash::digest(text.as_bytes()),
             shelf,
+            package: None,
         }
     }
 }
