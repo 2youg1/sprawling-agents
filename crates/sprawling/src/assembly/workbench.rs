@@ -20,7 +20,6 @@ use runtime::bench::ToolBench;
 
 use kernel::event::record::autonomy_word;
 
-mod blocks;
 mod desks;
 mod engine;
 mod servers;

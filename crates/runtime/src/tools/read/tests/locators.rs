@@ -75,10 +75,7 @@ fn a_cas_block_is_read_at_the_building_it_was_put_for() {
         dir.path(),
         Arc::new(Mutex::new(Catalog::new())),
         only_lab(),
-        Blocks {
-            store: cas_dir,
-            owner: Arc::new(|_: &kernel::B3Hash| Ok(None)),
-        },
+        &cas_dir,
     )
     .unwrap();
 
@@ -113,7 +110,7 @@ fn a_file_locator_reads_the_bytes_of_its_commit_under_its_address_bound() {
         root,
         Arc::new(Mutex::new(Catalog::new())),
         only_lab(),
-        unreferenced(),
+        Path::new("no-store"),
     )
     .unwrap();
 

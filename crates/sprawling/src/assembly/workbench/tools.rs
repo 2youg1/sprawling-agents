@@ -115,7 +115,7 @@ impl RunWorker {
             &site.write_root,
             std::sync::Arc::clone(&catalog),
             std::sync::Arc::clone(&bound),
-            super::blocks::of_lineage(&self.city_root, site.run_id, at.predecessor()),
+            &kernel::layout::CityLayout::new(&self.city_root).cas(),
         )?;
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which

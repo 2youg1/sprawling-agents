@@ -39,7 +39,7 @@ fn a_link_is_judged_by_where_it_lands() {
         }
     });
     let catalog = Arc::new(Mutex::new(Catalog::new()));
-    let mut tool = ReadTool::new(dir.path(), catalog, only_lab, unreferenced()).unwrap();
+    let mut tool = ReadTool::new(dir.path(), catalog, only_lab, Path::new("no-store")).unwrap();
 
     for asked in [
         "lab/to-vault/secret.md",
@@ -131,7 +131,7 @@ fn a_file_absent_at_the_check_is_not_opened_later() {
         dir.path(),
         Arc::new(Mutex::new(Catalog::new())),
         between,
-        unreferenced(),
+        Path::new("no-store"),
     )
     .unwrap();
 
@@ -176,7 +176,7 @@ fn a_directory_swapped_for_a_link_after_the_check_opens_nothing() {
         dir.path(),
         Arc::new(Mutex::new(Catalog::new())),
         between,
-        unreferenced(),
+        Path::new("no-store"),
     )
     .unwrap();
 

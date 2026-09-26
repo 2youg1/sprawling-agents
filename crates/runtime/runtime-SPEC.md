@@ -1420,20 +1420,19 @@ const NEARBY_CAP: usize = 16;
 
 ```rust
 // read::locator
-/// 本 run 或其前驱在账本里引用过这个块的那一行的地址；没有这样一行时为 None。
-pub type BlockOwner = Arc<dyn Fn(&B3Hash) -> Result<Option<Address>, AxError> + Send + Sync>;
-/// 城的块仓与块的归属，一个值：run 可能写在没有自己块仓的 worktree 里。
-pub struct Blocks { pub store: PathBuf, pub owner: BlockOwner }
-pub(super) fn open_locator(asked: &str, city_root: &Path, blocks: &Blocks,
+pub(super) fn open_locator(asked: &str, city_root: &Path, store: &Path,
                            bound: &dyn Fn(&Address) -> ReadVerdict) -> Option<Result<String, AxError>>;
-fn judged_at(locator: &Locator) -> Result<Address, AxError>; // 读取界的唯一判定处
+/// cas: 块按哪栋楼判读取界的唯一判定处。
+fn judged_at(hash: &B3Hash, origins: &[memory::BlockOrigin],
+             bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Address, AxError>;
+// ReadTool::new(city_root, catalog, bound, block_store: &Path)：块仓是城的，run 可能写在没有自己块仓的 worktree 里。
 ```
 
 - **以 `cas:` 或 `file:` 开头的参数是 Locator**，按 `Locator::parse` 判形，判不过即 `E_INVALID_ARGS`；其余参数走 catalog 与普通路径，不受影响（一个城内地址不含冒号，两者不相交）。
-- **按哪个地址判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个：`file:<addr>@<oid>` 按 `<addr>` 判；`cas:` 块一律 `E_GATE_DENIED`，恢复语让它改读块所出自的 `file:`。块仓不记一个块是为哪栋楼存的，而账本里写出一个哈希证明不了字节来自哪里：模型写的文字（例如委派的 `goal`）会落进带 `addr` 的行，所以按「哪一行写了这个哈希」判归属可以伪造。`cas:` 的读取在 `Cas::put` 的调用处记下存块时的楼与 run 之后才开放，届时 `judged_at` 按那份记录判。
+- **`cas:` 块按存块时记下的楼判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个。来源是 `Cas::put_for` 在存块时写下的（memory-SPEC §8-3）：一个块为几栋楼存过就有几条来源，取读者能读的第一栋；一栋都读不了就取第一条来源，让 `admit` 按那栋楼的理由拒绝；没有来源的块（上架的技能包、从未存过的哈希）＝`E_GATE_DENIED`，恢复语让它改读块所出自的 `file:`。只按楼判、不按 run 判：读得了那栋楼的文件就读得了为那栋楼存下的字节，而 run 只记作出处。另一条路是按账本里哪一行写了这个哈希来判，落选：模型写的文字（例如委派的 `goal`）会落进带 `addr` 的行，那样的归属可以伪造。`file:<addr>@<oid>` 按 `<addr>` 判。
 - **`file:` 在该 oid 上做 git 读**（`memory::blob_at`，memory-SPEC §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
 - **范围**：`cas:` 带的范围照 Locator 本身只交回那一段（`Cas::get_range`）；`file:` 带范围＝`E_INVALID_ARGS`，恢复语让它去掉范围改用 `offset`／`limit`——提交里的文件没有一份按范围读的实现，而 `offset`／`limit` 已答同一个问题。之后都按 `offset`／`limit` 切（§8-29-1）。字节不是 UTF-8＝`E_INVALID_ARGS`，read 只交文本。
-- **生产的 `Blocks`**（`bin::assembly::workbench::blocks`）只供出块仓位置；它的 `owner` 不参与任何判定，存块时的来源记录落地时由那份记录取代。
+- **为 run 存块的调用方**：转录（`Transcript::materialise`，按房间所在的楼）走 `put_for`。
 
 ### 8-30 runtime::tools::search（形状 1 判定＋形状 4 适配器）
 

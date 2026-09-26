@@ -6,49 +6,37 @@
 //! Opening a Locator: `cas:` bytes and `file:` bytes at a commit
 //! (runtime-SPEC section 8-29-5).
 //!
-//! **A content block carries no building.** The same bytes may sit in
-//! the store because a confidential building put them there, and a hash
-//! can be copied from anywhere, so the read bound is asked of the
-//! building whose ledger line in this run's lineage referenced the
-//! block. [`judged_at`] is the one place that decides which address a
-//! Locator is judged at; the judgement itself stays `chosen_path::admit`.
+//! **A content block is judged at the building it was put for.** The
+//! same bytes may sit in the store because a confidential building put
+//! them there, and a hash can be copied from anywhere, so the only
+//! answer to whose a block is comes from the record the store wrote when
+//! it took the bytes. [`judged_at`] is the one place that decides which
+//! address a Locator is judged at; the judgement itself stays
+//! `chosen_path::admit`.
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, B3Hash, Locator, ReadVerdict};
 use memory::MemoryError;
-
-/// The address of the ledger line in this run's lineage that referenced
-/// a content block, or `None` when no such line exists.
-pub type BlockOwner = Arc<dyn Fn(&B3Hash) -> Result<Option<Address>, AxError> + Send + Sync>;
-
-/// Where this city keeps content blocks, and whose each one is. One value
-/// because a block read needs both: the run may write in a worktree that
-/// holds no store of its own.
-pub struct Blocks {
-    pub store: PathBuf,
-    pub owner: BlockOwner,
-}
 
 /// The text a `cas:` or `file:` argument names, or `None` when the
 /// argument is not a Locator and belongs to the catalog or a path.
 pub(super) fn open_locator(
     asked: &str,
     city_root: &Path,
-    blocks: &Blocks,
+    store: &Path,
     bound: &dyn Fn(&Address) -> ReadVerdict,
 ) -> Option<Result<String, AxError>> {
     if !(asked.starts_with("cas:") || asked.starts_with("file:")) {
         return None;
     }
-    Some(read_admitted(asked, city_root, blocks, bound))
+    Some(read_admitted(asked, city_root, store, bound))
 }
 
 fn read_admitted(
     asked: &str,
     city_root: &Path,
-    blocks: &Blocks,
+    store: &Path,
     bound: &dyn Fn(&Address) -> ReadVerdict,
 ) -> Result<String, AxError> {
     let locator = Locator::parse(asked).map_err(|err| {
@@ -57,10 +45,15 @@ fn read_admitted(
              spells it",
         )
     })?;
-    super::super::chosen_path::admit(judged_at(&locator)?.as_str(), "read", bound)?;
     let bytes = match &locator {
         Locator::Cas { hash, range } => {
-            let cas = memory::Cas::open(&blocks.store).map_err(MemoryError::into_ax)?;
+            let cas = memory::Cas::open(store).map_err(MemoryError::into_ax)?;
+            let building = judged_at(
+                hash,
+                &cas.origins(hash).map_err(MemoryError::into_ax)?,
+                bound,
+            )?;
+            super::super::chosen_path::admit(building.as_str(), "read", bound)?;
             match range {
                 Some(range) => cas.get_range(hash, range),
                 None => cas.get(hash),
@@ -71,16 +64,19 @@ fn read_admitted(
             address,
             oid,
             range: None,
-        } => memory::blob_at(city_root, *oid, address)
-            .map_err(MemoryError::into_ax)?
-            .ok_or_else(|| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "read",
-                    format!("{asked} is not a file in that commit"),
-                )
-                .with_recovery("name a file the commit holds, not a directory or a later file")
-            })?,
+        } => {
+            super::super::chosen_path::admit(address.as_str(), "read", bound)?;
+            memory::blob_at(city_root, *oid, address)
+                .map_err(MemoryError::into_ax)?
+                .ok_or_else(|| {
+                    AxError::failure(
+                        AxCode::InvalidArgs,
+                        "read",
+                        format!("{asked} is not a file in that commit"),
+                    )
+                    .with_recovery("name a file the commit holds, not a directory or a later file")
+                })?
+        }
         Locator::File { range: Some(_), .. } => {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -96,24 +92,33 @@ fn read_admitted(
     })
 }
 
-/// The address whose read bound decides a Locator: a `file:` at its own
-/// address. A `cas:` block is refused whatever its hash, because the
-/// store keeps no record of the building a block was put for, and a
-/// hash spelled in a ledger line proves nothing about where its bytes
-/// came from: model-written text reaches lines that carry an address.
+/// The building whose read bound decides a `cas:` block: the first
+/// building it was put for that this reader may read, or, when there is
+/// none, the first it was put for, so that `admit` refuses with that
+/// building's reason. A `file:` is judged at its own address and needs
+/// no decision.
 ///
 /// # Errors
-/// `E_GATE_DENIED` for every `cas:` block.
-fn judged_at(locator: &Locator) -> Result<Address, AxError> {
-    match locator {
-        Locator::File { address, .. } => Ok(address.clone()),
-        Locator::Cas { hash, .. } => Err(AxError::failure(
-            AxCode::GateDenied,
-            "read",
-            format!("cas:b3-{hash} has no recorded building"),
-        )
-        .with_recovery(
-            "read the file the block was taken from as `file:<address>@<commit>`; a content              block is read only once the store records which building it was put for",
-        )),
-    }
+/// `E_GATE_DENIED` for a block put for no building.
+fn judged_at(
+    hash: &B3Hash,
+    origins: &[memory::BlockOrigin],
+    bound: &dyn Fn(&Address) -> ReadVerdict,
+) -> Result<Address, AxError> {
+    origins
+        .iter()
+        .map(|origin| &origin.building)
+        .find(|building| matches!(bound(building), ReadVerdict::Open))
+        .or_else(|| origins.first().map(|origin| &origin.building))
+        .cloned()
+        .ok_or_else(|| {
+            AxError::failure(
+                AxCode::GateDenied,
+                "read",
+                format!("cas:b3-{hash} was put for no building"),
+            )
+            .with_recovery(
+                "read the file the block was taken from as `file:<address>@<commit>`; a                  content block is read only at the building it was put for",
+            )
+        })
 }

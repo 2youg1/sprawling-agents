@@ -45,7 +45,6 @@ mod package;
 
 use super::chosen_path::{Located, ReadBound, real_location};
 use crate::catalog::{Catalog, Expansion};
-pub use locator::{BlockOwner, Blocks};
 use miss::Floor;
 
 /// The most lines one call may bring back, and the default: a default
@@ -195,7 +194,9 @@ pub struct ReadTool {
     /// What this run's building may read, asked of every path the model
     /// chooses and of the building a Locator's bytes belong to.
     bound: ReadBound,
-    blocks: Blocks,
+    /// Where this city keeps content blocks: a run may write in a
+    /// worktree that holds no store of its own.
+    block_store: PathBuf,
     meta: ToolMeta,
 }
 
@@ -207,7 +208,7 @@ impl ReadTool {
         city_root: &Path,
         catalog: Arc<Mutex<Catalog>>,
         bound: ReadBound,
-        blocks: Blocks,
+        block_store: &Path,
     ) -> Result<ReadTool, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
@@ -248,7 +249,7 @@ impl ReadTool {
             city_root: city_root.to_path_buf(),
             catalog,
             bound,
-            blocks,
+            block_store: block_store.to_path_buf(),
             meta: ToolMeta {
                 name: ToolName::parse("read")?,
                 disclosure: "Read a file by its path, or a skill by the name the catalog lists \
@@ -272,7 +273,7 @@ impl ReadTool {
     /// that happens to share the name must not be able to shadow it.
     fn resolve(&self, asked: &str) -> Result<Found, AxError> {
         if let Some(read) =
-            locator::open_locator(asked, &self.city_root, &self.blocks, &*self.bound)
+            locator::open_locator(asked, &self.city_root, &self.block_store, &*self.bound)
         {
             return read.map(Found::Text);
         }
