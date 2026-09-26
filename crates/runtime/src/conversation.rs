@@ -74,7 +74,9 @@ impl Conversation {
         });
     }
 
-    /// Steer joins the tail of the last user message, or opens one if none is open.
+    /// Steer joins the tail of the open user message, or opens one. A
+    /// steer that arrives after that message was sent is held until the
+    /// next tool results, and rides after them.
     pub fn push_steer(&mut self, source: &str, text: &str) {
         self.push_user_text(format!("{source}: {text}"));
     }
@@ -109,11 +111,25 @@ impl Conversation {
         }
     }
 
-    /// Tool results open the next user message, and the text held since
-    /// the last assembly follows them.
+    /// Tool results join the last user message, or open the next one,
+    /// and the text held since the last assembly follows them.
+    ///
+    /// Results never wait in `held`: a reply with no content pushes no
+    /// assistant message, so the last user message may already be sent,
+    /// and holding the results there would hold them at every turn.
     pub fn push_tool_results(&mut self, mut results: Vec<ContentBlock>) {
         results.append(&mut self.held);
-        self.push_user(results);
+        if results.is_empty() {
+            return;
+        }
+        match self.messages.last_mut() {
+            Some(last) if last.role == Role::User => last.content.extend(results),
+            _ => self.messages.push(ChatMessage {
+                cache: false,
+                role: Role::User,
+                content: results,
+            }),
+        }
     }
 
     /// Everything in `messages()` is now on the wire: later user text
