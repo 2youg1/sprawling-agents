@@ -2338,8 +2338,23 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 于是桌子问的每一道门都看得见它，`gate::command` 据此拒掉 `exec`（`E_TAINTED_ACTION`）；
 标签造不出来时 run 就停在这里，因为空 `TaintSet` 是每一道门都放行的那一格。
 
-**车道满不是拒绝**：`DrivingPool::full` 是 `pursue` 读的建议值，不是 `start` 的闸；
-人派的活从前就可以超过 `DRIVING_LANES`，城自己起的活同此。超出的部分停在 provider 的 admission 上排队。
+**车道满不是拒绝，是排队**：`DrivingPool::start` 对每一个派活入口都是同一道闸——人派的活、
+城自己起的活、敲门、委派、workshop、继任、追求，谁都一样。车道满时，已经准备好的那一轮活
+（`Driving` 连同它的写口与 `DriveContext`）进池里的先到先起队列，不开线程；`landed` 空出
+一条车道之后，`serve_flight` 在落地这一轮之前调 `start_waiting`，按到达顺序把排着的活起到
+车道满为止。排在前面的先起，所以落地时新派的子活、敲门排在已经在等的活后面。
+`in_flight` 只数车道里的，排队的不算；因为只有车道满才会排队，「有活在排」必然意味着
+「有车道在跑」，`land_the_rest` 的循环条件因此不变。起不来的那一轮（线程开不出）离开
+在飞表，拒绝交给它欠着的那一位。队列放在池里而不是放在 provider 的 admission 上，因为
+池数得清谁在等，admission 只让线程停着等，一个 20 节点的 workshop 就是 20 条线程。
+
+```rust
+impl DrivingPool {
+    fn start(&mut self, driving: Driving, ledger: Relay, context: DriveContext) -> Result<(), AxError>;
+    /// 车道空出之后，按到达顺序起排着的活，直到车道满；返回起不来的那几轮与各自的拒绝。
+    fn start_waiting(&mut self) -> Vec<(RunId, AxError)>;
+}
+```
 
 **`handle` 仍然是同步的一扇门**：`RunWorker::handle` = 一条命令 ＋ `land_the_rest`，
 于是命令行与测试看到的仍是「调用返回即事情做完」，而落地过程中起的子活、敲门与继任

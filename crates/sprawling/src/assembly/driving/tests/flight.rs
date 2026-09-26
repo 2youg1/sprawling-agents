@@ -324,3 +324,54 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
         "a cancelled run carries out no tool: {kinds:?}"
     );
 }
+
+/// **The lane count is one wall for every entrance.** Five pieces of
+/// work sent at once drive four at a time: the fifth waits in the pool
+/// rather than opening a thread to park on the provider's admission,
+/// and starts when a lane comes home, so all five still freeze.
+#[test]
+fn work_past_the_lane_count_waits_for_a_lane() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let rooms = ["lab/a", "lab/b", "lab/c", "lab/d", "lab/e"];
+    for room in rooms {
+        std::fs::create_dir_all(dir.path().join(room)).unwrap();
+    }
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
+    std::fs::write(
+        dir.path().join("lab").join(city::ROADMAP_FILE),
+        PLAN_TWO_FREE_ROWS,
+    )
+    .unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        rooms.iter().map(|_| completion("done", None)).collect(),
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    for room in rooms {
+        worker
+            .dispatch_into_lane(
+                asked(room),
+                "fire the kiln".to_owned(),
+                "the kiln is fired".to_owned(),
+                Owing::asked(channels::Reply::nowhere()),
+            )
+            .unwrap();
+    }
+    assert_eq!(
+        worker.flight.in_flight(),
+        crate::serving::pool::DRIVING_LANES,
+        "no more runs drive at once than there are lanes"
+    );
+    worker.land_the_rest().unwrap();
+    drop(provider);
+    let frozen = history(&report.ledger_dir)
+        .iter()
+        .filter(|line| line["kind"] == "run_frozen")
+        .count();
+    assert_eq!(
+        frozen,
+        rooms.len(),
+        "the run that waited for a lane ran too"
+    );
+}
