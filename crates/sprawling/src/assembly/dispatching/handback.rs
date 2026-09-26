@@ -47,7 +47,7 @@ impl RunWorker {
             .map_err(memory::MemoryError::into_ax)?;
         let claim = collab::Claim::new(
             collab::NodeId::parse(child.addr.as_str())?,
-            Locator::parse(&format!("cas:b3-{digest}"))?,
+            Locator::cas(digest),
             digest,
             child.who.clone(),
         );
@@ -76,14 +76,15 @@ impl RunWorker {
         // Through the room table rather than into a queue of its own:
         // the parent room may have another run reading in it, and a
         // handback delivered beside that reader is one nobody collects.
-        self.rooms.deliver(&signal)?;
+        self.collaborating.rooms.deliver(&signal)?;
         // And into the room's join, by the same reading a restart would
         // do: `Handback::from_signal` is the one inverse of the writer
         // just above, so a live delivery and a rebuild cannot disagree
         // about what a handback signal means.
         if let Some(collab::Handback::Finished(artifact)) = collab::Handback::from_signal(&signal)?
         {
-            self.joins
+            self.collaborating
+                .joins
                 .entry(parent.clone())
                 .or_default()
                 .accept(artifact);

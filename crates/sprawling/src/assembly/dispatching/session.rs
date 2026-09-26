@@ -83,6 +83,7 @@ impl RunWorker {
         policy: &kernel::BuildingPolicy,
     ) -> Result<NamingCall, AxError> {
         let chosen = self
+            .credentials
             .book
             .select(kernel::ModelTag::Digest, policy)
             .map_err(|refused| {

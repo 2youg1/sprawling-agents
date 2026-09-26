@@ -108,7 +108,7 @@ impl RunWorker {
             .put(brief.segment_text().as_bytes())
             .map_err(memory::MemoryError::into_ax)?;
         let given = Given {
-            job: Locator::parse(&format!("cas:b3-{job_hash}"))?,
+            job: Locator::cas(job_hash),
             brief,
             task,
             goal,
@@ -160,7 +160,7 @@ impl RunWorker {
         // drives, so a halt on its building reaches it; a root run is
         // ended by `Cancel`, which is a different verb.
         let member = match at.parent {
-            Some(_) => Some(self.backlog.enrol_run(
+            Some(_) => Some(self.flight.backlog.enrol_run(
                 &at.addr,
                 format!("run {} at {}", site.run_id, at.addr.as_str()),
             )?),
@@ -236,7 +236,7 @@ impl RunWorker {
         // backlog that would not take its member back used to cost the
         // room its mail too (sprawling-SPEC.md 8-46-9).
         let returned = self.return_borrowed(&at, &mut site, &desks);
-        let left = member.map_or(Ok(()), |id| self.backlog.leave(id));
+        let left = member.map_or(Ok(()), |id| self.flight.backlog.leave(id));
         returned?;
         left?;
         let Driven {
@@ -319,7 +319,11 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let returned = held(&desks.signals, "settle the signal desk")?.take_inbox();
         match desks.tenure {
-            QueueTenure::TheRoomQueue => self.rooms.give_back(&at.addr, site.run_id, returned)?,
+            QueueTenure::TheRoomQueue => {
+                self.collaborating
+                    .rooms
+                    .give_back(&at.addr, site.run_id, returned)?
+            }
             QueueTenure::ASpare { held_by } => self.note(
                 runtime::diagnostics::Level::Refuse,
                 "collab::inbox",

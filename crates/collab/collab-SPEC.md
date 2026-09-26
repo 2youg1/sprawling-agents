@@ -224,6 +224,7 @@ pub fn arbitrate(registered: &[GoalEntry], candidate: &GoalEntry) -> Option<Leve
 pub fn conflict_payload(candidate: &GoalEntry, level: &Level) -> Result<Payload, AxError>;
 ```
 
+- **`goal_conflict` 的形状归 kernel**：`conflict_payload` 把 `Level` 译成 `kernel::event::record::GoalConflict` 再经 `Payload::of` 写出，读者经 `Payload::read` 读回同一个 struct；本模块只拥有「哪一级」的判定。
 - **检测进 kernel，仲裁不进**：`kernel::goal::detect_conflict` 只答「撞没撞」；本模块答「谁来裁」。
 - **判序固定**（机械 → 读）：同一对目标恒落同一级，重放才可比。
 - **机械可判的只有一种形状**：双方都 claim 路径，且常设性一高一低——「常设的先走」不需要任何判断。其余（两个常设、外部资源同名）都要读目标陈述，那是模型的活。
@@ -331,6 +332,7 @@ impl OpenRequest {
     pub fn from_payload(data: &Payload) -> Result<OpenRequest, AxError>;
     pub fn merged_payload(&self, merge_commit: String, verified_by: String,
                           by: CommitAttribution) -> Result<Payload, AxError>;   // pr_merged
+    pub fn rejected_payload(&self, by: String, why: String) -> Result<Payload, AxError>;   // pr_rejected
 }
 pub struct MergedRequest {   // pr_merged 的键，唯一权威
     pub node: NodeId, pub implementer: String, pub branch: String,
@@ -338,6 +340,10 @@ pub struct MergedRequest {   // pr_merged 的键，唯一权威
     pub commit: String,            // 落地的那个 merge commit
     pub verified_by: String,
     pub by: CommitAttribution,     // flatten：哪次 Run 写的这个 commit
+}
+pub struct RejectedRequest {   // pr_rejected 的键，唯一权威；读者经 Payload::read 取 branch，读不出即拒绝重建
+    pub request: OpenRequest,      // flatten：被退回的那份请求
+    pub by: String, pub why: String,
 }
 pub enum PrEffect {
     Opened { branch: String },
@@ -497,7 +503,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 `pr_tool.rs` 原有 561 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
 
 - `pr_tool.rs`（354 行）——`PrEffect`、`PrDesk` 与它的 `open`／`list`／`check`／`take_effects`、`PrTool` 及其 `Tool` 实现，以及读参数的 `text`。它同时是索引位置，声明 `mod request;` 并 `pub use request::OpenRequest;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `PrDesk::new` 留在本文件。
-- `pr_tool/request.rs`——`OpenRequest` 及其 `payload`／`from_payload`／`merged_payload` 与 `MergedRequest`：`pr_opened` 与 `pr_merged` 两条记录的形状与回读。
+- `pr_tool/request.rs`——`OpenRequest` 及其 `payload`／`from_payload`／`merged_payload`／`rejected_payload` 与 `MergedRequest`／`RejectedRequest`：`pr_opened`、`pr_merged` 与 `pr_rejected` 三条记录的形状与回读。三者留在 collab 而不进 `kernel::event::record`：它们的键里有 `NodeId`，那是 collab 的类型。
 - `pr_tool/tests.rs`（152 行）——原内联 `mod tests` 原样迁出，断言、名字与 6 个 `#[test]` 一个未动。
 
 **无字段开放。** `OpenRequest` 的四个字段本来就是 `pub`，切分未放宽任何可见性。

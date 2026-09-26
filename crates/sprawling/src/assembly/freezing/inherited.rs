@@ -19,7 +19,7 @@
 
 use kernel::{AxError, ChatMessage, RunId};
 
-use super::super::{Assignment, RunWorker, ledger_dir};
+use super::super::{Assignment, RunWorker};
 
 impl RunWorker {
     /// The conversation this run opens with, and the line it was
@@ -38,7 +38,9 @@ impl RunWorker {
         let Some(origin) = at.origin else {
             return Ok(Vec::new());
         };
-        let mother = runtime::replay::verify_ledger_dir(&ledger_dir(&self.city_root))?;
+        let mother = runtime::replay::verify_ledger_dir(
+            &kernel::layout::CityLayout::new(&self.city_root).ledger(),
+        )?;
         let rebuilt = runtime::fork::inherited(&mother, origin.at_seq)?;
         self.note_lineage(
             &at.addr,

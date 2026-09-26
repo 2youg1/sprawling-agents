@@ -12,9 +12,11 @@
 //! reader asking "what does a restart find" and "what does a close
 //! leave" is asking one question from two ends.
 
-use super::{Flight, Namings, RoomQueues, RunWorker, Standing, city_segment, ledger_dir, now_ms};
+use super::{
+    Collaborating, Credentials, Doorstep, Flight, Planning, RoomQueues, RunWorker, Standing,
+    city_segment, now_ms,
+};
 use std::path::Path;
-use std::sync::Arc;
 
 use kernel::{AxError, EventKind, Locator};
 use memory::{Cas, JsonlLedger};
@@ -29,7 +31,7 @@ impl RunWorker {
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
     ) -> Result<Self, AxError> {
-        let dir = ledger_dir(city_root);
+        let dir = kernel::layout::CityLayout::new(city_root).ledger();
         let (ledger, _report) =
             JsonlLedger::open(&dir, now_ms()?).map_err(memory::MemoryError::into_ax)?;
         RunWorker::over(city_root, vault, log, ledger)
@@ -56,7 +58,7 @@ impl RunWorker {
         ledger: JsonlLedger,
     ) -> Result<Self, AxError> {
         let now = now_ms()?;
-        let dir = ledger_dir(city_root);
+        let dir = kernel::layout::CityLayout::new(city_root).ledger();
         let Standing {
             book,
             governance,
@@ -77,28 +79,25 @@ impl RunWorker {
             city: std::sync::OnceLock::new(),
             ledger,
             cas,
-            book,
-            vault: Arc::new(std::sync::Mutex::new(vault)),
+            credentials: Credentials::opened(book, expiries, vault),
             serving: None,
             governance,
-            rooms: RoomQueues::folded(collaboration.inboxes),
-            joins: collaboration.joins,
-            pursuits,
-            plan_holders: collaboration.plan_holders,
-            goals: collaboration.goals,
-            requests: collaboration.requests,
-            delegator,
+            collaborating: Collaborating {
+                rooms: RoomQueues::folded(collaboration.inboxes),
+                joins: collaboration.joins,
+                requests: collaboration.requests,
+                goals: collaboration.goals,
+            },
+            planning: Planning {
+                pursuits,
+                delegator,
+                holders: collaboration.plan_holders,
+            },
             last_tick: now,
-            expiries,
-            logins: std::collections::BTreeMap::new(),
             log,
-            knocks: Vec::new(),
-            entrance,
+            doorstep: Doorstep::opened(entrance),
             origins,
-            fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
-            backlog: runtime::Backlog::new(),
             flight: Flight::open(),
-            namings: Namings::open(),
         })
     }
 
@@ -125,7 +124,7 @@ impl RunWorker {
         let mut must_read = Vec::new();
         let bytes = city_segment(&self.city_root)?.bytes;
         let hash = self.cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
-        must_read.push(Locator::parse(&format!("cas:b3-{hash}"))?);
+        must_read.push(Locator::cas(hash));
         let standing = self.ledger.position();
         let handoff = runtime::handoff::Handoff::new(
             must_read,

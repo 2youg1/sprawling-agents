@@ -34,7 +34,7 @@ impl Views {
     /// not read ends the slice rather than emptying it - what was read is
     /// still true.
     pub(super) fn records_of(&mut self, run: RunId) -> Vec<EventRecord> {
-        let dir = crate::assembly::ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         if self.index.refresh(&dir).is_err() {
             return Vec::new();
         }

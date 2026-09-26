@@ -13,11 +13,11 @@ use kernel::{
     StopReason, TimeMs, ToolCall,
 };
 
+use crate::conversation::Conversation;
 use crate::handoff::Handoff;
 use crate::prefix::shape::PromptShape;
 use crate::reminder::ContextGauge;
 use crate::turn::{Interrupt, PhaseOutcome, Turn, TurnReport};
-use crate::window::Window;
 
 use super::fence::{Fence, FencePolicy};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
@@ -29,9 +29,9 @@ use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 ///
 /// Whichever safe point it arrives at, the fold takes effect at the next
 /// assembly — a steer never rewrites a request already on the wire.
-fn fold_steer(window: &mut Window, interrupt: &Interrupt) {
+fn fold_steer(conversation: &mut Conversation, interrupt: &Interrupt) {
     if let Interrupt::Steer { source, text } = interrupt {
-        window.push_steer(source, text);
+        conversation.push_steer(source, text);
     }
 }
 
@@ -100,12 +100,12 @@ impl Run<Active> {
             ig: false,
         })?;
 
-        let mut window = Window::new();
+        let mut conversation = Conversation::new();
         // A branch opens with the conversation it branched from, and then
         // its own lines: the task joins the mother's last user message when
         // one is open, which is the same rule a steer follows.
-        window.push_inherited(&plan.inherited);
-        window.push_task_lines(&plan.task, &plan.goal, plan.opening);
+        conversation.push_inherited(&plan.inherited);
+        conversation.push_task_lines(&plan.task, &plan.goal, plan.opening);
         let gauge = ContextGauge::new(
             kernel::Tokens::new(plan.shape.context_tokens),
             plan.second_threshold,
@@ -113,7 +113,7 @@ impl Run<Active> {
         Ok(Run {
             plan,
             state: Active {
-                window,
+                conversation,
                 turns: 0,
                 last_turn_t: None,
                 gauge,
@@ -142,12 +142,12 @@ impl Run<Active> {
 
         let turn = Turn::begin(self.plan.run, self.plan.who.clone(), t);
         let opening = (hooks.interrupt)(SafePoint::BeforeAssemble { turn: index });
-        fold_steer(&mut self.state.window, &opening);
+        fold_steer(&mut self.state.conversation, &opening);
         let turn = match turn.assemble(
             opening,
             ledger,
             &self.plan.prefix,
-            &self.state.window,
+            &self.state.conversation,
             &self.plan.tools,
             &self.plan.shape,
         )? {
@@ -162,7 +162,7 @@ impl Run<Active> {
         let shape = PromptShape::of(
             &self.plan.prefix,
             &self.plan.tools,
-            self.state.window.messages(),
+            self.state.conversation.messages(),
         )?;
         let changed = shape.attribute(self.state.prior_shape.as_ref());
         ledger.append(EventDraft {
@@ -176,7 +176,7 @@ impl Run<Active> {
         })?;
         self.state.prior_shape = Some(shape);
         let calling = (hooks.interrupt)(SafePoint::BeforeCall { turn: index });
-        fold_steer(&mut self.state.window, &calling);
+        fold_steer(&mut self.state.conversation, &calling);
         let turn = match turn.call(
             calling,
             ledger,
@@ -209,7 +209,7 @@ impl Run<Active> {
         self.state.fence.record_wave(decided, turn.calls());
 
         let wave = (hooks.interrupt)(SafePoint::BeforeWave { turn: index });
-        fold_steer(&mut self.state.window, &wave);
+        fold_steer(&mut self.state.conversation, &wave);
         let invoke = &mut hooks.invoke;
         let mut stamped = |call: &ToolCall| invoke(call, t);
         // The same question the three phase boundaries ask, asked again
@@ -219,10 +219,10 @@ impl Run<Active> {
         // effect at the next assembly and stopping is the only
         // instruction that can be carried out between two calls.
         let asking = &mut hooks.interrupt;
-        let window = &mut self.state.window;
+        let conversation = &mut self.state.conversation;
         let mut still_going = |call: u32| {
             let arrived = asking(SafePoint::BeforeToolCall { turn: index, call });
-            fold_steer(window, &arrived);
+            fold_steer(conversation, &arrived);
             arrived
         };
         let turn = match turn.execute(wave, ledger, &mut stamped, &mut still_going)? {
@@ -231,17 +231,17 @@ impl Run<Active> {
         };
 
         let settling = (hooks.interrupt)(SafePoint::BeforeSpawn { turn: index });
-        fold_steer(&mut self.state.window, &settling);
+        fold_steer(&mut self.state.conversation, &settling);
         let report = match turn.record(settling, ledger)? {
             PhaseOutcome::Advanced(report) => report,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };
         self.state.turns = self.state.turns.saturating_add(1);
         self.state
-            .window
+            .conversation
             .push_assistant(report.assistant().to_vec());
         self.state
-            .window
+            .conversation
             .push_tool_results(report.wave_results().to_vec());
         // The provider's count for this call, against the model's
         // window: a fact against a fact. It lands after the results the
@@ -250,7 +250,7 @@ impl Run<Active> {
             .usage()
             .and_then(|usage| self.state.gauge.observe(usage.input_tokens))
         {
-            self.state.window.push_reminder(&reminder);
+            self.state.conversation.push_reminder(&reminder);
         }
         if report.calls_made() == 0 {
             return Ok(Advance::Concluded(concluded(&report)?));
@@ -307,7 +307,7 @@ impl Run<Active> {
             state: Frozen {
                 completion,
                 turns,
-                window: self.state.window,
+                conversation: self.state.conversation,
             },
         })
     }

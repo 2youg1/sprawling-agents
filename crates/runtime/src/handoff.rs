@@ -7,20 +7,19 @@
 //! crossing point between a frozen Run and its successor. It is never a
 //! new authority: on conflict, fresh reads and real execution win.
 
+use kernel::event::record::HandoffWritten;
 use kernel::{AxCode, AxError, Locator, Payload, RunId};
-use serde::Serialize;
 
 /// Five sections, always present: must-read / overview / progress /
 /// context / next step. Prose quality is the probe's business (P1); the
 /// type enforces structure only.
 ///
-/// This struct is the `handoff_written` payload: its field names are
-/// the line's keys, so the five sections are spelled once rather than
-/// once here and once at the writer. It serializes and does not
-/// deserialize, because [`Handoff::new`] is the only way to hold one
-/// and a reader that built one from a line would be a second door past
-/// that constructor's refusal of an empty must-read list.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+/// It writes a [`HandoffWritten`], whose field names are the line's
+/// keys, and is never read back from one: [`Handoff::new`] is the only
+/// way to hold one, and a reader that built one from a line would be a
+/// second door past that constructor's refusal of an empty must-read
+/// list.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Handoff {
     must_read: Vec<Locator>,
     overview: String,
@@ -85,7 +84,13 @@ impl Handoff {
     /// # Errors
     /// Propagates whatever `Payload::of` says about the encoding.
     pub fn payload(&self) -> Result<Payload, AxError> {
-        Payload::of(self)
+        Payload::of(&HandoffWritten {
+            must_read: self.must_read.clone(),
+            overview: self.overview.clone(),
+            progress: self.progress.clone(),
+            context: self.context.clone(),
+            next_step: self.next_step.clone(),
+        })
     }
 }
 

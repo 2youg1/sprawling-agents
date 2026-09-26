@@ -70,19 +70,33 @@ fn scratch_dir() -> PathBuf {
 }
 
 fn draft(n: u64) -> Result<EventDraft, String> {
-    let mut map = serde_json::Map::new();
-    map.insert("n".to_owned(), serde_json::Value::from(n));
-    map.insert(
+    let mut body = serde_json::Map::new();
+    body.insert("n".to_owned(), serde_json::Value::from(n));
+    body.insert(
         "note".to_owned(),
         serde_json::Value::String("a line about the shape of ordinary work".to_owned()),
     );
+    let t = TimeMs::new(1_700_000_000_000_u64.saturating_add(n));
+    let room = Address::parse("bench/room").map_err(|e| e.to_string())?;
+    // A signal line as `collab` writes it, so the fold scenario reads
+    // every line through the reader production uses.
+    let signal = collab::Signal::new(
+        collab::SignalId::parse(&format!("bench-s{n}")).map_err(|e| e.to_string())?,
+        collab::SignalKind::Mention,
+        "bench".to_owned(),
+        room.clone(),
+        kernel::Version::new(1),
+        Payload::new(body).map_err(|e| e.to_string())?,
+        t,
+    )
+    .map_err(|e| e.to_string())?;
     Ok(EventDraft {
         run: RunId::CITY,
-        t: TimeMs::new(1_700_000_000_000_u64.saturating_add(n)),
+        t,
         who: "bench".to_owned(),
-        addr: None,
+        addr: Some(room),
         kind: EventKind::SignalEnqueued,
-        data: Payload::new(map).map_err(|e| e.to_string())?,
+        data: signal.enqueued_payload().map_err(|e| e.to_string())?,
         ig: false,
     })
 }

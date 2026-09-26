@@ -19,8 +19,8 @@
 //! an absent reading. The comparison then marks every position lost,
 //! which is the truth about a successor nobody could ask.
 
+use kernel::event::record::EvalRun;
 use kernel::{AxError, EventKind, Model, RunId};
-use serde_json::{Map, Value};
 
 use crate::effect;
 
@@ -196,7 +196,7 @@ impl RunWorker {
                 who: site.who.clone(),
                 addr: plan.addr.clone(),
                 kind: EventKind::EvalRun,
-                data: kernel::Payload::new(eval_payload(
+                data: kernel::Payload::of(&eval_payload(
                     &probe,
                     handed.predecessor,
                     (&handed.before, &after),
@@ -223,40 +223,17 @@ fn eval_payload(
     predecessor: RunId,
     readings: (&eval::Answers, &eval::Answers),
     comparison: &eval::Comparison,
-) -> Map<String, Value> {
+) -> EvalRun {
     let (before, after) = readings;
-    let strings = |items: &[String]| {
-        Value::Array(
-            items
-                .iter()
-                .map(|item| Value::String(item.clone()))
-                .collect(),
-        )
-    };
-    let mut map = Map::new();
-    map.insert("probe".to_owned(), Value::String(probe.id().name.clone()));
-    map.insert(
-        "version".to_owned(),
-        Value::Number(probe.id().version.into()),
-    );
-    map.insert(
-        "predecessor".to_owned(),
-        Value::String(predecessor.to_string()),
-    );
-    map.insert("kept".to_owned(), Value::Number(comparison.kept.into()));
-    map.insert(
-        "lost".to_owned(),
-        Value::Array(
-            comparison
-                .lost
-                .iter()
-                .map(|index| Value::Number((*index).into()))
-                .collect(),
-        ),
-    );
-    map.insert("before".to_owned(), strings(before.answers()));
-    map.insert("after".to_owned(), strings(after.answers()));
-    map
+    EvalRun {
+        probe: probe.id().name.clone(),
+        version: probe.id().version,
+        predecessor,
+        kept: comparison.kept,
+        lost: comparison.lost.clone(),
+        before: before.answers().to_vec(),
+        after: after.answers().to_vec(),
+    }
 }
 
 #[cfg(test)]

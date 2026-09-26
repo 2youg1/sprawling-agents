@@ -88,8 +88,12 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
         cut_on_write: Some("roadmap_claimed"),
         torn_tail: memory::TornTail::None,
     });
-    let (ledger, _report) =
-        memory::JsonlLedger::open_faulty(fs, &ledger_dir(dir.path()), now_ms().unwrap()).unwrap();
+    let (ledger, _report) = memory::JsonlLedger::open_faulty(
+        fs,
+        &kernel::layout::CityLayout::new(dir.path()).ledger(),
+        now_ms().unwrap(),
+    )
+    .unwrap();
     let mut worker = RunWorker::over(
         dir.path(),
         gateway::Custodian::in_memory(),

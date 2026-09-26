@@ -15,6 +15,7 @@
 use std::sync::{Arc, Mutex};
 
 use channels::ToolkitSlug;
+use kernel::event::record::ToolkitLinkOpened;
 use kernel::{Address, AxCode, AxError, EventKind, Payload, Proxying, SecretRef};
 
 use super::RunWorker;
@@ -102,7 +103,7 @@ impl RunWorker {
         toolkit: &ToolkitSlug,
     ) -> Result<(), AxError> {
         let city = kernel::layout::CityLayout::new(&self.city_root).city_address();
-        let held = broker_for(Some(&self.vault), city.as_ref())?.ok_or_else(|| {
+        let held = broker_for(Some(&self.credentials.vault), city.as_ref())?.ok_or_else(|| {
             AxError::failure(
                 AxCode::CredentialMissing,
                 "connect an outside application",
@@ -112,20 +113,13 @@ impl RunWorker {
         })?;
         let (broker, user) = held;
         broker.connect(toolkit.as_str(), &user)?;
-        self.record(EventKind::ToolkitLinkOpened, link_payload(toolkit)?)
+        // The slug and nothing else: which application a person asked for
+        // is the fact worth keeping, and the consent URL is a capability.
+        self.record(
+            EventKind::ToolkitLinkOpened,
+            Payload::of(&ToolkitLinkOpened {
+                toolkit: toolkit.as_str().to_owned(),
+            })?,
+        )
     }
-}
-
-/// What the ledger is told about one request to connect.
-///
-/// The slug and nothing else. Which application a person asked for is
-/// the fact worth keeping; everything else about that moment is either
-/// the broker's to answer now or a capability that must not be kept.
-fn link_payload(toolkit: &ToolkitSlug) -> Result<Payload, AxError> {
-    let mut map = serde_json::Map::new();
-    map.insert(
-        "toolkit".to_owned(),
-        serde_json::Value::String(toolkit.as_str().to_owned()),
-    );
-    Payload::new(map)
 }

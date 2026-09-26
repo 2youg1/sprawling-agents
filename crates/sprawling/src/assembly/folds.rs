@@ -8,14 +8,12 @@
 use std::path::Path;
 
 use kernel::AxError;
-use kernel::EventRecord;
-use runtime::replay::{VerifiedLedger, VerifiedLine};
 
 // The governance fold lives in `views`, where the reading side keeps
 // one too. Named here so the worker that judges from it reads under
 // the same name a page is answered under.
 pub(super) use crate::views::Governance;
-use crate::views::Views;
+use crate::views::known_records;
 
 use super::{Entrance, Expiries};
 
@@ -80,7 +78,7 @@ impl Standing {
                 governance.absorb(record.kind(), record.run(), record.addr(), record.data())?;
                 collaboration.absorb(record)?;
                 entrance.absorb(record.data());
-                expiries.absorb(record.kind(), record.data());
+                expiries.absorb(record.kind(), record.data())?;
                 origins.absorb(record.kind(), record.addr(), record.data())?;
             }
         }
@@ -93,39 +91,6 @@ impl Standing {
             origins,
         })
     }
-}
-
-/// Rebuilds the views from the ledger on disk. This is the disposability
-/// of a projection exercised on every start: nothing is persisted, and
-/// the answer is the same as if the process had been running all along.
-///
-/// # Errors
-/// Propagates chain verification failures; a city whose history does not
-/// verify is not one whose views should be served.
-pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
-    let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
-    let city_root = ledger_dir
-        .parent()
-        .and_then(Path::parent)
-        .unwrap_or(ledger_dir);
-    let mut views = Views::new(city_root);
-    for record in known_records(&verified) {
-        views.apply(record)?;
-    }
-    Ok(views)
-}
-
-/// The records the per-line check already parsed, in ledger order.
-///
-/// A line the check let through as ignorable carries a kind this build
-/// has no record for, so no fold is shown it; parsing the raw bytes a
-/// second time would refuse exactly that line and turn a history that
-/// verifies into a city that cannot start.
-fn known_records(verified: &VerifiedLedger) -> impl Iterator<Item = &EventRecord> {
-    verified.lines().iter().filter_map(|line| match line {
-        VerifiedLine::Known { record, .. } => Some(record),
-        VerifiedLine::IgnoredUnknown { .. } => None,
-    })
 }
 
 #[cfg(test)]

@@ -35,7 +35,7 @@ pub use goal_tool::{GoalDesk, GoalEffect, GoalTool};
 pub use handback::Handback;
 pub use inbox::{Inbox, Lane, Signal, SignalConsumed, SignalId, SignalKind};
 pub use pr::{Open, Pr, Verified};
-pub use pr_tool::{MergedRequest, OpenRequest, PrDesk, PrEffect, PrTool};
+pub use pr_tool::{MergedRequest, OpenRequest, PrDesk, PrEffect, PrTool, RejectedRequest};
 pub use signal_tool::{SignalDesk, SignalEffect, SignalTool};
 pub use steer::{AgentSteer, Steer};
 pub use triage::{Arrival, Landing, Reflex, Rule, Triage};
