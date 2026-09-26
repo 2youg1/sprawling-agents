@@ -126,6 +126,17 @@ impl Tool for EditTool {
         &self.meta
     }
 
+    /// The one file the call names. A path that does not parse wrote
+    /// nothing, since `invoke` refuses it before touching the disk, but
+    /// the answer stays `Domain` so that no reading of it can come out
+    /// narrower than the truth.
+    fn writes(&self, call: &ToolCall) -> kernel::Writes {
+        match arg(call.args.as_map(), "path").map(kernel::Address::parse) {
+            Ok(Ok(path)) => kernel::Writes::Paths(vec![path]),
+            Ok(Err(_)) | Err(_) => kernel::Writes::Domain,
+        }
+    }
+
     fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(

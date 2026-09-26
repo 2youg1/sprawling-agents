@@ -374,7 +374,10 @@ fn the_fence_after_an_edit_stages_the_edited_path_and_not_the_domain() {
     subjects.sort();
     assert_eq!(
         subjects,
-        vec!["checkpoint: hall".to_owned(), "checkpoint: hall/note.md".to_owned()]
+        vec![
+            "checkpoint: hall".to_owned(),
+            "checkpoint: hall/note.md".to_owned()
+        ]
     );
 }
 

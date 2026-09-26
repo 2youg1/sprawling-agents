@@ -218,6 +218,10 @@ pub(crate) fn drive_run<L: Ledger>(
     let fenced: std::rc::Rc<std::cell::RefCell<Vec<String>>> =
         std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let fenced_by_bench = std::rc::Rc::clone(&fenced);
+    // What the calls since the last fence said they wrote, which is what
+    // the next fence stages (runtime-SPEC 8-45). It opens as the whole
+    // domain: no commit of this run vouches yet for the tree it opened on.
+    let wrote = std::cell::RefCell::new(kernel::Writes::Domain);
     let asking = std::cell::RefCell::new(Interrupting {
         run_id,
         member,
@@ -274,10 +278,13 @@ pub(crate) fn drive_run<L: Ledger>(
                 BenchOutcome::Ran {
                     outcome,
                     fenced: at,
+                    wrote: this,
                 } => {
                     if let Some(oid) = at {
                         fenced.borrow_mut().push(oid);
                     }
+                    let so_far = wrote.replace(kernel::Writes::Nothing);
+                    wrote.replace(so_far.and(this));
                     if call.name.as_str() != "exec" {
                         return Ok(outcome);
                     }
@@ -321,8 +328,17 @@ pub(crate) fn drive_run<L: Ledger>(
             let _one_at_a_time = fence_gate
                 .lock()
                 .map_err(|_| poison("this city's fence gate"))?;
+            // `Nothing` means only reads ran, and the domain is what the
+            // fence staged before this rule existed; skipping that wave
+            // is the read-only rule's to decide.
+            let scope = match wrote.replace(kernel::Writes::Nothing) {
+                kernel::Writes::Paths(paths) => {
+                    paths.iter().map(|path| path.as_str().to_owned()).collect()
+                }
+                kernel::Writes::Nothing | kernel::Writes::Domain => fence_scope.clone(),
+            };
             let payload = fence_point
-                .wave_pre(&fence_scope, t, &of)
+                .wave_pre(&scope, t, &of)
                 .map_err(memory::MemoryError::into_ax)?;
             if let Some(oid) = payload
                 .as_map()

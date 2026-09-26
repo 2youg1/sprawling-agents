@@ -103,9 +103,12 @@ pub enum BenchOutcome {
     /// The tool ran; this is its result. `fenced` carries the commit
     /// the wave was fenced against when the forecast suspected a
     /// discard, so the post-wave sweep knows what to restore from.
+    /// `wrote` is the tool's own account of what the call may have
+    /// written, which the next fence stages (runtime-SPEC 8-45).
     Ran {
         outcome: ToolOutcome,
         fenced: Option<String>,
+        wrote: kernel::Writes,
     },
     /// A gate refused, or asked. Either way the answer travels back as
     /// a tool_result, which keeps the turn alive and tells the model
@@ -281,7 +284,12 @@ impl ToolBench {
         });
         self.seen.insert(*key, answered.clone());
         let outcome = answered?;
-        Ok(BenchOutcome::Ran { outcome, fenced })
+        let wrote = tool.writes(call);
+        Ok(BenchOutcome::Ran {
+            outcome,
+            fenced,
+            wrote,
+        })
     }
 }
 

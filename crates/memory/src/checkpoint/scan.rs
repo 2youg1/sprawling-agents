@@ -203,7 +203,9 @@ impl Checkpoint {
             .collect())
     }
 
-    /// One git pathspec per prefix the run may write under.
+    /// Two git pathspecs per scope, the scope itself and everything
+    /// under it, because a scope is a prefix the run may write under or,
+    /// when the lane knows what a wave wrote, one file (runtime-SPEC 8-45).
     ///
     /// Several, because a write domain is a set: a building's own
     /// subtree plus whatever else its `RULES.toml` declares. Staging
@@ -219,12 +221,9 @@ impl Checkpoint {
         }
         scopes
             .iter()
-            .map(|scope| {
-                if scope.is_empty() || scope == "." {
-                    "*".to_owned()
-                } else {
-                    format!("{}/*", scope.trim_end_matches('/'))
-                }
+            .flat_map(|scope| match scope.trim_end_matches('/') {
+                "" | "." => vec!["*".to_owned()],
+                prefix => vec![prefix.to_owned(), format!("{prefix}/*")],
             })
             .collect()
     }

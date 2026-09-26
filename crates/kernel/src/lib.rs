@@ -104,6 +104,7 @@ pub use spine::{ROADMAP_FILE, ROADMAP_STATUS_SPELLINGS, RoadmapRow, RoadmapShape
 pub use spine::{RoadmapStatus, ScopeChange, WriteMoment};
 pub use stall::{ActionFingerprint, StallVerdict};
 pub use taint::{TaintSet, TaintSource, Tainted};
+pub use tool::writes::Writes;
 pub use tool::{CostTier, Effect, ExecArm, GateSubject, RenderIntent, ServerLabel};
 pub use tool::{Temporal, TimeoutMs};
 pub use tool::{Tool, ToolCall, ToolMeta, ToolName, ToolOutcome};

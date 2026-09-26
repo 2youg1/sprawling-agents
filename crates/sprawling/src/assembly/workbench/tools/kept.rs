@@ -97,4 +97,9 @@ impl Tool for KeptEdit {
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
         self.edit.subject(call)
     }
+
+    /// The file `edit` names: custody rewrites the text, not the path.
+    fn writes(&self, call: &ToolCall) -> kernel::Writes {
+        self.edit.writes(call)
+    }
 }
