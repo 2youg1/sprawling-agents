@@ -53,6 +53,7 @@ impl RunWorker {
         asked: Asked,
         reply: channels::Reply,
     ) -> Result<(), AxError> {
+        self.room_for_new_work()?;
         if super::super::dispatching::session::needs_a_name(&at.addr, at.session.as_ref()) {
             return self.name_then_dispatch(at, asked.task, asked.goal, reply);
         }

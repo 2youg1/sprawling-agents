@@ -53,7 +53,9 @@ fn a_volume_below_its_floor_refuses_a_dispatch_before_anything_is_written() {
         })
         .map(drop);
 
-    let told = refused.as_ref().map_err(|e| (*e.code(), e.recovery().to_owned()));
+    let told = refused
+        .as_ref()
+        .map_err(|e| (*e.code(), e.recovery().to_owned()));
     assert_eq!(
         told,
         Err((
