@@ -178,10 +178,10 @@
     const held = column;
     const box = scroller;
     if (held === undefined || box === undefined) return;
-    // The first judgement is measured rather than assumed: a scroller
-    // left mid-history must not be yanked to the foot by the first
-    // append after it.
-    anchoring = anchorAt(footOf(box));
+    // A room opens at its newest words; only the person's own scroll
+    // moves it to reading back.
+    anchoring = anchorAt({ kind: "opened" });
+    box.scrollTop = box.scrollHeight;
     const watcher = new ResizeObserver(() => {
       const now = scroller;
       if (anchoring === "follow" && now !== undefined) now.scrollTop = now.scrollHeight;
@@ -248,7 +248,7 @@
       bind:this={scroller}
       class="min-h-0 flex-1 overflow-y-auto"
       onscroll={(event) => {
-        anchoring = anchorAt(footOf(event.currentTarget));
+        anchoring = anchorAt({ kind: "scrolled", foot: footOf(event.currentTarget) });
       }}
     >
       <!-- An empty room opens with the box about a third of the way down
