@@ -12,9 +12,10 @@
 //! not text, and showing it as text would show a reader something the
 //! file does not say.
 
+use std::path::Path;
+
 use kernel::Address;
 
-use super::holding::Views;
 use super::listing::resolve;
 use crate::assembly::DOC_BYTES_MAX;
 
@@ -23,12 +24,13 @@ use crate::assembly::DOC_BYTES_MAX;
 /// still text; shallow enough to cost nothing.
 const SNIFF_BYTES: usize = 8 * 1024;
 
-impl Views {
-    /// The head of one file, or `None` when there is no file to read.
-    pub(super) fn document_answer(&self, at: &Address) -> Option<channels::DocumentAnswer> {
-        let bytes = std::fs::read(resolve(&self.city_root, Some(at))).ok()?;
-        Some(read_document(at.clone(), &bytes))
-    }
+/// The head of one file, or `None` when there is no file to read.
+///
+/// Takes the city root rather than the views: it reads the disk, and
+/// runs after the view lock is released (sprawling-SPEC.md 8-92).
+pub(super) fn document_answer(city_root: &Path, at: Address) -> Option<channels::DocumentAnswer> {
+    let bytes = std::fs::read(resolve(city_root, Some(&at))).ok()?;
+    Some(read_document(at, &bytes))
 }
 
 /// Bytes as a reader may be given them: cut to what travels, with the
@@ -84,6 +86,7 @@ pub(super) fn read_document(at: Address, bytes: &[u8]) -> channels::DocumentAnsw
 )]
 mod tests {
     use super::*;
+    use crate::views::Views;
 
     /// The rules that govern a building are readable through the tree,
     /// which is the point of the tree.

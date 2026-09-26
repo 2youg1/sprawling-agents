@@ -39,7 +39,7 @@ use crate::assembly::{ledger_dir, rebuild_views};
 ///
 /// The views are folded, asked, and thrown away, so this costs one pass
 /// over the ledger and leaves nothing behind. **It is the same
-/// [`Views::answer`] a served city answers from**: a command line that
+/// [`Views::prepare`] a served city answers from**: a command line that
 /// read the history its own way would be a second answer to one
 /// question, and the one that drifted would be the one nobody was
 /// looking at.
@@ -49,7 +49,9 @@ use crate::assembly::{ledger_dir, rebuild_views};
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {
-    Ok(rebuild_views(&ledger_dir(city_root))?.answer(query))
+    Ok(rebuild_views(&ledger_dir(city_root))?
+        .prepare(query)
+        .finish())
 }
 
 /// The derived views a query reads. They are rebuilt from the ledger at

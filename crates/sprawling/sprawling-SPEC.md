@@ -76,7 +76,8 @@ pub(crate) async fn serve(city_root, addr, token, index_html, model) -> Result<(
 
 ```rust
 pub(crate) struct Views { city_root, hot: HotView, attribution: Attribution, approvals: BTreeMap<String, ApprovalSummary> }
-impl Views { fn apply(&mut self, &EventRecord) -> Result<(), AxError>; fn answer(&self, &Query) -> Answer; }
+impl Views { fn apply(&mut self, &EventRecord) -> Result<(), AxError>; fn prepare(&mut self, &Query) -> Prepared; }
+impl Prepared { fn finish(self) -> Answer; }                                 // 锁外读盘，见 8-92
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError>;   // 启动时冷重建
 fn read_spine(city_root: &Path) -> Vec<BuildingProgress>;                    // 查询时读盘
 ```
@@ -2066,8 +2067,8 @@ pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer
 而 `Views` 的一生是 `holding` 的；另一个理由是 `assembly.rs` 已站在 400 行预算上（开工时
 401 行），而为一行重导出把一道门推得更红是拿门当对手。
 
-一次性折叠这座城的账本并回答一个 Query，然后把视图扔掉。**它与被端上来的城答的是同一个
-`Views::answer`**——若 CLI 自己另写一份读法，同一个问题在这座城里就有两个答案，
+一次性折叠这座城的账本并回答一个 Query，然后把视图扔掉。**它与被端上来的城读的是同一条路：
+`answer_outside_the_lock` 用的 `Views::prepare` 与 `Prepared::finish`**——若 CLI 自己另写一份读法，同一个问题在这座城里就有两个答案，
 而漂开的总是没人看的那一个。链先被 `runtime::replay::verify_ledger_dir` 验过：
 历史不成立的城，它的视图不该被端出来。
 
@@ -3069,19 +3070,21 @@ city 段与 building 段同时携上它们的来源文档（`Assembled`：字节
 ```rust
 // views::prefix
 fn prefix_answer(&mut self, run: RunId) -> Option<channels::PrefixAnswer>;
-fn content_answer(&self, locator: &Locator) -> Option<channels::ContentAnswer>;
+fn content_answer(city_root: &Path, locator: &Locator) -> Option<channels::ContentAnswer>; // 锁外：读内容仓库（8-92）
 // views::skills
-fn skills_answer(&self, building: &Address) -> Option<channels::SkillsAnswer>;
+type SkillPins = BTreeMap<(String, B3Hash), Vec<RunId>>;
+fn skills_answer(city_root: &Path, building: &Address, pins: &SkillPins) -> Option<channels::SkillsAnswer>; // 锁外：扫书架（8-92）
 // views::git_status
-fn git_status_answer(&self, building: &Address) -> Option<channels::GitStatusAnswer>;
+fn git_status_ask(&self, building: &Address) -> GitStatusAsk; // 锁内：城根、楼、最近一次围栏
+impl GitStatusAsk { fn read(self) -> channels::Answer; } // 锁外：读工作树（8-92）
 ```
 
 **五条口径：**
 
 1. **`prefix_answer` 取该 run 最早的一条 `prompt_assembled`。** prefix 一次冻结管一次 run 的一生，之后每一轮记的是同样四个哈希；取最早的那一条，一次没走过第一轮的 run 也仍有答案。
 2. **字节的可读性判定只有一处。** `views::document` 的 `read_bytes` 同时服务树上的文件与仓库里的对象——什么样的字节算文本，不取决于它被存在哪里。
-3. **技能的书架在被问的那一刻扫盘，而 pin 出自历史。** `city::Library` 是书架的权威，旁边再留一份索引就是磁盘说法的第二份副本；而「哪些 run 用过」折自 `run_started` 里那张 `skills` 表（`Views::skill_pins`，键为名字与哈希成对），不是第二次扫盘。
-4. **`git_status_answer` 的比较基准取自历史而不是 HEAD。** 该楼最近一条 `checkpoint_committed`／`pr_merged` 就是基准，它由 `commits_answer(Some(building), None, 1)` 给出——变更栏旁边显示的那一行，正是提交列表打开时的第一行。
+3. **技能的书架在被问的那一刻扫盘，而 pin 出自历史。** `city::Library` 是书架的权威，旁边再留一份索引就是磁盘说法的第二份副本；而「哪些 run 用过」折自 `run_started` 里那张 `skills` 表（`Views::skill_pins`，键为名字与哈希成对），不是第二次扫盘。pin 表在锁内复制出来，扫盘在锁外对着这份副本做（8-92）。
+4. **`git_status_ask` 的比较基准取自历史而不是 HEAD。** 该楼最近一条 `checkpoint_committed`／`pr_merged` 就是基准，它由 `commits_answer(Some(building), None, 1)` 给出——变更栏旁边显示的那一行，正是提交列表打开时的第一行。
 5. **仓库句柄按次打开。** 这是投影里唯一一处伸向它不拥有的目录的读；跨重建留着的句柄会活得比开它的那座城还长。
 
 ### 8-68 `bin::release`：这是哪一版，以及唯一一次去问注册表（形状 4 适配器）
@@ -3507,7 +3510,46 @@ pub(super) fn spawn_folding(
 
 **线程随写线程结束。** `attend` 返回后写线程丢掉 `RunWorker`（连同观察者与 `machine`），通道随之关闭，折叠线程把通道里剩下的折完、广播完再退出；写线程 join 它之后才结束，所以 `serve` 对写线程的 join 也等到了最后一次广播。
 
-**尚未做到的（本节接口的当前状态）**：查询仍在锁内作答，`GitStatus` 等做 I/O 的查询仍在锁内做 I/O，所以读者之间、以及读者与折叠线程之间仍会互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取、把 I/O 移到锁外（锁内只取所需的小数据），是这一接口余下的两步。
+**尚未做到的（本节接口的当前状态）**：不做 I/O 的查询仍在锁内作答，所以读者之间、以及读者与折叠线程之间仍会为这段纯内存的时间互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取，是这一接口余下的一步。做 I/O 的查询怎样离开锁，见 8-92。
+
+### 8-92 做 I/O 的查询只在锁内取小数据，I/O 在锁外做（`bin::views::answering`、`bin::views::prepared`）
+
+```rust
+// bin::views::prepared —— shape: projection
+pub(crate) enum Prepared {
+    Held(channels::Answer),          // 视图自己答完了
+    GitStatus(GitStatusAsk),         // 锁内取了楼的地址与最近一次围栏，锁外读工作树
+    Preferences,                     // 锁外读这个人的设置文件
+    Config { city_root: PathBuf, addr: Address }, // 锁外读配置阶梯
+    Listing { city_root: PathBuf, at: Option<Address> }, // 锁外列一层目录
+    Document { city_root: PathBuf, at: Address },       // 锁外读一个文件的开头
+    Building { city_root: PathBuf, addr: Address, plan: PlanReading }, // 锁内取折叠好的计划，锁外读楼的目录
+    Changes { city_root: PathBuf, base: GitOid, head: Option<GitOid> }, // 锁外让 git 比较两个检查点
+    Hunks { city_root: PathBuf, oid_a: GitOid, oid_b: GitOid, path: String }, // 锁外读一个文件的补丁
+    Content { city_root: PathBuf, locator: Locator }, // 锁外读内容仓库里的一个对象
+    Archives { city_root: PathBuf, needle: String }, // 锁外逐楼读档案架
+    Skills { city_root: PathBuf, building: Address, pins: SkillPins }, // 锁内拷出钉住表，锁外扫书架
+    Metrics { city_root: PathBuf, held: channels::MetricsAnswer },   // 锁内填好折叠里的数，锁外数楼
+    Release,                         // 锁外经网络问发布页
+}
+// bin::views::answering
+impl Views { pub(crate) fn prepare(&mut self, query: &channels::Query) -> Prepared; }
+impl Prepared { pub(crate) fn finish(self) -> channels::Answer; } // bin::views::prepared
+pub(crate) fn answer_outside_the_lock(
+    views: &Mutex<Views>,
+    query: &channels::Query,
+) -> Result<channels::Answer, AxError>; // StorageFatal「read the city views」：锁中毒，恢复办法是重启服务
+```
+
+**锁只罩住 `prepare`。** `answer_outside_the_lock` 锁住视图，`prepare` 把查询要的小数据（地址、围栏那一行、城根路径）拷出来，放锁，再由 `finish` 做磁盘、git 或网络的 I/O。控制面（socket 与终端）的查询都经过它。被拒：在锁内跑 `git status`——变更页开着时每次刷新都持锁几十毫秒，折叠线程等它，run 的相邻事件到达客户端的间隔就被这个页面拉长。
+
+**变体是穷尽的枚举，而不是一个 `Box<dyn FnOnce>`。** 每种锁外的 I/O 有名字，`match` 列全，新加一种要在这里写出它锁内拿什么；闭包会把这件事藏进调用点。
+
+**`Prepared` 与它的 `finish` 自成一个模块。** `answering` 管「一个查询在锁内拿什么」，`prepared` 管「锁外怎样把它读完」；两者分开，锁外新添一种读法时不必动锁内那张表。
+
+**`Skills` 在锁内拷走整张钉住表。** 表的大小是「run 数 × 每个 run 钉住的技能数」，拷它是纯内存的一段；按这栋楼的书架先筛再拷，就得在锁内扫书架，正是要挪出去的那次读盘。
+
+**`Prefix` 仍在锁内读账本，`BuildingView` 的计划第一次被问时也在锁内读盘**（本节接口的当前状态）：`Prefix` 找那条 `prompt_assembled` 记录要刷新视图持有的账本索引，索引是可变的缓存，拆开它要等视图以 `Arc<ViewsSnapshot>` 发布（8-89）。`Commit`、`Commits` 只读折叠，不在此列。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 

@@ -25,7 +25,7 @@ use super::desk::CommandDesk;
 use super::serve::Opening;
 use super::serve::Serving;
 use crate::assembly::{Closing, acp_dispatch, fold_city, ledger_dir};
-use crate::views::Views;
+use crate::views::{Views, answer_outside_the_lock};
 
 /// One recording in, one line of text back.
 ///
@@ -160,17 +160,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // Built once and handed to both surfaces below. The socket and the
     // terminal are two ways into one city, and this is the read half of
     // what makes that literally true rather than a claim.
-    let answering: crate::console::Answering = Arc::new(move |query: channels::Query| {
-        let mut views = query_views.lock().map_err(|_| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "read the city views",
-                "the view lock is poisoned",
-            )
-            .with_recovery("restart the server; its views rebuild from the ledger")
-        })?;
-        Ok(views.answer(&query))
-    });
+    let answering: crate::console::Answering =
+        Arc::new(move |query: channels::Query| answer_outside_the_lock(&query_views, &query));
     // Read once, at startup, from the views the ledger just rebuilt.
     let city_name = views.lock().ok().and_then(|views| views.city());
     // The in-process Command set, not the wire one: the enrolment

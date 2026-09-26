@@ -19,44 +19,70 @@
 //! it was, so a comparison against the head would report every wave the
 //! city has ever run as uncommitted work.
 
+//! **The walk of the disk happens after the views are released.** The
+//! views hand over only the fence and the root; `git status` over a
+//! large tree takes tens of milliseconds, and the fold waits for every
+//! one of them it is run under (sprawling-SPEC.md 8-92).
+
+use std::path::PathBuf;
+
 use kernel::Address;
 
 use super::holding::Views;
 
+/// What `git status` for one building needs from the views, copied out
+/// while they are held.
+pub(crate) struct GitStatusAsk {
+    city_root: PathBuf,
+    building: Address,
+    checkpoint: Option<channels::CommitAnswer>,
+}
+
 impl Views {
+    /// The building's last fence and the city root, for a read of the
+    /// working tree after the views are released.
+    pub(super) fn git_status_ask(&self, building: &Address) -> GitStatusAsk {
+        GitStatusAsk {
+            city_root: self.city_root.clone(),
+            building: building.clone(),
+            // The newest commit the city fenced at this building or
+            // under it, asked of the same page the commits column
+            // reads, so the row shown beside the changes is the row the
+            // list opens with.
+            checkpoint: self
+                .commits_answer(Some(building), None, 1)
+                .commits
+                .into_iter()
+                .next(),
+        }
+    }
+}
+
+impl GitStatusAsk {
     /// The working tree of one building, with the last fence behind it.
     ///
-    /// `None` for a city with no repository, which is what
-    /// `Unavailable` says: "there is nothing to compare against" and
-    /// "nothing has changed" are different answers, and a person acts
-    /// differently on each.
-    pub(super) fn git_status_answer(
-        &self,
-        building: &Address,
-    ) -> Option<channels::GitStatusAnswer> {
-        // The newest commit the city fenced at this building or under
-        // it, asked of the same page the commits column reads, so the
-        // row shown beside the changes is the row the list opens with.
-        let checkpoint = self
-            .commits_answer(Some(building), None, 1)
-            .commits
-            .into_iter()
-            .next();
-        let status = memory::working_status(
+    /// `Unavailable` for a city with no repository: "there is nothing to
+    /// compare against" and "nothing has changed" are different answers,
+    /// and a person acts differently on each.
+    pub(super) fn read(self) -> channels::Answer {
+        let Ok(status) = memory::working_status(
             &self.city_root,
-            Some(building.as_str()),
-            checkpoint.as_ref().map(|commit| commit.oid),
-        )
-        .ok()?;
-        Some(channels::GitStatusAnswer {
-            building: building.clone(),
+            Some(self.building.as_str()),
+            self.checkpoint.as_ref().map(|commit| commit.oid),
+        ) else {
+            return channels::Answer::Unavailable {
+                query: format!("GitStatus({})", self.building.as_str()),
+            };
+        };
+        channels::Answer::GitStatus(Box::new(channels::GitStatusAnswer {
+            building: self.building,
             branch: status.branch,
             drift: status.drift.map(|drift| channels::Drift {
                 ahead: drift.ahead,
                 behind: drift.behind,
             }),
             files: status.files,
-            checkpoint,
-        })
+            checkpoint: self.checkpoint,
+        }))
     }
 }

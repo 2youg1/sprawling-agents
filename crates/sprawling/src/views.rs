@@ -40,6 +40,7 @@ pub(super) mod lines;
 pub(super) mod listing;
 pub(super) mod mcp_health;
 pub(super) mod prefix;
+pub(super) mod prepared;
 pub(super) mod rounds;
 pub(super) mod served;
 pub(super) mod skills;
@@ -49,6 +50,7 @@ mod standing_tests;
 mod tests;
 pub(super) mod toolkits;
 
+pub(crate) use answering::answer_outside_the_lock;
 pub(crate) use governance::Governance;
 pub(crate) use holding::Views;
 pub use holding::ask;
