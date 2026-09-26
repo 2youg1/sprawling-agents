@@ -88,3 +88,121 @@ pub fn adapter_for(
     )?;
     Ok(Box::new(endpoint))
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::string_slice,
+    clippy::arithmetic_side_effects,
+    reason = "test code"
+)]
+mod tests {
+    use std::io::{Read as _, Write as _};
+
+    use super::*;
+    use crate::endpoint::AuthSpec;
+    use crate::provider::registry::ConnectionKind;
+    use crate::router::{AttachedEndpoint, EndpointTuning};
+
+    /// A loopback server speaking the OpenAI shape that answers in
+    /// frames, and hands back the request it was sent.
+    fn loopback_sse_model() -> (String, std::thread::JoinHandle<String>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut buf = vec![0u8; 65536];
+            let mut request = String::new();
+            loop {
+                let n = socket.read(&mut buf).unwrap();
+                request.push_str(&String::from_utf8_lossy(&buf[..n]));
+                let Some(head_end) = request.find("\r\n\r\n") else {
+                    continue;
+                };
+                let length = request[..head_end]
+                    .lines()
+                    .find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("content-length: ")
+                            .map(|v| v.trim().parse::<usize>().unwrap())
+                    })
+                    .unwrap_or(0);
+                if request.len() >= head_end + 4 + length {
+                    break;
+                }
+            }
+            socket
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n",
+                )
+                .unwrap();
+            for frame in [
+                serde_json::json!({"choices": [{"delta": {"content": "on "}}]}),
+                serde_json::json!({"choices": [{"delta": {"content": "it"}}]}),
+                serde_json::json!({"choices": [{"delta": {}, "finish_reason": "stop"}]}),
+            ] {
+                socket
+                    .write_all(format!("data: {frame}\n\n").as_bytes())
+                    .unwrap();
+            }
+            socket.write_all(b"data: [DONE]\n\n").unwrap();
+            request
+        });
+        (format!("http://{addr}/v1"), server)
+    }
+
+    /// **A local model streams like any other.** A loopback endpoint
+    /// with no credential and no override is the plainest endpoint
+    /// there is, and it was the one endpoint whose answer reached the
+    /// page in one burst at the end: the request never asked for a
+    /// stream, so no delta frame ever crossed the socket.
+    #[test]
+    fn a_loopback_model_is_asked_for_a_stream_and_answers_in_increments() {
+        let (url, server) = loopback_sse_model();
+        let endpoint = AttachedEndpoint {
+            name: "local".to_owned(),
+            base_url: url,
+            dialect: ConnectionKind::OpenAiCompat.wire(),
+            connection_kind: ConnectionKind::OpenAiCompat,
+            auth: AuthSpec::None,
+            models: Vec::new(),
+            probed: false,
+            tuning: EndpointTuning::default(),
+        };
+        let entry = crate::market::MarketSnapshot::builtin()
+            .unwrap()
+            .lookup("local")
+            .unwrap()
+            .clone();
+        let chosen = Chosen {
+            endpoint: &endpoint,
+            entry: &entry,
+        };
+        let mut model = adapter_for(
+            &chosen,
+            crate::endpoint::redemption::redemption(),
+            Vec::new(),
+        )
+        .unwrap();
+
+        let said = std::cell::RefCell::new(Vec::new());
+        let mut onto = |held: &kernel::Increment| {
+            if let kernel::Increment::Said(text) = held {
+                said.borrow_mut().push(text.clone());
+            }
+        };
+        let ret = model
+            .call_streaming(&crate::endpoint::fakes::request(), &mut onto)
+            .unwrap();
+
+        let request = server.join().unwrap();
+        let body: serde_json::Value =
+            serde_json::from_str(&request[request.find("\r\n\r\n").unwrap() + 4..]).unwrap();
+        assert_eq!(body["stream"], serde_json::Value::Bool(true), "{body}");
+        assert_eq!(said.borrow().as_slice(), ["on ", "it"]);
+        assert_eq!(ret.stop, Some(kernel::StopReason::EndTurn));
+    }
+}
