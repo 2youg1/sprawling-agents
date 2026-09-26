@@ -267,21 +267,18 @@ pub fn drive(
             // A run always ends. A mid-turn failure whose code has a
             // carrier event (provider down, budget, watchdog) is written
             // into history under that carrier and the run freezes as
-            // cancelled - before this arm existed, a 401 from a provider
-            // left a run permanently "started": no event, no freeze, an
-            // event stream that simply went quiet.
+            // cancelled, so a 401 from a provider never leaves a run
+            // "started" with an event stream that simply went quiet.
             //
-            // A loadtime code names no carrier, and for a while that
-            // meant it left by a second door. It does not: the verdict
-            // is written first and the diagnosis travels afterwards, so
-            // the two facts do not compete. The old reason - "when the
-            // ledger itself is the casualty there is nothing truthful
-            // left to write" - holds for a corrupt store and not for
-            // `E_WIRE_MISMATCH`, where a provider spelled its dialect
-            // wrong and the ledger is in perfect health. Where the store
-            // really is the casualty, `freeze` fails on its own append
-            // and that failure is what travels, which is more honest
-            // than deciding in advance that nothing can be written.
+            // A loadtime code names no carrier, and it leaves by the
+            // same door: the verdict is written first and the diagnosis
+            // travels afterwards, so the two facts do not compete.
+            // `E_WIRE_MISMATCH` means a provider spelled its dialect
+            // wrong while the ledger is in perfect health. Where the
+            // store really is the casualty, `freeze` fails on its own
+            // append and that failure is what travels, which is more
+            // honest than deciding in advance that nothing can be
+            // written.
             Err(err) => {
                 let Carrier::Event(kind) = err.code().carrier() else {
                     run.freeze(ledger, handoff, Completion::Cancelled, hooks)?;
@@ -314,8 +311,7 @@ pub fn drive(
                 }
                 // The failure itself is the payload, through the one
                 // door: an encoding that fails travels as a refusal
-                // rather than as an empty object, which is what the
-                // discarded `Result` here used to leave behind.
+                // rather than as an empty object.
                 let data = Payload::of(&err)?;
                 ledger.append(EventDraft {
                     run: run.plan.run,

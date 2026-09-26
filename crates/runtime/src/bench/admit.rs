@@ -17,10 +17,9 @@ impl ToolBench {
     /// tool result rather than ending the turn, and an asking door's
     /// question reaches the model the same way.
     ///
-    /// `subject` is what the tool read off its own arguments (M-17).
-    /// The bench used to spell an argument name by hand here, which
-    /// judged the browser tool by a `host` key it never wrote; now the
-    /// tool's grammar answers and this function only matches.
+    /// `subject` is what the tool read off its own arguments: the
+    /// tool's grammar answers and this function only matches, so no
+    /// argument name is spelled twice.
     ///
     /// # Errors
     /// Refuses a call that declares an effect this bench does not route,
@@ -162,16 +161,17 @@ impl ToolBench {
                     ),
                 )
                 .with_recovery(
-                    "edit the scope's `CONFIG.toml`, or the building's `RULES.toml`, and                      dispatch again",
+                    "edit the scope's `CONFIG.toml`, or the building's `RULES.toml`, and \
+                     dispatch again",
                 ));
             }
             Effect::Spend => {
-                // No Spend tool instance exists until the egress proxy
-                // lands (P1); the door is wired so the first one meets it.
+                // No tool in this build declares Spend; the door is
+                // wired so the first one meets it.
                 return Err(AxError::failure(
                     AxCode::ToolUnavailable,
                     "invoke tool",
-                    format!("`{name}` declares Spend, which has no instance before P1"),
+                    format!("`{name}` declares Spend, which no tool in this build carries"),
                 )
                 .with_recovery(
                     "do this work with a tool that spends nothing; no tool in this build \
@@ -391,5 +391,18 @@ mod tests {
             .invoke(&call("ruler", kernel::Payload::empty()), &key(4), at())
             .unwrap_err();
         assert!(refused.subject().contains("no subject"));
+    }
+
+    #[test]
+    fn a_govern_refusal_tells_the_model_its_recovery_without_a_run_of_spaces() {
+        let scope = GateSubject::Scope("work".to_owned());
+        let mut bench = bench_with(stub("ruler", Effect::Govern, scope));
+        let refused = bench
+            .invoke(&call("ruler", kernel::Payload::empty()), &key(5), at())
+            .unwrap_err();
+        assert_eq!(
+            refused.recovery(),
+            "edit the scope's `CONFIG.toml`, or the building's `RULES.toml`, and dispatch again"
+        );
     }
 }

@@ -45,8 +45,8 @@ pub enum Disposal {
     /// Try the same call again, not before this moment. The moment
     /// comes from the backoff schedule [`Watchdog`] owns, and the
     /// failure travels with it: "backed off" without what it backed
-    /// off from is a line nobody can act on, and the run loop used to
-    /// write that half of the fact from a second place.
+    /// off from is a line nobody can act on, and a second writer of
+    /// that half of the fact could drift from this one.
     BackOff {
         until: TimeMs,
         code: AxCode,

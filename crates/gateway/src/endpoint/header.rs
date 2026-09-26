@@ -5,14 +5,10 @@
 
 //! The value of one header a person added to an endpoint.
 //!
-//! Two documents used to disagree about what such a value may hold:
-//! the registration said it could be a `secret:realm/name` reference,
-//! the endpoint configuration said it was never a credential, and no
-//! reader redeemed anything — so a person writing a reference got a
-//! literal header and a 401, and a person writing the key itself got
-//! the key in the ledger. The value is a type now, and the type
-//! decides: a reference is redeemed in the slot before the wire, and a
-//! literal that reads as a credential is refused where it is entered.
+//! The value is a type, and the type decides what it may hold: a
+//! `secret:realm/name` reference is redeemed in the slot before the
+//! wire, and a literal that reads as a credential is refused where it
+//! is entered, so a key never reaches the ledger as a header value.
 
 use kernel::{AxCode, AxError, SecretRef};
 

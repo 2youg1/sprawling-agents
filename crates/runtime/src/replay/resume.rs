@@ -64,10 +64,9 @@ pub fn outcome_unknown_draft(call: &EventRecord, t: TimeMs) -> Result<EventDraft
              call can be closed as an unknown outcome",
         ));
     }
-    // Read through the one struct `tool_called` is written from: this
-    // used to hunt two keys by hand and call either of them "unknown",
-    // so a call this build could not read was closed against a name
-    // that names nothing and paired with an id no line answers.
+    // Read through the one struct `tool_called` is written from, so a
+    // call this build cannot read is refused rather than closed against
+    // a name that names nothing and paired with an id no line answers.
     let called = call.data().read::<ToolCalled>()?;
     let error = AxError::failure(
         AxCode::ToolOutcomeUnknown,

@@ -6,9 +6,9 @@
 //! Progressive disclosure: L2 tools, reading-room
 //! SKILL entries and the current mode, one line each in the Resident
 //! segment, expansions on demand. Only what this session can actually
-//! reach is listed — admission is the caller's evidence (city::policy
-//! evaluates reading rooms in P1; until then the assembler supplies the
-//! admitted set directly).
+//! reach is listed — admission is the caller's evidence: the assembler
+//! reads each building's reading room off its `city::policy` rules and
+//! supplies the admitted set.
 //!
 //! `tool_defs` is the single source of `ChatRequest.tools`: a tool absent
 //! here does not exist for the model.

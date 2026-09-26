@@ -178,7 +178,7 @@ impl Turn<Calling<'_>> {
         // in each case - so what a page sees arriving and what the ledger
         // keeps cannot come from two different readings of one reply. A failure goes to the
         // recovery pipeline before it leaves this phase (runtime-SPEC
-        // §8-44), and every attempt - first or repaired - is recorded
+        // §8-49), and every attempt - first or repaired - is recorded
         // before it is made.
         let mut call = recovery::ModelCall::open(&mut self.journal, ledger, model, &request);
         let mut repair = recovery::BlockingResend;

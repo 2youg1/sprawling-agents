@@ -1,8 +1,6 @@
 # runtime-SPEC.md
 
 > crate：`runtime`。本 SPEC 先于代码存在；实现不多不少地遵守本文。
-> Stage 1 两模块（replay／fork）＋Stage 2 三模块最小形（turn／prefix／handoff，§8-3…§8-5）。
-> Stage 3 增章：完备化（§8-6）＋pipeline／offload（§8-7／§8-8）＋watchdog（§8-9）＋clock／catalog／mode（§8-10…§8-12)＋sandbox 缝（§8-13）＋tools 三件（§8-14）。
 
 ## 1 需求分解
 
@@ -18,7 +16,13 @@
 | `clock`＋`catalog`＋`mode` | ClockStamp 纯格式化＋渐进披露三类条目＋五 mode 枚举 |
 | `watchdog` | 处置面分级（纠正 Steer→停滞→冻结）；依据只从 kernel::stall 来 |
 | `sandbox` | 缝（trait）＋wasmtime fuel 生产适配器＋直通/故障两替身；A10 三断言 |
-| `tools/` 三件 | exec 三臂／edit 乐观并发／status 十二字段＋ToolBench 按 Effect 过门 |
+| `tools/` | exec 三臂／edit 乐观并发／read 区间读／search／status／succeed，与模型选路的唯一判定 `chosen_path`（§8-14、§8-29–§8-33） |
+| `bench`＋`conversation` | ToolBench 按 Effect 过门（§8-14、§8-46）；会话历史的唯一持有者（§8-3、§8-47） |
+| `run` | Dispatch → N 回合 → 冻结的事件序唯一权威（§8-15、§8-45） |
+| `digest`＋`diagnostics` | 冻结时的结构化摘要（§8-16）；给人读的诊断行（§8-17、§8-38） |
+| `sieve`＋`compaction`＋`elision` | 工具输出的确定性压缩（§8-27）；按内容分类的缩短判定（§8-7）与回合边界的压缩（§8-44）；「这里被剪过」的唯一标记（§8-42） |
+| `backlog` | 后台命令与委派 run 的全城一张表，halt 由此停得住（§8-28） |
+| `reminder`＋`redact`＋`transcript` | 上下文提醒（§8-34）；进账本前的打码（§8-41）；逐 run 的对话文件（§8-32） |
 
 「replay 只重演不重执行」的含义：重演＝验证链与重建记录序列；入窗重建器（C16/A15）随 prefix 组装加入，与分叉共用本模块的验证输出。
 
@@ -38,10 +42,11 @@
 1. **verify 的规范复验**：v1 无升级器链，故对每行断言 `canonical_line(parse_line(raw)) == raw`（写方规范性质）。未来 v>1 经升级器读入后此断言只对原版字节成立——届时随升级器一并改约（本文更新）。
 2. **fork 的 run_forked 落账**：事件写入母城 Ledger 由调用方（runtime 回合层／citysim）执行；fork 只产 EventDraft 与前缀，不持 Ledger 句柄——保持纯函数形。
 3. **同一套重建器**：A15 与 A19 共用 verify 输出；重建器＝verified 行序列本身。
+4. **前缀续期未接线**：`prefix::warmth` 的 `Warmed` 与记账已在（§8-4-2），而 run 结束后按 `next_due` 醒来发续期的那条循环还没有；接上它要先定续期的 usage 记成哪一种事件。
 
 ## 4 现状分析
 
-空壳。verify 为 O(n) 全量；消费面（测试/夹具/citysim）规模千行级，无性能议题；seq→偏移索引归 memory::index。
+verify 为 O(n) 全量；消费面（测试/夹具/citysim）规模千行级，无性能议题；seq→偏移索引归 memory::index。
 
 ## 5 权威信源
 
@@ -59,7 +64,7 @@ replay、verify、VerifiedLedger、VerifiedLine、fork prefix、`at_seq`。不�
 replay ──▶ kernel(event/ledger/error)、memory(jsonl::read_raw_lines)
 fork   ──▶ replay(VerifiedLedger)、kernel
 turn   ──▶ kernel(ledger/event/error/tool/model)、prefix(FrozenPrefix)
-turn/recovery ──▶ turn(ledger 的 Journal)、kernel(model/error)   // 模型调用恢复管线（§8-44）
+turn/recovery ──▶ turn(ledger 的 Journal)、kernel(model/error)   // 模型调用恢复管线（§8-49）
 prefix ──▶ kernel(locator::B3Hash/event::Payload/error)
 handoff──▶ kernel(locator/event/error)
 pipeline ──▶ offload、sieve、clock、kernel(tool)
@@ -71,7 +76,9 @@ sandbox ──▶ wasmtime（feature `wasm` 内藏；缝声明恒在）
 tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、memory(cas 经 pipeline)
 ```
 
-**本 crate 本版不做什么（否定式三条）**：
+上图只画各模块的主要依赖；crate 之间的依赖以 ARCHITECTURE 的 `depmap` 块为准，文件清单以它的模块图为准。
+
+**replay／fork 不做什么（否定式三条；本 crate 的其余模块，如 `tools::exec` 与 `backlog`，执行真效果）**：
 - 不重执行任何效果——verify 恒不调工具、不出网、不写盘。
 - 不生成 RunId——新 Run 身份由调用方注入（kernel 禁随机的同一纪律）。
 - 不读 projection——重放的唯一输入是 Ledger 原始行（历史只有一份）。
@@ -149,27 +156,24 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 **写账本的那一方走索引（`fork::indexed`）。** 持有账本的 worker 为一次分支重建只需要母 run 自己的那几行：`inherited_indexed` 用 `LedgerIndex::line_at` 读 `at_seq` 那一行定出母 run，再按 `run_seqs_before` 只读这条 run 的行，每一行先过 `memory::read_line`——它与验链门逐行所用的 `LineCheck::advance` 共用同一条分类规则：已知 kind 解析成记录，带 `ig` 的新 kind 跳过，其余（撕裂、不规范、无 `ig` 的未知 kind）以 `LineFault` 的码拒绝；切点与消息都由 `fold_run` 一处判定。它不验链：worker 是这本账唯一的写者，打开时已经过尾部恢复；而 `verify_ledger_dir` 为这一问把整本历史读进内存、逐行验链再解析（94 MB 的账本上是 +67 MiB 的瞬时内存）。拒绝写成人能照做的话：`at_seq` 不在索引里是 `outside`，恢复语给出母序列止于哪个 seq，母 run 在这之前没有 `run_started` 是同一条 `E_INVALID_ARGS`。
 **母亲自己是分支时，先重建她开场时继承的那段。** 流动循环里母亲的窗口以 `RunPlan::inherited` 开头，那段对话不在她自己的线上；她的 `run_forked`（`run` 是她、`from`／`at_seq` 指向祖母的切点）才是它的出处。所以 `inherited` 先找属主 run 的 `run_forked`，按其 `at_seq` 递归重建祖母的对话，经 `push_inherited` 放在最前，再折母亲自己的线——与 `Run::begin` 同一顺序。递归只往账本更早处走（`at_seq` 必须早于那条 `run_forked`，否则拒），所以一定终止。
 
-**上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`inherited` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
 
 **`addr` 落在 `run_forked` 的那一行上**：新 run 的 id 说的是「谁继续谁」，而地址说的是**哪个房间的这次继承已经用掉了**——`assembly::folds::session` 只用这两个字段回答「这个房间的当前一段是否还欠一段对话」。
 
 ### 8-3 runtime::turn（形状 5 typestate 机）＋bench／conversation
 
-**一个 typestate 机、一张工作台、一份会话历史，三种形状住一个文件。** 1,716 → 918（turn）＋740（bench）＋109（conversation）。
+**一个 typestate 机、一张工作台、一份会话历史，三种形状三个模块。**
 - `bench`（形状 1 判定）：`ToolBench`／`BenchOutcome` 与三条必要前提次序（去重先于副作用；exec 的 discard 预报先于 Write 门；Deny 以 `tool_result` 回去而不结束回合）。它拥有的是**次序**；工具本身以 `Box<dyn Tool>` 递入，沙盒在缝上，副作用不归它。
-  **它原本坐在第一个 `mod tests` 之后**——没有边界的地方，新代码落在光标所在的行。
 - `conversation`（形状 2 值）：`Conversation`／`Opening`。它是会话，不是 transcript（冻结后写下的逐 run 文件），也不是 `kernel::Window`（上下文大小）。一条不变量在每一个入口上成立——**连续的 user 内容并进已开的那条消息，而不另开一条**；steer、工具结果与开场任务是同一条规则的三扇门。
-- 公开面只改定义模块，**不新增任何根重导出**（`runtime::Opening` 原就在根上；`ToolBench` 原就只能走模块路径，今天仍然）。
+- 根重导出：`runtime::Opening` 在根上；`ToolBench` 只经 `runtime::bench`。
 
 ```rust
 pub struct Turn<S> { /* journal（run、who、t、refs、redacted）、state —— 全私有；相内数据在别的相不可表示 */ }
 pub struct Assembling(/* 私有 */);  pub struct Calling { /* prefix 哈希 */ }
 pub struct ToolWave { /* calls */ }   pub struct Recording { /* refs */ }
 
-pub enum Interrupt { None, Cancel }    // Steer variant 随 S3 只加（消费方传值不 match，开放无痛）
+pub enum Interrupt { None, Cancel, Steer { source: String, text: String } }
 pub enum PhaseOutcome<Next> { Advanced(Next), Cancelled(TurnCancelled) }
-// PhaseOutcome 刻意穷尽：新结局必须逼每个执行器表态，不得掉 catch-all；
-// G-22 之后全库枚举皆闭，这一条不再是判定输出的例外规则，而是常规。
+// PhaseOutcome 刻意穷尽：新结局必须逼每个执行器表态，不得掉 catch-all（全库枚举皆闭）。
 pub struct TurnCancelled { /* refs：含 cancel_received —— 私有，getter 取 */ }
 pub struct TurnReport { /* refs、model_returned_ref、wave_len —— getter 取 */ }
 
@@ -199,7 +203,7 @@ impl Turn<ToolWave> {
     /// Boundary 3 (工具执行前)；per call tool_called + tool_result，按调用序入账。
     /// 开头连续的 Effect::Read 调用同时执行，结果进重排缓冲；
     /// 第一条非只读调用等它们全部收齐后再开始，此后串行。
-    /// still_going 在每条 call 之前被问一次（B-70，见 §8-28-2）。
+    /// still_going 在每条 call 之前被问一次（见 §8-28-2）。
     /// 一条入账失败即返回，排在它后面的已放行只读调用不入账：`admit` 对 Effect::Read
     /// 不写去重表、taint 与检查点，所以它们没有留下账本不知道的状态。
     pub fn execute_concurrent(self, interrupt: Interrupt, ledger: &mut dyn Ledger,
@@ -224,26 +228,15 @@ impl Turn<Recording> {
 ```
 
 - **相变函数携 `&mut dyn Ledger`，相内字段私有**；无返回既往相的方法；跳相／相内取消／字面量构造中间相，三者编译不过（trybuild）。
-- **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。**工具波内的每条 call 同样是一道边界**（B-70）：一波是 N 件副作用而不是一件，于是 `execute_concurrent` 在每条 call 之前问 `still_going`，答案交给同一个 `consume_boundary`：Cancel 写下同一条 `cancel_received`，Steer 写下同一条 `steer_received`——消费中断的地方仍然只有一处。
+- **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。**工具波内的每条 call 同样是一道边界**：一波是 N 件副作用而不是一件，于是 `execute_concurrent` 在每条 call 之前问 `still_going`，答案交给同一个 `consume_boundary`：Cancel 写下同一条 `cancel_received`，Steer 写下同一条 `steer_received`——消费中断的地方仍然只有一处。
 - **四取消点**：组装前／provider 调用前／工具执行前／派生前，四点全住本模块。第四点由 `Turn<Recording>::record` 收边界快照，故 `record` 与前三相同形——收 `Interrupt`、答 `PhaseOutcome`。它买到的是别处买不到的一件事：**一个回合把活派下去之后、子 Run 起来之前，仍停得住**；`calls_made == 0` 的收尾回合尤其如此，那一刻在第四点之前根本没有下一个边界。
-- **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。S3 接真 dialect 时只加字段。
-- **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名那条今天走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
+- **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。
+- **前缀冻结是运行时不变量，不只是测试。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名一条走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
 - **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
 - **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行段与并行段共用，所以账本字节与串行执行完全一致（`tests/run_driver.rs` 与 `turn/tests/concurrent.rs` 对拍）。第一条非只读调用就是 fence：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
 - **`ConcurrentInvoke` 是三段，不是一个闭包。** 放行（`admit`，`&mut`，按调用序）、执行（`tool` 借出 `&dyn Tool`，`&self`，各条在 scope 线程上调它的 `invoke`）、记账（`account`，`&mut`，按调用序）。一个包着 bench 的闭包表达不了这个次序：放行与记账写同一张去重表与同一份 taint，而 bench 不是 `Sync`（checkpoint 持有 git 仓库句柄），工具是（`kernel::Tool: Send + Sync`，`invoke(&self)`；有内部状态的工具把状态放在自己的锁后）。三个闭包也不行：三者要借同一个 bench，一个要 `&`、两个要 `&mut`。所以它是 trait——第二实现在缝上已经存在：闭包的全覆盖实现（放行即作答，不报效果，于是 citysim 与脚本化工具的测试走串行、字节不动），与装配层 `bin::assembly::driving::placing` 的 bench 实现（sprawling-SPEC §8-31）。只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；`IdemKey` 的位置在放行时按调用序定下，exec 计数与 fence 记录在记账时按调用序累加，所以它们与串行波逐字相同。落选的是「lane 把整个 bench 放进锁、闭包取 `Sync`」：锁把三条读排成一条队，并行只剩名字。生产路径由 `tests/run_driver.rs` 的三读测试守着：`drive` 走 `lifecycle` 到 `execute_concurrent`，三条读彼此重叠，账本与串行逐行相同。
 
 - **生成中起跑只读调用（`runtime::turn::speculation`，形状 2 值：按位置的缓存 `Speculated`）。** `Generating::Speculating` 让 `call` 走 `Model::call_speculating`；模型每交出一条调用，只要它排在本回答第一条非只读调用之前、`effect_of` 答 `Effect::Read`、`ahead` 借得出工具，它就在一个 `std::thread::scope` 线程上起跑，scope 在模型调用返回前 join 全部线程，于是一回合的墙钟约等于 max(工具, 生成)，而不是两者之和。结果按调用在回答中的位置缓存进 `Turn<ToolWave>`，连同起跑时的那条调用；入账时仍按调用序先 `admit`，放行（`Cleared`）且该位置缓存的调用与结算后那条逐字段相等，才用缓存结果，否则照常执行——所以 `tool_called`／`tool_result` 的字节、顺序与串行波相同，推测结果本身不是事件。回答失败（流被切断、恢复段重发）时整份缓存随那次尝试丢弃；取消落在 k 处时 k 之后的缓存随 `Turn` 丢弃；`admit` 自己作答（重放、门拒绝）时该位置的缓存丢弃。哪些调用可以提前、缓存按什么序入账，权威是 `adversary/design/Speculating.lean`：越过第一条写调用推测会让读看到写之前的世界（`speculating_past_a_write_changes_the_ledger`）。**起跑不问 `still_going`**：一个已立的取消挡不住早读，它们的结果随 `Turn` 丢弃；代价是被停的 run 仍做完这些读，模型调用失败时也要等它们 join 才返回，而它们都无副作用，所以不越过任何门。**起跑先于放行**：放行写去重表与 taint，被截断的回答得把它们撤回，而只读调用的结果在放行前算出、放行后才用，被拒的那条结果从不到达模型与账本。落选的是「推测时就 `admit`」：它要为截断与取消各写一条撤销路径。`ahead` 有默认 `None`，闭包的全覆盖实现因此不提前起跑，citysim 字节不动；bench 的实现按名借出（`ToolBench::tool_named`，与 `tool_for` 同一张表）。
-
-#### 8-4-1 一句恢复语只许指向线上真有的动词（`prefix::segment::ANOTHER_ADDRESS`）
-
-```rust
-pub(crate) const ANOTHER_ADDRESS: &str =
-    "send this task to another address, which opens a session of its own";
-```
-
-- **一个事实一个家**：「一个被冻住的会话怎么出去」先前在两处各拼一遍（`prefix::segment::prefix_drifted` 与 `turn::report::shape_moved`），两句话说的是同一件事，而两份拼写可以各自漂。现在动词只拼一遍，两条拒绝各自接上它们自己的解释。
-- **拒绝不得指名一个不存在的动词**：先前的恢复语是「open a new session, or fork this run」——这两件事前端都做不到：同一个地址上开第二个 session 没有任何 Command，`Fork` 写下血统却没有任何 dispatch 路径消费它。**一句指向不存在动词的恢复语，比没有恢复语更坏**：人按它去找，找不到，然后以为是自己没找到。
-- **这句话随动词走**：`OpenSession`（`/new`）上线后，改的是这一个常量，而不是去两处各改一遍。
 
 ### 8-4 runtime::prefix（形状 5＋2）
 
@@ -273,13 +266,24 @@ pub fn verified_system_hashes(system: &[SystemBlock], frozen: &[B3Hash; 4]) -> R
 // 载荷的键由 `kernel::event::record::PromptAssembled` 一处拼写，写读两端各经 `Payload::of` 与
 // `Payload::read` 一扇门；本模块只提供值：`SegmentSlot::as_str` 给出 slot 名与 breakpoints 行，
 // `SegmentSource::row` 给出 `PromptSource`，`build_segment` 的落选行给出 `PromptSkip`（reason 是
-// 闭集 `SkipReason { Duplicate, Unreadable, NotUtf8, NoBudget }`，不再是四个手写字符串）。
+// 闭集 `SkipReason { Duplicate, Unreadable, NotUtf8, NoBudget }`）。
 ```
 
-- 段序即缓存经济：类型把四段位置写死，断点与各段上限属 S3 完备化（只加字段）。
+- 段序即缓存经济：类型把四段位置写死，断点与各段上限见 §8-6。
 - **`segment_hashes()` 返回构造时缓存值，`verified_segment_hashes()` 才是权威。** 一个事实（这段字节的哈希）只有一个权威：`FrozenSegment::assembled` 在构造时算一次，每次派活前从将发的字节重算一次并与它比对。两者不一致意味着模型将读到的字节不是运行冻结的那一份，而那正是「同一事件序列逐字节重放」所依赖的东西，故拒绝而非警告。
 - 分段哈希经 `B3Hash::digest`（kernel 唯一哈希产地）；A4（同输入同字节）由 golden 断言，A15 重建器随 S3。
 - trybuild 反例：`FrozenSegment::from(TimeMs)`／把 TimeMs 传进 assemble —— 无转换路径，编译不过（ClockStamp 等类型落地后同规逐个加反例）。
+
+### 8-4-1 一句恢复语只许指向线上真有的动词（`prefix::segment::ANOTHER_ADDRESS`）
+
+```rust
+pub(crate) const ANOTHER_ADDRESS: &str =
+    "send this task to another address, which opens a session of its own";
+```
+
+- **一个事实一个家**：「一个被冻住的会话怎么出去」只拼一遍，`prefix::segment::prefix_drifted` 与 `turn::report::shape_moved` 两条拒绝各自接上它们自己的解释；两份拼写会各自漂。
+- **拒绝不得指名一个不存在的动词**：恢复语只指向每个客户端都有的那件事——把任务发到另一个地址。**一句指向不存在动词的恢复语，比没有恢复语更坏**：人按它去找，找不到，然后以为是自己没找到。
+- **这句话随动词走**：线上有 `Command::OpenSession`；恢复语要改指它时，改的是这一个常量，而不是去两处各改一遍。
 
 ### 8-4-2 runtime::prefix::warmth：每个前缀最近一次请求与它的续期（形状 1 判定）
 
@@ -318,7 +322,7 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call
 ```
 
 - `lead_ms` 不是常量：`Warmed` 把每次经它发出的调用（真实请求与续期）的往返时长记为下一次续期的提前量，所以提前量跟着所连的 provider 与链路走，不按某一类机器调校。流式调用的往返含生成时长，只会让续期提前，不会让它晚于缓存过期。
-- 现状：`Warmed` 与记账已落地；run 结束后把 `Warmed` 留在 worker 上、在唯一 spawn 点的 attend 循环里按 `next_due` 醒来发续期、把续期的 usage 记成事件，尚未接线。
+- 未接线（§3）：run 结束后把 `Warmed` 留在 worker 上、在唯一 spawn 点的 attend 循环里按 `next_due` 醒来发续期、把续期的 usage 记成事件。
 
 ### 8-5 runtime::handoff（形状 2）
 
@@ -328,7 +332,7 @@ pub struct Handoff { /* must_read、overview、progress、context、next_step �
 impl Handoff {
     /// Sole constructor: must-read non-empty; every
     /// entry is an already-parsed Locator by type. Five sections always
-    /// present; prose quality is the probe's business (P1), not the type's.
+    /// present; prose quality is the handoff probe's business, not the type's.
     pub fn new(must_read: Vec<Locator>, overview: String, progress: String,
                context: String, next_step: String) -> Result<Handoff, AxError>;   // 空 must_read → E_INVALID_ARGS
     pub fn must_read(&self) -> &[Locator];  pub fn payload(&self) -> Result<Payload, AxError>;  // handoff_written 载荷
@@ -339,29 +343,33 @@ pub struct ResumeSeed { pub run: RunId, pub must_read: Vec<Locator> }
 pub fn resume(handoff: &Handoff, new_run: RunId) -> ResumeSeed;
 ```
 
-- **载荷即这五个字段**：`payload` 是 `Payload::of(self)`，键名由字段名给出，此前在此处又手写了一遍。只派生 `Serialize`：`new` 是持有一个 `Handoff` 的唯一路径，能从一行账本反造一个的读方会绕过它对空 must-read 的拒绝。
-- 「下一步」段首列用户指定动作、must-read 规范类机器填：内容约束属生产者（S3 回合层／P2 spine_files），类型只强制结构。
+- **载荷即这五个字段**：`payload` 是 `Payload::of(self)`，键名由字段名给出，不另手写一遍。只派生 `Serialize`：`new` 是持有一个 `Handoff` 的唯一路径，能从一行账本反造一个的读方会绕过它对空 must-read 的拒绝。
+- 「下一步」段首列用户指定动作、must-read 规范类机器填：内容约束属生产者（回合层与 spine 文件），类型只强制结构。
 - Run<Frozen> 无解冻：resume 不收 Run 值，只收 Handoff——「旧 Run 醒来」在签名上无法拼写。
 
-### 8-6 turn／prefix／handoff 完备化（形状不变，参数长入）
+### 8-6 turn／prefix／handoff 的会话面（形状不变，参数长入）
 
-「只加不改」的取义：typestate 四相、边界消费、事件序、私有字段三不变量不动；相变函数的入参按 S3 语义长入（assemble 增 window/tools），消费者（citysim）同集更新。被否替代：平行第二条 call 路径——同一相两个入口即两个权威，落选。
+typestate 四相、边界消费、事件序、私有字段三不变量不动；会话、工具与调用形状作为相变函数的入参进来。被否替代：平行第二条 call 路径——同一相两个入口即两个权威，落选。
 
 ```rust
-// kernel::model 增（缝上 canonical 会话类型，kernel-SPEC §8-24 同集改）：
+// kernel::model（缝上 canonical 会话类型，kernel-SPEC §8-24）：
 // ChatRequest<'a> { system: Vec<SystemBlock>, messages: Cow<'a, [ChatMessage]>, tools: Cow<'a, [ToolDef]>, breakpoint: MessageBreakpoint }
 // SystemBlock { text, cache }；ChatMessage { role, content: Vec<ContentBlock> }；Role { User, Assistant }
 // ContentBlock { Text{text} | ToolUse{id,name,input:Payload} | ToolResult{tool_use_id,content,is_error} }
 // ToolDef { name, description, input_schema: Payload }；ModelUsage 四整数；StopReason { EndTurn, ToolUse, MaxTokens }
-// ModelRequest<'a> 增 chat: ChatRequest<'a>；ModelReturn 增 usage: Option<ModelUsage>、stop: Option<StopReason>、billed: Option<UsdMicros>
+// ModelRequest<'a> 携 chat: ChatRequest<'a>；ModelReturn 携 usage: Option<ModelUsage>、stop: Option<StopReason>、billed: Option<UsdMicros>
 
-pub struct Window { /* messages: Vec<ChatMessage> —— 私有；执行器持有，逐回合推进 */ }
-impl Window { pub fn new() -> Window;
-    pub fn push_steer(&mut self, source: &str, text: &str);          // 「user」或「@ID」前缀形
-    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening);  // 首轮，run_started 可重建
+// runtime::conversation
 pub enum Opening { FromJob, Inherited, WithPerson }   // 穷尽三臂，城在写 brief 时已决定；Inherited 只由 fork 选
+pub struct Conversation { /* messages、sent、held —— 私有；执行器持有，逐回合推进 */ }
+impl Conversation { pub fn new() -> Conversation;
+    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening);  // 首轮，run_started 可重建
+    pub fn push_steer(&mut self, source: &str, text: &str);          // 「user」或「@ID」前缀形
+    pub fn push_reminder(&mut self, reminder: &ContextReminder);    // §8-34
+    pub fn push_inherited(&mut self, messages: &[ChatMessage]);     // 分支开场继承的那段（§8-2）
     pub fn push_assistant(&mut self, content: Vec<ContentBlock>);
     pub fn push_tool_results(&mut self, results: Vec<ContentBlock>); // ToolResult 块（pipeline 产出的成品文本）
+    pub fn mark_sent(&mut self);                                     // §8-47
     pub fn messages(&self) -> &[ChatMessage]; }
 
 pub struct CallShape { pub model: String, pub max_tokens: Option<Ceiling>, pub effort: Option<Effort>,
@@ -400,12 +408,11 @@ pub struct PrefixBuild { pub prefix: FrozenPrefix, pub notes: Payload }   // not
 pub fn build_prefix(plan: PrefixPlan) -> Result<PrefixBuild, AxError>;
 ```
 
-- **首轮不再指向任何东西**：`JOB.md` 的正文已是 Run 段，故 `FULL READ:` 那一行与它携的 `cas:b3-…` 一起取消——城里没有一个工具解析得了内容哈希，而溯源在 Ledger 里已记两遍。`Opening` 的两臂不是排版偏好：被派了一件活的会话与正在和人说话的会话要的第一句话不同，而把人那句话包成 `Task:`／`Goal:` 表单，换回来的也是一张表单。**`FromJob` 的开场行不复述任务**：它只写 `The task is in JOB.md above.` 与 `Goal: <goal>` 两行——任务正文已在 Run 段，再抄一遍，人贴的一段话每次请求就付两遍（Run 段不在缓存里，每回合全价）。Goal 仍写在这里，因为它是「什么时候停」，短，且是这一行唯一不重复的指令。**分叉重建的母亲开场用 `Inherited`**：母亲的 `JOB.md` 在她的房间里，不在分叉的 Run 段里，所以那一行写 `Task: <task>` 与 `Goal: <goal>`；若照搬 `FromJob`，分叉读到的「在上面的 JOB.md 里」指向一个它看不见的文件，母亲的任务就丢了。
+- **首轮不指向任何文件**：`JOB.md` 的正文已是 Run 段，所以开场行不携 `cas:b3-…` 一类的内容哈希——城里没有一个工具解析得了它，而溯源在 Ledger 里已记两遍。`Opening` 的两臂不是排版偏好：被派了一件活的会话与正在和人说话的会话要的第一句话不同，而把人那句话包成 `Task:`／`Goal:` 表单，换回来的也是一张表单。**`FromJob` 的开场行不复述任务**：它只写 `The task is in JOB.md above.` 与 `Goal: <goal>` 两行——任务正文已在 Run 段，再抄一遍，人贴的一段话每次请求就付两遍（Run 段不在缓存里，每回合全价）。Goal 仍写在这里，因为它是「什么时候停」，短，且是这一行唯一不重复的指令。**分叉重建的母亲开场用 `Inherited`**：母亲的 `JOB.md` 在她的房间里，不在分叉的 Run 段里，所以那一行写 `Task: <task>` 与 `Goal: <goal>`；若照搬 `FromJob`，分叉读到的「在上面的 JOB.md 里」指向一个它看不见的文件，母亲的任务就丢了。
 - **read 的两条路，差别在于谁选的**：**路径是模型选的，故受审**——`Address::parse` 杀穿越，`is_reserved` 杀保留子树（`E_GATE_DENIED`）；**catalog 里的名字是人选的**——楼的阅览室写下它时准入就已发生，故它解到的 skill 可以住在保留空间里。两条路共用一个参数，因为对模型而言它们是同一件事（把一份东西调到眼前）；**先问 catalog** ，一个同名文件不得遮蔽楼已经准入的 skill。
-- **`Catalog::expand` 改答 `Expansion { Skill { addr }, Said { text } }` 而不是 `String`**：skill 展开成一个可打开的地址，其余展开成目录自己持有的正文；两者压成一个字符串时，调用方只能拿它去试解析成地址，而一段恰好能解析成地址的正文就会被当成文件打开。
-- **`Catalog::expand` 改答 `Expansion { Skill { addr, package }, Said { text } }` 而不是 `String`**：skill 展开成一个可打开的地址，其余展开成目录自己持有的正文；两者压成一个字符串时，调用方只能拿它去试解析成地址，而一段恰好能解析成地址的正文就会被当成文件打开。这个错误真发生了，是一条红测试拿住的。
+- **`Catalog::expand` 答 `Expansion { Skill { addr, package }, Said { text } }` 而不是 `String`**：skill 展开成一个可打开的地址，其余展开成目录自己持有的正文；两者压成一个字符串时，调用方只能拿它去试解析成地址，而一段恰好能解析成地址的正文就会被当成文件打开。
 - **正文不在 prompt 里，所以交出去而不是拒绝**：`render()` 只写每条的 disclosure，`expansion` 从未进过窗口。
-- **它是 `Catalog::expand` 的第一个调用者**：在它之前，一栋楼的阅览室能报出一个 skill 的名字而永远交不出它。
+- **它是 `Catalog::expand` 的调用者**：没有它，一栋楼的阅览室能报出一个 skill 的名字而永远交不出它。
 - 截断：文件超段位余额即截到边界，原处留 ASCII 标记（文本与切口规则属 `runtime::elision`，§8-42），恒不静默丢尾；标记字节从段预算先扣。
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读。
 - 断点只有一个作者：`prefix::BreakpointPlan`（`prefix/breakpoint.rs`，形状 1 判定，纯函数）。`BreakpointPlan::for_conversation(&[ChatMessage])` 决定一次请求实际发出的断点：前三段（city／building／resident）的段界各一个，对话非空时尾消息再一个，合计 ≤ `CACHE_BREAKPOINTS_MAX`（4）；run 段界不放，因为尾锚紧随其后已覆盖它。`FrozenPrefix::system_blocks()` 以 `BreakpointPlan::marks_edge(slot)` 标 system 块，`BreakpointPlan::message_breakpoint` 标请求（回合借用会话，不复制它，kernel-SPEC §12.6），`prompt_payload(&plan)` 把 `plan.breakpoints()` 逐个拼成 `breakpoints` 行（段界写 slot 名，尾写 `tail`）；`verified_system_hashes` 以同一个 `marks_edge` 核对线上的块。兼容格式只负责拼写（Anthropic：被标记消息的最后一块带 `cache_control`），不决定任何断点。
@@ -420,11 +427,11 @@ impl BreakpointPlan {
 }
 ```
 - A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源的键以 `kernel::event::record::PromptSource` 为准：`{addr, kept, marker, dropped, producer}`，其中 `producer` 不参与对拍，因为哈希只盖段字节、指纹不是字节的一部分）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。拼接分隔符的唯一权威住 prefix.rs（`DOC_JOIN`），截断标记的唯一权威住 `runtime::elision`（§8-42），replay 同 crate 复用不另拷。
-- E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径（S4 serve；台账登记）。补写方经 `ToolCalled`／`ToolResult` 两个结构读写，读不懂即拒绝：若手挑 `id` 与 `name` 两个键、读不出就写下 `"unknown"`，一条这个 build 读不懂的调用就会被关在一个谁也答不上的 id 上。
+- E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径。补写方经 `ToolCalled`／`ToolResult` 两个结构读写，读不懂即拒绝：若手挑 `id` 与 `name` 两个键、读不出就写下 `"unknown"`，一条这个 build 读不懂的调用就会被关在一个谁也答不上的 id 上。
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读不再自定。
 - 断点：`FrozenPrefix::system_blocks()` 产四块、逐块 cache=true＝断点恒 4＝`CACHE_BREAKPOINTS_MAX`，断点只落段界。
-- handoff：形已全（五段＋构造点＋resume 消费），无改动；「下一步段首列用户指定动作」属生产者纪律（S3 执行器／P2 spine_files），类型不另加钩。
-- 第四取消点（派生前）：无派生生产者时推迟落地，理由是提前落地＝死入口＋不可测。`collab::delegate_tool` 是那个生产者：`SafePoint::BeforeSpawn` ＋ `Turn<Recording>::record(interrupt, ledger)`，装配层在 `Completion::Cancelled` 时清空派生台，**被取消的 Run 一件活也交不下去**。
+- handoff：五段＋构造点＋resume 消费；「下一步段首列用户指定动作」属生产者纪律（回合层与 spine 文件），类型不另加钩。
+- 第四取消点（派生前）：`collab::delegate_tool` 是它的生产者：`SafePoint::BeforeSpawn` ＋ `Turn<Recording>::record(interrupt, ledger)`，装配层在 `Completion::Cancelled` 时清空派生台，**被取消的 Run 一件活也交不下去**。
 
 ### 8-7 runtime::pipeline（形状 1＋组装处）
 
@@ -434,6 +441,7 @@ pub struct PackContext<'a> {
     pub stamp: Option<ClockStamp>,            // clock::StampGate 的产出；None＝不携
     pub net_notice: bool,                     // gate::egress 首次公网放行信号
     pub steer: Option<(String, String)>,      // (source, text)；上一边界消费到的 Steer
+    pub reminder: Option<ContextReminder>,    // 上下文提醒（§8-34）
     pub offload: Option<OffloadSite<'a>>,     // None＝无 CAS 可用（纯截断退路）
     pub sieve: Option<SieveRequest<'a>>,      // exec 结果才带；无站点即无 tee 即不压
     pub adviser: Option<Consultation>,        // 窗口顾问先跑，判断作参数从此入
@@ -456,28 +464,28 @@ impl Consultation { pub fn answer(&self) -> Option<&AdviserAnswer>;
                     pub fn payloads(&self) -> Result<Vec<Payload>, AxError>; }   // adviser_asked＋答或回落
 pub struct Adviser { /* answer —— 私有 */ }
 impl Adviser { pub fn none() -> Adviser;
-               pub fn with(answer: impl FnMut(&Ask, &Window) -> Result<AdviserAnswer, AdviserFailure>
+               pub fn with(answer: impl FnMut(&Ask, &Conversation) -> Result<AdviserAnswer, AdviserFailure>
                                  + Send + 'static) -> Adviser;
                pub fn consult(&mut self, ask: Ask, conversation: &Conversation, elapsed_ms: u64) -> Consultation; }
 ```
 
-- 定序（H-08 之后）：**判定由 `compaction::plan` 一处给出**，答 `Shrink { Keep, Cut(Strategy), MustOffload }`。`Keep` →原样；`MustOffload`（结构化、未知内容、以及非 UTF-8 字节）与「`Cut` 且 `len ≥ OFFLOAD_MIN_BYTES`」→ 有 `OffloadSite` 就 offload；`Cut` 而无站点或不够大 → `compaction::shorten` 按已定的 `Strategy` 裁。**`MustOffload` 而无站点是一次带恢复语的 `Err`，不是私自的字节切**：截半的结构化数据看上去仍可解析，那正是它比缺席更糟的理由，而旧的 `byte_cut` 让 pipeline 当场推翻 compaction 的定规——一条规则两个家。`byte_cut` 随之删除。标记仍由 `elision` 产出且只出现一次。
+- 定序：**判定由 `compaction::plan` 一处给出**，答 `Shrink { Keep, Cut(Strategy), MustOffload }`。`Keep` →原样；`MustOffload`（结构化、未知内容、以及非 UTF-8 字节）与「`Cut` 且 `len ≥ OFFLOAD_MIN_BYTES`」→ 有 `OffloadSite` 就 offload；`Cut` 而无站点或不够大 → `compaction::shorten` 按已定的 `Strategy` 裁。**`MustOffload` 而无站点是一次带恢复语的 `Err`，不是私自的字节切**：截半的结构化数据看上去仍可解析，那正是它比缺席更糟的理由；pipeline 若自己切字节，就当场推翻了 compaction 的定规——一条规则两个家。标记由 `elision` 产出且只出现一次。
 - **`Shrink::Cut(Strategy::Sections)` 不交给 offload。** 长文档的节标题骨架是该类存在的理由，而 offload 的替代体是文件头＋指向全文的指针，恰好把骨架丢掉；故 `Markup` 一律走 `shorten`，其余 `Cut` 仍按 `len ≥ OFFLOAD_MIN_BYTES` 入 store。
 - **非 UTF-8 的静默回落已登记**：`Err(_) => Content::Unknown` 丢掉 `Utf8Error` 的原因，把「二进制」折成「未知」；`Unknown` 的整块离窗使它的行为安全，但名字不对。修法需要一个新内容类与它的 plan／shorten 臂，不止一行，故只登记不改。
 - **顾问端口住 `runtime::pipeline::adviser`（形状 3 port＋1 判定），先于 `package` 跑。** 顾问装不进同步的 sieve 链（`Draft::step` 是 `impl FnOnce(&[String]) -> Vec<String>`，无 Result 无 async，而 sieve→package→package_exec 整链同步）；做法是顾问在链外先办，判断作 `PackContext.adviser` 喂进来。三条问法（`Noul` 是非＋概率／`Score` 有序打分／`Choice` 选一，后者仅用于开 session 选模型）与答案／回落载荷形状归 `kernel::event::record`，本模块只翻译与校验。
-- **顾问是窗口的顾问，不是前缀的顾问。** 端口签名只拿得到 `&Window`（与一个已拼好的 `Ask`）：拿不到 `FrozenConfig`，也拿不到 `FrozenPrefix`。逐轮换模型／effort 是前缀失效，不是窗口调整，故在本端口里写不出来；要挡它们得在 `CallShape` 上挡（§8-3）。
+- **顾问是窗口的顾问，不是前缀的顾问。** 端口签名只拿得到 `&Conversation`（与一个已拼好的 `Ask`）：拿不到 `FrozenConfig`，也拿不到 `FrozenPrefix`。逐轮换模型／effort 是前缀失效，不是窗口调整，故在本端口里写不出来；要挡它们得在 `CallShape` 上挡（§8-3）。
 - **顾问的影响只有两条臂，下界是「今天的每个数字」。** `Score { score_bp }` 按 basis points 缩放 cap 给能裁的内容类用；若缩放会把「本会整块保留」的 Structured／Unknown 变成 `MustOffload`，则沿城市自己的 plan 与预算（把一条密度分变成一次拒绝，正是 `Keep` 在防的那件事）。`Noul { keep: false, .. }` 只在「有 `OffloadSite` 且结果大于 cap」时把它移出窗口：offload 只存必须裁的东西，更小的结果没有放得下的去处。`Choice` 不进 `package`（只在开 session 选模型时用）。
 - **失败策略：无回答即无调整，且写进账本。** 未装顾问（`Adviser::none`）、端点不可用／超时、答非所问（问 `Noul` 答 `Score`、选择不在选项内、概率越界）一律回落，`Consultation::payloads()` 产出 `adviser_asked` 加 `adviser_answered`／`adviser_fell_back` 两条载荷随 `Packaged::events` 出去。**`answer()` 返回 `None` 时上面每一个数字在原地不动，所以最坏情况恰好等于今天的行为。**
 - **顾问端点走既有 `AttachEndpoint` 登记路径，不造第二套 provider 表。** 配置不新增 TOML 段（`ConfigLayer` 只有 effort／sandbox／mcp 且四处 `deny_unknown_fields`）；`gateway::adviser::AdviserClient` 收路由已产出的 `Chosen`，用 `adapter_for` 同一支笔、同一份凭证兑付与 deadline。`Choice` 问法在开 session 选模型时用，前缀成形之前。
 - 信封三附件一处组装：正文后依序追加 clock 行／net_notice 行（恒一次：正在连接互联网提醒，英文定句）／steer 行（`user:`／`@ID:` 前缀）；三行字节不计入 cap（附件与负载分账，附件有自己的封顶常数在实现内断言）。
-- 内容感知压缩分派表属 P3；本模块只持「原样／offload／截断」三臂，接口不预留分派参数。
+- 按内容分类的缩短判定住 `compaction`（八类内容、四种策略），sieve 住 §8-27；本模块只按它们的答案走「原样／offload／截断」三臂。
 
 ### 8-8 runtime::offload（形状 1；四不变量的独占定义处）
 
 ```rust
 pub const REST_DIR: &str = ".rest";
 pub struct OffloadSite<'a> { pub cas: &'a mut memory::Cas, pub city_root: &'a std::path::Path,
-                             pub room: &'a kernel::Address }
+                             pub room: &'a kernel::Address, pub origin: memory::BlockOrigin }   // origin：这块字节替哪个 run、哪栋楼写下（memory-SPEC）
 pub struct OffloadRecord { pub substitute: Vec<u8>, pub original: Locator, pub rest_path: String,
                            pub original_len: u64 }
 pub fn offload(bytes: &[u8], cap_bytes: u64, site: &mut OffloadSite<'_>) -> Result<OffloadRecord, AxError>;
@@ -510,13 +518,13 @@ impl Watchdog {
 }
 ```
 
-- 处置必分级：纠正 Steer 文本指名重复指纹；只有终局的处置被明拒。子 Run 监控：`Completion::Limit` 的呈现住 status.children（S3 类型已备，派生消费者 P2），本模块不重复存储子态。
+- 处置必分级：纠正 Steer 文本指名重复指纹；只有终局的处置被明拒。子 Run 监控：`Completion::Limit` 的呈现住 status.children，本模块不重复存储子态。
 - **provider 失败按 `AxError::retry` 的三态分类。** `No`→`Freeze { ProviderRefused }`，一次即止；`Yes` 与 `Unknown`→`BackOff { until }`（一次模型调用的效果只是一份城里从未收到的回答，效果是否落在对端只关乎计费，不关乎城里的状态，故「不知道」照样再问），`until = now + 退避`。**退避表只住 `Watchdog`**：自 provider 上次作答以来连续第 n 次失败的基准是 `500 ms × 2^(n-1)`，基准封顶 60 s（第 8 次起恒为 60 s）；实际等待是基准加一段抖动，抖动落在 `[0, 基准/2]`，所以第 n 次等待落在 `[基准, 1.5 × 基准]`，最长 90 s。起点 500 ms 与封顶 60 s 都是对端的尺度（一次过载的恢复时间），与所在机器的快慢无关，故不从机器的测量推导。落选的是「由调用层给 `until`」：调用层手里只有当前时刻，而 `gateway` 里并没有持 retry-after 的准入状态，结果是 `until` 恒等于「现在」，重试不隔一刻。**连续的计数在 provider 作答时归零**（`on_provider_answered`，`drive` 在每个走完的回合后调用）：一个已经恢复的 provider 不欠下一次故障一分钟的首等，而对重试的上限是对「同一个调用再问一次」的上限，不是对整个 Run 一生碰上几次故障的上限。`provider_failures` 仍是这个 Run 的总数，只作观察。**对端说了等多久时，等的是两者中较长的那个**：`until = now + max(退避表, AxError::retry_after_ms)`。对端的 `retry-after` 是它对自己何时恢复的陈述，早于它再问只会再收一次 429；退避表仍是下限，因为一个说「1 秒后」的对端连续失败时，连续计数照样该拉长间隔。对端给的等待不设上限：它可以很长，而停下一个在等的 Run 的是 `Halt`，`watchdog_fired` 里的 `until_ms` 让人看见它在等什么。**抖动以 `RunId` 为种子，同一个 Run 永远得到同一串等待。** 同一时刻被同一次故障打断的多个 Run 若按同一张表等待，会在同一毫秒一齐再问，把刚恢复的对端再压垮一次；抖动把它们错开。种子是 `RunId` 的 16 字节经 FNV-1a 折叠，与连续计数一起过一遍 splitmix64 的收尾混合，再对 `基准/2 + 1` 取余；不取随机源，因为一个 Run 的历史要能逐字节重放（citysim 与离线重放读的是同一张表），而 uuid v7 的末 74 位本身就是随机的，已经把同一毫秒启动的 Run 分开。抖动只往上加：退避表仍是下限，`retry-after` 取两者较长的规则不变。落选的是往下抖（`[基准/2, 基准]`）：那样第一次等待可以短于 500 ms，而表说的是「至少等这么久」。
-- **可重试的失败只对着人设的那个上限冻住**（`Retries`）。`UntilHalted` 下停它的是 `Halt`，城里唯一的刹车；`AtMost(n)` 下停它的是人在端点表单上填的那个数。**这两格是穷尽而不是一个带哨兵值的计数**：「一直试到有人喊停」与「试四次」是两种意图，一个数字拼不出前者。填进表单却没有任何东西去读的数字，比根本不给这个字段更糟——`request_max_retries` 此前正是如此，而 `Watchdog` 本身在生产代码里连一个调用方都没有。
+- **可重试的失败只对着人设的那个上限冻住**（`Retries`）。`UntilHalted` 下停它的是 `Halt`，城里唯一的刹车；`AtMost(n)` 下停它的是人在端点表单上填的那个数。**这两格是穷尽而不是一个带哨兵值的计数**：「一直试到有人喊停」与「试四次」是两种意图，一个数字拼不出前者。填进表单却没有任何东西去读的数字，比根本不给这个字段更糟，所以 `request_max_retries` 的读者就是 `Watchdog`，而它的调用方是下一条的 `drive`。
 - **`runtime::run::drive` 是那个调用方**：一次可重试的失败写一条 `watchdog_fired` 再重来，于是历史里第二条 `model_called` 就是人读到的那次重试，而不是一次无声的重复。节奏归 `Watchdog` 的退避表：`drive` 先把 `Watchdog` 给的 `until` 写进 `watchdog_fired`，再交给 `RunHooks::wait` 等到那一刻，于是历史许诺的「不早于 `until_ms`」与下一条 `model_called` 一致。**等待是 `Halt` 够得着一个没有回合在飞的 run 的地方**：`wait` 答 `Halted` 时 run 以 `Cancelled` 冻住，不再发下一次调用。落选的是「等完再问 `interrupt`」：退避长到一分钟，一个晚一分钟才生效的刹车不是刹车。装配层的 `wait` 以 50 ms 为片睡到 `until`，每片问一次是否停下；等待中到达的 steer 留到下一个安全点，不在等待里被吞掉。计数时钟（citysim、离线重放）答 `Allowed` 且不等，因为它重放的东西不在真实时间里等待。
-- **为什么删掉 `WATCHDOG_PROVIDER_RETRIES=2`。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。`retriable` 是产错处已经知道的事实（默认 false，fail-closed），拿它分类比在这里重新猜一遍强。
-- **`ProviderExhausted` 改名 `ProviderRefused`。** 既然没有重试预算了，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。载荷里的 `reason` 字串同改为 `provider_refused`。
-- fired_payload 的形状由 `kernel::event::record::WatchdogFired`（kernel-SPEC §8-4）独家拼出：`drive` 此前对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，于是一份历史里有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
+- **为什么按 `AxError::retry` 分类而不设固定次数。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。能否再试是产错处已经知道的事实（`Retry`，fail-closed），拿它分类比在这里重新猜一遍强。
+- **冻结原因叫 `ProviderRefused`**（载荷 `reason` 为 `provider_refused`）：没有重试预算，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。
+- fired_payload 的形状由 `kernel::event::record::WatchdogFired`（kernel-SPEC §8-4）独家拼出：`drive` 若对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，一份历史里就有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不是一个阀值。
 
 ### 8-10 runtime::clock（形状 1；纯格式化不采样）
 
@@ -552,11 +560,11 @@ pub struct Catalog { /* tools: BTreeMap<ToolName,…>、skills: BTreeMap、mode:
 impl Catalog {
     pub fn new() -> Catalog;
     pub fn admit_tool(&mut self, meta: &ToolMeta) -> Result<(), AxError>;      // disclosure 非空；重名＝E_INVALID_ARGS
-    pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 只收阅览室准入者（准入求值归 city::policy，P1；调用方直供）
+    pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 只收阅览室准入者（装配层按楼的 city::policy 规则求值后直供）
     pub fn set_mode(&mut self, mode: Mode);                                    // 只列本 Run 所处者
     pub fn render(&self) -> String;              // Resident 段的 catalog 部分：段头一行自述＋一行一件；BTreeMap 序恒定
     pub fn tool_defs(&self) -> Vec<ToolDef>;     // ChatRequest.tools 的唯一来源
-    pub fn expand(&self, name: &str) -> Option<&str>;   // 第二级披露（怎么用）
+    pub fn expand(&self, name: &str) -> Option<Expansion>;   // 第二级披露（怎么用），§8-6
     pub fn skill_pins(&self) -> Vec<SkillPin>;   // 本 Run 拿到了哪几份，当时各是什么字节
 }
 ```
@@ -564,13 +572,11 @@ impl Catalog {
 - **`hash` 是 `Option`，而那个 `None` 不是「没算」**：目录里另有两类条目的正文由本构建自己握着（mode 的纪律、dev 那一条），它们背后没有一份能在无人看着时改掉的文档。
 - **pin 从 catalog 取，不重扫一遍书架**：catalog 已经是「本 Run 能够到什么」的权威，再扫一次就是在另一个时刻对同一个问题给第二个答案。
 
-**`render()` 与 `set_mode()` 接线**。它们写下之后就**一个生产调用者都没有**，只有自己的测试在调。后果不是「少了一行文字」：工具走 `ChatRequest.tools` 到得了模型，而**阅览室准入的 SKILL 与本 Run 所处的 mode 从未到达任何模型**——`city::library` 的准入判定因此是一道没有下游的门。
+**`render()` 与 `set_mode()` 的生产调用者是装配层的 prefix 组装**。工具走 `ChatRequest.tools` 到达模型；没有 `render()`，**阅览室准入的 SKILL 与本 Run 所处的 mode 就到不了任何模型**，`city::library` 的准入判定就是一道没有下游的门。
 
 接法：`Catalog::render()` 追在 `identity.segment_bytes()` 之后，合成 Resident 段。**不另开第五个槽**：一个居民能够伸手取到什么，与它是谁同属一类常住事实，且两者都随 Run 冻结，故前缀在整个 Run 的寿命里仍可缓存。装配层因此把 prefix 的组装移到目录建好之后。
 
-**实测（一次真机派活）**：Resident 段 106 B → 1,176 B，差额 **1,070 B**（八件工具加一个 mode）。同一份派活下，模型被问「你被告知了哪些能力」时逐个点名 `archive, edit, exec, goal, plan, pr, signal, status`——其中 `plan` 就是 mode 的那一条，它此前从未被任何模型看见过。
-
-**第二级披露今天仍不可达，原因写在这里而不是留给人撞**：SKILL 的 `expansion` 是 `city::holding_address()` 给的一个地址，坐在**保留前缀 `.sprawling/` 下**，而本构建的工具台里**没有读文件的工具**（`edit` 只改不读）。故 `render()` 故意不印那个地址：叫一个模型去读它取不到的东西，比不告诉它更坏。补齐它需要一件读工具，那是一项新能力而不是一处缺陷修复。
+**第二级披露经 `read`**：SKILL 的 `expansion` 是 `city::holding_address()` 给的一个地址，坐在**保留前缀 `.sprawling/` 下**。`render()` 不印那个地址；模型按名字调 `read`，`read` 先查 catalog（§8-29），所以它不必知道、也读不到那个保留前缀下的路径。
 
 ### 8-12 runtime::mode（形状 6；dev 入口）
 
@@ -609,7 +615,7 @@ pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob)
 
 - 能力面＝wasip1 preopen 集（Mount 逐条）；无网络能力（WASI p1 天然无 socket 宿主实现——Python 臂禁网的机械保证）；fuel 上限即 Fuel（耗尽＝FuelExhausted，不是 Err：宿主无故障）。
 - 未授能力被拒的观察形：guest 内 open 失败→非零退出（Failure）；宿主恒不代 guest 隐藏失败。A10 三断言在真 wasmtime 上以手写 WAT 模块定形（不依赖 CPython 工件）；CPython-WASI 集成测试以环境变量指向工件（住机器本地的忽略目录，恒不入库），缺工件即 skip——`just check` 自足。
-**A10 三断言结论书**（证据＝`crates/runtime/tests/sandbox_a10.rs`，真 wasmtime 48.0.0，手写 WAT 不依赖任何外部工件）：
+**A10 三断言结论书**（证据＝`crates/runtime/tests/sandbox_a10.rs`，真 wasmtime（版本由 `Cargo.lock` 钉），手写 WAT 不依赖任何外部工件）：
 
 | 断言 | 观测形 | 结论 |
 |---|---|---|
@@ -619,10 +625,9 @@ pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob)
 
 - **无出网的机械形需精确化**：wasip1 **确有** `sock_send`／`sock_recv`／`sock_accept`／`sock_shutdown` 宿主实现（对非 socket fd 恒返 `ENOTSOCK`）；它没有的是**获得** socket 的途径——无 `sock_open`／`sock_connect`／`sock_bind`。故导入 `sock_connect` 的 guest 直接链接失败（`E_SANDBOX_DENIED`），而 guest 能拿到的每一个 fd 都来自 preopen（均为目录）。这才是 Python 臂禁网的准确依据。
 - **失败不得以默认值擦除**（rust-hardening Gate 5）：`try_into_inner()` 取不回管道、`get_fuel()` 报不出余量、退出码超 WASI 范围——三者均属**宿主故障**，恒返 `Err`；若以 `unwrap_or_default()`／`unwrap_or(1)` 兑成「空输出」「未耗尽」，就是把猜测冒充事实。
-- **代价实测**：开 `wasm` feature 后 runtime 依赖面由 71 个 crate 增至 257 个（+186）；debug 下 `libwasmtime_wasi.rlib` 单件 186 MiB。故 feature 内藏是必要的，非可选修饰。
-- 门的缺口：`just clippy` 取 `--all-targets` 而无 `--all-features`，故 feature 内藏的代码逃过零警告门。扩到 `--all-features` 要改 justfile，而 justfile 在 guard 辖区内。
+- **feature 内藏是必要的**：开 `wasm` feature 后 runtime 的依赖面增加一百多个 crate，debug 构建的 wasmtime-wasi 单件以百 MiB 计。`just clippy` 带 `--all-features`，所以内藏的代码同样过零警告门。
 
-- wasmtime 钉 48（2026-08 复核：含 GHSA-2r75-cxrj-cmph（path_open TRUNCATE 绕过，修于 44.0.2/45.0.0）与 CVE-2026-58494（hard-link/rename FilePerms 绕过，修于 45.0.3/46.0.1）两处修复——「钉版恒含权限绕过修复」的依据实例）。
+- wasmtime 钉 48（含 GHSA-2r75-cxrj-cmph（path_open TRUNCATE 绕过，修于 44.0.2/45.0.0）与 CVE-2026-58494（hard-link/rename FilePerms 绕过，修于 45.0.3/46.0.1）两处修复——「钉版恒含权限绕过修复」的依据实例）。
 
 **sandbox 增**：`AbsentSandbox` —— 未带执行引擎的构建在缝上的产品实现，逐次以 `E_TOOL_UNAVAILABLE` 拒并携替代臂。它存在的理由是**缺席要是一个判词而不是一个替身**：Echo 放在这个位置会对一个从未运行的 guest 回答「成功」，而第一个察觉的人是相信了那份输出的人。
 
@@ -665,12 +670,12 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 
 - **保证清单在类型上**：`Assurances` 逐轴五字段，每一臂的 `assurances()` 必须写满五轴，故新增一轴即四臂同时编译红——任何一臂都不会留下一个没人问过它的旧答案。`statement()` 由 `Assurances` 与 `Guarantee::phrase()`／`unkept()` 派生而非另写一段话，句子与类型因此不可能分家。
 - **选择是纯函数**：`choose` 取 `Offerings`——有 wrapper 即 `LinuxNamespaces`，否则 `CopiedTree`；scratch 根不可用即 `Unavailable { missing: ScratchDirectory }`。采样只有 `Offerings::this_machine()` 一处（`PATH`＋`std::env::temp_dir()`），两个 `detect()` 都只读它；测试用 `Offerings` 陈述一台机器而不是借一台。
-- **`WindowsJobObject` 本构建不构造，且拒而不降级**：`CreateJobObject` 是 workspace `unsafe_code = forbid` 在 `desktop/` 之外禁止的 FFI，runtime 的 `Cargo.toml` 也不在本改动的可写面内。以 `CopiedTree` 冒充它会对着一个开着网络的盒子回答「网络已关」，正是本模块存在的理由的镜像，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
+- **`WindowsJobObject` 本构建不构造，且拒而不降级**：`CreateJobObject` 是 workspace `unsafe_code = forbid` 在 `desktop/` 之外禁止的 FFI。以 `CopiedTree` 冒充它会对着一个开着网络的盒子回答「网络已关」，正是本模块存在的理由的镜像，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
 - **副本按命令一份、有界**：`place()` 把 `workdir` 复制进 scratch 根下的新目录，命令在副本里跑；`settled()` 在等待结束时删副本；交给 backlog 的后台命令由 `handed(id, …)` 记名、由 `reaped(&[Finished])` 在其成员报结时删；`Drop` 兜底。**删不掉不把命令判成失败**（与 `backlog/member.rs`、`collect()` 同一条判断：命令的收场是调用方应得的事实，一个临时目录只值磁盘）。界：`MAX_FILES = 100_000`、`MAX_BYTES = 256 MiB`、`MAX_DEPTH = 64`；越界**拒**并报出越过的那一对数字——半份副本会为一堆没带上的文件担保，而本模块的全部理由是防这个。`MAX_DEPTH` 同时终结自指链接造成的无底走查（链接按目标内容复制，因此指向树外的链接带进来的是内容而非一个通向人那棵树的入口）。
 - **`Mount`／`Fuel` 不沿用**：`Fuel` 是 wasmtime 指令计量、`Mount.guest` 是 guest 路径别名，二者 wasip1 专属。本模块保留的是**判断**（能力面＝能到达的路径集）而不是词形。宿主环境照旧不继承（exec 的 env allowlist 未动）；`SandboxJob.env` 的显式注入属 guest 面。
 - **placement**：调用参数 `where: sandbox|host`，缺省 `sandbox`。`host` 是「在原地跑」——它才是碰得到人那棵树的那一臂，故必须由调用方按名说出，也正是与 A-8 同一条纪律（默认引导先在沙箱里做，出沙箱才需要审批）里「需要审批」的那个动作。python 臂无 host 形（它是 wasip1 guest）：要宿主解释器走 program 臂。
-- **公开路径经 `runtime::tools`**：`confinement` 住 `tools/exec/`，`lib.rs` 不在本改动的可写面内，故 doctor 的依赖回报与工具自己的 disclosure 都从 `runtime::tools::{Confinement, Guarantee, Kept, Missing}` 读这一份定义。
-- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）、`the_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_settled_command_leaves_no_copy_behind`。
+- **公开路径经 `runtime::tools`**：`confinement` 住 `tools/exec/`，doctor 的依赖回报与工具自己的 disclosure 都从 `runtime::tools::{Confinement, Guarantee, Kept, Missing}` 读这一份定义。
+- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）；`crates/runtime/src/tools/exec/confinement/tests.rs` 的 `the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_sandbox_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_settled_sandbox_command_leaves_no_copy_behind`。
 
 **未决（§3 口径）**：副本是「一条命令一份」的直译，代价与工作树成正比；一棵带构建缓存的工作树会在每条命令上付一次复制。界内的取舍已定（越界拒而不是部分复制），但「一条命令一份」与「一个工具一份＋每命令同步」哪个对真正的工作树更合适，需要一次实测（一棵真实 room 的复制耗时与其命令数）才能定。
 
@@ -688,7 +693,7 @@ pub(super) fn one_level_down(Command) -> Command;
 - 失败：Unix 上 `nice` 自己总能起动，找不到的程序只会变成退出码 127 与 stderr 里的一行字，所以本模块在包 `nice` 之前先按 `execvp` 的找法（带分隔符的名字相对工作目录，裸名字沿核心的 `PATH`）确认程序是一个可执行文件，不是就返回 `E_TOOL_UNAVAILABLE`，动作与恢复同 backlog 的 spawn 失败（「check the program name, or use the shell arm」）。找不到 `nice` 本身时，spawn 在 backlog 里以同一个码报出。Windows 上不包外层，找不到程序仍在 spawn 处失败。Sandbox 放置下这一查找发生在宿主上，沙箱里看见的 `PATH` 若不同，结果以沙箱里的起动为准。
 - 证据：`crates/runtime/src/tools/exec/tests/yielding.rs` 的 `a_dispatched_command_runs_below_the_core`——同一条读自身优先级的命令，直接起动一次、经 exec 起动一次，断言后者的档位严格低于前者；Linux 臂 `a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level`——经 exec 起动的 `ionice` 读回自己的 IO 档位是 `best-effort: prio 7`。这一条只在 Linux 上编译与运行，先红与转绿都在合并火车的 Linux 任务里看到。
 
-**决定（M78，平台调用的取法）**：子进程的 CPU 优先级取第一档「安全 Rust」——`creation_flags` 与 `nice` 都是对外只给安全接口的现成路，不需要 Zig 叶子，也不需要 Lean 证明边界。**被否**：①起动后再对子进程调 `SetPriorityClass`／`setpriority`——要 FFI（`unsafe` 或 Zig 叶子），且子进程在改档之前已经以正常档跑了一段；②Unix 上用 `CommandExt::pre_exec` 调 `nice(2)`——`pre_exec` 本身是 `unsafe`。**重开参数**：Unix 主机上出现不带 `nice` 的受支持平台，或测得多包一层 `nice` 的起动开销占到一条命令墙钟时间的可见比例。
+**决定（平台调用的取法）**：子进程的 CPU 优先级取第一档「安全 Rust」——`creation_flags` 与 `nice` 都是对外只给安全接口的现成路，不需要 Zig 叶子，也不需要 Lean 证明边界。**被否**：①起动后再对子进程调 `SetPriorityClass`／`setpriority`——要 FFI（`unsafe` 或 Zig 叶子），且子进程在改档之前已经以正常档跑了一段；②Unix 上用 `CommandExt::pre_exec` 调 `nice(2)`——`pre_exec` 本身是 `unsafe`。**重开参数**：Unix 主机上出现不带 `nice` 的受支持平台，或测得多包一层 `nice` 的起动开销占到一条命令墙钟时间的可见比例。
 
 **逐 run 的 Job Object（`runtime::backlog::jobs`，形状 4 adapter）**：派出的命令起动之后，谁在吃内存要能归到派出它的 run，而一条 `cargo test` 真正吃内存的是它起的 `rustc` 与测试进程，不是 `cargo` 自己。所以 Windows 上每个 run 一个匿名 Job Object：`Backlog::run` 起动的子进程在登记进表的同一时刻装进它 owner 的 job（第一次装时创建），job 里的进程再起的进程由系统自动装进同一个 job，于是 job 的进程表就是这个 run 的整棵进程树。`Backlog::release(owner)` 丢掉这只 job 的句柄；job 不设 kill-on-close，丢句柄不杀进程，杀进程仍只归 `release` 与 `halt`。
 
@@ -703,7 +708,7 @@ impl Backlog { pub fn processes(&self) -> Result<BTreeMap<RunId, RunProcesses>, 
 - 每个进程的内存与 CPU 不在这里读：本 crate 不读平台计数（见下），由 sprawling 的 `bin::monitor` 按这里给出的 pid 去读。
 - 证据：`crates/runtime/src/backlog/tests.rs` 的 `a_run_owns_the_processes_its_commands_started`——一条经 `run` 转后台的命令，其 pid 出现在它 owner 的那一项里，别的 run 那一项里没有；Windows 上 `unfollowed` 为 0；`release` 之后这个 run 不再出现。
 
-**决定（M78、M91，job 的取法）**：Job Object 经 `win32job` 2.0.3（`Job::create`、`assign_process`、`query_process_id_list`，对外只给安全接口），本 crate 不写 `unsafe`；子进程的句柄经标准库的 `AsRawHandle` 取得。**被否**：①一整座城一只 job——分不出 run，而分解到 run 正是要它的原因；②只记直接子进程的 pid——`cargo`、`npm`、`sh -c` 这类命令自己几乎不占内存，读数会把一条吃掉几 GiB 的构建报成几 MiB；③`CREATE_SUSPENDED` 起动再装 job 再恢复——恢复线程要 FFI。代价：子进程从起动到装进 job 之间有一小段时间，那一段里它再起的进程不在 job 里（`cmd /C` 这类命令的第一个孙进程在这一段里起动的可能很小，但不为零）。**重开参数**：一个对外只给安全接口的 crate 能以挂起态起动子进程并在恢复前装进 job，或者读数显示 `unfollowed` 之外还有漏掉的孙进程。
+**决定（job 的取法）**：Job Object 经 `win32job` 2.0.3（`Job::create`、`assign_process`、`query_process_id_list`，对外只给安全接口），本 crate 不写 `unsafe`；子进程的句柄经标准库的 `AsRawHandle` 取得。**被否**：①一整座城一只 job——分不出 run，而分解到 run 正是要它的原因；②只记直接子进程的 pid——`cargo`、`npm`、`sh -c` 这类命令自己几乎不占内存，读数会把一条吃掉几 GiB 的构建报成几 MiB；③`CREATE_SUSPENDED` 起动再装 job 再恢复——恢复线程要 FFI。代价：子进程从起动到装进 job 之间有一小段时间，那一段里它再起的进程不在 job 里（`cmd /C` 这类命令的第一个孙进程在这一段里起动的可能很小，但不为零）。**重开参数**：一个对外只给安全接口的 crate 能以挂起态起动子进程并在恢复前装进 job，或者读数显示 `unfollowed` 之外还有漏掉的孙进程。
 
 **未决（§3 口径）**：核心线程升到正常档之上一级与空转安全阀在 sprawling-SPEC §8-93；派出进程的内存上限尚未落地，卡在一个事实上：`win32job` 2.0.3 对外只公开 job 的工作集上限（`limit_working_memory`，即 `JOB_OBJECT_LIMIT_WORKINGSET`，限的是常驻而不是提交量，按进程计），而在未提权的账户下设这一项被系统拒绝——`SetInformationJobObject` 返回 `ERROR_PRIVILEGE_NOT_HELD`（os error 1314，「客户端没有所需的特权」），普通账户的令牌里没有这一项要的特权，启用特权要 `AdjustTokenPrivileges`，是 FFI。于是这条路在普通账户上让每条派出命令都起动失败，或者静默不设上限，两者都不可取。作业级提交上限（`JOB_OBJECT_LIMIT_JOB_MEMORY`）不要特权，但设它的字段在 `win32job` 里是 crate 私有的，`process-wrap` 10.0.1 与 `windows-spawn` 0.1.0 也不设它。重开参数：一个对外只给安全接口的 crate 公开 `JOB_OBJECT_LIMIT_JOB_MEMORY` 或 `JOB_OBJECT_LIMIT_PROCESS_MEMORY`，或者这一处系统调用改走平台调用规则的第二档（Zig 叶子）。重命令共用的额度池尚未落地：池的大小由测得的核数与可用内存推出，哪些命令算重由城配置给默认表；可用内存的读数只在 sprawling 的 `bin::monitor::memory` 里读（sprawling-SPEC §8-94），由 `bin::assembly` 交给本 crate，本 crate 不读平台。内存紧时新 run 排队已在 sprawling-SPEC §8-46-3。
 
@@ -725,14 +730,15 @@ pub struct EditTool { /* city_root、writable: WriteDomain —— 私有 */ }
 impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Diff、temporal=Timeless */ }
 // new(city_root, addr, writable: WriteDomain)：writable＝该 Run 的写域（rules.write_domain()）。
 // 每次调用先判路径后碰盘：Address::parse 杀穿越（..／绝对路径／空段），WriteDomain::admits 杀域外与
-// reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。此前只有工具静态声明过门，
-// 模型选的 path 未经任何判定直接落盘——那是一个真漏洞，修在权威处而非 bench 里的第二份判定。
+// reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。工具静态声明的 Effect 只说它会写，
+// 模型选的 path 要在这里判——判定住权威处，而不是 bench 里的第二份判定。
 // args：{path, base_version, old, new}；version＝内容 B3Hash 前 16 hex；check_base 拒即 E_VERSION_CONFLICT；
 // old 必唯一命中（零命中／多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff＋new_version（逐次 diff 即回档粒度）
 
 // tools/read.rs —— 一个参数，两条路
-pub struct ReadTool { /* city_root、catalog: Rc<RefCell<Catalog>> —— 私有 */ }
-impl ReadTool { pub fn new(city_root: &Path, catalog: Rc<RefCell<Catalog>>) -> Result<ReadTool, AxError>; }
+pub struct ReadTool { /* city_root、catalog: Arc<Mutex<Catalog>>、bound、block_store —— 私有 */ }
+impl ReadTool { pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>, bound: ReadBound, block_store: &Path)
+    -> Result<ReadTool, AxError>; }   // bound 见 §8-29-1，block_store 见 §8-29-5
 impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render=Generic、temporal=Timeless */ }
 // args：{path}。先问 catalog，再当作地址。
 // 创建臂：base_version=="new"（16 hex 永拼不出，无碰撞）→ 文件必不存在（存在＝E_VERSION_CONFLICT 报真实版本），
@@ -742,12 +748,12 @@ impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render
 
 // tools/status.rs —— 十三字段
 pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode,
-    pub ctx_limit: Tokens, pub budget_usd: UsdMicros, pub budget_tokens: Tokens, pub trust: String,
+    pub ctx_limit: Tokens, pub trust: String,
     pub write_domain: String, pub locks: Vec<String>, pub worktree_path: String, pub worktree_disk: ByteLen,
-    pub signals_pending: u32, pub children: Vec<ChildStatus>, pub now: Option<ClockStamp>,
+    pub signals_pending: u32, pub now: Option<ClockStamp>,
     pub provider_mode: ProviderMode, pub neighbours: u32 }   // neighbours 在末尾，渲染序与声明序同一
 pub enum ProviderMode { Normal, Degraded, LocalOnly }
-pub struct ChildStatus { pub room: Address, pub kind: DelegateKind }   // 重塑
+pub struct ChildStatus { pub room: Address, pub kind: DelegateKind }
 pub struct StatusTool { /* snapshot＋ children: Box<dyn Fn() -> Vec<ChildStatus> + Send> ＋ backlog: Option<Backlog> */ }
 impl StatusTool {
     pub fn watching(snapshot: StatusSnapshot, children: Box<dyn Fn() -> Vec<ChildStatus> + Send>) -> Result<StatusTool, AxError>;
@@ -756,9 +762,9 @@ impl StatusTool {
 }
 impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timestamped、render=Generic；渲染序末尾追加 backlog 一行 */ }
 
-// ToolBench 住 turn.rs：按 Effect 过门是回合层职责，不另立 bench 模块。
+// ToolBench 住 runtime::bench（§8-3）：按 Effect 过门是回合层的次序，工具本身以 Box<dyn Tool> 递入。
 
-- **`children` 为何重塑**：旧形状 `{run, phase, ctx_used, ctx_lock}` 预设子已在跑。真实情形是子 Run 在父嚽结之后才开，故父自己那一跑里 **子既无 run id 也无上下文读数**——四个字段里三个只能填零，而零与未知是两件事。现形状只携得出口的两件：派到哪个房间、哪一类代理。
+- **`children` 只携地址与代理类别**：子 Run 在父嚽结之后才开，故父自己那一跑里 **子既无 run id 也无上下文读数**——四个字段里三个只能填零，而零与未知是两件事。现形状只携得出口的两件：派到哪个房间、哪一类代理。
 - **`ctx` 的用量为何现读**：快照在派发时冻结，那时还没有任何一次调用，冻结的用量只能是零，而且整跑都是零——一个照 City.md 去问 `status` 的模型会被告知窗口是空的。用量住 `ContextReading`：Run 每回合把 provider 报的 `input_tokens` 写进去，`status` 被调用时读出，所以报的是本跑最近一次已完成调用的计数。上限 `ctx_limit` 仍在快照里，因为它整跑不变。
 - **`neighbours` 追加在末尾而不插入到 `signals_pending` 旁边**：冻结序存在的理由是字段表增长时居民的习惯仍可迁移，而一次插入会把前十二行里的一半挪位。它只报**人数**不报名单：名单长度随人口增长，而 `status` 是一份定长文本（`render_children` 已为同一条理由被压成一行）；详情归 `neighbours` 工具，city-SPEC §8-15b。
 - **数的是人，不是地址**：一间没人站着的房间没有读者，把它计入会让 `neighbours: 3` 读起来像「有三个人可以说话」而实际上一个都没有。空房间仍然在工具的答案里，因为它对 delegate 与搬入是真信息。
@@ -804,15 +810,15 @@ pub struct ToolBench { /* route: kernel::tool::route::ToolRoute、domain: WriteD
                           taint: TaintSet、seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>、
                           prior_public_egress: bool —— 私有。`seen` 是「这把键答过没有、答了什么」的唯一一张表：键只在工具真正答过之后才写入，门拒/语法拒不留条目，故重试不算重放。 */ }
 impl ToolBench {
-    pub fn new(domain: WriteDomain, registry: Registry) -> ToolBench;
+    pub fn new(domain: WriteDomain) -> ToolBench;
     pub fn register(&mut self, tool: Box<dyn Tool>) -> Result<(), AxError>;
     /// Gate routing by declared Effect（收进回合层，executor 归还薄形）：
     /// exec 先 forecast（Suspected → **强制 checkpoint 先行**，见下）；Write → domain 门；
-    /// Egress → egress 门（target 由调用自报 host，不自报即 E_INVALID_ARGS）；Spend → 门已接但 P1 前无实例；
-    /// Spawn → delegation 门（恒 Escalate；granted 命中即放行，未命中即 Pending）；
-    /// Govern → govern 门（同形；提案正文由调用的 `text` 参数取，进 action_desc 供人过目）；
-    /// Deny → 以 refusal 作 tool_result 回流（不吞掉回合）；Escalate → BenchOutcome::Pending 回流（S3 无应答面）。
-    pub fn invoke(&mut self, call: &ToolCall, key: &IdemKey, ctx: &GateContext)
+    /// Egress → egress 门（subject 由工具从自己的参数读出）；Spend → 门已接，本构建无声明它的工具；
+    /// Spawn → 无门（派生深度是类型，`gate::spawn` 在派活处判）；Govern → 恒拒（run 不改写评判它的那些规则，
+    /// 规则在 CONFIG.toml 与楼的 RULES.toml 里由人改）；
+    /// Deny 与门的提问（E_APPROVAL_PENDING）都以 `Refused` 作 tool_result 回流，不吞掉回合。
+    pub fn invoke(&mut self, call: &ToolCall, key: &IdemKey, now: TimeMs)
         -> Result<BenchOutcome, AxError>;
     // invoke 是下面三段按序串起来的一条调用，三段各自公开，供并行的工具波分开用：
     /// 串行的放行：去重、各道门、exec 的 forecast fence。答得出的（重放、门拒、门问）当场答，
@@ -827,16 +833,15 @@ impl ToolBench {
     /// 并行波按调用序逐条调它，所以 `seen` 与 `taint` 的写入次序与串行波相同。
     pub fn account(&mut self, ticket: Ticket, answered: Result<ToolOutcome, AxError>)
         -> Result<BenchOutcome, AxError>;
-    // T15 预编译路由（A1）：名字→处理器由 `kernel::tool::route::ToolRoute` 在登记时排序一次，
+    // 预编译路由：名字→处理器由 `kernel::tool::route::ToolRoute` 在登记时排序一次，
     // 每次调用**一次**二分探测即得处理器（meta/subject/invoke 同一把借用）；
     // 被否：维持 BTreeMap 双探测（一次调用查两次＋每次探测的 String 分配——fx 反例的本仓对应物）。
     // 上面那句「按 Effect 过门」自己的名字住 `Doors`（domain/taint/sandbox/prior 四件同行值，
     // 自拥门判与失败形）：`None` 即此门已开，工具可跑；`Some` 即门已代这次调用给出答案。
     // 与 route 的同一把借用不相斥（字段级不相交借用），故一次探测服务整条链。
-    fn admit(&mut self, call: &ToolCall, name: &str, effect: &Effect, ctx: &GateContext)
+    fn admit(&mut self, call: &ToolCall, name: &str, effect: &Effect, subject: &GateSubject)
         -> Result<Option<BenchOutcome>, AxError>;
-    /// 一扇门的判定对本 bench 意味着什么。三处 Escalate 的「人已经允过的
-    /// cluster 不再问第二遍」原本各写一遍，现在只住这里。
+    /// 一扇门的判定对本 bench 意味着什么：Allow 放行，Deny 与 Ask 都是 `Refused`。
     fn settled(&self, outcome: GateOutcome) -> Option<BenchOutcome>;
     /// 同形：两处出网判定的「首次公开出网要记下来」只住这里。
     fn crossed(&mut self, outcome: EgressOutcome) -> Option<BenchOutcome>;
@@ -854,27 +859,17 @@ impl ToolBench {
     /// 条目要有 actor（问谁）与 artifact（看什么）；两者都不在一次工具调用里。
     /// 未给即拒（fail-closed）——一个人问不到的派生就是没人批准的派生。
     pub fn for_job(self, asking: Address, job: Locator) -> ToolBench;
-    /// A cluster the person already allowed. An escalation whose
-    /// cluster is granted runs instead of parking, which is what lets an
-    /// answer carry the work on rather than send it back to the door it
-    /// was just let through. Granted per **cluster**, because that is the
-    /// unit the person was shown and answered in.
-    ///
-    /// The caller folds these from `approval_resolved`; the bench does
-    /// not read history, because it runs inside a drive that owns the
-    /// ledger and a second reader of that would be a second answer.
-    pub fn grant(&mut self, cluster: ClusterKey);
 }
 ```
 
 - L0 三件恒列 prefix（City.md 只放这一级）；catalog 只收 L2——L0 不进 catalog（名字即文档）但 tool_defs 恒含三件（wire 面要 schema）。
 - **否决「Suspected → Discard 门」**：它与 kernel 既有设计冲突，以 kernel 为准。理由：`DiscardRequest` 只有 `Planned`／`Unplanned` 两变体，而 `decide` 对 `Unplanned` **恒判 Deny(NoRestoration)**——把 forecast 的预判包成 Unplanned 送进门，等于让任何含 `rm ` 的 exec 调用全被拒。`kernel::discard` 的注释早已写明正确意图：「text prediction is obfuscatable by design — hits route conservatively, and the git checkpoint net (S3) is the honest backstop」。故 **Suspected 不拒而围栏**：强制 `checkpoint.wave_pre` 先行再放行，删掉的东西因而可回档；**无 checkpoint 网时才拒**（`E_TOOL_UNAVAILABLE`），因为「无保护地跑」是唯一没人选择的结局。此路由使 A14 的先行半链在 exec 臂上机械成立。
 - ToolBench 持 `Option<Checkpoint>` 具体类型而非新 trait：checkpoint 只有一个实现，为尚不存在的第二实现引缝会造空抽象（AGENTS.md：trait 只在已有第二实现的缝上引入）。
-- **`BenchOutcome` 去掉 `#[non_exhaustive]`**：它是判定输出，两个下游各背着一条永不执行的 `_ =>`，而那正是 §7「新增一种答案而不回答它就不编译」要护的东西。收口是编译红：摘掉属性即得两条 `unreachable pattern`（citysim 一条、sprawling 一条），`-D warnings` 下即错，删掉它们才绿。下游从此必须穷尽匹配四臂。**G-22（叶子 7.10）把这一条推到全库**：本 crate 再无 `#[non_exhaustive]`，`Interrupt`／`Disposal`／`FreezeReason`／`Mode`／`SandboxExit`／`ProviderMode`／`SafePoint`／`Level` 八个枚举同期撤下，`clock.rs` 与 `bench/admit.rs` 的三条通配臂随之删除。
-- **三条规则各回到一处**：`invoke` 曾为 246 行，是 `length` 门报出的两个对象之一。拆它时量到三处重复：① `GateOutcome::Escalate` 的「granted 命中即放行」写了**三遍**（Write／Spawn／Govern）；② `EgressOutcome` 的「首次公开出网要记下来」写了**两遍**（Connector／Egress）；③ `serde_json::to_vec` 扫描参数写了两遍。三条都是规则而不是巧合：一份人给过的允许在三个地方各有一份实现，就是三个可以各自漂走的权威。归位后：`settled` 一处、`crossed` 一处，`admit` 成为那个 `match &effect` 自己的名字。尺寸 246 → 65（`admit` 139、`settled` 11、`crossed` 13）。行为逐字不变，公开面不变。
-- `BenchOutcome` 四态：`Ran{outcome, fenced}`（fenced 携围栏 oid，供波后补记）／`Refused{refusal}`（回流不终止回合）／`Pending{item}`／`Duplicate`。dedup 先于任何副作用；**key 在工具答过之后才记入 `seen`**，故被门拒的调用重试不算重放。**判重是 `seen` 上的一次 O(log n) 查找**，不抄键、不另立一张「领过权」的集合：第二张集合记的是 `seen` 键集的同一个事实，两份拷贝迟早分叉。工具按 `ToolName` 登记，`invoke` 以调用自带的名字查表，路由一次调用不分配。
+- **`BenchOutcome` 穷尽**：它是判定输出，下游必须穷尽匹配三臂——新增一种答案而不回答它就不编译（§7）；本 crate 的枚举全部如此，没有 `#[non_exhaustive]`，也没有通配臂。
+- **三条规则各有一处**：`GateOutcome` 对本 bench 意味着什么只住 `settled`（Allow 放行、Deny 与 Ask 都以 `Refused` 回流），「首次公开出网要记下来」只住 `crossed`，参数的秘密扫描只序列化一次；`admit` 是那个 `match effect` 自己的名字。一份规则在几处各有一份实现，就是几个可以各自漂走的权威。
+- `BenchOutcome` 三态：`Ran{outcome, fenced}`（fenced 携围栏 oid，供波后补记）／`Refused{refusal}`（回流不终止回合；门的提问也走这一臂）／`Duplicate{outcome}`。dedup 先于任何副作用；**key 在工具答过之后才记入 `seen`**，故被门拒的调用重试不算重放。**判重是 `seen` 上的一次 O(log n) 查找**，不抄键、不另立一张「领过权」的集合：第二张集合记的是 `seen` 键集的同一个事实，两份拷贝迟早分叉。工具按 `ToolName` 登记，`invoke` 以调用自带的名字查表，路由一次调用不分配。
 - status 的 result 是**按冻结序渲染的文本**而非 JSON 对象：`serde_json::Map` 对键排序，JSON 对象没有读者可依赖的序，「冻结序」会悄悄变成字母序。序是「模型读到的东西」的属性，故落在模型读到的地方。
-- 注意无 Egress／Spend 工具实例（出网代理 P1）：两门路由代码落地以测试替身驱动，接线台账仍记「计划内待接」至真实例出现。
+- 声明 `Egress` 的生产工具是浏览器工具（`bin::browser_tool`）；声明 `Spend` 的工具本构建没有，那扇门以测试替身驱动。
 
 ### 8-15 runtime::run（形状 5 typestate 机；**run 事件序的唯一权威**）
 
@@ -889,24 +884,30 @@ pub struct RunPlan {                 // 一个 Run 的全部常量，调用方�
     pub parent: Option<RunId>,                            // 派活给它的那个 Run
     pub predecessor: Option<RunId>,                       // 把这场活交给它的前任，深度守恒
     pub dispatched_by: Who,                               // 由谁派来，写进 run_started 的 dispatched_by
+    pub inherited: Vec<ChatMessage>,                      // 分支开场继承的那段对话（§8-2），不是分支则空
     pub shape: CallShape,
+    pub second_threshold: Option<SecondThreshold>,        // 上下文提醒的第二级（§8-34）
+    pub context: ContextReading,                          // 这一跑的上下文读数，status 与提醒现读它
     pub prefix: FrozenPrefix, pub policy: BuildingPolicy, pub tools: Vec<ToolDef>,
     pub skills: Vec<SkillPin>,                            // 阅览室准进了什么，当时各是什么字节
+    pub retries: Retries,                                 // 人在端点上设的重试上限（§8-9）
 }
 ```
 
 - **没有 `budget_turns` 与 `budget` 两栏**：回合上限与花销天花板都不存在，一跑循环到它自己结束为止；停一件正在跑的事是 `Cancel`，停一片是 `Halt`。
-- **`skills` 写进 `run_started` 载荷，且无条件写**（空则空数组），理由与当年 budget 两栏同一条：一个时有时无的 key 是一个读者得猜的形状，而「这栋楼一个都没准进」本身就是一件值得记下的事。进账本而不只留在进程里，是因为「它变了没有」需要一个**早一次的读取**，而进程一走就只剩账本说得出这一轮到底拿到了哪些字节。
+- **`skills` 写进 `run_started` 载荷，且无条件写**（空则空数组），理由：一个时有时无的 key 是一个读者得猜的形状，而「这栋楼一个都没准进」本身就是一件值得记下的事。进账本而不只留在进程里，是因为「它变了没有」需要一个**早一次的读取**，而进程一走就只剩账本说得出这一轮到底拿到了哪些字节。
 
 pub enum SafePoint { BeforeAssemble{turn:u32}, BeforeCall{turn:u32}, BeforeWave{turn:u32}, BeforeSpawn{turn:u32} }
 pub enum Advance { Turned, Concluded(Completion) }        // 穷尽；新结局逼每个调用方表态
 
-pub struct RunHooks<'a> {            // 四个闭包，不是四个 trait：本模块只有一个消费者形式
+pub struct RunHooks<'a> {            // 闭包，不是 trait：本模块只有一个消费者形式；invoke 除外
     pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,        // 时间入参，本模块恒不采样
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,       // 安全点由我定，信号由你答
     pub fence: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,  // 波前 checkpoint
+    pub writes: &'a dyn Fn(&ToolCall) -> Writes,                    // 这条调用会不会写（§8-45）
     pub invoke: &'a mut dyn ConcurrentInvoke,   // 一波的工具，三段（§8-3）；回合时间戳随 admit 行
     pub wait: &'a mut dyn FnMut(TimeMs) -> NextCall,               // 等到 Watchdog 给的 until；途中来了 Halt 就立刻答 Halted
+    pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,      // 说到一半的话往哪去（见本节末「RunHooks 的 deltas」）
 }
 
 impl Run<Active> {
@@ -920,16 +921,13 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
              hooks: &mut RunHooks<'_>, handoff: &Handoff) -> Result<Run<Frozen>, AxError>;
 ```
 
-- **为什么要这个模块**：「Dispatch → N 回合 → 冻结」的事件序先前只存在于 `citysim::executor`。真城再写一遍就是两个权威，而两者一旦漂开，**仿真继续绿而真城错**——仿真的全部价值恰好建立在它跑的是同一份代码上。故 citysim 改为本模块的调用方，23 剧本从此直接验证生产回路。
-- **`run_started.parent`**：只在派生开的 Run 上出现。父子关系先前只存在于「两行相邻」这个巧合里，而相邻不是一个可查询的事实；写进载荷之后，前端折得出树，离线重放也折得出同一棵树。
-- **`run_started.usd_micros` 与 `run_started.tokens`**：一跑被派出去时的花销天花板。写它与写 `parent` 同理——**一个进程死后，「这跑当时允许花多少」只剩账本能回答**。先前它只活在装配层的一个局部变量里，于是一跑因待批而停下、被批准后续上的那一跑天花板归零（sprawling-SPEC §8-23 查出、§8-25 修复）。两个键是 `u64` 整数，符合确定性第六条；`fixtures/golden-p0` 随之重生（`GOLDEN_WRITE=1`），这是它存在的用法。
-- **时间纪律**：dispatch 采两次（checkpoint、run_started），每回合一次；**自然结束与预算耗尽时 freeze 再采一次**，handoff 用它、run_frozen 用它＋1（两行同一件事，不值两次采样）；**取消时 freeze 沿用被打断那个回合的时间戳**，因为这次冻结属于那个回合而不是一件新事。三条合起来使一个计数器闭包（citysim）与一个壁钟闭包（真城）在同一驱动下各自正确。
+- **为什么要这个模块**：「Dispatch → N 回合 → 冻结」的事件序只有这一处。citysim 与真城各写一遍就是两个权威，而两者一旦漂开，**仿真继续绿而真城错**——仿真的全部价值恰好建立在它跑的是同一份代码上。故 citysim 是本模块的调用方，每个剧本直接验证生产回路。
+- **`run_started.parent`**：只在派生开的 Run 上出现。「两行相邻」不是一个可查询的事实；写进载荷之后，前端折得出树，离线重放也折得出同一棵树。
+- **时间纪律**：dispatch 采两次（checkpoint、run_started），每回合一次；**结束时 freeze 再采一次**，handoff 用它、run_frozen 用它＋1（两行同一件事，不值两次采样）；**取消时 freeze 沿用被打断那个回合的时间戳**，因为这次冻结属于那个回合而不是一件新事。三条合起来使一个计数器闭包（citysim）与一个壁钟闭包（真城）在同一驱动下各自正确。
 - **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
-- **第四种结束：回合中途的失败。** 上一段那句「无第二条退路」先前在代码里不成立：`drive` 的错误臂只对带 `Carrier::Event` 的码写载体事件并冻结，对 `Carrier::Loadtime` 的五个码直接 `return Err`，**那次 run 被丢掉、账本上只剩 `run_started`**。实测：ModelScope 的流式 tool_call 拼接缺陷令每次派活死于 `E_WIRE_MISMATCH`，重启后 `city_view` 仍报那次 run `frozen: false`，页面于是把每条消息都当 `steer` 发而被拒。**两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件。** 理由：`Loadtime` 原先的理由是「账本自身就是受害者时，没有什么真实的东西可写」——这对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立：供应方把兑换格式写错与账本健否无关。而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抩——这比预先判定「写不进去」更诚实。冻结后**原错误仍然向上抩**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
-- **Window 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
+- **第四种结束：回合中途的失败。** **两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件**：带 `Carrier::Event` 的码先写载体事件，`Carrier::Loadtime` 的码直接冻结。理由：「账本自身就是受害者时，没有什么真实的东西可写」对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立——供应方把兑换格式写错与账本健否无关；而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抛，这比预先判定「写不进去」更诚实。一次没有冻结的 run 在账本上只剩 `run_started`，重启后仍报 `frozen: false`，页面就把每条消息都当 `steer` 发。冻结后**原错误仍然向上抛**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
+- **Conversation 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
 - **闭包而非 trait，`invoke` 除外**：`now`／`interrupt`／`fence`／`wait` 的第二实现尚不存在，而本库的纪律是 trait 只在已有第二实现的缝上引入；`invoke` 是 §8-3 的 `ConcurrentInvoke`，它的第二实现已在缝上。`RunHooks` 自身只是引用的容器，不持策略。
-- **字节不变是验收标准**：同一堆剧本、同一份 `fixtures/golden-p0`，换了驱动实现而字节不动——这才能证明“提取”是提取而不是重写。
-
 ### 8-16 runtime::digest（形状 1 判定＋形状 2 值类型）
 
 ```rust
@@ -964,7 +962,7 @@ pub fn digest_once(text, origin, breaker, cached: &mut dyn FnMut(&B3Hash) -> Res
 pub enum Level { Refuse, Effect, Decide, Trace, Wire }  // 全序：层底控到该级为止
 impl Level { pub const DEFAULT: Level = Effect; pub const ALL: [Level; 5]; pub fn parse(&str) -> Option<Level>; }
 pub struct Site<'a> { pub run: RunId, pub seq: Seq, pub module: &'a str }   // 三字段必填
-pub type Sink = Box<dyn FnMut(&str) + Send>;
+pub type Sink = Box<dyn FnMut(Entry<'_>) + Send>;   // 一条 entry，不是一行文本（§8-38）
 pub struct Diagnostics { /* floor: Option<Level>、sink —— 私有 */ }
 impl Diagnostics {
     pub fn new(floor: Level, sink: Sink) -> Diagnostics;
@@ -978,17 +976,17 @@ impl Diagnostics {
 ```
 
 - **无读方法即全部形状保证**：「判定与恢复逻辑不读日志」不靠纪律，靠这一点——把一行读回来在类型上拼不出。推论就是收口条件：删光日志，行为、重放与总账逐字节不变。
-- **行上恒无时间戳**（与 `docs/logging.md` 早期口径的差异，已回写该文）：锦点是 `seq`——两条时间线靠一个整数对齐，而采样壁钟会在一个不允许采样的库里开第二个时间源。想要时间的 sink 在装配层自己加。
+- **行上恒无时间戳**：锚点是 `seq`——两条时间线靠一个整数对齐，而采样壁钟会在一个不允许采样的库里开第二个时间源。想要时间的 sink 在装配层自己加。
 - **坐标由 Ledger 自己说**：`memory::JsonlLedger::position()`（返回「现在写一条会落在哪」）。只给位置不给内容：一个能读记录的访问器会把判定逻辑引到它正在写的账上去。
 - **双重防线**：`Sealed` 无 Debug/Display，入行在类型层就不成立（反例 `tests/ui/log_a_credential.rs`）；普通字符串里的明文由 `redact::redact_text`——**同一个**扫描器与**同一份**替换实现，不是第二个——就地换成 `secret:redacted`（`Marker::Plain`）。不丢整行：周围那句话通常正是读者要的。
-- **不引 `tracing`**：它在此处的唯一功能是跨 `await` 携模块名的 span，而回合路径是同步的，该功能今天无消费者。理由已回写 `docs/logging.md` §7。
+- **不引 `tracing`**：它在此处的唯一功能是跨 `await` 携模块名的 span，而回合路径是同步的，该功能无消费者。理由见 `docs/logging.md` §7。
 - **写入方三处**（§6 的三类各一）：命令被拒（`refuse`，写在 `handle` 而非调用方，因为每个调用方都要）；endpoint 附着与探测结果（`effect`）；dispatch 跑完（`effect`，作为指向 Ledger 的指针）。
 
 ## 8.5 两个设计
 
-**第二对（S2，turn 侧）**：中断作相变入参（选中）vs 独立 `cancel()` 方法。后者表面更直观，但 cancel 方法可在任意持有点被调＝相内中断可表示，A9 退化成时序约定；选中方案把边界快照做成相变函数的形参，相内无入口，结构即断言。代价：调用方每相必须显式给 Interrupt（哪怕 None）——这个啰嗦是刎意的：它迫使执行器在每个边界问一次信号面。
+**turn 侧**：中断作相变入参（选中）vs 独立 `cancel()` 方法。后者表面更直观，但 cancel 方法可在任意持有点被调＝相内中断可表示，A9 退化成时序约定；选中方案把边界快照做成相变函数的形参，相内无入口，结构即断言。代价：调用方每相必须显式给 Interrupt（哪怕 None）——这个啰嗦是刎意的：它迫使执行器在每个边界问一次信号面。
 
-**首对（S1）：fork 消费 VerifiedLedger**（CLI 的 `fork` 与 `prefix` 仍如此；分支的对话重建只有 `inherited_indexed` 一扇门，理由见 8-2：账本唯一的写者打开账本时已验过，再验一次整链只为读一条 run 的几行，代价随历史长度增长）——分叉前必先验链，类型上把「从未验证的序列分叉」做成不可表示；分叉正确性与重放正确性因此是同一条断言。
+**fork 侧：fork 消费 VerifiedLedger**（CLI 的 `fork` 与 `prefix` 仍如此；分支的对话重建只有 `inherited_indexed` 一扇门，理由见 8-2：账本唯一的写者打开账本时已验过，再验一次整链只为读一条 run 的几行，代价随历史长度增长）——分叉前必先验链，类型上把「从未验证的序列分叉」做成不可表示；分叉正确性与重放正确性因此是同一条断言。
 **B（落选）：fork 直接吃原始行**（`prefix(lines: &[Vec<u8>], at_seq)`）——少一次验证成本，但打开「对损坏历史分叉」的路径，且 at_seq↔行号对应要自行重解 envelope＝第二解析权威。落选理由：验证成本 O(n) 在分叉频率下可忽略，而不变量 14（citysim 检查器）需要的正是 A 的类型保证。另 `verify_dir` 命名族落选：与 `verify_ledger_dir` 二选一，取后者（dir 一词泛滥易撞 S3 worktree 面）。
 
 ## 9 工作流程
@@ -1005,9 +1003,9 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 ## 12 Decisions
 
-- 恢复层不造码（§8-44）：恢复段的失败恒是它拿到的那个类型化错误，可定义性随原码走；该层改变的只是「同样的请求再发一次」与「换一扇门再问一次」之间的选择。
+- 恢复层不造码（§8-49）：恢复段的失败恒是它拿到的那个类型化错误，可定义性随原码走；该层改变的只是「同样的请求再发一次」与「换一扇门再问一次」之间的选择。
 
-- `E_INVALID_ARGS`（at_seq 越界）：不可定义掉——「从已冻结 Run 最后事件之后分叉」是用户可达输入（§19.1 点名）；静默夹取是被明拒的替代。
+- `E_INVALID_ARGS`（at_seq 越界）：不可定义掉——「从已冻结 Run 最后事件之后分叉」是用户可达输入；静默夹取是被明拒的替代。
 - `E_LOG_VERSION_UNSUPPORTED`（v 判向＋未知 kind 无 ig）：不可定义掉——数据比二进制长寿。
 - 链断/seq 洞/非规范字节：以 `E_CAS_CORRUPT` 报（存储完整性族；subject=行号与路径）——能否定义掉＝「介质位腐烂在设计边界外」，同 memory-SPEC §12。
 
@@ -1020,97 +1018,89 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 **被否**：保留字段与 `mint` 等将来接上——死机制照样要维护、要进公开面，而接上时的口径（谁写的、第几代）应由那时真实的摘要生产者决定，不是预先猜好。
 
 **重开参数**：出现一条把模型写的摘要放进前缀的生产路径时，重开本条，指纹随那条路径一起设计。
-### 12.1 定规：回合边界的压缩只在收尾边界换快照
+### 12.2 定规：回合边界的压缩只在收尾边界换快照
 - **决定**：一回合的 exchange 只允许在 `Turn<Recording>::record` 的收尾边界被压缩替换，时机是工具波全落地之后、一回合一次；判定由 `compaction::plan` 一处给出（8-44），`turn.rs` 不写任何阈值比较；`runtime::fork` 在同一边界重放同一判定。
 - **理由**：压缩若在波中换快照，它看见的是半截波，分组与 `fork` 的逐回合重建不同，同一历史会折出两种字节，分支与母亲分叉——这正是确定性回放（ARCHITECTURE §10）要排除的失败。收尾边界是这一波的唯一完整分组点。
 - **击败的备选**：①逐结果在波中压缩——分组随落地次序漂移，重放无法复现；②在 `turn.rs` 写一份阈值判断——「装不装得下」已经有一个家（`compaction::plan`），第二个家会各自漂移；③在边界把 `MustOffload` 的文本换成引用——这扇门没有 store，且城里没有工具解析得了引用，模型拿到的将是一条跟不上的指针，故该类文本原样保留、以 Ledger 为回路。
 
+### 12.3 定规：run 结束即终止它留下的后台命令
+- **决定**：`release(run)` 把这个 run 的命令改记为 `Nobody` 并终止它们，而不是让它们跑完（§8-28-1 第 4 条）。
+- **理由**：结束之后没有任何一次工具结果能把结局交给它；`Sandbox` 放置的命令跑在 `Confined` 的副本里，而那份副本在同一次 drop 里被删，让它跑下去等于让它对着一棵已删的树跑；一条无主命令留着的进程、句柄与临时目录是每个会话的边际内存。
+- **击败的备选**：让无主命令跑到自然结束、再把结局写成该 run 名下的一条账本事件——结局到达时已经没有读者，而事件表要为一件被选定不再发生的事多一种事件。
+- **重开的参数**：`Host` 放置成为后台命令的常态、且其对宿主树的副作用本身就是人要的产物时，run 的结束不再是「没人要」的证据，这条规则应重新论证。
+- **未决**：被终止的命令不在账本里留下一行：把「结束时终止了 N 条后台命令」写进账本需要 kernel 事件表多一种，归 kernel-SPEC 的事件表。
+
 ## 13 依赖选型
 
-kernel、memory（读面＋S3 增 cas 消费）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（S3 增：prefix golden）。
-S3 增：`wasmtime = "48"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
+kernel、memory（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
+`wasmtime = "48"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
 
 ## 14 硬编码声明
 
 无（行号计法与 recovery 文句不构成行为常量）。
 
-S3 增两处 pub(crate) 数据面（改须本 SPEC 同集；没有 `WATCHDOG_PROVIDER_RETRIES`，理由见 §8-9）：信封附件封顶 `ENVELOPE_ATTACH_MAX_BYTES=1024`（§8-7：附件与负载分账的断言界）；net_notice／truncation／offload 提示句三定句（ASCII，住 pipeline／offload 实现内，改句＝改入窗字节＝过本 SPEC）。
-8-44 增一项常量读取（值与理由住 `kernel::consts_policy`，本文件不复写）：`EXCHANGE_BUDGET_BYTES`——回合 exchange 的入窗预算，`compaction::exchange` 是唯一读者。
+两处 pub(crate) 数据面（改须本 SPEC 同集）：信封附件封顶 `ENVELOPE_ATTACH_MAX_BYTES=1024`（§8-7：附件与负载分账的断言界）；net_notice／truncation／offload 提示句三定句（ASCII，住 pipeline／offload 实现内，改句＝改入窗字节＝过本 SPEC）。
+一项常量读取（值与理由住 `kernel::consts_policy`，本文件不复写）：`EXCHANGE_BUDGET_BYTES`——回合 exchange 的入窗预算，`compaction::exchange` 是唯一读者。
 
 ## 15 影响面
 
-citysim 链检查器复用 verify_lines；bin `replay` 子命令接线；S2 prefix 重建器将消费 VerifiedLedger——接口定形，只加不改。
-S3：assemble 签名长入波及 citysim 执行器（同集更新）；kernel::model 增 canonical 类型波及 ScriptModel；ToolBench 收走 executor 门闭包（归还薄形）；E_TOOL_OUTCOME_UNKNOWN 补写面（replay 新增 dangling 检测）供 resume 路径消费。
+citysim 链检查器复用 verify_lines；bin `replay` 子命令接线；prefix 重建器消费 VerifiedLedger。
+citysim 是 `run::drive` 的调用方（§8-15），assemble 的签名变动波及它；kernel::model 的 canonical 类型波及 ScriptModel；ToolBench 持有全部门判；E_TOOL_OUTCOME_UNKNOWN 补写面（replay 的 dangling 检测）供 resume 路径消费。
 
 ## 16 测试与约束
 
 单测：五步各拒绝分支＋ig 跳过；fork 越界；fork_draft 载荷形。proptest：对任意合法 draft 序列（经内存 Ledger 物化）verify 恒过；任意单字节翻转恒拒。A2/A19 演示测试入 crates/runtime/tests/。约束：clippy 零告警。
-S3 增：A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）；A7 往返四断言；A18 零字节；watchdog 分级序；A10 三断言（feature `wasm` 下真 wasmtime＋WAT）；L0×失败注入矩阵（三臂×（正常／工具错／拒收））；ToolBench 门路由（Deny 回流／Escalate 回流／dedup 先于副作用）。
-8-44 增：`compaction::exchange::tests` 三例（预算内全保留；超预算回复按 `plan` 裁、结构化结果整块保留；份额随 exchange 大小走）；`turn/tests/compaction` 两例（收尾边界才换快照、波中达阈值按全波分组一次压）；`fork/tests` 一例（分支继承的是压缩后的 exchange）；citysim `compaction` 两例（波中达阈值账本全字节保留、同剧本逐字节重放）。
+A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）；A7 往返四断言；A18 零字节；watchdog 分级序；A10 三断言（feature `wasm` 下真 wasmtime＋WAT）；L0×失败注入矩阵（三臂×（正常／工具错／拒收））；ToolBench 门路由（Deny 回流／门的提问回流／dedup 先于副作用）。
+回合边界的压缩（§8-44）：`compaction::exchange::tests` 三例（预算内全保留；超预算回复按 `plan` 裁、结构化结果整块保留；份额随 exchange 大小走）；`turn/tests/compaction` 两例（收尾边界才换快照、波中达阈值按全波分组一次压）；`fork/tests` 一例（分支继承的是压缩后的 exchange）；citysim `compaction` 两例（波中达阈值账本全字节保留、同剧本逐字节重放）。
 
 ## 17 模型体验
 
-零字节：replay/fork 是离线设施；其产物（分叉 Run 的入窗历史）经 S2 prefix 组装间接入窗，本模块自身不产生任何 prefix 字节。
+入窗字节大半由本 crate 决定：prefix 四段与断点（§8-4、§8-6）、catalog 的 Resident 行与二级披露（§8-11）、工具结果的信封与压缩（§8-7、§8-27）、上下文提醒（§8-34）与回合边界的压缩（§8-44）。replay/fork 是离线设施，其产物（分叉 Run 的入窗历史）经 prefix 组装间接入窗，自身不产生 prefix 字节。
 
 ## 18 文档同步
 
-ARCHITECTURE §6 runtime 表随模块落地翻转状态；接线台账同 PR 登记；S3 完备化的「只加不改」取义见 §8-6（三不变量不动，相变入参按语义长入，消费者同集）；kernel-SPEC §8-23/§8-24 同集改；api-baseline 随每次公开面变更重算。
+模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 kernel-SPEC §8-23/§8-24 同一变更集；runtime 没有 api-baseline 文件，公开面即 `lib.rs` 的 `pub mod` 与根重导出。
 
-### RunHooks 多一个：说到一半的话往哪去
+### 8-15-1 RunHooks 的 deltas：说到一半的话往哪去
 
 ```rust
-pub struct RunHooks<'a> {
-    pub now: ...,
-    pub interrupt: ...,
-    pub fence: ...,
-    pub invoke: ...,
-    pub deltas: Option<&'a mut (dyn FnMut(&str) + 'a)>,
-}
+pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一个字段（§8-15）
 ```
 
-**`None` 是必要前提，不是缺省值。** 一个增量改变不了 run 的任何判断，所以「没人看」的驱动器就不向 provider 要流：`Turn::call` 在 `None` 时走 `Model::call`，字节与从前一模一样。citysim 与离线重放因此一字未改——**这是这条改动不碰确定性的全部理由**。
+**`None` 是必要前提，不是缺省值。** 一个增量改变不了 run 的任何判断：`Turn::call` 按 `Generating` 三臂选门——没人看（`Unwatched`）走阻塞门，有页面在读（`Watched`）走流式门，工具面要提前起跑只读调用（`Speculating`，§8-3）走推测门。citysim 与离线重放不看增量，所以增量不碰确定性。
 
 **它不返回 `Result`。** 增量不是判断：下游任何东西都不得据它分支，而一个能拒绝的 sink 会让一个显示细节有能力弄失败一次调用。
 
-**写进账本的那句话只从 `ModelReturn` 来。** `model_returned` 的载荷此前怎么写，现在还怎么写——增量恒不参与拼装它。于是「页面看到的」与「账本保存的」不可能出自对同一个回复的两次读法；流被切断表现为读取错误，永不表现为一个变短的回答。
+**写进账本的那句话只从 `ModelReturn` 来。** 增量恒不参与拼装 `model_returned` 的载荷。于是「页面看到的」与「账本保存的」不可能出自对同一个回复的两次读法；流被切断表现为读取错误，永不表现为一个变短的回答。
 
 **`Turn::call` 的 `'sink` 是显式命名的。** 调用方（`drive`）持有 sink 跨越整个 run 并把它交给每一轮；生命周期省略时，重借需要收缩 trait object 自己的生命周期，而 `&mut` 不允许。这不是风格，是这个签名必须显式的原因。
 
 ### 8-18 runtime::turn 目录化
-
-**919 行一个文件 → 334（`turn.rs`）＋44＋56＋100＋8＋109＋271＋81。** 切法是「测试迁出＋簇切」，逻辑一行未改，函数签名与公开面逐字节不变。
 
 | 文件 | 管什么 |
 |---|---|
 | `turn.rs` | typestate 载体 `Turn<S>` 与四个相类型，`assemble`／`call`／`record`，以及唯一的中断消费点 `consume_boundary`。`assemble` 与 `call` 带 `argument_count` 豁免，故留在原路径 |
 | `turn/boundary.rs` | 执行器在相变处交出什么、相变答什么：`Interrupt`、`PhaseOutcome`、`TurnCancelled` |
 | `turn/report.rs` | 一轮跑完交给 run loop 的东西与它被给定的调用形状：`TurnReport`、`CallShape` |
+| `turn/recovery.rs` | 模型调用的恢复管线（§8-49） |
+| `turn/prompt.rs` | 一次 run 的 prompt 材料 `RunPrompt`，`assemble` 的入参 |
+| `turn/speculation.rs` | 生成中起跑只读调用的门与缓存（§8-3） |
 | `turn/wave.rs` | 边界 3：`impl Turn<ToolWave>` 的工具波，只读前缀并行执行，按调用序入账 |
 | `turn/ledger.rs` | 本模块通往账本的唯一一道门：`Journal`、`Authored`、`Carried`（§8-41） |
 | `turn/tests.rs` | 纯索引 |
 | `turn/tests/helpers.rs` | 三处共用的夹具：`TestLedger`、`OneShotModel`、`prefix`／`run_id`／`shape`／`advance`／`probe_call` |
-| `turn/tests/phases.rs` | 四个边界跑在真账本链上（5 个 `#[test]`） |
-| `turn/tests/concurrent.rs` | 只读前缀并行：波内停下只起跑停点之前的调用，steer 落在串行波写它的位置，两者账本字节与串行一致（2 个 `#[test]`） |
-| `turn/tests/window.rs` | 开场白与 steer 在窗口里留下什么（3 个 `#[test]`） |
-| `turn/tests/redaction.rs` | 工具参数与工具结果里的密钥进不了账本，其余字段完好（2 个 `#[test]`） |
-
-**开放的字段（均为 `pub(super)`，仅供 `turn.rs` 构造）**：`TurnCancelled.refs`；`TurnReport.refs`、`TurnReport.model_returned`、`TurnReport.calls_made`、`TurnReport.assistant`、`TurnReport.wave_results`。构造点仍只有 `consume_boundary` 与 `Turn::<Recording>::record` 两处，getter 仍是唯一读法；`wave.rs` 不需要开任何字段，因为子模块本就能看见父模块的私有项。
-
-**api-baseline 重写了。** `Interrupt`／`PhaseOutcome`／`TurnCancelled`／`TurnReport` 的定义位置移进私有子模块后，`cargo public-api` 改印 `lib.rs` 的再导出路径（`runtime::TurnReport`），而非 `runtime::turn::TurnReport`。是同一项换了规范路径，不是公开面变化：`pub use turn::{…}` 与 `pub mod turn` 都没动，调用方一行 `use` 未改。
+| `turn/tests/phases.rs` | 四个边界跑在真账本链上 |
+| `turn/tests/concurrent.rs` | 只读前缀并行：波内停下只起跑停点之前的调用，steer 落在串行波写它的位置，两者账本字节与串行一致 |
+| `turn/tests/window.rs` | 开场白与 steer 在窗口里留下什么 |
+| `turn/tests/redaction.rs` | 工具参数与工具结果里的密钥进不了账本，其余字段完好 |
 
 ### 8-19 runtime::bench 目录化
 
-**740 → 254（`bench.rs`）＋215（`bench/admit.rs`）＋288（`bench/tests.rs`）。** 形状与 8-3 的 bench 行一致（形状 1 判定），三条必要前提次序未动。
-
 | 文件 | 管什么 |
 |---|---|
-| `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`grant`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_memory` |
+| `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_memory` |
 | `bench/admit.rs` | 门：`admit` 按 `Effect` 分派到 Write／Connector／Egress／Spawn／Govern 各门，`settled`／`crossed` 把一次判定翻译成 `BenchOutcome`，`scanned` 为两扇朝外的门备好密钥扫描的字节 |
-| `bench/tests.rs` | 去重、门、taint、fence 与注册冲突的夹具（8 个 `#[test]`） |
-
-**无字段开放。** 子模块本就能看见父模块的私有项，故 `ToolBench` 的字段一个都没动；唯一的可见性改动是 `fn admit` → `pub(super) fn admit`，因为它现在由父文件的 `invoke` 调用。
-
-**api-baseline 未重写。** 搬走的都是私有项，公开面逐字节不变。
+| `bench/tests.rs` | 去重、门、taint、fence 与注册冲突的夹具 |
 
 ### 8-20 runtime::replay 目录化
 
@@ -1120,79 +1110,47 @@ pub struct RunHooks<'a> {
 |---|---|
 | `replay.rs` | `VerifiedLine`／`VerifiedLedger`／`Envelope`，以及 `verify_lines`／`verify_ledger_dir`／`fold_ledger_dir`／`rebuild_prefix`。它同时是子模块的父模块，声明 `mod resume;` 并 `pub use resume::{dangling_tool_calls, outcome_unknown_draft};`，因此 crate 内外的 `use` 一行未改 |
 | `replay/resume.rs` | 崩溃恢复这一条规则的两次读法：`dangling_tool_calls` 认出结果未知的调用，`outcome_unknown_draft` 写下关掉它的那一行（`E_TOOL_OUTCOME_UNKNOWN`）。什么算悬空决定关帐行说什么，故同一个文件 |
-| `replay/tests.rs` | 离线验证拒绝什么：更高的 `v`、无 `ig:true` 的未知 kind、漂移的 prefix 源文档、悬空的 tool_called（5 个 `#[test]`） |
-
-**无字段开放。** `resume.rs` 经 `use super::{VerifiedLedger, VerifiedLine}` 读父模块的公开类型，`VerifiedLedger` 的私有字段一处也没放宽；`mod tests` 上原有的 `#[allow(...)]` 清单仍落在 `mod tests;` 声明上。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+| `replay/tests.rs` | 离线验证拒绝什么：更高的 `v`、无 `ig:true` 的未知 kind、漂移的 prefix 源文档、悬空的 tool_called |
 
 ### 8-21 runtime::prefix 目录化
-
-**546 → 391（`prefix.rs`）＋159（`prefix/tests.rs`）。** 只做测试迁出：四段构建与冻结前缀的生产代码本就在 400 行以内，不需要簇切，函数签名、类型与公开面一行未改。
 
 | 文件 | 管什么 |
 |---|---|
 | `prefix.rs` | `SegmentSlot`／`FrozenSegment`／`SourceDoc`／`SegmentCaps`／`PrefixPlan`／`FrozenPrefix`，以及 `build_prefix`／`build_segment`／`truncation_marker`／`DOC_JOIN` 与 `system_blocks`／`segment_hashes`／`prompt_payload` |
-| `prefix/tests.rs` | 冻结前缀保证什么：槽位次序、同输入同哈希、跨段去重与跳过入账、截断标记与字符边界、账本只记计划里的断点（8 个 `#[test]`） |
-
-**无字段开放。** 子模块本就能看见父模块的私有项，`mod tests` 上原有的 `#[allow(...)]` 清单原样搬到 `mod tests;` 声明上。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+| `prefix/tests.rs` | 冻结前缀保证什么：槽位次序、同输入同哈希、跨段去重与跳过入账、截断标记与字符边界、账本只记计划里的断点 |
 
 ### 8-22 runtime::tools::edit 目录化
-
-**522 → 335（`tools/edit.rs`）＋191（`tools/edit/tests.rs`）。** 只做测试迁出：乐观并发、写域双闸、创建臂与最小 unified diff 的生产代码本就在 400 行以内，不需要簇切，函数签名、类型与公开面一行未改。
 
 | 文件 | 管什么 |
 |---|---|
 | `tools/edit.rs` | `EditTool` 与 `version_of`／`CREATES`：`new` 的参数模式声明、`Tool::invoke` 的判定次序（工具身份→地址→写域→版本→匹配数→落盘），创建臂 `create`，以及 `unified_diff`／`common_prefix`／`common_suffix` |
-| `tools/edit/tests.rs` | edit 拒绝什么、回显什么：版本相符的落盘与 diff、陈旧版本、创建臂两种冲突、写域外与非法地址、缺文件的恢复话术、零次与多次匹配、错路由（9 个 `#[test]`） |
-
-**无字段开放。** 子模块本就能看见父模块的私有项，`mod tests` 上原有的 `#[allow(...)]` 清单原样搬到 `mod tests;` 声明上。
-
-**api-baseline 未重写。** 公开项 `EditTool`／`version_of` 的定义位置未动，规范路径不变。
+| `tools/edit/tests.rs` | edit 拒绝什么、回显什么：版本相符的落盘与 diff、陈旧版本、创建臂两种冲突、写域外与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
 
 ### 8-23 runtime::run 目录化
-
-**468 行一个文件 → 225（`run.rs`）＋264（`run/lifecycle.rs`）。** run.rs 无测试，故做的是簇切：把 `impl Run<Active>` 整块搬进子模块，逻辑一行未改，函数签名与公开面逐字节不变。
 
 | 文件 | 管什么 |
 |---|---|
 | `run.rs` | 一个 Run 的常量与状态类型（`RunPlan`／`SafePoint`／`Advance`／`RunHooks`／`Active`／`Frozen`／`Run<S>`）、`impl Run<Frozen>` 的三个读法、载荷构造 `payload`，以及驱动循环 `drive`。`drive` 带 `argument_count` 豁免，故留在原路径 |
 | `run/lifecycle.rs` | 一个活着的 Run 在账本上做的三件事：`dispatch` 的调度对（job pin＋run_started）、`advance` 的一回合（四个安全点、波前围栏、报告前推入窗），以及唯一出口 `freeze`（handoff_written＋run_frozen）；连同只有 `advance` 用得上的 `fold_steer` |
 
-**无字段开放。** 子模块本就能看见父模块的私有项，故 `Run`／`Active`／`Frozen` 的字段与 `fn payload` 的可见性一个都没动。
-
-**`impl Run<Active>` 保持为一整块，不按 dispatch／advance／freeze 三分。** 先试过三个文件，`cargo public-api` 立刻按 impl 块计数印出六行 `impl runtime::run::Run<runtime::run::Active>`（原为两行）——那是公开面输出的变化而不是规范路径重拼，故收回为一个子模块一个 impl 块。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+**`impl Run<Active>` 保持为一整块，不按 dispatch／advance／freeze 三分**：`cargo public-api` 按 impl 块计数，三分会让公开面输出多出四行而规范路径不变。
 
 ### 8-24 runtime::digest 目录化
-
-**449 行一个文件 → 321（`digest.rs`）＋132（`digest/tests.rs`）。** 切法只用了「测试迁出」：非测试部分本就在 400 行以内，逻辑一行未改，函数签名与公开面逐字节不变。
 
 | 文件 | 管什么 |
 |---|---|
 | `digest.rs` | 摘要管线本身：`StructureNode`／`Digest`／`Breaker`／`BreakerVerdict`／`DigestOutcome`，纯函数 `structure_of` 与 `close_deeper`，以及唯一入口 `digest_once`。`digest_once` 带 `argument_count` 豁免，故留在原路径 |
-| `digest/tests.rs` | 摘要对读者的四个承诺：标题树跳过代码围栏、模型写下的散文永远 suspect、同一内容哈希一生只摘要一次、熔断器计次开合（5 个 `#[test]`，与切前相等） |
-
-**无字段开放。** 子模块本就能看见父模块的私有项，故 `Digest` 的 `source`／`origin`／`structure`／`prose` 可见性一个都没动。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+| `digest/tests.rs` | 摘要对读者的四个承诺：标题树跳过代码围栏、模型写下的散文永远 suspect、同一内容哈希一生只摘要一次、熔断器计次开合 |
 
 ### 8-25 runtime::sandbox 目录化
 
-**缝与唯一一个真适配器分家。** `sandbox.rs` 先前把 wasmtime 适配器整个内联成 `mod engine { … }`，两百余行 wasmtime 专属代码压在缝的定义下面，文件因而越过 400 行上限。现在缝留在父文件，适配器有自己的文件。
+**缝与唯一一个真适配器分家**：缝留在父文件，两百余行 wasmtime 专属代码在适配器自己的文件里。
 
 | 文件 | 管什么 |
 |---|---|
 | `sandbox.rs` | 执行边界本身：`Fuel`／`Mount`／`SandboxJob`／`SandboxOutcome`／`SandboxExit`／`Sandbox` 缝，缺席判词 `AbsentSandbox`，两个替身 `EchoSandbox`／`FaultSandbox`，以及 feature `conformance` 下的 `assert_sandbox_conformance`。它声明 `#[cfg(feature = "wasm")] mod engine;` 并原样保留 `pub use engine::WasmtimeSandbox;` |
 | `sandbox/engine.rs` | 唯一会真跑 guest 的适配器：`WasmtimeSandbox`（引擎配置、预开目录、燃料预算、stdio 管道）、host 侧拒词构造 `host_error`，以及把引擎的收场判成 `SandboxExit` 的 `classify` |
-| `sandbox/tests.rs` | 两个替身对调用方的承诺：直通替身回声 stdin 并记下 job、故障替身按序发脚本且发完即止（2 个 `#[test]`，与切前相等） |
-
-**无字段开放。** `engine.rs` 与内联时一样经 `use super::{…}` 取缝的类型，`EchoSandbox.scripted`／`FaultSandbox.scripted` 的可见性没动。
-
-**api-baseline 未重写。** 公开项的定义位置未动，规范路径不变。
+| `sandbox/tests.rs` | 两个替身对调用方的承诺：直通替身回声 stdin 并记下 job、故障替身按序发脚本且发完即止 |
 
 ### 8-26 runtime::tools::exec 目录化
 
@@ -1202,11 +1160,7 @@ pub struct RunHooks<'a> {
 |---|---|
 | `tools/exec.rs` | 三臂本身：`ExecTool`（`new` 与 `run_program`／`run_python`／`run_shell`／`through_the_backlog`／`inherited_environment`）、环境白名单 `ENV_ALLOWLIST`、臂解析 `parse_arm`，以及 `impl Tool for ExecTool` 的路由。它声明 `mod outcome;` 并 `use outcome::{backgrounded, exceptional, settled, with_backlog, with_environment};` |
 | `tools/exec/outcome.rs` | 这把工具能给出的每一种回答的形状：`settled`（原名 `outcome`，模块名占了这个词故改用动词过去式）、`backgrounded`、`exceptional` 三种载荷，以及 `with_backlog`／`with_environment` 两条尾巴。全部 `pub(super)`，不出 `tools::exec` |
-| `tools/exec/tests.rs` | 每条臂对调用方的承诺：缺件时点名替代方案而拒绝、python 臂在沙盒里跑并报自己的退出码、燃料耗尽与 trap 原样抵达、无法识别的臂只拒不猜、program 臂真起子进程且环境被洗（5 个 `#[test]`，与切前相等）|
-
-**无字段开放。** 结果构造函数全部 `pub(super)`；测试是子模块，父模块的私有字段与私有方法本就可见。
-
-**api-baseline 未重写。** 公开项 `ExecTool`／`parse_arm` 的定义位置未动，规范路径不变。
+| `tools/exec/tests.rs` | 每条臂对调用方的承诺：缺件时点名替代方案而拒绝、python 臂在沙盒里跑并报自己的退出码、燃料耗尽与 trap 原样抵达、无法识别的臂只拒不猜、program 臂真起子进程且环境被洗|
 
 ### 8-27 runtime::sieve（形状 1 判定＋形状 6 数据面；**本节是压缩器的唯一权威**）
 
@@ -1216,9 +1170,9 @@ pub struct RunHooks<'a> {
 
 `sieve` 按**产生结果的命令**决定留下什么。它与 `compaction` 相邻而不重叠：`compaction` 看文本形状（Prose／Code／Diff／Log／Structured／Table／Markup／Unknown），`sieve` 看命令身份（`cargo build` 与 `git status` 的噪声形状完全不同，而两者都是 Log）。
 
-不用模型做压缩，理由是被架构强制的而非偏好：V6 要求同一颗种子重放出逐字节相同的对话，一个会思考的压缩器会让重放不可能。它同时省掉一次调用的钱与延迟。
+不用模型做压缩，理由是被架构强制的而非偏好：确定性（ARCHITECTURE 的确定性一节）要求同一颗种子重放出逐字节相同的对话，一个会思考的压缩器会让重放不可能。它同时省掉一次调用的钱与延迟。
 
-**顾问不是这条链上的模型（E-2）。** 它在 `pipeline::package` 之外先跑，判断作为 `PackContext.adviser` 进来，而且答案本身就是账本上的一条记录（`adviser_answered` 或 `adviser_fell_back`）——重放读到的是那条记录，不是再问一次。所以「同一颗种子重放出逐字节相同的对话」仍然成立，而 `sieve` 自己一个模型也不调：它只有七条固定阶段。
+**顾问不是这条链上的模型。** 它在 `pipeline::package` 之外先跑，判断作为 `PackContext.adviser` 进来，而且答案本身就是账本上的一条记录（`adviser_answered` 或 `adviser_fell_back`）——重放读到的是那条记录，不是再问一次。所以「同一颗种子重放出逐字节相同的对话」仍然成立，而 `sieve` 自己一个模型也不调：它只有七条固定阶段。
 
 #### 8-27-2 位置与法则
 
@@ -1246,7 +1200,7 @@ tee（原文钉进 CAS ＋ 实体化 rest 文件）
 6. **这条路上不用正则表达式**（判「重要」的四类模式全部手写线性扫描，见 §8-27-6）。
 7. 账本记的是**模型看到的字节**＋原文 locator。重放复现模型看到的东西，不是命令打印的东西。
 
-#### 8-27-5 阶段顺序与参数（全部已定，实现者不再选择）
+#### 8-27-5 阶段顺序与参数（全部已定，实现者不另选）
 
 | # | 阶段 | 参数 | 取值 |
 |---|---|---|---|
@@ -1350,7 +1304,7 @@ pub fn sieve(input: SieveInput<'_>, table: &FilterTable, site: &mut OffloadSite<
 // tee 走 offload::tee（pub(crate)；offload() 自身也改经它，store-before-cut 只有一处）；history 无论 Cut／Passed 都记本次原文
 
 - **账目不为任何一条臂而丢。** `Cut` 携 `SieveRecord.stages`；`Passed` 携 `account`——NothingShrank 时七条阶段全在，BelowFloor 时 `None`（没有阶段跑过，`reason` 就是全部账目）。`StageOutcome` 四变体（`Applied`／`Noop`／`Rejected`／`Unavailable`）是每个阶段唯一的答案形状。**顾问不是第八个 stage**：问／答／回落有自己的事件族（`adviser_asked`／`adviser_answered`／`adviser_fell_back`），在这里再记一份就是同一事实两个家；「顾问就是第八个 stage」是 E-2 核验更正前的措辞。
-- **pass 的账目去处**：经 sieve 但未被裁的结果若随后走普通 offload 离窗，`ResultOffloaded.sieve` 携这名 account（此前恒 `None`，等于说「未经 sieve」）；留在窗口内的 pass 不再写账，因为没有任何东西离窗。
+- **pass 的账目去处**：经 sieve 但未被裁的结果若随后走普通 offload 离窗，`ResultOffloaded.sieve` 携这名 account；留在窗口内的 pass 不写账，因为没有任何东西离窗。
 
 // runtime::sieve::filter — 过滤表（形状 6）
 pub struct Filter { id, command, subcommands: Vec<String>, strip_ansi: bool,
@@ -1389,7 +1343,7 @@ pub struct PackContext<'a> { /* 既有五字段 */ pub sieve: Option<SieveReques
 
 **三处读法**（§8-27 未写明处，按此实现；改口径先改这里）：
 
-1. **受保护片段的「不得触碰」**读作：含受保护片段的行不进模板去重、不被长行截断——这两级会**改写**一行；在第 7 级截断里它算最低一级重要行（排在 note/help 之后），与其他重要行一起按序取前 60。把它读成「恒不丢」会让一份三百条 URL 的清单压不动，与不变量 1 的目的相悖。跨调用差分**不豁免**它：把上一次逐字相同的行计入「未变 N 行」不改写任何一行，那行在 rest 文件里原样在，模型上一次也已读过；豁免它的第一版让每个 rustc 诊断块被 `-->` 行切成折不动的短段，差分在它为之而存在的 cargo 场景上恒为 Noop。空行同理计入。
+1. **受保护片段的「不得触碰」**读作：含受保护片段的行不进模板去重、不被长行截断——这两级会**改写**一行；在第 7 级截断里它算最低一级重要行（排在 note/help 之后），与其他重要行一起按序取前 60。把它读成「恒不丢」会让一份三百条 URL 的清单压不动，与不变量 1 的目的相悖。跨调用差分**不豁免**它：把上一次逐字相同的行计入「未变 N 行」不改写任何一行，那行在 rest 文件里原样在，模型上一次也已读过；豁免它会让每个 rustc 诊断块被 `-->` 行切成折不动的短段，差分在它为之而存在的 cargo 场景上恒为 Noop。空行同理计入。
    第 3 级模板去重另豁免过滤表 keep 命中的行及其分组（否则 `  |` 这样的诊断沟槽行跨块折叠，`10 |     let x0 = 1; [×6 similar lines]` 说的是并不相同的六行）。
 2. **过滤表的 `head`/`tail`** 是第 7 级 HEAD/TAIL 的逐表覆盖，不是第二次截断；`keep_*` 命中的行进第 7 级中段候选，优先级与 §8-27-6 的 warning 同级。这样截断只有一处权威。
 3. **generic 的 `on_empty`** 缺省为 `"(no output kept), exit {code}"`；`{code}` 在无退出码（sandbox trap／fuel 耗尽）时写 `none`。这是不变量 2 在通用路径上的执行体。
@@ -1397,8 +1351,6 @@ pub struct PackContext<'a> { /* 既有五字段 */ pub sieve: Option<SieveReques
 **三个 reducer 与表的关系**：cargo 与 git 是两个以代码构造的 `Filter` 值，rustc 诊断分组是 cargo 那张的 `keep_contains` 命中行向后扩到空行为止（同一诊断块整体进中段候选）；generic 是空谓词的 `Filter`。表内条目与内建同形，故楼级表可以整张换掉 cargo 的裁法而不动代码。
 
 **citysim 侧**：`Scenario` 增 `sieve: Option<SieveWorld>`（CAS＋environment＋过滤表＋本 run 的 history）；有它时执行器把名为 `exec` 的工具结果经 `package_exec` 走带 `SieveRequest` 的 `package`，模型看到 `{content, exit_code, sieve:[载荷]}`。`citysim/tests/sieve.rs`：同一目录同一表跑两遍账本逐字节相同；第二次同命令只出新错误与 `[unchanged: N lines…]`。
-
-**已知未接**：生产路径 `bin::assembly::driving` 今天不经 `pipeline::package`（工具结果原样交模型）；sieve 接进 `package` 与 citysim 执行器，生产接线随 backlog（§8-28）落表时一并走 `package`。
 
 #### 8-27-10 连接器结果：`runtime::pipeline::connector`
 
@@ -1418,12 +1370,12 @@ pub fn package_connector(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Resu
 
 ### 8-28 runtime::backlog（形状 4 适配器＋形状 6 数据面）
 
-**问题**：`turn.rs` 首段写明中断只在相位边界被消费，而 `Command::output()` 阻塞在系统调用里、不在边界上，所以一条挂死的命令 `halt` 停不住。删掉花费预算与回合上限之后，这是全仓唯一一处无界失效。
+**问题**：`turn.rs` 首段写明中断只在相位边界被消费，而 `Command::output()` 阻塞在系统调用里、不在边界上，所以一条挂死的命令若不入表，`halt` 停不住；没有回合上限与花销上限的城里，这会是一处无界失效。
 
 **设计**：一张表，成员是后台 exec 子进程与 `delegate` 子 run。
 
 - **`exec` 恒经此表**，不设 `background` 参数——两条路径就是两个权威，而有洞的那条永远是没人想起的那条。
-- 先阻塞等一个短窗口（**10 s**），短命令因而感觉上仍是同步的；超时则返回一个句柄并继续在后台跑，结果落**起它的那个 run 的下一次 `exec` 结果的尾部**，恒不落别的 run。这正是 `docs/City.md` 已经写给 agent 的那句话（「Do not wait for a long task. Start it, continue with other work, and read the result when it arrives at the end of a later tool result.」），今天对 exec 不成立。
+- 先阻塞等一个短窗口（**10 s**），短命令因而感觉上仍是同步的；超时则返回一个句柄并继续在后台跑，结果落**起它的那个 run 的下一次 `exec` 结果的尾部**，恒不落别的 run。给 agent 的说法是「长任务不要干等：起了它，做别的，结果到了会接在后面的工具结果尾部」。
 - `halt {scope}` 遍历该表并终止其成员；工作线程不再进入阻塞系统调用，halt 因而真的停得住。
 - `status` 报告表中属于本 run 的成员：几条在跑、各自跑了多久。
 
@@ -1461,18 +1413,16 @@ impl Backlog {
 
 三处实现选择，各有理由：
 
-1. **短窗口靠固定次数的轮询走完，不采样时钟，且窗口由调用方注入（B-47）。** 默认 10 s ＝ 500 次 × 20 ms，住 `PollBudget::DEFAULT`；表持一份 `PollBudget`，`Backlog::with_window` 换掉它。理由是本仓那条「时间是入参，唯一采样点是 `bin::assembly`」——一个为了等十秒而调 `Instant::now()` 的模块会把那条规则打穿，而计数不需要时钟。**注入不是为了可配置**：`Settled` 与 `Backgrounded` 两种载荷形状不同，一个不能选窗口的调用方要观察后一种就得真等十秒，于是套件要么慢十秒、要么不判它交付的那个形状。
+1. **短窗口靠固定次数的轮询走完，不采样时钟，且窗口由调用方注入。** 默认 10 s ＝ 500 次 × 20 ms，住 `PollBudget::DEFAULT`；表持一份 `PollBudget`，`Backlog::with_window` 换掉它。理由是本仓那条「时间是入参，唯一采样点是 `bin::assembly`」——一个为了等十秒而调 `Instant::now()` 的模块会把那条规则打穿，而计数不需要时钟。**注入不是为了可配置**：`Settled` 与 `Backgrounded` 两种载荷形状不同，一个不能选窗口的调用方要观察后一种就得真等十秒，于是套件要么慢十秒、要么不判它交付的那个形状。
 
-1b. **退出码是穷尽枚举，不是一个整数（B-47）。** `Exit::Ended { code }`／`Signalled`／`Unknown { why }` 三臂：`-1` 过去同时是「程序返回了负一」「被信号杀死」「本城没问出来」，而读结果的模型分不出是哪一件。`exec` 结果里 `exit_code` 键**只在 `Ended` 时出现**，另两臂写 `outcome`（`signalled`／`unknown`）与一句 `detail`；键名仍只由 `tools/exec/outcome.rs` 拼（§8-26）。
+1b. **退出码是穷尽枚举，不是一个整数。** `Exit::Ended { code }`／`Signalled`／`Unknown { why }` 三臂：一个整数分不出「程序返回了负一」「被信号杀死」「本城没问出来」，而读结果的模型要分得出。`exec` 结果里 `exit_code` 键**只在 `Ended` 时出现**，另两臂写 `outcome`（`signalled`／`unknown`）与一句 `detail`；键名仍只由 `tools/exec/outcome.rs` 拼（§8-26）。
 2. **子进程的输出写文件，不走管道。** 管道缓冲区填满会让后台子进程停在写系统调用上，于是「后台」变成「挂死」——那正是本节要修的那个洞的另一种写法。文件住 `std::env::temp_dir()` 下按 `BacklogId` 命名的一层目录，收割时读完即删。
 3. **表是一份共享句柄（`Clone` 的 `Arc<Mutex<_>>`）。** 装配层持一份，每个 `ExecTool` 持一份克隆，于是 `halt` 够得着 `exec` 起的东西而不必让 `halt` 认识 `exec`。表内是 `BTreeMap`，遍历序恒定。
-4. **后台命令的结局只欠起它的那个 run（`owner: RunId`）。** 表是全城一张（第 3 条），所以「谁收割」必须由表按成员记下的 owner 判，而不是由「谁先调 `exec`」判：不带 owner 的 `harvest` 会把一栋楼（包括 confidential 楼）里一条命令的 stdout／stderr 原文交给城里任何一个随后调 `exec` 的 run，进它的模型与账本，而起它的 run 反倒收不到。一条命令的归属是穷尽枚举 `Claim` 而不是 `bool`：`Window(RunId)`（短窗口里，归正在轮询它的那次调用）、`Run(RunId)`（已转后台，只交给这个 run 的 `harvest`）、`Nobody`（它的 run 已结束，结局不交给任何人）。`ExecTool` 在 drop 时调 `release(run)`：每个 run 的工具台在它冻结后被丢弃，于是 drop 就是「这个 run 再也收不到」的那一刻。`release` 把这个 run 的命令改记为 `Nobody` **并终止它们**（与 `halt` 同一个 `kill`）；此后任何一次 `harvest` 都会把已结束的 `Nobody` 成员不读即删（进程句柄与临时目录因此有界），输出不交给调用者。`release` 不会失败：它只把认领降为 `Nobody`、只终止进程，这两件事在表的任何状态下都成立，所以一张被死线程锁住的表它也照做（取 `PoisonError::into_inner`）；表的其余调用照旧答 `E_STORAGE_FATAL`。它的调用方是 drop，没有人可以转交失败，一个会失败的 `release` 只能被丢弃，而被丢弃的那一次正是命令被留着为一个不存在的 run 跑下去的那一次。**被否决的做法**：按 `scope`（楼或房间地址）收割——同一房间里前后两个 run 地址相同，于是后一个 run 仍会收到前一个的输出，而 confidential 的界是按 run 的模型与账本行划的，不是按地址。**run 结束即终止它留下的后台命令，而不是让它们跑完。** 理由：结束之后没有任何一次工具结果能把结局交给它；`Sandbox` 放置的命令跑在 `Confined` 的副本里，而那份副本在同一次 drop 里被删，让它跑下去等于让它对着一棵已删的树跑；一条无主命令留着的进程、句柄与临时目录是每个会话的边际内存。**被否决的做法**：让无主命令跑到自然结束、再把结局写成该 run 名下的一条账本事件——结局到达时已经没有读者，而事件表要为一件被选定不再发生的事多一种事件。**重开的参数**：`Host` 放置成为后台命令的常态、且其对宿主树的副作用本身就是人要的产物时，run 的结束不再是「没人要」的证据，这条规则应重新论证。今天被终止的命令不在账本里留下一行：把「结束时终止了 N 条后台命令」写进账本需要 kernel 事件表多一种，归 kernel-SPEC 的事件表。
-
-**已落地范围（诚实记账）**：成员目前只有后台 `exec` 子进程。`delegate` 子 run 入表是同一张表的第二类成员，接口已按此形状留好（`Standing`／`Finished` 不提进程），但尚未接线；`status` 报告本 run 那部分同理待接。**→ 第二类成员与 `status` 那一半由 §8-28-2 接上。**
+4. **后台命令的结局只欠起它的那个 run（`owner: RunId`）。** 表是全城一张（第 3 条），所以「谁收割」必须由表按成员记下的 owner 判，而不是由「谁先调 `exec`」判：不带 owner 的 `harvest` 会把一栋楼（包括 confidential 楼）里一条命令的 stdout／stderr 原文交给城里任何一个随后调 `exec` 的 run，进它的模型与账本，而起它的 run 反倒收不到。一条命令的归属是穷尽枚举 `Claim` 而不是 `bool`：`Window(RunId)`（短窗口里，归正在轮询它的那次调用）、`Run(RunId)`（已转后台，只交给这个 run 的 `harvest`）、`Nobody`（它的 run 已结束，结局不交给任何人）。`ExecTool` 在 drop 时调 `release(run)`：每个 run 的工具台在它冻结后被丢弃，于是 drop 就是「这个 run 再也收不到」的那一刻。`release` 把这个 run 的命令改记为 `Nobody` **并终止它们**（与 `halt` 同一个 `kill`）；此后任何一次 `harvest` 都会把已结束的 `Nobody` 成员不读即删（进程句柄与临时目录因此有界），输出不交给调用者。`release` 不会失败：它只把认领降为 `Nobody`、只终止进程，这两件事在表的任何状态下都成立，所以一张被死线程锁住的表它也照做（取 `PoisonError::into_inner`）；表的其余调用照旧答 `E_STORAGE_FATAL`。它的调用方是 drop，没有人可以转交失败，一个会失败的 `release` 只能被丢弃，而被丢弃的那一次正是命令被留着为一个不存在的 run 跑下去的那一次。**被否决的做法**：按 `scope`（楼或房间地址）收割——同一房间里前后两个 run 地址相同，于是后一个 run 仍会收到前一个的输出，而 confidential 的界是按 run 的模型与账本行划的，不是按地址。run 结束即终止它留下的后台命令（§12.3）。
 
 #### 8-28-2 第二类成员：委派下去的 run
 
-**问题**：§8-28 写明成员有两类，而 §8-28-1 只接了第一类。于是今天 `halt {scope}` 遍历表时看不见任何 run——一轮委派下去的活在它的 scope 被停摆之后照样跑到冻结。
+**问题**：表里若只有子进程，`halt {scope}` 遍历表时看不见任何 run——一轮委派下去的活在它的 scope 被停摆之后照样跑到冻结。所以委派下去的 run 是表的第二类成员。
 
 **设计**：表内成员分两种身体，一张表、一个 `halt`：
 
@@ -1490,19 +1440,19 @@ impl Backlog {
 ```
 
 - **一个 run 成员没有进程可杀**：`halt` 对它做的是把身体记成 `Stopping`，而 run 在下一个安全点问 `stopping` 并以 `Interrupt::Cancel` 走 `runtime::turn` 既有的取消路——取消因此仍只在相位边界被消费，§8-28 首段那条法则不动。
-- **每个 call 之前问一次（B-70）**：一次工具波是模型一条回复里要的 N 件副作用，不是一件。`SafePoint::BeforeToolCall { turn, call }` 是第五个安全点，`Turn::<ToolWave>::execute` 在每条 call **入账之前**问 `still_going(call) -> Interrupt`，答案走相位边界那一个 `consume_boundary`：Cancel 写下同一条 `cancel_received` 并终止回合，于是停城不必等整波跑完，也不会为没做的活留下 `tool_called`；Steer 写下 `steer_received`，这条 call 照做。两条 call 之间能立刻执行的指令仍只有「停」，改道的文字属于执行器的 `Window`，由执行器在回答之前折进去、在下一次组装时交给模型。答案取整个 `Interrupt` 而不是只说停不停的 `NextCall`，是因为窄答案让波内到达的 steer 只进了窗口、没进账本：模型读到了一段账本上没有来历的文字。
+- **每个 call 之前问一次**：一次工具波是模型一条回复里要的 N 件副作用，不是一件。`SafePoint::BeforeToolCall { turn, call }` 是第五个安全点，`Turn::<ToolWave>::execute` 在每条 call **入账之前**问 `still_going(call) -> Interrupt`，答案走相位边界那一个 `consume_boundary`：Cancel 写下同一条 `cancel_received` 并终止回合，于是停城不必等整波跑完，也不会为没做的活留下 `tool_called`；Steer 写下 `steer_received`，这条 call 照做。两条 call 之间能立刻执行的指令仍只有「停」，改道的文字属于执行器的 `Window`，由执行器在回答之前折进去、在下一次组装时交给模型。答案取整个 `Interrupt` 而不是只说停不停的 `NextCall`，是因为窄答案让波内到达的 steer 只进了窗口、没进账本：模型读到了一段账本上没有来历的文字。
 - **只有委派下去的 run 入表**。根 run 由 `Cancel` 结束，那是另一个动词（glossary「Halt」行）；把根 run 也入表会让 `halt` 与 `Cancel` 变成同一件事。
 - **`harvest` 与短窗口都跳过 run 成员**：它们收的是进程的退出码，run 的结局在账本上。
-- **`status` 的那一半**：第十四行 `backlog:` 追加在冻结序末尾（追加规则同 `neighbours`），报 `standing(addr)` 里属于本 run 地址的成员——`bg-3 cargo build (command)` 逐条分号相连，没有则 `none`。**不报跑了多久**：本表不采样时钟（§8-28-1 第 1 条），一个为了报时长而采样的 status 会是第二个采样点。
-- **接线在 `bin::assembly::dispatching::running::dispatch_in`**：`at.parent.is_some()` 时先 `enrol_run`，drive 结束后 `leave`；`Driving` 携 `member: Option<BacklogId>`，中断钩子在人的打断与 steer 之前先问 `stopping`。今天的派活是同步的，一条 `halt` 命令在子 run 跑完前到不了记账线程；驾驶池（sprawling-SPEC §8-42）落地后 `halt` 在记账线程上被处理而子 run 在池上跑，这条路才在产品里真正走通——本节先把表接对，红测试用 `attach_interrupts` 在子 run 的安全点上调 `halt`。
+- **`status` 的那一半**：末行 `backlog:` 追加在冻结序末尾（追加规则同 `neighbours`），报 `standing(addr)` 里属于本 run 地址的成员——`bg-3 cargo build (command)` 逐条分号相连，没有则 `none`。**不报跑了多久**：本表不采样时钟（§8-28-1 第 1 条），一个为了报时长而采样的 status 会是第二个采样点。
+- **接线在 `bin::assembly::dispatching::running`**：`at.parent.is_some()` 时先 `enrol_run`，drive 结束后 `leave`；`Driving` 携 `member: Option<BacklogId>`，中断钩子在人的打断与 steer 之前先问 `stopping`。`halt` 在记账线程上被处理而子 run 在驾驶池上跑（sprawling-SPEC §8-42）；红测试用 `attach_interrupts` 在子 run 的安全点上调 `halt`。
 
 **红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
-#### 8-28-3 exec 输出的实时流（已接：读增量、装配点注入、线上帧、服务端与页面两段缓冲）
+#### 8-28-3 exec 输出的实时流：读增量、装配点注入、线上帧、服务端与页面两段缓冲
 
 **现状**：一个 `exec` 调用的 stdout／stderr 只在调用结束时随工具结果进账本，页面（client 的监视器）在那之前只看得到「运行中」。第 2 条让输出写进 scratch 下的 `out`／`err` 两个文件，所以实时流不需要改子进程怎么写，只需要有人在它还在写时读这两个文件的增量。
 
-**已接的一段——`runtime::backlog::tail`（shape：adapter）**：
+**读增量——`runtime::backlog::tail`（shape：adapter）**：
 
 ```rust
 pub enum Stream { Out, Err }                          // 恒不是 bool
@@ -1519,16 +1469,16 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 
 - 窗口里的读停在交给后台那一刻，偏移随成员进表；此后本 run 的每次 `harvest` 对它自己的、仍在跑的后台命令从同一偏移接着读。块在放开表锁之后才交给 sink，所以 sink 慢不会让表上其他调用等它。
 
-**已接的第二段——装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `channels::LiveOutput`（channels-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
+**装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `channels::LiveOutput`（channels-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
 
-**已接的第三段——页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
+**页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
 
-**已接的第四段——服务端缓冲**：`sprawling::serving::output_ring`（sprawling-SPEC §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（channels-SPEC §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
+**服务端缓冲**：`sprawling::serving::output_ring`（sprawling-SPEC §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（channels-SPEC §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
 
 **设计**（四段共同遵守的规则）：
 
 - **读的地方是短窗口的轮询，不另起线程**。`Backlog::run` 每一拍轮询在 `settle` 之后按上次的偏移读两个文件新增的字节，交给调用方注入的一个 sink；窗口外交给后台的命令由 `harvest` 那一拍同样读增量。sink 缺席（citysim、replay、没人看的城）时一个字节都不读，行为与今天相同。
-- **每拍读的字节有上界**，按 `PollBudget` 的间隔推出而不写死：一拍最多读 `READ_PER_POLL` 字节，读不完的留到下一拍，所以一个刷屏的子进程让页面落后，而不让轮询变慢。
+- **每拍读的字节有上界**，按 `PollBudget` 的间隔推出而不写死：一拍最多读 `PollBudget::read_per_poll()` 字节，即 `interval_ms × READ_BYTES_PER_MS`，间隔越长每拍读得越多、喂给页面的速率不变；读不完的留到下一拍，所以一个刷屏的子进程让页面落后，而不让轮询变慢。
 - **服务端每个 run 一个有界环形缓冲**，按字节计上界，满了丢最旧的整块；后来打开 run 页的会话先拿到缓冲里的内容，再接实时帧。丢了多少不上线：`LiveOutput` 没有这一栏，而加一栏要让 `WIRE_V` 再加一，换来的只是预览里的一个数——调用落账时整段输出本来就会到。缓冲在这次调用的 `tool_returned` 落账时清空，因为那时账本里的结果是这段输出唯一的权威。
 - **线上是一种新的 `ServerFrame`**，与 `Delta` 同一条规则：可丢弃，不带账本序号，调用的结果落账时页面扔掉它，两者不一致时账本赢。这一帧让 `WIRE_V` 加一并重新生成 `client/src/wire.ts`。
 - **页面也是有界环形缓冲**，按行计，监视器的终端记录画它；溢出的行数照 `mon_lines_cut` 的样子说出来。
@@ -1545,9 +1495,9 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 
 `ReadTool` 增 `offset`（0 基行号，缺省 0）与 `limit`（缺省与上限**均为 512 行**）。被截断时结果携 `total_lines` 与 `next_offset`，所以「我拿到的是不是全部」不需要猜。`bytes` 字段的语义不变，仍是本次返回文本的长度。
 
-理由：今天是 `read_to_string` 整读，而 `kernel-SPEC.md` 1483 行、`ARCHITECTURE.md` 112 KB——一次读要么吃掉整个窗口，要么被管线从中间剪掉，而剪掉的往往正是要改的那一段。512 是选定值，不再讨论。
+理由：整读一份千行级的 SPEC 或数十 KB 的 ARCHITECTURE，要么吃掉整个窗口，要么被管线从中间剪掉，而剪掉的往往正是要改的那一段。512 是选定值。
 
-#### 8-29-1 参数与结果（实现照此，不再选择）
+#### 8-29-1 参数与结果（实现照此，不另选）
 
 ```rust
 // args：{path, offset?: u64, limit?: u64}
@@ -1625,7 +1575,7 @@ fn judged_at(hash: &B3Hash, origins: &[memory::BlockOrigin],
 
 ### 8-30 runtime::tools::search（形状 1 判定＋形状 4 适配器）
 
-**问题**：十三件工具里没有一件能找东西。找一个符号只有两条路——写 Python（要可选的 CPython-WASI 构件，很多机器上根本没有），或走 shell（Windows 上是 `findstr`，而 shell 本身是楼级配置可以关掉的）。旧对话有了一个地址，而**没有检索的地址比没有地址更糟**：模型被告知那里有东西，却够不着。
+**问题**：没有检索工具，找一个符号只有两条路——写 Python（要可选的 CPython-WASI 构件，很多机器上根本没有），或走 shell（Windows 上是 `findstr`，而 shell 本身是楼级配置可以关掉的）。旧对话有了一个地址，而**没有检索的地址比没有地址更糟**：模型被告知那里有东西，却够不着。
 
 #### 8-30-1 runtime::tools::chosen_path（形状 1；模型选路的唯一判定处）
 
@@ -1692,19 +1642,15 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 
 超过 512 行的文件返回恰 512 行、并给出真实 `total_lines` 与可续的 `next_offset`；`search` 找到子串并带上下文；`search` 对保留区前缀以 `E_GATE_DENIED` 拒绝；两者共用的 `chosen_path::admit` 有且只有一组测试，读界的两种关各一条拒绝。`search` 不带路径时不走关上的楼；大于 1 MiB 的文件计入 `unreadable` 并在 `unread` 里带原因；一条超过字节上限的首个命中被切进上限并带标记。开放楼里一条指向机密楼的链接：`read` 穿过它以 `E_GATE_DENIED` 拒绝，`search` 从开放楼走下去不交出机密楼里的命中。
 
-#### 8-30-5 同集改
-
-`architecture.toml` 的 runtime 条目 23→27 行（`chosen_path`、`read::tests`、`search`、`search::tests`）；`docs/glossary.md` §5 增 **search** 一行；装配层 `lay_out_workbench` 的准入清单由十三件变十四件，`search` 排在 `read` 之后——次序是缓存面的一部分，只在末尾追加。
-
 ### 8-31 runtime::tools::exec 的环境声明
 
 > 权威在 kernel-SPEC §8-22 的「11.1 增」段与 city-SPEC §8-4 的「11.1 增」段；本节只说 exec 这一侧怎么用它，以及构造面因此怎么变。
 
-**今天的事实**：`ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"]` 加 `env_clear()`。于是城里的 resident 跑不动 `cargo build`——MSVC 链接器读不到 `%ProgramFiles(x86)%`，退回裸 `link.exe`，撞上 PATH 上 Git 那个 coreutils `link`。本版本承诺的那条走完的回路断在第四段。
+**只放四个名字的后果**：`ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"]` 加 `env_clear()` 时，城里的 resident 跑不动 `cargo build`——MSVC 链接器读不到 `%ProgramFiles(x86)%`，退回裸 `link.exe`，撞上 PATH 上 Git 那个 coreutils `link`。
 
 **改法**：`ENV_ALLOWLIST` 原样留着，它是**每一栋楼无条件继承的地板**；楼在 `[sandbox] env_passthrough` 里逐名声明的是**地板之上加的那几个**。两份清单合并后按名取值，取不到的名字不进（一个没设过的变量不该变成空串——空串与未设置在 Windows 上是两件事）。
 
-**构造面**：`ExecTool::new` 原有七个参数，`argument_count` 的历史册子里记着它。不把它加到第八个，而是把总在一起走的那几个值起个名字：
+**构造面**：总在一起走的那几个值是一个有名字的值，`ExecTool::new` 因此只收三个参数：
 
 ```rust
 pub struct ExecSetup {                 // 形状 2 值类型
@@ -1720,7 +1666,7 @@ pub struct ExecSetup {                 // 形状 2 值类型
 pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Result<ExecTool, AxError>;
 ```
 
-三个参数，于是 `crates/runtime/src/tools/exec.rs::new` 那一行历史豁免不再被用到。它留在册子里不动：那份册子是 gate 机械面，删行与改被判代码同集会撞上 `guard`，而豁免只被查存在性、留着不放行任何东西。
+三个参数，在函数参数上限之内。
 
 **账本上留什么**：配置写入时不记事件——`CONFIG.toml` 是「一跑受什么治理」的权威，再记一条同事实的事件就是第二个权威。账本记的是**一跑拿它做了什么**：`exec` 的结果载荷增 `env` 字段，列出这次真正递给子进程的名字，按名排序。名字不是值——值恒不入账本。
 
@@ -1760,9 +1706,9 @@ impl Run<Frozen> { pub fn transcript(&self) -> Result<Transcript, AxError>; pub 
 
 **深度守恒**：succession 与 `delegate` 是两个动词。`delegate` 让深度加一；succession 不加。`Assignment::depth()` 从 `parent` 推出，继任者**继承前任的 `parent`**（而不是以前任为 parent），所以深度按构造守恒，工具表因而与前任逐名相同——`delegate` 在内。红测试：继任者的工具表与前任逐名相等。
 
-**账本**：`Assignment`／`RunPlan` 增 `predecessor: Option<RunId>`，写进 `run_started` 的 `predecessor` 键；`Provenance` 增同一指针（memory-SPEC §8-17：第六条 trailer `Sprawling-Predecessor`，仅在有前任时出现；`model_fields` 同时写 `predecessor`）。`bin::views` 从 `run_started` 折出 `predecessors: BTreeMap<RunId, RunId>`，`Query::Commit` 的答 `CommitAnswer` 增 `lineage: Vec<RunId>`——本跑在前，逐级向前到第一任（WIRE_V 14→15，channels-SPEC §8-18）。红测试：三次接替后 lineage 有四个 run。
+**账本**：`Assignment`／`RunPlan` 增 `predecessor: Option<RunId>`，写进 `run_started` 的 `predecessor` 键；`Provenance` 增同一指针（memory-SPEC §8-17：第六条 trailer `Sprawling-Predecessor`，仅在有前任时出现；`model_fields` 同时写 `predecessor`）。`bin::views` 从 `run_started` 折出 `predecessors: BTreeMap<RunId, RunId>`，`Query::Commit` 的答 `CommitAnswer` 增 `lineage: Vec<RunId>`——本跑在前，逐级向前到第一任（channels-SPEC §8-18）。红测试：三次接替后 lineage 有四个 run。
 
-**Handoff 从楼搬到房间**：`city::handoff(city_root, room)`／`handoff_path(city_root, room)` 读写 `<city>/<room>/Handoff.md`；模板在 `city::open_room` 打开房间时铺下，楼级 `lay_out` 不再铺它。理由是同楼并发：一栋楼一份 Handoff，两个房间同时冻结就是两份内容抢一个文件。
+**Handoff 住房间**：`city::handoff(city_root, room)`／`handoff_path(city_root, room)` 读写 `<city>/<room>/Handoff.md`；模板在 `city::open_room` 打开房间时铺下，楼级 `lay_out` 不铺它。理由是同楼并发：一栋楼一份 Handoff，两个房间同时冻结就是两份内容抢一个文件。
 
 **质量防线（不可选）**：`bin::assembly::probing::probe` 的 handoff 探针在每次 succession 真的跑。`handoff_probe()` 给出固定四问（版本 1）；装配层 `bin::assembly::probing` 在 `conclude` 读到接替请求时，用前任的 adapter 对前任的 transcript 问一遍（before），在继任者 `freeze_plan` 之后、第一回合之前，用继任者的 prefix 问一遍（after），`compare` 后记一条 `eval_run`（`probe`／`version`／`kept`／`lost`／两份答案）。探针答案不是判定，`lost` 报的是位置，人自己去读两份答案——这正是 sprawling-SPEC §8-39 交接探针一节定的口径。每次 succession 两次模型调用，这是这道防线的价钱，写在明处。
 
@@ -1788,55 +1734,48 @@ impl ContextReminder { pub fn render(&self) -> String; }
 
 `second` 来自 `RunPlan.second_threshold`：配置梯子冻结的值，`None`＝没有一层说话，取 `CTX_REMINDER_SECOND_DEFAULT`，「缺席取默认」只在这一个构造点判定。`window == 0`（簿上没写）恒不响：没有分母就没有百分比，与 `UnplannedProgress` 同一条理。整数算术：`used * 100 / window` 用 checked 乘法。
 
-**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`RunPlan` 增 `context: ContextReading`，Run 在每回合观察之前把同一个 `input_tokens` 记进去，装配层把同一格交给 `StatusTool::metering`——只有一处写，窗口提醒与 `status` 读的是同一个数；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Window::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
+**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`RunPlan` 增 `context: ContextReading`，Run 在每回合观察之前把同一个 `input_tokens` 记进去，装配层把同一格交给 `StatusTool::metering`——只有一处写，窗口提醒与 `status` 读的是同一个数；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Conversation::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
 
 **改这一格的入口**：`channels::Command::ConfigureBuilding` 的 `context_second_threshold`（channels-SPEC §8-45）写的就是 `RunPlan.second_threshold` 读的那一格——写入落那一级的 `[context] second_threshold`，下一个 Run 起点冻结时读到；正在跑的那个 Run 不受影响（冻结的理由见 kernel-SPEC §8-22）。
 
-### 8-29 回合不再有上限
+### 8-48 回合没有上限
 
-`RunPlan` 去掉 `budget_turns` 与 `budget`，`drive` 的 `while turns < budget` 变成 `loop`。一次跑的结束只有三种来路：一回合作出结论、一次带 carrier 事件的失败（写进历史后冻结为 cancelled）、或一个安全点送到的中断。
+`RunPlan` 没有回合上限与花销上限，`drive` 是一个 `loop`。一次跑的结束只有三种来路：一回合作出结论、一次带 carrier 事件的失败（写进历史后冻结为 cancelled）、或一个安全点送到的中断。
 
 - **理由是刹车只留一个**：没有人能在一件事跑之前给它定价，而一个替人说停的数字，停的时刻恰好是人最不希望它停的那一刻。要停一片就 `Halt`——它会终止那片里的后台成员；要停一条就 `Cancel`。
 - **`Completion::Limit` 保留**：回合上限没有了，这个词却仍有一条来路——一条什么都没说的回复（§8-37）。
-- **`StatusTool` 十三字段变十二**：`budget_usd`／`budget_tokens` 删除，那两个数报的是上限而不是花销。留在原地的是 `ctx`——已用 token 对着这次跑拿到的窗口，那是**报告花了多少**而不是**事前不许花**。
-- **citysim**：`ScenarioSpec.budget_turns` 随之删除；原先靠上限收尾的那条 scenario 改为「跑满它自己要的每一回合再作出结论」（十六波之后是空的那一波）。
-
 
 ### 8-37 一条什么都没说的回复，不是「做完了」
 
 `Run<Active>::advance` 的收尾判定从「本回合没有工具调用」一条，改为三问：没有工具调用、**答里有内容**、且不是停在上限上——三条同时成立才是 `Completion::Done`，否则是 `Completion::Limit`。
 
 - **理由是证据**：`Completion::Done` 必须引一条 `model_returned` 作证据，而一条 `content` 为空的 `model_returned` 证明不了任何工作完成。判它做完，等于在「什么都没说」的那一刻告诉人「你的活干完了」，并且把那条空记录作为凭据写进账本。
-- **它是怎么被发现的**：目录不认识的模型拿到零上限（kernel-SPEC §8-24 那条 `Ceiling`），请求带 `max_tokens: 0` 上线，供应方生成十六个 token 后截断、`content: null`、流式路径把截断报成 `stop`。三条串起来，界面上就是「思考了三分半，然后说做完了，正文一个字没有」。类型那一半修掉了零上限，判定这一半修掉了「空回复算完成」——**两条独立的路各自足以造出假历史，所以两条都堵**。
-- **`stop` 上抬一层**：`StopReason` 此前只进 `model_returned` 载荷就被丢掉，`ToolWave` 与 `Recording` 两个 typestate 不带它。现在它随两个 typestate 到 `TurnReport::stop()`，判定读它而不是从内容去猜——一条被截断但**有内容**的回复同样不是完成，那件事只有 `stop` 说得清。
+- **`stop` 随回合走**：`StopReason` 随 `ToolWave` 与 `Recording` 两个 typestate 到 `TurnReport::stop()`，判定读它而不是从内容去猜——一条被截断但**有内容**的回复同样不是完成，那件事只有 `stop` 说得清。
 - **否决「只看内容空不空」**：`stop == MaxTokens` 而内容非空的回复是半句话，判它完成同样是假历史；只看内容会把它漏掉。
-- **citysim 随之改口**：靠「脚本用光后那一波空回复」收尾的剧本改为显式说一句话（`citysim::concluding`），因为它们要断言的一直是「跑到工作做完」，而不是「模型不说话了」。`fixtures/golden-p0` 随之重生（`GOLDEN_WRITE=1`）。新增剧本 `a_reply_that_says_nothing_freezes_as_limit_rather_than_done` 用**供应方真实报文**（`content: []`、`stop_reason: max_tokens`）经生产翻译喂进来，钉住这条规则。
+- **citysim**：剧本以显式说一句话收尾（`citysim::concluding`），因为它们要断言的是「跑到工作做完」，而不是「模型不说话了」。剧本 `a_reply_that_says_nothing_freezes_as_limit_rather_than_done` 用**供应方真实报文**（`content: []`、`stop_reason: max_tokens`）经生产翻译喂进来，钉住这条规则。
 
 ### 8-36 写域的两道闸各问一个问题（kernel-SPEC §8-46 末段）
 
 - **`bench::admit`** 对 `Effect::Write { domain: area }` 改调 `kernel::reach(&self.domain, area, &self.taint)`：工具声明的是一块区域，门口只问这块区域够不够得到。
-- **`tools::edit::invoke`** 解析出 `target` 后改调 `kernel::domain(&self.writable, &target, &TaintSet::empty())`：`Allow` 继续，`Deny { refusal }` 原样作 `Err`（三段式因此由 kernel 一处产出，工具不再自拼 `Outside` 的话术），`Escalate` 在写域门上不可能出现——`GateOutcome` 刻意穷尽，这一臂如实答一条 `E_INVALID_ARGS` 说明该不变量，而不是 `unreachable!`。空 `TaintSet`：taint 是 bench 的事实，工具这一层没有它，拒词因此少一句「派生自 N 个外部来源」——那句话仍由门口那道 `reach` 说。
-- **红→绿**：`tools/edit/tests.rs` 新增「Documents 域的工具创建 `<city>/hall/note.md` 成功、创建 `<city>/hall/note.rs` 被拒（`E_OUTSIDE_WRITE_DOMAIN`，主语是文件）」；`bench/tests.rs` 新增「Documents 域、声明区域为 `hall/mayor` 的 `Write` 效果在门口放行」——改前后者红在 `NotMarkdown`。
+- **`tools::edit::invoke`** 解析出 `target` 后调 `kernel::domain(&self.writable, &target, &TaintSet::empty())`：`Allow` 继续，`Deny { refusal }` 原样作 `Err`（三段式因此由 kernel 一处产出，工具不自拼 `Outside` 的话术），`Escalate` 在写域门上不可能出现——`GateOutcome` 刻意穷尽，这一臂如实答一条 `E_INVALID_ARGS` 说明该不变量，而不是 `unreachable!`。空 `TaintSet`：taint 是 bench 的事实，工具这一层没有它，拒词因此少一句「派生自 N 个外部来源」——那句话仍由门口那道 `reach` 说。
+- **验收**：`tools/edit/tests.rs` 钉住「Documents 域的工具创建 `<city>/hall/note.md` 成功、创建 `<city>/hall/note.rs` 被拒（`E_OUTSIDE_WRITE_DOMAIN`，主语是文件）」；`bench/tests.rs` 钉住「Documents 域、声明区域为 `hall/mayor` 的 `Write` 效果在门口放行」。
 
 ### 8-35 去重答的是第一次的结果，而不是一句「你已经问过了」（形状 1 判定）
 
-**旧行为**：`ToolBench::invoke` 认得重复的 `IdemKey`，回 `BenchOutcome::Duplicate`，而两个调用方（`bin::assembly::driving::lane`、`citysim::executor`）把它翻成 `E_INVALID_ARGS`。于是「同一次调用做两遍」的正确答案——**第一次的结果**——被换成了一个错误：重试的模型学到的是「这件事失败了」，而它其实成功了。这是幂等只做了一半：副作用被挡住，答案没有被记住。
+**「同一次调用做两遍」的正确答案是第一次的结果**：回一个错误，重试的模型学到的是「这件事失败了」，而它其实成功了——那是幂等只做了一半：副作用被挡住，答案没有被记住。所以 `ToolBench` 记住的是键与答，两个调用方（`bin::assembly::driving::lane`、`citysim::executor`）把 `Duplicate` 回成第一次的 `ToolOutcome`。
 
-**改法是把记住的东西从键变成键与答**：
+```rust
+seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>   // ToolBench 私有
+pub enum BenchOutcome { …, Duplicate { outcome: ToolOutcome } }   // 调用方回第一次的 ToolOutcome，fenced 为空
+```
 
-| 之前 | 之后 |
-|---|---|
-| `seen: BTreeSet<IdemKey>` | `seen: BTreeMap<IdemKey, ToolOutcome>` |
-| `BenchOutcome::Duplicate` | `BenchOutcome::Duplicate { outcome: ToolOutcome }` |
-| 调用方回 `E_INVALID_ARGS` | 调用方回第一次的 `ToolOutcome`，`fenced` 为空 |
-
-- **写入点不动**：键仍在过门之后、工具运行之前记下（被门拒的重试不算重放），答在工具返回后补齐。故一次「记了键但工具报错」的调用不会留下一个假答案——那条路径根本不入表。
+- **写入点**：键与答在工具答过之后一起写入（`account`），失败的答也记下；被门拒的调用不入表，所以被门拒后的重试不算重放。
 - **`Duplicate` 仍是一个独立变体而不是并进 `Ran`**：`fenced` 对重放恒为空，而 `Ran` 的调用方要按 `fenced` 决定波后清扫；把两者合并会让「这一波要不要扫」多出一个恒空的分支。
 - **代价写在明处**：一次运行期间每个成功调用的结果都留在内存里。这与 `seen` 本来就要活到运行结束是同一条寿命，多出来的是 payload 的字节；一次运行的工具调用数以百计而非以百万计。
 
 ### 8-38 sink 收到的是一条 entry，不是一行文本（形状 2 值类型）
 
-**旧接口**：`pub type Sink = Box<dyn FnMut(&str) + Send>`——渲染在库内，sink 只见最终那行 JSON。于是「把日志行推给浏览器」的装配层必须把刚渲染好的那行**再解析回来**才能拿到 `level`／`run`／`seq`／`module`：一条日志行由什么字段构成，从此有了写与读两个权威，而读的那个漂了也没人看得见。
+**sink 收的是 entry 而不是渲染好的行**：否则「把日志行推给浏览器」的装配层要把刚渲染好的那行**再解析回来**才能拿到 `level`／`run`／`seq`／`module`，一条日志行由什么字段构成就有写与读两个权威，而读的那个漂了也没人看得见。
 
 **改法**是把字段本身交给 sink，文本留作其中一种去处：
 
@@ -1853,7 +1792,7 @@ pub fn render(entry: Entry<'_>) -> String;   // 一行 JSON：文本的唯一产
 
 ### 8-39 一段 prefix 自带它的来源，`prompt_assembled` 因此只有一条分支
 
-`FrozenSegment` 先前只携 slot、字节与哈希，来源注记则由 `build_prefix` 另行拼出；于是同一件事有两个作者——照计划装配出来的 prefix 写一种行，在城里按手边字节装配出来的 prefix 写另一种（其实是不写）。`replay::rebuild_prefix` 只读得懂前者，而页面要读的恰好是后者。
+`FrozenSegment` 自带来源注记，而不由 `build_prefix` 另行拼出；否则同一件事有两个作者——照计划装配出来的 prefix 写一种行，在城里按手边字节装配出来的 prefix 写另一种（或不写）。`replay::rebuild_prefix` 只读得懂前者，而页面要读的恰好是后者。
 
 ```rust
 pub struct SegmentSource { pub addr: Address, pub kept: u64, pub dropped: u64 }
@@ -1872,7 +1811,7 @@ impl FrozenSegment {
 1. **来源行只有一个作者。** `prompt_payload` 的两条分支合成一条：每一行的 `slot`／`hash`／`len`／`sources`／`skipped` 都从段本身取，`breakpoints` 恒上线。由此，在城里装配的 prefix 与照计划装配的 prefix 在同样的键下写同样的行，`rebuild_prefix` 读的仍是它一直在读的那四个键（`addr`／`kept`／`marker`／`dropped`）。
 2. **`marker` 由 `dropped > 0` 派生而不是独立字段。** 两个互相蕴含的字段是两个可以互相矛盾的字段。
 3. **没有来源文档的段写空表而不是省略键。** resident 段由身份与目录拼成，不出自任何文件；空表说的是「它不来自文档」，缺席的键说的是「不知道」。
-4. **`breakpoints` 记本次请求实际发出的断点，而不是四个 slot 名。** 行由 `BreakpointPlan::breakpoints()` 拼出，值是段界的 slot 名与 `tail`。类型仍是 `Vec<String>`、键名不变、`#[serde(default)]`，所以旧账照读：旧构建写的是 `["city","building","resident","run"]`，那是 slot 清单，其中 `run` 段界从未在请求里出现过。**被否**：保留 slot 清单另加一个 `plan` 键——那样账上仍有一行名为断点却不是断点的数据，读者要自己知道该信哪一个。
+4. **`breakpoints` 记本次请求实际发出的断点，而不是四个 slot 名。** 行由 `BreakpointPlan::breakpoints()` 拼出，值是段界的 slot 名与 `tail`。类型仍是 `Vec<String>`、键名不变、`#[serde(default)]`，所以写着 `["city","building","resident","run"]` 的记录照读：那是 slot 清单，其中 `run` 段界从未在请求里出现过。**被否**：保留 slot 清单另加一个 `plan` 键——那样账上仍有一行名为断点却不是断点的数据，读者要自己知道该信哪一个。
 
 5. **`prompt_assembled` 每个 run 只写一条。** `turn::prompt::PromptRecord` 记着本 run 最后写下的载荷；`assemble` 照常算出本回合的载荷，与之相等就不写，不等才写并记住。prefix 在 run 内冻结，断点计划只随「对话是否为空」变，所以此后各回合的行是第一条的逐字拷贝；回合间真正会动的请求区域由 `prompt_shape_compared` 逐回合记，尾锚恒落在最后一条消息上，无须逐回合重述。比较的是载荷本身而不是「是不是第一回合」：哪天某个回合的载荷真的变了，账上就多一条，账本不会替一个请求声称它没带的断点。读者据此按 run 取段：`memory::attribution` 以 run 为键保存段权重（memory-SPEC），`sprawling::views::prefix` 读一跑的第一条。旧账每回合一条，照读，因为同一 run 的各条相同。**被否**：之后的回合写一条引用首条的短记录——它不携任何读者需要的事实，只多一行链。
 
@@ -1887,13 +1826,13 @@ fn scratch_dir(&self, id: BacklogId) -> PathBuf;             // temp/sprawling-<
 
 **三条口径：**
 
-1. **`BacklogId` 与目录名回答的是两个问题。** id 在**一个** backlog 内部指认一个成员，下一个 backlog 的 id 又从 1 开始；而目录落在整台机器共用的临时目录里。旧名字是 `sprawling-<pid>-<id>`，等于假定那个计数器是进程全局的——它不是。同一进程开两个 backlog，两者的第一条命令必然撞同一个路径。
+1. **`BacklogId` 与目录名回答的是两个问题。** id 在**一个** backlog 内部指认一个成员，下一个 backlog 的 id 又从 1 开始；而目录落在整台机器共用的临时目录里。只用 `<pid>-<id>` 起名，等于假定那个计数器是进程全局的——它不是。同一进程开两个 backlog，两者的第一条命令必然撞同一个路径。
 2. **撞上之后是无声的。** `File::create` 截断另一方正在写的文件，`collect` 读完即 `remove_dir_all`，删掉另一方还在写的目录。人看到的是一条**退出码为 0、输出为空**的命令——既不报错也不重试，因为从每一方各自的角度看都一切正常。
-3. **生产今天只开一个 backlog，所以这是测试套件先撞上的。** `bin::assembly::lifetime` 全进程一个，而每个跑命令的测试各开一个、`cargo test` 又让它们同时跑。这不构成「只是测试问题」：把唯一性建立在「调用方只会开一个」之上，是把一条不变量交给调用方保管。`backlog::tests` 直接判目录名而不去赛跑两条命令——缺陷本身是确定的，只有损害是时序性的。
+3. **生产只开一个 backlog，唯一性照样不交给调用方。** `bin::assembly::lifetime` 全进程一个，而每个跑命令的测试各开一个、`cargo test` 又让它们同时跑。这不构成「只是测试问题」：把唯一性建立在「调用方只会开一个」之上，是把一条不变量交给调用方保管。`backlog::tests` 直接判目录名而不去赛跑两条命令——缺陷本身是确定的，只有损害是时序性的。
 
-### 8-41 回合带进账本的明文，必经打码那道门（S-02）
+### 8-41 回合带进账本的明文，必经打码那道门
 
-**不变量：`tool_called`、`tool_result`、`model_returned` 三类事件的载荷，在写进账本之前逐串跑过 `kernel::scan`，命中的区段换成 `secret:redacted/<b3-16>` 标记。** 此前只有 `model_returned` 受这条约束，工具参数与工具结果**逐字**入账：一次 `read` 读出的别人项目的 `.env` 正文、一次 `exec` 的 stdout，就此进入只增且可导出的历史。账本不可重写，所以这类损害不可逆——这是它排在安全清单最前的理由。
+**不变量：`tool_called`、`tool_result`、`model_returned` 三类事件的载荷，在写进账本之前逐串跑过 `kernel::scan`，命中的区段换成 `secret:redacted/<b3-16>` 标记。** 三类都要：工具参数与工具结果若**逐字**入账，一次 `read` 读出的别人项目的 `.env` 正文、一次 `exec` 的 stdout，就会进入只增且可导出的历史。账本不可重写，所以这类损害不可逆——这是它排在安全清单最前的理由。
 
 ```rust
 // turn/ledger.rs —— 本模块通往账本的唯一一道门
@@ -1950,11 +1889,9 @@ pub fn splice(text: &str, front: usize, back: usize, place: Elided) -> Cut;
 
 **关门测试**（`elision::tests` 与 `compaction::tests`）：`splice` 的 `dropped` 加上去掉标记后的长度恒等于输入长度——**对任意一对下标成立**，包括落在字符内部的与顺序颠倒的一对（proptest 量化，不是举例）；任何切口落在字符边界；`compact` 对一段日志报出的丢弃量与幸存字节数加起来是原文长度。
 
-### 8-44 turn::recovery —— 模型调用恢复管线的段契约（形状 2 值＋形状 3 内缝）
+### 8-49 turn::recovery —— 模型调用恢复管线的段契约（形状 2 值＋形状 3 内缝）
 
-**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`AxError::retry`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
-**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`is_retriable`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
-
+**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`AxError::retry`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语说由 watchdog 退避后再发同一个请求，段对那一族恒 `Skipped`。
 ```rust
 // turn/recovery.rs（形状 2 值＋形状 3 内缝；pub(super)：turn 之外没有第二个用户）
 pub(super) enum SegmentOutcome {
@@ -1995,16 +1932,16 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 
 **被否（各记理由与会重开它的参数）：**
 
-- **eve 的空响应 nudge 段**：「一条什么都没说的回复」意味着什么，§8-37 的 `concluded` 是唯一判定处（`Completion::Limit`），调用层再判一次就是第二个家，而 nudge 重发还会改写那条以供应方真实报文钉住的剧本。参数：有"空响应是瞬态"的实测数据时，与 §8-37 一同重开。
-- **eve 的「剔除被拒工具后重发」段**：本仓的 provider 拒绝从不回引 body（`ProviderFailure::Refused`），没有类型化触发点可依，靠错误文本嗅探即造脆弱权威；无声砍工具是能力的静默降级，与"拒答即声明"相悖。参数：gateway 的拒绝族带上类型化的拒绝面之后重开。
-- **eve 的「补悬空 tool_result 后重发」段**：回合窗口按构造无悬空调用（被取消的回合不入窗；`fold_run` 遇开波回退到上一安全点），触发点不存在；账本侧关帐的权威在 `replay::resume`，不写第二份。参数：出现能把悬空对话推进窗口的新入口时重开。
+- **空响应后追问一句的段**：「一条什么都没说的回复」意味着什么，§8-37 的 `concluded` 是唯一判定处（`Completion::Limit`），调用层再判一次就是第二个家，而 nudge 重发还会改写那条以供应方真实报文钉住的剧本。参数：有"空响应是瞬态"的实测数据时，与 §8-37 一同重开。
+- **「剔除被拒工具后重发」段**：本仓的 provider 拒绝从不回引 body（`ProviderFailure::Refused`），没有类型化触发点可依，靠错误文本嗅探即造脆弱权威；无声砍工具是能力的静默降级，与"拒答即声明"相悖。参数：gateway 的拒绝族带上类型化的拒绝面之后重开。
+- **「补悬空 tool_result 后重发」段**：回合窗口按构造无悬空调用（被取消的回合不入窗；`fold_run` 遇开波回退到上一安全点），触发点不存在；账本侧关帐的权威在 `replay::resume`，不写第二份。参数：出现能把悬空对话推进窗口的新入口时重开。
 - **盲重试段（对可重试失败原样重发）**：该判定属于 watchdog 与 `gateway::admission`（§8-9：watchdog 只判断还有没有下一次），段越权即第二个重试权威。
 - **`Skipped` 无载荷（unit 变体）**：结构上确实吞不掉错误，但"这一段转手的是哪个错误"也在答案里读不出来了，而谁把什么交给谁正是段契约要陈述的事实。
 - **段＝闭枚举（形状 6）**：多段场景只能靠触发点拼装，契约测不直接，且新修复进来即改枚举与全部 match。trait 的第二实现是测试里的记账段（本仓缝规则认可的替身一族：测试时钟、计数店）。
 
 ### 8-43 重试上限住 kernel
 
-两个 crate 互不依赖，而 gateway 决定要不要再发一次请求、`Watchdog` 决定要不要冻结这次运行，读的是同一个事实——所以 `Retries` 住 `kernel::retries`，两边都直接用 `kernel::Retries`，不再导出别名：别名让读者以为有两个类型，调用点于是写出一个两臂恒等的 `match` 去「转换」它们。
+两个 crate 互不依赖，而 gateway 决定要不要再发一次请求、`Watchdog` 决定要不要冻结这次运行，读的是同一个事实——所以 `Retries` 住 `kernel::retries`，两边都直接用 `kernel::Retries`，不导出别名：别名让读者以为有两个类型，调用点于是写出一个两臂恒等的 `match` 去「转换」它们。
 
 ### 8-44 runtime::compaction::exchange（形状 2 值＋形状 1 判定）：回合边界的压缩
 
@@ -2038,7 +1975,7 @@ pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes;   // 按声明的 Effect �
 - **波的分类**：没有调用 → `Empty`；每个调用的 `RunHooks::writes` 都答 `Nothing` → `ReadOnly`；否则 `MayWrite`。
 - **判定表**：`Changed`（上次 fence 后跑过可能写的调用）→ `Stage`，空波与只读波也一样；`Unfenced` 且 `MayWrite` → `Stage`；`Unfenced` 且 `Empty`／`ReadOnly` → `Skip`（树就是 run 开张时那棵）；`Fenced`（fence 之后没有可能写的调用跑过）→ `Skip`，上一个提交已经是这棵树。
 - **状态转移**：`MayWrite` → `Changed`（被取消打断的波也算，它的部分调用可能已经跑了）；`Empty`／`ReadOnly` 且立了 fence → `Fenced`；`Empty`／`ReadOnly` 且跳过 → 不变。只读波不改树，所以它既不需要自己的 fence，也不让下一波的 fence 多出一次提交。`Run<Active>` 持一个 `FencePolicy`，`advance` 只在 `Stage` 时调用 `RunHooks::fence` 并写 `checkpoint_committed`。
-- **为什么是一个模块**：「这一波要不要 fence」原本是 `advance` 里的一句 `if let Some(fence)`，答案恒为「要」。收成一个判定之后，后面两条规则（只读波、按写过的路径 stage）都只改这一处。
+- **为什么是一个模块**：「这一波要不要 fence」是一个判定，后面两条规则（只读波、按写过的路径 stage）都只改这一处。
 - **`Stage` 带什么由调用方定**：`RunHooks::fence` 仍只收时刻；stage 哪些路径，由持有 `ToolBench` 的一侧决定，因为只有 bench 知道每个调用的工具。`ToolBench::invoke` 在 `BenchOutcome::Ran.wrote` 里交回工具的 `Tool::writes`（kernel-SPEC `Writes`）；sprawling 的 lane 把上次 fence 以来各调用的 `wrote` 用 `Writes::and` 并起来，下一次 fence 只 stage 这些路径，并在 fence 后清零。run 的第一次 fence、以及并出来是 `Domain` 或 `Nothing` 的那次，stage 整个写域：第一次之前的树没有任何本 run 的提交担保；`Nothing` 出现在 run 的第一道 fence：那时还没有调用跑过。**失败的调用并入 `Domain`**：`ToolBench::invoke` 答 `Err` 时没有 `wrote`，而工具可能写到一半才失败，它自己对写了什么的说法不再可信；lane 于是把 `Domain` 并进去，下一次 fence stage 整个写域。只丢掉它、留下同波其他调用的 `Paths`，会让那半截写不进任何提交。**被否**：`RunHooks::fence` 收一个范围参数——run 驱动拿不到工具的 `Effect`，这个参数只能由 lane 填，等于把同一个并集在两层各拼一次。
 - **调用可能不可能写，由 `RunHooks::writes` 答**：`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里，所以 lane 在把 bench 借给 `invoke` 之前取出 `ToolBench::declared_writes`（名字到 `Writes::of(effect)` 的表），`writes` 查这张表。它按声明答，不按参数答：判定发生在波跑之前，而 `Tool::writes` 读的是一条跑完的调用。**被否**：`RunPlan` 带名字到 `Effect` 的表——`RunPlan` 是冻结的 run 描述，进账本的重放读它，而工具的 `Effect` 是 bench 注册时的事实，不该在两处各记一份。
 - **否决「空波一律跳过」**：结束回合的空波前那次 fence，是把上一波的写带进提交的唯一时机；跳过它，run 写下的文件就没有任何提交持有。
@@ -2068,7 +2005,7 @@ impl Conversation {
 - **规则**：`Conversation` 记下上次组装发出了几条消息（`sent`）。user 文本（steer、提醒）只并入**尚未发出**的最后一条 User 消息；最后一条 User 消息已经发出时，文本进一个待投槽（`held`），由下一次 `push_tool_results` 接在这一波结果之后，即词汇表里 Steer 的落点「下一份工具结果的末尾」。待投槽不在 `messages()` 里，所以它永远不会出现在一条它到达之前就已组好的请求中。
 - **调用点**：活的 run 在 `Turn::assemble` 答出 `Advanced` 之后调一次（`run::lifecycle`）；`fork` 在读到本 run 的 `prompt_shape_compared` 时调一次：`prompt_assembled` 每个 run 只写一次（8-39），而 `prompt_shape_compared` 是每一回合组装之后紧接着写的那一行。两边的标记来自同一个事实（这一回合的请求组好了），所以分支按同一规则重放出同样的字节。
 - **理由**：`BeforeCall`／`BeforeWave`／`BeforeToolCall`／`BeforeSpawn` 四个安全点都在组装之后，那时窗口最后一条仍是刚随请求发出的 User 消息。把 steer 并进去，下一次请求里 steer 排在一条没读过它的助手回复之前：模型看到的时间顺序是假的，而且已发出消息的字节变了，provider 的前缀缓存从这条消息起全部失效。
-- **字节**：`fixtures/golden-p0` 的剧本在第 0 回合收到 steer，第二次请求的 run 区域因此换了字节，账本自 `prompt_shape_compared` 起重生（`GOLDEN_WRITE=1`）。
+- **字节**：`fixtures/golden-p0` 的剧本在第 0 回合收到 steer，它第二次请求的 run 区域在工具结果之后带着这条 steer。
 - **例外：空回复之后的工具结果**：一条没有内容的回复不推助手消息，所以随后的 `push_tool_results` 碰到的最后一条仍是已发出的 User 消息。结果和待投文字并进这条消息，它的字节因此变了，provider 的前缀缓存从这条消息起失效。这里接受改写，因为另一条路是在它之后另开一条 User 消息，即被否的①：两条相邻的 User 消息是入口不变量要排除的形状。时间顺序仍然是真的：这条消息之后没有模型读过的回复。改写之后这条消息重新算作未发出（`sent` 退到它之前），所以在下一次组装之前到达的 steer 并进它，排在这批结果之后，不再多等一波。
 - **一条回复没有任何调用时**：run 就此结束（8-37），待投文字不再有下一次组装；它已由 `steer_received` 入账，账本仍是它的来历。
 - **fork 的切点落在一波之内时**：这一波整波丢弃（半个交换没有 provider 接受），分支只继承 `messages()`，待投槽里的文字不随分支走。待投文字只在「组装之后、这一波结果之前」存在，所以它针对的正是被丢弃的那一波；分支从没看到那一波，把它接到分支的第一条消息里，模型会读到一句指向不存在的上下文的话。这段文字已由 `steer_received` 入账，母 run 的账本仍是它的来历。被否：让 `Inherited` 带上待投文字——分支的首条 User 消息会以一句针对别人那一波的 steer 开头。

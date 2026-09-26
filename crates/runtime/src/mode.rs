@@ -7,13 +7,13 @@
 //! catalog lists only that one (progressive disclosure — the other modes'
 //! semantics stay out of the window).
 //!
-//! One exception, and it is one line long: [`change_modes_line`] names
-//! the self-change modes a run is *not* in. Without it an agent working
+//! One exception, and it is one line long: [`dev_entry`] tells a run
+//! that this city's own code is changeable, and names its modes. Without it an agent working
 //! in this city never learns that the city's own code and SPECs are
 //! changeable at all, or under what discipline — and a capability nobody
 //! is told about is one nobody uses.
 //!
-//! P3 adds the half that decides: [`admits`] says whether what a run
+//! The half that decides is [`admits`]: it says whether what a run
 //! produced may land, given the mode it was in. The evidence arrives as
 //! plain answers rather than as an instrument's type, because the
 //! instruments live in citysim, outside this crate, and the question
@@ -80,7 +80,7 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
         ),
         Mode::Ud => (
             "upgrade-with-double-validation mode: change behavior behind held-out evidence",
-            "A behavior change needs held-in and held-out evidence before adoption (P3 wires the gates).",
+            "A behavior change needs held-in and held-out evidence before adoption.",
         ),
         Mode::Experiment => (
             "experiment mode: explore without landing anything",

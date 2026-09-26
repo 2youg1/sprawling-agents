@@ -80,10 +80,9 @@ pub enum Strategy {
 /// What has to happen to one piece of text: decided here, carried out
 /// by the caller.
 ///
-/// Exhaustive, and `MustOffload` is why it exists. This module used to
-/// answer "do not shorten it" with a strategy the caller was free to
-/// read as "shorten it plainly, then", and the caller did - which left
-/// one crate holding two answers to whether structured data may be
+/// Exhaustive, and `MustOffload` is why it exists: "do not shorten it"
+/// is an answer the caller cannot read as "shorten it plainly, then",
+/// so this crate holds one answer to whether structured data may be
 /// truncated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shrink {

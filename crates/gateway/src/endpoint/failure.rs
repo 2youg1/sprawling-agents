@@ -33,10 +33,10 @@ fn transport_detail(err: &reqwest::Error) -> String {
 /// exchange that never completed carries no answer, so the same request
 /// may go out again, and so may one the provider answered with "busy"
 /// or "broken"; an answer that says the request itself is wrong would
-/// be given identically next time. Before this type every call site built its
-/// own error and none opted in, which made the default
-/// `Retries::UntilHalted` worth zero retries in practice — one
-/// transient disconnect ended a sub-run for good.
+/// be given identically next time. Every call site builds its error
+/// through this type, so the default `Retries::UntilHalted` holds for
+/// every retriable failure and one transient disconnect does not end a
+/// sub-run.
 #[derive(Debug)]
 pub(crate) enum ProviderFailure<'e> {
     /// The exchange never completed: the request did not reach the
