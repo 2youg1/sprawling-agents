@@ -3522,5 +3522,89 @@
   "results_session_earlier": {
     "en": "earlier sessions",
     "zh": "更早的会话"
+  },
+  "mon_monitor": {
+    "en": "following this run",
+    "zh": "跟随这个 run"
+  },
+  "mon_code": {
+    "en": "code",
+    "zh": "代码"
+  },
+  "mon_files_n": {
+    "en": "{n} files changed",
+    "zh": "改了 {n} 个文件"
+  },
+  "mon_following": {
+    "en": "following",
+    "zh": "跟随中"
+  },
+  "mon_paused": {
+    "en": "paused - F to follow",
+    "zh": "已暂停，按 F 继续跟随"
+  },
+  "mon_terminal_open": {
+    "en": "show the terminal",
+    "zh": "展开终端"
+  },
+  "mon_terminal_fold": {
+    "en": "fold the terminal",
+    "zh": "收起终端"
+  },
+  "mon_files": {
+    "en": "changed files",
+    "zh": "改过的文件"
+  },
+  "mon_terminal": {
+    "en": "terminal",
+    "zh": "终端"
+  },
+  "mon_nothing_changed": {
+    "en": "No file changed yet.",
+    "zh": "还没有改动任何文件。"
+  },
+  "mon_nothing_ran": {
+    "en": "No call made yet.",
+    "zh": "还没有发出任何调用。"
+  },
+  "mon_exited": {
+    "en": "exit {code}",
+    "zh": "退出码 {code}"
+  },
+  "mon_stopped": {
+    "en": "stopped: {why}",
+    "zh": "被停下：{why}"
+  },
+  "mon_running": {
+    "en": "running",
+    "zh": "运行中"
+  },
+  "mon_unread": {
+    "en": "no exit code",
+    "zh": "没有退出码"
+  },
+  "mon_lines_cut": {
+    "en": "{n} more lines are in the ledger",
+    "zh": "账本里还有 {n} 行"
+  },
+  "mon_comment": {
+    "en": "comment",
+    "zh": "写意见"
+  },
+  "mon_revert": {
+    "en": "revert this hunk",
+    "zh": "撤回这块"
+  },
+  "mon_comment_draft": {
+    "en": "About {path}, line {line}: ",
+    "zh": "关于 {path} 第 {line} 行："
+  },
+  "mon_revert_steer": {
+    "en": "Revert this change in {path} with the edit tool, against the file's current version. Replace\n```\n{now}\n```\nwith\n```\n{was}\n```",
+    "zh": "请用 edit 工具、基于 {path} 的当前版本撤回这处改动。把\n```\n{now}\n```\n换回\n```\n{was}\n```"
+  },
+  "run_monitor": {
+    "en": "monitor",
+    "zh": "监视器"
   }
 }

@@ -133,6 +133,7 @@ export function ui(): Ui {
     conn: {
       state: readable<LinkState>({ kind: "idle" }),
       belief: createBelief(() => 0).belief,
+      live: readable({}),
       asking: {
         ask: () => readable<Answer | undefined>(undefined),
         refresh: () => undefined,

@@ -3087,6 +3087,25 @@ export const Lagged = Schema.Struct({
 export type Lagged = typeof Lagged.Type;
 
 /**
+ * Which of a command's two outputs a piece came from.
+ */
+export const OutputStream = Schema.Literal("out", "err").annotations({ identifier: "OutputStream" });
+export type OutputStream = typeof OutputStream.Type;
+
+/**
+ * One piece of a running command's output, on its way to a page.
+ * 
+ * `text` is decoded lossily: a piece ends at a byte bound, which can
+ * fall inside a character, and the settled result is what a page keeps.
+ */
+export const LiveOutput = Schema.Struct({
+  run: RunId,
+  stream: OutputStream,
+  text: Schema.String,
+}).annotations({ identifier: "LiveOutput" });
+export type LiveOutput = typeof LiveOutput.Type;
+
+/**
  * Who reads a log line, and when.
  * 
  * The five `docs/logging.md` names, spelled on the wire exactly as
@@ -3155,6 +3174,9 @@ export const ServerFrame = Schema.Union(
   }),
   Schema.Struct({
     lagged: Lagged,
+  }),
+  Schema.Struct({
+    output: LiveOutput,
   }),
 ).annotations({ identifier: "ServerFrame" });
 export type ServerFrame = typeof ServerFrame.Type;

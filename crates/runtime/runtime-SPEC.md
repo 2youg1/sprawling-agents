@@ -1381,6 +1381,41 @@ impl Backlog {
 
 **红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
+#### 8-28-3 exec 输出的实时流（已接：读增量、装配点注入、线上帧、服务端与页面两段缓冲）
+
+**现状**：一个 `exec` 调用的 stdout／stderr 只在调用结束时随工具结果进账本，页面（client 的监视器）在那之前只看得到「运行中」。第 2 条让输出写进 scratch 下的 `out`／`err` 两个文件，所以实时流不需要改子进程怎么写，只需要有人在它还在写时读这两个文件的增量。
+
+**已接的一段——`runtime::backlog::tail`（shape：adapter）**：
+
+```rust
+pub enum Stream { Out, Err }                          // 恒不是 bool
+pub struct Chunk { pub run: RunId, pub member: BacklogId, pub stream: Stream, pub bytes: Vec<u8> }
+#[derive(Clone)] pub struct Sink(/* Arc<dyn Fn(Chunk) + Send + Sync> */);
+impl Sink { pub fn new(deliver: impl Fn(Chunk) + Send + Sync + 'static) -> Sink; }
+impl Backlog { pub fn with_sink(self, sink: Sink) -> Backlog; }
+impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms × READ_BYTES_PER_MS
+```
+
+- 没有失败返回：读增量是可丢弃的预览，账本里的工具结果才是这段输出的权威；一次读失败只让这一拍少送一块，下一拍从同一偏移再读，偏移只在真的读到字节后前移。
+- `READ_BYTES_PER_MS = 64`（每秒 64 KiB，一个人在页面上读得过来的上界的数倍），一拍的上界由它乘间隔得出，stdout 与 stderr 各得一半，所以刷屏的 stdout 饿不死 stderr。
+- 决定：sink 是一个闭包而不是 trait——今天只有一个生产装配者（服务端扇出）与一个测试收集者，两者都只要「交出一块」这一个动作。
+
+- 窗口里的读停在交给后台那一刻，偏移随成员进表；此后本 run 的每次 `harvest` 对它自己的、仍在跑的后台命令从同一偏移接着读。块在放开表锁之后才交给 sink，所以 sink 慢不会让表上其他调用等它。
+
+**已接的第二段——装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `channels::LiveOutput`（channels-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
+
+**已接的第三段——页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
+
+**已接的第四段——服务端缓冲**：`sprawling::serving::output_ring`（sprawling-SPEC §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（channels-SPEC §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
+
+**设计**（四段共同遵守的规则）：
+
+- **读的地方是短窗口的轮询，不另起线程**。`Backlog::run` 每一拍轮询在 `settle` 之后按上次的偏移读两个文件新增的字节，交给调用方注入的一个 sink；窗口外交给后台的命令由 `harvest` 那一拍同样读增量。sink 缺席（citysim、replay、没人看的城）时一个字节都不读，行为与今天相同。
+- **每拍读的字节有上界**，按 `PollBudget` 的间隔推出而不写死：一拍最多读 `READ_PER_POLL` 字节，读不完的留到下一拍，所以一个刷屏的子进程让页面落后，而不让轮询变慢。
+- **服务端每个 run 一个有界环形缓冲**，按字节计上界，满了丢最旧的整块；后来打开 run 页的会话先拿到缓冲里的内容，再接实时帧。丢了多少不上线：`LiveOutput` 没有这一栏，而加一栏要让 `WIRE_V` 再加一，换来的只是预览里的一个数——调用落账时整段输出本来就会到。缓冲在这次调用的 `tool_returned` 落账时清空，因为那时账本里的结果是这段输出唯一的权威。
+- **线上是一种新的 `ServerFrame`**，与 `Delta` 同一条规则：可丢弃，不带账本序号，调用的结果落账时页面扔掉它，两者不一致时账本赢。这一帧让 `WIRE_V` 加一并重新生成 `client/src/wire.ts`。
+- **页面也是有界环形缓冲**，按行计，监视器的终端记录画它；溢出的行数照 `mon_lines_cut` 的样子说出来。
+
 ### 8-29 runtime::tools::read 区间读（字节预算）
 
 **两道天花板，紧的那道说了算。** 512 行界定一次作答携带多少**结构**；`INTERVAL_CAP_BYTES`（64 KiB）界定它花掉窗口的多少**字节**——本仓源码一行约四十字节，而一个生成物可以整份压在一行里，故行上限单独不成其为界。

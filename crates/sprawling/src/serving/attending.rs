@@ -27,10 +27,11 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, RunId};
+use kernel::{AxCode, AxError, EventRecord, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
 use super::folding::{Broadcast, Folding, spawn_folding};
+use super::output_ring::OutputRing;
 use super::relay::Patience;
 use super::serve::Opening;
 use crate::assembly::{RunWorker, Serving, now_ms};
@@ -48,6 +49,9 @@ pub(super) struct Outward {
     pub(super) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
     pub(super) to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
     pub(super) head: Arc<channels::LedgerHead>,
+    pub(super) to_readers: tokio::sync::broadcast::Sender<channels::LiveOutput>,
+    /// What running commands already wrote, for a page opening late.
+    pub(super) kept: Arc<OutputRing>,
 }
 
 /// The thread, and the one thing it opens that something else needs.
@@ -78,6 +82,8 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         to_clients,
         to_watchers,
         head,
+        to_readers,
+        kept,
     } = outward;
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
@@ -122,16 +128,27 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             // worker that streamed to a page unable to interrupt it
             // would be the state this type exists to make unsayable.
             let interrupt_desk = Arc::clone(&worker_desk);
+            let keeping = Arc::clone(&kept);
             worker.serve(Serving {
                 deltas: std::sync::Arc::new(move |delta: channels::Delta| {
                     // No subscribers is not a failure: a city with no
                     // browser open is a city doing its work.
                     drop(to_watchers.send(delta));
                 }),
+                outputs: std::sync::Arc::new(move |piece: channels::LiveOutput| {
+                    keeping.keep(&piece);
+                    drop(to_readers.send(piece));
+                }),
                 machine,
                 interrupts: Arc::new(move |run: RunId| interrupt_desk.interrupt_for(run)),
             });
-            worker.observe(observer);
+            // The tail is emptied on this thread, right after the result
+            // is written, so no piece of that call can arrive after it.
+            let mut folding = observer;
+            worker.observe(Box::new(move |record: &EventRecord| {
+                kept.settle(record);
+                folding(record);
+            }));
             attend(&mut worker, &worker_desk);
             // Dropping the worker drops the observer, which closes the
             // fold's channel; what is still in it is folded and

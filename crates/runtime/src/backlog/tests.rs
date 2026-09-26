@@ -114,3 +114,98 @@ fn a_release_terminates_what_the_ended_run_left_running() {
     }
     panic!("a released command is still running five seconds later");
 }
+
+/// A watched command's output reaches the sink while the command still
+/// runs, in pieces no larger than one poll reads, so a page can show a
+/// build's first line before the build is handed to the background.
+#[test]
+fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
+    let window = crate::PollBudget::new(40, 10);
+    let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = pieces.clone();
+    let backlog = Backlog::with_window(window).with_sink(super::Sink::new(move |chunk| {
+        seen.lock().unwrap().push(chunk)
+    }));
+    let mut talking = if cfg!(windows) {
+        let mut command = std::process::Command::new("cmd");
+        command.args(["/C", "echo live& ping -n 3 127.0.0.1 >NUL"]);
+        command
+    } else {
+        let mut command = std::process::Command::new("sh");
+        command.args(["-c", "echo live; sleep 2"]);
+        command
+    };
+    talking.current_dir(std::env::temp_dir());
+    let owner = kernel::RunId::from_bytes([3; 16]);
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    let started = backlog
+        .run(owner, &addr, "talking".to_owned(), talking)
+        .unwrap();
+    assert!(matches!(started, crate::Started::Backgrounded { .. }));
+    let pieces = pieces.lock().unwrap();
+    assert!(pieces.iter().all(|piece| piece.run == owner
+        && piece.stream == super::Stream::Out
+        && piece.bytes.len() <= window.read_per_poll().div_ceil(2)));
+    let out: Vec<u8> = pieces
+        .iter()
+        .flat_map(|piece| piece.bytes.clone())
+        .collect();
+    assert!(
+        String::from_utf8_lossy(&out).starts_with("live"),
+        "the sink saw {out:?} before the window closed"
+    );
+    drop(pieces);
+    backlog.release(owner);
+}
+
+/// Past its window, a command's output keeps reaching the sink through
+/// its own run's harvest, from where the window stopped reading.
+#[test]
+fn a_backgrounded_command_keeps_reaching_the_sink_through_harvest() {
+    let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = pieces.clone();
+    let backlog = Backlog::with_window(crate::PollBudget::new(1, 1)).with_sink(super::Sink::new(
+        move |chunk| seen.lock().unwrap().push(chunk),
+    ));
+    let mut talking = if cfg!(windows) {
+        let mut command = std::process::Command::new("cmd");
+        command.args([
+            "/C",
+            "echo live& ping -n 2 127.0.0.1 >NUL& echo late& ping -n 3 127.0.0.1 >NUL",
+        ]);
+        command
+    } else {
+        let mut command = std::process::Command::new("sh");
+        command.args(["-c", "echo live; sleep 1; echo late; sleep 2"]);
+        command
+    };
+    talking.current_dir(std::env::temp_dir());
+    let owner = kernel::RunId::from_bytes([4; 16]);
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    let started = backlog
+        .run(owner, &addr, "talking".to_owned(), talking)
+        .unwrap();
+    assert!(matches!(started, crate::Started::Backgrounded { .. }));
+    let late = || {
+        let out: Vec<u8> = pieces
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|piece| piece.bytes.clone())
+            .collect();
+        String::from_utf8_lossy(&out).contains("late")
+    };
+    for _ in 0..150 {
+        assert!(backlog.harvest(owner).unwrap().is_empty());
+        if late() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    backlog.release(owner);
+    assert!(
+        late(),
+        "harvest handed the sink {:?}",
+        pieces.lock().unwrap()
+    );
+}

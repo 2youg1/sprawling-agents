@@ -3811,3 +3811,21 @@ impl RoomQueues {
 - **一个拒绝**：楼里某个房间的队列正借给一个 run（`worked_within`），拒 `E_BUSY`，主语点名房间与 run，恢复是先停下它。房间队列是城里唯一说「这里有人在干活」的账，另开一本会与它分歧；逐个看全部房间，因为地址序把 `lab-2` 排在 `lab` 与 `lab/room1` 之间，按前缀截区间会漏。
 - **先搬后记**：文件先搬进 `.sprawling/removed/`，再写 `building_removed`（载荷 addr、kept），因为这一行说的是「已经搬了」。楼以前写过的每一行都留在账里，什么都不删。
 - 客户端（`client/src/core/removal.ts`）在 City Hall 上不画这个控件，楼里有 run 在跑时画成不可用并说明原因；确认走 `parts/dialog`。城仍自己拒这两种情况，页面只是不把一个只会被拒的按钮交给人。
+
+### 8-90 还在跑的命令写出的字节，给后来打开页面的会话留一段（`bin::serving::output_ring`）
+
+```rust
+// bin::serving::output_ring —— shape: value
+pub(super) struct OutputRing { /* Mutex<BTreeMap<RunId, Kept>> */ }
+impl OutputRing {
+    pub(super) fn keep(&self, piece: &channels::LiveOutput); // 追加；超过上界时丢最旧的整块
+    pub(super) fn settle(&self, record: &EventRecord);       // tool_result 落账：清空这个 run
+    pub(super) fn so_far(&self) -> Vec<channels::LiveOutput>; // 每个 run 按到达次序
+}
+```
+
+- **没有失败返回**：它存的是可丢弃的预览（runtime-SPEC §8-28-3），账本里的结果才是权威；锁中毒时照样取出里面的表，因为每个操作都在一步之内让表保持一致，中毒只说明别的线程在锁外崩了。
+- **上界 `KEPT_BYTES_PER_RUN = 64 KiB`**，等于 runtime 一秒钟最多读出的字节（`READ_BYTES_PER_MS = 64`），也就够页面按 `LIVE_LINES = 400` 行画满两条流（每行约八十字节）。超过就从最旧的一块丢起，但最新的一块总留着，哪怕它自己超过上界。每个 run 的内存因此有上界，没有 run 在跑命令时表是空的。
+- **喂与清在记账线程上同步发生**：`attending` 装给 `Serving::outputs` 的闭包先 `keep` 再广播；装给 `worker.observe` 的观察者先 `settle` 再交给视图折叠。块在这次调用的结果落账之前读出，所以同一线程上的次序保证清空之后不会再收到这次调用的块。
+- **决定**：缓冲住在装配层而不是 `channels`。清空要认出 `tool_result` 这一行，而记账线程的观察者就在这里；放进 `channels` 要让它为这件事再订阅一次事件流。被否的另一种是让每个会话自己记：那只能记它打开之后的块，正好漏掉这个缓冲要补的那一段。
+

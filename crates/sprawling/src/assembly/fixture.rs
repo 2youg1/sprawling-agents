@@ -142,7 +142,7 @@ pub(super) const PLAN_ONE_FREE_ROW: &str = concat!(
 
 /// A control surface that listens for interrupts and nothing else.
 ///
-/// The three sinks are one value and one injection, so a test that
+/// The four sinks are one value and one injection, so a test that
 /// cares about steers says what it does not listen for rather than
 /// reaching for a setter of its own.
 pub(super) fn only_interrupts(
@@ -150,6 +150,7 @@ pub(super) fn only_interrupts(
 ) -> Serving {
     Serving {
         deltas: std::sync::Arc::new(|_delta| {}),
+        outputs: std::sync::Arc::new(|_piece| {}),
         machine: std::sync::Arc::new(|_found| {}),
         interrupts: source,
     }

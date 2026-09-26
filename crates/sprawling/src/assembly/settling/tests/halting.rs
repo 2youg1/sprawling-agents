@@ -125,3 +125,55 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
         "a frozen run is still standing in the backlog"
     );
 }
+
+/// A served city hands what a running command writes to the page while
+/// it still writes it (runtime-SPEC 8-28-3), through the same backlog a
+/// halt reaches.
+#[test]
+fn a_served_city_hands_a_running_commands_output_to_the_page() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = std::sync::Arc::clone(&pieces);
+    let mut serving = only_interrupts(std::sync::Arc::new(|_run| Interrupt::None));
+    serving.outputs = std::sync::Arc::new(move |piece: channels::LiveOutput| {
+        seen.lock().unwrap().push(piece);
+    });
+    worker.serve(serving);
+    let mut talking = if cfg!(windows) {
+        let mut command = std::process::Command::new("cmd");
+        command.args(["/C", "echo live& ping -n 3 127.0.0.1 >NUL"]);
+        command
+    } else {
+        let mut command = std::process::Command::new("sh");
+        command.args(["-c", "echo live; sleep 2"]);
+        command
+    };
+    talking.current_dir(dir.path());
+    let owner = RunId::from_bytes([7; 16]);
+    worker
+        .backlog
+        .run(
+            owner,
+            &Address::parse("lab").unwrap(),
+            "talking".to_owned(),
+            talking,
+        )
+        .unwrap();
+    let pieces = pieces.lock().unwrap();
+    let out: String = pieces
+        .iter()
+        .filter(|piece| piece.run == owner && piece.stream == channels::OutputStream::Out)
+        .map(|piece| piece.text.as_str())
+        .collect();
+    assert!(
+        out.starts_with("live"),
+        "the page saw {pieces:?} while the command ran"
+    );
+}

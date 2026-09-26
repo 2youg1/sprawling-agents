@@ -92,7 +92,7 @@ pub use server::{
 #[cfg(feature = "schema")]
 pub use wire::wire_schema;
 pub use wire::{Answered, Ask, AskId, AskOutcome};
-pub use wire::{ClientFrame, Delta, ServerFrame};
+pub use wire::{ClientFrame, Delta, LiveOutput, OutputStream, ServerFrame};
 pub use wire::{Hello, Query, Welcome};
 pub use wire::{Lagged, LogLevel, LogLine};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};

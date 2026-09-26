@@ -1436,3 +1436,16 @@ Dispatch { addr, task, goal, mode, idem, session, effort, model: Option<String> 
 - **被否：借 `SelectModel` 换 tag 再派活**。`SelectModel` 改的是整座城的配置，会在同时跑着的别人的 run 底下换模型；一次派活的选择只该属于这一次派活。
 - **被否：接受任意 id，在 `main` 的端点上直接调用**。窗口与输出上限是登记时说出的，未登记的 id 没有这两个数，上下文提醒只能量一个没人给过的数。
 - **`WIRE_V` 38→39**：给既有命名帧加字段是「语法换形而名字没换」那一类，§8-1 的 golden 随之变；`client/src/wire.ts` 由 `cargo xtask wire-ts --write` 同集重生成。
+### 8-48 `WIRE_V` 40：`ServerFrame::Output`，一条还在跑的命令写出的字节
+
+```rust
+pub enum ServerFrame { …, Delta(Delta), Log(LogLine), Lagged(Lagged), Output(LiveOutput) }
+pub enum OutputStream { Out, Err }        // 恒不是 bool
+pub struct LiveOutput { pub run: RunId, pub stream: OutputStream, pub text: String }
+```
+
+- **与 `Delta` 同一条规则**：可丢弃，不带账本序号，不进账本；调用的结果以 `tool_returned` 落账时页面扔掉它画的这段，两者不一致时账本赢。
+- **第四条广播通道 `ServeConfig::outputs`**：一条刷屏的命令不该把模型的增量或日志行挤出慢读者的窗口；`RecvError::Lagged` 一言不发地略过，理由与增量相同——漏掉的字节在调用落账时整段到达。
+- **`text` 是 UTF-8 有损解码**，因为一块在字节上界处切开，可能切在一个多字节字符中间；切口处画成替换字符只影响预览，结果以账本为准。**被否**：线上带字节数组——JSON 里一个字节要三四个字符，而页面最终画的是文本。
+- **`ServeConfig::outputs_so_far: Arc<dyn Fn() -> Vec<LiveOutput> + Send + Sync>`**：一个会话在送出 `Welcome` 之后、接实时帧之前调它一次，把还在跑的命令已经写出的字节按原来的次序作为 `Output` 帧送出，所以在命令跑到一半时打开页面的人先看到已经写出的部分。会话先订阅第四条通道再调它，所以一块可能送两遍而不会漏；预览里重复一块无害，漏一块则要等调用落账才补上。缓冲住在装配层（sprawling-SPEC §8-90），因为清空它要看账本里的 `tool_result`，而本 crate 不折叠账本。
+- **`OutputStream` 是 `runtime::Stream` 的第二处拼写而不是第二处权威**：本 crate 的依赖图够不到 `runtime`，映射住在装配层（`sprawling::assembly` 的 `serve`），与 `LogLevel`（§8-32）同一个安排。

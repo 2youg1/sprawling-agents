@@ -6,8 +6,8 @@
 -->
 
 <script lang="ts">
-  // One run under six lenses: where its time went (time), what was said (turns), what it was told
-  // before it said anything (prompt), what it has seen and how full its
+  // One run under seven lenses: where its time went (time), what was said (turns), its code
+  // beside its terminal (monitor), what it was told before it said anything (prompt), what it has seen and how full its
   // window is (context), what moved on disk (changes), and what it left
   // to be checked (evidence). The conversation is the same component
   // the first page draws, so a run reads the same from both doors.
@@ -48,6 +48,8 @@
   import Tabs from "./parts/tabs.svelte";
   import type { Lens } from "./parts/tabs.svelte";
   import Head from "./run/head.svelte";
+  import Monitor from "./monitor/monitor.svelte";
+  import { NO_TAIL } from "../core/live_output";
   import type { Share } from "./run/lanes";
   import { figuresOf } from "./run/lanes";
   import Prompt from "./run/prompt.svelte";
@@ -62,12 +64,13 @@
 
   const { run }: Props = $props();
 
-  type RunLens = "time" | "turns" | "prompt" | "context" | "changes" | "evidence";
+  type RunLens = "time" | "turns" | "monitor" | "prompt" | "context" | "changes" | "evidence";
 
-  const EVERY: readonly RunLens[] = ["time", "turns", "prompt", "context", "changes", "evidence"];
+  const EVERY: readonly RunLens[] = ["time", "turns", "monitor", "prompt", "context", "changes", "evidence"];
   const WORDS: Record<RunLens, Key> = {
     time: "run_time",
     turns: "run_turns",
+    monitor: "run_monitor",
     prompt: "run_prompt",
     context: "run_context",
     changes: "run_changes",
@@ -85,6 +88,7 @@
   const u = ui();
   const lang = u.lang;
   const belief = u.conn.belief;
+  const tails = u.conn.live;
 
   const roundsStore = $derived(u.conn.asking.ask({ rounds: { run } }));
   const rounds = $derived.by((): RoundsAnswer | undefined => {
@@ -200,6 +204,14 @@
     return at === null ? say($lang, "talk_resident") : roomOf(at);
   }
 
+  // A comment on a hunk lands in the composer, unsent: the words wait
+  // in this run's draft and the turns lens, which mounts the composer
+  // and reads the draft as it mounts, is brought forward.
+  function draftSteer(text: string): void {
+    u.prefs.setDraft(run, text);
+    current = "turns";
+  }
+
   function pick(id: string): void {
     const chosen = EVERY.find((each) => each === id);
     if (chosen !== undefined) current = chosen;
@@ -232,6 +244,10 @@
           />
         </div>
       {/if}
+    </div>
+  {:else if eye.id === "monitor"}
+    <div class="flex h-[70vh] min-h-0 flex-col rounded-card border border-edge">
+      <Monitor {turns} tail={$tails[run] ?? NO_TAIL} onDraft={draftSteer} onSteer={(text: string) => u.send(steer(run, text))} />
     </div>
   {:else if eye.id === "prompt"}
     <Prompt {run} />

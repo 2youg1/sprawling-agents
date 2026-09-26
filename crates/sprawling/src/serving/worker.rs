@@ -22,6 +22,7 @@ use kernel::{AxCode, AxError};
 
 use super::attending::{Outward, Started, spawn_worker};
 use super::desk::CommandDesk;
+use super::output_ring::OutputRing;
 use super::serve::Opening;
 use super::serve::Serving;
 use crate::assembly::{Closing, acp_dispatch, fold_city, ledger_dir};
@@ -141,6 +142,11 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // channel would let a talkative model push records out of a slow
     // reader's window.
     let deltas = tokio::sync::broadcast::Sender::new(256);
+    // Running commands' output, on a fourth channel for the same reason.
+    let outputs = tokio::sync::broadcast::Sender::new(256);
+    // And what they already wrote, for a page that opens mid-command.
+    let kept = Arc::new(OutputRing::default());
+    let kept_reader = Arc::clone(&kept);
     // The process log, on the third channel. Its sender was made before
     // the `Diagnostics` was, because the sink is what writes into it.
     let logs = journal.lines();
@@ -198,6 +204,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             to_clients: events.clone(),
             to_watchers: deltas.clone(),
             head: Arc::clone(&head),
+            to_readers: outputs.clone(),
+            kept,
         },
     )?;
 
@@ -221,6 +229,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         events,
         deltas,
         logs,
+        outputs,
+        outputs_so_far: Arc::new(move || kept_reader.so_far()),
         city: city_name,
         head,
         epoch,

@@ -116,6 +116,14 @@ pub struct ServeConfig {
     /// lost nothing. Sharing the event channel would let a city running
     /// at the `wire` floor push history out of that reader's window.
     pub logs: broadcast::Sender<crate::wire::LogLine>,
+    /// What running commands write, while they still write it. A fourth
+    /// channel, so a command flooding its stdout cannot push increments
+    /// or log lines out of a slow reader's window.
+    pub outputs: broadcast::Sender<crate::wire::LiveOutput>,
+    /// What running commands already wrote, in the order they wrote it.
+    /// A session sends it after `Welcome`, having subscribed to
+    /// `outputs` first, so a piece may arrive twice and never not at all.
+    pub outputs_so_far: Arc<dyn Fn() -> Vec<crate::wire::LiveOutput> + Send + Sync>,
     /// Answers a query from the city's derived views.
     pub queries: Answering,
     /// Where an enrolled credential goes. Takes the full [`Command`] and
@@ -176,6 +184,8 @@ pub(crate) struct ShellState {
     pub(crate) events: broadcast::Sender<Committed>,
     pub(crate) deltas: broadcast::Sender<crate::wire::Delta>,
     pub(crate) logs: broadcast::Sender<crate::wire::LogLine>,
+    pub(crate) outputs: broadcast::Sender<crate::wire::LiveOutput>,
+    pub(crate) outputs_so_far: Arc<dyn Fn() -> Vec<crate::wire::LiveOutput> + Send + Sync>,
     pub(crate) queries: Answering,
     pub(crate) secrets: SecretSink,
     pub(crate) acp: AcpSink,
@@ -249,6 +259,8 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         events: config.events.clone(),
         deltas: config.deltas.clone(),
         logs: config.logs.clone(),
+        outputs: config.outputs.clone(),
+        outputs_so_far: Arc::clone(&config.outputs_so_far),
         queries: Arc::clone(&config.queries),
         secrets: Arc::clone(&config.secrets),
         acp: Arc::clone(&config.acp),
