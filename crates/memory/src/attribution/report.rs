@@ -80,17 +80,21 @@ impl Attribution {
         Attribution::default()
     }
 
-    /// Folds one record in. Only `model_returned` moves money; the
-    /// other two kinds set the basis on which the next call is split.
+    /// Folds one record in. Only `model_returned` moves money; two other
+    /// kinds set the basis on which the next call is split, and
+    /// `run_frozen` drops the basis of a run that makes no further call.
     #[expect(
         clippy::wildcard_enum_match_arm,
-        reason = "three kinds carry money or its basis; the rest of the vocabulary is silent here"
+        reason = "four kinds carry money or its basis; the rest of the vocabulary is silent here"
     )]
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError> {
         match record.kind() {
             EventKind::PromptAssembled => {
                 self.segment_weights
                     .insert(record.run(), segment_weights(record.data().as_map()));
+            }
+            EventKind::RunFrozen => {
+                self.segment_weights.remove(&record.run());
             }
             EventKind::ToolResult => {
                 let name = record

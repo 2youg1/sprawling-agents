@@ -330,3 +330,24 @@ fn a_call_is_split_by_its_own_runs_prompt_not_the_latest_in_the_ledger() {
         .collect();
     assert_eq!(billed, vec![("city".to_owned(), 100)]);
 }
+
+/// A whole-ledger fold meets every run the city ever had; a frozen run
+/// makes no further call, so its segment basis is not kept for it.
+#[test]
+fn a_frozen_run_leaves_no_segment_basis_behind() {
+    let run = RunId::from_bytes([3; 16]);
+    let mut attribution = Attribution::new();
+    attribution
+        .apply(&prompt(run, "resident", 1, [1, 1, 1, 1], 4))
+        .unwrap();
+    attribution
+        .apply(&record(
+            run,
+            "resident",
+            2,
+            EventKind::RunFrozen,
+            serde_json::json!({}),
+        ))
+        .unwrap();
+    assert_eq!(attribution.segment_weights, BTreeMap::new());
+}
