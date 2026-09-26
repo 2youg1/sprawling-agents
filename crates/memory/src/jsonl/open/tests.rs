@@ -125,9 +125,16 @@ fn higher_version_fixture_is_refused_with_direction_and_path() {
         .join("..")
         .join("fixtures")
         .join("ledger-v2");
-    let before = fs::read(fixture.join("ledger-00000000000000000000.jsonl")).unwrap();
+    let segment = "ledger-00000000000000000000.jsonl";
+    let before = fs::read(fixture.join(segment)).unwrap();
+    // `open` takes a lock beside the directory it opens, so it opens a copy
+    // and the source tree stays untouched.
+    let scratch = tempfile::tempdir().unwrap();
+    let copy = scratch.path().join("ledger-v2");
+    fs::create_dir(&copy).unwrap();
+    fs::copy(fixture.join(segment), copy.join(segment)).unwrap();
 
-    let outcome = JsonlLedger::open(&fixture, TimeMs::new(0));
+    let outcome = JsonlLedger::open(&copy, TimeMs::new(0));
     let err = outcome.err().expect("v2 fixture must refuse to open");
     match &err {
         MemoryError::VersionAhead { path, v } => {
@@ -140,8 +147,12 @@ fn higher_version_fixture_is_refused_with_direction_and_path() {
     assert_eq!(ax.code(), &AxCode::LogVersionUnsupported);
     assert!(ax.to_string().contains("newer"), "direction must be spoken");
 
-    let after = fs::read(fixture.join("ledger-00000000000000000000.jsonl")).unwrap();
+    let after = fs::read(copy.join(segment)).unwrap();
     assert_eq!(before, after, "browsing must never rewrite (A16)");
+    assert!(
+        !fixture.with_extension("lock").exists(),
+        "a test must not write into the source tree"
+    );
 }
 /// A `v` below the first version anybody wrote is refused for being
 /// that, wherever it sits. It used to be refused as a broken chain when

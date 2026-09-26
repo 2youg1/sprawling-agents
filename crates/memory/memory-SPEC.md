@@ -148,7 +148,8 @@ impl WriterLock {
 }
 ```
 
-- **锁文件在账本目录旁边，不在里面。** 账本目录的读者把目录里的每一项都当历史：`has_history` 问「有没有条目」，`bundle` 逐文件拷贝。锁文件放进去，就会被当成一段历史拷进 bundle，而且 Windows 上另一个句柄读一个被锁住的文件会失败。`.sprawling/` 根是保留子树，本来就不随 bund- **每个账本目录都锁，锁路径只由 `dir` 推出。** `open_faulty` 不取锁：FaultFs 的盘只存在于这个进程里。理由见 §12 `LedgerHeld`。这个进程里。
+- **锁文件在账本目录旁边，不在里面。** 账本目录的读者把目录里的每一项都当历史：`has_history` 问「有没有条目」，`bundle` 逐文件拷贝。锁文件放进去，就会被当成一段历史拷进 bundle，而且 Windows 上另一个句柄读一个被锁住的文件会失败。`.sprawling/` 根是保留子树，本来就不随 bundle 走。
+- **每个账本目录都锁，锁路径只由 `dir` 推出。** `open_faulty` 不取锁：FaultFs 的盘只存在于这个进程里。理由见 §12 `LedgerHeld`。
 - **同一进程里的第二个句柄同样被拒。** `try_lock` 在 Windows 上是 `LockFileEx`，在 Unix 上是 `flock`，两者都按打开的句柄算，不按进程算。所以「一个进程里开两个 `JsonlLedger`」也被拒，这就是跨进程性质在单进程里可测的形式（`open/tests.rs` 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go`）。
 - **锁文件不删。** 放锁时删文件，会留下一个窗口：先到者还持着旧文件上的锁，后到者已经在同名的新文件上拿到了锁。一个空文件不花任何代价。
 - **锁文件不在就建，连同 `.sprawling/`。** 建不了这个文件，或者操作系统答不了这次取锁（答的不是「已被持有」），都是 `Io`→`E_STORAGE_FATAL`，subject 是锁文件的路径：连锁文件都写不了的城，也写不了账本。
