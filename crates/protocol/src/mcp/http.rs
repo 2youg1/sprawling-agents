@@ -79,7 +79,7 @@ impl HttpServer {
         // key the vault does not hold is a configuration error and not a
         // server that happens to be down.
         let headers = redeem(headers, resolve, "reach an mcp server")?;
-        let client = client_for(url)?;
+        let client = client_for(url, WholeRequest::DefaultTimeout)?;
         Ok(HttpServer {
             url: url.to_owned(),
             headers,
@@ -290,6 +290,16 @@ fn one_message(body: &str) -> Option<String> {
         .filter(|line| line.starts_with('{'))
 }
 
+/// How long one request of a client may run from its first byte to the
+/// end of its body.
+pub(super) enum WholeRequest {
+    /// The blocking client's default (30 s): a post and its answer.
+    DefaultTimeout,
+    /// No bound, for a body that is the whole conversation; every post
+    /// on such a client names its own patience instead.
+    Unbounded,
+}
+
 /// The client every MCP server reached over HTTP is spoken to through,
 /// by this transport and by `protocol::mcp::sse` alike.
 ///
@@ -302,17 +312,23 @@ fn one_message(body: &str) -> Option<String> {
 ///
 /// # Errors
 /// `AxCode::ConfigInvalid` when this machine cannot build the client.
-pub(super) fn client_for(url: &str) -> Result<reqwest::blocking::Client, AxError> {
-    gateway::client_for(kernel::Proxying::ExceptLocal, url)
-        .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")))
-        .build()
-        .map_err(|err| {
-            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
-                .with_recovery(
-                    "check this server's url in the MCP settings and the proxy settings \
+pub(super) fn client_for(
+    url: &str,
+    whole_request: WholeRequest,
+) -> Result<reqwest::blocking::Client, AxError> {
+    let builder = gateway::client_for(kernel::Proxying::ExceptLocal, url)
+        .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")));
+    match whole_request {
+        WholeRequest::DefaultTimeout => builder,
+        WholeRequest::Unbounded => builder.timeout(None),
+    }
+    .build()
+    .map_err(|err| {
+        AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string()).with_recovery(
+            "check this server's url in the MCP settings and the proxy settings \
                      this machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
-                )
-        })
+        )
+    })
 }
 
 #[cfg(test)]
