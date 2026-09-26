@@ -2363,7 +2363,7 @@ export type NoSecret = typeof NoSecret.Type;
  * 
  * `at_seq` is the line itself and not the line after it: a branch
  * inherits through that line, and the safe point the rebuild settles on
- * is that value or an earlier one (`runtime::fork::inherited`).
+ * is that value or an earlier one (`runtime::fork::inherited_indexed`).
  */
 export const Origin = Schema.Struct({
   at_seq: Seq,

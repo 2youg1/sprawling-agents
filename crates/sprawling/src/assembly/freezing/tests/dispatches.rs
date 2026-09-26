@@ -259,3 +259,79 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
         "a transcript is history: nobody edits it in place"
     );
 }
+
+/// Rebuilding a branch's conversation reads the mother's own lines, not
+/// the history: once the worker has indexed the ledger, a rebuild costs
+/// a small fraction of verifying the whole ledger, however much another
+/// run wrote into it.
+///
+/// The ratio against a verify of the same ledger is the instrument,
+/// because it holds on any disk and in any profile: a rebuild that still
+/// verifies the history is never ten times faster than a verify.
+#[test]
+fn inheriting_a_branch_does_not_verify_the_history() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let long_answer = "another room's long answer. ".repeat(140_000);
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion("the meter says 42", None),
+            completion(&long_answer, None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    for (room, task) in [("lab/room2", "mother"), ("lab/room3", "other")] {
+        worker
+            .handle(channels::Command::Dispatch {
+                addr: Address::parse(room).unwrap(),
+                task: task.to_owned(),
+                goal: "a number is written down".to_owned(),
+                mode: kernel::Mode::PlanGoal,
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, task.as_bytes()),
+                session: None,
+                effort: None,
+            })
+            .unwrap();
+    }
+    let verify_started = std::time::Instant::now();
+    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verify = verify_started.elapsed();
+    let origin = verified
+        .lines()
+        .iter()
+        .find_map(|line| match line {
+            runtime::replay::VerifiedLine::Known { record, .. }
+                if record.kind() == EventKind::RunStarted =>
+            {
+                Some(kernel::Origin {
+                    run: record.run(),
+                    at_seq: record.seq(),
+                })
+            }
+            runtime::replay::VerifiedLine::Known { .. }
+            | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
+        })
+        .expect("the mother ran");
+    let at = Assignment {
+        addr: Address::parse("lab/room1").unwrap(),
+        session: None,
+        effort: None,
+        mode: kernel::Mode::PlanGoal,
+        parent: None,
+        succession: None,
+        tainted: false,
+        origin: Some(origin),
+    };
+
+    worker.inherited(&at, RunId::from_bytes([7; 16])).unwrap();
+    let rebuild_started = std::time::Instant::now();
+    let messages = worker.inherited(&at, RunId::from_bytes([7; 16])).unwrap();
+    let rebuild = rebuild_started.elapsed();
+
+    assert!(!messages.is_empty(), "the mother's task is inherited");
+    assert!(
+        rebuild.saturating_mul(10) < verify,
+        "a warm rebuild took {rebuild:?}; verifying the ledger took {verify:?}"
+    );
+}

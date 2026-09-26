@@ -41,6 +41,7 @@
 3. **目录 fsync**：POSIX 上新建/rename 后同步父目录；Windows 无目录句柄同步原语，`sync_dir` 为显式 no-op。断电点阵在 FaultFs 模型层保持严格语义（未 sync_dir 的目录项不存活），使代码纪律跨平台一致；「fsync 返回但未落盘」的平台复验属 A3 完整版。
 4. **存储写失败码**：`append` 的 Io 失败映射 `E_STORAGE_FATAL`（装载期第 5 码，进程级 fatal）。
 5. **硬链接的判定按平台分两半，两半都写在这里。** junction 与 symlink 都是重解析点，`file_type().is_symlink()` 对两者同真，故合为 `AliasKind::Link`，在每一扇写门字面拒绝。硬链接在 Unix 由 `std::os::unix::fs::MetadataExt::nlink` 判定：`nlink>1` 的普通文件即 `AliasKind::HardLink`，同样在构造点字面拒绝；在 Windows 稳定版 `std` 读不到链接计数（`MetadataExt::number_of_links` 属未稳定特性 `windows_by_handle`，`std::fs::hard_link_count` 不存在），而 `unsafe_code` 全库 forbid、其豁免不得引入本 workspace，故 Windows 上硬链接臂由**写入恒落新 entry** 兜住（bundle 经 `bundle::landing::land` 写同目录暂存文件再 `rename` 覆盖，`runtime::tools::edit` 写前移除该名再建；两者都换掉目录项而不写穿旧 inode）——穿透在结构上不可能，只是不报拒。被否：为读链接计数引入窄 FFI（撞 unsafe 定规）或夜间特性（撞稳定工具链定规）。**重开参数**：Windows `std` 出现稳定的 `number_of_links` 或等价 API 时，把该臂并入构造点字面拒绝；Unix `nlink` 语义若变化，改 `kind_at` 一处。
+6. **`first_seen` 的那一次折叠放在哪里未定。** 现在它在本进程第一次遇到缺文件的切片时整段读取各段（8-24），所以启动后的第一次新 room 派活仍付一遍全账本读与一段大小的瞬时内存。候选是并进启动时 `verify_ledger_dir` 已有的那一遍，或放到 lane 上预先折好；判定它的证据是 94 MB 账本上启动时长与首次派活时延的同仪表读数。
 
 ## 4 现状分析
 
@@ -560,7 +561,9 @@ pub struct WorktreeLease { /* name、path、disk —— 私有 */ }
 impl Worktrees {
     pub fn open(city_root: &Path) -> Result<Worktrees, MemoryError>;
     pub fn claim(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError>;
-    pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError>;
+    pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError>;   // 解锁，不删树
+    /// 城的唯一写者（借出的 `JsonlLedger` 即凭证）打开时调用：之前的写者没还的锁全部解开。无仓库即无事可做。
+    pub fn lift_abandoned_leases(city_root: &Path, writer: &JsonlLedger) -> Result<(), MemoryError>;
     pub fn live(&self) -> Result<Vec<WorktreeName>, MemoryError>;
     /// 把一个节点已提交的活带进城的 trunk，返回落地的 commit。
     pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, MemoryError>;
@@ -591,10 +594,14 @@ impl WorktreeLease {
   并用一句「城的工作树有 N 字节」说这件事。断言：账本 4 KB、产品文件不到 1 KB 的城仍可领树。
 - **问不出祖先关系不是「不是祖先」（B-68）**：`graph_descendant_of` 的失败按 `Worktree{op:"judge a fast-forward"}` 上报，
   不再顶替成 `MergeStale`——把一次 git 失败说成「trunk 动过了」，会让一个 trunk 没动的人回去重做不需要重做的活。
-- **释放先注销后删文件（B-69）**：`release` 先 prune（`valid` ＋ `working_tree`），再删残留目录；
-  仓库已经忘掉这棵树时 prune 不是失败，那正是调用方要的末态。
-  倒过来的顺序在中途失败时会留下「git 仍列着、目录已没有」的名字，而它唯一的出口是 `WorktreeBusy`，于是这个名字被永久锁住。
-  `claim` 同时自愈：登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射；`E_WORKTREE_BUSY` 因此恒表示「有人正在用」。
+- **租约是 git 的 worktree 锁，树留在盘上（B-69）**：`claim` 以加锁的方式建树（`WorktreeAddOptions::lock`），`release` 只解锁，登记与目录都留下。
+  同名再领时树已在：不量城的工作树、不重新检出整棵树；干线已含该节点分支的全部提交时先把分支快进到干线（分支上还有未合入的活则不动它，那份活仍在等合并），
+  再把树强制检出到分支头并删掉未跟踪文件，最后加锁——
+  一个节点在两次 run 之间付一次全量检出，而不是每次 run 付一次、再付一次整目录删除。
+  未提交的改动与未跟踪文件在再领时消失：没提交的从来不是这个节点的活。
+  进程在 run 中途死掉会留下锁：一个城只有一个写者，所以新写者一拿到 `JsonlLedger` 就由 `lift_abandoned_leases` 解开全部锁——此时任何锁都不可能属于活着的 run。
+  `E_WORKTREE_BUSY` 因此恒表示「锁着」，也就是有人正在用；登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射。
+  否决「释放即 prune 并删目录」：它让同一节点的下一次 run 重新量整个城并全量检出，代价随城的大小涨，而节点的分支本来就留着。
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是一台机器自己的事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
 - **merge 只走 fast-forward**：trunk 在节点分枝之后动过即 `MergeStale`（→`E_VERSION_CONFLICT`），不由机器把一份活重放到别人的活上面——能说出「这份活是否仍然适用」的是做它的人。拒后城内文件逐字节不变（一条断言）。
@@ -741,7 +748,7 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
   - `index::reader::OpenSegment`——按 seq 取单行时持住段句柄。`Vfs::read_at` 每次调用开一次文件，
     那正是这个类型消掉的 734 µs／行（对 0.89 µs 顺走、5.82 µs 逆走，windows-x86_64 NVMe，五万条账本，2026-09-02）。
     它只读不写，而缝要建模的是崩溃语义，对一次定位读无话可说。
-  - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 删残留目录同走 `std::fs`。
+  - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 只解 git 的锁，不删目录。
     缝拦不住 git2，声称拦得住才是第二个权威。释放顺序与自愈见 §8-9。
   - `checkpoint`——同样经 git2 提交与检出。
   - `jsonl::ledger::WriterLock`——文件锁是操作系统对打开句柄的事实，Vfs 的崩溃语义模型对它无话可说（§8-1）。
@@ -906,7 +913,7 @@ pub fn working_status(city_root: &Path, scope: Option<&str>, base: Option<GitOid
 ### 8-24 `memory::sessions`：账本投影到各楼的 sessions（形状 7 投影）
 
 ```rust
-pub(crate) struct Sessions { /* layout、ledger、vfs、open —— 私有 */ }
+pub(crate) struct Sessions { /* layout、ledger、vfs、open、first_seen —— 私有 */ }
 impl Sessions {
     pub(crate) fn for_ledger(ledger_dir: &Path) -> Option<Sessions>;   // 非城账本 → None
     pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), MemoryError>;
@@ -918,7 +925,9 @@ pub(crate) const SLICE_MAGIC: &str = "slices v1";
 
 **只有账务线程写，而且写在账本落盘之后。** 入口是 `JsonlLedger::append_all`：一段 wave 全部 `sync_data` 之后才逐条 `absorb`。投影写失败不改变账本的返回值——历史已经在盘上，可弃物不得让它的调用方吃到一次假失败——但拒绝被报出（一行 `eprintln!`）而不是被吞掉。**投影永不进栅栏。** `checkpoint::stage_scopes` 跳过任何 `sessions` 下的路径（`is_session_projection`）：它还在被账务线程追加，而 git 的暂存要读它以为已经知道的文件；一个仍在长的文件会把整波拒成 `E_WORKTREE_BUSY`（8-8）。可弃物因此从不进历史，也不进任何 diff 的读者面。
 
-**头部是唯一的疑点。** 每份切片首行是 `slices v1 <first_seq>`，即该文件第一条记录的 seq。文件不存在、魔数不符、或首行 seq 与头部不符 → 整份重建：扫账本、按地址过滤、按账本序写下，不写迁移代码。进程重启后接上已有文件时，先校验头部与内容，再从账本把漏掉的尾巴补齐；段名带首 seq，故不可能含新记录的段不打开。断在半行的尾巴先截掉再续，与账本自己的 tail recovery 同一条读法。
+**头部是唯一的疑点。** 每份切片首行是 `slices v1 <first_seq>`，即该文件第一条记录的 seq。魔数不符、或首行 seq 与头部不符 → 整份重建：扫账本、按地址过滤、按账本序写下，不写迁移代码。文件不存在时先问常驻的 `first_seen`（地址 → 账本里它的第一条 seq）：第一条就是正在 absorb 的这条，账本里没有更早的行，切片就从这一条落下，一个段也不读；否则按上一句整份重建。进程重启后接上已有文件时，先校验头部与内容，再从账本把漏掉的尾巴补齐；段名带首 seq，故不可能含新记录的段不打开。断在半行的尾巴先截掉再续，与账本自己的 tail recovery 同一条读法。
+
+**新 room 不扫段。** `first_seen` 在本进程第一次遇到缺文件的切片时从各段折叠一次，此后由每次 `absorb` 增量写入，所以派往新 room 的活只付一次 `exists` 与一次追加；之前每个新 room 都要把整本账本读一遍再解析（94 MB 的账本上是一次 64 MiB 段读的瞬时内存），而答案永远是「除了这一条什么都没有」。被否：打开账本时就折叠——每个打开城账本的进程（包括只追加一行的命令）都要多读一遍全部段，而多数进程从不遇到缺文件的切片。剩下的一次折叠仍是整段读取，把它搬到 lane 上或并进启动时已有的 verify 那一遍，是 §3 的开放项。
 
 **重建逐字节相同。** 每一行都是账本 `canonical_line` 的副本，头部由内容决定（首条记录的 seq），所以删掉整个 `sessions/` 再放一遍得到同样的字节——`deleting_the_sessions_directory_and_replaying_the_ledger_restores_the_bytes` 钉住它。
 

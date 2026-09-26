@@ -6,7 +6,8 @@
 //! The external tools a building's configuration names, each already
 //! connected to its server or left out and named in the diagnostics.
 
-use super::super::{RunWorker, connect_mcp, now_ms, transport_site};
+use super::super::mcp::Reached;
+use super::super::{RunWorker, now_ms, transport_site};
 
 impl RunWorker {
     /// The external tools this run may reach, each already connected to
@@ -42,8 +43,9 @@ impl RunWorker {
         // The half of `[prepare_dispatch_ms]` this file owns: starting
         // every server this building declares and shaking hands with
         // each of them. Held apart from the whole-phase reading because
-        // it is the part a resident connection table would remove, and
-        // a figure that mixed the two could not say how much.
+        // it is the part the resident connection table removes on every
+        // dispatch after the first, and a figure that mixed the two could
+        // not say how much.
         let began = now_ms();
         let mut offered = Vec::new();
         let resolve = self.resolver();
@@ -53,16 +55,20 @@ impl RunWorker {
             // failure used to be filed under `bin::mcp_stdio`, which
             // sent the last reader who followed it to the wrong file.
             let site = transport_site(&server.transport);
-            match connect_mcp(server, write_root, confidential, &resolve) {
-                Ok((tools, opened)) => {
+            match self.mcp.tools(server, write_root, confidential, &resolve) {
+                Ok((tools, reached)) => {
+                    let how = match reached {
+                        Reached::Connected(opened) => {
+                            format!("{} speaking {}", opened.server, opened.protocol_version)
+                        }
+                        Reached::Resident => "already connected".to_owned(),
+                    };
                     self.note(
                         runtime::diagnostics::Level::Effect,
                         site,
                         &format!(
-                            "{} is {} speaking {}, offering {} tool(s)",
+                            "{} is {how}, offering {} tool(s)",
                             server.label.as_str(),
-                            opened.server,
-                            opened.protocol_version,
                             tools.len()
                         ),
                     );

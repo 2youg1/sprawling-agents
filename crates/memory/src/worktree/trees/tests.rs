@@ -29,7 +29,7 @@ fn landing(t: u64, of: &Provenance, reviewed_by_person: bool) -> Landing<'_> {
     }
 }
 
-fn city(dir: &Path) -> Worktrees {
+pub(super) fn city(dir: &Path) -> Worktrees {
     std::fs::create_dir_all(dir.join("lab")).unwrap();
     std::fs::write(dir.join("lab").join("notes.md"), b"first\n").unwrap();
     let mut checkpoint = Checkpoint::open(dir).unwrap();
@@ -38,7 +38,7 @@ fn city(dir: &Path) -> Worktrees {
         .unwrap();
     Worktrees::open(dir).unwrap()
 }
-fn name(raw: &str) -> WorktreeName {
+pub(super) fn name(raw: &str) -> WorktreeName {
     WorktreeName::parse(raw).unwrap()
 }
 
@@ -71,10 +71,6 @@ fn one_node_holds_one_tree_and_the_second_claim_is_refused_by_name() {
     assert!(ax.recovery().contains("release"));
 
     trees.release(held).unwrap();
-    assert!(
-        trees.live().unwrap().is_empty(),
-        "a released tree is gone from the repository, not just from disk"
-    );
     trees.claim(&name("node-1")).unwrap();
 }
 
@@ -115,19 +111,6 @@ fn a_registered_tree_with_no_directory_is_taken_back_rather_than_locked_away() {
 
     let again = trees.claim(&name("node-1")).unwrap();
     assert!(again.path().join("lab").join("notes.md").exists());
-}
-
-#[test]
-fn a_released_tree_takes_its_files_with_it() {
-    let dir = tempfile::tempdir().unwrap();
-    let trees = city(dir.path());
-    let lease = trees.claim(&name("node-1")).unwrap();
-    let path = lease.path().to_path_buf();
-    assert!(path.join("lab").join("notes.md").exists());
-
-    trees.release(lease).unwrap();
-    assert!(!path.exists());
-    assert!(dir.path().join("lab").join("notes.md").exists());
 }
 
 #[test]

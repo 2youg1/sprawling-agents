@@ -127,6 +127,22 @@ impl StdioServer {
     }
 }
 
+impl StdioServer {
+    /// Whether the child has exited. A connection left locked by a dead
+    /// thread, or a child whose state the platform will not report,
+    /// counts as ended: the caller starts a new one, which is the one
+    /// recovery either case has.
+    pub(crate) fn has_ended(&self) -> bool {
+        match self.inner.lock() {
+            Ok(mut connection) => match connection.child.try_wait() {
+                Ok(None) => false,
+                Ok(Some(_)) | Err(_) => true,
+            },
+            Err(_poisoned) => true,
+        }
+    }
+}
+
 impl std::fmt::Debug for StdioServer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.inner.try_lock() {
@@ -296,6 +312,23 @@ pub(crate) fn echoing(answer: &str) -> (String, Vec<String>) {
             ],
         )
     }
+}
+
+/// The server [`echoing`] builds, which also writes one line to
+/// `starts` each time it is started, so a test can count how many
+/// children a sequence of dispatches cost.
+#[cfg(test)]
+pub(crate) fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>) {
+    let (command, mut args) = echoing(answer);
+    let mark = if cfg!(windows) {
+        format!("Add-Content -LiteralPath '{}' -Value s; ", starts.display())
+    } else {
+        format!("echo s >> '{}'; ", starts.display())
+    };
+    if let Some(script) = args.last_mut() {
+        script.insert_str(0, &mark);
+    }
+    (command, args)
 }
 
 #[cfg(test)]

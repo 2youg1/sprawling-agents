@@ -15,6 +15,9 @@ use super::landing::{CheckoutRun, Landing, PlannedMerge, check_out};
 use super::lease::WorktreeLease;
 use super::name::WorktreeName;
 use super::weight::measure;
+use kept::Standing;
+
+mod kept;
 
 /// Where the trees live: inside the reserved subtree, because they are
 /// the city's own machinery rather than anybody's writable space. What a
@@ -59,18 +62,26 @@ impl Worktrees {
         })
     }
 
-    /// Opens a tree for one node.
+    /// Lends one node its tree: the one it was given before when that
+    /// tree is still on disk, reset to the node's branch, and a new one
+    /// otherwise.
     ///
     /// # Errors
-    /// Refuses a name already in use, a city whose working tree exceeds
+    /// Refuses a tree somebody holds, a city whose working tree exceeds
     /// the ceiling, and a repository with no commit to branch from.
     pub fn claim(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError> {
-        if self.live()?.contains(name) && !self.reclaim_abandoned(name)? {
-            return Err(MemoryError::WorktreeBusy {
+        match self.standing(name)? {
+            Standing::Held => Err(MemoryError::WorktreeBusy {
                 name: name.as_str().to_owned(),
                 detail: "another node holds this tree".to_owned(),
-            });
+            }),
+            Standing::Kept(tree) => self.reattach(name, &tree),
+            Standing::Absent => self.place(name),
         }
+    }
+
+    /// Places a new tree for `name`, locked from the moment it exists.
+    fn place(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError> {
         let source = self.repo.workdir().ok_or_else(|| MemoryError::Worktree {
             op: "find the city working tree",
             detail: "the repository is bare".to_owned(),
@@ -111,6 +122,7 @@ impl Worktrees {
             .find_branch(name.as_str(), git2::BranchType::Local)
             .ok();
         let mut opts = git2::WorktreeAddOptions::new();
+        opts.lock(true);
         if let Some(branch) = branch.as_ref() {
             opts.reference(Some(branch.get()));
         }
@@ -260,28 +272,21 @@ impl Worktrees {
         }
     }
 
-    /// Gives a tree back: the repository forgets it, then whatever is
-    /// left of its files goes.
-    ///
-    /// That order, because the registration is what makes the name
-    /// unusable. Removing the directory first and then failing left the
-    /// name registered with nothing behind it, and the only thing
-    /// [`Worktrees::claim`] could say about it was that somebody else
-    /// held it — a tree nobody held and nobody could take.
+    /// Gives a tree back and keeps its files for the node's next run:
+    /// the lock is the lease, so lifting it is the whole release.
     ///
     /// # Errors
-    /// Propagates a repository that refuses to prune and a directory
-    /// that cannot be removed.
+    /// Propagates a repository that cannot find or unlock the tree.
     pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError> {
-        self.forget(lease.name())?;
-        if lease.path().exists() {
-            std::fs::remove_dir_all(lease.path()).map_err(|source| MemoryError::Io {
-                op: "remove a worktree",
-                path: lease.path().to_path_buf(),
-                source,
-            })?;
-        }
-        Ok(())
+        let refuse = |op: &'static str, err: git2::Error| MemoryError::Worktree {
+            op,
+            detail: format!("{}: {err}", lease.name().as_str()),
+        };
+        self.repo
+            .find_worktree(lease.name().as_str())
+            .map_err(|err| refuse("find a worktree", err))?
+            .unlock()
+            .map_err(|err| refuse("unlock a worktree", err))
     }
 
     /// Unregisters `name`, taking its files with it where git will.
@@ -300,35 +305,13 @@ impl Worktrees {
             }
         };
         let mut opts = git2::WorktreePruneOptions::new();
-        opts.valid(true).working_tree(true);
+        // A lock on a tree whose directory is gone guards nothing.
+        opts.valid(true).locked(true).working_tree(true);
         tree.prune(Some(&mut opts))
             .map_err(|err| MemoryError::Worktree {
                 op: "prune a worktree",
                 detail: format!("{}: {err}", name.as_str()),
             })
-    }
-
-    /// Takes back a registration whose directory is gone, and says
-    /// whether the name is free again.
-    ///
-    /// A release interrupted between the two halves, or a directory a
-    /// person deleted by hand, leaves exactly this: a name git still
-    /// lists with no tree under it. Rebuilding it is the same reflex
-    /// the index has about a cache it doubts, and it is what keeps
-    /// `E_WORKTREE_BUSY` meaning that somebody is working.
-    fn reclaim_abandoned(&self, name: &WorktreeName) -> Result<bool, MemoryError> {
-        let registered =
-            self.repo
-                .find_worktree(name.as_str())
-                .map_err(|err| MemoryError::Worktree {
-                    op: "find a worktree",
-                    detail: format!("{}: {err}", name.as_str()),
-                })?;
-        if registered.path().exists() {
-            return Ok(false);
-        }
-        self.forget(name)?;
-        Ok(true)
     }
 
     /// Every tree the repository knows about, sorted.

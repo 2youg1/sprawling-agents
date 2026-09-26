@@ -138,6 +138,10 @@ impl RunWorker {
         (ledger, report, standing): (JsonlLedger, OpenReport, Standing),
     ) -> Result<Self, AxError> {
         let now = now_ms()?;
+        // Holding the one writer is what makes every worktree lock a
+        // lock nobody alive holds (memory-SPEC 8-9).
+        memory::Worktrees::lift_abandoned_leases(city_root, &ledger)
+            .map_err(memory::MemoryError::into_ax)?;
         let Standing {
             book,
             governance,
@@ -175,11 +179,13 @@ impl RunWorker {
             logins: std::collections::BTreeMap::new(),
             log,
             knocks: Vec::new(),
+            mcp: super::mcp::Residents::default(),
             entrance,
             origins,
             fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
             backlog: runtime::Backlog::new(),
             flight: Flight::open(),
+            index: memory::LedgerIndex::empty(),
         })
     }
 

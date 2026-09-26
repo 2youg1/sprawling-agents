@@ -20,7 +20,7 @@ use crate::event::{RunId, Seq};
 ///
 /// `at_seq` is the line itself and not the line after it: a branch
 /// inherits through that line, and the safe point the rebuild settles on
-/// is that value or an earlier one (`runtime::fork::inherited`).
+/// is that value or an earlier one (`runtime::fork::inherited_indexed`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Origin {

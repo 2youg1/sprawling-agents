@@ -8,8 +8,10 @@
 //! resurrection: the mother's frozen state never changes, and the new
 //! RunId arrives from the caller — this module is pure.
 //!
-//! Consumes [`VerifiedLedger`] only: replay and fork share one rebuilder,
-//! so fork correctness and replay correctness are the same assertion.
+//! [`prefix`] consumes [`VerifiedLedger`], so replay and fork share one
+//! rebuilder; a branch's conversation is rebuilt through the ledger
+//! index by [`inherited_indexed`], because the ledger's only writer asks
+//! for it and verified the ledger when it opened it.
 
 use kernel::event::record::{
     ModelReturned, RunForked, RunStarted, SteerReceived, ToolAnswer, ToolResult,
@@ -22,7 +24,7 @@ use kernel::{
 
 use crate::compaction::Exchange;
 use crate::conversation::{Conversation, Opening};
-use crate::replay::{VerifiedLedger, VerifiedLine};
+use crate::replay::VerifiedLedger;
 
 /// The fork prefix: raw lines `0..=at_seq`, byte-exact. Past the tail is
 /// `E_INVALID_ARGS`, never a silent clamp.
@@ -67,77 +69,24 @@ pub struct Inherited {
     pub at: Seq,
 }
 
-/// Rebuilds the mother's conversation from the ledger, through `at_seq`
-/// or through the nearest safe point before it.
-///
-/// **The ledger is the only source, and it is enough.** A run's window is
-/// folded forward by the loop that owns it, so it does not survive the
-/// process; every line it was folded from does. This walks the mother's
-/// own records - the opening from `run_started`, the assistant messages
-/// from `model_returned`, the tool results from `tool_result`, and what
-/// the person typed mid-flight from `steer_received` - and folds them
-/// through the same [`Conversation`] the live loop folds through, so the
-/// sequence a fork starts from is the sequence the mother sent rather
-/// than a second reading of the same records.
-///
-/// **Redaction is already applied.** The ledger holds what the city
-/// wrote after scanning for credentials, so a branch inherits the text
-/// the mother actually sent, which is the redacted one. That is the
-/// honest reading: the bytes before redaction exist nowhere any more.
-///
-/// **The turn boundary's compaction is re-applied here, from the same
-/// judgment.** The mother's window carries the compacted exchange of
-/// each turn (`runtime::compaction::Exchange`), and this rebuild compacts
-/// at the same boundary of the same turn, so a branch starts from the
-/// bytes the mother sent rather than from the fuller bytes the ledger
-/// kept.
-///
-/// **A reminder is not rebuilt, and cannot be.** The context gauge's
-/// nudge is folded into the window without a record of its own, because
-/// it is the city talking to the model about this run's budget. A branch
-/// starts with a gauge of its own, so it starts without that nudge.
-///
-/// # Errors
-/// Refuses an `at_seq` that names no line, and a line that belongs to a
-/// run with no `run_started` in this ledger - the same two facts
-/// [`prefix`] refuses, in the same words a person can act on.
-pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxError> {
-    let index = usize::try_from(at_seq.value()).map_err(|_| outside(mother, at_seq))?;
-    let mut lines = mother.lines().iter();
-    let owner = lines
-        .nth(index)
-        .and_then(run_of)
-        .ok_or_else(|| outside(mother, at_seq))?;
-    let start = (0..=index).find(|at| {
-        matches!(
-            mother.lines().get(*at).and_then(known),
-            Some(record) if record.run() == owner && record.kind() == EventKind::RunStarted
-        )
-    });
-    let Some(start) = start else {
-        return Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "fork",
-            format!("{owner} has no run_started in this ledger"),
-        )
-        .with_recovery("name a run this history holds, or start a session instead"));
-    };
+/// The refusal for a run whose opening line this history does not hold.
+fn no_start(owner: RunId) -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "fork",
+        format!("{owner} has no run_started in this ledger"),
+    )
+    .with_recovery("name a run this history holds, or start a session instead")
+}
 
+/// Folds one run's own records, from its `run_started` through the cut,
+/// into the conversation it sent. The one fold both doors share, so the
+/// verified door and the indexed one cut at the same line.
+fn fold_run<'a>(records: impl Iterator<Item = &'a EventRecord>) -> Result<Inherited, AxError> {
     let mut conversation = Conversation::new();
     let mut at = Seq::FIRST;
     let mut open: Option<Wave> = None;
-    for line in mother
-        .lines()
-        .iter()
-        .take(index.saturating_add(1))
-        .skip(start)
-    {
-        let Some(record) = known(line) else {
-            continue;
-        };
-        if record.run() != owner {
-            continue;
-        }
+    for record in records {
         match record.kind() {
             EventKind::RunStarted => {
                 let started = record.data().read::<RunStarted>()?;
@@ -330,33 +279,6 @@ fn result_block(result: &ToolResult) -> Result<ContentBlock, AxError> {
     })
 }
 
-/// One record's own kind, read from a verified line.
-fn known(line: &VerifiedLine) -> Option<&EventRecord> {
-    match line {
-        VerifiedLine::Known { record, .. } => Some(record),
-        VerifiedLine::IgnoredUnknown { .. } => None,
-    }
-}
-
-/// The run one line belongs to, when it belongs to one this build reads.
-fn run_of(line: &VerifiedLine) -> Option<RunId> {
-    known(line).map(EventRecord::run)
-}
-
-/// The refusal for a line that is not there, in the words a person can
-/// act on: what the sequence ends at.
-fn outside(mother: &VerifiedLedger, at_seq: Seq) -> AxError {
-    AxError::failure(
-        AxCode::InvalidArgs,
-        "fork",
-        format!("at_seq {}", at_seq.value()),
-    )
-    .with_recovery(match mother.tail_seq() {
-        Some(tail) => format!("the mother sequence ends at seq {}", tail.value()),
-        None => "the mother sequence is empty".to_string(),
-    })
-}
-
 /// The `run_forked` draft for the city Ledger; the caller supplies the
 /// new run id, the room it lands in, and the clock reading.
 pub fn fork_draft(
@@ -384,6 +306,9 @@ pub fn fork_draft(
         ig: false,
     })
 }
+
+mod indexed;
+pub use indexed::inherited_indexed;
 
 #[cfg(test)]
 mod tests;
