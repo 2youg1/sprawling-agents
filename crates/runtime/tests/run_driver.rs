@@ -1064,3 +1064,53 @@ fn three_reads_a_run_makes_in_one_wave_are_in_flight_together_and_leave_the_seri
     // In a serial wave the first read finishes before the second starts.
     assert_eq!(*meeting.fewest_seen.lock().unwrap(), READS);
 }
+
+#[test]
+fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
+    let mut ledger = RecordingLedger::new();
+    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::clone(&seen),
+        waves: vec![vec![call("t-1")]],
+    };
+    let mut now = counter();
+    let mut interrupt = |point: SafePoint| match point {
+        SafePoint::BeforeCall { turn: 0 } => Interrupt::Steer {
+            source: "user".to_owned(),
+            text: "measure it in metres".to_owned(),
+        },
+        _ => Interrupt::None,
+    };
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+
+    let seen = seen.borrow();
+    // The cache marker moves to the newest message; every byte before it
+    // is the request already sent.
+    let first = seen[0].strip_suffix("cache: true }]").unwrap();
+    assert!(
+        seen[1].starts_with(first),
+        "the second request extends the first:\n{}\n{}",
+        seen[0],
+        seen[1]
+    );
+    assert!(
+        seen[1].ends_with("Text { text: \"user: measure it in metres\" }], cache: true }]"),
+        "the steer lands after the result it arrived during: {}",
+        seen[1]
+    );
+}

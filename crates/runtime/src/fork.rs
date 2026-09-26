@@ -133,6 +133,11 @@ fn fold_run<'a>(
                     }
                 }
             }
+            // The live run marks what it sent right after each assembly,
+            // and the shape line is the one every turn writes there
+            // (prompt_assembled is written once per run), so a steer
+            // after it lands where the live one landed.
+            EventKind::PromptShapeCompared => conversation.mark_sent(),
             EventKind::SteerReceived => {
                 let steer = record.data().read::<SteerReceived>()?;
                 conversation.push_steer(&steer.source, &steer.text);
@@ -149,9 +154,6 @@ fn fold_run<'a>(
             | EventKind::SessionOpened
             | EventKind::RunForked
             | EventKind::PromptAssembled
-            // The cache shape measures a request; it is not one of the
-            // things the mother said.
-            | EventKind::PromptShapeCompared
             | EventKind::ModelCalled
             | EventKind::ToolCalled
             | EventKind::ResultOffloaded

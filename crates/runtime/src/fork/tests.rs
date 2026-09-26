@@ -22,7 +22,9 @@
     reason = "test code"
 )]
 
-use kernel::event::record::{ModelReturned, RunStarted, ToolAnswer, ToolCalled, ToolResult};
+use kernel::event::record::{
+    ModelReturned, RunStarted, SteerReceived, ToolAnswer, ToolCalled, ToolResult,
+};
 use kernel::{Address, ContentBlock, EventDraft, EventKind, Payload, Role, RunId, Seq, TimeMs};
 
 use super::Inherited;
@@ -175,6 +177,51 @@ fn a_mother_run_holding_a_line_of_a_newer_kind_rebuilds_without_it() {
             ..without
         }
     );
+}
+
+/// A steer recorded after the request was assembled reached the mother at
+/// the end of the next tool results, and the branch rebuilds it there: the
+/// task message she sent stays the bytes she sent.
+#[test]
+fn a_steer_after_assembly_is_inherited_after_the_results() {
+    let mut drafts = mother_drafts();
+    drafts.splice(
+        1..1,
+        [
+            line(EventKind::PromptShapeCompared, Payload::empty()),
+            line(
+                EventKind::SteerReceived,
+                Payload::of(&SteerReceived {
+                    source: "user".to_owned(),
+                    text: "in metres".to_owned(),
+                })
+                .unwrap(),
+            ),
+        ],
+    );
+    let inherited = verified(drafts).inherited(Seq::new(5)).unwrap();
+
+    let mut expected = crate::conversation::Conversation::new();
+    expected.push_task_lines(
+        "measure the meter",
+        "a number is written down",
+        crate::conversation::Opening::WithPerson,
+    );
+    expected.push_assistant(vec![ContentBlock::Text {
+        text: "reading it now".to_owned(),
+    }]);
+    expected.push_tool_results(vec![
+        ContentBlock::ToolResult {
+            tool_use_id: "tu_1".to_owned(),
+            content: "{\"said\":\"42\"}".to_owned(),
+            is_error: false,
+            attachments: Vec::new(),
+        },
+        ContentBlock::Text {
+            text: "user: in metres".to_owned(),
+        },
+    ]);
+    assert_eq!(inherited.messages, expected.messages().to_vec());
 }
 
 /// The rebuild is the mother's own window, folded through the same type
