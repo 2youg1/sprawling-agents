@@ -41,15 +41,17 @@
 </script>
 
 <script lang="ts">
+  import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import type { Doing } from "../../core/doing";
   import { say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock, kib, usd } from "../../core/time";
   import { ui } from "../../ui";
-  import { Address as AddressSchema } from "../../wire";
+  import { Address as AddressSchema, type Query } from "../../wire";
   import EmptyState from "../parts/empty.svelte";
   import Path from "../parts/path.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
   import type { Picked } from "./tree.svelte";
 
   interface Props {
@@ -64,11 +66,10 @@
   const lang = u.lang;
   const belief = u.conn.belief;
 
-  const asked = $derived(u.conn.asking.ask({ listing: { at } }));
-  const entries = $derived.by(() => {
-    const held = $asked;
-    return held !== undefined && "listing" in held ? held.listing.entries : undefined;
-  });
+  const question = $derived<Query>({ listing: { at } });
+  const asked = $derived(u.conn.asking.ask(question));
+  const read = $derived(readAnswer($asked, (held) => ("listing" in held ? held.listing.entries : undefined)));
+  const entries = $derived(read.kind === "held" ? read.value : undefined);
 
   const cost = u.conn.asking.ask(QUERIES.cost);
   function spent(run: string): number | null {
@@ -111,7 +112,9 @@
   }
 </script>
 
-{#if entries === undefined}
+{#if read.kind === "unavailable"}
+  <Unanswered query={read.query} asked={question} />
+{:else if entries === undefined}
   <p class="text-text-disabled">…</p>
 {:else}
   {const kind = kindOf(at, entries)}

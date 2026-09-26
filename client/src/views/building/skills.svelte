@@ -57,8 +57,10 @@
 </script>
 
 <script lang="ts">
+  import { readAnswer } from "../../core/answered";
   import { ui } from "../../ui";
-  import type { SkillsAnswer } from "../../wire";
+  import type { Query } from "../../wire";
+  import Unanswered from "../parts/unanswered.svelte";
   import type { Picked } from "./tree.svelte";
 
   interface Props {
@@ -71,11 +73,10 @@
   const u = ui();
   const lang = u.lang;
 
-  const asked = $derived(u.conn.asking.ask({ skills: { building } }));
-  const answer = $derived.by((): SkillsAnswer | undefined => {
-    const held = $asked;
-    return held !== undefined && "skills" in held ? held.skills : undefined;
-  });
+  const question = $derived<Query>({ skills: { building } });
+  const asked = $derived(u.conn.asking.ask(question));
+  const read = $derived(readAnswer($asked, (held) => ("skills" in held ? held.skills : undefined)));
+  const answer = $derived(read.kind === "held" ? read.value : undefined);
 
   // A row this city cannot open is not a button's promise. An external
   // shelf is read-only and lives outside every address this client can
@@ -89,7 +90,9 @@
 
 <div>
   <h2 class="mb-base text-heading font-heading">{say($lang, "bld_skills")}</h2>
-  {#if answer === undefined}
+  {#if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={question} />
+  {:else if answer === undefined}
     <p class="text-text-disabled">…</p>
   {:else}
     {#if answer.skills.length > 0}
