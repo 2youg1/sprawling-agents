@@ -579,6 +579,10 @@
     "en": "none: the machine itself",
     "zh": "无：宿主机本身"
   },
+  "facts_unreadable": {
+    "en": "could not read",
+    "zh": "读不出"
+  },
   "file_binary": {
     "en": "binary · {kib}",
     "zh": "二进制 · {kib}"
