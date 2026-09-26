@@ -2637,6 +2637,7 @@ dependencies = [
  "protocol",
  "reqwest",
  "runtime",
+ "serde",
  "serde_json",
  "tempfile",
  "thread-priority",

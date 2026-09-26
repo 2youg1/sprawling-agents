@@ -40,6 +40,7 @@ export type View =
   | { readonly kind: "cost" }
   | { readonly kind: "registry" }
   | { readonly kind: "welcome" }
+  | { readonly kind: "monitor" }
   // Every screen at once, on fixtures, reachable without a city. It is
   // a route rather than a build flag so the gate that measures it opens
   // the same bundle a person runs.
@@ -73,6 +74,8 @@ export function toFragment(view: View): string {
       return "#/cost";
     case "welcome":
       return "#/welcome";
+    case "monitor":
+      return "#/monitor";
     case "gallery":
       return "#/gallery";
   }
@@ -102,6 +105,7 @@ const BARE: Readonly<Record<string, View>> = {
   cost: { kind: "cost" },
   registry: { kind: "registry" },
   welcome: { kind: "welcome" },
+  monitor: { kind: "monitor" },
   gallery: { kind: "gallery" },
 };
 

@@ -144,6 +144,7 @@ pub channels::ClientAssets::Disk(std::path::PathBuf)
 pub channels::ClientAssets::Embedded(&'static [channels::EmbeddedFile])
 pub channels::ClientFrame::Command(alloc::boxed::Box<channels::WireCommand>)
 pub channels::ClientFrame::Hello(channels::Hello)
+pub channels::ClientFrame::Monitor(channels::Monitoring)
 pub channels::ClientFrame::Query(channels::Query)
 pub channels::Closing::at: kernel::event::identity::TimeMs
 pub channels::Closing::completion: alloc::string::String
@@ -543,6 +544,10 @@ pub channels::ModelFactsSummary::input_modalities: alloc::vec::Vec<alloc::string
 pub channels::ModelFactsSummary::input_price: core::option::Option<alloc::string::String>
 pub channels::ModelFactsSummary::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
 pub channels::ModelFactsSummary::output_price: core::option::Option<alloc::string::String>
+pub channels::MonitorFeed::samples: tokio::sync::broadcast::Sender<channels::Sample>
+pub channels::MonitorFeed::watch: alloc::sync::Arc<(dyn core::ops::function::Fn() -> alloc::boxed::Box<dyn core::marker::Send> + core::marker::Send + core::marker::Sync)>
+pub channels::Monitoring::Release
+pub channels::Monitoring::Watch
 pub channels::Motion::Off
 pub channels::Motion::On
 pub channels::Motion::System
@@ -716,6 +721,19 @@ pub channels::RunSummary::last_seq: kernel::event::identity::Seq
 pub channels::RunSummary::run: kernel::event::identity::RunId
 pub channels::RunSummary::started: core::option::Option<kernel::event::identity::TimeMs>
 pub channels::RunSummary::who: alloc::string::String
+pub channels::Sample::core_cpu_permille: u64
+pub channels::Sample::core_private_bytes: u64
+pub channels::Sample::core_read_bytes: u64
+pub channels::Sample::core_working_set_bytes: u64
+pub channels::Sample::core_written_bytes: u64
+pub channels::Sample::durable_lag: u64
+pub channels::Sample::event_to_screen_p50_nanos: u64
+pub channels::Sample::ledger_queue_depth: u64
+pub channels::Sample::machine_available_bytes: u64
+pub channels::Sample::machine_cpu_permille: u64
+pub channels::Sample::queued_runs: u64
+pub channels::Sample::relay_p50_nanos: u64
+pub channels::Sample::volume_free_bytes: u64
 pub channels::ServeConfig::acp: channels::AcpSink
 pub channels::ServeConfig::city: core::option::Option<kernel::address::Address>
 pub channels::ServeConfig::client: alloc::sync::Arc<channels::ClientAssets>
@@ -723,6 +741,7 @@ pub channels::ServeConfig::commands: alloc::sync::Arc<(dyn core::ops::function::
 pub channels::ServeConfig::deltas: tokio::sync::broadcast::Sender<channels::Delta>
 pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<kernel::event::payload::EventRecord>
 pub channels::ServeConfig::logs: tokio::sync::broadcast::Sender<channels::LogLine>
+pub channels::ServeConfig::monitor: channels::MonitorFeed
 pub channels::ServeConfig::queries: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Query) -> core::result::Result<channels::Answer, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::secrets: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Command<kernel::secret::sealed::Sealed<alloc::string::String>>, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::transcribe_sink: channels::TranscribeSink
@@ -731,6 +750,7 @@ pub channels::ServerFrame::Delta(channels::Delta)
 pub channels::ServerFrame::Event(alloc::boxed::Box<kernel::event::payload::EventRecord>)
 pub channels::ServerFrame::Lagged(channels::Lagged)
 pub channels::ServerFrame::Log(channels::LogLine)
+pub channels::ServerFrame::Monitor(channels::Sample)
 pub channels::ServerFrame::Refusal(alloc::boxed::Box<kernel::error::shape::AxError>)
 pub channels::ServerFrame::Welcome(channels::Welcome)
 pub channels::SessionState::AwaitingHello
@@ -740,6 +760,8 @@ pub channels::SessionStep::Deliver(alloc::boxed::Box<channels::WireCommand>)
 pub channels::SessionStep::Refuse
 pub channels::SessionStep::Refuse::close: bool
 pub channels::SessionStep::Refuse::error: alloc::boxed::Box<kernel::error::shape::AxError>
+pub channels::SessionStep::Release
+pub channels::SessionStep::Watch
 pub channels::SessionStep::Welcome(alloc::boxed::Box<channels::Welcome>)
 pub channels::SettledEffort::effort: kernel::model::wire::Effort
 pub channels::SettledEffort::from: channels::ConfigLayer
@@ -861,6 +883,7 @@ pub enum channels::Lighting
 pub enum channels::LogLevel
 pub enum channels::LoginStep
 pub enum channels::McpState
+pub enum channels::Monitoring
 pub enum channels::Motion
 pub enum channels::NoSecret
 pub enum channels::Note
@@ -992,6 +1015,7 @@ pub struct channels::McpServerHealth
 pub struct channels::McpToolLine
 pub struct channels::MetricsAnswer
 pub struct channels::ModelFactsSummary
+pub struct channels::MonitorFeed
 pub struct channels::Opening
 pub struct channels::Output
 pub struct channels::PairingToken(_)
@@ -1010,6 +1034,7 @@ pub struct channels::ReleaseLine
 pub struct channels::Reply(_)
 pub struct channels::RoundsAnswer
 pub struct channels::RunSummary
+pub struct channels::Sample
 pub struct channels::ServeConfig
 pub struct channels::SettledEffort
 pub struct channels::SettledSecond

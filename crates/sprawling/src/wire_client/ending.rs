@@ -23,7 +23,7 @@ impl Ending {
     pub(super) fn of(sent: &channels::ClientFrame) -> Self {
         match sent {
             channels::ClientFrame::Query(_) | channels::ClientFrame::Hello(_) => Self::OnReply,
-            channels::ClientFrame::Command(_) => Self::OnQuiet,
+            channels::ClientFrame::Command(_) | channels::ClientFrame::Monitor(_) => Self::OnQuiet,
         }
     }
 
@@ -57,7 +57,8 @@ impl Reply {
                 | channels::ServerFrame::Event(_)
                 | channels::ServerFrame::Delta(_)
                 | channels::ServerFrame::Log(_)
-                | channels::ServerFrame::Lagged(_),
+                | channels::ServerFrame::Lagged(_)
+                | channels::ServerFrame::Monitor(_),
             ) => Self::Other,
             // A frame this build cannot read is still printed; it is
             // simply not one that ends the call.

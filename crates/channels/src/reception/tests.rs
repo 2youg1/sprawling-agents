@@ -274,3 +274,25 @@ fn an_unspecified_address_is_not_loopback() {
         BindVerdict::Serve(BindFace::Exposed { .. })
     ));
 }
+
+#[test]
+fn a_live_session_watches_and_releases_the_monitor() {
+    let watch = ClientFrame::Monitor(crate::wire::Monitoring::Watch);
+    let release = ClientFrame::Monitor(crate::wire::Monitoring::Release);
+    let steps = (
+        decide_frame(SessionState::Live, watch.clone(), &unpaired(), None),
+        decide_frame(SessionState::Live, release, &unpaired(), None),
+        decide_frame(SessionState::AwaitingHello, watch, &unpaired(), None),
+    );
+    assert!(
+        matches!(
+            steps,
+            (
+                SessionStep::Watch,
+                SessionStep::Release,
+                SessionStep::Refuse { close: true, .. }
+            )
+        ),
+        "{steps:?}"
+    );
+}

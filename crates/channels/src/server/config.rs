@@ -108,6 +108,8 @@ pub struct ServeConfig {
     /// lost nothing. Sharing the event channel would let a city running
     /// at the `wire` floor push history out of that reader's window.
     pub logs: broadcast::Sender<crate::wire::LogLine>,
+    /// The performance monitor, for the sessions that ask to watch it.
+    pub monitor: MonitorFeed,
     /// Answers a query from the city's derived views. Synchronous: a
     /// query reads a projection, and a projection that needed to block
     /// would be a query pretending to be a command.
@@ -128,6 +130,7 @@ pub(crate) struct ShellState {
     pub(crate) events: broadcast::Sender<EventRecord>,
     pub(crate) deltas: broadcast::Sender<crate::wire::Delta>,
     pub(crate) logs: broadcast::Sender<crate::wire::LogLine>,
+    pub(crate) monitor: MonitorFeed,
     pub(crate) queries: Arc<dyn Fn(Query) -> Result<Answer, AxError> + Send + Sync>,
     pub(crate) secrets: SecretSink,
     pub(crate) acp: AcpSink,
@@ -141,6 +144,19 @@ pub(crate) struct ShellState {
     /// [`decide_bind`]: crate::reception::decide_bind
     pub(crate) face: BindFace,
     pub(crate) city: Option<Address>,
+}
+
+/// The performance monitor as a session sees it (channels-SPEC.md 8-47).
+///
+/// Whether anybody watches is decided where the history is kept; a
+/// session holds what `watch` returned for as long as it watches, and
+/// dropping that value is how it stops counting.
+#[derive(Clone)]
+pub struct MonitorFeed {
+    pub watch: Arc<dyn Fn() -> Box<dyn Send> + Send + Sync>,
+    /// One reading a second while anybody watches. A reading a slow
+    /// session missed is not stated: the next one is a second away.
+    pub samples: broadcast::Sender<crate::wire::Sample>,
 }
 
 /// What an accepted request gets back: the run it became, and nothing
@@ -199,6 +215,7 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         events: config.events.clone(),
         deltas: config.deltas.clone(),
         logs: config.logs.clone(),
+        monitor: config.monitor.clone(),
         queries: Arc::clone(&config.queries),
         secrets: Arc::clone(&config.secrets),
         acp: Arc::clone(&config.acp),

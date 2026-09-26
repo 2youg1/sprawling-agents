@@ -40,6 +40,7 @@
   import Hints from "./gallery/hints.svelte";
   import Keepers from "./gallery/kept.svelte";
   import RefusedLine from "./gallery/refused_line.svelte";
+  import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
   import Presences from "./gallery/presence.svelte";
   import Produced from "./gallery/produced.svelte";
@@ -85,6 +86,7 @@
   <Keepers />
   <Settings />
   <Tables />
+  <Monitor />
   <Parts />
   <Switches />
 </div>

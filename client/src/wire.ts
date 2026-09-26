@@ -9,7 +9,7 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 39 as const;
+export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
 export const WIRE_HASH = "7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
@@ -2700,6 +2700,12 @@ export const Hello = Schema.Struct({
 export type Hello = typeof Hello.Type;
 
 /**
+ * Whether this session counts as somebody watching the monitor.
+ */
+export const Monitoring = Schema.Literal("watch", "release").annotations({ identifier: "Monitoring" });
+export type Monitoring = typeof Monitoring.Type;
+
+/**
  * Queries read state. They are cacheable and free of side effects, so none
  * carries an `IdemKey` - a Query that needed one would have stopped being a
  * Query.
@@ -2848,6 +2854,9 @@ export const ClientFrame = Schema.Union(
   Schema.Struct({
     query: Query,
   }),
+  Schema.Struct({
+    monitor: Monitoring,
+  }),
 ).annotations({ identifier: "ClientFrame" });
 export type ClientFrame = typeof ClientFrame.Type;
 
@@ -2927,6 +2936,27 @@ export const LogLine = Schema.Struct({
 export type LogLine = typeof LogLine.Type;
 
 /**
+ * One reading of every counter the monitor shows, in integers because
+ * it travels on the wire (sprawling-SPEC.md 8-94).
+ */
+export const Sample = Schema.Struct({
+  core_cpu_permille: Schema.Int,
+  core_private_bytes: Schema.Int,
+  core_read_bytes: Schema.Int,
+  core_working_set_bytes: Schema.Int,
+  core_written_bytes: Schema.Int,
+  durable_lag: Schema.Int,
+  event_to_screen_p50_nanos: Schema.Int,
+  ledger_queue_depth: Schema.Int,
+  machine_available_bytes: Schema.Int,
+  machine_cpu_permille: Schema.Int,
+  queued_runs: Schema.Int,
+  relay_p50_nanos: Schema.Int,
+  volume_free_bytes: Schema.Int,
+}).annotations({ identifier: "Sample" });
+export type Sample = typeof Sample.Type;
+
+/**
  * The server's answer to a `Hello` it accepted.
  */
 export const Welcome = Schema.Struct({
@@ -2969,6 +2999,9 @@ export const ServerFrame = Schema.Union(
   }),
   Schema.Struct({
     lagged: Lagged,
+  }),
+  Schema.Struct({
+    monitor: Sample,
   }),
 ).annotations({ identifier: "ServerFrame" });
 export type ServerFrame = typeof ServerFrame.Type;

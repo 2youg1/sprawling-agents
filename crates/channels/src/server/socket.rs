@@ -40,7 +40,7 @@ use crate::reception::inbound::Inbound;
 use crate::reception::{
     Admission, Door, SessionState, SessionStep, Stream, decide_admission, decide_frame,
 };
-use crate::wire::ServerFrame;
+use crate::wire::{Sample, ServerFrame};
 
 use super::config::ShellState;
 
@@ -61,6 +61,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     let (refused, mut refusals) = tokio::sync::mpsc::unbounded_channel::<AxError>();
     // What this session has delivered and what it still owes.
     let mut stream = Stream::opening();
+    let mut watching: Option<Watching> = None;
     loop {
         tokio::select! {
             incoming = socket.recv() => {
@@ -128,6 +129,12 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                             return;
                         }
                     }
+                    SessionStep::Watch => {
+                        if watching.is_none() {
+                            watching = Some(((state.monitor.watch)(), state.monitor.samples.subscribe()));
+                        }
+                    }
+                    SessionStep::Release => watching = None,
                     SessionStep::Refuse { error, close } => {
                         if send(&mut socket, &ServerFrame::Refusal(error)).await.is_err() {
                             return;
@@ -216,7 +223,33 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                     Err(broadcast::error::RecvError::Closed) => return,
                 }
             }
+            read = next_sample(&mut watching) => {
+                match read {
+                    Ok(sample) => {
+                        if send(&mut socket, &ServerFrame::Monitor(sample)).await.is_err() {
+                            return;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Closed) => watching = None,
+                }
+            }
         }
+    }
+}
+
+/// What a watching session holds: the token that counts it, and its
+/// subscription to the readings.
+type Watching = (Box<dyn Send>, broadcast::Receiver<Sample>);
+
+/// The next reading for a watching session; never ready for one that
+/// is not watching, so the select above waits on its other arms.
+async fn next_sample(
+    watching: &mut Option<Watching>,
+) -> Result<Sample, broadcast::error::RecvError> {
+    match watching {
+        Some((_, samples)) => samples.recv().await,
+        None => std::future::pending().await,
     }
 }
 
