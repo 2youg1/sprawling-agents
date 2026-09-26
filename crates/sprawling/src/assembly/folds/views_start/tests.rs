@@ -128,3 +128,22 @@ fn views_a_snapshot_cannot_decode_are_folded_from_genesis() {
         from_genesis(dir.path(), &ledger)
     );
 }
+
+#[test]
+fn a_one_shot_read_refuses_a_line_edited_before_the_snapshot() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ledger, worker) = cut_then_raise(dir.path(), 3..4);
+    drop(worker);
+    let first = memory::ledger_segments_at(&ledger).unwrap().remove(0);
+    let mut bytes = std::fs::read(&first).unwrap();
+    let at = bytes.windows(4).position(|held| held == b"\"t\":").unwrap() + 4;
+    bytes[at] = if bytes[at] == b'1' { b'2' } else { b'1' };
+    std::fs::write(&first, bytes).unwrap();
+    let memory::ChainAudit::Broken(reason) = memory::audit_chain(&ledger).unwrap() else {
+        panic!("the edited ledger still audits whole");
+    };
+
+    let read = crate::assembly::rebuild_views(&ledger).map(|_| ());
+
+    assert_eq!(read, Err(reason));
+}
