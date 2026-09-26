@@ -88,7 +88,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
         monitor: channels::MonitorFeed {
-            watch: Arc::new(|| Box::new(())),
+            watch: Arc::new(|| -> Box<dyn Send> { Box::new(()) }),
             samples: tokio::sync::broadcast::channel(1).0,
         },
         client: Arc::new(channels::ClientAssets::Embedded(&[])),

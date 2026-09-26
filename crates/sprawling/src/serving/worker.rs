@@ -314,10 +314,12 @@ impl Listening {
 fn watched() -> channels::MonitorFeed {
     let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
     channels::MonitorFeed {
-        watch: Arc::new(move || {
+        watch: Arc::new(move || -> Box<dyn Send> {
             // The count is an atomic, so a poisoned lock guards no
             // half-written state and the watcher still counts.
-            let held = monitor.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let held = monitor
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             Box::new(held.watch())
         }),
         samples: tokio::sync::broadcast::channel(1).0,

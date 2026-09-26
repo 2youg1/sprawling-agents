@@ -57,7 +57,8 @@ impl Reply {
                 | channels::ServerFrame::Event(_)
                 | channels::ServerFrame::Delta(_)
                 | channels::ServerFrame::Log(_)
-                | channels::ServerFrame::Lagged(_),
+                | channels::ServerFrame::Lagged(_)
+                | channels::ServerFrame::Monitor(_),
             ) => Self::Other,
             // A frame this build cannot read is still printed; it is
             // simply not one that ends the call.
