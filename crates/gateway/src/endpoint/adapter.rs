@@ -18,8 +18,8 @@ use crate::router::Chosen;
 /// The adapter for one chosen model.
 ///
 /// Every chosen model gets an [`Endpoint`], a loopback one included:
-/// the endpoint decides locality once, when it builds its client, and
-/// the stream door is the endpoint's, so a local model answers in
+/// the endpoint decides locality once, when its client is built, and
+/// every adapter for one endpoint shares that client; the stream door is the endpoint's, so a local model answers in
 /// increments like any other.
 pub fn adapter_for(
     chosen: &Chosen<'_>,
@@ -46,7 +46,8 @@ pub fn adapter_for(
         .map(|(name, value)| (name, HeaderValue::Plain(value)))
         .collect();
     extra_headers.extend(tuning.extra_headers.iter().cloned());
-    let endpoint = Endpoint::new(
+    let endpoint = Endpoint::over(
+        chosen.transport,
         EndpointConfig {
             base_url: endpoint.chat_url(),
             dialect: endpoint.dialect,
@@ -155,9 +156,11 @@ mod tests {
             .lookup("local")
             .unwrap()
             .clone();
+        let transport = crate::endpoint::Transport::default();
         let chosen = Chosen {
             endpoint: &endpoint,
             entry: &entry,
+            transport: &transport,
         };
         let mut model = adapter_for(
             &chosen,
@@ -289,6 +292,10 @@ mod tests {
             .call(&crate::endpoint::fakes::request())
             .unwrap();
         }
-        assert_eq!(server.join().unwrap(), 1, "connections the four calls opened");
+        assert_eq!(
+            server.join().unwrap(),
+            1,
+            "connections the four calls opened"
+        );
     }
 }
