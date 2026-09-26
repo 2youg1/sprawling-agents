@@ -14,15 +14,24 @@ use kernel::{Address, AxError};
 /// Keyed by the whole declaration and the run root the child started
 /// in: a changed field is another server, and a child cannot move to
 /// another working directory once it runs.
+///
+/// Each key has its own lock, and the table's lock is held only to find
+/// or add a key: a lane still shaking hands with one server holds up
+/// the lanes asking for that server and nobody else.
 #[derive(Default)]
 pub(crate) struct Residents {
-    held: std::sync::Mutex<Vec<Resident>>,
+    keys: std::sync::Mutex<Vec<std::sync::Arc<Keyed>>>,
+}
+
+/// One server this worker was asked for, connected or not.
+struct Keyed {
+    server: kernel::McpServer,
+    root: std::path::PathBuf,
+    connected: std::sync::Mutex<Option<Resident>>,
 }
 
 /// One connected server and what it offered when it connected.
 struct Resident {
-    server: kernel::McpServer,
-    root: std::path::PathBuf,
     link: McpLink,
     /// Each tool under both its names, in the order the server listed
     /// them.
@@ -56,15 +65,43 @@ impl Residents {
         confidential: bool,
         resolve: &gateway::SecretResolver,
     ) -> Result<(Vec<protocol::McpTool>, Reached), AxError> {
-        let mut table = super::workbench::held(&self.held, "reach an mcp server")?;
-        table.retain(|held| !(held.serves(server, write_root) && held.link.has_ended()));
-        if let Some(held) = table.iter().find(|held| held.serves(server, write_root)) {
-            return Ok((held.tools(confidential)?, Reached::Resident));
+        let keyed = self.keyed(server, write_root)?;
+        let mut connected = super::workbench::held(&keyed.connected, "reach an mcp server")?;
+        if let Some(resident) = connected
+            .take()
+            .filter(|resident| !resident.link.has_ended())
+        {
+            let tools = resident.tools(confidential);
+            *connected = Some(resident);
+            return Ok((tools?, Reached::Resident));
         }
         let (resident, opened) = Resident::connect(server, write_root, resolve)?;
         let tools = resident.tools(confidential)?;
-        table.push(resident);
+        *connected = Some(resident);
         Ok((tools, Reached::Connected(opened)))
+    }
+
+    /// The entry for `server` started in `write_root`, added when this
+    /// is the first time it is asked for.
+    fn keyed(
+        &self,
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+    ) -> Result<std::sync::Arc<Keyed>, AxError> {
+        let mut keys = super::workbench::held(&self.keys, "find an mcp server's entry")?;
+        if let Some(found) = keys
+            .iter()
+            .find(|keyed| keyed.server == *server && keyed.root == write_root)
+        {
+            return Ok(std::sync::Arc::clone(found));
+        }
+        let added = std::sync::Arc::new(Keyed {
+            server: server.clone(),
+            root: write_root.to_path_buf(),
+            connected: std::sync::Mutex::new(None),
+        });
+        keys.push(std::sync::Arc::clone(&added));
+        Ok(added)
     }
 }
 
@@ -93,19 +130,7 @@ impl Resident {
             .into_iter()
             .map(|entry| (entry.meta, entry.remote))
             .collect();
-        Ok((
-            Resident {
-                server: server.clone(),
-                root: write_root.to_path_buf(),
-                link,
-                listed,
-            },
-            opened,
-        ))
-    }
-
-    fn serves(&self, server: &kernel::McpServer, write_root: &std::path::Path) -> bool {
-        self.server == *server && self.root == write_root
+        Ok((Resident { link, listed }, opened))
     }
 
     /// One handle per tool on the one connection: two connections would
