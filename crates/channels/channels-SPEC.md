@@ -241,12 +241,13 @@ pub struct ServeConfig {
     /// 命令受理面：**只受理，不执行**。同步、不阻塞；真正的回合循环在装配层自己的任务里跑。
     pub commands: Arc<dyn Fn(WireCommand) -> Result<(), AxError> + Send + Sync>,
     /// 事件广播源。本 crate 只 `subscribe`，恒不发送——写入方是 Ledger。
-    pub events: broadcast::Sender<EventRecord>,
+    /// 每条携记录与它已拼好的 `Event` 帧，见 §8-47。
+    pub events: broadcast::Sender<Committed>,
 }
 ```
 
 - **为什么 sink 只受理不执行**：一个 Dispatch 会跑几分钟到几小时。把它做成 `async` 并在 socket 任务里 await，等于把一条连接的寿命绑在一次派活上；刷新页面就会杀掉工作。**受理后立即返回，进展从 Ledger 的事件流回流**——这同时使「关掉界面再打开」与「从未关过」在服务端看来无差别。
-- **为什么广播的是 `EventRecord` 而不是自定义推送体**：客户端要重建的正是那一行历史。另造一个推送类型等于为同一件事立第二个形状权威，而两者一旦漂开，界面会显示一个历史里没有的事实。
+- **为什么广播的是 `EventRecord`（裹在 `Committed` 里）而不是自定义推送体**：客户端要重建的正是那一行历史。另造一个推送类型等于为同一件事立第二个形状权威，而两者一旦漂开，界面会显示一个历史里没有的事实。
 **回信地址（`Reply`／`Delivered`）**。受理与执行分开之后，工人的拒绝没有任何通道回到发问的那个 peer——回程只有 `EventRecord` 广播。真机派活验出的后果是：**一个人在设置页点 attach，base_url 少了 `/v1`，页面一个字都不说**，那条拒绝只躺在服务端自己的日志里。
 
 ```rust
@@ -1301,6 +1302,25 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 - **回答带 `SettledSecond { percent, from }`**：`from` 是说出这个值的那一级文件，理由与 `SettledEffort` 同（`Query::Config` 回答表那一条）；缺省不是缺口，而是城一级默认值在生效，页面据此把一个空框画成默认值。
 - **线的背面是同一件事**：写入经 `city::write_second_threshold` 落到那一级的 `CONFIG.toml` 的 `[context] second_threshold`，与 `write_effort` 同一扇门（读—改—写整份文件，别人的键原样保留）；`building_configured` 的载荷因此从三面到四面（`Written::context`）。
 - **`WIRE_V` 的路不单独走**：36→37 记的是这一次面变——给既有命名帧加字段是「语法换形而名字没换」那一类（字段名不进 `COMMAND_NAMES`），与 §8-44 的 35→36 无关；两次都在 §8-1 的 golden 里看得见。
+
+### 8-47 一条记录只序列化一次：`Committed`
+
+```rust
+/// 一条已提交的记录，与它在线上的那一帧。克隆只加两个引用计数。
+#[derive(Clone)]
+pub struct Committed { /* record: Arc<EventRecord>, frame: Utf8Bytes */ }
+impl Committed {
+    /// 拼帧：`{"event":` ＋ 记录的 JSON ＋ `}`。
+    /// # Errors  `E_WIRE_MISMATCH`：记录序列化不出来（恢复：该记录不推，页面按 `Lagged` 补拉）。
+    pub fn new(record: EventRecord) -> Result<Self, AxError>;
+    pub fn record(&self) -> &EventRecord;
+}
+```
+
+- **帧在广播之前拼好，socket 只写字节**。每个订阅者 `recv` 时广播要克隆一次载荷；载荷若是 `EventRecord`，16 个 socket 就是 16 次深拷贝加 16 次 `serde_json::to_string`。拼好的 `Utf8Bytes` 与 `Arc<EventRecord>` 让每个 socket 的代价降到两次引用计数和一次写。**被否**：socket 各自序列化——同一份字节算 N 遍，且 N 正是人开着的标签页数。
+- **拼法的唯一权威是 `Committed::new`**，守护夹具断言它拼出的帧与 `serde_json::to_string(&ServerFrame::Event(..))` 逐字节相等：`ServerFrame` 是外部标签的 snake_case 枚举，`Event` 臂的形状恰是 `{"event":<记录>}`，两者一旦漂开页面读到的是另一条历史。
+- **读数**：`instrument_fanout_cpu_per_event`（`--release --run-ignored only`）在 1／4／16 个订阅者上量每事件的 CPU，门槛是 16 个订阅者时 ≤ 1 µs。
+- 这份帧目前由 `EventRecord` 序列化而来；改为直接取 `append_all` 写下的账本行字节（使广播环只留一份字节，`Lagged` 补拉亦回账本字节）是本接口的下一步，前提是账本行与 `serde_json::to_vec(&EventRecord)` 逐字节相等——同一条守护夹具会判定它。
 
 ### 8-46 先占住端口，再交出城：`bind` 与 `serve` 分成两步
 

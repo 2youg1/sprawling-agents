@@ -15,6 +15,7 @@
 //! A refusal made minutes later has no way home, which is why a command
 //! carries the [`Reply`] address of whoever sent it.
 
+mod committed;
 mod config;
 mod listener;
 mod reply;
