@@ -259,7 +259,22 @@ impl Warmth {
 - 续期请求是该前缀最近一次真实请求原样重发，只把 `max_tokens` 压到 1：缓存按前缀字节命中，与输出上限无关，所以 1 个输出 token 是续期能付的最低价。
 - 一个前缀只留最近一条请求：同一前缀后来的请求覆盖前一条，内存随前缀数而非请求数增长。
 - 何时续、续几次全由 `kernel::keep_warm::renewal_due` 判定，本模块不另写第二个 TTL。
-- 现状：记账与发出已落地；在 run 结束后把 `Warmth` 留在 worker 上、从唯一 spawn 点起定时器按 `next_due` 醒来、实测 `lead_ms`、把续期 usage 记成事件，尚未接线。
+- 真实请求进账的门是 `Warmed`：它拥有一次 run 调用的 adapter，本身也是 `kernel::Model`，所以 turn loop 照旧只见 `&mut dyn Model`，每一次成功的调用（阻塞门或流式门）都在返回后按发出时刻记进 `Warmth`。失败的调用不记：provider 没有读到的前缀没有可续的缓存。
+
+```rust
+/// 拥有 adapter 的保温门；clock 取自 bin::assembly 的唯一采样点。
+pub struct Warmed<C> { /* model: Box<dyn Model + Send>、warmth: Warmth、clock: C —— 私有 */ }
+impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
+    pub fn new(model: Box<dyn Model + Send>, setting: KeepWarm, clock: C) -> Warmed<C>;
+    pub fn next_due(&self) -> Option<u64>;
+    /// 经自己拥有的 adapter 发出 now_ms 已到期的续期。
+    pub fn renew_due(&mut self, now_ms: u64) -> Result<Vec<ModelReturn>, AxError>;
+}
+impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call_streaming */ }
+```
+
+- `lead_ms` 不是常量：`Warmed` 把每次经它发出的调用（真实请求与续期）的往返时长记为下一次续期的提前量，所以提前量跟着所连的 provider 与链路走，不按某一类机器调校。流式调用的往返含生成时长，只会让续期提前，不会让它晚于缓存过期。
+- 现状：`Warmed` 与记账已落地；run 结束后把 `Warmed` 留在 worker 上、在唯一 spawn 点的 attend 循环里按 `next_due` 醒来发续期、把续期的 usage 记成事件，尚未接线。
 
 ### 8-5 runtime::handoff（形状 2）
 
