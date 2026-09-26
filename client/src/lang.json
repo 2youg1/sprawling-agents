@@ -3019,5 +3019,61 @@
   "run_doing_frozen": {
     "en": "wrapped up",
     "zh": "已收尾"
+  },
+  "run_time": {
+    "en": "time",
+    "zh": "时间"
+  },
+  "run_head_region": {
+    "en": "run summary",
+    "zh": "run 概况"
+  },
+  "run_head_outcome": {
+    "en": "outcome",
+    "zh": "结局"
+  },
+  "run_head_took": {
+    "en": "took",
+    "zh": "用时"
+  },
+  "run_head_started": {
+    "en": "started {clock}",
+    "zh": "{clock} 开始"
+  },
+  "run_head_tokens": {
+    "en": "tokens in / out",
+    "zh": "token 入 / 出"
+  },
+  "run_head_cached": {
+    "en": "{n} cached",
+    "zh": "缓存 {n}"
+  },
+  "run_head_spent": {
+    "en": "spent",
+    "zh": "花费"
+  },
+  "run_head_turns": {
+    "en": "{n} turns",
+    "zh": "{n} 个回合"
+  },
+  "run_head_origin": {
+    "en": "from",
+    "zh": "来处"
+  },
+  "run_river": {
+    "en": "where the time went, by turn",
+    "zh": "时间花在哪，按回合"
+  },
+  "run_calls": {
+    "en": "tool calls",
+    "zh": "工具调用"
+  },
+  "run_no_calls": {
+    "en": "no tool calls yet",
+    "zh": "还没有工具调用"
+  },
+  "run_no_turns": {
+    "en": "no turns yet",
+    "zh": "还没有回合"
   }
 }
