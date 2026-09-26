@@ -100,6 +100,10 @@ pub(in crate::assembly) struct Placing<'a> {
     pub(in crate::assembly) city: kernel::B3Hash,
     /// What time it is, for the base commit a first placement makes.
     pub(in crate::assembly) clock: &'a (dyn accounting::Clock + Send + Sync),
+    /// The city's one fence at a time: a first placement commits the
+    /// city's index, which every fence also stages and commits
+    /// (sprawling-SPEC.md 8-46-13).
+    pub(in crate::assembly) fence_gate: &'a std::sync::Mutex<()>,
 }
 
 impl Site {
@@ -140,10 +144,12 @@ impl Site {
                 effort: self.config.effort,
             },
         );
+        let turn = super::held(placing.fence_gate, "take the fence gate")?;
         memory::Checkpoint::open(placing.city_root)
             .map_err(memory::MemoryError::into_ax)?
             .ensure_base(&[addr.as_str().to_owned()], placing.clock.now()?, &of)
             .map_err(memory::MemoryError::into_ax)?;
+        drop(turn);
         let claimed = memory::Worktrees::open(placing.city_root)
             .map_err(memory::MemoryError::into_ax)?
             .claim(&tree_of(addr)?, &super::tree_scope(&self.building))
@@ -162,6 +168,22 @@ impl Site {
         self.write_root = claimed.path().to_path_buf();
         self.branch = Some(claimed.name().as_str().to_owned());
         self.lease = Some(claimed);
+        Ok(())
+    }
+}
+
+impl Site {
+    /// Names the branch a room under review works on before its tree is
+    /// placed. The branch is the tree's name, a function of the room
+    /// alone, so the desks opened on the accounting thread know it while
+    /// the lane still places the tree (sprawling-SPEC.md 8-93).
+    ///
+    /// # Errors
+    /// Propagates a room whose tree name will not parse.
+    pub(in crate::assembly) fn name_tree(&mut self, addr: &Address) -> Result<(), AxError> {
+        if self.rules.review() {
+            self.branch = Some(tree_of(addr)?.as_str().to_owned());
+        }
         Ok(())
     }
 }

@@ -86,7 +86,9 @@ fn placing<'f>(
         }))
         .unwrap();
     let sieving = Sieving {
-        cas: memory::Cas::open(&dir.join("cas")).unwrap(),
+        cas: std::sync::Arc::new(std::sync::Mutex::new(
+            memory::Cas::open(&dir.join("cas")).unwrap(),
+        )),
         city_root: dir.to_path_buf(),
         room: kernel::Address::parse("lab").unwrap(),
         origin: memory::BlockOrigin {

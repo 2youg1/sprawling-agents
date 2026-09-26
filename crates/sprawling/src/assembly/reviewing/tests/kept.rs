@@ -160,3 +160,93 @@ fn trees_opened(ledger_dir: &std::path::Path) -> Vec<String> {
         .map(|record| record.data().as_map()["name"].as_str().unwrap().to_owned())
         .collect()
 }
+
+/// A room under review whose tree cannot be placed yet does not hold
+/// the desk: the first placement commits the city's index, and while
+/// somebody else holds `.git/index.lock` that commit waits and then
+/// fails in the lane that drives the run, not on the accounting thread
+/// that took the command (sprawling-SPEC.md 8-93).
+#[test]
+fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+    lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    memory::Checkpoint::open(dir.path()).unwrap();
+    let lock = dir.path().join(".git").join("index.lock");
+    std::fs::write(&lock, "").unwrap();
+
+    worker.serve_one(Posted {
+        command: channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "work".to_owned(),
+            goal: "work".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"locked"),
+            session: None,
+            effort: None,
+            model: None,
+        },
+        reply: channels::Reply::nowhere(),
+    });
+    let in_the_air = worker.flight.in_flight();
+    let landed = worker.land_the_rest();
+    std::fs::remove_file(&lock).unwrap();
+
+    assert_eq!(
+        in_the_air, 1,
+        "the desk took the dispatch off while the index was locked"
+    );
+    assert!(
+        landed.is_err(),
+        "and the lane that could not place the tree came home refused"
+    );
+}
+
+/// A lane that placed the room's tree and then failed gives the tree
+/// back on its way home: the next dispatch to the room claims it again
+/// instead of finding it held by a run that is over (sprawling-SPEC.md
+/// 8-93).
+#[test]
+fn a_lane_that_fails_after_placing_the_tree_gives_it_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+    // The tree is claimed over the building's own subtree; the write
+    // domain, resolved later when the bench is laid out, refuses.
+    lay_rules(
+        dir.path(),
+        "lab",
+        &shut_rules("review = true\nprefixes = [\"elsewhere\"]\n"),
+    );
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+
+    let landed: Vec<bool> = [b"first".as_slice(), b"second"]
+        .into_iter()
+        .map(|idem| {
+            worker.serve_one(Posted {
+                command: channels::Command::Dispatch {
+                    addr: Address::parse("lab/room1").unwrap(),
+                    task: "work".to_owned(),
+                    goal: "work".to_owned(),
+                    mode: kernel::Mode::PlanGoal,
+                    idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
+                    session: None,
+                    effort: None,
+                    model: None,
+                },
+                reply: channels::Reply::nowhere(),
+            });
+            worker.land_the_rest().is_err()
+        })
+        .collect();
+
+    assert_eq!(
+        (landed, trees_opened(&report.ledger_dir).len()),
+        (vec![true, true], 2),
+        "each run placed the room's tree, failed, and gave the tree back"
+    );
+}

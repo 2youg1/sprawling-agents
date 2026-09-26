@@ -278,11 +278,12 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
 /// nodes nothing blocks are three runs going at once, not three runs one
 /// after another.
 ///
-/// The assertion is on the history rather than on a stopwatch: with a
-/// sequential pursuit each run's lines are a contiguous block, so
-/// exactly one run has started by the time the first one freezes. Three
-/// runs started before the first freeze is a fact only concurrency can
-/// produce, and it is the fact a person is promised.
+/// The assertion is on the lanes rather than on a stopwatch: the
+/// pursuit takes its rows off and returns, and nothing lands a run until
+/// the loop below serves the crossing, so a sequential pursuit has one
+/// run in the air at that moment and this one has three. The history
+/// cannot say it: each run's preparation happens in its own lane, so how
+/// its first line interleaves with another run's freeze is a race.
 ///
 /// Each node's room is named by rule, so no reply is spent on a name;
 /// the turns are concurrent and all get the same reply, which is what
@@ -302,34 +303,29 @@ fn three_ready_nodes_drive_three_runs_at_once() {
     let (base_url, _provider) =
         fake_openai(&["m-local"], vec![completion("nothing left to do", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    worker
-        .handle(channels::Command::Pursue {
+    worker.serve_one(crate::assembly::Posted {
+        command: channels::Command::Pursue {
             addr: Address::parse("lab").unwrap(),
             step: channels::PursuitStep::Set {
                 goal: "fire the kiln".to_owned(),
             },
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"pursue"),
-        })
-        .unwrap();
+        },
+        reply: channels::Reply::nowhere(),
+    });
+    let in_the_air = worker.flight.in_flight();
+    worker.land_the_rest().unwrap();
 
+    assert_eq!(
+        in_the_air, 3,
+        "three ready nodes are three runs going at once"
+    );
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let lines: Vec<serde_json::Value> = verified
         .raw_lines()
         .iter()
         .map(|line| serde_json::from_slice(line).unwrap())
         .collect();
-    let started: std::collections::BTreeSet<String> = lines
-        .iter()
-        .take_while(|line| line["kind"] != "run_frozen")
-        .filter(|line| line["kind"] == "run_started")
-        .map(|line| line["run"].as_str().unwrap_or_default().to_owned())
-        .collect();
-    assert_eq!(
-        started.len(),
-        3,
-        "three ready nodes are three runs going at once: {} had started when the first froze",
-        started.len()
-    );
     let frozen = lines
         .iter()
         .filter(|line| line["kind"] == "run_frozen")

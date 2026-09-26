@@ -59,14 +59,14 @@ fn a_run_standing_up_books_the_rules_it_will_stand_under() {
         &moved,
     )
     .unwrap();
-    let (driving, _continuation) = worker
-        .prepare_dispatch(
+    let (staged, _continuation) = worker
+        .stage_dispatch(
             asked("lab/east"),
             "fire the kiln".to_owned(),
             "the kiln is fired".to_owned(),
         )
         .unwrap();
-    drop(driving);
+    drop(staged);
 
     let lines = history(&report.ledger_dir);
     let entries = books(&lines, "building:lab", "RULES.toml");
@@ -174,14 +174,14 @@ fn a_building_that_does_not_exist_opens_no_account() {
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
 
-    let (driving, _continuation) = worker
-        .prepare_dispatch(
+    let (staged, _continuation) = worker
+        .stage_dispatch(
             asked("ghost/east"),
             "haunt".to_owned(),
             "haunted".to_owned(),
         )
         .unwrap();
-    drop(driving);
+    drop(staged);
 
     let scopes: Vec<_> = history(&report.ledger_dir)
         .into_iter()

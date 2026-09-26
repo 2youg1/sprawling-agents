@@ -13,15 +13,20 @@ use kernel::{Address, AxError, Locator};
 use runtime::bench::ToolBench;
 use runtime::{EditTool, ExecTool, SearchTool, StatusTool};
 
-use super::super::{Assignment, RunWorker, mounts_under};
+use super::super::{Assignment, mounts_under};
 use super::engine::machine_half;
-use super::{Desks, Reach, Site, Situation, Workbench, held, status_snapshot};
+use super::{BenchDesks, Laying, Reach, Site, Situation, Workbench, held, status_snapshot};
 
 mod kept;
 mod reading_room;
 
-impl RunWorker {
+impl Laying {
     /// Lays out what the model may see and what routes what it calls.
+    ///
+    /// It reads the city through [`Laying`] rather than the worker, so it
+    /// runs in the lane that drives the run: an MCP server that still
+    /// shakes hands holds up that lane and nothing else
+    /// (sprawling-SPEC.md 8-93).
     ///
     /// The catalogue and the bench are one phase because they are one
     /// registration: the catalogue is what the model was told exists,
@@ -37,9 +42,9 @@ impl RunWorker {
     /// duplicate registration on either list, and whatever the reading
     /// room reports.
     pub(in crate::assembly) fn lay_out_workbench(
-        &mut self,
+        &self,
         site: &Site,
-        desks: &Desks,
+        desks: &BenchDesks,
         at: &Assignment,
         job_locator: &Locator,
     ) -> Result<Workbench, AxError> {
@@ -62,15 +67,15 @@ impl RunWorker {
         // Every tool shares one keeper, so no two of them keep two keys
         // under one name (sprawling-SPEC.md 8-87).
         let keeper = std::sync::Arc::new(kept::Keeper::new(
-            self.vault_handle(),
-            self.ledger.position().value(),
+            Arc::clone(&self.vault),
+            self.staged_at.value(),
         ));
         // Who this run can reach, frozen at dispatch: the assembly runs
         // one run at a time and a signal lands after the drive returns,
         // so nothing moves under it. It answers `neighbours` and `status`.
         let seen =
             city::Neighbourhood::scan(&self.city_root, site.building.addr(), addr, &|room| {
-                self.collaborating.rooms.pending(room)
+                self.waiting.get(room).copied().unwrap_or(0)
             })?;
         // Where this run stands, carried rather than worked out: a run
         // that inferred its own depth would be one wrong answer away
@@ -147,10 +152,9 @@ impl RunWorker {
         let scope: Vec<String> = domain.prefixes().map(|p| p.as_str().to_owned()).collect();
         let mut bench = ToolBench::new(domain)
             .with_checkpoint(runtime::bench::CheckpointNet {
-                checkpoint: memory::Checkpoint::open(&site.write_root)
-                    .map_err(memory::MemoryError::into_ax)?,
+                checkpoint: self.open_checkpoint(&site.write_root)?,
                 scope,
-                of: site.provenance(self.city_hash()?, addr),
+                of: site.provenance(self.city, addr),
             })
             .for_job(addr.clone(), job_locator.clone());
         *bench.taint_mut() = at.taint.clone();
@@ -250,7 +254,7 @@ impl RunWorker {
     }
 }
 
-impl RunWorker {
+impl Laying {
     /// What this run's building may read by a path its model chose: the read bound, closed over
     /// the building and this city's rules (city-SPEC 8-2).
     ///
@@ -296,7 +300,7 @@ impl RunWorker {
                 run: site.run_id,
             },
             machine.engine,
-            self.flight.backlog.clone(),
+            self.backlog.clone(),
         )
     }
 
@@ -314,7 +318,7 @@ impl RunWorker {
     fn status_tool(
         &self,
         site: &Site,
-        desks: &Desks,
+        desks: &BenchDesks,
         at: &Assignment,
         reach: Reach<'_>,
     ) -> Result<StatusTool, AxError> {
@@ -327,18 +331,12 @@ impl RunWorker {
                 mode: at.mode,
                 write_domain: &site.rules.write_domain()?,
                 worktree: &site.write_root,
-                trust: &self.governance.autonomy,
+                trust: &self.trust,
                 context_tokens: site.model.context_tokens,
                 neighbours: reach.seen.residents(),
                 // What this resident already holds, so a model asking what it may
                 // touch is answered from the same list the conflict check reads.
-                locks: self
-                    .collaborating
-                    .goals
-                    .iter()
-                    .filter(|entry| entry.owner == site.who)
-                    .map(|entry| entry.statement.clone())
-                    .collect(),
+                locks: self.locks.clone(),
             }),
             Box::new(move || {
                 watched.lock().map_or_else(
@@ -357,7 +355,7 @@ impl RunWorker {
         )?;
         // The thirteenth line: what this run started and left running.
         Ok(tool
-            .reporting(self.flight.backlog.clone())
+            .reporting(self.backlog.clone())
             .metering(reach.context.clone()))
     }
 }

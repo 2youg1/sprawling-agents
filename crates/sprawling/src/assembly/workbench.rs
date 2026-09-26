@@ -28,6 +28,92 @@ mod tools;
 
 pub(super) use standing::Placing;
 
+/// What laying out a run's bench reads from the city: handles that
+/// clone, and values read when the dispatch was staged, so the bench is
+/// laid out in the lane that drives the run (sprawling-SPEC.md 8-93).
+///
+/// The folds the accounting thread rewrites - who has mail waiting, who
+/// holds which goal, how far the city trusts its residents - arrive as
+/// the values they had when the dispatch was staged, which is the moment
+/// the worker read them before the bench moved into the lane.
+pub(in crate::assembly) struct Laying {
+    pub(in crate::assembly) city_root: PathBuf,
+    /// The city's genesis line, which signs every fence.
+    pub(in crate::assembly) city: kernel::B3Hash,
+    vault: std::sync::Arc<std::sync::Mutex<gateway::Custodian>>,
+    connectors: std::sync::Arc<dyn accounting::Connectors + Send + Sync>,
+    backlog: runtime::Backlog,
+    /// The city's one fence at a time (`driving::lane::DriveContext`).
+    pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    /// The store the lanes share (`RunWorker::lane_store`).
+    pub(in crate::assembly) store: std::sync::Arc<std::sync::Mutex<memory::Cas>>,
+    notes: super::recording::Notes,
+    clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
+    /// Where the ledger stood when the dispatch was staged: what the
+    /// keeper counts from, and where each line written here is anchored.
+    staged_at: kernel::Seq,
+    trust: kernel::Autonomy,
+    /// How many signals each room with any waiting was holding.
+    waiting: std::collections::BTreeMap<Address, u32>,
+    /// The goals this run's resident already holds, which `status`
+    /// answers from the list the conflict check reads.
+    locks: Vec<String>,
+}
+
+impl Laying {
+    /// Writes one diagnostic line, anchored where the dispatch was staged.
+    fn note(&self, level: runtime::diagnostics::Level, module: &str, message: &str) {
+        self.notes.write(level, self.staged_at, module, message);
+    }
+
+    /// Opens the checkpoint a run's writes are fenced in.
+    ///
+    /// The first open in a city creates its repository, and two lanes
+    /// creating one race on its config lock, so the open takes the gate
+    /// a fence takes (sprawling-SPEC.md 8-46-13).
+    ///
+    /// # Errors
+    /// Propagates a gate a dead thread left, and a repository that will
+    /// not open.
+    fn open_checkpoint(&self, root: &std::path::Path) -> Result<memory::Checkpoint, AxError> {
+        let turn = held(&self.fence_gate, "take the fence gate")?;
+        let opened = memory::Checkpoint::open(root).map_err(memory::MemoryError::into_ax);
+        drop(turn);
+        opened
+    }
+}
+
+impl super::RunWorker {
+    /// What laying out a bench for `who` reads from this worker, taken
+    /// now.
+    ///
+    /// # Errors
+    /// Propagates a city whose genesis line cannot be read.
+    pub(in crate::assembly) fn laying(&self, who: &str) -> Result<Laying, AxError> {
+        Ok(Laying {
+            city_root: self.city_root.clone(),
+            city: self.city_hash()?,
+            vault: self.vault_handle(),
+            connectors: std::sync::Arc::clone(&self.connectors),
+            backlog: self.flight.backlog.clone(),
+            fence_gate: std::sync::Arc::clone(&self.flight.fence_gate),
+            store: std::sync::Arc::clone(&self.lane_store),
+            notes: self.log.clone(),
+            clock: std::sync::Arc::clone(&self.clock),
+            staged_at: self.ledger.position(),
+            trust: self.governance.autonomy.clone(),
+            waiting: self.collaborating.rooms.waiting(),
+            locks: self
+                .collaborating
+                .goals
+                .iter()
+                .filter(|entry| entry.owner == who)
+                .map(|entry| entry.statement.clone())
+                .collect(),
+        })
+    }
+}
+
 /// Who checks a delegate's own done check. Not the delegate: the whole
 /// point of `Claim::verified` is that a producer's verdict on its own
 /// work is not verification.
@@ -217,6 +303,34 @@ pub(super) struct Desks {
     /// This run's tenure over its room's queue, shown when it lands:
     /// only the holder gives a queue back (sprawling-SPEC.md 8-46-9).
     pub(super) tenure: super::QueueTenure,
+}
+
+/// The desks a run's bench holds while it drives: clones of the handles
+/// in [`Desks`], for the lane that lays the bench out. The room's queue
+/// and the tenure over it stay in [`Desks`], with the landing, because
+/// only the holder gives a queue back.
+pub(in crate::assembly) struct BenchDesks {
+    pub(in crate::assembly) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+    goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
+    plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
+    shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
+    pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
+    workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
+    waiting: u32,
+}
+
+impl Desks {
+    pub(in crate::assembly) fn for_bench(&self) -> BenchDesks {
+        BenchDesks {
+            signals: std::sync::Arc::clone(&self.signals),
+            goals: std::sync::Arc::clone(&self.goals),
+            plan: std::sync::Arc::clone(&self.plan),
+            shelf: std::sync::Arc::clone(&self.shelf),
+            pr: std::sync::Arc::clone(&self.pr),
+            workshop: std::sync::Arc::clone(&self.workshop),
+            waiting: self.waiting,
+        }
+    }
 }
 
 /// What a run can be told about itself at the moment it starts.

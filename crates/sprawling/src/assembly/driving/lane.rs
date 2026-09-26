@@ -205,6 +205,7 @@ pub(crate) fn drive_run<L: Ledger>(
         member,
         plan,
         handoff,
+        workbench,
     } = driving;
     let DriveContext {
         watching,
@@ -304,5 +305,6 @@ pub(crate) fn drive_run<L: Ledger>(
         // answers Allow or Deny. The sweep is the one thing that still
         // raises a question, and it raises it after this returns.
         raised: Vec::new(),
+        workbench,
     })
 }

@@ -22,8 +22,9 @@ use std::sync::mpsc;
 
 use kernel::{AxCode, AxError, RunId};
 
+use super::DriveContext;
+use super::dispatching::preparing::{Flown, Staged};
 use super::relay::{Relay, Wake};
-use super::{DriveContext, Driven, Driving, drive_run};
 use crate::monitor::memory::Memory;
 
 /// How many runs a city drives at once, whichever entrance started
@@ -49,7 +50,7 @@ const RESERVE_SHARE: u64 = 10;
 /// nothing about what to settle.
 pub(crate) struct Arrival {
     pub(crate) run: RunId,
-    pub(crate) driven: Result<Driven, AxError>,
+    pub(in crate::assembly) flown: Flown,
 }
 
 /// The lanes a city drives in.
@@ -77,9 +78,10 @@ pub(crate) struct DrivingPool {
     read_memory: fn() -> Memory,
 }
 
-/// One prepared drive and the two things its lane will be given.
+/// One staged dispatch and the two things its lane will be given. It
+/// holds no tree and no server yet: the lane prepares it.
 struct Waiting {
-    driving: Driving,
+    staged: Staged,
     ledger: Relay,
     context: DriveContext,
 }
@@ -124,16 +126,16 @@ impl DrivingPool {
     /// id would make the pool's own table lie about what is in flight.
     pub(crate) fn start(
         &mut self,
-        driving: Driving,
+        staged: Staged,
         ledger: Relay,
         context: DriveContext,
     ) -> Result<(), AxError> {
-        let run = driving.run_id;
+        let run = staged.run_id();
         if self.running.contains_key(&run)
             || self
                 .waiting
                 .iter()
-                .any(|queued| queued.driving.run_id == run)
+                .any(|queued| queued.staged.run_id() == run)
         {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -144,13 +146,13 @@ impl DrivingPool {
         }
         if self.full() {
             self.waiting.push_back(Waiting {
-                driving,
+                staged,
                 ledger,
                 context,
             });
             return Ok(());
         }
-        self.open_lane(driving, ledger, context)
+        self.open_lane(staged, ledger, context)
     }
 
     /// Starts the drives that waited for a lane, oldest first, until the
@@ -165,41 +167,41 @@ impl DrivingPool {
         // is a run the next reading has to make room for.
         while !self.full() {
             let Some(Waiting {
-                driving,
+                staged,
                 ledger,
                 context,
             }) = self.waiting.pop_front()
             else {
                 break;
             };
-            let run = driving.run_id;
-            if let Err(err) = self.open_lane(driving, ledger, context) {
+            let run = staged.run_id();
+            if let Err(err) = self.open_lane(staged, ledger, context) {
                 refused.push((run, err));
             }
         }
         refused
     }
 
-    /// Opens the thread one drive runs on.
+    /// Opens the thread one run is prepared and driven on.
     ///
     /// # Errors
     /// Refuses when the operating system will not start a thread.
     fn open_lane(
         &mut self,
-        driving: Driving,
+        staged: Staged,
         mut ledger: Relay,
         context: DriveContext,
     ) -> Result<(), AxError> {
-        let run = driving.run_id;
+        let run = staged.run_id();
         let home = self.home.clone();
         let lane = std::thread::Builder::new()
             .name(format!("sprawling-drive-{run}"))
             .spawn(move || {
-                let driven = drive_run(driving, &mut ledger, context);
+                let flown = staged.fly(&mut ledger, context);
                 // Nobody listening means the city stopped pursuing while
                 // this run was going: the history already has whatever
                 // this drive wrote, and there is nothing left to tell.
-                drop(home.send(Wake::Home(Box::new(Arrival { run, driven }))));
+                drop(home.send(Wake::Home(Box::new(Arrival { run, flown }))));
             })
             .map_err(|source| {
                 AxError::failure(

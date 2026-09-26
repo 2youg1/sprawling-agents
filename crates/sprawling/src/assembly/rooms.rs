@@ -235,6 +235,16 @@ impl RoomQueues {
             Some(RoomQueue::Lent { .. }) | None => 0,
         }
     }
+
+    /// [`RoomQueues::pending`] for every room holding anything, read at
+    /// once, for a bench laid out off this thread (sprawling-SPEC.md 8-93).
+    pub(in crate::assembly) fn waiting(&self) -> BTreeMap<Address, u32> {
+        self.rooms
+            .keys()
+            .map(|addr| (addr.clone(), self.pending(addr)))
+            .filter(|(_, pending)| *pending > 0)
+            .collect()
+    }
 }
 
 /// The read faces the tests assert through.
