@@ -261,7 +261,9 @@
         <p class="text-note text-text-quiet">{say($lang, hint)}</p>
       {/if}
     </header>
-    <div class="flex min-w-0 flex-col gap-wide @wide/page:flex-row @wide/page:items-start @wide/page:gap-section">
+    <!-- The dependency group lays its cards out in its own columns and
+    needs the whole row for them, so there the file stays under the body. -->
+    <div class={["flex min-w-0 flex-col gap-wide", shown === "tools" ? "" : "@wide/page:flex-row @wide/page:items-start @wide/page:gap-section"]}>
       <div class="min-w-0 flex-1">
         <div class={["flex min-w-0 flex-col gap-base", WIDTH[shown]]}>
           {#if shown === "accounts"}
