@@ -329,7 +329,7 @@ pub struct DiscardLine {
     /// sentence about it.
     ///
     /// Composing the sentence is the interface's job and it already has
-    /// one authority for it (`web::approval::ReturnPath`); a server that
+    /// one authority for it (`client/src/views/record/bin.svelte`); a server that
     /// also rendered the plan into words would be the second. `None`
     /// means the record names a scheme this build cannot read, which the
     /// interface shows as a row it will not invent an action for - the

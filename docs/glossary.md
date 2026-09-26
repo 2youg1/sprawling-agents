@@ -18,7 +18,7 @@ Everything a run does becomes an **EventRecord** in the **Ledger** before it bec
 
 That is also what makes the interface trustworthy in a specific, narrow way: it can be wrong about what it has not been told, and it cannot be wrong in a way the Ledger does not also record.
 
-Two more relations are worth stating because they are easy to invert. A **Gate** decides one action inside the city, and it decides it: the verdict is `Allow` or `Deny`, and a door that cannot decide is a door whose rule nobody has written. What a person answers is a different thing — a question a resident asked about the design, which no door can settle. And a **Discard** is a deletion that carries its own way back: the type has no constructor without one, so a deletion with no restoration is not something the code refuses, it is something the code cannot express.
+Two more relations are worth stating because they are easy to invert. A **Gate** decides one action inside the city, and it decides it: the verdict is `Allow`, `Deny` or `Ask`, and `Ask` means the rule itself hands that one action to the person, which is rare and counted: a door that cannot decide is a door whose rule nobody has written. What a person answers in the Approval Inbox is that question, and it is a different thing from a question a resident asked about the design, which no door can settle. And a **Discard** is a deletion that carries its own way back: the type has no constructor without one, so a deletion with no restoration is not something the code refuses, it is something the code cannot express.
 
 > The tables below are the vocabulary itself. The order is reading order rather than alphabetical order, because alphabetical order helps nobody on a first pass.
 

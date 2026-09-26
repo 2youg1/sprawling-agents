@@ -13,7 +13,7 @@
 //! the rule keeps naming one place.
 //!
 //! **This file holds the worker and the modules below hold its methods.**
-//! `RunWorker` is declared here, so its twenty-two private fields are
+//! `RunWorker` is declared here, so its private fields are
 //! visible throughout `assembly` and nowhere else — a private item
 //! reaches the module that declares it and that module's descendants, so
 //! the split cost no field its privacy. What stays here is what every
@@ -23,10 +23,11 @@
 //! `recording`; opening and closing in `lifetime`; the test fixtures in
 //! `fixture`.
 //!
-//! The `use` block below is the one place the sixteen submodules see
-//! each other through. A submodule imports from `super`, never from a
-//! sibling, so what one part of the assembly point offers another is
-//! stated once, here, and reads as a list rather than as a graph.
+//! The `use` block below is where the submodules see each other. A
+//! submodule imports from `super`, so what one part of the assembly
+//! point offers another is stated once, here, and reads as a list rather
+//! than as a graph; the one sibling reach is `credentials::dialect_headers`,
+//! which the dispatching modules read where the credentials module keeps it.
 
 mod building_page;
 mod commanding;

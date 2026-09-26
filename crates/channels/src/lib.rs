@@ -7,8 +7,8 @@
 //! read-only multi-city aggregation.
 //!
 //! The kernel types that appear on this crate's own signatures are
-//! re-exported below. `web` depends on `channels` and on nothing else
-//! (ARCHITECTURE section 2), so a client that cannot name `EventRecord`
+//! re-exported below. The client reads the wire and nothing else
+//! (ARCHITECTURE section 8), so a client that cannot name `EventRecord`
 //! cannot read the frames it is sent; a boundary crate that hands out
 //! frames owes the vocabulary to read them.
 
