@@ -72,6 +72,9 @@ pub(crate) struct Views {
     /// happens next, and a browser opened today would otherwise have no
     /// way to learn the name of a city initialised last month.
     pub(super) city: Option<Address>,
+    /// The seq of the last record shown to [`Views::apply`], which is
+    /// where the served ledger head starts before the fold moves it.
+    head: Option<kernel::Seq>,
     /// What waits in each room, folded from the signal records. Held
     /// here rather than read off a queue: a queue answers by being
     /// consumed, and a view that consumed what it showed would change
@@ -155,6 +158,7 @@ impl Views {
             governance: super::Governance::empty(),
             book: gateway::EndpointBook::new(),
             city: None,
+            head: None,
             waiting: std::collections::BTreeMap::new(),
             discards: std::collections::BTreeMap::new(),
             assets: Vec::new(),
@@ -186,6 +190,7 @@ impl Views {
         reason = "a few kinds change what a room holds; the rest of the event vocabulary does not"
     )]
     pub(crate) fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        self.head = Some(record.seq());
         self.hot
             .apply(record)
             .map_err(memory::MemoryError::into_ax)?;
@@ -318,6 +323,10 @@ impl Views {
     /// What this city is called: what its first record says, and for a
     /// city made before that record carried a name, the directory it
     /// lives in. One place decides, so two readers cannot disagree.
+    pub(crate) fn head(&self) -> Option<kernel::Seq> {
+        self.head
+    }
+
     pub(crate) fn city(&self) -> Option<Address> {
         self.city
             .clone()

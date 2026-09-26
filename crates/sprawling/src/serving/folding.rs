@@ -26,6 +26,14 @@ enum Fold {
     Examined(channels::DoctorAnswer),
 }
 
+/// Where a folded record goes next: the clients watching the city, and
+/// the head every welcome names, moved before the record is sent so a
+/// session that reads the head has already subscribed to what follows it.
+pub(super) struct Broadcast {
+    pub(super) to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+    pub(super) head: Arc<channels::LedgerHead>,
+}
+
 /// Whether the views still follow the ledger. Once a panic has poisoned
 /// the lock the fold stops, because a half-applied record leaves state
 /// no later record can be trusted to correct.
@@ -43,13 +51,13 @@ enum Following {
 /// `StorageFatal` when the thread cannot be started.
 pub(super) fn spawn_folding(
     views: Arc<Mutex<Views>>,
-    to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+    broadcast: Broadcast,
 ) -> Result<Folding, AxError> {
     let (committed, arriving) = mpsc::channel::<Fold>();
     let examined = committed.clone();
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
-        .spawn(move || fold_until_closed(&views, &arriving, &to_clients))
+        .spawn(move || fold_until_closed(&views, &arriving, &broadcast))
         .map_err(|source| {
             AxError::failure(
                 AxCode::StorageFatal,
@@ -82,11 +90,7 @@ pub(super) fn spawn_folding(
 ///
 /// The broadcast follows the fold so a client that queries on hearing a
 /// record finds it already folded.
-fn fold_until_closed(
-    views: &Mutex<Views>,
-    arriving: &mpsc::Receiver<Fold>,
-    to_clients: &tokio::sync::broadcast::Sender<EventRecord>,
-) {
+fn fold_until_closed(views: &Mutex<Views>, arriving: &mpsc::Receiver<Fold>, broadcast: &Broadcast) {
     let mut following = Following::Live;
     for fold in arriving {
         following = match following {
@@ -96,7 +100,8 @@ fn fold_until_closed(
         if let Fold::Committed(record) = fold {
             // A send with no subscribers is not a failure: a city with
             // no browser open is a city doing its work.
-            drop(to_clients.send(record));
+            broadcast.head.advance(record.seq());
+            drop(broadcast.to_clients.send(record));
         }
     }
 }

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use kernel::EventRecord;
 
-use super::spawn_folding;
+use super::{Broadcast, spawn_folding};
 use crate::assembly::init_city;
 use crate::views::Views;
 
@@ -24,7 +24,12 @@ fn the_writer_does_not_wait_for_a_reader_holding_the_views() {
     let genesis = EventRecord::parse_line(verified.raw_lines().first().unwrap()).unwrap();
     let views = Arc::new(Mutex::new(Views::new(dir.path())));
     let (to_clients, mut heard) = tokio::sync::broadcast::channel(8);
-    let mut folding = spawn_folding(Arc::clone(&views), to_clients).unwrap();
+    let head = Arc::new(channels::LedgerHead::default());
+    let broadcast = Broadcast {
+        to_clients,
+        head: Arc::clone(&head),
+    };
+    let mut folding = spawn_folding(Arc::clone(&views), broadcast).unwrap();
 
     let reader = views.lock().unwrap();
     let (written, returned) = mpsc::channel();
@@ -42,6 +47,7 @@ fn the_writer_does_not_wait_for_a_reader_holding_the_views() {
     drop((folding.observer, folding.machine));
     folding.thread.join().unwrap();
     assert_eq!(heard.try_recv().unwrap(), genesis);
+    assert_eq!(head.read(), Some(genesis.seq()));
     let mut folded_here = Views::new(dir.path());
     folded_here.apply(&genesis).unwrap();
     let city = channels::Query::CityView;

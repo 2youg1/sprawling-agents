@@ -240,7 +240,7 @@ pub fn decide_frame(
     let expected = Welcome {
         wire_v: WIRE_V,
         schema: schema_hash(),
-        resume_from: None,
+        resume_from: standing.head,
         city: standing.city.cloned(),
     };
     match (state, frame) {
