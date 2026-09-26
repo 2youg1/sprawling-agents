@@ -293,15 +293,31 @@ pub(crate) struct Finding {
     pub(crate) presence: Presence,
 }
 
-/// Asks this machine about every item in the table, in table order.
+/// Asks this machine about every item in the table at once, and answers
+/// in table order.
+///
+/// One scoped thread per item, because each probe spends its time
+/// waiting on a child process rather than on a core: the report then
+/// costs the slowest item instead of the sum of all of them.
 pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding> {
-    REQUIREMENTS
-        .iter()
-        .map(|requirement| Finding {
-            requirement,
-            presence: machine.look(requirement),
-        })
-        .collect()
+    std::thread::scope(|scope| {
+        let looking: Vec<_> = REQUIREMENTS
+            .iter()
+            .map(|requirement| (requirement, scope.spawn(move || machine.look(requirement))))
+            .collect();
+        looking
+            .into_iter()
+            .map(|(requirement, look)| Finding {
+                requirement,
+                // A probe that stopped without answering is reported as
+                // such, rather than taking the other rows down with it.
+                presence: look.join().unwrap_or_else(|_stopped| Presence::Broken {
+                    at: std::path::PathBuf::new(),
+                    fault: Fault::Unreadable("its probe stopped before it answered".to_owned()),
+                }),
+            })
+            .collect()
+    })
 }
 
 /// Whether one tier is reachable on this machine.
