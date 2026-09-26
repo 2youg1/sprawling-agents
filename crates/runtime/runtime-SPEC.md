@@ -222,7 +222,7 @@ impl FrozenPrefix {
     pub fn segment_hashes(&self) -> [B3Hash; 4];
     /// 从 `bytes()` 重算四段哈希并与构造时记录的对拍；不等即拒绝。
     pub fn verified_segment_hashes(&self) -> Result<[B3Hash; 4], AxError>;
-    pub fn prompt_payload(&self) -> Result<Payload, AxError>;   // prompt_assembled 载荷
+    pub fn prompt_payload(&self, plan: &BreakpointPlan) -> Result<Payload, AxError>;   // prompt_assembled 载荷
 }
 /// 同一断言作用在请求携带的四块上（`turn::call`）：四块、逐块 cache=true、逐块哈希对拍。
 pub fn verified_system_hashes(system: &[SystemBlock], frozen: &[B3Hash; 4]) -> Result<[B3Hash; 4], AxError>;

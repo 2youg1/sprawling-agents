@@ -75,7 +75,12 @@ fn records(
     baseline: Option<&PromptShape>,
 ) -> (serde_json::Value, serde_json::Value) {
     let prefix = prefix();
-    let assembled = serde_json::to_value(prefix.prompt_payload().unwrap()).unwrap();
+    let assembled = serde_json::to_value(
+        prefix
+            .prompt_payload(&crate::prefix::BreakpointPlan::for_conversation(&[]))
+            .unwrap(),
+    )
+    .unwrap();
     let shape = PromptShape::of(&prefix, tools, messages).unwrap();
     let compared =
         serde_json::to_value(shape.recorded(shape.attribute(baseline)).unwrap()).unwrap();
