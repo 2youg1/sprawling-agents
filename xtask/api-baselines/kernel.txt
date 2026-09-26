@@ -292,8 +292,8 @@ pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
 pub const kernel::DOORS: [kernel::gate::DoorId; 9]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 74]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 74]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::GIT_METADATA: &str
 pub const kernel::IDEM_DERIVE_V: u8
@@ -489,6 +489,7 @@ pub enum kernel::event::record::Admittance
 pub enum kernel::event::record::AdviserAnswer
 pub enum kernel::event::record::AdviserAsk
 pub enum kernel::event::record::AdviserFailure
+pub enum kernel::event::record::CacheRenewed
 pub enum kernel::event::record::CheckpointCommitted
 pub enum kernel::event::record::FiredAction
 pub enum kernel::event::record::InputKinds
@@ -1340,6 +1341,7 @@ pub kernel::EventKind::BackpressureShed
 pub kernel::EventKind::BudgetLimit
 pub kernel::EventKind::BuildingConfigured
 pub kernel::EventKind::BuildingCreated
+pub kernel::EventKind::CacheRenewed
 pub kernel::EventKind::CancelReceived
 pub kernel::EventKind::CheckpointCommitted
 pub kernel::EventKind::CityHalted
@@ -1854,6 +1856,7 @@ pub kernel::event::EventKind::BackpressureShed
 pub kernel::event::EventKind::BudgetLimit
 pub kernel::event::EventKind::BuildingConfigured
 pub kernel::event::EventKind::BuildingCreated
+pub kernel::event::EventKind::CacheRenewed
 pub kernel::event::EventKind::CancelReceived
 pub kernel::event::EventKind::CheckpointCommitted
 pub kernel::event::EventKind::CityHalted
@@ -1968,6 +1971,11 @@ pub kernel::event::record::BuildingConfigured::sandbox: bool
 pub kernel::event::record::BuildingCreated::addr: kernel::address::Address
 pub kernel::event::record::BuildingCreated::adopted: bool
 pub kernel::event::record::BuildingCreated::template: alloc::string::String
+pub kernel::event::record::CacheRenewed::Answered
+pub kernel::event::record::CacheRenewed::Answered::billed_usd_micros: core::option::Option<kernel::budget::UsdMicros>
+pub kernel::event::record::CacheRenewed::Answered::usage: core::option::Option<kernel::ModelUsage>
+pub kernel::event::record::CacheRenewed::Refused
+pub kernel::event::record::CacheRenewed::Refused::refused: kernel::AxError
 pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
 pub kernel::event::record::CheckpointCommitted::JobPinned
 pub kernel::event::record::CheckpointCommitted::JobPinned::job: kernel::locator::Locator

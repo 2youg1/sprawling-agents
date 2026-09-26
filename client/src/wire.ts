@@ -522,6 +522,7 @@ export const EventKind = Schema.Union(
   Schema.Literal("adviser_asked"),
   Schema.Literal("adviser_answered"),
   Schema.Literal("adviser_fell_back"),
+  Schema.Literal("cache_renewed"),
 ).annotations({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 

@@ -158,6 +158,7 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     case "spine_document_written":
     case "embedding_called": case "rerank_called":
     case "adviser_asked": case "adviser_answered": case "adviser_fell_back":
+    case "cache_renewed":
       return [moved, null];
   }
 }

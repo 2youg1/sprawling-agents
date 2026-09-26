@@ -56,7 +56,14 @@ impl Kept {
                 Some(_) | None => Ok(Vec::new()),
             };
             match renewed {
-                Ok(_answers) => door.next_due().is_some(),
+                Ok(answers) => {
+                    renewals.extend(
+                        answers
+                            .into_iter()
+                            .map(|answer| (room.clone(), answered(answer))),
+                    );
+                    door.next_due().is_some()
+                }
                 Err(refused) => {
                     renewals.push((room.clone(), CacheRenewed::Refused { refused }));
                     false
