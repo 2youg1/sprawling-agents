@@ -21,6 +21,7 @@ use crate::elision::{self, Elided};
 mod segment;
 
 pub(crate) mod shape;
+pub mod warmth;
 
 pub(crate) use segment::ANOTHER_ADDRESS;
 pub use segment::{FrozenSegment, SegmentSlot, SegmentSource};
