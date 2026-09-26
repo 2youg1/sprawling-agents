@@ -44,6 +44,24 @@ pub(in crate::assembly) fn oauth_refresh_ref(provider: &str) -> Result<SecretRef
     SecretRef::new(provider, OAUTH_REFRESH)
 }
 
+/// How a credential travels to an endpoint on one face
+/// (sprawling-SPEC.md 8-81).
+///
+/// A subscription's access token is a bearer token on every face: the
+/// vendor answers 401 when it arrives as the messages face's
+/// `x-api-key`. Any other reference travels as the face says. A header
+/// the person named wins over both.
+pub(in crate::assembly) fn auth_for(
+    dialect: kernel::DialectKind,
+    reference: SecretRef,
+    header: Option<String>,
+) -> gateway::AuthSpec {
+    match (header, reference.name() == OAUTH) {
+        (None, true) => gateway::AuthSpec::Bearer(reference),
+        (header, _) => gateway::AuthSpec::for_dialect(dialect, reference, header),
+    }
+}
+
 /// The provider an access token belongs to, read back from the record
 /// that named it.
 ///
