@@ -3128,6 +3128,10 @@
     "en": "Revert this change in {path} with the edit tool, against the file's current version. Replace\n```\n{now}\n```\nwith\n```\n{was}\n```",
     "zh": "请用 edit 工具、基于 {path} 的当前版本撤回这处改动。把\n```\n{now}\n```\n换回\n```\n{was}\n```"
   },
+  "run_monitor": {
+    "en": "monitor",
+    "zh": "监视器"
+  },
   "run_time": {
     "en": "time",
     "zh": "时间"
