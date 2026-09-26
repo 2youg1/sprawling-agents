@@ -417,7 +417,8 @@ pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
 pub struct FileDiscarded { pub paths: Vec<String>,            // `file:<path>`，git 认的名字 Address 未必认
                            pub restoration: Option<Restoration> } // 缺或方案不识：None，paths 照读
 pub struct DiscardRestored { pub paths: Vec<String> }
-pub struct AssetArchived { #[serde(default = "fact")] pub kind: String, pub day: u64, pub subject: String }
+pub struct AssetArchived { #[serde(default = "fact")] pub kind: String,
+                           #[serde(default)] pub day: u64, #[serde(default)] pub subject: String }
 pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
                              pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }
 pub struct RerankCalled { pub model: String, pub passages: u64, pub ranks: u64,
