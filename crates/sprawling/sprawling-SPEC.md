@@ -3575,8 +3575,8 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 - `sampler::beat(monitor: &Mutex<Monitor>, samples: &broadcast::Sender<Sample>, read: impl FnOnce() -> Sample)`：一拍。调用 `Monitor::tick(read)`；这一拍读了计数器，就把这一个读数发到 `samples`（即 `channels::MonitorFeed::samples`）。没人在看时 `read` 不被调用，什么也不发。发送时一个订阅者也没有不是失败：看的会话在两拍之间走了，它没有错过自己要的东西。锁中毒时照常取用：计数是原子的，历史是完整的 `VecDeque`，中毒不留下写了一半的状态。
 - `sampler::spawn_sampler(monitor: Weak<Mutex<Monitor>>, samples: broadcast::Sender<Sample>) -> Result<(), AxError>`：起名为 `sprawling-monitor` 的线程，每秒一拍，读数来自 `counters::Counters`。线程只持 `Weak`：`ServeConfig` 连同 `MonitorFeed::watch` 被丢弃后 `upgrade` 失败，线程在下一拍结束。起不了线程时返回 `StorageFatal`，recovery 是检查进程的线程上限（与 `serving::folding` 相同）。
-- `counters::Counters::open(volume: PathBuf) -> Counters` 与 `Counters::read(&mut self) -> Sample`：核心进程的三项取自 `OwnProcess`；整机 CPU（千分比）、可用内存；城所在卷的剩余空间。第一次读数没有上一次可比，两项 CPU 为 0。
-- `counters::own_process::OwnProcess::new() -> OwnProcess` 与 `OwnProcess::read(&mut self) -> OwnReading`：只问本进程、不遍历进程表的读数。`OwnReading { cpu_permille, private_bytes, working_set_bytes }`：CPU 是两次读数之间本进程累计 CPU 时间的增量除以墙钟增量与核数（千分比，整数运算，截到 `0..=1000`），第一次为 0；private 在 Windows 上是 PagefileUsage（即 PrivateUsage），其他平台是虚拟内存；工作集是驻留内存。平台拒绝某一项时这一项读作 0，与尚未接入的项同样处理：`Sample` 是给人看的读数，没有携带失败的位置，而一秒后下一拍会再读一次。`Counters` 只在有人看时存在：`beat` 之后历史为空（没人看）时采样线程丢掉它，平台句柄与进程表不常驻。
+- `counters::Counters::open(volume: PathBuf) -> Counters` 与 `Counters::read(&mut self, elapsed: Duration) -> Sample`：核心进程的三项取自 `OwnProcess`；整机 CPU（千分比）、可用内存；城所在卷的剩余空间。第一次读数没有上一次可比，两项 CPU 为 0。
+- `counters::own_process::OwnProcess::new() -> OwnProcess` 与 `OwnProcess::read(&mut self, elapsed: Duration) -> OwnReading`：只问本进程、不遍历进程表的读数，`elapsed` 是距上一次读数的墙钟时间。`OwnReading { cpu_permille, private_bytes, working_set_bytes }`：CPU 是两次读数之间本进程累计 CPU 时间的增量除以墙钟增量与核数（千分比，整数运算，截到 `0..=1000`），第一次为 0；private 在 Windows 上是 PagefileUsage（即 PrivateUsage），其他平台是虚拟内存；工作集是驻留内存。平台拒绝某一项时这一项读作 0，与尚未接入的项同样处理：`Sample` 是给人看的读数，没有携带失败的位置，而一秒后下一拍会再读一次。`Counters` 只在有人看时存在：`beat` 之后历史为空（没人看）时采样线程丢掉它，平台句柄与进程表不常驻。
 
 **定下的值。** 一拍的间隔 1 s（8-90 的「每秒一点」）；线程名 `sprawling-monitor`。
 
@@ -3584,8 +3584,9 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 1. 本进程的读数来自 `memory-stats`（工作集与 private）与 `cpu-time`（本进程 CPU 时间），整机与卷的读数来自 `sysinfo`，关掉默认特性、只开 `system` 与 `disk`。本工作区 `unsafe_code = forbid`，「只取需要的几个接口」在这里只能是另一个把平台调用包成安全接口的 crate，所以比较的是同一个 crate 的两种裁剪，以一个空的 release 探针（`lto`、`codegen-units = 1`、`strip`）实测：在 windows-msvc 的桌面级机器上（同时有别的编译在跑），空探针 123 904 字节，读齐本节这些计数器的探针 201 216 字节，多 77 312 字节（约 75.5 KiB）。启动时间不受影响：`Counters` 只在第一个人开始看时才打开，城的启动路径上没有它；打开一次（`System::new`、首次刷新进程与 CPU、列出磁盘）热缓存 0.42–0.56 s、冷缓存 2.8 s；之后每读一次 18–74 ms，其中本进程的刷新占 17–65 ms（`sysinfo` 在 Windows 上即使只问一个 pid 也遍历整张进程表），整机 CPU 0.7–8 ms，磁盘 0.2–0.8 ms，内存约 5 µs。本进程那一段因此换成只问本进程句柄的 `memory-stats` 加 `cpu-time`：同一类机器上的 release 探针读一次约 1.1 µs，比空探针多 1 024 字节，两者依赖的 `winapi` 与 `windows-sys` 已在依赖树里。代价是本进程的累计读写字节：没有找到以安全接口只读本进程 I/O 计数的 crate，这两项现在在所有平台上读作 0，而不是为它们留下每拍 17–65 ms 的整表刷新。默认特性的 `sysinfo` 在 LTO 之后并不更大（没用到的代码被去掉），裁掉特性省的是编译时间与依赖数。重新考虑的条件：出现以安全接口只读本进程 I/O 计数或整机 CPU、比 `sysinfo` 显著更快的 crate，或者 `unsafe_code` 的政策改变。
 2. 采样放在一条自己的线程上，而不是 tokio 任务：它每秒做一次阻塞的系统调用，放进异步运行时会占住一个工作线程；它与 `serving::folding` 一样是一条命名线程。没人看时线程每秒醒一次、读一个原子数，不读计数器也不留内存（8-90 决定 1）。
-3. 读数经 `Sample` 发出，不在这里换单位：换单位是 8-91 与 `client/src/core/monitor.ts` 的事。
-4. `f32` 的整机 CPU 负载是 `sysinfo` 唯一给出的形式，先截到 `0..=100` 再换成千分比；这一处 `as` 以 `#[expect]` 注明，它是本模块唯一的浮点。
+3. CPU 份额的墙钟分母由调用方以 `elapsed` 传入，采样线程传一拍的名义间隔 `BEAT`，而不是在这里读 `Instant::now`：取时间的地方只有 `bin::assembly`（clippy 的 `disallowed_methods` 守着），测试也因此能给出确定的分母。代价是 `sleep` 睡过头的那几毫秒让份额偏高同样的比例（1 s 里多睡 15 ms 就偏高 1.5%），对一条给人看的曲线可以忽略。重新考虑的条件：监视器的读数进入任何决定。
+4. 读数经 `Sample` 发出，不在这里换单位：换单位是 8-91 与 `client/src/core/monitor.ts` 的事。
+5. `f32` 的整机 CPU 负载是 `sysinfo` 唯一给出的形式，先截到 `0..=100` 再换成千分比；这一处 `as` 以 `#[expect]` 注明，它是本模块唯一的浮点。
 
 **测试。** `monitor::sampler::tests`：有人看时一拍把读到的那一个读数发给订阅者；没人看时不读、不发。`monitor::counters::tests`：读本进程得到非零的工作集、整机可用内存与卷剩余空间。`monitor::counters::own_process::tests`：第一次读数的 CPU 为 0，本进程忙过一段之后第二次读数的 CPU 大于 0，工作集与 private 非零。
 

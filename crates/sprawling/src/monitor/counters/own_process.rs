@@ -7,6 +7,10 @@
 //! the whole process table, so one reading costs about a microsecond
 //! (sprawling-SPEC.md 8-92).
 
+use std::time::Duration;
+
+use cpu_time::ProcessTime;
+
 /// The three figures of this process one sample carries.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct OwnReading {
@@ -15,20 +19,54 @@ pub(crate) struct OwnReading {
     pub(crate) working_set_bytes: u64,
 }
 
-/// The previous reading's CPU time and wall clock, which the next
-/// reading's CPU share is measured against.
-pub(crate) struct OwnProcess;
+/// The previous reading's CPU time, which the next reading's CPU share
+/// is measured against.
+pub(crate) struct OwnProcess {
+    previous: Option<Duration>,
+}
 
 impl OwnProcess {
     pub(crate) fn new() -> Self {
-        Self
+        Self { previous: None }
     }
 
-    /// Reads this process once. The first reading has nothing to compare
-    /// with, so its CPU reads 0; a figure the platform refuses reads 0.
-    pub(crate) fn read(&mut self) -> OwnReading {
-        OwnReading::default()
+    /// Reads this process once; `elapsed` is the wall time since the
+    /// previous reading. The first reading has nothing to compare with,
+    /// so its CPU reads 0; a figure the platform refuses reads 0.
+    pub(crate) fn read(&mut self, elapsed: Duration) -> OwnReading {
+        let cpu = ProcessTime::try_now().ok().map(|time| time.as_duration());
+        let cpu_permille = match (cpu, self.previous) {
+            (Some(spent), Some(spent_before)) => {
+                permille(spent.saturating_sub(spent_before), elapsed)
+            }
+            (Some(_) | None, None) | (None, Some(_)) => 0,
+        };
+        self.previous = cpu;
+        let memory = memory_stats::memory_stats();
+        OwnReading {
+            cpu_permille,
+            private_bytes: memory.map_or(0, |stats| widen(stats.virtual_mem)),
+            working_set_bytes: memory.map_or(0, |stats| widen(stats.physical_mem)),
+        }
     }
+}
+
+/// CPU time spent over wall time elapsed, spread over every core, as
+/// permille of the whole machine, clamped to `0..=1000`.
+fn permille(spent: Duration, elapsed: Duration) -> u64 {
+    let cores = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+    let capacity = elapsed
+        .as_nanos()
+        .saturating_mul(u128::try_from(cores).unwrap_or(u128::MAX));
+    spent
+        .as_nanos()
+        .saturating_mul(1000)
+        .checked_div(capacity)
+        .map_or(0, |share| u64::try_from(share.min(1000)).unwrap_or(1000))
+}
+
+fn widen(bytes: usize) -> u64 {
+    u64::try_from(bytes).unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]

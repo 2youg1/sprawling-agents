@@ -5,20 +5,22 @@
 
 //! A second reading after busy work shows the CPU it spent.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use cpu_time::ProcessTime;
 
 use super::OwnProcess;
 
 #[test]
 fn a_busy_process_reads_its_own_cpu_and_memory() {
     let mut own = OwnProcess::new();
-    let first = own.read();
-    let start = Instant::now();
+    let first = own.read(Duration::ZERO);
+    let start = ProcessTime::now();
     let mut spin = 0_u64;
     while start.elapsed() < Duration::from_millis(60) {
         spin = std::hint::black_box(spin.wrapping_add(1));
     }
-    let second = own.read();
+    let second = own.read(Duration::from_secs(1));
 
     assert_eq!(
         (

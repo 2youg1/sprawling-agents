@@ -55,7 +55,7 @@ fn sample_until_dropped(
         beat(&monitor, samples, || {
             counters
                 .get_or_insert_with(|| Counters::open(volume.clone()))
-                .read()
+                .read(BEAT)
         });
         if !lock(&monitor).is_watched() {
             counters = None;

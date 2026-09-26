@@ -10,8 +10,8 @@ use super::Counters;
 #[test]
 fn a_reading_of_this_process_has_memory_and_free_space() {
     let mut counters = Counters::open(std::env::temp_dir());
-    counters.read();
-    let second = counters.read();
+    counters.read(std::time::Duration::ZERO);
+    let second = counters.read(std::time::Duration::from_secs(1));
 
     let nonzero = |value: u64| value > 0;
     assert_eq!(
