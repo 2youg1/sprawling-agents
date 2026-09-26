@@ -331,6 +331,53 @@ fn a_fence_carries_what_the_run_may_write_and_not_only_its_room() {
     );
 }
 
+/// The fence after a wave stages the paths that wave's calls said they
+/// wrote, not the whole write domain: `edit` knows its one file, so the
+/// closing fence has no reason to walk the building for it
+/// (runtime-SPEC section 8-45). The first fence of the run still takes
+/// the whole domain, because no commit of this run vouches for the tree
+/// before it.
+#[test]
+fn the_fence_after_an_edit_stages_the_edited_path_and_not_the_domain() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion("writing the note", Some(("c1", "hall/note.md"))),
+            completion("done", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse(kernel::consts_policy::HALL_MAYOR).unwrap(),
+            task: "leave a note beside the hall".to_owned(),
+            goal: "one note".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    let repo = git2::Repository::open(dir.path()).unwrap();
+    let mut subjects: Vec<String> = repo
+        .references_glob("refs/sprawling/runs/*")
+        .unwrap()
+        .flatten()
+        .filter_map(|reference| {
+            let commit = repo.find_commit(reference.target()?).ok()?;
+            Some(commit.summary().ok()??.to_owned())
+        })
+        .collect();
+    subjects.sort();
+    assert_eq!(
+        subjects,
+        vec!["checkpoint: hall".to_owned(), "checkpoint: hall/note.md".to_owned()]
+    );
+}
+
 /// The city's genesis hash is read from the ledger once and remembered:
 /// it is the one fact about a city that cannot change without the city
 /// being a different one, and every fence, landing and merge used to
