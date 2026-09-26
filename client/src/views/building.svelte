@@ -183,23 +183,24 @@
     <!-- wording-ok: a drawn flag marking where the standing goal lives, hidden from readers -->
     <span class="text-text-disabled" aria-hidden="true">⚑</span>
     {#if pursuit === undefined}
+      <!-- The field wears the same box as every other input, and its button
+           is always there, so a person reads it as a place to type rather
+           than as a label. -->
       <input
-        class="h-control min-w-0 flex-1 bg-transparent text-note placeholder:text-text-disabled"
-        placeholder={say($lang, "bld_goal_placeholder")}
+        class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-disabled"
+        placeholder={fill(say($lang, "bld_goal_placeholder"), { addr: address })}
         bind:value={goal}
         onkeydown={(event) => {
           if (event.key === "Enter") setGoalNow();
         }}
       />
-      {#if goal.trim() !== ""}
-        <Button
-          label={say($lang, "bld_pursue")}
-          tone="primary"
-          onPress={() => {
-            setGoalNow();
-          }}
-        />
-      {/if}
+      <Button
+        label={say($lang, "bld_pursue")}
+        tone={goal.trim() === "" ? "secondary" : "primary"}
+        onPress={() => {
+          setGoalNow();
+        }}
+      />
     {:else}
       <span
         class={[

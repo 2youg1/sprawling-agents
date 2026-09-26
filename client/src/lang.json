@@ -180,8 +180,8 @@
     "zh": "提交"
   },
   "bld_goal_placeholder": {
-    "en": "standing goal…",
-    "zh": "常设目标…"
+    "en": "give {addr} a standing goal",
+    "zh": "给 {addr} 一个长期目标"
   },
   "bld_halt": {
     "en": "/stop {addr}",
@@ -208,8 +208,8 @@
     "zh": "{done}/{total}"
   },
   "bld_pursue": {
-    "en": "pursue",
-    "zh": "持续推进"
+    "en": "set as standing goal",
+    "zh": "设为常设目标"
   },
   "bld_release": {
     "en": "/release {addr}",
