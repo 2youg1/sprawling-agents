@@ -72,3 +72,60 @@ fn a_written_key_reaches_the_vault_and_not_the_file() {
         "the vault holds the key itself"
     );
 }
+
+/// A key a tool reads out of the city reaches the vault, and the model is
+/// handed the reference that resolves to it.
+#[test]
+fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
+    let key = written();
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab/room1")).unwrap();
+    std::fs::write(
+        dir.path().join("lab/room1/keys.md"),
+        format!("token = {key}\n"),
+    )
+    .unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "reading",
+                "tu_1",
+                "read",
+                serde_json::json!({ "path": "lab/room1/keys.md" }),
+            ),
+            completion("done", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "read the token".to_owned(),
+            goal: "the token is known".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"read"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    let asked = provider.bodies().join("\n");
+    assert!(!asked.contains(&key), "a request carried the key: {asked}");
+    let at = asked
+        .find("secret:output/")
+        .expect("the request carries the reference in the key's place");
+    let reference: String = asked[at..]
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '/' | '-' | '_' | '.'))
+        .collect();
+    let reference = kernel::SecretRef::parse(&reference).unwrap();
+    let vault = worker.vault_handle();
+    let held = vault.lock().unwrap().resolve(&reference).unwrap();
+    assert_eq!(
+        *held.into_vault_value(),
+        key,
+        "the vault holds the key itself"
+    );
+}
