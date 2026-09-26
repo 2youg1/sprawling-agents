@@ -24,9 +24,8 @@
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
 use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex, PoisonError};
 
-use kernel::{AxError, UsdMicros};
+use kernel::UsdMicros;
 
 use super::holding::Views;
 use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
@@ -38,61 +37,6 @@ use super::lines::{endpoints_answer, summarize};
 /// on the size of an answer on the wire, not a machine reading, so it is
 /// a constant (sprawling-SPEC section 8-90).
 pub(super) const TOP_BILLED: usize = 32;
-
-/// The views the fold last finished, handed to every reader
-/// (sprawling-SPEC.md 8-93).
-///
-/// The lock covers one `Arc` copy or swap and nothing that can panic,
-/// so even a poisoned lock holds a whole `Arc`, and it is read as one.
-pub(crate) struct Published {
-    current: Mutex<Arc<Views>>,
-}
-
-impl Published {
-    pub(crate) fn new(views: Views) -> Published {
-        Published {
-            current: Mutex::new(Arc::new(views)),
-        }
-    }
-
-    /// The views as the fold last published them. Held only while a
-    /// query copies out what it needs, because the fold takes a retired
-    /// copy back only once no reader holds it.
-    pub(crate) fn snapshot(&self) -> Arc<Views> {
-        Arc::clone(&self.current.lock().unwrap_or_else(PoisonError::into_inner))
-    }
-
-    /// Publishes `latest` and hands back the copy it replaces, which is
-    /// dropped or reclaimed outside the lock.
-    pub(crate) fn replace(&self, latest: Arc<Views>) -> Arc<Views> {
-        std::mem::replace(
-            &mut *self.current.lock().unwrap_or_else(PoisonError::into_inner),
-            latest,
-        )
-    }
-}
-
-/// Answers one query from a snapshot of the views, holding it only while
-/// [`Views::prepare`] copies out what the query needs: the disk, git or
-/// network read in [`Prepared::finish`] runs after the snapshot is let
-/// go, so neither the fold nor another reader waits on it.
-///
-/// The answer is dated by the snapshot it is prepared from, so the date
-/// is exactly the first record the answer does not reflect.
-///
-/// The `Result` is the shape the console's `Answering` takes; this path
-/// refuses nothing itself, because a snapshot is an `Arc` taken whole
-/// and has no poisoned state.
-pub(crate) fn answer_outside_the_lock(
-    views: &Published,
-    query: &channels::Query,
-) -> (kernel::Seq, Result<channels::Answer, AxError>) {
-    let snapshot = views.snapshot();
-    let as_of = snapshot.next_unfolded();
-    let prepared = snapshot.prepare(query);
-    drop(snapshot);
-    (as_of, Ok(prepared.finish()))
-}
 
 impl Views {
     /// What this machine had when the city started.

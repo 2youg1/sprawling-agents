@@ -15,7 +15,7 @@
     reason = "test code"
 )]
 
-use super::tests::view_record;
+use super::tests::{Place, view_record};
 use crate::views::Views;
 use kernel::{Address, EventKind, RunId};
 
@@ -30,8 +30,10 @@ fn halt_record(seq: u64, state: &str) -> kernel::EventRecord {
         serde_json::Value::String(state.to_owned()),
     );
     view_record(
-        seq,
-        RunId::CITY,
+        Place {
+            seq,
+            run: RunId::CITY,
+        },
         EventKind::CityHalted,
         &Address::parse("hall").unwrap(),
         data,
@@ -76,7 +78,12 @@ fn a_run_in_the_city_view_says_which_room_it_works_in() {
         serde_json::Value::String("a roadmap".to_owned()),
     );
     views
-        .apply(&view_record(1, run, EventKind::RunStarted, &room, data))
+        .apply(&view_record(
+            Place { seq: 1, run },
+            EventKind::RunStarted,
+            &room,
+            data,
+        ))
         .unwrap();
     let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
         panic!("CityView answers with a city");
@@ -105,8 +112,10 @@ fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
         let (start, end) = (2 * i + 1, 2 * i + 2);
         views
             .apply(&view_record(
-                start,
-                run_of(i),
+                Place {
+                    seq: start,
+                    run: run_of(i),
+                },
                 EventKind::RunStarted,
                 &room,
                 opened,
@@ -114,8 +123,10 @@ fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
             .unwrap();
         views
             .apply(&view_record(
-                end,
-                run_of(i),
+                Place {
+                    seq: end,
+                    run: run_of(i),
+                },
                 EventKind::RunFrozen,
                 &room,
                 closed,
@@ -157,7 +168,7 @@ fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {
     let mut fold = |run: RunId, kind: EventKind, data| {
         seq += 1;
         views
-            .apply(&view_record(seq, run, kind, &room, data))
+            .apply(&view_record(Place { seq, run }, kind, &room, data))
             .unwrap();
     };
     for i in 0..=RUNS {

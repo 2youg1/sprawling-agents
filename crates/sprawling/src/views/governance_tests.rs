@@ -17,7 +17,7 @@
 use crate::views::Views;
 use kernel::{Address, EventKind, RunId};
 
-use super::tests::view_record;
+use super::tests::{Place, view_record};
 
 /// Who answers for this city, and what was answered on the person's
 /// behalf, are one question with one answer.
@@ -39,8 +39,7 @@ fn the_governance_view_reports_who_answers_and_what_was_answered() {
     );
     views
         .apply(&view_record(
-            1,
-            run,
+            Place { seq: 1, run },
             EventKind::AutonomyChanged,
             &room,
             delegated,
@@ -62,8 +61,7 @@ fn the_governance_view_reports_who_answers_and_what_was_answered() {
     );
     views
         .apply(&view_record(
-            2,
-            run,
+            Place { seq: 2, run },
             EventKind::ApprovalResolved,
             &room,
             answered,

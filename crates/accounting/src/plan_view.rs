@@ -117,10 +117,8 @@ impl PlanView {
         let reach = may_move_plan(record.kind());
         let Some(building) = record.addr().and_then(building_of) else {
             // A record with no address could belong to any building, so
-            // a kind that moves a plan makes every parsed copy suspect.
-            // The rule used to name one kind and the comment beside it
-            // named the class, and the comment was the correct one
-            // (sprawling-SPEC.md 8-76).
+            // any kind that moves a plan, not one named kind, makes every
+            // parsed copy suspect (sprawling-SPEC.md 8-76).
             if !matches!(reach, PlanReach::Untouched) {
                 self.read.clear();
                 self.moved_all = self.moved_all.wrapping_add(1);

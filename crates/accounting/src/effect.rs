@@ -9,10 +9,9 @@
 //! `docs/glossary.md` defines the Ledger as the only history, and says
 //! every effect becomes an EventRecord first. ARCHITECTURE.md section 5
 //! calls that ordering the design's load-bearing rule rather than a
-//! logging preference. It used to be spelled out once per desk inside
-//! `dispatch_in`, and two of the six spelled it backwards - the shared
-//! plan was written and the shelf was filed before the lines that
-//! announce them.
+//! logging preference, and one that each desk spelling it for itself
+//! could get backwards: writing a shared plan or filing a shelf before
+//! the line that announces it.
 //!
 //! Here the order is a property of the types instead. [`Then`] - the
 //! change - is reachable only out of [`Landing::record`], and that

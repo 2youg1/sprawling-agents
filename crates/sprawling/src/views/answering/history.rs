@@ -29,13 +29,9 @@ impl LedgerAsk {
             records: Vec::new(),
             earlier: None,
         };
-        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        let Ok(mut index) = self.index.lock() else {
+        let Some((index, dir)) = self.indexed() else {
             return empty;
         };
-        if index.refresh(&dir).is_err() {
-            return empty;
-        }
         let Some(tail) = index.tail_seq() else {
             return empty;
         };
@@ -100,13 +96,9 @@ impl LedgerAsk {
         if to < from {
             return empty;
         }
-        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        let Ok(mut index) = self.index.lock() else {
+        let Some((index, dir)) = self.indexed() else {
             return empty;
         };
-        if index.refresh(&dir).is_err() {
-            return empty;
-        }
         let want = u64::from(limit.clamp(1, channels::HISTORY_MAX));
         let last = from
             .value()
@@ -162,13 +154,9 @@ impl LedgerAsk {
             records: Vec::new(),
             earlier: None,
         };
-        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        let Ok(mut index) = self.index.lock() else {
+        let Some((index, dir)) = self.indexed() else {
             return empty;
         };
-        if index.refresh(&dir).is_err() {
-            return empty;
-        }
         let want = usize::try_from(limit.clamp(1, channels::HISTORY_MAX)).unwrap_or(1);
         // One more than was asked for: whether this session wrote
         // anything older is exactly what `earlier` reports, and taking
@@ -228,9 +216,7 @@ impl LedgerAsk {
         run: kernel::RunId,
         mut apply: impl FnMut(&EventRecord) -> Result<(), memory::MemoryError>,
     ) -> Option<()> {
-        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        let mut index = self.index.lock().ok()?;
-        index.refresh(&dir).ok()?;
+        let (index, dir) = self.indexed()?;
         let mut oldest_first: Vec<kernel::Seq> = index.run_seqs_before(run, None).collect();
         oldest_first.reverse();
         let mut reader = index.reader(&dir);

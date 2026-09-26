@@ -49,7 +49,7 @@ impl Laying {
         // not say how much.
         let began = self.clock.now();
         let mut offered = Vec::new();
-        let resolve = crate::held_vault::resolving(std::sync::Arc::clone(&self.vault));
+        let resolve = accounting::held_vault::resolving(std::sync::Arc::clone(&self.vault));
         for server in &config.mcp {
             // The module a reader is sent to is the transport that
             // failed, not whichever one was written first.

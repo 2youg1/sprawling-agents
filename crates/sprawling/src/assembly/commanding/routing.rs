@@ -194,22 +194,13 @@ impl RunWorker {
             channels::Command::SetAutonomy {
                 scope, autonomy, ..
             } => self.set_autonomy(&scope, autonomy),
-            channels::Command::HandOff { item, .. } => Err(not_built(
-                "hand a question to somebody else",
-                item.as_str().to_owned(),
-                "answer it yourself, or appoint that resident as the delegate; handing one \
-                 question on is not built",
-            )),
+            channels::Command::HandOff { item, .. } => Err(Unbuilt::HandOff(&item).refusal()),
             // Nothing is written into the ledger: this is the person's
             // own layer and no run can observe it, so a record of it
             // in the city's one history would travel to every machine
             // that city is copied to.
             channels::Command::PutPreferences { patch, .. } => accounting::person::put(patch),
-            channels::Command::PutShelved { name, .. } => Err(not_built(
-                "write a shelved document",
-                name.clone(),
-                "edit the file under the shelf by hand; writing it from the page is not built",
-            )),
+            channels::Command::PutShelved { name, .. } => Err(Unbuilt::PutShelved(name).refusal()),
             channels::Command::Pursue { addr, step, .. } => self.set_pursuit(&addr, step),
             channels::Command::OpenSession {
                 addr, carry, from, ..
@@ -256,20 +247,14 @@ impl RunWorker {
             // a Command added without an executor stops the build here:
             // `channels::Command` is deliberately not `non_exhaustive`,
             // and this match is what that decision buys.
-            channels::Command::BatchByBuilding { addr, .. } => Err(not_built(
-                "run a building's work as one batch",
-                addr.as_str().to_owned(),
-                "dispatch the rooms one at a time; batching a building is not built",
-            )),
+            channels::Command::BatchByBuilding { addr, .. } => {
+                Err(Unbuilt::BatchByBuilding(&addr).refusal())
+            }
             // The handshake is where a peer proves who it is: `Hello`
             // carries the pairing token and `channels::server` judges it
             // before any command is read. A second door for the same
             // question would be a second authority on it.
-            channels::Command::Auth { .. } => Err(not_built(
-                "authenticate over the command channel",
-                "Auth".to_owned(),
-                "the pairing token is proved in the handshake, not in a command",
-            )),
+            channels::Command::Auth { .. } => Err(Unbuilt::Auth.refusal()),
         }
     }
 
@@ -320,5 +305,44 @@ impl RunWorker {
         reveal: fn(&std::path::Path, &kernel::Address) -> Result<(), AxError>,
     ) {
         self.reveal = reveal;
+    }
+}
+
+/// A verb the wire spells and this city cannot perform, with what the
+/// refusal names. Each is answered by its own arm of `run_command`, so a
+/// command added without an executor stops the build there.
+enum Unbuilt<'a> {
+    HandOff(&'a kernel::ApprovalId),
+    PutShelved(String),
+    BatchByBuilding(&'a kernel::Address),
+    Auth,
+}
+
+impl Unbuilt<'_> {
+    /// The refusal the city owes a peer that asks for this verb anyway.
+    fn refusal(self) -> AxError {
+        match self {
+            Unbuilt::HandOff(item) => not_built(
+                "hand a question to somebody else",
+                item.as_str().to_owned(),
+                "answer it yourself, or appoint that resident as the delegate; handing one \
+                 question on is not built",
+            ),
+            Unbuilt::PutShelved(name) => not_built(
+                "write a shelved document",
+                name,
+                "edit the file under the shelf by hand; writing it from the page is not built",
+            ),
+            Unbuilt::BatchByBuilding(addr) => not_built(
+                "run a building's work as one batch",
+                addr.as_str().to_owned(),
+                "dispatch the rooms one at a time; batching a building is not built",
+            ),
+            Unbuilt::Auth => not_built(
+                "authenticate over the command channel",
+                "Auth".to_owned(),
+                "the pairing token is proved in the handshake, not in a command",
+            ),
+        }
     }
 }

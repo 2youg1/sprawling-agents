@@ -5,5 +5,6 @@
 
 mod ceilings;
 mod dispatches;
+mod lineage;
 mod model_note;
 mod prefix;
