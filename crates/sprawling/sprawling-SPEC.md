@@ -3545,9 +3545,9 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 3. 树为主（D-15）：城 › 楼 › 房间 › 会话 › run › 回合 › 调用，分叉挂在父 run 的分叉点下，每个节点只有一个父；委派、敲门、handback 是详情里的链接，不是树的边。被否掉的：列表加详情为主（人要在交错的行里自己拼出一件活）；fx 式 JSON 树为主（就地展开推走下面的行，也看不出分叉）。
 4. 行选择与 run 折叠都消费 `memory::LedgerIndex` 这一个索引，不自己数段文件（memory-SPEC §8：`memory` 不对外暴露段）。
 
-## 8-91 `sprawling view`：给人的一面（`bin::main::view::keys`、`bin::main::view::arrange`、`bin::main::view::frame`、`bin::main::view::detail`、`bin::main::view::terminal`）
+## 8-91 `sprawling view`：给人的一面（`bin::main::view::keys`、`bin::main::view::arrange`、`bin::main::view::frame`、`bin::main::view::detail`、`bin::main::view::follow`、`bin::main::view::terminal`）
 
-**形状。** 四个纯模块，不碰终端也不碰盘。`keys` 是 decision：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。`terminal` 是 adapter：stdout 是终端且没有任何过滤参数时，`view` 一遍读完账本（折 lineage、收 `records` 行），进 raw 模式与备用屏，读键、调 `apply`、画 `frame()`，退出时无论成败都把终端还原。它不做任何决定。尚未做的：跟随服务中的城、从尾部倒读首屏、回合与调用两层、T8–T12 的 `ttyprobe` 验收。
+**形状。** 四个纯模块，不碰终端也不碰盘。`keys` 是 decision：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。`follow` 是 adapter：持有常驻的 `LedgerIndex` 与 lineage 折叠，`open` 一遍读完账本（折 lineage、收 `records` 行），`poll` 只折上次之后追加的行。`terminal` 是 adapter：stdout 是终端且没有任何过滤参数时，`view` 用 `follow` 读城，进 raw 模式与备用屏，读键、调 `apply`、画 `frame()`，退出时无论成败都把终端还原。它不做任何决定。尚未做的：从尾部倒读首屏、回合与调用两层、T8–T12 的 `ttyprobe` 验收。
 
 ```rust
 // bin::main::view::keys
@@ -3568,6 +3568,14 @@ impl Face {
     pub(super) fn resize(&mut self, size: Size);
     pub(super) fn frame(&self) -> Vec<String>;
     pub(super) fn is_closed(&self) -> bool;
+    pub(super) fn follow(&mut self, runs: &[RunLine], appended: Vec<Row>);
+}
+// bin::main::view::follow
+pub(super) const FOLLOW_TICK: Duration; // 100 ms
+pub(super) struct Follow;
+impl Follow {
+    pub(super) fn open(dir: &Path) -> Result<(Follow, Vec<RunLine>, Vec<Row>), ViewError>;
+    pub(super) fn poll(&mut self) -> Result<Option<(Vec<RunLine>, Vec<Row>)>, ViewError>;
 }
 // bin::main::view::detail
 pub(super) fn json_lines(value: &serde_json::Value) -> Vec<String>;
@@ -3583,6 +3591,8 @@ pub(super) fn show(dir: &Path) -> Result<(), ViewError>;
 
 **两个透镜共用选中物。** `Tab` 从树到账本：选中第一条 `seq ≥` 节点 `seq` 的行（run 的 `seq` 是它的 `first_seq`，别的节点是子树里最早的 `first_seq`）。从账本到树：选中这行所属的 run 节点并展开它的祖先；城自己的行选中城。
 
+**跟随。** 查看器开着时，`terminal` 等键最多 `FOLLOW_TICK`（100 ms）；没等到就 `poll` 一次：`LedgerIndex::refresh` 说没变就什么都不做，有追加就把新行折进 lineage 并交给 `Face::follow`。所以服务中的城里新开的 run 最迟一个 tick 加一次折叠之后出现在树上，远在 250 ms 之内。`Face::follow` 换上新的树、把新行接到 `records` 末尾，并保持：选中的仍是同一个节点（按 `NodeKey` 找回；它不在了就是城），展开过的仍展开，此前不在树上的 run 展开它的祖先，让人看得见它。账本行的光标不动。
+
 **帧。** 宽度 ≥ `SIDE_PANE_MIN_WIDTH`（110 列）时右侧常驻详情栏，左右各占一半，中间一列 `|`；窄时只画当前透镜，`Enter` 进全屏详情。全屏详情在任何宽度下都占满整屏。每行按字符截到栏宽；光标行以 `>` 开头；列表滚动到光标恰好可见。树行是缩进 + `+`（有子、折叠）/`-`（展开）/空格 + 标签；账本行是原行。详情对 run 节点画 `RunLine::to_json()`，对账本行画解析后的 JSON，解析不了就画原文字符串。
 
 **决定。**
@@ -3591,3 +3601,4 @@ pub(super) fn show(dir: &Path) -> Result<(), ViewError>;
 2. `crossterm` 只开 `events` 与 `windows` 两个特性：这一面不画颜色、不读粘贴与剪贴板，默认特性只会多链接没人调用的代码。被否掉的：自己写 Windows 控制台与 termios 两套 raw 模式——那是两份平台代码，换来的只是少一个依赖。
 3. 全屏详情在宽屏上也占满整屏，而不是在宽屏上忽略 `Enter`：同一个键在任何宽度下意思一样，大记录也能用满宽度看。
 4. 「等人」按 run 数在 `sprawling::lineage` 里，而不是读 `views::governance` 的待批表：待批表按 `id` 记，不记是哪个 run 提的，从它答不出「哪个 run 在等人」。代价是「请求加一、答复按 `id` 减一」这条规则有两处折叠，靠同一对 kernel 类型保持一致。条件变了就重议：待批表记下提出它的 run 时，lineage 改读它，删掉自己这一份。被否掉的：光标只看 `active`（等人批的 run 往往已经冻结，最需要人的那一个反而不在光标下）。
+5. 跟随靠轮询 `LedgerIndex::refresh`，不开文件系统通知，也不连服务中的城的 socket：没变时一次 refresh 只是一次目录列表加每段一次 `stat`，100 ms 一次对任何盘都是噪声；而通知在 Windows、inotify 与网络盘上是三套行为，socket 又要求查看器先知道城在不在服务。城不在服务时轮询什么都读不到，所以跟随不区分两种情况。条件变了就重议：`refresh` 在没变时也要读字节时。被否掉的：只在打开时读一次（人得退出重开才看得见新 run）。
