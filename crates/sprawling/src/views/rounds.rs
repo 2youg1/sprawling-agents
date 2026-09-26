@@ -178,6 +178,8 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                     outcome: channels::Outcome::Waiting,
                     at: record.seq(),
                     output: None,
+                    called: record.t(),
+                    answered: None,
                 };
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;
