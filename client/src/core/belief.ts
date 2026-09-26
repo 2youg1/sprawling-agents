@@ -32,6 +32,7 @@ import { LOG_WINDOW, merged } from "./belief/shape";
 import { runTable } from "./belief/runs.svelte";
 import { livened, liveOf } from "./belief/live";
 import { roomed, roomsOf } from "./belief/rooms";
+import { cancelledOf } from "./belief/cancelled";
 export type { Belief, Notice, RunBelief } from "./belief/shape";
 
 function unseen(run: RunId, at: Seq): RunBelief {
@@ -191,6 +192,7 @@ export function createBelief(now: () => number): BeliefStore {
     runs: runTable({}),
     live: [],
     rooms: new Map(),
+    cancelled: 0,
     halted: [],
     haltedAt: Seq.make(0),
     refusal: null,
@@ -252,6 +254,7 @@ export function createBelief(now: () => number): BeliefStore {
       runs: table,
       live: liveOf(table),
       rooms: roomsOf(table),
+      cancelled: cancelledOf(table),
       halted: stated >= held.haltedAt ? [...city.halted] : held.halted,
       haltedAt: stated >= held.haltedAt ? stated : held.haltedAt,
     });
@@ -327,7 +330,7 @@ export function createBelief(now: () => number): BeliefStore {
   function folded(held: Belief, run: RunId, next: RunBelief): void {
     const rooms = roomed(held, held.runs[run], next);
     held.runs[run] = next;
-    written({ ...held, live: livened(held.live, held.runs[run] ?? next), rooms });
+    written({ ...held, live: livened(held.live, held.runs[run] ?? next), rooms, cancelled: cancelledOf(held.runs) });
   }
 
   // One piece of what the model is producing. A page that joins in the

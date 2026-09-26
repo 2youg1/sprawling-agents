@@ -158,3 +158,29 @@ test("the runs of a room cost the room, not the city", () => {
   });
   expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
 });
+
+test("the cancelled count costs one run a record, not the city", () => {
+  const store = createBelief(() => 0);
+  store.adoptCity({
+    active: WORKING,
+    buildings: [],
+    frozen: RUNS - WORKING,
+    halted: [],
+    pursuits: [],
+    runs: Array.from({ length: RUNS }, (_, index) => listed(index)),
+  });
+  const reads = 200;
+  let start = 0;
+  let during = 0;
+  for (let at = 0; at < 2 * reads; at += 1) {
+    if (at === reads) start = performance.now();
+    store.apply(record(at % WORKING, at + 2, "tool_result"));
+    during += get(store.belief).cancelled;
+  }
+  const perRecordUs = ((performance.now() - start) * 1000) / reads;
+  store.apply({ ...record(0, 2 * reads + 2, "run_frozen"), data: { completion: "cancelled" } });
+  const once = get(store.belief).cancelled;
+  store.apply({ ...record(0, 2 * reads + 3, "run_frozen"), data: { completion: "cancelled" } });
+  expect({ during, once, again: get(store.belief).cancelled }).toEqual({ during: 0, once: 1, again: 1 });
+  expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
+});

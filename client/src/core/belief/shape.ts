@@ -64,6 +64,8 @@ export interface Belief {
   // The ids of the runs each room has held, oldest start first
   // (`rooms.ts`).
   rooms: ReadonlyMap<string, readonly RunId[]>;
+  // How many runs froze cancelled (`cancelled.ts`).
+  cancelled: number;
   halted: HaltScope[];
   // The ledger position the list of shut scopes is current to. Two
   // writers touch the list - an answer states the whole of it and a
