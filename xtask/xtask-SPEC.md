@@ -601,6 +601,8 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 | `xtask/src/render/pass/tests.rs` | 五次开页的名单、自称，以及两条对账各自的正反例 |
 | `xtask/src/render/probe.rs` | 那段量页面的脚本与它写读数的两个元素（`SINK`、`CONDITIONS`、`SETTLE_MS`、`PENDING`、`script`）；`engine.rs` 因此只管找引擎、开进程、把读数读回来 |
 | `xtask/src/render/announced.rs` | 屏幕阅读器遇到的那三条（原 `ax` 的三条）：`every_control_is_announceable`、`every_landmark_is_named`、`one_first_heading` |
+| `xtask/src/render/room.rs` | 字有没有地方站、弹层有没有地方开（§8-33）：`no_text_is_crushed`、`every_popover_shows_an_option` |
+| `xtask/src/render/room/tests.rs` | 两条各自的正反例 |
 
 **关门判据**（两条都实跑过，2026-09-21）：`cargo run -q -p xtask -- render` 五次开页全绿；**把探针写的那个属性名从 `data-theme` 改成别的而不动样式表**，亮色那一次必须红在「页面画的不是这一次要的条件」上（实测拒词：`the pass asked for the light page and the page drew itself dark`）；**把 `--force-high-contrast` 换成任何不开强制色的开关**，强制色那一次同样必须红（实测拒词：`the pass asked for forced colours and the engine drew the colours it authored`）。**改 `PASSES` 里那一行的 `Lighting` 不是这条控制**：它同时改掉了请求与期待，两边仍然一致，故照旧为绿。
 
@@ -827,3 +829,18 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 **败给的方案**：整道删掉。kernel 与 channels 的公开面有仓外读者（`adversary/`、客户端生成的 `wire.ts` 所依的线），它们的漂移值得一张夜间可见的差异表。
 
 **重议条件**：又有 crate 的公开面出现仓外读者，或夜间作业里 `apisync` 的红多次在合并后才被发现。
+
+### 8-33 `render` 量字有没有地方站、弹层有没有地方开（形状 1 判定）
+
+**两条性质，都是对 `Drawn` 的算术**，住在 `xtask/src/render/room.rs`：
+
+- `no_text_is_crushed`：一个自己写字的盒子（`text` 非空、`shows()`），名字至少两个字且不含换行（作者自己折的行不算挤，例如代码的行号栏），宽度小于两个字宽（`2 × px_x100 / 100`），而高度至少两个字高——也就是字被折成了多行。拒词给出盒子、宽、字号与行数的下界。它挡的缺陷是提示框在 390 宽下正文一字一行：每个盒子都没溢出、都在容器里，`survey` 的包含与截字两条读数都是绿的。
+- `every_popover_shows_an_option`：一个弹层（`role` 为 `listbox` 或 `menu`）被已量祖先截过后可见的高度——`Clips` 的祖先按位置截，`Scrolls` 的祖先只按自身高度截（滚得到的不算截掉）——，小于它第一项（`role` 为 `option` 或 `menuitem` 的后代）的高度。没有一项被量到的弹层不判。它挡的缺陷是主模型选择框打开后，列表被外层容器截到只剩一条细线。
+
+**常量**：两个字宽、两个字高（`CRUSHED_EMS = 2`）；一行字至少一个字高，故「高 ≥ 2 个字高」是「至少两行」的下界，单字按钮的内边距不会让它误报——那种盒子名字只有一个字。
+
+**已知的限**：可见高度按祖先的外框截，不算定位上下文：`position: fixed` 的弹层逃出非包含块祖先的截断，会被这里多截一次，是误报而非漏报；见到时把弹层的截断祖先改成不截或把弹层挂到外层，本条不加例外。
+
+**为什么不放进 `survey`**：几何的家是 `browser::survey`（§8-26），这两条本应是它的读数；本节先作为门自己的性质落地，因为改 `crates/browser` 与改门不能同一个提交，而这两条要在修提示框与选择框之前先对今天的 gallery 报红。**重议条件**：`survey` 下一次增加读数时，两条迁进去，本文件删掉。
+
+**本节属门禁机具，与产品代码分开提交。**
