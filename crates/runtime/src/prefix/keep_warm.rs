@@ -62,8 +62,17 @@ impl CacheUse {
 /// reads it while the entry is still alive. A renewal whose instant lies
 /// more than one cache lifetime after the last real use is not sent.
 pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u64> {
-    let _ = (setting, cache, lead_ms, PROMPT_CACHE_TTL_SECS);
-    None
+    match setting {
+        KeepWarm::Off => None,
+        KeepWarm::FiveMinute => {
+            let ttl_ms = PROMPT_CACHE_TTL_SECS.checked_mul(1000)?;
+            let due = cache
+                .refreshed_ms
+                .checked_add(ttl_ms)?
+                .saturating_sub(lead_ms);
+            (due.saturating_sub(cache.used_ms) <= ttl_ms).then_some(due)
+        }
+    }
 }
 
 #[cfg(test)]
