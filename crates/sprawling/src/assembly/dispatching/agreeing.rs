@@ -5,7 +5,9 @@
 
 //! Who gets woken, and where the work lands.
 
-use kernel::{Address, AxCode, AxError};
+use kernel::event::Scope;
+use kernel::event::record::{GoverningDocument, RulesChanged};
+use kernel::{Address, AxCode, AxError, EventKind, Payload};
 use kernel::{Locator, RunId, TimeMs};
 
 use crate::serving::CommandDesk;
@@ -160,8 +162,70 @@ impl RunWorker {
     /// Books what a run is about to stand under: the city's
     /// `CONFIG.toml` and, when the building exists, its own
     /// `CONFIG.toml` and `RULES.toml`.
+    ///
+    /// Each document is compared with what the governance fold last
+    /// booked, and one that moved gets a `rules_changed` line before the
+    /// run starts, so one line's `after` is the next line's `before` for
+    /// as long as nothing wrote the file in between. An absent file is
+    /// booked as zero bytes, the same reading `city::load` gives it. A
+    /// building that does not exist opens no account: a mistyped name
+    /// would otherwise leave the history holding a building the city
+    /// never had (sprawling-SPEC.md 8-40).
+    ///
+    /// # Errors
+    /// `E_STORAGE_FATAL` for a document or a building root that cannot
+    /// be read; propagates a history that will not take the line.
     pub(super) fn book_rules(&mut self, building: &city::Building) -> Result<(), AxError> {
-        let _ = building;
+        let mut documents = vec![(
+            Scope::City,
+            GoverningDocument::Config,
+            city::config_path(&self.city_root, building.addr(), city::Layer::City)?,
+        )];
+        let root = building.root(&self.city_root);
+        if root.try_exists().map_err(|err| unreadable(&root, &err))? {
+            let scope = Scope::Building(building.addr().clone());
+            documents.push((
+                scope.clone(),
+                GoverningDocument::Config,
+                city::config_path(&self.city_root, building.addr(), city::Layer::Building)?,
+            ));
+            documents.push((
+                scope,
+                GoverningDocument::Rules,
+                city::rules_path(&self.city_root, building.addr()),
+            ));
+        }
+        for (scope, which, path) in documents {
+            let bytes = match std::fs::read(&path) {
+                Ok(bytes) => bytes,
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+                Err(err) => return Err(unreadable(&path, &err)),
+            };
+            let after = kernel::B3Hash::digest(&bytes);
+            let before = self.governance.rules.get(&(scope.clone(), which)).copied();
+            if before != Some(after) {
+                let changed = RulesChanged {
+                    scope,
+                    which,
+                    before,
+                    after,
+                    bytes: bytes.len(),
+                };
+                self.record(EventKind::RulesChanged, Payload::of(&changed)?)?;
+            }
+        }
         Ok(())
     }
+}
+
+/// A document a run would stand under that this process cannot read.
+fn unreadable(path: &std::path::Path, err: &std::io::Error) -> AxError {
+    AxError::failure(
+        AxCode::StorageFatal,
+        "book what a run stands under",
+        format!("{}: {err}", path.display()),
+    )
+    .with_recovery(
+        "fix the file's permissions; a dispatch stands a run under these documents and          will not guess what they say",
+    )
 }

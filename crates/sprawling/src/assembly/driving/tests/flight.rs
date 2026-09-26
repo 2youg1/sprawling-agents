@@ -274,7 +274,7 @@ fn a_rules_change_says_which_entry_it_reached_the_city_in() {
         ],
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let mut dispatch = |worker: &mut RunWorker, room: &str| {
+    let dispatch = |worker: &mut RunWorker, room: &str| {
         let run = worker
             .dispatch_into_lane(
                 asked(room),
@@ -301,7 +301,12 @@ fn a_rules_change_says_which_entry_it_reached_the_city_in() {
     let entries = books(&lines, "building:lab", "RULES.toml");
     let chain: Vec<_> = entries
         .iter()
-        .map(|entry| (entry["data"]["before"].clone(), entry["data"]["after"].clone()))
+        .map(|entry| {
+            (
+                entry["data"]["before"].clone(),
+                entry["data"]["after"].clone(),
+            )
+        })
         .collect();
     assert_eq!(
         chain,
@@ -320,10 +325,16 @@ fn a_rules_change_says_which_entry_it_reached_the_city_in() {
             .filter_map(|line| line["seq"].as_u64())
             .min()
             .unwrap();
-        assert!(booked < stood_up, "booked at {booked}, {run} began at {stood_up}");
+        assert!(
+            booked < stood_up,
+            "booked at {booked}, {run} began at {stood_up}"
+        );
     }
     let rebuilt = Standing::fold(&report.ledger_dir).unwrap().governance;
-    assert_eq!(worker.governance.rules, rebuilt.rules, "a restart rebuilds the account");
+    assert_eq!(
+        worker.governance.rules, rebuilt.rules,
+        "a restart rebuilds the account"
+    );
 }
 
 /// A dispatch to a building the city does not have books the city's own
