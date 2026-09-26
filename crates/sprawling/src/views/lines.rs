@@ -246,3 +246,27 @@ pub(crate) fn summarize(run: RunId, hot: &memory::RunHot) -> channels::RunSummar
         started: hot.started,
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::config_answer;
+    use kernel::Address;
+
+    /// A value no file states is still answered, with the default named
+    /// as the layer it came from; a page told `null` has to keep its own
+    /// copy of the default to draw anything.
+    #[test]
+    fn an_unstated_second_rung_is_answered_with_the_default_as_its_layer() {
+        let dir = tempfile::tempdir().unwrap();
+        let addr = Address::parse("lab/room1").unwrap();
+        let answer = serde_json::to_value(config_answer(dir.path(), &addr).unwrap()).unwrap();
+        assert_eq!(
+            answer.get("second"),
+            Some(&serde_json::json!({
+                "percent": kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT,
+                "from": "default",
+            }))
+        );
+    }
+}

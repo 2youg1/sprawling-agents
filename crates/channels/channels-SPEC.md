@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 28 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`ec0edce8d6c76a2f93d3a8957bf92bb7fe9277d466d45dacbce9dd7c438cf510`；**WIRE_V ＝ 38**（回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`ec0edce8d6c76a2f93d3a8957bf92bb7fe9277d466d45dacbce9dd7c438cf510`；**WIRE_V ＝ 39**（缺省也是一层 `ConfigLayer::Default` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -1149,7 +1149,7 @@ pub enum ReleaseAnswer {
 | `Query::Preferences` → `PreferencesAnswer` | `lang: Option<Lang>`、welcomed、panel、`Appearance`、`proxying`、改过的和弦；`#[serde(default, deny_unknown_fields)]` | 浏览器曾按行缓存这些：十二个键、三个读取器，各自处理缺省与非法值。整表一扇门，允许值表由本 crate 声明一次并经 schema 传给客户端——**能画出来的选项就是这个 build 装得回的选项** |
 | 同上：本类型兼任 `[ui]` 的文法 | `[ui]` 节就是 `PreferencesAnswer` 的序列化；缺席字段取 `PreferencesAnswer::default()`（`panel` 是唯一不同于类型默认的一个：没人关之前它开着）；不认的键即拒 | 文件能写的键与答案能说的字段是**同一份声明**，而不是一边一份的两张表。`lang` 缺席而不是填 `en`：没人选过之前，浏览器自己的语言标是唯一的证据，写死一种语言会在每一台从未打开过该设置的机器上盖掉它 |
 | `Command::PutPreferences { patch, idem }` | `PreferencePatch` 闭集：`lang｜welcomed｜panel｜appearance｜proxying｜chord` | 一帧一件事，不是整表写回：两个屏幕各改一件，不得互相覆盖 |
-| `Query::Config { addr }` → `ConfigAnswer` | `effort: Option<SettledEffort>` ＋ `second: Option<SettledSecond>` ＋ `TuningDefaults`；`SettledEffort` 携 `ConfigLayer`（`city｜building｜resident`，与 `city::Layer` 同拼写）；`SettledSecond` 同携 `ConfigLayer`，`percent` 为已过 `SecondThreshold` 构造点的整百分数；`TuningDefaults` 为 `timeout_ms` ＋ `request_max_retries: Option<u32>`（`Retries::stated`，缺席即 `UntilHalted`）＋ `stream_idle_timeout_ms: Option<u64>`（缺席即与整通调用同界）＋ `proxying` | **层是答案的一半。** 只给解析值的页面说不出这是本层写的还是继承来的，于是要把三层再读一遍自己爬一次梯子——**一把梯子爬两次就是一个问题两个答案**。层名随 `city::Layer`：线上把楼的文件叫 `resident`、把房的文件叫 `room`，而梯子把房的文件叫 `resident`——读者与被治的那次 run 会对“这是哪一份文件”给出不同的答案；一处穷尽匹配（`bin::views::lines::rung_of`）把两份拼写钉在一起。`TuningDefaults` 是 `gateway::EndpointTuning::DEFAULTS` 的读出，字段形状也随它：重试上限是 `Retries` 而不是一个数（“直到有人按停”没有数字拼得出来），流的那个界是**闲置界而非整答案的截止**，且可缺席 |
+| `Query::Config { addr }` → `ConfigAnswer` | `effort: Option<SettledEffort>` ＋ `second: SettledSecond` ＋ `TuningDefaults`；`SettledEffort` 携 `ConfigLayer`（`default｜city｜building｜resident`，后三个与 `city::Layer` 同拼写，`default` 是没有任何一级文件说过、城的内建值在生效）；`SettledSecond` 同携 `ConfigLayer`，`percent` 为已过 `SecondThreshold` 构造点的整百分数，没有一级说过时是 `kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT` 且 `from = default`（§8-47）；`effort` 缺席仍是一句陈述：没有一级说过时回答的是提供方自己的缺省，城说不出那个值；`TuningDefaults` 为 `timeout_ms` ＋ `request_max_retries: Option<u32>`（`Retries::stated`，缺席即 `UntilHalted`）＋ `stream_idle_timeout_ms: Option<u64>`（缺席即与整通调用同界）＋ `proxying` | **层是答案的一半。** 只给解析值的页面说不出这是本层写的还是继承来的，于是要把三层再读一遍自己爬一次梯子——**一把梯子爬两次就是一个问题两个答案**。层名随 `city::Layer`：线上把楼的文件叫 `resident`、把房的文件叫 `room`，而梯子把房的文件叫 `resident`——读者与被治的那次 run 会对“这是哪一份文件”给出不同的答案；一处穷尽匹配（`bin::views::lines::rung_of`）把两份拼写钉在一起。`TuningDefaults` 是 `gateway::EndpointTuning::DEFAULTS` 的读出，字段形状也随它：重试上限是 `Retries` 而不是一个数（“直到有人按停”没有数字拼得出来），流的那个界是**闲置界而非整答案的截止**，且可缺席 |
 | `Command::PutShelved { shelf, name, text, idem }` | `Shelf { Library, Building(addr) }`；写 `shelved_document_written` | 与 `GovernedDocument` 同一条理由：两处货架都在保留子树里，任何写域都够不着，所以帧里没有路径可拼。`name` 允许子路径，脚本因此留得住自己的文件夹 |
 
 **八、`DialectKind::OpenAiResponses`（4.5 本体）。** kernel 的兼容格式集由二变三，`gateway::dialect` 的五个入口各多一条臂。登记与调用从此说同一句话：人粘贴 responses URL，`ConnectionKind::Responses` 记住了，而 `wire()` 从前仍答 `OpenAi`——**记对了、调错了**。形状取自供应方自己的规格（`openai/openai-openapi`，`openapi.yaml` 自述 API 版本 2.3.0，提交 `ddface9b`），不取自任何客户端库。
@@ -1317,3 +1317,12 @@ pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
 - **失败码不变**：判定拒绝仍是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定仍是 `E_CONFIG_INVALID`，recovery 仍是「换一个空闲端口，或者停掉占着它的进程」。
 - **被否：先试绑一次再放掉，然后在 `serve` 里真绑**。试绑与真绑之间，别的进程可以把端口拿走，那样原来的缺陷只是窗口变窄了，并没有消失。
 - **两者住 `server::listener`**，不住 `server::socket`：它们管的是监听器本身，先占、再服务；`server::socket` 管的是连上之后的会话、资产与上传。`Bound` 带 `#[must_use]`：占住端口而不服务，得到的是一个谁也不应答的端口。
+
+### 8-47 `WIRE_V` 39：缺省也是一层
+
+`ConfigLayer` 多一个 `Default`（线上拼 `default`）；`ConfigAnswer::second` 从 `Option<SettledSecond>` 变成 `SettledSecond`：没有一级文件说过时，它是 `CTX_REMINDER_SECOND_DEFAULT` 且 `from = default`。字段换了形而名字没换，故同集进位 38→39。
+
+- **缺席不是一个值**：`None` 让页面自己补上缺省，于是客户端带着第二份 `65`，和 kernel 的那一份之间没有任何东西把它们拴住。回答里写明生效值和它的来源，页面画出城说的数，只有一份。
+- **`from = default` 是页面判断「这一级有没有写过」的依据**：`default` 时框留空、把生效值画成提示；否则框里是那一级写下的数。
+- **`effort` 不跟着变**：没有一级说过时生效的是提供方的缺省，城不知道那个值；为它编一个级别就是说一句城说不出的话。重开条件：城自己开始为 effort 定一个缺省值。
+- **被否的方案**：保留 `Option` 并在旁边加一个 `default_percent` 字段——那样一个值有两个字段，读者要自己拼出生效值，拼法又多一个家。
