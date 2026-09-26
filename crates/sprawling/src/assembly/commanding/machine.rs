@@ -121,13 +121,16 @@ impl RunWorker {
     reason = "test code"
 )]
 mod tests {
-    use crate::assembly::{RunWorker, ledger_dir, now_ms};
+    use crate::assembly::{RunWorker, now_ms};
 
     /// A worker over an empty city, which is all this verb needs: it
     /// refuses before it touches the machine.
     fn worker(city_root: &std::path::Path) -> RunWorker {
-        let (ledger, _opened) =
-            memory::JsonlLedger::open(&ledger_dir(city_root), now_ms().unwrap()).unwrap();
+        let (ledger, _opened) = memory::JsonlLedger::open(
+            &kernel::layout::CityLayout::new(city_root).ledger(),
+            now_ms().unwrap(),
+        )
+        .unwrap();
         RunWorker::over(
             city_root,
             gateway::Custodian::in_memory(),

@@ -177,7 +177,9 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
         })
         .unwrap();
     // Find the mother's run_started node in the verified chain.
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
     let (mother, node) = verified
         .lines()
         .iter()
@@ -232,7 +234,9 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
             effort: None,
         })
         .unwrap();
-    let after = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let after =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
     let forked = after
         .lines()
         .iter()
@@ -294,7 +298,9 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
         })
         .unwrap();
 
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
     let run = verified
         .lines()
         .iter()

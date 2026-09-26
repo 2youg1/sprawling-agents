@@ -14,7 +14,7 @@
 
 use super::{
     Collaborating, Credentials, Flight, Namings, Planning, RoomQueues, RunWorker, Standing,
-    city_segment, ledger_dir, now_ms,
+    city_segment, now_ms,
 };
 use std::path::Path;
 
@@ -31,7 +31,7 @@ impl RunWorker {
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
     ) -> Result<Self, AxError> {
-        let dir = ledger_dir(city_root);
+        let dir = kernel::layout::CityLayout::new(city_root).ledger();
         let (ledger, _report) =
             JsonlLedger::open(&dir, now_ms()?).map_err(memory::MemoryError::into_ax)?;
         RunWorker::over(city_root, vault, log, ledger)
@@ -58,7 +58,7 @@ impl RunWorker {
         ledger: JsonlLedger,
     ) -> Result<Self, AxError> {
         let now = now_ms()?;
-        let dir = ledger_dir(city_root);
+        let dir = kernel::layout::CityLayout::new(city_root).ledger();
         let Standing {
             book,
             governance,

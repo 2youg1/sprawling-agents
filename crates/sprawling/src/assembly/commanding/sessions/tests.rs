@@ -33,7 +33,9 @@ fn addr(raw: &str) -> Address {
 /// Whether the history recorded a `session_opened` at this address, and
 /// what it said about carrying.
 fn carried_in_history(city_root: &Path, at: &Address) -> Option<bool> {
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(city_root)).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(city_root).ledger())
+            .unwrap();
     verified
         .raw_lines()
         .iter()
@@ -183,7 +185,9 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             effort: None,
         })
         .unwrap();
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
     let mother = verified
         .lines()
         .iter()

@@ -72,7 +72,7 @@ pub(super) fn attach_provider(
 /// workshop scenario in this module raises, and a diagnostic that guessed
 /// wider would print the whole history.
 pub(super) fn node_lines(city_root: &Path) -> Vec<String> {
-    runtime::replay::verify_ledger_dir(&ledger_dir(city_root))
+    runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(city_root).ledger())
         .map(|verified| {
             verified
                 .raw_lines()

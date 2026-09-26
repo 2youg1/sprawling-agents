@@ -281,7 +281,9 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
 
     // The posture is history, not a field: a second worker over the
     // same ledger knows the building is open again.
-    let restarted = Standing::fold(&ledger_dir(dir.path())).unwrap().governance;
+    let restarted = Standing::fold(&kernel::layout::CityLayout::new(dir.path()).ledger())
+        .unwrap()
+        .governance;
     assert!(restarted.halted.is_empty());
 }
 

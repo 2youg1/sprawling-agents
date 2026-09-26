@@ -1191,7 +1191,7 @@ invert the model seam，仍未动手。**这里不假装做过它。**
 
 所以整套留在 `src/`：夹具成为 `assembly::fixture`（父模块下的 `#[cfg(test)] mod`，十六个子模块都从 `super` 够得到），
 每个测试搬到**它咬的那个模块**旁边。**crate 的公开面因此一个条目都没有增加**——
-`ledger_dir`／`Views`／`Standing`／`CommandDesk` 全部仍是 `pub(crate)`，`api-baselines` 只多了两行
+`Views`／`Standing`／`CommandDesk` 全部仍是 `pub(crate)`，`api-baselines` 只多了两行
 `impl sprawling::assembly::RunWorker`：`RunWorker` 的方法现在写在三个文件里，`cargo public-api` 就记三个 impl 块。
 
 ### 验收
@@ -3522,4 +3522,20 @@ impl PlanHolders {
 **红**：一个 run 落下一行 `roadmap_claimed`（`record_for`，认领效果正是这样落地的），随后 worker 读到的持有者（`holders_in`）应当与从同一账本重折出来的一样。改动之前，worker 的表在开城之后再不更新：左边是空表，右边是 `{2: "lab/room1"}`。
 
 **`pursuits` 仍由 `plans` 直接改写**：宣布、暂停、恢复、撤下一个 pursuit 时，`plans` 先改 `Planning::pursuits`，再从改过的表读出 `goal` 写进 `pursuit_changed`。让 `Planning::absorb` 在追加之后折 `pursuit_changed`，要把判定挪到写之后、由记录铸回 `Pursuit`，这是行为变化而不是搬移，所以这一步不改这条路径。
+
+### 8-92 assembly 与 serving、views、doctor 之间的依赖只朝一个方向
+
+`bin::assembly` 是唯一知道所有具体类型的地方，别的模块不应当反过来知道它（ARCHITECTURE.md §3）。一条从 views、serving 或 doctor 指回 assembly 的边，意味着改 assembly 的内部可能改坏一个读面，而读面本来只该依赖它读的那份事实的权威。
+
+**账本在哪，由 `kernel::layout::CityLayout::ledger` 一处回答。** 每个读账本的地方直接调用 `CityLayout::new(city_root).ledger()`；assembly 不再转一手。转一手的函数只是给同一件事换了个名字，却让 views 的三处历史读面与 serving 的开城路径为了一个路径去依赖 assembly。
+
+仍然指回 assembly 的边，以及它们各自要去的地方：
+
+| 从 | 用到 assembly 的 | 去处 |
+|---|---|---|
+| `views` | `rebuild_views`、`DOC_BYTES_MAX` 与 `read_building`、`broker_for`、`McpLink`、`resolving` | 各自归到它所折叠或读取的那份事实的模块，assembly 从那里取用 |
+| `doctor::visit` | `has_history`、`History` | 城有没有历史是账本的事实，归到读账本的那一层 |
+| `serving` | `RunWorker`、`Serving`、`now_ms`、`acp_dispatch`、`drive_run` 与 `DriveContext`、`Driven`、`Driving` | serving 承载 worker 的线程与 lane；断开这组边要先决定 `attending` 与 `pool` 是归 assembly 还是把 assembly 用到的 `CommandDesk`、`relay`、`pool` 移出 serving |
+
+反方向（assembly 用 serving 的 `CommandDesk`、`relay`、`pool`、`random_token`、`open_vault`，用 views 的 `Governance`、`Views`、`pursued`、`session_opened`，用 doctor 的 `Machine`、`host`、`report`）是组装点应有的方向，保留。
 

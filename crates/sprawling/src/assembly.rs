@@ -80,7 +80,7 @@ use settling::{Ending, Settling, Sweep};
 pub(crate) use toolkits::broker_for;
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use kernel::{AxCode, AxError, EventRecord, RunId, TimeMs};
@@ -92,6 +92,8 @@ use crate::effect;
 use kernel::{Address, EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};
 use runtime::Interrupt;
+#[cfg(test)]
+use std::path::Path;
 
 /// The single sanctioned sampling point (clippy.toml disallowed-methods). Everything below this call takes `TimeMs` as a
 /// parameter.
@@ -118,12 +120,6 @@ pub(crate) fn now_ms() -> Result<TimeMs, AxError> {
         )
     })?;
     Ok(TimeMs::new(millis))
-}
-
-/// Where a city keeps its ledger: under the reserved prefix, outside
-/// every WriteDomain (C17).
-pub(crate) fn ledger_dir(city_root: &Path) -> PathBuf {
-    kernel::layout::CityLayout::new(city_root).ledger()
 }
 
 /// What the startup scan found and repaired.
@@ -259,8 +255,9 @@ impl RunWorker {
         if let Some(known) = self.city.get() {
             return Ok(*known);
         }
-        let read = memory::Provenance::city_of(&ledger_dir(&self.city_root))
-            .map_err(memory::MemoryError::into_ax)?;
+        let read =
+            memory::Provenance::city_of(&kernel::layout::CityLayout::new(&self.city_root).ledger())
+                .map_err(memory::MemoryError::into_ax)?;
         Ok(*self.city.get_or_init(|| read))
     }
 

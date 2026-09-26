@@ -39,7 +39,7 @@
 use kernel::event::record::SessionOpened;
 use kernel::{Address, AxCode, AxError, EventKind, Payload};
 
-use super::super::{RunWorker, ledger_dir};
+use super::super::RunWorker;
 
 impl RunWorker {
     /// Begins a new session at `addr`, keeping what `carry` names.
@@ -104,7 +104,9 @@ impl RunWorker {
     /// cannot be rebuilt is a refusal now, in words about the line they
     /// named, rather than a run that starts and finds nothing.
     fn origin_is_real(&self, origin: kernel::Origin) -> Result<(), AxError> {
-        let ledger = runtime::replay::verify_ledger_dir(&ledger_dir(&self.city_root))?;
+        let ledger = runtime::replay::verify_ledger_dir(
+            &kernel::layout::CityLayout::new(&self.city_root).ledger(),
+        )?;
         let index = usize::try_from(origin.at_seq.value()).map_err(|_| {
             AxError::failure(
                 AxCode::InvalidArgs,

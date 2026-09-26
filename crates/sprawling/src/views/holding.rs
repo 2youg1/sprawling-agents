@@ -34,7 +34,7 @@ use super::lines::verdict_line;
 use super::lines::{
     buildings_of, discard_lines, pursued, registry_line, restored_paths, signal_line,
 };
-use crate::assembly::{ledger_dir, rebuild_views};
+use crate::assembly::rebuild_views;
 
 /// Answers one query out of a city's own history, without serving it.
 ///
@@ -50,7 +50,7 @@ use crate::assembly::{ledger_dir, rebuild_views};
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {
-    Ok(rebuild_views(&ledger_dir(city_root))?.answer(query))
+    Ok(rebuild_views(&kernel::layout::CityLayout::new(city_root).ledger())?.answer(query))
 }
 
 /// The derived views a query reads. They are rebuilt from the ledger at
@@ -169,8 +169,10 @@ impl Views {
             // An unreadable ledger directory is not a reason to refuse to
             // start: the index is disposable, every refresh tries again,
             // and a city with no ledger yet is the ordinary first run.
-            index: memory::LedgerIndex::rebuild(&ledger_dir(city_root))
-                .unwrap_or_else(|_| memory::LedgerIndex::empty()),
+            index: memory::LedgerIndex::rebuild(
+                &kernel::layout::CityLayout::new(city_root).ledger(),
+            )
+            .unwrap_or_else(|_| memory::LedgerIndex::empty()),
             plans: crate::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
