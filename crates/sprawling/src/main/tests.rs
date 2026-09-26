@@ -155,7 +155,7 @@ fn each_way_a_call_ends_has_its_own_exit_code() {
 /// as the `AxError` it was, so neither reader loses a field.
 #[test]
 fn a_refusal_reads_the_same_to_a_person_and_to_a_program() {
-    use super::refusal::{written, Form};
+    use super::refusal::{Form, written};
     use kernel::{AxCode, AxError};
     let err = AxError::failure(AxCode::ToolUnknown, "call tool", "grep")
         .with_nearby(vec!["exec".into(), "edit".into()])

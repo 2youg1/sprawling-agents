@@ -6,8 +6,8 @@
 //! `sprawling call`: one frame over the wire, and the exit code that
 //! says what was observed (sprawling-SPEC.md 8-41, 8-90).
 
-use super::city::refused;
 use super::exit::Exit;
+use super::refusal::{Form, written};
 use super::router::flag_value;
 use super::wire_client::{self, Unheard};
 use kernel::consts_policy::DEFAULT_AT;
@@ -25,7 +25,7 @@ use kernel::consts_policy::DEFAULT_AT;
 pub(super) fn call(args: &[String]) -> Exit {
     let Some(frame) = args.get(1).filter(|a| !a.starts_with("--")) else {
         eprintln!(
-            "usage: sprawling call <frame-json|-> [--at host:port] [--token T] [--quiet-ms N]"
+            "usage: sprawling call <frame-json|-> [--at host:port] [--token T] [--quiet-ms N] [--json]"
         );
         eprintln!(
             "exit: 0 answered, 1 refused, 2 this command line, 3 nothing came back, 4 no city at --at"
@@ -87,7 +87,7 @@ pub(super) fn call(args: &[String]) -> Exit {
                 Unheard::NoCity(err) => (Exit::NoCity, err),
                 Unheard::Broken(err) => (Exit::Refused, err),
             };
-            refused(err);
+            eprint!("{}", written(err, Form::of(args)));
             exit
         }
     }

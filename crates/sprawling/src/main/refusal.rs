@@ -26,9 +26,26 @@ impl Form {
     }
 }
 
-/// The refusal's text, ending in a newline.
+/// The refusal's text, ending in a newline. The json form is one line;
+/// should the error ever fail to serialize, the person's form is written
+/// with the reason, so the refusal itself is never lost.
 pub(super) fn written(err: &AxError, form: Form) -> String {
     match form {
-        Form::Human | Form::Json => format!("{err}\nrecovery: {}\n", err.recovery()),
+        Form::Human => human(err),
+        Form::Json => match serde_json::to_string(err) {
+            Ok(line) => format!("{line}\n"),
+            Err(fail) => format!(
+                "{}could not write this refusal as json: {fail}\n",
+                human(err)
+            ),
+        },
+    }
+}
+
+fn human(err: &AxError) -> String {
+    let recovery = format!("{err}\nrecovery: {}\n", err.recovery());
+    match err.nearby() {
+        [] => recovery,
+        nearby => format!("{recovery}nearby: {}\n", nearby.join(", ")),
     }
 }
