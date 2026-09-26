@@ -124,18 +124,21 @@ export function splitModel(value: string): Names | null {
 }
 
 // The model the session open in a room answers with: the model of the
-// newest run since the session began, read from the room's runs oldest
-// start first (`heldIn`). A session keeps the model it was opened with,
-// so this, and not the city's next pick, is what a message sent here
-// reaches; `null` when the session has made no call yet.
+// newest run since the session began that has called one, read from the
+// room's runs oldest start first (`heldIn`). A session keeps the model
+// it was opened with, so this, and not the city's next pick, is what a
+// message sent here reaches, even while its newest run has not called
+// yet; `null` when the session has made no call at all.
 export function sessionModel(held: readonly RunBelief[], began: Seq | null): string | null {
-  return held.filter((run) => began === null || run.lastSeq > began).at(-1)?.model ?? null;
+  return held.filter((run) => (began === null || run.lastSeq > began) && run.model !== null).at(-1)?.model ?? null;
 }
 
 // What picking a row of the model pill means. With no session model the
 // pick points `main` at it; with one, the session cannot change model,
 // so a different pick points `main` at it and opens a new session in
-// the room, which answers with it.
+// the room, which answers with it. The ledger's `model_called` records
+// the model's name and not its endpoint, so the name alone identifies
+// the session's model: two endpoints serving one name read as one here.
 export type ModelMove =
   | { readonly kind: "select"; readonly names: Names }
   | { readonly kind: "reopen"; readonly names: Names }

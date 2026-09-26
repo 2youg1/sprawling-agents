@@ -31,7 +31,13 @@ describe("a hunk's actions", () => {
     expect(reverseOf(changed)).toEqual({
       now: "fn main() {\n    new();\n    more();\n}",
       was: "fn main() {\n    old();\n}",
+      fence: "```",
     });
+  });
+
+  test("the fence around either side is longer than any backtick run inside it", () => {
+    const fenced: Hunk = { lines: [{ sign: "added", old: null, new: 1, text: "````rust" }] };
+    expect(reverseOf(fenced).fence).toBe("`````");
   });
 
   test("the editor opens at the hunk's first line in the file as it is", () => {

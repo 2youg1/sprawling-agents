@@ -39,7 +39,7 @@
     [1, "approval_requested", { action_desc: "run cargo publish --dry-run outside the sandbox" }],
     [52, "approval_requested", { action_desc: "send a request to api.github.com" }],
     [3, "run_frozen", { completion: "limit" }],
-    [70, "run_frozen", { completion: "failed" }],
+    [70, "run_frozen", { completion: null }],
     ...[2, 8, 14, 33, 47, 95, 130, 180].map((ago): readonly [number, EventKind, Record<string, unknown>] => [
       ago,
       "run_frozen",

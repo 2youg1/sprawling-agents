@@ -198,6 +198,8 @@
     // A room opens at its newest words; only the person's own scroll
     // moves it to reading back.
     anchoring = anchorAt({ kind: "opened" });
+    // This write fires the column's scroll event, which measures the foot
+    // again and agrees with follow; the second measurement is expected.
     box.scrollTop = box.scrollHeight;
     const watcher = new ResizeObserver(() => {
       const now = scroller;

@@ -190,9 +190,9 @@ export const NOTICE_DAYS: readonly NoticeDay[] = [
     heading: "notices_yesterday",
     rows: [
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_CONFIG_INVALID", action: "dispatch", subject: "lab/east", at: "18:22", count: 1,
+      { code: "E_MODEL_UNCHOSEN", action: "choose the main model", subject: "lab/east", at: "18:22", count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-        recovery: "the room is frozen against this session; set main back in setup, or run /new" },
+        recovery: "attach a provider on the settings page and pick a model for this tag" },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       { code: "E_GATE_DENIED", action: "write", subject: "hall/.sprawling/rules.md", at: "17:50", count: 1,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them

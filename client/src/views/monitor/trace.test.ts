@@ -16,8 +16,14 @@ import { Schema } from "effect";
 import { Seq, Turn } from "../../wire";
 import { traceOf } from "./trace";
 
-const turn = (number: number, calls: readonly unknown[]): Turn =>
-  Schema.decodeUnknownSync(Turn)({ number, calls, notes: [], opened: number * 10, t: number * 1000 });
+const turn = (number: number, calls: readonly object[]): Turn =>
+  Schema.decodeUnknownSync(Turn)({
+    number,
+    calls: calls.map((call) => ({ called: number * 1000, ...call })),
+    notes: [],
+    opened: number * 10,
+    t: number * 1000,
+  });
 
 const at = (n: number): Seq => Seq.make(n);
 
@@ -27,6 +33,8 @@ const exec = turn(1, [
     called: 1010,
     tool: "exec",
     outcome: "answered",
+    called: 1000,
+    answered: 1250,
     arguments: { cut: 0, head: JSON.stringify({ arm: { shell: { text: "cargo test" } } }, null, 2) },
     output: {
       cut: 0,
@@ -64,11 +72,11 @@ const edit = turn(2, [
 ]);
 
 describe("a run's turns read as a terminal record and a code column", () => {
-  test("an exec call is its command, both streams and its exit code", () => {
+  test("an exec call is its command, both streams, its exit code and how long it took", () => {
     const { entries } = traceOf([exec]);
     expect(entries).toEqual([
-      { kind: "command", at: at(11), text: "cargo test", stdout: "ok\n", stderr: "warn\n", ending: { kind: "code", code: 101 }, cut: 0 },
-      { kind: "command", at: at(12), text: "git status", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0 },
+      { kind: "command", at: at(11), text: "cargo test", stdout: "ok\n", stderr: "warn\n", ending: { kind: "code", code: 101 }, cut: 0, took: 250 },
+      { kind: "command", at: at(12), text: "git status", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null },
     ]);
   });
 
@@ -93,5 +101,20 @@ describe("a run's turns read as a terminal record and a code column", () => {
     expect(trace.latest).toEqual({ kind: "entry", at: at(22) });
     expect(traceOf([exec]).latest).toEqual({ kind: "entry", at: at(12) });
     expect(traceOf([turn(2, edit.calls.slice(0, 1))]).latest).toEqual({ kind: "file", path: "src/lib.rs" });
+  });
+
+  test("a no-newline marker is neither a line nor a step of either counter", () => {
+    const diff = "@@ -1,1 +1,2 @@\n-end\n\\ No newline at end of file\n+end\n+tail\n\\ No newline at end of file\n";
+    const output = { cut: 0, head: JSON.stringify({ path: "a.txt", base_version: "abc", diff }) };
+    const marked = turn(3, [{ at: 31, tool: "edit", outcome: "answered", arguments: { cut: 0, head: "{}" }, output }]);
+    expect(traceOf([marked]).files.flatMap((file) => file.hunks)).toEqual([
+      {
+        lines: [
+          { sign: "removed", old: 1, new: null, text: "end" },
+          { sign: "added", old: null, new: 1, text: "end" },
+          { sign: "added", old: null, new: 2, text: "tail" },
+        ],
+      },
+    ]);
   });
 });

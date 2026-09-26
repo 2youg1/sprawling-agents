@@ -102,7 +102,7 @@ const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
   // Two ends that disagree about the wire disagree again on every
   // reconnect; only the client this city was built with settles it.
   E_WIRE_MISMATCH: [RELOAD],
-  // A standing goal needs a plan with a ready step; the mayor writes
+  // A standing goal needs a non-empty plan; the mayor writes
   // plans, so the form asks the mayor for one, and the person sends it.
   E_PLAN_MISSING: [ASK_PLAN],
   // Everything else: the refusal's own sentence is the guidance, and

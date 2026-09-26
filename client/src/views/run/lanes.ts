@@ -84,8 +84,16 @@ function worked(turn: Turn, to: number): Stretch[] {
 // A turn that called tools, cut at the first call and the last answer;
 // a call still running holds the tool lane to the end of the turn.
 function cut(number: number, from: number, to: number, calls: readonly Call[]): Stretch[] {
-  const first = Math.max(from, Math.min(...calls.map((call) => call.called)));
-  const last = Math.min(to, Math.max(...calls.map((call) => call.answered ?? to)));
+  // One pass rather than a spread into Math.min/max, whose argument
+  // count a turn with very many calls would exceed.
+  let earliest = Number.POSITIVE_INFINITY;
+  let latest = Number.NEGATIVE_INFINITY;
+  for (const call of calls) {
+    earliest = Math.min(earliest, call.called);
+    latest = Math.max(latest, call.answered ?? to);
+  }
+  const first = Math.max(from, earliest);
+  const last = Math.min(to, latest);
   const parts: readonly Stretch[] = [
     { share: "model", turn: number, from, to: first },
     { share: "tool", turn: number, from: first, to: Math.max(first, last) },

@@ -72,7 +72,7 @@ export function outcomeOf(run: RunBelief): Outcome | null {
   }
 }
 
-// One pass sorts the city into the three outcomes; only the runs of an
+// One pass sorts the city into the four outcomes; only the runs of an
 // outcome are then ordered, and only its first `first` are kept.
 export function resultsOf(runs: Iterable<RunBelief>, first: number): readonly Group[] {
   const held: Record<Outcome, RunBelief[]> = { waiting: [], failed: [], done: [], ended: [] };

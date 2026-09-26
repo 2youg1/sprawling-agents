@@ -3792,8 +3792,8 @@
     "zh": "关于 {path} 第 {line} 行："
   },
   "mon_revert_steer": {
-    "en": "Revert this change in {path} with the edit tool, against the file's current version. Replace\n```\n{now}\n```\nwith\n```\n{was}\n```",
-    "zh": "请用 edit 工具、基于 {path} 的当前版本撤回这处改动。把\n```\n{now}\n```\n换回\n```\n{was}\n```"
+    "en": "Revert this change in {path} with the edit tool, against the file's current version. Replace\n{fence}\n{now}\n{fence}\nwith\n{fence}\n{was}\n{fence}\nIf the file no longer holds the first block, a later edit already replaced this change: say so rather than edit.",
+    "zh": "请用 edit 工具、基于 {path} 的当前版本撤回这处改动。把\n{fence}\n{now}\n{fence}\n换回\n{fence}\n{was}\n{fence}\n若文件里已没有第一段，说明后来的改动已经取代了这处：请说明这一点，不要编辑。"
   },
   "run_monitor": {
     "en": "monitor",

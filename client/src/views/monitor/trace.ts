@@ -14,12 +14,14 @@
 // compact JSON on one line, so the line cut never falls inside one.
 // A result that does not read as that shape is still drawn, as its raw
 // head, because a record that drops what it cannot parse hides the
-// calls most worth looking at. The wire says when a call was made but
-// not how long it took, so a command carries no duration here.
+// calls most worth looking at. A command's duration is the span between
+// the moment the call was made and the moment it was answered, and a
+// call still running has none yet.
 
 import { Option, Schema } from "effect";
 
 import type { Call, Outcome, Seq, Turn } from "../../wire";
+import { tookOf } from "../run/lanes";
 
 export type Ending =
   | { readonly kind: "code"; readonly code: number }
@@ -36,6 +38,8 @@ export type Entry =
       readonly stderr: string;
       readonly ending: Ending;
       readonly cut: number;
+      // Milliseconds from call to answer; null while the call runs.
+      readonly took: number | null;
     }
   | {
       readonly kind: "call";
@@ -150,6 +154,7 @@ function commandOf(call: Call): Entry {
     stderr: Option.match(ran, { onNone: () => "", onSome: (r) => r.stderr ?? "" }),
     ending: endingOf(call.outcome, ran),
     cut: call.output?.cut ?? 0,
+    took: tookOf(call),
   };
 }
 
@@ -177,7 +182,9 @@ const HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
 // A unified diff cut into hunks, each line carrying the number it has
 // on the side it exists on. Lines before the first header are the file
-// names, which the column already states.
+// names, which the column already states. A line that opens with a
+// backslash is the "\ No newline at end of file" marker, which belongs
+// to neither side and so is neither drawn nor counted.
 function hunksOf(diff: string): readonly Hunk[] {
   const hunks: Line[][] = [];
   let old = 0;
@@ -189,7 +196,7 @@ function hunksOf(diff: string): readonly Hunk[] {
       old = Number(header[1]);
       now = Number(header[2]);
       hunks.push([]);
-    } else if (lines === undefined || text === "") {
+    } else if (lines === undefined || text === "" || text.startsWith("\\")) {
       continue;
     } else if (text.startsWith("-")) {
       lines.push({ sign: "removed", old, new: null, text: text.slice(1) });
