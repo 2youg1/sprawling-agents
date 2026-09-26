@@ -188,7 +188,7 @@ pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
         }
         // The third mouth, which also decides how long the next look
         // may sleep.
-        patience = match desk.next() {
+        patience = match desk.next(|run| worker.drives(run)) {
             // `carrying` holds this command's key in flight for the
             // length of the arm, so a frame that repeats it while the
             // work is going adds no second run. The desk may hold more,
