@@ -205,15 +205,13 @@ impl Views {
                 self.city = record.addr().cloned();
             }
             EventKind::SignalEnqueued => {
-                if let Some((room, line)) = signal_line(record) {
-                    self.waiting.entry(room).or_default().push(line);
-                }
+                let (room, line) = signal_line(record)?;
+                self.waiting.entry(room).or_default().push(line);
             }
             EventKind::SignalConsumed => {
-                if let Some((room, line)) = signal_line(record)
-                    && let Some(queue) = self.waiting.get_mut(&room)
-                {
-                    queue.retain(|held| held.id != line.id);
+                let taken = collab::SignalConsumed::from_payload(record.data())?;
+                if let Some(queue) = record.addr().and_then(|room| self.waiting.get_mut(room)) {
+                    queue.retain(|held| held.id != taken.id.as_str());
                 }
             }
             EventKind::PursuitChanged => {

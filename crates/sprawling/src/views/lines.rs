@@ -24,7 +24,7 @@
 
 use std::path::Path;
 
-use kernel::{Address, EventRecord, RunId};
+use kernel::{Address, AxError, EventRecord, RunId};
 
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
@@ -168,20 +168,22 @@ pub(crate) fn buildings_of(city_root: &Path) -> Vec<Address> {
 /// One signal, as a room's queue would show it. `None` for a record
 /// this version cannot read as a signal: a view skips what it cannot
 /// read rather than inventing a row for it.
-pub(crate) fn signal_line(record: &EventRecord) -> Option<(Address, channels::SignalLine)> {
-    let map = record.data().as_map();
-    let text = |key: &str| {
-        map.get(key)
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned)
-    };
-    let room = Address::parse(&text("room")?).ok()?;
-    Some((
-        room,
+/// The waiting row a `signal_enqueued` line adds, and the room it waits
+/// in, read through the struct its writer wrote.
+///
+/// # Errors
+/// Refuses a line this build cannot read as a signal: skipping it would
+/// leave a waiting signal out of the view.
+pub(crate) fn signal_line(
+    record: &EventRecord,
+) -> Result<(Address, channels::SignalLine), AxError> {
+    let signal = collab::Signal::from_payload(record.data())?;
+    Ok((
+        signal.room().clone(),
         channels::SignalLine {
-            id: text("id")?,
-            kind: text("kind").unwrap_or_else(|| "signal".to_owned()),
-            from: text("from").unwrap_or_default(),
+            id: signal.id().as_str().to_owned(),
+            kind: signal.kind().as_str().to_owned(),
+            from: signal.from().to_owned(),
             at: record.t(),
         },
     ))
