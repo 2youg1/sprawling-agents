@@ -50,26 +50,9 @@ fn a_cas_block_is_read_at_the_building_it_was_put_for() {
         run: kernel::RunId::from_bytes([7; 16]),
         building: kernel::Address::parse(building).unwrap(),
     };
-    let in_lab = cas
-        .put_for(
-            b"lab notes
-",
-            &put_in("lab"),
-        )
-        .unwrap();
-    let in_vault = cas
-        .put_for(
-            b"vault notes
-",
-            &put_in("vault"),
-        )
-        .unwrap();
-    let with_no_origin = cas
-        .put(
-            b"shelved
-",
-        )
-        .unwrap();
+    let in_lab = cas.put_for(b"lab notes\n", &put_in("lab")).unwrap();
+    let in_vault = cas.put_for(b"vault notes\n", &put_in("vault")).unwrap();
+    let with_no_origin = cas.put(b"shelved\n").unwrap();
     let stray = kernel::B3Hash::digest(b"never put");
     let tool = ReadTool::new(
         dir.path(),
@@ -80,17 +63,59 @@ fn a_cas_block_is_read_at_the_building_it_was_put_for() {
     .unwrap();
 
     let read = tool.invoke(&call(&format!("cas:b3-{in_lab}"))).unwrap();
-    assert_eq!(
-        read.result.as_map()["text"],
-        "lab notes
-"
-    );
+    assert_eq!(read.result.as_map()["text"], "lab notes\n");
     for refused in [in_vault, with_no_origin, stray] {
         let err = tool
             .invoke(&call(&format!("cas:b3-{refused}")))
             .unwrap_err();
         assert_eq!(err.code(), &AxCode::GateDenied, "{refused}");
     }
+}
+
+/// A block put for several buildings is read where any of them opens to
+/// the reader, and refused, when none does, with the reason of the first
+/// building it was put for.
+#[test]
+fn a_cas_block_put_for_two_buildings_is_judged_at_the_first_that_opens() {
+    let dir = tempfile::tempdir().unwrap();
+    let cas_dir = kernel::layout::CityLayout::new(dir.path()).cas();
+    let mut cas = memory::Cas::open(&cas_dir).unwrap();
+    let put_in = |building: &str| memory::BlockOrigin {
+        run: kernel::RunId::from_bytes([7; 16]),
+        building: kernel::Address::parse(building).unwrap(),
+    };
+    let shared = cas.put_for(b"shared notes\n", &put_in("vault")).unwrap();
+    cas.put_for(b"shared notes\n", &put_in("lab")).unwrap();
+    let closed = cas.put_for(b"closed notes\n", &put_in("vault")).unwrap();
+    cas.put_for(b"closed notes\n", &put_in("mill")).unwrap();
+    let tool = |bound: ReadBound| {
+        ReadTool::new(
+            dir.path(),
+            Arc::new(Mutex::new(Catalog::new())),
+            bound,
+            &cas_dir,
+        )
+        .unwrap()
+    };
+    let neither_vault_nor_mill: ReadBound =
+        Arc::new(|addr: &kernel::Address| match addr.as_str() {
+            "vault" => kernel::ReadVerdict::Confidential,
+            "mill" => kernel::ReadVerdict::RulesUnreadable(
+                AxError::failure(AxCode::InvalidArgs, "read the rules", "mill/RULES.toml")
+                    .with_recovery("fix the rules"),
+            ),
+            _ => kernel::ReadVerdict::Open,
+        });
+
+    let read = tool(only_lab())
+        .invoke(&call(&format!("cas:b3-{shared}")))
+        .unwrap();
+    assert_eq!(read.result.as_map()["text"], "shared notes\n");
+    let err = tool(neither_vault_nor_mill)
+        .invoke(&call(&format!("cas:b3-{closed}")))
+        .unwrap_err();
+    assert_eq!(err.code(), &AxCode::GateDenied);
+    assert!(err.to_string().contains("confidential"), "{err}");
 }
 
 #[test]
