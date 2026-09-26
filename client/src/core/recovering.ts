@@ -30,8 +30,9 @@ import { Option, Schema } from "effect";
 import type { Key } from "./lang";
 import { fill } from "./lang";
 import { MAYOR } from "./route";
+import { readRunId } from "./run_id";
 import { Address } from "../wire";
-import type { AxCode } from "../wire";
+import type { AxCode, AxError } from "../wire";
 
 // The room a form opens in: the mayor's, or the building the refusal
 // names.
@@ -157,9 +158,12 @@ export function formOf(room: FormRoom, subject: string, words: string): Option.O
 }
 
 // The actions a person can take about one refusal, in the order a
-// notice offers them.
-export function recoveryFor(code: AxCode): readonly Recovery[] {
-  return RECOVERIES[code];
+// notice offers them. `/stop` cancels the run a refusal names and
+// nothing wider (client-SPEC 4-39), so a refusal whose subject is not a
+// run does not offer it: a control that can never run is not an action.
+export function recoveryFor(error: Pick<AxError, "code" | "subject">): readonly Recovery[] {
+  const offered = RECOVERIES[error.code];
+  return Option.isSome(readRunId(error.subject)) ? offered : offered.filter((each) => each !== STOP);
 }
 
 // The one lever a refused link offers beside its state word: the table's

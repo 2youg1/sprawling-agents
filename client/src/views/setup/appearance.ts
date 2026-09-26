@@ -20,16 +20,9 @@ import { get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import type { Key } from "../../core/lang";
-import { STACK_SHAPE } from "../../core/prefs";
-import type {
-  Appearance,
-  Chroma,
-  Density,
-  Face,
-  Lighting,
-  Motion,
-  PreferenceDoor,
-} from "../../core/prefs";
+import { STACK_SHAPE } from "../../core/appearance";
+import type { Appearance, Chroma, Density, Face, Lighting, Motion } from "../../core/appearance";
+import type { PreferenceDoor } from "../../core/prefs";
 
 // The Local Font Access API, which Chromium offers and other engines do
 // not. Declared optional so the capability check is the type check.
