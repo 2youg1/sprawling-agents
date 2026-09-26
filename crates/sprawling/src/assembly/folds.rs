@@ -112,6 +112,12 @@ pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
     for record in known_records(&verified) {
         views.apply(record)?;
     }
+    views.adopt_epoch(
+        verified
+            .raw_lines()
+            .first()
+            .map(|genesis| kernel::ledger::chain_hash(genesis)),
+    );
     Ok(views)
 }
 

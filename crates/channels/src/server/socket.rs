@@ -72,7 +72,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                 // reaches the peer by one path whichever produced it.
                 let step = match inbound.read(&text) {
                     Ok(frame) => {
-                        decide_frame(phase, frame, &state.face, WelcomeFacts { city: state.city.as_ref(), head: state.head.read() })
+                        decide_frame(phase, frame, &state.face, WelcomeFacts { city: state.city.as_ref(), head: state.head.read(), epoch: state.epoch })
                     }
                     Err(unreadable) => unreadable,
                 };

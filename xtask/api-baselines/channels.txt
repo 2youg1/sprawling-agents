@@ -722,6 +722,7 @@ pub channels::ServeConfig::city: core::option::Option<kernel::address::Address>
 pub channels::ServeConfig::client: alloc::sync::Arc<channels::ClientAssets>
 pub channels::ServeConfig::commands: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::WireCommand, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::deltas: tokio::sync::broadcast::Sender<channels::Delta>
+pub channels::ServeConfig::epoch: core::option::Option<kernel::locator::B3Hash>
 pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<kernel::event::payload::EventRecord>
 pub channels::ServeConfig::head: alloc::sync::Arc<channels::LedgerHead>
 pub channels::ServeConfig::logs: tokio::sync::broadcast::Sender<channels::LogLine>
@@ -811,10 +812,12 @@ pub channels::Used::cached: kernel::budget::Tokens
 pub channels::Used::input: kernel::budget::Tokens
 pub channels::Used::output: kernel::budget::Tokens
 pub channels::Welcome::city: core::option::Option<kernel::address::Address>
+pub channels::Welcome::epoch: core::option::Option<kernel::locator::B3Hash>
 pub channels::Welcome::resume_from: core::option::Option<kernel::event::identity::Seq>
 pub channels::Welcome::schema: kernel::locator::B3Hash
 pub channels::Welcome::wire_v: u32
 pub channels::WelcomeFacts::city: core::option::Option<&'a kernel::address::Address>
+pub channels::WelcomeFacts::epoch: core::option::Option<kernel::locator::B3Hash>
 pub channels::WelcomeFacts::head: core::option::Option<kernel::event::identity::Seq>
 pub channels::Withheld::number: u32
 pub channels::Withheld::reason: alloc::string::String

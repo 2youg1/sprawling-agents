@@ -299,6 +299,7 @@ fn the_welcome_names_the_ledger_head_so_a_reconnect_fetches_only_what_it_missed(
         WelcomeFacts {
             city: None,
             head: Some(kernel::Seq::new(60)),
+            epoch: None,
         },
     );
     let SessionStep::Welcome(welcome) = step else {

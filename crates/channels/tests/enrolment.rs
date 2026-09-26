@@ -142,6 +142,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         }),
         city: None,
         head: Arc::default(),
+        epoch: None,
     };
     // The peer is this machine, which is the one peer the route admits;
     // the address arrives the way axum hands it to a handler under test.

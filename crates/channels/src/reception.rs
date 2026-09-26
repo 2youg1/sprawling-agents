@@ -215,12 +215,14 @@ pub enum SessionStep {
 }
 
 /// What a welcome tells a peer about the city it reached: which city it
-/// is, and the seq of the last record the city has broadcast. One value
+/// is, the seq of the last record the city has broadcast, and which
+/// ledger it is. One value
 /// because the two travel together into every welcome.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct WelcomeFacts<'a> {
     pub city: Option<&'a Address>,
     pub head: Option<Seq>,
+    pub epoch: Option<B3Hash>,
 }
 
 /// The whole session policy, as a pure function: which frames are legal
@@ -242,6 +244,7 @@ pub fn decide_frame(
         schema: schema_hash(),
         resume_from: standing.head,
         city: standing.city.cloned(),
+        epoch: standing.epoch,
     };
     match (state, frame) {
         (SessionState::AwaitingHello, ClientFrame::Hello(hello)) => {

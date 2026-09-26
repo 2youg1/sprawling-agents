@@ -26,7 +26,7 @@ use axum::http::{StatusCode, header};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{MethodRouter, get, post};
-use kernel::{Address, AxError, EventRecord, Sealed, Seq};
+use kernel::{Address, AxError, B3Hash, EventRecord, Sealed, Seq};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
@@ -126,6 +126,9 @@ pub struct ServeConfig {
     /// missed. The writer is whoever broadcasts, and it advances the head
     /// before each broadcast.
     pub head: Arc<LedgerHead>,
+    /// The chain hash of the Ledger's first line, read once at startup:
+    /// a ledger keeps its epoch for its whole life.
+    pub epoch: Option<B3Hash>,
 }
 
 /// The seq of the last record the city has broadcast, readable without a
@@ -182,6 +185,7 @@ pub(crate) struct ShellState {
     pub(crate) face: BindFace,
     pub(crate) city: Option<Address>,
     pub(crate) head: Arc<LedgerHead>,
+    pub(crate) epoch: Option<B3Hash>,
 }
 
 /// What an accepted request gets back: the run it became, and nothing
@@ -247,6 +251,7 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         face,
         city: config.city.clone(),
         head: Arc::clone(&config.head),
+        epoch: config.epoch,
     });
     Router::new()
         // The client bundle is the page itself: a browser that has not

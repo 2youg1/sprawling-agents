@@ -132,6 +132,10 @@ export function openConnection(
   // stream or a gap: the point a reconnect resumes after. Null until
   // the first record, and a page with no mark has nothing to resume.
   let mark: Seq | null = null;
+  // Which ledger the mark belongs to, as the last welcome named it. A
+  // welcome naming another one means the city was made again: the mark
+  // and every fold point into a history that no longer exists.
+  let epoch: string | null = null;
   // The attempt the ladder scheduled, held so a link that turns out to
   // be refused can cancel it. A refused link that left this running
   // would reopen the socket behind a message telling the person the
@@ -207,6 +211,17 @@ export function openConnection(
     return store.apply(record);
   }
 
+  // Forgets what the page folded when the welcome names another ledger,
+  // so the resume below finds no mark and rebuilds from a snapshot.
+  function renewed(named: string | null): void {
+    if (epoch !== null && named !== null && named !== epoch) {
+      mark = null;
+      gaps.splice(0, gaps.length);
+      store.forget();
+    }
+    epoch = named ?? epoch;
+  }
+
   // A welcome names the ledger head. A page that knows where it stopped
   // and is at most `RESUME_PAGES` pages behind fetches the records in
   // between and asks again only what the dead socket took with it;
@@ -258,6 +273,7 @@ export function openConnection(
         // asked for, so the walk starts its front range again rather than
         // waiting for a page that will never arrive.
         fetching = null;
+        renewed(action.welcome.epoch ?? null);
         resume(action.welcome.resume_from ?? null);
         askGap();
         return;

@@ -172,6 +172,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     });
     // Read once, at startup, from the views the ledger just rebuilt.
     let city_name = views.lock().ok().and_then(|views| views.city());
+    let epoch = views.lock().ok().and_then(|views| views.epoch());
     let head = Arc::new(channels::LedgerHead::at(
         views.lock().ok().and_then(|views| views.head()),
     ));
@@ -224,6 +225,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         logs,
         city: city_name,
         head,
+        epoch,
         secrets: Arc::new(move |command: channels::Command, reply: channels::Reply| {
             // The route waits for whichever comes first, so the
             // reply address is the credential's own request rather

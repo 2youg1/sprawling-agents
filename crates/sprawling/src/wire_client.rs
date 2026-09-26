@@ -297,6 +297,7 @@ mod tests {
                         schema: channels::schema_hash(),
                         resume_from: None,
                         city: None,
+                        epoch: None,
                     }))
                     .unwrap();
                 socket.send(Message::Text(welcome.into())).await.unwrap();
@@ -349,6 +350,7 @@ mod tests {
                         schema: channels::schema_hash(),
                         resume_from: None,
                         city: None,
+                        epoch: None,
                     }),
                     channels::ServerFrame::Answer(Box::new(channels::Answer::Run(None))),
                 ] {

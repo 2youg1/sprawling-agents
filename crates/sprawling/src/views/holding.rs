@@ -75,6 +75,9 @@ pub(crate) struct Views {
     /// The seq of the last record shown to [`Views::apply`], which is
     /// where the served ledger head starts before the fold moves it.
     head: Option<kernel::Seq>,
+    /// The chain hash of the ledger's first line, which names this
+    /// history for its whole life (channels-SPEC, `Welcome.epoch`).
+    epoch: Option<kernel::B3Hash>,
     /// What waits in each room, folded from the signal records. Held
     /// here rather than read off a queue: a queue answers by being
     /// consumed, and a view that consumed what it showed would change
@@ -159,6 +162,7 @@ impl Views {
             book: gateway::EndpointBook::new(),
             city: None,
             head: None,
+            epoch: None,
             waiting: std::collections::BTreeMap::new(),
             discards: std::collections::BTreeMap::new(),
             assets: Vec::new(),
@@ -323,6 +327,14 @@ impl Views {
     /// What this city is called: what its first record says, and for a
     /// city made before that record carried a name, the directory it
     /// lives in. One place decides, so two readers cannot disagree.
+    pub(crate) fn adopt_epoch(&mut self, epoch: Option<kernel::B3Hash>) {
+        self.epoch = epoch;
+    }
+
+    pub(crate) fn epoch(&self) -> Option<kernel::B3Hash> {
+        self.epoch
+    }
+
     pub(crate) fn head(&self) -> Option<kernel::Seq> {
         self.head
     }
