@@ -182,13 +182,15 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
                     }
                 }
             }
+            // The live run marks what it sent at the same line, so a
+            // steer after it lands where the live one landed.
+            EventKind::PromptAssembled => conversation.mark_sent(),
             EventKind::SteerReceived => {
                 let steer = record.data().read::<SteerReceived>()?;
                 conversation.push_steer(&steer.source, &steer.text);
             }
-            // Everything else is not the conversation: the segment
-            // hashes a call was assembled from, the accounting, the
-            // checks, the city's own lines. Listed rather than defaulted
+            // Everything else is not the conversation: the accounting,
+            // the checks, the city's own lines. Listed rather than defaulted
             // so a kind added to the vocabulary is a decision here - is
             // this something the mother said or answered? - instead of a
             // silence.
@@ -197,7 +199,6 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
             | EventKind::BuildingConfigured
             | EventKind::SessionOpened
             | EventKind::RunForked
-            | EventKind::PromptAssembled
             // The cache shape measures a request; it is not one of the
             // things the mother said.
             | EventKind::PromptShapeCompared

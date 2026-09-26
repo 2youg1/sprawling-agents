@@ -28,7 +28,8 @@ use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 /// window, the record belongs to the ledger.
 ///
 /// Whichever safe point it arrives at, the fold takes effect at the next
-/// assembly — a steer never rewrites a request already on the wire.
+/// assembly — a steer never rewrites a request already on the wire, which
+/// the conversation holds by knowing what the last assembly sent.
 fn fold_steer(conversation: &mut Conversation, interrupt: &Interrupt) {
     if let Interrupt::Steer { source, text } = interrupt {
         conversation.push_steer(source, text);
@@ -154,6 +155,7 @@ impl Run<Active> {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };
+        self.state.conversation.mark_sent();
         // What this request looks like to a prompt cache, and which of its
         // regions moved since the request before it. Written here, after the
         // turn has assembled, so the line describes a request that exists;
