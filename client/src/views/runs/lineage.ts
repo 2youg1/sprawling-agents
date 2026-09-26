@@ -73,11 +73,11 @@ function asking(run: BoardRun): boolean {
   return phaseOf(run.doing) === "person";
 }
 
-function guide(trail: readonly boolean[], last: boolean): string {
+export function guide(trail: readonly boolean[], last: boolean): string {
   return trail.map((more) => (more ? "│ " : "  ")).join("") + (last ? "└─" : "├─");
 }
 
-function placeOf(addr: string | null): { readonly building: string; readonly room: string } {
+export function placeOf(addr: string | null): { readonly building: string; readonly room: string } {
   const [building = "", ...room] = (addr ?? "").split("/");
   return { building, room: room.join("/") };
 }
@@ -102,7 +102,7 @@ function byNeed(a: BoardRun, b: BoardRun): number {
 }
 
 // A place holding a waiting run first, then by name.
-function placeByNeed(a: { readonly name: string; readonly runs: readonly BoardRun[] }, b: { readonly name: string; readonly runs: readonly BoardRun[] }): number {
+export function placeByNeed(a: { readonly name: string; readonly runs: readonly BoardRun[] }, b: { readonly name: string; readonly runs: readonly BoardRun[] }): number {
   return Number(b.runs.some(asking)) - Number(a.runs.some(asking)) || a.name.localeCompare(b.name);
 }
 

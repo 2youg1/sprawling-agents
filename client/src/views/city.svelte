@@ -4,20 +4,22 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The city page: one information bar, the drawing, and under it the
-  // runs board - every run in the city on the lineage tree, the runs
-  // waiting for the person first - which is the city's list: a building
-  // is a root of that tree, so a second list of buildings would say the
-  // same thing twice. What was picked in the drawing stands beside it
-  // when there is room and under it when there is not. In results mode
-  // the drawing and the board give way to the runs' outcomes alone.
+  // The city page: one information bar, the building table or the
+  // drawing, and under them the runs board - every run in the city on
+  // the lineage tree, the runs waiting for the person first. The table
+  // opens first because it reads at any width, where the drawing at a
+  // phone's width is a band too thin to read; the drawing is the second
+  // view, one switch away. What was picked in the table or the drawing
+  // stands beside it when there is room and under it when there is not.
+  // In results mode all of it gives way to the runs' outcomes alone.
   //
   // The shell fills the viewport; `max-w-page` binds the legend, which
-  // is prose, and never the drawing. The legend below the drawing is
-  // the second half of the bar's job: a city drawn in glyphs that
-  // nothing names is a picture; a legend is a set of labels, which is
-  // what makes the picture readable. Its five marks are the drawing's
-  // own art rather than icons, so they stay hand-drawn here (4-12).
+  // is prose, and never the drawing. The legend is folded behind one
+  // control under the drawing: a city drawn in glyphs that nothing
+  // names is a picture, and the legend is the set of labels that makes
+  // it readable, but open it takes half of a narrow screen. Its five
+  // marks are the drawing's own art rather than icons, so they stay
+  // hand-drawn here (4-12).
 
   import { QUERIES } from "../core/asking";
   import { readAnswer } from "../core/answered";
@@ -29,7 +31,9 @@
   import Panel from "./city/panel.svelte";
   import Results from "./city/results.svelte";
   import Skyline from "./city/skyline.svelte";
+  import Table from "./city/table.svelte";
   import EmptyState from "./parts/empty.svelte";
+  import Segmented from "./parts/segmented.svelte";
   import Unanswered from "./parts/unanswered.svelte";
   import Board from "./runs/board.svelte";
   import { boardRuns } from "./runs/lineage";
@@ -39,6 +43,10 @@
   // them in.
   const MARKS = ["window", "figure", "flag", "lamp", "plinth"] as const;
 
+  // The two ways the page draws the city's buildings, the first the one
+  // it opens on.
+  const VIEWS = ["table", "drawing"] as const;
+
   const u = ui();
   const { lang } = u;
   const belief = u.conn.belief;
@@ -46,6 +54,7 @@
   const held = u.prefs.held;
 
   let picked = $state.raw<Address | null>(null);
+  let view = $state<(typeof VIEWS)[number]>("table");
 
   const read = $derived(readAnswer($answer, (held) => ("city" in held ? held.city : undefined)));
   const city = $derived(read.kind === "held" ? read.value : undefined);
@@ -63,13 +72,35 @@
   <Bar />
   <div class="relative flex min-h-0 flex-1 flex-col @lg/page:flex-row">
     <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-pane py-base">
-      <div class="flex justify-end pb-snug"><Showing /></div>
+      <div class="flex flex-wrap justify-end gap-base pb-snug">
+        {#if $held.showing !== "results"}
+          <Segmented
+            label={say($lang, "city_view")}
+            options={VIEWS.map((value) => ({ value, label: say($lang, `city_view_${value}`) }))}
+            held={view}
+            onPick={(next: (typeof VIEWS)[number]) => {
+              view = next;
+            }}
+          />
+        {/if}
+        <Showing />
+      </div>
       {#if $held.showing === "results"}
         <Results />
       {:else if read.kind === "unavailable"}
         <Unanswered query={read.query} asked={QUERIES.city} />
       {:else if city === undefined}
         <p class="text-center text-text-faint">…</p>
+      {:else if city.buildings.length > 0 && view === "table"}
+        <Table
+          {city}
+          runs={board.runs}
+          now={board.now}
+          {picked}
+          onPick={(addr) => {
+            picked = addr;
+          }}
+        />
       {:else if city.buildings.length > 0}
         <Skyline
           {city}
@@ -78,9 +109,9 @@
             picked = addr;
           }}
         />
-        <ul
-          class="mx-auto mt-base flex max-w-page flex-wrap items-center justify-center gap-wide text-note text-text-faint"
-        >
+        <details class="mx-auto mt-base max-w-page text-note text-text-faint">
+          <summary class="cursor-pointer text-center text-text-quiet">{say($lang, "city_legend")}</summary>
+          <ul class="mt-snug flex flex-wrap items-center justify-center gap-wide">
           {#each MARKS as mark (mark)}
             <li class="flex items-center gap-tight">
               <svg viewBox="0 0 16 16" class="size-glyph shrink-0" aria-hidden="true">
@@ -103,7 +134,8 @@
               <span>{say($lang, `legend_${mark}`)}</span>
             </li>
           {/each}
-        </ul>
+          </ul>
+        </details>
       {:else}
         <!-- A city with no buildings is a city nobody has asked for
         anything yet, and the Mayor is where a person asks: raising a

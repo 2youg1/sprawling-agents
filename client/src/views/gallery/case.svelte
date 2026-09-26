@@ -70,7 +70,7 @@
     <div class="w-full {FRAME}" style:max-width={TALK}>{@render children()}</div>
   {:else}
     <div class="w-max max-w-full {FRAME}">
-      <div style:width style:max-width="100%">{@render children()}</div>
+      <div style:width="{String(width)}px" style:max-width="100%">{@render children()}</div>
     </div>
   {/if}
 </section>

@@ -3898,5 +3898,41 @@
   "facts_core_reading": {
     "en": "{cpu} cpu · {memory}",
     "zh": "CPU {cpu} · {memory}"
+  },
+  "city_view": {
+    "en": "what the city page shows",
+    "zh": "城页显示"
+  },
+  "city_view_table": {
+    "en": "table",
+    "zh": "楼表"
+  },
+  "city_view_drawing": {
+    "en": "drawing",
+    "zh": "画"
+  },
+  "city_legend": {
+    "en": "legend",
+    "zh": "图例"
+  },
+  "city_table": {
+    "en": "buildings and their runs",
+    "zh": "楼和它们的 run"
+  },
+  "city_table_row": {
+    "en": "{name}: {waiting} waiting for you, {working} at work, {done} done",
+    "zh": "{name}：{waiting} 个等你，{working} 个在干活，{done} 个完成"
+  },
+  "city_table_none": {
+    "en": "no runs",
+    "zh": "还没有 run"
+  },
+  "gallery_city_table": {
+    "en": "city · the building table",
+    "zh": "城 · 楼表"
+  },
+  "gallery_city_table_narrow": {
+    "en": "city · the building table at a phone's width",
+    "zh": "城 · 手机宽度下的楼表"
   }
 }
