@@ -151,4 +151,39 @@ mod tests {
         assert!(!provider_err("read the model list", &shape).is_retriable());
     }
 
+    /// Both dialects refuse an over-long request with a 400 and say why
+    /// in the body; the advice for a refusal in general (check the model
+    /// name, the credential and the dialect) points at three settings
+    /// that are not wrong here.
+    #[test]
+    fn a_request_that_outgrew_the_window_is_told_how_to_fit_again() {
+        use super::super::config::Endpoint;
+        use super::super::fakes::{config, fake_provider, request};
+        use super::super::redemption::redemption;
+        use kernel::Model;
+        let said = serde_json::json!({
+            "type": "error",
+            "error": { "type": "invalid_request_error",
+                       "message": "prompt is too long: 210000 tokens > 200000 maximum" },
+        })
+        .to_string();
+        let (url, handle) = fake_provider(vec![(400, said)], false);
+        let mut endpoint = Endpoint::new(config(&url), redemption()).unwrap();
+        let err = endpoint.call(&request()).unwrap_err();
+        assert_eq!(
+            (
+                err.code(),
+                err.is_retriable(),
+                err.recovery().contains("/new --carry")
+            ),
+            (&AxCode::Provider, false, true),
+            "{}",
+            err.recovery()
+        );
+        assert!(
+            !err.subject().contains("210000"),
+            "the body is never quoted back"
+        );
+        drop(handle.join());
+    }
 }

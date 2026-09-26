@@ -457,6 +457,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 
 - `E_PROVIDER`：不可定义掉——网络与对端是本 crate 的本质失败面；subject 写状态码与端点名，恒不含请求体。
 - **「能否再试一次」只有一个家：`endpoint::failure::ProviderFailure`**。调用点只说它看见了哪一种失败，retriable 与恢复语由该枚举一处给出，恒不在调用点第二次判定。往返未完成（send／execute／读体／读帧／静默超时）＝`Exchange`／`Cut`／`Silence`，标 `retriable`；对端已答而本城拒绝（非 2xx＝`Refused`，body 形状不可读＝`Unreadable`）与本侧 `.build()` 失败（`Unbuilt`，确定性重演同一失败）不标。此前十五处调用点各自造错、无一 opt-in，使默认 `Retries::UntilHalted` 实际等于零次重试：一次瞬时断连即静默废掉一个 handdown 子运行。
+- **窗口溢出是自己的一族：`Overflow`**。对端以 400 或 413 拒绝、且拒词（小写比对）含 `context_length_exceeded`、`prompt is too long`、`maximum context length` 或 `context window` 之一，由 `ProviderFailure::refusal(url, status, &body)` 判为 `Overflow`，否则为 `Refused`；读不出拒词的拒绝只按状态码算 `Refused`。`Overflow` 不标 retriable（同一请求再发一遍同样放不下），恢复语写城里真有的出路：`/new --carry` 带着摘要开新会话，或换一个窗口更大的模型。`Refused` 的恢复语让人去查模型名、凭证与兼容格式，对溢出而言这三项都没错，照做只会改坏。对侧正文只读来分类，subject 仍只写 URL 与状态码，恒不回显。落选的是「只按 413 判溢出」：两家兼容格式都用 400 报窗口溢出，只看状态码会漏掉最常见的那一种。
 - `E_WIRE_MISMATCH`：不可定义掉——对端响应形状漂移是外部事实；subject 写键路径。
 - `E_ENDPOINT_DIALECT_UNSUPPORTED`：不可定义掉——用户可配任意 external provider，兼容格式探查失败必须可报。
 - `E_CREDENTIAL_MISSING`／`E_CONFIG_INVALID`：kernel 已有码，语义照 Custody 一节；不新增码。
