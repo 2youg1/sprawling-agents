@@ -300,7 +300,7 @@ mod tests {
         // and the dialect is a pure function, so replay can still derive
         // the bytes that were actually sent.
         let mut req = sample_request();
-        req.messages[1].content.insert(
+        req.messages.to_mut()[1].content.insert(
             0,
             ContentBlock::Thinking {
                 thinking: "two parts".to_owned(),

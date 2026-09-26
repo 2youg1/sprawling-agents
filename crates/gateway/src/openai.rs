@@ -126,7 +126,7 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
         let system: Vec<&str> = req.system.iter().map(|b| b.text.as_str()).collect();
         messages.push(json!({ "role": "system", "content": system.join("\n\n") }));
     }
-    for message in &req.messages {
+    for message in req.messages.iter() {
         match message.role {
             Role::User => {
                 for block in &message.content {

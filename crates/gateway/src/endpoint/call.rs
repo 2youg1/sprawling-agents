@@ -30,9 +30,9 @@ use kernel::event::record::ModelFacts;
 /// Every picture one conversation refers to, in the order the blocks
 /// name them: the blocks a person attached and the ones a tool produced
 /// are the same value, so they are collected the same way.
-pub(crate) fn pictures_in(chat: &ChatRequest) -> Vec<&ImageRef> {
+pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
     let mut found = Vec::new();
-    for message in &chat.messages {
+    for message in chat.messages.iter() {
         for block in &message.content {
             match block {
                 ContentBlock::Image(picture) => found.push(picture),
@@ -231,7 +231,7 @@ mod tests {
     use kernel::{AxCode, Model};
 
     /// A request carrying `count` pictures in one user message.
-    fn seeing(count: u32) -> ModelRequest {
+    fn seeing(count: u32) -> ModelRequest<'static> {
         let mut req = request();
         let mut content = Vec::new();
         for i in 0..count {

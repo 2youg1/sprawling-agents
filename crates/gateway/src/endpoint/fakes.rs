@@ -338,7 +338,7 @@ pub(crate) fn config(url: &str) -> EndpointConfig {
     clippy::arithmetic_side_effects,
     reason = "test helper"
 )]
-pub(crate) fn request() -> ModelRequest {
+pub(crate) fn request() -> ModelRequest<'static> {
     ModelRequest {
         policy: BuildingPolicy::default(),
         segments: [B3Hash::digest(b"seg"); 4],

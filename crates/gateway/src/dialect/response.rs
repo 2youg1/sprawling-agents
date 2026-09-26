@@ -150,7 +150,7 @@ mod tests {
 
         // And on the way back out, inside a request's message history.
         let mut req = sample_request();
-        req.messages[1].content.insert(
+        req.messages.to_mut()[1].content.insert(
             0,
             ContentBlock::Thinking {
                 thinking: "two parts".to_owned(),
