@@ -118,7 +118,9 @@ impl Watchdog {
     /// A non-retriable failure freezes on the first one: repeating a
     /// request the provider has already rejected on its shape buys the
     /// same rejection again. A retriable one backs off from `now` by the
-    /// schedule [`Watchdog::backoff_ms`] owns.
+    /// schedule [`Watchdog::backoff_ms`] owns, or by the provider's own
+    /// `retry_after_ms` when that is longer: asking before the time it
+    /// named buys one more refusal.
     ///
     /// **A retriable failure freezes only against a ceiling the person
     /// set.** Under [`Retries::UntilHalted`] what stops a run that keeps
@@ -129,7 +131,9 @@ impl Watchdog {
     pub fn on_provider_failure(&mut self, failure: &AxError, now: TimeMs) -> Disposal {
         self.provider_failures = self.provider_failures.saturating_add(1);
         self.streak = self.streak.saturating_add(1);
-        let not_before = TimeMs::new(now.value().saturating_add(self.backoff_ms()));
+        let own = self.backoff_ms();
+        let wait = failure.retry_after_ms().map_or(own, |told| own.max(told));
+        let not_before = TimeMs::new(now.value().saturating_add(wait));
         let refused = Disposal::Freeze {
             reason: FreezeReason::ProviderRefused,
         };
