@@ -34,7 +34,7 @@ use crate::mismatch::{as_str, mismatch, mismatch_found, payload_from, require, t
 
 mod stream;
 
-pub(crate) use stream::{increment_of, settled};
+pub(crate) use stream::{call_completed_by, increment_of, settled};
 
 fn role_str(role: Role) -> &'static str {
     match role {

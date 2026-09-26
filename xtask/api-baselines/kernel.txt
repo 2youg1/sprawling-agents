@@ -666,6 +666,7 @@ pub fn kernel::Ledger::append_all(&mut self, alloc::vec::Vec<kernel::EventDraft>
 pub fn kernel::Mode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::Mode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::Model::call(&mut self, &kernel::ModelRequest) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
+pub fn kernel::Model::call_speculating(&mut self, &kernel::ModelRequest, kernel::model::Increments<'_>, kernel::model::EarlyCalls<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
 pub fn kernel::Model::call_streaming(&mut self, &kernel::ModelRequest, kernel::model::Increments<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
 pub fn kernel::ModelReturn::bare(kernel::Payload, alloc::vec::Vec<kernel::tool::ToolCall>) -> kernel::ModelReturn
 pub fn kernel::ModelReturn::bare(kernel::Payload, alloc::vec::Vec<kernel::tool::ToolCall>) -> kernel::ModelReturn
@@ -940,6 +941,7 @@ pub fn kernel::locator::Range::fmt(&self, &mut core::fmt::Formatter<'_>) -> core
 pub fn kernel::locator::Range::lines(u64, u64) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::locator::Range::lines(u64, u64) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::model::Model::call(&mut self, &kernel::ModelRequest) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
+pub fn kernel::model::Model::call_speculating(&mut self, &kernel::ModelRequest, kernel::model::Increments<'_>, kernel::model::EarlyCalls<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
 pub fn kernel::model::Model::call_streaming(&mut self, &kernel::ModelRequest, kernel::model::Increments<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
 pub fn kernel::model::content_from_message(&kernel::Payload) -> core::result::Result<alloc::vec::Vec<kernel::ContentBlock>, kernel::AxError>
 pub fn kernel::model::message_payload(&[kernel::ContentBlock]) -> core::result::Result<kernel::Payload, kernel::AxError>
@@ -2697,11 +2699,13 @@ pub trait kernel::Tool: core::marker::Send + core::marker::Sync
 pub trait kernel::ledger::Ledger
 pub trait kernel::model::Model
 pub trait kernel::tool::Tool: core::marker::Send + core::marker::Sync
+pub type kernel::EarlyCalls<'a> = &'a mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall)
 pub type kernel::Increments<'a> = &'a mut dyn core::ops::function::FnMut(&kernel::Increment)
 pub type kernel::config::EnvVarName::Error = kernel::AxError
 pub type kernel::config::EnvVarName::Error = kernel::AxError
 pub type kernel::config::SecondThreshold::Error = kernel::AxError
 pub type kernel::config::SecondThreshold::Error = kernel::AxError
+pub type kernel::model::EarlyCalls<'a> = &'a mut dyn core::ops::function::FnMut(&kernel::tool::ToolCall)
 pub type kernel::model::Increments<'a> = &'a mut dyn core::ops::function::FnMut(&kernel::Increment)
 pub type kernel::tool::ServerLabel::Error = kernel::AxError
 pub type kernel::tool::ServerLabel::Error = kernel::AxError

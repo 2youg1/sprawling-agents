@@ -20,7 +20,7 @@
 
 //! Response dialects: frames back to ChatResponse.
 
-use kernel::{AxError, ChatResponse, DialectKind, Increment};
+use kernel::{AxError, ChatResponse, DialectKind, Increment, ToolCall};
 use serde_json::Value;
 
 use super::responses;
@@ -36,6 +36,24 @@ pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<Increment> {
     .filter(|held| match held {
         Increment::Said(text) | Increment::Thought(text) => !text.is_empty(),
     })
+}
+
+/// The tool call the last of `frames` completes, in a dialect whose
+/// stream says when a call is complete before the answer settles.
+///
+/// Only the Anthropic stream closes each block with a frame of its own;
+/// the OpenAI dialects answer `None` and their calls arrive settled.
+///
+/// # Errors
+/// `E_PROVIDER` when the arguments stop in the middle of a value.
+pub(crate) fn call_completed_by(
+    kind: DialectKind,
+    frames: &[Value],
+) -> Result<Option<ToolCall>, AxError> {
+    match kind {
+        DialectKind::Anthropic => anthropic::call_completed_by(frames),
+        DialectKind::OpenAi | DialectKind::OpenAiResponses => Ok(None),
+    }
 }
 
 /// The settled answer a stream ends with, in the shape a non-streaming

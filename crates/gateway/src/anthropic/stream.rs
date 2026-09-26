@@ -17,7 +17,7 @@
 //! sent back: <https://platform.claude.com/docs/en/build-with-claude/thinking>.
 
 use kernel::AxError;
-use kernel::Increment;
+use kernel::{ContentBlock, Increment, ToolCall};
 use serde_json::{Value, json};
 
 use crate::mismatch::{settled_tool_arguments, stream_cut};
@@ -43,6 +43,82 @@ pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Incre
 /// output count. The blocks are rebuilt in index order so a tool call
 /// that arrived interleaved with text still lands where it was.
 pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
+    let Rebuilt {
+        content,
+        usage,
+        stop,
+    } = rebuilt(frames.iter())?;
+    let Some(stop) = stop else {
+        return Err(stream_cut(
+            "the stream ended without the frame that says why the model stopped",
+        ));
+    };
+    Ok(json!({ "content": content, "stop_reason": stop, "usage": usage }))
+}
+
+/// The tool call the last frame completes, when that frame is a
+/// `content_block_stop`.
+///
+/// # Errors
+/// As [`completed_call`].
+pub(crate) fn call_completed_by(frames: &[Value]) -> Result<Option<ToolCall>, AxError> {
+    let stopped = frames
+        .last()
+        .filter(|frame| frame.get("type").and_then(Value::as_str) == Some("content_block_stop"))
+        .and_then(|frame| frame.get("index"))
+        .and_then(Value::as_u64);
+    match stopped {
+        Some(at) => completed_call(frames, at),
+        None => Ok(None),
+    }
+}
+
+/// The tool call the `content_block_stop` at index `at` completes, read
+/// by the same `block_from` the settled answer is read by, so the call
+/// handed over early and the one in the `ModelReturn` are equal.
+///
+/// `None` when the block at `at` is not a tool call.
+///
+/// What a caller may do with the call before the answer settles is fixed
+/// by `adversary/design/Speculating.lean`: start it only when it reads and
+/// no writing call precedes it, keep its result out of the ledger until
+/// the answer settles, and discard it when the answer is cut.
+///
+/// # Errors
+/// `E_PROVIDER` when the arguments stop in the middle of a value, and
+/// `E_WIRE_MISMATCH` when the block is not one this dialect spells.
+fn completed_call(frames: &[Value], at: u64) -> Result<Option<ToolCall>, AxError> {
+    let Rebuilt { content, .. } = rebuilt(
+        frames
+            .iter()
+            .filter(|frame| frame.get("index").and_then(Value::as_u64) == Some(at)),
+    )?;
+    let Some(block) = content.first() else {
+        return Ok(None);
+    };
+    match super::block_from(block, &format!("content[{at}]"))? {
+        ContentBlock::ToolUse { id, name, input } => Ok(Some(ToolCall {
+            id,
+            name,
+            args: input,
+        })),
+        ContentBlock::Text { .. }
+        | ContentBlock::Thinking { .. }
+        | ContentBlock::RedactedThinking { .. }
+        | ContentBlock::ToolResult { .. }
+        | ContentBlock::Image(_) => Ok(None),
+    }
+}
+
+/// What the frames rebuild into: the blocks in index order, the usage
+/// as last counted, and the stop reason when its frame has arrived.
+struct Rebuilt {
+    content: Vec<Value>,
+    usage: Value,
+    stop: Option<String>,
+}
+
+fn rebuilt<'f>(frames: impl Iterator<Item = &'f Value>) -> Result<Rebuilt, AxError> {
     let mut blocks: std::collections::BTreeMap<u64, Value> = std::collections::BTreeMap::new();
     let mut text: std::collections::BTreeMap<u64, String> = std::collections::BTreeMap::new();
     let mut json: std::collections::BTreeMap<u64, String> = std::collections::BTreeMap::new();
@@ -101,11 +177,6 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
             _ => {}
         }
     }
-    let Some(stop) = stop else {
-        return Err(stream_cut(
-            "the stream ended without the frame that says why the model stopped",
-        ));
-    };
     let mut content = Vec::new();
     for (at, mut block) in blocks {
         if let Some(map) = block.as_object_mut() {
@@ -131,7 +202,11 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
         }
         content.push(block);
     }
-    Ok(json!({ "content": content, "stop_reason": stop, "usage": usage }))
+    Ok(Rebuilt {
+        content,
+        usage,
+        stop,
+    })
 }
 
 #[cfg(test)]
@@ -143,7 +218,7 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
     reason = "test code"
 )]
 mod tests {
-    use super::settled;
+    use super::{completed_call, settled};
     use kernel::DialectKind;
     use serde_json::json;
 
@@ -220,5 +295,44 @@ mod tests {
             "the refusal has to name the tool: {}",
             refused.subject()
         );
+    }
+
+    /// A tool call is complete when its block stops, not when the
+    /// message does: the call handed over at `content_block_stop` is
+    /// the one the settled answer carries, before any later prose.
+    #[test]
+    fn a_tool_call_is_handed_over_when_its_block_stops() {
+        let frames = vec![
+            json!({"type": "message_start", "message": {"usage": {"input_tokens": 4}}}),
+            json!({"type": "content_block_start", "index": 0,
+                   "content_block": {"type": "tool_use", "id": "tu_1", "name": "read",
+                                     "input": {}}}),
+            json!({"type": "content_block_delta", "index": 0,
+                   "delta": {"type": "input_json_delta", "partial_json": "{\"path\": "}}),
+            json!({"type": "content_block_start", "index": 1,
+                   "content_block": {"type": "text", "text": ""}}),
+            json!({"type": "content_block_delta", "index": 0,
+                   "delta": {"type": "input_json_delta", "partial_json": "\"a.md\"}"}}),
+            json!({"type": "content_block_stop", "index": 0}),
+        ];
+        let early = completed_call(&frames, 0)
+            .unwrap()
+            .expect("the block at 0 is a tool call");
+        assert_eq!(completed_call(&frames, 1).unwrap(), None);
+
+        let mut whole = frames;
+        whole.push(json!({"type": "content_block_delta", "index": 1,
+                          "delta": {"type": "text_delta", "text": "reading"}}));
+        whole.push(
+            json!({"type": "message_delta", "delta": {"stop_reason": "tool_use"},
+                          "usage": {"output_tokens": 9}}),
+        );
+        let canonical =
+            crate::dialect::response_from_wire(DialectKind::Anthropic, &settled(&whole).unwrap())
+                .unwrap();
+        let settled_calls = kernel::ModelReturn::from_response(canonical, None)
+            .unwrap()
+            .calls;
+        assert_eq!(settled_calls, vec![early]);
     }
 }
