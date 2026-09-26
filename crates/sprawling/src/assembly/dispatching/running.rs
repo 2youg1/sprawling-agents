@@ -225,6 +225,17 @@ impl RunWorker {
         let left = member.map_or(Ok(()), |id| self.flight.backlog.leave(id));
         returned?;
         left?;
+        // A lane that placed the tree and then failed leaves no sweep to
+        // read it, so the tree goes back before the failure does; kept,
+        // it would answer every later dispatch to the room with
+        // WorktreeBusy until the worker restarts (sprawling-SPEC.md 8-93).
+        let driven = match driven {
+            Ok(driven) => driven,
+            Err(failure) => {
+                self.release_lease(&mut site)?;
+                return Err(failure);
+            }
+        };
         let Driven {
             outcome: driven,
             adapter: home,
@@ -232,7 +243,7 @@ impl RunWorker {
             ran,
             mut raised,
             workbench,
-        } = driven?;
+        } = driven;
         site.adapter = Some(home);
         self.settle_desks(
             &site,
