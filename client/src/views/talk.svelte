@@ -137,7 +137,7 @@
   });
 
   // The last dispatch sent from this room, and where its run started:
-  // a bare building's work opens a room of its own (client-SPEC 12-4).
+  // a bare building's work opens a room of its own (client-SPEC 12-6).
   // The line saying so is about the dispatch, so a steer sent after it
   // or the run it started ending takes the line away.
   let sent = $state<Sent | null>(null);

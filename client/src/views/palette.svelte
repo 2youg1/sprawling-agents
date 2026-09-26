@@ -191,7 +191,7 @@
   // open when the verb put words back in it - which is what `/help`
   // does - and when it did nothing at all, as a verb given an address it
   // cannot read does: the line stays for the person to correct, as it
-  // does in the composer (client-SPEC 4-39).
+  // does in the composer (client-SPEC 4-41).
   function runSlash(chosen: Slash): void {
     // A record rather than bare variables, because the closures below
     // write it and only the caller reads it back.

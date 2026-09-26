@@ -7,7 +7,7 @@
 // that have not frozen are bounded by how many the city drives at once,
 // far fewer than the runs a long city has held, so the index is kept
 // forward one run at a time and a reader pays for the working runs
-// rather than for the table (client-SPEC 12-4).
+// rather than for the table (client-SPEC 12-3).
 
 import type { Belief, RunBelief } from "./shape";
 

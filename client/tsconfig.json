@@ -16,5 +16,5 @@
     "noEmit": true,
     "types": ["@types/bun"]
   },
-  "include": ["src", "scripts", "vite.config.ts", "svelte.config.ts", "eslint.config.ts"]
+  "include": ["src", "scripts", "vite.config.ts", "svelte.config.ts", "eslint.config.ts", "svelte.config.test.ts"]
 }
