@@ -100,7 +100,7 @@
   // control's whole name, so it carries the state as well.
   const name = $derived.by(() => {
     const parts = [say($lang, "presence_title")];
-    const waiting = $approvals.length;
+    const waiting = $approvals?.length ?? 0;
     const unread = $belief.notices.filter((notice) => !notice.seen).length;
     if (waiting > 0) parts.push(fill(say($lang, "nav_waiting"), { n: String(waiting) }));
     if (unread > 0) parts.push(fill(say($lang, "notices_unread"), { n: String(unread) }));
@@ -108,7 +108,7 @@
   });
 
   const busy = $derived(
-    $approvals.length > 0 || $belief.notices.some((notice) => !notice.seen),
+    ($approvals?.length ?? 0) > 0 || $belief.notices.some((notice) => !notice.seen),
   );
 
   // A link still on its way up is the one mark that resolves by itself,
@@ -225,7 +225,7 @@ second mark next to it. -->
     <Button tone="quiet" label={say($lang, "notices_clear")} onPress={sweep} />
   </div>
 
-  {#if $approvals.length > 0}
+  {#if $approvals !== undefined && $approvals.length > 0}
     <section class="border-b border-edge px-base py-snug" aria-label={say($lang, "talk_waiting_you")}>
       <h2 class="text-label font-label text-alert">{say($lang, "talk_waiting_you")}</h2>
       <WaitingCards items={$approvals} />
