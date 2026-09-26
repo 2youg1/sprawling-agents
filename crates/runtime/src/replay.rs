@@ -17,7 +17,7 @@
 use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, B3Hash, EventRecord, EventRef, Seq};
-use memory::{CheckedLine, LedgerIndex, LineCheck};
+use memory::{CheckedLine, LedgerIndex, LineCheck, Located};
 
 /// One verified line: a typed record with its ref echo, or an explicitly
 /// ignorable line from a future vocabulary.
@@ -94,6 +94,8 @@ pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError> {
 /// A2 folded instead of kept: each record the per-line check reads is
 /// lent to `each` and dropped, so what stays resident is one segment's
 /// bytes and one record rather than every raw line and every record.
+/// The same pass builds the `LedgerIndex` it returns, which covers
+/// exactly the history `each` saw.
 ///
 /// # Errors
 /// The first line that does not verify, named as `verify_ledger_dir`
@@ -106,17 +108,19 @@ pub fn fold_ledger_dir(
 ) -> Result<LedgerIndex, AxError> {
     let mut check = LineCheck::at_genesis();
     let mut line_no = 0u64;
-    for segment in memory::ledger_segments_at(dir).map_err(memory::MemoryError::into_ax)? {
-        let bytes = memory::read_segment(&segment).map_err(memory::MemoryError::into_ax)?;
-        for raw in bytes.lines() {
-            line_no = line_no.saturating_add(1);
-            match check.advance(raw).map_err(|fault| fault.into_ax(line_no))? {
-                CheckedLine::Known(record) => each(&record)?,
-                CheckedLine::IgnoredUnknown(_) => {}
+    LedgerIndex::folding(dir, |raw| {
+        line_no = line_no.saturating_add(1);
+        match check.advance(raw).map_err(|fault| fault.into_ax(line_no))? {
+            CheckedLine::Known(record) => {
+                each(&record)?;
+                Ok(Some(Located {
+                    seq: record.seq(),
+                    run: Some(record.run()),
+                }))
             }
+            CheckedLine::IgnoredUnknown(_) => Ok(None),
         }
-    }
-    LedgerIndex::rebuild(dir).map_err(memory::MemoryError::into_ax)
+    })
 }
 
 /// A15: recompute the four segment hashes from a `prompt_assembled`

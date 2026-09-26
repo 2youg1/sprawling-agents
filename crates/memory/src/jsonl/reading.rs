@@ -16,15 +16,14 @@ use crate::vfs::Vfs;
 
 use super::ledger::{complete_lines, is_segment};
 
-/// The bytes of one ledger segment, held so a streaming reader keeps one
-/// segment resident instead of the whole history.
-pub struct SegmentBytes {
+/// The bytes of one ledger segment, read without opening the ledger.
+pub(crate) struct SegmentBytes {
     bytes: Vec<u8>,
 }
 
 impl SegmentBytes {
     /// The segment's complete, non-empty lines, in file order.
-    pub fn lines(&self) -> impl Iterator<Item = &[u8]> {
+    pub(crate) fn lines(&self) -> impl Iterator<Item = &[u8]> {
         complete_lines(&self.bytes)
             .0
             .into_iter()
@@ -33,7 +32,7 @@ impl SegmentBytes {
 }
 
 /// Reads one segment `ledger_segments_at` named.
-pub fn read_segment(segment: &Path) -> Result<SegmentBytes, MemoryError> {
+pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, MemoryError> {
     RealFs::new()
         .read(segment)
         .map(|bytes| SegmentBytes { bytes })
@@ -42,7 +41,7 @@ pub fn read_segment(segment: &Path) -> Result<SegmentBytes, MemoryError> {
 
 /// Every complete line of the ledger in `dir`, copied out. For callers
 /// that keep the lines themselves (fork, replay, fixtures); a fold that
-/// wants only what the lines say walks `read_segment` instead.
+/// wants only what the lines say walks `LedgerIndex::folding` instead.
 pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, MemoryError> {
     let mut out = Vec::new();
     for segment in ledger_segments_at(dir)? {

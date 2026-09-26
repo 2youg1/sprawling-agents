@@ -34,5 +34,5 @@ mod verify;
 pub(crate) use first_line::first_line;
 pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
 pub(crate) use ledger::{complete_lines, segment_first_seq, segment_names};
-pub use reading::{SegmentBytes, ledger_segments_at, read_raw_lines_at, read_segment};
+pub use reading::{ledger_segments_at, read_raw_lines_at};
 pub use verify::{CheckedLine, LineCheck, LineFault};

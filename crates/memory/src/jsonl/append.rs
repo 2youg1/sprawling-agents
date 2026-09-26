@@ -210,8 +210,8 @@ impl kernel::ledger::conformance::LedgerInspect for JsonlLedger {
 mod tests {
     use super::*;
     use kernel::GENESIS_PREV;
-    use std::path::Path;
     use std::fs;
+    use std::path::Path;
     fn draft(kind: EventKind, t: u64) -> EventDraft {
         EventDraft {
             run: RunId::CITY,

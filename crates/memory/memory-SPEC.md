@@ -303,7 +303,7 @@ impl LineReader<'_> {
 }
 ```
 
-- **索引不落盘，只有一段常驻内存**：唯一建表入口是 `rebuild`，扫描账本目录；`Views` 持有它并在每次查询前 `refresh`。此前那份 `index.cache` 旁挂物已整体删除：`persist` 在 `db3a342` 之后的树里零生产调用者，读取方因此是在读一份没人写的文件，而「一份没人写的旁挂物」既是永不命中的空转，又是第二个可失效的“答案来源”。删掉的是写与读两半，`Folded`、`fold_segment`、`rebuild` 与 `refresh` 全部保留，故 `rebuild` 仍是「从段重建」。
+- **索引不落盘，只有一段常驻内存**：建表只有一遍扫描（`index/ledger.rs` 的 `walk`），两个入口共用它：`rebuild` 自己定位每一行，`folding` 让折叠交回它已读出的位置；`Views` 持有它并在每次查询前 `refresh`。此前那份 `index.cache` 旁挂物已整体删除：`persist` 在 `db3a342` 之后的树里零生产调用者，读取方因此是在读一份没人写的文件，而「一份没人写的旁挂物」既是永不命中的空转，又是第二个可失效的“答案来源”。删掉的是写与读两半，`Folded`、`fold_segment`、`rebuild` 与 `refresh` 全部保留，故 `rebuild` 仍是「从段重建」。
 - **取行走游标，而不是每行一次 open ＋逐字节 read**：一次 `History`／`RunHistory` 查询要取一段连续的 seq，而每一行重开段文件、再一次一个字节 `read` 到换行的读法，系统调用数与行长同阶。句柄因此住进 `LineReader`：段名不变即不重开，读用 `BufReader::read_until(b'\n')`，一次填充服务多行。
   - **实测**（5 万条账本，windows-x86_64 NVMe，每种模式 200 行）：顺序读（`history`）**0.89 µs／行**；逆序读（`run_history`）**5.82 µs／行**；随机跳读 **14.9 µs／行**。
   - **位置自持**：游标记住下一行的偏移，与所求偏移相同即不 seek（顺序读全程零 seek），不同则绝对 seek 并弃缓冲。`run_history` 逆序读每行付一次 seek 与一次缓冲填充，仍是常数次系统调用。
@@ -819,7 +819,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 `jsonl.rs`（812）→ `jsonl/ledger.rs`（类型＋段文法）／`open.rs`（打开与恢复，测试住 `open/tests.rs`）／
 `append.rs`（追加与读＋kernel::Ledger trait impl）；`index.rs`（783）→ `index/ledger.rs`
 （`LedgerIndex`，测试住 `index/ledger/tests.rs`）／`reader.rs`（`LineReader`＋`OpenSegment`）／
-`fold.rs`（折表与重建，`Folded`／`Located` 归此）；
+`fold.rs`（折表与一行怎样入表，`Folded`／`Located` 归此；扫描段的那一遍住 `ledger.rs`）；
 `worktree.rs`（622）→ `worktree/name.rs`／`lease.rs`／`trees.rs`（测试住 `trees/tests.rs`）；
 `bundle.rs`（532）→ `bundle/manifest.rs`（布局常量归此）／`export.rs`（避 `module_inception`）／
 `files.rs`；`checkpoint.rs`（480）→ `checkpoint/fence.rs`／`scan.rs`。

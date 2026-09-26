@@ -143,10 +143,11 @@ pub(crate) fn fold_city(ledger_dir: &Path) -> Result<(Views, (JsonlLedger, Stand
         JsonlLedger::open(ledger_dir, super::now_ms()?).map_err(memory::MemoryError::into_ax)?;
     let mut views = Views::new(city_root_of(ledger_dir));
     let mut standing = StandingFold::new();
-    fold_ledger_dir(ledger_dir, |record| {
+    let index = fold_ledger_dir(ledger_dir, |record| {
         views.apply(record)?;
         standing.absorb(record)
     })?;
+    views.hold_index(index);
     Ok((views, (ledger, standing.settle()?)))
 }
 
@@ -159,7 +160,8 @@ pub(crate) fn fold_city(ledger_dir: &Path) -> Result<(Views, (JsonlLedger, Stand
 /// verify is not one whose views should be served.
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
     let mut views = Views::new(city_root_of(ledger_dir));
-    fold_ledger_dir(ledger_dir, |record| views.apply(record))?;
+    let index = fold_ledger_dir(ledger_dir, |record| views.apply(record))?;
+    views.hold_index(index);
     Ok(views)
 }
 

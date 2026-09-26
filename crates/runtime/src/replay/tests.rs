@@ -75,17 +75,37 @@ fn the_index_covers_exactly_the_history_the_fold_saw() {
     let path = dir.path().join("ledger-00000000000000000000.jsonl");
     let first = genesis_line();
     let second = next_line(&first, 1);
-    let late = [next_line(&second, 2), b"
-".to_vec()].concat();
-    std::fs::write(&path, [first, b"
-".to_vec(), second, b"
-".to_vec()].concat()).unwrap();
+    let late = [
+        next_line(&second, 2),
+        b"
+"
+        .to_vec(),
+    ]
+    .concat();
+    std::fs::write(
+        &path,
+        [
+            first,
+            b"
+"
+            .to_vec(),
+            second,
+            b"
+"
+            .to_vec(),
+        ]
+        .concat(),
+    )
+    .unwrap();
     let mut folded = Vec::new();
     let index = fold_ledger_dir(dir.path(), |record| {
         folded.push(record.seq());
         if record.seq() == Seq::new(1) {
             use std::io::Write;
-            let mut file = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&path)
+                .unwrap();
             file.write_all(&late).unwrap();
         }
         Ok(())

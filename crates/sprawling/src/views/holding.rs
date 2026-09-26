@@ -163,11 +163,9 @@ impl Views {
             predecessors: std::collections::BTreeMap::new(),
             skill_pins: std::collections::BTreeMap::new(),
             events: 0,
-            // An unreadable ledger directory is not a reason to refuse to
-            // start: the index is disposable, every refresh tries again,
-            // and a city with no ledger yet is the ordinary first run.
-            index: memory::LedgerIndex::rebuild(&ledger_dir(city_root))
-                .unwrap_or_else(|_| memory::LedgerIndex::empty()),
+            // Empty until a fold hands over the index it built, or the
+            // first query refreshes it: the history is not read here.
+            index: memory::LedgerIndex::empty(),
             plans: crate::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
@@ -175,6 +173,12 @@ impl Views {
             machine: None,
             vault: None,
         }
+    }
+
+    /// Takes the index the fold that built these views read the history
+    /// into, so serving does not scan the history a second time.
+    pub(crate) fn hold_index(&mut self, index: memory::LedgerIndex) {
+        self.index = index;
     }
 
     /// Folds one record into every view that cares about it.
