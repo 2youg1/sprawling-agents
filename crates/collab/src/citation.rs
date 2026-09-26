@@ -11,7 +11,7 @@
 //! once per citation and reports every reading that is not
 //! [`Reading::Holds`]; what to check and why stays with the model.
 
-use kernel::Locator;
+use kernel::{Locator, Range};
 
 /// A quote and the place it claims to come from.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,16 +58,94 @@ impl Citation {
     /// Compares the quote with `bytes`, the content `pinned` resolves
     /// to. The version is judged before any text is read.
     #[must_use]
-    pub fn against(&self, _pinned: &Locator, _bytes: &[u8]) -> Reading {
-        Reading::Holds
+    pub fn against(&self, pinned: &Locator, bytes: &[u8]) -> Reading {
+        if !same_version(&self.at, pinned) {
+            return Reading::OtherVersion;
+        }
+        let range = range_of(&self.at);
+        let Some(found) = cited_text(range, bytes).map(|text| normalised(&text)) else {
+            return Reading::OutOfRange;
+        };
+        let quote = normalised(&self.quote);
+        let holds = match range {
+            Some(_) => found == quote,
+            None => found.contains(&quote),
+        };
+        if holds {
+            Reading::Holds
+        } else {
+            Reading::Differs { found }
+        }
     }
+}
+
+/// Whether two locators name the same content, whatever range each
+/// carries.
+fn same_version(cited: &Locator, pinned: &Locator) -> bool {
+    match (cited, pinned) {
+        (Locator::Cas { hash: a, .. }, Locator::Cas { hash: b, .. }) => a == b,
+        (
+            Locator::File {
+                address: a,
+                oid: a_oid,
+                ..
+            },
+            Locator::File {
+                address: b,
+                oid: b_oid,
+                ..
+            },
+        ) => a == b && a_oid == b_oid,
+        (Locator::Cas { .. }, Locator::File { .. })
+        | (Locator::File { .. }, Locator::Cas { .. }) => false,
+    }
+}
+
+fn range_of(at: &Locator) -> Option<Range> {
+    match at {
+        Locator::Cas { range, .. } | Locator::File { range, .. } => *range,
+    }
+}
+
+/// The text a range selects, or `None` when it runs past the end or
+/// is not UTF-8. Line ranges are 1-based and byte ranges 0-based, both
+/// closed, as the Locator grammar defines them.
+fn cited_text(range: Option<Range>, bytes: &[u8]) -> Option<String> {
+    match range {
+        None => std::str::from_utf8(bytes).ok().map(str::to_owned),
+        Some(Range::Bytes { from, to }) => {
+            let from = usize::try_from(from).ok()?;
+            let end = usize::try_from(to).ok()?.checked_add(1)?;
+            std::str::from_utf8(bytes.get(from..end)?)
+                .ok()
+                .map(str::to_owned)
+        }
+        Some(Range::Lines { from, to }) => {
+            let skip = usize::try_from(from.checked_sub(1)?).ok()?;
+            let take = usize::try_from(to.checked_sub(from)?.checked_add(1)?).ok()?;
+            let lines: Vec<&str> = std::str::from_utf8(bytes)
+                .ok()?
+                .lines()
+                .skip(skip)
+                .take(take)
+                .collect();
+            (lines.len() == take).then(|| lines.join("\n"))
+        }
+    }
+}
+
+/// Line breaks and indentation are layout, not content; anything
+/// further (case, punctuation) would let a quote that changed the
+/// meaning pass.
+fn normalised(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
-    use kernel::{B3Hash, Range};
+    use kernel::B3Hash;
 
     const DRAFT: &str =
         "The city keeps one ledger.\nEvery effect\n   is recorded first.\nNothing else.\n";
