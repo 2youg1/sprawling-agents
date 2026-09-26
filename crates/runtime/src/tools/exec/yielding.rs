@@ -29,6 +29,12 @@ const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
 #[cfg(unix)]
 const NICENESS_BELOW_THE_CORE: &str = "10";
 
+/// The IO level a dispatched command gets on Linux: the lowest of the
+/// best-effort class, which queues behind the core without the idle
+/// class's risk of reading nothing while the disk is busy.
+#[cfg(target_os = "linux")]
+const IO_BELOW_THE_CORE: [&str; 4] = ["-c", "2", "-n", "7"];
+
 /// The command, set to start below the core's priority.
 #[cfg(windows)]
 ///
@@ -66,12 +72,8 @@ pub(super) fn one_level_down(command: Command) -> Result<Command, AxError> {
         )
         .with_recovery("check the program name, or use the shell arm"));
     }
-    let mut lowered = Command::new("nice");
-    lowered
-        .arg("-n")
-        .arg(NICENESS_BELOW_THE_CORE)
-        .arg(program)
-        .args(command.get_args());
+    let mut lowered = start_below_the_core();
+    lowered.arg(program).args(command.get_args());
     if let Some(dir) = command.get_current_dir() {
         lowered.current_dir(dir);
     }
@@ -82,6 +84,34 @@ pub(super) fn one_level_down(command: Command) -> Result<Command, AxError> {
         };
     }
     Ok(lowered)
+}
+
+/// The wrapper a dispatched program starts under: `nice`, and on Linux
+/// `ionice` around it when the core's `PATH` has it. The IO half is the
+/// lighter of the two, so a host without util-linux keeps the CPU half
+/// instead of failing every command at spawn.
+#[cfg(target_os = "linux")]
+fn start_below_the_core() -> Command {
+    if is_executable_on_path(std::ffi::OsStr::new("ionice"), None) {
+        let mut both = Command::new("ionice");
+        both.args(IO_BELOW_THE_CORE).arg("nice");
+        both.args(["-n", NICENESS_BELOW_THE_CORE]);
+        return both;
+    }
+    nice_below_the_core()
+}
+
+/// The wrapper a dispatched program starts under: `nice`.
+#[cfg(all(unix, not(target_os = "linux")))]
+fn start_below_the_core() -> Command {
+    nice_below_the_core()
+}
+
+#[cfg(unix)]
+fn nice_below_the_core() -> Command {
+    let mut nice = Command::new("nice");
+    nice.args(["-n", NICENESS_BELOW_THE_CORE]);
+    nice
 }
 
 /// Whether `program` names an executable file the way `execvp` finds it:
