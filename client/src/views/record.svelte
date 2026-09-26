@@ -32,6 +32,7 @@ const LENS_NAMES: Record<Lens, Key> = {
   import type { Lens as Reading } from "./parts/tabs.svelte";
   import { say } from "../core/lang";
   import { ui } from "../ui";
+  import Page from "./parts/page.svelte";
   import Tabs from "./parts/tabs.svelte";
   import Archive from "./record/archive.svelte";
   import Bin from "./record/bin.svelte";
@@ -62,8 +63,7 @@ const LENS_NAMES: Record<Lens, Key> = {
   }
 </script>
 
-<div class="w-full max-w-page px-pane py-wide">
-  <h1 class="mb-wide text-title font-title" tabindex="-1">{say($lang, "nav_the_record")}</h1>
+<Page title={say($lang, "nav_the_record")}>
   <Tabs label={say($lang, "rec_lenses")} {lenses} current={lens} onPick={pick}>
     {#snippet panel(reading: Reading)}
       {#if reading.id === "ledger"}
@@ -77,4 +77,4 @@ const LENS_NAMES: Record<Lens, Key> = {
       {/if}
     {/snippet}
   </Tabs>
-</div>
+</Page>

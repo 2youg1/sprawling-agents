@@ -40,7 +40,7 @@
   }
 </script>
 
-<div class="flex flex-col gap-wide">
+<div class="grid grid-fit items-start gap-base">
   <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
     <span class="text-label font-label text-text">{say($lang, "setup_editor")}</span>
     <p class="text-note text-text-faint">{say($lang, "setup_editor_note")}</p>

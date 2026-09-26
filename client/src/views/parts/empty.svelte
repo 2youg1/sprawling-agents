@@ -27,19 +27,32 @@ export interface EmptyStateProps {
   readonly shape?: Snippet;
   // Usually one Button: the way out of the emptiness.
   readonly action?: Snippet;
+  // Where the sentence sits. `centred` stands alone in a narrow column;
+  // `region` stands in for a list or a table on a wide page, so it is
+  // drawn where that region would be - its left edge, its width, and a
+  // dashed outline of it - rather than as a line floating in the middle
+  // of the window.
+  readonly seat?: EmptySeat;
 }
+
+export type EmptySeat = "centred" | "region";
+
+const SEATS: Record<EmptySeat, string> = {
+  centred: "items-center px-pane py-section text-center",
+  region: "items-start rounded-card border border-dashed border-edge-input px-wide py-wide text-left",
+};
 </script>
 
 <script lang="ts">
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
 
-  const { missing, shape, action }: EmptyStateProps = $props();
+  const { missing, shape, action, seat = "centred" }: EmptyStateProps = $props();
 
   const { lang } = ui();
 </script>
 
-<div class="flex w-full flex-col items-center gap-base px-pane py-section text-center">
+<div class={["flex w-full flex-col gap-base", SEATS[seat]]}>
   {#if shape !== undefined}
     <div aria-hidden="true">
       {@render shape()}

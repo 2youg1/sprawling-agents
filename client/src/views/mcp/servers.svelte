@@ -96,7 +96,7 @@
 </script>
 
 {#if servers.length === 0}
-  <EmptyState missing="mcp_none" />
+  <EmptyState missing="mcp_none" seat="region" />
 {:else}
   <div class="flex flex-col gap-tight">
     <div class="flex justify-end">

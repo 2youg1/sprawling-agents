@@ -51,8 +51,10 @@
        column of prose has a width below which it stops being prose: the
        flex row let the reading pane shrink toward nothing at a narrow
        window, and the empty state under it wrapped one character per
-       line (client-SPEC 4-33's third rule). -->
-  <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-start gap-wide">
+       line (client-SPEC 4-33's third rule). On a wide page the
+       building list keeps its own width and the reading pane takes
+       the rest, as the MCP page draws the same pair. -->
+  <div class="grid items-start gap-wide @wide/page:grid-cols-[var(--spacing-tree)_minmax(0,1fr)]">
     <BuildingColumn
       label={say($lang, "mcp_building")}
       buildings={$buildings}
@@ -78,7 +80,7 @@
       {#if reading !== null}
         <FileView at={reading} root={chosen} />
       {:else}
-        <EmptyState missing="skills_unopened" />
+        <EmptyState missing="skills_unopened" seat="region" />
       {/if}
     </div>
   </div>

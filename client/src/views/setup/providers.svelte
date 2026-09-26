@@ -72,5 +72,5 @@
     {/each}
   </ul>
 {:else}
-  <EmptyState missing="setup_no_endpoints" />
+  <EmptyState missing="setup_no_endpoints" seat="region" />
 {/if}

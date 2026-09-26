@@ -143,6 +143,10 @@
     "en": "empty",
     "zh": "空"
   },
+  "bin_nothing": {
+    "en": "the recycle bin is empty: a file a run discards lands here, with the way to bring it back",
+    "zh": "回收站是空的：run 丢掉的文件会落在这里，并写明怎样找回"
+  },
   "bin_gone": {
     "en": "gone",
     "zh": "已丢弃"
@@ -418,6 +422,10 @@
   "cost_title": {
     "en": "cost",
     "zh": "成本"
+  },
+  "cost_total": {
+    "en": "spent in all",
+    "zh": "全城共花"
   },
   "cost_unpriced": {
     "en": "{calls} model calls came back with no price; they used {tokens} tokens",

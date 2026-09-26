@@ -235,7 +235,9 @@
   </div>
 {/snippet}
 
-<div class="flex flex-col gap-base">
+<!-- The cards flow into the grid of the group that holds them, so the
+language card the settings page adds beside them takes the next cell. -->
+<div class="contents">
   <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
     <span class="text-label font-label text-text">{say($lang, "appearance_lighting")}</span>
     <p class="text-note text-text-faint">{say($lang, "appearance_lighting_note")}</p>

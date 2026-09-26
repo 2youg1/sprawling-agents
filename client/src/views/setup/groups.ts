@@ -44,19 +44,21 @@ export const HINT: Record<Group, Key | null> = {
   about: null,
 };
 
-// The one width table: accounts, tools and skills take the page tier,
-// the rest the measure; the account group's two exceptions are in its
-// own body below.
+// The one width table. A group of cards takes the whole body and lays
+// its cards in as many measure-wide columns as it holds (`grid-fit`),
+// so a desktop window is filled with settings rather than with a strip
+// of 520px and a field of nothing; a group that is one list or one card
+// reads badly stretched and stops at the conversation's width.
 export const WIDTH: Record<Group, string> = {
-  accounts: "max-w-page",
-  run: "max-w-measure",
-  network: "max-w-measure",
-  tools: "max-w-page",
-  skills: "max-w-page",
-  appearance: "max-w-measure",
-  keys: "max-w-measure",
-  advanced: "max-w-measure",
-  about: "max-w-measure",
+  accounts: "",
+  run: "",
+  network: "max-w-talk",
+  tools: "",
+  skills: "",
+  appearance: "",
+  keys: "max-w-talk",
+  advanced: "",
+  about: "max-w-talk",
 };
 
 // The groups whose answers `core/prefs.ts` keeps (client-SPEC 4-29).

@@ -78,6 +78,7 @@
   import type { Lens } from "./parts/tabs.svelte";
   import { ui } from "../ui";
   import Banner from "./parts/banner.svelte";
+  import Page from "./parts/page.svelte";
   import Segmented from "./parts/segmented.svelte";
   import Tabs from "./parts/tabs.svelte";
   import ByCommand from "./mcp/by_command.svelte";
@@ -141,23 +142,27 @@
   }
 </script>
 
-<div class="flex w-full max-w-page flex-1 flex-col px-pane py-wide">
-  <div class="mb-wide flex flex-wrap items-baseline gap-base">
-    <h1 class="text-title font-title" tabindex="-1">{say($lang, "mcp_title")}</h1>
-    <span class="text-note text-text-quiet">{say($lang, "mcp_scope")}</span>
-    <Segmented
-      label={say($lang, "mcp_scope")}
-      options={scopes}
-      held={scope}
-      onPick={(value) => {
-        scope = value;
-      }}
-    />
-  </div>
+{#snippet scopeControl()}
+  <span class="text-note text-text-quiet">{say($lang, "mcp_scope")}</span>
+  <Segmented
+    label={say($lang, "mcp_scope")}
+    options={scopes}
+    held={scope}
+    onPick={(value) => {
+      scope = value;
+    }}
+  />
+{/snippet}
+
+<!-- Three columns once the page holds them: the building a server is
+added for, the servers it has and the form that adds one, and the two
+other ways in - Composio and the desktop - as a side panel. Under the
+wide container the side panel drops beneath the form. -->
+<Page title={say($lang, "mcp_title")} aside={scopeControl}>
   {#if banner !== null}
     <Banner text={banner} />
   {/if}
-  <div class="flex min-h-0 flex-1 gap-wide">
+  <div class="flex min-h-0 flex-1 items-start gap-wide">
     <BuildingColumn
       label={say($lang, "mcp_building")}
       buildings={$buildings}
@@ -167,8 +172,8 @@
         chosen = addr;
       }}
     />
-    <section class="flex min-w-0 flex-1 flex-col gap-wide">
-      <div class="flex flex-col gap-wide">
+    <div class="grid min-w-0 flex-1 items-start gap-wide @wide/page:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <section class="flex min-w-0 flex-col gap-wide" aria-label={say($lang, "mcp_doors")}>
         <Servers
           servers={reach.servers()}
           health={reach.health()}
@@ -198,16 +203,18 @@
             {/snippet}
           </Tabs>
         </div>
+      </section>
+      <div class="flex min-w-0 flex-col gap-wide">
+        <section class="flex flex-col gap-base rounded-card bg-raised px-pane py-base">
+          <h2 class="text-label font-label text-text-quiet">{say($lang, "mcp_composio")}</h2>
+          <Composio intake={reach.intake} />
+        </section>
+        <section class="flex flex-col gap-base rounded-card bg-raised px-pane py-base">
+          <h2 class="text-label font-label text-text-quiet">{say($lang, "desktop_title")}</h2>
+          <DesktopForm addr={chosen} />
+          <ContextRung addr={chosen} />
+        </section>
       </div>
-      <div>
-        <h2 class="mb-base text-label font-label text-text-quiet">{say($lang, "mcp_composio")}</h2>
-        <Composio intake={reach.intake} />
-      </div>
-      <div>
-        <h2 class="mb-base text-label font-label text-text-quiet">{say($lang, "desktop_title")}</h2>
-        <DesktopForm addr={chosen} />
-        <ContextRung addr={chosen} />
-      </div>
-    </section>
+    </div>
   </div>
-</div>
+</Page>

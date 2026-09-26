@@ -14,6 +14,7 @@
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Query } from "../../wire";
+  import EmptyState from "../parts/empty.svelte";
   import Unanswered from "../parts/unanswered.svelte";
 
   const u = ui();
@@ -29,7 +30,7 @@
 
 <div>
   <input
-    class="mb-base w-full rounded-control border border-edge-input bg-raised px-base py-snug text-body placeholder:text-text-faint"
+    class="mb-base w-full max-w-talk rounded-control border border-edge-input bg-raised px-base py-snug text-body placeholder:text-text-faint"
     placeholder={say($lang, "rec_search")}
     bind:value={needle}
   />
@@ -38,7 +39,7 @@
   {:else if hits === undefined}
     <p class="text-text-faint">…</p>
   {:else if hits.length === 0}
-    <p class="text-text-faint">{say($lang, "rec_nothing")}</p>
+    <EmptyState missing="rec_nothing" seat="region" />
   {:else}
     <ul class="text-note">
       {#each hits as hit (hit)}
