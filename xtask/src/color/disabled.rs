@@ -66,8 +66,12 @@ fn behind_disabled_variant(before: &str) -> bool {
         .rsplit(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | '`' | '{' | '}'))
         .next()
         .unwrap_or("")
-        .split(':')
-        .any(|variant| variant.contains("disabled"))
+        .rsplit_once(':')
+        .is_some_and(|(variants, _)| {
+            variants
+                .split(':')
+                .any(|variant| variant.contains("disabled"))
+        })
 }
 
 #[cfg(test)]
