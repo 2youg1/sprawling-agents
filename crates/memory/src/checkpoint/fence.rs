@@ -287,8 +287,7 @@ impl Checkpoint {
             std::fs::create_dir_all(parent)
                 .map_err(|err| refused(format!("{}: {err}", parent.display())))?;
         }
-        std::fs::write(&target, blob.content())
-            .map_err(|err| refused(format!("{address}: {err}")))
+        std::fs::write(&target, blob.content()).map_err(|err| refused(format!("{address}: {err}")))
     }
 }
 #[cfg(test)]
