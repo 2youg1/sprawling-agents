@@ -187,3 +187,60 @@ fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {
         (named, RUNS * (RUNS + 1) / 2 + 1)
     );
 }
+
+/// The hot view keeps only the recent frozen few (memory-SPEC section
+/// 8-5); a run pushed out of it is still a run the city holds, so its
+/// run view is answered from the Ledger instead of reading as unknown.
+#[test]
+fn an_evicted_run_still_answers_its_run_view() {
+    use kernel::Ledger;
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::assembly::init_city(dir.path()).unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    let run_of = |i: u64| RunId::from_bytes(u128::from(i + 1).to_be_bytes());
+    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+        .unwrap()
+        .0;
+    let recent = u64::try_from(memory::RECENT_FROZEN).unwrap();
+    for i in 0..=recent {
+        let opened = serde_json::json!({ "task": "a task", "goal": "a goal" });
+        let closed = serde_json::json!({ "completion": "done" });
+        for (kind, data) in [
+            (EventKind::RunStarted, opened),
+            (EventKind::RunFrozen, closed),
+        ] {
+            ledger
+                .append(kernel::EventDraft {
+                    run: run_of(i),
+                    t: kernel::TimeMs::new(1_000 + i),
+                    who: "city".to_owned(),
+                    addr: Some(room.clone()),
+                    kind,
+                    data: kernel::Payload::new(data.as_object().unwrap().clone()).unwrap(),
+                    ig: false,
+                })
+                .unwrap();
+        }
+    }
+    drop(ledger);
+
+    let mut views = crate::assembly::rebuild_views(&report.ledger_dir).unwrap();
+    let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
+        panic!("CityView answers with a city");
+    };
+    assert!(city.runs.iter().all(|r| r.run != run_of(0)));
+    let channels::Answer::Run(Some(summary)) =
+        views.answer(&channels::Query::RunView { run: run_of(0) })
+    else {
+        panic!("an evicted run is still a run the city holds");
+    };
+    assert_eq!(
+        (summary.frozen, summary.last_kind, summary.addr, summary.started),
+        (
+            true,
+            EventKind::RunFrozen,
+            Some(room),
+            Some(kernel::TimeMs::new(1_000))
+        )
+    );
+}
