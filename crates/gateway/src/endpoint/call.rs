@@ -47,6 +47,11 @@ pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
     found
 }
 
+/// The id one conversation carries to a host that asks for one.
+pub(crate) fn conversation_id(_req: &ModelRequest) -> Result<String, AxError> {
+    Ok(String::new())
+}
+
 impl Endpoint {
     /// What the far side says it serves, and what it says about each.
     ///
@@ -233,6 +238,41 @@ mod tests {
     use super::super::redemption::{Redemption, redemption, resolver};
     use super::*;
     use kernel::{AxCode, Model};
+
+    /// OpenCode asks for one stable id per conversation: every turn of
+    /// one conversation carries the same one, and another conversation
+    /// carries another.
+    #[test]
+    fn a_conversation_keeps_its_id_from_turn_to_turn() {
+        let said = |role, text: &str| kernel::ChatMessage {
+            role,
+            content: vec![kernel::ContentBlock::Text {
+                text: text.to_owned(),
+            }],
+        };
+        let mut first = request();
+        first
+            .chat
+            .messages
+            .to_mut()
+            .push(said(kernel::Role::User, "Task: probe"));
+        let mut later = first.clone();
+        later
+            .chat
+            .messages
+            .to_mut()
+            .push(said(kernel::Role::Assistant, "a later turn"));
+        let mut other = request();
+        other
+            .chat
+            .messages
+            .to_mut()
+            .push(said(kernel::Role::User, "another conversation"));
+        let id = conversation_id(&first).unwrap();
+        assert_eq!(id.len(), 64, "{id}");
+        assert_eq!(conversation_id(&later).unwrap(), id);
+        assert_ne!(conversation_id(&other).unwrap(), id);
+    }
 
     /// A request carrying `count` pictures in one user message.
     fn seeing(count: u32) -> ModelRequest<'static> {
