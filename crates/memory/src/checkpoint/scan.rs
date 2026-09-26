@@ -15,6 +15,7 @@ use crate::error::MemoryError;
 use super::fence::{Checkpoint, git_err};
 use super::provenance::Provenance;
 
+mod pathspec;
 mod stage_filter;
 use stage_filter::{StageFilter, workdir};
 
@@ -159,7 +160,7 @@ impl Checkpoint {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
         let found: BTreeMap<Vec<u8>, git2::Oid> =
             index.iter().map(|entry| (entry.path, entry.id)).collect();
-        let patterns = Self::pathspecs(scopes);
+        let patterns = pathspec::of(scopes);
         let specs: Vec<&str> = patterns.iter().map(String::as_str).collect();
         let mut filter = StageFilter::new(workdir(&self.repo)?);
         {
@@ -201,38 +202,6 @@ impl Checkpoint {
             .into_iter()
             .map(|path| String::from_utf8_lossy(&path).into_owned())
             .collect())
-    }
-
-    /// Two git pathspecs per scope, the scope itself and everything
-    /// under it, because a scope is a prefix the run may write under or,
-    /// when the lane knows what a wave wrote, one file (runtime-SPEC 8-45).
-    ///
-    /// Several, because a write domain is a set: a building's own
-    /// subtree plus whatever else its `RULES.toml` declares. Staging
-    /// one of them and judging against all of them is what left files a
-    /// run legitimately wrote outside every checkpoint.
-    ///
-    /// No prefixes at all means the whole tree rather than nothing: the
-    /// caller that passes an empty set is the base fence, which has no
-    /// resident to take a domain from.
-    ///
-    /// A scope is a literal path: the address grammar admits `[`, `]`,
-    /// `*` and `?`, and a scope read as a glob would stage its matches
-    /// instead of the file the wave wrote.
-    fn pathspecs(scopes: &[String]) -> Vec<String> {
-        if scopes.is_empty() {
-            return vec!["*".to_owned()];
-        }
-        scopes
-            .iter()
-            .flat_map(|scope| match scope.trim_end_matches('/') {
-                "" | "." => vec!["*".to_owned()],
-                prefix => {
-                    let literal = literal_glob(prefix);
-                    vec![format!("{literal}/*"), literal]
-                }
-            })
-            .collect()
     }
 
     /// Stages the whole working tree except the reserved subtree,
@@ -376,28 +345,6 @@ fn write_index(index: &mut git2::Index) -> Result<(), MemoryError> {
 /// collision and is refused on the first attempt.
 fn concurrent(err: &git2::Error) -> bool {
     err.class() == git2::ErrorClass::Index && err.message().contains("index.lock")
-}
-
-/// Spells `path` as a glob that matches only itself, each metacharacter
-/// inside a one-character class. A class rather than a backslash escape,
-/// because libgit2 compares a pattern with no unescaped wildcard byte for
-/// byte, backslashes included.
-fn literal_glob(path: &str) -> String {
-    path.chars()
-        .fold(String::with_capacity(path.len()), |mut glob, c| {
-            match c {
-                '[' | ']' | '*' | '?' | '\\' => {
-                    glob.push('[');
-                    if c == '\\' {
-                        glob.push('\\');
-                    }
-                    glob.push(c);
-                    glob.push(']');
-                }
-                other => glob.push(other),
-            }
-            glob
-        })
 }
 
 #[cfg(test)]

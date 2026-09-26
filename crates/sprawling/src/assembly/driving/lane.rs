@@ -335,15 +335,7 @@ pub(crate) fn drive_run<L: Ledger>(
             let _one_at_a_time = fence_gate
                 .lock()
                 .map_err(|_| poison("this city's fence gate"))?;
-            // `Nothing` means only reads ran, and the domain is what the
-            // fence staged before this rule existed; skipping that wave
-            // is the read-only rule's to decide.
-            let scope = match wrote.replace(kernel::Writes::Nothing) {
-                kernel::Writes::Paths(paths) => {
-                    paths.iter().map(|path| path.as_str().to_owned()).collect()
-                }
-                kernel::Writes::Nothing | kernel::Writes::Domain => fence_scope.clone(),
-            };
+            let scope = staged_scope(wrote.replace(kernel::Writes::Nothing), &fence_scope);
             let payload = fence_point
                 .wave_pre(&scope, t, &of)
                 .map_err(memory::MemoryError::into_ax)?;
@@ -389,4 +381,16 @@ pub(crate) fn drive_run<L: Ledger>(
         // raises a question, and it raises it after this returns.
         raised: Vec::new(),
     })
+}
+
+/// What the next fence stages: the paths the calls since the last fence
+/// said they wrote, or the whole write domain when one of them could not
+/// say (runtime-SPEC 8-45). `Nothing` means only reads ran, and the
+/// domain is what the fence staged before this rule existed; skipping
+/// that wave is the read-only rule's to decide.
+fn staged_scope(wrote: kernel::Writes, domain: &[String]) -> Vec<String> {
+    match wrote {
+        kernel::Writes::Paths(paths) => paths.iter().map(|path| path.as_str().to_owned()).collect(),
+        kernel::Writes::Nothing | kernel::Writes::Domain => domain.to_vec(),
+    }
 }
