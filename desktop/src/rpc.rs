@@ -5,7 +5,7 @@
 
 //! One JSON-RPC 2.0 message per line, read and written.
 //!
-//! The framing contract is the same one `bin::mcp_stdio` checks from the
+//! The framing contract is the same one `protocol::mcp::stdio` checks from the
 //! other end: the transport is line delimited, so a message may not carry
 //! a newline. `serde_json::to_string` writes none, and nothing here
 //! pretty-prints, so the contract holds by construction rather than by

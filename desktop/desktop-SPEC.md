@@ -39,7 +39,7 @@
 
 ## 4 现状分析
 
-`crates/protocol` 已经是这套协议的**客户端**权威：`Rpc::initialize`／`initialized`／`list_tools`／`call_tool`／`read` 定死了城里说出去的每一行，`bin::mcp_stdio` 定死了字节怎么走（子进程、按行、消息内无换行、超时即回收子进程）。本 package 是那一端的**对侧**，因此它的形状不是设计出来的，是**读出来的**。
+`crates/protocol` 已经是这套协议的**客户端**权威：`Rpc::initialize`／`initialized`／`list_tools`／`call_tool`／`read` 定死了城里说出去的每一行，`protocol::mcp::stdio` 定死了字节怎么走（子进程、按行、消息内无换行、超时即回收子进程）。本 package 是那一端的**对侧**，因此它的形状不是设计出来的，是**读出来的**。
 
 ## 5 权威信源
 
@@ -248,7 +248,7 @@ impl Desk {
 
 ## 10 实现逻辑
 
-1. **一条消息一行**：`serde_json::to_string` 不产生换行，且写出前不做美化；这与 `bin::mcp_stdio::Connection::framed` 的检查是同一条契约的两端。
+1. **一条消息一行**：`serde_json::to_string` 不产生换行，且写出前不做美化；这与 `protocol::mcp::stdio::Connection::framed` 的检查是同一条契约的两端。
 2. **握手顺序被强制**：`Fresh` 只答 `initialize` 与 `ping`，`Initializing` 收到通知才进 `Ready`。规范就是这么写的，而一个不强制它的 server 会让客户端的顺序错误在别处以别的形状爆出来。
 3. **`id` 原样回**：不解析、不重编号——`id` 是对侧的东西。通知（无 `id`）恒无答案，否则会在管道里留下一行，此后每次调用读到的都是上一条的答案。
 4. **glob 只认 `*`**：title pattern 是给人写的，一整套正则会让「我到底放开了什么」变成一个需要推演的问题。匹配按 ASCII 大小写不敏感，因为 Windows 的进程名就是这样比的。

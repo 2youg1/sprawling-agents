@@ -38,7 +38,7 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
 
-use crate::mcp_redeeming::{Redeemed, redeem};
+use super::redeeming::{Redeemed, redeem};
 
 /// How long the stream is given to announce where messages go. Shorter
 /// than a call's patience on purpose: this is one line from a server
@@ -86,7 +86,7 @@ impl SseServer {
         resolve: &gateway::SecretResolver,
     ) -> Result<SseServer, AxError> {
         let headers = Arc::new(redeem(headers, resolve, "reach an mcp server")?);
-        let client = client_for(url)?;
+        let client = super::http::client_for(url)?;
         let mut request = client
             .get(url)
             .header("accept", "text/event-stream")
@@ -135,7 +135,7 @@ impl SseServer {
     }
 }
 
-impl protocol::Outbound for SseServer {
+impl crate::Outbound for SseServer {
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError> {
         self.post(line, patience)?;
         let events = self.events.lock().map_err(|_| {
@@ -243,25 +243,6 @@ fn resolved_against(url: &str, announced: &str) -> Result<String, AxError> {
                 format!("{url}: the stream announced an endpoint this city cannot read: {err}"),
             )
             .with_recovery("the far end is not an MCP server, or speaks a revision without one")
-        })
-}
-
-fn client_for(url: &str) -> Result<reqwest::blocking::Client, AxError> {
-    // The city's own rule, for the reason `bin::mcp_http` gives: a tool
-    // server carries no setting of its own, and a proxy in front of a
-    // server on this machine answers for something else entirely.
-    gateway::client_for(kernel::Proxying::ExceptLocal, url)
-        // Named for the reason `bin::mcp_http` gives: a hosted server
-        // behind a content delivery network refuses a client that will
-        // not say what it is.
-        .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")))
-        .build()
-        .map_err(|err| {
-            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
-                .with_recovery(
-                    "check this server's url in the MCP settings and the proxy settings \
-                     this machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
-                )
         })
 }
 

@@ -46,8 +46,8 @@
 
 ## 7 模块边界
 
-- **字节怎么走**归 `bin::assembly`：stdio 子进程的拉起、超时与回收住装配层；本 crate 只出一行、收一行。
-- **一条消息能有多大**归本 crate（`mcp::reading`）：上限是 MCP 这个协议的事实，不是某一种传输的事实；两个传输各写一个数字就是两条会漂的上限。装配层仍然拥有 reader 的形式（线程、管道、`sync_channel`），它把字节交给 `read_one_message` 并接受它的拒绝。
+- **字节怎么走**归本 crate 的三种传输（`mcp::stdio`、`mcp::http`、`mcp::sse`，见 §8-17）：子进程的拉起、期限与回收，HTTP 会话与事件流都住这里。装配层只决定一栋楼按配置连哪几台 server。
+- **一条消息能有多大**归本 crate（`mcp::reading`）：上限是 MCP 这个协议的事实，不是某一种传输的事实；两个传输各写一个数字就是两条会漂的上限。每种传输拥有自己 reader 的形式（线程、管道、`sync_channel`），它把字节交给 `read_one_message` 并接受它的拒绝。
 - **准不准出网**归 `kernel::gate` 的 egress 门：外部工具声明 `Effect::Egress`，路由到那道门；本 crate 只在 confidential 一位上做构造点拒（更早、更硬）。
 - **回来的东西算什么**归 `kernel::taint`：与 L0 工具同落 `kernel::tool` 缝，故自动进污染环，本 crate 无解包面。
 
@@ -108,7 +108,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 - **开场必须是 `initialize`**，携 `protocolVersion`、`capabilities`、`clientInfo` 三项；随后必须发 `notifications/initialized`，之后才能问别的。故 `handshake()` 是这条生命周期的**唯一权威**，坐在两个传输之上——两个传输各写一遍就是两份会漂的生命周期。
 - **`capabilities` 故意为空**：roots／sampling／elicitation 是 server 反过来向**我们**要的能力；声明一项本城没实现的能力，等于招来一个随后只能拒的请求。
-- **会话住传输层，不住本 crate**，因为规范把它写在 Transports 而不是 Lifecycle：server **可选**在 `initialize` 应答的头里发 `Mcp-Session-Id`；一旦发了，客户端 **MUST** 在此后每一次请求带回。404 意味着 server 结束了会话，**MUST** 重开一个——故 `bin::mcp_http` 遇 404 丢掉 id 并标 `retriable`，而不是拿一个已死的 id 永远碰下去。
+- **会话住传输层，不住本 crate**，因为规范把它写在 Transports 而不是 Lifecycle：server **可选**在 `initialize` 应答的头里发 `Mcp-Session-Id`；一旦发了，客户端 **MUST** 在此后每一次请求带回。404 意味着 server 结束了会话，**MUST** 重开一个——故 `protocol::mcp::http` 遇 404 丢掉 id 并标 `retriable`，而不是拿一个已死的 id 永远碰下去。
 - **已知的向前变化**：更新的修订正在把会话去掉（SEP-2575）。本客户端协商的是 `2025-06-18` 并按那一版行事；一台忽略该头的 server 不会因此变得不可用。
 - **实测得到的一条**：一台在 CDN 后面的托管 server 对**不报名的客户端**回 403 `browser_signature_banned`，早于任何 MCP 消息。故 HTTP 传输带自己的 User-Agent。
 
@@ -156,7 +156,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 13 依赖选型
 
-`kernel`＋`serde_json`。**恒不引入** HTTP 客户端、异步运行时、任何一家服务商的 SDK：前两者归装配层，第三者会把「本体不认识任何一家」这条承诺作废。
+`kernel`＋`serde_json`＋`gateway`＋`reqwest`。HTTP 客户端只在 `gateway::client_for` 一处构造，本 crate 取它构造好的 builder，只加 user agent；`secret:realm/name` 引用经 `gateway::SecretResolver` 兑付。**恒不引入**异步运行时与任何一家服务商的 SDK：前者会让一次同步的工具调用变成异步库，后者会把「本体不认识任何一家」这条承诺作废。
 
 ## 14 硬编码声明
 
@@ -188,7 +188,32 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 2. **数值是推导来的，不是拍的。** `IMAGE_MAX_BYTES` 是 2 MiB，base64 后 2,796,203 B；8 MiB 让一次工具答案装得下这样一张图、它的文字与 JSON-RPC 信封，对本城已接受的最大载荷留 3 倍余量。读数与推导记在 `xtask/budgets.toml` 的 `[mcp_message_ceiling]`，值本身只有 `MESSAGE_CEILING` 一个家。
 3. **拒绝是终止性的，不是跳过一条。** 超限消息未读完的尾巴与下一条消息在字节上无从分辨，所以拒绝之后调用方**恒不**再从同一个 source 读；装配层回收子进程。`Received` 是穷尽枚举而非 `Option<String>`：「对侧关了输出」是调用方要据以停读的状态，用缺席表示它就等于让每个调用点各自重推一遍。
 
-**同集的另一半住装配层**（`bin::mcp_stdio`、`bin::mcp_http`、`bin::mcp_sse`，本 crate 不拥有）：reader 线程改调 `read_one_message`，`mpsc::channel()` 换 `sync_channel(N)`——无界队列在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态；HTTP 那条用 `take(MESSAGE_CEILING)` 包住响应体。
+**同集的另一半住传输**（`mcp::stdio`、`mcp::http`、`mcp::sse`）：reader 线程改调 `read_one_message`，`mpsc::channel()` 换 `sync_channel(N)`——无界队列在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态；HTTP 那条用 `take(MESSAGE_CEILING)` 包住响应体。
+
+### 8-17 三种传输与 `McpLink`（形状 4 适配器；实现 `Outbound`）
+
+```rust
+// mcp::link：一台可达的 server，不论经哪种传输
+#[derive(Clone)]
+pub struct McpLink(Reach); // 私有：enum Reach { Stdio, Http, Sse }；克隆即同一条连接的第二个句柄
+impl McpLink {
+    pub fn open(transport: &kernel::McpTransport, write_root: &Path,
+                resolve: &gateway::SecretResolver) -> Result<McpLink, AxError>;
+    pub fn site(transport: &kernel::McpTransport) -> &'static str; // 出事时该打开的模块
+}
+impl Outbound for McpLink { /* 逐传输转发 call／notify */ }
+// mcp::stdio::StdioServer、mcp::http::HttpServer、mcp::sse::SseServer：pub(crate)
+// mcp::redeeming：一栋楼写在 server 旁边的成对表，引用已兑付；三种传输共用
+#[cfg(any(test, feature = "conformance"))]
+pub fn echoing(answer: &str) -> (String, Vec<String>); // 对每行都回同一个结果的子进程
+```
+
+- **传输住协议旁边，不住组合根**：三种传输与握手说同一个协议，差别只在字节去哪。放在装配层时，`protocol` 定义了 `Outbound` 缝却看不见它的生产实现；组合根只剩「一栋楼按配置连哪几台 server」（`bin::assembly::mcp`）。拒绝的另一方案是把传输留在 `sprawling`、只搬 `McpLink`：那样 `McpLink` 的三个分支仍指向另一个 crate 的私有类型，搬不动。
+- **`site()` 由传输的拥有者给出**：报错地址是「哪个模块到达了这台 server」，只有拥有这三个模块的 crate 能不漂地说出它。
+- **HTTP 与 SSE 共用一个客户端构造**（`mcp::http::client_for`）：两者的代理规则、user agent 与拒词原本各写一份。
+- **子进程回收逻辑原样搬移**：期限到即杀子进程，理由见 `mcp::stdio` 的模块文档。
+- **`echoing` 在 `conformance` 后面**：装配层的测试要起同一个假 server；产品二进制不带它（`xtask artifact`）。
+- 失败码不变：各传输沿用 §12 的 `E_TIMEOUT`／`E_WIRE_MISMATCH`／`E_TOOL_UNAVAILABLE`，HTTP 与 SSE 在 401／403 抬 `E_CREDENTIAL_MISSING`，客户端构造不成抬 `E_CONFIG_INVALID`。
 
 ### 8-14 protocol 目录化（形状：主类型居索引，方法按簇归文件）
 
@@ -206,6 +231,6 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 | 每台 server 每次连接的消息数 | 2 次有应答的请求（`initialize`、`tools/list`）＋1 条通知（`notifications/initialized`） | `mcp::handshake` 的 `opening_one_connection_costs_two_round_trips_and_one_notification`，用一个计数 `Outbound` 数出来 |
 | 本 crate 为这三条消息花的 CPU | debug 33 µs／release 7 µs（每次连接，100 次取均值，Windows 11 开发机） | 一次性测量：在同一条测试里临时用 `Instant` 计时，读数记在此处后撤走。**计时不留在树里**——`clippy.toml` 对测试也禁 `Instant::now`，而跨机器可复现的读数是消息条数，不是微秒 |
 
-**这两个数字说明的事**：常驻连接表要省的不是本 crate 的时间。拼一行 JSON-RPC 与读一行答案在 release 下是 7 µs，一台 server 三条消息合计仍不到 10 µs；省下来的是**子进程启动**与**两次 stdio 往返**，两者都住装配层（`bin::assembly` 拥有传输，见 §7）。
+**这两个数字说明的事**：常驻连接表要省的不是本 crate 的时间。拼一行 JSON-RPC 与读一行答案在 release 下是 7 µs，一台 server 三条消息合计仍不到 10 µs；省下来的是**子进程启动**与**两次 stdio 往返**，两者都属于传输（见 §7），而是否常驻由持有连接的装配层决定。
 
 **因此本 crate 不动**：`Outbound` 缝已经允许一条连接活得比一次 drive 长（`McpLink` 可 clone，寿命由持有者决定），常驻表是持有者的决定，不是文法的决定。要不要做这张表，取决于装配层量出的那个数字——在 `crates/sprawling/src/assembly/dispatching/running.rs` 的 `prepare_dispatch` 里记一次 `mcp_tools` 的耗时，写进 `xtask/budgets.toml` 的 `prepare_dispatch_ms`（K-07 已为它留了行）。**没有那个数字之前，连接表不做。**

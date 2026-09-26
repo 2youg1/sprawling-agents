@@ -21,7 +21,7 @@
 use kernel::{Address, AxCode, AxError, TimeoutMs};
 
 use super::holding::Views;
-use crate::assembly::McpLink;
+use protocol::McpLink;
 
 /// How long one server is given to finish `initialize` and list what it
 /// offers. Shorter than a tool call's patience, because a person is
@@ -69,7 +69,7 @@ impl Views {
     /// because the server is up and understood the request: what to do
     /// about it is sign in, not check the address. Every transport
     /// raises that code from one place, so this mapping has nothing to
-    /// guess (`bin::mcp_http`, `bin::mcp_sse`).
+    /// guess (`protocol::mcp::http`, `protocol::mcp::sse`).
     fn handshake(&self, server: &kernel::McpServer) -> channels::McpState {
         match self.listed(server) {
             Ok(state) => state,

@@ -24,7 +24,7 @@ pub(super) fn connect_mcp(
 
     // The run's own root, which exists whether or not this building
     // lends its runs a worktree.
-    let mut handle = McpLink::open(&server.transport, write_root, resolve)?;
+    let mut handle = protocol::McpLink::open(&server.transport, write_root, resolve)?;
     let mut rpc = protocol::Rpc::new();
     let opened = protocol::handshake(&mut handle, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE)?;
     let listing = handle.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)?;
@@ -41,87 +41,6 @@ pub(super) fn connect_mcp(
         )?);
     }
     Ok((tools, opened))
-}
-
-/// Which module a reader should open when a server misbehaves.
-pub(super) fn transport_site(transport: &kernel::McpTransport) -> &'static str {
-    match *transport {
-        kernel::McpTransport::Stdio { .. } => "bin::mcp_stdio",
-        kernel::McpTransport::Http { .. } => "bin::mcp_http",
-        kernel::McpTransport::Sse { .. } => "bin::mcp_sse",
-    }
-}
-
-/// One reachable server, whichever way it is reached.
-///
-/// The three transports differ in where the bytes go and in nothing
-/// else, so the difference is spent here and the wiring above stays one
-/// path.
-#[derive(Clone)]
-pub(crate) enum McpLink {
-    Stdio(crate::mcp_stdio::StdioServer),
-    Http(crate::mcp_http::HttpServer),
-    Sse(crate::mcp_sse::SseServer),
-}
-
-impl McpLink {
-    /// Opens one server as its transport says it is reached.
-    ///
-    /// `write_root` is the run's own root, which exists whether or not
-    /// this building lends its runs a worktree; a child process starts
-    /// there and nowhere else.
-    ///
-    /// # Errors
-    /// Propagates each transport's own refusal to open, every one of
-    /// which names the server and what a person can do about it.
-    pub(crate) fn open(
-        transport: &kernel::McpTransport,
-        write_root: &std::path::Path,
-        resolve: &gateway::SecretResolver,
-    ) -> Result<McpLink, AxError> {
-        match *transport {
-            kernel::McpTransport::Stdio {
-                ref command,
-                ref args,
-                ref env,
-            } => {
-                let env = crate::mcp_redeeming::redeem(env, resolve, "start an mcp server")?;
-                Ok(McpLink::Stdio(crate::mcp_stdio::StdioServer::start(
-                    command, args, &env, write_root,
-                )?))
-            }
-            kernel::McpTransport::Http {
-                ref url,
-                ref headers,
-            } => Ok(McpLink::Http(crate::mcp_http::HttpServer::open(
-                url, headers, resolve,
-            )?)),
-            kernel::McpTransport::Sse {
-                ref url,
-                ref headers,
-            } => Ok(McpLink::Sse(crate::mcp_sse::SseServer::open(
-                url, headers, resolve,
-            )?)),
-        }
-    }
-}
-
-impl protocol::Outbound for McpLink {
-    fn call(&mut self, line: &str, patience: kernel::TimeoutMs) -> Result<String, AxError> {
-        match *self {
-            McpLink::Stdio(ref mut held) => held.call(line, patience),
-            McpLink::Http(ref mut held) => held.call(line, patience),
-            McpLink::Sse(ref mut held) => held.call(line, patience),
-        }
-    }
-
-    fn notify(&mut self, line: &str, patience: kernel::TimeoutMs) -> Result<(), AxError> {
-        match *self {
-            McpLink::Stdio(ref mut held) => held.notify(line, patience),
-            McpLink::Http(ref mut held) => held.notify(line, patience),
-            McpLink::Sse(ref mut held) => held.notify(line, patience),
-        }
-    }
 }
 
 /// Turns the configured mount list into paths under the run's write
@@ -181,7 +100,7 @@ mod tests {
     fn a_configured_server_becomes_a_tool_the_model_is_told_about_and_can_call() {
         let dir = tempfile::tempdir().unwrap();
         let report = init_city(dir.path()).unwrap();
-        let (command, args) = crate::mcp_stdio::echoing(SERVER_ANSWER);
+        let (command, args) = protocol::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
 
         let (base_url, provider) = fake_openai(
@@ -296,7 +215,7 @@ mod tests {
     fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
-        let (command, args) = crate::mcp_stdio::echoing(SERVER_ANSWER);
+        let (command, args) = protocol::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
         let mut worker = RunWorker::new(
             dir.path(),

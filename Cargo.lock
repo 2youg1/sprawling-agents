@@ -1869,8 +1869,11 @@ dependencies = [
 name = "protocol"
 version = "0.0.6"
 dependencies = [
+ "gateway",
  "kernel",
+ "reqwest",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
