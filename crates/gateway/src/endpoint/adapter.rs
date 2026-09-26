@@ -18,8 +18,8 @@ use crate::router::Chosen;
 /// The adapter for one chosen model.
 ///
 /// Every chosen model gets an [`Endpoint`], a loopback one included:
-/// the endpoint decides locality once, when it builds its client, and
-/// the stream door is the endpoint's, so a local model answers in
+/// the endpoint decides locality once, when its client is built, and
+/// every adapter for one endpoint shares that client; the stream door is the endpoint's, so a local model answers in
 /// increments like any other.
 pub fn adapter_for(
     chosen: &Chosen<'_>,
@@ -46,7 +46,8 @@ pub fn adapter_for(
         .map(|(name, value)| (name, HeaderValue::Plain(value)))
         .collect();
     extra_headers.extend(tuning.extra_headers.iter().cloned());
-    let endpoint = Endpoint::new(
+    let endpoint = Endpoint::over(
+        chosen.transport,
         EndpointConfig {
             base_url: endpoint.chat_url(),
             dialect: endpoint.dialect,
@@ -155,9 +156,11 @@ mod tests {
             .lookup("local")
             .unwrap()
             .clone();
+        let transport = crate::endpoint::Transport::default();
         let chosen = Chosen {
             endpoint: &endpoint,
             entry: &entry,
+            transport: &transport,
         };
         let mut model = adapter_for(
             &chosen,
@@ -182,5 +185,117 @@ mod tests {
         assert_eq!(body["stream"], serde_json::Value::Bool(true), "{body}");
         assert_eq!(said.borrow().as_slice(), ["on ", "it"]);
         assert_eq!(ret.stop, Some(kernel::StopReason::EndTurn));
+    }
+
+    /// A loopback server that keeps each connection open, answers
+    /// `calls` requests in all, and hands back how many connections
+    /// they arrived on.
+    fn keep_alive_model(calls: usize) -> (String, std::thread::JoinHandle<usize>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let body = serde_json::json!({
+            "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1}
+        })
+        .to_string();
+        let server = std::thread::spawn(move || {
+            let (mut served, mut connections) = (0, 0);
+            while served < calls {
+                let (mut socket, _) = listener.accept().unwrap();
+                connections += 1;
+                let mut pending = String::new();
+                let mut buf = vec![0u8; 65536];
+                while served < calls {
+                    let n = socket.read(&mut buf).unwrap();
+                    if n == 0 {
+                        break;
+                    }
+                    pending.push_str(&String::from_utf8_lossy(&buf[..n]));
+                    let Some(head_end) = pending.find("\r\n\r\n") else {
+                        continue;
+                    };
+                    let length = pending[..head_end]
+                        .lines()
+                        .find_map(|line| {
+                            line.to_ascii_lowercase()
+                                .strip_prefix("content-length: ")
+                                .map(|v| v.trim().parse::<usize>().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if pending.len() < head_end + 4 + length {
+                        continue;
+                    }
+                    pending.clear();
+                    served += 1;
+                    socket
+                        .write_all(
+                            format!(
+                                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+                                body.len()
+                            )
+                            .as_bytes(),
+                        )
+                        .unwrap();
+                }
+            }
+            connections
+        });
+        (format!("http://{addr}/v1"), server)
+    }
+
+    /// **One endpoint, one client.** Every blocking client starts its
+    /// own `reqwest-internal-sync-runtime` thread and keeps its own
+    /// connection pool, so four runs on one endpoint that each built a
+    /// client held four threads and opened four connections. The calls
+    /// here run one after another, so a shared client answers all four
+    /// on the one connection its pool kept.
+    #[test]
+    fn every_adapter_for_one_endpoint_shares_its_client() {
+        let (url, server) = keep_alive_model(4);
+        let endpoint = AttachedEndpoint {
+            name: "local".to_owned(),
+            base_url: url,
+            dialect: ConnectionKind::OpenAiCompat.wire(),
+            connection_kind: ConnectionKind::OpenAiCompat,
+            auth: AuthSpec::None,
+            models: Vec::new(),
+            probed: false,
+            tuning: EndpointTuning::default(),
+        };
+        let entry = crate::market::MarketSnapshot::builtin()
+            .unwrap()
+            .lookup("local")
+            .unwrap()
+            .clone();
+        let mut book = crate::router::EndpointBook::new();
+        book.apply_payload(
+            kernel::EventKind::EndpointAttached,
+            &crate::router::attached_payload(&endpoint).unwrap(),
+        )
+        .unwrap();
+        book.apply_payload(
+            kernel::EventKind::ModelSelected,
+            &crate::router::selected_payload(kernel::ModelTag::Main, "local", &entry, None)
+                .unwrap(),
+        )
+        .unwrap();
+        for _ in 0..4 {
+            let chosen = book
+                .select(kernel::ModelTag::Main, &kernel::BuildingPolicy::default())
+                .unwrap();
+            adapter_for(
+                &chosen,
+                crate::endpoint::redemption::redemption(),
+                Vec::new(),
+            )
+            .unwrap()
+            .call(&crate::endpoint::fakes::request())
+            .unwrap();
+        }
+        assert_eq!(
+            server.join().unwrap(),
+            1,
+            "connections the four calls opened"
+        );
     }
 }
