@@ -70,6 +70,7 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
             })
         }),
         city: None,
+        head: Arc::default(),
     };
     // The face comes from the same verdict the listener uses, so the
     // route under test judges a caller by the rule the served city does.

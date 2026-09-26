@@ -107,7 +107,7 @@ fn a_matching_hello_opens_the_session() {
         SessionState::AwaitingHello,
         hello(WIRE_V, None),
         &unpaired(),
-        None,
+        WelcomeFacts::default(),
     );
     let SessionStep::Welcome(welcome) = step else {
         panic!("a matching hello is welcomed");
@@ -122,7 +122,7 @@ fn a_different_wire_closes_the_session_rather_than_negotiating() {
         SessionState::AwaitingHello,
         hello(WIRE_V.saturating_add(1), None),
         &unpaired(),
-        None,
+        WelcomeFacts::default(),
     );
     let SessionStep::Refuse { error, close } = step else {
         panic!("a wire mismatch is refused");
@@ -133,7 +133,12 @@ fn a_different_wire_closes_the_session_rather_than_negotiating() {
 
 #[test]
 fn a_command_before_the_hello_is_refused_rather_than_queued() {
-    let step = decide_frame(SessionState::AwaitingHello, a_command(), &unpaired(), None);
+    let step = decide_frame(
+        SessionState::AwaitingHello,
+        a_command(),
+        &unpaired(),
+        WelcomeFacts::default(),
+    );
     let SessionStep::Refuse { close, .. } = step else {
         panic!("an unopened session runs nothing");
     };
@@ -143,7 +148,12 @@ fn a_command_before_the_hello_is_refused_rather_than_queued() {
 #[test]
 fn a_live_session_delivers_commands_and_answers_queries() {
     assert!(matches!(
-        decide_frame(SessionState::Live, a_command(), &unpaired(), None),
+        decide_frame(
+            SessionState::Live,
+            a_command(),
+            &unpaired(),
+            WelcomeFacts::default()
+        ),
         SessionStep::Deliver(_)
     ));
     assert!(matches!(
@@ -151,7 +161,7 @@ fn a_live_session_delivers_commands_and_answers_queries() {
             SessionState::Live,
             ClientFrame::Query(crate::wire::Query::CityView),
             &unpaired(),
-            None
+            WelcomeFacts::default()
         ),
         SessionStep::Answer(_)
     ));
@@ -159,7 +169,12 @@ fn a_live_session_delivers_commands_and_answers_queries() {
 
 #[test]
 fn a_second_hello_is_refused_without_ending_the_session() {
-    let step = decide_frame(SessionState::Live, hello(WIRE_V, None), &unpaired(), None);
+    let step = decide_frame(
+        SessionState::Live,
+        hello(WIRE_V, None),
+        &unpaired(),
+        WelcomeFacts::default(),
+    );
     let SessionStep::Refuse { close, .. } = step else {
         panic!("one session, one greeting");
     };
@@ -176,7 +191,7 @@ fn an_exposed_session_needs_the_pairing_token() {
             SessionState::AwaitingHello,
             hello(WIRE_V, None),
             &exposed,
-            None
+            WelcomeFacts::default()
         ),
         SessionStep::Refuse { close: true, .. }
     ));
@@ -185,7 +200,7 @@ fn an_exposed_session_needs_the_pairing_token() {
             SessionState::AwaitingHello,
             hello(WIRE_V, Some("pairing-code")),
             &exposed,
-            None
+            WelcomeFacts::default()
         ),
         SessionStep::Welcome(_)
     ));
@@ -273,4 +288,21 @@ fn an_unspecified_address_is_not_loopback() {
         decide_bind(&addr, Some(B3Hash::digest(b"pairing-code"))),
         BindVerdict::Serve(BindFace::Exposed { .. })
     ));
+}
+
+#[test]
+fn the_welcome_names_the_ledger_head_so_a_reconnect_fetches_only_what_it_missed() {
+    let step = decide_frame(
+        SessionState::AwaitingHello,
+        hello(WIRE_V, None),
+        &unpaired(),
+        WelcomeFacts {
+            city: None,
+            head: Some(kernel::Seq::new(60)),
+        },
+    );
+    let SessionStep::Welcome(welcome) = step else {
+        panic!("a matching hello is welcomed");
+    };
+    assert_eq!(welcome.resume_from, Some(kernel::Seq::new(60)));
 }

@@ -38,7 +38,8 @@ use tokio::sync::broadcast;
 use crate::assets::AssetReply;
 use crate::reception::inbound::Inbound;
 use crate::reception::{
-    Admission, Door, SessionState, SessionStep, Stream, decide_admission, decide_frame,
+    Admission, Door, SessionState, SessionStep, Stream, WelcomeFacts, decide_admission,
+    decide_frame,
 };
 use crate::wire::ServerFrame;
 
@@ -71,7 +72,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                 // reaches the peer by one path whichever produced it.
                 let step = match inbound.read(&text) {
                     Ok(frame) => {
-                        decide_frame(phase, frame, &state.face, state.city.as_ref())
+                        decide_frame(phase, frame, &state.face, WelcomeFacts { city: state.city.as_ref(), head: state.head.read() })
                     }
                     Err(unreadable) => unreadable,
                 };

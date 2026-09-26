@@ -77,7 +77,7 @@ pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
 pub use reception::{Admission, BindFace, BindVerdict, Door, HandshakeVerdict, Pairing};
 #[cfg(feature = "server")]
-pub use reception::{SessionState, SessionStep, decide_frame};
+pub use reception::{SessionState, SessionStep, WelcomeFacts, decide_frame};
 #[cfg(feature = "server")]
 pub use reception::{decide_admission, offered_pairing};
 #[cfg(feature = "server")]
@@ -85,7 +85,7 @@ pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
 pub use server::{AcpProgress, AcpSink, TranscribeSink};
 #[cfg(feature = "server")]
-pub use server::{Bound, Delivered, Reply, ServeConfig, bind, router, serve};
+pub use server::{Bound, Delivered, LedgerHead, Reply, ServeConfig, bind, router, serve};
 #[cfg(feature = "schema")]
 pub use wire::wire_schema;
 pub use wire::{ClientFrame, Delta, ServerFrame};

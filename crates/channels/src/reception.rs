@@ -214,6 +214,15 @@ pub enum SessionStep {
     Refuse { error: Box<AxError>, close: bool },
 }
 
+/// What a welcome tells a peer about the city it reached: which city it
+/// is, and the seq of the last record the city has broadcast. One value
+/// because the two travel together into every welcome.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WelcomeFacts<'a> {
+    pub city: Option<&'a Address>,
+    pub head: Option<Seq>,
+}
+
 /// The whole session policy, as a pure function: which frames are legal
 /// when, and what a mismatch does. Tested without a socket, for the same
 /// reason [`decide_bind`] is.
@@ -226,13 +235,13 @@ pub fn decide_frame(
     state: SessionState,
     frame: ClientFrame,
     face: &BindFace,
-    city: Option<&Address>,
+    standing: WelcomeFacts<'_>,
 ) -> SessionStep {
     let expected = Welcome {
         wire_v: WIRE_V,
         schema: schema_hash(),
         resume_from: None,
-        city: city.cloned(),
+        city: standing.city.cloned(),
     };
     match (state, frame) {
         (SessionState::AwaitingHello, ClientFrame::Hello(hello)) => {
