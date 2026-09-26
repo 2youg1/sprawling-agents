@@ -49,11 +49,10 @@ fn a_cas_block_is_read_at_the_building_that_referenced_it() {
     let in_lab = cas.put(b"lab notes\n").unwrap();
     let in_vault = cas.put(b"vault notes\n").unwrap();
     let stray = kernel::B3Hash::digest(b"never referenced");
-    let (lab_hash, vault_hash) = (in_lab.clone(), in_vault.clone());
     let owner: BlockOwner = Arc::new(move |hash: &kernel::B3Hash| {
-        Ok(if *hash == lab_hash {
+        Ok(if *hash == in_lab {
             Some(kernel::Address::parse("lab").unwrap())
-        } else if *hash == vault_hash {
+        } else if *hash == in_vault {
             Some(kernel::Address::parse("vault").unwrap())
         } else {
             None
