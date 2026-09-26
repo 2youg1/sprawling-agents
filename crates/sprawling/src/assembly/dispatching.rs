@@ -165,6 +165,7 @@ pub(super) const NAME_THE_WORK: &str = "Name this piece of work in two to four w
 pub(super) const NAME_TOKENS: Option<kernel::Ceiling> = kernel::Ceiling::new(32);
 
 pub(super) mod agreeing;
+pub(super) mod asking_name;
 pub(super) mod handback;
 pub(super) mod running;
 pub(super) mod session;

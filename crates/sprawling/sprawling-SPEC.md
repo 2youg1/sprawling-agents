@@ -3305,7 +3305,7 @@ pub(super) fn unnamed(addr: &Address) -> AxError;          // E_INVALID_ARGS，�
 pub(super) struct NamingCall;                               // 适配器、模型 id、楼的 policy；fn name(self, task) 在任意线程上调用
 ```
 
-**为什么**：记账线程替每一条正在跑的 run 过河追加。取名要等 provider 几秒，放在这条线程上时，另一条 run 在这几秒里一条记录也写不进去：`instrument_dispatch_gap` 在 digest 调用压 3 s 时量出 run A 的最大空档约 3,044 ms。现在调用本身在一条自己的线程上等，名字写进 `Namings` 的通道，再用 `Wake::Command` 敲一次记账线程的那一个队列；`serve_flight` 在服务完 relay 之后调用 `dispatch_the_named`，于是名字回家的派活与其它醒来的理由走同一张嘴。仪表断言这个空档不超过 5 ms（`DISPATCH_GAP_MAX_MS`）。
+**为什么**：记账线程替每一条正在跑的 run 过河追加。取名要等 provider 几秒，放在这条线程上时，另一条 run 在这几秒里一条记录也写不进去：`instrument_dispatch_gap` 在 digest 调用压 3 s 时量出 run A 的最大空档约 3,044 ms。现在调用本身在一条自己的线程上等，名字写进 `Namings` 的通道，再用 `Wake::Command` 敲一次记账线程的那一个队列；`serve_flight` 在服务完 relay 之后调用 `dispatch_the_named`，于是名字回家的派活与其它醒来的理由走同一张嘴。仪表断言 A 的最大空档小于取名调用本身（`NAMING`，3 s）：A 的最大空档里还有它自己每回合的围栏（每波 20–90 ms，调试构建下 100–340 ms），那是 A 自己的工作，不是 B 造成的停顿，所以几毫秒的上限量不到这件事。
 
 **顺序不变**：ARCHITECTURE §5 第 3 步「开房间是 dispatch 在盘上的第一件事」照旧成立。名字回来之前这次派活什么都没写；名字回来后走 `dispatch_into_lane`，它重新 `agree_to_work`（等名字期间城可能被 halt），然后才开房间。`adversary/design/Attending.lean` 的 `opening_the_room_is_the_first_write`、`nothing_is_written_before_the_name_is_home`、`the_naming_wait_is_off_the_accounting_thread` 持有这三条。幂等键在取名线程起飞时就结清，所以等名字期间重发的同一帧仍然只算一次。`RunWorker::driving` 把还在等的名字算作在飞，`land_the_rest` 与 `handle` 因此会等它们回家。
 

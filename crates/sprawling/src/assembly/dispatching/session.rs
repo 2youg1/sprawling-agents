@@ -124,7 +124,10 @@ impl RunWorker {
 ///
 /// An address with a room in it is already a session, so only a bare
 /// building with no session beside it is named.
-pub(super) fn needs_a_name(addr: &Address, session: Option<&kernel::SessionName>) -> bool {
+pub(in crate::assembly) fn needs_a_name(
+    addr: &Address,
+    session: Option<&kernel::SessionName>,
+) -> bool {
     session.is_none() && !addr.as_str().contains('/')
 }
 
