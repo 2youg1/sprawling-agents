@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 39 as const;
+export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94" as const;
+export const WIRE_HASH = "05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -1480,6 +1480,19 @@ export const GateRefusal = Schema.Struct({
 export type GateRefusal = typeof GateRefusal.Type;
 
 /**
+ * Whether the same request may go out again, said together with
+ * whether its effect already landed. On the wire `"yes"`, `"no"` or
+ * `"unknown"`; a ledger record written as `retriable: true/false`
+ * reads as `Yes`/`No`.
+ */
+export const Retry = Schema.Union(
+  Schema.Literal("yes"),
+  Schema.Literal("no"),
+  Schema.Literal("unknown"),
+).annotations({ identifier: "Retry" });
+export type Retry = typeof Retry.Type;
+
+/**
  * The unified error shape: seven wire fields and one that is left out
  * when absent, serialized in declaration order (determinism rule 6).
  * The model is the recovery subject: `nearby` and `recovery` must hold
@@ -1495,7 +1508,7 @@ export const AxError = Schema.Struct({
   gate: Schema.optional(Schema.NullOr(GateRefusal)),
   nearby: Schema.Array(Schema.String),
   recovery: Schema.String,
-  retriable: Schema.Boolean,
+  retry: Retry,
   retry_after_ms: Schema.optional(Schema.NullOr(Schema.Int)),
   subject: Schema.String,
 }).annotations({ identifier: "AxError" });

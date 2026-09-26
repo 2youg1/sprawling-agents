@@ -141,7 +141,10 @@ use serde::{Deserialize, Serialize};
 /// 39: `rules_changed` joins the event kinds, carrying which governing
 ///    document moved as a closed word; an older page would meet a kind
 ///    it cannot decode in the history it folds.
-pub const WIRE_V: u32 = 39;
+/// 40: an error's `retriable` flag becomes `retry`, one of `yes`, `no`
+///    or `unknown` (the request left and its answer was lost), so an
+///    older page would meet an error without the field it reads.
+pub const WIRE_V: u32 = 40;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

@@ -315,9 +315,10 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
         provider_wobble(),
         "the original error, field for field"
     );
-    assert!(
-        err.is_retriable(),
-        "the watchdog classifies it from this flag"
+    assert_eq!(
+        err.retry(),
+        kernel::Retry::Yes,
+        "the watchdog classifies it from this envelope"
     );
     assert_eq!(
         model.blocked, 0,

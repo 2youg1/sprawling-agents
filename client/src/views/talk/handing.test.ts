@@ -19,7 +19,7 @@ const NO_MODEL: AxError = {
   code: "E_CONFIG_INVALID",
   nearby: [],
   recovery: "attach a provider on the settings page and pick a model for this tag",
-  retriable: false,
+  retry: "no",
   subject: "no model is chosen for this tag",
 };
 

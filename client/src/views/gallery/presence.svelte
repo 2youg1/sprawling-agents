@@ -33,7 +33,7 @@
     gate: null,
     nearby: [],
     recovery: "file a key for this provider, then attach it again",
-    retriable: false,
+    retry: "no",
     subject: "zenmux",
   };
 </script>

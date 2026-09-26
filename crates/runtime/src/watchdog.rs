@@ -11,7 +11,7 @@
 //! Terminal-only watchdogs kill recoverable sessions; that lesson is the
 //! reason this type exists.
 
-use kernel::{AxCode, AxError, Payload, Retries, StallVerdict, TimeMs};
+use kernel::{AxCode, AxError, Payload, Retries, Retry, StallVerdict, TimeMs};
 use serde::{Deserialize, Serialize};
 
 /// One watchdog per run: it holds the correction history and the ceiling
@@ -112,12 +112,12 @@ impl Watchdog {
 
     /// Classifies one provider failure. The producer of the error
     /// already decided whether the same call is worth making again, so
-    /// this reads `AxError::is_retriable` rather than guessing a second
-    /// time from a count of attempts.
+    /// this reads `AxError::retry` rather than guessing a second time.
     ///
-    /// A non-retriable failure freezes on the first one: repeating a
-    /// request the provider has already rejected on its shape buys the
-    /// same rejection again. A retriable one backs off from `now` by the
+    /// `Retry::No` freezes on the first one: repeating a request the
+    /// provider rejected on its shape buys the same rejection again.
+    /// `Yes` and `Unknown` back off (a model call's only effect is an
+    /// answer the city never received) from `now` by the
     /// schedule [`Watchdog::backoff_ms`] owns, or by the provider's own
     /// `retry_after_ms` when that is longer: asking before the time it
     /// named buys one more refusal.
@@ -137,7 +137,7 @@ impl Watchdog {
         let refused = Disposal::Freeze {
             reason: FreezeReason::ProviderRefused,
         };
-        if !failure.is_retriable() {
+        if failure.retry() == Retry::No {
             return refused;
         }
         match self.retries {

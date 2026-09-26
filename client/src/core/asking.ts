@@ -88,7 +88,7 @@ interface Pending {
 // sentence for a person and therefore `lang.json`'s: the reporter names
 // the phrase, the seam that knows the language says it.
 function minted(code: AxCode, action: string, subject: string): Reported {
-  return { code, action, subject, nearby: [], retriable: false };
+  return { code, action, subject, nearby: [], retry: "no" };
 }
 
 export const keyOf = (query: Query): string => JSON.stringify(query);

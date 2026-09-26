@@ -321,8 +321,9 @@ shape, and that shape is a type rather than a convention.
 `AxError` carries seven wire fields in declaration order — which is rule 6
 of §10, so an error is as replayable as an event: a stable `code`, the
 `action` and `subject` it failed on, `nearby` candidates, a `recovery`
-sentence, whether it is `retriable`, and the gate's own refusal when a gate
-is what stopped it. **The model is the audience**, so `nearby` and
+sentence, whether it may be sent again (`retry`: yes, no, or unknown when
+the request left and its answer was lost), and the gate's own refusal when
+a gate is what stopped it. **The model is the audience**, so `nearby` and
 `recovery` hold directly executable information rather than apologies. Both
 constructors return an `ErrorDraft`, and `with_recovery` is the only way
 across to an `AxError` — a failure with no next step is unconstructible,

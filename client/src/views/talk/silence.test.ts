@@ -22,7 +22,7 @@ const refusedByProvider: Note = {
       code: "E_PROVIDER",
       nearby: [],
       recovery: "",
-      retriable: true,
+      retry: "yes",
       subject: "main",
     },
   },

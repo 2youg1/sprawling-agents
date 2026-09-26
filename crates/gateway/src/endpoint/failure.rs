@@ -7,7 +7,7 @@
 //! whether the same request may go out again and what the caller does
 //! next.
 
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, Retry};
 
 fn transport_detail(err: &reqwest::Error) -> String {
     let mut out = err.to_string();
@@ -74,21 +74,28 @@ impl ProviderFailure<'_> {
         }
     }
 
-    /// Whether the identical request may succeed if sent again later: an
-    /// exchange that never completed carries no answer, and a provider
-    /// answering 408, 429 or 5xx (529 is Anthropic's overload) says it
-    /// is busy or broken now, not that the request is wrong.
-    fn retriable(&self) -> bool {
+    /// Whether the identical request may succeed if sent again later,
+    /// and whether its effect landed. A connection that never opened
+    /// carried no request, and a provider answering 408, 429 or 5xx (529
+    /// is Anthropic's overload) says it is busy or broken now, not that
+    /// the request is wrong. Any other exchange that stopped did so after
+    /// the request left, so the provider may have run it and billed it.
+    fn retry(&self) -> Retry {
         match self {
+            ProviderFailure::Exchange(err) if err.is_connect() => Retry::Yes,
             ProviderFailure::Exchange(_)
             | ProviderFailure::Cut(_)
-            | ProviderFailure::Silence { .. } => true,
-            ProviderFailure::Refused { status, .. } => {
-                *status == reqwest::StatusCode::REQUEST_TIMEOUT
+            | ProviderFailure::Silence { .. } => Retry::Unknown,
+            ProviderFailure::Refused { status, .. }
+                if *status == reqwest::StatusCode::REQUEST_TIMEOUT
                     || *status == reqwest::StatusCode::TOO_MANY_REQUESTS
-                    || status.is_server_error()
+                    || status.is_server_error() =>
+            {
+                Retry::Yes
             }
-            ProviderFailure::Unreadable(_) | ProviderFailure::Unbuilt(_) => false,
+            ProviderFailure::Refused { .. }
+            | ProviderFailure::Unreadable(_)
+            | ProviderFailure::Unbuilt(_) => Retry::No,
         }
     }
 
@@ -106,15 +113,24 @@ impl ProviderFailure<'_> {
     }
 
     fn recovery(&self) -> &'static str {
-        if let ProviderFailure::Unbuilt(_) = self {
-            "check this endpoint's `base_url` and its extra headers: the request was \
-             refused by this side before it was sent"
-        } else if self.retriable() {
-            "the watchdog backs off and sends the same request again, until the run's \
-             retry limit or a Halt"
-        } else {
-            "the provider answered, and it would answer the same way again: check this \
-             endpoint's model name, credential and dialect, then dispatch again"
+        match (self, self.retry()) {
+            (ProviderFailure::Unbuilt(_), _) => {
+                "check this endpoint's `base_url` and its extra headers: the request was \
+                 refused by this side before it was sent"
+            }
+            (_, Retry::Yes) => {
+                "the watchdog backs off and sends the same request again, until the run's \
+                 retry limit or a Halt"
+            }
+            (_, Retry::Unknown) => {
+                "the request went out and its answer was lost, so the provider may have \
+                 run and billed it; the watchdog backs off and sends it again, until the \
+                 run's retry limit or a Halt"
+            }
+            (_, Retry::No) => {
+                "the provider answered, and it would answer the same way again: check this \
+                 endpoint's model name, credential and dialect, then dispatch again"
+            }
         }
     }
 }
@@ -123,10 +139,11 @@ impl ProviderFailure<'_> {
 /// its way out taken from [`ProviderFailure`], never decided here.
 pub(crate) fn provider_err(action: &str, failure: &ProviderFailure<'_>) -> AxError {
     let draft = AxError::failure(AxCode::Provider, action, failure.subject());
-    let draft = match (failure.retriable(), failure.retry_after_ms()) {
-        (true, Some(wait_ms)) => draft.retriable_after(wait_ms),
-        (true, None) => draft.retriable(),
-        (false, _) => draft,
+    let draft = match (failure.retry(), failure.retry_after_ms()) {
+        (Retry::Yes, Some(wait_ms)) => draft.retriable_after(wait_ms),
+        (Retry::Yes, None) => draft.retriable(),
+        (Retry::Unknown, _) => draft.effect_unknown(),
+        (Retry::No, _) => draft,
     };
     draft.with_recovery(failure.recovery())
 }
@@ -148,7 +165,10 @@ mod tests {
             ProviderFailure::Cut(&cut),
             ProviderFailure::Silence { quiet_ms: 5 },
         ] {
-            assert!(provider_err("read provider response", &exchange).is_retriable());
+            assert_eq!(
+                provider_err("read provider response", &exchange).retry(),
+                Retry::Unknown
+            );
         }
         let refused = provider_err(
             "call provider",
@@ -158,10 +178,13 @@ mod tests {
                 headers: &reqwest::header::HeaderMap::new(),
             },
         );
-        assert!(!refused.is_retriable(), "it would answer the same way");
+        assert_eq!(refused.retry(), Retry::No, "it would answer the same way");
         assert!(refused.subject().contains("answered 400"));
         let shape = ProviderFailure::Unreadable("no data array".to_owned());
-        assert!(!provider_err("read the model list", &shape).is_retriable());
+        assert_eq!(
+            provider_err("read the model list", &shape).retry(),
+            Retry::No
+        );
     }
     #[test]
     fn a_provider_that_says_busy_or_broken_is_asked_again_and_one_that_refuses_is_not() {
@@ -175,7 +198,8 @@ mod tests {
                     headers: &reqwest::header::HeaderMap::new(),
                 },
             )
-            .is_retriable()
+            .retry()
+                == Retry::Yes
         };
         let statuses = [400, 401, 403, 404, 408, 422, 429, 500, 502, 503, 504, 529];
         let retried: Vec<u16> = statuses.into_iter().filter(|&c| asked_again(c)).collect();
@@ -198,7 +222,7 @@ mod tests {
         }
         assert_eq!(
             ProviderFailure::Cut(&cut).recovery(),
-            "the watchdog backs off and sends the same request again, until the run's retry limit or a Halt"
+            "the request went out and its answer was lost, so the provider may have run and billed it; the watchdog backs off and sends it again, until the run's retry limit or a Halt"
         );
     }
 
