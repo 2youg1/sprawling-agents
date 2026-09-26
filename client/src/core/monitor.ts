@@ -10,25 +10,8 @@
 // `monitor.test.ts` holds this to the fixture `bin::monitor::top`'s own
 // screen test uses.
 
+import type { Sample } from "../wire";
 import type { Key } from "./lang";
-
-// One sample as `bin::monitor::Sample` serialises it; every counter is
-// an integer well inside 2^53.
-export interface Sample {
-  readonly core_cpu_permille: number;
-  readonly core_private_bytes: number;
-  readonly core_working_set_bytes: number;
-  readonly core_read_bytes: number;
-  readonly core_written_bytes: number;
-  readonly machine_cpu_permille: number;
-  readonly machine_available_bytes: number;
-  readonly volume_free_bytes: number;
-  readonly ledger_queue_depth: number;
-  readonly durable_lag: number;
-  readonly relay_p50_nanos: number;
-  readonly event_to_screen_p50_nanos: number;
-  readonly queued_runs: number;
-}
 
 export interface Row {
   readonly label: Key;

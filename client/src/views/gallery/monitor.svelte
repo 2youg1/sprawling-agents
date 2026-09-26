@@ -10,7 +10,7 @@
   // minutes behind it. The history is a fixed script rather than a
   // random one, so the render gate sees the same curves every time.
 
-  import type { Sample } from "../../core/monitor";
+  import type { Sample } from "../../wire";
 
   const GIB = 1024 ** 3;
 

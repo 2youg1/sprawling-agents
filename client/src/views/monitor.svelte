@@ -20,7 +20,7 @@
   // asks for that many of the latest points; a narrow panel shows the
   // last minute, a wide one all five.
 
-  import type { Sample } from "../core/monitor";
+  import type { Sample } from "../wire";
 
   export interface MonitorProps {
     readonly samples: readonly Sample[];
