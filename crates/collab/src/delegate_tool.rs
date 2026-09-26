@@ -7,9 +7,9 @@
 //! carried out by somebody else, one level down.
 //!
 //! Everything this tool decides was already decided elsewhere. Whether a
-//! spawn is admitted is `kernel::gate::spawn`, which has held the rule
-//! since S2 and had no caller in production until this file: **a
-//! delegated position spawns nothing, whatever kind it asks for.** What
+//! spawn is admitted is `kernel::gate::spawn`, and this file is its
+//! production caller: **a delegated position spawns nothing, whatever
+//! kind it asks for.** What
 //! this module adds is the desk that remembers what was asked for, so
 //! the assembly layer - the only thing that can build a run - can start
 //! it when the parent's wave is over.
@@ -110,8 +110,8 @@ impl DelegateDesk {
     }
 
     /// What has been asked for so far, without taking it. This is what
-    /// `status.children` reports: a run that handed work down and then
-    /// asked about its own situation used to be told "none".
+    /// `status.children` reports, so a run that handed work down and then
+    /// asks about its own situation is told what it handed down.
     #[must_use]
     pub fn asked(&self) -> &[Delegated] {
         &self.asked

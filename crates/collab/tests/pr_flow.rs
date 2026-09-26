@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The P2 losing line, end to end: a node works in its own tree, someone
-//! else verifies it, and only then does anything reach the building.
+//! The losing line "the implementer tests its own work", end to end: a
+//! node works in its own tree, someone else verifies it, and only then
+//! does anything reach the building.
 
 #![allow(
     clippy::unwrap_used,

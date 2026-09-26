@@ -125,10 +125,9 @@ impl Handback {
     ///
     /// `None` is an ordinary signal between residents, which reports no
     /// handed-down work. A signal that says it is a handback and cannot
-    /// be read as one is an error rather than a `None`: the reader that
-    /// used to live in the fold answered `None` to both questions, so a
-    /// delegate that stopped and a line this build cannot parse arrived
-    /// at the parent as the same silence.
+    /// be read as one is an error rather than a `None`: answering `None`
+    /// to both would make a delegate that stopped and a line this build
+    /// cannot parse arrive at the parent as the same silence.
     ///
     /// # Errors
     /// `E_WIRE_MISMATCH` for a handback body this build cannot read,
@@ -258,8 +257,7 @@ mod tests {
         assert!(body.contains_key("because"));
     }
 
-    /// The reader the fold used to hold, now the writer's own inverse:
-    /// a delegate that stopped comes back as a stop with its reason
+    /// The writer's own inverse: a delegate that stopped comes back as a stop with its reason
     /// rather than as the same `None` an ordinary signal answers.
     #[test]
     fn the_signal_reads_back_as_the_handback_that_wrote_it() {
