@@ -198,7 +198,7 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
-    let channels::Answer::Endpoints(book) = rebuild_views(&report.ledger_dir)
+    let channels::Answer::Endpoints(book) = crate::views::Views::rebuild(&report.ledger_dir)
         .unwrap()
         .answer(&channels::Query::EndpointView)
     else {

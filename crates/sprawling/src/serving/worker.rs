@@ -24,7 +24,7 @@ use super::attending::{Outward, Started, spawn_worker};
 use super::desk::CommandDesk;
 use super::serve::Opening;
 use super::serve::Serving;
-use crate::assembly::{acp_dispatch, rebuild_views};
+use crate::assembly::acp_dispatch;
 use crate::views::Views;
 
 /// One recording in, one line of text back.
@@ -147,7 +147,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // The views the control surface reads. Rebuilt from the ledger here,
     // folded forward by the write observer inside the worker: one fold
     // rule, two call sites, no second definition of what a view means.
-    let rebuilt = rebuild_views(&kernel::layout::CityLayout::new(city_root).ledger())?;
+    let rebuilt = Views::rebuild(&kernel::layout::CityLayout::new(city_root).ledger())?;
     // This machine is not asked here (sprawling-SPEC.md 8-54): the
     // table is thirty-two items, most of them a program started and
     // asked its version, and a serve that waited for all of them holds

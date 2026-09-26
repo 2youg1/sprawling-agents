@@ -34,7 +34,7 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     bytes.extend_from_slice(future.as_bytes());
     std::fs::write(&segment, &bytes).unwrap();
 
-    let views = rebuild_views(&report.ledger_dir).map(|_| ());
+    let views = crate::views::Views::rebuild(&report.ledger_dir).map(|_| ());
     let standing = Standing::fold(&report.ledger_dir).map(|_| ());
     assert_eq!((views, standing), (Ok(()), Ok(())));
 }

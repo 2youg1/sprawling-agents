@@ -8,7 +8,7 @@
 //!
 //! **Why it is a projection and not part of the assembly point.** Nothing
 //! here decides anything or reaches a provider: it folds records into the
-//! answers a client asks for, and `rebuild_views` throws the whole thing
+//! answers a client asks for, and `Views::rebuild` throws the whole thing
 //! away and folds the ledger again to get the same bytes. That is
 //! ARCHITECTURE.md section 9 shape 7, while `bin::assembly` is an
 //! adapter - and a file holding two shapes is what section 9 says a split
@@ -27,14 +27,10 @@ use std::path::{Path, PathBuf};
 use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-// Where a city keeps its ledger and how a building reads off disk are
-// `bin::assembly`'s: it forms the city that laid them out. Borrowed
-// rather than copied, so "where the ledger lives" keeps one answer.
 use super::lines::verdict_line;
 use super::lines::{
     buildings_of, discard_lines, pursued, registry_line, restored_paths, signal_line,
 };
-use crate::assembly::rebuild_views;
 
 /// Answers one query out of a city's own history, without serving it.
 ///
@@ -50,7 +46,7 @@ use crate::assembly::rebuild_views;
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {
-    Ok(rebuild_views(&kernel::layout::CityLayout::new(city_root).ledger())?.answer(query))
+    Ok(Views::rebuild(&kernel::layout::CityLayout::new(city_root).ledger())?.answer(query))
 }
 
 /// The derived views a query reads. They are rebuilt from the ledger at
@@ -150,6 +146,27 @@ pub(crate) struct Views {
 }
 
 impl Views {
+    /// Rebuilds the views from the ledger on disk. This is the
+    /// disposability of a projection exercised on every start: nothing
+    /// is persisted, and the answer is the same as if the process had
+    /// been running all along.
+    ///
+    /// # Errors
+    /// Propagates chain verification failures; a city whose history does
+    /// not verify is not one whose views should be served.
+    pub(crate) fn rebuild(ledger_dir: &Path) -> Result<Views, AxError> {
+        let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
+        let city_root = ledger_dir
+            .parent()
+            .and_then(Path::parent)
+            .unwrap_or(ledger_dir);
+        let mut views = Views::new(city_root);
+        for record in known_records(&verified) {
+            views.apply(record)?;
+        }
+        Ok(views)
+    }
+
     pub(crate) fn new(city_root: &Path) -> Views {
         Views {
             city_root: city_root.to_path_buf(),
@@ -325,4 +342,19 @@ impl Views {
             .clone()
             .or_else(|| kernel::layout::CityLayout::new(&self.city_root).city_address())
     }
+}
+
+/// The records the per-line check already parsed, in ledger order.
+///
+/// A line the check let through as ignorable carries a kind this build
+/// has no record for, so no fold is shown it; parsing the raw bytes a
+/// second time would refuse exactly that line and turn a history that
+/// verifies into a city that cannot start.
+pub(crate) fn known_records(
+    verified: &runtime::replay::VerifiedLedger,
+) -> impl Iterator<Item = &EventRecord> {
+    verified.lines().iter().filter_map(|line| match line {
+        runtime::replay::VerifiedLine::Known { record, .. } => Some(record),
+        runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
+    })
 }
