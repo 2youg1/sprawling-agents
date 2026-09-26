@@ -11,7 +11,7 @@ use crate::jsonl::CheckedLine;
 
 /// A chained ledger of `count` lines; `salt` makes two ledgers of the
 /// same length differ at every line.
-fn chain(count: u64, salt: u64) -> Vec<Vec<u8>> {
+pub(super) fn chain(count: u64, salt: u64) -> Vec<Vec<u8>> {
     let run = RunId::from_bytes([7u8; 16]);
     let mut prev = GENESIS_PREV;
     (0..count)

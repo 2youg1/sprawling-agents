@@ -22,6 +22,10 @@ use crate::jsonl::LineCheck;
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
+mod start;
+
+pub use start::{SnapshotStart, WholeFold, start_from_snapshot};
+
 const MAGIC: &[u8; 8] = b"SPRSNAP1";
 const FILE: &str = "chain.snap";
 /// Written whole and synced here first, then renamed over [`FILE`], so a
