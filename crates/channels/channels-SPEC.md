@@ -526,6 +526,7 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 | `SelectModel` | client | 选一个模型 |
 | `OpenSession` | client | 在同一个地址上开新的一段会话（`Carry` 说带不带上一段的交接，`from` 说从哪条线哪一行分出来） |
 | `Reveal` | client | 在人自己的文件管理器里指出一个地址 |
+| `RestoreDiscard` | client | 把回收站里一行按它自带的回去的路放回原处 |
 | `DoctorInstall` | client | 按需求表里的名字装一件机器缺的东西 |
 | `DoctorRefresh` | client | 重新探一遍机器，取代开城时的快照 |
 | `ConnectToolkit` | client | 请外包服务开一次同意会话，把一个外部应用接进来 |
@@ -1337,3 +1338,13 @@ pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
 - **失败码不变**：判定拒绝仍是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定仍是 `E_CONFIG_INVALID`，recovery 仍是「换一个空闲端口，或者停掉占着它的进程」。
 - **被否：先试绑一次再放掉，然后在 `serve` 里真绑**。试绑与真绑之间，别的进程可以把端口拿走，那样原来的缺陷只是窗口变窄了，并没有消失。
 - **两者住 `server::listener`**，不住 `server::socket`：它们管的是监听器本身，先占、再服务；`server::socket` 管的是连上之后的会话、资产与上传。`Bound` 带 `#[must_use]`：占住端口而不服务，得到的是一个谁也不应答的端口。
+
+### 8-47 `RestoreDiscard`：回收站的一行按它自己的路回去（`WIRE_V` 加一）
+
+```rust
+Command::RestoreDiscard { restoration: Restoration, idem: IdemKey }
+```
+
+- **帧里带的是那一行的 `restoration` 原样**，不是路径。`DiscardView` 的每一行已经带着它自己的回去的路（`Restoration`），页面把它交回来；城要是改成按路径去查，就得在写线程上为一次还原把整份历史再折一遍，而那一行本来就在页面手里。一个伪造的 `Tracked` 能做到的最多是把城自己历史里的某个文件写回城里它自己的路径——`Address` 爬不出城，`restore` 拒绝 `Address::is_reserved` 的地址，所以受保护的元数据子树（`.sprawling/`、`.git/`）不经这条路写入。
+- **三种路，三个回答**：`Tracked(file:<addr>@<oid>)` 由装配层经 `memory::Checkpoint::restore` 写回，再追加 `discard_restored`（载荷与它关掉的那条 `file_discarded` 同形：`paths` 与 `restoration`），`DiscardView` 据此把那一行标成已还原；`Interred` 答 `E_INVALID_ARGS`，recovery 说从内容仓库取回尚未接线；`Rebuildable` 答 `E_INVALID_ARGS`，recovery 就是那条重建的理由——没有存着的字节可放回去。带 `range` 的定位符同样被拒：还原的是整个文件。
+- **被否：`RestoreDiscard { path }`**。见第一条；另外，同一路径可以被丢两次，只给路径说不清要回到哪一次。

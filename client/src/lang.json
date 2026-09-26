@@ -155,6 +155,10 @@
     "en": "rebuildable:",
     "zh": "可重建："
   },
+  "bin_restore": {
+    "en": "put back",
+    "zh": "放回原处"
+  },
   "bin_restored": {
     "en": "restored",
     "zh": "已找回"

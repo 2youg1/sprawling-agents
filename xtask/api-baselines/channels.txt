@@ -250,6 +250,9 @@ pub channels::Command::PutSpine::which: channels::SpineDocument
 pub channels::Command::Release
 pub channels::Command::Release::idem: kernel::idem::IdemKey
 pub channels::Command::Release::scope: channels::HaltScope
+pub channels::Command::RestoreDiscard
+pub channels::Command::RestoreDiscard::idem: kernel::idem::IdemKey
+pub channels::Command::RestoreDiscard::restoration: kernel::discard::request::Restoration
 pub channels::Command::Reveal
 pub channels::Command::Reveal::at: kernel::address::Address
 pub channels::Command::Reveal::idem: kernel::idem::IdemKey

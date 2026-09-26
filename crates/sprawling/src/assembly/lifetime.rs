@@ -157,7 +157,7 @@ impl RunWorker {
         // fact about the code rather than a rule somebody follows.
         let delegator = kernel::Delegator::root();
         let pursuits = collaboration.pursuits(&delegator);
-        Ok(RunWorker {
+        let mut worker = RunWorker {
             city_root: city_root.to_path_buf(),
             city: std::sync::OnceLock::new(),
             ledger,
@@ -186,7 +186,34 @@ impl RunWorker {
             backlog: runtime::Backlog::new(),
             flight: Flight::open(),
             index: memory::LedgerIndex::empty(),
-        })
+        };
+        worker.sweep_abandoned_trees();
+        Ok(worker)
+    }
+
+    /// Takes back the trees a crash left behind (sprawling-SPEC 8-93).
+    ///
+    /// Nothing is held yet: the ledger this worker holds is locked to
+    /// this process, and no run has been dispatched. A tree that will
+    /// not go is told and left for the next open, because one stuck
+    /// directory is no reason to keep the person out of their city.
+    fn sweep_abandoned_trees(&mut self) {
+        let told = match memory::Worktrees::sweep_abandoned(&self.city_root, &[]) {
+            Ok(swept) if swept.is_empty() => return,
+            Ok(swept) => format!(
+                "took back {} worktree(s) a crash left behind: {}",
+                swept.len(),
+                swept
+                    .iter()
+                    .map(memory::WorktreeName::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Err(err) => format!(
+                "could not take back the worktrees a crash left behind; the next open tries again: {err}"
+            ),
+        };
+        self.note(runtime::diagnostics::Level::Effect, "bin::assembly", &told);
     }
 
     /// What opening this worker's ledger repaired.
@@ -300,5 +327,35 @@ mod tests {
                 Closing::Chosen
             ]
         );
+    }
+
+    /// A run whose process died keeps its tree until the city next
+    /// opens; that open is the one point no other process can hold the
+    /// city, and the sweep has to happen on it.
+    #[test]
+    fn a_crash_left_worktree_is_gone_once_the_city_opens() {
+        let dir = tempfile::tempdir().unwrap();
+        init_city(dir.path()).unwrap();
+        let repo = git2::Repository::init(dir.path()).unwrap();
+        let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
+        let tree = repo
+            .find_tree(repo.index().unwrap().write_tree().unwrap())
+            .unwrap();
+        repo.commit(Some("HEAD"), &signature, &signature, "base", &tree, &[])
+            .unwrap();
+        let trees = memory::Worktrees::open(dir.path()).unwrap();
+        let name = memory::WorktreeName::parse("run-1").unwrap();
+        drop(trees.claim(&name).unwrap());
+
+        drop(
+            RunWorker::new(
+                dir.path(),
+                gateway::Custodian::in_memory(),
+                runtime::diagnostics::Diagnostics::off(),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(trees.live().unwrap(), Vec::new());
     }
 }

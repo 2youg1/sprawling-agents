@@ -8,7 +8,7 @@
 use kernel::model::{Mode, Window};
 use kernel::{
     Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, IdemKey, McpServer, ModelTag,
-    Origin, ResidentId, Ruling, RunId, SandboxLimits, Sealed, SessionName,
+    Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -217,6 +217,14 @@ pub enum Command<Secret = Sealed<String>> {
     /// so there is no way to spell a request for anything else.
     Reveal {
         at: Address,
+        idem: IdemKey,
+    },
+    /// Put one recycle-bin row back by the way back it carries. The
+    /// frame carries the row's own restoration rather than a path: a
+    /// path can be discarded twice, and the row already knows which
+    /// commit holds the bytes.
+    RestoreDiscard {
+        restoration: Restoration,
         idem: IdemKey,
     },
     /// Install one thing this machine lacks, named as the doctor's

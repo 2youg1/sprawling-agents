@@ -8,9 +8,10 @@
 use std::path::Path;
 
 use kernel::event::record::{CheckpointCommitted, Commit};
-use kernel::{GitOid, Payload, TimeMs};
+use kernel::{Address, GitOid, Payload, TimeMs};
 use serde_json::{Map, Value};
 
+use crate::alias::WriteTarget;
 use crate::error::MemoryError;
 
 use super::provenance::Provenance;
@@ -250,7 +251,77 @@ impl Checkpoint {
         }
         Ok(payloads)
     }
+
+    /// The way back a `file_discarded` names: the blob at `address` in
+    /// commit `oid`, written to the same path under the working tree.
+    ///
+    /// Neither the index nor HEAD moves: putting a file back is not a
+    /// commit, and a person who restored one file should not find a new
+    /// line in their own branch's history. A link on the path, or a file
+    /// already at the target with other bytes, is refused rather than
+    /// followed or overwritten.
+    ///
+    /// # Errors
+    /// A commit the repository no longer holds (the fence reference is
+    /// what keeps one), a path that commit does not hold as a file, a
+    /// bare repository, an address in the protected metadata subtree
+    /// (`Address::is_reserved`), and a write the file system refuses;
+    /// `MemoryError::Alias` when a symbolic link or junction sits on the
+    /// path below the working tree, because `Address` bounds the
+    /// spelling of a path and not where the disk resolves it.
+    pub fn restore(&self, address: &Address, oid: &GitOid) -> Result<(), MemoryError> {
+        let refused = |detail: String| MemoryError::Checkpoint {
+            op: "restore a discarded file",
+            detail,
+        };
+        if address.is_reserved() {
+            return Err(refused(format!(
+                "{address} is protected metadata; the city writes it through its own gates, not a restore"
+            )));
+        }
+        let commit = git2::Oid::from_str(&oid.to_string())
+            .and_then(|oid| self.repo.find_commit(oid))
+            .map_err(git_err("find the restoration commit"))?;
+        let blob = commit
+            .tree()
+            .and_then(|tree| tree.get_path(Path::new(address.as_str())))
+            .and_then(|entry| entry.to_object(&self.repo))
+            .map_err(git_err("find the discarded file in its commit"))?
+            .into_blob()
+            .map_err(|_| refused(format!("{address}@{oid} is not a file")))?;
+        let workdir = self
+            .repo
+            .workdir()
+            .ok_or_else(|| refused("the city repository is bare".to_owned()))?;
+        let target = WriteTarget::within(
+            "restore a discarded file",
+            workdir,
+            &workdir.join(address.as_str()),
+        )?;
+        let target = target.as_path();
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|err| refused(format!("{}: {err}", parent.display())))?;
+        }
+        match std::fs::read(target) {
+            Ok(current) if current == blob.content() => return Ok(()),
+            Ok(_) => {
+                return Err(refused(format!(
+                    "{address}: a file already sits there; move it aside and restore again"
+                )));
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(refused(format!("{address}: {err}"))),
+        }
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(target)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, blob.content()))
+            .map_err(|err| refused(format!("{address}: {err}")))
+    }
 }
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
