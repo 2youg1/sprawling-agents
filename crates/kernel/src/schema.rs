@@ -127,7 +127,8 @@ impl JsonSchema for ServerLabel {
     }
     fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
         string_schema(
-            "How one external tool server is named inside this city: ascii lowercase letters              and digits, at least one, as `kernel::ServerLabel::parse` accepts it.",
+            "How one external tool server is named inside this city: ascii lowercase letters \
+             and digits, at least one, as `kernel::ServerLabel::parse` accepts it.",
             Some(SERVER_LABEL_PATTERN),
         )
     }

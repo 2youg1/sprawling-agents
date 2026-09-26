@@ -40,7 +40,8 @@
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
   import { CHROMAS, DENSITIES, FACES, LIGHTINGS, MOTIONS } from "../../core/prefs";
-  import { BODY_PX, sizingOf } from "../../core/sizing";
+  import { sizingOf } from "../../core/sizing";
+  import { BODY_PX } from "../../wire";
   import type { Appearance } from "../../core/prefs";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";

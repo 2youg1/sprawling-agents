@@ -14,6 +14,8 @@ export const WIRE_V = 40 as const;
 export const WIRE_HASH = "6b3b2d3069b8a6dc29e042d0df7924969eaa47728565d48518d1e442ce23c8d9" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
+/** The body sizes a person may ask for: `channels::BODY_PX_MIN` and `BODY_PX_MAX`. */
+export const BODY_PX = { min: 12, max: 20 } as const;
 
 /**
  * A canonical relative path inside the city: `/`-separated segments, none empty, none `.` or `..`, no backslash, no `:`, no control character, and no segment ending in a dot or whitespace, as `kernel::Address::parse` accepts it.

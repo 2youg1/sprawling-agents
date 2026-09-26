@@ -3,10 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The sizes a person may ask for. The floor is the smallest size the
-// colour gate has to hold its contrast tiers at, and the ceiling is
-// where a line of body text stops being body text.
-export const BODY_PX = { min: 12, max: 20 } as const;
+// The sizes a person may ask for are the city's range
+// (`channels::BODY_PX_MIN` and `BODY_PX_MAX`), which the generated wire
+// file states, so the box and the `[ui]` writer refuse the same sizes.
+import { BODY_PX } from "../wire";
 
 // What a box of digits says about the body size. Three outcomes rather
 // than a number and a flag: an empty box and a refused box lead to
