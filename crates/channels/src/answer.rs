@@ -45,7 +45,7 @@ pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
 pub use commits::{CommitAnswer, CommitsAnswer};
 pub use config::{ConfigAnswer, ConfigLayer, SettledEffort, SettledSecond, TuningDefaults};
-pub use cost_of::CostOfAnswer;
+pub use cost_of::{CostOfAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use doctor::DoctorSandboxMissing;
 pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
 pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
@@ -159,9 +159,8 @@ pub struct ChosenSummary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CityAnswer {
-    /// Every active run and the most recently frozen few, in RunId
-    /// order; `frozen` minus the frozen rows here is how many older runs
-    /// the paged history holds instead.
+    /// Every active run and the latest frozen few, in RunId order;
+    /// `frozen` counts every frozen run, listed or not.
     pub runs: Vec<RunSummary>,
     pub active: u64,
     pub frozen: u64,
@@ -195,12 +194,9 @@ pub struct ApprovalsAnswer {
     pub items: Vec<ApprovalItem>,
 }
 
-/// The five cuts of one authoritative total. The actor, segment, tool
-/// and skill cuts each sum to `total` exactly; `by_run` names every
-/// active run and the few billed most, so it may sum to less. The
-/// interface renders shares against `total` rather than normalising its
-/// own rows, so an unattributed remainder stays visible instead of being
-/// divided away.
+/// The five cuts of one authoritative total. Four cuts sum to `total`;
+/// `by_run` names the active runs and the few billed most, so it may sum
+/// to less. Shares render against `total`, so a remainder stays visible.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostAnswer {
@@ -243,6 +239,7 @@ pub enum Answer {
     Rounds(Box<RoundsAnswer>),
     Evidence(EvidenceAnswer),
     CostOf(CostOfAnswer),
+    RunCosts(RunCostsAnswer),
     Listing(ListingAnswer),
     Document(Box<DocumentAnswer>),
     Commits(CommitsAnswer),

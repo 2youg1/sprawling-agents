@@ -189,6 +189,9 @@ impl Views {
             channels::Query::Evidence { run } => {
                 channels::Answer::Evidence(self.evidence_answer(*run))
             }
+            channels::Query::RunCosts { .. } => {
+                channels::Answer::RunCosts(channels::RunCostsAnswer { runs: Vec::new() })
+            }
             channels::Query::CostOf { node } => channels::Answer::CostOf(self.cost_of_answer(node)),
             // The tree itself, one level and one file at a time.
             channels::Query::Listing { at } => {

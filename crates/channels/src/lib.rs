@@ -43,7 +43,8 @@ pub use answer::{ChangesAnswer, CommitAnswer, CommitsAnswer, HISTORY_MAX, Histor
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, EndpointSummary, EndpointsAnswer};
 pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
-pub use answer::{CostOfAnswer, EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
+pub use answer::{CostOfAnswer, EvidenceAnswer, RUN_COSTS_MAX, RunCostsAnswer};
+pub use answer::{ EvidenceItem, EvidenceKind, Picture};
 pub use answer::{Decision, GovernanceAnswer};
 pub use answer::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};

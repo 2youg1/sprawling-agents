@@ -138,13 +138,11 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-/// 39: a city view is bounded. `CityAnswer.runs` carries every active
-///    run and only the most recently frozen ones, while `frozen` still
-///    counts them all; an older page that read the list as the whole
-///    city would draw a city that had forgotten its history. A cost
-///    view's `by_run` is bounded the same way, to the active runs and
-///    the few billed most, so it may sum to less than `total`.
-pub const WIRE_V: u32 = 39;
+/// 39: `CityAnswer.runs` and `CostAnswer.by_run` carry the active runs
+///    and a recent or top-billed few; an older page reads them as all.
+/// 40: `Query::RunCosts`, what named runs cost, for the rows a cost
+///    view's `by_run` leaves out; an older page cannot ask it.
+pub const WIRE_V: u32 = 40;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

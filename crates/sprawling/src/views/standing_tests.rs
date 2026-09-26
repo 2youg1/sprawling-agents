@@ -249,3 +249,62 @@ fn an_evicted_run_still_answers_its_run_view() {
         )
     );
 }
+
+/// A city of `RECENT_FROZEN` + 1 runs, each started, billed `1_000 + i`
+/// micro-dollars and frozen, written to the Ledger and folded back, so
+/// the first of them is out of the hot view.
+fn a_city_whose_first_billed_run_was_evicted(root: &std::path::Path) -> Views {
+    use kernel::Ledger;
+    let report = crate::assembly::init_city(root).unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+        .unwrap()
+        .0;
+    let recent = u64::try_from(memory::RECENT_FROZEN).unwrap();
+    for i in 0..=recent {
+        for (kind, data) in [
+            (EventKind::RunStarted, serde_json::json!({ "task": "t", "goal": "g" })),
+            (EventKind::ModelReturned, serde_json::json!({ "billed_usd_micros": 1_000 + i })),
+            (EventKind::RunFrozen, serde_json::json!({ "completion": "done" })),
+        ] {
+            ledger
+                .append(kernel::EventDraft {
+                    run: billed_run(i),
+                    t: kernel::TimeMs::new(1_000 + i),
+                    who: "city".to_owned(),
+                    addr: Some(room.clone()),
+                    kind,
+                    data: kernel::Payload::new(data.as_object().unwrap().clone()).unwrap(),
+                    ig: false,
+                })
+                .unwrap();
+        }
+    }
+    drop(ledger);
+    crate::assembly::rebuild_views(&report.ledger_dir).unwrap()
+}
+
+fn billed_run(i: u64) -> RunId {
+    RunId::from_bytes(u128::from(i + 1).to_be_bytes())
+}
+
+/// The building directory asks what an old run cost by name; a run the
+/// city never saw spent nothing, which is an answer, not a gap.
+#[test]
+fn an_evicted_run_still_answers_what_it_cost() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = a_city_whose_first_billed_run_was_evicted(dir.path());
+    let never = RunId::from_bytes([0xee; 16]);
+    let asked = channels::Query::RunCosts {
+        runs: vec![billed_run(0), never],
+    };
+    assert_eq!(
+        views.answer(&asked),
+        channels::Answer::RunCosts(channels::RunCostsAnswer {
+            runs: vec![
+                (billed_run(0), kernel::UsdMicros::new(1_000)),
+                (never, kernel::UsdMicros::default()),
+            ],
+        })
+    );
+}
