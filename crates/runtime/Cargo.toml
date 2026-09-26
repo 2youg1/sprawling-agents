@@ -25,6 +25,11 @@ toml.workspace = true
 wasmtime = { version = "48", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
 wasmtime-wasi = { version = "48", optional = true }
 
+# One Job Object per run, so a run's whole process tree can be read
+# (runtime-SPEC 8-13-3); the crate's public surface is safe.
+[target.'cfg(windows)'.dependencies]
+win32job = "2.0.3"
+
 [features]
 wasm = ["dep:wasmtime", "dep:wasmtime-wasi"]
 conformance = ["kernel/conformance"]
