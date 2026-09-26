@@ -262,76 +262,78 @@
       {/if}
     </header>
     <div class="flex min-w-0 flex-col gap-wide @wide/page:flex-row @wide/page:items-start @wide/page:gap-section">
-      <div class={["flex min-w-0 flex-1 flex-col gap-base", WIDTH[shown]]}>
-        {#if shown === "accounts"}
-          <div class="flex flex-col gap-wide">
-            <!-- The form takes the conversation's 760 rather than a
-                measure, because what a person pastes into it is a base
-                URL and a key and 520 cut both off (client-SPEC 4-33,
-                4-36). -->
-            <div class="min-w-0 max-w-talk">
-              <ProviderDoor />
+      <div class="min-w-0 flex-1">
+        <div class={["flex min-w-0 flex-col gap-base", WIDTH[shown]]}>
+          {#if shown === "accounts"}
+            <div class="flex flex-col gap-wide">
+              <!-- The form takes the conversation's 760 rather than a
+                  measure, because what a person pastes into it is a base
+                  URL and a key and 520 cut both off (client-SPEC 4-33,
+                  4-36). -->
+              <div class="min-w-0 max-w-talk">
+                <ProviderDoor />
+              </div>
+              <div class="flex flex-col gap-base">
+                <h2 class="text-label font-label text-text-quiet">{say($lang, "setup_models")}</h2>
+                {#if answer !== undefined}
+                  <ModelChoice {answer} />
+                {/if}
+              </div>
             </div>
-            <div class="flex flex-col gap-base">
-              <h2 class="text-label font-label text-text-quiet">{say($lang, "setup_models")}</h2>
-              {#if answer !== undefined}
-                <ModelChoice {answer} />
-              {/if}
+          {:else if shown === "run"}
+            <div class="grid grid-fit items-start gap-base">
+              <div class="min-w-0 rounded-card bg-raised px-base py-snug">
+                <EffortSection />
+              </div>
+              <GovernedSection />
+              <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
+                <span class="text-label font-label text-text">{say($lang, "setup_autonomy")}</span>
+                <p class="text-note text-text-faint">{say($lang, "setup_autonomy_note")}</p>
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render autonomyControl()}
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render foot(undefined, "autonomy")}
+                <Decided />
+              </div>
             </div>
-          </div>
-        {:else if shown === "run"}
-          <div class="grid grid-fit items-start gap-base">
-            <div class="min-w-0 rounded-card bg-raised px-base py-snug">
-              <EffortSection />
-            </div>
-            <GovernedSection />
+          {:else if shown === "network"}
             <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-              <span class="text-label font-label text-text">{say($lang, "setup_autonomy")}</span>
-              <p class="text-note text-text-faint">{say($lang, "setup_autonomy_note")}</p>
+              <span class="text-label font-label text-text">{say($lang, "setup_network_default")}</span>
+              <p class="text-note text-text-faint">{say($lang, "setup_network_new_only")}</p>
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-              {@render autonomyControl()}
+              {@render proxyingControl()}
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-              {@render foot(undefined, "autonomy")}
-              <Decided />
+              {@render foot(ruleNote !== undefined ? say($lang, ruleNote) : undefined, "proxying")}
             </div>
-          </div>
-        {:else if shown === "network"}
-          <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-            <span class="text-label font-label text-text">{say($lang, "setup_network_default")}</span>
-            <p class="text-note text-text-faint">{say($lang, "setup_network_new_only")}</p>
-            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-            {@render proxyingControl()}
-            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-            {@render foot(ruleNote !== undefined ? say($lang, ruleNote) : undefined, "proxying")}
-          </div>
-        {:else if shown === "tools"}
-          {#if dependency !== undefined}
-            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-            {@render dependency()}
-          {:else}
-            <Machine />
+          {:else if shown === "tools"}
+            {#if dependency !== undefined}
+              <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+              {@render dependency()}
+            {:else}
+              <Machine />
+            {/if}
+          {:else if shown === "skills"}
+            <SkillsSection />
+          {:else if shown === "appearance"}
+            <div class="grid grid-fit items-start gap-base">
+              <AppearanceSection />
+              <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
+                <span class="text-label font-label text-text">{say($lang, "setup_language")}</span>
+                <p class="text-note text-text-faint">{say($lang, "setup_language_note")}</p>
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render languageControl()}
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render foot(undefined, "language")}
+              </div>
+            </div>
+          {:else if shown === "keys"}
+            <KeysSection />
+          {:else if shown === "advanced"}
+            <AdvancedSection />
+          {:else if shown === "about"}
+            <Release />
           {/if}
-        {:else if shown === "skills"}
-          <SkillsSection />
-        {:else if shown === "appearance"}
-          <div class="grid grid-fit items-start gap-base">
-            <AppearanceSection />
-            <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-              <span class="text-label font-label text-text">{say($lang, "setup_language")}</span>
-              <p class="text-note text-text-faint">{say($lang, "setup_language_note")}</p>
-              <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-              {@render languageControl()}
-              <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-              {@render foot(undefined, "language")}
-            </div>
-          </div>
-        {:else if shown === "keys"}
-          <KeysSection />
-        {:else if shown === "advanced"}
-          <AdvancedSection />
-        {:else if shown === "about"}
-          <Release />
-        {/if}
+        </div>
       </div>
       <div class="min-w-0 @wide/page:sticky @wide/page:top-0 @wide/page:w-tree @wide/page:shrink-0">
         <Toml />

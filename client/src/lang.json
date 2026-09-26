@@ -1607,6 +1607,10 @@
     "en": "nothing",
     "zh": "没有"
   },
+  "rec_archive_nothing": {
+    "en": "nothing filed matches this search; what a building's runs produce is filed here",
+    "zh": "归档里没有与之相符的东西；楼里各次 run 的产出会归档在这里"
+  },
   "rec_search": {
     "en": "search the archive",
     "zh": "搜索归档"

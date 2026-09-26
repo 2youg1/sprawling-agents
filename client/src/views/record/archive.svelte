@@ -39,7 +39,7 @@
   {:else if hits === undefined}
     <p class="text-text-faint">…</p>
   {:else if hits.length === 0}
-    <EmptyState missing="rec_nothing" seat="region" />
+    <EmptyState missing="rec_archive_nothing" seat="region" />
   {:else}
     <ul class="text-note">
       {#each hits as hit (hit)}
