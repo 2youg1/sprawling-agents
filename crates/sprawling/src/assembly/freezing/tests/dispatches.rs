@@ -320,7 +320,7 @@ fn inheriting_a_branch_does_not_verify_the_history() {
         mode: kernel::Mode::PlanGoal,
         parent: None,
         succession: None,
-        tainted: false,
+        taint: kernel::TaintSet::empty(),
         origin: Some(origin),
     };
 

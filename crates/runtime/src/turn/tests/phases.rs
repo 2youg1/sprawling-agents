@@ -115,7 +115,7 @@ fn cancel_at_the_call_boundary_stops_before_any_model_bytes() {
             Interrupt::None,
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )
@@ -155,7 +155,7 @@ fn steer_at_a_boundary_records_and_advances() {
             },
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )
@@ -200,7 +200,7 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
             Interrupt::None,
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )
@@ -256,7 +256,7 @@ fn the_ledger_chain_stays_verifiable_after_a_turn() {
             Interrupt::None,
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )
@@ -308,7 +308,7 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
             Interrupt::None,
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )

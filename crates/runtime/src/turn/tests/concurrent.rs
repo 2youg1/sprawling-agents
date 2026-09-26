@@ -71,7 +71,7 @@ fn wave_of(ledger: &mut TestLedger, calls: Vec<ToolCall>) -> Turn<ToolWave> {
         turn.assemble(
             Interrupt::None,
             ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &conversation,
             &[],
             &shape(),

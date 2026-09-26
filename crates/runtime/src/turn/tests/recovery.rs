@@ -294,7 +294,7 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
             Interrupt::None,
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )
