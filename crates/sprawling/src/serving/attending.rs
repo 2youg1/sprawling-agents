@@ -68,6 +68,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         vault,
         notice: vault_notice,
         log,
+        standing,
     } = opening;
     let Outward {
         desk: worker_desk,
@@ -89,7 +90,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let worker_thread = std::thread::Builder::new()
         .name("sprawling-runs".to_owned())
         .spawn(move || {
-            let mut worker = match RunWorker::new(&worker_root, vault, log) {
+            let mut worker = match RunWorker::inheriting(&worker_root, vault, log, standing) {
                 Ok(mut worker) => {
                     worker.open_for_service(vault_notice);
                     drop(ready_tx.send(Ok(worker.vault_handle())));

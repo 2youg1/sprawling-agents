@@ -67,32 +67,82 @@ impl Standing {
     /// Propagates chain verification and whatever a fold says about a
     /// payload it cannot read.
     pub(crate) fn fold(ledger_dir: &Path) -> Result<Standing, AxError> {
-        let mut book = gateway::EndpointBook::new();
-        let mut governance = Governance::empty();
-        let mut collaboration = CollaborationFold::default();
-        let mut entrance = Entrance::default();
-        let mut expiries = Expiries::default();
-        let mut origins = SessionOrigins::default();
+        let mut standing = StandingFold::new();
         if ledger_dir.exists() {
             let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
             for record in known_records(&verified) {
-                book.apply(record)?;
-                governance.absorb(record.kind(), record.run(), record.addr(), record.data())?;
-                collaboration.absorb(record)?;
-                entrance.absorb(record.data());
-                expiries.absorb(record.kind(), record.data());
-                origins.absorb(record.kind(), record.addr(), record.data())?;
+                standing.absorb(record)?;
             }
         }
+        standing.settle()
+    }
+}
+
+/// The folds a `Standing` is made of, part way through a history.
+struct StandingFold {
+    book: gateway::EndpointBook,
+    governance: Governance,
+    collaboration: CollaborationFold,
+    entrance: Entrance,
+    expiries: Expiries,
+    origins: SessionOrigins,
+}
+
+impl StandingFold {
+    fn new() -> StandingFold {
+        StandingFold {
+            book: gateway::EndpointBook::new(),
+            governance: Governance::empty(),
+            collaboration: CollaborationFold::default(),
+            entrance: Entrance::default(),
+            expiries: Expiries::default(),
+            origins: SessionOrigins::default(),
+        }
+    }
+
+    fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        self.book.apply(record)?;
+        self.governance
+            .absorb(record.kind(), record.run(), record.addr(), record.data())?;
+        self.collaboration.absorb(record)?;
+        self.entrance.absorb(record.data());
+        self.expiries.absorb(record.kind(), record.data());
+        self.origins
+            .absorb(record.kind(), record.addr(), record.data())
+    }
+
+    fn settle(self) -> Result<Standing, AxError> {
         Ok(Standing {
-            book,
-            governance,
-            collaboration: collaboration.settle()?,
-            entrance,
-            expiries,
-            origins,
+            book: self.book,
+            governance: self.governance,
+            collaboration: self.collaboration.settle()?,
+            entrance: self.entrance,
+            expiries: self.expiries,
+            origins: self.origins,
         })
     }
+}
+
+/// What a served city starts from: its views and the worker's standing,
+/// folded from one verified read of the history.
+///
+/// Each record is shown to the views and then to the standing, so the
+/// first byte a person sees waits on one verified pass rather than two,
+/// and the worker judges from exactly the history the pages answer from:
+/// two reads at two moments could answer for two different histories.
+///
+/// # Errors
+/// Propagates chain verification and whatever a fold says about a
+/// payload it cannot read.
+pub(crate) fn fold_city(ledger_dir: &Path) -> Result<(Views, Standing), AxError> {
+    let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
+    let mut views = Views::new(city_root_of(ledger_dir));
+    let mut standing = StandingFold::new();
+    for record in known_records(&verified) {
+        views.apply(record)?;
+        standing.absorb(record)?;
+    }
+    Ok((views, standing.settle()?))
 }
 
 /// Rebuilds the views from the ledger on disk. This is the disposability
@@ -104,15 +154,19 @@ impl Standing {
 /// verify is not one whose views should be served.
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
     let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
-    let city_root = ledger_dir
-        .parent()
-        .and_then(Path::parent)
-        .unwrap_or(ledger_dir);
-    let mut views = Views::new(city_root);
+    let mut views = Views::new(city_root_of(ledger_dir));
     for record in known_records(&verified) {
         views.apply(record)?;
     }
     Ok(views)
+}
+
+/// The city a ledger directory belongs to, two levels up.
+fn city_root_of(ledger_dir: &Path) -> &Path {
+    ledger_dir
+        .parent()
+        .and_then(Path::parent)
+        .unwrap_or(ledger_dir)
 }
 
 /// The records the per-line check already parsed, in ledger order.

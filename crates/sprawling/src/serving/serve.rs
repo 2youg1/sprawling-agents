@@ -48,11 +48,11 @@ pub struct Serving {
 }
 
 /// What a worker is opened with: where the city is, whose keys it may
-/// redeem, what the vault turned out to be, and where its diagnostics
-/// go.
+/// redeem, what the vault turned out to be, where its diagnostics go,
+/// and what the history already says.
 ///
-/// Four values that always travel together and are never chosen
-/// independently - `serve` settles all four before it has a thread to
+/// Five values that always travel together and are never chosen
+/// independently - `serve` settles all five before it has a thread to
 /// hand them to - so they travel as one, as `Reporter` does.
 pub(super) struct Opening {
     pub(super) city_root: std::path::PathBuf,
@@ -61,4 +61,7 @@ pub(super) struct Opening {
     /// disclosure. Consumed by the first `open_for_service`.
     pub(super) notice: Option<Payload>,
     pub(super) log: runtime::diagnostics::Diagnostics,
+    /// What the history already says, folded on the serve thread in the
+    /// same pass as the views, so the worker does not read it again.
+    pub(super) standing: crate::assembly::Standing,
 }

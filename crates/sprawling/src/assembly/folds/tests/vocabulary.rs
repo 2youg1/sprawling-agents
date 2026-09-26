@@ -38,3 +38,53 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     let standing = Standing::fold(&report.ledger_dir).map(|_| ());
     assert_eq!((views, standing), (Ok(()), Ok(())));
 }
+
+/// Serving reads the history once; what it hands the pages and the
+/// worker is what a read for each would have folded, and what the
+/// worker that wrote the history holds.
+#[test]
+fn one_read_of_the_history_folds_what_a_read_for_each_would() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    worker
+        .handle(channels::Command::Halt {
+            scope: channels::HaltScope::City,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"halt"),
+        })
+        .unwrap();
+
+    let (mut views, standing) = fold_city(&report.ledger_dir).unwrap();
+    let everything = channels::Query::History {
+        before: None,
+        limit: channels::HISTORY_MAX,
+    };
+    assert_eq!(
+        views.answer(&everything),
+        rebuild_views(&report.ledger_dir)
+            .unwrap()
+            .answer(&everything)
+    );
+    let judged = |governance: &Governance| {
+        (
+            governance.halted.clone(),
+            governance.autonomy.clone(),
+            governance.granted.clone(),
+        )
+    };
+    assert_eq!(
+        judged(&standing.governance),
+        judged(&Standing::fold(&report.ledger_dir).unwrap().governance)
+    );
+    assert_eq!(
+        judged(&standing.governance),
+        judged(&worker.governance),
+        "and the comparison above is not two empty folds agreeing"
+    );
+    assert!(!standing.governance.halted.is_empty());
+}
