@@ -139,6 +139,7 @@ impl RunWorker {
             backlog: runtime::Backlog::new(),
             flight: Flight::open(),
         };
+        worker.sweep_abandoned_trees();
         Ok(worker)
     }
 
