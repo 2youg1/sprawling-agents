@@ -262,3 +262,59 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
         "the inheritance is spent by the run that began the session"
     );
 }
+
+/// Checking a branch's origin reads the line it names, not the history:
+/// once the worker has indexed the ledger, a second check costs a small
+/// fraction of verifying the whole ledger, however long that history is.
+///
+/// The ratio against a verify of the same ledger is the instrument,
+/// because it holds on any disk and in any profile: a check that still
+/// verifies the history is never ten times faster than a verify.
+#[test]
+fn checking_a_branch_origin_does_not_verify_the_history() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let long_answer = "the meter says 42. ".repeat(100_000);
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion(&long_answer, None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: addr("lab/room2"),
+            task: "measure the meter".to_owned(),
+            goal: "a number is written down".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+    let verify_started = std::time::Instant::now();
+    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verify = verify_started.elapsed();
+    let started = verified
+        .lines()
+        .iter()
+        .find_map(|line| match line {
+            runtime::replay::VerifiedLine::Known { record, .. }
+                if record.kind() == EventKind::RunStarted =>
+            {
+                Some(kernel::Origin {
+                    run: record.run(),
+                    at_seq: record.seq(),
+                })
+            }
+            runtime::replay::VerifiedLine::Known { .. }
+            | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
+        })
+        .expect("the mother ran");
+
+    worker.origin_is_real(started).unwrap();
+    let check_started = std::time::Instant::now();
+    worker.origin_is_real(started).unwrap();
+    let check = check_started.elapsed();
+
+    assert!(
+        check.saturating_mul(10) < verify,
+        "a warm origin check took {check:?}; verifying the ledger took {verify:?}"
+    );
+}
