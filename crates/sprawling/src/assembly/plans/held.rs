@@ -8,6 +8,7 @@
 //! `roadmap_*` records change (sprawling-SPEC.md 8-91).
 
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use kernel::event::record::RoadmapMoved;
 use kernel::{Address, AxError, EventKind, NodeId, Payload};
@@ -26,6 +27,11 @@ pub(in crate::assembly) struct Planning {
     pub(in crate::assembly) delegator: kernel::Delegator,
     /// Which room holds each node of each building's plan.
     pub(in crate::assembly) holders: PlanHolders,
+    /// The one door a landing replaces a building's plan through:
+    /// `city::edit_against`, and in a test a writer that refuses, because
+    /// a read-only file does not stop the rename over it where the
+    /// directory is writable (sprawling-SPEC.md 8-42-8).
+    pub(in crate::assembly) write_plan: fn(&Path, &[u8], &[u8]) -> Result<(), AxError>,
 }
 
 impl Planning {
@@ -64,7 +70,7 @@ impl PlanHolders {
     /// otherwise leave a holder the history already released.
     #[expect(
         clippy::wildcard_enum_match_arm,
-        reason = "four kinds move a claim; the rest of the event vocabulary does not"
+        reason = "five kinds move a claim; the rest of the event vocabulary does not"
     )]
     pub(in crate::assembly) fn absorb(
         &mut self,
@@ -82,7 +88,13 @@ impl PlanHolders {
                         .insert(node, room.as_str().to_owned());
                 }
             }
-            EventKind::RoadmapFinished | EventKind::RoadmapReleased | EventKind::RoadmapBlocked => {
+            // A split is its parent's fate as much as a finish is: the
+            // run that split the node holds nothing afterwards
+            // (sprawling-SPEC.md 8-42-8).
+            EventKind::RoadmapFinished
+            | EventKind::RoadmapReleased
+            | EventKind::RoadmapSplit
+            | EventKind::RoadmapBlocked => {
                 let node = data.read::<RoadmapMoved>()?.node;
                 if let Some(building) = addr.and_then(building_of) {
                     self.0.entry(building).or_default().remove(&node);

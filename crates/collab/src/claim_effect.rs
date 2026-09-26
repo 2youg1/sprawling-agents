@@ -14,8 +14,8 @@
 //! Two shapes, so two files (ARCHITECTURE.md section 9).
 
 use kernel::event::record::{RoadmapMoved, RoadmapStep};
-use kernel::spine::check_roadmap_shape;
-use kernel::{AxError, EvidenceCell, Locator, NodeId, Payload, PlanExit};
+use kernel::spine::{check_roadmap_shape, insert_children, set_roadmap_status};
+use kernel::{AxError, EvidenceCell, Locator, NewChild, NodeId, Payload, PlanExit};
 use kernel::{RoadmapShape, RoadmapStatus};
 
 /// What the run did to the plan. Exhaustive on purpose, like the other
@@ -37,9 +37,12 @@ pub enum ClaimEffect {
         item: String,
         exit: PlanExit,
     },
+    /// Carries each child's weight as well as its item, because the
+    /// worker replays the split onto the plan it reads at landing and a
+    /// name alone does not rebuild the row the desk wrote.
     Split {
         parent: NodeId,
-        children: Vec<String>,
+        children: Vec<NewChild>,
     },
 }
 
@@ -67,6 +70,27 @@ impl ClaimEffect {
         }
     }
 
+    /// The plan text with this effect written into it. The one
+    /// definition of how an effect edits the plan: the desk edits its
+    /// copy through it when the model calls, and the worker replays the
+    /// same effects onto the file as it stands when the run lands, so a
+    /// row another run landed meanwhile is kept rather than reverted.
+    ///
+    /// # Errors
+    /// Propagates the plan's refusal to take the edit: a node that is
+    /// not in the text, or a split that would not fit.
+    pub fn apply(&self, text: &str) -> Result<String, AxError> {
+        match self {
+            ClaimEffect::Claimed { id, .. } => {
+                set_roadmap_status(text, id, RoadmapStatus::InProgress, None)
+            }
+            ClaimEffect::PutDown { id, exit, .. } => {
+                set_roadmap_status(text, id, exit.status(), exit.evidence())
+            }
+            ClaimEffect::Split { parent, children } => insert_children(text, parent, children),
+        }
+    }
+
     /// Which record this becomes.
     #[must_use]
     pub fn kind(&self) -> kernel::EventKind {
@@ -89,7 +113,7 @@ impl ClaimEffect {
         let step = match self {
             ClaimEffect::Claimed { item, .. } => RoadmapStep::Claimed { item: item.clone() },
             ClaimEffect::Split { children, .. } => RoadmapStep::Split {
-                children: children.clone(),
+                children: children.iter().map(|child| child.item.clone()).collect(),
             },
             ClaimEffect::PutDown { item, exit, .. } => {
                 let item = item.clone();

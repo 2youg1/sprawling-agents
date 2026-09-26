@@ -5,7 +5,7 @@
 
 //! The lines this worker appends, and the fold each one is shown to.
 //!
-//! Three entrances and one rule: the append comes first, and the
+//! Four entrances and one rule: the append comes first, and the
 //! worker's own books - the governance fold, the endpoint book - are
 //! shown the line only once the history has it. A book that stated
 //! what the process hoped to write would be a second authority.
@@ -13,6 +13,7 @@
 use kernel::{Address, AxError, EventDraft, EventKind, Ledger, Payload, RunId};
 
 use crate::effect;
+use crate::serving::booking::OpenClaims;
 
 use super::{RunWorker, now_ms};
 
@@ -104,6 +105,36 @@ impl RunWorker {
     /// effect a resident caused must carry the resident's name, or the
     /// history cannot say who spoke.
     pub(super) fn record_for(&mut self, run: RunId, line: effect::Line) -> Result<(), AxError> {
+        let (kind, addr, data) = self.append_for(run, line)?;
+        self.absorb(kind, run, Some(&addr), &data)
+    }
+
+    /// Appends one line of a run's plan step and closes the node it
+    /// closes in `open` as soon as the history has the line, before any
+    /// fold is shown it: a fold that refuses the line afterwards cannot
+    /// take it off the ledger, so a hand-back owed for that node would
+    /// make the history say a finished node was handed back
+    /// (sprawling-SPEC.md 8-42-8).
+    pub(super) fn record_closing(
+        &mut self,
+        run: RunId,
+        closing: effect::Closing,
+        open: &mut OpenClaims,
+    ) -> Result<(), AxError> {
+        let (kind, addr, data) = self.append_for(run, closing.line)?;
+        if let Some(node) = &closing.closes {
+            open.close(node);
+        }
+        self.absorb(kind, run, Some(&addr), &data)
+    }
+
+    /// Appends one line attributed to a run, and hands back what the
+    /// folds are shown: its kind, its room and the stamped payload.
+    fn append_for(
+        &mut self,
+        run: RunId,
+        line: effect::Line,
+    ) -> Result<(EventKind, Address, Payload), AxError> {
         let effect::Line {
             who,
             addr,
@@ -120,7 +151,7 @@ impl RunWorker {
             data: data.clone(),
             ig: false,
         })?;
-        self.absorb(kind, run, Some(&addr), &data)
+        Ok((kind, addr, data))
     }
 
     /// Shows one line this worker wrote to every fold it holds, whoever

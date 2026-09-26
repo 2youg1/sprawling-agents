@@ -181,6 +181,7 @@ impl RunWorker {
                 pursuits,
                 delegator,
                 holders: collaboration.plan_holders,
+                write_plan: city::edit_against,
             },
             last_tick: now,
             log,

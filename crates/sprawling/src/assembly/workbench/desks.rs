@@ -82,6 +82,15 @@ impl RunWorker {
             site.who.clone(),
             addr.clone(),
             plan_text,
+            crate::serving::booking::booking(
+                self.bell(),
+                crate::serving::booking::Claimant {
+                    building: site.building.addr().clone(),
+                    room: addr.clone(),
+                    run: site.run_id,
+                    who: site.who.clone(),
+                },
+            ),
         )));
 
         // What the building already knows, computed from the shelf

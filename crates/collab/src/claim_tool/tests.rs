@@ -12,6 +12,7 @@ use super::*;
 // The desk produces the effects; whether one still holds is
 // `claim_effect`'s question, asked here against a real desk run.
 use crate::claim_effect::{evidence_of, still_true};
+use kernel::spine::set_roadmap_status;
 
 const PLAN: &str = "\
 # Roadmap
@@ -28,6 +29,7 @@ fn desk() -> Arc<Mutex<ClaimDesk>> {
         "potter@lab.1".to_owned(),
         Address::parse("lab/room1").unwrap(),
         PLAN.to_owned(),
+        Booking::new(|_| Ok(())),
     )))
 }
 
@@ -338,6 +340,7 @@ fn a_plan_that_does_not_parse_refuses_with_the_repair() {
         "potter@lab.1".to_owned(),
         Address::parse("lab/room1").unwrap(),
         "no table here".to_owned(),
+        Booking::new(|_| Ok(())),
     )));
     let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     let refusal = tool

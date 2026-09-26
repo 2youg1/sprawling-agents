@@ -28,7 +28,7 @@ pub use arbiter::{Level, arbitrate, conflict_payload};
 pub use archive_tool::{ARCHIVE_KINDS, ArchiveDesk, ArchiveEffect, ArchiveTool, Held};
 pub use citation::{Citation, Reading};
 pub use claim_effect::{ClaimEffect, evidence_of, still_true};
-pub use claim_tool::{ClaimDesk, ClaimTool};
+pub use claim_tool::{Booking, ClaimDesk, ClaimTool};
 pub use delegate_tool::{DelegateDesk, DelegateTool, Delegated};
 pub use fanin::{Artifact, Claim, FanIn, Joined, PrivateQuestion};
 pub use goal_tool::{GoalDesk, GoalEffect, GoalTool};

@@ -98,6 +98,7 @@ impl CollaborationFold {
             EventKind::RoadmapClaimed
             | EventKind::RoadmapFinished
             | EventKind::RoadmapReleased
+            | EventKind::RoadmapSplit
             | EventKind::RoadmapBlocked => {
                 self.plan_holders
                     .absorb(record.kind(), record.addr(), record.data())?;

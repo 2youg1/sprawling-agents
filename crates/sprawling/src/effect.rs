@@ -21,7 +21,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxError, EventKind, Payload, TimeMs};
+use kernel::{Address, AxError, EventKind, NodeId, Payload, TimeMs};
 
 /// One line of the history, attributed to whoever caused it.
 ///
@@ -47,8 +47,13 @@ pub(crate) enum Then {
     Deliver(Vec<collab::Signal>),
     /// Hold this ground in the city's goal register.
     Hold(Vec<kernel::GoalEntry>),
-    /// Write the shared plan back, as the desk left it.
-    Roadmap { path: PathBuf, text: String },
+    /// Replace the shared plan with `text`, the run's effects replayed
+    /// onto `base`, only while the file still reads `base`.
+    Roadmap {
+        path: PathBuf,
+        base: String,
+        text: String,
+    },
     /// Put these on the building's shelf.
     Shelf(Vec<Filing>),
 }
@@ -67,12 +72,19 @@ pub(crate) struct Filing {
 ///
 /// Both fields are private, and `then` leaves only through
 /// [`Landing::record`].
-pub(crate) struct Landing {
-    lines: Vec<Line>,
+pub(crate) struct Landing<L = Line> {
+    lines: Vec<L>,
     then: Then,
 }
 
-impl Landing {
+/// One line of a plan's landing and the node whose claim it closes; a
+/// split closes its parent.
+pub(crate) struct Closing {
+    pub(crate) line: Line,
+    pub(crate) closes: Option<NodeId>,
+}
+
+impl<L> Landing<L> {
     /// Appends every line, then hands back the change that follows them.
     ///
     /// # Errors
@@ -81,14 +93,16 @@ impl Landing {
     /// that never receives it cannot apply it.
     pub(crate) fn record(
         self,
-        append: &mut impl FnMut(Line) -> Result<(), AxError>,
+        append: &mut impl FnMut(L) -> Result<(), AxError>,
     ) -> Result<Then, AxError> {
         for line in self.lines {
             append(line)?;
         }
         Ok(self.then)
     }
+}
 
+impl Landing {
     /// What a run said, and what it read out of its own queue.
     ///
     /// # Errors
@@ -231,27 +245,38 @@ impl Landing {
 }
 
 /// What a run's claims on the shared plan came to. Two answers and no
-/// third, because the plan is written whole: either every effect still
-/// matches the file as it stands and the lines take the rows, or one of
-/// them does not and nothing at all is written.
+/// third: either every effect still matches the file as it stands and
+/// all of them are replayed onto it, or one of them does not and nothing
+/// at all is written.
 pub(crate) enum Claims {
-    Landed(Box<Landing>),
-    /// The nodes that moved, so a person can be told which.
-    Stale(Vec<String>),
+    Landed(Box<Landing<Closing>>),
+    /// The nodes that moved, so a person can be told which, and the
+    /// `roadmap_released` lines that close the claims this run already
+    /// put on the ledger when the model made them.
+    Stale {
+        nodes: Vec<String>,
+        released: Box<Landing<Closing>>,
+    },
 }
 
 impl Claims {
     /// Checks each effect against the file as it stands now rather than
-    /// as it stood when the run was dispatched. Today one run is driven
-    /// at a time, so the two agree; when they stop agreeing the losing
-    /// claim is dropped rather than written over somebody's row.
+    /// as it stood when the run was dispatched. The accounting thread
+    /// already refused a node another run in flight held when the model
+    /// claimed it (`serving::booking`); this is the backstop for a run
+    /// that claimed from its old copy a node somebody had since landed,
+    /// whose claim is dropped rather than written over that row.
+    ///
+    /// The effects are replayed onto `on_disk` rather than the desk's
+    /// dispatch-time copy written back, so a row another run landed
+    /// since this one was dispatched is kept.
     ///
     /// # Errors
-    /// Propagates a claim whose payload cannot be built.
+    /// Propagates a claim whose payload cannot be built, or an effect
+    /// the plan on disk refuses to take.
     pub(crate) fn of(
         effects: &[collab::ClaimEffect],
         on_disk: &str,
-        text: String,
         path: PathBuf,
         room: &Address,
         who: &str,
@@ -271,23 +296,188 @@ impl Claims {
             .map(|effect| effect.id().to_string())
             .collect();
         if !stale.is_empty() {
-            return Ok(Claims::Stale(stale));
+            return Ok(Claims::Stale {
+                nodes: stale,
+                released: Box::new(Landing {
+                    lines: released(effects, room, who)?,
+                    then: Then::Nothing,
+                }),
+            });
         }
         let mut lines = Vec::new();
+        let mut text = on_disk.to_owned();
         for effect in effects {
-            lines.push(Line {
-                who: who.to_owned(),
-                addr: room.clone(),
-                // Which record this is, is the effect's own answer: the
-                // exit decided it, and a second match here would be a
-                // second opinion about what a stop means.
-                kind: effect.kind(),
-                data: effect.payload(who)?,
+            text = effect.apply(&text)?;
+            let closes = match effect {
+                // The claim's line went on the ledger when the accounting
+                // thread booked it (`serving::booking`); writing it again
+                // here would count the node as claimed twice.
+                collab::ClaimEffect::Claimed { .. } => continue,
+                collab::ClaimEffect::PutDown { id, .. } => Some(id.clone()),
+                collab::ClaimEffect::Split { parent, .. } => Some(parent.clone()),
+            };
+            lines.push(Closing {
+                line: Line {
+                    who: who.to_owned(),
+                    addr: room.clone(),
+                    // Which record this is, is the effect's own answer: the
+                    // exit decided it, and a second match here would be a
+                    // second opinion about what a stop means.
+                    kind: effect.kind(),
+                    data: effect.payload(who)?,
+                },
+                closes,
             });
         }
         Ok(Claims::Landed(Box::new(Landing {
             lines,
-            then: Then::Roadmap { path, text },
+            then: Then::Roadmap {
+                path,
+                base: on_disk.to_owned(),
+                text,
+            },
         })))
+    }
+}
+
+/// A `roadmap_released` line for each claim the accounting thread
+/// booked, for a landing that writes nothing else: without it the
+/// history reads the node as held by this run for ever.
+fn released(
+    effects: &[collab::ClaimEffect],
+    room: &Address,
+    who: &str,
+) -> Result<Vec<Closing>, AxError> {
+    effects
+        .iter()
+        .filter_map(|effect| {
+            let closes = Some(effect.id().clone());
+            let line = handed_back(effect, "the plan moved before this run landed", room, who);
+            line.map(|line| line.map(|line| Closing { line, closes }))
+                .transpose()
+        })
+        .collect()
+}
+
+/// The `roadmap_released` line that hands a claimed node back, saying
+/// why in `note`, or `None` for an effect that is not a claim. The one
+/// shape both a stale landing and a run that came home without landing
+/// close a claim with (sprawling-SPEC.md 8-42-8).
+///
+/// # Errors
+/// Propagates a payload that will not build.
+pub(crate) fn handed_back(
+    claim: &collab::ClaimEffect,
+    note: &str,
+    room: &Address,
+    who: &str,
+) -> Result<Option<Line>, AxError> {
+    let put_down = match claim {
+        collab::ClaimEffect::Claimed { id, item } => collab::ClaimEffect::PutDown {
+            id: id.clone(),
+            item: item.clone(),
+            exit: kernel::PlanExit::Stopped {
+                id: id.clone(),
+                why: kernel::StopCause::HandedBack {
+                    note: note.to_owned(),
+                },
+            },
+        },
+        collab::ClaimEffect::PutDown { .. } | collab::ClaimEffect::Split { .. } => {
+            return Ok(None);
+        }
+    };
+    Ok(Some(Line {
+        who: who.to_owned(),
+        addr: room.clone(),
+        kind: put_down.kind(),
+        data: put_down.payload(who)?,
+    }))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+mod tests {
+    use kernel::{Address, Tool};
+
+    use super::{Claims, Then};
+
+    const SNAPSHOT: &str = "# Roadmap
+
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+| 1 | wire the kiln | 1 |  | Not started |  |
+| 2 | glaze the pots | 1 |  | Not started |  |
+";
+
+    fn desk(run: u8) -> std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>> {
+        std::sync::Arc::new(std::sync::Mutex::new(collab::ClaimDesk::new(
+            format!("potter@lab.{run}"),
+            Address::parse("lab/room1").unwrap(),
+            SNAPSHOT.to_owned(),
+            collab::Booking::new(|_| Ok(())),
+        )))
+    }
+
+    fn act(desk: &std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>, args: serde_json::Value) {
+        let tool = collab::ClaimTool::new(desk.clone()).unwrap();
+        tool.invoke(&kernel::ToolCall {
+            id: "tu_1".to_owned(),
+            name: kernel::ToolName::parse("plan").unwrap(),
+            args: kernel::Payload::new(args.as_object().unwrap().clone()).unwrap(),
+        })
+        .unwrap();
+    }
+
+    /// What the plan reads after this run lands on `on_disk`.
+    fn landed(desk: &std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>, on_disk: &str) -> String {
+        let mut desk = desk.lock().unwrap();
+        let effects = desk.take_effects();
+        let room = Address::parse("lab/room1").unwrap();
+        match Claims::of(&effects, on_disk, "Roadmap.md".into(), &room, "potter").unwrap() {
+            Claims::Landed(landing) => match landing.then {
+                Then::Roadmap { text, .. } => text,
+                _ => panic!("a claim lands on the plan"),
+            },
+            Claims::Stale { nodes, .. } => panic!("{nodes:?} read as moved"),
+        }
+    }
+
+    /// Two runs read one plan and take different nodes. The one that
+    /// lands second writes its effects onto the plan as the first left
+    /// it, so the first run's finished row survives the second landing.
+    #[test]
+    fn two_runs_landing_different_nodes_keep_both_rows() {
+        let (first, second) = (desk(1), desk(2));
+        act(
+            &first,
+            serde_json::json!({ "action": "claim", "node": "1" }),
+        );
+        let evidence = format!("cas:b3-{}", "ab".repeat(32));
+        act(
+            &first,
+            serde_json::json!({ "action": "finish", "node": "1", "evidence": evidence }),
+        );
+        act(
+            &second,
+            serde_json::json!({ "action": "claim", "node": "2" }),
+        );
+        let after_first = landed(&first, SNAPSHOT);
+        let after_second = landed(&second, &after_first);
+        let status = |text: &str, id: &str| match kernel::spine::check_roadmap_shape(text) {
+            kernel::RoadmapShape::WellFormed { rows } => rows
+                .into_iter()
+                .find(|row| row.id.to_string() == id)
+                .map(|row| row.status),
+            kernel::RoadmapShape::Malformed { .. } => None,
+        };
+        assert_eq!(
+            (status(&after_second, "1"), status(&after_second, "2")),
+            (
+                Some(kernel::RoadmapStatus::Done),
+                Some(kernel::RoadmapStatus::InProgress)
+            ),
+            "the second landing keeps the first run's finished row"
+        );
     }
 }

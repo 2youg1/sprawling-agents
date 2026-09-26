@@ -12,7 +12,6 @@ use crate::effect;
 use super::super::{
     Assignment, Dispatched, Ending, Handover, Landed, Owed, Owing, RunWorker, Site, held,
 };
-use super::desks::write_plan;
 
 /// The action an `AxError` names when one of the two hand-down desks
 /// cannot be read. Written here rather than at the call site, where the
@@ -42,6 +41,19 @@ impl RunWorker {
         conversations: u32,
     ) -> Result<(), AxError> {
         let then = landing.record(&mut |line: effect::Line| self.record_for(run, line))?;
+        self.carry_out_landing(at, then, conversations)
+    }
+
+    /// Carries out what a landing's lines, already on the ledger, ask of
+    /// the city outside it. A caller that must act between the two — the
+    /// plan desk closes its claims once their closing lines are written —
+    /// records the landing itself and then calls this.
+    pub(in crate::assembly) fn carry_out_landing(
+        &mut self,
+        at: &Assignment,
+        then: effect::Then,
+        conversations: u32,
+    ) -> Result<(), AxError> {
         match then {
             effect::Then::Nothing => Ok(()),
             effect::Then::Deliver(signals) => {
@@ -81,20 +93,10 @@ impl RunWorker {
                 self.collaborating.goals.extend(entries);
                 Ok(())
             }
-            effect::Then::Roadmap { path, text } => {
-                let before = std::fs::read_to_string(&path).ok();
-                // The rollback is best effort by construction: the
-                // error a person must see is the one from the write,
-                // and a rollback that also failed cannot be reported
-                // here without replacing it.
-                write_plan(&path, &text).inspect_err(|_| match before {
-                    Some(text) => {
-                        drop(std::fs::write(&path, text));
-                    }
-                    None => {
-                        drop(std::fs::remove_file(&path));
-                    }
-                })
+            // The replacement is whole or not at all, so a refusal
+            // leaves the file at `base` with nothing to roll back.
+            effect::Then::Roadmap { path, base, text } => {
+                (self.planning.write_plan)(&path, base.as_bytes(), text.as_bytes())
             }
             effect::Then::Shelf(filings) => {
                 let mut written = Vec::new();

@@ -208,6 +208,10 @@ impl RunWorker {
     /// wrong took the room's mail and a tree's lease with it
     /// (sprawling-SPEC.md 8-46-9).
     ///
+    /// The plan step closes each node of `open_claims` as that node's
+    /// closing line reaches the ledger; the caller still owes the history
+    /// a put-back line for every node it did not close.
+    ///
     /// # Errors
     /// Propagates the drive's own failure to open a checkpoint, and
     /// every failure of settling the desks, the requests and the ending.
@@ -216,6 +220,7 @@ impl RunWorker {
         continuation: Continuation,
         driven: Result<Driven, AxError>,
         owing: Owing,
+        open_claims: &mut crate::serving::booking::OpenClaims,
     ) -> Result<Landed, AxError> {
         let Continuation {
             at,
@@ -255,6 +260,7 @@ impl RunWorker {
                     job_locator: &job_locator,
                 },
                 conversations,
+                open_claims,
             },
         )?;
         // What the run can show for itself. `None` is not `Some(false)`:
