@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 40 as const;
+export const WIRE_V = 41 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "655d38fee9b266e84681324441296e8106975927f9c6939fa1e5c2620320e72c" as const;
+export const WIRE_HASH = "676cc8466f916e04bfcc460a007c0e8f26fef303cbd8d19f10fe55759c2343ee" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -488,6 +488,32 @@ export const PursuitState = Schema.Literal("running", "paused").annotations({ id
 export type PursuitState = typeof PursuitState.Type;
 
 /**
+ * What a city holding a pursuit does next. Exhaustive: every arm is
+ * something the caller has to do, and a fifth would be a state nobody
+ * wrote an action for.
+ * 
+ * Carries serde because the page says it: the wire holds the kind, and
+ * the client takes the words for each kind from its own `lang.json`.
+ */
+export const PursuitVerdict = Schema.Union(
+  Schema.Struct({
+    kind: Schema.Literal("work"),
+    next: NodeId,
+  }),
+  Schema.Struct({
+    in_flight: Schema.Int,
+    kind: Schema.Literal("waiting"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("paused"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("finished"),
+  }),
+).annotations({ identifier: "PursuitVerdict" });
+export type PursuitVerdict = typeof PursuitVerdict.Type;
+
+/**
  * A city's standing goal, if it has one.
  * 
  * `verdict` is the city's own reading of whether there is anything left
@@ -498,7 +524,7 @@ export const PursuitLine = Schema.Struct({
   addr: Address,
   goal: Schema.String,
   state: PursuitState,
-  verdict: Schema.String,
+  verdict: PursuitVerdict,
 }).annotations({ identifier: "PursuitLine" });
 export type PursuitLine = typeof PursuitLine.Type;
 
@@ -506,8 +532,9 @@ export type PursuitLine = typeof PursuitLine.Type;
  * The closed event vocabulary.
  */
 export const EventKind = Schema.Union(
-  Schema.Literal("city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "login_started", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed"),
+  Schema.Literal("city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "login_started", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed", "went_back", "file_restored"),
   Schema.Literal("building_configured"),
+  Schema.Literal("building_removed"),
   Schema.Literal("session_opened"),
   Schema.Literal("prompt_shape_compared"),
   Schema.Literal("roadmap_split"),
@@ -523,6 +550,7 @@ export const EventKind = Schema.Union(
   Schema.Literal("adviser_asked"),
   Schema.Literal("adviser_answered"),
   Schema.Literal("adviser_fell_back"),
+  Schema.Literal("cache_renewed"),
 ).annotations({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -545,9 +573,12 @@ export type Seq = typeof Seq.Type;
  */
 export const RunSummary = Schema.Struct({
   addr: Schema.optional(Schema.NullOr(Address)),
+  ask: Schema.optional(Schema.NullOr(Schema.String)),
+  completion: Schema.optional(Schema.NullOr(Schema.String)),
   frozen: Schema.Boolean,
   last_kind: EventKind,
   last_seq: Seq,
+  pr: Schema.optional(Schema.NullOr(Schema.String)),
   run: RunId,
   started: Schema.optional(Schema.NullOr(TimeMs)),
   who: Schema.String,
@@ -644,6 +675,7 @@ export type CommitsAnswer = typeof CommitsAnswer.Type;
  * disagree with the run about which file they are looking at.
  */
 export const ConfigLayer = Schema.Union(
+  Schema.Literal("default"),
   Schema.Literal("city"),
   Schema.Literal("building"),
   Schema.Literal("resident"),
@@ -660,9 +692,22 @@ export const SettledEffort = Schema.Struct({
 export type SettledEffort = typeof SettledEffort.Type;
 
 /**
+ * The whole percents a file may state for the second rung, both ends
+ * included: the two figures `kernel::config::SecondThreshold`'s one
+ * construction point reads, answered so a page that states the span
+ * does not spell it a second time.
+ */
+export const SecondDomain = Schema.Struct({
+  max: Schema.Int,
+  min: Schema.Int,
+}).annotations({ identifier: "SecondDomain" });
+export type SecondDomain = typeof SecondDomain.Type;
+
+/**
  * `[context] second_threshold`, and the file that settled it.
  */
 export const SettledSecond = Schema.Struct({
+  domain: SecondDomain,
   from: ConfigLayer,
   percent: Schema.Int,
 }).annotations({ identifier: "SettledSecond" });
@@ -718,7 +763,7 @@ export type TuningDefaults = typeof TuningDefaults.Type;
 export const ConfigAnswer = Schema.Struct({
   addr: Address,
   effort: Schema.optional(Schema.NullOr(SettledEffort)),
-  second: Schema.optional(Schema.NullOr(SettledSecond)),
+  second: SettledSecond,
   tuning: TuningDefaults,
 }).annotations({ identifier: "ConfigAnswer" });
 export type ConfigAnswer = typeof ConfigAnswer.Type;
@@ -741,10 +786,21 @@ export const ContentAnswer = Schema.Struct({
 export type ContentAnswer = typeof ContentAnswer.Type;
 
 /**
- * The five cuts of one authoritative total. Each dimension sums to
- * `total` exactly; the interface renders shares against `total` rather
- * than normalising its own rows, so an unattributed remainder stays
- * visible instead of being divided away.
+ * The model calls that came back with no authoritative amount, and the
+ * tokens they used. A city whose provider never prices a call has a
+ * zero `total` after any number of runs; this is what tells that city
+ * apart from one where nothing ran.
+ */
+export const UnpricedCalls = Schema.Struct({
+  calls: Schema.Int,
+  tokens: Schema.Int,
+}).annotations({ identifier: "UnpricedCalls" });
+export type UnpricedCalls = typeof UnpricedCalls.Type;
+
+/**
+ * The five cuts of one authoritative total. Four cuts sum to `total`;
+ * `by_run` names the active runs and the few billed most, so it may sum
+ * to less. Shares render against `total`, so a remainder stays visible.
  */
 export const CostAnswer = Schema.Struct({
   by_actor: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
@@ -753,6 +809,7 @@ export const CostAnswer = Schema.Struct({
   by_skill: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
   by_tool: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
   total: UsdMicros,
+  unpriced: UnpricedCalls,
 }).annotations({ identifier: "CostAnswer" });
 export type CostAnswer = typeof CostAnswer.Type;
 
@@ -804,6 +861,28 @@ export const DiscardAnswer = Schema.Struct({
   rows: Schema.Array(DiscardLine),
 }).annotations({ identifier: "DiscardAnswer" });
 export type DiscardAnswer = typeof DiscardAnswer.Type;
+
+/**
+ * The level this machine gives the core's threads under the person's
+ * setting (sprawling-SPEC 8-93). The dispatched commands are not here:
+ * they always start one level below, and lowering is never refused.
+ */
+export const DoctorCore = Schema.Union(
+  Schema.Literal("raised"),
+  Schema.Literal("held_by_setting"),
+  Schema.Struct({
+    refused: Schema.Struct({
+      said: Schema.String,
+    }),
+  }),
+  Schema.Literal("lowered_by_valve"),
+  Schema.Struct({
+    unasked: Schema.Struct({
+      said: Schema.String,
+    }),
+  }),
+).annotations({ identifier: "DoctorCore" });
+export type DoctorCore = typeof DoctorCore.Type;
 
 /**
  * How long a value the store keeps stays reachable.
@@ -1032,6 +1111,7 @@ export type DoctorVerdict = typeof DoctorVerdict.Type;
  * This machine, item by item, with a verdict for each tier.
  */
 export const DoctorAnswer = Schema.Struct({
+  core: DoctorCore,
   custody: DoctorCustody,
   items: Schema.Array(DoctorItem),
   sandbox: DoctorSandbox,
@@ -1480,9 +1560,58 @@ export const GateRefusal = Schema.Struct({
 export type GateRefusal = typeof GateRefusal.Type;
 
 /**
- * The unified error shape: seven wire fields, serialized in declaration
- * order (determinism rule 6). The model is the recovery subject: `nearby`
- * and `recovery` must hold directly executable information, not apologies.
+ * The kind of one provider failure, as the call site that saw it named
+ * it. It travels on the wire so a page can say it in the reader's own
+ * language; the city's recovery sentence stays beside it for the fold.
+ */
+export const ProviderFailureKind = Schema.Union(
+  Schema.Struct({
+    kind: Schema.Literal("exchange"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("cut"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("silence"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("refused"),
+    status: Schema.Int,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("overflow"),
+    status: Schema.Int,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("unreadable"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("reported"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("unbuilt"),
+  }),
+).annotations({ identifier: "ProviderFailureKind" });
+export type ProviderFailureKind = typeof ProviderFailureKind.Type;
+
+/**
+ * Whether the same request may go out again, said together with
+ * whether its effect already landed. On the wire `"yes"`, `"no"` or
+ * `"unknown"`; a ledger record written as `retriable: true/false`
+ * reads as `Yes`/`No`.
+ */
+export const Retry = Schema.Union(
+  Schema.Literal("yes"),
+  Schema.Literal("no"),
+  Schema.Literal("unknown"),
+).annotations({ identifier: "Retry" });
+export type Retry = typeof Retry.Type;
+
+/**
+ * The unified error shape: seven wire fields and two that are left out
+ * when absent, serialized in declaration order (determinism rule 6).
+ * The model is the recovery subject: `nearby` and `recovery` must hold
+ * directly executable information, not apologies.
  * 
  * Everything but `code` sits behind one Box so the type stays cheap in
  * every seam's return slot (`result_large_err`); serde flatten keeps the
@@ -1493,8 +1622,10 @@ export const AxError = Schema.Struct({
   code: AxCode,
   gate: Schema.optional(Schema.NullOr(GateRefusal)),
   nearby: Schema.Array(Schema.String),
+  provider: Schema.optional(Schema.NullOr(ProviderFailureKind)),
   recovery: Schema.String,
-  retriable: Schema.Boolean,
+  retry: Retry,
+  retry_after_ms: Schema.optional(Schema.NullOr(Schema.Int)),
   subject: Schema.String,
 }).annotations({ identifier: "AxError" });
 export type AxError = typeof AxError.Type;
@@ -1834,6 +1965,7 @@ export type Closing = typeof Closing.Type;
  */
 export const Opening = Schema.Struct({
   at: TimeMs,
+  dispatched_by: Schema.optional(Schema.NullOr(Schema.String)),
   goal: Schema.String,
   task: Schema.String,
 }).annotations({ identifier: "Opening" });
@@ -1872,8 +2004,10 @@ export type Output = typeof Output.Type;
  * One tool call inside a turn.
  */
 export const Call = Schema.Struct({
+  answered: Schema.optional(Schema.NullOr(TimeMs)),
   arguments: Schema.optional(Schema.NullOr(Output)),
   at: Seq,
+  called: TimeMs,
   outcome: Outcome,
   output: Schema.optional(Schema.NullOr(Output)),
   subject: Schema.optional(Schema.NullOr(Schema.String)),
@@ -1905,7 +2039,9 @@ export const Note = Schema.Union(
   }),
   Schema.Struct({
     waiting: Schema.Struct({
+      answered: Schema.optional(Schema.NullOr(TimeMs)),
       at: Seq,
+      t: TimeMs,
     }),
   }),
   Schema.Struct({
@@ -1950,6 +2086,7 @@ export type Used = typeof Used.Type;
  */
 export const Turn = Schema.Struct({
   calls: Schema.Array(Call),
+  model: Schema.optional(Schema.NullOr(Schema.String)),
   notes: Schema.Array(Note),
   number: Schema.Int,
   opened: Seq,
@@ -1973,6 +2110,15 @@ export const RoundsAnswer = Schema.Struct({
   turns: Schema.Array(Turn),
 }).annotations({ identifier: "RoundsAnswer" });
 export type RoundsAnswer = typeof RoundsAnswer.Type;
+
+/**
+ * What each run a `Query::RunCosts` named was billed.
+ */
+export const RunCostsAnswer = Schema.Struct({
+  asked: Schema.Array(RunId),
+  runs: Schema.Array(Schema.Tuple(RunId, UsdMicros)),
+}).annotations({ identifier: "RunCostsAnswer" });
+export type RunCostsAnswer = typeof RunCostsAnswer.Type;
 
 /**
  * Which shelf a holding sits on, and where its document is.
@@ -2172,6 +2318,9 @@ export const Answer = Schema.Union(
     cost_of: CostOfAnswer,
   }),
   Schema.Struct({
+    run_costs: RunCostsAnswer,
+  }),
+  Schema.Struct({
     listing: ListingAnswer,
   }),
   Schema.Struct({
@@ -2217,6 +2366,193 @@ export const Answer = Schema.Union(
   }),
 ).annotations({ identifier: "Answer" });
 export type Answer = typeof Answer.Type;
+
+/**
+ * The asking side's own number for one question, minted monotonically
+ * per connection and echoed on the answer.
+ */
+export const AskId = Schema.Int.pipe(Schema.brand("AskId"));
+export type AskId = typeof AskId.Type;
+
+/**
+ * Whether the question was answered or refused. A refusal of a question
+ * travels here rather than as a bare `Refusal` frame, so the page knows
+ * which question fell through.
+ */
+export const AskOutcome = Schema.Union(
+  Schema.Struct({
+    answer: Answer,
+  }),
+  Schema.Struct({
+    refusal: AxError,
+  }),
+).annotations({ identifier: "AskOutcome" });
+export type AskOutcome = typeof AskOutcome.Type;
+
+/**
+ * The reply to one [`Ask`].
+ * 
+ * `as_of` is the first seq the answer does not reflect: the answer holds
+ * every record before it and none from it on. It and the answer are read
+ * under the same view lock, and a view that has folded nothing answers
+ * with `Seq::FIRST`, so genesis is never mistaken for already folded.
+ */
+export const Answered = Schema.Struct({
+  as_of: Seq,
+  ask_id: AskId,
+  outcome: AskOutcome,
+}).annotations({ identifier: "Answered" });
+export type Answered = typeof Answered.Type;
+
+/**
+ * Queries read state. They are cacheable and free of side effects, so none
+ * carries an `IdemKey` - a Query that needed one would have stopped being a
+ * Query.
+ */
+export const Query = Schema.Union(
+  Schema.Literal("city_view", "approval_queue", "metrics", "cost_view", "registry_view", "discard_view"),
+  Schema.Struct({
+    history: Schema.Struct({
+      before: Schema.optional(Schema.NullOr(Seq)),
+      limit: Schema.Int,
+    }),
+  }),
+  Schema.Struct({
+    run_history: Schema.Struct({
+      before: Schema.optional(Schema.NullOr(Seq)),
+      limit: Schema.Int,
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    history_range: Schema.Struct({
+      from: Seq,
+      limit: Schema.Int,
+      to: Seq,
+    }),
+  }),
+  Schema.Struct({
+    changes: Schema.Struct({
+      base: GitOid,
+      head: Schema.optional(Schema.NullOr(GitOid)),
+    }),
+  }),
+  Schema.Struct({
+    hunks: Schema.Struct({
+      oid_a: GitOid,
+      oid_b: GitOid,
+      path: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    commit: Schema.Struct({
+      oid: GitOid,
+    }),
+  }),
+  Schema.Struct({
+    run_view: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    inbox_view: Schema.Struct({
+      addr: Address,
+    }),
+  }),
+  Schema.Struct({
+    archive_search: Schema.Struct({
+      needle: Schema.String,
+    }),
+  }),
+  Schema.Literal("endpoint_view"),
+  Schema.Struct({
+    building_view: Schema.Struct({
+      addr: Address,
+    }),
+  }),
+  Schema.Literal("governance"),
+  Schema.Struct({
+    rounds: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    evidence: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    cost_of: Schema.Struct({
+      node: NodeId,
+    }),
+  }),
+  Schema.Struct({
+    listing: Schema.Struct({
+      at: Schema.optional(Schema.NullOr(Address)),
+    }),
+  }),
+  Schema.Struct({
+    document: Schema.Struct({
+      at: Address,
+    }),
+  }),
+  Schema.Struct({
+    commits: Schema.Struct({
+      before: Schema.optional(Schema.NullOr(Seq)),
+      building: Schema.optional(Schema.NullOr(Address)),
+      limit: Schema.Int,
+    }),
+  }),
+  Schema.Literal("doctor"),
+  Schema.Struct({
+    prefix: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    content: Schema.Struct({
+      locator: Locator,
+    }),
+  }),
+  Schema.Struct({
+    skills: Schema.Struct({
+      building: Address,
+    }),
+  }),
+  Schema.Struct({
+    git_status: Schema.Struct({
+      building: Address,
+    }),
+  }),
+  Schema.Struct({
+    mcp_health: Schema.Struct({
+      addr: Address,
+    }),
+  }),
+  Schema.Literal("toolkits"),
+  Schema.Literal("newest_release"),
+  Schema.Literal("preferences"),
+  Schema.Struct({
+    config: Schema.Struct({
+      addr: Address,
+    }),
+  }),
+  Schema.Struct({
+    run_costs: Schema.Struct({
+      runs: Schema.Array(RunId),
+    }),
+  }),
+).annotations({ identifier: "Query" });
+export type Query = typeof Query.Type;
+
+/**
+ * One question, carrying the number its answer will come back under.
+ */
+export const Ask = Schema.Struct({
+  ask_id: AskId,
+  query: Query,
+}).annotations({ identifier: "Ask" });
+export type Ask = typeof Ask.Type;
 
 /**
  * One field written into every request body this endpoint receives.
@@ -2363,7 +2699,7 @@ export type NoSecret = typeof NoSecret.Type;
  * 
  * `at_seq` is the line itself and not the line after it: a branch
  * inherits through that line, and the safe point the rebuild settles on
- * is that value or an earlier one (`runtime::fork::inherited`).
+ * is that value or an earlier one (`runtime::fork::inherited_indexed`).
  */
 export const Origin = Schema.Struct({
   at_seq: Seq,
@@ -2485,6 +2821,7 @@ export const Command = Schema.Union(
       goal: Schema.String,
       idem: IdemKey,
       mode: Mode,
+      model: Schema.optional(Schema.NullOr(Schema.String)),
       session: Schema.optional(Schema.NullOr(SessionName)),
       task: Schema.String,
     }),
@@ -2555,6 +2892,12 @@ export const Command = Schema.Union(
     }),
   }),
   Schema.Struct({
+    remove_building: Schema.Struct({
+      addr: Address,
+      idem: IdemKey,
+    }),
+  }),
+  Schema.Struct({
     put_secret: Schema.Struct({
       name: Schema.String,
       realm: Schema.String,
@@ -2584,6 +2927,12 @@ export const Command = Schema.Union(
     reveal: Schema.Struct({
       at: Address,
       idem: IdemKey,
+    }),
+  }),
+  Schema.Struct({
+    restore_discard: Schema.Struct({
+      idem: IdemKey,
+      restoration: Restoration,
     }),
   }),
   Schema.Struct({
@@ -2700,140 +3049,14 @@ export const Hello = Schema.Struct({
 export type Hello = typeof Hello.Type;
 
 /**
- * Queries read state. They are cacheable and free of side effects, so none
- * carries an `IdemKey` - a Query that needed one would have stopped being a
- * Query.
+ * Whether this session counts as somebody watching the monitor.
  */
-export const Query = Schema.Union(
-  Schema.Literal("city_view", "approval_queue", "metrics", "cost_view", "registry_view", "discard_view"),
-  Schema.Struct({
-    history: Schema.Struct({
-      before: Schema.optional(Schema.NullOr(Seq)),
-      limit: Schema.Int,
-    }),
-  }),
-  Schema.Struct({
-    run_history: Schema.Struct({
-      before: Schema.optional(Schema.NullOr(Seq)),
-      limit: Schema.Int,
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    history_range: Schema.Struct({
-      from: Seq,
-      limit: Schema.Int,
-      to: Seq,
-    }),
-  }),
-  Schema.Struct({
-    changes: Schema.Struct({
-      base: GitOid,
-      head: Schema.optional(Schema.NullOr(GitOid)),
-    }),
-  }),
-  Schema.Struct({
-    hunks: Schema.Struct({
-      oid_a: GitOid,
-      oid_b: GitOid,
-      path: Schema.String,
-    }),
-  }),
-  Schema.Struct({
-    commit: Schema.Struct({
-      oid: GitOid,
-    }),
-  }),
-  Schema.Struct({
-    run_view: Schema.Struct({
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    inbox_view: Schema.Struct({
-      addr: Address,
-    }),
-  }),
-  Schema.Struct({
-    archive_search: Schema.Struct({
-      needle: Schema.String,
-    }),
-  }),
-  Schema.Literal("endpoint_view"),
-  Schema.Struct({
-    building_view: Schema.Struct({
-      addr: Address,
-    }),
-  }),
-  Schema.Literal("governance"),
-  Schema.Struct({
-    rounds: Schema.Struct({
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    evidence: Schema.Struct({
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    cost_of: Schema.Struct({
-      node: NodeId,
-    }),
-  }),
-  Schema.Struct({
-    listing: Schema.Struct({
-      at: Schema.optional(Schema.NullOr(Address)),
-    }),
-  }),
-  Schema.Struct({
-    document: Schema.Struct({
-      at: Address,
-    }),
-  }),
-  Schema.Struct({
-    commits: Schema.Struct({
-      before: Schema.optional(Schema.NullOr(Seq)),
-      building: Schema.optional(Schema.NullOr(Address)),
-      limit: Schema.Int,
-    }),
-  }),
-  Schema.Literal("doctor"),
-  Schema.Struct({
-    prefix: Schema.Struct({
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    content: Schema.Struct({
-      locator: Locator,
-    }),
-  }),
-  Schema.Struct({
-    skills: Schema.Struct({
-      building: Address,
-    }),
-  }),
-  Schema.Struct({
-    git_status: Schema.Struct({
-      building: Address,
-    }),
-  }),
-  Schema.Struct({
-    mcp_health: Schema.Struct({
-      addr: Address,
-    }),
-  }),
-  Schema.Literal("toolkits"),
+export const Monitoring = Schema.Union(
   Schema.Literal("release"),
-  Schema.Literal("preferences"),
-  Schema.Struct({
-    config: Schema.Struct({
-      addr: Address,
-    }),
-  }),
-).annotations({ identifier: "Query" });
-export type Query = typeof Query.Type;
+  Schema.Literal("watch"),
+  Schema.Literal("watch_summary"),
+).annotations({ identifier: "Monitoring" });
+export type Monitoring = typeof Monitoring.Type;
 
 /**
  * Everything a client may send.
@@ -2846,7 +3069,10 @@ export const ClientFrame = Schema.Union(
     command: Command,
   }),
   Schema.Struct({
-    query: Query,
+    ask: Ask,
+  }),
+  Schema.Struct({
+    monitor: Monitoring,
   }),
 ).annotations({ identifier: "ClientFrame" });
 export type ClientFrame = typeof ClientFrame.Type;
@@ -2902,6 +3128,25 @@ export const Lagged = Schema.Struct({
 export type Lagged = typeof Lagged.Type;
 
 /**
+ * Which of a command's two outputs a piece came from.
+ */
+export const OutputStream = Schema.Literal("out", "err").annotations({ identifier: "OutputStream" });
+export type OutputStream = typeof OutputStream.Type;
+
+/**
+ * One piece of a running command's output, on its way to a page.
+ * 
+ * `text` is decoded lossily: a piece ends at a byte bound, which can
+ * fall inside a character, and the settled result is what a page keeps.
+ */
+export const LiveOutput = Schema.Struct({
+  run: RunId,
+  stream: OutputStream,
+  text: Schema.String,
+}).annotations({ identifier: "LiveOutput" });
+export type LiveOutput = typeof LiveOutput.Type;
+
+/**
  * Who reads a log line, and when.
  * 
  * The five `docs/logging.md` names, spelled on the wire exactly as
@@ -2927,10 +3172,32 @@ export const LogLine = Schema.Struct({
 export type LogLine = typeof LogLine.Type;
 
 /**
+ * One reading of every counter the monitor shows, in integers because
+ * it travels on the wire (sprawling-SPEC.md 8-94).
+ */
+export const Sample = Schema.Struct({
+  core_cpu_permille: Schema.Int,
+  core_private_bytes: Schema.Int,
+  core_read_bytes: Schema.Int,
+  core_working_set_bytes: Schema.Int,
+  core_written_bytes: Schema.Int,
+  durable_lag: Schema.Int,
+  event_to_screen_p50_nanos: Schema.Int,
+  ledger_queue_depth: Schema.Int,
+  machine_available_bytes: Schema.Int,
+  machine_cpu_permille: Schema.Int,
+  queued_runs: Schema.Int,
+  relay_p50_nanos: Schema.Int,
+  volume_free_bytes: Schema.Int,
+}).annotations({ identifier: "Sample" });
+export type Sample = typeof Sample.Type;
+
+/**
  * The server's answer to a `Hello` it accepted.
  */
 export const Welcome = Schema.Struct({
   city: Schema.optional(Schema.NullOr(Address)),
+  epoch: Schema.optional(Schema.NullOr(B3Hash)),
   resume_from: Schema.optional(Schema.NullOr(Seq)),
   schema: B3Hash,
   wire_v: Schema.Int,
@@ -2956,7 +3223,7 @@ export const ServerFrame = Schema.Union(
     event: EventRecord,
   }),
   Schema.Struct({
-    answer: Answer,
+    answered: Answered,
   }),
   Schema.Struct({
     refusal: AxError,
@@ -2969,6 +3236,12 @@ export const ServerFrame = Schema.Union(
   }),
   Schema.Struct({
     lagged: Lagged,
+  }),
+  Schema.Struct({
+    output: LiveOutput,
+  }),
+  Schema.Struct({
+    monitor: Sample,
   }),
 ).annotations({ identifier: "ServerFrame" });
 export type ServerFrame = typeof ServerFrame.Type;

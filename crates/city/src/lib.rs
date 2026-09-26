@@ -14,6 +14,8 @@ mod config_layers;
 mod document;
 mod gitignore;
 mod governed;
+mod handoff_form;
+mod history;
 mod library;
 mod neighbourhood;
 mod neighbours_tool;
@@ -40,19 +42,23 @@ pub use building::adopted_payload as building_adopted_payload;
 pub use building::all as buildings;
 pub use building::configured_payload as building_configured_payload;
 pub use building::created_payload as building_created_payload;
-pub use building::{Building, BuildingTemplate, create as create_building};
+pub use building::remove as remove_building;
+pub use building::removed_payload as building_removed_payload;
+pub use building::{Building, BuildingTemplate, Removed, create as create_building};
 pub use check::{Finding, Position, Report, check};
 pub use city_tool::CityTool;
 pub use config_layers::path as config_path;
 pub use config_layers::write_second_threshold;
 pub use config_layers::{ConfigLayer, Layer, load as load_config};
-pub use config_layers::{own_layer, write_session};
+pub use config_layers::{keep_warm, own_layer, write_session};
 pub use config_layers::{settled_effort, settled_second, write_effort, write_mcp, write_sandbox};
 pub use document::{Held, edit as edit_document, edit_against};
 pub use governed::{Governed, PREFERENCES_FILE, write_governed};
+pub use history::{History, has_history};
 // Where each of these files sits is `kernel::layout`'s answer, and the
 // names are re-exported rather than restated so that a caller reading
 // `city::CONFIG_TOML` and the layout that places it cannot disagree.
+pub use handoff_form::{HandoffSections, handoff_sections};
 pub use kernel::layout::{ARCHIVE_DIR, BUILDING_SHELF, CONFIG_FILE, LIBRARY_DIR, URBANITE_FILE};
 pub use library::{Holding, Library, Shelf};
 pub use library::{Installed, Placed, PlannedInstall, Slot};

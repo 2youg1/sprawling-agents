@@ -33,7 +33,7 @@ fn call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
 #[test]
 fn an_edit_against_the_version_it_saw_lands_and_echoes_a_diff() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     std::fs::write(tmp.path().join("work/a.txt"), "one\ntwo\nthree\n").unwrap();
     let version = version_of(b"one\ntwo\nthree\n");
     let outcome = tool
@@ -56,7 +56,7 @@ fn an_edit_against_the_version_it_saw_lands_and_echoes_a_diff() {
 #[test]
 fn a_file_that_moved_refuses_and_names_the_version_it_is_at_now() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     std::fs::write(tmp.path().join("work/a.txt"), "current\n").unwrap();
     let err = match tool.invoke(&call("work/a.txt", "0000000000000000", "current", "next")) {
         Err(err) => err,
@@ -74,7 +74,7 @@ fn a_file_that_moved_refuses_and_names_the_version_it_is_at_now() {
 #[test]
 fn base_version_new_creates_the_file_and_parents() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     let outcome = tool
         .invoke(&call("work/room/notes.md", "new", "", "first line\n"))
         .unwrap();
@@ -93,7 +93,7 @@ fn base_version_new_creates_the_file_and_parents() {
 #[test]
 fn creating_over_an_existing_file_is_a_version_conflict_naming_the_real_version() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     std::fs::write(tmp.path().join("work/a.txt"), "already\n").unwrap();
     let err = match tool.invoke(&call("work/a.txt", "new", "", "other\n")) {
         Err(err) => err,
@@ -110,7 +110,7 @@ fn creating_over_an_existing_file_is_a_version_conflict_naming_the_real_version(
 #[test]
 fn creating_with_a_nonempty_old_is_refused_with_the_form_to_use() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     let err = match tool.invoke(&call("work/b.txt", "new", "something", "content")) {
         Err(err) => err,
         Ok(_) => panic!("a create replaces nothing"),
@@ -123,7 +123,7 @@ fn creating_with_a_nonempty_old_is_refused_with_the_form_to_use() {
 fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("outside.txt"), "x").unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     for hostile in ["outside.txt", "elsewhere/f.md", ".sprawling/ledger/x"] {
         let err = match tool.invoke(&call(hostile, "new", "", "y")) {
             Err(err) => err,
@@ -154,7 +154,7 @@ fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
 #[test]
 fn a_missing_file_names_the_create_form_in_its_recovery() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     let version = version_of(b"whatever");
     let err = match tool.invoke(&call("work/absent.md", &version, "a", "b")) {
         Err(err) => err,
@@ -166,7 +166,7 @@ fn a_missing_file_names_the_create_form_in_its_recovery() {
 #[test]
 fn zero_or_many_matches_refuse_with_the_count() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     std::fs::write(tmp.path().join("work/a.txt"), "x\nx\n").unwrap();
     let version = version_of(b"x\nx\n");
     let err = match tool.invoke(&call("work/a.txt", &version, "x", "y")) {
@@ -186,7 +186,7 @@ fn zero_or_many_matches_refuse_with_the_count() {
 #[test]
 fn a_call_for_another_tool_is_refused_not_routed() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     let mut wrong = call("work/a.txt", "v", "a", "b");
     wrong.name = ToolName::parse("exec").unwrap();
     let err = match tool.invoke(&wrong) {
@@ -202,8 +202,7 @@ fn a_documents_tool_writes_markdown_and_refuses_code_by_name() {
     std::fs::create_dir_all(tmp.path().join("hall")).unwrap();
     let hall = Address::parse("hall").unwrap();
     let domain = kernel::WriteDomain::documents(vec![hall.clone()]).unwrap();
-    let mut tool =
-        EditTool::new(tmp.path(), Address::parse("hall/mayor").unwrap(), domain).unwrap();
+    let tool = EditTool::new(tmp.path(), Address::parse("hall/mayor").unwrap(), domain).unwrap();
     tool.invoke(&call(
         "hall/note.md",
         "new",
@@ -257,7 +256,7 @@ fn place_link(file: bool, from: &Path, to: &Path) -> bool {
 #[test]
 fn an_edit_through_a_link_to_a_reserved_path_is_refused() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     std::fs::create_dir_all(tmp.path().join(".git").join("hooks")).unwrap();
     let hook = tmp.path().join(".git").join("hooks").join("pre-run");
     std::fs::write(&hook, b"hook-body").unwrap();
@@ -293,7 +292,7 @@ fn an_edit_through_a_link_to_a_reserved_path_is_refused() {
 #[test]
 fn creating_below_a_link_leaves_the_link_target_untouched() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     let hooks = tmp.path().join(".git").join("hooks");
     std::fs::create_dir_all(&hooks).unwrap();
     if !place_link(true, &hooks, &tmp.path().join("work").join("alias-dir")) {
@@ -317,7 +316,7 @@ fn creating_below_a_link_leaves_the_link_target_untouched() {
 #[test]
 fn an_edit_through_a_hard_link_leaves_the_reserved_file_whole() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut tool = tool(tmp.path());
+    let tool = tool(tmp.path());
     std::fs::create_dir_all(tmp.path().join(".git").join("hooks")).unwrap();
     let hook = tmp.path().join(".git").join("hooks").join("pre-run");
     std::fs::write(&hook, b"hook-body").unwrap();

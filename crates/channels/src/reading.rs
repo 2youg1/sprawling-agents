@@ -17,7 +17,9 @@
 //! rather than an error, because a view that hid a record it could not
 //! parse would be a view that lies about what happened.
 
-use kernel::event::record::{CheckpointCommitted, FileDiscarded, FiredAction, WatchdogFired};
+use kernel::event::record::{
+    CheckpointCommitted, FileDiscarded, FiredAction, ProviderDegraded, WatchdogFired,
+};
 use kernel::{AxCode, AxError, EventKind, EventRecord, Seq};
 
 use crate::answer::{Note, Output, Used};
@@ -68,22 +70,18 @@ fn blocks_of(message: &serde_json::Value, kind: &str, field: &str) -> Option<Str
     (!found.is_empty()).then(|| found.join("\n"))
 }
 
-/// The counters `ModelUsage` carries. Absent when the provider sent no
-/// usage, which is a different fact from having spent nothing.
+/// The counters `ModelUsage` carries, read through its own
+/// deserialisation so a row written under an older meaning of
+/// `input_tokens` is converted by the one reader that knows the versions.
+/// Absent when the row carries no usage it can read, which is a
+/// different fact from having spent nothing.
 #[must_use]
 pub fn used_in(usage: &serde_json::Value) -> Option<Used> {
-    let map = usage.as_object()?;
-    let counter = |name: &str| {
-        map.get(name)
-            .and_then(serde_json::Value::as_u64)
-            .map(kernel::Tokens::new)
-    };
-    let input = counter("input_tokens")?;
-    let output = counter("output_tokens")?;
+    let usage = <kernel::ModelUsage as serde::Deserialize>::deserialize(usage).ok()?;
     Some(Used {
-        input,
-        output,
-        cached: counter("cache_read_tokens").unwrap_or_default(),
+        input: usage.input_tokens,
+        output: usage.output_tokens,
+        cached: usage.cache_read_tokens,
     })
 }
 
@@ -166,18 +164,24 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
                 Err(err) => unreadable(kind, &err, at),
             })
         }
-        EventKind::ProviderDegraded => {
-            let value = serde_json::Value::Object(map.clone());
-            Some(match serde_json::from_value(value) {
-                Ok(error) => Note::Refused { error, at },
-                Err(err) => unreadable(kind, &err, at),
-            })
-        }
+        // The vault's fallback to session memory shares this kind and
+        // changed nothing a turn did.
+        EventKind::ProviderDegraded => match record.data().read() {
+            Ok(ProviderDegraded::Refused(error)) => Some(Note::Refused { error, at }),
+            Ok(ProviderDegraded::VaultFellBack(_)) => None,
+            Err(err) => Some(unreadable(kind, &err, at)),
+        },
         EventKind::WatchdogFired => match record.data().read::<WatchdogFired>() {
             Ok(fired) => backed_off(fired.action, at),
             Err(err) => Some(unreadable(kind, &err, at)),
         },
-        EventKind::ApprovalRequested => Some(Note::Waiting { at }),
+        // When the person answered is recorded under the city's own run,
+        // which this one record cannot see; the rounds fold pairs it.
+        EventKind::ApprovalRequested => Some(Note::Waiting {
+            at,
+            t: record.t(),
+            answered: None,
+        }),
         // The job pin that opens a dispatch is a `checkpoint_committed`
         // naming no commit, and the record type says so rather than
         // leaving this reader to infer it from a missing key.

@@ -44,10 +44,12 @@ mod toolkits;
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
 pub use commits::{CommitAnswer, CommitsAnswer};
-pub use config::{ConfigAnswer, ConfigLayer, SettledEffort, SettledSecond, TuningDefaults};
-pub use cost_of::CostOfAnswer;
+pub use config::{
+    ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSecond, TuningDefaults,
+};
+pub use cost_of::{CostOfAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use doctor::DoctorSandboxMissing;
-pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
@@ -102,6 +104,15 @@ pub struct RunSummary {
     pub addr: Option<Address>,
     /// When the run began, from the same record.
     pub started: Option<TimeMs>,
+    /// How the run ended, as its `run_frozen` record says. Absent while
+    /// it runs, and when the view never saw the freeze.
+    pub completion: Option<String>,
+    /// The branch of the last pull request the run opened; a pull
+    /// request in the city is named by its branch and has no number.
+    pub pr: Option<String>,
+    /// What the run waits for the person to allow. Present exactly when
+    /// `last_kind` is `approval_requested`.
+    pub ask: Option<String>,
 }
 
 /// What the settings page reads back: what is attached, and what each
@@ -159,6 +170,8 @@ pub struct ChosenSummary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CityAnswer {
+    /// Every active run and the latest frozen few, in RunId order;
+    /// `frozen` counts every frozen run, listed or not.
     pub runs: Vec<RunSummary>,
     pub active: u64,
     pub frozen: u64,
@@ -192,10 +205,9 @@ pub struct ApprovalsAnswer {
     pub items: Vec<ApprovalItem>,
 }
 
-/// The five cuts of one authoritative total. Each dimension sums to
-/// `total` exactly; the interface renders shares against `total` rather
-/// than normalising its own rows, so an unattributed remainder stays
-/// visible instead of being divided away.
+/// The five cuts of one authoritative total. Four cuts sum to `total`;
+/// `by_run` names the active runs and the few billed most, so it may sum
+/// to less. Shares render against `total`, so a remainder stays visible.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostAnswer {
@@ -205,6 +217,19 @@ pub struct CostAnswer {
     pub by_segment: Vec<(String, UsdMicros)>,
     pub by_tool: Vec<(String, UsdMicros)>,
     pub by_skill: Vec<(String, UsdMicros)>,
+    /// The calls no provider priced, which `total` cannot show.
+    pub unpriced: UnpricedCalls,
+}
+
+/// The model calls that came back with no authoritative amount, and the
+/// tokens they used. A city whose provider never prices a call has a
+/// zero `total` after any number of runs; this is what tells that city
+/// apart from one where nothing ran.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct UnpricedCalls {
+    pub calls: u64,
+    pub tokens: u64,
 }
 
 /// What a query returns. `Unavailable` is a real answer: a view this
@@ -238,6 +263,7 @@ pub enum Answer {
     Rounds(Box<RoundsAnswer>),
     Evidence(EvidenceAnswer),
     CostOf(CostOfAnswer),
+    RunCosts(RunCostsAnswer),
     Listing(ListingAnswer),
     Document(Box<DocumentAnswer>),
     Commits(CommitsAnswer),

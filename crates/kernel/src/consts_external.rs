@@ -71,7 +71,7 @@ pub fn readable_log_v(v: u64) -> LogVersion {
 }
 
 /// The L0 tool set: always present, never discovered (5.1).
-pub const L0_TOOLS: [&str; 3] = ["exec", "edit", "status"];
+pub const L0_TOOLS: [&str; 3] = [crate::ToolName::EXEC, "edit", "status"];
 
 /// One secret shape: prefix + charset + length window (7.1). The table is
 /// data, not code; it grows with providers, and `kernel::secret::scan`

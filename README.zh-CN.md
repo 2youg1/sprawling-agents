@@ -175,7 +175,7 @@ sprawling help                      # 所有命令，一屏列完
 |---|---|---|
 | 订阅登录情报（跟随 [`docs/third-party.md`](docs/third-party.md) §1 列出的四个 harness 家族） | `gateway::oauth_profiles`（只有数据零分支）、`gateway::credential`（流程与续期） | 加一行 profile。**凭证保管恒不外包**：明文只到运行中的机器的凭证服务 |
 | 模型 endpoint 与 dialect | `gateway::endpoint`、`gateway::dialect`；本地推理走 `gateway::native` | 设置页里填 base URL 与 dialect；本地模型直连，不过网关 |
-| SaaS 与外部工具（[Composio](https://composio.dev) 是其中一个 MCP server） | `protocol::mcp` 的 `Outbound` seam、`bin::mcp_stdio` 与 `bin::mcp_http`、楼的 `CONFIG.toml` | 改一个 URL 或一条命令就换了 server；保密楼一个都不起 |
+| SaaS 与外部工具（[Composio](https://composio.dev) 是其中一个 MCP server） | `protocol::mcp` 的 `Outbound` seam、`protocol::mcp::stdio` 与 `protocol::mcp::http`、楼的 `CONFIG.toml` | 改一个 URL 或一条命令就换了 server；保密楼一个都不起 |
 | sandbox | `runtime::sandbox` seam（今天的适配器是 wasmtime fuel） | 实现这道 seam，过它的 conformance 断言套件 |
 | 客户端 | `channels::wire` 是唯一 API 面 | 想写第二个客户端，就对着这套线格式写 |
 
@@ -226,10 +226,10 @@ just check
 
 **浏览器那一页站的是同一类东西。** 它的运行时依赖是 `svelte`、`effect`，以及 `@lezer` 语法高亮器和它的语法包（MIT），页面第一次显示代码时才下载；里面没有任何 UI 库：`client/src/views/parts/` 里的控件都是这个仓库自己写的。从 W3C 的 ARIA Authoring Practices 与 Kobalte、Ark UI 的文档里取的是写成文字的行为：一个控件实现哪个模式、每个键做什么、关闭时焦点还给谁。**他们的代码一行都没有进树，所以这件事不欠任何许可义务**；读出来的那张键盘表落在 [`client/client-SPEC.md`](client/client-SPEC.md) 里。
 
-**[`skills/`](skills/) 下的六件 skill 站在更早的工作上，件件注明。** 其中三件——`sdd`、`tutor`、`translation`——是我用中文写作并以 AGPL-3.0-or-later 开源的 skill 的英译改编版（translation 原文的署名还记着 Claude Fable 5），**许可仅在本项目内改为 CC BY-NC 4.0**。另外三件——`why`、`how`、`blast-radius`——是我对 [pstack](https://github.com/cursor/plugins/tree/main/pstack)（Lauren Tan (poteto)，MIT）的改编版，**保持 MIT，且件件注明改编者是我**。`skills/LICENSES.md` 随目录走，发布归档里也有。这一段就是致谢，条款在 [`docs/third-party.md`](docs/third-party.md) §5。
+**[`skills/`](skills/) 下的六件 skill 站在更早的工作上，件件注明。** 其中三件——`sdd`、`tutor`、`translation`——是我用中文写作并以 AGPL-3.0-or-later 开源的 skill 的英译改编版（translation 原文的署名还记着 Claude Fable 5），在本项目里与全仓一样取 **MPL-2.0**。另外三件——`why`、`how`、`blast-radius`——是我对 [pstack](https://github.com/cursor/plugins/tree/main/pstack)（Lauren Tan (poteto)，MIT）的改编版，**保持 MIT，且件件注明改编者是我**。`skills/LICENSES.md` 随目录走，发布归档里也有。这一段就是致谢，条款在 [`docs/third-party.md`](docs/third-party.md) §5。
 
 外部应用的连接同样外包出去：城对任意 MCP server 说 MCP，Composio 是其中之一。这个仓库不带任何人的 key、不替谁付钱、不做代理。完整清单、怎么复核、许可怎么处理在 [`docs/third-party.md`](docs/third-party.md)。代码依赖的许可由 `cargo deny` 逐个核对，白名单是 [`deny.toml`](deny.toml)。
 
 ## 许可
 
-MPL-2.0，见 [`LICENSE`](LICENSE)；[`skills/`](skills/) 下的 skill 除外——自用三件带 **CC BY-NC 4.0**（仅本项目变更许可），pstack 改编三件保持 **MIT**；随发布归档走的 `skills/LICENSES.md` 携全文与署名，条款见 [`docs/third-party.md`](docs/third-party.md) §5。
+MPL-2.0，见 [`LICENSE`](LICENSE)；[`skills/`](skills/) 下的 skill 除外——自写三件与全仓一样取 **MPL-2.0**，`cursor/plugins` 改编四件保持 **MIT**；随发布归档走的 `skills/LICENSES.md` 携全文与署名，条款见 [`docs/third-party.md`](docs/third-party.md) §5。

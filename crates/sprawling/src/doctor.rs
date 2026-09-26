@@ -41,10 +41,11 @@ mod visit;
 pub(crate) use family::Family;
 pub(crate) use presence::{Absence, Fault, Presence, Version};
 pub(crate) use probe::{Machine, ThisMachine};
-pub(crate) use report::report;
-pub(crate) use running::Runnable;
+pub(crate) use report::answer;
 pub use screen::verb;
 pub(crate) use table::REQUIREMENTS;
+
+use accounting::Recipe;
 
 /// How long one `--version` call may take before this city stops
 /// waiting for it. Generous enough for a cold start on a slow disk,
@@ -212,63 +213,6 @@ pub(crate) enum Detection {
     /// Any member of one browser family, the first that answers.
     /// `SPRAWLING_BROWSER` overrides it (`doctor::family`).
     Family(Family),
-}
-
-/// What installing this item costs on one platform.
-pub(crate) enum Recipe {
-    /// A command this machine may run, once the person has agreed to it.
-    /// Every one of them is a per-user install; none asks for elevation.
-    Command {
-        program: &'static str,
-        args: &'static [&'static str],
-    },
-    /// A command printed and never run. A script piped into a shell is
-    /// code nobody read, so this city prints it and the person decides.
-    Print(&'static str),
-    /// Nothing here can install it; the line says what a person does.
-    Manual(&'static str),
-}
-
-impl Recipe {
-    /// The command as a person would type it, or the manual instruction.
-    pub(crate) fn spelled(&self) -> String {
-        match self {
-            Recipe::Command { program, args } => Runnable::new(program, args).spelled(),
-            Recipe::Print(line) => (*line).to_owned(),
-            Recipe::Manual(how) => format!("manual: {how}"),
-        }
-    }
-
-    /// The program this city may start for `item`, or the refusal that
-    /// says what the person does instead.
-    ///
-    /// **This is the only place a recipe is refused for not being
-    /// runnable.** Every caller - the terminal, the page, the machine
-    /// adapter - asks here, so a person is told the same thing about a
-    /// printed script whichever door they arrived at.
-    ///
-    /// # Errors
-    /// Refuses a printed recipe, because a script piped into a shell is
-    /// code nobody read, and a manual one, because nothing here can
-    /// install it.
-    pub(crate) fn command(&self, item: &str) -> Result<Runnable<'_>, kernel::AxError> {
-        let recovery = match self {
-            Recipe::Command { program, args } => return Ok(Runnable::new(program, args)),
-            Recipe::Print(_) => {
-                "run the printed line yourself: a script piped into a shell is code nobody read, \
-                 and this city does not read it for you"
-            }
-            Recipe::Manual(_) => {
-                "follow the printed instruction: nothing here can install this one"
-            }
-        };
-        Err(kernel::AxError::failure(
-            kernel::AxCode::ToolUnavailable,
-            "install a tool",
-            format!("{item}: {}", self.spelled()),
-        )
-        .with_recovery(recovery))
-    }
 }
 
 /// One thing this city needs, and everything that can be said about it

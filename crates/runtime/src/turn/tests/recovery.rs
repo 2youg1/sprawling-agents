@@ -226,7 +226,7 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &conversation,
             &[],
             &shape(),
@@ -243,7 +243,7 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            Some(&mut sink),
+            Generating::Watched(&mut sink),
         )
         .unwrap(),
     );
@@ -293,7 +293,7 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &Conversation::new(),
             &[],
             &shape(),
@@ -307,7 +307,7 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            Some(&mut sink),
+            Generating::Watched(&mut sink),
         )
         .unwrap_err();
     assert_eq!(
@@ -315,9 +315,10 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
         provider_wobble(),
         "the original error, field for field"
     );
-    assert!(
-        err.is_retriable(),
-        "the watchdog classifies it from this flag"
+    assert_eq!(
+        err.retry(),
+        kernel::Retry::Yes,
+        "the watchdog classifies it from this envelope"
     );
     assert_eq!(
         model.blocked, 0,

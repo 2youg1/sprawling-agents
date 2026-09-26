@@ -40,7 +40,7 @@ its container and scrolls sideways rather than break a value. -->
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.registry} />
   {:else if answer === undefined}
-    <p class="text-text-disabled">…</p>
+    <p class="text-text-faint">…</p>
   {:else}
     <Table assets={answer.assets} />
   {/if}

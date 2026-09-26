@@ -11,6 +11,7 @@
     clippy::indexing_slicing,
     clippy::string_slice,
     clippy::arithmetic_side_effects,
+    clippy::as_conversions,
     reason = "test code"
 )]
 
@@ -164,6 +165,43 @@ fn a_call_the_provider_never_billed_attributes_nothing() {
     assert_eq!(report.total.get(), 0);
     assert!(report.by_run.is_empty(), "no invented money");
     assert!(report.by_segment.is_empty());
+}
+
+#[test]
+fn a_call_with_no_amount_is_counted_as_unpriced_with_its_tokens() {
+    let run = RunId::from_bytes([4u8; 16]);
+    let mut attribution = Attribution::new();
+    let usage = serde_json::json!({
+        "input_tokens": 1200, "output_tokens": 300,
+        "cache_read_tokens": 40, "cache_write_tokens": 2
+    });
+    for (seq, data) in [
+        serde_json::json!({ "usage": usage }),
+        serde_json::json!({}),
+        serde_json::json!({ "usage": usage, "billed_usd_micros": 700u64 }),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        attribution
+            .apply(&record(
+                run,
+                "dave",
+                seq as u64,
+                EventKind::ModelReturned,
+                data,
+            ))
+            .unwrap();
+    }
+    let report = attribution.report();
+    assert_eq!(
+        report.unpriced,
+        Unpriced {
+            calls: 2,
+            tokens: 1542
+        }
+    );
+    assert_eq!(report.total.get(), 700);
 }
 
 #[test]

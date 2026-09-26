@@ -8,7 +8,7 @@
 use kernel::model::{Mode, Window};
 use kernel::{
     Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, IdemKey, McpServer, ModelTag,
-    Origin, ResidentId, Ruling, RunId, SandboxLimits, Sealed, SessionName,
+    Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -57,6 +57,14 @@ pub enum Command<Secret = Sealed<String>> {
         /// its room is opened, so it is chosen once and holds for every
         /// run in that room (city-SPEC.md section 8-14).
         effort: Option<Effort>,
+        /// Which registered model this one dispatch calls, by its id.
+        ///
+        /// `None` takes the model behind the `main` tag. A value names a
+        /// model the city registered under some tag, so it arrives with
+        /// the endpoint and the window it was registered with; an id the
+        /// city never registered is refused before anything is written
+        /// (channels-SPEC.md section 8-48).
+        model: Option<String>,
     },
     /// One step of a subscription login. Which step is named rather
     /// than inferred: beginning and redeeming are different actions
@@ -192,6 +200,15 @@ pub enum Command<Secret = Sealed<String>> {
         template: TemplateName,
         idem: IdemKey,
     },
+    /// Take a building out of the city. Its files move under the
+    /// reserved subtree and its history stays in the Ledger, so nothing
+    /// the person made is lost; a building with a run going is refused.
+    ///
+    /// Writes `building_removed`.
+    RemoveBuilding {
+        addr: Address,
+        idem: IdemKey,
+    },
     /// The one Command with no byte form. `Secret` is `Sealed<String>` in
     /// process and uninhabited on the wire.
     PutSecret {
@@ -217,6 +234,14 @@ pub enum Command<Secret = Sealed<String>> {
     /// so there is no way to spell a request for anything else.
     Reveal {
         at: Address,
+        idem: IdemKey,
+    },
+    /// Put one recycle-bin row back by the way back it carries. The
+    /// frame carries the row's own restoration rather than a path: a
+    /// path can be discarded twice, and the row already knows which
+    /// commit holds the bytes.
+    RestoreDiscard {
+        restoration: Restoration,
         idem: IdemKey,
     },
     /// Install one thing this machine lacks, named as the doctor's

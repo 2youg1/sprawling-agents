@@ -5,16 +5,59 @@
 
 //! The lines this worker appends, and the fold each one is shown to.
 //!
-//! Three entrances and one rule: the append comes first, and the
+//! Four entrances and one rule: the append comes first, and the
 //! worker's own books - the governance fold, the endpoint book - are
 //! shown the line only once the history has it. A book that stated
 //! what the process hoped to write would be a second authority.
 
 use kernel::{Address, AxError, EventDraft, EventKind, Ledger, Payload, RunId};
 
-use crate::effect;
+use crate::assembly::booking::OpenClaims;
+use accounting::effect;
 
-use super::{RunWorker, now_ms};
+use super::RunWorker;
+
+/// A ledger a dispatch's preparation writes through, with the key of the
+/// command that dispatch answers, so a line written without the worker
+/// is stamped by the rule [`RunWorker::record_for`] follows and a restart
+/// still recognises the command from it (sprawling-SPEC.md 8-93).
+pub(in crate::assembly) struct Stamping<'a, L> {
+    pub(in crate::assembly) ledger: &'a mut L,
+    pub(in crate::assembly) command: Option<kernel::IdemKey>,
+    /// What time it is, for each line's stamp.
+    pub(in crate::assembly) clock: &'a (dyn accounting::Clock + Send + Sync),
+}
+
+impl<L: Ledger> Stamping<'_, L> {
+    /// Appends one line on behalf of `run`, stamped with the command's
+    /// key when there is one.
+    ///
+    /// # Errors
+    /// Propagates a payload that will not take the key, a clock this
+    /// machine will not read, and the ledger's refusal of the line.
+    pub(in crate::assembly) fn record_for(
+        &mut self,
+        run: RunId,
+        line: effect::Line,
+    ) -> Result<(), AxError> {
+        let effect::Line {
+            who,
+            addr,
+            kind,
+            data,
+        } = line;
+        self.ledger.append(EventDraft {
+            run,
+            t: self.clock.now()?,
+            who,
+            addr: Some(addr),
+            kind,
+            data: super::commanding::entrance::stamped(self.command, data)?,
+            ig: false,
+        })?;
+        Ok(())
+    }
+}
 
 impl RunWorker {
     /// Writes one diagnostic line, anchored to where the ledger stands.
@@ -53,7 +96,7 @@ impl RunWorker {
         run: RunId,
         origin: kernel::Origin,
     ) -> Result<(), AxError> {
-        let t = now_ms()?;
+        let t = self.clock.now()?;
         let draft = runtime::fork::fork_draft(origin, run, addr.clone(), t, "owner".to_owned())?;
         self.ledger.append(draft)?;
         self.origins.spent(addr);
@@ -81,10 +124,10 @@ impl RunWorker {
         // The key of the command in flight goes on the record it is
         // writing, and nowhere else: that is how a restarted city reads
         // out of its own history what it has already carried out.
-        let data = self.entrance.stamp(data)?;
+        let data = super::commanding::entrance::stamped(self.doorstep.entrance.carrying(), data)?;
         let draft = EventDraft {
             run: RunId::CITY,
-            t: now_ms()?,
+            t: self.clock.now()?,
             who: "owner".to_owned(),
             addr: addr.clone(),
             kind,
@@ -96,10 +139,7 @@ impl RunWorker {
         // here, because the worker's own books are what its next decision
         // reads: a fold updated only on the rebuild path would answer a
         // dispatch about a session the process has already recorded.
-        self.origins.absorb(kind, addr.as_ref(), &data)?;
-        self.governance.absorb(kind, RunId::CITY, None, &data)?;
-        self.expiries.absorb(kind, &data);
-        self.book.apply_payload(kind, &data)
+        self.absorb(kind, RunId::CITY, addr.as_ref(), &data)
     }
 
     /// Appends one line attributed to a run rather than to the city.
@@ -107,28 +147,71 @@ impl RunWorker {
     /// effect a resident caused must carry the resident's name, or the
     /// history cannot say who spoke.
     pub(super) fn record_for(&mut self, run: RunId, line: effect::Line) -> Result<(), AxError> {
+        let (kind, addr, data) = self.append_for(run, line)?;
+        self.absorb(kind, run, Some(&addr), &data)
+    }
+
+    /// Appends one line of a run's plan step and closes the node it
+    /// closes in `open` as soon as the history has the line, before any
+    /// fold is shown it: a fold that refuses the line afterwards cannot
+    /// take it off the ledger, so a hand-back owed for that node would
+    /// make the history say a finished node was handed back
+    /// (sprawling-SPEC.md 8-42-8).
+    pub(super) fn record_closing(
+        &mut self,
+        run: RunId,
+        closing: effect::Closing,
+        open: &mut OpenClaims,
+    ) -> Result<(), AxError> {
+        let (kind, addr, data) = self.append_for(run, closing.line)?;
+        if let Some(node) = &closing.closes {
+            open.close(node);
+        }
+        self.absorb(kind, run, Some(&addr), &data)
+    }
+
+    /// Appends one line attributed to a run, and hands back what the
+    /// folds are shown: its kind, its room and the stamped payload.
+    fn append_for(
+        &mut self,
+        run: RunId,
+        line: effect::Line,
+    ) -> Result<(EventKind, Address, Payload), AxError> {
         let effect::Line {
             who,
             addr,
             kind,
             data,
         } = line;
-        let data = self.entrance.stamp(data)?;
+        let data = super::commanding::entrance::stamped(self.doorstep.entrance.carrying(), data)?;
         self.ledger.append(EventDraft {
             run,
-            t: now_ms()?,
+            t: self.clock.now()?,
             who,
             addr: Some(addr.clone()),
             kind,
             data: data.clone(),
             ig: false,
         })?;
-        // The book states what the history says, whoever wrote the line.
-        // Without this an approval a run raised was on the ledger and
-        // absent from `pending`, so the person could not answer it until
-        // the process restarted and folded the ledger again. It is the
-        // same fold a restart runs, shown the line this process wrote.
-        self.governance.absorb(kind, run, Some(&addr), &data)?;
-        Ok(())
+        Ok((kind, addr, data))
+    }
+
+    /// Shows one line this worker wrote to every fold it holds, whoever
+    /// the line was written for: a restart folds every line into every
+    /// fold, so a live fold that skipped some writer's lines would
+    /// disagree with the restart until the process restarted
+    /// (sprawling-SPEC.md 8-90). Each fold's own `absorb` decides which
+    /// kinds it reads.
+    fn absorb(
+        &mut self,
+        kind: EventKind,
+        run: RunId,
+        addr: Option<&Address>,
+        data: &Payload,
+    ) -> Result<(), AxError> {
+        self.origins.absorb(kind, run, addr, data)?;
+        self.governance.absorb(kind, run, addr, data)?;
+        self.planning.absorb(kind, addr, data)?;
+        self.credentials.absorb(kind, data)
     }
 }

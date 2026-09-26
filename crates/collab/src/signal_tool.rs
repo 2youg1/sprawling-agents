@@ -25,7 +25,8 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use crate::inbox::{Inbox, Signal, SignalId, SignalKind};
+use crate::inbox::{Inbox, Signal};
+use kernel::event::record::{SignalId, SignalKind};
 
 /// What the run did to the city's signals, in the order it did it. The
 /// worker turns each of these into a ledger line once the drive is over.
@@ -319,7 +320,7 @@ impl Tool for SignalTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,

@@ -6,7 +6,9 @@
 //! What opening a run costs before the model is asked anything.
 
 use kernel::ledger::chain_hash;
-use kernel::{Address, B3Hash, Ceiling, EventRef, GENESIS_PREV, Locator, Seq, ToolOutcome};
+use kernel::{
+    Address, B3Hash, Ceiling, EventRef, GENESIS_PREV, Locator, Seq, ToolCall, ToolOutcome,
+};
 
 use super::*;
 use crate::RunPlan;
@@ -48,6 +50,7 @@ fn plan() -> RunPlan {
         job,
         parent: None,
         predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
         inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),
@@ -56,6 +59,7 @@ fn plan() -> RunPlan {
             context_tokens: 0,
         },
         second_threshold: None,
+        context: crate::ContextReading::default(),
         prefix: FrozenPrefix::assemble(
             FrozenSegment::new(SegmentSlot::City, b"city".to_vec()),
             FrozenSegment::new(SegmentSlot::Building, b"building".to_vec()),
@@ -99,6 +103,7 @@ fn a_dispatch_writes_two_lines_and_samples_the_clock_twice() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| crate::NextCall::Allowed,
         deltas: None,

@@ -27,6 +27,8 @@
 
 //! MCP tools: listing, naming, calling.
 
+use std::sync::Mutex;
+
 use super::handshake::Rpc;
 use super::outbound::{EXTERNAL_CALL_PATIENCE, Outbound};
 use kernel::{
@@ -158,6 +160,13 @@ pub struct McpTool {
     meta: ToolMeta,
     remote: String,
     patience: TimeoutMs,
+    /// The request id and the connection it numbers are one lock: a
+    /// reply is read off the same connection the request went out on,
+    /// so two calls on one server take turns.
+    link: Mutex<Link>,
+}
+
+struct Link {
     rpc: Rpc,
     outbound: Box<dyn Outbound>,
 }
@@ -198,8 +207,10 @@ impl McpTool {
             meta,
             remote,
             patience,
-            rpc: Rpc::new(),
-            outbound,
+            link: Mutex::new(Link {
+                rpc: Rpc::new(),
+                outbound,
+            }),
         })
     }
 
@@ -215,7 +226,7 @@ impl Tool for McpTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -228,8 +239,21 @@ impl Tool for McpTool {
             )));
         }
         let arguments = Value::Object(call.args.as_map().clone());
-        let line = self.rpc.call_tool(&self.remote, &arguments)?;
-        let answer = self.outbound.call(&line, self.patience)?;
+        let answer = {
+            let mut link = self.link.lock().map_err(|_| {
+                AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "call an external tool",
+                    format!(
+                        "{}: an earlier call died holding the connection",
+                        self.remote
+                    ),
+                )
+                .with_recovery("dispatch the work again; the next run connects afresh")
+            })?;
+            let line = link.rpc.call_tool(&self.remote, &arguments)?;
+            link.outbound.call(&line, self.patience)?
+        };
         let result = super::outbound::digits_for_floats(Rpc::read(&answer)?);
         let map = match result {
             Value::Object(map) => map,

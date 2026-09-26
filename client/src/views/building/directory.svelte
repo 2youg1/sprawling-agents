@@ -17,6 +17,7 @@
   // the city does not promise: a room is where a job was written down or
   // a transcript was left.
   import type { Key } from "../../core/lang";
+  import { heldIn } from "../../core/belief/rooms";
   import { roomOf } from "../../core/route";
   import type { Address, Entry } from "../../wire";
 
@@ -47,6 +48,7 @@
   import { say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock, kib, usd } from "../../core/time";
+  import { readable } from "svelte/store";
   import { ui } from "../../ui";
   import { Address as AddressSchema, type Query } from "../../wire";
   import EmptyState from "../parts/empty.svelte";
@@ -72,17 +74,32 @@
   const entries = $derived(read.kind === "held" ? read.value : undefined);
 
   const cost = u.conn.asking.ask(QUERIES.cost);
+
+  const runs = $derived(heldIn($belief, at).reverse());
+
+  // The cost view names the active runs and the few billed most; the
+  // rest of this building's runs are asked for by name, newest first,
+  // in one question, and the server answers only the newest
+  // RUN_COSTS_MAX of them; older cold runs show no figure.
+  const cold = $derived.by(() => {
+    const held = $cost;
+    if (held === undefined || !("cost" in held)) return [];
+    const warm = new Set(held.cost.by_run.map(([name]) => name));
+    return runs.map((run) => run.run).filter((run) => !warm.has(run));
+  });
+  const coldCost = $derived(
+    cold.length === 0 ? readable(undefined) : u.conn.asking.ask({ run_costs: { runs: cold } }),
+  );
+
   function spent(run: string): number | null {
     const held = $cost;
     if (held === undefined || !("cost" in held)) return null;
-    return held.cost.by_run.find(([name]) => name === run)?.[1] ?? null;
+    const warm = held.cost.by_run.find(([name]) => name === run)?.[1];
+    if (warm !== undefined) return warm;
+    const asked = $coldCost;
+    if (asked === undefined || !("run_costs" in asked)) return null;
+    return asked.run_costs.runs.find(([name]) => name === run)?.[1] ?? null;
   }
-
-  const runs = $derived(
-    Object.values($belief.runs)
-      .filter((run) => run.addr === at)
-      .sort((left, right) => (right.started ?? 0) - (left.started ?? 0)),
-  );
 
   function posture(doing: Doing): string {
     switch (doing.kind) {
@@ -115,7 +132,7 @@
 {#if read.kind === "unavailable"}
   <Unanswered query={read.query} asked={question} />
 {:else if entries === undefined}
-  <p class="text-text-disabled">…</p>
+  <p class="text-text-faint">…</p>
 {:else}
   {const kind = kindOf(at, entries)}
   <div>
@@ -154,10 +171,10 @@
                 <span class="min-w-0 flex-1 truncate text-text-quiet">{run.task ?? run.run}</span>
                 <span class="shrink-0 text-text-faint">{posture(run.doing)}</span>
                 {#if micros !== null && micros !== 0}
-                  <span class="shrink-0 text-text-disabled">{usd(micros)}</span>
+                  <span class="shrink-0 text-text-faint">{usd(micros)}</span>
                 {/if}
                 {#if run.started}
-                  <span class="shrink-0 text-text-disabled">{clock($lang, run.started)}</span>
+                  <span class="shrink-0 text-text-faint">{clock($lang, run.started)}</span>
                 {/if}
               </a>
             </li>
@@ -189,7 +206,7 @@
             />
             <span class="flex-1"></span>
             {#if entry.kind !== "directory"}
-              <span class="shrink-0 font-mono text-text-disabled">{kib(entry.kind.file.bytes)}</span>
+              <span class="shrink-0 font-mono text-text-faint">{kib(entry.kind.file.bytes)}</span>
             {/if}
           </li>
         {/each}

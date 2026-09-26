@@ -3,124 +3,176 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reaching the MCP servers a building's configuration names.
+//! Reaching the MCP servers a building's configuration names: the
+//! production `accounting::Connectors`, and the one door that swaps it
+//! for another (accounting-SPEC.md 8-2).
 
+use accounting::Reached;
 use kernel::{Address, AxError};
 
-/// Starts one server and turns what it offers into tools.
+use super::RunWorker;
+
+/// Every MCP server this worker has reached, kept connected between
+/// runs, so a dispatch pays for a child and a handshake only when its
+/// server was not already running (sprawling-SPEC.md 8-4).
 ///
-/// The connection opens with the lifecycle the specification defines -
-/// `initialize`, then `notifications/initialized` - and only then asks
-/// what it offers. What the handshake learns is written to the
-/// diagnostics rather than branched on: negotiating a version needs a
-/// second version this build can speak before it can decide anything.
-pub(super) fn connect_mcp(
-    server: &kernel::McpServer,
-    write_root: &std::path::Path,
-    confidential: bool,
-    resolve: &gateway::SecretResolver,
-) -> Result<(Vec<protocol::McpTool>, protocol::Handshake), AxError> {
-    use protocol::Outbound as _;
-
-    // The run's own root, which exists whether or not this building
-    // lends its runs a worktree.
-    let mut handle = McpLink::open(&server.transport, write_root, resolve)?;
-    let mut rpc = protocol::Rpc::new();
-    let opened = protocol::handshake(&mut handle, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE)?;
-    let listing = handle.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)?;
-    let listed = protocol::tools_from(&server.label, &protocol::Rpc::read(&listing)?)?;
-    let mut tools = Vec::new();
-    for entry in listed {
-        // One connection, one handle per tool: two of them would be two
-        // answers to what the same label offers.
-        tools.push(protocol::McpTool::new(
-            entry.meta,
-            entry.remote,
-            Box::new(handle.clone()),
-            confidential,
-        )?);
-    }
-    Ok((tools, opened))
-}
-
-/// Which module a reader should open when a server misbehaves.
-pub(super) fn transport_site(transport: &kernel::McpTransport) -> &'static str {
-    match *transport {
-        kernel::McpTransport::Stdio { .. } => "bin::mcp_stdio",
-        kernel::McpTransport::Http { .. } => "bin::mcp_http",
-        kernel::McpTransport::Sse { .. } => "bin::mcp_sse",
-    }
-}
-
-/// One reachable server, whichever way it is reached.
+/// Keyed by the whole declaration and the run root the child started
+/// in: a changed field is another server, and a child cannot move to
+/// another working directory once it runs.
 ///
-/// The three transports differ in where the bytes go and in nothing
-/// else, so the difference is spent here and the wiring above stays one
-/// path.
-#[derive(Clone)]
-pub(crate) enum McpLink {
-    Stdio(crate::mcp_stdio::StdioServer),
-    Http(crate::mcp_http::HttpServer),
-    Sse(crate::mcp_sse::SseServer),
+/// Each key has its own lock, and the table's lock is held only to find
+/// or add a key: a lane still shaking hands with one server holds up
+/// the lanes asking for that server and nobody else.
+#[derive(Default)]
+pub(crate) struct Residents {
+    keys: std::sync::Mutex<Vec<std::sync::Arc<Keyed>>>,
 }
 
-impl McpLink {
-    /// Opens one server as its transport says it is reached.
+/// One server this worker was asked for, connected or not.
+struct Keyed {
+    server: kernel::McpServer,
+    root: std::path::PathBuf,
+    connected: std::sync::Mutex<Option<Resident>>,
+}
+
+/// One connected server and what it offered when it connected.
+struct Resident {
+    link: protocol::McpLink,
+    /// Each tool under both its names, in the order the server listed
+    /// them.
+    listed: Vec<(kernel::ToolMeta, String)>,
+}
+
+impl accounting::Connectors for Residents {
+    fn connect(
+        &mut self,
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+        confidential: bool,
+        resolve: &gateway::SecretResolver,
+    ) -> Result<(Vec<protocol::McpTool>, Reached), AxError> {
+        self.tools(server, write_root, confidential, resolve)
+    }
+}
+
+impl Residents {
+    /// The tools `server` offers, over the connection an earlier run left
+    /// when its child still runs, and over a new one otherwise.
     ///
-    /// `write_root` is the run's own root, which exists whether or not
-    /// this building lends its runs a worktree; a child process starts
-    /// there and nowhere else.
+    /// A child that has ended is dropped from the table and started
+    /// again here, which is how a server that died between two runs
+    /// comes back.
+    ///
+    /// Takes `&self`, so lanes preparing dispatches at once can share
+    /// one table; the port's `connect` reaches the same door.
     ///
     /// # Errors
-    /// Propagates each transport's own refusal to open, every one of
-    /// which names the server and what a person can do about it.
-    pub(crate) fn open(
-        transport: &kernel::McpTransport,
+    /// Propagates the transport's refusal to open, a failed handshake or
+    /// listing, and `protocol::McpTool::new`'s refusal on a confidential
+    /// building.
+    pub(crate) fn tools(
+        &self,
+        server: &kernel::McpServer,
         write_root: &std::path::Path,
+        confidential: bool,
         resolve: &gateway::SecretResolver,
-    ) -> Result<McpLink, AxError> {
-        match *transport {
-            kernel::McpTransport::Stdio {
-                ref command,
-                ref args,
-                ref env,
-            } => {
-                let env = crate::mcp_redeeming::redeem(env, resolve, "start an mcp server")?;
-                Ok(McpLink::Stdio(crate::mcp_stdio::StdioServer::start(
-                    command, args, &env, write_root,
-                )?))
-            }
-            kernel::McpTransport::Http {
-                ref url,
-                ref headers,
-            } => Ok(McpLink::Http(crate::mcp_http::HttpServer::open(
-                url, headers, resolve,
-            )?)),
-            kernel::McpTransport::Sse {
-                ref url,
-                ref headers,
-            } => Ok(McpLink::Sse(crate::mcp_sse::SseServer::open(
-                url, headers, resolve,
-            )?)),
+    ) -> Result<(Vec<protocol::McpTool>, Reached), AxError> {
+        let keyed = self.keyed(server, write_root)?;
+        let mut connected = super::workbench::held(&keyed.connected, "reach an mcp server")?;
+        if let Some(resident) = connected
+            .take()
+            .filter(|resident| !resident.link.has_ended())
+        {
+            let tools = resident.tools(confidential);
+            *connected = Some(resident);
+            return Ok((tools?, Reached::Resident));
         }
+        let (resident, opened) = Resident::connect(server, write_root, resolve)?;
+        let tools = resident.tools(confidential)?;
+        *connected = Some(resident);
+        Ok((tools, Reached::Connected(opened)))
+    }
+
+    /// The entry for `server` started in `write_root`, added when this
+    /// is the first time it is asked for.
+    fn keyed(
+        &self,
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+    ) -> Result<std::sync::Arc<Keyed>, AxError> {
+        let mut keys = super::workbench::held(&self.keys, "find an mcp server's entry")?;
+        if let Some(found) = keys
+            .iter()
+            .find(|keyed| keyed.server == *server && keyed.root == write_root)
+        {
+            return Ok(std::sync::Arc::clone(found));
+        }
+        let added = std::sync::Arc::new(Keyed {
+            server: server.clone(),
+            root: write_root.to_path_buf(),
+            connected: std::sync::Mutex::new(None),
+        });
+        keys.push(std::sync::Arc::clone(&added));
+        Ok(added)
     }
 }
 
-impl protocol::Outbound for McpLink {
-    fn call(&mut self, line: &str, patience: kernel::TimeoutMs) -> Result<String, AxError> {
-        match *self {
-            McpLink::Stdio(ref mut held) => held.call(line, patience),
-            McpLink::Http(ref mut held) => held.call(line, patience),
-            McpLink::Sse(ref mut held) => held.call(line, patience),
-        }
+impl RunWorker {
+    /// The same worker, reaching every MCP server through `connectors`
+    /// instead of starting the ones a building's configuration names.
+    ///
+    /// The door citysim and the dispatch tests drive a worker through:
+    /// what a server offers is theirs to script, while refusing servers
+    /// to a confidential building and leaving a failed one out stay the
+    /// worker's.
+    #[must_use]
+    pub fn with_connectors(self, connectors: Box<dyn accounting::Connectors + Send>) -> RunWorker {
+        RunWorker { connectors, ..self }
+    }
+}
+
+impl Resident {
+    /// Starts one server and asks what it offers.
+    ///
+    /// The connection opens with the lifecycle the specification defines -
+    /// `initialize`, then `notifications/initialized` - and only then asks
+    /// what it offers. What the handshake learns is written to the
+    /// diagnostics rather than branched on: negotiating a version needs a
+    /// second version this build can speak before it can decide anything.
+    fn connect(
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+        resolve: &gateway::SecretResolver,
+    ) -> Result<(Resident, protocol::Handshake), AxError> {
+        use protocol::Outbound as _;
+
+        // The run's own root, which exists whether or not this building
+        // lends its runs a worktree.
+        let mut link = protocol::McpLink::open(&server.transport, write_root, resolve)?;
+        let mut rpc = protocol::Rpc::new();
+        let opened = protocol::handshake(&mut link, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE)?;
+        let listing = link.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)?;
+        let listed = protocol::tools_from(&server.label, &protocol::Rpc::read(&listing)?)?
+            .into_iter()
+            .map(|entry| (entry.meta, entry.remote))
+            .collect();
+        Ok((Resident { link, listed }, opened))
     }
 
-    fn notify(&mut self, line: &str, patience: kernel::TimeoutMs) -> Result<(), AxError> {
-        match *self {
-            McpLink::Stdio(ref mut held) => held.notify(line, patience),
-            McpLink::Http(ref mut held) => held.notify(line, patience),
-            McpLink::Sse(ref mut held) => held.notify(line, patience),
-        }
+    /// One handle per tool on the one connection: two connections would
+    /// be two answers to what the same label offers.
+    fn tools(&self, confidential: bool) -> Result<Vec<protocol::McpTool>, AxError> {
+        self.listed
+            .iter()
+            .map(|(meta, remote)| {
+                protocol::McpTool::new(
+                    meta.clone(),
+                    remote.clone(),
+                    Box::new(self.link.clone()),
+                    confidential,
+                )
+            })
+            .collect()
     }
 }
 
@@ -181,7 +233,7 @@ mod tests {
     fn a_configured_server_becomes_a_tool_the_model_is_told_about_and_can_call() {
         let dir = tempfile::tempdir().unwrap();
         let report = init_city(dir.path()).unwrap();
-        let (command, args) = crate::mcp_stdio::echoing(SERVER_ANSWER);
+        let (command, args) = protocol::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
 
         let (base_url, provider) = fake_openai(
@@ -201,6 +253,7 @@ mod tests {
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
 
@@ -271,6 +324,7 @@ mod tests {
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
 
@@ -296,7 +350,7 @@ mod tests {
     fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
-        let (command, args) = crate::mcp_stdio::echoing(SERVER_ANSWER);
+        let (command, args) = protocol::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
         let mut worker = RunWorker::new(
             dir.path(),
@@ -321,6 +375,102 @@ mod tests {
         assert!(
             worker.mcp_tools(&config, dir.path(), false).is_empty(),
             "a service that is down today does not stop the building from working today"
+        );
+    }
+
+    /// A stdio declaration under `label`, as a building's `[[mcp]]`
+    /// table would carry it.
+    fn stdio_server(label: &str, (command, args): (String, Vec<String>)) -> kernel::McpServer {
+        kernel::McpServer {
+            label: kernel::ServerLabel::parse(label).unwrap(),
+            transport: kernel::McpTransport::Stdio {
+                command,
+                args,
+                env: Vec::new(),
+            },
+        }
+    }
+
+    fn no_secrets() -> gateway::SecretResolver {
+        Box::new(|_| {
+            Err(AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "resolve a secret",
+                "this server declares none",
+            )
+            .with_recovery("give the test server no secret"))
+        })
+    }
+
+    /// How many tools `server` offered, and whether this call connected
+    /// it, in a shape a lane's thread can hand back.
+    fn reach(residents: &Residents, server: &kernel::McpServer, root: &Path) -> (usize, bool) {
+        let (tools, reached) = residents.tools(server, root, false, &no_secrets()).unwrap();
+        (tools.len(), matches!(reached, Reached::Connected(_)))
+    }
+
+    /// Two lanes reaching two servers share one table: a handshake that
+    /// has not been answered yet holds up the lanes asking for its own
+    /// server and nobody else (sprawling-SPEC.md 8-4).
+    #[test]
+    fn a_server_still_shaking_hands_keeps_no_other_server_waiting() {
+        let dir = tempfile::tempdir().unwrap();
+        let (starts, gate) = (dir.path().join("starts.txt"), dir.path().join("open"));
+        let slow = stdio_server("slow", protocol::gated(SERVER_ANSWER, &starts, &gate));
+        let quick = stdio_server("quick", protocol::echoing(SERVER_ANSWER));
+        let residents = Residents::default();
+
+        std::thread::scope(|scope| {
+            let waiting = scope.spawn(|| reach(&residents, &slow, dir.path()));
+            let patience = std::time::Instant::now() + std::time::Duration::from_secs(60);
+            while !starts.exists() && std::time::Instant::now() < patience {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            assert!(starts.exists(), "the gated server started");
+            let other = scope.spawn(|| reach(&residents, &quick, dir.path()));
+            let patience = std::time::Instant::now() + std::time::Duration::from_secs(30);
+            while !other.is_finished() && std::time::Instant::now() < patience {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            let answered_while_the_first_waited = other.is_finished() && !waiting.is_finished();
+            std::fs::write(&gate, "").unwrap();
+            assert_eq!(waiting.join().unwrap(), (1, true));
+            assert_eq!(other.join().unwrap(), (1, true));
+            assert!(
+                answered_while_the_first_waited,
+                "the second server was reached while the first still shook hands"
+            );
+        });
+    }
+
+    #[test]
+    fn a_second_dispatch_reaches_the_server_the_first_one_started() {
+        let dir = tempfile::tempdir().unwrap();
+        init_city(dir.path()).unwrap();
+        let starts = dir.path().join("starts.txt");
+        let (command, args) = protocol::counting_starts(SERVER_ANSWER, &starts);
+        write_server_table(dir.path(), "lab", &command, &args);
+        let mut worker = RunWorker::new(
+            dir.path(),
+            gateway::Custodian::in_memory(),
+            runtime::diagnostics::Diagnostics::off(),
+        )
+        .unwrap();
+        let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
+
+        let first = worker.mcp_tools(&config, dir.path(), false);
+        drop(first);
+        let second = worker.mcp_tools(&config, dir.path(), false);
+
+        assert_eq!(
+            second.len(),
+            1,
+            "the resident connection still offers its tool"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&starts).unwrap().lines().count(),
+            1,
+            "two dispatches to one building started its server once"
         );
     }
 }

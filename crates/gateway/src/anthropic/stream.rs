@@ -20,6 +20,7 @@ use kernel::AxError;
 use kernel::{ContentBlock, Increment, ToolCall};
 use serde_json::{Value, json};
 
+use crate::endpoint::failure::{ProviderFailure, provider_err};
 use crate::mismatch::{settled_tool_arguments, stream_cut};
 
 /// What one `content_block_delta` carries, if it carries either stream.
@@ -174,6 +175,17 @@ fn rebuilt<'f>(frames: impl Iterator<Item = &'f Value>) -> Result<Rebuilt, AxErr
                     }
                 }
             }
+            Some("error") => {
+                let kind = map
+                    .get("error")
+                    .and_then(|held| held.get("type"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("an error without a type");
+                return Err(provider_err(
+                    "read a streamed answer",
+                    &ProviderFailure::Reported { kind },
+                ));
+            }
             _ => {}
         }
     }
@@ -273,6 +285,24 @@ mod tests {
             .expect_err("a thinking block without a signature cannot be sent back");
         assert_eq!(refused.code(), &kernel::AxCode::WireMismatch);
         assert!(!refused.recovery().is_empty());
+    }
+
+    /// Anthropic reports an overload that starts mid-answer as an
+    /// `error` frame on a stream that already answered 200.
+    #[test]
+    fn an_error_frame_mid_stream_is_the_failure_it_reports() {
+        let frames = vec![
+            json!({"type": "message_start", "message": {"usage": {"input_tokens": 4}}}),
+            json!({"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}),
+        ];
+        let refused = settled(&frames).expect_err("an error frame is not an answer");
+        assert_eq!(
+            (
+                refused.subject(),
+                serde_json::to_value(&refused).unwrap()["retry"].clone()
+            ),
+            ("the stream reported overloaded_error", json!("yes"))
+        );
     }
 
     /// Half a tool call is not a tool call with fewer arguments: an

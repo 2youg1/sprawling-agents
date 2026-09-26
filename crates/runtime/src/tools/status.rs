@@ -17,9 +17,10 @@
 //! stands where a spend ceiling used to is the context reading, which is
 //! tokens a run has actually used against the window it was given.
 //!
-//! Nothing here samples. The executor sets the snapshot once per turn
-//! and the tool reports it; a tool that read the clock itself would
-//! make two calls in one turn disagree about "now".
+//! Nothing here samples. The snapshot is frozen at dispatch, and what
+//! moves while the run goes on - its children, its backlog, its context
+//! used - is read from the one place that records it; a tool that read
+//! the clock itself would make two calls in one turn disagree about "now".
 
 use kernel::{
     Address, AxCode, AxError, ByteLen, CostTier, DelegateKind, Effect, Payload, RenderIntent,
@@ -29,6 +30,7 @@ use serde_json::{Map, Value};
 
 use crate::backlog::{Backlog, Standing};
 use crate::clock::ClockStamp;
+use crate::reminder::ContextReading;
 use kernel::Mode;
 
 /// How the gateway is currently able to serve. Degraded and LocalOnly
@@ -64,15 +66,14 @@ pub struct ChildStatus {
     pub kind: DelegateKind,
 }
 
-/// The twelve frozen fields. The thirteenth, `backlog`, is read live
-/// from the table rather than frozen here, for the reason `children` is
-/// a closure: what is running changes while the run goes on.
+/// The frozen fields. `backlog` is read live from the table and the
+/// context used from the run's reading rather than frozen here, for the
+/// reason `children` is a closure: both change while the run goes on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatusSnapshot {
     pub who: String,
     pub addr: Address,
     pub mode: Mode,
-    pub ctx_used: Tokens,
     pub ctx_limit: Tokens,
     pub trust: String,
     pub write_domain: String,
@@ -95,11 +96,14 @@ pub struct StatusSnapshot {
 
 pub struct StatusTool {
     snapshot: StatusSnapshot,
-    children: Box<dyn Fn() -> Vec<ChildStatus> + Send>,
+    children: Box<dyn Fn() -> Vec<ChildStatus> + Send + Sync>,
     /// The table this run's background commands stand in. `None` in a
     /// tool built without one, which reports `backlog: none` truthfully:
     /// nothing was started through a table that does not exist.
     backlog: Option<Backlog>,
+    /// The run's context reading. A tool built without one reports zero,
+    /// which is true of a run that has made no call.
+    context: ContextReading,
     meta: ToolMeta,
 }
 
@@ -125,7 +129,7 @@ impl StatusTool {
     /// Propagates a malformed parameter schema.
     pub fn watching(
         snapshot: StatusSnapshot,
-        children: Box<dyn Fn() -> Vec<ChildStatus> + Send>,
+        children: Box<dyn Fn() -> Vec<ChildStatus> + Send + Sync>,
     ) -> Result<StatusTool, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
@@ -134,6 +138,7 @@ impl StatusTool {
             snapshot,
             children,
             backlog: None,
+            context: ContextReading::default(),
             meta: ToolMeta {
                 name: ToolName::parse("status")?,
                 disclosure:
@@ -153,10 +158,12 @@ impl StatusTool {
         })
     }
 
-    /// The executor's once-per-turn update. Sampling inside the tool
-    /// would let two calls in one turn disagree.
-    pub fn set_snapshot(&mut self, snapshot: StatusSnapshot) {
-        self.snapshot = snapshot;
+    /// The reading the run records the provider's count into, which the
+    /// `ctx` line reports (runtime-SPEC, `status`).
+    #[must_use]
+    pub fn metering(mut self, context: ContextReading) -> StatusTool {
+        self.context = context;
+        self
     }
 
     /// The table whose members at this run's address the thirteenth
@@ -187,7 +194,7 @@ impl StatusSnapshot {
     /// sorts its keys, so "the frozen order" would silently become
     /// alphabetical. Order is a property of what the model reads, so it
     /// is expressed where the model reads it.
-    pub fn render(&self, children: &[ChildStatus], standing: &[Standing]) -> String {
+    pub fn render(&self, used: Tokens, children: &[ChildStatus], standing: &[Standing]) -> String {
         let locks = if self.locks.is_empty() {
             "none".to_owned()
         } else {
@@ -203,7 +210,7 @@ impl StatusSnapshot {
             format!("who: {}", self.who),
             format!("addr: {}", self.addr),
             format!("mode: {}", self.mode.as_str()),
-            format!("ctx: {}/{}", self.ctx_used.get(), self.ctx_limit.get()),
+            format!("ctx: {}/{}", used.get(), self.ctx_limit.get()),
             format!("trust: {}", self.trust),
             format!("write_domain: {} (locks: {locks})", self.write_domain),
             format!(
@@ -256,7 +263,7 @@ impl Tool for StatusTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -271,7 +278,11 @@ impl Tool for StatusTool {
         let mut result = Map::new();
         result.insert(
             "text".to_owned(),
-            Value::String(self.snapshot.render(&(self.children)(), &self.standing())),
+            Value::String(self.snapshot.render(
+                self.context.tokens(),
+                &(self.children)(),
+                &self.standing(),
+            )),
         );
         Ok(ToolOutcome {
             result: Payload::new(result)?,

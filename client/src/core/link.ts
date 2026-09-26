@@ -9,12 +9,14 @@
 // without a socket. Ported from `crates/web/src/socket/link.rs`.
 
 import type {
-  Answer,
+  Answered,
   AxError,
   ClientFrame,
   Delta,
   EventRecord,
+  LiveOutput,
   LogLine,
+  Sample,
   Seq,
   ServerFrame,
   Welcome,
@@ -56,16 +58,21 @@ export type LinkAction =
   | { readonly kind: "send"; readonly frame: ClientFrame }
   | { readonly kind: "welcomed"; readonly welcome: Welcome }
   | { readonly kind: "deliver"; readonly event: EventRecord }
-  | { readonly kind: "answered"; readonly answer: Answer }
+  | { readonly kind: "answered"; readonly answered: Answered }
   | { readonly kind: "saying"; readonly delta: Delta }
   // One line of the process log. Not history: it has no sequence of
   // its own, it is never written down, and a page that missed one has
   // lost nothing.
   | { readonly kind: "logged"; readonly line: LogLine }
+  // A piece of what a running command has written. Discardable, like
+  // an increment: the call's result is what the Ledger keeps.
+  | { readonly kind: "writing"; readonly piece: LiveOutput }
   // A range of ledger records the event stream skipped. Its own action
   // rather than a report: the page can do something about it, and what
   // it does is ask the Ledger for the range.
   | { readonly kind: "lagged"; readonly from: Seq; readonly to: Seq }
+  // One monitor reading, sent only while this page watches.
+  | { readonly kind: "sampled"; readonly sample: Sample }
   | { readonly kind: "wait"; readonly ms: number }
   | { readonly kind: "report"; readonly error: AxError }
   | { readonly kind: "close" };
@@ -117,7 +124,7 @@ function refusal(
     subject,
     recovery: say(lang, recovery),
     nearby: [],
-    retriable: false,
+    retry: "no",
   };
 }
 
@@ -243,8 +250,13 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   if ("event" in frame) {
     return [link, { kind: "deliver", event: frame.event }];
   }
-  if ("answer" in frame) {
-    return [link, { kind: "answered", answer: frame.answer }];
+  if ("answered" in frame) {
+    // A question refused for the wire itself ends the link like any other
+    // wire refusal; every other outcome goes back under its own id.
+    const { outcome } = frame.answered;
+    return "refusal" in outcome && outcome.refusal.code === "E_WIRE_MISMATCH"
+      ? refuse(link, outcome.refusal)
+      : [link, { kind: "answered", answered: frame.answered }];
   }
   if ("delta" in frame) {
     return [link, { kind: "saying", delta: frame.delta }];
@@ -257,6 +269,12 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   }
   if ("lagged" in frame) {
     return [link, { kind: "lagged", from: frame.lagged.from, to: frame.lagged.to }];
+  }
+  if ("output" in frame) {
+    return [link, { kind: "writing", piece: frame.output }];
+  }
+  if ("monitor" in frame) {
+    return [link, { kind: "sampled", sample: frame.monitor }];
   }
   return unhandled(link, frame);
 }

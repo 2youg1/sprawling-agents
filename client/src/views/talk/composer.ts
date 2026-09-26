@@ -11,7 +11,8 @@
 
 import { Option, Schema } from "effect";
 
-import type { RunBelief } from "../../core/belief";
+import type { Belief, RunBelief } from "../../core/belief";
+import { heldIn } from "../../core/belief/rooms";
 import { EFFORTS } from "../../core/commands";
 import type { PreferenceDoor } from "../../core/prefs";
 import type { Key, Lang } from "../../core/lang";
@@ -21,7 +22,7 @@ import { UNSTATED, offered, parse, reached } from "../../core/slash";
 import type { Slash, SlashHands } from "../../core/slash";
 import type { Sending } from "../../core/doing";
 import { Address } from "../../wire";
-import type { Command, Effort } from "../../wire";
+import type { Command, Effort, Seq } from "../../wire";
 import type { View } from "../../core/route";
 import type { Choice } from "../parts/combobox.svelte";
 import type { PopoverColumn } from "../parts/popover";
@@ -112,14 +113,6 @@ export interface Served extends Names {
 // the seam is.
 const MID = "\u0000";
 
-export function modelChoices(served: readonly Served[]): Choice[] {
-  return served.map((each) => ({
-    value: `${each.endpoint}${MID}${each.model}`,
-    label: each.model,
-    note: each.label,
-  }));
-}
-
 export function modelValue(chosen: Names | undefined): string | null {
   return chosen === undefined ? null : `${chosen.endpoint}${MID}${chosen.model}`;
 }
@@ -128,6 +121,50 @@ export function splitModel(value: string): Names | null {
   const [endpoint, model] = value.split(MID);
   if (endpoint === undefined || model === undefined || model === "") return null;
   return { endpoint, model };
+}
+
+// The model the session open in a room answers with: the model of the
+// newest run since the session began, read from the room's runs oldest
+// start first (`heldIn`). A session keeps the model it was opened with,
+// so this, and not the city's next pick, is what a message sent here
+// reaches; `null` when the session has made no call yet.
+export function sessionModel(held: readonly RunBelief[], began: Seq | null): string | null {
+  return held.filter((run) => began === null || run.lastSeq > began).at(-1)?.model ?? null;
+}
+
+// What picking a row of the model pill means. With no session model the
+// pick points `main` at it; with one, the session cannot change model,
+// so a different pick points `main` at it and opens a new session in
+// the room, which answers with it.
+export type ModelMove =
+  | { readonly kind: "select"; readonly names: Names }
+  | { readonly kind: "reopen"; readonly names: Names }
+  | { readonly kind: "stay" };
+
+export function modelMove(value: string, session: string | null): ModelMove {
+  const names = splitModel(value);
+  if (names === null || names.model === session) return { kind: "stay" };
+  return session === null ? { kind: "select", names } : { kind: "reopen", names };
+}
+
+// The rows and the value of the model pill. While a session model is
+// known the pill shows it, marked as kept by the session, and a model
+// the city no longer serves still gets its row, so the pill never reads
+// as naming no model while one answers.
+function modelRows(lang: Lang, around: Around): { choices: Choice[]; value: string | null } {
+  const session = around.session;
+  const kept = say(lang, "talk_model_kept");
+  const served = around.served.find((each) => each.model === session);
+  const unserved = session === null || served !== undefined ? [] : [{ endpoint: "", model: session, label: kept }];
+  const rows = [...unserved, ...around.served];
+  return {
+    choices: rows.map((each) => ({
+      value: `${each.endpoint}${MID}${each.model}`,
+      label: each.model === session ? `${each.model} · ${kept}` : each.model,
+      note: each.label,
+    })),
+    value: modelValue(session === null ? around.chosen : (served ?? unserved.at(0))),
+  };
 }
 
 // The level in force, spelled as the row that offers it: nobody having
@@ -146,16 +183,11 @@ export function decodeRoom(value: string): Address | null {
 }
 
 // Every room a person could move a conversation to: the buildings the
-// city knows, and the rooms runs have already opened.
-export function roomsKnown(
-  buildings: Iterable<{ readonly addr: string }>,
-  runs: Iterable<RunBelief>,
-): string[] {
-  const named = new Set<string>([MAYOR]);
+// city knows, and the rooms runs have already opened (the keys of
+// belief's rooms index).
+export function roomsKnown(buildings: Iterable<{ readonly addr: string }>, opened: Iterable<string>): string[] {
+  const named = new Set<string>([MAYOR, ...opened]);
   for (const building of buildings) named.add(building.addr);
-  for (const run of runs) {
-    if (run.addr !== null) named.add(run.addr);
-  }
   return [...named].sort((a, b) => a.localeCompare(b));
 }
 
@@ -181,6 +213,8 @@ export interface Picks {
 export interface Around {
   readonly served: readonly Served[];
   readonly chosen: Names | undefined;
+  // The model the session open here answers with (`sessionModel`).
+  readonly session: string | null;
   readonly rooms: readonly string[];
   readonly here: Address | null;
   readonly effort: Effort | null;
@@ -193,10 +227,9 @@ export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill,
   const levels: readonly (typeof UNSTATED | Effort)[] = [UNSTATED, ...EFFORTS];
   return [
     {
-      label: say(lang, "talk_column_model"),
+      label: say(lang, around.session === null ? "talk_column_model" : "talk_model_locked"),
       placeholder: say(lang, "talk_no_model"),
-      choices: modelChoices(around.served),
-      value: modelValue(around.chosen),
+      ...modelRows(lang, around),
       pick: picks.model,
     },
     {
@@ -259,24 +292,6 @@ export function pickSlash(chosen: Slash, line: string, hands: SlashHands): strin
 
 // -------------------------------------------------------- the run in reach
 
-// The newest run of a room - still going, or whatever finished last.
-// One derivation for the run a steer lands on and the run a `/stop`
-// reaches, so the box and the page cannot name two runs.
-//
-// `moving` asks for one still going, which is what a message typed now
-// steers; `any` is what a verb that names a room wants.
-export function newestRun(
-  runs: Iterable<RunBelief>,
-  room: string | null,
-  posture: "moving" | "any",
-): RunBelief | undefined {
-  if (room === null) return undefined;
-  return [...runs]
-    .filter((run) => run.addr === room && (posture === "any" || run.doing.kind !== "frozen"))
-    .sort((a, b) => (b.started ?? 0) - (a.started ?? 0))
-    .at(0);
-}
-
 // Everything a typed verb may reach for (`core/slash.ts` fills the same
 // shape from the palette), minus the one conversion this file owns: a
 // run belief becomes the run and position a verb acts on.
@@ -285,7 +300,7 @@ export interface Reach {
   readonly go: (view: View) => void;
   readonly here: Address | null;
   readonly live: RunBelief | undefined;
-  readonly runs: Iterable<RunBelief>;
+  readonly belief: Belief;
   readonly models: readonly Served[];
   readonly effort: Effort | null;
   readonly setEffort: (effort: Effort | null) => void;
@@ -299,7 +314,7 @@ export function slashHands(reach: Reach): SlashHands {
     go: reach.go,
     here: reach.here,
     live: reached(reach.live),
-    newest: (room) => reached(newestRun(reach.runs, room, "any")),
+    newest: (room) => reached(heldIn(reach.belief, room).at(-1)),
     models: reach.models.map((each) => ({ endpoint: each.endpoint, model: each.model })),
     effort: reach.effort,
     setEffort: reach.setEffort,

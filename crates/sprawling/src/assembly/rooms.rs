@@ -81,6 +81,20 @@ impl RoomQueues {
         }
     }
 
+    /// A room inside `building` whose queue is lent, and the run it is
+    /// lent to: the one fact that says a run is working in the
+    /// building. Every room is looked at, because address order puts
+    /// `lab-2` between `lab` and `lab/room1`.
+    pub(in crate::assembly) fn worked_within(
+        &self,
+        building: &Address,
+    ) -> Option<(Address, RunId)> {
+        self.rooms.iter().find_map(|(addr, queue)| match queue {
+            RoomQueue::Lent { to, .. } if addr.is_within(building) => Some((addr.clone(), *to)),
+            RoomQueue::Lent { .. } | RoomQueue::Home(_) => None,
+        })
+    }
+
     /// The queues a history folds to. Nothing is lent when a worker
     /// opens: a run that was driving when the process stopped is not
     /// driving now.

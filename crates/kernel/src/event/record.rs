@@ -40,11 +40,19 @@
 
 mod adviser;
 mod checkpoint;
+mod collaboration;
 mod control;
+mod credential;
 mod discard;
+mod endpoint;
 mod governance;
+mod history;
 mod log;
 mod modality;
+mod probe;
+mod provider;
+mod renewal;
+mod roadmap;
 mod run;
 mod tool;
 mod turn;
@@ -53,20 +61,31 @@ pub use adviser::{
     AdviserAnswer, AdviserAnswered, AdviserAsk, AdviserAsked, AdviserFailure, AdviserFellBack,
 };
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
+pub use collaboration::{
+    ConflictLevel, GoalConflict, Lane, PursuitChanged, PursuitMove, SignalConsumed, SignalEnqueued,
+    SignalId, SignalKind, WorktreeOpened,
+};
 pub use control::{
     BuildingConfigured, BuildingCreated, CancelReceived, CityInitialized, FiredAction, GateChecked,
     HandoffWritten, PolicyChanged, WatchdogFired,
 };
+pub use credential::{LoginStarted, SecretCaptured, ToolkitLinkOpened};
 pub use discard::{AssetArchived, DiscardRestored, FileDiscarded};
+pub use endpoint::{AttachedTuning, EndpointAttached, EndpointLost, InputKinds, ModelSelected};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     GoverningDocument, RulesChanged, SpineDocumentWritten, autonomy_word,
 };
+pub use history::{FileRestored, WentBack};
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
-pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
+pub use probe::{EndpointProbed, ModelFacts, ProbeFailure};
+pub use provider::{ProviderDegraded, VaultFellBack};
+pub use renewal::CacheRenewed;
+pub use roadmap::{RoadmapMoved, RoadmapStep};
+pub use run::{EvalRun, EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,
-    PromptSkip, PromptSource, ShapeChanged, ShapePart, SkipReason, SteerReceived, SummaryProducer,
+    PromptSkip, PromptSource, ShapeChanged, ShapePart, SkipReason, SteerReceived,
 };

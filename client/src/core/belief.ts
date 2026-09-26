@@ -21,7 +21,7 @@ import type { Readable } from "svelte/store";
 
 import { readProbed } from "./probed";
 import { PHASES } from "./doing";
-import { completionOf, haltOf, sessionStart, taskOf, toolCall } from "./reading";
+import { askOf, branchOf, completionOf, haltOf, modelOf, sessionStart, taskOf, toolCall } from "./reading";
 import { sameScope } from "./scope";
 
 import { CITY_RUN, Seq, TimeMs } from "../wire";
@@ -31,6 +31,9 @@ import type { Belief, RunBelief } from "./belief/shape";
 import { LOG_WINDOW, merged } from "./belief/shape";
 import { runTable } from "./belief/runs.svelte";
 import { adopted } from "./belief/adopted";
+import { livened, liveOf } from "./belief/live";
+import { roomed, roomsOf } from "./belief/rooms";
+import { cancelledOf, recounted } from "./belief/cancelled";
 export type { Belief, Notice, RunBelief } from "./belief/shape";
 
 function unseen(run: RunId, at: Seq): RunBelief {
@@ -41,6 +44,9 @@ function unseen(run: RunId, at: Seq): RunBelief {
     task: null,
     lastSeq: at,
     doing: { kind: "unknown" },
+    model: null,
+    pr: null,
+    ask: null,
     local: true,
     saying: "",
     thinking: "",
@@ -50,7 +56,8 @@ function unseen(run: RunId, at: Seq): RunBelief {
 // One record forward, answering the run it produced and the name of the
 // first field in it this build could not read.
 function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] {
-  const moved: RunBelief = { ...held, lastSeq: record.seq };
+  // Every record ends the ask; only the request itself states one.
+  const moved: RunBelief = { ...held, lastSeq: record.seq, ask: null };
   switch (record.kind) {
     case "run_started": {
       const [task, bad] = taskOf(record);
@@ -65,8 +72,13 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
         bad,
       ];
     }
-    case "model_called":
-      return [{ ...moved, doing: PHASES.model_called, saying: "", thinking: "" }, null];
+    case "model_called": {
+      const [model, bad] = modelOf(record);
+      return [
+        { ...moved, doing: PHASES.model_called, model: model ?? held.model, saying: "", thinking: "" },
+        bad,
+      ];
+    }
     case "model_returned":
       return [{ ...moved, saying: "", thinking: "" }, null];
     case "tool_called": {
@@ -78,8 +90,14 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     }
     case "tool_result":
       return [{ ...moved, doing: PHASES.tool_result }, null];
-    case "approval_requested":
-      return [{ ...moved, doing: PHASES.approval_requested }, null];
+    case "approval_requested": {
+      const [ask, bad] = askOf(record);
+      return [{ ...moved, doing: PHASES.approval_requested, ask }, bad];
+    }
+    case "pr_opened": {
+      const [pr, bad] = branchOf(record);
+      return [{ ...moved, pr }, bad];
+    }
     case "run_frozen": {
       const [completion, bad] = completionOf(record);
       return [
@@ -99,7 +117,7 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     // sits among sixty.
     case "session_opened":
     case "city_initialized": case "city_halted": case "building_created":
-    case "building_configured": case "run_forked": case "prompt_assembled":
+    case "building_configured": case "building_removed": case "run_forked": case "prompt_assembled":
     case "prompt_shape_compared":
     case "result_offloaded": case "log_truncated": case "gate_checked":
     case "gate_denied": case "approval_resolved": case "policy_created":
@@ -109,7 +127,7 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     case "draft_resolved": case "goal_registered": case "goal_conflict":
     case "arbitration_verdict": case "pursuit_changed": case "repair_started":
     case "repair_reused": case "worktree_opened": case "checkpoint_committed":
-    case "handoff_written": case "pr_opened": case "pr_merged":
+    case "handoff_written": case "pr_merged":
     case "pr_rejected": case "roadmap_claimed": case "roadmap_finished":
     case "roadmap_released": case "roadmap_split": case "roadmap_blocked":
     case "endpoint_attached": case "endpoint_lost": case "endpoint_probed":
@@ -117,9 +135,10 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     case "digest_invalidated": case "eval_run": case "asset_archived":
     case "toolkit_link_opened": case "credential_lent": case "secret_captured":
     case "secret_egress_blocked": case "file_discarded": case "discard_restored":
+    case "went_back": case "file_restored":
     case "autonomy_changed": case "taint_promoted": case "cross_building_transfer":
     case "governed_document_written":
-    case "spine_document_written": case "rules_changed":
+    case "spine_document_written": case "rules_changed": case "cache_renewed":
     case "embedding_called": case "rerank_called":
     case "adviser_asked": case "adviser_answered": case "adviser_fell_back":
       return [moved, null];
@@ -138,6 +157,8 @@ export interface BeliefStore {
   readonly refused: (error: AxError | null) => void;
   readonly named: (city: string | null) => void;
   readonly noticesSeen: () => void;
+  // Drops every fold: what the page held came from another ledger.
+  readonly forget: () => void;
   // Runs `folds` and tells subscribers once, after the last of them:
   // a burst of records between two paints is one update and one paint.
   // Batches nest; only the outermost one publishes.
@@ -149,8 +170,11 @@ export function createBelief(now: () => number): BeliefStore {
   // subscribers about it. They differ only inside a batch; reading the
   // local rather than the store keeps a fold from subscribing and
   // unsubscribing once per record.
-  let current: Belief = {
+  const empty = (): Belief => ({
     runs: runTable({}),
+    live: [],
+    rooms: new Map(),
+    cancelled: 0,
     halted: [],
     haltedAt: Seq.make(0),
     refusal: null,
@@ -159,7 +183,8 @@ export function createBelief(now: () => number): BeliefStore {
     sessions: {},
     probed: null,
     logs: [],
-  };
+  });
+  let current: Belief = empty();
   const store = writable<Belief>(current);
   let depth = 0;
 
@@ -215,9 +240,13 @@ export function createBelief(now: () => number): BeliefStore {
       if (listed.has(run)) continue;
       if (was.local) runs[run] = { ...was, local: false };
     }
+    const table = runTable(runs);
     written({
       ...held,
-      runs: runTable(runs),
+      runs: table,
+      live: liveOf(table),
+      rooms: roomsOf(table),
+      cancelled: cancelledOf(table),
       halted: stated >= held.haltedAt ? [...city.halted] : held.halted,
       haltedAt: stated >= held.haltedAt ? stated : held.haltedAt,
     });
@@ -286,9 +315,16 @@ export function createBelief(now: () => number): BeliefStore {
   // holds; the table is the store's own, so the new top-level belief is
   // what tells a subscriber that something moved, and every run it holds
   // is a fresh object whenever its reading changed.
+  //
+  // The working runs move with it: the index holds the table's own
+  // reading of the run, so the words written into it in place reach a
+  // reader of the index too.
   function folded(held: Belief, run: RunId, next: RunBelief): void {
+    const was = held.runs[run];
+    const rooms = roomed(held, was, next);
+    const cancelled = recounted(held.cancelled, was, next);
     held.runs[run] = next;
-    written({ ...held });
+    written({ ...held, live: livened(held.live, held.runs[run] ?? next), rooms, cancelled });
   }
 
   // One piece of what the model is producing. A page that joins in the
@@ -350,10 +386,12 @@ export function createBelief(now: () => number): BeliefStore {
     }
     const notices = merged(held.notices, error, TimeMs.make(now()));
     const run = error.action.startsWith("steer") ? held.runs[error.subject] : undefined;
-    if (run !== undefined && run.doing.kind !== "frozen") {
-      held.runs[error.subject] = { ...run, doing: PHASES.run_frozen };
-    }
-    written({ ...held, refusal: error, notices });
+    batch(() => {
+      if (run !== undefined && run.doing.kind !== "frozen") {
+        folded(held, run.run, { ...run, doing: PHASES.run_frozen });
+      }
+      written({ ...current, refusal: error, notices });
+    });
   }
 
   // The name the welcome carried: a page that only hears what happens
@@ -369,5 +407,9 @@ export function createBelief(now: () => number): BeliefStore {
     written({ ...held, notices: held.notices.map((each) => ({ ...each, seen: true })) });
   }
 
-  return { belief: store, adoptCity, apply, say, logged, refused, named, noticesSeen, batch };
+  function forget(): void {
+    written(empty());
+  }
+
+  return { belief: store, adoptCity, apply, say, logged, refused, named, noticesSeen, forget, batch };
 }

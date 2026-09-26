@@ -65,12 +65,17 @@ impl Model for Endpoint {
             .map_err(|err| provider_err("call provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
+            // The headers outlive the body read: a retry-after is read
+            // off them after `text` has taken the response.
+            let headers = response.headers().clone();
             return Err(provider_err(
                 "call provider",
-                &ProviderFailure::Refused {
-                    url: &self.config.base_url,
+                &ProviderFailure::refusal(
+                    &self.config.base_url,
                     status,
-                },
+                    &headers,
+                    &response.text(),
+                ),
             ));
         }
         // A cut stream surfaces here as a body read error — no partial
@@ -88,9 +93,13 @@ impl Endpoint {
     /// blocking one given the same answer return the same value.
     pub(super) fn returned(&self, settled: &Value) -> Result<ModelReturn, AxError> {
         let resp = response_from_wire(self.config.dialect, settled)?;
+        // A row with no figure is nobody's price: settling it would
+        // record a measured zero where no measurement exists.
         let billed: Option<UsdMicros> = match &self.config.pricing {
-            Some(entry) => Some(cost::settle(&resp.usage, None, entry)?.billed),
-            None => None,
+            Some(entry) if entry.states_a_price() => {
+                Some(cost::settle(&resp.usage, None, entry)?.billed)
+            }
+            Some(_) | None => None,
         };
         ModelReturn::from_response(resp, billed)
     }
@@ -192,6 +201,32 @@ mod tests {
             "the refusal names the input kind a person has to choose: {}",
             err.recovery()
         );
+    }
+    #[test]
+    fn a_price_row_with_no_figure_leaves_the_call_unbilled() {
+        let body = serde_json::json!({
+            "content": [{ "type": "text", "text": "done" }],
+            "stop_reason": "end_turn",
+            "usage": { "input_tokens": 900, "output_tokens": 100 },
+        })
+        .to_string();
+        let (url, server) = fake_provider(vec![(200, body)], false);
+        let free = crate::market::MarketSnapshot::builtin()
+            .unwrap()
+            .lookup("local")
+            .unwrap()
+            .clone();
+        let mut endpoint = Endpoint::new(
+            super::super::config::EndpointConfig {
+                pricing: Some(free),
+                ..config(&url)
+            },
+            redemption(),
+        )
+        .unwrap();
+        let ret = endpoint.call(&request()).unwrap();
+        server.join().unwrap();
+        assert_eq!(ret.billed_usd_micros, None, "nobody priced this call");
     }
     #[test]
     fn a_confidential_building_never_reaches_a_remote_provider() {

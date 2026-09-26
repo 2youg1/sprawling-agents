@@ -10,12 +10,14 @@
 use std::sync::Arc;
 
 use kernel::Payload;
+use kernel::event::record::{LoginStarted, SecretCaptured};
 use kernel::{AxCode, AxError, EventKind};
 
+use crate::held_vault::{poisoned_vault, resolving};
 use crate::serving::random_token;
 
-use super::super::{RunWorker, now_ms};
-use super::{Credential, Entered, PROBE_TIMEOUT_MS, poisoned_vault, subscription};
+use super::super::RunWorker;
+use super::{Credential, Entered, PROBE_TIMEOUT_MS, subscription};
 
 /// How a credential reached the vault, as its `secret_captured` record
 /// states it.
@@ -37,6 +39,29 @@ impl Arrival {
     }
 }
 
+/// A subscription credential's capture line: the provider's
+/// `expires_in` turned into the instant it stops working, in the city's
+/// own clock, because renewal compares that instant with the next call.
+///
+/// # Errors
+/// Propagates a clock that cannot be read.
+fn captured_until(
+    now: kernel::TimeMs,
+    reference: kernel::SecretRef,
+    origin: String,
+    expires_in_s: Option<u64>,
+) -> Result<SecretCaptured, AxError> {
+    let expires_at = match expires_in_s {
+        Some(seconds) => Some(now.value().saturating_add(seconds.saturating_mul(1_000))),
+        None => None,
+    };
+    Ok(SecretCaptured {
+        reference,
+        origin,
+        expires_at,
+    })
+}
+
 impl RunWorker {
     /// Renews a subscription credential that is about to stop working.
     ///
@@ -51,12 +76,12 @@ impl RunWorker {
     /// the login is over, and saying so beats retrying what will fail
     /// again.
     pub(in crate::assembly) fn renew_if_stale(&mut self, provider: &str) -> Result<(), AxError> {
-        let Some(expires_at) = self.expiries.of(provider) else {
+        let Some(expires_at) = self.credentials.expiries.of(provider) else {
             return Ok(());
         };
         // A minute of margin: a call started now must still be holding a
         // working credential when it reaches the far end.
-        if now_ms()?.value().saturating_add(60_000) < expires_at {
+        if self.clock.now()?.value().saturating_add(60_000) < expires_at {
             return Ok(());
         }
         let Some(profile) = gateway::profile(provider) else {
@@ -64,37 +89,33 @@ impl RunWorker {
         };
         let stored = subscription::oauth_refresh_ref(provider)?;
         let refresh = {
-            let vault = self.vault.lock().map_err(|_| poisoned_vault())?;
+            let vault = self
+                .credentials
+                .vault
+                .lock()
+                .map_err(|_| poisoned_vault())?;
             vault.resolve(&stored)?
         };
         let tokens = gateway::oauth_refresh(profile, &refresh, PROBE_TIMEOUT_MS)?;
         let access = subscription::oauth_ref(provider)?;
         {
-            let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
+            let mut vault = self
+                .credentials
+                .vault
+                .lock()
+                .map_err(|_| poisoned_vault())?;
             vault.set(&access, tokens.access)?;
             if let Some(next) = tokens.refresh {
                 vault.set(&stored, next)?;
             }
         }
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "ref".to_owned(),
-            serde_json::Value::String(access.to_string()),
-        );
-        map.insert(
-            "origin".to_owned(),
-            serde_json::Value::String(format!("{provider}-renewal")),
-        );
-        if let Some(seconds) = tokens.expires_in_s {
-            let at = now_ms()?
-                .value()
-                .saturating_add(seconds.saturating_mul(1_000));
-            map.insert(
-                "expires_at".to_owned(),
-                serde_json::Value::Number(at.into()),
-            );
-        }
-        self.record(EventKind::SecretCaptured, Payload::new(map)?)
+        let captured = captured_until(
+            self.clock.now()?,
+            access,
+            format!("{provider}-renewal"),
+            tokens.expires_in_s,
+        )?;
+        self.record(EventKind::SecretCaptured, Payload::of(&captured)?)
     }
 
     /// One step of a subscription login.
@@ -164,39 +185,27 @@ impl RunWorker {
                     gateway::Grant::AuthorizationCode { .. } => gateway::OauthPending::Redirect(
                         gateway::oauth_begin(profile, random_token(48)?, random_token(24)?)?,
                     ),
-                    gateway::Grant::DeviceCode { .. } => {
-                        gateway::device_login_begin(profile, now_ms()?.value(), PROBE_TIMEOUT_MS)?
-                    }
+                    gateway::Grant::DeviceCode { .. } => gateway::device_login_begin(
+                        profile,
+                        self.clock.now()?.value(),
+                        PROBE_TIMEOUT_MS,
+                    )?,
                 };
-                let mut map = serde_json::Map::new();
-                map.insert(
-                    "provider".to_owned(),
-                    serde_json::Value::String(provider.to_owned()),
-                );
                 // The URL carries a PKCE challenge and a state, both of
                 // which are public by design; no credential exists yet.
                 // A device login's page is public for the same reason:
                 // the code that pairs with it stays in this process.
-                map.insert(
-                    "auth_url".to_owned(),
-                    serde_json::Value::String(pending.open_url().to_owned()),
-                );
-                // The short code the person types on that page, for
-                // the grant that has one. Absent rather than empty: a
-                // redirect login has no such code, and a blank one on
-                // the page would read as a code that failed to arrive.
-                if let Some(user_code) = pending.user_code() {
-                    map.insert(
-                        "user_code".to_owned(),
-                        serde_json::Value::String(user_code.to_owned()),
-                    );
-                }
-                self.logins.insert(provider.to_owned(), pending);
-                self.record(EventKind::LoginStarted, Payload::new(map)?)
+                let started = LoginStarted {
+                    provider: provider.to_owned(),
+                    auth_url: pending.open_url().to_owned(),
+                    user_code: pending.user_code().map(str::to_owned),
+                };
+                self.credentials.logins.insert(provider.to_owned(), pending);
+                self.record(EventKind::LoginStarted, Payload::of(&started)?)
             }
             channels::LoginStep::Code { code } => {
-                let asked_at = now_ms()?.value();
-                let pending = self.logins.get_mut(provider).ok_or_else(|| {
+                let asked_at = self.clock.now()?.value();
+                let pending = self.credentials.logins.get_mut(provider).ok_or_else(|| {
                     AxError::failure(
                         AxCode::CredentialMissing,
                         "redeem an authorization code",
@@ -221,38 +230,30 @@ impl RunWorker {
                 };
                 // Spent, and only now: a person who mistyped keeps the
                 // login they began rather than starting a new one.
-                self.logins.remove(provider);
+                self.credentials.logins.remove(provider);
                 let access = subscription::oauth_ref(provider)?;
                 {
-                    let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
+                    let mut vault = self
+                        .credentials
+                        .vault
+                        .lock()
+                        .map_err(|_| poisoned_vault())?;
                     vault.set(&access, tokens.access)?;
                     if let Some(refresh) = tokens.refresh {
                         let reference = subscription::oauth_refresh_ref(provider)?;
                         vault.set(&reference, refresh)?;
                     }
                 }
-                let mut map = serde_json::Map::new();
-                map.insert(
-                    "ref".to_owned(),
-                    serde_json::Value::String(access.to_string()),
-                );
-                map.insert(
-                    "origin".to_owned(),
-                    serde_json::Value::String(format!("{provider}-subscription")),
-                );
                 // When it stops working, in the city's own clock. Not a
                 // secret, and the one fact that decides whether the next
                 // call must renew first.
-                if let Some(seconds) = tokens.expires_in_s {
-                    let at = now_ms()?
-                        .value()
-                        .saturating_add(seconds.saturating_mul(1_000));
-                    map.insert(
-                        "expires_at".to_owned(),
-                        serde_json::Value::Number(at.into()),
-                    );
-                }
-                self.record(EventKind::SecretCaptured, Payload::new(map)?)?;
+                let captured = captured_until(
+                    self.clock.now()?,
+                    access.clone(),
+                    format!("{provider}-subscription"),
+                    tokens.expires_in_s,
+                )?;
+                self.record(EventKind::SecretCaptured, Payload::of(&captured)?)?;
                 if profile.api_base.is_empty() {
                     return Err(AxError::failure(
                         AxCode::ConfigInvalid,
@@ -301,25 +302,25 @@ impl RunWorker {
         arrival: Arrival,
     ) -> Result<(), AxError> {
         {
-            let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
+            let mut vault = self
+                .credentials
+                .vault
+                .lock()
+                .map_err(|_| poisoned_vault())?;
             vault.set(reference, value.into_vault_value())?;
         }
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "ref".to_owned(),
-            serde_json::Value::String(reference.to_string()),
-        );
-        map.insert(
-            "origin".to_owned(),
-            serde_json::Value::String(arrival.spelling().to_owned()),
-        );
-        self.record(EventKind::SecretCaptured, Payload::new(map)?)
+        let captured = SecretCaptured {
+            reference: reference.clone(),
+            origin: arrival.spelling().to_owned(),
+            expires_at: None,
+        };
+        self.record(EventKind::SecretCaptured, Payload::of(&captured)?)
     }
 
     /// The redemption closure the adapters take: one resolve per call,
     /// nothing cached, the lock held only while the vault is read.
     pub(in crate::assembly) fn resolver(&self) -> gateway::SecretResolver {
-        resolving(Arc::clone(&self.vault))
+        resolving(Arc::clone(&self.credentials.vault))
     }
 
     /// The vault this city resolves credentials through.
@@ -330,7 +331,7 @@ impl RunWorker {
     /// the last moment and exposed only while a header is written" stays
     /// one path rather than two.
     pub(crate) fn vault_handle(&self) -> Arc<std::sync::Mutex<gateway::Custodian>> {
-        Arc::clone(&self.vault)
+        Arc::clone(&self.credentials.vault)
     }
 }
 
@@ -350,15 +351,4 @@ fn not_approved_yet(provider: &str, seconds: u64) -> AxError {
         "approve the login on the page this city opened, then enter the code again; \
          the vendor asks for {seconds} seconds between tries"
     ))
-}
-
-/// One resolver over one vault. A fresh one per operation, because
-/// `SecretResolver` is spent by the endpoint it is handed to.
-pub(crate) fn resolving(
-    vault: Arc<std::sync::Mutex<gateway::Custodian>>,
-) -> gateway::SecretResolver {
-    Box::new(move |reference: &kernel::SecretRef| {
-        let held = vault.lock().map_err(|_| poisoned_vault())?;
-        held.resolve(reference)
-    })
 }

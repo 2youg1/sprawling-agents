@@ -14,6 +14,8 @@ use crate::address::Address;
 use crate::error::{AxCode, AxError};
 use crate::event::Payload;
 
+pub mod writes;
+
 /// Tool identity as it appears in catalog and events: non-empty ASCII
 /// lowercase, digits, underscore.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -28,6 +30,10 @@ impl ToolName {
     /// The tool that drives the browser a person already has open, with
     /// that person's own profile.
     pub const USER_BROWSER: &'static str = "usersbrowser";
+
+    /// The three-arm execution tool. One authority, because the discard
+    /// forecast, the lane's command count and its sieve all route on it.
+    pub const EXEC: &'static str = "exec";
 
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let well_formed = !raw.is_empty()
@@ -303,12 +309,17 @@ pub enum GateSubject {
 /// `Send`, because a bench of tools is driven on a pool thread rather
 /// than on the thread that built it (sprawling-SPEC 8-44). A tool that
 /// holds something a thread cannot give up has no place on a bench.
-pub trait Tool: Send {
+///
+/// `Sync`, and `invoke` takes `&self`, because the read-only calls at
+/// the head of a wave run at the same time (runtime-SPEC 8-3), so one
+/// tool can be inside `invoke` on several threads at once. A tool with
+/// state of its own keeps that state behind its own lock.
+pub trait Tool: Send + Sync {
     fn meta(&self) -> &ToolMeta;
 
     /// Fail-closed identity: a call whose name differs from `meta().name`
     /// must return `E_INVALID_ARGS`, never route silently.
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
 
     /// What this call is about, read by the grammar this tool already
     /// parses its arguments with.
@@ -324,6 +335,12 @@ pub trait Tool: Send {
     fn subject(&self, _call: &ToolCall) -> Result<GateSubject, AxError> {
         Ok(GateSubject::None)
     }
+
+    /// What this call may have written to the city's tree once it ran;
+    /// the default reads the declared effect and nothing more.
+    fn writes(&self, _call: &ToolCall) -> writes::Writes {
+        writes::Writes::of(&self.meta().effect)
+    }
 }
 
 /// The exec three-arm shape (L0 frozen surface, 5.1). Lives on the tool
@@ -338,56 +355,7 @@ pub enum ExecArm {
 }
 
 #[cfg(feature = "conformance")]
-pub mod conformance {
-    //! One assertion suite for every tool implementation (V3).
-
-    use super::{Tool, ToolCall, ToolName};
-    use crate::error::AxCode;
-    use crate::event::Payload;
-
-    /// Asserts the meta is complete and the identity is fail-closed:
-    /// a wrong-name call is refused with `E_INVALID_ARGS`, and the tool
-    /// still answers after refusing (no poisoned state).
-    #[allow(
-        clippy::panic,
-        clippy::expect_used,
-        reason = "conformance suites assert by panicking; they are dev-only by feature"
-    )]
-    pub fn assert_tool_conformance<T: Tool>(tool: &mut T) {
-        let meta = tool.meta().clone();
-        assert!(
-            !meta.name.as_str().is_empty(),
-            "tool name must be non-empty"
-        );
-        assert!(
-            !meta.disclosure.is_empty(),
-            "disclosure must answer what-and-when in one breath"
-        );
-        let wrong = ToolName::parse("no_such_tool_name").expect("literal is well-formed");
-        assert_ne!(
-            wrong, meta.name,
-            "conformance probe name collides with the tool under test"
-        );
-        let refused = tool.invoke(&ToolCall {
-            id: "conf-mismatch".to_owned(),
-            name: wrong,
-            args: Payload::empty(),
-        });
-        match refused {
-            Err(err) => assert_eq!(
-                err.code(),
-                &AxCode::InvalidArgs,
-                "wrong-name call must be E_INVALID_ARGS"
-            ),
-            Ok(_) => panic!("a tool must refuse a call bearing another tool's name"),
-        }
-        let meta_after = tool.meta();
-        assert_eq!(
-            meta_after.name, meta.name,
-            "a refusal must not poison the tool"
-        );
-    }
-}
+pub mod conformance;
 
 #[cfg(test)]
 #[allow(

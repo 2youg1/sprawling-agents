@@ -35,6 +35,7 @@
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
+use accounting::Runnable;
 use kernel::{AxCode, AxError};
 
 /// How many times one install program is asked whether it has
@@ -52,32 +53,6 @@ pub(crate) const PATIENCE: u32 = 3_600;
 /// CPU.
 const TICK: Duration = Duration::from_millis(50);
 
-/// A program and its arguments that this city is allowed to start.
-///
-/// Constructed only by `Recipe::command`, which is where a recipe this
-/// city may not run is refused, so holding one of these is the proof
-/// that the question was asked and answered.
-pub(crate) struct Runnable<'a> {
-    program: &'a str,
-    args: &'a [&'a str],
-}
-
-impl<'a> Runnable<'a> {
-    pub(crate) fn new(program: &'a str, args: &'a [&'a str]) -> Runnable<'a> {
-        Runnable { program, args }
-    }
-
-    /// The command as a person would type it into their own terminal.
-    /// Every message about this program quotes this, so what a person
-    /// is told to run is what this city ran.
-    pub(crate) fn spelled(&self) -> String {
-        if self.args.is_empty() {
-            return self.program.to_owned();
-        }
-        format!("{} {}", self.program, self.args.join(" "))
-    }
-}
-
 /// Runs one install program to completion, or stops it when the
 /// knocks run out.
 ///
@@ -91,8 +66,8 @@ impl<'a> Runnable<'a> {
 /// carries the recovery that actually works: run the line yourself,
 /// where an installer that wants an answer can get one.
 pub(crate) fn run(item: &str, runnable: &Runnable, patience: u32) -> Result<(), AxError> {
-    let mut child = Command::new(runnable.program)
-        .args(runnable.args)
+    let mut child = Command::new(runnable.program())
+        .args(runnable.args())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -101,7 +76,7 @@ pub(crate) fn run(item: &str, runnable: &Runnable, patience: u32) -> Result<(), 
             AxError::failure(
                 AxCode::ToolUnavailable,
                 "install a tool",
-                format!("{item}: {}: {err}", runnable.program),
+                format!("{item}: {}: {err}", runnable.program()),
             )
             .with_recovery("install the package manager first, or run the printed line yourself")
         })?;
@@ -204,40 +179,72 @@ fn unwatchable(
 mod tests {
     use super::*;
 
+    use accounting::Recipe;
+
     /// A program that ends by itself, and one that ends in failure.
-    fn ending(code: &'static str) -> (&'static str, Vec<&'static str>) {
-        if cfg!(target_os = "windows") {
-            ("cmd", vec!["/C", "exit", code])
-        } else {
-            ("sh", vec!["-c", "exit $0", code])
+    fn ending(code: Code) -> Recipe {
+        match (cfg!(target_os = "windows"), code) {
+            (true, Code::Success) => Recipe::Command {
+                program: "cmd",
+                args: &["/C", "exit", "0"],
+            },
+            (true, Code::Failure) => Recipe::Command {
+                program: "cmd",
+                args: &["/C", "exit", "3"],
+            },
+            (false, Code::Success) => Recipe::Command {
+                program: "sh",
+                args: &["-c", "exit 0"],
+            },
+            (false, Code::Failure) => Recipe::Command {
+                program: "sh",
+                args: &["-c", "exit 3"],
+            },
         }
+    }
+
+    enum Code {
+        Success,
+        Failure,
     }
 
     /// A program that keeps running whatever its stdin is: it stands in
     /// for the package manager that is downloading, or wedged, when the
     /// knocks run out.
-    fn never_ending() -> (&'static str, Vec<&'static str>) {
+    fn never_ending() -> Recipe {
         if cfg!(target_os = "windows") {
-            ("ping", vec!["-n", "30", "127.0.0.1"])
+            Recipe::Command {
+                program: "ping",
+                args: &["-n", "30", "127.0.0.1"],
+            }
         } else {
-            ("sleep", vec!["30"])
+            Recipe::Command {
+                program: "sleep",
+                args: &["30"],
+            }
         }
     }
 
     /// A program that waits for a person to type something: it stands
     /// in for the source agreement and the password prompt.
-    fn waiting_on_input() -> (&'static str, Vec<&'static str>) {
+    fn waiting_on_input() -> Recipe {
         if cfg!(target_os = "windows") {
-            ("cmd", vec!["/C", "pause"])
+            Recipe::Command {
+                program: "cmd",
+                args: &["/C", "pause"],
+            }
         } else {
-            ("sh", vec!["-c", "read answer"])
+            Recipe::Command {
+                program: "sh",
+                args: &["-c", "read answer"],
+            }
         }
     }
 
     #[test]
     fn a_program_that_never_ends_is_killed_when_the_knocks_run_out() {
-        let (program, args) = never_ending();
-        let runnable = Runnable::new(program, &args);
+        let recipe = never_ending();
+        let runnable = recipe.command("pretend").unwrap();
         // Forty knocks at 50 ms: the child runs for thirty seconds, so
         // returning at all is the assertion, and the test costs two.
         let refused = run("pretend", &runnable, 40).unwrap_err();
@@ -254,8 +261,8 @@ mod tests {
     /// thread for every knock it was given.
     #[test]
     fn a_program_that_asks_a_question_ends_long_before_the_knocks_do() {
-        let (program, args) = waiting_on_input();
-        let runnable = Runnable::new(program, &args);
+        let recipe = waiting_on_input();
+        let runnable = recipe.command("pretend").unwrap();
         // A hundred knocks is five seconds of patience; reading end of
         // input takes one. A `Timeout` here means stdin was not null.
         let outcome = run("pretend", &runnable, 100);
@@ -267,21 +274,25 @@ mod tests {
 
     #[test]
     fn a_program_that_succeeds_is_reported_as_done() {
-        let (program, args) = ending("0");
-        assert!(run("pretend", &Runnable::new(program, &args), PATIENCE).is_ok());
+        let recipe = ending(Code::Success);
+        assert!(run("pretend", &recipe.command("pretend").unwrap(), PATIENCE).is_ok());
     }
 
     #[test]
     fn a_program_that_fails_is_reported_with_the_line_a_person_can_rerun() {
-        let (program, args) = ending("3");
-        let refused = run("pretend", &Runnable::new(program, &args), PATIENCE).unwrap_err();
+        let recipe = ending(Code::Failure);
+        let refused = run("pretend", &recipe.command("pretend").unwrap(), PATIENCE).unwrap_err();
         assert_eq!(refused.code(), &AxCode::ToolUnavailable);
         assert!(refused.to_string().contains("ended in failure"));
     }
 
     #[test]
     fn a_program_that_is_not_on_this_machine_is_refused_before_any_wait() {
-        let runnable = Runnable::new("sprawling-no-such-installer", &[]);
+        let recipe = Recipe::Command {
+            program: "sprawling-no-such-installer",
+            args: &[],
+        };
+        let runnable = recipe.command("pretend").unwrap();
         let refused = run("pretend", &runnable, PATIENCE).unwrap_err();
         assert_eq!(refused.code(), &AxCode::ToolUnavailable);
     }

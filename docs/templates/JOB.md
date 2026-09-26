@@ -1,4 +1,4 @@
-# JOB.md — <fill-task>
+# JOB.md
 
 > The task for this session. Read it in full and leave it unchanged.
 

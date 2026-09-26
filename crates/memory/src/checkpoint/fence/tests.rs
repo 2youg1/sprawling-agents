@@ -316,6 +316,58 @@ fn every_fence_a_run_raises_survives_git_gc_whichever_handle_raised_it() {
 }
 
 #[test]
+fn a_file_scope_is_a_literal_path_and_not_a_glob() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "hall/notes1.md", "decoy");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    checkpoint
+        .wave_pre(&["hall".to_owned()], TimeMs::new(1_000), &resident())
+        .unwrap();
+
+    write(tmp.path(), "hall/notes[1].md", "written");
+    write(tmp.path(), "hall/notes1.md", "decoy changed");
+    let fence = checkpoint
+        .wave_pre(
+            &["hall/notes[1].md".to_owned()],
+            TimeMs::new(2_000),
+            &resident(),
+        )
+        .unwrap();
+    assert_eq!(files_of(&fence), ["hall/notes[1].md"]);
+}
+
+/// The address grammar admits a leading `!`, which a git pathspec reads
+/// as a negation: the scope `!notes.md` has to stage that file, and
+/// removing it has to stage the removal, and neither may stage any
+/// other file the tree changed.
+#[test]
+fn a_file_scope_with_a_leading_bang_is_that_file_and_not_a_negation() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "notes.md", "decoy");
+    write(tmp.path(), "other.md", "decoy");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    checkpoint
+        .wave_pre(&[], TimeMs::new(1_000), &resident())
+        .unwrap();
+
+    write(tmp.path(), "!notes.md", "written");
+    write(tmp.path(), "notes.md", "decoy changed");
+    write(tmp.path(), "other.md", "decoy changed");
+    let scope = ["!notes.md".to_owned()];
+    let added = checkpoint
+        .wave_pre(&scope, TimeMs::new(2_000), &resident())
+        .unwrap();
+    std::fs::remove_file(tmp.path().join("!notes.md")).unwrap();
+    let removed = checkpoint
+        .wave_pre(&scope, TimeMs::new(3_000), &resident())
+        .unwrap();
+    assert_eq!(
+        [files_of(&added), files_of(&removed)],
+        [["!notes.md"], ["!notes.md"]]
+    );
+}
+
+#[test]
 fn a_fence_lists_only_the_paths_it_changed() {
     let tmp = tempfile::tempdir().unwrap();
     write(tmp.path(), "work/kept.txt", "kept");
@@ -342,4 +394,91 @@ fn a_fence_lists_only_the_paths_it_changed() {
         .wave_pre(&scope, TimeMs::new(3_000), &resident())
         .unwrap();
     assert_eq!(files_of(&third), Vec::<String>::new());
+}
+
+#[test]
+fn restore_leaves_a_file_the_person_made_after_the_discard() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/doomed.txt", "about to go");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let pre = checkpoint
+        .wave_pre(
+            &["work".to_owned()],
+            TimeMs::new(1_700_000_000_000),
+            &resident(),
+        )
+        .unwrap();
+    let pre_oid = GitOid::parse(&oid_of(&pre)).unwrap();
+    std::fs::remove_file(tmp.path().join("work/doomed.txt")).unwrap();
+    write(tmp.path(), "work/doomed.txt", "the person's newer file");
+
+    let restored = checkpoint.restore(&Address::parse("work/doomed.txt").unwrap(), &pre_oid);
+
+    assert_eq!(
+        (
+            restored.is_err(),
+            std::fs::read_to_string(tmp.path().join("work/doomed.txt")).unwrap()
+        ),
+        (true, "the person's newer file".to_owned())
+    );
+}
+
+#[test]
+fn restore_refuses_a_link_on_the_path_and_writes_nothing_outside_the_city() {
+    let tmp = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/doomed.txt", "about to go");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let pre = checkpoint
+        .wave_pre(
+            &["work".to_owned()],
+            TimeMs::new(1_700_000_000_000),
+            &resident(),
+        )
+        .unwrap();
+    let pre_oid = GitOid::parse(&oid_of(&pre)).unwrap();
+    std::fs::remove_dir_all(tmp.path().join("work")).unwrap();
+    assert!(
+        crate::alias::tests::place_link(false, outside.path(), &tmp.path().join("work")),
+        "the fixture could not make a link"
+    );
+
+    let restored = checkpoint.restore(&Address::parse("work/doomed.txt").unwrap(), &pre_oid);
+
+    assert_eq!(
+        (
+            restored.is_err(),
+            outside.path().join("doomed.txt").exists()
+        ),
+        (true, false)
+    );
+}
+
+#[test]
+fn restore_refuses_a_reserved_address_and_writes_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), ".sprawling/doc.txt", "from history");
+    let repo = git2::Repository::init(tmp.path()).unwrap();
+    let mut index = repo.index().unwrap();
+    index.add_path(Path::new(".sprawling/doc.txt")).unwrap();
+    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+    let sig = git2::Signature::now("t", "t@t").unwrap();
+    let held = repo
+        .commit(None, &sig, &sig, "holds a reserved file", &tree, &[])
+        .unwrap();
+    let checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    std::fs::remove_file(tmp.path().join(".sprawling/doc.txt")).unwrap();
+
+    let restored = checkpoint.restore(
+        &Address::parse(".sprawling/doc.txt").unwrap(),
+        &GitOid::parse(&held.to_string()).unwrap(),
+    );
+
+    assert_eq!(
+        (
+            restored.is_err(),
+            tmp.path().join(".sprawling/doc.txt").exists()
+        ),
+        (true, false)
+    );
 }

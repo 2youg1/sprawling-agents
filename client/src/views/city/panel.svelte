@@ -10,7 +10,7 @@
   // on a medium one, and a block under the drawing on a narrow one -
   // one component either way, so the three widths cannot drift apart.
 
-  import type { RunBelief } from "../../core/belief";
+  import { heldWithin } from "../../core/belief/rooms";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock } from "../../core/time";
@@ -40,12 +40,8 @@
     return held.progress.planned;
   });
   const pursuit = $derived(city.pursuits.find((line) => line.addr === addr));
-  const runs = $derived.by((): readonly RunBelief[] => {
-    const held = Object.values($belief.runs)
-      .filter((run) => run.addr !== null && (run.addr === addr || run.addr.startsWith(`${addr}/`)))
-      .sort((a, b) => (b.started ?? 0) - (a.started ?? 0));
-    return held.slice(0, 8);
-  });
+  // The newest eight runs of the building, newest first.
+  const runs = $derived(heldWithin($belief, addr).reverse().slice(0, 8));
 </script>
 
 <div class="flex flex-col gap-base">
@@ -123,7 +119,7 @@
               ></span>
               <span class="min-w-0 flex-1 truncate text-text-quiet">{run.task ?? run.run}</span>
               {#if run.started !== null}
-                <span class="shrink-0 text-text-disabled">{clock($lang, run.started)}</span>
+                <span class="shrink-0 text-text-faint">{clock($lang, run.started)}</span>
               {/if}
             </a>
           </li>

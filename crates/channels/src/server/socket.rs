@@ -32,15 +32,16 @@ use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, Seq};
 use tokio::sync::broadcast;
 
 use crate::assets::AssetReply;
 use crate::reception::inbound::Inbound;
 use crate::reception::{
-    Admission, Door, SessionState, SessionStep, Stream, decide_admission, decide_frame,
+    Admission, Door, SessionState, SessionStep, Stream, WelcomeFacts, decide_admission,
+    decide_frame,
 };
-use crate::wire::ServerFrame;
+use crate::wire::{Answered, Ask, AskOutcome, Sample, ServerFrame};
 
 use super::config::ShellState;
 
@@ -54,6 +55,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     let mut events = state.events.subscribe();
     let mut deltas = state.deltas.subscribe();
     let mut logs = state.logs.subscribe();
+    let mut outputs = state.outputs.subscribe();
     // This session's own refusals, which the worker posts into long
     // after the command was accepted. Unbounded because a refusal must
     // not be dropped and because its rate is the rate at which one
@@ -61,6 +63,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     let (refused, mut refusals) = tokio::sync::mpsc::unbounded_channel::<AxError>();
     // What this session has delivered and what it still owes.
     let mut stream = Stream::opening();
+    let mut watching: Option<Watching> = None;
     loop {
         tokio::select! {
             incoming = socket.recv() => {
@@ -71,7 +74,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                 // reaches the peer by one path whichever produced it.
                 let step = match inbound.read(&text) {
                     Ok(frame) => {
-                        decide_frame(phase, frame, &state.face, state.city.as_ref())
+                        decide_frame(phase, frame, &state.face, WelcomeFacts { city: state.city.as_ref(), head: state.head.read(), epoch: state.epoch })
                     }
                     Err(unreadable) => unreadable,
                 };
@@ -80,6 +83,11 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         phase = SessionState::Live;
                         if send(&mut socket, &ServerFrame::Welcome(*welcome)).await.is_err() {
                             return;
+                        }
+                        for written in (state.outputs_so_far)() {
+                            if send(&mut socket, &ServerFrame::Output(written)).await.is_err() {
+                                return;
+                            }
                         }
                     }
                     SessionStep::Deliver(command) => {
@@ -93,7 +101,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                             return;
                         }
                     }
-                    SessionStep::Answer(query) => {
+                    SessionStep::Answer(ask) => {
                         // Answering reads the disk and takes a lock, and
                         // it ran here, inside the task that owns this
                         // socket. One `RunHistory` therefore held a
@@ -105,29 +113,45 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         // read belongs, and this stays true however fast
                         // the read becomes.
                         let answering = Arc::clone(&state.queries);
-                        let asked = *query;
+                        let Ask { ask_id, query } = *ask;
                         let outcome =
-                            tokio::task::spawn_blocking(move || answering(asked)).await;
-                        let frame = match outcome {
-                            Ok(Ok(answer)) => ServerFrame::Answer(Box::new(answer)),
-                            Ok(Err(error)) => ServerFrame::Refusal(Box::new(error)),
+                            tokio::task::spawn_blocking(move || answering(query)).await;
+                        let (as_of, outcome) = match outcome {
+                            Ok((as_of, Ok(answer))) => (as_of, AskOutcome::Answer(answer)),
+                            Ok((as_of, Err(error))) => (as_of, AskOutcome::Refusal(error)),
                             // The pool dropped the work, which means the
                             // runtime is going down; say so rather than
                             // leave the page waiting on a frame that
-                            // will never come.
-                            Err(_) => ServerFrame::Refusal(Box::new(
-                                AxError::failure(
-                                    AxCode::StorageFatal,
-                                    "answer a query",
-                                    "the answering task did not finish",
-                                )
-                                .with_recovery("ask again; if it repeats, restart the server"),
-                            )),
+                            // will never come. Nothing was read, so the
+                            // answer is dated at the start of history.
+                            Err(_) => (
+                                Seq::FIRST,
+                                AskOutcome::Refusal(
+                                    AxError::failure(
+                                        AxCode::StorageFatal,
+                                        "answer a query",
+                                        "the answering task did not finish",
+                                    )
+                                    .with_recovery("ask again; if it repeats, restart the server"),
+                                ),
+                            ),
                         };
+                        let frame = ServerFrame::Answered(Box::new(Answered {
+                            ask_id,
+                            as_of,
+                            outcome,
+                        }));
                         if send(&mut socket, &frame).await.is_err() {
                             return;
                         }
                     }
+                    SessionStep::Watch(watched) => {
+                        let samples = watching
+                            .take()
+                            .map_or_else(|| state.monitor.samples.subscribe(), |(_, samples)| samples);
+                        watching = Some(((state.monitor.watch)(watched), samples));
+                    }
+                    SessionStep::Release => watching = None,
                     SessionStep::Refuse { error, close } => {
                         if send(&mut socket, &ServerFrame::Refusal(error)).await.is_err() {
                             return;
@@ -216,7 +240,47 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                     Err(broadcast::error::RecvError::Closed) => return,
                 }
             }
+            // Running commands' output. A skipped piece is not stated: the
+            // whole output arrives with the call's result either way.
+            written = outputs.recv() => {
+                match written {
+                    Ok(piece) => {
+                        if phase == SessionState::Live
+                            && send(&mut socket, &ServerFrame::Output(piece)).await.is_err() {
+                            return;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Closed) => return,
+                }
+            }
+            read = next_sample(&mut watching) => {
+                match read {
+                    Ok(sample) => {
+                        if send(&mut socket, &ServerFrame::Monitor(sample)).await.is_err() {
+                            return;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Closed) => watching = None,
+                }
+            }
         }
+    }
+}
+
+/// What a watching session holds: the token that counts it, and its
+/// subscription to the readings.
+type Watching = (Box<dyn Send>, broadcast::Receiver<Sample>);
+
+/// The next reading for a watching session; never ready for one that
+/// is not watching, so the select above waits on its other arms.
+async fn next_sample(
+    watching: &mut Option<Watching>,
+) -> Result<Sample, broadcast::error::RecvError> {
+    match watching {
+        Some((_, samples)) => samples.recv().await,
+        None => std::future::pending().await,
     }
 }
 

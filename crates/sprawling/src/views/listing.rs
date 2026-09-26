@@ -16,16 +16,15 @@ use std::path::Path;
 
 use kernel::Address;
 
-use super::holding::Views;
-
-impl Views {
-    /// One level of the tree under `at`, or the city root when `at` is
-    /// absent: directories first, then files, each in name order.
-    pub(super) fn listing_answer(&self, at: Option<&Address>) -> channels::ListingAnswer {
-        channels::ListingAnswer {
-            at: at.cloned(),
-            entries: list(&resolve(&self.city_root, at)),
-        }
+/// One level of the tree under `at`, or the city root when `at` is
+/// absent: directories first, then files, each in name order.
+///
+/// Takes the city root rather than the views: it reads the disk, and
+/// runs after the view lock is released (sprawling-SPEC.md 8-92).
+pub(super) fn listing_answer(city_root: &Path, at: Option<Address>) -> channels::ListingAnswer {
+    channels::ListingAnswer {
+        entries: list(&resolve(city_root, at.as_ref())),
+        at,
     }
 }
 
@@ -78,6 +77,7 @@ fn list(dir: &Path) -> Vec<channels::Entry> {
 )]
 mod tests {
     use super::*;
+    use crate::views::Views;
 
     fn names(entries: &[channels::Entry]) -> Vec<&str> {
         entries.iter().map(|entry| entry.name.as_str()).collect()

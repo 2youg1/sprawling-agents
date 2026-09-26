@@ -4,34 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import type { Key } from "../../core/lang";
+import type { Section } from "../../core/slash";
 
-// The three sections a verb falls under, and the word for each,
-// decided by the spelling both halves of the slash seam already
-// share.
-export const SECTIONS = ["actions", "navigation", "sessions"] as const;
-export type Section = (typeof SECTIONS)[number];
+// The word for each section a verb names for itself in `core/slash.ts`.
 export const SECTION_WORD: Readonly<Record<Section, Key>> = {
   actions: "palette_group_actions",
   navigation: "palette_group_navigation",
   sessions: "palette_group_sessions",
 };
-const SECTION: Readonly<Record<string, Section>> = {
-  "/dispatch": "sessions",
-  "/steer": "sessions",
-  "/new": "sessions",
-  "/fork": "sessions",
-  "/go": "navigation",
-  "/mcp": "navigation",
-  "/doctor": "navigation",
-  "/stop": "actions",
-  "/release": "actions",
-  "/raise": "actions",
-  "/model": "actions",
-  "/effort": "actions",
-  "/help": "actions",
-  "/clear": "actions",
-};
-// A verb `core/slash.ts` grew before this screen classified it lands
-// with the actions - visible and runnable, which is how its section
-// gets named next time.
-export const sectionOf = (spelling: string): Section => SECTION[spelling] ?? "actions";

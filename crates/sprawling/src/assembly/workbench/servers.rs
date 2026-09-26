@@ -6,7 +6,9 @@
 //! The external tools a building's configuration names, each already
 //! connected to its server or left out and named in the diagnostics.
 
-use super::super::{RunWorker, connect_mcp, now_ms, transport_site};
+use accounting::Reached;
+
+use super::super::RunWorker;
 
 impl RunWorker {
     /// The external tools this run may reach, each already connected to
@@ -42,27 +44,33 @@ impl RunWorker {
         // The half of `[prepare_dispatch_ms]` this file owns: starting
         // every server this building declares and shaking hands with
         // each of them. Held apart from the whole-phase reading because
-        // it is the part a resident connection table would remove, and
-        // a figure that mixed the two could not say how much.
-        let began = now_ms();
+        // it is the part the resident connection table removes on every
+        // dispatch after the first, and a figure that mixed the two could
+        // not say how much.
+        let began = self.clock.now();
         let mut offered = Vec::new();
         let resolve = self.resolver();
         for server in &config.mcp {
             // The module a reader is sent to is the transport that
-            // failed, not whichever one was written first: every MCP
-            // failure used to be filed under `bin::mcp_stdio`, which
-            // sent the last reader who followed it to the wrong file.
-            let site = transport_site(&server.transport);
-            match connect_mcp(server, write_root, confidential, &resolve) {
-                Ok((tools, opened)) => {
+            // failed, not whichever one was written first.
+            let site = protocol::McpLink::site(&server.transport);
+            match self
+                .connectors
+                .connect(server, write_root, confidential, &resolve)
+            {
+                Ok((tools, reached)) => {
+                    let how = match reached {
+                        Reached::Connected(opened) => {
+                            format!("{} speaking {}", opened.server, opened.protocol_version)
+                        }
+                        Reached::Resident => "already connected".to_owned(),
+                    };
                     self.note(
                         runtime::diagnostics::Level::Effect,
                         site,
                         &format!(
-                            "{} is {} speaking {}, offering {} tool(s)",
+                            "{} is {how}, offering {} tool(s)",
                             server.label.as_str(),
-                            opened.server,
-                            opened.protocol_version,
                             tools.len()
                         ),
                     );
@@ -79,7 +87,7 @@ impl RunWorker {
         // the tools: the reading is diagnostic, the connections are the
         // work. The clock's failure is still said, with its recovery,
         // rather than leaving a reader to wonder why the line is absent.
-        match (began, now_ms()) {
+        match (began, self.clock.now()) {
             (Ok(began), Ok(ended)) => {
                 let spent = ended.value().saturating_sub(began.value());
                 self.note(

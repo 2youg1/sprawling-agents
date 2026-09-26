@@ -70,6 +70,7 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
         job: Some(job()),
         parent,
         predecessor,
+        dispatched_by: None,
         skills: vec![
             SkillPin {
                 name: "read".to_owned(),
@@ -213,4 +214,26 @@ fn the_two_endings_that_cite_nothing_leave_the_key_absent() {
         assert_eq!(bytes(&new), bytes(&hand_written_frozen(&completion)));
         assert!(!bytes(&new).contains("evidence"), "{}", bytes(&new));
     }
+}
+
+/// The bytes `sprawling::assembly::probing` wrote by hand for an
+/// `eval_run` line, empty lists included.
+#[test]
+fn an_eval_line_keeps_the_bytes_its_ledger_already_holds() {
+    let predecessor = RunId::from_bytes([5u8; 16]);
+    let wire = format!(
+        "{{\"after\":[\"a\",\"\"],\"before\":[\"a\",\"b\"],\"kept\":1,\"lost\":[1],\"predecessor\":\"{predecessor}\",\"probe\":\"handoff\",\"version\":2}}"
+    );
+    let payload = Payload::of(&EvalRun {
+        probe: "handoff".to_owned(),
+        version: 2,
+        predecessor,
+        kept: 1,
+        lost: vec![1],
+        before: vec!["a".to_owned(), "b".to_owned()],
+        after: vec!["a".to_owned(), String::new()],
+    })
+    .unwrap();
+    assert_eq!(bytes(&payload), wire);
+    assert_eq!(serde_json::from_str::<Payload>(&wire).unwrap(), payload);
 }

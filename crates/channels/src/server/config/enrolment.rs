@@ -13,6 +13,7 @@ use axum::body::Bytes;
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use kernel::event::record::SecretCaptured;
 use kernel::{AxError, EventKind, EventRecord, Sealed, SecretRef};
 use tokio::sync::broadcast;
 
@@ -163,17 +164,12 @@ fn stored_reference(record: &EventRecord, place: &SecretRef) -> Option<String> {
     if record.kind() != EventKind::SecretCaptured {
         return None;
     }
-    let said = record.data().as_map().get("ref")?.as_str()?;
-    let Ok(found) = SecretRef::parse(said) else {
-        // A `ref` outside the grammar names no vault place, so it answers
-        // this request exactly as little as another writer's reference
-        // does, and the wait goes on for the record that does.
-        return None;
-    };
-    if found != *place {
-        return None;
-    }
-    Some(said.to_owned())
+    // A line that does not read as a capture - a `ref` outside the
+    // grammar among them - names no vault place, so it answers this
+    // request exactly as little as another writer's reference does, and
+    // the wait goes on for the record that does.
+    let captured: SecretCaptured = record.data().read().ok()?;
+    (captured.reference == *place).then(|| captured.reference.to_string())
 }
 
 /// What the city said about one enrolment, or why the wait for it ended.

@@ -89,6 +89,7 @@ fn plan(window: u64) -> RunPlan {
         job: Locator::parse(&format!("file:{}/JOB.md@{}", addr.as_str(), "a".repeat(40))).unwrap(),
         parent: None,
         predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
         inherited: Vec::new(),
         shape: CallShape {
             model: "metered".to_owned(),
@@ -97,6 +98,7 @@ fn plan(window: u64) -> RunPlan {
             context_tokens: window,
         },
         second_threshold: None,
+        context: runtime::ContextReading::default(),
         prefix: FrozenPrefix::assemble(
             FrozenSegment::new(SegmentSlot::City, b"city".to_vec()),
             FrozenSegment::new(SegmentSlot::Building, b"building".to_vec()),
@@ -147,6 +149,7 @@ fn windows_for(reported: Vec<u64>) -> Vec<String> {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -211,6 +214,7 @@ fn a_model_with_no_stated_window_is_never_reminded() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -220,5 +224,71 @@ fn a_model_with_no_stated_window_is_never_reminded() {
         !seen.borrow()[1].contains("[context]"),
         "no denominator, no percentage: {}",
         seen.borrow()[1]
+    );
+}
+
+/// `status` froze its context reading at dispatch, before any call, so a
+/// model that asked how full its window was heard zero for the whole run.
+/// It now hears the count the provider gave for the call that asked.
+#[test]
+fn status_reports_the_count_of_the_call_that_asked() {
+    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let mut model = MeteredModel {
+        reported: vec![300, 400, 500],
+        seen,
+    };
+    let plan = plan(1_000);
+    let status = runtime::StatusTool::new(runtime::StatusSnapshot {
+        who: "resident".to_owned(),
+        addr: Address::parse("lab/room1").unwrap(),
+        mode: kernel::Mode::Up,
+        ctx_limit: Tokens::new(1_000),
+        trust: "trusted".to_owned(),
+        write_domain: "lab/room1".to_owned(),
+        locks: Vec::new(),
+        worktree_path: "lab/room1".to_owned(),
+        worktree_disk: kernel::ByteLen::new(0),
+        signals_pending: 0,
+        now: None,
+        provider_mode: runtime::ProviderMode::Normal,
+        neighbours: 0,
+    })
+    .unwrap()
+    .metering(plan.context.clone());
+    let heard = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let lines = std::rc::Rc::clone(&heard);
+    let mut ledger = SinkLedger { seq: 1 };
+    let mut tick = 0u64;
+    let mut now = move || {
+        tick = tick.saturating_add(1);
+        Ok(TimeMs::new(tick))
+    };
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |call: &ToolCall, _: TimeMs| {
+        let outcome = kernel::Tool::invoke(&status, call)?;
+        let text = serde_json::to_value(&outcome.result).unwrap()["text"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        lines.borrow_mut().extend(
+            text.lines()
+                .filter(|line| line.starts_with("ctx:"))
+                .map(str::to_owned),
+        );
+        Ok(outcome)
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke: &mut invoke,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+    drive(plan, &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    assert_eq!(
+        *heard.borrow(),
+        vec!["ctx: 300/1000".to_owned(), "ctx: 400/1000".to_owned()]
     );
 }

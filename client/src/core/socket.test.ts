@@ -241,4 +241,85 @@ describe("the browser half", () => {
     expect({ state: get(conn.state).kind, accepted, held: get(conn.unsent) })
       .toEqual({ state: "refused", accepted: false, held: 0 });
   });
+
+  // Fifty records written while the page was away are fifty records to
+  // fetch, not every answer on the page asked again: the welcome names
+  // the ledger head, and the page asks for the range between its own
+  // high-water mark and that head.
+  test("fetches the records written while it was away rather than a snapshot", () => {
+    install();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    const first = FakeSocket.opened[0];
+    first?.onopen?.();
+    const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: 10, city: null };
+    first?.onmessage?.({ data: JSON.stringify({ welcome }) });
+    const metrics = {
+      approvals_waiting: 0,
+      buildings: 0,
+      discards_outstanding: 0,
+      events: 10,
+      runs_active: 0,
+      runs_frozen: 0,
+      signals_waiting: 0,
+    };
+    const record = {
+      seq: 10,
+      prev: "0".repeat(64),
+      t: 1,
+      v: 1,
+      who: "city",
+      run: "00000000-0000-4000-8000-000000000001",
+      kind: "log_truncated",
+      data: {},
+    };
+    first?.onmessage?.({ data: JSON.stringify({ event: record }) });
+    const stop = conn.asking.ask("metrics").subscribe(() => undefined);
+    first?.onmessage?.({ data: JSON.stringify({ answered: { ask_id: 1, as_of: 11, outcome: { answer: { metrics } } } }) });
+    const before = booked.length;
+    first?.onclose?.();
+    booked[before]?.run();
+    const second = FakeSocket.opened[1];
+    second?.onopen?.();
+    second?.onmessage?.({ data: JSON.stringify({ welcome: { ...welcome, resume_from: 60 } }) });
+
+    const asked: unknown[] | undefined = second?.sent.slice(1).map((text): unknown => JSON.parse(text));
+    stop();
+
+    expect(asked).toEqual([{ ask: { ask_id: 2, query: { history_range: { from: 11, to: 60, limit: 200 } } } }]);
+  });
+  // A welcome from another ledger - the city was made again - names a
+  // head the old mark means nothing against: the page forgets what it
+  // folded and asks everything again rather than fetching a range.
+  test("rebuilds from a snapshot when the ledger's epoch changed", () => {
+    install();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    const first = FakeSocket.opened[0];
+    first?.onopen?.();
+    const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: 10, city: null, epoch: "a".repeat(64) };
+    first?.onmessage?.({ data: JSON.stringify({ welcome }) });
+    const record = {
+      seq: 10,
+      prev: "0".repeat(64),
+      t: 1,
+      v: 1,
+      who: "city",
+      run: "00000000-0000-4000-8000-000000000001",
+      kind: "log_truncated",
+      data: {},
+    };
+    first?.onmessage?.({ data: JSON.stringify({ event: record }) });
+    const stop = conn.asking.ask("metrics").subscribe(() => undefined);
+    const before = booked.length;
+    first?.onclose?.();
+    booked[before]?.run();
+    const second = FakeSocket.opened[1];
+    second?.onopen?.();
+    const renewed = { ...welcome, resume_from: 60, epoch: "b".repeat(64) };
+    second?.onmessage?.({ data: JSON.stringify({ welcome: renewed }) });
+
+    const asked: unknown[] | undefined = second?.sent.slice(1).map((text): unknown => JSON.parse(text));
+    stop();
+
+    expect(asked).toEqual([{ ask: { ask_id: 2, query: "metrics" } }]);
+  });
 });

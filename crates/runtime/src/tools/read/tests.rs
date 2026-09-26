@@ -6,10 +6,19 @@
 use super::*;
 use crate::catalog::CatalogEntry;
 
+mod doors;
+mod locators;
+
 fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
     let catalog = Arc::new(Mutex::new(Catalog::new()));
     let everywhere: ReadBound = Arc::new(|_: &kernel::Address| kernel::ReadVerdict::Open);
-    let tool = ReadTool::new(root, Arc::clone(&catalog), everywhere).unwrap();
+    let tool = ReadTool::new(
+        root,
+        Arc::clone(&catalog),
+        everywhere,
+        Path::new("no-store"),
+    )
+    .unwrap();
     (tool, catalog)
 }
 
@@ -42,7 +51,7 @@ fn a_file_in_the_city_comes_back_with_its_own_length() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let outcome = tool.invoke(&call("lab/Memo.md")).unwrap();
     let map = outcome.result.as_map();
@@ -56,7 +65,7 @@ fn a_file_in_the_city_comes_back_with_its_own_length() {
 #[test]
 fn a_model_chosen_path_cannot_reach_a_reserved_subtree() {
     let dir = tempfile::tempdir().unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
     for asked in [
         ".sprawling/ledger/0001.jsonl",
         "lab/.sprawling/RULES.toml",
@@ -80,7 +89,7 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
     let shelf = dir.path().join(".sprawling").join("library");
     std::fs::create_dir_all(&shelf).unwrap();
     std::fs::write(shelf.join("review.md"), "check the diff first\n").unwrap();
-    let (mut tool, catalog) = tool(dir.path());
+    let (tool, catalog) = tool(dir.path());
     catalog
         .lock()
         .unwrap()
@@ -89,6 +98,7 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
             disclosure: "how this building reviews".to_owned(),
             expansion: ".sprawling/library/review.md".to_owned(),
             hash: None,
+            package: None,
         })
         .unwrap();
 
@@ -105,7 +115,7 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
 #[test]
 fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
     let dir = tempfile::tempdir().unwrap();
-    let (mut tool, catalog) = tool(dir.path());
+    let (tool, catalog) = tool(dir.path());
     catalog.lock().unwrap().set_mode(kernel::Mode::Experiment);
 
     let mode = tool.invoke(&call("mode:experiment")).unwrap();
@@ -121,7 +131,7 @@ fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
 #[test]
 fn a_missing_file_is_the_callers_mistake_not_the_disks() {
     let dir = tempfile::tempdir().unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
     let err = tool.invoke(&call("lab/nowhere.md")).unwrap_err();
     assert_eq!(err.code(), &AxCode::InvalidArgs);
 }
@@ -143,7 +153,7 @@ fn a_wide_file_is_cut_on_a_line_end_and_continues_without_a_gap() {
         .map(|n| format!("{n:04}{}\n", "x".repeat(1_019)))
         .collect();
     std::fs::write(dir.path().join("lab").join("Wide.md"), &wide).unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let first = tool.invoke(&call("lab/Wide.md")).unwrap();
     let map = first.result.as_map();
@@ -184,7 +194,7 @@ fn a_single_line_past_the_budget_still_makes_progress() {
     let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
     let body = format!("{}\nsecond\n", "y".repeat(cap.saturating_mul(2)));
     std::fs::write(dir.path().join("lab").join("OneLine.md"), &body).unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let answer = tool.invoke(&call("lab/OneLine.md")).unwrap();
     let map = answer.result.as_map();
@@ -202,7 +212,7 @@ fn a_long_file_answers_with_the_cap_a_total_and_the_next_offset() {
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     let body: String = (0..700).map(|n| format!("line {n}\n")).collect();
     std::fs::write(dir.path().join("lab").join("Long.md"), &body).unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let first = tool.invoke(&call("lab/Long.md")).unwrap();
     let map = first.result.as_map();
@@ -233,7 +243,7 @@ fn a_limit_over_the_cap_is_clamped_and_a_short_file_stays_whole() {
     let body: String = (0..600).map(|n| format!("line {n}\n")).collect();
     std::fs::write(dir.path().join("lab").join("Long.md"), &body).unwrap();
     std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let capped = tool
         .invoke(&interval("lab/Long.md", 0, Some(9_000)))
@@ -256,7 +266,7 @@ fn an_offset_past_the_end_answers_empty_with_the_total() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     let outcome = tool.invoke(&interval("lab/Memo.md", 40, None)).unwrap();
     let map = outcome.result.as_map();
@@ -270,7 +280,7 @@ fn an_interval_that_cannot_be_counted_is_refused_rather_than_guessed() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(dir.path().join("lab").join("Memo.md"), "one decision\n").unwrap();
-    let (mut tool, _catalog) = tool(dir.path());
+    let (tool, _catalog) = tool(dir.path());
 
     for bad in [
         Value::String("12".to_owned()),
@@ -299,46 +309,43 @@ fn the_tool_refuses_another_tools_call_and_still_answers() {
     kernel::tool::conformance::assert_tool_conformance(&mut tool);
 }
 
-/// A link is judged where it lands, not where it was written: a door in
-/// an open building leading into a confidential one, into a reserved
-/// subtree, or out of the city opens nothing, and each refusal is the
-/// gate's.
+/// A catalog whose lock a dying thread left behind is not trusted, and
+/// its names do not fall through to a file that happens to share one.
 #[test]
-fn a_link_is_judged_by_where_it_lands() {
+fn a_poisoned_catalog_refuses_rather_than_falls_through() {
     let dir = tempfile::tempdir().unwrap();
-    let outside = tempfile::tempdir().unwrap();
-    for room in ["lab", "vault/room1", ".sprawling"] {
-        std::fs::create_dir_all(dir.path().join(room)).unwrap();
-    }
-    std::fs::write(dir.path().join("vault/room1/secret.md"), "the vault\n").unwrap();
-    std::fs::write(dir.path().join(".sprawling/secret.md"), "governance\n").unwrap();
-    std::fs::write(outside.path().join("secret.md"), "elsewhere\n").unwrap();
-    let lab = dir.path().join("lab");
-    super::super::chosen_path::make_link(
-        &lab.join("to-vault"),
-        &dir.path().join("vault").join("room1"),
-    );
-    super::super::chosen_path::make_link(&lab.join("to-reserved"), &dir.path().join(".sprawling"));
-    super::super::chosen_path::make_link(&lab.join("to-outside"), outside.path());
-    let only_lab: ReadBound = Arc::new(|addr: &kernel::Address| {
-        if addr.as_str().starts_with("vault") {
-            kernel::ReadVerdict::Confidential
-        } else {
-            kernel::ReadVerdict::Open
-        }
-    });
-    let catalog = Arc::new(Mutex::new(Catalog::new()));
-    let mut tool = ReadTool::new(dir.path(), catalog, only_lab).unwrap();
+    std::fs::write(dir.path().join("review"), "a file named like the skill\n").unwrap();
+    let (tool, catalog) = tool(dir.path());
+    let poisoner = Arc::clone(&catalog);
+    let died = std::thread::spawn(move || {
+        let _held = poisoner.lock().unwrap();
+        panic!("the thread dies holding the catalog");
+    })
+    .join();
+    assert!(died.is_err());
 
-    for asked in [
-        "lab/to-vault/secret.md",
-        "lab/to-reserved/secret.md",
-        "lab/to-outside/secret.md",
-    ] {
-        let refused = tool.invoke(&call(asked));
-        assert!(
-            matches!(&refused, Err(err) if err.code() == &AxCode::GateDenied),
-            "{asked} was read through a link: {refused:?}"
-        );
-    }
+    let refused = tool.invoke(&call("review"));
+    assert!(
+        matches!(&refused, Err(err) if err.code() == &AxCode::StorageFatal),
+        "a poisoned catalog fell through to the path: {refused:?}"
+    );
+}
+
+/// A miss names what is there instead, and points at a tool every
+/// building has rather than at `exec`, which City Hall does not.
+#[test]
+fn a_miss_offers_the_nearest_directorys_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join(".sprawling")).unwrap();
+    std::fs::write(dir.path().join("lab").join("Memo.md"), "x\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let err = tool.invoke(&call("lab/notes/Memo.mb")).unwrap_err();
+    assert_eq!(err.nearby(), ["lab/Memo.md"]);
+    let above = tool.invoke(&call("ghost/Memo.md")).unwrap_err();
+    assert!(
+        above.nearby().is_empty(),
+        "a miss listed above the path it was admitted to: {:?}",
+        above.nearby()
+    );
+    assert!(!err.recovery().contains("exec"), "{}", err.recovery());
 }

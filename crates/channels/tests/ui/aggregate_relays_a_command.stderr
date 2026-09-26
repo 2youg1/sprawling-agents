@@ -6,7 +6,7 @@ error[E0308]: mismatched types
    |                       |
    |                       arguments to this method are incorrect
    |
-   = note: expected enum `channels::Query`
+   = note: expected enum `Query`
               found enum `channels::Command<_>`
 note: method defined here
   --> src/aggregate.rs

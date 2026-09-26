@@ -15,8 +15,8 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use kernel::event::record::{RunForked, RunStarted};
-use kernel::{Address, AxError, EventKind, EventRecord, RunId, Seq};
+use kernel::event::record::{ApprovalResolved, RunForked, RunStarted};
+use kernel::{Address, ApprovalItem, AxError, EventKind, EventRecord, RunId, Seq};
 
 /// One run, and where it hangs in the lineage.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +37,10 @@ pub struct RunLine {
     pub first_seq: Seq,
     pub last_seq: Seq,
     pub state: Option<memory::RunPhase>,
+    /// The `approval_requested` lines this run raised that no
+    /// `approval_resolved` has answered yet: how many questions it is
+    /// waiting on the person for.
+    pub unanswered: usize,
 }
 
 impl RunLine {
@@ -56,15 +60,18 @@ impl RunLine {
             "first_seq": self.first_seq.value(),
             "last_seq": self.last_seq.value(),
             "state": state,
+            "unanswered": self.unanswered,
         })
     }
 }
 
-/// The fold: every run seen so far, and the latest stretch of each room.
+/// The fold: every run seen so far, the latest stretch of each room,
+/// and the run that raised each unanswered question.
 #[derive(Default)]
 pub struct Lineage {
     runs: BTreeMap<RunId, RunLine>,
     stretches: BTreeMap<Address, Seq>,
+    asked_by: BTreeMap<String, RunId>,
     hot: memory::HotView,
 }
 
@@ -72,8 +79,9 @@ impl Lineage {
     /// Folds one record in, in seq order.
     ///
     /// # Errors
-    /// Refuses a `run_started` or `run_forked` whose payload cannot be
-    /// read, and whatever `memory::HotView` refuses.
+    /// Refuses a `run_started`, `run_forked`, `approval_requested` or
+    /// `approval_resolved` whose payload cannot be read, and whatever
+    /// `memory::HotView` refuses.
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "two kinds carry lineage; every other kind only moves last_seq"
@@ -87,6 +95,16 @@ impl Lineage {
             && let Some(addr) = record.addr()
         {
             self.stretches.insert(addr.clone(), seq);
+        }
+        // An answer may land on any run, the city's included, so it is
+        // matched to the asking run by the question's id.
+        if record.kind() == EventKind::ApprovalResolved {
+            let answered = record.data().read::<ApprovalResolved>()?;
+            if let Some(asker) = self.asked_by.remove(answered.id.as_str())
+                && let Some(line) = self.runs.get_mut(&asker)
+            {
+                line.unanswered = line.unanswered.saturating_sub(1);
+            }
         }
         let run = record.run();
         if run == RunId::CITY {
@@ -102,6 +120,7 @@ impl Lineage {
             first_seq: seq,
             last_seq: seq,
             state: None,
+            unanswered: 0,
         });
         line.last_seq = seq;
         match record.kind() {
@@ -119,6 +138,16 @@ impl Lineage {
                 let forked = record.data().read::<RunForked>()?;
                 line.parent = Some(forked.from);
                 line.forked_at = Some(forked.at_seq);
+            }
+            EventKind::ApprovalRequested => {
+                let asked = record.data().read::<ApprovalItem>()?;
+                if self
+                    .asked_by
+                    .insert(asked.id.as_str().to_owned(), run)
+                    .is_none()
+                {
+                    line.unanswered = line.unanswered.saturating_add(1);
+                }
             }
             _ => {}
         }
@@ -146,7 +175,7 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError> {
     let index = memory::LedgerIndex::rebuild(ledger_dir).map_err(memory::MemoryError::into_ax)?;
     let mut reader = index.reader(ledger_dir);
     let mut lineage = Lineage::default();
-    for &seq in index.seqs() {
+    for seq in index.seqs() {
         let line = reader.line_at(seq).map_err(memory::MemoryError::into_ax)?;
         lineage.apply(&EventRecord::parse_line(&line)?)?;
     }

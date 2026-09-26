@@ -12,9 +12,12 @@
 //! reader asking "what does a restart find" and "what does a close
 //! leave" is asking one question from two ends.
 
-use super::{Flight, RoomQueues, RunWorker, Standing, city_segment, ledger_dir, now_ms};
+use super::{
+    Collaborating, Credentials, Doorstep, Flight, GatewayModels, Planning, RoomQueues, RunWorker,
+    Standing, SystemClock, city_segment,
+};
+use crate::doctor::{PATIENCE, Platform, ThisMachine};
 use std::path::Path;
-use std::sync::Arc;
 
 use kernel::{AxError, EventKind, Locator};
 use memory::{Cas, JsonlLedger, OpenReport};
@@ -97,8 +100,11 @@ impl RunWorker {
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
     ) -> Result<Self, AxError> {
-        let opened = JsonlLedger::open(&ledger_dir(city_root), now_ms()?)
-            .map_err(memory::MemoryError::into_ax)?;
+        let opened = JsonlLedger::open(
+            &kernel::layout::CityLayout::new(city_root).ledger(),
+            accounting::Clock::now(&SystemClock)?,
+        )
+        .map_err(memory::MemoryError::into_ax)?;
         RunWorker::over(city_root, vault, log, opened)
     }
 
@@ -123,7 +129,7 @@ impl RunWorker {
         log: runtime::diagnostics::Diagnostics,
         (ledger, report): (JsonlLedger, OpenReport),
     ) -> Result<Self, AxError> {
-        let standing = Standing::fold(&ledger_dir(city_root))?;
+        let standing = Standing::fold(&kernel::layout::CityLayout::new(city_root).ledger())?;
         RunWorker::holding(city_root, vault, log, (ledger, report, standing))
     }
 
@@ -134,10 +140,14 @@ impl RunWorker {
     pub(crate) fn holding(
         city_root: &Path,
         vault: gateway::Custodian,
-        log: runtime::diagnostics::Diagnostics,
+        mut log: runtime::diagnostics::Diagnostics,
         (ledger, report, standing): (JsonlLedger, OpenReport, Standing),
     ) -> Result<Self, AxError> {
-        let now = now_ms()?;
+        let now = accounting::Clock::now(&SystemClock)?;
+        // Holding the one writer is what makes every worktree lock a
+        // lock nobody alive holds (memory-SPEC 8-9).
+        memory::Worktrees::lift_abandoned_leases(city_root, &ledger)
+            .map_err(memory::MemoryError::into_ax)?;
         let Standing {
             book,
             governance,
@@ -145,7 +155,21 @@ impl RunWorker {
             entrance,
             expiries,
             origins,
+            cut,
         } = standing;
+        if let Err(fault) = cut {
+            log.write(
+                runtime::diagnostics::Level::Refuse,
+                runtime::diagnostics::Site {
+                    run: kernel::RunId::CITY,
+                    seq: kernel::Seq::FIRST,
+                    module: "bin::assembly",
+                },
+                &format!(
+                    "the standing snapshot was not cut: {fault}; the city goes on, and the next start folds from the older snapshot or from genesis"
+                ),
+            );
+        }
         let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
         // The one place a `Delegator` is minted in this process, which
@@ -153,34 +177,68 @@ impl RunWorker {
         // fact about the code rather than a rule somebody follows.
         let delegator = kernel::Delegator::root();
         let pursuits = collaboration.pursuits(&delegator);
-        Ok(RunWorker {
+        let mut worker = RunWorker {
             city_root: city_root.to_path_buf(),
             city: std::sync::OnceLock::new(),
             ledger,
             opening: LedgerOpening::from(report),
             cas,
-            book,
-            vault: Arc::new(std::sync::Mutex::new(vault)),
+            credentials: Credentials::opened(book, expiries, vault),
             serving: None,
             governance,
-            rooms: RoomQueues::folded(collaboration.inboxes),
-            joins: collaboration.joins,
-            pursuits,
-            plan_holders: collaboration.plan_holders,
-            goals: collaboration.goals,
-            requests: collaboration.requests,
-            delegator,
+            collaborating: Collaborating {
+                rooms: RoomQueues::folded(collaboration.inboxes),
+                joins: collaboration.joins,
+                workshops: std::collections::BTreeMap::new(),
+                requests: collaboration.requests,
+                goals: collaboration.goals,
+            },
+            planning: Planning {
+                pursuits,
+                delegator,
+                holders: collaboration.plan_holders,
+                write_plan: city::edit_against,
+            },
             last_tick: now,
-            expiries,
-            logins: std::collections::BTreeMap::new(),
             log,
-            knocks: Vec::new(),
-            entrance,
+            doorstep: Doorstep::opened(entrance),
             origins,
-            fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
-            backlog: runtime::Backlog::new(),
             flight: Flight::open(),
-        })
+            index: memory::LedgerIndex::empty(),
+            warm: super::keeping_warm::Kept::default(),
+            models: Box::new(GatewayModels),
+            connectors: Box::new(super::mcp::Residents::default()),
+            machine: Box::new(ThisMachine::new(Platform::current(), PATIENCE)),
+            clock: std::sync::Arc::new(SystemClock),
+            read_volume: crate::monitor::volume::read,
+        };
+        worker.sweep_abandoned_trees();
+        Ok(worker)
+    }
+
+    /// Takes back the trees a crash left behind (sprawling-SPEC 8-93).
+    ///
+    /// Nothing is held yet: the ledger this worker holds is locked to
+    /// this process, and no run has been dispatched. A tree that will
+    /// not go is told and left for the next open, because one stuck
+    /// directory is no reason to keep the person out of their city.
+    fn sweep_abandoned_trees(&mut self) {
+        let told = match memory::Worktrees::sweep_abandoned(&self.city_root, &[]) {
+            Ok(swept) if swept.is_empty() => return,
+            Ok(swept) => format!(
+                "took back {} worktree(s) a crash left behind: {}",
+                swept.len(),
+                swept
+                    .iter()
+                    .map(memory::WorktreeName::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Err(err) => format!(
+                "could not take back the worktrees a crash left behind; the next open tries again: {err}"
+            ),
+        };
+        self.note(runtime::diagnostics::Level::Effect, "bin::assembly", &told);
     }
 
     /// What opening this worker's ledger repaired.
@@ -239,13 +297,28 @@ impl RunWorker {
         );
         self.record(EventKind::HandoffWritten, handoff.payload()?)
     }
+
+    /// The same worker, reading every time through `clock` instead of
+    /// the wall clock (accounting-SPEC.md 8-3).
+    ///
+    /// The door citysim and the tests drive a worker through: when
+    /// things happen is theirs to script, while what the worker writes
+    /// at those times stays its own. The ledger was opened before this
+    /// door, at the wall clock's time.
+    #[must_use]
+    pub fn with_clock(
+        self,
+        clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
+    ) -> RunWorker {
+        RunWorker { clock, ..self }
+    }
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::Closing;
-    use crate::assembly::{RunWorker, init_city, ledger_dir};
+    use crate::assembly::{RunWorker, init_city};
     use kernel::{AxCode, AxError};
     use std::io::Write;
 
@@ -255,10 +328,11 @@ mod tests {
     fn a_torn_tail_is_told_in_the_startup_scan() {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
-        let segment = memory::ledger_segments_at(&ledger_dir(dir.path()))
-            .unwrap()
-            .pop()
-            .unwrap();
+        let segment =
+            memory::ledger_segments_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
+                .unwrap()
+                .pop()
+                .unwrap();
         let torn = b"{\"v\":1,\"seq\":99,\"half";
         std::fs::OpenOptions::new()
             .append(true)
@@ -294,5 +368,35 @@ mod tests {
                 Closing::Chosen
             ]
         );
+    }
+
+    /// A run whose process died keeps its tree until the city next
+    /// opens; that open is the one point no other process can hold the
+    /// city, and the sweep has to happen on it.
+    #[test]
+    fn a_crash_left_worktree_is_gone_once_the_city_opens() {
+        let dir = tempfile::tempdir().unwrap();
+        init_city(dir.path()).unwrap();
+        let repo = git2::Repository::init(dir.path()).unwrap();
+        let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
+        let tree = repo
+            .find_tree(repo.index().unwrap().write_tree().unwrap())
+            .unwrap();
+        repo.commit(Some("HEAD"), &signature, &signature, "base", &tree, &[])
+            .unwrap();
+        let trees = memory::Worktrees::open(dir.path()).unwrap();
+        let name = memory::WorktreeName::parse("run-1").unwrap();
+        drop(trees.claim(&name, &[]).unwrap());
+
+        drop(
+            RunWorker::new(
+                dir.path(),
+                gateway::Custodian::in_memory(),
+                runtime::diagnostics::Diagnostics::off(),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(trees.live().unwrap(), Vec::new());
     }
 }

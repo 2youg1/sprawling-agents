@@ -24,6 +24,7 @@
 use std::path::PathBuf;
 
 use std::collections::BTreeMap;
+use std::sync::{Mutex, MutexGuard};
 
 use kernel::{
     AxCode, AxError, CostTier, Effect, EnvVarName, ExecArm, Payload, RenderIntent, RunId, Temporal,
@@ -35,6 +36,7 @@ use crate::backlog::{Backlog, Exit, Started};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
 mod confinement;
+mod yielding;
 
 pub use confinement::{
     Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offerings, Placed, Placement,
@@ -70,9 +72,11 @@ pub struct ExecSetup {
 
 pub struct ExecTool {
     setup: ExecSetup,
-    sandbox: Box<dyn Sandbox>,
+    /// Locked because `Sandbox::run` takes `&mut self` while `invoke`
+    /// takes `&self`; exec writes, so no second call waits on it.
+    sandbox: Mutex<Box<dyn Sandbox>>,
     backlog: Backlog,
-    confinement: Confined,
+    confinement: Mutex<Confined>,
     meta: ToolMeta,
 }
 
@@ -129,9 +133,9 @@ impl ExecTool {
         );
         Ok(ExecTool {
             setup,
-            sandbox,
+            sandbox: Mutex::new(sandbox),
             backlog,
-            confinement,
+            confinement: Mutex::new(confinement),
             meta: ToolMeta {
                 name: ToolName::parse("exec")?,
                 disclosure,
@@ -146,7 +150,7 @@ impl ExecTool {
     }
 
     fn run_program(
-        &mut self,
+        &self,
         path: &str,
         args: &[String],
         placement: Placement,
@@ -167,13 +171,17 @@ impl ExecTool {
     /// There is no `background` argument, because two paths would be two
     /// authorities and the one with the hole in it would always be the
     /// one nobody remembered.
+    ///
+    /// The command is lowered before its environment is cleared, so that
+    /// the clearing lands on whatever process is actually spawned.
     fn through_the_backlog(
-        &mut self,
-        mut command: std::process::Command,
+        &self,
+        command: std::process::Command,
         what: String,
         arm: &str,
         placement: Placement,
     ) -> Result<ToolOutcome, AxError> {
+        let mut command = yielding::one_level_down(command)?;
         let inherited = self.inherited_environment();
         command.env_clear();
         for (key, value) in &inherited {
@@ -182,7 +190,8 @@ impl ExecTool {
         let (command, placed) = match placement {
             Placement::Host => (command, None),
             Placement::Sandbox => {
-                let (command, placed) = self.confinement.place(command, &self.setup.workdir)?;
+                let (command, placed) =
+                    held(&self.confinement)?.place(command, &self.setup.workdir)?;
                 (command, Some(placed))
             }
         };
@@ -196,13 +205,13 @@ impl ExecTool {
                 stderr,
             } => {
                 if let Some(placed) = placed {
-                    self.confinement.settled(placed);
+                    held(&self.confinement)?.settled(placed);
                 }
                 settled(&stdout, &stderr, exit, arm)?
             }
             Started::Backgrounded { id, what } => {
                 if let Some(placed) = placed {
-                    self.confinement.handed(id, placed);
+                    held(&self.confinement)?.handed(id, placed);
                 }
                 backgrounded(&id, &what, arm)?
             }
@@ -233,7 +242,7 @@ impl ExecTool {
         chosen
     }
 
-    fn run_python(&mut self, code: &str) -> Result<ToolOutcome, AxError> {
+    fn run_python(&self, code: &str) -> Result<ToolOutcome, AxError> {
         let Some(wasm) = self.setup.python_wasm.clone() else {
             return Err(AxError::failure(
                 AxCode::ToolUnavailable,
@@ -250,7 +259,7 @@ impl ExecTool {
             mounts: self.setup.mounts.clone(),
             fuel: self.setup.fuel,
         };
-        let result = self.sandbox.run(&job)?;
+        let result = held(&self.sandbox)?.run(&job)?;
         let exit = match &result.exit {
             SandboxExit::Success => Exit::Ended { code: 0 },
             SandboxExit::Failure { code } => Exit::Ended {
@@ -278,7 +287,7 @@ impl ExecTool {
         )
     }
 
-    fn run_shell(&mut self, text: &str, placement: Placement) -> Result<ToolOutcome, AxError> {
+    fn run_shell(&self, text: &str, placement: Placement) -> Result<ToolOutcome, AxError> {
         let Some(shell) = &self.setup.shell else {
             return Err(AxError::failure(
                 AxCode::ToolUnavailable,
@@ -338,7 +347,7 @@ impl Tool for ExecTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -364,9 +373,22 @@ impl Tool for ExecTool {
             ExecArm::Shell { text } => self.run_shell(&text, placement),
         }?;
         let finished = self.backlog.harvest(self.setup.run)?;
-        self.confinement.reaped(&finished);
+        held(&self.confinement)?.reaped(&finished);
         with_backlog(answer, finished)
     }
+}
+
+/// One of this tool's own locks, or the refusal that says a thread died
+/// holding it.
+fn held<T>(lock: &Mutex<T>) -> Result<MutexGuard<'_, T>, AxError> {
+    lock.lock().map_err(|_| {
+        AxError::failure(
+            AxCode::ToolUnavailable,
+            "run exec",
+            "a previous command left this tool locked when its thread died",
+        )
+        .with_recovery("dispatch the work again; the next run starts with a fresh exec tool")
+    })
 }
 
 /// The tool is dropped when its run's bench is, which is when the run

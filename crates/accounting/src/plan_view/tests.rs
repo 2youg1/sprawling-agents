@@ -1,0 +1,330 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+#![allow(
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
+    reason = "test code"
+)]
+
+use super::*;
+use kernel::{EventDraft, EventKind, GENESIS_PREV, Payload, RunId, Seq, TimeMs};
+
+const PLAN: &str = "\
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+| 1 | groundwork | 1 |  | Blocked |  |
+| 2 | build | 1 | 1 | Not started |  |
+| 3 | ship | 1 | 2 | Not started |  |
+";
+
+fn city(text: &str) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("lab");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("Roadmap.md"), text).unwrap();
+    dir
+}
+
+fn addr() -> Address {
+    Address::parse("lab").unwrap()
+}
+
+fn record(kind: EventKind, data: serde_json::Value) -> EventRecord {
+    record_in("lab/room1", kind, data)
+}
+
+fn record_in(addr: &str, kind: EventKind, data: serde_json::Value) -> EventRecord {
+    let draft = EventDraft {
+        run: RunId::CITY,
+        t: TimeMs::new(0),
+        who: "mason@lab.1".into(),
+        addr: Some(Address::parse(addr).unwrap()),
+        kind,
+        data: Payload::new(data.as_object().unwrap().clone()).unwrap(),
+        ig: false,
+    };
+    EventRecord::from_draft(draft, Seq::FIRST, GENESIS_PREV)
+}
+
+#[test]
+fn a_plan_is_parsed_once_and_a_record_that_moves_it_makes_it_read_again() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    let first = view.of(dir.path(), &addr());
+    assert_eq!(first.rows.len(), 3);
+
+    // Nothing has said the plan moved, so a rewritten file is not
+    // seen: that is the whole saving, and it is only correct
+    // because every writer leaves a record.
+    std::fs::write(dir.path().join("lab").join("Roadmap.md"), "gone").unwrap();
+    assert_eq!(view.of(dir.path(), &addr()).rows.len(), 3);
+
+    view.apply(&record(
+        EventKind::RoadmapSplit,
+        serde_json::json!({"node": "1", "by": "mason@lab.1"}),
+    ));
+    assert!(
+        view.of(dir.path(), &addr()).rows.is_empty(),
+        "the record sent it back to the file"
+    );
+}
+
+/// A tool wave is a reason to read again even though it says nothing
+/// about the plan: an agent that edited the table with the edit tool
+/// leaves no `roadmap_*` record behind it.
+#[test]
+fn a_checkpoint_sends_the_plan_back_to_the_file() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    assert_eq!(view.of(dir.path(), &addr()).rows.len(), 3);
+    std::fs::write(
+        dir.path().join("lab").join("Roadmap.md"),
+        PLAN.replace("| 3 | ship | 1 | 2 | Not started |  |\n", ""),
+    )
+    .unwrap();
+    view.apply(&record(
+        EventKind::CheckpointCommitted,
+        serde_json::json!({}),
+    ));
+    assert_eq!(view.of(dir.path(), &addr()).rows.len(), 2);
+}
+
+#[test]
+fn the_reason_a_node_is_red_comes_from_the_record_and_the_status_from_the_table() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    let bare = view.of(dir.path(), &addr());
+    assert_eq!(bare.blocked.len(), 1, "one cause, not three symptoms");
+    assert!(
+        bare.blocked[0].line.contains("the plan says `Blocked`"),
+        "with no record behind it the status word is the reason: {}",
+        bare.blocked[0].line
+    );
+    assert_eq!(bare.blocked[0].waiting, 2, "2 and 3 stand behind it");
+
+    view.apply(&record(
+        EventKind::RoadmapBlocked,
+        serde_json::json!({
+            "node": "1", "by": "mason@lab.1",
+            "why": {"blocked": {"note": "the quarry is shut"}}
+        }),
+    ));
+    let told = view.of(dir.path(), &addr());
+    assert_eq!(
+        told.blocked[0].line,
+        "branch 1 is stuck at 1: the quarry is shut"
+    );
+}
+
+/// The projection holds nothing of its own, so throwing it away
+/// and folding the same records again
+/// produces the same reading.
+#[test]
+fn deleting_the_projection_and_folding_again_gives_the_same_reading() {
+    let dir = city(PLAN);
+    let history = [
+        record(
+            EventKind::RoadmapClaimed,
+            serde_json::json!({"node": "2", "by": "mason@lab.1"}),
+        ),
+        record(
+            EventKind::RoadmapBlocked,
+            serde_json::json!({
+                "node": "1", "by": "mason@lab.1",
+                "why": {"blocked": {"note": "the quarry is shut"}}
+            }),
+        ),
+    ];
+    let mut first = PlanView::default();
+    let mut second = PlanView::default();
+    for held in &history {
+        first.apply(held);
+        second.apply(held);
+    }
+    let left = first.of(dir.path(), &addr());
+    let right = second.of(dir.path(), &addr());
+    assert_eq!(
+        serde_json::to_string(&left.blocked).unwrap(),
+        serde_json::to_string(&right.blocked).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_string(&left.rows).unwrap(),
+        serde_json::to_string(&right.rows).unwrap()
+    );
+}
+
+#[test]
+fn a_plan_that_does_not_parse_reports_the_problem_and_no_denominator() {
+    let dir = city("no table here");
+    let mut view = PlanView::default();
+    let reading = view.of(dir.path(), &addr());
+    assert!(matches!(reading.progress, Progress::Unplanned(_)));
+    assert!(!reading.problems.is_empty());
+    assert!(reading.rows.is_empty());
+}
+
+#[test]
+fn a_dependency_circle_is_a_problem_rather_than_a_silent_empty_plan() {
+    let dir = city(
+        "\
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+| 1 | a | 1 | 2 | Not started |  |
+| 2 | b | 1 | 1 | Not started |  |
+",
+    );
+    let mut view = PlanView::default();
+    let reading = view.of(dir.path(), &addr());
+    assert!(
+        reading.problems.iter().any(|why| why.contains("circle")),
+        "{:?}",
+        reading.problems
+    );
+}
+
+/// The record that carries no address is the one the old rule ignored:
+/// a checkpoint written for the city rather than for a room used to
+/// leave every parsed plan in place, and the comment beside the rule
+/// said the opposite.
+#[test]
+fn a_record_with_no_address_stales_every_plan_it_could_have_moved() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    assert_eq!(view.of(dir.path(), &addr()).rows.len(), 3);
+    std::fs::write(
+        dir.path().join("lab").join("Roadmap.md"),
+        PLAN.replace("| 3 | ship | 1 | 2 | Not started |  |\n", ""),
+    )
+    .unwrap();
+
+    let draft = EventDraft {
+        run: RunId::CITY,
+        t: TimeMs::new(0),
+        who: "owner".into(),
+        addr: None,
+        kind: EventKind::CheckpointCommitted,
+        data: Payload::new(serde_json::Map::new()).unwrap(),
+        ig: false,
+    };
+    view.apply(&EventRecord::from_draft(draft, Seq::FIRST, GENESIS_PREV));
+    assert_eq!(
+        view.of(dir.path(), &addr()).rows.len(),
+        2,
+        "a record belonging to no building makes every parsed plan suspect"
+    );
+}
+
+/// A kind nobody classified would be a plan that goes stale by accident
+/// or never goes stale at all, so the table answers for all of them.
+#[test]
+fn every_event_kind_has_a_reach() {
+    // Named rather than counted. A number here is a second place the
+    // table has to be remembered, and the one nobody updates: adding a
+    // kind that moves a plan should make this list disagree by name,
+    // which says which kind, not that the total moved.
+    let moving: Vec<String> = EventKind::ALL
+        .into_iter()
+        .filter(|kind| may_move_plan(*kind) != PlanReach::Untouched)
+        .map(|kind| format!("{kind:?}"))
+        .collect();
+    assert_eq!(
+        moving,
+        vec![
+            "CityInitialized",
+            "BuildingCreated",
+            "CheckpointCommitted",
+            "RunFrozen",
+            "RoadmapClaimed",
+            "RoadmapFinished",
+            "RoadmapReleased",
+            "RoadmapSplit",
+            "RoadmapBlocked",
+            "SpineDocumentWritten",
+        ],
+        "these kinds move a plan and every other kind leaves it where it was"
+    );
+}
+
+/// A plan read with the cache released is not put back when a record
+/// moved it in the meantime: the file on disk has changed, and the
+/// cache would go on answering with the table it replaced.
+#[test]
+fn a_plan_read_before_a_record_moved_it_is_not_put_back() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    let (_, fresh) = view.ask(&addr()).read(dir.path(), &addr());
+
+    std::fs::write(dir.path().join("lab").join("Roadmap.md"), "gone").unwrap();
+    view.apply(&record(
+        EventKind::RoadmapSplit,
+        serde_json::json!({"node": "1", "by": "mason@lab.1"}),
+    ));
+    view.remember(fresh.unwrap());
+
+    assert!(
+        view.of(dir.path(), &addr()).rows.is_empty(),
+        "the stale read was put back"
+    );
+}
+
+/// The per-building generations stay bounded however many buildings a
+/// city names, and a read asked for before they were forgotten is still
+/// refused when its building moves again: its own count restarts from
+/// zero and would otherwise match the one the read was asked at.
+#[test]
+fn the_generations_held_stay_bounded_and_refuse_the_reads_they_forget() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    let split = serde_json::json!({"node": "1", "by": "mason@lab.1"});
+    view.apply(&record(EventKind::RoadmapSplit, split.clone()));
+    let (_, fresh) = view.ask(&addr()).read(dir.path(), &addr());
+    for n in 0..GENERATIONS_HELD {
+        view.apply(&record_in(
+            &format!("b{n}"),
+            EventKind::RoadmapSplit,
+            split.clone(),
+        ));
+    }
+    view.apply(&record(EventKind::RoadmapSplit, split));
+    let asked = fresh.unwrap();
+    let refused = view.generation(&asked.addr) != asked.asked_at;
+
+    assert_eq!(
+        (view.moved.len() <= GENERATIONS_HELD, refused),
+        (true, true),
+        "the generations grew past their bound"
+    );
+}
+
+/// A panic under the plan lock loses no stop cause: the next holder
+/// takes the cache back, drops the readings the panic may have torn,
+/// and the red node still carries the sentence its record gave.
+#[test]
+fn a_poisoned_plan_cache_is_taken_back_with_its_causes() {
+    let dir = city(PLAN);
+    let shared = std::sync::Arc::new(Mutex::new(PlanView::default()));
+    shared.lock().unwrap().apply(&record(
+        EventKind::RoadmapBlocked,
+        serde_json::json!({
+            "node": "1", "by": "mason@lab.1",
+            "why": {"blocked": {"note": "the quarry is shut"}}
+        }),
+    ));
+    let held = std::sync::Arc::clone(&shared);
+    let _ = std::thread::spawn(move || {
+        let _guard = held.lock().unwrap();
+        panic!("a reader panics while it holds the plans");
+    })
+    .join();
+    assert!(shared.is_poisoned());
+
+    let read = plans_of(&shared, dir.path(), BTreeSet::from([addr()]));
+    assert_eq!(
+        read[&addr()].blocked[0].line,
+        "branch 1 is stuck at 1: the quarry is shut"
+    );
+    assert!(!shared.is_poisoned(), "the cache is taken back");
+}

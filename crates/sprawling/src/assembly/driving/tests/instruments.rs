@@ -7,7 +7,7 @@
 //! (sprawling-SPEC.md 8-84): a relay round trip, and the gap a second
 //! dispatch leaves in a run that is already going.
 //!
-//! Both drive `serving::attending::attend` on a thread of its own, send
+//! Both drive `assembly::attending::attend` on a thread of its own, send
 //! work in through `CommandDesk::post`, and talk to the loopback
 //! provider. Both are ignored by `just check`, because they read the
 //! wall clock and take seconds; `just bench` runs them and prints one
@@ -27,10 +27,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
+use crate::assembly::CommandDesk;
+use crate::assembly::attending::attend;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
-use crate::serving::CommandDesk;
-use crate::serving::attending::attend;
 
 /// Appends timed per store: enough for a stable middle, few enough that
 /// the disk store stays inside a few seconds at a barrier each.
@@ -209,7 +209,7 @@ fn relay_round_trips(store: Store) -> Vec<Duration> {
                 dir.path(),
                 gateway::Custodian::in_memory(),
                 runtime::diagnostics::Diagnostics::off(),
-                in_memory_ledger(&ledger_dir(dir.path())),
+                in_memory_ledger(&kernel::layout::CityLayout::new(dir.path()).ledger()),
             )
             .unwrap(),
             &base_url,
@@ -259,7 +259,12 @@ fn in_memory_ledger(dir: &std::path::Path) -> (memory::JsonlLedger, memory::Open
         cut_on_write: None,
         torn_tail: memory::TornTail::None,
     });
-    memory::JsonlLedger::open_faulty(fs, dir, now_ms().unwrap()).unwrap()
+    memory::JsonlLedger::open_faulty(
+        fs,
+        dir,
+        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
+    )
+    .unwrap()
 }
 
 /// A city with one building and one room in it, under ordinary rules.
@@ -287,6 +292,7 @@ fn dispatch(addr: &str, task: &str, key: &[u8]) -> channels::Command {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
         effort: None,
+        model: None,
     }
 }
 
@@ -298,7 +304,7 @@ fn nowhere() -> channels::Reply {
 fn marker() -> kernel::EventDraft {
     kernel::EventDraft {
         run: RunId::CITY,
-        t: now_ms().unwrap(),
+        t: accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
         who: "city".to_owned(),
         addr: None,
         kind: kernel::EventKind::CityInitialized,
@@ -311,11 +317,12 @@ fn marker() -> kernel::EventDraft {
 fn until_frozen(root: &std::path::Path, runs: usize) -> Vec<serde_json::Value> {
     let started = Instant::now();
     loop {
-        let lines: Vec<serde_json::Value> = memory::read_raw_lines_at(&ledger_dir(root))
-            .unwrap_or_default()
-            .iter()
-            .filter_map(|line| serde_json::from_slice(line).ok())
-            .collect();
+        let lines: Vec<serde_json::Value> =
+            memory::read_raw_lines_at(&kernel::layout::CityLayout::new(root).ledger())
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|line| serde_json::from_slice(line).ok())
+                .collect();
         if lines
             .iter()
             .filter(|line| line["kind"] == "run_frozen")

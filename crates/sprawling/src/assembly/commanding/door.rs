@@ -20,7 +20,7 @@
 use kernel::AxError;
 
 use super::super::RunWorker;
-use crate::serving::Posted;
+use crate::assembly::Posted;
 
 impl RunWorker {
     /// Carries out one command and waits for whatever it started.
@@ -75,7 +75,7 @@ impl RunWorker {
     pub(crate) fn serve_one(&mut self, posted: Posted) {
         let Posted { command, reply } = posted;
         let key = command.idem().copied();
-        if let Some(first) = key.and_then(|key| self.entrance.answered(&key)) {
+        if let Some(first) = key.and_then(|key| self.doorstep.entrance.answered(&key)) {
             let said = super::entrance::repeated(command.name());
             self.note(runtime::diagnostics::Level::Effect, "bin::assembly", &said);
             if let Err(err) = first {
@@ -84,7 +84,7 @@ impl RunWorker {
             return;
         }
         if let Some(key) = key {
-            self.entrance.begin(key);
+            self.doorstep.entrance.begin(key);
         }
         // The key settles here even for a verb that leaves a run going,
         // because what this command does is start one: a second frame
@@ -92,7 +92,7 @@ impl RunWorker {
         // recognised and adds no second run, which is the whole of what
         // the door is for (sprawling-SPEC.md 8-46-2).
         let outcome = self.carry_out(command, reply.clone());
-        self.entrance.settle(&outcome);
+        self.doorstep.entrance.settle(&outcome);
         if let Err(err) = outcome {
             self.hand_back(&reply, err);
         }

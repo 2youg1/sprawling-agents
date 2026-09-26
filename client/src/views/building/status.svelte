@@ -52,10 +52,10 @@
       class="text-text-faint hover:text-text-quiet">{roomOf(commit.actor)}</a
     >
     {#if commit.model !== ""}
-      <span class="text-text-disabled">{commit.model}</span>
+      <span class="text-text-faint">{commit.model}</span>
     {/if}
     {#if commit.spent > 0}
-      <span class="text-text-disabled"
+      <span class="text-text-faint"
         >{fill(say($lang, "commits_spent"), { usd: usd(commit.spent) })}</span
       >
     {/if}
@@ -65,14 +65,14 @@
 <div>
   <h2 class="mb-base text-heading font-heading">{say($lang, "bld_changes")}</h2>
   {#if status === undefined}
-    <p class="text-text-disabled">…</p>
+    <p class="text-text-faint">…</p>
   {:else if status === null}
     <p class="text-text-faint">{say($lang, "git_unavailable")}</p>
   {:else}
     <p class="mb-base flex flex-wrap items-baseline gap-base text-note">
       <span class="text-text-quiet">{say($lang, "git_branch")}</span>
       <span class="font-mono text-text-faint">{status.branch ?? say($lang, "git_detached")}</span>
-      <span class="text-text-disabled">
+      <span class="text-text-faint">
         {#if status.drift !== null && status.drift !== undefined}
           {fill(say($lang, "git_drift"), {
             ahead: String(status.drift.ahead),
@@ -93,7 +93,7 @@
           <li class="flex items-center gap-base border-b border-edge py-snug">
             <span class="w-figure shrink-0 text-text-faint">{howWord($lang, file.how)}</span>
             <span class="flex-1 truncate font-mono text-text-quiet">{file.path}</span>
-            <span class="shrink-0 font-mono text-text-disabled">{linesWord($lang, file.lines)}</span>
+            <span class="shrink-0 font-mono text-text-faint">{linesWord($lang, file.lines)}</span>
           </li>
         {/each}
       </ul>

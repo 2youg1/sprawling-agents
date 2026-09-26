@@ -58,7 +58,7 @@
           {/if}
           <!-- wording-ok: the wire value `chat` / `responses` / `messages`, spelled the same in both languages -->
           <span class="text-text-faint">{wireApiOf(endpoint.dialect)}</span>
-          <span class="flex-1 truncate font-mono text-text-disabled">{endpoint.base_url}</span>
+          <span class="flex-1 truncate font-mono text-text-faint">{endpoint.base_url}</span>
           <span class="text-text-faint">
             {endpoint.has_credential ? say($lang, "setup_keyed") : say($lang, "setup_unkeyed")}
           </span>

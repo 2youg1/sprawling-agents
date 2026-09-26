@@ -10,21 +10,24 @@
   // the window. The span and its reason are
   // `kernel::config::SecondThreshold`'s one construction point - thirty
   // through ninety, so the line about a handoff can still be said
-  // before the window closes - and this page states the span rather
-  // than judging it: the city's refusal comes back carrying the span,
-  // and a page that enforced it here would be the second place the
-  // rule lives.
+  // before the window closes - and this page states the span the city
+  // answers with rather than judging it: the city's refusal comes back
+  // carrying the span, and a page that enforced it here, or spelled it
+  // itself, would be the second place the rule lives.
   //
   // A box left empty is the city's own default, written as nothing at
   // all. What is in force is what `Query::Config` answers - the file's
-  // word, read fresh - not this page's memory of a save.
+  // word, read fresh, and the layer it came from - not this page's
+  // memory of a save. The default is one of those layers, so the page
+  // draws the city's figure as the empty box's hint rather than keeping
+  // a copy of it.
 </script>
 
 <script lang="ts">
   import { configureContext } from "../core/commands";
   import { fill, say } from "../core/lang";
   import { ui } from "../ui";
-  import type { Address } from "../wire";
+  import type { Address, SettledSecond } from "../wire";
   import Button from "./parts/button.svelte";
   import Field from "./parts/field.svelte";
 
@@ -36,22 +39,20 @@
   const u = ui();
   const lang = u.lang;
 
-  const SECOND_MIN = 30;
-  const SECOND_MAX = 90;
-  const SECOND_DEFAULT = 65;
 
   let box = $state("");
   let edited = $state(false);
 
   const config = $derived(u.conn.asking.ask({ config: { addr } }));
-  // What the file says, or an empty box for a building that states
-  // nothing - which is the default in force rather than a gap.
-  const onDisk = $derived.by((): string => {
+  // What is in force here and which layer said it, once the city has
+  // answered.
+  const settled = $derived.by(() => {
     const answer = $config;
-    if (answer === undefined || !("config" in answer)) return "";
-    const second = answer.config.second;
-    return second === null || second === undefined ? "" : String(second.percent);
+    return answer === undefined || !("config" in answer) ? undefined : answer.config.second;
   });
+  // What a file says, or an empty box where no file states the rung -
+  // which is the default in force rather than a gap.
+  const onDisk = $derived(settled === undefined || settled.from === "default" ? "" : String(settled.percent));
 
   let was: Address | undefined = undefined;
   $effect(() => {
@@ -64,11 +65,10 @@
     was = at;
   });
 
-  const span = (): string =>
+  const span = (domain: SettledSecond["domain"]): string =>
     fill(say($lang, "context_second_range"), {
-      min: String(SECOND_MIN),
-      max: String(SECOND_MAX),
-      default: String(SECOND_DEFAULT),
+      min: String(domain.min),
+      max: String(domain.max),
     });
 
   function save(): void {
@@ -90,6 +90,7 @@
     step={1}
     suffix={say($lang, "context_second_unit")}
     mono
+    {...(settled?.from === "default" ? { placeholder: String(settled.percent) } : {})}
     value={box}
     onInput={(next: string) => {
       box = next;
@@ -103,6 +104,8 @@
       {...(edited ? {} : { why: say($lang, "context_second_unchanged") })}
       onPress={save}
     />
-    <span class="text-note text-text-faint">{span()}</span>
+    {#if settled !== undefined}
+      <span class="text-note text-text-faint">{span(settled.domain)}</span>
+    {/if}
   </div>
 </div>

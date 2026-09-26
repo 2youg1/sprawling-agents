@@ -34,6 +34,7 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 mod contrast;
+mod disabled;
 mod roles;
 mod scan;
 mod tables;
@@ -154,6 +155,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     // from a text that no longer holds the hops.
     violations.extend(roles::judge_roles(root, &source)?);
     violations.extend(scan_for_literals(root)?);
+    violations.extend(disabled::judge_disabled_ink(root)?);
     Ok(violations)
 }
 

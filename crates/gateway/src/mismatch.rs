@@ -85,8 +85,11 @@ pub(crate) fn stream_cut(detail: &str) -> AxError {
         "read a streamed answer",
         detail.to_owned(),
     )
-    .retriable()
-    .with_recovery("dispatch again; the reply that arrived was not a whole one")
+    .effect_unknown()
+    .with_recovery(
+        "the reply stopped before its end, so the provider may have run and billed it; \
+         the watchdog backs off and sends it again, until the run's retry limit or a Halt",
+    )
 }
 
 /// One field of a JSON object, or a mismatch naming the path it is

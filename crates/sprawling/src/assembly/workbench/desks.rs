@@ -8,7 +8,7 @@
 
 use kernel::{Address, AxError};
 
-use super::super::{RunWorker, now_ms};
+use super::super::RunWorker;
 use super::{Desks, Site};
 
 impl RunWorker {
@@ -42,7 +42,7 @@ impl RunWorker {
             site.branch
                 .as_deref()
                 .and_then(|name| collab::NodeId::parse(name).ok()),
-            self.requests.clone(),
+            self.collaborating.requests.clone(),
         )));
 
         // The room's queue is lent to the desk for the length of the
@@ -50,20 +50,20 @@ impl RunWorker {
         // loan rather than the queue being lifted out of it, so a
         // second run in the same room is answered instead of being
         // handed a queue that would overwrite the first one's.
-        let lent = self.rooms.lend(addr, site.run_id);
+        let lent = self.collaborating.rooms.lend(addr, site.run_id);
         let waiting = lent.inbox.pending();
         let signals = std::sync::Arc::new(std::sync::Mutex::new(collab::SignalDesk::new(
             site.run_id,
             addr.clone(),
             site.who.clone(),
             site.building.addr().clone(),
-            now_ms()?,
+            self.clock.now()?,
             lent.inbox,
         )));
         let goals = std::sync::Arc::new(std::sync::Mutex::new(collab::GoalDesk::new(
             site.run_id,
             site.who.clone(),
-            self.goals.clone(),
+            self.collaborating.goals.clone(),
         )));
 
         // The plan is shared ground, so it is read from and written back
@@ -82,6 +82,16 @@ impl RunWorker {
             site.who.clone(),
             addr.clone(),
             plan_text,
+            crate::assembly::booking::booking(
+                self.bell(),
+                crate::assembly::booking::Claimant {
+                    building: site.building.addr().clone(),
+                    room: addr.clone(),
+                    run: site.run_id,
+                    who: site.who.clone(),
+                    clock: std::sync::Arc::clone(&self.clock),
+                },
+            ),
         )));
 
         // What the building already knows, computed from the shelf
@@ -102,12 +112,31 @@ impl RunWorker {
             addr.clone(),
             held,
         )));
+        // Copied rather than lent: the join and the graph stay with the
+        // worker, which answers a handback while this run is still going.
+        let mut joined = collab::FanIn::new();
+        if let Some(existing) = self.collaborating.joins.get(addr) {
+            for artifact in existing.artifacts() {
+                joined.accept(artifact.clone());
+            }
+        }
+        let workshop = std::sync::Arc::new(std::sync::Mutex::new(collab::WorkshopDesk::new(
+            site.who.clone(),
+            joined,
+            self.collaborating
+                .workshops
+                .get(addr)
+                .map_or_else(std::collections::BTreeSet::new, |underway| {
+                    underway.handed().clone()
+                }),
+        )));
         Ok(Desks {
             signals,
             goals,
             plan,
             shelf,
             pr,
+            workshop,
             plan_path,
             waiting,
             tenure: lent.tenure,

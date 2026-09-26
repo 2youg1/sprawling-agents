@@ -7,8 +7,8 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::event::record::WorktreeOpened;
 use kernel::{ByteLen, Payload};
-use serde_json::{Map, Value};
 
 use crate::error::MemoryError;
 
@@ -48,16 +48,11 @@ impl WorktreeLease {
     /// # Errors
     /// Propagates the payload's refusal to hold what it was given.
     pub fn opened_payload(&self) -> Result<Payload, MemoryError> {
-        let mut map = Map::new();
-        map.insert(
-            "name".to_owned(),
-            Value::String(self.name.as_str().to_owned()),
-        );
-        map.insert(
-            "disk_bytes".to_owned(),
-            Value::Number(self.disk.get().into()),
-        );
-        Payload::new(map).map_err(|source| MemoryError::Draft { source })
+        Payload::of(&WorktreeOpened {
+            name: self.name.as_str().to_owned(),
+            disk_bytes: self.disk,
+        })
+        .map_err(|source| MemoryError::Draft { source })
     }
 }
 
@@ -71,6 +66,8 @@ impl WorktreeLease {
 )]
 mod tests {
     use super::super::trees::Worktrees;
+    use serde_json::Value;
+
     use super::*;
     use crate::checkpoint::Checkpoint;
     use kernel::TimeMs;
@@ -96,7 +93,7 @@ mod tests {
     fn the_tree_is_measured_rather_than_estimated() {
         let dir = tempfile::tempdir().unwrap();
         let trees = city(dir.path());
-        let lease = trees.claim(&name("node-1")).unwrap();
+        let lease = trees.claim(&name("node-1"), &[]).unwrap();
         assert!(
             lease.disk().get() >= 6,
             "the checked-out file has six bytes"

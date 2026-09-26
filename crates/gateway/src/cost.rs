@@ -61,7 +61,15 @@ pub fn settle(
     }
     let mut total: u64 = 0;
     for (tokens, price, what) in [
-        (usage.input_tokens.get(), entry.input_price, "input"),
+        (
+            usage
+                .input_tokens
+                .get()
+                .saturating_sub(usage.cache_read_tokens.get())
+                .saturating_sub(usage.cache_write_tokens.get()),
+            entry.input_price,
+            "input",
+        ),
         (usage.output_tokens.get(), entry.output_price, "output"),
         (
             usage.cache_read_tokens.get(),
@@ -113,6 +121,7 @@ mod tests {
             output_tokens: Tokens::new(output),
             cache_read_tokens: Tokens::new(read),
             cache_write_tokens: Tokens::new(write),
+            dialect: None,
         }
     }
 
@@ -129,9 +138,10 @@ mod tests {
     fn the_price_sheet_computes_integer_shares() {
         let market = MarketSnapshot::builtin().unwrap();
         let entry = market.lookup("claude-sonnet").unwrap();
-        // 1 Mtok in at $3 + 100k out at $15 + 200k cache-read at $0.30.
+        // 1 Mtok in, 200k of it read from the cache: 800k at $3 + 100k
+        // out at $15 + 200k cache-read at $0.30.
         let cost = settle(&usage(1_000_000, 100_000, 200_000, 0), None, entry).unwrap();
-        assert_eq!(cost.billed, UsdMicros::new(3_000_000 + 1_500_000 + 60_000));
+        assert_eq!(cost.billed, UsdMicros::new(2_400_000 + 1_500_000 + 60_000));
         assert_eq!(cost.source, CostSource::PriceSheet);
         // A zero-usage call settles to zero, legally.
         let free = settle(&usage(0, 0, 0, 0), None, entry).unwrap();

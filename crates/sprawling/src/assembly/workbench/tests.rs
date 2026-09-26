@@ -30,6 +30,7 @@ fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap_err();
     assert!(err.recovery().contains(city::RULES_FILE));
@@ -81,6 +82,7 @@ fn a_run_is_told_who_shares_its_building_and_what_to_bring_them() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -152,6 +154,7 @@ fn a_signal_one_run_sends_is_read_by_the_run_that_pulls_it() {
                 ),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
     }
@@ -249,6 +252,7 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -283,26 +287,7 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
 #[test]
 fn a_fence_carries_what_the_run_may_write_and_not_only_its_room() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
-    let (base_url, _provider) = fake_openai(
-        &["m-local"],
-        vec![
-            completion("writing the note", Some(("c1", "hall/note.md"))),
-            completion("done", None),
-        ],
-    );
-    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    worker
-        .handle(channels::Command::Dispatch {
-            addr: Address::parse(kernel::consts_policy::HALL_MAYOR).unwrap(),
-            task: "leave a note beside the hall".to_owned(),
-            goal: "one note".to_owned(),
-            mode: kernel::Mode::PlanGoal,
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
-            session: None,
-            effort: None,
-        })
-        .unwrap();
+    let repo = a_note_beside_the_hall(dir.path());
 
     // The room is `hall/mayor`; the note is one level up, inside the
     // building the Mayor's domain covers.
@@ -310,8 +295,6 @@ fn a_fence_carries_what_the_run_may_write_and_not_only_its_room() {
         dir.path().join("hall").join("note.md").exists(),
         "the write has to land before a fence can be asked to carry it"
     );
-
-    let repo = git2::Repository::open(dir.path()).unwrap();
     let note = std::path::Path::new("hall/note.md");
     let carried: Vec<String> = repo
         .references()
@@ -329,6 +312,63 @@ fn a_fence_carries_what_the_run_may_write_and_not_only_its_room() {
         "no commit in this repository carries hall/note.md, so the city \
          wrote a file it can neither show in a diff nor restore"
     );
+}
+
+/// The fence after a wave stages the paths that wave's calls said they
+/// wrote, not the whole write domain: `edit` knows its one file, so the
+/// closing fence has no reason to walk the building for it
+/// (runtime-SPEC section 8-45). The first fence of the run still takes
+/// the whole domain, because no commit of this run vouches for the tree
+/// before it.
+#[test]
+fn the_fence_after_an_edit_stages_the_edited_path_and_not_the_domain() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = a_note_beside_the_hall(dir.path());
+    let mut subjects: Vec<String> = repo
+        .references_glob("refs/sprawling/runs/*")
+        .unwrap()
+        .flatten()
+        .filter_map(|reference| {
+            let commit = repo.find_commit(reference.target()?).ok()?;
+            Some(commit.summary().ok()??.to_owned())
+        })
+        .collect();
+    subjects.sort();
+    assert_eq!(
+        subjects,
+        vec![
+            "checkpoint: hall".to_owned(),
+            "checkpoint: hall/note.md".to_owned()
+        ]
+    );
+}
+
+/// Dispatches the Mayor, through the production path, to leave a note
+/// in the hall beside its room with one `edit`, and opens the city's
+/// repository afterwards.
+fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
+    init_city(city).unwrap();
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion("writing the note", Some(("c1", "hall/note.md"))),
+            completion("done", None),
+        ],
+    );
+    let mut worker = worker_with_provider(city, &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse(kernel::consts_policy::HALL_MAYOR).unwrap(),
+            task: "leave a note beside the hall".to_owned(),
+            goal: "one note".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    git2::Repository::open(city).unwrap()
 }
 
 /// The city's genesis hash is read from the ledger once and remembered:

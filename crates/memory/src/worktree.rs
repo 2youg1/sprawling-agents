@@ -22,9 +22,11 @@
 //! is a full checkout under the ceiling. That is the fallback arm of the
 //! design, stated as the current state rather than as the design.
 
+mod back;
 mod landing;
 mod lease;
 mod name;
+mod sweep;
 mod trees;
 mod weight;
 

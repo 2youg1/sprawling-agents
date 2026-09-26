@@ -108,7 +108,9 @@ fn bytes_that_are_not_text_are_stored_whole_rather_than_cut() {
             reminder: None,
             offload: Some(OffloadSite {
                 cas: &mut cas,
-                environment: &env,
+                city_root: &env,
+                room: &kernel::Address::parse("room").unwrap(),
+                origin: crate::offload::tests::origin(),
             }),
             sieve: None,
             adviser: None,
@@ -136,7 +138,9 @@ fn large_results_offload_first_and_account_it() {
             reminder: None,
             offload: Some(OffloadSite {
                 cas: &mut cas,
-                environment: &env,
+                city_root: &env,
+                room: &kernel::Address::parse("room").unwrap(),
+                origin: crate::offload::tests::origin(),
             }),
             sieve: None,
             adviser: None,
@@ -169,7 +173,9 @@ fn an_exec_result_is_sieved_before_it_is_packaged() {
             reminder: None,
             offload: Some(OffloadSite {
                 cas: &mut cas,
-                environment: &env,
+                city_root: &env,
+                room: &kernel::Address::parse("room").unwrap(),
+                origin: crate::offload::tests::origin(),
             }),
             sieve: Some(SieveRequest {
                 key: CommandKey::of(&kernel::ExecArm::Program {
@@ -299,7 +305,9 @@ fn a_sieved_pass_that_leaves_carries_its_stage_account() {
             reminder: None,
             offload: Some(OffloadSite {
                 cas: &mut cas,
-                environment: &env,
+                city_root: &env,
+                room: &kernel::Address::parse("room").unwrap(),
+                origin: crate::offload::tests::origin(),
             }),
             sieve: Some(SieveRequest {
                 key: CommandKey::of(&kernel::ExecArm::Program {

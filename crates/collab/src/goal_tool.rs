@@ -223,7 +223,7 @@ impl Tool for GoalTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn a_clear_claim_registers_and_the_next_one_in_the_same_run_sees_it() {
-        let (mut tool, desk) = tool(Vec::new());
+        let (tool, desk) = tool(Vec::new());
         tool.invoke(&call(serde_json::json!({
             "statement": "rewrite the notes",
             "paths": ["lab/room1/notes.md"],
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn a_claim_on_held_ground_is_refused_with_the_level_that_decides_it() {
-        let (mut tool, _desk) = tool(vec![held("g-held", "lab/room1", true)]);
+        let (tool, _desk) = tool(vec![held("g-held", "lab/room1", true)]);
         let refusal = tool
             .invoke(&call(serde_json::json!({
                 "statement": "repaint the room",
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn a_reading_that_no_machine_can_do_goes_to_a_resident_not_to_the_person() {
-        let (mut tool, _desk) = tool(vec![held("g-held", "lab/room1", true)]);
+        let (tool, _desk) = tool(vec![held("g-held", "lab/room1", true)]);
         let refusal = tool
             .invoke(&call(serde_json::json!({
                 "statement": "also keep the kiln",
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn a_goal_that_claims_nothing_is_refused() {
-        let (mut tool, _desk) = tool(Vec::new());
+        let (tool, _desk) = tool(Vec::new());
         let refusal = tool
             .invoke(&call(serde_json::json!({ "statement": "be helpful" })))
             .unwrap_err();

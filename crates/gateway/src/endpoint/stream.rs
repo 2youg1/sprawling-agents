@@ -80,12 +80,17 @@ impl Endpoint {
             .map_err(|err| provider_err("call provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
+            // The headers outlive the body read: a retry-after is read
+            // off them after `text` has taken the response.
+            let headers = response.headers().clone();
             return Err(provider_err(
                 "call provider",
-                &ProviderFailure::Refused {
-                    url: &self.config.base_url,
+                &ProviderFailure::refusal(
+                    &self.config.base_url,
                     status,
-                },
+                    &headers,
+                    &response.text(),
+                ),
             ));
         }
         // A provider that ignores `stream: true` answers with the

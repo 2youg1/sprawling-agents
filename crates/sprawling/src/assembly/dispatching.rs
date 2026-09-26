@@ -5,7 +5,7 @@
 
 //! Who gets woken, and where the work lands.
 
-use kernel::{Address, Locator, Model, RunId};
+use kernel::{Address, Locator, RunId};
 
 /// A resident who was signalled and has no run open.
 ///
@@ -42,6 +42,10 @@ pub(super) struct Assignment {
     /// caller said. It is written into the room's own configuration
     /// layer, so it cannot be answered before the room exists.
     pub(super) effort: Option<kernel::Effort>,
+    /// The registered model this dispatch named by id, when it named
+    /// one; `None` runs on the `main` tag's model. Spent by agreeing,
+    /// which finds the tag that registered it (sprawling-SPEC.md 8-10).
+    pub(super) model: Option<String>,
     pub(super) mode: kernel::Mode,
     /// The run that handed this work down, when somebody did.
     pub(super) parent: Option<RunId>,
@@ -66,6 +70,9 @@ pub(super) struct Assignment {
     /// run of that session and by no later one: a branch is a beginning,
     /// and the run that begins it is the one that inherits.
     pub(super) origin: Option<kernel::Origin>,
+    /// Who sent this work, recorded in `run_started` because that
+    /// line's author is always the city's desk.
+    pub(super) dispatched_by: kernel::event::Who,
 }
 
 /// One succession, as the successor's dispatch receives it: who is
@@ -123,7 +130,7 @@ pub(super) struct Agreed {
     /// The name of the endpoint the model is reached through, which is
     /// the provider a model's note is filed under (sprawling-SPEC 8-85).
     pub(super) provider: String,
-    pub(super) adapter: Box<dyn Model + Send>,
+    pub(super) adapter: super::keeping_warm::Door,
     /// How many times this run may make a failed call again, as the
     /// person set it on the endpoint that was chosen. Read here, where
     /// the endpoint is chosen, because nothing downstream sees the book.
@@ -137,10 +144,10 @@ pub(super) struct Knock {
     /// The mode of the run that spoke. Carried rather than defaulted: an
     /// answer belongs to the same piece of work as the question.
     pub(super) mode: kernel::Mode,
-    /// How many knocks deep the run that spoke was. The woken run is one
-    /// hop further on, and the ceiling is read there
+    /// Where the run that spoke stood in its conversation. The woken run
+    /// is one hop further on, and both ceilings are read there
     /// (sprawling-SPEC.md 8-46-12).
-    pub(super) conversations: u32,
+    pub(super) chain: super::KnockChain,
 }
 
 /// What one dispatch left behind. Carried rather than re-derived,

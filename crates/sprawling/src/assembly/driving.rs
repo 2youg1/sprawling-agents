@@ -5,10 +5,10 @@
 
 //! One drive, and what it leaves behind.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use kernel::RunId;
-use kernel::{Address, AxCode, AxError};
+use kernel::{Address, AxError};
 use runtime::bench::ToolBench;
 use runtime::run::RunPlan;
 use runtime::{SieveSite, package_exec};
@@ -18,6 +18,7 @@ use super::{RunWorker, Site};
 pub(crate) mod flight;
 pub(crate) mod lane;
 pub(in crate::assembly) mod owing;
+mod placing;
 
 /// What one drive is handed: the machinery it runs on, and the run it
 /// runs as.
@@ -36,7 +37,7 @@ pub(crate) struct Driving {
     /// The model this run calls, already chosen and already credentialed.
     /// Owned, and handed back inside [`Driven`]: who holds the adapter is
     /// a fact the types state, not a loan the reader has to track.
-    pub(crate) adapter: Box<dyn kernel::Model + Send>,
+    pub(crate) adapter: super::keeping_warm::Door,
     /// What routes a call the model makes. Spent by the drive: nothing
     /// after it asks the bench anything, so it is dropped where it is
     /// used rather than carried home.
@@ -68,11 +69,14 @@ pub(crate) struct Driving {
 }
 
 /// What the sieve needs from the city for one run: a store to pin the
-/// original in, a directory the model can read the rest from, the
+/// original in, the room the model reads the rest from, the
 /// filter table frozen with the run, and what this run already saw.
 pub(crate) struct Sieving {
     pub(crate) cas: memory::Cas,
-    pub(crate) environment: PathBuf,
+    pub(crate) city_root: PathBuf,
+    pub(crate) room: Address,
+    /// The run and room an original is pinned for.
+    pub(crate) origin: memory::BlockOrigin,
     pub(crate) table: runtime::FilterTable,
     pub(crate) history: runtime::SieveHistory,
 }
@@ -93,7 +97,9 @@ impl Sieving {
             SieveSite {
                 offload: runtime::offload::OffloadSite {
                     cas: &mut self.cas,
-                    environment: &self.environment,
+                    city_root: &self.city_root,
+                    room: &self.room,
+                    origin: self.origin.clone(),
                 },
                 table: &self.table,
                 history: &mut self.history,
@@ -112,7 +118,7 @@ pub(crate) struct Driven {
     pub(crate) outcome: Result<runtime::Run<runtime::run::Frozen>, AxError>,
     /// The adapter, home from the drive. The caller takes it apart back
     /// into the site it came from: a `Site` gains and loses no field.
-    pub(crate) adapter: Box<dyn kernel::Model + Send>,
+    pub(crate) adapter: super::keeping_warm::Door,
     /// The commits each wave fenced against; the first is what the sweep
     /// restores a discarded file from.
     pub(crate) fenced: Vec<String>,
@@ -124,7 +130,7 @@ pub(crate) struct Driven {
     pub(crate) raised: Vec<kernel::ApprovalItem>,
 }
 
-impl RunWorker {
+impl Sieving {
     /// What the sieve needs from this city for one run.
     ///
     /// The store is a second handle on the same CAS rather than a loan
@@ -132,35 +138,33 @@ impl RunWorker {
     /// through a temporary file, so two handles are one library, and a
     /// drive that borrowed the worker's could not leave the thread the
     /// worker lives on. The rest directory sits inside the room, which
-    /// is the one place a model-chosen path is allowed to read from.
+    /// is the one place a model-chosen path is allowed to read from;
+    /// the offload makes it when it first writes a rest file.
     ///
     /// # Errors
-    /// Propagates a store that will not open and a rest directory that
-    /// cannot be made.
-    pub(in crate::assembly) fn sieving_for(
-        &self,
+    /// Propagates a store that will not open.
+    pub(in crate::assembly) fn for_run(
+        city_root: &Path,
         site: &Site,
         addr: &Address,
     ) -> Result<Sieving, AxError> {
-        let cas = memory::Cas::open(&kernel::layout::CityLayout::new(&self.city_root).cas())
+        let cas = memory::Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
-        let environment = site.write_root.join(addr.as_str()).join(".rest");
-        std::fs::create_dir_all(&environment).map_err(|err| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "make the rest directory",
-                format!("{}: {err}", environment.display()),
-            )
-            .with_recovery("make the room writable")
-        })?;
         Ok(Sieving {
             cas,
-            environment,
+            city_root: site.write_root.clone(),
+            room: addr.clone(),
+            origin: memory::BlockOrigin {
+                run: site.run_id,
+                building: addr.clone(),
+            },
             table: site.filters.clone(),
             history: runtime::SieveHistory::default(),
         })
     }
+}
 
+impl RunWorker {
     /// The four handles a drive takes from this worker.
     ///
     /// Cloned rather than lent, so N drives can hold them at once and
@@ -177,8 +181,9 @@ impl RunWorker {
                 .serving
                 .as_ref()
                 .map(|at| std::sync::Arc::clone(&at.interrupts)),
-            fence_gate: std::sync::Arc::clone(&self.fence_gate),
-            backlog: self.backlog.clone(),
+            fence_gate: std::sync::Arc::clone(&self.flight.fence_gate),
+            backlog: self.flight.backlog.clone(),
+            clock: std::sync::Arc::clone(&self.clock),
         }
     }
 }

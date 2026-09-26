@@ -5,8 +5,6 @@
 
 use super::*;
 
-use std::num::NonZeroU32;
-
 fn four() -> (FrozenSegment, FrozenSegment, FrozenSegment, FrozenSegment) {
     (
         FrozenSegment::new(SegmentSlot::City, b"city bytes".to_vec()),
@@ -85,7 +83,6 @@ fn doc(addr: &str, body: &str) -> SourceDoc {
     SourceDoc {
         addr: Address::parse(addr).unwrap(),
         bytes: Some(body.as_bytes().to_vec()),
-        producer: None,
     }
 }
 
@@ -98,7 +95,6 @@ fn plan() -> PrefixPlan {
             SourceDoc {
                 addr: Address::parse("b/missing.md").unwrap(),
                 bytes: None,
-                producer: None,
             },
         ],
         resident: vec![doc("b/urbanite.md", "who i am")],
@@ -155,7 +151,6 @@ fn oversized_documents_truncate_with_an_explicit_marker() {
     p.run = vec![SourceDoc {
         addr: Address::parse("b/room/job.md").unwrap(),
         bytes: Some(long.into_bytes()),
-        producer: None,
     }];
     let prefix = build_prefix(p).unwrap();
     let run_bytes = prefix.segments()[3].bytes().to_vec();
@@ -186,7 +181,6 @@ fn multibyte_truncation_lands_on_a_char_boundary() {
                 .repeat(3)
                 .into_bytes(),
         ),
-        producer: None,
     }];
     let prefix = build_prefix(p).unwrap();
     assert!(String::from_utf8(prefix.segments()[0].bytes().to_vec()).is_ok());
@@ -211,86 +205,4 @@ fn hash_changes_with_a_single_byte() {
     let one = FrozenSegment::new(SegmentSlot::City, b"abc".to_vec());
     let two = FrozenSegment::new(SegmentSlot::City, b"abd".to_vec());
     assert_ne!(one.hash(), two.hash());
-}
-
-/// 每份压缩摘要在账本事件中标注生产模型与代数；非摘要的行不写这个键，
-/// 来源不明的摘要写 `"unknown"`，于是「不是摘要」与「摘要但不知谁写的」在账上可分。
-#[test]
-fn a_summary_source_carries_its_producer_into_the_row() {
-    let producer = SummaryProducer::Written {
-        model: "model-a".to_owned(),
-        generation: NonZeroU32::new(2).unwrap(),
-    };
-    let mut p = plan();
-    p.city = vec![SourceDoc {
-        addr: Address::parse("city/Summary.md").unwrap(),
-        bytes: Some(b"# old work".to_vec()),
-        producer: Some(producer),
-    }];
-    p.building = vec![SourceDoc {
-        addr: Address::parse("lobby/RULES.md").unwrap(),
-        bytes: Some(b"rules".to_vec()),
-        producer: Some(SummaryProducer::Unknown),
-    }];
-    let built = build_prefix(p).unwrap();
-    let json = serde_json::to_value(
-        built
-            .prompt_payload(&BreakpointPlan::for_conversation(&[]))
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(
-        json["segments"][0]["sources"][0]["producer"],
-        serde_json::json!({ "written": { "model": "model-a", "generation": 2 } })
-    );
-    assert_eq!(
-        json["segments"][1]["sources"][0]["producer"],
-        serde_json::json!("unknown")
-    );
-    assert_eq!(
-        json["segments"][2]["sources"][0].get("producer"),
-        None,
-        "非摘要的行不写这个键"
-    );
-}
-
-/// 回放读的那条路：`build_prefix` 写出的载荷经 `Payload::read` 读回
-/// `PromptAssembled`，逐源仍问得出生产者。写端的行断言与读端的行断言各自
-/// 成立还不够——中间那次编码解码是它们唯一共享的动作，而回放走的正是它。
-#[test]
-fn the_payload_a_build_wrote_reads_back_with_its_producer_intact() {
-    use kernel::event::record::PromptSource;
-
-    let written = SummaryProducer::Written {
-        model: "model-a".to_owned(),
-        generation: NonZeroU32::new(3).unwrap(),
-    };
-    let mut p = plan();
-    p.city = vec![SourceDoc {
-        addr: Address::parse("city/Summary.md").unwrap(),
-        bytes: Some(b"# old work".to_vec()),
-        producer: Some(written.clone()),
-    }];
-    let payload = build_prefix(p)
-        .unwrap()
-        .prompt_payload(&BreakpointPlan::for_conversation(&[]))
-        .unwrap();
-    let read: PromptAssembled = payload.read().unwrap();
-    let answered = |slot: usize| -> Vec<SummaryProducer> {
-        read.segments[slot]
-            .sources
-            .iter()
-            .map(PromptSource::producer)
-            .collect()
-    };
-    assert_eq!(
-        answered(0),
-        vec![written],
-        "换模型后回放仍答得出这份旧摘要是谁写的、第几代"
-    );
-    assert_eq!(
-        answered(2),
-        vec![SummaryProducer::Unknown],
-        "没记生产者的行读回来是未知，不是回放当下跑的那个模型"
-    );
 }

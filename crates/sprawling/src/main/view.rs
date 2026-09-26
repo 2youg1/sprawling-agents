@@ -14,7 +14,7 @@
 use super::city::report;
 use super::grammar::{Arguments, nearest};
 use kernel::{AxError, EventKind, EventRecord, RunId, Seq};
-use std::io::{BufWriter, ErrorKind, Write};
+use std::io::{BufWriter, ErrorKind, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -73,6 +73,8 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
     let mut out = BufWriter::new(std::io::stdout().lock());
     let written = if read.has("--runs") {
         write_runs(&dir, &mut out)
+    } else if chosen.is_everything() && std::io::stdout().is_terminal() {
+        terminal::show(&dir)
     } else {
         write_records(&dir, &chosen, &mut out)
     };
@@ -89,6 +91,22 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
 }
 
 impl Selection {
+    /// Whether no condition narrows the lines: only then does a person
+    /// at a terminal get the interactive face instead of the lines.
+    fn is_everything(&self) -> bool {
+        matches!(
+            self,
+            Selection {
+                tail: None,
+                from: None,
+                run: None,
+                kind: None,
+                who: None,
+                grep: None
+            }
+        )
+    }
+
     fn read(read: &Arguments) -> Result<Selection, String> {
         let number = |flag: &str| -> Result<Option<u64>, String> {
             read.value(flag)
@@ -167,34 +185,43 @@ pub(super) fn write_records(
     out: &mut impl Write,
 ) -> Result<(), ViewError> {
     let index = memory::LedgerIndex::rebuild(dir)?;
-    let run_seqs: Vec<Seq>;
-    let walk: &[Seq] = match chosen.run {
+    let mut reader = index.reader(dir);
+    match chosen.run {
         Some(run) => {
             let mut seqs: Vec<Seq> = index.run_seqs_before(run, None).collect();
             seqs.reverse();
-            run_seqs = seqs;
-            &run_seqs
+            write_walk(&mut reader, seqs.into_iter(), chosen, out)
         }
-        None => index.seqs(),
-    };
-    let start = chosen
-        .from
-        .map_or(0, |from| walk.partition_point(|seq| *seq < from));
-    let walk = walk.get(start..).unwrap_or_default();
-    let mut reader = index.reader(dir);
+        None => write_walk(&mut reader, index.seqs(), chosen, out),
+    }
+}
+
+/// Writes the lines of `walk`, an ascending run of seqs, that `chosen`
+/// admits.
+fn write_walk(
+    reader: &mut memory::LineReader<'_>,
+    walk: impl DoubleEndedIterator<Item = Seq>,
+    chosen: &Selection,
+    out: &mut impl Write,
+) -> Result<(), ViewError> {
+    let from = chosen.from;
+    let walk = walk.filter(|seq| from.is_none_or(|from| *seq >= from));
     match chosen.tail {
         None => {
-            for &seq in walk {
+            for seq in walk {
                 let line = reader.line_at(seq)?;
                 if chosen.admits(&line)? {
                     out.write_all(&line)?;
-                    out.write_all(b"\n")?;
+                    out.write_all(
+                        b"
+",
+                    )?;
                 }
             }
         }
         Some(count) => {
             let mut kept = Vec::new();
-            for &seq in walk.iter().rev() {
+            for seq in walk.rev() {
                 if kept.len() >= count {
                     break;
                 }
@@ -205,7 +232,10 @@ pub(super) fn write_records(
             }
             for line in kept.iter().rev() {
                 out.write_all(line)?;
-                out.write_all(b"\n")?;
+                out.write_all(
+                    b"
+",
+                )?;
             }
         }
     }
@@ -224,3 +254,23 @@ pub(super) fn write_runs(dir: &Path, out: &mut impl Write) -> Result<(), ViewErr
 #[cfg(test)]
 #[path = "view_tests.rs"]
 mod tests;
+
+#[path = "view/arrange.rs"]
+mod arrange;
+#[path = "view/detail.rs"]
+mod detail;
+#[path = "view/follow.rs"]
+mod follow;
+#[path = "view/frame.rs"]
+mod frame;
+#[cfg(test)]
+#[path = "view/frame_tests.rs"]
+mod frame_tests;
+#[path = "view/keys.rs"]
+mod keys;
+#[path = "view/list.rs"]
+mod list;
+#[path = "view/rounds.rs"]
+mod rounds;
+#[path = "view/terminal.rs"]
+mod terminal;

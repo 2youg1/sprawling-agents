@@ -1,13 +1,13 @@
 ---
 name: translation
 description: "The complete procedure for translating form-as-content text — philosophy, social theory, intellectual history, history, literature, and academic papers — into Chinese at low variance, from English, French, German, Russian, Japanese, Korean, or Latin. Use to translate a paper, chapter, or whole book, resume a running translation, debate a rendering, or audit fidelity against the original."
-license: CC BY-NC 4.0
+license: MPL-2.0
 metadata:
   hermes:
     tags: [translation, form-as-content, philosophy, academic, book, low-variance, workflow, multilingual]
 ---
 
-> **Provenance and license.** The original of this skill is 2youg1's own Chinese-language open-source skill, published under AGPL-3.0-or-later. This file is its English translation and adaptation, and the license is changed **only within this project**: it carries CC BY-NC 4.0 here, while the original remains AGPL-3.0-or-later. Reuse owes credit to the author, and no commercial use without separate permission.
+> **Provenance and license.** The original of this skill is 2youg1's own Chinese-language open-source skill, published under AGPL-3.0-or-later. This file is its English translation and adaptation by the same author, and it carries MPL-2.0 here, the license of the rest of this repository; the original remains AGPL-3.0-or-later.
 
 # Translation
 

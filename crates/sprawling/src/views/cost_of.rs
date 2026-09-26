@@ -21,28 +21,48 @@ impl Views {
     ///
     /// A node nobody has claimed answers zero with an empty list rather
     /// than `Unavailable`: "no run has held this node" is a true answer,
-    /// while `Unavailable` says the view could not look.
-    pub(super) fn cost_of_answer(&mut self, node: &NodeId) -> channels::CostOfAnswer {
+    /// while `None` says the view could not read a run's records.
+    pub(super) fn cost_of_answer(&self, node: &NodeId) -> Option<channels::CostOfAnswer> {
         let held = self.claims.get(node).cloned().unwrap_or_default();
-        let report = self.attribution.report();
         let mut runs: Vec<(RunId, UsdMicros)> = Vec::with_capacity(held.len());
         let mut spent: u64 = 0;
         for run in held {
-            // The attribution keys a run by its own display form, which
-            // is the one spelling the ledger and this map share.
-            let name = run.to_string();
-            let billed = report
-                .by_run
-                .iter()
-                .find_map(|(held, usd)| (held == &name).then_some(*usd))
-                .unwrap_or_default();
+            let billed = self.billed_to(run)?;
             spent = spent.saturating_add(billed.get());
             runs.push((run, billed));
         }
-        channels::CostOfAnswer {
+        Some(channels::CostOfAnswer {
             node: node.clone(),
             spent: UsdMicros::new(spent),
             runs,
+        })
+    }
+
+    /// What each named run was billed, in the order asked and cut at
+    /// `channels::RUN_COSTS_MAX`; a run whose records cannot be read has
+    /// no row.
+    pub(super) fn run_costs_answer(&self, runs: &[RunId]) -> channels::RunCostsAnswer {
+        channels::RunCostsAnswer {
+            asked: runs.to_vec(),
+            runs: runs
+                .iter()
+                .take(channels::RUN_COSTS_MAX)
+                .filter_map(|run| self.billed_to(*run).map(|billed| (*run, billed)))
+                .collect(),
+        }
+    }
+
+    /// What one run was billed, the one answer every view that shows a
+    /// run's money reads (sprawling-SPEC section 8-90): the
+    /// attribution's row while it holds one, the run's own records in
+    /// the Ledger once the hot view evicted it, and zero for a run no
+    /// priced call was attributed to. `None` when the Ledger could not
+    /// be read.
+    pub(super) fn billed_to(&self, run: RunId) -> Option<UsdMicros> {
+        match self.attribution.billed_to(&run) {
+            Some(billed) => Some(billed),
+            None if self.hot.was_evicted(&run) => self.ledger_ask().recalled_bill(run),
+            None => Some(UsdMicros::default()),
         }
     }
 }

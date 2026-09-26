@@ -5,13 +5,16 @@
 
 //! What this city can sign in as, and what it may call.
 //!
-//! The values and the readings live here; `signing` holds the login
-//! and the vault, `endpoints` what may be called.
+//! The values and the readings live here; `held` is what the worker
+//! keeps (the book, the vault, the expiries, the logins begun),
+//! `signing` the login and the vault's use, `endpoints` what may be
+//! called.
 
 use kernel::{AxCode, AxError};
 
 mod endpoints;
 mod environment;
+pub(super) mod held;
 mod probing;
 pub(super) mod signing;
 pub(super) mod subscription;
@@ -207,15 +210,6 @@ pub(super) fn dialect_headers(dialect: kernel::DialectKind) -> Vec<(String, gate
 /// floating one would change the wire under a replay.
 /// <https://platform.claude.com/docs/en/api/messages>
 pub(super) const ANTHROPIC_VERSION: &str = "2023-06-01";
-
-pub(super) fn poisoned_vault() -> AxError {
-    AxError::failure(
-        AxCode::StorageFatal,
-        "reach the vault",
-        "the vault lock is poisoned",
-    )
-    .with_recovery("restart the server; enrolled credentials are unaffected")
-}
 
 /// What one tag already points at, when it points at this same model
 /// behind this same endpoint.

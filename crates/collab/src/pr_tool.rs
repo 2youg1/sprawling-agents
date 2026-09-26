@@ -31,7 +31,7 @@ use crate::workshop::NodeId;
 
 mod request;
 
-pub use request::{MergedRequest, OpenRequest};
+pub use request::{MergedRequest, OpenRequest, RejectedRequest};
 
 /// What the run did to the city's requests. Exhaustive for the same
 /// reason as the other desks: every variant is a line the worker has to
@@ -297,7 +297,7 @@ impl Tool for PrTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,

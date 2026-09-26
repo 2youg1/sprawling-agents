@@ -46,6 +46,8 @@ shipped one happens to be written in is a replaceable fact.
 │        │           concrete type, samples the clock, hands   │
 │        │           out seeds, and starts every task          │
 │        │                                                     │
+│        ├── accounting ─ the ports the one writer reaches     │
+│        │              outside itself through                 │
 │        ├── runtime ── turns, tools, sandbox, watchdog, fork  │
 │        ├── collab  ── inbox, signals, claims, delegation,    │
 │        │              workshop, fan-in, pull requests        │
@@ -102,7 +104,7 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = "z"`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `"z"` rather than `3` on a measurement whose criterion was written before the readings existed — the manifest records both arms. |
-| Dependency count | <!-- xtask:begin dependency_count -->401<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->441<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
@@ -161,9 +163,24 @@ runtime: kernel, memory, gateway
 collab: kernel, memory
 city: kernel
 browser: kernel
-protocol: kernel
+protocol: kernel, gateway
 channels: kernel
-sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels
+accounting: kernel, gateway, protocol, channels, city, collab
+sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels, accounting
+```
+
+Inside one crate the compiler sees no layering: `sprawling` builds as one
+unit whichever way its modules name each other. The block below is the
+machine authority for the direction of the edges that matter there, also
+read by `cargo xtask depmap`. Each line names a module and the paths its
+production code never names; tests may still build a fixture through the
+assembly point. `bin::assembly` knows every concrete type, so the modules
+it assembles never name it back (sprawling-SPEC 8-92).
+
+```directions
+crates/sprawling/src/doctor: crate::assembly
+crates/sprawling/src/serving: crate::assembly
+crates/sprawling/src/views: crate::assembly
 ```
 
 What each unit owns is stated once, in §1's figure. It is not repeated
@@ -186,7 +203,9 @@ repository readable:
 | Event | anywhere a `kernel::Ledger` handle is held | writing `tool_result` after a tool runs |
 
 Below the binary no crate depends on more than two others: `runtime` and
-`collab` each use `kernel` and `memory`, and `sprawling` is the only crate
+`collab` each use `kernel` and `memory`, `protocol` uses `kernel` and
+`gateway` (an MCP server reached over HTTP gets its client from
+`gateway::client_for`, the one place a client is built), and `sprawling` is the only crate
 that depends on most of the workspace. The `depmap` block above also lets `runtime` use
 `gateway`, and the code does not take that edge yet. A crate may **use**
 the interfaces of what it depends on and nothing more; the moment a
@@ -196,13 +215,15 @@ moves up into the assembly layer.
 `xtask` and `citysim` are workspace members outside the product graph.
 **citysim drives the turn loop a second time**: `runtime::run::drive` with
 simulated adapters — a scripted model, scripted tools, an in-memory Ledger
-— which is how a script reproduces a run. It stops below `bin::assembly`,
-whose `RunWorker` builds its model adapter out of the endpoint book rather
-than receiving one; the dispatch policy above that line is held by that
-module's own tests. `sprawling` carries a lib target so the policy is at
-least *reachable* — an integration test enters by the same door
-`channels::server` uses — and inverting the model seam is what a seeded
-scenario would still need.
+— which is how a script reproduces a run. It stops below `bin::assembly`:
+`RunWorker` receives its model adapters through `accounting::ModelFactory`,
+its MCP servers through `accounting::Connectors`, its time through
+`accounting::Clock` and the machine it runs on through
+`accounting::Machine`, and integration tests
+drive a dispatch against scripted ones by the same door `channels::server`
+uses, but the worker itself still lives in
+`sprawling`, which citysim does not depend on. Moving the worker into
+`accounting` is what a seeded scenario still needs.
 
 ## 4 Seams
 
@@ -219,8 +240,13 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `kernel::tool` | crates/kernel/src/tool.rs | runtime tools, collab tools, browser, protocol | citysim: scripted tools |
 | `kernel::model` | crates/kernel/src/model.rs | gateway: native and endpoint | citysim: scripted model |
 | `runtime::sandbox` | crates/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
+| `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `bin::assembly::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `protocol::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
+| `accounting::models` | crates/accounting/src/models.rs | `bin::assembly::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
+| `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::SystemClock`: the wall clock, the one sampling point | the stopped clock in `crates/sprawling/tests/clock.rs` |
+| `accounting::connectors` | crates/accounting/src/connectors.rs | `bin::assembly::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
+| `accounting::machine` | crates/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner | the scripted machine in `crates/sprawling/tests/machine.rs` |
 
 The *second adapter* column has no checker: a seam whose double was
 deleted would still read as real here. That is a known hole, not a
@@ -321,8 +347,9 @@ shape, and that shape is a type rather than a convention.
 `AxError` carries seven wire fields in declaration order — which is rule 6
 of §10, so an error is as replayable as an event: a stable `code`, the
 `action` and `subject` it failed on, `nearby` candidates, a `recovery`
-sentence, whether it is `retriable`, and the gate's own refusal when a gate
-is what stopped it. **The model is the audience**, so `nearby` and
+sentence, whether it may be sent again (`retry`: yes, no, or unknown when
+the request left and its answer was lost), and the gate's own refusal when
+a gate is what stopped it. **The model is the audience**, so `nearby` and
 `recovery` hold directly executable information rather than apologies. Both
 constructors return an `ErrorDraft`, and `with_recovery` is the only way
 across to an `AxError` — a failure with no next step is unconstructible,
@@ -406,12 +433,12 @@ branch's work is its children.
 
 One WebSocket, three kinds of frame, and a schema hash that both ends check
 on connect: a page from a different build refuses rather than misreads.
-`WIRE_V` is <!-- xtask:begin wire_v -->40<!-- xtask:end -->.
+`WIRE_V` is <!-- xtask:begin wire_v -->41<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
-| `Command` | <!-- xtask:begin command_frames -->28<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
-| `Query` | <!-- xtask:begin query_frames -->34<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
+| `Command` | <!-- xtask:begin command_frames -->30<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
+| `Query` | <!-- xtask:begin query_frames -->35<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
 
@@ -522,7 +549,10 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
+| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader, and `runtime::turn::wave`, whose scoped threads run the read-only prefix of a tool wave and are all joined before the wave accounts a single result. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
+| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader, and `protocol::mcp::stdio` and `protocol::mcp::sse`, which give each MCP connection one reader that ends when the connection closes. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the console, first run, and the doctor's probe reader |
+| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader, `runtime::turn::wave`, whose scoped threads run the read-only prefix of a tool wave and are all joined before the wave accounts a single result, and `runtime::turn::speculation`, whose scoped threads run the reads a model hands over while it is still generating and are all joined before the model call returns. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
+| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::assembly::pool`, the attending worker under `bin::assembly` and the fold under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
 | 4 | Seeded RNG handed out from one place | assembly derives per session |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -557,7 +587,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2237<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2495<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
@@ -587,9 +617,10 @@ display lists rather than bitmaps: the preconditions for bitmap comparison
 are paid for — placement is a pure function of the id, painter order is
 total, projection and its inverse are exact — but there is no rasteriser.
 V6 stops below `bin::assembly` (§3): a scripted scenario reproduces a run,
-not a dispatch, because `RunWorker` builds its model adapter instead of
-receiving one; what holds the dispatch policy is that module's own tests,
-plus the integration tests the lib target makes possible. And the tree
+not a dispatch, because `RunWorker` still lives in `sprawling` rather than in
+`accounting`; what holds the dispatch policy is that module's own tests,
+plus the integration tests that hand the worker a scripted
+`accounting::ModelFactory`. And the tree
 holds 3 kani harnesses, all of which CI proves in under a minute each — a
 harness that builds a `Vec`, a `String` or a `BTreeSet` gives CBMC loops it
 cannot bound, and one over symbolic non-linear arithmetic gives the solver
@@ -623,15 +654,17 @@ than typed.
 The four load scenarios — multi-run parallel, large-ledger fold,
 large-worktree placement, and long-session streaming forward — are re-measured
 by `just bench`, one reading line per scenario and sub-metric, every line
-carrying its machine class. Their baselines sit in the table below. The two
+carrying its machine class. Multi-run parallel is read by
+`instrument_relay_round_trip`, which drives the accounting loop the city runs
+(sprawling-SPEC.md 8-84); its readings and their machine class sit in
+`xtask/budgets.toml` `[relay_round_trip]`. The other three are
+citysim's bench scenarios, and their baselines sit in the table below. The two
 latency tiers and the ratchet that governs these readings live in
 `xtask/budgets.toml` `[local_latency]`; a reading under the registered load
 only goes down.
 
 | Load scenario, sub-metric | Baseline (p50 / p95 / p99) | Machine class |
 |---|---|---|
-| multi-run parallel, `harness` | 5 / 9 / 24 µs per append | general: windows-x86_64, 16 cores, NVMe |
-| multi-run parallel, `persist` | 730 / 953 / 4,326 µs per append | general: windows-x86_64, 16 cores, NVMe |
 | large-ledger fold, `harness` | <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->2,759<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p95_ms -->3,765<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p99_ms -->3,765<!-- xtask:end --> ms per rebuild, from `[views_rebuild_per_mb]` | general: windows-x86_64, 16 cores, NVMe |
 | large-worktree placement, `whole` | 10,503 / 11,052 / 11,052 ms per claim | general: windows-x86_64, 16 cores, NVMe |
 | long-session forwarding, `harness` | 4 / 4 / 4 µs per event | general: windows-x86_64, 16 cores, NVMe |

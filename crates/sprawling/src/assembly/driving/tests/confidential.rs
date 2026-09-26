@@ -76,6 +76,7 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let events = seen
@@ -148,6 +149,7 @@ fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -207,6 +209,7 @@ fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     drop(provider);

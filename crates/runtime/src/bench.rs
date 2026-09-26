@@ -103,9 +103,12 @@ pub enum BenchOutcome {
     /// The tool ran; this is its result. `fenced` carries the commit
     /// the wave was fenced against when the forecast suspected a
     /// discard, so the post-wave sweep knows what to restore from.
+    /// `wrote` is the tool's own account of what the call may have
+    /// written, which the next fence stages (runtime-SPEC 8-45).
     Ran {
         outcome: ToolOutcome,
         fenced: Option<String>,
+        wrote: kernel::Writes,
     },
     /// A gate refused, or asked. Either way the answer travels back as
     /// a tool_result, which keeps the turn alive and tells the model
@@ -117,6 +120,21 @@ pub enum BenchOutcome {
     /// is owed the first result: an error here would teach the model a
     /// call failed when it succeeded.
     Duplicate { outcome: ToolOutcome },
+}
+
+/// Each registered tool's answer to what it may write, by declared effect.
+pub struct DeclaredWrites(BTreeMap<ToolName, kernel::Writes>);
+
+impl DeclaredWrites {
+    /// A name the bench does not hold answers `Domain`: the call will be
+    /// refused, and a guess that it writes nothing is the one guess that
+    /// could leave a write outside every fence.
+    pub fn of(&self, call: &ToolCall) -> kernel::Writes {
+        self.0
+            .get(&call.name)
+            .cloned()
+            .unwrap_or(kernel::Writes::Domain)
+    }
 }
 
 impl ToolBench {
@@ -173,6 +191,18 @@ impl ToolBench {
         Ok(())
     }
 
+    /// What each registered tool may write, read off its declared
+    /// effect alone, taken out before the bench is lent to the run so the
+    /// fence policy can ask it while a wave waits (runtime-SPEC 8-45).
+    pub fn declared_writes(&self) -> DeclaredWrites {
+        DeclaredWrites(
+            self.tools
+                .iter()
+                .map(|(name, tool)| (name.clone(), kernel::Writes::of(&tool.meta().effect)))
+                .collect(),
+        )
+    }
+
     pub fn taint_mut(&mut self) -> &mut TaintSet {
         &mut self.taint
     }
@@ -184,21 +214,41 @@ impl ToolBench {
     }
 
     /// Routes one call: dedup, then the door its Effect names, then the
-    /// tool itself.
+    /// tool itself: `clear`, then the tool `tool_for` names, then
+    /// `account`, in order, on one thread.
     pub fn invoke(
         &mut self,
         call: &ToolCall,
         key: &IdemKey,
         now: kernel::TimeMs,
     ) -> Result<BenchOutcome, AxError> {
+        match self.clear(call, key, now)? {
+            Clearance::Answered(outcome) => Ok(outcome),
+            Clearance::Cleared(ticket) => {
+                let answered = self.tool_for(&ticket).and_then(|tool| tool.invoke(call));
+                self.account(ticket, answered)
+            }
+        }
+    }
+
+    /// Dedup, the doors, and the discard forecast's fence: everything
+    /// that decides whether a call may run, and reads or writes what
+    /// the calls before it left. A concurrent wave clears its calls one
+    /// at a time, in call order.
+    pub fn clear(
+        &mut self,
+        call: &ToolCall,
+        key: &IdemKey,
+        now: kernel::TimeMs,
+    ) -> Result<Clearance, AxError> {
         // Before any unreplayable effect (8.2). `seen` holds a key only
         // once the tool answered it, so its keys are the claimed set and
         // a second copy of them would be a second authority.
         if let Some(answered) = self.seen.get(key) {
             return match answered {
-                Ok(outcome) => Ok(BenchOutcome::Duplicate {
+                Ok(outcome) => Ok(Clearance::Answered(BenchOutcome::Duplicate {
                     outcome: outcome.clone(),
-                }),
+                })),
                 Err(refused) => Err(refused.clone()),
             };
         }
@@ -212,6 +262,7 @@ impl ToolBench {
             .with_recovery("call one of the tools listed in your catalog"));
         };
         let effect = tool.meta().effect.clone();
+        let wrote = tool.writes(call);
         // What the call is about, in the tool's own grammar (M-17).
         // Read before any door: a subject this tool cannot read is a
         // call no door may judge.
@@ -219,15 +270,15 @@ impl ToolBench {
 
         // The command door stands before the forecast: a command a
         // tainted run may not execute owes no checkpoint.
-        if name == "exec"
+        if name == ToolName::EXEC
             && let Some(answered) = self.settled(kernel::gate::command(&self.taint))
         {
-            return Ok(answered);
+            return Ok(Clearance::Answered(answered));
         }
 
         // exec is forecast first. A hit does not refuse: it fences.
         let mut fenced = None;
-        if name == "exec"
+        if name == ToolName::EXEC
             && let Ok(arm) = crate::tools::parse_arm(call.args.as_map())
             && let DiscardForecast::Suspected { pattern } = kernel::discard::forecast(&arm)
         {
@@ -253,36 +304,103 @@ impl ToolBench {
         }
 
         if let Some(answered) = self.admit(call, name, &effect, &subject)? {
-            return Ok(answered);
+            return Ok(Clearance::Answered(answered));
         }
+        Ok(Clearance::Cleared(Ticket {
+            key: *key,
+            name: call.name.clone(),
+            effect,
+            fenced,
+            wrote,
+        }))
+    }
 
-        // Re-borrowed here: the forecast fence needed `self` mutably.
-        let Some(tool) = self.tools.get_mut(&call.name) else {
-            return Err(AxError::failure(
+    /// The tool a cleared call runs on. What comes back is the tool
+    /// rather than the bench, because the bench is not `Sync` (its
+    /// checkpoint holds a git repository handle) while a tool is: the
+    /// calls of one wave invoke their tools on several threads at once,
+    /// and none of them touches the dedup table or the taint.
+    ///
+    /// # Errors
+    /// A ticket naming a tool this bench does not hold.
+    pub fn tool_for(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError> {
+        self.tool_named(&ticket.name).ok_or_else(|| {
+            AxError::failure(
                 AxCode::ToolUnavailable,
                 "invoke tool",
-                format!("no tool named `{name}` is registered"),
+                format!("no tool named `{}` is registered", ticket.name),
             )
             .with_nearby(self.tools.keys().map(ToString::to_string).collect())
             .with_recovery(
                 "call one of the tools listed beside this error; those are the tools \
                  this run holds",
-            ));
-        };
-        // The key is recorded with the answer it earned, so a retry after
-        // a gate refusal is not a replay, and a call the tool itself
-        // failed answers its replay the same way it answered the first
-        // time rather than running again. Outside content enters the run
-        // here and nowhere else, so every later call's doors read the
-        // taint it brought.
-        let answered = tool.invoke(call).and_then(|outcome| {
-            self.taint = outside::entered(&effect, &self.taint)?;
+            )
+        })
+    }
+
+    /// The tool registered under `name`, lent out before any call to it
+    /// is cleared, so a read the model hands over can start while it is
+    /// still generating (runtime-SPEC §8-3). A name this bench does not
+    /// hold starts nothing early; admitting the call reports it.
+    pub fn tool_named(&self, name: &ToolName) -> Option<&dyn Tool> {
+        self.tools.get(name).map(AsRef::as_ref)
+    }
+
+    /// Records what a cleared call answered. A concurrent wave accounts
+    /// its calls in call order, so the dedup table and the taint grow
+    /// in the order a serial wave grows them.
+    ///
+    /// The key is recorded with the answer it earned, so a retry after
+    /// a gate refusal is not a replay, and a call the tool itself
+    /// failed answers its replay the same way it answered the first
+    /// time rather than running again. Outside content enters the run
+    /// here and nowhere else, so every later call's doors read the
+    /// taint it brought.
+    ///
+    /// # Errors
+    /// The tool's own refusal, and outside content whose source label
+    /// is empty.
+    pub fn account(
+        &mut self,
+        ticket: Ticket,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<BenchOutcome, AxError> {
+        let answered = answered.and_then(|outcome| {
+            self.taint = outside::entered(&ticket.effect, &self.taint)?;
             Ok(outcome)
         });
-        self.seen.insert(*key, answered.clone());
+        self.seen.insert(ticket.key, answered.clone());
         let outcome = answered?;
-        Ok(BenchOutcome::Ran { outcome, fenced })
+        Ok(BenchOutcome::Ran {
+            outcome,
+            fenced: ticket.fenced,
+            wrote: ticket.wrote,
+        })
     }
+}
+
+/// What `clear` decided about one call.
+#[derive(Debug)]
+pub enum Clearance {
+    /// The bench answered without running the tool: a replay, or a door
+    /// that refused or asked.
+    Answered(BenchOutcome),
+    /// The call may run; `tool_for` and then `account` take the ticket.
+    Cleared(Ticket),
+}
+
+/// A call `clear` let through: the tool `tool_for` names, and what
+/// `account` records the answer under.
+#[derive(Debug)]
+pub struct Ticket {
+    key: IdemKey,
+    name: ToolName,
+    effect: Effect,
+    /// The commit the discard forecast fenced this call against.
+    fenced: Option<String>,
+    /// What the tool says the call may write, asked while the bench
+    /// still holds the tool; `account` hands it on in the outcome.
+    wrote: kernel::Writes,
 }
 
 /// The memory crate owns its own error root; the turn layer speaks

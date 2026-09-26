@@ -5,16 +5,7 @@
 
 //! The wire's words and the kernel's, translated one way each.
 
-use kernel::EventRecord;
 use kernel::{Address, AxCode, AxError};
-
-/// What this agent is called: the last segment of its address, which is
-/// the word a person typed into `call it` when they started the
-/// session. Never the whole address — an agent addressed as its own
-/// name reads more like somebody than like a path.
-pub(super) fn name_of(addr: &Address) -> &str {
-    addr.as_str().rsplit('/').next().unwrap_or(addr.as_str())
-}
 
 /// Which governed document a wire frame names. Total: the two sets have
 /// the same three members and neither owns the other, so the translation
@@ -44,11 +35,6 @@ pub(super) fn not_built(action: &'static str, subject: String, instead: &'static
 /// The building an address belongs to: its first segment.
 pub(super) fn building_of(addr: &Address) -> Option<Address> {
     Address::parse(addr.as_str().split('/').next()?).ok()
-}
-
-/// Which plan node a `roadmap_*` record names.
-pub(super) fn plan_node_of(record: &EventRecord) -> Option<kernel::NodeId> {
-    kernel::NodeId::parse(record.data().as_map().get("node")?.as_str()?).ok()
 }
 
 /// Which scope a wire frame names, in the value the ledger records.

@@ -26,6 +26,10 @@ use serde::{Deserialize, Serialize};
 /// the ladder called the room's file that is a wire whose readers
 /// disagree with the run about which file they are looking at.
 pub enum ConfigLayer {
+    /// No file states the value, and the city's built-in figure is in
+    /// force. A layer rather than an absence, so the page that draws
+    /// the value is told the figure instead of keeping a copy of it.
+    Default,
     /// The city's own `CONFIG.toml`, which covers every building.
     City,
     /// The building's file, which covers every room under it.
@@ -50,6 +54,18 @@ pub struct SettledSecond {
     /// `kernel::config::SecondThreshold`'s one construction point.
     pub percent: u64,
     pub from: ConfigLayer,
+    pub domain: SecondDomain,
+}
+
+/// The whole percents a file may state for the second rung, both ends
+/// included: the two figures `kernel::config::SecondThreshold`'s one
+/// construction point reads, answered so a page that states the span
+/// does not spell it a second time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SecondDomain {
+    pub min: u64,
+    pub max: u64,
 }
 
 /// What an endpoint that settled nothing is called with.
@@ -97,9 +113,9 @@ pub struct ConfigAnswer {
     /// in a level nobody chose.
     pub effort: Option<SettledEffort>,
     /// Where the context reminder's second rung sits at this address.
-    /// Absent means no layer stated it and the city's own default
-    /// answers, which is a statement rather than a gap: the page draws
-    /// the default instead of an empty box.
-    pub second: Option<SettledSecond>,
+    /// Always answered: where no file states it, the figure is
+    /// `kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT` and the
+    /// layer is [`ConfigLayer::Default`].
+    pub second: SettledSecond,
     pub tuning: TuningDefaults,
 }

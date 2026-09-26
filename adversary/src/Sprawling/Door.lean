@@ -275,11 +275,15 @@ def Verb.frame : Verb → String
       , ("idem", .str idem.value) ]
   | .verbatim raw => raw
 where
-  query name := (Json.mkObj [("query", .str name)]).compress
+  /-- Every question goes out under id 1: this adversary reads an answer by the
+  query name it carries, so the id is never read back. -/
+  ask (query : Json) : String :=
+    (Json.mkObj [("ask", Json.mkObj [("ask_id", Json.num (JsonNumber.fromNat 1)), ("query", query)])]).compress
+  query name := ask (.str name)
   /-- A query that carries fields is a tagged object where one that carries
   none is a bare word, which is how serde renders the two kinds of variant. -/
-  asked name fields :=
-    (Json.mkObj [("query", Json.mkObj [(name, Json.mkObj fields)])]).compress
+  asked name fields := ask (Json.mkObj [(name, Json.mkObj fields)])
+
   command name fields := (Json.mkObj [("command", Json.mkObj [(name, Json.mkObj fields)])]).compress
   tokensOrNull : Option Nat → Json
     | some tokens => Json.num (JsonNumber.fromNat tokens)
@@ -459,7 +463,7 @@ private def localRefusal (said : String) : Option Complaint :=
              , action := ((remainder :: more).intersperse ":" |> String.join).trimAscii.toString
              , subject := ""
              , recovery := recoveryIn rest
-             , retriable := false }
+             , retry := "no" }
       else none
     | _ => none
 where

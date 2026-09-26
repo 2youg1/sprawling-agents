@@ -15,7 +15,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxCode, AxError, Model, RunId};
+use kernel::{Address, AxCode, AxError, RunId};
 use runtime::bench::ToolBench;
 
 use kernel::event::record::autonomy_word;
@@ -25,6 +25,8 @@ mod engine;
 mod servers;
 mod standing;
 mod tools;
+
+pub(super) use standing::Placing;
 
 /// Who checks a delegate's own done check. Not the delegate: the whole
 /// point of `Claim::verified` is that a producer's verdict on its own
@@ -49,7 +51,7 @@ pub(super) struct Site {
     pub(super) model: gateway::ModelEntry,
     /// The endpoint the model is reached through (sprawling-SPEC 8-85).
     pub(super) provider: String,
-    pub(super) adapter: Option<Box<dyn Model + Send>>,
+    pub(super) adapter: Option<super::keeping_warm::Door>,
     pub(super) identity: city::Identity,
     pub(super) who: String,
     pub(super) run_id: RunId,
@@ -89,6 +91,8 @@ pub(super) struct Workbench {
     pub(super) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     /// Whether this run asked to be replaced, read when it concludes.
     pub(super) succession: std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
+    /// Where the run records the provider's count, which `status` reads.
+    pub(super) context: runtime::ContextReading,
 }
 
 /// Who this run can reach: the residents beside it, and the sub-agents
@@ -100,6 +104,7 @@ pub(super) struct Workbench {
 pub(super) struct Reach<'a> {
     pub(super) seen: &'a city::Neighbourhood,
     pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
+    pub(super) context: &'a runtime::ContextReading,
 }
 
 /// Takes a desk, or says why it cannot be taken.
@@ -165,7 +170,7 @@ impl Site {
     /// refuse.
     pub(super) fn fence_scope(&self) -> Result<Vec<String>, AxError> {
         if self.lease.is_some() {
-            return Ok(vec![self.building.addr().as_str().to_owned()]);
+            return Ok(tree_scope(&self.building));
         }
         Ok(self
             .rules
@@ -174,6 +179,14 @@ impl Site {
             .map(|prefix| prefix.as_str().to_owned())
             .collect())
     }
+}
+
+/// What a building under review writes in its tree: its own subtree.
+/// The tree is claimed, fenced and offered over this one scope, so a
+/// claim that checked out less than the fence stages, or an offer that
+/// staged more than the claim checked out, cannot happen.
+fn tree_scope(building: &city::Building) -> Vec<String> {
+    vec![building.addr().as_str().to_owned()]
 }
 
 /// The desks one dispatch lends out, and takes back when the drive ends.
@@ -190,6 +203,9 @@ pub(super) struct Desks {
     pub(super) plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
     pub(super) shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
     pub(super) pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
+    /// The room's workshop, holding what it already got back and handed
+    /// down, so a graph laid out again hands nothing down twice.
+    pub(super) workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
     /// Where the shared plan lives, so the claims that survive are
     /// written back to the file they were checked against.
     pub(super) plan_path: PathBuf,
@@ -211,9 +227,8 @@ pub(super) struct Desks {
 /// `status` for exactly those, so a model that obeyed got a row of
 /// noughts and learnt not to ask again.
 ///
-/// `ctx_used` and `children` stay at their empty values, and both are
-/// true: nothing has been read at dispatch, and this city cannot yet
-/// make a child. `worktree_disk` is zero because measuring a tree costs
+/// The context used and the children are not here: both move while the
+/// run goes on, so `status` reads them live. `worktree_disk` is zero because measuring a tree costs
 /// a walk of it, and a number nobody has asked for is not worth one.
 pub(super) struct Situation<'a> {
     pub(super) addr: &'a Address,
@@ -233,7 +248,6 @@ pub(super) fn status_snapshot(situation: Situation<'_>) -> runtime::StatusSnapsh
         who: situation.who.to_owned(),
         addr: situation.addr.clone(),
         mode: situation.mode,
-        ctx_used: kernel::Tokens::default(),
         ctx_limit: kernel::Tokens::new(situation.context_tokens),
         trust: autonomy_word::spell(situation.trust),
         write_domain: situation

@@ -121,6 +121,8 @@ fn files_under(root: &std::path::Path, dir: &std::path::Path, found: &mut Vec<St
 fn each_way_a_call_ends_has_its_own_exit_code() {
     use super::calling::call;
     use super::exit::Exit;
+    const CITY_VIEW: &str = r#"{"ask":{"ask_id":1,"query":"city_view"}}"#;
+    const NO_SUCH_QUERY: &str = r#"{"ask":{"ask_id":1,"query":"no_such"}}"#;
     // A port that was bound and released: nothing listens on it.
     let vacant = std::net::TcpListener::bind("127.0.0.1:0")
         .unwrap()
@@ -131,18 +133,16 @@ fn each_way_a_call_ends_has_its_own_exit_code() {
     let table = [
         (words(&["call"]), Exit::Line),
         (words(&["call", "{not json", "--at", &vacant]), Exit::Line),
+        (words(&["call", NO_SUCH_QUERY, "--at", &vacant]), Exit::Line),
         (
-            words(&["call", "{\"query\":\"no_such\"}", "--at", &vacant]),
+            words(&["call", CITY_VIEW, "--quiet-ms", "soon"]),
             Exit::Line,
         ),
         (
-            words(&["call", "{\"query\":\"city_view\"}", "--quiet-ms", "soon"]),
+            words(&["call", CITY_VIEW, "--until", "no_such_kind"]),
             Exit::Line,
         ),
-        (
-            words(&["call", "{\"query\":\"city_view\"}", "--at", &vacant]),
-            Exit::NoCity,
-        ),
+        (words(&["call", CITY_VIEW, "--at", &vacant]), Exit::NoCity),
     ];
     let observed = table
         .iter()

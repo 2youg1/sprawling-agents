@@ -39,10 +39,10 @@ impl RunWorker {
         let entered = entered.resolved()?;
         let endpoint = self.endpoint_of(entered)?;
         let found = Probing {
-            reach: reach_of(&endpoint.base_url, endpoint.tuning.proxying)?,
+            reach: reach_of(&endpoint.base_url, endpoint.tuning.proxying, &*self.clock)?,
             served: self.probe(&endpoint),
         };
-        let payload = probed_payload(&endpoint.name, &endpoint.base_url, &found)?;
+        let payload = probed_payload(&endpoint.name, &endpoint.base_url, found)?;
         self.record(EventKind::EndpointProbed, payload)
     }
 
@@ -106,6 +106,7 @@ impl RunWorker {
         header: Option<String>,
     ) -> gateway::AuthSpec {
         let archived = self
+            .credentials
             .book
             .endpoints()
             .find(|endpoint| endpoint.name == name)
@@ -245,7 +246,9 @@ impl RunWorker {
         loop {
             match probe.list_models(&url) {
                 Ok(served) => return Ok(served),
-                Err(err) if attempts_left > 0 && err.is_retriable() => {
+                // Listing models is read-only, so an unknown effect is
+                // asked again as readily as a known one.
+                Err(err) if attempts_left > 0 && err.retry() != kernel::Retry::No => {
                     attempts_left = attempts_left.saturating_sub(1);
                 }
                 Err(err) => return Err(err),
@@ -343,7 +346,7 @@ mod tests {
                 ),
             })
             .unwrap();
-        let (_, _, entry) = worker.book.choices().next().unwrap();
+        let (_, _, entry) = worker.credentials.book.choices().next().unwrap();
         assert_eq!(
             entry.max_output_tokens,
             kernel::Ceiling::new(4_096),

@@ -31,6 +31,7 @@ import type {
   ModelTag,
   PreferencePatch,
   PursuitStep,
+  Restoration,
   RunId,
   SessionName,
   ToolkitSlug,
@@ -121,6 +122,12 @@ export function reveal(at: Address): Command {
   return { reveal: { at, idem: mintIdem() } };
 }
 
+// Put one recycle-bin row back. The row's own way back travels whole,
+// because a path can be discarded twice and the row knows which time.
+export function restoreDiscard(restoration: Restoration): Command {
+  return { restore_discard: { restoration, idem: mintIdem() } };
+}
+
 // Install one thing this machine lacks, by the name the city answered
 // with. Only a recipe the city may run is run; the other two come back
 // as a refusal saying what the person does instead.
@@ -157,6 +164,12 @@ export function createBuilding(addr: Address, template: Template): Command {
       idem: mintIdem(),
     },
   };
+}
+
+// Takes a building out of the city; its files are kept under the
+// reserved subtree and its history stays in the ledger.
+export function removeBuilding(addr: Address): Command {
+  return { remove_building: { addr, idem: mintIdem() } };
 }
 
 // A new session at the same address: a fresh conversation in this

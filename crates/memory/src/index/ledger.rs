@@ -8,13 +8,14 @@
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use kernel::{RunId, Seq};
+use kernel::{AxError, RunId, Seq};
 
-use crate::error::MemoryError;
+use crate::error::{MemoryError, io_err};
+use crate::jsonl::segment_names;
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
-use super::fold::Folded;
+use super::fold::{Folded, Located};
 use super::reader::LineReader;
 
 /// What one [`LedgerIndex::refresh`] did, and what it lifted off the
@@ -61,7 +62,32 @@ impl LedgerIndex {
     /// Propagates a ledger directory that cannot be listed or read.
     pub fn rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError> {
         let vfs: Box<dyn Vfs> = Box::new(RealFs::new());
-        let folded = super::fold::rebuild(vfs.as_ref(), dir)?;
+        let folded = scan(vfs.as_ref(), dir)?;
+        Ok(LedgerIndex {
+            folded,
+            vfs: Mutex::new(vfs),
+        })
+    }
+
+    /// Reads the ledger once for a fold and for the index together: each
+    /// complete line is lent to `each` in ledger order, then indexed at
+    /// its offset. `each` returns the line's place when it has read it
+    /// already, so the index does not parse the line again, or `None` for
+    /// the index to locate it by the rule `rebuild` uses. One segment's
+    /// bytes are resident at a time, and the index covers exactly the
+    /// lines `each` saw: a line appended during the fold waits for
+    /// `refresh`.
+    ///
+    /// # Errors
+    /// The first error `each` returns, or a ledger directory that cannot
+    /// be listed or read. The lines before it were already lent, so the
+    /// caller discards what it folded.
+    pub fn folding(
+        dir: &Path,
+        each: impl FnMut(&[u8]) -> Result<Option<Located>, AxError>,
+    ) -> Result<LedgerIndex, AxError> {
+        let vfs: Box<dyn Vfs> = Box::new(RealFs::new());
+        let folded = walk(vfs.as_ref(), dir, each, MemoryError::into_ax)?;
         Ok(LedgerIndex {
             folded,
             vfs: Mutex::new(vfs),
@@ -109,7 +135,7 @@ impl LedgerIndex {
         let plan = self.plan_refresh(dir)?;
         match plan {
             RefreshPlan::Rebuild => {
-                let folded = super::fold::rebuild(self.seam().as_ref(), dir)?;
+                let folded = scan(self.seam().as_ref(), dir)?;
                 self.folded = folded;
                 Ok(Refreshed::Rebuilt)
             }
@@ -208,7 +234,7 @@ impl LedgerIndex {
 
     /// Every seq the index holds, ascending: the walk a reader takes
     /// to read the whole ledger forwards, which is its fast direction.
-    pub fn seqs(&self) -> &[Seq] {
+    pub fn seqs(&self) -> impl DoubleEndedIterator<Item = Seq> + '_ {
         self.folded.seqs()
     }
 
@@ -238,6 +264,45 @@ enum RefreshPlan {
     Unchanged,
     Appended { spans: Vec<Span> },
     Rebuild,
+}
+
+/// Every line indexed by the rule the index owns.
+fn scan(vfs: &dyn Vfs, dir: &Path) -> Result<Folded, MemoryError> {
+    walk(vfs, dir, |_| Ok(None), |failure| failure)
+}
+
+/// The one pass over the segments that builds a `Folded`.
+fn walk<E>(
+    vfs: &dyn Vfs,
+    dir: &Path,
+    mut each: impl FnMut(&[u8]) -> Result<Option<Located>, E>,
+    lift: impl Fn(MemoryError) -> E,
+) -> Result<Folded, E> {
+    let mut folded = Folded::empty();
+    for name in segment_names(vfs, dir).map_err(&lift)? {
+        let path = dir.join(&name);
+        let bytes = vfs
+            .read(&path)
+            .map_err(io_err("read segment", &path))
+            .map_err(&lift)?;
+        let mut offset: u64 = 0;
+        for line in bytes.split_inclusive(|b| *b == b'\n') {
+            // A torn tail carries no seq we can trust; it is skipped, and
+            // the next append overwrites it (jsonl owns that repair).
+            let Some(body) = line.strip_suffix(b"\n") else {
+                break;
+            };
+            if !body.is_empty() {
+                match each(body)? {
+                    Some(located) => folded.insert_located(&name, offset, located),
+                    None => folded.insert_line(&name, offset, body),
+                }
+            }
+            offset = offset.saturating_add(u64::try_from(line.len()).unwrap_or(0));
+        }
+        folded.scanned.insert(name, offset);
+    }
+    Ok(folded)
 }
 
 #[cfg(test)]

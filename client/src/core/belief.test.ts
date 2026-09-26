@@ -288,7 +288,7 @@ describe("one refusal, however often it arrived", () => {
     action: "dispatch the task",
     subject: "hall/mayor",
     nearby: [],
-    retriable: false,
+    retry: "no",
     recovery: "",
   };
 
@@ -385,5 +385,18 @@ describe("batch", () => {
     store.named("city");
 
     expect(get(store.belief).city).toBe("city");
+  });
+});
+
+describe("the model a session answers with", () => {
+  // The defect: the page showed the model the city would pick next, and
+  // a session keeps the model it was opened with, so a refused switch
+  // left the facts strip naming a model that was not answering.
+  test("the model a run's call went to is the run's model", () => {
+    const store = createBelief(() => 0);
+    store.apply(started(ONE, 2));
+    expect(get(store.belief).runs[ONE]?.model).toBeNull();
+    expect(store.apply(event(ONE, 3, "model_called", { segments: [], model: "fake-small" }))).toBeNull();
+    expect(get(store.belief).runs[ONE]?.model).toBe("fake-small");
   });
 });

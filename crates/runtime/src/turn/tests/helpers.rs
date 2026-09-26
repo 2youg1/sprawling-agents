@@ -12,7 +12,7 @@
 )]
 
 use super::super::*;
-use crate::prefix::{FrozenSegment, SegmentSlot};
+use crate::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 use kernel::ledger::chain_hash;
 use kernel::{EventDraft, GENESIS_PREV};
 

@@ -33,11 +33,20 @@ use crate::{Address, RESERVED_PREFIX};
 pub const LEDGER_DIR: &str = "ledger";
 /// The content-addressed object store, under the city's reserved subtree.
 pub const CAS_DIR: &str = "cas";
+/// What the views held after one ledger line, under the city's reserved
+/// subtree; a projection a start may discard.
+pub const SNAPSHOT_DIR: &str = "snapshot";
 /// The city's shelves of skills, under the city's reserved subtree.
 pub const LIBRARY_DIR: &str = "library";
 /// A building's own shelf of skills, under that building's reserved
 /// subtree: what this building knows and no other building is given.
 pub const BUILDING_SHELF: &str = "skills";
+/// The one document of a skill filed as a directory: a package on a
+/// section shelf, and every skill on a shelf the city mounts from
+/// elsewhere. It is the layout pi, claude and agents all use; the
+/// catalog lists this file's first line, and `read` opens the files
+/// beside it by `<name>/<path>`.
+pub const SKILL_FILE: &str = "SKILL.md";
 /// What one configuration layer declares. The same file name at every
 /// layer, because the layer is the scope it sits in rather than a name.
 pub const CONFIG_FILE: &str = "CONFIG.toml";
@@ -95,6 +104,12 @@ impl CityLayout {
     #[must_use]
     pub fn ledger(&self) -> PathBuf {
         self.governed_root().join(LEDGER_DIR)
+    }
+
+    /// The snapshot a start resumes the views from.
+    #[must_use]
+    pub fn snapshot(&self) -> PathBuf {
+        self.governed_root().join(SNAPSHOT_DIR)
     }
 
     /// The whole city's object store.

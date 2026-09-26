@@ -15,7 +15,7 @@ mod adapter;
 mod auth;
 mod call;
 pub(crate) mod config;
-mod failure;
+pub(crate) mod failure;
 #[cfg(test)]
 pub(crate) mod fakes;
 mod header;
@@ -28,6 +28,6 @@ mod transport;
 pub use adapter::adapter_for;
 pub use config::{AuthSpec, Endpoint, EndpointConfig};
 pub use header::HeaderValue;
-pub use models::ModelFacts;
+pub use kernel::event::record::ModelFacts;
 pub use redemption::{ImageResolver, Redemption, SecretResolver};
 pub(crate) use transport::Transport;

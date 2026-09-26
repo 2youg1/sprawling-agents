@@ -65,6 +65,14 @@ impl DelegateDesk {
         }
     }
 
+    /// A desk standing where this one stands - the same depth, the same
+    /// building - with nothing asked, for work this run's graph hands
+    /// down after the run is over.
+    #[must_use]
+    pub fn beside(&self) -> DelegateDesk {
+        DelegateDesk::new(self.depth, self.building.clone())
+    }
+
     /// Admits one request, or refuses it in the gate's own words.
     ///
     /// # Errors
@@ -199,7 +207,7 @@ impl Tool for DelegateTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -299,7 +307,7 @@ mod tests {
     #[test]
     fn a_root_run_may_hand_work_down_and_is_told_where_it_will_happen() {
         let desk = desk(Depth::Root);
-        let mut tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
+        let tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
         let outcome = tool.invoke(&call("lab/helper", None)).unwrap();
         assert_eq!(outcome.result.as_map()["room"], "lab/helper");
         assert_eq!(
@@ -319,7 +327,7 @@ mod tests {
     #[test]
     fn a_delegate_cannot_delegate_and_the_refusal_says_what_to_do_instead() {
         let desk = desk(Depth::Delegated);
-        let mut tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
+        let tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
         for kind in [None, Some("ephemeral"), Some("resident")] {
             let err = tool.invoke(&call("lab/helper", kind)).unwrap_err();
             assert_eq!(err.code(), &AxCode::DelegationDepth);
@@ -332,7 +340,7 @@ mod tests {
     #[test]
     fn a_delegate_stays_inside_the_building_that_asked_for_it() {
         let desk = desk(Depth::Root);
-        let mut tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
+        let tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
         let err = tool.invoke(&call("shop/helper", None)).unwrap_err();
         assert_eq!(err.code(), &AxCode::CrossBuildingDenied);
         assert!(err.recovery().contains("signal"));
@@ -341,7 +349,7 @@ mod tests {
     #[test]
     fn an_unknown_kind_is_refused_rather_than_rounded_down() {
         let desk = desk(Depth::Root);
-        let mut tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
+        let tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
         let err = tool
             .invoke(&call("lab/helper", Some("apprentice")))
             .unwrap_err();
@@ -354,7 +362,7 @@ mod tests {
     #[test]
     fn the_tool_refuses_another_tools_call_and_still_answers() {
         let desk = desk(Depth::Root);
-        let mut tool = DelegateTool::new(desk).unwrap();
+        let tool = DelegateTool::new(desk).unwrap();
         let mut wrong = call("lab/helper", None);
         wrong.name = ToolName::parse("signal").unwrap();
         let err = tool.invoke(&wrong).unwrap_err();

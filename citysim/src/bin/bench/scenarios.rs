@@ -3,8 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The four load scenarios: multi-run parallel, large-ledger fold,
-//! large-worktree placement, and long-session streaming forward.
+//! Four of the five load scenarios: large-ledger fold, large-worktree
+//! placement, kept-worktree reclaim, and long-session streaming forward.
+//!
+//! The fifth, multi-run parallel, is measured inside `sprawling` by
+//! `instrument_relay_round_trip`, which drives the accounting loop the
+//! city runs. Its relay face is `pub(crate)`, so a scenario here could
+//! only time a copy of that loop, and a copy reads what the copy costs
+//! (citysim-SPEC.md section 8-6).
 //!
 //! Each is a thin measuring loop over the product's own public faces
 //! (citysim-SPEC.md section 8-6). The load every recorded reading was
@@ -14,7 +20,6 @@
 //! outside `bin::assembly` is this tree's alone.
 
 use std::path::Path;
-use std::time::Duration;
 
 use kernel::{Address, B3Hash, Effort, EventDraft, EventRecord, Ledger as _, RunId, TimeMs};
 use memory::{Checkpoint, ModelChoice, Provenance, WorktreeName, Worktrees};
@@ -24,9 +29,6 @@ use super::reading::{Load, MachineClass, Reading, SubMetric};
 /// The fixed load each scenario runs under. Data, not policy: change a
 /// field and the new readings are not comparable with the register's.
 pub(crate) struct Fixture {
-    /// Driving lanes writing at once, and the records each one writes.
-    pub(crate) lanes: u32,
-    pub(crate) records_per_lane: u32,
     /// The ledger the fold walks, and how many rebuilds are sampled.
     pub(crate) fold_records: u64,
     pub(crate) fold_rounds: u32,
@@ -40,8 +42,6 @@ pub(crate) struct Fixture {
 
 /// The registered load: the fixture every baseline reading names.
 pub(crate) const REGISTERED: Fixture = Fixture {
-    lanes: 4,
-    records_per_lane: 250,
     fold_records: 50_000,
     fold_rounds: 5,
     tree_files: 512,
@@ -62,86 +62,14 @@ pub(crate) fn all(
     let mut readings = Vec::new();
     for load in Load::ALL {
         let of_load = match load {
-            Load::MultiRunParallel => multi_run_parallel(scratch, fixture, machine)?,
             Load::LargeLedgerFold => large_ledger_fold(scratch, fixture, machine)?,
             Load::LargeWorktreePlacement => large_worktree_placement(scratch, fixture, machine)?,
+            Load::KeptWorktreeReclaim => kept_worktree_reclaim(scratch, fixture, machine)?,
             Load::LongSessionForwarding => long_session_forwarding(fixture, machine)?,
         };
         readings.extend(of_load);
     }
     Ok(readings)
-}
-
-/// Multi-run parallel: lanes write at once and one accounting thread
-/// takes every write, once through each Ledger adapter.
-fn multi_run_parallel(
-    scratch: &Path,
-    fixture: &Fixture,
-    machine: MachineClass,
-) -> Result<Vec<Reading>, String> {
-    let harness = accounting(&mut citysim::MemLedger::new(), fixture)?;
-    let dir = scratch.join("multi-run");
-    std::fs::create_dir_all(&dir).map_err(|why| format!("{why}"))?;
-    let (mut ledger, _report) = memory::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
-        .map_err(|why| format!("{}", why.into_ax()))?;
-    let persist = accounting(&mut ledger, fixture)?;
-    Ok(vec![
-        Reading::of(Load::MultiRunParallel, SubMetric::Harness, machine, harness)?,
-        Reading::of(Load::MultiRunParallel, SubMetric::Persist, machine, persist)?,
-    ])
-}
-
-/// The shape production drives in: lanes hand drafts to one accounting
-/// thread and wait, so the per-record time is what every lane's write
-/// waits for. The relay face is `pub(crate)` in `sprawling::serving`, so
-/// this reproduces its shape over the same `kernel::Ledger` port.
-fn accounting<L: kernel::Ledger>(
-    ledger: &mut L,
-    fixture: &Fixture,
-) -> Result<Vec<Duration>, String> {
-    let mut times = Vec::new();
-    let mut failure = None;
-    std::thread::scope(|scope| {
-        let (tx, rx) = std::sync::mpsc::channel();
-        let mut lanes = Vec::new();
-        for lane in 0..fixture.lanes {
-            let tx = tx.clone();
-            let per = u64::from(fixture.records_per_lane);
-            lanes.push(scope.spawn(move || -> Result<(), String> {
-                for i in 0..per {
-                    let n = u64::from(lane).saturating_mul(per).saturating_add(i);
-                    tx.send(super::draft(n)?)
-                        .map_err(|why| format!("hand a draft to the accounting thread: {why}"))?;
-                }
-                Ok(())
-            }));
-        }
-        drop(tx);
-        for draft in rx {
-            if failure.is_some() {
-                continue;
-            }
-            let t0 = super::stamp();
-            match ledger.append(draft) {
-                Ok(committed) => {
-                    std::hint::black_box(committed);
-                    times.push(t0.elapsed());
-                }
-                Err(why) => failure = Some(format!("{why}")),
-            }
-        }
-        for lane in lanes {
-            let joined = match lane.join() {
-                Ok(Ok(())) => continue,
-                Ok(Err(why)) => why,
-                Err(_) => "a driving lane panicked before its records were sent".to_owned(),
-            };
-            if failure.is_none() {
-                failure = Some(joined);
-            }
-        }
-    });
-    failure.map_or(Ok(times), Err)
 }
 
 /// Large-ledger fold: the whole production rebuild over a large ledger -
@@ -183,7 +111,65 @@ fn large_worktree_placement(
     fixture: &Fixture,
     machine: MachineClass,
 ) -> Result<Vec<Reading>, String> {
-    let city_root = scratch.join("placement");
+    let trees = placement_city(&scratch.join("placement"), fixture)?;
+    let mut times = Vec::new();
+    for i in 0..fixture.placements {
+        let name = node(i)?;
+        let t0 = super::stamp();
+        let lease = trees
+            .claim(&name, &[])
+            .map_err(|why| format!("{}", why.into_ax()))?;
+        times.push(t0.elapsed());
+        trees
+            .release(lease)
+            .map_err(|why| format!("{}", why.into_ax()))?;
+    }
+    Ok(vec![Reading::of(
+        Load::LargeWorktreePlacement,
+        SubMetric::Whole,
+        machine,
+        times,
+    )?])
+}
+
+/// Kept-worktree reclaim: a node's second run takes back the tree its
+/// first run left, with the trunk unmoved in between. Priced whole for
+/// the same reason as the first placement.
+fn kept_worktree_reclaim(
+    scratch: &Path,
+    fixture: &Fixture,
+    machine: MachineClass,
+) -> Result<Vec<Reading>, String> {
+    let trees = placement_city(&scratch.join("reclaim"), fixture)?;
+    let name = node(0)?;
+    let first = trees
+        .claim(&name, &[])
+        .map_err(|why| format!("{}", why.into_ax()))?;
+    trees
+        .release(first)
+        .map_err(|why| format!("{}", why.into_ax()))?;
+    let mut times = Vec::new();
+    for _ in 0..fixture.placements {
+        let t0 = super::stamp();
+        let lease = trees
+            .claim(&name, &[])
+            .map_err(|why| format!("{}", why.into_ax()))?;
+        times.push(t0.elapsed());
+        trees
+            .release(lease)
+            .map_err(|why| format!("{}", why.into_ax()))?;
+    }
+    Ok(vec![Reading::of(
+        Load::KeptWorktreeReclaim,
+        SubMetric::Whole,
+        machine,
+        times,
+    )?])
+}
+
+/// A city of `fixture.tree_files` files under `bulk`, with the base
+/// commit every worktree branches from.
+fn placement_city(city_root: &Path, fixture: &Fixture) -> Result<Worktrees, String> {
     let bulk = city_root.join("bulk");
     std::fs::create_dir_all(&bulk).map_err(|why| format!("{why}"))?;
     let bytes = usize::try_from(fixture.tree_file_bytes).map_err(|why| format!("{why}"))?;
@@ -201,31 +187,15 @@ fn large_worktree_placement(
             effort: Some(Effort::Low),
         },
     );
-    let mut checkpoint =
-        Checkpoint::open(&city_root).map_err(|why| format!("{}", why.into_ax()))?;
-    checkpoint
+    Checkpoint::open(city_root)
+        .map_err(|why| format!("{}", why.into_ax()))?
         .ensure_base(&["bulk".to_owned()], TimeMs::new(1_700_000_000_000), &owner)
         .map_err(|why| format!("{}", why.into_ax()))?;
-    let trees = Worktrees::open(&city_root).map_err(|why| format!("{}", why.into_ax()))?;
-    let mut times = Vec::new();
-    for i in 0..fixture.placements {
-        let name = WorktreeName::parse(&format!("node-{i}"))
-            .map_err(|why| format!("{}", why.into_ax()))?;
-        let t0 = super::stamp();
-        let lease = trees
-            .claim(&name)
-            .map_err(|why| format!("{}", why.into_ax()))?;
-        times.push(t0.elapsed());
-        trees
-            .release(lease)
-            .map_err(|why| format!("{}", why.into_ax()))?;
-    }
-    Ok(vec![Reading::of(
-        Load::LargeWorktreePlacement,
-        SubMetric::Whole,
-        machine,
-        times,
-    )?])
+    Worktrees::open(city_root).map_err(|why| format!("{}", why.into_ax()))
+}
+
+fn node(i: u32) -> Result<WorktreeName, String> {
+    WorktreeName::parse(&format!("node-{i}")).map_err(|why| format!("{}", why.into_ax()))
 }
 
 /// Long-session streaming forward: every event of one long session,

@@ -8,7 +8,10 @@
 //! fenced block in ARCHITECTURE.md — no hidden edge, kernel stays at
 //! zero; and `pub trait` appears only in the files the seam table lists —
 //! one adapter is a hypothetical seam, so a trait outside the seam list is
-//! decoration, not architecture.
+//! decoration, not architecture. A third reads inside a crate: the
+//! `directions` block names the paths a module's production code never
+//! names, which is how a cycle between two modules of one crate is seen
+//! (`directions`).
 //!
 //! The seam table is read out of its own section (`architecture`), never
 //! out of the whole document: a whitelist recognised by the shape of a
@@ -25,6 +28,8 @@ use crate::walk;
 
 use architecture::PATH as ARCH;
 
+mod directions;
+
 /// Where the seams are declared, and where a `pub trait` may therefore
 /// live.
 const SEAM_SECTION: u32 = 4;
@@ -39,6 +44,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 
     check_edges(root, &allowed, &mut violations)?;
     check_pub_traits(root, &seams, &mut violations)?;
+    directions::check(root, &text, &mut violations)?;
     Ok(violations)
 }
 

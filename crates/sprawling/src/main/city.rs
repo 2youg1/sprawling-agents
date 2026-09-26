@@ -11,7 +11,7 @@
 //! directory that holds no history, settle the pairing key before
 //! anything binds, choose where the client bundle comes from, build the
 //! diagnostics sink, attach the console, hand one `serving::Serving` to
-//! `serving::listen`, and print the banner only once that has taken the
+//! `assembly::listen`, and print the banner only once that has taken the
 //! port and the city's writer. `up`, the first screen and `serve`
 //! differ only in what they do before they arrive there and in whether
 //! they open a browser, so none of them re-derives the sequence.
@@ -62,11 +62,11 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
-    let history = match assembly::has_history(folder) {
+    let history = match city::has_history(folder) {
         Ok(history) => history,
         Err(err) => return report(err),
     };
-    if history == assembly::History::Present {
+    if history == city::History::Present {
         println!("{} is already a city; opening it", folder.display());
         return serve_city(folder, DEFAULT_AT, &[], opening(&[], Open::Browser));
     }
@@ -111,11 +111,11 @@ pub(super) fn report_standing(report: &assembly::InitReport) {
 /// and the launcher in the release archive both arrive here, so the
 /// sequence has exactly one definition and `init` and `serve` keep theirs.
 pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitCode {
-    let history = match assembly::has_history(city) {
+    let history = match city::has_history(city) {
         Ok(history) => history,
         Err(err) => return report(err),
     };
-    if history == assembly::History::Absent {
+    if history == city::History::Absent {
         match assembly::init_city(city) {
             Ok(raised) => println!(
                 "city raised at {} (genesis seq {})",
@@ -169,6 +169,23 @@ pub(super) fn serve(dir: Option<&String>, addr: Option<&String>, args: &[String]
     serve_city(std::path::Path::new(dir), raw, args, open)
 }
 
+/// The child `serve` of a supervised run, from the decisions made above.
+fn child(args: &[String], open: Open, wanted: bool) -> sprawling::supervising::Child {
+    use sprawling::supervising::{Child, Console, Window};
+    Child {
+        forwarded: super::verbs::forwarded(args),
+        first: match open {
+            Open::Browser => Window::Open,
+            Open::Nothing => Window::Leave,
+        },
+        console: if wanted {
+            Console::Enter
+        } else {
+            Console::Skip
+        },
+    }
+}
+
 pub(super) fn serve_city(
     city: &std::path::Path,
     raw: &str,
@@ -178,11 +195,11 @@ pub(super) fn serve_city(
     // A directory with no history is not a city, and saying so beats the
     // storage layer's report that it could not list a ledger directory -
     // which is true, unhelpful, and names a path nobody chose.
-    let history = match assembly::has_history(city) {
+    let history = match city::has_history(city) {
         Ok(history) => history,
         Err(err) => return report(err),
     };
-    if history == assembly::History::Absent {
+    if history == city::History::Absent {
         eprintln!("no city at {}", city.display());
         eprintln!(
             "recovery: `sprawling up {0}` raises one and serves it",
@@ -199,6 +216,21 @@ pub(super) fn serve_city(
         eprintln!("recovery: give host:port, for example {DEFAULT_AT}");
         return ExitCode::from(2);
     };
+    // After the refusals a restart could not cure, so a mistyped line
+    // is refused once here rather than spending the crash budget
+    // (sprawling-SPEC.md 8-90).
+    // The terminal this city runs in becomes its console when `up`
+    // started it, or when `serve` was asked. `--no-console` is the way
+    // out for a supervisor that wants the old blocking shape.
+    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
+        && !args.iter().any(|a| a == "--no-console");
+    if args.iter().any(|a| a == "--supervise") {
+        return match sprawling::supervising::supervise(city, raw, &child(args, open, wanted)) {
+            Ok(sprawling::supervising::Ended::Chosen) => ExitCode::SUCCESS,
+            Ok(sprawling::supervising::Ended::Degraded) => ExitCode::FAILURE,
+            Err(err) => report(err),
+        };
+    }
     // The client source: embedded by default; a directory for the
     // development loop, read per request so an edit shows on refresh.
     let client = match flag_value(args, "--web-dir") {
@@ -222,7 +254,9 @@ pub(super) fn serve_city(
         Err(err) => return report(err),
     };
     let token = keyed.code().map(str::to_owned);
-    let runtime = match tokio::runtime::Runtime::new() {
+    // The socket's workers stand above the commands the city dispatches
+    // (sprawling-SPEC.md 8-93).
+    let runtime = match serving::serving_runtime(serving::setting_telling_a_refusal()) {
         Ok(runtime) => runtime,
         Err(err) => {
             eprintln!("could not start the async runtime: {err}");
@@ -238,7 +272,7 @@ pub(super) fn serve_city(
     // The one sink a diagnostic line leaves this process through: the
     // terminal, and the page that has the log lens open. Made before
     // the `Diagnostics` because the sink is what writes into it.
-    let journal = serving::Journal::new();
+    let journal = serving::Journal::new(std::sync::Arc::new(assembly::SystemClock));
     let floor = match log_floor(args) {
         Ok(floor) => floor,
         Err(unknown) => {
@@ -251,11 +285,6 @@ pub(super) fn serve_city(
         Some(level) => runtime::diagnostics::Diagnostics::new(level, journal.sink()),
         None => runtime::diagnostics::Diagnostics::off(),
     };
-    // The terminal this city runs in becomes its console when `up`
-    // started it, or when `serve` was asked. `--no-console` is the way
-    // out for a supervisor that wants the old blocking shape.
-    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
-        && !args.iter().any(|a| a == "--no-console");
     let console = wanted.then(|| console::Terminal {
         url: firstrun::local_url(bind),
         token: token.clone(),
@@ -270,7 +299,7 @@ pub(super) fn serve_city(
     // The port and the writer are both taken before a word is printed:
     // a banner saying "running" over a port another process holds was a
     // claim the city could not keep (sprawling-SPEC.md 8-88).
-    let listening = match runtime.block_on(serving::listen(serving::Serving {
+    let listening = match runtime.block_on(assembly::listen(serving::Serving {
         city_root: city.to_path_buf(),
         addr: bind,
         token,

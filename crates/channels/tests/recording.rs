@@ -44,6 +44,12 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
     let config = ServeConfig {
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
+        outputs: tokio::sync::broadcast::channel(16).0,
+        outputs_so_far: Arc::new(Vec::new),
+        monitor: channels::MonitorFeed {
+            watch: Arc::new(|_| -> Box<dyn Send> { Box::new(()) }),
+            samples: tokio::sync::broadcast::channel(1).0,
+        },
         client: Arc::new(channels::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
         transcribe_sink: Arc::new(move |body: Vec<u8>, kind: String| match hearing {
@@ -57,9 +63,12 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
         }),
         events,
         queries: Arc::new(|_| {
-            Ok(Answer::Unavailable {
-                query: "none".to_owned(),
-            })
+            (
+                kernel::Seq::FIRST,
+                Ok(Answer::Unavailable {
+                    query: "none".to_owned(),
+                }),
+            )
         }),
         secrets: Arc::new(|_: Command<kernel::Sealed<String>>, _: Reply| Ok(())),
         acp: Arc::new(|_, _| {
@@ -70,6 +79,8 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
             })
         }),
         city: None,
+        head: Arc::default(),
+        epoch: None,
     };
     // The face comes from the same verdict the listener uses, so the
     // route under test judges a caller by the rule the served city does.

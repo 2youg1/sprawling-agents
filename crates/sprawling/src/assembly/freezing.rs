@@ -12,9 +12,9 @@ use kernel::{Address, AxCode, AxError};
 use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot, SegmentSource};
 use runtime::run::RunPlan;
 
-use super::{Assignment, Given, RunWorker, Site, Workbench, city_segment, held, name_of};
+use super::{Assignment, Given, Site, Workbench, city_segment, held};
 use model_note::model_note;
-use run_slot::{Predecessor, run_segment, task_line};
+use run_slot::{Predecessor, run_segment};
 
 /// Bytes about to be frozen into one slot, and the documents they were
 /// read from.
@@ -42,7 +42,7 @@ impl Assembled {
     pub(super) fn of_one(addr: Address, bytes: Vec<u8>) -> Assembled {
         let kept = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         Assembled {
-            sources: vec![SegmentSource::whole(addr, kept, None)],
+            sources: vec![SegmentSource::whole(addr, kept)],
             bytes,
         }
     }
@@ -60,7 +60,6 @@ impl Assembled {
         self.sources.push(SegmentSource::whole(
             at,
             u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-            None,
         ));
     }
 
@@ -171,33 +170,26 @@ fn addressed(city_root: &Path, path: &Path) -> Result<Address, AxError> {
     Address::parse(&spelled)
 }
 
-impl RunWorker {
-    /// Puts one desk's effects on the ledger, and only then makes the
-    /// change they announce.
-    ///
-    /// This is the one door for all five of them. The change arrives as
-    /// the return value of `Landing::record`, which appends first, so
-    /// there is no expression in this file that reaches the city before
-    /// the history - and the match below is exhaustive, so a new kind of
-    /// change has to say here what it is.
-    ///
-    /// # Errors
-    /// Propagates the first line the ledger refuses, in which case
-    /// nothing changes; then whatever delivering, writing the plan or
-    /// filing an entry reports.
-    /// Freezes what this run is: the plan it drives on, and the handoff
-    /// that says what to read to pick it up again.
-    ///
-    /// One phase because the two are one decision. The prefix is
-    /// assembled for this plan and frozen with it, the handoff quotes
-    /// the plan's own task line, and the job locator ends up in both -
-    /// pinned in the store, so what a resumed run reads is the bytes the
-    /// run segment carried rather than a file somebody edited since.
-    ///
-    /// # Errors
-    /// Propagates a city or run segment that will not read, a norm on
-    /// the must-read list that will not open, a store that will not take
-    /// the bytes, and a handoff the runtime refuses.
+/// What freezing a plan reads from outside the run's own site, as
+/// values rather than as the worker that holds them, so a plan can be
+/// frozen on whichever thread prepares the run (sprawling-SPEC.md 8-93).
+pub(super) struct Freezing<'a> {
+    pub(super) city_root: &'a Path,
+    /// The store the prefix and the norms are pinned in. Content
+    /// addressed, so a second handle on the same store writes the same
+    /// files.
+    pub(super) cas: &'a mut memory::Cas,
+    /// The conversation this run opens with, rebuilt where the ledger
+    /// and its index are held, because that is also where its lineage
+    /// line is written.
+    pub(super) inherited: Vec<kernel::ChatMessage>,
+    /// The run a carried session continues from, when the room's last
+    /// session was carried rather than begun fresh; read from the
+    /// session origins where the ledger is held, as `inherited` is.
+    pub(super) carried_from: Option<kernel::RunId>,
+}
+
+impl Freezing<'_> {
     /// Puts every segment of a frozen prefix into the store, so the
     /// hashes `prompt_assembled` records can be read back as text.
     ///
@@ -236,7 +228,7 @@ impl RunWorker {
             brief,
             Predecessor {
                 room: &at.addr,
-                run: at.predecessor(),
+                run: at.predecessor().or(self.carried_from),
             },
         )?);
         if let Some(note) = model_note(&self.city_root, &site.provider, &site.model.id)? {
@@ -245,8 +237,21 @@ impl RunWorker {
         Ok(slot)
     }
 
+    /// Freezes what this run is: the plan it drives on, and the handoff
+    /// that says what to read to pick it up again.
+    ///
+    /// One phase because the two are one decision. The prefix is
+    /// assembled for this plan and frozen with it, the handoff quotes
+    /// the plan's own task line, and the job locator ends up in both -
+    /// pinned in the store, so what a resumed run reads is the bytes the
+    /// run segment carried rather than a file somebody edited since.
+    ///
+    /// # Errors
+    /// Propagates a city or run segment that will not read, a norm on
+    /// the must-read list that will not open, a store that will not take
+    /// the bytes, and a handoff the runtime refuses.
     pub(super) fn freeze_plan(
-        &mut self,
+        mut self,
         site: &Site,
         workbench: &Workbench,
         at: &Assignment,
@@ -272,7 +277,7 @@ impl RunWorker {
         // segment is identical for every agent in the city and is
         // cached as such, and a name in it would make one copy per
         // agent of the largest stable block in the prompt.
-        let mut resident = format!("Your name: {}\n\n", name_of(addr)).into_bytes();
+        let mut resident = format!("Your name: {}\n\n", addr.name()).into_bytes();
         resident.extend_from_slice(&site.identity.segment_bytes());
         resident.push(NEWLINE);
         resident.extend_from_slice(
@@ -280,7 +285,6 @@ impl RunWorker {
                 .render()
                 .as_bytes(),
         );
-        let inherited = self.inherited(at, site.run_id)?;
         let prefix = FrozenPrefix::assemble(
             city_segment(&self.city_root)?.freeze(SegmentSlot::City),
             building_segment(&self.city_root, addr, site.building.addr())?
@@ -306,7 +310,8 @@ impl RunWorker {
             job: job.clone(),
             parent: at.parent,
             predecessor: at.predecessor(),
-            inherited,
+            dispatched_by: at.dispatched_by.clone(),
+            inherited: std::mem::take(&mut self.inherited),
             shape: runtime::turn::CallShape {
                 model: site.model.id.clone(),
                 // The model's own ceiling, not a number chosen here.
@@ -322,6 +327,7 @@ impl RunWorker {
                 context_tokens: site.model.context_tokens,
             },
             second_threshold: site.config.second_threshold,
+            context: workbench.context.clone(),
             prefix,
             policy: site.rules.policy().clone(),
             tools,
@@ -337,6 +343,12 @@ impl RunWorker {
         // when the building is laid out, and a model asked to recite the
         // list from memory gets one entry wrong eventually.
         let mut must_read = Vec::new();
+        // Put for this run at this building, so the next session's `read`
+        // judges each norm where it was read from rather than refusing it.
+        let origin = memory::BlockOrigin {
+            run: site.run_id,
+            building: addr.clone(),
+        };
         for norm in city::norms(&self.city_root, addr)? {
             let bytes = std::fs::read(&norm).map_err(|err| {
                 AxError::failure(
@@ -346,25 +358,14 @@ impl RunWorker {
                 )
                 .with_recovery("fix the file's permissions, or remove it from the building")
             })?;
-            let hash = self.cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
+            let hash = self
+                .cas
+                .put_for(&bytes, &origin)
+                .map_err(memory::MemoryError::into_ax)?;
             must_read.push(Locator::cas(hash));
         }
         must_read.push(job);
-        // The address is a pure function of the room and the run, so
-        // the handoff can name the transcript before a turn is taken.
-        // It names the room's file and never the ledger: the ledger is
-        // one chain for the whole city, under a subtree `read` refuses.
-        let transcript = runtime::Transcript::address(addr, site.run_id)?;
-        let handoff = runtime::handoff::Handoff::new(
-            must_read,
-            task_line(&plan),
-            "see the city roadmap".to_owned(),
-            format!(
-                "dispatched from the control surface; transcript at {}",
-                transcript.as_str()
-            ),
-            "resume from the job locator".to_owned(),
-        )?;
+        let handoff = self.frozen_handoff(&plan, must_read)?;
         Ok((plan, handoff))
     }
 }
@@ -374,6 +375,8 @@ impl RunWorker {
 mod inherited;
 mod model_note;
 mod run_slot;
+
+mod frozen_handoff;
 
 #[cfg(test)]
 #[allow(

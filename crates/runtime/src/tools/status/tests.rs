@@ -18,7 +18,6 @@ fn snapshot() -> StatusSnapshot {
         who: "alice".to_owned(),
         addr: Address::parse("work").unwrap(),
         mode: Mode::Up,
-        ctx_used: Tokens::new(1200),
         ctx_limit: Tokens::new(8000),
         trust: "trusted".to_owned(),
         write_domain: "work".to_owned(),
@@ -42,7 +41,7 @@ fn call() -> ToolCall {
 
 #[test]
 fn the_thirteen_fields_report_in_the_frozen_order() {
-    let mut tool = StatusTool::new(snapshot()).unwrap();
+    let tool = StatusTool::new(snapshot()).unwrap();
     let outcome = tool.invoke(&call()).unwrap();
     let value = serde_json::to_value(&outcome.result).unwrap();
     let text = value["text"].as_str().unwrap();
@@ -82,7 +81,7 @@ fn the_thirteen_fields_report_in_the_frozen_order() {
 fn the_children_line_says_where_the_work_went_and_which_kind_of_delegate() {
     let handed = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let seen = std::sync::Arc::clone(&handed);
-    let mut tool =
+    let tool =
         StatusTool::watching(snapshot(), Box::new(move || seen.lock().unwrap().clone())).unwrap();
 
     let before = serde_json::to_value(&tool.invoke(&call()).unwrap().result).unwrap();
@@ -104,27 +103,18 @@ fn the_children_line_says_where_the_work_went_and_which_kind_of_delegate() {
 
 #[test]
 fn the_tool_reports_what_it_was_given_and_never_samples() {
-    let mut tool = StatusTool::new(snapshot()).unwrap();
+    let tool = StatusTool::new(snapshot()).unwrap();
     let first = tool.invoke(&call()).unwrap();
     let second = tool.invoke(&call()).unwrap();
     assert_eq!(
         first.result, second.result,
         "two calls, one turn, one answer"
     );
-
-    let mut next = snapshot();
-    next.provider_mode = ProviderMode::Degraded;
-    next.signals_pending = 0;
-    tool.set_snapshot(next);
-    let after = serde_json::to_value(&tool.invoke(&call()).unwrap().result).unwrap();
-    let text = after["text"].as_str().unwrap();
-    assert!(text.contains("provider_mode: degraded"), "{text}");
-    assert!(text.contains("signals_pending: 0"), "{text}");
 }
 
 #[test]
 fn a_call_for_another_tool_is_refused() {
-    let mut tool = StatusTool::new(snapshot()).unwrap();
+    let tool = StatusTool::new(snapshot()).unwrap();
     let mut wrong = call();
     wrong.name = ToolName::parse("edit").unwrap();
     assert_eq!(

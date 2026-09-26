@@ -24,8 +24,9 @@ use kernel::{Address, AxCode, AxError, NodeId, RunId};
 
 use super::super::{Continuation, Driven, Owed, Owing, RunWorker, Unasked};
 use super::{Driving, lane::DriveContext};
-use crate::serving::pool::{Arrival, DRIVING_LANES, DrivingPool};
-use crate::serving::relay::{Patience, Relay, RelayGate, Wake};
+use crate::assembly::booking::OpenClaims;
+use crate::assembly::pool::{Arrival, DRIVING_LANES, DrivingPool};
+use crate::assembly::relay::{Patience, Relay, RelayGate, Wake};
 
 /// One run in a lane: everything the city does once the drive is home,
 /// and what that landing is owed.
@@ -61,6 +62,13 @@ pub(in crate::assembly) struct Flight {
     /// arrival order. Kept rather than re-queued, so arrival order is
     /// landing order.
     homes: VecDeque<Arrival>,
+    /// One fence at a time per city: a repository has one index, and
+    /// every lane stages and commits it (`driving::lane`).
+    pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    /// What is still running while the runs go on. One table per city,
+    /// and every `exec` gets a handle onto it, so `halt` reaches a
+    /// command without knowing which tool started it.
+    pub(in crate::assembly) backlog: runtime::Backlog,
 }
 
 impl Flight {
@@ -71,6 +79,8 @@ impl Flight {
             gate,
             driving: BTreeMap::new(),
             homes: VecDeque::new(),
+            fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
+            backlog: runtime::Backlog::new(),
         }
     }
 
@@ -79,10 +89,11 @@ impl Flight {
         self.pool.in_flight()
     }
 
-    /// Whether every lane is taken. The concurrency wall a caller reads
-    /// before it prepares work it cannot start.
+    /// Whether a new run waits: every lane is taken, or memory is tight.
+    /// The concurrency wall a caller reads before it prepares work it
+    /// cannot start; the memory is read here, at the moment it decides.
     pub(in crate::assembly) fn full(&self) -> bool {
-        self.pool.full()
+        self.pool.full(crate::monitor::memory::read())
     }
 
     /// The plan rows one pursuit has in lanes: how many, and which
@@ -152,10 +163,14 @@ impl Flight {
             )
             .with_recovery("report this: a lane is entered and recorded together")));
         };
+        // Its landing runs on this thread before the queue is served
+        // again, so no claim is answered between the release and the
+        // plan on disk saying how the run's nodes ended.
         Some(Ok(Home {
             driven,
             continuation,
             owing,
+            open_claims: self.gate.booked.release(run),
         }))
     }
 }
@@ -165,6 +180,7 @@ struct Home {
     driven: Result<Driven, AxError>,
     continuation: Continuation,
     owing: Owing,
+    open_claims: OpenClaims,
 }
 
 impl RunWorker {
@@ -196,22 +212,65 @@ impl RunWorker {
         let Some(arrival) = self.flight.arrived() else {
             return Ok(Landed::Nothing);
         };
+        // A lane has just come home, so the work waiting for one starts
+        // before this run is landed (sprawling-SPEC.md 8-46-2).
+        for (run, err) in self.flight.pool.start_waiting() {
+            self.note(
+                runtime::diagnostics::Level::Refuse,
+                "bin::assembly",
+                &format!(
+                    "{run} waited for a lane and could not start: {}",
+                    err.subject()
+                ),
+            );
+            if let Some(lane) = self.flight.driving.remove(&run) {
+                self.hand_back(&lane.owing.reply(), err);
+            }
+        }
         let Home {
             driven,
             continuation,
             owing,
+            mut open_claims,
         } = arrival?;
         // Read before the obligation is spent, because a successor
         // takes it over and the refusal below still has to reach the
         // person who asked for the run this one replaced.
         let reply = owing.reply();
-        match self.land(continuation, driven, owing) {
-            Ok(landed) => Ok(landed),
+        let landed = self.land(continuation, driven, owing, &mut open_claims);
+        let given_back = self.give_back_claims(open_claims);
+        match landed {
+            Ok(landed) => {
+                given_back?;
+                self.advance_pursuits(&landed);
+                Ok(landed)
+            }
             Err(err) => {
+                if let Err(lost) = given_back {
+                    self.note(
+                        runtime::diagnostics::Level::Refuse,
+                        "bin::assembly::booking",
+                        &format!("a claim of a run whose landing failed stays open: {lost}"),
+                    );
+                }
                 self.hand_back(&reply, err.clone());
                 Err(err)
             }
         }
+    }
+
+    /// Writes the lines that give back every node a run still had booked
+    /// when its landing ended without settling its plan: the claim went
+    /// on the history at call time, so only this closes it
+    /// (sprawling-SPEC.md 8-42-8).
+    ///
+    /// # Errors
+    /// Propagates the first line the ledger refuses.
+    fn give_back_claims(&mut self, open_claims: OpenClaims) -> Result<(), AxError> {
+        let (run, put_backs) = open_claims.owed();
+        put_backs
+            .into_iter()
+            .try_for_each(|line| self.record_for(run, line))
     }
 
     /// A write face issued by the same gate the lanes write through, for
@@ -309,10 +368,12 @@ impl RunWorker {
             origin: None,
             session: None,
             effort: None,
+            model: None,
             mode: kernel::Mode::PlanGoal,
             parent: None,
             succession: None,
             taint: because.taint(),
+            dispatched_by: kernel::event::Who::City,
         };
         let reason = because.because();
         match self.dispatch_into_lane(at, task, goal, Owing::unasked(because)) {

@@ -7,17 +7,17 @@
 
 use kernel::{AxError, Completion, RunId};
 
-use crate::effect;
+use accounting::effect;
 
 use super::super::{
     Assignment, Dispatched, Ending, Handover, Landed, Owed, Owing, RunWorker, Site, held,
 };
-use super::desks::write_plan;
 
 /// The action an `AxError` names when one of the two hand-down desks
 /// cannot be read. Written here rather than at the call site, where the
 /// arm it sits in has no room for it.
 const DELEGATE_DESK: &str = "read the delegate desk";
+const WORKSHOP_DESK: &str = "read the workshop desk";
 const SUCCESSION_DESK: &str = "read the succession desk";
 
 /// Who raised what, and where. The four travel together because an
@@ -39,13 +39,26 @@ impl RunWorker {
         at: &Assignment,
         run: RunId,
         landing: effect::Landing,
-        conversations: u32,
+        chain: &super::super::KnockChain,
     ) -> Result<(), AxError> {
         let then = landing.record(&mut |line: effect::Line| self.record_for(run, line))?;
+        self.carry_out_landing(at, then, chain)
+    }
+
+    /// Carries out what a landing's lines, already on the ledger, ask of
+    /// the city outside it. A caller that must act between the two — the
+    /// plan desk closes its claims once their closing lines are written —
+    /// records the landing itself and then calls this.
+    pub(in crate::assembly) fn carry_out_landing(
+        &mut self,
+        at: &Assignment,
+        then: effect::Then,
+        chain: &super::super::KnockChain,
+    ) -> Result<(), AxError> {
         match then {
             effect::Then::Nothing => Ok(()),
             effect::Then::Deliver(signals) => {
-                let knocks_mark = self.knocks.len();
+                let knocks_mark = self.doorstep.knocks.len();
                 let outcome = (|| {
                     for signal in &signals {
                         // The room table decides what a delivery means,
@@ -54,13 +67,13 @@ impl RunWorker {
                         // spelled once, there, because the line is
                         // already on the ledger and a line no queue
                         // holds is a torn city.
-                        self.rooms.deliver(signal)?;
+                        self.collaborating.rooms.deliver(signal)?;
                         // Somebody was spoken to. Whether that starts a run
                         // is decided in one place, so that the two ways of
                         // reaching a resident stay one decision. The
                         // speaking run's place in the conversation rides on,
                         // so the knock this queues is one hop further in.
-                        self.knock(signal, &at.addr, at.mode, conversations)?;
+                        self.knock(signal, &at.addr, at.mode, chain)?;
                     }
                     Ok(())
                 })();
@@ -72,29 +85,19 @@ impl RunWorker {
                         // are cut back to the mark. Delivered signals stay
                         // delivered — the queue has no recall — and the
                         // ledger says exactly which ones those are.
-                        self.knocks.truncate(knocks_mark);
+                        self.doorstep.knocks.truncate(knocks_mark);
                         Err(err)
                     }
                 }
             }
             effect::Then::Hold(entries) => {
-                self.goals.extend(entries);
+                self.collaborating.goals.extend(entries);
                 Ok(())
             }
-            effect::Then::Roadmap { path, text } => {
-                let before = std::fs::read_to_string(&path).ok();
-                // The rollback is best effort by construction: the
-                // error a person must see is the one from the write,
-                // and a rollback that also failed cannot be reported
-                // here without replacing it.
-                write_plan(&path, &text).inspect_err(|_| match before {
-                    Some(text) => {
-                        drop(std::fs::write(&path, text));
-                    }
-                    None => {
-                        drop(std::fs::remove_file(&path));
-                    }
-                })
+            // The replacement is whole or not at all, so a refusal
+            // leaves the file at `base` with nothing to roll back.
+            effect::Then::Roadmap { path, base, text } => {
+                (self.planning.write_plan)(&path, base.as_bytes(), text.as_bytes())
             }
             effect::Then::Shelf(filings) => {
                 let mut written = Vec::new();
@@ -150,6 +153,7 @@ impl RunWorker {
             driven,
             mut raised,
             delegates,
+            workshop,
             succession,
             owing,
         } = ending;
@@ -213,6 +217,13 @@ impl RunWorker {
         // what makes that reachable: a cancel arriving after the last
         // wave used to have no boundary left to land on, so work asked
         // for by a turn nobody wanted started anyway.
+        // The graph this run laid out stays with the room, so a node's
+        // handback hands the next ones down after this run is over. A
+        // cancelled run's graph goes with the nodes it did not hand down.
+        let laid_out = held(workshop, WORKSHOP_DESK)?.take_underway();
+        if let (Some(underway), Completion::Done(_) | Completion::Limit) = (laid_out, &ending) {
+            self.collaborating.workshops.insert(addr.clone(), underway);
+        }
         let handed = match ending {
             Completion::Cancelled => Vec::new(),
             Completion::Done(_) | Completion::Limit => held(delegates, DELEGATE_DESK)?.take(),
@@ -239,11 +250,13 @@ impl RunWorker {
                     addr: work.room,
                     session: None,
                     effort: None,
+                    model: None,
                     mode: at.mode,
                     origin: None,
                     parent: Some(run_id),
                     succession: None,
                     taint: at.taint.clone(),
+                    dispatched_by: kernel::event::Who::resident(addr.clone())?,
                 },
                 work.task,
                 work.goal,
@@ -294,7 +307,10 @@ impl RunWorker {
             // before it goes, so the successor's answers have something
             // to be compared with. Nobody discovers decay otherwise
             // until the third succession.
-            let before = self.probe_before(adapter.as_deref_mut(), &frozen, &who)?;
+            let before = self.probe_before(adapter.as_mut(), &frozen, &who)?;
+            if let Some(door) = adapter {
+                self.warm.keep(addr.clone(), door);
+            }
             let plan = frozen.plan();
             // **The obligation moves with the work.** A successor is the
             // same piece of work carrying on, so whoever was owed the
@@ -306,6 +322,7 @@ impl RunWorker {
                     addr: addr.clone(),
                     session: None,
                     effort: None,
+                    model: None,
                     mode: at.mode,
                     origin: None,
                     parent: at.parent,
@@ -314,6 +331,7 @@ impl RunWorker {
                         before,
                     }),
                     taint: at.taint.clone(),
+                    dispatched_by: kernel::event::Who::resident(addr.clone())?,
                 },
                 plan.task.clone(),
                 plan.goal.clone(),
@@ -321,8 +339,14 @@ impl RunWorker {
             )?;
             return Ok(Landed::Elsewhere);
         }
+        // What this run sent stays warm for the room's next run
+        // (sprawling-SPEC 8-93).
+        if let Some(door) = adapter {
+            self.warm.keep(addr.clone(), door);
+        }
         self.discharge(
             owing,
+            at,
             &Dispatched {
                 run: run_id,
                 addr,
@@ -341,7 +365,12 @@ impl RunWorker {
     ///
     /// # Errors
     /// Propagates a handback the parent's room will not take.
-    fn discharge(&mut self, owing: Owing, done: &Dispatched) -> Result<Landed, AxError> {
+    fn discharge(
+        &mut self,
+        owing: Owing,
+        at: &Assignment,
+        done: &Dispatched,
+    ) -> Result<Landed, AxError> {
         match owing.owed() {
             Owed::Asked => Ok(Landed::Elsewhere),
             // Nobody typed a command for this one, so the history is
@@ -362,7 +391,15 @@ impl RunWorker {
             }),
             Owed::Child { parent } => {
                 let parent = parent.clone();
-                self.deliver_handback(&parent, done)?;
+                let handback = self.deliver_handback(&parent, done)?;
+                self.hand_down_what_is_ready(&parent, at, &owing)?;
+                // The asker is woken by the decision every signal takes,
+                // once its graph has nothing left out: each node that is
+                // still out comes back on its own (sprawling-SPEC.md
+                // 8-46-12).
+                if !self.collaborating.workshops.contains_key(&parent) {
+                    self.knock(&handback, &done.addr, at.mode, owing.knock_chain())?;
+                }
                 Ok(Landed::Elsewhere)
             }
         }

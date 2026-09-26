@@ -18,9 +18,9 @@
 )]
 
 use super::super::*;
+use crate::assembly::CommandDesk;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
-use crate::serving::CommandDesk;
 
 #[test]
 fn a_socket_that_carried_no_request_spends_no_scripted_reply() {
@@ -104,6 +104,7 @@ fn a_dispatch_runs_a_whole_turn_loop_and_the_chain_still_verifies() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -220,6 +221,7 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -307,6 +309,7 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let kinds = seen

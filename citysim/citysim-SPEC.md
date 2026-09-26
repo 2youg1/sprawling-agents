@@ -110,7 +110,7 @@ pub struct ScenarioReport { pub lines: Vec<Vec<u8>>, pub completion: &'static st
 pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError>;
 ```
 
-- 事件序（无取消正常收束）：`checkpoint_committed`（JOB.md 先落）→ `run_started` → 每回合 `prompt_assembled→model_called→model_returned[→tool_called→tool_result]*` → 空 calls 回合后 `handoff_written` → `run_frozen{completion:done, evidence:[末 model_returned]}`。
+- 事件序（无取消正常收束）：`checkpoint_committed`（JOB.md 先落）→ `run_started` → `prompt_assembled`（每 run 一条，runtime-SPEC §8-39 第 5 条）→ 每回合 `prompt_shape_compared→model_called→model_returned[→tool_called→tool_result]*` → 空 calls 回合后 `handoff_written` → `run_frozen{completion:done, evidence:[末 model_returned]}`。
 - 取消在指定边界注入 `Interrupt::Cancel`：事件序断言＝cancel_received 后无新 model_called/tool_called，恒有 handoff_written 先于 run_frozen（A9 先行，逐边界三剧本）。
 - `budget_turns` 是执行器的回合上限（到限即 `run_frozen{completion:limit}`）：真预算梯随 gate 挂剧本接入。
 
@@ -227,13 +227,16 @@ pub fn first_byte(binary: &Path, city: &Path, samples: usize) -> Result<Samples,
 
 ### 8-6 负载场景骨架与读数行（bench，T13 第一段）
 
-四个负载场景各一个一键复测的 bench 场景：多 run 并行（`multi_run_parallel`）、大账本 fold（`large_ledger_fold`）、大 worktree 放置（`large_worktree_placement`）、长会话流式转发（`long_session_forwarding`）。测量面仍是既有那一家：`just bench`（本 crate 的 bench Main）产读数，`xtask/budgets.toml` 记基线行，不另造仪表。剧本执行器继续用计数时钟；本 crate 内凡计时都住在 bench Main 的模块树里，采样点仍是 `bench::stamp()` 那一个。
+四个负载场景都由 `just bench` 一键复测。其中三个是本 crate bench Main 的场景：大账本 fold（`large_ledger_fold`）、大 worktree 放置（`large_worktree_placement`）、长会话流式转发（`long_session_forwarding`）。第四个，多 run 并行，由 `sprawling` 的 `instrument_relay_round_trip` 量（sprawling-SPEC 8-84）：它驱动城里在跑的那个记账循环 `attend`，`just bench` 在本 crate 那一行之后跑它。bench Main 产读数，`xtask/budgets.toml` 记基线行，不另造仪表。剧本执行器继续用计数时钟；本 crate 内凡计时都住在 bench Main 的模块树里，采样点仍是 `bench::stamp()` 那一个。
+五个负载场景各一个一键复测的 bench 场景：多 run 并行（`multi_run_parallel`）、大账本 fold（`large_ledger_fold`）、大 worktree 放置（`large_worktree_placement`）、再领一棵留着的 worktree（`kept_worktree_reclaim`）、长会话流式转发（`long_session_forwarding`）。测量面仍是既有那一家：`just bench`（本 crate 的 bench Main）产读数，`xtask/budgets.toml` 记基线行，不另造仪表。剧本执行器继续用计数时钟；本 crate 内凡计时都住在 bench Main 的模块树里，采样点仍是 `bench::stamp()` 那一个。
 
 读数形（`bench::reading`，shape 2 value，一次构造点）：
 
 ```rust
 pub enum MachineClass { General }   // 参照类属：盘、内存、CPU 均为一般水平
-pub enum Load { MultiRunParallel, LargeLedgerFold, LargeWorktreePlacement, LongSessionForwarding }
+pub enum Load { LargeLedgerFold, LargeWorktreePlacement, LongSessionForwarding }
+pub enum SubMetric { Harness, Whole }
+pub enum Load { MultiRunParallel, LargeLedgerFold, LargeWorktreePlacement, KeptWorktreeReclaim, LongSessionForwarding }
 pub enum SubMetric { Harness, Persist, Whole }
 pub struct Reading { /* load, sub, machine, samples, p50, p95, p99 */ }
 impl Reading {
@@ -249,18 +252,17 @@ impl Reading {
 
 `floor_us` 是最小样本：机器安静时这条路径本身要花多少。它与 `p50_us` 并列，因为两者回答的不是一个问题——floor 贴着设计的下限，p50 带着机器的其余负载——而挂钟读数不设棘轮，两者就都得留在读数里，下一个读者才分得清一次回归是设计变慢了还是机器变忙了。
 
-`machine_class` 是读数自带的字段而非行头批注：异类机器的读数不与参照类属同表比较。口径是 harness 自身路径的处理耗时（测量机的类属见 `machine_class`）——不含动画时长、不含网络传输。`SubMetric` 三值把定标拆开计：
+`machine_class` 是读数自带的字段而非行头批注：异类机器的读数不与参照类属同表比较。口径是 harness 自身路径的处理耗时（测量机的类属见 `machine_class`）——不含动画时长、不含网络传输。`SubMetric` 两值把定标拆开计：
 
 | 子指标 | 量的是什么 | 对它定档的是什么 |
 |---|---|---|
 | `harness` | harness 纯开销，路径下无持久化提交 | 两档延迟目标（第一档 p95、第二档 p99，值住 `[local_latency]` 行，第二档严于并覆盖第一档） |
-| `persist` | 同一路径带耐久提交 | 盘的物理下限，不是延迟档 |
 | `whole` | 路径本体就是盘上作业、缝口不拆的（worktree 放置） | 无 |
 
 场景（`bench::scenarios`，shape 4 adapter，套在产品公共面上，无自有政策）：
 
 ```rust
-pub struct Fixture { /* lanes, records_per_lane, fold_records, fold_rounds,
+pub struct Fixture { /* fold_records, fold_rounds,
                        tree_files, tree_file_bytes, placements, forward_events */ }
 pub const REGISTERED: Fixture = Fixture { … };   // 既定负载：读数只在该 fixture 内可比，只降不升
 pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
@@ -269,9 +271,9 @@ pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
 
 | 场景 | 驱动的公共面 | 子指标 |
 |---|---|---|
-| `multi_run_parallel` | `kernel::Ledger` 端口（MemLedger 与 JsonlLedger 两个适配器各跑一遍），数条 lane 经 mpsc 汇到一个 accounting thread | `harness`＋`persist` |
 | `large_ledger_fold` | `sprawling::ask`，重建每个视图的生产全路径 | `harness` |
 | `large_worktree_placement` | `memory::Checkpoint::ensure_base` 之后 `Worktrees::claim`／`release` | `whole` |
+| `kept_worktree_reclaim` | 同一座城里同一个节点的第二次及以后的 `Worktrees::claim`，其间干线不动（memory-SPEC 8-9 的再领） | `whole` |
 | `long_session_forwarding` | `channels::ServerFrame::Event` 装帧＋序列化，即 socket 之前的本地半段 | `harness` |
 
 失败出口：域错误按其 `AxError`（动作/主体/稳定码/恢复语）格式化成一行；bench 自身的失败（零样本）构造 `AxError::failure(AxCode::InvalidArgs, …)`＋`with_recovery`，不新增码（§9-16 的口径）；Main 打 `bench failed: …` 且退出非零（既有形）。
@@ -282,7 +284,9 @@ pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
 
 **B（落选）：像体积那样把延迟读数设门（超标即 CI 红）。** 落选理由：同一处定规写着「gating them would make a busy runner look like a defect」（budgets.toml 头注与 ARCHITECTURE §11 同句）；读数回归由棘轮纪律与单独提交的放宽手续治理，不由 CI 红绿治理。
 
-**红**：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 字段；`the_four_load_scenarios_rerun_and_emit_the_stable_format`——四个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）。
+**红**：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 字段；`every_load_scenario_reruns_and_emits_the_stable_format`——本 crate 的每个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）。
+
+**多 run 并行不在本 crate 里量。** relay、`serve_flight` 与 desk 都是 `sprawling` 的 `pub(crate)`，本 crate 够不到，这里的场景只能抄一份 relay 的形状：数条 lane 经 mpsc 汇到一条线程，计时只包住那条线程上的一次 `append`。抄件量的是抄件：它的 `harness` 是 MemLedger 一次追加（5 µs 量级），而一次往返的代价取决于生产循环怎么等，抄件没有那份等法，也就量不到它；它的 `persist` 每条一道屏障，生产的 `append_all` 一批一道；盘的份额由那件仪表 `store=disk` 与 `store=memory` 两行之差读出，所以 `SubMetric` 没有 `persist`。**败给的方案**：给 `sprawling` 开一扇公共门让本 crate 驱动 `serve_flight`。那扇门没有生产调用者，而仪表放在 crate 内已经能驱动生产循环本身（sprawling-SPEC 8-84 的决定）。
 
 ### 8-7 红队：有无验证 run 两臂的结论质量（`citysim::red_team`）
 

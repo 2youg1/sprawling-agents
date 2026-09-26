@@ -41,6 +41,7 @@ fn a_handoff_that_cannot_be_read_is_refused_by_name() {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"handoff"),
         session: None,
         effort: None,
+        model: None,
     });
 
     let err = outcome.expect_err("an unreadable handoff is not an absent one");
@@ -87,6 +88,7 @@ fn work_offered_in_up_mode_without_a_test_does_not_land() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     drop(provider);
@@ -136,6 +138,7 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -167,6 +170,28 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
         .as_array()
         .expect("the handoff carries its must-read list");
     assert_eq!(must_read.len(), 3, "city, building, job: {must_read:?}");
+
+    // Every stored entry of that list is pinned to the room the run
+    // works in, so `read` there admits it instead of refusing a block
+    // with no origin.
+    let unreadable: Vec<String> = must_read
+        .iter()
+        .filter_map(|entry| kernel::Locator::parse(entry.as_str()?).ok())
+        .filter_map(|locator| match locator {
+            kernel::Locator::Cas { hash, .. } => Some(hash),
+            _ => None,
+        })
+        .filter(|hash| {
+            !worker
+                .cas
+                .origins(hash)
+                .unwrap()
+                .iter()
+                .any(|origin| origin.building == room)
+        })
+        .map(|hash| hash.to_string())
+        .collect();
+    assert_eq!(unreadable, Vec::<String>::new(), "{must_read:?}");
 }
 
 /// The prefix carries what it tells the agent to read.
@@ -205,6 +230,7 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     drop(provider);
@@ -257,5 +283,139 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
             .permissions()
             .readonly(),
         "a transcript is history: nobody edits it in place"
+    );
+}
+
+/// Rebuilding a branch's conversation reads the mother's own lines, not
+/// the history: the history was verified when the city opened, and a
+/// rebuild that verified it again would cost the whole ledger on every
+/// branch.
+///
+/// A chain broken after genesis is the witness: a verify refuses it, and
+/// the rebuild, which never reads that line, inherits as it would from an
+/// intact ledger.
+#[test]
+fn inheriting_a_branch_does_not_verify_the_history() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, _provider) =
+        fake_openai(&["m-local"], vec![completion("the meter says 42", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room2").unwrap(),
+            task: "mother".to_owned(),
+            goal: "a number is written down".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
+    let origin = verified
+        .lines()
+        .iter()
+        .find_map(|line| match line {
+            runtime::replay::VerifiedLine::Known { record, .. }
+                if record.kind() == EventKind::RunStarted =>
+            {
+                Some(kernel::Origin {
+                    run: record.run(),
+                    at_seq: record.seq(),
+                })
+            }
+            runtime::replay::VerifiedLine::Known { .. }
+            | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
+        })
+        .expect("the mother ran");
+    let at = Assignment {
+        addr: Address::parse("lab/room1").unwrap(),
+        session: None,
+        effort: None,
+        model: None,
+        mode: kernel::Mode::PlanGoal,
+        parent: None,
+        succession: None,
+        taint: kernel::TaintSet::empty(),
+        dispatched_by: kernel::event::Who::Person,
+        origin: Some(origin),
+    };
+
+    break_the_chain_after_genesis(dir.path());
+
+    let inherited = worker.inherited(&at, RunId::from_bytes([7; 16]));
+    assert!(
+        inherited
+            .as_ref()
+            .is_ok_and(|messages| !messages.is_empty()),
+        "a branch rebuild verified the history, or inherited nothing: {inherited:?}"
+    );
+}
+
+/// The handoff a run is frozen with is the one its room holds: the
+/// sections the last session wrote, and the file's own bytes pinned as
+/// something the successor must read, rather than a line that points at
+/// a roadmap the file never mentioned.
+#[test]
+fn the_frozen_handoff_carries_the_rooms_own_sections_and_pins_its_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+    let written = "# Handoff - lab/room1\n\n<must-read>\nlab/room1/probe.log, the last reading\n</must-read>\n\n\
+                   <overall>\nMeasure the drift of the probe.\n</overall>\n\n\
+                   <current-progress>\nThree of five readings taken.\n</current-progress>\n\n\
+                   <context>\nThe second sensor is broken; ignore it.\n</context>\n\n\
+                   <next-step>\nTake reading four.\n</next-step>\n";
+    std::fs::write(city::handoff_path(dir.path(), &room), written).unwrap();
+    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: room,
+            task: "measure the thing".to_owned(),
+            goal: "a number with a unit, then stop".to_owned(),
+            model: None,
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+    drop(provider);
+
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let handoff = verified
+        .raw_lines()
+        .iter()
+        .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+        .find(|value| value["kind"] == "handoff_written")
+        .expect("a run that freezes writes its handoff");
+    let data = &handoff["data"];
+    let pinned = kernel::B3Hash::digest(written.as_bytes()).to_string();
+    assert_eq!(
+        (
+            data["overview"].as_str(),
+            data["progress"].as_str(),
+            data["next_step"].as_str(),
+            data["context"]
+                .as_str()
+                .is_some_and(|context| context.contains("The second sensor is broken")),
+            data["must_read"]
+                .as_array()
+                .is_some_and(|list| list.iter().any(|entry| entry.to_string().contains(&pinned))),
+        ),
+        (
+            Some("Measure the drift of the probe."),
+            Some("Three of five readings taken."),
+            Some("Take reading four."),
+            true,
+            true,
+        ),
+        "{data}"
     );
 }

@@ -53,6 +53,7 @@ impl RunWorker {
         asked: Asked,
         reply: channels::Reply,
     ) -> Result<(), AxError> {
+        self.room_for_new_work()?;
         self.dispatch_into_lane(at, asked.task, asked.goal, Owing::asked(reply))
             .map(drop)
     }
@@ -77,6 +78,7 @@ impl RunWorker {
                 mode,
                 session,
                 effort,
+                model,
                 ..
             } => self.dispatch_asked(
                 Assignment {
@@ -87,10 +89,12 @@ impl RunWorker {
                     addr,
                     session,
                     effort,
+                    model,
                     mode,
                     parent: None,
                     succession: None,
                     taint: kernel::TaintSet::empty(),
+                    dispatched_by: kernel::event::Who::Person,
                 },
                 Asked { task, goal },
                 reply,
@@ -179,6 +183,7 @@ impl RunWorker {
             channels::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
             }
+            channels::Command::RemoveBuilding { addr, .. } => self.remove_building(&addr),
             channels::Command::Approve { item, verdict, .. } => {
                 // The control surface is the person's entrance, so the
                 // answerer is a human here by construction. A resident
@@ -220,6 +225,9 @@ impl RunWorker {
             } => self.put_spine(at, which, base, body),
             channels::Command::Halt { scope, .. } => self.set_admission(&scope, Admittance::Halted),
             channels::Command::Reveal { at, .. } => crate::revealing::reveal(&self.city_root, &at),
+            channels::Command::RestoreDiscard {
+                ref restoration, ..
+            } => self.restore_discard(restoration),
             channels::Command::DoctorInstall { ref item, .. } => self.doctor_install(item),
             channels::Command::DoctorRefresh { .. } => {
                 self.look_at_this_machine();

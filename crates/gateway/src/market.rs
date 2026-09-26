@@ -11,25 +11,12 @@
 use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, Ceiling, UsdMicros};
-use serde::{Deserialize, Serialize};
 
-/// What a model accepts as input.
-///
-/// A closed judgement rather than a set of flags: every row answers it,
-/// and the answer decides whether a picture may be sent at all. The
-/// default is the narrow one, because guessing narrow costs a refusal a
-/// person can act on and guessing wide costs a 400 from the provider.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum InputKinds {
-    #[default]
-    Text,
-    TextImage,
-}
+pub use kernel::event::record::InputKinds;
 
 /// One catalog row. Prices are USD micros per one million tokens —
 /// integers end to end (decision paths ban floats).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModelEntry {
     pub id: String,
     pub context_tokens: u64,
@@ -51,6 +38,23 @@ pub struct ModelEntry {
     pub output_price: UsdMicros,
     pub cache_read_price: UsdMicros,
     pub cache_write_price: UsdMicros,
+}
+
+impl ModelEntry {
+    /// Whether this row names any price at all. A row whose four prices
+    /// are zero is what the pick point writes for a model the catalogue
+    /// does not know, and what a local model carries; neither is a
+    /// measured price of zero.
+    pub fn states_a_price(&self) -> bool {
+        [
+            self.input_price,
+            self.output_price,
+            self.cache_read_price,
+            self.cache_write_price,
+        ]
+        .iter()
+        .any(|price| price.get() > 0)
+    }
 }
 
 /// A versioned snapshot; lookups are by provider model id.

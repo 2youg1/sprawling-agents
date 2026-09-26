@@ -57,9 +57,8 @@ Signal｜Inbox｜Steer｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitrati
 ### 8-1 collab::inbox（形状 2 值类型＋形状 7 投影）
 
 ```rust
-pub struct SignalId(String);                       // 非空、无空白；去重的依据；serde 经 parse／as_str
-pub enum SignalKind { Mention, Thread, Broadcast, Steer }   // serde 经 parse／as_str，四个线上词只一处
-pub enum Lane { Urgent, Ordinary }                 // 由 kind 推出，不由调用方给
+// SignalId、SignalKind、Lane 与两条线的载荷 SignalEnqueued／SignalConsumed 住 kernel::event::record
+// （kernel-SPEC §8-4）：它们是 Ledger 行的形状，折叠与视图不经 collab 也要读
 pub struct Signal { /* id、kind、from、room、room_version、payload、at —— 私有 */ }
 impl Signal {
     pub fn new(id: SignalId, kind: SignalKind, from: String, room: Address,
@@ -68,10 +67,6 @@ impl Signal {
     pub fn enqueued_payload(&self) -> Result<Payload, AxError>;   // signal_enqueued
     pub fn consumed_payload(&self, by: &str) -> Result<Payload, AxError>;   // signal_consumed
     pub fn from_payload(payload: &Payload) -> Result<Signal, AxError>;      // enqueued_payload 的逆
-}
-pub struct SignalConsumed { pub id: SignalId, pub by: String }   // signal_consumed 的键，唯一权威
-impl SignalConsumed {
-    pub fn from_payload(payload: &Payload) -> Result<SignalConsumed, AxError>;
 }
 pub struct Inbox { /* 两条 memory::EventQueue＋bandwidth —— 私有 */ }
 impl Inbox {
@@ -92,7 +87,7 @@ impl Inbox {
 - **pull bandwidth 在接收方**：发送方推不动接收方的上下文窗口；一次 `pull` 最多取 bandwidth 件，Signal 在 prefix 里恒占零字节，常驻的只是 `status` 的 `signals_pending`。
 - **洪水交给 backpressure**：`deliver` 返回 `kernel::Admission`，削峰判定住 `kernel::backpressure`，计数住队列；本模块不自定义第二套限流。
 - **`E_SIGNAL_UNKNOWN` 已定义掉**：本模块自写自读载荷，kind 是穷尽枚举，一个本版本不认的 kind 只能来自更新的二进制写的 Ledger，而那已由版本方向门（`E_LOG_VERSION_UNSUPPORTED`）拒在外面；同一句话里不认的 kind 在本版本写入面也拼不出来（`SignalKind::parse` 拒它，报 `E_INVALID_ARGS`）。实测佐证：删除前全仓只有 `kernel::error` 自己提到它，零生产者。实施：删 `AxCode::SignalUnknown`，AxCode 36 → 35，kernel-SPEC §8-1 表随之删行。
-- **两条线上形状各有一个 serde 结构（7.7）**：`signal_enqueued` 的七个键住私有的 `SignalLine`，`signal_consumed` 的两个键住 `SignalConsumed`，写经 `Payload::of`、读经 `Payload::read`。此前同一批键在本文件里手拼一遍又手挑一遍，`lane` 的两个词也另拼一处。`lane` 仍然写出去给 crate 外的读者，但**回读时不采信**——它由 `kind` 推出，读一份存下来的副本就会让一条行说它走了另一条 lane。写在旧行上的读法不变：`lane` 缺席即照旧推出。
+- **两条线上形状各有一个 serde 结构（7.7）**：`signal_enqueued` 的键住 kernel 的 `SignalEnqueued`，`signal_consumed` 的两个键住 kernel 的 `SignalConsumed`，写经 `Payload::of`、读经 `Payload::read`，与其余 EventKind 的载荷同住一处；`Lane` 的推导（`Signal::lane`）留在本 crate。`lane` 仍然写出去给 crate 外的读者，但**回读时不采信**——它由 `kind` 推出，读一份存下来的副本就会让一条行说它走了另一条 lane。写在旧行上的读法不变：`lane` 缺席即照旧推出。
 - **`Signal::from_payload` 是 `enqueued_payload` 的逆**：没有它，投影重建就要在仓库里长出第二份 Signal 解析器。重建方式是**先筛后送**：从 Ledger 收齐 `signal_enqueued` 与 `signal_consumed` 两组 id，只把未被消费的按原序 `deliver` 一遍——于是队列不需要「按 id 删除」这个不属于队列的动作。
 
 ### 8-2 collab::steer（形状 2 值类型）
@@ -144,7 +139,19 @@ impl Workshop {
     pub fn schedule(&self) -> Vec<NodeId>;                                  // 确定性：同图同序
     pub fn ready(&self, done: &BTreeSet<NodeId>) -> Vec<NodeId>;            // 可并行者即扇出
 }
+pub struct LaidOut { pub schedule: Vec<NodeId>, pub handed: Vec<NodeId>, pub waiting: Vec<NodeId> }
+// collab::workshop::underway —— 形状 1 数据
+pub struct Underway { /* workshop、handed: BTreeSet<NodeId> —— 私有 */ }
+impl Underway {
+    pub fn new(workshop: Workshop, handed: BTreeSet<NodeId>) -> Underway;  // handed：这个房间此前已派出的节点
+    pub fn hand_next(&mut self, done: &BTreeSet<NodeId>) -> Result<Vec<Delegated>, AxError>; // ready(done) 减去已派集，记为已派
+    pub fn handed(&self) -> &BTreeSet<NodeId>;
+    pub fn schedule(&self) -> Vec<NodeId>;
+    pub fn is_joined(&self, done: &BTreeSet<NodeId>) -> bool;             // 每个节点都已汇合
+}
 ```
+
+- **`Underway` 是一张图加上它的已派集**：一个节点在「就绪」与「已汇合」之间是「在飞」，只看 `done` 分不出它与「未派」。`hand_next` 只交出就绪且未派过的节点，所以同一个节点不会因为图被再摆一次、或者两个 handback 先后到达而被派两次。
 
 - **调度确定性是判负与重放的前提**：有序集合＋按 id 破平，故交付顺序不同也排出同一序。环在构造点拒并点名——一个存在的 Workshop 是一个跑得完的 Workshop。
 - **契约即 JOB.md**：被派入节点的 Agent 的任务权威就是这份契约本身，机制在 prefix 零常驻。
@@ -155,11 +162,12 @@ impl Workshop {
 ### 8-4b collab::workshop_tool（形状 4 适配器）
 
 ```rust
-pub struct WorkshopDesk { /* who、laid_out: Option<Workshop>、joined: FanIn —— 私有 */ }
+pub struct WorkshopDesk { /* who、handed: BTreeSet<NodeId>、underway: Option<Underway>、joined: FanIn —— 私有 */ }
 impl WorkshopDesk {
-    pub fn new(who: String, joined: FanIn) -> WorkshopDesk;
+    pub fn new(who: String, joined: FanIn, handed: BTreeSet<NodeId>) -> WorkshopDesk;
     pub fn lay_out(&mut self, contracts: Vec<NodeContract>, delegates: &mut DelegateDesk)
-        -> Result<Vec<NodeId>, AxError>;         // 按 schedule 序逐个走派生台
+        -> Result<LaidOut, AxError>;             // 只派 Underway::hand_next(已汇合的节点)，按 id 序
+    pub fn take_underway(&mut self) -> Option<Underway>;   // 装配层在 run 结束时收走，按房间保存
     pub fn question(&self) -> Result<PrivateQuestion, AxError>;
     pub fn judge(&self, answer: &str) -> Result<Joined, AxError>;
     pub fn accept(&mut self, artifact: Artifact);
@@ -170,9 +178,11 @@ pub struct WorkshopTool { /* 模型那一面：op ∈ {lay_out, question, judge}
 - **workshop 是派生的扇出，不是第二条派生通路**：每个节点都过 `DelegateDesk::ask`，故一层深与人的准入两道门是同一段代码。工具的 `Effect` 也是 `Spawn`——摆一张图与派一个人，对人来说是同一个问题。
 - **节点的 `JOB.md` 就是契约本身**（`NodeContract::job_text`），不写摘要：摘要即第二个权威。
 - **节点 id 就是它的房间地址**，与 `Handback::node()` 同一取法；于是一个节点的身份只有一处。
-- **图先自证可跑，再交出去**：`Workshop::new` 在构造点拒重名／悬空依赖／环，故「半张图已派出去、剩下的没人起」这种状态拼不出来。
+- **图先自证可跑，再交出去**：`Workshop::new` 在构造点拒重名／悬空依赖／环，故一张图若有节点没派出去，原因只能是它的依赖还没汇合，不会是图本身跑不完。
+- **只派就绪集，`depends_on` 在运行时生效**：`lay_out` 交给派生台的是 `Underway::hand_next(done)`，即 `Workshop::ready(done)` 中这个房间尚未派过的节点，`done` 是这个房间的 join 已收下 Artifact 的节点。一个依赖未汇合的节点若也立刻派出，它读到的是还不存在的产出。工具的回答里 `schedule` 是整张图的序，`handed` 是这次真正派出去的那一组，其余节点在 `waiting` 里。
+- **下一组就绪集在 handback 到达时派出**：`lay_out` 摆出的 `Underway` 在 run 结束时由装配层收走，与这个房间的 join 并排按房间保存（`Collaborating.workshops`）。一个节点的 handback 汇入父房间的 join 之后，装配层对同一个 `Underway` 调 `hand_next`，新就绪的节点按上一个兄弟节点的派法（同一个父 run、同一个 mode）派进 lane；所有节点都汇合后这张图即删去。于是后来的 session 不必再摆一次图，工作也会继续。再摆同一张图仍然允许，但桌子带着这个房间的已派集开张，在飞的节点不会被再派一次；再摆出的 `Underway` 取代旧的那张。图只在内存里：进程重启后它不在了，这时由这个房间后来的某个 Run 再摆一次，join 已收下的节点被跳过。
 - **一个 Run 一张图**：第二次 `lay_out` 即拒，因为一个 session 里两张图是「这次在造什么」的两个答案。
-- **join 属房间而不属 Run**：子在父冻结之后才开，故 `FanIn` 由装配层按房间保存（`RunWorker.joins`），并与 inbox 折自同一批 `signal_enqueued` 行。`judge` 的围栏一字未改：答不出 digest 前八位即拒，且拒词恒不回显答案。
+- **join 属房间而不属 Run**：子在父冻结之后才开，故 `FanIn` 由装配层按房间保存（`RunWorker.joins`），并与 inbox 折自同一批 `signal_enqueued` 行。`judge` 的围栏见 8-5：答案是 artifact 的全文，拒词恒不回显答案。
 
 ### 8-5 collab::fanin（形状 2 值类型）
 
@@ -192,6 +202,7 @@ impl FanIn {
 - **只收已验证 Artifact**：未验证的产出是 Claim；`Artifact` 无公开构造子，故「Claim 进汇合」在类型层拼不出来。
 - **实现者不自测**（判负线之一）：`verified` 的 verifier 等于生产者即拒。
 - **private-info question 是围栏不是证明**：答案由 artifact 内容派生，只有打开过才答得出；能断言的只是「一眼未看就判」被拒。**拒词恒不回显正确答案**——回显即教会那条捷径。
+- **答案是 artifact 的全文，按 digest 核对**：题面必须给出 artifact 的 locator，读者才找得到它；而 `cas:b3-…` locator 本身就拼出了内容 digest，handback 信号里也带着同一个 locator。所以任何由 digest 派生的答案（例如 digest 前八位）都写在题面上，抄题面即可过关。`decide` 因此要全文：把答案按字节求 BLAKE3，等于 artifact 的 digest 才放行。答案末尾缺的那个换行按原文补回一次再比，因为工具参数经 JSON 传递时常被去掉结尾换行，而这不说明读者没打开过。代价是长 artifact 的答案也长；被否决的方案是按 digest 另派一个秘密的问题，它需要 artifact 在城里另存内容，而 `Artifact` 只持 locator 与 digest。
 
 ### 8-6 collab::pr（形状 5 typestate）
 
@@ -219,6 +230,7 @@ pub fn arbitrate(registered: &[GoalEntry], candidate: &GoalEntry) -> Option<Leve
 pub fn conflict_payload(candidate: &GoalEntry, level: &Level) -> Result<Payload, AxError>;
 ```
 
+- **`goal_conflict` 的形状归 kernel**：`conflict_payload` 把 `Level` 译成 `kernel::event::record::GoalConflict` 再经 `Payload::of` 写出，读者经 `Payload::read` 读回同一个 struct；本模块只拥有「哪一级」的判定。
 - **检测进 kernel，仲裁不进**：`kernel::goal::detect_conflict` 只答「撞没撞」；本模块答「谁来裁」。
 - **判序固定**（机械 → 读）：同一对目标恒落同一级，重放才可比。
 - **机械可判的只有一种形状**：双方都 claim 路径，且常设性一高一低——「常设的先走」不需要任何判断。其余（两个常设、外部资源同名）都要读目标陈述，那是模型的活。
@@ -231,6 +243,7 @@ pub struct Delegated { pub room: Address, pub task: String, pub goal: String, pu
 pub struct DelegateDesk { /* depth: Depth、building: Address、asked —— 私有 */ }
 impl DelegateDesk {
     pub fn new(depth: Depth, building: Address) -> DelegateDesk;
+    pub fn beside(&self) -> DelegateDesk;   // 同一 depth、同一 building、未派任何活：图在 run 结束后派的节点过同样两道门
     pub fn ask(&mut self, work: Delegated) -> Result<&Delegated, AxError>;   // 门在这里被叫
     pub fn asked(&self) -> &[Delegated];                                      // status.children 的真值
     pub fn take(&mut self) -> Vec<Delegated>;                                 // 回合落定后装配层取走
@@ -326,6 +339,7 @@ impl OpenRequest {
     pub fn from_payload(data: &Payload) -> Result<OpenRequest, AxError>;
     pub fn merged_payload(&self, merge_commit: String, verified_by: String,
                           by: CommitAttribution) -> Result<Payload, AxError>;   // pr_merged
+    pub fn rejected_payload(&self, by: String, why: String) -> Result<Payload, AxError>;   // pr_rejected
 }
 pub struct MergedRequest {   // pr_merged 的键，唯一权威
     pub node: NodeId, pub implementer: String, pub branch: String,
@@ -333,6 +347,10 @@ pub struct MergedRequest {   // pr_merged 的键，唯一权威
     pub commit: String,            // 落地的那个 merge commit
     pub verified_by: String,
     pub by: CommitAttribution,     // flatten：哪次 Run 写的这个 commit
+}
+pub struct RejectedRequest {   // pr_rejected 的键，唯一权威；读者经 Payload::read 取 branch，读不出即拒绝重建
+    pub request: OpenRequest,      // flatten：被退回的那份请求
+    pub by: String, pub why: String,
 }
 pub enum PrEffect {
     Opened { branch: String },
@@ -386,22 +404,27 @@ pub enum ClaimEffect {
     /// 造出来的东西，把它的两个臂抄进第二个枚举，就是对「一个节点可以
     /// 怎么离开」的第二份意见。
     PutDown { id: NodeId, item: String, exit: PlanExit },
-    Split   { parent: NodeId, children: Vec<String> },
+    Split   { parent: NodeId, children: Vec<NewChild> },   // 经 `kernel` 重导出，住 `spine::row`
 }
 impl ClaimEffect {
     pub fn id(&self) -> &NodeId;
     pub fn expected_before(&self) -> RoadmapStatus;   // 经 `kernel` 重导出，住 `spine::row`，公共拼写不变
     pub fn kind(&self) -> EventKind;          // 由出口决定，不由调用方决定
-    pub fn payload(&self, who: &str) -> Result<Payload, AxError>;
+    pub fn payload(&self, who: &str) -> Result<Payload, AxError>;   // 形状是 kernel::event::record::RoadmapMoved
+    /// 把这条效应写进一份计划文本；桌子改自己的副本与工人落地时改盘上那份，走的都是它。
+    pub fn apply(&self, text: &str) -> Result<String, AxError>;
 }
 pub struct ClaimDesk { /* who、room、roadmap 文本、本次 drive 持有的 Held、effects —— 私有 */ }
 impl ClaimDesk {
-    pub fn new(who: String, room: Address, roadmap: String) -> ClaimDesk;
+    pub fn new(who: String, room: Address, roadmap: String, booking: Booking) -> ClaimDesk;
     pub fn take_effects(&mut self) -> Vec<ClaimEffect>;
     pub fn roadmap(&self) -> Option<&str>;    // Some 仅当本次 drive 改过；工人据此写盘一次
     pub fn holding(&self) -> Option<&NodeId>;
     pub fn abandon(&mut self) -> Result<(), AxError>;   // 冻结路径花掉仍被持有的 Held
 }
+/// 调用时判定认领的那个权威；城里是记账线程（sprawling-SPEC 8-42-8）。
+pub struct Booking(Box<dyn FnMut(&ClaimEffect) -> Result<(), AxError> + Send>);
+impl Booking { pub fn new(ask: impl FnMut(&ClaimEffect) -> Result<(), AxError> + Send + 'static) -> Booking; }
 pub fn evidence_of(text: &str, id: &NodeId) -> Option<Locator>;
 pub fn still_true(text: &str, effect: &ClaimEffect) -> bool;
 pub struct ClaimTool { /* meta、Rc<RefCell<ClaimDesk>> —— 私有 */ }
@@ -414,13 +437,21 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 - **六个动作长在同一条 catalog 行上，不新开工具**。模型每一轮读的**行数**是成本，一行背后的**动词数**不是。
 - **收口是字节数，量出来的**：四个动作的 `plan` 条目是 **548 B**（disclosure ＋ schema 的紧凑 JSON），六个动作是 **546 B**，一条断言钉住它不超过 548。disclosure 里那句 *Must this be expanded?* 是 LLM First（`ARCHITECTURE.md` §9）的提醒：它在缓存前缀里，零延迟、零花费；不追问、不设深度上限、不设审批。省下的字节来自把 Locator 文法从 schema 移进拒词——**一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节**。schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
 - **状态迁移由 `kernel::PlanTree` 从计划自身判，不由调用者声明**：`claim` 只从就绪集里取（叶子、无人认领、依赖全绿），`finish`／`block`／`release` 只能作用于**本次 drive 认领的那个节点**。拒词报出此刻的状态并指向一个真能拿的节点——「不行」会教模型改写参数再试，「2.3 在做，2.4 就绪」不会。
+- **认领在调用时由 `Booking` 判定，桌子的副本先答**：桌子持有派活那一刻的文件，并排派出的另一轮活读的是同一份，
+  所以 `claim` 先让 `PlanTree::claim` 在副本上判（它的拒词能指向一个就绪节点），再问 `Booking`；`Booking` 拒绝时，
+  桌子不持有节点、不排效应、不改文本，拒词原样交给模型。`Booking` 记的是「哪轮在飞的活持有哪个节点」，
+  只活到那轮活落地为止，落地之后回答这个问题的仍是文件——所以它不是第二份认领登记表。
+  `Booking` 拿到的是整条 `ClaimEffect::Claimed` 而不只是节点号，因为权威在登记的同时把这条认领记进账本，
+  而那一行的种类与载荷只由 `ClaimEffect::kind`／`payload` 定义。
 - **一次 drive 只持有一个节点**，理由与旧版同：一个 Run 同时占两个节点，两个节点的进度都读不出来。
 - **计划门禁就是那个 `Held` 值**：它由 `PlanTree::claim` 铸出，只能花在 `finish`（绿）或 `stop`（红／交回）上。**没有第三个出口**——一个只是结束了的 run 由 `abandon` 把它花在 `FrozeWithoutEvidence` 上，于是「认领了却没交代」这一态在冻结之后不可达。这正是 `blockage` 里红色的来处。
 - **`split` 之后本次 drive 不再持有那根枝**：它拿到的那件活现在是几片，它接下来该拿其中一片。写盘前先把新文本重新解析并 `PlanTree::build` 一次，**拆不出合法树就一个字节都不写**。拆分结果除 `node` 与 `children` 外带 `unfinished`：该节点下尚未 `Done` 的子节点数，由拆完的树数出，不由调用者声明。
 - **`block` 与 `release` 都必须带一句原因**，且原因**随记录走而不是随表格走**：表格只有位置说「Blocked」，一句话该住在 `roadmap_blocked` 的载荷里，在表里再放一份就是同一句话的第二个权威。
 - **哪一种记录由出口决定**（`ClaimEffect::kind`）：绿→`roadmap_finished`，红→`roadmap_blocked`，交回→`roadmap_released`，拆→`roadmap_split`。工人不再自己 match 一遍，于是「停下来意味着什么」只有一个答案。
 - **效果穷尽**（同 `SignalEffect`／`GoalEffect`／`PrEffect`）：每个变体都是工人必须写下的一条账，新增一个变体应当是写入处的编译错误。
-- **并发口径（诚实边界）**：工人写盘前重读文件，**每个节点只核第一条效果**——一个先认领再结项的 run 两条效果都是它自己按派活时的文件顺序产出的，拿第二条去问磁盘，等于问「我自己刚才那条落盘了没有」，而它没有：desk 是最后整份写一次。行若已不是预期状态则整组丢弃并留一条诊断，而不是覆盖。
+- **效应怎么改文本只有一个定义**（`ClaimEffect::apply`）：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上那份。
+  `Split` 因此带着子节点的 weight：只带名字的效应重放不出桌子写下的那几行。
+- **并发口径（诚实边界）**：工人写盘前重读文件，**每个节点只核第一条效果**——一个先认领再结项的 run 两条效果都是它自己按派活时的文件顺序产出的，拿第二条去问磁盘，等于问「我自己刚才那条落盘了没有」，而它没有：效应是落地时才重放的。行若已不是预期状态则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变，别的轮先落下的行原样留在盘上。
 
 ## 8.5 两个设计
 
@@ -492,25 +523,19 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 `pr_tool.rs` 原有 561 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成三份：
 
 - `pr_tool.rs`（354 行）——`PrEffect`、`PrDesk` 与它的 `open`／`list`／`check`／`take_effects`、`PrTool` 及其 `Tool` 实现，以及读参数的 `text`。它同时是索引位置，声明 `mod request;` 并 `pub use request::OpenRequest;`，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `PrDesk::new` 留在本文件。
-- `pr_tool/request.rs`——`OpenRequest` 及其 `payload`／`from_payload`／`merged_payload` 与 `MergedRequest`：`pr_opened` 与 `pr_merged` 两条记录的形状与回读。
+- `pr_tool/request.rs`——`OpenRequest` 及其 `payload`／`from_payload`／`merged_payload`／`rejected_payload` 与 `MergedRequest`／`RejectedRequest`：`pr_opened`、`pr_merged` 与 `pr_rejected` 三条记录的形状与回读。三者留在 collab 而不进 `kernel::event::record`：它们的键里有 `NodeId`，那是 collab 的类型。
 - `pr_tool/tests.rs`（152 行）——原内联 `mod tests` 原样迁出，断言、名字与 6 个 `#[test]` 一个未动。
 
 **无字段开放。** `OpenRequest` 的四个字段本来就是 `pub`，切分未放宽任何可见性。
 
 **apisync 未重写基线。** `OpenRequest` 的定义模块从 `pr_tool` 移到私有的 `pr_tool::request`，公开路径仍是 `collab::OpenRequest`，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-15 collab::inbox 目录化
+### 8-15 collab::inbox 的文件
 
-`inbox.rs` 原有 543 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成四份：
+- `inbox.rs`——`Signal` 及其构造、访问器、`lane`、两条记录 `enqueued_payload`／`consumed_payload` 与逆 `from_payload`，以及接收侧 `Inbox` 的 `new`／`deliver`／`pull`／`take_steer`／`pending`。带参数豁免的 `Signal::new` 留在本文件。
+- `inbox/tests.rs`——去重、lane 次序、bandwidth 与两条记录，经生产入口。
 
-- `inbox.rs`（341 行）——`Lane`、`Signal` 及其构造、访问器、`lane`、两条记录 `enqueued_payload`／`consumed_payload`、私有的 `wire`／`from_wire` 与 `broken`，以及接收侧 `Inbox` 的 `new`／`deliver`／`pull`／`take_steer`／`pending`。它同时是索引位置，声明 `mod signal_id;`／`mod signal_kind;` 并 `pub use` 两个类型，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `Signal::new` 留在本文件。
-- `inbox/signal_id.rs`（37 行）——`SignalId` 与它的 `parse`／`as_str`：重复投递靠什么被认出。
-- `inbox/signal_kind.rs`（50 行）——`SignalKind` 与它的 `as_str`／`parse`：四种通信各自的线上名字。
-- `inbox/tests.rs`（141 行）——原内联 `mod tests` 原样迁出，断言、名字与 7 个 `#[test]` 一个未动。
-
-**无字段开放。** `SignalId` 的元组字段仍是私有，两个子模块都只暴露原有的公开方法。
-
-**apisync 未重写基线。** `SignalId` 与 `SignalKind` 的定义模块从 `inbox` 移到私有的 `inbox::signal_id`／`inbox::signal_kind`，公开路径仍是 `collab::SignalId`／`collab::SignalKind`，`cargo xtask apisync` 对 collab 无差异。
+`SignalId`、`SignalKind`、`Lane` 不在本 crate：它们是 `signal_enqueued`／`signal_consumed` 两行的字段类型，与行的 struct 同住 `kernel::event::record`，于是折叠与视图读这两行时只依赖 kernel。本 crate 不再转出它们，调用方写 `kernel::event::record::SignalId`，路径只有一条。
 
 ### 8-16 collab::workshop_tool 目录化
 

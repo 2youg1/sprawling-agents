@@ -26,18 +26,22 @@ use kernel::{
 
 use crate::compaction::Exchange;
 use crate::conversation::Conversation;
-use crate::prefix::FrozenPrefix;
 
 mod boundary;
 mod ledger;
+mod prompt;
 mod recovery;
 mod report;
+mod speculation;
 mod wave;
 
 use ledger::{Authored, Carried, Journal};
 
 pub use boundary::{Interrupt, NextCall, PhaseOutcome, TurnCancelled};
+pub use prompt::{PromptRecord, RunPrompt};
 pub use report::{CallShape, TurnReport};
+pub use speculation::Generating;
+pub use wave::{Admitted, ConcurrentInvoke};
 
 /// The typestate carrier. Phase data lives in `S` and is private to this
 /// module: a phase literal cannot be forged, a phase cannot be skipped,
@@ -61,6 +65,7 @@ pub struct Calling {
 #[derive(Debug)]
 pub struct ToolWave {
     calls: Vec<ToolCall>,
+    speculated: speculation::Speculated,
     model_returned: EventRef,
     assistant: Vec<ContentBlock>,
     usage: Option<ModelUsage>,
@@ -89,12 +94,13 @@ impl Turn<Assembling> {
     /// Boundary 1 (before assembly). Builds the canonical request from
     /// the frozen prefix (system blocks), the window (messages) and the
     /// catalog's tool defs; appends `prompt_assembled` with the prefix's
-    /// full source notes.
+    /// full source notes unless the run has already recorded that same
+    /// payload.
     pub fn assemble(
         mut self,
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
-        prefix: &FrozenPrefix,
+        prompt: RunPrompt<'_>,
         conversation: &Conversation,
         tools: &[ToolDef],
         shape: &CallShape,
@@ -106,18 +112,21 @@ impl Turn<Assembling> {
         // will carry and checked against what the session froze. It
         // comes before `prompt_assembled` is written: a refusal must not
         // leave a line describing a prefix the city will not send.
-        let segments = prefix.verified_segment_hashes()?;
+        let segments = prompt.prefix.verified_segment_hashes()?;
         // One plan decides every breakpoint: the system blocks, the tail
         // message and the record all read it, so the record names only
         // breakpoints this request carries.
         let plan = crate::prefix::BreakpointPlan::for_conversation(conversation.messages());
-        let prompt = prefix.prompt_payload(&plan)?;
-        self.journal
-            .append_authored(ledger, Authored::PromptAssembled, prompt)?;
+        let payload = prompt.prefix.prompt_payload(&plan)?;
+        if !prompt.recorded.holds(&payload) {
+            self.journal
+                .append_authored(ledger, Authored::PromptAssembled, payload.clone())?;
+            prompt.recorded.remember(payload);
+        }
         let mut chat = ChatRequest {
             model: shape.model.clone(),
             max_tokens: shape.max_tokens,
-            system: prefix.system_blocks()?,
+            system: prompt.prefix.system_blocks()?,
             messages: conversation.messages().to_vec(),
             tools: tools.to_vec(),
             effort: shape.effort,
@@ -133,7 +142,9 @@ impl Turn<Assembling> {
 impl Turn<Calling> {
     /// Boundary 2 (before the provider call). Appends `model_called` and
     /// `model_returned`; a provider Err propagates after nothing but the
-    /// boundary consumption touched the ledger.
+    /// boundary consumption touched the ledger. The reads `generating`
+    /// starts early are not events: they ride to the wave, which uses
+    /// each only for the settled call equal to the one started.
     /// `'sink` is named rather than elided because the caller holds the
     /// sink for the whole run and hands it to every turn: with an elided
     /// lifetime the reborrow would have to shrink the trait object's own
@@ -144,7 +155,7 @@ impl Turn<Calling> {
         ledger: &mut dyn Ledger,
         model: &mut dyn Model,
         policy: &BuildingPolicy,
-        deltas: Option<&mut (dyn FnMut(&kernel::Increment) + 'sink)>,
+        generating: Generating<'_, 'sink>,
     ) -> Result<PhaseOutcome<Turn<ToolWave>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
@@ -160,17 +171,16 @@ impl Turn<Calling> {
             segments,
             chat,
         };
-        // The streaming door when somebody is watching, the blocking one
-        // when nobody is. Both return the same `ModelReturn`, and the
-        // record below is written from that return in either case - so
-        // what a page sees arriving and what the ledger keeps cannot come
-        // from two different readings of one reply. A failure goes to the
+        // The door `generating` picks. Every door returns the same
+        // `ModelReturn`, and the record below is written from that return
+        // in each case - so what a page sees arriving and what the ledger
+        // keeps cannot come from two different readings of one reply. A failure goes to the
         // recovery pipeline before it leaves this phase (runtime-SPEC
         // §8-44), and every attempt - first or repaired - is recorded
         // before it is made.
         let mut call = recovery::ModelCall::open(&mut self.journal, ledger, model, &request);
         let mut repair = recovery::BlockingResend;
-        let returned_value = call.ask(&mut [&mut repair], deltas)?;
+        let (returned_value, speculated) = call.ask(&mut [&mut repair], generating)?;
         let ModelReturn {
             message,
             calls,
@@ -202,6 +212,7 @@ impl Turn<Calling> {
             journal: self.journal,
             state: ToolWave {
                 calls,
+                speculated,
                 model_returned,
                 assistant,
                 usage,

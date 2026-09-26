@@ -15,7 +15,7 @@ fn hundred(at: u64) -> Vec<Duration> {
 #[test]
 fn a_reading_line_is_stable_and_carries_its_machine_class() {
     let reading = Reading::of(
-        Load::MultiRunParallel,
+        Load::LargeLedgerFold,
         SubMetric::Harness,
         MachineClass::General,
         hundred(10),
@@ -23,7 +23,7 @@ fn a_reading_line_is_stable_and_carries_its_machine_class() {
     .unwrap();
     assert_eq!(
         reading.line(),
-        "perf load=multi_run_parallel sub=harness machine_class=general \
+        "perf load=large_ledger_fold sub=harness machine_class=general \
          samples=100 floor_us=10 p50_us=10 p95_us=10 p99_us=10"
     );
 }

@@ -19,12 +19,12 @@
 //! an absent reading. The comparison then marks every position lost,
 //! which is the truth about a successor nobody could ask.
 
-use kernel::{AxError, EventKind, Model, RunId};
-use serde_json::{Map, Value};
+use kernel::event::record::EvalRun;
+use kernel::{AxError, EventKind, Ledger, Model, RunId};
 
-use crate::effect;
+use accounting::effect;
 
-use super::{Handover, RunWorker, Site};
+use super::{Handover, RunWorker, Site, Stamping};
 
 pub(super) mod probe;
 
@@ -97,7 +97,7 @@ impl RunWorker {
     /// build defect rather than a run's.
     pub(super) fn probe_before(
         &mut self,
-        adapter: Option<&mut (dyn Model + Send + 'static)>,
+        adapter: Option<&mut super::keeping_warm::Door>,
         frozen: &runtime::Run<runtime::run::Frozen>,
         who: &str,
     ) -> Result<probe::Answers, AxError> {
@@ -148,24 +148,26 @@ impl RunWorker {
             }
         }
     }
+}
 
+impl Site {
     /// The second reading, over the successor's frozen prefix, and the
     /// `eval_run` line comparing it with the first.
     ///
     /// # Errors
     /// Propagates a ledger that refuses the line. The model call itself
     /// never fails this: an unanswerable successor reads as empty.
-    pub(super) fn probe_after(
+    pub(super) fn probe_after<L: Ledger>(
         &mut self,
-        site: &mut Site,
         plan: &runtime::RunPlan,
         handed: &Handover,
+        lines: &mut Stamping<'_, L>,
     ) -> Result<(), AxError> {
         let Ok(probe) = probe::handoff_probe() else {
             return Ok(());
         };
         let count = probe.questions().len();
-        let answered = site.adapter.as_mut().and_then(|model| {
+        let answered = self.adapter.as_mut().and_then(|model| {
             let request = kernel::ModelRequest {
                 policy: plan.policy.clone(),
                 segments: plan.prefix.segment_hashes(),
@@ -192,13 +194,13 @@ impl RunWorker {
         };
         let after = probe.answered(answers)?;
         let comparison = probe::compare(&handed.before, &after)?;
-        self.record_for(
+        lines.record_for(
             plan.run,
             effect::Line {
-                who: site.who.clone(),
+                who: self.who.clone(),
                 addr: plan.addr.clone(),
                 kind: EventKind::EvalRun,
-                data: kernel::Payload::new(eval_payload(
+                data: kernel::Payload::of(&eval_payload(
                     &probe,
                     handed.predecessor,
                     (&handed.before, &after),
@@ -225,40 +227,17 @@ fn eval_payload(
     predecessor: RunId,
     readings: (&probe::Answers, &probe::Answers),
     comparison: &probe::Comparison,
-) -> Map<String, Value> {
+) -> EvalRun {
     let (before, after) = readings;
-    let strings = |items: &[String]| {
-        Value::Array(
-            items
-                .iter()
-                .map(|item| Value::String(item.clone()))
-                .collect(),
-        )
-    };
-    let mut map = Map::new();
-    map.insert("probe".to_owned(), Value::String(probe.id().name.clone()));
-    map.insert(
-        "version".to_owned(),
-        Value::Number(probe.id().version.into()),
-    );
-    map.insert(
-        "predecessor".to_owned(),
-        Value::String(predecessor.to_string()),
-    );
-    map.insert("kept".to_owned(), Value::Number(comparison.kept.into()));
-    map.insert(
-        "lost".to_owned(),
-        Value::Array(
-            comparison
-                .lost
-                .iter()
-                .map(|index| Value::Number((*index).into()))
-                .collect(),
-        ),
-    );
-    map.insert("before".to_owned(), strings(before.answers()));
-    map.insert("after".to_owned(), strings(after.answers()));
-    map
+    EvalRun {
+        probe: probe.id().name.clone(),
+        version: probe.id().version,
+        predecessor,
+        kept: comparison.kept,
+        lost: comparison.lost.clone(),
+        before: before.answers().to_vec(),
+        after: after.answers().to_vec(),
+    }
 }
 
 #[cfg(test)]

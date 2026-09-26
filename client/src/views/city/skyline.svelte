@@ -19,6 +19,7 @@
   // `glow` or `ground` a second time.
 
   import type { RunBelief } from "../../core/belief";
+  import { heldWithin } from "../../core/belief/rooms";
   import { fill, say } from "../../core/lang";
   import { fraction } from "../../core/share";
   import { ui } from "../../ui";
@@ -96,6 +97,17 @@
   const u = ui();
   const { lang } = u;
   const belief = u.conn.belief;
+
+  // What of a label fits under its tower. A monospace glyph advances
+  // 0.6 em, so the room in glyphs is the tower's slot - the tower and
+  // the gap it shares with its neighbours - over that advance; a longer
+  // label would run into the next tower's name. A cut label ends in an
+  // ellipsis, and the whole of it stays in the tower's accessible name
+  // and in the `<title>` a pointer shows.
+  function fitted(text: string, room: number, size: number): string {
+    const fits = Math.max(1, Math.floor(room / (size * 0.6)));
+    return text.length <= fits ? text : `${text.slice(0, fits - 1)}…`;
+  }
 
   function ratio(building: BuildingProgress): { done: number; blocked: number } | null {
     if ("planned" in building.progress) {
@@ -213,9 +225,7 @@
   }
 
   const drawing = $derived.by((): Drawing => {
-    const runs = Object.values($belief.runs).sort((a, b) => (a.started ?? 0) - (b.started ?? 0));
-    const of = (addr: string): RunBelief[] =>
-      runs.filter((run) => run.addr !== null && (run.addr === addr || run.addr.startsWith(`${addr}/`)));
+    const of = (addr: string): RunBelief[] => heldWithin($belief, addr);
     const hall = city.buildings.find((each) => each.addr === "hall");
     const others = city.buildings
       .filter((each) => each.addr !== "hall")
@@ -359,12 +369,14 @@
       <text x={tower.x + tower.w / 2} y={drawing.ground + PLINTH + 22} text-anchor="middle"
         class={["font-mono group-hover:fill-text", tower.building.addr === picked ? "fill-text" : "fill-text-quiet"]}
         font-size="12">
-        {tower.name}
+        <title>{tower.name}</title>
+        {fitted(tower.name, tower.w + GAP - 8, 12)}
       </text>
       {#if tower.line !== ""}
         <text x={tower.x + tower.w / 2} y={drawing.ground + PLINTH + 38} text-anchor="middle"
           class="fill-text-disabled font-mono" font-size="11">
-          {tower.line}
+          <title>{tower.line}</title>
+          {fitted(tower.line, tower.w + GAP - 8, 11)}
         </text>
       {/if}
       {#each tower.active.slice(0, 3) as run, index (run.run)}

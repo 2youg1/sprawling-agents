@@ -35,7 +35,7 @@
 </script>
 
 <div class="my-base text-body">
-  <div class="mb-tight text-note text-text-disabled">{who}</div>
+  <div class="mb-tight text-note text-text-faint">{who}</div>
   {#if laid !== ""}
     <Prose text={laid} />
   {/if}

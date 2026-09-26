@@ -40,22 +40,24 @@ pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Turn, Used};
 pub use answer::{ChangesAnswer, CommitAnswer, CommitsAnswer, HISTORY_MAX, HistoryAnswer};
-pub use answer::{ChosenSummary, CityAnswer, CostAnswer, EndpointSummary, EndpointsAnswer};
+pub use answer::{ChosenSummary, CityAnswer, CostAnswer, EndpointSummary};
 pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
-pub use answer::{CostOfAnswer, EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
+pub use answer::{CostOfAnswer, EvidenceAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use answer::{Decision, GovernanceAnswer};
-pub use answer::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use answer::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use answer::{DocumentAnswer, Entry, EntryKind, ListingAnswer};
+pub use answer::{EndpointsAnswer, UnpricedCalls};
+pub use answer::{EvidenceItem, EvidenceKind, Picture};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
 pub use answer::{ReleaseAnswer, ReleaseLine};
-pub use answer::{SettledEffort, SettledSecond, TuningDefaults};
+pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
 pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
 #[cfg(feature = "server")]
 pub use assets::{AssetReply, ClientAssets, EmbeddedFile};
@@ -75,20 +77,23 @@ pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
 pub use reception::{Admission, BindFace, BindVerdict, Door, HandshakeVerdict, Pairing};
 #[cfg(feature = "server")]
-pub use reception::{SessionState, SessionStep, decide_frame};
+pub use reception::{SessionState, SessionStep, WelcomeFacts, decide_frame};
 #[cfg(feature = "server")]
 pub use reception::{decide_admission, offered_pairing};
 #[cfg(feature = "server")]
 pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
-pub use server::{AcpProgress, AcpSink, TranscribeSink};
+pub use server::{AcpProgress, AcpSink, Answering, MonitorFeed, TranscribeSink};
 #[cfg(feature = "server")]
-pub use server::{Bound, Committed, Delivered, Reply, ServeConfig, bind, router, serve};
+pub use server::{Bound, Committed, Delivered, LedgerHead, Reply, ServeConfig};
+#[cfg(feature = "server")]
+pub use server::{bind, router, serve};
 #[cfg(feature = "schema")]
 pub use wire::wire_schema;
-pub use wire::{ClientFrame, Delta, ServerFrame};
+pub use wire::{Answered, Ask, AskId, AskOutcome};
+pub use wire::{ClientFrame, Delta, LiveOutput, OutputStream, ServerFrame};
 pub use wire::{Hello, Query, Welcome};
-pub use wire::{Lagged, LogLevel, LogLine};
+pub use wire::{Lagged, LogLevel, LogLine, Monitoring, Sample, Watched};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};
 
 pub use kernel::model::{Mode, Window};

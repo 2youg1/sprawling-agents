@@ -5,11 +5,11 @@
 
 //! What a run offers a building it may not write in, and what merging it costs.
 
-use kernel::{AxError, EventKind, Payload};
+use kernel::{AxError, EventKind};
 
-use crate::effect;
+use accounting::effect;
 
-use super::{Assignment, RunWorker, Site, held, now_ms};
+use super::{Assignment, RunWorker, Site, held};
 
 impl RunWorker {
     /// Settles what a run asked of the request register.
@@ -34,7 +34,8 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let (addr, who, run_id, mode) = (&at.addr, site.who.as_str(), site.run_id, at.mode);
         let write_root = site.write_root.as_path();
-        let fence_scope = site.fence_scope()?.join(" ");
+        let scopes = site.fence_scope()?;
+        let fence_scope = scopes.join(" ");
         let fence_scope = fence_scope.as_str();
         // What the run asked of the request register. Opening commits
         // the run's own tree first, because the record names the commit
@@ -58,7 +59,12 @@ impl RunWorker {
                         // merge (memory-SPEC 8-8).
                         let at = memory::Checkpoint::open(write_root)
                             .map_err(memory::MemoryError::into_ax)?
-                            .land(now_ms()?, &of, &format!("offer: {fence_scope}"))
+                            .land(
+                                &scopes,
+                                self.clock.now()?,
+                                &of,
+                                &format!("offer: {fence_scope}"),
+                            )
                             .map_err(memory::MemoryError::into_ax)?;
                         let request = collab::OpenRequest {
                             node: collab::NodeId::parse(&branch)?,
@@ -75,7 +81,7 @@ impl RunWorker {
                                 data: request.payload()?,
                             },
                         )?;
-                        self.requests.push(request);
+                        self.collaborating.requests.push(request);
                     }
                     collab::PrEffect::Merged { request, by } => {
                         // The last gate before work becomes the
@@ -89,22 +95,21 @@ impl RunWorker {
                             alternative,
                         } = runtime::admits(mode, produced)
                         {
-                            let mut data = request.payload()?.as_map().clone();
-                            data.insert("by".to_owned(), serde_json::Value::String(by));
-                            data.insert(
-                                "why".to_owned(),
-                                serde_json::Value::String(format!("{because}; {alternative}")),
-                            );
                             self.record_for(
                                 run_id,
                                 effect::Line {
                                     who: who.to_owned(),
                                     addr: addr.clone(),
                                     kind: EventKind::PrRejected,
-                                    data: Payload::new(data)?,
+                                    data: request.rejected_payload(
+                                        by,
+                                        format!("{because}; {alternative}"),
+                                    )?,
                                 },
                             )?;
-                            self.requests.retain(|held| held.branch != request.branch);
+                            self.collaborating
+                                .requests
+                                .retain(|held| held.branch != request.branch);
                             continue;
                         }
                         let name = memory::WorktreeName::parse(&request.branch)
@@ -142,28 +147,29 @@ impl RunWorker {
                         // person never read (sprawling-SPEC.md 8-49).
                         planned
                             .apply(&memory::Landing {
-                                t: now_ms()?,
+                                t: self.clock.now()?,
                                 of: &of,
                                 subject: &format!("merge: {}", request.branch),
                                 reviewed_by_person: false,
                             })
                             .map_err(memory::MemoryError::into_ax)?;
-                        self.requests.retain(|held| held.branch != request.branch);
+                        self.collaborating
+                            .requests
+                            .retain(|held| held.branch != request.branch);
                     }
                     collab::PrEffect::Rejected { request, by, why } => {
-                        let mut data = request.payload()?.as_map().clone();
-                        data.insert("by".to_owned(), serde_json::Value::String(by));
-                        data.insert("why".to_owned(), serde_json::Value::String(why));
                         self.record_for(
                             run_id,
                             effect::Line {
                                 who: who.to_owned(),
                                 addr: addr.clone(),
                                 kind: EventKind::PrRejected,
-                                data: Payload::new(data)?,
+                                data: request.rejected_payload(by, why)?,
                             },
                         )?;
-                        self.requests.retain(|held| held.branch != request.branch);
+                        self.collaborating
+                            .requests
+                            .retain(|held| held.branch != request.branch);
                     }
                 }
             }

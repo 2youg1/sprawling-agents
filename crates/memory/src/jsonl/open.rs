@@ -92,6 +92,7 @@ impl JsonlLedger {
             observer: None,
             lock: None,
             halt: crate::chain_audit::ChainHalt::default(),
+            pending_unwind: None,
         };
 
         let Some(last) = segments.last().cloned() else {

@@ -29,21 +29,21 @@
 
 <div>
   <input
-    class="mb-base w-full rounded-control border border-edge-input bg-raised px-base py-snug text-body placeholder:text-text-disabled"
+    class="mb-base w-full rounded-control border border-edge-input bg-raised px-base py-snug text-body placeholder:text-text-faint"
     placeholder={say($lang, "rec_search")}
     bind:value={needle}
   />
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
   {:else if hits === undefined}
-    <p class="text-text-disabled">…</p>
+    <p class="text-text-faint">…</p>
   {:else if hits.length === 0}
     <p class="text-text-faint">{say($lang, "rec_nothing")}</p>
   {:else}
     <ul class="text-note">
       {#each hits as hit (hit)}
         <li class="settled-row flex gap-base border-b border-edge py-snug">
-          <span class="w-figure shrink-0 text-text-disabled">{hit.day}</span>
+          <span class="w-figure shrink-0 text-text-faint">{hit.day}</span>
           <span class="w-figure shrink-0 text-text-faint">{hit.kind}</span>
           <a
             href={toFragment({ kind: "building", address: hit.building })}

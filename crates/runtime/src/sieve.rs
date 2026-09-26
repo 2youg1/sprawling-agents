@@ -302,7 +302,7 @@ pub fn sieve(
         size(bytes_in),
         size(body_len),
         filter.id,
-        pinned.rest_path.display()
+        pinned.rest_path
     );
     let out = format!("{body}\n{footer}");
     if out.len() > text.len() {

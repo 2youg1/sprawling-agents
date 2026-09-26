@@ -5,26 +5,11 @@
 
 //! What a drive left, on the ledger before it is made true.
 
-use kernel::{AxCode, AxError};
+use kernel::AxError;
 
-use crate::effect;
+use accounting::effect;
 
-use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held, now_ms};
-
-/// Writes the plan back, creating nothing that was not there: a
-/// building without a plan is a building whose residents have nothing
-/// to claim, and inventing one here would put a denominator on screen
-/// that no person wrote.
-pub(in crate::assembly) fn write_plan(path: &std::path::Path, text: &str) -> Result<(), AxError> {
-    std::fs::write(path, text).map_err(|err| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "write the plan",
-            format!("{}: {err}", path.display()),
-        )
-        .with_recovery("fix the file's permissions; the claim was not recorded")
-    })
-}
+use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held};
 
 impl RunWorker {
     /// Settles the four desks that leave lines behind, in the order the
@@ -52,7 +37,8 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let Settling {
             sweep,
-            conversations,
+            chain,
+            open_claims,
         } = settling;
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
         let (write_root, building) = (site.write_root.as_path(), &site.building);
@@ -62,13 +48,13 @@ impl RunWorker {
         // other source than `Landing::record`, so a change that outran
         // its own line cannot be written here.
         let spoken = effect::Landing::signals(signal_effects, addr, who)?;
-        self.settle(at, run_id, spoken, conversations)?;
+        self.settle(at, run_id, spoken, &chain)?;
         let ground = effect::Landing::goals(
             held(&desks.goals, "settle the goal desk")?.take_effects(),
             addr,
             who,
         )?;
-        self.settle(at, run_id, ground, conversations)?;
+        self.settle(at, run_id, ground, &chain)?;
         // The sweep the forecast cannot replace. A command can be
         // obfuscated past a text prediction; what is missing from the
         // working tree cannot be talked out of. The base is the first
@@ -82,7 +68,7 @@ impl RunWorker {
                 .map_err(memory::MemoryError::into_ax)?;
             let swept = discarded.len();
             let lost = effect::Landing::discards(discarded, addr, who);
-            self.settle(at, run_id, lost, conversations)?;
+            self.settle(at, run_id, lost, &chain)?;
             // Over the threshold a person is told, and the class is one
             // no policy can waive. Each file is restorable on its own;
             // what the count says is that nobody meant this.
@@ -101,7 +87,7 @@ impl RunWorker {
                         class: kernel::ApprovalClass::Question,
                         detail: addr.as_str().to_owned(),
                     },
-                    created: now_ms()?,
+                    created: self.clock.now()?,
                     tainted: false,
                 };
                 sweep.raised.push(item);
@@ -119,23 +105,25 @@ impl RunWorker {
         // still held here was neither finished nor stopped, and the
         // `Held` dies with the desk, so it is spent on its one exit now
         // or the row stays `In progress` for ever.
-        let (claim_effects, plan_after) = {
+        let (claim_effects, plan_changed) = {
             let mut desk = held(&desks.plan, "settle the plan desk")?;
             desk.abandon()?;
-            (desk.take_effects(), desk.roadmap().map(str::to_owned))
+            (desk.take_effects(), desk.roadmap().is_some())
         };
-        if let Some(text) = plan_after {
+        if plan_changed {
             let on_disk = city::roadmap(&self.city_root, building.addr())?;
-            match effect::Claims::of(
-                &claim_effects,
-                &on_disk,
-                text,
-                desks.plan_path.clone(),
-                addr,
-                who,
-            )? {
+            // A node's claim is closed the moment its closing line is on
+            // the ledger, not when `Roadmap.md` is rewritten or the whole
+            // landing is: a refusal part-way leaves owed only the nodes
+            // whose last line still reads them as held (sprawling-SPEC.md
+            // 8-42-8).
+            let mut close =
+                |closing: effect::Closing| self.record_closing(run_id, closing, open_claims);
+            match effect::Claims::of(&claim_effects, &on_disk, desks.plan_path.clone(), addr, who)?
+            {
                 effect::Claims::Landed(taken) => {
-                    self.settle(at, run_id, *taken, conversations)?;
+                    let then = taken.record(&mut close)?;
+                    self.carry_out_landing(at, then, &chain)?;
                     self.tell_whoever_is_behind(
                         at,
                         Reporter {
@@ -144,10 +132,12 @@ impl RunWorker {
                             who,
                         },
                         &claim_effects,
-                        conversations,
+                        &chain,
                     )?;
                 }
-                effect::Claims::Stale(nodes) => {
+                effect::Claims::Stale { nodes, released } => {
+                    let then = released.record(&mut close)?;
+                    self.carry_out_landing(at, then, &chain)?;
                     for node in nodes {
                         self.note(
                             runtime::diagnostics::Level::Refuse,
@@ -171,11 +161,11 @@ impl RunWorker {
             held(&desks.shelf, "settle the shelf")?.take_effects(),
             write_root,
             building.addr(),
-            now_ms()?,
+            self.clock.now()?,
             addr,
             who,
         )?;
-        self.settle(at, run_id, remembered, conversations)?;
+        self.settle(at, run_id, remembered, &chain)?;
         Ok(())
     }
 }

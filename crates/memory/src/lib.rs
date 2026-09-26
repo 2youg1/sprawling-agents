@@ -27,8 +27,9 @@ pub use jsonl::WriteObserver;
 // One line on purpose: the index-file rule permits single-line `use`
 // declarations only, and rustfmt wraps the list at 100 columns.
 #[rustfmt::skip]
-pub use jsonl::{CheckedLine, LineCheck, LineFault};
+pub use jsonl::{CheckedLine, LineCheck, LineFault, read_line};
 pub use jsonl::{JsonlLedger, OpenReport, TailTruncation, ledger_segments_at, read_raw_lines_at};
+pub use jsonl::{TailLine, TailLines};
 
 // The projection the Ledger lays down beside each building: one file per
 // room, disposable, read by nobody in the product (memory-SPEC 8-24).
@@ -46,17 +47,19 @@ pub use bundle::{Bundle, MANIFEST, Manifest, open_restored};
 
 mod cas;
 
-pub use cas::Cas;
+pub use cas::{BlockOrigin, Cas};
 
 mod index;
 
 pub use index::LedgerIndex;
 pub use index::LineReader;
+pub use index::Located;
 pub use index::Refreshed;
 
 mod hot;
 
 pub use hot::HotView;
+pub use hot::RECENT_FROZEN;
 pub use hot::RunHot;
 pub use hot::RunPhase;
 
@@ -64,6 +67,7 @@ mod attribution;
 
 pub use attribution::Attribution;
 pub use attribution::AttributionReport;
+pub use attribution::Unpriced;
 
 mod queue;
 
@@ -81,8 +85,11 @@ mod snapshot;
 
 pub use snapshot::ChainSnapshot;
 pub use snapshot::SnapshotFit;
+pub use snapshot::SnapshotStart;
 pub use snapshot::StoredSnapshot;
+pub use snapshot::WholeFold;
 pub use snapshot::read_snapshot;
+pub use snapshot::start_from_snapshot;
 pub use snapshot::write_snapshot;
 
 mod digest_cache;
@@ -99,16 +106,18 @@ pub use worktree::Worktrees;
 
 mod checkpoint;
 
-pub use checkpoint::Checkpoint;
 pub use checkpoint::ModelChoice;
 pub use checkpoint::Provenance;
 pub use checkpoint::effort_word;
 pub use checkpoint::recorded_effort;
+pub use checkpoint::{BaseProgress, Checkpoint};
 
+mod blob;
 mod changes;
 mod hunks;
 mod status;
 
+pub use blob::blob_at;
 pub use changes::{Head, between};
 pub use hunks::{FilePatch, PatchLine, Withheld, of_file};
 pub use status::{Drift, WorkingStatus, working_status};

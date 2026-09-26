@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::completion::Completion;
 use crate::event::identity::{RunId, Seq};
 use crate::event::kind::EventKind;
+use crate::event::who::Who;
 use crate::locator::{B3Hash, Locator};
 use crate::origin::Origin;
 
@@ -59,6 +60,14 @@ pub struct RunStarted {
     /// absence to infer.
     #[serde(default)]
     pub skills: Vec<SkillPin>,
+    /// Who dispatched this run: the person, the city's own desk (a
+    /// plan, the schedule, an arrival), or the resident that delegated,
+    /// succeeded itself or knocked. The line's author cannot say it,
+    /// because the city's desk writes every `run_started`. Absent only
+    /// in a record written before the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub dispatched_by: Option<Who>,
 }
 
 /// `run_frozen`: how a run ended, and what it cites for having ended
@@ -148,6 +157,25 @@ pub struct RunForked {
     pub from: RunId,
     /// The last sequence number of `from` that this run inherits.
     pub at_seq: Seq,
+}
+
+/// `eval_run`: the handoff probe asked of a successor, compared with
+/// what its predecessor answered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct EvalRun {
+    /// The probe's name and version, which together fix its questions.
+    pub probe: String,
+    pub version: u32,
+    /// The run whose answers are the reference.
+    pub predecessor: RunId,
+    /// How many answers the successor kept.
+    pub kept: u32,
+    /// The question indices whose answers differ, in order.
+    pub lost: Vec<u32>,
+    /// The predecessor's answers and the successor's, one per question.
+    pub before: Vec<String>,
+    pub after: Vec<String>,
 }
 
 #[cfg(test)]

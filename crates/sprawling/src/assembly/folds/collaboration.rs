@@ -6,12 +6,12 @@
 //! The two projections the collaboration tools read: what is waiting in
 //! each room, and what ground is already claimed.
 
+use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-use crate::effect;
-use crate::views::pursuit_from;
+use crate::views::pursued;
 
-use super::super::{building_of, plan_node_of};
+use super::super::PlanHolders;
 
 /// The three registers a run's collaboration tools read from.
 pub(in crate::assembly) struct Collaboration {
@@ -26,8 +26,7 @@ pub(in crate::assembly) struct Collaboration {
     /// What each building was last told to work towards.
     pursuits: std::collections::BTreeMap<Address, (String, kernel::PursuitState)>,
     /// Which room holds each node of each building's plan.
-    pub(in crate::assembly) plan_holders:
-        std::collections::BTreeMap<Address, std::collections::BTreeMap<kernel::NodeId, String>>,
+    pub(in crate::assembly) plan_holders: PlanHolders,
 }
 
 impl Collaboration {
@@ -60,20 +59,21 @@ impl Collaboration {
 /// queue is `enqueued` minus `consumed` and the two arrive in whatever
 /// order the work happened in. Nothing else here needs a second look, so
 /// nothing else is staged.
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(super) struct CollaborationFold {
     pub(super) goals: Vec<kernel::GoalEntry>,
     /// What each building was last told to work towards. Text and
     /// state, because a `Pursuit` is minted through the depth-zero
     /// position and a fold has none.
     pursuits: std::collections::BTreeMap<Address, (String, kernel::PursuitState)>,
-    /// Which room holds each node of each building's plan. The map a
-    /// red node's neighbours are found through, and the one copy of it:
-    /// the record that claims a node carries the room in its `addr`,
-    /// so nothing here derives what somebody else already wrote down.
-    plan_holders:
-        std::collections::BTreeMap<Address, std::collections::BTreeMap<kernel::NodeId, String>>,
+    /// Which room holds each node of each building's plan: the map a
+    /// red node's neighbours are found through.
+    plan_holders: PlanHolders,
     pub(super) requests: Vec<collab::OpenRequest>,
+    #[serde(
+        serialize_with = "enqueued_as_text",
+        deserialize_with = "enqueued_from_text"
+    )]
     enqueued: Vec<collab::Signal>,
     consumed: std::collections::BTreeSet<String>,
 }
@@ -93,38 +93,28 @@ impl CollaborationFold {
                 // it cannot read: a consumption skipped here is a
                 // signal the rebuild believes is still waiting, and a
                 // resident is handed it a second time.
-                let taken = collab::SignalConsumed::from_payload(record.data())?;
+                let taken = record
+                    .data()
+                    .read::<kernel::event::record::SignalConsumed>()?;
                 self.consumed.insert(taken.id.as_str().to_owned());
             }
-            EventKind::GoalRegistered => self.goals.push(effect::goal_from_payload(record.data())?),
-            EventKind::RoadmapClaimed => {
-                if let (Some(building), Some(node), Some(room)) = (
-                    record.addr().and_then(building_of),
-                    plan_node_of(record),
-                    record.addr(),
-                ) {
-                    self.plan_holders
-                        .entry(building)
-                        .or_default()
-                        .insert(node, room.as_str().to_owned());
-                }
-            }
-            EventKind::RoadmapFinished | EventKind::RoadmapReleased | EventKind::RoadmapBlocked => {
-                if let (Some(building), Some(node)) =
-                    (record.addr().and_then(building_of), plan_node_of(record))
-                {
-                    self.plan_holders.entry(building).or_default().remove(&node);
-                }
+            EventKind::GoalRegistered => self.goals.push(record.data().read()?),
+            EventKind::RoadmapClaimed
+            | EventKind::RoadmapFinished
+            | EventKind::RoadmapReleased
+            | EventKind::RoadmapSplit
+            | EventKind::RoadmapBlocked => {
+                self.plan_holders
+                    .absorb(record.kind(), record.addr(), record.data())?;
             }
             EventKind::PursuitChanged => {
-                if let Some((addr, held)) = pursuit_from(record) {
-                    match held {
-                        Some(entry) => {
-                            self.pursuits.insert(addr, entry);
-                        }
-                        None => {
-                            self.pursuits.remove(&addr);
-                        }
+                let addr = pursued(record)?;
+                match record.data().read::<PursuitChanged>()?.held()? {
+                    Some(entry) => {
+                        self.pursuits.insert(addr, entry);
+                    }
+                    None => {
+                        self.pursuits.remove(&addr);
                     }
                 }
             }
@@ -135,15 +125,17 @@ impl CollaborationFold {
             // merged one is done, and a rejected one goes back to the
             // resident who wrote it rather than sitting in a queue
             // nobody owns.
-            EventKind::PrMerged | EventKind::PrRejected => {
-                if let Some(branch) = record
+            EventKind::PrMerged => {
+                let branch = record.data().read::<collab::MergedRequest>()?.branch;
+                self.requests.retain(|held| held.branch != branch);
+            }
+            EventKind::PrRejected => {
+                let branch = record
                     .data()
-                    .as_map()
-                    .get("branch")
-                    .and_then(serde_json::Value::as_str)
-                {
-                    self.requests.retain(|held| held.branch != branch);
-                }
+                    .read::<collab::RejectedRequest>()?
+                    .request
+                    .branch;
+                self.requests.retain(|held| held.branch != branch);
             }
             _ => {}
         }
@@ -198,3 +190,28 @@ pub(in crate::assembly) fn new_inbox() -> collab::Inbox {
 pub(in crate::assembly) const INBOX_CAPACITY: u64 = 256;
 
 pub(super) const SIGNAL_BANDWIDTH: u32 = 4;
+
+/// The signals still waiting, in a snapshot, as the `signal_enqueued`
+/// payloads they were folded from: the writer's own inverse reads them
+/// back, and a payload is JSON, which postcard cannot carry.
+fn enqueued_as_text<S: serde::Serializer>(
+    enqueued: &[collab::Signal],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let payloads = enqueued
+        .iter()
+        .map(collab::Signal::enqueued_payload)
+        .collect::<Result<Vec<_>, AxError>>()
+        .map_err(serde::ser::Error::custom)?;
+    super::as_json_text(&payloads, serializer)
+}
+
+fn enqueued_from_text<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<collab::Signal>, D::Error> {
+    super::from_json_text::<Vec<kernel::Payload>, D>(deserializer)?
+        .iter()
+        .map(collab::Signal::from_payload)
+        .collect::<Result<Vec<_>, AxError>>()
+        .map_err(serde::de::Error::custom)
+}

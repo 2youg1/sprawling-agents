@@ -19,6 +19,8 @@ pub(super) enum Verb {
     Serve,
     Resume,
     Call,
+    Dispatch,
+    Top,
     Enrol,
     Whose,
     Check,
@@ -53,6 +55,8 @@ pub(super) enum Takes {
 #[derive(Debug)]
 pub(super) struct Flag {
     pub(super) name: &'static str,
+    /// The one-letter spelling a hand types often, read as `name`.
+    pub(super) short: Option<&'static str>,
     pub(super) takes: Takes,
     pub(super) says: &'static str,
 }
@@ -77,7 +81,12 @@ pub(super) struct Row {
 }
 
 const fn flag(name: &'static str, takes: Takes, says: &'static str) -> Flag {
-    Flag { name, takes, says }
+    Flag {
+        name,
+        short: None,
+        takes,
+        says,
+    }
 }
 
 use Need::{Optional, Required};
@@ -102,6 +111,11 @@ const SERVED: &[Flag] = &[
     NO_OPEN,
     flag("--console", Nothing, "enter the city's console"),
     flag("--no-console", Nothing, "do not enter the console"),
+    flag(
+        "--supervise",
+        Nothing,
+        "serve in a child process, resume and serve again after a crash",
+    ),
     LOG,
     flag(
         "--web-dir",
@@ -109,6 +123,34 @@ const SERVED: &[Flag] = &[
         "read the client from <dir> on every request",
     ),
 ];
+
+/// The flags of a served line a supervised child receives as given, each
+/// with the value `SERVED` says it takes; the four the supervisor decides
+/// again for every child, and `--supervise` itself, are left out.
+pub(super) fn forwarded(args: &[String]) -> Vec<String> {
+    let decided = [
+        "--supervise",
+        "--open",
+        "--no-open",
+        "--console",
+        "--no-console",
+    ];
+    let mut kept = Vec::new();
+    let mut words = args.iter();
+    while let Some(word) = words.next() {
+        let Some(flag) = SERVED.iter().find(|flag| flag.name == word) else {
+            continue;
+        };
+        if decided.contains(&flag.name) {
+            continue;
+        }
+        kept.push(word.clone());
+        if let Takes::Value(_) = flag.takes {
+            kept.extend(words.next().cloned());
+        }
+    }
+    kept
+}
 
 /// The table. Its order is the order the overview prints.
 pub(super) const VERBS: &[Row] = &[
@@ -165,10 +207,50 @@ pub(super) const VERBS: &[Row] = &[
                 Value("n"),
                 "how long a silence ends the answer",
             ),
+            flag(
+                "--until",
+                Value("kind"),
+                "a command ends on the first event of this kind",
+            ),
             flag("--json", Nothing, "write a refusal as one line of json"),
         ],
         says: "send one wire frame, print every frame back",
         effect: Effect::Changes,
+    },
+    Row {
+        verb: Verb::Dispatch,
+        name: "dispatch",
+        aliases: &[],
+        positionals: &[("addr", Required), ("task", Required)],
+        flags: &[
+            AT,
+            flag("--token", Value("token"), "the pairing token"),
+            flag(
+                "--quiet-ms",
+                Value("n"),
+                "how long a silent city ends the wait",
+            ),
+            flag("--detach", Nothing, "print the run id once it starts"),
+            Flag {
+                short: Some("-m"),
+                ..flag(
+                    "--model",
+                    Value("id"),
+                    "run on this registered model, not main's",
+                )
+            },
+        ],
+        says: "send one task, print its events until the run freezes",
+        effect: Effect::Changes,
+    },
+    Row {
+        verb: Verb::Top,
+        name: "top",
+        aliases: &[],
+        positionals: &[],
+        flags: &[AT, flag("--token", Value("token"), "the pairing token")],
+        says: "watch a city's monitor: a screen on a terminal, a JSON line a second otherwise",
+        effect: Effect::ReadsOnly,
     },
     Row {
         verb: Verb::Enrol,
@@ -330,8 +412,8 @@ pub(super) fn usage(row: &Row) -> String {
         Optional => format!(" [{name}]"),
     });
     let flags = row.flags.iter().map(|flag| match flag.takes {
-        Nothing => format!(" [{}]", flag.name),
-        Value(what) => format!(" [{} <{what}>]", flag.name),
+        Nothing => format!(" [{}]", spelled(flag)),
+        Value(what) => format!(" [{} <{what}>]", spelled(flag)),
     });
     let name = row.name;
     format!(
@@ -364,4 +446,12 @@ pub(super) fn overview() -> String {
         })
         .collect();
     format!("commands:{lines}\n\nsprawling help <verb> explains one.")
+}
+
+/// A flag as help prints it: `-m/--model`, or `--at` when it has no short.
+fn spelled(flag: &Flag) -> String {
+    match flag.short {
+        Some(short) => format!("{short}/{}", flag.name),
+        None => flag.name.to_owned(),
+    }
 }

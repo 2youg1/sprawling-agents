@@ -10,7 +10,9 @@
 //! wire that carried the wording would make the page's words the
 //! server's to choose. The one exception is `enables`, which is the
 //! requirement table's own clause about what an item is for: no reader
-//! can derive it, and nothing else on this answer can carry it.
+//! can derive it, and nothing else on this answer can carry it. The
+//! `said` fields carry what a platform or a program said, which no
+//! reader can derive either.
 
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +32,28 @@ pub struct DoctorAnswer {
     pub sandbox: DoctorSandbox,
     /// Where credentials rest on this machine, and how long they stay.
     pub custody: DoctorCustody,
+    /// Where this machine lets the core's threads stand.
+    pub core: DoctorCore,
+}
+
+/// The level this machine gives the core's threads under the person's
+/// setting (sprawling-SPEC 8-93). The dispatched commands are not here:
+/// they always start one level below, and lowering is never refused.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorCore {
+    /// One step above normal.
+    Raised,
+    /// Normal, because the person's `[core] priority` asks for it.
+    HeldBySetting,
+    /// Normal, because the platform refused the raise; `said` is the
+    /// platform's own words.
+    Refused { said: String },
+    /// Normal, lowered after keeping a core busy.
+    LoweredByValve,
+    /// The doctor could not ask; `said` is why.
+    Unasked { said: String },
 }
 
 /// Who needs an item, and therefore which verdict it counts towards.

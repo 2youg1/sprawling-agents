@@ -34,7 +34,7 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     bytes.extend_from_slice(future.as_bytes());
     std::fs::write(&segment, &bytes).unwrap();
 
-    let views = rebuild_views(&report.ledger_dir).map(|_| ());
+    let views = crate::views::Views::rebuild(&report.ledger_dir).map(|_| ());
     let standing = Standing::fold(&report.ledger_dir).map(|_| ());
     assert_eq!((views, standing), (Ok(()), Ok(())));
 }
@@ -79,7 +79,7 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
     ] {
         assert_eq!(
             views.answer(&applied),
-            rebuild_views(&report.ledger_dir).unwrap().answer(&applied)
+            Views::rebuild(&report.ledger_dir).unwrap().answer(&applied)
         );
     }
     assert_eq!(
@@ -92,4 +92,33 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
         "and the comparison above is not two empty folds agreeing"
     );
     assert!(!standing.governance.halted.is_empty());
+}
+
+/// A pursuit line this build cannot read stops the fold. Skipping it
+/// would leave standing whatever goal the line changed, so a building a
+/// person cleared would go on pursuing after a restart.
+#[test]
+fn a_pursuit_line_the_build_cannot_read_stops_the_fold() {
+    let line = unreadable(
+        kernel::EventKind::PursuitChanged,
+        serde_json::json!({ "step": "abandon", "goal": "read the meter" }),
+    );
+    assert!(
+        super::super::collaboration::CollaborationFold::default()
+            .absorb(&line)
+            .is_err()
+    );
+}
+
+fn unreadable(kind: kernel::EventKind, data: serde_json::Value) -> EventRecord {
+    let draft = kernel::EventDraft {
+        run: RunId::CITY,
+        t: kernel::TimeMs::new(0),
+        who: "person".into(),
+        addr: Some(Address::parse("lab").unwrap()),
+        kind,
+        data: kernel::Payload::new(data.as_object().unwrap().clone()).unwrap(),
+        ig: false,
+    };
+    EventRecord::from_draft(draft, kernel::Seq::FIRST, kernel::ledger::GENESIS_PREV)
 }

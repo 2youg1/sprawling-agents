@@ -151,7 +151,7 @@ impl Tool for NeighboursTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn the_default_scope_is_the_building_and_it_names_every_address_once() {
         let dir = city_with_two_residents();
-        let mut tool = tool(dir.path(), "lab/mason");
+        let tool = tool(dir.path(), "lab/mason");
         let answer = text_of(&tool.invoke(&call(None)).unwrap());
         assert!(answer.contains("- lab/scribe: Reads twice, writes once."));
         assert!(answer.contains("- lab/store: an open room, nobody in it"));
@@ -262,7 +262,7 @@ mod tests {
     #[test]
     fn the_city_scope_gives_names_and_no_residents() {
         let dir = city_with_two_residents();
-        let mut tool = tool(dir.path(), "lab/mason");
+        let tool = tool(dir.path(), "lab/mason");
         let answer = text_of(&tool.invoke(&call(Some("city"))).unwrap());
         assert!(answer.contains("- lab (you are here)"));
         assert!(answer.contains("- market"));
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn a_scope_nobody_defined_is_refused_with_the_two_that_exist() {
         let dir = city_with_two_residents();
-        let mut tool = tool(dir.path(), "lab/mason");
+        let tool = tool(dir.path(), "lab/mason");
         let refusal = tool.invoke(&call(Some("planet"))).unwrap_err();
         assert_eq!(*refusal.code(), AxCode::InvalidArgs);
         assert!(refusal.recovery().contains("building"));
@@ -286,7 +286,7 @@ mod tests {
     fn a_building_with_one_address_says_so_instead_of_printing_an_empty_list() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("lab")).unwrap();
-        let mut tool = tool(dir.path(), "lab");
+        let tool = tool(dir.path(), "lab");
         let answer = text_of(&tool.invoke(&call(None)).unwrap());
         assert!(answer.contains("only place in this building"));
         assert!(!answer.contains("- "), "there is no list to print");

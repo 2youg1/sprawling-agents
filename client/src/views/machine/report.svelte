@@ -28,18 +28,19 @@
 // second way of getting the same answer.
 
 import type { Key } from "../../core/lang";
-import type { DoctorItem } from "../../wire";
+import type { DoctorCore, DoctorItem } from "../../wire";
 import type { Weight } from "../parts/glyph";
 import type { Tone } from "../parts/button.svelte";
-import type { Offer } from "../setup/dependencies";
+import type { Absence, Offer } from "../setup/dependencies";
 
 // What the badge beside the name weighs. The word is what states the
 // answer; the weight only decides how loudly, and a broken or required
-// missing item is the one a person has to act on.
-function weightOf(item: DoctorItem): Weight {
+// missing item is the one a person has to act on - unless it is a spare
+// of a group another member already answers.
+function weightOf(item: DoctorItem, absence: Absence): Weight {
   if ("present" in item.state) return "quiet";
   if ("broken" in item.state) return "alert";
-  return item.need === "optional" ? "quiet" : "alert";
+  return item.need === "optional" || absence === "spare" ? "quiet" : "alert";
 }
 
 // The paint each offer carries, and the reason it carries when a press
@@ -49,6 +50,24 @@ function weightOf(item: DoctorItem): Weight {
 // **No offer takes the primary tone** (ux-upgrades A11): install is a
 // per-card act, and a row's act is not the one button a screen is for.
 // The screen's single primary is `check again`, above the cards.
+// The level the core's threads stand at, and the platform's own words
+// when it refused: those are the platform's to choose, not the page's.
+function coreOf(core: DoctorCore): { readonly key: Key; readonly said: string | null } {
+  if (typeof core !== "string") {
+    return "refused" in core
+      ? { key: "machine_core_refused", said: core.refused.said }
+      : { key: "machine_core_unasked", said: core.unasked.said };
+  }
+  switch (core) {
+    case "raised":
+      return { key: "machine_core_raised", said: null };
+    case "held_by_setting":
+      return { key: "machine_core_held", said: null };
+    case "lowered_by_valve":
+      return { key: "machine_core_lowered", said: null };
+  }
+}
+
 const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = {
   press: { tone: "secondary", why: null },
   by_hand: { tone: "quiet", why: "machine_install_by_hand" },
@@ -60,7 +79,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   import { say } from "../../core/lang";
   import type { DoctorAnswer } from "../../wire";
   import { ui } from "../../ui";
-  import { offerOf, outstanding, recommended, required, spelledOf, standing, stateKey, versionOf } from "../setup/dependencies";
+  import { absenceOf, offerOf, outstanding, recommended, required, spelledOf, standing, stateKey, versionOf } from "../setup/dependencies";
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
   import Progress from "../parts/progress.svelte";
@@ -80,6 +99,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   const second = $derived(recommended(answer));
   const missedUse = $derived(outstanding(answer, "use"));
   const missedDevelop = $derived(outstanding(answer, "develop"));
+  const core = $derived(coreOf(answer.core));
 
   // One program, and everything a person decides about it from one
   // card: the name, the state, the version, what it enables, and the
@@ -88,7 +108,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   // before installing it.
 </script>
 
-{#snippet card(item: DoctorItem)}
+{#snippet card(item: DoctorItem, absence: Absence)}
   {@const said = versionOf(item.state)}
   {@const how = spelledOf(item.install)}
   {@const offer = OFFER[offerOf(item)]}
@@ -112,9 +132,11 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
           {/snippet}
         </Tip>
       {/if}
-      <Badge text={say($lang, stateKey(item.state))} weight={weightOf(item)} dot />
+      <Badge text={say($lang, stateKey(item.state))} weight={weightOf(item, absence)} dot />
       {#if item.need === "optional"}
-        <span class="text-note text-text-disabled">{say($lang, "machine_optional")}</span>
+        <span class="text-note text-text-faint">{say($lang, "machine_optional")}</span>
+      {:else if absence === "spare"}
+        <span class="text-note text-text-faint">{say($lang, "machine_spare")}</span>
       {/if}
       <span class="min-w-0 flex-1"></span>
       {#if said !== null}
@@ -123,7 +145,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
     </div>
     <p class="text-note text-text-faint">{item.enables}</p>
     {#if how === null}
-      <span class="text-note text-text-disabled">{say($lang, "machine_no_recipe")}</span>
+      <span class="text-note text-text-faint">{say($lang, "machine_no_recipe")}</span>
     {:else}
       <div class="flex min-w-0 flex-col gap-snug">
         <!-- A command cut at the card's edge cannot be typed, and a
@@ -175,7 +197,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
     <ul class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-base">
       {#each items as item (item.name)}
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-        {@render card(item)}
+        {@render card(item, absenceOf(item, missing, items))}
       {/each}
     </ul>
   </section>
@@ -186,4 +208,11 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   {@render column(say($lang, "machine_required"), missedUse, first)}
   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
   {@render column(say($lang, "machine_recommended"), missedDevelop, second)}
+  <p class="flex min-w-0 flex-wrap items-baseline gap-tight text-note">
+    <span class="text-text-quiet">{say($lang, "machine_core")}</span>
+    <span class="text-text">{say($lang, core.key)}</span>
+    {#if core.said !== null}
+      <span class="min-w-0 break-words text-text-faint">{core.said}</span>
+    {/if}
+  </p>
 </div>

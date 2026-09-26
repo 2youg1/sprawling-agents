@@ -130,7 +130,7 @@ impl Tool for RulesTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn a_proposal_that_evaluates_becomes_the_rules_the_next_run_is_judged_by() {
         let dir = tempfile::tempdir().unwrap();
-        let mut tool = tool(dir.path());
+        let tool = tool(dir.path());
         let outcome = tool
             .invoke(&call(
                 "propose",
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn a_proposal_that_does_not_evaluate_leaves_the_old_rules_standing() {
         let dir = tempfile::tempdir().unwrap();
-        let mut tool = tool(dir.path());
+        let tool = tool(dir.path());
         tool.invoke(&call(
             "propose",
             Some("confidential = false\nwrite = \"everything\"\n"),
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn a_document_that_does_not_say_whether_it_is_confidential_is_refused() {
         let dir = tempfile::tempdir().unwrap();
-        let mut tool = tool(dir.path());
+        let tool = tool(dir.path());
         let err = tool
             .invoke(&call(
                 "propose",
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn an_unknown_verb_is_refused_and_the_tool_still_answers() {
         let dir = tempfile::tempdir().unwrap();
-        let mut tool = tool(dir.path());
+        let tool = tool(dir.path());
         assert!(tool.invoke(&call("delete", None)).is_err());
         let mut wrong = call("read", None);
         wrong.name = ToolName::parse("status").unwrap();

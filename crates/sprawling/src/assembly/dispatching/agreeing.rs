@@ -12,11 +12,10 @@ use kernel::event::record::{GoverningDocument, RulesChanged};
 use kernel::{Address, AxCode, AxError, EventKind, Payload};
 use kernel::{Locator, RunId, TimeMs};
 
-use crate::serving::CommandDesk;
+use crate::assembly::CommandDesk;
 
 use super::super::RunWorker;
-use super::Agreed;
-use crate::assembly::credentials::dialect_headers;
+use super::{Agreed, Assignment};
 
 /// A run's identity, derived rather than drawn: the same job dispatched
 /// at the same millisecond to the same address is the same run, and no
@@ -87,6 +86,7 @@ pub(crate) fn acp_dispatch(
             // ...and says nothing about how hard to think, so the
             // layers above answer.
             effort: None,
+            model: None,
         },
         channels::Reply::nowhere(),
     );
@@ -116,7 +116,8 @@ impl RunWorker {
     /// load, a tag with no model behind it, an endpoint that is no
     /// longer attached, a confidential building whose model would leave
     /// this machine, and a subscription credential that will not renew.
-    pub(super) fn agree_to_work(&mut self, addr: &Address) -> Result<Agreed, AxError> {
+    pub(super) fn agree_to_work(&mut self, at: &Assignment) -> Result<Agreed, AxError> {
+        let addr = &at.addr;
         if let Some(scope) = self.halted_by(addr) {
             return Err(AxError::failure(
                 AxCode::GateDenied,
@@ -132,23 +133,27 @@ impl RunWorker {
         // reach, so they are read before one is chosen.
         let building = city::Building::of(addr)?;
         let rules = city::load(&self.city_root, building.addr())?;
-        let chosen = self.book.select(kernel::ModelTag::Main, rules.policy())?;
+        let own = city::own_layer(&self.city_root, addr)?;
+        let tag = self.tag_for(at.model.as_deref(), own.model())?;
+        let chosen = self.credentials.book.select(tag, rules.policy())?;
         // A subscription credential that expires mid-run is a run that
         // dies on its second turn, so it is renewed before the run
         // starts rather than after a call comes back refused. The
         // endpoint a login attached carries the provider's own name.
         self.renew_if_stale(&chosen.endpoint.name.clone())?;
-        let chosen = self.book.select(kernel::ModelTag::Main, rules.policy())?;
+        let chosen = self.credentials.book.select(tag, rules.policy())?;
         let model = chosen.entry.clone();
         let provider = chosen.endpoint.name.clone();
-        let adapter = gateway::adapter_for(
-            &chosen,
-            self.redemption()?,
-            dialect_headers(chosen.endpoint.dialect)
-                .into_iter()
-                .map(|(name, value)| (name, value.spelled()))
-                .collect(),
-        )?;
+        let adapter = self.models.build(&chosen, self.redemption()?)?;
+        // Every request the run sends goes through the keep-warm door,
+        // so a landed run can have its prefix renewed (sprawling-SPEC
+        // 8-93); under the default setting the door only forwards.
+        let clock = std::sync::Arc::clone(&self.clock);
+        let adapter = crate::assembly::keeping_warm::Door::new(
+            adapter,
+            city::keep_warm(&self.city_root, building.addr())?,
+            Box::new(move || clock.now()),
+        );
         let retries = chosen.endpoint.tuning.request_max_retries;
         Ok(Agreed {
             building,
@@ -216,6 +221,47 @@ impl RunWorker {
             }
         }
         Ok(())
+    }
+
+    /// The tag whose registration a dispatch runs on, so the endpoint,
+    /// the window and the policy check come with the model.
+    ///
+    /// A model the dispatch names runs under the tag that registered
+    /// it. A dispatch that names none - a successor, a wake knock, a
+    /// follow-up without `-m` - continues on the model its room froze
+    /// while a tag still registers it, and otherwise runs on `main`:
+    /// the session's shape check then refuses the moved model with the
+    /// way out a person can take (sprawling-SPEC.md 8-79), which a
+    /// refusal here could not name.
+    ///
+    /// # Errors
+    /// Refuses a named id no tag registered, before anything is written.
+    fn tag_for(
+        &self,
+        named: Option<&str>,
+        frozen: Option<&str>,
+    ) -> Result<kernel::ModelTag, AxError> {
+        let Some(id) = named else {
+            return Ok(frozen
+                .and_then(|id| self.tag_registering(id))
+                .unwrap_or(kernel::ModelTag::Main));
+        };
+        self.tag_registering(id).ok_or_else(|| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "dispatch work",
+                format!("no tag registers the model {id}"),
+            )
+            .with_recovery("register it under a tag on the settings page, then dispatch again")
+        })
+    }
+
+    /// The tag the model `id` is registered under, if any is.
+    fn tag_registering(&self, id: &str) -> Option<kernel::ModelTag> {
+        self.credentials
+            .book
+            .choices()
+            .find_map(|(tag, _, entry)| (entry.id == id).then_some(tag))
     }
 }
 

@@ -193,7 +193,7 @@ inductive Frame
   | welcomed (welcome : Welcome) | happened (record : Record)
   | answered (name : String) (body : Json) | refused (complaint : Complaint)
   | streamed (run : String) (text : String) | logged (level : String) (line : String)
-structure Complaint where code : Code; action, subject, recovery : String; retriable : Bool
+structure Complaint where code : Code; action, subject, recovery, retry : String
 def decodeFrame  : String → Except String Frame
 def cityBuildings : Json → Option (List String)
 

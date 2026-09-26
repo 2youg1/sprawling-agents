@@ -8,14 +8,14 @@
 //!
 //! **Why it is a projection and not part of the assembly point.** Nothing
 //! here decides anything or reaches a provider: it folds records into the
-//! answers a client asks for, and `rebuild_views` throws the whole thing
+//! answers a client asks for, and `Views::rebuild` throws the whole thing
 //! away and folds the ledger again to get the same bytes. That is
 //! ARCHITECTURE.md section 9 shape 7, while `bin::assembly` is an
 //! adapter - and a file holding two shapes is what section 9 says a split
 //! looks like.
 //!
 //! **What it deliberately does not hold.** The plans are
-//! `crate::plan_view`'s and are read through it; a second parse here
+//! `accounting::plan_view`'s and are read through it; a second parse here
 //! would be a second answer to "what is stuck and why", and only one of
 //! them would be folding the records that say why. What waits in a room
 //! is folded from signal records rather than read off a queue, because a
@@ -24,38 +24,45 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-// Where a city keeps its ledger and how a building reads off disk are
-// `bin::assembly`'s: it forms the city that laid them out. Borrowed
-// rather than copied, so "where the ledger lives" keeps one answer.
-use super::lines::verdict_line;
-use super::lines::{
-    buildings_of, discard_lines, pursuit_from, registry_line, restored_paths, signal_line,
-};
-use crate::assembly::{ledger_dir, rebuild_views};
+use super::lines::{discard_lines, pursued, registry_line, restored_paths, signal_line};
+use super::snapshot::start::{city_root_of, start_audited};
 
 /// Answers one query out of a city's own history, without serving it.
 ///
-/// The views are folded, asked, and thrown away, so this costs one pass
-/// over the ledger and leaves nothing behind. **It is the same
-/// [`Views::answer`] a served city answers from**: a command line that
+/// The views are folded, asked, and thrown away: from the snapshot a
+/// served city cut when one fits, from genesis otherwise, and nothing is
+/// left behind. **It is the same
+/// [`Views::prepare`] a served city answers from**: a command line that
 /// read the history its own way would be a second answer to one
 /// question, and the one that drifted would be the one nobody was
 /// looking at.
 ///
 /// # Errors
-/// Propagates a history that does not verify and a record that will not
+/// Propagates a chain the whole-ledger audit finds broken or cannot
+/// read, folded lines that do not verify, and a record that will not
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {
-    Ok(rebuild_views(&ledger_dir(city_root))?.answer(query))
+    Ok(
+        Views::rebuild(&kernel::layout::CityLayout::new(city_root).ledger())?
+            .prepare(query)
+            .finish(),
+    )
 }
 
 /// The derived views a query reads. They are rebuilt from the ledger at
 /// startup and folded forward by the write observer, so deleting them
 /// costs nothing but the rebuild — the ledger remains the only history.
+///
+/// The encoding a snapshot holds (sprawling-SPEC 8-91) leaves out the
+/// four fields that are not folded from the ledger; `Views::decode`
+/// takes them from `Views::new`.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct Views {
+    #[serde(skip)]
     pub(super) city_root: PathBuf,
     pub(super) hot: memory::HotView,
     pub(super) attribution: memory::Attribution,
@@ -74,6 +81,12 @@ pub(crate) struct Views {
     /// happens next, and a browser opened today would otherwise have no
     /// way to learn the name of a city initialised last month.
     pub(super) city: Option<Address>,
+    /// The seq of the last record shown to [`Views::apply`], which is
+    /// where the served ledger head starts before the fold moves it.
+    pub(super) head: Option<kernel::Seq>,
+    /// The chain hash of the ledger's first line, which names this
+    /// history for its whole life (channels-SPEC, `Welcome.epoch`).
+    pub(super) epoch: Option<kernel::B3Hash>,
     /// What waits in each room, folded from the signal records. Held
     /// here rather than read off a queue: a queue answers by being
     /// consumed, and a view that consumed what it showed would change
@@ -104,6 +117,12 @@ pub(crate) struct Views {
     /// How many records this view has folded. The one number a page
     /// cannot derive from any other answer.
     pub(super) events: u64,
+    /// The first seq not yet folded, which dates every answer read from
+    /// here: the answer reflects every record before it. `Seq::FIRST`
+    /// until genesis is folded, so "nothing folded" never reads as
+    /// "genesis folded".
+    pub(super) next_unfolded: kernel::Seq,
+    #[serde(skip, default = "super::snapshot::fresh_index")]
     /// seq to byte offset, held rather than rebuilt.
     ///
     /// Rebuilding it read the whole side cache and allocated a `String`
@@ -111,10 +130,27 @@ pub(crate) struct Views {
     /// asked - 14.4 ms of it on a fifty thousand record ledger. Held, the
     /// same question costs one directory listing and the bytes that are
     /// actually new.
-    pub(super) index: memory::LedgerIndex,
+    ///
+    /// Behind a lock of its own because the fold never touches it: a
+    /// query carries the `Arc` out of its snapshot of the views and
+    /// reads the ledger with only readers waiting on it (sprawling-SPEC.md 8-92).
+    pub(super) index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
+    /// Where each run's first `prompt_assembled` record sits, so the
+    /// prompt a page asks for is one ledger line rather than a walk
+    /// back through the whole run.
+    pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
-    pub(super) plans: crate::plan_view::PlanView,
+    ///
+    /// Behind a lock of its own so a reader reads a plan off the disk
+    /// with the views released and puts it back afterwards; the fold
+    /// holds it only to forget what a record may have moved
+    /// (sprawling-SPEC.md 8-92).
+    #[serde(
+        serialize_with = "super::snapshot::encode_plans",
+        deserialize_with = "super::snapshot::decode_plans"
+    )]
+    pub(super) plans: std::sync::Arc<std::sync::Mutex<accounting::plan_view::PlanView>>,
     /// What each building is working towards, folded from the records
     /// that said so. The goal text and its state, not the value itself:
     /// declaring a pursuit takes the depth-zero position, and a view
@@ -139,17 +175,72 @@ pub(crate) struct Views {
     /// a city nobody has asked yet - every city that has just been
     /// served - and it answers `Unavailable` rather than an empty
     /// machine.
+    #[serde(skip)]
     pub(super) machine: Option<channels::DoctorAnswer>,
     /// The vault the worker opened; set by `views::served`. `None` is a
     /// `Views` nobody served - a rebuild, a test - and a server wanting
     /// a credential then reports that it could not be redeemed rather
     /// than reaching out with the reference as though it were the
     /// value.
+    #[serde(skip)]
     pub(super) vault: Option<std::sync::Arc<std::sync::Mutex<gateway::Custodian>>>,
 }
 
 impl Views {
+    /// The views of the ledger on disk, from its snapshot when one fits
+    /// and from genesis otherwise (sprawling-SPEC 8-91). A reader that
+    /// serves nothing: it cuts no snapshot, so a one-shot query writes
+    /// nothing to disk, and the answer is the same as if the process had
+    /// been running all along.
+    ///
+    /// The whole chain is audited first, because no background audit runs
+    /// beside a one-shot read and the snapshot's fit checks only the line
+    /// at its seq: without the audit a line edited before that seq would
+    /// be answered from.
+    ///
+    /// # Errors
+    /// The audit's reason when the chain is broken or cannot be read, and
+    /// the verification failures of the lines it folds; a city whose
+    /// history does not verify is not one whose views should be served.
+    pub(crate) fn rebuild(ledger_dir: &Path) -> Result<Views, AxError> {
+        start_audited::<Views>(ledger_dir).map(|started| started.folded)
+    }
+
+    /// The empty views of the city whose ledger is `ledger_dir`, before a
+    /// fold has shown them any record.
+    pub(crate) fn over(ledger_dir: &Path) -> Views {
+        Views::new(city_root_of(ledger_dir))
+    }
+
     pub(crate) fn new(city_root: &Path) -> Views {
+        // Empty until a fold hands over the index it built, or the first
+        // query refreshes it: the history is not read here.
+        Views::sharing(
+            city_root,
+            super::snapshot::fresh_index(),
+            std::sync::Arc::default(),
+        )
+    }
+
+    /// A second, empty fold over the same city that shares this one's
+    /// ledger index and plan cache: both are caches of the disk rather
+    /// than folded state, so the two copies the fold thread alternates
+    /// between keep one of each (sprawling-SPEC.md 8-93). A served city
+    /// makes its twin with [`Views::twin`], from views already folded.
+    #[cfg(test)]
+    pub(crate) fn unfolded_twin(&self) -> Views {
+        Views::sharing(
+            &self.city_root,
+            std::sync::Arc::clone(&self.index),
+            std::sync::Arc::clone(&self.plans),
+        )
+    }
+
+    fn sharing(
+        city_root: &Path,
+        index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
+        plans: std::sync::Arc<std::sync::Mutex<accounting::plan_view::PlanView>>,
+    ) -> Views {
         Views {
             city_root: city_root.to_path_buf(),
             hot: memory::HotView::new(),
@@ -157,6 +248,8 @@ impl Views {
             governance: super::Governance::empty(),
             book: gateway::EndpointBook::new(),
             city: None,
+            head: None,
+            epoch: None,
             waiting: std::collections::BTreeMap::new(),
             discards: std::collections::BTreeMap::new(),
             assets: Vec::new(),
@@ -165,18 +258,50 @@ impl Views {
             predecessors: std::collections::BTreeMap::new(),
             skill_pins: std::collections::BTreeMap::new(),
             events: 0,
-            // An unreadable ledger directory is not a reason to refuse to
-            // start: the index is disposable, every refresh tries again,
-            // and a city with no ledger yet is the ordinary first run.
-            index: memory::LedgerIndex::rebuild(&ledger_dir(city_root))
-                .unwrap_or_else(|_| memory::LedgerIndex::empty()),
-            plans: crate::plan_view::PlanView::default(),
+            next_unfolded: kernel::Seq::FIRST,
+            index,
+            first_prompts: std::collections::BTreeMap::new(),
+            plans,
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
             claims: std::collections::BTreeMap::new(),
             machine: None,
             vault: None,
         }
+    }
+
+    /// Takes the index the fold that built these views read the history
+    /// into, so serving does not scan it again, and the epoch its genesis
+    /// line's chain hash names, so a page reconnecting to another ledger
+    /// rebuilds. Written into the lock this copy shares with its twin, so
+    /// both read it.
+    ///
+    /// # Errors
+    /// Propagates a segment the index names that cannot be read.
+    pub(crate) fn hold_index(
+        &mut self,
+        index: memory::LedgerIndex,
+        ledger_dir: &Path,
+    ) -> Result<(), AxError> {
+        self.epoch = match index.reader(ledger_dir).line_at(kernel::Seq::FIRST) {
+            Ok(genesis) => Some(kernel::ledger::chain_hash(&genesis)),
+            Err(memory::MemoryError::SeqMissing { .. }) => None,
+            Err(other) => return Err(other.into_ax()),
+        };
+        // The whole index is replaced, so whatever a panic left half
+        // written under a poisoned lock is gone with it.
+        *self
+            .index
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = index;
+        self.index.clear_poison();
+        Ok(())
+    }
+
+    /// The first seq this view has not folded: an answer read from here
+    /// reflects every record before it.
+    pub(crate) fn next_unfolded(&self) -> kernel::Seq {
+        self.next_unfolded
     }
 
     /// Folds one record into every view that cares about it.
@@ -188,44 +313,52 @@ impl Views {
         reason = "a few kinds change what a room holds; the rest of the event vocabulary does not"
     )]
     pub(crate) fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        self.head = Some(record.seq());
         self.hot
             .apply(record)
             .map_err(memory::MemoryError::into_ax)?;
         self.attribution
             .apply(record)
             .map_err(memory::MemoryError::into_ax)?;
+        // A freeze may evict a run and a late record may land on one;
+        // either way its money is folded back from the Ledger on demand
+        // (sprawling-SPEC section 8-90), so the row goes with it.
+        if record.kind() == EventKind::RunFrozen || self.hot.was_evicted(&record.run()) {
+            let hot = &self.hot;
+            self.attribution.retain_runs(|run| !hot.was_evicted(run));
+        }
         self.book.apply(record)?;
         // The one governance fold, shown this line exactly as the
         // worker's own copy is shown it.
         self.governance
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
-        self.plans.apply(record);
+        accounting::plan_view::PlanView::take_back(&self.plans).apply(record);
         self.events = self.events.saturating_add(1);
+        self.next_unfolded = record.seq().next()?;
         match record.kind() {
             EventKind::CityInitialized => {
                 self.city = record.addr().cloned();
             }
             EventKind::SignalEnqueued => {
-                if let Some((room, line)) = signal_line(record) {
-                    self.waiting.entry(room).or_default().push(line);
-                }
+                let (room, line) = signal_line(record)?;
+                self.waiting.entry(room).or_default().push(line);
             }
             EventKind::SignalConsumed => {
-                if let Some((room, line)) = signal_line(record)
-                    && let Some(queue) = self.waiting.get_mut(&room)
-                {
-                    queue.retain(|held| held.id != line.id);
+                let taken = record
+                    .data()
+                    .read::<kernel::event::record::SignalConsumed>()?;
+                if let Some(queue) = record.addr().and_then(|room| self.waiting.get_mut(room)) {
+                    queue.retain(|held| held.id != taken.id.as_str());
                 }
             }
             EventKind::PursuitChanged => {
-                if let Some((addr, held)) = pursuit_from(record) {
-                    match held {
-                        Some(entry) => {
-                            self.pursuits.insert(addr, entry);
-                        }
-                        None => {
-                            self.pursuits.remove(&addr);
-                        }
+                let addr = pursued(record)?;
+                match record.data().read::<PursuitChanged>()?.held()? {
+                    Some(entry) => {
+                        self.pursuits.insert(addr, entry);
+                    }
+                    None => {
+                        self.pursuits.remove(&addr);
                     }
                 }
             }
@@ -246,15 +379,11 @@ impl Views {
                 // that made it. Nothing is removed when the node is put
                 // down: what a node cost is what it cost, and a run that
                 // released it still spent the money.
-                if let Some(node) = record
+                let node = record
                     .data()
-                    .as_map()
-                    .get("node")
-                    .and_then(serde_json::Value::as_str)
-                    .and_then(|held| kernel::NodeId::parse(held).ok())
-                {
-                    self.claims.entry(node).or_default().insert(record.run());
-                }
+                    .read::<kernel::event::record::RoadmapMoved>()?
+                    .node;
+                self.claims.entry(node).or_default().insert(record.run());
             }
             EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record),
             EventKind::RunStarted => {
@@ -267,54 +396,22 @@ impl Views {
                 }
             }
             EventKind::ApprovalResolved => self.fold_ruling(record)?,
+            EventKind::PromptAssembled => {
+                self.first_prompts
+                    .entry(record.run())
+                    .or_insert(record.seq());
+            }
             _ => {}
         }
         Ok(())
     }
 
-    /// One entry per building, with its plan as the projection last read
-    /// it.
-    pub(super) fn spine(&mut self) -> Vec<channels::BuildingProgress> {
-        let root = self.city_root.clone();
-        buildings_of(&root)
-            .into_iter()
-            .map(|addr| {
-                let reading = self.plans.of(&root, &addr);
-                channels::BuildingProgress {
-                    addr,
-                    progress: reading.progress,
-                    problems: reading.problems,
-                    blocked: reading.blocked,
-                    ready: u32::try_from(reading.ready.len()).unwrap_or(u32::MAX),
-                }
-            })
-            .collect()
+    pub(crate) fn epoch(&self) -> Option<kernel::B3Hash> {
+        self.epoch
     }
 
-    /// What each pursuit is doing, as the city reads it.
-    ///
-    /// The verdict is computed here rather than on the page, so the stop
-    /// condition has one authority: a client that worked out for itself
-    /// whether a city had finished would be the second.
-    pub(super) fn pursuit_lines(&mut self) -> Vec<channels::PursuitLine> {
-        let root = self.city_root.clone();
-        let held: Vec<(Address, String, kernel::PursuitState)> = self
-            .pursuits
-            .iter()
-            .map(|(addr, (goal, state))| (addr.clone(), goal.clone(), *state))
-            .collect();
-        let in_flight = u32::try_from(self.hot.active_count()).unwrap_or(u32::MAX);
-        let mut out = Vec::new();
-        for (addr, goal, state) in held {
-            let ready = self.plans.of(&root, &addr).ready;
-            out.push(channels::PursuitLine {
-                goal,
-                state,
-                verdict: verdict_line(kernel::pursuit::observe(state, &ready, in_flight)),
-                addr,
-            });
-        }
-        out
+    pub(crate) fn head(&self) -> Option<kernel::Seq> {
+        self.head
     }
 
     /// What this city is called: what its first record says, and for a

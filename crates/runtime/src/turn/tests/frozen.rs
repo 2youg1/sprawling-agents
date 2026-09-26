@@ -43,7 +43,7 @@ fn a_prefix_whose_bytes_moved_is_refused_before_anything_is_assembled() {
     let Err(refusal) = turn.assemble(
         Interrupt::None,
         &mut ledger,
-        &drifted,
+        RunPrompt::new(&drifted, &mut PromptRecord::default()),
         &conversation,
         &[],
         &shape(),

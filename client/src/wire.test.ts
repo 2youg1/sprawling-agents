@@ -47,11 +47,11 @@ describe("the wire constants", () => {
 });
 
 describe("client frames", () => {
-  test("a Hello, a Command and two Queries decode to what was sent", () => {
+  test("a Hello, a Command and two Asks decode to what was sent", () => {
     const hello = { hello: { wire_v: WIRE_V, schema: hash, token: null } };
     const command = { command: { steer: { run, text: "keep going", idem } } };
-    const paged = { query: { run_history: { run, before: null, limit: 20 } } };
-    const unit = { query: "city_view" };
+    const paged = { ask: { ask_id: 1, query: { run_history: { run, before: null, limit: 20 } } } };
+    const unit = { ask: { ask_id: 2, query: "city_view" } };
     for (const frame of [hello, command, paged, unit]) {
       expect(accepted(decodeClient(frame))).toEqual(frame);
     }
@@ -64,9 +64,9 @@ describe("client frames", () => {
 });
 
 describe("server frames", () => {
-  test("an Answer with nested values, an Event and a Delta decode to what was sent", () => {
+  test("an Answered with nested values, an Event and a Delta decode to what was sent", () => {
     const answer = {
-      answer: {
+      answered: { ask_id: 3, as_of: 7, outcome: { answer: {
         city: {
           runs: [{ run, who: "planner@acme.1", frozen: false, last_seq: 7, last_kind: "run_started" }],
           active: 1,
@@ -80,10 +80,10 @@ describe("server frames", () => {
               ready: 1,
             },
           ],
-          pursuits: [{ addr: "acme", goal: "ship it", state: "running", verdict: "working on 2.3" }],
+          pursuits: [{ addr: "acme", goal: "ship it", state: "running", verdict: { kind: "work", next: "2.3" } }],
           halted: [],
         },
-      },
+      } } },
     };
     const event = {
       event: {

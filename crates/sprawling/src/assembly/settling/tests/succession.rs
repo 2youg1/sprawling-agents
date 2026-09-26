@@ -79,7 +79,19 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
             completion("over to you", None),
             probed(),
             probed(),
-            tool_completion("looking", "tu_4", "status", serde_json::json!({})),
+            // A call that may write, because only such a wave is fenced
+            // (runtime-SPEC 8-45): a read-only one changes no file.
+            tool_completion(
+                "noting",
+                "tu_4",
+                "edit",
+                serde_json::json!({
+                    "path": "lab/room1/notes.md",
+                    "base_version": "new",
+                    "old": "",
+                    "new": "the lexer\n"
+                }),
+            ),
             completion("done", None),
         ],
     );
@@ -93,6 +105,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"succession"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let bodies = provider.bodies();
@@ -144,7 +157,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
         })
         .expect("the fourth run's wave fences a commit");
     let oid = kernel::GitOid::parse(fenced.data().as_map()["oid"].as_str().unwrap()).unwrap();
-    let mut views = rebuild_views(&report.ledger_dir).unwrap();
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let channels::Answer::Commit(said) = views.answer(&channels::Query::Commit { oid }) else {
         panic!("a commit this city made answers which run wrote it");
     };
@@ -198,6 +211,7 @@ fn the_handoff_in_the_room_reaches_the_successor() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"room-handoff"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let bodies = provider.bodies();

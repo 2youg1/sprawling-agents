@@ -51,7 +51,7 @@ structure Complaint where
   action : String
   subject : String
   recovery : String
-  retriable : Bool
+  retry : String
 deriving BEq, Inhabited
 
 instance : ToString Complaint where
@@ -125,10 +125,6 @@ private def natField (what : String) (pairs : List (String × Json)) (key : Stri
     Except String Nat := do
   (← field what pairs key).getNat?
 
-private def boolField (what : String) (pairs : List (String × Json)) (key : String) :
-    Except String Bool := do
-  (← field what pairs key).getBool?
-
 private def parseWelcome (body : Json) : Except String Welcome := do
   let pairs ← expectObject "Welcome" body
   let city :=
@@ -145,7 +141,7 @@ private def parseComplaint (body : Json) : Except String Complaint := do
          , action := ← stringField "AxError" pairs "action"
          , subject := ← stringField "AxError" pairs "subject"
          , recovery := ← stringField "AxError" pairs "recovery"
-         , retriable := ← boolField "AxError" pairs "retriable" }
+         , retry := ← stringField "AxError" pairs "retry" }
 
 private def parseRecord (body : Json) : Except String Record := do
   let pairs ← expectObject "EventRecord" body
@@ -162,6 +158,15 @@ private def parseAnswer (body : Json) : Except String Frame := do
   | [(tag, inner)] => return .answered tag inner
   | fields => .error s!"an answer is one tagged object, not {fields.length}"
 
+/-- An answered frame carries the asking side's id, the ledger position the
+answer was read at, and one outcome: the answer, or the refusal of the question. -/
+private def parseAnswered (body : Json) : Except String Frame := do
+  let pairs ← expectObject "Answered" body
+  match ← expectObject "AskOutcome" (← field "Answered" pairs "outcome") with
+  | [("answer", inner)] => parseAnswer inner
+  | [("refusal", inner)] => return .refused (← parseComplaint inner)
+  | fields => .error s!"an outcome is one answer or one refusal, not {fields.length} fields"
+
 private def parseDelta (body : Json) : Except String Frame := do
   let pairs ← expectObject "Delta" body
   return .streamed (← stringField "Delta" pairs "run") (← stringField "Delta" pairs "text")
@@ -176,7 +181,7 @@ private def parseFrame (value : Json) : Except String Frame := do
     match tag with
     | "welcome" => return .welcomed (← parseWelcome body)
     | "event" => return .happened (← parseRecord body)
-    | "answer" => parseAnswer body
+    | "answered" => parseAnswered body
     | "refusal" => return .refused (← parseComplaint body)
     | "delta" => parseDelta body
     | "log" => parseLog body

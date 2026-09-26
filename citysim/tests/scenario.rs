@@ -124,7 +124,6 @@ fn the_minimal_loop_closes_and_the_chain_verifies() {
             "model_returned",
             "tool_called",
             "tool_result",
-            "prompt_assembled",
             "prompt_shape_compared",
             "model_called",
             "model_returned",
@@ -247,7 +246,11 @@ fn a_run_takes_every_turn_its_work_asks_for_and_then_concludes() {
     let report = run_scenario(sc).unwrap();
     assert_eq!(report.completion, "done");
     let ks = kinds(&report.lines);
-    assert_eq!(ks.iter().filter(|k| *k == "prompt_assembled").count(), 17);
+    assert_eq!(
+        ks.iter().filter(|k| *k == "prompt_shape_compared").count(),
+        17
+    );
+    assert_eq!(ks.iter().filter(|k| *k == "prompt_assembled").count(), 1);
     assert_eq!(ks.last().unwrap(), "run_frozen");
 }
 
@@ -371,7 +374,6 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
                 who: "worker@sim.1".to_owned(),
                 addr: Address::parse("sim/lobby/room1").unwrap(),
                 mode: kernel::Mode::Up,
-                ctx_used: kernel::Tokens::new(900),
                 ctx_limit: kernel::Tokens::new(8000),
                 trust: "trusted".to_owned(),
                 write_domain: "sim/lobby/room1".to_owned(),

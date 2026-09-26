@@ -50,11 +50,13 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
     let rebuilt = Standing::fold(&report.ledger_dir).unwrap().collaboration;
     let live_queues: std::collections::BTreeMap<String, u32> = worker
+        .collaborating
         .rooms
         .queued()
         .into_iter()
@@ -71,12 +73,12 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
         "a queue the working city holds is a queue a restart finds"
     );
     assert_eq!(
-        worker.goals.len(),
+        worker.collaborating.goals.len(),
         rebuilt.goals.len(),
         "the ground claimed is folded from one rule"
     );
     assert_eq!(
-        worker.requests.len(),
+        worker.collaborating.requests.len(),
         rebuilt.requests.len(),
         "the register of open requests is folded from one rule"
     );
@@ -197,7 +199,7 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
-    let channels::Answer::Endpoints(book) = rebuild_views(&report.ledger_dir)
+    let channels::Answer::Endpoints(book) = crate::views::Views::rebuild(&report.ledger_dir)
         .unwrap()
         .answer(&channels::Query::EndpointView)
     else {
@@ -233,6 +235,7 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag),
         session: None,
         effort: None,
+        model: None,
     };
     let halt = |scope| channels::Command::Halt {
         scope,
@@ -280,7 +283,9 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
 
     // The posture is history, not a field: a second worker over the
     // same ledger knows the building is open again.
-    let restarted = Standing::fold(&ledger_dir(dir.path())).unwrap().governance;
+    let restarted = Standing::fold(&kernel::layout::CityLayout::new(dir.path()).ledger())
+        .unwrap()
+        .governance;
     assert!(restarted.halted.is_empty());
 }
 
@@ -322,7 +327,7 @@ fn when_a_subscription_credential_expires_survives_a_restart() {
         )
         .unwrap();
     assert_eq!(
-        worker.expiries.of("anthropic"),
+        worker.credentials.expiries.of("anthropic"),
         Some(1_700_000_000_000),
         "the worker that wrote the line reads its own book"
     );
@@ -330,7 +335,7 @@ fn when_a_subscription_credential_expires_survives_a_restart() {
     let rebuilt = Standing::fold(&report.ledger_dir).unwrap().expiries;
     assert_eq!(
         rebuilt.of("anthropic"),
-        worker.expiries.of("anthropic"),
+        worker.credentials.expiries.of("anthropic"),
         "a restarted city renews on the schedule the provider stated"
     );
     assert_eq!(

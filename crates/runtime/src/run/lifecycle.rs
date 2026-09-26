@@ -10,16 +10,16 @@ use kernel::event::Who;
 use kernel::event::record::{CheckpointCommitted, RunFrozen, RunStarted};
 use kernel::{
     AxCode, AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, Payload, RunId,
-    StopReason, TimeMs, ToolCall,
+    StopReason, TimeMs,
 };
 
 use crate::conversation::Conversation;
 use crate::handoff::Handoff;
 use crate::prefix::shape::PromptShape;
 use crate::reminder::ContextGauge;
-use crate::turn::{Interrupt, PhaseOutcome, Turn, TurnReport};
+use crate::turn::{Generating, Interrupt, PhaseOutcome, RunPrompt, Turn, TurnReport};
 
-use super::fence::{Fence, FencePolicy};
+use super::fence::{Fence, FencePolicy, Wave};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 
 /// A steer changes what the model reads next, so the driver folds it into
@@ -28,7 +28,8 @@ use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 /// window, the record belongs to the ledger.
 ///
 /// Whichever safe point it arrives at, the fold takes effect at the next
-/// assembly — a steer never rewrites a request already on the wire.
+/// assembly — a steer never rewrites a request already on the wire, which
+/// the conversation holds by knowing what the last assembly sent.
 fn fold_steer(conversation: &mut Conversation, interrupt: &Interrupt) {
     if let Interrupt::Steer { source, text } = interrupt {
         conversation.push_steer(source, text);
@@ -89,6 +90,7 @@ impl Run<Active> {
             parent: plan.parent,
             predecessor: plan.predecessor,
             skills: plan.skills.clone(),
+            dispatched_by: Some(plan.dispatched_by.clone()),
         };
         ledger.append(EventDraft {
             run: plan.run,
@@ -118,6 +120,7 @@ impl Run<Active> {
                 last_turn_t: None,
                 gauge,
                 prior_shape: None,
+                prompt: crate::turn::PromptRecord::default(),
                 fence: FencePolicy::opening(),
             },
         })
@@ -146,7 +149,7 @@ impl Run<Active> {
         let turn = match turn.assemble(
             opening,
             ledger,
-            &self.plan.prefix,
+            RunPrompt::new(&self.plan.prefix, &mut self.state.prompt),
             &self.state.conversation,
             &self.plan.tools,
             &self.plan.shape,
@@ -154,6 +157,7 @@ impl Run<Active> {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };
+        self.state.conversation.mark_sent();
         // What this request looks like to a prompt cache, and which of its
         // regions moved since the request before it. Written here, after the
         // turn has assembled, so the line describes a request that exists;
@@ -182,17 +186,26 @@ impl Run<Active> {
             ledger,
             model,
             &self.plan.policy,
-            // Reborrowed rather than moved: the sink belongs to the
-            // hooks and every later turn needs it too.
-            hooks.deltas.as_deref_mut(),
+            // Reborrowed rather than moved: the sink and the tool face
+            // belong to the hooks and every later turn needs them too.
+            Generating::Speculating {
+                deltas: hooks.deltas.as_deref_mut(),
+                tools: &*hooks.invoke,
+            },
         )? {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };
 
+        // Recorded before the wave, so a `status` call in it reports the
+        // count of the very call that asked for it.
+        if let Some(usage) = turn.usage() {
+            self.plan.context.record(usage.input_tokens);
+        }
         // The fence goes up before the wave, not before a suspicious call:
         // anything the wave deletes then has a commit to come back from.
-        let decided = self.state.fence.for_wave(turn.calls());
+        let touches = Wave::of(turn.calls(), hooks.writes);
+        let decided = self.state.fence.for_wave(touches);
         if let (Fence::Stage, Some(fence)) = (decided, hooks.fence.as_mut()) {
             let committed = fence(t)?;
             ledger.append(EventDraft {
@@ -206,12 +219,10 @@ impl Run<Active> {
             })?;
         }
 
-        self.state.fence.record_wave(decided, turn.calls());
+        self.state.fence.record_wave(decided, touches);
 
         let wave = (hooks.interrupt)(SafePoint::BeforeWave { turn: index });
         fold_steer(&mut self.state.conversation, &wave);
-        let invoke = &mut hooks.invoke;
-        let mut stamped = |call: &ToolCall| invoke(call, t);
         // The same question the three phase boundaries ask, asked again
         // before each call of the wave. A cancel ends the wave there; a
         // steer is recorded by the turn and folded into the window, and
@@ -225,10 +236,11 @@ impl Run<Active> {
             fold_steer(conversation, &arrived);
             arrived
         };
-        let turn = match turn.execute(wave, ledger, &mut stamped, &mut still_going)? {
-            PhaseOutcome::Advanced(next) => next,
-            PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
-        };
+        let turn =
+            match turn.execute_concurrent(wave, ledger, &mut *hooks.invoke, &mut still_going)? {
+                PhaseOutcome::Advanced(next) => next,
+                PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
+            };
 
         let settling = (hooks.interrupt)(SafePoint::BeforeSpawn { turn: index });
         fold_steer(&mut self.state.conversation, &settling);

@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use city::{History, has_history};
 use kernel::event::record::AutonomyChanged;
 use kernel::{Address, AxCode, AxError, EventDraft, EventKind, EventRef};
 use kernel::{Ledger, Payload, RunId};
@@ -15,7 +16,7 @@ use memory::JsonlLedger;
 use crate::serving::open_vault;
 
 use super::freezing::Assembled;
-use super::{RunWorker, ScanReport, ledger_dir, now_ms};
+use super::{RunWorker, ScanReport, SystemClock};
 
 /// The city segment of every prefix, and a file the person is meant to
 /// edit: `init` writes it into the city, and every later run reads that
@@ -66,43 +67,6 @@ pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing 
     city::survey(&entries, history == History::Present)
 }
 
-/// Whether a directory carries a city's history.
-///
-/// Two answers, so a caller cannot read a third state into a `false`: a
-/// ledger directory that is missing or empty is `Absent`, and one with
-/// an entry is `Present`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum History {
-    Absent,
-    Present,
-}
-
-/// Whether this directory already carries a city's history.
-///
-/// The one fact `init` refuses on and `up` branches on, read from one
-/// place so the two can never disagree about what counts as a city.
-///
-/// # Errors
-/// `StorageFatal` when the ledger directory is there but cannot be
-/// listed: calling that `Absent` would let `init` write a second genesis
-/// over a city it merely failed to read.
-pub fn has_history(city_root: &Path) -> Result<History, AxError> {
-    let dir = ledger_dir(city_root);
-    match std::fs::read_dir(&dir) {
-        Ok(mut entries) => Ok(match entries.next() {
-            Some(_) => History::Present,
-            None => History::Absent,
-        }),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(History::Absent),
-        Err(err) => Err(AxError::failure(
-            AxCode::StorageFatal,
-            "read city history",
-            format!("{}: {err}", dir.display()),
-        )
-        .with_recovery("make the ledger directory readable, or name a different city directory")),
-    }
-}
-
 /// `sprawling init <dir>`: the genesis write. The city is born when
 /// `city_initialized` becomes line zero; a second init refuses — history
 /// starts once.
@@ -129,7 +93,7 @@ pub fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
 pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> {
     let history = has_history(city_root)?;
     let standing = standing_of(city_root, history);
-    let dir = ledger_dir(city_root);
+    let dir = kernel::layout::CityLayout::new(city_root).ledger();
     if history == History::Present {
         return Err(AxError::failure(
             AxCode::ConfigInvalid,
@@ -149,7 +113,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
              write, then run `sprawling init` again",
         )
     })?;
-    let now = now_ms()?;
+    let now = accounting::Clock::now(&SystemClock)?;
     let (mut ledger, report) =
         JsonlLedger::open(&dir, now).map_err(memory::MemoryError::into_ax)?;
     let genesis = ledger.append(EventDraft {
@@ -307,6 +271,31 @@ impl RunWorker {
             "city::building",
             &format!("{} adopted as a building", building.addr().as_str()),
         );
+        // The base fence is paid here rather than by the first dispatch,
+        // which would otherwise hash every file of the folder before its
+        // first tool call (memory-SPEC 8-8). No run and no model exist
+        // yet, and an invented model id would be worse than none.
+        let of = memory::Provenance::new(
+            RunId::CITY,
+            addr.clone(),
+            self.city_hash()?,
+            memory::ModelChoice {
+                id: String::new(),
+                effort: None,
+            },
+        );
+        let t = accounting::Clock::now(&*self.clock)?;
+        memory::Checkpoint::open(&self.city_root)
+            .and_then(|checkpoint| {
+                checkpoint.base_fence(&[addr.as_str().to_owned()], t, &of, &mut |step| {
+                    self.note(
+                        runtime::diagnostics::Level::Effect,
+                        "memory::checkpoint",
+                        &format!("{}: base fence {step:?}", addr.as_str()),
+                    );
+                })
+            })
+            .map_err(memory::MemoryError::into_ax)?;
         let payload = city::building_adopted_payload(&building)?;
         self.record(EventKind::BuildingCreated, payload)
     }
@@ -321,7 +310,9 @@ impl RunWorker {
     /// Propagates whatever the chain says about itself: a history that
     /// does not verify is not a history to append closing drafts to.
     pub fn startup_scan(&mut self) -> Result<ScanReport, AxError> {
-        let verified = runtime::replay::verify_ledger_dir(&ledger_dir(&self.city_root))?;
+        let verified = runtime::replay::verify_ledger_dir(
+            &kernel::layout::CityLayout::new(&self.city_root).ledger(),
+        )?;
         let dangling = runtime::replay::dangling_tool_calls(&verified);
         let mut closed = 0usize;
         for (run, seq) in dangling {
@@ -335,7 +326,7 @@ impl RunWorker {
                 | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
             });
             let Some(call) = call else { continue };
-            let draft = runtime::replay::outcome_unknown_draft(&call, now_ms()?)?;
+            let draft = runtime::replay::outcome_unknown_draft(&call, self.clock.now()?)?;
             self.ledger.append(draft)?;
             closed = closed.saturating_add(1);
         }
@@ -360,3 +351,13 @@ impl RunWorker {
     reason = "test code"
 )]
 mod tests;
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod adoption_tests;

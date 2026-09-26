@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The folded index: seq to (segment, byte offset), and the scans that
-//! build it.
+//! The folded index: seq to (segment, byte offset), and what indexing
+//! one line means.
 //!
 //! Nothing here is persisted. The maps are rebuilt from the segments
 //! whenever a reader opens them, and [`crate::index::LedgerIndex`] keeps
@@ -13,20 +13,18 @@
 //! used to carry the same maps; it had no writer left, and a reader of a
 //! file nobody writes is a second answer waiting to disagree.
 //!
-//! The storage is three parallel columns over lines and a span table
+//! The storage is one implicit-seq column over lines and a span table
 //! over runs ([`Entries`], [`RunTable`]). The public queries are the
 //! contract; the layout is theirs to change, and `tests` holds the
 //! BTreeMap-shaped oracle that pins the answers.
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use kernel::{RunId, Seq};
 
-use crate::error::{MemoryError, io_err};
-use crate::jsonl::segment_names;
-use crate::vfs::Vfs;
+mod entries;
+use entries::{Entries, Seqs};
 
 pub(crate) struct Folded {
     pub(crate) scanned: BTreeMap<String, u64>,
@@ -73,9 +71,14 @@ impl Folded {
     /// line: the seq join that carries a run's name is registered with
     /// its spans in the same call.
     pub(crate) fn insert_line(&mut self, name: &str, offset: u64, body: &[u8]) {
-        let Some(located) = locate(body) else {
-            return;
-        };
+        if let Some(located) = locate(body) {
+            self.insert_located(name, offset, located);
+        }
+    }
+
+    /// Indexes a line whose place in the history a caller has already
+    /// read, so the line is not parsed a second time.
+    pub(crate) fn insert_located(&mut self, name: &str, offset: u64, located: Located) {
         self.entries.insert(located.seq, name, offset);
         if let Some(run) = located.run {
             self.runs.add(run, located.seq);
@@ -96,8 +99,8 @@ impl Folded {
         self.entries.tail_seq()
     }
 
-    pub(crate) fn seqs(&self) -> &[Seq] {
-        &self.entries.seqs
+    pub(crate) fn seqs(&self) -> Seqs<'_> {
+        self.entries.seqs()
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -106,76 +109,6 @@ impl Folded {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.entries.len() == 0
-    }
-}
-
-/// seq → (segment name, line offset) as three parallel columns.
-///
-/// `seqs` is strictly increasing and carries the binary search;
-/// `locs` rides beside it as (segment dictionary id, byte offset), so a
-/// ledger of fifty thousand lines holds fifty thousand offsets and one
-/// name per segment instead of one `String` per line. A lookup is one
-/// binary search; an append lands at the end of every column, which is
-/// the common case by the ledger's own append order.
-///
-/// Lines arrive in seq order, but a damaged ledger may say otherwise
-/// and an index over a damaged ledger is exactly what a repair path
-/// needs: an out-of-order line is placed by the same search rather than
-/// trusted, and a seq written twice keeps the last location — the map
-/// this replaced overwrote the same way.
-struct Entries {
-    seqs: Vec<Seq>,
-    segs: Vec<String>,
-    locs: Vec<(usize, u64)>,
-}
-
-impl Entries {
-    fn empty() -> Entries {
-        Entries {
-            seqs: Vec::new(),
-            segs: Vec::new(),
-            locs: Vec::new(),
-        }
-    }
-
-    fn insert(&mut self, seq: Seq, name: &str, offset: u64) {
-        let seg = self.seg_id(name);
-        match self.seqs.binary_search(&seq) {
-            Ok(at) => {
-                if let Some(loc) = self.locs.get_mut(at) {
-                    *loc = (seg, offset);
-                }
-            }
-            Err(at) => {
-                self.seqs.insert(at, seq);
-                self.locs.insert(at, (seg, offset));
-            }
-        }
-    }
-
-    /// The dictionary id of one segment name, minted at first sight.
-    fn seg_id(&mut self, name: &str) -> usize {
-        if let Some(id) = self.segs.iter().position(|held| held == name) {
-            return id;
-        }
-        let id = self.segs.len();
-        self.segs.push(name.to_owned());
-        id
-    }
-
-    fn loc_of(&self, seq: Seq) -> Option<(&str, u64)> {
-        let at = self.seqs.binary_search(&seq).ok()?;
-        let (seg, offset) = self.locs.get(at).copied()?;
-        let name = self.segs.get(seg)?;
-        Some((name.as_str(), offset))
-    }
-
-    fn tail_seq(&self) -> Option<Seq> {
-        self.seqs.last().copied()
-    }
-
-    fn len(&self) -> usize {
-        self.seqs.len()
     }
 }
 
@@ -334,45 +267,14 @@ impl Span {
     }
 }
 
-pub(crate) fn rebuild(vfs: &dyn Vfs, dir: &Path) -> Result<Folded, MemoryError> {
-    let mut folded = Folded::empty();
-    for name in segment_names(vfs, dir)? {
-        let path = dir.join(&name);
-        let bytes = vfs.read(&path).map_err(io_err("read segment", &path))?;
-        let mut offset: u64 = 0;
-        for line in bytes.split_inclusive(|b| *b == b'\n') {
-            let complete = line.last().copied() == Some(b'\n');
-            let body = if complete {
-                line.get(..line.len().saturating_sub(1)).unwrap_or(line)
-            } else {
-                line
-            };
-            // A torn tail carries no seq we can trust; it is skipped, and
-            // the next append overwrites it (jsonl owns that repair).
-            if complete && !body.is_empty() {
-                folded.insert_line(&name, offset, body);
-            }
-            if complete {
-                folded.scanned.insert(
-                    name.clone(),
-                    offset.saturating_add(u64::try_from(line.len()).unwrap_or(0)),
-                );
-            }
-            offset = offset.saturating_add(u64::try_from(line.len()).unwrap_or(0));
-        }
-        folded.scanned.entry(name).or_insert(0);
-    }
-    Ok(folded)
-}
-
-/// Where a line sits and whose it is.
-pub(crate) struct Located {
-    pub(crate) seq: Seq,
+/// Where a line sits in the history and whose it is.
+pub struct Located {
+    pub seq: Seq,
     /// `None` when the line names no run that reads back as one. The
     /// line is still indexed by seq: an index over a damaged ledger is
     /// exactly what a repair path needs, and a line dropped here would
     /// be invisible to every reader.
-    pub(crate) run: Option<RunId>,
+    pub run: Option<RunId>,
 }
 
 /// Reads two fields off one parse. Indexing must not depend on the

@@ -14,7 +14,7 @@
 
 use kernel::{
     Address, AxError, BuildingPolicy, Carrier, Completion, EventDraft, Ledger, Locator, Model,
-    Payload, RunId, TimeMs, ToolCall, ToolDef, ToolOutcome,
+    Payload, RunId, TimeMs, ToolCall, ToolDef,
 };
 
 use kernel::ChatMessage;
@@ -54,13 +54,17 @@ pub struct RunPlan {
     /// fact folded from the ledger rather than inferred from two runs
     /// sharing an address.
     pub predecessor: Option<RunId>,
+    /// Who dispatched this run, written into `run_started`: the line's
+    /// author is always the city's desk, so only the dispatch site
+    /// knows whether the person, the city or a resident sent it.
+    pub dispatched_by: kernel::event::Who,
     /// The conversation this run starts from, when it is the first run of
     /// a session that branched off another. Empty for every other run.
     ///
     /// It is the window's material and not the prefix's: a prefix segment
     /// is a document a person can read and edit, while this is what the
     /// model said and what the tools answered, and the ledger is where
-    /// those live (`runtime::fork::inherited` rebuilds them from it).
+    /// those live (`runtime::fork::inherited_indexed` rebuilds them from it).
     pub inherited: Vec<ChatMessage>,
     pub shape: CallShape,
     /// Where the context reminder's second rung sits for this run: the
@@ -69,6 +73,10 @@ pub struct RunPlan {
     /// setting here, so "each rung sounds once per run" cannot depend on
     /// when somebody edited a file.
     pub second_threshold: Option<kernel::SecondThreshold>,
+    /// Where this run records the provider's count after each call. The
+    /// caller keeps a clone for whatever reports the reading, which is
+    /// `status`: the run writes it and nothing else does.
+    pub context: crate::ContextReading,
     pub prefix: FrozenPrefix,
     pub policy: BuildingPolicy,
     pub tools: Vec<ToolDef>,
@@ -137,11 +145,15 @@ pub struct RunHooks<'a> {
     /// The pre-wave checkpoint fence. `None` runs without a net, which
     /// the tool layer refuses for anything that can delete.
     pub fence: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,
-    /// Runs one tool call. The turn's stamp rides along because the tool
-    /// layer stamps results and derives idempotency keys from it, and a
-    /// caller that sampled its own clock there would be a second time
-    /// source inside one turn.
-    pub invoke: &'a mut dyn FnMut(&ToolCall, TimeMs) -> Result<ToolOutcome, AxError>,
+    /// What a call may write, by its declared effect, asked before the
+    /// wave runs: a wave whose every call answers `Nothing` changes no
+    /// file, so it needs no fence of its own (§8-45).
+    pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes,
+    /// Runs a wave's tool calls in three stages (see
+    /// [`crate::ConcurrentInvoke`]). The turn's stamp rides along because
+    /// the tool layer stamps results from it, and a caller that sampled
+    /// its own clock there would be a second time source inside one turn.
+    pub invoke: &'a mut dyn crate::ConcurrentInvoke,
     /// Holds the run until the moment the watchdog set for the next call
     /// to a provider that failed, and answers whether that call may go.
     ///
@@ -174,6 +186,9 @@ pub struct Active {
     /// the next one is compared against. `None` before the first
     /// request, and that absence is the `FirstRequest` a record states.
     prior_shape: Option<crate::prefix::shape::PromptShape>,
+    /// The `prompt_assembled` payload this run wrote last, which a turn
+    /// does not write again (runtime-SPEC.md section 8-39, item 5).
+    prompt: crate::turn::PromptRecord,
     /// Whether the next wave needs a fence (§8-45).
     fence: fence::FencePolicy,
 }
@@ -243,7 +258,7 @@ pub fn drive(
     hooks: &mut RunHooks<'_>,
     handoff: &Handoff,
 ) -> Result<Run<Frozen>, AxError> {
-    let mut watchdog = crate::Watchdog::new(plan.retries);
+    let mut watchdog = crate::Watchdog::new(plan.retries, plan.run);
     let mut run = Run::dispatch(plan, ledger, hooks)?;
     let ending = loop {
         match run.advance(ledger, model, hooks) {

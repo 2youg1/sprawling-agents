@@ -17,6 +17,8 @@
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::redundant_closure,
+    clippy::disallowed_methods,
     reason = "test code"
 )]
 
@@ -183,6 +185,7 @@ fn plan() -> RunPlan {
         job: Locator::parse(&format!("file:{}/JOB.md@{}", addr.as_str(), "a".repeat(40))).unwrap(),
         parent: None,
         predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
         inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),
@@ -191,6 +194,7 @@ fn plan() -> RunPlan {
             context_tokens: 0,
         },
         second_threshold: None,
+        context: runtime::ContextReading::default(),
         prefix: FrozenPrefix::assemble(
             FrozenSegment::new(SegmentSlot::City, b"city".to_vec()),
             FrozenSegment::new(SegmentSlot::Building, b"building".to_vec()),
@@ -246,6 +250,7 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -264,7 +269,6 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
             "model_returned",
             "tool_called",
             "tool_result",
-            "prompt_assembled",
             "prompt_shape_compared",
             "model_called",
             "model_returned",
@@ -282,8 +286,8 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
     assert_eq!(stamps[1], 1);
     assert_eq!(stamps[2], 2);
     assert_eq!(stamps[8], 3);
-    assert_eq!(stamps[12], 4);
-    assert_eq!(stamps[13], 5);
+    assert_eq!(stamps[11], 4);
+    assert_eq!(stamps[12], 5);
 }
 
 /// There is no ceiling to reach, so a run goes on until its
@@ -314,6 +318,7 @@ fn a_retriable_failure_is_made_again_up_to_the_number_the_person_set() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -360,6 +365,7 @@ fn a_ceiling_that_is_reached_ends_the_run() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -396,6 +402,7 @@ fn a_run_ends_when_its_work_runs_out_rather_than_at_a_ceiling() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -432,6 +439,7 @@ fn a_cancel_at_a_safe_point_freezes_inside_the_interrupted_turn() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -477,6 +485,7 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
             now: &mut now,
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
+            writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
             invoke: &mut invoke,
             wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
             deltas: None,
@@ -519,6 +528,7 @@ fn a_run_that_calls_nothing_puts_up_no_fence() {
             now: &mut now,
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
+            writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
             invoke: &mut invoke,
             wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
             deltas: None,
@@ -527,6 +537,44 @@ fn a_run_that_calls_nothing_puts_up_no_fence() {
         assert!(matches!(frozen.completion(), Completion::Done(_)));
     }
     // Nothing ran and nothing will: the tree is the one the run opened on.
+    assert_eq!(fenced, Vec::<u64>::new());
+}
+
+/// A wave whose every call only reads changes no file: it needs no fence
+/// before it, and the closing turn after it has no writes to carry.
+#[test]
+fn a_read_only_wave_puts_up_no_fence() {
+    let mut ledger = RecordingLedger::new();
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+        waves: vec![vec![call("t-1")]],
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut fenced: Vec<u64> = Vec::new();
+    let mut fence = |t: TimeMs| {
+        fenced.push(t.value());
+        Ok(Payload::empty())
+    };
+    {
+        let mut hooks = RunHooks {
+            now: &mut now,
+            interrupt: &mut interrupt,
+            fence: Some(&mut fence),
+            writes: &|_: &kernel::ToolCall| kernel::Writes::Nothing,
+            invoke: &mut invoke,
+            wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+            deltas: None,
+        };
+        let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+        assert!(matches!(frozen.completion(), Completion::Done(_)));
+    }
     assert_eq!(fenced, Vec::<u64>::new());
 }
 
@@ -549,6 +597,7 @@ fn advance_reports_each_turn_so_a_caller_can_stop_between_them() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -597,6 +646,7 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -648,6 +698,7 @@ fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts()
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -698,6 +749,7 @@ fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -750,6 +802,7 @@ fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -766,7 +819,7 @@ fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
 }
 
 /// A provider answering 500 in a row is asked again on a backoff that
-/// doubles, each wait is the moment the history records, and a halt that
+/// doubles (plus the run's jitter), each wait is the moment the history records, and a halt that
 /// lands during a wait stops the run there. Before the wait hook the
 /// loop asked again at once, recorded a wait it never took, and a root
 /// run had no safe point inside the retry for a halt to reach.
@@ -799,6 +852,7 @@ fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut wait,
         deltas: None,
@@ -820,7 +874,14 @@ fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
         .collect();
     let backoffs: Vec<u64> = fired.iter().map(|(t, until)| until - t).collect();
     let untils: Vec<u64> = fired.iter().map(|(_, until)| *until).collect();
-    assert_eq!(backoffs, vec![500, 1_000, 2_000], "the wait doubles");
+    assert!(
+        backoffs
+            .iter()
+            .zip([500, 1_000, 2_000])
+            .all(|(wait, base)| (base..=base + base / 2).contains(wait))
+            && backoffs.len() == 3,
+        "the wait doubles, plus at most half again of jitter: {backoffs:?}"
+    );
     assert_eq!(waited, untils, "the run waits for the moment it records");
     assert_eq!(*attempts.borrow(), 3, "no call goes out after the halt");
     assert!(matches!(frozen.completion(), Completion::Cancelled));
@@ -857,6 +918,7 @@ fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -881,4 +943,349 @@ fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
         seen.borrow()[1].contains("measure it in metres"),
         "and the next assembly carries it"
     );
+}
+
+const READS: u32 = 3;
+
+/// Long enough that a thread the scheduler delays under a loaded build
+/// still arrives; a serial wave waits it out on every read and fails.
+const ARRIVAL_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Where the reads of one wave meet: each read waits until every read of
+/// the wave has started, then notes how many had started while it was
+/// still running. A read that saw them all overlapped every other read.
+struct Meeting {
+    started: std::sync::Mutex<u32>,
+    arrived: std::sync::Condvar,
+    fewest_seen: std::sync::Mutex<u32>,
+}
+
+/// A read-only tool; with a meeting, each call waits at it.
+struct MeetingRead {
+    meta: kernel::ToolMeta,
+    meeting: Option<std::sync::Arc<Meeting>>,
+}
+
+impl kernel::Tool for MeetingRead {
+    fn meta(&self) -> &kernel::ToolMeta {
+        &self.meta
+    }
+
+    fn invoke(&self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
+        if let Some(meeting) = &self.meeting {
+            let mut started = meeting.started.lock().unwrap();
+            *started = started.saturating_add(1);
+            meeting.arrived.notify_all();
+            let (started, _) = meeting
+                .arrived
+                .wait_timeout_while(started, ARRIVAL_WAIT, |seen| *seen < READS)
+                .unwrap();
+            let mut fewest = meeting.fewest_seen.lock().unwrap();
+            *fewest = (*fewest).min(*started);
+        }
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    }
+}
+
+/// The bench's three stages, with each call's key placed by its
+/// position in the run, as the lane places it. It stays because runtime
+/// cannot depend on sprawling, where the served city's `Placing` lives;
+/// that one is judged in sprawling's `driving::tests::placing`.
+struct Placed {
+    bench: runtime::bench::ToolBench,
+    next: u64,
+}
+
+impl Placed {
+    fn with(meeting: Option<std::sync::Arc<Meeting>>) -> Placed {
+        Placed::of(Box::new(MeetingRead {
+            meta: read_meta(),
+            meeting,
+        }))
+    }
+
+    fn of(read: Box<dyn kernel::Tool>) -> Placed {
+        let domain = kernel::WriteDomain::new(vec![Address::parse("lab").unwrap()]).unwrap();
+        let mut bench = runtime::bench::ToolBench::new(domain);
+        bench.register(read).unwrap();
+        Placed { bench, next: 0 }
+    }
+
+    fn key(&mut self, call: &ToolCall) -> kernel::IdemKey {
+        let at = self.next;
+        self.next = at.saturating_add(1);
+        kernel::IdemKey::derive(
+            &RunId::from_bytes([7; 16]),
+            kernel::Seq::new(at),
+            call.id.as_bytes(),
+        )
+    }
+}
+
+fn read_meta() -> kernel::ToolMeta {
+    kernel::ToolMeta {
+        name: ToolName::parse("read").unwrap(),
+        disclosure: "reads a file".to_owned(),
+        params: Payload::empty(),
+        effect: kernel::Effect::Read,
+        cost_tier: kernel::CostTier::Free,
+        timeout: None,
+        render: kernel::RenderIntent::Generic,
+        temporal: kernel::Temporal::Timeless,
+    }
+}
+
+fn answer(outcome: runtime::bench::BenchOutcome) -> Result<ToolOutcome, AxError> {
+    match outcome {
+        runtime::bench::BenchOutcome::Ran { outcome, .. }
+        | runtime::bench::BenchOutcome::Duplicate { outcome } => Ok(outcome),
+        runtime::bench::BenchOutcome::Refused { refusal } => Err(*refusal),
+    }
+}
+
+impl runtime::ConcurrentInvoke for Placed {
+    fn effect_of(&self, call: &ToolCall) -> Option<kernel::Effect> {
+        self.bench
+            .meta_of(&call.name)
+            .map(|meta| meta.effect.clone())
+    }
+
+    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> runtime::Admitted {
+        let key = self.key(call);
+        match self.bench.clear(call, &key, t) {
+            Ok(runtime::bench::Clearance::Cleared(ticket)) => runtime::Admitted::Cleared(ticket),
+            Ok(runtime::bench::Clearance::Answered(outcome)) => {
+                runtime::Admitted::Answered(answer(outcome))
+            }
+            Err(refused) => runtime::Admitted::Answered(Err(refused)),
+        }
+    }
+
+    fn ahead(&self, call: &ToolCall) -> Option<&dyn kernel::Tool> {
+        self.bench.tool_named(&call.name)
+    }
+
+    fn tool(&self, ticket: &runtime::bench::Ticket) -> Result<&dyn kernel::Tool, AxError> {
+        self.bench.tool_for(ticket)
+    }
+
+    fn account(
+        &mut self,
+        _call: &ToolCall,
+        ticket: runtime::bench::Ticket,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<ToolOutcome, AxError> {
+        self.bench.account(ticket, answered).and_then(answer)
+    }
+}
+
+fn three_reads_driven(invoke: &mut dyn runtime::ConcurrentInvoke) -> RecordingLedger {
+    let read = |id: &str| ToolCall {
+        id: id.to_owned(),
+        name: ToolName::parse("read").unwrap(),
+        args: Payload::empty(),
+    };
+    let mut ledger = RecordingLedger::new();
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+        waves: vec![vec![read("r1"), read("r2"), read("r3")]],
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    ledger
+}
+
+/// The production driver runs a wave's leading reads at once, and the
+/// ledger it leaves is the one the same calls leave one after another.
+#[test]
+fn three_reads_a_run_makes_in_one_wave_are_in_flight_together_and_leave_the_serial_ledger() {
+    let mut one_by_one = Placed::with(None);
+    let mut invoke = |call: &ToolCall, t: TimeMs| {
+        let key = one_by_one.key(call);
+        one_by_one.bench.invoke(call, &key, t).and_then(answer)
+    };
+    let serial = three_reads_driven(&mut invoke);
+
+    let meeting = std::sync::Arc::new(Meeting {
+        started: std::sync::Mutex::new(0),
+        arrived: std::sync::Condvar::new(),
+        fewest_seen: std::sync::Mutex::new(u32::MAX),
+    });
+    let concurrent = three_reads_driven(&mut Placed::with(Some(meeting.clone())));
+
+    assert_eq!(concurrent.lines, serial.lines);
+    // In a serial wave the first read finishes before the second starts.
+    assert_eq!(*meeting.fewest_seen.lock().unwrap(), READS);
+}
+
+#[test]
+fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
+    let mut ledger = RecordingLedger::new();
+    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::clone(&seen),
+        waves: vec![vec![call("t-1")]],
+    };
+    let mut now = counter();
+    let mut interrupt = |point: SafePoint| match point {
+        SafePoint::BeforeCall { turn: 0 } => Interrupt::Steer {
+            source: "user".to_owned(),
+            text: "measure it in metres".to_owned(),
+        },
+        _ => Interrupt::None,
+    };
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+
+    let seen = seen.borrow();
+    // The cache marker moves to the newest message; every byte before it
+    // is the request already sent.
+    let first = seen[0].strip_suffix("cache: true }]").unwrap();
+    assert!(
+        seen[1].starts_with(first),
+        "the second request extends the first:\n{}\n{}",
+        seen[0],
+        seen[1]
+    );
+    assert!(
+        seen[1].ends_with("Text { text: \"user: measure it in metres\" }], cache: true }]"),
+        "the steer lands after the result it arrived during: {}",
+        seen[1]
+    );
+}
+
+/// How long the generating model writes text after it hands its read
+/// over, and how long that read takes to answer.
+const WRITING: std::time::Duration = std::time::Duration::from_millis(500);
+const READING: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// A read-only tool that takes `READING` to answer.
+struct SlowRead;
+
+impl kernel::Tool for SlowRead {
+    fn meta(&self) -> &kernel::ToolMeta {
+        static META: std::sync::OnceLock<kernel::ToolMeta> = std::sync::OnceLock::new();
+        META.get_or_init(read_meta)
+    }
+
+    fn invoke(&self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
+        std::thread::sleep(READING);
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    }
+}
+
+/// A streaming model that hands each call of its wave over as the call
+/// completes, then writes text for `WRITING` before its answer settles.
+struct GeneratingModel {
+    waves: Vec<Vec<ToolCall>>,
+}
+
+impl Model for GeneratingModel {
+    fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        self.call_speculating(req, &mut |_: &kernel::Increment| {}, &mut |_: &ToolCall| {})
+    }
+
+    fn call_speculating(
+        &mut self,
+        _req: &ModelRequest,
+        _onto: kernel::Increments<'_>,
+        early: kernel::EarlyCalls<'_>,
+    ) -> Result<ModelReturn, AxError> {
+        let calls = if self.waves.is_empty() {
+            Vec::new()
+        } else {
+            self.waves.remove(0)
+        };
+        calls.iter().for_each(|call| early(call));
+        if !calls.is_empty() {
+            std::thread::sleep(WRITING);
+        }
+        Ok(ModelReturn::bare(
+            message_payload(&[ContentBlock::Text {
+                text: "reading".to_owned(),
+            }])
+            .unwrap(),
+            calls,
+        ))
+    }
+}
+
+fn one_read_while_generating(
+    invoke: &mut dyn runtime::ConcurrentInvoke,
+) -> (RecordingLedger, std::time::Duration) {
+    let mut ledger = RecordingLedger::new();
+    let mut model = GeneratingModel {
+        waves: vec![vec![ToolCall {
+            id: "r1".to_owned(),
+            name: ToolName::parse("read").unwrap(),
+            args: Payload::empty(),
+        }]],
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+    let began = std::time::Instant::now();
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    (ledger, began.elapsed())
+}
+
+/// A read the model hands over before it finishes writing runs while it
+/// writes: the turn takes about the longer of the two, not their sum,
+/// and the ledger is the one the same read leaves when it runs after the
+/// answer settles.
+#[test]
+fn a_read_handed_over_while_the_model_writes_runs_during_the_writing() {
+    let mut one_by_one = Placed::of(Box::new(SlowRead));
+    let mut invoke = |call: &ToolCall, t: TimeMs| {
+        let key = one_by_one.key(call);
+        one_by_one.bench.invoke(call, &key, t).and_then(answer)
+    };
+    let (serial, _) = one_read_while_generating(&mut invoke);
+
+    let (speculated, took) = one_read_while_generating(&mut Placed::of(Box::new(SlowRead)));
+
+    assert!(
+        took < WRITING + READING,
+        "the read waited for the model to finish writing: the run took {took:?}"
+    );
+    assert_eq!(speculated.lines, serial.lines);
 }

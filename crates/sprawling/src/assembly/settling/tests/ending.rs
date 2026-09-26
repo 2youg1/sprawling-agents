@@ -34,6 +34,7 @@ fn an_allowed_item_carries_the_work_on_instead_of_asking_for_the_command_again()
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"first"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -174,6 +175,7 @@ fn work_handed_down_becomes_a_run_that_cannot_hand_it_down_again() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     // The work went down without anybody being asked: one level of
@@ -282,15 +284,16 @@ fn what_came_back_from_a_delegate_waits_in_the_room_that_asked_for_it() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
-    let waiting = worker.rooms.pending(&room);
+    let waiting = worker.collaborating.rooms.pending(&room);
     assert_eq!(
         waiting, 1,
         "exactly one handback per piece of work handed down"
     );
-    let taken = worker.rooms.pull_at_home(&room).unwrap();
+    let taken = worker.collaborating.rooms.pull_at_home(&room).unwrap();
     let body = taken[0].payload().as_map();
     assert_eq!(body["room"], "lab/helper");
     assert_eq!(
@@ -346,6 +349,7 @@ fn status_tells_a_run_where_the_work_it_handed_down_went() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

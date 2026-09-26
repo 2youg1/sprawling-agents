@@ -11,9 +11,12 @@ mod reading;
 use std::collections::BTreeSet;
 use std::sync::Mutex;
 
+use accounting::Runnable;
+
 use super::paint::Ink;
 use super::screen::{Asked, run};
 use super::*;
+use crate::serving::standing::Standing;
 
 /// A machine that answers from a script and installs nothing.
 ///
@@ -23,6 +26,7 @@ use super::*;
 pub(super) struct ScriptedMachine {
     absent: BTreeSet<&'static str>,
     asked: Mutex<Vec<String>>,
+    core: Standing,
 }
 
 impl ScriptedMachine {
@@ -30,7 +34,12 @@ impl ScriptedMachine {
         ScriptedMachine {
             absent: absent.iter().copied().collect(),
             asked: Mutex::new(Vec::new()),
+            core: Standing::Raised,
         }
+    }
+
+    pub(super) fn standing(self, core: Standing) -> ScriptedMachine {
+        ScriptedMachine { core, ..self }
     }
 }
 
@@ -44,6 +53,16 @@ impl Machine for ScriptedMachine {
                 version: Version::Said("9.9.9".to_owned()),
             }
         }
+    }
+
+    fn core_standing(&self) -> Result<Standing, kernel::AxError> {
+        Ok(self.core.clone())
+    }
+}
+
+impl accounting::Machine for ScriptedMachine {
+    fn report(&self) -> channels::DoctorAnswer {
+        super::answer(self)
     }
 
     fn install(&self, name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {

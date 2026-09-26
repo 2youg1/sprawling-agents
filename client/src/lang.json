@@ -155,6 +155,10 @@
     "en": "rebuildable:",
     "zh": "可重建："
   },
+  "bin_restore": {
+    "en": "put back",
+    "zh": "放回原处"
+  },
   "bin_restored": {
     "en": "restored",
     "zh": "已找回"
@@ -184,8 +188,8 @@
     "zh": "给 {addr} 一个长期目标"
   },
   "bld_halt": {
-    "en": "/stop {addr}",
-    "zh": "/stop {addr}"
+    "en": "/halt {addr}",
+    "zh": "/halt {addr}"
   },
   "bld_no_rooms": {
     "en": "no rooms yet",
@@ -210,6 +214,22 @@
   "bld_pursue": {
     "en": "set as standing goal",
     "zh": "设为常设目标"
+  },
+  "bld_pursuit_finished": {
+    "en": "finished: nothing is ready and nobody is working",
+    "zh": "已完成：没有就绪的活，也没有 run 在做"
+  },
+  "bld_pursuit_paused": {
+    "en": "paused",
+    "zh": "已暂停"
+  },
+  "bld_pursuit_waiting": {
+    "en": "waiting for {runs} run(s) still going",
+    "zh": "在等 {runs} 个还没结束的 run"
+  },
+  "bld_pursuit_working": {
+    "en": "working on {node}",
+    "zh": "正在做 {node}"
   },
   "bld_release": {
     "en": "/release {addr}",
@@ -312,8 +332,8 @@
     "zh": "已花 {usd}"
   },
   "city_stop": {
-    "en": "/stop --all",
-    "zh": "/stop --all"
+    "en": "/halt --all",
+    "zh": "/halt --all"
   },
   "city_stopped": {
     "en": "stopped",
@@ -391,6 +411,10 @@
     "en": "cost",
     "zh": "成本"
   },
+  "cost_unpriced": {
+    "en": "{calls} model calls came back with no price; they used {tokens} tokens",
+    "zh": "{calls} 次模型调用没有报价，共用了 {tokens} 个 token"
+  },
   "context_second_save": {
     "en": "write it",
     "zh": "写入"
@@ -412,8 +436,8 @@
     "zh": "窗口用到几成时，提醒该写交接了"
   },
   "context_second_range": {
-    "en": "a whole percent of the window from {min} to {max}; the default is {default}",
-    "zh": "窗口的整数百分比，{min} 到 {max}；默认 {default}"
+    "en": "a whole percent of the window from {min} to {max}; an empty box is the city's default",
+    "zh": "窗口的整数百分比，{min} 到 {max}；留空即城的默认值"
   },
   "desktop_allowlist": {
     "en": "windows this building may touch",
@@ -778,6 +802,30 @@
   "machine_checking": {
     "en": "checking",
     "zh": "检查中"
+  },
+  "machine_core": {
+    "en": "core threads",
+    "zh": "核心线程"
+  },
+  "machine_core_held": {
+    "en": "normal, as config.toml [core] priority asks",
+    "zh": "正常档，按 config.toml 的 [core] priority"
+  },
+  "machine_core_lowered": {
+    "en": "normal, lowered after keeping a core busy",
+    "zh": "正常档，占满一个核之后被降回"
+  },
+  "machine_core_raised": {
+    "en": "one step above normal",
+    "zh": "比正常档高一档"
+  },
+  "machine_core_refused": {
+    "en": "normal, the platform refused the raise",
+    "zh": "正常档，平台拒绝了升档"
+  },
+  "machine_core_unasked": {
+    "en": "not asked",
+    "zh": "没能问到"
   },
   "machine_install": {
     "en": "install",
@@ -1366,6 +1414,42 @@
   "presence_title": {
     "en": "what the city is telling you",
     "zh": "城里的动静"
+  },
+  "provider_cut": {
+    "en": "the answer stopped part-way; the same request is worth sending again",
+    "zh": "回答中途断了，同一个请求值得再发一次"
+  },
+  "provider_exchange": {
+    "en": "the request never completed; the same request is worth sending again",
+    "zh": "请求没有完成，同一个请求值得再发一次"
+  },
+  "provider_overflow": {
+    "en": "the conversation no longer fits this model's window (the provider answered {status}); start a new session that keeps the summary, or choose a model with a larger window",
+    "zh": "对话已经放不进这个模型的窗口（供应方回答 {status}）：开一个带摘要的新会话，或换一个窗口更大的模型"
+  },
+  "provider_refused": {
+    "en": "the provider refused with {status}; check this endpoint's model name, key and dialect",
+    "zh": "供应方以 {status} 拒绝了请求：检查这个接口的模型名、密钥和接口形态"
+  },
+  "provider_refused_busy": {
+    "en": "the provider answered {status}: busy or broken for now; the same request is worth sending again",
+    "zh": "供应方回答 {status}，表示它此刻忙或出了故障，同一个请求值得再发一次"
+  },
+  "provider_reported": {
+    "en": "the provider reported an error part-way through its answer",
+    "zh": "供应方在回答中途报了错"
+  },
+  "provider_silence": {
+    "en": "the provider went silent mid-answer; the same request is worth sending again",
+    "zh": "供应方回答到一半不再出声，同一个请求值得再发一次"
+  },
+  "provider_unbuilt": {
+    "en": "this side could not build the request; check this endpoint's base_url and extra headers",
+    "zh": "这一侧没能造出请求：检查这个接口的 base_url 和附加请求头"
+  },
+  "provider_unreadable": {
+    "en": "the provider answered in a shape the city cannot read; check this endpoint's dialect",
+    "zh": "供应方的回答城读不懂：检查这个接口的接口形态"
   },
   "rec_archive": {
     "en": "the archive",
@@ -2079,6 +2163,10 @@
     "en": "walk the welcome again",
     "zh": "再走一遍欢迎页"
   },
+  "setup_retries_until_halted": {
+    "en": "until halted",
+    "zh": "直到叫停"
+  },
   "setup_select_all": {
     "en": "choose all",
     "zh": "全选"
@@ -2200,8 +2288,8 @@
     "zh": "跳到页面内容"
   },
   "slash_clear": {
-    "en": "empty the box",
-    "zh": "清空输入框"
+    "en": "drop this conversation and start a new session here",
+    "zh": "丢掉这段对话，在此地址开一个新对话"
   },
   "slash_dispatch": {
     "en": "open a run with these words",
@@ -2256,8 +2344,8 @@
     "zh": "把这句话说进正在跑的 run"
   },
   "slash_stop": {
-    "en": "stop this run, one building, or the whole city",
-    "zh": "停下这次 run、某栋楼，或整座城"
+    "en": "cancel the run that is going",
+    "zh": "取消正在跑的这次 run"
   },
   "slot_building": {
     "en": "building",
@@ -2379,7 +2467,6 @@
     "en": "hearing…",
     "zh": "听写中…"
   },
-
   "talk_landed": {
     "en": "this run went to",
     "zh": "这次 run 去了"
@@ -2473,8 +2560,8 @@
     "zh": "/steer"
   },
   "talk_steer_queued": {
-    "en": "/steer --queued",
-    "zh": "/steer --queued"
+    "en": "/steer · after the tool call",
+    "zh": "/steer · 工具调用之后"
   },
   "talk_stop": {
     "en": "/stop",
@@ -3207,5 +3294,429 @@
   "gallery_runs_many": {
     "en": "the runs board with 1,200 runs: only the rows on screen are drawn",
     "zh": "1200 个 run 的全城 run 板：只画屏幕上的行"
+  },
+  "slash_halt": {
+    "en": "stop one building, or the whole city, until released",
+    "zh": "停下某栋楼或整座城，直到放行"
+  },
+  "slash_diff": {
+    "en": "open the changes of the run in this room",
+    "zh": "打开此房间 run 的改动"
+  },
+  "ask_late_title": {
+    "en": "no answer came back to the {query} question",
+    "zh": "{query} 这个问题没有等到回答"
+  },
+  "talk_model_kept": {
+    "en": "this session",
+    "zh": "本会话"
+  },
+  "talk_model_locked": {
+    "en": "model, kept by this session: another model opens a new session",
+    "zh": "模型，本会话固定：换模型会开一个新会话"
+  },
+  "bld_remove": {
+    "en": "Remove {addr}",
+    "zh": "移走 {addr}"
+  },
+  "bld_remove_busy": {
+    "en": "stop the runs here before removing this building",
+    "zh": "先停下这里在跑的派活，再移走这栋楼"
+  },
+  "bld_remove_title": {
+    "en": "Remove {addr} from the city?",
+    "zh": "把 {addr} 移出城？"
+  },
+  "bld_remove_detail": {
+    "en": "Its files move to .sprawling/removed and its history stays in the ledger. Move the folder back to the city root and adopt it to bring it back.",
+    "zh": "它的文件搬到 .sprawling/removed，历史留在 ledger 里。把文件夹搬回城的根目录再收编，就能找回。"
+  },
+  "machine_spare": {
+    "en": "one of a kind that needs only one, and another is here",
+    "zh": "同类有一个即可，已经有了"
+  },
+  "setup_effort_standing": {
+    "en": "in force at {addr}: {effort}, from {from}",
+    "zh": "{addr} 现在的档位：{effort}，来自{from}"
+  },
+  "setup_effort_unstated": {
+    "en": "in force at {addr}: no level stated, so the provider decides",
+    "zh": "{addr} 现在没有写档位，由供应方决定"
+  },
+  "setup_effort_from_city": {
+    "en": "the city's CONFIG.toml",
+    "zh": "城的 CONFIG.toml"
+  },
+  "setup_effort_from_building": {
+    "en": "this building's own file",
+    "zh": "这栋楼自己的文件"
+  },
+  "setup_effort_from_default": {
+    "en": "the city's built-in default",
+    "zh": "城的内置默认值"
+  },
+  "setup_effort_from_resident": {
+    "en": "the room's own file",
+    "zh": "这个房间自己的文件"
+  },
+  "setup_effort_where": {
+    "en": "to choose another level for one conversation, use the third box under the composer",
+    "zh": "要为一段对话另选档位，用对话框下方的第三格"
+  },
+  "showing_label": {
+    "en": "show",
+    "zh": "显示"
+  },
+  "showing_whole": {
+    "en": "everything",
+    "zh": "全部"
+  },
+  "showing_results": {
+    "en": "results only",
+    "zh": "只看结果"
+  },
+  "results_waiting": {
+    "en": "waiting for you",
+    "zh": "等你"
+  },
+  "results_failed": {
+    "en": "failed",
+    "zh": "失败"
+  },
+  "results_done": {
+    "en": "just finished",
+    "zh": "刚完成"
+  },
+  "results_ended": {
+    "en": "ended",
+    "zh": "已结束"
+  },
+  "results_more": {
+    "en": "{n} more",
+    "zh": "还有 {n} 条"
+  },
+  "results_none": {
+    "en": "nothing here",
+    "zh": "暂无"
+  },
+  "results_produced": {
+    "en": "what it produced",
+    "zh": "产出"
+  },
+  "results_produced_line": {
+    "en": "changed {files} files · +{added} −{removed}",
+    "zh": "改了 {files} 个文件 · +{added} −{removed}"
+  },
+  "results_row_produced": {
+    "en": "{files} files · +{added} −{removed}",
+    "zh": "{files} 个文件 · +{added} −{removed}"
+  },
+  "results_all": {
+    "en": "all",
+    "zh": "全部"
+  },
+  "results_tab": {
+    "en": "{name} {n}",
+    "zh": "{name} {n}"
+  },
+  "results_which": {
+    "en": "which outcomes to list",
+    "zh": "列哪些结果"
+  },
+  "results_city": {
+    "en": "{runs} runs · {rest} still working or set aside, not listed",
+    "zh": "{runs} 个 run · 其余 {rest} 个在干活或已放下，不列出"
+  },
+  "results_minutes": {
+    "en": "last ten minutes",
+    "zh": "最近十分钟"
+  },
+  "results_hour": {
+    "en": "this hour",
+    "zh": "这一小时"
+  },
+  "results_earlier": {
+    "en": "earlier",
+    "zh": "更早"
+  },
+  "showing_note": {
+    "en": "Results only draws a room's words, answers, endings and what they produced, and the city's waiting, failed and finished runs. The switch on either page changes this too.",
+    "zh": "只看结果时，房间只画人的话、回答、结局与产出，城只列等你、失败、刚完成三类。两页上的开关也会改这一项。"
+  },
+  "run_time": {
+    "en": "time",
+    "zh": "时间"
+  },
+  "run_head_region": {
+    "en": "run summary",
+    "zh": "run 概况"
+  },
+  "run_head_outcome": {
+    "en": "outcome",
+    "zh": "结局"
+  },
+  "run_head_took": {
+    "en": "took",
+    "zh": "用时"
+  },
+  "run_head_started": {
+    "en": "started {clock}",
+    "zh": "{clock} 开始"
+  },
+  "run_head_tokens": {
+    "en": "tokens in / out",
+    "zh": "token 入 / 出"
+  },
+  "run_head_cached": {
+    "en": "{n} cached",
+    "zh": "缓存 {n}"
+  },
+  "run_head_spent": {
+    "en": "spent",
+    "zh": "花费"
+  },
+  "run_head_turns": {
+    "en": "{n} turns",
+    "zh": "{n} 个回合"
+  },
+  "run_head_model": {
+    "en": "model",
+    "zh": "模型"
+  },
+  "run_head_origin": {
+    "en": "from",
+    "zh": "来处"
+  },
+  "run_head_dispatched_by": {
+    "en": "dispatched by",
+    "zh": "由谁派来"
+  },
+  "run_river": {
+    "en": "where the time went, by turn",
+    "zh": "时间花在哪，按回合"
+  },
+  "run_calls": {
+    "en": "tool calls",
+    "zh": "工具调用"
+  },
+  "run_no_calls": {
+    "en": "no tool calls yet",
+    "zh": "还没有工具调用"
+  },
+  "run_no_turns": {
+    "en": "no turns yet",
+    "zh": "还没有回合"
+  },
+  "results_row_pr": {
+    "en": "PR {pr}",
+    "zh": "拉取请求 {pr}"
+  },
+  "results_row_ask": {
+    "en": "asks to {ask}",
+    "zh": "要{ask}"
+  },
+  "results_block_done": {
+    "en": "done",
+    "zh": "做完了"
+  },
+  "results_block_failed": {
+    "en": "failed · {why}",
+    "zh": "失败 · {why}"
+  },
+  "results_block_stopped": {
+    "en": "stopped · {why}",
+    "zh": "停下了 · {why}"
+  },
+  "results_block_nothing": {
+    "en": "no commit",
+    "zh": "没有提交"
+  },
+  "results_block_working": {
+    "en": "working",
+    "zh": "在干活"
+  },
+  "results_block_open": {
+    "en": "open the run",
+    "zh": "打开监视"
+  },
+  "results_room_counts": {
+    "en": "{sessions} sessions · {runs} runs",
+    "zh": "{sessions} 个会话 · {runs} 个 run"
+  },
+  "results_session_this": {
+    "en": "this session",
+    "zh": "这段会话"
+  },
+  "results_session_forked": {
+    "en": "session forked from {mother} at turn {turn}",
+    "zh": "从 {mother} 第 {turn} 轮分出的会话"
+  },
+  "results_session_earlier": {
+    "en": "earlier sessions",
+    "zh": "更早的会话"
+  },
+  "mon_monitor": {
+    "en": "following this run",
+    "zh": "跟随这个 run"
+  },
+  "mon_code": {
+    "en": "code",
+    "zh": "代码"
+  },
+  "mon_files_n": {
+    "en": "{n} files changed",
+    "zh": "改了 {n} 个文件"
+  },
+  "mon_following": {
+    "en": "following",
+    "zh": "跟随中"
+  },
+  "mon_paused": {
+    "en": "paused - F to follow",
+    "zh": "已暂停，按 F 继续跟随"
+  },
+  "mon_terminal_open": {
+    "en": "show the terminal",
+    "zh": "展开终端"
+  },
+  "mon_terminal_fold": {
+    "en": "fold the terminal",
+    "zh": "收起终端"
+  },
+  "mon_files": {
+    "en": "changed files",
+    "zh": "改过的文件"
+  },
+  "mon_terminal": {
+    "en": "terminal",
+    "zh": "终端"
+  },
+  "mon_nothing_changed": {
+    "en": "No file changed yet.",
+    "zh": "还没有改动任何文件。"
+  },
+  "mon_nothing_ran": {
+    "en": "No call made yet.",
+    "zh": "还没有发出任何调用。"
+  },
+  "mon_exited": {
+    "en": "exit {code}",
+    "zh": "退出码 {code}"
+  },
+  "mon_stopped": {
+    "en": "stopped: {why}",
+    "zh": "被停下：{why}"
+  },
+  "mon_running": {
+    "en": "running",
+    "zh": "运行中"
+  },
+  "mon_unread": {
+    "en": "no exit code",
+    "zh": "没有退出码"
+  },
+  "mon_lines_cut": {
+    "en": "{n} more lines are in the ledger",
+    "zh": "账本里还有 {n} 行"
+  },
+  "mon_comment": {
+    "en": "comment",
+    "zh": "写意见"
+  },
+  "mon_revert": {
+    "en": "revert this hunk",
+    "zh": "撤回这块"
+  },
+  "mon_comment_draft": {
+    "en": "About {path}, line {line}: ",
+    "zh": "关于 {path} 第 {line} 行："
+  },
+  "mon_revert_steer": {
+    "en": "Revert this change in {path} with the edit tool, against the file's current version. Replace\n```\n{now}\n```\nwith\n```\n{was}\n```",
+    "zh": "请用 edit 工具、基于 {path} 的当前版本撤回这处改动。把\n```\n{now}\n```\n换回\n```\n{was}\n```"
+  },
+  "run_monitor": {
+    "en": "monitor",
+    "zh": "监视器"
+  },
+  "ask_unfiled": {
+    "en": "reload the page to fetch the client this city was built with; report it if a reload does not settle it",
+    "zh": "刷新页面，取回这座城配套的客户端；若刷新后依旧如此，请把它报上来"
+  },
+  "city_buildings": {
+    "en": "buildings",
+    "zh": "楼"
+  },
+  "file_missing": {
+    "en": "missing",
+    "zh": "不存在"
+  },
+  "monitor_title": {
+    "en": "performance",
+    "zh": "性能"
+  },
+  "monitor_core_cpu": {
+    "en": "core cpu",
+    "zh": "核心 CPU"
+  },
+  "monitor_core_private": {
+    "en": "core private",
+    "zh": "核心私有内存"
+  },
+  "monitor_core_working_set": {
+    "en": "core working set",
+    "zh": "核心工作集"
+  },
+  "monitor_core_read": {
+    "en": "core read",
+    "zh": "核心读出"
+  },
+  "monitor_core_written": {
+    "en": "core written",
+    "zh": "核心写入"
+  },
+  "monitor_machine_cpu": {
+    "en": "machine cpu",
+    "zh": "整机 CPU"
+  },
+  "monitor_machine_available": {
+    "en": "machine available",
+    "zh": "整机可用内存"
+  },
+  "monitor_volume_free": {
+    "en": "volume free",
+    "zh": "卷剩余空间"
+  },
+  "monitor_ledger_queue_depth": {
+    "en": "ledger queue depth",
+    "zh": "记账队列深度"
+  },
+  "monitor_durable_lag": {
+    "en": "durable lag",
+    "zh": "持久水位落后"
+  },
+  "monitor_relay_p50": {
+    "en": "relay p50",
+    "zh": "relay 往返 p50"
+  },
+  "monitor_event_to_screen_p50": {
+    "en": "event to screen p50",
+    "zh": "事件到屏幕 p50"
+  },
+  "monitor_queued_runs": {
+    "en": "queued runs",
+    "zh": "排队的 run"
+  },
+  "monitor_waiting": {
+    "en": "waiting for the first sample",
+    "zh": "等待第一次采样"
+  },
+  "facts_core": {
+    "en": "core",
+    "zh": "核心"
+  },
+  "facts_core_reading": {
+    "en": "{cpu} cpu · {memory}",
+    "zh": "CPU {cpu} · {memory}"
   }
 }

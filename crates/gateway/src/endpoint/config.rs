@@ -20,7 +20,7 @@ use super::header::HeaderValue;
 use super::redemption::Redemption;
 use crate::market::ModelEntry;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AuthSpec {
     Bearer(SecretRef),
     Header { name: String, value: SecretRef },
@@ -77,13 +77,6 @@ pub struct Endpoint {
     pub(super) redemption: Redemption,
 }
 
-/// A transport failure as its whole chain states it.
-///
-/// `reqwest`'s own `Display` says only that sending failed; whether it
-/// was a refused connection, an unresolvable name or a passed deadline
-/// lives one link further down - and that link is the entire difference
-/// between "the provider is down" and "the provider is slow" for the
-/// person reading the refusal.
 impl Endpoint {
     /// One endpoint with a client of its own, for a probe or a single
     /// call; a chosen model shares its endpoint's client instead
@@ -255,9 +248,12 @@ mod tests {
             "a provider that says nothing must end as a timeout: {}",
             err.subject()
         );
-        // The deadline passed with no answer at all, so the same
-        // request is worth sending again; this is the opt-in the
-        // watchdog reads before it spends a retry.
-        assert!(err.is_retriable(), "a call that never completed");
+        // The deadline passed after the request left, so whether the
+        // provider ran it is not known; the watchdog still asks again.
+        assert_eq!(
+            err.retry(),
+            kernel::Retry::Unknown,
+            "a call that never completed"
+        );
     }
 }

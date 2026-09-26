@@ -107,7 +107,7 @@ fn the_snapshot_is_replaced_at_the_closing_boundary_and_not_before() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &conversation,
             &[],
             &shape(),
@@ -120,15 +120,15 @@ fn the_snapshot_is_replaced_at_the_closing_boundary_and_not_before() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );
     let turn = advance(
-        turn.execute(
+        turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut |_| Ok(outcome(&prose(20))),
+            &mut |_: &ToolCall, _: TimeMs| Ok(outcome(&prose(20))),
             &mut |_| Interrupt::None,
         )
         .unwrap(),
@@ -201,7 +201,7 @@ fn a_threshold_crossed_mid_wave_compacts_once_over_the_whole_exchange() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &conversation,
             &[],
             &shape(),
@@ -214,16 +214,16 @@ fn a_threshold_crossed_mid_wave_compacts_once_over_the_whole_exchange() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );
     let mut seen = 0usize;
     let turn = advance(
-        turn.execute(
+        turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut |_call| {
+            &mut |_call: &ToolCall, _: TimeMs| {
                 seen += 1;
                 Ok(outcome(&prose(20_000)))
             },

@@ -15,6 +15,13 @@
 //! one. A steer, a tool result and the opening task are three doors into
 //! the same rule, so none of them can produce the alternating shape a
 //! provider refuses.
+//!
+//! **A message already sent is never rewritten.** Text that arrives after
+//! the last assembly, while the open user message is on the wire, is held
+//! and lands after the next tool results, so the next request extends the
+//! last one instead of editing it. The one exception is tool results after
+//! an empty reply, which extend the sent message rather than open a second
+//! adjacent user message, and leave it open again (runtime-SPEC §8-47).
 
 use kernel::{ChatMessage, ContentBlock, Role};
 
@@ -29,6 +36,10 @@ use kernel::{ChatMessage, ContentBlock, Role};
 pub enum Opening {
     /// Somebody wrote the task down; the job file's text is in the prefix.
     FromJob,
+    /// Somebody wrote the task down for a mother, and a branch is
+    /// rebuilding her conversation: her job file lives in her room, not
+    /// in the branch's prefix, so the task travels in the message.
+    Inherited,
     /// Nobody did; the person is on the other side of this message.
     WithPerson,
 }
@@ -39,6 +50,11 @@ pub enum Opening {
 #[derive(Debug, Clone, Default)]
 pub struct Conversation {
     messages: Vec<ChatMessage>,
+    /// How many of `messages` the last assembly sent.
+    sent: usize,
+    /// User text that arrived while the open user message was already
+    /// sent; it waits for the next tool results.
+    held: Vec<ContentBlock>,
 }
 
 impl Conversation {
@@ -49,14 +65,14 @@ impl Conversation {
     /// The dispatch lines: deterministic from `run_started`'s recorded
     /// inputs, hence rebuildable.
     ///
-    /// No pointer to the job file. Its text is the run segment of the
-    /// frozen prefix, so a line sending the agent to fetch what it has
-    /// already been handed costs a turn and buys nothing; the content
-    /// hash that line used to carry is recorded twice in the ledger,
-    /// which is where provenance belongs.
+    /// The job file's text is the run segment of the frozen prefix, so
+    /// the assigned opening names it rather than repeating it: the run
+    /// segment is not cached, and a pasted task written here again
+    /// would be paid for twice on every turn.
     pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening) {
         self.push_user_text(match opening {
-            Opening::FromJob => format!("Task: {task}\nGoal: {goal}"),
+            Opening::FromJob => format!("The task is in JOB.md above.\nGoal: {goal}"),
+            Opening::Inherited => format!("Task: {task}\nGoal: {goal}"),
             // The person's own line, unwrapped. A conversational turn
             // dressed in field labels reads as a form, and a form is
             // answered with a form.
@@ -64,7 +80,9 @@ impl Conversation {
         });
     }
 
-    /// Steer joins the tail of the last user message, or opens one if none is open.
+    /// Steer joins the tail of the open user message, or opens one. A
+    /// steer that arrives after that message was sent is held until the
+    /// next tool results, and rides after them.
     pub fn push_steer(&mut self, source: &str, text: &str) {
         self.push_user_text(format!("{source}: {text}"));
     }
@@ -99,13 +117,25 @@ impl Conversation {
         }
     }
 
-    /// Tool results open the next user message.
-    pub fn push_tool_results(&mut self, results: Vec<ContentBlock>) {
+    /// Tool results join the last user message, or open the next one,
+    /// and the text held since the last assembly follows them.
+    ///
+    /// Results never wait in `held`: a reply with no content pushes no
+    /// assistant message, so the last user message may already be sent,
+    /// and holding the results there would hold them at every turn. The
+    /// message they extend is open again, so a steer before the next
+    /// assembly joins it after them.
+    pub fn push_tool_results(&mut self, mut results: Vec<ContentBlock>) {
+        results.append(&mut self.held);
         if results.is_empty() {
             return;
         }
+        let reopened = self.messages.len().saturating_sub(1);
         match self.messages.last_mut() {
-            Some(last) if last.role == Role::User => last.content.extend(results),
+            Some(last) if last.role == Role::User => {
+                last.content.extend(results);
+                self.sent = self.sent.min(reopened);
+            }
             _ => self.messages.push(ChatMessage {
                 cache: false,
                 role: Role::User,
@@ -114,18 +144,32 @@ impl Conversation {
         }
     }
 
+    /// Everything in `messages()` is now on the wire: later user text
+    /// joins none of it.
+    pub fn mark_sent(&mut self) {
+        self.sent = self.messages.len();
+    }
+
     pub fn messages(&self) -> &[ChatMessage] {
         &self.messages
     }
 
     fn push_user_text(&mut self, text: String) {
-        let block = ContentBlock::Text { text };
+        self.push_user(vec![ContentBlock::Text { text }]);
+    }
+
+    fn push_user(&mut self, blocks: Vec<ContentBlock>) {
+        if blocks.is_empty() {
+            return;
+        }
+        let open = self.messages.len() > self.sent;
         match self.messages.last_mut() {
-            Some(last) if last.role == Role::User => last.content.push(block),
+            Some(last) if last.role == Role::User && open => last.content.extend(blocks),
+            Some(last) if last.role == Role::User => self.held.extend(blocks),
             _ => self.messages.push(ChatMessage {
                 cache: false,
                 role: Role::User,
-                content: vec![block],
+                content: blocks,
             }),
         }
     }

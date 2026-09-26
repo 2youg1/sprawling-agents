@@ -172,7 +172,7 @@ fn line(release: &Release) -> ReleaseLine {
 /// Both readings, taken and judged.
 ///
 /// **One authority for the whole check.** `status --check` and
-/// [`Query::Release`](channels::Query::Release) render the same value,
+/// [`Query::NewestRelease`](channels::Query::NewestRelease) render the same value,
 /// so the terminal and the page cannot come to different conclusions
 /// about one binary.
 ///

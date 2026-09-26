@@ -321,3 +321,42 @@ fn a_fence_can_tell_a_session_slice_from_a_promise() {
         );
     }
 }
+
+/// A room the Ledger has never carried before is filed from the one
+/// record that names it: once the process knows which addresses the
+/// Ledger holds, a new room reads no segment, so its first slice is
+/// laid down even when the segments are gone.
+#[test]
+fn a_new_room_is_filed_without_reading_the_ledger() {
+    let tmp = tempfile::tempdir().unwrap();
+    let ledger_dir = city(tmp.path());
+    let (mut ledger, _) = JsonlLedger::open(&ledger_dir, TimeMs::new(0)).unwrap();
+    ledger
+        .append_all(vec![
+            draft(Some("webapp/api-rewrite"), EventKind::RunStarted),
+            draft(Some("webapp/backend/db-migration"), EventKind::RunStarted),
+        ])
+        .unwrap();
+    drop(ledger);
+    let records: Vec<EventRecord> = crate::read_raw_lines_at(&ledger_dir)
+        .unwrap()
+        .iter()
+        .map(|line| EventRecord::parse_line(line).unwrap())
+        .collect();
+    std::fs::remove_dir_all(slice_of(tmp.path(), "webapp/room").parent().unwrap()).unwrap();
+
+    let mut sessions = Sessions::for_ledger(&ledger_dir).unwrap();
+    sessions.absorb(&records[0]).unwrap();
+    std::fs::remove_dir_all(&ledger_dir).unwrap();
+    let filed = sessions.absorb(&records[1]);
+
+    assert!(
+        filed.is_ok(),
+        "a new room read the Ledger to be filed: {filed:?}"
+    );
+    let slice = std::fs::read(slice_of(tmp.path(), "webapp/backend/db-migration")).unwrap();
+    let mut expected = format!("{SLICE_MAGIC} {}\n", records[1].seq().value()).into_bytes();
+    expected.extend_from_slice(&records[1].canonical_line().unwrap());
+    expected.push(b'\n');
+    assert_eq!(slice, expected);
+}

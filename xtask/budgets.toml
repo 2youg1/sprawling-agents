@@ -195,14 +195,14 @@ names = [
   "crates/collab/src/inbox.rs::new",               # 7
   "crates/collab/src/signal_tool.rs::new",         # 6
   "crates/runtime/src/turn.rs::assemble",          # 6
-  "crates/sprawling/src/effect.rs::of",            # 6
-  "crates/sprawling/src/effect.rs::shelf",         # 6
+  "crates/accounting/src/effect.rs::of",            # 6
+  "crates/accounting/src/effect.rs::shelf",         # 6
   "crates/browser/src/act.rs::frame_for",          # 5
   "crates/city/src/archive.rs::entry",             # 5
   "crates/collab/src/pr_tool.rs::new",             # 5
   "crates/kernel/src/config.rs::freeze",           # 6  # 5→6: the second-rung ladder is the sixth concern of kernel-SPEC 8-22
   "crates/runtime/src/digest.rs::digest_once",     # 5
-  "crates/runtime/src/fork.rs::fork_draft",        # 5
+  "crates/runtime/src/fork/lineage.rs::fork_draft",        # 5
   "crates/runtime/src/handoff.rs::new",            # 5
   "crates/runtime/src/run.rs::drive",              # 5
   "crates/runtime/src/turn.rs::call",              # 5
@@ -585,10 +585,21 @@ status = "measured, not gated: p50 4.796 ms, p95 5.574, p99 7.230; floor 4.051, 
 # to say why in writing. The slack is about what one small crate brings
 # with it, so a routine addition is recorded rather than refused, and a
 # wave of them is refused rather than recorded.
+# The resource-bottleneck work added one such wave on purpose: sysinfo
+# for the measured memory and core count the heavy-command pool is sized
+# from, thread-priority for the core's own scheduling class, cpu-time and
+# memory-stats for the performance monitor's own readings, cap-std for
+# installing a skill package through directory handles, and crossterm
+# for the terminal views. Each
+# is the safe-Rust face of a platform call the code would otherwise make
+# through `unsafe`, which the workspace forbids; together they bring 52
+# packages, most of them the Windows bindings two of them share. The
+# budget moves to hold them with the same headroom it had before; the
+# slack is unchanged.
 [dependency_count]
 what = "packages in Cargo.lock once every transitive dependency is resolved, workspace members included"
-budget_packages = 420
-best_packages = 389
+budget_packages = 472
+best_packages = 441
 slack_packages = 16
 measured_by = "cargo xtask budget (budget::lockfile_packages, counting [[package]] in Cargo.lock)"
 status = "gated"
@@ -603,9 +614,10 @@ status = "gated"
 #
 # The sub-metric split is what keeps a disk's floor from masking harness
 # overhead (citysim-SPEC.md section 8-6): `harness` carries no durability
-# commit and is the only sub-metric these tiers price; `persist` carries
-# one and answers to the disk instead; `whole` is disk work whose seam
-# does not split and gets no tier. The target values live here and
+# commit and is the only sub-metric these tiers price; `whole` is disk
+# work whose seam does not split and gets no tier. Multi-run parallel is
+# read by `[relay_round_trip]`, where the `store=memory` line is the
+# harness and the gap to `store=disk` is the disk. The target values live here and
 # nowhere else; the readings and their machine class live in the
 # performance book in ARCHITECTURE.md.
 #
@@ -615,14 +627,23 @@ status = "gated"
 what = "the harness's own processing latency over the four load scenarios, one metric in two stages"
 stage_one_p95_us = 16000
 stage_two_p99_us = 1000
-scope = "sub-metric `harness` only; `persist` answers to the disk's physical floor, `whole` carries no tier (citysim-SPEC.md section 8-6)"
-measured_by = "just bench (citysim bench bin, release): one reading line per scenario and sub-metric, each carrying its machine class"
+scope = "sub-metric `harness` only, and the `store=memory` line of `[relay_round_trip]` for multi-run parallel; `whole` carries no tier (citysim-SPEC.md section 8-6)"
+measured_by = "just bench, release: the citysim bench bin gives one reading line per scenario and sub-metric for three scenarios, and `instrument_relay_round_trip` gives multi-run parallel; each line carries its machine class"
 status = "staged targets, not gated: a wall-clock figure is the machine's. Baselines sit in the ARCHITECTURE.md performance book. Under the registered fixture a reading only goes down; relaxing a tier or fattening the fixture lands in a commit of its own"
 
 [relay_round_trip]
 what = "one relay append from a lane to the accounting thread and back, while a run is in flight, with `attend` as the city runs it"
 measured_by = "cargo nextest run -p sprawling --run-ignored only -E 'test(/::instrument_relay/)' --no-capture (crates/sprawling/src/assembly/driving/tests/instruments.rs, sprawling-SPEC.md 8-84), 200 samples per store"
 status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized build, windows-x86_64, 16 cores, three other builds running beside it. Polling loop before the one queue: store=disk p50 31198 us, store=memory p50 31313 us, both the two timed waits. The one queue: store=memory p50 45 us against 29 us for the store's own append with no crossing; store=disk p50 2351 us, floor 1458 us, which is the device's fsync, a physical floor. The release reading and the 10 us memory target are not yet taken"
+
+# The wall time of a tool wave whose leading calls only read. The
+# concurrent-wave test judges the behaviour (every read of the wave in
+# flight at once, and the serial ledger byte for byte); how long the wave
+# takes is the machine's, so it is recorded here and never asserted.
+[tool_wave_reads]
+what = "one wave of three read calls of 50 ms each, from the first call started to the last result accounted"
+measured_by = "not instrumented: taken with a wall-clock bound in crates/runtime/src/turn/tests/concurrent.rs before that bound became the rendezvous check"
+status = "measured, not gated: serial 153.0 ms; concurrent 51-60 ms on an idle machine and 82.8 ms under a merge-train build (debug build, windows-x86_64, 16 cores). A wall-clock figure is the machine's, so it is recorded, never gated"
 
 # What the client pays to fold one animation frame of stream into the
 # belief, with one subscriber reading the run table the way the views do.
@@ -633,3 +654,35 @@ status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized b
 what = "one animation frame of 50 token deltas folded into a belief of R runs, one subscriber reading the run table"
 measured_by = "bun test --conditions=browser client/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds R=1e4 to 4000 us)"
 status = "measured, not gated here: per frame with the `$state` run table 30-37 us at R=1e3 and 30-54 us at R=1e4, and 30 us at R=1e2 once warm (the first size measured pays the runes runtime warm-up, 94-330 us), against 29-34 us, 58-73 us and 471-539 us with belief.batch alone, interleaved on the same instrument (bun 1.4, x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"
+
+# What the page pays to read one event frame off the socket. Event and
+# delta frames arrive once per ledger record and once per token, so they
+# skip the Effect schema for JSON.parse and a narrow guard taken from it
+# (client-SPEC 4-6); the schema path is measured beside it so the gap the
+# guard buys stays visible.
+[client_frame_decode]
+what = "one event frame decoded from its text, by the hot decoder and by the Effect schema it stands in for"
+measured_by = "cd client && bun scripts/frame_cost.ts (prints one client_frame_decode line: the fastest of 15 batches of 2000 decodes, per path)"
+status = "measured, not gated: hot 1.8-3.9 us against 16-28 us for the schema path, interleaved on the same instrument (bun 1.4, x86_64 desktop class, 16 cores). The same floor read 3.7-8.6 us with 32 busy loops beside it, so a wall-clock bound held as a unit test failed on a loaded machine; the register records the reading and nothing gates it"
+
+# What one streamed token costs the page while a reply is still arriving
+# (T12): script plus the layout the token forces. The raw shape drew the
+# whole growing text in one pre-wrapped node and laid it out as blocks
+# only when the record took over, so each token re-laid the whole reply
+# and the turn jumped at the end. The block shape (`talk/saying.svelte`)
+# lays out each block as it closes and keeps only the open tail as text.
+# Headless Edge rounds its clock to 0.1 ms, so the mean over every token
+# carries the finer figure. Not gated: a wall-clock reading is the machine's.
+[stream_relayout]
+what = "one streamed token in a live turn: script plus forced layout, and how far the turn jumps when the record takes over"
+measured_by = "cd client && bun scripts/relayout.ts - headless Edge, a 2,753-character reply with lists, tables, code and headings in 689 four-character tokens, 7 interleaved rounds of each shape"
+status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs each - raw shape mean 426-441 us, p99 1.0 ms, takeover 3.8-4.3 ms, jump 793 px; block shape mean 72-80 us, p99 0.5-0.6 ms, takeover 2.5-2.8 ms, jump 0 px"
+
+# What the city pays, in results-only mode, to sort its runs into the
+# three outcomes a person acts on and keep the newest few of each. The
+# page then draws at most three times `FIRST` rows, so this triage is
+# the only part of the frame that grows with the city.
+[city_results]
+what = "one triage of a 200-run city into waiting, failed and done, each cut to its FIRST newest (client/src/core/results.ts)"
+measured_by = "bun test --conditions=browser client/src/core/results.test.ts (prints one city_results line and holds a triage to 1600 us, a tenth of a 16 ms frame)"
+status = "measured, not gated here: 45-124 us per city across three runs (bun 1.4, x86_64 desktop class, other builds running beside it). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"

@@ -53,7 +53,7 @@ Commands, every one the city accepts, generated from the wire schema by
 `cargo xtask docnum` (`sprawling call` lists them too):
 
 <!-- xtask:begin command_names -->
-`dispatch`, `login`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `put_secret`, `steer`, `cancel`, `halt`, `reveal`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `put_spine`, `connect_toolkit`, `put_preferences`, `put_shelved`, `auth`
+`dispatch`, `login`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `remove_building`, `put_secret`, `steer`, `cancel`, `halt`, `reveal`, `restore_discard`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `put_spine`, `connect_toolkit`, `put_preferences`, `put_shelved`, `auth`
 <!-- xtask:end -->
 
 The ones whose arguments need saying:
@@ -80,7 +80,7 @@ with the same key and read the answer you missed.
 Queries, every one the city answers:
 
 <!-- xtask:begin query_names -->
-`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `history_range`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `building_view`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `release`, `preferences`, `config`
+`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `history_range`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `building_view`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `newest_release`, `preferences`, `config`, `run_costs`
 <!-- xtask:end -->
 
 Each answers with one `answer` frame whose shape is the query's own; a
@@ -101,7 +101,8 @@ Every frame back is one object with exactly one key:
 A refusal is an answer, not an error: the call happened and this is what it
 said. `sprawling call` exits `0` when the city answered, `1` when the city
 refused the frame, `3` when nothing arrived inside the quiet window
-(`--quiet-ms`, default two seconds); `2` is the binary refusing your command
+(`--quiet-ms`, default two seconds), or the event `--until <kind>` waits
+for did not; `2` is the binary refusing your command
 line before any city was reached, and `4` is no city answering at `--at`.
 
 Payloads hold integers. Money is `usd_micros`, never a float, and a

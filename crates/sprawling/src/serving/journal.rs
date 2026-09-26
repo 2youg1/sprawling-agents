@@ -15,14 +15,20 @@
 //! line back, so the rule that decision logic reads no log output is
 //! unchanged.
 //!
-//! **The clock is sampled here** because this is the assembly layer,
-//! which is where sampling is sanctioned (`docs/logging.md` section 8);
-//! the library that writes the entry is not allowed a second time
-//! source. A clock that cannot be read leaves the line's `t` absent
-//! rather than dropping the line, because the ledger position is what
-//! anchors it and the diagnostic is what the reader came for.
+//! **The clock is handed in at construction** by whoever assembles the
+//! process, from the one place sampling is sanctioned (`bin::assembly`,
+//! `docs/logging.md` section 8); the library that writes the entry is not
+//! allowed a second time source, and neither is this module. A clock
+//! that cannot be read leaves the line's `t` absent rather than dropping
+//! the line, because the ledger position is what anchors it and the
+//! diagnostic is what the reader came for.
 
+use kernel::TimeMs;
 use runtime::diagnostics::{Entry, Sink};
+
+/// Where a line's time comes from: the assembly point's clock
+/// (accounting-SPEC.md 8-3), shared with every sink this journal makes.
+pub type Clock = std::sync::Arc<dyn accounting::Clock + Send + Sync>;
 
 /// How many lines a page that stopped reading may fall behind before it
 /// starts losing them.
@@ -35,13 +41,15 @@ const DEPTH: usize = 512;
 /// Where the process log goes on its way out of this process.
 pub struct Journal {
     lines: tokio::sync::broadcast::Sender<channels::LogLine>,
+    clock: Clock,
 }
 
 impl Journal {
     #[must_use]
-    pub fn new() -> Journal {
+    pub fn new(clock: Clock) -> Journal {
         Journal {
             lines: tokio::sync::broadcast::Sender::new(DEPTH),
+            clock,
         }
     }
 
@@ -54,21 +62,16 @@ impl Journal {
     #[must_use]
     pub fn sink(&self) -> Sink {
         let lines = self.lines.clone();
+        let clock = std::sync::Arc::clone(&self.clock);
         Box::new(move |entry: Entry<'_>| {
             eprintln!("{}", runtime::diagnostics::render(entry));
-            drop(lines.send(carried(entry)));
+            drop(lines.send(carried(entry, clock.now().ok())));
         })
     }
 
     /// The broadcast the socket subscribes to.
-    pub(super) fn lines(&self) -> tokio::sync::broadcast::Sender<channels::LogLine> {
+    pub(crate) fn lines(&self) -> tokio::sync::broadcast::Sender<channels::LogLine> {
         self.lines.clone()
-    }
-}
-
-impl Default for Journal {
-    fn default() -> Journal {
-        Journal::new()
     }
 }
 
@@ -77,10 +80,10 @@ impl Default for Journal {
 /// The nil run is the city speaking for itself, and it travels as an
 /// absent run: a page filtering by run would otherwise offer a
 /// session-shaped identifier that names no session.
-fn carried(entry: Entry<'_>) -> channels::LogLine {
+fn carried(entry: Entry<'_>, t: Option<TimeMs>) -> channels::LogLine {
     channels::LogLine {
         seq: entry.site.seq,
-        t: crate::assembly::now_ms().ok(),
+        t,
         level: level(entry.level),
         module: entry.site.module.to_owned(),
         run: (entry.site.run != kernel::RunId::CITY).then_some(entry.site.run),
@@ -108,15 +111,18 @@ mod tests {
     use runtime::diagnostics::{Level, Site};
 
     fn entry_at(run: kernel::RunId, level: Level) -> channels::LogLine {
-        carried(Entry {
-            level,
-            site: Site {
-                run,
-                seq: kernel::Seq::new(9),
-                module: "bin::assembly",
+        carried(
+            Entry {
+                level,
+                site: Site {
+                    run,
+                    seq: kernel::Seq::new(9),
+                    module: "bin::assembly",
+                },
+                message: "wrote notes.md",
             },
-            message: "wrote notes.md",
-        })
+            None,
+        )
     }
 
     /// The five names a page spells are the five names a terminal
@@ -137,7 +143,7 @@ mod tests {
     /// and the scan that protects the ledger protects this too.
     #[test]
     fn a_written_line_reaches_a_watcher_with_its_credential_already_gone() {
-        let journal = Journal::new();
+        let journal = Journal::new(std::sync::Arc::new(crate::assembly::SystemClock));
         let mut watching = journal.lines().subscribe();
         let mut log = runtime::diagnostics::Diagnostics::new(
             runtime::diagnostics::Level::Effect,

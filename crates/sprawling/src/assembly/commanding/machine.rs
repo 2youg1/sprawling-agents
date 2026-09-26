@@ -19,14 +19,30 @@
 //! That is the right place for them anyway: the alternative is a read
 //! that starts processes, which would hold the one thread every other
 //! read is answered on and would do it without anybody asking.
+//!
+//! **The worker reaches the machine through `accounting::Machine`**
+//! (accounting-SPEC.md 8-4); `doctor::ThisMachine` is the production
+//! one, and `with_machine` is the one door that swaps it.
 
 use kernel::{AxCode, AxError};
 
-use crate::doctor::{Machine, PATIENCE, Platform, REQUIREMENTS, ThisMachine};
+use crate::doctor::{Platform, REQUIREMENTS};
 
 use super::super::RunWorker;
 
 impl RunWorker {
+    /// The same worker, looking at and installing onto `machine`
+    /// instead of the machine it runs on (accounting-SPEC.md 8-4).
+    ///
+    /// The door citysim and the tests drive a worker through: what the
+    /// machine answers and what an install does are theirs to script,
+    /// while refusing a name the requirement table does not carry and a
+    /// recipe this city may not run stay the worker's.
+    #[must_use]
+    pub fn with_machine(self, machine: Box<dyn accounting::Machine + Send>) -> RunWorker {
+        RunWorker { machine, ..self }
+    }
+
     /// Gets one thing this machine lacks, then looks again.
     ///
     /// The look is part of the verb rather than a second frame the page
@@ -81,7 +97,7 @@ impl RunWorker {
             "bin::doctor",
             &format!("installing {item}: {}", runnable.spelled()),
         );
-        ThisMachine::new(Some(platform), PATIENCE).install(item, &runnable)?;
+        self.machine.install(item, &runnable)?;
         self.note(
             runtime::diagnostics::Level::Effect,
             "bin::doctor",
@@ -99,7 +115,7 @@ impl RunWorker {
     /// that silently did nothing there would be a verb whose behaviour
     /// depended on who was watching.
     pub(in crate::assembly) fn look_at_this_machine(&mut self) {
-        let found = crate::doctor::report();
+        let found = self.machine.report();
         let items = found.items.len();
         if let Some(serving) = self.serving.as_ref() {
             (serving.machine)(found);
@@ -121,7 +137,7 @@ impl RunWorker {
     reason = "test code"
 )]
 mod tests {
-    use crate::assembly::{RunWorker, ledger_dir, now_ms};
+    use crate::assembly::RunWorker;
 
     /// A worker over an empty city, which is all this verb needs: it
     /// refuses before it touches the machine.
@@ -130,7 +146,11 @@ mod tests {
             city_root,
             gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
-            memory::JsonlLedger::open(&ledger_dir(city_root), now_ms().unwrap()).unwrap(),
+            memory::JsonlLedger::open(
+                &kernel::layout::CityLayout::new(city_root).ledger(),
+                accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
+            )
+            .unwrap(),
         )
         .unwrap()
     }

@@ -8,7 +8,7 @@
 //!
 //! **Why it is a projection and not part of the assembly point.** Nothing
 //! here decides anything or reaches a provider: it folds records into the
-//! answers a client asks for, and `rebuild_views` throws the whole thing
+//! answers a client asks for, and `Views::rebuild` throws the whole thing
 //! away and folds the ledger again to get the same bytes. That is
 //! ARCHITECTURE.md section 9 shape 7, while `bin::assembly` is an
 //! adapter - and a file holding two shapes is what section 9 says a split
@@ -23,20 +23,75 @@
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
+use std::collections::BTreeSet;
+use std::sync::{Arc, Mutex, PoisonError};
+
+use kernel::{AxError, UsdMicros};
+
 use super::holding::Views;
+use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
 
 mod history;
-use super::lines::{buildings_of, config_answer, endpoints_answer, summarize};
-use crate::assembly::read_building;
+use super::lines::{endpoints_answer, summarize};
 
-/// The answer to a question this city could not look up.
+/// How many runs a cost view names besides every active one: a bound
+/// on the size of an answer on the wire, not a machine reading, so it is
+/// a constant (sprawling-SPEC section 8-90).
+pub(super) const TOP_BILLED: usize = 32;
+
+/// The views the fold last finished, handed to every reader
+/// (sprawling-SPEC.md 8-93).
 ///
-/// One shape, named once: a reader that met an empty city and a reader
-/// that met a city which could not look have to be able to tell the
-/// difference, and every caller spelling the refusal itself is how the
-/// two start looking alike.
-fn unavailable(query: String) -> channels::Answer {
-    channels::Answer::Unavailable { query }
+/// The lock covers one `Arc` copy or swap and nothing that can panic,
+/// so even a poisoned lock holds a whole `Arc`, and it is read as one.
+pub(crate) struct Published {
+    current: Mutex<Arc<Views>>,
+}
+
+impl Published {
+    pub(crate) fn new(views: Views) -> Published {
+        Published {
+            current: Mutex::new(Arc::new(views)),
+        }
+    }
+
+    /// The views as the fold last published them. Held only while a
+    /// query copies out what it needs, because the fold takes a retired
+    /// copy back only once no reader holds it.
+    pub(crate) fn snapshot(&self) -> Arc<Views> {
+        Arc::clone(&self.current.lock().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    /// Publishes `latest` and hands back the copy it replaces, which is
+    /// dropped or reclaimed outside the lock.
+    pub(crate) fn replace(&self, latest: Arc<Views>) -> Arc<Views> {
+        std::mem::replace(
+            &mut *self.current.lock().unwrap_or_else(PoisonError::into_inner),
+            latest,
+        )
+    }
+}
+
+/// Answers one query from a snapshot of the views, holding it only while
+/// [`Views::prepare`] copies out what the query needs: the disk, git or
+/// network read in [`Prepared::finish`] runs after the snapshot is let
+/// go, so neither the fold nor another reader waits on it.
+///
+/// The answer is dated by the snapshot it is prepared from, so the date
+/// is exactly the first record the answer does not reflect.
+///
+/// The `Result` is the shape the console's `Answering` takes; this path
+/// refuses nothing itself, because a snapshot is an `Arc` taken whole
+/// and has no poisoned state.
+pub(crate) fn answer_outside_the_lock(
+    views: &Published,
+    query: &channels::Query,
+) -> (kernel::Seq, Result<channels::Answer, AxError>) {
+    let snapshot = views.snapshot();
+    let as_of = snapshot.next_unfolded();
+    let prepared = snapshot.prepare(query);
+    drop(snapshot);
+    (as_of, Ok(prepared.finish()))
 }
 
 impl Views {
@@ -52,7 +107,9 @@ impl Views {
         }
     }
 
-    /// How much of everything this city is holding right now.
+    /// How much of everything this city is holding right now, but for
+    /// the building count, which `Prepared::finish` reads off the
+    /// directory once the lock is released.
     ///
     /// A count that cannot be expressed is reported as the largest
     /// count this wire can carry rather than dropped: a saturated
@@ -63,7 +120,7 @@ impl Views {
             events: self.events,
             runs_active: self.hot.active_count(),
             runs_frozen: self.hot.frozen_count(),
-            buildings: u64::try_from(buildings_of(&self.city_root).len()).unwrap_or(u64::MAX),
+            buildings: 0,
             approvals_waiting: u64::try_from(self.governance.pending.len()).unwrap_or(u64::MAX),
             signals_waiting: self
                 .waiting
@@ -80,31 +137,49 @@ impl Views {
         }
     }
 
-    /// Answers one query. Every arm either answers or names itself
+    /// The ledger as a history reader takes it out of the snapshot.
+    pub(super) fn ledger_ask(&self) -> LedgerAsk {
+        LedgerAsk {
+            city_root: self.city_root.clone(),
+            index: std::sync::Arc::clone(&self.index),
+        }
+    }
+
+    /// What a read of now needs, copied out of the snapshot.
+    fn live_ask(&self) -> LiveAsk {
+        LiveAsk {
+            city_root: self.city_root.clone(),
+            city: self.city.clone(),
+            vault: self.vault.clone(),
+        }
+    }
+
+    /// Answers one query in one call, lock or no lock.
+    #[cfg(test)]
+    pub(crate) fn answer(&mut self, query: &channels::Query) -> channels::Answer {
+        self.prepare(query).finish()
+    }
+
+    /// Answers one query, or copies out what its read of the disk, git
+    /// or network needs. Every arm either answers or names itself
     /// unavailable; none of them returns an empty result that a reader
     /// would mistake for an empty city.
-    pub(crate) fn answer(&mut self, query: &channels::Query) -> channels::Answer {
-        match query {
-            channels::Query::CityView => {
-                let runs: Vec<channels::RunSummary> = self
-                    .hot
-                    .runs()
-                    .map(|(run, hot)| summarize(*run, hot))
-                    .collect();
-                let active = self.hot.active_count();
-                let frozen = self.hot.frozen_count();
-                channels::Answer::City(channels::CityAnswer {
-                    runs,
-                    active,
-                    frozen,
-                    buildings: self.spine(),
-                    pursuits: self.pursuit_lines(),
-                    halted: self.governance.halted.iter().map(named).collect(),
-                })
-            }
-            channels::Query::RunView { run } => {
-                channels::Answer::Run(self.hot.get(run).map(|hot| summarize(*run, hot)))
-            }
+    pub(crate) fn prepare(&self, query: &channels::Query) -> Prepared {
+        Prepared::Held(match query {
+            channels::Query::CityView => return Prepared::City(self.city_ask()),
+            // An evicted run always has records in the Ledger, so a
+            // recall that cannot read them is "I could not look"; the
+            // Ledger is read after the snapshot is let go.
+            channels::Query::RunView { run } => match self.hot.get(run) {
+                Some(hot) => channels::Answer::Run(Some(summarize(*run, hot))),
+                None if self.hot.was_evicted(run) => {
+                    return Prepared::Recalled {
+                        ledger: self.ledger_ask(),
+                        run: *run,
+                    };
+                }
+                None => channels::Answer::Run(None),
+            },
             channels::Query::ApprovalQueue => {
                 channels::Answer::Approvals(channels::ApprovalsAnswer {
                     items: self.governance.pending.values().cloned().collect(),
@@ -120,135 +195,148 @@ impl Views {
                 let report = self.attribution.report();
                 channels::Answer::Cost(Box::new(channels::CostAnswer {
                     total: report.total,
-                    by_run: report.by_run,
+                    by_run: top_billed(report.by_run, &self.active_names()),
                     by_actor: report.by_actor,
                     by_segment: report.by_segment,
                     by_tool: report.by_tool,
                     by_skill: report.by_skill,
+                    unpriced: channels::UnpricedCalls {
+                        calls: report.unpriced.calls,
+                        tokens: report.unpriced.tokens,
+                    },
                 }))
             }
             channels::Query::History { before, limit } => {
-                channels::Answer::History(Box::new(self.history(*before, *limit)))
+                return Prepared::History {
+                    ledger: self.ledger_ask(),
+                    before: *before,
+                    limit: *limit,
+                };
             }
             channels::Query::HistoryRange { from, to, limit } => {
-                channels::Answer::HistoryRange(Box::new(self.history_range(*from, *to, *limit)))
+                return Prepared::HistoryRange {
+                    ledger: self.ledger_ask(),
+                    from: *from,
+                    to: *to,
+                    limit: *limit,
+                };
             }
             channels::Query::RunHistory { run, before, limit } => {
-                channels::Answer::History(Box::new(self.run_history(*run, *before, *limit)))
-            }
-            // A checkpoint this city does not hold is `Unavailable`, not
-            // an empty change list: "nothing moved" and "I could not
-            // look" are different answers and a reader acts differently
-            // on each.
-            channels::Query::Changes { base, head } => {
-                let far = match head {
-                    Some(oid) => memory::Head::Commit(*oid),
-                    None => memory::Head::WorkingTree,
+                return Prepared::RunHistory {
+                    ledger: self.ledger_ask(),
+                    run: *run,
+                    before: *before,
+                    limit: *limit,
                 };
-                match memory::between(&self.city_root, *base, far) {
-                    Ok(files) => channels::Answer::Changes(channels::ChangesAnswer {
-                        base: *base,
-                        head: *head,
-                        files,
-                    }),
-                    Err(_) => channels::Answer::Unavailable {
-                        query: format!("Changes({base})"),
-                    },
-                }
+            }
+            channels::Query::Changes { base, head } => {
+                return Prepared::Changes {
+                    city_root: self.city_root.clone(),
+                    base: *base,
+                    head: *head,
+                };
             }
             channels::Query::Hunks { oid_a, oid_b, path } => {
-                self.hunks_answer(*oid_a, *oid_b, path)
+                return Prepared::Hunks {
+                    city_root: self.city_root.clone(),
+                    oid_a: *oid_a,
+                    oid_b: *oid_b,
+                    path: path.clone(),
+                };
             }
             channels::Query::Commit { oid } => self.commit_answer(*oid),
             channels::Query::Commits {
                 building,
                 before,
                 limit,
-            } => channels::Answer::Commits(self.commits_answer(building.as_ref(), *before, *limit)),
+            } => match self.commits_answer(building.as_ref(), *before, *limit) {
+                Some(page) => channels::Answer::Commits(page),
+                None => unavailable(format!("Commits({before:?})")),
+            },
             // Three readings answered here so a second client draws a
             // session without folding the ledger itself.
             channels::Query::Rounds { run } => {
-                channels::Answer::Rounds(Box::new(self.rounds_answer(*run)))
+                return Prepared::Rounds {
+                    ledger: self.ledger_ask(),
+                    run: *run,
+                };
             }
             channels::Query::Evidence { run } => {
-                channels::Answer::Evidence(self.evidence_answer(*run))
+                return Prepared::Evidence {
+                    ledger: self.ledger_ask(),
+                    run: *run,
+                };
             }
-            channels::Query::CostOf { node } => channels::Answer::CostOf(self.cost_of_answer(node)),
+            channels::Query::RunCosts { runs } => {
+                channels::Answer::RunCosts(self.run_costs_answer(runs))
+            }
+            channels::Query::CostOf { node } => match self.cost_of_answer(node) {
+                Some(answer) => channels::Answer::CostOf(answer),
+                None => unavailable(format!("CostOf({node})")),
+            },
             // The tree itself, one level and one file at a time.
             channels::Query::Listing { at } => {
-                channels::Answer::Listing(self.listing_answer(at.as_ref()))
+                return Prepared::Listing {
+                    city_root: self.city_root.clone(),
+                    at: at.clone(),
+                };
             }
-            channels::Query::Document { at } => match self.document_answer(at) {
-                Some(answer) => channels::Answer::Document(Box::new(answer)),
-                // A file this city does not hold, for the reason a building
-                // nobody raised is: "I could not look" is its own answer.
-                None => channels::Answer::Unavailable {
-                    query: format!("Document({})", at.as_str()),
-                },
-            },
+            channels::Query::Document { at } => {
+                return Prepared::Document {
+                    city_root: self.city_root.clone(),
+                    at: at.clone(),
+                };
+            }
             // What an agent was told, and the store read that recovers
             // it. A run with no prompt yet and an object this city no
             // longer holds are both "I could not look".
-            channels::Query::Prefix { run } => match self.prefix_answer(*run) {
-                Some(answer) => channels::Answer::Prefix(Box::new(answer)),
-                None => unavailable(format!("Prefix({run})")),
-            },
+            channels::Query::Prefix { run } => return Prepared::Prefix(self.prefix_ask(*run)),
             // Read at every asking rather than held: the file is one a
             // person also edits, and a copy kept in this fold would
             // answer with what it said the last time somebody used a
-            // page. A file that cannot be read is "I could not look",
-            // which is what the settings page draws its own state
-            // from.
-            channels::Query::Preferences => match crate::person::read() {
-                Ok(settled) => channels::Answer::Preferences(Box::new(settled)),
-                Err(_) => unavailable("Preferences".to_owned()),
-            },
-            // A ladder that cannot be read is "I could not look": the
-            // files are the person's own and the page says so rather
-            // than drawing figures nothing on disk states.
-            channels::Query::Config { addr } => match config_answer(&self.city_root, addr) {
-                Ok(answer) => channels::Answer::Config(Box::new(answer)),
-                Err(_) => unavailable(format!("Config({})", addr.as_str())),
-            },
-            channels::Query::Content { locator } => match self.content_answer(locator) {
-                Some(answer) => channels::Answer::Content(Box::new(answer)),
-                None => unavailable(format!("Content({locator})")),
-            },
-            channels::Query::Skills { building } => match self.skills_answer(building) {
-                Some(answer) => channels::Answer::Skills(Box::new(answer)),
-                None => unavailable(format!("Skills({})", building.as_str())),
-            },
-            channels::Query::GitStatus { building } => match self.git_status_answer(building) {
-                Some(answer) => channels::Answer::GitStatus(Box::new(answer)),
-                None => channels::Answer::Unavailable {
-                    query: format!("GitStatus({})", building.as_str()),
-                },
+            // page.
+            channels::Query::Preferences => return Prepared::Preferences,
+            channels::Query::Config { addr } => {
+                return Prepared::Config {
+                    city_root: self.city_root.clone(),
+                    addr: addr.clone(),
+                };
+            }
+            channels::Query::Content { locator } => {
+                return Prepared::Content {
+                    city_root: self.city_root.clone(),
+                    locator: locator.clone(),
+                };
+            }
+            channels::Query::Skills { building } => {
+                return Prepared::Skills {
+                    city_root: self.city_root.clone(),
+                    building: building.clone(),
+                    pins: self.skill_pins.clone(),
+                };
+            }
+            channels::Query::GitStatus { building } => match self.git_status_ask(building) {
+                Some(ask) => return Prepared::GitStatus(ask),
+                None => unavailable(format!("GitStatus({})", building.as_str())),
             },
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }
             channels::Query::Doctor => self.doctor_or_unavailable(),
             channels::Query::McpHealth { addr } => {
-                channels::Answer::McpHealth(Box::new(self.mcp_health_answer(addr)))
+                return Prepared::McpHealth {
+                    live: self.live_ask(),
+                    addr: addr.clone(),
+                };
             }
-            channels::Query::Toolkits => {
-                channels::Answer::Toolkits(Box::new(self.toolkits_answer()))
-            }
-            // Leaves this machine, and only on a press (channels-SPEC 8-36).
-            channels::Query::Release => {
-                channels::Answer::Release(Box::new(crate::release::answer()))
-            }
+            channels::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
+            channels::Query::NewestRelease => return Prepared::Release,
             channels::Query::BuildingView { addr } => {
-                let root = self.city_root.clone();
-                let plan = self.plans.of(&root, addr);
-                match read_building(&root, addr, plan) {
-                    Some(answer) => channels::Answer::Building(Box::new(answer)),
-                    // A building nobody raised is not an empty building. The
-                    // page needs to be able to tell those apart.
-                    None => channels::Answer::Unavailable {
-                        query: format!("BuildingView({})", addr.as_str()),
-                    },
-                }
+                return Prepared::Building {
+                    city_root: self.city_root.clone(),
+                    addr: addr.clone(),
+                    plans: std::sync::Arc::clone(&self.plans),
+                };
             }
             channels::Query::InboxView { addr } => channels::Answer::Inbox(channels::InboxAnswer {
                 addr: addr.clone(),
@@ -261,22 +349,55 @@ impl Views {
                 assets: self.assets.clone(),
             }),
             channels::Query::ArchiveSearch { needle } => {
-                channels::Answer::Archive(self.search_archives(needle))
+                return Prepared::Archives {
+                    city_root: self.city_root.clone(),
+                    needle: needle.clone(),
+                };
             }
-            channels::Query::Metrics => channels::Answer::Metrics(Box::new(self.metrics())),
-        }
+            channels::Query::Metrics => {
+                return Prepared::Metrics {
+                    city_root: self.city_root.clone(),
+                    held: self.metrics(),
+                };
+            }
+        })
     }
 }
 
-/// One shut scope in the shape a `halt` frame names it.
+/// The rows of a cost view's `by_run`: every run `active` names, and
+/// the [`TOP_BILLED`] other runs billed most (a tie goes to the lower
+/// name), in name order like the report they come from.
 ///
-/// The ledger keeps `Scope` and its own spelling; a page is answered in
-/// the vocabulary it would use to ask, so nothing on the other side has
-/// to take a string apart to know which building it is looking at.
-fn named(scope: &kernel::event::Scope) -> channels::HaltScope {
-    match scope {
-        kernel::event::Scope::City => channels::HaltScope::City,
-        kernel::event::Scope::Building(addr) => channels::HaltScope::Building(addr.clone()),
-        kernel::event::Scope::Workshop(addr) => channels::HaltScope::Workshop(addr.clone()),
+/// The cut is one `select_nth_unstable_by` over the other runs, so
+/// asking costs O(runs) and never sorts them all.
+fn top_billed(
+    by_run: Vec<(String, UsdMicros)>,
+    active: &BTreeSet<String>,
+) -> Vec<(String, UsdMicros)> {
+    let (mut shown, mut others): (Vec<_>, Vec<_>) = by_run
+        .into_iter()
+        .partition(|(run, _)| active.contains(run));
+    if let Some(last) = TOP_BILLED.checked_sub(1)
+        && others.len() > TOP_BILLED
+    {
+        others.select_nth_unstable_by(last, |(left, paid_left), (right, paid_right)| {
+            paid_right.cmp(paid_left).then_with(|| left.cmp(right))
+        });
+        others.truncate(TOP_BILLED);
+    }
+    shown.append(&mut others);
+    shown.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    shown
+}
+
+impl Views {
+    /// The active runs under the name the attribution keys them by,
+    /// their own display form.
+    fn active_names(&self) -> BTreeSet<String> {
+        self.hot
+            .runs()
+            .filter(|(_, hot)| hot.phase == memory::RunPhase::Active)
+            .map(|(run, _)| run.to_string())
+            .collect()
     }
 }

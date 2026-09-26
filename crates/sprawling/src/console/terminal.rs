@@ -50,14 +50,11 @@ pub struct Terminal {
     pub bind: SocketAddr,
 }
 
-/// The one function that turns a question into an answer, shared with
-/// the socket rather than reimplemented beside it.
-///
-/// `assembly::serve` builds it once and hands the same `Arc` to both
-/// surfaces, so a number this console prints and a number a browser
-/// draws cannot disagree: they are one call.
-pub(crate) type Answering =
-    Arc<dyn Fn(channels::Query) -> Result<channels::Answer, kernel::AxError> + Send + Sync>;
+// The one function that turns a question into an answer, shared with
+// the socket rather than reimplemented beside it: `assembly::serve`
+// builds it once and hands the same `Arc` to both surfaces, so a number
+// this console prints and a number a browser draws cannot disagree.
+pub(crate) use channels::Answering;
 use kernel::Address;
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
@@ -149,7 +146,7 @@ pub(crate) fn web_url(terminal: &Terminal) -> String {
 /// typing would have made interaction a condition of service.
 pub(crate) fn start(
     terminal: Terminal,
-    desk: Arc<crate::serving::CommandDesk>,
+    desk: Arc<crate::assembly::CommandDesk>,
     answering: Answering,
     mut watching: tokio::sync::broadcast::Receiver<channels::Committed>,
 ) {
@@ -191,11 +188,19 @@ fn say<W: Write>(out: &mut W, line: &str) {
 /// The loop, over any reader and writer so a test can drive it.
 pub(super) fn drive<R: BufRead, W: Write>(
     terminal: &Terminal,
-    desk: &crate::serving::CommandDesk,
+    desk: &crate::assembly::CommandDesk,
     answering: &Answering,
     input: &mut R,
     out: &mut W,
 ) {
+    let mut keys = match LineKeys::drawn() {
+        Ok(keys) => keys,
+        Err(err) => {
+            say(out, &format!("  {err}"));
+            say(out, &format!("  {}", err.recovery()));
+            return;
+        }
+    };
     let mut selected: Option<Address> = None;
     let mut typed = String::new();
     loop {
@@ -209,7 +214,8 @@ pub(super) fn drive<R: BufRead, W: Write>(
             Ok(0) | Err(_) => return,
             Ok(_) => {}
         }
-        match parse(&typed, selected.as_ref()) {
+        let idem = keys.next();
+        match parse(&typed, selected.as_ref(), idem) {
             Line::Nothing => {}
             Line::Help => {
                 say(out, &help(selected.as_ref()));
@@ -225,8 +231,8 @@ pub(super) fn drive<R: BufRead, W: Write>(
                 // owns them, so this screen renders a number it never
                 // computes. A city too busy to answer still has a port.
                 let vitals = match answering(channels::Query::Metrics) {
-                    Ok(channels::Answer::Metrics(vitals)) => Some(*vitals),
-                    Ok(_) | Err(_) => None,
+                    (_, Ok(channels::Answer::Metrics(vitals))) => Some(*vitals),
+                    (_, Ok(_) | Err(_)) => None,
                 };
                 say(out, &serving(terminal, vitals.as_ref(), std::process::id()));
             }
@@ -244,17 +250,19 @@ pub(super) fn drive<R: BufRead, W: Write>(
                     say(out, &format!("  did you mean: {}", nearest.join(", ")));
                 }
             }
+            Line::Malformed { verb, reason } => {
+                say(out, &format!("  `/{verb}` cannot be read: {reason}"));
+                say(
+                    out,
+                    "  the body is the wire's own JSON; `idem` may be left out",
+                );
+            }
             Line::Frame(frame) => post(desk, answering, *frame, out),
             Line::Work(task) => {
                 let Some(addr) = selected.clone() else {
                     continue;
                 };
-                match dispatch(&addr, &task) {
-                    Ok(frame) => post(desk, answering, frame, out),
-                    Err(err) => {
-                        say(out, &format!("  {err}"));
-                    }
-                }
+                post(desk, answering, dispatch(&addr, &task, idem), out);
             }
         }
     }
@@ -263,7 +271,7 @@ pub(super) fn drive<R: BufRead, W: Write>(
 /// One frame, onto the same desk a browser's frames land on, or into the
 /// same answering function a browser's questions reach.
 fn post<W: Write>(
-    desk: &crate::serving::CommandDesk,
+    desk: &crate::assembly::CommandDesk,
     answering: &Answering,
     frame: channels::ClientFrame,
     out: &mut W,
@@ -285,8 +293,8 @@ fn post<W: Write>(
         // refused later. It goes to the same function the socket calls,
         // so a person inside a city stops being told to open a second
         // terminal and ask it from outside.
-        channels::ClientFrame::Query(query) => answer(answering, query, out),
-        channels::ClientFrame::Hello(_) => {
+        channels::ClientFrame::Ask(ask) => answer(answering, ask.query, out),
+        channels::ClientFrame::Hello(_) | channels::ClientFrame::Monitor(_) => {
             say(out, "  this console is already inside the city");
         }
     }
@@ -299,7 +307,10 @@ fn post<W: Write>(
 /// belong to the browser; a console that drew them would be serving two
 /// masters at once.
 fn answer<W: Write>(answering: &Answering, query: channels::Query, out: &mut W) {
-    match answering(query) {
+    // The console prints each answer where it was asked, so it pairs
+    // nothing and has no use for the date the answer was read at.
+    let (_as_of, answered) = answering(query);
+    match answered {
         Ok(answer) => match serde_json::to_string(&answer) {
             Ok(text) => {
                 say(out, &text);
@@ -319,27 +330,59 @@ fn answer<W: Write>(answering: &Answering, query: channels::Query, out: &mut W) 
 }
 
 /// A line of work, as the Command a browser would have sent for it.
+fn dispatch(addr: &Address, task: &str, idem: kernel::IdemKey) -> channels::ClientFrame {
+    channels::ClientFrame::Command(Box::new(channels::WireCommand::Dispatch {
+        addr: addr.clone(),
+        task: task.to_owned(),
+        goal: String::new(),
+        mode: channels::Mode::PlanGoal,
+        idem,
+        // `/at` already chose the room; a line typed after it
+        // continues what is working there.
+        session: None,
+        effort: None,
+        model: None,
+    }))
+}
+
+/// One idempotency key per typed line.
 ///
-/// # Errors
-/// Refuses only when the mode tag this console names stops being a mode
-/// tag, which would be a change in `channels::wire` this file has not
-/// followed - so it is reported rather than assumed away.
-fn dispatch(addr: &Address, task: &str) -> Result<channels::ClientFrame, kernel::AxError> {
-    Ok(channels::ClientFrame::Command(Box::new(
-        channels::WireCommand::Dispatch {
-            addr: addr.clone(),
-            task: task.to_owned(),
-            goal: String::new(),
-            mode: channels::Mode::PlanGoal,
-            idem: kernel::IdemKey::derive(
-                &kernel::RunId::CITY,
-                kernel::Seq::FIRST,
-                format!("console:{}:{task}", addr.as_str()).as_bytes(),
-            ),
-            // `/at` already chose the room; a line typed after it
-            // continues what is working there.
-            session: None,
-            effort: None,
-        },
-    )))
+/// The city answers a key it has seen with its first answer, and keeps
+/// every key across restarts, so a key derived from the words alone
+/// swallowed a line typed twice and replayed a refusal after its cause
+/// was fixed. The line count separates two lines of one console; the
+/// origin, drawn from OS entropy, separates two consoles that reach the
+/// same count.
+struct LineKeys {
+    origin: [u8; 16],
+    lines: kernel::Seq,
+}
+
+impl LineKeys {
+    fn drawn() -> Result<LineKeys, kernel::AxError> {
+        let mut origin = [0u8; 16];
+        getrandom::fill(&mut origin).map_err(|err| {
+            kernel::AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "draw an origin for this console's keys",
+                err.to_string(),
+            )
+            .with_recovery(
+                "this machine's entropy source refused; the city keeps serving, drive it from the WebUI or `sprawling call`",
+            )
+        })?;
+        Ok(LineKeys {
+            origin,
+            lines: kernel::Seq::FIRST,
+        })
+    }
+
+    /// The key for the line just read, advancing to the next line.
+    fn next(&mut self) -> kernel::IdemKey {
+        let key = kernel::IdemKey::derive(&kernel::RunId::CITY, self.lines, &self.origin);
+        // A console that has read 2^64 lines reuses its last key; no
+        // person reaches it, and wrapping would reuse the first one.
+        self.lines = self.lines.next().unwrap_or(self.lines);
+        key
+    }
 }

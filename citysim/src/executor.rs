@@ -9,7 +9,8 @@
 //! and the city runs the same driver against real ones.
 //!
 //! Event order (no cancel, natural conclusion):
-//! checkpoint_committed, run_started, then per turn prompt_assembled,
+//! checkpoint_committed, run_started, prompt_assembled once per run
+//! (runtime-SPEC §8-39 item 5), then per turn prompt_shape_compared,
 //! model_called, model_returned, (tool_called, tool_result)*, and finally
 //! handoff_written, run_frozen.
 
@@ -212,6 +213,7 @@ pub fn run_scenario_on(
         job,
         parent: None,
         predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
         // A simulated run is nobody's branch: it is a scenario's own
         // first run.
         inherited: Vec::new(),
@@ -222,6 +224,7 @@ pub fn run_scenario_on(
             context_tokens: 0,
         },
         second_threshold: None,
+        context: runtime::ContextReading::default(),
         prefix,
         policy: BuildingPolicy::default(),
         tools: Vec::new(),
@@ -252,7 +255,7 @@ pub fn run_scenario_on(
                 // one is due, inside this result's byte budget.
                 let stamp = stamps.observe(t, temporal, &config.clock_zones)?;
                 if let Some(world) = sieve.as_mut()
-                    && call.name.as_str() == "exec"
+                    && call.name.as_str() == kernel::ToolName::EXEC
                 {
                     return package_exec(call, &outcome, world, stamp);
                 }
@@ -313,6 +316,7 @@ pub fn run_scenario_on(
                 now: &mut now,
                 interrupt: &mut interrupt,
                 fence: Some(&mut fence),
+                writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
                 invoke: &mut invoke,
                 wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
                 deltas: None,
@@ -324,6 +328,7 @@ pub fn run_scenario_on(
                 now: &mut now,
                 interrupt: &mut interrupt,
                 fence: None,
+                writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
                 invoke: &mut invoke,
                 wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
                 deltas: None,

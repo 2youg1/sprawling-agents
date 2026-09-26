@@ -21,6 +21,9 @@ use super::super::terminal::drive;
 use super::super::*;
 use kernel::Address;
 use std::sync::Arc;
+pub(super) fn key() -> kernel::IdemKey {
+    kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"a typed line")
+}
 pub(super) fn room() -> Address {
     Address::parse("lab/room1").unwrap()
 }
@@ -50,21 +53,24 @@ pub(super) fn vitals() -> channels::MetricsAnswer {
 
 /// The one function the socket calls, standing in for the views.
 pub(super) fn answering() -> Answering {
-    Arc::new(|query: channels::Query| match query {
-        channels::Query::Metrics => Ok(channels::Answer::Metrics(Box::new(vitals()))),
-        other => Err(kernel::AxError::failure(
-            kernel::AxCode::ConfigInvalid,
-            "answer a question",
-            format!("{} is not scripted here", other.name()),
-        )
-        .with_recovery("this test answers Metrics and nothing else")),
+    Arc::new(|query: channels::Query| {
+        let answer = match query {
+            channels::Query::Metrics => Ok(channels::Answer::Metrics(Box::new(vitals()))),
+            other => Err(kernel::AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "answer a question",
+                format!("{} is not scripted here", other.name()),
+            )
+            .with_recovery("this test answers Metrics and nothing else")),
+        };
+        (kernel::Seq::FIRST, answer)
     })
 }
 
 /// Runs the console loop over a scripted script and returns what a
 /// person would have seen.
 pub(super) fn typed(script: &str, terminal: &Terminal) -> String {
-    let desk = crate::serving::CommandDesk::new();
+    let desk = crate::assembly::CommandDesk::new();
     let mut out: Vec<u8> = Vec::new();
     drive(
         terminal,

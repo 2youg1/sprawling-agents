@@ -41,6 +41,7 @@
   import LinkBanner from "./views/link_banner.svelte";
   import Mcp from "./views/mcp.svelte";
   import Notifier from "./views/notifier.svelte";
+  import Monitor from "./views/monitor.svelte";
   import Palette from "./views/palette.svelte";
   import Rail from "./views/rail.svelte";
   import RecordView from "./views/record.svelte";
@@ -64,6 +65,7 @@
   const approvals = u.approvals;
   const belief = u.conn.belief;
   const linkState = u.conn.state;
+  const samples = u.conn.monitor.samples;
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const bindings = keymap();
 
@@ -102,7 +104,7 @@
   let arrived = false;
 
   const waiting = $derived($approvals.length);
-  const working = $derived(Object.values($belief.runs).some((run) => run.doing.kind !== "frozen"));
+  const working = $derived($belief.live.length > 0);
   const halted = $derived(cityIsShut($belief.halted));
   const unsent = u.conn.unsent;
   // The attempt the ladder is on since the link was lost, held through
@@ -114,14 +116,8 @@
     if (now.kind === "backoff") lostAttempt = now.attempt + 1;
     else if (now.kind === "live" || now.kind === "refused") lostAttempt = null;
   });
-  // How many runs this city cancelled. The wire carries no count of
-  // what one halt froze, so this counts the runs whose own freeze says
-  // `cancelled`, which is what a halt writes.
-  const frozen = $derived(
-    Object.values($belief.runs).filter(
-      (run) => run.doing.kind === "frozen" && run.doing.completion === "cancelled",
-    ).length,
-  );
+  // How many runs this city cancelled.
+  const frozen = $derived($belief.cancelled);
   // Whether this city can take a dispatch at all: a `main` model is
   // chosen. Until then the first page is the welcome, unless the person
   // has already walked it and asked to be left alone.
@@ -358,6 +354,8 @@
         <Registry />
       {:else if view.kind === "welcome"}
         <Welcome />
+      {:else if view.kind === "monitor"}
+        <Monitor samples={$samples} watch={u.conn.monitor.watch} />
       {:else if view.kind === "gallery"}
         <!-- The storybook and its fixture tables are a chunk of their
              own, fetched only when a person opens `#/gallery`, so the

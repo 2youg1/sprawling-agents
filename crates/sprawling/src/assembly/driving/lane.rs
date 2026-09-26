@@ -9,19 +9,18 @@
 //!
 //! It is a free function rather than a method because a lane is a
 //! thread that holds no worker (sprawling-SPEC.md 8-46-1): everything a
-//! drive needs from the city arrives in [`DriveContext`], which is four
+//! drive needs from the city arrives in [`DriveContext`], which is five
 //! handles that clone, and the ledger arrives as a parameter — the
 //! accounting thread hands its own, and a lane hands a
-//! [`Relay`](crate::serving::Relay).
+//! [`Relay`](crate::assembly::relay::Relay).
 
 use kernel::{AxError, Ledger};
 use kernel::{RunId, TimeMs};
-use runtime::bench::BenchOutcome;
 use runtime::run::{RunHooks, SafePoint, drive};
 use runtime::{Interrupt, NextCall};
 
+use super::placing::{Fencing, Placing};
 use super::{Driven, Driving};
-use crate::assembly::now_ms;
 
 /// What one drive takes from the city, in handles rather than in loans.
 ///
@@ -58,6 +57,9 @@ pub(crate) struct DriveContext {
     /// and that is a different contender: another sprawling process on
     /// the same city, which no mutex here can see.
     pub(crate) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    /// The worker's own clock, so a run's lines and the worker's are
+    /// read from one time (accounting-SPEC.md 8-3).
+    pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
 }
 
 /// Who may interrupt one drive, in rank order: the halt that reached
@@ -141,7 +143,7 @@ impl Interrupting {
             // desk records the consumption before it reports the refusal.
             // A safe point is not the place to stop a run over a message it
             // cannot act on, which is the answer the person's own entrance
-            // gives an empty steer (serving::desk). What must not happen is
+            // gives an empty steer (assembly::desk). What must not happen is
             // the two arriving here as one case; they do not.
             Err(_) => Interrupt::None,
         }
@@ -168,7 +170,7 @@ fn poison(what: &str) -> AxError {
 /// The three hooks live here because they are the only code that
 /// touches the ledger while the driver owns it: one interrupt source
 /// merging the person and the residents, one fence going up before each
-/// wave, and one invocation point deriving the key for a call.
+/// wave, and one tool face placing each call's key by its position.
 /// Everything they collect - the commits a wave fenced against, what
 /// the run's own commands did, and the items a gate raised - is theirs
 /// only for the length of the drive, so it comes back as one value
@@ -193,13 +195,13 @@ pub(crate) fn drive_run<L: Ledger>(
 ) -> Result<Driven, AxError> {
     let Driving {
         mut adapter,
-        mut bench,
+        bench,
         signals,
         write_root,
         fence_scope,
         run_id,
         of,
-        mut sieving,
+        sieving,
         member,
         plan,
         handoff,
@@ -209,15 +211,17 @@ pub(crate) fn drive_run<L: Ledger>(
         person,
         backlog,
         fence_gate,
+        clock,
     } = context;
-    let mut now = || now_ms();
+    let mut now = || clock.now();
+    let declared = bench.declared_writes();
     let mut fence_point =
         memory::Checkpoint::open(&write_root).map_err(memory::MemoryError::into_ax)?;
-    // What the bench fenced, so the sweep afterwards knows which commit
-    // a deleted file can be restored from.
-    let fenced: std::rc::Rc<std::cell::RefCell<Vec<String>>> =
-        std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let fenced_by_bench = std::rc::Rc::clone(&fenced);
+    // What the wave fence and the bench fenced, in the order they went
+    // up, so the sweep afterwards knows which commit a deleted file can
+    // be restored from; and what the calls since the last fence said they
+    // wrote, which is what the next fence stages.
+    let fencing = Fencing::opened();
     let asking = std::cell::RefCell::new(Interrupting {
         run_id,
         member,
@@ -226,15 +230,7 @@ pub(crate) fn drive_run<L: Ledger>(
         steers: signals,
         held: None,
     });
-    // What the run's own commands did. It is the only evidence of "the
-    // tests passed" the city can observe without being told, and being
-    // told is what a mode is supposed to check.
-    let ran: std::rc::Rc<std::cell::RefCell<(u32, u32)>> =
-        std::rc::Rc::new(std::cell::RefCell::new((0, 0)));
-    let ran_by_bench = std::rc::Rc::clone(&ran);
-    let driven = {
-        let fenced = fenced_by_bench;
-        let ran = ran_by_bench;
+    let (driven, ran) = {
         let mut interrupt = |_: SafePoint| asking.borrow_mut().ask();
         // How late a halt may land while a run waits out a provider. It
         // is the scale a person notices, not a reading of this machine.
@@ -245,7 +241,7 @@ pub(crate) fn drive_run<L: Ledger>(
             }
             // A clock that cannot be read sends at once: the turn that
             // follows samples the same clock and reports its failure.
-            let Ok(at) = now_ms() else {
+            let Ok(at) = clock.now() else {
                 return NextCall::Allowed;
             };
             let left = until.value().saturating_sub(at.value());
@@ -254,82 +250,23 @@ pub(crate) fn drive_run<L: Ledger>(
             }
             std::thread::sleep(std::time::Duration::from_millis(left.min(HALT_SLICE_MS)));
         };
-        // Where this call sits in this run. The key used to derive from
-        // the turn's millisecond stamp and the tool's name, which broke
-        // twice over: it took a clock, which determinism rule 7 forbids
-        // outright, and it ignored the arguments - so two `read`s of two
-        // different files in one turn were one key, and the second came
-        // back "this call was already made". A model reads that as a
-        // fault in itself.
-        let placed = std::cell::Cell::new(0u64);
-        let mut invoke = |call: &kernel::ToolCall, t: TimeMs| {
-            let at = placed.get();
-            placed.set(at.saturating_add(1));
-            // What the action is, is the tool face's to say (kernel-SPEC
-            // 8-23). Two identical calls at two positions are two keys
-            // and both run; the same position replayed is one key, which
-            // is what deduplication is for.
-            let key = kernel::IdemKey::derive(&run_id, kernel::Seq::new(at), &call.action()?);
-            match bench.invoke(call, &key, t)? {
-                BenchOutcome::Ran {
-                    outcome,
-                    fenced: at,
-                } => {
-                    if let Some(oid) = at {
-                        fenced.borrow_mut().push(oid);
-                    }
-                    if call.name.as_str() != "exec" {
-                        return Ok(outcome);
-                    }
-                    // Absence of `exit_code` is a failure, not a
-                    // success: a command a signal stopped returns no
-                    // code at all, and reading that as zero would let
-                    // a halted build count as tests that passed.
-                    let result = outcome.result.as_map();
-                    let failed = match result.get("exit_code").and_then(serde_json::Value::as_i64) {
-                        Some(code) => code != 0,
-                        None => true,
-                    };
-                    {
-                        let mut counts = ran.borrow_mut();
-                        if failed {
-                            counts.1 = counts.1.saturating_add(1);
-                        } else {
-                            counts.0 = counts.0.saturating_add(1);
-                        }
-                    }
-                    sieving.package(call, outcome)
-                }
-                BenchOutcome::Refused { refusal } => Err(*refusal),
-                // A replay is answered with what the first call
-                // answered, sieved the same way. An error here would tell
-                // the model its call failed when it succeeded
-                // (runtime-SPEC.md 8-35). The command counters are not
-                // touched: nothing ran this time.
-                BenchOutcome::Duplicate { outcome } => {
-                    if call.name.as_str() == "exec" {
-                        sieving.package(call, outcome)
-                    } else {
-                        Ok(outcome)
-                    }
-                }
-            }
-        };
+        let mut placing = Placing::new(bench, sieving, run_id, &fencing);
         let mut fence = |t: TimeMs| {
             // Held for the whole of `wave_pre`: staging, committing and
             // reading back are one act over one index.
             let _one_at_a_time = fence_gate
                 .lock()
                 .map_err(|_| poison("this city's fence gate"))?;
+            let scope = fencing.take_scope(&fence_scope);
             let payload = fence_point
-                .wave_pre(&fence_scope, t, &of)
+                .wave_pre(&scope, t, &of)
                 .map_err(memory::MemoryError::into_ax)?;
             if let Some(oid) = payload
                 .as_map()
                 .get("oid")
                 .and_then(serde_json::Value::as_str)
             {
-                fenced.borrow_mut().push(oid.to_owned());
+                fencing.fenced.borrow_mut().push(oid.to_owned());
             }
             Ok(payload)
         };
@@ -350,17 +287,19 @@ pub(crate) fn drive_run<L: Ledger>(
             now: &mut now,
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
-            invoke: &mut invoke,
+            writes: &|call: &kernel::ToolCall| declared.of(call),
+            invoke: &mut placing,
             wait: &mut wait,
             deltas: watching.is_some().then_some(&mut watched),
         };
-        drive(plan, ledger, adapter.as_mut(), &mut hooks, &handoff)
+        let driven = drive(plan, ledger, &mut adapter, &mut hooks, &handoff);
+        (driven, placing.ran())
     };
     Ok(Driven {
         outcome: driven,
         adapter,
-        fenced: fenced.borrow().clone(),
-        ran: *ran.borrow(),
+        fenced: fencing.fenced.into_inner(),
+        ran,
         // Nothing a door answers reaches a person any more: a door
         // answers Allow or Deny. The sweep is the one thing that still
         // raises a question, and it raises it after this returns.

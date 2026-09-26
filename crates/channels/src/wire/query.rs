@@ -335,7 +335,7 @@ pub enum Query {
     ///
     /// Nothing it answers updates anything. Where a binary lives belongs
     /// to whoever installed it, so this reports and stops.
-    Release,
+    NewestRelease,
     /// Everything this person settled about their own reading of the
     /// city: the language, the appearance, the chords they rebound.
     ///
@@ -355,6 +355,16 @@ pub enum Query {
     /// time. Two climbs of one ladder is two answers to one question.
     Config {
         addr: Address,
+    },
+    /// What each named run has been billed, for the runs a cost view's
+    /// `by_run` leaves out. At most
+    /// [`RUN_COSTS_MAX`](crate::RUN_COSTS_MAX) runs are answered per
+    /// question and the rest go unanswered, so a directory that names
+    /// its runs newest first shows the cost of the newest cold runs; the
+    /// money is folded from the Ledger for a run the city no longer
+    /// holds warm, so the cost is proportional to the runs asked about.
+    RunCosts {
+        runs: Vec<RunId>,
     },
 }
 

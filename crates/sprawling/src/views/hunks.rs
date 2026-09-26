@@ -10,46 +10,43 @@
 //! vocabulary, and turning that into the wire's is a responsibility with
 //! a name.
 
-use super::holding::Views;
+use std::path::Path;
 
-impl Views {
-    /// The patch text of one file between two checkpoints.
-    ///
-    /// An oid this city never wrote is `Unavailable`, for the reason
-    /// `Changes` gives: "it changed nothing" and "I cannot read it" are
-    /// different answers, and a reader's next move differs.
-    pub(super) fn hunks_answer(
-        &self,
-        oid_a: kernel::GitOid,
-        oid_b: kernel::GitOid,
-        path: &str,
-    ) -> channels::Answer {
-        let Ok(patch) = memory::of_file(&self.city_root, oid_a, memory::Head::Commit(oid_b), path)
-        else {
-            return channels::Answer::Unavailable {
-                query: format!("Hunks({oid_a}..{oid_b} {path})"),
-            };
+/// The patch text of one file between two checkpoints.
+///
+/// An oid this city never wrote is `Unavailable`, for the reason
+/// `Changes` gives: "it changed nothing" and "I cannot read it" are
+/// different answers, and a reader's next move differs.
+pub(super) fn hunks_answer(
+    city_root: &Path,
+    oid_a: kernel::GitOid,
+    oid_b: kernel::GitOid,
+    path: &str,
+) -> channels::Answer {
+    let Ok(patch) = memory::of_file(city_root, oid_a, memory::Head::Commit(oid_b), path) else {
+        return channels::Answer::Unavailable {
+            query: format!("Hunks({oid_a}..{oid_b} {path})"),
         };
-        channels::Answer::Hunks(Box::new(channels::HunksAnswer {
-            oid_a,
-            oid_b,
-            path: path.to_owned(),
-            lines: patch
-                .lines
-                .into_iter()
-                .map(|line| channels::PatchLine {
-                    number: line.number,
-                    text: line.text,
-                })
-                .collect(),
-            withheld: patch
-                .withheld
-                .into_iter()
-                .map(|held| channels::Withheld {
-                    number: held.number,
-                    reason: held.reason,
-                })
-                .collect(),
-        }))
-    }
+    };
+    channels::Answer::Hunks(Box::new(channels::HunksAnswer {
+        oid_a,
+        oid_b,
+        path: path.to_owned(),
+        lines: patch
+            .lines
+            .into_iter()
+            .map(|line| channels::PatchLine {
+                number: line.number,
+                text: line.text,
+            })
+            .collect(),
+        withheld: patch
+            .withheld
+            .into_iter()
+            .map(|held| channels::Withheld {
+                number: held.number,
+                reason: held.reason,
+            })
+            .collect(),
+    }))
 }

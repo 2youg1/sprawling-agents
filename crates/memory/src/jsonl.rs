@@ -30,10 +30,16 @@ mod barrier;
 mod first_line;
 mod ledger;
 mod open;
+mod reading;
+mod tail;
+mod unwind;
 mod verify;
 
-pub use append::{ledger_segments_at, read_raw_lines_at};
 pub(crate) use first_line::first_line;
+#[cfg(test)]
+pub(crate) use ledger::segment_file_name;
 pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
 pub(crate) use ledger::{complete_lines, segment_first_seq, segment_names};
-pub use verify::{CheckedLine, LineCheck, LineFault};
+pub use reading::{ledger_segments_at, read_raw_lines_at};
+pub use tail::{TailLine, TailLines};
+pub use verify::{CheckedLine, LineCheck, LineFault, read_line};

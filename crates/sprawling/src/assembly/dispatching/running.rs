@@ -9,8 +9,8 @@ use kernel::Locator;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site, Sweep,
-    Workbench, held, now_ms,
+    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site,
+    Stamping, Sweep, Workbench, held,
 };
 use super::{Assignment, Given};
 
@@ -56,11 +56,11 @@ impl RunWorker {
         // takes the drive. Read from the city's own clock rather than
         // from a profiler, because the figure that matters is the one
         // taken on the thread no append is served on.
-        let began = now_ms()?;
+        let began = self.clock.now()?;
         // Nothing is written before the city agrees to take the work:
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
-        let agreed = self.agree_to_work(&at.addr)?;
+        let agreed = self.agree_to_work(&at)?;
         // A key pasted into the work goes to the vault before the text
         // is sent to be named, written to a room or recorded.
         let task = self.take_custody(task)?;
@@ -119,6 +119,31 @@ impl RunWorker {
         // row of locals every phase below would then have to be handed
         // one at a time.
         let mut site = self.stand_up(agreed, &at, &given)?;
+        // The run id is derived from the job locator, so the brief's
+        // origin can only be recorded once the run stands; the bytes are
+        // already durable and this put adds the origin record alone.
+        self.cas
+            .put_for(
+                given.brief.segment_text().as_bytes(),
+                &memory::BlockOrigin {
+                    run: site.run_id,
+                    building: at.addr.clone(),
+                },
+            )
+            .map_err(memory::MemoryError::into_ax)?;
+        site.place_tree(
+            &at.addr,
+            &super::super::workbench::Placing {
+                city_root: &self.city_root,
+                city: self.city_hash()?,
+                clock: &*self.clock,
+            },
+            &mut Stamping {
+                ledger: &mut self.ledger,
+                command: self.doorstep.entrance.carrying(),
+                clock: &*self.clock,
+            },
+        )?;
         let desks = self.open_desks(&site, &at.addr)?;
 
         // What the model may see, what routes the call it makes, and
@@ -128,13 +153,31 @@ impl RunWorker {
         // what to read to pick it up again: one phase, because the
         // handoff quotes the plan and the plan is what the prefix was
         // assembled for.
-        let (plan, handoff) = self.freeze_plan(&site, &workbench, &at, given)?;
+        let inherited = self.inherited(&at, site.run_id)?;
+        let (plan, handoff) = super::super::freezing::Freezing {
+            city_root: &self.city_root,
+            cas: &mut self.cas,
+            inherited,
+            carried_from: self.origins.carried_from(&at.addr),
+        }
+        .freeze_plan(&site, &workbench, &at, given)?;
+        // The freeze begins the room's session: what a carried session
+        // was owed is spent, and this run is the room's last.
+        self.origins.started(&at.addr, site.run_id);
         // The probe's second reading, over what this successor was
         // handed and before it takes a turn: the comparison with the
         // predecessor's answers is what says whether the handoff lost
         // something.
         if let Some(handed) = at.succession.as_ref() {
-            self.probe_after(&mut site, &plan, handed)?;
+            site.probe_after(
+                &plan,
+                handed,
+                &mut Stamping {
+                    ledger: &mut self.ledger,
+                    command: self.doorstep.entrance.carrying(),
+                    clock: &*self.clock,
+                },
+            )?;
         }
 
         let fence_scope = site.fence_scope()?;
@@ -157,13 +200,13 @@ impl RunWorker {
         // drives, so a halt on its building reaches it; a root run is
         // ended by `Cancel`, which is a different verb.
         let member = match at.parent {
-            Some(_) => Some(self.backlog.enrol_run(
+            Some(_) => Some(self.flight.backlog.enrol_run(
                 &at.addr,
                 format!("run {} at {}", site.run_id, at.addr.as_str()),
             )?),
             None => None,
         };
-        let spent = now_ms()?.value().saturating_sub(began.value());
+        let spent = self.clock.now()?.value().saturating_sub(began.value());
         self.note(
             runtime::diagnostics::Level::Trace,
             "bin::assembly",
@@ -177,7 +220,7 @@ impl RunWorker {
             fence_scope,
             run_id: site.run_id,
             of: site.provenance(self.city_hash()?, &at.addr),
-            sieving: self.sieving_for(&site, &at.addr)?,
+            sieving: super::super::driving::Sieving::for_run(&self.city_root, &site, &at.addr)?,
             member,
             plan,
             handoff,
@@ -208,6 +251,10 @@ impl RunWorker {
     /// wrong took the room's mail and a tree's lease with it
     /// (sprawling-SPEC.md 8-46-9).
     ///
+    /// The plan step closes each node of `open_claims` as that node's
+    /// closing line reaches the ledger; the caller still owes the history
+    /// a put-back line for every node it did not close.
+    ///
     /// # Errors
     /// Propagates the drive's own failure to open a checkpoint, and
     /// every failure of settling the desks, the requests and the ending.
@@ -216,6 +263,7 @@ impl RunWorker {
         continuation: Continuation,
         driven: Result<Driven, AxError>,
         owing: Owing,
+        open_claims: &mut crate::assembly::booking::OpenClaims,
     ) -> Result<Landed, AxError> {
         let Continuation {
             at,
@@ -228,12 +276,12 @@ impl RunWorker {
         // Read before the obligation moves on: this run's place in the
         // conversation is what a signal it sends carries forward, and
         // `settle_desks` below is where those signals are spoken.
-        let conversations = owing.conversations();
+        let chain = owing.knock_chain().clone();
         // Both loans go back before either failure is propagated: a
         // backlog that would not take its member back used to cost the
         // room its mail too (sprawling-SPEC.md 8-46-9).
         let returned = self.return_borrowed(&at, &mut site, &desks);
-        let left = member.map_or(Ok(()), |id| self.backlog.leave(id));
+        let left = member.map_or(Ok(()), |id| self.flight.backlog.leave(id));
         returned?;
         left?;
         let Driven {
@@ -254,7 +302,8 @@ impl RunWorker {
                     raised: &mut raised,
                     job_locator: &job_locator,
                 },
-                conversations,
+                chain,
+                open_claims,
             },
         )?;
         // What the run can show for itself. `None` is not `Some(false)`:
@@ -285,6 +334,7 @@ impl RunWorker {
                 driven,
                 raised,
                 delegates: &workbench.delegates,
+                workshop: &desks.workshop,
                 succession: &workbench.succession,
                 owing,
             },
@@ -316,7 +366,7 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let returned = held(&desks.signals, "settle the signal desk")?.take_inbox();
         match desks.tenure {
-            QueueTenure::TheRoomQueue => self.rooms.give_back(&at.addr, site.run_id, returned)?,
+            QueueTenure::TheRoomQueue => self.vacate(&at.addr, site.run_id, returned)?,
             QueueTenure::ASpare { held_by } => self.note(
                 runtime::diagnostics::Level::Refuse,
                 "collab::inbox",

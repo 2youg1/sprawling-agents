@@ -41,15 +41,20 @@
   import Hints from "./gallery/hints.svelte";
   import Keepers from "./gallery/kept.svelte";
   import RefusedLine from "./gallery/refused_line.svelte";
+  import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
   import Presences from "./gallery/presence.svelte";
   import Produced from "./gallery/produced.svelte";
   import Runs from "./gallery/runs.svelte";
+  import Resulted from "./gallery/resulted.svelte";
+  import Streamed from "./gallery/streamed.svelte";
   import Screens from "./gallery/screens.svelte";
   import Settings from "./gallery/settings.svelte";
   import Shelved from "./gallery/shelved.svelte";
   import Switches from "./gallery/switches.svelte";
   import Tables from "./gallery/tables.svelte";
+  import Monitored from "./gallery/monitored.svelte";
+  import Timed from "./gallery/timed.svelte";
 
   const { lang } = ui();
 
@@ -89,6 +94,11 @@
   <Keepers />
   <Settings />
   <Tables />
+  <Monitor />
   <Parts />
   <Switches />
+  <Monitored />
+  <Timed />
+  <Resulted />
+  <Streamed />
 </div>

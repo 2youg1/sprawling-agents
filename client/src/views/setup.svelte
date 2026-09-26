@@ -267,8 +267,11 @@
 <div
   class="flex min-h-0 w-full flex-1 flex-col gap-wide px-wide py-wide @lg/page:flex-row @lg/page:items-start @lg/page:gap-section"
 >
+  <!-- Opaque and one level up: the fields scrolling under the stuck
+  strip sit in positioned wrappers of their own, and would otherwise be
+  drawn through it. -->
   <nav
-    class="sticky top-0 flex shrink-0 flex-row gap-tight overflow-x-auto @lg/page:w-[200px] @lg/page:flex-col @lg/page:overflow-visible"
+    class="sticky top-0 z-1 flex shrink-0 flex-row gap-tight overflow-x-auto bg-page @lg/page:w-[200px] @lg/page:flex-col @lg/page:overflow-visible"
     aria-label={say($lang, "setup_groups")}
   >
     {#each NAV as entry (entry.kind === "group" ? entry.group : entry.kind)}

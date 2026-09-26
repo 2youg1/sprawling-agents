@@ -6,13 +6,13 @@
 import { PHASES, moves } from "../doing";
 import type { Doing } from "../doing";
 import type { RunSummary } from "../../wire";
-
 import type { RunBelief } from "./shape";
 
-// What an answer says a frozen run's ending was. The completion is the
-// record's, and an answer carries none, so a run this page never
-// streamed is frozen with nothing to cite.
-function frozen(held: RunBelief | undefined): Doing {
+// What an answer says a frozen run's ending was: the completion it
+// names, else the one this page folded, else an ending nobody stated.
+function frozen(summary: RunSummary, held: RunBelief | undefined): Doing {
+  const completion = summary.completion ?? null;
+  if (completion !== null) return { kind: "frozen", completion };
   return held?.doing.kind === "frozen" ? held.doing : PHASES.run_frozen;
 }
 
@@ -26,7 +26,8 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
   // row's to state, and the answer settles nothing else but that.
   if (held !== undefined && held.lastSeq >= summary.last_seq) {
     const at = held.started ?? summary.started ?? null;
-    return { ...held, addr: held.addr ?? summary.addr ?? null, started: at, local: false };
+    const pr = held.pr ?? summary.pr ?? null;
+    return { ...held, addr: held.addr ?? summary.addr ?? null, started: at, pr, local: false };
   }
   // The answer is the newer reading. Its `last_kind` states the phase
   // where the kind does; a kind that states none leaves what the page
@@ -39,7 +40,10 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
     started: summary.started ?? held?.started ?? null,
     task: held?.task ?? null,
     lastSeq: summary.last_seq,
-    doing: summary.frozen ? frozen(held) : (stated ?? held?.doing ?? { kind: "unknown" }),
+    doing: summary.frozen ? frozen(summary, held) : (stated ?? held?.doing ?? { kind: "unknown" }),
+    model: held?.model ?? null,
+    pr: summary.pr ?? held?.pr ?? null,
+    ask: summary.ask ?? null,
     local: false,
     saying: held?.saying ?? "",
     thinking: held?.thinking ?? "",

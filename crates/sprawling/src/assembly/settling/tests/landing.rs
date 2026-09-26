@@ -19,13 +19,13 @@ use crate::assembly::*;
 
 fn speaking_signal(id: &str, room: &Address) -> collab::Signal {
     collab::Signal::new(
-        collab::SignalId::parse(id).unwrap(),
-        collab::SignalKind::Mention,
+        kernel::event::record::SignalId::parse(id).unwrap(),
+        kernel::event::record::SignalKind::Mention,
         "ito".to_owned(),
         room.clone(),
         kernel::Version::new(1),
         kernel::Payload::empty(),
-        now_ms().unwrap(),
+        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
     )
     .unwrap()
 }
@@ -62,19 +62,20 @@ Trades in the market as {who}.
     let room = Address::parse("market/hana").unwrap();
     // One slot: the second delivery sheds, so the landing settles
     // halfway by construction rather than by luck.
-    worker.rooms = crate::assembly::RoomQueues::folded(std::collections::BTreeMap::from([(
-        room.clone(),
-        collab::Inbox::new(1, 1),
-    )]));
-    let knocks_mark = worker.knocks.len();
+    worker.collaborating.rooms = crate::assembly::RoomQueues::folded(
+        std::collections::BTreeMap::from([(room.clone(), collab::Inbox::new(1, 1))]),
+    );
+    let knocks_mark = worker.doorstep.knocks.len();
     let at = Assignment {
         addr: Address::parse("market/ito").unwrap(),
         parent: None,
         succession: None,
         session: None,
         effort: None,
+        model: None,
         mode: kernel::Mode::Up,
         taint: kernel::TaintSet::empty(),
+        dispatched_by: kernel::event::Who::Person,
         origin: None,
     };
     let effects = vec![
@@ -84,15 +85,17 @@ Trades in the market as {who}.
     ];
     let landing =
         effect::Landing::signals(effects, &Address::parse("market/ito").unwrap(), "ito").unwrap();
-    let err = worker.settle(&at, RunId::CITY, landing, 0).unwrap_err();
+    let err = worker
+        .settle(&at, RunId::CITY, landing, &KnockChain::default())
+        .unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::BackpressureShed);
     assert_eq!(
-        worker.knocks.len(),
+        worker.doorstep.knocks.len(),
         knocks_mark,
         "knocks pushed by landed signals are cut back on failure"
     );
     assert_eq!(
-        worker.rooms.pending(&room),
+        worker.collaborating.rooms.pending(&room),
         1,
         "only the first signal landed in the queue"
     );
@@ -122,8 +125,10 @@ fn a_half_filed_shelf_is_unwound() {
         succession: None,
         session: None,
         effort: None,
+        model: None,
         mode: kernel::Mode::Up,
         taint: kernel::TaintSet::empty(),
+        dispatched_by: kernel::event::Who::Person,
         origin: None,
     };
     let effects = vec![
@@ -140,14 +145,16 @@ fn a_half_filed_shelf_is_unwound() {
         effects,
         dir.path(),
         &building,
-        now_ms().unwrap(),
+        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
         &Address::parse("lab").unwrap(),
         "potter",
     )
     .unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let err = worker.settle(&at, RunId::CITY, landing, 0).unwrap_err();
+    let err = worker
+        .settle(&at, RunId::CITY, landing, &KnockChain::default())
+        .unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::StorageFatal);
     // The first filing was unwound: nothing is on the shelf that the
     // history does not already carry — and the history carries both
@@ -190,10 +197,9 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
 
     let mut waiting = collab::Inbox::new(8, 4);
     waiting.deliver(&speaking_signal("s-kept", &room)).unwrap();
-    worker.rooms = crate::assembly::RoomQueues::folded(std::collections::BTreeMap::from([(
-        room.clone(),
-        waiting,
-    )]));
+    worker.collaborating.rooms = crate::assembly::RoomQueues::folded(
+        std::collections::BTreeMap::from([(room.clone(), waiting)]),
+    );
 
     let (driving, continuation) = worker
         .prepare_dispatch(
@@ -201,10 +207,12 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
                 addr: room.clone(),
                 session: None,
                 effort: None,
+                model: None,
                 mode: kernel::Mode::PlanGoal,
                 parent: None,
                 succession: None,
                 taint: kernel::TaintSet::empty(),
+                dispatched_by: kernel::event::Who::Person,
                 origin: None,
             },
             "read what is waiting".to_owned(),
@@ -212,7 +220,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         )
         .unwrap();
     assert_eq!(
-        worker.rooms.pending(&room),
+        worker.collaborating.rooms.pending(&room),
         0,
         "the queue is out with the run that is driving"
     );
@@ -224,16 +232,18 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         "the disk went away",
     )
     .with_recovery("this is the failure the test is about");
+    let mut open_claims = crate::assembly::booking::ClaimBook::default().release(RunId::CITY);
     let err = worker
         .land(
             continuation,
             Err(failed),
             Owing::unasked(crate::assembly::Unasked::Knock),
+            &mut open_claims,
         )
         .unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::StorageFatal);
     assert_eq!(
-        worker.rooms.pending(&room),
+        worker.collaborating.rooms.pending(&room),
         1,
         "the room still has what it was holding"
     );

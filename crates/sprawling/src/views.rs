@@ -8,14 +8,14 @@
 //!
 //! **Why it is a projection and not part of the assembly point.** Nothing
 //! here decides anything or reaches a provider: it folds records into the
-//! answers a client asks for, and `rebuild_views` throws the whole thing
+//! answers a client asks for, and `Views::rebuild` throws the whole thing
 //! away and folds the ledger again to get the same bytes. That is
 //! ARCHITECTURE.md section 9 shape 7, while `bin::assembly` is an
 //! adapter - and a file holding two shapes is what section 9 says a split
 //! looks like.
 //!
 //! **What it deliberately does not hold.** The plans are
-//! `crate::plan_view`'s and are read through it; a second parse here
+//! `accounting::plan_view`'s and are read through it; a second parse here
 //! would be a second answer to "what is stuck and why", and only one of
 //! them would be folding the records that say why. What waits in a room
 //! is folded from signal records rather than read off a queue, because a
@@ -25,6 +25,8 @@
 pub(super) mod answered;
 pub(super) mod answering;
 pub(super) mod archives;
+pub(super) mod building_page;
+pub(super) mod city;
 pub(super) mod commits;
 pub(super) mod cost_of;
 pub(super) mod document;
@@ -40,36 +42,20 @@ pub(super) mod lines;
 pub(super) mod listing;
 pub(super) mod mcp_health;
 pub(super) mod prefix;
+pub(super) mod prepared;
 pub(super) mod rounds;
 pub(super) mod served;
 pub(super) mod skills;
+pub(super) mod snapshot;
 #[cfg(test)]
 mod standing_tests;
 #[cfg(test)]
 mod tests;
 pub(super) mod toolkits;
 
+pub(crate) use answering::{Published, answer_outside_the_lock};
 pub(crate) use governance::Governance;
 pub(crate) use holding::Views;
 pub use holding::ask;
-pub(crate) use lines::pursuit_from;
-/// What a `session_opened` line says the session branched from, if
-/// anything.
-///
-/// `Ok(None)` is two facts at once and deliberately one answer: a
-/// session that began without a branch, and a line written before
-/// this key existed. Both mean the same thing to a dispatch - this
-/// session inherits nothing - and the second one cannot be a
-/// refusal, because a ledger this repository ships holds such a
-/// line.
-///
-/// # Errors
-/// Refuses a `from` that is present and cannot be read: a branch
-/// whose origin is unreadable is not a session that began without
-/// one.
-pub(crate) fn session_opened(
-    data: &kernel::Payload,
-) -> Result<Option<kernel::Origin>, kernel::AxError> {
-    let opened = data.read::<kernel::event::record::SessionOpened>()?;
-    Ok(opened.from)
-}
+pub(crate) use lines::pursued;
+pub use rounds::turns;

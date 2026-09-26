@@ -5,7 +5,7 @@
 
 //! Ledger appends: waves, reads, and the kernel Ledger face.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use kernel::ledger::chain_hash;
 use kernel::{
@@ -13,8 +13,6 @@ use kernel::{
 };
 
 use crate::error::{MemoryError, io_err};
-use crate::real_fs::RealFs;
-use crate::vfs::Vfs;
 
 use super::barrier::Barrier;
 use super::ledger::{JsonlLedger, WriteObserver, complete_lines, is_segment, segment_file_name};
@@ -44,6 +42,10 @@ impl JsonlLedger {
     /// Group commit: one durability barrier for the whole wave
     /// (memory-SPEC 3-1: the batch is what the wave delivered).
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, MemoryError> {
+        // A restore a failed wave left owed runs first: it is what mends
+        // the barrier, and it may remove the segment this wave would
+        // append to.
+        self.finish_unwind()?;
         self.barrier.admit(&self.dir, self.next_seq)?;
         self.halt.admit()?;
         if drafts.is_empty() {
@@ -87,21 +89,7 @@ impl JsonlLedger {
         }
 
         self.barrier = Barrier::Broken;
-        for (path, bytes) in &writes {
-            self.vfs
-                .append(path, bytes)
-                .map_err(io_err("append event line", path))?;
-        }
-        for (path, _) in &writes {
-            self.vfs
-                .sync_data(path)
-                .map_err(io_err("sync segment", path))?;
-        }
-        if !created.is_empty() {
-            self.vfs
-                .sync_dir(&self.dir.clone())
-                .map_err(io_err("sync ledger dir", &self.dir.clone()))?;
-        }
+        self.write_wave(&writes, created)?;
 
         self.barrier = Barrier::Whole;
         self.seg_path = cur_path;
@@ -180,43 +168,6 @@ impl JsonlLedger {
     }
 }
 
-/// Read-only face for replay and fixtures: never opens the ledger, never
-/// repairs, never writes — replay must not mutate what it verifies
-/// (runtime-SPEC 8-1). Complete lines only; a torn tail byte-run is not a
-/// line and is left for `open` to judge.
-pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, MemoryError> {
-    let vfs = RealFs::new();
-    let mut out = Vec::new();
-    for seg in ledger_segments_at(dir)? {
-        let bytes = vfs.read(&seg).map_err(io_err("read segment", &seg))?;
-        let (lines, _) = complete_lines(&bytes);
-        for line in lines {
-            if !line.is_empty() {
-                out.push(line.to_vec());
-            }
-        }
-    }
-    Ok(out)
-}
-
-/// The ledger segments in `dir`, in the order they must be read.
-///
-/// An empty result means the directory holds no ledger at all, which is a
-/// different fact from a ledger that holds no events, and only this face
-/// can tell them apart: `read_raw_lines_at` answers `Ok([])` to both. The
-/// caller that has to tell them apart is the one that took the path from
-/// a person - `sprawling replay` - and it asks here so that the segment
-/// naming rule is never spelled a second time somewhere else.
-pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, MemoryError> {
-    let vfs = RealFs::new();
-    Ok(vfs
-        .list(dir)
-        .map_err(io_err("list ledger dir", dir))?
-        .into_iter()
-        .filter(|p| is_segment(p))
-        .collect())
-}
-
 impl kernel::Ledger for JsonlLedger {
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         let refs = self.append_all(vec![draft]).map_err(MemoryError::into_ax)?;
@@ -255,6 +206,7 @@ mod tests {
     use super::*;
     use kernel::GENESIS_PREV;
     use std::fs;
+    use std::path::Path;
     fn draft(kind: EventKind, t: u64) -> EventDraft {
         EventDraft {
             run: RunId::CITY,

@@ -26,7 +26,7 @@ use crate::provider::registry::ConnectionKind;
 use super::payload::auth_reference;
 use super::tuning::EndpointTuning;
 /// One endpoint the person attached, as the book holds it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AttachedEndpoint {
     pub name: String,
     /// The base URL the person entered, without a path of its own; the
@@ -200,6 +200,17 @@ mod tests {
             read.probed,
             "a ledger written before this key existed recorded only probed attachments"
         );
+    }
+
+    /// A `probed` the line spells as something other than a yes or a
+    /// no is not a probe that succeeded: reading it as one would put an
+    /// endpoint nobody reached into the book as reached.
+    #[test]
+    fn an_unreadable_probed_is_refused_rather_than_read_as_probed() {
+        let endpoint = attached("house", "https://api.example.test/v1");
+        let mut map = attached_payload(&endpoint).unwrap().as_map().clone();
+        map.insert("probed".to_owned(), serde_json::Value::from("no"));
+        assert!(super::super::payload::read_attached(&Payload::new(map).unwrap()).is_err());
     }
 
     #[test]

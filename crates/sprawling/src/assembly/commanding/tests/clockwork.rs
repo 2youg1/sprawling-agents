@@ -14,10 +14,10 @@
     reason = "test code"
 )]
 
+use crate::assembly::CommandDesk;
+use crate::assembly::desk::DeskWait;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
-use crate::serving::CommandDesk;
-use crate::serving::desk::DeskWait;
 
 #[test]
 fn a_scheduled_job_starts_by_itself_and_only_once_per_firing() {
@@ -70,6 +70,7 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lab/room1|read the plan"),
         session: None,
         effort: None,
+        model: None,
     };
 
     desk.post(asked(), channels::Reply::nowhere());
@@ -145,7 +146,7 @@ fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
     desk.close(Closing::Broken {
         cause: "the listener is gone".to_owned(),
     });
-    crate::serving::attending::attend(&mut worker, &desk);
+    crate::assembly::attending::attend(&mut worker, &desk);
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let last = verified

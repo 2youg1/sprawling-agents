@@ -33,12 +33,16 @@ use channels::{PreferencePatch, PreferencesAnswer};
 use kernel::{AxCode, AxError};
 
 use crate::home::Home;
+use crate::serving::standing::CorePriority;
 
 /// The section of the person's file these live under. Written once:
 /// the reader and the writer name it, and a section written under one
 /// spelling and read under another is a setting that never takes
 /// effect.
 const UI: &str = "ui";
+/// The section and key of the one core setting (sprawling-SPEC.md 8-93).
+const CORE: &str = "core";
+const PRIORITY: &str = "priority";
 
 /// Everything this person settled, as their file states it.
 ///
@@ -78,6 +82,37 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
         let text = toml::to_string_pretty(&document).map_err(|err| invalid(file, &err))?;
         held.replace(text.as_bytes())
     })
+}
+
+/// Whether the core's threads stand above normal: `priority` in the
+/// `[core]` section, `"raised"` when absent (sprawling-SPEC.md 8-93).
+///
+/// # Errors
+///
+/// As [`read`] for a file that cannot be read or parsed, and
+/// `ConfigInvalid` for a `priority` that is neither `"raised"` nor
+/// `"normal"`.
+pub(crate) fn core_priority() -> Result<CorePriority, AxError> {
+    stated_core_priority(&file()?)
+}
+
+fn stated_core_priority(file: &Path) -> Result<CorePriority, AxError> {
+    match document(file)?
+        .get(CORE)
+        .and_then(|core| core.get(PRIORITY))
+    {
+        None => Ok(CorePriority::Raised),
+        Some(toml::Value::String(level)) if level == "raised" => Ok(CorePriority::Raised),
+        Some(toml::Value::String(level)) if level == "normal" => Ok(CorePriority::Normal),
+        Some(other) => Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "read whether the core stands above normal",
+            format!("{}: [{CORE}] {PRIORITY} = {other}", file.display()),
+        )
+        .with_recovery(
+            "write priority = \"raised\" or priority = \"normal\" under [core], or delete the line",
+        )),
+    }
 }
 
 /// Where this person's file is. The home directory is `home::Home`'s
@@ -190,6 +225,39 @@ mod tests {
         let text = std::fs::read_to_string(&file).unwrap();
         assert!(text.contains("kept"), "{text}");
         assert!(stated(&file).unwrap().welcomed);
+    }
+
+    /// The one setting that holds the core's threads at normal, read
+    /// from the file a person edits; an absent section raises them.
+    #[test]
+    fn a_person_who_turns_the_raise_off_gets_normal_priority() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        let absent = stated_core_priority(&file).unwrap();
+        std::fs::write(
+            &file,
+            "[core]
+priority = \"normal\"
+",
+        )
+        .unwrap();
+        let off = stated_core_priority(&file).unwrap();
+        std::fs::write(
+            &file,
+            "[core]
+priority = \"fast\"
+",
+        )
+        .unwrap();
+        let misspelled = stated_core_priority(&file).map_err(|err| *err.code());
+        assert_eq!(
+            (absent, off, misspelled),
+            (
+                CorePriority::Raised,
+                CorePriority::Normal,
+                Err(AxCode::ConfigInvalid)
+            )
+        );
     }
 
     /// A file this build cannot read is not overwritten: the person

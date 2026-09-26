@@ -95,7 +95,7 @@ const SHAPE =
     {#if crumbs.length > 0}
       <nav class="flex min-w-0 flex-wrap items-center gap-tight" aria-label={say($lang, "code_crumbs")}>
         {#each crumbs as crumb, at (crumb)}
-          {#if at > 0}<span class="text-text-disabled" aria-hidden="true">/</span>{/if}<span
+          {#if at > 0}<span class="text-text-faint" aria-hidden="true">/</span>{/if}<span
             class={at === crumbs.length - 1 ? "text-text-quiet" : "text-text-faint"}>{crumb.part}</span
           >
         {/each}
@@ -119,7 +119,7 @@ const SHAPE =
   gutter stays put at the left while the text runs under it. -->
   <div class="min-h-0 flex-1 overflow-auto">
     <div class="flex min-w-max font-mono text-note leading-relaxed">
-      <pre class="sticky left-0 shrink-0 select-none bg-chrome px-snug text-right text-text-disabled" aria-hidden="true">{gutter}</pre>
+      <pre class="sticky left-0 shrink-0 select-none bg-chrome px-snug text-right text-text-faint" aria-hidden="true">{gutter}</pre>
       <pre class="px-snug text-text-quiet"><Inked {text} source={path} /></pre>
     </div>
   </div>

@@ -14,7 +14,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 | `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 38（其中装载期六码）；carrier 声明位 |
 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
-| `event` | 2 值类型 | EventKind 72（二分共 9 条入窗）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
+| `event` | 2 值类型 | EventKind 78（二分共 9 条入窗）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
 | `version` | 2 值类型 | 乐观并发：Version 单调值＋base 新鲜度判定 |
 | `idem` | 2 值类型 | IdemKey 确定性派生（BLAKE3 XOF 16 字节＋版本字节） |
 | `consts_external` | 6 数据面 | 外部事实常量 5 项 |
@@ -76,6 +76,7 @@ Stage 2 追加：
 6. **浮点拒绝在构造点**：Ledger 载荷禁浮点（确定性七条之 6）由 `Payload::new` 与其 `Deserialize` 双侧执行，serde_json 数字非 i64/u64 可表示即拒。
 7. **存储写失败码**（S2 期初定）：增装载期第 5 码 `E_STORAGE_FATAL`（AxCode 36）承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
 8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。
+9. **没有写方的 kind 不定型**：`credential_lent`、`backpressure_shed`、`digest_invalidated` 在 `EventKind` 里有名字，但本树没有任何写方。结构体要以写方的字节为准（record 模块规则 1），没有写方就没有可对齐的字节，故它们留在 `record` 之外，与 F1 家族的无写方 kind 同理；哪天出现写方，它的第一版就经 `Payload::of` 写，结构体随之落在 `record` 下。
 
 ## 4 现状分析
 
@@ -162,10 +163,22 @@ pub struct GateRefusal {                // three-part refusal；三段必填
     rule: String, violation: String, alternative: String,
 }
 
-pub struct AxError {                    // 七字段，序列化字段序＝声明序
+pub struct AxError {                    // 七字段加一个可缺字段，序列化字段序＝声明序
     code: AxCode, action: String, subject: String,
-    nearby: Vec<String>, recovery: String, retriable: bool,
+    nearby: Vec<String>, recovery: String, retry: Retry,
+    retry_after_ms: Option<u64>,        // 缺省即不写出；只随 Retry::Yes 出现
     gate: Option<GateRefusal>,
+}
+
+/// 同一个请求能否再发一次，连同它的效果是否已经落地；线上拼作 "yes"／"no"／"unknown"。
+pub enum Retry {
+    Yes,      // 效果没有落地，同一请求稍后可能成功：可以
+    No,       // 同一请求再发一次注定同样失败：不可以
+    Unknown,  // 请求已经发出而回答丢了，效果是否落地无从得知：不知道
+}
+// AxError 另有 `provider: Option<ProviderFailureKind>`，排在 `gate` 之后，缺席时不上线。
+pub enum ProviderFailureKind {  // 携 serde，内标签 kind
+    Exchange, Cut, Silence, Refused { status: u32 }, Overflow { status: u32 }, Unreadable, Reported, Unbuilt,
 }
 
 pub enum Carrier { Event(EventKind), Loadtime }
@@ -179,11 +192,15 @@ impl AxCode {
 
 ```rust
 impl AxError {
-    /// Non-gate failure. `retriable` defaults to false (fail-closed).
+    /// Non-gate failure. `retry` defaults to `Retry::No` (fail-closed).
     pub fn failure(code: AxCode, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     /// Gate refusal. Sets `gate` to the mandatory three parts.
     pub fn refusal(code: AxCode, action: impl Into<String>, subject: impl Into<String>, gate: GateRefusal) -> ErrorDraft;
+    /// 模型调用失败的 E_PROVIDER：种类在场；`retry` 起于 `No`，由 gateway 的 `ProviderFailure::retry` 在 draft 上设定。
+    pub fn provider(kind: ProviderFailureKind, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     pub fn code(&self) -> &AxCode;  pub fn gate(&self) -> Option<&GateRefusal>;
+    pub fn retry(&self) -> Retry;
+    pub fn provider_failure(&self) -> Option<ProviderFailureKind>;
     /// 改写下层抛上来的恢复语；与 `ErrorDraft::with_recovery` 分名，因为它毁掉一句而不是补上第一句。
     #[must_use] pub fn rewrite_recovery(self, recovery: impl Into<String>) -> Self;
 }
@@ -192,12 +209,20 @@ impl AxError {
 pub struct ErrorDraft { /* 私有：尚未拿到恢复语的那六个字段 */ }
 impl ErrorDraft {
     pub fn with_nearby(self, nearby: Vec<String>) -> Self;
-    pub fn retriable(self) -> Self;     // 显式声明可重试，默认不可
+    pub fn retriable(self) -> Self;     // Retry::Yes，显式声明，默认 No
+    pub fn retriable_after(self, wait_ms: u64) -> Self; // Retry::Yes，且对端说了最早何时再问
+    pub fn effect_unknown(self) -> Self; // Retry::Unknown：请求已发出，回答丢了
     pub fn with_recovery(self, recovery: impl Into<String>) -> AxError;   // 唯一出口
 }
 ```
 
+**供应方失败的种类上线，句子不上线**：`provider` 只在 `AxError::provider` 造出的 E_PROVIDER 上在场（gateway 的 `provider_err` 是它的调用处；不是模型调用的 E_PROVIDER，如连接器的 http 客户端，不带种类）。客户端按 `kind` 从 `lang.json` 取人读的出路，城写的 `recovery` 折进「城的原话」供排错；城若只给英文句子，中文界面就只能照抄英文。种类不判「能不能再试一次」：那一判住在 gateway 的 `ProviderFailure::retry`，因为它要看种类之外的东西——连接是否建起（`Exchange` 分 `Yes` 与 `Unknown`）、拒绝的状态码（408／429／5xx 可重试）、流中报错的类型。**被否**：让种类另带一个 `is_retriable`——它看不见这些，会与 `retry` 成为同一事实的两个已经不一致的权威。
+
 **H-01 定案：取 typestate，不取四参**。路线图 §13.1 原定 `failure(code, action, subject, recovery)` 四参必填，此处改记为 typestate，理由三条：其一，`refusal` 已占满四参，再塞恢复语就是第五参，越过参数上限；其二，恢复语只剩 `ErrorDraft::with_recovery` 一个设定处，四参方案则要把 `with_recovery` 留作改写器，同一个名字两份职责；其三，四参要重写全部 641 个调用点，typestate 只动缺恢复语的那些，改动面恰好等于缺陷面。关门理由随之由「每处四实参」改为「编译通过」——恢复语必填这条现在由类型系统执行，grep 执行不了它。`AxError` 一经存在即已完工，`with_nearby`／`retriable` 只在 draft 上，故链式调用中 `with_recovery` 恒为最后一环。
+
+**`retry_after_ms` 是失败方对「再问之前至少等多久」的陈述**，读取处是 `AxError::retry_after_ms() -> Option<u64>`。它只能经 `retriable_after` 写入，而该方法同时置 `Retry::Yes`，故「不可重试却带等待」拼不出来。`None` 时字段不上线、不入账，旧的账本记录照读（`serde(default)`）。
+
+**`retry` 是三态信封，不是布尔。** 一个 `bool` 只能说「可以」与「不可以」，于是请求已经发出、回答却丢了的那一类失败（流中断、静默超时、发送途中断开）只能被说成「可以」，而那是假话：对端也许已经执行了它、计了费，一个有副作用的动作再发一次就是第二次副作用。第三态 `Unknown` 把「效果是否已经落地」说进信封，决定再发与否的是知道这个动作是否幂等的调用方（runtime 的 watchdog 对一次模型调用照样退避重问，因为它的效果只是一份城里从未收到的回答）。落选的是另加一个 `landed: bool` 字段：「可以」蕴含未落地、「不可以」与落地无关，两字段会拼出「可以且已落地」这样没有意义的组合。线上字段名随之由 `retriable` 改为 `retry`，`WIRE_V` 加一；旧账本记录里的 `retriable: true/false` 照读为 `Yes`／`No`。落选的是把等待时长写进 `recovery` 文本：那是给读者的一句话，重试节奏的持有者（runtime 的 watchdog）不该从句子里解析数字。
 
 「gate 码走 `refusal`」由构造纪律＋单测保证；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
@@ -272,9 +297,11 @@ impl Address {
     pub fn is_within(&self, prefix: &Address) -> bool;  // 段边界字节前缀；WriteDomain 原语
     pub fn is_reserved(&self) -> bool;                  // 任一段 ASCII 大小写不敏感命中 PROTECTED_METADATA 之一（C17，见 8-28、8-55、8-73）
     pub fn as_str(&self) -> &str;
+    pub fn name(&self) -> &str;                         // 最后一段：人起名时打下的那个词
 }
 ```
 
+- `name` 是地址的最后一段。一个居民、一个房间在名册与页面上以它称呼，而不以整条路径称呼：整条路径读起来像路径，最后一段读起来像某个人。语法保证至少一段且段非空，所以它总有答案。这件事写在类型上一处，城的名册、楼的页面与 prefix 里的「你的名字」读的是同一个定义。
 - 派生：`Clone/Debug/Display/PartialEq/Eq/PartialOrd/Ord/Hash`（BTreeMap 键）。
 - serde：呈现为字符串；`Deserialize` 经 `parse` 复验（fail-closed 读盘）。
 - 同一性按字节：`Eq`、`Ord` 与 `is_within` 在所有平台上逐字节比较，大小写不同的两个地址因而是两个地址；`is_within` 自反（`a.is_within(a)`）。**只有 `is_reserved` 折叠 ASCII 大小写**，因为它是一道只允许多拒的门，而它守的目录名在文件系统那边是大小写不敏感的（8-55）。
@@ -395,8 +422,16 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub task: String, pub goal: String, pub job: Option<Locator>,
     pub parent: Option<RunId>, pub predecessor: Option<RunId>,
     pub skills: Vec<SkillPin>,          // 空亦写出
+    pub dispatched_by: Option<Who>,     // 由谁派来：person／city／派活的居民地址；缺键为 None
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
+pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64 }
+    // prompt_assembled 的一行来源；不带摘要生产者指纹：没有路径产出摘要（runtime-SPEC §12.1）。旧行里多出的 producer 键读时忽略；本结构没有方法，读者直接读字段
+pub struct EvalRun { pub probe: String, pub version: u32, pub predecessor: RunId,  // eval_run：交接探针的一次读数
+                    pub kept: u32, pub lost: Vec<u32>,       // lost 是答案不同的题号
+                    pub before: Vec<String>, pub after: Vec<String> }   // 全部必填，空亦写出
+pub struct WentBack { pub name: String, pub point: GitOid }            // 回到过去：一棵新树起于 point
+pub struct FileRestored { pub name: String, pub path: String, pub point: GitOid } // path 取 git 树的写法
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
@@ -426,6 +461,29 @@ pub struct FileDiscarded { pub paths: Vec<String>,            // `file:<path>`�
 pub struct DiscardRestored { pub paths: Vec<String> }
 pub struct AssetArchived { #[serde(default = "fact")] pub kind: String,
                            #[serde(default)] pub day: u64, #[serde(default)] pub subject: String }
+pub struct PursuitChanged { pub step: PursuitMove,       // goal 只在 clear 之后缺席
+                            pub goal: Option<String> }
+#[serde(rename_all = "snake_case")] pub enum PursuitMove { Set, Pause, Resume, Clear }
+pub struct GoalConflict { pub goal: GoalId, pub with: GoalId, pub level: ConflictLevel }
+#[serde(rename_all = "snake_case")] pub enum ConflictLevel { Serialize, Arbitrate }
+// goal_registered 的载荷就是 GoalEntry 本身，不另立 struct：目标表持有的正是它
+impl PursuitChanged { pub fn held(self) -> Result<Option<(String, PursuitState)>, AxError>; }
+pub struct SignalEnqueued { pub id: SignalId, pub kind: SignalKind, pub from: String, pub room: Address,
+                            pub room_version: Version, pub payload: Payload, pub at: TimeMs,
+                            pub lane: Option<Lane> }   // lane 写出给 collab 之外的读者，回读不采信：它由 kind 推出
+pub struct RoadmapMoved { pub by: String, pub node: NodeId,   // roadmap_claimed／split／finished／released／blocked 共用
+                          #[serde(flatten)] pub step: RoadmapStep }   // 五行同有 by、node、verb，差别只在 verb 之后
+#[serde(tag = "verb", rename_all = "snake_case")]
+pub enum RoadmapStep { Claimed { item: String }, Split { children: Vec<String> },
+                       Finished { item: String, evidence: Locator },
+                       Released { item: String, why: StopCause, line: String },
+                       Blocked { item: String, why: StopCause, line: String } }
+// NodeId 读回经 NodeId::parse：node 读不出的一行让折叠停下，而不是被跳过——跳过会让节点看似无人持有
+pub struct WorktreeOpened { pub name: String, pub disk_bytes: ByteLen }   // 不携路径：路径是一台机器的事实
+pub struct SignalConsumed { pub id: SignalId, pub by: String }   // 内容已在 enqueue 行里，不写第二遍
+#[serde(rename_all = "snake_case")] pub enum Lane { Urgent, Ordinary }
+pub struct SignalId(String);                       // 非空、无空白；serde 经 parse／as_str
+pub enum SignalKind { Mention, Thread, Broadcast, Steer }   // serde 经 parse／as_str，四个线上词只一处
 pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
                              pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }
 pub struct RerankCalled { pub model: String, pub passages: u64, pub ranks: u64,
@@ -441,6 +499,64 @@ pub struct AdviserAnswered { pub subject: String, #[serde(flatten)] pub answer: 
 #[serde(rename_all = "snake_case")]
 pub enum AdviserFailure { Unavailable, Timeout, Unreadable }
 pub struct AdviserFellBack { pub subject: String, pub reason: AdviserFailure }
+
+// record::credential：F3 家族里凭据进出的三行。`ref` 是 SecretRef 而不是 String，
+// 语法之外的引用读不成这一行（Payload::read 报 E_WIRE_MISMATCH），不再被读者各自静默跳过。
+pub struct SecretCaptured { #[serde(rename = "ref")] pub reference: SecretRef,
+                            #[serde(default)] pub origin: String,   // enrolment | pasted | <provider>-subscription | <provider>-renewal
+                            pub expires_at: Option<u64> }           // 缺席即省略，不写 null
+pub struct LoginStarted { pub provider: String, pub auth_url: String,
+                          pub user_code: Option<String> }           // 只有设备码登录才有；缺席即省略
+pub struct ToolkitLinkOpened { pub toolkit: String }
+
+// record::endpoint：F3 家族里「哪个 model 替哪个 tag 作答」的两行。gateway 的 EndpointBook
+// 只经 Payload::read 读它们；InputKinds 随之归 kernel（gateway::InputKinds 是它的再导出），
+// 因为账本行的值要用 kernel 自己的类型。
+#[serde(rename_all = "snake_case")] #[derive(Default)]
+pub enum InputKinds { #[default] Text, TextImage }
+pub struct ModelSelected { pub tag: ModelTag, pub endpoint: String, pub model: String,
+                           pub context_tokens: u64,
+                           #[serde(default)] pub max_output_tokens: Option<u64>, // 总是写出，缺席写 null
+                           pub ceiling_from: Option<String>,   // person|upstream|preset|policy；缺席即省略
+                           #[serde(default)] pub input: InputKinds, // 旧行没有这个键，读作 Text
+                           pub input_price: UsdMicros, pub output_price: UsdMicros,
+                           pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
+impl ModelSelected { pub fn ceiling(&self) -> Option<Ceiling>; }   // 0 与 null 同读作「未声明」
+pub struct EndpointLost { pub name: String }
+pub struct EndpointAttached { pub name: String, pub base_url: String, pub dialect: DialectKind,
+                              pub auth: Option<SecretRef>,          // 引用，从不是密钥；缺席即省略
+                              pub auth_header: Option<String>,      // 非 bearer 时凭据所在的 header
+                              pub models: Vec<String>,              // 空亦写出
+                              pub connection_kind: Option<String>,  // 旧行没有，读者按 dialect 回推
+                              #[serde(default = true)] pub probed: bool,
+                              pub tuning: Option<AttachedTuning> }  // 什么都没设就省略；不是对象读作未设
+pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u64>,
+                            pub stream_idle_timeout_ms: Option<u64>, pub request_max_retries: Option<u32>,
+                            pub proxying: Option<Proxying>,        // 默认值省略
+                            pub extra_headers: Vec<(String, String)>, pub overrides: Vec<(String, String)> }
+// AttachedTuning 的每个键缺席读作未设、在而读不懂也读作未设（行不被拒）：编造一个期限比没有期限更难解释。
+// EndpointAttached 顶层的键则不然：probed、auth、connection_kind 在而读不懂，整行读不成（E_WIRE_MISMATCH），
+// 因为把一个没探到的端点读成探到过，是在书里放进一个没人够得着的端点。
+
+// record::probe：endpoint_probed，一次探测在挂上任何东西之前看到的。ModelFacts 随之归 kernel
+// （gateway::ModelFacts 是它的再导出，读一行 /models 的 gateway::endpoint::models::facts_of 仍归 gateway），
+// 因为账本行的值要用 kernel 自己的类型。
+pub struct ModelFacts { pub id: String, pub context_tokens: Option<u64>, pub max_output_tokens: Option<Ceiling>,
+                        pub input_modalities: Vec<String>, pub input_price: Option<String>,
+                        pub output_price: Option<String> }        // 缺席写 null，行没说就是没说
+pub struct EndpointProbed { pub name: String, pub base_url: String, pub reach: Reach,
+                            pub models: Vec<String>, pub facts: Vec<ModelFacts>,   // 读不到列表时两者都写空
+                            pub failed: Option<ProbeFailure> }                   // 缺席即省略
+pub struct ProbeFailure { pub code: String, pub subject: String }
+// record::provider：provider_degraded 有两个写方、两种形状，一个 untagged enum 让读者靠读来分，
+// 不靠猜键：E_PROVIDER 经 kernel::error 的 carrier 表平铺写成 AxError 本身；vault 启动探针退到
+// session memory 时写 VaultFellBack。两者都不是的行读不成（E_WIRE_MISMATCH）。
+#[serde(untagged)] pub enum ProviderDegraded { Refused(AxError), VaultFellBack(VaultFellBack) }
+pub struct VaultFellBack { pub component: String,     // 探针写 vault
+                           pub fallback: String,      // 探针写 session-memory
+                           pub persistence: String,   // gateway::Persistence 的自有拼法
+                           pub reason: String }
+// channels::note_of 只把 Refused 记成回合上的 Note::Refused；VaultFellBack 没改变任何回合，不出 note。
 
 pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
                         pub subject: Option<String> }   // 键缺席读作 None
@@ -465,11 +581,15 @@ pub enum FiredAction { Steer { text: String },
                        Freeze { reason: String } }
 pub struct GateChecked {}               // 无生产写方：结构是决定
 pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked，无写方：结构是决定
+#[serde(untagged)] pub enum CacheRenewed {   // cache_renewed：先试 Refused，因为 Answered 的字段全可缺
+    Refused { refused: AxError },
+    Answered { usage: Option<ModelUsage>, billed_usd_micros: Option<UsdMicros> },
+}
 ```
 
-已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`tool_called`／`tool_result`、
+已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`went_back`／`file_restored`、`tool_called`／`tool_result`、
 `checkpoint_committed`、`approval_resolved`、`autonomy_changed`、`city_halted`、
-`governed_document_written`、`embedding_called`／`rerank_called`、
+`governed_document_written`、`embedding_called`／`rerank_called`、`cache_renewed`、
 `adviser_asked`／`adviser_answered`／`adviser_fell_back`；
 `city_initialized`、`building_created`、`building_configured`、`cancel_received`、
 `handoff_written`、`watchdog_fired`、`gate_checked`、`policy_created`／`policy_revoked`；
@@ -518,13 +638,14 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 - 铸造纪律（15.3-1）：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
-**EventKind 74 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
+**EventKind 78 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
 | 创世与空间 | `city_initialized` | record-only（创世行，prev＝64 个 0） |
 | 创世与空间 | `building_created` | record-only |
 | 创世与空间 | `building_configured` | record-only |
+| 创世与空间 | `building_removed` | record-only（人把一栋楼移出城：载荷携 addr 与 kept——文件搬到 reserved subtree 下的哪里；不删一个字节，楼写过的每一行留在账里） |
 | 基集 | `session_opened` | record-only（新的一段从哪里开始；`prompt_assembled` 记的是它之后给了那一跑什么） |
 | 基集 | `run_started` | record-only |
 | 基集 | `run_forked` | record-only |
@@ -587,6 +708,8 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 隐私与 Discard | `file_discarded` | record-only |
 | 隐私与 Discard | `discard_restored` | record-only |
 | 隐私与 Discard | `autonomy_changed` | record-only |
+| 统一历史 | `went_back` | record-only（回到过去：名为 name 的新树起于提交 point；干线不动。与 `worktree_opened` 分开，因为只有这条说出这棵树停在历史的哪一点） |
+| 统一历史 | `file_restored` | record-only（从 point 取回 path 到名为 name 的树；point 上没有这个文件即删掉它。撤销就是追加这一条，账本不删任何行。path 取 git 树的写法（`/` 分隔、相对），不随写下它的机器变） |
 | 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 | 治理与设施 | `spine_document_written` | record-only（人写下某楼自己的 spine 文档之一，载荷携 building、which 与字节数，恒不携正文。与上一行分开是因为这几份有第二个写者，写入携起手正文并可能被拒） |
 | 治理与设施 | `rules_changed` | record-only（一次派发所站的规则文档之一换了内容（城的 `CONFIG.toml`，楼的 `CONFIG.toml` 与 `RULES.toml`）：载荷携 scope、which（`RULES.toml`／`CONFIG.toml`，枚举 `GoverningDocument`）、前后两枚摘要与字节数，恒不携正文。在准入（`agree_to_work`）之后、第一次读规则之前落账——先落账再生效；准入拒绝的派发与不存在的楼不记。`before` 缺席即开账行；本行的 `after` 等于同一文档下一行的 `before`，断链本身说明有人绕过一切门改了文件） |
@@ -596,6 +719,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 顾问 | `adviser_asked` | record-only（问了一次判断：问题种类（noul／score／choice）与对象。问本身不决定任何字节） |
 | 顾问 | `adviser_answered` | **in-window**（重放不再问顾问，读到的是这条答案：它决定一件东西留不留在窗口里，因此它决定模型请求字节。**这也是「入窗」从 8 变 9 的那一条**） |
 | 顾问 | `adviser_fell_back` | record-only（没有可用的顾问答案，确定性策略作答，reason 是 `unavailable`／`timeout`／`unreadable` 之一。没有这条，顾问塑形的窗口与城自己策略塑形的窗口会折出同一段历史） |
+| 保温 | `cache_renewed` | record-only（保温续期一次入账，写在房间地址下：成功时携 provider 自报的四个 token 数与它自报的账单额，失败时携 provider 的拒绝原样（`AxError`）。续期只重发前缀、不改变任何一次请求的字节，所以不入窗；记下它是为了让人从历史里读出保温花了多少） |
 
 二分依据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 
@@ -828,6 +952,51 @@ pub fn admit(stats: &QueueStats, item: &ItemMeta) -> Admission;
 - kani：全函数无溢出；单调性——同 capacity/cost 下 depth 更小恒不更难 Admit。
 - 饱饱不饿死（活性）属 citysim liveness（P2），非本函数可证。
 
+### 8-74 kernel::degradation（形状 1 判定）
+
+资源成为瓶颈时，harness 如实说出慢在哪里。本模块只判定：读数由调用方采，显示由事实条与 doctor 做；这里给出每种降级的类型、它的依据与恢复办法，以及剩余空间不够时是否还接新活。
+
+```rust
+pub struct ResourceReadings {
+    pub durable_lag: Duration,     // 最早一条已追加未落盘的事件等了多久（持久水位线落后多少）
+    pub commit_floor: Duration,    // 本卷实测的 fsync 中位数：该步的物理下限
+    pub volume: VolumeSpace,       // 城所在卷的剩余空间与总容量
+    pub queued_runs: u32,          // 因可用内存不够而排队的 run 数
+    pub schedule_delay: Duration,  // 记账线程从被唤醒到真正运行的中位延迟
+}
+pub struct VolumeSpace { pub free_bytes: u64, pub total_bytes: u64 }
+pub enum Degradation {
+    DiskSlow { durable_lag: Duration, commit_floor: Duration },
+    DiskLow { free_bytes: u64, floor_bytes: u64 },
+    MemoryTight { queued_runs: u32 },
+    CpuSaturated { schedule_delay: Duration },
+}
+pub enum Recovery {
+    ReduceDiskLoad,
+    FreeDiskSpace { at_least_bytes: u64 },
+    FreeMemory,
+    ReduceCpuLoad,
+}
+impl Degradation { pub fn recovery(&self) -> Recovery; }
+/// Every degradation the readings show, in the order DiskSlow, DiskLow,
+/// MemoryTight, CpuSaturated; no allocation.
+pub fn assess(readings: &ResourceReadings) -> impl Iterator<Item = Degradation>;
+/// Whether the city takes on new work: a volume below its floor refuses
+/// with the DiskLow it shows; every other state admits.
+pub fn admit_work(volume: VolumeSpace) -> Result<(), Degradation>;
+/// The free-space floor this volume derives: a share of its size, clamped.
+pub fn free_space_floor(volume_bytes: u64) -> u64;
+```
+
+- 依据即变体字段：每种降级带着判定它的读数，显示面不再回头读第二份。恢复办法是类型，措辞在 `client/src/lang.json`。
+- 盘慢：`durable_lag` 同时超过 `commit_floor × DISK_SLOW_FACTOR` 与 `DISK_SLOW_MIN`。前者随设备走（旋转盘的 fsync 本来就慢，不算降级），后者挡住快盘上的微秒级抖动。
+- 盘快满：`volume.free_bytes < free_space_floor(volume.total_bytes)`；地板取卷容量的 `1 / FREE_SPACE_FLOOR_DIVISOR`，夹在 `FREE_SPACE_FLOOR_MIN` 与 `FREE_SPACE_FLOOR_MAX` 之间。恢复办法给出回到地板以上至少要腾出的字节数。
+- 内存紧：`queued_runs > 0`。排队本身就是 S5.9L 的内存闸门给出的，这里只把它说出来。
+- CPU 被占满：`schedule_delay > CPU_SATURATED_DELAY`，即一帧（60 Hz）——人开始看得见的延迟；它是感知常数，不随机器类别调。
+- 只有盘快满停止接新活：盘慢与 CPU 满时接活只会变慢，不会丢；内存紧已由排队处理。`admit_work` 只读卷的两个数，因为受理新活的入口只该为它付一次读卷，而不是整份读数；拒绝带着 `Degradation::DiskLow`，入口据它的 `recovery()` 告诉人至少腾出多少。
+- 写盘失败时账本不坏、重启可恢复，由 memory 承担（memory-SPEC 8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
+- 生产的调用方：人发来的 `Dispatch` 在写下任何东西之前经 `admit_work` 读一次城所在卷（sprawling-SPEC 8-94）。未落地：事实条与 doctor 的显示；`Wake` 等不经人的入口；`ResourceReadings` 其余四项的生产填写者——`bin::monitor::Sample` 没有 fsync 中位数与调度延迟，它的 `durable_lag` 是条数而本模块要的是等待时长，且监视器只在有人看时采样，不能作为判定的唯一来源（sprawling-SPEC 8-90 决定 1）。
+
 ### 8-14 kernel::stall
 
 ```rust
@@ -948,7 +1117,7 @@ pub enum WriteMoment { BeforeReport, AfterFeedback, OnPlanChange }
 - **拼写单套且不区分大小写**：运行时文档全面英文化后，中英两套拼写会成为「一个 Resident 允许写什么」的第二个权威；而大小写不入契约是因为 `done` 这类行表达的事实表装得下，把它判成 Malformed 等于拿一个读者不接受的理由把该行逐出分母。**线上拼写另有一套**（`snake_case` 标识符）：线帧是给程序读的，表格是给人读的，让客户端硬编码 `Awaiting approval` 正是短语表存在要防的事。
 - **写者与读者同住**：`set_roadmap_status` 与 `insert_children` 是这张表仅有的两个编辑入口，两者共用同一段「哪几行是这张表」的判定（`locate_table`／`body_row`）。三条契约不变：只改首个表；输出行规范化，故**同一次改写两次得到同一字节**；`Done` 缺证据恒拒（`E_EVIDENCE_MISSING`）。
 - **`insert_children` 只往后编号，不补空位**：一个计划索引是一个名字，复用它等于悄悄搬走别人的证据。子节点落在父节点**最后一个后代之后**，于是阅读顺序不变、昨天看到的编号今天仍指同一件活。
-- **`WriteMoment` 有消费者**：正因为可写时刻是封闭的，读者才可以在两次写之间**持有已解析的树**而不是每问一次就把每栋楼的文件重解析一遍（`bin::plan_view`）。
+- **`WriteMoment` 有消费者**：正因为可写时刻是封闭的，读者才可以在两次写之间**持有已解析的树**而不是每问一次就把每栋楼的文件重解析一遍（`accounting::plan_view`）。
 
 ### 8-32 kernel::share（形状 2 value）
 
@@ -1046,7 +1215,7 @@ impl Pursuit {
     pub fn pause(&mut self);
     pub fn resume(&mut self);
 }
-pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Paused, Finished }
+pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Paused, Finished }  // 携 serde，内标签 kind
 pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> PursuitVerdict;
 ```
 
@@ -1055,6 +1224,7 @@ pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> Pursuit
 - **钱明确不是停机条件**。本仓的成本面受众是 Agent（给它优化的材料），不是刹车；一个读预算的停机条件回答的是一个这里没人问的问题。
 - **`observe` 收状态而不收 `Pursuit`**：判定不依赖目标说了什么，而一个必须先持有 `Pursuit` 才能发问的读者，等于要拿深度零位才能**读**这座城。**声明是被守的动作，看不是。**
 - **子代理拼不出来**：`declare` 收 `&Delegator`，而 `Delegate` 造不出一个（trybuild `delegate_declares_pursuit`）。与 `delegation` 同一个两层守卫，理由也同一个：一个能让全城通宵干活的子代理，就是一个能替你决定通宵干什么的子代理。
+- **`PursuitVerdict` 原样上线**：线上是 `{"kind":"work","next":"2.3"}` 这类内标签形状，`PursuitLine.verdict` 就是它。人读的那句话由客户端按 `kind` 从 `lang.json` 取词；城若在线上给一句英文，中文界面就只能照抄英文，而两边各写一份措辞就是同一句话的两个权威。
 - **pause 与 clear 是两件事，都要**：暂停留着目标，清除把它丢掉（丢掉值本身，于是不会被误恢复）。取消一个 **run** 是第三件事，住在 run 那边。
 
 ### 8-20 kernel::completion
@@ -1211,13 +1381,19 @@ impl ToolRoute {
 }
 pub struct ToolOutcome { pub result: Payload, #[serde(default)] pub attachments: Vec<ImageRef> }
 
-pub trait Tool: Send {
+pub trait Tool: Send + Sync {
     fn meta(&self) -> &ToolMeta;
     /// Fail-closed identity: a call whose name differs from meta().name
     /// must return E_INVALID_ARGS, never route silently.
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError>;   // 默认 `GateSubject::None`
+    fn writes(&self, call: &ToolCall) -> Writes;   // 默认按 `meta().effect`：`Read` → `Nothing`，其余 → `Domain`
 }
+pub enum Writes { Nothing, Paths(Vec<Address>), Domain }
+// Tool::writes 的返回：一条跑完的调用可能写了城里树上的哪些路径，由工具自己的文法读出来（M-17）。
+// `Paths` 只给确知自己写了哪些文件的工具（`edit` 答它的 `path`）；说不清的（`exec`、协作桌、改规则）答 `Domain`，
+// fence 于是扫整个写域。默认实现不猜：只有声明 `Effect::Read` 的工具答 `Nothing`。
+// `Writes::and` 合并两条答案：`Domain` 吸收一切，`Nothing` 是单位元，两组 `Paths` 取并集。
 #[cfg(feature = "conformance")]
 pub fn assert_tool_conformance<T: Tool>(tool: &mut T);   // 八字段完备＋name 文法＋错名调用拒收
 
@@ -1225,6 +1401,7 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
                                     // 三臂恒三（L0 冻结面），故穷尽不标 non_exhaustive；discard::forecast 的入参
 ```
 
+- **`invoke` 取 `&self`，trait 要求 `Send + Sync`。** 一波里开头连续的只读调用由 `Turn::execute_concurrent` 同时起跑（runtime-SPEC §8-3），同一张工作台上的工具因此会被几个线程同时借用；`&self` 加 `Sync` 让「这件工具能被并行调用」由类型回答，而不是由调用方记住。有内部状态的工具把状态放在自己的锁后面（`Mutex`），锁只罩住那份状态，不罩整次调用。**被否**：①保留 `&mut self`，由工作台给每件工具套一把锁——同名的两条只读调用（两次 `read`）会在这把锁上排队，并行只剩不同名的调用；②每次调用克隆一件工具——持有子进程、连接或目录的工具克隆不出同一件东西。
 - **`params` 复用 `Payload`**：键序 BTreeMap＋拒浮点白拿；schema 约定属 S3 工具实珰。
 - **`ToolRoute`（预编译路由表，A1）**：登记时按名排序一次（预编译点），此后每次调用一次二分探测即得处理器——替掉 `ToolBench` 里 `BTreeMap<String,_>` 的一次调用两次探测与每次探测的 `String` 分配。**被否**：①`phf`／`matchers` 类 const 期完美哈希——名册不是编译期常量，connector 工具名（`{label}_{tool}`）由楼的 `CONFIG.toml` 在登记时到达，而 phf 表会把内建名的拼写再抄一份，正是本模块用 `ToolName` 常量消灭的那种第二家；②维持 BTreeMap 双探测——fx 反例（线性扫描且一次调用查两次）在本仓的对应物就是这两次探测。排序数组二分（`slice::binary_search_by`）是任务允许的 const fn 排序数组二分形：名表建在 const 不可行的部分（名册动态）已由①说明，探测算法本身即那条二分。
 - **`ToolName::EXEC`**：`"exec"` 曾逐字写在 `runtime::bench`（discard 预报）、`bin::assembly::driving::lane`（两处：命令计数与 sieve）与 `citysim::executor`（两处）——一个事实五个家。`BROWSER` 的先例同理；拼写收进本模块后五处读者共用一常量。
@@ -1272,10 +1449,15 @@ pub struct Ceiling(NonZeroU64);  // 零不可表达：new(0) 即 None
 pub struct ChatRequest { pub model: String, pub max_tokens: Option<Ceiling>, pub system: Vec<SystemBlock>,
                          pub messages: Vec<ChatMessage>, pub tools: Vec<ToolDef> }
 pub struct ModelUsage { pub input_tokens: Tokens, pub output_tokens: Tokens,
-                        pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens }
+                        pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens,
+                        pub dialect: Option<DialectKind> }
 pub struct ChatResponse { pub content: Vec<ContentBlock>, pub stop: StopReason, pub usage: ModelUsage }
 pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError>;  // model_returned 载荷的唯一成形处
 ```
+
+`ModelUsage.input_tokens` 在每种兼容格式下都是**这次请求的全部输入 token，含缓存读与缓存写**。OpenAI 两个兼容格式本来就这样报；Anthropic 的 `input_tokens` 只数未缓存的部分，由它的解析器加上两个缓存数。选这个口径是因为上下文量表读的正是它（一次请求占了多大的窗口），而按价单结算时用 `input_tokens - cache_read_tokens - cache_write_tokens` 求未缓存部分只需一次减法。`dialect` 记下是哪个兼容格式报的；脚本模型与测试不经兼容格式，记 `None`。
+
+账本只追加：`model_returned.usage` 在写时带 `"v": 1`（本口径）与 `dialect`，旧行字节不改。读者一律经 `ModelUsage` 的 `Deserialize` 读这一格，版本换算只在那里做：没有 `v` 的旧行没有兼容格式可查，当 `cache_read_tokens + cache_write_tokens > input_tokens` 时它只可能是 Anthropic 的旧口径（全部输入不会小于其中的缓存部分），读成三者之和；否则照写的读。两种旧口径在没有缓存时一致，所以照读只会把「有缓存、且缓存部分不超过未缓存部分」的 Anthropic 旧行读小，这种行在带长前缀的会话里少见。
 
 浮点禁令只有一个家：`Payload::new`（及其 `Deserialize`）。wire 面把 `serde_json::Value` 转成
 `Payload` 即受判，故 seam 不再另设判定原语，拒绝理由与错误码也只有一处。
@@ -1627,6 +1809,16 @@ S2 激活的码（逐码答「能否定义掉」）：
 
 **重开参数**：任一条成立即重开——①某个高频修改的 kernel 模块的引用者降到 kernel 依赖者的一半以下，且省下的 crate 里有 runtime 或 sprawling；②`cargo build --workspace --timings` 显示，改一个策略模块后被省下的那批 crate 占增量重编时间 10% 以上；③kernel 单 crate 的重编时间超过一次策略改动增量重编总时间的一半。
 
+### 12.5 定规：降级的线相对于设备，停止接新活的拒绝带着读数
+
+**决定**：`degradation` 的「盘慢」线取本卷实测 fsync 的倍数（另设不闪烁的下限），「盘快满」的地板取卷容量的一份再夹住上下界，「CPU 被占满」取一帧；只有「盘快满」停止接新活，`admit_work` 只读卷的剩余空间与总容量，拒绝时返回那一个 `Degradation::DiskLow`。
+
+**理由**：harness 要在十年前的旋转盘和服务器上都说真话。固定毫秒数的盘慢线会让旋转盘永远处于降级、让 NVMe 永远不降级；固定字节数的地板对小卷太贪、对大卷太松。CPU 的线是人的感知常数，与机器类别无关。拒绝要告诉人至少腾出多少字节，`backpressure::Admission::Shed` 只带一个原因，读数会在入口处丢掉；`backpressure::admit` 管的是队列的格数，与卷的字节不是同一个决定。盘慢、CPU 满、内存紧都只让活变慢或排队，不丢数据，所以不拒绝；盘满继续接活会让下一次写盘失败。
+
+**被否**：①每种降级各自决定是否拒活——内存紧已由 S5.9L 的排队处理，再拒一次是同一决定两个家；②固定阈值——违背「不把常数调成某一类机器」；③经 `Admission::Shed { reason: DiskLow }` 拒绝——入口得再算一次地板才能说出恢复办法，同一个地板两个家。
+
+**重开参数**：实测显示某一类设备上 `DISK_SLOW_FACTOR` 让盘慢状态在无外部负载时出现，或地板不足以写下一次快照。
+
 ## 13 依赖选型
 
 `serde`＋`serde_json`（规范字节与载荷；B.7 钉版）；`thiserror`（Display/Error derive；B.7）；`blake3`（唯一哈希，B.7 钉 S1；1.8.6 现行 stable）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）。S2 增：`secrecy` 0.10.3＋`zeroize` 1.9.0（Sealed；B.7 钉 Stage 2–3，2026-08 复核为最新）。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
@@ -1769,7 +1961,7 @@ secret 门白名单随 `sealed.rs` 搬家）。完成检查：同 8-36。
 
 `model.rs`（516）切成四文件：`model/wire.rs` 收线上会话的词汇（dialect 无关的规范形）（`BuildingPolicy`／`Role`／
 `StopReason`／`SystemBlock`／`DialectKind`／`ModelTag`／`Effort`／`ContentBlock`／`ChatMessage`／
-`ToolDef`／`ChatRequest` 含 `empty`／`ModelUsage`／`ChatResponse`）；`model/seam.rs` 收一次调用两个方向
+`ToolDef`／`ChatRequest` 含 `empty`／`ChatResponse`）；`model/usage.rs` 收 `ModelUsage` 与它的行形（`UsageRow`，版本换算只在这里）；`model/seam.rs` 收一次调用两个方向
 所载之物与内容↔载荷两转换（`ModelRequest`／`ModelReturn` 含 `bare`／`from_response`、`message_payload`／
 `content_from_message`）；`model/conformance.rs` 收 feature 门后的一致性断言；
 `model/tests.rs` 收原 `mod tests`（6 个 `#[test]`，断言与名字不动，补 `AxCode`／`Payload`／`B3Hash`／
@@ -2118,3 +2310,28 @@ impl CityLayout {
 - `SANDBOX_FUEL_DEFAULT`：`SandboxLimits.fuel` 是裸 `u64`，域未设。
 - `STARTUP_BUDGET_TOKENS`／`BYTES_PER_TOKEN`／`LOOP_REPEAT_THRESHOLD`／`OFFLOAD_MIN_BYTES`／`DRAFT_HELD_ESCALATE`／`EDIT_WAR_FREEZE`／`DISCARD_FILES_MAX`／`DISCARD_RETENTION_DAYS`：算术输入或判定输入，无拒因句式，保持裸数即是正确形状。
 - `PREFIX_SLOTS`：域已在类型上（`NonZeroU64`），不迁。
+
+### 8-74 `kernel::keep_warm`：缓存保温的设置与判定（形状 1 判定）
+
+**设置与判定住 kernel，因为读它的两处互不依赖**：`city::config_layers` 把 `[cache] keep_warm` 读成这个值，runtime 按它排续期；两个 crate 只共有 kernel，所以枚举的拼法与「何时续期」只能在这里各有一处定义。
+
+```rust
+/// 城的保温设置。默认 Off：Off 时本模块不排任何续期，城不会多发一条请求。
+#[derive(Default)] #[serde(rename_all = "snake_case")]   // 缺省 Off
+pub enum KeepWarm { Off, FiveMinute }
+/// 一个前缀的缓存状态：最近一次真实请求带它发出的时刻，与缓存最近一次被刷新的时刻（毫秒）。
+pub struct CacheUse { /* used_ms、refreshed_ms —— 私有；refreshed_ms ≥ used_ms 由构造保证 */ }
+impl CacheUse {
+    pub fn sent(at_ms: u64) -> CacheUse;                  // 一条真实请求带着它发出
+    pub fn renewed(self, at_ms: u64) -> CacheUse;         // 一条续期请求刷新了它，不改 used_ms
+}
+/// 下一条续期请求的发出时刻；None＝不续期。lead_ms 是调用方测得的到 provider 的往返时长，
+/// 续期提前这么久发出，使 provider 在 TTL 到期前读到它。
+pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u64>;
+```
+
+- 判定：`FiveMinute` 时，续期时刻＝`refreshed_ms + PROMPT_CACHE_TTL_SECS·1000 − lead_ms`（饱和减）；该时刻距 `used_ms` 超过一个 TTL 即不续期。所以「最近 5 分钟内用过」与缓存寿命是同一个常数 `consts_external::PROMPT_CACHE_TTL_SECS`，不另立第二个 300。一次真实使用最多换来一次续期：续期不改 `used_ms`，第二次续期的时刻必然离真实使用超过一个 TTL。
+- `lead_ms` 由调用方对所连 provider 实测给出，不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
+- 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。
+- 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（city-SPEC §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
+- 现状：设置与判定已落地；按它记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（runtime-SPEC §8-4-2）。定时器尚未接线，因此今天任何配置下城都不发续期请求。

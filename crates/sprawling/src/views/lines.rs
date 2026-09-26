@@ -8,14 +8,14 @@
 //!
 //! **Why it is a projection and not part of the assembly point.** Nothing
 //! here decides anything or reaches a provider: it folds records into the
-//! answers a client asks for, and `rebuild_views` throws the whole thing
+//! answers a client asks for, and `Views::rebuild` throws the whole thing
 //! away and folds the ledger again to get the same bytes. That is
 //! ARCHITECTURE.md section 9 shape 7, while `bin::assembly` is an
 //! adapter - and a file holding two shapes is what section 9 says a split
 //! looks like.
 //!
 //! **What it deliberately does not hold.** The plans are
-//! `crate::plan_view`'s and are read through it; a second parse here
+//! `accounting::plan_view`'s and are read through it; a second parse here
 //! would be a second answer to "what is stuck and why", and only one of
 //! them would be folding the records that say why. What waits in a room
 //! is folded from signal records rather than read off a queue, because a
@@ -25,7 +25,7 @@
 use std::path::Path;
 
 use kernel::event::record::{AssetArchived, DiscardRestored, FileDiscarded};
-use kernel::{Address, EventRecord, RunId};
+use kernel::{Address, AxError, EventRecord, RunId};
 
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
@@ -48,6 +48,10 @@ pub(crate) fn config_answer(
     addr: &Address,
 ) -> Result<channels::ConfigAnswer, kernel::AxError> {
     let defaults = gateway::EndpointTuning::DEFAULTS;
+    let domain = channels::SecondDomain {
+        min: kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
+        max: kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
+    };
     Ok(channels::ConfigAnswer {
         addr: addr.clone(),
         effort: city::settled_effort(city_root, addr)?.map(|(effort, layer)| {
@@ -56,12 +60,18 @@ pub(crate) fn config_answer(
                 from: rung_of(layer),
             }
         }),
-        second: city::settled_second(city_root, addr)?.map(|(threshold, layer)| {
+        second: city::settled_second(city_root, addr)?.map_or(
             channels::SettledSecond {
+                percent: kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT,
+                from: channels::ConfigLayer::Default,
+                domain,
+            },
+            |(threshold, layer)| channels::SettledSecond {
                 percent: u64::from(threshold),
                 from: rung_of(layer),
-            }
-        }),
+                domain,
+            },
+        ),
         tuning: channels::TuningDefaults {
             timeout_ms: defaults.timeout_ms,
             request_max_retries: defaults.retries.stated(),
@@ -120,51 +130,26 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::Endpoi
     channels::EndpointsAnswer { endpoints, chosen }
 }
 
-/// One clause a person reads: what the city is doing about its pursuit.
+/// The building a `pursuit_changed` record is about.
 ///
-/// The one wording, so the page, the console and a log line all say the
-/// same thing about the same verdict.
-pub(crate) fn verdict_line(verdict: kernel::PursuitVerdict) -> String {
-    match verdict {
-        kernel::PursuitVerdict::Work { next } => format!("working on {next}"),
-        kernel::PursuitVerdict::Waiting { in_flight } => {
-            format!("waiting for {in_flight} run(s) still going")
-        }
-        kernel::PursuitVerdict::Paused => "paused".to_owned(),
-        kernel::PursuitVerdict::Finished => {
-            "finished: nothing is ready and nobody is working".to_owned()
-        }
-    }
-}
-
-/// What one `pursuit_changed` record says.
-///
-/// `None` for a record this build cannot read as one, which a view skips
-/// rather than inventing a goal for.
-pub(crate) fn pursuit_from(
-    record: &EventRecord,
-) -> Option<(Address, Option<(String, kernel::PursuitState)>)> {
-    let map = record.data().as_map();
-    let addr = record.addr()?.clone();
-    let step = map.get("step")?.as_str()?;
-    let goal = map
-        .get("goal")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_owned();
-    let held = match step {
-        "set" => Some((goal, kernel::PursuitState::Running)),
-        "pause" => Some((goal, kernel::PursuitState::Paused)),
-        "resume" => Some((goal, kernel::PursuitState::Running)),
-        "clear" => None,
-        _ => return None,
-    };
-    Some((addr, held))
+/// # Errors
+/// Refuses a record with no address: the step it records belongs to no
+/// building, and a fold that skipped it would keep whatever goal the
+/// step changed.
+pub(crate) fn pursued(record: &EventRecord) -> Result<Address, kernel::AxError> {
+    record.addr().cloned().ok_or_else(|| {
+        kernel::AxError::failure(
+            kernel::AxCode::WireMismatch,
+            "read a pursuit_changed line",
+            format!("line {} names no building", record.seq().value()),
+        )
+        .with_recovery("replay with the build that wrote this record")
+    })
 }
 
 /// Every building the city has, in reading order.
 ///
-/// The plans themselves are `crate::plan_view`'s: reading them here as
+/// The plans themselves are `accounting::plan_view`'s: reading them here as
 /// well would be a second parse of the same file, and the two would
 /// disagree the first time one of them was invalidated and the other was
 /// not.
@@ -177,20 +162,22 @@ pub(crate) fn buildings_of(city_root: &Path) -> Vec<Address> {
 /// One signal, as a room's queue would show it. `None` for a record
 /// this version cannot read as a signal: a view skips what it cannot
 /// read rather than inventing a row for it.
-pub(crate) fn signal_line(record: &EventRecord) -> Option<(Address, channels::SignalLine)> {
-    let map = record.data().as_map();
-    let text = |key: &str| {
-        map.get(key)
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned)
-    };
-    let room = Address::parse(&text("room")?).ok()?;
-    Some((
-        room,
+/// The waiting row a `signal_enqueued` line adds, and the room it waits
+/// in, read through the struct its writer wrote.
+///
+/// # Errors
+/// Refuses a line this build cannot read as a signal: skipping it would
+/// leave a waiting signal out of the view.
+pub(crate) fn signal_line(
+    record: &EventRecord,
+) -> Result<(Address, channels::SignalLine), AxError> {
+    let signal = collab::Signal::from_payload(record.data())?;
+    Ok((
+        signal.room().clone(),
         channels::SignalLine {
-            id: text("id")?,
-            kind: text("kind").unwrap_or_else(|| "signal".to_owned()),
-            from: text("from").unwrap_or_default(),
+            id: signal.id().as_str().to_owned(),
+            kind: signal.kind().as_str().to_owned(),
+            from: signal.from().to_owned(),
             at: record.t(),
         },
     ))
@@ -244,5 +231,36 @@ pub(crate) fn summarize(run: RunId, hot: &memory::RunHot) -> channels::RunSummar
         last_kind: hot.last_kind,
         addr: hot.addr.clone(),
         started: hot.started,
+        completion: hot.completion.clone(),
+        pr: hot.pr.clone(),
+        ask: hot.ask.clone(),
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::config_answer;
+    use kernel::Address;
+
+    /// A value no file states is still answered, with the default named
+    /// as the layer it came from and the domain a file may state; a page
+    /// told `null` has to keep its own copy of both to draw anything.
+    #[test]
+    fn an_unstated_second_rung_is_answered_with_the_default_as_its_layer() {
+        let dir = tempfile::tempdir().unwrap();
+        let addr = Address::parse("lab/room1").unwrap();
+        let answer = serde_json::to_value(config_answer(dir.path(), &addr).unwrap()).unwrap();
+        assert_eq!(
+            answer.get("second"),
+            Some(&serde_json::json!({
+                "percent": kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT,
+                "from": "default",
+                "domain": {
+                    "min": kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
+                    "max": kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
+                },
+            }))
+        );
     }
 }

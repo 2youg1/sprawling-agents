@@ -25,7 +25,12 @@ fn a_session_with_a_person_opens_in_the_persons_own_words() {
     let ContentBlock::Text { text } = &assigned.messages()[0].content[0] else {
         panic!("the dispatch lines are text");
     };
-    assert_eq!(text, "Task: close the loop\nGoal: one turn, then stop");
+    // The task is the run segment of the prefix already; repeating it
+    // here would carry the person's line twice in every request.
+    assert_eq!(
+        text,
+        "The task is in JOB.md above.\nGoal: one turn, then stop"
+    );
 
     let mut talking = Conversation::new();
     talking.push_task_lines("what do you make of this", "", Opening::WithPerson);
@@ -78,5 +83,72 @@ fn the_window_folds_steer_into_the_open_user_message() {
         conversation.messages().len(),
         3,
         "steer after assistant opens a new message"
+    );
+}
+
+/// A reply with no content pushes no assistant message, so the results
+/// that follow meet a user message already on the wire. They still land
+/// in the window, and a steer held since the send rides after them.
+#[test]
+fn tool_results_after_an_empty_reply_reach_the_window() {
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("find it", "found", Opening::FromJob);
+    conversation.mark_sent();
+    conversation.push_steer("user", "narrow the search");
+    conversation.push_assistant(Vec::new());
+    let result = ContentBlock::ToolResult {
+        tool_use_id: "call-1".to_owned(),
+        content: "{}".to_owned(),
+        is_error: false,
+        attachments: Vec::new(),
+    };
+    conversation.push_tool_results(vec![result.clone()]);
+    let blocks: Vec<&ContentBlock> = conversation
+        .messages()
+        .iter()
+        .flat_map(|message| message.content.iter())
+        .collect();
+    assert_eq!(
+        blocks[1..],
+        [
+            &result,
+            &ContentBlock::Text {
+                text: "user: narrow the search".to_owned()
+            }
+        ]
+    );
+}
+
+/// Results that rewrote a sent message leave it open again: a steer
+/// that arrives before the next assembly joins it after those results
+/// instead of waiting one more wave.
+#[test]
+fn a_steer_after_results_on_a_sent_message_joins_them() {
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("find it", "found", Opening::FromJob);
+    conversation.mark_sent();
+    conversation.push_assistant(Vec::new());
+    let result = ContentBlock::ToolResult {
+        tool_use_id: "call-1".to_owned(),
+        content: "{}".to_owned(),
+        is_error: false,
+        attachments: Vec::new(),
+    };
+    conversation.push_tool_results(vec![result.clone()]);
+    conversation.push_steer("user", "narrow the search");
+    let tail: Vec<&ContentBlock> = conversation
+        .messages()
+        .iter()
+        .flat_map(|message| message.content.iter())
+        .skip(1)
+        .collect();
+    assert_eq!(
+        tail,
+        [
+            &result,
+            &ContentBlock::Text {
+                text: "user: narrow the search".to_owned()
+            }
+        ]
     );
 }

@@ -26,8 +26,8 @@
 //! asserted in tests.
 
 use kernel::{
-    AxCode, AxError, ChatRequest, ChatResponse, ContentBlock, Effort, ModelUsage, Role, StopReason,
-    Tokens,
+    AxCode, AxError, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort, ModelUsage,
+    Role, StopReason, Tokens,
 };
 use serde_json::{Map, Value, json};
 
@@ -309,6 +309,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         cache_read_tokens: cache_read,
         // No OpenAI wire slot: cache writes are not reported distinctly.
         cache_write_tokens: Tokens::new(0),
+        dialect: Some(DialectKind::OpenAi),
     };
     Ok(ChatResponse {
         content,

@@ -35,6 +35,8 @@ mod check;
 mod city;
 #[path = "main/data.rs"]
 mod data;
+#[path = "main/dispatch.rs"]
+mod dispatch;
 #[path = "main/exit.rs"]
 mod exit;
 #[path = "main/grammar.rs"]

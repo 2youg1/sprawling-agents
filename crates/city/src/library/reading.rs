@@ -21,10 +21,7 @@ use crate::config_layers::SHELVES_KEY;
 use super::ShelfKey;
 use super::shelf::{Holding, OwnShelf, Shelf, holding_name, plain_name};
 
-/// What a skill on a shelf outside the city is filed as: one directory
-/// per skill, holding this file. It is the layout pi, claude and agents
-/// all use, and the one place this city states it.
-pub(super) const SKILL_FILE: &str = "SKILL.md";
+pub(super) use kernel::layout::SKILL_FILE;
 
 /// Reads one shelf into the map. A shelf that is not there is an empty
 /// shelf: most cities start with nothing settled, and most buildings
@@ -56,28 +53,60 @@ pub(super) fn shelve(
             continue;
         }
         for item in read_dir(&section)? {
-            if item.is_dir() {
-                continue;
+            if let Some(holding) = holding_at(city_root, shelf, &section_name, &item)? {
+                holdings.insert(ShelfKey::of(&holding.name), holding);
             }
-            let file = spelled(&item)?;
-            let Some(name) = holding_name(&file) else {
-                continue;
-            };
-            if !plain_name(&name) {
-                continue;
-            }
-            let text = read_holding(&item)?;
-            // The address is read back off the path the layout chose,
-            // so a shelf that moves cannot leave the addresses of what
-            // sits on it pointing at where it used to be.
-            let addr = address_of(city_root, &item)?;
-            holdings.insert(
-                ShelfKey::of(&name),
-                Holding::of(name, section_name.clone(), &text, shelf.at(addr)),
-            );
         }
     }
     Ok(())
+}
+
+/// The holding one item on a section shelf is, or `None` when it is not
+/// one: the one derivation the scan and an install's read-back share.
+///
+/// # Errors
+/// Propagates a holding that cannot be read, a name this machine spells
+/// outside Unicode, and a path the city cannot spell as an address.
+pub(super) fn holding_at(
+    city_root: &Path,
+    shelf: &OwnShelf,
+    section: &str,
+    item: &Path,
+) -> Result<Option<Holding>, AxError> {
+    let Some((name, document)) = filed(item)? else {
+        return Ok(None);
+    };
+    if !plain_name(&name) {
+        return Ok(None);
+    }
+    let text = read_holding(&document)?;
+    // The address is read back off the path the layout chose, so a
+    // shelf that moves cannot leave the addresses of what sits on it
+    // pointing at where it used to be.
+    let addr = address_of(city_root, &document)?;
+    let package = (document != item)
+        .then(|| address_of(city_root, item))
+        .transpose()?;
+    Ok(Some(Holding {
+        package,
+        ..Holding::of(name, section.to_owned(), &text, shelf.at(addr))
+    }))
+}
+
+/// What one item on a section shelf holds, as its name and the document
+/// the catalog reads: `<name>.md` is the document itself, and a package
+/// `<name>/` is its [`SKILL_FILE`], the files beside which stay on the
+/// shelf for `read` to open. A directory without that file is not a
+/// holding, the same as on an external shelf.
+fn filed(item: &Path) -> Result<Option<(String, PathBuf)>, AxError> {
+    if item.is_dir() {
+        let document = item.join(SKILL_FILE);
+        return document
+            .is_file()
+            .then(|| spelled(item).map(|name| (name, document)))
+            .transpose();
+    }
+    Ok(holding_name(&spelled(item)?).map(|name| (name, item.to_path_buf())))
 }
 
 /// Reads one skill off a shelf the city does not keep: one directory per
@@ -224,3 +253,7 @@ pub(super) fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
     out.sort();
     Ok(out)
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests;

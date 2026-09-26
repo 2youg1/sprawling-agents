@@ -191,7 +191,7 @@ impl Tool for ArchiveTool {
         &self.meta
     }
 
-    fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+    fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn recording_queues_one_effect_and_writes_nothing_yet() {
         let shared = desk(Vec::new());
-        let mut tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
+        let tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
         tool.invoke(&call(serde_json::json!({
             "action": "record",
             "kind": "decision",
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn a_fifth_kind_is_refused_with_the_four_it_could_be() {
         let shared = desk(Vec::new());
-        let mut tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
+        let tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
         let refusal = tool
             .invoke(&call(serde_json::json!({
                 "action": "record", "kind": "note", "text": "something",
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn an_empty_note_is_refused_because_nobody_could_act_on_it() {
         let shared = desk(Vec::new());
-        let mut tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
+        let tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
         assert!(
             tool.invoke(&call(serde_json::json!({
                 "action": "record", "kind": "fact", "text": "   ",
@@ -331,7 +331,7 @@ mod tests {
                 text: "glazes are mixed by weight".to_owned(),
             },
         ]);
-        let mut tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
+        let tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
         let outcome = tool
             .invoke(&call(
                 serde_json::json!({ "action": "recall", "query": "KILN" }),
@@ -361,7 +361,7 @@ mod tests {
 
     #[test]
     fn an_action_this_tool_does_not_have_is_refused_by_name() {
-        let mut tool = ArchiveTool::new(desk(Vec::new())).unwrap();
+        let tool = ArchiveTool::new(desk(Vec::new())).unwrap();
         let refusal = tool
             .invoke(&call(serde_json::json!({ "action": "forget" })))
             .unwrap_err();

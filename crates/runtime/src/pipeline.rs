@@ -154,7 +154,7 @@ fn store(
         original: record.original.clone(),
         len: record.original_len,
         substitute_len,
-        rest_path: record.rest_path.display().to_string(),
+        rest_path: record.rest_path,
         sieve,
     }
     .payload()?;

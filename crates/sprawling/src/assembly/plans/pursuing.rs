@@ -9,8 +9,9 @@
 //! **Execute in parallel, account in series** (ARCHITECTURE section 10,
 //! rule 5). Every node of the ready set gets a lane of its own; every
 //! line those lanes write crosses back to this thread, and every run
-//! that comes home is landed here, in the order it arrives
-//! (sprawling-SPEC.md 8-46-4).
+//! that comes home is landed by `serve_flight`, in the order it
+//! arrives, which then moves every pursuit on (sprawling-SPEC.md
+//! 8-46-4).
 //!
 //! The lanes are the city's, not this pursuit's: a pursuit takes rows
 //! into the same table a person's dispatch goes into, so the number of
@@ -19,81 +20,75 @@
 use kernel::{Address, AxError, NodeId};
 
 use super::super::{Assignment, Landed, RunWorker};
-use crate::serving::relay::Patience;
-
-/// Why one pass over the ready set stopped taking work.
-///
-/// The difference decides whether the pursuit is over: nothing left to
-/// take and nothing of its own in a lane is finished, while a full city
-/// still has this pursuit's work ahead of it.
-enum Taking {
-    /// `kernel::pursuit` says there is nothing to take right now.
-    Nothing,
-    /// Every lane in the city is taken, and ready work is still waiting.
-    LanesFull,
-}
 
 impl RunWorker {
-    /// Takes ready work for as long as a pursuit says to, driving every
-    /// node of the ready set at once.
+    /// Moves every pursuit on after a run has come home.
     ///
     /// **It terminates because a node leaves the ready set when a lane
     /// takes it, and comes back only if the run that took it left it
-    /// alone** — and that case stops the pursuit rather than
-    /// re-dispatching. Splitting a branch adds work, which is the city
-    /// finding more to do rather than looping.
+    /// alone** — and that case pauses the pursuit rather than
+    /// re-dispatching, so the ledger and the page both say it stopped.
+    /// Splitting a branch adds work, which is the city finding more to
+    /// do rather than looping.
     ///
-    /// The verdict is `kernel::pursuit`'s and is not re-derived here:
-    /// what "there is nothing left to do" means has one authority, and
-    /// this is the first caller able to tell it the truth about how many
-    /// runs are going.
-    ///
-    /// # Errors
-    /// Propagates a dispatch that could not be prepared, a lane that
-    /// could not be started, and every failure of landing a run.
-    pub(super) fn pursue(&mut self, addr: &Address) -> Result<(), AxError> {
-        let mut stalled = false;
-        loop {
-            let taking = if stalled {
-                Taking::Nothing
-            } else {
-                self.take_ready_work(addr)?
-            };
-            if matches!(taking, Taking::Nothing) && self.flight.rows_of(addr).is_empty() {
-                return Ok(());
+    /// Any landing may have freed a lane or made a node ready, so every
+    /// pursuit is asked, not only the one whose row came home. A pursuit
+    /// that cannot take work is noted rather than failing the landing
+    /// that happened to come before it: the two have no cause in common.
+    pub(in crate::assembly) fn advance_pursuits(&mut self, landed: &Landed) {
+        if let Landed::Row { addr, node } = landed
+            && self.ready_in(addr).contains(node)
+        {
+            self.note(
+                runtime::diagnostics::Level::Refuse,
+                "kernel::pursuit",
+                &format!(
+                    "{node} is still ready after a run took it; the pursuit pauses rather than                      dispatching it again"
+                ),
+            );
+            if let Err(err) = self.set_pursuit(addr, channels::PursuitStep::Pause) {
+                self.pursuit_refused(addr, &err);
             }
-            // A run home may be this pursuit's row or somebody else's
-            // dispatch; both land here, and only the first one changes
-            // what this loop does next.
-            let Landed::Row { addr: at, node } = self.serve_flight(Patience::Unbounded)? else {
-                continue;
-            };
-            // A run that came home leaving its node exactly as it found
-            // it would be dispatched again for ever, so the check is on
-            // the ready set rather than on a counter.
-            if at == *addr && self.ready_in(addr).contains(&node) {
-                self.note(
-                    runtime::diagnostics::Level::Refuse,
-                    "kernel::pursuit",
-                    &format!(
-                        "{node} is still ready after a run took it; the pursuit stops rather \
-                         than dispatching it again"
-                    ),
-                );
-                stalled = true;
+        }
+        let pursuing: Vec<Address> = self.planning.pursuits.keys().cloned().collect();
+        for addr in pursuing {
+            if let Err(err) = self.pursue(&addr) {
+                self.pursuit_refused(&addr, &err);
             }
         }
     }
 
-    /// Starts a run for every ready node there is a free lane for.
+    /// Notes a pursuit that could not move on, against its building.
+    fn pursuit_refused(&mut self, addr: &Address, err: &AxError) {
+        self.note(
+            runtime::diagnostics::Level::Refuse,
+            "kernel::pursuit",
+            &format!("{} could not take work: {}", addr.as_str(), err.subject()),
+        );
+    }
+
+    /// Starts a run for every ready node there is a free lane for, and
+    /// returns.
+    ///
+    /// **Moved on by events, not by a loop.** The rows it starts land
+    /// through `serve_flight` like any other run, and each landing calls
+    /// [`Self::advance_pursuits`], so the desk is free the moment this
+    /// returns: a loop here held `Pause`, `Halt` and every other command
+    /// out until the pursuit's last row came home (sprawling-SPEC.md
+    /// 8-46-4).
     ///
     /// Nodes already in a lane are not in the ready set it asks about:
     /// ready means a run could take this node now, and one already
-    /// taken could not be taken twice.
-    fn take_ready_work(&mut self, addr: &Address) -> Result<Taking, AxError> {
+    /// taken could not be taken twice. The verdict is
+    /// `kernel::pursuit`'s and is not re-derived here.
+    ///
+    /// # Errors
+    /// Propagates a dispatch that could not be prepared and a lane that
+    /// could not be started.
+    pub(super) fn pursue(&mut self, addr: &Address) -> Result<(), AxError> {
         while !self.flight.full() {
-            let Some(state) = self.pursuits.get(addr).map(kernel::Pursuit::state) else {
-                return Ok(Taking::Nothing);
+            let Some(state) = self.planning.pursuits.get(addr).map(kernel::Pursuit::state) else {
+                return Ok(());
             };
             let busy = self.flight.rows_of(addr);
             let ready: Vec<NodeId> = self
@@ -104,13 +99,16 @@ impl RunWorker {
             let kernel::PursuitVerdict::Work { next } =
                 kernel::pursuit::observe(state, &ready, self.flight.in_flight())
             else {
-                return Ok(Taking::Nothing);
+                return Ok(());
             };
             let (Some(item), Some(goal)) = (
                 self.plan_item(addr, &next),
-                self.pursuits.get(addr).map(|held| held.goal().to_owned()),
+                self.planning
+                    .pursuits
+                    .get(addr)
+                    .map(|held| held.goal().to_owned()),
             ) else {
-                return Ok(Taking::Nothing);
+                return Ok(());
             };
             self.note(
                 runtime::diagnostics::Level::Effect,
@@ -122,17 +120,19 @@ impl RunWorker {
                     addr: addr.clone(),
                     session: None,
                     effort: None,
+                    model: None,
                     mode: kernel::Mode::PlanGoal,
                     parent: None,
                     origin: None,
                     succession: None,
                     taint: kernel::TaintSet::empty(),
+                    dispatched_by: kernel::event::Who::City,
                 },
                 format!("Plan node {next}: {item}"),
                 goal,
             )?;
             self.take_row_into_lane(driving, addr.clone(), next, continuation)?;
         }
-        Ok(Taking::LanesFull)
+        Ok(())
     }
 }

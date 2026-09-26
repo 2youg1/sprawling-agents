@@ -20,8 +20,8 @@
 
 use kernel::{Address, AxCode, AxError, TimeoutMs};
 
-use super::holding::Views;
-use crate::assembly::McpLink;
+use super::prepared::LiveAsk;
+use protocol::McpLink;
 
 /// How long one server is given to finish `initialize` and list what it
 /// offers. Shorter than a tool call's patience, because a person is
@@ -29,7 +29,7 @@ use crate::assembly::McpLink;
 /// has said nothing in this long is one they need told about.
 const HANDSHAKE_PATIENCE: TimeoutMs = TimeoutMs(15_000);
 
-impl Views {
+impl LiveAsk {
     /// Reaches every server this address's configuration names, in the
     /// order it names them.
     ///
@@ -69,7 +69,7 @@ impl Views {
     /// because the server is up and understood the request: what to do
     /// about it is sign in, not check the address. Every transport
     /// raises that code from one place, so this mapping has nothing to
-    /// guess (`bin::mcp_http`, `bin::mcp_sse`).
+    /// guess (`protocol::mcp::http`, `protocol::mcp::sse`).
     fn handshake(&self, server: &kernel::McpServer) -> channels::McpState {
         match self.listed(server) {
             Ok(state) => state,
@@ -101,7 +101,7 @@ impl Views {
             )
             .with_recovery("this city has no vault open; serve it and ask again")
         })?;
-        let resolve = crate::assembly::resolving(std::sync::Arc::clone(vault));
+        let resolve = crate::held_vault::resolving(std::sync::Arc::clone(vault));
         // A server is reached from the city root rather than from a
         // run's worktree: nothing is running, and the tree a run would
         // have does not exist yet.
@@ -194,10 +194,14 @@ mod tests {
     #[test]
     fn an_address_that_configures_no_server_answers_an_empty_list() {
         let dir = tempfile::tempdir().unwrap();
-        let views = Views::new(dir.path());
+        let live = LiveAsk {
+            city_root: dir.path().to_path_buf(),
+            city: None,
+            vault: None,
+        };
         let addr = Address::parse("lab/room1").unwrap();
         assert_eq!(
-            views.mcp_health_answer(&addr),
+            live.mcp_health_answer(&addr),
             channels::McpHealthAnswer {
                 addr,
                 servers: Vec::new(),

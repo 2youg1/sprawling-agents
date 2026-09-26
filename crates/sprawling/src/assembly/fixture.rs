@@ -63,6 +63,29 @@ pub(super) fn attach_provider(
     Ok(worker)
 }
 
+/// A worker over a ledger that loses the first append carrying `cut`,
+/// and loses nothing when `cut` is `None`.
+pub(super) fn worker_over_faults(root: &Path, cut: Option<&'static str>) -> RunWorker {
+    let fs = memory::FaultFs::new(memory::FaultPlan {
+        cut_at_op: None,
+        cut_on_write: cut,
+        torn_tail: memory::TornTail::None,
+    });
+    let opened = memory::JsonlLedger::open_faulty(
+        fs,
+        &kernel::layout::CityLayout::new(root).ledger(),
+        accounting::Clock::now(&SystemClock).unwrap(),
+    )
+    .unwrap();
+    RunWorker::over(
+        root,
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+        opened,
+    )
+    .unwrap()
+}
+
 /// Every line the nodes of a workshop wrote, in order, with the kind of
 /// each - because a handdown that does not come back is a race in what
 /// the city asked for, and the kind of the line that ended a node is what
@@ -72,7 +95,7 @@ pub(super) fn attach_provider(
 /// workshop scenario in this module raises, and a diagnostic that guessed
 /// wider would print the whole history.
 pub(super) fn node_lines(city_root: &Path) -> Vec<String> {
-    runtime::replay::verify_ledger_dir(&ledger_dir(city_root))
+    runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(city_root).ledger())
         .map(|verified| {
             verified
                 .raw_lines()
@@ -92,6 +115,41 @@ pub(super) fn node_lines(city_root: &Path) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// Breaks the history's hash chain at its second line, leaving every
+/// line a well-formed record: that line's `prev` no longer names the
+/// genesis line.
+///
+/// A reader that verifies the history refuses this ledger; a reader that
+/// reads only the lines it was asked about does not notice. That
+/// difference, rather than a timing, is what shows a query stayed off the
+/// verify path.
+pub(super) fn break_the_chain_after_genesis(city_root: &Path) {
+    let segment = memory::ledger_segments_at(&kernel::layout::CityLayout::new(city_root).ledger())
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+    let mut bytes = std::fs::read(&segment).unwrap();
+    let key = b"\"prev\":\"";
+    let second = bytes
+        .iter()
+        .position(|byte| *byte == b'\n')
+        .and_then(|end| end.checked_add(1))
+        .unwrap();
+    let digit = bytes[second..]
+        .windows(key.len())
+        .position(|window| window == key)
+        .and_then(|at| second.checked_add(at)?.checked_add(key.len()))
+        .unwrap();
+    bytes[digit] = if bytes[digit] == b'0' { b'1' } else { b'0' };
+    std::fs::write(&segment, bytes).unwrap();
+    assert!(
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(city_root).ledger())
+            .is_err(),
+        "the broken chain is refused by a verify"
+    );
 }
 
 /// One completion that calls a named tool with the given arguments.
@@ -142,7 +200,7 @@ pub(super) const PLAN_ONE_FREE_ROW: &str = concat!(
 
 /// A control surface that listens for interrupts and nothing else.
 ///
-/// The three sinks are one value and one injection, so a test that
+/// The four sinks are one value and one injection, so a test that
 /// cares about steers says what it does not listen for rather than
 /// reaching for a setter of its own.
 pub(super) fn only_interrupts(
@@ -150,6 +208,7 @@ pub(super) fn only_interrupts(
 ) -> Serving {
     Serving {
         deltas: std::sync::Arc::new(|_delta| {}),
+        outputs: std::sync::Arc::new(|_piece| {}),
         machine: std::sync::Arc::new(|_found| {}),
         interrupts: source,
     }
@@ -203,9 +262,14 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
-    let joined = worker.joins.get(&room).map_or(0, |j| j.artifacts().count());
+    let joined = worker
+        .collaborating
+        .joins
+        .get(&room)
+        .map_or(0, |j| j.artifacts().count());
     // Why a missing handback is worth a paragraph: the failure is a
     // race in what the provider was asked, so the answer is which
     // run got what, not which line the cell says is false.

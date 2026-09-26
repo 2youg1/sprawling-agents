@@ -40,6 +40,7 @@ fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbo
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"unreadable"),
         session: None,
         effort: None,
+        model: None,
     });
 
     let err = outcome.expect_err("a plan nobody can read is not an empty plan");
@@ -83,42 +84,12 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
     // not something a caller up here knows, and any number written
     // here would stop meaning this line the moment anything upstream
     // read one more file.
-    let fs = memory::FaultFs::new(memory::FaultPlan {
-        cut_at_op: None,
-        cut_on_write: Some("roadmap_claimed"),
-        torn_tail: memory::TornTail::None,
-    });
-    let opened =
-        memory::JsonlLedger::open_faulty(fs, &ledger_dir(dir.path()), now_ms().unwrap()).unwrap();
-    let mut worker = RunWorker::over(
-        dir.path(),
-        gateway::Custodian::in_memory(),
-        runtime::diagnostics::Diagnostics::off(),
-        opened,
+    let mut worker = attach_provider(
+        worker_over_faults(dir.path(), Some("roadmap_claimed")),
+        &base_url,
+        "m-local",
     )
     .unwrap();
-    worker
-        .handle(channels::Command::AttachEndpoint {
-            name: channels::ProviderName::parse("house").unwrap(),
-            base_url,
-            dialect: kernel::DialectKind::OpenAi,
-            secret: None,
-            auth_header: None,
-            admit: Vec::new(),
-            tuning: channels::EndpointTuning::default(),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
-        })
-        .unwrap();
-    worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
-            model: "m-local".to_owned(),
-            tag: kernel::ModelTag::Main,
-            context_tokens: kernel::Window::new(32_768),
-            max_output_tokens: kernel::Ceiling::new(4_096),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
-        })
-        .unwrap();
 
     let outcome = worker.handle(channels::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
@@ -128,6 +99,7 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lost"),
         session: None,
         effort: None,
+        model: None,
     });
     drop(provider);
 
@@ -136,10 +108,9 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
         after, PLAN_TWO_FREE_ROWS,
         "the line never landed, so the plan on disk must stand exactly as it was"
     );
-    assert!(
-        outcome.is_err(),
-        "a dispatch whose line the history refused must not report success"
-    );
+    // The claim's line is written when the model makes it, so the
+    // refusal went to the model as the claim's answer and the run went on.
+    assert!(outcome.is_ok(), "the run goes on past a refused claim");
 }
 
 #[test]
@@ -174,6 +145,7 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
                 ),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
     }
@@ -202,6 +174,75 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
         history.matches("roadmap_claimed").count(),
         1,
         "one row, one claim, however many runs asked for it"
+    );
+}
+
+/// A booking lasts as long as the run that holds it, and no longer.
+///
+/// The first run takes node 1 and hands it back, so the plan on disk
+/// reads node 1 as free again when the second run is dispatched; the
+/// only thing left that could refuse the second run is a booking the
+/// first run never gave up when it came home, which would keep the
+/// node from every later run until the city restarted.
+#[test]
+fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(&plan, PLAN_ONE_FREE_ROW).unwrap();
+    let take = serde_json::json!({ "action": "claim", "node": "1" });
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion("taking a row", "tu_1", "plan", take.clone()),
+            tool_completion(
+                "handing it back",
+                "tu_2",
+                "plan",
+                serde_json::json!({ "action": "release", "node": "1", "reason": "not mine" }),
+            ),
+            completion("handed back", None),
+            tool_completion("taking the freed row", "tu_3", "plan", take),
+            completion("took it", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    for (n, room) in ["lab/room1", "lab/room2"].into_iter().enumerate() {
+        worker
+            .handle(channels::Command::Dispatch {
+                addr: Address::parse(room).unwrap(),
+                task: "take a row from the plan".to_owned(),
+                goal: "claim one row".to_owned(),
+                mode: kernel::Mode::PlanGoal,
+                idem: kernel::IdemKey::derive(
+                    &RunId::CITY,
+                    kernel::Seq::new(u64::try_from(n).unwrap()),
+                    b"dispatch",
+                ),
+                session: None,
+                effort: None,
+                model: None,
+            })
+            .unwrap();
+    }
+    drop(provider);
+
+    let history: String = runtime::replay::verify_ledger_dir(&report.ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .collect();
+    assert_eq!(
+        (
+            history.matches("roadmap_claimed").count(),
+            std::fs::read_to_string(&plan)
+                .unwrap()
+                .contains("| 1 | wire the kiln | 1 |  | Blocked |  |"),
+        ),
+        (2, true),
+        "the second run takes the node the first handed back, and freezing while holding it leaves it Blocked"
     );
 }
 
@@ -243,6 +284,7 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     drop(provider);
@@ -304,6 +346,7 @@ fn a_run_that_ends_holding_a_row_leaves_it_blocked_rather_than_in_progress() {
             addr: Address::parse("lab/room1").unwrap(),
             task: "take a row".to_owned(),
             goal: "claim one row".to_owned(),
+            model: None,
             mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"froze"),
             session: None,

@@ -63,7 +63,7 @@ const WEAR: Record<Tone, string> = {
 // both remaining states, because loading and refused are the same
 // answer to the hand: not now.
 const MUTED =
-  "not-data-[state=idle]:bg-raised not-data-[state=idle]:text-text-disabled";
+  "aria-disabled:bg-raised aria-disabled:text-text-disabled";
 
 // The shape, and the four properties that travel when it changes.
 // Background colour is among them so a hover arrives rather than

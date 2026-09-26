@@ -83,7 +83,9 @@ fn the_job_file_lands_in_the_room_and_says_what_the_run_was_asked_for() {
     let path = job_path(dir.path(), &room);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
     assert!(path.ends_with(JOB_FILE));
-    assert!(text.contains("measure the thing"));
+    // The person's line is written once: a title that repeated it would
+    // send every pasted paragraph to the provider twice per request.
+    assert_eq!(text.matches("measure the thing").count(), 1);
     assert!(text.contains("a number with a unit, then stop"));
     // No ceiling section: the brief states the task and the goal, and
     // nothing states what the work may cost.

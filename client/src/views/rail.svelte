@@ -79,9 +79,7 @@
   // and this file decides only the pinned case.
   const label = $derived(`rail-label truncate ${posture === "named" ? "block" : "hidden"}`);
 
-  const active = $derived(
-    Object.values($belief.runs).filter((run) => run.doing.kind !== "frozen").length,
-  );
+  const active = $derived($belief.live.length);
   const waiting = $derived($approvals.length);
   const halted = $derived(cityIsShut($belief.halted));
 
@@ -152,7 +150,10 @@
     </div>
     {#if halted}
       <div class="flex h-rail w-full items-center gap-base px-base" role="status" aria-label={say($lang, "halt_title")}>
-        <Badge text={say($lang, "halt_title")} weight="alert" dot />
+        <!-- The banner above the page already says it in words; a
+        collapsed rail has room for the mark alone, and words there would
+        spill over the page. -->
+        <span class="inline-block size-dot shrink-0 rounded-pill bg-alert" aria-hidden="true"></span>
         <span class={label}>{say($lang, "halt_title")}</span>
       </div>
     {/if}

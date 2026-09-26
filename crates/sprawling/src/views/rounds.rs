@@ -20,11 +20,14 @@ mod reading_tests;
 #[cfg(test)]
 mod tests;
 
+use std::collections::BTreeMap;
+
 use channels::{EventKind, EventRecord, RunId, UsdMicros};
+use kernel::event::record::ApprovalResolved;
 
-use super::holding::Views;
+use super::prepared::LedgerAsk;
 
-impl Views {
+impl LedgerAsk {
     /// The newest [`channels::HISTORY_MAX`] records of one run, oldest
     /// first.
     ///
@@ -33,17 +36,19 @@ impl Views {
     /// quietly change how much of a session it can see. A line that will
     /// not read ends the slice rather than emptying it - what was read is
     /// still true.
-    pub(super) fn records_of(&mut self, run: RunId) -> Vec<EventRecord> {
-        let dir = crate::assembly::ledger_dir(&self.city_root);
-        if self.index.refresh(&dir).is_err() {
+    pub(super) fn records_of(&self, run: RunId) -> Vec<EventRecord> {
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
+        let Ok(mut index) = self.index.lock() else {
+            return Vec::new();
+        };
+        if index.refresh(&dir).is_err() {
             return Vec::new();
         }
         let want = usize::try_from(channels::HISTORY_MAX).unwrap_or(1);
-        let mut newest: Vec<kernel::Seq> =
-            self.index.run_seqs_before(run, None).take(want).collect();
+        let mut newest: Vec<kernel::Seq> = index.run_seqs_before(run, None).take(want).collect();
         newest.reverse();
         let mut records = Vec::with_capacity(newest.len());
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         for seq in newest {
             let Ok(line) = reader.line_at(seq) else {
                 break;
@@ -57,9 +62,15 @@ impl Views {
     }
 
     /// One session, folded into the rounds a person reads.
-    pub(super) fn rounds_answer(&mut self, run: RunId) -> channels::RoundsAnswer {
+    pub(super) fn rounds_answer(&self, run: RunId) -> channels::RoundsAnswer {
         let records = self.records_of(run);
-        let turns = turns(records.iter());
+        let mut turns = turns(records.iter());
+        if records
+            .iter()
+            .any(|record| record.kind() == EventKind::ApprovalRequested)
+        {
+            answer_waits(&mut turns, &records, &self.records_of(RunId::CITY));
+        }
         channels::RoundsAnswer {
             opened_at: opened_at(&turns),
             opening: opening(&records),
@@ -93,6 +104,37 @@ fn opened_at(turns: &[channels::Turn]) -> Option<kernel::GitOid> {
         })
 }
 
+/// Writes onto each wait in `turns` when its answer was recorded.
+///
+/// `approval_resolved` is recorded under the city's own run, not under
+/// the session that asked, so `asked` (the session's records) gives each
+/// request's approval id and `city` gives each answer's time. A request
+/// or answer outside its window, or a payload that will not read back,
+/// leaves `answered` at `None` rather than a guessed end.
+fn answer_waits(turns: &mut [channels::Turn], asked: &[EventRecord], city: &[EventRecord]) {
+    let ids: BTreeMap<kernel::Seq, String> = asked
+        .iter()
+        .filter(|record| record.kind() == EventKind::ApprovalRequested)
+        .filter_map(|record| {
+            let item = record.data().read::<kernel::ApprovalItem>().ok()?;
+            Some((record.seq(), item.id.as_str().to_owned()))
+        })
+        .collect();
+    let answers: BTreeMap<String, kernel::TimeMs> = city
+        .iter()
+        .filter(|record| record.kind() == EventKind::ApprovalResolved)
+        .filter_map(|record| {
+            let ruled = record.data().read::<ApprovalResolved>().ok()?;
+            Some((ruled.id.as_str().to_owned(), record.t()))
+        })
+        .collect();
+    for note in turns.iter_mut().flat_map(|turn| turn.notes.iter_mut()) {
+        if let channels::Note::Waiting { at, answered, .. } = note {
+            *answered = ids.get(at).and_then(|id| answers.get(id)).copied();
+        }
+    }
+}
+
 /// How the session opened, from the first `run_started` in the window.
 #[must_use]
 fn opening(records: &[EventRecord]) -> Option<channels::Opening> {
@@ -111,6 +153,7 @@ fn opening(records: &[EventRecord]) -> Option<channels::Opening> {
                 task: started.task,
                 goal: started.goal,
                 at: record.t(),
+                dispatched_by: started.dispatched_by,
             }
         })
 }
@@ -140,7 +183,7 @@ fn closing(records: &[EventRecord]) -> Option<channels::Closing> {
     clippy::wildcard_enum_match_arm,
     reason = "the kinds that open, close and fill a turn are named; every other kind is a note"
 )]
-pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<channels::Turn> {
+pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<channels::Turn> {
     let mut folded: Vec<channels::Turn> = Vec::new();
     // Which turn each outstanding call sits in, by the id the runtime
     // gave it. Answers arrive after other calls have been made, so the
@@ -154,6 +197,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                     number,
                     opened: record.seq(),
                     t: record.t(),
+                    model: channels::text(record.data().as_map().get("model")),
                     said: None,
                     thought: None,
                     spent: None,
@@ -178,6 +222,8 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                     outcome: channels::Outcome::Waiting,
                     at: record.seq(),
                     output: None,
+                    called: record.t(),
+                    answered: None,
                 };
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;
@@ -223,6 +269,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                 {
                     call.outcome = outcome;
                     call.output = said.and_then(channels::output_in);
+                    call.answered = Some(record.t());
                 }
             }
             kind => {

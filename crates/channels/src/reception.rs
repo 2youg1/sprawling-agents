@@ -37,7 +37,9 @@ use kernel::{Address, AxCode, AxError, B3Hash, Seq};
 
 use crate::auth;
 use crate::command::WireCommand;
-use crate::wire::{ClientFrame, Hello, Lagged, Query, WIRE_V, Welcome, schema_hash};
+use crate::wire::{
+    Ask, ClientFrame, Hello, Lagged, Monitoring, WIRE_V, Watched, Welcome, schema_hash,
+};
 
 /// Which face the listener presents, and the credential it demands.
 ///
@@ -208,10 +210,25 @@ pub enum SessionStep {
     Welcome(Box<Welcome>),
     /// Hand this command to the sink.
     Deliver(Box<WireCommand>),
-    /// Evaluate this query and answer it.
-    Answer(Box<Query>),
+    /// Evaluate this question and answer it under its own number.
+    Answer(Box<Ask>),
+    /// Count this session as watching the monitor and send it readings.
+    Watch(Watched),
+    /// Stop counting this session and stop sending it readings.
+    Release,
     /// Send this refusal; `close` ends the session afterwards.
     Refuse { error: Box<AxError>, close: bool },
+}
+
+/// What a welcome tells a peer about the city it reached: which city it
+/// is, the seq of the last record the city has broadcast, and which
+/// ledger it is. One value
+/// because the two travel together into every welcome.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WelcomeFacts<'a> {
+    pub city: Option<&'a Address>,
+    pub head: Option<Seq>,
+    pub epoch: Option<B3Hash>,
 }
 
 /// The whole session policy, as a pure function: which frames are legal
@@ -226,13 +243,14 @@ pub fn decide_frame(
     state: SessionState,
     frame: ClientFrame,
     face: &BindFace,
-    city: Option<&Address>,
+    standing: WelcomeFacts<'_>,
 ) -> SessionStep {
     let expected = Welcome {
         wire_v: WIRE_V,
         schema: schema_hash(),
-        resume_from: None,
-        city: city.cloned(),
+        resume_from: standing.head,
+        city: standing.city.cloned(),
+        epoch: standing.epoch,
     };
     match (state, frame) {
         (SessionState::AwaitingHello, ClientFrame::Hello(hello)) => {
@@ -256,7 +274,14 @@ pub fn decide_frame(
             close: true,
         },
         (SessionState::Live, ClientFrame::Command(command)) => SessionStep::Deliver(command),
-        (SessionState::Live, ClientFrame::Query(query)) => SessionStep::Answer(Box::new(query)),
+        (SessionState::Live, ClientFrame::Ask(ask)) => SessionStep::Answer(Box::new(ask)),
+        (SessionState::Live, ClientFrame::Monitor(Monitoring::Watch)) => {
+            SessionStep::Watch(Watched::Everything)
+        }
+        (SessionState::Live, ClientFrame::Monitor(Monitoring::WatchSummary)) => {
+            SessionStep::Watch(Watched::Summary)
+        }
+        (SessionState::Live, ClientFrame::Monitor(Monitoring::Release)) => SessionStep::Release,
         (SessionState::Live, ClientFrame::Hello(_)) => SessionStep::Refuse {
             error: Box::new(
                 AxError::failure(

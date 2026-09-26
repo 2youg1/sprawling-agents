@@ -1,8 +1,10 @@
 # Licenses and attribution for `skills/`
 
-The skills in this directory do not carry the MPL-2.0 notice that governs
-the rest of this tree: each keeps its own license, stated in its frontmatter,
-stated here, and recorded in `docs/third-party.md` §5. This file travels with
+Each skill in this directory states its license in its frontmatter, here,
+and in `docs/third-party.md` §5. The repository owner's own skills carry
+MPL-2.0, the license of the rest of this tree; a skill adapted from someone
+else's work keeps that work's license, and is here only because that license
+permits redistribution. This file travels with
 the directory — in the tree and in the release archive — so the obligations
 reach every copy.
 
@@ -42,17 +44,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## `sdd`, `tutor`, `translation` — CC BY-NC 4.0
+## `sdd`, `tutor`, `translation` — MPL-2.0
 
 English translations and adaptations by 2youg1, 2026, of the author's own
-Chinese-language open-source skills, published under AGPL-3.0-or-later. **The
-license is changed only within this project**: these three files carry
-CC BY-NC 4.0 and the originals remain AGPL-3.0-or-later. The translation
+Chinese-language open-source skills, published under AGPL-3.0-or-later. The
+author licenses these three files under MPL-2.0, the license in `LICENSE` at
+the root of this tree; the originals remain AGPL-3.0-or-later. The translation
 skill keeps the byline its original wore — KL9 ＆ Claude Fable 5.
-
-Reuse under CC BY-NC 4.0 owes two things: credit to the author (2youg1), and
-no commercial use without separate permission. The full license:
-<https://creativecommons.org/licenses/by-nc/4.0/>.
 
 ## `authority-review` — MIT
 

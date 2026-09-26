@@ -31,12 +31,14 @@ function keyOf(row: DiscardLine): string {
 
 <script lang="ts">
   import { QUERIES } from "../../core/asking";
+  import { restoreDiscard } from "../../core/commands";
   import { clock } from "../../core/time";
   import { ui } from "../../ui";
   import Path from "../parts/path.svelte";
 
   const u = ui();
   const lang = u.lang;
+  const send = u.send;
   const held = u.conn.asking.ask(QUERIES.discards);
 
   const rows = $derived.by(() => {
@@ -46,7 +48,7 @@ function keyOf(row: DiscardLine): string {
 </script>
 
 {#if rows === undefined}
-  <p class="text-text-disabled">…</p>
+  <p class="text-text-faint">…</p>
 {:else if rows.length === 0}
   <p class="text-text-faint">{say($lang, "bin_empty")}</p>
 {:else}
@@ -58,9 +60,21 @@ function keyOf(row: DiscardLine): string {
             <Path path={row.path} />
           </span>
           <span class="text-text-faint">{clock($lang, row.at)}</span>
-          <span class={row.restored ? "text-text-disabled" : "text-alert"}>
+          <span class={row.restored ? "text-text-faint" : "text-alert"}>
             {row.restored ? say($lang, "bin_restored") : say($lang, "bin_gone")}
           </span>
+          {#if !row.restored && row.restoration !== null && row.restoration !== undefined && "tracked" in row.restoration}
+            {@const restoration = row.restoration}
+            <button
+              type="button"
+              class="rounded-control px-snug text-text-quiet hover:text-text"
+              onclick={() => {
+                send(restoreDiscard(restoration));
+              }}
+            >
+              {say($lang, "bin_restore")}
+            </button>
+          {/if}
         </div>
         <div class="summary mt-tight truncate font-mono text-text-faint">{way($lang, row)}</div>
       </li>

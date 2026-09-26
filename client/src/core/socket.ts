@@ -31,18 +31,26 @@ import type { Lang } from "./lang";
 import { createAsking } from "./asking";
 import type { Asking } from "./asking";
 import { createBelief } from "./belief";
+import { createWatching } from "./watching";
+import type { Watching } from "./watching";
 import type { Belief } from "./belief";
+import { NO_TAIL, appended } from "./live_output";
+import type { Tail } from "./live_output";
 import { decodeFrame, encodeFrame } from "./frames";
 import { createUnsent, isSpeech } from "./unsent";
 import { langOf, say } from "./lang";
 import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
-import type { Command, HistoryRangeAnswer, Query, Seq, ServerFrame } from "../wire";
+import { AskId, Seq } from "../wire";
+import type { Command, EventRecord, HistoryRangeAnswer, Query, RunId, ServerFrame } from "../wire";
 
 export interface Connection {
   readonly state: Readable<LinkState>;
   readonly belief: Readable<Belief>;
   readonly asking: Asking;
+  // Each run's running command, as far as it has written, until the
+  // call's result lands (core/live_output.ts).
+  readonly live: Readable<Readonly<Partial<Record<RunId, Tail>>>>;
   // Words said while the link is down, waiting for the next welcome.
   readonly unsent: Readable<number>;
   // Sends one command, or holds it in `unsent` when it is words and the
@@ -53,6 +61,7 @@ export interface Connection {
   readonly dismissRefusal: () => void;
   // Everything in the bell has now been looked at.
   readonly markNoticesSeen: () => void;
+  readonly monitor: Pick<Watching, "samples" | "watch" | "watchSummary">;
 }
 
 // The pairing code the host put on the URL that opened this page. An
@@ -68,12 +77,26 @@ interface Gap {
   readonly at: Seq;
   // The last sequence the range reaches.
   readonly to: Seq;
+  // What the records of the range do to the answers on the page once
+  // folded: see `filled` and `resume`.
+  readonly records: GapRecords;
 }
+
+// A range `lagged` named holds records the live stream skipped, which
+// invalidate nothing; a range written while the socket was down holds
+// the news the answers on the page missed, and each record invalidates
+// what it touches.
+type GapRecords = "folded" | "invalidating";
 
 // One page of a gap. The server caps an answer at its own limit whatever
 // this asks for, and a page small enough to fold in one frame keeps a
 // long gap from holding up the records that are still arriving.
 const GAP_PAGE = 200;
+
+// How many gap pages a reconnect fetches before a snapshot is the
+// cheaper way to the present: past this, asking every watched question
+// again moves fewer bytes than walking the range (client-SPEC 4-39).
+const RESUME_PAGES = 2;
 
 // How a POST offers this city's pairing token.
 //
@@ -111,6 +134,7 @@ export function openConnection(
   const state = writable<LinkState>(link.state);
   const store = createBelief(now);
   const unsent = createUnsent();
+  const live = writable<Readonly<Partial<Record<RunId, Tail>>>>({});
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
@@ -121,11 +145,32 @@ export function openConnection(
   // filled waits its turn and nothing is dropped between them.
   const gaps: Gap[] = [];
   let fetching: Seq | null = null;
+  // The id the page in flight went out under: its answer is recognised
+  // by the id, never by its content.
+  let gapAsk: AskId | null = null;
+  // The last id this connection's page minted. One counter for every
+  // question, so the gap walk and the views never share an id.
+  let lastAsk = 0;
+  // The highest ledger sequence this page has folded, from the live
+  // stream or a gap: the point a reconnect resumes after. Null until
+  // the first record, and a page with no mark has nothing to resume.
+  let mark: Seq | null = null;
+  // Which ledger the mark belongs to, as the last welcome named it. A
+  // welcome naming another one means the city was made again: the mark
+  // and every fold point into a history that no longer exists.
+  let epoch: string | null = null;
   // The attempt the ladder scheduled, held so a link that turns out to
   // be refused can cancel it. A refused link that left this running
   // would reopen the socket behind a message telling the person the
   // opposite.
   let reconnect: ReturnType<typeof setTimeout> | null = null;
+
+  // Sends one question under a fresh id; null when the socket is not open.
+  function sendAsk(query: Query): AskId | null {
+    lastAsk = lastAsk >= 0xffff_ffff ? 1 : lastAsk + 1;
+    const askId = AskId.make(lastAsk);
+    return sendText(encodeFrame({ ask: { ask_id: askId, query } })) ? askId : null;
+  }
 
   function sendText(text: string): boolean {
     if (socket?.readyState !== WebSocket.OPEN) {
@@ -134,36 +179,35 @@ export function openConnection(
     socket.send(text);
     return true;
   }
+  const watching = createWatching(sendText);
 
   // Asks for one page of the oldest range still owed, and only when none
-  // is in flight: the wire carries no request id, so a second question
-  // for the same range would be an answer this page cannot tell apart
-  // from the first.
+  // is in flight: the next page starts at the cursor the last one returned.
   function askGap(): void {
     const front = gaps[0];
     if (front === undefined || fetching !== null) {
       return;
     }
     fetching = front.at;
-    sendText(
-      encodeFrame({
-        query: { history_range: { from: front.at, to: front.to, limit: GAP_PAGE } },
-      }),
-    );
+    gapAsk = sendAsk({ history_range: { from: front.at, to: front.to, limit: GAP_PAGE } });
   }
 
   // The records of one page of a gap, folded like any other record: what
-  // the page lost is what happened, and the fold is what draws it. They
-  // invalidate nothing - they are old records rather than news, and
-  // marking every answer stale for them would ask the city for
-  // everything again.
+  // the page lost is what happened, and the fold is what draws it. A
+  // `folded` gap (the stream lagged while the socket stayed open)
+  // invalidates nothing: its answers were already asked after those
+  // records. An `invalidating` gap (written while the socket was down)
+  // marks stale each answer a record touches, since no answer since
+  // the disconnect has seen it.
   function filled(range: HistoryRangeAnswer): void {
     // One report per page, naming the first field this build could not
     // read: a page of two hundred records is one question's answer, and
     // a notice per record would bury the question in its answer.
     let bad: string | null = null;
+    const records = gaps[0]?.records ?? "folded";
     for (const record of range.records) {
-      const unreadable = store.apply(record);
+      const unreadable = folded(record);
+      if (records === "invalidating") asking.invalidate(record);
       bad ??= unreadable;
     }
     if (bad !== null) store.refused(unreadableRecord(lang, bad));
@@ -181,13 +225,48 @@ export function openConnection(
     if (front !== undefined && cursor !== null) {
       // The server's cursor, not arithmetic here: it is the one place
       // that knows where the Ledger holds the next record of the range.
-      gaps.unshift({ at: cursor, to: front.to });
+      gaps.unshift({ ...front, at: cursor });
     }
     askGap();
   }
 
+  // Folds one record and moves the mark past it.
+  function folded(record: EventRecord): string | null {
+    if (mark === null || record.seq > mark) mark = record.seq;
+    return store.apply(record);
+  }
+
+  // Forgets what the page folded when the welcome names another ledger,
+  // so the resume below finds no mark and rebuilds from a snapshot.
+  function renewed(named: string | null): void {
+    if (epoch !== null && named !== null && named !== epoch) {
+      mark = null;
+      gaps.splice(0, gaps.length);
+      store.forget();
+    }
+    epoch = named ?? epoch;
+  }
+
+  // A welcome names the ledger head. A page that knows where it stopped
+  // and is at most `RESUME_PAGES` pages behind fetches the records in
+  // between and asks again only what the dead socket took with it;
+  // any other page asks every watched question again.
+  function resume(head: Seq | null): void {
+    const owed = gaps.reduce((far, gap) => (gap.to > far ? gap.to : far), mark ?? head ?? Seq.make(0));
+    if (mark === null || head === null || head < mark || head - owed > RESUME_PAGES * GAP_PAGE) {
+      asking.reconnected();
+      return;
+    }
+    // A lagged gap still pending was folded-only because the answers of
+    // the open socket had seen it; those answers died with the socket,
+    // so its records now mark stale what they touch like the new gap's.
+    gaps.splice(0, gaps.length, ...gaps.map((gap): Gap => ({ ...gap, records: "invalidating" })));
+    if (head > owed) gaps.push({ at: Seq.make(owed + 1), to: head, records: "invalidating" });
+    asking.resumed();
+  }
+
   const asking = createAsking(
-    (query: Query) => (isLive(link) ? sendText(encodeFrame({ query })) : false),
+    (query: Query) => (isLive(link) ? sendAsk(query) : null),
     now,
     // A question that never came back lands where every other refusal
     // lands: the corner
@@ -219,42 +298,60 @@ export function openConnection(
         // asked for, so the walk starts its front range again rather than
         // waiting for a page that will never arrive.
         fetching = null;
+        gapAsk = null;
+        renewed(action.welcome.epoch ?? null);
+        resume(action.welcome.resume_from ?? null);
         askGap();
-        asking.reconnected();
         unsent.release((command) => sendText(encodeFrame({ command })));
+        watching.reconnected();
         return;
       case "deliver": {
         // The field this build could not read, if any, is reported here
         // rather than swallowed: the frame decoded and the socket is
         // still speaking this wire, so it goes where every other refusal
         // goes, and the rest of the record has already been folded.
-        const bad = store.apply(action.event);
+        const bad = folded(action.event);
+        if (action.event.kind === "tool_result") {
+          live.update(({ [action.event.run]: _settled, ...rest }) => rest);
+        }
         asking.invalidate(action.event);
         if (bad !== null) store.refused(unreadableRecord(lang, bad));
         return;
       }
-      case "answered":
-        if ("history_range" in action.answer) {
+      case "answered": {
+        const { ask_id, as_of, outcome } = action.answered;
+        if ("refusal" in outcome) store.refused(outcome.refusal);
+        if (ask_id === gapAsk) {
           // The one answer that is this page's own question rather than a
           // view's: it settles no held question, so it is folded here and
           // never reaches the asking.
-          filled(action.answer.history_range);
+          gapAsk = null;
+          if ("answer" in outcome && "history_range" in outcome.answer) filled(outcome.answer.history_range);
           return;
         }
-        if ("city" in action.answer) {
-          store.adoptCity(action.answer.city);
+        if ("answer" in outcome && "city" in outcome.answer) {
+          store.adoptCity(outcome.answer.city);
         }
-        asking.answered(action.answer);
+        asking.answered(ask_id, as_of, outcome);
         return;
+      }
       case "saying":
         store.say(action.delta);
         return;
       case "logged":
         store.logged(action.line);
         return;
+      case "writing": {
+        const { piece } = action;
+        live.update((tails) => ({ ...tails, [piece.run]: appended(tails[piece.run] ?? NO_TAIL, piece) }));
+        return;
+      }
       case "lagged":
-        gaps.push({ at: action.from, to: action.to });
+        gaps.push({ at: action.from, to: action.to, records: "folded" });
         askGap();
+        return;
+      case "sampled":
+        watching.sampled(action.sample);
         return;
       case "wait":
         reconnect = setTimeout(() => {
@@ -378,6 +475,7 @@ export function openConnection(
     belief: store.belief,
     asking,
     unsent: unsent.count,
+    live,
     command(command) {
       if (isLive(link)) return sendText(encodeFrame({ command }));
       if (isRefused(link) || !isSpeech(command)) return false;
@@ -393,5 +491,6 @@ export function openConnection(
     markNoticesSeen() {
       store.noticesSeen();
     },
+    monitor: watching,
   };
 }

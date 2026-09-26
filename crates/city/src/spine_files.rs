@@ -30,7 +30,7 @@ use crate::policy::rules_path;
 
 pub(crate) mod hall;
 
-mod blank;
+pub(crate) mod blank;
 use blank::{empty_roadmap, is_blank_form};
 
 pub use hall::{
@@ -170,8 +170,8 @@ pub fn handoff_path(city_root: &Path, room: &Address) -> PathBuf {
 /// **Removed, not blanked.** The blank form this module lays down when a
 /// room is opened answers `handoff` with `None` exactly as a missing file
 /// does, so writing one would leave two states where one says the same
-/// thing. The bytes are not lost: `handoff_written` in the ledger holds
-/// what the last session wrote, and a replay reads them back from there.
+/// thing. This discards the only copy of what the last session wrote:
+/// `handoff_written` holds the dispatcher's handoff, not this file.
 ///
 /// **A slot that is already empty is not a failure.** The caller asked
 /// for a new session, which is a thing that can be done whatever the

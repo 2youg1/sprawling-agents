@@ -10,16 +10,25 @@
 //! always carries a materialized read-only rest path. CAS dedup makes
 //! repeated offloads of the same bytes idempotent.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use kernel::{AxCode, AxError, Locator};
+use kernel::{Address, AxCode, AxError, Locator};
 use memory::Cas;
 
-/// Where offloaded bytes live: the CAS for the original, the run's
-/// environment directory for the materialized rest file.
+/// The directory inside the room that holds materialized rest files.
+pub const REST_DIR: &str = ".rest";
+
+/// Where offloaded bytes live: the CAS for the original, and the room
+/// whose `REST_DIR` holds the materialized rest file. The room travels
+/// as its city address because the model's read tool resolves every
+/// path from the city root. `origin` is the run and building the
+/// original is pinned for, so that a `cas:` read of it is judged where
+/// the output was made.
 pub struct OffloadSite<'a> {
     pub cas: &'a mut Cas,
-    pub environment: &'a Path,
+    pub city_root: &'a Path,
+    pub room: &'a Address,
+    pub origin: memory::BlockOrigin,
 }
 
 /// The outcome: a substitute that fits the cap, the original pinned in
@@ -28,15 +37,27 @@ pub struct OffloadSite<'a> {
 pub struct OffloadRecord {
     pub substitute: Vec<u8>,
     pub original: Locator,
-    pub rest_path: PathBuf,
+    pub rest_path: String,
     pub original_len: u64,
 }
 
-fn hint_line(total: u64, rest_path: &Path, locator: &Locator) -> String {
-    format!(
-        "\n[offloaded: total {total} bytes; rest at {}; original {locator}]",
-        rest_path.display()
-    )
+fn hint_line(total: u64, rest_path: &str, locator: &Locator) -> String {
+    format!("\n[offloaded: total {total} bytes; rest at {rest_path}; original {locator}]")
+}
+
+/// Writes the rest file under the room and answers its city address,
+/// `<room>/.rest/rest-<hash>.dat`: the spelling the model's read tool
+/// admits and resolves from the city root, and the same bytes in the
+/// ledger on every machine.
+fn materialized(
+    bytes: &[u8],
+    site: &OffloadSite<'_>,
+    locator: &Locator,
+) -> Result<String, AxError> {
+    let name = rest_file_name(locator);
+    let room = site.room.as_str();
+    materialize(bytes, &site.city_root.join(room).join(REST_DIR), &name)?;
+    Ok(format!("{room}/{REST_DIR}/{name}"))
 }
 
 fn rest_file_name(locator: &Locator) -> String {
@@ -53,7 +74,7 @@ fn rest_file_name(locator: &Locator) -> String {
     format!("rest-{tail}.dat")
 }
 
-fn materialize(bytes: &[u8], path: &Path) -> Result<(), AxError> {
+fn materialize(bytes: &[u8], dir: &Path, name: &str) -> Result<(), AxError> {
     let io = |err: std::io::Error| {
         AxError::failure(
             AxCode::StorageFatal,
@@ -65,13 +86,15 @@ fn materialize(bytes: &[u8], path: &Path) -> Result<(), AxError> {
              run's environment directory, then ask for the result again",
         )
     };
+    let path = dir.join(name);
     if path.exists() {
         return Ok(());
     }
-    std::fs::write(path, bytes).map_err(io)?;
-    let mut perms = std::fs::metadata(path).map_err(io)?.permissions();
+    std::fs::create_dir_all(dir).map_err(io)?;
+    std::fs::write(&path, bytes).map_err(io)?;
+    let mut perms = std::fs::metadata(&path).map_err(io)?.permissions();
     perms.set_readonly(true);
-    std::fs::set_permissions(path, perms).map_err(io)?;
+    std::fs::set_permissions(&path, perms).map_err(io)?;
     Ok(())
 }
 
@@ -80,17 +103,19 @@ fn materialize(bytes: &[u8], path: &Path) -> Result<(), AxError> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tee {
     pub(crate) original: Locator,
-    pub(crate) rest_path: PathBuf,
+    pub(crate) rest_path: String,
 }
 
 /// Pins the full original before anything is cut from it: invariants 1
 /// and 4 in one call, so no cutter can run without the way back
 /// existing first. Repeating it on the same bytes is idempotent.
 pub(crate) fn tee(bytes: &[u8], site: &mut OffloadSite<'_>) -> Result<Tee, AxError> {
-    let hash = site.cas.put(bytes).map_err(memory::MemoryError::into_ax)?;
+    let hash = site
+        .cas
+        .put_for(bytes, &site.origin)
+        .map_err(memory::MemoryError::into_ax)?;
     let original = Locator::cas(hash);
-    let rest_path = site.environment.join(rest_file_name(&original));
-    materialize(bytes, &rest_path)?;
+    let rest_path = materialized(bytes, site, &original)?;
     Ok(Tee {
         original,
         rest_path,
@@ -184,7 +209,7 @@ pub fn offload(
 
 /// Restores the rest file from the CAS after external cleanup; the bytes
 /// are the original, verbatim (A7's third assertion).
-pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<PathBuf, AxError> {
+pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<String, AxError> {
     let Locator::Cas { hash, .. } = locator else {
         return Err(AxError::failure(
             AxCode::InvalidArgs,
@@ -197,9 +222,7 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<Pa
         ));
     };
     let bytes = site.cas.get(hash).map_err(memory::MemoryError::into_ax)?;
-    let rest_path = site.environment.join(rest_file_name(locator));
-    materialize(&bytes, &rest_path)?;
-    Ok(rest_path)
+    materialized(&bytes, site, locator)
 }
 
 #[cfg(test)]
@@ -210,23 +233,30 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<Pa
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
-    fn site(dir: &tempfile::TempDir) -> (Cas, PathBuf) {
+    pub(crate) fn origin() -> memory::BlockOrigin {
+        memory::BlockOrigin {
+            run: kernel::RunId::from_bytes([7; 16]),
+            building: kernel::Address::parse("lab").unwrap(),
+        }
+    }
+
+    fn site(dir: &tempfile::TempDir) -> (Cas, Address) {
         let cas = Cas::open(&dir.path().join("cas")).unwrap();
-        let env = dir.path().join("env");
-        std::fs::create_dir_all(&env).unwrap();
-        (cas, env)
+        (cas, Address::parse("room").unwrap())
     }
 
     #[test]
     fn a7_roundtrip_all_four_assertions() {
         let dir = tempfile::tempdir().unwrap();
-        let (mut cas, env) = site(&dir);
+        let (mut cas, room) = site(&dir);
         let mut s = OffloadSite {
             cas: &mut cas,
-            environment: &env,
+            city_root: dir.path(),
+            room: &room,
+            origin: origin(),
         };
         let original: Vec<u8> = (0..40_000u32)
             .map(|i| u8::try_from(i % 251).unwrap())
@@ -238,30 +268,79 @@ mod tests {
         assert!(
             String::from_utf8_lossy(&record.substitute).contains("[offloaded: total 40000 bytes")
         );
+        assert!(
+            String::from_utf8_lossy(&record.substitute).contains("; rest at room/.rest/rest-"),
+            "the hint names the rest file by its address in the room"
+        );
         // The rest path serves the full original.
-        assert_eq!(std::fs::read(&record.rest_path).unwrap(), original);
+        assert_eq!(
+            std::fs::read(dir.path().join(&record.rest_path)).unwrap(),
+            original
+        );
         // The CAS serves the full original by locator.
         let Locator::Cas { hash, .. } = &record.original else {
             panic!("expected a cas locator");
         };
         assert_eq!(s.cas.get(hash).unwrap(), original);
         // External cleanup, then rematerialize: bytes identical.
-        let mut perms = std::fs::metadata(&record.rest_path).unwrap().permissions();
+        let mut perms = std::fs::metadata(dir.path().join(&record.rest_path))
+            .unwrap()
+            .permissions();
         #[allow(clippy::permissions_set_readonly_false, reason = "test cleanup")]
         perms.set_readonly(false);
-        std::fs::set_permissions(&record.rest_path, perms).unwrap();
-        std::fs::remove_file(&record.rest_path).unwrap();
+        std::fs::set_permissions(dir.path().join(&record.rest_path), perms).unwrap();
+        std::fs::remove_file(dir.path().join(&record.rest_path)).unwrap();
         let back = rematerialize(&record.original, &mut s).unwrap();
-        assert_eq!(std::fs::read(&back).unwrap(), original);
+        assert_eq!(std::fs::read(dir.path().join(&back)).unwrap(), original);
+    }
+
+    #[test]
+    fn the_rest_address_is_one_the_read_tool_admits_and_resolves() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut cas, room) = site(&dir);
+        let mut s = OffloadSite {
+            cas: &mut cas,
+            city_root: dir.path(),
+            room: &room,
+            origin: origin(),
+        };
+        let original = vec![3u8; 30_000];
+        let record = offload(&original, 2_048, &mut s).unwrap();
+        let admitted =
+            crate::tools::admit(&record.rest_path, "read", &|_| kernel::ReadVerdict::Open).unwrap();
+        assert_eq!(
+            std::fs::read(dir.path().join(admitted.as_str())).unwrap(),
+            original,
+            "the read tool resolves the rest address from the city root"
+        );
+    }
+
+    #[test]
+    fn the_original_is_pinned_for_the_run_and_building_it_was_cut_for() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut cas, room) = site(&dir);
+        let mut s = OffloadSite {
+            cas: &mut cas,
+            city_root: dir.path(),
+            room: &room,
+            origin: origin(),
+        };
+        let record = offload(&vec![3u8; 30_000], 2_048, &mut s).unwrap();
+        let Locator::Cas { hash, .. } = &record.original else {
+            panic!("expected a cas locator");
+        };
+        assert_eq!(s.cas.origins(hash).unwrap(), vec![origin()]);
     }
 
     #[test]
     fn same_bytes_offload_to_the_same_locator() {
         let dir = tempfile::tempdir().unwrap();
-        let (mut cas, env) = site(&dir);
+        let (mut cas, room) = site(&dir);
         let mut s = OffloadSite {
             cas: &mut cas,
-            environment: &env,
+            city_root: dir.path(),
+            room: &room,
+            origin: origin(),
         };
         let original = vec![7u8; 30_000];
         let one = offload(&original, 2_048, &mut s).unwrap();
@@ -276,10 +355,12 @@ mod tests {
     #[test]
     fn lossless_input_and_hopeless_caps_are_refused() {
         let dir = tempfile::tempdir().unwrap();
-        let (mut cas, env) = site(&dir);
+        let (mut cas, room) = site(&dir);
         let mut s = OffloadSite {
             cas: &mut cas,
-            environment: &env,
+            city_root: dir.path(),
+            room: &room,
+            origin: origin(),
         };
         let err = offload(b"small", 4_096, &mut s).unwrap_err();
         assert_eq!(*err.code(), AxCode::InvalidArgs);

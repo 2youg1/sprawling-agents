@@ -25,30 +25,24 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
     let room = Address::parse("lab/room1").unwrap();
     let run = RunId::from_bytes([7u8; 16]);
 
-    let mut enqueued = serde_json::Map::new();
-    enqueued.insert(
-        "id".to_owned(),
-        serde_json::Value::String("sig-1".to_owned()),
-    );
-    enqueued.insert(
-        "kind".to_owned(),
-        serde_json::Value::String("question".to_owned()),
-    );
-    enqueued.insert(
-        "from".to_owned(),
-        serde_json::Value::String("lab/room2".to_owned()),
-    );
-    enqueued.insert(
-        "room".to_owned(),
-        serde_json::Value::String(room.as_str().to_owned()),
-    );
+    // The two lines exactly as `effect` writes them: the consumption
+    // carries only the id and the taker, and its room is the line's addr.
+    let signal = collab::Signal::new(
+        kernel::event::record::SignalId::parse("sig-1").unwrap(),
+        kernel::event::record::SignalKind::Thread,
+        "lab/room2".to_owned(),
+        room.clone(),
+        kernel::Version::new(1),
+        Payload::new(serde_json::Map::new()).unwrap(),
+        kernel::TimeMs::new(1_000),
+    )
+    .unwrap();
+    let line = |seq, kind, data: Payload| view_record(seq, run, kind, &room, data.as_map().clone());
     views
-        .apply(&view_record(
+        .apply(&line(
             1,
-            run,
             EventKind::SignalEnqueued,
-            &room,
-            enqueued.clone(),
+            signal.enqueued_payload().unwrap(),
         ))
         .unwrap();
 
@@ -58,16 +52,14 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
         panic!("InboxView answers with an inbox");
     };
     assert_eq!(inbox.waiting.len(), 1);
-    assert_eq!(inbox.waiting[0].kind, "question");
+    assert_eq!(inbox.waiting[0].kind, "thread");
 
     // Taking a signal empties the row; the view never took it itself.
     views
-        .apply(&view_record(
+        .apply(&line(
             2,
-            run,
             EventKind::SignalConsumed,
-            &room,
-            enqueued,
+            signal.consumed_payload("lab/room1").unwrap(),
         ))
         .unwrap();
     let channels::Answer::Inbox(inbox) =
@@ -353,4 +345,428 @@ fn a_roadmap_that_cannot_be_parsed_reports_its_rows_rather_than_a_number() {
         matches!(plan.progress, kernel::Progress::Unplanned(_)),
         "an unreadable plan has no denominator, and no percentage"
     );
+}
+
+/// The fold takes the same lock a reader does, so a reader that ran
+/// `git status` under it held every event behind that walk of the disk:
+/// a file written between `prepare` and `finish` is one the answer shows.
+#[test]
+fn a_git_status_reader_does_not_hold_the_views_while_git_reads_the_disk() {
+    let dir = tempfile::tempdir().unwrap();
+    git2::Repository::init(dir.path()).unwrap();
+    let lab = dir.path().join("lab");
+    std::fs::create_dir(&lab).unwrap();
+    std::fs::write(lab.join("before.txt"), "x").unwrap();
+    let mut views = Views::new(dir.path());
+    let query = channels::Query::GitStatus {
+        building: Address::parse("lab").unwrap(),
+    };
+    let prepared = views.prepare(&query);
+    std::fs::write(lab.join("after.txt"), "y").unwrap();
+
+    let read = prepared.finish();
+    assert!(matches!(read, channels::Answer::GitStatus(_)), "{read:?}");
+    assert_eq!(read, views.answer(&query));
+}
+
+/// The configuration ladder is read after the views are released, and
+/// the release page is not asked for under them: `prepare` leaves both
+/// reads to `finish`.
+#[test]
+fn the_config_ladder_and_the_release_page_are_read_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let room = Address::parse("lab/room1").unwrap();
+    let query = channels::Query::Config { addr: room.clone() };
+    let prepared = views.prepare(&query);
+    let city_layer = city::config_path(dir.path(), &room, city::Layer::City).unwrap();
+    std::fs::create_dir_all(city_layer.parent().unwrap()).unwrap();
+    std::fs::write(
+        &city_layer,
+        "[model]
+effort = \"low\"
+",
+    )
+    .unwrap();
+
+    let read = prepared.finish();
+    assert_eq!(read, views.answer(&query));
+    let channels::Answer::Config(config) = read else {
+        panic!("Config answers with a ladder");
+    };
+    assert!(config.effort.is_some(), "{config:?}");
+    assert!(matches!(
+        views.prepare(&channels::Query::NewestRelease),
+        super::prepared::Prepared::Release
+    ));
+}
+
+/// A page that opens a file or lists a directory reads the tree after
+/// the views are released, so it shows the tree as it is at `finish`.
+#[test]
+fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let views = Views::new(dir.path());
+    let at = Address::parse("notes").unwrap();
+    let document = views.prepare(&channels::Query::Document { at: at.clone() });
+    let listing = views.prepare(&channels::Query::Listing { at: None });
+    std::fs::write(dir.path().join("notes"), "written after the lock").unwrap();
+
+    assert_eq!(
+        (document.finish(), listing.finish()),
+        (
+            channels::Answer::Document(Box::new(channels::DocumentAnswer {
+                at,
+                text: "written after the lock".to_owned(),
+                bytes: 22,
+                truncated: false,
+                binary: false,
+            })),
+            channels::Answer::Listing(channels::ListingAnswer {
+                at: None,
+                entries: vec![channels::Entry {
+                    name: "notes".to_owned(),
+                    kind: channels::EntryKind::File { bytes: 22 },
+                }],
+            }),
+        )
+    );
+}
+
+/// The building page walks the building's directory after the views are
+/// released; only its plan, folded and cached, is read under them.
+#[test]
+fn the_building_page_reads_its_directory_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let query = channels::Query::BuildingView {
+        addr: Address::parse("lab").unwrap(),
+    };
+    let prepared = views.prepare(&query);
+    std::fs::create_dir(dir.path().join("lab")).unwrap();
+
+    let answer = prepared.finish();
+    assert!(
+        matches!(answer, channels::Answer::Building(_)),
+        "{answer:?}"
+    );
+    assert_eq!(answer, views.answer(&query));
+}
+
+/// The city page lists the buildings and reads their plans after the
+/// views are released: a building raised between `prepare` and `finish`
+/// is one the answer shows, and its plan is the one on disk then.
+#[test]
+fn the_city_page_lists_its_buildings_and_reads_their_plans_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let views = Views::new(dir.path());
+    let prepared = views.prepare(&channels::Query::CityView);
+    std::fs::create_dir(dir.path().join("lab")).unwrap();
+    std::fs::write(
+        dir.path().join("lab").join("Roadmap.md"),
+        "| # | Item | Weight | Needs | Status | Evidence |\n\
+         |---|------|--------|-------|--------|----------|\n\
+         | 1 | groundwork | 1 |  | Not started |  |\n",
+    )
+    .unwrap();
+
+    let read = prepared.finish();
+    let channels::Answer::City(city) = &read else {
+        panic!("CityView answers with a city: {read:?}");
+    };
+    assert_eq!(
+        city.buildings
+            .iter()
+            .map(|line| (line.addr.as_str().to_owned(), line.ready))
+            .collect::<Vec<_>>(),
+        vec![("lab".to_owned(), 1)]
+    );
+    assert_eq!(read, views.prepare(&channels::Query::CityView).finish());
+}
+
+/// A change list, a patch, a stored object and an archive search read the
+/// disk after the views are released: a city that appears between
+/// `prepare` and `finish` is the one each of them reports.
+#[test]
+fn git_store_and_archive_readers_read_after_the_views_are_released() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (staged, root) = (tmp.path().join("staged"), tmp.path().join("city"));
+    let lab = Address::parse("lab").unwrap();
+    std::fs::create_dir_all(staged.join("lab")).unwrap();
+    let repo = git2::Repository::init(&staged).unwrap();
+    let signature = git2::Signature::now("city", "city@localhost").unwrap();
+    let commit = |text: &str| {
+        std::fs::write(staged.join("lab/lex.rs"), text).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(std::path::Path::new("lab/lex.rs")).unwrap();
+        index.write().unwrap();
+        let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+        let parents: Vec<git2::Commit> = repo
+            .head()
+            .ok()
+            .and_then(|head| head.peel_to_commit().ok())
+            .into_iter()
+            .collect();
+        let parents: Vec<&git2::Commit> = parents.iter().collect();
+        let oid = repo
+            .commit(Some("HEAD"), &signature, &signature, "c", &tree, &parents)
+            .unwrap();
+        kernel::GitOid::from_bytes(oid.as_bytes().try_into().unwrap())
+    };
+    let (oid_a, oid_b) = (commit("a\n"), commit("a\nb\n"));
+    std::fs::write(staged.join("lab/lex.rs"), "a\nb\nc\n").unwrap();
+    let hash = memory::Cas::open(&kernel::layout::CityLayout::new(&staged).cas())
+        .unwrap()
+        .put(b"held in the store")
+        .unwrap();
+    let entry = city::archive_entry(
+        &staged,
+        &lab,
+        city::ArchiveKind::parse("decision").unwrap(),
+        kernel::TimeMs::new(0),
+        "chose git over a second index",
+    )
+    .unwrap();
+    city::file_archive(&entry, "because").unwrap();
+
+    let queries = [
+        channels::Query::Changes {
+            base: oid_b,
+            head: None,
+        },
+        channels::Query::Hunks {
+            oid_a,
+            oid_b,
+            path: "lab/lex.rs".to_owned(),
+        },
+        channels::Query::Content {
+            locator: kernel::Locator::Cas { hash, range: None },
+        },
+        channels::Query::ArchiveSearch {
+            needle: "git".to_owned(),
+        },
+    ];
+    let mut views = Views::new(&root);
+    let prepared: Vec<_> = queries.iter().map(|query| views.prepare(query)).collect();
+    // Opening the store makes its directory, so a read done under the
+    // lock leaves a directory behind for the city to replace.
+    if root.exists() {
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+    std::fs::rename(&staged, &root).unwrap();
+
+    let read: Vec<_> = prepared
+        .into_iter()
+        .map(|prepared| prepared.finish())
+        .collect();
+    let fresh: Vec<_> = queries.iter().map(|query| views.answer(query)).collect();
+    assert_eq!(read, fresh);
+    assert!(
+        read.iter().all(
+            |answer| !matches!(answer, channels::Answer::Unavailable { .. })
+                && !matches!(answer, channels::Answer::Archive(found) if found.hits.is_empty())
+        ),
+        "{read:?}"
+    );
+}
+
+/// The skills page scans the shelves, and the vital signs count the
+/// buildings, after the views are released: a building raised between
+/// `prepare` and `finish` is one each of them sees.
+#[test]
+fn the_shelves_and_the_building_count_are_read_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let queries = [
+        channels::Query::Skills {
+            building: Address::parse("lab").unwrap(),
+        },
+        channels::Query::Metrics,
+    ];
+    let prepared: Vec<_> = queries.iter().map(|query| views.prepare(query)).collect();
+    let shelf = kernel::layout::CityLayout::new(dir.path())
+        .building_skills(&Address::parse("lab").unwrap())
+        .join("utilities");
+    std::fs::create_dir_all(&shelf).unwrap();
+    std::fs::write(
+        shelf.join("diffing.md"),
+        "This lab's own rule
+",
+    )
+    .unwrap();
+
+    let read: Vec<_> = prepared
+        .into_iter()
+        .map(|prepared| prepared.finish())
+        .collect();
+    let fresh: Vec<_> = queries.iter().map(|query| views.answer(query)).collect();
+    assert_eq!(read, fresh);
+}
+
+/// The prompt a run was frozen with is read out of the ledger and the
+/// store after the views are released: a line and an object that land
+/// between `prepare` and `finish` are both ones the answer shows.
+#[test]
+fn the_prompt_a_run_was_told_is_read_after_the_views_are_released() {
+    use kernel::Ledger;
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let run = RunId::from_bytes([7u8; 16]);
+    let room = Address::parse("lab/room1").unwrap();
+    let told = b"the city says";
+    let hash = kernel::B3Hash::digest(told);
+    let data = serde_json::json!({ "segments": [
+        { "slot": "city", "hash": hash, "len": told.len(), "sources": [] }
+    ] });
+    let data = data.as_object().unwrap().clone();
+    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+        .unwrap()
+        .0;
+    let mut views = Views::new(dir.path());
+    let at = ledger.position().value();
+    views
+        .apply(&view_record(
+            at,
+            run,
+            EventKind::PromptAssembled,
+            &room,
+            data.clone(),
+        ))
+        .unwrap();
+
+    let prepared = views.prepare(&channels::Query::Prefix { run });
+    ledger
+        .append(kernel::EventDraft {
+            run,
+            t: kernel::TimeMs::new(1_000),
+            who: "lab/room1".to_owned(),
+            addr: Some(room),
+            kind: EventKind::PromptAssembled,
+            data: Payload::new(data).unwrap(),
+            ig: false,
+        })
+        .unwrap();
+    drop(ledger);
+    memory::Cas::open(&kernel::layout::CityLayout::new(dir.path()).cas())
+        .unwrap()
+        .put(told)
+        .unwrap();
+
+    assert_eq!(
+        prepared.finish(),
+        channels::Answer::Prefix(Box::new(channels::PrefixAnswer {
+            run,
+            segments: vec![channels::PrefixSegment {
+                slot: channels::PrefixSlot::City,
+                hash,
+                bytes: 13,
+                text: "the city says".to_owned(),
+                stored: true,
+                sources: Vec::new(),
+            }],
+        }))
+    );
+}
+
+/// A plan nobody has read yet is read after the views are released, so
+/// the building page shows the table as it stands at `finish`.
+#[test]
+fn a_plan_nobody_has_read_yet_is_read_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let building = dir.path().join("lab");
+    std::fs::create_dir_all(&building).unwrap();
+    let query = channels::Query::BuildingView {
+        addr: Address::parse("lab").unwrap(),
+    };
+    let prepared = Views::new(dir.path()).prepare(&query);
+    std::fs::write(
+        building.join("Roadmap.md"),
+        "# Roadmap\n\n| # | Item | Weight | Needs | Status | Evidence |\n\
+         |---|---|---|---|---|---|\n\
+         | 1 | wired | 1 |  | not started |  |\n",
+    )
+    .unwrap();
+
+    assert_eq!(prepared.finish(), Views::new(dir.path()).answer(&query));
+}
+
+/// The history, a named range, one run's transcript, its rounds and its
+/// evidence are read out of the ledger after the views are released: a
+/// line appended between `prepare` and `finish` is one each answer shows.
+#[test]
+fn the_ledger_readers_read_after_the_views_are_released() {
+    use kernel::Ledger;
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let run = RunId::from_bytes([7u8; 16]);
+    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+        .unwrap()
+        .0;
+    let appended_at = ledger.position();
+    let mut views = Views::new(dir.path());
+    let queries = [
+        channels::Query::History {
+            before: None,
+            limit: 50,
+        },
+        channels::Query::HistoryRange {
+            from: appended_at,
+            to: appended_at,
+            limit: 50,
+        },
+        channels::Query::RunHistory {
+            run,
+            before: None,
+            limit: 50,
+        },
+        channels::Query::Rounds { run },
+        channels::Query::Evidence { run },
+    ];
+    let prepared: Vec<_> = queries.iter().map(|query| views.prepare(query)).collect();
+    let data = serde_json::json!({ "segments": [] });
+    ledger
+        .append(kernel::EventDraft {
+            run,
+            t: kernel::TimeMs::new(1_000),
+            who: "lab/room1".to_owned(),
+            addr: Some(Address::parse("lab/room1").unwrap()),
+            kind: EventKind::PromptAssembled,
+            data: Payload::new(data.as_object().unwrap().clone()).unwrap(),
+            ig: false,
+        })
+        .unwrap();
+    drop(ledger);
+
+    let read: Vec<_> = prepared
+        .into_iter()
+        .map(|prepared| prepared.finish())
+        .collect();
+    let fresh: Vec<_> = queries.iter().map(|query| views.answer(query)).collect();
+    assert_eq!(read, fresh);
+}
+
+#[test]
+fn the_mcp_health_page_reads_its_servers_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    let views = Views::new(dir.path());
+    let prepared = views.prepare(&channels::Query::McpHealth { addr: room.clone() });
+    let config = city::config_path(dir.path(), &room, city::Layer::City).unwrap();
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(
+        &config,
+        "[[mcp]]\nlabel = \"apps\"\ncommand = \"sprawling-no-such-server\"\n",
+    )
+    .unwrap();
+    let channels::Answer::McpHealth(answer) = prepared.finish() else {
+        panic!("not an MCP health answer");
+    };
+    let labels: Vec<_> = answer
+        .servers
+        .iter()
+        .map(|server| server.label.as_str().to_owned())
+        .collect();
+    assert_eq!(labels, vec!["apps".to_owned()]);
 }

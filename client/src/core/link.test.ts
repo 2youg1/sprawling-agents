@@ -42,7 +42,7 @@ function refusalOf(code: AxError["code"]): AxError {
     subject: "the city said no",
     recovery: "ask for something this building may do",
     nearby: [],
-    retriable: false,
+    retry: "no",
   };
 }
 
@@ -63,7 +63,7 @@ describe("a frame this build cannot read", () => {
         recovery:
           "reload the page to fetch the client this server was built with",
         nearby: [],
-        retriable: false,
+        retry: "no",
       },
     });
   });
