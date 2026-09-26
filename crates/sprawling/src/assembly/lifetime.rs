@@ -17,7 +17,46 @@ use std::path::Path;
 use std::sync::Arc;
 
 use kernel::{AxError, EventKind, Locator};
-use memory::{Cas, JsonlLedger};
+use memory::{Cas, JsonlLedger, OpenReport};
+
+/// What opening the ledger repaired before this worker read a line of
+/// it (sprawling-SPEC.md 8-86). The ledger records the cut as
+/// `log_truncated`, but no page draws that line, so the worker keeps
+/// this value to tell the person at the two doors a city opens through.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum LedgerOpening {
+    /// Every byte on disk was a whole, chained line.
+    Intact,
+    /// A crash left the last line half-written; opening cut these bytes.
+    TailDropped { bytes: u64 },
+}
+
+impl From<OpenReport> for LedgerOpening {
+    fn from(report: OpenReport) -> Self {
+        match report.recovered {
+            None => LedgerOpening::Intact,
+            Some(cut) => LedgerOpening::TailDropped {
+                bytes: cut.dropped_bytes,
+            },
+        }
+    }
+}
+
+impl LedgerOpening {
+    /// The one sentence a person reads about the cut: what, why, and
+    /// what to do. `None` when nothing was cut.
+    pub(crate) fn notice(self) -> Option<String> {
+        match self {
+            LedgerOpening::Intact => None,
+            LedgerOpening::TailDropped { bytes } => Some(format!(
+                "the ledger's last line was half-written when the city last stopped, so \
+                 opening cut {bytes} byte(s) from its tail and recorded log_truncated; every \
+                 earlier line verified. Check whether the last action before that stop needs \
+                 doing again"
+            )),
+        }
+    }
+}
 
 impl RunWorker {
     /// # Errors
@@ -29,13 +68,13 @@ impl RunWorker {
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
     ) -> Result<Self, AxError> {
-        let dir = ledger_dir(city_root);
-        let (ledger, _report) =
-            JsonlLedger::open(&dir, now_ms()?).map_err(memory::MemoryError::into_ax)?;
-        RunWorker::over(city_root, vault, log, ledger)
+        let opened = JsonlLedger::open(&ledger_dir(city_root), now_ms()?)
+            .map_err(memory::MemoryError::into_ax)?;
+        RunWorker::over(city_root, vault, log, opened)
     }
 
-    /// Builds a worker around a ledger somebody else opened (LOADING; UNLOADING: `close_city`).
+    /// Builds a worker around a ledger somebody else opened, together
+    /// with what that open repaired (LOADING; UNLOADING: `close_city`).
     ///
     /// Where the history comes from is not this worker's decision to
     /// make, and taking it as a parameter is the same correction
@@ -53,7 +92,7 @@ impl RunWorker {
         city_root: &Path,
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
-        ledger: JsonlLedger,
+        (ledger, report): (JsonlLedger, OpenReport),
     ) -> Result<Self, AxError> {
         let now = now_ms()?;
         let dir = ledger_dir(city_root);
@@ -76,6 +115,7 @@ impl RunWorker {
             city_root: city_root.to_path_buf(),
             city: std::sync::OnceLock::new(),
             ledger,
+            opening: LedgerOpening::from(report),
             cas,
             book,
             vault: Arc::new(std::sync::Mutex::new(vault)),
@@ -100,6 +140,11 @@ impl RunWorker {
             flight: Flight::open(),
             namings: Namings::open(),
         })
+    }
+
+    /// What opening this worker's ledger repaired.
+    pub(crate) fn opening(&self) -> LedgerOpening {
+        self.opening
     }
 
     /// Closes the city in the record, so a stop somebody chose and a
@@ -140,5 +185,44 @@ impl RunWorker {
             "the city is closing; its handoff is on the ledger",
         );
         self.record(EventKind::HandoffWritten, handoff.payload()?)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+mod tests {
+    use crate::assembly::{RunWorker, init_city, ledger_dir};
+    use std::io::Write;
+
+    /// A crash mid-write leaves half a line; the next open cuts it and
+    /// the person who runs `resume` has to be told what was cut.
+    #[test]
+    fn a_torn_tail_is_told_in_the_startup_scan() {
+        let dir = tempfile::tempdir().unwrap();
+        init_city(dir.path()).unwrap();
+        let segment = memory::ledger_segments_at(&ledger_dir(dir.path()))
+            .unwrap()
+            .pop()
+            .unwrap();
+        let torn = b"{\"v\":1,\"seq\":99,\"half";
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&segment)
+            .unwrap()
+            .write_all(torn)
+            .unwrap();
+
+        let mut worker = RunWorker::new(
+            dir.path(),
+            gateway::Custodian::in_memory(),
+            runtime::diagnostics::Diagnostics::off(),
+        )
+        .unwrap();
+        let summary = worker.startup_scan().unwrap().summary();
+
+        assert!(
+            summary.contains(&format!("{} byte(s)", torn.len())),
+            "the scan must say how much of the tail was cut: {summary}"
+        );
     }
 }

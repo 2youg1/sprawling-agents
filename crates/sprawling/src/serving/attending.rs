@@ -91,6 +91,11 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         .spawn(move || {
             let mut worker = match RunWorker::new(&worker_root, vault, log) {
                 Ok(mut worker) => {
+                    // Before the banner, so a torn tail is the first
+                    // thing the person running the city reads.
+                    if let Some(notice) = worker.opening().notice() {
+                        eprintln!("{notice}");
+                    }
                     worker.open_for_service(vault_notice);
                     drop(ready_tx.send(Ok(worker.vault_handle())));
                     worker
