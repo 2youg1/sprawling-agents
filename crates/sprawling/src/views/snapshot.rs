@@ -122,6 +122,22 @@ impl Views {
         })
     }
 
+    /// Cuts a snapshot of these views at `record`, the last record they
+    /// folded. Its `canonical_line` is the ledger's line, so the cut reads
+    /// nothing back from the ledger (sprawling-SPEC.md 8-91).
+    ///
+    /// # Errors
+    /// `InvalidArgs` when the record does not serialise, and those of
+    /// [`start::cut_at`].
+    pub(crate) fn cut_snapshot_at(&self, record: &EventRecord) -> Result<(), AxError> {
+        let last = (record.seq(), record.canonical_line()?);
+        start::cut_at(
+            &kernel::layout::CityLayout::new(&self.city_root).ledger(),
+            self,
+            Some(&last),
+        )
+    }
+
     /// The last line these views folded, read through their index, which
     /// is where a snapshot of them is cut. `None` before genesis is
     /// folded.

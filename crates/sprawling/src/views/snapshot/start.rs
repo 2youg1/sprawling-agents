@@ -58,7 +58,7 @@ pub(crate) struct Started<F> {
         not(test),
         expect(
             dead_code,
-            reason = "serve folds the whole history and the other starts discard how they began; the tests read it, and 8-91 leaves open where a page reads it"
+            reason = "serve folds the whole history on the standing's pass, so no served page has a start reason to read (8-91); the other starts discard how they began, and the tests read it"
         )
     )]
     pub(crate) from: FoldStart,
