@@ -369,3 +369,28 @@ fn a_dispatch_that_names_a_registered_model_runs_on_it() {
         "a refused dispatch opened no room"
     );
 }
+
+/// A later run in a room opened with `-m` names no model, as a
+/// successor or a wake knock does, and runs on the room's frozen model.
+#[test]
+fn a_run_naming_no_model_runs_on_the_room_frozen_one() {
+    let dir = tempfile::tempdir().unwrap();
+    open_lab(dir.path());
+    let replies = vec![completion("done", None), completion("done", None)];
+    let (base_url, _provider) = fake_openai(&["m-local", "m-other"], replies);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::SelectModel {
+            endpoint: channels::ProviderName::parse("house").unwrap(),
+            model: "m-other".to_owned(),
+            tag: kernel::ModelTag::Digest,
+            context_tokens: kernel::Window::new(32_768),
+            max_output_tokens: kernel::Ceiling::new(4_096),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select-digest"),
+        })
+        .unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    worker.handle(ask_on(&room, "m-other", b"dispatch-1")).unwrap();
+    let second = worker.handle(ask(&room, None, b"dispatch-2"));
+    assert!(second.is_ok(), "{second:?}");
+}
