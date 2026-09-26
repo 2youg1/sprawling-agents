@@ -23,7 +23,7 @@ pub(super) fn asked(addr: &str) -> Assignment {
         addr: Address::parse(addr).unwrap(),
         session: None,
         effort: None,
-        mode: runtime::Mode::PlanGoal,
+        mode: kernel::Mode::PlanGoal,
         parent: None,
         succession: None,
         tainted: false,

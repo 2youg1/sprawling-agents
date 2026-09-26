@@ -133,6 +133,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **succession** | A run replacing itself: same address, same depth, therefore the same tools — a successor is not a delegate, which is why it may delegate. It carries a handoff and the address of the conversation that produced it, and it needs no person. |
 | **lineage** | The chain of runs a succession leaves behind. `Provenance` names each one's predecessor, so "how many times has this resident replaced itself since I last looked" is one question with one answer. |
 | **transcript** | What one run actually saw, written beside its room as `<run-id>.jsonl` when the run freezes: the messages, the calls, the results as the model received them. Not the Ledger — the Ledger is the city's, this is the run's, and only the second one is a thing a resident may read. |
+| **conversation** | The volatile half of a request: the messages a run's executor carries and folds forward turn by turn, handed to the model beneath the frozen prefix on every call, and gone when the process stops (`runtime::conversation::Conversation`). Not the **transcript** — that is the frozen per-run file written once the run ends — and not the context window, which is `kernel::Window`, the number of tokens a model accepts. A fork rebuilds a conversation from the Ledger rather than copying it. |
 
 ## 6 Interface
 

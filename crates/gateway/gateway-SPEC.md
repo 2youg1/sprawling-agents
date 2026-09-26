@@ -524,7 +524,7 @@ ARCHITECTURE §6 gateway 表逐行状态翻转；§6 接线台账登记（endpoi
 ### 8-16 端点带着人给它定的规矩：`EndpointTuning` 与 `ModelFacts`（形状 7 值 ＋ 形状 4 适配器）
 
 ```rust
-pub enum Retries { UntilHalted, AtMost(u32) }          // 缺席即 UntilHalted，就这一处
+// Retries 即 kernel::Retries，缺席即 UntilHalted；本 crate 不再导出别名
 pub struct TuningDefaults { pub timeout_ms: u64, pub retries: Retries, pub stream_idle_timeout_ms: Option<u64> }
 pub enum HeaderValue { Plain(String), Redeemed(SecretRef) }
 
@@ -684,7 +684,7 @@ pub struct Ranks;                                // of(&AttachedEndpoint, model)
 
 ### 8-31 重试上限住 kernel
 
-`gateway::Retries` 现在是 `kernel::Retries` 的再导出。缺席的含义（`UntilHalted`）、探测在无人可停时读成一次（`without_a_brake`）、以及记进账本时写不写这个数（`stated`），三条都由那一处定义，本 crate 不再自持一份。
+本 crate 直接用 `kernel::Retries`，不再导出别名。缺席的含义（`UntilHalted`）、探测在无人可停时读成一次（`without_a_brake`）、以及记进账本时写不写这个数（`stated`），三条都由那一处定义，本 crate 不再自持一份。
 
 ### 8-20 第三支笔：OpenAI responses 面（叶子 4.5 · F-05）
 

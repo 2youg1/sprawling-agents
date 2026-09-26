@@ -47,7 +47,7 @@ impl RunWorker {
             .map_err(memory::MemoryError::into_ax)?;
         let claim = collab::Claim::new(
             collab::NodeId::parse(child.addr.as_str())?,
-            Locator::parse(&format!("cas:b3-{digest}"))?,
+            Locator::cas(digest),
             digest,
             child.who.clone(),
         );

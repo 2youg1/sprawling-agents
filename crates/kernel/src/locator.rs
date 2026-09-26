@@ -186,6 +186,14 @@ pub enum Locator {
 }
 
 impl Locator {
+    /// The whole stored object behind `hash`. Infallible because a
+    /// `B3Hash` is already a digest the grammar accepts, so a caller that
+    /// holds one never spells the locator as text and parses it back.
+    #[must_use]
+    pub const fn cas(hash: B3Hash) -> Self {
+        Locator::Cas { hash, range: None }
+    }
+
     /// Fail-closed parser: exact grammar or `E_LOCATOR_INVALID`.
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let parsed = Locator::parse_inner(raw)?;

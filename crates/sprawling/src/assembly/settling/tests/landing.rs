@@ -73,7 +73,7 @@ Trades in the market as {who}.
         succession: None,
         session: None,
         effort: None,
-        mode: runtime::Mode::Up,
+        mode: kernel::Mode::Up,
         tainted: false,
         origin: None,
     };
@@ -122,7 +122,7 @@ fn a_half_filed_shelf_is_unwound() {
         succession: None,
         session: None,
         effort: None,
-        mode: runtime::Mode::Up,
+        mode: kernel::Mode::Up,
         tainted: false,
         origin: None,
     };
@@ -201,7 +201,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
                 addr: room.clone(),
                 session: None,
                 effort: None,
-                mode: runtime::Mode::PlanGoal,
+                mode: kernel::Mode::PlanGoal,
                 parent: None,
                 succession: None,
                 tainted: false,

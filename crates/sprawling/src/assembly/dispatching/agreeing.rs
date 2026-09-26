@@ -149,10 +149,7 @@ impl RunWorker {
                 .map(|(name, value)| (name, value.spelled()))
                 .collect(),
         )?;
-        let retries = match chosen.endpoint.tuning.request_max_retries {
-            gateway::Retries::AtMost(ceiling) => runtime::Retries::AtMost(ceiling),
-            gateway::Retries::UntilHalted => runtime::Retries::UntilHalted,
-        };
+        let retries = chosen.endpoint.tuning.request_max_retries;
         Ok(Agreed {
             building,
             rules,

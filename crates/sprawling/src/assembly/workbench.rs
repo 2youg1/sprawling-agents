@@ -68,7 +68,7 @@ pub(super) struct Site {
     pub(super) filters: runtime::FilterTable,
     /// Carried from the endpoint this run was given, frozen with
     /// everything else the run was set up with.
-    pub(super) retries: runtime::Retries,
+    pub(super) retries: kernel::Retries,
 }
 
 /// What the model may see, what routes what it calls, and who it may
@@ -219,7 +219,7 @@ pub(super) struct Situation<'a> {
     pub(super) addr: &'a Address,
     pub(super) who: &'a str,
     signals_pending: u32,
-    mode: runtime::Mode,
+    mode: kernel::Mode,
     write_domain: &'a kernel::WriteDomain,
     worktree: &'a Path,
     trust: &'a kernel::Autonomy,
