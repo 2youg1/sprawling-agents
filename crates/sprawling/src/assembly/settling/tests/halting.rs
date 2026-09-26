@@ -64,7 +64,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
         })
         .unwrap();
     let lab = Address::parse("lab").unwrap();
-    let table = worker.backlog.clone();
+    let table = worker.flight.backlog.clone();
     let halted = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let counted = std::sync::Arc::clone(&halted);
     worker.serve(only_interrupts(std::sync::Arc::new(move |_run| {
@@ -118,6 +118,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
     assert_eq!(child_calls, 0, "a cancelled child still called the model");
     assert!(
         worker
+            .flight
             .backlog
             .standing(&Address::parse("lab").unwrap())
             .unwrap()

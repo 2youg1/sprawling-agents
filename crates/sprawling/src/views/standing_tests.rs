@@ -224,7 +224,7 @@ fn an_evicted_run_still_answers_its_run_view() {
     }
     drop(ledger);
 
-    let mut views = crate::assembly::rebuild_views(&report.ledger_dir).unwrap();
+    let mut views = Views::rebuild(&report.ledger_dir).unwrap();
     let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
         panic!("CityView answers with a city");
     };
@@ -290,7 +290,7 @@ fn a_city_whose_first_billed_run_was_evicted(root: &std::path::Path) -> Views {
         }
     }
     drop(ledger);
-    crate::assembly::rebuild_views(&report.ledger_dir).unwrap()
+    Views::rebuild(&report.ledger_dir).unwrap()
 }
 
 fn billed_run(i: u64) -> RunId {

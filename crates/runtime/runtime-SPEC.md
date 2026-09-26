@@ -116,6 +116,7 @@ pub fn fold_ledger_dir(dir: &Path, each: impl FnMut(&EventRecord) -> Result<(), 
 流程：逐行①envelope 探查（serde_json::Value：v/seq/prev/kind/ig 键）；②v 判向（>EVENT_LOG_V 即 `E_LOG_VERSION_UNSUPPORTED`）；③链续（`chain_hash` 复算对拍 prev，首行对 GENESIS_PREV）；④seq 连续（自 FIRST 起）；⑤kind 已知→`parse_line` 全解＋规范复验＋`to_ref`；未知＋`ig:true`→记 IgnoredUnknown；未知无 ig→`E_LOG_VERSION_UNSUPPORTED`（subject=kind＋行号）。链与 seq 对一切行（含 ignored）成立。
 
 **「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 与 `fold_ledger_dir` 的生产调用方（`fold`、`rebuild_views`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
+**「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 的四个生产调用方（`fold`、`Views::rebuild`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
 
 故依据归给**拿到人输入路径的那一层**：`sprawling replay <ledger-dir>` 先问 `memory::ledger_segments_at`，一段都没有就报 `E_PATH_NOT_FOUND`（sprawling-SPEC §12）。先例取自本仓库：`xtask guard` 在无提交时说 `no commits yet, nothing to judge`，而不说通过。**空账本本身仍然合法**：`verify_lines(vec![])` 照旧返回空 `VerifiedLedger`。
 

@@ -11,7 +11,7 @@ use std::path::Path;
 use kernel::{AxCode, AxError, RunId, Seq};
 use runtime::diagnostics::{Diagnostics, Level, Site};
 
-use super::{RunWorker, ledger_dir};
+use super::RunWorker;
 
 impl RunWorker {
     /// Attaches a fresh halt to this worker's writer, then walks the
@@ -30,7 +30,7 @@ impl RunWorker {
     ) -> Result<std::thread::JoinHandle<()>, AxError> {
         let halt = memory::ChainHalt::default();
         self.ledger.halt_on(halt.clone());
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         let at = self.ledger.position();
         std::thread::Builder::new()
             .name("sprawling-chain-audit".to_owned())

@@ -6,12 +6,12 @@
 //! The two projections the collaboration tools read: what is waiting in
 //! each room, and what ground is already claimed.
 
-use kernel::event::record::{PursuitChanged, RoadmapMoved};
+use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
 use crate::views::pursued;
 
-use super::super::building_of;
+use super::super::PlanHolders;
 
 /// The three registers a run's collaboration tools read from.
 pub(in crate::assembly) struct Collaboration {
@@ -26,8 +26,7 @@ pub(in crate::assembly) struct Collaboration {
     /// What each building was last told to work towards.
     pursuits: std::collections::BTreeMap<Address, (String, kernel::PursuitState)>,
     /// Which room holds each node of each building's plan.
-    pub(in crate::assembly) plan_holders:
-        std::collections::BTreeMap<Address, std::collections::BTreeMap<kernel::NodeId, String>>,
+    pub(in crate::assembly) plan_holders: PlanHolders,
 }
 
 impl Collaboration {
@@ -67,12 +66,9 @@ pub(super) struct CollaborationFold {
     /// state, because a `Pursuit` is minted through the depth-zero
     /// position and a fold has none.
     pursuits: std::collections::BTreeMap<Address, (String, kernel::PursuitState)>,
-    /// Which room holds each node of each building's plan. The map a
-    /// red node's neighbours are found through, and the one copy of it:
-    /// the record that claims a node carries the room in its `addr`,
-    /// so nothing here derives what somebody else already wrote down.
-    plan_holders:
-        std::collections::BTreeMap<Address, std::collections::BTreeMap<kernel::NodeId, String>>,
+    /// Which room holds each node of each building's plan: the map a
+    /// red node's neighbours are found through.
+    plan_holders: PlanHolders,
     pub(super) requests: Vec<collab::OpenRequest>,
     enqueued: Vec<collab::Signal>,
     consumed: std::collections::BTreeSet<String>,
@@ -99,22 +95,12 @@ impl CollaborationFold {
                 self.consumed.insert(taken.id.as_str().to_owned());
             }
             EventKind::GoalRegistered => self.goals.push(record.data().read()?),
-            EventKind::RoadmapClaimed => {
-                let node = record.data().read::<RoadmapMoved>()?.node;
-                if let (Some(building), Some(room)) =
-                    (record.addr().and_then(building_of), record.addr())
-                {
-                    self.plan_holders
-                        .entry(building)
-                        .or_default()
-                        .insert(node, room.as_str().to_owned());
-                }
-            }
-            EventKind::RoadmapFinished | EventKind::RoadmapReleased | EventKind::RoadmapBlocked => {
-                let node = record.data().read::<RoadmapMoved>()?.node;
-                if let Some(building) = record.addr().and_then(building_of) {
-                    self.plan_holders.entry(building).or_default().remove(&node);
-                }
+            EventKind::RoadmapClaimed
+            | EventKind::RoadmapFinished
+            | EventKind::RoadmapReleased
+            | EventKind::RoadmapBlocked => {
+                self.plan_holders
+                    .absorb(record.kind(), record.addr(), record.data())?;
             }
             EventKind::PursuitChanged => {
                 let addr = pursued(record)?;

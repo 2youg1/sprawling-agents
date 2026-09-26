@@ -157,7 +157,7 @@ impl RunWorker {
         // drives, so a halt on its building reaches it; a root run is
         // ended by `Cancel`, which is a different verb.
         let member = match at.parent {
-            Some(_) => Some(self.backlog.enrol_run(
+            Some(_) => Some(self.flight.backlog.enrol_run(
                 &at.addr,
                 format!("run {} at {}", site.run_id, at.addr.as_str()),
             )?),
@@ -233,7 +233,7 @@ impl RunWorker {
         // backlog that would not take its member back used to cost the
         // room its mail too (sprawling-SPEC.md 8-46-9).
         let returned = self.return_borrowed(&at, &mut site, &desks);
-        let left = member.map_or(Ok(()), |id| self.backlog.leave(id));
+        let left = member.map_or(Ok(()), |id| self.flight.backlog.leave(id));
         returned?;
         left?;
         let Driven {

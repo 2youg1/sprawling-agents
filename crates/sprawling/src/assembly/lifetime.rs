@@ -13,8 +13,8 @@
 //! leave" is asking one question from two ends.
 
 use super::{
-    Collaborating, Credentials, Flight, RoomQueues, RunWorker, Standing, city_segment,
-    ledger_dir, now_ms,
+    Collaborating, Credentials, Doorstep, Flight, Planning, RoomQueues, RunWorker, Standing,
+    city_segment, now_ms,
 };
 use std::path::Path;
 
@@ -99,8 +99,11 @@ impl RunWorker {
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
     ) -> Result<Self, AxError> {
-        let opened = JsonlLedger::open(&ledger_dir(city_root), now_ms()?)
-            .map_err(memory::MemoryError::into_ax)?;
+        let opened = JsonlLedger::open(
+            &kernel::layout::CityLayout::new(city_root).ledger(),
+            now_ms()?,
+        )
+        .map_err(memory::MemoryError::into_ax)?;
         RunWorker::over(city_root, vault, log, opened)
     }
 
@@ -125,7 +128,7 @@ impl RunWorker {
         log: runtime::diagnostics::Diagnostics,
         (ledger, report): (JsonlLedger, OpenReport),
     ) -> Result<Self, AxError> {
-        let standing = Standing::fold(&ledger_dir(city_root))?;
+        let standing = Standing::fold(&kernel::layout::CityLayout::new(city_root).ledger())?;
         RunWorker::holding(city_root, vault, log, (ledger, report, standing))
     }
 
@@ -174,17 +177,16 @@ impl RunWorker {
                 requests: collaboration.requests,
                 goals: collaboration.goals,
             },
-            pursuits,
-            plan_holders: collaboration.plan_holders,
-            delegator,
+            planning: Planning {
+                pursuits,
+                delegator,
+                holders: collaboration.plan_holders,
+            },
             last_tick: now,
             log,
-            knocks: Vec::new(),
+            doorstep: Doorstep::opened(entrance),
             mcp: super::mcp::Residents::default(),
-            entrance,
             origins,
-            fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
-            backlog: runtime::Backlog::new(),
             flight: Flight::open(),
             index: memory::LedgerIndex::empty(),
         };
@@ -279,7 +281,7 @@ impl RunWorker {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::Closing;
-    use crate::assembly::{RunWorker, init_city, ledger_dir};
+    use crate::assembly::{RunWorker, init_city};
     use kernel::{AxCode, AxError};
     use std::io::Write;
 
@@ -289,10 +291,11 @@ mod tests {
     fn a_torn_tail_is_told_in_the_startup_scan() {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
-        let segment = memory::ledger_segments_at(&ledger_dir(dir.path()))
-            .unwrap()
-            .pop()
-            .unwrap();
+        let segment =
+            memory::ledger_segments_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
+                .unwrap()
+                .pop()
+                .unwrap();
         let torn = b"{\"v\":1,\"seq\":99,\"half";
         std::fs::OpenOptions::new()
             .append(true)

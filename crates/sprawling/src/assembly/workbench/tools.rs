@@ -287,7 +287,7 @@ impl RunWorker {
                 run: site.run_id,
             },
             machine.engine,
-            self.backlog.clone(),
+            self.flight.backlog.clone(),
         )
     }
 
@@ -350,9 +350,8 @@ impl RunWorker {
                 trust: &self.governance.autonomy,
                 context_tokens: site.model.context_tokens,
                 neighbours: reach.seen.residents(),
-                // What this resident already holds, so a model asking
-                // what it may touch is answered from the same list the
-                // conflict check reads.
+                // What this resident already holds, so a model asking what it may
+                // touch is answered from the same list the conflict check reads.
                 locks: self
                     .collaborating
                     .goals
@@ -376,8 +375,9 @@ impl RunWorker {
                 )
             }),
         )?;
+        // The thirteenth line: what this run started and left running.
         Ok(tool
-            .reporting(self.backlog.clone())
+            .reporting(self.flight.backlog.clone())
             .metering(reach.context.clone()))
     }
 }

@@ -51,7 +51,7 @@ impl Views {
     /// line of the same run carries the same four hashes (runtime-SPEC
     /// section 8-39, item 5); the first is the one every run has.
     fn first_prompt(&mut self, run: RunId) -> Option<EventRecord> {
-        let dir = crate::assembly::ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index.refresh(&dir).ok()?;
         let seqs: Vec<Seq> = self.index.run_seqs_before(run, None).collect();
         let mut reader = self.index.reader(&dir);

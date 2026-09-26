@@ -144,38 +144,14 @@ pub(crate) fn fold_city(
 ) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
     let (ledger, report) =
         JsonlLedger::open(ledger_dir, super::now_ms()?).map_err(memory::MemoryError::into_ax)?;
-    let mut views = Views::new(city_root_of(ledger_dir));
+    let mut views = Views::over(ledger_dir);
     let mut standing = StandingFold::new();
     let index = fold_ledger_dir(ledger_dir, |record| {
         views.apply(record)?;
         standing.absorb(record)
     })?;
-    views.adopt_epoch(epoch_of(&index, ledger_dir)?);
-    views.hold_index(index);
+    views.hold_index(index, ledger_dir)?;
     Ok((views, (ledger, report, standing.settle()?)))
-}
-
-/// Rebuilds the views from the ledger on disk. This is the disposability
-/// of a projection exercised on every start: nothing is persisted, and
-/// the answer is the same as if the process had been running all along.
-///
-/// # Errors
-/// Propagates chain verification failures; a city whose history does not
-/// verify is not one whose views should be served.
-pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
-    let mut views = Views::new(city_root_of(ledger_dir));
-    let index = fold_ledger_dir(ledger_dir, |record| views.apply(record))?;
-    views.adopt_epoch(epoch_of(&index, ledger_dir)?);
-    views.hold_index(index);
-    Ok(views)
-}
-
-/// The city a ledger directory belongs to, two levels up.
-fn city_root_of(ledger_dir: &Path) -> &Path {
-    ledger_dir
-        .parent()
-        .and_then(Path::parent)
-        .unwrap_or(ledger_dir)
 }
 
 #[cfg(test)]
@@ -187,21 +163,3 @@ fn city_root_of(ledger_dir: &Path) -> &Path {
     reason = "test code"
 )]
 mod tests;
-
-/// The ledger's epoch: the chain hash of its genesis line, which names
-/// this history and no other, so a page reconnecting to another ledger
-/// at the same address rebuilds rather than resumes. `None` for a ledger
-/// with no line yet.
-///
-/// # Errors
-/// Propagates a segment the index names that cannot be read.
-fn epoch_of(
-    index: &memory::LedgerIndex,
-    ledger_dir: &Path,
-) -> Result<Option<kernel::B3Hash>, AxError> {
-    match index.reader(ledger_dir).line_at(kernel::Seq::FIRST) {
-        Ok(genesis) => Ok(Some(kernel::ledger::chain_hash(&genesis))),
-        Err(memory::MemoryError::SeqMissing { .. }) => Ok(None),
-        Err(other) => Err(other.into_ax()),
-    }
-}

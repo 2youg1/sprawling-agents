@@ -9,7 +9,6 @@
 
 use kernel::{EventRecord, UsdMicros};
 
-use crate::assembly::ledger_dir;
 use crate::views::holding::Views;
 use crate::views::lines::summarize;
 
@@ -30,7 +29,7 @@ impl Views {
             records: Vec::new(),
             earlier: None,
         };
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         if self.index.refresh(&dir).is_err() {
             return empty;
         }
@@ -98,7 +97,7 @@ impl Views {
         if to < from {
             return empty;
         }
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         if self.index.refresh(&dir).is_err() {
             return empty;
         }
@@ -157,7 +156,7 @@ impl Views {
             records: Vec::new(),
             earlier: None,
         };
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         if self.index.refresh(&dir).is_err() {
             return empty;
         }
@@ -224,7 +223,7 @@ impl Views {
         run: kernel::RunId,
         mut apply: impl FnMut(&EventRecord) -> Result<(), memory::MemoryError>,
     ) -> Option<()> {
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index.refresh(&dir).ok()?;
         let mut oldest_first: Vec<kernel::Seq> = self.index.run_seqs_before(run, None).collect();
         oldest_first.reverse();

@@ -20,7 +20,7 @@
 
 use kernel::{AxError, ChatMessage, RunId};
 
-use super::super::{Assignment, RunWorker, ledger_dir};
+use super::super::{Assignment, RunWorker};
 
 impl RunWorker {
     /// The conversation this run opens with, and the line it was
@@ -39,7 +39,7 @@ impl RunWorker {
         let Some(origin) = at.origin else {
             return Ok(Vec::new());
         };
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index
             .refresh(&dir)
             .map_err(memory::MemoryError::into_ax)?;

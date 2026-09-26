@@ -11,7 +11,7 @@ use crate::assembly::init_city;
 /// Changes one digit of the first line's timestamp in place, so the
 /// line still parses and only the chain can tell.
 fn break_the_first_line(city_root: &Path) {
-    let first = memory::ledger_segments_at(&ledger_dir(city_root))
+    let first = memory::ledger_segments_at(&kernel::layout::CityLayout::new(city_root).ledger())
         .unwrap()
         .remove(0);
     let mut bytes = std::fs::read(&first).unwrap();
@@ -31,7 +31,8 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
     )
     .unwrap();
     break_the_first_line(dir.path());
-    let memory::ChainAudit::Broken(reason) = memory::audit_chain(&ledger_dir(dir.path())).unwrap()
+    let memory::ChainAudit::Broken(reason) =
+        memory::audit_chain(&kernel::layout::CityLayout::new(dir.path()).ledger()).unwrap()
     else {
         panic!("the tampered ledger still audits whole");
     };

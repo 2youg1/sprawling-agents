@@ -24,7 +24,7 @@ use super::attending::{Outward, Started, spawn_worker};
 use super::desk::CommandDesk;
 use super::serve::Opening;
 use super::serve::Serving;
-use crate::assembly::{Closing, acp_dispatch, fold_city, ledger_dir};
+use crate::assembly::{Closing, acp_dispatch, fold_city};
 use crate::views::{Views, answer_outside_the_lock};
 
 /// One recording in, one line of text back.
@@ -148,7 +148,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // folded from one verified read of the ledger here; the views are
     // folded forward by the write observer inside the worker: one fold
     // rule, two call sites, no second definition of what a view means.
-    let (rebuilt, held) = fold_city(&ledger_dir(city_root))?;
+    let (rebuilt, held) = fold_city(&kernel::layout::CityLayout::new(city_root).ledger())?;
     // This machine is not asked here (sprawling-SPEC.md 8-54): the
     // table is thirty-two items, most of them a program started and
     // asked its version, and a serve that waited for all of them holds

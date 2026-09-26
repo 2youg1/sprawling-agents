@@ -167,7 +167,13 @@ impl RunWorker {
         conversations: u32,
     ) -> Result<(), AxError> {
         let room = signal.room();
-        if room == speaker || self.knocks.iter().any(|queued| &queued.addr == room) {
+        if room == speaker
+            || self
+                .doorstep
+                .knocks
+                .iter()
+                .any(|queued| &queued.addr == room)
+        {
             return Ok(());
         }
         if !matches!(
@@ -176,7 +182,7 @@ impl RunWorker {
         ) {
             return Ok(());
         }
-        self.knocks.push(Knock {
+        self.doorstep.knocks.push(Knock {
             addr: room.clone(),
             from: signal.from().to_owned(),
             mode,
@@ -201,7 +207,7 @@ impl RunWorker {
     /// room is a fact about the city, and failing the speaker's dispatch
     /// over it would punish the wrong run.
     pub(super) fn answer_knocks(&mut self) {
-        for knock in std::mem::take(&mut self.knocks) {
+        for knock in std::mem::take(&mut self.doorstep.knocks) {
             // The chain is bounded here rather than at the push: a knock
             // that has already gone as far as it may is stepped over
             // like one that cannot be answered, so the run that spoke is

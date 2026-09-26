@@ -8,7 +8,7 @@
 //!
 //! **Why it is a projection and not part of the assembly point.** Nothing
 //! here decides anything or reaches a provider: it folds records into the
-//! answers a client asks for, and `rebuild_views` throws the whole thing
+//! answers a client asks for, and `Views::rebuild` throws the whole thing
 //! away and folds the ledger again to get the same bytes. That is
 //! ARCHITECTURE.md section 9 shape 7, while `bin::assembly` is an
 //! adapter - and a file holding two shapes is what section 9 says a split
@@ -27,14 +27,10 @@ use std::path::{Path, PathBuf};
 use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-// Where a city keeps its ledger and how a building reads off disk are
-// `bin::assembly`'s: it forms the city that laid them out. Borrowed
-// rather than copied, so "where the ledger lives" keeps one answer.
 use super::lines::verdict_line;
 use super::lines::{
     buildings_of, discard_lines, pursued, registry_line, restored_paths, signal_line,
 };
-use crate::assembly::{ledger_dir, rebuild_views};
 
 /// Answers one query out of a city's own history, without serving it.
 ///
@@ -50,9 +46,11 @@ use crate::assembly::{ledger_dir, rebuild_views};
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {
-    Ok(rebuild_views(&ledger_dir(city_root))?
-        .prepare(query)
-        .finish())
+    Ok(
+        Views::rebuild(&kernel::layout::CityLayout::new(city_root).ledger())?
+            .prepare(query)
+            .finish(),
+    )
 }
 
 /// The derived views a query reads. They are rebuilt from the ledger at
@@ -163,6 +161,27 @@ pub(crate) struct Views {
 }
 
 impl Views {
+    /// Rebuilds the views from the ledger on disk. This is the
+    /// disposability of a projection exercised on every start: nothing
+    /// is persisted, and the answer is the same as if the process had
+    /// been running all along.
+    ///
+    /// # Errors
+    /// Propagates chain verification failures; a city whose history does
+    /// not verify is not one whose views should be served.
+    pub(crate) fn rebuild(ledger_dir: &Path) -> Result<Views, AxError> {
+        let mut views = Views::over(ledger_dir);
+        let index = runtime::replay::fold_ledger_dir(ledger_dir, |record| views.apply(record))?;
+        views.hold_index(index, ledger_dir)?;
+        Ok(views)
+    }
+
+    /// The empty views of the city whose ledger is `ledger_dir`, two
+    /// levels up, before a fold has shown them any record.
+    pub(crate) fn over(ledger_dir: &Path) -> Views {
+        Views::new(ledger_dir.ancestors().nth(2).unwrap_or(ledger_dir))
+    }
+
     pub(crate) fn new(city_root: &Path) -> Views {
         Views {
             city_root: city_root.to_path_buf(),
@@ -194,10 +213,24 @@ impl Views {
         }
     }
 
-    /// Takes the index the fold that built these views read the history
-    /// into, so serving does not scan the history a second time.
-    pub(crate) fn hold_index(&mut self, index: memory::LedgerIndex) {
+    /// Takes the index the fold read the history into, so serving does
+    /// not scan it again, and the epoch its genesis line's chain hash
+    /// names, so a page reconnecting to another ledger rebuilds.
+    ///
+    /// # Errors
+    /// Propagates a segment the index names that cannot be read.
+    pub(crate) fn hold_index(
+        &mut self,
+        index: memory::LedgerIndex,
+        ledger_dir: &Path,
+    ) -> Result<(), AxError> {
+        self.epoch = match index.reader(ledger_dir).line_at(kernel::Seq::FIRST) {
+            Ok(genesis) => Some(kernel::ledger::chain_hash(&genesis)),
+            Err(memory::MemoryError::SeqMissing { .. }) => None,
+            Err(other) => return Err(other.into_ax()),
+        };
         self.index = index;
+        Ok(())
     }
 
     /// The first seq this view has not folded: an answer read from here
@@ -348,13 +381,6 @@ impl Views {
         out
     }
 
-    /// What this city is called: what its first record says, and for a
-    /// city made before that record carried a name, the directory it
-    /// lives in. One place decides, so two readers cannot disagree.
-    pub(crate) fn adopt_epoch(&mut self, epoch: Option<kernel::B3Hash>) {
-        self.epoch = epoch;
-    }
-
     pub(crate) fn epoch(&self) -> Option<kernel::B3Hash> {
         self.epoch
     }
@@ -363,6 +389,9 @@ impl Views {
         self.head
     }
 
+    /// What this city is called: what its first record says, and for a
+    /// city made before that record carried a name, the directory it
+    /// lives in. One place decides, so two readers cannot disagree.
     pub(crate) fn city(&self) -> Option<Address> {
         self.city
             .clone()

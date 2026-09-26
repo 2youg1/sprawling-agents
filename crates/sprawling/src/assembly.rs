@@ -35,6 +35,7 @@ mod collaborating;
 mod commanding;
 mod credentials;
 mod dispatching;
+mod doorstep;
 mod driving;
 mod folds;
 mod freezing;
@@ -62,12 +63,14 @@ use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
+use doorstep::Doorstep;
 use driving::flight::{Flight, Landed};
 pub(crate) use driving::lane::{DriveContext, drive_run};
 use driving::owing::{Owed, Owing, Unasked};
 pub(crate) use driving::{Driven, Driving};
+pub(crate) use folds::Standing;
+pub(crate) use folds::fold_city;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
-pub(crate) use folds::{Standing, fold_city, rebuild_views};
 use genesis::city_segment;
 pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
 pub(crate) use lifetime::Closing;
@@ -75,23 +78,26 @@ use lifetime::LedgerOpening;
 use mcp::mounts_under;
 use naming::{building_of, governed_of, name_of, not_built, scope_of};
 use plans::Reporter;
+use plans::held::{PlanHolders, Planning};
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
 pub(crate) use toolkits::broker_for;
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use kernel::{Address, AxCode, AxError, EventRecord, RunId, TimeMs};
+use kernel::{AxCode, AxError, EventRecord, RunId, TimeMs};
 // What the test fixtures below reach through `super::*`, now that the
 // lines this worker appends live in `recording`.
 #[cfg(test)]
 use crate::effect;
 #[cfg(test)]
-use kernel::{EventDraft, EventKind, Payload};
+use kernel::{Address, EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};
 use runtime::Interrupt;
+#[cfg(test)]
+use std::path::Path;
 
 /// The single sanctioned sampling point (clippy.toml disallowed-methods). Everything below this call takes `TimeMs` as a
 /// parameter.
@@ -118,12 +124,6 @@ pub(crate) fn now_ms() -> Result<TimeMs, AxError> {
         )
     })?;
     Ok(TimeMs::new(millis))
-}
-
-/// Where a city keeps its ledger: under the reserved prefix, outside
-/// every WriteDomain (C17).
-pub(crate) fn ledger_dir(city_root: &Path) -> PathBuf {
-    kernel::layout::CityLayout::new(city_root).ledger()
 }
 
 /// What the startup scan found and repaired.
@@ -212,16 +212,9 @@ pub struct RunWorker {
     governance: Governance,
     /// What residents are handing one another (`collaborating`).
     collaborating: Collaborating,
-    /// What each building is working towards, and the depth-zero
-    /// position that lets one be declared. Held by the worker because
-    /// the worker is what acts on it; rebuilt from the records on open,
-    /// like the endpoint book and the goal register beside it.
-    pursuits: std::collections::BTreeMap<Address, kernel::Pursuit>,
-    delegator: kernel::Delegator,
-    /// Which room holds each node of each building's plan, folded from
-    /// the claim records and kept up to date as this worker writes them.
-    plan_holders:
-        std::collections::BTreeMap<Address, std::collections::BTreeMap<kernel::NodeId, String>>,
+    /// What each building is working towards and who holds which part
+    /// of its plan (`plans::held`).
+    planning: Planning,
     /// The instant the schedule was last read against. Set when the
     /// worker opens, so a city that was off owes nothing for the time it
     /// was off.
@@ -229,30 +222,19 @@ pub struct RunWorker {
     /// The diagnostic log. Write-only, and nothing here reads it back:
     /// turning it off must leave the ledger byte-identical.
     log: runtime::diagnostics::Diagnostics,
-    /// Residents who were spoken to while nobody was home. Held between
-    /// the run that spoke and the runs that answer, because delivery
-    /// happens after the speaker has frozen.
-    knocks: Vec<Knock>,
+    /// What reached the city's door and has not yet become a run
+    /// (`doorstep`).
+    doorstep: Doorstep,
     /// Every MCP server a run of this worker reached, still connected
     /// (`assembly::mcp::Residents`).
     pub(in crate::assembly) mcp: mcp::Residents,
-    /// Every command key this city has answered, and what it answered.
-    /// Folded from the history like the endpoint book beside it, so a
-    /// client retrying across a restart is still asking for one thing.
-    entrance: Entrance,
-    /// What is still running while the runs go on. One table per city,
-    /// and every `exec` gets a handle onto it, so `halt` reaches a
-    /// command without knowing which tool started it.
-    backlog: runtime::Backlog,
     /// What each room's current session branched from, until the run
     /// that begins it is written (`assembly::folds::session`).
     pub(in crate::assembly) origins: SessionOrigins,
-    /// One fence at a time per city: a repository has one index, and
-    /// every lane of this worker stages and commits it (`driving::lane`).
-    pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// Every run in a lane right now, the crossing those lanes write
-    /// history through, and what the city owes each one when it comes
-    /// home. One per city, so the number of runs a city drives at once
+    /// history through, what the city owes each one when it comes home,
+    /// the one fence they take turns at, and the commands they left
+    /// running. One per city, so the number of runs a city drives at once
     /// has one answer (sprawling-SPEC.md 8-46-2).
     flight: Flight,
     /// Where each line of the history sits, folded once and refreshed
@@ -279,8 +261,9 @@ impl RunWorker {
         if let Some(known) = self.city.get() {
             return Ok(*known);
         }
-        let read = memory::Provenance::city_of(&ledger_dir(&self.city_root))
-            .map_err(memory::MemoryError::into_ax)?;
+        let read =
+            memory::Provenance::city_of(&kernel::layout::CityLayout::new(&self.city_root).ledger())
+                .map_err(memory::MemoryError::into_ax)?;
         Ok(*self.city.get_or_init(|| read))
     }
 

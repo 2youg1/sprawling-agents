@@ -171,8 +171,8 @@ impl RunWorker {
                 .serving
                 .as_ref()
                 .map(|at| std::sync::Arc::clone(&at.interrupts)),
-            fence_gate: std::sync::Arc::clone(&self.fence_gate),
-            backlog: self.backlog.clone(),
+            fence_gate: std::sync::Arc::clone(&self.flight.fence_gate),
+            backlog: self.flight.backlog.clone(),
         }
     }
 }

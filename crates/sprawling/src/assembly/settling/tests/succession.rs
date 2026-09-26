@@ -145,7 +145,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
         })
         .expect("the fourth run's wave fences a commit");
     let oid = kernel::GitOid::parse(fenced.data().as_map()["oid"].as_str().unwrap()).unwrap();
-    let mut views = rebuild_views(&report.ledger_dir).unwrap();
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let channels::Answer::Commit(said) = views.answer(&channels::Query::Commit { oid }) else {
         panic!("a commit this city made answers which run wrote it");
     };

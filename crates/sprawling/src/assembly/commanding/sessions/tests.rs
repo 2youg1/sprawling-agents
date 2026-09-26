@@ -33,7 +33,9 @@ fn addr(raw: &str) -> Address {
 /// Whether the history recorded a `session_opened` at this address, and
 /// what it said about carrying.
 fn carried_in_history(city_root: &Path, at: &Address) -> Option<bool> {
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(city_root)).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(city_root).ledger())
+            .unwrap();
     verified
         .raw_lines()
         .iter()
@@ -184,7 +186,9 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             model: None,
         })
         .unwrap();
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
     let mother = verified
         .lines()
         .iter()
@@ -293,7 +297,9 @@ fn checking_a_branch_origin_does_not_verify_the_history() {
         })
         .unwrap();
     let verify_started = std::time::Instant::now();
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
     let verify = verify_started.elapsed();
     let started = verified
         .lines()
@@ -348,7 +354,9 @@ fn a_carried_session_names_the_previous_runs_transcript() {
         effort: None,
     };
     worker.handle(dispatch("measure", b"one")).unwrap();
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
     let previous = verified
         .lines()
         .iter()
