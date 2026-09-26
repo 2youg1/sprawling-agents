@@ -18,6 +18,7 @@
 
 //! Payload faces: references on the wire, never credentials.
 
+use kernel::event::record::ModelSelected;
 use kernel::{AxCode, AxError, ModelTag, Payload, Proxying, SecretRef};
 use serde_json::{Map, Value};
 
@@ -32,7 +33,7 @@ use super::tuning::EndpointTuning;
 /// record says "nothing was settled" by staying silent about it.
 mod reading;
 
-pub(crate) use reading::{read_attached, read_choice, text};
+pub(crate) use reading::{read_attached, read_choice};
 
 fn tuning_value(tuning: &EndpointTuning) -> Result<Option<Value>, AxError> {
     let mut map = Map::new();
@@ -243,44 +244,17 @@ pub fn selected_payload(
     entry: &ModelEntry,
     ceiling_from: Option<crate::CeilingSource>,
 ) -> Result<Payload, AxError> {
-    let mut map = Map::new();
-    map.insert("tag".to_owned(), Value::String(tag.as_str().to_owned()));
-    map.insert("endpoint".to_owned(), Value::String(endpoint.to_owned()));
-    map.insert("model".to_owned(), Value::String(entry.id.clone()));
-    map.insert(
-        "context_tokens".to_owned(),
-        Value::Number(entry.context_tokens.into()),
-    );
-    map.insert(
-        "max_output_tokens".to_owned(),
-        match entry.max_output_tokens {
-            Some(ceiling) => Value::Number(ceiling.get().into()),
-            None => Value::Null,
-        },
-    );
-    if let Some(rung) = ceiling_from {
-        map.insert(
-            "ceiling_from".to_owned(),
-            Value::String(rung.as_str().to_owned()),
-        );
-    }
-    map.insert(
-        "input".to_owned(),
-        serde_json::to_value(entry.input).map_err(|err| {
-            AxError::failure(AxCode::InvalidArgs, "encode input kinds", err.to_string())
-                .with_recovery(
-                    "report this against gateway::router::payload: `InputKinds` is a plain \
-                     enum and JSON refuses none of its spellings",
-                )
-        })?,
-    );
-    for (key, price) in [
-        ("input_price", entry.input_price),
-        ("output_price", entry.output_price),
-        ("cache_read_price", entry.cache_read_price),
-        ("cache_write_price", entry.cache_write_price),
-    ] {
-        map.insert(key.to_owned(), Value::Number(price.get().into()));
-    }
-    Payload::new(map)
+    Payload::of(&ModelSelected {
+        tag,
+        endpoint: endpoint.to_owned(),
+        model: entry.id.clone(),
+        context_tokens: entry.context_tokens,
+        max_output_tokens: entry.max_output_tokens.map(kernel::Ceiling::get),
+        ceiling_from: ceiling_from.map(|rung| rung.as_str().to_owned()),
+        input: entry.input,
+        input_price: entry.input_price,
+        output_price: entry.output_price,
+        cache_read_price: entry.cache_read_price,
+        cache_write_price: entry.cache_write_price,
+    })
 }

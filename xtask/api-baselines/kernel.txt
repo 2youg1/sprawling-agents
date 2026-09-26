@@ -488,6 +488,7 @@ pub enum kernel::event::record::AdviserAnswer
 pub enum kernel::event::record::AdviserAsk
 pub enum kernel::event::record::AdviserFailure
 pub enum kernel::event::record::CheckpointCommitted
+pub enum kernel::event::record::InputKinds
 pub enum kernel::event::record::PartChange
 pub enum kernel::event::record::ShapeChanged
 pub enum kernel::event::record::SkipReason
@@ -842,6 +843,7 @@ pub fn kernel::event::Who::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fm
 pub fn kernel::event::Who::parse(&str) -> core::result::Result<kernel::event::Who, kernel::AxError>
 pub fn kernel::event::Who::resident(kernel::address::Address) -> core::result::Result<kernel::event::Who, kernel::AxError>
 pub fn kernel::event::Who::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+pub fn kernel::event::record::ModelSelected::ceiling(&self) -> core::option::Option<kernel::Ceiling>
 pub fn kernel::event::record::PromptSource::producer(&self) -> kernel::event::record::SummaryProducer
 pub fn kernel::event::record::RunFrozen::of(&kernel::completion::Completion) -> kernel::event::record::RunFrozen
 pub fn kernel::event::record::ToolCalled::subject_of(&kernel::Payload) -> core::option::Option<alloc::string::String>
@@ -1956,10 +1958,13 @@ pub kernel::event::record::EmbeddingCalled::inputs: u64
 pub kernel::event::record::EmbeddingCalled::model: alloc::string::String
 pub kernel::event::record::EmbeddingCalled::prompt_tokens: core::option::Option<kernel::budget::Tokens>
 pub kernel::event::record::EmbeddingCalled::vectors: u64
+pub kernel::event::record::EndpointLost::name: alloc::string::String
 pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
 pub kernel::event::record::EvidenceCite::seq: kernel::Seq
 pub kernel::event::record::GovernedDocumentWritten::bytes: usize
 pub kernel::event::record::GovernedDocumentWritten::which: alloc::string::String
+pub kernel::event::record::InputKinds::Text
+pub kernel::event::record::InputKinds::TextImage
 pub kernel::event::record::LogTruncated::dropped_bytes: u64
 pub kernel::event::record::LoginStarted::auth_url: alloc::string::String
 pub kernel::event::record::LoginStarted::provider: alloc::string::String
@@ -1971,6 +1976,17 @@ pub kernel::event::record::ModelReturned::calls: u64
 pub kernel::event::record::ModelReturned::message: kernel::Payload
 pub kernel::event::record::ModelReturned::stop: core::option::Option<kernel::StopReason>
 pub kernel::event::record::ModelReturned::usage: core::option::Option<kernel::ModelUsage>
+pub kernel::event::record::ModelSelected::cache_read_price: kernel::budget::UsdMicros
+pub kernel::event::record::ModelSelected::cache_write_price: kernel::budget::UsdMicros
+pub kernel::event::record::ModelSelected::ceiling_from: core::option::Option<alloc::string::String>
+pub kernel::event::record::ModelSelected::context_tokens: u64
+pub kernel::event::record::ModelSelected::endpoint: alloc::string::String
+pub kernel::event::record::ModelSelected::input: kernel::event::record::InputKinds
+pub kernel::event::record::ModelSelected::input_price: kernel::budget::UsdMicros
+pub kernel::event::record::ModelSelected::max_output_tokens: core::option::Option<u64>
+pub kernel::event::record::ModelSelected::model: alloc::string::String
+pub kernel::event::record::ModelSelected::output_price: kernel::budget::UsdMicros
+pub kernel::event::record::ModelSelected::tag: kernel::ModelTag
 pub kernel::event::record::PartChange::Moved
 pub kernel::event::record::PartChange::Same
 pub kernel::event::record::PromptAssembled::breakpoints: alloc::vec::Vec<alloc::string::String>
@@ -2513,12 +2529,14 @@ pub struct kernel::event::record::CityHalted
 pub struct kernel::event::record::Commit
 pub struct kernel::event::record::CommitAttribution
 pub struct kernel::event::record::EmbeddingCalled
+pub struct kernel::event::record::EndpointLost
 pub struct kernel::event::record::EvidenceCite
 pub struct kernel::event::record::GovernedDocumentWritten
 pub struct kernel::event::record::LogTruncated
 pub struct kernel::event::record::LoginStarted
 pub struct kernel::event::record::ModelCalled
 pub struct kernel::event::record::ModelReturned
+pub struct kernel::event::record::ModelSelected
 pub struct kernel::event::record::PromptAssembled
 pub struct kernel::event::record::PromptSegment
 pub struct kernel::event::record::PromptShapeCompared

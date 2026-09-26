@@ -11,52 +11,29 @@
 //! build cannot encode something it holds, and a read fails when the
 //! history holds something this build cannot name.
 
-use kernel::{AxCode, AxError, Ceiling, DialectKind, ModelTag, Payload, SecretRef, UsdMicros};
+use kernel::event::record::ModelSelected;
+use kernel::{AxCode, AxError, DialectKind, ModelTag, Payload, SecretRef};
 use serde_json::Value;
 
 use super::super::AttachedEndpoint;
 use super::super::book::Choice;
 use super::read_tuning;
 use crate::endpoint::{AuthSpec, ModelFacts};
-use crate::market::{InputKinds, ModelEntry};
+use crate::market::ModelEntry;
 use crate::provider::registry::ConnectionKind;
 
-pub(crate) fn invalid(subject: impl Into<String>) -> AxError {
+fn invalid(subject: impl Into<String>) -> AxError {
     AxError::failure(AxCode::WireMismatch, "read an endpoint record", subject)
         .with_recovery("replay with the build that wrote this record")
 }
 
-pub(crate) fn text(payload: &Payload, key: &str) -> Result<String, AxError> {
+fn text(payload: &Payload, key: &str) -> Result<String, AxError> {
     payload
         .as_map()
         .get(key)
         .and_then(Value::as_str)
         .map(str::to_owned)
         .ok_or_else(|| invalid(format!("{key} is missing or not a string")))
-}
-
-/// A registered ceiling, or `None` when this record states none.
-///
-/// Tolerant in both directions a record can spell absence: a key that is
-/// missing or null, and the zero that a build writing `u64` wrote when
-/// no catalogue row knew the model. Zero read back as a ceiling is a
-/// request the provider answers with nothing, so it reads as unknown.
-pub(crate) fn ceiling(payload: &Payload, key: &str) -> Result<Option<Ceiling>, AxError> {
-    match payload.as_map().get(key) {
-        None | Some(Value::Null) => Ok(None),
-        Some(value) => value
-            .as_u64()
-            .map(Ceiling::new)
-            .ok_or_else(|| invalid(format!("{key} is not a count"))),
-    }
-}
-
-pub(crate) fn count(payload: &Payload, key: &str) -> Result<u64, AxError> {
-    payload
-        .as_map()
-        .get(key)
-        .and_then(Value::as_u64)
-        .ok_or_else(|| invalid(format!("{key} is missing or not a count")))
 }
 
 pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxError> {
@@ -137,38 +114,26 @@ pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxErr
 }
 
 pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxError> {
-    let raw = text(payload, "tag")?;
-    let tag = ModelTag::ALL
-        .into_iter()
-        .find(|candidate| candidate.as_str() == raw)
-        .ok_or_else(|| invalid(format!("{raw} is not a tag this build knows")))?;
-    // Tolerant on purpose: every `model_selected` written before this
-    // key existed replays as text-only rather than as a broken record.
-    let input = match payload.as_map().get("input") {
-        None => InputKinds::default(),
-        Some(value) => {
-            serde_json::from_value(value.clone()).map_err(|err| invalid(format!("input: {err}")))?
-        }
-    };
-    let entry = ModelEntry {
-        id: text(payload, "model")?,
-        context_tokens: count(payload, "context_tokens")?,
-        max_output_tokens: ceiling(payload, "max_output_tokens")?,
-        input,
-        input_price: UsdMicros::new(count(payload, "input_price")?),
-        output_price: UsdMicros::new(count(payload, "output_price")?),
-        cache_read_price: UsdMicros::new(count(payload, "cache_read_price")?),
-        cache_write_price: UsdMicros::new(count(payload, "cache_write_price")?),
-    };
+    let selected: ModelSelected = payload.read()?;
+    let max_output_tokens = selected.ceiling();
     // A record written while this build carried a retreat arm may hold
     // `fallback_endpoint` and `fallback_model`. Nothing ever wrote a
     // value into them and nothing acts on them now, so they are read
     // past in the same way as any other key this book does not own.
     Ok((
-        tag,
+        selected.tag,
         Choice {
-            endpoint: text(payload, "endpoint")?,
-            entry,
+            endpoint: selected.endpoint,
+            entry: ModelEntry {
+                id: selected.model,
+                context_tokens: selected.context_tokens,
+                max_output_tokens,
+                input: selected.input,
+                input_price: selected.input_price,
+                output_price: selected.output_price,
+                cache_read_price: selected.cache_read_price,
+                cache_write_price: selected.cache_write_price,
+            },
         },
     ))
 }

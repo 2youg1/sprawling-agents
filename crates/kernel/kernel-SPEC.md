@@ -439,6 +439,21 @@ pub struct LoginStarted { pub provider: String, pub auth_url: String,
                           pub user_code: Option<String> }           // 只有设备码登录才有；缺席即省略
 pub struct ToolkitLinkOpened { pub toolkit: String }
 
+// record::endpoint：F3 家族里「哪个 model 替哪个 tag 作答」的两行。gateway 的 EndpointBook
+// 只经 Payload::read 读它们；InputKinds 随之归 kernel（gateway::InputKinds 是它的再导出），
+// 因为账本行的值要用 kernel 自己的类型。
+#[serde(rename_all = "snake_case")] #[derive(Default)]
+pub enum InputKinds { #[default] Text, TextImage }
+pub struct ModelSelected { pub tag: ModelTag, pub endpoint: String, pub model: String,
+                           pub context_tokens: u64,
+                           #[serde(default)] pub max_output_tokens: Option<u64>, // 总是写出，缺席写 null
+                           pub ceiling_from: Option<String>,   // person|upstream|preset|policy；缺席即省略
+                           #[serde(default)] pub input: InputKinds, // 旧行没有这个键，读作 Text
+                           pub input_price: UsdMicros, pub output_price: UsdMicros,
+                           pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
+impl ModelSelected { pub fn ceiling(&self) -> Option<Ceiling>; }   // 0 与 null 同读作「未声明」
+pub struct EndpointLost { pub name: String }
+
 pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
                         pub subject: Option<String> }   // 键缺席读作 None
 pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
