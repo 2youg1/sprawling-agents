@@ -41,7 +41,7 @@ worker 的两个读写面 `effect` 与 `plan_view`、以及 worker 与 `views` �
 ## 3 假设与歧义
 
 - `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，`views` 还在 `crates/sprawling/src/views`，所以 citysim（不依赖 `sprawling`）仍驱动不了一次 dispatch。归属由 §7 的表和 §12-9 至 §12-12 定下；还没做的按这个次序：
-  1. 还缺的端口。`revealing`（`RunWorker.reveal`）、`monitor::memory`（`DrivingPool` 的 `read_memory`）与 `monitor::volume`（`RunWorker.read_volume`）已经是交进来的 `fn` 指针；还直接碰 `bin` 的是 `views::prepared` 回答 `NewestRelease` 时调的 `release::answer`（它和 doctor 的答案、vault 一样是 served 的城交给 views 的事实，归 `views::served`）、`workbench::tools` 调的 `browser_tool::for_rules`、`workbench::engine` 读的 `doctor::host` 与 `Presence`，以及 `commanding::machine` 查的 `doctor::REQUIREMENTS` 与 `Platform`。
+  1. 还缺的端口。`revealing`（`RunWorker.reveal`）、`monitor::memory`（`DrivingPool` 的 `read_memory`）与 `monitor::volume`（`RunWorker.read_volume`）已经是交进来的 `fn` 指针；`release`（`Views.registry`）也是；还直接碰 `bin` 的是 `workbench::tools` 调的 `browser_tool::for_rules`、`workbench::engine` 读的 `doctor::host` 与 `Presence`，以及 `commanding::machine` 查的 `doctor::REQUIREMENTS` 与 `Platform`。
   2. `views` 搬进本 crate。它的测试里有一部分造一个 worker（`views/tests.rs` 经 `crate::assembly` 的 fixture，`document`、`listing`、`skills` 的测试调 `init_city`），它们要么随 worker 搬、要么先留在 `sprawling` 经 `views` 的公开面测。
   3. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）；`genesis`、`listening`、`attending`、`chain_watch` 与生产适配器留在装配根（§12-12）。
   4. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。
@@ -84,7 +84,7 @@ ModelFactory｜Connectors｜Clock｜Machine｜Recipe｜Runnable｜accounting thr
 | `serving::door::random_token` | 随 `credentials` 搬进本 crate | OAuth 登录的 verifier 与 state | 它的熵必须不可预测：一个第三方能预测的 verifier 就是一个第三方能完成的登录，所以没有哪个脚本场景可以换掉它，端口在这里只会开一个让它变得可预测的门；它经 `getrandom` 这个安全接口取熵，不启动任何东西 |
 | `revealing` | 经端口：`RunWorker` 的 `reveal` 字段，一个 `fn` 指针（sprawling-SPEC.md 8-60） | `Reveal` 在主机的文件管理器里打开一个地址 | 启动主机的一个程序 |
 | `browser_tool` | 经端口 | 按楼的规则给 run 的浏览器工具 | 启动浏览器，经 BiDi 说话 |
-| `release` | 经端口 | `views` 回答 `Release` 查询 | 向 npm 注册表发请求 |
+| `release` | 经端口：`Views.registry`，一个由 `views::served` 放进来的 `fn` 指针（sprawling-SPEC.md 中 `Views.machine` 旁的那一条） | `views` 回答 `NewestRelease` 查询 | 向 npm 注册表发请求 |
 | `console` | 留在装配根 | — | 只有 `listening` 用它；它是终端，不是 worker |
 | `serving` 的其余部分（`folding`、`output_ring`、`Serving`、`open_vault`） | 留在装配根 | — | 只有 `attending`、`listening` 与 `genesis` 用它们 |
 | `assembly` 的 `listening`、`attending`、`chain_watch`、`genesis`、`models`、`mcp::Residents`、`SystemClock` | 留在装配根 | — | 起线程、绑端口、造城的目录、生产适配器：§12-1 与 §12-12 |
