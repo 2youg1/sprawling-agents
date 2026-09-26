@@ -167,6 +167,7 @@
       case "command":
         return recovery.spelled;
       case "reconnect":
+      case "settings":
         return say(lang, recovery.verb);
     }
   }

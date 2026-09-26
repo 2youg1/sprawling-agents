@@ -24,7 +24,8 @@ import type { AxCode } from "../wire";
 
 export type Recovery =
   | { readonly kind: "command"; readonly spelled: string }
-  | { readonly kind: "reconnect"; readonly verb: Key };
+  | { readonly kind: "reconnect"; readonly verb: Key }
+  | { readonly kind: "settings"; readonly verb: Key };
 
 const NEW: Recovery = { kind: "command", spelled: "/new" };
 const FORK: Recovery = { kind: "command", spelled: "/fork" };
@@ -32,12 +33,20 @@ const STOP: Recovery = { kind: "command", spelled: "/stop" };
 // The word for asking the link to try again lives here rather than at
 // two notice surfaces (`link_retry` in `lang.json`).
 const AGAIN: Recovery = { kind: "reconnect", verb: "link_retry" };
+// Choosing a model happens on the settings page and nowhere else, so
+// the one thing a notice can do about an unchosen model is take the
+// person there.
+const SETTINGS: Recovery = { kind: "settings", verb: "act_go_settings" };
 
 const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
   // The room's model is frozen against this session: leave the room, or
   // branch from the run that already got somewhere (the assignment
   // behind this table).
   E_CONFIG_INVALID: [NEW, FORK],
+  // Nothing is chosen for this kind of model yet: a new room or a
+  // branch would meet the same refusal, and the settings page is where
+  // a provider is attached and a model picked.
+  E_MODEL_UNCHOSEN: [SETTINGS],
   // Something is occupying the place this refusal is about, and the
   // only way past it is to stop what is running there.
   E_BUSY: [STOP],

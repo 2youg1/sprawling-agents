@@ -1245,11 +1245,11 @@ the work: a halted city that laid a job file down would leave a task in a room n
 | 4 | `dispatching::prepare_dispatch` | `halted_by` | `E_GATE_DENIED` | 否 |
 | 5 | 同上 | `city::write_brief` | 存储错 | **写：`JOB.md`** |
 | 6 | 同上 | `cas.put` | 存储错 | 写：CAS 对象（`.sprawling/` 内，内容寻址） |
-| 7 | `workbench::stand_up` | `Building::of`／`city::load`／`load_config`／`Router::select`／`renew_if_stale`／`adapter_for`／`Identity::load` | `E_INVALID_ARGS`／`E_CONFIG_INVALID`／`E_GATE_DENIED` | 否 |
+| 7 | `workbench::stand_up` | `Building::of`／`city::load`／`load_config`／`Router::select`／`renew_if_stale`／`adapter_for`／`Identity::load` | `E_INVALID_ARGS`／`E_CONFIG_INVALID`／`E_MODEL_UNCHOSEN`／`E_GATE_DENIED` | 否 |
 | 8 | 同上 | `run_id_for`／`governance.sent`／worktree 租约 | 存储错 | 写 |
 
 实测（`sprawling call` 打到一座刚 init 的城）：派活到从没立过的楼 `gamma`，得到
-`E_CONFIG_INVALID「no model is chosen for this tag」`——**来自第 7 段的 `Router::select`**——
+`E_MODEL_UNCHOSEN「no model is chosen for this tag」`——**来自第 7 段的 `Router::select`**——
 而磁盘上留下 `<city>/gamma/one/JOB.md`，账本只有 `seq 0 city_initialized`。
 **第 2 段与第 5 段跑在第 7 段之前，这就是全部的病因。** 不是写域逃逸：`Work ".sprawling/evil"`
 得到 `E_INVALID_ARGS` 且一字节未落，保留子树守得住。

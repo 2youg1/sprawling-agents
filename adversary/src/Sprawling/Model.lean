@@ -160,7 +160,7 @@ def refusal (world : World) : Action y → Option Code
     -- smuggled into this code, because the two are different claims: this one
     -- says which refusal a caller gets, that one says what the disk looks like
     -- afterwards.
-    else if !world.attached then some ⟨"E_CONFIG_INVALID"⟩
+    else if !world.attached then some ⟨"E_MODEL_UNCHOSEN"⟩
     else none
   | .stop _ => none
   | .resume _ => none

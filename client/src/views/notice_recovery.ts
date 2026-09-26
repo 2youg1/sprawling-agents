@@ -95,7 +95,7 @@ function composerRoom(view: View, runs: Belief["runs"]): Address | null {
 // a command is labelled by its spelling's own phrase where the table
 // above knows one.
 export function recoveryLabel(recovery: Recovery, lang: Lang): string {
-  if (recovery.kind === "reconnect") {
+  if (recovery.kind !== "command") {
     return say(lang, recovery.verb);
   }
   const key = VERBS[recovery.spelled];
@@ -107,7 +107,7 @@ export function recoveryLabel(recovery: Recovery, lang: Lang): string {
 // on, so it offers its deeds greyed rather than guessing at one (SPEC 7-2: `aria-disabled` keeps the control
 // in the Tab order with its reason readable).
 export function recoveryWhy(u: Ui, recovery: Recovery, about: About): Key | undefined {
-  if (recovery.kind === "reconnect") {
+  if (recovery.kind !== "command") {
     return undefined;
   }
   const target = targetFor(u, about);
@@ -124,6 +124,10 @@ export function recoveryWhy(u: Ui, recovery: Recovery, about: About): Key | unde
 export function recover(u: Ui, recovery: Recovery, about: About): void {
   if (recovery.kind === "reconnect") {
     u.conn.retry();
+    return;
+  }
+  if (recovery.kind === "settings") {
+    u.go({ kind: "setup" });
     return;
   }
   const target = targetFor(u, about);

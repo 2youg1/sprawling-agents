@@ -53,12 +53,18 @@ pub enum AxCode {
     TaintedAction,
     RepairBusy,
     DelegationDepth,
-    // Governance and facilities (13).
+    // Governance and facilities (14).
     ApprovalPending,
     ApprovalDenied,
     CrossBuildingDenied,
     DigestSuspect,
     CredentialMissing,
+    /// No model is chosen for the tag a caller asked for. Apart from
+    /// `ConfigInvalid` because its recovery differs: a new city starts
+    /// here and is sent to the settings page, while `ConfigInvalid`
+    /// also answers a room whose frozen model changed, which a new
+    /// session recovers.
+    ModelUnchosen,
     ConfigInvalid,
     CasCorrupt,
     StorageFatal,
@@ -84,7 +90,7 @@ pub enum AxCode {
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
     /// (from S2 on) `xtask specalign`.
-    pub const ALL: [AxCode; 38] = [
+    pub const ALL: [AxCode; 39] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
         AxCode::ToolUnavailable,
@@ -110,6 +116,7 @@ impl AxCode {
         AxCode::CrossBuildingDenied,
         AxCode::DigestSuspect,
         AxCode::CredentialMissing,
+        AxCode::ModelUnchosen,
         AxCode::ConfigInvalid,
         AxCode::CasCorrupt,
         AxCode::StorageFatal,
@@ -153,6 +160,7 @@ impl AxCode {
             AxCode::CrossBuildingDenied => "E_CROSS_BUILDING_DENIED",
             AxCode::DigestSuspect => "E_DIGEST_SUSPECT",
             AxCode::CredentialMissing => "E_CREDENTIAL_MISSING",
+            AxCode::ModelUnchosen => "E_MODEL_UNCHOSEN",
             AxCode::ConfigInvalid => "E_CONFIG_INVALID",
             AxCode::CasCorrupt => "E_CAS_CORRUPT",
             AxCode::StorageFatal => "E_STORAGE_FATAL",
@@ -216,6 +224,7 @@ impl AxCode {
             | AxCode::RepairBusy
             | AxCode::DigestSuspect
             | AxCode::CredentialMissing
+            | AxCode::ModelUnchosen
             | AxCode::WorktreeBusy
             | AxCode::BrowserUnavailable
             | AxCode::ToolOutcomeUnknown
@@ -319,9 +328,9 @@ mod tests {
         // The length is the close of the table, so it is stated once:
         // a code added without a spelling, or two codes sharing one,
         // fails here rather than at a caller.
-        assert_eq!(AxCode::ALL.len(), 38);
+        assert_eq!(AxCode::ALL.len(), 39);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
-        assert_eq!(spellings.len(), 38);
+        assert_eq!(spellings.len(), 39);
         for s in &spellings {
             assert!(s.starts_with("E_"));
         }

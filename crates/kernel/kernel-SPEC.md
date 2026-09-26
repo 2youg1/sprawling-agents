@@ -156,7 +156,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 
 ```rust
                       // C8：对扩展开放
-pub enum AxCode { PathNotFound, /* …38 variant，serde 呈现名见下表 */ }
+pub enum AxCode { PathNotFound, /* …39 variant，serde 呈现名见下表 */ }
 
 pub struct GateRefusal {                // three-part refusal；三段必填
     rule: String, violation: String, alternative: String,
@@ -201,7 +201,7 @@ impl ErrorDraft {
 
 「gate 码走 `refusal`」由构造纪律＋单测保证；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
-**AxCode 38 全集与 carrier 对应（specalign 数据面）**
+**AxCode 39 全集与 carrier 对应（specalign 数据面）**
 
 > 协作组由六降为五——`E_SIGNAL_UNKNOWN` 已定义掉（三码之一；理由与实测见 `collab-SPEC.md` §8-1）。删除时全仓只有本文件提到它，零生产者。剩下两码（`E_WORKTREE_BUSY`／`E_DIGEST_SUSPECT`）已在各自 SPEC 里答过「能否定义掉」，答案是能保留——它们各自有一个真实的运行期情境。
 
@@ -233,6 +233,7 @@ impl ErrorDraft {
 | 治理与设施 | `E_CROSS_BUILDING_DENIED` | `gate_denied` |
 | 治理与设施 | `E_DIGEST_SUSPECT` | `tool_result` |
 | 治理与设施 | `E_CREDENTIAL_MISSING` | `tool_result` |
+| 治理与设施 | `E_MODEL_UNCHOSEN` | `tool_result` |
 | 治理与设施 | `E_CONFIG_INVALID` | 装载期（无 carrier） |
 | 治理与设施 | `E_CAS_CORRUPT` | 装载期（无 carrier） |
 | 治理与设施 | `E_STORAGE_FATAL` | 装载期（无 carrier） |
@@ -1555,6 +1556,7 @@ S2 激活的码（逐码答「能否定义掉」）：
 - `E_EVIDENCE_MISSING`：部分定义掉——无证据 Done 已不可构造（类型半）；构造时拒绝仍需此码（运行时半，A6 双守）。
 - `E_SECRET_EGRESS`／`E_DISCARD_IRREVERSIBLE`：不可——两门存在的理由即这两类越界可发生；类型已把「无 Restoration 的 Discard 值」定义掉，Unplanned 请求（exec 预判路）是剩余不可消部分。
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
+- `E_MODEL_UNCHOSEN`（这一类模型还没有人选定）：不可——城在没接供应方、没选模型时也要能开，所以「这一类没有模型」是人可达的状态。它不并进 `E_CONFIG_INVALID`：那一码还答「会话中途换了模型」「端点已不在」等情形，出路各不相同（去设置 对 开新对话），而客户端只能按码给出路。生产者只有 `gateway::router` 的 `EndpointBook::select`；账本此刻可写，所以 carrier 是 `tool_result`，不进装载期白名单。
 
 其余未激活码随其生产模块的 SPEC 章逐码作答（S3+）。
 

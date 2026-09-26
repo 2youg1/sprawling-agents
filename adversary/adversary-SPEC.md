@@ -35,7 +35,7 @@
 4. U5 渲染出的 Rust 源码与 `crates/sprawling/tests/from_adversary.rs` 逐字节相同。渲染器是那个文件的唯一权威：文件里的三条测试、两个辅助函数与每一行注释都从 `Regression.lean` 出，而 URL 的那五种拼法、中转站的名字与那个模型 id 从 `Provider.lean` 出。
 5. **咬得动的证据**：把 `Model.lean` 的 `refusal` 里 `work` 那条停摆守卫摘掉后，`a halted city takes no work until it is released` 必须失败。一个永远为真的性质与没有性质等价。
 
-   **已演示。** 摘掉该守卫后该性质报错，收缩 3 次得到两步反例 `Stop City ; Work acme one`，并指出 `refused with Code "E_GATE_DENIED" where Code "E_CONFIG_INVALID" was owed`；恢复后转绿。它咬得动的是**守序**，而不只是「停摆时派活会失败」。这一条同时是对 §13 那套自备机器的验收：生成器、收缩器、极性推导与后置条件四件必须同时工作，才会得到这个最小反例。
+   **已演示。** 摘掉该守卫后该性质报错，收缩 3 次得到两步反例 `Stop City ; Work acme one`，并指出 `refused with Code "E_GATE_DENIED" where Code "E_MODEL_UNCHOSEN" was owed`；恢复后转绿。它咬得动的是**守序**，而不只是「停摆时派活会失败」。这一条同时是对 §13 那套自备机器的验收：生成器、收缩器、极性推导与后置条件四件必须同时工作，才会得到这个最小反例。
 
 ## 3 假设与歧义
 
@@ -67,13 +67,13 @@ Rust 侧的验收测试全部是**具体轨迹**：`crates/sprawling/tests/assem
 
 ### 第二个发现：一次被拒的派活写进了城里
 
-随机轨迹在早期样本上失败，收缩后得到两步：`Raise "acme"`／`Work "gamma"`（一个从没立过的地址）／`Look`——`Look` 看见 `["acme","gamma"]`，而只有 `acme` 被立过。追下去是同一条缝的两个症状：派活到一个没立过的楼答 `E_CONFIG_INVALID`，而磁盘上留下了 `城根/gamma/one/JOB.md`，账本里一条都没有。
+随机轨迹在早期样本上失败，收缩后得到两步：`Raise "acme"`／`Work "gamma"`（一个从没立过的地址）／`Look`——`Look` 看见 `["acme","gamma"]`，而只有 `acme` 被立过。追下去是同一条缝的两个症状：派活到一个没立过的楼答 `E_MODEL_UNCHOSEN`，而磁盘上留下了 `城根/gamma/one/JOB.md`，账本里一条都没有。
 
 **诊断**：`assembly/dispatching.rs` 的 `dispatch_in` 顺序是「判停摆 → 写 JOB.md → 落 CAS → 解析模型 tag」。它开头那句注释把该守的规矩写得一字不差——*"Nothing is written before the city agrees to take the work"*——**停摆那道门守住了它，配置那道门在写之后才判**。这与 `ARCHITECTURE.md` §5 第 4 条（*every effect becomes an event first*）直接冲突。
 
 **边界已量过，不夸大**：保留子树是守住的。`Work ".sprawling/evil"` 得到 `E_INVALID_ARGS` 且一个字节都没落地，所以这不是写域逃逸，而是「判定晚于副作用」。
 
-**已修。** 向没立过的 `gamma` 派活，城答 `E_CONFIG_INVALID`，城根下仍然只有 `City.md`。`a refusal costs nothing` 那一组两条随之转绿并留着——它们此后守的是那次修复确立的**判定先于副作用**这个次序，而不是当时那一行代码。
+**已修。** 向没立过的 `gamma` 派活，城答 `E_MODEL_UNCHOSEN`，城根下仍然只有 `City.md`。`a refusal costs nothing` 那一组两条随之转绿并留着——它们此后守的是那次修复确立的**判定先于副作用**这个次序，而不是当时那一行代码。
 
 ### 第三个发现：一把每条命令都必须带、而没有人读的钥匙
 
@@ -329,19 +329,19 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 | `raise` 一个已被占的地址 | 一定被拒，且 `E_INVALID_ARGS` |
 | `raise` 一个含 `.sprawling` 段的地址 | 一定被拒，且 `E_INVALID_ARGS` |
 | `work` 而城或该楼停摆 | 一定被拒，且 `E_GATE_DENIED` |
-| `work` 而未停摆且无 provider | 一定被拒，且 `E_CONFIG_INVALID` |
+| `work` 而未停摆且无 provider | 一定被拒，且 `E_MODEL_UNCHOSEN` |
 | `batch`（一条拼得出、执行不了的帧） | 一定被拒，且 `E_WIRE_MISMATCH`，且 `recovery` 非空 |
 | `look` | 答里的楼集合恰是模型记的那一套 |
 | 每一次拒绝 | `recovery` 非空——三段式承诺的第三段 |
 
-**三条守序（guard order）被显式钉住**，因为它们是用户看得见的差别：停摆压过配置（`E_GATE_DENIED` 而不是 `E_CONFIG_INVALID`），地址良构压过占用，以及——**对派活而言**——停摆压过地址良构。一个把前两条调换了的实现会在城停摆时叫人去挂 provider——恢复建议指向一件与真实原因无关的事。
+**三条守序（guard order）被显式钉住**，因为它们是用户看得见的差别：停摆压过配置（`E_GATE_DENIED` 而不是 `E_MODEL_UNCHOSEN`），地址良构压过占用，以及——**对派活而言**——停摆压过地址良构。一个把前两条调换了的实现会在城停摆时叫人去挂 provider——恢复建议指向一件与真实原因无关的事。
 
 第三条是**量出来的，不是想出来的**，而且它纠正的是模型而不是产品。四次直接测量说明产品是自洽的：
 
 | 条件 | 码 |
 |---|---|
 | 派活，未停摆，保留地址 | `E_INVALID_ARGS` |
-| 派活，未停摆，普通地址 | `E_CONFIG_INVALID` |
+| 派活，未停摆，普通地址 | `E_MODEL_UNCHOSEN` |
 | 派活，已停摆，保留地址 | `E_GATE_DENIED` |
 | 立楼，已停摆，保留地址 | `E_INVALID_ARGS` |
 

@@ -107,6 +107,7 @@ private def variant : Code → String
   | ⟨"E_INVALID_ARGS"⟩ => "InvalidArgs"
   | ⟨"E_GATE_DENIED"⟩ => "GateDenied"
   | ⟨"E_CONFIG_INVALID"⟩ => "ConfigInvalid"
+  | ⟨"E_MODEL_UNCHOSEN"⟩ => "ModelUnchosen"
   | ⟨"E_WIRE_MISMATCH"⟩ => "WireMismatch"
   | ⟨other⟩ => s!"UnknownToTheRenderer_{other}"
 

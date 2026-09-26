@@ -98,7 +98,7 @@ fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
 /// see that no record in the one history mentions.
 ///
 /// The code is asserted beside the disk because the two are separate
-/// promises. The caller is owed `E_CONFIG_INVALID` here - nothing is
+/// promises. The caller is owed `E_MODEL_UNCHOSEN` here - nothing is
 /// attached, so no tag names a model - and moving the judgement in
 /// front of the write must not change which refusal that is.
 #[test]
@@ -125,7 +125,7 @@ fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
 
     assert_eq!(
         *refused.code(),
-        AxCode::ConfigInvalid,
+        AxCode::ModelUnchosen,
         "a city with nothing attached refuses a dispatch for having no model: {refused}"
     );
     assert!(
