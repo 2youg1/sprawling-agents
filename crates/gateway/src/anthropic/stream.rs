@@ -200,6 +200,21 @@ mod tests {
         assert!(!refused.recovery().is_empty());
     }
 
+    /// Anthropic reports an overload that starts mid-answer as an
+    /// `error` frame on a stream that already answered 200.
+    #[test]
+    fn an_error_frame_mid_stream_is_the_failure_it_reports() {
+        let frames = vec![
+            json!({"type": "message_start", "message": {"usage": {"input_tokens": 4}}}),
+            json!({"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}),
+        ];
+        let refused = settled(&frames).expect_err("an error frame is not an answer");
+        assert_eq!(
+            (refused.subject(), serde_json::to_value(&refused).unwrap()["retry"].clone()),
+            ("the stream reported overloaded_error", json!("yes"))
+        );
+    }
+
     /// Half a tool call is not a tool call with fewer arguments: an
     /// `exec {}` assembled from a cut stream passes the gates and runs.
     #[test]
