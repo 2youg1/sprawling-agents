@@ -294,7 +294,10 @@ impl RunWorker {
             // before it goes, so the successor's answers have something
             // to be compared with. Nobody discovers decay otherwise
             // until the third succession.
-            let before = self.probe_before(adapter.as_deref_mut(), &frozen, &who)?;
+            let before = self.probe_before(adapter.as_mut(), &frozen, &who)?;
+            if let Some(door) = adapter {
+                self.warm.keep(addr.as_str().to_owned(), door);
+            }
             let plan = frozen.plan();
             // **The obligation moves with the work.** A successor is the
             // same piece of work carrying on, so whoever was owed the
@@ -320,6 +323,11 @@ impl RunWorker {
                 onward,
             )?;
             return Ok(Landed::Elsewhere);
+        }
+        // What this run sent stays warm for the room's next run
+        // (sprawling-SPEC 8-93).
+        if let Some(door) = adapter {
+            self.warm.keep(addr.as_str().to_owned(), door);
         }
         self.discharge(
             owing,

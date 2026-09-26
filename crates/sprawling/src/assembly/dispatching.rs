@@ -5,7 +5,7 @@
 
 //! Who gets woken, and where the work lands.
 
-use kernel::{Address, Locator, Model, RunId};
+use kernel::{Address, Locator, RunId};
 
 /// A resident who was signalled and has no run open.
 ///
@@ -121,7 +121,7 @@ pub(super) struct Agreed {
     /// The name of the endpoint the model is reached through, which is
     /// the provider a model's note is filed under (sprawling-SPEC 8-85).
     pub(super) provider: String,
-    pub(super) adapter: Box<dyn Model + Send>,
+    pub(super) adapter: super::keeping_warm::Door,
     /// How many times this run may make a failed call again, as the
     /// person set it on the endpoint that was chosen. Read here, where
     /// the endpoint is chosen, because nothing downstream sees the book.

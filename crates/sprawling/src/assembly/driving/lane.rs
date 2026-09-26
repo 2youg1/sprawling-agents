@@ -354,7 +354,7 @@ pub(crate) fn drive_run<L: Ledger>(
             wait: &mut wait,
             deltas: watching.is_some().then_some(&mut watched),
         };
-        drive(plan, ledger, adapter.as_mut(), &mut hooks, &handoff)
+        drive(plan, ledger, &mut adapter, &mut hooks, &handoff)
     };
     Ok(Driven {
         outcome: driven,

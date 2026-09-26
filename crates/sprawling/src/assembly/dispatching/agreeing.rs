@@ -153,6 +153,14 @@ impl RunWorker {
                 .map(|(name, value)| (name, value.spelled()))
                 .collect(),
         )?;
+        // Every request the run sends goes through the keep-warm door,
+        // so a landed run can have its prefix renewed (sprawling-SPEC
+        // 8-93); under the default setting the door only forwards.
+        let adapter = crate::assembly::keeping_warm::Door::new(
+            adapter,
+            city::keep_warm(&self.city_root, building.addr())?,
+            crate::assembly::now_ms,
+        );
         let retries = chosen.endpoint.tuning.request_max_retries;
         Ok(Agreed {
             building,

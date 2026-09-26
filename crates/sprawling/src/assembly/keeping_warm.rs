@@ -43,12 +43,27 @@ impl Kept {
     }
 
     /// Sends every renewal due by `now_ms`, then lets go of the doors
-    /// that owe nothing more.
+    /// that owe nothing more and of the doors whose renewal failed: a
+    /// provider that refused a renewal is not asked again every wake.
     ///
     /// # Errors
     /// The first door's failure; the doors after it still renew.
-    pub(in crate::assembly) fn renew_due(&mut self, _now_ms: u64) -> Result<(), AxError> {
-        Ok(())
+    pub(in crate::assembly) fn renew_due(&mut self, now_ms: u64) -> Result<(), AxError> {
+        let mut first_failure = None;
+        self.doors.retain(|_, door| {
+            let renewed = match door.next_due() {
+                Some(due) if due <= now_ms => door.renew_due(now_ms).map(drop),
+                Some(_) | None => Ok(()),
+            };
+            match renewed {
+                Ok(()) => door.next_due().is_some(),
+                Err(err) => {
+                    first_failure.get_or_insert(err);
+                    false
+                }
+            }
+        });
+        first_failure.map_or(Ok(()), Err)
     }
 }
 
@@ -73,7 +88,12 @@ impl RunWorker {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "test")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test"
+)]
 mod tests {
     use super::*;
     use kernel::consts_external::PROMPT_CACHE_TTL_SECS;
@@ -81,8 +101,8 @@ mod tests {
         B3Hash, BuildingPolicy, Ceiling, ChatRequest, ContentBlock, KeepWarm, Model, ModelRequest,
         ModelReturn,
     };
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     const USED_AT: u64 = 1_000_000;
     const TTL_MS: u64 = PROMPT_CACHE_TTL_SECS * 1000;

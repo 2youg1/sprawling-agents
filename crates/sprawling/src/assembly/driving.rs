@@ -36,7 +36,7 @@ pub(crate) struct Driving {
     /// The model this run calls, already chosen and already credentialed.
     /// Owned, and handed back inside [`Driven`]: who holds the adapter is
     /// a fact the types state, not a loan the reader has to track.
-    pub(crate) adapter: Box<dyn kernel::Model + Send>,
+    pub(crate) adapter: super::keeping_warm::Door,
     /// What routes a call the model makes. Spent by the drive: nothing
     /// after it asks the bench anything, so it is dropped where it is
     /// used rather than carried home.
@@ -112,7 +112,7 @@ pub(crate) struct Driven {
     pub(crate) outcome: Result<runtime::Run<runtime::run::Frozen>, AxError>,
     /// The adapter, home from the drive. The caller takes it apart back
     /// into the site it came from: a `Site` gains and loses no field.
-    pub(crate) adapter: Box<dyn kernel::Model + Send>,
+    pub(crate) adapter: super::keeping_warm::Door,
     /// The commits each wave fenced against; the first is what the sweep
     /// restores a discarded file from.
     pub(crate) fenced: Vec<String>,

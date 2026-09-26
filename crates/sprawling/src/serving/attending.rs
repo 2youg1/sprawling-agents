@@ -215,8 +215,20 @@ pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
                     }
                     Err(_) => 0,
                 };
+                // A kept keep-warm door that falls due before the next
+                // schedule read wakes the loop for itself
+                // (sprawling-SPEC.md 8-93); none is kept by default.
+                let until_warm = match (worker.warm_due(), now_ms()) {
+                    (Some(_), Ok(now)) => {
+                        worker.renew_warm(now);
+                        worker
+                            .warm_due()
+                            .map_or(u64::MAX, |due| due.saturating_sub(now.value()))
+                    }
+                    (None, _) | (Some(_), Err(_)) => u64::MAX,
+                };
                 Patience::For(Duration::from_millis(
-                    SCHEDULE_TICK_MS.saturating_sub(since),
+                    SCHEDULE_TICK_MS.saturating_sub(since).min(until_warm),
                 ))
             }
             DeskWait::Close => {
