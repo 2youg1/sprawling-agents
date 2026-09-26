@@ -6,10 +6,15 @@
 //! How a city is stood up and served, as opposed to how one piece of
 //! work is run.
 //!
-//! Three things happen here and nothing else: the one writer thread is
-//! started with the ledger inside it (`serving::attending`), the socket
-//! is handed the sinks it may reach the city through, and the whole of
-//! it is stopped when the person stops it.
+//! Three things happen here and nothing else: the port is taken and the
+//! one writer thread is started with the ledger inside it
+//! (`serving::attending`), in that order ([`listen`]); the socket is
+//! handed the sinks it may reach the city through; and the whole of it
+//! is stopped when the person stops it ([`Listening::serve`]).
+//!
+//! The order is sprawling-SPEC.md 8-83, and this file is its one
+//! definition: a port another process holds is refused before a writer
+//! exists, so a refused serve leaves the Ledger exactly as it found it.
 
 use std::sync::Arc;
 
@@ -69,18 +74,35 @@ async fn closed_by_hand() -> std::io::Result<()> {
     tokio::signal::ctrl_c().await
 }
 
-/// Serves one city until the person stops it, and returns when the last
-/// worker has finished what it was doing.
+/// A city that has taken its port and opened its one writer, and does
+/// not answer yet.
+///
+/// Holding one is the proof that every refusal a serve can make has
+/// been made: the caller prints "running" only once it has this value.
+/// Dropped without [`Listening::serve`], the writer thread waits until
+/// the process ends and writes no handoff.
+#[must_use = "a listening city answers nobody until it is served"]
+pub struct Listening {
+    bound: channels::Bound,
+    config: channels::ServeConfig,
+    desk: Arc<CommandDesk>,
+    answering: crate::console::Answering,
+    worker: std::thread::JoinHandle<()>,
+    console: Option<crate::console::Terminal>,
+}
+
+/// Takes the city's port, then opens its one writer.
 ///
 /// The worker runs on its own thread and the socket never touches the
 /// Ledger: a refreshed page cannot kill work, and a command is accepted
 /// in one place and executed in another.
 ///
 /// # Errors
-/// Refuses before serving when the city cannot be opened — an unreadable
-/// chain, a store that will not open — and propagates whatever binding
-/// the address reports.
-pub async fn serve(serving: Serving) -> Result<(), AxError> {
+/// Refuses before a writer exists when the address may not or cannot be
+/// bound (`E_CONFIG_INVALID`); refuses before anything is written when
+/// another process holds the city (`E_LEDGER_HELD`) or the city cannot
+/// be opened - an unreadable chain, a store that will not open.
+pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let Serving {
         city_root,
         addr,
@@ -93,7 +115,13 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
         console,
     } = serving;
     let city_root = city_root.as_path();
-    let token = token.as_deref();
+    let token_digest = match token.as_deref() {
+        Some(raw) => Some(channels::PairingToken::from_configured(raw)?.digest()),
+        None => None,
+    };
+    // The port first: a serve refused here has opened nothing and
+    // written nothing.
+    let bound = channels::bind(addr, token_digest).await?;
     let cas_root = kernel::layout::CityLayout::new(city_root).cas();
     std::fs::create_dir_all(&cas_root).map_err(|source| {
         AxError::failure(
@@ -103,11 +131,6 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
         )
         .with_recovery("check the city directory is writable")
     })?;
-
-    let token_digest = match token {
-        Some(raw) => Some(channels::PairingToken::from_configured(raw)?.digest()),
-        None => None,
-    };
 
     // The event fan-out, and the one writer that feeds it. The worker
     // owns the ledger, so a city has a single writer no matter how many
@@ -185,8 +208,6 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
     let audio_views = Arc::clone(&views);
     let audio_vault = city_vault;
     let config = channels::ServeConfig {
-        addr,
-        token_digest,
         client: Arc::new(client),
         commands: Arc::new(
             move |command: channels::WireCommand, reply: channels::Reply| {
@@ -215,46 +236,73 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
         acp: Arc::new(move |body, pairing| acp_dispatch(&acp_desk, body, pairing)),
         transcribe_sink: hearing(audio_views, audio_vault),
     };
-    // The terminal this city is running in, if it was asked for. It gets
-    // the same desk the socket posts to and the same event stream the
-    // browser reads, so nothing here is a second control surface - it is
-    // the first one, reached from the keyboard that started the city.
-    if let Some(terminal) = console {
-        let console_desk = Arc::clone(&desk);
-        let watching = config.events.subscribe();
-        // The same answering function the socket was given, not a second
-        // one built beside it: a count this terminal prints and a count
-        // a browser draws are one call, so they cannot disagree.
-        crate::console::start(terminal, console_desk, Arc::clone(&answering), watching);
-    }
-    // Ctrl-C used to be a process death: `sprawling resume` recovered
-    // it, and a stop somebody chose and a stop that was a crash left the
-    // same silence in the record. The listener stops accepting first,
-    // then the worker is told - it reads that where it reads its queue,
-    // so whatever command is running finishes and the handoff is the
-    // last line rather than a line in the middle of one.
-    let served = tokio::select! {
-        result = channels::serve(config) => result,
-        signal = closed_by_hand() => {
-            // A signal handler that cannot be installed is worth saying
-            // out loud: the city keeps serving, and the person now knows
-            // that Ctrl-C will be the hard stop it always was.
-            signal.map_err(|source| {
-                AxError::failure(
-                    AxCode::StorageFatal,
-                    "listen for an orderly close",
-                    source.to_string(),
-                )
-                .with_recovery("stop the city from the console instead; /quit closes it")
-            })
+    Ok(Listening {
+        bound,
+        config,
+        desk,
+        answering,
+        worker: worker_thread,
+        console,
+    })
+}
+
+impl Listening {
+    /// Answers until the person stops the city, and returns once the
+    /// writer thread has written its handoff and ended.
+    ///
+    /// # Errors
+    /// Propagates the accept failures the listener reports, and a
+    /// signal handler that cannot be installed.
+    pub async fn serve(self) -> Result<(), AxError> {
+        let Listening {
+            bound,
+            config,
+            desk,
+            answering,
+            worker,
+            console,
+        } = self;
+        // The terminal this city is running in, if it was asked for. It gets
+        // the same desk the socket posts to and the same event stream the
+        // browser reads, so nothing here is a second control surface - it is
+        // the first one, reached from the keyboard that started the city.
+        if let Some(terminal) = console {
+            let console_desk = Arc::clone(&desk);
+            let watching = config.events.subscribe();
+            // The same answering function the socket was given, not a second
+            // one built beside it: a count this terminal prints and a count
+            // a browser draws are one call, so they cannot disagree.
+            crate::console::start(terminal, console_desk, Arc::clone(&answering), watching);
         }
-    };
-    desk.close();
-    // Joined rather than left to the process exit: the handoff is
-    // written by that thread, and a main that returned first would end
-    // the process before the line it exists to write.
-    if let Err(panicked) = worker_thread.join() {
-        eprintln!("the run worker ended abnormally: {panicked:?}");
+        // Ctrl-C used to be a process death: `sprawling resume` recovered
+        // it, and a stop somebody chose and a stop that was a crash left the
+        // same silence in the record. The listener stops accepting first,
+        // then the worker is told - it reads that where it reads its queue,
+        // so whatever command is running finishes and the handoff is the
+        // last line rather than a line in the middle of one.
+        let served = tokio::select! {
+            result = channels::serve(bound, config) => result,
+            signal = closed_by_hand() => {
+                // A signal handler that cannot be installed is worth saying
+                // out loud: the city keeps serving, and the person now knows
+                // that Ctrl-C will be the hard stop it always was.
+                signal.map_err(|source| {
+                    AxError::failure(
+                        AxCode::StorageFatal,
+                        "listen for an orderly close",
+                        source.to_string(),
+                    )
+                    .with_recovery("stop the city from the console instead; /quit closes it")
+                })
+            }
+        };
+        desk.close();
+        // Joined rather than left to the process exit: the handoff is
+        // written by that thread, and a main that returned first would end
+        // the process before the line it exists to write.
+        if let Err(panicked) = worker.join() {
+            eprintln!("the run worker ended abnormally: {panicked:?}");
+        }
+        served
     }
-    served
 }

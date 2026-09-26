@@ -284,10 +284,10 @@ pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
 pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
 pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
-pub const kernel::AxCode::ALL: [kernel::AxCode; 37]
-pub const kernel::AxCode::ALL: [kernel::AxCode; 37]
-pub const kernel::DOORS: [kernel::gate::DoorId; 9]
+pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
+pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
+pub const kernel::DOORS: [kernel::gate::DoorId; 9]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
@@ -1164,6 +1164,7 @@ pub kernel::AxCode::EvidenceMissing
 pub kernel::AxCode::GateDenied
 pub kernel::AxCode::GoalConflict
 pub kernel::AxCode::InvalidArgs
+pub kernel::AxCode::LedgerHeld
 pub kernel::AxCode::LocatorInvalid
 pub kernel::AxCode::LogVersionUnsupported
 pub kernel::AxCode::LoopSuspected
@@ -1815,6 +1816,7 @@ pub kernel::error::AxCode::EvidenceMissing
 pub kernel::error::AxCode::GateDenied
 pub kernel::error::AxCode::GoalConflict
 pub kernel::error::AxCode::InvalidArgs
+pub kernel::error::AxCode::LedgerHeld
 pub kernel::error::AxCode::LocatorInvalid
 pub kernel::error::AxCode::LogVersionUnsupported
 pub kernel::error::AxCode::LoopSuspected

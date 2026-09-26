@@ -17,13 +17,23 @@ use crate::vfs::Vfs;
 
 use super::ledger::{
     JsonlLedger, OpenReport, PriorSegment, SEGMENT_ROLL_BYTES, TailBoundary, TailTruncation,
-    complete_lines, is_segment, segment_file_name,
+    WriterLock, complete_lines, is_segment, segment_file_name,
 };
 
 impl JsonlLedger {
-    /// Production entrance: std filesystem underneath.
+    /// Production entrance: std filesystem underneath, and the ledger
+    /// directory's writer lock, taken before anything is read or
+    /// repaired and held for as long as the returned ledger lives.
+    ///
+    /// # Errors
+    /// `LedgerHeld` when another writer holds this ledger, in this
+    /// process or another; otherwise whatever reading and repairing the
+    /// segments reports.
     pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), MemoryError> {
-        JsonlLedger::open_with(Box::new(RealFs::new()), dir, now)
+        let lock = WriterLock::take(dir)?;
+        let (mut ledger, report) = JsonlLedger::open_with(Box::new(RealFs::new()), dir, now)?;
+        ledger.lock = Some(lock);
+        Ok((ledger, report))
     }
 
     /// The `fault` entrance: the same ledger, over the deterministic
@@ -77,6 +87,7 @@ impl JsonlLedger {
             // directly has no buildings, and files nothing.
             sessions: crate::sessions::Sessions::for_ledger(dir),
             observer: None,
+            lock: None,
         };
 
         let Some(last) = segments.last().cloned() else {
