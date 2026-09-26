@@ -100,8 +100,29 @@ fn a_refresh_counts_the_items_the_machine_it_was_handed_answered() {
 struct Recording(Arc<Mutex<Vec<(String, String)>>>);
 
 impl accounting::Machine for Recording {
+    /// What it installed is present afterwards, so the install ends
+    /// with the item found rather than with the refusal a package
+    /// manager that left it unfindable earns.
     fn report(&self) -> channels::DoctorAnswer {
-        OneItem.report()
+        let mut answer = OneItem.report();
+        answer.items.extend(
+            self.0
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(item, _)| channels::DoctorItem {
+                    name: item.clone(),
+                    tier: channels::DoctorTier::Use,
+                    need: channels::DoctorNeed::Optional,
+                    homepage: None,
+                    state: channels::DoctorState::Present {
+                        at: format!("/bin/{item}"),
+                        version: channels::DoctorVersion::Silent,
+                    },
+                    install: channels::DoctorInstall::UnknownPlatform,
+                }),
+        );
+        answer
     }
 
     fn install(&self, item: &str, runnable: &accounting::Runnable<'_>) -> Result<(), AxError> {
