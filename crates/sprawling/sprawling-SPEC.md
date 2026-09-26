@@ -2574,7 +2574,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 **两道保险各管一个对手，理由写在各自的位置**：这里的闸门管**同一个进程里**的两条 lane；`memory::checkpoint::scan::write_index` 的等待管**另一个 sprawling 进程**压在同一座城上，那是任何互斥量都看不见的对手。把两者合成一个机制会让其中一侧假装看见了它看不见的东西。
 
-### 8-46-9 一个房间一个队列：`bin::assembly::rooms`（B-28 ＋ B-29）
+### 8-46-9 一个房间一个队列：`bin::assembly::rooms`
 
 形状：**深模块**（ARCH §9 第 1 种）。文件 `crates/sprawling/src/assembly/rooms.rs`。
 
@@ -2627,7 +2627,7 @@ impl RoomQueues {
 于是一把中毒的 backlog 锁连房间的信一起吞掉。此后两次归还都先做完，再按顺序抛出第一个失败——
 归还路径上没有提前返回。
 
-### 8-46-10 服务态是一个值：`Serving`（G-08）
+### 8-46-10 服务态是一个值：`Serving`
 
 `RunWorker` 从前有三个各自 `Some` 的 `Option`——`interrupts`／`watching`／`machine`——三个 setter
 （`watch`／`examine`／`attach_interrupts`）由 `assembly::attending` 在同一口气里各调一次，文档各自写着
@@ -2646,7 +2646,7 @@ impl RunWorker { pub(crate) fn serve(&mut self, serving: Serving); }
 一个 `Option<Serving>`，一个注入点，漏一个即编译错。`assembly::attending` 的三次调用合为一次；
 测试要只听中断时经 `fixture::only_interrupts` 明写它不听什么，而不是另开一扇门。
 
-### 8-46-11 排程窗口逐条走完，撤销靠反向命令（B-50 ＋ 4.8）
+### 8-46-11 排程窗口逐条走完，撤销靠反向命令
 
 `tick` 从前先把 `last_tick` 推到 `now` 再逐条派活，`?` 在第 k 条上返回时第 k+1..n 条到期作业**既没跑、没入账、
 也不会回来**：一栋楼地址写错就能让同一分钟里其它所有定时活消失。此后每条到期作业都经 `start_unasked` 尝试，
@@ -2666,7 +2666,7 @@ impl RunWorker { pub(crate) fn serve(&mut self, serving: Serving); }
    carrier 产生，没有命令能写它。撤销 attach 要么加 `Command::DetachEndpoint`（wire 变更），要么这一格不做。
 2. `select_model` 的反向命令要求「上一次选择」存在且那个端点仍然挂着；第一次选择之前没有可回退的值。
 
-### 8-46-12 两条接力链各有上限（B-51）
+### 8-46-12 两条接力链各有上限
 
 **一条没有人在里面的链不许无限长。** H-04 把七个入口都送进车道之后，敲门链与继任链不再堵住
 记账线程，`Halt` 与 `Cancel` 也读得进来了；但两条链本身仍然无界——A 叫醒 B，B 再叫醒 C，
@@ -3175,7 +3175,7 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 4. **问 npm，不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release，对本仓库答 404。npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西，问它才是问人真正有的那个问题。
 5. **失败说清停在哪一阶段。** 只在失败路径上多发一次 `gateway::reach`，把 `kernel::reach` 已定义的分阶段读数——名字没解析、连不上、握手失败、对方答了什么状态——放进 recovery。「它没成功」不是一个人能据以行动的答案，而这条路径上多一次请求换一句能行动的话是划算的。退出码报的是问题有没有被回答，而不是答案是什么：版本过期是消息不是故障，而读不到注册表会让人以为自己查过了。
 
-### 8-69 真端点验收闸 `just e2e`（`crates/sprawling/tests/e2e.rs`；Roadmap §20.6、§24.3）
+### 8-69 真端点验收闸 `just e2e`（`crates/sprawling/tests/e2e.rs`）
 
 这个仓库的其余检查都在回答一个它自己写的 provider。这一条把一个人粘贴的 base URL、key 与模型名拿来，attach → 选模型 → 派活，再回头读账本——于是「key 填了，从来没跑通」是一次红，而不是一份报告。
 
@@ -3206,7 +3206,7 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 
 **没查证的字段不写。** 上游文法里本城不确定的键一律登记为待查并留空，而不是猜一个默认值填进去——一个猜出来的 base URL 会在 404 之后让人去查一件本城自己编的事实。
 
-### 8-73 run 标识直接取自摘要，而停不下来的疑问算「停」（`assembly::dispatching::agreeing::run_id_for`、`assembly::driving::lane`；Roadmap B-52）
+### 8-73 run 标识直接取自摘要，而停不下来的疑问算「停」（`assembly::dispatching::agreeing::run_id_for`、`assembly::driving::lane`）
 
 - **缺陷**：`run_id_for` 把摘要印成十六进制再逐对解回字节，两步各带一个 `unwrap_or`——`from_utf8` 失败取 `"00"`，`from_str_radix` 失败取 `0`。一次解不出的摘要于是变成全零的 run id，而两条不同的活会得到同一个标识。
 - **改法**：`B3Hash::as_bytes()` 的前十六字节即标识，解析这一步整个消失。字节与旧写法逐位相同（印出来的十六进制正是这些字节），故账本与 replay 的字节不变。
@@ -3215,7 +3215,7 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 
 **本章测试**：`two_jobs_at_one_millisecond_get_two_run_ids`（`assembly::dispatching::tests`）。
 
-### 8-74 折叠读不懂的那一行就说出来，而「关」与「开」只有一种拼法（`assembly::folds`、`views::holding`；Roadmap B-53、G-26）
+### 8-74 折叠读不懂的那一行就说出来，而「关」与「开」只有一种拼法（`assembly::folds`、`views::holding`）
 
 ```rust
 fn scope_of(scope: &channels::HaltScope) -> kernel::event::Scope;   // assembly::naming：唯一的翻译
@@ -3231,20 +3231,20 @@ impl RunWorker { fn halted_by(&self, addr: &Address) -> Option<kernel::event::Sc
 
 **本章测试**：`an_unreadable_approval_item_stops_the_fold`（`assembly::folds::tests`）、`an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted`（`kernel::event::record::governance`）。
 
-### 8-76 哪些记录会动计划，是一张穷尽表（`plan_view::reach::may_move_plan`；Roadmap B-55）
+### 8-76 哪些记录会动计划，是一张穷尽表（`accounting::plan_view::reach::may_move_plan`；accounting-SPEC.md 8-6）
 
 ```rust
 enum PlanReach { Untouched, Stale, NodeFreed, NodeStopped }
 fn may_move_plan(kind: EventKind) -> PlanReach;
 ```
 
-- **缺陷**：`PlanView::apply` 的注释写「没有地址的记录使每一份解析可疑」，代码只在 `CityInitialized` 时清空；一条没有地址的 `checkpoint_committed` 于是让每栋楼继续报改动前的表。
-- **改法**：失效判定上提为按 `EventKind` 的穷尽表，通配臂消失；没有地址的记录只要它的类别会动计划，就清掉全部解析。类别与旧代码逐条相同，故有地址那条路径上的行为不变。
-- **仍未收进来的一类**：`pr_merged` 同样会把文件落进楼里，今天读作 `Untouched`。改它要连着改 `views::commits` 的期望，故单列一条叶子，不混进本节。
+- **失效判定是按 `EventKind` 的穷尽表，没有通配臂**：加一种事件，就要在这里说它动不动计划。
+- **没有地址的记录**：只要它的类别会动计划，就清掉每一份解析；一条没有地址的 `checkpoint_committed` 因此不会让每栋楼继续报旧的表。
+- **`pr_merged` 读作 `Untouched`**：它同样会把文件落进楼里，改成 `Stale` 要连着改 `views::commits` 的期望，那是这张表之外的一件事。
 
-**本章测试**：`a_record_with_no_address_stales_every_plan_it_could_have_moved`、`every_event_kind_has_a_reach`（`plan_view::tests`）。
+**本章测试**：`a_record_with_no_address_stales_every_plan_it_could_have_moved`、`every_event_kind_has_a_reach`（`accounting::plan_view::tests`）。
 
-### 8-78 一次派活在会计线程上花了多久，城自己说出来（`assembly::dispatching::running`、`assembly::workbench::servers`；Roadmap 11.5、K-05）
+### 8-78 一次派活在会计线程上花了多久，城自己说出来（`assembly::dispatching::running`、`assembly::workbench::servers`）
 
 ```rust
 // stage_dispatch：进出各读一次城钟，Level::Trace 报出
@@ -3258,7 +3258,7 @@ fn may_move_plan(kind: EventKind) -> PlanReach;
 - **读钟读不出不丢工具**：`mcp_tools` 无法报出 `Result`，因此钟失败时只是不报这一行；连接是工作，读数是诊断。
 - **本章测试**：`a_dispatch_says_what_it_spent_before_the_drive`（`assembly::dispatching::tests`）盯住「读数被说出来」这一件事，不断言数值——墙钟数值属于跑它的那台机器，属于 `budgets.toml` 的那一行。
 
-### 8-79 会话冻下的形状只选一次（`assembly::dispatching::session_shape`、`assembly::dispatching::running`；E-2 前缀冻结的派活面一半）
+### 8-79 会话冻下的形状只选一次（`assembly::dispatching::session_shape`、`assembly::dispatching::running`）
 
 ```rust
 impl RunWorker {
