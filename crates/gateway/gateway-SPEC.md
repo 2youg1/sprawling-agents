@@ -697,7 +697,7 @@ pub struct Ranks;                                // of(&AttachedEndpoint, model)
 
 `dialect/responses/` 三个文件——`request.rs`（规范请求 → `input` 数组）、`reply.rs`（`output` 数组 ↔ `ChatResponse`）、`stream.rs`（具名事件 → `Increment`，终帧 → 已定答案）。`dialect` 的五个入口各多一条臂，闭集由二变三。
 
-**形状取自供应方自己的规格**：`openai/openai-openapi`，`openapi.yaml` 自述 `info.version` ＝ 2.3.0，提交 `ddface9b`（2026-09-19）。不取自任何客户端库，也不取自记忆。看着不对的字段通常是搬过家的字段——改这里之前先读那份文档。
+**形状取自供应方自己的规格**：`openai/openai-openapi`，`openapi.yaml` 自述 `info.version` ＝ 2.3.0，提交 `d983890f`（2026-09-26）。不取自任何客户端库，也不取自记忆。看着不对的字段通常是搬过家的字段——改这里之前先读那份文档。
 
 **它不是第二支笔的一个开关。** chat 面发 `messages`、读 `choices`；这面发 `input`、读 `output`——一个数组，成员是消息、函数调用与推理项，而不是一条挂着若干字段的消息。流是第三套文法：具名事件（`response.output_text.delta`）而不是匿名 chunk。折在一起就是一个在每一步上分支的写入器。
 

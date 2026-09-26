@@ -8,7 +8,7 @@
 //! **Every shape here is read off the provider's own specification, not
 //! off a client library.** The source is `openai/openai-openapi`, the
 //! document `openapi.yaml` declares as API version 2.3.0, read at
-//! commit `ddface9b`. A field that looks wrong is usually a field that
+//! commit `d983890f`. A field that looks wrong is usually a field that
 //! moved, so check that document before changing anything below.
 //!
 //! **This is a third dialect and not a variant of the second.** The
