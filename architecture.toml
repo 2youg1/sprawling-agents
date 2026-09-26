@@ -774,7 +774,7 @@ module = [
   { name = "citysim::bench (main)", file = "citysim/src/bin/bench/main.rs", owns = "the measuring Main: the budget rows' measurements, and where every reading line is printed", shape = "adapter", since = "P1", status = "built", spec = "citysim-SPEC.md#8-6" },
   { name = "citysim::bench::reading", file = "citysim/src/bin/bench/reading.rs", owns = "one load-scenario reading line: the fixed key order, the percentiles, and the machine class every reading carries", shape = "value", since = "P1", status = "built", spec = "citysim-SPEC.md#8-6" },
   { name = "citysim::bench::reading::tests", file = "citysim/src/bin/bench/reading/tests.rs", owns = "the reading line's stable format and its machine-class field", shape = "test", since = "P1", status = "built", spec = "citysim-SPEC.md#8-6" },
-  { name = "citysim::bench::scenarios", file = "citysim/src/bin/bench/scenarios.rs", owns = "the four load scenarios and the fixed fixture their readings are comparable under", shape = "adapter", since = "P1", status = "built", spec = "citysim-SPEC.md#8-6" },
+  { name = "citysim::bench::scenarios", file = "citysim/src/bin/bench/scenarios.rs", owns = "three of the four load scenarios (multi-run parallel is sprawling's relay instrument) and the fixed fixture their readings are comparable under", shape = "adapter", since = "P1", status = "built", spec = "citysim-SPEC.md#8-6" },
   { name = "citysim::bench::scenarios::tests", file = "citysim/src/bin/bench/scenarios/tests.rs", owns = "that every load scenario reruns and emits the stable format", shape = "test", since = "P1", status = "built", spec = "citysim-SPEC.md#8-6" },
 ]
 
