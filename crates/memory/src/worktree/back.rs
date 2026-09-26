@@ -154,15 +154,22 @@ impl Worktrees {
 
 /// `path` in the spelling a git tree uses, or `None` when it is empty,
 /// leaves the tree, names the reserved subtree, or holds a segment Win32
-/// folds onto another name (a trailing `.` or space, or a `:` stream
-/// suffix), because `.git.` there names the tree's `.git` link.
+/// folds onto another name (a trailing `.` or space, a `:` stream
+/// suffix, or a `~` and a digit, the shape of an 8.3 short name), because
+/// `.git.` and, where the volume makes short names, `GIT~1` there name
+/// the tree's `.git` link.
 fn in_tree(path: &Path) -> Option<String> {
     let segments = path
         .components()
         .map(|component| match component {
-            Component::Normal(segment) => segment
-                .to_str()
-                .filter(|segment| !segment.ends_with(['.', ' ']) && !segment.contains(':')),
+            Component::Normal(segment) => segment.to_str().filter(|segment| {
+                !segment.ends_with(['.', ' '])
+                    && !segment.contains(':')
+                    && !segment
+                        .split('~')
+                        .skip(1)
+                        .any(|after| after.starts_with(|c: char| c.is_ascii_digit()))
+            }),
             Component::Prefix(_)
             | Component::RootDir
             | Component::CurDir
