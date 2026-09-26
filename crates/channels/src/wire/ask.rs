@@ -53,3 +53,21 @@ pub enum AskOutcome {
     Answer(Answer),
     Refusal(AxError),
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::super::{ClientFrame, Query};
+    use super::{Ask, AskId};
+
+    #[test]
+    fn a_client_frame_round_trips_through_json() {
+        let frame = ClientFrame::Ask(Ask {
+            ask_id: AskId(7),
+            query: Query::CityView,
+        });
+        let text = serde_json::to_string(&frame).unwrap();
+        let back: ClientFrame = serde_json::from_str(&text).unwrap();
+        assert_eq!(frame, back);
+    }
+}

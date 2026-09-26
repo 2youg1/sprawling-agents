@@ -356,17 +356,6 @@ mod tests {
         assert!(QUERY_NAMES.contains(&Query::Release.name()));
     }
 
-    #[test]
-    fn a_client_frame_round_trips_through_json() {
-        let frame = ClientFrame::Ask(Ask {
-            ask_id: AskId(7),
-            query: Query::CityView,
-        });
-        let text = serde_json::to_string(&frame).unwrap();
-        let back: ClientFrame = serde_json::from_str(&text).unwrap();
-        assert_eq!(frame, back);
-    }
-
     /// The document names both roots, every command by its wire name,
     /// and the one frame a socket cannot spell as a value nothing
     /// satisfies — so the client generated from it refuses the same
