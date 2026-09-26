@@ -25,7 +25,7 @@
   // Solid original crossed with its `SetStoreFunction`.
 
   import type { Key } from "../../../core/lang";
-  import type { Draft, Line } from "./draft";
+  import type { Draft, Line, TuningField } from "./draft";
 import type { Proxying } from "../../../wire";
 
   export type SetDraft = <K extends keyof Draft>(part: K, value: Draft[K]) => void;
@@ -51,8 +51,6 @@ import type { Proxying } from "../../../wire";
   // The three tuning figures, each with the word it is offered under
   // and the step one arrow key moves it by. A table rather than three
   // boxes: the row below draws itself from it.
-  type TuningField = "timeoutMs" | "requestRetries" | "streamIdleMs";
-
   const TUNING: readonly (readonly [Key, TuningField, number])[] = [
     ["setup_timeout_ms", "timeoutMs", 1000],
     ["setup_request_retries", "requestRetries", 1],
@@ -62,16 +60,26 @@ import type { Proxying } from "../../../wire";
 
 <script lang="ts">
   import { say } from "../../../core/lang";
+  import { HALL } from "../../shared/buildings";
   import { ui } from "../../../ui";
   import Button from "../../parts/button.svelte";
   import Field from "../../parts/field.svelte";
   import Segmented from "../../parts/segmented.svelte";
-  import { ID_SHAPE, PROXYINGS, blankLine, boxed, idOf, naming, proxyingNote } from "./draft";
+  import { ID_SHAPE, PROXYINGS, blankLine, boxed, idOf, naming, proxyingNote, tuningHints } from "./draft";
 
   const { draft, setDraft, onRenamed }: AdvancedProps = $props();
 
-  const { lang } = ui();
+  const u = ui();
+  const { lang } = u;
   const ruleNote = $derived(proxyingNote(draft.proxying));
+  // The city's figures for an untuned endpoint are the same at every
+  // address, and the hall is the one address every city has.
+  const config = u.conn.asking.ask({ config: { addr: HALL } });
+  const hints = $derived.by(() => {
+    const answer = $config;
+    const defaults = answer !== undefined && "config" in answer ? answer.config.tuning : undefined;
+    return tuningHints(draft, defaults, say($lang, "setup_retries_until_halted"));
+  });
 
   function rename(part: "id" | "label", typed: string): void {
     setDraft(part, naming(typed));
@@ -166,6 +174,7 @@ import type { Proxying } from "../../../wire";
         {step}
         mono
         value={draft[part]}
+        placeholder={hints[part]}
         onInput={(value: string) => {
           setDraft(part, value);
         }}

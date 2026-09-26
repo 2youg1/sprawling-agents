@@ -299,10 +299,11 @@ pub channels::CommitsAnswer::commits: alloc::vec::Vec<channels::CommitAnswer>
 pub channels::CommitsAnswer::more: bool
 pub channels::ConfigAnswer::addr: kernel::address::Address
 pub channels::ConfigAnswer::effort: core::option::Option<channels::SettledEffort>
-pub channels::ConfigAnswer::second: core::option::Option<channels::SettledSecond>
+pub channels::ConfigAnswer::second: channels::SettledSecond
 pub channels::ConfigAnswer::tuning: channels::TuningDefaults
 pub channels::ConfigLayer::Building
 pub channels::ConfigLayer::City
+pub channels::ConfigLayer::Default
 pub channels::ConfigLayer::Resident
 pub channels::ContentAnswer::binary: bool
 pub channels::ContentAnswer::bytes: u64
@@ -732,6 +733,8 @@ pub channels::RunSummary::last_seq: kernel::event::identity::Seq
 pub channels::RunSummary::run: kernel::event::identity::RunId
 pub channels::RunSummary::started: core::option::Option<kernel::event::identity::TimeMs>
 pub channels::RunSummary::who: alloc::string::String
+pub channels::SecondDomain::max: u64
+pub channels::SecondDomain::min: u64
 pub channels::ServeConfig::acp: channels::AcpSink
 pub channels::ServeConfig::city: core::option::Option<kernel::address::Address>
 pub channels::ServeConfig::client: alloc::sync::Arc<channels::ClientAssets>
@@ -759,6 +762,7 @@ pub channels::SessionStep::Refuse::error: alloc::boxed::Box<kernel::error::shape
 pub channels::SessionStep::Welcome(alloc::boxed::Box<channels::Welcome>)
 pub channels::SettledEffort::effort: kernel::model::wire::Effort
 pub channels::SettledEffort::from: channels::ConfigLayer
+pub channels::SettledSecond::domain: channels::SecondDomain
 pub channels::SettledSecond::from: channels::ConfigLayer
 pub channels::SettledSecond::percent: u64
 pub channels::Shelf::Building(kernel::address::Address)
@@ -1035,6 +1039,7 @@ pub struct channels::Reply(_)
 pub struct channels::RoundsAnswer
 pub struct channels::RunCostsAnswer
 pub struct channels::RunSummary
+pub struct channels::SecondDomain
 pub struct channels::ServeConfig
 pub struct channels::SettledEffort
 pub struct channels::SettledSecond

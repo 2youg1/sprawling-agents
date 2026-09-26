@@ -644,6 +644,7 @@ export type CommitsAnswer = typeof CommitsAnswer.Type;
  * disagree with the run about which file they are looking at.
  */
 export const ConfigLayer = Schema.Union(
+  Schema.Literal("default"),
   Schema.Literal("city"),
   Schema.Literal("building"),
   Schema.Literal("resident"),
@@ -660,9 +661,22 @@ export const SettledEffort = Schema.Struct({
 export type SettledEffort = typeof SettledEffort.Type;
 
 /**
+ * The whole percents a file may state for the second rung, both ends
+ * included: the two figures `kernel::config::SecondThreshold`'s one
+ * construction point reads, answered so a page that states the span
+ * does not spell it a second time.
+ */
+export const SecondDomain = Schema.Struct({
+  max: Schema.Int,
+  min: Schema.Int,
+}).annotations({ identifier: "SecondDomain" });
+export type SecondDomain = typeof SecondDomain.Type;
+
+/**
  * `[context] second_threshold`, and the file that settled it.
  */
 export const SettledSecond = Schema.Struct({
+  domain: SecondDomain,
   from: ConfigLayer,
   percent: Schema.Int,
 }).annotations({ identifier: "SettledSecond" });
@@ -718,7 +732,7 @@ export type TuningDefaults = typeof TuningDefaults.Type;
 export const ConfigAnswer = Schema.Struct({
   addr: Address,
   effort: Schema.optional(Schema.NullOr(SettledEffort)),
-  second: Schema.optional(Schema.NullOr(SettledSecond)),
+  second: SettledSecond,
   tuning: TuningDefaults,
 }).annotations({ identifier: "ConfigAnswer" });
 export type ConfigAnswer = typeof ConfigAnswer.Type;

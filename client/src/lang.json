@@ -416,8 +416,8 @@
     "zh": "窗口用到几成时，提醒该写交接了"
   },
   "context_second_range": {
-    "en": "a whole percent of the window from {min} to {max}; the default is {default}",
-    "zh": "窗口的整数百分比，{min} 到 {max}；默认 {default}"
+    "en": "a whole percent of the window from {min} to {max}; an empty box is the city's default",
+    "zh": "窗口的整数百分比，{min} 到 {max}；留空即城的默认值"
   },
   "desktop_allowlist": {
     "en": "windows this building may touch",
@@ -2082,6 +2082,10 @@
   "setup_rerun": {
     "en": "walk the welcome again",
     "zh": "再走一遍欢迎页"
+  },
+  "setup_retries_until_halted": {
+    "en": "until halted",
+    "zh": "直到叫停"
   },
   "setup_select_all": {
     "en": "choose all",

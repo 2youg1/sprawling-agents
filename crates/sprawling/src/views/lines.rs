@@ -48,6 +48,10 @@ pub(crate) fn config_answer(
     addr: &Address,
 ) -> Result<channels::ConfigAnswer, kernel::AxError> {
     let defaults = gateway::EndpointTuning::DEFAULTS;
+    let domain = channels::SecondDomain {
+        min: kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
+        max: kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
+    };
     Ok(channels::ConfigAnswer {
         addr: addr.clone(),
         effort: city::settled_effort(city_root, addr)?.map(|(effort, layer)| {
@@ -56,12 +60,18 @@ pub(crate) fn config_answer(
                 from: rung_of(layer),
             }
         }),
-        second: city::settled_second(city_root, addr)?.map(|(threshold, layer)| {
+        second: city::settled_second(city_root, addr)?.map_or(
             channels::SettledSecond {
+                percent: kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT,
+                from: channels::ConfigLayer::Default,
+                domain,
+            },
+            |(threshold, layer)| channels::SettledSecond {
                 percent: u64::from(threshold),
                 from: rung_of(layer),
-            }
-        }),
+                domain,
+            },
+        ),
         tuning: channels::TuningDefaults {
             timeout_ms: defaults.timeout_ms,
             request_max_retries: defaults.retries.stated(),
@@ -238,5 +248,33 @@ pub(crate) fn summarize(run: RunId, hot: &memory::RunHot) -> channels::RunSummar
         last_kind: hot.last_kind,
         addr: hot.addr.clone(),
         started: hot.started,
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::config_answer;
+    use kernel::Address;
+
+    /// A value no file states is still answered, with the default named
+    /// as the layer it came from and the domain a file may state; a page
+    /// told `null` has to keep its own copy of both to draw anything.
+    #[test]
+    fn an_unstated_second_rung_is_answered_with_the_default_as_its_layer() {
+        let dir = tempfile::tempdir().unwrap();
+        let addr = Address::parse("lab/room1").unwrap();
+        let answer = serde_json::to_value(config_answer(dir.path(), &addr).unwrap()).unwrap();
+        assert_eq!(
+            answer.get("second"),
+            Some(&serde_json::json!({
+                "percent": kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT,
+                "from": "default",
+                "domain": {
+                    "min": kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
+                    "max": kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
+                },
+            }))
+        );
     }
 }

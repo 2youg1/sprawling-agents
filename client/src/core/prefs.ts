@@ -39,7 +39,7 @@ import { langOf } from "./lang";
 import { browserRows } from "./rows";
 import { sizingOf } from "./sizing";
 import type { Rows } from "./rows";
-import type { Proxying } from "../wire";
+import { Proxying } from "../wire";
 import type { Notifying } from "./notify";
 
 // ------------------------------------------------------------- the rows
@@ -123,7 +123,14 @@ export const DENSITIES: readonly Density[] = ["comfortable", "compact"];
 export const RAILS: readonly Rail[] = ["glyphs", "named", "away"];
 export const CHROMAS: readonly Chroma[] = ["full", "off"];
 export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
-const PROXYINGS: readonly Proxying[] = ["except_local", "always", "never"];
+// Read out of the wire's own union rather than spelled again, so a rule
+// the city adds is offered here without a second list to forget.
+export const PROXYING_RULES: readonly Proxying[] = Proxying.members.flatMap((rule) => rule.literals);
+
+// The sizes a person may ask for. The floor is the smallest size the
+// colour gate has to hold its contrast tiers at, and the ceiling is
+// where a line of body text stops being body text.
+export const BODY_PX = { min: 12, max: 20 } as const;
 export const NOTIFYINGS: readonly Notifying[] = ["off", "on"];
 
 // What a person may write into a font stack: the characters a family
@@ -289,7 +296,7 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
     panel: rows.getItem(ROWS.panel) !== NO,
     rail: readOne(RAILS, rows.getItem(ROWS.rail), "glyphs"),
     appearance: readAppearance(rows),
-    proxying: readOne(PROXYINGS, rows.getItem(ROWS.proxying), "except_local"),
+    proxying: readOne(PROXYING_RULES, rows.getItem(ROWS.proxying), "except_local"),
     notifying: readOne(NOTIFYINGS, rows.getItem(ROWS.notifying), "off"),
   };
 }

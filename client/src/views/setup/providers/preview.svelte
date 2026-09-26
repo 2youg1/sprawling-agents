@@ -19,7 +19,7 @@
 
   import type { WireApi } from "../../../core/commands";
   import type { Draft, Line } from "./draft";
-  import { idOf } from "./draft";
+  import { figureIn, idOf } from "./draft";
 
   export interface PreviewsProps {
     readonly draft: Draft;
@@ -107,10 +107,18 @@
       `base_url = ${JSON.stringify(draft.baseUrl.trim())}`,
       `wire_api = ${JSON.stringify(draft.wireApi)}`,
       `env_key = ${JSON.stringify(reference)}`,
-      `request_max_retries = ${draft.requestRetries.trim()}`,
-      `stream_idle_timeout_ms = ${draft.streamIdleMs.trim()}`,
-      `timeout_ms = ${draft.timeoutMs.trim()}`,
     );
+    // A box left empty is left out, as the attach command leaves it
+    // out, so the file and the command both leave the figure to the city.
+    const figures = [
+      ["request_max_retries", draft.requestRetries],
+      ["stream_idle_timeout_ms", draft.streamIdleMs],
+      ["timeout_ms", draft.timeoutMs],
+    ] as const;
+    for (const [name, text] of figures) {
+      const figure = figureIn(text);
+      if (figure !== null) lines.push(`${name} = ${String(figure)}`);
+    }
     const headers = pairs(draft.headers);
     if (headers.length > 0) {
       const written = headers.map(
