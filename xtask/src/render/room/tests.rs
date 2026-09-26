@@ -117,3 +117,24 @@ fn a_list_that_spills_past_a_holder_that_shows_it_passes() {
         .is_empty()
     );
 }
+
+#[test]
+fn a_code_gutter_folded_by_its_author_is_not_crushed() {
+    assert!(crushed(&[words("1\n2\n3\n4", [69, 40, 25, 80])]).is_empty());
+}
+
+#[test]
+fn a_list_scrolled_out_of_a_tall_window_is_reachable() {
+    let window = Drawn {
+        down: Overflow::Scrolls,
+        ..el(("MAIN", "-"), "-", [0, 0, 300, 900], -1)
+    };
+    assert!(
+        clipped(&[
+            window,
+            el(("UL", "listbox"), "commands", [0, -2626, 300, 64], 0),
+            el(("LI", "option"), "city", [0, -2626, 300, 32], 1),
+        ])
+        .is_empty()
+    );
+}

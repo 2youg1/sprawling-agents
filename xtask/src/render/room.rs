@@ -23,6 +23,9 @@ const CRUSHED_EMS: i64 = 2;
 
 /// No sentence is set narrower than two glyphs and folded onto lines.
 ///
+/// Words that carry their own line breaks were folded by their author,
+/// not by the engine: a code gutter is one number a line by design.
+///
 /// A name of one glyph is left alone: a close button is one glyph in a
 /// box its padding makes taller than wide, and that is its shape.
 pub(super) fn no_text_is_crushed(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
@@ -30,7 +33,11 @@ pub(super) fn no_text_is_crushed(drawn: &[Drawn], at: &str, out: &mut Vec<Violat
         let Some(run) = &held.text else { continue };
         let glyph = i64::from(run.px_x100).checked_div(100).unwrap_or(0);
         let room = glyph.saturating_mul(CRUSHED_EMS);
-        if glyph == 0 || held.name.chars().nth(1).is_none() || held.width >= room {
+        if glyph == 0
+            || held.name.chars().nth(1).is_none()
+            || held.name.contains('\n')
+            || held.width >= room
+        {
             continue;
         }
         if held.height < room {
@@ -108,18 +115,28 @@ fn holds(drawn: &[Drawn], ancestor: usize, held: &Drawn) -> bool {
     false
 }
 
-/// The height of `popover` left after every clipping ancestor cut it.
+/// The height of `popover` left after every ancestor cut it.
+///
+/// A clipping holder cuts by position. A scrolling holder cuts only by
+/// its own height, because a person can scroll the rest into view: a
+/// list scrolled away above the fold is reachable, a list taller than
+/// its window is not wholly.
 fn visible_height(drawn: &[Drawn], popover: &Drawn) -> i64 {
     let (mut top, mut bottom) = (popover.top, popover.top.saturating_add(popover.height));
+    let mut window = popover.height;
     let mut up = usize::try_from(popover.parent).ok();
     while let Some(holder) = up.and_then(|at| drawn.get(at)) {
-        if !matches!(holder.down, Overflow::Shows) {
-            top = top.max(holder.top);
-            bottom = bottom.min(holder.top.saturating_add(holder.height));
+        match holder.down {
+            Overflow::Shows => {}
+            Overflow::Clips => {
+                top = top.max(holder.top);
+                bottom = bottom.min(holder.top.saturating_add(holder.height));
+            }
+            Overflow::Scrolls => window = window.min(holder.height),
         }
         up = usize::try_from(holder.parent).ok();
     }
-    bottom.saturating_sub(top).max(0)
+    bottom.saturating_sub(top).max(0).min(window)
 }
 
 #[cfg(test)]
