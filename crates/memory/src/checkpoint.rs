@@ -25,7 +25,7 @@
 //! **A wave fence leaves HEAD alone**. The city forms around
 //! a person's own folder, so a commit per tool wave on their branch
 //! buries their history under the machine's bookkeeping. The fence is a
-//! dangling commit, filed under `refs/sprawling/runs/<run>/<seq>`, and
+//! dangling commit, filed under `refs/sprawling/runs/<run>/<oid>`, and
 //! everything downstream works from the oid as it always did. Only
 //! `ensure_base` and `land` move HEAD, because a worktree branches from
 //! a commit and offered work has to be on a branch.

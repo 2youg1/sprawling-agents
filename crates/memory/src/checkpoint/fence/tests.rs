@@ -257,14 +257,9 @@ fn three_waves_leave_three_fences_and_a_history_that_did_not_grow() {
         .map(str::to_owned)
         .collect();
     filed.sort();
-    assert_eq!(
-        filed,
-        vec![
-            format!("{prefix}0"),
-            format!("{prefix}1"),
-            format!("{prefix}2"),
-        ]
-    );
+    let mut expected: Vec<String> = fences.iter().map(|oid| format!("{prefix}{oid}")).collect();
+    expected.sort();
+    assert_eq!(filed, expected);
 
     // Each fence still checks out: a dangling commit reachable through
     // its reference is not collected.
