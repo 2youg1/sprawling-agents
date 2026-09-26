@@ -1341,7 +1341,8 @@ pub struct Opening {
 - **派活者写在 `run_started` 的载荷里，不读那条记录的作者**：`run_started` 的作者恒为 `city`——是城的派活台写下这一行——所以作者说不出这次 run 是人派的、城按日程与计划派的，还是一个居民委派、接替或敲门派的。派活处各自知道答案：人下的 `Dispatch` 写 `person`；计划节点、日程、外来到达与人刚放行的活写 `city`；委派写委派者的地址，接替写前任的地址，敲门叫醒写敲门者的地址。`runtime::RunPlan.dispatched_by` 把它从派活处带到 `run_started`，线上的 `Opening` 原样转述。
 - **旧账本里没有这个键**，读作 `None`，页面不画「由谁派来」而不猜。
 - **被否：从 `parent`／`predecessor` 推断**。那两个键只说明委派与接替，人派的与城派的在账本里长得一样，推断在最常见的两种派活上答不出来。
-先占住端口，再交出城：`bind` 与 `serve` 分成两步
+
+### 8-46 先占住端口，再交出城：`bind` 与 `serve` 分成两步
 
 ```rust
 pub struct Bound { /* listener: tokio::net::TcpListener, face: BindFace —— 私有 */ }
