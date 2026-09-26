@@ -1795,4 +1795,4 @@ pub(super) fn entered(effect: &Effect, taint: &TaintSet) -> Result<TaintSet, AxE
 - **调用点只有一个**：`ToolBench::invoke` 在工具答出 `Ok` 之后、把答案交还模型之前，用 `entered` 的返回值替换 bench 的 taint。之后同一 run 的每扇门（`command`／`reach`／`undoable`）读到的都是长大后的集合，所以读过一段 MCP 回答或网页的 run 再调 exec，由 `kernel::gate::command` 答 `E_TAINTED_ACTION`。失败的调用不并入：没有内容进门。来源标签为空时答 `E_CONFIG_INVALID`，这个错误就是这次调用被记下的答案，模型读不到那段内容。
 - **为什么按 `Effect` 判，而不是让每个工具自报**：`Effect` 已经是工具注册时声明的「这次调用伸向哪里」，门按它分派；来源再让工具另报一次，就是同一事实的第二份定义，漏报的工具会把外来内容当成内生数据放进来。
 - **为什么是一个函数**：外来内容在 run 里要过的每一道手续（今天是标 taint，之后是密钥托管的入站扫描）都挂在这同一处，第二个消费者改这一个函数，不另开入口。
-- **未定**：他楼文件（`read` 经 read bound 落进另一栋楼的路径）今天的 `Effect` 是 `Read`，这张表因此不标它；要标它，需要 `GateSubject::Path` 在 bench 里能判出「不在本楼」，证据是一条读他楼文件后 exec 被拒的 bench 测试。run 起点的 taint 仍由 sprawling 的 `Assignment.tainted: bool` 在 `workbench::tools::run_taint` 里翻成单一来源 `outside`；换成携带来源的 `TaintSet` 是下一阶段。
+- **未定**：他楼文件（`read` 经 read bound 落进另一栋楼的路径）今天的 `Effect` 是 `Read`，这张表因此不标它；要标它，需要 `GateSubject::Path` 在 bench 里能判出「不在本楼」，证据是一条读他楼文件后 exec 被拒的 bench 测试。run 起点的 taint 是 sprawling 的 `Assignment.taint: kernel::TaintSet`，由 `Unasked::taint` 给出（一次 arrival 标为 `arrival:<source>`），原样放上 bench。
