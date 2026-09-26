@@ -4,13 +4,13 @@
 
 ![binary](docs/badges/release_binary.svg) ![client](docs/badges/frontend_artifact.svg)
 
-The binary the badges refer to is attached to the [latest release](../../releases/latest). Both numbers are produced by the same build gate that weighs the artifacts—no one hand-writes sizes into the docs.
+The binary the badges refer to is attached to the [latest release](../../releases/latest). Both numbers are produced by the build gate that weighs the artifacts, so nobody writes a size into the docs by hand.
 
-> **Status: pre-alpha, research & development.** The main loop works: register a provider in the browser, raise a building, dispatch a job; the model actually calls tools and writes files into that building. Several agents work in one city, each in its own room, and a building working towards a goal drives its whole ready set at once — up to four runs together, while work a person dispatches by hand is still run one piece at a time.
+> **Status: pre-alpha, research & development.** The main loop works: register a provider in the browser, raise a building, dispatch a job, and the model calls tools and writes files into that building. Several agents work in one city, each in its own room, and several runs of one building drive at the same time, each on a lane of the driving pool, while one accounting thread writes all of them into the Ledger.
 >
-> What’s still missing is listed under [What works / what doesn’t](#what-works-what-doesnt). Read that section before you hand it real work.
+> What is still missing is listed under [What works / what doesn't](#what-works--what-doesnt). Read that section before you hand it real work.
 >
-> 中文: [README.zh-CN.md](README.zh-CN.md)
+> 中文: [README.zh-CN.md](README.zh-CN.md) · For an agent: [LLM.md](LLM.md)
 
 **Strengths**: tiny footprint; concepts that feel genuinely cool; built for multi-agent from the start, not a single agent with a pile of extensions.
 
@@ -38,51 +38,112 @@ Apart from migrating the necessary business skills / MCP / ACP pieces, I recomme
 
 sprawling is designed for modest hardware, so I refuse to let multi-agent workloads explode in performance cost. That also makes it suitable for old laptops or cheap cloud boxes.
 
-I don’t sell APIs and I can’t afford a hard drive full of your data, so everything stays local. There is a dedicated confidential building; paired with a local model it is fully usable for private data. The trade-off is that I cannot run enormous-scale tests myself.
+I don’t sell APIs and I can’t afford a hard drive full of your data, so everything stays local. There is a dedicated confidential building: it stops a run before any call to a remote provider and starts no outside tool server, so paired with a local model it can work on private data. The trade-off is that I cannot run enormous-scale tests myself.
 
 ---
 
 ## What it is
 
-One binary, one browser page, and the page is embedded inside the binary at build time. **The client is replaceable**: `client/` is TypeScript — Svelte and Effect, built by [bun](https://bun.sh), never npm and never node — and anything that speaks the WebSocket protocol in `crates/channels` is a client. It is written against the WebSocket protocol in `crates/channels`, and anything else that speaks that protocol is a client too, in whatever language you and your agents write best. The gate that once forbade JavaScript in this tree was removed for exactly that reason — it was excluding architectures rather than defects.
+One binary, one browser page, and the page is embedded inside the binary at build time. **The client is replaceable**: `client/` is TypeScript with Svelte and Effect, and bun installs and builds it. It is written against the WebSocket protocol in `crates/channels`, and anything else that speaks that protocol is a client too, in whatever language you and your agents write best.
 
 The directory tree on disk *is* the space: a **City** is a directory tree, a project is a **Building**, an agent’s workspace is a **Room**.
 
-**One address freezes four things at once.** `lab/room1` tells you where the files live, which files this agent may write, what context it starts with, and whom it reports to. These four never need a mechanism to stay consistent—they are the same fact.
+**One address answers three questions at once.** `lab/room1` names a place on disk, and that place settles which files this agent may write, which documents it starts with, and whom it reports to. Nothing has to keep the three answers consistent, because they are read off one fact.
 
-**Agents find each other and speak without you relaying.** A run can ask who shares its building and gets back every address it can reach, each with the line that resident's own `URBANITE.md` offers about what to bring them—so "who do I talk to" has an answer that is not a guess. Speaking to somebody who is working slips the message under their door: it lands at the end of their next tool result. Speaking to somebody who is not starts a run for them. Either way the message arrives labelled `@` and the sender's address, which is also the address that answers it—**a resident can never render as you**, and that is a property of the type rather than a convention.
+**Agents find each other and speak without you relaying.** A run can ask who shares its building and gets back every address it can reach, each with the line that resident's own `URBANITE.md` offers about what to bring them, so "who do I talk to" has an answer that is not a guess. Speaking to somebody who is working slips the message under their door: it lands at the end of their next tool result. Speaking to somebody who is not starts a run for them. Either way the message arrives labelled `@` and the sender's address, which is also the address that answers it. **A resident can never render as you**: only the person's own entrance can build a message that speaks as the person, and that is a property of the type rather than a convention.
 
-**The Ledger is the only history.** Every effect first becomes an event, then becomes an effect. Every view in the UI is a projection of that event stream: delete one, rebuild from the Ledger, and the bytes match. Change a single byte in the log and chain verification reports the line number and refuses to proceed.
+**The Ledger is the only history.** Every effect first becomes an event, then becomes an effect. Every view in the UI is a projection of that event stream: delete one, rebuild it from the Ledger, and the bytes match. Change a single byte in the log and chain verification reports the line and refuses to go on.
 
-**Deletion comes with its own undo path.** The type that means “discard a file” has no constructor without a Restoration—“deleted and gone forever” is not rejected at runtime; it cannot even be written. Every row in the recycle bin carries the exact sentence that can restore it.
+**Deletion comes with its own undo path.** The type that means “discard a file” has no constructor without a Restoration, so “deleted and gone forever” is not rejected at runtime; it cannot even be written. Every row in the recycle bin carries its way back, and one press on the row puts the file back where it was, unless a file you made since stands at that path.
 
-**Cost is attributed across five dimensions**, each of which sums exactly to the number the provider actually bills. When a provider supplies no price (e.g. a subscription), the UI says there is no price instead of printing `$0.00`. Zero and unknown are different things.
+**Cost is cut five ways**: by run, by resident, by prefix segment, by tool, and by skill. Each amount is what the provider billed for the call when it reports one, and the price sheet's figure when it does not. When a provider supplies no price at all, as with a subscription, the page says there is no price instead of printing `$0.00`, and it counts the calls and tokens that went unpriced. Zero and unknown are different things.
 
-**The UI’s design goal is not to bother you.** No red dots, no unread counts, no infinite scroll, no animated progress bars. The only thing that interrupts you is a decision that requires a human. Everything else waits where you will find it.
+**The UI is designed not to bother you.** A browser notification is raised for one kind of thing only: a decision that needs you. The progress of runs reaches a hidden tab through its title and icon, and everything else waits where you will find it.
 
-**Every component carries its SPEC beside it.** `crates/<crate>/<crate>-SPEC.md` states that crate's interfaces and the reasoning behind them, and it is written before the code and changed before the code changes. A person and an agent therefore alter this project by reading the same file, and a gate refuses a change whose public surface and SPEC move apart.
+**Every component carries its SPEC beside it.** `crates/<crate>/<crate>-SPEC.md` states that crate's interfaces and the reasoning behind them, and it is written before the code and changed before the code changes. A person and an agent therefore alter this project by reading the same file. The `specalign` gate refuses a kernel enum whose variants and SPEC table differ.
 
-**Some states are not validated—they are unrepresentable.** Forging an event reference, deserializing a “completed” status, entering credentials across the network, drawing a percentage without a denominator—these cannot be expressed in the type system. Each has a compile-fail counter-example in the tests, because “cannot be written” is itself an assertion that must be proven.
+**Some states are not validated; they are unrepresentable.** Sending a credential over the wire, discarding a file with no way back, putting a sealed credential into a Ledger payload, claiming work is done without evidence, giving part of a plan more weight than its parent had, and verifying your own work cannot be expressed in the type system. The tests hold <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-fail cases, because “cannot be written” is itself an assertion that has to be proven.
 
 ## Getting it running
 
 ### Quick start
 
-1. Download the archive for your system from the [latest release](../../releases/latest).
+1. Download the archive for your system from the [latest release](../../releases/latest): Windows (x86-64), macOS (Apple silicon) or Linux (x86-64).
 2. Unpack it anywhere.
-3. Run **`sprawling.exe`** (Windows: double-click it) or **`./sprawling`** (macOS). It asks one question before it creates anything.
+3. Run **`sprawling.exe`** (Windows: double-click it) or **`./sprawling`** (macOS and Linux). It asks one question before it creates anything.
 
-That is the whole install. Nothing is registered, and nothing outside that folder is written to—delete the folder and it is gone. A console window opens and stays open: **that window is the city**. Your browser opens at `http://127.0.0.1:8787`; if it doesn’t, open the address yourself. `Ctrl-C` in the window stops the city.
+That is the whole install. Nothing is registered, and nothing outside that folder is written to: delete the folder and it is gone. A console window opens and stays open: **that window is the city**. Your browser opens at `http://127.0.0.1:8787`; if it doesn’t, open the address yourself. `Ctrl-C` in the window stops the city.
 
-The binaries are not code-signed, so the first run trips a warning. Windows says “Windows protected your PC”—choose **More info → Run anyway**. macOS refuses the first launch—open it once from Finder’s right-click menu.
+The binaries are not code-signed, so the first run trips a warning. Windows says “Windows protected your PC”: choose **More info → Run anyway**. macOS refuses the first launch: open it once from Finder’s right-click menu.
+
+Or fetch and unpack in one line; the script ends by running `sprawling install`, which decides where the binary goes and puts it on your PATH:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling/main/install.sh | sh        # macOS, Linux
+irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex             # Windows PowerShell
+```
 
 **Before it can do anything you need a model to call**: an API key for a provider speaking the OpenAI or Anthropic dialect, or a subscription login. sprawling schedules agents, records what they do, and shows it to you; it does not think by itself.
 
 ### From a terminal
 
-One binary is enough: the page ships inside it, and running it needs no JavaScript runtime. Building `client/` from source needs bun, and nothing else.
+One binary is enough: the page ships inside it, and running it needs no JavaScript runtime. Building `client/` from source needs bun.
 
 If you already have bun or node, `bunx sprawling up` — or `npx sprawling up` — fetches that same binary from npm and runs it. The runtime does the fetching, not the running.
+
+The launcher runs one command, and you can run it yourself:
+
+```bash
+sprawling up [city-dir] [addr]      # raise the city if it is not there, serve it, open the WebUI
+```
+
+Taken apart, when you want the steps separately:
+
+```bash
+sprawling init  <city-dir>          # found a city; the name is written into the genesis record
+sprawling serve <city-dir> [addr]   # serve a city that already exists; loopback only by default
+# then open http://127.0.0.1:8787
+```
+
+`up --supervise` serves the city in a child process and, after a crash, resumes it and serves again, until the crashes come too fast to be worth another try.
+
+> **Don’t `cargo install` this.** The client is built by [bun](https://bun.sh) before the binary and embedded into it. A plain cargo build cannot run that step, and yields a binary whose page is blank. Take a release archive, or build it with `just dist`.
+
+Four steps on the page:
+
+1. **settings** — enter the provider’s base URL, dialect (OpenAI or Anthropic), and key. The key goes straight into the OS credential store; after that the page only ever sees a reference of the form `secret:realm/name`.
+2. On the same page, pick a model for each role: `main` does the thinking, `digest` reads long documents for it, and `transcribe`, if you want it, turns recordings into text.
+3. Raise a building: type `/raise lab` in the box at the bottom of the page.
+4. In the box, say what should be produced and what counts as done, and send it. **It never asks for a budget**: nobody can price a job before it runs, and subscriptions have no unit price anyway. Actual spend is reported from the record afterwards. **Nothing rations a conversation either**: when agents wake each other, how long they go on is theirs to decide. A single run has no turn ceiling: it runs until it concludes, and what stops one that should not go on is `/stop`, or `/halt` for a whole building or the city.
+
+The page opens on a conversation with the Mayor, who plans work across buildings. Hand the Mayor an idea when you do not yet know which building it belongs in.
+
+Other commands:
+
+```bash
+sprawling install [--uninstall]      # make `sprawling` a word your shell resolves, or take it back off
+sprawling doctor [<city>] [--install] [--explain <code>]
+                                     # what this machine has against what a city needs; --install offers each missing item, one at a time; --explain connects a refusal code to this machine
+sprawling enrol <realm>/<name>       # read a credential from stdin and hand it to a city; it never touches the command line
+sprawling dispatch <addr> <task>     # send one task to a served city and print its events until the run ends; -m <id> picks the model
+sprawling call '<frame>'             # send one wire frame, print every frame back (see LLM.md)
+sprawling top                        # watch a served city's monitor: a screen on a terminal, one JSON line a second otherwise
+sprawling view <city>                # read a city's Ledger lines or its run tree, read-only
+sprawling check <city>               # read every TOML file a city holds; print each error as path:line:column
+sprawling resume <city-dir>          # after a restart: verify the chain, close tool calls whose results are lost, report who is waiting for a human
+sprawling fork <city> <run> <seq> <addr>  # branch a lineage from one step of a run
+sprawling adopt <city> <addr>        # take a directory already inside the city in as a building, without overwriting any file
+sprawling replay <ledger-dir>        # offline chain verification, read-only
+sprawling whose <city> <commit>      # which run wrote a commit this city made, answered from the Ledger
+sprawling export <city> <bundle-dir> # pack a whole city
+sprawling restore <bundle-dir> <city> # unpack a bundle on another machine
+sprawling status [--deps] [--check]  # this binary: version, client, what it is built from; --check asks npm for a newer release
+sprawling help                       # every command, on one screen
+```
+
+Launched with no command at all, by double-clicking it for instance, it shows a single screen, names the folder it would create, and waits for you to agree before creating anything. Founding a city writes the genesis record, and that does not happen because somebody double-clicked a file.
+
+A step-by-step walk from empty directory to first Run lives in [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)).
 
 ### Staying current
 
@@ -93,58 +154,13 @@ sprawling version                   # which release this is, and the day it was 
 sprawling status --check            # ask npm whether a newer one is published
 ```
 
-The **machine** page has the same check behind a button. Both print what to run and stop there: updating replaces a binary, and which binary you replace depends on how you installed it.
+The **machine** section of the settings page has the same check behind a button. Both print what to run and stop there: updating replaces a binary, and which binary you replace depends on how you installed it.
 
 ```bash
 bunx sprawling@latest up            # if npm is how you run it
 ```
 
-Installed from an archive, download the new one and run `sprawling install` again. A city's `city/` folder is not touched by either route.
-
-From a terminal it is one command, and the same one the launcher runs:
-
-```bash
-sprawling up [city-dir] [addr]      # raise the city if it is not there, serve it, open the WebUI
-```
-
-Taken apart, when you want the steps separately:
-
-```bash
-sprawling init  <city-dir>          # found a city; the name is written into the genesis record
-sprawling serve <city-dir> [addr]   # start the control plane; defaults to loopback only
-# then open http://127.0.0.1:8787
-```
-
-> **Don’t `cargo install` this.** The client is built by [bun](https://bun.sh) before the binary and embedded into it. A plain cargo build cannot run that step, and yields a binary whose page is blank. Take a release archive, or build it with `just dist`.
-
-Four steps on the page, roughly ten seconds:
-
-1. **settings** — enter the provider’s base URL, dialect (OpenAI or Anthropic), and key. The key goes straight into the OS credential store; thereafter the page only ever sees a reference of the form `secret:realm/name`.
-2. On the same page, pick models by role: `main` does the thinking, `digest` reads long documents for it.
-3. **city** — raise a building.
-4. The control surface at the bottom — address, what should be produced, what counts as done. **It never asks for a budget**: nobody can price a job before it runs, and subscriptions have no unit price anyway. Actual spend is reported from the record afterwards. **Nothing rations a conversation either** — when agents wake each other, how long they go on is theirs to decide. A single run has no turn ceiling either: it runs until it concludes, and what stops one that should not go on is `Cancel`, or `Halt` for a whole scope.
-
-Other commands:
-
-```bash
-sprawling install [--uninstall]     # make `sprawling` a word your shell resolves, or take it back off
-sprawling doctor [<city>] [--install] [--explain <code>]
-                                    # what this machine has against what a city needs, building by building; --install offers each missing item, one at a time; --explain connects a refusal code to this machine
-sprawling enrol <realm>/<name>      # read a credential from stdin into the OS store; it never touches the command line
-sprawling resume <city-dir>         # after a restart: verify the chain, close tool calls whose results are lost, report who is waiting for a human
-sprawling fork <city> <run> <seq>   # branch a lineage from a given step of a Run
-sprawling adopt <city> <dir>        # absorb an existing directory as a building without overwriting any files
-sprawling replay <ledger-dir>       # offline chain verification, read-only
-sprawling whose <city> <oid>        # which run wrote a commit this city made, answered from the Ledger
-sprawling export <city-dir> <file>  # pack a city; the manifest is the integrity criterion
-sprawling restore <file> <city-dir> # unpack it on another machine
-sprawling status [--deps]           # state of this machine; --deps lists the compiled-in dependencies
-sprawling help                      # every command, on one screen
-```
-
-Launched with no command at all—by double-clicking it, for instance—it shows a single screen, names the folder it would create, and waits for you to agree before creating anything. Founding a city writes the genesis record, and that does not happen because somebody double-clicked a file.
-
-A step-by-step walk from empty directory to first Run lives in [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)).
+Installed from an archive, download the new one and run `sprawling install` again. Neither route touches a city's folder.
 
 ## History
 
@@ -152,31 +168,31 @@ A city works inside a git repository that is usually **yours**, and it leaves tw
 
 **The Ledger is the city's own history**, and the only one: every effect becomes a line before it becomes anything else, the chain is verifiable offline, and every page you read is a projection of it.
 
-**Git is the restoration authority for files.** Before each wave of tool calls the city commits what is there, so anything that disappears has a commit to come back from. Those fences do not land on your branch: they are commits nobody's `HEAD` points at, kept alive by a reference under `refs/sprawling/runs/`. `git log` therefore does not grow one `checkpoint:` line per tool wave — your own history stays the shape you left it. Only two things reach a branch: the first commit of a repository that had none, and the merge that lands a reviewed piece of work.
+**Git is the restoration authority for files.** Before each wave of tool calls the city commits what is there, so anything that disappears has a commit to come back from. Those fences do not land on your branch: they are commits nobody's `HEAD` points at, kept alive by a reference under `refs/sprawling/runs/`. `git log` therefore does not grow one line per tool wave, and your own history stays the shape you left it. Only two things move a branch: the first commit of a repository that had none, and the merge that lands a reviewed piece of work.
 
-**Every commit the city makes says who made it.** The author is the resident's own address at a mailbox derived from the city — `lab/parser@1a2b3c4d5e6f.sprawling`, unroutable on purpose, because it identifies a city rather than promising to deliver mail — and the message carries five git trailers:
+**Every commit the city makes says who made it.** The author is the resident's own address at a mailbox derived from the city — `lab/parser@1a2b3c4d5e6f.sprawling`, unroutable on purpose, because it identifies a city rather than promising to deliver mail — and the message carries git trailers:
 
 ```
-Sprawling-Run: 0193f2c1-...
+Sprawling-Run: <run id>
 Sprawling-Actor: lab/parser
-Sprawling-Model: claude-sonnet-4-6
+Sprawling-Model: <model id>
 Sprawling-Effort: high
-Sprawling-City: 8f14e45fceea
+Sprawling-City: <city hash>
 ```
 
-They are git's own trailer syntax, so `git interpret-trailers --parse` reads them with no help from us. **They are a projection for readers outside the city, not a second history**: where a trailer and the Ledger disagree, the trailer is the side that is wrong.
+A run that replaced another adds `Sprawling-Predecessor: <run id>`. The block is git's own trailer syntax, so `git interpret-trailers --parse` reads it with no help from us. **The trailers are a projection for readers outside the city, not a second history**: where a trailer and the Ledger disagree, the trailer is the side that is wrong.
 
-**And the question reads backwards too.** Given a commit id, `sprawling whose` answers which run wrote it — out of the Ledger, never out of git, so a city exported and restored somewhere else with no `.git` beside it still answers:
+**The question also reads backwards.** Given a full forty-digit commit id, `sprawling whose` answers which run wrote it, out of the Ledger and never out of git, so a city exported and restored somewhere else with no `.git` beside it still answers:
 
 ```
-$ sprawling whose ./mycity 3f1c9a...
-run     0193f2c1-6b7a-7c3d-9e10-2f4b6d8a0c11
+$ sprawling whose ./mycity <commit id>
+run     <run id>
 actor   lab/parser (session refactor-the-ledger)
-model   claude-sonnet-4-6 (effort high)
+model   <model id> (effort high)
 ledger  seq 4127
 ```
 
-Exit code 1 means this city has no record of writing that commit — which is a different answer from "nothing changed", and the one an audit needs.
+Exit code 1 means this city has no record of writing that commit. That is a different answer from "nothing changed", and it is the one an audit needs.
 
 ## Five words
 
@@ -185,24 +201,25 @@ Exit code 1 means this city has no record of writing that commit — which is a 
 | **City** | One city on one machine: a directory tree, one Ledger, one complete history. Two cities never reference each other. |
 | **Building** | A building inside the city; one building, one business line. Configuration, Archive, and WriteDomain are all scoped to it. |
 | **Room** | A room inside a building, i.e. a subdirectory. One agent works in one room. |
-| **Run** | A piece of work with a beginning and an end. **Resident is identity; Run is cost**—the two numbers differ by two orders of magnitude. |
+| **Run** | A piece of work with a beginning and an end. **Resident is identity; Run is cost.** |
 | **Ledger** | The only history. One line, one event; append-only; offline-verifiable. |
 
 The rest of the vocabulary is in [`docs/glossary.md`](docs/glossary.md).
 
-## What works / what doesn’t
+## What works / what doesn't
 
-**Works**, each backed by an end-to-end assertion or a real measurement: register a provider and select models; raise a building and dispatch work; the model actually calls tools and writes files into that building; **residents find each other, speak, and wake each other without a person relaying a single message** — two of them held a price negotiation to a written agreement against a real provider; attach an external MCP server to a building; several agents at work in one city, each with its own git worktree, changes merging back only after another resident has reviewed them (this is a compile error, not a rule); a standing goal driving up to four ready plan nodes at the same time, each run writing its history through the one thread that owns it; ten pages (city, live, approvals, recycle bin, archive, cost, ledger, building, room mailbox, settings); pause a city and release it; offline chain verification; export a city and restore it on another machine.
+**Works**: register a provider and select models; raise a building, dispatch work, and let the model call tools and write files into that building; residents find each other, speak, and wake each other without a person relaying a message; attach an external MCP server to a building; several agents at work in one city, each with its own git worktree, changes merging back only after another resident has reviewed them (verifying your own work is a compile error, not a rule); a building working towards a goal drives its whole ready set at once; a run given no model continues on the one its room started with; a new run waits while memory is tight, and a dispatch is refused before anything is written when the city's disk is close to full; pause a city and release it; put a discarded file back from the recycle bin; take a building out of the city, with its files kept under the reserved subtree and its history kept in the Ledger; offline chain verification; export a city and restore it on another machine.
+
+The page has a conversation with any room (the Mayor's by default), the city, each building, each run, the record (Ledger, archive, recycle bin, log), cost, the registry, MCP, a performance monitor, and settings.
 
 **Not done, and why**:
 
 | Missing piece | Reason |
 |---|---|
-| OS-level sandbox | Requires per-platform work; only one-third can be verified on this machine. Unverified isolation is worse than none, because people will treat it as a defense. Today’s claim is therefore “a deletion can be undone,” not “a deletion cannot happen.” |
-| Browser end-to-end in CI | The loop is a local command, not a gate. **This release's client has been driven in a real browser exactly once** — the sessions behind the claims above went through the wire, which is a debugging door rather than the product. |
-| Reproducible builds | Fixtures are ready; the compiler flags that would make two builds byte-identical are not yet set. |
-| Work a person dispatches by hand, driven at the same instant | A building working towards a goal now drives its whole ready set at once, four runs at a time, each in a lane of its own (`sprawling-SPEC.md` §8-46). A job a person sends is still run one at a time: the command loop answers one command before it takes the next. Either way one thread owns the Ledger, so runs are driven in parallel and accounted for in series. |
-| Attributing spend to skills | This is a decision, not a debt: a tool call does not happen “under” a skill—a skill is a disclosure line in the prefix, not call context. Charging by skill would invent a metric. |
+| An OS sandbox on every platform | A command the agent runs is confined by whatever the platform offers, and the exec tool's own description names which arm it got and what that arm does not hold. On Linux with a namespace wrapper installed, the command runs in namespaces of its own. On Windows and macOS it runs in a copy of the working tree, so your files are safe from it but the network is open to it. Isolation that nobody verified is worse than none, because people will treat it as a defense. The claim today is therefore “a deletion can be undone,” not “a deletion cannot happen.” |
+| Browser end-to-end in CI | CI opens every settled screen in a real browser engine on fixtures (`cargo xtask render`), but no CI job drives a live city through a browser. |
+| Byte-identical builds across machines | `cargo xtask repro` builds the release binary twice from one tree and compares the bytes, and a nightly job runs it. Two machines building the same tree still record different source paths, and removing them needs a compiler switch this project's pinned toolchain does not offer. |
+| Attributing spend to skills | A tool call does not happen “under” a skill: a skill is a disclosure line in the prefix, not call context. The cost page keeps a by-skill cut, and every call lands in its `no_skill` bucket. |
 
 ## What you can swap
 
@@ -211,10 +228,10 @@ I sell neither APIs nor account hosting, so everything external sits on a seam a
 | Piece | Lives in | How to replace |
 |---|---|---|
 | Subscription-login intel (followed from the four harness families listed in [`docs/third-party.md`](docs/third-party.md) §1) | `gateway::oauth_profiles` (data only, zero branches), `gateway::credential` (flow & renewal) | Add one profile line. **Credential custody is never outsourced**: plaintext reaches only the local credential store. |
-| Model endpoint & dialect | `gateway::endpoint`, `gateway::dialect`; local inference via `gateway::native` | Enter base URL and dialect on the settings page; local models connect directly, bypassing the gateway. |
-| SaaS & external tools ([Composio](https://composio.dev) is one MCP server among others) | `protocol::mcp` `Outbound` seam, `protocol::mcp::stdio` & `protocol::mcp::http`, the building’s `CONFIG.toml` | Change one URL or one command to switch servers; confidential buildings start none. |
-| Sandbox | `runtime::sandbox` seam (current adapter is wasmtime fuel) | Implement the seam and pass its conformance assertion suite. |
-| Client | `channels::wire` is the sole API surface | Want a second client? Write against this wire format. |
+| Model endpoint & dialect | `gateway::endpoint`, `gateway::dialect` | Enter base URL and dialect on the settings page. By default a model served on this machine is called directly rather than through the machine's proxy, and a setting changes that. |
+| SaaS & external tools ([Composio](https://composio.dev) is one MCP server among others) | the `protocol::mcp` `Outbound` seam, `protocol::mcp::stdio`, `protocol::mcp::http` and `protocol::mcp::sse`, the broker in `protocol::mcp::broker`, the building’s `CONFIG.toml` | Change one URL or one command to switch servers; confidential buildings start none. |
+| Sandbox | `runtime::sandbox` seam (the current adapter is wasmtime with a fuel budget); `runtime::tools` confinement for host commands | Implement the seam and pass its conformance assertion suite. |
+| Client | `channels::wire` is the sole API surface | Want a second client? Write against this wire format. [`LLM.md`](LLM.md) is the same surface, written for an agent. |
 
 Location and replacement steps for each piece are in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
@@ -228,30 +245,32 @@ One chain inside a city, one chain per pair between cities. The two repositories
 
 ## Where it listens, where credentials live
 
-**Defaults to loopback only.** To let another machine on the same network connect, bind a non-loopback address and set `SPRAWLING_PAIRING_TOKEN`. Without a pairing token it **refuses to start**—it does not come up and then reject connections one by one. Beyond that, this repository ships neither tunnel nor relay: those two things each carry their own trust model, and choosing one for you would be making a security decision on your behalf.
+**It listens on loopback only by default.** To let another machine on the same network connect, bind a non-loopback address. Such an address always needs a pairing token: the city adopts `SPRAWLING_PAIRING_TOKEN` when it is set, and otherwise mints a token for this serve and prints the address to open with it. The port is never open without a token. Beyond that, this repository ships neither tunnel nor relay: each of those carries its own trust model, and choosing one for you would be making a security decision on your behalf.
 
-**Credential plaintext never enters any file, any event, or any log.** Keys go into the OS credential store; configuration keeps only `secret:realm/name`. Model output is run through the same secret scanner before it is recorded, so a key the model happens to echo never becomes permanent history.
+**Credential plaintext never enters any file, any event, or any log.** Keys go into the OS credential store; configuration keeps only `secret:realm/name`. What a model says passes a secret scan before it becomes a Ledger payload, the log passes the same scan, and content staged for a git fence is scanned before it is committed, so a key the model happens to echo never becomes permanent history.
 
 ## Documentation
 
 Apart from this page and the getting-started guide, the docs are in English.
 
 - Just arrived and want to know what this is: this page is enough; one level deeper is [`docs/glossary.md`](docs/glossary.md).
-- Want to put it to work: [`docs/getting-started.zh-CN.md`](docs/getting-started.zh-CN.md) → [`docs/operating.md`](docs/operating.md).
-- Want to change it: [`ARCHITECTURE.md`](ARCHITECTURE.md) → [`AGENTS.md`](AGENTS.md) → the code and tests of the neighboring modules.
+- Want to put it to work: [`docs/getting-started.md`](docs/getting-started.md) → [`docs/operating.md`](docs/operating.md).
+- An agent driving a city from outside: [`LLM.md`](LLM.md).
+- Want to change it: [`ARCHITECTURE.md`](ARCHITECTURE.md) → [`AGENTS.md`](AGENTS.md) → the code and tests of the neighbouring modules.
 
-Also available: [`CHANGELOG.md`](CHANGELOG.md) (what each release changed, and which machine produced the numbers it claims), [`docs/logging.md`](docs/logging.md) (why logs are not history), [`docs/frontend-method.md`](docs/frontend-method.md) (how a screen is built, and why the client is not hand-written), [`docs/third-party.md`](docs/third-party.md) (whose shoulders we stand on, and the license obligations). [`docs/City.md`](docs/City.md) and [`docs/templates/`](docs/templates/) are the documents the city writes into buildings—agents read them, and so can you.
+Also available: [`CHANGELOG.md`](CHANGELOG.md) (what each release changed), [`SECURITY.md`](SECURITY.md) (how to report a vulnerability), [`docs/logging.md`](docs/logging.md) (why logs are not history), [`docs/frontend-method.md`](docs/frontend-method.md) (how a screen is built and accepted), [`docs/third-party.md`](docs/third-party.md) (whose shoulders we stand on, and the license obligations). [`docs/City.md`](docs/City.md) and [`docs/templates/`](docs/templates/) are the documents the city writes into buildings: agents read them, and so can you.
 
 ## Contributing
 
 Start with [`AGENTS.md`](AGENTS.md). The thirty-second version:
 
 ```bash
-cargo install just cargo-nextest --locked
+cargo install just --locked
+just prereqs                        # every other tool the loop needs, with the install line for each one that is absent
 just check
 ```
 
-When that is green, a change is considered finished. **PR bodies, issues, and review comments may be written in your native language.** If you can, attach a parallel translation (English if your native language is not English, Chinese if it is)—a side-by-side version lets both humans and agents read faster and keeps meaning from being lost in translation.
+When `just check` is green, a change is finished. **PR bodies, issues, and review comments may be written in your native language.** If you can, attach a parallel translation (English if your native language is not English, Chinese if it is): side by side, both humans and agents read faster, and a mistranslation is visible instead of silent. [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) has the rest.
 
 ## Standing on the shoulders of others
 
@@ -261,16 +280,16 @@ Logging into a provider requires a small set of endpoints and parameters. Rather
 
 **What is followed is intelligence, not code.** Endpoints and parameters are facts; the flow and credential custody are implemented here. That holds for an upstream under a proprietary licence exactly as it holds for one under Apache-2.0, and one of the four is proprietary.
 
-**The browser page stands on the same kind of thing.** Its runtime dependencies are `svelte`, `effect`, and the `@lezer` syntax highlighter with its grammars (MIT), which the page downloads only when it first shows code; no component library is among them: every control in `client/src/views/parts/` is this repository's own. What is taken from the W3C's ARIA Authoring Practices and from the Kobalte and Ark UI documentation is behaviour published as prose: which pattern a control implements, what each key does, where the focus returns when it closes. **Not one line of their code is in this tree, so nothing is owed for it** — and the keyboard table that reading produced is specified in [`client/client-SPEC.md`](client/client-SPEC.md).
+**The browser page stands on the same kind of thing.** Its runtime dependencies are `svelte`, `effect`, and the `@lezer` syntax highlighter with its grammars (MIT), which the page downloads only when it first shows code; no component library is among them: every control in `client/src/views/parts/` is this repository's own. What is taken from the W3C's ARIA Authoring Practices and from the Kobalte and Ark UI documentation is behaviour published as prose: which pattern a control implements, what each key does, where the focus returns when it closes. **Not one line of their code is in this tree, so nothing is owed for it**, and the keyboard table that reading produced is specified in [`client/client-SPEC.md`](client/client-SPEC.md).
 
-**The skills under [`skills/`](skills/) stand on earlier work, and say so.** Three of them — `sdd`, `tutor`, `translation` — are English translations and adaptations of Chinese-language skills I wrote and published as open source under AGPL-3.0-or-later (the translation skill's original byline also credits Claude Fable 5), licensed MPL-2.0 here like the rest of this tree. The other three — `why`, `how`, `blast-radius` — are my modified adaptations of [pstack](https://github.com/cursor/plugins/tree/main/pstack) (Lauren Tan (poteto), MIT); they keep their licence, and every file names me as the one who modified it. `authority-review` is a modified adaptation of the Thermos plugin in the same `cursor/plugins` tree (MIT) — pass two recut as the one-fact-one-authority audit I wrote for the configuration this city was built against. `skills/LICENSES.md` travels with the directory, in the release archive too. This paragraph is the acknowledgment; [`docs/third-party.md`](docs/third-party.md) §5 is the terms.
+**The skills under [`skills/`](skills/) stand on earlier work, and say so.** Three of them — `sdd`, `tutor`, `translation` — are English translations and adaptations of Chinese-language skills I wrote and published as open source under AGPL-3.0-or-later (the translation skill's original byline also credits Claude Fable 5); here they carry MPL-2.0 like the rest of this tree. Three more — `why`, `how`, `blast-radius` — are my modified adaptations of [pstack](https://github.com/cursor/plugins/tree/main/pstack) (Lauren Tan (poteto), MIT); they keep their licence, and every file names me as the one who modified it. `authority-review` is a modified adaptation of the Thermos plugin in the same `cursor/plugins` tree (MIT): its second pass is recut as the one-fact-one-authority audit I wrote for the configuration this city was built against. `skills/LICENSES.md` travels with the directory, in the release archive too. This paragraph is the acknowledgment; [`docs/third-party.md`](docs/third-party.md) §5 is the terms.
 
-Connections to external applications are likewise outsourced: the city speaks MCP to any MCP server; Composio is one of them. This repository carries no one’s keys, pays for no one, and acts as no proxy. The full list, how to re-verify, and how licenses are handled live in [`docs/third-party.md`](docs/third-party.md). Licenses of code dependencies are checked one by one by `cargo deny`; the allow-list is [`deny.toml`](deny.toml).
+Connections to external applications are likewise outsourced: the city speaks MCP to any MCP server, and Composio is one of them. This repository carries no one’s keys, pays for no one, and acts as no proxy. The full list, how to re-verify, and how licenses are handled live in [`docs/third-party.md`](docs/third-party.md). Licenses of code dependencies are checked one by one by `cargo deny`; the allow-list is [`deny.toml`](deny.toml).
 
 ## License
 
-MPL-2.0 — see [`LICENSE`](LICENSE), except the skills under [`skills/`](skills/): my three carry MPL-2.0 like the rest of the tree, the four adaptations of `cursor/plugins` keep MIT, and all of them ship in the release archive with `skills/LICENSES.md`. Terms and credit: [`docs/third-party.md`](docs/third-party.md) §5.
+MPL-2.0 — see [`LICENSE`](LICENSE). Under [`skills/`](skills/), my three skills carry MPL-2.0 like the rest of the tree, and the four adaptations of `cursor/plugins` keep MIT; all seven ship in the release archive with `skills/LICENSES.md`. Terms and credit: [`docs/third-party.md`](docs/third-party.md) §5.
 
 ---
 
-Questions, bug reports and disagreements are all welcome—open an issue, or write to the address on my profile.
+Questions, bug reports and disagreements are all welcome: open an issue, or write to the address on my profile.
