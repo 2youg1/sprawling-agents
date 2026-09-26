@@ -343,3 +343,30 @@ fn a_fence_lists_only_the_paths_it_changed() {
         .unwrap();
     assert_eq!(files_of(&third), Vec::<String>::new());
 }
+
+#[test]
+fn restore_leaves_a_file_the_person_made_after_the_discard() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/doomed.txt", "about to go");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let pre = checkpoint
+        .wave_pre(
+            &["work".to_owned()],
+            TimeMs::new(1_700_000_000_000),
+            &resident(),
+        )
+        .unwrap();
+    let pre_oid = GitOid::parse(&oid_of(&pre)).unwrap();
+    std::fs::remove_file(tmp.path().join("work/doomed.txt")).unwrap();
+    write(tmp.path(), "work/doomed.txt", "the person's newer file");
+
+    let restored = checkpoint.restore(&Address::parse("work/doomed.txt").unwrap(), &pre_oid);
+
+    assert_eq!(
+        (
+            restored.is_err(),
+            std::fs::read_to_string(tmp.path().join("work/doomed.txt")).unwrap()
+        ),
+        (true, "the person's newer file".to_owned())
+    );
+}
