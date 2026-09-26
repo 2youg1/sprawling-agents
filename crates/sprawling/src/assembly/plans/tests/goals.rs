@@ -354,13 +354,11 @@ fn a_pursuit_gives_the_desk_back_while_its_rows_drive() {
         "the pursuit returned before its row came home"
     );
     worker.land_the_rest().unwrap();
-    let history =
-        std::fs::read_to_string(report.ledger_dir.join("segment-000000.jsonl")).unwrap_or_default();
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let frozen = verified
         .raw_lines()
         .iter()
         .filter(|line| String::from_utf8_lossy(line).contains("\"kind\":\"run_frozen\""))
         .count();
-    assert_eq!(frozen, 1, "the row still landed: {history}");
+    assert_eq!(frozen, 1, "the row still landed");
 }

@@ -231,7 +231,10 @@ impl RunWorker {
         // person who asked for the run this one replaced.
         let reply = owing.reply();
         match self.land(continuation, driven, owing) {
-            Ok(landed) => Ok(landed),
+            Ok(landed) => {
+                self.advance_pursuits(&landed);
+                Ok(landed)
+            }
             Err(err) => {
                 self.hand_back(&reply, err.clone());
                 Err(err)
