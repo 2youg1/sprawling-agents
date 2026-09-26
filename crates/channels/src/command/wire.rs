@@ -45,6 +45,7 @@ impl<Secret> Command<Secret> {
             | Self::ProbeEndpoint { ref idem, .. }
             | Self::ConfigureBuilding { ref idem, .. }
             | Self::CreateBuilding { ref idem, .. }
+            | Self::RemoveBuilding { ref idem, .. }
             | Self::Steer { ref idem, .. }
             | Self::Cancel { ref idem, .. }
             | Self::Halt { ref idem, .. }
@@ -202,6 +203,7 @@ impl From<WireCommand> for Command {
             Command::Cancel { run, idem } => Self::Cancel { run, idem },
             Command::Halt { scope, idem } => Self::Halt { scope, idem },
             Command::Reveal { at, idem } => Self::Reveal { at, idem },
+            Command::RemoveBuilding { addr, idem } => Self::RemoveBuilding { addr, idem },
             Command::DoctorInstall { item, idem } => Self::DoctorInstall { item, idem },
             Command::DoctorRefresh { idem } => Self::DoctorRefresh { idem },
             Command::ConnectToolkit { toolkit, idem } => Self::ConnectToolkit { toolkit, idem },

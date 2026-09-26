@@ -135,7 +135,7 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     // sits among sixty.
     case "session_opened":
     case "city_initialized": case "city_halted": case "building_created":
-    case "building_configured": case "run_forked": case "prompt_assembled":
+    case "building_configured": case "building_removed": case "run_forked": case "prompt_assembled":
     case "prompt_shape_compared":
     case "result_offloaded": case "log_truncated": case "gate_checked":
     case "gate_denied": case "approval_resolved": case "policy_created":

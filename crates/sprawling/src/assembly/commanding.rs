@@ -10,6 +10,7 @@ pub(super) mod door;
 pub(super) mod entrance;
 pub(super) mod governing;
 pub(super) mod machine;
+pub(super) mod removing;
 pub(super) mod routing;
 pub(super) mod sessions;
 #[cfg(test)]

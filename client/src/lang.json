@@ -3024,6 +3024,22 @@
     "en": "nothing runs here now; halting refuses new work",
     "zh": "这栋楼现在没有在跑的派活；叫停会拒收新活"
   },
+  "bld_remove": {
+    "en": "Remove {addr}",
+    "zh": "移走 {addr}"
+  },
+  "bld_remove_busy": {
+    "en": "stop the runs here before removing this building",
+    "zh": "先停下这里在跑的派活，再移走这栋楼"
+  },
+  "bld_remove_title": {
+    "en": "Remove {addr} from the city?",
+    "zh": "把 {addr} 移出城？"
+  },
+  "bld_remove_detail": {
+    "en": "Its files move to .sprawling/removed and its history stays in the ledger. Move the folder back to the city root and adopt it to bring it back.",
+    "zh": "它的文件搬到 .sprawling/removed，历史留在 ledger 里。把文件夹搬回城的根目录再收编，就能找回。"
+  },
   "machine_spare": {
     "en": "one of a kind that needs only one, and another is here",
     "zh": "同类有一个即可，已经有了"

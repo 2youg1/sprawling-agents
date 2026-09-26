@@ -159,6 +159,12 @@ export function createBuilding(addr: Address, template: Template): Command {
   };
 }
 
+// Takes a building out of the city; its files are kept under the
+// reserved subtree and its history stays in the ledger.
+export function removeBuilding(addr: Address): Command {
+  return { remove_building: { addr, idem: mintIdem() } };
+}
+
 // A new session at the same address: a fresh conversation in this
 // room, so the frozen model and effort go and the room may choose both
 // again. `carry` says whether the previous session's handoff travels

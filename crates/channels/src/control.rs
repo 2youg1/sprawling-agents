@@ -96,6 +96,9 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // belongs where the run is, not here.
         | Command::OpenSession { .. }
         | Command::CreateBuilding { .. }
+        // Removing a building with a run going is refused where the
+        // runs are, so this verb never reaches one.
+        | Command::RemoveBuilding { .. }
         | Command::PutSecret { .. }
         // Opening a file manager reaches nothing a run is doing.
         | Command::Reveal { .. }

@@ -182,6 +182,7 @@ impl RunWorker {
             channels::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
             }
+            channels::Command::RemoveBuilding { addr, .. } => self.remove_building(&addr),
             channels::Command::Approve { item, verdict, .. } => {
                 // The control surface is the person's entrance, so the
                 // answerer is a human here by construction. A resident

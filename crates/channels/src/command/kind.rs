@@ -192,6 +192,15 @@ pub enum Command<Secret = Sealed<String>> {
         template: TemplateName,
         idem: IdemKey,
     },
+    /// Take a building out of the city. Its files move under the
+    /// reserved subtree and its history stays in the Ledger, so nothing
+    /// the person made is lost; a building with a run going is refused.
+    ///
+    /// Writes `building_removed`.
+    RemoveBuilding {
+        addr: Address,
+        idem: IdemKey,
+    },
     /// The one Command with no byte form. `Secret` is `Sealed<String>` in
     /// process and uninhabited on the wire.
     PutSecret {

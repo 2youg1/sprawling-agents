@@ -138,7 +138,10 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-pub const WIRE_V: u32 = 38;
+/// 39: a building can be removed. `Command::RemoveBuilding` and the
+///    `building_removed` event are new, so an older page would draw no
+///    control for the one and meet a kind it cannot decode in the other.
+pub const WIRE_V: u32 = 39;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};

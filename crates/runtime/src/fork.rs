@@ -195,6 +195,7 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
             EventKind::CityInitialized
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured
+            | EventKind::BuildingRemoved
             | EventKind::SessionOpened
             | EventKind::RunForked
             | EventKind::PromptAssembled

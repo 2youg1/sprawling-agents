@@ -158,7 +158,7 @@ const GOVERNANCE_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
 ]);
 
 const BUILDING_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "building_created", "building_configured", "roadmap_claimed", "roadmap_finished",
+  "building_created", "building_configured", "building_removed", "roadmap_claimed", "roadmap_finished",
   "roadmap_released", "roadmap_split", "roadmap_blocked", "pursuit_changed",
   "checkpoint_committed", "handoff_written", "run_started", "run_frozen",
   "pr_merged", "asset_archived", "governed_document_written",

@@ -487,6 +487,7 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 | 创世与空间 | `city_initialized` | record-only（创世行，prev＝64 个 0） |
 | 创世与空间 | `building_created` | record-only |
 | 创世与空间 | `building_configured` | record-only |
+| 创世与空间 | `building_removed` | record-only（人把一栋楼移出城：载荷携 addr 与 kept——文件搬到 reserved subtree 下的哪里；不删一个字节，楼写过的每一行留在账里） |
 | 基集 | `session_opened` | record-only（新的一段从哪里开始；`prompt_assembled` 记的是它之后给了那一跑什么） |
 | 基集 | `run_started` | record-only |
 | 基集 | `run_forked` | record-only |

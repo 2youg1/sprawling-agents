@@ -3515,3 +3515,19 @@ pub(super) enum LineError {
 
 1. 不用 clap。命令表是数据，解析器约两百行；启动时间几乎全是操作系统的开销（Windows x86-64 桌面级机器上，`--version` 首字节 7.98 ms，空进程下限 5.40 ms），没有给一个参数库的依赖、编译时间与体积留出位置。重新考虑的条件：动词需要子动词或 shell 补全以外的、这张表表达不了的结构。
 2. 不用 `+` 前缀区分动词。现有动词不改名，一个词仍然是一个动词，文档与肌肉记忆都不必迁移。
+
+## 8-90 移走一栋楼（`bin::assembly::commanding::removing`，形状 3 决定；channels-SPEC §19、city-SPEC §8-3）
+
+```rust
+impl RunWorker {
+    pub(in crate::assembly) fn remove_building(&mut self, addr: &Address) -> Result<(), AxError>;
+}
+impl RoomQueues {
+    pub(in crate::assembly) fn worked_within(&self, building: &Address) -> Option<(Address, RunId)>;
+}
+```
+
+- `Command::RemoveBuilding` 走这里。城拥有 `city::remove_building` 不知道的两件事：楼里有没有 run 正在跑，以及 Ledger 记什么。
+- **一个拒绝**：楼里某个房间的队列正借给一个 run（`worked_within`），拒 `E_BUSY`，主语点名房间与 run，恢复是先停下它。房间队列是城里唯一说「这里有人在干活」的账，另开一本会与它分歧；逐个看全部房间，因为地址序把 `lab-2` 排在 `lab` 与 `lab/room1` 之间，按前缀截区间会漏。
+- **先搬后记**：文件先搬进 `.sprawling/removed/`，再写 `building_removed`（载荷 addr、kept），因为这一行说的是「已经搬了」。楼以前写过的每一行都留在账里，什么都不删。
+- 客户端（`client/src/core/removal.ts`）在 City Hall 上不画这个控件，楼里有 run 在跑时画成不可用并说明原因；确认走 `parts/dialog`。城仍自己拒这两种情况，页面只是不把一个只会被拒的按钮交给人。

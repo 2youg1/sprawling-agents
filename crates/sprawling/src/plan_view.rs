@@ -247,6 +247,10 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         // other, so the table is re-read rather than trusted.
         | EventKind::SpineDocumentWritten => PlanReach::Stale,
         EventKind::BuildingConfigured
+        // A removed building is no longer listed, so no view asks for
+        // its plan; a building raised later under the same name is a
+        // `building_created`, which re-reads.
+        | EventKind::BuildingRemoved
         | EventKind::SessionOpened
         | EventKind::RunStarted
         | EventKind::RunForked

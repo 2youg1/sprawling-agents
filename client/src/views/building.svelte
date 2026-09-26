@@ -45,8 +45,9 @@
 
 <script lang="ts">
   import { QUERIES } from "../core/asking";
-  import { halt, pursue, release } from "../core/commands";
+  import { halt, pursue, release, removeBuilding } from "../core/commands";
   import { fill, say } from "../core/lang";
+  import { removalOf } from "../core/removal";
   import { roomOf, toFragment } from "../core/route";
   import { buildingIsShut } from "../core/scope";
   import { ui } from "../ui";
@@ -54,6 +55,7 @@
   import { Address as AddressSchema } from "../wire";
   import Badge from "./parts/badge.svelte";
   import Button from "./parts/button.svelte";
+  import Dialog from "./parts/dialog.svelte";
   import Commits from "./building/commits.svelte";
   import Directory from "./building/directory.svelte";
   import FileView from "./building/file.svelte";
@@ -92,6 +94,10 @@
   });
 
   const halted = $derived(buildingIsShut($belief.halted, address));
+  const removal = $derived(removalOf(address, livingIn(address)));
+  // Removing moves the building's files out of the city, so it is asked
+  // through `parts/dialog` before the command leaves.
+  let removing = $state(false);
   const done = $derived.by(() => {
     const held = building;
     if (held === undefined || !("planned" in held.progress) || held.progress.planned.total === 0) {
@@ -237,6 +243,16 @@
     {#if !halted && livingIn(address) === 0}
       <span class="text-note text-text-quiet">{say($lang, "bld_halt_idle")}</span>
     {/if}
+    {#if removal !== "hall"}
+      <Button
+        label={fill(say($lang, "bld_remove"), { addr: address })}
+        tone="quiet"
+        {...removal === "busy" ? { why: say($lang, "bld_remove_busy") } : {}}
+        onPress={() => {
+          removing = true;
+        }}
+      />
+    {/if}
     <span class="@lg/page:hidden">
       <Button
         label={say($lang, "bld_tree")}
@@ -357,3 +373,19 @@
     </aside>
   </div>
 </div>
+
+<Dialog
+  open={removing}
+  title={fill(say($lang, "bld_remove_title"), { addr: address })}
+  detail={say($lang, "bld_remove_detail")}
+  confirmLabel={fill(say($lang, "bld_remove"), { addr: address })}
+  cancelLabel={say($lang, "part_cancel")}
+  destructive
+  onConfirm={() => {
+    removing = false;
+    if (u.send(removeBuilding(address))) u.go({ kind: "city" });
+  }}
+  onCancel={() => {
+    removing = false;
+  }}
+/>

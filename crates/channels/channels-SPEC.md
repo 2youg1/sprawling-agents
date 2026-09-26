@@ -19,7 +19,7 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 28 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 29 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
   **当前 golden**：`ec0edce8d6c76a2f93d3a8957bf92bb7fe9277d466d45dacbce9dd7c438cf510`；**WIRE_V ＝ 38**（回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
@@ -535,6 +535,7 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 | `ConnectToolkit` | client | 请外包服务开一次同意会话，把一个外部应用接进来 |
 | `PutSpine` | client | 写一栋楼自己的 spine 文档（roadmap／memo／handoff／spec）。携 `base`（发信方起手时那份正文）与 `body`，文件已被人或居民改过即拒——**这几份有两个写者**，与 `PutDocument` 的单写者前提不同，故两道门的守卫不同 |
 | `CreateBuilding` | client | 起一栋楼 |
+| `RemoveBuilding` | client | 把一栋楼移出城：文件搬进 reserved subtree（city-SPEC §8-3），历史留在 Ledger，写 `building_removed`；有 run 正在其中某个房间里跑时拒 `E_BUSY`，点名房间与 run |
 | `Steer` | client | 中途换方向 |
 | `Cancel` | client | 停下这一个 |
 | `Halt` | client | 停下一个范围 |
