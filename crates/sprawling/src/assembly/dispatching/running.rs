@@ -65,14 +65,7 @@ impl RunWorker {
         // is sent to be named, written to a room or recorded.
         let task = self.take_custody(task)?;
         let goal = self.take_custody(goal)?;
-        // Naming the work costs one call to the digest model, so it is
-        // asked after the city has agreed rather than before: a person
-        // does not pay a provider to name work this city was never going
-        // to take. The rules read a moment ago carry the building's
-        // policy into that call, so the task text of a confidential
-        // building reaches only a model on this machine.
-        let session =
-            self.session_for(&at.addr, at.session.take(), &task, agreed.rules.policy())?;
+        let session = super::session::session_for(&at.addr, at.session.take(), &task)?;
         // The first thing this city writes for a dispatch, and the line
         // where `addr` stops being where the work was sent and becomes
         // where the run works.

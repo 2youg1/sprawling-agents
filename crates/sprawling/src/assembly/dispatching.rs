@@ -151,24 +151,7 @@ pub(crate) struct Dispatched {
     pub(super) completion: kernel::Completion,
 }
 
-/// What the digest model is told when it is asked to name a piece of
-/// work.
-///
-/// Short on purpose, and it states the shape of a legal answer rather
-/// than trusting one: `SessionName::parse` is the authority and refuses
-/// anything with a separator in it, so a prompt that did not say "one
-/// segment" would spend a call to be refused.
-pub(super) const NAME_THE_WORK: &str = "Name this piece of work in two to four words, joined by hyphens, in \
-     lowercase ASCII. Answer with the name alone: no path, no quotes, no \
-     explanation. Example: refactor-ledger-reads";
-
-/// How many tokens a name is worth. Four words do not need more, and a
-/// ceiling is what stops a model that decided to explain itself from
-/// costing a person real money for a filename.
-pub(super) const NAME_TOKENS: Option<kernel::Ceiling> = kernel::Ceiling::new(32);
-
 pub(super) mod agreeing;
-pub(super) mod asking_name;
 pub(super) mod custody;
 pub(super) mod handback;
 pub(super) mod running;
