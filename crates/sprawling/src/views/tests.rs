@@ -25,30 +25,24 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
     let room = Address::parse("lab/room1").unwrap();
     let run = RunId::from_bytes([7u8; 16]);
 
-    let mut enqueued = serde_json::Map::new();
-    enqueued.insert(
-        "id".to_owned(),
-        serde_json::Value::String("sig-1".to_owned()),
-    );
-    enqueued.insert(
-        "kind".to_owned(),
-        serde_json::Value::String("question".to_owned()),
-    );
-    enqueued.insert(
-        "from".to_owned(),
-        serde_json::Value::String("lab/room2".to_owned()),
-    );
-    enqueued.insert(
-        "room".to_owned(),
-        serde_json::Value::String(room.as_str().to_owned()),
-    );
+    // The two lines exactly as `effect` writes them: the consumption
+    // carries only the id and the taker, and its room is the line's addr.
+    let signal = collab::Signal::new(
+        kernel::event::record::SignalId::parse("sig-1").unwrap(),
+        kernel::event::record::SignalKind::Thread,
+        "lab/room2".to_owned(),
+        room.clone(),
+        kernel::Version::new(1),
+        Payload::new(serde_json::Map::new()).unwrap(),
+        kernel::TimeMs::new(1_000),
+    )
+    .unwrap();
+    let line = |seq, kind, data: Payload| view_record(seq, run, kind, &room, data.as_map().clone());
     views
-        .apply(&view_record(
+        .apply(&line(
             1,
-            run,
             EventKind::SignalEnqueued,
-            &room,
-            enqueued.clone(),
+            signal.enqueued_payload().unwrap(),
         ))
         .unwrap();
 
@@ -58,16 +52,14 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
         panic!("InboxView answers with an inbox");
     };
     assert_eq!(inbox.waiting.len(), 1);
-    assert_eq!(inbox.waiting[0].kind, "question");
+    assert_eq!(inbox.waiting[0].kind, "thread");
 
     // Taking a signal empties the row; the view never took it itself.
     views
-        .apply(&view_record(
+        .apply(&line(
             2,
-            run,
             EventKind::SignalConsumed,
-            &room,
-            enqueued,
+            signal.consumed_payload("lab/room1").unwrap(),
         ))
         .unwrap();
     let channels::Answer::Inbox(inbox) =

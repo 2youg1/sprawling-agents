@@ -18,23 +18,9 @@
 //! and what stands in the prefix is nothing at all — only `status`
 //! reports that signals are waiting.
 
+use kernel::event::record::{Lane, SignalConsumed, SignalEnqueued, SignalId, SignalKind};
 use kernel::{Address, Admission, AxCode, AxError, IdemKey, Payload, RunId, Seq, TimeMs, Version};
 use memory::{EventQueue, QueueLane};
-use serde::{Deserialize, Serialize};
-
-mod signal_id;
-mod signal_kind;
-
-pub use signal_id::SignalId;
-pub use signal_kind::SignalKind;
-
-/// Which line a signal waits in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Lane {
-    Urgent,
-    Ordinary,
-}
 
 /// One communication between residents.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,7 +120,7 @@ impl Signal {
     /// # Errors
     /// Propagates the payload's refusal to hold what it was given.
     pub fn enqueued_payload(&self) -> Result<Payload, AxError> {
-        Payload::of(&SignalLine {
+        Payload::of(&SignalEnqueued {
             id: self.id.clone(),
             kind: self.kind,
             from: self.from.clone(),
@@ -169,7 +155,7 @@ impl Signal {
     /// Refuses a payload missing a field or carrying a kind this version
     /// does not know.
     pub fn from_payload(payload: &Payload) -> Result<Signal, AxError> {
-        let line: SignalLine = payload.read()?;
+        let line: SignalEnqueued = payload.read()?;
         Signal::new(
             line.id,
             line.kind,
@@ -179,48 +165,6 @@ impl Signal {
             line.payload,
             line.at,
         )
-    }
-}
-
-/// `signal_enqueued`: the signal itself, and the line it waits in.
-///
-/// The one authority for this line's keys. They used to be written key
-/// by key and read key by key in this same file, which is two spellings
-/// of seven names and a place for them to drift.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct SignalLine {
-    id: SignalId,
-    kind: SignalKind,
-    from: String,
-    room: Address,
-    room_version: Version,
-    payload: Payload,
-    at: TimeMs,
-    /// Written for a reader outside this crate, never read back here:
-    /// the lane is derived from `kind` by [`Signal::lane`], and reading
-    /// a stored copy would let a line say which lane it took while the
-    /// derivation says another. Absent on a line written before the key
-    /// existed, which changes nothing, for the same reason.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    lane: Option<Lane>,
-}
-
-/// `signal_consumed`: which signal was taken, and by whom.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SignalConsumed {
-    pub id: SignalId,
-    pub by: String,
-}
-
-impl SignalConsumed {
-    /// Reads back what [`Signal::consumed_payload`] wrote.
-    ///
-    /// # Errors
-    /// Refuses a payload this build cannot read as a consumption. A
-    /// fold that skipped such a line instead would count the signal as
-    /// still waiting and hand it to a resident twice.
-    pub fn from_payload(payload: &Payload) -> Result<SignalConsumed, AxError> {
-        payload.read()
     }
 }
 

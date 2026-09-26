@@ -19,7 +19,8 @@
 
 use kernel::{Address, AxCode, AxError, TimeMs, Version};
 
-use crate::inbox::{Signal, SignalId, SignalKind};
+use crate::inbox::Signal;
+use kernel::event::record::{SignalId, SignalKind};
 
 /// How the person's steer is attributed in the window.
 const PERSON_SOURCE: &str = "user";

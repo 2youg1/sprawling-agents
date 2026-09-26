@@ -13,6 +13,7 @@ use crate::address::Address;
 
 /// Non-empty goal identity; uniqueness bookkeeping is the caller's.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GoalId(String);
 
 impl GoalId {

@@ -25,7 +25,8 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use crate::inbox::{Inbox, Signal, SignalId, SignalKind};
+use crate::inbox::{Inbox, Signal};
+use kernel::event::record::{SignalId, SignalKind};
 
 /// What the run did to the city's signals, in the order it did it. The
 /// worker turns each of these into a ledger line once the drive is over.

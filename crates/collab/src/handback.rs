@@ -24,8 +24,9 @@ use kernel::{Address, AxCode, AxError, Locator, Payload, TimeMs, Version};
 use serde::{Deserialize, Serialize};
 
 use crate::fanin::{Artifact, Claim};
-use crate::inbox::{Signal, SignalId, SignalKind};
+use crate::inbox::Signal;
 use crate::workshop::NodeId;
+use kernel::event::record::{SignalId, SignalKind};
 
 /// How one piece of handed-down work came back. Exhaustive: a delegate
 /// that finished and one that stopped are different facts, and a parent

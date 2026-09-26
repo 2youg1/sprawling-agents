@@ -621,7 +621,7 @@ impl PlannedMerge<'_> {
 }
 impl WorktreeLease {
     pub fn name(&self) -> &WorktreeName;  pub fn path(&self) -> &Path;  pub fn disk(&self) -> ByteLen;
-    pub fn opened_payload(&self) -> Result<Payload, MemoryError>;   // worktree_opened
+    pub fn opened_payload(&self) -> Result<Payload, MemoryError>;   // worktree_opened，形状是 kernel::event::record::WorktreeOpened
 }
 ```
 

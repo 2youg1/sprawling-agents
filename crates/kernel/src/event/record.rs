@@ -42,9 +42,11 @@ mod adviser;
 mod checkpoint;
 mod control;
 mod discard;
+mod collaboration;
 mod governance;
 mod log;
 mod modality;
+mod roadmap;
 mod run;
 mod tool;
 mod turn;
@@ -58,12 +60,17 @@ pub use control::{
     HandoffWritten, PolicyChanged, WatchdogFired,
 };
 pub use discard::{AssetArchived, DiscardRestored, FileDiscarded};
+pub use collaboration::{
+    ConflictLevel, GoalConflict, Lane, PursuitChanged, PursuitMove, SignalConsumed, SignalEnqueued,
+    SignalId, SignalKind, WorktreeOpened,
+};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     GoverningDocument, RulesChanged, SpineDocumentWritten, autonomy_word,
 };
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
+pub use roadmap::{RoadmapMoved, RoadmapStep};
 pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{

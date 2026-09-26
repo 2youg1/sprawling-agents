@@ -25,7 +25,7 @@
 use std::path::Path;
 
 use kernel::event::record::{AssetArchived, DiscardRestored, FileDiscarded};
-use kernel::{Address, EventRecord, RunId};
+use kernel::{Address, AxError, EventRecord, RunId};
 
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
@@ -137,29 +137,21 @@ pub(crate) fn verdict_line(verdict: kernel::PursuitVerdict) -> String {
     }
 }
 
-/// What one `pursuit_changed` record says.
+/// The building a `pursuit_changed` record is about.
 ///
-/// `None` for a record this build cannot read as one, which a view skips
-/// rather than inventing a goal for.
-pub(crate) fn pursuit_from(
-    record: &EventRecord,
-) -> Option<(Address, Option<(String, kernel::PursuitState)>)> {
-    let map = record.data().as_map();
-    let addr = record.addr()?.clone();
-    let step = map.get("step")?.as_str()?;
-    let goal = map
-        .get("goal")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_owned();
-    let held = match step {
-        "set" => Some((goal, kernel::PursuitState::Running)),
-        "pause" => Some((goal, kernel::PursuitState::Paused)),
-        "resume" => Some((goal, kernel::PursuitState::Running)),
-        "clear" => None,
-        _ => return None,
-    };
-    Some((addr, held))
+/// # Errors
+/// Refuses a record with no address: the step it records belongs to no
+/// building, and a fold that skipped it would keep whatever goal the
+/// step changed.
+pub(crate) fn pursued(record: &EventRecord) -> Result<Address, kernel::AxError> {
+    record.addr().cloned().ok_or_else(|| {
+        kernel::AxError::failure(
+            kernel::AxCode::WireMismatch,
+            "read a pursuit_changed line",
+            format!("line {} names no building", record.seq().value()),
+        )
+        .with_recovery("replay with the build that wrote this record")
+    })
 }
 
 /// Every building the city has, in reading order.
@@ -177,20 +169,22 @@ pub(crate) fn buildings_of(city_root: &Path) -> Vec<Address> {
 /// One signal, as a room's queue would show it. `None` for a record
 /// this version cannot read as a signal: a view skips what it cannot
 /// read rather than inventing a row for it.
-pub(crate) fn signal_line(record: &EventRecord) -> Option<(Address, channels::SignalLine)> {
-    let map = record.data().as_map();
-    let text = |key: &str| {
-        map.get(key)
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned)
-    };
-    let room = Address::parse(&text("room")?).ok()?;
-    Some((
-        room,
+/// The waiting row a `signal_enqueued` line adds, and the room it waits
+/// in, read through the struct its writer wrote.
+///
+/// # Errors
+/// Refuses a line this build cannot read as a signal: skipping it would
+/// leave a waiting signal out of the view.
+pub(crate) fn signal_line(
+    record: &EventRecord,
+) -> Result<(Address, channels::SignalLine), AxError> {
+    let signal = collab::Signal::from_payload(record.data())?;
+    Ok((
+        signal.room().clone(),
         channels::SignalLine {
-            id: text("id")?,
-            kind: text("kind").unwrap_or_else(|| "signal".to_owned()),
-            from: text("from").unwrap_or_default(),
+            id: signal.id().as_str().to_owned(),
+            kind: signal.kind().as_str().to_owned(),
+            from: signal.from().to_owned(),
             at: record.t(),
         },
     ))

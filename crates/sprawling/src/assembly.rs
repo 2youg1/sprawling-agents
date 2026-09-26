@@ -71,7 +71,7 @@ pub(crate) use lifetime::Closing;
 use lifetime::LedgerOpening;
 pub(crate) use mcp::McpLink;
 use mcp::{mounts_under, transport_site};
-use naming::{building_of, governed_of, name_of, not_built, plan_node_of, scope_of};
+use naming::{building_of, governed_of, name_of, not_built, scope_of};
 use plans::Reporter;
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};

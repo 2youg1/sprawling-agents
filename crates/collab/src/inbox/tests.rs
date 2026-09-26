@@ -172,8 +172,12 @@ fn a_line_written_by_hand_before_this_shape_had_a_struct_still_reads() {
 #[test]
 fn a_consumption_that_does_not_read_is_a_refusal_rather_than_a_skip() {
     let sent = signal("s-9", SignalKind::Mention);
-    let taken = SignalConsumed::from_payload(&sent.consumed_payload("lab/room2").unwrap()).unwrap();
+    let taken = sent
+        .consumed_payload("lab/room2")
+        .unwrap()
+        .read::<SignalConsumed>()
+        .unwrap();
     assert_eq!(taken.id.as_str(), "s-9");
     assert_eq!(taken.by, "lab/room2");
-    assert!(SignalConsumed::from_payload(&Payload::empty()).is_err());
+    assert!(Payload::empty().read::<SignalConsumed>().is_err());
 }

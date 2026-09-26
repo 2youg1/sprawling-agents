@@ -57,7 +57,7 @@ impl RunWorker {
             CITY_VERIFIER,
         );
         let signal = back.signal(
-            collab::SignalId::parse(&format!("handback-{}", child.run))?,
+            kernel::event::record::SignalId::parse(&format!("handback-{}", child.run))?,
             parent.clone(),
             now_ms()?,
         )?;

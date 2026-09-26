@@ -13,10 +13,10 @@
 //! says it made it say. `ClaimDesk` decides; this describes and checks.
 //! Two shapes, so two files (ARCHITECTURE.md section 9).
 
+use kernel::event::record::{RoadmapMoved, RoadmapStep};
 use kernel::spine::check_roadmap_shape;
-use kernel::{AxCode, AxError, EvidenceCell, Locator, NodeId, Payload, PlanExit};
+use kernel::{AxError, EvidenceCell, Locator, NodeId, Payload, PlanExit};
 use kernel::{RoadmapShape, RoadmapStatus};
-use serde_json::{Map, Value};
 
 /// What the run did to the plan. Exhaustive on purpose, like the other
 /// desks': every variant is a line the worker has to write, so a new one
@@ -86,61 +86,36 @@ impl ClaimEffect {
     /// # Errors
     /// Propagates the payload's refusal to hold what it was given.
     pub fn payload(&self, who: &str) -> Result<Payload, AxError> {
-        let mut map = Map::new();
-        map.insert("by".to_owned(), Value::String(who.to_owned()));
-        map.insert("node".to_owned(), Value::String(self.id().to_string()));
-        match self {
-            ClaimEffect::Claimed { item, .. } => {
-                map.insert("verb".to_owned(), Value::String("claimed".to_owned()));
-                map.insert("item".to_owned(), Value::String(item.clone()));
-            }
-            ClaimEffect::Split { children, .. } => {
-                map.insert("verb".to_owned(), Value::String("split".to_owned()));
-                map.insert(
-                    "children".to_owned(),
-                    Value::Array(
-                        children
-                            .iter()
-                            .map(|text| Value::String(text.clone()))
-                            .collect(),
-                    ),
-                );
-            }
+        let step = match self {
+            ClaimEffect::Claimed { item, .. } => RoadmapStep::Claimed { item: item.clone() },
+            ClaimEffect::Split { children, .. } => RoadmapStep::Split {
+                children: children.clone(),
+            },
             ClaimEffect::PutDown { item, exit, .. } => {
-                map.insert("item".to_owned(), Value::String(item.clone()));
+                let item = item.clone();
                 match exit {
-                    PlanExit::Finished { evidence, .. } => {
-                        map.insert("verb".to_owned(), Value::String("finished".to_owned()));
-                        map.insert("evidence".to_owned(), Value::String(evidence.to_string()));
-                    }
-                    PlanExit::Stopped { why, .. } => {
-                        map.insert(
-                            "verb".to_owned(),
-                            Value::String(
-                                if why.is_red() { "blocked" } else { "released" }.to_owned(),
-                            ),
-                        );
-                        map.insert(
-                            "why".to_owned(),
-                            serde_json::to_value(why).map_err(|err| {
-                                AxError::failure(
-                                    AxCode::InvalidArgs,
-                                    "record why a plan node stopped",
-                                    err.to_string(),
-                                )
-                                .with_recovery(
-                                    "report this against collab::claim_effect: the \
-                                     reason a node stopped is a plain enum and JSON \
-                                     refuses none of its spellings",
-                                )
-                            })?,
-                        );
-                        map.insert("line".to_owned(), Value::String(why.line()));
-                    }
+                    PlanExit::Finished { evidence, .. } => RoadmapStep::Finished {
+                        item,
+                        evidence: evidence.clone(),
+                    },
+                    PlanExit::Stopped { why, .. } if why.is_red() => RoadmapStep::Blocked {
+                        item,
+                        why: why.clone(),
+                        line: why.line(),
+                    },
+                    PlanExit::Stopped { why, .. } => RoadmapStep::Released {
+                        item,
+                        why: why.clone(),
+                        line: why.line(),
+                    },
                 }
             }
-        }
-        Payload::new(map)
+        };
+        Payload::of(&RoadmapMoved {
+            by: who.to_owned(),
+            node: self.id().clone(),
+            step,
+        })
     }
 }
 

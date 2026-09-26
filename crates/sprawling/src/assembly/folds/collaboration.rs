@@ -6,12 +6,12 @@
 //! The two projections the collaboration tools read: what is waiting in
 //! each room, and what ground is already claimed.
 
+use kernel::event::record::{PursuitChanged, RoadmapMoved};
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-use crate::effect;
-use crate::views::pursuit_from;
+use crate::views::pursued;
 
-use super::super::{building_of, plan_node_of};
+use super::super::building_of;
 
 /// The three registers a run's collaboration tools read from.
 pub(in crate::assembly) struct Collaboration {
@@ -93,16 +93,17 @@ impl CollaborationFold {
                 // it cannot read: a consumption skipped here is a
                 // signal the rebuild believes is still waiting, and a
                 // resident is handed it a second time.
-                let taken = collab::SignalConsumed::from_payload(record.data())?;
+                let taken = record
+                    .data()
+                    .read::<kernel::event::record::SignalConsumed>()?;
                 self.consumed.insert(taken.id.as_str().to_owned());
             }
-            EventKind::GoalRegistered => self.goals.push(effect::goal_from_payload(record.data())?),
+            EventKind::GoalRegistered => self.goals.push(record.data().read()?),
             EventKind::RoadmapClaimed => {
-                if let (Some(building), Some(node), Some(room)) = (
-                    record.addr().and_then(building_of),
-                    plan_node_of(record),
-                    record.addr(),
-                ) {
+                let node = record.data().read::<RoadmapMoved>()?.node;
+                if let (Some(building), Some(room)) =
+                    (record.addr().and_then(building_of), record.addr())
+                {
                     self.plan_holders
                         .entry(building)
                         .or_default()
@@ -110,21 +111,19 @@ impl CollaborationFold {
                 }
             }
             EventKind::RoadmapFinished | EventKind::RoadmapReleased | EventKind::RoadmapBlocked => {
-                if let (Some(building), Some(node)) =
-                    (record.addr().and_then(building_of), plan_node_of(record))
-                {
+                let node = record.data().read::<RoadmapMoved>()?.node;
+                if let Some(building) = record.addr().and_then(building_of) {
                     self.plan_holders.entry(building).or_default().remove(&node);
                 }
             }
             EventKind::PursuitChanged => {
-                if let Some((addr, held)) = pursuit_from(record) {
-                    match held {
-                        Some(entry) => {
-                            self.pursuits.insert(addr, entry);
-                        }
-                        None => {
-                            self.pursuits.remove(&addr);
-                        }
+                let addr = pursued(record)?;
+                match record.data().read::<PursuitChanged>()?.held()? {
+                    Some(entry) => {
+                        self.pursuits.insert(addr, entry);
+                    }
+                    None => {
+                        self.pursuits.remove(&addr);
                     }
                 }
             }
@@ -135,15 +134,17 @@ impl CollaborationFold {
             // merged one is done, and a rejected one goes back to the
             // resident who wrote it rather than sitting in a queue
             // nobody owns.
-            EventKind::PrMerged | EventKind::PrRejected => {
-                if let Some(branch) = record
+            EventKind::PrMerged => {
+                let branch = record.data().read::<collab::MergedRequest>()?.branch;
+                self.requests.retain(|held| held.branch != branch);
+            }
+            EventKind::PrRejected => {
+                let branch = record
                     .data()
-                    .as_map()
-                    .get("branch")
-                    .and_then(serde_json::Value::as_str)
-                {
-                    self.requests.retain(|held| held.branch != branch);
-                }
+                    .read::<collab::RejectedRequest>()?
+                    .request
+                    .branch;
+                self.requests.retain(|held| held.branch != branch);
             }
             _ => {}
         }
