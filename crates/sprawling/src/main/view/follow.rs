@@ -52,8 +52,8 @@ pub(super) struct Follow {
 }
 
 enum Reading {
-    Filling(Receiver<Result<(Whole, Folded), ViewError>>),
-    Whole(Whole),
+    Filling(Receiver<Result<(Box<Whole>, Folded), ViewError>>),
+    Whole(Box<Whole>),
 }
 
 /// A resident index and lineage fold over the whole ledger.
@@ -136,12 +136,12 @@ fn row_of(record: &EventRecord, raw: &[u8]) -> Row {
 }
 
 impl Whole {
-    fn fold(dir: &Path) -> Result<(Whole, Folded), ViewError> {
-        let mut whole = Whole {
+    fn fold(dir: &Path) -> Result<(Box<Whole>, Folded), ViewError> {
+        let mut whole = Box::new(Whole {
             index: LedgerIndex::rebuild(dir)?,
             lineage: Lineage::default(),
             folded_to: None,
-        };
+        });
         let folded = whole.fold_appended(dir)?;
         Ok((whole, folded))
     }

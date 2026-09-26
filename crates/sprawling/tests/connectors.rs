@@ -241,7 +241,11 @@ impl Model for Calling {
             .flat_map(|message| &message.content)
             .filter_map(|block| match block {
                 ContentBlock::ToolResult { content, .. } => Some(content.clone()),
-                _ => None,
+                ContentBlock::Text { .. }
+                | ContentBlock::Thinking { .. }
+                | ContentBlock::RedactedThinking { .. }
+                | ContentBlock::ToolUse { .. }
+                | ContentBlock::Image(_) => None,
             })
             .collect();
         if !results.is_empty() {

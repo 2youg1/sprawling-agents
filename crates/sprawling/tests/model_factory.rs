@@ -230,7 +230,7 @@ fn a_confidential_building_refuses_before_the_factory_is_asked() {
         factory,
     );
     let refused = dispatch(&mut worker, Some(kernel::SessionName::parse("s1").unwrap()))
-        .map_err(|err| err.code().clone());
+        .map_err(|err| *err.code());
 
     assert_eq!(
         (refused, asked.lock().unwrap().clone()),
