@@ -56,6 +56,23 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
     Ok(json!({ "content": content, "stop_reason": stop, "usage": usage }))
 }
 
+/// The tool call the last frame completes, when that frame is a
+/// `content_block_stop`.
+///
+/// # Errors
+/// As [`completed_call`].
+pub(crate) fn call_completed_by(frames: &[Value]) -> Result<Option<ToolCall>, AxError> {
+    let stopped = frames
+        .last()
+        .filter(|frame| frame.get("type").and_then(Value::as_str) == Some("content_block_stop"))
+        .and_then(|frame| frame.get("index"))
+        .and_then(Value::as_u64);
+    match stopped {
+        Some(at) => completed_call(frames, at),
+        None => Ok(None),
+    }
+}
+
 /// The tool call the `content_block_stop` at index `at` completes, read
 /// by the same `block_from` the settled answer is read by, so the call
 /// handed over early and the one in the `ModelReturn` are equal.
@@ -70,14 +87,7 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
 /// # Errors
 /// `E_PROVIDER` when the arguments stop in the middle of a value, and
 /// `E_WIRE_MISMATCH` when the block is not one this dialect spells.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the Model port has no door that hands an early call to the runtime yet"
-    )
-)]
-pub(crate) fn completed_call(frames: &[Value], at: u64) -> Result<Option<ToolCall>, AxError> {
+fn completed_call(frames: &[Value], at: u64) -> Result<Option<ToolCall>, AxError> {
     let Rebuilt { content, .. } = rebuilt(
         frames
             .iter()

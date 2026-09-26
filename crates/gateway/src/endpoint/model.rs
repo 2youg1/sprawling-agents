@@ -27,11 +27,20 @@ impl Model for Endpoint {
         req: &ModelRequest,
         onto: kernel::Increments<'_>,
     ) -> Result<ModelReturn, AxError> {
+        self.call_speculating(req, onto, &mut |_| {})
+    }
+
+    fn call_speculating(
+        &mut self,
+        req: &ModelRequest,
+        onto: kernel::Increments<'_>,
+        early: kernel::EarlyCalls<'_>,
+    ) -> Result<ModelReturn, AxError> {
         if req.policy.confidential {
             return Err(self.confidential_refusal());
         }
         self.refuse_pictures_a_blind_model_cannot_read(req)?;
-        self.stream(req, onto)
+        self.stream(req, onto, early)
     }
 
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {

@@ -25,4 +25,5 @@ mod responses;
 
 pub use images::ImageBytes;
 pub use request::request_wire;
+pub(crate) use response::call_completed_by;
 pub use response::{increment_of, response_from_wire, response_wire, settled_from_stream};
