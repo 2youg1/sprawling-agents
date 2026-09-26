@@ -73,16 +73,19 @@ pub(super) struct Face {
 
 impl Face {
     /// The tree lens, the cursor where the person is most likely needed:
-    /// the latest active run, else the latest run, else the city.
+    /// the latest run waiting on the person's answer, else the latest
+    /// active run, else the latest run, else the city.
     pub(super) fn open(runs: &[RunLine], records: Vec<Row>, size: Size) -> Face {
         let entries = arrange(runs);
-        let latest = |active_only: bool| {
+        let latest = |keep: fn(&RunLine) -> bool| {
             runs.iter()
-                .filter(|line| !active_only || line.state == Some(memory::RunPhase::Active))
+                .filter(|line| keep(line))
                 .max_by_key(|line| line.first_seq)
                 .map(|line| line.run)
         };
-        let chosen = latest(true).or_else(|| latest(false));
+        let chosen = latest(|line| line.unanswered > 0)
+            .or_else(|| latest(|line| line.state == Some(memory::RunPhase::Active)))
+            .or_else(|| latest(|_| true));
         let tree_at = chosen
             .and_then(|run| {
                 entries

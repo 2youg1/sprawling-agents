@@ -23,9 +23,40 @@ fn run(n: u8) -> RunId {
 
 /// Two rooms, a fork, a successor and a second stretch of one room,
 /// written as one segment; returns the raw lines as the file holds them.
+/// The question `asker` raises, and the answer that closes it.
+fn question(asker: RunId) -> (Value, Value) {
+    let cluster = kernel::ClusterKey {
+        class: kernel::ApprovalClass::Question,
+        detail: "push".to_owned(),
+    };
+    let item = kernel::ApprovalItem {
+        id: kernel::ApprovalId::of(&asker, Seq::new(1)),
+        actor: "tester".to_owned(),
+        action_desc: "push".to_owned(),
+        artifact: kernel::Locator::Cas {
+            hash: B3Hash::digest(b""),
+            range: None,
+        },
+        cluster_key: cluster.clone(),
+        created: TimeMs::new(0),
+        tainted: false,
+    };
+    let answer = kernel::event::record::ApprovalResolved {
+        id: item.id.clone(),
+        verdict: kernel::Ruling::Allow,
+        cluster,
+    };
+    (
+        serde_json::to_value(item).unwrap(),
+        serde_json::to_value(answer).unwrap(),
+    )
+}
+
 fn write_city_ledger(dir: &Path) -> Vec<Vec<u8>> {
     let lab = Some(Address::parse("lab/a").unwrap());
     let yard = Some(Address::parse("yard/b").unwrap());
+    let (asked_by_3, _) = question(run(3));
+    let (asked_by_2, answered_2) = question(run(2));
     let script: Vec<(RunId, Option<Address>, EventKind, Value)> = vec![
         (RunId::CITY, None, EventKind::CityInitialized, json!({})),
         (
@@ -79,10 +110,13 @@ fn write_city_ledger(dir: &Path) -> Vec<Vec<u8>> {
         ),
         (
             run(4),
-            lab,
+            lab.clone(),
             EventKind::ToolCalled,
             json!({"tool": "E_TOOL"}),
         ),
+        (run(3), lab, EventKind::ApprovalRequested, asked_by_3),
+        (run(2), yard, EventKind::ApprovalRequested, asked_by_2),
+        (RunId::CITY, None, EventKind::ApprovalResolved, answered_2),
     ];
     let mut prev = B3Hash::digest(b"");
     let mut blob = Vec::new();
@@ -201,7 +235,8 @@ fn records_are_byte_for_byte_what_grep_finds_in_the_same_ledger() {
     }
 }
 
-/// Every parent pointer `--runs` writes is the one the ledger wrote.
+/// Every parent pointer `--runs` writes is the one the ledger wrote, and
+/// every question a run raised counts until its answer lands.
 #[test]
 fn runs_carry_the_parent_pointers_the_ledger_wrote() {
     let dir = tempfile::tempdir().unwrap();
@@ -220,12 +255,13 @@ fn runs_carry_the_parent_pointers_the_ledger_wrote() {
                 forked_at: Option<u64>,
                 predecessor: Option<RunId>,
                 seqs: (u64, u64),
-                state: &str| {
+                (state, unanswered): (&str, usize)| {
         json!({
             "run": r.to_string(), "addr": addr, "session": session,
             "parent": parent.map(|p| p.to_string()), "forked_at": forked_at,
             "predecessor": predecessor.map(|p| p.to_string()),
             "first_seq": seqs.0, "last_seq": seqs.1, "state": state,
+            "unanswered": unanswered,
         })
     };
     assert_eq!(
@@ -239,7 +275,7 @@ fn runs_carry_the_parent_pointers_the_ledger_wrote() {
                 None,
                 None,
                 (1, 9),
-                "frozen"
+                ("frozen", 0)
             ),
             line(
                 run(2),
@@ -248,8 +284,8 @@ fn runs_carry_the_parent_pointers_the_ledger_wrote() {
                 None,
                 None,
                 None,
-                (3, 6),
-                "active"
+                (3, 12),
+                ("active", 0)
             ),
             line(
                 run(3),
@@ -258,8 +294,8 @@ fn runs_carry_the_parent_pointers_the_ledger_wrote() {
                 Some(run(1)),
                 Some(2),
                 None,
-                (5, 5),
-                "active"
+                (5, 11),
+                ("active", 1)
             ),
             line(
                 run(4),
@@ -269,7 +305,7 @@ fn runs_carry_the_parent_pointers_the_ledger_wrote() {
                 None,
                 Some(run(1)),
                 (8, 10),
-                "active"
+                ("active", 0)
             ),
         ]
     );
