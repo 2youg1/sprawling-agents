@@ -177,6 +177,11 @@ impl Entries {
     fn len(&self) -> usize {
         self.seqs.len()
     }
+
+    #[cfg(test)]
+    fn resident_bytes(&self) -> usize {
+        self.seqs.len() * size_of::<Seq>() + self.locs.len() * size_of::<(usize, u64)>()
+    }
 }
 
 /// run → the seq values it wrote, as ascending disjoint spans.

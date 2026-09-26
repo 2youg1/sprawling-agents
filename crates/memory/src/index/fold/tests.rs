@@ -152,3 +152,19 @@ proptest! {
         }
     }
 }
+
+/// A healthy ledger numbers its lines one after another, so the seq of
+/// each line is implied by its place and only the offset is held.
+#[test]
+fn a_contiguous_ledger_costs_eight_bytes_per_record() {
+    let mut folded = Folded::empty();
+    let count = 10_000u64;
+    for seq in 1..=count {
+        let body = format!("{{\"seq\":{seq}}}");
+        folded.insert_line("seg-0", seq * 64, body.as_bytes());
+    }
+    assert_eq!(
+        (folded.len(), folded.entries.resident_bytes()),
+        (10_000, 80_000)
+    );
+}
