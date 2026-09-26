@@ -424,3 +424,24 @@ fn a_dispatched_command_runs_below_the_core() {
          {core:?}; {result}"
     );
 }
+
+/// `nice` starts even when the program it is asked to run does not exist,
+/// so without a lookup of its own a missing program would come back as a
+/// settled exit 127 instead of the typed refusal with its recovery.
+#[cfg(unix)]
+#[test]
+fn a_missing_program_still_refuses_under_nice() {
+    let chamber = tempfile::tempdir().unwrap();
+    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let err = match tool.invoke(&call(serde_json::json!({
+        "program": { "path": "sprawling-no-such-program", "args": [] }
+    }))) {
+        Err(err) => err,
+        Ok(outcome) => panic!(
+            "a missing program must refuse: {}",
+            serde_json::to_value(&outcome.result).unwrap()
+        ),
+    };
+    assert_eq!(*err.code(), AxCode::ToolUnavailable);
+    assert!(err.recovery().contains("program name"), "{err:?}");
+}

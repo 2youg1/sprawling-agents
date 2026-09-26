@@ -178,7 +178,7 @@ impl ExecTool {
         arm: &str,
         placement: Placement,
     ) -> Result<ToolOutcome, AxError> {
-        let mut command = yielding::one_level_down(command);
+        let mut command = yielding::one_level_down(command)?;
         let inherited = self.inherited_environment();
         command.env_clear();
         for (key, value) in &inherited {
