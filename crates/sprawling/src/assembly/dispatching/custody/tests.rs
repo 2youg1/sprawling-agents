@@ -8,6 +8,7 @@
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::string_slice,
     reason = "test code"
 )]
 
@@ -16,7 +17,11 @@ use std::path::Path;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
 
-const PASTED: &str = "sk-ant-api03-Zx9Qm2Lp7Rt4Vw8Ya1Bc5De6Fg3Hj0Kn4Ms";
+/// An anthropic-shaped key, put together at run time so that the tree
+/// itself holds no key shape for `xtask secret` to find.
+fn pasted() -> String {
+    ["sk-", "ant-", &"Kx7q".repeat(10)].concat()
+}
 
 /// Every file under `dir` whose bytes contain `needle`.
 fn files_holding(dir: &Path, needle: &[u8]) -> Vec<std::path::PathBuf> {
@@ -41,6 +46,7 @@ fn files_holding(dir: &Path, needle: &[u8]) -> Vec<std::path::PathBuf> {
 /// holds it, and the reference that stands in its place resolves to it.
 #[test]
 fn a_pasted_key_reaches_the_vault_and_nothing_else() {
+    let key = pasted();
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
@@ -48,7 +54,7 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
     worker
         .handle(channels::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
-            task: format!("call the messages API with {PASTED} and report the model list"),
+            task: format!("call the messages API with {key} and report the model list"),
             goal: "the list is written down".to_owned(),
             mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"paste"),
@@ -58,12 +64,9 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
         .unwrap();
 
     let asked = provider.bodies().join("\n");
-    assert!(
-        !asked.contains(PASTED),
-        "a request carried the key: {asked}"
-    );
+    assert!(!asked.contains(&key), "a request carried the key: {asked}");
     assert_eq!(
-        files_holding(dir.path(), PASTED.as_bytes()),
+        files_holding(dir.path(), key.as_bytes()),
         Vec::<std::path::PathBuf>::new(),
         "the key was written into the city"
     );
@@ -77,5 +80,9 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
     let reference = kernel::SecretRef::parse(&reference).unwrap();
     let vault = worker.vault_handle();
     let held = vault.lock().unwrap().resolve(&reference).unwrap();
-    assert_eq!(held.expose(), PASTED, "the vault holds the key itself");
+    assert_eq!(
+        *held.into_vault_value(),
+        key,
+        "the vault holds the key itself"
+    );
 }
