@@ -238,6 +238,10 @@ mod tests {
         assert!(
             String::from_utf8_lossy(&record.substitute).contains("[offloaded: total 40000 bytes")
         );
+        assert!(
+            String::from_utf8_lossy(&record.substitute).contains("; rest at ./.rest/rest-"),
+            "the hint names the rest file by its address in the room"
+        );
         // The rest path serves the full original.
         assert_eq!(std::fs::read(&record.rest_path).unwrap(), original);
         // The CAS serves the full original by locator.

@@ -301,6 +301,21 @@ fn every_filtered_result_says_where_the_original_is() {
 }
 
 #[test]
+fn the_footer_names_the_rest_file_by_its_address_in_the_room() {
+    let mut world = world();
+    let record = cut(run(
+        &mut world,
+        &cargo_key(),
+        Some(101),
+        &cargo_build_output(),
+    ));
+    let footer = record.text.lines().last().unwrap();
+    let at = footer.split(", rest at ").nth(1).unwrap().trim_end_matches(']');
+    assert!(at.starts_with("./.rest/rest-") && at.ends_with(".dat"), "{footer}");
+    assert_eq!(record.offloaded().rest_path, at, "the ledger and the model read one address");
+}
+
+#[test]
 fn a_clean_build_says_so_rather_than_saying_nothing() {
     let mut world = world();
     let noise = "   Compiling dep v0.1.0\n".repeat(120);
