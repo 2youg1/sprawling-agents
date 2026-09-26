@@ -171,16 +171,12 @@ function staleBy(record: EventRecord, key: string, query: Query): boolean {
   const run = record.run;
   const kind = record.kind;
   switch (name) {
-    // A mid-run record only moves a row's `last_seq`, which the page's
-    // own fold already read off the same record; the city view changes
-    // when its membership, a building, a pursuit or a halt does.
+    // A mid-run record only moves `last_seq`, which the page's own fold reads.
     case "city_view":
       return BUILDING_MOVED.has(kind) || kind === "city_halted";
-    case "metrics":
-      return true;
     case "rounds": case "evidence": case "run_view": case "run_history": case "run_costs":
       return key.includes(run);
-    case "history":
+    case "metrics": case "history":
       return true;
     case "approval_queue":
       return kind === "approval_requested" || kind === "approval_resolved";
