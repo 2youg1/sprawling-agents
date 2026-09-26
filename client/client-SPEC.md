@@ -141,7 +141,8 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `idem.ts` | 2 值 | `mintIdem()` |
 | `mark.ts` | 4 适配器 | `paintMark(document, quiet \| live \| waiting)`：把令牌解算成引擎实际会画的颜色，拼成 SVG data URL 写进 `<link rel="icon">`；零颜色字面量 |
 | `rows.ts` | 4 适配器 | `Rows { getItem, setItem, removeItem }`、`memory()`、`browserRows()`：浏览器存储那一扇门，三处会抛的拒绝（禁用存储、配额为零、写时配额满）在这里各变成一个值 |
-| `prefs.ts` | 6 数据 | `Preferences { lang, welcomed, panel, appearance, proxying }`、`Keeper = "browser" \| "city"`、`PreferenceDoor { held, keeper, adopt, setLang, setWelcomed, setPanel, setAppearance, setProxying, chord(action), setChord, draft(at), setDraft }`、`loadPreferences(rows, browserLang)`、`preferences()`；**全客户端每一个存储键的拼写都只在这个文件的 `ROWS` 里**（草稿键 `sprawling.draft.<房间或 run>`、快捷键 `sprawling.key.<action>`） |
+| `results.ts` | 1 判定 | `Showing = whole \| results`、`drawsCalls(showing)`（房间在 `results` 下不挂载 `calls.svelte` 与推理折叠）、`Outcome = waiting \| failed \| done`、`outcomeOf(run)`、`resultsOf(runs, first) -> Group { outcome, first, total }[]`（一遍分三类，每类按 `started` 新到旧只留前 `first` 条，`FIRST = 5`）；只看结果模式「画什么」的唯一判定处。200 个 run 的夹具城分类耗时由 `results.test.ts` 判定并打印 `city_results` 行，登记于 `xtask/budgets.toml` |
+| `prefs.ts` | 6 数据 | `Preferences { lang, welcomed, panel, appearance, proxying, showing }`、`Keeper = "browser" \| "city"`、`PreferenceDoor { held, keeper, adopt, setLang, setWelcomed, setPanel, setAppearance, setProxying, setShowing, chord(action), setChord, draft(at), setDraft }`、`loadPreferences(rows, browserLang)`、`preferences()`；**全客户端每一个存储键的拼写都只在这个文件的 `ROWS` 里**（草稿键 `sprawling.draft.<房间或 run>`、快捷键 `sprawling.key.<action>`） |
 | `prose.ts` | 1 判定 | `blocks(text) -> Block[]`, `inline(text) -> Inline[]`：Markdown 读成数据，永不 innerHTML |
 | `route.ts` | 1 判定 | 见 §3-2 |
 | `time.ts` | 1 判定 | `ago`, `clock`, `count`, `usd`, `kib` |
@@ -150,7 +151,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 ## 6 视图（免 SPEC，列出以便定位）
 
-`views/parts/tip.svelte` 提示（见设计 4-18）；`views/parts/code.svelte` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.svelte` 左栏；`views/talk.svelte` ＋ `talk/{thread,calls,composer,waiting}.svelte` 对话 ＋ `talk/artifact.svelte` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.svelte` ＋ `city/{bar,panel,skyline,marks}.svelte` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.svelte`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.svelte` ＋ `building/{tree,commits}.svelte`；`views/changes.svelte`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.svelte`；`views/setup.svelte` ＋ `setup/{providers,models,skills,appearance,keys}.svelte`（skills 组见设计 4-31）＋ `setup/kept.svelte`（一个组的答案由谁保管，见设计 4-29）；`views/shared/{provider,effort,buildings}.svelte`（欢迎页与设置页共用的三件，`buildings.svelte` 的第二个座位是 `#/mcp`）；`views/machine.svelte`（doctor 的答）；`views/desktop.svelte`（一栋楼的桌面白名单）；`views/mcp.svelte`；`views/welcome.svelte`；`views/record.svelte`；`views/cost.svelte`；`views/palette.svelte`；`views/refusal.svelte`；`views/prose.svelte`；`views/gallery.svelte`。
+`views/parts/tip.svelte` 提示（见设计 4-18）；`views/parts/code.svelte` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.svelte` 左栏；`views/talk.svelte` ＋ `talk/{thread,calls,composer,waiting}.svelte` 对话 ＋ `talk/artifact.svelte` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.svelte` ＋ `city/{bar,panel,skyline,marks,results}.svelte` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.svelte`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.svelte` ＋ `building/{tree,commits}.svelte`；`views/changes.svelte`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.svelte`；`views/setup.svelte` ＋ `setup/{providers,models,skills,appearance,keys}.svelte`（skills 组见设计 4-31）＋ `setup/kept.svelte`（一个组的答案由谁保管，见设计 4-29）；`views/shared/{provider,effort,buildings}.svelte`（欢迎页与设置页共用的三件，`buildings.svelte` 的第二个座位是 `#/mcp`）；`views/shared/showing.svelte`（只看结果开关，三个座位：房间、城、外观设置，都写同一条偏好，所以页上的选择就是下一页的默认）；`views/machine.svelte`（doctor 的答）；`views/desktop.svelte`（一栋楼的桌面白名单）；`views/mcp.svelte`；`views/welcome.svelte`；`views/record.svelte`；`views/cost.svelte`；`views/palette.svelte`；`views/refusal.svelte`；`views/prose.svelte`；`views/gallery.svelte`。
 
 **`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（偏好走 `core/rows.ts` 那扇门，没有 localStorage 时是一张只活一次会话的表）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。`app.svelte` 用动态 `import()` 取 `views/gallery.svelte`，所以画廊与它的夹具表是 bundle 里单独的一块，只在打开 `#/gallery` 时下载：其余路由首屏不再为它付字节，而 `frontend_artifact` 称的是整个 dist，这一块仍在其中。
 
@@ -401,3 +402,10 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：两者给同样的逐键粒度——读 `runs[id].saying` 的 effect 只因这个 run 这个字段重跑，遍历表的读者只因 run 的增删重跑（`belief/grain.svelte.test.ts` 判定）。记录的写法让十余个按 `runs[id]`、`Object.values(runs)` 读表的视图一行不改。在 R = 1e4、一帧 50 个 delta、一个读全表的订阅者下，每帧折叠从约 470–540 µs 降到约 30–40 µs（`belief/fold_cost.test.ts`，同一仪表前后交错测），因为 delta 不再让订阅者走一遍表。
 - **被击败的备选**：`SvelteMap<RunId, RunBelief>`。粒度相同，但每个读者都得改成 `get`／`values()`，且对已有键 `set` 新值时，有遍历读者就会连带推进迭代版本。
 - **重开参数**：视图改由 belief 暴露的派生索引读表（不再直接下标）时，表的容器可以换，读者迁移的成本就不再存在。
+
+### 12-3 只看结果模式里，人取消的 run 不进任何一类
+
+- **决策**：`outcomeOf` 把 `completion = done` 记为刚完成，`cancelled` 不列，其余冻结（`limit`、未名的结局与此后新增的词）记为失败；在跑的 run 不列。
+- **理由**：三类是人要处理的东西。取消是人自己做的，结果他已知道；没有说明怎么结束的 run 没有报告完成，按失败给人看，比悄悄漏掉安全。
+- **被击败的备选**：把取消也记为失败——会把人自己的动作当成要他处理的事，挤掉真正失败的前 N 条。
+- **重开参数**：取消可以由人以外的一方发起（例如预算或上级 run 撤回）时，那部分取消应当按失败列出。
