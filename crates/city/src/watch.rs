@@ -201,7 +201,7 @@ fn refuse(subject: String) -> AxError {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct WatchFile {
+pub(crate) struct WatchFile {
     #[serde(default)]
     source: Vec<SourceRow>,
 }
