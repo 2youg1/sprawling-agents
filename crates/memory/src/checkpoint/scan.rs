@@ -215,6 +215,10 @@ impl Checkpoint {
     /// No prefixes at all means the whole tree rather than nothing: the
     /// caller that passes an empty set is the base fence, which has no
     /// resident to take a domain from.
+    ///
+    /// A scope is a literal path: the address grammar admits `[`, `]`,
+    /// `*` and `?`, and a scope read as a glob would stage its matches
+    /// instead of the file the wave wrote.
     fn pathspecs(scopes: &[String]) -> Vec<String> {
         if scopes.is_empty() {
             return vec!["*".to_owned()];
@@ -223,7 +227,10 @@ impl Checkpoint {
             .iter()
             .flat_map(|scope| match scope.trim_end_matches('/') {
                 "" | "." => vec!["*".to_owned()],
-                prefix => vec![prefix.to_owned(), format!("{prefix}/*")],
+                prefix => {
+                    let literal = literal_glob(prefix);
+                    vec![format!("{literal}/*"), literal]
+                }
             })
             .collect()
     }
@@ -369,6 +376,28 @@ fn write_index(index: &mut git2::Index) -> Result<(), MemoryError> {
 /// collision and is refused on the first attempt.
 fn concurrent(err: &git2::Error) -> bool {
     err.class() == git2::ErrorClass::Index && err.message().contains("index.lock")
+}
+
+/// Spells `path` as a glob that matches only itself, each metacharacter
+/// inside a one-character class. A class rather than a backslash escape,
+/// because libgit2 compares a pattern with no unescaped wildcard byte for
+/// byte, backslashes included.
+fn literal_glob(path: &str) -> String {
+    path.chars()
+        .fold(String::with_capacity(path.len()), |mut glob, c| {
+            match c {
+                '[' | ']' | '*' | '?' | '\\' => {
+                    glob.push('[');
+                    if c == '\\' {
+                        glob.push('\\');
+                    }
+                    glob.push(c);
+                    glob.push(']');
+                }
+                other => glob.push(other),
+            }
+            glob
+        })
 }
 
 #[cfg(test)]

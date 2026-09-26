@@ -470,7 +470,9 @@ impl Checkpoint {
     /// 面对空 index，所以照旧列出它们提交的每一个文件。
     /// `scopes` 的每一项可以是目录前缀，也可以是一个文件：lane 在只知道
     /// 这一波写了哪些文件时只把它们交进来（runtime-SPEC §8-45），所以每项
-    /// 生成两条 pathspec，它本身与 `<它>/*`。
+    /// 生成两条 pathspec，它本身与 `<它>/*`。每项都是**字面路径**：地址文法
+    /// 允许 `[` `]` `*` `?`，所以这些字节各自包进单字符类（`[[]`）再交给
+    /// libgit2，否则 `notes[1].md` 会暂存 `notes1.md` 而漏掉写下的文件。
     pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
