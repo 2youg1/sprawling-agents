@@ -41,6 +41,7 @@
   // front of a grid.
 
   import type { DoctorAnswer } from "../../wire";
+  import type { Walk } from "../setup/installing";
 
   const MACHINE: DoctorAnswer = {
     core: "raised",
@@ -103,12 +104,41 @@
         state: { absent: { absence: "not_on_search_path" } },
         install: "unknown_platform",
       },
+      {
+        name: "just",
+        tier: "develop",
+        need: "required",
+        state: { present: { at: "/usr/bin/just", version: { said: { text: "just 1.58.0" } } } },
+        install: { command: { spelled: "winget install --id Casey.Just -e" } },
+      },
+      {
+        name: "cargo-deny",
+        tier: "develop",
+        need: "optional",
+        state: { absent: { absence: "not_on_search_path" } },
+        install: { command: { spelled: "cargo install cargo-deny --locked" } },
+      },
+      {
+        name: "elan",
+        tier: "develop",
+        need: "optional",
+        state: { absent: { absence: "not_on_search_path" } },
+        install: { print: { spelled: "curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh" } },
+      },
     ],
     tiers: [
       { tier: "use", missing: ["firefox", "ripgrep"] },
       { tier: "develop", missing: [] },
     ],
   };
+
+  // The one press that installs what the develop tier lacks, part way:
+  // one item done, one failed with the city's recovery, one running.
+  const WALK: Walk = [
+    { name: "just", state: "done", why: null },
+    { name: "cargo-audit", state: "failed", why: "read what it reported in the log, then run the line yourself in a terminal" },
+    { name: "cargo-deny", state: "running", why: null },
+  ];
 </script>
 
 <script lang="ts">
@@ -137,7 +167,7 @@
 the city; these two are the survey above and the state before anyone
 has asked. -->
 {#snippet cards()}
-  <MachineReport answer={MACHINE} onInstall={() => undefined} />
+  <MachineReport answer={MACHINE} onInstall={() => undefined} planned={["cargo-deny"]} onInstallAll={() => undefined} walk={WALK} />
 {/snippet}
 
 {#snippet unchecked()}

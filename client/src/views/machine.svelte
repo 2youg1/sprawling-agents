@@ -27,11 +27,13 @@ const DOCTOR = "sprawling doctor --install";
 </script>
 
 <script lang="ts">
+  import { untrack } from "svelte";
   import { QUERIES } from "../core/asking";
   import { doctorInstall, doctorRefresh } from "../core/commands";
   import { say } from "../core/lang";
   import { ui } from "../ui";
   import type { DoctorAnswer } from "../wire";
+  import { answered, plan, refused, running, started, type Walk } from "./setup/installing";
   import Button from "./parts/button.svelte";
   import Copy from "./machine/copy.svelte";
   import Report from "./machine/report.svelte";
@@ -106,6 +108,39 @@ const DOCTOR = "sprawling doctor --install";
     u.conn.asking.refresh(QUERIES.doctor);
   }
 
+  // One press installs everything the develop tier is missing, one
+  // item at a time (`views/setup/installing`): each fresh answer and
+  // each refusal moves the walk on, and the item it moves to is sent.
+  let walk = $state.raw<Walk | null>(null);
+  const planned = $derived(answer === undefined ? [] : plan(answer));
+
+  function installAll(): void {
+    walk = started(planned);
+  }
+
+  $effect(() => {
+    const now = answer;
+    const held = untrack(() => walk);
+    if (now === undefined || held === null) return;
+    walk = answered(held, now);
+  });
+
+  const refusal = $derived($belief.refusal);
+  $effect(() => {
+    const now = refusal;
+    const held = untrack(() => walk);
+    if (now === null || held === null) return;
+    walk = refused(held, now);
+  });
+
+  let sent: string | null = null;
+  $effect(() => {
+    const next = walk === null ? null : running(walk);
+    if (next === null || next === sent) return;
+    sent = next;
+    install(next);
+  });
+
   const reaching = $derived.by((): boolean => {
     const kind = $link.kind;
     return kind === "opening" || kind === "handshaking" || kind === "live";
@@ -114,7 +149,12 @@ const DOCTOR = "sprawling doctor --install";
 
 <div class="flex min-w-0 flex-col gap-wide">
   <div class="flex flex-wrap items-center gap-snug">
-    <Button label={say($lang, "machine_recheck")} tone="primary" loading={asking} onPress={recheck} />
+    <Button
+      label={say($lang, "machine_recheck")}
+      tone={planned.length > 0 ? "secondary" : "primary"}
+      loading={asking}
+      onPress={recheck}
+    />
     <!-- wording-ok: the one command this screen exists to hand over;
     a machine spelling, identical in both languages (client-SPEC 4-10) -->
     <code class="rounded-control bg-chrome px-base py-tight font-mono text-note text-text">
@@ -123,7 +163,7 @@ const DOCTOR = "sprawling doctor --install";
     <Copy text={DOCTOR} />
   </div>
   {#if answer !== undefined}
-    <Report {answer} onInstall={install} />
+    <Report {answer} onInstall={install} {planned} onInstallAll={installAll} {walk} />
   {:else if reaching}
     <Skeleton />
   {:else}

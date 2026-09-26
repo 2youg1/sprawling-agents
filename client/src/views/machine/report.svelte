@@ -8,30 +8,27 @@
 // gallery can show this machine in states nobody's own machine happens
 // to be in.
 //
-// **A card per program, and a grid as wide as the body.** A card
-// carries its own width: name, state, version, what the program
-// enables, the command, and the two controls at one height. The grid
-// asks for a minimum column of 320 points rather than a breakpoint,
-// because the column width is a fact about the card and the breakpoint
-// would be a guess about the window.
+// **One section per tier, because the city judges each tier on its
+// own.** Running a city and developing sprawling are different people
+// with different lists; the progress bar and the "still missing" line of
+// a section are the city's verdict on that tier and nothing else (see
+// `standing` in `views/setup/dependencies`).
 //
-// The two tiers stay, because a person acts differently on them: what
-// the city cannot run without, and what it would use if the machine had
-// it. Each tier keeps its own count and its own verdict, and the city's
-// verdict is not the rows below it (see `standing` in
-// `views/setup/dependencies`).
+// **A row per program, and a row only as tall as what is left to do.**
+// A program this machine has is one line: its name, its state, its
+// version. A missing one adds the command that gets it, the install or
+// copy control, and one line saying where the command gets it from and
+// why the page waits for a press before running it.
 //
-// One click installs. `Command::DoctorInstall` runs the recipe this
-// city may run and refuses the other two with what a person does
-// instead, and the install ends by looking at this machine again - so
-// `check again` is the manual half of the same verb rather than a
-// second way of getting the same answer.
+// The develop section carries the one press that installs everything
+// it is missing (`views/setup/installing`); the screen's `machine.svelte`
+// sends the installs, and this file only draws how far they have got.
 
 import type { Key } from "../../core/lang";
 import type { DoctorCore, DoctorItem } from "../../wire";
 import type { Weight } from "../parts/glyph";
-import type { Tone } from "../parts/button.svelte";
-import type { Absence, Offer } from "../setup/dependencies";
+import type { Absence } from "../setup/dependencies";
+import type { StepState } from "../setup/installing";
 
 // What the badge beside the name weighs. The word is what states the
 // answer; the weight only decides how loudly, and a broken or required
@@ -43,13 +40,6 @@ function weightOf(item: DoctorItem, absence: Absence): Weight {
   return item.need === "optional" || absence === "spare" ? "quiet" : "alert";
 }
 
-// The paint each offer carries, and the reason it carries when a press
-// does nothing. A reason is what makes the control grey - `Button`
-// owns that rule - so this table states the reason and never the grey.
-//
-// **No offer takes the primary tone** (ux-upgrades A11): install is a
-// per-card act, and a row's act is not the one button a screen is for.
-// The screen's single primary is `check again`, above the cards.
 // The level the core's threads stand at, and the platform's own words
 // when it refused: those are the platform's to choose, not the page's.
 function coreOf(core: DoctorCore): { readonly key: Key; readonly said: string | null } {
@@ -68,18 +58,20 @@ function coreOf(core: DoctorCore): { readonly key: Key; readonly said: string | 
   }
 }
 
-const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = {
-  press: { tone: "secondary", why: null },
-  by_hand: { tone: "quiet", why: "machine_install_by_hand" },
-  held: { tone: "quiet", why: "machine_installed" },
+const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = {
+  waiting: { key: "machine_step_waiting", weight: "quiet" },
+  running: { key: "machine_step_running", weight: "quiet" },
+  done: { key: "machine_step_done", weight: "quiet" },
+  failed: { key: "machine_step_failed", weight: "alert" },
 };
 </script>
 
 <script lang="ts">
-  import { say } from "../../core/lang";
-  import type { DoctorAnswer } from "../../wire";
+  import { fill, say } from "../../core/lang";
+  import type { DoctorAnswer, DoctorTier } from "../../wire";
   import { ui } from "../../ui";
-  import { absenceOf, enablesKey, offerOf, outstanding, recommended, required, spelledOf, standing, stateKey, versionOf } from "../setup/dependencies";
+  import { absenceOf, enablesKey, offerOf, ofTier, outstanding, siteOf, sourceOf, spelledOf, standing, stateKey, versionOf } from "../setup/dependencies";
+  import { over, type Walk } from "../setup/installing";
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
   import Progress from "../parts/progress.svelte";
@@ -89,37 +81,49 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   interface Props {
     readonly answer: DoctorAnswer;
     readonly onInstall?: (item: string) => void;
+    // What one press would install, and the press itself.
+    readonly planned?: readonly string[];
+    readonly onInstallAll?: () => void;
+    // How far that press has got, once it was pressed.
+    readonly walk?: Walk | null;
   }
 
-  const { answer, onInstall }: Props = $props();
+  const { answer, onInstall, planned = [], onInstallAll, walk = null }: Props = $props();
 
   const { lang } = ui();
 
-  const first = $derived(required(answer));
-  const second = $derived(recommended(answer));
-  const missedUse = $derived(outstanding(answer, "use"));
-  const missedDevelop = $derived(outstanding(answer, "develop"));
   const core = $derived(coreOf(answer.core));
+  const walking = $derived(walk !== null && !over(walk));
 
-  // One program, and everything a person decides about it from one
-  // card: the name, the state, the version, what it enables, and the
-  // command that would get it. The name links to the program's own
-  // site when the city knows one, so a person can read what a thing is
-  // before installing it.
+  // Where the command gets the program from and why the page waits,
+  // or why the page will not run it at all; a manual line says what to
+  // do by itself.
+  function noteOf(item: DoctorItem, how: string): string | null {
+    const install = item.install;
+    if (typeof install === "string" || "manual" in install) return null;
+    if ("command" in install) {
+      const source = sourceOf(how);
+      return fill(say($lang, "machine_install_press"), {
+        source: "key" in source ? say($lang, source.key) : source.program,
+      });
+    }
+    const site = siteOf(how);
+    return site === null ? say($lang, "machine_install_admin") : fill(say($lang, "machine_install_by_hand"), { site });
+  }
 </script>
 
-{#snippet card(item: DoctorItem, absence: Absence)}
+{#snippet row(item: DoctorItem, absence: Absence)}
   {@const said = versionOf(item.state)}
   {@const how = spelledOf(item.install)}
-  {@const offer = OFFER[offerOf(item)]}
   {@const enables = enablesKey(item.name)}
-  <li class="flex min-w-0 flex-col gap-snug rounded-card bg-raised p-base">
-    <div class="flex min-w-0 flex-wrap items-center gap-snug">
+  {@const here = "present" in item.state}
+  <li class="flex min-w-0 flex-col gap-tight rounded-card bg-raised px-base py-snug">
+    <div class="flex min-w-0 items-center gap-snug">
       {#if item.homepage === undefined || item.homepage === null}
-        <span class="font-mono text-label text-text">{item.name}</span>
+        <span class="shrink-0 whitespace-nowrap font-mono text-label text-text">{item.name}</span>
       {:else}
         {@const site = item.homepage}
-        <Tip text={site}>
+        <span class="shrink-0 whitespace-nowrap"><Tip text={site}>
           {#snippet children(hint)}
             <a
               class="font-mono text-label text-text underline decoration-edge underline-offset-2 hover:decoration-accent"
@@ -131,64 +135,97 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
               {item.name}
             </a>
           {/snippet}
-        </Tip>
+        </Tip></span>
       {/if}
       <Badge text={say($lang, stateKey(item.state))} weight={weightOf(item, absence)} dot />
       {#if item.need === "optional"}
-        <span class="text-note text-text-faint">{say($lang, "machine_optional")}</span>
+        <span class="shrink-0 text-note text-text-faint">{say($lang, "machine_optional")}</span>
       {:else if absence === "spare"}
-        <span class="text-note text-text-faint">{say($lang, "machine_spare")}</span>
+        <span class="min-w-0 truncate text-note text-text-faint">{say($lang, "machine_spare")}</span>
       {/if}
       <span class="min-w-0 flex-1"></span>
       {#if said !== null}
-        <span class="min-w-0 truncate text-note text-text-quiet">{said}</span>
+        <span class="min-w-0 truncate font-mono text-note text-text-quiet">{said}</span>
       {/if}
     </div>
     {#if enables !== null}
       <p class="text-note text-text-faint">{say($lang, enables)}</p>
     {/if}
-    {#if how === null}
-      <span class="text-note text-text-faint">{say($lang, "machine_no_recipe")}</span>
-    {:else}
-      <div class="flex min-w-0 flex-col gap-snug">
-        <!-- A command cut at the card's edge cannot be typed, and a
-        command pushed sideways has to be scrolled before it can be
-        read whole: pre-wrap keeps every character on the card. Each
-        word is one box, so a line breaks between words and never at
-        the hyphen inside `--locked`; only a word wider than the card
-        breaks inside itself. -->
-        <code class="block whitespace-pre-wrap break-words rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet"
-          >{#each how.split(" ") as word, index (index)}{index > 0 ? " " : ""}<span class="inline-block max-w-full"
-              >{word}</span
-            >{/each}</code
-        >
-        <div class="flex flex-wrap items-center gap-tight">
-          <Button
-            label={say($lang, "machine_install")}
-            tone={offer.tone}
-            {...(offer.why === null ? {} : { why: say($lang, offer.why) })}
-            onPress={() => {
-              onInstall?.(item.name);
-            }}
-          />
+    {#if !here}
+      {#if how === null}
+        <span class="text-note text-text-faint">{say($lang, "machine_no_recipe")}</span>
+      {:else}
+        {@const note = noteOf(item, how)}
+        <div class="flex min-w-0 items-start gap-tight">
+          <!-- A command cut at the row's edge cannot be typed: pre-wrap
+          keeps every character in the row, and a line breaks between
+          words, never at the hyphen inside `--locked`. -->
+          <code class="min-w-0 flex-1 whitespace-pre-wrap break-words rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet"
+            >{#each how.split(" ") as word, index (index)}{index > 0 ? " " : ""}<span class="inline-block max-w-full"
+                >{word}</span
+              >{/each}</code
+          >
+          {#if offerOf(item) === "press"}
+            <Button
+              label={say($lang, "machine_install")}
+              tone="secondary"
+              loading={walk?.some((each) => each.name === item.name && each.state === "running") === true}
+              onPress={() => {
+                onInstall?.(item.name);
+              }}
+            />
+          {/if}
           <Copy text={how} />
         </div>
-      </div>
+        {#if note !== null}
+          <p class="text-note text-text-faint">{note}</p>
+        {/if}
+      {/if}
     {/if}
   </li>
 {/snippet}
 
-{#snippet column(title: string, missing: readonly string[] | null, items: readonly DoctorItem[])}
+{#snippet steps(each: Walk)}
+  {@const done = each.filter((step) => step.state === "done" || step.state === "failed").length}
+  <div class="flex min-w-0 flex-col gap-snug rounded-card bg-raised px-base py-snug">
+    <Progress label={say($lang, "machine_progress_label")} {done} total={each.length} />
+    <ol class="flex min-w-0 flex-col gap-tight">
+      {#each each as step (step.name)}
+        <li class="flex min-w-0 flex-wrap items-baseline gap-snug text-note">
+          <span class="w-[10rem] shrink-0 truncate font-mono text-text">{step.name}</span>
+          <Badge text={say($lang, STEP[step.state].key)} weight={STEP[step.state].weight} dot />
+          {#if step.why !== null}
+            <span class="min-w-0 flex-1 break-words text-text-faint">{step.why}</span>
+          {/if}
+        </li>
+      {/each}
+    </ol>
+  </div>
+{/snippet}
+
+{#snippet tier(title: string, which: DoctorTier)}
+  {@const items = ofTier(answer, which)}
+  {@const missing = outstanding(answer, which)}
   {@const far = standing(items, missing === null ? null : missing.length)}
   <section class="flex min-w-0 flex-col gap-snug" aria-label={title}>
-    <h2 class="text-label font-label text-text-quiet">{title}</h2>
+    <div class="flex min-w-0 flex-wrap items-center gap-base">
+      <h2 class="text-label font-label text-text">{title}</h2>
+      {#if which === "develop" && planned.length > 0 && onInstallAll !== undefined}
+        <Button
+          label={fill(say($lang, "machine_install_all"), { count: String(planned.length) })}
+          tone="primary"
+          loading={walking}
+          onPress={onInstallAll}
+        />
+        <span class="text-note text-text-faint">{say($lang, "machine_install_all_note")}</span>
+      {/if}
+    </div>
     <Progress label={say($lang, "machine_progress_label")} done={far.done} total={far.total} />
-    <!-- The city's own verdict on this tier, which is not the cards
-    below it: a run of interchangeable items collapses into the one
-    thing a person is still missing, so a tier of empty cards can be a
-    tier with nothing left to do. The names are set apart by the gap
-    between them rather than joined by a word, because a conjunction
-    would be a second authority on how a list reads in each language. -->
+    <!-- The city's own verdict on this tier, which is not the rows below
+    it: a run of interchangeable items collapses into the one thing a
+    person is still missing. The names are set apart by the gap between
+    them rather than joined by a word, because a conjunction would be a
+    second authority on how a list reads in each language. -->
     {#if missing !== null && missing.length > 0}
       <p class="flex flex-wrap items-baseline gap-tight text-note">
         <span class="text-text-quiet">{say($lang, "machine_missing")}</span>
@@ -197,10 +234,14 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
         {/each}
       </p>
     {/if}
-    <ul class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-base">
+    {#if which === "develop" && walk !== null}
+      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+      {@render steps(walk)}
+    {/if}
+    <ul class="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] items-start gap-snug">
       {#each items as item (item.name)}
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-        {@render card(item, absenceOf(item, missing, items))}
+        {@render row(item, absenceOf(item, missing, items))}
       {/each}
     </ul>
   </section>
@@ -208,9 +249,9 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
 
 <div class="flex min-w-0 flex-col gap-wide">
   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-  {@render column(say($lang, "machine_required"), missedUse, first)}
+  {@render tier(say($lang, "machine_tier_use"), "use")}
   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-  {@render column(say($lang, "machine_recommended"), missedDevelop, second)}
+  {@render tier(say($lang, "machine_tier_develop"), "develop")}
   <p class="flex min-w-0 flex-wrap items-baseline gap-tight text-note">
     <span class="text-text-quiet">{say($lang, "machine_core")}</span>
     <span class="text-text">{say($lang, core.key)}</span>

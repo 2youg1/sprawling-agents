@@ -46,10 +46,15 @@ export function stateKey(
 // anything a person can read. The three wordless answers - it said
 // nothing, its line was not text, it was late - are facts about how it
 // did not answer, and a card shows the item rather than them.
+//
+// The number out of the line rather than the line: `git version 2.55.0
+// .windows.1` and a path uv printed both carry one, and a row has room
+// for the number alone. A line with no dotted number is shown as it is.
 export function versionOf(state: DoctorState): string | null {
   if (!("present" in state)) return null;
   const said = state.present.version;
-  return typeof said === "object" ? said.said.text : null;
+  if (typeof said !== "object") return null;
+  return /\d+(?:\.\d+)+/u.exec(said.said.text)?.[0] ?? said.said.text;
 }
 
 // The command that would get a missing item, as a person would type it.
@@ -60,15 +65,34 @@ export function spelledOf(install: DoctorInstall): string | null {
   return install.manual.how;
 }
 
-// What the city cannot run without. Everything else - the optional
-// members of the run tier and the whole develop tier - is a
-// recommendation rather than a requirement.
-export function required(answer: DoctorAnswer): readonly DoctorItem[] {
-  return answer.items.filter((each) => each.tier === "use" && each.need === "required");
+// The rows of one tier, in the city's table order, which for the develop
+// tier is the order installing them has to follow.
+export function ofTier(answer: DoctorAnswer, tier: DoctorTier): readonly DoctorItem[] {
+  return answer.items.filter((each) => each.tier === tier);
 }
 
-export function recommended(answer: DoctorAnswer): readonly DoctorItem[] {
-  return answer.items.filter((each) => each.tier !== "use" || each.need !== "required");
+// Where a command the city may run gets its program from, named by the
+// program the command starts. A program this page has no name for is
+// shown as itself.
+const SOURCE: Readonly<Partial<Record<string, Key>>> = {
+  winget: "machine_source_winget",
+  brew: "machine_source_brew",
+  cargo: "machine_source_cargo",
+  rustup: "machine_source_rustup",
+  elan: "machine_source_elan",
+  uv: "machine_source_uv",
+};
+
+export function sourceOf(spelled: string): { readonly key: Key } | { readonly program: string } {
+  const program = spelled.split(" ")[0] ?? spelled;
+  const key = SOURCE[program];
+  return key === undefined ? { program } : { key };
+}
+
+// The site a printed install script is downloaded from, when its line
+// names one.
+export function siteOf(spelled: string): string | null {
+  return /https:\/\/([^/\s"]+)/u.exec(spelled)?.[1] ?? null;
 }
 
 // What the city still names as missing for one tier, or nothing when
