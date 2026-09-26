@@ -18,6 +18,7 @@ use kernel::{Address, AxCode, AxError, B3Hash, Payload, SystemBlock};
 
 use crate::elision::{self, Elided};
 
+pub mod keep_warm;
 mod segment;
 
 pub(crate) mod shape;
