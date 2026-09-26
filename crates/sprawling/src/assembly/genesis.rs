@@ -307,6 +307,31 @@ impl RunWorker {
             "city::building",
             &format!("{} adopted as a building", building.addr().as_str()),
         );
+        // The base fence is paid here rather than by the first dispatch,
+        // which would otherwise hash every file of the folder before its
+        // first tool call (memory-SPEC 8-8). No run and no model exist
+        // yet, and an invented model id would be worse than none.
+        let of = memory::Provenance::new(
+            RunId::CITY,
+            addr.clone(),
+            self.city_hash()?,
+            memory::ModelChoice {
+                id: String::new(),
+                effort: None,
+            },
+        );
+        let t = now_ms()?;
+        memory::Checkpoint::open(&self.city_root)
+            .and_then(|checkpoint| {
+                checkpoint.base_fence(&[addr.as_str().to_owned()], t, &of, &mut |step| {
+                    self.note(
+                        runtime::diagnostics::Level::Effect,
+                        "memory::checkpoint",
+                        &format!("{}: base fence {step:?}", addr.as_str()),
+                    );
+                })
+            })
+            .map_err(memory::MemoryError::into_ax)?;
         let payload = city::building_adopted_payload(&building)?;
         self.record(EventKind::BuildingCreated, payload)
     }
