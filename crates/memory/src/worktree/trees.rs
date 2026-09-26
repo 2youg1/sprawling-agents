@@ -103,10 +103,19 @@ impl Worktrees {
         // tree is a materialization, the branch is the line of work.
         // Reattaching is what makes releasing a tree cheap enough to do
         // between sessions.
-        let branch = self
+        let branch = match self
             .repo
             .find_branch(name.as_str(), git2::BranchType::Local)
-            .ok();
+        {
+            Ok(branch) => Some(branch),
+            Err(err) if err.code() == git2::ErrorCode::NotFound => None,
+            Err(err) => {
+                return Err(MemoryError::Worktree {
+                    op: "find a node branch",
+                    detail: format!("{}: {err}", name.as_str()),
+                });
+            }
+        };
         self.add_tree(name, branch.as_ref().map(git2::Branch::get))
     }
 
