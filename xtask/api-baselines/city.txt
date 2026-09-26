@@ -240,6 +240,7 @@ pub fn city::config_path(&std::path::Path, &kernel::address::Address, city::Laye
 pub fn city::create_building(&std::path::Path, &kernel::address::Address, city::BuildingTemplate) -> core::result::Result<city::Building, kernel::error::shape::AxError>
 pub fn city::day_of(kernel::event::identity::TimeMs) -> u64
 pub fn city::desktop_scope_path(&std::path::Path, &kernel::address::Address) -> std::path::PathBuf
+pub fn city::edit_against(&std::path::Path, &[u8], &[u8]) -> core::result::Result<(), kernel::error::shape::AxError>
 pub fn city::edit_document<T>(&std::path::Path, impl core::ops::function::FnOnce(&city::Held<'_>) -> core::result::Result<T, kernel::error::shape::AxError>) -> core::result::Result<T, kernel::error::shape::AxError>
 pub fn city::evaluate(&kernel::address::Address, &str) -> core::result::Result<city::BuildingRules, kernel::error::shape::AxError>
 pub fn city::file_archive(&city::ArchiveEntry, &str) -> core::result::Result<(), kernel::error::shape::AxError>

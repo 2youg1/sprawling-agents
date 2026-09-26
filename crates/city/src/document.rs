@@ -113,7 +113,25 @@ pub fn edit<T>(
 /// `E_STORAGE_FATAL` every other write face of this module raises when
 /// the file cannot be read or the write will not land.
 pub fn edit_against(path: &Path, base: &[u8], body: &[u8]) -> Result<(), AxError> {
-    edit(path, |held| held.replace(body))
+    edit(path, |held| {
+        let on_disk = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(err) => return Err(storage(path, err.to_string())),
+        };
+        if on_disk != base {
+            return Err(AxError::failure(
+                AxCode::VersionConflict,
+                "replace a document",
+                format!(
+                    "{}: the file is no longer the text the writer started from",
+                    path.display()
+                ),
+            )
+            .with_recovery("read the file again and send the change once more"));
+        }
+        held.replace(body)
+    })
 }
 
 /// One document, held against every other writer of it in this process.
