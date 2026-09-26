@@ -311,6 +311,7 @@ pub fn settle(usage: &ModelUsage, authoritative: Option<UsdMicros>, entry: &Mode
 ```
 
 - 权威计费额在场恒胜（`CostSource::Authoritative`）；缺席则按价目推算：`input×input_price/1M + output×output_price/1M + cache 两项`，全程 checked 整数（溢出→E_INVALID_ARGS 报「结算溢出」）。model_returned 载荷含 `billed_usd_micros`＋usage 四整数，A20 对账消费之。
+- **四项价格皆零的价目行不结算**：`Endpoint::returned` 只在 `ModelEntry::states_a_price()`（四项价格至少一项非零）时调 `settle`，否则 `billed_usd_micros` 缺席。选型点在目录不认识模型时把四项价格填零，本地模型的行也是零；把它们结算成 `0` 会让账本说「量过了，花了零」，而实际是没有人报过价——`memory::Attribution` 把缺席记为无报价的调用并数它的 token，成本页据此说「没有报价」。落选的是「结算出 0 再由读者猜 0 是否可信」：同一个 0 在两种城里意思相反，读者没有凭据分辨。
 
 ### 8-9 gateway::router（形状 7 projection）
 

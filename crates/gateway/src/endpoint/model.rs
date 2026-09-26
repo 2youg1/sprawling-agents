@@ -194,6 +194,32 @@ mod tests {
         );
     }
     #[test]
+    fn a_price_row_with_no_figure_leaves_the_call_unbilled() {
+        let body = serde_json::json!({
+            "content": [{ "type": "text", "text": "done" }],
+            "stop_reason": "end_turn",
+            "usage": { "input_tokens": 900, "output_tokens": 100 },
+        })
+        .to_string();
+        let (url, server) = fake_provider(vec![(200, body)], false);
+        let free = crate::market::MarketSnapshot::builtin()
+            .unwrap()
+            .lookup("local")
+            .unwrap()
+            .clone();
+        let mut endpoint = Endpoint::new(
+            super::super::config::EndpointConfig {
+                pricing: Some(free),
+                ..config(&url)
+            },
+            redemption(),
+        )
+        .unwrap();
+        let ret = endpoint.call(&request()).unwrap();
+        server.join().unwrap();
+        assert_eq!(ret.billed_usd_micros, None, "nobody priced this call");
+    }
+    #[test]
     fn a_confidential_building_never_reaches_a_remote_provider() {
         // No listener at all: if the refusal were routing-level rather
         // than here, this would fail as a transport error instead.
