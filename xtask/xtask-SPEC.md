@@ -273,7 +273,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 | `xtask/src/color/tables.rs` | 怎么从 `client/src/theme.css` 读出四张表（`GRAY_RAMP`、`COLOUR_TOKENS`、`TEXT_TOKENS`、`TYPE_SCALE`）与 `TEXT_SURFACE_CEILING` |
 | `xtask/src/color/contrast.rs` | 一对令牌的 APCA 对比度是多少（`apca_lc` 及其 OKLCH→sRGB 链路），以及 Bronze Simple Mode 允许某个字号使用哪一层（`bronze_tier`） |
 | `xtask/src/color/scan.rs` | 全仓扫描：什么算一个颜色字面量（`literal_at`、`hex_colour`），扫哪些文件（`scan_for_literals`） |
-| `xtask/src/color/disabled.rs` | 禁用墨色 `text-text-disabled` 是否只写在一个带 `disabled` 的变体之后（`judge_disabled_ink`、`bare_uses`），以及同一波里待改文件的钉数（`PINNED`，§8-8a） |
+| `xtask/src/color/disabled.rs` | 禁用墨色 `text-text-disabled` 是否只写在一个带 `disabled` 的变体之后（`judge_disabled_ink`、`bare_uses`） |
 | `xtask/src/color/tests.rs` | 原内联 `mod tests` 原样迁出，14 个测试一个不少 |
 
 **无字段开放**：跨文件引用只用 `pub(super)` 函数；`grey_ramp` 因 `badge` 门经 `color::grey_ramp` 调用而在索引位置以 `pub(crate) use` 重导出，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
@@ -410,7 +410,6 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 
 - **判的是类名的写法，不是运行时的条件**：`{off ? 'text-text-disabled' : …}` 这种三元式里，门看不出条件是不是「禁用」，所以不收；元素本来就带 `aria-disabled`，写成变体，状态与墨色由同一个属性决定，没有第二个权威。
 - **类名的边界**：从出现处往前取到空白、引号、反引号或花括号为止，这一段按 `:` 切开，最后一段之前的任何一段含 `disabled` 即算禁用上下文。
-- **待改文件登记（ratchet）**：`disabled.rs` 的 `PINNED` 表按文件钉住当前的出现次数，只为同一波里正被别的包改写的文件而设；一个文件的出现次数不得超过钉住的数，降到零时该行本身成为违例，提示把它划掉。
 - **败给的方案**：在 `lang.json` 或组件里另立一个「次要信息」灰级。那是 `--color-text-faint` 的第二份定义。
 - **改价条件**：若 `--tier-text-disabled` 升到 Lc 60 以上，这个灰级就足以承载信息，本条可以撤。
 
