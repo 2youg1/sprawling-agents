@@ -213,7 +213,7 @@ impl Checkpoint {
     /// No prefixes at all means the whole tree rather than nothing: the
     /// caller that passes an empty set is the base fence, which has no
     /// resident to take a domain from.
-    fn pathspecs(scopes: &[String]) -> Vec<String> {
+    pub(crate) fn pathspecs(scopes: &[String]) -> Vec<String> {
         if scopes.is_empty() {
             return vec!["*".to_owned()];
         }
@@ -227,24 +227,6 @@ impl Checkpoint {
                 }
             })
             .collect()
-    }
-
-    /// Stages the whole working tree except the reserved subtree,
-    /// deletions included.
-    fn stage_tree(&mut self) -> Result<(), MemoryError> {
-        let mut index = self.repo.index().map_err(git_err("read index"))?;
-        let mut filter = StageFilter::new(workdir(&self.repo)?);
-        {
-            let mut admit = |path: &std::path::Path, _matched: &[u8]| -> i32 { filter.admit(path) };
-            index
-                .add_all(["*"], git2::IndexAddOption::DEFAULT, Some(&mut admit))
-                .map_err(git_err("stage the tree"))?;
-            index
-                .update_all(["*"], Some(&mut admit))
-                .map_err(git_err("stage deletions"))?;
-        }
-        filter.refused()?;
-        write_index(&mut index)
     }
 
     /// Commits the index at the injected time. An unchanged tree still
@@ -299,23 +281,24 @@ impl Checkpoint {
     /// signature carries the injected instant, so the same script lands
     /// the same oid.
     ///
-    /// The whole tree is staged rather than one scope: a run that is
-    /// landing is offering the tree it was lent, and that tree is its
-    /// own. The reserved subtree is the one exception, for the reason it
-    /// is always the exception - what governs a scope is not in any
-    /// write domain, and in the city itself it also holds the other
-    /// runs' working trees.
+    /// Only `scopes` is staged, as a fence stages it: a kept tree is
+    /// checked out again over its scope alone, so its files outside the
+    /// scope may trail the branch, and staging them would take back
+    /// what the trunk changed there (memory-SPEC 8-9). Entries outside
+    /// the scope go into the commit as the index holds them. No scope
+    /// stages the whole tree except the reserved subtree, whose rule
+    /// [`StageFilter`] owns.
     ///
     /// # Errors
     /// Propagates staging, the staged-secret scan, and the commit.
     pub fn land(
         &mut self,
-        _scopes: &[String],
+        scopes: &[String],
         t: TimeMs,
         of: &Provenance,
         subject: &str,
     ) -> Result<String, MemoryError> {
-        self.stage_tree()?;
+        self.stage_scopes(scopes)?;
         self.scan_staged()?;
         let oid = self.commit(&CommitPlan {
             t,

@@ -100,28 +100,47 @@ impl Worktrees {
     }
 
     /// Takes a kept tree back into use: the node's branch moved up to
-    /// the trunk when the trunk already holds all of it, every tracked
-    /// file forced to that branch head, every untracked file removed,
-    /// then the lock. Git rewrites only the files that differ, so a node's second
-    /// run costs what it left behind, not the size of the city.
+    /// the trunk when the trunk already holds all of it, the index read
+    /// back from that branch head, every tracked file under `scopes`
+    /// forced to it and every untracked one there removed, then the
+    /// lock. Git rewrites only the files that differ, and only inside
+    /// the scope, so a node's second run costs what it left behind in
+    /// its own scope, not the size of the city.
+    ///
+    /// The index is read back whole before the narrowed checkout because
+    /// that checkout moves only the entries it writes: an entry outside
+    /// the scope left at the last run's commit would be committed again
+    /// by the next scoped offer, taking back what the trunk changed there.
     pub(super) fn reattach(
         &self,
         name: &WorktreeName,
         tree: &git2::Worktree,
-        _scopes: &[String],
+        scopes: &[String],
     ) -> Result<WorktreeLease, MemoryError> {
         let refuse = |op: &'static str, err: git2::Error| MemoryError::Worktree {
             op,
             detail: format!("{}: {err}", name.as_str()),
         };
         self.follow_trunk(name)?;
-        git2::Repository::open_from_worktree(tree)
-            .map_err(|err| refuse("open a kept worktree", err))?
-            .checkout_head(Some(
-                git2::build::CheckoutBuilder::new()
-                    .force()
-                    .remove_untracked(true),
-            ))
+        let repo = git2::Repository::open_from_worktree(tree)
+            .map_err(|err| refuse("open a kept worktree", err))?;
+        let head = repo
+            .head()
+            .and_then(|head| head.peel_to_tree())
+            .map_err(|err| refuse("read a kept worktree's branch", err))?;
+        let mut index = repo
+            .index()
+            .map_err(|err| refuse("read a kept worktree's index", err))?;
+        index
+            .read_tree(&head)
+            .and_then(|()| index.write())
+            .map_err(|err| refuse("reset a kept worktree's index", err))?;
+        let mut checkout = git2::build::CheckoutBuilder::new();
+        checkout.force().remove_untracked(true);
+        for spec in crate::checkpoint::Checkpoint::pathspecs(scopes) {
+            checkout.path(spec);
+        }
+        repo.checkout_head(Some(&mut checkout))
             .map_err(|err| refuse("reset a kept worktree", err))?;
         tree.lock(Some(LEASE_REASON))
             .map_err(|err| refuse("lock a worktree", err))?;
