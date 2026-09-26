@@ -25,8 +25,9 @@ fn transport_detail(err: &reqwest::Error) -> String {
 ///
 /// **This enum is the one home of "may this be tried again".** An
 /// exchange that never completed carries no answer, so the same request
-/// may go out again; an answer the city refuses would be refused
-/// identically next time. Before this type every call site built its
+/// may go out again, and so may one the provider answered with "busy"
+/// or "broken"; an answer that says the request itself is wrong would
+/// be given identically next time. Before this type every call site built its
 /// own error and none opted in, which made the default
 /// `Retries::UntilHalted` worth zero retries in practice — one
 /// transient disconnect ended a sub-run for good.
@@ -40,7 +41,7 @@ pub(crate) enum ProviderFailure<'e> {
     Cut(&'e std::io::Error),
     /// A stream stayed open and silent past the bound set for silence.
     Silence { quiet_ms: u64 },
-    /// The provider answered and the status refuses the request. The
+    /// The provider answered with a status that is not 2xx. The
     /// provider's own body is never quoted back.
     Refused {
         url: &'e str,
@@ -71,32 +72,31 @@ impl ProviderFailure<'_> {
         }
     }
 
+    /// Whether the identical request may succeed if sent again later: an
+    /// exchange that never completed carries no answer, and a provider
+    /// answering 408, 429 or 5xx (529 is Anthropic's overload) says it
+    /// is busy or broken now, not that the request is wrong.
     fn retriable(&self) -> bool {
         match self {
             ProviderFailure::Exchange(_)
             | ProviderFailure::Cut(_)
             | ProviderFailure::Silence { .. } => true,
-            ProviderFailure::Refused { .. }
-            | ProviderFailure::Unreadable(_)
-            | ProviderFailure::Unbuilt(_) => false,
+            ProviderFailure::Refused { status, .. } => {
+                *status == reqwest::StatusCode::REQUEST_TIMEOUT
+                    || *status == reqwest::StatusCode::TOO_MANY_REQUESTS
+                    || status.is_server_error()
+            }
+            ProviderFailure::Unreadable(_) | ProviderFailure::Unbuilt(_) => false,
         }
     }
 
     fn recovery(&self) -> &'static str {
-        match self {
-            ProviderFailure::Exchange(_)
-            | ProviderFailure::Cut(_)
-            | ProviderFailure::Silence { .. } => {
-                "the watchdog decides retry or failover; admission widens the interval"
-            }
-            ProviderFailure::Refused { .. } | ProviderFailure::Unreadable(_) => {
-                "the provider answered, and it would answer the same way again: check this \
-                 endpoint's model name, credential and dialect, then dispatch again"
-            }
-            ProviderFailure::Unbuilt(_) => {
-                "check this endpoint's `base_url` and its extra headers: the request was \
-                 refused by this side before it was sent"
-            }
+        if let ProviderFailure::Unbuilt(_) = self {
+            "check this endpoint's `base_url` and its extra headers: the request was              refused by this side before it was sent"
+        } else if self.retriable() {
+            "the watchdog backs off and sends the same request again, until the run's              retry limit or a Halt"
+        } else {
+            "the provider answered, and it would answer the same way again: check this              endpoint's model name, credential and dialect, then dispatch again"
         }
     }
 }
