@@ -3,6 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use kernel::{Address, ReadVerdict};
+
 use super::*;
 
 /// A bound under which every building is open, so a test about the walk
@@ -313,4 +315,34 @@ fn a_link_that_does_not_resolve_is_counted_as_unread() {
         "{}",
         unread[0]["why"]
     );
+}
+
+/// A building whose rules do not read is closed like a confidential
+/// one, but the closing is a failure a person has to fix, so the walk
+/// names it instead of answering as if it held nothing.
+#[test]
+fn a_building_whose_rules_do_not_read_is_named_among_the_unread() {
+    let dir = city();
+    std::fs::create_dir_all(dir.path().join("broken").join("room1")).unwrap();
+    let bound: ReadBound = std::sync::Arc::new(|addr: &Address| {
+        if addr.as_str().starts_with("broken") {
+            ReadVerdict::RulesUnreadable(
+                AxError::failure(
+                    kernel::AxCode::InvalidArgs,
+                    "read the rules",
+                    "broken/RULES.toml",
+                )
+                .with_recovery("fix the rules"),
+            )
+        } else {
+            ReadVerdict::Open
+        }
+    });
+    let mut tool = SearchTool::new(dir.path(), bound).unwrap();
+
+    let whole = tool.invoke(&text("the ledger")).unwrap();
+    let map = whole.result.as_map();
+    assert_eq!(map["count"], 2, "the two hits in lab");
+    assert_eq!(map["unreadable"], 1, "{:?}", map["unread"]);
+    assert_eq!(map["unread"][0]["path"], "broken");
 }
