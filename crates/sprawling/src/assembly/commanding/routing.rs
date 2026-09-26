@@ -10,8 +10,8 @@ use kernel::event::record::Admittance;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Assignment, Ceilings, Chosen, Credential, Entered, Owing, RunWorker, Unasked, mode_of,
-    not_built, tuning_of,
+    Assignment, Ceilings, Chosen, Credential, Entered, Owing, RunWorker, Unasked, not_built,
+    tuning_of,
 };
 
 /// What a Cancel or a Steer is told when no run answers to the id it
@@ -87,7 +87,7 @@ impl RunWorker {
                     addr,
                     session,
                     effort,
-                    mode: mode_of(mode),
+                    mode,
                     parent: None,
                     succession: None,
                     tainted: false,
@@ -170,9 +170,11 @@ impl RunWorker {
                     max_output_tokens,
                 },
             ),
-            channels::Command::PutSecret { realm, name, value } => {
-                self.put_secret(realm, name, value)
-            }
+            channels::Command::PutSecret { realm, name, value } => self.put_secret(
+                &kernel::SecretRef::new(&realm, &name)?,
+                value,
+                crate::assembly::credentials::signing::Arrival::Enrolment,
+            ),
             channels::Command::Login { provider, step, .. } => self.login(provider.as_str(), step),
             channels::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())

@@ -13,8 +13,6 @@
 
 //! Endpoint configuration: auth, overrides, construction.
 
-use std::time::Duration;
-
 use kernel::{AxCode, AxError, DialectKind, Proxying, SecretRef};
 use serde_json::Value;
 
@@ -80,22 +78,15 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
+    /// One endpoint with a client of its own, for a probe or a single
+    /// call; a chosen model shares its endpoint's client instead
+    /// ([`Endpoint::over`]).
+    ///
+    /// # Errors
+    /// `E_CONFIG_INVALID` when no client can be built for this
+    /// `base_url` and the machine's proxy settings.
     pub fn new(config: EndpointConfig, redemption: Redemption) -> Result<Endpoint, AxError> {
-        let client = crate::client_for(config.proxying, &config.base_url)
-            .timeout(Duration::from_millis(config.timeout_ms))
-            .build()
-            .map_err(|err| {
-                AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
-                    .with_recovery(
-                        "check this endpoint's `base_url` and the proxy settings this \
-                         machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
-                    )
-            })?;
-        Ok(Endpoint {
-            config,
-            client,
-            redemption,
-        })
+        Endpoint::over(&super::transport::Transport::default(), config, redemption)
     }
 
     /// The provider-side name of the model this endpoint calls.

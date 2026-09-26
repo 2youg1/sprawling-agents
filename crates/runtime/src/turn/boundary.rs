@@ -10,7 +10,7 @@ use kernel::EventRef;
 
 /// Boundary snapshot, supplied by the executor at every phase change.
 /// `Cancel` ends the turn at the boundary; `Steer` records and advances
-/// (the executor folds the text into its `Window`).
+/// (the executor folds the text into its `Conversation`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Interrupt {
     None,

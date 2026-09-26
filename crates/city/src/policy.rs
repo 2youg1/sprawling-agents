@@ -33,10 +33,12 @@ use std::path::{Path, PathBuf};
 use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist, WriteDomain};
 
+mod cache;
 mod desktop;
 mod evaluate;
 mod reach;
 
+pub use cache::RulesCache;
 pub use desktop::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 pub use evaluate::evaluate;
 pub use reach::DomainReach;

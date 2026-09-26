@@ -202,12 +202,16 @@ impl SearchTool {
                 break;
             }
             let path = match chosen_path::walked(&self.city_root, path, &rel, &*self.bound) {
-                Walked::Directory(path) => path,
-                Walked::File(path) => {
+                Ok(Walked::Directory(path)) => path,
+                Ok(Walked::File(path)) => {
                     self.scan_file(&path, &rel, looking, &mut found);
                     continue;
                 }
-                Walked::Passed => continue,
+                Ok(Walked::Passed) => continue,
+                Err(unresolved) => {
+                    found.could_not_look(&rel, unresolved.to_string());
+                    continue;
+                }
             };
             match sorted_entries(&path) {
                 Ok(entries) => {

@@ -169,34 +169,41 @@ pub(crate) enum Walked {
     Directory(PathBuf),
     /// A file, or the file an admitted link lands on: it is scanned.
     File(PathBuf),
-    /// A link [`land`] refuses, or a link to a directory, which is not
-    /// entered because a walk through links can come back to where it
-    /// started. Passed over without a word, as a closed building is.
+    /// A link [`land`] refuses at the gate, or a link to a directory,
+    /// which is not entered because a walk through links can come back
+    /// to where it started. Passed over without a word, as a closed
+    /// building is.
     Passed,
 }
 
 /// Judges one entry of a walk, asking the disk once about an entry that
 /// is not a link. An entry the disk will not describe is handed on as a
 /// file, so the open that follows names why it could not be looked at.
+///
+/// # Errors
+/// Whatever [`land`] refuses a link with other than `E_GATE_DENIED`:
+/// a link whose real location does not resolve is a place the walk
+/// could not look, not a closed building, and the walker reports it.
 pub(crate) fn walked(
     city_root: &Path,
     path: PathBuf,
     rel: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Walked {
+) -> Result<Walked, AxError> {
     let Ok(kind) = std::fs::symlink_metadata(&path).map(|meta| meta.file_type()) else {
-        return Walked::File(path);
+        return Ok(Walked::File(path));
     };
     if kind.is_dir() {
-        return Walked::Directory(path);
+        return Ok(Walked::Directory(path));
     }
     if !kind.is_symlink() {
-        return Walked::File(path);
+        return Ok(Walked::File(path));
     }
-    let landed = Address::parse(rel).and_then(|addr| land(city_root, &addr, "search", bound));
-    match landed {
-        Ok(real) if real.is_file() => Walked::File(real),
-        Ok(_) | Err(_) => Walked::Passed,
+    match Address::parse(rel).and_then(|addr| land(city_root, &addr, "search", bound)) {
+        Ok(real) if real.is_file() => Ok(Walked::File(real)),
+        Ok(_) => Ok(Walked::Passed),
+        Err(refused) if refused.code() == &AxCode::GateDenied => Ok(Walked::Passed),
+        Err(unresolved) => Err(unresolved),
     }
 }
 

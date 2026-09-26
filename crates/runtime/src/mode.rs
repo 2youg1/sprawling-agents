@@ -15,20 +15,13 @@
 //!
 //! P3 adds the half that decides: [`admits`] says whether what a run
 //! produced may land, given the mode it was in. The evidence arrives as
-//! plain answers rather than as an `eval` type, because that crate sits
-//! outside this one and the question here is not how evidence was
-//! gathered but whether enough of it exists.
+//! plain answers rather than as an instrument's type, because the
+//! instruments live in citysim, outside this crate, and the question
+//! here is not how evidence was gathered but whether enough of it
+//! exists.
 
 use crate::catalog::CatalogEntry;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
-    PlanGoal,
-    Up,
-    Sc,
-    Ud,
-    Experiment,
-}
+use kernel::Mode;
 
 /// The name of the catalog row that opens the developer discipline.
 pub const DEV_ENTRY: &str = "dev";
@@ -65,50 +58,39 @@ pub fn dev_entry() -> CatalogEntry {
     }
 }
 
-impl Mode {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Mode::PlanGoal => "plan_goal",
-            Mode::Up => "up",
-            Mode::Sc => "sc",
-            Mode::Ud => "ud",
-            Mode::Experiment => "experiment",
-        }
-    }
-
-    /// The catalog row for this mode: disclosure one-liner plus the
-    /// expansion text (plan_goal carries its four exit conditions).
-    pub fn catalog_entry(&self) -> CatalogEntry {
-        let (disclosure, expansion) = match self {
-            Mode::PlanGoal => (
-                "plan first, then execute toward the stated goal; report when the goal is met",
-                "Write the plan into Roadmap.md before edits. Exit plan_goal and work \
+/// The catalog row for this mode: disclosure one-liner plus the
+/// expansion text (plan_goal carries its four exit conditions).
+#[must_use]
+pub fn catalog_entry(mode: Mode) -> CatalogEntry {
+    let (disclosure, expansion) = match mode {
+        Mode::PlanGoal => (
+            "plan first, then execute toward the stated goal; report when the goal is met",
+            "Write the plan into Roadmap.md before edits. Exit plan_goal and work \
                  directly when any holds: the task is lightweight; no file changes; no \
                  mechanically verifiable goal; pure conversation. Record the exit reason.",
-            ),
-            Mode::Up => (
-                "utility-production mode: build one reusable asset with tests",
-                "Produce one asset, register it, and prove it with its own tests before reporting.",
-            ),
-            Mode::Sc => (
-                "self-check mode: renovate an existing asset without changing its contract",
-                "Refresh the asset; its observable contract must not move. Diff and tests are the evidence.",
-            ),
-            Mode::Ud => (
-                "upgrade-with-double-validation mode: change behavior behind held-out evidence",
-                "A behavior change needs held-in and held-out evidence before adoption (P3 wires the gates).",
-            ),
-            Mode::Experiment => (
-                "experiment mode: explore without landing anything",
-                "Nothing produced here merges; findings go to Memo.md.",
-            ),
-        };
-        CatalogEntry {
-            name: format!("mode:{}", self.as_str()),
-            disclosure: disclosure.to_owned(),
-            expansion: expansion.to_owned(),
-            hash: None,
-        }
+        ),
+        Mode::Up => (
+            "utility-production mode: build one reusable asset with tests",
+            "Produce one asset, register it, and prove it with its own tests before reporting.",
+        ),
+        Mode::Sc => (
+            "self-check mode: renovate an existing asset without changing its contract",
+            "Refresh the asset; its observable contract must not move. Diff and tests are the evidence.",
+        ),
+        Mode::Ud => (
+            "upgrade-with-double-validation mode: change behavior behind held-out evidence",
+            "A behavior change needs held-in and held-out evidence before adoption (P3 wires the gates).",
+        ),
+        Mode::Experiment => (
+            "experiment mode: explore without landing anything",
+            "Nothing produced here merges; findings go to Memo.md.",
+        ),
+    };
+    CatalogEntry {
+        name: format!("mode:{}", mode.as_str()),
+        disclosure: disclosure.to_owned(),
+        expansion: expansion.to_owned(),
+        hash: None,
     }
 }
 
@@ -306,9 +288,9 @@ mod tests {
     #[test]
     fn names_are_stable_and_entries_carry_both_levels() {
         assert_eq!(Mode::PlanGoal.as_str(), "plan_goal");
-        let entry = Mode::PlanGoal.catalog_entry();
+        let entry = catalog_entry(Mode::PlanGoal);
         assert_eq!(entry.name, "mode:plan_goal");
         assert!(entry.expansion.contains("Exit plan_goal"));
-        assert!(!Mode::Experiment.catalog_entry().disclosure.is_empty());
+        assert!(!catalog_entry(Mode::Experiment).disclosure.is_empty());
     }
 }

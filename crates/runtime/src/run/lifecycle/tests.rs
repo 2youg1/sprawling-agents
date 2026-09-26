@@ -9,10 +9,11 @@ use kernel::ledger::chain_hash;
 use kernel::{Address, B3Hash, Ceiling, EventRef, GENESIS_PREV, Locator, Seq, ToolOutcome};
 
 use super::*;
+use crate::RunPlan;
 use crate::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 use crate::run::Opening;
 use crate::turn::CallShape;
-use crate::{Retries, RunPlan};
+use kernel::Retries;
 
 /// A ledger that records nothing but how often it was asked.
 struct CountingLedger {

@@ -46,7 +46,7 @@ pub use config_layers::write_second_threshold;
 pub use config_layers::{ConfigLayer, Layer, load as load_config};
 pub use config_layers::{own_layer, write_session};
 pub use config_layers::{settled_effort, settled_second, write_effort, write_mcp, write_sandbox};
-pub use document::{Held, edit as edit_document};
+pub use document::{Held, edit as edit_document, edit_against};
 pub use governed::{Governed, PREFERENCES_FILE, write_governed};
 // Where each of these files sits is `kernel::layout`'s answer, and the
 // names are re-exported rather than restated so that a caller reading
@@ -58,7 +58,7 @@ pub use library::{install as install_skill, plan_install as plan_skill_install};
 pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;
 pub use policy::write_rules;
-pub use policy::{BuildingRules, DomainReach, ModelPool, RULES_FILE};
+pub use policy::{BuildingRules, DomainReach, ModelPool, RULES_FILE, RulesCache};
 pub use policy::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 pub use policy::{UserBrowser, UserBrowserEndpoint};
 pub use policy::{agents_path, evaluate, load, rules_path};

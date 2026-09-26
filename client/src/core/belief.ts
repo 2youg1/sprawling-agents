@@ -29,6 +29,7 @@ import type { AxError, CityAnswer, Delta, EventRecord, LogLine, RunId, RunSummar
 
 import type { Belief, RunBelief } from "./belief/shape";
 import { LOG_WINDOW, merged } from "./belief/shape";
+import { runTable } from "./belief/runs.svelte";
 export type { Belief, Notice, RunBelief } from "./belief/shape";
 
 function unseen(run: RunId, at: Seq): RunBelief {
@@ -154,7 +155,7 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     case "secret_egress_blocked": case "file_discarded": case "discard_restored":
     case "autonomy_changed": case "taint_promoted": case "cross_building_transfer":
     case "governed_document_written":
-    case "spine_document_written":
+    case "spine_document_written": case "rules_changed":
     case "embedding_called": case "rerank_called":
     case "adviser_asked": case "adviser_answered": case "adviser_fell_back":
       return [moved, null];
@@ -185,7 +186,7 @@ export function createBelief(now: () => number): BeliefStore {
   // local rather than the store keeps a fold from subscribing and
   // unsubscribing once per record.
   let current: Belief = {
-    runs: {},
+    runs: runTable({}),
     halted: [],
     haltedAt: Seq.make(0),
     refusal: null,
@@ -243,7 +244,7 @@ export function createBelief(now: () => number): BeliefStore {
     }
     written({
       ...held,
-      runs,
+      runs: runTable(runs),
       halted: stated >= held.haltedAt ? [...city.halted] : held.halted,
       haltedAt: stated >= held.haltedAt ? stated : held.haltedAt,
     });
@@ -323,14 +324,27 @@ export function createBelief(now: () => number): BeliefStore {
   // run's records fill in the address, the task and the phase as they
   // arrive, and the next answer that does not list the run takes it
   // away, because every run born here is `local`.
+  //
+  // A run already held takes the words in place: its field is `$state`,
+  // so the readers of that run's words redraw and the belief is not
+  // republished. Only a run the words introduce changes the table's
+  // shape, and that is published.
   function say(delta: Delta): void {
     const held = current;
-    const run = held.runs[delta.run] ?? unseen(delta.run, Seq.make(0));
-    const moved: RunBelief =
-      "said" in delta.increment
-        ? { ...run, saying: run.saying + delta.increment.said }
-        : { ...run, thinking: run.thinking + delta.increment.thought };
-    folded(held, delta.run, moved);
+    const run = held.runs[delta.run];
+    if (run === undefined) {
+      const born = unseen(delta.run, Seq.make(0));
+      folded(
+        held,
+        delta.run,
+        "said" in delta.increment
+          ? { ...born, saying: delta.increment.said }
+          : { ...born, thinking: delta.increment.thought },
+      );
+      return;
+    }
+    if ("said" in delta.increment) run.saying += delta.increment.said;
+    else run.thinking += delta.increment.thought;
   }
 
   // One line of the process log, appended to the window. The oldest go

@@ -35,8 +35,10 @@ use crate::serving::attending::attend;
 /// Appends timed per store: enough for a stable middle, few enough that
 /// the disk store stays inside a few seconds at a barrier each.
 const APPENDS: usize = 200;
-/// What the digest model takes to name a room in the gap scenario,
-/// which is about what a remote model takes to answer a short request.
+/// What a request asking a model to name a room is held for, which is
+/// about what a remote model takes to answer a short request. Rooms are
+/// named by rule (sprawling-SPEC.md 8-86), so no dispatch sends one and
+/// the hold shows in the reading only if naming comes back.
 const NAMING: Duration = Duration::from_secs(3);
 /// The status turns run A takes before it answers.
 const TURNS: usize = 30;
@@ -44,7 +46,7 @@ const TURNS: usize = 30;
 const B_ARRIVES_AT_CALL: usize = 5;
 /// A phrase only run A's requests carry.
 const A_TASK: &str = "tally the east kiln";
-/// The phrase only the naming request carries.
+/// The phrase a request asking a model to name a room would carry.
 const NAMING_PHRASE: &str = "Name this piece of work";
 /// The longest the scenario may take before it is reported as stuck.
 const WITHIN: Duration = Duration::from_secs(60);
@@ -127,21 +129,10 @@ fn instrument_dispatch_gap() {
     let (base_url, provider) = fake_openai_paced(
         &["m-local"],
         vec![(A_TASK, a_replies)],
-        vec![completion("benchroom", None), completion("glazed", None)],
+        vec![completion("glazed", None)],
         pace,
     );
-    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    // B is sent to a building with no room, so a digest model names it.
-    worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
-            model: "m-local".to_owned(),
-            tag: kernel::ModelTag::Digest,
-            context_tokens: kernel::Window::new(32_768),
-            max_output_tokens: kernel::Ceiling::new(4_096),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"digest"),
-        })
-        .unwrap();
+    let worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let attending = attending(worker, &desk);
     desk.post(dispatch("lab/east", A_TASK, b"a"), nowhere());
     let lines = until_frozen(dir.path(), 2);
@@ -157,8 +148,8 @@ fn instrument_dispatch_gap() {
     assert!(
         lines
             .iter()
-            .any(|line| line["kind"] == "run_started" && line["addr"] == "lab/benchroom"),
-        "run B was named and started, so the scenario happened"
+            .any(|line| line["kind"] == "run_started" && line["addr"] == "lab/glaze-the-west-kiln"),
+        "run B was named by rule and started, so the scenario happened"
     );
     let stamps: Vec<u64> = lines
         .iter()
@@ -173,6 +164,16 @@ fn instrument_dispatch_gap() {
         gaps.last().copied().unwrap_or(0),
         gaps.get(gaps.len() / 2).copied().unwrap_or(0),
         machine()
+    );
+    // Dispatching B into a bare building must not stall A. The bound is
+    // the held naming call rather than a few
+    // milliseconds, because A's widest gap also holds its own turns'
+    // fences, which are A's work and not a stall B caused.
+    let widest = gaps.last().copied().unwrap_or(0);
+    let naming = u64::try_from(NAMING.as_millis()).unwrap();
+    assert!(
+        widest < naming,
+        "run A stood still for {widest} ms while run B was dispatched, as long as the {naming} ms naming call"
     );
 }
 
@@ -241,7 +242,7 @@ fn relay_round_trips(store: Store) -> Vec<Duration> {
 /// costs.
 fn own_appends() -> Vec<Duration> {
     let dir = tempfile::tempdir().unwrap();
-    let mut ledger = in_memory_ledger(dir.path());
+    let (mut ledger, _) = in_memory_ledger(dir.path());
     (0..APPENDS)
         .map(|_| {
             let draft = marker();
@@ -252,15 +253,13 @@ fn own_appends() -> Vec<Duration> {
         .collect()
 }
 
-fn in_memory_ledger(dir: &std::path::Path) -> memory::JsonlLedger {
+fn in_memory_ledger(dir: &std::path::Path) -> (memory::JsonlLedger, memory::OpenReport) {
     let fs = memory::FaultFs::new(memory::FaultPlan {
         cut_at_op: None,
         cut_on_write: None,
         torn_tail: memory::TornTail::None,
     });
-    memory::JsonlLedger::open_faulty(fs, dir, now_ms().unwrap())
-        .unwrap()
-        .0
+    memory::JsonlLedger::open_faulty(fs, dir, now_ms().unwrap()).unwrap()
 }
 
 /// A city with one building and one room in it, under ordinary rules.

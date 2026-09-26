@@ -88,13 +88,13 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
         cut_on_write: Some("roadmap_claimed"),
         torn_tail: memory::TornTail::None,
     });
-    let (ledger, _report) =
+    let opened =
         memory::JsonlLedger::open_faulty(fs, &ledger_dir(dir.path()), now_ms().unwrap()).unwrap();
     let mut worker = RunWorker::over(
         dir.path(),
         gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
-        ledger,
+        opened,
     )
     .unwrap();
     worker
@@ -181,8 +181,8 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
 
     let after = std::fs::read_to_string(&plan).unwrap();
     assert!(
-        after.contains("| 1 | wire the kiln | 1 |  | In progress |  |"),
-        "the plan on disk carries the claim: {after}"
+        after.contains("| 1 | wire the kiln | 1 |  | Blocked |  |"),
+        "the claim landed, and the run that ended holding it left it red: {after}"
     );
     assert!(
         after.contains("| 2 | glaze tests | 1 |  | Not started |  |"),
@@ -272,4 +272,61 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
 ",
         );
     assert!(history.contains("roadmap_finished"));
+}
+
+/// A run that ends while holding a node spends it on
+/// `FrozeWithoutEvidence`: the row turns red instead of staying
+/// `In progress` for ever, which is what lets `pursue` see its ready
+/// set shrink (sprawling-SPEC `pursue` termination; collab-SPEC
+/// `ClaimDesk::abandon`).
+#[test]
+fn a_run_that_ends_holding_a_row_leaves_it_blocked_rather_than_in_progress() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(&plan, PLAN_TWO_FREE_ROWS).unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "taking a row",
+                "tu_1",
+                "plan",
+                serde_json::json!({ "action": "claim", "node": "1" }),
+            ),
+            completion("stopping without a word", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "take a row".to_owned(),
+            goal: "claim one row".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"froze"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+    drop(provider);
+
+    let after = std::fs::read_to_string(&plan).unwrap();
+    let kernel::RoadmapShape::WellFormed { rows } = kernel::spine::check_roadmap_shape(&after)
+    else {
+        panic!("an edited plan still parses");
+    };
+    let statuses: Vec<(String, kernel::RoadmapStatus)> = rows
+        .into_iter()
+        .map(|row| (row.id.to_string(), row.status))
+        .collect();
+    assert_eq!(
+        statuses,
+        vec![
+            ("1".to_owned(), kernel::RoadmapStatus::Blocked),
+            ("2".to_owned(), kernel::RoadmapStatus::NotStarted),
+        ],
+        "the held row is spent on its one exit when the run ends: {after}"
+    );
 }

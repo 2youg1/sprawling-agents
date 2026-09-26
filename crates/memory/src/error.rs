@@ -9,7 +9,7 @@
 //! **Why this is a module of its own.** memory-SPEC 7 recorded
 //! the condition when the type was born: it lived beside the ledger
 //! while fewer than three modules aggregated here, and moved out at
-//! three. Twelve modules import it today, and nine of its fourteen
+//! three. Twelve modules import it today, and nine of its fifteen
 //! variants describe failures the ledger cannot produce — a corrupt CAS
 //! object, a bundle that is not a city, a worktree that is behind
 //! the trunk. Executing a decision whose stated condition has arrived
@@ -94,6 +94,10 @@ pub enum MemoryError {
         path: PathBuf,
         kind: crate::alias::AliasKind,
     },
+    /// Another handle holds this city's writer lock: a second process,
+    /// or a second ledger in this one (memory-SPEC 8-1).
+    #[error("the ledger at {dir} is held by another writer")]
+    LedgerHeld { dir: PathBuf },
 }
 
 impl MemoryError {
@@ -186,6 +190,15 @@ impl MemoryError {
                 AxError::failure(AxCode::SecretEgress, "commit checkpoint", locations)
                     .with_recovery("remove the secret from the staged files, then retry")
             }
+            MemoryError::LedgerHeld { dir } => AxError::failure(
+                AxCode::LedgerHeld,
+                "open the ledger for writing",
+                dir.display().to_string(),
+            )
+            .with_recovery(
+                "another sprawling process is serving or changing this city; stop it \
+                 (Ctrl-C in its terminal, or /quit in its console), then run this again",
+            ),
             MemoryError::Alias { op, path, kind } => {
                 AxError::failure(AxCode::OutsideWriteDomain, op, path.display().to_string())
                     .with_recovery(format!(

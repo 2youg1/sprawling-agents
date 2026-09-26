@@ -128,7 +128,7 @@ fn a_knock_past_the_conversation_ceiling_starts_no_run() {
     worker.knocks.push(Knock {
         addr: Address::parse("market/hana").unwrap(),
         from: "market/ito".to_owned(),
-        mode: runtime::Mode::PlanGoal,
+        mode: kernel::Mode::PlanGoal,
         conversations: u32::MAX,
     });
     worker.answer_knocks();

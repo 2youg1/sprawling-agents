@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::approval::{ApprovalId, Autonomy, ClusterKey, Ruling};
 use crate::error::{AxCode, AxError};
 use crate::event::scope::Scope;
+use crate::locator::B3Hash;
 use crate::registry::ResidentId;
 
 /// `approval_resolved`: how one inbox item was answered.
@@ -184,6 +185,48 @@ pub struct GovernedDocumentWritten {
     pub bytes: usize,
 }
 
+/// `rules_changed`: a document a dispatch stands under holds other bytes
+/// than the last line booked for it.
+///
+/// Never the text, for the reason [`GovernedDocumentWritten`] gives; the
+/// two digests are what a replay compares instead. One line's `after`
+/// is the next line's `before` for the same document as long as nothing
+/// wrote it between them, so a gap in that chain says a hand reached the
+/// file outside every door.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct RulesChanged {
+    /// What the document governs: the city, or one existing building.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
+    pub scope: Scope,
+    /// Which of the scope's documents moved; a building holds both, so
+    /// the scope alone cannot say.
+    pub which: GoverningDocument,
+    /// What the last line left the document as. Absent opens the
+    /// document's account rather than claiming a change that never was.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub before: Option<B3Hash>,
+    /// What the document is now.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
+    pub after: B3Hash,
+    /// The length of what now stands, in bytes.
+    pub bytes: usize,
+}
+
+/// The two documents a scope is judged by, spelled on the wire as the
+/// file names they live under.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum GoverningDocument {
+    /// A building's `RULES.toml`.
+    #[serde(rename = "RULES.toml")]
+    Rules,
+    /// A `CONFIG.toml` layer, the city's or a building's.
+    #[serde(rename = "CONFIG.toml")]
+    Config,
+}
+
 /// `spine_document_written`: which of a building's own spine documents
 /// a person wrote, and how long it now is.
 ///
@@ -301,6 +344,38 @@ mod tests {
         assert_eq!(
             serde_json::to_string(written.as_map()).unwrap(),
             r#"{"bytes":12,"which":"MAYOR.md"}"#
+        );
+    }
+
+    /// The file names a replay reads, and the absent `before` that opens
+    /// a document's account.
+    #[test]
+    fn a_rules_change_carries_the_file_name_and_two_digests_never_the_text() {
+        let opening = RulesChanged {
+            scope: Scope::Building(Address::parse("lab").unwrap()),
+            which: GoverningDocument::Rules,
+            before: None,
+            after: B3Hash::digest(b"new"),
+            bytes: 3,
+        };
+        let payload = Payload::of(&opening).unwrap();
+        let text = serde_json::to_string(payload.as_map()).unwrap();
+        assert_eq!(
+            text,
+            format!(
+                r#"{{"after":"{}","bytes":3,"scope":"building:lab","which":"RULES.toml"}}"#,
+                B3Hash::digest(b"new")
+            )
+        );
+        assert_eq!(payload.read::<RulesChanged>().unwrap(), opening);
+        let moved = RulesChanged {
+            which: GoverningDocument::Config,
+            before: Some(B3Hash::digest(b"old")),
+            ..opening
+        };
+        assert_eq!(
+            Payload::of(&moved).unwrap().read::<RulesChanged>().unwrap(),
+            moved
         );
     }
 }

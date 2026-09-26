@@ -115,9 +115,13 @@ impl RunWorker {
                 );
             }
         }
-        // What the run did to the plan.
+        // What the run did to the plan. This is the freeze path: a node
+        // still held here was neither finished nor stopped, and the
+        // `Held` dies with the desk, so it is spent on its one exit now
+        // or the row stays `In progress` for ever.
         let (claim_effects, plan_after) = {
             let mut desk = held(&desks.plan, "settle the plan desk")?;
+            desk.abandon()?;
             (desk.take_effects(), desk.roadmap().map(str::to_owned))
         };
         if let Some(text) = plan_after {

@@ -36,7 +36,6 @@
   import City from "./views/city.svelte";
   import Cost from "./views/cost.svelte";
   import Facts from "./views/facts.svelte";
-  import Gallery from "./views/gallery.svelte";
   import Mcp from "./views/mcp.svelte";
   import Palette from "./views/palette.svelte";
   import Rail from "./views/rail.svelte";
@@ -349,7 +348,16 @@
       {:else if view.kind === "welcome"}
         <Welcome />
       {:else if view.kind === "gallery"}
-        <Gallery />
+        <!-- The storybook and its fixture tables are a chunk of their
+             own, fetched only when a person opens `#/gallery`, so the
+             page every other route loads does not carry them. -->
+        {#await import("./views/gallery.svelte")}
+          <!-- Pending until the chunk lands; the render gate waits for
+               this mark to go before it measures the page. -->
+          <div data-pending></div>
+        {:then gallery}
+          <gallery.default />
+        {/await}
       {/if}
     </main>
     <!-- Under every page, and outside `<main>` on purpose: it is a

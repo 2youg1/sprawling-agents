@@ -107,7 +107,7 @@ fn plan(window: u64) -> RunPlan {
         policy: BuildingPolicy::default(),
         tools: Vec::new(),
         skills: Vec::new(),
-        retries: runtime::Retries::UntilHalted,
+        retries: kernel::Retries::UntilHalted,
     }
 }
 

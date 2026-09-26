@@ -60,12 +60,14 @@ mod engine;
 mod marks;
 mod pass;
 mod probe;
+mod room;
 mod sources;
 
 use announced::{every_control_is_announceable, every_landmark_is_named, one_first_heading};
 use engine::{Measured, Opening, browser, measure};
 use marks::no_key_is_underlined;
 use pass::Pass;
+use room::{every_popover_shows_an_option, no_text_is_crushed};
 
 /// The route that draws every state worth looking at, on fixtures.
 ///
@@ -159,6 +161,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         every_landmark_is_named(&page.drawn, &at, &mut violations);
         one_first_heading(&page.drawn, &at, &mut violations);
         no_key_is_underlined(&page.drawn, &at, &mut violations);
+        no_text_is_crushed(&page.drawn, &at, &mut violations);
+        every_popover_shows_an_option(&page.drawn, &at, &mut violations);
         let readings = survey::judge(page);
         for reading in readings.iter().filter(refusable) {
             // A refusal names the line as well as the page: a gate that

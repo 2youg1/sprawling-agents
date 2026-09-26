@@ -53,12 +53,17 @@
   // entry in the notification drawer - so a notice cannot be shown in
   // one place and shaped differently in another (client-SPEC 4-35).
   //
-  // **The reader's own title is the heading; the city's own words are
-  // the fold.** The heading comes from `err_<code>` in `lang.json`; the
-  // English originals the error carries - the action, the subject and
-  // the recovery - fold into one mono-font disclosure and never stand as
-  // a heading (UX B8). The stable code itself rides the heading's right
-  // edge, where a person can cite it.
+  // **The reader's own title is the heading; the city's way out is the
+  // body; the rest of its words are the fold.** The heading comes from
+  // `err_<code>` in `lang.json`, and one code covers several causes, so
+  // the heading names the kind of refusal and never the cause. The
+  // recovery the city wrote is the one sentence that knows the cause
+  // and what to do about it, so it stands under the heading unfolded; a
+  // person who had to open a disclosure to learn that the next step is
+  // the settings page would first press the buttons that do not help.
+  // The action and the subject fold into one mono-font disclosure and
+  // never stand as a heading (UX B8). The stable code itself rides the
+  // heading's right edge, where a person can cite it.
   //
   // **The same refusal is one notice with a count.** However many times
   // a refusal arrives, a person who reads the same four fields twice
@@ -118,6 +123,9 @@
       {/if}
       <span class="ml-auto shrink-0 font-mono text-note text-text-faint">{code}</span>
     </div>
+    {#if recovery !== ""}
+      <p class="min-w-0 wrap-anywhere text-note text-text">{recovery}</p>
+    {/if}
     <details class="min-w-0">
       <summary class="cursor-pointer text-note text-text-faint">{say($lang, "notices_detail")}</summary>
       <div
@@ -125,9 +133,6 @@
       >
         <span>{action}</span>
         <span>{subject}</span>
-        {#if recovery !== ""}
-          <span>{recovery}</span>
-        {/if}
       </div>
     </details>
   </div>

@@ -8,8 +8,8 @@ mod city;
 mod faults;
 mod reading;
 
-use std::cell::RefCell;
 use std::collections::BTreeSet;
+use std::sync::Mutex;
 
 use super::paint::Ink;
 use super::screen::{Asked, run};
@@ -22,14 +22,14 @@ use super::*;
 /// here without the machine this test runs on being asked anything.
 pub(super) struct ScriptedMachine {
     absent: BTreeSet<&'static str>,
-    asked: RefCell<Vec<String>>,
+    asked: Mutex<Vec<String>>,
 }
 
 impl ScriptedMachine {
     pub(super) fn missing(absent: &[&'static str]) -> ScriptedMachine {
         ScriptedMachine {
             absent: absent.iter().copied().collect(),
-            asked: RefCell::new(Vec::new()),
+            asked: Mutex::new(Vec::new()),
         }
     }
 }
@@ -47,7 +47,7 @@ impl Machine for ScriptedMachine {
     }
 
     fn install(&self, name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
-        self.asked.borrow_mut().push(name.to_owned());
+        self.asked.lock().unwrap().push(name.to_owned());
         Ok(())
     }
 }
@@ -327,7 +327,7 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
         "the command was not shown: {shown}"
     );
     assert!(
-        machine.asked.borrow().is_empty(),
+        machine.asked.lock().unwrap().is_empty(),
         "a no installed something"
     );
 
@@ -347,7 +347,7 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
     )
     .unwrap();
     assert_eq!(
-        machine.asked.borrow().as_slice(),
+        machine.asked.lock().unwrap().as_slice(),
         ["just".to_owned()],
         "exactly the item that was answered yes is installed"
     );
@@ -372,7 +372,7 @@ fn the_default_checks_and_installs_nothing() {
         &mut screen,
     )
     .unwrap();
-    assert!(machine.asked.borrow().is_empty());
+    assert!(machine.asked.lock().unwrap().is_empty());
     let shown = String::from_utf8(screen).unwrap();
     assert!(
         shown.contains("not ready to use: missing a browser engine"),

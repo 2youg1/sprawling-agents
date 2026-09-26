@@ -13,7 +13,6 @@ gateway = { path = "../gateway" }
 channels = { path = "../channels" }
 city = { path = "../city" }
 collab = { path = "../collab" }
-eval = { path = "../eval" }
 browser = { path = "../browser" }
 protocol = { path = "../protocol" }
 futures-util = { workspace = true }
@@ -25,6 +24,7 @@ tokio-tungstenite = { workspace = true }
 # The person's own layer is TOML for the reason a city's CONFIG.toml is:
 # it is a file somebody edits by hand while the city is stopped.
 toml = { workspace = true }
+zeroize = { workspace = true }
 
 [features]
 # The execution engine, off by default. `AbsentSandbox` refuses tool

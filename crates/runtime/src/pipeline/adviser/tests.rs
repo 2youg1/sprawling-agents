@@ -23,10 +23,10 @@ use super::*;
 use crate::offload::OffloadSite;
 use memory::Cas;
 
-fn window() -> Window {
-    let mut window = Window::new();
-    window.push_task_lines("do it", "it is done", crate::window::Opening::FromJob);
-    window
+fn conversation() -> Conversation {
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("do it", "it is done", crate::conversation::Opening::FromJob);
+    conversation
 }
 
 /// An adviser that answers whatever the test scripted, so the port's
@@ -39,7 +39,7 @@ fn scripted(answer: Result<AdviserAnswer, AdviserFailure>) -> Adviser {
 #[test]
 fn an_answer_to_another_question_is_a_fallback() {
     let mut adviser = scripted(Ok(AdviserAnswer::Score { score_bp: 1 }));
-    let consultation = adviser.consult(Ask::noul("toolu_01", "material"), &window(), 7);
+    let consultation = adviser.consult(Ask::noul("toolu_01", "material"), &conversation(), 7);
     assert_eq!(
         consultation,
         Consultation::FellBack {
@@ -58,7 +58,7 @@ fn a_choice_outside_the_offered_options_is_a_fallback() {
     }));
     let consultation = adviser.consult(
         Ask::choice("dispatch", vec!["sonnet".to_owned(), "opus".to_owned()]),
-        &window(),
+        &conversation(),
         3,
     );
     assert_eq!(consultation.answer(), None);
@@ -71,7 +71,7 @@ fn a_choice_outside_the_offered_options_is_a_fallback() {
 #[test]
 fn a_missing_adviser_falls_back_as_unavailable() {
     let mut adviser = Adviser::none();
-    let consultation = adviser.consult(Ask::score("toolu_02", "text"), &window(), 0);
+    let consultation = adviser.consult(Ask::score("toolu_02", "text"), &conversation(), 0);
     let Consultation::FellBack { reason, ask, .. } = consultation else {
         panic!("no adviser means no answer");
     };
@@ -85,7 +85,7 @@ fn a_valid_answer_is_kept_and_records_the_two_lines() {
         keep: false,
         confidence_bp: 8_750,
     }));
-    let consultation = adviser.consult(Ask::noul("toolu_01", "material"), &window(), 41);
+    let consultation = adviser.consult(Ask::noul("toolu_01", "material"), &conversation(), 41);
     assert_eq!(
         consultation.answer(),
         Some(&AdviserAnswer::Noul {
@@ -111,7 +111,7 @@ fn a_valid_answer_is_kept_and_records_the_two_lines() {
 #[test]
 fn a_fallback_records_the_reason() {
     let mut adviser = scripted(Err(AdviserFailure::Timeout));
-    let consultation = adviser.consult(Ask::score("toolu_09", "text"), &window(), 900);
+    let consultation = adviser.consult(Ask::score("toolu_09", "text"), &conversation(), 900);
     let payloads = consultation.payloads().unwrap();
     assert_eq!(
         payloads.get(1).unwrap().as_map().get("reason"),
@@ -130,12 +130,12 @@ fn a_fallback_records_the_reason() {
 #[test]
 fn a_density_score_scales_the_budget_and_records_the_two_lines() {
     let text = "The first sentence says what this result is about. ".repeat(40);
-    let mut window = Window::new();
-    window.push_task_lines("t", "g", crate::window::Opening::FromJob);
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("t", "g", crate::conversation::Opening::FromJob);
     let mut adviser = Adviser::with(|_ask, _window| {
         Ok(kernel::event::record::AdviserAnswer::Score { score_bp: 1_000 })
     });
-    let consultation = adviser.consult(Ask::score("result", text.as_str()), &window, 12);
+    let consultation = adviser.consult(Ask::score("result", text.as_str()), &conversation, 12);
     let mut ctx = no_offload(4_096);
     ctx.adviser = Some(consultation);
     let out = package(text.as_bytes(), ctx).unwrap();
@@ -160,10 +160,10 @@ fn a_density_score_scales_the_budget_and_records_the_two_lines() {
 #[test]
 fn a_fallback_is_recorded_and_leaves_every_figure_alone() {
     let text = "The first sentence says what this result is about. ".repeat(40);
-    let mut window = Window::new();
-    window.push_task_lines("t", "g", crate::window::Opening::FromJob);
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("t", "g", crate::conversation::Opening::FromJob);
     let mut adviser = Adviser::none();
-    let consultation = adviser.consult(Ask::score("result", text.as_str()), &window, 0);
+    let consultation = adviser.consult(Ask::score("result", text.as_str()), &conversation, 0);
     let mut ctx = no_offload(4_096);
     ctx.adviser = Some(consultation);
     let out = package(text.as_bytes(), ctx).unwrap();
@@ -183,8 +183,8 @@ fn an_advisers_not_needed_acts_only_where_a_store_could_hold_it() {
     let mut cas = Cas::open(&dir.path().join("cas")).unwrap();
     let env = dir.path().join("env");
     std::fs::create_dir_all(&env).unwrap();
-    let mut window = Window::new();
-    window.push_task_lines("t", "g", crate::window::Opening::FromJob);
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("t", "g", crate::conversation::Opening::FromJob);
     let mut adviser = Adviser::with(|_ask, _window| {
         Ok(kernel::event::record::AdviserAnswer::Noul {
             keep: false,
@@ -192,7 +192,7 @@ fn an_advisers_not_needed_acts_only_where_a_store_could_hold_it() {
         })
     });
     let big = "The first sentence says what this result is about. ".repeat(400);
-    let consultation = adviser.consult(Ask::noul("result", big.as_str()), &window, 5);
+    let consultation = adviser.consult(Ask::noul("result", big.as_str()), &conversation, 5);
     let out = package(
         big.as_bytes(),
         PackContext {
@@ -216,7 +216,7 @@ fn an_advisers_not_needed_acts_only_where_a_store_could_hold_it() {
         out.content
     );
     let small = "{\"ok\":true}";
-    let consultation = adviser.consult(Ask::noul("result", small), &window, 5);
+    let consultation = adviser.consult(Ask::noul("result", small), &conversation, 5);
     let out = package(
         small.as_bytes(),
         PackContext {

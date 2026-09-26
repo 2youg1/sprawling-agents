@@ -15,6 +15,7 @@ use super::super::{Assignment, RunWorker, mounts_under};
 use super::engine::machine_half;
 use super::{Desks, Reach, Site, Situation, Workbench, held, status_snapshot};
 
+mod kept;
 mod reading_room;
 
 impl RunWorker {
@@ -55,7 +56,11 @@ impl RunWorker {
         // what this run admits, and until it was set here the mode's own
         // catalog entry reached no model.
         held(&catalog, "lay out the catalog")?.set_mode(mode);
-        let edit = EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?;
+        let edit = kept::KeptEdit::new(
+            EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?,
+            self.vault_handle(),
+            self.ledger.position().value(),
+        );
         // Who this run can reach, read once at dispatch and frozen with
         // it. Nothing here can move under the run: the assembly is
         // single-threaded, so no second run executes while this one
@@ -252,21 +257,20 @@ fn run_taint(at: &Assignment) -> Result<kernel::TaintSet, AxError> {
 }
 
 impl RunWorker {
-    /// What this run's building may read by a path its model chose: the
-    /// read bound, closed over the building and this city's rules
-    /// (city-SPEC 8-2).
+    /// What this run's building may read by a path its model chose: the read bound, closed over
+    /// the building and this city's rules (city-SPEC 8-2).
     ///
-    /// Another building's rules are read each time a path lands in it,
-    /// not here, so a run that stays in its own building never pays for
-    /// them, and a building made confidential after this dispatch is
-    /// closed from that moment (city-SPEC 12.2).
+    /// Another building's rules are read each time a path lands in it, not here, so a run that
+    /// stays in its own building never pays for them, and a building made confidential after this
+    /// dispatch is closed from that moment (city-SPEC 12.2). What was read stays for this run
+    /// while the file's stamp holds (city-SPEC 12.3).
     fn read_bound(&self, site: &Site) -> runtime::ReadBound {
-        let city_root = self.city_root.clone();
+        let rules = city::RulesCache::new(&self.city_root);
         let home = site.building.addr().clone();
         std::sync::Arc::new(move |target: &Address| {
             kernel::address::may_read(&home, target, || {
                 let holder = city::Building::of(target)?;
-                city::load(&city_root, holder.addr()).map(|rules| rules.policy().confidential)
+                rules.load(holder.addr()).map(|r| r.policy().confidential)
             })
         })
     }

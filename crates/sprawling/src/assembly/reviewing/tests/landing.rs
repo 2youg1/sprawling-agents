@@ -77,6 +77,8 @@ fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
             completion("checked", None),
         ],
     );
+    // The implementer's writer lets go first: a city has one writer.
+    drop(worker);
     let mut checker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     checker
         .handle(channels::Command::Dispatch {
@@ -202,6 +204,8 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
             completion("checked", None),
         ],
     );
+    // The implementer's writer lets go first: a city has one writer.
+    drop(worker);
     let mut checker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     checker
         .handle(channels::Command::Dispatch {
@@ -293,6 +297,8 @@ fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
             completion("checked", None),
         ],
     );
+    // The implementer's writer lets go first: a city has one writer.
+    drop(worker);
     let mut checker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     checker
         .handle(channels::Command::Dispatch {

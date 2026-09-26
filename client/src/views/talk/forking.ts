@@ -101,3 +101,15 @@ export function planFork(mother: RunId, entry: ForkEntry): ForkPlan {
     walkedBack: open,
   };
 }
+
+// A Latin stop ends a sentence only before a space or the end, so a
+// version number or a file name keeps its dots; a CJK stop always does.
+const SENTENCE = /^.*?(?:[.!?](?=\s|$)|[。！？])/u;
+
+// The mother run as the divider names it: the first sentence of its task,
+// because a run id is thirty-six characters nobody recognises and the
+// task is what the person remembers asking.
+export function motherName(task: string): string {
+  const line = task.trim().split("\n")[0] ?? "";
+  return SENTENCE.exec(line)?.[0] ?? line;
+}

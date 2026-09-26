@@ -17,7 +17,6 @@
 
 //! Serving configuration: routes and bodies.
 
-use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Router;
@@ -26,7 +25,7 @@ use axum::http::{StatusCode, header};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{MethodRouter, get, post};
-use kernel::{Address, AxError, B3Hash, EventRecord, Sealed};
+use kernel::{Address, AxError, EventRecord, Sealed};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
@@ -61,11 +60,6 @@ const ENROLMENT_PATIENCE: std::time::Duration = std::time::Duration::from_secs(2
 /// `channels` declares no `pub trait` (it is not on the seam list,
 /// ARCHITECTURE section 3), and one implementation is not a seam.
 pub struct ServeConfig {
-    pub addr: SocketAddr,
-    /// Digest of the pairing token, never the token. `None` means no token
-    /// is configured, which [`decide_bind`] turns into a refusal for any
-    /// address reachable beyond this machine.
-    pub token_digest: Option<B3Hash>,
     /// The client bundle, handed in by the assembly layer so this crate
     /// never learns where build artifacts live.
     pub client: Arc<ClientAssets>,

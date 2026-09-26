@@ -23,9 +23,11 @@ mod model;
 mod models;
 pub(crate) mod redemption;
 mod stream;
+mod transport;
 
 pub use adapter::adapter_for;
 pub use config::{AuthSpec, Endpoint, EndpointConfig};
 pub use header::HeaderValue;
 pub use models::ModelFacts;
 pub use redemption::{ImageResolver, Redemption, SecretResolver};
+pub(crate) use transport::Transport;

@@ -371,12 +371,11 @@ impl Tool for ExecTool {
 
 /// The tool is dropped when its run's bench is, which is when the run
 /// can no longer be handed anything: what it left in the background is
-/// released so the table does not keep it for the life of the city.
+/// terminated and released so the table does not keep it for the life of
+/// the city.
 impl Drop for ExecTool {
     fn drop(&mut self) {
-        // A table left locked by a dead thread already answers every
-        // later caller with `E_STORAGE_FATAL`; a drop has nobody to tell.
-        drop(self.backlog.release(self.setup.run));
+        self.backlog.release(self.setup.run);
     }
 }
 

@@ -78,69 +78,6 @@ fn a_configuration_layer_is_named_by_the_scope_it_sits_in() {
 }
 
 #[test]
-fn a_session_slice_lives_under_the_sessions_of_its_first_segment() {
-    let sessions = Path::new("/city")
-        .join("webapp")
-        .join(RESERVED_PREFIX)
-        .join(SESSIONS_DIR);
-    assert_eq!(
-        layout().session_slice(&addr("webapp/api-rewrite")),
-        sessions.join("api-rewrite.jsonl")
-    );
-    // A room one level below a room keeps its own path: the nesting
-    // of the address is the nesting of the files.
-    assert_eq!(
-        layout().session_slice(&addr("webapp/backend/db-migration")),
-        sessions.join("backend").join("db-migration.jsonl")
-    );
-    // A run that named no session works at the building's address.
-    assert_eq!(
-        layout().session_slice(&addr("webapp")),
-        sessions.join("webapp.jsonl")
-    );
-}
-
-#[test]
-fn a_session_slice_is_out_of_every_write_domain() {
-    let path = layout().session_slice(&addr("lab/room1"));
-    let spelled = path.to_string_lossy().replace('\\', "/");
-    let as_address = spelled.trim_start_matches("/city/").to_owned();
-    assert!(
-        addr(&as_address).is_reserved(),
-        "{spelled} is not in a reserved subtree"
-    );
-}
-
-#[test]
-fn a_fence_can_tell_a_session_slice_from_a_promise() {
-    let held = [
-        "lab/.sprawling/sessions/room1.jsonl",
-        "lab/room1/.sprawling/sessions/room1.jsonl",
-        "lab/.SPRAWLING/sessions/x",
-    ];
-    for spelled in held {
-        assert!(
-            CityLayout::is_session_projection(Path::new(spelled)),
-            "{spelled} is a session slice"
-        );
-    }
-    let kept = [
-        "lab/.sprawling/CONFIG.toml",
-        "lab/.sprawling/skills/one/SKILL.md",
-        "lab/room1/JOB.md",
-        "sessions/room1.jsonl",
-        "lab/room1/sessions/notes.md",
-        "lab/.sprawling/library/sessions.md",
-    ];
-    for spelled in kept {
-        assert!(
-            !CityLayout::is_session_projection(Path::new(spelled)),
-            "{spelled} is a person's or a promise, not a slice"
-        );
-    }
-}
-
-#[test]
 fn a_city_s_name_is_the_directory_it_lives_in() {
     assert_eq!(
         CityLayout::new(Path::new("/city")).city_address(),

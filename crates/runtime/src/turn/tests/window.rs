@@ -12,7 +12,7 @@
 )]
 
 use super::super::*;
-use crate::window::Opening;
+use crate::conversation::Opening;
 
 /// The two openings are two situations, and the words differ.
 /// A session nobody assigned a task to gets the person's own line,
@@ -20,7 +20,7 @@ use crate::window::Opening;
 /// form and is answered as one.
 #[test]
 fn a_session_with_a_person_opens_in_the_persons_own_words() {
-    let mut assigned = Window::new();
+    let mut assigned = Conversation::new();
     assigned.push_task_lines("close the loop", "one turn, then stop", Opening::FromJob);
     let ContentBlock::Text { text } = &assigned.messages()[0].content[0] else {
         panic!("the dispatch lines are text");
@@ -32,7 +32,7 @@ fn a_session_with_a_person_opens_in_the_persons_own_words() {
         "The task is in JOB.md above.\nGoal: one turn, then stop"
     );
 
-    let mut talking = Window::new();
+    let mut talking = Conversation::new();
     talking.push_task_lines("what do you make of this", "", Opening::WithPerson);
     let ContentBlock::Text { text } = &talking.messages()[0].content[0] else {
         panic!("the dispatch line is text");
@@ -49,9 +49,9 @@ fn no_opening_line_points_at_a_file_the_agent_already_has() {
         ("stop when it builds", Opening::FromJob),
         ("", Opening::WithPerson),
     ] {
-        let mut window = Window::new();
-        window.push_task_lines("do the thing", goal, opening);
-        let ContentBlock::Text { text } = &window.messages()[0].content[0] else {
+        let mut conversation = Conversation::new();
+        conversation.push_task_lines("do the thing", goal, opening);
+        let ContentBlock::Text { text } = &conversation.messages()[0].content[0] else {
             panic!("the opening is text");
         };
         assert!(!text.contains("FULL READ"), "{opening:?} still points away");
@@ -61,26 +61,26 @@ fn no_opening_line_points_at_a_file_the_agent_already_has() {
 
 #[test]
 fn the_window_folds_steer_into_the_open_user_message() {
-    let mut window = Window::new();
-    window.push_tool_results(vec![ContentBlock::ToolResult {
+    let mut conversation = Conversation::new();
+    conversation.push_tool_results(vec![ContentBlock::ToolResult {
         tool_use_id: "call-1".to_owned(),
         content: "{}".to_owned(),
         is_error: false,
         attachments: Vec::new(),
     }]);
-    window.push_steer("user", "look again");
+    conversation.push_steer("user", "look again");
     assert_eq!(
-        window.messages().len(),
+        conversation.messages().len(),
         1,
         "steer rides the open user message"
     );
-    assert_eq!(window.messages()[0].content.len(), 2);
-    window.push_assistant(vec![ContentBlock::Text {
+    assert_eq!(conversation.messages()[0].content.len(), 2);
+    conversation.push_assistant(vec![ContentBlock::Text {
         text: "ok".to_owned(),
     }]);
-    window.push_steer("@planner", "hurry");
+    conversation.push_steer("@planner", "hurry");
     assert_eq!(
-        window.messages().len(),
+        conversation.messages().len(),
         3,
         "steer after assistant opens a new message"
     );

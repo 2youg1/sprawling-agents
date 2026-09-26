@@ -119,8 +119,8 @@ fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
     assert!(
         city::roadmap(dir.path(), &lab_addr)
             .unwrap()
-            .contains("| 1 | wire the kiln | 1 |  | In progress |"),
-        "the node is claimed in the plan"
+            .contains("| 1 | wire the kiln | 1 |  | Blocked |"),
+        "the node was claimed, and the run that ended holding it left it red"
     );
 }
 #[test]

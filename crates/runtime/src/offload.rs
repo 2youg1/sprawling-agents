@@ -99,7 +99,7 @@ pub(crate) struct Tee {
 /// existing first. Repeating it on the same bytes is idempotent.
 pub(crate) fn tee(bytes: &[u8], site: &mut OffloadSite<'_>) -> Result<Tee, AxError> {
     let hash = site.cas.put(bytes).map_err(memory::MemoryError::into_ax)?;
-    let original = Locator::parse(&format!("cas:b3-{hash}"))?;
+    let original = Locator::cas(hash);
     let rest_path = materialized(bytes, site.room, &original)?;
     Ok(Tee {
         original,

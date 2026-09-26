@@ -9,6 +9,7 @@ use std::path::Path;
 
 use kernel::AxError;
 use kernel::EventRecord;
+use runtime::replay::{VerifiedLedger, VerifiedLine};
 
 // The governance fold lives in `views`, where the reading side keeps
 // one too. Named here so the worker that judges from it reads under
@@ -58,7 +59,7 @@ impl Standing {
     /// is what now holds, so the two extra passes bought nothing but the
     /// time and the memory of reading a whole history twice more.
     ///
-    /// A line is parsed once here and shown to each fold. Verification
+    /// A line is parsed once, by the per-line check, and shown to each fold. Verification
     /// stays where it was: a history that does not verify is not one any
     /// of these three views may be built from.
     ///
@@ -74,11 +75,10 @@ impl Standing {
         let mut origins = SessionOrigins::default();
         if ledger_dir.exists() {
             let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
-            for line in verified.raw_lines() {
-                let record = EventRecord::parse_line(line)?;
-                book.apply(&record)?;
+            for record in known_records(&verified) {
+                book.apply(record)?;
                 governance.absorb(record.kind(), record.run(), record.addr(), record.data())?;
-                collaboration.absorb(&record)?;
+                collaboration.absorb(record)?;
                 entrance.absorb(record.data());
                 expiries.absorb(record.kind(), record.data());
                 origins.absorb(record.kind(), record.addr(), record.data())?;
@@ -109,11 +109,23 @@ pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
         .and_then(Path::parent)
         .unwrap_or(ledger_dir);
     let mut views = Views::new(city_root);
-    for line in verified.raw_lines() {
-        let record = EventRecord::parse_line(line)?;
-        views.apply(&record)?;
+    for record in known_records(&verified) {
+        views.apply(record)?;
     }
     Ok(views)
+}
+
+/// The records the per-line check already parsed, in ledger order.
+///
+/// A line the check let through as ignorable carries a kind this build
+/// has no record for, so no fold is shown it; parsing the raw bytes a
+/// second time would refuse exactly that line and turn a history that
+/// verifies into a city that cannot start.
+fn known_records(verified: &VerifiedLedger) -> impl Iterator<Item = &EventRecord> {
+    verified.lines().iter().filter_map(|line| match line {
+        VerifiedLine::Known { record, .. } => Some(record),
+        VerifiedLine::IgnoredUnknown { .. } => None,
+    })
 }
 
 #[cfg(test)]
