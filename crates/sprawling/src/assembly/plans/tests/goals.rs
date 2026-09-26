@@ -40,6 +40,7 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
                 ),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
     }
@@ -127,6 +128,7 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     // Laying out a graph is a spawn like any other, and a spawn is

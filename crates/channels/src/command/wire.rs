@@ -93,6 +93,7 @@ impl From<WireCommand> for Command {
                 idem,
                 session,
                 effort,
+                model,
             } => Self::Dispatch {
                 addr,
                 task,
@@ -101,6 +102,7 @@ impl From<WireCommand> for Command {
                 idem,
                 session,
                 effort,
+                model,
             },
             Command::Login {
                 provider,

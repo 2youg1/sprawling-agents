@@ -60,6 +60,7 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"paste"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

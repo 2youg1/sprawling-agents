@@ -87,6 +87,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let calls_before_the_child = provider.bodies().len();

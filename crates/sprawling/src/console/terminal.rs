@@ -341,6 +341,7 @@ fn dispatch(addr: &Address, task: &str, idem: kernel::IdemKey) -> channels::Clie
         // continues what is working there.
         session: None,
         effort: None,
+        model: None,
     }))
 }
 

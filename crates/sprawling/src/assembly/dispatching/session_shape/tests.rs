@@ -82,6 +82,33 @@ fn ask(addr: &Address, effort: Option<kernel::Effort>, key: &[u8]) -> channels::
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
         effort,
+        model: None,
+    }
+}
+
+/// A dispatch that names the model it runs on.
+fn ask_on(addr: &Address, model: &str, key: &[u8]) -> channels::Command {
+    match ask(addr, None, key) {
+        channels::Command::Dispatch {
+            addr,
+            task,
+            goal,
+            mode,
+            idem,
+            session,
+            effort,
+            ..
+        } => channels::Command::Dispatch {
+            addr,
+            task,
+            goal,
+            mode,
+            idem,
+            session,
+            effort,
+            model: Some(model.to_owned()),
+        },
+        other => other,
     }
 }
 
@@ -296,5 +323,49 @@ fn a_model_chosen_after_a_session_opened_does_not_reach_it() {
     assert_eq!(
         city::own_layer(dir.path(), &elsewhere).unwrap().model(),
         Some("m-other")
+    );
+}
+
+/// A dispatch that names a registered model runs on it, and one that
+/// names a model nobody registered is refused before the room exists.
+///
+/// The named model is registered under another tag, so the `main` tag
+/// still answers `m-local`: what reaches the room's frozen layer can
+/// only have come from the dispatch.
+#[test]
+fn a_dispatch_that_names_a_registered_model_runs_on_it() {
+    let dir = tempfile::tempdir().unwrap();
+    open_lab(dir.path());
+    let (base_url, _provider) =
+        fake_openai(&["m-local", "m-other"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::SelectModel {
+            endpoint: channels::ProviderName::parse("house").unwrap(),
+            model: "m-other".to_owned(),
+            tag: kernel::ModelTag::Digest,
+            context_tokens: kernel::Window::new(32_768),
+            max_output_tokens: kernel::Ceiling::new(4_096),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select-digest"),
+        })
+        .unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    worker
+        .handle(ask_on(&room, "m-other", b"dispatch-1"))
+        .unwrap();
+    assert_eq!(
+        city::own_layer(dir.path(), &room).unwrap().model(),
+        Some("m-other"),
+        "the room froze the model the dispatch named, not the main tag's"
+    );
+
+    let stranger = Address::parse("lab/room2").unwrap();
+    let refused = worker
+        .handle(ask_on(&stranger, "m-nobody", b"dispatch-2"))
+        .unwrap_err();
+    assert_eq!(*refused.code(), AxCode::ConfigInvalid, "{refused}");
+    assert!(
+        !dir.path().join("lab").join("room2").exists(),
+        "a refused dispatch opened no room"
     );
 }

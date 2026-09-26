@@ -46,6 +46,24 @@ fn a_flag_value_is_not_an_address() {
     assert_eq!(read.positional(2), None, "the address took the log level");
 }
 
+/// `-m` is the short spelling of `--model`, so a body reads one name
+/// whichever the person typed.
+#[test]
+fn a_short_flag_reads_as_its_long_name() {
+    for spelled in ["-m", "--model"] {
+        let line = ["dispatch", "lab/room1", "write it", spelled, "m-other"];
+        let Ok(Invocation::Run(Verb::Dispatch, read)) = parse(&words(&line)) else {
+            panic!("{line:?} did not parse as dispatch");
+        };
+        assert_eq!(read.value("--model"), Some("m-other"), "{line:?}");
+        assert_eq!(
+            read.positional(3),
+            None,
+            "{line:?}: the model id is no positional"
+        );
+    }
+}
+
 #[test]
 fn a_mistyped_verb_names_the_nearest() {
     assert_eq!(

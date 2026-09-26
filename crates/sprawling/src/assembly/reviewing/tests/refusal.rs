@@ -63,6 +63,7 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"one"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -141,6 +142,7 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"two"),
         session: None,
         effort: None,
+        model: None,
     });
 
     assert_eq!(

@@ -83,6 +83,7 @@ pub(crate) fn acp_dispatch(
             // ...and says nothing about how hard to think, so the
             // layers above answer.
             effort: None,
+            model: None,
         },
         channels::Reply::nowhere(),
     );

@@ -40,6 +40,7 @@ fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbo
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"unreadable"),
         session: None,
         effort: None,
+        model: None,
     });
 
     let err = outcome.expect_err("a plan nobody can read is not an empty plan");
@@ -128,6 +129,7 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lost"),
         session: None,
         effort: None,
+        model: None,
     });
     drop(provider);
 
@@ -174,6 +176,7 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
                 ),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
     }
@@ -243,6 +246,7 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     drop(provider);

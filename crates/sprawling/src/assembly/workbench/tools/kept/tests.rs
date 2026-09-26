@@ -55,6 +55,7 @@ fn a_written_key_reaches_the_vault_and_not_the_file() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"write"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

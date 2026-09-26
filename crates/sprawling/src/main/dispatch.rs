@@ -62,6 +62,7 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
         idem,
         session: None,
         effort: None,
+        model: None,
     }));
     let ending = Ending::OnRun {
         under: addr,

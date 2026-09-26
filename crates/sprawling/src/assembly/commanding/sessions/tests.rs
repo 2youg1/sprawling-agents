@@ -181,6 +181,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
@@ -221,6 +222,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"carry-on"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -254,6 +256,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"again"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let next = provider.bodies();

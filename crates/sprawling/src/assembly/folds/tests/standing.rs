@@ -50,6 +50,7 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -233,6 +234,7 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag),
         session: None,
         effort: None,
+        model: None,
     };
     let halt = |scope| channels::Command::Halt {
         scope,

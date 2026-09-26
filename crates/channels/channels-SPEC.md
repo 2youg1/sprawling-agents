@@ -1328,3 +1328,14 @@ pub enum Query { /* … */ NewestRelease }   // 线上拼作 "newest_release"
 - **只改查询，不改答复**：`Answer::Release` 与 `ReleaseAnswer` 保持原名。答复不出现在人能输入的地方，没有同名的歧义；改它只会多一次无人受益的线上换形。
 - **`WIRE_V` 不动**：变体名进 `QUERY_NAMES`，名字一变 §8-1 的 golden 就变，旧页面在握手时被拒，而不是发出一条城不认识的查询；`WIRE_V` 只为「名字没换而语法换形」而升（§298），改名不属于那一类。新名字登记在 `docs/glossary.md` §6；旧拼法不进 `xtask/lexicon.toml`，因为已发布版本的 `CHANGELOG.md` 如实记着它当时的名字，子串禁令会误伤那段历史。
 - **被否：保留 `release` 作别名**。一条查询两个拼法，就是同一个名字有两个家；握手已经把旧页面挡在门外，别名没有读者。
+
+### 8-48 `WIRE_V` 39：`Dispatch` 可以点名这一次的模型
+
+```rust
+Dispatch { addr, task, goal, mode, idem, session, effort, model: Option<String> }
+```
+
+- **`model` 是城已登记的一个模型 id**，登记在哪个 tag 下都行；`None` 取 `main` tag 的模型，与原来一样。装配按这个 id 在簿子里找到那一条登记，连同它的端点与窗口一起用，保密楼的「不离开本机」检查照旧由 `ModelBook::select` 做（sprawling-SPEC §8-10）。
+- **被否：借 `SelectModel` 换 tag 再派活**。`SelectModel` 改的是整座城的配置，会在同时跑着的别人的 run 底下换模型；一次派活的选择只该属于这一次派活。
+- **被否：接受任意 id，在 `main` 的端点上直接调用**。窗口与输出上限是登记时说出的，未登记的 id 没有这两个数，上下文提醒只能量一个没人给过的数。
+- **`WIRE_V` 38→39**：给既有命名帧加字段是「语法换形而名字没换」那一类，§8-1 的 golden 随之变；`client/src/wire.ts` 由 `cargo xtask wire-ts --write` 同集重生成。

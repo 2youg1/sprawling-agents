@@ -246,6 +246,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
             idem: key(b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         },
         channels::Reply::nowhere(),
     );

@@ -67,6 +67,7 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let bodies = provider.bodies();

@@ -79,6 +79,7 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

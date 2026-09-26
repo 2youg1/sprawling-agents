@@ -54,6 +54,7 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"step2"),
             session: Some(kernel::SessionName::parse("one").unwrap()),
             effort: None,
+            model: None,
         })
         .unwrap_err();
     assert_eq!(*refused2.code(), AxCode::ConfigInvalid);
@@ -77,6 +78,7 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"step4"),
             session: Some(kernel::SessionName::parse("two").unwrap()),
             effort: None,
+            model: None,
         })
         .unwrap_err();
     assert_eq!(*refused4.code(), AxCode::GateDenied);
