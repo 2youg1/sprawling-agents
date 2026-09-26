@@ -16,7 +16,6 @@ mod endpoint;
 mod market;
 mod mcp;
 mod mismatch;
-mod native;
 mod oauth_profiles;
 mod openai;
 mod provider;
@@ -40,7 +39,6 @@ pub use endpoint::{AuthSpec, Endpoint, EndpointConfig, HeaderValue, SecretResolv
 pub use endpoint::{ImageResolver, ModelFacts, Redemption};
 pub use market::{InputKinds, MarketSnapshot, ModelEntry};
 pub use mcp::{Broker, Connection, Toolkit};
-pub use native::{Native, NativeConfig};
 pub use oauth_profiles::{Grant, OAUTH_PROFILES, OauthProfile, profile, profile_for};
 pub use provider::ceiling::{CeilingSource, OutputCeiling, Stated};
 pub use provider::modality::Modality;
@@ -52,5 +50,5 @@ pub use provider::registry::{ConnectionKind, Family, resolve as resolve_connecti
 pub use reach::{client_for, is_local, reach, through};
 pub use router::{AttachedEndpoint, Chosen, EndpointBook, EndpointTuning};
 pub use router::{DialectHint, Normalised, normalise_entered};
-pub use router::{Retries, TuningDefaults, attached_payload, selected_payload};
+pub use router::{TuningDefaults, attached_payload, selected_payload};
 pub use transcribe::{AudioType, Recording, Transcriber, TranscriberConfig, transcriber_for};

@@ -151,7 +151,7 @@ impl RunWorker {
         &mut self,
         signal: &collab::Signal,
         speaker: &Address,
-        mode: runtime::Mode,
+        mode: kernel::Mode,
         conversations: u32,
     ) -> Result<(), AxError> {
         let room = signal.room();

@@ -7,8 +7,8 @@
 //! read-only multi-city aggregation.
 //!
 //! The kernel types that appear on this crate's own signatures are
-//! re-exported below. `web` depends on `channels` and on nothing else
-//! (ARCHITECTURE section 2), so a client that cannot name `EventRecord`
+//! re-exported below. The client reads the wire and nothing else
+//! (ARCHITECTURE section 8), so a client that cannot name `EventRecord`
 //! cannot read the frames it is sent; a boundary crate that hands out
 //! frames owes the vocabulary to read them.
 
@@ -67,9 +67,7 @@ pub use command::{Carry, Command, WireCommand};
 pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret};
 pub use command::{PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
-pub use kernel::highlight::markdown;
 pub use kernel::{FileChange, How, Lines};
-pub use kernel::{Span, Token};
 pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
 pub use preference::{BODY_PX_MAX, BODY_PX_MIN, PreferencePatch, PreferencesAnswer};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};
@@ -85,7 +83,7 @@ pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
 pub use server::{AcpProgress, AcpSink, TranscribeSink};
 #[cfg(feature = "server")]
-pub use server::{Delivered, Reply, ServeConfig, router, serve};
+pub use server::{Bound, Delivered, Reply, ServeConfig, bind, router, serve};
 #[cfg(feature = "schema")]
 pub use wire::wire_schema;
 pub use wire::{ClientFrame, Delta, ServerFrame};

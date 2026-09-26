@@ -6,7 +6,7 @@
 //! The handoff probe, asked of a predecessor and of its successor, and
 //! the line that records what survived the crossing.
 //!
-//! `eval::probe` owns the questions and the comparison and is never in
+//! `probe` owns the questions and the comparison and is never in
 //! the loop that produces what it measures; this module is that loop.
 //! The first reading is taken over the predecessor's transcript before
 //! it hands over, the second over the successor's frozen prefix before
@@ -26,6 +26,8 @@ use crate::effect;
 
 use super::{Handover, RunWorker, Site};
 
+pub(super) mod probe;
+
 /// The most a probe answer may cost. Four one-line answers do not need
 /// more, and a ceiling is what stops a model that decided to explain
 /// itself from charging a person for the measurement.
@@ -36,7 +38,7 @@ const PROBE_TOKENS: Option<kernel::Ceiling> = kernel::Ceiling::new(256);
 const PROBE_FRAME: &str = "Answer each numbered question on its own line, in order, in as few \
      words as the question allows. Write nothing else.";
 
-fn questions_block(probe: &eval::Probe) -> String {
+fn questions_block(probe: &probe::Probe) -> String {
     let mut text = String::from(PROBE_FRAME);
     text.push('\n');
     for (index, question) in probe.questions().iter().enumerate() {
@@ -98,8 +100,8 @@ impl RunWorker {
         adapter: Option<&mut (dyn Model + Send + 'static)>,
         frozen: &runtime::Run<runtime::run::Frozen>,
         who: &str,
-    ) -> Result<eval::Answers, AxError> {
-        let probe = eval::handoff_probe()?;
+    ) -> Result<probe::Answers, AxError> {
+        let probe = probe::handoff_probe()?;
         let count = probe.questions().len();
         let plan = frozen.plan();
         let mut messages: Vec<kernel::ChatMessage> = frozen
@@ -139,7 +141,7 @@ impl RunWorker {
             None => {
                 self.note(
                     runtime::diagnostics::Level::Refuse,
-                    "eval::probe",
+                    "bin::assembly::probing::probe",
                     &format!("{who} could not be asked before handing over"),
                 );
                 empty_reading()
@@ -159,7 +161,7 @@ impl RunWorker {
         plan: &runtime::RunPlan,
         handed: &Handover,
     ) -> Result<(), AxError> {
-        let Ok(probe) = eval::handoff_probe() else {
+        let Ok(probe) = probe::handoff_probe() else {
             return Ok(());
         };
         let count = probe.questions().len();
@@ -189,7 +191,7 @@ impl RunWorker {
             None => vec![String::new(); count],
         };
         let after = probe.answered(answers)?;
-        let comparison = eval::compare(&handed.before, &after)?;
+        let comparison = probe::compare(&handed.before, &after)?;
         self.record_for(
             plan.run,
             effect::Line {
@@ -212,17 +214,17 @@ impl RunWorker {
 /// # Errors
 /// Propagates a shipped probe that does not construct, which is a
 /// build defect rather than a run's.
-fn empty_reading() -> Result<eval::Answers, AxError> {
-    let probe = eval::handoff_probe()?;
+fn empty_reading() -> Result<probe::Answers, AxError> {
+    let probe = probe::handoff_probe()?;
     let count = probe.questions().len();
     probe.answered(vec![String::new(); count])
 }
 
 fn eval_payload(
-    probe: &eval::Probe,
+    probe: &probe::Probe,
     predecessor: RunId,
-    readings: (&eval::Answers, &eval::Answers),
-    comparison: &eval::Comparison,
+    readings: (&probe::Answers, &probe::Answers),
+    comparison: &probe::Comparison,
 ) -> Map<String, Value> {
     let (before, after) = readings;
     let strings = |items: &[String]| {
@@ -281,9 +283,8 @@ mod tests {
 
     #[test]
     fn a_reading_nobody_could_take_is_a_row_of_empty_answers() {
-        let reading = empty_reading().unwrap();
-        assert_eq!(reading.id().name, "handoff");
-        assert!(reading.answers().iter().all(String::is_empty));
-        assert_eq!(reading.answers().len(), 4);
+        let blank = vec![String::new(); 4];
+        let expected = probe::handoff_probe().unwrap().answered(blank).unwrap();
+        assert_eq!(empty_reading().unwrap(), expected);
     }
 }

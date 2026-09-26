@@ -7,8 +7,7 @@
     clippy::wildcard_enum_match_arm,
     clippy::let_underscore_must_use,
     clippy::let_underscore_untyped,
-    clippy::fn_params_excessive_bools,
-    reason = "A gate reads somebody else's vocabulary: `syn`'s syntax               tree and `serde_json`'s value are `#[non_exhaustive]`               upstream, so a wildcard over them is the correct arm               rather than an erased decision, and no arm this package               writes can be made exhaustive by changing this tree. The               other three relax at one remove, for reports written to a               stream nobody reads back and for two independent switches               of one command line. This is the only exception in the               tree, and `expect` makes it self-cleaning: the day no               site needs it, the build says so. It does not extend to a               gate matching on a kernel enum - that arm belongs in the               crate that owns the enum."
+    reason = "A gate reads somebody else's vocabulary: `syn`'s syntax               tree and `serde_json`'s value are `#[non_exhaustive]`               upstream, so a wildcard over them is the correct arm               rather than an erased decision, and no arm this package               writes can be made exhaustive by changing this tree. The               other two relax at one remove, for reports written to a               stream nobody reads back. This is the only exception in the               tree, and `expect` makes it self-cleaning: the day no               site needs it, the build says so. It does not extend to a               gate matching on a kernel enum - that arm belongs in the               crate that owns the enum."
 )]
 
 //! Gate runner. One gate per module; `gates` runs them all in order.
@@ -49,7 +48,6 @@ mod specalign;
 // The session-slice path gate: only its writer names the path
 // (memory-SPEC 8-24). Declared here because a module lives where the
 // crate root says it does.
-mod slices;
 // The grid instrument (xtask-SPEC.md section 8-26). It is declared here
 // because a module lives where the crate root says it does; it is not a
 // subcommand, and `cargo xtask render --survey` is how a person reaches
@@ -71,7 +69,6 @@ fn main() -> ExitCode {
         Ok(root) => root,
         Err(err) => return report::internal_failure(&err),
     };
-    let range = value_arg(&args, "--range");
     match args.first().map(String::as_str) {
         // The roster documents quote, printed from the same array the
         // usage text renders from: a gate table in a document is checked
@@ -82,7 +79,7 @@ fn main() -> ExitCode {
             }
             ExitCode::SUCCESS
         }
-        Some("gates") => gates::run(&root, range.as_deref(), &gate_names(&args)),
+        Some("gates") => gates::run(&root, &gate_names(&args)),
         Some("color") => report::finish("color", color::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
         Some("budget") => match budget::report(&root) {
@@ -189,19 +186,17 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(err) => report::internal_failure(&err),
         },
-        Some("apisync") => report::finish("apisync", apisync::check(&root, range.as_deref())),
+        Some("apisync") => report::finish("apisync", apisync::check(&root)),
         Some("header") => report::finish("header", header::check(&root)),
         Some("lexicon") => report::finish("lexicon", lexicon::check(&root)),
         Some("length") => report::finish("length", length::check(&root)),
         Some("boundary") => report::finish("boundary", boundary::check(&root)),
-        Some("slices") => report::finish("slices", slices::check(&root)),
         Some("artifact") => report::finish("artifact", artifact::check(&root)),
         Some("modmap") => report::finish("modmap", modmap::check(&root)),
         Some("npm") => report::finish("npm", npm::check(&root)),
         Some("depmap") => report::finish("depmap", depmap::check(&root)),
-        Some("guard") => report::finish("guard", guard::check(&root, range.as_deref())),
+        Some("guard") => report::finish("guard", guard::check(&root)),
         Some("release") => report::finish("release", release::check(&root)),
-        Some("features") => report::finish("features", gates::default_features(&root)),
         Some("spec") => match spec::run(&root, args.get(1).map(String::as_str)) {
             Ok(message) => {
                 println!("{message}");
@@ -233,9 +228,10 @@ fn repo_root() -> Result<PathBuf, XtaskError> {
     }
 }
 
-/// The value of one named flag anywhere after the subcommand: `--range`
-/// for `guard`, `--target` for `package`. One reader, so two flags cannot
-/// end up with two spellings of what "the value after it" means.
+/// The value of one named flag anywhere after the subcommand: `--target`
+/// for `package`, `--tag`, `--assets` and `--out` for `release`. One
+/// reader, so two flags cannot end up with two spellings of what "the
+/// value after it" means.
 fn value_arg(args: &[String], flag: &str) -> Option<String> {
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -247,7 +243,9 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
 }
 
 /// The gate names typed after `gates`: every argument that is neither a
-/// flag nor the value `--range` takes.
+/// flag nor the value `--range` takes. No gate reads history, so a
+/// `--range` a CI job still passes is skipped rather than read as a gate
+/// name.
 fn gate_names(args: &[String]) -> Vec<String> {
     let mut names = Vec::new();
     let mut it = args.iter().skip(1);
@@ -275,15 +273,15 @@ struct Tool {
 /// read together, so a command that grows a flag is printed with it.
 const TOOLS: [Tool; 12] = [
     Tool {
-        call: "gates [<gate>...] [--range a..b]",
-        gives: "every gate, or only the named ones; --range bounds the commits `apisync` and `guard` judge",
+        call: "gates [<gate>...]",
+        gives: "every gate, or only the named ones",
     },
     Tool {
         call: "gates --list",
         gives: "the gate roster, one name per line",
     },
     Tool {
-        call: "<gate> [--range a..b]",
+        call: "<gate>",
         gives: "one gate on its own",
     },
     Tool {

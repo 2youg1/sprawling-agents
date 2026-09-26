@@ -25,7 +25,7 @@ check: prereqs fmt-check fmt-check-desktop clippy features test build-web gates 
 #
 # AGENTS.md, docs/CONTRIBUTING.md and flake.nix all point here instead of
 # listing tools themselves: four lists of one fact is how a person
-# installed everything named and still met a red `apisync` on the first
+# installed everything named and still met a red gate on the first
 # run. Each row is one `command -v`, so the whole recipe costs
 # milliseconds and `check` opens with it - a missing tool is named before
 # a compile rather than twenty minutes into one.
@@ -74,10 +74,10 @@ prereqs mode="check":
     need required bun 'command -v bun' \
         'https://bun.sh' \
         'the client bundle, and the gates that judge artifacts'
-    need required cargo-public-api 'command -v cargo-public-api' \
+    need optional cargo-public-api 'command -v cargo-public-api' \
         'cargo install cargo-public-api --locked' \
-        'the apisync gate, which fails closed without it'
-    need required nightly-rustdoc 'rustup run nightly rustdoc --version' \
+        'cargo xtask apisync, which the nightly job runs'
+    need optional nightly-rustdoc 'rustup run nightly rustdoc --version' \
         'rustup toolchain install nightly --profile minimal' \
         'the rustdoc JSON cargo-public-api reads'
     need optional cargo-deny 'command -v cargo-deny' \

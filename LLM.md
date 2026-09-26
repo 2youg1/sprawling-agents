@@ -102,7 +102,7 @@ A refusal is an answer, not an error: the call happened and this is what it
 said. `sprawling call` exits `0` when the city answered, `1` when the city
 refused the frame, `3` when nothing arrived inside the quiet window
 (`--quiet-ms`, default two seconds); `2` is the binary refusing your command
-line before any city was reached.
+line before any city was reached, and `4` is no city answering at `--at`.
 
 Payloads hold integers. Money is `usd_micros`, never a float, and a
 subscription reports no price at all rather than zero.

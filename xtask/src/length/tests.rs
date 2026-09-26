@@ -159,6 +159,20 @@ fn every_pinned_file_is_over_the_budget_it_is_excused_from() {
     }
 }
 
+#[test]
+fn the_file_budget_counts_production_lines_only() {
+    let source = "fn production() {}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn t() {}
+}
+";
+    let parsed = syn::parse_file(source).unwrap();
+    assert_eq!(production_lines(source, &parsed.items), 2);
+}
+
 fn lengths(source: &str) -> Vec<(String, usize)> {
     let parsed = syn::parse_file(source).unwrap();
     measure(&parsed.items)

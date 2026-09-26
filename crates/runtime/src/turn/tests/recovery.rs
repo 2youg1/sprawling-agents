@@ -215,11 +215,11 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
         streamed: 0,
         blocked: 0,
     };
-    let mut window = Window::new();
-    window.push_task_lines(
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines(
         "probe the city",
         "one probe",
-        crate::window::Opening::FromJob,
+        crate::conversation::Opening::FromJob,
     );
     let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
     let turn = advance(
@@ -227,7 +227,7 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
             Interrupt::None,
             &mut ledger,
             &prefix(),
-            &window,
+            &conversation,
             &[],
             &shape(),
         )
@@ -294,7 +294,7 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
             Interrupt::None,
             &mut ledger,
             &prefix(),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )

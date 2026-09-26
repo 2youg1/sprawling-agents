@@ -38,15 +38,13 @@ use tokio::sync::broadcast;
 use crate::assets::AssetReply;
 use crate::reception::inbound::Inbound;
 use crate::reception::{
-    Admission, BindVerdict, Door, SessionState, SessionStep, Stream, decide_admission, decide_bind,
-    decide_frame,
+    Admission, Door, SessionState, SessionStep, Stream, decide_admission, decide_frame,
 };
 use crate::wire::ServerFrame;
 
-use super::config::{ServeConfig, ShellState, router};
+use super::config::ShellState;
 
 use super::reply::{Delivered, Reply, refusal_text};
-use std::net::SocketAddr;
 /// The shell around [`decide_frame`]: it moves bytes and holds no policy.
 /// Every judgement here is the pure function's; every branch below is
 /// either a send, a receive, or the end of the session.
@@ -339,43 +337,4 @@ pub(crate) async fn accept_recording(
         Ok(text) => (StatusCode::OK, text).into_response(),
         Err(err) => (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response(),
     }
-}
-
-/// Binds and serves until the future is dropped.
-///
-/// Returns the refusal from [`decide_bind`] without touching the network
-/// when the configuration is not allowed to listen.
-///
-/// # Errors
-/// Refuses an exposed bind without a pairing token; propagates the bind and
-/// accept failures the operating system reports.
-pub async fn serve(config: ServeConfig) -> Result<(), AxError> {
-    // The face that comes back is the whole of what this listener presents
-    // and what it demands; it goes into the shell, where every door reads it
-    // rather than reading the configuration again. The peer address is read
-    // on both faces, because enrolment is refused off this machine even when
-    // the listener never left it.
-    let face = match decide_bind(&config.addr, config.token_digest) {
-        BindVerdict::Serve(face) => face,
-        BindVerdict::Refuse(err) => return Err(err),
-    };
-    let listener = tokio::net::TcpListener::bind(config.addr)
-        .await
-        .map_err(|source| {
-            AxError::failure(
-                AxCode::ConfigInvalid,
-                "bind the control surface",
-                format!("{}: {source}", config.addr),
-            )
-            .with_recovery("choose a free port, or stop the process already holding it")
-        })?;
-    let app = router(&config, face).into_make_service_with_connect_info::<SocketAddr>();
-    axum::serve(listener, app).await.map_err(|source| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "serve the control surface",
-            source.to_string(),
-        )
-        .with_recovery("restart the process; the listener is gone")
-    })
 }

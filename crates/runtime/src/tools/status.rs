@@ -29,7 +29,7 @@ use serde_json::{Map, Value};
 
 use crate::backlog::{Backlog, Standing};
 use crate::clock::ClockStamp;
-use crate::mode::Mode;
+use kernel::Mode;
 
 /// How the gateway is currently able to serve. Degraded and LocalOnly
 /// are situations the model should plan around, so they are reported

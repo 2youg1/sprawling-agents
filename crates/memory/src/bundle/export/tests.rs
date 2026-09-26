@@ -60,21 +60,18 @@ impl crate::vfs::Vfs for LosesRoadmap {
         self.0.read_at(path, offset, len)
     }
     fn append(&mut self, path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
-        if Self::swallowed(path) {
-            return Ok(());
-        }
         self.0.append(path, bytes)
     }
     fn truncate(&mut self, path: &std::path::Path, len: u64) -> std::io::Result<()> {
         self.0.truncate(path, len)
     }
     fn sync_data(&mut self, path: &std::path::Path) -> std::io::Result<()> {
-        if Self::swallowed(path) {
-            return Ok(());
-        }
         self.0.sync_data(path)
     }
     fn rename(&mut self, from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+        if Self::swallowed(to) {
+            return self.0.remove_file(from);
+        }
         self.0.rename(from, to)
     }
     fn sync_dir(&mut self, dir: &std::path::Path) -> std::io::Result<()> {
@@ -85,6 +82,13 @@ impl crate::vfs::Vfs for LosesRoadmap {
     }
     fn exists(&self, path: &std::path::Path) -> bool {
         self.0.exists(path)
+    }
+    fn copy_permissions(
+        &mut self,
+        from: &std::path::Path,
+        to: &std::path::Path,
+    ) -> std::io::Result<()> {
+        self.0.copy_permissions(from, to)
     }
 }
 

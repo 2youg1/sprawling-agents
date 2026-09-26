@@ -2645,8 +2645,8 @@
     "zh": "这个房间正忙"
   },
   "err_e_config_invalid": {
-    "en": "this room's model is frozen",
-    "zh": "这个房间的模型已冻结"
+    "en": "the city cannot use a model here",
+    "zh": "城在这里用不了模型"
   },
   "err_e_link_refused": {
     "en": "the city refused this connection",
@@ -2840,6 +2840,10 @@
     "en": "copied",
     "zh": "已复制"
   },
+  "fork_pending": {
+    "en": "forked from turn {turn} · what you send next opens the branch",
+    "zh": "分叉自第 {turn} 轮 · 下一句会在分叉出的新会话里发出"
+  },
   "fork_mother": {
     "en": "mother run",
     "zh": "母 run"
@@ -2992,6 +2996,10 @@
     "en": "Write what needs doing and hand it to the Mayor.",
     "zh": "写下要做的事，交给市长。"
   },
+  "welcome_card_work_hint_unready": {
+    "en": "Available once a provider is connected.",
+    "zh": "接上供应商后可用。"
+  },
   "welcome_card_work_draft": {
     "en": "Ask the city to …",
     "zh": "让这座城去办……"
@@ -2999,6 +3007,10 @@
   "welcome_card_provider": {
     "en": "connect a provider",
     "zh": "接上一家供应商"
+  },
+  "welcome_card_provider_first": {
+    "en": "do this first",
+    "zh": "先做这一步"
   },
   "welcome_card_provider_hint": {
     "en": "Point this city at a model it may call.",

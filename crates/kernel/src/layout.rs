@@ -35,11 +35,6 @@ pub const LEDGER_DIR: &str = "ledger";
 pub const CAS_DIR: &str = "cas";
 /// The city's shelves of skills, under the city's reserved subtree.
 pub const LIBRARY_DIR: &str = "library";
-/// One building's projection of the sessions run in it, under that
-/// building's reserved subtree. Derived from the Ledger, so a person
-/// reading a building finds its history beside it; disposable, so nothing
-/// in the product reads it.
-pub const SESSIONS_DIR: &str = "sessions";
 /// A building's own shelf of skills, under that building's reserved
 /// subtree: what this building knows and no other building is given.
 pub const BUILDING_SHELF: &str = "skills";
@@ -178,56 +173,6 @@ impl CityLayout {
     #[must_use]
     pub fn urbanite(&self, addr: &Address) -> PathBuf {
         self.scope(addr).join(URBANITE_FILE)
-    }
-
-    /// The projection of one session's records: the room address is the
-    /// session's identity, and a building is its first segment.
-    ///
-    /// An address below a building becomes one file under that
-    /// building's sessions, its name the rooms below the building, so the
-    /// nesting of rooms is the nesting of the files and no reader has to
-    /// know which segment was a building. A run that named no session
-    /// works at the building's own address, and its file then carries the
-    /// building's name.
-    #[must_use]
-    pub fn session_slice(&self, room: &Address) -> PathBuf {
-        let raw = room.as_str();
-        let (building, under) = raw.split_once('/').unwrap_or((raw, ""));
-        let name = if under.is_empty() { building } else { under };
-        let mut path = self.root.clone();
-        path.push(building);
-        path.push(RESERVED_PREFIX);
-        path.push(SESSIONS_DIR);
-        path.push(format!("{name}.jsonl"));
-        path
-    }
-
-    /// Whether `relative` names a session slice: a file under some
-    /// scope's reserved `sessions` directory.
-    ///
-    /// A slice is a disposable projection of the Ledger
-    /// (memory-SPEC 8-24) and the city appends to it while a wave runs,
-    /// so the checkpoint never stages one: git reads a workdir file it
-    /// believes it knows, and a file the city itself keeps writing makes
-    /// that read refuse the whole wave. The reserved prefix is required
-    /// immediately before `sessions`, so a person's own directory that
-    /// happens to carry that name is not mistaken for the projection.
-    /// One predicate rather than each caller spelling the directory,
-    /// which is what `xtask slices` holds.
-    #[must_use]
-    pub fn is_session_projection(relative: &Path) -> bool {
-        let mut held = false;
-        for component in relative.components() {
-            let Some(name) = component.as_os_str().to_str() else {
-                held = false;
-                continue;
-            };
-            if name.eq_ignore_ascii_case(SESSIONS_DIR) {
-                return held;
-            }
-            held = name.eq_ignore_ascii_case(RESERVED_PREFIX);
-        }
-        false
     }
 
     /// The layout whose ledger is `dir`, when `dir` is a city's.

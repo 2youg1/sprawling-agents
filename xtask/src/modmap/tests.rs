@@ -37,13 +37,6 @@ fn map_of(entries: &[&str]) -> Map {
     toml::from_str(&format!("module = [\n  {body},\n]\n")).expect("a module map")
 }
 
-fn root() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("xtask sits one level under the repository root")
-        .to_path_buf()
-}
-
 /// `desktop` is built out of the workspace, so its files are not under
 /// `crates/` and this gate never walks to them. The map still carries them
 /// for a reader, and carrying them may not turn into judging them.
@@ -74,17 +67,6 @@ fn a_bad_status_a_duplicate_and_an_empty_duty_are_each_refused() {
             .iter()
             .any(|held| held.violation.contains("empty `owns`"))
     );
-}
-
-/// The gate against the map it guards.
-#[test]
-fn this_repository_passes_its_own_module_map() {
-    let violations = check(&root()).expect("the module map is readable");
-    let said: Vec<String> = violations
-        .iter()
-        .map(|held| format!("{}: {}", held.location, held.violation))
-        .collect();
-    assert!(said.is_empty(), "{said:#?}");
 }
 
 #[test]

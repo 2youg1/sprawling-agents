@@ -4,185 +4,30 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which room a dispatch works in: the session a person named, or the
-//! name the digest model gives the work when nobody did.
+//! name this city takes from the task by rule when nobody did
+//! (sprawling-SPEC.md 8-86).
 
-use kernel::{Address, AxCode, AxError};
+use kernel::{Address, AxError, SessionName};
 
 use super::super::RunWorker;
-use super::{NAME_THE_WORK, NAME_TOKENS};
-use crate::assembly::credentials::dialect_headers;
+
+/// How much of one word a rule name keeps. Four words of this length
+/// and three hyphens are 63 characters, inside the session name limit,
+/// so a rule name is always a legal one.
+const RULE_WORD_MAX: usize = 15;
+
+/// How many words of the task a rule name keeps.
+const RULE_WORDS: usize = 4;
+
+/// What a task with no ASCII word in it is called; `city::open_room`
+/// suffixes it when the room is taken.
+const UNWORDED: &str = "work";
 
 impl RunWorker {
-    /// Where a dispatch works: the room a named session opens, or the
-    /// address it was sent to.
-    ///
-    /// A named session opens a room of its own under the building, so
-    /// two sessions started from the same screen do not write over each
-    /// other's files. An unnamed one is a person continuing what is
-    /// already at that address.
-    /// What this piece of work should be called, when the person did not
-    /// say.
-    ///
-    /// A person who writes one sentence has named the work in it, and
-    /// making them name it twice is the ceremony this interface exists
-    /// to remove. So an address that names a building with no session
-    /// beside it is answered here, by asking the cheapest model this
-    /// city has for a short name.
-    ///
-    /// **A refusal, never a guess.** When no model answers, when the
-    /// answer is not a legal session name, or when the address already
-    /// names a room, this returns what it was given. The failure a
-    /// person then sees names the field they have to fill, and the
-    /// composer opens that one control — which is the whole reason the
-    /// fallback is a refusal rather than a name this city made up. A run
-    /// living in a room somebody did not choose cannot be found again by
-    /// the name they would look for.
-    ///
-    /// `policy` is the building's own, read by the caller from the rules
-    /// it already loaded: naming the work sends the task text to a
-    /// model, so a confidential building governs this call exactly as it
-    /// governs the run's own calls.
-    ///
-    /// # Errors
-    /// Refuses when no legal name could be had, and propagates the
-    /// book's refusal to route a confidential building's text to a model
-    /// that is not on this machine.
-    pub(super) fn session_for(
-        &mut self,
-        addr: &Address,
-        session: Option<kernel::SessionName>,
-        task: &str,
-        policy: &kernel::BuildingPolicy,
-    ) -> Result<Option<kernel::SessionName>, AxError> {
-        if session.is_some() {
-            return Ok(session);
-        }
-        // An address with a room in it is already a session: this is the
-        // shape a second dispatch into an open session takes, and naming
-        // it again would open a room inside a room.
-        if addr.as_str().contains('/') {
-            return Ok(None);
-        }
-        // The choice is made under the building's policy and refused
-        // here rather than swallowed: a confidential building that has
-        // no digest model on this machine is a decision for the person,
-        // and the two ways out are both named.
-        let chosen = self
-            .book
-            .select(kernel::ModelTag::Digest, policy)
-            .map_err(|refused| {
-                refused.rewrite_recovery(
-                    "name the room yourself by sending the work to `building/name`, or choose a \
-                     digest model that runs on this machine",
-                )
-            })?;
-        let Some(named) = self.name_the_work(&chosen, task, policy)? else {
-            return Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "work out what to call this work",
-                addr.as_str().to_owned(),
-            )
-            .with_recovery(
-                "name the room yourself: send the work to `building/name` rather than to \
-                 `building`",
-            ));
-        };
-        Ok(Some(named))
-    }
-
-    /// One cheap model call, turning a task into a short room name.
-    ///
-    /// The digest tag, which is this city's word for the small model
-    /// that reads so the main one does not have to. Naming a piece of
-    /// work is exactly that shape of job, and putting it on the main
-    /// model would charge a person reasoning tokens for a filename.
-    ///
-    /// `Ok(None)` is reserved for one outcome: **the model answered, and
-    /// what it answered is not a legal session name.** A credential that
-    /// cannot be redeemed, an endpoint that cannot be built, a call that
-    /// did not come back and a reply whose content cannot be read are
-    /// each returned as the error they are, because a person told only
-    /// "name the room yourself" would never learn that their provider
-    /// was unreachable (sprawling-SPEC.md 8-75).
-    ///
-    /// The endpoint is chosen by the caller under the building's policy,
-    /// and that same policy rides along on the request: the task text
-    /// travels under the rules of the building it was sent to, not under
-    /// a laxer set written here.
-    ///
-    /// # Errors
-    /// Propagates the vault's refusal to redeem, the adapter's refusal
-    /// to be built, the provider's own failure, and a reply this build
-    /// cannot read.
-    fn name_the_work(
-        &self,
-        chosen: &gateway::Chosen<'_>,
-        task: &str,
-        policy: &kernel::BuildingPolicy,
-    ) -> Result<Option<kernel::SessionName>, AxError> {
-        let model_id = chosen.entry.id.clone();
-        let mut adapter = gateway::adapter_for(
-            chosen,
-            self.redemption()?,
-            dialect_headers(chosen.endpoint.dialect)
-                .into_iter()
-                .map(|(name, value)| (name, value.spelled()))
-                .collect(),
-        )?;
-        let answer = adapter.call(&kernel::ModelRequest {
-            policy: policy.clone(),
-            segments: [kernel::B3Hash::digest(b""); 4],
-            chat: kernel::ChatRequest {
-                model: model_id,
-                max_tokens: NAME_TOKENS,
-                system: vec![kernel::SystemBlock {
-                    text: NAME_THE_WORK.to_owned(),
-                    cache: false,
-                }],
-                messages: vec![kernel::ChatMessage {
-                    cache: false,
-                    role: kernel::Role::User,
-                    content: vec![kernel::ContentBlock::Text {
-                        text: task.to_owned(),
-                    }],
-                }],
-                tools: Vec::new(),
-                effort: None,
-            },
-        })?;
-        // The model is asked for one word and sometimes writes a
-        // sentence around it. The first line, stripped of the
-        // punctuation an answer tends to arrive wrapped in, is what is
-        // offered to the parser — and the parser decides, not this.
-        let spoken = kernel::model::content_from_message(&answer.message)?
-            .into_iter()
-            .find_map(|block| match block {
-                kernel::ContentBlock::Text { text } => Some(text),
-                kernel::ContentBlock::Thinking { .. }
-                | kernel::ContentBlock::RedactedThinking { .. }
-                | kernel::ContentBlock::ToolUse { .. }
-                | kernel::ContentBlock::Image(_)
-                | kernel::ContentBlock::ToolResult { .. } => None,
-            });
-        // A reply with no words in it is a model that did not name the
-        // work, which is the one outcome the caller turns into a field
-        // for the person to fill.
-        let Some(said) = spoken else {
-            return Ok(None);
-        };
-        let Some(first) = said.lines().next() else {
-            return Ok(None);
-        };
-        let candidate = first
-            .trim()
-            .trim_matches(|glyph: char| glyph == '`' || glyph == '"' || glyph == '.');
-        Ok(kernel::SessionName::parse(candidate).ok())
-    }
-
     pub(super) fn room_for(
         &self,
         addr: Address,
-        session: Option<&kernel::SessionName>,
+        session: Option<&SessionName>,
     ) -> Result<Address, AxError> {
         match session {
             None => Ok(addr),
@@ -191,5 +36,60 @@ impl RunWorker {
                 city::open_room(&self.city_root, building.addr(), name)
             }
         }
+    }
+}
+
+/// Where a dispatch works: the session a person named, the room the
+/// address already names, or a room named from the task by rule.
+///
+/// A person who writes one sentence has named the work in it, and
+/// making them name it twice is the ceremony this interface exists
+/// to remove. The name is taken from the task's own words rather
+/// than asked of a model, so it costs no call before the run's
+/// first token and no reply can turn into a room a person cannot
+/// find again.
+///
+/// # Errors
+/// Propagates `rule_name`, which does not fail on any task.
+pub(super) fn session_for(
+    addr: &Address,
+    session: Option<SessionName>,
+    task: &str,
+) -> Result<Option<SessionName>, AxError> {
+    // An address with a room in it is already a session: this is the
+    // shape a second dispatch into an open session takes, and naming
+    // it again would open a room inside a room.
+    match session {
+        None if !addr.as_str().contains('/') => rule_name(task).map(Some),
+        None | Some(_) => Ok(session),
+    }
+}
+
+/// The room name a task earns: its first four ASCII words, lowercased,
+/// each cut to fifteen characters, joined by hyphens.
+///
+/// A task with no ASCII word, or whose words spell a name the city
+/// keeps for itself, is called `work`; `city::open_room` suffixes it
+/// when the room is taken, so the fallback never shares a room.
+///
+/// # Errors
+/// Propagates `SessionName::parse`, which stays the authority on what
+/// a session name is and accepts `work`.
+pub(super) fn rule_name(task: &str) -> Result<SessionName, AxError> {
+    let words = task
+        .split(|glyph: char| !glyph.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .take(RULE_WORDS)
+        .map(|word| {
+            word.chars()
+                .take(RULE_WORD_MAX)
+                .map(|glyph| glyph.to_ascii_lowercase())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("-");
+    match SessionName::parse(&words) {
+        Ok(name) => Ok(name),
+        Err(_unspellable) => SessionName::parse(UNWORDED),
     }
 }

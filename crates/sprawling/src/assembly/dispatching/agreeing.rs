@@ -3,7 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Who gets woken, and where the work lands.
+//! Taking on work: the run id a dispatch derives, the ACP request
+//! turned into that dispatch, and `agree_to_work`, which decides whether
+//! the city may take it before anything is written.
 
 use kernel::event::Scope;
 use kernel::event::record::{GoverningDocument, RulesChanged};
@@ -138,6 +140,7 @@ impl RunWorker {
         self.renew_if_stale(&chosen.endpoint.name.clone())?;
         let chosen = self.book.select(kernel::ModelTag::Main, rules.policy())?;
         let model = chosen.entry.clone();
+        let provider = chosen.endpoint.name.clone();
         let adapter = gateway::adapter_for(
             &chosen,
             self.redemption()?,
@@ -146,14 +149,12 @@ impl RunWorker {
                 .map(|(name, value)| (name, value.spelled()))
                 .collect(),
         )?;
-        let retries = match chosen.endpoint.tuning.request_max_retries {
-            gateway::Retries::AtMost(ceiling) => runtime::Retries::AtMost(ceiling),
-            gateway::Retries::UntilHalted => runtime::Retries::UntilHalted,
-        };
+        let retries = chosen.endpoint.tuning.request_max_retries;
         Ok(Agreed {
             building,
             rules,
             model,
+            provider,
             adapter,
             retries,
         })

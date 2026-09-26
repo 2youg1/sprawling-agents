@@ -44,7 +44,7 @@ impl BrowserTool {
             .cas
             .put(shot.bytes())
             .map_err(memory::MemoryError::into_ax)?;
-        let locator = Locator::parse(&format!("cas:b3-{hash}"))?;
+        let locator = Locator::cas(hash);
         let picture = ImageRef {
             locator,
             media_type: shot.media(),

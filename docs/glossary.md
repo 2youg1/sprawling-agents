@@ -18,7 +18,7 @@ Everything a run does becomes an **EventRecord** in the **Ledger** before it bec
 
 That is also what makes the interface trustworthy in a specific, narrow way: it can be wrong about what it has not been told, and it cannot be wrong in a way the Ledger does not also record.
 
-Two more relations are worth stating because they are easy to invert. A **Gate** decides one action inside the city, and it decides it: the verdict is `Allow` or `Deny`, and a door that cannot decide is a door whose rule nobody has written. What a person answers is a different thing — a question a resident asked about the design, which no door can settle. And a **Discard** is a deletion that carries its own way back: the type has no constructor without one, so a deletion with no restoration is not something the code refuses, it is something the code cannot express.
+Two more relations are worth stating because they are easy to invert. A **Gate** decides one action inside the city, and it decides it: the verdict is `Allow`, `Deny` or `Ask`, and `Ask` means the rule itself hands that one action to the person, which is rare and counted: a door that cannot decide is a door whose rule nobody has written. What a person answers in the Approval Inbox is that question, and it is a different thing from a question a resident asked about the design, which no door can settle. And a **Discard** is a deletion that carries its own way back: the type has no constructor without one, so a deletion with no restoration is not something the code refuses, it is something the code cannot express.
 
 > The tables below are the vocabulary itself. The order is reading order rather than alphabetical order, because alphabetical order helps nobody on a first pass.
 
@@ -58,6 +58,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **EventDraft** | An event that has not yet been given a `seq` and a `prev`. Only the Ledger port turns one into an EventRecord. |
 | **EventRef** | A reference to an event. **Privately minted**: no public constructor and no serde, so a forged reference cannot be spelled. |
 | **Locator** | The retrieval grammar, `cas:` or `file:`. Fail-closed: a shape that does not match is refused rather than guessed. |
+| **Citation** | A quote paired with the `cas:` or `file:` Locator range it claims to come from. A verification run compares it, after collapsing whitespace, against the version pinned for review; a citation that names another version does not hold even when the words match. |
 | **CAS** | Content-addressed store (BLAKE3). Identical content is stored once for its lifetime. |
 | **projection** | A view rebuilt from the event stream. **Disposable**: deleting the table and rebuilding from the Ledger gives byte-identical results. |
 | **Snapshot** | The same idea inside the browser (`client/src/core/belief.ts`): equally disposable, equally forward-only. |
@@ -132,6 +133,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **succession** | A run replacing itself: same address, same depth, therefore the same tools — a successor is not a delegate, which is why it may delegate. It carries a handoff and the address of the conversation that produced it, and it needs no person. |
 | **lineage** | The chain of runs a succession leaves behind. `Provenance` names each one's predecessor, so "how many times has this resident replaced itself since I last looked" is one question with one answer. |
 | **transcript** | What one run actually saw, written beside its room as `<run-id>.jsonl` when the run freezes: the messages, the calls, the results as the model received them. Not the Ledger — the Ledger is the city's, this is the run's, and only the second one is a thing a resident may read. |
+| **conversation** | The volatile half of a request: the messages a run's executor carries and folds forward turn by turn, handed to the model beneath the frozen prefix on every call, and gone when the process stops (`runtime::conversation::Conversation`). Not the **transcript** — that is the frozen per-run file written once the run ends — and not the context window, which is `kernel::Window`, the number of tokens a model accepts. A fork rebuilds a conversation from the Ledger rather than copying it. |
 
 ## 6 Interface
 

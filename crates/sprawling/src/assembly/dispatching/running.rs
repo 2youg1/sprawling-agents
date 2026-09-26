@@ -61,18 +61,15 @@ impl RunWorker {
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
         let agreed = self.agree_to_work(&at.addr)?;
+        // A key pasted into the work goes to the vault before the text
+        // is sent to be named, written to a room or recorded.
+        let task = self.take_custody(task)?;
+        let goal = self.take_custody(goal)?;
         // What this run will stand under reaches the history before it
         // governs anybody, and only once the city has agreed: a refused
         // dispatch still writes nothing (sprawling-SPEC.md 8-40).
         self.book_rules(&agreed.building)?;
-        // Naming the work costs one call to the digest model, so it is
-        // asked after the city has agreed rather than before: a person
-        // does not pay a provider to name work this city was never going
-        // to take. The rules read a moment ago carry the building's
-        // policy into that call, so the task text of a confidential
-        // building reaches only a model on this machine.
-        let session =
-            self.session_for(&at.addr, at.session.take(), &task, agreed.rules.policy())?;
+        let session = super::session::session_for(&at.addr, at.session.take(), &task)?;
         // The first thing this city writes for a dispatch, and the line
         // where `addr` stops being where the work was sent and becomes
         // where the run works.
@@ -108,7 +105,7 @@ impl RunWorker {
             .put(brief.segment_text().as_bytes())
             .map_err(memory::MemoryError::into_ax)?;
         let given = Given {
-            job: Locator::parse(&format!("cas:b3-{job_hash}"))?,
+            job: Locator::cas(job_hash),
             brief,
             task,
             goal,

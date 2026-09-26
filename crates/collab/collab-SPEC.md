@@ -578,3 +578,29 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 - **`PutDown` 携 `PlanExit` 而不是一个动词**：出口是计划闸产出的东西，把它的两条臂抄进第二个枚举，就是对「一个节点可以怎么离开」持第二种意见。
 - **`still_true` 问的是记录本身答不了的那个问题**：盘上的文档现在是否仍然说着这条效应声称它让它说的话。
+
+### 8-22 collab::citation（形状 1 判定）
+
+```rust
+pub struct Citation { /* quote: String, at: Locator */ }
+impl Citation {
+    pub fn new(quote: String, at: Locator) -> Citation;
+    pub fn quote(&self) -> &str;
+    pub fn at(&self) -> &Locator;
+    pub fn against(&self, pinned: &Locator, bytes: &[u8]) -> Reading;   // 纯函数，无 I/O
+}
+pub enum Reading {
+    Holds,                        // 规范化后，区间里的文字就是引文
+    OtherVersion,                 // 引文指向的不是被钉住的那个版本（hash／oid／地址不同）
+    OutOfRange,                   // 区间超出被钉版本的长度，或落在非 UTF-8 的字节上
+    Differs { found: String },    // 区间在，文字不同；found 是规范化后的原文，供报告引用
+}
+```
+
+- **最小写法是「引文 + `cas:`／`file:` Locator 区间」**：不另立引用语法。Locator 已是城市唯一的检索文法（glossary *Locator*），区间沿用它的 `L<from>-<to>`（1 起、闭）与 `B<from>-<to>`（0 起、闭）。不带区间的 Locator 表示引文可出现在整份版本中的任意位置。
+- **比对前规范化**：两侧都把连续空白（含换行）压成一个空格并去掉首尾空白。换行与缩进是排版不是内容；再多一步（大小写、标点）就会让一条改了意思的引文被判为相符，所以只到此为止。
+- **版本不同先于文字比对**：`OtherVersion` 在读区间之前判定。引文若指向另一个 hash，它与被钉版本的文字碰巧相同也不算核对过——改稿后旧的审查要失效，靠的就是这一步。
+- **验证 run 逐条调用 `against`**，非 `Holds` 的每一条都进它的报告；方法（查什么、怎么查）仍归模型，本模块只供机制。
+- **为什么是 `Reading` 而不是 `Result`**：一条对不上的引文是验证的**结果**，与 `Handback::Stopped` 同理；它要被报告，而不是让调用方的 `?` 把它当故障抛掉。
+
+仍未落地（同属本包）：验证节点在另一地址以全新会话跑 `done_check` 之后才铸 `Artifact`；验证者不得是图中任何实现者、改了代码须第三方再验；JOB 钉住被审文档的 Locator；删掉 `handback.rs` 的 `matches!(Done)` + `CITY_VERIFIER` 与 `Claim::verified(bool)`。证据：子 run 以 Done 结束而 `done_check` 失败时不铸 `Artifact` 的测试。

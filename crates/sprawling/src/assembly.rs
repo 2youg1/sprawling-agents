@@ -13,7 +13,7 @@
 //! the rule keeps naming one place.
 //!
 //! **This file holds the worker and the modules below hold its methods.**
-//! `RunWorker` is declared here, so its twenty-two private fields are
+//! `RunWorker` is declared here, so its private fields are
 //! visible throughout `assembly` and nowhere else — a private item
 //! reaches the module that declares it and that module's descendants, so
 //! the split cost no field its privacy. What stays here is what every
@@ -23,10 +23,11 @@
 //! `recording`; opening and closing in `lifetime`; the test fixtures in
 //! `fixture`.
 //!
-//! The `use` block below is the one place the sixteen submodules see
-//! each other through. A submodule imports from `super`, never from a
-//! sibling, so what one part of the assembly point offers another is
-//! stated once, here, and reads as a list rather than as a graph.
+//! The `use` block below is where the submodules see each other. A
+//! submodule imports from `super`, so what one part of the assembly
+//! point offers another is stated once, here, and reads as a list rather
+//! than as a graph; the one sibling reach is `credentials::dialect_headers`,
+//! which the dispatching modules read where the credentials module keeps it.
 
 mod building_page;
 mod commanding;
@@ -65,9 +66,10 @@ use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 pub(crate) use folds::{Standing, rebuild_views};
 use genesis::city_segment;
 pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
+use lifetime::LedgerOpening;
 pub(crate) use mcp::McpLink;
 use mcp::{connect_mcp, mounts_under, transport_site};
-use naming::{building_of, governed_of, mode_of, name_of, not_built, plan_node_of, scope_of};
+use naming::{building_of, governed_of, name_of, not_built, plan_node_of, scope_of};
 use plans::Reporter;
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
@@ -122,6 +124,8 @@ pub(crate) fn ledger_dir(city_root: &Path) -> PathBuf {
 
 /// What the startup scan found and repaired.
 pub struct ScanReport {
+    /// What opening the ledger cut, told after the counts.
+    pub(crate) opening: LedgerOpening,
     pub(crate) lines: usize,
     pub(crate) closed_calls: usize,
     /// The one count a caller branches on rather than prints: `resume`
@@ -131,14 +135,19 @@ pub struct ScanReport {
 }
 
 impl ScanReport {
-    /// One line a person reads: what was verified, what was closed, and
-    /// what is still owed an answer.
+    /// What a person reads: what was verified, what was closed, what is
+    /// still owed an answer, and, on a second line, what opening the
+    /// ledger cut from a torn tail.
     #[must_use]
     pub fn summary(&self) -> String {
-        format!(
+        let counts = format!(
             "{} line(s) verified; {} unknown-outcome call(s) closed; {} approval(s) waiting",
             self.lines, self.closed_calls, self.waiting_approvals
-        )
+        );
+        match self.opening.notice() {
+            None => counts,
+            Some(notice) => format!("{counts}\n{notice}"),
+        }
     }
 }
 
@@ -176,6 +185,8 @@ pub struct RunWorker {
     /// legal state.
     city: std::sync::OnceLock<kernel::B3Hash>,
     ledger: JsonlLedger,
+    /// What opening `ledger` repaired, kept until a person is told.
+    opening: LedgerOpening,
     cas: Cas,
     /// Every endpoint the person attached and every model they chose,
     /// folded from the ledger. The worker keeps its own copy because a

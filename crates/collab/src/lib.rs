@@ -8,6 +8,7 @@
 
 mod arbiter;
 mod archive_tool;
+mod citation;
 mod claim_effect;
 mod claim_tool;
 mod delegate_tool;
@@ -25,6 +26,7 @@ mod workshop_tool;
 
 pub use arbiter::{Level, arbitrate, conflict_payload};
 pub use archive_tool::{ARCHIVE_KINDS, ArchiveDesk, ArchiveEffect, ArchiveTool, Held};
+pub use citation::{Citation, Reading};
 pub use claim_effect::{ClaimEffect, evidence_of, still_true};
 pub use claim_tool::{Booking, ClaimDesk, ClaimTool};
 pub use delegate_tool::{DelegateDesk, DelegateTool, Delegated};

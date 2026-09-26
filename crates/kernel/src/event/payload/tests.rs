@@ -189,3 +189,17 @@ fn a_payload_nested_past_what_the_reader_can_parse_is_refused_on_write() {
         assert!(err.recovery().contains("CAS"), "{err}");
     }
 }
+
+/// The float check descends one call per level, and the depth check does
+/// not, so the depth is judged first: a payload too deep for the reader
+/// is refused for its depth even when a float waits at the bottom, and
+/// the recursive walk only ever runs over the levels the reader accepts.
+#[test]
+fn a_payload_too_deep_is_refused_for_its_depth_before_its_floats_are_walked() {
+    let inner = (1..PAYLOAD_DEPTH_MAX + 1).fold(json!(0.5), |value, _| json!([value]));
+    let mut deep = Map::new();
+    deep.insert("k".into(), inner);
+    let err = Payload::new(deep).expect_err("too deep and carrying a float");
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+    assert!(err.recovery().contains("CAS"), "{err}");
+}

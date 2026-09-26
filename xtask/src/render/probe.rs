@@ -18,7 +18,21 @@ use browser::survey::probe::{SETTLE_MS, body};
 
 pub(super) use browser::survey::probe::declared;
 
+use super::engine::BUDGET_MS;
 use super::pass::Pass;
+
+/// The mark the client leaves on a view it fetches as a chunk of its own
+/// until the chunk lands.
+///
+/// A private attribute rather than `aria-busy`, because the gallery
+/// draws skeletons and loading buttons as fixtures, and those read busy
+/// for as long as the page is open. A file-served chunk does not hold the engine's
+/// virtual time, so without this wait the probe raced the chunk and
+/// measured a page with no first heading.
+const PENDING: &str = "[data-pending]";
+
+/// How often the probe asks again whether a view is still pending.
+const POLL_MS: u32 = 100;
 
 /// Where the walk writes what it read.
 pub(super) const SINK: &str = "sprawling-render";
@@ -66,14 +80,51 @@ window.addEventListener('unhandledrejection', function (e) {{
 }});
 </script>
 <script>
-setTimeout(function () {{
+// Measure once no view is pending, leaving two polls of the budget for
+// the dump; a page still pending then is reported as one that never
+// settled rather than judged as the half-drawn page it is.
+var waited = {SETTLE_MS};
+function measure() {{
+  if (document.querySelector('{PENDING}')) {{
+    if (waited + {poll_twice} < {BUDGET_MS}) {{
+      waited += {POLL_MS};
+      setTimeout(measure, {POLL_MS});
+      return;
+    }}
+    document.getElementById('{FAILED}').textContent =
+      'a lazily loaded view was still pending after ' + waited + ' virtual ms';
+    return;
+  }}
   var read = (function () {{{}}})();
   document.getElementById('{SINK}').textContent = read.sink;
   document.getElementById('{DECLARED}').textContent = read.declared;
   document.getElementById('{CONDITIONS}').textContent = read.conditions;
-}}, {SETTLE_MS});
+}}
+setTimeout(measure, {SETTLE_MS});
 </script>
 "#,
-        body(Some(pass.theme()))
+        body(Some(pass.theme())),
+        poll_twice = POLL_MS.saturating_mul(2),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::pass::wanted;
+    use super::script;
+    use crate::report::XtaskError;
+
+    /// A view the client fetches as a chunk of its own lands after the
+    /// page's first paint, and a file-served chunk does not hold the
+    /// engine's virtual time. The probe has to wait for the mark the
+    /// client clears, or it measures a page with no heading.
+    #[test]
+    fn the_probe_waits_while_a_view_is_pending() -> Result<(), XtaskError> {
+        let probe = wanted()?.into_iter().map(script).collect::<String>();
+        assert!(
+            probe.contains("querySelector('[data-pending]')"),
+            "the probe measures without asking whether a region is still loading"
+        );
+        Ok(())
+    }
 }

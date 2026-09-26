@@ -18,12 +18,12 @@ use crate::assembly::*;
 
 /// A dispatch as the desk delivers one: a person's work, sent to a room
 /// that already exists.
-fn asked(addr: &str) -> Assignment {
+pub(super) fn asked(addr: &str) -> Assignment {
     Assignment {
         addr: Address::parse(addr).unwrap(),
         session: None,
         effort: None,
-        mode: runtime::Mode::PlanGoal,
+        mode: kernel::Mode::PlanGoal,
         parent: None,
         succession: None,
         tainted: false,
@@ -32,7 +32,7 @@ fn asked(addr: &str) -> Assignment {
 }
 
 /// Every line of the city's history, parsed, oldest first.
-fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
+pub(super) fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
         .raw_lines()
@@ -190,179 +190,137 @@ fn a_closing_city_lands_the_runs_still_driving() {
     );
 }
 
-/// The digest the account writes for a document's bytes.
-fn digest(text: &str) -> String {
-    kernel::B3Hash::digest(text.as_bytes()).to_string()
-}
-
-/// The entries the account holds for one governing document, oldest
-/// first. Selected by scope and document because a building holds two:
-/// the scope alone cannot say which one moved.
-fn books<'a>(
-    lines: &'a [serde_json::Value],
-    scope: &str,
-    which: &str,
-) -> Vec<&'a serde_json::Value> {
-    lines
-        .iter()
-        .filter(|line| {
-            line["kind"] == "rules_changed"
-                && line["data"]["scope"] == scope
-                && line["data"]["which"] == which
-        })
-        .collect()
-}
-
-/// A hand that reached `RULES.toml` while nothing was looking is in the
-/// account before the run it governs stands up, and the first sight of
-/// a document opens its account rather than claiming a change.
+/// **A Cancel posted while a lane drives reaches that lane.**
+///
+/// The accounting thread reads the desk on every wake, and a lane reads
+/// it only at its safe points, so the thread nearly always saw the
+/// Cancel first and refused it as though no run answered to it. The
+/// bite is the first assertion: a refusal reached the person while the
+/// run it named was still in its model call.
 #[test]
-fn a_run_standing_up_books_the_rules_it_will_stand_under() {
+fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
+    use std::sync::{Arc, Mutex, mpsc};
+    const WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
+    const LOOK: std::time::Duration = std::time::Duration::from_millis(5);
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
-    lay_rules(dir.path(), "lab", &ordinary_rules("review = false\n"));
-    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
-    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-
-    let moved = ordinary_rules("review = true\n");
-    std::fs::write(
-        city::rules_path(dir.path(), &Address::parse("lab").unwrap()),
-        &moved,
-    )
-    .unwrap();
-    let (driving, _continuation) = worker
-        .prepare_dispatch(
-            asked("lab/east"),
-            "fire the kiln".to_owned(),
-            "the kiln is fired".to_owned(),
-        )
-        .unwrap();
-    drop(driving);
-
-    let lines = history(&report.ledger_dir);
-    let entries = books(&lines, "building:lab", "RULES.toml");
-    assert_eq!(entries.len(), 1, "one hand, one entry: {entries:?}");
-    assert_eq!(
-        entries[0]["data"],
-        serde_json::json!({
-            "scope": "building:lab",
-            "which": "RULES.toml",
-            "after": digest(&moved),
-            "bytes": moved.len(),
-        }),
-        "no `before`: nothing booked this document yet"
-    );
-}
-
-/// One entry's `after` is the next entry's `before`, every entry lands
-/// before the first line of the run it governs, and a restart folds the
-/// same account out of the lines alone.
-#[test]
-fn a_rules_change_says_which_entry_it_reached_the_city_in() {
-    let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
-    std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
-    std::fs::create_dir_all(dir.path().join("lab").join("west")).unwrap();
-    let stood = ordinary_rules("review = false\n");
-    lay_rules(dir.path(), "lab", &stood);
-    let (base_url, provider) = fake_openai(
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
+    let (arrived_tx, arrived) = mpsc::channel();
+    let (release, released) = mpsc::channel::<()>();
+    let held = Mutex::new((Some(arrived_tx), released));
+    let pace: Pace = Arc::new(move |request: &str| {
+        if !request.starts_with("POST ") {
+            return;
+        }
+        let mut held = held.lock().unwrap();
+        if let Some(arrived) = held.0.take() {
+            arrived.send(()).unwrap();
+            held.1.recv().unwrap();
+        }
+    });
+    let looking = completion_with("looking", "status", "tu_0", serde_json::json!({}));
+    let (base_url, provider) = fake_openai_paced(
         &["m-local"],
-        vec![
-            completion("east is done", None),
-            completion("west is done", None),
-        ],
+        Vec::new(),
+        vec![looking, completion("done", None)],
+        pace,
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let dispatch = |worker: &mut RunWorker, room: &str| {
-        let run = worker
-            .dispatch_into_lane(
-                asked(room),
-                format!("fire the kiln in {room}"),
-                format!("the kiln in {room} is fired"),
-                Owing::asked(channels::Reply::nowhere()),
-            )
-            .unwrap();
-        worker.land_the_rest().unwrap();
-        run
+    let desk = Arc::new(crate::serving::CommandDesk::new());
+    let asking = Arc::clone(&desk);
+    worker.serve(only_interrupts(Arc::new(move |run| {
+        asking.interrupt_for(run)
+    })));
+    let attending = {
+        let desk = Arc::clone(&desk);
+        std::thread::spawn(move || crate::serving::attending::attend(&mut worker, &desk))
     };
-
-    let first = dispatch(&mut worker, "lab/east");
-    let moved = ordinary_rules("review = true\n");
-    std::fs::write(
-        city::rules_path(dir.path(), &Address::parse("lab").unwrap()),
-        &moved,
-    )
-    .unwrap();
-    let second = dispatch(&mut worker, "lab/west");
-    drop(provider);
-
-    let lines = history(&report.ledger_dir);
-    let entries = books(&lines, "building:lab", "RULES.toml");
-    let chain: Vec<_> = entries
+    let key = |material: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, material);
+    desk.post(
+        channels::Command::Dispatch {
+            addr: Address::parse("lab/east").unwrap(),
+            task: "fire the east kiln".to_owned(),
+            goal: "the east kiln is fired".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: key(b"dispatch"),
+            session: None,
+            effort: None,
+        },
+        channels::Reply::nowhere(),
+    );
+    arrived.recv_timeout(WITHIN).unwrap();
+    let run = history(&report.ledger_dir)
         .iter()
-        .map(|entry| {
-            (
-                entry["data"]["before"].clone(),
-                entry["data"]["after"].clone(),
-            )
+        .find(|line| line["kind"] == "run_started")
+        .map(|line| RunId::parse(line["run"].as_str().unwrap()).unwrap())
+        .expect("the run in its model call said it started");
+
+    let heard = |into: &Arc<Mutex<Vec<AxError>>>| {
+        let told = Arc::clone(into);
+        channels::Reply::to(move |error| {
+            told.lock().unwrap().push(error);
+            channels::Delivered::ToThePeer
         })
-        .collect();
-    assert_eq!(
-        chain,
-        vec![
-            (serde_json::Value::Null, digest(&stood).into()),
-            (digest(&stood).into(), digest(&moved).into()),
-        ],
-        "the opening line, then the hand that moved it"
+    };
+    let for_the_run = Arc::new(Mutex::new(Vec::new()));
+    let for_nobody = Arc::new(Mutex::new(Vec::new()));
+    desk.post(
+        channels::Command::Cancel {
+            run,
+            idem: key(b"cancel the kiln"),
+        },
+        heard(&for_the_run),
     );
-    for (entry, run) in entries.iter().zip([first, second]) {
-        let booked = entry["seq"].as_u64().unwrap();
-        let run = run.to_string();
-        let stood_up = lines
-            .iter()
-            .filter(|line| line["run"] == run.as_str())
-            .filter_map(|line| line["seq"].as_u64())
-            .min()
-            .unwrap();
-        assert!(
-            booked < stood_up,
-            "booked at {booked}, {run} began at {stood_up}"
-        );
+    // A Cancel no run answers to, posted behind it: once its refusal is
+    // back, the accounting thread has looked at everything before it.
+    desk.post(
+        channels::Command::Cancel {
+            run: RunId::CITY,
+            idem: key(b"cancel nothing"),
+        },
+        heard(&for_nobody),
+    );
+    // Counted looks rather than a clock, which test code may not read:
+    // each look sleeps `LOOK`, so the count bounds the wait at `WITHIN`.
+    let looks = WITHIN.as_millis() / LOOK.as_millis();
+    let mut looked = 0;
+    while for_nobody.lock().unwrap().is_empty() {
+        looked += 1;
+        assert!(looked < looks, "the desk was never read");
+        std::thread::sleep(LOOK);
     }
-    let rebuilt = Standing::fold(&report.ledger_dir).unwrap().governance;
     assert_eq!(
-        worker.governance.rules, rebuilt.rules,
-        "a restart rebuilds the account"
+        *for_the_run.lock().unwrap(),
+        Vec::<AxError>::new(),
+        "a Cancel for a run in a lane is that lane's to take, not a refusal"
     );
-}
 
-/// A dispatch to a building the city does not have books the city's own
-/// layer and opens no account for the building.
-#[test]
-fn a_building_that_does_not_exist_opens_no_account() {
-    let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
-    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
-    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-
-    let (driving, _continuation) = worker
-        .prepare_dispatch(
-            asked("ghost/east"),
-            "haunt".to_owned(),
-            "haunted".to_owned(),
-        )
-        .unwrap();
-    drop(driving);
-
-    let scopes: Vec<_> = history(&report.ledger_dir)
-        .into_iter()
-        .filter(|line| line["kind"] == "rules_changed")
-        .map(|line| (line["data"]["scope"].clone(), line["data"]["which"].clone()))
+    release.send(()).unwrap();
+    let mut looked = 0;
+    while !history(&report.ledger_dir)
+        .iter()
+        .any(|line| line["kind"] == "run_frozen")
+    {
+        looked += 1;
+        assert!(looked < looks, "the run never froze");
+        std::thread::sleep(LOOK);
+    }
+    desk.close();
+    attending.join().unwrap();
+    drop(provider);
+    let run = run.to_string();
+    let kinds: Vec<String> = history(&report.ledger_dir)
+        .iter()
+        .filter(|line| line["run"] == run.as_str())
+        .map(|line| line["kind"].as_str().unwrap().to_owned())
         .collect();
-    assert_eq!(
-        scopes,
-        vec![("city".into(), "CONFIG.toml".into())],
-        "only the city's own layer is booked"
+    assert!(
+        kinds.iter().any(|kind| kind == "cancel_received"),
+        "the lane took the Cancel at its next safe point: {kinds:?}"
+    );
+    assert!(
+        !kinds.iter().any(|kind| kind == "tool_result"),
+        "a cancelled run carries out no tool: {kinds:?}"
     );
 }

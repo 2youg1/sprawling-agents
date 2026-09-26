@@ -20,7 +20,7 @@ use crate::alias::WriteTarget;
 use crate::error::{MemoryError, io_err};
 use crate::vfs::Vfs;
 
-use super::files::write_file;
+use super::landing::{Bits, land};
 use super::manifest::CITY;
 
 /// The bundle's directory for the history.
@@ -56,11 +56,11 @@ pub(crate) fn export(vfs: &mut dyn Vfs, city_root: &Path, dest: &Path) -> Result
     vfs.create_dir_all(&dir)
         .map_err(io_err("make a bundle directory", &dir))?;
     if let Some(bytes) = pack {
-        let target = WriteTarget::at("write a history pack", &dir.join(PACK))?;
-        write_file(vfs, &target, &bytes)?;
+        let target = WriteTarget::within("write a history pack", dest, &dir.join(PACK))?;
+        land(vfs, target, &bytes, Bits::OfReplaced)?;
     }
-    let target = WriteTarget::at("write the history refs", &dir.join(REFS))?;
-    write_file(vfs, &target, refs.as_bytes())
+    let target = WriteTarget::within("write the history refs", dest, &dir.join(REFS))?;
+    land(vfs, target, refs.as_bytes(), Bits::OfReplaced)
 }
 
 /// One pack of every object the refs of `repo` reach, `None` when they

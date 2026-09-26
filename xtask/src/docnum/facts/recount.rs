@@ -224,6 +224,20 @@ pub(super) fn grouped_bytes(root: &Path, row: &str, field: &str) -> Result<Strin
     Ok(format!("{} B", grouped(bytes_of(root, row, field)?)))
 }
 
+/// One integer field of a register row, grouped the way a document
+/// writes it and without a unit, because the unit is the field's to
+/// name: `views_rebuild_per_mb.best_p50_ms` reads `2,759`.
+///
+/// # Errors
+/// The argument carries no `.field`, or the row or field is absent.
+pub(super) fn figure(root: &Path, argument: &str) -> Result<String, XtaskError> {
+    let (row, field) = argument.split_once('.').ok_or_else(|| XtaskError::Doc {
+        file: "xtask/budgets.toml".to_owned(),
+        msg: format!("`{argument}` names no field: write it as `row.field`"),
+    })?;
+    Ok(grouped(bytes_of(root, row, field)?))
+}
+
 /// How many times the budget of a register row exceeds its reading, to
 /// one decimal: `7.3×`.
 pub(super) fn headroom(root: &Path, row: &str) -> Result<String, XtaskError> {
@@ -258,7 +272,7 @@ fn bytes_of(root: &Path, row: &str, field: &str) -> Result<u64, XtaskError> {
         })?;
     u64::try_from(stated).map_err(|_| XtaskError::Doc {
         file: "xtask/budgets.toml".to_owned(),
-        msg: format!("[{row}].{field} is not a byte count: {stated}"),
+        msg: format!("[{row}].{field} is not a non-negative count: {stated}"),
     })
 }
 
