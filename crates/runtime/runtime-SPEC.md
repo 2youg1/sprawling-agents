@@ -1364,7 +1364,9 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 - `READ_BYTES_PER_MS = 64`（每秒 64 KiB，一个人在页面上读得过来的上界的数倍），一拍的上界由它乘间隔得出，stdout 与 stderr 各得一半，所以刷屏的 stdout 饿不死 stderr。
 - 决定：sink 是一个闭包而不是 trait——今天只有一个生产装配者（服务端扇出）与一个测试收集者，两者都只要「交出一块」这一个动作。
 
-**待接**：`harvest` 那一拍对窗口外命令读增量；服务端环形缓冲与装配点注入 sink；`ServerFrame` 与 `WIRE_V`；页面环形缓冲。设计如下。
+- 窗口里的读停在交给后台那一刻，偏移随成员进表；此后本 run 的每次 `harvest` 对它自己的、仍在跑的后台命令从同一偏移接着读。块在放开表锁之后才交给 sink，所以 sink 慢不会让表上其他调用等它。
+
+**待接**：服务端环形缓冲与装配点注入 sink；`ServerFrame` 与 `WIRE_V`；页面环形缓冲。设计如下。
 
 **设计**：
 
