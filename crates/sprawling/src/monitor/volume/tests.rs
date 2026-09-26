@@ -16,3 +16,14 @@ fn a_relative_city_path_reads_the_disk_that_holds_it() {
     assert!(total(&here).is_some(), "the working directory is on a disk");
     assert_eq!(total(Path::new(".")), total(&here));
 }
+
+/// `fs::canonicalize` spells a Windows path `\?\C:\...`; a mount point
+/// `C:\` is no prefix of that spelling unless the prefix is normalised.
+#[test]
+fn a_canonical_city_path_reads_the_disk_that_holds_it() {
+    let here = std::env::current_dir().unwrap();
+    let canonical = std::fs::canonicalize(&here).unwrap();
+    let total = |city: &Path| read(city).map(|space| space.total_bytes);
+    assert!(total(&here).is_some(), "the working directory is on a disk");
+    assert_eq!(total(&canonical), total(&here));
+}
