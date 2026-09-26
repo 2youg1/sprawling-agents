@@ -325,8 +325,8 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
 }
 
 /// The request field that states how hard to think. This dialect spells
-/// the five working levels in `effort`, and spells "do not think" in a
-/// different field entirely — `effort` has no `none`.
+/// the five working levels in `output_config.effort`, and spells "do not
+/// think" in a different field entirely - `effort` has no `none`.
 fn effort_fields(effort: Option<Effort>) -> Vec<(&'static str, Value)> {
     let Some(effort) = effort else {
         return Vec::new();
@@ -339,5 +339,7 @@ fn effort_fields(effort: Option<Effort>) -> Vec<(&'static str, Value)> {
         Effort::XHigh => "xhigh",
         Effort::Max => "max",
     };
-    vec![("effort", Value::String(level.to_owned()))]
+    // The reference hangs `effort` under `output_config` and nowhere
+    // else, so a top-level `effort` is a field the provider refuses.
+    vec![("output_config", json!({ "effort": level }))]
 }

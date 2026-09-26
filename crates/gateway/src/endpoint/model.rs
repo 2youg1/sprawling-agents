@@ -54,11 +54,7 @@ impl Model for Endpoint {
         }
         self.refuse_pictures_a_blind_model_cannot_read(req)?;
         let wire = self.wire_request(req)?;
-        let request = self.authorize(
-            self.client
-                .post(&self.config.base_url)
-                .header("content-type", "application/json"),
-        )?;
+        let request = self.chat_post(req)?;
         let response = request
             .json(&wire)
             .send()

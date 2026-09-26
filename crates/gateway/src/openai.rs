@@ -12,14 +12,17 @@
 //!
 //! - Request and response:
 //!   <https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create/>
-//! - `reasoning.effort` and its accepted values:
+//! - `reasoning_effort` and its accepted values: `ReasoningEffort` in
+//!   `openai/openai-openapi`'s `openapi.yaml`, and
 //!   <https://developers.openai.com/api/docs/guides/reasoning>
 //!
 //! **Loss accounting is explicit, because this dialect is not the
 //! canonical shape.** This wire has no explicit cache breakpoints
 //! (provider caching is implicit prefix-matching), so `cache` markers
-//! drop on this path; it cannot spell a thinking block, so one is not
-//! sent rather than sent as prose; and its `tool` message accepts only
+//! drop on this path; the specification's assistant message has no
+//! field for a thinking block, so one is not sent rather than sent as
+//! prose, except to a host whose documentation reads it back as
+//! `reasoning_content`; and its `tool` message accepts only
 //! a string, so pictures a tool produced ride in the user message that
 //! immediately follows it — the pictures arrive, and what is lost is
 //! the statement that they came out of that tool call. All three are
@@ -33,6 +36,7 @@ use serde_json::{Map, Value, json};
 
 use crate::dialect::ImageBytes;
 use crate::mismatch::{as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero};
+use crate::provider::preset::{CeilingField, ChatSpelling, EffortField, ReasoningReturn};
 
 mod stream;
 
@@ -86,6 +90,31 @@ fn joined_text(content: &[ContentBlock]) -> String {
     out
 }
 
+/// The reasoning one assistant turn goes back with, when its host reads
+/// it back.
+///
+/// Only the text: a signature is a first-party provider's proof over
+/// its own reasoning, and no host on this face checks one.
+fn reasoning_returned(content: &[ContentBlock], reasoning: ReasoningReturn) -> Option<String> {
+    match reasoning {
+        ReasoningReturn::Dropped => None,
+        ReasoningReturn::AsReasoningContent => {
+            let thought: Vec<&str> = content
+                .iter()
+                .filter_map(|block| match block {
+                    ContentBlock::Thinking { thinking, .. } => Some(thinking.as_str()),
+                    ContentBlock::Text { .. }
+                    | ContentBlock::RedactedThinking { .. }
+                    | ContentBlock::ToolUse { .. }
+                    | ContentBlock::ToolResult { .. }
+                    | ContentBlock::Image(_) => None,
+                })
+                .collect();
+            (!thought.is_empty()).then(|| thought.join("\n\n"))
+        }
+    }
+}
+
 /// One picture, as this wire spells it: a data URL inside a content
 /// part, which is the only place this dialect accepts image bytes.
 fn image_part(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, AxError> {
@@ -118,7 +147,11 @@ fn pictures_of(content: &[ContentBlock], images: &ImageBytes) -> Result<Vec<Valu
     Ok(parts)
 }
 
-pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, AxError> {
+pub(crate) fn request(
+    req: &ChatRequest,
+    images: &ImageBytes,
+    spelling: ChatSpelling,
+) -> Result<Value, AxError> {
     let mut messages = Vec::new();
     if !req.system.is_empty() {
         // Explicit breakpoints have no OpenAI wire slot; the marker drops
@@ -174,6 +207,9 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
                         Value::String(text)
                     },
                 );
+                if let Some(thinking) = reasoning_returned(&message.content, spelling.reasoning) {
+                    entry.insert("reasoning_content".to_owned(), Value::String(thinking));
+                }
                 let mut tool_calls = Vec::new();
                 for block in &message.content {
                     if let ContentBlock::ToolUse { id, name, input } = block {
@@ -199,14 +235,26 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
     // default is a real number, where a zero is a reply with nothing in
     // it that reads downstream as work that finished.
     if let Some(ceiling) = req.max_tokens {
-        root.insert("max_tokens".to_owned(), Value::Number(ceiling.get().into()));
+        let field = match spelling.ceiling {
+            CeilingField::MaxTokens => "max_tokens",
+            CeilingField::MaxCompletionTokens => "max_completion_tokens",
+        };
+        root.insert(field.to_owned(), Value::Number(ceiling.get().into()));
     }
     root.insert("messages".to_owned(), Value::Array(messages));
     if let Some(effort) = req.effort {
-        root.insert(
-            "reasoning".to_owned(),
-            json!({ "effort": effort_field(effort) }),
-        );
+        let level = effort_field(effort);
+        match spelling.effort {
+            EffortField::ReasoningEffort => {
+                root.insert(
+                    "reasoning_effort".to_owned(),
+                    Value::String(level.to_owned()),
+                );
+            }
+            EffortField::ReasoningObject => {
+                root.insert("reasoning".to_owned(), json!({ "effort": level }));
+            }
+        }
     }
     if !req.tools.is_empty() {
         let tools: Result<Vec<Value>, AxError> = req

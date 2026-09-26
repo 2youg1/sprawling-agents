@@ -309,8 +309,15 @@ fn resolve_path(kept: &[&str], suffix: &str, host: &str, presets: &dyn HostDefau
     if !suffix.is_empty() {
         return String::new();
     }
-    match presets.default_path(host) {
-        Some(preset) => format!("/{}", preset.trim_matches('/')),
+    // A vendor whose API hangs straight under the host states `/`,
+    // which stores as no path at all: a stored base URL carries no
+    // trailing slash.
+    match presets
+        .default_path(host)
+        .map(|preset| preset.trim_matches('/'))
+    {
+        Some("") => String::new(),
+        Some(preset) => format!("/{preset}"),
         None => UNLISTED_HOST_PATH.to_owned(),
     }
 }

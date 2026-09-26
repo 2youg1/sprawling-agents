@@ -15,19 +15,21 @@ use kernel::DialectKind;
 
 use crate::market::InputKinds;
 
-use super::{HostPreset, ModelPreset};
+use super::{CeilingField, ChatSpelling, EffortField, HostPreset, ModelPreset, ReasoningReturn};
 
 /// The hosts this city knows without asking.
 ///
 /// Short on purpose. A host belongs here when this city can cite what
 /// it serves; everything else reaches the same facts through the
 /// endpoint's own model list, which is the rung above this table.
-pub const PRESETS: [HostPreset; 7] = [
+pub const PRESETS: [HostPreset; 13] = [
     HostPreset {
         host: "api.anthropic.com",
         base_path: "/v1",
         dialect: Some(DialectKind::Anthropic),
         models: ANTHROPIC_MODELS,
+        chat: ChatSpelling::DOCUMENTED,
+        session_header: None,
         source: "https://platform.claude.com/docs/en/api/messages",
     },
     HostPreset {
@@ -37,7 +39,47 @@ pub const PRESETS: [HostPreset; 7] = [
         // person's own toggle says which one this registration means.
         dialect: None,
         models: OPENAI_MODELS,
-        source: "https://platform.openai.com/docs/api-reference/chat",
+        // `max_tokens` "is not compatible with o-series models"
+        // (`CreateChatCompletionRequest` in `openai/openai-openapi`).
+        chat: ChatSpelling {
+            ceiling: CeilingField::MaxCompletionTokens,
+            ..ChatSpelling::DOCUMENTED
+        },
+        session_header: None,
+        source: "https://github.com/openai/openai-openapi/blob/master/openapi.yaml",
+    },
+    HostPreset {
+        // The documented base URL carries no path: the chat face is
+        // `/chat/completions` straight under the host.
+        host: "api.deepseek.com",
+        base_path: "/",
+        // Chat and responses both answer here, messages under
+        // `/anthropic`.
+        dialect: None,
+        models: &[],
+        // Thinking is on by default, and a request with tools whose
+        // history lacks the earlier `reasoning_content` answers 400.
+        chat: ChatSpelling {
+            reasoning: ReasoningReturn::AsReasoningContent,
+            ..ChatSpelling::DOCUMENTED
+        },
+        session_header: None,
+        source: "https://api-docs.deepseek.com/guides/thinking_mode",
+    },
+    HostPreset {
+        host: "api.x.ai",
+        base_path: "/v1",
+        // Chat completions and responses are both served here.
+        dialect: None,
+        models: &[],
+        // `max_tokens` is deprecated in favour of
+        // `max_completion_tokens`.
+        chat: ChatSpelling {
+            ceiling: CeilingField::MaxCompletionTokens,
+            ..ChatSpelling::DOCUMENTED
+        },
+        session_header: None,
+        source: "https://docs.x.ai/developers/rest-api-reference/inference/chat-completions",
     },
     HostPreset {
         host: "openrouter.ai",
@@ -50,16 +92,68 @@ pub const PRESETS: [HostPreset; 7] = [
         // its own model list, so a row here would be a second home for
         // a fact the endpoint already publishes.
         models: &[],
-        source: "https://openrouter.ai/docs/api-reference/overview",
+        // Its own `reasoning` object carries `max`, which its
+        // `reasoning_effort` enum does not, and it takes an earlier
+        // turn's reasoning back as `reasoning_content`.
+        chat: ChatSpelling {
+            ceiling: CeilingField::MaxTokens,
+            effort: EffortField::ReasoningObject,
+            reasoning: ReasoningReturn::AsReasoningContent,
+        },
+        session_header: None,
+        source: "https://openrouter.ai/docs/guides/best-practices/reasoning-tokens",
     },
     HostPreset {
         host: "generativelanguage.googleapis.com",
-        base_path: "/v1beta",
-        // The OpenAI-compatible face hangs below this prefix; which
-        // face a registration means is the person's to say.
+        // The OpenAI-compatible face. `/v1beta` alone is Gemini's own
+        // shape, which this city does not write.
+        base_path: "/v1beta/openai",
+        dialect: Some(DialectKind::OpenAi),
+        models: &[],
+        chat: ChatSpelling::DOCUMENTED,
+        session_header: None,
+        source: "https://ai.google.dev/gemini-api/docs/openai",
+    },
+    HostPreset {
+        // Zhipu's mainland platform; `api.z.ai` below is the same API
+        // served outside mainland China.
+        host: "open.bigmodel.cn",
+        base_path: "/api/paas/v4",
+        dialect: Some(DialectKind::OpenAi),
+        models: &[],
+        // The assistant message takes `reasoning_content`, which
+        // `clear_thinking: false` keeps in context.
+        chat: ChatSpelling {
+            reasoning: ReasoningReturn::AsReasoningContent,
+            ..ChatSpelling::DOCUMENTED
+        },
+        session_header: None,
+        source: "https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8",
+    },
+    HostPreset {
+        host: "api.z.ai",
+        base_path: "/api/paas/v4",
+        dialect: Some(DialectKind::OpenAi),
+        models: &[],
+        chat: ChatSpelling {
+            reasoning: ReasoningReturn::AsReasoningContent,
+            ..ChatSpelling::DOCUMENTED
+        },
+        session_header: None,
+        source: "https://docs.z.ai/api-reference/llm/chat-completion",
+    },
+    HostPreset {
+        // OpenCode Zen. OpenCode Go hangs under `/zen/go/v1` on the
+        // same host, so a Go registration is entered with its path.
+        host: "opencode.ai",
+        base_path: "/zen/v1",
+        // Each model answers on the face its row names: chat,
+        // responses or messages.
         dialect: None,
         models: &[],
-        source: "https://ai.google.dev/api",
+        chat: ChatSpelling::DOCUMENTED,
+        session_header: Some("x-opencode-session"),
+        source: "https://opencode.ai/docs/go/",
     },
     HostPreset {
         // The Kimi Code subscription, whose API does not hang under
@@ -77,6 +171,8 @@ pub const PRESETS: [HostPreset; 7] = [
         // to read, and no vendor page reachable from this machine
         // states them.
         models: &[],
+        chat: MOONSHOT_CHAT,
+        session_header: None,
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
     HostPreset {
@@ -86,6 +182,8 @@ pub const PRESETS: [HostPreset; 7] = [
         // Pending: as above, the model list is the statement and it
         // needs a key.
         models: &[],
+        chat: MOONSHOT_CHAT,
+        session_header: None,
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
     HostPreset {
@@ -95,9 +193,35 @@ pub const PRESETS: [HostPreset; 7] = [
         base_path: "/v1",
         dialect: Some(DialectKind::OpenAi),
         models: &[],
+        chat: MOONSHOT_CHAT,
+        session_header: None,
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
+    HostPreset {
+        // Dashscope's compatible mode on its one fixed host; the other
+        // regions give each workspace a host of its own, entered with
+        // its path.
+        host: "dashscope-us.aliyuncs.com",
+        base_path: "/compatible-mode/v1",
+        dialect: Some(DialectKind::OpenAi),
+        models: &[],
+        chat: ChatSpelling::DOCUMENTED,
+        session_header: None,
+        source: "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
+    },
 ];
+
+/// Moonshot's chat face: `max_tokens` is deprecated in favour of
+/// `max_completion_tokens`, and every earlier assistant message keeps
+/// its `reasoning_content`, read at
+/// <https://platform.moonshot.ai/docs/api/chat>. The Kimi Code
+/// subscription serves the same models, and `kimi-k2.7-code` keeps
+/// every earlier `reasoning_content` whatever the request says.
+const MOONSHOT_CHAT: ChatSpelling = ChatSpelling {
+    ceiling: CeilingField::MaxCompletionTokens,
+    effort: EffortField::ReasoningEffort,
+    reasoning: ReasoningReturn::AsReasoningContent,
+};
 
 /// Anthropic's documented ceilings. The Messages API requires
 /// `max_tokens` in every request, so a missing row here is a call that

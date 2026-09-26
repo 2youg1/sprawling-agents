@@ -27,6 +27,9 @@ export const FACES: readonly (readonly [string, readonly WireApi[]])[] = [
   ["api.deepseek.com", ["chat"]],
   ["api.anthropic.com", ["messages"]],
   ["api.openai.com", ["responses", "chat"]],
+  // Only the OpenAI-compatible chat face; the rest of this host speaks
+  // Gemini's own shape, which the city does not write.
+  ["generativelanguage.googleapis.com", ["chat"]],
 ];
 
 // The faces a host answers in, or nothing when this table has no row
