@@ -50,3 +50,64 @@ fn referrer(raw: &[u8], lineage: &[String], needle: &str) -> Option<Address> {
     let spelled = line.get("data")?.to_string().contains(needle);
     spelled.then(|| Address::parse(line.get("addr")?.as_str()?).ok())?
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use kernel::{EventDraft, EventKind, Ledger, Payload, TimeMs};
+
+    use super::*;
+
+    fn line(run: RunId, addr: &str, spelled: &str) -> EventDraft {
+        let mut data = serde_json::Map::new();
+        data.insert("result".to_owned(), Value::String(spelled.to_owned()));
+        EventDraft {
+            run,
+            t: TimeMs::new(1),
+            who: "resident".to_owned(),
+            addr: Some(Address::parse(addr).unwrap()),
+            kind: EventKind::ToolCalled,
+            data: Payload::new(data).unwrap(),
+            ig: false,
+        }
+    }
+
+    /// A block is whose the first line of this lineage that spelled it
+    /// says, and a line of another run says nothing about this one.
+    #[test]
+    fn a_block_belongs_to_the_line_of_this_lineage_that_referenced_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let (run, before, other) = (
+            RunId::from_bytes([1; 16]),
+            RunId::from_bytes([2; 16]),
+            RunId::from_bytes([3; 16]),
+        );
+        let (mine, inherited, foreign) = (
+            B3Hash::digest(b"mine"),
+            B3Hash::digest(b"inherited"),
+            B3Hash::digest(b"foreign"),
+        );
+        let ledger_dir = kernel::layout::CityLayout::new(dir.path()).ledger();
+        let (mut ledger, _) = memory::JsonlLedger::open(&ledger_dir, TimeMs::new(1)).unwrap();
+        ledger
+            .append(line(other, "vault", &format!("cas:b3-{foreign}")))
+            .unwrap();
+        ledger
+            .append(line(other, "vault", &format!("see cas:b3-{mine}")))
+            .unwrap();
+        ledger
+            .append(line(run, "lab", &format!("see cas:b3-{mine}")))
+            .unwrap();
+        ledger
+            .append(line(before, "lab/room", &format!("cas:b3-{inherited}")))
+            .unwrap();
+        drop(ledger);
+
+        let blocks = of_lineage(dir.path(), run, Some(before));
+        let owner_of = |hash: &B3Hash| (blocks.owner)(hash).unwrap().map(|a| a.as_str().to_owned());
+        assert_eq!(
+            [owner_of(&mine), owner_of(&inherited), owner_of(&foreign)],
+            [Some("lab".to_owned()), Some("lab/room".to_owned()), None]
+        );
+    }
+}
