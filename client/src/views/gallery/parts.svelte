@@ -223,17 +223,32 @@ and arrives red at once; `:user-invalid` is the browser reading
   </div>
 </Case>
 
+<!-- Two pickers stacked as the settings page stacks them, the first one
+open: the second one's trigger is what the list must be painted over. -->
 <Case label="combobox · open on click, nothing chosen">
-  <Combobox
-    label={say($lang, "setup_models")}
-    placeholder={say($lang, "part_search")}
-    empty={say($lang, "part_no_match")}
-    choices={MODELS.map((each) => ({ value: each.id, label: each.id, note: each.context }))}
-    value={model}
-    onPick={(value) => {
-      model = value;
-    }}
-  />
+  <div class="flex flex-col gap-base">
+    <Combobox
+      label={say($lang, "setup_main")}
+      placeholder={say($lang, "part_search")}
+      empty={say($lang, "part_no_match")}
+      choices={MODELS.map((each) => ({ value: each.id, label: each.id, note: each.context }))}
+      value={model}
+      onPick={(value) => {
+        model = value;
+      }}
+      starts="open"
+    />
+    <Combobox
+      label={say($lang, "setup_digest")}
+      placeholder={say($lang, "part_search")}
+      empty={say($lang, "part_no_match")}
+      choices={MODELS.map((each) => ({ value: each.id, label: each.id, note: each.context }))}
+      value={null}
+      onPick={(value) => {
+        model = value;
+      }}
+    />
+  </div>
 </Case>
 
 <Case label="table · partial selection, sortable, corrected in place">

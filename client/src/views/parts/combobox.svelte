@@ -36,18 +36,24 @@
 		readonly value: string | null;
 		// The picked value; closing and focus return stay in this file.
 		readonly onPick: (value: string) => void;
+		// How the popup is drawn before anyone touches it. Every screen
+		// starts closed; the gallery draws it open so the list is measured.
+		readonly starts?: "open" | "closed";
 	}
 </script>
 
 <script lang="ts">
-	const { label, placeholder, empty, choices, value, onPick }: ComboboxProps = $props();
+	import { untrack } from "svelte";
+
+	const { label, placeholder, empty, choices, value, onPick, starts = "closed" }: ComboboxProps =
+		$props();
 
 	// One instance, one id root: the list and the rows derive their ids
 	// from it, so `aria-controls` and `aria-activedescendant` always name
 	// elements that are there.
 	const uid = $props.id();
 
-	let open = $state(false);
+	let open = $state(untrack(() => starts) === "open");
 	let query = $state("");
 	// Where the cursor wants to be. It is clamped where it is read rather
 	// than reset where the list changes: a filter that shortens the list
@@ -70,8 +76,10 @@
 
 	// The filter takes the focus the moment the popup opens, so every key
 	// in the table below lands on the combobox rather than on the trigger.
+	// Without scrolling: the popup sits under the trigger the person just
+	// pressed, and a popup drawn open on load must not move the page.
 	$effect(() => {
-		if (open && search !== undefined) search.focus();
+		if (open && search !== undefined) search.focus({ preventScroll: true });
 	});
 
 	// Closing resets the popup's own state - the filter and the cursor -
@@ -182,11 +190,13 @@
 		</span>
 	</button>
 	{#if open}
-		<!-- No stacking number: the list is positioned and the form rows
-			under it are not, which is already the order they are painted
-			in. The popup enters as `rise` and leaves as a cut. -->
+		<!-- A stacking number, because every combobox root is positioned:
+			without one the next picker in the same form, later in the
+			document, is painted over this list and leaves one row of its
+			own trigger where the models should be. The popup enters as
+			`rise` and leaves as a cut. -->
 		<div
-			class="rise absolute top-full left-0 mt-tight flex w-full flex-col rounded-panel border border-edge-panel bg-raised p-tight shadow-float"
+			class="rise absolute top-full left-0 z-10 mt-tight flex w-full flex-col rounded-panel border border-edge-panel bg-raised p-tight shadow-float"
 		>
 			<input
 				bind:this={search}

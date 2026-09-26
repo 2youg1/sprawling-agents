@@ -128,10 +128,15 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
       <div class="flex min-w-0 flex-col gap-snug">
         <!-- A command cut at the card's edge cannot be typed, and a
         command pushed sideways has to be scrolled before it can be
-        read whole: pre-wrap keeps every character on the card. -->
-        <code class="block whitespace-pre-wrap break-words rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet">
-          {how}
-        </code>
+        read whole: pre-wrap keeps every character on the card. Each
+        word is one box, so a line breaks between words and never at
+        the hyphen inside `--locked`; only a word wider than the card
+        breaks inside itself. -->
+        <code class="block whitespace-pre-wrap break-words rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet"
+          >{#each how.split(" ") as word, index (index)}{index > 0 ? " " : ""}<span class="inline-block max-w-full"
+              >{word}</span
+            >{/each}</code
+        >
         <div class="flex flex-wrap items-center gap-tight">
           <Button
             label={say($lang, "machine_install")}

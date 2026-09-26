@@ -127,10 +127,6 @@
     "en": "the page keeps asking; if no answer ever comes back, reconnect from the dot at the top of the rail",
     "zh": "页面会继续追问；若始终等不到回答，就从左栏顶部那个点重连一次"
   },
-  "ask_unfiled": {
-    "en": "reload the page to fetch the client this city was built with; report it if a reload does not settle it",
-    "zh": "刷新页面，取回这座城配套的客户端；若刷新后依旧如此，请把它报上来"
-  },
   "autonomy_clerk": {
     "en": "the clerk",
     "zh": "clerk 代答"

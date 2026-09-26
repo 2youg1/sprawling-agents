@@ -363,13 +363,11 @@ export function createAsking(
     if (slot !== undefined) {
       slot.reported = false;
       slot.value.set(answer);
-      return;
     }
-    // Neither round could place it, so a question this page holds will
-    // never be settled by its own answer, and the page would wait for
-    // ever on an answer that has already been and gone.
-    noticed("ask_unfiled", minted("E_WIRE_MISMATCH", "file an answer under the question it settles",
-      Object.keys(answer)[0] ?? "answer"));
+    // Neither round could place it, and nothing is said: no question
+    // waits on it, so there is nothing a person could do, and a question
+    // that does wait is still in the queue, where the sweep reports it
+    // once its patience runs out.
   }
 
   function invalidate(record: EventRecord): void {
