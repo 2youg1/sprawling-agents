@@ -209,7 +209,7 @@ fn relay_round_trips(store: Store) -> Vec<Duration> {
                 dir.path(),
                 gateway::Custodian::in_memory(),
                 runtime::diagnostics::Diagnostics::off(),
-                in_memory_ledger(&ledger_dir(dir.path())),
+                in_memory_ledger(&kernel::layout::CityLayout::new(dir.path()).ledger()),
             )
             .unwrap(),
             &base_url,
@@ -311,11 +311,12 @@ fn marker() -> kernel::EventDraft {
 fn until_frozen(root: &std::path::Path, runs: usize) -> Vec<serde_json::Value> {
     let started = Instant::now();
     loop {
-        let lines: Vec<serde_json::Value> = memory::read_raw_lines_at(&ledger_dir(root))
-            .unwrap_or_default()
-            .iter()
-            .filter_map(|line| serde_json::from_slice(line).ok())
-            .collect();
+        let lines: Vec<serde_json::Value> =
+            memory::read_raw_lines_at(&kernel::layout::CityLayout::new(root).ledger())
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|line| serde_json::from_slice(line).ok())
+                .collect();
         if lines
             .iter()
             .filter(|line| line["kind"] == "run_frozen")

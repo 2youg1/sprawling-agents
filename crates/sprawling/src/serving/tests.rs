@@ -80,7 +80,7 @@ fn a_loopback_listener_is_handed_nothing_to_present() {
 fn a_serve_refused_at_the_socket_writes_no_line() {
     let city = tempfile::tempdir().expect("a temporary directory");
     crate::assembly::init_city(city.path()).expect("a city forms");
-    let ledger = crate::assembly::ledger_dir(city.path());
+    let ledger = kernel::layout::CityLayout::new(city.path()).ledger();
     // As text, so a failure shows the line that was written.
     let lines = || -> Vec<String> {
         memory::read_raw_lines_at(&ledger)
@@ -116,7 +116,7 @@ fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
     let city = tempfile::tempdir().expect("a temporary directory");
     crate::assembly::init_city(city.path()).expect("a city forms");
     let held = memory::JsonlLedger::open(
-        &crate::assembly::ledger_dir(city.path()),
+        &kernel::layout::CityLayout::new(city.path()).ledger(),
         kernel::TimeMs::new(0),
     )
     .expect("the first writer opens the city");

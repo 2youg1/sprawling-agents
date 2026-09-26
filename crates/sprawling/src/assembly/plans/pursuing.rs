@@ -92,7 +92,7 @@ impl RunWorker {
     /// taken could not be taken twice.
     fn take_ready_work(&mut self, addr: &Address) -> Result<Taking, AxError> {
         while !self.flight.full() {
-            let Some(state) = self.pursuits.get(addr).map(kernel::Pursuit::state) else {
+            let Some(state) = self.planning.pursuits.get(addr).map(kernel::Pursuit::state) else {
                 return Ok(Taking::Nothing);
             };
             let busy = self.flight.rows_of(addr);
@@ -108,7 +108,10 @@ impl RunWorker {
             };
             let (Some(item), Some(goal)) = (
                 self.plan_item(addr, &next),
-                self.pursuits.get(addr).map(|held| held.goal().to_owned()),
+                self.planning
+                    .pursuits
+                    .get(addr)
+                    .map(|held| held.goal().to_owned()),
             ) else {
                 return Ok(Taking::Nothing);
             };

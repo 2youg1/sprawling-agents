@@ -12,9 +12,11 @@
 //! reader asking "what does a restart find" and "what does a close
 //! leave" is asking one question from two ends.
 
-use super::{Flight, RoomQueues, RunWorker, Standing, city_segment, ledger_dir, now_ms};
+use super::{
+    Collaborating, Credentials, Doorstep, Flight, Planning, RoomQueues, RunWorker, Standing,
+    city_segment, now_ms,
+};
 use std::path::Path;
-use std::sync::Arc;
 
 use kernel::{AxError, EventKind, Locator};
 use memory::{Cas, JsonlLedger, OpenReport};
@@ -68,8 +70,11 @@ impl RunWorker {
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
     ) -> Result<Self, AxError> {
-        let opened = JsonlLedger::open(&ledger_dir(city_root), now_ms()?)
-            .map_err(memory::MemoryError::into_ax)?;
+        let opened = JsonlLedger::open(
+            &kernel::layout::CityLayout::new(city_root).ledger(),
+            now_ms()?,
+        )
+        .map_err(memory::MemoryError::into_ax)?;
         RunWorker::over(city_root, vault, log, opened)
     }
 
@@ -95,7 +100,7 @@ impl RunWorker {
         (ledger, report): (JsonlLedger, OpenReport),
     ) -> Result<Self, AxError> {
         let now = now_ms()?;
-        let dir = ledger_dir(city_root);
+        let dir = kernel::layout::CityLayout::new(city_root).ledger();
         // Holding the one writer is what makes every worktree lock a
         // lock nobody alive holds (memory-SPEC 8-9).
         memory::Worktrees::lift_abandoned_leases(city_root, &ledger)
@@ -121,27 +126,25 @@ impl RunWorker {
             ledger,
             opening: LedgerOpening::from(report),
             cas,
-            book,
-            vault: Arc::new(std::sync::Mutex::new(vault)),
+            credentials: Credentials::opened(book, expiries, vault),
             serving: None,
             governance,
-            rooms: RoomQueues::folded(collaboration.inboxes),
-            joins: collaboration.joins,
-            pursuits,
-            plan_holders: collaboration.plan_holders,
-            goals: collaboration.goals,
-            requests: collaboration.requests,
-            delegator,
+            collaborating: Collaborating {
+                rooms: RoomQueues::folded(collaboration.inboxes),
+                joins: collaboration.joins,
+                requests: collaboration.requests,
+                goals: collaboration.goals,
+            },
+            planning: Planning {
+                pursuits,
+                delegator,
+                holders: collaboration.plan_holders,
+            },
             last_tick: now,
-            expiries,
-            logins: std::collections::BTreeMap::new(),
             log,
-            knocks: Vec::new(),
             mcp: super::mcp::Residents::default(),
-            entrance,
+            doorstep: Doorstep::opened(entrance),
             origins,
-            fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
-            backlog: runtime::Backlog::new(),
             flight: Flight::open(),
             index: memory::LedgerIndex::empty(),
         })
@@ -196,7 +199,7 @@ impl RunWorker {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    use crate::assembly::{RunWorker, init_city, ledger_dir};
+    use crate::assembly::{RunWorker, init_city};
     use std::io::Write;
 
     /// A crash mid-write leaves half a line; the next open cuts it and
@@ -205,10 +208,11 @@ mod tests {
     fn a_torn_tail_is_told_in_the_startup_scan() {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
-        let segment = memory::ledger_segments_at(&ledger_dir(dir.path()))
-            .unwrap()
-            .pop()
-            .unwrap();
+        let segment =
+            memory::ledger_segments_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
+                .unwrap()
+                .pop()
+                .unwrap();
         let torn = b"{\"v\":1,\"seq\":99,\"half";
         std::fs::OpenOptions::new()
             .append(true)

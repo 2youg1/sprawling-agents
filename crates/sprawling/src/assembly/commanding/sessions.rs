@@ -39,7 +39,7 @@
 use kernel::event::record::SessionOpened;
 use kernel::{Address, AxCode, AxError, EventKind, Payload};
 
-use super::super::{RunWorker, ledger_dir};
+use super::super::RunWorker;
 
 impl RunWorker {
     /// Begins a new session at `addr`, keeping what `carry` names.
@@ -59,7 +59,7 @@ impl RunWorker {
         carry: channels::Carry,
         from: Option<kernel::Origin>,
     ) -> Result<(), AxError> {
-        if let Some(working) = self.rooms.worked_by(addr) {
+        if let Some(working) = self.collaborating.rooms.worked_by(addr) {
             return Err(AxError::failure(
                 AxCode::Busy,
                 "start a new session",
@@ -104,7 +104,7 @@ impl RunWorker {
     /// cannot be rebuilt is a refusal now, in words about the line they
     /// named, rather than a run that starts and finds nothing.
     fn origin_is_real(&mut self, origin: kernel::Origin) -> Result<(), AxError> {
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index
             .refresh(&dir)
             .map_err(memory::MemoryError::into_ax)?;

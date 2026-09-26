@@ -285,12 +285,12 @@ fn what_came_back_from_a_delegate_waits_in_the_room_that_asked_for_it() {
         })
         .unwrap();
 
-    let waiting = worker.rooms.pending(&room);
+    let waiting = worker.collaborating.rooms.pending(&room);
     assert_eq!(
         waiting, 1,
         "exactly one handback per piece of work handed down"
     );
-    let taken = worker.rooms.pull_at_home(&room).unwrap();
+    let taken = worker.collaborating.rooms.pull_at_home(&room).unwrap();
     let body = taken[0].payload().as_map();
     assert_eq!(body["room"], "lab/helper");
     assert_eq!(

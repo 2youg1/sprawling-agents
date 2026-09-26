@@ -10,7 +10,7 @@
 //! work, and a filed question is read by the person who has to answer
 //! it before that work goes on.
 
-use kernel::{AxCode, AxError, EventKind, Payload};
+use kernel::{AxError, EventKind, Payload};
 
 use super::Filing;
 use crate::assembly::RunWorker;
@@ -51,35 +51,13 @@ impl RunWorker {
             }
         }
         for item in raised.iter() {
-            let value = serde_json::to_value(item).map_err(|err| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "record a waiting item",
-                    err.to_string(),
-                )
-                .with_recovery(
-                    "report this against sprawling::assembly::settling::landing: an \
-                     approval item is text, flags and one address",
-                )
-            })?;
-            let map = value.as_object().cloned().ok_or_else(|| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "record a waiting item",
-                    "an approval item is an object",
-                )
-                .with_recovery(
-                    "report this against sprawling::assembly::settling::landing: an \
-                     approval item encodes as a JSON object and this one did not",
-                )
-            })?;
             self.record_for(
                 run_id,
                 effect::Line {
                     who: who.to_owned(),
                     addr: addr.clone(),
                     kind: EventKind::ApprovalRequested,
-                    data: Payload::new(map)?,
+                    data: Payload::of(item)?,
                 },
             )?;
         }

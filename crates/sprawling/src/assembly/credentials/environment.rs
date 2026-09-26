@@ -61,7 +61,7 @@ impl RunWorker {
                 &format!("{err}; {}", err.recovery()),
             );
         }
-        if !self.book.is_empty() {
+        if !self.credentials.book.is_empty() {
             return;
         }
         let (Ok(base_url), Ok(model)) = (

@@ -21,7 +21,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxCode, AxError, EventKind, Payload, TimeMs};
+use kernel::{Address, AxError, EventKind, Payload, TimeMs};
 
 /// One line of the history, attributed to whoever caused it.
 ///
@@ -146,7 +146,7 @@ impl Landing {
                         who: who.to_owned(),
                         addr: room.clone(),
                         kind: EventKind::GoalRegistered,
-                        data: goal_payload(&entry)?,
+                        data: Payload::of(&entry)?,
                     });
                     hold.push(entry);
                 }
@@ -211,24 +211,15 @@ impl Landing {
                 at,
                 &text,
             )?;
-            let mut data = serde_json::Map::new();
-            data.insert(
-                "kind".to_owned(),
-                serde_json::Value::String(entry.kind.as_str().to_owned()),
-            );
-            data.insert(
-                "day".to_owned(),
-                serde_json::Value::Number(entry.day.into()),
-            );
-            data.insert(
-                "subject".to_owned(),
-                serde_json::Value::String(entry.subject.clone()),
-            );
             lines.push(Line {
                 who: who.to_owned(),
                 addr: room.clone(),
                 kind: EventKind::AssetArchived,
-                data: Payload::new(data)?,
+                data: Payload::of(&kernel::event::record::AssetArchived {
+                    kind: entry.kind.as_str().to_owned(),
+                    day: entry.day,
+                    subject: entry.subject.clone(),
+                })?,
             });
             filings.push(Filing { entry, body: text });
         }
@@ -299,42 +290,4 @@ impl Claims {
             then: Then::Roadmap { path, text },
         })))
     }
-}
-
-/// The `goal_registered` payload is the entry itself. One shape, written
-/// and read here, so a claim reads back as the claim that was made.
-///
-/// # Errors
-/// Refuses an entry that does not serialise to an object.
-pub(crate) fn goal_payload(entry: &kernel::GoalEntry) -> Result<Payload, AxError> {
-    let value = serde_json::to_value(entry).map_err(|err| {
-        AxError::failure(AxCode::InvalidArgs, "record a goal", err.to_string()).with_recovery(
-            "report this against sprawling::effect: a goal entry is text and whole \
-                 numbers, and JSON refuses neither",
-        )
-    })?;
-    let map = value.as_object().cloned().ok_or_else(|| {
-        AxError::failure(AxCode::InvalidArgs, "record a goal", "a goal is an object").with_recovery(
-            "report this against sprawling::effect: a goal entry encodes as a JSON \
-             object and this one did not",
-        )
-    })?;
-    Payload::new(map)
-}
-
-/// The other direction of the same shape, which is why it lives beside
-/// it: a restarted worker rebuilds its goal register by reading back
-/// exactly what this module wrote.
-///
-/// # Errors
-/// Refuses a payload this build's `GoalEntry` cannot be read out of.
-pub(crate) fn goal_from_payload(data: &Payload) -> Result<kernel::GoalEntry, AxError> {
-    serde_json::from_value(serde_json::Value::Object(data.as_map().clone())).map_err(|err| {
-        AxError::failure(
-            AxCode::InvalidArgs,
-            "read a registered goal",
-            err.to_string(),
-        )
-        .with_recovery("this shape is written by the same binary that reads it; report it")
-    })
 }

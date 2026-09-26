@@ -8,7 +8,7 @@
 //!
 //! **Why it is a projection and not part of the assembly point.** Nothing
 //! here decides anything or reaches a provider: it folds records into the
-//! answers a client asks for, and `rebuild_views` throws the whole thing
+//! answers a client asks for, and `Views::rebuild` throws the whole thing
 //! away and folds the ledger again to get the same bytes. That is
 //! ARCHITECTURE.md section 9 shape 7, while `bin::assembly` is an
 //! adapter - and a file holding two shapes is what section 9 says a split
@@ -24,7 +24,8 @@
 
 use std::path::Path;
 
-use kernel::{Address, EventRecord, RunId};
+use kernel::event::record::{AssetArchived, DiscardRestored, FileDiscarded};
+use kernel::{Address, AxError, EventRecord, RunId};
 
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
@@ -136,29 +137,21 @@ pub(crate) fn verdict_line(verdict: kernel::PursuitVerdict) -> String {
     }
 }
 
-/// What one `pursuit_changed` record says.
+/// The building a `pursuit_changed` record is about.
 ///
-/// `None` for a record this build cannot read as one, which a view skips
-/// rather than inventing a goal for.
-pub(crate) fn pursuit_from(
-    record: &EventRecord,
-) -> Option<(Address, Option<(String, kernel::PursuitState)>)> {
-    let map = record.data().as_map();
-    let addr = record.addr()?.clone();
-    let step = map.get("step")?.as_str()?;
-    let goal = map
-        .get("goal")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_owned();
-    let held = match step {
-        "set" => Some((goal, kernel::PursuitState::Running)),
-        "pause" => Some((goal, kernel::PursuitState::Paused)),
-        "resume" => Some((goal, kernel::PursuitState::Running)),
-        "clear" => None,
-        _ => return None,
-    };
-    Some((addr, held))
+/// # Errors
+/// Refuses a record with no address: the step it records belongs to no
+/// building, and a fold that skipped it would keep whatever goal the
+/// step changed.
+pub(crate) fn pursued(record: &EventRecord) -> Result<Address, kernel::AxError> {
+    record.addr().cloned().ok_or_else(|| {
+        kernel::AxError::failure(
+            kernel::AxCode::WireMismatch,
+            "read a pursuit_changed line",
+            format!("line {} names no building", record.seq().value()),
+        )
+        .with_recovery("replay with the build that wrote this record")
+    })
 }
 
 /// Every building the city has, in reading order.
@@ -176,61 +169,62 @@ pub(crate) fn buildings_of(city_root: &Path) -> Vec<Address> {
 /// One signal, as a room's queue would show it. `None` for a record
 /// this version cannot read as a signal: a view skips what it cannot
 /// read rather than inventing a row for it.
-pub(crate) fn signal_line(record: &EventRecord) -> Option<(Address, channels::SignalLine)> {
-    let map = record.data().as_map();
-    let text = |key: &str| {
-        map.get(key)
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned)
-    };
-    let room = Address::parse(&text("room")?).ok()?;
-    Some((
-        room,
+/// The waiting row a `signal_enqueued` line adds, and the room it waits
+/// in, read through the struct its writer wrote.
+///
+/// # Errors
+/// Refuses a line this build cannot read as a signal: skipping it would
+/// leave a waiting signal out of the view.
+pub(crate) fn signal_line(
+    record: &EventRecord,
+) -> Result<(Address, channels::SignalLine), AxError> {
+    let signal = collab::Signal::from_payload(record.data())?;
+    Ok((
+        signal.room().clone(),
         channels::SignalLine {
-            id: text("id")?,
-            kind: text("kind").unwrap_or_else(|| "signal".to_owned()),
-            from: text("from").unwrap_or_default(),
+            id: signal.id().as_str().to_owned(),
+            kind: signal.kind().as_str().to_owned(),
+            from: signal.from().to_owned(),
             at: record.t(),
         },
     ))
 }
 
-/// The rows one discard record states. A record carries the paths it
-/// discarded and one restoration per path.
+/// The rows one `file_discarded` record states: one per path, each with
+/// the record's way back. A record this version cannot read states no
+/// rows, for the reason [`signal_line`] gives.
 pub(crate) fn discard_lines(record: &EventRecord) -> Vec<channels::DiscardLine> {
-    let map = record.data().as_map();
-    // The plan travels as itself. It was written by serialising a
-    // `Restoration`, so it reads back as one; a scheme this build cannot
-    // name comes through as `None` and the row still appears.
-    let restoration = map
-        .get("restoration")
-        .cloned()
-        .and_then(|way| serde_json::from_value::<channels::Restoration>(way).ok());
-    map.get("paths")
-        .and_then(serde_json::Value::as_array)
-        .map(|paths| {
-            paths
-                .iter()
-                .filter_map(|path| {
-                    Some(channels::DiscardLine {
-                        path: path.as_str()?.to_owned(),
-                        restoration: restoration.clone(),
-                        at: record.t(),
-                        restored: false,
-                    })
-                })
-                .collect()
+    let Ok(FileDiscarded { paths, restoration }) = record.data().read() else {
+        return Vec::new();
+    };
+    paths
+        .into_iter()
+        .map(|path| channels::DiscardLine {
+            path,
+            restoration: restoration.clone(),
+            at: record.t(),
+            restored: false,
         })
-        .unwrap_or_default()
+        .collect()
 }
 
+/// The paths one `discard_restored` record put back; none when this
+/// version cannot read it.
+pub(crate) fn restored_paths(record: &EventRecord) -> Vec<String> {
+    record
+        .data()
+        .read::<DiscardRestored>()
+        .map_or_else(|_| Vec::new(), |restored| restored.paths)
+}
+
+/// One shelf entry, as the registry shows it. `None` for a record with
+/// no room or one this version cannot read.
 pub(crate) fn registry_line(record: &EventRecord) -> Option<channels::RegistryLine> {
-    let map = record.data().as_map();
-    let text = |key: &str| map.get(key).and_then(serde_json::Value::as_str);
+    let AssetArchived { kind, subject, .. } = record.data().read().ok()?;
     Some(channels::RegistryLine {
         addr: record.addr().cloned()?,
-        kind: text("kind").unwrap_or("fact").to_owned(),
-        subject: text("subject").unwrap_or_default().to_owned(),
+        kind,
+        subject,
         at: record.t(),
     })
 }

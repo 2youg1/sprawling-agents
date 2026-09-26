@@ -295,7 +295,9 @@ fn inheriting_a_branch_does_not_verify_the_history() {
             .unwrap();
     }
     let verify_started = std::time::Instant::now();
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
     let verify = verify_started.elapsed();
     let origin = verified
         .lines()
