@@ -144,3 +144,18 @@ fn flags(line: &[String]) -> impl Iterator<Item = String> + '_ {
 fn resume_line(city: &Path) -> Vec<String> {
     vec!["resume".to_owned(), city.display().to_string()]
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_child_of_up_no_open_does_not_enter_the_console() {
+        let line: Vec<String> = ["up", "c", "--no-open", "--supervise"]
+            .map(str::to_owned)
+            .to_vec();
+        let child = serve_line(Path::new("c"), "127.0.0.1:1", &line, Launch::First);
+        assert!(!child.iter().any(|word| word == "--console"), "{child:?}");
+    }
+}
