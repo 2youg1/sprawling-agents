@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use kernel::{Address, GitOid, Locator};
 
 use super::archives::search_archives;
+use super::building_page::read_building;
 use super::document::document_answer;
 use super::git_status::GitStatusAsk;
 use super::hunks::hunks_answer;
@@ -24,7 +25,6 @@ use super::lines::config_answer;
 use super::listing::listing_answer;
 use super::prefix::content_answer;
 use super::skills::{SkillPins, skills_answer};
-use super::building_page::read_building;
 use crate::plan_view::PlanReading;
 
 /// The answer to a question this city could not look up.
