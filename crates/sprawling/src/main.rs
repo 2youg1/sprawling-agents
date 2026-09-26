@@ -27,10 +27,14 @@ include!(concat!(env!("OUT_DIR"), "/client_embed.rs"));
 /// CycloneDX file half).
 const DEPENDENCIES: &str = include_str!(concat!(env!("OUT_DIR"), "/deps.txt"));
 
+#[path = "main/calling.rs"]
+mod calling;
 #[path = "main/city.rs"]
 mod city;
 #[path = "main/data.rs"]
 mod data;
+#[path = "main/exit.rs"]
+mod exit;
 #[path = "main/grammar.rs"]
 mod grammar;
 #[path = "main/router.rs"]

@@ -109,3 +109,35 @@ fn files_under(root: &std::path::Path, dir: &std::path::Path, found: &mut Vec<St
         }
     }
 }
+
+/// `call`'s rows of the exit-code table: each way a call can end
+/// reaches its own code, and none of these touch a city that exists.
+///
+/// A frame the wire cannot carry is this command line's fault (2), and
+/// an address where nothing answers is no city at all (4); both used to
+/// exit 1, which an agent reads as "the city refused" and answers by
+/// fixing a frame the city never saw.
+#[test]
+fn each_way_a_call_ends_has_its_own_exit_code() {
+    use super::calling::call;
+    use super::exit::Exit;
+    // A port that was bound and released: nothing listens on it.
+    let vacant = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .to_string();
+    let words = |line: &[&str]| line.iter().map(ToString::to_string).collect::<Vec<_>>();
+    let table = [
+        (words(&["call"]), Exit::Line),
+        (words(&["call", "{not json", "--at", &vacant]), Exit::Line),
+        (words(&["call", "{\"query\":\"no_such\"}", "--at", &vacant]), Exit::Line),
+        (words(&["call", "{\"query\":\"city_view\"}", "--quiet-ms", "soon"]), Exit::Line),
+        (words(&["call", "{\"query\":\"city_view\"}", "--at", &vacant]), Exit::NoCity),
+    ];
+    let observed = table
+        .iter()
+        .map(|(line, _)| (line.clone(), call(line)))
+        .collect::<Vec<_>>();
+    assert_eq!(observed, table.to_vec());
+}
