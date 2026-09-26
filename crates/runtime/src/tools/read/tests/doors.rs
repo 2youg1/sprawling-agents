@@ -127,8 +127,7 @@ fn a_file_absent_at_the_check_is_not_opened_later() {
             kernel::ReadVerdict::Open
         }
     });
-    let tool =
-        ReadTool::new(dir.path(), Arc::new(Mutex::new(Catalog::new())), between).unwrap();
+    let tool = ReadTool::new(dir.path(), Arc::new(Mutex::new(Catalog::new())), between).unwrap();
 
     let refused = tool.invoke(&call("lab/door/sub/secret.md"));
     assert!(
@@ -167,8 +166,7 @@ fn a_directory_swapped_for_a_link_after_the_check_opens_nothing() {
             kernel::ReadVerdict::Open
         }
     });
-    let tool =
-        ReadTool::new(dir.path(), Arc::new(Mutex::new(Catalog::new())), between).unwrap();
+    let tool = ReadTool::new(dir.path(), Arc::new(Mutex::new(Catalog::new())), between).unwrap();
 
     let refused = tool.invoke(&call("lab/door/sub/secret.md"));
     assert!(
