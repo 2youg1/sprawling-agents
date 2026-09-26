@@ -18,13 +18,13 @@ use std::thread;
 use crate::report::{self, Violation, XtaskError};
 use crate::{
     artifact, boundary, budget, color, depmap, docnum, guard, header, length, lexicon, modmap, npm,
-    proof, release, render, secret, specalign, wire_ts, wiring, wording,
+    proof, release, render, secret, specalign, unused, wire_ts, wiring, wording,
 };
 
 /// How many gates run. The array below is typed by it, so the number and
 /// the list are one token apart and cannot disagree; `vocabulary` reads
 /// it so no document has to hold a copy.
-pub(crate) const COUNT: usize = 20;
+pub(crate) const COUNT: usize = 21;
 
 /// One gate: the name a person types, and the check it runs.
 pub(crate) struct Gate {
@@ -62,6 +62,10 @@ pub(crate) const GATES: [Gate; COUNT] = [
     Gate {
         name: "depmap",
         check: depmap::check,
+    },
+    Gate {
+        name: "unused",
+        check: unused::check,
     },
     Gate {
         name: "npm",
@@ -169,17 +173,35 @@ fn judge(
             .map(|(name, verdict)| {
                 (
                     name,
-                    verdict
-                        .join()
-                        .unwrap_or(Err(XtaskError::GatePanicked { name })),
+                    verdict.join().unwrap_or_else(|payload| {
+                        Err(XtaskError::GatePanicked {
+                            name,
+                            message: panic_message(payload.as_ref()),
+                        })
+                    }),
                 )
             })
             .collect()
     })
 }
 
+/// The text a panic carried: `panic!` with a literal leaves a `&str`,
+/// with format arguments a `String`; any other payload has no words.
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<&str>()
+        .map(|text| (*text).to_owned())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "a payload that is not text".to_owned())
+}
+
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
 mod tests {
     use std::path::Path;
     use std::sync::Mutex;
@@ -204,8 +226,33 @@ mod tests {
         check: record,
     };
 
+    fn explode(_: &Path) -> Result<Vec<Violation>, XtaskError> {
+        panic!("the fixture could not be read")
+    }
+
+    static EXPLODES: Gate = Gate {
+        name: "explodes",
+        check: explode,
+    };
+
+    #[test]
+    fn a_gate_that_panics_reports_the_panic_message_in_its_verdict() {
+        let verdicts: Vec<(&str, String)> = judge(&[&EXPLODES], Path::new("."))
+            .into_iter()
+            .map(|(name, verdict)| (name, verdict.unwrap_err().to_string()))
+            .collect();
+        assert_eq!(
+            verdicts,
+            [(
+                "explodes",
+                "run gate `explodes`: the gate panicked with \"the fixture could not be read\" (gate-panicked); run `cargo xtask gates explodes` to see the panic alone".to_owned()
+            )]
+        );
+    }
+
     #[test]
     fn gates_judge_off_the_calling_thread_and_report_in_roster_order() {
+        JUDGED_ON.lock().unwrap().clear();
         let names: Vec<&str> = judge(&[&FIRST, &SECOND], Path::new("."))
             .into_iter()
             .map(|(name, _)| name)

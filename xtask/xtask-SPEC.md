@@ -127,7 +127,7 @@ pub(crate) struct Violation {
 2. **modmap**：模块行的依据＝竖线表行、第 2 列以 `crates/` 开头以 `.rs` 结尾、第 1 列含 `::`、恰七列（第七列是 `Spec`，见 8-10）、第 6 列 ∈ 状态枚举——这组条件把 §3 缝表（四列）与别处的清单行天然排除。双向对账：表有文件无（状态≠未建 才要求在盘）；盘有表无（lib.rs 与索引文件豁免）；盘有且状态＝未建 → 「状态未翻转」。索引文件的依据：文件名去 `.rs` 后与同目录某子目录同名，且该子目录内有表内文件。
 3. **depmap**：§2 围栏块 ```` ```depmap ```` 为机器权威；`cargo metadata --format-version 1 --no-deps` 输出经 serde_json::Value 读取；只查 normal＋build 依赖（dev 依赖留给测试自由）。子集断言而非相等断言——空壳期合法。
 4. **guard**：`wall` 把两份 manifest 逐键比对，再比两处抄过去的常量；只读工作树，不调 git。
-5. **vocabulary（挂在 lexicon 门下）**：一条断言，修一种第二权威。**退役词必须指向被定义过的词**——`lexicon.toml` 说哪种说法作废，`docs/glossary.md` 说该用哪个词，此前无人让二者对账，于是一条退役词可以指向一个词汇表从未定义的名字，而照门的建议改词的人会落到一个没有释义的词上。依据宽一格：replacement 命中任一词汇表**粗体词**或含 `.md`（指向一份文件也是一种定义）。文档里的门数不在这里对账：`docnum` 的 `gate_count` 行从 `gates::COUNT` 重算它，一个数只有一个重算者。
+5. **vocabulary（挂在 lexicon 门下）**：一条断言，修一种第二权威。**退役词必须指向被定义过的词**——`lexicon.toml` 说哪种说法作废，`docs/glossary.md` 说该用哪个词，此前无人让二者对账，于是一条退役词可以指向一个词汇表从未定义的名字，而照门的建议改词的人会落到一个没有释义的词上。依据宽一格：replacement 命中任一词汇表**粗体词**或含 `.md`（指向一份文件也是一种定义）。文档里的门数不在这里对账：`docnum` 的 `gate_count` 行从 `gates::COUNT` 重算它，一个数只有一个重算者。重算只到受管标记为止：标记之外用数字或数词写出的门数，没有任何一道门读它，所以文档只在 `gate_count` 标记里写门数，别处写「全部门」，评审守这一条。
 6. **release**：公开树**由过滤生成**而不由手工挑选，分类是一条**封闭的前缀规则**（`is_scaffolding`）；未被规则点名的一律归产品面——**失败方向是故意的**：未分类的文件出现在产物里会被人看见，反过来则悤声消失。其中三条的依据值得写下来：①公开树上零脚手架路径；②产品文档不得链向或在正文里点名脚手架（无链的「去看 SPEC」最好写也最难发现，故扫全文而不只扫链接）；③**任何发布文件不得携家目录路径**（`machine_path`）。第三条的口径是**隐私而非整洁**：`/tmp`、`/etc`、`C:/windows` 是关于一类机器的事实，而且「绝对路径被拒」那三条测试必须写出一个绝对路径——典型反例先咬住的正是它们，故规则收窄到家目录形状（`:\users\`／`:/users/`／`/home/`／`/root/` 等七种，大小写不计）。扫描面是**全部可读成文本的发布文件**，不只 `.md`：源码与清单里的硬编码家目录更坏而不是更好。报告只截二十字符，因为把整行引进 CI 日志就是把它再公开一次；文件自豁免（同 secret／color 两门的先例：写不出不包含待检形状的检测器）。
 
 **第五条断言：发决定，不发场合。** 一份产品文档说的是决定，不是决定发生的场合。这一条与第三条同性质而更宽一类——家目录有形状，而「这台机器验不了什么」写成散文时没有形状。能查的部分收成两张封闭的字面表：
@@ -394,7 +394,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 `--color-text-disabled` 的目标是 APCA Lc 30（`--tier-text-disabled`），浅色页上约 2:1，只够告诉手「这里按不动」，不够让眼读出一个字。所以门的规则是：客户端源码（`client/src` 下的 `.svelte`／`.ts`／`.css`，不含 `theme.css`）里每一处 `text-text-disabled` 类名，都必须挂在一个名字里带 `disabled` 的变体之后，例如 `aria-disabled:text-text-disabled`、`disabled:text-text-disabled`、`group-aria-disabled:text-text-disabled`。花费、时刻、模型名、run id、占位字、按键字样这些人要读的信息，改用 `text-text-faint`（Lc 60）或更高一级。
 
 - **判的是类名的写法，不是运行时的条件**：`{off ? 'text-text-disabled' : …}` 这种三元式里，门看不出条件是不是「禁用」，所以不收；元素本来就带 `aria-disabled`，写成变体，状态与墨色由同一个属性决定，没有第二个权威。
-- **类名的边界**：从出现处往前取到空白、引号、反引号或花括号为止，这一段按 `:` 切开，最后一段之前的任何一段含 `disabled` 即算禁用上下文。
+- **类名的边界**：从出现处往前取到空白、引号、反引号或花括号为止，这一段按 `:` 切开，最后一段之前的任何一段含 `disabled` 即算禁用上下文；最后一段是紧贴在类名前面的文字，不是变体，不算。否定的任意变体（`[&:not(:disabled)]:`）也含 `disabled`，同样算禁用上下文，这是按文字判的代价，客户端里没有这种写法。
 - **败给的方案**：在 `lang.json` 或组件里另立一个「次要信息」灰级。那是 `--color-text-faint` 的第二份定义。
 - **改价条件**：若 `--tier-text-disabled` 升到 Lc 60 以上，这个灰级就足以承载信息，本条可以撤。
 
@@ -799,7 +799,7 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 **决定**：不带 pid 时自己起一座夹具城，而不是量自己。旧形状缺省量 `std::process::id()`，量到的是 xtask，登记簿里那行 idle 读数比真正在 serve 的空城还低；读数又是 working set，含共享映像页。**败给的方案**：没有 pid 就拒绝。它也改掉了错的读数，但「一座空城闲着占多少」是每次都要问的问题，让人自己先起一座城再抄 pid，等于把量具的一半交回给人。
 ### 8-31 `gates` 并行判定，按门序报告（形状 1 判定）
 
-**决定**：`gates::run` 把选中的每道门交给 `std::thread::scope` 里的一条线程，再按 `GATES` 的次序逐条 `join`，把 `(门名, 结论)` 依门序交给 `report::finish_all`。一条线程若 panic，那道门报 `could not judge`（`XtaskError::GatePanicked`），其余各门照常出结论。
+**决定**：`gates::run` 把选中的每道门交给 `std::thread::scope` 里的一条线程，再按 `GATES` 的次序逐条 `join`，把 `(门名, 结论)` 依门序交给 `report::finish_all`。一条线程若 panic，那道门报 `could not judge`（`XtaskError::GatePanicked`，带 panic 的消息：载荷是 `&str` 或 `String` 时取其文字，否则写明载荷不是文字），其余各门照常出结论；消息随结论按门序印出，而不是只留在默认 panic 钩子乱序写进 stderr 的那一行里。
 
 **为什么**：各门只读树、互不写同一处，判定时间彼此独立，串行时门阶段的墙钟是各门之和，并行时是最慢那一道。报告按门序而不按完成序，所以两次运行在同一棵树上的输出逐字相同。
 
@@ -836,7 +836,7 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **接口**：`depmap` 除了 crate 边与 `pub trait`，再读 ARCHITECTURE.md 的 ```` ```directions ```` 围栏块。每行 `模块路径: Rust 路径, Rust 路径`，模块路径是仓库相对、不带扩展名的路径（`crates/sprawling/src/views` 覆盖 `views.rs` 与 `views/` 下每个 `.rs`），右边是这个模块的产品代码永不写出的路径（`crate::assembly`）。违例报出文件与行号；块里点名的模块在树上不存在也是违例；块缺失或行无冒号是文档错误（`XtaskError::Doc`），不当作「没什么可判」。
 
-**读法**：按行读文本。注释行不算代码；测试不算产品代码：名为 `tests.rs` 或以 `_tests.rs` 结尾的文件（本仓把拆出去的测试模块命名为 `<主题>_tests.rs`，如 `views/standing_tests.rs`）、`tests` 目录下的文件、`#[cfg(test)]` 下的那个条目（以 `;` 结尾则一行，否则直到花括号闭合）都跳过，因为测试可以经装配点造夹具，而被测模块并不因此依赖装配点。路径按整段匹配，`crate::assembly_line` 不算 `crate::assembly`。`use crate::{assembly, …}` 这种分组写法读不出来；这是按行文本读法的代价，块里的路径按树上实际的写法登记。
+**读法**：按行读文本。注释行不算代码；测试不算产品代码：名为 `tests.rs` 或以 `_tests.rs` 结尾的文件（本仓把拆出去的测试模块命名为 `<主题>_tests.rs`，如 `views/standing_tests.rs`）、`tests` 目录下的文件、`#[cfg(test)]` 下的那个条目（以 `;` 结尾则一行，否则直到花括号闭合；数花括号之前先去掉本行的字符串与字符字面量，因为 `"{"` 里的花括号不开块，照数会让跳过延续到条目之后，把后面的产品代码悄悄漏判）都跳过，因为测试可以经装配点造夹具，而被测模块并不因此依赖装配点。路径按整段匹配，`crate::assembly_line` 不算 `crate::assembly`。读不出来的写法有四种：`use crate::{assembly, …}` 这种分组写法、`super::assembly` 与 `super::super::assembly` 这种相对路径、拆在几行上的路径、经另一模块 `pub(crate) use` 转出的装配点条目；跨行的字符串字面量里的花括号也照数。这是按行文本读法的代价，块里的路径按树上实际的写法登记；要堵上它们，改为用 `syn` 解析 `use` 树并把相对路径解析成 `crate::` 形式。
 
 **决定**：模块方向写在 ARCHITECTURE.md 与 crate 边同一节，由同一道门读。**败给的方案**：一个在 sprawling 里扫自己源码的测试——它判的是树的形状而不是行为，放在被判的 crate 里会让产品 crate 知道自己的源码路径；也败给新开一道门，因为方向就是依赖图的一部分，门名册不必为它多一行。**重议条件**：某个 crate 的模块要按图而不是按禁止表来判（例如要求整个 crate 无环），那时改为从 `use` 解析出模块图。
 
@@ -877,5 +877,22 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 人可以要的正文字号区间住 `channels::BODY_PX_MIN`／`BODY_PX_MAX`：写 `[ui]` 的那一层据它拒，而外观页此前自己写了一份 `{ min: 12, max: 20 }`（`client/src/core/sizing.ts`，另有一份没人读的在 `prefs.ts`）——两份区间在其中一份先动的那一刻就是两个区间。生成器因此在文件开头多发一条 `export const BODY_PX = { min, max } as const;`，两个数取自那两个常量，随 `WIRE_V`、`WIRE_HASH`、`CITY_RUN` 一起作为 `Constants` 的一个字段走（`body_px: BodyPx`），而不是给 `emit` 添参数。
 
 **被否**：把区间放进 `PreferencesAnswer`——那个类型同时是 `[ui]` 文件的文法，多一个字段就是文件里多一个人能写、而写了也不生效的键；放进 `Query::Config`——那个回答按地址爬梯子，而正文字号是这个人的、不是某个地址的。区间是这个构建的常量，不随城变，故走生成物而不走一次查询。
+
+### 8-37 `unused`：清单里声明、源码里从不点名的依赖（形状 1 判定）
+
+**接口**：`unused::check(root) -> Result<Vec<Violation>, XtaskError>`，在 `GATES` 里，随 `just gates` 进 `just check`。两条断言：
+
+- **包的依赖有人点名**：`docnum::facts::packages` 列出的每个包（根清单的 `members` 与 `exclude`），它的 `[dependencies]`、`[dev-dependencies]`、`[build-dependencies]` 以及各 `[target.*]` 下同名三表里的每个键，把 `-` 换成 `_` 之后，至少在这个包目录下某个 `.rs` 文件里作为一个完整标识符出现一次。违例的 `location` 是 `<包目录>/Cargo.toml`，`violation` 点名表与键。
+- **工作区依赖有人继承**：根清单 `[workspace.dependencies]` 的每个键，至少是某个包的某张依赖表里的键。违例的 `location` 是 `Cargo.toml`。
+
+清单不解析或某个包的清单读不到，是 `XtaskError::Doc`／`Io`，退出码 2，不当作「没有依赖」。
+
+**读法**：按词读文本，不解析 Rust。键在代码里的名字就是键本身（`package = "…"` 改名时，代码写的也是键），所以不读 `package`。一个包的全部 `.rs` 文件合成一份文本判三张表：dev 依赖只在测试里点名、build 依赖只在 `build.rs` 里点名，这两条细分不判。这是有意放宽：它挡的缺陷是「依赖留在清单里而代码早已不用」，一个依赖被错放在哪张表里由 cargo 的编译错误来挡。
+
+**为什么**：`-D warnings` 下 rustc 的 `dead_code` 已经挡住 crate 私有的死函数与死类型，`unused_crate_dependencies` 却会对每个只在测试或 bench 里用到的依赖误报，工作区因此不开它；清单里的死依赖于是没有任何一道检查看见，而它每次都多编译一整棵依赖树。死代码里能机械判定、编译器又不判的，就是这一类。
+
+**败给的方案**：`cargo machete` 或 `cargo +nightly udeps`。前者判的正是同一件事，但要多装一个工具，并且 `just prereqs` 在缺它的机器上只能跳过——一道会被跳过的门挡不住回归；后者要 nightly 并且整仓编译一次，判一次要几分钟，不能进每次的 `just check`。本门只读文本，一次在毫秒量级。
+
+**已知的限**：只被 feature 打开、代码里从不点名的依赖（例如只为给传递依赖开一个 feature 而声明的包）会被判红；树上今天没有这种依赖。出现时在该包清单里加注释说明理由，并给本门加一张从 `[package.metadata]` 读的豁免表——在那之前不预先造豁免机制。宏展开出来的名字（`#[derive(Serialize)]` 而全文从不写 `serde`）同样判红；把 `use serde::Serialize` 写出来即可。
 
 **本节属门禁机具，与产品代码分开提交。**

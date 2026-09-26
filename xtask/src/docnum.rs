@@ -37,7 +37,7 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-mod facts;
+pub(crate) mod facts;
 
 /// What opens a managed span, up to the fact's key.
 const BEGIN: &str = "<!-- xtask:begin ";

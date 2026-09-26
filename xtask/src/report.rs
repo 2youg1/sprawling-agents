@@ -36,9 +36,9 @@ pub(crate) enum XtaskError {
     #[error("run gate `{name}`: no gate has that name (unknown-gate); name one of: {known}")]
     UnknownGate { name: String, known: String },
     #[error(
-        "run gate `{name}`: the gate panicked (gate-panicked); run `cargo xtask gates {name}` to see the panic alone"
+        "run gate `{name}`: the gate panicked with {message:?} (gate-panicked); run `cargo xtask gates {name}` to see the panic alone"
     )]
-    GatePanicked { name: &'static str },
+    GatePanicked { name: &'static str, message: String },
     #[error(
         "judge tree {here}: this xtask was built from {built} (stale-build); run `cargo clean -p xtask` and the command again, so cargo rebuilds it from this tree"
     )]

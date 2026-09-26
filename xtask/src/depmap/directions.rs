@@ -180,12 +180,54 @@ fn after(skipping: Skip, code: &str) -> Skip {
         Skip::Body(depth) => depth,
         Skip::No | Skip::Attribute => 0,
     };
+    let code = without_literals(code);
     let opened = depth.saturating_add(code.matches('{').count());
     let closed = code.matches('}').count();
     match opened.checked_sub(closed) {
         Some(0) | None if code.ends_with(';') || code.ends_with('}') => Skip::No,
         Some(0) | None => Skip::Body(0),
         Some(left) => Skip::Body(left),
+    }
+}
+
+/// `code` with its string and char literals removed, so the braces left
+/// are the ones that open and close blocks. A `'` that does not start a
+/// char literal starts a lifetime and is dropped alone.
+fn without_literals(code: &str) -> String {
+    let mut kept = String::with_capacity(code.len());
+    let mut chars = code.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => skip_past(&mut chars, '"'),
+            '\'' => {
+                let mut ahead = chars.clone();
+                match (ahead.next(), ahead.next()) {
+                    (Some('\\'), _) => {
+                        chars.next();
+                        chars.next();
+                        skip_past(&mut chars, '\'');
+                    }
+                    (Some(_), Some('\'')) => {
+                        chars.next();
+                        chars.next();
+                    }
+                    _ => {}
+                }
+            }
+            other => kept.push(other),
+        }
+    }
+    kept
+}
+
+/// Advance past the next `end` that no backslash escapes.
+fn skip_past(chars: &mut std::str::Chars<'_>, end: char) {
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            chars.next();
+        } else if c == end {
+            return;
+        }
     }
 }
 
@@ -228,6 +270,45 @@ mod tests {
         assert_eq!(
             named(source, &forbidden),
             vec![(1, "crate::assembly"), (14, "crate::assembly")]
+        );
+    }
+
+    #[test]
+    fn a_brace_inside_a_literal_does_not_extend_a_test_item() {
+        let source = "#[cfg(test)]\n\
+                      mod tests {\n\
+                          fn g() { let open = \"{\"; let close = '}'; let quoted: &'static str = \"\\\"{\"; }\n\
+                      }\n\
+                      fn h() { crate::assembly::now_ms(); }\n";
+        let forbidden = forbidden();
+        assert_eq!(named(source, &forbidden), vec![(5, "crate::assembly")]);
+    }
+
+    #[test]
+    fn a_missing_module_is_reported_and_a_test_file_is_not_judged() {
+        let root = std::env::temp_dir().join(format!("depmap-directions-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let views = root.join("crates/x/src/views");
+        std::fs::create_dir_all(&views).unwrap();
+        std::fs::write(root.join("crates/x/src/views.rs"), "fn f() {}\n").unwrap();
+        std::fs::write(views.join("tests.rs"), "use crate::assembly::Fixture;\n").unwrap();
+        let text = "```directions\n\
+                    crates/x/src/gone: crate::assembly\n\
+                    crates/x/src/views: crate::assembly\n\
+                    ```\n";
+        let mut violations = Vec::new();
+        check(&root, text, &mut violations).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        let found: Vec<(String, String)> = violations
+            .into_iter()
+            .map(|v| (v.location, v.violation))
+            .collect();
+        assert_eq!(
+            found,
+            vec![(
+                format!("{ARCH} ```directions crates/x/src/gone"),
+                "no `crates/x/src/gone.rs` and no `crates/x/src/gone/` directory".to_owned()
+            )]
         );
     }
 

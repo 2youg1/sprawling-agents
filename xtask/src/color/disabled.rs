@@ -66,8 +66,12 @@ fn behind_disabled_variant(before: &str) -> bool {
         .rsplit(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | '`' | '{' | '}'))
         .next()
         .unwrap_or("")
-        .split(':')
-        .any(|variant| variant.contains("disabled"))
+        .rsplit_once(':')
+        .is_some_and(|(variants, _)| {
+            variants
+                .split(':')
+                .any(|variant| variant.contains("disabled"))
+        })
 }
 
 #[cfg(test)]
@@ -82,5 +86,11 @@ mod tests {
                     const MUTED = \"group-aria-disabled:hover:text-text-disabled\";\n\
                     {off ? 'text-text-disabled' : 'text-text'}\n";
         assert_eq!(bare_uses(text), vec![1, 3, 5]);
+    }
+
+    #[test]
+    fn text_glued_to_the_class_is_not_a_variant() {
+        let text = "<span class=\"xdisabledtext-text-disabled\">{cost}</span>\n";
+        assert_eq!(bare_uses(text), vec![1]);
     }
 }
