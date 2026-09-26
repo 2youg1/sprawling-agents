@@ -1939,6 +1939,13 @@ pub kernel::event::record::AdviserFellBack::subject: alloc::string::String
 pub kernel::event::record::ApprovalResolved::cluster: kernel::approval::ClusterKey
 pub kernel::event::record::ApprovalResolved::id: kernel::approval::ApprovalId
 pub kernel::event::record::ApprovalResolved::verdict: kernel::approval::Ruling
+pub kernel::event::record::AttachedTuning::extra_headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub kernel::event::record::AttachedTuning::label: core::option::Option<alloc::string::String>
+pub kernel::event::record::AttachedTuning::overrides: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub kernel::event::record::AttachedTuning::proxying: core::option::Option<kernel::reach::Proxying>
+pub kernel::event::record::AttachedTuning::request_max_retries: core::option::Option<u32>
+pub kernel::event::record::AttachedTuning::stream_idle_timeout_ms: core::option::Option<u64>
+pub kernel::event::record::AttachedTuning::timeout_ms: core::option::Option<u64>
 pub kernel::event::record::AutonomyChanged::autonomy: kernel::approval::Autonomy
 pub kernel::event::record::AutonomyChanged::scope: kernel::event::Scope
 pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
@@ -1958,7 +1965,23 @@ pub kernel::event::record::EmbeddingCalled::inputs: u64
 pub kernel::event::record::EmbeddingCalled::model: alloc::string::String
 pub kernel::event::record::EmbeddingCalled::prompt_tokens: core::option::Option<kernel::budget::Tokens>
 pub kernel::event::record::EmbeddingCalled::vectors: u64
+pub kernel::event::record::EndpointAttached::auth: core::option::Option<kernel::SecretRef>
+pub kernel::event::record::EndpointAttached::auth_header: core::option::Option<alloc::string::String>
+pub kernel::event::record::EndpointAttached::base_url: alloc::string::String
+pub kernel::event::record::EndpointAttached::connection_kind: core::option::Option<alloc::string::String>
+pub kernel::event::record::EndpointAttached::dialect: kernel::DialectKind
+pub kernel::event::record::EndpointAttached::models: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::EndpointAttached::name: alloc::string::String
+pub kernel::event::record::EndpointAttached::probed: bool
+pub kernel::event::record::EndpointAttached::tuning: core::option::Option<kernel::event::record::AttachedTuning>
 pub kernel::event::record::EndpointLost::name: alloc::string::String
+pub kernel::event::record::EvalRun::after: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::EvalRun::before: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::EvalRun::kept: u32
+pub kernel::event::record::EvalRun::lost: alloc::vec::Vec<u32>
+pub kernel::event::record::EvalRun::predecessor: kernel::RunId
+pub kernel::event::record::EvalRun::probe: alloc::string::String
+pub kernel::event::record::EvalRun::version: u32
 pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
 pub kernel::event::record::EvidenceCite::seq: kernel::Seq
 pub kernel::event::record::GovernedDocumentWritten::bytes: usize
@@ -2524,12 +2547,15 @@ pub struct kernel::event::record::AdviserAnswered
 pub struct kernel::event::record::AdviserAsked
 pub struct kernel::event::record::AdviserFellBack
 pub struct kernel::event::record::ApprovalResolved
+pub struct kernel::event::record::AttachedTuning
 pub struct kernel::event::record::AutonomyChanged
 pub struct kernel::event::record::CityHalted
 pub struct kernel::event::record::Commit
 pub struct kernel::event::record::CommitAttribution
 pub struct kernel::event::record::EmbeddingCalled
+pub struct kernel::event::record::EndpointAttached
 pub struct kernel::event::record::EndpointLost
+pub struct kernel::event::record::EvalRun
 pub struct kernel::event::record::EvidenceCite
 pub struct kernel::event::record::GovernedDocumentWritten
 pub struct kernel::event::record::LogTruncated

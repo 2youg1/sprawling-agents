@@ -3,14 +3,149 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which model answers for a tag, and which endpoint stopped answering:
-//! the two lines the gateway's endpoint book is rebuilt from besides the
-//! attachment itself.
+//! What a person attached, which model answers for a tag, and which
+//! endpoint stopped answering: the three lines the gateway's endpoint
+//! book is rebuilt from.
 
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
 
 use crate::budget::UsdMicros;
-use crate::model::{Ceiling, ModelTag};
+use crate::model::{Ceiling, DialectKind, ModelTag};
+use crate::reach::Proxying;
+use crate::secret::SecretRef;
+
+/// `endpoint_attached`: a base URL, its dialect, the credential's vault
+/// place and the model ids the endpoint reported.
+///
+/// **The credential is a reference, never the key**: that is what keeps
+/// this line exportable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct EndpointAttached {
+    pub name: String,
+    pub base_url: String,
+    pub dialect: DialectKind,
+    /// Absent for an endpoint that takes no credential.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub auth: Option<SecretRef>,
+    /// The header the credential travels in, when it is not a bearer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_header: Option<String>,
+    pub models: Vec<String>,
+    /// `gateway::ConnectionKind` in its own spelling. Absent on a line
+    /// written by a build with one registration per dialect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_kind: Option<String>,
+    /// Absent means true: every line written before the key existed
+    /// came from a probe that succeeded.
+    #[serde(default = "probed_by_default")]
+    pub probed: bool,
+    /// What the person settled; absent when they settled nothing, and
+    /// read as nothing settled when it is not an object.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "readable"
+    )]
+    pub tuning: Option<AttachedTuning>,
+}
+
+/// How the person set an endpoint up, as the line keeps it.
+///
+/// Tolerant in one direction only: a key that is missing reads as
+/// nothing settled, which is what every line written before the key
+/// existed means, and a key that is present and unreadable is left out
+/// rather than guessed at, because a deadline this city invented would
+/// be a deadline nobody can explain.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct AttachedTuning {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "readable"
+    )]
+    pub label: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "readable"
+    )]
+    pub timeout_ms: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "readable"
+    )]
+    pub stream_idle_timeout_ms: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "readable"
+    )]
+    pub request_max_retries: Option<u32>,
+    /// Absent for the default, which is how the line says nothing was
+    /// settled here too.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "readable"
+    )]
+    pub proxying: Option<Proxying>,
+    /// Header name and the person's own spelling of its value, which for
+    /// a credential is its reference.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "readable_pairs"
+    )]
+    pub extra_headers: Vec<(String, String)>,
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "readable_pairs"
+    )]
+    pub overrides: Vec<(String, String)>,
+}
+
+const fn probed_by_default() -> bool {
+    true
+}
+
+/// A value this build can read, or `None`: the tolerance
+/// [`AttachedTuning`] documents, decided in one place.
+fn readable<'de, D: Deserializer<'de>, T: DeserializeOwned>(
+    held: D,
+) -> Result<Option<T>, D::Error> {
+    Ok(serde_json::from_value(Value::deserialize(held)?).ok())
+}
+
+/// The rows that are two strings; a row that is not is left out rather
+/// than half read.
+fn readable_pairs<'de, D: Deserializer<'de>>(held: D) -> Result<Vec<(String, String)>, D::Error> {
+    let Value::Array(rows) = Value::deserialize(held)? else {
+        return Ok(Vec::new());
+    };
+    Ok(rows
+        .into_iter()
+        .filter_map(|row| match row {
+            Value::Array(cells) => match (cells.first(), cells.get(1)) {
+                (Some(Value::String(name)), Some(Value::String(value))) => {
+                    Some((name.clone(), value.clone()))
+                }
+                _ => None,
+            },
+            Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Object(_) => None,
+        })
+        .collect())
+}
 
 /// What a model accepts as input.
 ///
@@ -106,7 +241,44 @@ mod tests {
     /// disk reads back and a new line is byte-identical to an old one.
     #[test]
     fn each_endpoint_line_keeps_the_bytes_its_ledger_already_holds() {
-        let cases: [(Payload, &str); 3] = [
+        let cases: [(Payload, &str); 5] = [
+            (
+                Payload::of(&EndpointAttached {
+                    name: "house".to_owned(),
+                    base_url: "https://api.example.test/v1".to_owned(),
+                    dialect: DialectKind::OpenAi,
+                    auth: Some(SecretRef::parse("secret:house/key").unwrap()),
+                    auth_header: Some("x-api-key".to_owned()),
+                    models: vec!["opus-nine".to_owned()],
+                    connection_kind: Some("openai_compat".to_owned()),
+                    probed: false,
+                    tuning: Some(AttachedTuning {
+                        label: Some("House".to_owned()),
+                        timeout_ms: Some(30_000),
+                        request_max_retries: Some(2),
+                        proxying: Some(Proxying::Never),
+                        extra_headers: vec![("x-team".to_owned(), "secret:house/team".to_owned())],
+                        ..AttachedTuning::default()
+                    }),
+                })
+                .unwrap(),
+                "{\"auth\":\"secret:house/key\",\"auth_header\":\"x-api-key\",\"base_url\":\"https://api.example.test/v1\",\"connection_kind\":\"openai_compat\",\"dialect\":\"open_ai\",\"models\":[\"opus-nine\"],\"name\":\"house\",\"probed\":false,\"tuning\":{\"extra_headers\":[[\"x-team\",\"secret:house/team\"]],\"label\":\"House\",\"proxying\":\"never\",\"request_max_retries\":2,\"timeout_ms\":30000}}",
+            ),
+            (
+                Payload::of(&EndpointAttached {
+                    name: "local".to_owned(),
+                    base_url: "http://127.0.0.1:11434/v1".to_owned(),
+                    dialect: DialectKind::OpenAi,
+                    auth: None,
+                    auth_header: None,
+                    models: Vec::new(),
+                    connection_kind: Some("openai_compat".to_owned()),
+                    probed: true,
+                    tuning: None,
+                })
+                .unwrap(),
+                "{\"base_url\":\"http://127.0.0.1:11434/v1\",\"connection_kind\":\"openai_compat\",\"dialect\":\"open_ai\",\"models\":[],\"name\":\"local\",\"probed\":true}",
+            ),
             (
                 Payload::of(&selected(Some(32_000), Some("preset"))).unwrap(),
                 "{\"cache_read_price\":300000,\"cache_write_price\":3750000,\"ceiling_from\":\"preset\",\"context_tokens\":200000,\"endpoint\":\"house\",\"input\":\"text_image\",\"input_price\":3000000,\"max_output_tokens\":32000,\"model\":\"opus-nine\",\"output_price\":15000000,\"tag\":\"main\"}",
@@ -128,6 +300,25 @@ mod tests {
             let back: Payload = serde_json::from_str(wire).unwrap();
             assert_eq!(back, payload);
         }
+    }
+
+    /// A tuning key this build cannot read is left out, and the rest of
+    /// the line still reads.
+    #[test]
+    fn an_unreadable_tuning_key_is_left_out_rather_than_refusing_the_line() {
+        let payload: Payload = serde_json::from_str(
+            "{\"base_url\":\"u\",\"dialect\":\"anthropic\",\"models\":[],\"name\":\"n\",\"tuning\":{\"timeout_ms\":-1,\"label\":7,\"overrides\":[[\"a\",\"b\"],[\"c\"],3]}}",
+        )
+        .unwrap();
+        let read = payload.read::<EndpointAttached>().unwrap();
+        assert!(read.probed);
+        assert_eq!(
+            read.tuning,
+            Some(AttachedTuning {
+                overrides: vec![("a".to_owned(), "b".to_owned())],
+                ..AttachedTuning::default()
+            })
+        );
     }
 
     /// A line from before `input` existed reads as text-only, and its

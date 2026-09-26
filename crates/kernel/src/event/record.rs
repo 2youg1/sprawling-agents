@@ -54,14 +54,14 @@ pub use adviser::{
 };
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
 pub use credential::{LoginStarted, SecretCaptured, ToolkitLinkOpened};
-pub use endpoint::{EndpointLost, InputKinds, ModelSelected};
+pub use endpoint::{AttachedTuning, EndpointAttached, EndpointLost, InputKinds, ModelSelected};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     SpineDocumentWritten, autonomy_word,
 };
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
-pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
+pub use run::{EvalRun, EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,

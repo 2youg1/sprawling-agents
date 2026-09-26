@@ -393,6 +393,9 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub skills: Vec<SkillPin>,          // 空亦写出
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
+pub struct EvalRun { pub probe: String, pub version: u32, pub predecessor: RunId,  // eval_run：交接探针的一次读数
+                    pub kept: u32, pub lost: Vec<u32>,       // lost 是答案不同的题号
+                    pub before: Vec<String>, pub after: Vec<String> }   // 全部必填，空亦写出
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
@@ -453,6 +456,20 @@ pub struct ModelSelected { pub tag: ModelTag, pub endpoint: String, pub model: S
                            pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
 impl ModelSelected { pub fn ceiling(&self) -> Option<Ceiling>; }   // 0 与 null 同读作「未声明」
 pub struct EndpointLost { pub name: String }
+pub struct EndpointAttached { pub name: String, pub base_url: String, pub dialect: DialectKind,
+                              pub auth: Option<SecretRef>,          // 引用，从不是密钥；缺席即省略
+                              pub auth_header: Option<String>,      // 非 bearer 时凭据所在的 header
+                              pub models: Vec<String>,              // 空亦写出
+                              pub connection_kind: Option<String>,  // 旧行没有，读者按 dialect 回推
+                              #[serde(default = true)] pub probed: bool,
+                              pub tuning: Option<AttachedTuning> }  // 什么都没设就省略；不是对象读作未设
+pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u64>,
+                            pub stream_idle_timeout_ms: Option<u64>, pub request_max_retries: Option<u32>,
+                            pub proxying: Option<Proxying>,        // 默认值省略
+                            pub extra_headers: Vec<(String, String)>, pub overrides: Vec<(String, String)> }
+// AttachedTuning 的每个键缺席读作未设、在而读不懂也读作未设（行不被拒）：编造一个期限比没有期限更难解释。
+// EndpointAttached 顶层的键则不然：probed、auth、connection_kind 在而读不懂，整行读不成（E_WIRE_MISMATCH），
+// 因为把一个没探到的端点读成探到过，是在书里放进一个没人够得着的端点。
 
 pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
                         pub subject: Option<String> }   // 键缺席读作 None
