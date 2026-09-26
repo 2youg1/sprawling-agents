@@ -23,7 +23,7 @@ use kernel::{Address, Locator, RunId};
 /// address, mode and ceiling. Passed side by side they were four
 /// parameters on six signatures, and the depth had to be derived twice.
 ///
-/// The other two are spent in `prepare_dispatch`'s prologue and never seen
+/// The other two are spent in `stage_dispatch`'s prologue and never seen
 /// again, and they are here rather than beside it because opening a room
 /// is the first thing this city writes for a dispatch. A caller that
 /// opened it would put the rule "agree before you write" in a second
