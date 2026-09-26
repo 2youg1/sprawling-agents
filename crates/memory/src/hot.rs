@@ -254,6 +254,31 @@ mod tests {
         assert_eq!(view.get(&run).unwrap().started, Some(TimeMs::new(1_700)));
     }
 
+    /// A city that ran thousands of times held a row for every run it
+    /// ever froze; only the active runs and the recent few stay, and a
+    /// late record on an evicted run is its tail, not a new run's fence.
+    #[test]
+    fn frozen_runs_beyond_the_recent_few_leave_a_tombstone() {
+        let mut view = HotView::new();
+        let recent = u64::try_from(RECENT_FROZEN).unwrap();
+        let run_of = |i: u64| RunId::from_bytes(u128::from(i + 1).to_be_bytes());
+        for i in 0..=recent {
+            view.apply(&record(run_of(i), 2 * i, EventKind::RunStarted))
+                .unwrap();
+            view.apply(&record(run_of(i), 2 * i + 1, EventKind::RunFrozen))
+                .unwrap();
+        }
+        let tail = 2 * recent + 2;
+        view.apply(&record(run_of(0), tail, EventKind::CheckpointCommitted))
+            .unwrap();
+        let held: Vec<RunId> = view.runs().map(|(run, _)| *run).collect();
+        let newest: Vec<RunId> = (1..=recent).map(run_of).collect();
+        assert_eq!(
+            (held, view.active_count(), view.frozen_count()),
+            (newest, 0, recent + 1)
+        );
+    }
+
     #[test]
     fn a_city_level_record_is_not_a_run() {
         // `RunId::CITY` is the nil id that marks a record belonging to the
