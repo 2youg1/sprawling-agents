@@ -47,7 +47,7 @@ export const QUERIES = {
   governance: "governance",
   doctor: "doctor",
   toolkits: "toolkits",
-  release: "release",
+  release: "newest_release",
   preferences: "preferences",
 } as const satisfies Readonly<Record<string, Extract<Query, string>>>;
 

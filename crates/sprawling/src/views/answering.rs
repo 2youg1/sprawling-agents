@@ -235,7 +235,7 @@ impl Views {
                 channels::Answer::Toolkits(Box::new(self.toolkits_answer()))
             }
             // Leaves this machine, and only on a press (channels-SPEC 8-36).
-            channels::Query::Release => {
+            channels::Query::NewestRelease => {
                 channels::Answer::Release(Box::new(crate::release::answer()))
             }
             channels::Query::BuildingView { addr } => {

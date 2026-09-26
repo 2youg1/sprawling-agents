@@ -89,7 +89,7 @@ use serde::{Deserialize, Serialize};
 ///    when it opened, and one press connects an outside application -
 ///    `Query::Toolkits` reads the broker's shelf and
 ///    `Command::ConnectToolkit` opens a consent session on it.
-/// 31: `Query::Release` answers which release this city is and which
+/// 31: `Query::NewestRelease` answers which release this city is and which
 ///    one npm offers - the only query that reaches the internet, asked
 ///    when somebody presses the button and never on a timer.
 /// 32: the wire stops guessing, and the tables stop being written by
@@ -349,7 +349,7 @@ mod tests {
     fn a_query_names_itself_with_its_entry_in_the_table() {
         assert_eq!(Query::CityView.name(), "CityView");
         assert!(QUERY_NAMES.contains(&Query::CityView.name()));
-        assert!(QUERY_NAMES.contains(&Query::Release.name()));
+        assert!(QUERY_NAMES.contains(&Query::NewestRelease.name()));
     }
 
     /// The query that asks npm is named for what it answers, so it

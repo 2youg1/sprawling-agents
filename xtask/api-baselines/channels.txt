@@ -673,11 +673,11 @@ pub channels::Query::Listing::at: core::option::Option<kernel::address::Address>
 pub channels::Query::McpHealth
 pub channels::Query::McpHealth::addr: kernel::address::Address
 pub channels::Query::Metrics
+pub channels::Query::NewestRelease
 pub channels::Query::Preferences
 pub channels::Query::Prefix
 pub channels::Query::Prefix::run: kernel::event::identity::RunId
 pub channels::Query::RegistryView
-pub channels::Query::Release
 pub channels::Query::Rounds
 pub channels::Query::Rounds::run: kernel::event::identity::RunId
 pub channels::Query::RunHistory

@@ -99,7 +99,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
 
 /// A function of WIRE_V and the two name tables, so any change to the
 /// protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "ec0edce8d6c76a2f93d3a8957bf92bb7fe9277d466d45dacbce9dd7c438cf510";
+const WIRE_SCHEMA_GOLDEN: &str = "b8dacc18b4a93a1663229246683eb9d24a66fe2cda9b2918aa82a4d0a923e7ad";
 
 // -------------------------------------------------------------- binding face
 
