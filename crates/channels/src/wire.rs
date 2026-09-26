@@ -140,10 +140,12 @@ use serde::{Deserialize, Serialize};
 ///    meet a variant it cannot decode.
 /// 39: `rules_changed` joins the event kinds, carrying which governing
 ///    document moved as a closed word; an older page would meet a kind
-///    it cannot decode in the history it folds. A question carries the
-///    asking side's own number, and its answer or refusal comes back
-///    under it with the ledger position it was read at.
-pub const WIRE_V: u32 = 39;
+///    it cannot decode in the history it folds.
+/// 40: a question carries the asking side's own number, and its answer
+///    or refusal comes back under it with the ledger position it was
+///    read at; an older page would send a `query` frame this build
+///    cannot read.
+pub const WIRE_V: u32 = 40;
 mod ask;
 mod query;
 
