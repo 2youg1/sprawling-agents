@@ -22,6 +22,27 @@ pub(crate) struct Heard {
     pub(crate) answers: u32,
     /// The run a dispatch started, when an [`Ending::OnRun`] saw it.
     pub(crate) run: Option<RunId>,
+    /// Whether the wait stopped on its milestone or on a silence.
+    pub(crate) watch: Watch,
+}
+
+/// How an [`Ending::OnRun`] wait stopped. A frame or a reply ending the
+/// other two endings carries no milestone, so they are `NotAsked`.
+#[derive(Clone, Copy)]
+pub(crate) enum Watch {
+    NotAsked,
+    Reached,
+    /// The quiet window closed before the run reached its milestone.
+    Unreached,
+}
+
+/// What stopped the listening loop.
+#[derive(Clone, Copy)]
+pub(super) enum Stopped {
+    /// [`Ending::ends_on`] said so.
+    OnFrame,
+    /// The quiet window closed, or the city closed the socket.
+    OnSilence,
 }
 
 /// What the city did about the frame it was sent. Exhaustive: these
@@ -36,6 +57,10 @@ pub(crate) enum Spoken {
     /// closed. Whether the city took the work is not knowable here, so
     /// this is neither of the other two.
     Quiet,
+    /// The city spoke, but the dispatched run did not reach the
+    /// milestone the caller waits on before the window closed: the run
+    /// may still be working, or may never have started.
+    Unfinished,
 }
 
 impl Heard {
@@ -119,6 +144,17 @@ impl Ending {
                     false
                 }
             },
+        }
+    }
+
+    /// How the wait stopped, as far as a run's milestone goes.
+    pub(super) fn watch(&self, stopped: Stopped) -> Watch {
+        match (self, stopped) {
+            (Self::OnReply | Self::OnQuiet, Stopped::OnFrame | Stopped::OnSilence) => {
+                Watch::NotAsked
+            }
+            (Self::OnRun { .. }, Stopped::OnFrame) => Watch::Reached,
+            (Self::OnRun { .. }, Stopped::OnSilence) => Watch::Unreached,
         }
     }
 
@@ -211,7 +247,27 @@ impl Reply {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
-    use super::{Address, Ending, Milestone, Reply, RunId};
+    use super::{Address, Ending, Heard, Milestone, Reply, RunId, Spoken, Stopped};
+
+    /// A dispatch that heard only unrelated frames before the window
+    /// closed did not see its run freeze, so it is not an answer.
+    #[test]
+    fn a_dispatch_silenced_before_its_milestone_is_unfinished() {
+        let mut ending = Ending::OnRun {
+            under: Address::parse("watchtower").unwrap(),
+            until: Milestone::Frozen,
+            run: None,
+        };
+        assert!(!ending.ends_on(&Reply::Other));
+        let heard = Heard {
+            frames: 2,
+            refusals: 0,
+            answers: 1,
+            run: ending.run(),
+            watch: ending.watch(Stopped::OnSilence),
+        };
+        assert!(matches!(heard.spoken(), Spoken::Unfinished));
+    }
 
     fn run_event(reached: Milestone, run: RunId, addr: &str) -> Reply {
         Reply::Run {

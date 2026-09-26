@@ -91,7 +91,7 @@ pub(super) fn call(args: &[String]) -> ExitCode {
             match heard.spoken() {
                 wire_client::Spoken::Refused => ExitCode::FAILURE,
                 wire_client::Spoken::Answered => ExitCode::SUCCESS,
-                wire_client::Spoken::Quiet => {
+                wire_client::Spoken::Quiet | wire_client::Spoken::Unfinished => {
                     eprintln!(
                         "nothing came back inside {quiet}ms: the city may still be working on it"
                     );

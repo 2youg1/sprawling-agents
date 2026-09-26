@@ -18,10 +18,12 @@ use kernel::consts_policy::DEFAULT_AT;
 use std::process::ExitCode;
 use std::time::Duration;
 
-/// How long a silence ends the wait when no `--quiet-ms` is given. A
-/// running dispatch streams events, so this bounds a city that stopped
-/// speaking, not a run that is slow.
-const QUIET_MS: u64 = 2_000;
+/// How long a silence ends the wait when no `--quiet-ms` is given. One
+/// model call streams nothing until it returns, and a dispatch to a
+/// building makes one to name the room before its run starts, so the
+/// window must outlast a slow call; it bounds a city that stopped
+/// speaking, and a wait it ends before the milestone exits 3.
+const QUIET_MS: u64 = 120_000;
 
 /// Sends the dispatch and prints what comes back; the exit code is the
 /// table `call` uses: 0 answered, 1 refused, 2 this command line, 3
@@ -86,6 +88,12 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
                 Spoken::Quiet => {
                     eprintln!(
                         "nothing came back inside {quiet}ms: the city may still be working on it"
+                    );
+                    ExitCode::from(3)
+                }
+                Spoken::Unfinished => {
+                    eprintln!(
+                        "the run did not reach its milestone inside {quiet}ms of silence: it may still be working; read the city's own log"
                     );
                     ExitCode::from(3)
                 }

@@ -28,7 +28,7 @@ mod ending;
 /// frame spoken on the socket, so it has its own file.
 mod enrolment;
 
-use ending::{Echo, Reply};
+use ending::{Echo, Reply, Stopped, Watch};
 pub(crate) use ending::{Ending, Heard, Milestone, Spoken};
 pub(crate) use enrolment::{enrol, split_reference};
 
@@ -147,6 +147,7 @@ async fn converse(
         refusals: 0,
         answers: 0,
         run: None,
+        watch: Watch::NotAsked,
     };
     // The greeting is answered before anything else is sent: a client
     // that shouted its command at a server which then refused the
@@ -166,15 +167,18 @@ async fn converse(
         .send(Message::Text(sending.body.as_str().into()))
         .await
         .map_err(|err| unreachable_city(at, &err.to_string()))?;
+    let mut stopped = Stopped::OnSilence;
     while let Some(text) = next_frame(&mut socket, quiet).await? {
         let reply = Reply::of(&text);
         report(&text, &reply, &sending.ending.echo(), &mut heard);
         heard.answers = heard.answers.saturating_add(1);
         if sending.ending.ends_on(&reply) {
+            stopped = Stopped::OnFrame;
             break;
         }
     }
     heard.run = sending.ending.run();
+    heard.watch = sending.ending.watch(stopped);
     // Closing rather than dropping: a city that is told the peer has
     // gone stops holding a session open for it.
     let _closed = socket.close(None).await;
