@@ -118,8 +118,24 @@ impl HotView {
     /// The runs a city view carries: every active run, and the
     /// [`RECENT_FROZEN`] frozen runs with the latest `last_seq`, in
     /// RunId order like [`HotView::runs`].
+    ///
+    /// The cut is one `select_nth_unstable` over the frozen runs'
+    /// `last_seq`, so asking costs O(runs) and never sorts.
     pub fn in_view(&self) -> impl Iterator<Item = (&RunId, &RunHot)> {
-        self.runs.iter()
+        let mut frozen: Vec<Seq> = self
+            .runs
+            .values()
+            .filter(|hot| hot.phase == RunPhase::Frozen)
+            .map(|hot| hot.last_seq)
+            .collect();
+        let oldest_shown = match frozen.len().checked_sub(RECENT_FROZEN) {
+            Some(cut) => *frozen.select_nth_unstable(cut).1,
+            None => Seq::FIRST,
+        };
+        self.runs.iter().filter(move |(_, hot)| match hot.phase {
+            RunPhase::Active => true,
+            RunPhase::Frozen => hot.last_seq >= oldest_shown,
+        })
     }
 
     pub fn get(&self, run: &RunId) -> Option<&RunHot> {

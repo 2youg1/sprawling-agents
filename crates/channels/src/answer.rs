@@ -159,6 +159,9 @@ pub struct ChosenSummary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CityAnswer {
+    /// Every active run and the most recently frozen few, in RunId
+    /// order; `frozen` minus the frozen rows here is how many older runs
+    /// the paged history holds instead.
     pub runs: Vec<RunSummary>,
     pub active: u64,
     pub frozen: u64,

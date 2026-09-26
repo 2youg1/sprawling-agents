@@ -104,10 +104,22 @@ fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
         closed.insert("completion".to_owned(), serde_json::Value::from("done"));
         let (start, end) = (2 * i + 1, 2 * i + 2);
         views
-            .apply(&view_record(start, run_of(i), EventKind::RunStarted, &room, opened))
+            .apply(&view_record(
+                start,
+                run_of(i),
+                EventKind::RunStarted,
+                &room,
+                opened,
+            ))
             .unwrap();
         views
-            .apply(&view_record(end, run_of(i), EventKind::RunFrozen, &room, closed))
+            .apply(&view_record(
+                end,
+                run_of(i),
+                EventKind::RunFrozen,
+                &room,
+                closed,
+            ))
             .unwrap();
     }
 
