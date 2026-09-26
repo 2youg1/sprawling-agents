@@ -12,7 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Address, AxCode, AxError, GoalId, Payload, PursuitState, TimeMs, Version};
+use crate::{Address, AxCode, AxError, ByteLen, GoalId, Payload, PursuitState, TimeMs, Version};
 
 /// `goal_conflict`: a goal that asked for ground another goal holds,
 /// and how far up the settling had to go.
@@ -113,6 +113,16 @@ pub struct SignalEnqueued {
 pub struct SignalConsumed {
     pub id: SignalId,
     pub by: String,
+}
+
+/// `worktree_opened`: the tree a resident was given to work a claimed
+/// node in, by name and measured size. It carries no path: an absolute
+/// path is a fact about one machine, and a history that holds one does
+/// not survive being moved to another.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorktreeOpened {
+    pub name: String,
+    pub disk_bytes: ByteLen,
 }
 
 /// Which line a signal waits in.
@@ -267,6 +277,20 @@ mod tests {
                 Some(("read the meter".to_owned(), PursuitState::Paused)),
                 None
             )
+        );
+    }
+
+    /// The bytes `memory`'s worktree lease wrote by hand: a name and a
+    /// size, and no path.
+    #[test]
+    fn a_worktree_line_writes_the_keys_the_hand_written_map_wrote() {
+        let opened = WorktreeOpened {
+            name: "node-1".to_owned(),
+            disk_bytes: ByteLen::new(6),
+        };
+        assert_eq!(
+            serde_json::to_string(&Payload::of(&opened).unwrap()).unwrap(),
+            r#"{"disk_bytes":6,"name":"node-1"}"#
         );
     }
 

@@ -424,6 +424,7 @@ impl PursuitChanged { pub fn held(self) -> Result<Option<(String, PursuitState)>
 pub struct SignalEnqueued { pub id: SignalId, pub kind: SignalKind, pub from: String, pub room: Address,
                             pub room_version: Version, pub payload: Payload, pub at: TimeMs,
                             pub lane: Option<Lane> }   // lane 写出给 collab 之外的读者，回读不采信：它由 kind 推出
+pub struct WorktreeOpened { pub name: String, pub disk_bytes: ByteLen }   // 不携路径：路径是一台机器的事实
 pub struct SignalConsumed { pub id: SignalId, pub by: String }   // 内容已在 enqueue 行里，不写第二遍
 #[serde(rename_all = "snake_case")] pub enum Lane { Urgent, Ordinary }
 pub struct SignalId(String);                       // 非空、无空白；serde 经 parse／as_str
