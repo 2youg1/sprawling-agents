@@ -189,3 +189,132 @@ fn a_closing_city_lands_the_runs_still_driving() {
         "the run in the lane was landed before the city closed"
     );
 }
+
+/// **A Cancel posted while a lane drives reaches that lane.**
+///
+/// The accounting thread reads the desk on every wake, and a lane reads
+/// it only at its safe points, so the thread nearly always saw the
+/// Cancel first and refused it as though no run answered to it. The
+/// bite is the first assertion: a refusal reached the person while the
+/// run it named was still in its model call.
+#[test]
+fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
+    use std::sync::{Arc, Mutex, mpsc};
+    const WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
+    let (arrived_tx, arrived) = mpsc::channel();
+    let (release, released) = mpsc::channel::<()>();
+    let held = Mutex::new((Some(arrived_tx), released));
+    let pace: Pace = Arc::new(move |request: &str| {
+        if !request.starts_with("POST ") {
+            return;
+        }
+        let mut held = held.lock().unwrap();
+        if let Some(arrived) = held.0.take() {
+            arrived.send(()).unwrap();
+            held.1.recv().unwrap();
+        }
+    });
+    let looking = completion_with("looking", "status", "tu_0", serde_json::json!({}));
+    let (base_url, provider) = fake_openai_paced(
+        &["m-local"],
+        Vec::new(),
+        vec![looking, completion("done", None)],
+        pace,
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let desk = Arc::new(crate::serving::CommandDesk::new());
+    let asking = Arc::clone(&desk);
+    worker.serve(only_interrupts(Arc::new(move |run| {
+        asking.interrupt_for(run)
+    })));
+    let attending = {
+        let desk = Arc::clone(&desk);
+        std::thread::spawn(move || crate::serving::attending::attend(&mut worker, &desk))
+    };
+    let key = |material: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, material);
+    desk.post(
+        channels::Command::Dispatch {
+            addr: Address::parse("lab/east").unwrap(),
+            task: "fire the east kiln".to_owned(),
+            goal: "the east kiln is fired".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: key(b"dispatch"),
+            session: None,
+            effort: None,
+        },
+        channels::Reply::nowhere(),
+    );
+    arrived.recv_timeout(WITHIN).unwrap();
+    let run = history(&report.ledger_dir)
+        .iter()
+        .find(|line| line["kind"] == "run_started")
+        .map(|line| RunId::parse(line["run"].as_str().unwrap()).unwrap())
+        .expect("the run in its model call said it started");
+
+    let heard = |into: &Arc<Mutex<Vec<AxError>>>| {
+        let told = Arc::clone(into);
+        channels::Reply::to(move |error| {
+            told.lock().unwrap().push(error);
+            channels::Delivered::ToThePeer
+        })
+    };
+    let for_the_run = Arc::new(Mutex::new(Vec::new()));
+    let for_nobody = Arc::new(Mutex::new(Vec::new()));
+    desk.post(
+        channels::Command::Cancel {
+            run,
+            idem: key(b"cancel the kiln"),
+        },
+        heard(&for_the_run),
+    );
+    // A Cancel no run answers to, posted behind it: once its refusal is
+    // back, the accounting thread has looked at everything before it.
+    desk.post(
+        channels::Command::Cancel {
+            run: RunId::CITY,
+            idem: key(b"cancel nothing"),
+        },
+        heard(&for_nobody),
+    );
+    let started = std::time::Instant::now();
+    while for_nobody.lock().unwrap().is_empty() {
+        assert!(started.elapsed() < WITHIN, "the desk was never read");
+        std::thread::sleep(std::time::Duration::from_millis(2));
+    }
+    assert_eq!(
+        *for_the_run.lock().unwrap(),
+        Vec::<AxError>::new(),
+        "a Cancel for a run in a lane is that lane's to take, not a refusal"
+    );
+
+    release.send(()).unwrap();
+    let started = std::time::Instant::now();
+    while !history(&report.ledger_dir)
+        .iter()
+        .any(|line| line["kind"] == "run_frozen")
+    {
+        assert!(started.elapsed() < WITHIN, "the run never froze");
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    desk.close();
+    attending.join().unwrap();
+    drop(provider);
+    let run = run.to_string();
+    let kinds: Vec<String> = history(&report.ledger_dir)
+        .iter()
+        .filter(|line| line["run"] == run.as_str())
+        .map(|line| line["kind"].as_str().unwrap().to_owned())
+        .collect();
+    assert!(
+        kinds.iter().any(|kind| kind == "cancel_received"),
+        "the lane took the Cancel at its next safe point: {kinds:?}"
+    );
+    assert!(
+        !kinds.iter().any(|kind| kind == "tool_result"),
+        "a cancelled run carries out no tool: {kinds:?}"
+    );
+}
