@@ -15,11 +15,9 @@
 //! over are not the package's to file, and where it points can change
 //! between this check and the landing.
 //!
-//! A package is walked by directory handles: its root is opened from
-//! its parent without following a link, and every item beneath is
-//! opened by name relative to the directory handle that listed it, so a
-//! directory swapped for a link after its judgement is outside anything
-//! the walk can open.
+//! A package is read by [`walk`], which opens every item relative to
+//! the directory handle that listed it; a resident's document has no
+//! directory to walk and is judged by its own path.
 //!
 //! The reading keeps every byte it read - one snapshot per item - and
 //! hashes exactly those bytes, so the landing writes what was judged and
@@ -30,12 +28,12 @@ use std::io::Read;
 use std::ops::Range;
 use std::path::Path;
 
-use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
-use cap_std::fs::{Dir, OpenOptions};
 use kernel::{AxCode, AxError, B3Hash};
 
 use crate::library::reading;
 use crate::library::shelf::{HOLDING_EXT, holding_name};
+
+pub(super) mod walk;
 
 /// The first bytes of a package's canonical string, so a document that
 /// happens to read like one is never taken for a package in the store.
@@ -102,36 +100,9 @@ fn unlinked(path: &Path) -> Result<Metadata, AxError> {
 }
 
 /// Reads a package whole: every item under it, in canonical order, and
-/// [`reading::SKILL_FILE`] among them as text the scan can read. Every
-/// byte is read through a chain of directory handles from the package's
-/// root, each opened without following a link.
+/// [`reading::SKILL_FILE`] among them as text the scan can read.
 fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
-    let mut found = Vec::new();
-    let mut open = vec![(open_root(dir)?, String::new())];
-    while let Some((at, prefix)) = open.pop() {
-        let listed = at
-            .entries()
-            .map_err(|err| source_io(&dir.join(&prefix), &err))?;
-        for entry in listed {
-            let entry = entry.map_err(|err| source_io(&dir.join(&prefix), &err))?;
-            let shown = dir.join(&prefix).join(entry.file_name());
-            let path = format!("{prefix}{}", reading::spelled(&shown)?);
-            let kind = entry.file_type().map_err(|err| source_io(&shown, &err))?;
-            if kind.is_symlink() {
-                return Err(refuses_link(&shown));
-            } else if kind.is_dir() {
-                open.push((
-                    open_directory(&at, &entry.file_name(), &shown)?,
-                    format!("{path}/"),
-                ));
-                found.push((path, None));
-            } else if kind.is_file() {
-                found.push((path, Some(read_file(&at, &entry.file_name(), &shown)?)));
-            } else {
-                return Err(not_a_source(&shown, "it is neither a directory nor a file"));
-            }
-        }
-    }
+    let mut found = walk::items(dir)?;
     found.sort_by(|left, right| left.0.cmp(&right.0));
     let mut stored = PACKAGE_HEADER.to_vec();
     let mut items = Vec::with_capacity(found.len());
@@ -156,53 +127,6 @@ fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
         stored,
         hash,
     })
-}
-
-/// Opens the package's root from its parent, without following a link.
-fn open_root(dir: &Path) -> Result<Dir, AxError> {
-    let Some(leaf) = dir.file_name() else {
-        return Err(not_a_source(dir, "it names no directory"));
-    };
-    let parent = dir
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."));
-    let parent = Dir::open_ambient_dir(parent, cap_std::ambient_authority())
-        .map_err(|err| source_io(dir, &err))?;
-    open_directory(&parent, leaf, dir)
-}
-
-/// Opens one directory by name relative to the handle that listed it,
-/// and refuses when what the handle holds is not a plain directory.
-fn open_directory(at: &Dir, name: &std::ffi::OsStr, shown: &Path) -> Result<Dir, AxError> {
-    let handle = at
-        .open_dir_nofollow(name)
-        .map_err(|err| source_io(shown, &err))?
-        .into_std_file();
-    let meta = handle.metadata().map_err(|err| source_io(shown, &err))?;
-    if !(meta.is_dir() && plain(&meta)) {
-        return Err(refuses_link(shown));
-    }
-    Ok(Dir::from_std_file(handle))
-}
-
-/// Reads one file by name relative to the handle that listed it,
-/// without following a link, and refuses what is not a plain file.
-fn read_file(at: &Dir, name: &std::ffi::OsStr, shown: &Path) -> Result<Vec<u8>, AxError> {
-    let mut options = OpenOptions::new();
-    options.read(true).follow(FollowSymlinks::No);
-    let mut file = at
-        .open_with(name, &options)
-        .map_err(|err| source_io(shown, &err))?
-        .into_std();
-    let meta = file.metadata().map_err(|err| source_io(shown, &err))?;
-    if !(meta.is_file() && plain(&meta)) {
-        return Err(refuses_link(shown));
-    }
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)
-        .map_err(|err| source_io(shown, &err))?;
-    Ok(bytes)
 }
 
 /// Appends one item to the canonical string: its kind, its
@@ -305,14 +229,14 @@ fn same_file(_judged: &Metadata, opened: &Metadata) -> bool {
 /// Whether an opened handle holds the item itself: on Windows, no reparse
 /// point of any kind, for the reason [`same_file`] gives.
 #[cfg(windows)]
-fn plain(opened: &Metadata) -> bool {
+pub(super) fn plain(opened: &Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
     opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0
 }
 
 #[cfg(not(windows))]
-fn plain(opened: &Metadata) -> bool {
+pub(super) fn plain(opened: &Metadata) -> bool {
     !opened.file_type().is_symlink()
 }
 
@@ -325,7 +249,7 @@ fn require_text(path: &Path, bytes: Option<&[u8]>) -> Result<(), AxError> {
     }
 }
 
-fn refuses_link(path: &Path) -> AxError {
+pub(super) fn refuses_link(path: &Path) -> AxError {
     AxError::failure(
         AxCode::InvalidArgs,
         "install a skill",
@@ -340,7 +264,7 @@ fn refuses_link(path: &Path) -> AxError {
     )
 }
 
-fn not_a_source(path: &Path, why: &str) -> AxError {
+pub(super) fn not_a_source(path: &Path, why: &str) -> AxError {
     AxError::failure(
         AxCode::InvalidArgs,
         "install a skill",
@@ -353,7 +277,7 @@ fn not_a_source(path: &Path, why: &str) -> AxError {
     ))
 }
 
-fn source_io(path: &Path, err: &std::io::Error) -> AxError {
+pub(super) fn source_io(path: &Path, err: &std::io::Error) -> AxError {
     if err.kind() == std::io::ErrorKind::NotFound {
         return AxError::failure(
             AxCode::PathNotFound,

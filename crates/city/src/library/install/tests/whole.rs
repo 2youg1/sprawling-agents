@@ -150,3 +150,46 @@ fn an_item_deep_inside_changed_before_the_landing_refuses_the_whole() {
     );
     assert!(!shelved_package(city_root.path(), "utilities", "review").exists());
 }
+
+/// `<name>.md` and `<name>/` side by side are two holdings under one
+/// name: the scan would keep whichever it met last, so the shelf state
+/// is refused rather than read as the package alone.
+#[test]
+fn a_name_held_both_as_a_document_and_as_a_package_is_refused() {
+    let city_root = tempfile::tempdir().unwrap();
+    let stage = tempfile::tempdir().unwrap();
+    let slot = Slot::library("utilities").unwrap();
+    let src = package(stage.path(), "firing", BODY);
+    let (_seen, mut register) = counted();
+    install(city_root.path(), &slot, &src, &mut register).unwrap();
+    std::fs::write(shelved(city_root.path(), "utilities", "firing"), BODY).unwrap();
+
+    let err = plan_install(city_root.path(), &slot, &src).err();
+
+    assert_eq!(
+        err.as_ref().map(|err| *err.code()),
+        Some(AxCode::InvalidArgs),
+        "two holdings under one name refuse the install: {err:?}"
+    );
+}
+
+/// A package past the size limit is refused by the lengths the handles
+/// report, before its bytes are held.
+#[test]
+fn a_package_past_the_size_limit_is_refused() {
+    let city_root = tempfile::tempdir().unwrap();
+    let stage = tempfile::tempdir().unwrap();
+    let src = package(stage.path(), "kiln", BODY);
+    std::fs::File::create(src.join("glaze.bin"))
+        .unwrap()
+        .set_len(super::super::precheck::walk::PACKAGE_BYTES_LIMIT)
+        .unwrap();
+
+    let err = plan_install(city_root.path(), &Slot::library("utilities").unwrap(), &src).err();
+
+    assert_eq!(
+        err.as_ref().map(|err| *err.code()),
+        Some(AxCode::InvalidArgs),
+        "a package past the limit is refused: {err:?}"
+    );
+}

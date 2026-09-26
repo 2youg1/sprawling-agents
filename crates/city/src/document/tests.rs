@@ -111,3 +111,28 @@ fn a_document_brings_its_directories_with_it() {
     replace(&path, b"# the task\n").unwrap();
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "# the task\n");
 }
+
+/// A tree is placed, never laid over one: a target already there is
+/// refused before anything is staged beside it, and stays as it was.
+#[test]
+fn a_tree_refused_for_a_target_already_there_stages_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("review");
+    std::fs::create_dir(&target).unwrap();
+
+    let placed = place_tree(&target, &[TreeEntry::File("SKILL.md", b"# Review\n")]);
+
+    assert_eq!(
+        placed.as_ref().map_err(|err| *err.code()),
+        Err(AxCode::StorageFatal)
+    );
+    assert_eq!(
+        std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<Vec<_>>(),
+        vec![std::ffi::OsString::from("review")],
+        "nothing is staged beside the target"
+    );
+    assert_eq!(std::fs::read_dir(&target).unwrap().count(), 0);
+}

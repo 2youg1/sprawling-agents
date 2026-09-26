@@ -297,8 +297,9 @@ pub fn install(
 /// What the shelf holds under `name`, and the refusal when the name is
 /// taken under another section - where the scan's by-name key would let
 /// two filings silently shadow each other. `<name>.md` and `<name>/` are
-/// one name, and whatever sits there is read by the same precheck as the
-/// source, so the two hashes compare like for like.
+/// one name - both at once is refused, since the scan would keep either -
+/// and whatever sits there is read by the same precheck as the source,
+/// so the two hashes compare like for like.
 fn shelf_state(slot: &Slot, city_root: &Path, name: &str) -> Result<Option<B3Hash>, AxError> {
     let root = slot.shelf.root(&CityLayout::new(city_root));
     if !root.exists() {
@@ -313,16 +314,22 @@ fn shelf_state(slot: &Slot, city_root: &Path, name: &str) -> Result<Option<B3Has
         if !plain_name(&held_under) {
             continue;
         }
-        for named in [section.join(holding_file_name(name)), section.join(name)] {
-            if let Err(err) = std::fs::symlink_metadata(&named)
-                && err.kind() == std::io::ErrorKind::NotFound
-            {
-                continue;
+        let held: Vec<_> = [section.join(holding_file_name(name)), section.join(name)]
+            .into_iter()
+            .filter(|named| {
+                !matches!(std::fs::symlink_metadata(named),
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound)
+            })
+            .collect();
+        match held.as_slice() {
+            [] => {}
+            [_, _, ..] => {
+                let file = holding_file_name(name);
+                let twice = format!("{held_under} twice, as {file} and {name}/");
+                return Err(name_taken(name, &twice));
             }
-            if held_under != slot.section {
-                return Err(name_taken(name, &held_under));
-            }
-            found = Some(inspect(&named)?.hash);
+            [_] if held_under != slot.section => return Err(name_taken(name, &held_under)),
+            [one] => found = Some(inspect(one)?.hash),
         }
     }
     Ok(found)
