@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
-import { QUERIES, createAsking, keyOf } from "./asking";
+import { HELD_CAP, QUERIES, createAsking, keyOf } from "./asking";
 import type { Reported } from "./asking";
 import type { Key } from "./lang";
 import { Address, Query } from "../wire";
@@ -197,5 +197,29 @@ describe("asking", () => {
 
     driver.pass(30_000);
     expect(driver.reports).toHaveLength(0);
+  });
+
+  // A long-lived tab visits more buildings than it keeps on screen, so
+  // what it holds is bounded: past the cap the answer used least
+  // recently and watched by nobody goes, and asking it again goes out.
+  test("past the cap the least recently used unwatched answer is dropped", () => {
+    const driver = driven();
+    const health = (at: number): Query => ({ mcp_health: { addr: Address.make(`hall/a${String(at)}`) } });
+    const fill = (from: number): void => {
+      for (let at = from; at <= HELD_CAP; at += 1) {
+        driver.ask.ask(health(at));
+        driver.ask.answered({ mcp_health: { addr: Address.make(`hall/a${String(at)}`), servers: [] } });
+      }
+    };
+    const watching = driver.ask.ask(health(0)).subscribe(() => undefined);
+    driver.ask.answered({ mcp_health: { addr: Address.make("hall/a0"), servers: [] } });
+    fill(1);
+    const sent = driver.sent.length;
+
+    driver.ask.ask(health(0));
+    expect(driver.sent, "a watched answer is never dropped").toHaveLength(sent);
+    driver.ask.ask(health(1));
+    expect(driver.sent, "the least recently used one was").toHaveLength(sent + 1);
+    watching();
   });
 });

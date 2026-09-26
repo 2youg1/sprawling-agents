@@ -21,9 +21,16 @@ import { writable } from "svelte/store";
 import type { Readable, Writable } from "svelte/store";
 
 import type { Key } from "./lang";
-import type { Address, Answer, AxCode, AxError, EventKind, EventRecord, Query, Seq } from "../wire";
+import { reachOf, reaches } from "./staleness";
+import type { Address, Answer, AxCode, AxError, EventRecord, Query, Seq } from "../wire";
 
 const PACE_MS = 250;
+
+// How many answers a page keeps. A page draws a few dozen at once; the
+// rest are what a person may come back to, and past this count the one
+// used least recently and watched by nobody is dropped, so a tab left
+// open for a week holds what it holds on the first day.
+export const HELD_CAP = 128;
 
 // How long one question may go unanswered before the page stops
 // drawing a skeleton over it. One home for the deadline: the sweep
@@ -144,76 +151,6 @@ function kindsOf(answer: Answer): readonly string[] {
   return [];
 }
 
-// What moves a provider's standing, a decision, and a building's
-// papers. Named rather than written out at the arm that reads them: a
-// set has a name a reader can hold, and the arm then states which
-// question it belongs to and nothing else.
-const PROVIDER_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "endpoint_attached", "endpoint_lost", "endpoint_probed",
-  "model_selected", "login_started", "provider_degraded",
-]);
-
-const GOVERNANCE_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "approval_resolved", "autonomy_changed", "policy_created", "policy_revoked",
-]);
-
-const BUILDING_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "building_created", "building_configured", "roadmap_claimed", "roadmap_finished",
-  "roadmap_released", "roadmap_split", "roadmap_blocked", "pursuit_changed",
-  "checkpoint_committed", "handoff_written", "run_started", "run_frozen",
-  "pr_merged", "asset_archived", "governed_document_written",
-]);
-
-// Which held answers one record makes stale.
-function staleBy(record: EventRecord, key: string, query: Query): boolean {
-  const name = nameOf(query);
-  const run = record.run;
-  const kind = record.kind;
-  switch (name) {
-    case "city_view": case "metrics":
-      return true;
-    case "rounds": case "evidence": case "run_view": case "run_history":
-      return key.includes(run);
-    case "history":
-      return true;
-    case "approval_queue":
-      return kind === "approval_requested" || kind === "approval_resolved";
-    case "governance":
-      return GOVERNANCE_MOVED.has(kind);
-    case "endpoint_view":
-      return PROVIDER_MOVED.has(kind);
-    case "inbox_view":
-      return kind === "signal_enqueued" || kind === "signal_consumed";
-    case "discard_view":
-      return kind === "file_discarded" || kind === "discard_restored";
-    case "registry_view":
-      return kind === "asset_archived";
-    case "cost_view": case "cost_of":
-      return kind === "model_returned" || kind === "roadmap_claimed";
-    // A prompt is frozen once for the life of a run and the object
-    // behind a hash never changes, so neither answer can go stale.
-    case "prefix": case "content":
-      return false;
-    // A shelf moves when somebody edits the building's rules, and a
-    // pin appears when a run starts under them.
-    case "skills":
-      return kind === "building_configured" || kind === "run_started";
-    // The working tree moves whenever a wave writes, and every wave
-    // ends in a fence.
-    case "git_status":
-      return kind === "checkpoint_committed" || kind === "pr_merged";
-    // Only the newest page can grow: an older page is bounded above by
-    // a seq already written, and a commit's lineage walks backwards
-    // from the run that made it, so a later successor never changes it.
-    case "commits":
-      return (kind === "checkpoint_committed" || kind === "pr_merged") && key.includes("\"before\":null");
-    case "building_view": case "listing": case "document": case "archive_search":
-      return BUILDING_MOVED.has(kind);
-    default:
-      return false;
-  }
-}
-
 export interface Asking {
   // The answer to one question, as a store: `undefined` until the first
   // answer lands. Subscribing counts as watching; a watched answer is
@@ -239,6 +176,9 @@ export function createAsking(
   const held = new Map<string, Held>();
   const pending: Pending[] = [];
   const parsed = new Map<string, Query>();
+  // The keys held under each question name: a record is judged once per
+  // name rather than once per held answer.
+  const byName = new Map<string, Set<string>>();
   // One patience timer for the whole queue: the clock says which
   // questions are late, so a timer each would only be one more thing
   // to cancel.
@@ -299,7 +239,12 @@ export function createAsking(
   function slotFor(query: Query): [string, Held] {
     const key = keyOf(query);
     const found = held.get(key);
-    if (found !== undefined) return [key, found];
+    if (found !== undefined) {
+      // Re-inserted, so the map's order is the order of last use.
+      held.delete(key);
+      held.set(key, found);
+      return [key, found];
+    }
     const slot: Held = {
       value: writable<Answer | undefined>(undefined),
       reported: false,
@@ -310,7 +255,25 @@ export function createAsking(
     };
     held.set(key, slot);
     parsed.set(key, query);
+    const name = nameOf(query);
+    const named = byName.get(name) ?? new Set<string>();
+    byName.set(name, named.add(key));
+    if (held.size > HELD_CAP) dropLeastRecent();
     return [key, slot];
+  }
+
+  // A slot somebody watches, or one still waiting on its answer or its
+  // pace timer, stays: dropping it would strand a subscriber or leave an
+  // answer with nowhere to land.
+  function dropLeastRecent(): void {
+    for (const [key, slot] of held) {
+      if (slot.watchers > 0 || slot.inflight || slot.timer !== null) continue;
+      held.delete(key);
+      const query = parsed.get(key);
+      parsed.delete(key);
+      if (query !== undefined) byName.get(nameOf(query))?.delete(key);
+      return;
+    }
   }
 
   // The public face of one slot: subscribing is what makes an answer
@@ -373,11 +336,16 @@ export function createAsking(
   }
 
   function invalidate(record: EventRecord): void {
-    for (const [key, slot] of held) {
-      const query = parsed.get(key);
-      if (query === undefined || !staleBy(record, key, query)) continue;
-      slot.stale = true;
-      if (slot.watchers > 0) schedule(key, query, slot);
+    for (const [name, keys] of byName) {
+      const reach = reachOf(name, record.kind);
+      if (reach === "none") continue;
+      for (const key of keys) {
+        const slot = held.get(key);
+        const query = parsed.get(key);
+        if (slot === undefined || query === undefined || !reaches(reach, key, record.run)) continue;
+        slot.stale = true;
+        if (slot.watchers > 0) schedule(key, query, slot);
+      }
     }
   }
 
