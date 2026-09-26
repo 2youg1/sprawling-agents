@@ -112,3 +112,18 @@ export function producedOf(files: readonly FileChange[]): Produced {
   }
   return { files: files.length, added, removed };
 }
+
+// How recent a row of the results city is. The list is read by time,
+// newest first, and cut where a person's sense of "just now" changes:
+// the last ten minutes, the last hour, everything before.
+export type Recency = "minutes" | "hour" | "earlier";
+export const RECENCIES: readonly Recency[] = ["minutes", "hour", "earlier"];
+
+export interface Band {
+  readonly recency: Recency;
+  readonly runs: readonly RunBelief[];
+}
+
+export function bandsOf(_runs: readonly RunBelief[], _now: number): readonly Band[] {
+  return [];
+}

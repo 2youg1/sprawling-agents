@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import type { RunBelief } from "./belief/shape";
 import type { Doing } from "./doing";
 import { adopted } from "./belief";
-import { FIRST, drawsCalls, outcomeOf, producedOf, resultsOf } from "./results";
+import { FIRST, bandsOf, drawsCalls, outcomeOf, producedOf, resultsOf } from "./results";
 import { RunId, Seq, TimeMs } from "../wire";
 
 // The fixture city of the contract: two hundred runs, forty of each of
@@ -88,5 +88,20 @@ describe("the produced line", () => {
         { path: "c.png", how: { renamed: { from: "d.png" } }, lines: "binary" },
       ]),
     ).toEqual({ files: 3, added: 13, removed: 1 });
+  });
+});
+
+describe("the results city's recency bands", () => {
+  test("cuts the rows at ten minutes and at an hour, newest first, and leaves an empty band out", () => {
+    const now = 100 * 60_000;
+    const aged = (index: number, minutes: number | null): RunBelief => ({
+      ...runAt(index),
+      started: minutes === null ? null : TimeMs.make(now - minutes * 60_000),
+    });
+    const bands = bandsOf([aged(1, 90), aged(2, 3), aged(3, null), aged(4, 9), aged(5, 61)], now);
+    expect(bands.map((band) => [band.recency, band.runs.map((run) => run.task)])).toEqual([
+      ["minutes", ["task 2", "task 4"]],
+      ["earlier", ["task 5", "task 1", "task 3"]],
+    ]);
   });
 });
