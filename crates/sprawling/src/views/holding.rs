@@ -313,6 +313,9 @@ impl Views {
         reason = "a few kinds change what a room holds; the rest of the event vocabulary does not"
     )]
     pub(crate) fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        // Before the first change, so an overflow leaves nothing half
+        // folded.
+        let next_unfolded = record.seq().next()?;
         self.head = Some(record.seq());
         self.hot
             .apply(record)
@@ -334,7 +337,7 @@ impl Views {
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
         accounting::plan_view::PlanView::take_back(&self.plans).apply(record);
         self.events = self.events.saturating_add(1);
-        self.next_unfolded = record.seq().next()?;
+        self.next_unfolded = next_unfolded;
         match record.kind() {
             EventKind::CityInitialized => {
                 self.city = record.addr().cloned();
@@ -347,7 +350,7 @@ impl Views {
                 let taken = record
                     .data()
                     .read::<kernel::event::record::SignalConsumed>()?;
-                if let Some(queue) = record.addr().and_then(|room| self.waiting.get_mut(room)) {
+                for queue in self.waiting.values_mut() {
                     queue.retain(|held| held.id != taken.id.as_str());
                 }
             }
