@@ -13,6 +13,11 @@
 # with a second state, and this repository does not keep two authorities
 # for one thing.
 #
+# Every entry's commit prefix is `card-S0.DEPS`, a card reserved for
+# dependency bumps: Dependabot adds `: ` after a prefix that ends in a
+# letter, so its subjects pass the commit-message check in ci.yml
+# (xtask-SPEC.md section 8-35) under the same rule as any other commit.
+#
 # Transitive dependencies ride the weekly cadence: nobody designed them in,
 # and a weekly grouped PR is cheap to review while a daily transitive bump
 # would be noise.
@@ -35,7 +40,7 @@ updates:
       interval: daily
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "card-S0.DEPS"
     groups:
       actions:
         patterns: ["*"]
@@ -51,7 +56,7 @@ updates:
       - dependency-type: direct
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "card-S0.DEPS"
     groups:
       patch-and-minor:
         update-types: ["patch", "minor"]
@@ -67,7 +72,7 @@ updates:
       - dependency-type: indirect
     open-pull-requests-limit: 10
     commit-message:
-      prefix: "deps"
+      prefix: "card-S0.DEPS"
     groups:
       patch-and-minor:
         update-types: ["patch", "minor"]

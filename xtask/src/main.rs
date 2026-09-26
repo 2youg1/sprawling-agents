@@ -25,6 +25,7 @@ mod budget;
 mod bundle;
 mod channel;
 mod color;
+mod commits;
 mod depmap;
 mod docnum;
 mod gates;
@@ -204,6 +205,13 @@ fn main() -> ExitCode {
         Some("npm") => report::finish("npm", npm::check(&root)),
         Some("depmap") => report::finish("depmap", depmap::check(&root)),
         Some("guard") => report::finish("guard", guard::check(&root)),
+        Some("commits") => match value_arg(&args, "--range") {
+            Some(range) => report::finish("commits", commits::check(&root, &range)),
+            None => {
+                usage();
+                ExitCode::from(2)
+            }
+        },
         Some("release") => report::finish("release", release::check(&root)),
         Some("spec") => match spec::run(&root, args.get(1).map(String::as_str)) {
             Ok(message) => {
@@ -267,7 +275,7 @@ struct Tool {
 /// Everything `cargo xtask` answers that is not a gate, plus the flags
 /// that change what a gate does. The dispatcher above and this array are
 /// read together, so a command that grows a flag is printed with it.
-const TOOLS: [Tool; 12] = [
+const TOOLS: [Tool; 13] = [
     Tool {
         call: "gates [<gate>...]",
         gives: "every gate, or only the named ones",
@@ -287,6 +295,10 @@ const TOOLS: [Tool; 12] = [
     Tool {
         call: "proof --list",
         gives: "the kani harness roster, read from the `#[kani::proof]` attributes",
+    },
+    Tool {
+        call: "commits --range <base>..<tip>",
+        gives: "every commit subject and ruling trailer in that range, judged",
     },
     Tool {
         call: "spec <crate>",

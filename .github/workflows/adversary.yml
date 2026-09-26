@@ -60,31 +60,7 @@ jobs:
           rustup show
           cargo build -p sprawling --locked
 
-      # The toolchain is the only thing downloaded, and `lean-toolchain` pins
-      # which one, so the key is that file and nothing else. Build output is
-      # deliberately not cached: it takes seconds to produce and a stale entry
-      # would be a red nobody could reproduce.
-      - uses: actions/cache@v6
-        with:
-          path: ~/.elan
-          key: adversary-${{ runner.os }}-elan-${{ hashFiles('adversary/lean-toolchain') }}
-
-      - name: install the toolchain the checker is written in
-        run: |
-          if [ ! -x "$HOME/.elan/bin/elan" ]; then
-            curl -fsSL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
-            sh elan-init.sh -y --default-toolchain none
-          fi
-          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-
-      # Named rather than left to happen inside the build, so a download that
-      # fails says so where a reader is looking, and so the cache above saves a
-      # toolchain that is already whole.
-      - name: fetch the pinned toolchain
-        working-directory: adversary
-        run: |
-          elan toolchain install "$(cat lean-toolchain)"
-          lake --version
+      - uses: ./.github/actions/lean
 
       - name: build the checker
         working-directory: adversary

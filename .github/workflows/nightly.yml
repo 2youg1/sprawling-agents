@@ -204,6 +204,38 @@ jobs:
           path: target/autoharness/report.txt
           if-no-files-found: warn
 
+  # A real endpoint, spoken to over the network with a real key: the world
+  # outside this repository again, since a provider changes its wire, its
+  # models and its limits at a time of its choosing. `just e2e` passes with
+  # one line where the credentials are absent, which is right at a desk;
+  # here they are configured, so `SPRAWLING_E2E_REQUIRED=1` turns a missing
+  # one into a red that names it rather than a skip that reads like a pass
+  # (sprawling-SPEC.md, the e2e acceptance gate). The key is a repository
+  # secret; the base URL, the model and the dialect are repository
+  # variables, because none of them is a credential.
+  e2e:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      SPRAWLING_E2E_REQUIRED: "1"
+      SPRAWLING_E2E_BASE_URL: ${{ vars.SPRAWLING_E2E_BASE_URL }}
+      SPRAWLING_E2E_MODEL: ${{ vars.SPRAWLING_E2E_MODEL }}
+      SPRAWLING_E2E_DIALECT: ${{ vars.SPRAWLING_E2E_DIALECT }}
+      SPRAWLING_E2E_KEY: ${{ secrets.SPRAWLING_E2E_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: e2e
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - name: the acceptance gate for a real endpoint
+        run: just e2e
+
   # Advisories and yanked versions: the one check in this repository whose
   # input is written by other people at a time of their choosing. On a
   # pull request it would turn a change red for a reason its author cannot

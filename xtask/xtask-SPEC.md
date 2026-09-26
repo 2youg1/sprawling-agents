@@ -859,3 +859,15 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 找不到执行 `gh release create` 的 job，本身就是一条发现，而不是「没什么可判」：静默通过会让整条规则随一次改名消失。
 
 **不判的**：证明是否真的上传成功、`gh attestation verify` 能否通过——那要一次真实的 tag 推送，由发布流水线自己在服务端失败。
+
+### 8-35 `xtask::commits`：一段提交范围里每条提交信息的主题与裁决尾注（形状 1 判定）
+
+**要判的事实**：AGENTS.md「Commits」一节的两条可机判的规则。其一，主题行匹配 `^card-S\d+\.[0-9A-Z]+: `，即 `card-`、`S`、至少一位数字、`.`、至少一个数字或大写字母，再接冒号与一个空格。其二，以 `Verdict:` 开头的行只能逐字是 `Verdict: user-approved`；拼错的裁决尾注读起来像一次裁决，实际上谁也没裁。
+
+**不是门**：门判树，不判历史（§8-6 与 `guard.rs` 的模块文档记着原因：读历史会让每次门运行依赖调用者传的范围）。故这是一条子命令 `cargo xtask commits --range <base>..<tip>`，由 `just commits <range>` 调用，CI 的 `fast` 作业在拉取请求上传 `base..head`、在推送上传 `before..after`。
+
+**接口**：`pub(crate) fn check(root: &Path, range: &str) -> Result<Vec<Violation>, XtaskError>` 跑 `git log --no-merges --format=%H%x1f%B%x1e <range>`，逐条交给纯函数 `fn findings(message: &str) -> Vec<String>`；每条违规的 `location` 是提交的短哈希。失败：git 起不来或返回非零时为 `XtaskError::Cmd`，缺 `--range` 时 main 打印用法并以 2 退出。
+
+**合并提交不判**：合并提交不带自己的改动，它的主题由 git 或托管平台生成（`Merge branch …`、`Merge pull request …`），要求它带卡号只会让每次合并都红，而它合进来的每条非合并提交照样被判。Dependabot 的提交由 `.github/dependabot.yml` 的 `commit-message.prefix` 定为 `card-S0.DEPS`，Dependabot 在以字母结尾的前缀后自己补 `: `，所以它的主题也落在同一条规则里，不另开豁免。
+
+**败给的方案**：写成第 21 道门并在门里读 `--range`。门名册是树的判定，`just check` 在本地不带范围跑它；一道只在带范围时才判东西的门，在本地永远绿，正是「CI 里有、本地没有」的检查。
