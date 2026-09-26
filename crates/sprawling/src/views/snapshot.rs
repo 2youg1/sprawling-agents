@@ -7,9 +7,12 @@
 
 use std::path::Path;
 
+use std::sync::{Arc, Mutex};
+
 use kernel::{AxCode, AxError, B3Hash, Seq};
 
 use super::Views;
+use crate::plan_view::PlanView;
 
 /// Changed whenever a fold rule or the encoding of `Views` changes within
 /// one version of this binary; a new version discards every snapshot
@@ -31,6 +34,23 @@ pub(super) fn fresh_index() -> std::sync::Arc<std::sync::Mutex<memory::LedgerInd
     std::sync::Arc::new(std::sync::Mutex::new(memory::LedgerIndex::empty()))
 }
 
+/// The plan cache as a snapshot holds it: the cache itself, not the lock
+/// the two copies of the views share it through (sprawling-SPEC.md 8-93).
+pub(super) fn encode_plans<S: serde::Serializer>(
+    plans: &Arc<Mutex<PlanView>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serde::Serialize::serialize(&*PlanView::take_back(plans), serializer)
+}
+
+/// The plan cache `encode_plans` wrote, behind a lock of its own.
+pub(super) fn decode_plans<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Arc<Mutex<PlanView>>, D::Error> {
+    <PlanView as serde::Deserialize>::deserialize(deserializer)
+        .map(|plans| Arc::new(Mutex::new(plans)))
+}
+
 impl Views {
     /// The folded state, without the fields `Views::new` rebuilds.
     ///
@@ -42,6 +62,25 @@ impl Views {
                 .with_recovery(
                     "restart the server; the views fold from the ledger without a snapshot",
                 )
+        })
+    }
+
+    /// A second copy of these views, folded to the same record and sharing
+    /// their ledger index and plan cache, for the fold thread to alternate
+    /// with (sprawling-SPEC.md 8-93). Made through the encoding a snapshot
+    /// holds, which carries every folded field, so the copy starts where
+    /// this one stands without the history being read again.
+    ///
+    /// # Errors
+    /// Those of [`Views::encode`] and [`Views::decode`].
+    pub(crate) fn twin(&self) -> Result<Views, AxError> {
+        let copy = Views::decode(&self.city_root, &self.encode()?)?;
+        Ok(Views {
+            index: Arc::clone(&self.index),
+            plans: Arc::clone(&self.plans),
+            machine: self.machine.clone(),
+            vault: self.vault.clone(),
+            ..copy
         })
     }
 

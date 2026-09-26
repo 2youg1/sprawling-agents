@@ -282,6 +282,7 @@ fn status_reports_the_count_of_the_call_that_asked() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };

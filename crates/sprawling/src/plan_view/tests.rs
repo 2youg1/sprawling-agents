@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use kernel::{EventDraft, GENESIS_PREV, Payload, RunId, Seq, TimeMs};
+use kernel::{EventDraft, EventKind, GENESIS_PREV, Payload, RunId, Seq, TimeMs};
 
 const PLAN: &str = "\
 | # | Item | Weight | Needs | Status | Evidence |
@@ -27,11 +27,15 @@ fn addr() -> Address {
 }
 
 fn record(kind: EventKind, data: serde_json::Value) -> EventRecord {
+    record_in("lab/room1", kind, data)
+}
+
+fn record_in(addr: &str, kind: EventKind, data: serde_json::Value) -> EventRecord {
     let draft = EventDraft {
         run: RunId::CITY,
         t: TimeMs::new(0),
         who: "mason@lab.1".into(),
-        addr: Some(Address::parse("lab/room1").unwrap()),
+        addr: Some(Address::parse(addr).unwrap()),
         kind,
         data: Payload::new(data.as_object().unwrap().clone()).unwrap(),
         ig: false,
@@ -236,4 +240,85 @@ fn every_event_kind_has_a_reach() {
         ],
         "these kinds move a plan and every other kind leaves it where it was"
     );
+}
+
+/// A plan read with the cache released is not put back when a record
+/// moved it in the meantime: the file on disk has changed, and the
+/// cache would go on answering with the table it replaced.
+#[test]
+fn a_plan_read_before_a_record_moved_it_is_not_put_back() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    let (_, fresh) = view.ask(&addr()).read(dir.path(), &addr());
+
+    std::fs::write(dir.path().join("lab").join("Roadmap.md"), "gone").unwrap();
+    view.apply(&record(
+        EventKind::RoadmapSplit,
+        serde_json::json!({"node": "1", "by": "mason@lab.1"}),
+    ));
+    view.remember(fresh.unwrap());
+
+    assert!(
+        view.of(dir.path(), &addr()).rows.is_empty(),
+        "the stale read was put back"
+    );
+}
+
+/// The per-building generations stay bounded however many buildings a
+/// city names, and a read asked for before they were forgotten is still
+/// refused when its building moves again: its own count restarts from
+/// zero and would otherwise match the one the read was asked at.
+#[test]
+fn the_generations_held_stay_bounded_and_refuse_the_reads_they_forget() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    let split = serde_json::json!({"node": "1", "by": "mason@lab.1"});
+    view.apply(&record(EventKind::RoadmapSplit, split.clone()));
+    let (_, fresh) = view.ask(&addr()).read(dir.path(), &addr());
+    for n in 0..GENERATIONS_HELD {
+        view.apply(&record_in(
+            &format!("b{n}"),
+            EventKind::RoadmapSplit,
+            split.clone(),
+        ));
+    }
+    view.apply(&record(EventKind::RoadmapSplit, split));
+    let asked = fresh.unwrap();
+    let refused = view.generation(&asked.addr) != asked.asked_at;
+
+    assert_eq!(
+        (view.moved.len() <= GENERATIONS_HELD, refused),
+        (true, true),
+        "the generations grew past their bound"
+    );
+}
+
+/// A panic under the plan lock loses no stop cause: the next holder
+/// takes the cache back, drops the readings the panic may have torn,
+/// and the red node still carries the sentence its record gave.
+#[test]
+fn a_poisoned_plan_cache_is_taken_back_with_its_causes() {
+    let dir = city(PLAN);
+    let shared = std::sync::Arc::new(Mutex::new(PlanView::default()));
+    shared.lock().unwrap().apply(&record(
+        EventKind::RoadmapBlocked,
+        serde_json::json!({
+            "node": "1", "by": "mason@lab.1",
+            "why": {"blocked": {"note": "the quarry is shut"}}
+        }),
+    ));
+    let held = std::sync::Arc::clone(&shared);
+    let _ = std::thread::spawn(move || {
+        let _guard = held.lock().unwrap();
+        panic!("a reader panics while it holds the plans");
+    })
+    .join();
+    assert!(shared.is_poisoned());
+
+    let read = plans_of(&shared, dir.path(), BTreeSet::from([addr()]));
+    assert_eq!(
+        read[&addr()].blocked[0].line,
+        "branch 1 is stuck at 1: the quarry is shut"
+    );
+    assert!(!shared.is_poisoned(), "the cache is taken back");
 }

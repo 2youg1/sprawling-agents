@@ -297,7 +297,7 @@ fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
     let channels::Answer::Rounds(answer) = views.answer(&channels::Query::Rounds { run }) else {
         panic!("Rounds answers with rounds");
     };
-    let records = views.records_of(run);
+    let records = views.ledger_ask().records_of(run);
     assert_eq!(answer.run, run);
     assert_eq!(
         answer.turns,

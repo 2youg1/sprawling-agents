@@ -10,10 +10,10 @@
 use kernel::{EventRecord, UsdMicros};
 
 use crate::assembly::ledger_dir;
-use crate::views::holding::Views;
 use crate::views::lines::summarize;
+use crate::views::prepared::LedgerAsk;
 
-impl Views {
+impl LedgerAsk {
     /// A bounded slice of the one history, ending just before `before`
     /// or at the tail.
     ///
@@ -21,8 +21,8 @@ impl Views {
     /// records would be a second copy of the only history, and the index
     /// already maps a sequence to a byte offset. An unreadable line ends
     /// the slice rather than emptying it - what was read is still true.
-    pub(super) fn history(
-        &mut self,
+    pub(in crate::views) fn history(
+        &self,
         before: Option<kernel::Seq>,
         limit: u32,
     ) -> channels::HistoryAnswer {
@@ -86,8 +86,8 @@ impl Views {
     /// It also ends the walk, so `next` says nothing more can be asked
     /// for - the gaps the Ledger really has are not ranges this can fill,
     /// and a cursor pointing past one would have the page ask for ever.
-    pub(super) fn history_range(
-        &mut self,
+    pub(in crate::views) fn history_range(
+        &self,
         from: kernel::Seq,
         to: kernel::Seq,
         limit: u32,
@@ -153,8 +153,8 @@ impl Views {
     /// answer is delivered in and the order the cursor walks without a
     /// seek. A line that will not read ends the slice rather than
     /// emptying it - what was read is still true.
-    pub(super) fn run_history(
-        &mut self,
+    pub(in crate::views) fn run_history(
+        &self,
         run: kernel::RunId,
         before: Option<kernel::Seq>,
         limit: u32,
@@ -205,10 +205,7 @@ impl Views {
     ///
     /// `None` when the records cannot be read: an evicted run always has
     /// some, so the caller answers that it could not look.
-    pub(in crate::views) fn recalled(
-        &mut self,
-        run: kernel::RunId,
-    ) -> Option<channels::RunSummary> {
+    pub(in crate::views) fn recalled(&self, run: kernel::RunId) -> Option<channels::RunSummary> {
         let mut alone = memory::HotView::new();
         self.fold_recalled(run, |record| alone.apply(record))?;
         alone.get(&run).map(|hot| summarize(run, hot))
@@ -218,7 +215,7 @@ impl Views {
     /// from its own records through a `memory::Attribution` holding it
     /// alone, so the cold side prices by the same rule as the hot one.
     /// `None` when the records cannot be read.
-    pub(in crate::views) fn recalled_bill(&mut self, run: kernel::RunId) -> Option<UsdMicros> {
+    pub(in crate::views) fn recalled_bill(&self, run: kernel::RunId) -> Option<UsdMicros> {
         let mut alone = memory::Attribution::new();
         self.fold_recalled(run, |record| alone.apply(record))?;
         Some(alone.billed_to(&run).unwrap_or_default())
@@ -228,7 +225,7 @@ impl Views {
     /// the index names them, so the work is the run's records alone.
     /// `None` when a line cannot be read or `apply` refuses it.
     fn fold_recalled(
-        &mut self,
+        &self,
         run: kernel::RunId,
         mut apply: impl FnMut(&EventRecord) -> Result<(), memory::MemoryError>,
     ) -> Option<()> {

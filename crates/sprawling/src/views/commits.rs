@@ -93,7 +93,7 @@ impl super::holding::Views {
     /// filter makes the count meaningless. `None` when a row's run was
     /// evicted and its records could not be read.
     pub(super) fn commits_answer(
-        &mut self,
+        &self,
         building: Option<&Address>,
         before: Option<Seq>,
         limit: u32,
@@ -140,7 +140,7 @@ impl super::holding::Views {
     /// A commit this city never wrote is `Unavailable`, for the reason
     /// `Changes` gives: "I did not write it" and "it changed nothing"
     /// are different answers, and a reader acts differently on each.
-    pub(super) fn commit_answer(&mut self, oid: GitOid) -> channels::Answer {
+    pub(super) fn commit_answer(&self, oid: GitOid) -> channels::Answer {
         let unavailable = || channels::Answer::Unavailable {
             query: format!("Commit({oid})"),
         };

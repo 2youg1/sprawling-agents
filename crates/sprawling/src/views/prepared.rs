@@ -4,18 +4,21 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The second half of a query that reads the disk, git or the network:
-//! what `Views::prepare` copied out under the view lock, and the read
-//! [`Prepared::finish`] does once the lock is released.
+//! what `Views::prepare` copied out of a snapshot of the views, and the
+//! read [`Prepared::finish`] does once the snapshot is let go.
 //!
 //! Apart from `answering` because the two change for different reasons:
 //! that module decides what a query takes while the fold waits, and this
 //! one how the read is done while it does not.
 
+use std::collections::BTreeSet;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
-use kernel::{Address, GitOid, Locator};
+use kernel::{Address, GitOid, Locator, RunId, Seq};
 
 use super::archives::search_archives;
+use super::city::CityAsk;
 use super::document::document_answer;
 use super::git_status::GitStatusAsk;
 use super::hunks::hunks_answer;
@@ -25,7 +28,7 @@ use super::listing::listing_answer;
 use super::prefix::{PrefixAsk, content_answer};
 use super::skills::{SkillPins, skills_answer};
 use crate::assembly::read_building;
-use crate::plan_view::PlanAsk;
+use crate::plan_view::{PlanView, plans_of};
 
 /// The answer to a question this city could not look up.
 ///
@@ -37,9 +40,18 @@ pub(super) fn unavailable(query: String) -> channels::Answer {
     channels::Answer::Unavailable { query }
 }
 
-/// A query's answer split at the view lock: what the views settled while
-/// held, or the small data a read of the disk, git or network needs,
-/// copied out so that read can run with the lock released.
+/// What a read of now - a tool server's handshake, the broker's shelf -
+/// needs from the views, copied out so the read runs with the snapshot
+/// let go.
+pub(crate) struct LiveAsk {
+    pub(super) city_root: PathBuf,
+    pub(super) city: Option<Address>,
+    pub(super) vault: Option<Arc<Mutex<gateway::Custodian>>>,
+}
+
+/// A query's answer split at the snapshot: what the views settled while
+/// it was held, or the small data a read of the disk, git or network
+/// needs, copied out so that read runs with the snapshot let go.
 pub(crate) enum Prepared {
     /// Answered from the views alone.
     Held(channels::Answer),
@@ -78,6 +90,12 @@ pub(crate) enum Prepared {
         building: Address,
         pins: SkillPins,
     },
+    /// Where each tool server one address reaches stands: the
+    /// configuration read and every handshake run after the snapshot
+    /// is let go, because a handshake waits up to its patience.
+    McpHealth { live: LiveAsk, addr: Address },
+    /// The broker's shelf, read after the snapshot is let go.
+    Toolkits(LiveAsk),
     /// The vital signs: every figure the fold holds, and the building
     /// count, which only the directory can give, still to read.
     Metrics {
@@ -91,24 +109,91 @@ pub(crate) enum Prepared {
     },
     /// The head of one file.
     Document { city_root: PathBuf, at: Address },
-    /// One building's directory, beside its plan: described from the
-    /// cache, or still to read.
+    /// Every building's progress and every pursuit's verdict, with the
+    /// buildings still to list and their plans still to read.
+    City(CityAsk),
+    /// One building's directory and its plan.
     Building {
         city_root: PathBuf,
         addr: Address,
-        plan: PlanAsk,
+        plans: Arc<Mutex<PlanView>>,
     },
     /// The prompt one run was frozen with: a ledger line and the store.
     Prefix(PrefixAsk),
+    /// A bounded slice of the history ending before a cursor.
+    History {
+        ledger: LedgerAsk,
+        before: Option<Seq>,
+        limit: u32,
+    },
+    /// One named range of the history.
+    HistoryRange {
+        ledger: LedgerAsk,
+        from: Seq,
+        to: Seq,
+        limit: u32,
+    },
+    /// One run's own records ending before a cursor.
+    RunHistory {
+        ledger: LedgerAsk,
+        run: RunId,
+        before: Option<Seq>,
+        limit: u32,
+    },
+    /// One run's records, folded into the rounds a person reads.
+    Rounds { ledger: LedgerAsk, run: RunId },
+    /// Every locator one run left behind.
+    Evidence { ledger: LedgerAsk, run: RunId },
+    /// The summary of a run the hot view evicted, folded from its own
+    /// records in the Ledger.
+    Recalled { ledger: LedgerAsk, run: RunId },
+}
+
+/// The ledger as a history reader carries it out of the snapshot: where
+/// it lives, and its index, which has a lock of its own that only
+/// readers wait on (sprawling-SPEC.md 8-92).
+pub(crate) struct LedgerAsk {
+    pub(super) city_root: PathBuf,
+    pub(super) index: Arc<Mutex<memory::LedgerIndex>>,
 }
 
 impl Prepared {
-    /// Does the read the views left for after the lock, and answers.
+    /// Does the read the views left for after the snapshot, and answers.
     pub(crate) fn finish(self) -> channels::Answer {
         match self {
             Self::Held(answer) => answer,
             Self::GitStatus(ask) => ask.read(),
             Self::Prefix(ask) => ask.read(),
+            Self::City(ask) => ask.read(),
+            Self::History {
+                ledger,
+                before,
+                limit,
+            } => channels::Answer::History(Box::new(ledger.history(before, limit))),
+            Self::HistoryRange {
+                ledger,
+                from,
+                to,
+                limit,
+            } => channels::Answer::HistoryRange(Box::new(ledger.history_range(from, to, limit))),
+            Self::RunHistory {
+                ledger,
+                run,
+                before,
+                limit,
+            } => channels::Answer::History(Box::new(ledger.run_history(run, before, limit))),
+            Self::Rounds { ledger, run } => {
+                channels::Answer::Rounds(Box::new(ledger.rounds_answer(run)))
+            }
+            Self::Evidence { ledger, run } => {
+                channels::Answer::Evidence(ledger.evidence_answer(run))
+            }
+            // An evicted run always has records in the Ledger, so a
+            // recall that cannot read them is "I could not look".
+            Self::Recalled { ledger, run } => match ledger.recalled(run) {
+                Some(summary) => channels::Answer::Run(Some(summary)),
+                None => unavailable(format!("RunView({run})")),
+            },
             // A settings file that cannot be read is "I could not
             // look", not an empty set of preferences.
             Self::Preferences => match crate::person::read() {
@@ -139,8 +224,11 @@ impl Prepared {
             Self::Building {
                 city_root,
                 addr,
-                plan,
-            } => match read_building(&city_root, &addr, plan.read(&city_root, &addr)) {
+                plans,
+            } => match plans_of(&plans, &city_root, BTreeSet::from([addr.clone()]))
+                .remove(&addr)
+                .and_then(|plan| read_building(&city_root, &addr, plan))
+            {
                 Some(answer) => channels::Answer::Building(Box::new(answer)),
                 // A building nobody raised is not an empty building. The
                 // page needs to be able to tell those apart.
@@ -187,6 +275,10 @@ impl Prepared {
             // A count that cannot be expressed is reported as the largest
             // count this wire can carry, for the reason every figure of
             // `Views::metrics` is.
+            Self::McpHealth { live, addr } => {
+                channels::Answer::McpHealth(Box::new(live.mcp_health_answer(&addr)))
+            }
+            Self::Toolkits(live) => channels::Answer::Toolkits(Box::new(live.toolkits_answer())),
             Self::Metrics { city_root, held } => {
                 channels::Answer::Metrics(Box::new(channels::MetricsAnswer {
                     buildings: u64::try_from(buildings_of(&city_root).len()).unwrap_or(u64::MAX),

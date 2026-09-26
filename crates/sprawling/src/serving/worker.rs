@@ -26,31 +26,23 @@ use super::output_ring::OutputRing;
 use super::serve::Opening;
 use super::serve::Serving;
 use crate::assembly::{Closing, acp_dispatch, ledger_dir, start_served_views};
-use crate::views::{Views, answer_outside_the_lock};
+use crate::views::{Published, answer_outside_the_lock};
 
 /// One recording in, one line of text back.
 ///
-/// The choice of endpoint is read from the city's own state under its
-/// lock, and the provider round trip happens after that lock is gone: a
-/// call that takes ten seconds must not hold the answer to every other
-/// read for ten seconds.
+/// The choice of endpoint is read from a snapshot of the city's own
+/// state, and the provider round trip happens after that snapshot is let
+/// go: a call that takes ten seconds must not keep a retired copy of the
+/// views from the fold for ten seconds.
 fn hearing(
-    views: Arc<std::sync::Mutex<Views>>,
+    views: Arc<Published>,
     vault: Arc<std::sync::Mutex<gateway::Custodian>>,
 ) -> channels::TranscribeSink {
     Arc::new(move |bytes: Vec<u8>, media: String| {
         let recording = gateway::Recording::new(bytes, gateway::AudioType::of_media_type(&media)?)?;
-        let speaking = {
-            let held = views.lock().map_err(|_| {
-                AxError::failure(
-                    AxCode::StorageFatal,
-                    "read the city views",
-                    "the view lock is poisoned",
-                )
-                .with_recovery("restart the server; its views rebuild from the ledger")
-            })?;
-            held.transcriber(crate::assembly::resolving(Arc::clone(&vault)))?
-        };
+        let speaking = views
+            .snapshot()
+            .transcriber(crate::assembly::resolving(Arc::clone(&vault)))?;
         speaking.transcribe(&recording)
     })
 }
@@ -158,13 +150,16 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // read afterwards folds only what arrives after it (sprawling-SPEC
     // 8-91).
     let (rebuilt, held) = start_served_views(&ledger_dir(city_root), &mut log)?;
+    // The fold thread alternates between two copies, so the second is
+    // made here from the first (sprawling-SPEC.md 8-93).
+    let spare = rebuilt.twin()?;
     // This machine is not asked here (sprawling-SPEC.md 8-54): the
     // table is thirty-two items, most of them a program started and
     // asked its version, and a serve that waited for all of them holds
     // the socket shut for seconds to answer a question only one page
     // asks. The answer stays `None` until `DoctorRefresh` fills it,
     // which is the one verb that asks this machine.
-    let views = Arc::new(std::sync::Mutex::new(rebuilt));
+    let views = Arc::new(Published::new(rebuilt));
     let query_views = Arc::clone(&views);
     // Built once and handed to both surfaces below. The socket and the
     // terminal are two ways into one city, and this is the read half of
@@ -172,11 +167,11 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let answering: crate::console::Answering =
         Arc::new(move |query: channels::Query| answer_outside_the_lock(&query_views, &query));
     // Read once, at startup, from the views the ledger just rebuilt.
-    let city_name = views.lock().ok().and_then(|views| views.city());
-    let epoch = views.lock().ok().and_then(|views| views.epoch());
-    let head = Arc::new(channels::LedgerHead::at(
-        views.lock().ok().and_then(|views| views.head()),
-    ));
+    let started_from = views.snapshot();
+    let city_name = started_from.city();
+    let epoch = started_from.epoch();
+    let head = Arc::new(channels::LedgerHead::at(started_from.head()));
+    drop(started_from);
     // The in-process Command set, not the wire one: the enrolment
     // route delivers a sealed credential here, and no wire frame can.
     let desk = Arc::new(CommandDesk::new());
@@ -204,6 +199,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         Outward {
             desk: Arc::clone(&desk),
             views: Arc::clone(&views),
+            spare,
             to_clients: events.clone(),
             to_watchers: deltas.clone(),
             head: Arc::clone(&head),
@@ -212,13 +208,6 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         },
     )?;
 
-    // The vault the worker opened, lent to the reads that need one.
-    // Lent rather than opened a second time: "a credential is redeemed
-    // at the last moment, through one door" stops being true the moment
-    // there are two handles on the same secrets.
-    if let Ok(mut held) = views.lock() {
-        held.lend_the_vault(Arc::clone(&city_vault));
-    }
     let audio_views = Arc::clone(&views);
     let audio_vault = city_vault;
     let config = channels::ServeConfig {

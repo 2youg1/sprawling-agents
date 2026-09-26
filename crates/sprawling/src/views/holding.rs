@@ -30,9 +30,7 @@ use kernel::{Address, AxError, EventKind, EventRecord};
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
-use super::lines::{
-    buildings_of, discard_lines, pursued, registry_line, restored_paths, signal_line,
-};
+use super::lines::{discard_lines, pursued, registry_line, restored_paths, signal_line};
 use crate::assembly::{ledger_dir, rebuild_views};
 
 /// Answers one query out of a city's own history, without serving it.
@@ -135,8 +133,8 @@ pub(crate) struct Views {
     /// actually new.
     ///
     /// Behind a lock of its own because the fold never touches it: a
-    /// query carries the `Arc` out of the view lock and reads the
-    /// ledger with only readers waiting on it (sprawling-SPEC.md 8-92).
+    /// query carries the `Arc` out of its snapshot of the views and
+    /// reads the ledger with only readers waiting on it (sprawling-SPEC.md 8-92).
     pub(super) index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
     /// Where each run's first `prompt_assembled` record sits, so the
     /// prompt a page asks for is one ledger line rather than a walk
@@ -144,7 +142,16 @@ pub(crate) struct Views {
     pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
-    pub(super) plans: crate::plan_view::PlanView,
+    ///
+    /// Behind a lock of its own so a reader reads a plan off the disk
+    /// with the views released and puts it back afterwards; the fold
+    /// holds it only to forget what a record may have moved
+    /// (sprawling-SPEC.md 8-92).
+    #[serde(
+        serialize_with = "super::snapshot::encode_plans",
+        deserialize_with = "super::snapshot::decode_plans"
+    )]
+    pub(super) plans: std::sync::Arc<std::sync::Mutex<crate::plan_view::PlanView>>,
     /// What each building is working towards, folded from the records
     /// that said so. The goal text and its state, not the value itself:
     /// declaring a pursuit takes the depth-zero position, and a view
@@ -182,6 +189,34 @@ pub(crate) struct Views {
 
 impl Views {
     pub(crate) fn new(city_root: &Path) -> Views {
+        // Empty until a fold hands over the index it built, or the first
+        // query refreshes it: the history is not read here.
+        Views::sharing(
+            city_root,
+            super::snapshot::fresh_index(),
+            std::sync::Arc::default(),
+        )
+    }
+
+    /// A second, empty fold over the same city that shares this one's
+    /// ledger index and plan cache: both are caches of the disk rather
+    /// than folded state, so the two copies the fold thread alternates
+    /// between keep one of each (sprawling-SPEC.md 8-93). A served city
+    /// makes its twin with [`Views::twin`], from views already folded.
+    #[cfg(test)]
+    pub(crate) fn unfolded_twin(&self) -> Views {
+        Views::sharing(
+            &self.city_root,
+            std::sync::Arc::clone(&self.index),
+            std::sync::Arc::clone(&self.plans),
+        )
+    }
+
+    fn sharing(
+        city_root: &Path,
+        index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
+        plans: std::sync::Arc<std::sync::Mutex<crate::plan_view::PlanView>>,
+    ) -> Views {
         Views {
             city_root: city_root.to_path_buf(),
             hot: memory::HotView::new(),
@@ -200,11 +235,9 @@ impl Views {
             skill_pins: std::collections::BTreeMap::new(),
             events: 0,
             next_unfolded: kernel::Seq::FIRST,
-            // Empty until a fold hands over the index it built, or the
-            // first query refreshes it: the history is not read here.
-            index: super::snapshot::fresh_index(),
+            index,
             first_prompts: std::collections::BTreeMap::new(),
-            plans: crate::plan_view::PlanView::default(),
+            plans,
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
             claims: std::collections::BTreeMap::new(),
@@ -214,9 +247,16 @@ impl Views {
     }
 
     /// Takes the index the fold that built these views read the history
-    /// into, so serving does not scan the history a second time.
+    /// into, so serving does not scan the history a second time. Written
+    /// into the lock this copy shares with its twin, so both read it.
     pub(crate) fn hold_index(&mut self, index: memory::LedgerIndex) {
-        self.index = std::sync::Arc::new(std::sync::Mutex::new(index));
+        // The whole index is replaced, so whatever a panic left half
+        // written under a poisoned lock is gone with it.
+        *self
+            .index
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = index;
+        self.index.clear_poison();
     }
 
     /// The first seq this view has not folded: an answer read from here
@@ -253,7 +293,7 @@ impl Views {
         // worker's own copy is shown it.
         self.governance
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
-        self.plans.apply(record);
+        crate::plan_view::PlanView::take_back(&self.plans).apply(record);
         self.events = self.events.saturating_add(1);
         self.next_unfolded = record.seq().next()?;
         match record.kind() {
@@ -325,51 +365,6 @@ impl Views {
             _ => {}
         }
         Ok(())
-    }
-
-    /// One entry per building, with its plan as the projection last read
-    /// it.
-    pub(super) fn spine(&mut self) -> Vec<channels::BuildingProgress> {
-        let root = self.city_root.clone();
-        buildings_of(&root)
-            .into_iter()
-            .map(|addr| {
-                let reading = self.plans.of(&root, &addr);
-                channels::BuildingProgress {
-                    addr,
-                    progress: reading.progress,
-                    problems: reading.problems,
-                    blocked: reading.blocked,
-                    ready: u32::try_from(reading.ready.len()).unwrap_or(u32::MAX),
-                }
-            })
-            .collect()
-    }
-
-    /// What each pursuit is doing, as the city reads it.
-    ///
-    /// The verdict is computed here rather than on the page, so the stop
-    /// condition has one authority: a client that worked out for itself
-    /// whether a city had finished would be the second.
-    pub(super) fn pursuit_lines(&mut self) -> Vec<channels::PursuitLine> {
-        let root = self.city_root.clone();
-        let held: Vec<(Address, String, kernel::PursuitState)> = self
-            .pursuits
-            .iter()
-            .map(|(addr, (goal, state))| (addr.clone(), goal.clone(), *state))
-            .collect();
-        let in_flight = u32::try_from(self.hot.active_count()).unwrap_or(u32::MAX);
-        let mut out = Vec::new();
-        for (addr, goal, state) in held {
-            let ready = self.plans.of(&root, &addr).ready;
-            out.push(channels::PursuitLine {
-                goal,
-                state,
-                verdict: kernel::pursuit::observe(state, &ready, in_flight),
-                addr,
-            });
-        }
-        out
     }
 
     /// What this city is called: what its first record says, and for a

@@ -175,8 +175,9 @@ impl Tool for Kept {
         self.tool.subject(call)
     }
 
-    /// The file `edit` names: custody rewrites the text, not the path.
+    /// What the kept tool writes: custody rewrites the text, not the
+    /// path.
     fn writes(&self, call: &ToolCall) -> kernel::Writes {
-        self.edit.writes(call)
+        self.tool.writes(call)
     }
 }

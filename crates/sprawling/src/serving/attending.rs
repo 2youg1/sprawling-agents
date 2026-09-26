@@ -30,13 +30,13 @@ use std::time::Duration;
 use kernel::{AxCode, AxError, EventRecord, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
-use super::folding::{Broadcast, Folding, spawn_folding};
+use super::folding::{Broadcast, Copies, Folding, spawn_folding};
 use super::output_ring::OutputRing;
 use super::relay::Patience;
 use super::serve::Opening;
 use super::standing::setting_telling_a_refusal;
 use crate::assembly::{RunWorker, Serving, now_ms};
-use crate::views::Views;
+use crate::views::{Published, Views};
 
 /// Where a worker's work goes, and where it comes from.
 ///
@@ -46,7 +46,10 @@ use crate::views::Views;
 /// run's increments.
 pub(super) struct Outward {
     pub(super) desk: Arc<CommandDesk>,
-    pub(super) views: Arc<std::sync::Mutex<Views>>,
+    pub(super) views: Arc<Published>,
+    /// The unpublished twin of `views`, folded over the same records
+    /// (sprawling-SPEC.md 8-93).
+    pub(super) spare: Views,
     pub(super) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
     pub(super) to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
     pub(super) head: Arc<channels::LedgerHead>,
@@ -80,6 +83,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let Outward {
         desk: worker_desk,
         views,
+        spare,
         to_clients,
         to_watchers,
         head,
@@ -95,8 +99,16 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let Folding {
         observer,
         machine,
+        lend,
         thread: fold_thread,
-    } = spawn_folding(views, Broadcast { to_clients, head }, setting)?;
+    } = spawn_folding(
+        Copies {
+            published: views,
+            spare,
+        },
+        Broadcast { to_clients, head },
+        setting,
+    )?;
     // The one sanctioned thread besides the runtime's own. The ledger was
     // opened, its writer lock taken, before the history was folded; it
     // moves into this thread and never leaves: a city has one writer.
@@ -173,7 +185,13 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             .with_recovery("check process thread limits")
         })?;
     let vault = match ready_rx.recv() {
-        Ok(Ok(vault)) => vault,
+        // Lent rather than opened a second time: "a credential is
+        // redeemed at the last moment, through one door" stops being
+        // true the moment there are two handles on the same secrets.
+        Ok(Ok(vault)) => {
+            lend(Arc::clone(&vault));
+            vault
+        }
         Ok(Err(err)) => return Err(err),
         Err(_) => {
             return Err(AxError::failure(

@@ -43,7 +43,7 @@ impl Views {
     /// working tree after the views are released.
     /// `None` when the newest fence's row cannot be read, which the
     /// caller answers as `Unavailable`, as the commits column does.
-    pub(super) fn git_status_ask(&mut self, building: &Address) -> Option<GitStatusAsk> {
+    pub(super) fn git_status_ask(&self, building: &Address) -> Option<GitStatusAsk> {
         Some(GitStatusAsk {
             city_root: self.city_root.clone(),
             building: building.clone(),
