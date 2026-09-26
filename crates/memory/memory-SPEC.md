@@ -469,10 +469,13 @@ impl Checkpoint {
     /// 这一波碰过什么。首个 fence 与 `ensure_base`
     /// 面对空 index，所以照旧列出它们提交的每一个文件。
     /// `scopes` 的每一项可以是目录前缀，也可以是一个文件：lane 在只知道
-    /// 这一波写了哪些文件时只把它们交进来（runtime-SPEC §8-45），所以每项
-    /// 生成两条 pathspec，它本身与 `<它>/*`。每项都是**字面路径**：地址文法
-    /// 允许 `[` `]` `*` `?`，所以这些字节各自包进单字符类（`[[]`）再交给
-    /// libgit2，否则 `notes[1].md` 会暂存 `notes1.md` 而漏掉写下的文件。
+    /// 这一波写了哪些文件时只把它们交进来（runtime-SPEC §8-45）。工作区里是
+    /// 文件、或工作区没有而 index 记为文件的项，按字面路径 `add_path`／
+    /// `remove_path`，过同一道 `StageFilter` 与同一条 ignore 规则；其余的项
+    /// 生成两条 pathspec，它本身与 `<它>/*`，交给一次 `add_all`。只拿 pathspec
+    /// 走两个文件，5,000 个文件的写域上中位数 107 ms，字面暂存 61 ms（同上仪表）。
+    /// pathspec 里每项仍是**字面路径**：地址文法允许 `[` `]` `*` `?`，所以这些
+    /// 字节各自包进单字符类（`[[]`）再交给 libgit2，否则 `notes[1]` 会匹配 `notes1`。
     pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
     /// 一栋楼的基线 fence（`checkpoint::base`）：暂存 `scopes`、扫描、提交，
     /// 全部对象先写进内存里的对象库（mempack），最后作为**一个 pack** 落盘。
