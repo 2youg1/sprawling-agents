@@ -172,6 +172,9 @@ fn the_heading_is_written_before_any_item_is_asked() {
         fn install(&self, _name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
             Ok(())
         }
+        fn core_standing(&self) -> Result<crate::serving::standing::Standing, kernel::AxError> {
+            Ok(crate::serving::standing::Standing::Raised)
+        }
     }
     struct Screen(Arc<AtomicBool>);
     impl std::io::Write for Screen {

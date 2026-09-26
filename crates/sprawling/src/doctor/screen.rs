@@ -20,6 +20,10 @@ use std::process::ExitCode;
 
 use std::ffi::OsString;
 
+use kernel::AxError;
+
+use crate::serving::standing::Standing;
+
 use super::explain::{Explanation, explain, explanation_lines};
 use super::needs::{lack_line, lacks};
 use super::paint::{Ink, Part, row, summary};
@@ -134,6 +138,9 @@ pub(crate) fn run<R: BufRead, W: Write>(
         }
         writeln!(out)?;
     }
+    for line in priority_lines(&machine.core_standing()) {
+        writeln!(out, "{line}")?;
+    }
     let mut ready = true;
     for tier in Tier::ALL {
         let verdict = verdict(&findings, tier);
@@ -151,6 +158,11 @@ pub(crate) fn run<R: BufRead, W: Write>(
     }
     writeln!(out)?;
     Ok(ready)
+}
+
+/// The part that says where this machine lets the core's threads stand.
+fn priority_lines(_core: &Result<Standing, AxError>) -> Vec<String> {
+    Vec::new()
 }
 
 /// One line per building that asked for what this machine lacks, and

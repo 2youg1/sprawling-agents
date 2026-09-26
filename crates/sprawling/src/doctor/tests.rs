@@ -14,6 +14,7 @@ use std::sync::Mutex;
 use super::paint::Ink;
 use super::screen::{Asked, run};
 use super::*;
+use crate::serving::standing::{Held, Standing};
 
 /// A machine that answers from a script and installs nothing.
 ///
@@ -23,6 +24,7 @@ use super::*;
 pub(super) struct ScriptedMachine {
     absent: BTreeSet<&'static str>,
     asked: Mutex<Vec<String>>,
+    core: Standing,
 }
 
 impl ScriptedMachine {
@@ -30,7 +32,12 @@ impl ScriptedMachine {
         ScriptedMachine {
             absent: absent.iter().copied().collect(),
             asked: Mutex::new(Vec::new()),
+            core: Standing::Raised,
         }
+    }
+
+    fn standing(self, core: Standing) -> ScriptedMachine {
+        ScriptedMachine { core, ..self }
     }
 }
 
@@ -49,6 +56,10 @@ impl Machine for ScriptedMachine {
     fn install(&self, name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
         self.asked.lock().unwrap().push(name.to_owned());
         Ok(())
+    }
+
+    fn core_standing(&self) -> Result<Standing, kernel::AxError> {
+        Ok(self.core.clone())
     }
 }
 
@@ -381,5 +392,35 @@ fn the_default_checks_and_installs_nothing() {
     assert!(
         !shown.contains("[y/N]"),
         "the default asks nothing: {shown}"
+    );
+}
+
+/// A Unix machine without `CAP_SYS_NICE` refuses the raise; the doctor
+/// says the core stands at normal and why, rather than nothing.
+#[test]
+fn the_doctor_says_where_the_platform_lets_the_core_stand() {
+    let machine = ScriptedMachine::missing(&[]).standing(Standing::Normal(Held::Refused(
+        "Operation not permitted".to_owned(),
+    )));
+    let mut nobody = std::io::Cursor::new(Vec::new());
+    let mut screen: Vec<u8> = Vec::new();
+    run(
+        &Asked {
+            install: false,
+            city: None,
+            explain: None,
+            ink: Ink::Plain,
+        },
+        &machine,
+        &mut nobody,
+        &mut screen,
+    )
+    .unwrap();
+    let shown = String::from_utf8(screen).unwrap();
+    assert!(
+        shown.contains(
+            "  priority - where the core's threads stand\n\n    core threads    normal, the platform refused: Operation not permitted\n\n"
+        ),
+        "{shown}"
     );
 }
