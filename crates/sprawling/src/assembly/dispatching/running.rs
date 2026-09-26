@@ -231,7 +231,7 @@ impl RunWorker {
         // Read before the obligation moves on: this run's place in the
         // conversation is what a signal it sends carries forward, and
         // `settle_desks` below is where those signals are spoken.
-        let conversation = owing.conversation().clone();
+        let chain = owing.knock_chain().clone();
         // Both loans go back before either failure is propagated: a
         // backlog that would not take its member back used to cost the
         // room its mail too (sprawling-SPEC.md 8-46-9).
@@ -257,7 +257,7 @@ impl RunWorker {
                     raised: &mut raised,
                     job_locator: &job_locator,
                 },
-                conversation,
+                chain,
             },
         )?;
         // What the run can show for itself. `None` is not `Some(false)`:

@@ -31,15 +31,8 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
         city::BuildingTemplate::Minimal,
     )
     .unwrap();
-    for who in ["ito", "hana"] {
-        let room = dir.path().join("market").join(who);
-        std::fs::create_dir_all(&room).unwrap();
-        std::fs::write(
-            room.join(city::URBANITE_FILE),
-            format!("# URBANITE.md\n\nTrades in the market as {who}.\n"),
-        )
-        .unwrap();
-    }
+    move_in(dir.path(), "market/ito");
+    move_in(dir.path(), "market/hana");
     // A room with nobody in it, to prove the other half of the rule.
     std::fs::create_dir_all(dir.path().join("market").join("store")).unwrap();
 
@@ -82,13 +75,7 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
         })
         .unwrap();
 
-    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
-    let started: Vec<String> = verified
-        .raw_lines()
-        .iter()
-        .map(|line| String::from_utf8_lossy(line).into_owned())
-        .filter(|line| line.contains("\"kind\":\"run_started\""))
-        .collect();
+    let started = runs_started(&report.ledger_dir);
     assert_eq!(
         started.len(),
         2,
@@ -129,17 +116,11 @@ fn a_knock_past_the_conversation_ceiling_starts_no_run() {
         addr: Address::parse("market/hana").unwrap(),
         from: "market/ito".to_owned(),
         mode: kernel::Mode::PlanGoal,
-        conversation: Conversation::deep(u32::MAX),
+        chain: KnockChain::deep(u32::MAX),
     });
     worker.answer_knocks();
     assert!(!worker.driving(), "a knock past the ceiling opens no lane");
-    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
-    let started: Vec<String> = verified
-        .raw_lines()
-        .iter()
-        .map(|line| String::from_utf8_lossy(line).into_owned())
-        .filter(|line| line.contains("\"kind\":\"run_started\""))
-        .collect();
+    let started = runs_started(&report.ledger_dir);
     assert!(
         started.is_empty(),
         "a knock past the ceiling must not start a run: {started:?}"
@@ -331,7 +312,7 @@ fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
         addr: hana.clone(),
         from: "market/ito".to_owned(),
         mode: kernel::Mode::PlanGoal,
-        conversation: Conversation::default(),
+        chain: KnockChain::default(),
     });
     worker.answer_knocks();
     worker.land_the_rest().unwrap();

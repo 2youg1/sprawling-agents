@@ -66,7 +66,7 @@ pub(crate) use dispatching::{Dispatched, acp_dispatch};
 use doorstep::Doorstep;
 use driving::flight::{Flight, Landed};
 pub(crate) use driving::lane::{DriveContext, drive_run};
-use driving::owing::{Conversation, Owed, Owing, Unasked};
+use driving::owing::{KnockChain, Owed, Owing, Unasked};
 pub(crate) use driving::{Driven, Driving};
 pub(crate) use folds::Standing;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};

@@ -138,7 +138,7 @@ pub(super) struct Knock {
     /// Where the run that spoke stood in its conversation. The woken run
     /// is one hop further on, and both ceilings are read there
     /// (sprawling-SPEC.md 8-46-12).
-    pub(super) conversation: super::Conversation,
+    pub(super) chain: super::KnockChain,
 }
 
 /// What one dispatch left behind. Carried rather than re-derived,

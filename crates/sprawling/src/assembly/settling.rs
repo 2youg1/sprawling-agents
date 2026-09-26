@@ -32,7 +32,7 @@ pub(super) struct Sweep<'a> {
 /// arguments in step (sprawling-SPEC.md 8-46-12).
 pub(super) struct Settling<'a> {
     pub(super) sweep: Sweep<'a>,
-    pub(super) conversation: super::Conversation,
+    pub(super) chain: super::KnockChain,
 }
 
 /// What one drive ended with, as the conclusion reads it.

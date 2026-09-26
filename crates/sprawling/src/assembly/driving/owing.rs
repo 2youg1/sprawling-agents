@@ -106,18 +106,15 @@ pub(in crate::assembly) struct Owing {
 /// ninth successor of its work.
 #[derive(Clone, Default)]
 struct Relays {
-    conversation: Conversation,
+    chain: KnockChain,
     successions: u32,
 }
 
-/// Where one run stands in the conversation that woke it.
-///
-/// `hops` is this run's own depth, which only its branch moves. `woken`
-/// is how many runs the whole conversation has started, shared by every
-/// branch, so a conversation that fans out is bounded by its width as
-/// well as by its depth (sprawling-SPEC.md 8-46-12).
+/// Where one run stands in the knock chain that woke it: `hops` is its
+/// own branch's depth, and `woken` counts the runs every branch started,
+/// so a chain that fans out is bounded in width as well as depth.
 #[derive(Clone, Default)]
-pub(in crate::assembly) struct Conversation {
+pub(in crate::assembly) struct KnockChain {
     hops: u32,
     woken: Arc<AtomicU32>,
 }
@@ -133,10 +130,8 @@ const CONVERSATION_HOPS_MAX: u32 = 16;
 /// to price the work (sprawling-SPEC.md 8-46-12).
 const SUCCESSION_HOPS_MAX: u32 = 64;
 
-/// The most runs one conversation may wake across all its branches. The
-/// hop ceiling bounds a chain; this bounds a broadcast, which at sixteen
-/// hops deep could otherwise wake more residents than a city holds
-/// (sprawling-SPEC.md 8-46-12).
+/// The most runs one conversation may wake across all its branches: a
+/// broadcast rather than a chain (sprawling-SPEC.md 8-46-12).
 const CONVERSATION_RUNS_MAX: u32 = 64;
 
 impl Relays {
@@ -144,19 +139,19 @@ impl Relays {
     /// the conversation has already gone as far as it may.
     fn after_knock(&self) -> Result<Relays, AxError> {
         let hops = self
-            .conversation
+            .chain
             .hops
             .checked_add(1)
             .filter(|next| *next <= CONVERSATION_HOPS_MAX)
             .ok_or_else(|| {
                 conversation_refused(format!(
                     "a conversation already {} knocks deep",
-                    self.conversation.hops
+                    self.chain.hops
                 ))
             })?;
         // Counted after the depth, so a knock refused for depth takes
         // nothing from the width every other branch still draws on.
-        self.conversation
+        self.chain
             .woken
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |woken| {
                 woken
@@ -169,9 +164,9 @@ impl Relays {
                 ))
             })?;
         Ok(Relays {
-            conversation: Conversation {
+            chain: KnockChain {
                 hops,
-                woken: Arc::clone(&self.conversation.woken),
+                woken: Arc::clone(&self.chain.woken),
             },
             successions: self.successions,
         })
@@ -200,7 +195,7 @@ impl Relays {
                 )
             })?;
         Ok(Relays {
-            conversation: self.conversation.clone(),
+            chain: self.chain.clone(),
             successions,
         })
     }
@@ -221,10 +216,10 @@ fn conversation_refused(subject: String) -> AxError {
 }
 
 #[cfg(test)]
-impl Conversation {
+impl KnockChain {
     /// A conversation already `hops` knocks deep that has woken nobody.
-    pub(in crate::assembly) fn deep(hops: u32) -> Conversation {
-        Conversation {
+    pub(in crate::assembly) fn deep(hops: u32) -> KnockChain {
+        KnockChain {
             hops,
             woken: Arc::default(),
         }
@@ -260,12 +255,12 @@ impl Owing {
     /// # Errors
     /// Refuses with `E_LOOP_SUSPECTED` when the knock would exceed
     /// `CONVERSATION_HOPS_MAX` or `CONVERSATION_RUNS_MAX`.
-    pub(in crate::assembly) fn knocked(conversation: Conversation) -> Result<Owing, AxError> {
+    pub(in crate::assembly) fn knocked(chain: KnockChain) -> Result<Owing, AxError> {
         Ok(Owing {
             owed: Owed::Unasked(Unasked::Knock),
             reply: Arc::new(channels::Reply::nowhere()),
             relays: Relays {
-                conversation,
+                chain,
                 successions: 0,
             }
             .after_knock()?,
@@ -307,8 +302,8 @@ impl Owing {
 
     /// Where this run stands in its conversation. Read by the landing so
     /// a signal this run sends carries the chain's place on.
-    pub(in crate::assembly) fn conversation(&self) -> &Conversation {
-        &self.relays.conversation
+    pub(in crate::assembly) fn knock_chain(&self) -> &KnockChain {
+        &self.relays.chain
     }
 
     /// The same obligation one succession further along, or the refusal
@@ -361,12 +356,12 @@ mod tests {
     /// run's place as the input.
     #[test]
     fn a_knock_chain_stops_at_its_ceiling() {
-        let owed = match Owing::knocked(Conversation::deep(CONVERSATION_HOPS_MAX - 1)) {
+        let owed = match Owing::knocked(KnockChain::deep(CONVERSATION_HOPS_MAX - 1)) {
             Ok(owed) => owed,
             Err(refusal) => panic!("a knock below the ceiling was refused: {refusal}"),
         };
-        assert_eq!(owed.conversation().hops, CONVERSATION_HOPS_MAX);
-        let refusal = Owing::knocked(Conversation::deep(CONVERSATION_HOPS_MAX))
+        assert_eq!(owed.knock_chain().hops, CONVERSATION_HOPS_MAX);
+        let refusal = Owing::knocked(KnockChain::deep(CONVERSATION_HOPS_MAX))
             .err()
             .expect("a knock at the ceiling must be refused");
         assert_eq!(refusal.code(), &AxCode::LoopSuspected);
@@ -376,12 +371,12 @@ mod tests {
     /// A delegate inherits the conversation it came from.
     #[test]
     fn a_delegated_child_inherits_the_chain_it_came_from() {
-        let parent = match Owing::knocked(Conversation::deep(3)) {
+        let parent = match Owing::knocked(KnockChain::deep(3)) {
             Ok(parent) => parent,
             Err(refusal) => panic!("a knock below the ceiling was refused: {refusal}"),
         };
         let child = parent.child(Address::parse("market/hana").unwrap());
-        assert_eq!(child.conversation().hops, parent.conversation().hops);
+        assert_eq!(child.knock_chain().hops, parent.knock_chain().hops);
     }
 
     /// Width, not only depth: every branch of one conversation draws on
@@ -390,7 +385,7 @@ mod tests {
     /// branch stays.
     #[test]
     fn a_conversation_that_fans_out_stops_at_its_width() {
-        let spoken = Conversation::default();
+        let spoken = KnockChain::default();
         for _ in 0..CONVERSATION_RUNS_MAX {
             if let Err(refusal) = Owing::knocked(spoken.clone()) {
                 panic!("a knock below the width was refused: {refusal}");

@@ -152,7 +152,7 @@ impl RunWorker {
         signal: &collab::Signal,
         speaker: &Address,
         mode: kernel::Mode,
-        conversation: &super::Conversation,
+        chain: &super::KnockChain,
     ) -> Result<(), AxError> {
         let room = signal.room();
         if room == speaker {
@@ -168,7 +168,7 @@ impl RunWorker {
             addr: room.clone(),
             from: signal.from().to_owned(),
             mode,
-            conversation: conversation.clone(),
+            chain: chain.clone(),
         });
         Ok(())
     }
@@ -223,7 +223,7 @@ impl RunWorker {
             // that has already gone as far as it may is stepped over
             // like one that cannot be answered, so the run that spoke is
             // not punished for it (sprawling-SPEC.md 8-46-12).
-            let owing = match Owing::knocked(knock.conversation) {
+            let owing = match Owing::knocked(knock.chain) {
                 Ok(owing) => owing,
                 Err(refusal) => {
                     self.note(
