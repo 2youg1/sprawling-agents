@@ -11,14 +11,13 @@
     reason = "test code"
 )]
 
-use std::cell::RefCell;
 use std::sync::{Arc, Condvar, Mutex};
 
 use kernel::{AxError, Effect, Payload, RunId, TimeMs, Tool, ToolCall, ToolName, ToolOutcome};
 use runtime::{Admitted, ConcurrentInvoke};
 
 use super::super::Sieving;
-use super::super::placing::Placing;
+use super::super::placing::{Fencing, Placing};
 
 const READS: u32 = 3;
 
@@ -67,7 +66,7 @@ impl Tool for MeetingRead {
 fn placing<'f>(
     meeting: Option<Arc<Meeting>>,
     dir: &std::path::Path,
-    fenced: &'f RefCell<Vec<String>>,
+    fencing: &'f Fencing,
 ) -> Placing<'f> {
     let domain = kernel::WriteDomain::new(vec![kernel::Address::parse("lab").unwrap()]).unwrap();
     let mut bench = runtime::bench::ToolBench::new(domain);
@@ -90,10 +89,14 @@ fn placing<'f>(
         cas: memory::Cas::open(&dir.join("cas")).unwrap(),
         city_root: dir.to_path_buf(),
         room: kernel::Address::parse("lab").unwrap(),
+        origin: memory::BlockOrigin {
+            run: RunId::CITY,
+            building: kernel::Address::parse("lab").unwrap(),
+        },
         table: runtime::FilterTable::builtin(),
         history: runtime::SieveHistory::default(),
     };
-    Placing::new(bench, sieving, RunId::CITY, fenced)
+    Placing::new(bench, sieving, RunId::CITY, fencing)
 }
 
 fn reads() -> Vec<ToolCall> {
@@ -116,8 +119,8 @@ fn a_served_citys_reads_run_at_once_and_leave_what_they_leave_in_turn() {
     let calls = reads();
     let t = TimeMs::new(1);
 
-    let serial_fenced = RefCell::new(Vec::new());
-    let mut one_by_one = placing(None, dir.path(), &serial_fenced);
+    let serial_fencing = Fencing::opened();
+    let mut one_by_one = placing(None, dir.path(), &serial_fencing);
     let serial: Vec<ToolOutcome> = calls
         .iter()
         .map(|call| match one_by_one.admit(call, t) {
@@ -134,8 +137,8 @@ fn a_served_citys_reads_run_at_once_and_leave_what_they_leave_in_turn() {
         arrived: Condvar::new(),
         fewest_seen: Mutex::new(u32::MAX),
     });
-    let fenced = RefCell::new(Vec::new());
-    let mut lane = placing(Some(Arc::clone(&meeting)), dir.path(), &fenced);
+    let fencing = Fencing::opened();
+    let mut lane = placing(Some(Arc::clone(&meeting)), dir.path(), &fencing);
     assert!(
         calls
             .iter()
@@ -171,5 +174,12 @@ fn a_served_citys_reads_run_at_once_and_leave_what_they_leave_in_turn() {
     assert_eq!(*meeting.fewest_seen.lock().unwrap(), READS);
     assert_eq!((at_once, lane.ran()), (serial, one_by_one.ran()));
     drop((lane, one_by_one));
-    assert_eq!(fenced.into_inner(), serial_fenced.into_inner());
+    let domain = ["lab".to_owned()];
+    assert_eq!(
+        (fencing.take_scope(&domain), fencing.fenced.into_inner()),
+        (
+            serial_fencing.take_scope(&domain),
+            serial_fencing.fenced.into_inner()
+        )
+    );
 }

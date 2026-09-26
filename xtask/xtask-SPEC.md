@@ -119,7 +119,7 @@ pub(crate) struct Violation {
 
 ## 9 工作流程
 
-`cargo xtask <gate>` → 定位仓库根（`CARGO_MANIFEST_DIR` 的父目录）→ 读数据面（ARCHITECTURE.md／lexicon.toml／git）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 每道门各占一条 `thread::scope` 线程并行判定，按门序汇合结果后统一渲染（§8-31）。**门数与门序都只住 `gates::GATES` 那张数组**（`--list`、usage 与按名选门都读它）：`COUNT` 就是它的长度类型参数，数目与清单相隔一个 token，故不可能各说各话。要知道跑了哪几道门、按什么次序，读那张数组，不要在文档里再养一份。
+`cargo xtask <gate>` → 定位仓库根（`root::judged`，见 §12「判的是哪棵树」）→ 读数据面（ARCHITECTURE.md／lexicon.toml／git）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 每道门各占一条 `thread::scope` 线程并行判定，按门序汇合结果后统一渲染（§8-31）。**门数与门序都只住 `gates::GATES` 那张数组**（`--list`、usage 与按名选门都读它）：`COUNT` 就是它的长度类型参数，数目与清单相隔一个 token，故不可能各说各话。要知道跑了哪几道门、按什么次序，读那张数组，不要在文档里再养一份。
 
 ## 10 实现逻辑
 
@@ -163,6 +163,8 @@ pub(crate) struct Violation {
 ## 12 Decisions
 
 `XtaskError`（thiserror）：`Io{path}`｜`Doc{file,msg}`（数据面不可解析）｜`Cmd{cmd,msg}`（git/cargo 调用失败）｜`Usage`。数据面坏＝退出码 2（门自身故障），不伪装成 0 或 1——门坏了必须显性，静默通过是门的最坏失效。
+
+**判的是哪棵树**：仓库根取「当前目录往上第一个含 `xtask/Cargo.toml` 的目录」，与编进二进制的根（`CARGO_MANIFEST_DIR` 的父目录）规范化后比较；两者不是同一目录时以 `StaleBuild`（`stale-build`，退出码 2）拒判，恢复是 `cargo clean -p xtask` 后重跑；当前目录往上没有检出时以 `NoCheckout`（`no-checkout`，退出码 2）拒判。理由是测出来的：cargo 对工作区成员的指纹只比源文件的相对路径与 mtime，不比 `CARGO_MANIFEST_DIR`；一个 target 目录从另一份检出复制过来（复制给了产物更新的 mtime）后，`cargo xtask` 报 `Fresh`，跑的是那份检出编出的 xtask，而编译期的根把它钉在那份检出上——在一份检出里放一个缺 MPL 头的 `.rs`，用另一份检出编出的 `xtask.exe` 从这里跑 `header`，报 `ok`。只在运行时取根（落选）不够：此时二进制的门逻辑本身也是另一份检出的，拿旧门判新树同样是静默通过；只认编译期的根（原状）就是上面那次静默通过。不调 `git rev-parse --show-toplevel`：往上找一个文件是微秒级，起一个 git 进程在 Windows 上是十毫秒级，而规则与 cargo 找工作区的方式相同——从当前目录往上。
 
 **一门判不动，不得连累其余各门的结论**（issue #5）。`gates` 的那张数组是急切求值的，<!-- xtask:begin gate_count -->20<!-- xtask:end --> 道门在第一行输出之前就已全部跑完；此前的循环一遇 `Err` 即 `return`，于是排在它后面的 `release` 与 `guard` 结论已在手里却从未被打印。缺 `cargo-public-api` 是 `docs/CONTRIBUTING.md` §7 明列的预期状态，而在那种机器上，一次带违规的运行与一次干净的运行输出逐字相同，作为必要前提的 `guard` 恰在被吞掉的那两道里。故聚合运行遍历到底，逐门报出 `ok`／`N violation(s)`／`could not judge` 三态之一，再统一渲染全部违规。**退出码取最重的一态**：任一门判不动＝2，否则有违规＝1，否则 0——判不动压过判有罪，因为「没判」与「判过且干净」同形正是本条要拆开的东西。
 
@@ -266,6 +268,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 | `xtask/src/color/tables.rs` | 怎么从 `client/src/theme.css` 读出四张表（`GRAY_RAMP`、`COLOUR_TOKENS`、`TEXT_TOKENS`、`TYPE_SCALE`）与 `TEXT_SURFACE_CEILING` |
 | `xtask/src/color/contrast.rs` | 一对令牌的 APCA 对比度是多少（`apca_lc` 及其 OKLCH→sRGB 链路），以及 Bronze Simple Mode 允许某个字号使用哪一层（`bronze_tier`） |
 | `xtask/src/color/scan.rs` | 全仓扫描：什么算一个颜色字面量（`literal_at`、`hex_colour`），扫哪些文件（`scan_for_literals`） |
+| `xtask/src/color/disabled.rs` | 禁用墨色 `text-text-disabled` 是否只写在一个带 `disabled` 的变体之后（`judge_disabled_ink`、`bare_uses`） |
 | `xtask/src/color/tests.rs` | 原内联 `mod tests` 原样迁出，14 个测试一个不少 |
 
 **无字段开放**：跨文件引用只用 `pub(super)` 函数；`grey_ramp` 因 `badge` 门经 `color::grey_ramp` 调用而在索引位置以 `pub(crate) use` 重导出，其它文件的 `use` 一行未改。xtask 不入 `apisync`，无基线重写。
@@ -385,6 +388,15 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 - **浅色在哪里被选中不归这份样式表管**：`system` 由客户端读 `prefers-color-scheme` 后写成 `data-theme`，而不是在 CSS 里再写一遍同一套令牌。**败给的方案**：`@media (prefers-color-scheme: light)` 里再声明一遍十一档——那是同一块调色板的第二份定义，两份在他们开始不一致之前都是对的。
 - **扫描的依据一字未改**：`literal_at`／`hex_colour` 认得的颜色语法、扫的扩展名、拒词三段全部照旧。
 - **改价条件**：若将来出现第二个客户端，产地表回到多行，`THEME` 与产地表重新分开。
+
+#### 8-8a 禁用墨色只写在禁用状态之后（`color/disabled.rs`，形状 6 数据面）
+
+`--color-text-disabled` 的目标是 APCA Lc 30（`--tier-text-disabled`），浅色页上约 2:1，只够告诉手「这里按不动」，不够让眼读出一个字。所以门的规则是：客户端源码（`client/src` 下的 `.svelte`／`.ts`／`.css`，不含 `theme.css`）里每一处 `text-text-disabled` 类名，都必须挂在一个名字里带 `disabled` 的变体之后，例如 `aria-disabled:text-text-disabled`、`disabled:text-text-disabled`、`group-aria-disabled:text-text-disabled`。花费、时刻、模型名、run id、占位字、按键字样这些人要读的信息，改用 `text-text-faint`（Lc 60）或更高一级。
+
+- **判的是类名的写法，不是运行时的条件**：`{off ? 'text-text-disabled' : …}` 这种三元式里，门看不出条件是不是「禁用」，所以不收；元素本来就带 `aria-disabled`，写成变体，状态与墨色由同一个属性决定，没有第二个权威。
+- **类名的边界**：从出现处往前取到空白、引号、反引号或花括号为止，这一段按 `:` 切开，最后一段之前的任何一段含 `disabled` 即算禁用上下文。
+- **败给的方案**：在 `lang.json` 或组件里另立一个「次要信息」灰级。那是 `--color-text-faint` 的第二份定义。
+- **改价条件**：若 `--tier-text-disabled` 升到 Lc 60 以上，这个灰级就足以承载信息，本条可以撤。
 
 ### 8-9 secret：门只看人写的文件，派生文件由它的输入作证
 

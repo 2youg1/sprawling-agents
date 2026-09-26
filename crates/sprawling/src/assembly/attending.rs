@@ -27,13 +27,15 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, Payload, RunId};
+use kernel::{AxCode, AxError, EventRecord, Payload, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
 use super::relay::Patience;
 use super::{RunWorker, Serving};
-use crate::serving::folding::{Broadcast, Folding, spawn_folding};
-use crate::views::Views;
+use crate::serving::folding::{Broadcast, Copies, Folding, spawn_folding};
+use crate::serving::output_ring::OutputRing;
+use crate::serving::setting_telling_a_refusal;
+use crate::views::{Published, Views};
 
 /// What a worker is opened with: where the city is, whose keys it may
 /// redeem, what the vault turned out to be, where its diagnostics go,
@@ -67,10 +69,16 @@ pub(super) struct Opening {
 /// run's increments.
 pub(super) struct Outward {
     pub(super) desk: Arc<CommandDesk>,
-    pub(super) views: Arc<std::sync::Mutex<Views>>,
+    pub(super) views: Arc<Published>,
+    /// The unpublished twin of `views`, folded over the same records
+    /// (sprawling-SPEC.md 8-93).
+    pub(super) spare: Views,
     pub(super) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
     pub(super) to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
     pub(super) head: Arc<channels::LedgerHead>,
+    pub(super) to_readers: tokio::sync::broadcast::Sender<channels::LiveOutput>,
+    /// What running commands already wrote, for a page opening late.
+    pub(super) kept: Arc<OutputRing>,
 }
 
 /// The thread, and the one thing it opens that something else needs.
@@ -98,18 +106,32 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let Outward {
         desk: worker_desk,
         views,
+        spare,
         to_clients,
         to_watchers,
         head,
+        to_readers,
+        kept,
     } = outward;
+    // The views thread stands above the commands the city dispatches
+    // (sprawling-SPEC.md 8-93).
+    let setting = setting_telling_a_refusal();
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
-    // (sprawling-SPEC.md 8-89).
+    // (sprawling-SPEC.md 8-93).
     let Folding {
         observer,
         machine,
+        lend,
         thread: fold_thread,
-    } = spawn_folding(views, Broadcast { to_clients, head })?;
+    } = spawn_folding(
+        Copies {
+            published: views,
+            spare,
+        },
+        Broadcast { to_clients, head },
+        setting,
+    )?;
     // The one sanctioned thread besides the runtime's own. The ledger was
     // opened, its writer lock taken, before the history was folded; it
     // moves into this thread and never leaves: a city has one writer.
@@ -145,16 +167,27 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             // worker that streamed to a page unable to interrupt it
             // would be the state this type exists to make unsayable.
             let interrupt_desk = Arc::clone(&worker_desk);
+            let keeping = Arc::clone(&kept);
             worker.serve(Serving {
                 deltas: std::sync::Arc::new(move |delta: channels::Delta| {
                     // No subscribers is not a failure: a city with no
                     // browser open is a city doing its work.
                     drop(to_watchers.send(delta));
                 }),
+                outputs: std::sync::Arc::new(move |piece: channels::LiveOutput| {
+                    keeping.keep(&piece);
+                    drop(to_readers.send(piece));
+                }),
                 machine,
                 interrupts: Arc::new(move |run: RunId| interrupt_desk.interrupt_for(run)),
             });
-            worker.observe(observer);
+            // The tail is emptied on this thread, right after the result
+            // is written, so no piece of that call can arrive after it.
+            let mut folding = observer;
+            worker.observe(Box::new(move |record: &EventRecord| {
+                kept.settle(record);
+                folding(record);
+            }));
             attend(&mut worker, &worker_desk);
             // Dropping the worker drops the observer, which closes the
             // fold's channel; what is still in it is folded and
@@ -175,7 +208,13 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             .with_recovery("check process thread limits")
         })?;
     let vault = match ready_rx.recv() {
-        Ok(Ok(vault)) => vault,
+        // Lent rather than opened a second time: "a credential is
+        // redeemed at the last moment, through one door" stops being
+        // true the moment there are two handles on the same secrets.
+        Ok(Ok(vault)) => {
+            lend(Arc::clone(&vault));
+            vault
+        }
         Ok(Err(err)) => return Err(err),
         Err(_) => {
             return Err(AxError::failure(

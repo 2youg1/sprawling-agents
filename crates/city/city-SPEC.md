@@ -28,6 +28,10 @@
 
 「Resident 住哪」取**地址即目录**：`<city>/<addr>/URBANITE.md`。Building 模板实例化后若改变目录形状，改的是 `urbanite_path` 一处。
 
+**书架文档由页面写入（`PutShelved`）尚未实现，规则已定**：页面写的书架文档只经 `library::install`（§8-28，上架唯一的门），作为单文档包安装；写进已安装的包时生成新版本——暂存后整体替换（§8-27），不在原地改；每次写入在账本记一行新事件 `shelved_document_written`（kernel 事件表）。wire 的 `PutShelved` 分支此刻仍答 `not_built`，客户端没有控件。
+
+**升级后的模板过期检查尚未实现，规则已定**：`init` 布置的城文件（`City.md` 与 `docs/templates/` 下的模板）带上布置时所用模板的标记（模板内容哈希）；新二进制打开旧城的路径上挂一个检查，标记与二进制所带模板不符即如实说出哪份文件过期，并给出更新命令。标记与检查的挂点都还没有代码。
+
 ## 4 现状分析
 
 `city` 起初是空壳，本 SPEC 描述的是它的第一批代码。
@@ -156,7 +160,19 @@ pub fn adopt(city_root: &Path, addr: &Address) -> Result<Building, AxError>;
 pub fn adopted_payload(building: &Building) -> Result<Payload, AxError>;          // adopted: true
 pub fn configured_payload(building: &Building, wrote: Written)
     -> Result<Payload, AxError>;                              // building_configured
+
+// building/removal.rs（形状 2 值类型＋一个实例化动作）
+pub struct Removed { /* addr、kept —— 私有 */ }
+impl Removed {
+    pub fn addr(&self) -> &Address;
+    pub fn kept(&self) -> &str;          // 楼的文件现在所在处，相对城根、以 / 分段
+}
+pub fn remove(city_root: &Path, addr: &Address) -> Result<Removed, AxError>;   // city::remove_building
+pub fn removed_payload(removed: &Removed) -> Result<Payload, AxError>;         // building_removed
 ```
+
+- **移走楼＝把目录整个搬进 `.sprawling/removed/<名>`，不删一个字节**：人造的东西一样不丢，楼的历史仍在 Ledger 里，`building_removed` 记下它搬去了哪里。同名的楼第二次被移走时落在 `<名>-2`、`<名>-3`……第一个空位，已搬走的那份不被覆盖。搬用 `std::fs::rename`：同一卷上是一步，半途失败时楼要么还在原处、要么已整个到位。放在 reserved prefix 下，是因为 `all` 不列点开头的目录，而写域够不到那里——被移走的楼不再是楼，也不能被居民改动。找回＝人把目录搬回城根，再 `adopt`。
+- **拒绝**：房间地址（`lab/room1` 不是楼，`AxCode::InvalidArgs`）；City Hall（`HALL_BUILDING`，城自己的楼，地址由城定，`InvalidArgs`）；没有目录的地址（`InvalidArgs`）；搬不动（文件被占用等，`StorageFatal`，恢复：关掉占用它的程序再试）。有活跃 run 的楼由 sprawling 在调用前拒绝——本模块不知道哪些 run 在跑。
 
 - **模板名只有一个家**：`parse` 不再另列一张字符串表，而是拿 `ALL` 里每一个的 `name()` 去比；拒词里的合法集也由同一趟生成。于是加一个模板只改枚举与 `name()` 两处，而「解析认得的集合」与「拒词列出的集合」在类型上是同一个（Roadmap 7.14）。`Hall` 的名字取 `kernel::consts_policy::HALL_BUILDING`：City Hall 是唯一一栋地址由城而不是由人定的楼，模板名与那个地址是同一个词。
 
@@ -628,13 +644,17 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 
 只依赖 `kernel`（拓扑硬约束）＋ std。dev 依赖 `tempfile`。
 
-另有两件依赖，均已在 workspace 钉版（不新增版本权威）：`toml` 与 `serde`（derive）。理由：三层配置的格式是 TOML，而 `toml` 已被 `xtask` 消费（budgets.toml／lexicon.toml）；解析走 serde derive 加 `deny_unknown_fields`，使「写错的键」在反序列化那一刻失败。手写一个 TOML 子集解析器是可行的另一条路，已落选：它会把一个已有权威的格式变成本库自己的私有变体。
+另有两件依赖，均已在 workspace 钉版（不新增版本权威）：`toml` 与 `serde`（derive）。
+
+`cap-std` 与 `cap-fs-ext`（workspace 钉版）：技能包预检要按打开的目录句柄相对地列举与打开（§8-28），标准库只按路径打开。它们是安全 Rust 里的那一层 `openat`；其下的 `cap-primitives` 已在锁文件里（`wasmtime-wasi` 之下），许可相同。落选的另一条路是只收城自己控制的暂存区里的来源：它把「来源是谁的目录」变成一条安装方要遵守的约定，而不是由读法成立。理由：三层配置的格式是 TOML，而 `toml` 已被 `xtask` 消费（budgets.toml／lexicon.toml）；解析走 serde derive 加 `deny_unknown_fields`，使「写错的键」在反序列化那一刻失败。手写一个 TOML 子集解析器是可行的另一条路，已落选：它会把一个已有权威的格式变成本库自己的私有变体。
 
 ## 14 硬编码声明
 
 城里每一份文件叫什么、落在哪，权威是 `kernel::layout`：`ARCHIVE_DIR`、`BUILDING_SHELF`、`CONFIG_FILE`、`LIBRARY_DIR`、`URBANITE_FILE` 由本 crate `pub use` 转出而不复述，路径由 `CityLayout` 的十一个方法给出而不逐段 push。`spine_files` 的 `HANDOFF_FILE` 与 `JOB_FILE` 同样只是 `kernel::layout` 那一份的别名。本 crate 自己定义的文件名只剩没进布局表的那几份：`RULES_FILE`、`DESKTOP_SCOPE_FILE`、`PREFERENCES_FILE`、`SCHEDULE_FILE`、`WATCH_FILE`、`GITIGNORE_FILE` 与 spine 剩下的那一组。
 
 Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第一句话）。
+
+`PACKAGE_BYTES_LIMIT`（32 MiB，`library::install::precheck::walk`）：一件技能包文件字节的上限，理由见 §8-28。它是产品的界，不是按某一类机器调出来的数：包的字节要在内存里握两份，而技能的本分是文本和小脚本。
 
 `CONFIG_FILE`（三层同名，理由见 §8.5）；新楼的 `RULES.toml` 字节不写在代码里，而是 `include_str!("../../../docs/templates/RULES.toml")`——它的权威是那份模板，路径写错在编译期就会被堵住；`Confidential` 模板对该字串做一处行替换（`confidential = false` → `true`），替换是否真的生效由 `policy::evaluate` 读回来断言。
 
@@ -883,7 +903,11 @@ pub fn edit<T>(path: &Path, act: impl FnOnce(&Held<'_>) -> Result<T, AxError>)
 pub fn edit_against(path: &Path, base: &[u8], body: &[u8]) -> Result<(), AxError>;
 pub struct Held<'a> { /* 私有 */ }
 impl Held<'_> { pub fn replace(&self, body: &[u8]) -> Result<(), AxError>; }
+pub(crate) enum TreeEntry<'a> { Directory(&'a str), File(&'a str, &'a [u8]) }
+pub(crate) fn place_tree(target: &Path, entries: &[TreeEntry<'_>]) -> Result<(), AxError>;
 ```
+
+- **一棵树同样要么整棵、要么没有**：`place_tree` 把一个此刻不存在的目录整棵放上去（§8-28 的整包安装是它唯一的调用者）——每一项在目标旁一个点开头的暂存目录里写好并 `sync_all`，暂存目录里的每一层目录（嵌套的子目录和暂存根）在 unix 上各自 `sync_all`——只刷根时，换入可能先于某个子目录的目录项落盘，崩溃后读者会看到半个包——再一次 `rename` 把整个目录换到位；读者看到的是没有这个目录或完整的它。目标已在即拒（`E_STORAGE_FATAL`），判在暂存之前、判的是路径本身（一个链接也算「已在」），所以被拒时目标旁什么也没暂存：这扇门只放置，不覆盖一棵树——标准库的 `rename` 在 unix 与 Windows 上都会把一个空目录静默换掉，覆盖非空目录则不是一次操作。上次被杀的写者留下的暂存目录从未换到位、没有读者见过，先清掉再写。暂存目录里的文件不再各自经一次暂存改名：整棵树在换到位之前对谁都不可见，逐个文件的改名只多花系统调用。
 
 **`edit` 与 `Held` 对外开放，`replace` 不**（叶子 3.1 改了这一条记录，理由在此）：人层 `<home>/.sprawling/config.toml` 不在任何一座城里，却与一份 `CONFIG.toml` 同性质——有人手工编辑它，有解析器把它读回来，同一条命令流写它。它要的正是本模块那两条性质，而**再写一份「要么整份要么不动」就是给 B-49 立第二个权威**，两份实现里迟早有一份漏掉 `sync_all` 或漏掉锁。开放的是读-改-写那扇门（`edit` 与它给出的 `Held`），不是整份覆写那条捷径：`replace` 留在 crate 内，因为城外唯一的调用方做的是读-改-写，而一个能整份覆写的外部调用方就能不读就写。
 
@@ -917,8 +941,8 @@ impl Slot {
     pub fn building(building: &Address, section: &str) -> Result<Slot, AxError>;
 }
 pub enum Placed { Fresh, AlreadyShelved }                  // 穷尽两态
-pub struct Installed { pub holding: Holding, pub placed: Placed }
-pub struct PlannedInstall { /* 名字、正文、哈希、依据快照、落点 —— 私有 */ }
+pub struct Installed { pub holding: Holding, pub hash: B3Hash, pub placed: Placed }
+pub struct PlannedInstall { /* 名字、每一项的字节快照、哈希、依据、落点 —— 私有 */ }
 impl PlannedInstall {
     pub fn name(&self) -> &str;
     pub fn hash(&self) -> &B3Hash;
@@ -931,17 +955,20 @@ pub fn install(city_root: &Path, slot: &Slot, package: &Path,
     register: &mut dyn FnMut(&[u8]) -> Result<B3Hash, AxError>) -> Result<Installed, AxError>;
 ```
 
-- **来源两个形状，落点一个形状**：技能包是 `<name>/SKILL.md` 一个目录一件（与外部书架同一布局，`SKILL_FILE` 仍是它的唯一家）；居民自建技能是一份 `.md`。两者都落成 `<shelf>/<section>/<name>.md`，即 §8-8 扫描读的文档形状。**包里多带任何一项即拒**：本入口今天只落文档形状，收下多余文件就是把它静默丢掉；§8-8 的扫描已认得目录形状的包，把整包落成 `<shelf>/<section>/<name>/`、对整包算哈希的那一步尚未在这扇门里——那一步要定的是整包哈希的字节序（逐项路径＋长度＋内容的规范串）与 TOCTOU 快照扩到每一项。
+- **来源两个形状，落点随来源**：技能包是 `<name>/` 一个目录一件，内含 `SKILL.md`（与外部书架同一布局，`SKILL_FILE` 仍是它的唯一家），整包落成 `<shelf>/<section>/<name>/`：包里的每个目录与文件都照原相对路径落下，一项不丢——收下却不落的文件就是被静默丢掉的文件；居民自建技能是一份 `.md`，落成 `<shelf>/<section>/<name>.md`。两个落点都是 §8-8 扫描读的形状，`Installed::holding` 即扫描读回的那件持有（由同一个函数从盘上读出，不是第二个推导）。
+- **整包哈希的字节序（规范串）**：头 `sprawling-skill-package/1
+`，其后每一项按相对路径（段间用 `/`）的字节序排列，一项是：种类一字节（`d` 目录、`f` 文件）、路径长度（u64 小端）、路径字节；文件再跟内容长度（u64 小端）、内容字节。长度前缀让任何两个不同的包拼不出同一串；带头是为了一份恰好长得像规范串的文档在 CAS 里不会被读成一个包。包的哈希是这串字节的 BLAKE3，文档的哈希是正文的 BLAKE3——`PlannedInstall::hash` 与 `Installed::hash` 都是它，也是人批准的那一个。包的 `Installed::holding.hash` 仍是扫描给的 `SKILL.md` 的哈希（§8-8），两者答的是两个问题：前者是「装下的是哪一整份」，后者是「catalog 那一行变了没有」；扫描不为每次读 catalog 去读包里每个文件。
+- **包的大小有上限**：一件包的文件字节合计不超过 `PACKAGE_BYTES_LIMIT`（32 MiB，`precheck::walk`）。预检把整包字节握在内存里、plan 与 apply 各读一遍，CAS 把整包存成一个 blob；一件技能是文本和几份小脚本，上限比它的本分宽得多，又远低于一台机器能握两份的量。判法按句柄报出的长度在读之前判，读时再以剩余额度加一截断，读的时候变大的文件同样被拒；超限＝`E_INVALID_ARGS`，拒词点出越线的那一项。
 - **不执行代码**：本模块只读字节、判形状——包里的任何内容都不被执行、编译或解释。预检是静态的，这是它全部的含义。
-- **禁符号链接，恒拒**：包目录与它的每一项先经 `symlink_metadata` 判形，出现链接即拒，**不论它指向哪里**——经链接读到的字节不属于这个包，且落位前后可以指向不同的东西。拒词指出是哪一项，并说出「重打包，只用普通文件与目录」。
-- **名称冲突校验按「一个名字一个持有」判**：目标书架上已有 `<name>.md` 而 section 不同即拒——§8-8 的扫描按名字建键，两格同名会按遍历序静默互盖。同格同名同哈希是幂等（`Placed::AlreadyShelved`，一个字节不写）；同格同名异哈希即拒（与「二次出生恒拒」同形，覆写会把一件在用的技能悄悄换掉）。name 与 section 都必须是能落盘的单段名：非空、不以点开头、无分隔符——扫描会跳过空名与点开头的项，收下这样的名字等于装进一个 catalog 永远看不见的格子。
-- **TOCTOU 复查在落位之前**：`plan_install` 记下依据快照（来源逐项的名字/种类/长度＋正文哈希，以及目标格当时有没有东西、哈希是什么），`apply` 落位前重算比对；**不一致即整体拒收**（`E_VERSION_CONFLICT`）——盘上一个字节不动，`register` 不被调用。装上架的字节因此恒是来源某个完整状态的忠实映像，而落架不会盖掉一个缝里刚出现的同名持有。
-- **staging 原子换入复用 `city::document::replace`**：一条写路径只有一个舞步（暂存文件＋`rename`），另写一套就是给「要么整份要么不动」立第二个权威。
-- **内容哈希入 CAS，登记先于换入**：`register` 由装配层供给（本 crate 依赖只有 `kernel`，CAS 归 `memory`；与 `Neighbourhood::scan` 的 `waiting` 同一口径），绑定的是 `memory::Cas::put`。登记哈希与落架哈希不符即拒（`E_CAS_CORRUPT`）：书架与 CAS 说的是同一份字节才叫有据可查。**来源记名即内容哈希**：盘上那份是现场，CAS 那份是历史（与 JOB.md 同一口径，§8-13 的 hash 答的正是「它变了没有」）。
-- **失败码**：来源不在＝`E_PATH_NOT_FOUND`；来源不是包（缺 `SKILL.md`、带多余项、既不是目录也不是 `.md` 文件）、包里有链接、名字或 section 不可用、名称冲突＝`E_INVALID_ARGS`（与 `building::create` 的「名字已被占」同码同形）；依据被换＝`E_VERSION_CONFLICT`；登记哈希不符＝`E_CAS_CORRUPT`；落盘失败沿 `document::replace` 的 `E_STORAGE_FATAL`。每条拒因都带动作、主体与可执行的恢复语。
+- **禁符号链接，恒拒**：来源本身与包里每一层的每一项都经 `symlink_metadata` 判形，出现链接即拒，**不论它指向哪里、藏在第几层**——经链接读到的字节不属于这个包，且落位前后可以指向不同的东西。这条规则只在 `precheck` 里。**包按打开的目录句柄逐级走**（`cap-std`／`cap-fs-ext`）：包根由它的父目录句柄不跟随链接地打开，此后每一项只按名字、相对于列出它的那个目录句柄打开——子目录经 `open_dir_nofollow`，文件经不跟随链接的只读打开——打开后再由句柄自身的元数据判形，是链接、不是普通目录或文件、或（Windows 上）带任何重解析点（云端占位、去重文件不跟随打开时给出的是存根的字节）即拒。列举只贡献名字，列表里每一项的种类先判一次（是链接即拒）；读到的每个字节都经过一条从包根起、不含链接的句柄链，于是一个子目录在被判形之后换成链接，走读也到不了它指向的地方——换上的链接要么打不开，要么打开的是链接本身而被拒。Windows 上列举由句柄反查出的路径去列（`cap-std` 在 Windows 上的实现），一次被调包骗过的列举只会给出错的名字；这些名字仍相对真句柄打开，得到的是 NotFound 或包里自己的项，包外的字节进不来。居民自建技能的单份文档没有目录可走：`unlinked` 判路径本身的形状（来源与架上已有的同名持有都经它），`read_unlinked` 在打开的那一刻再判一次——Windows 不跟随链接地打开并拒一切重解析点，unix 比对打开前后的 inode。拒词指出是哪一项，并说出「重打包，只用普通文件与目录」。
+- **名称冲突校验按「一个名字一个持有」判**：目标书架上 `<name>.md` 或 `<name>/` 任一在、而 section 不同即拒——§8-8 的扫描按名字建键，两格同名会按遍历序静默互盖。同格同名的已有持有按与来源同一个预检读出哈希（文档读正文、包算整包规范串）：同哈希是幂等（`Placed::AlreadyShelved`，一个字节不写）；异哈希即拒（与「二次出生恒拒」同形，覆写会把一件在用的技能悄悄换掉）——形状不同的同名持有哈希必不同，同样拒。同一格里 `<name>.md` 与 `<name>/` 并存也拒：那是一个名字两件持有，扫描会按遍历序留下其中一件，拿任何一件的哈希答「已在架上」都是只看了一半；拒词说出两件，恢复语让人先拿下其一。name 与 section 都必须是能落盘的单段名：非空、不以点开头、无分隔符——扫描会跳过空名与点开头的项，收下这样的名字等于装进一个 catalog 永远看不见的格子。
+- **TOCTOU 复查在落位之前，落下的是快照**：`plan_install` 把来源的每一项读进内存（每项一份字节快照）并算出哈希，同时记下目标格当时有没有东西、哈希是什么；`apply` 落位前把来源整包重读一遍、重算哈希比对（哈希覆盖每一项的路径、种类、长度与内容，于是任何一项被改、增、删、换形都算「被换」），**不一致即整体拒收**（`E_VERSION_CONFLICT`）——盘上一个字节不动，`register` 不被调用。落位写的是快照里的字节而不是再去读来源，于是复查之后的一次调包也进不了书架：装上架的字节恒是来源某个完整状态的忠实映像，而落架不会盖掉一个缝里刚出现的同名持有。
+- **staging 原子换入只在 `city::document` 里**：文档经 `document::replace`（暂存文件＋`rename`）；包经 `document::place_tree`——在同一 section 里一个点开头的暂存目录中写齐每一项（每个文件在暂存目录里经 `stage` 写入并 `sync_all`，不再各自暂存改名；扫描跳过点开头的项），再一次 `rename` 把整个目录换进 `<name>/`。目录换入的目标此刻不存在（存在就是 `AlreadyShelved` 或拒），所以读者看到的要么没有这件包、要么整包，没有第三种。上次崩溃留下的同名暂存目录先删掉再写：它从未被换入，没有读者见过它。
+- **内容哈希入 CAS，登记先于换入**：`register` 由装配层供给（本 crate 依赖只有 `kernel`，CAS 归 `memory`；与 `Neighbourhood::scan` 的 `waiting` 同一口径），绑定的是 `memory::Cas::put`。登记的是哈希所算的那串字节——文档登记正文，包登记整包规范串（一个 blob，键就是人批准的哈希，历史能从它还原整包；逐项分别登记会留下一堆没有清单的 blob，整包哈希在 CAS 里指不到任何东西）。登记哈希与 `Installed::hash` 不符即拒（`E_CAS_CORRUPT`）：书架与 CAS 说的是同一份字节才叫有据可查。**来源记名即内容哈希**：盘上那份是现场，CAS 那份是历史（与 JOB.md 同一口径，§8-13 的 hash 答的正是「它变了没有」）。
+- **失败码**：来源不在＝`E_PATH_NOT_FOUND`；来源不是包（缺 `SKILL.md`、既不是目录也不是 `.md` 文件）、包里有链接、包超过大小上限、名字或 section 不可用、名称冲突（含同格 `<name>.md` 与 `<name>/` 并存）＝`E_INVALID_ARGS`（与 `building::create` 的「名字已被占」同码同形）；依据被换＝`E_VERSION_CONFLICT`；登记哈希不符＝`E_CAS_CORRUPT`；落盘失败沿 `document::replace` 的 `E_STORAGE_FATAL`。每条拒因都带动作、主体与可执行的恢复语。
 - **外部书架没有臂**：`Slot` 只有两个构造点，城库与楼架。外部书架是别人目录的只读挂载（§8-8），往那里落东西在类型上就拼不出来。
 
-**本节测试**：`library::install::tests`——装上架的字节等于来源字节且扫描读回的 `Holding` 与 `Installed::holding` 整体相等；同哈希重装幂等（`AlreadyShelved`，盘上字节不变）；**plan 与 apply 之间来源目录被换即整体拒收**（拒后盘上无文件、登记零调用）；经符号链接的包恒拒；异哈希占名与跨 section 同名各拒一次。CAS 绑定的端到端一例在 `crates/sprawling/tests/skill_install.rs`（`Cas::put` 兑付 `register`，装上架的内容可按 `Installed::holding.hash` 从 CAS 取回同一份字节）。
+**本节测试**：`library::install::tests`——装上架的字节等于来源字节且扫描读回的 `Holding` 与 `Installed::holding` 整体相等；带子目录与多个文件的包整包落成 `<name>/`、逐项字节相等、登记的一个 blob 的哈希等于 `Installed::hash`；同哈希重装幂等（`AlreadyShelved`，盘上字节不变）；**plan 与 apply 之间来源被换即整体拒收**（`SKILL.md` 被改、多出一项、深层一项被改；拒后盘上无文件、登记零调用）；经符号链接的包恒拒，深层一项是链接也拒且拒词点出那一项；异哈希占名与跨 section 同名各拒一次；同格 `<name>.md` 与 `<name>/` 并存即拒；超过大小上限的包即拒（按句柄报出的长度，不读字节）。`document::tests` 另有一例：目标已在时 `place_tree` 拒收，目标旁不留暂存目录、目标原样。CAS 绑定的端到端一例在 `crates/sprawling/tests/skill_install.rs`（`Cas::put` 兑付 `register`，装上架的内容可按 `Installed::hash` 从 CAS 取回同一份字节）。
 
 ### 8-29 city::check：一座城的每份 TOML，逐份读一遍，错处落到行列（形状 1 判定）
 

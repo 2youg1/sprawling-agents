@@ -41,6 +41,7 @@ mod release;
 mod render;
 mod report;
 mod repro;
+mod root;
 mod sbom;
 mod secret;
 mod spec;
@@ -58,14 +59,20 @@ mod wire_ts;
 mod wiring;
 mod wording;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
 
 use report::XtaskError;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let root = match repo_root() {
+    let judged = std::env::current_dir()
+        .map_err(|source| XtaskError::Io {
+            path: ".".to_owned(),
+            source,
+        })
+        .and_then(|cwd| root::judged(Path::new(env!("CARGO_MANIFEST_DIR")), &cwd));
+    let root = match judged {
         Ok(root) => root,
         Err(err) => return report::internal_failure(&err),
     };
@@ -213,18 +220,6 @@ fn main() -> ExitCode {
             usage();
             ExitCode::from(2)
         }
-    }
-}
-
-/// The repo root is the parent of the xtask manifest directory.
-fn repo_root() -> Result<PathBuf, XtaskError> {
-    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    match manifest.parent() {
-        Some(parent) => Ok(parent.to_path_buf()),
-        None => Err(XtaskError::Doc {
-            file: "CARGO_MANIFEST_DIR".to_owned(),
-            msg: "xtask manifest directory has no parent".to_owned(),
-        }),
     }
 }
 

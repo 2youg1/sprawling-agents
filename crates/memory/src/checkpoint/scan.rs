@@ -15,6 +15,7 @@ use crate::error::MemoryError;
 use super::fence::{Checkpoint, git_err};
 use super::provenance::Provenance;
 
+pub(crate) mod pathspec;
 mod stage_filter;
 use stage_filter::{StageFilter, workdir};
 
@@ -143,6 +144,10 @@ impl Checkpoint {
     /// outside the scope are never touched — the write domain is the
     /// boundary, and a wider `add` would stage what the Run never held.
     ///
+    /// One `add_all`, which stages removals as well: libgit2 walks the
+    /// index against the working tree once and skips each unchanged file
+    /// by its stat data, and a second `update_all` walk repaid nothing.
+    ///
     /// **A session slice is never staged.** It is a disposable
     /// projection the city's own accounting thread appends to while the
     /// wave runs, and a fence that staged it would ask git to read a
@@ -156,13 +161,33 @@ impl Checkpoint {
     /// and the index it wrote, which is what the fence touched and not
     /// what the city holds.
     pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, MemoryError> {
+        let files = self.stage_scopes_held(scopes)?;
+        write_index(&mut self.repo.index().map_err(git_err("read index"))?)?;
+        Ok(files)
+    }
+
+    /// Stages `scopes` into the repository's index in memory and leaves
+    /// the file on disk as it was, for a caller whose objects are not on
+    /// disk yet: an index written before them names blobs a failure
+    /// would drop, and later fences skip those entries by their stat data.
+    pub(crate) fn stage_scopes_held(
+        &mut self,
+        scopes: &[String],
+    ) -> Result<Vec<String>, MemoryError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
         let found: BTreeMap<Vec<u8>, git2::Oid> =
             index.iter().map(|entry| (entry.path, entry.id)).collect();
-        let patterns = Self::pathspecs(scopes);
-        let specs: Vec<&str> = patterns.iter().map(String::as_str).collect();
-        let mut filter = StageFilter::new(workdir(&self.repo)?);
-        {
+        let root = workdir(&self.repo)?;
+        let (files, prefixes): (Vec<&String>, Vec<&String>) = scopes
+            .iter()
+            .partition(|scope| names_a_file(root, &index, scope));
+        let mut filter = StageFilter::new(root);
+        for file in files {
+            self.stage_file(&mut index, &mut filter, std::path::Path::new(file.as_str()))?;
+        }
+        if scopes.is_empty() || !prefixes.is_empty() {
+            let patterns = pathspec::of(&prefixes.into_iter().cloned().collect::<Vec<_>>());
+            let specs: Vec<&str> = patterns.iter().map(String::as_str).collect();
             let mut admit = |path: &std::path::Path, _matched: &[u8]| -> i32 { filter.admit(path) };
             index
                 .add_all(
@@ -171,12 +196,8 @@ impl Checkpoint {
                     Some(&mut admit),
                 )
                 .map_err(git_err("stage scope"))?;
-            index
-                .update_all(specs.iter(), Some(&mut admit))
-                .map_err(git_err("stage deletions"))?;
         }
         filter.refused()?;
-        write_index(&mut index)?;
         let mut changed: BTreeSet<Vec<u8>> = BTreeSet::new();
         let mut present = 0usize;
         for entry in index.iter() {
@@ -203,30 +224,28 @@ impl Checkpoint {
             .collect())
     }
 
-    /// One git pathspec per prefix the run may write under.
-    ///
-    /// Several, because a write domain is a set: a building's own
-    /// subtree plus whatever else its `RULES.toml` declares. Staging
-    /// one of them and judging against all of them is what left files a
-    /// run legitimately wrote outside every checkpoint.
-    ///
-    /// No prefixes at all means the whole tree rather than nothing: the
-    /// caller that passes an empty set is the base fence, which has no
-    /// resident to take a domain from.
-    pub(crate) fn pathspecs(scopes: &[String]) -> Vec<String> {
-        if scopes.is_empty() {
-            return vec!["*".to_owned()];
+    /// Stages one file the wave wrote, or its removal, by its literal
+    /// path: a pathspec walk would cost the whole domain for one file.
+    /// The same admission and the same ignore rule as the walk.
+    fn stage_file(
+        &self,
+        index: &mut git2::Index,
+        filter: &mut StageFilter,
+        file: &std::path::Path,
+    ) -> Result<(), MemoryError> {
+        let ignored = self
+            .repo
+            .is_path_ignored(file)
+            .map_err(git_err("stage scope"))?;
+        if filter.admit(file) != 0 || (ignored && index.get_path(file, 0).is_none()) {
+            return Ok(());
         }
-        scopes
-            .iter()
-            .map(|scope| {
-                if scope.is_empty() || scope == "." {
-                    "*".to_owned()
-                } else {
-                    format!("{}/*", scope.trim_end_matches('/'))
-                }
-            })
-            .collect()
+        if workdir(&self.repo)?.join(file).is_file() {
+            index.add_path(file)
+        } else {
+            index.remove_path(file)
+        }
+        .map_err(git_err("stage scope"))
     }
 
     /// Commits the index at the injected time. An unchanged tree still
@@ -332,7 +351,7 @@ impl Checkpoint {
 /// Retrying is safe because the index being written is the in-memory one
 /// this call built, unchanged by a failed write: the second attempt
 /// states the same thing as the first.
-fn write_index(index: &mut git2::Index) -> Result<(), MemoryError> {
+pub(super) fn write_index(index: &mut git2::Index) -> Result<(), MemoryError> {
     const ATTEMPTS: u32 = 20;
     const WAIT: std::time::Duration = std::time::Duration::from_millis(25);
     let mut attempt: u32 = 0;
@@ -354,6 +373,20 @@ fn write_index(index: &mut git2::Index) -> Result<(), MemoryError> {
 /// collision and is refused on the first attempt.
 fn concurrent(err: &git2::Error) -> bool {
     err.class() == git2::ErrorClass::Index && err.message().contains("index.lock")
+}
+
+/// Whether a scope names one file rather than a prefix: a file in the
+/// working tree, or a path the index holds as a file and the tree no
+/// longer has.
+fn names_a_file(root: &std::path::Path, index: &git2::Index, scope: &str) -> bool {
+    match std::fs::symlink_metadata(root.join(scope)) {
+        Ok(meta) => meta.is_file(),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            index.get_path(std::path::Path::new(scope), 0).is_some()
+        }
+        // Any other failure is left to the walk, which reports it.
+        Err(_) => false,
+    }
 }
 
 #[cfg(test)]

@@ -26,6 +26,7 @@ pub(super) mod answered;
 pub(super) mod answering;
 pub(super) mod archives;
 pub(super) mod building_page;
+pub(super) mod city;
 pub(super) mod commits;
 pub(super) mod cost_of;
 pub(super) mod document;
@@ -45,14 +46,16 @@ pub(super) mod prepared;
 pub(super) mod rounds;
 pub(super) mod served;
 pub(super) mod skills;
+pub(super) mod snapshot;
 #[cfg(test)]
 mod standing_tests;
 #[cfg(test)]
 mod tests;
 pub(super) mod toolkits;
 
-pub(crate) use answering::answer_outside_the_lock;
+pub(crate) use answering::{Published, answer_outside_the_lock};
 pub(crate) use governance::Governance;
 pub(crate) use holding::Views;
 pub use holding::ask;
 pub(crate) use lines::pursued;
+pub use rounds::turns;

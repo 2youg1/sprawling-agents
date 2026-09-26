@@ -75,6 +75,8 @@ pub(crate) struct Sieving {
     pub(crate) cas: memory::Cas,
     pub(crate) city_root: PathBuf,
     pub(crate) room: Address,
+    /// The run and room an original is pinned for.
+    pub(crate) origin: memory::BlockOrigin,
     pub(crate) table: runtime::FilterTable,
     pub(crate) history: runtime::SieveHistory,
 }
@@ -97,6 +99,7 @@ impl Sieving {
                     cas: &mut self.cas,
                     city_root: &self.city_root,
                     room: &self.room,
+                    origin: self.origin.clone(),
                 },
                 table: &self.table,
                 history: &mut self.history,
@@ -151,6 +154,10 @@ impl Sieving {
             cas,
             city_root: site.write_root.clone(),
             room: addr.clone(),
+            origin: memory::BlockOrigin {
+                run: site.run_id,
+                building: addr.clone(),
+            },
             table: site.filters.clone(),
             history: runtime::SieveHistory::default(),
         })

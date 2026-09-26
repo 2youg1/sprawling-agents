@@ -36,9 +36,9 @@ pub(super) const BUILDING_DISCLOSURE: &str = "drive this machine's browser: open
 /// that will not open.
 pub(crate) fn for_building(
     city_root: &std::path::Path,
-    building: &kernel::Address,
+    origin: memory::BlockOrigin,
 ) -> Result<BrowserTool, AxError> {
-    let profile = city_root.join(browser::Profile::of(building)?.path().as_str());
+    let profile = city_root.join(browser::Profile::of(&origin.building)?.path().as_str());
     std::fs::create_dir_all(&profile).map_err(|err| {
         AxError::failure(
             AxCode::StorageFatal,
@@ -55,6 +55,7 @@ pub(crate) fn for_building(
         Role::Building,
         Box::new(crate::browser_bidi::LazyEngine::new(profile, false, port)),
         cas,
+        origin,
     )
 }
 
@@ -75,15 +76,15 @@ pub(super) fn open_cas(city_root: &std::path::Path) -> Result<Cas, AxError> {
 /// that will not open.
 pub(crate) fn for_rules(
     city_root: &std::path::Path,
-    building: &kernel::Address,
+    origin: &memory::BlockOrigin,
     rules: &city::BuildingRules,
 ) -> Result<Vec<BrowserTool>, AxError> {
     let mut tools = Vec::new();
     if rules.browser() {
-        tools.push(for_building(city_root, building)?);
+        tools.push(for_building(city_root, origin.clone())?);
     }
     if let Some(user) = rules.usersbrowser() {
-        tools.push(for_user_browser(city_root, user)?);
+        tools.push(for_user_browser(city_root, user, origin.clone())?);
     }
     Ok(tools)
 }

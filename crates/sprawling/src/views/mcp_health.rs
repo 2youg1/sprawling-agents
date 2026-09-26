@@ -20,7 +20,7 @@
 
 use kernel::{Address, AxCode, AxError, TimeoutMs};
 
-use super::holding::Views;
+use super::prepared::LiveAsk;
 use protocol::McpLink;
 
 /// How long one server is given to finish `initialize` and list what it
@@ -29,7 +29,7 @@ use protocol::McpLink;
 /// has said nothing in this long is one they need told about.
 const HANDSHAKE_PATIENCE: TimeoutMs = TimeoutMs(15_000);
 
-impl Views {
+impl LiveAsk {
     /// Reaches every server this address's configuration names, in the
     /// order it names them.
     ///
@@ -194,10 +194,14 @@ mod tests {
     #[test]
     fn an_address_that_configures_no_server_answers_an_empty_list() {
         let dir = tempfile::tempdir().unwrap();
-        let views = Views::new(dir.path());
+        let live = LiveAsk {
+            city_root: dir.path().to_path_buf(),
+            city: None,
+            vault: None,
+        };
         let addr = Address::parse("lab/room1").unwrap();
         assert_eq!(
-            views.mcp_health_answer(&addr),
+            live.mcp_health_answer(&addr),
             channels::McpHealthAnswer {
                 addr,
                 servers: Vec::new(),

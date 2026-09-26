@@ -118,8 +118,8 @@ export interface FieldProps {
       {step}
       {pattern}
       class="min-w-0 flex-1 bg-transparent text-body {disabled
-        ? 'text-text-disabled'
-        : 'text-text'} placeholder:text-text-disabled {mono ? 'font-mono' : ''}"
+        ? 'aria-disabled:text-text-disabled'
+        : 'text-text'} placeholder:text-text-faint {mono ? 'font-mono' : ''}"
       {value}
       {placeholder}
       aria-disabled={disabled}

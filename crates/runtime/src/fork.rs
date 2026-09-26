@@ -151,6 +151,7 @@ fn fold_run<'a>(
             EventKind::CityInitialized
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured
+            | EventKind::BuildingRemoved
             | EventKind::SessionOpened
             | EventKind::RunForked
             | EventKind::PromptAssembled
@@ -208,6 +209,8 @@ fn fold_run<'a>(
             | EventKind::FileDiscarded
             | EventKind::DiscardRestored
             | EventKind::AutonomyChanged
+            | EventKind::WentBack
+            | EventKind::FileRestored
             | EventKind::GovernedDocumentWritten
             | EventKind::SpineDocumentWritten
             | EventKind::RulesChanged

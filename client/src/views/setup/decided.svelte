@@ -40,7 +40,7 @@
 <div class="flex flex-col gap-tight">
   <span class="text-note font-label text-text-quiet">{say($lang, "decided_title")}</span>
   {#if newest === undefined}
-    <p class="text-note text-text-disabled">…</p>
+    <p class="text-note text-text-faint">…</p>
   {:else if newest.length === 0}
     <p class="text-note text-text-faint">{say($lang, "decided_none")}</p>
   {:else}

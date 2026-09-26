@@ -25,8 +25,10 @@ use crate::error::MemoryError;
 /// partway leaves bytes the position does not account for - a torn
 /// line, or whole lines whose sync failed - and a wave appended after
 /// them would sit behind bytes the next open truncates, so its `Ok`
-/// would claim a record the disk then loses. Only open reads the tail
-/// and knows what is there; a broken handle refuses every later wave.
+/// would claim a record the disk then loses. A broken handle refuses
+/// every later wave until the position is true again: either
+/// `jsonl::unwind` has cut the segments back to their length before the
+/// failed wave, or a reopen has read the tail.
 pub(crate) enum Barrier {
     Whole,
     Broken,

@@ -194,12 +194,29 @@ fn a_session_the_server_ended_is_forgotten_rather_than_kept() {
         .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
         .unwrap_err();
     assert!(err.subject().contains("ended this session"));
+    assert_eq!(err.retry(), kernel::Retry::Yes, "the call never ran");
     assert_eq!(
         held.session.lock().unwrap().id,
         None,
         "a session the server disowned is not sent back to it"
     );
     let _ = server.join();
+}
+
+/// A 404 on a request that carried no session id says the address is
+/// wrong, and asking again only earns the same answer: a retryer that
+/// reads `retry()` does not send the call again.
+#[test]
+fn a_404_without_a_session_is_a_wrong_address_and_is_not_asked_again() {
+    let (url, server) = fake_server(404, "{}".to_owned());
+    let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
+
+    let err = held
+        .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
+        .unwrap_err();
+
+    drop(server.join());
+    assert_eq!(err.retry(), kernel::Retry::No);
 }
 
 /// A paid server's key belongs in the vault, not in a building's

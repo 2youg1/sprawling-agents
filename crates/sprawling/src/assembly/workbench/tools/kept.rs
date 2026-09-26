@@ -175,4 +175,10 @@ impl Tool for Kept {
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
         self.tool.subject(call)
     }
+
+    /// What the kept tool writes: custody rewrites the text, not the
+    /// path.
+    fn writes(&self, call: &ToolCall) -> kernel::Writes {
+        self.tool.writes(call)
+    }
 }

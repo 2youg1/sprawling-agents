@@ -24,6 +24,7 @@ pub mod doctor;
 pub mod firstrun;
 pub mod home;
 pub mod lineage;
+pub mod monitor;
 pub mod release;
 mod revealing;
 pub mod serving;
@@ -37,4 +38,4 @@ mod person;
 mod toolkit_broker;
 mod views;
 
-pub use views::ask;
+pub use views::{ask, turns};

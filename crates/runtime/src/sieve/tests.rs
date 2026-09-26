@@ -45,6 +45,7 @@ fn run(world: &mut World, key: &CommandKey, code: Option<i64>, text: &str) -> Si
         cas: &mut world.cas,
         city_root: &world.root,
         room: &world.address,
+        origin: crate::offload::tests::origin(),
     };
     let input = SieveInput {
         key,

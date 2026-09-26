@@ -5,18 +5,69 @@
 
 //! A run's bench as the tool face a wave drives in three stages
 //! (runtime-SPEC.md 8-3): each call's key is placed by its position when
-//! it is admitted, and the commits it was fenced against and the
-//! commands that ran are counted when it is accounted. Both happen in
-//! call order, so a wave whose reads ran at once leaves the same keys,
-//! the same fence list and the same counts as one that ran them in turn.
+//! it is admitted, and the commits it was fenced against, what it says
+//! it wrote and the commands that ran are counted when it is accounted.
+//! Both happen in call order, so a wave whose reads ran at once leaves
+//! the same keys, the same fence list, the same next fence and the same
+//! counts as one that ran them in turn.
 
 use std::cell::RefCell;
 
-use kernel::{AxError, Effect, IdemKey, RunId, Seq, TimeMs, Tool, ToolCall, ToolOutcome};
+use kernel::{AxError, Effect, IdemKey, RunId, Seq, TimeMs, Tool, ToolCall, ToolOutcome, Writes};
 use runtime::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
 use runtime::{Admitted, ConcurrentInvoke};
 
 use super::Sieving;
+
+/// What a run's calls leave for the fences around them. Shared between
+/// the tool face and the wave fence, which the turn driver holds at once.
+pub(super) struct Fencing {
+    /// The commits the run was fenced against, in the order they went
+    /// up. The wave fence and the bench both add to it, so the sweep
+    /// afterwards reads the first commit a deleted file can be restored
+    /// from.
+    pub(super) fenced: RefCell<Vec<String>>,
+    /// What the calls since the last fence said they wrote, which is
+    /// what the next fence stages (runtime-SPEC 8-45).
+    wrote: RefCell<Writes>,
+}
+
+impl Fencing {
+    /// A run's fencing before its first call. What it wrote opens as the
+    /// whole domain: no commit of this run vouches yet for the tree it
+    /// opened on.
+    pub(super) fn opened() -> Fencing {
+        Fencing {
+            fenced: RefCell::new(Vec::new()),
+            wrote: RefCell::new(Writes::Domain),
+        }
+    }
+
+    /// What the next fence stages: the paths the calls since the last
+    /// fence said they wrote, or the whole write domain when one of them
+    /// could not say. Taken, so the fence after it starts from what the
+    /// calls after this one say. `Nothing` stages the domain as well:
+    /// staging less than the domain is safe only on the calls' own
+    /// account of what they wrote, and there is none to go by.
+    pub(super) fn take_scope(&self, domain: &[String]) -> Vec<String> {
+        match self.wrote.replace(Writes::Nothing) {
+            Writes::Paths(paths) => paths.iter().map(|path| path.as_str().to_owned()).collect(),
+            Writes::Nothing | Writes::Domain => domain.to_vec(),
+        }
+    }
+
+    fn add(&self, this: Writes) {
+        let mut held = self.wrote.borrow_mut();
+        *held = std::mem::replace(&mut *held, Writes::Nothing).and(this);
+    }
+
+    /// A call that failed may have failed partway through its writes, and
+    /// its own account of them no longer holds, so the next fence walks
+    /// the whole domain (runtime-SPEC 8-45).
+    fn widen(&self) {
+        self.add(Writes::Domain);
+    }
+}
 
 pub(super) struct Placing<'f> {
     bench: ToolBench,
@@ -34,10 +85,7 @@ pub(super) struct Placing<'f> {
     /// evidence of "the tests passed" the city can observe without being
     /// told, and being told is what a mode is supposed to check.
     ran: (u32, u32),
-    /// The commits the run was fenced against, in the order they went
-    /// up. The wave fence writes the same list, so the sweep afterwards
-    /// reads the first commit a deleted file can be restored from.
-    fenced: &'f RefCell<Vec<String>>,
+    fencing: &'f Fencing,
 }
 
 impl<'f> Placing<'f> {
@@ -45,7 +93,7 @@ impl<'f> Placing<'f> {
         bench: ToolBench,
         sieving: Sieving,
         run: RunId,
-        fenced: &'f RefCell<Vec<String>>,
+        fencing: &'f Fencing,
     ) -> Placing<'f> {
         Placing {
             bench,
@@ -53,7 +101,7 @@ impl<'f> Placing<'f> {
             run,
             next: 0,
             ran: (0, 0),
-            fenced,
+            fencing,
         }
     }
 
@@ -65,10 +113,15 @@ impl<'f> Placing<'f> {
     /// What the model reads back for what the bench decided.
     fn answered(&mut self, call: &ToolCall, decided: BenchOutcome) -> Result<ToolOutcome, AxError> {
         match decided {
-            BenchOutcome::Ran { outcome, fenced } => {
+            BenchOutcome::Ran {
+                outcome,
+                fenced,
+                wrote,
+            } => {
                 if let Some(oid) = fenced {
-                    self.fenced.borrow_mut().push(oid);
+                    self.fencing.fenced.borrow_mut().push(oid);
                 }
+                self.fencing.add(wrote);
                 if call.name.as_str() != kernel::ToolName::EXEC {
                     return Ok(outcome);
                 }
@@ -129,7 +182,10 @@ impl ConcurrentInvoke for Placing<'_> {
         match self.bench.clear(call, &key, t) {
             Ok(Clearance::Cleared(ticket)) => Admitted::Cleared(ticket),
             Ok(Clearance::Answered(decided)) => Admitted::Answered(self.answered(call, decided)),
-            Err(refused) => Admitted::Answered(Err(refused)),
+            Err(refused) => {
+                self.fencing.widen();
+                Admitted::Answered(Err(refused))
+            }
         }
     }
 
@@ -147,7 +203,10 @@ impl ConcurrentInvoke for Placing<'_> {
         ticket: Ticket,
         answered: Result<ToolOutcome, AxError>,
     ) -> Result<ToolOutcome, AxError> {
-        let decided = self.bench.account(ticket, answered)?;
+        let decided = self
+            .bench
+            .account(ticket, answered)
+            .inspect_err(|_| self.fencing.widen())?;
         self.answered(call, decided)
     }
 }

@@ -28,8 +28,10 @@ use kernel::{Address, AxCode, AxError, Payload};
 
 use crate::policy::RULES_FILE;
 
+pub(crate) mod removal;
 pub(crate) mod template;
 
+pub use removal::{Removed, remove, removed_payload};
 pub use template::BuildingTemplate;
 
 /// A building: the top-level address that governs a run.

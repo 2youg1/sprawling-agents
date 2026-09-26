@@ -20,11 +20,11 @@ use channels::{EventKind, EventRecord, RunId};
 use kernel::Locator;
 use kernel::event::record::{RoadmapMoved, RoadmapStep};
 
-use super::holding::Views;
+use super::prepared::LedgerAsk;
 
-impl Views {
+impl LedgerAsk {
     /// Every locator this run left behind, oldest first.
-    pub(super) fn evidence_answer(&mut self, run: RunId) -> channels::EvidenceAnswer {
+    pub(super) fn evidence_answer(&self, run: RunId) -> channels::EvidenceAnswer {
         let items = self
             .records_of(run)
             .iter()

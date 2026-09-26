@@ -11,7 +11,9 @@ default: check
 # skip when those are absent. Without this dependency `just check`
 # reported green on a machine where neither gate had ever run; CI says
 # the same thing through `.github/actions/client-artifacts`, which runs
-# `build-web` for the jobs that run those gates.
+# `build-web` for the jobs that run those gates. It sits before `clippy`
+# as well, because `crates/sprawling/build.rs` embeds the bundle: built
+# after the compile, a stale bundle is what clippy and the tests saw.
 #
 # Formatting of both trees runs right after `prereqs`, because it answers
 # in seconds and every later step compiles for minutes: an unformatted
@@ -19,7 +21,124 @@ default: check
 # step, after the whole workspace had been built and tested. `just` runs
 # a dependency once per invocation, so `check-desktop` finds
 # `fmt-check-desktop` already done and does not repeat it.
-check: prereqs fmt-check fmt-check-desktop clippy features test build-web gates check-client check-desktop
+check: prereqs fmt-check fmt-check-desktop build-web clippy features test gates check-client check-desktop
+
+# The merge's whole check: the phases of `check`, but every phase runs
+# even after another has failed, so one run names every red rather than
+# the first. build-web runs first and once, because the compile embeds
+# the bundle and the gates read it. The phases that share the workspace
+# target run as one chain, and the client and `desktop/` (its own
+# target) run beside it, so the run takes as long as its longest chain.
+# Each phase logs to <target>/check-all/<phase>.log, and phases.tsv holds
+# one `phase<TAB>exit<TAB>seconds` row per phase. Naming phases runs
+# those alone, which is how a red phase is rerun after its fix.
+check-all *phases:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    out="${CARGO_TARGET_DIR:-target}/check-all"
+    rm -rf "$out" && mkdir -p "$out" || exit 2
+    wanted=" {{phases}} "
+    phase() {
+        local name=$1 start=$SECONDS rc
+        shift
+        [ "$wanted" = "  " ] || [[ "$wanted" == *" $name "* ]] || return 0
+        "$@" > "$out/$name.log" 2>&1
+        rc=$?
+        printf '%s\t%s\t%s\n' "$name" "$rc" "$((SECONDS - start))" >> "$out/phases.tsv"
+    }
+    just prereqs || exit 2
+    phase fmt just fmt-check
+    phase fmt-desktop just fmt-check-desktop
+    phase build-web just build-web
+    { phase clippy just clippy; phase features just features
+      phase test just test --no-fail-fast; phase gates just gates; } &
+    { phase client just client-checks; } &
+    { phase desktop just --no-deps check-desktop; } &
+    wait
+    touch "$out/phases.tsv"
+    column -t -s $'\t' "$out/phases.tsv"
+    awk -F'\t' '$2 != 0 { red = 1 } END { exit red }' "$out/phases.tsv"
+
+# The branch check (AGENTS.md, Verification tier 2) on <base>...HEAD:
+# the guard over the branch's own commits, formatting, clippy on the
+# workspace when a package changed, every test of a changed package and
+# the tests of its dependents that name an item or module the diff
+# touched, every gate that reads sources, and the client, its artifact
+# gates and `desktop/` when the branch touched them. Every step runs even
+# after another failed. Clippy lints the whole workspace on all features,
+# the set `check` compiles, because a `-p` selection unifies features
+# differently and recompiles shared dependencies for every selection.
+# A green result is recorded against the tree, and a clean worktree on a
+# recorded tree returns at once, so one tree is never checked twice.
+check-branch base="main":
+    #!/usr/bin/env bash
+    set -uo pipefail
+    tree=$(git rev-parse 'HEAD^{tree}') && mb=$(git merge-base '{{base}}' HEAD) || exit 2
+    mark="${CARGO_TARGET_DIR:-target}/check-branch/$tree.ok"
+    clean=$([ -z "$(git status --porcelain)" ] && echo yes)
+    if [ -n "$clean" ] && [ -f "$mark" ]; then echo "check-branch: tree $tree is already green"; exit 0; fi
+    changed=$(git diff --name-only "$mb" HEAD)
+    touched() { printf '%s\n' "$changed" | grep -q "^$1/"; }
+    # Every workspace package lives in crates/<name>, xtask or citysim.
+    packages=$(printf '%s\n' "$changed" | grep -v '\.md$' | sed -n 's#^crates/\([^/]*\)/.*#\1#p; s#^\(xtask\|citysim\)/.*#\1#p' | sort -u)
+    rc=0
+    step() { echo "== $1"; shift; "$@" || { rc=1; echo "== red: $*"; }; }
+    gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm') || exit 2
+    step guard cargo xtask gates guard --range "$mb..HEAD"
+    step fmt just fmt-check
+    touched client && step build-web just build-web
+    if [ -n "$packages" ]; then
+        step clippy just clippy
+        step tests just test --no-fail-fast --no-tests=warn -E "$(just branch-tests "$mb" $packages)"
+    fi
+    # shellcheck disable=SC2086
+    step gates cargo xtask gates $gates --range "$mb..HEAD"
+    step deny just deny
+    touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
+    touched desktop && step desktop just check-desktop
+    [ "$rc" = 0 ] && [ -n "$clean" ] && mkdir -p "$(dirname "$mark")" && touch "$mark"
+    exit "$rc"
+
+# The nextest filterset `check-branch` runs: every test of each changed
+# package, and in each workspace package that depends on one, the test
+# files that name an item or module the diff since <base> added, removed
+# or edited. Names under four characters are too common to mean
+# anything and are left out.
+branch-tests base +packages:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    changed=" {{packages}} "
+    names=$( { git diff -U0 '{{base}}' HEAD -- '*.rs' | grep -E '^[+-][^+-]' \
+                 | grep -oE '\b(fn|struct|enum|trait|const|static|type|mod)\s+[A-Za-z_][A-Za-z0-9_]*' | awk '{print $2}'
+               git diff --name-only '{{base}}' HEAD -- '*.rs' | sed -n 's#.*/src/##p' | sed 's#\.rs$##' | tr '/' '\n'; } \
+             | grep -Evx 'main|lib|mod|tests?|.{0,3}' | sort -u | paste -sd'|')
+    filters=$(for p in {{packages}}; do printf 'package(%s)\n' "$p"; done)
+    if [ -n "$names" ]; then
+        for p in {{packages}}; do
+            cargo tree --workspace --locked -i "$p" -e normal,dev,build --depth 1 --prefix none --format '{p}' | awk '{print $1}'
+        done | sort -u | while read -r dep; do
+            [[ "$changed" == *" $dep "* ]] && continue
+            dir=crates/$dep; [ -d "$dir" ] || dir=$dep
+            git grep -lwE "$names" -- "$dir/tests/*.rs" "$dir/src/**/tests.rs" "$dir/src/**/*_tests.rs" | while read -r file; do
+                rel=${file#"$dir"/}; rel=${rel%.rs}
+                case $rel in
+                    # A directory under tests/ is a test binary only with a main.rs
+                    # or a sibling <dir>.rs; otherwise it holds fixtures.
+                    tests/*/*) binary=$(echo "$rel" | cut -d/ -f2)
+                               if [ -f "$dir/tests/$binary/main.rs" ] || [ -f "$dir/tests/$binary.rs" ]; then
+                                   printf 'binary_id(%s::%s)\n' "$dep" "$binary"
+                               fi ;;
+                    tests/*) printf 'binary_id(%s::%s)\n' "$dep" "${rel#tests/}" ;;
+                    *) module=${rel#src/}; module=${module%/tests}; module=${module#main/}; module=${module#lib/}
+                       case $module in bin/*/*) module=${module#bin/*/} ;; esac
+                       case $module in
+                           main|lib|tests) printf 'package(%s)\n' "$dep" ;;
+                           *) printf '(package(%s) & test(/^%s::/))\n' "$dep" "${module//\//::}" ;;
+                       esac ;;
+                esac
+            done
+        done
+    fi | cat <(printf '%s\n' "$filters") - | sort -u | paste -sd'|' | sed 's/|/ | /g'
 
 # The one authority on what this repository's loop needs installed.
 #
@@ -139,8 +258,9 @@ features:
     cargo check -p channels --no-default-features --locked
 
 # `just prereqs` names cargo-nextest; `just test-std` is the fallback.
-test:
-    cargo nextest run --workspace --locked --all-features
+[positional-arguments]
+test *args:
+    cargo nextest run --workspace --locked --all-features "$@"
 
 test-std:
     cargo test --workspace --locked
@@ -209,7 +329,10 @@ build-web:
 # instead of holding a second `bun install` line that could drift from
 # it. `just` runs a dependency once per invocation, so `just check`
 # installs and bundles exactly once even though both recipes are in it.
-check-client: build-web
+check-client: build-web client-checks
+
+# The client's own gates on the dependencies build-web installed.
+client-checks:
     cd client && bun run lint && bun run typecheck && bun run test
 
 # The gate that opens the gallery in a real engine, on its own: roles,

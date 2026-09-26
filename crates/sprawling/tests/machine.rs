@@ -54,6 +54,7 @@ impl accounting::Machine for OneItem {
                 keeps: channels::DoctorCustodyLifetime::ThisProcess,
                 refusal: None,
             },
+            core: channels::DoctorCore::HeldBySetting,
         }
     }
 

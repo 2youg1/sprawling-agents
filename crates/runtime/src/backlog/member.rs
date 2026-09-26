@@ -12,6 +12,7 @@ use std::process::Child;
 use kernel::{Address, AxCode, AxError, RunId};
 
 use super::BacklogKind;
+use super::tail::Tail;
 
 pub(super) struct Member {
     pub(super) scope: Address,
@@ -26,6 +27,7 @@ pub(super) enum Body {
         child: Child,
         dir: PathBuf,
         claim: Claim,
+        tail: Tail,
     },
     Run(RunState),
 }

@@ -78,7 +78,7 @@ pub(crate) use driving::lane::{DriveContext, drive_run};
 use driving::owing::{KnockChain, Owed, Owing, Unasked};
 pub(crate) use driving::{Driven, Driving};
 pub(crate) use folds::Standing;
-pub(crate) use folds::fold_city;
+pub(crate) use folds::start_served_views;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 use genesis::city_segment;
 pub use genesis::{Adopt, InitReport, form_city, init_city};
@@ -95,7 +95,7 @@ use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use kernel::{AxCode, AxError, EventRecord, RunId, TimeMs};
@@ -107,8 +107,6 @@ use accounting::effect;
 use kernel::{Address, EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};
 use runtime::Interrupt;
-#[cfg(test)]
-use std::path::Path;
 
 /// The wall clock: the single sanctioned sampling point (clippy.toml
 /// disallowed-methods), and the production `accounting::Clock`
@@ -175,7 +173,7 @@ impl ScanReport {
 
 /// Where a served city listens, installed once by whoever serves it.
 ///
-/// The three sinks are one fact — *somebody is watching this city* —
+/// The four sinks are one fact — *somebody is watching this city* —
 /// and a worker that has any of them has all of them. A worker driven
 /// one command at a time has none, and that absence is the switch: its
 /// runs ask their provider for no stream at all, so replay and citysim
@@ -183,6 +181,8 @@ impl ScanReport {
 pub(crate) struct Serving {
     /// Where a model's text goes while it is still arriving.
     pub(crate) deltas: Arc<dyn Fn(channels::Delta) + Send + Sync>,
+    /// Where a running command's output goes while it is still written.
+    pub(crate) outputs: Arc<dyn Fn(channels::LiveOutput) + Send + Sync>,
     /// Where a fresh look at this machine goes: the one place the
     /// doctor's answer is replaced after the look taken at start-up.
     pub(crate) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
@@ -213,12 +213,12 @@ pub struct RunWorker {
     /// Whose identity this city can call which model under
     /// (`credentials::held`).
     credentials: Credentials,
-    /// The three places a live control surface listens, or `None` in a
+    /// The four places a live control surface listens, or `None` in a
     /// worker driven one command at a time.
     ///
-    /// **One `Option`, not three.** The three sinks are installed by
+    /// **One `Option`, not four.** The four sinks are installed by
     /// one caller in one breath and are absent together in every other
-    /// worker; as three fields the type admitted eight states of which
+    /// worker; as four fields the type admitted sixteen states of which
     /// two were reachable, and adding a fourth sink meant remembering a
     /// fourth setter (sprawling-SPEC.md 8-46-10).
     serving: Option<Serving>,
@@ -275,6 +275,9 @@ pub struct RunWorker {
     /// (`SystemClock`). Shared, because a lane reads it while the
     /// worker does.
     pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
+    /// Reads the city's volume at the door new work enters by
+    /// (sprawling-SPEC.md 8-94).
+    read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
 }
 
 impl RunWorker {
@@ -306,14 +309,30 @@ impl RunWorker {
         self.ledger.observe(sink);
     }
 
-    /// Takes the three places a served city listens.
+    /// Takes the four places a served city listens.
     ///
     /// Separate from [`Self::observe`] because the two carry different
     /// kinds of thing: that one carries history, and these carry a view
     /// of work in progress and of the machine under it. One call rather
     /// than three, so a worker cannot end up streaming to a page that
     /// cannot interrupt it.
+    ///
+    /// The backlog takes the output sink here, so a worker nobody serves
+    /// reads no command's output at all (runtime-SPEC 8-28-3).
     pub(crate) fn serve(&mut self, serving: Serving) {
+        let outputs = Arc::clone(&serving.outputs);
+        self.flight.backlog = self.flight.backlog.clone().with_sink(runtime::Sink::new(
+            move |chunk: runtime::Chunk| {
+                outputs(channels::LiveOutput {
+                    run: chunk.run,
+                    stream: match chunk.stream {
+                        runtime::Stream::Out => channels::OutputStream::Out,
+                        runtime::Stream::Err => channels::OutputStream::Err,
+                    },
+                    text: String::from_utf8_lossy(&chunk.bytes).into_owned(),
+                });
+            },
+        ));
         self.serving = Some(serving);
     }
 }

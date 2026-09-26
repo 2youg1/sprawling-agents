@@ -213,6 +213,7 @@ pub fn run_scenario_on(
         job,
         parent: None,
         predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
         // A simulated run is nobody's branch: it is a scenario's own
         // first run.
         inherited: Vec::new(),
@@ -315,6 +316,7 @@ pub fn run_scenario_on(
                 now: &mut now,
                 interrupt: &mut interrupt,
                 fence: Some(&mut fence),
+                writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
                 invoke: &mut invoke,
                 wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
                 deltas: None,
@@ -326,6 +328,7 @@ pub fn run_scenario_on(
                 now: &mut now,
                 interrupt: &mut interrupt,
                 fence: None,
+                writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
                 invoke: &mut invoke,
                 wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
                 deltas: None,

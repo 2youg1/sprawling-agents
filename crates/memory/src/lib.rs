@@ -29,6 +29,7 @@ pub use jsonl::WriteObserver;
 #[rustfmt::skip]
 pub use jsonl::{CheckedLine, LineCheck, LineFault, read_line};
 pub use jsonl::{JsonlLedger, OpenReport, TailTruncation, ledger_segments_at, read_raw_lines_at};
+pub use jsonl::{TailLine, TailLines};
 
 // The projection the Ledger lays down beside each building: one file per
 // room, disposable, read by nobody in the product (memory-SPEC 8-24).
@@ -46,7 +47,7 @@ pub use bundle::{Bundle, MANIFEST, Manifest, open_restored};
 
 mod cas;
 
-pub use cas::Cas;
+pub use cas::{BlockOrigin, Cas};
 
 mod index;
 
@@ -105,16 +106,18 @@ pub use worktree::Worktrees;
 
 mod checkpoint;
 
-pub use checkpoint::Checkpoint;
 pub use checkpoint::ModelChoice;
 pub use checkpoint::Provenance;
 pub use checkpoint::effort_word;
 pub use checkpoint::recorded_effort;
+pub use checkpoint::{BaseProgress, Checkpoint};
 
+mod blob;
 mod changes;
 mod hunks;
 mod status;
 
+pub use blob::blob_at;
 pub use changes::{Head, between};
 pub use hunks::{FilePatch, PatchLine, Withheld, of_file};
 pub use status::{Drift, WorkingStatus, working_status};

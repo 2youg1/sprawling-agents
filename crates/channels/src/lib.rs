@@ -47,7 +47,7 @@ pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
 pub use answer::{CostOfAnswer, EvidenceAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use answer::{Decision, GovernanceAnswer};
-pub use answer::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use answer::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
@@ -84,7 +84,7 @@ pub use reception::{decide_admission, offered_pairing};
 #[cfg(feature = "server")]
 pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
-pub use server::{AcpProgress, AcpSink, Answering, TranscribeSink};
+pub use server::{AcpProgress, AcpSink, Answering, MonitorFeed, TranscribeSink};
 #[cfg(feature = "server")]
 pub use server::{
     Bound, Committed, Delivered, LedgerHead, Reply, ServeConfig, bind, router, serve,
@@ -92,9 +92,9 @@ pub use server::{
 #[cfg(feature = "schema")]
 pub use wire::wire_schema;
 pub use wire::{Answered, Ask, AskId, AskOutcome};
-pub use wire::{ClientFrame, Delta, ServerFrame};
+pub use wire::{ClientFrame, Delta, LiveOutput, OutputStream, ServerFrame};
 pub use wire::{Hello, Query, Welcome};
-pub use wire::{Lagged, LogLevel, LogLine};
+pub use wire::{Lagged, LogLevel, LogLine, Monitoring, Sample, Watched};
 pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};
 
 pub use kernel::model::{Mode, Window};

@@ -75,7 +75,7 @@
     {#snippet children(hint)}
       <button
         type="button"
-        class="relative flex h-control-sm w-control-sm shrink-0 items-center justify-center rounded-control text-text-disabled before:absolute before:-inset-snug before:content-[''] hover:text-text-quiet"
+        class="relative flex h-control-sm w-control-sm shrink-0 items-center justify-center rounded-control text-text-faint before:absolute before:-inset-snug before:content-[''] hover:text-text-quiet"
         aria-disabled={Option.isNone(address) ? "true" : undefined}
         aria-label={say($lang, "path_reveal")}
         aria-describedby={hint}

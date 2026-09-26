@@ -32,7 +32,9 @@ use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
 
 use accounting::Runnable;
-use kernel::AxError;
+use kernel::{AxCode, AxError};
+
+use crate::serving::standing::{Standing, raise_this_thread};
 
 use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Version};
 
@@ -49,6 +51,14 @@ use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Version}
 pub(crate) trait Machine: accounting::Machine + Sync {
     /// Whether this item is here, and in what condition.
     fn look(&self, requirement: &Requirement) -> Presence;
+
+    /// Where this machine lets a core thread stand under the person's
+    /// setting (sprawling-SPEC.md 8-93).
+    ///
+    /// # Errors
+    /// Reports a setting that does not read, and a thread that could not
+    /// be started to ask.
+    fn core_standing(&self) -> Result<Standing, AxError>;
 }
 
 /// The machine this process is running on.
@@ -106,6 +116,26 @@ impl Machine for ThisMachine {
             Detection::Built { carried } => built(*carried),
             Detection::Family(family) => super::family::look(*family, self.platform, &search_path),
         }
+    }
+
+    /// Asks on a thread of its own that ends with the answer, so the
+    /// doctor's own threads keep their level.
+    fn core_standing(&self) -> Result<Standing, AxError> {
+        let setting = crate::person::core_priority()?;
+        let unasked = |cause: String| {
+            AxError::failure(
+                AxCode::ToolUnavailable,
+                "ask the platform to raise a thread above normal",
+                cause,
+            )
+            .with_recovery("run doctor again; the core's own threads are asked when a city serves")
+        };
+        std::thread::Builder::new()
+            .name("doctor-standing".to_owned())
+            .spawn(move || raise_this_thread(setting))
+            .map_err(|err| unasked(err.to_string()))?
+            .join()
+            .map_err(|_| unasked("the thread that asked stopped before it answered".to_owned()))
     }
 }
 

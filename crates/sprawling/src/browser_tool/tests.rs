@@ -96,7 +96,8 @@ fn a_screenshot_past_the_cap_is_taken_again_and_the_smaller_one_kept() {
             json!({ "data": ONE_RED_PIXEL }),
         ],
     };
-    let tool = BrowserTool::new(Role::Building, Box::new(port), cas).expect("the tool builds");
+    let tool =
+        BrowserTool::new(Role::Building, Box::new(port), cas, origin()).expect("the tool builds");
     let shot = tool
         .invoke(&call(json!({ "action": "screenshot" })))
         .expect("the shot is taken again and kept");
@@ -208,6 +209,11 @@ fn one_conversation_replays_from_open_to_a_screenshot_that_is_evidence() {
         .get(hash)
         .expect("the bytes are in the store");
     assert_eq!(stored.len(), 70);
+    let origins = Cas::open(&dir.path().join("cas"))
+        .expect("the same store reopens")
+        .origins(hash)
+        .expect("the origins read");
+    assert_eq!(origins, vec![origin()], "pinned for the run that took it");
 }
 
 #[test]
@@ -278,6 +284,7 @@ fn the_person_tool_asks_before_it_connects_and_names_itself() {
         Role::PersonWaiting,
         Box::new(crate::browser_bidi::AttachedBrowser::waiting()),
         cas,
+        origin(),
     )
     .expect("the tool builds");
     assert_eq!(
@@ -316,6 +323,7 @@ fn a_declared_address_is_the_effect_the_attach_door_judges() {
             "ws://127.0.0.1:9222/session",
         )),
         cas,
+        origin(),
     )
     .expect("the tool builds");
     assert!(matches!(

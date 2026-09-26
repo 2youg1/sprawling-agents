@@ -46,8 +46,10 @@
 <script lang="ts">
   import { readAnswer } from "../core/answered";
   import { QUERIES } from "../core/asking";
-  import { halt, pursue, release } from "../core/commands";
+  import { halt, pursue, release, removeBuilding } from "../core/commands";
   import { fill, say } from "../core/lang";
+  import { pursuitClause } from "../core/pursuit";
+  import { removalOf } from "../core/removal";
   import { roomOf, toFragment } from "../core/route";
   import { within } from "../core/belief/live";
   import { buildingIsShut } from "../core/scope";
@@ -57,6 +59,7 @@
   import Badge from "./parts/badge.svelte";
   import Button from "./parts/button.svelte";
   import Unanswered from "./parts/unanswered.svelte";
+  import Dialog from "./parts/dialog.svelte";
   import Commits from "./building/commits.svelte";
   import Directory from "./building/directory.svelte";
   import FileView from "./building/file.svelte";
@@ -94,6 +97,10 @@
   });
 
   const halted = $derived(buildingIsShut($belief.halted, address));
+  const removal = $derived(removalOf(address, livingIn(address)));
+  // Removing moves the building's files out of the city, so it is asked
+  // through `parts/dialog` before the command leaves.
+  let removing = $state(false);
   const done = $derived.by(() => {
     const held = building;
     if (held === undefined || !("planned" in held.progress) || held.progress.planned.total === 0) {
@@ -167,7 +174,7 @@
       {say($lang, "nav_city")}
     </a>
     <!-- wording-ok: the path separator between two addresses, hidden from readers -->
-    <span class="text-text-disabled" aria-hidden="true">/</span>
+    <span class="text-text-faint" aria-hidden="true">/</span>
     <h1 class="text-title font-title" tabindex="-1">{address}</h1>
     {#if done !== null}
       <Badge
@@ -178,13 +185,13 @@
       />
     {/if}
     <!-- wording-ok: a drawn flag marking where the standing goal lives, hidden from readers -->
-    <span class="text-text-disabled" aria-hidden="true">⚑</span>
+    <span class="text-text-faint" aria-hidden="true">⚑</span>
     {#if pursuit === undefined}
       <!-- The field wears the same box as every other input, and its button
            is always there, so a person reads it as a place to type rather
            than as a label. -->
       <input
-        class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-disabled"
+        class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-faint"
         placeholder={fill(say($lang, "bld_goal_placeholder"), { addr: address })}
         bind:value={goal}
         onkeydown={(event) => {
@@ -206,7 +213,7 @@
         ]}
       ></span>
       <span class="min-w-0 flex-1 truncate text-note text-text-quiet">{pursuit.goal}</span>
-      <span class="font-mono text-note text-text-disabled">{pursuit.verdict}</span>
+      <span class="font-mono text-note text-text-faint">{pursuitClause($lang, pursuit.verdict)}</span>
       <Button
         label={pursuit.state === "running" ? say($lang, "bld_pause") : say($lang, "bld_resume")}
         tone="quiet"
@@ -235,6 +242,16 @@
     {#if !halted && livingIn(address) === 0}
       <span class="text-note text-text-quiet">{say($lang, "bld_halt_idle")}</span>
     {/if}
+    {#if removal !== "hall"}
+      <Button
+        label={fill(say($lang, "bld_remove"), { addr: address })}
+        tone="quiet"
+        {...removal === "busy" ? { why: say($lang, "bld_remove_busy") } : {}}
+        onPress={() => {
+          removing = true;
+        }}
+      />
+    {/if}
     <span class="@lg/page:hidden">
       <Button
         label={say($lang, "bld_tree")}
@@ -247,16 +264,18 @@
   </header>
 
   <div class="flex min-h-0 flex-1 flex-col @lg/page:flex-row">
+    <!-- Below the tree's width the four pages stay on screen as one row
+         that scrolls sideways, and the files toggle opens the tree with
+         the rooms under it: hiding the pages behind "files" left a narrow
+         screen with the plan and no visible way to the other three. -->
     <aside
-      class={[
-        "shrink-0 overflow-y-auto border-edge px-snug py-base @lg/page:block @lg/page:w-tree @lg/page:border-r",
-        treeOpen ? "block border-b" : "hidden",
-      ]}
+      class="shrink-0 border-b border-edge px-snug py-base @lg/page:w-tree @lg/page:overflow-y-auto @lg/page:border-r @lg/page:border-b-0"
     >
+      <div class="flex gap-tight overflow-x-auto @lg/page:flex-col @lg/page:gap-0 @lg/page:overflow-visible">
       <button
         type="button"
         class={[
-          "mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none",
+          "flex h-step shrink-0 items-center rounded-control pl-tight pr-snug text-left text-note leading-none @lg/page:mb-tight @lg/page:w-full",
           shown.kind === "plan" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome",
         ]}
         aria-current={shown.kind === "plan" ? "true" : undefined}
@@ -264,13 +283,13 @@
           pick(PLAN);
         }}
       >
-        <span class="flex w-base shrink-0 justify-center text-text-disabled">≡</span>
+        <span class="flex w-base shrink-0 justify-center text-text-faint">≡</span>
         <span class="ml-tight">{say($lang, "bld_plan")}</span>
       </button>
       <button
         type="button"
         class={[
-          "mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none",
+          "flex h-step shrink-0 items-center rounded-control pl-tight pr-snug text-left text-note leading-none @lg/page:mb-tight @lg/page:w-full",
           shown.kind === "commits" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome",
         ]}
         aria-current={shown.kind === "commits" ? "true" : undefined}
@@ -279,13 +298,13 @@
         }}
       >
         <!-- wording-ok: the git branch mark naming the commits list, hidden from readers -->
-        <span class="flex w-base shrink-0 justify-center font-mono text-text-disabled">⎇</span>
+        <span class="flex w-base shrink-0 justify-center font-mono text-text-faint">⎇</span>
         <span class="ml-tight">{say($lang, "bld_commits")}</span>
       </button>
       <button
         type="button"
         class={[
-          "mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none",
+          "flex h-step shrink-0 items-center rounded-control pl-tight pr-snug text-left text-note leading-none @lg/page:mb-tight @lg/page:w-full",
           shown.kind === "changes" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome",
         ]}
         aria-current={shown.kind === "changes" ? "true" : undefined}
@@ -294,13 +313,13 @@
         }}
       >
         <!-- wording-ok: the plus-minus mark naming the changes list, hidden from readers -->
-        <span class="flex w-base shrink-0 justify-center font-mono text-text-disabled">±</span>
+        <span class="flex w-base shrink-0 justify-center font-mono text-text-faint">±</span>
         <span class="ml-tight">{say($lang, "bld_changes")}</span>
       </button>
       <button
         type="button"
         class={[
-          "mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none",
+          "flex h-step shrink-0 items-center rounded-control pl-tight pr-snug text-left text-note leading-none @lg/page:mb-tight @lg/page:w-full",
           shown.kind === "skills" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome",
         ]}
         aria-current={shown.kind === "skills" ? "true" : undefined}
@@ -309,10 +328,19 @@
         }}
       >
         <!-- wording-ok: the asterisk mark naming the skills list, hidden from readers -->
-        <span class="flex w-base shrink-0 justify-center text-text-disabled">✳</span>
+        <span class="flex w-base shrink-0 justify-center text-text-faint">✳</span>
         <span class="ml-tight">{say($lang, "bld_skills")}</span>
       </button>
-      <Tree root={address} {picked} onPick={pick} />
+      </div>
+      <div class={[treeOpen ? "mt-base block" : "hidden", "@lg/page:mt-tight @lg/page:block"]}>
+        <Tree root={address} {picked} onPick={pick} />
+        {#if building !== undefined}
+          <div class="mt-base border-t border-edge pt-base @wide/page:hidden">
+            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+            {@render rooms(building)}
+          </div>
+        {/if}
+      </div>
     </aside>
     <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-pane py-base">
       {#if shown.kind === "plan"}
@@ -321,7 +349,7 @@
         {:else if read.kind === "unavailable"}
           <Unanswered query={read.query} asked={question} />
         {:else}
-          <p class="text-text-disabled">…</p>
+          <p class="text-text-faint">…</p>
         {/if}
       {:else if shown.kind === "commits"}
         <Commits building={address} />
@@ -346,3 +374,19 @@
     </aside>
   </div>
 </div>
+
+<Dialog
+  open={removing}
+  title={fill(say($lang, "bld_remove_title"), { addr: address })}
+  detail={say($lang, "bld_remove_detail")}
+  confirmLabel={fill(say($lang, "bld_remove"), { addr: address })}
+  cancelLabel={say($lang, "part_cancel")}
+  destructive
+  onConfirm={() => {
+    removing = false;
+    if (u.send(removeBuilding(address))) u.go({ kind: "city" });
+  }}
+  onCancel={() => {
+    removing = false;
+  }}
+/>

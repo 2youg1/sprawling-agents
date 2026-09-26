@@ -13,6 +13,7 @@ question is what this turn did or waits on. -->
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import Person from "./person.svelte";
+  import RefusedNote from "./refused_note.svelte";
   import type { ForkEntry, ForkPlan } from "./forking";
   import type { Note, RunId, Turn } from "../../wire";
 
@@ -41,13 +42,7 @@ question is what this turn did or waits on. -->
     {onHover}
   />
 {:else if "refused" in note}
-  {@const error = note.refused.error}
-  <div class="my-snug rounded-card border border-alert/40 px-base py-snug text-note text-text-quiet">
-    <span class="text-alert">{error.code}</span> · {error.action} · {error.subject}
-    {#if error.recovery !== ""}
-      <div class="mt-tight text-text-faint">{error.recovery}</div>
-    {/if}
-  </div>
+  <RefusedNote error={note.refused.error} />
 {:else if "waiting" in note}
   <div class="my-snug text-note text-alert">{say($lang, "talk_waiting_you")}</div>
 {:else if "discarded" in note}

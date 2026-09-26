@@ -46,6 +46,7 @@ mod credential;
 mod discard;
 mod endpoint;
 mod governance;
+mod history;
 mod log;
 mod modality;
 mod probe;
@@ -75,6 +76,7 @@ pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     GoverningDocument, RulesChanged, SpineDocumentWritten, autonomy_word,
 };
+pub use history::{FileRestored, WentBack};
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
 pub use probe::{EndpointProbed, ModelFacts, ProbeFailure};

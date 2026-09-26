@@ -78,18 +78,18 @@
   {#if line.speaker === "person"}
     <div class="my-base flex flex-col items-end">
       <div class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap">{line.text}</div>
-      <div class="mt-tight text-note text-text-disabled">{say($lang, "talk_you")}</div>
+      <div class="mt-tight text-note text-text-faint">{say($lang, "talk_you")}</div>
     </div>
   {:else if line.speaker === "resident"}
     <div class="my-base text-body">
-      <div class="mb-tight text-note text-text-disabled">{say($lang, "talk_resident")}</div>
+      <div class="mb-tight text-note text-text-faint">{say($lang, "talk_resident")}</div>
       <div class="whitespace-pre-wrap leading-relaxed">{line.text}</div>
     </div>
   {/if}
 {/snippet}
 
 {#snippet divider(word: string)}
-  <div class="my-wide flex items-center gap-base text-note text-text-disabled">
+  <div class="my-wide flex items-center gap-base text-note text-text-faint">
     <span class="h-px flex-1 bg-raised"></span>
     <span>{word}</span>
     <span class="h-px flex-1 bg-raised"></span>
@@ -145,7 +145,7 @@ centring it: two thousand pixels of white under a composer in a room
 with one round in it reads as a page that broke. -->
 <Case label="composer · an empty room lifts the box">
   <div class="flex flex-col items-center gap-base pt-[18vh] text-center">
-    <p class="text-heading font-heading text-text-disabled">{say($lang, "talk_empty_mayor")}</p>
+    <p class="text-heading font-heading text-text-faint">{say($lang, "talk_empty_mayor")}</p>
     <p class="text-note text-text-faint">{say($lang, "talk_opening_mayor")}</p>
     <div class="w-full">
       <Composer
@@ -314,7 +314,7 @@ history, and five of them is not what the person came back for. -->
 from, and the mother run a person can open to see where the words
 came from. -->
 <Case label="talk · forked from turn 3, with the mother run linked">
-  <div class="my-wide flex items-center gap-base text-note text-text-disabled">
+  <div class="my-wide flex items-center gap-base text-note text-text-faint">
     <span class="h-px flex-1 bg-raised"></span>
     <a href={toFragment({ kind: "run", run: MOTHER })} class="hover:text-text-quiet">
       {fill(say($lang, "session_forked_divider"), { turn: "3", at: motherName(MOTHER_TASK) })} · 11:47

@@ -31,19 +31,26 @@ import type { Lang } from "./lang";
 import { createAsking } from "./asking";
 import type { Asking } from "./asking";
 import { createBelief } from "./belief";
+import { createWatching } from "./watching";
+import type { Watching } from "./watching";
 import type { Belief } from "./belief";
+import { NO_TAIL, appended } from "./live_output";
+import type { Tail } from "./live_output";
 import { decodeFrame, encodeFrame } from "./frames";
 import { createUnsent, isSpeech } from "./unsent";
 import { langOf, say } from "./lang";
 import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import { AskId, Seq } from "../wire";
-import type { Command, EventRecord, HistoryRangeAnswer, Query, ServerFrame } from "../wire";
+import type { Command, EventRecord, HistoryRangeAnswer, Query, RunId, ServerFrame } from "../wire";
 
 export interface Connection {
   readonly state: Readable<LinkState>;
   readonly belief: Readable<Belief>;
   readonly asking: Asking;
+  // Each run's running command, as far as it has written, until the
+  // call's result lands (core/live_output.ts).
+  readonly live: Readable<Readonly<Partial<Record<RunId, Tail>>>>;
   // Words said while the link is down, waiting for the next welcome.
   readonly unsent: Readable<number>;
   // Sends one command, or holds it in `unsent` when it is words and the
@@ -54,6 +61,7 @@ export interface Connection {
   readonly dismissRefusal: () => void;
   // Everything in the bell has now been looked at.
   readonly markNoticesSeen: () => void;
+  readonly monitor: Pick<Watching, "samples" | "watch" | "watchSummary">;
 }
 
 // The pairing code the host put on the URL that opened this page. An
@@ -126,6 +134,7 @@ export function openConnection(
   const state = writable<LinkState>(link.state);
   const store = createBelief(now);
   const unsent = createUnsent();
+  const live = writable<Readonly<Partial<Record<RunId, Tail>>>>({});
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
@@ -170,6 +179,7 @@ export function openConnection(
     socket.send(text);
     return true;
   }
+  const watching = createWatching(sendText);
 
   // Asks for one page of the oldest range still owed, and only when none
   // is in flight: the next page starts at the cursor the last one returned.
@@ -293,6 +303,7 @@ export function openConnection(
         resume(action.welcome.resume_from ?? null);
         askGap();
         unsent.release((command) => sendText(encodeFrame({ command })));
+        watching.reconnected();
         return;
       case "deliver": {
         // The field this build could not read, if any, is reported here
@@ -300,6 +311,9 @@ export function openConnection(
         // still speaking this wire, so it goes where every other refusal
         // goes, and the rest of the record has already been folded.
         const bad = folded(action.event);
+        if (action.event.kind === "tool_result") {
+          live.update(({ [action.event.run]: _settled, ...rest }) => rest);
+        }
         asking.invalidate(action.event);
         if (bad !== null) store.refused(unreadableRecord(lang, bad));
         return;
@@ -327,9 +341,17 @@ export function openConnection(
       case "logged":
         store.logged(action.line);
         return;
+      case "writing": {
+        const { piece } = action;
+        live.update((tails) => ({ ...tails, [piece.run]: appended(tails[piece.run] ?? NO_TAIL, piece) }));
+        return;
+      }
       case "lagged":
         gaps.push({ at: action.from, to: action.to, records: "folded" });
         askGap();
+        return;
+      case "sampled":
+        watching.sampled(action.sample);
         return;
       case "wait":
         reconnect = setTimeout(() => {
@@ -453,6 +475,7 @@ export function openConnection(
     belief: store.belief,
     asking,
     unsent: unsent.count,
+    live,
     command(command) {
       if (isLive(link)) return sendText(encodeFrame({ command }));
       if (isRefused(link) || !isSpeech(command)) return false;
@@ -468,5 +491,6 @@ export function openConnection(
     markNoticesSeen() {
       store.noticesSeen();
     },
+    monitor: watching,
   };
 }

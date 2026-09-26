@@ -14,6 +14,8 @@ use crate::address::Address;
 use crate::error::{AxCode, AxError};
 use crate::event::Payload;
 
+pub mod writes;
+
 /// Tool identity as it appears in catalog and events: non-empty ASCII
 /// lowercase, digits, underscore.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -332,6 +334,12 @@ pub trait Tool: Send + Sync {
     /// `invoke` would produce.
     fn subject(&self, _call: &ToolCall) -> Result<GateSubject, AxError> {
         Ok(GateSubject::None)
+    }
+
+    /// What this call may have written to the city's tree once it ran;
+    /// the default reads the declared effect and nothing more.
+    fn writes(&self, _call: &ToolCall) -> writes::Writes {
+        writes::Writes::of(&self.meta().effect)
     }
 }
 

@@ -14,7 +14,9 @@ import type {
   ClientFrame,
   Delta,
   EventRecord,
+  LiveOutput,
   LogLine,
+  Sample,
   Seq,
   ServerFrame,
   Welcome,
@@ -62,10 +64,15 @@ export type LinkAction =
   // its own, it is never written down, and a page that missed one has
   // lost nothing.
   | { readonly kind: "logged"; readonly line: LogLine }
+  // A piece of what a running command has written. Discardable, like
+  // an increment: the call's result is what the Ledger keeps.
+  | { readonly kind: "writing"; readonly piece: LiveOutput }
   // A range of ledger records the event stream skipped. Its own action
   // rather than a report: the page can do something about it, and what
   // it does is ask the Ledger for the range.
   | { readonly kind: "lagged"; readonly from: Seq; readonly to: Seq }
+  // One monitor reading, sent only while this page watches.
+  | { readonly kind: "sampled"; readonly sample: Sample }
   | { readonly kind: "wait"; readonly ms: number }
   | { readonly kind: "report"; readonly error: AxError }
   | { readonly kind: "close" };
@@ -262,6 +269,12 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   }
   if ("lagged" in frame) {
     return [link, { kind: "lagged", from: frame.lagged.from, to: frame.lagged.to }];
+  }
+  if ("output" in frame) {
+    return [link, { kind: "writing", piece: frame.output }];
+  }
+  if ("monitor" in frame) {
+    return [link, { kind: "sampled", sample: frame.monitor }];
   }
   return unhandled(link, frame);
 }

@@ -24,12 +24,12 @@
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
 use std::collections::BTreeSet;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, PoisonError};
 
-use kernel::{AxCode, AxError, UsdMicros};
+use kernel::{AxError, UsdMicros};
 
 use super::holding::Views;
-use super::prepared::{Prepared, unavailable};
+use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
 
 mod history;
 use super::lines::{endpoints_answer, summarize};
@@ -39,36 +39,58 @@ use super::lines::{endpoints_answer, summarize};
 /// a constant (sprawling-SPEC section 8-90).
 pub(super) const TOP_BILLED: usize = 32;
 
-/// Answers one query from the views the fold shares with every reader,
-/// holding them only while [`Views::prepare`] copies out what the query
-/// needs: the disk, git or network read in [`Prepared::finish`] runs
-/// after the lock is released, so the fold never waits on it.
+/// The views the fold last finished, handed to every reader
+/// (sprawling-SPEC.md 8-93).
 ///
-/// The answer is dated under the same lock its copy is taken under, so
-/// the date is exactly the first record the answer does not reflect.
+/// The lock covers one `Arc` copy or swap and nothing that can panic,
+/// so even a poisoned lock holds a whole `Arc`, and it is read as one.
+pub(crate) struct Published {
+    current: Mutex<Arc<Views>>,
+}
+
+impl Published {
+    pub(crate) fn new(views: Views) -> Published {
+        Published {
+            current: Mutex::new(Arc::new(views)),
+        }
+    }
+
+    /// The views as the fold last published them. Held only while a
+    /// query copies out what it needs, because the fold takes a retired
+    /// copy back only once no reader holds it.
+    pub(crate) fn snapshot(&self) -> Arc<Views> {
+        Arc::clone(&self.current.lock().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    /// Publishes `latest` and hands back the copy it replaces, which is
+    /// dropped or reclaimed outside the lock.
+    pub(crate) fn replace(&self, latest: Arc<Views>) -> Arc<Views> {
+        std::mem::replace(
+            &mut *self.current.lock().unwrap_or_else(PoisonError::into_inner),
+            latest,
+        )
+    }
+}
+
+/// Answers one query from a snapshot of the views, holding it only while
+/// [`Views::prepare`] copies out what the query needs: the disk, git or
+/// network read in [`Prepared::finish`] runs after the snapshot is let
+/// go, so neither the fold nor another reader waits on it.
 ///
-/// # Errors
-/// `StorageFatal` when a panic poisoned the view lock: the views no
-/// longer follow the ledger, and only a restart rebuilds them. The date
-/// is then the first seq, which every record follows.
+/// The answer is dated by the snapshot it is prepared from, so the date
+/// is exactly the first record the answer does not reflect.
+///
+/// The `Result` is the shape the console's `Answering` takes; this path
+/// refuses nothing itself, because a snapshot is an `Arc` taken whole
+/// and has no poisoned state.
 pub(crate) fn answer_outside_the_lock(
-    views: &Mutex<Views>,
+    views: &Published,
     query: &channels::Query,
 ) -> (kernel::Seq, Result<channels::Answer, AxError>) {
-    let Ok(mut held) = views.lock() else {
-        return (
-            kernel::Seq::FIRST,
-            Err(AxError::failure(
-                AxCode::StorageFatal,
-                "read the city views",
-                "the view lock is poisoned",
-            )
-            .with_recovery("restart the server; its views rebuild from the ledger")),
-        );
-    };
-    let as_of = held.next_unfolded();
-    let prepared = held.prepare(query);
-    drop(held);
+    let snapshot = views.snapshot();
+    let as_of = snapshot.next_unfolded();
+    let prepared = snapshot.prepare(query);
+    drop(snapshot);
     (as_of, Ok(prepared.finish()))
 }
 
@@ -115,6 +137,23 @@ impl Views {
         }
     }
 
+    /// The ledger as a history reader takes it out of the snapshot.
+    pub(super) fn ledger_ask(&self) -> LedgerAsk {
+        LedgerAsk {
+            city_root: self.city_root.clone(),
+            index: std::sync::Arc::clone(&self.index),
+        }
+    }
+
+    /// What a read of now needs, copied out of the snapshot.
+    fn live_ask(&self) -> LiveAsk {
+        LiveAsk {
+            city_root: self.city_root.clone(),
+            city: self.city.clone(),
+            vault: self.vault.clone(),
+        }
+    }
+
     /// Answers one query in one call, lock or no lock.
     #[cfg(test)]
     pub(crate) fn answer(&mut self, query: &channels::Query) -> channels::Answer {
@@ -125,33 +164,20 @@ impl Views {
     /// or network needs. Every arm either answers or names itself
     /// unavailable; none of them returns an empty result that a reader
     /// would mistake for an empty city.
-    pub(crate) fn prepare(&mut self, query: &channels::Query) -> Prepared {
+    pub(crate) fn prepare(&self, query: &channels::Query) -> Prepared {
         Prepared::Held(match query {
-            channels::Query::CityView => {
-                let runs: Vec<channels::RunSummary> = self
-                    .hot
-                    .runs()
-                    .map(|(run, hot)| summarize(*run, hot))
-                    .collect();
-                let active = self.hot.active_count();
-                let frozen = self.hot.frozen_count();
-                channels::Answer::City(channels::CityAnswer {
-                    runs,
-                    active,
-                    frozen,
-                    buildings: self.spine(),
-                    pursuits: self.pursuit_lines(),
-                    halted: self.governance.halted.iter().map(named).collect(),
-                })
-            }
+            channels::Query::CityView => return Prepared::City(self.city_ask()),
             // An evicted run always has records in the Ledger, so a
-            // recall that cannot read them is "I could not look".
+            // recall that cannot read them is "I could not look"; the
+            // Ledger is read after the snapshot is let go.
             channels::Query::RunView { run } => match self.hot.get(run) {
                 Some(hot) => channels::Answer::Run(Some(summarize(*run, hot))),
-                None if self.hot.was_evicted(run) => match self.recalled(*run) {
-                    Some(summary) => channels::Answer::Run(Some(summary)),
-                    None => unavailable(format!("RunView({run})")),
-                },
+                None if self.hot.was_evicted(run) => {
+                    return Prepared::Recalled {
+                        ledger: self.ledger_ask(),
+                        run: *run,
+                    };
+                }
                 None => channels::Answer::Run(None),
             },
             channels::Query::ApprovalQueue => {
@@ -181,13 +207,27 @@ impl Views {
                 }))
             }
             channels::Query::History { before, limit } => {
-                channels::Answer::History(Box::new(self.history(*before, *limit)))
+                return Prepared::History {
+                    ledger: self.ledger_ask(),
+                    before: *before,
+                    limit: *limit,
+                };
             }
             channels::Query::HistoryRange { from, to, limit } => {
-                channels::Answer::HistoryRange(Box::new(self.history_range(*from, *to, *limit)))
+                return Prepared::HistoryRange {
+                    ledger: self.ledger_ask(),
+                    from: *from,
+                    to: *to,
+                    limit: *limit,
+                };
             }
             channels::Query::RunHistory { run, before, limit } => {
-                channels::Answer::History(Box::new(self.run_history(*run, *before, *limit)))
+                return Prepared::RunHistory {
+                    ledger: self.ledger_ask(),
+                    run: *run,
+                    before: *before,
+                    limit: *limit,
+                };
             }
             channels::Query::Changes { base, head } => {
                 return Prepared::Changes {
@@ -216,10 +256,16 @@ impl Views {
             // Three readings answered here so a second client draws a
             // session without folding the ledger itself.
             channels::Query::Rounds { run } => {
-                channels::Answer::Rounds(Box::new(self.rounds_answer(*run)))
+                return Prepared::Rounds {
+                    ledger: self.ledger_ask(),
+                    run: *run,
+                };
             }
             channels::Query::Evidence { run } => {
-                channels::Answer::Evidence(self.evidence_answer(*run))
+                return Prepared::Evidence {
+                    ledger: self.ledger_ask(),
+                    run: *run,
+                };
             }
             channels::Query::RunCosts { runs } => {
                 channels::Answer::RunCosts(self.run_costs_answer(runs))
@@ -244,10 +290,7 @@ impl Views {
             // What an agent was told, and the store read that recovers
             // it. A run with no prompt yet and an object this city no
             // longer holds are both "I could not look".
-            channels::Query::Prefix { run } => match self.prefix_answer(*run) {
-                Some(answer) => channels::Answer::Prefix(Box::new(answer)),
-                None => unavailable(format!("Prefix({run})")),
-            },
+            channels::Query::Prefix { run } => return Prepared::Prefix(self.prefix_ask(*run)),
             // Read at every asking rather than held: the file is one a
             // person also edits, and a copy kept in this fold would
             // answer with what it said the last time somebody used a
@@ -281,19 +324,18 @@ impl Views {
             }
             channels::Query::Doctor => self.doctor_or_unavailable(),
             channels::Query::McpHealth { addr } => {
-                channels::Answer::McpHealth(Box::new(self.mcp_health_answer(addr)))
+                return Prepared::McpHealth {
+                    live: self.live_ask(),
+                    addr: addr.clone(),
+                };
             }
-            channels::Query::Toolkits => {
-                channels::Answer::Toolkits(Box::new(self.toolkits_answer()))
-            }
+            channels::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
             channels::Query::NewestRelease => return Prepared::Release,
             channels::Query::BuildingView { addr } => {
-                let city_root = self.city_root.clone();
-                let plan = self.plans.of(&city_root, addr);
                 return Prepared::Building {
-                    city_root,
+                    city_root: self.city_root.clone(),
                     addr: addr.clone(),
-                    plan,
+                    plans: std::sync::Arc::clone(&self.plans),
                 };
             }
             channels::Query::InboxView { addr } => channels::Answer::Inbox(channels::InboxAnswer {
@@ -322,11 +364,6 @@ impl Views {
     }
 }
 
-/// One shut scope in the shape a `halt` frame names it.
-///
-/// The ledger keeps `Scope` and its own spelling; a page is answered in
-/// the vocabulary it would use to ask, so nothing on the other side has
-/// to take a string apart to know which building it is looking at.
 /// The rows of a cost view's `by_run`: every run `active` names, and
 /// the [`TOP_BILLED`] other runs billed most (a tie goes to the lower
 /// name), in name order like the report they come from.
@@ -362,13 +399,5 @@ impl Views {
             .filter(|(_, hot)| hot.phase == memory::RunPhase::Active)
             .map(|(run, _)| run.to_string())
             .collect()
-    }
-}
-
-fn named(scope: &kernel::event::Scope) -> channels::HaltScope {
-    match scope {
-        kernel::event::Scope::City => channels::HaltScope::City,
-        kernel::event::Scope::Building(addr) => channels::HaltScope::Building(addr.clone()),
-        kernel::event::Scope::Workshop(addr) => channels::HaltScope::Workshop(addr.clone()),
     }
 }

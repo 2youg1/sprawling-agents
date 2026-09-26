@@ -176,6 +176,10 @@ pub enum Retry {
     No,       // 同一请求再发一次注定同样失败：不可以
     Unknown,  // 请求已经发出而回答丢了，效果是否落地无从得知：不知道
 }
+// AxError 另有 `provider: Option<ProviderFailureKind>`，排在 `gate` 之后，缺席时不上线。
+pub enum ProviderFailureKind {  // 携 serde，内标签 kind
+    Exchange, Cut, Silence, Refused { status: u32 }, Overflow { status: u32 }, Unreadable, Reported, Unbuilt,
+}
 
 pub enum Carrier { Event(EventKind), Loadtime }
 impl AxCode {
@@ -192,8 +196,11 @@ impl AxError {
     pub fn failure(code: AxCode, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     /// Gate refusal. Sets `gate` to the mandatory three parts.
     pub fn refusal(code: AxCode, action: impl Into<String>, subject: impl Into<String>, gate: GateRefusal) -> ErrorDraft;
+    /// 模型调用失败的 E_PROVIDER：种类在场；`retry` 起于 `No`，由 gateway 的 `ProviderFailure::retry` 在 draft 上设定。
+    pub fn provider(kind: ProviderFailureKind, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     pub fn code(&self) -> &AxCode;  pub fn gate(&self) -> Option<&GateRefusal>;
     pub fn retry(&self) -> Retry;
+    pub fn provider_failure(&self) -> Option<ProviderFailureKind>;
     /// 改写下层抛上来的恢复语；与 `ErrorDraft::with_recovery` 分名，因为它毁掉一句而不是补上第一句。
     #[must_use] pub fn rewrite_recovery(self, recovery: impl Into<String>) -> Self;
 }
@@ -208,6 +215,8 @@ impl ErrorDraft {
     pub fn with_recovery(self, recovery: impl Into<String>) -> AxError;   // 唯一出口
 }
 ```
+
+**供应方失败的种类上线，句子不上线**：`provider` 只在 `AxError::provider` 造出的 E_PROVIDER 上在场（gateway 的 `provider_err` 是它的调用处；不是模型调用的 E_PROVIDER，如连接器的 http 客户端，不带种类）。客户端按 `kind` 从 `lang.json` 取人读的出路，城写的 `recovery` 折进「城的原话」供排错；城若只给英文句子，中文界面就只能照抄英文。种类不判「能不能再试一次」：那一判住在 gateway 的 `ProviderFailure::retry`，因为它要看种类之外的东西——连接是否建起（`Exchange` 分 `Yes` 与 `Unknown`）、拒绝的状态码（408／429／5xx 可重试）、流中报错的类型。**被否**：让种类另带一个 `is_retriable`——它看不见这些，会与 `retry` 成为同一事实的两个已经不一致的权威。
 
 **H-01 定案：取 typestate，不取四参**。路线图 §13.1 原定 `failure(code, action, subject, recovery)` 四参必填，此处改记为 typestate，理由三条：其一，`refusal` 已占满四参，再塞恢复语就是第五参，越过参数上限；其二，恢复语只剩 `ErrorDraft::with_recovery` 一个设定处，四参方案则要把 `with_recovery` 留作改写器，同一个名字两份职责；其三，四参要重写全部 641 个调用点，typestate 只动缺恢复语的那些，改动面恰好等于缺陷面。关门理由随之由「每处四实参」改为「编译通过」——恢复语必填这条现在由类型系统执行，grep 执行不了它。`AxError` 一经存在即已完工，`with_nearby`／`retriable` 只在 draft 上，故链式调用中 `with_recovery` 恒为最后一环。
 
@@ -413,6 +422,7 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub task: String, pub goal: String, pub job: Option<Locator>,
     pub parent: Option<RunId>, pub predecessor: Option<RunId>,
     pub skills: Vec<SkillPin>,          // 空亦写出
+    pub dispatched_by: Option<Who>,     // 由谁派来：person／city／派活的居民地址；缺键为 None
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64 }
@@ -420,6 +430,8 @@ pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pu
 pub struct EvalRun { pub probe: String, pub version: u32, pub predecessor: RunId,  // eval_run：交接探针的一次读数
                     pub kept: u32, pub lost: Vec<u32>,       // lost 是答案不同的题号
                     pub before: Vec<String>, pub after: Vec<String> }   // 全部必填，空亦写出
+pub struct WentBack { pub name: String, pub point: GitOid }            // 回到过去：一棵新树起于 point
+pub struct FileRestored { pub name: String, pub path: String, pub point: GitOid } // path 取 git 树的写法
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
@@ -575,7 +587,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 }
 ```
 
-已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`tool_called`／`tool_result`、
+已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`went_back`／`file_restored`、`tool_called`／`tool_result`、
 `checkpoint_committed`、`approval_resolved`、`autonomy_changed`、`city_halted`、
 `governed_document_written`、`embedding_called`／`rerank_called`、`cache_renewed`、
 `adviser_asked`／`adviser_answered`／`adviser_fell_back`；
@@ -627,12 +639,14 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
 **EventKind 75 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
+**EventKind 77 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
 | 创世与空间 | `city_initialized` | record-only（创世行，prev＝64 个 0） |
 | 创世与空间 | `building_created` | record-only |
 | 创世与空间 | `building_configured` | record-only |
+| 创世与空间 | `building_removed` | record-only（人把一栋楼移出城：载荷携 addr 与 kept——文件搬到 reserved subtree 下的哪里；不删一个字节，楼写过的每一行留在账里） |
 | 基集 | `session_opened` | record-only（新的一段从哪里开始；`prompt_assembled` 记的是它之后给了那一跑什么） |
 | 基集 | `run_started` | record-only |
 | 基集 | `run_forked` | record-only |
@@ -695,6 +709,8 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 隐私与 Discard | `file_discarded` | record-only |
 | 隐私与 Discard | `discard_restored` | record-only |
 | 隐私与 Discard | `autonomy_changed` | record-only |
+| 统一历史 | `went_back` | record-only（回到过去：名为 name 的新树起于提交 point；干线不动。与 `worktree_opened` 分开，因为只有这条说出这棵树停在历史的哪一点） |
+| 统一历史 | `file_restored` | record-only（从 point 取回 path 到名为 name 的树；point 上没有这个文件即删掉它。撤销就是追加这一条，账本不删任何行。path 取 git 树的写法（`/` 分隔、相对），不随写下它的机器变） |
 | 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 | 治理与设施 | `spine_document_written` | record-only（人写下某楼自己的 spine 文档之一，载荷携 building、which 与字节数，恒不携正文。与上一行分开是因为这几份有第二个写者，写入携起手正文并可能被拒） |
 | 治理与设施 | `rules_changed` | record-only（一次派发所站的规则文档之一换了内容（城的 `CONFIG.toml`，楼的 `CONFIG.toml` 与 `RULES.toml`）：载荷携 scope、which（`RULES.toml`／`CONFIG.toml`，枚举 `GoverningDocument`）、前后两枚摘要与字节数，恒不携正文。在准入（`agree_to_work`）之后、第一次读规则之前落账——先落账再生效；准入拒绝的派发与不存在的楼不记。`before` 缺席即开账行；本行的 `after` 等于同一文档下一行的 `before`，断链本身说明有人绕过一切门改了文件） |
@@ -937,6 +953,51 @@ pub fn admit(stats: &QueueStats, item: &ItemMeta) -> Admission;
 - kani：全函数无溢出；单调性——同 capacity/cost 下 depth 更小恒不更难 Admit。
 - 饱饱不饿死（活性）属 citysim liveness（P2），非本函数可证。
 
+### 8-74 kernel::degradation（形状 1 判定）
+
+资源成为瓶颈时，harness 如实说出慢在哪里。本模块只判定：读数由调用方采，显示由事实条与 doctor 做；这里给出每种降级的类型、它的依据与恢复办法，以及剩余空间不够时是否还接新活。
+
+```rust
+pub struct ResourceReadings {
+    pub durable_lag: Duration,     // 最早一条已追加未落盘的事件等了多久（持久水位线落后多少）
+    pub commit_floor: Duration,    // 本卷实测的 fsync 中位数：该步的物理下限
+    pub volume: VolumeSpace,       // 城所在卷的剩余空间与总容量
+    pub queued_runs: u32,          // 因可用内存不够而排队的 run 数
+    pub schedule_delay: Duration,  // 记账线程从被唤醒到真正运行的中位延迟
+}
+pub struct VolumeSpace { pub free_bytes: u64, pub total_bytes: u64 }
+pub enum Degradation {
+    DiskSlow { durable_lag: Duration, commit_floor: Duration },
+    DiskLow { free_bytes: u64, floor_bytes: u64 },
+    MemoryTight { queued_runs: u32 },
+    CpuSaturated { schedule_delay: Duration },
+}
+pub enum Recovery {
+    ReduceDiskLoad,
+    FreeDiskSpace { at_least_bytes: u64 },
+    FreeMemory,
+    ReduceCpuLoad,
+}
+impl Degradation { pub fn recovery(&self) -> Recovery; }
+/// Every degradation the readings show, in the order DiskSlow, DiskLow,
+/// MemoryTight, CpuSaturated; no allocation.
+pub fn assess(readings: &ResourceReadings) -> impl Iterator<Item = Degradation>;
+/// Whether the city takes on new work: a volume below its floor refuses
+/// with the DiskLow it shows; every other state admits.
+pub fn admit_work(volume: VolumeSpace) -> Result<(), Degradation>;
+/// The free-space floor this volume derives: a share of its size, clamped.
+pub fn free_space_floor(volume_bytes: u64) -> u64;
+```
+
+- 依据即变体字段：每种降级带着判定它的读数，显示面不再回头读第二份。恢复办法是类型，措辞在 `client/src/lang.json`。
+- 盘慢：`durable_lag` 同时超过 `commit_floor × DISK_SLOW_FACTOR` 与 `DISK_SLOW_MIN`。前者随设备走（旋转盘的 fsync 本来就慢，不算降级），后者挡住快盘上的微秒级抖动。
+- 盘快满：`volume.free_bytes < free_space_floor(volume.total_bytes)`；地板取卷容量的 `1 / FREE_SPACE_FLOOR_DIVISOR`，夹在 `FREE_SPACE_FLOOR_MIN` 与 `FREE_SPACE_FLOOR_MAX` 之间。恢复办法给出回到地板以上至少要腾出的字节数。
+- 内存紧：`queued_runs > 0`。排队本身就是 S5.9L 的内存闸门给出的，这里只把它说出来。
+- CPU 被占满：`schedule_delay > CPU_SATURATED_DELAY`，即一帧（60 Hz）——人开始看得见的延迟；它是感知常数，不随机器类别调。
+- 只有盘快满停止接新活：盘慢与 CPU 满时接活只会变慢，不会丢；内存紧已由排队处理。`admit_work` 只读卷的两个数，因为受理新活的入口只该为它付一次读卷，而不是整份读数；拒绝带着 `Degradation::DiskLow`，入口据它的 `recovery()` 告诉人至少腾出多少。
+- 写盘失败时账本不坏、重启可恢复，由 memory 承担（memory-SPEC 8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
+- 生产的调用方：人发来的 `Dispatch` 在写下任何东西之前经 `admit_work` 读一次城所在卷（sprawling-SPEC 8-94）。未落地：事实条与 doctor 的显示；`Wake` 等不经人的入口；`ResourceReadings` 其余四项的生产填写者——`bin::monitor::Sample` 没有 fsync 中位数与调度延迟，它的 `durable_lag` 是条数而本模块要的是等待时长，且监视器只在有人看时采样，不能作为判定的唯一来源（sprawling-SPEC 8-90 决定 1）。
+
 ### 8-14 kernel::stall
 
 ```rust
@@ -1155,7 +1216,7 @@ impl Pursuit {
     pub fn pause(&mut self);
     pub fn resume(&mut self);
 }
-pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Paused, Finished }
+pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Paused, Finished }  // 携 serde，内标签 kind
 pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> PursuitVerdict;
 ```
 
@@ -1164,6 +1225,7 @@ pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> Pursuit
 - **钱明确不是停机条件**。本仓的成本面受众是 Agent（给它优化的材料），不是刹车；一个读预算的停机条件回答的是一个这里没人问的问题。
 - **`observe` 收状态而不收 `Pursuit`**：判定不依赖目标说了什么，而一个必须先持有 `Pursuit` 才能发问的读者，等于要拿深度零位才能**读**这座城。**声明是被守的动作，看不是。**
 - **子代理拼不出来**：`declare` 收 `&Delegator`，而 `Delegate` 造不出一个（trybuild `delegate_declares_pursuit`）。与 `delegation` 同一个两层守卫，理由也同一个：一个能让全城通宵干活的子代理，就是一个能替你决定通宵干什么的子代理。
+- **`PursuitVerdict` 原样上线**：线上是 `{"kind":"work","next":"2.3"}` 这类内标签形状，`PursuitLine.verdict` 就是它。人读的那句话由客户端按 `kind` 从 `lang.json` 取词；城若在线上给一句英文，中文界面就只能照抄英文，而两边各写一份措辞就是同一句话的两个权威。
 - **pause 与 clear 是两件事，都要**：暂停留着目标，清除把它丢掉（丢掉值本身，于是不会被误恢复）。取消一个 **run** 是第三件事，住在 run 那边。
 
 ### 8-20 kernel::completion
@@ -1326,7 +1388,13 @@ pub trait Tool: Send + Sync {
     /// must return E_INVALID_ARGS, never route silently.
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError>;   // 默认 `GateSubject::None`
+    fn writes(&self, call: &ToolCall) -> Writes;   // 默认按 `meta().effect`：`Read` → `Nothing`，其余 → `Domain`
 }
+pub enum Writes { Nothing, Paths(Vec<Address>), Domain }
+// Tool::writes 的返回：一条跑完的调用可能写了城里树上的哪些路径，由工具自己的文法读出来（M-17）。
+// `Paths` 只给确知自己写了哪些文件的工具（`edit` 答它的 `path`）；说不清的（`exec`、协作桌、改规则）答 `Domain`，
+// fence 于是扫整个写域。默认实现不猜：只有声明 `Effect::Read` 的工具答 `Nothing`。
+// `Writes::and` 合并两条答案：`Domain` 吸收一切，`Nothing` 是单位元，两组 `Paths` 取并集。
 #[cfg(feature = "conformance")]
 pub fn assert_tool_conformance<T: Tool>(tool: &mut T);   // 八字段完备＋name 文法＋错名调用拒收
 
@@ -1741,6 +1809,16 @@ S2 激活的码（逐码答「能否定义掉」）：
 **被否**：①把策略常量与门拆成 `kernel-policy`——多一个 crate、多一份 SPEC 与 API 基线、多一条 `depmap` 边，换来的是关键路径之外几个 crate 的重编；②按 `error`／`event` 拆出底层 crate——它们被全部下游引用，改它们照样全量重编，拆了只是多一层。
 
 **重开参数**：任一条成立即重开——①某个高频修改的 kernel 模块的引用者降到 kernel 依赖者的一半以下，且省下的 crate 里有 runtime 或 sprawling；②`cargo build --workspace --timings` 显示，改一个策略模块后被省下的那批 crate 占增量重编时间 10% 以上；③kernel 单 crate 的重编时间超过一次策略改动增量重编总时间的一半。
+
+### 12.5 定规：降级的线相对于设备，停止接新活的拒绝带着读数
+
+**决定**：`degradation` 的「盘慢」线取本卷实测 fsync 的倍数（另设不闪烁的下限），「盘快满」的地板取卷容量的一份再夹住上下界，「CPU 被占满」取一帧；只有「盘快满」停止接新活，`admit_work` 只读卷的剩余空间与总容量，拒绝时返回那一个 `Degradation::DiskLow`。
+
+**理由**：harness 要在十年前的旋转盘和服务器上都说真话。固定毫秒数的盘慢线会让旋转盘永远处于降级、让 NVMe 永远不降级；固定字节数的地板对小卷太贪、对大卷太松。CPU 的线是人的感知常数，与机器类别无关。拒绝要告诉人至少腾出多少字节，`backpressure::Admission::Shed` 只带一个原因，读数会在入口处丢掉；`backpressure::admit` 管的是队列的格数，与卷的字节不是同一个决定。盘慢、CPU 满、内存紧都只让活变慢或排队，不丢数据，所以不拒绝；盘满继续接活会让下一次写盘失败。
+
+**被否**：①每种降级各自决定是否拒活——内存紧已由 S5.9L 的排队处理，再拒一次是同一决定两个家；②固定阈值——违背「不把常数调成某一类机器」；③经 `Admission::Shed { reason: DiskLow }` 拒绝——入口得再算一次地板才能说出恢复办法，同一个地板两个家。
+
+**重开参数**：实测显示某一类设备上 `DISK_SLOW_FACTOR` 让盘慢状态在无外部负载时出现，或地板不足以写下一次快照。
 
 ## 13 依赖选型
 

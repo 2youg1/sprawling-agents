@@ -175,7 +175,13 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
             Ok(fired) => backed_off(fired.action, at),
             Err(err) => Some(unreadable(kind, &err, at)),
         },
-        EventKind::ApprovalRequested => Some(Note::Waiting { at }),
+        // When the person answered is recorded under the city's own run,
+        // which this one record cannot see; the rounds fold pairs it.
+        EventKind::ApprovalRequested => Some(Note::Waiting {
+            at,
+            t: record.t(),
+            answered: None,
+        }),
         // The job pin that opens a dispatch is a `checkpoint_committed`
         // naming no commit, and the record type says so rather than
         // leaving this reader to infer it from a missing key.

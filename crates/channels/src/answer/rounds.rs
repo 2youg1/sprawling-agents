@@ -72,7 +72,15 @@ pub enum Note {
     Fenced { oid: GitOid, at: Seq },
     /// This turn stopped for a person. What waits and who answers is the
     /// approval queue's; copying it here would be a third authority.
-    Waiting { at: Seq },
+    /// `t` is when the Ledger recorded the request and `answered` when
+    /// it recorded the answer, paired back by approval id from the
+    /// city's own run; `None` when the answer is outside that window or
+    /// has not come, and the page then draws no guessed end.
+    Waiting {
+        at: Seq,
+        t: TimeMs,
+        answered: Option<TimeMs>,
+    },
     /// A word arrived - from the person watching, or from another
     /// address that reached this one.
     Arrived { from: String, said: String, at: Seq },
@@ -94,7 +102,7 @@ impl Note {
         match *self {
             Self::Refused { at, .. }
             | Self::Fenced { at, .. }
-            | Self::Waiting { at }
+            | Self::Waiting { at, .. }
             | Self::Arrived { at, .. }
             | Self::Discarded { at, .. }
             | Self::Unreadable { at, .. } => at,
@@ -144,6 +152,13 @@ pub struct Call {
     /// What it said, bounded. `None` when the call has not answered, or
     /// when the result carried nothing this build can read as text.
     pub output: Option<Output>,
+    /// When the Ledger wrote the call, read from that record the way
+    /// [`Turn::t`] is, so a replayed session keeps its original times.
+    pub called: TimeMs,
+    /// When the Ledger wrote the result paired with this call. `None`
+    /// exactly when `outcome` is [`Outcome::Waiting`]: the two are set by
+    /// one pairing, and an answer outside the window is not guessed.
+    pub answered: Option<TimeMs>,
 }
 
 /// One turn: the model was asked, and this is what came of it.
@@ -168,6 +183,12 @@ pub struct Turn {
     /// case. An `Option` here would be a state no fold can produce and
     /// every reader would still have to answer.
     pub t: TimeMs,
+    /// The endpoint's model id the `model_called` that opened this turn
+    /// recorded. Per turn because a session can change model midway,
+    /// and a name for the whole session would be wrong for half of it.
+    /// `None` when that record carries no model name as text; the page
+    /// then draws no name rather than a guessed one.
+    pub model: Option<String>,
     /// What the model said in this turn: its prose, without the
     /// reasoning that produced it.
     pub said: Option<String>,
@@ -196,6 +217,10 @@ pub struct Opening {
     pub task: String,
     pub goal: String,
     pub at: TimeMs,
+    /// Who dispatched the run, as its `run_started` records it; `None`
+    /// for a ledger written before the key existed.
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub dispatched_by: Option<kernel::event::Who>,
 }
 
 /// How a session ended, in the word the run froze with: `done`,

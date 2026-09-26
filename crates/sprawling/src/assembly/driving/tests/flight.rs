@@ -28,6 +28,7 @@ pub(super) fn asked(addr: &str) -> Assignment {
         parent: None,
         succession: None,
         taint: kernel::TaintSet::empty(),
+        dispatched_by: kernel::event::Who::Person,
         origin: None,
     }
 }

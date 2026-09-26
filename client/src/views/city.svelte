@@ -9,7 +9,8 @@
   // waiting for the person first - which is the city's list: a building
   // is a root of that tree, so a second list of buildings would say the
   // same thing twice. What was picked in the drawing stands beside it
-  // when there is room and under it when there is not.
+  // when there is room and under it when there is not. In results mode
+  // the drawing and the board give way to the runs' outcomes alone.
   //
   // The shell fills the viewport; `max-w-page` binds the legend, which
   // is prose, and never the drawing. The legend below the drawing is
@@ -26,11 +27,13 @@
   import { ui } from "../ui";
   import Bar from "./city/bar.svelte";
   import Panel from "./city/panel.svelte";
+  import Results from "./city/results.svelte";
   import Skyline from "./city/skyline.svelte";
   import EmptyState from "./parts/empty.svelte";
   import Unanswered from "./parts/unanswered.svelte";
   import Board from "./runs/board.svelte";
   import { boardRuns } from "./runs/lineage";
+  import Showing from "./shared/showing.svelte";
 
   // The five marks the drawing carries, and the order a reader meets
   // them in.
@@ -40,6 +43,7 @@
   const { lang } = u;
   const belief = u.conn.belief;
   const answer = u.conn.asking.ask(QUERIES.city);
+  const held = u.prefs.held;
 
   let picked = $state.raw<Address | null>(null);
 
@@ -59,10 +63,13 @@
   <Bar />
   <div class="relative flex min-h-0 flex-1 flex-col @lg/page:flex-row">
     <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-pane py-base">
-      {#if read.kind === "unavailable"}
+      <div class="flex justify-end pb-snug"><Showing /></div>
+      {#if $held.showing === "results"}
+        <Results />
+      {:else if read.kind === "unavailable"}
         <Unanswered query={read.query} asked={QUERIES.city} />
       {:else if city === undefined}
-        <p class="text-center text-text-disabled">…</p>
+        <p class="text-center text-text-faint">…</p>
       {:else if city.buildings.length > 0}
         <Skyline
           {city}
@@ -113,7 +120,7 @@
           {/snippet}
         </EmptyState>
       {/if}
-      {#if board.runs.length > 0}
+      {#if $held.showing !== "results" && board.runs.length > 0}
         <div class="mt-wide">
           <Board runs={board.runs} now={board.now} level={2} />
         </div>

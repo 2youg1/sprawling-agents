@@ -36,6 +36,7 @@ use crate::backlog::{Backlog, Exit, Started};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
 mod confinement;
+mod yielding;
 
 pub use confinement::{
     Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offerings, Placed, Placement,
@@ -170,13 +171,17 @@ impl ExecTool {
     /// There is no `background` argument, because two paths would be two
     /// authorities and the one with the hole in it would always be the
     /// one nobody remembered.
+    ///
+    /// The command is lowered before its environment is cleared, so that
+    /// the clearing lands on whatever process is actually spawned.
     fn through_the_backlog(
         &self,
-        mut command: std::process::Command,
+        command: std::process::Command,
         what: String,
         arm: &str,
         placement: Placement,
     ) -> Result<ToolOutcome, AxError> {
+        let mut command = yielding::one_level_down(command)?;
         let inherited = self.inherited_environment();
         command.env_clear();
         for (key, value) in &inherited {

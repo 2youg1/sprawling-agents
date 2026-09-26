@@ -22,51 +22,79 @@ use kernel::{Address, B3Hash, EventKind, EventRecord, Locator, RunId, Seq};
 
 use super::document::read_bytes;
 use super::holding::Views;
+use super::prepared::{LedgerAsk, unavailable};
+
+/// What a `Prefix` question takes out of the views: where the run's
+/// first prompt sits on the ledger, and the ledger that holds the line.
+/// The line and the store are read by [`PrefixAsk::read`], after the
+/// views are released.
+pub(crate) struct PrefixAsk {
+    ledger: LedgerAsk,
+    run: RunId,
+    first: Option<Seq>,
+}
 
 impl Views {
-    /// The four segments one run was frozen with.
+    pub(super) fn prefix_ask(&self, run: RunId) -> PrefixAsk {
+        PrefixAsk {
+            ledger: self.ledger_ask(),
+            run,
+            first: self.first_prompts.get(&run).copied(),
+        }
+    }
+}
+
+impl PrefixAsk {
+    /// The four segments the run was frozen with.
     ///
-    /// `None` for a run this city never froze a prefix for and for a
-    /// store that will not open, which is what `Unavailable` says: a
-    /// run that has not reached its first turn has no prompt yet, and
-    /// an empty answer would read as a run that was told nothing.
-    pub(super) fn prefix_answer(&mut self, run: RunId) -> Option<channels::PrefixAnswer> {
-        let record = self.first_prompt(run)?;
-        let store = store(&self.city_root)?;
-        let segments = record
-            .data()
-            .as_map()
-            .get("segments")?
-            .as_array()?
-            .iter()
-            .filter_map(|row| segment_of(row, &store))
-            .collect();
-        Some(channels::PrefixAnswer { run, segments })
+    /// `Unavailable` for a run this city never froze a prefix for and
+    /// for a ledger or store that will not open: a run that has not
+    /// reached its first turn has no prompt yet, and an empty answer
+    /// would read as a run that was told nothing.
+    pub(super) fn read(self) -> channels::Answer {
+        match self.segments() {
+            Some(segments) => channels::Answer::Prefix(Box::new(channels::PrefixAnswer {
+                run: self.run,
+                segments,
+            })),
+            None => unavailable(format!("Prefix({})", self.run)),
+        }
+    }
+
+    fn segments(&self) -> Option<Vec<channels::PrefixSegment>> {
+        let record = self.first_prompt()?;
+        let store = store(&self.ledger.city_root)?;
+        Some(
+            record
+                .data()
+                .as_map()
+                .get("segments")?
+                .as_array()?
+                .iter()
+                .filter_map(|row| segment_of(row, &store))
+                .collect(),
+        )
     }
 
     /// The `prompt_assembled` record that opened this run.
     ///
     /// The oldest one, not the newest: the prefix is frozen once for
-    /// the life of a run, so a run writes this record once and a later
-    /// line of the same run carries the same four hashes (runtime-SPEC
-    /// section 8-39, item 5); the first is the one every run has.
-    fn first_prompt(&mut self, run: RunId) -> Option<EventRecord> {
-        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        self.index.refresh(&dir).ok()?;
-        let seqs: Vec<Seq> = self.index.run_seqs_before(run, None).collect();
-        let mut reader = self.index.reader(&dir);
-        for seq in seqs.into_iter().rev() {
-            let Ok(line) = reader.line_at(seq) else {
-                continue;
-            };
-            let Ok(record) = EventRecord::parse_line(&line) else {
-                continue;
-            };
-            if record.kind() == EventKind::PromptAssembled {
-                return Some(record);
-            }
-        }
-        None
+    /// the life of a run and every later turn records the same four
+    /// hashes, so any of them says the same thing and the first is the
+    /// one a run that never got past turn one still has. A poisoned
+    /// index is read as one that will not refresh, because a refresh
+    /// cut short can leave an offset pointing at another line.
+    fn first_prompt(&self) -> Option<EventRecord> {
+        let seq = self.first?;
+        let dir = kernel::layout::CityLayout::new(&self.ledger.city_root).ledger();
+        let line = {
+            let mut index = self.ledger.index.lock().ok()?;
+            index.refresh(&dir).ok()?;
+            index.reader(&dir).line_at(seq).ok()?
+        };
+        EventRecord::parse_line(&line)
+            .ok()
+            .filter(|record| record.kind() == EventKind::PromptAssembled)
     }
 }
 

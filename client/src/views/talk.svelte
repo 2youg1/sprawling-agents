@@ -40,6 +40,9 @@
   import Landed from "./talk/landed.svelte";
   import type { Boundary, ForkPlan } from "./talk/forking";
   import Thread from "./talk/thread.svelte";
+  import Showing from "./shared/showing.svelte";
+  import Stream from "./talk/stream.svelte";
+  import { drawsCalls } from "../core/results";
   import { anchorAt, footOf } from "./talk/anchoring";
   import type { Anchoring } from "./talk/anchoring";
   import { NOTHING, artifactsIn } from "./talk/trace";
@@ -293,7 +296,7 @@
         {/if}
         {#if runs.length === 0}
           <div class="flex flex-col items-center gap-base py-section text-center">
-            <p class="text-heading font-heading text-text-disabled">
+            <p class="text-heading font-heading text-text-faint">
               {isMayor
                 ? say($lang, "talk_empty_mayor")
                 : fill(say($lang, "talk_empty_room"), { room: who })}
@@ -306,10 +309,15 @@
             <div class="w-full">{@render composer()}</div>
           </div>
         {:else}
-          <Divider {earlier} {who} boundary={story} onFork={doFork} onRetry={send} />
-          {#each shown as run (run.run)}
-            <Thread {run} {who} onFork={doFork} onRetry={send} />
-          {/each}
+          <div class="mb-base flex justify-end"><Showing /></div>
+          {#if drawsCalls($held.showing)}
+            <Divider {earlier} {who} boundary={story} onFork={doFork} onRetry={send} />
+            {#each shown as run (run.run)}
+              <Thread {run} {who} onFork={doFork} onRetry={send} />
+            {/each}
+          {:else}
+            <Stream {shown} {earlier} boundary={story} />
+          {/if}
           <Waiting />
         {/if}
       </div>

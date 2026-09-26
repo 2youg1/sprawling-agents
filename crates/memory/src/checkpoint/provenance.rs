@@ -32,7 +32,7 @@ use crate::real_fs::RealFs;
 /// The two always travel together — a model id without the effort asked
 /// of it does not say what the call was — so they arrive as one value
 /// rather than as two parameters a caller can hand over half of.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModelChoice {
     /// The endpoint's own model id. Empty when the caller genuinely does
     /// not know it: an invented id would be worse than an absent one.

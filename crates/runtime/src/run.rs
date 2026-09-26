@@ -14,7 +14,7 @@
 
 use kernel::{
     Address, AxError, BuildingPolicy, Carrier, Completion, EventDraft, Ledger, Locator, Model,
-    Payload, RunId, TimeMs, ToolDef,
+    Payload, RunId, TimeMs, ToolCall, ToolDef,
 };
 
 use kernel::ChatMessage;
@@ -54,6 +54,10 @@ pub struct RunPlan {
     /// fact folded from the ledger rather than inferred from two runs
     /// sharing an address.
     pub predecessor: Option<RunId>,
+    /// Who dispatched this run, written into `run_started`: the line's
+    /// author is always the city's desk, so only the dispatch site
+    /// knows whether the person, the city or a resident sent it.
+    pub dispatched_by: kernel::event::Who,
     /// The conversation this run starts from, when it is the first run of
     /// a session that branched off another. Empty for every other run.
     ///
@@ -141,6 +145,10 @@ pub struct RunHooks<'a> {
     /// The pre-wave checkpoint fence. `None` runs without a net, which
     /// the tool layer refuses for anything that can delete.
     pub fence: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,
+    /// What a call may write, by its declared effect, asked before the
+    /// wave runs: a wave whose every call answers `Nothing` changes no
+    /// file, so it needs no fence of its own (§8-45).
+    pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes,
     /// Runs a wave's tool calls in three stages (see
     /// [`crate::ConcurrentInvoke`]). The turn's stamp rides along because
     /// the tool layer stamps results from it, and a caller that sampled

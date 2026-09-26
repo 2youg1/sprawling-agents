@@ -28,7 +28,7 @@ pub mod tools;
 pub mod transcript;
 
 pub use backlog::{Backlog, BacklogId, BacklogKind, Finished, Standing, Started};
-pub use backlog::{Exit, PollBudget, Unseen};
+pub use backlog::{Chunk, Exit, PollBudget, Sink, Stream, Unseen};
 pub use tools::ChildStatus;
 pub use tools::EditTool;
 pub use tools::ProviderMode;

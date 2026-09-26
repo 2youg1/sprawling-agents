@@ -89,10 +89,11 @@ impl Flight {
         self.pool.in_flight()
     }
 
-    /// Whether every lane is taken. The concurrency wall a caller reads
-    /// before it prepares work it cannot start.
+    /// Whether a new run waits: every lane is taken, or memory is tight.
+    /// The concurrency wall a caller reads before it prepares work it
+    /// cannot start; the memory is read here, at the moment it decides.
     pub(in crate::assembly) fn full(&self) -> bool {
-        self.pool.full()
+        self.pool.full(crate::monitor::memory::read())
     }
 
     /// The plan rows one pursuit has in lanes: how many, and which
@@ -372,6 +373,7 @@ impl RunWorker {
             parent: None,
             succession: None,
             taint: because.taint(),
+            dispatched_by: kernel::event::Who::City,
         };
         let reason = because.because();
         match self.dispatch_into_lane(at, task, goal, Owing::unasked(because)) {

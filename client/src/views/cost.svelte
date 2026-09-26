@@ -93,7 +93,7 @@ const TITLES: Record<Cut, Key> = {
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.cost} />
   {:else if answer === undefined || reading === undefined}
-    <p class="text-text-disabled">…</p>
+    <p class="text-text-faint">…</p>
   {:else if reading.kind === "unpriced"}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
     {@render unpriced(answer.unpriced)}
@@ -124,7 +124,7 @@ const TITLES: Record<Cut, Key> = {
             <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
             {@render cut(answer[each], answer.total)}
           {:else}
-            <p class="text-note text-text-disabled">—</p>
+            <p class="text-note text-text-faint">—</p>
           {/if}
         </section>
       {/each}

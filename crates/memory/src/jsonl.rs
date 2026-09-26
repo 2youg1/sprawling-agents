@@ -31,6 +31,8 @@ mod first_line;
 mod ledger;
 mod open;
 mod reading;
+mod tail;
+mod unwind;
 mod verify;
 
 pub(crate) use first_line::first_line;
@@ -39,4 +41,5 @@ pub(crate) use ledger::segment_file_name;
 pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
 pub(crate) use ledger::{complete_lines, segment_first_seq, segment_names};
 pub use reading::{ledger_segments_at, read_raw_lines_at};
+pub use tail::{TailLine, TailLines};
 pub use verify::{CheckedLine, LineCheck, LineFault, read_line};

@@ -671,6 +671,24 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 
 **未决（§3 口径）**：副本是「一条命令一份」的直译，代价与工作树成正比；一棵带构建缓存的工作树会在每条命令上付一次复制。界内的取舍已定（越界拒而不是部分复制），但「一条命令一份」与「一个工具一份＋每命令同步」哪个对真正的工作树更合适，需要一次实测（一棵真实 room 的复制耗时与其命令数）才能定。
 
+### 8-13-3 runtime::tools::exec::yielding（派出的命令降一级；形状 4 adapter）
+
+agent 派出去的构建、测试与 sprawling 的记账、视图、socket 服务抢同一批核；控制面必须赢，所以 exec 派出的每一条宿主命令都以低于核心的优先级起动，而不是继承核心的优先级。本模块只做「把一条 `Command` 改成降一级起动」这一件事，不决定哪条命令要降——凡经 `through_the_backlog` 的命令一律降，那是全部宿主子进程的唯一产地（§8-14），故降级只有这一处权威。
+
+```rust
+pub(super) fn one_level_down(Command) -> Command;
+```
+
+- **Windows**：`BELOW_NORMAL_PRIORITY_CLASS`（`0x0000_4000`，`WinBase.h`），经标准库的安全接口 `std::os::windows::process::CommandExt::creation_flags` 在创建时给出，不需要管理员，也不需要 `unsafe`。是绝对档位而非相对档位：核心在正常档时，子进程低一档。
+- **Unix**：包一层 `nice -n 10 <program> <args>`，工作目录与环境变量逐项搬到外层命令上。`nice` 是 POSIX 规定的工具；增量是相对的，所以子进程总比核心低 10 个 nice 单位，不需要 `CAP_SYS_NICE`（降优先级从不需要特权）。Linux 上核心的 `PATH` 里有 `ionice` 时，再在外面包一层 `ionice -c 2 -n 7`：IO 优先级取 best-effort 类里最低的一级，而不是 idle 类——idle 类在磁盘忙时可以让一条构建一个字节也读不到，best-effort 最低级只是排在核心之后。没有 `ionice`（例如不带 util-linux 的系统）时只包 `nice`：IO 这一半是两半里较轻的一半，缺了它不该让每条命令都起动失败。
+- **次序**：降级在清环境与放置之前做，于是 `env_clear` 与环境白名单落在最外层命令上，沙箱的包装（`LinuxNamespaces` 的 wrapper）再包住降过级的命令；优先级沿进程树继承，所以 wrapper 下的真命令同样低一档。
+- 失败：Unix 上 `nice` 自己总能起动，找不到的程序只会变成退出码 127 与 stderr 里的一行字，所以本模块在包 `nice` 之前先按 `execvp` 的找法（带分隔符的名字相对工作目录，裸名字沿核心的 `PATH`）确认程序是一个可执行文件，不是就返回 `E_TOOL_UNAVAILABLE`，动作与恢复同 backlog 的 spawn 失败（「check the program name, or use the shell arm」）。找不到 `nice` 本身时，spawn 在 backlog 里以同一个码报出。Windows 上不包外层，找不到程序仍在 spawn 处失败。Sandbox 放置下这一查找发生在宿主上，沙箱里看见的 `PATH` 若不同，结果以沙箱里的起动为准。
+- 证据：`crates/runtime/src/tools/exec/tests/yielding.rs` 的 `a_dispatched_command_runs_below_the_core`——同一条读自身优先级的命令，直接起动一次、经 exec 起动一次，断言后者的档位严格低于前者；Linux 臂 `a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level`——经 exec 起动的 `ionice` 读回自己的 IO 档位是 `best-effort: prio 7`。这一条只在 Linux 上编译与运行，先红与转绿都在合并火车的 Linux 任务里看到。
+
+**决定（M78，平台调用的取法）**：子进程的 CPU 优先级取第一档「安全 Rust」——`creation_flags` 与 `nice` 都是对外只给安全接口的现成路，不需要 Zig 叶子，也不需要 Lean 证明边界。**被否**：①起动后再对子进程调 `SetPriorityClass`／`setpriority`——要 FFI（`unsafe` 或 Zig 叶子），且子进程在改档之前已经以正常档跑了一段；②Unix 上用 `CommandExt::pre_exec` 调 `nice(2)`——`pre_exec` 本身是 `unsafe`。**重开参数**：Unix 主机上出现不带 `nice` 的受支持平台，或测得多包一层 `nice` 的起动开销占到一条命令墙钟时间的可见比例。
+
+**未决（§3 口径）**：核心线程升到正常档之上一级与空转安全阀在 sprawling-SPEC §8-93；派出进程的内存上限尚未落地，卡在一个事实上：`win32job` 2.0.3 对外只公开 job 的工作集上限（`limit_working_memory`，即 `JOB_OBJECT_LIMIT_WORKINGSET`，限的是常驻而不是提交量，按进程计），而在未提权的账户下设这一项被系统拒绝——`SetInformationJobObject` 返回 `ERROR_PRIVILEGE_NOT_HELD`（os error 1314，「客户端没有所需的特权」），普通账户的令牌里没有这一项要的特权，启用特权要 `AdjustTokenPrivileges`，是 FFI。于是这条路在普通账户上让每条派出命令都起动失败，或者静默不设上限，两者都不可取。作业级提交上限（`JOB_OBJECT_LIMIT_JOB_MEMORY`）不要特权，但设它的字段在 `win32job` 里是 crate 私有的，`process-wrap` 10.0.1 与 `windows-spawn` 0.1.0 也不设它。重开参数：一个对外只给安全接口的 crate 公开 `JOB_OBJECT_LIMIT_JOB_MEMORY` 或 `JOB_OBJECT_LIMIT_PROCESS_MEMORY`，或者这一处系统调用改走平台调用规则的第二档（Zig 叶子）。重命令共用的额度池尚未落地：池的大小由测得的核数与可用内存推出，哪些命令算重由城配置给默认表；可用内存的读数只在 sprawling 的 `bin::monitor::memory` 里读（sprawling-SPEC §8-94），由 `bin::assembly` 交给本 crate，本 crate 不读平台。内存紧时新 run 排队已在 sprawling-SPEC §8-46-3。
+
 ### 8-14 runtime::tools 四件（形状 4；tools.rs 为纯索引）
 
 ```rust
@@ -852,6 +870,7 @@ pub struct RunPlan {                 // 一个 Run 的全部常量，调用方�
     pub opening: Opening,                                 // 这一场是接了写下来的活，还是人在场
     pub parent: Option<RunId>,                            // 派活给它的那个 Run
     pub predecessor: Option<RunId>,                       // 把这场活交给它的前任，深度守恒
+    pub dispatched_by: Who,                               // 由谁派来，写进 run_started 的 dispatched_by
     pub shape: CallShape,
     pub prefix: FrozenPrefix, pub policy: BuildingPolicy, pub tools: Vec<ToolDef>,
     pub skills: Vec<SkillPin>,                            // 阅览室准进了什么，当时各是什么字节
@@ -1445,6 +1464,41 @@ impl Backlog {
 
 **红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
+#### 8-28-3 exec 输出的实时流（已接：读增量、装配点注入、线上帧、服务端与页面两段缓冲）
+
+**现状**：一个 `exec` 调用的 stdout／stderr 只在调用结束时随工具结果进账本，页面（client 的监视器）在那之前只看得到「运行中」。第 2 条让输出写进 scratch 下的 `out`／`err` 两个文件，所以实时流不需要改子进程怎么写，只需要有人在它还在写时读这两个文件的增量。
+
+**已接的一段——`runtime::backlog::tail`（shape：adapter）**：
+
+```rust
+pub enum Stream { Out, Err }                          // 恒不是 bool
+pub struct Chunk { pub run: RunId, pub member: BacklogId, pub stream: Stream, pub bytes: Vec<u8> }
+#[derive(Clone)] pub struct Sink(/* Arc<dyn Fn(Chunk) + Send + Sync> */);
+impl Sink { pub fn new(deliver: impl Fn(Chunk) + Send + Sync + 'static) -> Sink; }
+impl Backlog { pub fn with_sink(self, sink: Sink) -> Backlog; }
+impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms × READ_BYTES_PER_MS
+```
+
+- 没有失败返回：读增量是可丢弃的预览，账本里的工具结果才是这段输出的权威；一次读失败只让这一拍少送一块，下一拍从同一偏移再读，偏移只在真的读到字节后前移。
+- `READ_BYTES_PER_MS = 64`（每秒 64 KiB，一个人在页面上读得过来的上界的数倍），一拍的上界由它乘间隔得出，stdout 与 stderr 各得一半，所以刷屏的 stdout 饿不死 stderr。
+- 决定：sink 是一个闭包而不是 trait——今天只有一个生产装配者（服务端扇出）与一个测试收集者，两者都只要「交出一块」这一个动作。
+
+- 窗口里的读停在交给后台那一刻，偏移随成员进表；此后本 run 的每次 `harvest` 对它自己的、仍在跑的后台命令从同一偏移接着读。块在放开表锁之后才交给 sink，所以 sink 慢不会让表上其他调用等它。
+
+**已接的第二段——装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `channels::LiveOutput`（channels-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
+
+**已接的第三段——页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
+
+**已接的第四段——服务端缓冲**：`sprawling::serving::output_ring`（sprawling-SPEC §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（channels-SPEC §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
+
+**设计**（四段共同遵守的规则）：
+
+- **读的地方是短窗口的轮询，不另起线程**。`Backlog::run` 每一拍轮询在 `settle` 之后按上次的偏移读两个文件新增的字节，交给调用方注入的一个 sink；窗口外交给后台的命令由 `harvest` 那一拍同样读增量。sink 缺席（citysim、replay、没人看的城）时一个字节都不读，行为与今天相同。
+- **每拍读的字节有上界**，按 `PollBudget` 的间隔推出而不写死：一拍最多读 `READ_PER_POLL` 字节，读不完的留到下一拍，所以一个刷屏的子进程让页面落后，而不让轮询变慢。
+- **服务端每个 run 一个有界环形缓冲**，按字节计上界，满了丢最旧的整块；后来打开 run 页的会话先拿到缓冲里的内容，再接实时帧。丢了多少不上线：`LiveOutput` 没有这一栏，而加一栏要让 `WIRE_V` 再加一，换来的只是预览里的一个数——调用落账时整段输出本来就会到。缓冲在这次调用的 `tool_returned` 落账时清空，因为那时账本里的结果是这段输出唯一的权威。
+- **线上是一种新的 `ServerFrame`**，与 `Delta` 同一条规则：可丢弃，不带账本序号，调用的结果落账时页面扔掉它，两者不一致时账本赢。这一帧让 `WIRE_V` 加一并重新生成 `client/src/wire.ts`。
+- **页面也是有界环形缓冲**，按行计，监视器的终端记录画它；溢出的行数照 `mon_lines_cut` 的样子说出来。
+
 ### 8-29 runtime::tools::read 区间读（字节预算）
 
 **两道天花板，紧的那道说了算。** 512 行界定一次作答携带多少**结构**；`INTERVAL_CAP_BYTES`（64 KiB）界定它花掉窗口的多少**字节**——本仓源码一行约四十字节，而一个生成物可以整份压在一行里，故行上限单独不成其为界。
@@ -1514,6 +1568,24 @@ const NEARBY_CAP: usize = 16;
 - **打开之后再核一次，不符＝`E_GATE_DENIED`**：`text_at` 打开判过的真实路径，然后核两件事：这条路径此刻的真实位置仍是它自己（路上没有换进来的链接），此刻这条路径上的文件与打开的句柄是同一个文件（`same-file` 的 `Handle`，比的是卷与文件号）；任一不符即拒，拒因不说出链接指向哪里。之后只从已打开的句柄读。两道核验各挡一种换法：判定之后换进来并一直留着的链接，打开与再开都穿过它而相等，只有重求真实位置看得见；打开时是链接、重求前又换回的，只有句柄比对看得见。剩下的窗口要在打开、重求、再开之间来回换三次。打开放在判定之后而不是之前，因为先打开就会在判定前打开链接背后未经判定的东西，Unix 上一个 FIFO 会让这次打开一直阻塞。catalog 里的单份文档也先经 `real_location`（§8-30-1）求真实位置，所以 `text_at` 的每个调用方交来的都是真实路径，核验对它们一视同仁。
 - **列目录是尽力而为**：目录列不出或名字不是 Unicode 时 `nearby` 为空，调用方要的拒因是「没命中」本身。
 - **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（city-SPEC §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
+
+#### 8-29-5 打开一个 Locator：`cas:` 与 `file:`（`runtime::tools::read::locator`）
+
+```rust
+// read::locator
+pub(super) fn open_locator(asked: &str, city_root: &Path, store: &Path,
+                           bound: &dyn Fn(&Address) -> ReadVerdict) -> Option<Result<String, AxError>>;
+/// cas: 块按哪栋楼判读取界的唯一判定处。
+fn judged_at(hash: &B3Hash, origins: &[memory::BlockOrigin],
+             bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Address, AxError>;
+// ReadTool::new(city_root, catalog, bound, block_store: &Path)：块仓是城的，run 可能写在没有自己块仓的 worktree 里。
+```
+
+- **以 `cas:` 或 `file:` 开头的参数是 Locator**，按 `Locator::parse` 判形，判不过即 `E_INVALID_ARGS`；其余参数走 catalog 与普通路径，不受影响（一个城内地址不含冒号，两者不相交）。
+- **`cas:` 块按存块时记下的楼判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个。来源是 `Cas::put_for` 在存块时写下的（memory-SPEC §8-3）：一个块为几栋楼存过就有几条来源，取读者能读的第一栋；一栋都读不了就取第一条来源，让 `admit` 按那栋楼的理由拒绝；没有来源的块（上架的技能包、从未存过的哈希）＝`E_GATE_DENIED`，恢复语让它改读块所出自的 `file:`。只按楼判、不按 run 判：读得了那栋楼的文件就读得了为那栋楼存下的字节，而 run 只记作出处。另一条路是按账本里哪一行写了这个哈希来判，落选：模型写的文字（例如委派的 `goal`）会落进带 `addr` 的行，那样的归属可以伪造。`file:<addr>@<oid>` 按 `<addr>` 判。
+- **`file:` 在该 oid 上做 git 读**（`memory::blob_at`，memory-SPEC §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
+- **范围**：`cas:` 带的范围照 Locator 本身只交回那一段（`Cas::get_range`）；`file:` 带范围＝`E_INVALID_ARGS`，恢复语让它去掉范围改用 `offset`／`limit`——提交里的文件没有一份按范围读的实现，而 `offset`／`limit` 已答同一个问题。之后都按 `offset`／`limit` 切（§8-29-1）。字节不是 UTF-8＝`E_INVALID_ARGS`，read 只交文本。
+- **为 run 存块的调用方都走 `put_for`**：转录（`Transcript::materialise`，记房间）、卸载的原件（`offload::tee`，记命令所在的房间，来源随 `OffloadSite` 传入）、截图（`bin::browser_tool`，记这栋楼）、交接单 must-read 里的规范文档（`bin::assembly::freezing`，记 run 所在的房间）、run 的任务书（`bin::assembly::dispatching::running`，记房间；run id 由任务书的定位符派生，所以先 `put` 取得哈希，run 立起后再 `put_for` 补记来源）、子 run 的交回说明（`bin::assembly::dispatching::handback`，记子 run 与它的房间）。仍走 `put` 的有两类：上架的技能包不是为某个 run 存的，读不到它的 `cas:`，它按 catalog 名读；冻结前缀的各段（`intern_prefix`）只为让账本里的前缀可审计，一个段为同一栋楼的所有 run 共用，不作为定位符交给任何 run。
 
 ### 8-30 runtime::tools::search（形状 1 判定＋形状 4 适配器）
 
@@ -1914,20 +1986,25 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 
 ```rust
 pub(crate) enum Fence { Skip, Stage }
+pub(crate) enum Wave { Empty, ReadOnly, MayWrite }  // 由 RunHooks::writes 逐个调用读出
 enum SinceFence { Unfenced, Fenced, Changed }   // 相对本 run 上一次 fence 的树
 pub(crate) struct FencePolicy { since: SinceFence }
 impl FencePolicy {
     pub(crate) fn opening() -> Self;                                   // Unfenced
-    pub(crate) fn for_wave(&self, calls: &[ToolCall]) -> Fence;        // 只读
-    pub(crate) fn record_wave(&mut self, fence: Fence, calls: &[ToolCall]); // 只改状态
+    pub(crate) fn for_wave(&self, wave: Wave) -> Fence;                // 只读
+    pub(crate) fn record_wave(&mut self, fence: Fence, wave: Wave);    // 只改状态
 }
+// RunHooks 上：
+pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes;   // 按声明的 Effect 答（Writes::of），未注册的名字答 Domain
 ```
 
 - **fence 做两件事**：一是给这一波可能删改的东西留一个能回退的提交；二是把上一波写下的文件带进一个提交——否则那些写既进不了 diff，也还原不回来。所以判定看两样：这一波要调用什么，以及上一次 fence 之后有没有调用跑过。
-- **判定表**：`Changed`（上次 fence 后跑过调用）→ `Stage`，空波也一样；`Unfenced` 且这一波有调用 → `Stage`；`Unfenced` 且空波 → `Skip`（树就是 run 开张时那棵）；`Fenced`（fence 之后没有调用跑过）→ `Skip`，上一个提交已经是这棵树。
-- **状态转移**：这一波有调用 → `Changed`（被取消打断的波也算，它的部分调用可能已经跑了）；空波且立了 fence → `Fenced`；空波且跳过 → 不变。`Run<Active>` 持一个 `FencePolicy`，`advance` 只在 `Stage` 时调用 `RunHooks::fence` 并写 `checkpoint_committed`。
+- **波的分类**：没有调用 → `Empty`；每个调用的 `RunHooks::writes` 都答 `Nothing` → `ReadOnly`；否则 `MayWrite`。
+- **判定表**：`Changed`（上次 fence 后跑过可能写的调用）→ `Stage`，空波与只读波也一样；`Unfenced` 且 `MayWrite` → `Stage`；`Unfenced` 且 `Empty`／`ReadOnly` → `Skip`（树就是 run 开张时那棵）；`Fenced`（fence 之后没有可能写的调用跑过）→ `Skip`，上一个提交已经是这棵树。
+- **状态转移**：`MayWrite` → `Changed`（被取消打断的波也算，它的部分调用可能已经跑了）；`Empty`／`ReadOnly` 且立了 fence → `Fenced`；`Empty`／`ReadOnly` 且跳过 → 不变。只读波不改树，所以它既不需要自己的 fence，也不让下一波的 fence 多出一次提交。`Run<Active>` 持一个 `FencePolicy`，`advance` 只在 `Stage` 时调用 `RunHooks::fence` 并写 `checkpoint_committed`。
 - **为什么是一个模块**：「这一波要不要 fence」原本是 `advance` 里的一句 `if let Some(fence)`，答案恒为「要」。收成一个判定之后，后面两条规则（只读波、按写过的路径 stage）都只改这一处。
-- **未定**：今天每个调用都按「可能写」算，因为 run 驱动还不知道每个调用声明的 `Effect`——`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里。一旦 `RunPlan` 或 `RunHooks` 带上名字到 `Effect` 的表，「这一波有调用」换成「这一波有可能写的调用」，只读波就落到 `Fenced`/`Unfenced` 的 `Skip`；`Stage` 也应只带这一波写过的路径（写工具自报；exec 这类说不清的才扫写域）。定下它的证据是：5,000 文件的楼首次派活 ≤ 200 ms。
+- **`Stage` 带什么由调用方定**：`RunHooks::fence` 仍只收时刻；stage 哪些路径，由持有 `ToolBench` 的一侧决定，因为只有 bench 知道每个调用的工具。`ToolBench::invoke` 在 `BenchOutcome::Ran.wrote` 里交回工具的 `Tool::writes`（kernel-SPEC `Writes`）；sprawling 的 lane 把上次 fence 以来各调用的 `wrote` 用 `Writes::and` 并起来，下一次 fence 只 stage 这些路径，并在 fence 后清零。run 的第一次 fence、以及并出来是 `Domain` 或 `Nothing` 的那次，stage 整个写域：第一次之前的树没有任何本 run 的提交担保；`Nothing` 出现在 run 的第一道 fence：那时还没有调用跑过。**失败的调用并入 `Domain`**：`ToolBench::invoke` 答 `Err` 时没有 `wrote`，而工具可能写到一半才失败，它自己对写了什么的说法不再可信；lane 于是把 `Domain` 并进去，下一次 fence stage 整个写域。只丢掉它、留下同波其他调用的 `Paths`，会让那半截写不进任何提交。**被否**：`RunHooks::fence` 收一个范围参数——run 驱动拿不到工具的 `Effect`，这个参数只能由 lane 填，等于把同一个并集在两层各拼一次。
+- **调用可能不可能写，由 `RunHooks::writes` 答**：`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里，所以 lane 在把 bench 借给 `invoke` 之前取出 `ToolBench::declared_writes`（名字到 `Writes::of(effect)` 的表），`writes` 查这张表。它按声明答，不按参数答：判定发生在波跑之前，而 `Tool::writes` 读的是一条跑完的调用。**被否**：`RunPlan` 带名字到 `Effect` 的表——`RunPlan` 是冻结的 run 描述，进账本的重放读它，而工具的 `Effect` 是 bench 注册时的事实，不该在两处各记一份。
 - **否决「空波一律跳过」**：结束回合的空波前那次 fence，是把上一波的写带进提交的唯一时机；跳过它，run 写下的文件就没有任何提交持有。
 - **否决「每波都 fence」**：一个没跑过任何调用的 run，提交的是一棵没变的树，却多付一次 stage 与 commit。
 

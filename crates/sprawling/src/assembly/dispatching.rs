@@ -70,6 +70,9 @@ pub(super) struct Assignment {
     /// run of that session and by no later one: a branch is a beginning,
     /// and the run that begins it is the one that inherits.
     pub(super) origin: Option<kernel::Origin>,
+    /// Who sent this work, recorded in `run_started` because that
+    /// line's author is always the city's desk.
+    pub(super) dispatched_by: kernel::event::Who,
 }
 
 /// One succession, as the successor's dispatch receives it: who is

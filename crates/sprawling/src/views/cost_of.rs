@@ -22,7 +22,7 @@ impl Views {
     /// A node nobody has claimed answers zero with an empty list rather
     /// than `Unavailable`: "no run has held this node" is a true answer,
     /// while `None` says the view could not read a run's records.
-    pub(super) fn cost_of_answer(&mut self, node: &NodeId) -> Option<channels::CostOfAnswer> {
+    pub(super) fn cost_of_answer(&self, node: &NodeId) -> Option<channels::CostOfAnswer> {
         let held = self.claims.get(node).cloned().unwrap_or_default();
         let mut runs: Vec<(RunId, UsdMicros)> = Vec::with_capacity(held.len());
         let mut spent: u64 = 0;
@@ -41,7 +41,7 @@ impl Views {
     /// What each named run was billed, in the order asked and cut at
     /// `channels::RUN_COSTS_MAX`; a run whose records cannot be read has
     /// no row.
-    pub(super) fn run_costs_answer(&mut self, runs: &[RunId]) -> channels::RunCostsAnswer {
+    pub(super) fn run_costs_answer(&self, runs: &[RunId]) -> channels::RunCostsAnswer {
         channels::RunCostsAnswer {
             asked: runs.to_vec(),
             runs: runs
@@ -58,10 +58,10 @@ impl Views {
     /// the Ledger once the hot view evicted it, and zero for a run no
     /// priced call was attributed to. `None` when the Ledger could not
     /// be read.
-    pub(super) fn billed_to(&mut self, run: RunId) -> Option<UsdMicros> {
+    pub(super) fn billed_to(&self, run: RunId) -> Option<UsdMicros> {
         match self.attribution.billed_to(&run) {
             Some(billed) => Some(billed),
-            None if self.hot.was_evicted(&run) => self.recalled_bill(run),
+            None if self.hot.was_evicted(&run) => self.ledger_ask().recalled_bill(run),
             None => Some(UsdMicros::default()),
         }
     }

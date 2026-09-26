@@ -6,7 +6,7 @@
 //! What failed about one provider call, and the one place that decides
 //! whether it may be asked again and what the person does next.
 
-use kernel::{AxCode, AxError, Retry};
+use kernel::{AxError, ProviderFailureKind, Retry};
 
 /// A transport failure as its whole chain states it.
 ///
@@ -128,6 +128,26 @@ impl ProviderFailure<'_> {
         }
     }
 
+    /// What the wire carries so a page can say this failure in its
+    /// reader's language.
+    fn kind(&self) -> ProviderFailureKind {
+        let status = |code: &reqwest::StatusCode| u32::from(code.as_u16());
+        match self {
+            ProviderFailure::Exchange(_) => ProviderFailureKind::Exchange,
+            ProviderFailure::Cut(_) => ProviderFailureKind::Cut,
+            ProviderFailure::Silence { .. } => ProviderFailureKind::Silence,
+            ProviderFailure::Refused { status: code, .. } => ProviderFailureKind::Refused {
+                status: status(code),
+            },
+            ProviderFailure::Overflow { status: code, .. } => ProviderFailureKind::Overflow {
+                status: status(code),
+            },
+            ProviderFailure::Unreadable(_) => ProviderFailureKind::Unreadable,
+            ProviderFailure::Reported { .. } => ProviderFailureKind::Reported,
+            ProviderFailure::Unbuilt(_) => ProviderFailureKind::Unbuilt,
+        }
+    }
+
     /// Whether the identical request may succeed if sent again later,
     /// and whether its effect landed. A connection that never opened
     /// carried no request, and a provider answering 408, 429 or 5xx (529
@@ -207,10 +227,11 @@ impl ProviderFailure<'_> {
     }
 }
 
-/// One provider failure as an `E_PROVIDER` error, its retriability and
-/// its way out taken from [`ProviderFailure`], never decided here.
+/// One provider failure as an `E_PROVIDER` error, its kind, its
+/// retriability and its way out taken from [`ProviderFailure`], never
+/// decided here.
 pub(crate) fn provider_err(action: &str, failure: &ProviderFailure<'_>) -> AxError {
-    let draft = AxError::failure(AxCode::Provider, action, failure.subject());
+    let draft = AxError::provider(failure.kind(), action, failure.subject());
     let draft = match (failure.retry(), failure.retry_after_ms()) {
         (Retry::Yes, Some(wait_ms)) => draft.retriable_after(wait_ms),
         (Retry::Yes, None) => draft.retriable(),
@@ -357,7 +378,7 @@ mod tests {
         use super::super::config::Endpoint;
         use super::super::fakes::{config, fake_provider, request};
         use super::super::redemption::redemption;
-        use kernel::Model;
+        use kernel::{AxCode, Model};
         let said = serde_json::json!({
             "type": "error",
             "error": { "type": "invalid_request_error",

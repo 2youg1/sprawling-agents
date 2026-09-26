@@ -9,7 +9,10 @@
 //! `answer` so that file stays inside its budget; every name is
 //! re-exported from there and the public spelling is unchanged.
 
-use kernel::{Address, McpServer, NodeId, Progress, PursuitState, RoadmapStatus, SandboxLimits};
+use kernel::{
+    Address, McpServer, NodeId, Progress, PursuitState, PursuitVerdict, RoadmapStatus,
+    SandboxLimits,
+};
 use serde::{Deserialize, Serialize};
 
 /// A building's plan, as its own `Roadmap.md` states it.
@@ -82,9 +85,9 @@ pub struct PursuitLine {
     pub addr: Address,
     pub goal: String,
     pub state: PursuitState,
-    /// One clause: working on 2.3, waiting for two runs, paused, or
-    /// finished.
-    pub verdict: String,
+    /// The kind, never a sentence: a page takes the words for it from its
+    /// own language table.
+    pub verdict: PursuitVerdict,
 }
 
 /// One document of a building, as it stands on disk.

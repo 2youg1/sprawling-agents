@@ -303,7 +303,11 @@ fn a_turn_waiting_on_a_person_says_so_without_copying_the_queue() {
     ];
     assert_eq!(
         turns(&events)[0].notes,
-        vec![Note::Waiting { at: Seq::new(2) }]
+        vec![Note::Waiting {
+            at: Seq::new(2),
+            t: TimeMs::new(2),
+            answered: None
+        }]
     );
 }
 
@@ -334,4 +338,60 @@ fn an_event_that_changed_nothing_about_this_turn_is_not_a_note() {
         record(3, EventKind::PromptAssembled, serde_json::json!({})),
     ];
     assert!(turns(&events)[0].notes.is_empty());
+}
+
+/// The answer is recorded under the city's own run, so the rounds fold
+/// pairs it back by approval id; an answer to some other item is not it.
+#[test]
+fn a_wait_is_answered_when_the_city_recorded_its_ruling() {
+    let cluster = kernel::ClusterKey {
+        class: kernel::ApprovalClass::Question,
+        detail: "market/ito".to_owned(),
+    };
+    let item = kernel::ApprovalItem {
+        id: kernel::ApprovalId::new("item-held").unwrap(),
+        actor: "market/ito".to_owned(),
+        action_desc: "ask hana what she charges".to_owned(),
+        artifact: kernel::Locator::parse(
+            "file:market/ito@0000000000000000000000000000000000000000",
+        )
+        .unwrap(),
+        cluster_key: cluster.clone(),
+        created: TimeMs::new(2),
+        tainted: false,
+    };
+    let ruling = |seq: u64, id: &str| {
+        let ruled = kernel::event::record::ApprovalResolved {
+            id: kernel::ApprovalId::new(id).unwrap(),
+            verdict: kernel::Ruling::Allow,
+            cluster: cluster.clone(),
+        };
+        record(
+            seq,
+            EventKind::ApprovalResolved,
+            serde_json::to_value(ruled).unwrap(),
+        )
+    };
+    let asked_here = [
+        asked(1),
+        record(
+            2,
+            EventKind::ApprovalRequested,
+            serde_json::to_value(&item).unwrap(),
+        ),
+    ];
+    let mut folded = turns(&asked_here);
+    super::answer_waits(
+        &mut folded,
+        &asked_here,
+        &[ruling(5, "item-other"), ruling(9, "item-held")],
+    );
+    assert_eq!(
+        folded[0].notes,
+        vec![Note::Waiting {
+            at: Seq::new(2),
+            t: TimeMs::new(2),
+            answered: Some(TimeMs::new(9))
+        }]
+    );
 }

@@ -21,7 +21,10 @@
 //! answer with, which is why an object is never lifted whole to hand
 //! back a fragment of it.
 
+mod origin;
 mod ranges;
+
+pub use origin::BlockOrigin;
 
 use std::path::{Path, PathBuf};
 

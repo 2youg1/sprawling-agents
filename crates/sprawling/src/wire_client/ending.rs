@@ -148,6 +148,12 @@ impl Ending {
                 milestone,
                 run: None,
             },
+            // A watch has no reply and names no run: the city's quiet
+            // is the only end it can have.
+            (
+                channels::ClientFrame::Monitor(_),
+                Until::Quiet | Until::Event(_) | Until::Run { .. },
+            ) => Self::Quiet,
         }
     }
 
@@ -274,7 +280,9 @@ impl Reply {
                 channels::ServerFrame::Welcome(_)
                 | channels::ServerFrame::Delta(_)
                 | channels::ServerFrame::Log(_)
-                | channels::ServerFrame::Lagged(_),
+                | channels::ServerFrame::Lagged(_)
+                | channels::ServerFrame::Output(_)
+                | channels::ServerFrame::Monitor(_),
             ) => Self::Other,
             // A frame this build cannot read is still printed; it is
             // simply not one that ends the call.

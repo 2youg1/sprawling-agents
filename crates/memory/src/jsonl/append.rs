@@ -42,6 +42,10 @@ impl JsonlLedger {
     /// Group commit: one durability barrier for the whole wave
     /// (memory-SPEC 3-1: the batch is what the wave delivered).
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, MemoryError> {
+        // A restore a failed wave left owed runs first: it is what mends
+        // the barrier, and it may remove the segment this wave would
+        // append to.
+        self.finish_unwind()?;
         self.barrier.admit(&self.dir, self.next_seq)?;
         self.halt.admit()?;
         if drafts.is_empty() {
@@ -85,21 +89,7 @@ impl JsonlLedger {
         }
 
         self.barrier = Barrier::Broken;
-        for (path, bytes) in &writes {
-            self.vfs
-                .append(path, bytes)
-                .map_err(io_err("append event line", path))?;
-        }
-        for (path, _) in &writes {
-            self.vfs
-                .sync_data(path)
-                .map_err(io_err("sync segment", path))?;
-        }
-        if !created.is_empty() {
-            self.vfs
-                .sync_dir(&self.dir.clone())
-                .map_err(io_err("sync ledger dir", &self.dir.clone()))?;
-        }
+        self.write_wave(&writes, created)?;
 
         self.barrier = Barrier::Whole;
         self.seg_path = cur_path;

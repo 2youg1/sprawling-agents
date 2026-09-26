@@ -257,28 +257,31 @@ impl RunWorker {
             // A brief that read like the person would make every
             // reply go to the wrong place.
             let speaker = &knock.from;
-            let outcome = self.dispatch_into_lane(
-                Assignment {
-                    addr: knock.addr.clone(),
-                    session: None,
-                    effort: None,
-                    model: None,
-                    mode: knock.mode,
-                    parent: None,
-                    succession: None,
-                    taint: kernel::TaintSet::empty(),
-                    origin: None,
-                },
-                format!(
-                    "@{speaker} signalled you. This run exists because that signal arrived: \
+            let outcome = kernel::event::Who::parse(speaker).and_then(|by| {
+                self.dispatch_into_lane(
+                    Assignment {
+                        addr: knock.addr.clone(),
+                        session: None,
+                        effort: None,
+                        model: None,
+                        mode: knock.mode,
+                        parent: None,
+                        succession: None,
+                        taint: kernel::TaintSet::empty(),
+                        origin: None,
+                        dispatched_by: by,
+                    },
+                    format!(
+                        "@{speaker} signalled you. This run exists because that signal arrived: \
                      nobody else asked for it."
-                ),
-                format!(
-                    "The signals waiting for you have been read, and @{speaker} has an answer \
+                    ),
+                    format!(
+                        "The signals waiting for you have been read, and @{speaker} has an answer \
                      if one was needed."
-                ),
-                owing,
-            );
+                    ),
+                    owing,
+                )
+            });
             if let Err(err) = outcome {
                 self.note(
                     runtime::diagnostics::Level::Refuse,

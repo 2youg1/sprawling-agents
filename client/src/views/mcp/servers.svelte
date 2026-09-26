@@ -116,7 +116,7 @@
           <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
           {@render stateBadge(stateOf(server.label))}
           {say($lang, "mcp_tools")}
-          <span class="text-text-disabled">{toolCount(stateOf(server.label))}</span>
+          <span class="text-text-faint">{toolCount(stateOf(server.label))}</span>
         </span>
       {/snippet}
       {#snippet actions()}
@@ -148,7 +148,7 @@
             {#each pairsOf(server) as pair, at (at)}
               <span class="min-w-0 wrap-anywhere font-mono text-text">
                 <!-- wording-ok: the "=" is punctuation in type, not a word; the two values are the city's own. -->
-                {pair[0]}<span class="text-text-disabled">&nbsp;=&nbsp;</span>{pair[1]}
+                {pair[0]}<span class="text-text-faint">&nbsp;=&nbsp;</span>{pair[1]}
               </span>
             {/each}
           </div>

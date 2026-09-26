@@ -39,12 +39,12 @@
   import type { View } from "../core/route";
   import { cityIsShut, CITY } from "../core/scope";
   import { completed } from "../core/completion";
-  import { offered, reached } from "../core/slash";
-  import type { Reached, Slash, SlashHands } from "../core/slash";
+  import { SECTIONS, offered, reached } from "../core/slash";
+  import type { Reached, Section, Slash, SlashHands } from "../core/slash";
   import { ui } from "../ui";
   import { Address } from "../wire";
   import Empty from "./parts/empty.svelte";
-  import { SECTIONS, SECTION_WORD, sectionOf } from "./palette/sections";
+  import { SECTION_WORD } from "./palette/sections";
   import { Kbd } from "./parts/kbd.svelte";
 
   interface Entry {
@@ -171,6 +171,7 @@
       case "/dispatch":
         return here === null ? NEEDS_ROOM : undefined;
       case "/steer":
+      case "/stop":
         return live === null ? NEEDS_RUN : undefined;
       case "/model":
         return models.length === 0 ? NEEDS_MODEL : undefined;
@@ -217,25 +218,27 @@
     }
   }
 
-  const commands = $derived.by((): Entry[] =>
-    offered(query.trim()).map((each) => ({
-      label: each.grammar === "" ? each.spelling : `${each.spelling} ${each.grammar}`,
-      hint: say($lang, each.about),
-      why: whyFor(each.spelling),
-      act: () => {
-        runSlash(each);
-      },
-    })),
-  );
-
   // The slash list as three labelled sections, in the order the
   // question is usually asked: what to do, where to go, what session.
-  const grouped = $derived.by(() =>
-    SECTIONS.map((section) => ({
+  // Each verb names its section itself, and the flat list the cursor
+  // walks is read in the same order the sections draw it.
+  const grouped = $derived.by((): { section: Section; entries: Entry[] }[] => {
+    const typed = offered(query.trim());
+    return SECTIONS.map((section) => ({
       section,
-      entries: commands.filter((entry) => sectionOf(entry.label.split(" ").at(0) ?? "") === section),
-    })).filter((group) => group.entries.length > 0),
-  );
+      entries: typed
+        .filter((each) => each.section === section)
+        .map((each) => ({
+          label: each.grammar === "" ? each.spelling : `${each.spelling} ${each.grammar}`,
+          hint: say($lang, each.about),
+          why: whyFor(each.spelling),
+          act: () => {
+            runSlash(each);
+          },
+        })),
+    })).filter((group) => group.entries.length > 0);
+  });
+  const commands = $derived(grouped.flatMap((group) => group.entries));
 
   const shown = $derived.by((): Entry[] => {
     const needle = query.trim().toLowerCase();
@@ -260,9 +263,11 @@
 </script>
 
 <!-- Escape, answered by the shell's key handler, closes this box; the
-click on the scrim is the pointer's extra way out, not the only one. -->
+click on the scrim is the pointer's extra way out, not the only one.
+It stands above the rail, whose drawer is `z-10`: on a narrow window the
+rail would otherwise cover the left half of the box. -->
 <div
-  class="fixed inset-0 flex items-start justify-center bg-page/70 pt-section"
+  class="fixed inset-0 z-20 flex items-start justify-center bg-page/70 px-snug pt-section"
   role="presentation"
   onclick={(event) => {
     if (event.target === event.currentTarget) onClose();
@@ -275,7 +280,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
   >
     <input
       bind:this={box}
-      class="w-full rounded-control bg-raised px-base py-snug text-body placeholder:text-text-disabled"
+      class="w-full rounded-control bg-raised px-base py-snug text-body placeholder:text-text-faint"
       placeholder={say($lang, "palette_placeholder")}
       value={query}
       oninput={(event) => {
@@ -314,7 +319,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
                 type="button"
                 class={[
                   "flex w-full items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body",
-                  entry.why === undefined ? "hover:bg-raised" : "text-text-disabled",
+                  entry.why === undefined ? "hover:bg-raised" : "aria-disabled:text-text-disabled",
                   at === cursor ? "bg-raised" : "",
                 ]}
                 aria-disabled={entry.why !== undefined}
@@ -326,7 +331,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
                 }}
               >
                 <span class="truncate font-mono">{entry.label}</span>
-                <span class="shrink-0 text-note text-text-disabled">
+                <span class="shrink-0 text-note text-text-faint">
                   {entry.why === undefined ? entry.hint : say($lang, entry.why)}
                 </span>
               </button>
@@ -350,7 +355,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
               }}
             >
               <span class="truncate font-mono">{entry.label}</span>
-              <span class="shrink-0 text-note text-text-disabled">
+              <span class="shrink-0 text-note text-text-faint">
                 {#if entry.action === undefined}
                   {entry.hint}
                 {:else}

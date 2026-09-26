@@ -130,23 +130,6 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::Endpoi
     channels::EndpointsAnswer { endpoints, chosen }
 }
 
-/// One clause a person reads: what the city is doing about its pursuit.
-///
-/// The one wording, so the page, the console and a log line all say the
-/// same thing about the same verdict.
-pub(crate) fn verdict_line(verdict: kernel::PursuitVerdict) -> String {
-    match verdict {
-        kernel::PursuitVerdict::Work { next } => format!("working on {next}"),
-        kernel::PursuitVerdict::Waiting { in_flight } => {
-            format!("waiting for {in_flight} run(s) still going")
-        }
-        kernel::PursuitVerdict::Paused => "paused".to_owned(),
-        kernel::PursuitVerdict::Finished => {
-            "finished: nothing is ready and nobody is working".to_owned()
-        }
-    }
-}
-
 /// The building a `pursuit_changed` record is about.
 ///
 /// # Errors
@@ -248,6 +231,9 @@ pub(crate) fn summarize(run: RunId, hot: &memory::RunHot) -> channels::RunSummar
         last_kind: hot.last_kind,
         addr: hot.addr.clone(),
         started: hot.started,
+        completion: hot.completion.clone(),
+        pr: hot.pr.clone(),
+        ask: hot.ask.clone(),
     }
 }
 

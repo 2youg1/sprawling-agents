@@ -50,7 +50,7 @@ function gist(data: Payload): string {
 {#if read.kind === "unavailable"}
   <Unanswered query={read.query} asked={question} />
 {:else if answer === undefined}
-  <p class="text-text-disabled">…</p>
+  <p class="text-text-faint">…</p>
 {:else}
   {#snippet ledgerRows()}
     {#each [...answer.records].reverse() as record (record.seq)}
@@ -63,7 +63,7 @@ function gist(data: Payload): string {
       >
         {#snippet status()}
           <span class="flex items-center gap-base whitespace-nowrap font-mono text-note">
-            <span class="text-text-disabled">{record.seq}</span>
+            <span class="text-text-faint">{record.seq}</span>
             <Tip text={clock($lang, record.t)}>
               {#snippet children(hint)}
                 <!-- svelte-ignore a11y_no_noninteractive_tabindex (the day rides one key away from the time, so the hint must be reachable by keyboard) -->

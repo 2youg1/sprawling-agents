@@ -76,12 +76,12 @@ pub(crate) async fn serve(city_root, addr, token, index_html, model) -> Result<(
 
 ```rust
 pub(crate) struct Views { city_root, hot: HotView, attribution: Attribution, approvals: BTreeMap<String, ApprovalSummary> }
-impl Views { fn apply(&mut self, &EventRecord) -> Result<(), AxError>; fn prepare(&mut self, &Query) -> Prepared; }
+impl Views { fn apply(&mut self, &EventRecord) -> Result<(), AxError>; fn prepare(&self, &Query) -> Prepared; }
 impl Prepared { fn finish(self) -> Answer; }                                 // 锁外读盘，见 8-92
-pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError>;   // 启动时冷重建
 impl Views { fn apply(&mut self, &EventRecord) -> Result<(), AxError>; fn answer(&self, &Query) -> Answer; }
 impl Views { pub(crate) fn rebuild(ledger_dir: &Path) -> Result<Views, AxError>; }   // 启动时冷重建
 fn read_spine(city_root: &Path) -> Vec<BuildingProgress>;                    // 查询时读盘
+impl CityAsk { fn read(self) -> channels::Answer; }                     // 放下快照后列楼、读计划，见 8-92
 ```
 
 - **视图冷重建与热折叠共用 `apply`**：启动时把 Ledger 逐行喂进去，其后由 `JsonlLedger::observe` 喂。测试断言两条路径答案逐字段相等——这就是「projection 可弃」的可执行形式。
@@ -421,7 +421,7 @@ impl RunWorker {
     pub fn handle(&mut self, channels::Command) -> Result<(), AxError>;
     pub fn startup_scan(&mut self) -> Result<ScanReport, AxError>;
     pub fn fork(&mut self, RunId, Seq, Option<Address>) -> Result<RunId, AxError>;
-    pub fn adopt_building(&mut self, Address) -> Result<(), AxError>;
+    pub fn adopt_building(&mut self, Address) -> Result<(), AxError>;   // 收楼即立基线 fence（memory-SPEC 8-8 base_fence），进度写诊断
 }
 
 // console
@@ -1011,12 +1011,37 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 ## 8-34 计划的投影（`accounting::plan_view`）
 
 `PlanView` 与 `PlanReading` 住在 `accounting`，规格见 accounting-SPEC.md 8-6；`views` 与 `RunWorker.plan_holders` 从那里读。
+`CityView` 与 `Metrics` 过去每被问一次，就把每栋楼的 `Roadmap.md` 从盘上读出来重新解析一遍。页面是轮询的，而一份计划一小时改不了几次——这是**为一个几乎不变的答案，按提问频率付钱**。
+
+```rust
+pub(crate) struct PlanView { /* read、causes、每栋楼与全城的代数 —— 私有 */ }
+pub(crate) struct PlanReading {
+    pub(crate) progress: Progress,
+    pub(crate) problems: Vec<String>,
+    pub(crate) rows: Vec<channels::PlanRow>,
+    pub(crate) blocked: Vec<channels::BlockedLine>,
+    pub(crate) ready: Vec<NodeId>,
+}
+impl PlanView {
+    pub(crate) fn apply(&mut self, record: &EventRecord);
+}
+pub(crate) fn plans_of(shared: &Mutex<PlanView>, city_root: &Path, addrs: BTreeSet<Address>) -> BTreeMap<Address, PlanReading>; // 锁外读盘，见 8-92
+```
+
+- **文件仍然是计划**。变的只是谁去读：`kernel::WriteMoment` 说这张表只在三个时刻被写，而每一个时刻都是一条记录，于是折叠记录、只在有记录点到那栋楼时才回去读文件。
+- **失效由两类记录触发，理由不同**。`roadmap_*` 说一个 run 动了计划——既是忘掉已解析副本的理由，也是一件本身值得留着的事实（红的原因）。`checkpoint_committed` 只说一波工具写过文件——**用 edit 工具改了表的 agent 不留 `roadmap_*` 记录**，一个忽略工具波的缓存会继续报改动之前的计划。
+- **它是投影不是副本**：这里不存计划说了什么，只存**上一次读到的时候它是什么**，并在任何可能改变它的事情发生时丢掉。删掉整个它、把同一批记录再折一遍，得到同样的字节——因为它做的全部事情就是折叠。
+- **它折的唯一一件文件装不下的事，是节点为什么红**。表格有位置说 `Blocked`；人需要的那句话在 `roadmap_blocked` 的记录里，在表里再放一份就是同一句话的第二个权威。没有记录撑着的 `Blocked` 行仍然算红，措辞退回状态词本身——一个人手改的行仍然是一行说着活停了的行。
+- **`BuildingView` 也走这一份**：楼的对象页从这里拿计划，只有文档、房间与档案仍在被问的那一刻读盘。让对象页自己再解析一次，就是「什么卡住了、为什么」有两个答案，而只有一个在折记录。
 
 ## 8-35 谁在追一个目标，谁替它派活（`RunWorker.pursuits`）
 
 - **值住在工人身上，事实住在账本里。** `kernel::Pursuit` 由 `Delegator::root()` 铸出，而这座城里**唯一一处 `Delegator::root()` 就在 `RunWorker::over`**——于是「子代理不能让全城通宵干活」是一件关于代码的事实，而不是一条谁去遵守的规则。设置／暂停／恢复／清除各落一条 `pursuit_changed`，`Views` 折它来画，重启后工人从同一批记录把值重新铸出来。两处折叠都经 `Payload::read::<kernel::event::record::PursuitChanged>` 与它的 `held` 读这一行，读不回的一行让折叠报错而不是被跳过：跳过它，一座被清除目标的楼在重启后会继续追下去。
 - **`Views` 不持 `Pursuit`，只持文本与状态**：一个能铸出 `Pursuit` 的视图，就是那道守卫上的第二扇门。判定仍由 `kernel::observe_pursuit` 给出，措辞由 `verdict_line` 一处写出——页面、控制台与日志说同一句话。
 - **`pursue` 会终止，理由在集合上而不在计数器上**：认领把节点移出就绪集，而一个结束时还持有节点的 run 会把它留成 Blocked（`ClaimDesk::abandon`），所以就绪集严格变小；唯一让它变大的是拆分，而那是这座城找到了更多活，不是在打转。派活之后若该节点仍在就绪集里，追求暂停并留一条诊断——**看的是集合本身，不是一个凭空定的上限。**
+- **值住在工人身上，事实住在账本里。** `kernel::Pursuit` 由 `Delegator::root()` 铸出，而这座城里**唯一一处 `Delegator::root()` 就在 `RunWorker::over`**——于是「子代理不能让全城通宵干活」是一件关于代码的事实，而不是一条谁去遵守的规则。设置／暂停／恢复／清除各落一条 `pursuit_changed`，`Views` 折它来画，重启后工人从同一批记录把值重新铸出来。
+- **`Views` 不持 `Pursuit`，只持文本与状态**：一个能铸出 `Pursuit` 的视图，就是那道守卫上的第二扇门。判定仍由 `kernel::pursuit::observe` 给出，并以 `kernel::PursuitVerdict` 原样放进 `PursuitLine.verdict`；城不替它写句子，人读的措辞只在客户端的 `lang.json` 里按种类取。
+- **`pursue` 会终止，理由在集合上而不在计数器上**：认领把节点移出就绪集，而一个结束时还持有节点的 run 会把它留成 Blocked（`ClaimDesk::abandon`），所以就绪集严格变小；唯一让它变大的是拆分，而那是这座城找到了更多活，不是在打转。派活之后若该节点仍在就绪集里，循环停下并留一条诊断——**看的是集合本身，不是一个凭空定的上限。**
 
 ## 8-36 一个节点红了，站在它后面的人会知道（`tell_whoever_is_behind`）
 
@@ -1088,7 +1113,7 @@ justfile／CI 无涉；S4 前端框架结论书将改写 build.rs 拷贝源与 `
 
 ### 搬走什么
 
-`Views` 结构与它的两个 `impl`、`endpoints_answer`、`verdict_line`、`pursuit_from`、`buildings_of`、
+`Views` 结构与它的两个 `impl`、`endpoints_answer`、`pursuit_from`、`buildings_of`、
 `signal_line`、`discard_lines`、`registry_line`、`summarize`，以及**咬它们的那十条断言**。
 测试跟着被测的东西走：一份留在原处的断言会让下一个人以为那里还有代码。
 
@@ -1708,6 +1733,8 @@ pub(crate) fn verb(args: &[String]) -> ExitCode;              // 必需项有缺
 
 // bin::doctor::probe（形状 4 adapter：运行中的机器）
 pub(crate) trait Machine: accounting::Machine { fn look(&self, r: &Requirement) -> Presence; }   // 安装经父 trait 的 install（accounting-SPEC.md 8-4）
+pub(crate) trait Machine { fn look(&self, r: &Requirement) -> Presence; fn install(&self, name: &str, recipe: &Recipe) -> Result<(), AxError>;
+                           fn core_standing(&self) -> Result<Standing, AxError>; } // §8-93 的档位，由平台实际给出
 pub(crate) struct ThisMachine { platform: Option<Platform>, patience: Duration }
 pub(crate) fn answer(machine: &dyn Machine) -> channels::DoctorAnswer;   // bin::doctor::report：一页答案，ThisMachine 的 report 就是它
 pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .exe／.cmd／.bat 在先，无扩展名在后
@@ -1723,6 +1750,8 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 - **一项是环境变量而不是程序**：exec 工具 python 臂要的 CPython-WASI 组件由 `PYTHON_WASM_ENV` 指路（`bin::assembly::workbench::tools`），故它的探测是「那个变量指的文件在不在」，安装那一栏是 `Manual`——没有包管理器发它。它是 `Optional`，行尾说明它开启的是什么。
 - **终端里的词是英文，这不违反 wording 门**：AGENTS.md 的语言表把词表的管辖写在客户端上，`xtask wording` 扫的目录是 `client/src`（见 `xtask/src/wording.rs` 的 `CLIENT` 常量）。控制台是操作者的，与 `install`／`console`／`firstrun` 同一口径。
 - **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它经 `accounting::Machine::install` 记下的安装请求）。终端与 worker 的安装走同一个 `accounting::Machine::install`，所以测试记下的就是终端真正会启动的那一次。判定因此不需要测试机上真装着什么就能被咬。
+- **核心线程实际站在哪一档（§8-93）**：报告在各层的判定之后多一段 `priority`，一行 `core threads`：`one step above normal`；`normal, as config.toml [core] priority asks`；`normal, the platform refused: <原因>`（Unix 上没有 `CAP_SYS_NICE`）；读不出设置时是 `unknown: <错误>`。`ThisMachine` 读人的设置，在一条临时线程上调 `raise_this_thread` 得到这一档，线程随即结束，所以 doctor 自己的线程不换档。报的是运行 doctor 的主机此刻会给核心的档位，而不是某座正在跑的城的线程被安全阀降回之后的档位。派出的命令总是低一档（runtime-SPEC §8-13-3，降档从不被拒），这一段不重复它。证据：`crates/sprawling/src/doctor/tests/reading.rs` 的 `the_doctor_says_where_the_platform_lets_the_core_stand`（平台拒绝升档的机器，报告里是那一行与平台给的原因）。页面读同一读数：`report::fold` 从同一个 `Machine::core_standing` 折出 `DoctorAnswer::core`（channels-SPEC §8-25），词由页面选；证据是 `doctor::report::tests` 的 `the_page_is_told_where_the_core_stands`。
+- **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它记下的安装请求）。判定因此不需要测试机上真装着什么就能被咬。
 
 **本章测试**：表的完整性（每一项都有探测方法，且三个平台各自要么给出命令要么明说 `manual`；每一个 `Optional` 项都说出它开启什么）；`verdict` 对「全在」「缺一个必需项」「只缺一个可选项」三类输入给出正确的穷尽枚举（可选项缺失不拖垮该层）；`finding_line` 的三种写法；`--install` 在答 `n` 时**一件也不装**、答 `y` 时只装被问的那一件（由 `ScriptedMachine` 记账）。
 
@@ -2502,7 +2531,7 @@ pub(crate) struct Arrival { run: RunId, driven: Result<Driven, AxError> }
 pub(crate) struct DrivingPool { /* lanes、一个 mpsc 的两头、每条车道的 JoinHandle */ }
 impl DrivingPool {
     pub(crate) fn open(lanes: u32) -> DrivingPool;
-    pub(crate) fn full(&self) -> bool;
+    pub(crate) fn full(&self, memory: Memory) -> bool;
     pub(crate) fn in_flight(&self) -> u32;
     /// 交出一次驾驶：起一条车道。run id 取自 `driving` 自己，不另传一份——
     /// 两处说同一件事就有两处说错的机会。
@@ -2524,6 +2553,8 @@ impl DrivingPool {
 两个数字今天相等是刻意的，而把 provider 的天花板变成一个可读的公开值会改动 `gateway` 的公开面、
 需要重算 api-baseline，那是一次独立的卡，不该塞进这一张。**在它落地之前，比天花板大的车道数只会让线程停在
 admission 上排队**——§8-42-3 早就写下这句话，这里把它从设计变成一个带理由的常量。
+
+**内存紧时计划的下一行排队**：`full` 在车道都占满时为真，另外在已有 run 在跑、而整机可用内存低于物理内存的十分之一时也为真（`admits(in_flight, lanes, memory)` 是这一条规则的唯一出处）。读数是 `bin::monitor::memory::read()`，由 `bin::assembly` 的 `Flight::full` 在计划推进循环（`assembly::plans::pursuing`）每次决定是否起下一行时读一次，所以跟着实时的可用内存走；读一次的耗时还没有测过，只发生在起一行之前。`full` 只有这一个调用者：人的派遣（`dispatch_into_lane`）与排程、外来到达、刚解除阻塞的工作（`start_unasked`）经 `Flight::take` 直接进 `DrivingPool::start`，不问 `admits`，所以内存紧时它们照样与在跑的 run 并排起跑，车道上限对它们也同样不设防。这是本接口的现状；把 `admits` 挪进每轮都经过的那一道门（`DrivingPool::start` 或 `Flight::take`），并定下被拒的一轮是等还是带重试地被拒，才让这条规则覆盖每一个新 run。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/sprawling/src/serving/pool.rs` 的 `a_new_run_waits_while_memory_is_tight`。
 
 ### 8-46-4 `pursue` 拿走整个 ready set（`bin::assembly::plans::pursuing`）
 
@@ -2603,6 +2634,8 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 `records_of(run)` 用 `LedgerIndex::run_seqs_before` 取这次跑最新的 `HISTORY_MAX` 条 seq，逐条读行、逐条解析，旧在前。**上界与客户端原来问的那一段等宽**：`web::live::page` 一直是 `RunHistory { limit: HISTORY_MAX }`，所以搬到服务端之后一个会话能被读到的范围一字未变——搬家不该顺手改答案。读不回来的一行**截断而不清空**：读到的那些仍然是真的（同 `Views::history`）。
 
 折叠本身逐字从 `web::turn::rounds` 搬来，一条不改：`model_called` 开一个回合；`tool_called` 挂进当前回合并按 runtime 给的 id 记下等答；`model_returned` 落到最近一个回合上；`tool_result` 按 id 找回它自己的那次调用——**恒不按位置配对**，因为两个调用可以先后发出而后发的先答；其余记录按 `channels::reading::note_of` 判是否成为一条 `Note`。`opened_at` 是本会话第一条 `Fenced` 的 oid：那是这份活开始时的树，取最新的一道栅栏答的是另一个问题（「上一波动了什么」）。
+
+**等人的终点从城自己的 run 里配回来**：`approval_resolved` 记在 `RunId::CITY` 下，不在这次会话的记录里，所以折完回合之后 `answer_waits` 按 approval id 把答复的 `t` 写回 `Note::Waiting.answered`。只有这次会话的窗口里有 `approval_requested` 时才读城的那一段（同样最新的 `HISTORY_MAX` 条）——没等过人的会话不多付一次读。请求或答复落在各自窗口外、或载荷读不回来时，`answered` 为 `None`，页面把请求之后整段画给人，而不是猜一个终点。备选是让治理折叠常驻一张 id→答复时刻的表：它随城一生里答过的每一件批准只增不减，而这里的读只在打开一个等过人的会话时才付。
 
 ### 8-50-2 `bin::views::evidence`——写下来的证据，不携字节
 
@@ -2935,7 +2968,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 ## 8-52 新客户端要问的四件事，服务端怎么答（`bin::views::listing`、`bin::views::document`、`views::rounds`、`views::holding`；channels-SPEC §8-23）
 
 - **`Views.governance: views::Governance`**（原 `Views.halted`／`Views.approvals`／`Views.autonomy` 三个散字段）。停摆作用域、待答项与自治档由 `city_halted`／`approval_requested`／`approval_resolved`／`autonomy_changed` 折出，**折法只有 `Governance::absorb` 一处**：工作线程持一份判定面，`Views` 持一份读面，同一个类型、同一遍折，重建即相等（`views::tests`、`what_a_worker_holds_is_what_a_restart_rebuilds`）。此前 `Views` 把这四条记录另拼了一遍，两份拼法对「读不懂的决定算什么」答得不一样。`CityAnswer.halted` 是 `governance.halted` 的 `Vec` 形。
-- **`summarize` 把 `RunHot.addr`／`started` 抄进 `RunSummary`**，不读账本。
+- **`summarize` 把 `RunHot.addr`／`started`／`completion`／`pr`／`ask` 抄进 `RunSummary`**，不读账本（channels-SPEC §8-48）。
 - **`rounds_answer` 多读两条记录**：窗口里第一条 `run_started` 成 `Opening { task, goal, at: record.t() }`，第一条 `run_frozen` 成 `Closing { completion, at }`；`turns()` 本身一字不动。
 - **`bin::views::listing`**（新文件）：`at` 为 `None` 读城根，否则读 `city_root/<at>`；`read_dir` 一层，目录在前、文件在后、各按名字 UTF-8 序；读不了的目录答空表而不是拒绝——同 `read_building` 的口径，一个读不了的目录在页面上是一个空目录。符号链接按 `metadata` 判：指向目录的算目录。文件大小 `u64`。
 - **`bin::views::document`**（新文件）：路径同上；`std::fs::read` 失败答 `Unavailable`（同 `BuildingView` 对没立过的楼的口径）；头 8 KiB 含 NUL 判 `binary`；否则取前 `DOC_BYTES_MAX` 字节 `from_utf8_lossy`，`truncated = len > DOC_BYTES_MAX`。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
@@ -3164,7 +3197,7 @@ impl protocol::Outbound for SseServer { /* call：先 POST 再等流；notify：
 ### 8-66 `bin::views::mcp_health`：一个地址够得到的每台 server 此刻站在哪（形状 7 投影）
 
 ```rust
-impl Views {
+impl LiveAsk {
     pub(super) fn mcp_health_answer(&self, addr: &Address) -> channels::McpHealthAnswer;
 }
 ```
@@ -3296,7 +3329,7 @@ impl RunWorker { fn halted_by(&self, addr: &Address) -> Option<kernel::event::Sc
 
 **本章测试**：`an_unreadable_approval_item_stops_the_fold`（`assembly::folds::tests`）、`an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted`（`kernel::event::record::governance`）。
 
-### 8-76 哪些记录会动计划，是一张穷尽表（`plan_view::may_move_plan`；Roadmap B-55）
+### 8-76 哪些记录会动计划，是一张穷尽表（`plan_view::reach::may_move_plan`；Roadmap B-55）
 
 ```rust
 enum PlanReach { Untouched, Stale, NodeFreed, NodeStopped }
@@ -3613,30 +3646,44 @@ impl Listening {
 
 **本章测试**：`assembly::listening::tests::a_serve_refused_at_the_socket_writes_no_line`：测试自己先占住端口，`listen` 返回错误，账本的每一行与之前逐字节相同。锁的那一半由 memory 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go` 守住。
 
-### 8-89 视图在自己的线程上折叠，写线程不等读者（`bin::serving::folding`）
+### 8-93 视图在自己的线程上折叠并发布快照，写线程与折叠都不等读者（`bin::serving::folding`、`bin::views::answering`）
 
 ```rust
 // bin::serving::folding —— shape: adapter
 pub(super) struct Folding {
     pub(super) observer: Box<dyn FnMut(&EventRecord) + Send>,
     pub(super) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    pub(super) lend: Box<dyn FnOnce(Arc<Mutex<gateway::Custodian>>) + Send>,
     pub(super) thread: std::thread::JoinHandle<()>,
 }
 pub(super) fn spawn_folding(
-    views: Arc<Mutex<Views>>,
+    published: Arc<Published>,
+    spare: Views,
     to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+    setting: CorePriority, // 视图线程是否升档（8-93）
 ) -> Result<Folding, AxError>; // StorageFatal「start the view fold」：线程起不来
+// bin::views::answering
+pub(crate) struct Published { /* 私有：Mutex<Arc<Views>> */ }
+impl Published {
+    pub(crate) fn new(views: Views) -> Published;
+    pub(crate) fn snapshot(&self) -> Arc<Views>;                    // 读者拿的快照
+    pub(crate) fn replace(&self, latest: Arc<Views>) -> Arc<Views>; // 发布新的一份，交回被换下的那份
+}
+// bin::assembly::folds
+impl Views { pub(crate) fn twin(&self) -> Result<Views, AxError>; } // 经快照编码复制出第二份，共用账本索引与计划缓存
 ```
 
-**写线程只做一次 `send`。** 观察者（`observer`）与机器体检的落点（`machine`）都只把一份 `Fold`（一条已提交的记录，或一份 `DoctorAnswer`）放进无界 `mpsc` 通道，然后返回；名为 `sprawling-views` 的线程按到达顺序取出，锁住 `Views` 折叠，放锁之后才把记录广播给客户端。被拒：观察者在写线程上直接 `lock()`，读者（例如变更页的 `GitStatus` 在锁内跑 `git status`）持锁多久，写线程的下一次落盘就晚多久——一个 run 相邻事件的间隔被一个页面拉长。
+**写线程只做一次 `send`。** 观察者（`observer`）、机器体检的落点（`machine`）与借出金库的 `lend` 都只把一份 `Fold`（一条已提交的记录、一份 `DoctorAnswer`，或工作线程打开的金库）放进无界 `mpsc` 通道，然后返回。名为 `sprawling-views` 的线程每次把通道里已到的全部取出为一批，按到达顺序折叠。被拒：观察者在写线程上直接锁视图——读者持锁多久，写线程的下一次落盘就晚多久。
 
-**广播排在折叠之后。** 客户端收到一条记录再去查询，查到的视图已经含有这条记录；把广播留在写线程上会让事件先于视图到达。代价是广播会等读者，写线程不会。
+**两份视图轮换，读者拿快照。** 折叠线程持有备用的一份 `Views`，`Published` 持有发布出去的那份 `Arc<Views>`。每一批：折进备用份，用 `replace` 把它发布，广播这批记录，再收回换下来的那份（`Arc::try_unwrap`；读者还拿着就让出时间片再试），把同一批折进去，它成为下一批的备用份。读者用 `snapshot` 拷一只 `Arc`，锁只罩住这一次指针拷贝；`answer_outside_the_lock` 在快照上 `prepare`，放下快照再 `finish`。于是读者之间不互等，读者不等折叠，折叠在广播之前不等任何读者，收回时只等在换下之前拿到快照、还在做纯内存 `prepare` 的读者。`prepare` 因此只做纯内存的事：连时间也要花在读盘、git 或网络上的查询在快照里只拷走它要的小数据，`finish` 在快照放下后才去读；`McpHealth` 的握手（每台服务器最多等 `HANDSHAKE_PATIENCE`）与 `Toolkits` 的中介书架都是这样，拷走的是 `LiveAsk`（城根、城地址、保管人的 `Arc`）。在快照里握手会让收回一直自旋到握手超时，其间没有一批能折叠或广播。第二份由 `Views::twin` 在 `start_served_views` 折完之后经快照编码（8-91）复制出来，不再读一遍历史；两份共用同一只账本索引与计划缓存的 `Arc`，所以多出的内存只是折叠本身的一份。计划缓存在快照里按它自己编码，锁不进快照。被拒：每批克隆一份整的视图发布——每条记录一次整份拷贝，而且 `memory::HotView` 与 `memory::Attribution` 不是 `Clone`；`RwLock<Views>`——折叠的写锁要等每个在读的读者，新读者又排在写锁后面。代价是折叠常驻两份，每条记录折两次。
 
-**锁中毒要说出来。** 中毒之后视图不再折叠（半折的状态不可信），第一次遇到时向标准错误写一条诊断，指出从哪条记录起视图停在了哪里、以及恢复办法（重启服务，视图从 Ledger 重建）；此后的记录照常广播。只写一次，因为之后每条记录都是同一个事实。
+**广播排在发布之后。** 客户端收到一条记录再去查询，拿到的快照已经含有这条记录。
 
-**线程随写线程结束。** `attend` 返回后写线程丢掉 `RunWorker`（连同观察者与 `machine`），通道随之关闭，折叠线程把通道里剩下的折完、广播完再退出；写线程 join 它之后才结束，所以 `serve` 对写线程的 join 也等到了最后一次广播。
+**没有读者能毒化的视图锁。** 读者只读不可变的快照，恐慌不会撕坏它。`Published` 的锁里只有一次 `Arc` 拷贝或交换，没有会恐慌的操作，换下来的那份在锁外交回；即便锁中毒，锁里仍是一只完整的 `Arc`，所以照取不误（`PoisonError::into_inner`）。视图拒绝折叠的记录照旧写一条诊断到标准错误后跳过；折叠线程自己恐慌则线程结束，观察者此后每次 `send` 失败都说出这条记录到不了视图，恢复办法是重启服务，视图从 Ledger 重建。
 
-**尚未做到的（本节接口的当前状态）**：不做 I/O 的查询仍在锁内作答，所以读者之间、以及读者与折叠线程之间仍会为这段纯内存的时间互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取，是这一接口余下的一步。做 I/O 的查询怎样离开锁，见 8-92。
+**金库经通道借给两份视图。** 金库在工作线程里打开，`spawn_worker` 收到它之后调用 `lend`，两份视图各拿到同一只句柄；在这之前的快照里没有金库，要用凭证的读法按「借不到」作答。
+
+**线程随写线程结束。** `attend` 返回后写线程丢掉 `RunWorker`（连同观察者与 `machine`），通道随之关闭，折叠线程把通道里剩下的折完、发布、广播完再退出；写线程 join 它之后才结束，所以 `serve` 对写线程的 join 也等到了最后一次广播。
 
 ### 8-92 做 I/O 的查询只在锁内取小数据，I/O 在锁外做（`bin::views::answering`、`bin::views::prepared`）
 
@@ -3649,7 +3696,9 @@ pub(crate) enum Prepared {
     Config { city_root: PathBuf, addr: Address }, // 锁外读配置阶梯
     Listing { city_root: PathBuf, at: Option<Address> }, // 锁外列一层目录
     Document { city_root: PathBuf, at: Address },       // 锁外读一个文件的开头
-    Building { city_root: PathBuf, addr: Address, plan: PlanReading }, // 锁内取折叠好的计划，锁外读楼的目录
+    City(CityAsk),                   // 锁内取 run 摘要、停工范围与各追求，锁外列楼、读计划
+    Building { city_root: PathBuf, addr: Address, plans: Arc<Mutex<PlanView>> }, // 锁外读楼的目录与它的计划
+    Prefix(PrefixAsk),               // 锁内取折叠记下的那条记录的序号，锁外读账本那一行与内容仓库
     Changes { city_root: PathBuf, base: GitOid, head: Option<GitOid> }, // 锁外让 git 比较两个检查点
     Hunks { city_root: PathBuf, oid_a: GitOid, oid_b: GitOid, path: String }, // 锁外读一个文件的补丁
     Content { city_root: PathBuf, locator: Locator }, // 锁外读内容仓库里的一个对象
@@ -3657,17 +3706,22 @@ pub(crate) enum Prepared {
     Skills { city_root: PathBuf, building: Address, pins: SkillPins }, // 锁内拷出钉住表，锁外扫书架
     Metrics { city_root: PathBuf, held: channels::MetricsAnswer },   // 锁内填好折叠里的数，锁外数楼
     Release,                         // 锁外经网络问发布页
+    History { ledger: LedgerAsk, before: Option<Seq>, limit: u32 },      // 锁外刷新索引、读一段历史
+    HistoryRange { ledger: LedgerAsk, from: Seq, to: Seq, limit: u32 },  // 锁外读一个区间
+    RunHistory { ledger: LedgerAsk, run: RunId, before: Option<Seq>, limit: u32 }, // 锁外读一个 run 的记录
+    Rounds { ledger: LedgerAsk, run: RunId },                            // 锁外读一个 run 的记录再折成回合
+    Evidence { ledger: LedgerAsk, run: RunId },                          // 锁外读一个 run 留下的定位符
 }
 // bin::views::answering
-impl Views { pub(crate) fn prepare(&mut self, query: &channels::Query) -> Prepared; }
+impl Views { pub(crate) fn prepare(&self, query: &channels::Query) -> Prepared; } // 只读视图
 impl Prepared { pub(crate) fn finish(self) -> channels::Answer; } // bin::views::prepared
 pub(crate) fn answer_outside_the_lock(
-    views: &Mutex<Views>,
+    views: &Published,
     query: &channels::Query,
-) -> Result<channels::Answer, AxError>; // StorageFatal「read the city views」：锁中毒，恢复办法是重启服务
+) -> channels::Answer; // 在快照上 prepare，放下快照再 finish（8-93）
 ```
 
-**锁只罩住 `prepare`。** `answer_outside_the_lock` 锁住视图，`prepare` 把查询要的小数据（地址、围栏那一行、城根路径）拷出来，放锁，再由 `finish` 做磁盘、git 或网络的 I/O。控制面（socket 与终端）的查询都经过它。被拒：在锁内跑 `git status`——变更页开着时每次刷新都持锁几十毫秒，折叠线程等它，run 的相邻事件到达客户端的间隔就被这个页面拉长。
+**I/O 在放下快照之后。** `answer_outside_the_lock` 取一份快照（8-93），`prepare` 把查询要的小数据（地址、围栏那一行、城根路径）拷出来，放下快照，再由 `finish` 做磁盘、git 或网络的 I/O。控制面（socket 与终端）的查询都经过它。被拒：在锁内跑 `git status`——变更页开着时每次刷新都持锁几十毫秒，折叠线程等它，run 的相邻事件到达客户端的间隔就被这个页面拉长。
 
 **变体是穷尽的枚举，而不是一个 `Box<dyn FnOnce>`。** 每种锁外的 I/O 有名字，`match` 列全，新加一种要在这里写出它锁内拿什么；闭包会把这件事藏进调用点。
 
@@ -3675,7 +3729,32 @@ pub(crate) fn answer_outside_the_lock(
 
 **`Skills` 在锁内拷走整张钉住表。** 表的大小是「run 数 × 每个 run 钉住的技能数」，拷它是纯内存的一段；按这栋楼的书架先筛再拷，就得在锁内扫书架，正是要挪出去的那次读盘。
 
-**`Prefix` 仍在锁内读账本，`BuildingView` 的计划第一次被问时也在锁内读盘**（本节接口的当前状态）：`Prefix` 找那条 `prompt_assembled` 记录要刷新视图持有的账本索引，索引是可变的缓存，拆开它要等视图以 `Arc<ViewsSnapshot>` 发布（8-89）。`Commit`、`Commits` 只读折叠，不在此列。
+```rust
+// bin::plan_view
+pub(crate) fn plans_of(
+    shared: &Mutex<PlanView>,
+    city_root: &Path,
+    addrs: BTreeSet<Address>,
+) -> BTreeMap<Address, PlanReading>; // 锁内描述缓存里有的；放锁读没读过的表；再锁一次放回代数没动过的读数
+// bin::views::city —— shape: projection
+pub(crate) struct CityAsk { city_root: PathBuf, plans: Arc<Mutex<PlanView>>, held: channels::CityAnswer, pursuits: Vec<(Address, String, PursuitState)>, in_flight: u32 }
+impl CityAsk { pub(super) fn read(self) -> channels::Answer; } // 锁外列楼的目录、读计划、算每个追求的判词
+// bin::views::prefix
+pub(crate) struct PrefixAsk { ledger: LedgerAsk, run: RunId, first: Option<Seq> }
+// bin::views::prepared
+pub(crate) struct LedgerAsk { city_root: PathBuf, index: Arc<Mutex<memory::LedgerIndex>> } // 历史、回合与证据带出快照的那一份账本
+impl PrefixAsk { pub(super) fn read(self) -> channels::Answer; } // 读不到那一行或内容仓库打不开：Unavailable
+```
+
+**账本索引有自己的锁。** 索引是账本文件的缓存，折叠从不碰它（它在查询时才刷新），所以它不属于视图的锁：`Views` 持 `Arc<Mutex<memory::LedgerIndex>>`，`Prefix` 把这只 `Arc` 带出视图的锁，在 `finish` 里锁索引、刷新、读一行。读者之间仍为索引互等，折叠线程不等。索引的锁中毒时，读它的查询按「刷新失败」作答（`Prefix` 答 `Unavailable`，历史答空页），因为半刷新的偏移表会把别的行当成要找的那一行。被拒：`finish` 里另建一份索引——那是整本账本的一次扫描（五万条约 14 ms），比锁内那一段还长。
+
+**第一条 `prompt_assembled` 的序号由折叠记下。** `apply` 为每个 run 记它第一条 `prompt_assembled` 的 `Seq`（每个 run 一个数），`finish` 只读这一行；原先是锁内倒着读这个 run 的每一行找它。整条记录不进折叠：四段的来源表随文档数增长，而每个会话多占的内存是这个进程要压低的量。
+
+**计划缓存有自己的锁，回填看代数。** `Views` 持 `Arc<Mutex<PlanView>>`：折叠在 `apply` 里锁它作废读数，读者只在锁内做纯内存的描述，读表在锁外。`PlanView` 为每栋楼记一个代数，任何可能动到这栋楼计划的记录（`apply` 作废它的那一刻）都让代数加一，不带地址的这类记录让全城的代数加一。每楼的代数最多记 1024 栋（`GENERATIONS_HELD`）：再来一栋新楼时全部清掉、全城代数加一，于是在途的回填各被拒一次，而不是让这张表随进程见过的每栋楼增长；只清每楼的数而不动全城的数是错的，因为清零后那栋楼再动一次，它的数又回到读者问时的值。`plans_of` 在第一次锁内给每栋没读过的楼拷出停因表与当时的代数，锁外读表，第二次锁内只放回代数仍相等的读数：两次锁之间折进来的记录可能刚让这份读数过时，放回去就会让缓存一直报旧计划，直到下一条动它的记录。被拒：读到的一律不回填——每次问都要重读每栋楼的表，这正是缓存要省掉的读盘。计划缓存的锁中毒时，下一个持锁者（读者或折叠）用 `PlanView::take_back` 把它收回：丢掉读数与代数（恐慌可能撕了它们，于是每栋楼重读一次表，在途的回填因全城代数加一而被拒），保留停因表（每条停因由一次插入整条写入），再解除中毒。被拒：中毒后弃用缓存——那样每个红节点的句子都悄悄退回表格上的状态词，没人知道为什么；而答 `StorageFatal` 在这里代价过高，因为缓存里没有一样东西是恐慌能弄假而重读修不回来的。
+
+**`CityView` 与 `BuildingView` 都在锁外读盘。** `prepare` 只拷 run 摘要、停工的范围、各追求（地址、目标、状态）与在飞的 run 数，`CityAsk::read` 在锁外列楼的目录，用 `plans_of` 取这些楼与各追求所在地址的计划，再算楼的进度与每个追求的判词。`BuildingView` 带出计划缓存的 `Arc`，在 `finish` 里读楼的目录并用同一个 `plans_of` 取它的计划。
+
+**历史、回合与证据只带出账本。** `History`、`HistoryRange`、`RunHistory`、`Rounds`、`Evidence` 不读折叠里的任何东西，`prepare` 只拷城根并克隆索引的 `Arc`（`LedgerAsk`），刷新索引、读行、折成回合或挑出定位符都在 `finish` 里做。于是在锁内作答的查询都只读折叠，不碰盘：`Commit`、`Commits` 也在此列。
 
 ### 8-90 服务中的城在后台审计整条链，链断了写者就停（`bin::assembly::chain_watch`）
 
@@ -3691,13 +3770,89 @@ impl RunWorker {
 
 **一次调用，接上停机再起线程。** 它新建一个 `memory::ChainHalt`，先经 `JsonlLedger::halt_on` 接到这个 worker 的写者上，再在名为 `sprawling-chain-audit` 的线程上跑 `memory::audit_chain`（memory-SPEC 8-27）。线程只持有账本目录、停机值和自己的 `Diagnostics`，不碰写者，所以写线程从不等审计。`serve` 的写线程在 `open_for_service` 之后调用它；起不来的线程与起不来的写线程一样，让 `serve` 失败。citysim 与测试不走这条路，所以它们的时序里没有第二个线程。
 
-**结果作为诊断推给页面。** 审计线程的 `Diagnostics` 与写者的那一份同一个落点（`serving::Journal` 的 sink）、同一个级别下限，所以页面在日志里读到这一行：`Whole` 写一条 `Effect`，给出核对过的行数；`Broken(reason)` 先 `trip(reason)`，再写一条 `Refuse`，内容就是审计的原因与恢复办法；读账本本身失败（`MemoryError`）写一条 `Refuse`，但不跳闸，因为没读完的审计没有证明链断了。
+**结果作为诊断推给页面。** 审计线程的 `Diagnostics` 与写者的那一份同一个落点（`serving::Journal` 的 sink）、同一个级别下限，所以页面在日志里读到这一行：`Whole` 写一条 `Effect`，给出核对过的行数；`Broken(reason)` 先 `trip(reason)`，再写一条 `Refuse`，内容就是审计的原因与恢复办法；读账本本身失败（`MemoryError`）同样先 `trip`，原因是那次读取的失败，再写一条 `Refuse`：没读完的审计没有证明链断了，但也没有证明它完好，而视图从快照起步（8-91）时，快照之前的行只有这次审计会看；写在一条未经证明的链后面的行，与写在断链后面的行一样收不回来。**被否：读失败只报告不停写。** 那是视图全量核对起步时的规则，那时启动本身已经证明过整条链。
 
 **视图不需要第二个停机值。** 视图只折写者已经写下的记录（8-89），写者停了，视图也就不再有新工作；给视图再接一个 `ChainHalt` 会让「这座城还收不收工作」有两处定义。被拒的命令经写者的 `MemoryError::ChainHalted` 回到页面，说的与诊断是同一句话。
 
 **被拒：审计放在启动路径上同步做完再开端口。** 那正是要去掉的全链读取；审计的价值在于它不挡首字节。
 
-**本节接口的当前状态**：启动仍由 `rebuild_views` 与 `Standing::fold` 全量校验并折叠，所以审计目前只抓启动之后才坏掉的行。启动改走 `memory::start_from_snapshot`（memory-SPEC 8-28）只折尾部，需要先有 `Views` 与 `Standing` 的字节编码：它们持有 `memory::HotView`、`memory::Attribution`、`gateway::EndpointBook` 等字段私有的类型，所以编码要由各自的 crate 各给一份，而不是在这个 crate 里写第二份。那时一个没读完的审计也要停写，因为快照在审计通过之前没有被证明。
+**本节接口的当前状态**：`Views`（8-91）与 `Standing`（8-92）都从快照起步，只折尾部；快照之前的行在起步时由 `Standing::fold` 的同步审计（8-92）看过一遍，起步之后被改坏的行只有这次后台审计会看。所以 `serve` 起步时整条链被读两遍：一遍同步、挡在首字节之前，一遍在这里的后台线程上；上面「被拒」的同步审计因此实际上在启动路径上。要把它从首字节前拿掉，服务中的 worker 得在审计证明链完好之前不接受命令，而写者现在只在审计返回 `Broken` 时才停。
+
+### 8-91 视图从快照起步：编码、切快照、只折尾部（`bin::views::snapshot`、`bin::views::snapshot::start`、`bin::assembly::folds::views_start`）
+
+```rust
+// bin::views::snapshot::start —— shape: projection
+pub(crate) fn city_root_of(ledger_dir: &Path) -> &Path;   // 账本目录上两级
+pub(crate) trait SnapshotFold: Sized {
+    const DIR: &'static str;                  // <city>/.sprawling/snapshot/ 下这个折叠自己的目录
+    fn fold_version() -> u32;
+    fn empty(city_root: &Path) -> Self;
+    fn decode(city_root: &Path, bytes: &[u8]) -> Result<Self, AxError>;
+    fn encode(&self) -> Result<Vec<u8>, AxError>;
+    fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError>;
+    fn keep_index(&mut self, index: LedgerIndex, ledger_dir: &Path) -> Result<(), AxError>;
+}
+pub(crate) struct Started<F> { pub(crate) folded: F, pub(crate) from: FoldStart, /* 最后一行：切快照用 */ }
+pub(crate) enum FoldStart { Resumed { tail: usize }, Whole(memory::WholeFold) }
+pub(crate) fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError>;
+pub(crate) fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError>; // 先 memory::audit_chain，Broken(reason) 原样返回
+pub(crate) fn cut<F: SnapshotFold>(ledger_dir: &Path, started: &Started<F>) -> Result<(), AxError>;
+pub(crate) fn cut_at<F: SnapshotFold>(ledger_dir: &Path, folded: &F, last: Option<&(Seq, Vec<u8>)>) -> Result<(), AxError>;
+pub(crate) fn last_line(index: &LedgerIndex, ledger_dir: &Path) -> Result<Option<(Seq, Vec<u8>)>, AxError>;
+
+// bin::views::snapshot —— shape: projection
+impl Views {
+    pub(crate) fn encode(&self) -> Result<Vec<u8>, AxError>;                         // StorageFatal「encode the views」
+    pub(crate) fn decode(city_root: &Path, bytes: &[u8]) -> Result<Views, AxError>;  // CasCorrupt「decode the views」
+}
+pub(crate) fn views_fold_version() -> u32;
+impl SnapshotFold for Views { const DIR: &'static str = "views"; /* … */ }
+impl Views { pub(crate) fn rebuild(ledger_dir: &Path) -> Result<Views, AxError>; } // start_audited::<Views>，不切快照
+
+// bin::assembly::folds::views_start —— shape: projection
+pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics)
+    -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError>; // fold_city 的错误原样返回；切快照的失败只进 log
+```
+
+**起步路径放在视图一侧。** `snapshot::start` 由 `views` 持有：一次性查询经 `Views::rebuild` 从这里起步，而 `views` 的生产代码不点名 `crate::assembly`（8-92 的方向块）；`Standing` 的起步（`assembly::folds::standing_start`）从 assembly 指向 views，方向与 assembly 取用 `views::Governance` 相同。**被否：留在 `assembly::folds`，由 `assembly` 提供 `Views::rebuild`。** 那让读面为了一次性查询重新点名组装点，正是方向块拒绝的边。
+
+**编码由各类型自己的 crate 给出。** `memory::HotView`、`memory::Attribution`、`gateway::EndpointBook` 与本 crate 的 `Governance`、`PlanView`、`CommitFacts` 各在定义处派生 `serde::Serialize`／`Deserialize`，`Views` 本身也派生，字节格式是 postcard。`city_root`、`index`（side cache 的 seq→偏移表）、`machine` 与 `vault` 不进快照：前两个由 `Views::new` 从盘上重建（`decode` 用结构更新语法取 `Views::new` 的这两个值，所以重建规则只有一处），后两个本来就不是从账本折出来的。`PlanView` 只存 `causes`，已解析的计划是缓存，下一次提问时重新读。**被否：JSON。** `skill_pins` 以 `(String, B3Hash)` 为键，JSON 的键只能是字符串；而且 JSON 读写都比 postcard 慢、体积更大，这些都记在首字节上。**被否：手写逐字段编码。** 那是每个字段的第二份拼写，加一个字段就要改两处。
+
+**`fold_version` 不靠人记得改。** `views_fold_version()` 取 blake3(`CARGO_PKG_VERSION` ‖ `VIEWS_FOLD_RULES`) 的前四字节（LE）：换一个版本的二进制就丢弃旧快照、从创世折一次；同一版本内改了折叠规则或 `Views` 的字段，改 `VIEWS_FOLD_RULES` 这个常量。这条规则由 `views::snapshot::tests` 机器核对：常量写成 `views-fold-<16 位十六进制>`，后缀是一份固定夹具（三条手写记录，分别填进 Inbox、弃置箱与登记册；时间与序号都是常数，不经过时钟）折出的 `Views` 的 postcard 编码的 blake3 前缀；编码一变，测试给出新的常量值并失败，所以常量不可能停在旧编码上。夹具里一直为空的字段只在增删时改变字节，换了类型不会。**被否：只钉常量，或另钉一个哈希。** 前者什么也没核对；后者改字段时只需改哈希，常量照旧，旧快照照样被接受。字节解不开（postcard 报错）同样按 `WholeFold::Damaged` 退回全量折叠。
+
+**两个折叠，一条起步路径。** 视图与 `Standing`（8-92）各有一份快照，放在 `<city>/.sprawling/snapshot/` 下各自的目录（`views/`、`standing/`）里，各有自己的 `fold_version`，因为两者的编码各自改变；核对快照、折尾部、退回全量折叠、切快照只在 `snapshot::start` 写一次，由 `SnapshotFold` 接两种折叠。**被否：两个折叠共用一份快照。** 那让只改了一边编码的构建丢掉两边的快照，而且 `Standing` 在每个 worker 打开时就切，视图只在 `serve` 起步时切，两者的最后一行并不总相同。
+
+**起步只折尾部。** `start_views` 即 `start::<Views>`，它调 `memory::start_from_snapshot(ledger_dir, <city>/.sprawling/snapshot/views/, views_fold_version())`（memory-SPEC 8-28）。`Resume`：解码快照里的 views，再用 `ChainSnapshot::resume()` 给出的 `LineCheck` 逐行核对并折尾部——尾部仍然过同一个逐行检查，行号从 `seq + 1` 数起。`Whole`：与没有快照时完全相同，`runtime::replay::verify_lines` 从创世核对并折叠。快照之前的行在起步时不再逐行核对：切快照时它们已经过一次完整的核对（从创世或从上一份快照起），`fit` 用一行的链哈希证明它们还是那些行；之后被改坏的行在服务中的城里由后台的 `audit_chain`（8-90）抓住；一次性的查询（`views::ask` 经 `Views::rebuild`）旁边没有后台审计，所以 `Views::rebuild` 经 `start_audited::<Views>` 起步：先同步跑一次 `memory::audit_chain`，只有它返回 `Whole` 才从快照起步作答，`Broken(reason)` 与读不了账本都原样拒绝。**被否：一次性查询从创世全量折叠。** 审计是流式的，只算哈希不解析、不折叠，内存为 O(1)；全量折叠还要解析每条记录并建出整份视图，同样读一遍账本却多花解析与折叠。**快照校验失败绝不信任它**：任何一种 `WholeFold` 都走全量折叠，原因放在 `from` 里；`serve` 把它作为一条 `Effect` 诊断写进日志，说明这次从哪里起步、为什么。
+
+**本节接口的当前状态**：`Standing::fold` 还没有从快照起步（`Collaboration`、`Entrance`、`Expiries`、`SessionOrigins` 的编码尚未给出）；长时间运行中的城只在起步时切快照，运行中按测得的折叠成本切快照尚未落地——折叠线程（`serving::folding`）手里有每条已提交的 `EventRecord`，`canonical_line` 就是账本里的那行字节，所以在那里切不必再读一遍账本；视图拒折过一条记录之后本进程就不能再切，否则从快照起步会接受全量折叠拒绝的历史；间隔要取时间，而取时间的地方是 `bin::assembly`，所以节奏要以参数接一个时钟；`from` 的原因写进 `log`，页面只有在起步时开着日志视角才看得到，之后打开的页面看不到，因为日志行按 `serving::journal` 的规则可丢——它是成为页面打开时就读的某个视图的字段（改线格式），还是留作日志行，尚未决定；40 万行城首字节 ≤ 150 ms 的读数留在延后的测量里。
+**尚未做到的（本节接口的当前状态）**：查询仍在锁内作答，`GitStatus` 等做 I/O 的查询仍在锁内做 I/O，所以读者之间、以及读者与折叠线程之间仍会互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取、把 I/O 移到锁外（锁内只取所需的小数据），是这一接口余下的两步。
+**切快照：服务起步时，折叠越过快照就切一次。** `serve` 的写线程调 `start_served_views`：它先 `start_views`，再切快照（`snapshot::start::cut`），再把起步原因写进 `log`，最后交出视图。从创世折过至少一行、或尾部非空时，在最后一行切一份新快照；尾部为空（快照已在最后一行）时什么也不写。这个频率不含常数：切一次的代价是一次编码加一次 `sync`，与视图大小成正比；它省下的是下一次起步重折这段尾部的时间，与尾部长度成正比，而尾部只在上次起步之后增长。一次性的查询（`views::ask`）经 `Views::rebuild` 只读快照，不切：读命令不写盘。**写不下快照不让 `serve` 失败**：失败写成一条 `Refuse` 诊断，内容是失败原因与恢复办法，视图照常交出。快照只是下一次起步的捷径：没切成，下一次起步从旧快照或从创世多折一段，结果逐字节相同，只慢一些；而账本写不下时历史本身就缺了，两者不能同样对待。**被否：写不下快照就让 `serve` 失败。** 那让一个只影响下次起步速度的故障（快照目录满、权限错）挡住整座城。
+
+**本节接口的当前状态**：长时间运行中的城只在起步时切快照，运行中按测得的折叠成本切快照尚未落地——折叠线程（`serving::folding`）手里有每条已提交的 `EventRecord`，`canonical_line` 就是账本里的那行字节，所以在那里切不必再读一遍账本；视图拒折过一条记录之后本进程就不能再切，否则从快照起步会接受全量折叠拒绝的历史；间隔要取时间，而取时间的地方是 `bin::assembly`，所以节奏要以参数接一个时钟；`from` 的原因写进 `log`，页面只有在起步时开着日志视角才看得到，之后打开的页面看不到，因为日志行按 `serving::journal` 的规则可丢——它是成为页面打开时就读的某个视图的字段（改线格式），还是留作日志行，尚未决定；40 万行城首字节 ≤ 150 ms 的读数留在延后的测量里。
+
+### 8-92 worker 的 Standing 从快照起步（`bin::assembly::folds::standing_start`）
+
+```rust
+// bin::assembly::folds::standing_start —— shape: projection
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(super) struct StandingFolds { book, governance, collaboration: CollaborationFold, entrance, expiries, origins }
+impl SnapshotFold for StandingFolds { const DIR: &'static str = "standing"; /* … */ }
+impl StandingFolds { pub(super) fn settle(self, cut: Result<(), AxError>) -> Result<Standing, AxError>; }
+pub(in crate::assembly) fn as_json_text<T: Serialize, S: Serializer>(value: &T, serializer: S) -> Result<S::Ok, S::Error>;
+pub(in crate::assembly) fn from_json_text<'de, T: DeserializeOwned, D: Deserializer<'de>>(deserializer: D) -> Result<T, D::Error>;
+```
+
+**快照存的是还没 settle 的折叠。** `Standing` 里的 `Collaboration` 是 `CollaborationFold::settle` 的结果：信号的入队与消费按工作发生的顺序到达，队列要到最后一行之后才能算出；尾部再折进来时还要那些被搁置的信号，所以快照存 `CollaborationFold`，不存 `Collaboration`。六个折叠对一条记录的处理只写在 `StandingFolds::absorb` 一处，从创世与从快照起步都走它。
+
+**postcard 装不下的字段写成 JSON 文本。** `Entrance.refused` 里的 `AxError` 用 `#[serde(flatten)]`，postcard 不支持；`CollaborationFold.enqueued` 里的信号带 `Payload`（JSON 值），postcard 读不回来。前者整张表经 `as_json_text` 写成一段 JSON 文本；后者先经写者自己的 `Signal::enqueued_payload` 变回入队记录的载荷，读回时经它的逆 `Signal::from_payload`，所以信号的形状只有一处定义。`Entrance.carrying` 是本进程正在执行的命令，不是从历史折出来的，不进快照。**被否：给 `AxError` 另写一份不带 flatten 的编码。** 那是这个类型的第二份拼写，线上的 JSON 形状与快照的形状会各自漂移。
+
+**起步之前先审计整条链。** `Standing::fold` 经 `start_audited::<StandingFolds>` 起步：先同步跑一次 `memory::audit_chain`，只有它返回 `Whole` 才调 `start`；审计后起步只在 `start_audited` 写一次，一次性查询（8-91）与它共用。`Broken(reason)` 原样返回，worker 打不开，读不了账本同样拒绝。起步本身看不到快照之前的行：`fit` 只核对快照那一行，`JsonlLedger::open` 的尾部扫描只读最后一段；`fork`、`adopt` 与一次性命令打开的 worker 旁边也没有后台审计（8-90）。于是某个封好的段里一行被改写成另一行，仍然规范、仍接得上前一行，只断了下一行的 `prev`，除了这次审计谁都看不到；有了它，从快照起步绝不接受一条全量折叠会拒绝的链。审计是流式的，只算哈希不解析、不折叠，内存为 O(1)，但每次打开 worker 都要读一遍整条链的字节。**被否：只在旁边没有后台审计的 worker 上审计。** `Standing` 决定 worker 接不接一条命令，服务中的 worker 在后台审计跑完之前就会按一段没证明过的历史接受命令，而写者只在审计返回 `Broken` 时才停。
+
+**每次打开 worker 都切。** `Standing::fold` 先 `start::<StandingFolds>`，折过了快照之后的行就切一份新快照，再 settle。切不成不是折叠的错：结果放在 `Standing.cut` 里，`RunWorker::over` 把它写成一条 `Refuse` 诊断，worker 照常打开，理由与 8-91 相同。账本目录不存在时什么也不读、不切。
+
+**`fold_version`**：blake3(`CARGO_PKG_VERSION` ‖ `STANDING_FOLD_RULES`) 的前四字节（LE）；同一版本内改了折叠规则或 `StandingFolds` 的字段，改 `STANDING_FOLD_RULES`。
+
+**本节接口的当前状态**：`STANDING_FOLD_RULES` 还没有像 `VIEWS_FOLD_RULES` 那样钉上一份夹具编码的摘要，改了编码而忘了改常量时，同一版本的二进制会接受旧快照并在 `decode` 失败后退回全量折叠，或在字段顺序不变、含义变了时接受它；钉摘要需要一份填满六个折叠的固定夹具。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 
@@ -3810,7 +3965,7 @@ pub(super) fn verb(read: &Arguments) -> ExitCode;
 pub(super) struct Selection { tail: Option<usize>, from: Option<Seq>, run: Option<RunId>, kind: Option<EventKind>, who: Option<String>, grep: Option<String> }
 pub(super) fn write_records(dir: &Path, chosen: &Selection, out: &mut impl Write) -> Result<(), ViewError>;
 // sprawling::lineage
-pub struct RunLine { run, addr, session, parent, forked_at, predecessor, first_seq, last_seq, state }
+pub struct RunLine { run, addr, session, parent, forked_at, predecessor, first_seq, last_seq, state, unanswered }
 pub struct Lineage;                       // fold：apply(&EventRecord) -> Result<(), AxError>
 impl Lineage { pub fn lines(&self) -> impl Iterator<Item = RunLine>; }
 pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
@@ -3818,7 +3973,7 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 
 **`records` 透镜（非终端时的输出）。** 输出账本原行，逐字节相同，每行一个 `\n`，按 seq 升序。条件同时成立才选中：`--from <seq>`（含）、`--run <id>`（走 `LedgerIndex::run_seqs_before`，不读别的 run 的行）、`--kind <k>`（信封的 `kind`）、`--who <addr前缀>`（信封 `addr` 以它开头；没有 `addr` 的行不中）、`--grep <子串>`（原行按字节含这个子串，不是正则，glossary 的搜索规则）。`--tail N` 最后作用：只留选中的最后 N 行，从尾部倒着找，找够就停。信封只借用解析 `run`、`kind`、`addr` 三个字段。
 
-**`--runs`（`tree` 透镜给 agent 的画法）。** 每个 run 一行 JSON：`run`、`addr`、`session`、`parent`、`forked_at`、`predecessor`、`first_seq`、`last_seq`、`state`，按 `first_seq` 升序。`parent` 是 `run_forked.from`，没有分叉记录时是 `run_started.parent`；`forked_at` 是 `run_forked.at_seq`；`predecessor` 是 `run_started.predecessor`；`session` 是这个 run 开始前、同一地址上最近一条 `session_opened` 的 seq（这段 stretch 的名字），没有就是 `null`。`state` 取自 `memory::HotView` 的 `RunPhase`（`active`、`frozen`），与 Views 的 run 列表同一份折叠，不另算。父指针都在行里，agent 不需要第二次查询就能拼出树。
+**`--runs`（`tree` 透镜给 agent 的画法）。** 每个 run 一行 JSON：`run`、`addr`、`session`、`parent`、`forked_at`、`predecessor`、`first_seq`、`last_seq`、`state`、`unanswered`，按 `first_seq` 升序。`parent` 是 `run_forked.from`，没有分叉记录时是 `run_started.parent`；`forked_at` 是 `run_forked.at_seq`；`predecessor` 是 `run_started.predecessor`；`session` 是这个 run 开始前、同一地址上最近一条 `session_opened` 的 seq（这段 stretch 的名字），没有就是 `null`。`state` 取自 `memory::HotView` 的 `RunPhase`（`active`、`frozen`），与 Views 的 run 列表同一份折叠，不另算。`unanswered` 是这个 run 提出、还没有 `approval_resolved` 答复的 `approval_requested` 条数：请求按它的 `id` 记在提出它的 run 名下，答复按同一个 `id` 销掉，不管答复落在哪个 run 上；两种记录的 payload 都经 kernel 的类型读（`ApprovalItem`、`ApprovalResolved`），读不了就拒，与 `views::governance` 同一条规则（8-74）。父指针都在行里，agent 不需要第二次查询就能拼出树。
 
 **失败。** `--kind` 不是 `EventKind` 的 snake_case 名：stderr 一行 `sprawling: view: no event kind '<k>'. Did you mean '<近似名>'?`，退出 2（近似名用 `grammar::nearest` 那一条规则）。`--run` 不是 RunId、`--from`/`--tail` 不是数：同形，退出 2。账本目录读不了：`AxError` 的正文与 recovery，退出 1。
 
@@ -4083,3 +4238,289 @@ impl RunWorker {
 **还没落地的两个阶段，各自独立成立。** 几个前提已经成立：树的放置是 `Site::place_tree`、交接探针是 `Site::probe_after`，都不借 worker，经 `Stamping` 写进任何一个 `Ledger`；冻结是 `Freezing::freeze_plan`，`inherited` 在它之前、仍在记账线程上；筛子的准备是 `Sieving::for_run(city_root, site, addr)`，它开 CAS 的第二个句柄，也不借 worker；常驻表按键上锁（8-4），它仍只在记账线程上被调用，`a_server_still_shaking_hands_keeps_no_other_server_waiting` 用两条线程守着「一台握手未答的 server 不挡另一台」。
 1. 切出 `Staged`、`stage_dispatch` 与 `prepare_in_lane`；`prepare_dispatch` 暂时是二者在同一线程上的组合，直接调它的测试（`settling/tests/landing.rs`、`driving/tests/rules_account.rs`）不改。守护测试已经在前面落下。
 2. `Flight` 把 `prepare_in_lane` 放进 lane 的闭包、排在 `drive_run` 之前，`prepare_dispatch` 这个组合随之删除，调用它的两个入口（`driving::flight`、`plans::pursuing`）改为 `stage_dispatch` 加起飞。红测在这一阶段落下并转绿，`[prepare_dispatch_ms]` 的读数只剩记账线程那一半。
+
+## 8-90 移走一栋楼（`bin::assembly::commanding::removing`，形状 3 决定；channels-SPEC §19、city-SPEC §8-3）
+
+```rust
+impl RunWorker {
+    pub(in crate::assembly) fn remove_building(&mut self, addr: &Address) -> Result<(), AxError>;
+}
+impl RoomQueues {
+    pub(in crate::assembly) fn worked_within(&self, building: &Address) -> Option<(Address, RunId)>;
+}
+```
+
+- `Command::RemoveBuilding` 走这里。城拥有 `city::remove_building` 不知道的两件事：楼里有没有 run 正在跑，以及 Ledger 记什么。
+- **一个拒绝**：楼里某个房间的队列正借给一个 run（`worked_within`），拒 `E_BUSY`，主语点名房间与 run，恢复是先停下它。房间队列是城里唯一说「这里有人在干活」的账，另开一本会与它分歧；逐个看全部房间，因为地址序把 `lab-2` 排在 `lab` 与 `lab/room1` 之间，按前缀截区间会漏。
+- **先搬后记**：文件先搬进 `.sprawling/removed/`，再写 `building_removed`（载荷 addr、kept），因为这一行说的是「已经搬了」。楼以前写过的每一行都留在账里，什么都不删。
+- 客户端（`client/src/core/removal.ts`）在 City Hall 上不画这个控件，楼里有 run 在跑时画成不可用并说明原因；确认走 `parts/dialog`。城仍自己拒这两种情况，页面只是不把一个只会被拒的按钮交给人。
+
+### 8-90 还在跑的命令写出的字节，给后来打开页面的会话留一段（`bin::serving::output_ring`）
+
+```rust
+// bin::serving::output_ring —— shape: value
+pub(super) struct OutputRing { /* Mutex<BTreeMap<RunId, Kept>> */ }
+impl OutputRing {
+    pub(super) fn keep(&self, piece: &channels::LiveOutput); // 追加；超过上界时丢最旧的整块
+    pub(super) fn settle(&self, record: &EventRecord);       // tool_result 落账：清空这个 run
+    pub(super) fn so_far(&self) -> Vec<channels::LiveOutput>; // 每个 run 按到达次序
+}
+```
+
+- **没有失败返回**：它存的是可丢弃的预览（runtime-SPEC §8-28-3），账本里的结果才是权威；锁中毒时照样取出里面的表，因为每个操作都在一步之内让表保持一致，中毒只说明别的线程在锁外崩了。
+- **上界 `KEPT_BYTES_PER_RUN = 64 KiB`**，等于 runtime 一秒钟最多读出的字节（`READ_BYTES_PER_MS = 64`），也就够页面按 `LIVE_LINES = 400` 行画满两条流（每行约八十字节）。超过就从最旧的一块丢起，但最新的一块总留着，哪怕它自己超过上界。每个 run 的内存因此有上界，没有 run 在跑命令时表是空的。
+- **喂与清在记账线程上同步发生**：`attending` 装给 `Serving::outputs` 的闭包先 `keep` 再广播；装给 `worker.observe` 的观察者先 `settle` 再交给视图折叠。块在这次调用的结果落账之前读出，所以同一线程上的次序保证清空之后不会再收到这次调用的块。
+- **决定**：缓冲住在装配层而不是 `channels`。清空要认出 `tool_result` 这一行，而记账线程的观察者就在这里；放进 `channels` 要让它为这件事再订阅一次事件流。被否的另一种是让每个会话自己记：那只能记它打开之后的块，正好漏掉这个缓冲要补的那一段。
+
+## 8-93 核心线程站在正常档之上，空转就降回（`bin::serving::standing`，形状：状态机）
+
+agent 派出的命令从低于正常的档位起动（runtime-SPEC §8-13-3）；本节补上另一半：核心自己的线程起动时把自己升到正常档之上一级，于是一台被构建占满的机器上，视图的折叠与广播仍排在派出的命令前面。升在线程一级而不是进程一级：进程档位在 Windows 上要对自身句柄调 `SetPriorityClass`，没有安全接口；线程档位有。
+
+```rust
+// bin::serving::standing —— shape: state machine
+pub(crate) enum CorePriority { Raised, Normal }   // 人的设置；Normal 即「关掉高优先级」
+pub(crate) enum Standing { Raised, Normal(Held) } // 这条线程实际站在哪一档
+pub(crate) enum Held { ByTheSetting, Refused(String), ByTheValve }
+pub(crate) enum Verdict { Keep, Lower }
+pub(crate) const BUSY_LIMIT: Duration;            // 10 s
+pub(crate) fn raise_this_thread(setting: CorePriority) -> Standing;
+pub(crate) fn lower_this_thread() -> Result<Standing, thread_priority::Error>;
+pub(crate) struct Valve;                           // 忙了多久，是否该降回
+impl Valve {
+    pub(crate) fn new(limit: Duration, now: Instant) -> Self;
+    pub(crate) fn record(&mut self, woke: Instant, slept: Instant); // 一次醒来到下一次阻塞
+    pub(crate) fn verdict(&self) -> Verdict;
+}
+pub(crate) struct CoreThread;                      // 一条核心线程的档位与它的阀
+impl CoreThread {
+    pub(crate) fn raise(name: &'static str, setting: CorePriority, now: Instant) -> Self;
+    pub(crate) fn record_turn_lowering_when_busy(&mut self, woke: Instant, slept: Instant);
+}
+pub(crate) fn setting_telling_a_refusal() -> CorePriority; // 读不了就 Normal，并向标准错误说出拒绝
+pub(crate) fn serving_runtime(setting: CorePriority) -> std::io::Result<tokio::runtime::Runtime>;
+// bin::assembly
+pub(crate) fn monotonic_now() -> Instant; // 单调钟的唯一取样点，与 now_ms 并列；阀量的是时长，墙钟会跳
+// bin::person
+pub(crate) fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
+```
+
+- **升到哪一档**：`thread-priority` 的跨平台值 70，在 Windows 上是 `THREAD_PRIORITY_ABOVE_NORMAL`（正常档进程里基准优先级 9，派出的 `BELOW_NORMAL_PRIORITY_CLASS` 子进程是 6）；降回用 50，即正常档。Unix 上升档要 `CAP_SYS_NICE`；没有时操作系统拒绝，线程留在正常档，`Standing::Normal(Held::Refused(原因))` 把原因带回来，`CoreThread::raise` 向标准错误说一次——相对效果由子进程的 `nice` 给出，不靠这一步。
+- **设置**：人的配置文件（`Home::person_config`，即 `config.toml`）里 `[core]` 一节的 `priority`，`"raised"` 或 `"normal"`，缺省为 `"raised"`。`"normal"` 让 `raise_this_thread` 不调任何平台接口，返回 `Standing::Normal(Held::ByTheSetting)`。文件读不了、解析不了或值拼错时，服务照常起动，核心留在正常档，并向标准错误说出拒绝与恢复办法：升档是有全机代价的一方，要有一个说「可以」的读数才做。设置在服务起动时读一次，改了要重启服务。
+- **安全阀**：升了档的线程若空转，会拖住整台机器。每条升档线程带一个 `Valve`，每处理完一件事记一次「醒来—再次阻塞」；窗口从上一个窗口关上时开始，第一件结束在窗口开出 `BUSY_LIMIT` 之后的事关上它；关上时忙的时间占到窗口的 15/16 以上，`verdict` 变成 `Lower`，此后一直是 `Lower`。`record_turn_lowering_when_busy` 见到站在升档上的线程得了 `Lower`，就调 `lower_this_thread` 回到正常档，并向标准错误写一行说给人：哪条线程、忙满了多少秒、已降回正常档。时间作参数传入，`Valve` 本身不读钟，所以它的判定可以用编造的时刻逐点验证。
+- **量的是墙钟，不是 CPU 时间**：线程在两次阻塞之间走过的墙钟时间是它占着核的时间的上界；升了档的线程很少被抢占，二者接近。
+- **哪些线程**：视图线程 `sprawling-views`（`bin::serving::folding`）起动时升档，每折完、广播完一件记一次。socket 服务所在的 tokio 多线程运行时由 `serving_runtime` 建（`bin::main::city` 用它代替 `Runtime::new`）：每条 worker 第一次被唤醒（`on_thread_unpark`）时升档，此后每次唤醒到下一次停放（`on_thread_park`）记一次，档位与阀放在线程本地。只在唤醒时升，因为只有 worker 会停放与唤醒：阻塞池的线程（`spawn_blocking`）从不唤醒，所以永远不会成为没有阀的升档线程；代价是一条起动后从未停放过的 worker 留在正常档，而这正是安全的一侧。
+- 证据：`crates/sprawling/src/serving/standing/tests.rs` 的 `a_raised_core_thread_stands_above_normal`（Windows 臂：升档后读回 `AboveNormal`）与 `a_thread_busy_through_the_window_is_lowered`（忙满一个窗口的线程判降回，忙一半的不判）；`a_socket_worker_stands_above_normal_once_it_has_woken`（Windows 臂：`serving_runtime` 的 worker 睡过一次之后读回 `AboveNormal`）；`crates/sprawling/src/person.rs` 的 `a_person_who_turns_the_raise_off_gets_normal_priority`。
+
+**决定**
+
+1. 线程档位取第一档「安全 Rust」：`thread-priority`（MIT）对外只给安全接口，内部的 `SetThreadPriority`／`GetThreadPriority` 由它负责，本仓不写 `unsafe`。不取 Zig 叶子：一次只传句柄与常量的调用没有 `(ptr, len)` 边界可以放在 Zig 后面，Rust 侧调用 `extern` 的那一处 `unsafe` 也省不掉。被否：本仓自己写 `unsafe` 调 `SetPriorityClass`，把整个进程升到 `HIGH_PRIORITY_CLASS`——没有测量表明它全局最佳，而且会把 tokio 的每条线程连同它们的空转风险一起升上去。重开参数：线程档升满之后，后台负载占满所有核时 relay 往返 p50 与空闲之比仍大于 1.2。
+2. 安全阀量墙钟而不量 CPU 时间：读线程自己的 CPU 时间在 Windows 上是 `GetThreadTimes`，没有第一档的路；在一轮之内，墙钟只会高估忙的程度，所以对已经结束的轮，阀只会判得早，不会判得晚。阀只在一轮结束时判：一条从不停放的 tokio worker（持续有任务时，tokio 的维护性 `park_timeout(0)` 不调停放与唤醒回调）和一次不返回的折叠都没有「轮结束」，所以它们一直留在升档上，阀对它们不起作用。重开参数：出现对外只给安全接口、读线程 CPU 时间的 crate。
+3. 降回之后不再升：一条线程忙满过一个窗口，就说明它的工作量不该排在派出的命令前面；反复升降只会让人看到忽快忽慢。
+
+**尚未做到的（本节接口的当前状态）**：阀只在一轮结束时判定（决定 2），所以一条持续有任务、从不停放的 worker 和一次不返回的折叠永远不会被降回，而这正是阀要防的情形；在忙的期间也作判定——tokio worker 按每次任务轮询记（`tokio_unstable` 下的 `on_before_task_poll`／`on_after_task_poll`），或在每次唤醒与任务边界处拿正在进行的一轮已走过的时间比窗口——是这一接口余下的一步。写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。doctor 还不报告每个平台实际站在哪一档。
+
+## 8-90 性能监视器的历史：有人看才采样，每项 300 点（`bin::monitor`，形状：状态机）
+**尚未做到的（本节接口的当前状态）**：阀只在一轮结束时判定（决定 2），所以一条持续有任务、从不停放的 worker 和一次不返回的折叠永远不会被降回，而这正是阀要防的情形；在忙的期间也作判定——tokio worker 按每次任务轮询记（`tokio_unstable` 下的 `on_before_task_poll`／`on_after_task_poll`），或在每次唤醒与任务边界处拿正在进行的一轮已走过的时间比窗口——是这一接口余下的一步。写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。按任务边界记要 tokio 的 `on_before_task_poll`／`on_after_task_poll`，二者在 tokio 1.53 里只在 `--cfg tokio_unstable` 下编译，而这个 cfg 是整个构建的 rustflags，改它会让每条构建重编全部依赖；在唤醒时比较则看不到正在跑的那一轮（唤醒的线程刚结束等待），所以这一步不为它打开 `tokio_unstable`（每条构建都要全量重编依赖）；重开条件是 tokio 稳定这两个回调，或测得一个忙回合造成优先级倒挂（一条升档的核心线程在忙，人或 agent 等着的回答被它拖后）。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。
+
+## 8-94 性能监视器的历史：有人看才采样，每项 300 点（`bin::monitor`，形状：状态机）
+
+WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是同一份历史：每秒一个 `Sample`，最近 300 个（5 分钟）。`bin::monitor` 只管两件事：此刻有没有人在看，以及看的人读到的那 300 个点。计数器从哪里读（核心进程、Job Object、整机、城所在的卷、记账线程）由调用方传进来的读取函数决定，本模块不碰平台接口。
+
+**接口。**
+
+- `Sample`：一次读数，全部是 `u64` 的整数计数，没有浮点（它会上线协议，定义在 `channels::wire::monitor`，见 channels-SPEC.md 8-47，本模块用的就是那一个类型）。字段：`core_cpu_permille`、`core_private_bytes`、`core_working_set_bytes`、`core_read_bytes`、`core_written_bytes`、`machine_cpu_permille`、`machine_available_bytes`、`volume_free_bytes`、`ledger_queue_depth`、`durable_lag`、`relay_p50_nanos`、`event_to_screen_p50_nanos`、`queued_runs`。
+- `Monitor::new()`：不分配。
+- `Monitor::watch(&self, watched: Watched) -> Watch`：一个在看的人，看整页（`Watched::Everything`）或只看事实条摘要（`Watched::Summary`，`Watched` 定义在 `channels::wire::monitor`）。两类分开计数。`Watch` 被丢弃时这个人就不再算数；它可以跨线程持有（socket 线程持有，采样线程计数）。
+- `Monitor::tick(&mut self, read: impl FnOnce(Watched) -> Sample)`：每秒调用一次。有人看整页时以 `Watched::Everything` 调用 `read` 一次；只有看摘要的人时以 `Watched::Summary` 调用，读的一方只读本进程；把结果放进历史，满 300 个时丢掉最旧的。没人在看时不调用 `read`，并释放历史占的内存。
+- `Monitor::is_watched(&self) -> bool`：此刻有没有人持有 `Watch`，不论哪一类。
+- `Monitor::watch(&self) -> Watch`：一个在看的人。`Watch` 被丢弃时这个人就不再算数；它可以跨线程持有（socket 线程持有，采样线程计数）。
+- `Monitor::tick(&mut self, read: impl FnOnce() -> Sample)`：每秒调用一次。有人在看时调用 `read` 一次并把结果放进历史，满 300 个时丢掉最旧的；没人在看时不调用 `read`，并释放历史占的内存。
+- `Monitor::history(&self) -> impl Iterator<Item = &Sample>`：从最旧到最新。
+- 没有失败路径：计数是 `AtomicUsize` 的加减，历史的容量在第一次放入时一次预留。
+
+**定下的值。** `CAPACITY = 300`（每秒一点，5 分钟）；`HISTORY_BUDGET = 64 KiB`，`CAPACITY × size_of::<Sample>()` 超过它时编译失败（13 个 `u64`，现为 31 200 字节）。
+
+**决定。**
+
+1. 没人看时既不读计数器也不留历史。零开销指的是 CPU 与内存两轴：不读就没有系统调用，释放就没有常驻的 31 KiB；代价是重新打开监视页时曲线从空开始。另一种做法是一直采样、页面打开就有 5 分钟的曲线，它让每个没人看的城都多付一份开销，而这正是人要求避免的。重新考虑的条件：人要求打开页面就看到过去 5 分钟。
+2. 读取函数由调用方传入，而不是一个 trait。现在只有一种读法（生产的平台计数器）；测试传一个计数的闭包即可验证「没人看不读」，不必为一个没有第二实现的接缝造 trait。
+3. 历史是一个 `VecDeque`，第一次放入时 `reserve_exact(CAPACITY)`，之后不再分配。
+
+**测试。** `monitor::tests`：没人看时 `read` 一次也不被调用、历史为空，人走了以后历史被释放；放入 301 个点后只剩最后 300 个、从旧到新；只有看摘要的人时 `read` 收到 `Summary`，再来一个看整页的人时收到 `Everything`，他走了以后回到 `Summary`。
+
+**本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 8-92；线上的一对监视帧见 channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 8-91 的规则算出。`sprawling top` 经这对帧看监视器，见 8-93。事实条摘要 `client/src/views/facts.svelte` 经 `WatchSummary` 看监视器，只显示本进程的 CPU 与工作集；只有它在看时采样线程只读 `OwnProcess`，不打开 `sysinfo`。其余尚未落地：采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
+
+## 8-91 `sprawling top` 的输出：一行 JSON 与一屏曲线（`bin::monitor::top`，形状：projection）
+
+`sprawling top <city>` 读 8-90 的历史，按 stdout 是不是终端选一种输出。本模块只把历史投影成文本，不碰终端、不碰 socket：判断 stdout 是不是终端、每秒重画一次、从城里取历史，都是调用方的事。
+**测试。** `monitor::tests`：没人看时 `read` 一次也不被调用、历史为空，人走了以后历史被释放；放入 301 个点后只剩最后 300 个、从旧到新。
+
+**本节接口的当前状态。** 监视器的其余部分尚未落地：生产的计数器读取（核心进程的 CPU、private、工作集、读写字节；Job Object 的汇总与逐进程明细并归到 run；整机 CPU、可用内存；卷的剩余空间与磁盘延迟），其余计数器的来源（内存已定为 `sysinfo`，见下；其余的是 `sysinfo` 还是只取需要的几个平台接口，按体积与启动时间实测后定在这里），每秒调用 `tick` 并把新读数发到 `MonitorFeed::samples` 的采样任务（线上的一对监视帧已在，channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计；在采样任务落地前，看的会话收不到读数），WebUI 监视页接到路由与监视帧上（面板本身 `client/src/views/monitor.svelte` 已在：打开时调用传入的 `watch`、关闭时调用它返回的释放函数，曲线按面板宽度取最近的点，读数与曲线由 `client/src/core/monitor.ts` 按 8-95 的规则算出；它还没有路由，也没有帧可读）与事实条摘要，`sprawling top <city>`（终端里是交互界面，stdout 不是终端时每秒一行 JSON）（两种输出的投影见 8-95；命令本身、终端的重画与交互尚未落地），以及采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
+**本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 8-96；线上的一对监视帧见 channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 8-95 的规则算出。`sprawling top` 经这对帧看监视器，见 8-97。事实条摘要 `client/src/views/facts.svelte` 经 `WatchSummary` 看监视器，只显示本进程的 CPU 与工作集；只有它在看时采样线程只读 `OwnProcess`，不打开 `sysinfo`。其余尚未落地：采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
+
+**内存的读数**（`bin::monitor::memory`）：整机物理内存与可用内存经 `sysinfo`（只开 `system` 特性，只刷新 RAM）一次读出成 `Memory { physical, available }`，这是城里读内存的唯一一处；计划推进按它决定下一行是否排队（§8-46-3，只管计划行；其他入口的现状见那里）。平台不报时两项都是零，此时不算紧。取 `sysinfo`，因为它是对外只给安全接口的现成路，本 crate 不写 `unsafe`。
+
+## 8-95 `sprawling top` 的输出：一行 JSON 与一屏曲线（`bin::monitor::top`，形状：projection）
+
+`sprawling top <city>` 读 8-94 的历史，按 stdout 是不是终端选一种输出。本模块只把历史投影成文本，不碰终端、不碰 socket：判断 stdout 是不是终端、每秒重画一次、从城里取历史，都是调用方的事。
+
+**接口。**
+
+- `json_line(sample: &Sample) -> serde_json::Result<String>`：stdout 不是终端时每秒打印的那一行。一个 JSON 对象，键就是 `Sample` 的 13 个字段名，值是整数；不含换行，调用方负责换行。agent 按行读，一行一个完整的读数。
+- `sparkline(values: impl IntoIterator<Item = u64>, width: usize) -> String`：终端画面里一项计数器的曲线。只取最后 `width` 个值，每个值一个字符，从 `▁` 到 `█` 共 8 级，按这几个值自己的最小值到最大值线性分级（整数运算，最小值画 `▁`，最大值画 `█`）；全部相等时整条画 `▁`。值不足 `width` 个时曲线就短一些，不补空白。
+- 失败：`sparkline` 没有失败路径。`json_line` 只转交 `serde_json` 的错误；13 个整数字段没有可被拒绝的内容，所以它实际上不会出现，调用方把它当作写 stdout 失败处理，而不是在这里用一个隐藏的 `unwrap` 吞掉。
+- `screen(samples: &[Sample], curve_width: usize) -> String`：终端画面的一屏（不含清屏与光标控制，那是调用方的事）。每个计数器一行，共 13 行，以 `
+` 分隔，顺序与 `Sample` 的字段相同：左对齐 24 列的英文标签，右对齐 10 列的最新读数，两个空格，再是这一项最近 `curve_width` 个点的曲线。没有样本时返回空串，调用方在第一秒什么也不画。
+- 读数的写法按单位定：千分比写成一位小数的百分数（`123` → `12.3%`）；字节按 1024 进位取最大的、读数不小于 1 的单位，写一位小数（`B` 只写整数，其后是 `KiB`、`MiB`、`GiB`、`TiB`）；纳秒按 1000 进位，同样写一位小数（`ns` 只写整数，其后是 `µs`、`ms`、`s`）；计数原样写。小数一律截断而不是四舍五入，整数运算，没有浮点。
+
+**定下的值。** 8 级字符 `▁▂▃▄▅▆▇█`（U+2581–U+2588），与常见终端字体都有的块元素一致。标签列宽 24、读数列宽 10：最长的标签 `event to screen p50` 与最长的读数 `1023.9 GiB` 都放得下。
+
+**决定。**
+
+1. 曲线按窗口内自己的最小值到最大值分级，而不是从 0 分级。监视器看的是变化：一个 3.1 GiB 到 3.2 GiB 之间抖动的工作集，从 0 分级会画成一条平线。代价是两行曲线的高度不能互相比较，读数本身印在曲线旁边。
+2. JSON 用 `serde_json` 按字段名写出，而不是手拼字符串。`serde_json` 已是本 crate 的依赖，字段名与 `Sample` 同处一地，手拼会让键名在两处各写一遍。
+3. 一屏是一个纯函数返回的字符串，而不是直接写终端的绘制器。交互（按键、窗口尺寸、重画节奏）留在调用方，这一屏的内容才能用整串比较来测。
+4. 单位换算写在这里，不借 `runtime::sieve` 的 `size`：那一个只到 `KiB`、属于另一个 crate 的私有实现，而这里还要换算纳秒。
+5. WebUI 面板在浏览器里按同样的规则自己算读数与曲线（`client/src/core/monitor.ts`），而不是让城把画好的行随帧发过去。曲线取多少个点取决于面板在屏幕上有多宽，只有浏览器知道；标签要从 `lang.json` 取两种语言，终端这一侧只有英文。代价是分级与单位换算在 Rust 与 TypeScript 各写一遍，两边由同一组样本对照：`client/src/core/monitor.test.ts` 用的样本与期望读数和 `monitor::top::tests` 的一屏测试逐项相同，改规则时两份测试的期望一起改；没有机器门把这两份期望绑在一起。重新考虑的条件：监视帧改为携带已画好的行，或者面板改用非字符的画法。
+
+**测试。** `monitor::top::tests`：一行 JSON 解析回来正好是 13 个键、值等于读数、不含换行；0 到 7 画成 `▁▂▃▄▅▆▇█`，宽度不足时只画最新的几个，全部相等时画 `▁`；两份样本的一屏逐行等于预期的 13 行，没有样本时为空。
+
+## 8-96 采样线程与计数器读取（`bin::monitor::sampler`、`bin::monitor::counters`，形状：状态机 / adapter）
+
+8-94 的 `Monitor` 只回答「有没有人在看」与「看到了哪 300 个点」；每秒调用一次 `tick`、把新读数发给看的会话、以及读数从哪个平台接口来，是这两个模块的事。
+
+**接口。**
+
+- `sampler::beat(monitor: &Mutex<Monitor>, samples: &broadcast::Sender<Sample>, read: impl FnOnce() -> Sample)`：一拍。调用 `Monitor::tick(read)`；这一拍读了计数器，就把这一个读数发到 `samples`（即 `channels::MonitorFeed::samples`）。没人在看时 `read` 不被调用，什么也不发。发送时一个订阅者也没有不是失败：看的会话在两拍之间走了，它没有错过自己要的东西。锁中毒时照常取用：计数是原子的，历史是完整的 `VecDeque`，中毒不留下写了一半的状态。
+- `sampler::spawn_sampler(monitor: Weak<Mutex<Monitor>>, samples: broadcast::Sender<Sample>) -> Result<(), AxError>`：起名为 `sprawling-monitor` 的线程，每秒一拍，读数来自 `counters::Counters`。线程只持 `Weak`：`ServeConfig` 连同 `MonitorFeed::watch` 被丢弃后 `upgrade` 失败，线程在下一拍结束。起不了线程时返回 `StorageFatal`，recovery 是检查进程的线程上限（与 `serving::folding` 相同）。
+- `counters::Counters::open(volume: PathBuf) -> Counters` 与 `Counters::read(&mut self, watched: Watched, elapsed: Duration) -> Sample`：核心进程的五项取自 `OwnProcess`；`Watched::Everything` 时再读整机 CPU（千分比）、可用内存与城所在卷的剩余空间。`sysinfo` 的句柄在第一次 `Everything` 读数时才打开，一次 `Summary` 读数把它们丢掉，所以只有摘要在看时它们不常驻。第一次读数没有上一次可比，两项 CPU 为 0。
+- `counters::own_process::OwnProcess::new() -> OwnProcess` 与 `OwnProcess::read(&mut self, elapsed: Duration) -> OwnReading`：只问本进程、不遍历进程表的读数，`elapsed` 是距上一次读数的墙钟时间。`OwnReading { cpu_permille, private_bytes, working_set_bytes, read_bytes, written_bytes }`：CPU 是两次读数之间本进程累计 CPU 时间的增量除以墙钟增量与核数（千分比，整数运算，截到 `0..=1000`），第一次为 0；private 在 Windows 上是 PagefileUsage（即 PrivateUsage），其他平台是虚拟内存；工作集是驻留内存；读写字节是本进程累计经存储读写的字节数，Linux 上取自 `/proc/self/io` 的 `read_bytes` 与 `write_bytes`（std 读文件，不需要 unsafe），其他平台读作 0（决定 1）。平台拒绝某一项时这一项读作 0，与尚未接入的项同样处理：`Sample` 是给人看的读数，没有携带失败的位置，而一秒后下一拍会再读一次。`Counters` 只在有人看时存在：`beat` 之后历史为空（没人看）时采样线程丢掉它，平台句柄与进程表不常驻。
+
+**定下的值。** 一拍的间隔 1 s（8-94 的「每秒一点」）；线程名 `sprawling-monitor`。
+
+**决定。**
+
+1. 本进程的读数来自 `memory-stats`（工作集与 private）与 `cpu-time`（本进程 CPU 时间），整机与卷的读数来自 `sysinfo`，关掉默认特性、只开 `system` 与 `disk`。本工作区 `unsafe_code = forbid`，「只取需要的几个接口」在这里只能是另一个把平台调用包成安全接口的 crate，所以比较的是同一个 crate 的两种裁剪，以一个空的 release 探针（`lto`、`codegen-units = 1`、`strip`）实测：在 windows-msvc 的桌面级机器上（同时有别的编译在跑），空探针 123 904 字节，读齐本节这些计数器的探针 201 216 字节，多 77 312 字节（约 75.5 KiB）。启动时间不受影响：`Counters` 只在第一个人开始看时才打开，城的启动路径上没有它；打开一次（`System::new`、首次刷新进程与 CPU、列出磁盘）热缓存 0.42–0.56 s、冷缓存 2.8 s；之后每读一次 18–74 ms，其中本进程的刷新占 17–65 ms（`sysinfo` 在 Windows 上即使只问一个 pid 也遍历整张进程表），整机 CPU 0.7–8 ms，磁盘 0.2–0.8 ms，内存约 5 µs。本进程那一段因此换成只问本进程句柄的 `memory-stats` 加 `cpu-time`：同一类机器上的 release 探针读一次约 1.1 µs，比空探针多 1 024 字节，两者依赖的 `winapi` 与 `windows-sys` 已在依赖树里。代价是本进程的累计读写字节：没有找到以安全接口只读本进程 I/O 计数的 crate。Linux 上 `/proc/self/io` 是一个普通文件，std 读它即可；Windows 的 `GetProcessIoCounters` 只能经 unsafe 调用，所以在出现包好它的安全 crate 之前这两项在 Windows 与其他平台上读作 0，而不是为它们留下每拍 17–65 ms 的整表刷新。默认特性的 `sysinfo` 在 LTO 之后并不更大（没用到的代码被去掉），裁掉特性省的是编译时间与依赖数。重新考虑的条件：出现以安全接口只读本进程 I/O 计数或整机 CPU、比 `sysinfo` 显著更快的 crate，或者 `unsafe_code` 的政策改变。
+2. 采样放在一条自己的线程上，而不是 tokio 任务：它每秒做一次阻塞的系统调用，放进异步运行时会占住一个工作线程；它与 `serving::folding` 一样是一条命名线程。没人看时线程每秒醒一次、读一个原子数，不读计数器也不留内存（8-94 决定 1）。
+3. CPU 份额的墙钟分母由调用方以 `elapsed` 传入，采样线程传一拍的名义间隔 `BEAT`，而不是在这里读 `Instant::now`：取时间的地方只有 `bin::assembly`（clippy 的 `disallowed_methods` 守着），测试也因此能给出确定的分母。代价是 `sleep` 睡过头的那几毫秒让份额偏高同样的比例（1 s 里多睡 15 ms 就偏高 1.5%），对一条给人看的曲线可以忽略。重新考虑的条件：监视器的读数进入任何决定。
+4. 读数经 `Sample` 发出，不在这里换单位：换单位是 8-95 与 `client/src/core/monitor.ts` 的事。
+5. `f32` 的整机 CPU 负载是 `sysinfo` 唯一给出的形式，先截到 `0..=100` 再换成千分比；这一处 `as` 以 `#[expect]` 注明，它是本模块唯一的浮点。
+
+**测试。** `monitor::sampler::tests`：有人看时一拍把读到的那一个读数发给订阅者；没人看时不读、不发。`monitor::counters::tests`：读本进程得到非零的工作集、整机可用内存与卷剩余空间。`monitor::counters::own_process::tests`：第一次读数的 CPU 为 0，本进程忙过一段之后第二次读数的 CPU 大于 0，工作集与 private 非零。
+
+**本节接口的当前状态。** 整机可用内存经 8-94 的 `bin::monitor::memory` 读出，与计划推进的内存闸（§8-46-3）读同一处。核心自己的健康（记账队列深度、持久水位线落后多少、relay 往返与事件到屏幕的 p50、排队的 run、S5.9M 的降级状态）与 Job Object 的汇总和逐进程明细尚未接入，这几项读数现为 0，缺的是来源而不是采样：派出的命令没有装进 Job Object（派出进程的内存上限在 runtime-SPEC §8-13-3 未决），所以没有 job 可读；排队的 run 没有计数，`Flight` 只在 assembly 线程里知道在跑的数目（`in_flight`），等 lane 的计划行不计；其余几项要各自的所有者先公开一个跨线程可读的计数。磁盘延迟没有字段。本进程的累计读写字节在 Linux 以外读作 0（决定 1）。一拍里剩下的大头是 `sysinfo` 的整机 CPU（0.7–8 ms）与磁盘（0.2–0.8 ms），离「采样一次 ≤ 50 µs」还差这两项；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
+
+## 8-97 `sprawling top`：经线协议看监视器（`bin::wire_client::watching`，形状：adapter）
+
+`sprawling top [--at host:port] [--token T]` 与 `call` 一样经 `--at` 找到一座在跑的城（默认同一个 `DEFAULT_AT`），握手后发 `ClientFrame::Monitor(Watch)`，此后每收到一个 `ServerFrame::Monitor` 就输出一次，直到城关闭连接或人按 Ctrl-C。城是由地址找到的，而不是由城名：一座城的地址就是它被 `serve`/`up` 时占的端口，`call` 与 `enrol` 已经这样找城。
+
+**接口。**
+
+- `Output::{Screen, Lines}`：stdout 是终端时为 `Screen`，否则为 `Lines`（`std::io::IsTerminal`）。
+- `shown(text: &str, history: &mut VecDeque<Sample>, output: Output, curve_width: usize) -> Option<String>`：收到的一帧文本变成要写到 stdout 的文字。不是监视读数的帧（欢迎、事件等）返回 `None`。读数先放进 `history`（满 `monitor::CAPACITY` 丢最旧的），`Lines` 返回 8-95 的 `json_line` 加一个换行；`Screen` 返回清屏并把光标移到左上角的 `ESC[H ESC[2J`，接 8-95 的 `screen(history, curve_width)` 与换行。`json_line` 失败时返回 `None`（8-95：实际不会出现）。
+- `top(at: &str, token: Option<&str>, output: Output) -> Result<(), AxError>`：连接、握手、发 `Watch`、逐帧调用 `shown` 并写出。连不上、握手被拒与读帧出错沿用 `call` 的错误（`E_WIRE_MISMATCH` 等）；连续 5 s 没有一帧视为城已停，正常返回。
+- 曲线宽度：环境变量 `COLUMNS` 能读成数时取它减去标签与读数占的 36 列，否则按 80 列算（44 个点）；标准库不给终端尺寸，不为这一个数引入依赖。
+
+**决定。**
+
+1. 文字由纯函数 `shown` 算出，socket 与 stdout 留在 `top`：一帧变成哪几个字节可以用整串比较来测，而连接只在端到端里测。
+2. 沉默 5 s 即结束，而不是永远等：读数每秒一个，5 个空拍说明城已停或已不再发，一个 agent 读到 EOF 比读到永远的阻塞有用。重新考虑的条件：采样的节拍变长。
+
+**测试。** `wire_client::watching::tests`：一帧读数在 `Lines` 下是一行 JSON 加换行，在 `Screen` 下是清屏序列接一屏；不是读数的帧什么也不输出、不进历史。
+
+## 8-94 城所在卷快满时不接新活（`bin::monitor::volume`，形状：adapter；`bin::assembly::commanding::shedding`，形状：decision）
+
+kernel-SPEC 8-74 的 `degradation::admit_work` 判定卷低于地板时不接新活；本节给它生产的读数和生产的入口。读数不取监视器的 `Sample`：监视器只在有人看时采样（8-90 决定 1），而不接新活不能取决于此刻有没有人开着监视页。
+
+**接口。**
+
+- `volume::space(disks: &sysinfo::Disks, city: &Path) -> Option<kernel::degradation::VolumeSpace>`：挂载点是城路径最长前缀的那块盘的剩余空间与总容量；没有一块盘的挂载点是它的前缀时为 `None`。「城在哪块盘上」只有这一个家：8-92 的 `Counters` 读卷的剩余空间也经它。
+- `volume::read(city: &Path) -> Option<kernel::degradation::VolumeSpace>`：先以 `std::fs::canonicalize` 把城的路径解析成真实路径（跟随符号链接与 junction），失败时退回 `std::path::absolute`；在 Windows 上再把 verbatim 盘符前缀 `\\?\C:` 还原成普通盘符前缀 `C:`，然后列出一次盘、调用 `space`。生产的入口经它读卷。不解析链接，指向另一块盘的城会读到放链接的那块盘；不补全相对路径或不还原 verbatim 前缀，没有一个挂载点是它的前缀，读作 `None`，盘满时照常接活。
+- `RunWorker` 持有一个 `fn(&Path) -> Option<VolumeSpace>` 的读卷函数，生产时是 `volume::read`。人发来的 `Dispatch` 在命名房间、写下任何东西之前读一次卷并调用 `admit_work`；拒绝时回 `BackpressureShed`，subject 是城的根目录，recovery 给出至少要腾出的字节数（`Recovery::FreeDiskSpace`）。读不到卷（`None`）时照常接活：读不到不等于盘满，拒活要有读数作依据。
+
+**决定。**
+
+1. 在入口读卷，而不是由一条常驻线程每秒读一次再把最近的读数放在入口：受理新活是人一次次发来的，一次读卷（`sysinfo` 列盘加刷新）远小于随后一次模型调用；常驻读取让每座没人发活的城都付一份开销。代价是 `sysinfo` 只会列出全部的盘，一次读卷也问到与城无关的盘；只问城所在的那一块，要一个以安全接口给出单个路径剩余空间与容量的 crate，它还不在依赖树里。重新考虑的条件：实测一次读卷超过一次 `Dispatch` 在同一台机器上花掉时间的 10%，或者这样的 crate 进了依赖树，或者有一块与城无关的盘（网络盘、休眠的外置盘）让列盘停住。
+2. 读卷函数是函数指针，不是 trait：生产只有一种读法，测试给一个返回低剩余空间的函数即可注入「盘快满」。
+
+**测试。** `assembly::commanding::tests::shedding`：读卷函数报告卷低于地板时，`Dispatch` 被拒为 `BackpressureShed`，recovery 说出要腾出的字节数，房间没有被建起来。`monitor::volume::tests`：以相对路径 `.` 读卷、以 `canonicalize` 给出的 verbatim 拼写读卷，都与以工作目录的绝对路径读到同一块盘。
+
+**本节接口的当前状态。** `Wake` 等不经人的入口尚未接入；事实条与 doctor 尚不显示降级；盘慢、内存紧、CPU 被占满三种状态还没有生产的读数（kernel-SPEC 8-74）。
+## 8-91 `sprawling view`：给人的一面（`bin::main::view::keys`、`bin::main::view::arrange`、`bin::main::view::rounds`、`bin::main::view::frame`、`bin::main::view::detail`、`bin::main::view::follow`、`bin::main::view::terminal`）
+
+**形状。** 五个纯模块，不碰终端也不碰盘。`keys` 是 decision：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`rounds` 是 projection：把一个 run 在 `records` 里的行经 `sprawling::turns`（`views::rounds::turns` 的公开投影，与 Views 的回合页同一份折叠）折成回合，再把回合与其中的调用排成那个 run 下面的 `Entry`。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。`follow` 是 adapter：`open` 经 `memory::TailLines` 只读账本最新的 `FIRST_WINDOW_LINES` 行，折出窗口里的 lineage 与 `records` 行，同时在一条后台线程上跑整遍的 `LedgerIndex::rebuild` 与 lineage 折叠；`poll` 在整遍折完之前只看它到了没有，到了就交出整份（`Polled::Filled`），此后持有常驻的 `LedgerIndex` 与 lineage，只折上次之后追加的行（`Polled::Appended`）。`terminal` 是 adapter：stdout 是终端且没有任何过滤参数时，`view` 用 `follow` 读城，进 raw 模式与备用屏，读键、调 `apply`、画 `frame()`，退出时无论成败都把终端还原。它不做任何决定。`list` 是 projection：哪些树行可见、每行标什么、滚到光标可见的那一屏。尚未做的：T8–T12 的 `ttyprobe` 验收。
+
+```rust
+// bin::main::view::keys
+pub(super) enum Key { Char(char), Up, Down, Left, Right, Enter, Tab, Esc, PageUp, PageDown, Home, End, Interrupt }
+pub(super) enum Action { Up, Down, PageUp, PageDown, First, Last, Collapse, Expand, SwitchLens, OpenDetail, CloseDetail, Quit }
+pub(super) fn action_for(key: Key) -> Option<Action>;
+// bin::main::view::arrange
+pub(super) enum NodeKey { City, Building(String), Room(Address), Session(Address, Option<Seq>), Run(RunId), Round(RunId, u32), Call(RunId, Seq) }
+pub(super) struct Entry { key: NodeKey, depth: usize, parent: Option<usize>, seq: Seq, label: String, detail: serde_json::Value }
+pub(super) fn arrange(runs: &[RunLine], rounds: &Rounds) -> Vec<Entry>;
+// bin::main::view::list
+pub(super) fn visible(entries: &[Entry], expanded: &BTreeSet<usize>) -> Vec<usize>;
+pub(super) fn tree_lines(entries: &[Entry], shown: &[usize], expanded: &BTreeSet<usize>, rounds: &Rounds) -> Vec<String>;
+pub(super) fn scrolled(lines: Vec<String>, cursor: usize, rows: usize) -> Vec<String>;
+// bin::main::view::rounds
+pub(super) type Rounds = BTreeMap<RunId, Result<Vec<channels::Turn>, AxError>>;
+pub(super) fn fold(run: RunId, rows: &[Row]) -> Result<Vec<channels::Turn>, AxError>;
+pub(super) fn append_below(entries: &mut Vec<Entry>, at: usize, folded: &Result<Vec<channels::Turn>, AxError>);
+// sprawling（库）
+pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<channels::Turn>;
+// bin::main::view::frame
+pub(super) struct Size { columns: usize, rows: usize }
+pub(super) struct Face;
+pub(super) const FILLING: &str; // 状态行
+impl Face {
+    pub(super) fn open(runs: &[RunLine], records: Vec<Row>, size: Size) -> Face;
+    pub(super) fn open_window(runs: &[RunLine], window: Vec<Row>, size: Size) -> Face;
+    pub(super) fn fill(&mut self, runs: &[RunLine], whole: Vec<Row>);
+    pub(super) fn apply(&mut self, action: Action);
+    pub(super) fn resize(&mut self, size: Size);
+    pub(super) fn frame(&self) -> Vec<String>;
+    pub(super) fn is_closed(&self) -> bool;
+    pub(super) fn follow(&mut self, runs: &[RunLine], appended: Vec<Row>);
+}
+// bin::main::view::follow
+pub(super) const FOLLOW_TICK: Duration; // 100 ms
+pub(super) struct Row { seq: Seq, run: RunId, line: String }
+pub(super) struct Follow;
+pub(super) const FIRST_WINDOW_LINES: usize; // 1000
+pub(super) type Folded = (Vec<RunLine>, Vec<Row>);
+pub(super) enum Polled { Filled(Folded), Appended(Folded) }
+impl Follow {
+    pub(super) fn open(dir: &Path) -> Result<(Follow, Folded), ViewError>; // 只有窗口
+    pub(super) fn poll(&mut self) -> Result<Option<Polled>, ViewError>;
+}
+// bin::main::view::detail
+pub(super) fn json_lines(value: &serde_json::Value) -> Vec<String>;
+pub(super) fn line_lines(line: &str) -> Vec<String>; // 不是 JSON 的行画成一个字符串
+// bin::main::view::terminal
+pub(super) fn show(dir: &Path) -> Result<(), ViewError>;
+```
+
+**键。** `j`/`↓` 下一行，`k`/`↑` 上一行，`h`/`←` 折叠（已折叠时跳到父），`l`/`→` 展开（已展开时进第一个子），`PageDown`/`PageUp` 翻一屏，`g`/`Home` 第一行，`G`/`End` 最后一行，`Tab` 换透镜，`Enter` 进全屏详情，`Esc` 退出全屏详情，`q` 与 Ctrl-C（raw 模式下它是一个键，不是信号）关掉查看器。别的键没有动作；Windows 另报的松开与重复不算按键。与 WebUI 的 run 板同一套键（D-15）。
+
+**树。** 城 › 楼（地址的第一段）› 房间（整个地址）› 会话（`RunLine.session`，没有就是房间的第一段 stretch）› run。父 run 在账本里时，run 挂在父 run 下面（分叉挂在分叉点下，标 `fork @<at_seq>`）；否则挂在自己的会话下；没有地址的 run 直接挂在城下。同一个父下的子按 `first_seq` 排；接替的 run 带 `after <predecessor>`。每个节点只有一个父。run 第一次被展开（`l`/`→`）时才折它的行：`rounds::fold` 从 `records` 里挑出这个 run 的行交给 `sprawling::turns`，结果按 run 记在 `Face` 里，树重排时回合（`round <n> @<opened>`）排在这个 run 的分叉之前，每个回合下是它的调用（`<tool> <subject>`）。回合节点的 `seq` 是打开它的 `model_called`，调用节点的是它的 `tool_called`，所以 `Tab` 落在那一行上。一行解析不了时，这个 run 下只有一个节点，标签写出解析错误，而不是少掉几个回合。跟随时，已折过的 run 有新行就重折。详情画 `channels::Turn`、`channels::Call` 的 JSON。
+
+**打开时的光标。** 最新的等人批的 run（`unanswered > 0`）；没有就是最新的 `active` run；再没有就是最新的 run；一个 run 都没有就是城。「最新」按 `first_seq`。只展开它的祖先。
+
+**两个透镜共用选中物。** `Tab` 从树到账本：选中第一条 `seq ≥` 节点 `seq` 的行（run 的 `seq` 是它的 `first_seq`，别的节点是子树里最早的 `first_seq`）。从账本到树：选中这行所属的 run 节点并展开它的祖先；城自己的行选中城。
+
+**首屏从尾部读。** 查看器打开时只付最新 `FIRST_WINDOW_LINES` 行的字节与解析，`Face::open_window` 按这些行画树，最后一行是状态行 `FILLING`，列表让出这一行。lineage 与 `HotView` 是按 seq 正向的折叠：窗口里看不到 `run_started` 的 run 没有地址（挂在城下），状态也只按窗口里的行定。整遍折叠到了，`Face::fill` 换上整份 lineage 与整份 `records`（窗口之前的行排在窗口前面，折叠看到的窗口之后的行排在后面），重折每个已折过回合的 run，状态行消失；选中的仍是同一个节点并展开它的祖先，账本行的光标仍在同一个 `seq` 上。整遍折完之前 `poll` 不读账本的追加：整遍折叠开始于窗口之后，追加的行都在它里面。
+
+**跟随。** 查看器开着时，`terminal` 等键最多 `FOLLOW_TICK`（100 ms）；没等到就 `poll` 一次：`LedgerIndex::refresh` 说没变就什么都不做，有追加就把新行折进 lineage 并交给 `Face::follow`。所以服务中的城里新开的 run 最迟一个 tick 加一次折叠之后出现在树上，远在 250 ms 之内。`Face::follow` 换上新的树、把新行接到 `records` 末尾，并保持：选中的仍是同一个节点（按 `NodeKey` 找回；它不在了就是城），展开过的仍展开，此前不在树上的 run 展开它的祖先，让人看得见它。账本行的光标不动。
+
+**帧。** 宽度 ≥ `SIDE_PANE_MIN_WIDTH`（110 列）时右侧常驻详情栏，左右各占一半，中间一列 `|`；窄时只画当前透镜，`Enter` 进全屏详情。全屏详情在任何宽度下都占满整屏。每行按字符截到栏宽；光标行以 `>` 开头；列表滚动到光标恰好可见。树行是缩进 + `+`（有子、折叠）/`-`（展开）/空格 + 标签；还没折过回合的 run 也标 `+`，因为它有没有回合要到第一次展开时才知道（决定 6），标空格会告诉人那里什么都没有；账本行是原行。详情对 run 节点画 `RunLine::to_json()`，对账本行画解析后的 JSON，解析不了就画原文字符串。
+
+**决定。**
+
+1. 键到动作是一张纯表，帧是 `Face` 的纯函数；终端 adapter 只做读键、调 `apply`、写 `frame()`。被否掉的：在事件循环里直接改光标——那样每个动作只能在真终端里测。
+2. `crossterm` 只开 `events` 与 `windows` 两个特性：这一面不画颜色、不读粘贴与剪贴板，默认特性只会多链接没人调用的代码。被否掉的：自己写 Windows 控制台与 termios 两套 raw 模式——那是两份平台代码，换来的只是少一个依赖。
+3. 全屏详情在宽屏上也占满整屏，而不是在宽屏上忽略 `Enter`：同一个键在任何宽度下意思一样，大记录也能用满宽度看。
+4. 「等人」按 run 数在 `sprawling::lineage` 里，而不是读 `views::governance` 的待批表：待批表按 `id` 记，不记是哪个 run 提的，从它答不出「哪个 run 在等人」。代价是「请求加一、答复按 `id` 减一」这条规则有两处折叠，靠同一对 kernel 类型保持一致。条件变了就重议：待批表记下提出它的 run 时，lineage 改读它，删掉自己这一份。被否掉的：光标只看 `active`（等人批的 run 往往已经冻结，最需要人的那一个反而不在光标下）。
+5. 跟随靠轮询 `LedgerIndex::refresh`，不开文件系统通知，也不连服务中的城的 socket：没变时一次 refresh 只是一次目录列表加每段一次 `stat`，100 ms 一次对任何盘都是噪声；而通知在 Windows、inotify 与网络盘上是三套行为，socket 又要求查看器先知道城在不在服务。城不在服务时轮询什么都读不到，所以跟随不区分两种情况。条件变了就重议：`refresh` 在没变时也要读字节时。被否掉的：只在打开时读一次（人得退出重开才看得见新 run）。
+6. 回合在展开时才折，从已在内存里的 `records` 行折，不回盘：打开时就给每个 run 折回合，会让 40 万行的账本在首屏前多解析一遍，而人一次只看几个 run；回盘按 `run_seqs_before` 读会让纯的 `Face` 碰盘。代价是展开一个 run 要扫一遍 `records` 挑它的行、再解析这些行。条件变了就重议：`records` 不再整本常驻内存时（从尾部倒读首屏之后），改由 `follow` 按 `LedgerIndex::run_seqs_before` 读这个 run 的行。被否掉的：在 `view` 里另写一份回合折叠（与 Views 的回合页是同一个规则的两份）。
+7. 首屏的窗口按行数定（`FIRST_WINDOW_LINES` = 1000），不按终端行数，也不按字节：树要的是足够多的 run，一屏的行数给不出几个 run；一千行是几百 KB 的读与解析，在任何盘上都是首屏里的小头，而整遍折叠在后台，不挡第一帧。后台用一条 `std::thread`，因为查看器是同步的终端循环，没有运行时可以借；它只活到整遍折完，结果经一条 channel 交回，查看器退出时它随进程结束。条件变了就重议：run 索引快照（S5.22）落地后，首屏直接读快照，窗口与后台折叠一起删掉。被否掉的：打开时同步读完整本（40 万行的账本首屏要等整遍折叠）。

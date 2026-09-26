@@ -114,8 +114,12 @@ impl RunWorker {
         // `search` ask one read bound, so what one may open the other may
         // find.
         let bound = self.read_bound(site);
-        let read =
-            runtime::ReadTool::new(&site.write_root, Arc::clone(&catalog), Arc::clone(&bound))?;
+        let read = runtime::ReadTool::new(
+            &site.write_root,
+            Arc::clone(&catalog),
+            Arc::clone(&bound),
+            &kernel::layout::CityLayout::new(&self.city_root).cas(),
+        )?;
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
         // means Python this machine may not have or a shell this
@@ -206,9 +210,14 @@ impl RunWorker {
         // reason above - what keeps their position keeps the cache.
         // `city::policy` refuses both settings on a confidential
         // building, so neither is ever reached there.
-        for tool in
-            crate::browser_tool::for_rules(&self.city_root, site.building.addr(), &site.rules)?
-        {
+        for tool in crate::browser_tool::for_rules(
+            &self.city_root,
+            &memory::BlockOrigin {
+                run: site.run_id,
+                building: site.building.addr().clone(),
+            },
+            &site.rules,
+        )? {
             admitted.push(Box::new(tool));
         }
         // External tools, for a building whose configuration names a

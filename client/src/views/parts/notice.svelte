@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts" module>
-  import type { Key } from "../../core/lang";
-  import table from "../../lang.json";
-
   // Something that happened, against something that was refused.
   export type Weight = "info" | "alert";
 
@@ -33,17 +30,6 @@
     inline: "fade mt-tight rounded-card border border-edge-input px-snug py-tight",
     drawer: "fade w-full border-b border-edge px-base py-snug",
   };
-
-  // The title is the sentence this client can say in the reader's own
-  // language, found under `err_` plus the code in lower case. A code
-  // whose key `lang.json` does not hold has no translation yet, and the
-  // title then shows that key name itself: a visible `err_e_foo` is a
-  // defect somebody reports, and a silently chosen default sentence is
-  // one nobody does (`fill` leaves its unfilled slots visible for the
-  // same reason).
-  function isKey(raw: string): raw is Key {
-    return Object.hasOwn(table, raw);
-  }
 </script>
 
 <script lang="ts">
@@ -77,6 +63,7 @@
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Badge from "./badge.svelte";
+  import { noticeTitle } from "./notice_title";
 
   interface Props {
     readonly seat: Seat;
@@ -102,8 +89,7 @@
 
   const { lang } = ui();
 
-  const titleKey = $derived(`err_${code.toLowerCase()}`);
-  const title = $derived(isKey(titleKey) ? say($lang, titleKey) : titleKey);
+  const title = $derived(noticeTitle($lang, code, subject));
 </script>
 
 <div

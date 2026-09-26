@@ -9,9 +9,10 @@
 use serde::{Deserialize, Serialize};
 
 use super::code::AxCode;
+use super::provider::ProviderFailureKind;
 use super::refusal::GateRefusal;
 
-/// The unified error shape: seven wire fields and one that is left out
+/// The unified error shape: seven wire fields and two that are left out
 /// when absent, serialized in declaration order (determinism rule 6).
 /// The model is the recovery subject: `nearby` and `recovery` must hold
 /// directly executable information, not apologies.
@@ -41,6 +42,8 @@ struct ErrorDetail {
     retry_after_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     gate: Option<GateRefusal>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    provider: Option<ProviderFailureKind>,
 }
 
 /// Whether the same request may go out again, said together with
@@ -116,6 +119,7 @@ impl AxError {
                     retry: Retry::No,
                     retry_after_ms: None,
                     gate: None,
+                    provider: None,
                 }),
             },
         }
@@ -132,6 +136,20 @@ impl AxError {
     ) -> ErrorDraft {
         let mut draft = AxError::failure(code, action, subject);
         draft.pending.detail.gate = Some(gate);
+        draft
+    }
+
+    /// An `E_PROVIDER` error that names the kind of failure a model
+    /// call met. `retry` starts `No` like any failure: whether the
+    /// request may go out again is decided by the gateway's
+    /// `ProviderFailure::retry`, which sees more than the kind does.
+    pub fn provider(
+        kind: ProviderFailureKind,
+        action: impl Into<String>,
+        subject: impl Into<String>,
+    ) -> ErrorDraft {
+        let mut draft = AxError::failure(AxCode::Provider, action, subject);
+        draft.pending.detail.provider = Some(kind);
         draft
     }
 
@@ -167,6 +185,10 @@ impl AxError {
 
     pub fn gate(&self) -> Option<&GateRefusal> {
         self.detail.gate.as_ref()
+    }
+
+    pub fn provider_failure(&self) -> Option<ProviderFailureKind> {
+        self.detail.provider
     }
 
     /// Replaces the recovery sentence of an error raised further down,

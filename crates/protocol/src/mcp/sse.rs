@@ -163,9 +163,10 @@ impl crate::Outbound for SseServer {
                     "call an mcp server",
                     format!("{}: no answer within {} ms", self.messages, patience.0),
                 )
-                .retriable()
+                .effect_unknown()
                 .with_recovery(
-                    "the server took the message and said nothing; this run continues without it",
+                    "the server took the message and said nothing, and may have acted on it; \
+                     check what it was asked to do before asking again",
                 ),
                 RecvTimeoutError::Disconnected => AxError::failure(
                     AxCode::ToolUnavailable,

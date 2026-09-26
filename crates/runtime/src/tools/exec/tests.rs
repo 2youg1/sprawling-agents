@@ -7,6 +7,8 @@ use super::*;
 use crate::sandbox::{EchoSandbox, FaultSandbox};
 use kernel::Address;
 
+mod yielding;
+
 fn call(arm: Value) -> ToolCall {
     let mut args = Map::new();
     args.insert("arm".to_owned(), arm);

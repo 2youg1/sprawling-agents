@@ -27,13 +27,17 @@
 //! is in the `roadmap_blocked` record, and putting a second copy of it
 //! in the table would be a second authority for the same sentence.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::sync::Mutex;
 
 use kernel::{
-    Address, Blockage, EventKind, EventRecord, NodeId, PlanTree, Progress, RedNode, RoadmapShape,
+    Address, Blockage, EventRecord, NodeId, PlanTree, Progress, RedNode, RoadmapShape,
     RoadmapStatus, StopCause, UnplannedProgress,
 };
+
+mod reach;
+use reach::{PlanReach, building_of, cause_of, may_move_plan, node_of};
 
 /// What one building's plan came to when it was last read.
 enum Reading {
@@ -45,11 +49,49 @@ enum Reading {
 }
 
 /// The plans of a city.
-#[derive(Default)]
+///
+/// A snapshot keeps only `causes`: `read` is a cache of parsed plan
+/// files, and a start re-reads a plan the first time it is asked;
+/// the generations guard only reads in flight.
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct PlanView {
+    #[serde(skip)]
     read: BTreeMap<Address, Reading>,
     /// Why each red node is red, folded from the records that said so.
     causes: BTreeMap<Address, BTreeMap<NodeId, StopCause>>,
+    /// How many records may have moved each building's plan. A plan
+    /// read with the cache released is put back only when this has not
+    /// moved since it was asked for. Not in a snapshot: it only guards
+    /// reads in flight, and a start has none.
+    #[serde(skip)]
+    moved: BTreeMap<Address, u64>,
+    /// How many records with no address may have moved every plan.
+    #[serde(skip)]
+    moved_all: u64,
+}
+
+/// How many buildings keep a generation of their own before every one
+/// of them is folded into the city-wide count. A city that has named
+/// more buildings than this then refuses the reads in flight at that
+/// moment, once each, instead of holding a map that grows with every
+/// building it ever named.
+const GENERATIONS_HELD: usize = 1024;
+
+/// Where the fold stood on one building's plan when a reader asked for
+/// it: equal again at the write-back when no record moved that plan in
+/// between.
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+struct Generation {
+    all: u64,
+    one: u64,
+}
+
+/// A plan read off the disk with the cache released, waiting to be put
+/// back.
+struct FreshPlan {
+    addr: Address,
+    asked_at: Generation,
+    reading: Reading,
 }
 
 /// What a page is told about one building's plan.
@@ -81,9 +123,17 @@ impl PlanView {
             // (sprawling-SPEC.md 8-76).
             if !matches!(reach, PlanReach::Untouched) {
                 self.read.clear();
+                self.moved_all = self.moved_all.wrapping_add(1);
             }
             return;
         };
+        if !matches!(reach, PlanReach::Untouched) {
+            if self.moved.len() >= GENERATIONS_HELD && !self.moved.contains_key(&building) {
+                self.forget_generations();
+            }
+            let moved = self.moved.entry(building.clone()).or_default();
+            *moved = moved.wrapping_add(1);
+        }
         match reach {
             PlanReach::Untouched => {}
             PlanReach::Stale => {
@@ -105,108 +155,236 @@ impl PlanView {
     }
 
     /// What one building's plan says, reading the file only when the
-    /// fold says it may have moved.
+    /// fold says it may have moved: the three steps [`plans_of`] takes
+    /// around its lock, taken in one.
     pub fn of(&mut self, city_root: &Path, addr: &Address) -> PlanReading {
-        if !self.read.contains_key(addr) {
-            let reading = match city::roadmap(city_root, addr) {
-                // A plan that cannot be opened is not a plan somebody
-                // wrote badly. Read as an empty document it would come
-                // back as "no table found", which sends a person to
-                // edit a table when the file will not open.
-                Err(err) => Reading::Unreadable(vec![err.to_string()]),
-                Ok(text) => match kernel::spine::check_roadmap_shape(&text) {
-                    RoadmapShape::WellFormed { rows } => match PlanTree::build(rows) {
-                        Ok(tree) => Reading::Tree(Box::new(tree)),
-                        Err(refusal) => Reading::Unreadable(vec![refusal.to_string()]),
-                    },
-                    RoadmapShape::Malformed { problems } => Reading::Unreadable(problems),
-                },
-            };
-            self.read.insert(addr.clone(), reading);
+        let (reading, fresh) = self.ask(addr).read(city_root, addr);
+        if let Some(fresh) = fresh {
+            self.remember(fresh);
         }
+        reading
+    }
+
+    /// What one building's plan says as far as the cache holds it,
+    /// without reading the disk: the cache is held while this runs, and
+    /// a plan nobody has read yet is left to [`PlanAsk::read`].
+    fn ask(&self, addr: &Address) -> PlanAsk {
         match self.read.get(addr) {
-            Some(Reading::Tree(tree)) => self.describe(addr, tree),
-            Some(Reading::Unreadable(problems)) => PlanReading {
-                progress: unplanned(),
-                problems: problems.clone(),
-                rows: Vec::new(),
-                blocked: Vec::new(),
-                ready: Vec::new(),
-            },
-            None => PlanReading {
-                progress: unplanned(),
-                problems: Vec::new(),
-                rows: Vec::new(),
-                blocked: Vec::new(),
-                ready: Vec::new(),
+            Some(reading) => PlanAsk::Held(describe(reading, self.causes.get(addr))),
+            None => PlanAsk::Unread {
+                causes: self.causes.get(addr).cloned().unwrap_or_default(),
+                asked_at: self.generation(addr),
             },
         }
     }
 
-    fn describe(&self, addr: &Address, tree: &PlanTree) -> PlanReading {
-        let ready = tree.ready();
-        let rows = tree
-            .nodes()
-            .map(|node| channels::PlanRow {
-                node: node.row.id.clone(),
-                item: node.row.item.clone(),
-                status: node.row.status,
-                share_ppb: node.share.ppb(),
-                needs: node.row.needs.clone(),
-                ready: ready.contains(&node.row.id),
-                leaf: node.is_leaf(),
-                evidence: match &node.row.evidence {
-                    kernel::EvidenceCell::Present(locator) => Some(locator.to_string()),
-                    kernel::EvidenceCell::Empty | kernel::EvidenceCell::Invalid { .. } => None,
-                },
-            })
-            .collect();
-        let blocked = self
-            .blockages(addr, tree)
+    /// Puts back a plan read with the cache released, unless a record
+    /// folded since it was asked for may have moved it.
+    fn remember(&mut self, fresh: FreshPlan) {
+        if self.generation(&fresh.addr) == fresh.asked_at {
+            self.read.insert(fresh.addr, fresh.reading);
+        }
+    }
+
+    /// Folds every building's generation into the city-wide one, which
+    /// moves so that a read asked for before cannot match again once its
+    /// building's count restarts from zero.
+    fn forget_generations(&mut self) {
+        self.moved.clear();
+        self.moved_all = self.moved_all.wrapping_add(1);
+    }
+
+    fn generation(&self, addr: &Address) -> Generation {
+        Generation {
+            all: self.moved_all,
+            one: self.moved.get(addr).copied().unwrap_or_default(),
+        }
+    }
+}
+
+/// Every named building's plan: described from the cache while it is
+/// held, read off the disk once it is released, and put back only when
+/// no record moved that plan in between (sprawling-SPEC.md 8-92).
+///
+/// A poisoned cache is taken back by [`PlanView::take_back`], so a panic
+/// under the lock costs the parsed plans and never a stop cause.
+pub fn plans_of(
+    shared: &Mutex<PlanView>,
+    city_root: &Path,
+    addrs: BTreeSet<Address>,
+) -> BTreeMap<Address, PlanReading> {
+    let asks: Vec<(Address, PlanAsk)> = {
+        let view = PlanView::take_back(shared);
+        addrs
             .into_iter()
-            .map(|blockage| channels::BlockedLine {
-                line: blockage.line(),
-                waiting: u32::try_from(blockage.reaches.len()).unwrap_or(u32::MAX),
-                source: blockage.source,
+            .map(|addr| {
+                let ask = view.ask(&addr);
+                (addr, ask)
             })
-            .collect();
-        PlanReading {
-            progress: tree.progress(),
-            problems: Vec::new(),
-            rows,
-            blocked,
-            ready,
+            .collect()
+    };
+    let mut fresh = Vec::new();
+    let readings = asks
+        .into_iter()
+        .map(|(addr, ask)| {
+            let (reading, read) = ask.read(city_root, &addr);
+            fresh.extend(read);
+            (addr, reading)
+        })
+        .collect();
+    let mut view = PlanView::take_back(shared);
+    for read in fresh {
+        view.remember(read);
+    }
+    readings
+}
+
+impl PlanView {
+    /// Locks the cache, taking it back when a panic poisoned it.
+    ///
+    /// The panic may have torn a parsed plan or a generation, so those
+    /// are dropped and every plan is read off the disk again, and a
+    /// read already in flight is refused at its write-back. The stop
+    /// causes are kept: they are written whole by one map insert, and
+    /// without them a red node's sentence would fall back to the
+    /// status word with nobody told why.
+    pub fn take_back(shared: &Mutex<Self>) -> std::sync::MutexGuard<'_, Self> {
+        shared.lock().unwrap_or_else(|poisoned| {
+            let mut view = poisoned.into_inner();
+            view.read.clear();
+            view.forget_generations();
+            shared.clear_poison();
+            view
+        })
+    }
+}
+
+/// One building's plan as `PlanView::ask` left it for after the lock.
+enum PlanAsk {
+    /// The cached plan, described.
+    Held(PlanReading),
+    /// A plan nobody has read since it last moved, why each of its red
+    /// nodes is red, and where the fold stood when it was asked for.
+    Unread {
+        causes: BTreeMap<NodeId, StopCause>,
+        asked_at: Generation,
+    },
+}
+
+impl PlanAsk {
+    /// The plan, reading the file when the cache did not hold it, and
+    /// what was read, for [`PlanView::remember`] to put back.
+    fn read(self, city_root: &Path, addr: &Address) -> (PlanReading, Option<FreshPlan>) {
+        match self {
+            Self::Held(reading) => (reading, None),
+            Self::Unread { causes, asked_at } => {
+                let reading = read_plan(city_root, addr);
+                (
+                    describe(&reading, Some(&causes)),
+                    Some(FreshPlan {
+                        addr: addr.clone(),
+                        asked_at,
+                        reading,
+                    }),
+                )
+            }
         }
     }
+}
 
-    /// The red nodes of one building, and how far each one reaches.
-    ///
-    /// The table says which nodes are red; the fold says why. A node the
-    /// table calls blocked with no record behind it is still red — the
-    /// sentence is then the status word itself, because a row a person
-    /// edited by hand is still a row that says the work has stopped.
-    fn blockages(&self, addr: &Address, tree: &PlanTree) -> Vec<Blockage> {
-        let known = self.causes.get(addr);
-        let red: Vec<RedNode> = tree
-            .nodes()
-            .filter(|node| {
-                matches!(
-                    node.row.status,
-                    RoadmapStatus::Blocked | RoadmapStatus::AwaitingApproval
-                )
-            })
-            .map(|node| RedNode {
-                at: node.row.id.clone(),
-                why: known
-                    .and_then(|held| held.get(&node.row.id))
-                    .cloned()
-                    .unwrap_or_else(|| StopCause::Blocked {
-                        note: format!("the plan says `{}`", node.row.status.spelling()),
-                    }),
-            })
-            .collect();
-        kernel::blockage::spread(tree, &red)
+/// One building's plan file, parsed.
+fn read_plan(city_root: &Path, addr: &Address) -> Reading {
+    match city::roadmap(city_root, addr) {
+        // A plan that cannot be opened is not a plan somebody wrote
+        // badly. Read as an empty document it would come back as "no
+        // table found", which sends a person to edit a table when the
+        // file will not open.
+        Err(err) => Reading::Unreadable(vec![err.to_string()]),
+        Ok(text) => match kernel::spine::check_roadmap_shape(&text) {
+            RoadmapShape::WellFormed { rows } => match PlanTree::build(rows) {
+                Ok(tree) => Reading::Tree(Box::new(tree)),
+                Err(refusal) => Reading::Unreadable(vec![refusal.to_string()]),
+            },
+            RoadmapShape::Malformed { problems } => Reading::Unreadable(problems),
+        },
     }
+}
+
+/// What a page is told about one reading, given why its red nodes are red.
+fn describe(reading: &Reading, causes: Option<&BTreeMap<NodeId, StopCause>>) -> PlanReading {
+    match reading {
+        Reading::Tree(tree) => describe_tree(tree, causes),
+        Reading::Unreadable(problems) => PlanReading {
+            progress: unplanned(),
+            problems: problems.clone(),
+            rows: Vec::new(),
+            blocked: Vec::new(),
+            ready: Vec::new(),
+        },
+    }
+}
+
+fn describe_tree(tree: &PlanTree, causes: Option<&BTreeMap<NodeId, StopCause>>) -> PlanReading {
+    let ready = tree.ready();
+    let rows = tree
+        .nodes()
+        .map(|node| channels::PlanRow {
+            node: node.row.id.clone(),
+            item: node.row.item.clone(),
+            status: node.row.status,
+            share_ppb: node.share.ppb(),
+            needs: node.row.needs.clone(),
+            ready: ready.contains(&node.row.id),
+            leaf: node.is_leaf(),
+            evidence: match &node.row.evidence {
+                kernel::EvidenceCell::Present(locator) => Some(locator.to_string()),
+                kernel::EvidenceCell::Empty | kernel::EvidenceCell::Invalid { .. } => None,
+            },
+        })
+        .collect();
+    let blocked = blockages(tree, causes)
+        .into_iter()
+        .map(|blockage| channels::BlockedLine {
+            line: blockage.line(),
+            waiting: u32::try_from(blockage.reaches.len()).unwrap_or(u32::MAX),
+            source: blockage.source,
+        })
+        .collect();
+    PlanReading {
+        progress: tree.progress(),
+        problems: Vec::new(),
+        rows,
+        blocked,
+        ready,
+    }
+}
+
+/// The red nodes of one building, and how far each one reaches.
+///
+/// The table says which nodes are red; the fold says why. A node the
+/// table calls blocked with no record behind it is still red — the
+/// sentence is then the status word itself, because a row a person
+/// edited by hand is still a row that says the work has stopped.
+fn blockages(tree: &PlanTree, known: Option<&BTreeMap<NodeId, StopCause>>) -> Vec<Blockage> {
+    let red: Vec<RedNode> = tree
+        .nodes()
+        .filter(|node| {
+            matches!(
+                node.row.status,
+                RoadmapStatus::Blocked | RoadmapStatus::AwaitingApproval
+            )
+        })
+        .map(|node| RedNode {
+            at: node.row.id.clone(),
+            why: known
+                .and_then(|held| held.get(&node.row.id))
+                .cloned()
+                .unwrap_or_else(|| StopCause::Blocked {
+                    note: format!("the plan says `{}`", node.row.status.spelling()),
+                }),
+        })
+        .collect();
+    kernel::blockage::spread(tree, &red)
 }
 
 fn unplanned() -> Progress {
@@ -214,122 +392,6 @@ fn unplanned() -> Progress {
         steps: 0,
         budget: kernel::BudgetUse::default(),
     })
-}
-
-/// How far one record reaches into what this view holds.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum PlanReach {
-    /// The kind cannot move a plan, so every parsed copy still stands.
-    Untouched,
-    /// The plan may have moved and the parsed copy is out of date.
-    Stale,
-    /// Out of date, and the node the record names is no longer stopped.
-    NodeFreed,
-    /// Out of date, and the node the record names has stopped, for the
-    /// reason the record carries.
-    NodeStopped,
-}
-
-/// Which records can move a plan. Exhaustive on purpose: a kind added
-/// to the vocabulary without an answer here is a compile error rather
-/// than a stale table nobody notices (sprawling-SPEC.md 8-76).
-fn may_move_plan(kind: EventKind) -> PlanReach {
-    match kind {
-        EventKind::RoadmapFinished | EventKind::RoadmapReleased => PlanReach::NodeFreed,
-        EventKind::RoadmapBlocked => PlanReach::NodeStopped,
-        EventKind::CityInitialized
-        | EventKind::BuildingCreated
-        | EventKind::CheckpointCommitted
-        | EventKind::RunFrozen
-        | EventKind::RoadmapClaimed
-        | EventKind::RoadmapSplit
-        // A person's write to `Roadmap.md` moves the plan like any
-        // other, so the table is re-read rather than trusted.
-        | EventKind::SpineDocumentWritten => PlanReach::Stale,
-        EventKind::BuildingConfigured
-        | EventKind::SessionOpened
-        | EventKind::RunStarted
-        | EventKind::RunForked
-        | EventKind::PromptAssembled
-        // The cache shape measures one request; it names no plan row.
-        | EventKind::PromptShapeCompared
-        | EventKind::ModelCalled
-        | EventKind::ModelReturned
-        | EventKind::ToolCalled
-        | EventKind::ToolResult
-        | EventKind::ResultOffloaded
-        | EventKind::GateChecked
-        | EventKind::GateDenied
-        | EventKind::HandoffWritten
-        | EventKind::SteerReceived
-        | EventKind::CancelReceived
-        | EventKind::WatchdogFired
-        | EventKind::BudgetLimit
-        | EventKind::LogTruncated
-        | EventKind::SignalEnqueued
-        | EventKind::SignalConsumed
-        | EventKind::DraftHeld
-        | EventKind::DraftResolved
-        | EventKind::GoalRegistered
-        | EventKind::GoalConflict
-        | EventKind::ArbitrationVerdict
-        | EventKind::RepairStarted
-        | EventKind::RepairReused
-        | EventKind::WorktreeOpened
-        | EventKind::PrOpened
-        | EventKind::PrMerged
-        | EventKind::PrRejected
-        | EventKind::PursuitChanged
-        | EventKind::ApprovalRequested
-        | EventKind::ApprovalResolved
-        | EventKind::PolicyCreated
-        | EventKind::PolicyRevoked
-        | EventKind::TaintPromoted
-        | EventKind::CrossBuildingTransfer
-        | EventKind::CityHalted
-        | EventKind::BackpressureShed
-        | EventKind::DigestInvalidated
-        | EventKind::EndpointAttached
-        | EventKind::EndpointProbed
-        | EventKind::EndpointLost
-        | EventKind::ModelSelected
-        | EventKind::ProviderDegraded
-        | EventKind::LoginStarted
-        | EventKind::EvalRun
-        | EventKind::AssetArchived
-        | EventKind::CredentialLent
-        | EventKind::SecretCaptured
-        | EventKind::SecretEgressBlocked
-        | EventKind::FileDiscarded
-        | EventKind::DiscardRestored
-        | EventKind::AutonomyChanged
-        | EventKind::GovernedDocumentWritten
-        | EventKind::RulesChanged
-        | EventKind::ToolkitLinkOpened
-        // A call to an embeddings or rerank face, and every line an
-        // adviser consultation writes, are about the window one run is
-        // given: none of them names a plan row.
-        | EventKind::EmbeddingCalled
-        | EventKind::RerankCalled
-        | EventKind::AdviserAsked
-        | EventKind::AdviserAnswered
-        | EventKind::AdviserFellBack
-        | EventKind::CacheRenewed => PlanReach::Untouched,
-    }
-}
-
-/// The building an address belongs to: its first segment.
-fn building_of(addr: &Address) -> Option<Address> {
-    let head = addr.as_str().split('/').next()?;
-    Address::parse(head).ok()
-}
-
-fn node_of(record: &EventRecord) -> Option<NodeId> {
-    NodeId::parse(record.data().as_map().get("node")?.as_str()?).ok()
-}
-
-fn cause_of(record: &EventRecord) -> Option<StopCause> {
-    serde_json::from_value(record.data().as_map().get("why")?.clone()).ok()
 }
 
 #[cfg(test)]

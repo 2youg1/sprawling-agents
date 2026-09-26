@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum EventKind {
-    // Genesis and space (3).
+    // Genesis and space (4).
     CityInitialized,
     BuildingCreated,
     /// A person changed what one building's runs may reach.
@@ -23,6 +23,12 @@ pub enum EventKind {
     /// is the fact the file cannot carry - that the change happened,
     /// when, and to which building.
     BuildingConfigured,
+    /// A person took a building out of the city.
+    ///
+    /// The payload names the building and where its files are kept
+    /// under the reserved subtree; nothing is deleted, and every record
+    /// the building wrote stays in this history.
+    BuildingRemoved,
     // Base set (19).
     /// A session started at an address: the shape the last one froze
     /// was forgotten, and the summary it left was carried or not.
@@ -117,6 +123,9 @@ pub enum EventKind {
     FileDiscarded,
     DiscardRestored,
     AutonomyChanged,
+    // Unified history (2).
+    WentBack,
+    FileRestored,
     /// One of the three documents that govern a city was written by a
     /// person. Recorded because what governs a city decides what every
     /// later run is given, and "who changed this, and when" has to be
@@ -188,10 +197,11 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 75] = [
+    pub const ALL: [EventKind; 78] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
+        EventKind::BuildingRemoved,
         EventKind::SessionOpened,
         EventKind::RunStarted,
         EventKind::RunForked,
@@ -254,6 +264,8 @@ impl EventKind {
         EventKind::FileDiscarded,
         EventKind::DiscardRestored,
         EventKind::AutonomyChanged,
+        EventKind::WentBack,
+        EventKind::FileRestored,
         EventKind::GovernedDocumentWritten,
         EventKind::SpineDocumentWritten,
         EventKind::RulesChanged,
@@ -282,6 +294,7 @@ impl EventKind {
             EventKind::CityInitialized
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured
+            | EventKind::BuildingRemoved
             | EventKind::RunStarted
             // Starting a session decides what the next run is given, and
             // the bytes it is given are recorded by `prompt_assembled`;
@@ -341,6 +354,8 @@ impl EventKind {
             | EventKind::FileDiscarded
             | EventKind::DiscardRestored
             | EventKind::AutonomyChanged
+            | EventKind::WentBack
+            | EventKind::FileRestored
             // Connecting an application changes which tools a later run
             // is offered, and the tool table is assembled from the
             // configuration rather than from this line, so nothing here

@@ -19,7 +19,7 @@ use kernel::{RunId, TimeMs};
 use runtime::run::{RunHooks, SafePoint, drive};
 use runtime::{Interrupt, NextCall};
 
-use super::placing::Placing;
+use super::placing::{Fencing, Placing};
 use super::{Driven, Driving};
 
 /// What one drive takes from the city, in handles rather than in loans.
@@ -214,12 +214,14 @@ pub(crate) fn drive_run<L: Ledger>(
         clock,
     } = context;
     let mut now = || clock.now();
+    let declared = bench.declared_writes();
     let mut fence_point =
         memory::Checkpoint::open(&write_root).map_err(memory::MemoryError::into_ax)?;
     // What the wave fence and the bench fenced, in the order they went
     // up, so the sweep afterwards knows which commit a deleted file can
-    // be restored from.
-    let fenced = std::cell::RefCell::new(Vec::new());
+    // be restored from; and what the calls since the last fence said they
+    // wrote, which is what the next fence stages.
+    let fencing = Fencing::opened();
     let asking = std::cell::RefCell::new(Interrupting {
         run_id,
         member,
@@ -248,22 +250,23 @@ pub(crate) fn drive_run<L: Ledger>(
             }
             std::thread::sleep(std::time::Duration::from_millis(left.min(HALT_SLICE_MS)));
         };
-        let mut placing = Placing::new(bench, sieving, run_id, &fenced);
+        let mut placing = Placing::new(bench, sieving, run_id, &fencing);
         let mut fence = |t: TimeMs| {
             // Held for the whole of `wave_pre`: staging, committing and
             // reading back are one act over one index.
             let _one_at_a_time = fence_gate
                 .lock()
                 .map_err(|_| poison("this city's fence gate"))?;
+            let scope = fencing.take_scope(&fence_scope);
             let payload = fence_point
-                .wave_pre(&fence_scope, t, &of)
+                .wave_pre(&scope, t, &of)
                 .map_err(memory::MemoryError::into_ax)?;
             if let Some(oid) = payload
                 .as_map()
                 .get("oid")
                 .and_then(serde_json::Value::as_str)
             {
-                fenced.borrow_mut().push(oid.to_owned());
+                fencing.fenced.borrow_mut().push(oid.to_owned());
             }
             Ok(payload)
         };
@@ -284,6 +287,7 @@ pub(crate) fn drive_run<L: Ledger>(
             now: &mut now,
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
+            writes: &|call: &kernel::ToolCall| declared.of(call),
             invoke: &mut placing,
             wait: &mut wait,
             deltas: watching.is_some().then_some(&mut watched),
@@ -294,7 +298,7 @@ pub(crate) fn drive_run<L: Ledger>(
     Ok(Driven {
         outcome: driven,
         adapter,
-        fenced: fenced.into_inner(),
+        fenced: fencing.fenced.into_inner(),
         ran,
         // Nothing a door answers reaches a person any more: a door
         // answers Allow or Deny. The sweep is the one thing that still

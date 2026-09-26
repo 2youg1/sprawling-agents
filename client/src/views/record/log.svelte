@@ -145,7 +145,7 @@ function isLevel(raw: string): raw is LogLevel {
       },
     })}
     <span class="flex-1"></span>
-    <span class="text-note text-text-disabled">{say($lang, "log_window")}</span>
+    <span class="text-note text-text-faint">{say($lang, "log_window")}</span>
   </div>
   {#if shown.length === 0}
     <EmptyState missing="log_empty" />
@@ -154,7 +154,7 @@ function isLevel(raw: string): raw is LogLevel {
       {#each [...shown].reverse() as line (line.seq)}
         {@const at = wroteAt(line)}
         <li class="settled-row flex gap-base border-b border-edge py-tight">
-          <span class="w-figure shrink-0 text-right text-text-disabled">{line.seq}</span>
+          <span class="w-figure shrink-0 text-right text-text-faint">{line.seq}</span>
           <span class="w-figure shrink-0 whitespace-nowrap text-text-faint">
             {#if at !== null}
               <Tip text={clock($lang, at)}>

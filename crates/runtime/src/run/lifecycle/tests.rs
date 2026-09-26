@@ -50,6 +50,7 @@ fn plan() -> RunPlan {
         job,
         parent: None,
         predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
         inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),
@@ -102,6 +103,7 @@ fn a_dispatch_writes_two_lines_and_samples_the_clock_twice() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| crate::NextCall::Allowed,
         deltas: None,

@@ -49,7 +49,7 @@
 {#snippet bounded(output: Output)}
   <pre
     class="mt-tight max-h-output overflow-auto rounded-card border border-edge bg-page p-snug font-mono text-note text-text-quiet"
-  >{output.cut > 0 ? `${output.head}\n` : output.head}{#if output.cut > 0}<span class="text-text-disabled">{fill(say($lang, "run_cut"), { n: String(output.cut) })}</span>{/if}</pre>
+  >{output.cut > 0 ? `${output.head}\n` : output.head}{#if output.cut > 0}<span class="text-text-faint">{fill(say($lang, "run_cut"), { n: String(output.cut) })}</span>{/if}</pre>
   {#if output.cut > 0}
     <a class="text-note text-text-faint hover:text-text-quiet" href={toFragment({ kind: "run", run })}>
       {say($lang, "talk_call_open")}
@@ -77,7 +77,7 @@
 
 <details class="my-tight text-note text-text-faint">
   <summary
-    class="cursor-pointer rounded-control px-tight marker:text-text-disabled hover:bg-chrome hover:text-text-quiet"
+    class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:bg-chrome hover:text-text-quiet"
   >
     {summary}
   </summary>
@@ -108,7 +108,7 @@
           {callWord(call.tool, call.subject)}
         </span>
         {#if call.arguments}
-          <span class="mt-tight block text-text-disabled">{say($lang, "talk_call_arguments")}</span>
+          <span class="mt-tight block text-text-faint">{say($lang, "talk_call_arguments")}</span>
           <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself) -->
           {@render bounded(call.arguments)}
         {/if}

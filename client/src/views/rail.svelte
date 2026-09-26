@@ -150,7 +150,10 @@
     </div>
     {#if halted}
       <div class="flex h-rail w-full items-center gap-base px-base" role="status" aria-label={say($lang, "halt_title")}>
-        <Badge text={say($lang, "halt_title")} weight="alert" dot />
+        <!-- The banner above the page already says it in words; a
+        collapsed rail has room for the mark alone, and words there would
+        spill over the page. -->
+        <span class="inline-block size-dot shrink-0 rounded-pill bg-alert" aria-hidden="true"></span>
         <span class={label}>{say($lang, "halt_title")}</span>
       </div>
     {/if}

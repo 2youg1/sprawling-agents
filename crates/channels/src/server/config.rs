@@ -116,6 +116,16 @@ pub struct ServeConfig {
     /// lost nothing. Sharing the event channel would let a city running
     /// at the `wire` floor push history out of that reader's window.
     pub logs: broadcast::Sender<crate::wire::LogLine>,
+    /// What running commands write, while they still write it. A fourth
+    /// channel, so a command flooding its stdout cannot push increments
+    /// or log lines out of a slow reader's window.
+    pub outputs: broadcast::Sender<crate::wire::LiveOutput>,
+    /// What running commands already wrote, in the order they wrote it.
+    /// A session sends it after `Welcome`, having subscribed to
+    /// `outputs` first, so a piece may arrive twice and never not at all.
+    pub outputs_so_far: Arc<dyn Fn() -> Vec<crate::wire::LiveOutput> + Send + Sync>,
+    /// The performance monitor, for the sessions that ask to watch it.
+    pub monitor: MonitorFeed,
     /// Answers a query from the city's derived views.
     pub queries: Answering,
     /// Where an enrolled credential goes. Takes the full [`Command`] and
@@ -176,6 +186,9 @@ pub(crate) struct ShellState {
     pub(crate) events: broadcast::Sender<Committed>,
     pub(crate) deltas: broadcast::Sender<crate::wire::Delta>,
     pub(crate) logs: broadcast::Sender<crate::wire::LogLine>,
+    pub(crate) outputs: broadcast::Sender<crate::wire::LiveOutput>,
+    pub(crate) outputs_so_far: Arc<dyn Fn() -> Vec<crate::wire::LiveOutput> + Send + Sync>,
+    pub(crate) monitor: MonitorFeed,
     pub(crate) queries: Answering,
     pub(crate) secrets: SecretSink,
     pub(crate) acp: AcpSink,
@@ -191,6 +204,19 @@ pub(crate) struct ShellState {
     pub(crate) city: Option<Address>,
     pub(crate) head: Arc<LedgerHead>,
     pub(crate) epoch: Option<B3Hash>,
+}
+
+/// The performance monitor as a session sees it (channels-SPEC.md 8-47).
+///
+/// Whether anybody watches is decided where the history is kept; a
+/// session holds what `watch` returned for as long as it watches, and
+/// dropping that value is how it stops counting.
+#[derive(Clone)]
+pub struct MonitorFeed {
+    pub watch: Arc<dyn Fn(crate::wire::Watched) -> Box<dyn Send> + Send + Sync>,
+    /// One reading a second while anybody watches. A reading a slow
+    /// session missed is not stated: the next one is a second away.
+    pub samples: broadcast::Sender<crate::wire::Sample>,
 }
 
 /// What an accepted request gets back: the run it became, and nothing
@@ -249,6 +275,9 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         events: config.events.clone(),
         deltas: config.deltas.clone(),
         logs: config.logs.clone(),
+        outputs: config.outputs.clone(),
+        outputs_so_far: Arc::clone(&config.outputs_so_far),
+        monitor: config.monitor.clone(),
         queries: Arc::clone(&config.queries),
         secrets: Arc::clone(&config.secrets),
         acp: Arc::clone(&config.acp),

@@ -30,9 +30,11 @@
 //! `ensure_base` and `land` move HEAD, because a worktree branches from
 //! a commit and offered work has to be on a branch.
 
-mod fence;
+mod base;
+pub(crate) mod fence;
 mod provenance;
-mod scan;
+pub(crate) mod scan;
 
+pub use base::BaseProgress;
 pub use fence::Checkpoint;
 pub use provenance::{ModelChoice, Provenance, effort_word, recorded_effort};

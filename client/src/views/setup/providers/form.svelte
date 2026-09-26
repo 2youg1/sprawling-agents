@@ -274,7 +274,7 @@
     />
     {#if field.kind === "stored"}
       <span class="text-text-faint">{say($lang, "setup_key_stored")}</span>
-      <span class="font-mono text-text-disabled">{reference}</span>
+      <span class="font-mono text-text-faint">{reference}</span>
       <span class="flex gap-snug">
         <Button
           label={say($lang, "setup_key_replace")}

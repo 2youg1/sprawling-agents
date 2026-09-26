@@ -146,7 +146,7 @@ impl Worktrees {
         }
         let mut checkout = git2::build::CheckoutBuilder::new();
         checkout.force().remove_untracked(true);
-        for spec in crate::checkpoint::Checkpoint::pathspecs(scopes) {
+        for spec in crate::checkpoint::scan::pathspec::of(scopes) {
             checkout.path(spec);
         }
         repo.checkout_head(Some(&mut checkout))

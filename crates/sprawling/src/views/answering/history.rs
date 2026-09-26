@@ -9,10 +9,10 @@
 
 use kernel::{EventRecord, UsdMicros};
 
-use crate::views::holding::Views;
 use crate::views::lines::summarize;
+use crate::views::prepared::LedgerAsk;
 
-impl Views {
+impl LedgerAsk {
     /// A bounded slice of the one history, ending just before `before`
     /// or at the tail.
     ///
@@ -20,8 +20,8 @@ impl Views {
     /// records would be a second copy of the only history, and the index
     /// already maps a sequence to a byte offset. An unreadable line ends
     /// the slice rather than emptying it - what was read is still true.
-    pub(super) fn history(
-        &mut self,
+    pub(in crate::views) fn history(
+        &self,
         before: Option<kernel::Seq>,
         limit: u32,
     ) -> channels::HistoryAnswer {
@@ -30,10 +30,13 @@ impl Views {
             earlier: None,
         };
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        if self.index.refresh(&dir).is_err() {
+        let Ok(mut index) = self.index.lock() else {
+            return empty;
+        };
+        if index.refresh(&dir).is_err() {
             return empty;
         }
-        let Some(tail) = self.index.tail_seq() else {
+        let Some(tail) = index.tail_seq() else {
             return empty;
         };
         let end = match before {
@@ -51,7 +54,7 @@ impl Views {
         let want = u64::from(limit.clamp(1, channels::HISTORY_MAX));
         let start = end.value().saturating_sub(want.saturating_sub(1));
         let mut records = Vec::new();
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         for value in start..=end.value() {
             let Ok(line) = reader.line_at(kernel::Seq::new(value)) else {
                 break;
@@ -82,8 +85,8 @@ impl Views {
     /// It also ends the walk, so `next` says nothing more can be asked
     /// for - the gaps the Ledger really has are not ranges this can fill,
     /// and a cursor pointing past one would have the page ask for ever.
-    pub(super) fn history_range(
-        &mut self,
+    pub(in crate::views) fn history_range(
+        &self,
         from: kernel::Seq,
         to: kernel::Seq,
         limit: u32,
@@ -98,7 +101,10 @@ impl Views {
             return empty;
         }
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        if self.index.refresh(&dir).is_err() {
+        let Ok(mut index) = self.index.lock() else {
+            return empty;
+        };
+        if index.refresh(&dir).is_err() {
             return empty;
         }
         let want = u64::from(limit.clamp(1, channels::HISTORY_MAX));
@@ -107,7 +113,7 @@ impl Views {
             .saturating_add(want.saturating_sub(1))
             .min(to.value());
         let mut records = Vec::new();
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         // A walk that stopped early found no line at that sequence, which
         // means the Ledger ends there: nothing beyond it can be asked for
         // either, and a cursor pointing past it would have the page ask for
@@ -146,8 +152,8 @@ impl Views {
     /// answer is delivered in and the order the cursor walks without a
     /// seek. A line that will not read ends the slice rather than
     /// emptying it - what was read is still true.
-    pub(super) fn run_history(
-        &mut self,
+    pub(in crate::views) fn run_history(
+        &self,
         run: kernel::RunId,
         before: Option<kernel::Seq>,
         limit: u32,
@@ -157,15 +163,17 @@ impl Views {
             earlier: None,
         };
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        if self.index.refresh(&dir).is_err() {
+        let Ok(mut index) = self.index.lock() else {
+            return empty;
+        };
+        if index.refresh(&dir).is_err() {
             return empty;
         }
         let want = usize::try_from(limit.clamp(1, channels::HISTORY_MAX)).unwrap_or(1);
         // One more than was asked for: whether this session wrote
         // anything older is exactly what `earlier` reports, and taking
         // one extra sequence answers it without a second question.
-        let mut newest: Vec<kernel::Seq> = self
-            .index
+        let mut newest: Vec<kernel::Seq> = index
             .run_seqs_before(run, before)
             .take(want.saturating_add(1))
             .collect();
@@ -176,7 +184,7 @@ impl Views {
         let earlier = has_older.then(|| newest.last().copied()).flatten();
         newest.reverse();
         let mut records = Vec::with_capacity(newest.len());
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         for seq in newest {
             let Ok(line) = reader.line_at(seq) else {
                 break;
@@ -196,10 +204,7 @@ impl Views {
     ///
     /// `None` when the records cannot be read: an evicted run always has
     /// some, so the caller answers that it could not look.
-    pub(in crate::views) fn recalled(
-        &mut self,
-        run: kernel::RunId,
-    ) -> Option<channels::RunSummary> {
+    pub(in crate::views) fn recalled(&self, run: kernel::RunId) -> Option<channels::RunSummary> {
         let mut alone = memory::HotView::new();
         self.fold_recalled(run, |record| alone.apply(record))?;
         alone.get(&run).map(|hot| summarize(run, hot))
@@ -209,7 +214,7 @@ impl Views {
     /// from its own records through a `memory::Attribution` holding it
     /// alone, so the cold side prices by the same rule as the hot one.
     /// `None` when the records cannot be read.
-    pub(in crate::views) fn recalled_bill(&mut self, run: kernel::RunId) -> Option<UsdMicros> {
+    pub(in crate::views) fn recalled_bill(&self, run: kernel::RunId) -> Option<UsdMicros> {
         let mut alone = memory::Attribution::new();
         self.fold_recalled(run, |record| alone.apply(record))?;
         Some(alone.billed_to(&run).unwrap_or_default())
@@ -219,15 +224,16 @@ impl Views {
     /// the index names them, so the work is the run's records alone.
     /// `None` when a line cannot be read or `apply` refuses it.
     fn fold_recalled(
-        &mut self,
+        &self,
         run: kernel::RunId,
         mut apply: impl FnMut(&EventRecord) -> Result<(), memory::MemoryError>,
     ) -> Option<()> {
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        self.index.refresh(&dir).ok()?;
-        let mut oldest_first: Vec<kernel::Seq> = self.index.run_seqs_before(run, None).collect();
+        let mut index = self.index.lock().ok()?;
+        index.refresh(&dir).ok()?;
+        let mut oldest_first: Vec<kernel::Seq> = index.run_seqs_before(run, None).collect();
         oldest_first.reverse();
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         for seq in oldest_first {
             let line = reader.line_at(seq).ok()?;
             apply(&EventRecord::parse_line(&line).ok()?).ok()?;

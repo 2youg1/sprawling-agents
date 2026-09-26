@@ -16,8 +16,9 @@
 //! - **A name check.** One name holds one holding, so a name taken on
 //!   the shelf refuses a different skill under it - in this section or
 //!   any other, because the scan keys holdings by name alone.
-//! - **An atomic landing.** The document is swapped in whole through
-//!   `city::document::replace`, the one write path this crate has.
+//! - **An atomic landing.** A document is swapped in whole through
+//!   `city::document::replace`, and a package is placed whole through
+//!   `city::document::place_tree`: the write paths live in one module.
 //! - **A recheck before the landing.** The decision is separated from
 //!   the landing ([`plan_install`] then [`PlannedInstall::apply`]) so
 //!   that "the package moved underneath while it was being installed" is
@@ -37,6 +38,7 @@ use kernel::{Address, AxCode, AxError, B3Hash};
 
 use super::reading;
 use super::shelf::{Holding, OwnShelf, holding_file_name, plain_name};
+use crate::document::TreeEntry;
 
 mod precheck;
 #[cfg(test)]
@@ -50,7 +52,7 @@ mod precheck;
 )]
 mod tests;
 
-use precheck::{Fingerprint, inspect};
+use precheck::{Item, Shape, inspect};
 
 /// Where one skill is filed: which of the shelves the city keeps itself,
 /// and which section of it.
@@ -94,13 +96,15 @@ impl Slot {
         })
     }
 
-    /// Where a holding of `name` lands in this slot. One derivation,
-    /// shared with the layout the scan reads back.
-    fn target(&self, layout: &CityLayout, name: &str) -> PathBuf {
-        self.shelf
-            .root(layout)
-            .join(&self.section)
-            .join(holding_file_name(name))
+    /// Where a holding of `name` in `shape` lands in this slot: the
+    /// layout the scan reads back, a document as `<name>.md` and a
+    /// package as `<name>/`.
+    fn target(&self, layout: &CityLayout, name: &str, shape: &Shape) -> PathBuf {
+        let section = self.shelf.root(layout).join(&self.section);
+        match shape {
+            Shape::Document => section.join(holding_file_name(name)),
+            Shape::Package(_) => section.join(name),
+        }
     }
 }
 
@@ -117,11 +121,13 @@ pub enum Placed {
 /// What an install put on the shelf, and whether it had to.
 ///
 /// The holding is the value a scan of the same shelf reads back, whole:
-/// one name is one holding, and the install's derivation and the scan's
-/// cannot disagree.
+/// it is read back off the shelf by the scan's own function, so the two
+/// cannot disagree. `hash` is what the store files the install under:
+/// the document's hash, or the whole package's (city-SPEC.md 8-28).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Installed {
     pub holding: Holding,
+    pub hash: B3Hash,
     pub placed: Placed,
 }
 
@@ -136,9 +142,12 @@ pub struct PlannedInstall {
     source: PathBuf,
     slot: Slot,
     name: String,
-    body: String,
+    shape: Shape,
+    /// Every byte the decision was made on, which is what lands.
+    stored: Vec<u8>,
     hash: B3Hash,
-    basis: Basis,
+    /// What the shelf held under the name when the decision was made.
+    shelved: Option<B3Hash>,
 }
 
 impl PlannedInstall {
@@ -176,45 +185,67 @@ impl PlannedInstall {
         let again =
             inspect(&self.source).map_err(|why| moved_underneath(&self.source, why.subject()))?;
         let layout = CityLayout::new(&self.city_root);
-        let target = self.slot.target(&layout, &self.name);
+        let target = self.slot.target(&layout, &self.name, &self.shape);
         let shelf_again = shelf_state(&self.slot, &self.city_root, &self.name)
             .map_err(|why| moved_underneath(&target, why.subject()))?;
-        if again.fingerprint != self.basis.source || again.hash != self.hash {
+        if again.hash != self.hash {
             return Err(moved_underneath(
                 &self.source,
                 "what is there now is not what the decision was made against",
             ));
         }
-        if shelf_again != self.basis.shelf {
+        if shelf_again != self.shelved {
             return Err(moved_underneath(
                 &target,
                 "what is there now is not what the decision was made against",
             ));
         }
-        let placed = match self.basis.shelf {
+        let placed = match self.shelved {
             Some(_) => Placed::AlreadyShelved,
             None => Placed::Fresh,
         };
         // Registration lands before the swap: the store is the history
         // of what was installed, and a landing that fails after it leaves
         // the store remembering rather than the shelves lying.
-        let stored = register(self.body.as_bytes())?;
+        let stored = register(&self.stored)?;
         if stored != self.hash {
             return Err(store_disagrees(&self.hash, &stored));
         }
         if placed == Placed::Fresh {
-            crate::document::replace(&target, self.body.as_bytes())?;
+            self.land(&target)?;
         }
-        let at = reading::address_of(&self.city_root, &target)?;
+        let holding = reading::holding_at(
+            &self.city_root,
+            &self.slot.shelf,
+            &self.slot.section,
+            &target,
+        )?
+        .ok_or_else(|| not_read_back(&target))?;
         Ok(Installed {
-            holding: Holding::of(
-                self.name,
-                self.slot.section,
-                &self.body,
-                self.slot.shelf.at(at),
-            ),
+            holding,
+            hash: self.hash,
             placed,
         })
+    }
+
+    /// Writes the snapshot the decision was made on, never the source
+    /// again: bytes swapped in after the recheck cannot reach the shelf.
+    fn land(&self, target: &Path) -> Result<(), AxError> {
+        let Shape::Package(items) = &self.shape else {
+            return crate::document::replace(target, &self.stored);
+        };
+        let entries = items
+            .iter()
+            .map(|item| match item {
+                Item::Directory(path) => Ok(TreeEntry::Directory(path)),
+                Item::File(path, bytes) => self
+                    .stored
+                    .get(bytes.clone())
+                    .map(|body| TreeEntry::File(path, body))
+                    .ok_or_else(|| not_read_back(target)),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        crate::document::place_tree(target, &entries)
     }
 }
 
@@ -243,12 +274,10 @@ pub fn plan_install(
         source: package.to_path_buf(),
         slot: slot.clone(),
         name: inspected.name,
-        body: inspected.body,
+        shape: inspected.shape,
+        stored: inspected.stored,
         hash: inspected.hash,
-        basis: Basis {
-            source: inspected.fingerprint,
-            shelf: shelved,
-        },
+        shelved,
     })
 }
 
@@ -265,19 +294,12 @@ pub fn install(
     plan_install(city_root, slot, package)?.apply(register)
 }
 
-/// The world one decision was made against: the source's shape, and
-/// what the shelf held under the name at that moment.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Basis {
-    source: Fingerprint,
-    shelf: Option<B3Hash>,
-}
-
 /// What the shelf holds under `name`, and the refusal when the name is
 /// taken under another section - where the scan's by-name key would let
-/// two filings silently shadow each other. Judged exactly as the scan
-/// judges an entry: a dotted item is not a holding, a directory is not
-/// a holding, and whatever else sits under this name is one.
+/// two filings silently shadow each other. `<name>.md` and `<name>/` are
+/// one name - both at once is refused, since the scan would keep either -
+/// and whatever sits there is read by the same precheck as the source,
+/// so the two hashes compare like for like.
 fn shelf_state(slot: &Slot, city_root: &Path, name: &str) -> Result<Option<B3Hash>, AxError> {
     let root = slot.shelf.root(&CityLayout::new(city_root));
     if !root.exists() {
@@ -292,15 +314,23 @@ fn shelf_state(slot: &Slot, city_root: &Path, name: &str) -> Result<Option<B3Has
         if !plain_name(&held_under) {
             continue;
         }
-        let named = section.join(holding_file_name(name));
-        if !named.exists() || named.is_dir() {
-            continue;
+        let held: Vec<_> = [section.join(holding_file_name(name)), section.join(name)]
+            .into_iter()
+            .filter(|named| {
+                !matches!(std::fs::symlink_metadata(named),
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound)
+            })
+            .collect();
+        match held.as_slice() {
+            [] => {}
+            [_, _, ..] => {
+                let file = holding_file_name(name);
+                let twice = format!("{held_under} twice, as {file} and {name}/");
+                return Err(name_taken(name, &twice));
+            }
+            [_] if held_under != slot.section => return Err(name_taken(name, &held_under)),
+            [one] => found = Some(inspect(one)?.hash),
         }
-        if held_under != slot.section {
-            return Err(name_taken(name, &held_under));
-        }
-        let text = reading::read_holding(&named)?;
-        found = Some(B3Hash::digest(text.as_bytes()));
     }
     Ok(found)
 }
@@ -344,6 +374,18 @@ fn moved_underneath(path: &Path, why: &str) -> AxError {
         ),
     )
     .with_recovery("start the install again from what is there now")
+}
+
+fn not_read_back(target: &Path) -> AxError {
+    AxError::failure(
+        AxCode::StorageFatal,
+        "install a skill",
+        format!(
+            "{} landed but does not read back as a holding",
+            target.display()
+        ),
+    )
+    .with_recovery("take what landed at the path above off the shelf, then install again")
 }
 
 fn store_disagrees(ours: &B3Hash, stored: &B3Hash) -> AxError {

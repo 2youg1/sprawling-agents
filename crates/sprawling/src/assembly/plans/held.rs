@@ -57,7 +57,7 @@ impl Planning {
 ///
 /// The room is the record's own `addr`, so nothing here derives what the
 /// claiming run already wrote down.
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(in crate::assembly) struct PlanHolders(BTreeMap<Address, BTreeMap<NodeId, String>>);
 
 impl PlanHolders {

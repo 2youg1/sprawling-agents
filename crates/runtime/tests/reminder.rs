@@ -89,6 +89,7 @@ fn plan(window: u64) -> RunPlan {
         job: Locator::parse(&format!("file:{}/JOB.md@{}", addr.as_str(), "a".repeat(40))).unwrap(),
         parent: None,
         predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
         inherited: Vec::new(),
         shape: CallShape {
             model: "metered".to_owned(),
@@ -148,6 +149,7 @@ fn windows_for(reported: Vec<u64>) -> Vec<String> {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -212,6 +214,7 @@ fn a_model_with_no_stated_window_is_never_reminded() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -279,6 +282,7 @@ fn status_reports_the_count_of_the_call_that_asked() {
         interrupt: &mut interrupt,
         fence: None,
         invoke: &mut invoke,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
     };

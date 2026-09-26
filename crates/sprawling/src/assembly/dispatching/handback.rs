@@ -48,7 +48,13 @@ impl RunWorker {
         );
         let digest = self
             .cas
-            .put(account.as_bytes())
+            .put_for(
+                account.as_bytes(),
+                &memory::BlockOrigin {
+                    run: child.run,
+                    building: child.addr.clone(),
+                },
+            )
             .map_err(memory::MemoryError::into_ax)?;
         let claim = collab::Claim::new(
             collab::NodeId::parse(child.addr.as_str())?,
@@ -144,6 +150,9 @@ impl RunWorker {
                     parent: sibling.parent,
                     succession: None,
                     taint: sibling.taint.clone(),
+                    // The same resident handed down both halves of one
+                    // workshop, so the sibling's sender is this one's.
+                    dispatched_by: sibling.dispatched_by.clone(),
                 },
                 work.task,
                 work.goal,

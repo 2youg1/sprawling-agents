@@ -52,3 +52,18 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
 
     assert_eq!(refused, Some(reason));
 }
+
+/// An audit that did not finish proved nothing whole, and a view that
+/// resumed from a snapshot has only this audit looking at the lines
+/// before it.
+#[test]
+fn an_audit_that_cannot_read_the_ledger_trips_the_halt() {
+    let dir = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("no-ledger-here");
+    let reason = memory::audit_chain(&missing).unwrap_err().into_ax();
+    let halt = memory::ChainHalt::default();
+
+    report_audit(&missing, &halt, Seq::FIRST, Diagnostics::off());
+
+    assert_eq!(halt.reason(), Some(&reason));
+}

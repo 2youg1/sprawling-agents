@@ -79,7 +79,7 @@ fn access_provider(place: &SecretRef) -> Option<String> {
 /// Folded from `secret_captured`, which is where the provider stated
 /// it. Nothing here is a secret: an expiry is a time, and the token it
 /// describes is in the vault.
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(in crate::assembly) struct Expiries {
     by_provider: std::collections::BTreeMap<String, u64>,
 }
