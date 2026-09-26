@@ -7,7 +7,7 @@ use crate::assembly::*;
 
 /// A claim lands through the run that made it (`record_for`), and the
 /// worker's own table of who holds which node reads it at once, as a
-/// restart folding the same history does (sprawling-SPEC.md 8-91).
+/// restart folding the same history does (sprawling-SPEC.md 8-111).
 #[test]
 fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
     let dir = tempfile::tempdir().unwrap();
@@ -56,7 +56,7 @@ fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
 /// A claim booked at the call reaches the ledger through the gate the
 /// lanes write through, and the worker's own holders read it before the
 /// claiming run lands, as a restart folding the same history does
-/// (sprawling-SPEC.md 8-42-8, 8-90).
+/// (sprawling-SPEC.md 8-42-8, 8-110).
 #[test]
 fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands() {
     use kernel::Tool;
@@ -280,7 +280,7 @@ fn a_landing_refused_part_way_hands_back_only_the_nodes_it_did_not_close() {
 /// the split line is the parent's fate: a landing that succeeds owes no
 /// hand-back line after it, and neither the live holders nor a restart's
 /// fold of the same history show the parent held (sprawling-SPEC.md
-/// 8-42-8, 8-91).
+/// 8-42-8, 8-111).
 #[test]
 fn a_split_closes_the_claim_on_its_parent() {
     use crate::assembly::fixture::*;

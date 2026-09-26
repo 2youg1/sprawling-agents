@@ -5,7 +5,7 @@
 
 //! What residents are handing one another: the part of the worker's
 //! state that signals, handbacks, pull requests and goal claims change
-//! (sprawling-SPEC.md 8-90).
+//! (sprawling-SPEC.md 8-110).
 
 use std::collections::BTreeMap;
 

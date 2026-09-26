@@ -27,7 +27,7 @@ const SNIFF_BYTES: usize = 8 * 1024;
 /// The head of one file, or `None` when there is no file to read.
 ///
 /// Takes the city root rather than the views: it reads the disk, and
-/// runs after the view lock is released (sprawling-SPEC.md 8-92).
+/// runs after the view lock is released (sprawling-SPEC.md 8-100).
 pub(super) fn document_answer(city_root: &Path, at: Address) -> Option<channels::DocumentAnswer> {
     let bytes = std::fs::read(resolve(city_root, Some(&at))).ok()?;
     Some(read_document(at, &bytes))

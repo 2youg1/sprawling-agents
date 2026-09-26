@@ -5,11 +5,9 @@
 
 //! One session's records folded into the rounds a page reads.
 //!
-//! **This fold used to run in the browser.** `web::turn` held it, so a
-//! second client could not draw a session without writing the same fold
-//! again, and the wire stopped being the whole API. Card-6.5 moved it
-//! here whole: the arms below are the arms that were there, so a session
-//! reads the same after the move as before it.
+//! **This fold runs on the server, not in the browser.** A fold held by
+//! one client would make a second client write the same fold again to
+//! draw a session, and the wire would stop being the whole API.
 //!
 //! Reading one payload is [`channels::reading`]'s, because the client
 //! still folds the pushed stream forward into what it believes and that
@@ -31,9 +29,9 @@ impl LedgerAsk {
     /// The newest [`channels::HISTORY_MAX`] records of one run, oldest
     /// first.
     ///
-    /// The same width the client used to ask for with
-    /// `Query::RunHistory`, because moving a fold to the server must not
-    /// quietly change how much of a session it can see. A line that will
+    /// The same width a client asks for with `Query::RunHistory`, so the
+    /// fold sees as much of a session as a client reading the history
+    /// would. A line that will
     /// not read ends the slice rather than emptying it - what was read is
     /// still true.
     pub(super) fn records_of(&self, run: RunId) -> Vec<EventRecord> {

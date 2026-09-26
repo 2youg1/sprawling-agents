@@ -11,12 +11,9 @@
     reason = "test code"
 )]
 
-//! The fold the view layer used to run, asserted here instead.
-//!
-//! Every assertion below was `web::turn::rounds_tests`, unchanged: the
-//! view layer's own tests are the record of what it computed, so a
-//! server-side fold that satisfies them is a server-side fold that
-//! answers what the view layer answered for the same session.
+//! What the rounds fold answers, asserted case by case: a server-side
+//! fold that satisfies these answers what a client folding the same
+//! session's records would.
 
 use super::{opened_at, turns};
 use channels::{B3Hash, EventDraft, EventKind, EventRecord, Outcome, Payload, RunId, Seq, TimeMs};
@@ -231,8 +228,7 @@ fn the_bytes_stay_addressable_because_every_call_carries_its_seq() {
 }
 
 /// The base a change list is addressed by is the session's first fence,
-/// not its latest one - the same reading `web::live::page` used to do
-/// for itself with `crate::turn::opened_at`.
+/// not its latest one.
 #[test]
 fn the_change_base_is_the_first_fence_of_the_session() {
     let fence = |seq: u64, oid: &str| {
@@ -254,8 +250,8 @@ fn the_change_base_is_the_first_fence_of_the_session() {
 }
 
 /// The whole point of the card, asserted through the production door:
-/// a page that asks `Query::Rounds` is handed exactly what the view
-/// layer used to fold for itself out of the same records.
+/// a page that asks `Query::Rounds` is handed exactly the fold of the
+/// same records a client would compute for itself.
 #[test]
 fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
     use kernel::Ledger;

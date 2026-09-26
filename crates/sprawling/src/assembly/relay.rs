@@ -60,7 +60,7 @@ pub(crate) enum Wake {
 pub(crate) struct Drained {
     /// Every line the ledger took, in ledger order: a line a lane wrote
     /// is history as much as one the accounting thread wrote, so the
-    /// same folds are shown it (sprawling-SPEC.md 8-90).
+    /// same folds are shown it (sprawling-SPEC.md 8-110).
     pub(crate) written: Vec<EventDraft>,
     /// Registrations in arrival order, left to the thread that holds the
     /// goal register: a copy of the register here would be a second
@@ -429,7 +429,7 @@ mod tests {
     /// **The measurement this batching exists for, expressed as a
     /// count.** A drain that holds four drafts must reach the store
     /// once: a disk barrier costs the same for four records as for one,
-    /// and four barriers is what the old shape paid. The counting store
+    /// and a barrier per record would pay four. The counting store
     /// is the second adapter the port already allows for.
     #[test]
     fn everything_already_waiting_reaches_the_store_in_one_wave() {

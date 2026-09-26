@@ -299,11 +299,11 @@ fn serve(
                     }
                 }
                 // What counts as a request is settled here and nowhere
-                // else. It used to be settled twice - the record asked
-                // for a header terminator and the reply for nothing at
-                // all - so a socket carrying no request stayed off the
-                // record and still spent a scripted reply, and every
-                // turn after it answered the question before it.
+                // else. Settled twice - the record asking for a header
+                // terminator and the reply for nothing at all - a socket
+                // carrying no request would stay off the record and still
+                // spend a scripted reply, and every turn after it would
+                // answer the question before it.
                 if !whole {
                     return;
                 }

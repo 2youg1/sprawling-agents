@@ -74,7 +74,7 @@ pub(super) struct Outward {
     pub(super) desk: Arc<CommandDesk>,
     pub(super) views: Arc<Published>,
     /// The unpublished twin of `views`, folded over the same records
-    /// (sprawling-SPEC.md 8-93).
+    /// (sprawling-SPEC.md 8-99).
     pub(super) spare: Views,
     pub(super) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
     pub(super) to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
@@ -127,7 +127,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     } = outward;
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
-    // (sprawling-SPEC.md 8-93).
+    // (sprawling-SPEC.md 8-99).
     let Folding {
         observer,
         machine,
@@ -308,7 +308,7 @@ pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
                 };
                 // A kept keep-warm door that falls due before the next
                 // schedule read wakes the loop for itself
-                // (sprawling-SPEC.md 8-93); none is kept by default.
+                // (sprawling-SPEC.md 8-112); none is kept by default.
                 let until_warm = match (worker.warm_due(), worker.clock.now()) {
                     (Some(_), Ok(now)) => {
                         worker.renew_warm(now);

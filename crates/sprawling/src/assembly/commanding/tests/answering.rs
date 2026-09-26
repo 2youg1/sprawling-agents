@@ -318,13 +318,10 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
 }
 #[test]
 fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
-    // What this replaced: one catch-all whose recovery read "this
-    // stage runs Dispatch; the rest land with their cards", which is
-    // a sentence about a build stage that ended. Eight commands
-    // reached it, three of them from buttons this client used to
-    // draw, and a person pressing one learned nothing they could act
-    // on. The match is exhaustive now, so a command added without an
-    // executor stops the build rather than reaching a person.
+    // The match over commands is exhaustive, so a command added without
+    // an executor stops the build rather than reaching a person as a
+    // catch-all refusal that names a build stage and nothing they can
+    // act on.
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(

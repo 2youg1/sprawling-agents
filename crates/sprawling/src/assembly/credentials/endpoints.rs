@@ -260,9 +260,9 @@ impl RunWorker {
     /// What an adapter redeems at the wire: the credential this city
     /// holds, and the pictures its content store holds.
     ///
-    /// The store is opened once here rather than once per picture: a
-    /// conversation carrying four pictures used to open four handles on
-    /// one immutable directory (sprawling-SPEC.md 8-50). The handle is
+    /// The store is opened once here rather than once per picture, so a
+    /// conversation carrying four pictures holds one handle on one
+    /// immutable directory rather than four (sprawling-SPEC.md 8-50). The handle is
     /// this adapter's own rather than the worker's, because the worker's
     /// is needed elsewhere while a call is out.
     ///

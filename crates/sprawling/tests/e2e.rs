@@ -66,8 +66,8 @@ const WRONG_KEY: &str = "sk-e2e-deliberately-wrong-key";
 
 /// One request may take a minute and is never retried.
 ///
-/// Both figures serve the runtime constraint this gate is written under
-/// (Roadmap section 0.0): with retries at zero the gateway's backoff
+/// Both figures serve the runtime limit this gate is written under:
+/// with retries at zero the gateway's backoff
 /// never sleeps, and three calls at a minute each still land inside the
 /// 180-second timeout the recipe imposes.
 const REQUEST_TIMEOUT_MS: u64 = 60_000;

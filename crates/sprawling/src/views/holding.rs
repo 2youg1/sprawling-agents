@@ -48,9 +48,8 @@ pub(crate) struct Views {
     ///
     /// The reading side of the one governance fold. The worker holds
     /// the judging side, of the same type and folded by the same
-    /// `absorb`: this view used to spell the four arms a second time,
-    /// and the two spellings disagreed about what an unreadable ruling
-    /// meant.
+    /// `absorb`, so the two sides cannot spell the four arms differently
+    /// or disagree about what an unreadable ruling means.
     pub(super) governance: super::Governance,
     pub(super) book: gateway::EndpointBook,
     /// The city's own name, as its first record states it. Handed to a
@@ -110,7 +109,7 @@ pub(crate) struct Views {
     ///
     /// Behind a lock of its own because the fold never touches it: a
     /// query carries the `Arc` out of its snapshot of the views and
-    /// reads the ledger with only readers waiting on it (sprawling-SPEC.md 8-92).
+    /// reads the ledger with only readers waiting on it (sprawling-SPEC.md 8-100).
     pub(super) index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
     /// Where each run's first `prompt_assembled` record sits, so the
     /// prompt a page asks for is one ledger line rather than a walk
@@ -122,7 +121,7 @@ pub(crate) struct Views {
     /// Behind a lock of its own so a reader reads a plan off the disk
     /// with the views released and puts it back afterwards; the fold
     /// holds it only to forget what a record may have moved
-    /// (sprawling-SPEC.md 8-92).
+    /// (sprawling-SPEC.md 8-100).
     #[serde(
         serialize_with = "super::snapshot::encode_plans",
         deserialize_with = "super::snapshot::decode_plans"
@@ -188,7 +187,7 @@ impl Views {
     /// A second, empty fold over the same city that shares this one's
     /// ledger index and plan cache: both are caches of the disk rather
     /// than folded state, so the two copies the fold thread alternates
-    /// between keep one of each (sprawling-SPEC.md 8-93). A served city
+    /// between keep one of each (sprawling-SPEC.md 8-99). A served city
     /// makes its twin with [`Views::twin`], from views already folded.
     #[cfg(test)]
     pub(crate) fn unfolded_twin(&self) -> Views {
@@ -289,7 +288,7 @@ impl Views {
             .map_err(memory::MemoryError::into_ax)?;
         // A freeze may evict a run and a late record may land on one;
         // either way its money is folded back from the Ledger on demand
-        // (sprawling-SPEC section 8-90), so the row goes with it.
+        // (sprawling-SPEC section 8-106), so the row goes with it.
         if record.kind() == EventKind::RunFrozen || self.hot.was_evicted(&record.run()) {
             let hot = &self.hot;
             self.attribution.retain_runs(|run| !hot.was_evicted(run));

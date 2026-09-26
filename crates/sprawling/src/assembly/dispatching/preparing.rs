@@ -7,7 +7,7 @@
 //! another process: the review tree, the bench with its MCP servers,
 //! and the frozen plan. It runs in the lane that drives the run, so the
 //! accounting thread never waits on a handshake or a checkout
-//! (sprawling-SPEC.md 8-93).
+//! (sprawling-SPEC.md 8-113).
 
 use kernel::{AxCode, AxError, Ledger, Locator, RunId};
 

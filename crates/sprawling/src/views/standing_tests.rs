@@ -40,9 +40,8 @@ fn halt_record(seq: u64, state: &str) -> kernel::EventRecord {
     )
 }
 
-/// A page refreshed after `stop the city` used to see a city that
-/// looked open, because the halt was a record it had not been sent and
-/// a judgement it could not ask for.
+/// A page refreshed after `stop the city` must not see a city that looks
+/// open: the city view names the scopes the halt shut.
 #[test]
 fn the_city_view_names_the_scopes_a_halt_shut() {
     let dir = tempfile::tempdir().unwrap();
@@ -93,9 +92,10 @@ fn a_run_in_the_city_view_says_which_room_it_works_in() {
     assert_eq!(summary.started, Some(kernel::TimeMs::new(1_000)));
 }
 
-/// A city that has run thousands of times used to put every run it ever
-/// held on the wire at each asking (sprawling-SPEC section 8-90): 8,000
-/// runs made a 1.37 MB city view, fetched again after every record.
+/// A city that has run thousands of times puts a bounded view on the
+/// wire at each asking (sprawling-SPEC section 8-106): every run it ever
+/// held would make 8,000 runs a 1.37 MB city view, fetched again after
+/// every record.
 #[test]
 fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
     const RUNS: u64 = 8_000;
@@ -146,8 +146,8 @@ fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
     assert_eq!((listed, city.active, city.frozen), (newest, 0, RUNS));
 }
 
-/// A cost view used to name every run a city ever billed (sprawling-SPEC
-/// section 8-90); it names every active run and the few billed most,
+/// A cost view names every active run and the few billed most rather
+/// than every run a city ever billed (sprawling-SPEC section 8-106),
 /// while `total` still sums them all.
 #[test]
 fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {

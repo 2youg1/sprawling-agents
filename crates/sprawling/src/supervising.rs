@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether a served city that just ended is left down, raised again, or
-//! handed to the person (sprawling-SPEC.md section 8-90).
+//! handed to the person (sprawling-SPEC.md section 8-109).
 //!
 //! The decision alone: no process, no clock. `children` runs the
 //! processes and samples the time; how an ending reads is

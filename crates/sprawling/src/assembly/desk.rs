@@ -172,8 +172,8 @@ impl CommandDesk {
     /// dropped: the sender asked for one thing and one thing is
     /// happening. Every client mints the key from what the person
     /// entered, so a double-click, a transport that resent a frame and
-    /// an editor retrying after a timeout all arrive as one ask - and
-    /// each of them used to be a second run against a paid provider.
+    /// an editor retrying after a timeout all arrive as one ask rather
+    /// than as a second run against a paid provider.
     /// Once the work is over the key is forgotten, so asking for the
     /// same work again is a second piece of work rather than silence.
     pub(crate) fn post(&self, command: channels::Command, reply: channels::Reply) {

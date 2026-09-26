@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What reached the city's door and has not yet become a run
-//! (sprawling-SPEC.md 8-91).
+//! (sprawling-SPEC.md 8-111).
 
 use std::collections::BTreeMap;
 

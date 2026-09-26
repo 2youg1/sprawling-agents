@@ -23,11 +23,11 @@ impl RunWorker {
     ///
     /// **A figure the person left empty is not a figure they erased.**
     /// The settings page sends the whole row on every pick, so re-picking
-    /// an already registered model used to overwrite its ceiling with
-    /// nothing, and the next call on the Anthropic wire was refused for a
-    /// field it could no longer write (sprawling-SPEC.md 8-71). An empty
-    /// box now keeps what this same model was registered with, read back
-    /// by `registered_as`.
+    /// an already registered model with an empty box must not overwrite
+    /// its ceiling with nothing: the next call on the Anthropic wire
+    /// would be refused for a field it could not write (sprawling-SPEC.md
+    /// 8-71). An empty box keeps what this same model was registered
+    /// with, read back by `registered_as`.
     pub(in crate::assembly) fn select_model(
         &mut self,
         chosen: Chosen,
@@ -74,10 +74,10 @@ impl RunWorker {
         let registered = registered_as(&self.credentials.book, tag, &endpoint, &model);
         // What the person stated outranks what they stated before, which
         // outranks the catalogue, and what none of the three states
-        // stays unstated. **The old reading of an unknown model was
-        // zero**, which the OpenAI wire wrote out as `max_tokens: 0` and
-        // a provider answered with no content at all; the run then froze
-        // as work that finished. A ceiling this city cannot name is now
+        // stays unstated. **An unknown model's ceiling is not zero**: the
+        // OpenAI wire would write zero out as `max_tokens: 0`, a provider
+        // would answer with no content at all, and the run would freeze
+        // as work that finished. A ceiling this city cannot name is
         // carried as one it cannot name.
         let context_tokens = context_tokens.or_else(|| {
             registered
@@ -95,7 +95,7 @@ impl RunWorker {
         // default is the last rung rather than a number invented at the
         // call site (gateway-SPEC.md 8-17). Because the ladder always
         // answers, a model no catalogue knows can still be called on the
-        // Anthropic wire, which is what B-01 was.
+        // Anthropic wire.
         let resolved = gateway::OutputCeiling::resolve(
             gateway::Stated {
                 person: max_output_tokens,

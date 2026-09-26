@@ -39,7 +39,7 @@ impl RunWorker {
     /// landing will need afterwards. Every line it writes goes through
     /// this worker on this thread; the review tree, the bench with its
     /// MCP servers and the frozen plan are the lane's
-    /// (sprawling-SPEC.md 8-93).
+    /// (sprawling-SPEC.md 8-113).
     ///
     /// # Errors
     /// Propagates every refusal a dispatch can owe before it costs
@@ -186,9 +186,9 @@ impl RunWorker {
     /// **What the dispatch borrowed is given back before the drive's
     /// own outcome is read.** A drive that failed is exactly when the
     /// room's queue and the worktree lease are most likely to be lost:
-    /// the old order returned early at `driven?`, so a disk that went
-    /// wrong took the room's mail and a tree's lease with it
-    /// (sprawling-SPEC.md 8-46-9).
+    /// returning early at `driven?` would let a disk that went wrong take
+    /// the room's mail and a tree's lease with it (sprawling-SPEC.md
+    /// 8-46-9).
     ///
     /// The plan step closes each node of `open_claims` as that node's
     /// closing line reaches the ledger; the caller still owes the history
@@ -219,7 +219,7 @@ impl RunWorker {
         // `settle_desks` below is where those signals are spoken.
         let chain = owing.knock_chain().clone();
         // Both loans go back before either failure is propagated: a
-        // backlog that would not take its member back used to cost the
+        // backlog that would not take its member back must not cost the
         // room its mail too (sprawling-SPEC.md 8-46-9).
         let returned = self.return_borrowed(&at, &mut site, &desks);
         let left = member.map_or(Ok(()), |id| self.flight.backlog.leave(id));
@@ -228,7 +228,7 @@ impl RunWorker {
         // A lane that placed the tree and then failed leaves no sweep to
         // read it, so the tree goes back before the failure does; kept,
         // it would answer every later dispatch to the room with
-        // WorktreeBusy until the worker restarts (sprawling-SPEC.md 8-93).
+        // WorktreeBusy until the worker restarts (sprawling-SPEC.md 8-113).
         let driven = match driven {
             Ok(driven) => driven,
             Err(failure) => {

@@ -285,9 +285,9 @@ mod tests {
         );
     }
 
-    /// Two different calls to one tool in one turn are two calls. The key
-    /// used to be the turn's millisecond stamp plus the tool's name, so
-    /// the second came back as a duplicate of the first - and the model
+    /// Two different calls to one tool in one turn are two calls. A key
+    /// made of the turn's millisecond stamp and the tool's name would
+    /// return the second as a duplicate of the first, and the model would
     /// read that as a fault in itself.
     #[test]
     fn the_same_tool_twice_with_different_arguments_runs_twice() {
@@ -500,7 +500,7 @@ mod tests {
     /// A dispatch whose server has not answered its handshake yet leaves
     /// the desk free: the command is answered on the accounting thread,
     /// and the lane that will drive the run is the one that waits for
-    /// the server (sprawling-SPEC.md 8-93).
+    /// the server (sprawling-SPEC.md 8-113).
     #[test]
     fn a_dispatch_whose_server_still_shakes_hands_leaves_the_desk_free() {
         let dir = tempfile::tempdir().unwrap();

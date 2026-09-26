@@ -218,7 +218,7 @@ pub(super) fn serve_city(
     };
     // After the refusals a restart could not cure, so a mistyped line
     // is refused once here rather than spending the crash budget
-    // (sprawling-SPEC.md 8-90).
+    // (sprawling-SPEC.md 8-109).
     // The terminal this city runs in becomes its console when `up`
     // started it, or when `serve` was asked. `--no-console` is the way
     // out for a supervisor that wants the old blocking shape.

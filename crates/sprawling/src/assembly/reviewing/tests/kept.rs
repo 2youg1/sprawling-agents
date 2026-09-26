@@ -96,7 +96,7 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
 /// one line under the command's key before take-off, `worktree_opened`,
 /// and a restart recognises the command again from that line alone: the
 /// placement of the tree keeps stamping it wherever it runs
-/// (sprawling-SPEC.md 8-93).
+/// (sprawling-SPEC.md 8-113).
 #[test]
 fn a_review_dispatch_sent_again_after_a_restart_is_answered_once() {
     let dir = tempfile::tempdir().unwrap();
@@ -165,7 +165,7 @@ fn trees_opened(ledger_dir: &std::path::Path) -> Vec<String> {
 /// the desk: the first placement commits the city's index, and while
 /// somebody else holds `.git/index.lock` that commit waits and then
 /// fails in the lane that drives the run, not on the accounting thread
-/// that took the command (sprawling-SPEC.md 8-93).
+/// that took the command (sprawling-SPEC.md 8-113).
 #[test]
 fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
     let dir = tempfile::tempdir().unwrap();
@@ -208,7 +208,7 @@ fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
 /// A lane that placed the room's tree and then failed gives the tree
 /// back on its way home: the next dispatch to the room claims it again
 /// instead of finding it held by a run that is over (sprawling-SPEC.md
-/// 8-93).
+/// 8-113).
 #[test]
 fn a_lane_that_fails_after_placing_the_tree_gives_it_back() {
     let dir = tempfile::tempdir().unwrap();

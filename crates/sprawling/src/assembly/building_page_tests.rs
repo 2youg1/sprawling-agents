@@ -37,7 +37,7 @@ fn a_building_page_still_shows_the_rules_that_govern_it() {
 }
 
 /// A plan nobody can open and a plan somebody wrote badly are two
-/// different facts, and the page used to state the second one.
+/// different facts, and the page states the first.
 ///
 /// Reading the file as empty runs it through `check_roadmap_shape`,
 /// which finds no header row and answers `no six-column table

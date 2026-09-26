@@ -122,8 +122,8 @@ fn started_runs(ledger_dir: &Path) -> usize {
 /// A run that hands work down starts a real second run, and that
 /// run cannot hand work down again.
 ///
-/// `kernel::gate::spawn` had held the one-level rule since S2 with
-/// no caller in production; this is the caller. The child is
+/// `kernel::gate::spawn` holds the one-level rule; this is its caller
+/// in production. The child is
 /// dispatched after the parent's turn settles rather than inside the
 /// tool call, because a tool that drove a run would be driving one
 /// from inside another run's tool bench.
@@ -307,9 +307,8 @@ fn what_came_back_from_a_delegate_waits_in_the_room_that_asked_for_it() {
     );
 }
 
-/// `status.children` was a hardcoded empty list, so the one field a
-/// run could have used to check what it had handed down always said
-/// "none".
+/// `status.children` is read, not a constant empty list: it is the one
+/// field a run can use to check what it handed down.
 #[test]
 fn status_tells_a_run_where_the_work_it_handed_down_went() {
     let dir = tempfile::tempdir().unwrap();

@@ -6,9 +6,8 @@
 //! What a line typed into a serving city means (sprawling-SPEC.md
 //! section 8-11).
 //!
-//! `sprawling up` used to print four lines and block until Ctrl-C. That
-//! terminal is a surface the product threw away, and on a machine with
-//! no browser it is the only surface there is.
+//! The terminal `sprawling up` blocks in is a surface of its own: on a
+//! machine with no browser it is the only surface there is.
 //!
 //! Everything here is a pure judgement over one line of text. What the
 //! judgement produces is either a control action the terminal carries

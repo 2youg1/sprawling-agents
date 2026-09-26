@@ -187,9 +187,9 @@ impl RunWorker {
         // work out their own depth.
         //
         // A cancelled run hands nothing down. The fourth safe point is
-        // what makes that reachable: a cancel arriving after the last
-        // wave used to have no boundary left to land on, so work asked
-        // for by a turn nobody wanted started anyway.
+        // what makes that reachable: without it a cancel arriving after
+        // the last wave would have no boundary left to land on, and work
+        // asked for by a turn nobody wanted would start anyway.
         // The graph this run laid out stays with the room, so a node's
         // handback hands the next ones down after this run is over. A
         // cancelled run's graph goes with the nodes it did not hand down.
@@ -313,7 +313,7 @@ impl RunWorker {
             return Ok(Landed::Elsewhere);
         }
         // What this run sent stays warm for the room's next run
-        // (sprawling-SPEC 8-93).
+        // (sprawling-SPEC 8-112).
         if let Some(door) = adapter {
             self.warm.keep(addr.clone(), door);
         }

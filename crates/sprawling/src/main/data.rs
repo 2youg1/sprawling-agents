@@ -175,8 +175,7 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
     };
     let (vault, _notice) = serving::open_vault();
     // Which room the branch lands in: the address the person named, or
-    // the one the mother ran in, which is the same choice `Fork` used to
-    // make before a branch became a session rather than a run.
+    // the one the mother ran in.
     let Some(room) = addr else {
         eprintln!("usage: sprawling fork <city-dir> <run> <seq> <addr>");
         eprintln!("a branch opens a session in a room; name the room it opens in");

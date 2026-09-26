@@ -40,7 +40,7 @@ pub(super) fn fresh_index() -> std::sync::Arc<std::sync::Mutex<memory::LedgerInd
 }
 
 /// The plan cache as a snapshot holds it: the cache itself, not the lock
-/// the two copies of the views share it through (sprawling-SPEC.md 8-93).
+/// the two copies of the views share it through (sprawling-SPEC.md 8-99).
 pub(super) fn encode_plans<S: serde::Serializer>(
     plans: &Arc<Mutex<PlanView>>,
     serializer: S,
@@ -104,7 +104,7 @@ impl Views {
 
     /// A second copy of these views, folded to the same record and sharing
     /// their ledger index and plan cache, for the fold thread to alternate
-    /// with (sprawling-SPEC.md 8-93). Made through the encoding a snapshot
+    /// with (sprawling-SPEC.md 8-99). Made through the encoding a snapshot
     /// holds, which carries every folded field, so the copy starts where
     /// this one stands without the history being read again.
     ///

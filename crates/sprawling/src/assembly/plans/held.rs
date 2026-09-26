@@ -5,7 +5,7 @@
 
 //! What each building is working towards and who holds which part of its
 //! plan: the part of the worker's state that `pursuit_changed` and the
-//! `roadmap_*` records change (sprawling-SPEC.md 8-91).
+//! `roadmap_*` records change (sprawling-SPEC.md 8-111).
 
 use std::collections::BTreeMap;
 use std::path::Path;

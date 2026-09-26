@@ -6,10 +6,11 @@
 //! The key every command carries, read at the door it enters by.
 //!
 //! What these pin: the wire makes all 23 state-changing commands carry
-//! an `IdemKey` so that a retry is harmless, and until this door read it
-//! nothing in the city did. `assembly::desk` collapses a repeat that is
-//! still queued or still running; a repeat that arrives after the first
-//! one finished used to be a second effect.
+//! an `IdemKey` so that a retry is harmless, and this door is where the
+//! city reads it. `assembly::desk` collapses a repeat that is still
+//! queued or still running; a repeat that arrives after the first one
+//! finished is answered with the answer the city kept for that key
+//! (`Doorstep.entrance`), not made a second effect.
 
 #![allow(
     clippy::float_arithmetic,
@@ -99,10 +100,10 @@ fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
 }
 
 /// A repeat is answered with the first answer, not with a second one
-/// that the first effect made up. Answering an approval twice used to
-/// report "nothing is waiting" the second time - a refusal manufactured
-/// by the success of the first attempt, which tells a retrying client
-/// that its command failed when it succeeded.
+/// that the first effect made up. Answering an approval twice must not
+/// report "nothing is waiting" the second time: that refusal would be
+/// manufactured by the success of the first attempt, and would tell a
+/// retrying client that its command failed when it succeeded.
 #[test]
 fn a_repeat_is_answered_with_what_the_first_ask_was_answered() {
     let dir = tempfile::tempdir().unwrap();

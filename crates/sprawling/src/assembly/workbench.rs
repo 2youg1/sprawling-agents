@@ -30,7 +30,7 @@ pub(super) use standing::Placing;
 
 /// What laying out a run's bench reads from the city: handles that
 /// clone, and values read when the dispatch was staged, so the bench is
-/// laid out in the lane that drives the run (sprawling-SPEC.md 8-93).
+/// laid out in the lane that drives the run (sprawling-SPEC.md 8-113).
 ///
 /// The folds the accounting thread rewrites - who has mail waiting, who
 /// holds which goal, how far the city trusts its residents - arrive as
@@ -245,14 +245,12 @@ impl Site {
     ///
     /// Without a lease the fence is **the run's write domain**, which is
     /// the building's own subtree plus whatever else its `RULES.toml`
-    /// declares. It used to be the room, on the belief that a room is
-    /// the only place a run may write in the city itself - and the gate
-    /// never agreed: `city::policy::write_domain` defaults to the whole
-    /// building, and City Hall's residents reach every document under
-    /// theirs. Everything a run wrote in between was staged by no fence,
-    /// so it reached no `changes` answer and no `file_discarded` record
-    /// could restore it. memory-SPEC section 8-18 already said the fence
-    /// is the write domain; this is the code agreeing with it.
+    /// declares, as memory-SPEC section 8-18 states. The room would be
+    /// narrower than the gate: `city::policy::write_domain` defaults to
+    /// the whole building, and City Hall's residents reach every document
+    /// under theirs. Anything a run wrote outside a room-sized fence would
+    /// be staged by no fence, reach no `changes` answer, and have no
+    /// `file_discarded` record that could restore it.
     ///
     /// # Errors
     /// Propagates a building whose declared prefixes its own rules
@@ -338,12 +336,11 @@ impl Desks {
 
 /// What a run can be told about itself at the moment it starts.
 ///
-/// Every field here is read from something. Eight of them used to be
-/// constants — the mode was always `plan_goal`, the write domain was
-/// the room rather than what the building granted, and the budget, the
-/// context limit and the locks were zeros. City.md tells a model to call
-/// `status` for exactly those, so a model that obeyed got a row of
-/// noughts and learnt not to ask again.
+/// Every field here is read from something, never a constant: the mode,
+/// the write domain the building granted, the budget, the context limit
+/// and the locks. City.md tells a model to call `status` for exactly
+/// those, and a row of constants would teach a model that obeyed not to
+/// ask again.
 ///
 /// The context used and the children are not here: both move while the
 /// run goes on, so `status` reads them live. `worktree_disk` is zero

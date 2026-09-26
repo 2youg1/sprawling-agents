@@ -6,14 +6,12 @@
 //! Every building's plan, parsed once and re-parsed only when something
 //! could have moved it.
 //!
-//! **The file is still the plan.** What changed is who does the reading:
-//! `CityView` and `Metrics` used to open every building's `Roadmap.md`
-//! and parse it again for every question a page asked, which is a disk
-//! read and a parse per poll for a document that changes a few times an
-//! hour. `kernel::WriteMoment` says the plan may only be written at
-//! three moments, and every one of those moments is an event — so this
-//! folds the events and re-reads a building only when one of them
-//! names it.
+//! **The file is still the plan.** Reading every building's `Roadmap.md`
+//! for every question a page asks would cost a disk read and a parse per
+//! poll for a document that changes a few times an hour.
+//! `kernel::WriteMoment` says the plan may only be written at three
+//! moments, and every one of those moments is an event, so this folds
+//! the events and re-reads a building only when one of them names it.
 //!
 //! **Why it is a projection and not a copy.** Nothing here stores what
 //! the plan says; it stores what the plan *was* the last time it was
@@ -202,7 +200,7 @@ impl PlanView {
 
 /// Every named building's plan: described from the cache while it is
 /// held, read off the disk once it is released, and put back only when
-/// no record moved that plan in between (sprawling-SPEC.md 8-92).
+/// no record moved that plan in between (sprawling-SPEC.md 8-100).
 ///
 /// A poisoned cache is taken back by [`PlanView::take_back`], so a panic
 /// under the lock costs the parsed plans and never a stop cause.

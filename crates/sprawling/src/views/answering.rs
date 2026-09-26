@@ -35,7 +35,7 @@ use super::lines::{endpoints_answer, summarize};
 
 /// How many runs a cost view names besides every active one: a bound
 /// on the size of an answer on the wire, not a machine reading, so it is
-/// a constant (sprawling-SPEC section 8-90).
+/// a constant (sprawling-SPEC section 8-106).
 pub(super) const TOP_BILLED: usize = 32;
 
 impl Views {

@@ -94,7 +94,7 @@ impl Site {
 
 /// What placing a room's tree reads from the city, as values rather
 /// than as the worker that holds them, so the placement runs on
-/// whichever thread prepares the run (sprawling-SPEC.md 8-93).
+/// whichever thread prepares the run (sprawling-SPEC.md 8-113).
 pub(in crate::assembly) struct Placing<'a> {
     pub(in crate::assembly) city_root: &'a Path,
     pub(in crate::assembly) city: kernel::B3Hash,
@@ -176,7 +176,7 @@ impl Site {
     /// Names the branch a room under review works on before its tree is
     /// placed. The branch is the tree's name, a function of the room
     /// alone, so the desks opened on the accounting thread know it while
-    /// the lane still places the tree (sprawling-SPEC.md 8-93).
+    /// the lane still places the tree (sprawling-SPEC.md 8-113).
     ///
     /// # Errors
     /// Propagates a room whose tree name will not parse.
@@ -199,7 +199,7 @@ impl RunWorker {
     /// that renewal - so cutting it apart would move a clock sample,
     /// which a structural change may not relocate. The tree a room under
     /// review writes in is placed afterwards by [`Site::place_tree`],
-    /// which needs nothing from this worker (sprawling-SPEC.md 8-93).
+    /// which needs nothing from this worker (sprawling-SPEC.md 8-113).
     ///
     /// The frozen configuration is read here rather than in the
     /// agreement, and the reason is the room: a dispatch that names an

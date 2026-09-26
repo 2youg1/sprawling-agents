@@ -20,7 +20,7 @@ use super::RunWorker;
 /// A ledger a dispatch's preparation writes through, with the key of the
 /// command that dispatch answers, so a line written without the worker
 /// is stamped by the rule [`RunWorker::record_for`] follows and a restart
-/// still recognises the command from it (sprawling-SPEC.md 8-93).
+/// still recognises the command from it (sprawling-SPEC.md 8-113).
 pub(in crate::assembly) struct Stamping<'a, L> {
     pub(in crate::assembly) ledger: &'a mut L,
     pub(in crate::assembly) command: Option<kernel::IdemKey>,
@@ -60,7 +60,7 @@ impl<L: Ledger> Stamping<'_, L> {
 }
 
 /// The diagnostic log's write end: the worker holds one, and each lane
-/// preparing a dispatch holds a clone (sprawling-SPEC.md 8-93).
+/// preparing a dispatch holds a clone (sprawling-SPEC.md 8-113).
 ///
 /// Shared rather than lent, because nothing reads a line back: where a
 /// line lands decides nothing, so two threads writing to one log need
@@ -239,7 +239,7 @@ impl RunWorker {
     /// the folds, in ledger order. Each line is already history and its
     /// lane already has its answer, so a fold that refuses one is
     /// reported: no lane is left to act on the refusal, and the next
-    /// line must still be shown (sprawling-SPEC.md 8-90).
+    /// line must still be shown (sprawling-SPEC.md 8-110).
     pub(super) fn show_relayed(&mut self, written: Vec<EventDraft>) {
         for line in written {
             if let Err(err) = self.absorb(line.kind, line.run, line.addr.as_ref(), &line.data) {
@@ -256,7 +256,7 @@ impl RunWorker {
     /// planning, goal and credentials folds, whoever the line was written
     /// for: a restart folds every line into every fold, so a live fold
     /// that skipped some writer's lines would disagree with the restart
-    /// until the process restarted (sprawling-SPEC.md 8-90). Each fold's
+    /// until the process restarted (sprawling-SPEC.md 8-110). Each fold's
     /// own `absorb` decides which kinds it reads. The other collaboration
     /// fields and the entrance are not shown the line here: the effect
     /// handler that wrote it and `entrance.stamp` keep them in step.

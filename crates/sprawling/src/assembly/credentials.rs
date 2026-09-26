@@ -44,9 +44,9 @@ impl Entered {
     ///
     /// The one place a typed address becomes a called one. Probing and
     /// attaching both arrive here, so the two cannot reach different
-    /// hosts from the same text \u2014 which is what B-02 was: the form
-    /// probed one URL and the book recorded another, and the second one
-    /// 404ed. A URL whose path already names a face decides the shape,
+    /// hosts from the same text; otherwise the form could probe one URL
+    /// while the book records another, and the second one 404s.
+    /// A URL whose path already names a face decides the shape,
     /// because a pasted URL is evidence and a toggle left on its default
     /// is not.
     ///
@@ -183,8 +183,8 @@ pub(super) struct Chosen {
 /// figure is taken where the catalogue has a row for the model.
 pub(super) struct Ceilings {
     /// `None` when nobody stated one. Zero is unrepresentable here:
-    /// a window of zero and a window nobody registered used to be the
-    /// same byte, and the reminder read every session as full.
+    /// a window of zero and a window nobody registered would be the same
+    /// byte, and the reminder would read every session as full.
     pub(super) context_tokens: Option<kernel::Window>,
     pub(super) max_output_tokens: Option<kernel::Ceiling>,
 }

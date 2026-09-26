@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Every run of a city folded into one line that carries its parent
-//! pointers (sprawling-SPEC.md 8-93).
+//! pointers (sprawling-SPEC.md 8-105).
 //!
 //! This is the projection the `tree` lens of `sprawling view` draws:
 //! the agent reads it as JSON lines, the interactive viewer arranges it

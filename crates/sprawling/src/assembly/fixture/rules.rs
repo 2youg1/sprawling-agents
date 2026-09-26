@@ -5,10 +5,9 @@
 
 //! What a building's rules look like in a test, and where they go.
 //!
-//! Both, in one place. Twenty-five tests used to spell a rules file
-//! themselves, so the format had a home in each of them and a change to
-//! it had to find every one — which is the same defect the format
-//! change was made to remove from the product.
+//! Both, in one place, so the format has one home in the tests as it
+//! has one in the product, and a change to it does not have to find
+//! every test that spells a rules file itself.
 
 use std::path::Path;
 

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How a refusal is written on the command line (sprawling-SPEC.md 8-91):
+//! How a refusal is written on the command line (sprawling-SPEC.md 8-103):
 //! the text alone, so the caller decides where it goes.
 
 use kernel::AxError;

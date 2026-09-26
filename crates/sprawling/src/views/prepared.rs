@@ -151,7 +151,7 @@ pub(crate) enum Prepared {
 
 /// The ledger as a history reader carries it out of the snapshot: where
 /// it lives, and its index, which has a lock of its own that only
-/// readers wait on (sprawling-SPEC.md 8-92).
+/// readers wait on (sprawling-SPEC.md 8-100).
 pub(crate) struct LedgerAsk {
     pub(super) city_root: PathBuf,
     pub(super) index: Arc<Mutex<memory::LedgerIndex>>,
@@ -165,7 +165,7 @@ impl LedgerAsk {
     /// offset pointing at another line, so the index is replaced by an
     /// empty one and the poison cleared: the refresh that follows scans
     /// the whole ledger once, and later reads refresh incrementally again
-    /// (sprawling-SPEC.md 8-92).
+    /// (sprawling-SPEC.md 8-100).
     pub(super) fn indexed(&self) -> Option<(MutexGuard<'_, memory::LedgerIndex>, PathBuf)> {
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         let mut index = self.index.lock().unwrap_or_else(|poisoned| {

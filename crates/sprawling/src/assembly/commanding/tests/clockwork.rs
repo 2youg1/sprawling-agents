@@ -129,9 +129,9 @@ fn a_close_lands_between_commands_and_never_inside_one() {
     ));
 }
 
-/// A serve that failed used to close the city through the same door
-/// Ctrl-C uses, and the handoff then said the person had closed it: a
-/// choice nobody made, and a failure the next session never heard of.
+/// A serve that failed closes the city as `Broken`, not through the door
+/// Ctrl-C uses: a handoff saying the person closed it would record a
+/// choice nobody made and a failure the next session never heard of.
 #[test]
 fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -165,11 +165,11 @@ fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
     );
 }
 
-/// One job in a window used to take the rest of that window with it:
-/// the tick closed the window first and returned on the first refusal,
-/// so the other jobs due that minute never ran and nothing recorded
-/// that they had not. Every due job is now attempted, and a refusal is
-/// written to the log instead of to the other jobs.
+/// One job in a window must not take the rest of that window with it:
+/// a tick that closed the window first and returned on the first refusal
+/// would leave the other jobs due that minute unrun, with nothing
+/// recording that they had not run. Every due job is attempted, and a
+/// refusal is written to the log instead of to the other jobs.
 #[test]
 fn a_scheduled_job_that_cannot_start_does_not_take_the_others_with_it() {
     let dir = tempfile::tempdir().unwrap();

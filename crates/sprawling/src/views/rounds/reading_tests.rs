@@ -54,7 +54,7 @@ fn asked(seq: u64) -> EventRecord {
 }
 
 /// The payload `runtime::turn` writes when the model answers. Five
-/// fields, and this fold used to read none of them.
+/// fields, and this fold reads all of them.
 fn answered_model(seq: u64, text: &str) -> EventRecord {
     record(
         seq,
@@ -164,7 +164,7 @@ fn a_long_output_is_cut_and_says_how_much_it_cut() {
     assert_eq!(output.cut, 40 - OUTPUT_LINES);
 }
 
-/// The headline case: a three-part refusal used to render as one grey
+/// The headline case: a three-part refusal must not render as one grey
 /// line indistinguishable from a successful read.
 #[test]
 fn a_door_that_refused_lands_in_the_turn_whole() {

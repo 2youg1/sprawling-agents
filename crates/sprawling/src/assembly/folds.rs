@@ -62,7 +62,7 @@ pub(crate) struct Standing {
 impl Standing {
     /// The folds of one pass over the history, from the standing
     /// snapshot when one fits and from genesis otherwise, with a new
-    /// snapshot cut at the last line folded (sprawling-SPEC 8-92).
+    /// snapshot cut at the last line folded (sprawling-SPEC 8-101).
     ///
     /// One pass for all six folds: recognising a repeat, an expiry or a
     /// session's origin across a restart must not cost a second read of
@@ -105,7 +105,7 @@ impl Standing {
 /// folded under.
 ///
 /// A standing snapshot is cut at the last line folded, as every worker
-/// open cuts one (sprawling-SPEC 8-92), so a worker opened over this city
+/// open cuts one (sprawling-SPEC 8-101), so a worker opened over this city
 /// later folds only what arrives after it; a cut that fails is in
 /// `Standing.cut`, not here.
 ///

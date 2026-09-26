@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What running commands already wrote, kept per run so a page that
-//! opens mid-command sees it (sprawling-SPEC.md 8-90).
+//! opens mid-command sees it (sprawling-SPEC.md 8-115).
 
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Mutex, MutexGuard, PoisonError};

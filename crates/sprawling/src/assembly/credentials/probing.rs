@@ -8,8 +8,8 @@
 //! **A probe's answer is a reading, not a success or a failure.** A
 //! host that does not resolve, a socket nothing answers, a certificate
 //! this machine does not trust and a provider that says 401 are four
-//! different next steps for the person filling in the form, and all four
-//! used to arrive as one sentence from a transport library. So every
+//! different next steps for the person filling in the form, and a
+//! transport library says all four in one sentence. So every
 //! probe records where the call stopped, stage by stage, and a probe
 //! that never reached a model list records that beside the stage that
 //! stopped it rather than instead of it.

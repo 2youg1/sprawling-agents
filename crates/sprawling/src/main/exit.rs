@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The exit codes this binary speaks, one variant per code
-//! (sprawling-SPEC.md 8-91).
+//! (sprawling-SPEC.md 8-103).
 //!
 //! For an agent driving the binary the exit code is the result, so each
 //! code asserts one fact and no two facts share a code: a city that is
@@ -22,8 +22,9 @@ pub(super) enum Exit {
     /// 2: this command line was not readable, including a `call` frame
     /// the wire cannot carry.
     Line,
-    /// 3: `call` sent its frame and nothing came back inside the quiet
-    /// window.
+    /// 3: `call` or `dispatch` sent its frame and nothing came back
+    /// inside the quiet window, or the city spoke and the frame the verb
+    /// waited for did not come (`Spoken::Quiet`, `Spoken::Unfinished`).
     Quiet,
     /// 4: nothing at the address answered as a city.
     NoCity,

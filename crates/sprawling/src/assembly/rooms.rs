@@ -173,8 +173,8 @@ impl RoomQueues {
             }
         };
         // The queue comes home whatever the signals that waited do to
-        // it: this method exists because a queue that failed on its way
-        // back used to be a queue the city forgot it had.
+        // it: a queue that failed on its way back must not become a
+        // queue the city forgets it has.
         let mut refused = None;
         for signal in &waiting {
             let delivered = returned
@@ -237,7 +237,7 @@ impl RoomQueues {
     }
 
     /// [`RoomQueues::pending`] for every room holding anything, read at
-    /// once, for a bench laid out off this thread (sprawling-SPEC.md 8-93).
+    /// once, for a bench laid out off this thread (sprawling-SPEC.md 8-113).
     pub(in crate::assembly) fn waiting(&self) -> BTreeMap<Address, u32> {
         self.rooms
             .keys()
