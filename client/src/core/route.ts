@@ -54,11 +54,11 @@ export const DEFAULT_VIEW: View = { kind: "talk", address: MAYOR };
 export function toFragment(view: View): string {
   switch (view.kind) {
     case "talk":
-      return view.address === MAYOR ? "#/" : `#/talk/${view.address}`;
+      return view.address === MAYOR ? "#/" : `#/talk/${escaped(view.address)}`;
     case "city":
       return "#/city";
     case "building":
-      return `#/building/${view.address}`;
+      return `#/building/${escaped(view.address)}`;
     case "run":
       return `#/run/${view.run}`;
     case "setup":
@@ -133,6 +133,28 @@ export function page(name: string): Option.Option<View> {
   return Option.fromNullable(BARE[name] ?? OLD[name]);
 }
 
+// An address as the address bar carries it: each segment percent-encoded,
+// the slashes between them kept, so a room named in any script is written
+// the way a browser would write it and read back through `unescaped`.
+function escaped(address: Address): string {
+  return address.split("/").map(encodeURIComponent).join("/");
+}
+
+// The segments a browser percent-encoded, decoded one by one so an encoded
+// slash stays inside its segment. `None` for a malformed escape, which
+// names nothing rather than a room spelled with a stray `%`.
+const decodeSegment = Option.liftThrowable(decodeURIComponent);
+
+function unescaped(tail: string): Option.Option<string> {
+  return Option.map(Option.all(tail.split("/").map(decodeSegment)), (segments) =>
+    segments.join("/"),
+  );
+}
+
+function readEscapedAddress(tail: string): Option.Option<Address> {
+  return Option.flatMap(unescaped(tail), readAddress);
+}
+
 function named(raw: string): string {
   return raw.replace(/^#*/, "").replace(/^\/*/, "");
 }
@@ -152,13 +174,13 @@ export function fromFragment(raw: string): Option.Option<View> {
   switch (head) {
     case "talk":
     case "s":
-      return Option.map(readAddress(tail), (address) => ({
+      return Option.map(readEscapedAddress(tail), (address) => ({
         kind: "talk",
         address,
       }));
     case "building":
     case "b":
-      return Option.map(readAddress(tail), (address) => ({
+      return Option.map(readEscapedAddress(tail), (address) => ({
         kind: "building",
         address,
       }));

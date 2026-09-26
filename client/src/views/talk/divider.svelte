@@ -9,6 +9,7 @@
   import { clock } from "../../core/time";
   import type { RunBelief } from "../../core/belief";
   import { ui } from "../../ui";
+  import { motherName } from "./forking";
   import type { Boundary, ForkPlan } from "./forking";
   import Thread from "./thread.svelte";
 
@@ -38,10 +39,13 @@
   const line = $derived.by((): string | null => {
     if (boundary === null) return null;
     if (boundary.kind === "forked") {
-      return fill(say($lang, "session_forked_divider"), {
+      const mother = boundary.mother;
+      const task = earlier.find((run) => run.run === mother)?.task ?? null;
+      const named = fill(say($lang, "session_forked_divider"), {
         turn: String(boundary.turn),
-        at: say($lang, "fork_mother"),
+        at: task === null ? say($lang, "fork_mother") : motherName(task),
       });
+      return boundary.at === null ? named : `${named} · ${clock($lang, boundary.at)}`;
     }
     // A boundary this page watched open knows its minute; one found
     // here after a reload says only that the stretch is new, which is

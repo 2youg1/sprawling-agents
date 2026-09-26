@@ -73,6 +73,18 @@ describe("route", () => {
     expect(toFragment({ kind: "talk", address: MAYOR })).toBe("#/");
   });
 
+  test("a room named in any script opens from the address bar the browser wrote", () => {
+    const named = Address.make("shop/收到。");
+    const written = "#/talk/shop/%E6%94%B6%E5%88%B0%E3%80%82";
+    expect(fromFragment(written)).toEqual(
+      Option.some({ kind: "talk", address: named }),
+    );
+    expect(fromFragment(toFragment({ kind: "talk", address: named }))).toEqual(
+      Option.some({ kind: "talk", address: named }),
+    );
+    expect(fromFragment("#/talk/shop/%E6%94")).toEqual(Option.none());
+  });
+
   test("every fragment the old pages wrote still lands", () => {
     const kept: readonly (readonly [string, View])[] = [
       ["#/overview", { kind: "city" }],
