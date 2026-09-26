@@ -154,7 +154,7 @@ fn a_mother_run_holding_a_line_of_a_newer_kind_rebuilds_without_it() {
     let last = written
         .split(|byte| *byte == b'\n')
         .filter(|line| !line.is_empty())
-        .last()
+        .next_back()
         .unwrap()
         .to_vec();
     let future = format!(

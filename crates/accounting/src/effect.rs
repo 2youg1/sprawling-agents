@@ -396,7 +396,12 @@ pub fn handed_back(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::wildcard_enum_match_arm,
+    reason = "test code"
+)]
 mod tests {
     use kernel::{Address, Tool};
 

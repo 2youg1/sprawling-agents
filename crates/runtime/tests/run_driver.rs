@@ -17,6 +17,8 @@
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::redundant_closure,
+    clippy::disallowed_methods,
     reason = "test code"
 )]
 

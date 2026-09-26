@@ -3,6 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+#![allow(
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
+    reason = "test code"
+)]
+
 use super::*;
 use kernel::{EventDraft, EventKind, GENESIS_PREV, Payload, RunId, Seq, TimeMs};
 

@@ -238,7 +238,7 @@ fn status_reports_the_count_of_the_call_that_asked() {
         seen,
     };
     let plan = plan(1_000);
-    let mut status = runtime::StatusTool::new(runtime::StatusSnapshot {
+    let status = runtime::StatusTool::new(runtime::StatusSnapshot {
         who: "resident".to_owned(),
         addr: Address::parse("lab/room1").unwrap(),
         mode: kernel::Mode::Up,
@@ -265,7 +265,7 @@ fn status_reports_the_count_of_the_call_that_asked() {
     };
     let mut interrupt = |_: SafePoint| Interrupt::None;
     let mut invoke = |call: &ToolCall, _: TimeMs| {
-        let outcome = kernel::Tool::invoke(&mut status, call)?;
+        let outcome = kernel::Tool::invoke(&status, call)?;
         let text = serde_json::to_value(&outcome.result).unwrap()["text"]
             .as_str()
             .unwrap()

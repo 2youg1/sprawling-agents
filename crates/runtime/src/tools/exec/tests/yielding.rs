@@ -6,6 +6,8 @@
 //! A dispatched command starts below the core, on every platform
 //! (runtime-SPEC.md 8-13-3).
 
+#![allow(clippy::arithmetic_side_effects, reason = "test code")]
+
 use super::*;
 
 /// A command that prints the scheduling priority it itself runs at, and
