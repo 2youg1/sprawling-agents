@@ -502,7 +502,7 @@ ARCHITECTURE §6 gateway 表逐行状态翻转；§6 接线台账登记（endpoi
 
 **思考块的 signature 与文本走两条 delta，两条都要收。** Anthropic 把一个 thinking 块拆成 `thinking_delta`（正文）与 `signature_delta`（签名）两串增量，而 `content_block_start` 给出的那份 signature 恒为空串。`settled` 因此按 index 累积 signature 并在重装时写回，与 `partial_json` 同形。**空 signature 在 `block_from` 升为 `E_WIRE_MISMATCH`**：provider 拿签名去核验它自己发出的那段推理，空的那份带进下一回合就是一个 400，而这座城此刻还说不出为什么——拒在产生它的那一回合，报的才是「流把签名丢了」。两条往返（settled→`response_from_wire`→`request_wire`）逐字节相等由 `anthropic/stream.rs` 的测试钉住。
 
-**半个工具参数恒拒，两家同码同形。** 流中断时 `partial_json`／`arguments` 停在一个值的中间；把它读成 `{}` 就是把半次调用变成一次真的「无参数调用」，而 `exec {}`／`write {}` 会落账、过门、真执行。判定住 `mismatch::settled_tool_arguments(tool, at, raw)`——两家 dialect 都从碎片拼参数，故拼完即校验的那一句只有一处，拒词点名工具、index、已收字符数与解析停在哪里，码取 `E_PROVIDER`（`stream_cut`，retriable：截断的流与截断的 body 是同一种失败）。落选的是「在 OpenAI 侧沿用 `response_from` 的 `E_WIRE_MISMATCH`」：形状没有漂，漂的是这次传输，而 `E_WIRE_MISMATCH` 的恢复语会让人去改 dialect 与 base url 两个没有错的设置。
+**半个工具参数恒拒，两家同码同形。** 流中断时 `partial_json`／`arguments` 停在一个值的中间；把它读成 `{}` 就是把半次调用变成一次真的「无参数调用」，而 `exec {}`／`write {}` 会落账、过门、真执行。判定住 `mismatch::settled_tool_arguments(tool, at, raw)`——两家 dialect 都从碎片拼参数，故拼完即校验的那一句只有一处，拒词点名工具、index、已收字符数与解析停在哪里，码取 `E_PROVIDER`（`stream_cut`，`Retry::Unknown`：截断的流与截断的 body 是同一种失败）。落选的是「在 OpenAI 侧沿用 `response_from` 的 `E_WIRE_MISMATCH`」：形状没有漂，漂的是这次传输，而 `E_WIRE_MISMATCH` 的恢复语会让人去改 dialect 与 base url 两个没有错的设置。
 
 **认不出的帧跳过，缺失的结算帧不跳过。** provider 会加新的事件类型，一个人不该因为其中一个是新的就丢掉整次调用；但流在说明「为什么停」的那一帧之前结束，是 `Provider` 失败并且可重试——它和一个被截断的 body 是同一种失败，刻意不允许「保留已收到的增量」来补救：把不完整的回复当成完整的呈现出去，是这里唯一不能有的结局。
 

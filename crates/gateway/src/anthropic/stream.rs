@@ -20,6 +20,7 @@ use kernel::AxError;
 use kernel::Increment;
 use serde_json::{Value, json};
 
+use crate::endpoint::failure::{ProviderFailure, provider_err};
 use crate::mismatch::{settled_tool_arguments, stream_cut};
 
 /// What one `content_block_delta` carries, if it carries either stream.
@@ -97,6 +98,17 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
                         counted.insert(name.clone(), value.clone());
                     }
                 }
+            }
+            Some("error") => {
+                let kind = map
+                    .get("error")
+                    .and_then(|held| held.get("type"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("an error without a type");
+                return Err(provider_err(
+                    "read a streamed answer",
+                    &ProviderFailure::Reported { kind },
+                ));
             }
             _ => {}
         }
@@ -210,7 +222,10 @@ mod tests {
         ];
         let refused = settled(&frames).expect_err("an error frame is not an answer");
         assert_eq!(
-            (refused.subject(), serde_json::to_value(&refused).unwrap()["retry"].clone()),
+            (
+                refused.subject(),
+                serde_json::to_value(&refused).unwrap()["retry"].clone()
+            ),
             ("the stream reported overloaded_error", json!("yes"))
         );
     }
