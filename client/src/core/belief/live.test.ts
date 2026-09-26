@@ -7,6 +7,8 @@ import { expect, test } from "bun:test";
 import { get } from "svelte/store";
 
 import { createBelief } from "../belief";
+import { newestWorking } from "./live";
+import type { RunBelief } from "./shape";
 import type { CityAnswer, EventKind, EventRecord, RunSummary } from "../../wire";
 import { B3Hash, RunId, Seq, TimeMs } from "../../wire";
 
@@ -26,10 +28,10 @@ function runId(index: number): RunId {
   return RunId.make(`00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`);
 }
 
-function listed(index: number): RunSummary {
+function listed(index: number, addr: string | null = null): RunSummary {
   return {
     run: runId(index),
-    addr: null,
+    addr,
     started: TimeMs.make(index),
     last_seq: Seq.make(1),
     last_kind: "run_started",
@@ -80,5 +82,38 @@ test("reading the working runs costs the working runs, not the city", () => {
     working,
     after: get(store.belief).live.map((run) => run.run),
   }).toEqual({ working: 2 * WORKING * RECORDS, after: [runId(1), runId(2), runId(3)] });
+  expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
+});
+
+test("the newest working run of a room costs the working runs, not the city", () => {
+  const store = createBelief(() => 0);
+  // Every run of the city stood in the one room, so a reader that walks
+  // the table to find the room's runs walks the whole city.
+  const room = "hall/mayor";
+  store.adoptCity({
+    active: WORKING,
+    buildings: [],
+    frozen: RUNS - WORKING,
+    halted: [],
+    pursuits: [],
+    runs: Array.from({ length: RUNS }, (_, index) => listed(RUNS - 1 - index, room)),
+  });
+  const records = Array.from({ length: 2 * RECORDS }, (_, each) =>
+    record(each % WORKING, each + 2, "tool_result"),
+  );
+  let start = 0;
+  let newest: RunBelief | undefined;
+  for (const [at, each] of records.entries()) {
+    if (at === RECORDS) start = performance.now();
+    store.apply(each);
+    newest = newestWorking(get(store.belief), room);
+  }
+  const perRecordUs = ((performance.now() - start) * 1000) / RECORDS;
+  store.apply(record(WORKING - 1, 2 * RECORDS + 2, "run_frozen"));
+  expect({
+    steady: newest?.run,
+    after: newestWorking(get(store.belief), room)?.run,
+    elsewhere: newestWorking(get(store.belief), "hall"),
+  }).toEqual({ steady: runId(WORKING - 1), after: runId(WORKING - 2), elsewhere: undefined });
   expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
 });

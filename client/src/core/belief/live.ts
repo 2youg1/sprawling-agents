@@ -9,7 +9,7 @@
 // forward one run at a time and a reader pays for the working runs
 // rather than for the table (client-SPEC 12-4).
 
-import type { RunBelief } from "./shape";
+import type { Belief, RunBelief } from "./shape";
 
 // Oldest start first, the order every reader wants: the newest working
 // run is the last one.
@@ -39,4 +39,14 @@ export function livened(live: readonly RunBelief[], run: RunBelief): readonly Ru
 // Whether a run is in this room or a room below it.
 export function within(run: RunBelief, room: string): boolean {
   return run.addr !== null && (run.addr === room || run.addr.startsWith(`${room}/`));
+}
+
+// The newest working run of one room: the run a message typed there
+// steers, a `/stop` there reaches, and the room's page shows as going,
+// so the box and the page cannot name two runs.
+export function newestWorking(belief: Belief, room: string): RunBelief | undefined {
+  return Object.values(belief.runs)
+    .filter((run) => run.addr === room && working(run))
+    .sort((a, b) => (b.started ?? 0) - (a.started ?? 0))
+    .at(0);
 }
