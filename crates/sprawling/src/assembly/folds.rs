@@ -60,31 +60,27 @@ pub(crate) struct Standing {
 }
 
 impl Standing {
-    /// One verified pass, three folds.
+    /// The folds of one pass over the history, from the standing
+    /// snapshot when one fits and from genesis otherwise, with a new
+    /// snapshot cut at the last line folded (sprawling-SPEC 8-92).
     ///
-    /// Until this existed the three were three functions, and opening a
-    /// worker read, parsed and chain-verified the same bytes three times
-    /// over to answer three questions about them. The answers never
-    /// disagreed, which `what_a_worker_holds_is_what_a_restart_rebuilds`
-    /// is what now holds, so the two extra passes bought nothing but the
-    /// time and the memory of reading a whole history twice more.
-    ///
-    /// A line is parsed once, by the per-line check, and shown to each fold. Verification
-    /// stays where it was: a history that does not verify is not one any
-    /// of these three views may be built from.
+    /// One pass for all six folds: recognising a repeat, an expiry or a
+    /// session's origin across a restart must not cost a second read of
+    /// the history, which `what_a_worker_holds_is_what_a_restart_rebuilds`
+    /// holds. A snapshot that fails verification or does not decode is
+    /// never trusted; the whole history is verified and folded instead.
     ///
     /// # Errors
-    /// Propagates chain verification and whatever a fold says about a
-    /// payload it cannot read.
+    /// Propagates chain verification of what is folded and whatever a
+    /// fold says about a payload it cannot read; a cut that fails is in
+    /// `cut`, not here.
     pub(crate) fn fold(ledger_dir: &Path) -> Result<Standing, AxError> {
-        let mut folds = StandingFolds::empty(ledger_dir);
-        if ledger_dir.exists() {
-            let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
-            for record in known_records(&verified) {
-                folds.absorb(record)?;
-            }
+        if !ledger_dir.exists() {
+            return StandingFolds::empty(ledger_dir).settle(Ok(()));
         }
-        folds.settle(Ok(()))
+        let started = snapshot_start::start::<StandingFolds>(ledger_dir)?;
+        let cut = snapshot_start::cut(ledger_dir, &started);
+        started.folded.settle(cut)
     }
 }
 
