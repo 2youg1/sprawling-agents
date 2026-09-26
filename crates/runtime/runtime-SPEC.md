@@ -969,7 +969,7 @@ pub struct RunHooks<'a> {
 |---|---|
 | `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`grant`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_memory` |
 | `bench/admit.rs` | 门：`admit` 按 `Effect` 分派到 Write／Connector／Egress／Spawn／Govern 各门，`settled`／`crossed` 把一次判定翻译成 `BenchOutcome`，`scanned` 为两扇朝外的门备好密钥扫描的字节 |
-| `bench/tests.rs` | 去重、门、fence 与注册冲突的夹具（7 个 `#[test]`） |
+| `bench/tests.rs` | 去重、门、taint、fence 与注册冲突的夹具（8 个 `#[test]`） |
 
 **无字段开放。** 子模块本就能看见父模块的私有项，故 `ToolBench` 的字段一个都没动；唯一的可见性改动是 `fn admit` → `pub(super) fn admit`，因为它现在由父文件的 `invoke` 调用。
 
@@ -1783,3 +1783,16 @@ impl FencePolicy {
 - **未定**：今天每个调用都按「可能写」算，因为 run 驱动还不知道每个调用声明的 `Effect`——`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里。一旦 `RunPlan` 或 `RunHooks` 带上名字到 `Effect` 的表，「这一波有调用」换成「这一波有可能写的调用」，只读波就落到 `Fenced`/`Unfenced` 的 `Skip`；`Stage` 也应只带这一波写过的路径（写工具自报；exec 这类说不清的才扫写域）。定下它的证据是：5,000 文件的楼首次派活 ≤ 200 ms。
 - **否决「空波一律跳过」**：结束回合的空波前那次 fence，是把上一波的写带进提交的唯一时机；跳过它，run 写下的文件就没有任何提交持有。
 - **否决「每波都 fence」**：一个没跑过任何调用的 run，提交的是一棵没变的树，却多付一次 stage 与 commit。
+
+### 8-46 runtime::bench::outside（形状 1 判定；**外来内容进 run 的唯一入口**）
+
+```rust
+// crates/runtime/src/bench/outside.rs
+pub(super) fn entered(effect: &Effect, taint: &TaintSet) -> Result<TaintSet, AxError>;  // 一次答案进门后 run 的 taint
+```
+
+- **判定表**（对 `Effect` 穷尽，无通配臂）：`Connector { label }` → 并入 `mcp:<label>`；`Egress` → 并入 `web`；`AttachUserBrowser` → 并入 `web:browser`；`Read`／`Write`／`Spawn`／`Govern`／`Spend` → 原样返回。新增一种 `Effect` 不回答这张表就不编译。
+- **调用点只有一个**：`ToolBench::invoke` 在工具答出 `Ok` 之后、把答案交还模型之前，用 `entered` 的返回值替换 bench 的 taint。之后同一 run 的每扇门（`command`／`reach`／`undoable`）读到的都是长大后的集合，所以读过一段 MCP 回答或网页的 run 再调 exec，由 `kernel::gate::command` 答 `E_TAINTED_ACTION`。失败的调用不并入：没有内容进门。来源标签为空时答 `E_CONFIG_INVALID`，这个错误就是这次调用被记下的答案，模型读不到那段内容。
+- **为什么按 `Effect` 判，而不是让每个工具自报**：`Effect` 已经是工具注册时声明的「这次调用伸向哪里」，门按它分派；来源再让工具另报一次，就是同一事实的第二份定义，漏报的工具会把外来内容当成内生数据放进来。
+- **为什么是一个函数**：外来内容在 run 里要过的每一道手续（今天是标 taint，之后是密钥托管的入站扫描）都挂在这同一处，第二个消费者改这一个函数，不另开入口。
+- **未定**：他楼文件（`read` 经 read bound 落进另一栋楼的路径）今天的 `Effect` 是 `Read`，这张表因此不标它；要标它，需要 `GateSubject::Path` 在 bench 里能判出「不在本楼」，证据是一条读他楼文件后 exec 被拒的 bench 测试。run 起点的 taint 仍由 sprawling 的 `Assignment.tainted: bool` 在 `workbench::tools::run_taint` 里翻成单一来源 `outside`；换成携带来源的 `TaintSet` 是下一阶段。
