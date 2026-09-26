@@ -58,14 +58,7 @@ fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
 #[test]
 fn a_claim_whose_landing_failed_is_handed_back() {
     use crate::assembly::fixture::*;
-    let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
-    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
-    std::fs::write(
-        dir.path().join("lab").join(city::ROADMAP_FILE),
-        PLAN_ONE_FREE_ROW,
-    )
-    .unwrap();
+    let dir = city_with_plan(PLAN_ONE_FREE_ROW);
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -88,24 +81,7 @@ fn a_claim_whose_landing_failed_is_handed_back() {
             completion("done", None),
         ],
     );
-    let fs = memory::FaultFs::new(memory::FaultPlan {
-        cut_at_op: None,
-        cut_on_write: Some("goal_registered"),
-        torn_tail: memory::TornTail::None,
-    });
-    let opened = memory::JsonlLedger::open_faulty(
-        fs,
-        &kernel::layout::CityLayout::new(dir.path()).ledger(),
-        now_ms().unwrap(),
-    )
-    .unwrap();
-    let worker = RunWorker::over(
-        dir.path(),
-        gateway::Custodian::in_memory(),
-        runtime::diagnostics::Diagnostics::off(),
-        opened,
-    )
-    .unwrap();
+    let worker = worker_over_faults(dir.path(), Some("goal_registered"));
     let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
     let landed = worker.handle(channels::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
@@ -240,28 +216,6 @@ fn city_with_plan(plan: &str) -> tempfile::TempDir {
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(dir.path().join("lab").join(city::ROADMAP_FILE), plan).unwrap();
     dir
-}
-
-/// A worker whose ledger loses the first append carrying `cut`.
-fn worker_over_faults(root: &std::path::Path, cut: Option<&'static str>) -> RunWorker {
-    let fs = memory::FaultFs::new(memory::FaultPlan {
-        cut_at_op: None,
-        cut_on_write: cut,
-        torn_tail: memory::TornTail::None,
-    });
-    let opened = memory::JsonlLedger::open_faulty(
-        fs,
-        &kernel::layout::CityLayout::new(root).ledger(),
-        now_ms().unwrap(),
-    )
-    .unwrap();
-    RunWorker::over(
-        root,
-        gateway::Custodian::in_memory(),
-        runtime::diagnostics::Diagnostics::off(),
-        opened,
-    )
-    .unwrap()
 }
 
 fn dispatch(key: &[u8]) -> channels::Command {

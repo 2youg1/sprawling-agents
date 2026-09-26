@@ -63,6 +63,29 @@ pub(super) fn attach_provider(
     Ok(worker)
 }
 
+/// A worker over a ledger that loses the first append carrying `cut`,
+/// and loses nothing when `cut` is `None`.
+pub(super) fn worker_over_faults(root: &Path, cut: Option<&'static str>) -> RunWorker {
+    let fs = memory::FaultFs::new(memory::FaultPlan {
+        cut_at_op: None,
+        cut_on_write: cut,
+        torn_tail: memory::TornTail::None,
+    });
+    let opened = memory::JsonlLedger::open_faulty(
+        fs,
+        &kernel::layout::CityLayout::new(root).ledger(),
+        now_ms().unwrap(),
+    )
+    .unwrap();
+    RunWorker::over(
+        root,
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+        opened,
+    )
+    .unwrap()
+}
+
 /// Every line the nodes of a workshop wrote, in order, with the kind of
 /// each - because a handdown that does not come back is a race in what
 /// the city asked for, and the kind of the line that ended a node is what

@@ -83,46 +83,12 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
     // not something a caller up here knows, and any number written
     // here would stop meaning this line the moment anything upstream
     // read one more file.
-    let fs = memory::FaultFs::new(memory::FaultPlan {
-        cut_at_op: None,
-        cut_on_write: Some("roadmap_claimed"),
-        torn_tail: memory::TornTail::None,
-    });
-    let opened = memory::JsonlLedger::open_faulty(
-        fs,
-        &kernel::layout::CityLayout::new(dir.path()).ledger(),
-        now_ms().unwrap(),
+    let mut worker = attach_provider(
+        worker_over_faults(dir.path(), Some("roadmap_claimed")),
+        &base_url,
+        "m-local",
     )
     .unwrap();
-    let mut worker = RunWorker::over(
-        dir.path(),
-        gateway::Custodian::in_memory(),
-        runtime::diagnostics::Diagnostics::off(),
-        opened,
-    )
-    .unwrap();
-    worker
-        .handle(channels::Command::AttachEndpoint {
-            name: channels::ProviderName::parse("house").unwrap(),
-            base_url,
-            dialect: kernel::DialectKind::OpenAi,
-            secret: None,
-            auth_header: None,
-            admit: Vec::new(),
-            tuning: channels::EndpointTuning::default(),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
-        })
-        .unwrap();
-    worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
-            model: "m-local".to_owned(),
-            tag: kernel::ModelTag::Main,
-            context_tokens: kernel::Window::new(32_768),
-            max_output_tokens: kernel::Ceiling::new(4_096),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
-        })
-        .unwrap();
 
     let outcome = worker.handle(channels::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
