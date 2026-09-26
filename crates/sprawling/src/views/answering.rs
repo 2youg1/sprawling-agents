@@ -23,15 +23,21 @@
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
+use std::collections::BTreeSet;
 use std::sync::Mutex;
 
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, UsdMicros};
 
 use super::holding::Views;
 use super::prepared::{Prepared, unavailable};
 
 mod history;
 use super::lines::{endpoints_answer, summarize};
+
+/// How many runs a cost view names besides every active one: a bound
+/// on the size of an answer on the wire, not a machine reading, so it is
+/// a constant (sprawling-SPEC section 8-90).
+pub(super) const TOP_BILLED: usize = 32;
 
 /// Answers one query from the views the fold shares with every reader,
 /// holding them only while [`Views::prepare`] copies out what the query
@@ -131,9 +137,16 @@ impl Views {
                     halted: self.governance.halted.iter().map(named).collect(),
                 })
             }
-            channels::Query::RunView { run } => {
-                channels::Answer::Run(self.hot.get(run).map(|hot| summarize(*run, hot)))
-            }
+            // An evicted run always has records in the Ledger, so a
+            // recall that cannot read them is "I could not look".
+            channels::Query::RunView { run } => match self.hot.get(run) {
+                Some(hot) => channels::Answer::Run(Some(summarize(*run, hot))),
+                None if self.hot.was_evicted(run) => match self.recalled(*run) {
+                    Some(summary) => channels::Answer::Run(Some(summary)),
+                    None => unavailable(format!("RunView({run})")),
+                },
+                None => channels::Answer::Run(None),
+            },
             channels::Query::ApprovalQueue => {
                 channels::Answer::Approvals(channels::ApprovalsAnswer {
                     items: self.governance.pending.values().cloned().collect(),
@@ -149,7 +162,7 @@ impl Views {
                 let report = self.attribution.report();
                 channels::Answer::Cost(Box::new(channels::CostAnswer {
                     total: report.total,
-                    by_run: report.by_run,
+                    by_run: top_billed(report.by_run, &self.active_names()),
                     by_actor: report.by_actor,
                     by_segment: report.by_segment,
                     by_tool: report.by_tool,
@@ -185,7 +198,10 @@ impl Views {
                 building,
                 before,
                 limit,
-            } => channels::Answer::Commits(self.commits_answer(building.as_ref(), *before, *limit)),
+            } => match self.commits_answer(building.as_ref(), *before, *limit) {
+                Some(page) => channels::Answer::Commits(page),
+                None => unavailable(format!("Commits({before:?})")),
+            },
             // Three readings answered here so a second client draws a
             // session without folding the ledger itself.
             channels::Query::Rounds { run } => {
@@ -194,7 +210,13 @@ impl Views {
             channels::Query::Evidence { run } => {
                 channels::Answer::Evidence(self.evidence_answer(*run))
             }
-            channels::Query::CostOf { node } => channels::Answer::CostOf(self.cost_of_answer(node)),
+            channels::Query::RunCosts { runs } => {
+                channels::Answer::RunCosts(self.run_costs_answer(runs))
+            }
+            channels::Query::CostOf { node } => match self.cost_of_answer(node) {
+                Some(answer) => channels::Answer::CostOf(answer),
+                None => unavailable(format!("CostOf({node})")),
+            },
             // The tree itself, one level and one file at a time.
             channels::Query::Listing { at } => {
                 return Prepared::Listing {
@@ -240,7 +262,10 @@ impl Views {
                 };
             }
             channels::Query::GitStatus { building } => {
-                return Prepared::GitStatus(self.git_status_ask(building));
+                match self.git_status_ask(building) {
+                    Some(ask) => return Prepared::GitStatus(ask),
+                    None => unavailable(format!("GitStatus({})", building.as_str())),
+                }
             }
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
@@ -293,6 +318,44 @@ impl Views {
 /// The ledger keeps `Scope` and its own spelling; a page is answered in
 /// the vocabulary it would use to ask, so nothing on the other side has
 /// to take a string apart to know which building it is looking at.
+/// The rows of a cost view's `by_run`: every run `active` names, and
+/// the [`TOP_BILLED`] other runs billed most (a tie goes to the lower
+/// name), in name order like the report they come from.
+///
+/// The cut is one `select_nth_unstable_by` over the other runs, so
+/// asking costs O(runs) and never sorts them all.
+fn top_billed(
+    by_run: Vec<(String, UsdMicros)>,
+    active: &BTreeSet<String>,
+) -> Vec<(String, UsdMicros)> {
+    let (mut shown, mut others): (Vec<_>, Vec<_>) = by_run
+        .into_iter()
+        .partition(|(run, _)| active.contains(run));
+    if let Some(last) = TOP_BILLED.checked_sub(1)
+        && others.len() > TOP_BILLED
+    {
+        others.select_nth_unstable_by(last, |(left, paid_left), (right, paid_right)| {
+            paid_right.cmp(paid_left).then_with(|| left.cmp(right))
+        });
+        others.truncate(TOP_BILLED);
+    }
+    shown.append(&mut others);
+    shown.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    shown
+}
+
+impl Views {
+    /// The active runs under the name the attribution keys them by,
+    /// their own display form.
+    fn active_names(&self) -> BTreeSet<String> {
+        self.hot
+            .runs()
+            .filter(|(_, hot)| hot.phase == memory::RunPhase::Active)
+            .map(|(run, _)| run.to_string())
+            .collect()
+    }
+}
+
 fn named(scope: &kernel::event::Scope) -> channels::HaltScope {
     match scope {
         kernel::event::Scope::City => channels::HaltScope::City,

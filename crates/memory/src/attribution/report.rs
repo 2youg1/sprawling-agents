@@ -156,6 +156,23 @@ impl Attribution {
         Ok(())
     }
 
+    /// What `run` was billed, when this fold holds a row for it: one
+    /// lookup rather than a whole `report()` per question.
+    pub fn billed_to(&self, run: &RunId) -> Option<UsdMicros> {
+        self.by_run
+            .get(&run.to_string())
+            .copied()
+            .map(UsdMicros::new)
+    }
+
+    /// Drops the `by_run` row of every run `keep` refuses. `total` and
+    /// the other four cuts keep the money, so they still sum to `total`
+    /// while `by_run` shrinks to the runs a caller still holds warm.
+    pub fn retain_runs(&mut self, keep: impl Fn(&RunId) -> bool) {
+        self.by_run
+            .retain(|name, _| RunId::parse(name).map_or(true, |run| keep(&run)));
+    }
+
     pub fn report(&self) -> AttributionReport {
         AttributionReport {
             total: UsdMicros::new(self.total),

@@ -41,8 +41,10 @@ pub(crate) struct GitStatusAsk {
 impl Views {
     /// The building's last fence and the city root, for a read of the
     /// working tree after the views are released.
-    pub(super) fn git_status_ask(&self, building: &Address) -> GitStatusAsk {
-        GitStatusAsk {
+    /// `None` when the newest fence's row cannot be read, which the
+    /// caller answers as `Unavailable`, as the commits column does.
+    pub(super) fn git_status_ask(&mut self, building: &Address) -> Option<GitStatusAsk> {
+        Some(GitStatusAsk {
             city_root: self.city_root.clone(),
             building: building.clone(),
             // The newest commit the city fenced at this building or
@@ -50,11 +52,11 @@ impl Views {
             // reads, so the row shown beside the changes is the row the
             // list opens with.
             checkpoint: self
-                .commits_answer(Some(building), None, 1)
+                .commits_answer(Some(building), None, 1)?
                 .commits
                 .into_iter()
                 .next(),
-        }
+        })
     }
 }
 

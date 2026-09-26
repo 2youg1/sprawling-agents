@@ -58,6 +58,7 @@ pub use index::Refreshed;
 mod hot;
 
 pub use hot::HotView;
+pub use hot::RECENT_FROZEN;
 pub use hot::RunHot;
 pub use hot::RunPhase;
 

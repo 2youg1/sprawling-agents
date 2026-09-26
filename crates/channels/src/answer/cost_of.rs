@@ -29,3 +29,20 @@ pub struct CostOfAnswer {
     /// One entry per run that claimed this node, in run order.
     pub runs: Vec<(RunId, UsdMicros)>,
 }
+
+/// How many runs one `Query::RunCosts` may name: a bound on the size of
+/// one answer on the wire, not a machine reading.
+pub const RUN_COSTS_MAX: usize = 64;
+
+/// What each run a `Query::RunCosts` named was billed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct RunCostsAnswer {
+    /// The runs the question named, echoed so a reader files the answer
+    /// under the question it asked.
+    pub asked: Vec<RunId>,
+    /// One row per run asked, in that order and cut at
+    /// [`RUN_COSTS_MAX`]. A run whose records could not be read has no
+    /// row: a missing row means "could not look", a zero "spent nothing".
+    pub runs: Vec<(RunId, UsdMicros)>,
+}

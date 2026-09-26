@@ -4,12 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The history readers: a bounded slice ending before a cursor, one
-//! named range with its endpoints echoed, and a run's own transcript.
+//! named range with its endpoints echoed, a run's own transcript, and
+//! the summary of a run the hot view evicted.
 
-use kernel::EventRecord;
+use kernel::{EventRecord, UsdMicros};
 
 use crate::assembly::ledger_dir;
 use crate::views::holding::Views;
+use crate::views::lines::summarize;
 
 impl Views {
     /// A bounded slice of the one history, ending just before `before`
@@ -186,5 +188,51 @@ impl Views {
             records.push(record);
         }
         channels::HistoryAnswer { records, earlier }
+    }
+
+    /// The summary of a run the hot view evicted, folded from that run's
+    /// own records in the Ledger through a `memory::HotView` holding it
+    /// alone, so the cold side maps a record to a row by the same rule
+    /// as the hot one (sprawling-SPEC section 8-90).
+    ///
+    /// `None` when the records cannot be read: an evicted run always has
+    /// some, so the caller answers that it could not look.
+    pub(in crate::views) fn recalled(
+        &mut self,
+        run: kernel::RunId,
+    ) -> Option<channels::RunSummary> {
+        let mut alone = memory::HotView::new();
+        self.fold_recalled(run, |record| alone.apply(record))?;
+        alone.get(&run).map(|hot| summarize(run, hot))
+    }
+
+    /// What a run the attribution no longer holds was billed, folded
+    /// from its own records through a `memory::Attribution` holding it
+    /// alone, so the cold side prices by the same rule as the hot one.
+    /// `None` when the records cannot be read.
+    pub(in crate::views) fn recalled_bill(&mut self, run: kernel::RunId) -> Option<UsdMicros> {
+        let mut alone = memory::Attribution::new();
+        self.fold_recalled(run, |record| alone.apply(record))?;
+        Some(alone.billed_to(&run).unwrap_or_default())
+    }
+
+    /// Folds every record `run` wrote, oldest first, through `apply`;
+    /// the index names them, so the work is the run's records alone.
+    /// `None` when a line cannot be read or `apply` refuses it.
+    fn fold_recalled(
+        &mut self,
+        run: kernel::RunId,
+        mut apply: impl FnMut(&EventRecord) -> Result<(), memory::MemoryError>,
+    ) -> Option<()> {
+        let dir = ledger_dir(&self.city_root);
+        self.index.refresh(&dir).ok()?;
+        let mut oldest_first: Vec<kernel::Seq> = self.index.run_seqs_before(run, None).collect();
+        oldest_first.reverse();
+        let mut reader = self.index.reader(&dir);
+        for seq in oldest_first {
+            let line = reader.line_at(seq).ok()?;
+            apply(&EventRecord::parse_line(&line).ok()?).ok()?;
+        }
+        Some(())
     }
 }

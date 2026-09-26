@@ -353,7 +353,7 @@ impl LineReader<'_> {
 ### 8-5 memory::hot（形状 7）
 
 ```rust
-pub struct HotView { /* runs: BTreeMap<RunId, RunHot>、counts —— 私有 */ }
+pub struct HotView { /* runs: BTreeMap<RunId, RunHot>、evicted: BTreeSet<RunId> —— 私有 */ }
 pub struct RunHot { pub phase: RunPhase, pub last_seq: Seq, pub last_kind: EventKind, pub who: String,
                     pub addr: Option<Address>, pub started: Option<TimeMs> }   // 房间与开始时刻
 pub enum RunPhase { Active, Frozen }
@@ -361,9 +361,15 @@ impl HotView {
     pub fn new() -> HotView;
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError>;   // 增量；重复 seq 幂等（只前进）
     pub fn runs(&self) -> impl Iterator<Item = (&RunId, &RunHot)>;              // BTreeMap 序
+    pub fn get(&self, run: &RunId) -> Option<&RunHot>;
+    pub fn was_evicted(&self, run: &RunId) -> bool;                            // 墓碑：这次跑冻结后被逐出
     pub fn active_count(&self) -> u64;  pub fn frozen_count(&self) -> u64;
 }
+pub const RECENT_FROZEN: usize = 32;
 ```
+
+- **热视图只留活跃的跑和最近冻结的 `RECENT_FROZEN` 个**：一次跑冻结后，若留着的冻结跑超过 `RECENT_FROZEN`，`last_seq` 最小的那个被逐出，只留一块墓碑（它的 RunId）。所以 `runs()` 本身就是一页城景该带的那几次跑，城景的大小只随活跃数增长，热视图的内存也一样（墓碑每次跑 16 字节）；更早的冻结跑经分页的 `History`／`RunHistory` 读，`frozen_count` 把墓碑也数进去，页面知道列表之外还有多少。每次冻结至多逐出一个，找最小 `last_seq` 扫一遍留着的跑，O(活跃＋N)，不另建按 seq 排的索引。`RECENT_FROZEN` 是线上答复的大小上界，不随机器变，所以是常量；它只在这里定义一次。
+- **落在墓碑上的记录归冷的一侧**：冻结在热视图里是终态，被逐出的跑不会再活跃，所以一条记录的 RunId 在墓碑里时，`apply` 什么也不改——那条记录在账本里，分页的历史读得到它。没有墓碑的话，一条没有开场的尾巴会被当成一次新跑的栅栏，把旧跑重新记成活跃的（活跃数多一，城景多一行）。
 
 - 界面查询在此命中不读盘；run_started→Active，run_frozen→Frozen；其余事件只推进 last_seq/last_kind。
 - **`addr` 与 `started` 从 `run_started` 记下**：`record.addr()` 是这次跑的房间，`record.t()` 是它开始的时刻；二者只在这一种记录上赋值，其余记录不动它们，所以一次跑的房间不会被后来的城市级记录改写。`Option`，因为热视图可能在 `run_started` 之前先看到同一次跑的 `checkpoint_committed`（栅栏先于开场落账），也可能只看到一段没有开场的尾巴——**看不到的事不猜**。理由：`RunSummary.who` 是首条记录的作者、恒为 `city`，单靠它无法把一次跑归到 `hall/mayor` 这个房间，「与 Mayor 的对话」就在线上拼不出来。

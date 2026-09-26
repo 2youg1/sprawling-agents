@@ -43,13 +43,14 @@ pub use answer::{ChangesAnswer, CommitAnswer, CommitsAnswer, HISTORY_MAX, Histor
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, EndpointSummary, EndpointsAnswer};
 pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
-pub use answer::{CostOfAnswer, EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
+pub use answer::{CostOfAnswer, EvidenceAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use answer::{Decision, GovernanceAnswer};
 pub use answer::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use answer::{DocumentAnswer, Entry, EntryKind, ListingAnswer};
+pub use answer::{EvidenceItem, EvidenceKind, Picture};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};

@@ -356,6 +356,16 @@ pub enum Query {
     Config {
         addr: Address,
     },
+    /// What each named run has been billed, for the runs a cost view's
+    /// `by_run` leaves out. At most
+    /// [`RUN_COSTS_MAX`](crate::RUN_COSTS_MAX) runs are answered per
+    /// question and the rest go unanswered, so a directory that names
+    /// its runs newest first shows the cost of the newest cold runs; the
+    /// money is folded from the Ledger for a run the city no longer
+    /// holds warm, so the cost is proportional to the runs asked about.
+    RunCosts {
+        runs: Vec<RunId>,
+    },
 }
 
 /// The Query surface, in declaration order — the order the handshake

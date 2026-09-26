@@ -89,41 +89,38 @@ impl super::holding::Views {
     /// `before` is exclusive; `limit` is clamped to the same ceiling as
     /// `History`. `more` says whether a further page exists, found by
     /// walking one commit past the page rather than by counting: the
-    /// filter makes the count meaningless.
+    /// filter makes the count meaningless. `None` when a row's run was
+    /// evicted and its records could not be read.
     pub(super) fn commits_answer(
-        &self,
+        &mut self,
         building: Option<&Address>,
         before: Option<Seq>,
         limit: u32,
-    ) -> channels::CommitsAnswer {
+    ) -> Option<channels::CommitsAnswer> {
         let want = usize::try_from(limit.clamp(1, channels::HISTORY_MAX)).unwrap_or(usize::MAX);
-        // One report for the whole page: it is a fold over every billed
-        // call, and asking it per row would walk that fold forty times
-        // to answer forty questions with the same numbers.
-        let billed = self.attribution.report();
-        let mut page = self
+        let mut rows = self
             .commit_seqs
             .range(..before.unwrap_or(Seq::new(u64::MAX)))
             .rev()
             .filter_map(|(_, oid)| self.commits.get(oid).map(|facts| (*oid, facts)))
             .filter(|(_, facts)| building.is_none_or(|at| facts.worked_under(at)))
             .take(want.saturating_add(1))
-            .map(|(oid, facts)| {
-                facts.answer(
-                    oid,
-                    self.lineage_of(facts.run),
-                    spent_by(&billed, facts.run),
-                )
-            })
+            .map(|(oid, facts)| (oid, facts.run))
             .collect::<Vec<_>>();
-        let more = page.len() > want;
-        page.truncate(want);
-        channels::CommitsAnswer {
+        let more = rows.len() > want;
+        rows.truncate(want);
+        let mut page = Vec::with_capacity(rows.len());
+        for (oid, run) in rows {
+            let spent = self.billed_to(run)?;
+            let facts = self.commits.get(&oid)?;
+            page.push(facts.answer(oid, self.lineage_of(run), spent));
+        }
+        Some(channels::CommitsAnswer {
             building: building.cloned(),
             before,
             commits: page,
             more,
-        }
+        })
     }
 
     /// Files which run a `run_started` says this one replaced, when it
@@ -142,16 +139,18 @@ impl super::holding::Views {
     /// A commit this city never wrote is `Unavailable`, for the reason
     /// `Changes` gives: "I did not write it" and "it changed nothing"
     /// are different answers, and a reader acts differently on each.
-    pub(super) fn commit_answer(&self, oid: GitOid) -> channels::Answer {
-        match self.commits.get(&oid) {
-            Some(facts) => channels::Answer::Commit(facts.answer(
-                oid,
-                self.lineage_of(facts.run),
-                spent_by(&self.attribution.report(), facts.run),
-            )),
-            None => channels::Answer::Unavailable {
-                query: format!("Commit({oid})"),
-            },
+    pub(super) fn commit_answer(&mut self, oid: GitOid) -> channels::Answer {
+        let unavailable = || channels::Answer::Unavailable {
+            query: format!("Commit({oid})"),
+        };
+        let Some(run) = self.commits.get(&oid).map(|facts| facts.run) else {
+            return unavailable();
+        };
+        match (self.billed_to(run), self.commits.get(&oid)) {
+            (Some(spent), Some(facts)) => {
+                channels::Answer::Commit(facts.answer(oid, self.lineage_of(run), spent))
+            }
+            (None, _) | (_, None) => unavailable(),
         }
     }
 
@@ -170,20 +169,6 @@ impl super::holding::Views {
         }
         chain
     }
-}
-
-/// What one run has been billed, out of a report already folded.
-///
-/// The attribution keys a run by its own display form, which is the
-/// one spelling the ledger and these records share. A run no priced
-/// call is attributed to has spent nothing, which is an answer.
-fn spent_by(billed: &memory::AttributionReport, run: RunId) -> UsdMicros {
-    let name = run.to_string();
-    billed
-        .by_run
-        .iter()
-        .find_map(|(held, usd)| (held == &name).then_some(*usd))
-        .unwrap_or_default()
 }
 
 /// The commit one record announced, if it announced one.
@@ -301,7 +286,7 @@ mod tests {
             views.fold_commit(&record);
         }
 
-        let lab = views.commits_answer(Some(&addr("lab")), None, 20);
+        let lab = views.commits_answer(Some(&addr("lab")), None, 20).unwrap();
         let seqs: Vec<u64> = lab.commits.iter().map(|c| c.seq.value()).collect();
         assert_eq!(
             seqs,
@@ -311,15 +296,17 @@ mod tests {
         assert!(!lab.more);
         assert_eq!(lab.building, Some(addr("lab")));
 
-        let first = views.commits_answer(Some(&addr("lab")), None, 1);
+        let first = views.commits_answer(Some(&addr("lab")), None, 1).unwrap();
         assert_eq!(first.commits.len(), 1);
         assert!(first.more, "one page held back is a page");
-        let next = views.commits_answer(Some(&addr("lab")), Some(Seq::new(8)), 1);
+        let next = views
+            .commits_answer(Some(&addr("lab")), Some(Seq::new(8)), 1)
+            .unwrap();
         assert_eq!(next.commits.first().map(|c| c.seq.value()), Some(3));
         assert!(!next.more);
         assert_eq!(next.before, Some(Seq::new(8)));
 
-        let hall = views.commits_answer(Some(&addr("hall")), None, 20);
+        let hall = views.commits_answer(Some(&addr("hall")), None, 20).unwrap();
         assert_eq!(hall.commits.len(), 1);
         assert_eq!(hall.commits.first().unwrap().actor.as_str(), "hall/mayor");
 
@@ -327,11 +314,12 @@ mod tests {
         assert!(
             views
                 .commits_answer(Some(&addr("la")), None, 20)
+                .unwrap()
                 .commits
                 .is_empty()
         );
 
-        let all = views.commits_answer(None, None, 20);
+        let all = views.commits_answer(None, None, 20).unwrap();
         assert_eq!(all.commits.len(), 3);
     }
 

@@ -47,6 +47,7 @@
   import { say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock, kib, usd } from "../../core/time";
+  import { readable } from "svelte/store";
   import { ui } from "../../ui";
   import { Address as AddressSchema, type Query } from "../../wire";
   import EmptyState from "../parts/empty.svelte";
@@ -72,17 +73,36 @@
   const entries = $derived(read.kind === "held" ? read.value : undefined);
 
   const cost = u.conn.asking.ask(QUERIES.cost);
-  function spent(run: string): number | null {
-    const held = $cost;
-    if (held === undefined || !("cost" in held)) return null;
-    return held.cost.by_run.find(([name]) => name === run)?.[1] ?? null;
-  }
 
   const runs = $derived(
     Object.values($belief.runs)
       .filter((run) => run.addr === at)
       .sort((left, right) => (right.started ?? 0) - (left.started ?? 0)),
   );
+
+  // The cost view names the active runs and the few billed most; the
+  // rest of this building's runs are asked for by name, newest first,
+  // in one question, and the server answers only the newest
+  // RUN_COSTS_MAX of them; older cold runs show no figure.
+  const cold = $derived.by(() => {
+    const held = $cost;
+    if (held === undefined || !("cost" in held)) return [];
+    const warm = new Set(held.cost.by_run.map(([name]) => name));
+    return runs.map((run) => run.run).filter((run) => !warm.has(run));
+  });
+  const coldCost = $derived(
+    cold.length === 0 ? readable(undefined) : u.conn.asking.ask({ run_costs: { runs: cold } }),
+  );
+
+  function spent(run: string): number | null {
+    const held = $cost;
+    if (held === undefined || !("cost" in held)) return null;
+    const warm = held.cost.by_run.find(([name]) => name === run)?.[1];
+    if (warm !== undefined) return warm;
+    const asked = $coldCost;
+    if (asked === undefined || !("run_costs" in asked)) return null;
+    return asked.run_costs.runs.find(([name]) => name === run)?.[1] ?? null;
+  }
 
   function posture(doing: Doing): string {
     switch (doing.kind) {

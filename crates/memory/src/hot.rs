@@ -12,7 +12,7 @@
 //! lets a caller replay from any point without first proving where it
 //! left off.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::{Address, EventKind, EventRecord, RunId, Seq, TimeMs};
 
@@ -41,9 +41,19 @@ pub struct RunHot {
     pub started: Option<TimeMs>,
 }
 
+/// How many frozen runs the hot view holds besides every active one,
+/// and so how many a city view carries. A bound on the size of an
+/// answer on the wire, not a machine reading, so it is a constant
+/// (memory-SPEC section 8-5).
+pub const RECENT_FROZEN: usize = 32;
+
 #[derive(Default)]
 pub struct HotView {
     runs: BTreeMap<RunId, RunHot>,
+    /// Frozen runs pushed out of `runs`, by id alone. Freezing is
+    /// terminal, so a later record on one of these is the tail of an old
+    /// run, never the fence of a new one.
+    evicted: BTreeSet<RunId>,
 }
 
 impl HotView {
@@ -61,7 +71,7 @@ impl HotView {
         // city-level records"). Admitting one here invented a run nobody
         // started, and the count it fed said a city was working the
         // moment it existed.
-        if run == RunId::CITY {
+        if run == RunId::CITY || self.evicted.contains(&run) {
             return Ok(());
         }
         let seq = record.seq();
@@ -101,11 +111,38 @@ impl HotView {
                 );
             }
         }
+        if kind == EventKind::RunFrozen {
+            self.evict_the_oldest_frozen_beyond_recent();
+        }
         Ok(())
     }
 
-    /// Iteration is in RunId order — the same order on every process,
-    /// so a rendered list never reshuffles between restarts.
+    /// Keeps at most [`RECENT_FROZEN`] frozen runs, tombstoning the one
+    /// with the lowest `last_seq`. One freeze adds one frozen run, so one
+    /// eviction restores the bound; the scan is O(active + RECENT_FROZEN).
+    fn evict_the_oldest_frozen_beyond_recent(&mut self) {
+        let frozen = || {
+            self.runs
+                .iter()
+                .filter(|(_, hot)| hot.phase == RunPhase::Frozen)
+        };
+        if frozen().count() <= RECENT_FROZEN {
+            return;
+        }
+        let Some(oldest) = frozen()
+            .min_by_key(|(_, hot)| hot.last_seq)
+            .map(|(run, _)| *run)
+        else {
+            return;
+        };
+        self.runs.remove(&oldest);
+        self.evicted.insert(oldest);
+    }
+
+    /// Every active run and the [`RECENT_FROZEN`] frozen runs with the
+    /// latest `last_seq`: what a city view carries. Iteration is in RunId
+    /// order — the same order on every process, so a rendered list never
+    /// reshuffles between restarts.
     pub fn runs(&self) -> impl Iterator<Item = (&RunId, &RunHot)> {
         self.runs.iter()
     }
@@ -114,12 +151,19 @@ impl HotView {
         self.runs.get(run)
     }
 
+    /// Whether `run` froze and was pushed out of the view. Its records
+    /// are still in the Ledger; a reader that needs them goes there.
+    pub fn was_evicted(&self, run: &RunId) -> bool {
+        self.evicted.contains(run)
+    }
+
     pub fn active_count(&self) -> u64 {
         self.count_phase(RunPhase::Active)
     }
 
     pub fn frozen_count(&self) -> u64 {
-        self.count_phase(RunPhase::Frozen)
+        let evicted = u64::try_from(self.evicted.len()).unwrap_or(u64::MAX);
+        self.count_phase(RunPhase::Frozen).saturating_add(evicted)
     }
 
     fn count_phase(&self, phase: RunPhase) -> u64 {
@@ -224,6 +268,31 @@ mod tests {
         .unwrap();
         assert_eq!(view.get(&run).unwrap().addr, Some(room));
         assert_eq!(view.get(&run).unwrap().started, Some(TimeMs::new(1_700)));
+    }
+
+    /// A city that ran thousands of times held a row for every run it
+    /// ever froze; only the active runs and the recent few stay, and a
+    /// late record on an evicted run is its tail, not a new run's fence.
+    #[test]
+    fn frozen_runs_beyond_the_recent_few_leave_a_tombstone() {
+        let mut view = HotView::new();
+        let recent = u64::try_from(RECENT_FROZEN).unwrap();
+        let run_of = |i: u64| RunId::from_bytes(u128::from(i + 1).to_be_bytes());
+        for i in 0..=recent {
+            view.apply(&record(run_of(i), 2 * i, EventKind::RunStarted))
+                .unwrap();
+            view.apply(&record(run_of(i), 2 * i + 1, EventKind::RunFrozen))
+                .unwrap();
+        }
+        let tail = 2 * recent + 2;
+        view.apply(&record(run_of(0), tail, EventKind::CheckpointCommitted))
+            .unwrap();
+        let held: Vec<RunId> = view.runs().map(|(run, _)| *run).collect();
+        let newest: Vec<RunId> = (1..=recent).map(run_of).collect();
+        assert_eq!(
+            (held, view.active_count(), view.frozen_count()),
+            (newest, 0, recent + 1)
+        );
     }
 
     #[test]
