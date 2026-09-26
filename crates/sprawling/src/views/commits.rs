@@ -141,18 +141,16 @@ impl super::holding::Views {
     /// `Changes` gives: "I did not write it" and "it changed nothing"
     /// are different answers, and a reader acts differently on each.
     pub(super) fn commit_answer(&self, oid: GitOid) -> channels::Answer {
-        let unavailable = || channels::Answer::Unavailable {
-            query: format!("Commit({oid})"),
-        };
-        let Some(run) = self.commits.get(&oid).map(|facts| facts.run) else {
-            return unavailable();
-        };
-        match (self.billed_to(run), self.commits.get(&oid)) {
-            (Some(spent), Some(facts)) => {
-                channels::Answer::Commit(facts.answer(oid, self.lineage_of(run), spent))
-            }
-            (None, _) | (_, None) => unavailable(),
-        }
+        self.commits
+            .get(&oid)
+            .and_then(|facts| {
+                self.billed_to(facts.run).map(|spent| {
+                    channels::Answer::Commit(facts.answer(oid, self.lineage_of(facts.run), spent))
+                })
+            })
+            .unwrap_or_else(|| channels::Answer::Unavailable {
+                query: format!("Commit({oid})"),
+            })
     }
 
     /// The run and every predecessor behind it, nearest first. A chain

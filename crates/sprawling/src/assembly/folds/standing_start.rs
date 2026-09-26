@@ -16,8 +16,10 @@ use super::{Entrance, Expiries, Governance, SessionOrigins, Standing};
 use crate::views::snapshot::start::SnapshotFold;
 
 /// Changed whenever a standing fold rule or the encoding of
-/// [`StandingFolds`] changes within one version of this binary.
-const STANDING_FOLD_RULES: &str = "standing-fold-1";
+/// [`StandingFolds`] changes within one version of this binary. The
+/// suffix is the digest of a fixed fixture's encoding, which the tests
+/// beside this file hold, so the encoding cannot move alone.
+const STANDING_FOLD_RULES: &str = "standing-fold-683928ce40929932";
 
 /// The six folds of [`Standing`] after the last line they read, before
 /// the collaboration fold settles: a tail folded on after a snapshot
