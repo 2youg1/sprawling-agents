@@ -115,6 +115,30 @@ fn an_answer_finds_its_own_call_and_not_the_nearest_one() {
 }
 
 #[test]
+fn a_call_carries_the_ledger_times_it_was_called_and_answered() {
+    // The records' clock is their sequence number, so the call at 3 that
+    // answers at 5 reads as 3..5, and the one never answered has no end.
+    let events = [
+        asked(1),
+        called(3, "a", "read", "x"),
+        called(4, "b", "exec", "cargo build"),
+        answered(5, "a"),
+    ];
+    let times: Vec<_> = turns(&events)[0]
+        .calls
+        .iter()
+        .map(|call| (call.called, call.answered))
+        .collect();
+    assert_eq!(
+        times,
+        [
+            (TimeMs::new(3), Some(TimeMs::new(5))),
+            (TimeMs::new(4), None)
+        ]
+    );
+}
+
+#[test]
 fn a_call_still_running_says_so_rather_than_looking_finished() {
     let events = [asked(1), called(2, "a", "exec", "cargo build")];
     assert_eq!(turns(&events)[0].calls[0].outcome, Outcome::Waiting);

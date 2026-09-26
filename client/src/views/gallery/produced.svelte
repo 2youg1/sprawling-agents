@@ -41,7 +41,8 @@
     subject: string | null,
     output: Output | null,
   ): Call {
-    return { at: Seq.make(at), outcome: "answered", output, subject, tool };
+    const t = TimeMs.make(at);
+    return { at: Seq.make(at), outcome: "answered", output, subject, tool, called: t, answered: t };
   }
 
   // The turn one fixture's calls live in, carrying those same calls:
