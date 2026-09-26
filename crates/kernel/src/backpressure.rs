@@ -25,6 +25,9 @@ pub struct ItemMeta {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShedReason {
     CapacityExhausted,
+    /// The city's volume is below its free-space floor; decided only by
+    /// `degradation::admit_work`.
+    DiskLow,
 }
 
 /// Deliberately exhaustive: a new admission outcome must force every

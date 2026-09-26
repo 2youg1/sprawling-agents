@@ -778,7 +778,7 @@ pub struct BudgetUse { pub usd: UsdMicros, pub tokens: Tokens }    // serde（Pr
 ```rust
 pub struct QueueStats { pub depth: u64, pub capacity: u64 }
 pub struct ItemMeta { pub cost: u64 }        // 槽位数：Signal＝1，受理新 Run 的 fd 预留可 >1
-pub enum ShedReason { CapacityExhausted }
+pub enum ShedReason { CapacityExhausted, DiskLow }
 pub enum Admission { Admit, Shed { reason: ShedReason } }
 /// Decides whether the queue admits one more item. Pure and total:
 /// depth + cost ≤ capacity admits; checked arithmetic, overflow sheds.
@@ -788,6 +788,51 @@ pub fn admit(stats: &QueueStats, item: &ItemMeta) -> Admission;
 - 削峰是 city-wide 准入姿态：同一函数服务 Signal 队列与 fd 预留（capacity 语义由调用方赋）；队列与计数器住 memory::queue（S3）与调用方。
 - kani：全函数无溢出；单调性——同 capacity/cost 下 depth 更小恒不更难 Admit。
 - 饱饱不饿死（活性）属 citysim liveness（P2），非本函数可证。
+- `DiskLow` 只由 `degradation::admit_work` 给出（8-74）：剩余空间低于地板时停止接新活，已在跑的活不受影响。
+
+### 8-74 kernel::degradation（形状 1 判定）
+
+资源成为瓶颈时，harness 如实说出慢在哪里。本模块只判定：读数由调用方采（S5.9N 的性能监视器是唯一采样点），显示由事实条与 doctor 做；这里给出每种降级的类型、它的依据与恢复办法，以及剩余空间不够时是否还接新活。
+
+```rust
+pub struct ResourceReadings {
+    pub durable_lag: Duration,     // 最早一条已追加未落盘的事件等了多久（持久水位线落后多少）
+    pub commit_floor: Duration,    // 本卷实测的 fsync 中位数：该步的物理下限
+    pub free_bytes: u64,           // 城所在卷的剩余空间
+    pub volume_bytes: u64,         // 城所在卷的总容量
+    pub queued_runs: u32,          // 因可用内存不够而排队的 run 数
+    pub schedule_delay: Duration,  // 记账线程从被唤醒到真正运行的中位延迟
+}
+pub enum Degradation {
+    DiskSlow { durable_lag: Duration, commit_floor: Duration },
+    DiskLow { free_bytes: u64, floor_bytes: u64 },
+    MemoryTight { queued_runs: u32 },
+    CpuSaturated { schedule_delay: Duration },
+}
+pub enum Recovery {
+    ReduceDiskLoad,
+    FreeDiskSpace { at_least_bytes: u64 },
+    FreeMemory,
+    ReduceCpuLoad,
+}
+impl Degradation { pub fn recovery(&self) -> Recovery; }
+/// Every degradation the readings show, in the order DiskSlow, DiskLow,
+/// MemoryTight, CpuSaturated; no allocation.
+pub fn assess(readings: &ResourceReadings) -> impl Iterator<Item = Degradation>;
+/// Whether the city takes on new work: DiskLow sheds, every other state admits.
+pub fn admit_work(readings: &ResourceReadings) -> Admission;
+/// The free-space floor this volume derives: a share of its size, clamped.
+pub fn free_space_floor(volume_bytes: u64) -> u64;
+```
+
+- 依据即变体字段：每种降级带着判定它的读数，显示面不再回头读第二份。恢复办法是类型，措辞在 `client/src/lang.json`。
+- 盘慢：`durable_lag` 同时超过 `commit_floor × DISK_SLOW_FACTOR` 与 `DISK_SLOW_MIN`。前者随设备走（旋转盘的 fsync 本来就慢，不算降级），后者挡住快盘上的微秒级抖动。
+- 盘快满：`free_bytes < free_space_floor(volume_bytes)`；地板取卷容量的 `1 / FREE_SPACE_FLOOR_DIVISOR`，夹在 `FREE_SPACE_FLOOR_MIN` 与 `FREE_SPACE_FLOOR_MAX` 之间。恢复办法给出回到地板以上至少要腾出的字节数。
+- 内存紧：`queued_runs > 0`。排队本身就是 S5.9L 的内存闸门给出的，这里只把它说出来。
+- CPU 被占满：`schedule_delay > CPU_SATURATED_DELAY`，即一帧（60 Hz）——人开始看得见的延迟；它是感知常数，不随机器类别调。
+- 只有盘快满停止接新活：盘慢与 CPU 满时接活只会变慢，不会丢；内存紧已由排队处理。停止接新活用 `backpressure::Admission`，不另立一套准入。
+- 写盘失败时账本不坏、重启可恢复，由 memory 的 `fault_fs` 注入测试与 jsonl 的撕裂尾恢复承担（torn tail 截到最长有效前缀）；本模块不复述。
+- 未落地：事实条与 doctor 的显示，读数接入 S5.9N 的采样点，停止接新活接到受理新 run 的入口。
 
 ### 8-14 kernel::stall
 
@@ -1613,6 +1658,16 @@ S2 激活的码（逐码答「能否定义掉」）：
 **被否**：①把策略常量与门拆成 `kernel-policy`——多一个 crate、多一份 SPEC 与 API 基线、多一条 `depmap` 边，换来的是关键路径之外几个 crate 的重编；②按 `error`／`event` 拆出底层 crate——它们被全部下游引用，改它们照样全量重编，拆了只是多一层。
 
 **重开参数**：任一条成立即重开——①某个高频修改的 kernel 模块的引用者降到 kernel 依赖者的一半以下，且省下的 crate 里有 runtime 或 sprawling；②`cargo build --workspace --timings` 显示，改一个策略模块后被省下的那批 crate 占增量重编时间 10% 以上；③kernel 单 crate 的重编时间超过一次策略改动增量重编总时间的一半。
+
+### 12.5 定规：降级的线相对于设备，停止接新活只借 backpressure 的准入
+
+**决定**：`degradation` 的「盘慢」线取本卷实测 fsync 的倍数（另设不闪烁的下限），「盘快满」的地板取卷容量的一份再夹住上下界，「CPU 被占满」取一帧；只有「盘快满」停止接新活，停止时返回 `backpressure::Admission::Shed { reason: DiskLow }`。
+
+**理由**：harness 要在十年前的旋转盘和服务器上都说真话。固定毫秒数的盘慢线会让旋转盘永远处于降级、让 NVMe 永远不降级；固定字节数的地板对小卷太贪、对大卷太松。CPU 的线是人的感知常数，与机器类别无关。准入只有一个家：另立一套「接不接新活」会和 `admit` 各自演化。盘慢、CPU 满、内存紧都只让活变慢或排队，不丢数据，所以不拒绝；盘满继续接活会让下一次写盘失败。
+
+**被否**：①每种降级各自决定是否拒活——内存紧已由 S5.9L 的排队处理，再拒一次是同一决定两个家；②固定阈值——违背「不把常数调成某一类机器」。
+
+**重开参数**：实测显示某一类设备上 `DISK_SLOW_FACTOR` 让盘慢状态在无外部负载时出现，或地板不足以写下一次快照。
 
 ## 13 依赖选型
 
