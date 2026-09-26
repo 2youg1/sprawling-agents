@@ -159,7 +159,7 @@ pub struct WorkshopDesk { /* who、laid_out: Option<Workshop>、joined: FanIn �
 impl WorkshopDesk {
     pub fn new(who: String, joined: FanIn) -> WorkshopDesk;
     pub fn lay_out(&mut self, contracts: Vec<NodeContract>, delegates: &mut DelegateDesk)
-        -> Result<Vec<NodeId>, AxError>;         // 按 schedule 序逐个走派生台
+        -> Result<Vec<NodeId>, AxError>;         // 只派 ready(已汇合的节点) 那一组，按 id 序
     pub fn question(&self) -> Result<PrivateQuestion, AxError>;
     pub fn judge(&self, answer: &str) -> Result<Joined, AxError>;
     pub fn accept(&mut self, artifact: Artifact);
@@ -170,7 +170,9 @@ pub struct WorkshopTool { /* 模型那一面：op ∈ {lay_out, question, judge}
 - **workshop 是派生的扇出，不是第二条派生通路**：每个节点都过 `DelegateDesk::ask`，故一层深与人的准入两道门是同一段代码。工具的 `Effect` 也是 `Spawn`——摆一张图与派一个人，对人来说是同一个问题。
 - **节点的 `JOB.md` 就是契约本身**（`NodeContract::job_text`），不写摘要：摘要即第二个权威。
 - **节点 id 就是它的房间地址**，与 `Handback::node()` 同一取法；于是一个节点的身份只有一处。
-- **图先自证可跑，再交出去**：`Workshop::new` 在构造点拒重名／悬空依赖／环，故「半张图已派出去、剩下的没人起」这种状态拼不出来。
+- **图先自证可跑，再交出去**：`Workshop::new` 在构造点拒重名／悬空依赖／环，故一张图若有节点没派出去，原因只能是它的依赖还没汇合，不会是图本身跑不完。
+- **只派就绪集，`depends_on` 在运行时生效**：`lay_out` 交给派生台的是 `Workshop::ready(done)`，`done` 是这个房间的 join 已收下 Artifact 的节点。一个依赖未汇合的节点若也立刻派出，它读到的是还不存在的产出。工具的回答里 `schedule` 是整张图的序，`handed` 是这次真正派出去的那一组，其余节点在 `waiting` 里。
+- **下一组就绪集怎么派出去（当前状态）**：图只活在一个 Run 的 `WorkshopDesk` 里，装配层没有按房间保存它；依赖的 handback 到达后，由这个房间后来的某个 Run 再摆一次同一张图，join 已收下的节点被跳过，新就绪的节点被派出。未决的是：已派出、尚未 handback 的节点在再摆时会被再派一次，因为桌子不知道它在飞；把图与「已派集」按房间和 join 一起保存、在 handback 到达时派下一组，可以同时消掉再摆与重派。
 - **一个 Run 一张图**：第二次 `lay_out` 即拒，因为一个 session 里两张图是「这次在造什么」的两个答案。
 - **join 属房间而不属 Run**：子在父冻结之后才开，故 `FanIn` 由装配层按房间保存（`RunWorker.joins`），并与 inbox 折自同一批 `signal_enqueued` 行。`judge` 的围栏一字未改：答不出 digest 前八位即拒，且拒词恒不回显答案。
 

@@ -49,31 +49,64 @@ fn node(room: &str, depends_on: &[&str]) -> Value {
     })
 }
 
-#[test]
-fn a_graph_is_handed_down_in_dependency_order_and_each_node_carries_its_contract() {
-    let (mut tool, _desk, delegates) = tool();
-    let outcome = tool
-        .invoke(&lay_out(serde_json::json!([
-            node("lab/writer", &["lab/reader"]),
-            node("lab/reader", &[]),
-        ])))
-        .unwrap();
-    let schedule: Vec<&str> = outcome.result.as_map()["schedule"]
+fn names(outcome: &ToolOutcome, field: &str) -> Vec<String> {
+    outcome.result.as_map()[field]
         .as_array()
         .unwrap()
         .iter()
-        .map(|v| v.as_str().unwrap())
-        .collect();
-    assert_eq!(schedule, ["lab/reader", "lab/writer"]);
+        .map(|v| v.as_str().unwrap().to_owned())
+        .collect()
+}
 
+fn joined(room: &str) -> Artifact {
+    let digest = B3Hash::digest(room.as_bytes());
+    Claim::new(
+        NodeId::parse(room).unwrap(),
+        Locator::parse(&format!("cas:b3-{digest}")).unwrap(),
+        digest,
+        room.to_owned(),
+    )
+    .verified(true, "city")
+    .unwrap()
+}
+
+/// A node whose dependency has not joined would read an output that
+/// does not exist yet, so it waits; the schedule still names the whole
+/// graph.
+#[test]
+fn only_the_nodes_whose_dependencies_have_joined_are_handed_down() {
+    let (mut first, _desk, delegates) = tool();
+    let graph = serde_json::json!([
+        node("lab/writer", &["lab/reader"]),
+        node("lab/reader", &[]),
+    ]);
+    let outcome = first.invoke(&lay_out(graph.clone())).unwrap();
     let handed = delegates.lock().unwrap().take();
-    assert_eq!(handed.len(), 2);
-    assert_eq!(handed[0].room.as_str(), "lab/reader");
+    let rooms: Vec<&str> = handed.iter().map(|work| work.room.as_str()).collect();
+    assert_eq!(rooms, ["lab/reader"]);
+    assert_eq!(names(&outcome, "schedule"), ["lab/reader", "lab/writer"]);
+    assert_eq!(names(&outcome, "handed"), ["lab/reader"]);
+    assert_eq!(names(&outcome, "waiting"), ["lab/writer"]);
     assert!(
         handed[0].task.contains("## Done check"),
         "the node's job file is its contract, not a summary of it: {}",
         handed[0].task
     );
+
+    // A later run of the room, once the reader has handed back, lays the
+    // same graph out and hands down the writer alone.
+    let (mut later, desk, delegates) = tool();
+    desk.lock().unwrap().accept(joined("lab/reader"));
+    let outcome = later.invoke(&lay_out(graph)).unwrap();
+    assert_eq!(names(&outcome, "handed"), ["lab/writer"]);
+    let rooms: Vec<String> = delegates
+        .lock()
+        .unwrap()
+        .take()
+        .iter()
+        .map(|work| work.room.as_str().to_owned())
+        .collect();
+    assert_eq!(rooms, ["lab/writer"]);
 }
 
 /// The graph refuses itself before anything is handed down, so a
