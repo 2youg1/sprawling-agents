@@ -33,8 +33,9 @@ export type RunSpend =
   | { readonly kind: "spent"; readonly micros: number };
 
 export function runSpend(read: Answered<CostAnswer>, run: RunId | null): RunSpend {
+  if (run === null) return { kind: "none" };
   if (read.kind === "unavailable") return { kind: "unreadable" };
-  if (run === null || read.kind === "asking") return { kind: "none" };
+  if (read.kind === "asking") return { kind: "none" };
   if (costReading(read.value).kind === "unpriced") return { kind: "unpriced" };
   const found = read.value.by_run.find(([name]) => name === run);
   return { kind: "spent", micros: found === undefined ? 0 : found[1] };
