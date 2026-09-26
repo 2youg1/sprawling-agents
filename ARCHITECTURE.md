@@ -163,7 +163,7 @@ collab: kernel, memory
 city: kernel
 eval: kernel, memory
 browser: kernel
-protocol: kernel
+protocol: kernel, gateway
 channels: kernel
 sprawling: kernel, memory, gateway, runtime, collab, city, eval, browser, protocol, channels
 ```
@@ -188,7 +188,9 @@ repository readable:
 | Event | anywhere a `kernel::Ledger` handle is held | writing `tool_result` after a tool runs |
 
 Below the binary no crate depends on more than two others: `runtime` and
-`collab` each use `kernel` and `memory`, and `sprawling` is the only crate
+`collab` each use `kernel` and `memory`, `protocol` uses `kernel` and
+`gateway` (an MCP server reached over HTTP gets its client from
+`gateway::client_for`, the one place a client is built), and `sprawling` is the only crate
 that depends on most of the workspace. The `depmap` block above also lets `runtime` use
 `gateway`, and the code does not take that edge yet. A crate may **use**
 the interfaces of what it depends on and nothing more; the moment a
