@@ -16,7 +16,7 @@ import { heldIn } from "../../core/belief/rooms";
 import { EFFORTS, MODES, openSession, selectModel } from "../../core/commands";
 import type { PreferenceDoor } from "../../core/prefs";
 import type { Key, Lang } from "../../core/lang";
-import { say } from "../../core/lang";
+import { fill, say } from "../../core/lang";
 import { MAYOR } from "../../core/route";
 import { UNSTATED, offered, parse } from "../../core/slash";
 import { reached } from "../../core/slash_hands";
@@ -180,6 +180,17 @@ export function effortLevel(value: string): Effort | null {
   return EFFORTS.find((known) => known === value) ?? null;
 }
 
+// What sending to a room means, in one line: the Mayor's own room, a
+// bare building (a dispatch there opens a room of its own, client-SPEC
+// 12-6), or a room that carries on a conversation.
+function roomNote(lang: Lang, room: string): string {
+  if (room === MAYOR) return say(lang, "talk_room_note_mayor");
+  const slash = room.indexOf("/");
+  return slash < 0
+    ? say(lang, "talk_room_note_building")
+    : fill(say(lang, "talk_room_note_room"), { building: room.slice(0, slash) });
+}
+
 // The room a pill names, in the address spelling the wire brands.
 export function decodeRoom(value: string): Address | null {
   return Option.getOrNull(Schema.decodeOption(Address)(value));
@@ -284,7 +295,7 @@ export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill,
     {
       label: say(lang, "talk_column_workspace"),
       placeholder: say(lang, "talk_column_workspace"),
-      choices: around.rooms.map((room) => ({ value: room, label: room })),
+      choices: around.rooms.map((room) => ({ value: room, label: room, note: roomNote(lang, room) })),
       value: around.here,
       pick: picks.workspace,
     },

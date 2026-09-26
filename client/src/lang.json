@@ -2639,6 +2639,18 @@
     "en": "no run yet",
     "zh": "还没有 run"
   },
+  "talk_room_note_mayor": {
+    "en": "the Mayor: plans the city and hands out work",
+    "zh": "市长：给整座城做计划、派活"
+  },
+  "talk_room_note_building": {
+    "en": "the building itself: a message opens a new room in it",
+    "zh": "这栋楼本身：消息会在楼里开一个新房间"
+  },
+  "talk_room_note_room": {
+    "en": "a room in {building}: carries on the conversation there",
+    "zh": "{building} 楼里的一个房间：接着那里的对话说"
+  },
   "talk_empty_mayor": {
     "en": "the Mayor",
     "zh": "市长室"
