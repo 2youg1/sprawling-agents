@@ -228,4 +228,17 @@ describe("the browser half", () => {
       sent: [JSON.stringify({ command: words })],
     });
   });
+  // A refused link reaches no welcome until the person acts, and the
+  // only lever some refusals offer is a reload, which drops the queue:
+  // so the words are not taken, and the composer keeps the draft.
+  test("refuses to hold words while the link is refused", () => {
+    install();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    FakeSocket.opened[0]?.onopen?.();
+    FakeSocket.opened[0]?.onmessage?.({ data: "{\"welcome\":" });
+    const accepted = conn.command(steer(RunId.make("00000000-0000-4000-8000-000000000001"), "and the tests"));
+
+    expect({ state: get(conn.state).kind, accepted, held: get(conn.unsent) })
+      .toEqual({ state: "refused", accepted: false, held: 0 });
+  });
 });

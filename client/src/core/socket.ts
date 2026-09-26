@@ -380,7 +380,7 @@ export function openConnection(
     unsent: unsent.count,
     command(command) {
       if (isLive(link)) return sendText(encodeFrame({ command }));
-      if (!isSpeech(command)) return false;
+      if (isRefused(link) || !isSpeech(command)) return false;
       unsent.hold(command);
       return true;
     },
