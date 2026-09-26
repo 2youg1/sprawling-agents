@@ -34,10 +34,7 @@ fn a_reading_is_a_json_line_or_a_redrawn_screen_and_nothing_else_shows() {
     let line = shown(&first_text, &mut history, Output::Lines, 8);
     let redrawn = shown(&second_text, &mut history, Output::Screen, 8);
 
-    let expected_screen = format!(
-        "\u{1b}[H\u{1b}[2J{}\n",
-        screen(&[first, second], 8)
-    );
+    let expected_screen = format!("\u{1b}[H\u{1b}[2J{}\n", screen(&[first, second], 8));
     assert_eq!(
         (other, kept_after_other, line, redrawn),
         (

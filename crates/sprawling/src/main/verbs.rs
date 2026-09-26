@@ -19,6 +19,7 @@ pub(super) enum Verb {
     Serve,
     Resume,
     Call,
+    Top,
     Enrol,
     Whose,
     Fork,
@@ -166,6 +167,15 @@ pub(super) const VERBS: &[Row] = &[
         ],
         says: "send one wire frame, print every frame back",
         effect: Effect::Changes,
+    },
+    Row {
+        verb: Verb::Top,
+        name: "top",
+        aliases: &[],
+        positionals: &[],
+        flags: &[AT, flag("--token", Value("token"), "the pairing token")],
+        says: "watch a city's monitor: a screen on a terminal, a JSON line a second otherwise",
+        effect: Effect::ReadsOnly,
     },
     Row {
         verb: Verb::Enrol,

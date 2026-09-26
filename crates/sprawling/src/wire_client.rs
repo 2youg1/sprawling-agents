@@ -33,6 +33,7 @@ mod watching;
 
 use ending::{Ending, Reply};
 pub(crate) use enrolment::{enrol, split_reference};
+pub(crate) use watching::{Output, top};
 
 /// What came back before the city went quiet.
 pub(crate) struct Heard {
