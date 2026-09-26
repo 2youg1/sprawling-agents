@@ -16,6 +16,7 @@ impl city::Neighbourhood
 impl city::NeighboursTool
 impl city::PlannedInstall
 impl city::Resident
+impl city::RulesCache
 impl city::RulesTool
 impl city::RunBrief
 impl city::Schedule
@@ -203,6 +204,8 @@ pub fn city::PlannedInstall::hash(&self) -> &kernel::locator::B3Hash
 pub fn city::PlannedInstall::name(&self) -> &str
 pub fn city::Resident::addr(&self) -> &kernel::address::Address
 pub fn city::Resident::digest(&self) -> kernel::locator::B3Hash
+pub fn city::RulesCache::load(&self, &kernel::address::Address) -> core::result::Result<alloc::sync::Arc<city::BuildingRules>, kernel::error::shape::AxError>
+pub fn city::RulesCache::new(&std::path::Path) -> city::RulesCache
 pub fn city::RulesTool::invoke(&mut self, &kernel::tool::ToolCall) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn city::RulesTool::meta(&self) -> &kernel::tool::ToolMeta
 pub fn city::RulesTool::new(&std::path::Path, kernel::address::Address) -> core::result::Result<city::RulesTool, kernel::error::shape::AxError>
@@ -298,6 +301,7 @@ pub struct city::NeighboursTool
 pub struct city::PlannedInstall
 pub struct city::Relocation
 pub struct city::Resident
+pub struct city::RulesCache
 pub struct city::RulesTool
 pub struct city::Schedule
 pub struct city::Slot
