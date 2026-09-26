@@ -31,15 +31,17 @@ export interface EmptyStateProps {
   // `region` stands in for a list or a table on a wide page, so it is
   // drawn where that region would be - its left edge, its width, and a
   // dashed outline of it - rather than as a line floating in the middle
-  // of the window.
+  // of the window. `inset` is the same seat inside a container that
+  // already draws the region's outline, such as an empty table's frame.
   readonly seat?: EmptySeat;
 }
 
-export type EmptySeat = "centred" | "region";
+export type EmptySeat = "centred" | "region" | "inset";
 
 const SEATS: Record<EmptySeat, string> = {
   centred: "items-center px-pane py-section text-center",
   region: "items-start rounded-card border border-dashed border-edge-input px-wide py-wide text-left",
+  inset: "items-start px-wide py-wide text-left",
 };
 </script>
 

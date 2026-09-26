@@ -107,7 +107,7 @@
     <!-- An empty registry is a city that has not been asked for
     anything yet: an asset is filed by a run, and a run begins in the
     conversation with the Mayor. -->
-    <EmptyState missing="registry_empty" seat="region">
+    <EmptyState missing="registry_empty" seat="inset">
       {#snippet action()}
         <a
           href={toFragment({ kind: "talk", address: MAYOR })}
