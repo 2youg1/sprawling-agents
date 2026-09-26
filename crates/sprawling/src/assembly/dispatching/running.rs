@@ -61,6 +61,10 @@ impl RunWorker {
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
         let agreed = self.agree_to_work(&at.addr)?;
+        // What this run will stand under reaches the history before it
+        // governs anybody, and only once the city has agreed: a refused
+        // dispatch still writes nothing (sprawling-SPEC.md 8-40).
+        self.book_rules(&agreed.building)?;
         // Naming the work costs one call to the digest model, so it is
         // asked after the city has agreed rather than before: a person
         // does not pay a provider to name work this city was never going

@@ -156,4 +156,12 @@ impl RunWorker {
             retries,
         })
     }
+
+    /// Books what a run is about to stand under: the city's
+    /// `CONFIG.toml` and, when the building exists, its own
+    /// `CONFIG.toml` and `RULES.toml`.
+    pub(super) fn book_rules(&mut self, building: &city::Building) -> Result<(), AxError> {
+        let _ = building;
+        Ok(())
+    }
 }

@@ -668,6 +668,7 @@ self.record_for(…, EventKind::AssetArchived, …)?;          // 后落账
 struct Governance {
     pending: BTreeMap<String, ApprovalItem>, autonomy: Autonomy,
     granted: Vec<ClusterKey>, halted: BTreeSet<kernel::event::Scope>,
+    rules: BTreeMap<(kernel::event::Scope, GoverningDocument), B3Hash>, // 从 rules_changed 折；每份治理文档上次记下的摘要（§8-40）
     sent: BTreeMap<RunId, Sent>,          // 从 run_started 折；task、goal、budget
     origins: BTreeMap<String, BlockedJob>, // 从 approval_requested 折；答复时 O(log n)
 }
@@ -1300,6 +1301,7 @@ effort: None`，那正是 `session_for`／`room_for` 对它们本来就有的答
 
 ```rust
 let agreed = self.agree_to_work(&at.addr)?;        // 只读；第一条拒绝在这里
+self.book_rules(&agreed.building)?;                // 答应之后的第一句：rules_changed 先落账再生效
 let session = self.session_for(&at.addr, at.session.take(), &task, agreed.rules.policy())?;
 // ↑ 可能花一次 Digest 调用，而那次调用带着这座楼的策略
 at.addr = self.room_for(at.addr, session.as_ref())?;                  // ← 第一次写
@@ -1322,6 +1324,24 @@ let mut site = self.stand_up(agreed, &at, &given)?;
 
 **验收**：`assembly::dispatching::tests::a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine`——
 confidential 楼、主模型与城同机、Digest 端点在机器之外，往楼名派活以 `E_GATE_DENIED` 告终，任务原文不上任何一条线。
+
+**`book_rules` 是答应之后的第一句：改规则先落账再生效**。派工是规则的生效点：人手改 `RULES.toml`／`CONFIG.toml`
+之后，城在下一次派工时才把新规则交给一个 run。`RunWorker::book_rules(&Building)` 把 city 层的 `CONFIG.toml`，
+以及这栋楼**真实存在**时它自己的 `CONFIG.toml` 与 `RULES.toml`，逐份对比治理 fold 上次记下的摘要（`Governance.rules`，§8-25），
+动了就先落一行 `rules_changed` 再让 run 起步。载荷携 scope、`which: GoverningDocument`（一栋楼两份，scope 单独说不清是哪份）、
+before、after 与字节数，恒不携正文；`before` 缺席即开账行，此后本行的 `after` 等于下一行的 `before`，链断本身就说明有人绕过一切门改了文件。
+摘要状态只由 fold 从 `rules_changed` 行得出，重启重建同一本账。缺席的文件按零字节记摘要，与 `city::load` 把缺席读成普通楼是同一个判断。
+读不了的文件以 `E_STORAGE_FATAL` 拒绝这次派工：一个 run 不能站在城说不清的规则之下。
+
+- **记在 `agree_to_work` 之后，不在它之前**：本节的规矩是城答应之前不写任何东西，一次被拒的派工因此不留行。
+  被否：`prepare_dispatch` 的第一句——停城、被拒的模型也会先落一行账，拒绝不再是「什么都没写」。
+- **只为存在的楼记账**：楼的根目录不存在时，只记 city 层那一份。
+  理由：往一个打错的楼名派活会给不存在的楼开账，账上就多出一座城没有的楼。存在与否用 `try_exists` 问，问不出来按读不了拒绝，而不是当作不存在。
+- **记账点在派工（生效点），不在写入门**：这两份文件有一个在编辑器里动笔的写者，写入门看不见那次写入；
+  生效点看见的是文档本身，两种写者一视同仁。每一个入口——人的派工、城自发的活、计划自己的一行——都经 `prepare_dispatch` 起步。
+
+验收：`assembly::driving::tests::flight` 的三条 `rules_changed` 测试——首见开账、链上前后相接并先于它治理的 run 的每一行、
+重启 fold 出同一本账；往不存在的楼派活只记 city 层一行。
 
 **`halted_by` 并入 `agree_to_work`**：它本来就是唯一守住的那道门，
 现在与其余五道站在一起，于是「城答应什么」读一处就够。
