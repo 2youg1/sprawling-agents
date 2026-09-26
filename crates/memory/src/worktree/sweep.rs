@@ -12,12 +12,12 @@
 //! reserved subtree, and the branch git made for it. This module takes
 //! back each of them, and only what the city made (memory-SPEC 8-9).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::error::MemoryError;
 
 use super::name::WorktreeName;
-use super::trees::{WORKTREE_DIR, Worktrees};
+use super::trees::Worktrees;
 
 impl Worktrees {
     /// Takes back every tree under `<city>/.sprawling/worktrees/` that
@@ -66,11 +66,12 @@ impl Worktrees {
         Ok(swept)
     }
 
-    /// Whether git's registration of `name` points into the city's own
-    /// subtree. A tree the person added with `git worktree add` lives
-    /// anywhere else. Compared by trailing components, because the city
-    /// root this process was given may be spelled differently from the
-    /// one the tree was claimed under.
+    /// Whether git's registration of `name` is exactly `home/<name>` of
+    /// this city. The common git dir lists trees of every city and
+    /// linked checkout that shares it, so a matching path suffix proves
+    /// nothing; both sides are resolved on disk, because the city root
+    /// this process was given may be spelled differently from the one
+    /// the tree was claimed under.
     fn made_here(&self, name: &WorktreeName) -> Result<bool, MemoryError> {
         let tree = self
             .repo
@@ -79,11 +80,7 @@ impl Worktrees {
                 op: "find a worktree",
                 detail: format!("{}: {err}", name.as_str()),
             })?;
-        Ok(tree.path().ends_with(
-            Path::new(kernel::RESERVED_PREFIX)
-                .join(WORKTREE_DIR)
-                .join(name.as_str()),
-        ))
+        Ok(resolved(tree.path()) == resolved(&self.home.join(name.as_str())))
     }
 
     /// Deletes the branch git made for the tree `name`, unless its tip
@@ -164,6 +161,18 @@ impl Worktrees {
         }
         Ok(swept)
     }
+}
+
+/// `path` as the disk spells it: the whole path when it exists, else its
+/// parent resolved and the last component kept, else `path` unchanged. A
+/// crash may have removed the tree's own directory while its home stays.
+fn resolved(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path)
+        .or_else(|_| match (path.parent(), path.file_name()) {
+            (Some(parent), Some(leaf)) => std::fs::canonicalize(parent).map(|dir| dir.join(leaf)),
+            (None, _) | (_, None) => Ok(path.to_path_buf()),
+        })
+        .unwrap_or_else(|_| path.to_path_buf())
 }
 
 #[cfg(test)]
