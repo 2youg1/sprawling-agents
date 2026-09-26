@@ -38,10 +38,37 @@ pub(super) fn dropping(city_root: PathBuf) -> channels::DropSink {
 /// address, and `E_STORAGE_FATAL` naming the path when the disk will
 /// not take the bytes.
 pub(super) fn keep_dropped(city_root: &Path, name: &str, bytes: &[u8]) -> Result<PathBuf, AxError> {
-    let _ = (city_root, name, bytes, HASH_CHARS);
-    let _: Option<(Address, B3Hash)> = None;
-    Err(AxError::failure(AxCode::StorageFatal, "keep a dropped file", "not yet")
-        .with_recovery("not yet"))
+    let hash = B3Hash::digest(bytes).to_string();
+    let folder = hash.get(..HASH_CHARS).unwrap_or(&hash);
+    let addr = format!("{DROPPED_DIR}/{folder}/{name}");
+    let one_segment = !name.is_empty() && !name.contains(['/', '\\']);
+    if !one_segment || Address::parse(&addr).is_err() {
+        return Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "keep a dropped file",
+            format!("{name:?} is not a name a file in this city can have"),
+        )
+        .with_recovery("rename the file, then drop it again"));
+    }
+    let root = std::path::absolute(city_root).map_err(|err| stored(city_root, &err))?;
+    let dir = root.join(DROPPED_DIR).join(folder);
+    let path = dir.join(name);
+    if std::fs::read(&path).is_ok_and(|held| held == bytes) {
+        return Ok(path);
+    }
+    std::fs::create_dir_all(&dir).map_err(|err| stored(&dir, &err))?;
+    std::fs::write(&path, bytes).map_err(|err| stored(&path, &err))?;
+    Ok(path)
+}
+
+/// The refusal a disk that would not take a dropped file earns.
+fn stored(path: &Path, err: &std::io::Error) -> AxError {
+    AxError::failure(
+        AxCode::StorageFatal,
+        "keep a dropped file",
+        format!("{}: {err}", path.display()),
+    )
+    .with_recovery("free space on the city's disk or make that folder writable, then drop it again")
 }
 
 #[cfg(test)]

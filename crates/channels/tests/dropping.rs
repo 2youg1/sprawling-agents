@@ -128,5 +128,8 @@ async fn the_citys_refusal_comes_back_whole() {
 #[tokio::test]
 async fn a_file_past_the_framework_default_still_arrives() {
     let (status, said) = send("/drop?name=big.bin", vec![0; 3 * 1024 * 1024]).await;
-    assert_eq!((status, said.as_str()), (200, "/city/dropped/3145728/big.bin"));
+    assert_eq!(
+        (status, said.as_str()),
+        (200, "/city/dropped/3145728/big.bin")
+    );
 }

@@ -205,13 +205,12 @@ mod tests {
     fn chat_is_one_line_about_the_conversation_and_holds_nothing_back() {
         let entry = catalog_entry(Mode::Chat);
         assert_eq!(entry.name, "mode:chat");
-        assert!(
-            entry.disclosure.contains("convers"),
-            "{}",
-            entry.disclosure
-        );
+        assert!(entry.disclosure.contains("convers"), "{}", entry.disclosure);
         assert!(!entry.disclosure.contains('\n'), "one line");
-        assert!(!entry.expansion.is_empty(), "a read of the entry says something");
+        assert!(
+            !entry.expansion.is_empty(),
+            "a read of the entry says something"
+        );
         assert_eq!(admits(Mode::Chat, &Produced::default()), Admission::Lands);
     }
 
