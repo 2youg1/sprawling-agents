@@ -70,6 +70,9 @@ pub(crate) struct CoreThread {
     name: &'static str,
     standing: Standing,
     valve: Valve,
+    /// What puts the thread back at normal: the platform, or in a test a
+    /// platform that refuses.
+    lower: fn() -> Result<Standing, thread_priority::Error>,
 }
 
 impl CoreThread {
@@ -84,6 +87,18 @@ impl CoreThread {
             name,
             standing,
             valve: Valve::new(BUSY_LIMIT, now),
+            lower: lower_this_thread,
+        }
+    }
+
+    /// A thread already standing raised, lowered by `lower`.
+    #[cfg(test)]
+    fn raised_with(lower: fn() -> Result<Standing, thread_priority::Error>, now: Instant) -> Self {
+        Self {
+            name: "test",
+            standing: Standing::Raised,
+            valve: Valve::new(BUSY_LIMIT, now),
+            lower,
         }
     }
 
@@ -99,7 +114,7 @@ impl CoreThread {
     /// Lowers the calling thread and says so on stderr; a refusal leaves
     /// it raised, and the next turn tries again.
     fn lowered_telling_the_person(&self) -> Standing {
-        match lower_this_thread() {
+        match (self.lower)() {
             Ok(standing) => {
                 eprintln!(
                     "thread {} kept a core busy for {} s and is back at normal priority",
