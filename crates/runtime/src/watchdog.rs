@@ -11,6 +11,8 @@
 //! Terminal-only watchdogs kill recoverable sessions; that lesson is the
 //! reason this type exists.
 
+use std::num::NonZeroU64;
+
 use kernel::{AxCode, AxError, Payload, Retries, Retry, RunId, StallVerdict, TimeMs};
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +29,9 @@ pub struct Watchdog {
     /// same call again.
     streak: u32,
     retries: Retries,
+    /// Folded from the run's id once, so the run's jitter is the same
+    /// on every replay and different from its neighbours'.
+    jitter_seed: u64,
 }
 
 /// Deliberately exhaustive: a new disposal must force every run loop to
@@ -80,9 +85,10 @@ impl FreezeReason {
 
 impl Watchdog {
     #[must_use]
-    pub fn new(retries: Retries, _run: RunId) -> Watchdog {
+    pub fn new(retries: Retries, run: RunId) -> Watchdog {
         Watchdog {
             retries,
+            jitter_seed: seed_of(run),
             ..Watchdog::default()
         }
     }
@@ -156,17 +162,22 @@ impl Watchdog {
         self.streak = 0;
     }
 
-    /// How long the failure just counted waits: 500 ms doubled for each
-    /// failure in a row before it, capped at a minute. Both numbers are
-    /// the provider's scale, the time an overloaded service takes to
-    /// recover, so no reading of this machine moves them.
+    /// How long the failure just counted waits: a base of 500 ms doubled
+    /// for each failure in a row before it, capped at a minute, plus up
+    /// to half the base again. Both numbers are the provider's scale,
+    /// the time an overloaded service takes to recover, so no reading of
+    /// this machine moves them. The jitter only adds, so the base stays
+    /// the floor; it is drawn from the run's seed and the streak, so
+    /// runs cut by one outage spread out and each replays its own.
     fn backoff_ms(&self) -> u64 {
         const FIRST_MS: u64 = 500;
         const CEILING_MS: u64 = 60_000;
         let doublings = self.streak.saturating_sub(1).min(16);
-        FIRST_MS
+        let base = FIRST_MS
             .checked_shl(doublings)
-            .map_or(CEILING_MS, |wait| wait.min(CEILING_MS))
+            .map_or(CEILING_MS, |wait| wait.min(CEILING_MS));
+        let spread = NonZeroU64::MIN.saturating_add(base >> 1);
+        base.saturating_add(mixed(self.jitter_seed ^ u64::from(self.streak)) % spread)
     }
 
     /// The `watchdog_fired` payload (E_LOOP_SUSPECTED's carrier when the
@@ -242,6 +253,25 @@ pub enum FiredAction {
     Freeze { reason: String },
 }
 
+/// FNV-1a over the id's sixteen bytes. A uuid v7 keeps its random bits
+/// at the end, which is where runs started in one millisecond differ,
+/// and FNV-1a lets the last byte move the whole word.
+fn seed_of(run: RunId) -> u64 {
+    run.as_bytes()
+        .iter()
+        .fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+            (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+        })
+}
+
+/// splitmix64's finishing mix, so neighbouring streaks and seeds land
+/// far apart before the remainder takes the low bits.
+fn mixed(word: u64) -> u64 {
+    let word = (word ^ (word >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    let word = (word ^ (word >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    word ^ (word >> 31)
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -251,6 +281,7 @@ pub enum FiredAction {
     clippy::wildcard_enum_match_arm,
     clippy::let_underscore_must_use,
     clippy::let_underscore_untyped,
+    clippy::arithmetic_side_effects,
     reason = "test code"
 )]
 mod tests {
