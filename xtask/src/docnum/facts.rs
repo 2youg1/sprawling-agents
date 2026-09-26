@@ -39,7 +39,7 @@ pub(super) struct Fact {
 }
 
 /// Every fact a managed span may name.
-const FACTS: [Fact; 19] = [
+const FACTS: [Fact; 20] = [
     Fact {
         key: "wire_v",
         home: "channels::WIRE_V",
