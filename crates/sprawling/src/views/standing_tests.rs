@@ -85,3 +85,40 @@ fn a_run_in_the_city_view_says_which_room_it_works_in() {
     assert_eq!(summary.addr, Some(room));
     assert_eq!(summary.started, Some(kernel::TimeMs::new(1_000)));
 }
+
+/// A city that has run thousands of times used to put every run it ever
+/// held on the wire at each asking (sprawling-SPEC section 8-90): 8,000
+/// runs made a 1.37 MB city view, fetched again after every record.
+#[test]
+fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
+    const RUNS: u64 = 8_000;
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let room = Address::parse("lab/room1").unwrap();
+    let run_of = |i: u64| RunId::from_bytes(u128::from(i + 1).to_be_bytes());
+    for i in 0..RUNS {
+        let mut opened = serde_json::Map::new();
+        opened.insert("task".to_owned(), serde_json::Value::from("a task"));
+        opened.insert("goal".to_owned(), serde_json::Value::from("a goal"));
+        let mut closed = serde_json::Map::new();
+        closed.insert("completion".to_owned(), serde_json::Value::from("done"));
+        let (start, end) = (2 * i + 1, 2 * i + 2);
+        views
+            .apply(&view_record(start, run_of(i), EventKind::RunStarted, &room, opened))
+            .unwrap();
+        views
+            .apply(&view_record(end, run_of(i), EventKind::RunFrozen, &room, closed))
+            .unwrap();
+    }
+
+    let answer = views.answer(&channels::Query::CityView);
+    let bytes = serde_json::to_vec(&answer).unwrap().len();
+    let channels::Answer::City(city) = answer else {
+        panic!("CityView answers with a city");
+    };
+    let recent = u64::try_from(memory::RECENT_FROZEN).unwrap();
+    let listed: Vec<RunId> = city.runs.iter().map(|r| r.run).collect();
+    let newest: Vec<RunId> = (RUNS - recent..RUNS).map(run_of).collect();
+    assert!(bytes <= 16 * 1024, "city_view is {bytes} bytes");
+    assert_eq!((listed, city.active, city.frozen), (newest, 0, RUNS));
+}

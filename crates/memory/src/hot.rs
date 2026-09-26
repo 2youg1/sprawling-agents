@@ -41,6 +41,11 @@ pub struct RunHot {
     pub started: Option<TimeMs>,
 }
 
+/// How many frozen runs a city view carries besides every active one.
+/// A bound on the size of an answer on the wire, not a machine reading,
+/// so it is a constant (memory-SPEC section 8-5).
+pub const RECENT_FROZEN: usize = 32;
+
 #[derive(Default)]
 pub struct HotView {
     runs: BTreeMap<RunId, RunHot>,
@@ -107,6 +112,13 @@ impl HotView {
     /// Iteration is in RunId order — the same order on every process,
     /// so a rendered list never reshuffles between restarts.
     pub fn runs(&self) -> impl Iterator<Item = (&RunId, &RunHot)> {
+        self.runs.iter()
+    }
+
+    /// The runs a city view carries: every active run, and the
+    /// [`RECENT_FROZEN`] frozen runs with the latest `last_seq`, in
+    /// RunId order like [`HotView::runs`].
+    pub fn in_view(&self) -> impl Iterator<Item = (&RunId, &RunHot)> {
         self.runs.iter()
     }
 

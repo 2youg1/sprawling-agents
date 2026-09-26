@@ -328,9 +328,13 @@ impl HotView {
     pub fn new() -> HotView;
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError>;   // 增量；重复 seq 幂等（只前进）
     pub fn runs(&self) -> impl Iterator<Item = (&RunId, &RunHot)>;              // BTreeMap 序
+    pub fn in_view(&self) -> impl Iterator<Item = (&RunId, &RunHot)>;           // 活跃的全部＋最近 RECENT_FROZEN 个冻结的，BTreeMap 序
     pub fn active_count(&self) -> u64;  pub fn frozen_count(&self) -> u64;
 }
+pub const RECENT_FROZEN: usize = 32;
 ```
+
+- **`in_view` 是一页城景该带的那几次跑**：活跃的一个不少，冻结的只取 `last_seq` 最大的 `RECENT_FROZEN` 个。一座跑过 8,000 次的城，城景原先把 8,000 行都带上线（约 1.37 MB），每来一条记录页面就重拉一次；有界之后城景的大小只随活跃数增长。更早的冻结跑经分页的 `History`／`RunHistory` 读，`active_count`／`frozen_count` 仍数全部，所以页面知道列表之外还有多少。选法是对冻结跑的 `last_seq` 做一次 `select_nth_unstable`（O(n)），不另建按 seq 排的索引：热视图本身按活跃＋最近 N 收缩之后 n 就是那个界。`RECENT_FROZEN` 是线上答复的大小上界，不随机器变，所以是常量；它只在这里定义一次。
 
 - 界面查询在此命中不读盘；run_started→Active，run_frozen→Frozen；其余事件只推进 last_seq/last_kind。
 - **`addr` 与 `started` 从 `run_started` 记下**：`record.addr()` 是这次跑的房间，`record.t()` 是它开始的时刻；二者只在这一种记录上赋值，其余记录不动它们，所以一次跑的房间不会被后来的城市级记录改写。`Option`，因为热视图可能在 `run_started` 之前先看到同一次跑的 `checkpoint_committed`（栅栏先于开场落账），也可能只看到一段没有开场的尾巴——**看不到的事不猜**。理由：`RunSummary.who` 是首条记录的作者、恒为 `city`，单靠它无法把一次跑归到 `hall/mayor` 这个房间，「与 Mayor 的对话」就在线上拼不出来。

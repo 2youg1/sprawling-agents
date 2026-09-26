@@ -88,7 +88,7 @@ impl Views {
             channels::Query::CityView => {
                 let runs: Vec<channels::RunSummary> = self
                     .hot
-                    .runs()
+                    .in_view()
                     .map(|(run, hot)| summarize(*run, hot))
                     .collect();
                 let active = self.hot.active_count();
