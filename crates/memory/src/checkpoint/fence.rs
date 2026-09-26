@@ -66,7 +66,7 @@ pub(super) fn committed(
 pub struct Checkpoint {
     pub(crate) repo: git2::Repository,
     /// The last commit this handle made, fence or landing. The scan
-    /// compares against it, because a fence no longer moves HEAD.
+    /// compares against it, because a fence does not move HEAD.
     pub(crate) last: Option<git2::Oid>,
 }
 

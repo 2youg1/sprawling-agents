@@ -126,7 +126,7 @@ impl MemoryError {
     pub fn into_ax(self) -> AxError {
         match self {
             // Storage write failure is process-fatal; E_STORAGE_FATAL is its loadtime
-            // code (S2 stage-opening verdict).
+            // code.
             MemoryError::Io { op, path, source } => {
                 AxError::failure(AxCode::StorageFatal, op, path.display().to_string())
                     .with_recovery(format!(

@@ -9,13 +9,10 @@ use serde::{Deserialize, Serialize};
 
 /// Which discipline a run works under. A run sits in exactly one.
 ///
-/// Closed, and carried on the wire in this spelling. A dispatch used to
-/// name its mode as free text that the assembly layer matched against
-/// four words and answered every other word with [`Mode::PlanGoal`], so
-/// a client that misspelled `experiment` got a planning run and no
-/// refusal. There is now nothing to misspell: a word outside this set
-/// fails to deserialize at the process boundary, which is where the
-/// sender can still be told.
+/// Closed, and carried on the wire in this spelling. A word outside this
+/// set fails to deserialize at the process boundary, which is where the
+/// sender can still be told; read as a default, a misspelled
+/// `experiment` would become a planning run with no refusal.
 ///
 /// Defined here rather than in `runtime` for the reason
 /// [`DialectKind`](crate::DialectKind) is: the wire carries it and
@@ -85,8 +82,7 @@ mod tests {
         }
     }
 
-    /// The silent default this type exists to delete: an unknown word
-    /// used to become a planning run.
+    /// An unknown word is refused, not read as a planning run.
     #[test]
     fn a_word_outside_the_set_is_refused_rather_than_read_as_planning() {
         assert!(serde_json::from_str::<Mode>("\"a-mode-we-have-never-heard-of\"").is_err());

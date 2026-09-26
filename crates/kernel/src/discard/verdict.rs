@@ -14,14 +14,13 @@ pub enum DiscardVerdict {
     Deny { reason: DenyReason },
 }
 
-/// The decision table (7.2), in fixed order: no plan denies, taint
+/// The decision table, in fixed order: no plan denies, taint
 /// denies, the rest passes.
 ///
 /// Scale and ownership pass because a planned discard carries a
-/// restoration and is therefore reversible: sixteen files, one
-/// megabyte, and another resident's registered asset used to be the
-/// points at which a person was interrupted, and an interruption is
-/// not a rule. What still bounds a delete in advance is written where
+/// restoration and is therefore reversible: no file count, byte count
+/// or other resident's registered asset interrupts a person, because an
+/// interruption is not a rule. What still bounds a delete in advance is written where
 /// rules live — the write domain says which files a resident reaches
 /// at all, and the registry keeps the evidence that puts a deleted
 /// asset back.

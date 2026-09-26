@@ -36,7 +36,7 @@ fn token_byte(byte: u8) -> bool {
 /// while the city's own artifacts — blake3 hex, uuids, digit runs — are
 /// single-case by construction and must not light up every ledger line.
 /// An all-lowercase secret evades this detector; the shape table stays
-/// the primary net and rotation the last remedy (7.1).
+/// the primary net and rotation the last remedy.
 fn mixed_alphabet(bytes: &[u8]) -> bool {
     let has_upper = bytes.iter().any(u8::is_ascii_uppercase);
     let has_lower = bytes.iter().any(u8::is_ascii_lowercase);
@@ -278,7 +278,7 @@ mod tests {
         // These three matter because the entropy detector cannot reach
         // them. Their bodies are all-lowercase hex, so `mixed_alphabet`
         // is false and the second detector never fires - the shape table
-        // is the only net, which is what S2's module header predicted.
+        // is the only net.
         let hex64 = "0f1e2d3c".repeat(8);
         for (prefix, provider) in [("sk-or-v1-", "openrouter"), ("sk-ai-v1-", "zenmux")] {
             let text = format!("KEY={prefix}{hex64}");
@@ -319,7 +319,7 @@ mod tests {
     }
 
     proptest! {
-        /// Kani mirror: total on arbitrary inputs, spans in bounds.
+        /// Total on arbitrary inputs, spans in bounds.
         #[test]
         fn scan_is_total_and_in_bounds(bytes in proptest::collection::vec(any::<u8>(), 0..256)) {
             for hit in scan(&bytes) {

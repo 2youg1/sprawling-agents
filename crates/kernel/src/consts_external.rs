@@ -7,8 +7,7 @@
 //! outside world. Changing one requires evidence that the world changed,
 //! never our own preference.
 //!
-//! Data, plus the classifications that read that data and nothing else.
-//! The charter used to say "zero branches"; it now says this, because
+//! Data, plus the classifications that read that data and nothing else:
 //! [`readable_log_v`] answers a question only [`EVENT_LOG_V`] can answer
 //! and every home it could have had instead would have been a second
 //! place to decide which ledgers this build opens.
@@ -73,9 +72,9 @@ pub fn readable_log_v(v: u64) -> LogVersion {
 /// The L0 tool set: always present, never discovered (5.1).
 pub const L0_TOOLS: [&str; 3] = [crate::ToolName::EXEC, "edit", "status"];
 
-/// One secret shape: prefix + charset + length window (7.1). The table is
+/// One secret shape: prefix + charset + length window. The table is
 /// data, not code; it grows with providers, and `kernel::secret::scan`
-/// (S2) plus `xtask secret` are its only consumers.
+/// plus `xtask secret` are its only consumers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SecretShape {
     pub provider: &'static str,

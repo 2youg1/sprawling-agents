@@ -113,7 +113,7 @@ pub const DRAFT_HELD_ESCALATE: u32 = 3;
 pub const EDIT_WAR_FREEZE: u32 = 2;
 
 /// 3.5 bits/char. Second constant scheduled for re-estimation; evidence =
-/// false-positive rate on repository and fixture corpora (7.1).
+/// false-positive rate on repository and fixture corpora.
 pub const SECRET_ENTROPY_MIN: Ratio = Ratio { num: 7, den: 2 };
 
 pub const DISCARD_FILES_MAX: u32 = 16;

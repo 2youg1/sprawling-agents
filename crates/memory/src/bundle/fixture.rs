@@ -5,10 +5,8 @@
 
 //! The one city the bundle tests export, restore and weigh.
 //!
-//! Three test modules used to carry a byte-identical copy of it, which
-//! is three authorities on what a city looks like: changing one left the
-//! other two asserting against a shape that no longer existed
-//! (memory-SPEC.md 8-21).
+//! One fixture for the three bundle test modules, so they assert
+//! against one shape of a city (memory-SPEC.md 8-21).
 
 #![allow(
     clippy::unwrap_used,

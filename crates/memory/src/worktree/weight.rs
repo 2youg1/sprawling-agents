@@ -18,9 +18,8 @@ use crate::reserved::outside_reserved;
 ///
 /// The ceiling asks how big the working tree a node would copy is, and
 /// the ledger, the object store, the projections and the other nodes'
-/// trees are none of it. Counting them meant a city that had run for a
-/// month refused to hand out a tree because its own history had grown,
-/// and said so in a sentence about the working tree.
+/// trees are none of it. Counting them would make a city's own history
+/// refuse it a tree, in a sentence about the working tree.
 ///
 /// An explicit worklist rather than recursion: a deep tree is a
 /// data-dependent depth, and a stack overflow is not a failure a caller

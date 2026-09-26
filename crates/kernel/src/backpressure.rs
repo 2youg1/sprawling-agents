@@ -6,7 +6,7 @@
 //! Admission control: the city-wide shedding posture.
 //! One function serves every queue-shaped resource — signal queues and fd
 //! headroom alike; capacity semantics belong to the caller. Queues and
-//! counters live in memory::queue (S3), never here.
+//! counters live in memory::queue, never here.
 
 /// A queue's occupancy snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,7 +38,7 @@ pub enum Admission {
 /// Decides whether the queue admits one more item. Pure and total:
 /// `depth + cost <= capacity` admits; checked arithmetic, overflow sheds
 /// (fail-closed). Shedding refuses new items only — starving what is
-/// already queued is a liveness property and citysim's to assert (P2).
+/// already queued is a liveness property and citysim's to assert.
 pub fn admit(stats: &QueueStats, item: &ItemMeta) -> Admission {
     match stats.depth.checked_add(item.cost) {
         Some(total) if total <= stats.capacity => Admission::Admit,

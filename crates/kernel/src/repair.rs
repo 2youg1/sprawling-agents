@@ -14,7 +14,7 @@ use crate::address::Address;
 use crate::event::RunId;
 
 /// Deliberately exhaustive verdict. Queued is a legal outcome, not an
-/// error — E_REPAIR_BUSY only carries it across the tool surface (S3).
+/// error — E_REPAIR_BUSY only carries it across the tool surface.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RepairVerdict {
     Lease,

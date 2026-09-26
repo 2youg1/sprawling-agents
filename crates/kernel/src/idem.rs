@@ -32,7 +32,7 @@ pub struct IdemKey {
 impl IdemKey {
     /// The sole construction point (`kernel::idem::derive`).
     /// Fixed-width run and seq make the framing injective without length
-    /// prefixes; the action canonicalization rule is the tool layer's (S2).
+    /// prefixes; the action canonicalization rule is `ToolCall::action`'s.
     pub fn derive(run: &RunId, seq: Seq, action_canonical: &[u8]) -> IdemKey {
         let mut hasher = blake3::Hasher::new();
         hasher.update(run.as_bytes());

@@ -17,7 +17,7 @@
 use serde::{Deserialize, Serialize};
 
 /// One micro-USD. Decimal price lists convert at the single accounting
-/// entry point (S3 gateway::cost); decisions never touch floats.
+/// entry point (gateway::cost); decisions never touch floats.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UsdMicros(u64);

@@ -179,9 +179,7 @@ impl kernel::Ledger for JsonlLedger {
         })
     }
 
-    /// One buffer, one write and one barrier for the whole wave, which
-    /// is what this store has always been able to do and what the port
-    /// could not ask for until now.
+    /// One buffer, one write and one barrier for the whole wave.
     fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
         JsonlLedger::append_all(self, drafts).map_err(MemoryError::into_ax)
     }

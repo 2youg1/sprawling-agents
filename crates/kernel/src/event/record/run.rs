@@ -50,8 +50,7 @@ pub struct RunStarted {
     pub parent: Option<RunId>,
     /// The run this one replaced, when it is a successor. Spelled the
     /// same way here and on `checkpoint_committed`, because it is one
-    /// fact: `memory::checkpoint::provenance` used to own a second
-    /// spelling of it.
+    /// fact with one spelling.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predecessor: Option<RunId>,
     /// Written even when empty, and deliberately: a key that comes and

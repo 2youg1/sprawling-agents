@@ -93,7 +93,7 @@ pub enum AxCode {
 
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
-    /// (from S2 on) `xtask specalign`.
+    /// `xtask specalign`.
     pub const ALL: [AxCode; 40] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,

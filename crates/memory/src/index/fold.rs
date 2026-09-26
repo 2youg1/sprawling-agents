@@ -9,9 +9,9 @@
 //! Nothing here is persisted. The maps are rebuilt from the segments
 //! whenever a reader opens them, and [`crate::index::LedgerIndex`] keeps
 //! them for the life of a process so a query costs one directory listing
-//! plus the bytes appended since the last look. A side artifact on disk
-//! used to carry the same maps; it had no writer left, and a reader of a
-//! file nobody writes is a second answer waiting to disagree.
+//! plus the bytes appended since the last look. Nothing on disk carries
+//! the same maps, because a second copy is a second answer waiting to
+//! disagree.
 //!
 //! The storage is one implicit-seq column over lines and a span table
 //! over runs ([`Entries`], [`RunTable`]). The public queries are the

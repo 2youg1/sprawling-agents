@@ -334,14 +334,10 @@ impl Checkpoint {
 /// **`.git/index.lock` is taken for the length of one write, and two runs
 /// of one building stage their scopes at the same time by design** -
 /// `assembly::plans::pursuing` drives every node of a ready set at once,
-/// in one repository. The loser of that race used to be told "the index
-/// is locked; this might be due to a concurrent or crashed process",
-/// which is true and useless: the concurrent process is this city, the
-/// lock is held for microseconds, and the sentence in front of the person
-/// said "retry the wave" while nothing retried it. A run that hit the
-/// window ended as cancelled, its node was handed back as though its own
-/// done check had failed, and its parent was told nothing it could act
-/// on.
+/// in one repository. The run that loses that race waits and tries
+/// again, because the concurrent process is this city and the lock is
+/// held for microseconds; refusing would end the run as cancelled and
+/// hand its node back as though its own done check had failed.
 ///
 /// **Bounded, because a lock held by a dead process is a different
 /// fact.** Twenty-five milliseconds apart, twenty times: a genuinely

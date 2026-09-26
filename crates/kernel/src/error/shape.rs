@@ -127,7 +127,7 @@ impl AxError {
 
     /// Gate refusal: the only constructor that sets the three mandatory
     /// parts. Gate-carrier codes must come through here (kernel::gate is
-    /// their sole producer from S2 on).
+    /// their sole producer).
     pub fn refusal(
         code: AxCode,
         action: impl Into<String>,

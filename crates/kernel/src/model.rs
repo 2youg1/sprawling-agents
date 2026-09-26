@@ -6,7 +6,7 @@
 //! The model seam (seam registry ARCHITECTURE 3).
 //! Every provider call carries a `BuildingPolicy` value; the policy is
 //! *defined* here (kernel cannot name outer crates) and *evaluated* by
-//! `city::policy` (P1) — dependency inversion, same as the ledger seam.
+//! `city::policy` — dependency inversion, same as the ledger seam.
 
 mod image;
 mod mode;
@@ -55,7 +55,7 @@ pub type Increments<'a> = &'a mut dyn FnMut(&Increment);
 /// `adversary/design/Speculating.lean`.
 pub type EarlyCalls<'a> = &'a mut dyn FnMut(&ToolCall);
 
-/// The model port. Production adapters: gateway::native, gateway::endpoint;
+/// The model port. Production adapter: gateway::endpoint;
 /// second adapter: citysim scripted model. Implementations never sample
 /// clocks or read global state.
 pub trait Model {
