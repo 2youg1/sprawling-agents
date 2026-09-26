@@ -2047,6 +2047,13 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
   `Then::Roadmap` 带着那份文本作基线，经 `city::edit_against` 替换。桌子的副本是派活那一刻的文件，写它会把别的轮在这期间落下的行
   改回派活时的状态；重放只动本轮碰过的行。基线与读盘之间只隔同一线程上的落账，能在这里改动文件的只有城外的写者（人的编辑器），
   那时替换以 `E_VERSION_CONFLICT` 拒绝，行已在账本上而文件未动，错误原样交给 `settle` 的调用方。
+- **回家的每一条路都要合上本轮开着的认领**：`roadmap_claimed` 在调用时入账，所以每一条认领都得有一条 `roadmap_released`
+  或完成行把它合上，否则重启后 `folds::collaboration` 把那个节点读成永远被那间房占着，`plans` 还会给它发阻塞通知。
+  今天合上它的只有 `settle_desks` 里的两条路：`Claims::Landed`（放下／完成行）与 `Claims::Stale`（`released()`）。
+  **未定：驱动返回 `Err`（`running.rs` 的 `driven?`），或 `settle_desks` 在更早的 `?` 上失败（清扫、`city::roadmap`、
+  `Claims::of` 拒绝重放）时，本轮的认领行没有合上行。** 定下它的办法：`ClaimBook::release` 返回本轮仍开着的认领，
+  由回家那一处在落地失败的每条路上为它们追加 `HandedBack` 行，使回家成为合上认领的唯一一处；证据是一条红测——
+  一轮认领后驱动失败的活，历史里认领行之后跟着一条放回行。
 - **未定：目标登记**。`goal_registered` 仍在落地时由工人写下，目标登记还没走「调用时由记账线程判定并先入账」这条路；
   两轮并排的活登记同一片地，第二个要到落地才知道。能定下它的证据：一条红测——两轮活从同一份目标登记表出发登记同一片地，
   第二个在调用时被拒。
