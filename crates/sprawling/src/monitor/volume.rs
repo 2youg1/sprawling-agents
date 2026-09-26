@@ -6,17 +6,45 @@
 //! Which disk holds the city, and how much room it has left
 //! (sprawling-SPEC.md 8-94).
 
-use std::path::Path;
+use std::path::{Component, Path, PathBuf, Prefix};
 
 use kernel::degradation::VolumeSpace;
 use sysinfo::Disks;
 
 /// Lists the disks once and reads the one that holds `city`, resolved
-/// against the working directory first: no mount point is a prefix of a
-/// relative path.
+/// first: a link would name the disk that holds the link, and no mount
+/// point is a prefix of a relative or verbatim path.
 pub(crate) fn read(city: &Path) -> Option<VolumeSpace> {
-    let city = std::path::absolute(city).ok()?;
-    space(&Disks::new_with_refreshed_list(), &city)
+    let city = std::fs::canonicalize(city)
+        .or_else(|_| std::path::absolute(city))
+        .ok()?;
+    space(
+        &Disks::new_with_refreshed_list(),
+        &without_verbatim_disk(&city),
+    )
+}
+
+/// `\?\C:\city` respelled `C:\city`, the spelling mount points carry.
+fn without_verbatim_disk(path: &Path) -> PathBuf {
+    let mut components = path.components();
+    match components.next() {
+        Some(Component::Prefix(prefix)) => match prefix.kind() {
+            Prefix::VerbatimDisk(letter) => {
+                let mut plain = PathBuf::from(format!("{}:", char::from(letter)));
+                plain.extend(components);
+                plain
+            }
+            Prefix::Verbatim(_)
+            | Prefix::VerbatimUNC(..)
+            | Prefix::DeviceNS(_)
+            | Prefix::UNC(..)
+            | Prefix::Disk(_) => path.to_path_buf(),
+        },
+        Some(
+            Component::RootDir | Component::CurDir | Component::ParentDir | Component::Normal(_),
+        )
+        | None => path.to_path_buf(),
+    }
 }
 
 /// The free space and capacity of the disk whose mount point is the
