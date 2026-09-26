@@ -13,6 +13,7 @@
 use kernel::{AxError, Increment};
 use serde_json::{Value, json};
 
+use crate::endpoint::failure::{ProviderFailure, provider_err};
 use crate::mismatch::{settled_tool_arguments, stream_cut};
 
 /// What one chunk carries, if it carries either stream. Absent on the
@@ -72,6 +73,18 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
             && !held.is_null()
         {
             usage = Some(held.clone());
+        }
+        // Rate limits name their reason in `code` and a bare category
+        // (`requests`, `tokens`) in `type`, so `code` is read first.
+        if let Some(error) = map.get("error").and_then(Value::as_object) {
+            let kind = ["code", "type"]
+                .into_iter()
+                .find_map(|key| error.get(key).and_then(Value::as_str))
+                .unwrap_or("an error without a type");
+            return Err(provider_err(
+                "read a streamed answer",
+                &ProviderFailure::Reported { kind },
+            ));
         }
         let Some(first) = map
             .get("choices")
@@ -204,6 +217,46 @@ mod tests {
             refused.subject().contains("exec"),
             "the refusal has to name the tool: {}",
             refused.subject()
+        );
+    }
+
+    /// A provider that fails after answering 200 sends one chunk with an
+    /// `error` object and no `choices`; the rate limit names its reason
+    /// in `code` and a bare category in `type`.
+    #[test]
+    fn an_error_chunk_mid_stream_is_the_failure_it_reports() {
+        let reported = |error: serde_json::Value| {
+            let frames = vec![
+                json!({"choices": [{"delta": {"content": "hal"}}]}),
+                json!({ "error": error }),
+            ];
+            let refused = settled(&frames).expect_err("an error chunk is not an answer");
+            (
+                refused.subject().to_owned(),
+                serde_json::to_value(&refused).unwrap()["retry"].clone(),
+            )
+        };
+        assert_eq!(
+            [
+                reported(json!({"message": "m", "type": "server_error", "code": null})),
+                reported(
+                    json!({"message": "m", "type": "requests", "code": "rate_limit_exceeded"})
+                ),
+                reported(
+                    json!({"message": "m", "type": "insufficient_quota", "code": "insufficient_quota"})
+                ),
+            ],
+            [
+                ("the stream reported server_error".to_owned(), json!("yes")),
+                (
+                    "the stream reported rate_limit_exceeded".to_owned(),
+                    json!("yes")
+                ),
+                (
+                    "the stream reported insufficient_quota".to_owned(),
+                    json!("no")
+                ),
+            ]
         );
     }
 }

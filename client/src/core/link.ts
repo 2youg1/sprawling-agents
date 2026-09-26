@@ -117,7 +117,7 @@ function refusal(
     subject,
     recovery: say(lang, recovery),
     nearby: [],
-    retriable: false,
+    retry: "no",
   };
 }
 

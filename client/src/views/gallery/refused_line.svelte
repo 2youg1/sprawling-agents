@@ -28,7 +28,7 @@
     nearby: [],
     // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     recovery: "attach a provider on the settings page and pick a model for this tag",
-    retriable: false,
+    retry: "no",
     // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     subject: "no model is chosen for this tag",
   };

@@ -15,7 +15,7 @@ mod adapter;
 mod auth;
 mod call;
 pub(crate) mod config;
-mod failure;
+pub(crate) mod failure;
 #[cfg(test)]
 pub(crate) mod fakes;
 mod header;

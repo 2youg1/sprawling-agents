@@ -11,9 +11,10 @@ use serde::{Deserialize, Serialize};
 use super::code::AxCode;
 use super::refusal::GateRefusal;
 
-/// The unified error shape: seven wire fields, serialized in declaration
-/// order (determinism rule 6). The model is the recovery subject: `nearby`
-/// and `recovery` must hold directly executable information, not apologies.
+/// The unified error shape: seven wire fields and one that is left out
+/// when absent, serialized in declaration order (determinism rule 6).
+/// The model is the recovery subject: `nearby` and `recovery` must hold
+/// directly executable information, not apologies.
 ///
 /// Everything but `code` sits behind one Box so the type stays cheap in
 /// every seam's return slot (`result_large_err`); serde flatten keeps the
@@ -34,9 +35,54 @@ struct ErrorDetail {
     subject: String,
     nearby: Vec<String>,
     recovery: String,
-    retriable: bool,
+    #[serde(alias = "retriable")]
+    retry: Retry,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    retry_after_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     gate: Option<GateRefusal>,
+}
+
+/// Whether the same request may go out again, said together with
+/// whether its effect already landed. On the wire `"yes"`, `"no"` or
+/// `"unknown"`; a ledger record written as `retriable: true/false`
+/// reads as `Yes`/`No`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Retry {
+    /// The effect did not land, and the same request may succeed later.
+    Yes,
+    /// The same request would fail the same way again.
+    No,
+    /// The request went out and its answer was lost: whether its effect
+    /// landed is not known, so only a caller who knows the action is
+    /// idempotent sends it again.
+    Unknown,
+}
+
+impl<'de> Deserialize<'de> for Retry {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Spelling {
+            Word(String),
+            Flag(bool),
+        }
+        match Spelling::deserialize(deserializer)? {
+            Spelling::Flag(true) => Ok(Retry::Yes),
+            Spelling::Flag(false) => Ok(Retry::No),
+            Spelling::Word(word) => match word.as_str() {
+                "yes" => Ok(Retry::Yes),
+                "no" => Ok(Retry::No),
+                "unknown" => Ok(Retry::Unknown),
+                other => Err(serde::de::Error::unknown_variant(
+                    other,
+                    &["yes", "no", "unknown"],
+                )),
+            },
+        }
+    }
 }
 
 /// An error that still owes the reader its recovery sentence.
@@ -52,7 +98,7 @@ pub struct ErrorDraft {
 }
 
 impl AxError {
-    /// Non-gate failure. `retriable` starts false (fail-closed) and
+    /// Non-gate failure. `retry` starts `No` (fail-closed) and
     /// `nearby` starts empty; both grow on the draft.
     pub fn failure(
         code: AxCode,
@@ -67,7 +113,8 @@ impl AxError {
                     subject: subject.into(),
                     nearby: Vec::new(),
                     recovery: String::new(),
-                    retriable: false,
+                    retry: Retry::No,
+                    retry_after_ms: None,
                     gate: None,
                 }),
             },
@@ -108,8 +155,14 @@ impl AxError {
         &self.detail.recovery
     }
 
-    pub fn is_retriable(&self) -> bool {
-        self.detail.retriable
+    pub fn retry(&self) -> Retry {
+        self.detail.retry
+    }
+
+    /// The least the raiser says to wait before asking again, when it
+    /// said one; present only on a `Retry::Yes` error.
+    pub fn retry_after_ms(&self) -> Option<u64> {
+        self.detail.retry_after_ms
     }
 
     pub fn gate(&self) -> Option<&GateRefusal> {
@@ -137,8 +190,22 @@ impl ErrorDraft {
 
     /// Declares the action safe to retry as-is. Explicit opt-in only.
     pub fn retriable(mut self) -> Self {
-        self.pending.detail.retriable = true;
+        self.pending.detail.retry = Retry::Yes;
         self
+    }
+
+    /// Declares that the request went out and its answer was lost, so
+    /// whether its effect landed is not known.
+    pub fn effect_unknown(mut self) -> Self {
+        self.pending.detail.retry = Retry::Unknown;
+        self
+    }
+
+    /// Declares the action safe to retry, and no sooner than `wait_ms`
+    /// from now: the other side's own word on when it recovers.
+    pub fn retriable_after(mut self, wait_ms: u64) -> Self {
+        self.pending.detail.retry_after_ms = Some(wait_ms);
+        self.retriable()
     }
 
     /// Writes the one sentence that tells the reader what to do next, and
@@ -165,7 +232,7 @@ mod tests {
         let err = AxError::failure(AxCode::PathNotFound, "read file", "docs/a.md")
             .with_recovery("create docs/a.md, or read one of the paths `ls docs` lists");
         assert!(err.gate().is_none());
-        assert!(!err.is_retriable());
+        assert_eq!(err.retry(), Retry::No);
         assert_eq!(err.code(), &AxCode::PathNotFound);
     }
 
@@ -175,7 +242,7 @@ mod tests {
             .with_nearby(vec!["exec".into(), "edit".into(), "status".into()])
             .retriable()
             .with_recovery("use an L0 tool");
-        assert!(err.is_retriable());
+        assert_eq!(err.retry(), Retry::Yes);
         let json = serde_json::to_value(&err).unwrap();
         assert_eq!(json["code"], "E_TOOL_UNKNOWN");
         assert_eq!(json["nearby"][0], "exec");
@@ -192,8 +259,22 @@ mod tests {
         let code_at = json.find("\"code\"").unwrap();
         let action_at = json.find("\"action\"").unwrap();
         let subject_at = json.find("\"subject\"").unwrap();
-        let retriable_at = json.find("\"retriable\"").unwrap();
+        let retriable_at = json.find("\"retry\"").unwrap();
         assert!(code_at < action_at && action_at < subject_at && subject_at < retriable_at);
+    }
+
+    #[test]
+    fn a_ledger_record_written_with_the_retriable_flag_still_reads() {
+        let record = |flag: bool| {
+            serde_json::json!({"code": "E_PROVIDER", "action": "call model", "subject": "s",
+                "nearby": [], "recovery": "r", "retriable": flag})
+        };
+        let retry = |flag| {
+            serde_json::from_value::<AxError>(record(flag))
+                .unwrap()
+                .retry()
+        };
+        assert_eq!([retry(true), retry(false)], [Retry::Yes, Retry::No]);
     }
 
     #[test]

@@ -70,7 +70,11 @@ impl Endpoint {
         if !status.is_success() {
             return Err(provider_err(
                 "list models",
-                &ProviderFailure::Refused { url, status },
+                &ProviderFailure::Refused {
+                    url,
+                    status,
+                    headers: response.headers(),
+                },
             ));
         }
         let body: Value = response
@@ -167,7 +171,11 @@ impl Endpoint {
         if !status.is_success() {
             return Err(provider_err(
                 "post to provider",
-                &ProviderFailure::Refused { url, status },
+                &ProviderFailure::Refused {
+                    url,
+                    status,
+                    headers: response.headers(),
+                },
             ));
         }
         response

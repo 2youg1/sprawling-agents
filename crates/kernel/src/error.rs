@@ -15,7 +15,7 @@
 //! - every constructed error says what to do next: both constructors
 //!   return an [`ErrorDraft`], and [`ErrorDraft::with_recovery`] is the
 //!   only way to obtain an [`AxError`].
-//! - `retriable` defaults to false; a caller must opt in explicitly
+//! - `retry` defaults to `Retry::No`; a caller must opt in explicitly
 //!   (fail-closed).
 //!
 //! The carrier-event declaration (`AxCode::carrier`) lives together with
@@ -27,4 +27,4 @@ mod shape;
 
 pub use code::{AxCode, Carrier};
 pub use refusal::GateRefusal;
-pub use shape::{AxError, ErrorDraft};
+pub use shape::{AxError, ErrorDraft, Retry};

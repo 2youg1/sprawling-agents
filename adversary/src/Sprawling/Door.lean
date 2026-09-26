@@ -459,7 +459,7 @@ private def localRefusal (said : String) : Option Complaint :=
              , action := ((remainder :: more).intersperse ":" |> String.join).trimAscii.toString
              , subject := ""
              , recovery := recoveryIn rest
-             , retriable := false }
+             , retry := "no" }
       else none
     | _ => none
 where

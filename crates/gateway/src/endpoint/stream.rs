@@ -85,6 +85,7 @@ impl Endpoint {
                 &ProviderFailure::Refused {
                     url: &self.config.base_url,
                     status,
+                    headers: response.headers(),
                 },
             ));
         }

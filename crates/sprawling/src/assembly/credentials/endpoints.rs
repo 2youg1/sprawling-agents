@@ -245,7 +245,9 @@ impl RunWorker {
         loop {
             match probe.list_models(&url) {
                 Ok(served) => return Ok(served),
-                Err(err) if attempts_left > 0 && err.is_retriable() => {
+                // Listing models is read-only, so an unknown effect is
+                // asked again as readily as a known one.
+                Err(err) if attempts_left > 0 && err.retry() != kernel::Retry::No => {
                     attempts_left = attempts_left.saturating_sub(1);
                 }
                 Err(err) => return Err(err),

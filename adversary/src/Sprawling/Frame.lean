@@ -51,7 +51,7 @@ structure Complaint where
   action : String
   subject : String
   recovery : String
-  retriable : Bool
+  retry : String
 deriving BEq, Inhabited
 
 instance : ToString Complaint where
@@ -125,10 +125,6 @@ private def natField (what : String) (pairs : List (String × Json)) (key : Stri
     Except String Nat := do
   (← field what pairs key).getNat?
 
-private def boolField (what : String) (pairs : List (String × Json)) (key : String) :
-    Except String Bool := do
-  (← field what pairs key).getBool?
-
 private def parseWelcome (body : Json) : Except String Welcome := do
   let pairs ← expectObject "Welcome" body
   let city :=
@@ -145,7 +141,7 @@ private def parseComplaint (body : Json) : Except String Complaint := do
          , action := ← stringField "AxError" pairs "action"
          , subject := ← stringField "AxError" pairs "subject"
          , recovery := ← stringField "AxError" pairs "recovery"
-         , retriable := ← boolField "AxError" pairs "retriable" }
+         , retry := ← stringField "AxError" pairs "retry" }
 
 private def parseRecord (body : Json) : Except String Record := do
   let pairs ← expectObject "EventRecord" body

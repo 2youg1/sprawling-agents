@@ -226,6 +226,8 @@ impl<'de> serde_core::de::Deserialize<'de> for kernel::AxCode
 impl<'de> serde_core::de::Deserialize<'de> for kernel::AxCode
 impl<'de> serde_core::de::Deserialize<'de> for kernel::Payload
 impl<'de> serde_core::de::Deserialize<'de> for kernel::Payload
+impl<'de> serde_core::de::Deserialize<'de> for kernel::Retry
+impl<'de> serde_core::de::Deserialize<'de> for kernel::Retry
 impl<'de> serde_core::de::Deserialize<'de> for kernel::SecretRef
 impl<'de> serde_core::de::Deserialize<'de> for kernel::SecretRef
 impl<'de> serde_core::de::Deserialize<'de> for kernel::address::Address
@@ -437,6 +439,7 @@ pub enum kernel::RenderIntent
 pub enum kernel::RepairVerdict
 pub enum kernel::Restoration
 pub enum kernel::Retries
+pub enum kernel::Retry
 pub enum kernel::RoadmapShape
 pub enum kernel::RoadmapStatus
 pub enum kernel::Role
@@ -478,6 +481,7 @@ pub enum kernel::discard::DiscardVerdict
 pub enum kernel::discard::Restoration
 pub enum kernel::error::AxCode
 pub enum kernel::error::Carrier
+pub enum kernel::error::Retry
 pub enum kernel::event::EventKind
 pub enum kernel::event::Scope
 pub enum kernel::event::Who
@@ -565,14 +569,16 @@ pub fn kernel::AxError::failure(kernel::AxCode, impl core::convert::Into<alloc::
 pub fn kernel::AxError::failure(kernel::AxCode, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> kernel::ErrorDraft
 pub fn kernel::AxError::gate(&self) -> core::option::Option<&kernel::GateRefusal>
 pub fn kernel::AxError::gate(&self) -> core::option::Option<&kernel::GateRefusal>
-pub fn kernel::AxError::is_retriable(&self) -> bool
-pub fn kernel::AxError::is_retriable(&self) -> bool
 pub fn kernel::AxError::nearby(&self) -> &[alloc::string::String]
 pub fn kernel::AxError::nearby(&self) -> &[alloc::string::String]
 pub fn kernel::AxError::recovery(&self) -> &str
 pub fn kernel::AxError::recovery(&self) -> &str
 pub fn kernel::AxError::refusal(kernel::AxCode, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, kernel::GateRefusal) -> kernel::ErrorDraft
 pub fn kernel::AxError::refusal(kernel::AxCode, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, kernel::GateRefusal) -> kernel::ErrorDraft
+pub fn kernel::AxError::retry(&self) -> kernel::Retry
+pub fn kernel::AxError::retry(&self) -> kernel::Retry
+pub fn kernel::AxError::retry_after_ms(&self) -> core::option::Option<u64>
+pub fn kernel::AxError::retry_after_ms(&self) -> core::option::Option<u64>
 pub fn kernel::AxError::rewrite_recovery(self, impl core::convert::Into<alloc::string::String>) -> Self
 pub fn kernel::AxError::rewrite_recovery(self, impl core::convert::Into<alloc::string::String>) -> Self
 pub fn kernel::AxError::subject(&self) -> &str
@@ -603,8 +609,12 @@ pub fn kernel::EgressAllowlist::is_empty(&self) -> bool
 pub fn kernel::EgressAllowlist::is_empty(&self) -> bool
 pub fn kernel::EgressAllowlist::new(alloc::vec::Vec<alloc::string::String>) -> kernel::EgressAllowlist
 pub fn kernel::EgressAllowlist::new(alloc::vec::Vec<alloc::string::String>) -> kernel::EgressAllowlist
+pub fn kernel::ErrorDraft::effect_unknown(self) -> Self
+pub fn kernel::ErrorDraft::effect_unknown(self) -> Self
 pub fn kernel::ErrorDraft::retriable(self) -> Self
 pub fn kernel::ErrorDraft::retriable(self) -> Self
+pub fn kernel::ErrorDraft::retriable_after(self, u64) -> Self
+pub fn kernel::ErrorDraft::retriable_after(self, u64) -> Self
 pub fn kernel::ErrorDraft::with_nearby(self, alloc::vec::Vec<alloc::string::String>) -> Self
 pub fn kernel::ErrorDraft::with_nearby(self, alloc::vec::Vec<alloc::string::String>) -> Self
 pub fn kernel::ErrorDraft::with_recovery(self, impl core::convert::Into<alloc::string::String>) -> kernel::AxError
@@ -694,6 +704,8 @@ pub fn kernel::PlanExit::status(&self) -> kernel::RoadmapStatus
 pub fn kernel::PlanExit::status(&self) -> kernel::RoadmapStatus
 pub fn kernel::PlanNode::is_leaf(&self) -> bool
 pub fn kernel::PlanNode::is_leaf(&self) -> bool
+pub fn kernel::Retry::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
+pub fn kernel::Retry::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn kernel::RoadmapStatus::spelling(self) -> &'static str
 pub fn kernel::RoadmapStatus::spelling(self) -> &'static str
 pub fn kernel::RunId::as_bytes(&self) -> &[u8; 16]
@@ -1572,6 +1584,9 @@ pub kernel::Restoration::Rebuildable::reason: alloc::string::String
 pub kernel::Restoration::Tracked(kernel::locator::Locator)
 pub kernel::Retries::AtMost(u32)
 pub kernel::Retries::UntilHalted
+pub kernel::Retry::No
+pub kernel::Retry::Unknown
+pub kernel::Retry::Yes
 pub kernel::RoadmapRow::evidence: kernel::EvidenceCell
 pub kernel::RoadmapRow::id: kernel::node_id::NodeId
 pub kernel::RoadmapRow::item: alloc::string::String
@@ -1828,6 +1843,9 @@ pub kernel::error::AxCode::WireMismatch
 pub kernel::error::AxCode::WorktreeBusy
 pub kernel::error::Carrier::Event(kernel::EventKind)
 pub kernel::error::Carrier::Loadtime
+pub kernel::error::Retry::No
+pub kernel::error::Retry::Unknown
+pub kernel::error::Retry::Yes
 pub kernel::event::EventDraft::addr: core::option::Option<kernel::address::Address>
 pub kernel::event::EventDraft::data: kernel::Payload
 pub kernel::event::EventDraft::ig: bool

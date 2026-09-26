@@ -288,7 +288,7 @@ describe("one refusal, however often it arrived", () => {
     action: "dispatch the task",
     subject: "hall/mayor",
     nearby: [],
-    retriable: false,
+    retry: "no",
     recovery: "",
   };
 

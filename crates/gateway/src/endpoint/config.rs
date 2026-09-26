@@ -255,9 +255,12 @@ mod tests {
             "a provider that says nothing must end as a timeout: {}",
             err.subject()
         );
-        // The deadline passed with no answer at all, so the same
-        // request is worth sending again; this is the opt-in the
-        // watchdog reads before it spends a retry.
-        assert!(err.is_retriable(), "a call that never completed");
+        // The deadline passed after the request left, so whether the
+        // provider ran it is not known; the watchdog still asks again.
+        assert_eq!(
+            err.retry(),
+            kernel::Retry::Unknown,
+            "a call that never completed"
+        );
     }
 }
