@@ -108,7 +108,9 @@ pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError>;
 /// 分叉与重演要原始行，仍走 `verify_ledger_dir`。
 /// 失败即停：第 k 行验不过时，前 k-1 条已经给过 `each`，此时返回的 Err 说明整份折叠作废，
 /// 调用方丢弃它折出的一切（与 `verify_ledger_dir` 同一拒词、同一行号）。无段目录同上，折叠为空。
-pub fn fold_ledger_dir(dir: &Path, each: impl FnMut(&EventRecord) -> Result<(), AxError>) -> Result<(), AxError>;
+/// 读史走 `memory::LedgerIndex::folding`，返回的索引与折叠出自同一遍字节：索引覆盖的恰是 `each` 见过的那段历史，
+/// 折叠之后别人追加的行不在其中，留给 `refresh`。已知行把自己的 seq 与 run 交给索引，ignorable 行由索引自己定位。
+pub fn fold_ledger_dir(dir: &Path, each: impl FnMut(&EventRecord) -> Result<(), AxError>) -> Result<LedgerIndex, AxError>;
 ```
 
 流程：逐行①envelope 探查（serde_json::Value：v/seq/prev/kind/ig 键）；②v 判向（>EVENT_LOG_V 即 `E_LOG_VERSION_UNSUPPORTED`）；③链续（`chain_hash` 复算对拍 prev，首行对 GENESIS_PREV）；④seq 连续（自 FIRST 起）；⑤kind 已知→`parse_line` 全解＋规范复验＋`to_ref`；未知＋`ig:true`→记 IgnoredUnknown；未知无 ig→`E_LOG_VERSION_UNSUPPORTED`（subject=kind＋行号）。链与 seq 对一切行（含 ignored）成立。
