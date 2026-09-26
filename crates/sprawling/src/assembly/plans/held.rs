@@ -8,8 +8,9 @@
 //! `roadmap_*` records change (sprawling-SPEC.md 8-91).
 
 use std::collections::BTreeMap;
+use std::path::Path;
 
-use kernel::{Address, EventKind, NodeId, Payload};
+use kernel::{Address, AxError, EventKind, NodeId, Payload};
 
 use super::super::building_of;
 
@@ -25,6 +26,11 @@ pub(in crate::assembly) struct Planning {
     pub(in crate::assembly) delegator: kernel::Delegator,
     /// Which room holds each node of each building's plan.
     pub(in crate::assembly) holders: PlanHolders,
+    /// The one door a landing replaces a building's plan through:
+    /// `city::edit_against`, and in a test a writer that refuses, because
+    /// a read-only file does not stop the rename over it where the
+    /// directory is writable (sprawling-SPEC.md 8-42-8).
+    pub(in crate::assembly) write_plan: fn(&Path, &[u8], &[u8]) -> Result<(), AxError>,
 }
 
 impl Planning {

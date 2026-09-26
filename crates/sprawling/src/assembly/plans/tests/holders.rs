@@ -144,14 +144,7 @@ fn a_claim_whose_landing_failed_is_handed_back() {
 #[test]
 fn a_claim_closed_on_the_ledger_is_not_handed_back_when_the_roadmap_write_fails() {
     use crate::assembly::fixture::*;
-    let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
-    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
-    let roadmap = dir.path().join("lab").join(city::ROADMAP_FILE);
-    std::fs::write(&roadmap, PLAN_ONE_FREE_ROW).unwrap();
-    let mut locked = std::fs::metadata(&roadmap).unwrap().permissions();
-    locked.set_readonly(true);
-    std::fs::set_permissions(&roadmap, locked.clone()).unwrap();
+    let dir = city_with_plan(PLAN_ONE_FREE_ROW);
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -164,54 +157,146 @@ fn a_claim_closed_on_the_ledger_is_not_handed_back_when_the_roadmap_write_fails(
             completion("done", None),
         ],
     );
+    let worker = worker_over_faults(dir.path(), None);
+    let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
+    worker.planning.write_plan = |path, _, _| {
+        Err(AxError::failure(
+            AxCode::StorageFatal,
+            "replace a document",
+            path.display().to_string(),
+        )
+        .with_recovery("nothing: this writer refuses every plan"))
+    };
+    let landed = worker.handle(dispatch(b"refused plan"));
+    drop(provider);
+
+    assert_eq!(
+        (landed.is_err(), plan_lines(&worker)),
+        (
+            true,
+            owned(&[("roadmap_claimed", "1"), ("roadmap_blocked", "1")])
+        ),
+        "the claim, then the one line that closed it"
+    );
+}
+
+/// A claim closes when its own closing line reaches the ledger, so a
+/// ledger that takes a landing's first closing line and refuses its
+/// second owes a hand-back line for the second node alone: the first
+/// node's release is already the last line the history holds for it
+/// (sprawling-SPEC.md 8-42-8).
+#[test]
+fn a_landing_refused_part_way_hands_back_only_the_nodes_it_did_not_close() {
+    use crate::assembly::fixture::*;
+    let dir = city_with_plan(PLAN_TWO_FREE_ROWS);
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "taking a row",
+                "tu_1",
+                "plan",
+                serde_json::json!({ "action": "claim", "node": "1" }),
+            ),
+            tool_completion(
+                "giving it back",
+                "tu_2",
+                "plan",
+                serde_json::json!({ "action": "release", "node": "1", "reason": "not my trade" }),
+            ),
+            tool_completion(
+                "taking the other",
+                "tu_3",
+                "plan",
+                serde_json::json!({ "action": "claim", "node": "2" }),
+            ),
+            completion("done", None),
+        ],
+    );
+    let worker = worker_over_faults(dir.path(), Some("roadmap_blocked"));
+    let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
+    let landed = worker.handle(dispatch(b"cut part way"));
+    drop(provider);
+
+    assert_eq!(
+        (landed.is_err(), plan_lines(&worker)),
+        (
+            true,
+            owned(&[
+                ("roadmap_claimed", "1"),
+                ("roadmap_claimed", "2"),
+                ("roadmap_released", "1"),
+                ("roadmap_released", "2"),
+            ])
+        ),
+        "node 1 is closed by its own release; only node 2 is handed back"
+    );
+}
+
+/// A city whose building `lab` has `plan` as its roadmap.
+fn city_with_plan(plan: &str) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(dir.path().join("lab").join(city::ROADMAP_FILE), plan).unwrap();
+    dir
+}
+
+/// A worker whose ledger loses the first append carrying `cut`.
+fn worker_over_faults(root: &std::path::Path, cut: Option<&'static str>) -> RunWorker {
     let fs = memory::FaultFs::new(memory::FaultPlan {
         cut_at_op: None,
-        cut_on_write: None,
+        cut_on_write: cut,
         torn_tail: memory::TornTail::None,
     });
     let opened = memory::JsonlLedger::open_faulty(
         fs,
-        &kernel::layout::CityLayout::new(dir.path()).ledger(),
+        &kernel::layout::CityLayout::new(root).ledger(),
         now_ms().unwrap(),
     )
     .unwrap();
-    let worker = RunWorker::over(
-        dir.path(),
+    RunWorker::over(
+        root,
         gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
         opened,
     )
-    .unwrap();
-    let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
-    let landed = worker.handle(channels::Command::Dispatch {
+    .unwrap()
+}
+
+fn dispatch(key: &[u8]) -> channels::Command {
+    channels::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
-        task: "take a row".to_owned(),
-        goal: "one claim".to_owned(),
+        task: "work the plan".to_owned(),
+        goal: "the plan's rows".to_owned(),
         mode: kernel::Mode::PlanGoal,
-        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"locked plan"),
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
         effort: None,
-    });
-    drop(provider);
-    #[allow(clippy::permissions_set_readonly_false)]
-    locked.set_readonly(false);
-    std::fs::set_permissions(&roadmap, locked).unwrap();
+    }
+}
 
-    let closing: Vec<String> = worker
+/// Each `roadmap_*` line on the history: its kind and the node it names.
+fn plan_lines(worker: &RunWorker) -> Vec<(String, String)> {
+    worker
         .ledger
         .read_raw_lines()
         .unwrap()
         .iter()
-        .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
-        .filter_map(|line| line["kind"].as_str().map(str::to_owned))
-        .filter(|kind| kind.starts_with("roadmap_"))
-        .collect();
-    assert_eq!(
-        (landed.is_err(), closing),
-        (
-            true,
-            vec!["roadmap_claimed".to_owned(), "roadmap_blocked".to_owned()]
-        ),
-        "the claim, then the one line that closed it"
-    );
+        .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+        .filter(|line| line["kind"].as_str().unwrap().starts_with("roadmap_"))
+        .map(|line| {
+            (
+                line["kind"].as_str().unwrap().to_owned(),
+                line["data"]["node"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect()
+}
+
+fn owned(lines: &[(&str, &str)]) -> Vec<(String, String)> {
+    lines
+        .iter()
+        .map(|(kind, node)| ((*kind).to_owned(), (*node).to_owned()))
+        .collect()
 }

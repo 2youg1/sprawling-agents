@@ -2026,11 +2026,13 @@ impl ClaimBook {
     pub(crate) fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger); // 入账并登记，或拒绝；然后回信
     pub(crate) fn release(&mut self, run: RunId) -> OpenClaims; // 这轮活回家时放开它持有的节点，交出它们的放回行
 }
-#[must_use] pub(crate) struct OpenClaims { /* run 与放回行 —— 私有 */ }
+#[must_use] pub(crate) struct OpenClaims { /* run 与 node → 放回行 —— 私有 */ }
 impl OpenClaims {
-    pub(crate) fn closed(&mut self);                         // 落地已为它们写下结局：不再放回
+    pub(crate) fn close(&mut self, node: &NodeId);           // 这个节点的一条收尾行已在账上：不再放回它
     pub(crate) fn owed(self) -> (RunId, Vec<effect::Line>);  // 尚未合上的放回行，归在哪一轮活名下
 }
+// effect.rs：计划那一步的每一行带着它合上的节点；split 行是 None
+pub(crate) struct Closing { pub(crate) line: Line, pub(crate) closes: Option<NodeId> }
 // effect.rs：放回行的唯一拼法，陈旧落地的 released() 与车道的认领共用
 pub(crate) fn handed_back(claim: &ClaimEffect, note: &str, room: &Address, who: &str) -> Result<Option<Line>, AxError>;
 pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking;
@@ -2051,15 +2053,18 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
   （`StopCause::HandedBack`，说明是计划在落地前变了）一起落账；只丢弃不补，`folds::collaboration` 会把那一行读成永远有人占着。
   落地成功时 `Claims::of` 照样重放 `Claimed` 改文本，但不再写它的行，否则同一次认领在历史里数成两次。
 - **落地重放效应，不写桌子的副本**：`Claims::of` 把本轮的效应按次序经 `ClaimEffect::apply` 重放到落地时读到的盘上文本，
-  `Then::Roadmap` 带着那份文本作基线，经 `city::edit_against` 替换。桌子的副本是派活那一刻的文件，写它会把别的轮在这期间落下的行
+  `Then::Roadmap` 带着那份文本作基线，经 `Planning::write_plan` 替换；生产里它就是 `city::edit_against`，测试换上一个拒绝的写者，
+因为只读文件拦不住 Unix 上目录可写时的 rename，「改写被拒」要在每个 OS 上都成立才能钉住下面那条规则。桌子的副本是派活那一刻的文件，写它会把别的轮在这期间落下的行
   改回派活时的状态；重放只动本轮碰过的行。基线与读盘之间只隔同一线程上的落账，能在这里改动文件的只有城外的写者（人的编辑器），
   那时替换以 `E_VERSION_CONFLICT` 拒绝，行已在账本上而文件未动，错误原样交给 `settle` 的调用方。
 - **回家的每一条路都要合上本轮开着的认领**：`roadmap_claimed` 在调用时入账，所以每一条认领都得有一条 `roadmap_released`
   或完成行把它合上，否则重启后 `folds::collaboration` 把那个节点读成永远被那间房占着，`plans` 还会给它发阻塞通知。
   车道在调用那一刻把认领行与它的放回行（`PutDown`，`StopCause::HandedBack`，说明这轮活回家却没有落地）一起拼好交给记账线程，
   `ClaimBook` 登记节点时连放回行一起记下；`Flight::arrived` 放开这轮活时 `release` 交出仍登记着的放回行（`OpenClaims`），
-  随 `Home` 交给落地。`settle_desks` 的计划那一步把效应落下之后（`Claims::Landed` 的放下／完成行，或 `Claims::Stale` 的
-  `released()`）调 `OpenClaims::closed`。落地结束后，不论成败，`serve_flight` 经 `record_for` 追加余下的放回行（时刻在追加时取，
+  随 `Home` 交给落地。`settle_desks` 的计划那一步每把一条收尾行写上账本（`Claims::Landed` 的放下／完成行，或 `Claims::Stale` 的
+  `released()`），就对那一行的 `Closing::closes` 调 `OpenClaims::close`。`folds::collaboration` 按每个节点的最后一行判定持有，
+  任何一条收尾行都让节点空出来，所以账本在其中一条上拒绝时，已写上收尾行的节点不再放回，只有最后一行仍是 `roadmap_claimed`
+  的节点还欠放回行；一次清空整份 `OpenClaims` 会给已完成或已阻塞的节点再补一条放回行。落地结束后，不论成败，`serve_flight` 经 `record_for` 追加余下的放回行（时刻在追加时取，
   各份折叠照常看见它们）：落地在计划那一步之前的任何一个 `?` 上失败——驱动本身返回 `Err`（`driven?`）、目标行、清扫、
   `city::roadmap`、`Claims::of` 拒绝重放——余下的就是本轮全部的认领。计划那一步之后的失败（书架、请求、租约、结论）不再补行，
   因为那时认领已经合上，补一条放回行会让历史说一个已完成的节点又被放回。落地成功而追加失败时返回追加的错误；落地已经失败时
@@ -2067,7 +2072,7 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
 - **未定：目标登记**。`goal_registered` 仍在落地时由工人写下，目标登记还没走「调用时由记账线程判定并先入账」这条路；
   两轮并排的活登记同一片地，第二个要到落地才知道。能定下它的证据：一条红测——两轮活从同一份目标登记表出发登记同一片地，
   第二个在调用时被拒。
-- 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes|a_claim_whose_landing_failed/)'`；
+- 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes|a_claim_whose_landing_failed|a_claim_closed_on_the_ledger|a_landing_refused_part_way/)'`；
   `cargo nextest run -p collab -E 'test(/two_runs_read_as_ready/)'` 在桌子一侧钉住「第二个认领当场被拒、什么都不留」。
 
 ## 8-41 一次提交出自哪次运行，从账本回答（`bin::views::commits`、`sprawling whose`）
@@ -3684,6 +3689,7 @@ pub(in crate::assembly) struct Planning {
     pub(in crate::assembly) pursuits: BTreeMap<Address, kernel::Pursuit>, // 每栋楼在朝什么推进
     pub(in crate::assembly) delegator: kernel::Delegator,                // 深度零的位置：只有它能宣布一个 pursuit
     pub(in crate::assembly) holders: PlanHolders,                        // 每栋楼的计划里，哪个节点由哪个房间认领着
+    pub(in crate::assembly) write_plan: fn(&Path, &[u8], &[u8]) -> Result<(), AxError>, // 落地替换 Roadmap.md 的那一扇门（8-42-8）
 }
 impl Planning {
     pub(in crate::assembly) fn absorb(&mut self, kind: EventKind, addr: Option<&Address>, data: &Payload);
