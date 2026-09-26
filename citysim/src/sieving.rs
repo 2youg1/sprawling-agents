@@ -61,6 +61,10 @@ pub(crate) fn package_exec(
             offload: OffloadSite {
                 cas: &mut world.cas,
                 environment: &world.environment,
+                origin: memory::BlockOrigin {
+                    run: kernel::RunId::CITY,
+                    building: kernel::Address::parse("env")?,
+                },
             },
             table: &world.table,
             history: &mut world.history,

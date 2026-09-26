@@ -16,10 +16,13 @@ use kernel::{AxCode, AxError, Locator};
 use memory::Cas;
 
 /// Where offloaded bytes live: the CAS for the original, the run's
-/// environment directory for the materialized rest file.
+/// environment directory for the materialized rest file, and the run
+/// and building the original is pinned for, so that a `cas:` read of it
+/// is judged where the output was made.
 pub struct OffloadSite<'a> {
     pub cas: &'a mut Cas,
     pub environment: &'a Path,
+    pub origin: memory::BlockOrigin,
 }
 
 /// The outcome: a substitute that fits the cap, the original pinned in
@@ -210,8 +213,15 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<Pa
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    pub(crate) fn origin() -> memory::BlockOrigin {
+        memory::BlockOrigin {
+            run: kernel::RunId::from_bytes([7; 16]),
+            building: kernel::Address::parse("lab").unwrap(),
+        }
+    }
 
     fn site(dir: &tempfile::TempDir) -> (Cas, PathBuf) {
         let cas = Cas::open(&dir.path().join("cas")).unwrap();
@@ -227,6 +237,7 @@ mod tests {
         let mut s = OffloadSite {
             cas: &mut cas,
             environment: &env,
+            origin: origin(),
         };
         let original: Vec<u8> = (0..40_000u32)
             .map(|i| u8::try_from(i % 251).unwrap())
@@ -256,12 +267,29 @@ mod tests {
     }
 
     #[test]
+    fn the_original_is_pinned_for_the_run_and_building_it_was_cut_for() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut cas, env) = site(&dir);
+        let mut s = OffloadSite {
+            cas: &mut cas,
+            environment: &env,
+            origin: origin(),
+        };
+        let record = offload(&vec![3u8; 30_000], 2_048, &mut s).unwrap();
+        let Locator::Cas { hash, .. } = &record.original else {
+            panic!("expected a cas locator");
+        };
+        assert_eq!(s.cas.origins(hash).unwrap(), vec![origin()]);
+    }
+
+    #[test]
     fn same_bytes_offload_to_the_same_locator() {
         let dir = tempfile::tempdir().unwrap();
         let (mut cas, env) = site(&dir);
         let mut s = OffloadSite {
             cas: &mut cas,
             environment: &env,
+            origin: origin(),
         };
         let original = vec![7u8; 30_000];
         let one = offload(&original, 2_048, &mut s).unwrap();
@@ -280,6 +308,7 @@ mod tests {
         let mut s = OffloadSite {
             cas: &mut cas,
             environment: &env,
+            origin: origin(),
         };
         let err = offload(b"small", 4_096, &mut s).unwrap_err();
         assert_eq!(*err.code(), AxCode::InvalidArgs);

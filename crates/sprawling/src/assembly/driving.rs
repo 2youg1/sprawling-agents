@@ -73,6 +73,8 @@ pub(crate) struct Driving {
 pub(crate) struct Sieving {
     pub(crate) cas: memory::Cas,
     pub(crate) environment: PathBuf,
+    /// The run and room an original is pinned for.
+    pub(crate) origin: memory::BlockOrigin,
     pub(crate) table: runtime::FilterTable,
     pub(crate) history: runtime::SieveHistory,
 }
@@ -94,6 +96,7 @@ impl Sieving {
                 offload: runtime::offload::OffloadSite {
                     cas: &mut self.cas,
                     environment: &self.environment,
+                    origin: self.origin.clone(),
                 },
                 table: &self.table,
                 history: &mut self.history,
@@ -156,6 +159,10 @@ impl RunWorker {
         Ok(Sieving {
             cas,
             environment,
+            origin: memory::BlockOrigin {
+                run: site.run_id,
+                building: addr.clone(),
+            },
             table: site.filters.clone(),
             history: runtime::SieveHistory::default(),
         })

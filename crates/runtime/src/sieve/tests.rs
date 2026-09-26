@@ -40,6 +40,7 @@ fn run(world: &mut World, key: &CommandKey, code: Option<i64>, text: &str) -> Si
     let mut tee = OffloadSite {
         cas: &mut world.cas,
         environment: &world.env,
+        origin: crate::offload::tests::origin(),
     };
     let input = SieveInput {
         key,
