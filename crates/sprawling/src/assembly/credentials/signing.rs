@@ -24,7 +24,7 @@ pub(in crate::assembly) enum Arrival {
     /// A person enrolled it on the host, under a name they chose.
     Enrolment,
     /// It was pasted into a dispatch and taken into custody there
-    /// (sprawling-SPEC.md 8-84).
+    /// (sprawling-SPEC.md 8-85).
     Pasted,
 }
 

@@ -5,7 +5,7 @@
 
 //! A key a person pastes into a dispatch goes to the vault, and the
 //! dispatch carries its `secret:` reference instead (sprawling-SPEC.md
-//! 8-84).
+//! 8-85).
 
 use kernel::{AxCode, AxError, Sealed, SecretRef};
 use zeroize::Zeroizing;
