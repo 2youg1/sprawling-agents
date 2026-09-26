@@ -14,9 +14,9 @@ Signing in to a provider requires knowing four things: the authorization endpoin
 
 | Project | Licence | What is followed | Where to look | Tracked to |
 |---|---|---|---|---|
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI's subscription login: authorization endpoint, token endpoint, client id, scopes, device-code flow | `codex-rs/login/` | `b725da3b6d52` |
+| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI's subscription login: authorization endpoint, token endpoint, client id, scopes, device-code flow | `codex-rs/login/` | `c9e25207073a` |
 | [openai/codex](https://github.com/openai/codex) | Apache-2.0 | where OpenAI states the contract for driving codex non-interactively, which is the shape the `Codex` family answers in | `docs/exec.md` | `ab753387ccf5` |
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | which base URL a ChatGPT subscription is served under, as against the key-billed platform | `codex-rs/model-provider-info/` | `8f103417ef3e` |
+| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | which base URL a ChatGPT subscription is served under, as against the key-billed platform | `codex-rs/model-provider-info/` | `c9e25207073a` |
 | [anthropics/claude-agent-sdk-typescript](https://github.com/anthropics/claude-agent-sdk-typescript) | proprietary, under Anthropic's Commercial Terms of Service | the protocol types the Claude agent wire is spelled in, and which release changed one | `CHANGELOG.md` | `9e477a178c37` |
 | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's browser login: that the endpoints come from OIDC discovery at `{issuer}/.well-known/openid-configuration`, and how a refresh is spelled | `crates/codegen/xai-grok-login/src/oidc/` | `f0e3be1100ef` |
 | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's issuer `https://auth.x.ai`, the public client id, and the scopes a subscription asks for | `crates/codegen/xai-grok-login/src/config.rs` | `75810042ca27` |
