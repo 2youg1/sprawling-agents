@@ -3515,3 +3515,21 @@ pub(super) enum LineError {
 
 1. 不用 clap。命令表是数据，解析器约两百行；启动时间几乎全是操作系统的开销（Windows x86-64 桌面级机器上，`--version` 首字节 7.98 ms，空进程下限 5.40 ms），没有给一个参数库的依赖、编译时间与体积留出位置。重新考虑的条件：动词需要子动词或 shell 补全以外的、这张表表达不了的结构。
 2. 不用 `+` 前缀区分动词。现有动词不改名，一个词仍然是一个动词，文档与肌肉记忆都不必迁移。
+
+### 8-90 还在跑的命令写出的字节，给后来打开页面的会话留一段（`bin::serving::output_ring`）
+
+```rust
+// bin::serving::output_ring —— shape: value
+pub(super) struct OutputRing { /* Mutex<BTreeMap<RunId, Kept>> */ }
+impl OutputRing {
+    pub(super) fn keep(&self, piece: &channels::LiveOutput); // 追加；超过上界时丢最旧的整块
+    pub(super) fn settle(&self, record: &EventRecord);       // tool_result 落账：清空这个 run
+    pub(super) fn so_far(&self) -> Vec<channels::LiveOutput>; // 每个 run 按到达次序
+}
+```
+
+- **没有失败返回**：它存的是可丢弃的预览（runtime-SPEC §8-28-3），账本里的结果才是权威；锁中毒时照样取出里面的表，因为每个操作都在一步之内让表保持一致，中毒只说明别的线程在锁外崩了。
+- **上界 `KEPT_BYTES_PER_RUN = 64 KiB`**，等于 runtime 一秒钟最多读出的字节（`READ_BYTES_PER_MS = 64`），也就够页面按 `LIVE_LINES = 400` 行画满两条流（每行约八十字节）。超过就从最旧的一块丢起，但最新的一块总留着，哪怕它自己超过上界。每个 run 的内存因此有上界，没有 run 在跑命令时表是空的。
+- **喂与清在记账线程上同步发生**：`attending` 装给 `Serving::outputs` 的闭包先 `keep` 再广播；装给 `worker.observe` 的观察者先 `settle` 再交给视图折叠。块在这次调用的结果落账之前读出，所以同一线程上的次序保证清空之后不会再收到这次调用的块。
+- **决定**：缓冲住在装配层而不是 `channels`。清空要认出 `tool_result` 这一行，而记账线程的观察者就在这里；放进 `channels` 要让它为这件事再订阅一次事件流。被否的另一种是让每个会话自己记：那只能记它打开之后的块，正好漏掉这个缓冲要补的那一段。
+
