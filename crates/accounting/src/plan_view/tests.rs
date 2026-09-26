@@ -185,10 +185,9 @@ fn a_dependency_circle_is_a_problem_rather_than_a_silent_empty_plan() {
     );
 }
 
-/// The record that carries no address is the one the old rule ignored:
-/// a checkpoint written for the city rather than for a room used to
-/// leave every parsed plan in place, and the comment beside the rule
-/// said the opposite.
+/// A checkpoint written for the city rather than for a room carries no
+/// address, so it cannot say which plan it moved: every parsed plan its
+/// kind could have moved goes stale.
 #[test]
 fn a_record_with_no_address_stales_every_plan_it_could_have_moved() {
     let dir = city(PLAN);

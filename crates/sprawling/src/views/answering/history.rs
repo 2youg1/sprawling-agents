@@ -135,10 +135,9 @@ impl LedgerAsk {
     /// One bound, not two. The index knows which sequences this run
     /// wrote, so the newest `limit` of them are named before a single
     /// line is read and the work is proportional to the answer rather
-    /// than to the ledger. What used to need a second bound - a client
-    /// naming a session that ended a month ago and making the server
-    /// walk the whole history to find out - is no longer reachable, so
-    /// the second bound is gone rather than merely unused.
+    /// than to the ledger. A client naming a session that ended a month
+    /// ago cannot make the server walk the whole history to find it, so
+    /// no second bound is needed.
     ///
     /// The lines are then read oldest first, which is both the order the
     /// answer is delivered in and the order the cursor walks without a

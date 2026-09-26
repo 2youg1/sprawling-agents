@@ -161,8 +161,8 @@ impl Laying {
         // One registration feeds both. The catalogue is what the model
         // was told exists and the bench is what routes the call it
         // makes, so a name on one list and not the other is either a
-        // tool nobody can call or a call nobody was told about. These
-        // used to be two lists of thirteen lines, agreeing by hand.
+        // tool nobody can call or a call nobody was told about; one list
+        // leaves nothing to agree by hand.
         //
         // The order is the catalogue's: `render` puts the tools in front
         // of the model in this order and the resident segment is hashed,

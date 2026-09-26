@@ -214,10 +214,10 @@ impl RunWorker {
     ///
     /// **One wave, not a loop.** Each knock goes into a lane and this
     /// returns; the runs it started speak to each other as they land,
-    /// and every landing drains this queue again. The old loop drove
-    /// each woken resident to its frozen end on the accounting thread,
-    /// so a conversation between four residents held the command desk
-    /// shut for as long as it lasted, with `Halt` among the commands that
+    /// and every landing drains this queue again. Driving each woken
+    /// resident to its frozen end on the accounting thread would let a
+    /// conversation between four residents hold the command desk shut
+    /// for as long as it lasted, with `Halt` among the commands that
     /// could not get in (sprawling-SPEC.md 8-46-2).
     ///
     /// A knock that cannot be answered is noted and stepped over. The

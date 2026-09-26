@@ -8,9 +8,8 @@
 //!
 //! One definition, folded the same way wherever it is held: the reading
 //! side keeps one inside the `Views` a page is answered from, and the
-//! judging side keeps one inside the worker that writes. They used to
-//! be two folds of the same four records, agreeing by inspection, and
-//! `what_a_worker_holds_is_what_a_restart_rebuilds` is what now holds
+//! judging side keeps one inside the worker that writes. Both are this
+//! fold, and `what_a_worker_holds_is_what_a_restart_rebuilds` holds
 //! them equal.
 
 use kernel::event::Scope;
@@ -110,11 +109,11 @@ impl Governance {
     /// Refuses a line this build cannot read. The three governance
     /// payloads are read through the one kernel type each was written
     /// from, so this fold and `views::answered` cannot answer
-    /// differently about the same line; they used to be dropped in
-    /// silence here, which made a history written by another build open
-    /// as a city with work missing from its account, approvals nobody
-    /// would ever be asked, and an allowance narrower than the person
-    /// gave (sprawling-SPEC.md 8-74).
+    /// differently about the same line. Dropping such a line in silence
+    /// would open a history written by another build as a city with work
+    /// missing from its account, approvals nobody would ever be asked,
+    /// and an allowance narrower than the person gave
+    /// (sprawling-SPEC.md 8-74).
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "a few kinds move this fold; the rest of the event vocabulary does not"

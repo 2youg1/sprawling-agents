@@ -268,11 +268,10 @@ impl RunWorker {
     /// minute running yesterday, and the ledger says when it woke.
     ///
     /// **Every job due in the window is started, and one that cannot be
-    /// is noted rather than swallowing the rest.** The old loop returned
-    /// on the first refusal after the window had already been closed, so
-    /// one mistyped building address made every other job due that
-    /// minute disappear with nothing recorded (sprawling-SPEC.md
-    /// 8-46-2).
+    /// is noted rather than swallowing the rest.** Returning on the first
+    /// refusal after the window had closed would let one mistyped
+    /// building address make every other job due that minute disappear
+    /// with nothing recorded (sprawling-SPEC.md 8-46-2).
     ///
     /// # Errors
     /// Propagates the schedule's own refusal to parse. A job that cannot
@@ -291,8 +290,8 @@ impl RunWorker {
             }
         }
         // The window closes once it has been walked, never before: a
-        // schedule read that stopped halfway used to leave `last_tick`
-        // past jobs no lane ever took.
+        // schedule read that stopped halfway would leave `last_tick` past
+        // jobs no lane ever took.
         self.last_tick = now;
         Ok(started)
     }

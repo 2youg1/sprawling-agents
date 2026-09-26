@@ -48,9 +48,8 @@ pub(crate) struct Views {
     ///
     /// The reading side of the one governance fold. The worker holds
     /// the judging side, of the same type and folded by the same
-    /// `absorb`: this view used to spell the four arms a second time,
-    /// and the two spellings disagreed about what an unreadable ruling
-    /// meant.
+    /// `absorb`, so the two sides cannot spell the four arms differently
+    /// or disagree about what an unreadable ruling means.
     pub(super) governance: super::Governance,
     pub(super) book: gateway::EndpointBook,
     /// The city's own name, as its first record states it. Handed to a

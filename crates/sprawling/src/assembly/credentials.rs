@@ -183,8 +183,8 @@ pub(super) struct Chosen {
 /// figure is taken where the catalogue has a row for the model.
 pub(super) struct Ceilings {
     /// `None` when nobody stated one. Zero is unrepresentable here:
-    /// a window of zero and a window nobody registered used to be the
-    /// same byte, and the reminder read every session as full.
+    /// a window of zero and a window nobody registered would be the same
+    /// byte, and the reminder would read every session as full.
     pub(super) context_tokens: Option<kernel::Window>,
     pub(super) max_output_tokens: Option<kernel::Ceiling>,
 }

@@ -136,8 +136,8 @@ impl Tool for BrowserTool {
     }
 
     /// The host this call names, read by the same grammar `invoke`
-    /// reads (M-17). The bench used to spell `host` by hand, which this
-    /// tool never wrote.
+    /// reads, so the bench and the tool cannot disagree about which host
+    /// a call names.
     ///
     /// # Errors
     /// Refuses arguments this tool cannot read, which is what `invoke`

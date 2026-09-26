@@ -210,9 +210,9 @@ pub(crate) struct Serving {
 pub struct RunWorker {
     city_root: PathBuf,
     /// Which city this is, as the genesis line hashes. Read from the
-    /// ledger the first time a commit needs signing and remembered:
-    /// every fence, landing and merge used to re-read the front of the
-    /// history for it (sprawling-SPEC.md 8-51). Lazy rather than read on
+    /// ledger the first time a commit needs signing and remembered, so
+    /// no fence, landing or merge re-reads the front of the history for
+    /// it (sprawling-SPEC.md 8-51). Lazy rather than read on
     /// open, because a worker over a city with no genesis line yet is a
     /// legal state.
     city: std::sync::OnceLock<kernel::B3Hash>,

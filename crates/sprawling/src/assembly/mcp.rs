@@ -285,9 +285,9 @@ mod tests {
         );
     }
 
-    /// Two different calls to one tool in one turn are two calls. The key
-    /// used to be the turn's millisecond stamp plus the tool's name, so
-    /// the second came back as a duplicate of the first - and the model
+    /// Two different calls to one tool in one turn are two calls. A key
+    /// made of the turn's millisecond stamp and the tool's name would
+    /// return the second as a duplicate of the first, and the model would
     /// read that as a fault in itself.
     #[test]
     fn the_same_tool_twice_with_different_arguments_runs_twice() {

@@ -238,8 +238,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             // The route waits for whichever comes first, so the
             // reply address is the credential's own request rather
             // than nowhere: a vault that refuses is a fact the
-            // person typing the key needs, and it used to reach
-            // nobody at all.
+            // person typing the key needs.
             secrets_desk.post(command, reply);
             Ok(())
         }),
@@ -289,9 +288,9 @@ impl Listening {
             // a browser draws are one call, so they cannot disagree.
             crate::console::start(terminal, console_desk, Arc::clone(&answering), watching);
         }
-        // Ctrl-C used to be a process death: `sprawling resume` recovered
-        // it, and a stop somebody chose and a stop that was a crash left the
-        // same silence in the record. The listener stops accepting first,
+        // Ctrl-C is an orderly close, so a stop somebody chose and a stop
+        // that was a crash do not leave the same silence in the record.
+        // The listener stops accepting first,
         // then the worker is told - it reads that where it reads its queue,
         // so whatever command is running finishes and the handoff is the
         // last line rather than a line in the middle of one.

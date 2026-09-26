@@ -73,13 +73,13 @@ pub(super) struct Placing<'f> {
     bench: ToolBench,
     sieving: Sieving,
     run: RunId,
-    /// Where the next call sits in this run. The key used to derive from
-    /// the turn's millisecond stamp and the tool's name, which broke
-    /// twice over: it took a clock, which determinism rule 7 forbids
-    /// outright, and it ignored the arguments - so two `read`s of two
-    /// different files in one turn were one key, and the second came
-    /// back "this call was already made". A model reads that as a fault
-    /// in itself.
+    /// Where the next call sits in this run. The key derives from this
+    /// position rather than from the turn's millisecond stamp and the
+    /// tool's name: a stamp is a clock, which determinism rule 7 forbids
+    /// outright, and a name ignores the arguments, so two `read`s of two
+    /// different files in one turn would be one key and the second would
+    /// come back "this call was already made". A model reads that as a
+    /// fault in itself.
     next: u64,
     /// What the run's own commands did: (passed, failed). It is the only
     /// evidence of "the tests passed" the city can observe without being

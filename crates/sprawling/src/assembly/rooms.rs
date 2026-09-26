@@ -173,8 +173,8 @@ impl RoomQueues {
             }
         };
         // The queue comes home whatever the signals that waited do to
-        // it: this method exists because a queue that failed on its way
-        // back used to be a queue the city forgot it had.
+        // it: a queue that failed on its way back must not become a
+        // queue the city forgets it has.
         let mut refused = None;
         for signal in &waiting {
             let delivered = returned

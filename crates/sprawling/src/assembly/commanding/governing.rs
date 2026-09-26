@@ -164,9 +164,9 @@ impl RunWorker {
             // of work, interrupted.
             //
             // Into a lane, so that answering one item does not hold the
-            // desk for the length of the run it releases - which is how
-            // a person answering a queue of approvals used to wait
-            // minutes between two clicks (sprawling-SPEC.md 8-46-2). The
+            // desk for the length of the run it releases; a person
+            // answering a queue of approvals would otherwise wait minutes
+            // between two clicks (sprawling-SPEC.md 8-46-2). The
             // room it was interrupted in already exists, so no session
             // is opened.
             // The start reports its own refusal; there is no run id to

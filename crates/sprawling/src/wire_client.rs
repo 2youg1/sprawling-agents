@@ -384,8 +384,8 @@ mod tests {
 
     /// A query has exactly one reply, so `call` ends on it rather than
     /// holding the process open for a quiet window that can bring
-    /// nothing more: the city's answer arrives in milliseconds and the
-    /// window used to add two whole seconds to every query.
+    /// nothing more: the city's answer arrives in milliseconds, and
+    /// waiting out the window would add whole seconds to every query.
     #[test]
     fn a_query_returns_on_its_answer_before_the_quiet_window_ends() {
         let quiet = Duration::from_millis(1_000);

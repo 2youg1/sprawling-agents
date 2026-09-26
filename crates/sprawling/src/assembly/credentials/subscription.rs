@@ -13,10 +13,10 @@
 //! rename cannot leave the reader looking for the old name.
 //!
 //! The table is folded from the history like every other book the
-//! worker keeps. It used to be written only by the process that logged
-//! in, so a restarted city had no expiry for anything and renewed
-//! nothing — and discovered each expiry as a 401 in the middle of a
-//! run, losing that turn (sprawling-SPEC.md 8-11).
+//! worker keeps. A table written only by the process that logged in
+//! would leave a restarted city with no expiry for anything, renewing
+//! nothing and discovering each expiry as a 401 in the middle of a run,
+//! losing that turn (sprawling-SPEC.md 8-11).
 
 use kernel::event::record::SecretCaptured;
 use kernel::{AxError, EventKind, Payload, SecretRef};
