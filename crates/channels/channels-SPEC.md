@@ -1331,3 +1331,16 @@ pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
 - **失败码不变**：判定拒绝仍是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定仍是 `E_CONFIG_INVALID`，recovery 仍是「换一个空闲端口，或者停掉占着它的进程」。
 - **被否：先试绑一次再放掉，然后在 `serve` 里真绑**。试绑与真绑之间，别的进程可以把端口拿走，那样原来的缺陷只是窗口变窄了，并没有消失。
 - **两者住 `server::listener`**，不住 `server::socket`：它们管的是监听器本身，先占、再服务；`server::socket` 管的是连上之后的会话、资产与上传。`Bound` 带 `#[must_use]`：占住端口而不服务，得到的是一个谁也不应答的端口。
+
+### 8-48 `WIRE_V` 40：`ServerFrame::Output`，一条还在跑的命令写出的字节
+
+```rust
+pub enum ServerFrame { …, Delta(Delta), Log(LogLine), Lagged(Lagged), Output(LiveOutput) }
+pub enum OutputStream { Out, Err }        // 恒不是 bool
+pub struct LiveOutput { pub run: RunId, pub stream: OutputStream, pub text: String }
+```
+
+- **与 `Delta` 同一条规则**：可丢弃，不带账本序号，不进账本；调用的结果以 `tool_returned` 落账时页面扔掉它画的这段，两者不一致时账本赢。
+- **第四条广播通道 `ServeConfig::outputs`**：一条刷屏的命令不该把模型的增量或日志行挤出慢读者的窗口；`RecvError::Lagged` 一言不发地略过，理由与增量相同——漏掉的字节在调用落账时整段到达。
+- **`text` 是 UTF-8 有损解码**，因为一块在字节上界处切开，可能切在一个多字节字符中间；切口处画成替换字符只影响预览，结果以账本为准。**被否**：线上带字节数组——JSON 里一个字节要三四个字符，而页面最终画的是文本。
+- **`OutputStream` 是 `runtime::Stream` 的第二处拼写而不是第二处权威**：本 crate 的依赖图够不到 `runtime`，映射住在装配层（`sprawling::assembly` 的 `serve`），与 `LogLevel`（§8-32）同一个安排。

@@ -1345,7 +1345,7 @@ impl Backlog {
 
 **红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
-#### 8-28-3 exec 输出的实时流（读增量已接，服务端缓冲、线上帧与页面缓冲未接）
+#### 8-28-3 exec 输出的实时流（读增量、装配点注入与线上帧已接，服务端缓冲与页面缓冲未接）
 
 **现状**：一个 `exec` 调用的 stdout／stderr 只在调用结束时随工具结果进账本，页面（client 的监视器）在那之前只看得到「运行中」。第 2 条让输出写进 scratch 下的 `out`／`err` 两个文件，所以实时流不需要改子进程怎么写，只需要有人在它还在写时读这两个文件的增量。
 
@@ -1366,7 +1366,9 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 
 - 窗口里的读停在交给后台那一刻，偏移随成员进表；此后本 run 的每次 `harvest` 对它自己的、仍在跑的后台命令从同一偏移接着读。块在放开表锁之后才交给 sink，所以 sink 慢不会让表上其他调用等它。
 
-**待接**：服务端环形缓冲与装配点注入 sink；`ServerFrame` 与 `WIRE_V`；页面环形缓冲。设计如下。
+**已接的第二段——装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `channels::LiveOutput`（channels-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
+
+**待接**：服务端每个 run 的环形缓冲（后来打开 run 页的会话先拿到它）；页面环形缓冲。设计如下。
 
 **设计**：
 
