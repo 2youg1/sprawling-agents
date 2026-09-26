@@ -68,7 +68,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         vault,
         notice: vault_notice,
         log,
-        standing,
+        held,
     } = opening;
     let Outward {
         desk: worker_desk,
@@ -84,13 +84,13 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         machine,
         thread: fold_thread,
     } = spawn_folding(views, to_clients)?;
-    // The one sanctioned thread besides the runtime's own. The ledger is
-    // opened *inside* it and never leaves: a city has one writer, and the
-    // type never has to cross a thread boundary to prove it.
+    // The one sanctioned thread besides the runtime's own. The ledger was
+    // opened, its writer lock taken, before the history was folded; it
+    // moves into this thread and never leaves: a city has one writer.
     let worker_thread = std::thread::Builder::new()
         .name("sprawling-runs".to_owned())
         .spawn(move || {
-            let mut worker = match RunWorker::inheriting(&worker_root, vault, log, standing) {
+            let mut worker = match RunWorker::holding(&worker_root, vault, log, held) {
                 Ok(mut worker) => {
                     worker.open_for_service(vault_notice);
                     drop(ready_tx.send(Ok(worker.vault_handle())));

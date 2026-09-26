@@ -59,17 +59,6 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
         })
         .unwrap();
 
-    let (mut views, standing) = fold_city(&report.ledger_dir).unwrap();
-    let everything = channels::Query::History {
-        before: None,
-        limit: channels::HISTORY_MAX,
-    };
-    assert_eq!(
-        views.answer(&everything),
-        rebuild_views(&report.ledger_dir)
-            .unwrap()
-            .answer(&everything)
-    );
     let judged = |governance: &Governance| {
         (
             governance.halted.clone(),
@@ -77,13 +66,29 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
             governance.granted.clone(),
         )
     };
+    // The worker holds the writer lock; `fold_city` takes it before it reads.
+    let the_worker_judged = judged(&worker.governance);
+    drop(worker);
+
+    let (mut views, (_ledger, standing)) = fold_city(&report.ledger_dir).unwrap();
+    // Answered from what `Views::apply` folded, not from the on-disk index.
+    for applied in [
+        channels::Query::CityView,
+        channels::Query::Governance,
+        channels::Query::ApprovalQueue,
+    ] {
+        assert_eq!(
+            views.answer(&applied),
+            rebuild_views(&report.ledger_dir).unwrap().answer(&applied)
+        );
+    }
     assert_eq!(
         judged(&standing.governance),
         judged(&Standing::fold(&report.ledger_dir).unwrap().governance)
     );
     assert_eq!(
         judged(&standing.governance),
-        judged(&worker.governance),
+        the_worker_judged,
         "and the comparison above is not two empty folds agreeing"
     );
     assert!(!standing.governance.halted.is_empty());

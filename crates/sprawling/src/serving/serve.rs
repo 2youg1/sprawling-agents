@@ -61,7 +61,8 @@ pub(super) struct Opening {
     /// disclosure. Consumed by the first `open_for_service`.
     pub(super) notice: Option<Payload>,
     pub(super) log: runtime::diagnostics::Diagnostics,
-    /// What the history already says, folded on the serve thread in the
-    /// same pass as the views, so the worker does not read it again.
-    pub(super) standing: crate::assembly::Standing,
+    /// The opened ledger and what its history already says, folded on the
+    /// serve thread under its writer lock in the same pass as the views,
+    /// so the worker neither opens nor reads it again.
+    pub(super) held: (memory::JsonlLedger, crate::assembly::Standing),
 }

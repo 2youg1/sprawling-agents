@@ -6,8 +6,8 @@
 //! A worker opened over a history, and the city closed in the record.
 //!
 //! The two ends of one lifetime: `RunWorker::new`, `over` and
-//! `inheriting` are LOADING - the worker folds what the ledger says before it acts on
-//! anything - and `close_city` is UNLOADING, the one line that says a
+//! `holding` are LOADING - the worker folds, or is handed, what the
+//! ledger says before it acts on anything - and `close_city` is UNLOADING, the one line that says a
 //! stop was chosen rather than suffered. They sit together because a
 //! reader asking "what does a restart find" and "what does a close
 //! leave" is asking one question from two ends.
@@ -35,25 +35,6 @@ impl RunWorker {
         RunWorker::over(city_root, vault, log, ledger)
     }
 
-    /// Opens the ledger and builds a worker around a standing somebody
-    /// already folded, so the history is not read a second time.
-    ///
-    /// The standing must have been folded from this city's ledger before
-    /// the open: the open repairs only a torn tail, which no fold reads.
-    ///
-    /// # Errors
-    /// Propagates whatever opening the ledger or the store reports.
-    pub(crate) fn inheriting(
-        city_root: &Path,
-        vault: gateway::Custodian,
-        log: runtime::diagnostics::Diagnostics,
-        standing: Standing,
-    ) -> Result<Self, AxError> {
-        let (ledger, _report) = JsonlLedger::open(&ledger_dir(city_root), now_ms()?)
-            .map_err(memory::MemoryError::into_ax)?;
-        RunWorker::holding(city_root, vault, log, (ledger, standing))
-    }
-
     /// Builds a worker around a ledger somebody else opened (LOADING; UNLOADING: `close_city`).
     ///
     /// Where the history comes from is not this worker's decision to
@@ -78,7 +59,10 @@ impl RunWorker {
         RunWorker::holding(city_root, vault, log, (ledger, standing))
     }
 
-    fn holding(
+    ///
+    /// `holding` takes a ledger already opened, its writer lock held, and
+    /// the standing folded from it under that lock.
+    pub(crate) fn holding(
         city_root: &Path,
         vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
