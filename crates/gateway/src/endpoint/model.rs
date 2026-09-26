@@ -20,7 +20,8 @@ use crate::cost;
 use crate::dialect::response_from_wire;
 use crate::market::InputKinds;
 
-use super::config::{Endpoint, ProviderFailure, provider_err};
+use super::config::Endpoint;
+use super::failure::{ProviderFailure, provider_err};
 impl Model for Endpoint {
     fn call_streaming(
         &mut self,

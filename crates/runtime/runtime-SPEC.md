@@ -1699,7 +1699,7 @@ pub fn splice(text: &str, front: usize, back: usize, place: Elided) -> Cut;
 
 ### 8-44 turn::recovery —— 模型调用恢复管线的段契约（形状 2 值＋形状 3 内缝）
 
-**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`is_retriable`）的唯一家是 `gateway::endpoint::config::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
+**错误分层三层各管一段。**「同一个请求还能不能再发一次」（`is_retriable`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
 
 ```rust
 // turn/recovery.rs（形状 2 值＋形状 3 内缝；pub(super)：turn 之外没有第二个用户）
