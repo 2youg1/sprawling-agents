@@ -126,7 +126,7 @@ impl RunWorker {
                     parent: None,
                     origin: None,
                     succession: None,
-                    tainted: false,
+                    taint: kernel::TaintSet::empty(),
                 },
                 format!("Plan node {next}: {item}"),
                 goal,

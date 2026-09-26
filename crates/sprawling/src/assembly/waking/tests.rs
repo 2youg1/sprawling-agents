@@ -253,6 +253,8 @@ addr = \"lab/room1\"
 /// Through the production path - arrival, dispatch, the bench the
 /// workbench lays out - because the defect this pins was a bench that
 /// never learned the run was tainted, which no unit of the bench shows.
+/// The refusal names the source the work arrived from, so the taint the
+/// door read is the arrival's own label rather than one made up later.
 #[test]
 fn an_arrival_that_starts_work_is_refused_exec() {
     let dir = tempfile::tempdir().unwrap();
@@ -285,5 +287,9 @@ fn an_arrival_that_starts_work_is_refused_exec() {
     assert!(
         answered.contains("E_TAINTED_ACTION"),
         "a tainted run's exec reached past the command door: {answered}"
+    );
+    assert!(
+        answered.contains("carries content from arrival:github"),
+        "the command door read a taint that does not name the arrival: {answered}"
     );
 }

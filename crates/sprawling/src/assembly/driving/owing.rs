@@ -58,13 +58,13 @@ pub(in crate::assembly) enum Owed {
 /// Four reasons rather than one flag, because each one names a
 /// different person to go back to when the run cannot be started: the
 /// schedule file, the watch table, a resident, or an answered approval.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(in crate::assembly) enum Unasked {
     /// The schedule said this job was due.
     Schedule,
     /// Something arrived from outside and the watch table routed it
-    /// here.
-    Arrival,
+    /// here. The source it arrived from is the taint the run carries.
+    Arrival(kernel::TaintSource),
     /// A neighbour signalled a resident who was not working.
     Knock,
     /// A person answered the approval this work was waiting on.
@@ -73,12 +73,21 @@ pub(in crate::assembly) enum Unasked {
 
 impl Unasked {
     /// One clause a diagnostic line ends with.
-    pub(in crate::assembly) fn because(self) -> &'static str {
+    pub(in crate::assembly) fn because(&self) -> &'static str {
         match self {
             Unasked::Schedule => "the schedule said it was due",
-            Unasked::Arrival => "something arrived from outside",
+            Unasked::Arrival(_) => "something arrived from outside",
             Unasked::Knock => "a neighbour signalled this resident",
             Unasked::Unblocked => "a person answered the approval it was waiting on",
+        }
+    }
+
+    /// The taint a run started for this reason carries into every door
+    /// its bench asks: only an arrival began with somebody else's text.
+    pub(in crate::assembly) fn taint(&self) -> kernel::TaintSet {
+        match self {
+            Unasked::Arrival(source) => kernel::TaintSet::of(source.clone()),
+            Unasked::Schedule | Unasked::Knock | Unasked::Unblocked => kernel::TaintSet::empty(),
         }
     }
 }

@@ -312,8 +312,9 @@ impl RunWorker {
             mode: kernel::Mode::PlanGoal,
             parent: None,
             succession: None,
-            tainted: matches!(because, Unasked::Arrival),
+            taint: because.taint(),
         };
+        let reason = because.because();
         match self.dispatch_into_lane(at, task, goal, Owing::unasked(because)) {
             Ok(run) => Some(run),
             Err(err) => {
@@ -323,7 +324,7 @@ impl RunWorker {
                     &format!(
                         "no run started at {} although {}: {}",
                         addr.as_str(),
-                        because.because(),
+                        reason,
                         err.subject()
                     ),
                 );

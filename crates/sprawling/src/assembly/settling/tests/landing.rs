@@ -74,7 +74,7 @@ Trades in the market as {who}.
         session: None,
         effort: None,
         mode: kernel::Mode::Up,
-        tainted: false,
+        taint: kernel::TaintSet::empty(),
         origin: None,
     };
     let effects = vec![
@@ -123,7 +123,7 @@ fn a_half_filed_shelf_is_unwound() {
         session: None,
         effort: None,
         mode: kernel::Mode::Up,
-        tainted: false,
+        taint: kernel::TaintSet::empty(),
         origin: None,
     };
     let effects = vec![
@@ -204,7 +204,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
                 mode: kernel::Mode::PlanGoal,
                 parent: None,
                 succession: None,
-                tainted: false,
+                taint: kernel::TaintSet::empty(),
                 origin: None,
             },
             "read what is waiting".to_owned(),
