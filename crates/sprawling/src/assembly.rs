@@ -39,6 +39,7 @@ mod driving;
 mod folds;
 mod freezing;
 mod genesis;
+mod keeping_warm;
 mod lifetime;
 mod mcp;
 mod naming;
@@ -223,6 +224,9 @@ pub struct RunWorker {
     /// running. One per city, so the number of runs a city drives at once
     /// has one answer (sprawling-SPEC.md 8-46-2).
     flight: Flight,
+    /// The keep-warm doors of runs that have landed, one per room
+    /// (`keeping_warm`); empty under the default setting.
+    warm: keeping_warm::Kept,
 }
 
 impl RunWorker {

@@ -98,6 +98,7 @@ impl RunWorker {
             doorstep: Doorstep::opened(entrance),
             origins,
             flight: Flight::open(),
+            warm: super::keeping_warm::Kept::default(),
         })
     }
 
