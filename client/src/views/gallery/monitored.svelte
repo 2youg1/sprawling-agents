@@ -29,6 +29,7 @@
       calls: [
         {
           at: 11,
+          called: 1100,
           tool: "edit",
           subject: "src/ledger.rs",
           outcome: "answered",
@@ -42,6 +43,7 @@
         },
         {
           at: 12,
+          called: 1200,
           tool: "exec",
           outcome: "answered",
           arguments: said({ arm: { shell: { text: "cargo test -p ledger" } } }),
@@ -54,6 +56,7 @@
         },
         {
           at: 13,
+          called: 1300,
           tool: "exec",
           outcome: "waiting",
           arguments: said({ arm: { program: { path: "cargo", args: ["clippy", "-p", "ledger"] } } }),
