@@ -282,6 +282,28 @@ mod tests {
     }
 
     #[test]
+    fn a_tree_under_another_citys_home_survives_the_sweep() {
+        let dir = tempfile::tempdir().unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        drop(city(dir.path()));
+        let foreign = elsewhere
+            .path()
+            .join(kernel::RESERVED_PREFIX)
+            .join("worktrees")
+            .join("run-9");
+        std::fs::create_dir_all(foreign.parent().unwrap()).unwrap();
+        let repo = git2::Repository::open(dir.path()).unwrap();
+        repo.worktree("run-9", &foreign, None).unwrap();
+
+        let swept = Worktrees::sweep_abandoned(dir.path(), &[]).unwrap();
+
+        assert_eq!(
+            (swept, left(dir.path()).registered, foreign.exists()),
+            (vec![], vec!["run-9".to_owned()], true)
+        );
+    }
+
+    #[test]
     fn a_live_runs_tree_and_the_persons_own_tree_survive_the_sweep() {
         let dir = tempfile::tempdir().unwrap();
         let elsewhere = tempfile::tempdir().unwrap();
