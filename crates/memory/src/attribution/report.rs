@@ -52,6 +52,7 @@ pub struct Attribution {
     segment_weights: BTreeMap<RunId, Vec<(String, u64)>>,
     tool_weights: BTreeMap<String, u64>,
     skill_weights: BTreeMap<String, u64>,
+    unpriced: Unpriced,
 }
 
 pub struct AttributionReport {
@@ -128,6 +129,11 @@ impl Attribution {
                 else {
                     // A call with no authoritative amount attributes
                     // nothing. Estimating here would invent money.
+                    self.unpriced.calls = self.unpriced.calls.saturating_add(1);
+                    self.unpriced.tokens = self
+                        .unpriced
+                        .tokens
+                        .saturating_add(usage_tokens(record.data().as_map()));
                     self.tool_weights.clear();
                     self.skill_weights.clear();
                     return Ok(());
@@ -175,9 +181,24 @@ impl Attribution {
             by_segment: quantify(&self.by_segment),
             by_tool: quantify(&self.by_tool),
             by_skill: quantify(&self.by_skill),
-            unpriced: Unpriced::default(),
+            unpriced: self.unpriced,
         }
     }
+}
+
+/// The four token counts of one `model_returned`'s `usage`, summed; a
+/// call that reported no usage used no tokens anyone measured.
+fn usage_tokens(data: &serde_json::Map<String, Value>) -> u64 {
+    let usage = data.get("usage");
+    [
+        "input_tokens",
+        "output_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens",
+    ]
+    .into_iter()
+    .filter_map(|field| usage.and_then(|u| u.get(field)).and_then(Value::as_u64))
+    .fold(0, u64::saturating_add)
 }
 
 #[cfg(test)]
