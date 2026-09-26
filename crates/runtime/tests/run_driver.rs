@@ -1164,9 +1164,12 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
     drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
 
     let seen = seen.borrow();
-    // The cache marker moves to the newest message; every byte before it
-    // is the request already sent.
-    let first = seen[0].strip_suffix("cache: true }]").unwrap();
+    // The breakpoint is a request-side annotation, so a message prints
+    eprintln!("SEEN0={}
+SEEN1={}", seen[0], seen.get(1).cloned().unwrap_or_default());
+    // the same in every request that carries it: every byte before the
+    // closing bracket is the request already sent.
+    let first = seen[0].strip_suffix(']').unwrap();
     assert!(
         seen[1].starts_with(first),
         "the second request extends the first:\n{}\n{}",
@@ -1174,7 +1177,7 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
         seen[1]
     );
     assert!(
-        seen[1].ends_with("Text { text: \"user: measure it in metres\" }], cache: true }]"),
+        seen[1].ends_with("Text { text: \"user: measure it in metres\" }] }]"),
         "the steer lands after the result it arrived during: {}",
         seen[1]
     );
