@@ -139,6 +139,7 @@ export function ui(): Ui {
         answered: () => undefined,
         invalidate: () => undefined,
         reconnected: () => undefined,
+        resumed: () => undefined,
       },
       command: () => false,
       retry: () => undefined,

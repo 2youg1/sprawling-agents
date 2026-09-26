@@ -36,7 +36,8 @@ import { decodeFrame, encodeFrame } from "./frames";
 import { langOf, say } from "./lang";
 import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
-import type { Command, HistoryRangeAnswer, Query, Seq, ServerFrame } from "../wire";
+import { Seq } from "../wire";
+import type { Command, EventRecord, HistoryRangeAnswer, Query, ServerFrame } from "../wire";
 
 export interface Connection {
   readonly state: Readable<LinkState>;
@@ -65,12 +66,26 @@ interface Gap {
   readonly at: Seq;
   // The last sequence the range reaches.
   readonly to: Seq;
+  // What the records of the range do to the answers on the page once
+  // folded: see `filled` and `resume`.
+  readonly records: GapRecords;
 }
+
+// A range `lagged` named holds records the live stream skipped, which
+// invalidate nothing; a range written while the socket was down holds
+// the news the answers on the page missed, and each record invalidates
+// what it touches.
+type GapRecords = "folded" | "invalidating";
 
 // One page of a gap. The server caps an answer at its own limit whatever
 // this asks for, and a page small enough to fold in one frame keeps a
 // long gap from holding up the records that are still arriving.
 const GAP_PAGE = 200;
+
+// How many gap pages a reconnect fetches before a snapshot is the
+// cheaper way to the present: past this, asking every watched question
+// again moves fewer bytes than walking the range (client-SPEC 4-39).
+const RESUME_PAGES = 2;
 
 // How a POST offers this city's pairing token.
 //
@@ -113,6 +128,10 @@ export function openConnection(
   // filled waits its turn and nothing is dropped between them.
   const gaps: Gap[] = [];
   let fetching: Seq | null = null;
+  // The highest ledger sequence this page has folded, from the live
+  // stream or a gap: the point a reconnect resumes after. Null until
+  // the first record, and a page with no mark has nothing to resume.
+  let mark: Seq | null = null;
   // The attempt the ladder scheduled, held so a link that turns out to
   // be refused can cancel it. A refused link that left this running
   // would reopen the socket behind a message telling the person the
@@ -154,8 +173,10 @@ export function openConnection(
     // read: a page of two hundred records is one question's answer, and
     // a notice per record would bury the question in its answer.
     let bad: string | null = null;
+    const records = gaps[0]?.records ?? "folded";
     for (const record of range.records) {
-      const unreadable = store.apply(record);
+      const unreadable = folded(record);
+      if (records === "invalidating") asking.invalidate(record);
       bad ??= unreadable;
     }
     if (bad !== null) store.refused(unreadableRecord(lang, bad));
@@ -173,9 +194,29 @@ export function openConnection(
     if (front !== undefined && cursor !== null) {
       // The server's cursor, not arithmetic here: it is the one place
       // that knows where the Ledger holds the next record of the range.
-      gaps.unshift({ at: cursor, to: front.to });
+      gaps.unshift({ ...front, at: cursor });
     }
     askGap();
+  }
+
+  // Folds one record and moves the mark past it.
+  function folded(record: EventRecord): string | null {
+    if (mark === null || record.seq > mark) mark = record.seq;
+    return store.apply(record);
+  }
+
+  // A welcome names the ledger head. A page that knows where it stopped
+  // and is at most `RESUME_PAGES` pages behind fetches the records in
+  // between and asks again only what the dead socket took with it;
+  // any other page asks every watched question again.
+  function resume(head: Seq | null): void {
+    const owed = gaps.reduce((far, gap) => (gap.to > far ? gap.to : far), mark ?? head ?? Seq.make(0));
+    if (mark === null || head === null || head < mark || head - owed > RESUME_PAGES * GAP_PAGE) {
+      asking.reconnected();
+      return;
+    }
+    if (head > owed) gaps.push({ at: Seq.make(owed + 1), to: head, records: "invalidating" });
+    asking.resumed();
   }
 
   const asking = createAsking(
@@ -211,15 +252,15 @@ export function openConnection(
         // asked for, so the walk starts its front range again rather than
         // waiting for a page that will never arrive.
         fetching = null;
+        resume(action.welcome.resume_from ?? null);
         askGap();
-        asking.reconnected();
         return;
       case "deliver": {
         // The field this build could not read, if any, is reported here
         // rather than swallowed: the frame decoded and the socket is
         // still speaking this wire, so it goes where every other refusal
         // goes, and the rest of the record has already been folded.
-        const bad = store.apply(action.event);
+        const bad = folded(action.event);
         asking.invalidate(action.event);
         if (bad !== null) store.refused(unreadableRecord(lang, bad));
         return;
@@ -244,7 +285,7 @@ export function openConnection(
         store.logged(action.line);
         return;
       case "lagged":
-        gaps.push({ at: action.from, to: action.to });
+        gaps.push({ at: action.from, to: action.to, records: "folded" });
         askGap();
         return;
       case "wait":

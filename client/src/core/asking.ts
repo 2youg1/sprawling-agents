@@ -222,9 +222,13 @@ export interface Asking {
   readonly refresh: (query: Query) => void;
   readonly answered: (answer: Answer) => void;
   readonly invalidate: (record: EventRecord) => void;
-  // Everything is stale after a reconnect: the page missed whatever
-  // happened while the socket was down.
+  // Everything is stale after a reconnect the page cannot resume: it
+  // missed whatever happened while the socket was down.
   readonly reconnected: () => void;
+  // A reconnect whose missed records are being fetched: those records
+  // invalidate what they touch, so only the questions the dead socket
+  // took with it are asked again.
+  readonly resumed: () => void;
 }
 
 // The clock and the ear are handed in: a deadline a test cannot drive
@@ -382,17 +386,22 @@ export function createAsking(
   }
 
   function reconnected(): void {
+    for (const slot of held.values()) slot.stale = true;
+    resumed();
+  }
+
+  function resumed(): void {
     pending.length = 0;
     if (patience !== null) clearTimeout(patience);
     patience = null;
     for (const [key, slot] of held) {
+      if (slot.inflight) slot.stale = true;
       slot.inflight = false;
       slot.reported = false;
-      slot.stale = true;
       const query = parsed.get(key);
-      if (query !== undefined && slot.watchers > 0) dispatch(key, query, slot);
+      if (slot.stale && query !== undefined && slot.watchers > 0) dispatch(key, query, slot);
     }
   }
 
-  return { ask, refresh, answered, invalidate, reconnected };
+  return { ask, refresh, answered, invalidate, reconnected, resumed };
 }

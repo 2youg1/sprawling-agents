@@ -150,7 +150,6 @@ describe("the browser half", () => {
     first?.onopen?.();
     const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: 10, city: null };
     first?.onmessage?.({ data: JSON.stringify({ welcome }) });
-    const stop = conn.asking.ask("metrics").subscribe(() => undefined);
     const metrics = {
       approvals_waiting: 0,
       buildings: 0,
@@ -160,7 +159,6 @@ describe("the browser half", () => {
       runs_frozen: 0,
       signals_waiting: 0,
     };
-    first?.onmessage?.({ data: JSON.stringify({ answer: { metrics } }) });
     const record = {
       seq: 10,
       prev: "0".repeat(64),
@@ -172,6 +170,8 @@ describe("the browser half", () => {
       data: {},
     };
     first?.onmessage?.({ data: JSON.stringify({ event: record }) });
+    const stop = conn.asking.ask("metrics").subscribe(() => undefined);
+    first?.onmessage?.({ data: JSON.stringify({ answer: { metrics } }) });
     const before = booked.length;
     first?.onclose?.();
     booked[before]?.run();
@@ -179,7 +179,7 @@ describe("the browser half", () => {
     second?.onopen?.();
     second?.onmessage?.({ data: JSON.stringify({ welcome: { ...welcome, resume_from: 60 } }) });
 
-    const asked = second?.sent.slice(1).map((text) => JSON.parse(text) as unknown);
+    const asked: unknown[] | undefined = second?.sent.slice(1).map((text): unknown => JSON.parse(text));
     stop();
 
     expect(asked).toEqual([{ query: { history_range: { from: 11, to: 60, limit: 200 } } }]);
