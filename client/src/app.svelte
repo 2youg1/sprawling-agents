@@ -99,14 +99,8 @@
   const waiting = $derived($approvals.length);
   const working = $derived($belief.live.length > 0);
   const halted = $derived(cityIsShut($belief.halted));
-  // How many runs this city cancelled. The wire carries no count of
-  // what one halt froze, so this counts the runs whose own freeze says
-  // `cancelled`, which is what a halt writes.
-  const frozen = $derived(
-    Object.values($belief.runs).filter(
-      (run) => run.doing.kind === "frozen" && run.doing.completion === "cancelled",
-    ).length,
-  );
+  // How many runs this city cancelled.
+  const frozen = $derived($belief.cancelled);
   // Whether this city can take a dispatch at all: a `main` model is
   // chosen. Until then the first page is the welcome, unless the person
   // has already walked it and asked to be left alone.
