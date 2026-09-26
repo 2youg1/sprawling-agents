@@ -67,3 +67,13 @@ fn the_fold_rules_name_carries_the_digest_of_the_views_encoding() {
          so every snapshot cut under the old encoding is refused"
     );
 }
+
+/// Views hold run ids - commit facts, predecessors, skill pins - and a
+/// snapshot or a twin reads them back from the same binary encoding they
+/// were written in. A city with one commit in it could not be served.
+#[test]
+fn a_run_id_reads_back_from_the_snapshot_encoding() {
+    let run = RunId::from_bytes([7u8; 16]);
+    let bytes = postcard::to_allocvec(&run).unwrap();
+    assert_eq!(postcard::from_bytes::<RunId>(&bytes).unwrap(), run);
+}
