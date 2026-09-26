@@ -32,12 +32,7 @@ pub struct Payload(serde_json::Map<String, serde_json::Value>);
 impl Payload {
     /// Sole constructor.
     pub fn new(map: serde_json::Map<String, serde_json::Value>) -> Result<Self, AxError> {
-        for value in map.values() {
-            // Depth first: it is iterative, and it bounds the recursion
-            // `reject_floats` spends on the levels that remain.
-            reject_depth(value, PAYLOAD_DEPTH_MAX.saturating_sub(1))?;
-            reject_floats(value)?;
-        }
+        reject_floats_and_depth(&map)?;
         Ok(Payload(map))
     }
 
@@ -108,58 +103,60 @@ impl<'de> Deserialize<'de> for Payload {
     }
 }
 
-fn reject_floats(value: &serde_json::Value) -> Result<(), AxError> {
-    match value {
-        serde_json::Value::Number(n) if !n.is_i64() && !n.is_u64() => {
-            Err(
-                AxError::failure(AxCode::InvalidArgs, "build payload", n.to_string())
-                    .with_recovery("ledger payloads never carry floats; scale to integers"),
-            )
+/// Refuses a float anywhere under `map`, and containers nested past
+/// [`PAYLOAD_DEPTH_MAX`], in one iterative walk over one stack: a hostile
+/// payload cannot spend the writer's stack, and a well-formed one costs a
+/// single allocation however wide or deep it is. A container is judged
+/// before anything under it, so a payload too deep for the reader is
+/// refused for its depth even when a float waits at the bottom.
+fn reject_floats_and_depth(
+    map: &serde_json::Map<String, serde_json::Value>,
+) -> Result<(), AxError> {
+    // The payload's own object is the first level, so what it holds
+    // starts one container down.
+    let mut pending: Vec<(&serde_json::Value, usize)> =
+        map.values().map(|value| (value, 1)).collect();
+    while let Some((value, above)) = pending.pop() {
+        match value {
+            serde_json::Value::Number(n) if !n.is_i64() && !n.is_u64() => {
+                return Err(
+                    AxError::failure(AxCode::InvalidArgs, "build payload", n.to_string())
+                        .with_recovery("ledger payloads never carry floats; scale to integers"),
+                );
+            }
+            serde_json::Value::Array(items) => {
+                let level = opened(above)?;
+                pending.extend(items.iter().map(|item| (item, level)));
+            }
+            serde_json::Value::Object(inner) => {
+                let level = opened(above)?;
+                pending.extend(inner.values().map(|item| (item, level)));
+            }
+            serde_json::Value::Null
+            | serde_json::Value::Bool(_)
+            | serde_json::Value::Number(_)
+            | serde_json::Value::String(_) => {}
         }
-        serde_json::Value::Array(items) => items.iter().try_for_each(reject_floats),
-        serde_json::Value::Object(map) => map.values().try_for_each(reject_floats),
-        serde_json::Value::Null
-        | serde_json::Value::Bool(_)
-        | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => Ok(()),
-    }
-}
-
-/// Refuses `value` when its containers nest deeper than `room`; iterative
-/// over the levels so a hostile payload cannot spend the writer's stack.
-fn reject_depth(value: &serde_json::Value, room: usize) -> Result<(), AxError> {
-    let mut level: Vec<&serde_json::Value> = vec![value];
-    let mut room = room;
-    while !level.is_empty() {
-        let next: Vec<&serde_json::Value> = level
-            .iter()
-            .flat_map(|value| match value {
-                serde_json::Value::Array(items) => items.iter().collect::<Vec<_>>(),
-                serde_json::Value::Object(map) => map.values().collect(),
-                serde_json::Value::Null
-                | serde_json::Value::Bool(_)
-                | serde_json::Value::Number(_)
-                | serde_json::Value::String(_) => Vec::new(),
-            })
-            .collect();
-        let opens_a_level = level
-            .iter()
-            .any(|value| value.is_array() || value.is_object());
-        if opens_a_level {
-            room = room.checked_sub(1).ok_or_else(|| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "build payload",
-                    format!("nesting deeper than {PAYLOAD_DEPTH_MAX} levels"),
-                )
-                .with_recovery(
-                    "store the body in CAS and carry its locator in the payload; the ledger reader cannot parse this depth back",
-                )
-            })?;
-        }
-        level = next;
     }
     Ok(())
+}
+
+/// The level a container sits at when `above` containers hold it, or the
+/// refusal when that passes [`PAYLOAD_DEPTH_MAX`].
+fn opened(above: usize) -> Result<usize, AxError> {
+    above
+        .checked_add(1)
+        .filter(|level| *level <= PAYLOAD_DEPTH_MAX)
+        .ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "build payload",
+                format!("nesting deeper than {PAYLOAD_DEPTH_MAX} levels"),
+            )
+            .with_recovery(
+                "store the body in CAS and carry its locator in the payload; the ledger reader cannot parse this depth back",
+            )
+        })
 }
 
 /// What a recording party supplies; the Ledger implementation owns the

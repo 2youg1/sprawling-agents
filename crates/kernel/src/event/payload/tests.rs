@@ -190,10 +190,9 @@ fn a_payload_nested_past_what_the_reader_can_parse_is_refused_on_write() {
     }
 }
 
-/// The float check descends one call per level, and the depth check does
-/// not, so the depth is judged first: a payload too deep for the reader
-/// is refused for its depth even when a float waits at the bottom, and
-/// the recursive walk only ever runs over the levels the reader accepts.
+/// The walk judges a container before anything under it, so a payload
+/// too deep for the reader is refused for its depth even when a float
+/// waits at the bottom.
 #[test]
 fn a_payload_too_deep_is_refused_for_its_depth_before_its_floats_are_walked() {
     let inner = (1..PAYLOAD_DEPTH_MAX + 1).fold(json!(0.5), |value, _| json!([value]));
