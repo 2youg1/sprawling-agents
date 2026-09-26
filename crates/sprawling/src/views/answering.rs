@@ -211,10 +211,7 @@ impl Views {
             // What an agent was told, and the store read that recovers
             // it. A run with no prompt yet and an object this city no
             // longer holds are both "I could not look".
-            channels::Query::Prefix { run } => match self.prefix_answer(*run) {
-                Some(answer) => channels::Answer::Prefix(Box::new(answer)),
-                None => unavailable(format!("Prefix({run})")),
-            },
+            channels::Query::Prefix { run } => return Prepared::Prefix(self.prefix_ask(*run)),
             // Read at every asking rather than held: the file is one a
             // person also edits, and a copy kept in this fold would
             // answer with what it said the last time somebody used a
@@ -254,12 +251,10 @@ impl Views {
             }
             channels::Query::Release => return Prepared::Release,
             channels::Query::BuildingView { addr } => {
-                let city_root = self.city_root.clone();
-                let plan = self.plans.of(&city_root, addr);
                 return Prepared::Building {
-                    city_root,
+                    city_root: self.city_root.clone(),
                     addr: addr.clone(),
-                    plan,
+                    plan: self.plans.ask(addr),
                 };
             }
             channels::Query::InboxView { addr } => channels::Answer::Inbox(channels::InboxAnswer {

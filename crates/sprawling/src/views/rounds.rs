@@ -35,15 +35,17 @@ impl Views {
     /// still true.
     pub(super) fn records_of(&mut self, run: RunId) -> Vec<EventRecord> {
         let dir = crate::assembly::ledger_dir(&self.city_root);
-        if self.index.refresh(&dir).is_err() {
+        let Ok(mut index) = self.index.lock() else {
+            return Vec::new();
+        };
+        if index.refresh(&dir).is_err() {
             return Vec::new();
         }
         let want = usize::try_from(channels::HISTORY_MAX).unwrap_or(1);
-        let mut newest: Vec<kernel::Seq> =
-            self.index.run_seqs_before(run, None).take(want).collect();
+        let mut newest: Vec<kernel::Seq> = index.run_seqs_before(run, None).take(want).collect();
         newest.reverse();
         let mut records = Vec::with_capacity(newest.len());
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         for seq in newest {
             let Ok(line) = reader.line_at(seq) else {
                 break;

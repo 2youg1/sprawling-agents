@@ -111,7 +111,15 @@ pub(crate) struct Views {
     /// asked - 14.4 ms of it on a fifty thousand record ledger. Held, the
     /// same question costs one directory listing and the bytes that are
     /// actually new.
-    pub(super) index: memory::LedgerIndex,
+    ///
+    /// Behind a lock of its own because the fold never touches it: a
+    /// query carries the `Arc` out of the view lock and reads the
+    /// ledger with only readers waiting on it (sprawling-SPEC.md 8-92).
+    pub(super) index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
+    /// Where each run's first `prompt_assembled` record sits, so the
+    /// prompt a page asks for is one ledger line rather than a walk
+    /// back through the whole run.
+    pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
     pub(super) plans: crate::plan_view::PlanView,
@@ -168,8 +176,11 @@ impl Views {
             // An unreadable ledger directory is not a reason to refuse to
             // start: the index is disposable, every refresh tries again,
             // and a city with no ledger yet is the ordinary first run.
-            index: memory::LedgerIndex::rebuild(&ledger_dir(city_root))
-                .unwrap_or_else(|_| memory::LedgerIndex::empty()),
+            index: std::sync::Arc::new(std::sync::Mutex::new(
+                memory::LedgerIndex::rebuild(&ledger_dir(city_root))
+                    .unwrap_or_else(|_| memory::LedgerIndex::empty()),
+            )),
+            first_prompts: std::collections::BTreeMap::new(),
             plans: crate::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
@@ -267,6 +278,11 @@ impl Views {
                 }
             }
             EventKind::ApprovalResolved => self.fold_ruling(record)?,
+            EventKind::PromptAssembled => {
+                self.first_prompts
+                    .entry(record.run())
+                    .or_insert(record.seq());
+            }
             _ => {}
         }
         Ok(())
