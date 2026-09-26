@@ -15,6 +15,7 @@ use crate::error::{MemoryError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
+use super::first_line::first_line;
 use super::ledger::{
     JsonlLedger, OpenReport, PriorSegment, SEGMENT_ROLL_BYTES, TailBoundary, TailTruncation,
     WriterLock, complete_lines, is_segment, segment_file_name,
@@ -118,12 +119,9 @@ impl JsonlLedger {
         let Some(first) = segments.first() else {
             return Ok(());
         };
-        let bytes = self
-            .vfs
-            .read(first)
-            .map_err(io_err("read segment", first))?;
-        let (lines, _) = complete_lines(&bytes);
-        let Some(first_line) = lines.first() else {
+        let Some(first_line) =
+            first_line(self.vfs.as_ref(), first).map_err(io_err("read segment", first))?
+        else {
             // Empty or torn-before-first-line segment: version unknowable;
             // tail recovery decides what remains.
             return Ok(());
@@ -132,7 +130,7 @@ impl JsonlLedger {
         // it carries no version information, and tail recovery owns it.
         // With more segments behind it the same damage is non-tail and
         // must refuse instead (memory-SPEC 8-1).
-        let probed = serde_json::from_slice::<serde_json::Value>(first_line)
+        let probed = serde_json::from_slice::<serde_json::Value>(&first_line)
             .ok()
             .and_then(|value| value.get("v").and_then(serde_json::Value::as_u64));
         let v = match probed {

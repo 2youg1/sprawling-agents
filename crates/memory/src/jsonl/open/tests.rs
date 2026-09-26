@@ -365,3 +365,37 @@ fn an_ignorable_line_from_a_newer_vocabulary_is_kept_and_chained() {
         .unwrap();
     assert_eq!(reopened.read_raw_lines().unwrap().len(), 3);
 }
+
+/// The version probe reads the first line, not the first segment: a
+/// single-segment ledger is read once on open (by tail recovery), not
+/// twice.
+#[test]
+fn opening_a_single_segment_ledger_reads_it_once() {
+    use crate::fault_fs::{FaultFs, FaultPlan, TornTail};
+    let fs = FaultFs::new(FaultPlan {
+        cut_at_op: None,
+        cut_on_write: None,
+        torn_tail: TornTail::None,
+    });
+    let dir = Path::new("l");
+    let (mut ledger, _) = JsonlLedger::open_faulty(fs.clone(), dir, TimeMs::new(0)).unwrap();
+    let drafts = (0..2_000)
+        .map(|t| draft(EventKind::RunStarted, t))
+        .collect();
+    ledger.append_all(drafts).unwrap();
+    let segment_len: u64 = ledger
+        .read_raw_lines()
+        .unwrap()
+        .iter()
+        .map(|line| u64::try_from(line.len()).unwrap() + 1)
+        .sum();
+    drop(ledger);
+
+    let before = fs.bytes_read();
+    JsonlLedger::open_faulty(fs.clone(), dir, TimeMs::new(1)).unwrap();
+    let moved = fs.bytes_read() - before;
+    assert!(
+        moved.saturating_mul(10) < segment_len.saturating_mul(12),
+        "opening a {segment_len}-byte ledger read {moved} bytes"
+    );
+}
