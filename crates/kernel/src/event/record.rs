@@ -40,6 +40,7 @@
 
 mod adviser;
 mod checkpoint;
+mod collaboration;
 mod discard;
 mod governance;
 mod log;
@@ -52,6 +53,7 @@ pub use adviser::{
     AdviserAnswer, AdviserAnswered, AdviserAsk, AdviserAsked, AdviserFailure, AdviserFellBack,
 };
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
+pub use collaboration::{ConflictLevel, GoalConflict, PursuitChanged, PursuitMove};
 pub use discard::{AssetArchived, DiscardRestored, FileDiscarded};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,

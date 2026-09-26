@@ -38,3 +38,55 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     let standing = Standing::fold(&report.ledger_dir).map(|_| ());
     assert_eq!((views, standing), (Ok(()), Ok(())));
 }
+
+/// A pursuit line this build cannot read stops the fold. Skipping it
+/// would leave standing whatever goal the line changed, so a building a
+/// person cleared would go on pursuing after a restart.
+#[test]
+fn a_pursuit_line_the_build_cannot_read_stops_the_fold() {
+    let line = unreadable(
+        kernel::EventKind::PursuitChanged,
+        serde_json::json!({ "step": "abandon", "goal": "read the meter" }),
+    );
+    assert!(CollaborationFold::default().absorb(&line).is_err());
+}
+
+/// A goal line this build cannot read is a mismatch of vocabulary, the
+/// same refusal every other record read gives, so the recovery a person
+/// is handed is to replay with the build that wrote it.
+#[test]
+fn a_goal_line_the_build_cannot_read_is_a_wire_mismatch() {
+    let line = unreadable(
+        kernel::EventKind::GoalRegistered,
+        serde_json::json!({ "id": "a", "owner": "lab/a" }),
+    );
+    let refused = CollaborationFold::default()
+        .absorb(&line)
+        .map_err(|err| err.code().clone());
+    assert_eq!(refused, Err(kernel::AxCode::WireMismatch));
+}
+
+/// A request line that names no branch stops the fold. Skipping it
+/// left the request in the register, so a rebuild offered a rejected
+/// branch for review a second time.
+#[test]
+fn a_request_line_that_names_no_branch_stops_the_fold() {
+    let line = unreadable(
+        kernel::EventKind::PrRejected,
+        serde_json::json!({ "node": "lab-a", "by": "lab/b", "why": "no tests" }),
+    );
+    assert!(CollaborationFold::default().absorb(&line).is_err());
+}
+
+fn unreadable(kind: kernel::EventKind, data: serde_json::Value) -> EventRecord {
+    let draft = kernel::EventDraft {
+        run: RunId::CITY,
+        t: kernel::TimeMs::new(0),
+        who: "person".into(),
+        addr: Some(Address::parse("lab").unwrap()),
+        kind,
+        data: kernel::Payload::new(data.as_object().unwrap().clone()).unwrap(),
+        ig: false,
+    };
+    EventRecord::from_draft(draft, kernel::Seq::FIRST, kernel::ledger::GENESIS_PREV)
+}

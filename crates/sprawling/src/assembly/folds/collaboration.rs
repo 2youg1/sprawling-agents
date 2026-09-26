@@ -6,10 +6,10 @@
 //! The two projections the collaboration tools read: what is waiting in
 //! each room, and what ground is already claimed.
 
+use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-use crate::effect;
-use crate::views::pursuit_from;
+use crate::views::pursued;
 
 use super::super::{building_of, plan_node_of};
 
@@ -96,7 +96,7 @@ impl CollaborationFold {
                 let taken = collab::SignalConsumed::from_payload(record.data())?;
                 self.consumed.insert(taken.id.as_str().to_owned());
             }
-            EventKind::GoalRegistered => self.goals.push(effect::goal_from_payload(record.data())?),
+            EventKind::GoalRegistered => self.goals.push(record.data().read()?),
             EventKind::RoadmapClaimed => {
                 if let (Some(building), Some(node), Some(room)) = (
                     record.addr().and_then(building_of),
@@ -117,14 +117,13 @@ impl CollaborationFold {
                 }
             }
             EventKind::PursuitChanged => {
-                if let Some((addr, held)) = pursuit_from(record) {
-                    match held {
-                        Some(entry) => {
-                            self.pursuits.insert(addr, entry);
-                        }
-                        None => {
-                            self.pursuits.remove(&addr);
-                        }
+                let addr = pursued(record)?;
+                match record.data().read::<PursuitChanged>()?.held()? {
+                    Some(entry) => {
+                        self.pursuits.insert(addr, entry);
+                    }
+                    None => {
+                        self.pursuits.remove(&addr);
                     }
                 }
             }
@@ -135,15 +134,17 @@ impl CollaborationFold {
             // merged one is done, and a rejected one goes back to the
             // resident who wrote it rather than sitting in a queue
             // nobody owns.
-            EventKind::PrMerged | EventKind::PrRejected => {
-                if let Some(branch) = record
+            EventKind::PrMerged => {
+                let branch = record.data().read::<collab::MergedRequest>()?.branch;
+                self.requests.retain(|held| held.branch != branch);
+            }
+            EventKind::PrRejected => {
+                let branch = record
                     .data()
-                    .as_map()
-                    .get("branch")
-                    .and_then(serde_json::Value::as_str)
-                {
-                    self.requests.retain(|held| held.branch != branch);
-                }
+                    .read::<collab::RejectedRequest>()?
+                    .request
+                    .branch;
+                self.requests.retain(|held| held.branch != branch);
             }
             _ => {}
         }

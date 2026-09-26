@@ -24,6 +24,7 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
 // Where a city keeps its ledger and how a building reads off disk are
@@ -31,7 +32,7 @@ use kernel::{Address, AxError, EventKind, EventRecord};
 // rather than copied, so "where the ledger lives" keeps one answer.
 use super::lines::verdict_line;
 use super::lines::{
-    buildings_of, discard_lines, pursuit_from, registry_line, restored_paths, signal_line,
+    buildings_of, discard_lines, pursued, registry_line, restored_paths, signal_line,
 };
 use crate::assembly::{ledger_dir, rebuild_views};
 
@@ -206,26 +207,23 @@ impl Views {
                 self.city = record.addr().cloned();
             }
             EventKind::SignalEnqueued => {
-                if let Some((room, line)) = signal_line(record) {
-                    self.waiting.entry(room).or_default().push(line);
-                }
+                let (room, line) = signal_line(record)?;
+                self.waiting.entry(room).or_default().push(line);
             }
             EventKind::SignalConsumed => {
-                if let Some((room, line)) = signal_line(record)
-                    && let Some(queue) = self.waiting.get_mut(&room)
-                {
-                    queue.retain(|held| held.id != line.id);
+                let taken = collab::SignalConsumed::from_payload(record.data())?;
+                if let Some(queue) = record.addr().and_then(|room| self.waiting.get_mut(room)) {
+                    queue.retain(|held| held.id != taken.id.as_str());
                 }
             }
             EventKind::PursuitChanged => {
-                if let Some((addr, held)) = pursuit_from(record) {
-                    match held {
-                        Some(entry) => {
-                            self.pursuits.insert(addr, entry);
-                        }
-                        None => {
-                            self.pursuits.remove(&addr);
-                        }
+                let addr = pursued(record)?;
+                match record.data().read::<PursuitChanged>()?.held()? {
+                    Some(entry) => {
+                        self.pursuits.insert(addr, entry);
+                    }
+                    None => {
+                        self.pursuits.remove(&addr);
                     }
                 }
             }
