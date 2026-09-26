@@ -639,12 +639,11 @@ pub(crate) struct Line { who: String, addr: Address, kind: EventKind, data: Payl
 /// 一张桌子留下的全部效应：它们成为的行，以及行之后才允许发生的变化。
 pub(crate) struct Landing { lines: Vec<Line>, then: Then }   // 两个字段都是私有的
 
-pub(crate) enum Then { Nothing, Deliver(Vec<collab::Signal>), Hold(Vec<GoalEntry>),
+pub(crate) enum Then { Nothing, Deliver(Vec<collab::Signal>),
                        Roadmap { path: PathBuf, base: String, text: String }, Shelf(Vec<Filing>) }
 
 impl Landing {
     pub(crate) fn signals(Vec<SignalEffect>, room: &Address, who: &str) -> Result<Landing, AxError>;
-    pub(crate) fn goals(Vec<GoalEffect>, room: &Address, who: &str) -> Result<Landing, AxError>;
     pub(crate) fn discards(Vec<Payload>, room: &Address, who: &str) -> Landing;
     pub(crate) fn shelf(Vec<ArchiveEffect>, write_root, building, at, room, who) -> Result<Landing, AxError>;
     /// 先走完每一行，再把变化交出去。这是 `Then` 唯一的出口。
@@ -1936,7 +1935,7 @@ impl kernel::Ledger for Relay {
 }
 
 /// 唤醒记账线程的一切，同在一条队列上：每张嘴一个变体，再加关门。
-pub(crate) enum Wake { Relay(RelayRequest), Home(Box<Arrival>), Command, Close }
+pub(crate) enum Wake { Relay(RelayRequest), Claim(ClaimAsk), Goal(GoalAsk), Home(Box<Arrival>), Command, Close }
 
 /// 一次看队列最多等多久。
 pub(crate) enum Patience { Now, For(Duration), Unbounded }
@@ -1950,9 +1949,13 @@ impl RelayGate {
     pub(crate) fn bell(&self) -> mpsc::Sender<Wake>;
     /// 按 `patience` 等第一条消息，再用 `try_recv` 把排在后面的一次取尽：relay 请求**合成一道屏障**
     /// 写下去，回家的活按到达次序放进 `homes`，Command 与 Close 只负责唤醒。
-    pub(crate) fn serve(&self, patience: Patience, ledger: &mut impl kernel::Ledger,
-                        homes: &mut VecDeque<Arrival>);
+    /// 认领按队列次序当场答复；目标登记不在这里答，按到达次序交回。
+    pub(crate) fn serve(&mut self, patience: Patience, ledger: &mut impl kernel::Ledger,
+                        homes: &mut VecDeque<Arrival>) -> Drained;
 }
+/// 一次看队列留给记账线程的东西：账本收下的每一行（按账本次序，交给各份折叠），
+/// 与等着目标表答复的登记（按到达次序，交给 `RunWorker::answer_goal`）。
+pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goals: Vec<GoalAsk> }
 ```
 
 **为什么 `append` 阻塞**：`kernel::Ledger` 的契约写着「`Ok(ref)` 意味着这条记录在那个适配器的介质里已经耐久」。
@@ -2089,6 +2092,7 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
 
 - **走同一条队列**：认领是 `Wake::Claim`，与 relay 的 append 同在记账线程那一条队列上（8-42-4），而不是第二条通道；
   `RelayGate` 持有 `ClaimBook`，`serve` 在排空队列时逐个答复。车道阻塞在一个 rendezvous 通道上等回信，与 append 一样。
+  入账的认领行随 `serve` 的返回值交回，经 `RunWorker::absorb` 进活的 `PlanHolders`，所以那轮活还没回家时，记账线程读到的持有者已经与重启折出的一致。
 - **拒词**：`InvalidArgs`，动作 `claim a plan node`，说出节点与持有它的 run，恢复是「list the plan and claim a node that is ready」。
   记账线程已经不在时是 `StorageFatal`，与 relay 的 `gone` 同一形状。
 - **先入账再登记**：`answer` 接受认领时，在记账线程上把 `roadmap_claimed` 追加进账本，追加成功才登记节点并回 `Ok`；
@@ -2118,10 +2122,16 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
   `city::roadmap`、`Claims::of` 拒绝重放——余下的就是本轮全部的认领。计划那一步之后的失败（书架、请求、租约、结论）不再补行，
   因为那时认领已经合上，补一条放回行会让历史说一个已完成的节点又被放回。落地成功而追加失败时返回追加的错误；落地已经失败时
   返回落地的原错误，追加的失败记进诊断——账本已经拒绝过一行，第二次拒绝不改变人要做的事。认领在它的收尾行（finished、blocked、released 或拆分父节点的 split）写上账本时就算关闭——拆分之后这一轮什么也不持有，split 行就是父节点的去向，不等 `Roadmap.md` 改写返回：改写被拒（`E_VERSION_CONFLICT` 或文件不可写）时收尾行已在账上，不再补放回行。
-- **未定：目标登记**。`goal_registered` 仍在落地时由工人写下，目标登记还没走「调用时由记账线程判定并先入账」这条路；
-  两轮并排的活登记同一片地，第二个要到落地才知道。能定下它的证据：一条红测——两轮活从同一份目标登记表出发登记同一片地，
-  第二个在调用时被拒。
-- 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes|a_claim_whose_landing_failed|a_claim_closed_on_the_ledger|a_landing_refused_part_way|a_split_closes_the_claim_on_its_parent/)'`；
+- **目标登记同一条路**（`bin::assembly::registering`，形状 4 适配器）：`goal` 工具的桌子不留目标表的副本，只铸 id、拼 `GoalEntry`，
+  经 `registering::booking` 把它作为 `Wake::Goal` 送上同一条队列并阻塞等回信。`serve` 不自己答它，而是按到达次序交回；
+  记账线程在给各份折叠看过这一次写下的行之后逐个答复（`RunWorker::answer_goal`）：对着全城的目标表
+  `collab::arbitrate`，不撞就先把 `goal_registered` 写上账本，撞了就先写 `goal_conflict`（载荷 `collab::conflict_payload`），
+  两种都经 `record_for` 写、经 `absorb` 进活的目标表，然后才回 `Ok` 或 `collab::conflict_refusal`。
+  于是并排的第二轮活在调用那一刻被拒，同一轮活的第二次登记也撞上第一次；落地不再写任何目标行（`Landing` 没有目标那一扇门）。
+  目标表只由 `goal_registered` 折出，活的与重启的走同一个定义 `collaborating::register_goal`。
+  **不在 `serve` 里答**：目标表住在 `RunWorker` 上，`serve` 只借得到账本；在那里答就得给门一份目标表的副本，
+  那是第二个「这片地归谁」的答案，同一次排空里的第二个登记还会读不到第一个。
+- 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes|a_claim_whose_landing_failed|a_claim_closed_on_the_ledger|a_landing_refused_part_way|a_split_closes_the_claim_on_its_parent|a_claim_booked_through_the_gate|two_runs_registering_one_ground/)'`；
   `cargo nextest run -p collab -E 'test(/two_runs_read_as_ready/)'` 在桌子一侧钉住「第二个认领当场被拒、什么都不留」。
 
 ## 8-41 一次提交出自哪次运行，从账本回答（`bin::views::commits`、`sprawling whose`）
@@ -4214,7 +4224,7 @@ impl RunWorker {
 
 **冻结前缀为什么逐字节不变。** 前缀由三段文件、一个 run slot 与工具表拼成，每个输入在搬前搬后是同一个值。三段读的是城根下的文件，从 `stage_dispatch` 到 `prepare_in_lane` 之间记账线程不写它们：它写的是账本、brief 与 job。run slot 由 `Given`、模型注记与继承的对话拼成，三者都在 `Staged` 里。树的路径是 `city_root` 与 `tree_of(addr)` 的纯函数，与哪条线程去认领无关。工具表的顺序由 `lay_out_workbench` 的准入顺序定；其中 MCP 那部分，命中时是表项记下的 `listed`，缺表时是这一次 list 的结果，与握手在哪条线程上无关。run id 仍在记账线程上铸，从它铸 id 的三件工具拿到的还是同一个 id。唯一换了线程的时钟读数是计时用的 `[prepare_dispatch_ms]`，它不进任何记录；铸 run id 的那一次采样不搬（`stand_up` 的文档：结构改动不得移动时钟采样）。
 
-**行的次序。** 准备阶段在 lane 里写的行有两种：评审楼的 `worktree_opened`，与继任 run 的 `eval_run`（`probe_after` 在继任者起步前问一次模型，写下与前任答案的比较）。它们和驾驶写的行走同一个 relay，所以一个 run 自己的行仍是准备的行在前、驾驶的行在后，两个 run 的行怎样交错由 relay 决定，重放的确定性由 8-46-5 保证。relay 服务的 append 今天直接进账本、不经 `RunWorker::absorb`（8-90）。这对这两种行无害，因为 absorb 交给的四份折叠（会话起点、治理、计划、凭据）没有一份读它们；以后谁要把一条被这四份折叠读的记录搬进 lane，先要让 relay 的服务经过 absorb。`record_for` 还给记账线程写的每一行盖上正在处理的命令的幂等键，relay 的行不经它。重启后认出一条重复的命令，靠的是 `Entrance::absorb` 在历史里见到带这个键的某一行；一次评审楼的派活在规则没变时（`book_rules` 只在规则变了才写 `rules_changed`），带键的行只有 `worktree_opened` 这一行。所以 `Staged` 带上命令的键（`Entrance::carrying`，没有命令时为空），`Stamping::record_for` 用同一条盖键的规则给 `worktree_opened` 与 `eval_run`（`Site::probe_after` 也经 `Stamping` 写）盖上，这两行搬前搬后逐字节相同。盖键的规则是键与载荷的纯函数 `commanding::entrance::stamped`，`RunWorker::record_for` 与 `Stamping::record_for` 都调它。`a_review_dispatch_sent_again_after_a_restart_is_answered_once` 经 `serve_one`（认键的那道门；`handle` 不经它）守着这一点。
+**行的次序。** 准备阶段在 lane 里写的行有两种：评审楼的 `worktree_opened`，与继任 run 的 `eval_run`（`probe_after` 在继任者起步前问一次模型，写下与前任答案的比较）。它们和驾驶写的行走同一个 relay，所以一个 run 自己的行仍是准备的行在前、驾驶的行在后，两个 run 的行怎样交错由 relay 决定，重放的确定性由 8-46-5 保证。relay 服务写下的每一行——lane 的 append 与调用时入账的认领行——都由 `serve` 交回，`serve_flight` 逐行交给 `RunWorker::absorb`，与记账线程自己写的行走同一条路（8-90）：活的折叠与重启折叠读同一份历史，一条被这四份折叠（会话起点、治理、计划、凭据）读的记录搬进 lane 不用另接线。折叠拒绝一行时那一行已在账上、回信已发出，拒绝记进诊断，不改变车道收到的答复。`record_for` 还给记账线程写的每一行盖上正在处理的命令的幂等键，relay 的行不经它。重启后认出一条重复的命令，靠的是 `Entrance::absorb` 在历史里见到带这个键的某一行；一次评审楼的派活在规则没变时（`book_rules` 只在规则变了才写 `rules_changed`），带键的行只有 `worktree_opened` 这一行。所以 `Staged` 带上命令的键（`Entrance::carrying`，没有命令时为空），`Stamping::record_for` 用同一条盖键的规则给 `worktree_opened` 与 `eval_run`（`Site::probe_after` 也经 `Stamping` 写）盖上，这两行搬前搬后逐字节相同。盖键的规则是键与载荷的纯函数 `commanding::entrance::stamped`，`RunWorker::record_for` 与 `Stamping::record_for` 都调它。`a_review_dispatch_sent_again_after_a_restart_is_answered_once` 经 `serve_one`（认键的那道门；`handle` 不经它）守着这一点。
 
 **验收的两条测试。** 其一是红：记账线程在一次派活里不做 worktree 与 MCP 的 I/O。测试用一台握手要等测试放行的 stdio MCP 夹具，把一轮活派进评审楼；握手没放行时，记账线程要在限定时间内答出另一条命令。今天握手在记账线程上，那条命令答不出，断言失败。树的一半同形：测试在一座还没有提交的城里先放一把 `.git/index.lock`，`ensure_base` 等锁时记账线程仍要答。其二是守护（`a_review_dispatch_freezes_the_prefix_it_froze_on_the_accounting_thread`）：一座新城、一个评审房间、同一条 job，这个 run 在 `prompt_assembled` 里记下的四段哈希等于测试里钉住的那一组，它们取自记账线程上准备一切的路径。不需要钉时钟：铸 run id 的那次时钟采样不进前缀，两座新城派同一条 job 冻结出同样的四段。它在搬前搬后都绿，作用是让搬动改不了前缀；有意改动新城前缀文字的改动，从它的失败里取新的哈希。
 

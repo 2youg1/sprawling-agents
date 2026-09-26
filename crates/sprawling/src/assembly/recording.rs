@@ -196,6 +196,23 @@ impl RunWorker {
         Ok((kind, addr, data))
     }
 
+    /// Shows every line the gate wrote for the lanes and the claims to
+    /// the folds, in ledger order. Each line is already history and its
+    /// lane already has its answer, so a fold that refuses one is
+    /// reported: no lane is left to act on the refusal, and the next
+    /// line must still be shown (sprawling-SPEC.md 8-90).
+    pub(super) fn show_relayed(&mut self, written: Vec<EventDraft>) {
+        for line in written {
+            if let Err(err) = self.absorb(line.kind, line.run, line.addr.as_ref(), &line.data) {
+                self.note(
+                    runtime::diagnostics::Level::Refuse,
+                    "bin::assembly::relay",
+                    &format!("a fold refused a {:?} line a lane wrote: {err}", line.kind),
+                );
+            }
+        }
+    }
+
     /// Shows one line this worker wrote to every fold it holds, whoever
     /// the line was written for: a restart folds every line into every
     /// fold, so a live fold that skipped some writer's lines would
@@ -212,6 +229,7 @@ impl RunWorker {
         self.origins.absorb(kind, run, addr, data)?;
         self.governance.absorb(kind, run, addr, data)?;
         self.planning.absorb(kind, addr, data)?;
+        super::collaborating::register_goal(&mut self.collaborating.goals, kind, data)?;
         self.credentials.absorb(kind, data)
     }
 }

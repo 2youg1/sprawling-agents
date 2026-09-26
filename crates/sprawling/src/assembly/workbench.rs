@@ -192,8 +192,9 @@ fn tree_scope(building: &city::Building) -> Vec<String> {
 /// The desks one dispatch lends out, and takes back when the drive ends.
 ///
 /// Grouped because they are lent and taken back together: five handles
-/// passed side by side are five chances to take four of them back. Four
-/// of them settle in one order in `settle_desks`; `pr` settles after,
+/// passed side by side are five chances to take four of them back. Three
+/// of them settle in one order in `settle_desks`, `goals` is answered at
+/// each call on the accounting thread, and `pr` settles after,
 /// once the run has something to show for itself, and it belongs here
 /// all the same - what makes them one value is the lending, not the
 /// settling.

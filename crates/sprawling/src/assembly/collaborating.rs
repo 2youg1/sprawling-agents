@@ -39,3 +39,23 @@ pub(in crate::assembly) struct Collaborating {
     /// conflict check reads them in.
     pub(in crate::assembly) goals: Vec<kernel::GoalEntry>,
 }
+
+/// How one line changes the goal register: a `goal_registered` line
+/// appends its entry, in the order the claims were made, and no other
+/// kind touches it. The live worker and the restart's fold both call it,
+/// so the two registers cannot come to disagree.
+///
+/// # Errors
+/// Refuses a `goal_registered` payload that does not read as a
+/// [`kernel::GoalEntry`]: an entry skipped here is ground the next
+/// registration would find free.
+pub(in crate::assembly) fn register_goal(
+    goals: &mut Vec<kernel::GoalEntry>,
+    kind: kernel::EventKind,
+    data: &kernel::Payload,
+) -> Result<(), kernel::AxError> {
+    if kind == kernel::EventKind::GoalRegistered {
+        goals.push(data.read()?);
+    }
+    Ok(())
+}

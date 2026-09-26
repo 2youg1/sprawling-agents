@@ -38,15 +38,13 @@ pub struct Line {
 /// What the city does once a desk's lines are on the ledger.
 ///
 /// Every arm is a change somebody can observe without reading the
-/// history: a room's queue, the goal register, the shared plan, the
-/// building's shelf. That is exactly why none of them may happen first.
+/// history: a room's queue, the shared plan, the building's shelf.
+/// That is exactly why none of them may happen first.
 pub enum Then {
     /// The line was the whole of it.
     Nothing,
     /// Put each signal in the room it names, and knock on that door.
     Deliver(Vec<collab::Signal>),
-    /// Hold this ground in the city's goal register.
-    Hold(Vec<kernel::GoalEntry>),
     /// Replace the shared plan with `text`, the run's effects replayed
     /// onto `base`, only while the file still reads `base`.
     Roadmap {
@@ -139,44 +137,6 @@ impl Landing {
         Ok(Landing {
             lines,
             then: Then::Deliver(deliver),
-        })
-    }
-
-    /// What ground a run claimed, and where two claims met.
-    ///
-    /// # Errors
-    /// Propagates an entry or a conflict whose payload cannot be built.
-    pub fn goals(
-        effects: Vec<collab::GoalEffect>,
-        room: &Address,
-        who: &str,
-    ) -> Result<Landing, AxError> {
-        let mut lines = Vec::new();
-        let mut hold = Vec::new();
-        for effect in effects {
-            match effect {
-                collab::GoalEffect::Registered(entry) => {
-                    lines.push(Line {
-                        who: who.to_owned(),
-                        addr: room.clone(),
-                        kind: EventKind::GoalRegistered,
-                        data: Payload::of(&entry)?,
-                    });
-                    hold.push(entry);
-                }
-                collab::GoalEffect::Conflicted { entry, level } => {
-                    lines.push(Line {
-                        who: who.to_owned(),
-                        addr: room.clone(),
-                        kind: EventKind::GoalConflict,
-                        data: collab::conflict_payload(&entry, &level)?,
-                    });
-                }
-            }
-        }
-        Ok(Landing {
-            lines,
-            then: Then::Hold(hold),
         })
     }
 

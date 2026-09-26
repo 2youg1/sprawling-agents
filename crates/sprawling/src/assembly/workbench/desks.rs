@@ -60,10 +60,10 @@ impl RunWorker {
             self.clock.now()?,
             lent.inbox,
         )));
-        let goals = std::sync::Arc::new(std::sync::Mutex::new(collab::GoalDesk::new(
+        let goals = std::sync::Arc::new(std::sync::Mutex::new(self.goal_desk(
             site.run_id,
-            site.who.clone(),
-            self.collaborating.goals.clone(),
+            addr,
+            &site.who,
         )));
 
         // The plan is shared ground, so it is read from and written back
@@ -141,5 +141,21 @@ impl RunWorker {
             waiting,
             tenure: lent.tenure,
         })
+    }
+
+    /// The goal desk a run registers its ground through: each entry is
+    /// decided on the accounting thread at the call, and its line is
+    /// filed under `room`.
+    pub(in crate::assembly) fn goal_desk(
+        &self,
+        run: kernel::RunId,
+        room: &Address,
+        who: &str,
+    ) -> collab::GoalDesk {
+        collab::GoalDesk::new(
+            run,
+            who.to_owned(),
+            super::super::registering::booking(self.bell(), run, room.clone()),
+        )
     }
 }

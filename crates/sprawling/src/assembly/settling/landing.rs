@@ -90,10 +90,6 @@ impl RunWorker {
                     }
                 }
             }
-            effect::Then::Hold(entries) => {
-                self.collaborating.goals.extend(entries);
-                Ok(())
-            }
             // The replacement is whole or not at all, so a refusal
             // leaves the file at `base` with nothing to roll back.
             effect::Then::Roadmap { path, base, text } => {

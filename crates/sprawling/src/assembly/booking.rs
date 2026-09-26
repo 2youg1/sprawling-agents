@@ -93,7 +93,10 @@ impl ClaimBook {
     /// or refuses because another run in flight holds it, and sends the
     /// answer back to the lane. A line the ledger refuses books nothing,
     /// so no run holds a node the history does not show it holding.
-    pub(crate) fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger) {
+    ///
+    /// Hands back the line when the ledger took it, for the folds the
+    /// accounting thread shows every line it writes.
+    pub(crate) fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger) -> Option<EventDraft> {
         let ClaimAsk {
             building,
             node,
@@ -113,13 +116,15 @@ impl ClaimBook {
                 ),
             )
             .with_recovery("list the plan and claim a node that is ready")),
-            Some(_) | None => ledger.append(line).map(|_| {
+            Some(_) | None => ledger.append(line.clone()).map(|_| {
                 self.held.insert(key, Booked { run, put_back });
             }),
         };
+        let taken = answer.is_ok().then_some(line);
         // A lane that stopped listening keeps its booking until it comes
         // home, which is what a lane that heard the answer would do.
         drop(back.send(answer));
+        taken
     }
 
     /// Lets go of every node the run held, once it has come home, and

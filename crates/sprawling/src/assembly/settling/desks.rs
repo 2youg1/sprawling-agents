@@ -12,7 +12,7 @@ use accounting::effect;
 use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held};
 
 impl RunWorker {
-    /// Settles the four desks that leave lines behind, in the order the
+    /// Settles the three desks that leave lines behind, in the order the
     /// history takes them.
     ///
     /// Each one goes through `RunWorker::settle`, which appends before it
@@ -49,12 +49,6 @@ impl RunWorker {
         // its own line cannot be written here.
         let spoken = effect::Landing::signals(signal_effects, addr, who)?;
         self.settle(at, run_id, spoken, &chain)?;
-        let ground = effect::Landing::goals(
-            held(&desks.goals, "settle the goal desk")?.take_effects(),
-            addr,
-            who,
-        )?;
-        self.settle(at, run_id, ground, &chain)?;
         // The sweep the forecast cannot replace. A command can be
         // obfuscated past a text prediction; what is missing from the
         // working tree cannot be talked out of. The base is the first

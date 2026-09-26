@@ -67,6 +67,89 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
     );
 }
 
+/// Two runs dispatched side by side read one goal register. The
+/// accounting thread decides each registration at the call, so the
+/// second run to stake the same ground is refused before it spends
+/// another call, and the history holds the one registration and the
+/// clash (sprawling-SPEC.md 8-42-8).
+#[test]
+fn two_runs_registering_one_ground_side_by_side_leave_one_holder() {
+    use kernel::Tool;
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    let tool = |run: u8, room: &str| {
+        let desk = worker.goal_desk(
+            RunId::from_bytes([run; 16]),
+            &Address::parse(room).unwrap(),
+            &format!("potter@lab.{run}"),
+        );
+        collab::GoalTool::new(
+            Address::parse(room).unwrap(),
+            std::sync::Arc::new(std::sync::Mutex::new(desk)),
+        )
+        .unwrap()
+    };
+    let (first, second) = (tool(1, "lab/room1"), tool(2, "lab/room2"));
+    let call = kernel::ToolCall {
+        id: "tu_1".to_owned(),
+        name: kernel::ToolName::parse("goal").unwrap(),
+        args: Payload::new(
+            serde_json::json!({
+                "statement": "rewrite the kiln notes",
+                "paths": ["lab/room1/notes.md"],
+                "standing": true,
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        )
+        .unwrap(),
+    };
+    let lanes = std::thread::spawn(move || {
+        let taken = first.invoke(&call).is_ok();
+        (
+            taken,
+            second.invoke(&call).map_err(|refusal| *refusal.code()),
+        )
+    });
+    while !lanes.is_finished() {
+        worker
+            .serve_flight(relay::Patience::For(std::time::Duration::from_millis(5)))
+            .unwrap();
+    }
+    let (taken, refused) = lanes.join().unwrap();
+    let goal_lines: Vec<String> = worker
+        .ledger
+        .read_raw_lines()
+        .unwrap()
+        .iter()
+        .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+        .filter_map(|line| line["kind"].as_str().map(str::to_owned))
+        .filter(|kind| kind.starts_with("goal_"))
+        .collect();
+    assert_eq!(
+        (
+            taken,
+            refused.err(),
+            goal_lines,
+            worker.collaborating.goals.len()
+        ),
+        (
+            true,
+            Some(AxCode::GoalConflict),
+            vec!["goal_registered".to_owned(), "goal_conflict".to_owned()],
+            1
+        ),
+        "the first run holds the ground from its call, and the second is refused at its own"
+    );
+}
+
 /// A graph of nodes runs in dependency order, each in its own room
 /// with its contract as its `JOB.md`, and what comes back verified
 /// joins - so the next run in that room can be asked a question only

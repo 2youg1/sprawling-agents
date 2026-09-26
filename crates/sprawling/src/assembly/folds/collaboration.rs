@@ -98,7 +98,11 @@ impl CollaborationFold {
                     .read::<kernel::event::record::SignalConsumed>()?;
                 self.consumed.insert(taken.id.as_str().to_owned());
             }
-            EventKind::GoalRegistered => self.goals.push(record.data().read()?),
+            EventKind::GoalRegistered => super::super::collaborating::register_goal(
+                &mut self.goals,
+                record.kind(),
+                record.data(),
+            )?,
             EventKind::RoadmapClaimed
             | EventKind::RoadmapFinished
             | EventKind::RoadmapReleased

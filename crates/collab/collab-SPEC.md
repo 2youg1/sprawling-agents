@@ -310,25 +310,25 @@ impl Tool for SignalTool { /* 两个 action：send｜pull */ }
 ### 8-9 collab::goal_tool（形状 4 适配器）
 
 ```rust
-pub enum GoalEffect {
-    Registered(GoalEntry),
-    Conflicted { entry: GoalEntry, with: GoalId, level: Option<Level> },
-}
-pub struct GoalDesk { /* run、owner、registered: Vec<GoalEntry>、effects、minted —— 私有 */ }
+pub struct GoalDesk { /* run、owner、minted、booking —— 私有 */ }
 impl GoalDesk {
-    pub fn new(run: RunId, owner: String, registered: Vec<GoalEntry>) -> GoalDesk;
-    pub fn take_effects(&mut self) -> Vec<GoalEffect>;
+    pub fn new(run: RunId, owner: String, booking: GoalBooking) -> GoalDesk;
 }
-pub struct GoalTool { /* meta、desk: Rc<RefCell<GoalDesk>> —— 私有 */ }
-impl GoalTool { pub fn new(desk: Rc<RefCell<GoalDesk>>) -> Result<GoalTool, AxError>; }
+/// 调用时判定目标登记的那个权威；城里是记账线程（sprawling-SPEC 8-42-8）。
+pub struct GoalBooking(Box<dyn FnMut(&GoalEntry) -> Result<(), AxError> + Send>);
+impl GoalBooking { pub fn new(ask: impl FnMut(&GoalEntry) -> Result<(), AxError> + Send + 'static) -> GoalBooking; }
+/// 撞了之后交给模型的那条拒绝：`E_GOAL_CONFLICT`，第三段是那一级的可执行说法。
+pub fn conflict_refusal(entry: &GoalEntry, level: &Level) -> AxError;
+pub struct GoalTool { /* meta、desk: Arc<Mutex<GoalDesk>> —— 私有 */ }
+impl GoalTool { pub fn new(room: Address, desk: Arc<Mutex<GoalDesk>>) -> Result<GoalTool, AxError>; }
 ```
 
-- **三层各守其职，一层不多**：`kernel::goal::detect_conflict` 答撞没撞（纯判定）→ `collab::arbitrate` 答谁来裁（两级）→ 本模块只把两者接成一件工具。它恒不自己判冲突，也恒不自己定级。
-- **撞了就不登记**：冲突返回 `E_GOAL_CONFLICT` 三段式拒，第三段是仲裁给的那一级的可执行说法（串行等完某一件｜跟某人商量）。一个只说「不行」的拒绝会让模型换个说法再试一次。
+- **三层各守其职，一层不多**：`kernel::goal::detect_conflict` 答撞没撞（纯判定）→ `collab::arbitrate` 答谁来裁（两级）→ 本模块只把条目拼好交给 `GoalBooking`。它恒不自己判冲突，也恒不自己定级。
+- **登记在调用时由 `GoalBooking` 判定，桌子不留副本**：并排派出的两轮活读的是同一份目标表，只凭桌子自己的副本，两轮都会登记同一片地。所以桌子只铸 id、拼条目，然后问 `GoalBooking`；权威按队列次序对着全城的目标表 `arbitrate`，先写账（`goal_registered` 或 `goal_conflict`）再回答。`GoalBooking` 的 `Err` 原样交给模型，桌子不排任何效应——两种结局在回答之前都已经在账上。
+- **撞了就不登记**：冲突返回 `conflict_refusal` 拼出的 `E_GOAL_CONFLICT` 三段式拒，第三段是仲裁给的那一级的可执行说法（串行等完某一件｜跟某人商量）。拒词只在本模块拼一次，权威调它，于是撞的原因只有一种说法。一个只说「不行」的拒绝会让模型换个说法再试一次。
 - **工具只走得到两条路**：机械可判的串行化，与交给居民读。原先那三个「调用方才知道」的 bool 已随 `Level::Owner` 删去（8-7）——一个恒传 `false` 的参数不是入参，是一句没人读的话。
-- **同一 Run 内的第二次登记看得见第一次**：desk 把刚登记的条目接在 `registered` 尾上，否则一个 Run 能把同一个资源登记两次而不撞。
-- **登记后才入账**：同 8-8，工具只产 effect；`goal_registered` 与 `goal_conflict` 两种事件由工人在驱动返回后写，工人的目标表随之前推。**不写第三种 `arbitration_verdict`**：`conflict_payload` 已携着那一级，再写一条就是同一件事的第二个权威；该事件留给真正跑过一场仲裁的 Run。
-- **两个 effect 枚举都是穷尽的**（自 G-22 起全库如此）：每个变体都是工人必须写下的一条账，所以新增一个得是**写账那一端的编译错误**，而不是一条直到某个 Signal 惄悄没入账才有人发现的运行期分支——理由同 `AxCode::carrier()` 的穷尽 match。
+- **同一 Run 内的第二次登记看得见第一次**：第一次的 `goal_registered` 在回答之前已经进了权威的目标表，所以第二次撞上它。
+- **不写第三种 `arbitration_verdict`**：`conflict_payload` 已携着那一级，再写一条就是同一件事的第二个权威；该事件留给真正跑过一场仲裁的 Run。
 
 ### 8-10 collab::pr_tool（形状 4 适配器）
 
@@ -448,7 +448,7 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 - **`split` 之后本次 drive 不再持有那根枝**：它拿到的那件活现在是几片，它接下来该拿其中一片。写盘前先把新文本重新解析并 `PlanTree::build` 一次，**拆不出合法树就一个字节都不写**。拆分结果除 `node` 与 `children` 外带 `unfinished`：该节点下尚未 `Done` 的子节点数，由拆完的树数出，不由调用者声明。
 - **`block` 与 `release` 都必须带一句原因**，且原因**随记录走而不是随表格走**：表格只有位置说「Blocked」，一句话该住在 `roadmap_blocked` 的载荷里，在表里再放一份就是同一句话的第二个权威。
 - **哪一种记录由出口决定**（`ClaimEffect::kind`）：绿→`roadmap_finished`，红→`roadmap_blocked`，交回→`roadmap_released`，拆→`roadmap_split`。工人不再自己 match 一遍，于是「停下来意味着什么」只有一个答案。
-- **效果穷尽**（同 `SignalEffect`／`GoalEffect`／`PrEffect`）：每个变体都是工人必须写下的一条账，新增一个变体应当是写入处的编译错误。
+- **效果穷尽**（同 `SignalEffect`／`PrEffect`）：每个变体都是工人必须写下的一条账，新增一个变体应当是写入处的编译错误。
 - **效应怎么改文本只有一个定义**（`ClaimEffect::apply`）：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上那份。
   `Split` 因此带着子节点的 weight：只带名字的效应重放不出桌子写下的那几行。
 - **并发口径（诚实边界）**：工人写盘前重读文件，**每个节点只核第一条效果**——一个先认领再结项的 run 两条效果都是它自己按派活时的文件顺序产出的，拿第二条去问磁盘，等于问「我自己刚才那条落盘了没有」，而它没有：效应是落地时才重放的。行若已不是预期状态则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变，别的轮先落下的行原样留在盘上。

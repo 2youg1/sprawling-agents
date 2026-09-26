@@ -53,10 +53,73 @@ fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
     );
 }
 
+/// A claim booked at the call reaches the ledger through the gate the
+/// lanes write through, and the worker's own holders read it before the
+/// claiming run lands, as a restart folding the same history does
+/// (sprawling-SPEC.md 8-42-8, 8-90).
+#[test]
+fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands() {
+    use kernel::Tool;
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    let (building, room) = (
+        Address::parse("lab").unwrap(),
+        Address::parse("lab/room1").unwrap(),
+    );
+    let claimant = booking::Claimant {
+        building: building.clone(),
+        room: room.clone(),
+        run: RunId::from_bytes([7; 16]),
+        who: "potter@lab.7".to_owned(),
+        clock: std::sync::Arc::new(SystemClock),
+    };
+    let desk = collab::ClaimDesk::new(
+        "potter@lab.7".to_owned(),
+        room,
+        crate::assembly::fixture::PLAN_ONE_FREE_ROW.to_owned(),
+        booking::booking(worker.bell(), claimant),
+    );
+    let tool = collab::ClaimTool::new(std::sync::Arc::new(std::sync::Mutex::new(desk))).unwrap();
+    let call = kernel::ToolCall {
+        id: "tu_1".to_owned(),
+        name: kernel::ToolName::parse("plan").unwrap(),
+        args: Payload::new(
+            serde_json::json!({ "action": "claim", "node": "1" })
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .unwrap(),
+    };
+    let lane = std::thread::spawn(move || tool.invoke(&call).map(drop));
+    while !lane.is_finished() {
+        worker
+            .serve_flight(relay::Patience::For(std::time::Duration::from_millis(5)))
+            .unwrap();
+    }
+    lane.join().unwrap().unwrap();
+    let rebuilt = Standing::fold(&report.ledger_dir)
+        .unwrap()
+        .collaboration
+        .plan_holders
+        .in_building(&building);
+    assert_eq!(
+        (worker.holders_in(&building), rebuilt.len()),
+        (rebuilt, 1),
+        "the live holders read the claim the gate wrote, as the restart's fold does"
+    );
+}
+
 /// A claim's line is written when the model makes it, so a run whose
 /// landing fails before its plan settles still owes the history the
 /// line that closes it: the claim, then the node handed back
-/// (sprawling-SPEC.md 8-42-8). The goal's line is the one lost here
+/// (sprawling-SPEC.md 8-42-8). The signal's line is the one lost here
 /// because landing writes it before the plan's.
 #[test]
 fn a_claim_whose_landing_failed_is_handed_back() {
@@ -72,24 +135,24 @@ fn a_claim_whose_landing_failed_is_handed_back() {
                 serde_json::json!({ "action": "claim", "node": "1" }),
             ),
             tool_completion(
-                "staking ground",
+                "telling a neighbour",
                 "tu_2",
-                "goal",
+                "signal",
                 serde_json::json!({
-                    "statement": "rewrite the kiln notes",
-                    "paths": ["lab/room1/notes.md"],
-                    "standing": true,
+                    "action": "send",
+                    "to": "lab/room2",
+                    "text": "the kiln row is mine",
                 }),
             ),
             completion("done", None),
         ],
     );
-    let worker = worker_over_faults(dir.path(), Some("goal_registered"));
+    let worker = worker_over_faults(dir.path(), Some("signal_enqueued"));
     let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
     let landed = worker.handle(channels::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
-        task: "take a row and stake the notes".to_owned(),
-        goal: "one claim, one goal".to_owned(),
+        task: "take a row and tell a neighbour".to_owned(),
+        goal: "one claim, one signal".to_owned(),
         mode: kernel::Mode::PlanGoal,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lost goal"),
         session: None,
