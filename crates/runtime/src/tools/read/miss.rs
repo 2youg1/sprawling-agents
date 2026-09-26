@@ -14,9 +14,11 @@
 //! `search`, which every building's tool set carries; `exec` is not in
 //! City Hall's.
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError};
+use same_file::Handle;
 
 use crate::tools::chosen_path::{Located, real_location};
 
@@ -54,11 +56,22 @@ const NEARBY_CAP: usize = 16;
 
 /// The text at `at`, or the miss. A location that was absent when it
 /// was judged is reported missing without being opened, so a link
-/// placed there since cannot lead the open past the judgement.
+/// placed there since cannot lead the open past the judgement. A
+/// present one is read from the handle the open returned, and only
+/// after [`still_judged`] has found that handle is the file judged.
 pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String, AxError> {
     match at {
         Located::Present(path) => {
-            std::fs::read_to_string(&path).map_err(|err| unread(asked, &path, floor, &err))
+            let mut opened = std::fs::File::open(&path)
+                .and_then(Handle::from_file)
+                .map_err(|err| unread(asked, &path, floor, &err))?;
+            still_judged(asked, &path, &opened)?;
+            let mut text = String::new();
+            opened
+                .as_file_mut()
+                .read_to_string(&mut text)
+                .map_err(|err| unread(asked, &path, floor, &err))?;
+            Ok(text)
         }
         Located::Absent(path) => Err(unread(
             asked,
@@ -66,6 +79,33 @@ pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String,
             floor,
             &std::io::ErrorKind::NotFound.into(),
         )),
+    }
+}
+
+/// Whether the file `opened` at the judged real location `judged` is
+/// still the file judged there: the location must still resolve to
+/// itself, so no link was swapped onto it after the judgement, and the
+/// file at it now must be the one opened, so no link was there during
+/// the open and gone again before the resolution. The refusal does not
+/// say where a swapped link leads.
+fn still_judged(asked: &str, judged: &Path, opened: &Handle) -> Result<(), AxError> {
+    let changed = |why: &str| {
+        AxError::failure(
+            AxCode::GateDenied,
+            "read",
+            format!("{asked} changed after it was judged: {why}"),
+        )
+        .with_recovery("read it again once nothing is moving the directories on its path")
+    };
+    match std::fs::canonicalize(judged) {
+        Ok(real) if real == judged => {}
+        Ok(_) => return Err(changed("a link now stands on its path")),
+        Err(err) => return Err(changed(&err.to_string())),
+    }
+    match Handle::from_path(judged) {
+        Ok(now) if now == *opened => Ok(()),
+        Ok(_) => Err(changed("another file stands there now")),
+        Err(err) => Err(changed(&err.to_string())),
     }
 }
 

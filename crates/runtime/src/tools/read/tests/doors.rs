@@ -137,6 +137,46 @@ fn a_file_absent_at_the_check_is_not_opened_later() {
     );
 }
 
+/// A file present at the check is read only while it is still the file
+/// the check judged: a directory on its path swapped for a link between
+/// the check and the open would lead the open wherever the link points.
+#[test]
+fn a_directory_swapped_for_a_link_after_the_check_opens_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    for room in ["lab", "annex/sub", "vault/room1"] {
+        std::fs::create_dir_all(dir.path().join(room)).unwrap();
+    }
+    std::fs::write(dir.path().join("annex/sub/secret.md"), "the annex\n").unwrap();
+    std::fs::write(dir.path().join("vault/room1/secret.md"), "the vault\n").unwrap();
+    make_link(
+        &dir.path().join("lab").join("door"),
+        &dir.path().join("annex"),
+    );
+    let root = dir.path().to_path_buf();
+    // The link on the way makes the check judge `annex/...` a second
+    // time, after the real location was resolved: the swap lands there.
+    let between: ReadBound = Arc::new(move |addr: &kernel::Address| {
+        let checked = root.join("annex").join("sub");
+        if addr.as_str() == "annex/sub/secret.md" && !checked.is_symlink() {
+            std::fs::remove_dir_all(&checked).unwrap();
+            make_link(&checked, &root.join("vault").join("room1"));
+        }
+        if addr.as_str().starts_with("vault") {
+            kernel::ReadVerdict::Confidential
+        } else {
+            kernel::ReadVerdict::Open
+        }
+    });
+    let mut tool =
+        ReadTool::new(dir.path(), Arc::new(Mutex::new(Catalog::new())), between).unwrap();
+
+    let refused = tool.invoke(&call("lab/door/sub/secret.md"));
+    assert!(
+        matches!(&refused, Err(err) if err.code() == &AxCode::GateDenied),
+        "a file was read through a link swapped in after the check: {refused:?}"
+    );
+}
+
 /// A single document that happens to be called `SKILL.md` is not a
 /// package: its section holds skills the reading room did not admit.
 #[test]

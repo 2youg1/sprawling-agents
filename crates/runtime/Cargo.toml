@@ -8,6 +8,10 @@ publish.workspace = true
 [dependencies]
 kernel = { path = "../kernel" }
 memory = { path = "../memory" }
+# File identity (volume and file index on Windows, device and inode
+# elsewhere): `read` compares the handle it opened with the file now at
+# the judged location, which std exposes only on unstable APIs.
+same-file = "1"
 serde.workspace = true
 serde_json.workspace = true
 # The sieve's filter table is a TOML file in the reserved

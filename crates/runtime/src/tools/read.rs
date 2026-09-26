@@ -42,7 +42,7 @@ use serde_json::{Map, Value};
 mod miss;
 mod package;
 
-use super::chosen_path::{Located, ReadBound};
+use super::chosen_path::{Located, ReadBound, real_location};
 use crate::catalog::{Catalog, Expansion};
 use miss::Floor;
 
@@ -276,7 +276,8 @@ impl ReadTool {
                 "the catalog was left locked by a thread that died",
             )
             .with_recovery(
-                "end this run and resume it: the catalog cannot be trusted again inside a                  process where a thread died holding it",
+                "end this run and resume it: the catalog cannot be trusted again inside a \
+                 process where a thread died holding it",
             )
         })?;
         if let Some(expansion) = catalog.expand(asked) {
@@ -294,7 +295,7 @@ impl ReadTool {
                         )
                     })?;
                     Ok(Found::File {
-                        at: Located::Present(self.under_city(&addr)),
+                        at: real_location(&self.under_city(&addr), "read", asked)?,
                         floor: Floor::Document,
                     })
                 }
