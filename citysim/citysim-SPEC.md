@@ -110,7 +110,7 @@ pub struct ScenarioReport { pub lines: Vec<Vec<u8>>, pub completion: &'static st
 pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError>;
 ```
 
-- 事件序（无取消正常收束）：`checkpoint_committed`（JOB.md 先落）→ `run_started` → 每回合 `prompt_assembled→model_called→model_returned[→tool_called→tool_result]*` → 空 calls 回合后 `handoff_written` → `run_frozen{completion:done, evidence:[末 model_returned]}`。
+- 事件序（无取消正常收束）：`checkpoint_committed`（JOB.md 先落）→ `run_started` → `prompt_assembled`（每 run 一条，runtime-SPEC §8-39 第 5 条）→ 每回合 `prompt_shape_compared→model_called→model_returned[→tool_called→tool_result]*` → 空 calls 回合后 `handoff_written` → `run_frozen{completion:done, evidence:[末 model_returned]}`。
 - 取消在指定边界注入 `Interrupt::Cancel`：事件序断言＝cancel_received 后无新 model_called/tool_called，恒有 handoff_written 先于 run_frozen（A9 先行，逐边界三剧本）。
 - `budget_turns` 是执行器的回合上限（到限即 `run_frozen{completion:limit}`）：真预算梯随 gate 挂剧本接入。
 
