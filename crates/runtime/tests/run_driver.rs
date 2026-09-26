@@ -929,7 +929,9 @@ impl kernel::Tool for MeetingRead {
 }
 
 /// The bench's three stages, with each call's key placed by its
-/// position in the run, as the lane places it.
+/// position in the run, as the lane places it. It stays because runtime
+/// cannot depend on sprawling, where the served city's `Placing` lives;
+/// that one is judged in sprawling's `driving::tests::placing`.
 struct Placed {
     bench: runtime::bench::ToolBench,
     next: u64,

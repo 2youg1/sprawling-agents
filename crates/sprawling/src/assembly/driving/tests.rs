@@ -7,6 +7,7 @@ mod confidential;
 mod flight;
 mod instruments;
 mod ledger;
+mod placing;
 mod rules_account;
 mod sieving;
 mod turns;
