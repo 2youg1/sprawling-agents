@@ -87,9 +87,11 @@ fn run_id(byte: u8) -> RunId {
 
 fn lines() -> impl Strategy<Value = Vec<Line>> {
     // A small seq space forces repeats and out-of-order arrivals; the
-    // occasional large value keeps the tail honest.
+    // occasional large value keeps the tail honest. An offset too wide
+    // to pack sends a line to the outliers, and when its slot is already
+    // in the column that slot becomes a hole.
     let seq = prop_oneof![6 => 0u64..12, 1 => 12u64..4000];
-    let offset = 0u64..65536;
+    let offset = prop_oneof![8 => 0u64..65536, 1 => (1u64 << 48)..(1u64 << 49)];
     let line = (0u8..4, offset, seq, run_names()).prop_map(|(seg, offset, seq, run)| Line {
         seg,
         offset,
