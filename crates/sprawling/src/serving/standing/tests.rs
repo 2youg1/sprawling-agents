@@ -76,3 +76,29 @@ fn a_socket_worker_stands_above_normal_once_it_has_woken() {
         ThreadPriority::Os(WinAPIThreadPriority::AboveNormal.into())
     );
 }
+
+static LOWERINGS_ASKED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+fn a_platform_that_refuses() -> Result<Standing, thread_priority::Error> {
+    LOWERINGS_ASKED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    Err(thread_priority::Error::Priority("refused in a test"))
+}
+
+/// A lowering the platform refuses is asked for once: every later turn
+/// of the busy thread leaves the platform alone.
+#[test]
+fn a_lowering_the_platform_refuses_is_asked_once() {
+    let start = Instant::now();
+    let at = |ms: u64| start + Duration::from_millis(ms);
+    let limit: u64 = BUSY_LIMIT.as_millis().try_into().unwrap();
+    let mut core = super::CoreThread::raised_with(a_platform_that_refuses, start);
+
+    (0..4).for_each(|window| {
+        core.record_turn_lowering_when_busy(at(window * limit), at((window + 1) * limit))
+    });
+
+    assert_eq!(
+        LOWERINGS_ASKED.load(std::sync::atomic::Ordering::Relaxed),
+        1
+    );
+}

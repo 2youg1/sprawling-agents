@@ -58,8 +58,8 @@ impl RunWorker {
     }
 }
 
-/// `text` with every provider-shaped key replaced by the reference
-/// `keep` stored it under, or `None` when `text` holds no such key.
+/// `text` with every provider-shaped key replaced by what `keep` puts in
+/// its place, or `None` when `text` holds no such key.
 ///
 /// Only shape-table hits are taken: an entropy hit is as often a commit
 /// hash the resident has to read as it is a credential.
@@ -67,9 +67,9 @@ impl RunWorker {
 /// # Errors
 /// Propagates `keep` refusing a key, and a span off the text's character
 /// boundaries.
-pub(in crate::assembly) fn kept_text(
+pub(in crate::assembly) fn kept_text<InPlace: std::fmt::Display>(
     text: &str,
-    mut keep: impl FnMut(&str, &str) -> Result<SecretRef, AxError>,
+    mut keep: impl FnMut(&str, &str) -> Result<InPlace, AxError>,
 ) -> Result<Option<String>, AxError> {
     let keys: Vec<_> = kernel::secret::scan(text.as_bytes())
         .into_iter()

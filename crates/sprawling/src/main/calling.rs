@@ -9,6 +9,7 @@
 use super::exit::Exit;
 use super::refusal::{Form, written};
 use super::router::flag_value;
+use super::verbs::{self, Verb};
 use super::wire_client::{self, Listen, Spoken, Unheard, Until};
 use kernel::consts_policy::DEFAULT_AT;
 
@@ -24,9 +25,9 @@ use kernel::consts_policy::DEFAULT_AT;
 /// failure becomes a success.
 pub(super) fn call(args: &[String]) -> Exit {
     let Some(frame) = args.get(1).filter(|a| !a.starts_with("--")) else {
-        eprintln!(
-            "usage: sprawling call <frame-json|-> [--at host:port] [--token T] [--quiet-ms N] [--until <event-kind>] [--json]"
-        );
+        if let Some(row) = verbs::row(Verb::Call) {
+            eprintln!("usage: {}", verbs::usage(row));
+        }
         eprintln!(
             "exit: 0 answered, 1 refused, 2 this command line, 3 nothing came back, 4 no city at --at"
         );
@@ -40,7 +41,13 @@ pub(super) fn call(args: &[String]) -> Exit {
         match std::io::read_to_string(std::io::stdin()) {
             Ok(text) => text,
             Err(err) => {
-                eprintln!("could not read the frame from stdin: {err}");
+                let refusal = kernel::AxError::failure(
+                    kernel::AxCode::WireMismatch,
+                    "read the frame to send from stdin",
+                    err.to_string(),
+                )
+                .with_recovery("pipe one UTF-8 JSON frame into `sprawling call -`, or pass the frame as the argument");
+                eprint!("{}", written(&refusal, Form::of(args)));
                 return Exit::Refused;
             }
         }

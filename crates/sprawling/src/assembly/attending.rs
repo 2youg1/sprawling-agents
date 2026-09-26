@@ -32,17 +32,17 @@ use kernel::{AxCode, AxError, EventRecord, Payload, RunId};
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
 use super::relay::Patience;
 use super::{RunWorker, Serving};
+use crate::serving::CorePriority;
 use crate::serving::folding::{Broadcast, Copies, Folding, spawn_folding};
 use crate::serving::output_ring::OutputRing;
-use crate::serving::setting_telling_a_refusal;
 use crate::views::{Published, Views};
 
 /// What a worker is opened with: where the city is, whose keys it may
 /// redeem, what the vault turned out to be, where its diagnostics go,
 /// and what the history already says.
 ///
-/// Five values that always travel together and are never chosen
-/// independently - `listen` settles all five before it has a thread to
+/// Values that always travel together and are never chosen
+/// independently - `listen` settles them all before it has a thread to
 /// hand them to - so they travel as one, as `Reporter` does.
 pub(super) struct Opening {
     pub(super) city_root: std::path::PathBuf,
@@ -59,6 +59,9 @@ pub(super) struct Opening {
     /// `log`, held apart because the audit thread never touches the
     /// writer (sprawling-SPEC.md 8-90).
     pub(super) audit_log: runtime::diagnostics::Diagnostics,
+    /// The person's `[core] priority`, the reading the socket's workers
+    /// already stand on.
+    pub(super) core: CorePriority,
 }
 
 /// Where a worker's work goes, and where it comes from.
@@ -110,6 +113,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         log,
         held,
         audit_log,
+        core: setting,
     } = opening;
     let Outward {
         desk: worker_desk,
@@ -121,9 +125,6 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         to_readers,
         kept,
     } = outward;
-    // The views thread stands above the commands the city dispatches
-    // (sprawling-SPEC.md 8-93).
-    let setting = setting_telling_a_refusal();
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
     // (sprawling-SPEC.md 8-93).
@@ -138,6 +139,8 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             spare,
         },
         Broadcast { to_clients, head },
+        // The views thread stands above the commands the city
+        // dispatches (sprawling-SPEC.md 8-93).
         setting,
         crate::serving::standing::monotonic_now,
     )?;

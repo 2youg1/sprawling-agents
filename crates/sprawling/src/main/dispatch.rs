@@ -16,6 +16,7 @@ use super::city::report;
 use super::exit::Exit;
 use super::grammar::Arguments;
 use super::refusal::Form;
+use super::verbs::{self, Verb};
 use super::wire_client::{self, Listen, Milestone, Spoken, Until};
 use kernel::consts_policy::DEFAULT_AT;
 use std::process::ExitCode;
@@ -34,9 +35,9 @@ const QUIET_MS: u64 = 120_000;
 /// milestone, 4 no city at `--at`.
 pub(super) fn verb(read: &Arguments) -> ExitCode {
     let (Some(addr), Some(task)) = (read.positional(1), read.positional(2)) else {
-        eprintln!(
-            "usage: sprawling dispatch <addr> <task> [--detach] [-m/--model <id>] [--at host:port]"
-        );
+        if let Some(row) = verbs::row(Verb::Dispatch) {
+            eprintln!("usage: {}", verbs::usage(row));
+        }
         return Exit::Line.into();
     };
     let addr = match kernel::Address::parse(addr) {
