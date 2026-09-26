@@ -48,6 +48,10 @@ citysim 不受 ARCHITECTURE §6 模块表约束（表只辖 crates/**），但 M
 
 `executable_name()` 拼的是 `install.rs` 装出来的那个名字：`INSTALLED_STEM` 加本平台后缀。该事实的权威是 `xtask/src/platform.rs` 每平台的 `binary` 字段，`cargo xtask artifact` 把发行侧的四种拼法（工作流矩阵、两个安装脚本、npm shim）钉在它上面；citysim 这一处不在那四种之内，它是唯一需要这个名字的**测量**读者。够不到权威的原因是位置而非取舍：`install` 模块住在 `crates/sprawling/src/main.rs`，二进制的模块不可 import，而 `xtask` 是工具不是依赖。本 crate 内只留这一处拼写——`shipped_binary` 找的路径名与 `archive_of` 写出的 zip 成员名都读它。**重开参数**：这个名字若移进 `sprawling` lib 成为公共面，本函数改为读它，重述随之删除。
 
+### 3-6 决定：评估仪器住在 citysim，不另立 crate
+
+五件仪器（§8-8）没有产品调用点：`suite` 只由 `tests/evaluation.rs` 驱动，其余四件只由自己的测试驱动。为它们在产品拓扑里立一个 crate，换来的是一个不进二进制却占一格依赖图的单元，以及 `sprawling` 为一个交接探针多背一条边。citysim 本就是 dev-only 的第二个 Main，仪器与剧本同住，产品图少一个单元。交接探针有生产调用点，归它的拥有者 `bin::assembly::probing`（sprawling-SPEC §8-39）。落选方案：保留独立的 `eval` crate——它唯一的生产面是那个探针。**重开条件**：一件仪器得到生产调用点。
+
 ## 4 现状分析
 
 空壳 lib。无性能议题。
@@ -280,13 +284,102 @@ pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
 
 **红**：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 字段；`the_four_load_scenarios_rerun_and_emit_the_stable_format`——四个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）。
 
+### 8-8 仪器：suite、score、metabolism、nesting、ablation
+
+五件仪器回答「城拿什么证据评估自己」。它们**恒不是合并门**：一件仪器说某样东西变差了，是给人看的证据，不是 CI 的红灯。量的是模型行为，两次不一样是常态，所以它们出证据不出红灯；设阈值的门归 `xtask budget`，依据是「机器两次量得一样」。
+
+| 模块 | 它回答的问题 | 构型 |
+|---|---|---|
+| `suite`（含 held-out 判定） | 一批真实任务怎么组织、怎么跑两次而结果可比 | 库面，`tests/evaluation.rs` 驱动 |
+| `score`、`metabolism` | 哪些沉淀资产在升值、哪些该退场 | 仅测试构型 |
+| `nesting` | 模型编辑哪种嵌套格式错得最少，错时怎么错 | 仅测试构型 |
+| `ablation` | 拿掉 City.md 的某一段，居民做不了什么 | 仅测试构型 |
+
+三条前提只消费不重议：**评分对象是资产不是 Agent**（会话冻结即终结，Ephemeral 恒不进评分与 metabolism）；**语料只取自真实工作**（一份合成任务集测出来的分数，测的是出题人）；**登记归 `kernel::registry`**（Asset 是什么、登记在哪由它答；这里只答「这份登记值多少」，成本读数归 `memory::attribution`）。统计全用整数，比率以千分数（`per_mille`）表达，不引入统计库。
+
+**仪器只在测试构型里编译。** `score`、`metabolism`、`nesting`、`ablation` 在 `lib.rs` 写作 `#[cfg(test)] mod`：它们回答的是「这套规则算得对不对」，答法是自己的测试，提问者是读测试的人；没有剧本调用它们。dead_code 因此不是被 `#[allow]` 压掉的，是不存在的。**重开条件**：出现一个生产调用点要对资产排序或退场，例如城层的资产清单视图；届时那个模块搬到拥有该视图的 crate。
+
+#### 8-8-1 suite（形状 2 值类型＋形状 1 判定）
+
+```rust
+pub enum Half { HeldIn, HeldOut }
+pub struct Task { pub id: String, pub at: Locator, pub half: Half }
+pub struct Outcome { pub id: String, pub passed: bool }
+pub struct Tally { pub tried: u32, pub passed: u32 }   // per_mille() 整数千分比
+pub struct Report { pub held_in: Tally, pub held_out: Tally, pub unknown: u32 }
+pub struct Suite { /* BTreeMap<String, Task> —— 私有 */ }
+impl Suite {
+    pub fn new(tasks: Vec<Task>) -> Result<Suite, AxError>;   // 同一 id 两次即拒（泄漏在构造点）
+    pub fn half(&self, half: Half) -> Vec<&Task>;             // id 序＝执行序
+    pub fn report(&self, outcomes: &[Outcome]) -> Report;
+}
+```
+
+- **泄漏是构造点的拒绝，不是事后的告警**：同一个 id 出现两次即拒，无论落在同半还是异半。一份被看过的 held-out 集在它被看过之后就不值钱了。
+- **任务只携 Locator 不携正文**：抄一份正文进来就会与它来自的那件活漂开。
+- **不认识的 outcome 计入 `unknown` 而非计入分母**：一次回答了没人问过的问题的运行，不是这份 suite 的运行。
+
+#### 8-8-2 score 与 metabolism（形状 1 判定；仅测试构型）
+
+```rust
+pub struct AssetUse { pub uses: u32, pub resident: ByteLen, pub idle_days: u32 }
+pub struct Score { pub per_mille: u32, pub idle_days: u32 }
+pub fn score(usage: &AssetUse) -> Score;
+pub fn worst_first<T: Clone>(assets: &[(T, Score)]) -> Vec<(T, Score)>;
+
+pub const ASSET_IDLE_DAYS: u32 = 90;
+pub const ASSET_FLOOR_PER_MILLE: u32 = 1_000;
+pub enum Disposal { Keep, Warn { because: String }, Retire { because: String } }
+pub fn dispose(usage: &AssetUse, score: Score, warned_already: bool) -> Disposal;
+pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposal)>;
+```
+
+- **分子是被取用次数，分母是常驻字节**：同样的有用程度，占的地方越大越贵——那是它在每一次披露它的 prompt 里都要付的账。
+- **`idle_days` 并列而不折进分数**：便宜且无用与昂贵且不可或缺是两回事。
+- **最重的处置是 `Retire`，不是删除**：退场＝不再被披露，字节仍在盘上与历史里。
+- **先警告后退场，理由随处置同行**：没有任何东西在第一次被注意到的同一轮里停止被提供——那一轮正是人说「它重要」的机会。
+
+#### 8-8-3 nesting（形状 1 判定；仅测试构型）
+
+计划树要住在一个模型每天编辑的文件里，TOML／JSON／Markdown 三选一由这件仪器的数字决定，不由口味决定。`Fault` 是穷尽枚举，**按破坏力排序**：`LostField`（能解析、少了一个字段——唯一一种文件仍可读而一个计划节点悄悄不存在的结局）＞ `ChangedBystander` ＞ `Unparseable` ＞ `Truncated` ＞ `NotApplied`。`grade` 报最坏的那一个；`recommended` 先比错误率，平手比各自最坏的错法。
+
+它不调用模型：`Attempt` 是某个模型已经产出的东西，一个自持 provider 的 suite 无法离线跑、无法重放。语料自己解析不了时拒绝而不是记分。三种格式读成同一组叶子（`path -> value`，`nesting/reading.rs`）；Markdown 那条刻意严格，因为会修复松散缩进的读法会藏掉这件仪器正在计数的失败。
+
+#### 8-8-4 ablation（`ablation.rs` 形状 1 判定，`ablation/capabilities.rs` 形状 6 数据；仅测试构型）
+
+`docs/City.md` 是每个居民读到的第一份文本，它每多一段就向每一次 prefix 收一次租。这把尺把文档按段切开，逐段拿掉，量一个居民因此做不了什么。入口是一条 `#[ignore]` 测试，只在有人点名时跑：
+
+```
+cargo nextest run -p citysim --run-ignored all -E 'test(city_md)' --no-capture
+```
+
+可测量的替身是**能力与凭据**：一条 `Capability` 是居民必须能做的一件事，它的 `cue` 是文中授予这件事的那句逐字短语。
+
+```rust
+pub(crate) struct Capability { pub(crate) name: &'static str, pub(crate) cue: &'static str }
+pub(crate) struct Passage { pub(crate) index: u32, pub(crate) opening: String, pub(crate) removed: ByteLen }
+pub(crate) enum Cost { Untouched, Restated { also_said: Vec<&'static str> }, Sole { lost: Vec<&'static str> } }
+pub(crate) struct Charge { pub(crate) passage: Passage, pub(crate) cost: Cost }
+pub(crate) struct Ablation { /* 私有：passages、corpus */ }
+impl Ablation {
+    pub(crate) fn new(document: &str, corpus: &'static [Capability]) -> Result<Ablation, AxError>;
+    pub(crate) fn charges(&self) -> Vec<Charge>;
+    pub(crate) fn costliest_first(&self) -> Vec<Charge>;
+}
+```
+
+- **三值而非布尔**：`Restated` 让人看得见文档在哪里重复自己。
+- **语料自己不能给自己打分**：`new` 在整份文档里找不到某条 cue 即拒（`E_INVALID_ARGS`，recovery 指向语料）。
+- **切段规则**：空行切块，以 `- ` 开头的块并入上一段。
+- **`costliest_first` 先比失去的能力数（降），平手比被删字节数（升），末位比 `index`**：排序两次必须一样。
+
 ## 9–16 工作流程／实现／边界／错误／依赖／硬编码／影响面／测试
 
 - 流程：测试构造 drafts→MemLedger append→checker／conformance／对拍 JsonlLedger；另有 Scenario→run_scenario→check_chain＋事件序断言。
 - 实现：append＝from_draft→canonical_line→chain_hash 推进；无别的逻辑。
 - 边界：空 Ledger check 通过；单创世行通过。
 - 错误：透传 kernel/replay 的 AxError，不新增码。
-- 依赖：kernel（features=["conformance"]）、memory（对拍＋夹具）、runtime（复用 verify）；dev：tempfile。
+- 依赖：kernel（features=["conformance"]）、memory（对拍＋夹具）、runtime（复用 verify）、toml（nesting 读它评分的 TOML 形状）；dev：tempfile。
 - 硬编码：无。
 - 影响面：剧本执行器建于本 crate 之上；夹具脚本是后续验证工作的起点。
 - 测试：conformance 双实现、字节对拍、夹具对拍、篡改检出。

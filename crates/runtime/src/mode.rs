@@ -15,9 +15,10 @@
 //!
 //! P3 adds the half that decides: [`admits`] says whether what a run
 //! produced may land, given the mode it was in. The evidence arrives as
-//! plain answers rather than as an `eval` type, because that crate sits
-//! outside this one and the question here is not how evidence was
-//! gathered but whether enough of it exists.
+//! plain answers rather than as an instrument's type, because the
+//! instruments live in citysim, outside this crate, and the question
+//! here is not how evidence was gathered but whether enough of it
+//! exists.
 
 use crate::catalog::CatalogEntry;
 

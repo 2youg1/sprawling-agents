@@ -401,7 +401,6 @@ name = "citysim"
 version = "0.0.6"
 dependencies = [
  "channels",
- "eval",
  "gateway",
  "kernel",
  "memory",
@@ -410,6 +409,7 @@ dependencies = [
  "sha2 0.11.0",
  "sprawling",
  "tempfile",
+ "toml",
  "zeroize",
  "zip",
 ]
@@ -829,15 +829,6 @@ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "eval"
-version = "0.0.6"
-dependencies = [
- "kernel",
- "serde_json",
- "toml",
 ]
 
 [[package]]
@@ -2635,7 +2626,6 @@ dependencies = [
  "channels",
  "city",
  "collab",
- "eval",
  "flate2",
  "futures-util",
  "gateway",

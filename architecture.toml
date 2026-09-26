@@ -414,16 +414,6 @@ module = [
   { name = "city::gitignore", file = "crates/city/src/gitignore.rs", owns = "what a building promises is tracked, what one session was thinking is not", shape = "data", since = "V4", status = "built", spec = "city-SPEC.md#8-21" },
   { name = "city::vocation", file = "crates/city/src/vocation.rs", owns = "whether the residents at an address build or plan", shape = "decision", since = "V4", status = "built", spec = "city-SPEC.md#8-22" },
   { name = "city::city_tool", file = "crates/city/src/city_tool.rs", owns = "the face the city itself shows a model: raise, adopt, list", shape = "adapter", since = "V4", status = "built", spec = "city-SPEC.md#8-23" },
-  { name = "eval::suite", file = "crates/eval/src/suite.rs", owns = "real tasks split into what a change may learn from and what judges it", shape = "decision", since = "P3", status = "built", spec = "eval-SPEC.md#8-1" },
-  { name = "eval::probe", file = "crates/eval/src/probe.rs", owns = "the same questions asked twice, versioned so two versions never compare", shape = "value", since = "P3", status = "built", spec = "eval-SPEC.md#8-2" },
-  { name = "eval::score", file = "crates/eval/src/score.rs", owns = "what a settled asset is worth, in integer thousandths", shape = "decision", since = "P3", status = "built", spec = "eval-SPEC.md#8-3" },
-  { name = "eval::nesting", file = "crates/eval/src/nesting.rs", owns = "which nested format a model edits with fewest mistakes, and how it fails when it fails", shape = "decision", since = "V3", status = "built", spec = "eval-SPEC.md#8-5" },
-  { name = "eval::nesting::reading", file = "crates/eval/src/nesting/reading.rs", owns = "reading a document of any of the three shapes into the same leaves", shape = "decision", since = "V3", status = "built", spec = "eval-SPEC.md#8-5" },
-  { name = "eval::nesting::tests", file = "crates/eval/src/nesting/tests.rs", owns = "the graded fixtures: worst fault wins, and a tie broken by damage", shape = "decision", since = "V3", status = "built", spec = "eval-SPEC.md#8-5" },
-  { name = "eval::metabolism", file = "crates/eval/src/metabolism.rs", owns = "clearing out: warn first, retire second, delete never", shape = "decision", since = "P3", status = "built", spec = "eval-SPEC.md#8-4" },
-  { name = "eval::ablation", file = "crates/eval/src/ablation.rs", owns = "what a resident stops being able to do when one passage of the city document is removed", shape = "decision", since = "V3", status = "built", spec = "eval-SPEC.md#8-7" },
-  { name = "eval::ablation::capabilities", file = "crates/eval/src/ablation/capabilities.rs", owns = "the corpus: each thing a resident must be able to do, and the phrase in the document that grants it", shape = "data", since = "V3", status = "built", spec = "eval-SPEC.md#8-7" },
-  { name = "eval::ablation::tests", file = "crates/eval/src/ablation/tests.rs", owns = "the graded fixtures, and the on-demand run against the real City.md", shape = "decision", since = "V3", status = "built", spec = "eval-SPEC.md#8-7" },
   { name = "channels::wire", file = "crates/channels/src/wire.rs", owns = "the envelope both sides speak: the frames, the version and its hash", shape = "value", since = "S4", status = "built", spec = "channels-SPEC.md#8-1" },
   { name = "channels::named_frames", file = "crates/channels/src/named_frames.rs", owns = "one declaration of a frame family, from which the enum, each variant's wire name and the schema-hash table are all generated", shape = "grammar", since = "P1", status = "built", spec = "channels-SPEC.md#8-1" },
   { name = "channels::preference", file = "crates/channels/src/preference.rs", owns = "what one person set for themselves, as the wire carries it", shape = "value type", since = "V0.0.6", status = "built", spec = "channels-SPEC.md#8-1" },
@@ -603,6 +593,7 @@ module = [
   { name = "bin::assembly::settling::tests::halting", file = "crates/sprawling/src/assembly/settling/tests/halting.rs", owns = "a halt on a scope reaches the run a resident handed down inside it", shape = "adapter", since = "V4", status = "built", spec = "sprawling-SPEC.md#8-39" },
   { name = "bin::assembly::reviewing", file = "crates/sprawling/src/assembly/reviewing.rs", owns = "what a run offers a building it may not write in, and what merging it costs", shape = "adapter", since = "V3", status = "built", spec = "sprawling-SPEC.md#8-39" },
   { name = "bin::assembly::probing", file = "crates/sprawling/src/assembly/probing.rs", owns = "the handoff probe asked of a predecessor and of its successor, and the line that records what survived", shape = "adapter", since = "V4", status = "built", spec = "sprawling-SPEC.md#8-39" },
+  { name = "bin::assembly::probing::probe", file = "crates/sprawling/src/assembly/probing/probe.rs", owns = "the same questions asked twice, versioned so two versions never compare", shape = "value", since = "P3", status = "built", spec = "sprawling-SPEC.md#8-39" },
   { name = "bin::assembly::reviewing::tests", file = "crates/sprawling/src/assembly/reviewing/tests.rs", owns = "the index of the review tests", shape = "adapter", since = "V3", status = "built", spec = "sprawling-SPEC.md#8-39" },
   { name = "bin::assembly::reviewing::tests::landing", file = "crates/sprawling/src/assembly/reviewing/tests/landing.rs", owns = "work reaching a review building only after a second resident checks it", shape = "adapter", since = "V3", status = "built", spec = "sprawling-SPEC.md#8-39" },
   { name = "bin::assembly::reviewing::tests::refusal", file = "crates/sprawling/src/assembly/reviewing/tests/refusal.rs", owns = "a merge whose announcing line the history refused leaves the building where it was", shape = "adapter", since = "V3", status = "built", spec = "sprawling-SPEC.md#8-39" },
@@ -787,9 +778,6 @@ duty = "several residents in one building, without stepping on each other"
 
 [family.city]
 duty = "space, identity, and the documents a building keeps"
-
-[family.eval]
-duty = "whether a change made the city better"
 
 [family.channels]
 duty = "the process boundary"
