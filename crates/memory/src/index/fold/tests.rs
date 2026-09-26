@@ -184,3 +184,23 @@ fn a_contiguous_ledger_costs_eight_bytes_per_record() {
         (10_000, 80_000)
     );
 }
+
+/// A damaged ledger whose seqs double from line to line must not double
+/// the column with them: holes stay bounded by the lines the column holds.
+#[test]
+fn doubling_seqs_leave_the_column_bounded_by_its_lines() {
+    let mut folded = Folded::empty();
+    let seqs = std::iter::once(1u64)
+        .chain(std::iter::successors(Some(65u64), |seq| seq.checked_mul(2)).take(15));
+    for seq in seqs {
+        let body = format!("{{\"seq\":{seq}}}");
+        folded.insert_line("seg-0", seq, body.as_bytes());
+    }
+    let bound = 64 * (folded.len() + 64);
+    assert!(
+        folded.entries.resident_bytes() <= bound,
+        "{} resident bytes for {} lines, bound {bound}",
+        folded.entries.resident_bytes(),
+        folded.len()
+    );
+}
