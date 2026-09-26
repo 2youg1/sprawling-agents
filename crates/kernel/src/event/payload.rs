@@ -80,10 +80,13 @@ impl Payload {
     /// once per key rather than at each reader. Unknown keys pass, so a
     /// newer writer never breaks an older reader.
     ///
+    /// Deserializes from the held map by reference, so a read allocates
+    /// only what `T` owns, never a second copy of the payload.
+    ///
     /// # Errors
     /// A payload this build cannot read as `T`.
     pub fn read<T: serde::de::DeserializeOwned>(&self) -> Result<T, AxError> {
-        serde_json::from_value(serde_json::Value::Object(self.0.clone())).map_err(|err| {
+        T::deserialize(&self.0).map_err(|err| {
             AxError::failure(
                 AxCode::WireMismatch,
                 "read a ledger payload",

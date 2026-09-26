@@ -241,6 +241,7 @@ struct Held {
 
 #[test]
 fn read_lends_the_payload_instead_of_copying_it() {
-    let payload = Payload::new(Map::from_iter([("body".to_owned(), json!("x".repeat(64)))])).unwrap();
+    let payload =
+        Payload::new(Map::from_iter([("body".to_owned(), json!("x".repeat(64)))])).unwrap();
     assert_eq!(payload.read::<Held>().unwrap(), Held { body: Handed::Lent });
 }
