@@ -99,9 +99,9 @@ pub fn classify(command: &Command) -> ControlVerdict {
         | Command::PutSecret { .. }
         // Opening a file manager reaches nothing a run is doing.
         | Command::Reveal { .. }
-        // Putting a discarded file back writes where a run already
-        // finished writing; the sweep that found it gone ran after the
-        // wave, so no run in flight is reached.
+        // Putting a discarded file back only creates a file that is
+        // absent: memory refuses a link on the path and any file already
+        // at the target, so a run writing there is never overwritten.
         | Command::RestoreDiscard { .. }
         // Installing a tool and looking at this machine again are both
         // about the machine rather than about the city: neither reaches

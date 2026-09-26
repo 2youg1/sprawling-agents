@@ -256,8 +256,9 @@ impl Checkpoint {
     ///
     /// Neither the index nor HEAD moves: putting a file back is not a
     /// commit, and a person who restored one file should not find a new
-    /// line in their own branch's history. `Address` cannot climb out of
-    /// the city, so the path it spells needs no second check.
+    /// line in their own branch's history. A link on the path, or a file
+    /// already at the target with other bytes, is refused rather than
+    /// followed or overwritten.
     ///
     /// # Errors
     /// A commit the repository no longer holds (the fence reference is
@@ -283,12 +284,48 @@ impl Checkpoint {
             .workdir()
             .ok_or_else(|| refused("the city repository is bare".to_owned()))?
             .join(address.as_str());
+        refuse_links(&target, address).map_err(refused)?;
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|err| refused(format!("{}: {err}", parent.display())))?;
         }
-        std::fs::write(&target, blob.content()).map_err(|err| refused(format!("{address}: {err}")))
+        match std::fs::read(&target) {
+            Ok(current) if current == blob.content() => return Ok(()),
+            Ok(_) => {
+                return Err(refused(format!(
+                    "{address}: a file already sits there; move it aside and restore again"
+                )));
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(refused(format!("{address}: {err}"))),
+        }
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&target)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, blob.content()))
+            .map_err(|err| refused(format!("{address}: {err}")))
     }
+}
+
+/// Refuses when any component of `target` under the working tree that
+/// exists on disk is a symbolic link or junction, because `Address`
+/// bounds the spelling of a path, not where the disk resolves it
+/// (kernel `Address` leaves link resolution to the effect layer).
+fn refuse_links(target: &Path, address: &Address) -> Result<(), String> {
+    let depth = address.as_str().split('/').count();
+    target
+        .ancestors()
+        .take(depth)
+        .try_for_each(|path| match std::fs::symlink_metadata(path) {
+            Ok(meta) if meta.file_type().is_symlink() => Err(format!(
+                "{address}: {} is a link; remove it and restore again",
+                path.display()
+            )),
+            Ok(_) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(format!("{}: {err}", path.display())),
+        })
 }
 #[cfg(test)]
 #[allow(
