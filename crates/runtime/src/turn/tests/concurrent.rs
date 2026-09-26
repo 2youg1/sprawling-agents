@@ -65,8 +65,10 @@ fn three_reads_in_one_wave_take_the_time_of_one_and_leave_the_serial_ledger() {
     let mut serial = TestLedger::new();
     let turn = wave_of(&mut serial, calls());
     advance(
-        turn.execute(Interrupt::None, &mut serial, &mut slow_read, &mut |_| NextCall::Allowed)
-            .unwrap(),
+        turn.execute(Interrupt::None, &mut serial, &mut slow_read, &mut |_| {
+            NextCall::Allowed
+        })
+        .unwrap(),
     );
 
     let mut concurrent = TestLedger::new();

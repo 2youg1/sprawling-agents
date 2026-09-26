@@ -104,7 +104,7 @@ impl Turn<ToolWave> {
         }
         let calls = std::mem::take(&mut self.state.calls);
         let mut exchange = self.open_exchange();
-        let mut asked = (0..=u32::MAX).map(|index| still_going(index));
+        let mut asked = (0..=u32::MAX).map(still_going);
         let mut standing = NextCall::Allowed;
         let leading: Vec<&ToolCall> = calls
             .iter()
@@ -225,5 +225,25 @@ fn all_at_once(
     calls: &[&ToolCall],
     invoke: &(dyn Fn(&ToolCall) -> Result<ToolOutcome, AxError> + Sync),
 ) -> Vec<Result<ToolOutcome, AxError>> {
-    calls.iter().map(|call| invoke(call)).collect()
+    let Some((first, rest)) = calls.split_first() else {
+        return Vec::new();
+    };
+    std::thread::scope(|scope| {
+        let others: Vec<_> = rest
+            .iter()
+            .map(|call| scope.spawn(move || invoke(call)))
+            .collect();
+        std::iter::once(invoke(first))
+            .chain(others.into_iter().map(|worker| {
+                worker.join().unwrap_or_else(|_| {
+                    Err(AxError::failure(
+                        AxCode::ToolUnavailable,
+                        "run a read-only tool call",
+                        "the tool stopped its thread without an answer",
+                    )
+                    .with_recovery("call the tool again; report it when it stops a second time"))
+                })
+            }))
+            .collect()
+    })
 }
