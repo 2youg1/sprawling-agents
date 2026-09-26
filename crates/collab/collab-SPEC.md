@@ -386,13 +386,15 @@ pub enum ClaimEffect {
     /// 造出来的东西，把它的两个臂抄进第二个枚举，就是对「一个节点可以
     /// 怎么离开」的第二份意见。
     PutDown { id: NodeId, item: String, exit: PlanExit },
-    Split   { parent: NodeId, children: Vec<String> },
+    Split   { parent: NodeId, children: Vec<NewChild> },   // 经 `kernel` 重导出，住 `spine::row`
 }
 impl ClaimEffect {
     pub fn id(&self) -> &NodeId;
     pub fn expected_before(&self) -> RoadmapStatus;   // 经 `kernel` 重导出，住 `spine::row`，公共拼写不变
     pub fn kind(&self) -> EventKind;          // 由出口决定，不由调用方决定
     pub fn payload(&self, who: &str) -> Result<Payload, AxError>;
+    /// 把这条效应写进一份计划文本；桌子改自己的副本与工人落地时改盘上那份，走的都是它。
+    pub fn apply(&self, text: &str) -> Result<String, AxError>;
 }
 pub struct ClaimDesk { /* who、room、roadmap 文本、本次 drive 持有的 Held、effects —— 私有 */ }
 impl ClaimDesk {
@@ -427,7 +429,9 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 - **`block` 与 `release` 都必须带一句原因**，且原因**随记录走而不是随表格走**：表格只有位置说「Blocked」，一句话该住在 `roadmap_blocked` 的载荷里，在表里再放一份就是同一句话的第二个权威。
 - **哪一种记录由出口决定**（`ClaimEffect::kind`）：绿→`roadmap_finished`，红→`roadmap_blocked`，交回→`roadmap_released`，拆→`roadmap_split`。工人不再自己 match 一遍，于是「停下来意味着什么」只有一个答案。
 - **效果穷尽**（同 `SignalEffect`／`GoalEffect`／`PrEffect`）：每个变体都是工人必须写下的一条账，新增一个变体应当是写入处的编译错误。
-- **并发口径（诚实边界）**：工人写盘前重读文件，**每个节点只核第一条效果**——一个先认领再结项的 run 两条效果都是它自己按派活时的文件顺序产出的，拿第二条去问磁盘，等于问「我自己刚才那条落盘了没有」，而它没有：desk 是最后整份写一次。行若已不是预期状态则整组丢弃并留一条诊断，而不是覆盖。
+- **效应怎么改文本只有一个定义**（`ClaimEffect::apply`）：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上那份。
+  `Split` 因此带着子节点的 weight：只带名字的效应重放不出桌子写下的那几行。
+- **并发口径（诚实边界）**：工人写盘前重读文件，**每个节点只核第一条效果**——一个先认领再结项的 run 两条效果都是它自己按派活时的文件顺序产出的，拿第二条去问磁盘，等于问「我自己刚才那条落盘了没有」，而它没有：效应是落地时才重放的。行若已不是预期状态则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变，别的轮先落下的行原样留在盘上。
 
 ## 8.5 两个设计
 

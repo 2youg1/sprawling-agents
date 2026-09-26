@@ -340,3 +340,100 @@ pub(crate) fn goal_from_payload(data: &Payload) -> Result<kernel::GoalEntry, AxE
         .with_recovery("this shape is written by the same binary that reads it; report it")
     })
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+mod tests {
+    use kernel::{Address, Tool};
+
+    use super::{Claims, Then};
+
+    const SNAPSHOT: &str = "# Roadmap
+
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+| 1 | wire the kiln | 1 |  | Not started |  |
+| 2 | glaze the pots | 1 |  | Not started |  |
+";
+
+    fn desk(run: u8) -> std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>> {
+        std::sync::Arc::new(std::sync::Mutex::new(collab::ClaimDesk::new(
+            format!("potter@lab.{run}"),
+            Address::parse("lab/room1").unwrap(),
+            SNAPSHOT.to_owned(),
+            collab::Booking::new(|_| Ok(())),
+        )))
+    }
+
+    fn act(desk: &std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>, args: serde_json::Value) {
+        let mut tool = collab::ClaimTool::new(desk.clone()).unwrap();
+        tool.invoke(&kernel::ToolCall {
+            id: "tu_1".to_owned(),
+            name: kernel::ToolName::parse("plan").unwrap(),
+            args: kernel::Payload::new(args.as_object().unwrap().clone()).unwrap(),
+        })
+        .unwrap();
+    }
+
+    /// What the plan reads after this run lands on `on_disk`.
+    fn landed(desk: &std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>, on_disk: &str) -> String {
+        let mut desk = desk.lock().unwrap();
+        let effects = desk.take_effects();
+        let text = desk.roadmap().unwrap().to_owned();
+        let room = Address::parse("lab/room1").unwrap();
+        match Claims::of(
+            &effects,
+            on_disk,
+            text,
+            "Roadmap.md".into(),
+            &room,
+            "potter",
+        )
+        .unwrap()
+        {
+            Claims::Landed(landing) => match landing.then {
+                Then::Roadmap { text, .. } => text,
+                _ => panic!("a claim lands on the plan"),
+            },
+            Claims::Stale(nodes) => panic!("{nodes:?} read as moved"),
+        }
+    }
+
+    /// Two runs read one plan and take different nodes. The one that
+    /// lands second writes its effects onto the plan as the first left
+    /// it, so the first run's finished row survives the second landing.
+    #[test]
+    fn two_runs_landing_different_nodes_keep_both_rows() {
+        let (first, second) = (desk(1), desk(2));
+        act(
+            &first,
+            serde_json::json!({ "action": "claim", "node": "1" }),
+        );
+        let evidence = format!("cas:b3-{}", "ab".repeat(32));
+        act(
+            &first,
+            serde_json::json!({ "action": "finish", "node": "1", "evidence": evidence }),
+        );
+        act(
+            &second,
+            serde_json::json!({ "action": "claim", "node": "2" }),
+        );
+        let after_first = landed(&first, SNAPSHOT);
+        let after_second = landed(&second, &after_first);
+        let status = |text: &str, id: &str| match kernel::spine::check_roadmap_shape(text) {
+            kernel::RoadmapShape::WellFormed { rows } => rows
+                .into_iter()
+                .find(|row| row.id.to_string() == id)
+                .map(|row| row.status),
+            kernel::RoadmapShape::Malformed { .. } => None,
+        };
+        assert_eq!(
+            (status(&after_second, "1"), status(&after_second, "2")),
+            (
+                Some(kernel::RoadmapStatus::Done),
+                Some(kernel::RoadmapStatus::InProgress)
+            ),
+            "the second landing keeps the first run's finished row"
+        );
+    }
+}
