@@ -356,59 +356,57 @@ fn a_roadmap_that_cannot_be_parsed_reports_its_rows_rather_than_a_number() {
 }
 
 /// The fold takes the same lock a reader does, so a reader that ran
-/// `git status` under it held every event behind that walk of the disk.
+/// `git status` under it held every event behind that walk of the disk:
+/// a file written between `prepare` and `finish` is one the answer shows.
 #[test]
 fn a_git_status_reader_does_not_hold_the_views_while_git_reads_the_disk() {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::{Arc, Mutex};
-    use std::time::{Duration, Instant};
-
     let dir = tempfile::tempdir().unwrap();
     git2::Repository::init(dir.path()).unwrap();
     let lab = dir.path().join("lab");
     std::fs::create_dir(&lab).unwrap();
-    for n in 0..2000 {
-        std::fs::write(lab.join(format!("f{n}.txt")), "x").unwrap();
-    }
-    let views = Arc::new(Mutex::new(Views::new(dir.path())));
+    std::fs::write(lab.join("before.txt"), "x").unwrap();
+    let mut views = Views::new(dir.path());
     let query = channels::Query::GitStatus {
         building: Address::parse("lab").unwrap(),
     };
-    let solo = (0..3)
-        .map(|_| {
-            let asked = Instant::now();
-            let answer = crate::views::answer_outside_the_lock(&views, &query).unwrap();
-            assert!(
-                matches!(answer, channels::Answer::GitStatus(_)),
-                "{answer:?}"
-            );
-            asked.elapsed()
-        })
-        .min()
-        .unwrap();
+    let prepared = views.prepare(&query);
+    std::fs::write(lab.join("after.txt"), "y").unwrap();
 
-    let done = Arc::new(AtomicBool::new(false));
-    let reader = {
-        let (views, query, done) = (Arc::clone(&views), query.clone(), Arc::clone(&done));
-        std::thread::spawn(move || {
-            for _ in 0..8 {
-                crate::views::answer_outside_the_lock(&views, &query).unwrap();
-            }
-            done.store(true, Ordering::SeqCst);
-        })
+    let read = prepared.finish();
+    assert!(matches!(read, channels::Answer::GitStatus(_)), "{read:?}");
+    assert_eq!(read, views.answer(&query));
+}
+
+/// The configuration ladder is read after the views are released, and
+/// the release page is not asked for under them: `prepare` leaves both
+/// reads to `finish`.
+#[test]
+fn the_config_ladder_and_the_release_page_are_read_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let room = Address::parse("lab/room1").unwrap();
+    let query = channels::Query::Config { addr: room.clone() };
+    let prepared = views.prepare(&query);
+    let city_layer = city::config_path(dir.path(), &room, city::Layer::City).unwrap();
+    std::fs::create_dir_all(city_layer.parent().unwrap()).unwrap();
+    std::fs::write(
+        &city_layer,
+        "[model]
+effort = \"low\"
+",
+    )
+    .unwrap();
+
+    let read = prepared.finish();
+    assert_eq!(read, views.answer(&query));
+    let channels::Answer::Config(config) = read else {
+        panic!("Config answers with a ladder");
     };
-    let mut longest = Duration::ZERO;
-    while !done.load(Ordering::SeqCst) {
-        let asked = Instant::now();
-        drop(views.lock().unwrap());
-        longest = longest.max(asked.elapsed());
-        std::thread::yield_now();
-    }
-    reader.join().unwrap();
-    assert!(
-        longest * 4 < solo,
-        "the fold waited {longest:?} for the views while one git status takes {solo:?}"
-    );
+    assert!(config.effort.is_some(), "{config:?}");
+    assert!(matches!(
+        views.prepare(&channels::Query::Release),
+        super::prepared::Prepared::Release
+    ));
 }
 
 /// A page that opens a file or lists a directory reads the tree after
