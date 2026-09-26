@@ -33,6 +33,7 @@
   // beside it pins the rail, so neither control answers for the other.
 
   import type { Rail } from "../core/prefs";
+  import { LABELS } from "../core/keys";
   import type { Action } from "../core/keys";
   import { MAYOR, toFragment } from "../core/route";
   import type { View } from "../core/route";
@@ -56,8 +57,7 @@
   interface Item {
     readonly key: "talk" | "city" | "record" | "cost" | "setup";
     readonly view: View;
-    // Already in the person's language.
-    readonly label: string;
+    // Also what the page is called, read from the key table.
     readonly action: Action;
     readonly glyph: GlyphName;
     readonly badge?: number | undefined;
@@ -81,13 +81,16 @@
   const waiting = $derived($approvals.length);
   const halted = $derived(cityIsShut($belief.halted));
 
+  // The name each page goes by is the name its key goes by, so the rail,
+  // the palette and the key sheet cannot call one page two things.
   const items = $derived.by((): Item[] => [
-    { key: "talk", view: { kind: "talk", address: MAYOR }, label: say($lang, "nav_mayor"), action: "go.talk", glyph: "talk" },
-    { key: "city", view: { kind: "city" }, label: say($lang, "nav_city"), action: "go.city", glyph: "city", badge: active },
-    { key: "record", view: { kind: "record", lens: "ledger" }, label: say($lang, "nav_the_record"), action: "go.record", glyph: "record" },
-    { key: "cost", view: { kind: "cost" }, label: say($lang, "cost_title"), action: "go.cost", glyph: "cost" },
-    { key: "setup", view: { kind: "setup" }, label: say($lang, "nav_settings"), action: "go.setup", glyph: "setup" },
+    { key: "talk", view: { kind: "talk", address: MAYOR }, action: "go.talk", glyph: "talk" },
+    { key: "city", view: { kind: "city" }, action: "go.city", glyph: "city", badge: active },
+    { key: "record", view: { kind: "record", lens: "ledger" }, action: "go.record", glyph: "record" },
+    { key: "cost", view: { kind: "cost" }, action: "go.cost", glyph: "cost" },
+    { key: "setup", view: { kind: "setup" }, action: "go.setup", glyph: "setup" },
   ]);
+
 
   function here(item: Item): "page" | undefined {
     return view.kind === item.key ? "page" : undefined;
@@ -147,7 +150,7 @@
       </div>
     {/if}
     {#each items as item (item.key)}
-      <Tip text={item.label}>
+      <Tip text={say($lang, LABELS[item.action])}>
         {#snippet children(hint: string)}
           <a
             href={toFragment(item.view)}
@@ -169,7 +172,7 @@
                 </span>
               {/if}
             </span>
-            <span class="{label} flex-1">{item.label}</span>
+            <span class="{label} flex-1">{say($lang, LABELS[item.action])}</span>
             <span class={label}>
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; svelte-check types this imported snippet fine, and typescript-eslint does not resolve exports of another .svelte module) -->
               {@render Kbd({ action: item.action })}
