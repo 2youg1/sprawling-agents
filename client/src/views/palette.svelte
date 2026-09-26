@@ -39,12 +39,12 @@
   import type { View } from "../core/route";
   import { cityIsShut, CITY } from "../core/scope";
   import { completed } from "../core/completion";
-  import { offered, reached } from "../core/slash";
-  import type { Reached, Slash, SlashHands } from "../core/slash";
+  import { SECTIONS, offered, reached } from "../core/slash";
+  import type { Reached, Section, Slash, SlashHands } from "../core/slash";
   import { ui } from "../ui";
   import { Address } from "../wire";
   import Empty from "./parts/empty.svelte";
-  import { SECTIONS, SECTION_WORD, sectionOf } from "./palette/sections";
+  import { SECTION_WORD } from "./palette/sections";
   import { Kbd } from "./parts/kbd.svelte";
 
   interface Entry {
@@ -171,6 +171,7 @@
       case "/dispatch":
         return here === null ? NEEDS_ROOM : undefined;
       case "/steer":
+      case "/stop":
         return live === null ? NEEDS_RUN : undefined;
       case "/model":
         return models.length === 0 ? NEEDS_MODEL : undefined;
@@ -217,25 +218,27 @@
     }
   }
 
-  const commands = $derived.by((): Entry[] =>
-    offered(query.trim()).map((each) => ({
-      label: each.grammar === "" ? each.spelling : `${each.spelling} ${each.grammar}`,
-      hint: say($lang, each.about),
-      why: whyFor(each.spelling),
-      act: () => {
-        runSlash(each);
-      },
-    })),
-  );
-
   // The slash list as three labelled sections, in the order the
   // question is usually asked: what to do, where to go, what session.
-  const grouped = $derived.by(() =>
-    SECTIONS.map((section) => ({
+  // Each verb names its section itself, and the flat list the cursor
+  // walks is read in the same order the sections draw it.
+  const grouped = $derived.by((): { section: Section; entries: Entry[] }[] => {
+    const typed = offered(query.trim());
+    return SECTIONS.map((section) => ({
       section,
-      entries: commands.filter((entry) => sectionOf(entry.label.split(" ").at(0) ?? "") === section),
-    })).filter((group) => group.entries.length > 0),
-  );
+      entries: typed
+        .filter((each) => each.section === section)
+        .map((each) => ({
+          label: each.grammar === "" ? each.spelling : `${each.spelling} ${each.grammar}`,
+          hint: say($lang, each.about),
+          why: whyFor(each.spelling),
+          act: () => {
+            runSlash(each);
+          },
+        })),
+    })).filter((group) => group.entries.length > 0);
+  });
+  const commands = $derived(grouped.flatMap((group) => group.entries));
 
   const shown = $derived.by((): Entry[] => {
     const needle = query.trim().toLowerCase();

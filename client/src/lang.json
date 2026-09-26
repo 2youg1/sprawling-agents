@@ -188,8 +188,8 @@
     "zh": "给 {addr} 一个长期目标"
   },
   "bld_halt": {
-    "en": "/stop {addr}",
-    "zh": "/stop {addr}"
+    "en": "/halt {addr}",
+    "zh": "/halt {addr}"
   },
   "bld_no_rooms": {
     "en": "no rooms yet",
@@ -316,8 +316,8 @@
     "zh": "已花 {usd}"
   },
   "city_stop": {
-    "en": "/stop --all",
-    "zh": "/stop --all"
+    "en": "/halt --all",
+    "zh": "/halt --all"
   },
   "city_stopped": {
     "en": "stopped",
@@ -2212,8 +2212,8 @@
     "zh": "跳到页面内容"
   },
   "slash_clear": {
-    "en": "empty the box",
-    "zh": "清空输入框"
+    "en": "drop this conversation and start a new session here",
+    "zh": "丢掉这段对话，在此地址开一个新对话"
   },
   "slash_dispatch": {
     "en": "open a run with these words",
@@ -2268,8 +2268,8 @@
     "zh": "把这句话说进正在跑的 run"
   },
   "slash_stop": {
-    "en": "stop this run, one building, or the whole city",
-    "zh": "停下这次 run、某栋楼，或整座城"
+    "en": "cancel the run that is going",
+    "zh": "取消正在跑的这次 run"
   },
   "slot_building": {
     "en": "building",
@@ -2391,7 +2391,6 @@
     "en": "hearing…",
     "zh": "听写中…"
   },
-
   "talk_landed": {
     "en": "this run went to",
     "zh": "这次 run 去了"
@@ -2485,8 +2484,8 @@
     "zh": "/steer"
   },
   "talk_steer_queued": {
-    "en": "/steer --queued",
-    "zh": "/steer --queued"
+    "en": "/steer · after the tool call",
+    "zh": "/steer · 工具调用之后"
   },
   "talk_stop": {
     "en": "/stop",
@@ -3219,5 +3218,13 @@
   "gallery_runs_many": {
     "en": "the runs board with 1,200 runs: only the rows on screen are drawn",
     "zh": "1200 个 run 的全城 run 板：只画屏幕上的行"
+  },
+  "slash_halt": {
+    "en": "stop one building, or the whole city, until released",
+    "zh": "停下某栋楼或整座城，直到放行"
+  },
+  "slash_diff": {
+    "en": "open the changes of the run in this room",
+    "zh": "打开此房间 run 的改动"
   }
 }
