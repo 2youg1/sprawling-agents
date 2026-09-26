@@ -62,6 +62,11 @@ describe("the session's model", () => {
     expect(sessionModel(runs, Seq.make(2))).toBe("fake-chat");
     expect(sessionModel(runs, Seq.make(9))).toBeNull();
   });
+
+  test("is the newest known model when the newest run has not called one yet", () => {
+    const runs = [run("00000000-0000-4000-8000-000000000001", 3, "fake-small"), run("00000000-0000-4000-8000-000000000002", 7, null)];
+    expect(sessionModel(runs, Seq.make(2))).toBe("fake-small");
+  });
 });
 
 describe("picking a model", () => {
