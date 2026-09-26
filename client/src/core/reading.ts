@@ -131,6 +131,18 @@ export function completionOf(record: EventRecord): [string | null, string | null
   return [held.value, first(held)];
 }
 
+// `ApprovalItem::action_desc`: what an asking run waits to be allowed.
+export function askOf(record: EventRecord): [string | null, string | null] {
+  const held = required(record, "action_desc");
+  return [held.value, first(held)];
+}
+
+// `collab::OpenRequest::branch`: the name a pull request goes by.
+export function branchOf(record: EventRecord): [string | null, string | null] {
+  const held = required(record, "branch");
+  return [held.value, first(held)];
+}
+
 // The two words `kernel::event::record::Admittance` spells. Closed on
 // both sides: a record carrying a third is a wire this build cannot
 // read, not a release.

@@ -3338,5 +3338,189 @@
   "setup_effort_where": {
     "en": "to choose another level for one conversation, use the third box under the composer",
     "zh": "要为一段对话另选档位，用对话框下方的第三格"
+  },
+  "showing_label": {
+    "en": "show",
+    "zh": "显示"
+  },
+  "showing_whole": {
+    "en": "everything",
+    "zh": "全部"
+  },
+  "showing_results": {
+    "en": "results only",
+    "zh": "只看结果"
+  },
+  "results_waiting": {
+    "en": "waiting for you",
+    "zh": "等你"
+  },
+  "results_failed": {
+    "en": "failed",
+    "zh": "失败"
+  },
+  "results_done": {
+    "en": "just finished",
+    "zh": "刚完成"
+  },
+  "results_ended": {
+    "en": "ended",
+    "zh": "已结束"
+  },
+  "results_more": {
+    "en": "{n} more",
+    "zh": "还有 {n} 条"
+  },
+  "results_none": {
+    "en": "nothing here",
+    "zh": "暂无"
+  },
+  "results_produced": {
+    "en": "what it produced",
+    "zh": "产出"
+  },
+  "results_produced_line": {
+    "en": "changed {files} files · +{added} −{removed}",
+    "zh": "改了 {files} 个文件 · +{added} −{removed}"
+  },
+  "results_row_produced": {
+    "en": "{files} files · +{added} −{removed}",
+    "zh": "{files} 个文件 · +{added} −{removed}"
+  },
+  "results_all": {
+    "en": "all",
+    "zh": "全部"
+  },
+  "results_tab": {
+    "en": "{name} {n}",
+    "zh": "{name} {n}"
+  },
+  "results_which": {
+    "en": "which outcomes to list",
+    "zh": "列哪些结果"
+  },
+  "results_city": {
+    "en": "{runs} runs · {rest} still working or set aside, not listed",
+    "zh": "{runs} 个 run · 其余 {rest} 个在干活或已放下，不列出"
+  },
+  "results_minutes": {
+    "en": "last ten minutes",
+    "zh": "最近十分钟"
+  },
+  "results_hour": {
+    "en": "this hour",
+    "zh": "这一小时"
+  },
+  "results_earlier": {
+    "en": "earlier",
+    "zh": "更早"
+  },
+  "showing_note": {
+    "en": "Results only draws a room's words, answers, endings and what they produced, and the city's waiting, failed and finished runs. The switch on either page changes this too.",
+    "zh": "只看结果时，房间只画人的话、回答、结局与产出，城只列等你、失败、刚完成三类。两页上的开关也会改这一项。"
+  },
+  "run_time": {
+    "en": "time",
+    "zh": "时间"
+  },
+  "run_head_region": {
+    "en": "run summary",
+    "zh": "run 概况"
+  },
+  "run_head_outcome": {
+    "en": "outcome",
+    "zh": "结局"
+  },
+  "run_head_took": {
+    "en": "took",
+    "zh": "用时"
+  },
+  "run_head_started": {
+    "en": "started {clock}",
+    "zh": "{clock} 开始"
+  },
+  "run_head_tokens": {
+    "en": "tokens in / out",
+    "zh": "token 入 / 出"
+  },
+  "run_head_cached": {
+    "en": "{n} cached",
+    "zh": "缓存 {n}"
+  },
+  "run_head_spent": {
+    "en": "spent",
+    "zh": "花费"
+  },
+  "run_head_turns": {
+    "en": "{n} turns",
+    "zh": "{n} 个回合"
+  },
+  "run_head_origin": {
+    "en": "from",
+    "zh": "来处"
+  },
+  "run_river": {
+    "en": "where the time went, by turn",
+    "zh": "时间花在哪，按回合"
+  },
+  "run_calls": {
+    "en": "tool calls",
+    "zh": "工具调用"
+  },
+  "run_no_calls": {
+    "en": "no tool calls yet",
+    "zh": "还没有工具调用"
+  },
+  "run_no_turns": {
+    "en": "no turns yet",
+    "zh": "还没有回合"
+  },
+  "results_row_pr": {
+    "en": "PR {pr}",
+    "zh": "PR {pr}"
+  },
+  "results_row_ask": {
+    "en": "asks to {ask}",
+    "zh": "要{ask}"
+  },
+  "results_block_done": {
+    "en": "done",
+    "zh": "做完了"
+  },
+  "results_block_failed": {
+    "en": "failed · {why}",
+    "zh": "失败 · {why}"
+  },
+  "results_block_stopped": {
+    "en": "stopped · {why}",
+    "zh": "停下了 · {why}"
+  },
+  "results_block_nothing": {
+    "en": "no commit",
+    "zh": "没有提交"
+  },
+  "results_block_working": {
+    "en": "working",
+    "zh": "在干活"
+  },
+  "results_block_open": {
+    "en": "open the run",
+    "zh": "打开监视"
+  },
+  "results_room_counts": {
+    "en": "{sessions} sessions · {runs} runs",
+    "zh": "{sessions} 个会话 · {runs} 个 run"
+  },
+  "results_session_this": {
+    "en": "this session",
+    "zh": "这段会话"
+  },
+  "results_session_forked": {
+    "en": "session forked from {mother} at turn {turn}",
+    "zh": "从 {mother} 第 {turn} 轮分出的会话"
+  },
+  "results_session_earlier": {
+    "en": "earlier sessions",
+    "zh": "更早的会话"
   }
 }

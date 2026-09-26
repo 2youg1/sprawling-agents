@@ -16,6 +16,7 @@
 // an approval.
 
 import type { EventKind } from "../wire";
+import type { Key } from "./lang";
 
 export type Doing =
   // This page knows the run exists and has not been told a phase: the
@@ -93,4 +94,13 @@ export const PHASES: Record<Moving, Doing> = {
   approval_requested: { kind: "waiting" },
   tool_called: { kind: "calling", tool: null, subject: null },
   run_frozen: { kind: "frozen", completion: null },
+};
+
+// Each posture in words, for a page that names it rather than draws it.
+export const POSTURE_WORD: Record<Doing["kind"], Key> = {
+  unknown: "city_at_work",
+  thinking: "run_doing_thinking",
+  calling: "run_doing_calling",
+  waiting: "run_doing_waiting",
+  frozen: "run_doing_frozen",
 };

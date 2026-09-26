@@ -19,6 +19,7 @@
   import { QUERIES } from "../../core/asking";
   import type { RunBelief } from "../../core/belief";
   import { keymap } from "../../core/keys";
+  import { drawsCalls } from "../../core/results";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock, count, usd } from "../../core/time";
@@ -60,6 +61,7 @@
 
   const u = ui();
   const { lang } = u;
+  const held = u.prefs.held;
 
   // The entry under the hand - hovered or focused - which is the one the
   // `fork.here` chord branches from. Cleared as the hand leaves, so a
@@ -228,10 +230,10 @@ said, and what that cost. -->
     {#each turn.notes.filter((note) => "arrived" in note) as note (noteAt(note))}
       <NoteLine {note} {turn} run={run.run} {onFork} onHover={hoverFork} />
     {/each}
-    {#if turn.thought}
+    {#if turn.thought && drawsCalls($held.showing)}
       {@render reasoning(turn.thought, false)}
     {/if}
-    {#if turn.calls.length > 0}
+    {#if turn.calls.length > 0 && drawsCalls($held.showing)}
       <Calls
         calls={turn.calls}
         run={run.run}
@@ -286,7 +288,7 @@ said, and what that cost. -->
   <!-- No `aria-live` on the growing text: a screen reader told every
        token hears noise (ux B2). The frozen line below is what speaks,
        and it speaks once. -->
-  {#if !frozen && run.thinking.length > 0}
+  {#if !frozen && run.thinking.length > 0 && drawsCalls($held.showing)}
     {@render reasoning(run.thinking, true)}
   {/if}
   {#if streaming}

@@ -41,6 +41,10 @@ export function clock(lang: Lang, at: number): string {
 
 // The time of day alone, for a column where the day is the same on
 // every row.
+export function hhmm(at: number): string {
+  return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
 export function hhmmss(at: number): string {
   return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
@@ -58,4 +62,17 @@ export function kib(bytes: number): string {
   if (bytes < 1024) return `${String(bytes)} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+}
+
+// A length of time as the largest two units that say it: `42s`,
+// `4m 12s`, `1h 03m`. Under ten seconds keeps a tenth, because a tool
+// call is often that short.
+export function lasted(ms: number): string {
+  const seconds = Math.max(0, ms) / 1000;
+  if (seconds < 10) return `${seconds.toFixed(1)}s`;
+  const whole = Math.round(seconds);
+  if (whole < 60) return `${String(whole)}s`;
+  const minutes = Math.floor(whole / 60);
+  if (minutes < 60) return `${String(minutes)}m ${String(whole % 60).padStart(2, "0")}s`;
+  return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60).padStart(2, "0")}m`;
 }

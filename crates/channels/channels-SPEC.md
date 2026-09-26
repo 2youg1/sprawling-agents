@@ -26,6 +26,7 @@
   **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 38**（回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 39**（缺省也是一层 `ConfigLayer::Default` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   **当前 golden**：`1efcbe95ee51b1c9efaee07d21d95824d714604c1974e8b41b2ec3dfdbbe725a`；**WIRE_V ＝ 39**（`Dispatch` 可点名这一次的模型 → §8-48；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::NewestRelease` → §8-36、§8-47；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7`；**WIRE_V ＝ 40**（一行 run 带上结局、PR 分支与所等之事 `RunSummary.completion`／`pr`／`ask` → §8-48；一次工具调用的起止时刻 `Call.called`／`Call.answered` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -1331,6 +1332,36 @@ impl Committed {
 - **拼法的唯一权威是 `Committed::new`**，守护夹具断言它拼出的帧与 `serde_json::to_string(&ServerFrame::Event(..))` 逐字节相等：`ServerFrame` 是外部标签的 snake_case 枚举，`Event` 臂的形状恰是 `{"event":<记录>}`，两者一旦漂开页面读到的是另一条历史。
 - **读数**：`instrument_fanout_cpu_per_event`（`--release --run-ignored only`）在 1／4／16 个订阅者上量每事件的 CPU，门槛是 16 个订阅者的每事件代价不超过 1 个订阅者的两倍——即序列化只算一次，不随标签页数增长。门槛取比值而不取绝对值，因为绝对值随机器档次变；现在的每事件代价由那一次 `EventRecord` 序列化主导（约 10 µs 量级），16 个订阅者时 ≤ 1 µs 是下一条的目标，不是现在成立的性质。
 - 这份帧目前由 `EventRecord` 序列化而来；改为直接取 `append_all` 写下的账本行字节（使广播环只留一份字节，`Lagged` 补拉亦回账本字节）是本接口的下一步，前提是账本行与 `serde_json::to_vec(&EventRecord)` 逐字节相等——同一条守护夹具会判定它。
+### 8-47 `WIRE_V` 39：一次工具调用带上它的起止时刻
+
+```rust
+pub struct Call {
+    // …既有字段…
+    pub called: TimeMs,            // tool_called 那条记录的 t
+    pub answered: Option<TimeMs>,  // 配对上的 tool_result 那条记录的 t；未答为 None
+}
+```
+
+- **时刻读自账本记录，不读此处的时钟**：与 `Turn.t` 同理，重放的会话报它当初的时刻。`called` 不是 `Option`：一次调用由一条 `EventRecord` 折出，它总带读数。`answered` 与 `outcome` 同时写、同一次配对——`outcome` 为 `Waiting` 时它必为 `None`，窗口外答的调用也是 `None`，不猜。
+- **为什么要上线**：run 页的时间透镜原本只能按回合着色，一个回合里模型说话与工具运行各占多久，线上没有数；有了这两个时刻，透镜画的是量出来的段，而不是按回合结局推断的整段。
+- **被否：只带一个时长**。时长丢了起点，页面画不出调用在时间轴上的位置，也就排不出并发的两次调用。
+
+### 8-48 `WIRE_V` 40：一行 run 带上它的结局、它开的 PR 与它等的事
+
+```rust
+pub struct RunSummary {
+    // …既有字段…
+    pub completion: Option<String>, // run_frozen.completion；未冻结或窗口外为 None
+    pub pr: Option<String>,         // 最近一条 pr_opened 的 branch（城里的 PR 以分支为名）
+    pub ask: Option<String>,        // 最后一条记录是 approval_requested 时，它的 action_desc
+}
+```
+
+- **为什么要上线**：只看结果的城把冻结的 run 分成做完、失败与已结束，并在一行末尾写出 PR 或等你做的事。页面重载后它只有 `city_view` 的答，没有这三件，每个冻结 run 都落进「已结束」，等你的 run 只知道在等、不知道等什么。
+- **三件都由 `memory::RunHot` 折出**（memory-SPEC §8-5），`summarize` 照抄，不读账本。
+- **`ask` 只在 `last_kind` 为 `approval_requested` 时有值**：页面判断等待用的是 `last_kind`，`ask` 跟着同一条记录走，二者不会一个说在等、一个说不等。
+- **`pr` 是分支名而不是数字**：城里的 PR 是 `collab::OpenRequest`，它的身份是分支（`node` 由分支解析而来），账本里没有别的编号；编一个序号就是给人一个线外查不到的名字。
+- **被否：把 `Rounds.closing` 让城逐行去问**。那是每行一次查询，一座两百个 run 的城首屏要问两百次，而这三件热视图本来就在折。
 
 ### 8-46 先占住端口，再交出城：`bind` 与 `serve` 分成两步
 

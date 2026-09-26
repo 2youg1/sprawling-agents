@@ -45,11 +45,14 @@
   import Presences from "./gallery/presence.svelte";
   import Produced from "./gallery/produced.svelte";
   import Runs from "./gallery/runs.svelte";
+  import Resulted from "./gallery/resulted.svelte";
+  import Streamed from "./gallery/streamed.svelte";
   import Screens from "./gallery/screens.svelte";
   import Settings from "./gallery/settings.svelte";
   import Shelved from "./gallery/shelved.svelte";
   import Switches from "./gallery/switches.svelte";
   import Tables from "./gallery/tables.svelte";
+  import Timed from "./gallery/timed.svelte";
 
   const { lang } = ui();
 
@@ -91,4 +94,7 @@
   <Tables />
   <Parts />
   <Switches />
+  <Timed />
+  <Resulted />
+  <Streamed />
 </div>

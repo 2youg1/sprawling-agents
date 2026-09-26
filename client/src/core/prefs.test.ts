@@ -31,6 +31,7 @@ const STATED: Preferences = {
   },
   proxying: "always",
   notifying: "on",
+  showing: "results",
 };
 
 describe("the cache in front of the city", () => {

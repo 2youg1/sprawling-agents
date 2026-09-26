@@ -572,9 +572,12 @@ export type Seq = typeof Seq.Type;
  */
 export const RunSummary = Schema.Struct({
   addr: Schema.optional(Schema.NullOr(Address)),
+  ask: Schema.optional(Schema.NullOr(Schema.String)),
+  completion: Schema.optional(Schema.NullOr(Schema.String)),
   frozen: Schema.Boolean,
   last_kind: EventKind,
   last_seq: Seq,
+  pr: Schema.optional(Schema.NullOr(Schema.String)),
   run: RunId,
   started: Schema.optional(Schema.NullOr(TimeMs)),
   who: Schema.String,
@@ -1976,8 +1979,10 @@ export type Output = typeof Output.Type;
  * One tool call inside a turn.
  */
 export const Call = Schema.Struct({
+  answered: Schema.optional(Schema.NullOr(TimeMs)),
   arguments: Schema.optional(Schema.NullOr(Output)),
   at: Seq,
+  called: TimeMs,
   outcome: Outcome,
   output: Schema.optional(Schema.NullOr(Output)),
   subject: Schema.optional(Schema.NullOr(Schema.String)),

@@ -665,3 +665,12 @@ status = "measured, not gated: hot 1.8-3.9 us against 16-28 us for the schema pa
 what = "one streamed token in a live turn: script plus forced layout, and how far the turn jumps when the record takes over"
 measured_by = "cd client && bun scripts/relayout.ts - headless Edge, a 2,753-character reply with lists, tables, code and headings in 689 four-character tokens, 7 interleaved rounds of each shape"
 status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs each - raw shape mean 426-441 us, p99 1.0 ms, takeover 3.8-4.3 ms, jump 793 px; block shape mean 72-80 us, p99 0.5-0.6 ms, takeover 2.5-2.8 ms, jump 0 px"
+
+# What the city pays, in results-only mode, to sort its runs into the
+# three outcomes a person acts on and keep the newest few of each. The
+# page then draws at most three times `FIRST` rows, so this triage is
+# the only part of the frame that grows with the city.
+[city_results]
+what = "one triage of a 200-run city into waiting, failed and done, each cut to its FIRST newest (client/src/core/results.ts)"
+measured_by = "bun test --conditions=browser client/src/core/results.test.ts (prints one city_results line and holds a triage to 1600 us, a tenth of a 16 ms frame)"
+status = "measured, not gated here: 45-124 us per city across three runs (bun 1.4, x86_64 desktop class, other builds running beside it). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"

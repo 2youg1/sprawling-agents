@@ -42,6 +42,12 @@ export interface RunBelief {
   // was opened with, so this, and not the city's next pick, is the model
   // answering; null until the run's first call is heard.
   readonly model: string | null;
+  // The branch of the last pull request the run opened: a pull request
+  // in the city is named by its branch and has no number.
+  readonly pr: string | null;
+  // What the run waits for the person to allow, present only while its
+  // last record is the request, as `RunSummary.ask` is.
+  readonly ask: string | null;
   // Heard from the stream and named by no answer yet: an answer folded
   // before the run began cannot name it, and that silence is not the
   // city saying the run is over.

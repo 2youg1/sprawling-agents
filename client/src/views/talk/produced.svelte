@@ -1,0 +1,45 @@
+<!--
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+-->
+
+<script lang="ts">
+  // What a run produced, as the one phrase a results row or block ends
+  // with: how many files it changed and how many lines moved, measured
+  // from the tree the run opened at (`RoundsAnswer.opened_at`) to the
+  // tree it last fenced (`lastFenceIn` in `trace.ts`, the same bound the
+  // run page asks with). The numbers are that `Changes` answer summed
+  // once in `core/results.ts`. A run that fenced nothing passes
+  // `head = null`, the working tree, exactly as the run page does.
+  import { fill, say } from "../../core/lang";
+  import { producedOf } from "../../core/results";
+  import { ui } from "../../ui";
+  import type { GitOid } from "../../wire";
+
+  interface Props {
+    readonly base: GitOid;
+    readonly head: GitOid | null;
+  }
+
+  const { base, head }: Props = $props();
+  const u = ui();
+  const { lang } = u;
+
+  const asked = $derived(u.conn.asking.ask({ changes: { base, head } }));
+  const produced = $derived.by(() => {
+    const held = $asked;
+    return held !== undefined && "changes" in held ? producedOf(held.changes.files) : null;
+  });
+</script>
+
+{#if produced !== null && produced.files > 0}
+  <span class="shrink-0 text-note text-text-quiet" aria-label={say($lang, "results_produced")}>
+    {fill(say($lang, "results_row_produced"), {
+      files: String(produced.files),
+      added: String(produced.added),
+      removed: String(produced.removed),
+    })}
+  </span>
+{/if}

@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // One run under five lenses: what was said (turns), what it was told
+  // One run under six lenses: where its time went (time), what was said (turns), what it was told
   // before it said anything (prompt), what it has seen and how full its
   // window is (context), what moved on disk (changes), and what it left
   // to be checked (evidence). The conversation is the same component
@@ -26,7 +26,7 @@
   import { sendingInto } from "../core/doing";
   import { fill, say } from "../core/lang";
   import type { Key } from "../core/lang";
-  import { buildingOf, roomOf, toFragment } from "../core/route";
+  import { buildingOf, roomOf } from "../core/route";
   import { count, usd } from "../core/time";
   import { ui } from "../ui";
   import { Address } from "../wire";
@@ -47,9 +47,14 @@
   import Unanswered from "./parts/unanswered.svelte";
   import Tabs from "./parts/tabs.svelte";
   import type { Lens } from "./parts/tabs.svelte";
+  import Head from "./run/head.svelte";
+  import type { Share } from "./run/lanes";
+  import { figuresOf } from "./run/lanes";
   import Prompt from "./run/prompt.svelte";
+  import River from "./run/river.svelte";
   import Composer from "./talk/composer.svelte";
   import Thread from "./talk/thread.svelte";
+  import { lastFenceIn } from "./talk/trace";
 
   interface Props {
     readonly run: RunId;
@@ -57,10 +62,11 @@
 
   const { run }: Props = $props();
 
-  type RunLens = "turns" | "prompt" | "context" | "changes" | "evidence";
+  type RunLens = "time" | "turns" | "prompt" | "context" | "changes" | "evidence";
 
-  const EVERY: readonly RunLens[] = ["turns", "prompt", "context", "changes", "evidence"];
+  const EVERY: readonly RunLens[] = ["time", "turns", "prompt", "context", "changes", "evidence"];
   const WORDS: Record<RunLens, Key> = {
+    time: "run_time",
     turns: "run_turns",
     prompt: "run_prompt",
     context: "run_context",
@@ -73,7 +79,7 @@
   };
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
 
-  let current = $state<RunLens>("turns");
+  let current = $state<RunLens>("time");
   const lenses = $derived(EVERY.map((id) => ({ id, label: say($lang, WORDS[id]) })));
 
   const u = ui();
@@ -109,14 +115,7 @@
 
   const turns = $derived(rounds?.turns ?? []);
   const fence = $derived(rounds?.opened_at ?? null);
-  const lastFence = $derived.by((): GitOid | null => {
-    for (let at = turns.length - 1; at >= 0; at -= 1) {
-      for (const note of turns[at]?.notes ?? []) {
-        if ("fenced" in note) return note.fenced.oid;
-      }
-    }
-    return null;
-  });
+  const lastFence = $derived(lastFenceIn(turns));
 
   // The evidence question exists only while its lens is open: a
   // watched answer is refreshed when stale, and nobody is looking at
@@ -130,16 +129,35 @@
 
   const peak = $derived(peakOf(turns));
   const seen = $derived(seenOf(turns));
-  const spent = $derived(spentOf(turns));
+  const spent = $derived(figuresOf(turns).usd);
   const live = $derived(shown !== undefined && shown.doing.kind !== "frozen");
   const room = $derived(shown?.addr ?? null);
 
+  // The run's clock as the page knows it: from the opening (or the
+  // first turn) to the closing, or to now while the run is live.
+  const from = $derived(rounds?.opening?.at ?? turns[0]?.t ?? shown?.started ?? null);
+  const to = $derived.by((): number | null => {
+    if (rounds?.closing !== null && rounds?.closing !== undefined) return rounds.closing.at;
+    const last = turns.at(-1)?.t ?? from;
+    return last === null ? null : live ? Math.max(last, u.now()) : last;
+  });
+  const tail = $derived.by((): Share | null => {
+    switch (shown?.doing.kind) {
+      case "calling":
+        return "tool";
+      case "waiting":
+        return "person";
+      case "thinking":
+        return "model";
+      case "frozen":
+      case "unknown":
+      case undefined:
+        return null;
+    }
+  });
+
   function peakOf(round: readonly Turn[]): number {
     return Math.max(1, ...round.map((turn) => (turn.used?.input ?? 0) + (turn.used?.output ?? 0)));
-  }
-
-  function spentOf(round: readonly Turn[]): number {
-    return round.reduce((sum, turn) => sum + (turn.spent ?? 0), 0);
   }
 
   // What this run read, most consulted first: the window's own list
@@ -189,7 +207,13 @@
 </script>
 
 {#snippet panel(eye: Lens)}
-  {#if eye.id === "turns"}
+  {#if eye.id === "time"}
+    {#if from !== null && to !== null && turns.length > 0}
+      <River {turns} {from} {to} {tail} />
+    {:else}
+      <EmptyState missing="run_no_turns" />
+    {/if}
+  {:else if eye.id === "turns"}
     <div class="mx-auto max-w-talk">
       {#if shown !== undefined}
         <Thread run={shown} who={roomWord(room)} />
@@ -309,17 +333,6 @@
 
 <div class="flex min-h-0 w-full max-w-page flex-1 flex-col px-pane pt-wide">
   <div class="flex flex-wrap items-center gap-base pb-base">
-    {#if room !== null}
-      <a
-        href={toFragment({ kind: "building", address: buildingOf(room) })}
-        class="text-note text-text-faint">{buildingOf(room)}</a
-      >
-      <span class="text-text-faint">/</span>
-      <a href={toFragment({ kind: "talk", address: room })} class="text-note text-text-faint"
-        >{roomOf(room)}</a
-      >
-      <span class="text-text-faint">/</span>
-    {/if}
     <!-- The run's own id when nothing has named the task yet. The
          summary's `who` is not offered here: it is the resident, and a
          resident's name standing where the task stands reads as a task
@@ -338,6 +351,14 @@
       </button>
     {/if}
   </div>
+  <Head
+    {turns}
+    doing={shown?.doing}
+    closing={rounds?.closing ?? null}
+    {room}
+    {from}
+    {to}
+  />
   {#if rounds?.opening?.goal}
     <p class="mb-base text-note text-text-faint">{say($lang, "run_goal")}: {rounds.opening.goal}</p>
   {/if}

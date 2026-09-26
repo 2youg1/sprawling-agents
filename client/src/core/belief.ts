@@ -21,7 +21,7 @@ import type { Readable } from "svelte/store";
 
 import { readProbed } from "./probed";
 import { PHASES } from "./doing";
-import { completionOf, haltOf, modelOf, sessionStart, taskOf, toolCall } from "./reading";
+import { askOf, branchOf, completionOf, haltOf, modelOf, sessionStart, taskOf, toolCall } from "./reading";
 import { sameScope } from "./scope";
 
 import { CITY_RUN, Seq, TimeMs } from "../wire";
@@ -45,6 +45,8 @@ function unseen(run: RunId, at: Seq): RunBelief {
     lastSeq: at,
     doing: { kind: "unknown" },
     model: null,
+    pr: null,
+    ask: null,
     local: true,
     saying: "",
     thinking: "",
@@ -54,7 +56,8 @@ function unseen(run: RunId, at: Seq): RunBelief {
 // One record forward, answering the run it produced and the name of the
 // first field in it this build could not read.
 function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] {
-  const moved: RunBelief = { ...held, lastSeq: record.seq };
+  // Every record ends the ask; only the request itself states one.
+  const moved: RunBelief = { ...held, lastSeq: record.seq, ask: null };
   switch (record.kind) {
     case "run_started": {
       const [task, bad] = taskOf(record);
@@ -87,8 +90,14 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     }
     case "tool_result":
       return [{ ...moved, doing: PHASES.tool_result }, null];
-    case "approval_requested":
-      return [{ ...moved, doing: PHASES.approval_requested }, null];
+    case "approval_requested": {
+      const [ask, bad] = askOf(record);
+      return [{ ...moved, doing: PHASES.approval_requested, ask }, bad];
+    }
+    case "pr_opened": {
+      const [pr, bad] = branchOf(record);
+      return [{ ...moved, pr }, bad];
+    }
     case "run_frozen": {
       const [completion, bad] = completionOf(record);
       return [
@@ -118,7 +127,7 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     case "draft_resolved": case "goal_registered": case "goal_conflict":
     case "arbitration_verdict": case "pursuit_changed": case "repair_started":
     case "repair_reused": case "worktree_opened": case "checkpoint_committed":
-    case "handoff_written": case "pr_opened": case "pr_merged":
+    case "handoff_written": case "pr_merged":
     case "pr_rejected": case "roadmap_claimed": case "roadmap_finished":
     case "roadmap_released": case "roadmap_split": case "roadmap_blocked":
     case "endpoint_attached": case "endpoint_lost": case "endpoint_probed":
