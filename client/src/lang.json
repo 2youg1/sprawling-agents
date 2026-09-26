@@ -3509,7 +3509,7 @@
   },
   "results_row_pr": {
     "en": "PR {pr}",
-    "zh": "PR {pr}"
+    "zh": "拉取请求 {pr}"
   },
   "results_row_ask": {
     "en": "asks to {ask}",
