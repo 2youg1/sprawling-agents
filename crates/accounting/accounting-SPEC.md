@@ -12,12 +12,7 @@
 | `models` | 一次 run 或一次命名调用，拿什么模型适配器去说话 | 8-1 |
 | `connectors` | 一栋楼配置里写的 MCP server，怎样连上并变成工具 | 8-2 |
 | `clock` | 现在几点 | 8-3 |
-
-目标形状里还有一个端口与一批搬迁，现在都还不在本 crate：
-
-| 端口 | 它回答的问题 | 现在的住处 |
-|---|---|---|
-| `Machine` | city 所在的主机上有哪些工具，以及装上一个 | `bin::doctor::probe::Machine`，`pub(crate)` |
+| `machine` | city 所在的主机上有哪些工具，以及装上一个人同意过的那一个 | 8-4 |
 
 `RunWorker` 的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例与 `views` 仍在 `crates/sprawling/src/assembly` 与 `crates/sprawling/src/views`。
 
@@ -35,14 +30,15 @@
 
 第五条在 `crates/sprawling/tests/clock.rs`：`a_worker_stamps_its_lines_with_the_clock_it_was_handed`。worker 接收一个停在固定时刻的脚本 `Clock` 之后写下的每一行，`t` 都是那个时刻；只要还有一个写点自己读墙钟，这一行的 `t` 就是现在的时间。
 
+第六条在 `crates/sprawling/tests/machine.rs`：`a_refresh_counts_the_items_the_machine_it_was_handed_answered`。worker 接收一个脚本 `Machine`，它的回答只有一个条目；`DoctorRefresh` 之后 worker 在诊断里报的条目数是 1。只要 worker 还自己去问主机，报的就是需求表的全部条目数。测试从 `DoctorRefresh` 进而不从 `DoctorInstall` 进：对着一个还自己动手的 worker，后者会在宿主上真的启动包管理器。
+
 ## 3 假设与歧义
 
-- `Machine` 端口的签名还没定。worker 用到的两处是 `doctor_install`（跑一条人同意过的安装命令）与 `look_at_this_machine`（`doctor::report()`，交回 `channels::DoctorAnswer`）。未定的是：`install` 收 `bin::doctor::Runnable`——它只由 `Recipe::command` 造出，持有它就证明这条命令被问过——还是收 program 与 args；前者要求 `Runnable` 与 `Requirement`、`Presence` 一起搬到本 crate 或更低处。能定下它的证据是：`views`／`doctor`／`serving` 之间的环断开之后（sprawling-SPEC.md 8-92 的表），`doctor` 的类型还被谁用。红测不能对着现在的代码去跑 `DoctorInstall`，因为那会在宿主上真的启动包管理器；它要从 `DoctorRefresh` 进，看诊断里 worker 数到的条目数。
 - `views` 在读侧与写侧各有一份 `Governance`，搬进本 crate 时哪一侧拥有这个类型，取决于 `bin::views` 与 `bin::assembly` 之间的环断在哪里（sprawling-SPEC.md 8-92 的表）。
 
 ## 4 现状分析
 
-本 crate 现有三个端口。`ModelFactory` 的生产适配器在装配根（`bin::assembly::models`），第二实现在 `crates/sprawling/tests/model_factory.rs`；`Connectors` 的生产适配器是 `bin::assembly::mcp::McpServers`，第二实现在 `crates/sprawling/tests/connectors.rs`；`Clock` 的生产适配器是 `bin::assembly::SystemClock`，第二实现在 `crates/sprawling/tests/clock.rs`。
+本 crate 现有三个端口。`ModelFactory` 的生产适配器在装配根（`bin::assembly::models`），第二实现在 `crates/sprawling/tests/model_factory.rs`；`Connectors` 的生产适配器是 `bin::assembly::mcp::McpServers`，第二实现在 `crates/sprawling/tests/connectors.rs`；`Clock` 的生产适配器是 `bin::assembly::SystemClock`，第二实现在 `crates/sprawling/tests/clock.rs`；`Machine` 的生产适配器是 `bin::assembly::commanding::machine::Doctor`，第二实现在 `crates/sprawling/tests/machine.rs`。
 
 ## 5 权威信源
 
@@ -50,7 +46,7 @@ ARCHITECTURE.md §3（依赖律与 `depmap`）、§4（端口表）、§11（V6 
 
 ## 6 命名统一
 
-ModelFactory｜Connectors｜Clock｜accounting thread｜Chosen｜Redemption。「适配器」专指 `kernel::Model` 的一个实现；「端口」专指本 crate 声明、外层实现的 trait。
+ModelFactory｜Connectors｜Clock｜Machine｜Recipe｜Runnable｜accounting thread｜Chosen｜Redemption。「适配器」专指 `kernel::Model` 的一个实现；「端口」专指本 crate 声明、外层实现的 trait。
 
 ## 7 模块边界
 
@@ -59,6 +55,7 @@ ModelFactory｜Connectors｜Clock｜accounting thread｜Chosen｜Redemption。�
 - 把生产适配器接到 worker 上，归装配根 `bin::assembly`。
 - MCP 的生命周期（`initialize`、`notifications/initialized`、`tools/list`）怎样说，归 `protocol`；一个工具能不能在机密楼里存在，归 `protocol::McpTool::new`。端口只声明「连上一个 server，交回它的工具」。
 - 机密楼根本不启动 server，这一步在 worker 的 `mcp_tools` 里、端口被问到之前。
+- 主机上有什么、每一项怎样判定、怎样折叠成一页，归 `bin::doctor`（它是这台机器有什么的唯一权威）；一条安装配方能不能跑，归 `Recipe::command`；worker 只决定一个名字在不在需求表里、这个平台有没有配方。
 
 ## 8 接口先行
 
@@ -146,9 +143,58 @@ impl RunWorker {
 - **固定值**：`RunWorker::new` 与 `over` 装上 `SystemClock`；`with_clock` 是唯一换掉它的门。`Send + Sync` 与 `Arc`，是因为 lane 线程与 worker 同时读它。
 - **等待也读这个钟**：lane 等 provider 的退避时，一片一片地睡，直到这个钟过了期限。所以一个永远不走的脚本钟，会让遇上退避的 run 一直等下去；脚本要让钟往前走。
 
+### 8-4 accounting::machine（形状 3 端口）
+
+```rust
+pub trait Machine {
+    /// Asks this machine every question the requirement table holds.
+    fn report(&self) -> channels::DoctorAnswer;
+    /// # Errors
+    /// A program this machine cannot start, one that ended in failure,
+    /// and one still running when its patience ran out.
+    fn install(&self, item: &str, runnable: &Runnable<'_>) -> Result<(), AxError>;
+}
+
+pub enum Recipe {
+    Command { program: &'static str, args: &'static [&'static str] },
+    Print(&'static str),
+    Manual(&'static str),
+}
+impl Recipe {
+    pub fn spelled(&self) -> String;
+    /// # Errors
+    /// `E_TOOL_UNAVAILABLE` for a printed recipe and a manual one, with
+    /// what the person does instead.
+    pub fn command(&self, item: &str) -> Result<Runnable<'_>, AxError>;
+}
+
+pub struct Runnable<'a> { /* private */ }
+impl<'a> Runnable<'a> {
+    pub fn program(&self) -> &'a str;
+    pub fn args(&self) -> &'a [&'a str];
+    pub fn spelled(&self) -> String;
+}
+```
+
+```rust
+// bin::assembly::commanding::machine（形状 4 适配器）
+pub(in crate::assembly) struct Doctor;   // 生产：doctor::report() 与 doctor::running 的安装
+impl RunWorker {
+    pub fn with_machine(self, machine: Box<dyn accounting::Machine + Send>) -> RunWorker;
+}
+```
+
+- **只有 `Recipe::command` 造得出 `Runnable`。** `Runnable` 的构造函数在本 crate 之外不可见，所以持有一个 `Runnable` 就证明这条命令问过「这座城能不能跑它」；打印的配方与手动的配方在那里被拒。任何一个 `Machine` 实现拿到的都是这个证明，而不是一个程序名加参数。
+- **失败**：`install` 原样传 `bin::doctor::running` 的 `AxError`；`Recipe::command` 的拒绝是 `E_TOOL_UNAVAILABLE`，恢复说明人该做什么。端口不另造错误码。
+- **worker 读的两处都经 `RunWorker.machine`**：`doctor_install` 的安装与它之后的重看，以及 `DoctorRefresh` 的 `look_at_this_machine`。worker 仍自己拒绝需求表里没有的名字与没有配方的平台，这一步在端口被问到之前。
+- **固定值**：`RunWorker::new` 与 `over` 装上 `Doctor`；`with_machine` 是唯一换掉它的门。
+- **依赖**：`report` 交回线上的 `channels::DoctorAnswer`，所以本 crate 依赖 `channels`（ARCHITECTURE.md §3 的 `depmap`）。
+
 ## 12 决策
 
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只依赖 `kernel` 与 `gateway` 的接口类型。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。
 2. **`with_models` 是一个消费 `self` 的方法，而不是 `new` 的第四个参数。** 理由：生产只有一种工厂，`new` 的每个调用方（serve、doctor、测试）都会写同一个 `GatewayModels`；换工厂的只有 citysim 与测试。被否决的做法：`new` 加参数——四个调用点重复同一个值，而这个值只有一个权威。
 3. **端口参数是 `Chosen` 与 `Redemption`，不含 dialect 头。** 理由：dialect 头由 `Chosen` 的 dialect 决定，把它交给调用方算，两个调用点就各有一份拼法。被否决的做法：照抄 `gateway::adapter_for` 的三参数签名。
 4. **`Connectors` 交回整条连接（握手之后的工具与握手结果），而不是一个裸的 `protocol::Outbound`。** 理由：一个 server 的每个工具各持有同一条链接的一份克隆，而 `Outbound` 是 trait object，不能克隆；交回裸链接，worker 就得再要一个「造链接」的工厂。被否决的做法：端口只负责 `McpLink::open`——那要多一个端口，而握手的说法本来就归 `protocol`，不归 worker。
+5. **`Machine` 回答整页，而不是逐项回答 `look(&Requirement) -> Presence`。** 理由：worker 要的是一页答案与一次安装；逐项的端口要把 `Requirement`、`Detection`、`Family`、`PerPlatform`、`Platform` 与 `Presence` 整个搬进本 crate，而且沙箱与凭据保管这两项机器级的读仍然绕过端口直接碰主机，脚本也就换不掉它们。被否决的做法：逐项端口——搬走 doctor 的整个模型，却仍留两条通向主机的路。`doctor::probe::Machine` 仍是 doctor 自己逐项判定时的缝，它的第二实现在 doctor 的测试里。
+6. **`install` 收 `Runnable`，不收程序名加参数；`Recipe` 与 `Runnable` 因此一起住在本 crate。** 理由：`Runnable` 是「这条命令被问过」的证明，只有与它同住一个 crate 的 `Recipe::command` 能造它，crate 的可见性替代了原先只靠约定守的 `pub(crate)` 构造函数。被否决的做法：收 `&str` 与 `&[&str]`——任何实现、任何调用方都能装任何程序，拒绝打印配方的规则就只剩调用方的自觉。

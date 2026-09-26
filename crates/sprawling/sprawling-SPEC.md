@@ -1629,8 +1629,7 @@ pub(crate) enum Need { Required, OneOf(Group), Optional }   // 一组任一即�
 pub enum Platform { Windows, MacOs, Linux }            // `bin::install` 经它进入，遵 lib.rs 的约定：二进制进入即公开
 pub(crate) struct PerPlatform<T> { windows: T, macos: T, linux: T }
 pub(crate) enum Detection { Program { program, version_arg, places }, Environment { variable } }
-pub(crate) enum Recipe { Command { program, args }, Print(&'static str), Manual(&'static str) }
-pub(crate) struct Requirement { name, tier, need, enables, detect, homepage, recipe }
+pub(crate) struct Requirement { name, tier, need, enables, detect, homepage, recipe }   // recipe: PerPlatform<accounting::Recipe>（accounting-SPEC 8-4）
 pub(crate) enum Presence { Present(String), Absent }
 pub(crate) struct Finding { requirement: &'static Requirement, presence: Presence }
 pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding>;
@@ -2940,15 +2939,15 @@ impl Journal {
 `Query::Doctor` 答的是开城那一刻的快照（§8-53）。于是机器页只能把一行命令复制到终端，装完还要重启城才看得见结果。两条命令补上这段，执行点是 `bin::assembly::commanding::machine`。
 
 ```rust
-// bin::doctor（Recipe 的唯一拒绝语）
+// accounting::machine（Recipe 的唯一拒绝语；Runnable 只由它造，accounting-SPEC 8-4）
 impl Recipe {
-    pub(crate) fn command(&self, item: &str) -> Result<Runnable<'_>, AxError>;
+    pub fn command(&self, item: &str) -> Result<Runnable<'_>, AxError>;
 }
+pub struct Runnable<'a> { /* 私有：program、args */ }
 // bin::doctor::running（本二进制起安装程序的唯一一处）
 pub(crate) const PATIENCE: u32 = 3_600; // knocks, TICK apart
-pub(crate) struct Runnable<'a> { /* 私有：program、args */ }
-pub(crate) fn run(item: &str, runnable: &Runnable, deadline: Duration) -> Result<(), AxError>;
-// bin::assembly::commanding::machine
+pub(crate) fn run(item: &str, runnable: &accounting::Runnable, patience: u32) -> Result<(), AxError>;
+// bin::assembly::commanding::machine：worker 经 RunWorker.machine（accounting::Machine）探与装，生产实现是 Doctor
 impl RunWorker {
     pub(in crate::assembly) fn doctor_install(&mut self, item: &str) -> Result<(), AxError>;
     pub(in crate::assembly) fn look_at_this_machine(&mut self);
