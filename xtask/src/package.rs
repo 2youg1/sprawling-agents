@@ -105,6 +105,11 @@ impl ReleaseTarget {
 /// set, and the workspace's own `target/` otherwise. The variable's value
 /// is a parameter so the rule can be judged without touching the
 /// process environment.
+///
+/// A relative value is joined to the workspace root, while cargo resolves
+/// it against the directory it was started in; the two agree because
+/// every recipe that reaches this runs from the root, where `just` starts
+/// it. `build.target-dir` in a cargo config is not read.
 fn cargo_target_dir(root: &Path, named: Option<std::ffi::OsString>) -> PathBuf {
     match named.map(PathBuf::from) {
         Some(stated) if stated.as_os_str().is_empty() => root.join("target"),
