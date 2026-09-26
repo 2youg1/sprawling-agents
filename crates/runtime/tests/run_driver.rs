@@ -264,7 +264,6 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
             "model_returned",
             "tool_called",
             "tool_result",
-            "prompt_assembled",
             "prompt_shape_compared",
             "model_called",
             "model_returned",
