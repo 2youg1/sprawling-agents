@@ -17,7 +17,7 @@
 //! sent back: <https://platform.claude.com/docs/en/build-with-claude/thinking>.
 
 use kernel::AxError;
-use kernel::{Increment, ToolCall};
+use kernel::{ContentBlock, Increment, ToolCall};
 use serde_json::{Value, json};
 
 use crate::mismatch::{settled_tool_arguments, stream_cut};
@@ -65,13 +65,34 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
 /// # Errors
 /// `E_PROVIDER` when the arguments stop in the middle of a value, and
 /// `E_WIRE_MISMATCH` when the block is not one this dialect spells.
-#[expect(
-    dead_code,
-    reason = "the Model port has no door that hands an early call to the runtime yet"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the Model port has no door that hands an early call to the runtime yet"
+    )
 )]
 pub(crate) fn completed_call(frames: &[Value], at: u64) -> Result<Option<ToolCall>, AxError> {
-    let _ = (frames, at);
-    Ok(None)
+    let Rebuilt { content, .. } = rebuilt(
+        frames
+            .iter()
+            .filter(|frame| frame.get("index").and_then(Value::as_u64) == Some(at)),
+    )?;
+    let Some(block) = content.first() else {
+        return Ok(None);
+    };
+    match super::block_from(block, &format!("content[{at}]"))? {
+        ContentBlock::ToolUse { id, name, input } => Ok(Some(ToolCall {
+            id,
+            name,
+            args: input,
+        })),
+        ContentBlock::Text { .. }
+        | ContentBlock::Thinking { .. }
+        | ContentBlock::RedactedThinking { .. }
+        | ContentBlock::ToolResult { .. }
+        | ContentBlock::Image(_) => Ok(None),
+    }
 }
 
 /// What the frames rebuild into: the blocks in index order, the usage
