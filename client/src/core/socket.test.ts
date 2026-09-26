@@ -139,4 +139,49 @@ describe("the browser half", () => {
       saying: "abc",
     });
   });
+  // Fifty records written while the page was away are fifty records to
+  // fetch, not every answer on the page asked again: the welcome names
+  // the ledger head, and the page asks for the range between its own
+  // high-water mark and that head.
+  test("fetches the records written while it was away rather than a snapshot", () => {
+    install();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    const first = FakeSocket.opened[0];
+    first?.onopen?.();
+    const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: 10, city: null };
+    first?.onmessage?.({ data: JSON.stringify({ welcome }) });
+    const stop = conn.asking.ask("metrics").subscribe(() => undefined);
+    const metrics = {
+      approvals_waiting: 0,
+      buildings: 0,
+      discards_outstanding: 0,
+      events: 10,
+      runs_active: 0,
+      runs_frozen: 0,
+      signals_waiting: 0,
+    };
+    first?.onmessage?.({ data: JSON.stringify({ answer: { metrics } }) });
+    const record = {
+      seq: 10,
+      prev: "0".repeat(64),
+      t: 1,
+      v: 1,
+      who: "city",
+      run: "00000000-0000-4000-8000-000000000001",
+      kind: "log_truncated",
+      data: {},
+    };
+    first?.onmessage?.({ data: JSON.stringify({ event: record }) });
+    const before = booked.length;
+    first?.onclose?.();
+    booked[before]?.run();
+    const second = FakeSocket.opened[1];
+    second?.onopen?.();
+    second?.onmessage?.({ data: JSON.stringify({ welcome: { ...welcome, resume_from: 60 } }) });
+
+    const asked = second?.sent.slice(1).map((text) => JSON.parse(text) as unknown);
+    stop();
+
+    expect(asked).toEqual([{ query: { history_range: { from: 11, to: 60, limit: 200 } } }]);
+  });
 });
