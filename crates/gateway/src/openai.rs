@@ -318,6 +318,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
     })
 }
 
+#[cfg(test)]
 pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
     let text = joined_text(&resp.content);
     let mut message = Map::new();

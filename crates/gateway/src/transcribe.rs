@@ -17,4 +17,4 @@ mod wire;
 
 pub use chosen::transcriber_for;
 pub use recording::{AudioType, Recording};
-pub use transcriber::{Transcriber, TranscriberConfig};
+pub use transcriber::Transcriber;

@@ -87,9 +87,10 @@ pub fn response_from_wire(kind: DialectKind, wire: &Value) -> Result<ChatRespons
     }
 }
 
-/// Canonical response onto the wire. Production uses this for replay
-/// fixtures and citysim scripts; tests use it for round-trip proof.
-pub fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<Value, AxError> {
+/// Canonical response onto the wire: the provider's reply as a test
+/// writes it, and the other half of the round-trip proof.
+#[cfg(test)]
+pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<Value, AxError> {
     match kind {
         DialectKind::Anthropic => anthropic::response_wire(resp),
         DialectKind::OpenAi => openai::response_wire(resp),

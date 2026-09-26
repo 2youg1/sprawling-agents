@@ -43,6 +43,8 @@ mod reply;
 mod request;
 mod stream;
 
-pub(crate) use reply::{response_from, response_wire};
+pub(crate) use reply::response_from;
+#[cfg(test)]
+pub(crate) use reply::response_wire;
 pub(crate) use request::request;
 pub(crate) use stream::{increment_of, settled};

@@ -29,5 +29,5 @@ pub use adapter::adapter_for;
 pub use config::{AuthSpec, Endpoint, EndpointConfig};
 pub use header::HeaderValue;
 pub use kernel::event::record::ModelFacts;
-pub use redemption::{ImageResolver, Redemption, SecretResolver};
+pub use redemption::{Redemption, SecretResolver};
 pub(crate) use transport::Transport;

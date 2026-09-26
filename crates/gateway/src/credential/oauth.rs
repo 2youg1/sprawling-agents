@@ -11,10 +11,9 @@ mod flow;
 mod types;
 
 pub use codec::oauth_random;
-pub use device::{
-    DeviceAuthorization, DeviceLogin, DevicePoll, DeviceRefusal, DeviceStep, FormPost, PollStep,
-    device_authorization_request, device_login_begin,
-};
+pub use device::{DeviceStep, FormPost, device_login_begin};
 pub(crate) use flow::degraded_payload;
-pub use flow::{oauth_begin, oauth_redeem, oauth_redeem_request, oauth_refresh};
-pub use types::{OauthPending, OauthTokens, RedirectPending, TokenRequest};
+#[cfg(test)]
+pub(crate) use flow::oauth_redeem_request;
+pub use flow::{oauth_begin, oauth_redeem, oauth_refresh};
+pub use types::OauthPending;

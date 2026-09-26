@@ -291,6 +291,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
     })
 }
 
+#[cfg(test)]
 fn stop_str(stop: StopReason) -> &'static str {
     match stop {
         StopReason::EndTurn => "end_turn",
@@ -301,6 +302,7 @@ fn stop_str(stop: StopReason) -> &'static str {
 
 /// The response direction carries no pictures: a provider answers with
 /// text, thinking and tool calls, so there is nothing to resolve.
+#[cfg(test)]
 pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
     let empty = ImageBytes::default();
     let content: Result<Vec<Value>, AxError> = resp
