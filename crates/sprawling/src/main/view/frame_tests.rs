@@ -330,3 +330,19 @@ fn expanding_a_run_shows_its_rounds_and_their_calls() {
         ]
     );
 }
+
+/// A run is marked openable until its rounds are folded: whether it has
+/// any is not known before the person first opens it.
+#[test]
+fn a_run_whose_rounds_are_not_folded_yet_is_marked_openable() {
+    let runs = vec![line(2, "yard/b", (3, 3), Some(memory::RunPhase::Active))];
+    let records = vec![ledger_row(
+        3,
+        channels::EventKind::ModelCalled,
+        serde_json::json!({}),
+    )];
+    assert_eq!(
+        Face::open(&runs, records, NARROW).frame()[4],
+        format!(">        + run {R2} active #3..3")
+    );
+}
