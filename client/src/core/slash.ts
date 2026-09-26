@@ -37,7 +37,7 @@ import type { Key } from "./lang";
 import { PAGES, page } from "./route";
 import type { View } from "./route";
 import { CITY } from "./scope";
-import type { Command, Effort, RunId, Seq } from "../wire";
+import type { Command, Effort, Mode, RunId, Seq } from "../wire";
 
 // A run a verb can act on: which one, and how far it has got. `/steer`,
 // `/stop` and `/diff` need the first, and a branch needs both.
@@ -80,6 +80,9 @@ export interface SlashHands {
   // that is where the person set it.
   readonly effort: Effort | null;
   readonly setEffort: (effort: Effort | null) => void;
+  // The discipline a run this verb opens works under, from the pill
+  // beside the box.
+  readonly mode: Mode;
   // What a new run is told to aim at, already in the person's language.
   readonly goal: string;
   // The line in the box: emptied by a verb that ran, refilled by `/help`.
@@ -178,7 +181,13 @@ export const SLASH: readonly Slash[] = [
     run: (hands, call) => {
       if (hands.here === null || call.rest === "") return;
       hands.command(
-        dispatch({ addr: hands.here, task: call.rest, goal: hands.goal, effort: hands.effort }),
+        dispatch({
+          addr: hands.here,
+          task: call.rest,
+          goal: hands.goal,
+          effort: hands.effort,
+          mode: hands.mode,
+        }),
       );
       hands.write("");
     },

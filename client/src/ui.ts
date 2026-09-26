@@ -16,6 +16,7 @@ import { derived, get, readable, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import { QUERIES } from "./core/asking";
+import { MODES } from "./core/commands";
 import { createBelief } from "./core/belief";
 import type { Lang } from "./core/lang";
 import type { LinkState } from "./core/link";
@@ -25,7 +26,7 @@ import { memory } from "./core/rows";
 import type { AddressBar, View } from "./core/route";
 import { go } from "./core/route";
 import type { Connection } from "./core/socket";
-import type { Answer, ApprovalItem, Command, Effort } from "./wire";
+import type { Answer, ApprovalItem, Command, Effort, Mode } from "./wire";
 
 export interface Ui {
   readonly conn: Connection;
@@ -44,6 +45,9 @@ export interface Ui {
   // overrule the city's file without saying so; what the selector over
   // the composer states is the session it is about to open.
   readonly effort: Readable<Effort | null>;
+  // The discipline the next dispatch runs under, held for this page the
+  // way effort is; it starts at the first a control offers.
+  readonly mode: Readable<Mode>;
   // The questions this city is holding for the person, as one reading
   // three views share: the dot on the rail, the rail's badge, and the
   // tab's title. Before this each of them folded the same answer by
@@ -59,6 +63,7 @@ export interface Ui {
   // Milliseconds now, read where a view needs a relative time.
   readonly now: () => number;
   readonly chooseEffort: (level: Effort | null) => void;
+  readonly chooseMode: (mode: Mode) => void;
   readonly go: (view: View) => void;
   // Sends a command, and says so when it could not be sent.
   readonly send: (command: Command) => boolean;
@@ -86,17 +91,20 @@ export interface Opening {
 // statement of what a page reads.
 function readied(value: Opening): Ui {
   const effort = writable<Effort | null>(null);
+  const mode = writable<Mode>(MODES[0] ?? "plan_goal");
   const hearing = value.conn.asking.ask(QUERIES.endpoints);
   return {
     ...value,
     lang: derived(value.prefs.held, (held) => held.lang),
     effort,
+    mode,
     approvals: derived(
       value.conn.asking.ask(QUERIES.approvals),
       (answer) => (answer !== undefined && "approvals" in answer ? answer.approvals.items : []),
       [],
     ),
     chooseEffort: effort.set,
+    chooseMode: mode.set,
     go: (view) => {
       go(value.bar, view);
     },

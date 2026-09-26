@@ -13,7 +13,7 @@ import { Option, Schema } from "effect";
 
 import type { Belief, RunBelief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
-import { EFFORTS } from "../../core/commands";
+import { EFFORTS, MODES } from "../../core/commands";
 import type { PreferenceDoor } from "../../core/prefs";
 import type { Key, Lang } from "../../core/lang";
 import { say } from "../../core/lang";
@@ -22,7 +22,7 @@ import { UNSTATED, offered, parse, reached } from "../../core/slash";
 import type { Slash, SlashHands } from "../../core/slash";
 import type { Sending } from "../../core/doing";
 import { Address } from "../../wire";
-import type { Command, Effort, Seq } from "../../wire";
+import type { Command, Effort, Mode, Seq } from "../../wire";
 import type { View } from "../../core/route";
 import type { Choice } from "../parts/combobox.svelte";
 import type { PopoverColumn } from "../parts/popover";
@@ -93,7 +93,7 @@ export function draftAt(door: PreferenceDoor, at: string | undefined): Draft {
   };
 }
 
-// ------------------------------------------------------- the three pills
+// -------------------------------------------------------- the four pills
 
 // One model the city could point the `main` face at: the endpoint that
 // serves it and its id.
@@ -206,10 +206,11 @@ export interface Picks {
   readonly model: (value: string) => void;
   readonly workspace: (value: string) => void;
   readonly effort: (value: string) => void;
+  readonly mode: (value: string) => void;
 }
 
 // Everything the pills read off the page and the city, gathered so the
-// three rows are built in one place.
+// four rows are built in one place.
 export interface Around {
   readonly served: readonly Served[];
   readonly chosen: Names | undefined;
@@ -218,12 +219,13 @@ export interface Around {
   readonly rooms: readonly string[];
   readonly here: Address | null;
   readonly effort: Effort | null;
+  readonly mode: Mode;
 }
 
-// The three pills - model, workspace, effort - in the order they stand
+// The four pills - model, workspace, effort, mode - in the order they stand
 // in the row. The effort rows carry what a level costs beside the level
 // itself, because this is where a person decides (client-SPEC 4-28).
-export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill, Pill, Pill] {
+export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill, Pill, Pill, Pill] {
   const levels: readonly (typeof UNSTATED | Effort)[] = [UNSTATED, ...EFFORTS];
   return [
     {
@@ -249,6 +251,13 @@ export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill,
       })),
       value: around.effort ?? UNSTATED,
       pick: picks.effort,
+    },
+    {
+      label: say(lang, "talk_column_mode"),
+      placeholder: say(lang, "talk_column_mode"),
+      choices: MODES.map((each) => ({ value: each, label: say(lang, `mode_${each}`) })),
+      value: around.mode,
+      pick: picks.mode,
     },
   ];
 }
@@ -304,6 +313,7 @@ export interface Reach {
   readonly models: readonly Served[];
   readonly effort: Effort | null;
   readonly setEffort: (effort: Effort | null) => void;
+  readonly mode: Mode;
   readonly goal: string;
   readonly write: (line: string) => void;
 }
@@ -318,6 +328,7 @@ export function slashHands(reach: Reach): SlashHands {
     models: reach.models.map((each) => ({ endpoint: each.endpoint, model: each.model })),
     effort: reach.effort,
     setEffort: reach.setEffort,
+    mode: reach.mode,
     goal: reach.goal,
     write: reach.write,
   };

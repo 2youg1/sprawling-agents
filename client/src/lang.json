@@ -2419,6 +2419,10 @@
     "en": "effort",
     "zh": "强度"
   },
+  "talk_column_mode": {
+    "en": "mode",
+    "zh": "方式"
+  },
   "talk_column_model": {
     "en": "model",
     "zh": "模型"
@@ -3674,6 +3678,26 @@
   "file_missing": {
     "en": "missing",
     "zh": "不存在"
+  },
+  "mode_experiment": {
+    "en": "experiment: try it, nothing promised",
+    "zh": "试验：试一试，不作保证"
+  },
+  "mode_plan_goal": {
+    "en": "plan: write it down, change nothing",
+    "zh": "计划：写下来，不改动"
+  },
+  "mode_sc": {
+    "en": "renovate: keep what it does",
+    "zh": "翻新：外部行为不变"
+  },
+  "mode_ud": {
+    "en": "change: behaviour, with evidence",
+    "zh": "改变：改行为，带证据"
+  },
+  "mode_up": {
+    "en": "build: one piece with its tests",
+    "zh": "建造：一件东西连同它的测试"
   },
   "monitor_title": {
     "en": "performance",

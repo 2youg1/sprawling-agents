@@ -38,6 +38,7 @@ import type {
 import {
   Ceiling as CeilingSchema,
   Effort as EffortSchema,
+  Mode as ModeSchema,
   Window as WindowSchema,
   TemplateName as TemplateNameSchema,
 } from "../wire";
@@ -50,10 +51,9 @@ import {
 // is what `Dispatch.effort === null` spells below.
 export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 
-// The one mode a conversation runs in: plan first, then work. The city
-// reads any tag it does not know as this one, so the spelling here is
-// the explicit form of the default.
-const PLAN_MODE: Mode = "plan_goal";
+// The disciplines a run may work under, in the order a control offers
+// them (kernel `Mode::ALL`); the first is the one a page starts with.
+export const MODES: readonly Mode[] = ModeSchema.members.flatMap((member) => member.literals);
 
 // A dispatch names a room: `addr` is the room itself (`hall/mayor`),
 // and the city opens no second room inside it. A room a person names on
@@ -67,6 +67,7 @@ export interface Dispatch {
   // nothing about effort and the provider decides, which is not the
   // same request as `"none"`, an instruction not to think.
   readonly effort: Effort | null;
+  readonly mode: Mode;
 }
 
 export function dispatch(d: Dispatch): Command {
@@ -75,7 +76,7 @@ export function dispatch(d: Dispatch): Command {
       addr: d.addr,
       task: d.task,
       goal: d.goal,
-      mode: PLAN_MODE,
+      mode: d.mode,
       session: null,
       effort: d.effort,
       idem: mintIdem(),

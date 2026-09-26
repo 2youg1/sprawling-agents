@@ -63,6 +63,7 @@
   const belief = u.conn.belief;
   const held = u.prefs.held;
   const effort = u.effort;
+  const mode = u.mode;
 
   const { onClose }: { readonly onClose: () => void } = $props();
 
@@ -195,6 +196,7 @@
       models,
       effort: $effort,
       setEffort: u.chooseEffort,
+      mode: $mode,
       goal: say($lang, "talk_goal"),
       write: (line) => {
         written.line = line;
