@@ -56,7 +56,7 @@ pub(crate) enum Landed {
 /// The lanes, the crossing, and what each driving run is carrying.
 pub(in crate::assembly) struct Flight {
     pool: DrivingPool,
-    gate: RelayGate,
+    pub(in crate::assembly) gate: RelayGate,
     driving: BTreeMap<RunId, InLane>,
     /// Runs home that one drain found beyond the one it landed, in
     /// arrival order. Kept rather than re-queued, so arrival order is
@@ -87,12 +87,6 @@ impl Flight {
     /// How many runs are driving right now, whoever started them.
     pub(in crate::assembly) fn in_flight(&self) -> u32 {
         self.pool.in_flight()
-    }
-
-    /// The accounting queue's counts, for the sampler's thread
-    /// (sprawling-SPEC.md 8-98).
-    pub(in crate::assembly) fn health(&self) -> crate::monitor::health::Health {
-        self.gate.health()
     }
 
     /// Whether a new run waits: every lane is taken, or memory is tight.

@@ -161,7 +161,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                         drop(ready_tx.send(Err(err)));
                         return;
                     }
-                    drop(ready_tx.send(Ok((worker.vault_handle(), worker.flight.health()))));
+                    drop(ready_tx.send(Ok((worker.vault_handle(), worker.flight.gate.health()))));
                     worker
                 }
                 Err(err) => {
