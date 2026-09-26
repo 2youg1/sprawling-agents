@@ -99,10 +99,12 @@ pub use checkpoint::Provenance;
 pub use checkpoint::effort_word;
 pub use checkpoint::recorded_effort;
 
+mod blob;
 mod changes;
 mod hunks;
 mod status;
 
+pub use blob::blob_at;
 pub use changes::{Head, between};
 pub use hunks::{FilePatch, PatchLine, Withheld, of_file};
 pub use status::{Drift, WorkingStatus, working_status};

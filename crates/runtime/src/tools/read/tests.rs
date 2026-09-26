@@ -7,11 +7,21 @@ use super::*;
 use crate::catalog::CatalogEntry;
 
 mod doors;
+mod locators;
+
+/// No block is referenced by any run: what every test that reads no
+/// `cas:` Locator hands the tool.
+fn unreferenced() -> Blocks {
+    Blocks {
+        store: PathBuf::from("no-store"),
+        owner: Arc::new(|_: &kernel::B3Hash| Ok(None)),
+    }
+}
 
 fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
     let catalog = Arc::new(Mutex::new(Catalog::new()));
     let everywhere: ReadBound = Arc::new(|_: &kernel::Address| kernel::ReadVerdict::Open);
-    let tool = ReadTool::new(root, Arc::clone(&catalog), everywhere).unwrap();
+    let tool = ReadTool::new(root, Arc::clone(&catalog), everywhere, unreferenced()).unwrap();
     (tool, catalog)
 }
 

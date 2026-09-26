@@ -1416,6 +1416,25 @@ const NEARBY_CAP: usize = 16;
 - **列目录是尽力而为**：目录列不出或名字不是 Unicode 时 `nearby` 为空，调用方要的拒因是「没命中」本身。
 - **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（city-SPEC §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
 
+#### 8-29-5 打开一个 Locator：`cas:` 与 `file:`（`runtime::tools::read::locator`）
+
+```rust
+// read::locator
+/// 本 run 或其前驱在账本里引用过这个块的那一行的地址；没有这样一行时为 None。
+pub type BlockOwner = Arc<dyn Fn(&B3Hash) -> Result<Option<Address>, AxError> + Send + Sync>;
+/// 城的块仓与块的归属，一个值：run 可能写在没有自己块仓的 worktree 里。
+pub struct Blocks { pub store: PathBuf, pub owner: BlockOwner }
+pub(super) fn open_locator(asked: &str, city_root: &Path, blocks: &Blocks,
+                           bound: &dyn Fn(&Address) -> ReadVerdict) -> Option<Result<String, AxError>>;
+fn judged_at(locator: &Locator, owner: &BlockOwner) -> Result<Address, AxError>; // 读取界的唯一判定处
+```
+
+- **以 `cas:` 或 `file:` 开头的参数是 Locator**，按 `Locator::parse` 判形，判不过即 `E_INVALID_ARGS`；其余参数走 catalog 与普通路径，不受影响（一个城内地址不含冒号，两者不相交）。
+- **按哪个地址判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个：`file:<addr>@<oid>` 按 `<addr>` 判；`cas:` 块不记来源楼，所以按账本里**本 run 或其前驱**引用它的那一行所属的地址判。没有这样一行＝`E_GATE_DENIED`，恢复语说出「只能读本 run 或其前驱在账本里引用过的块」：一个哈希可以从别处抄来，而读取界要问的是「这些字节属于哪栋楼」，只有引用它的那一行答得出。
+- **`file:` 在该 oid 上做 git 读**（`memory::blob_at`，memory-SPEC §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
+- **范围**：`cas:` 带的范围照 Locator 本身只交回那一段（`Cas::get_range`）；`file:` 带范围＝`E_INVALID_ARGS`，恢复语让它去掉范围改用 `offset`／`limit`——提交里的文件没有一份按范围读的实现，而 `offset`／`limit` 已答同一个问题。之后都按 `offset`／`limit` 切（§8-29-1）。字节不是 UTF-8＝`E_INVALID_ARGS`，read 只交文本。
+- **生产的 `Blocks`**（`bin::assembly::workbench::blocks`）在被问到时才读账本，只看 `run` 为本 run 或其前驱（`Assignment::predecessor`，接替前的那一任）的行，在它们的载荷里找 `cas:b3-<hash>` 这串写法，取第一行的 `addr`；没有 `addr` 的行说不出字节属于谁，不算引用。读账本的代价只落在真正问了 `cas:` 的调用上。
+
 ### 8-30 runtime::tools::search（形状 1 判定＋形状 4 适配器）
 
 **问题**：十三件工具里没有一件能找东西。找一个符号只有两条路——写 Python（要可选的 CPython-WASI 构件，很多机器上根本没有），或走 shell（Windows 上是 `findstr`，而 shell 本身是楼级配置可以关掉的）。旧对话有了一个地址，而**没有检索的地址比没有地址更糟**：模型被告知那里有东西，却够不着。
