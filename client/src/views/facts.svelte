@@ -123,7 +123,11 @@
     }
   }
 
+  // The model answering the run that is going wins over the city's next
+  // pick: a session keeps the model it was opened with.
   const model = $derived.by((): string => {
+    const answering = $moving?.model;
+    if (answering !== undefined && answering !== null) return answering;
     const held = $endpoints;
     if (held === undefined || !("endpoints" in held)) return NOTHING;
     return (

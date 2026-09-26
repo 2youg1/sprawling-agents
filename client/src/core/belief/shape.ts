@@ -38,6 +38,10 @@ export interface RunBelief {
   readonly task: string | null;
   readonly lastSeq: Seq;
   readonly doing: Doing;
+  // The model the run's last call went to. A session keeps the model it
+  // was opened with, so this, and not the city's next pick, is the model
+  // answering; null until the run's first call is heard.
+  readonly model: string | null;
   // Heard from the stream and named by no answer yet: an answer folded
   // before the run began cannot name it, and that silence is not the
   // city saying the run is over.

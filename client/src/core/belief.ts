@@ -21,7 +21,7 @@ import type { Readable } from "svelte/store";
 import { readProbed } from "./probed";
 import { PHASES, moves } from "./doing";
 import type { Doing } from "./doing";
-import { completionOf, haltOf, sessionStart, taskOf, toolCall } from "./reading";
+import { completionOf, haltOf, modelOf, sessionStart, taskOf, toolCall } from "./reading";
 import { sameScope } from "./scope";
 
 import { CITY_RUN, Seq, TimeMs } from "../wire";
@@ -40,6 +40,7 @@ function unseen(run: RunId, at: Seq): RunBelief {
     task: null,
     lastSeq: at,
     doing: { kind: "unknown" },
+    model: null,
     local: true,
     saying: "",
     thinking: "",
@@ -77,6 +78,7 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
     task: held?.task ?? null,
     lastSeq: summary.last_seq,
     doing: summary.frozen ? frozen(held) : (stated ?? held?.doing ?? { kind: "unknown" }),
+    model: held?.model ?? null,
     local: false,
     saying: held?.saying ?? "",
     thinking: held?.thinking ?? "",
@@ -101,8 +103,13 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
         bad,
       ];
     }
-    case "model_called":
-      return [{ ...moved, doing: PHASES.model_called, saying: "", thinking: "" }, null];
+    case "model_called": {
+      const [model, bad] = modelOf(record);
+      return [
+        { ...moved, doing: PHASES.model_called, model: model ?? held.model, saying: "", thinking: "" },
+        bad,
+      ];
+    }
     case "model_returned":
       return [{ ...moved, saying: "", thinking: "" }, null];
     case "tool_called": {
