@@ -406,7 +406,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 ### 12-3 对话里没有 `/goal`
 
-- **决策**（人的裁决）：页面的斜杠表不设 `/goal`。
+- **决策**（由人选定）：页面的斜杠表不设 `/goal`。
 - **理由**：目标已经有两处权威——楼的常设目标（`set_pursuit`／`pursue`，sprawling-SPEC §8-35）与每次派活的 `run_started.goal`。对话里再开一个入口，就是同一事实的第三处定义，三处之间没有东西把它们绑在一起。
 - **被击败的备选**：`/goal <text>|pause|resume|clear`，把 `/goal x` 翻成 `pursue{step:{set:{goal:"x"}}}`。
 - **重开参数**：常设目标与派活目标合并成一处权威时，对话入口可以指向那一处而不增加定义。
