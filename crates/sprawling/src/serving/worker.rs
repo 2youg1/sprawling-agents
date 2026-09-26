@@ -22,6 +22,7 @@ use kernel::{AxCode, AxError};
 
 use super::attending::{Outward, Started, spawn_worker};
 use super::desk::CommandDesk;
+use super::output_ring::OutputRing;
 use super::serve::Opening;
 use super::serve::Serving;
 use crate::assembly::{acp_dispatch, ledger_dir, rebuild_views};
@@ -143,6 +144,9 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let (deltas, _watching) = tokio::sync::broadcast::channel(256);
     // Running commands' output, on a fourth channel for the same reason.
     let (outputs, _reading) = tokio::sync::broadcast::channel(256);
+    // And what they already wrote, for a page that opens mid-command.
+    let kept = Arc::new(OutputRing::default());
+    let kept_reader = Arc::clone(&kept);
     // The process log, on the third channel. Its sender was made before
     // the `Diagnostics` was, because the sink is what writes into it.
     let logs = journal.lines();
@@ -198,6 +202,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             to_clients: events.clone(),
             to_watchers: deltas.clone(),
             to_readers: outputs.clone(),
+            kept,
         },
     )?;
 
@@ -222,6 +227,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         deltas,
         logs,
         outputs,
+        outputs_so_far: Arc::new(move || kept_reader.so_far()),
         city: city_name,
         secrets: Arc::new(move |command: channels::Command, reply: channels::Reply| {
             // The route waits for whichever comes first, so the

@@ -82,6 +82,11 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         if send(&mut socket, &ServerFrame::Welcome(*welcome)).await.is_err() {
                             return;
                         }
+                        for written in (state.outputs_so_far)() {
+                            if send(&mut socket, &ServerFrame::Output(written)).await.is_err() {
+                                return;
+                            }
+                        }
                     }
                     SessionStep::Deliver(command) => {
                         let back = refused.clone();

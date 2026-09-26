@@ -731,6 +731,7 @@ pub channels::ServeConfig::deltas: tokio::sync::broadcast::Sender<channels::Delt
 pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<kernel::event::payload::EventRecord>
 pub channels::ServeConfig::logs: tokio::sync::broadcast::Sender<channels::LogLine>
 pub channels::ServeConfig::outputs: tokio::sync::broadcast::Sender<channels::LiveOutput>
+pub channels::ServeConfig::outputs_so_far: alloc::sync::Arc<(dyn core::ops::function::Fn() -> alloc::vec::Vec<channels::LiveOutput> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::queries: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Query) -> core::result::Result<channels::Answer, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::secrets: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Command<kernel::secret::sealed::Sealed<alloc::string::String>>, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::transcribe_sink: channels::TranscribeSink

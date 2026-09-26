@@ -35,7 +35,16 @@ impl OutputRing {
     /// Appends a piece to its run's tail, dropping the oldest whole
     /// pieces past the bound. The newest piece always stays.
     pub(super) fn keep(&self, piece: &LiveOutput) {
-        let _ = piece;
+        let mut runs = self.runs();
+        let kept = runs.entry(piece.run).or_default();
+        kept.bytes = kept.bytes.saturating_add(piece.text.len());
+        kept.pieces.push_back(piece.clone());
+        while kept.bytes > KEPT_BYTES_PER_RUN && kept.pieces.len() > 1 {
+            let Some(oldest) = kept.pieces.pop_front() else {
+                break;
+            };
+            kept.bytes = kept.bytes.saturating_sub(oldest.text.len());
+        }
     }
 
     /// Empties a run's tail once its call's result is in the Ledger.
@@ -94,7 +103,10 @@ mod tests {
     fn a_page_opening_mid_command_sees_what_was_written_until_the_result_lands() {
         let (building, testing) = (RunId::from_bytes([1; 16]), RunId::from_bytes([2; 16]));
         let ring = OutputRing::default();
-        let written = [piece(building, "compiling\n"), piece(testing, "running 3 tests\n")];
+        let written = [
+            piece(building, "compiling\n"),
+            piece(testing, "running 3 tests\n"),
+        ];
         written.iter().for_each(|each| ring.keep(each));
         assert_eq!(ring.so_far(), written.to_vec());
 

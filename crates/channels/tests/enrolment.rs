@@ -88,6 +88,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
         outputs: tokio::sync::broadcast::channel(16).0,
+        outputs_so_far: Arc::new(Vec::new),
         client: Arc::new(channels::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
         transcribe_sink: Arc::new(|_, _| {
