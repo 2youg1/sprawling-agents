@@ -29,6 +29,10 @@ use kernel::{ChatMessage, ContentBlock, Role};
 pub enum Opening {
     /// Somebody wrote the task down; the job file's text is in the prefix.
     FromJob,
+    /// Somebody wrote the task down for a mother, and a branch is
+    /// rebuilding her conversation: her job file lives in her room, not
+    /// in the branch's prefix, so the task travels in the message.
+    Inherited,
     /// Nobody did; the person is on the other side of this message.
     WithPerson,
 }
@@ -56,6 +60,7 @@ impl Conversation {
     pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening) {
         self.push_user_text(match opening {
             Opening::FromJob => format!("The task is in JOB.md above.\nGoal: {goal}"),
+            Opening::Inherited => format!("Task: {task}\nGoal: {goal}"),
             // The person's own line, unwrapped. A conversational turn
             // dressed in field labels reads as a form, and a form is
             // answered with a form.

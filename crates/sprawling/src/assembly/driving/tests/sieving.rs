@@ -106,10 +106,16 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
         "the way back does not resolve to what the command printed"
     );
     let rest = std::path::Path::new(account["rest_path"].as_str().unwrap());
-    assert!(rest.exists(), "the rest file is not where the account says");
     assert!(
-        rest.starts_with(&room),
-        "the rest file is outside the room a model may read: {}",
+        rest.is_relative()
+            && !rest
+                .components()
+                .any(|part| part == std::path::Component::ParentDir),
+        "the rest file is not named by its address in the room a model may read: {}",
         rest.display()
+    );
+    assert!(
+        room.join(rest).exists(),
+        "the rest file is not where the account says"
     );
 }

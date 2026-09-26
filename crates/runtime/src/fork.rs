@@ -145,7 +145,7 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
                     &started.task,
                     &started.goal,
                     if started.job.is_some() {
-                        Opening::FromJob
+                        Opening::Inherited
                     } else {
                         Opening::WithPerson
                     },
