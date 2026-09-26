@@ -5,6 +5,8 @@
 
 //! Checkpoint scans: staged secrets and scoped commits.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use kernel::TimeMs;
 use kernel::secret::scan;
 
@@ -148,8 +150,15 @@ impl Checkpoint {
     /// under an open handle makes that read refuse the whole wave
     /// (memory-SPEC 8-8, 8-24). Nor does one ever stage protected
     /// metadata or an alias - [`StageFilter`] owns that rule.
+    ///
+    /// Returns the paths whose staged blob this call added, changed or
+    /// removed, in byte order: the difference between the index it found
+    /// and the index it wrote, which is what the fence touched and not
+    /// what the city holds.
     pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, MemoryError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
+        let found: BTreeMap<Vec<u8>, git2::Oid> =
+            index.iter().map(|entry| (entry.path, entry.id)).collect();
         let patterns = Self::pathspecs(scopes);
         let specs: Vec<&str> = patterns.iter().map(String::as_str).collect();
         let mut filter = StageFilter::new(workdir(&self.repo)?);
@@ -168,12 +177,30 @@ impl Checkpoint {
         }
         filter.refused()?;
         write_index(&mut index)?;
-        let mut files: Vec<String> = index
-            .iter()
-            .map(|entry| String::from_utf8_lossy(&entry.path).into_owned())
-            .collect();
-        files.sort();
-        Ok(files)
+        let mut changed: BTreeSet<Vec<u8>> = BTreeSet::new();
+        let mut present = 0usize;
+        for entry in index.iter() {
+            let unchanged = match found.get(&entry.path) {
+                Some(id) => {
+                    present = present.saturating_add(1);
+                    *id == entry.id
+                }
+                None => false,
+            };
+            if !unchanged {
+                changed.insert(entry.path);
+            }
+        }
+        // Only a removal leaves a found path unmatched, so the second
+        // pass is paid by the waves that deleted something.
+        if present < found.len() {
+            let staged: BTreeSet<Vec<u8>> = index.iter().map(|entry| entry.path).collect();
+            changed.extend(found.into_keys().filter(|path| !staged.contains(path)));
+        }
+        Ok(changed
+            .into_iter()
+            .map(|path| String::from_utf8_lossy(&path).into_owned())
+            .collect())
     }
 
     /// One git pathspec per prefix the run may write under.

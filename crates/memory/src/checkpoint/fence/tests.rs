@@ -287,3 +287,32 @@ fn head_len(root: &Path) -> usize {
     walk.push_head().unwrap();
     walk.count()
 }
+
+#[test]
+fn a_fence_lists_only_the_paths_it_changed() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/kept.txt", "kept");
+    write(tmp.path(), "work/gone.txt", "gone");
+    write(tmp.path(), "work/edited.txt", "before");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let scope = ["work".to_owned()];
+    checkpoint
+        .wave_pre(&scope, TimeMs::new(1_000), &resident())
+        .unwrap();
+
+    std::fs::remove_file(tmp.path().join("work/gone.txt")).unwrap();
+    write(tmp.path(), "work/edited.txt", "after");
+    write(tmp.path(), "work/fresh.txt", "fresh");
+    let second = checkpoint
+        .wave_pre(&scope, TimeMs::new(2_000), &resident())
+        .unwrap();
+    assert_eq!(
+        files_of(&second),
+        ["work/edited.txt", "work/fresh.txt", "work/gone.txt"],
+        "an untouched file is not this fence's news"
+    );
+    let third = checkpoint
+        .wave_pre(&scope, TimeMs::new(3_000), &resident())
+        .unwrap();
+    assert_eq!(files_of(&third), Vec::<String>::new());
+}
