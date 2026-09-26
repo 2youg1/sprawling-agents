@@ -753,3 +753,28 @@ fn the_ledger_readers_read_after_the_views_are_released() {
     let fresh: Vec<_> = queries.iter().map(|query| views.answer(query)).collect();
     assert_eq!(read, fresh);
 }
+
+#[test]
+fn the_mcp_health_page_reads_its_servers_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    let views = Views::new(dir.path());
+    let prepared = views.prepare(&channels::Query::McpHealth { addr: room.clone() });
+    let config = city::config_path(dir.path(), &room, city::Layer::City).unwrap();
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(
+        &config,
+        "[[mcp]]\nlabel = \"apps\"\ncommand = \"sprawling-no-such-server\"\n",
+    )
+    .unwrap();
+    let channels::Answer::McpHealth(answer) = prepared.finish() else {
+        panic!("not an MCP health answer");
+    };
+    let labels: Vec<_> = answer
+        .servers
+        .iter()
+        .map(|server| server.label.as_str().to_owned())
+        .collect();
+    assert_eq!(labels, vec!["apps".to_owned()]);
+}
