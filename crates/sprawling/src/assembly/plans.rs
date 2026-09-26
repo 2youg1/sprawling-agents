@@ -189,11 +189,11 @@ impl RunWorker {
 
     /// Sets, pauses, resumes or clears a building's pursuit.
     ///
-    /// **Held in the process and not written down.** A standing goal is
-    /// a posture rather than a fact about the past, and a city that came
-    /// back from a restart already working through the night is the one
-    /// failure this must not have. What the goal *does* — every run it
-    /// starts — is recorded like anything else.
+    /// **Held in the process only once the ledger has it.** Each change
+    /// is decided and its pursuit minted first, then `pursuit_changed` is
+    /// appended, then the worker holds the result, so a failed append
+    /// leaves nothing a restart would not fold back (sprawling-SPEC.md
+    /// 8-91).
     ///
     /// A goal is declared through the depth-zero position this Desk
     /// holds, which is the runtime half of the guard the type already
@@ -212,7 +212,10 @@ impl RunWorker {
             )
             .with_recovery("set a goal first; there is nothing here to change")
         };
-        let step = match step {
+        // Decided and minted first, held only once the ledger has the
+        // line: a failed append leaves the process holding what a restart
+        // would fold (sprawling-SPEC.md 8-91).
+        let change = match step {
             channels::PursuitStep::Set { goal } => {
                 // A pursuit works through the plan's ready steps, so on a
                 // building with no plan it would finish at once having
@@ -224,58 +227,91 @@ impl RunWorker {
                 // holds. That is the runtime half of the guard the type
                 // already carries: a sub-agent has no `Delegator`, and
                 // no path from a tool reaches this function either.
-                let declared = kernel::Pursuit::declare(&self.planning.delegator, goal)?;
-                self.note(
-                    runtime::diagnostics::Level::Effect,
-                    "kernel::pursuit",
-                    &format!(
-                        "{} works towards `{}` until nothing is ready",
-                        addr.as_str(),
-                        declared.goal()
-                    ),
-                );
-                self.planning.pursuits.insert(addr.clone(), declared);
-                PursuitMove::Set
+                PursuitChange::Declare(kernel::Pursuit::declare(&self.planning.delegator, goal)?)
             }
-            channels::PursuitStep::Pause => {
-                self.planning
-                    .pursuits
-                    .get_mut(addr)
-                    .ok_or_else(|| missing("pause a pursuit"))?
-                    .pause();
-                PursuitMove::Pause
-            }
-            channels::PursuitStep::Resume => {
-                self.planning
-                    .pursuits
-                    .get_mut(addr)
-                    .ok_or_else(|| missing("resume a pursuit"))?
-                    .resume();
-                PursuitMove::Resume
-            }
-            channels::PursuitStep::Clear => {
-                self.planning
-                    .pursuits
-                    .remove(addr)
-                    .ok_or_else(|| missing("clear a pursuit"))?;
-                PursuitMove::Clear
-            }
+            channels::PursuitStep::Pause => PursuitChange::Pause,
+            channels::PursuitStep::Resume => PursuitChange::Resume,
+            channels::PursuitStep::Clear => PursuitChange::Clear,
         };
-        let changed = PursuitChanged {
-            step,
-            goal: self
-                .planning
-                .pursuits
-                .get(addr)
-                .map(|held| held.goal().to_owned()),
+        let held = self.planning.pursuits.get(addr);
+        let changed = match &change {
+            PursuitChange::Declare(pursuit) => PursuitChanged {
+                step: PursuitMove::Set,
+                goal: Some(pursuit.goal().to_owned()),
+            },
+            PursuitChange::Pause => PursuitChanged {
+                step: PursuitMove::Pause,
+                goal: Some(
+                    held.ok_or_else(|| missing("pause a pursuit"))?
+                        .goal()
+                        .to_owned(),
+                ),
+            },
+            PursuitChange::Resume => PursuitChanged {
+                step: PursuitMove::Resume,
+                goal: Some(
+                    held.ok_or_else(|| missing("resume a pursuit"))?
+                        .goal()
+                        .to_owned(),
+                ),
+            },
+            PursuitChange::Clear => {
+                held.ok_or_else(|| missing("clear a pursuit"))?;
+                PursuitChanged {
+                    step: PursuitMove::Clear,
+                    goal: None,
+                }
+            }
         };
         self.record_at(
             EventKind::PursuitChanged,
             addr.clone(),
             Payload::of(&changed)?,
         )?;
+        self.hold_pursuit(addr, change);
         self.pursue(addr)
     }
+
+    /// Applies one pursuit change the ledger already holds to the
+    /// pursuit this worker keeps for `addr`.
+    fn hold_pursuit(&mut self, addr: &Address, change: PursuitChange) {
+        match change {
+            PursuitChange::Declare(pursuit) => {
+                self.note(
+                    runtime::diagnostics::Level::Effect,
+                    "kernel::pursuit",
+                    &format!(
+                        "{} works towards `{}` until nothing is ready",
+                        addr.as_str(),
+                        pursuit.goal()
+                    ),
+                );
+                self.planning.pursuits.insert(addr.clone(), pursuit);
+            }
+            PursuitChange::Pause => {
+                if let Some(held) = self.planning.pursuits.get_mut(addr) {
+                    held.pause();
+                }
+            }
+            PursuitChange::Resume => {
+                if let Some(held) = self.planning.pursuits.get_mut(addr) {
+                    held.resume();
+                }
+            }
+            PursuitChange::Clear => {
+                self.planning.pursuits.remove(addr);
+            }
+        }
+    }
+}
+
+/// One step of a building's pursuit, decided and minted before its
+/// `pursuit_changed` line is written and held only after.
+enum PursuitChange {
+    Declare(kernel::Pursuit),
+    Pause,
+    Resume,
+    Clear,
 }
 
 pub(super) mod held;

@@ -20,7 +20,8 @@ use kernel::AxError;
 /// Asks `machine` once and folds what it said into the answer the
 /// wire carries. `ThisMachine`'s `accounting::Machine::report` is this.
 ///
-/// Called from `DoctorRefresh` and nowhere else: every item but the
+/// Reached through `accounting::Machine::report`, which the worker calls
+/// from `DoctorRefresh` and nowhere else: every item but the
 /// browsers is a program started and asked its version, which is
 /// seconds rather than milliseconds, so neither a serve nor a query
 /// waits for it - a person opening the page that shows it asks for it,

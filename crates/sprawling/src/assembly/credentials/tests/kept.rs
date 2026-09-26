@@ -18,7 +18,7 @@ use crate::assembly::*;
 /// Reading that as "no credential" asks the provider with no
 /// `Authorization` header at all - which answers 401, and a person
 /// reads that as their key being wrong - and then writes the endpoint
-/// back with its key gone. Clearing one is `DetachEndpoint`.
+/// back with its key gone.
 #[test]
 fn an_empty_key_keeps_the_credential_this_city_has_archived() {
     let dir = tempfile::tempdir().unwrap();
@@ -151,14 +151,8 @@ fn a_subscription_token_keeps_its_bearer_header_when_the_settings_are_saved_agai
         .endpoints()
         .find(|endpoint| endpoint.name == "anthropic")
         .expect("the endpoint stayed attached");
-    let gateway::AuthSpec::Bearer(reference) = &kept.auth else {
-        panic!(
-            "a subscription token travels as a bearer token, not {:?}",
-            kept.auth
-        );
-    };
     assert_eq!(
-        reference,
-        &kernel::SecretRef::parse("secret:anthropic/oauth").unwrap()
+        kept.auth,
+        gateway::AuthSpec::Bearer(kernel::SecretRef::parse("secret:anthropic/oauth").unwrap())
     );
 }

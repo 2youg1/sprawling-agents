@@ -139,8 +139,8 @@ pub(super) fn tuning_of(
 /// read off a form.
 pub(super) enum Credential {
     /// No key was entered this time, which is not the same as no key:
-    /// the city keeps what it has for this endpoint, and only
-    /// `DetachEndpoint` removes one (sprawling-SPEC.md 8-81). The
+    /// the city keeps what it has for this endpoint, and an empty box
+    /// never removes one (sprawling-SPEC.md 8-81). The
     /// header is the one the person named for a key, which still
     /// decides how an archived reference travels.
     Absent { header: Option<String> },

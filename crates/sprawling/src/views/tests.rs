@@ -212,6 +212,78 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
 
 /// One record for a view test, carrying a payload and an address.
 #[cfg(test)]
+/// A consumption leaves the inbox by its id, whatever room the line that
+/// records it names: nothing forces a consumed line's `addr` to be the
+/// room the signal was enqueued in, and `CollaborationFold` already reads
+/// it that way.
+#[test]
+fn a_consumed_signal_leaves_the_inbox_whatever_room_its_line_names() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let room = Address::parse("lab/room1").unwrap();
+    let elsewhere = Address::parse("lab/room2").unwrap();
+    let run = RunId::from_bytes([7u8; 16]);
+    let signal = collab::Signal::new(
+        kernel::event::record::SignalId::parse("sig-1").unwrap(),
+        kernel::event::record::SignalKind::Thread,
+        "lab/room2".to_owned(),
+        room.clone(),
+        kernel::Version::new(1),
+        Payload::new(serde_json::Map::new()).unwrap(),
+        kernel::TimeMs::new(1_000),
+    )
+    .unwrap();
+    views
+        .apply(&view_record(
+            1,
+            run,
+            EventKind::SignalEnqueued,
+            &room,
+            signal.enqueued_payload().unwrap().as_map().clone(),
+        ))
+        .unwrap();
+    views
+        .apply(&view_record(
+            2,
+            run,
+            EventKind::SignalConsumed,
+            &elsewhere,
+            signal
+                .consumed_payload("lab/room2")
+                .unwrap()
+                .as_map()
+                .clone(),
+        ))
+        .unwrap();
+
+    let channels::Answer::Inbox(inbox) = views.answer(&channels::Query::InboxView { addr: room })
+    else {
+        panic!("InboxView answers with an inbox");
+    };
+    assert_eq!(inbox.waiting, Vec::new());
+}
+
+/// `as_of` is the first seq an answer does not reflect: the client holds
+/// an answer read before genesis as stale once genesis lands only while
+/// this holds.
+#[test]
+fn the_views_answer_as_of_the_first_seq_they_have_not_folded() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let room = Address::parse("lab").unwrap();
+    assert_eq!(views.next_unfolded(), kernel::Seq::FIRST);
+    views
+        .apply(&view_record(
+            kernel::Seq::FIRST.value(),
+            RunId::CITY,
+            EventKind::CityInitialized,
+            &room,
+            serde_json::Map::new(),
+        ))
+        .unwrap();
+    assert_eq!(views.next_unfolded(), kernel::Seq::FIRST.next().unwrap());
+}
+
 pub(super) fn view_record(
     seq: u64,
     run: RunId,

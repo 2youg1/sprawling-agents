@@ -46,7 +46,7 @@ use kernel::{Address, AxError, EventRecord, RunId};
 pub(crate) fn config_answer(
     city_root: &Path,
     addr: &Address,
-) -> Result<channels::ConfigAnswer, kernel::AxError> {
+) -> Result<channels::ConfigAnswer, AxError> {
     let defaults = gateway::EndpointTuning::DEFAULTS;
     let domain = channels::SecondDomain {
         min: kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
@@ -137,9 +137,9 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::Endpoi
 /// Refuses a record with no address: the step it records belongs to no
 /// building, and a fold that skipped it would keep whatever goal the
 /// step changed.
-pub(crate) fn pursued(record: &EventRecord) -> Result<Address, kernel::AxError> {
+pub(crate) fn pursued(record: &EventRecord) -> Result<Address, AxError> {
     record.addr().cloned().ok_or_else(|| {
-        kernel::AxError::failure(
+        AxError::failure(
             kernel::AxCode::WireMismatch,
             "read a pursuit_changed line",
             format!("line {} names no building", record.seq().value()),

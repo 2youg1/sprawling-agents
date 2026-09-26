@@ -92,7 +92,8 @@ impl RunWorker {
     /// and holds the reference only while it is mounted, so every
     /// later visit says nothing about the credential; reading that as
     /// `AuthSpec::None` probed without a key and wrote the endpoint
-    /// back without one. Removing a credential is `DetachEndpoint`.
+    /// back without one. Removing a credential needs a command of its
+    /// own, which the wire does not carry yet.
     ///
     /// The reference is kept and the header is worked out again by
     /// [`auth_for`], because the same key moves between faces: one archived as

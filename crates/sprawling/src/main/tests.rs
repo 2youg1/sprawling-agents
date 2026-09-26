@@ -168,3 +168,27 @@ fn a_refusal_reads_the_same_to_a_person_and_to_a_program() {
         (Some("nearby: exec, edit"), 1, err)
     );
 }
+
+/// A supervised child receives the flags of the served line with their
+/// values, and none of the ones the supervisor decides again for it: a
+/// dropped value would start the child on a different log level or
+/// client directory than the person asked for.
+#[test]
+fn a_supervised_child_is_forwarded_the_served_flags_with_their_values() {
+    let line = [
+        "up",
+        "city",
+        "--log",
+        "debug",
+        "--web-dir",
+        "client/dist",
+        "--supervise",
+        "--no-open",
+        "--console",
+    ]
+    .map(str::to_owned);
+    assert_eq!(
+        super::verbs::forwarded(&line),
+        ["--log", "debug", "--web-dir", "client/dist"].map(str::to_owned)
+    );
+}

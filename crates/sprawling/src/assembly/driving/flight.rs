@@ -203,7 +203,10 @@ impl RunWorker {
     /// of landing a run. A dispatch somebody asked for is *also* handed
     /// its refusal, because the caller of this function is a loop and
     /// the person who asked is not in it.
-    pub(crate) fn serve_flight(&mut self, patience: Patience) -> Result<Landed, AxError> {
+    pub(in crate::assembly) fn serve_flight(
+        &mut self,
+        patience: Patience,
+    ) -> Result<Landed, AxError> {
         let patience = if self.flight.homes.is_empty() {
             patience
         } else {
@@ -291,7 +294,7 @@ impl RunWorker {
 
     /// A sender onto the accounting thread's one queue, for the desk
     /// this thread attends.
-    pub(crate) fn bell(&self) -> mpsc::Sender<Wake> {
+    pub(in crate::assembly) fn bell(&self) -> mpsc::Sender<Wake> {
         self.flight.gate.bell()
     }
 
@@ -302,7 +305,7 @@ impl RunWorker {
 
     /// Whether `run` is in a lane right now, and so reads its own Cancel
     /// and Steer off the desk at its safe points.
-    pub(crate) fn drives(&self, run: RunId) -> bool {
+    pub(in crate::assembly) fn drives(&self, run: RunId) -> bool {
         self.flight.driving.contains_key(&run)
     }
 
@@ -315,7 +318,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates the first landing that fails. The lanes still going
     /// are left to the caller, which is closing anyway.
-    pub(crate) fn land_the_rest(&mut self) -> Result<(), AxError> {
+    pub(in crate::assembly) fn land_the_rest(&mut self) -> Result<(), AxError> {
         while self.driving() {
             self.serve_flight(Patience::Unbounded)?;
         }

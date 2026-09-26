@@ -343,8 +343,9 @@ impl Desks {
 /// noughts and learnt not to ask again.
 ///
 /// The context used and the children are not here: both move while the
-/// run goes on, so `status` reads them live. `worktree_disk` is zero because measuring a tree costs
-/// a walk of it, and a number nobody has asked for is not worth one.
+/// run goes on, so `status` reads them live. `worktree_disk` is zero
+/// because measuring a tree costs a walk of it, and a number nobody has
+/// asked for is not worth one.
 pub(super) struct Situation<'a> {
     pub(super) addr: &'a Address,
     pub(super) who: &'a str,
