@@ -14,7 +14,7 @@
 use std::collections::BTreeMap;
 
 use kernel::keep_warm::{CacheUse, KeepWarm, renewal_due};
-use kernel::{AxError, B3Hash, Ceiling, Model, ModelRequest, ModelReturn};
+use kernel::{AxError, B3Hash, Ceiling, Increments, Model, ModelRequest, ModelReturn, TimeMs};
 
 /// Keep-warm bookkeeping for the prefixes one session has sent.
 #[derive(Debug, Clone)]
@@ -100,6 +100,70 @@ fn renewal_of(request: &ModelRequest) -> ModelRequest {
     renewal
 }
 
+/// The door a run's requests enter the keep-warm account by: it owns the
+/// adapter a run calls and is itself the [`Model`] the turn loop is
+/// handed, so every request that reached the provider is recorded
+/// without the turn loop knowing keep-warm exists.
+///
+/// The clock is the caller's, injected from the one sampling point; the
+/// round trip it measures around each call is the lead the next renewal
+/// leaves with, so the lead follows the provider this door reaches.
+pub struct Warmed<C> {
+    model: Box<dyn Model + Send>,
+    warmth: Warmth,
+    clock: C,
+}
+
+impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
+    /// Wraps `model`; under [`KeepWarm::Off`] it only forwards.
+    pub fn new(model: Box<dyn Model + Send>, setting: KeepWarm, clock: C) -> Warmed<C> {
+        Warmed {
+            model,
+            warmth: Warmth::new(setting, 0),
+            clock,
+        }
+    }
+
+    /// See [`Warmth::next_due`].
+    pub fn next_due(&self) -> Option<u64> {
+        self.warmth.next_due()
+    }
+
+    /// Sends every renewal due by `now_ms` through the adapter this door
+    /// owns; see [`Warmth::renew_due`].
+    ///
+    /// # Errors
+    /// The model's failure, unchanged.
+    pub fn renew_due(&mut self, now_ms: u64) -> Result<Vec<ModelReturn>, AxError> {
+        self.warmth.renew_due(self.model.as_mut(), now_ms)
+    }
+
+    /// Makes one real call through `send` and, when the provider
+    /// answered, records it with the round trip it took.
+    fn recorded(
+        &mut self,
+        request: &ModelRequest,
+        send: impl FnOnce(&mut dyn Model) -> Result<ModelReturn, AxError>,
+    ) -> Result<ModelReturn, AxError> {
+        let _ = &mut self.clock;
+        send(self.model.as_mut())
+    }
+}
+
+impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> {
+    fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        self.recorded(req, |model| model.call(req))
+    }
+
+    fn call_streaming(
+        &mut self,
+        req: &ModelRequest,
+        onto: Increments<'_>,
+    ) -> Result<ModelReturn, AxError> {
+        self.recorded(req, |model| model.call_streaming(req, onto))
+    }
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -176,5 +240,52 @@ mod tests {
         renewal.chat.max_tokens = Ceiling::new(1);
         assert_eq!(provider.seen, vec![renewal]);
         assert_eq!(warmth.next_due(), None);
+    }
+
+    /// What reached the provider behind a [`Warmed`] door, read after
+    /// the door owns the provider.
+    type Seen = std::sync::Arc<std::sync::Mutex<Vec<ModelRequest>>>;
+
+    struct Behind(Seen);
+
+    impl Model for Behind {
+        fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+            let mut provider = Provider::default();
+            let answer = provider.call(req);
+            self.0.lock().unwrap().push(req.clone());
+            answer
+        }
+    }
+
+    fn door(setting: KeepWarm) -> (Warmed<impl FnMut() -> Result<TimeMs, AxError>>, Seen) {
+        let seen = Seen::default();
+        let clock = || Ok(TimeMs::new(USED_AT));
+        let warmed = Warmed::new(Box::new(Behind(seen.clone())), setting, clock);
+        (warmed, seen)
+    }
+
+    fn wake_door_through_two_lifetimes(warmed: &mut Warmed<impl FnMut() -> Result<TimeMs, AxError>>) {
+        for now in (USED_AT..=USED_AT + 2 * TTL_MS).step_by(1_000) {
+            warmed.renew_due(now).unwrap();
+        }
+    }
+
+    #[test]
+    fn the_default_door_forwards_a_run_and_sends_nothing_of_its_own() {
+        let (mut warmed, seen) = door(KeepWarm::default());
+        warmed.call(&request()).unwrap();
+        wake_door_through_two_lifetimes(&mut warmed);
+        assert_eq!(*seen.lock().unwrap(), vec![request()]);
+    }
+
+    #[test]
+    fn a_five_minute_door_renews_what_a_run_sent_through_it_once() {
+        let (mut warmed, seen) = door(KeepWarm::FiveMinute);
+        warmed.call_streaming(&request(), &mut |_| {}).unwrap();
+        assert_eq!(warmed.next_due(), Some(USED_AT + TTL_MS));
+        wake_door_through_two_lifetimes(&mut warmed);
+        let mut renewal = request();
+        renewal.chat.max_tokens = Ceiling::new(1);
+        assert_eq!(*seen.lock().unwrap(), vec![request(), renewal]);
     }
 }
