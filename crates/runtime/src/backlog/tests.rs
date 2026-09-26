@@ -209,3 +209,55 @@ fn a_backgrounded_command_keeps_reaching_the_sink_through_harvest() {
         pieces.lock().unwrap()
     );
 }
+
+/// A run owns the processes its commands started, and nothing another
+/// run started; once released it owns none. On Windows the reading
+/// follows a command into what it starts, so `cmd /C ping` is two
+/// processes of one run, and no command is read as itself only.
+#[test]
+fn a_run_owns_the_processes_its_commands_started() {
+    let backlog = Backlog::with_window(crate::PollBudget::new(1, 1));
+    let (mine, other) = (
+        kernel::RunId::from_bytes([3; 16]),
+        kernel::RunId::from_bytes([4; 16]),
+    );
+    let mut nested = if cfg!(windows) {
+        let mut command = std::process::Command::new("cmd");
+        command.args(["/C", "ping -n 6 127.0.0.1 > NUL"]);
+        command
+    } else {
+        let mut command = std::process::Command::new("sh");
+        command.args(["-c", "sleep 5; true"]);
+        command
+    };
+    nested.current_dir(std::env::temp_dir());
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    let started = backlog
+        .run(mine, &addr, "nested".to_owned(), nested)
+        .unwrap();
+    assert!(matches!(started, crate::Started::Backgrounded { .. }));
+    // Windows may add the console host to the job, so a tree of at
+    // least two; elsewhere the command itself, read as itself only.
+    let followed = |seen: &(usize, u32)| {
+        if cfg!(windows) {
+            seen.0 >= 2 && seen.1 == 0
+        } else {
+            *seen == (1, 1)
+        }
+    };
+    let mut seen = (0, u32::MAX);
+    for _ in 0..250 {
+        let readings = backlog.processes().unwrap();
+        assert!(!readings.contains_key(&other));
+        seen = readings
+            .get(&mine)
+            .map_or((0, u32::MAX), |run| (run.pids.len(), run.unfollowed));
+        if followed(&seen) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert!(followed(&seen), "read {seen:?}");
+    backlog.release(mine);
+    assert!(!backlog.processes().unwrap().contains_key(&mine));
+}

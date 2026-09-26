@@ -57,7 +57,7 @@ pub(crate) enum Landed {
 /// The lanes, the crossing, and what each driving run is carrying.
 pub(in crate::assembly) struct Flight {
     pool: DrivingPool,
-    gate: RelayGate,
+    pub(in crate::assembly) gate: RelayGate,
     driving: BTreeMap<RunId, InLane>,
     /// Runs home that one drain found beyond the one it landed, in
     /// arrival order. Kept rather than re-queued, so arrival order is

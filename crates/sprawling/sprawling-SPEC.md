@@ -4313,9 +4313,6 @@ pub fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：prio
 
 **尚未做到的（本节接口的当前状态）**：阀只在一轮结束时判定（决定 2），所以一条持续有任务、从不停放的 worker 和一次不返回的折叠永远不会被降回，而这正是阀要防的情形；在忙的期间也作判定——tokio worker 按每次任务轮询记（`tokio_unstable` 下的 `on_before_task_poll`／`on_after_task_poll`），或在每次唤醒与任务边界处拿正在进行的一轮已走过的时间比窗口——是这一接口余下的一步。写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。doctor 还不报告每个平台实际站在哪一档。
 
-## 8-90 性能监视器的历史：有人看才采样，每项 300 点（`bin::monitor`，形状：状态机）
-**尚未做到的（本节接口的当前状态）**：阀只在一轮结束时判定（决定 2），所以一条持续有任务、从不停放的 worker 和一次不返回的折叠永远不会被降回，而这正是阀要防的情形；在忙的期间也作判定——tokio worker 按每次任务轮询记（`tokio_unstable` 下的 `on_before_task_poll`／`on_after_task_poll`），或在每次唤醒与任务边界处拿正在进行的一轮已走过的时间比窗口——是这一接口余下的一步。写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。按任务边界记要 tokio 的 `on_before_task_poll`／`on_after_task_poll`，二者在 tokio 1.53 里只在 `--cfg tokio_unstable` 下编译，而这个 cfg 是整个构建的 rustflags，改它会让每条构建重编全部依赖；在唤醒时比较则看不到正在跑的那一轮（唤醒的线程刚结束等待），所以这一步不为它打开 `tokio_unstable`（每条构建都要全量重编依赖）；重开条件是 tokio 稳定这两个回调，或测得一个忙回合造成优先级倒挂（一条升档的核心线程在忙，人或 agent 等着的回答被它拖后）。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。
-
 ## 8-94 性能监视器的历史：有人看才采样，每项 300 点（`bin::monitor`，形状：状态机）
 
 WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是同一份历史：每秒一个 `Sample`，最近 300 个（5 分钟）。`bin::monitor` 只管两件事：此刻有没有人在看，以及看的人读到的那 300 个点。计数器从哪里读（核心进程、Job Object、整机、城所在的卷、记账线程）由调用方传进来的读取函数决定，本模块不碰平台接口。
@@ -4327,8 +4324,6 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 - `Monitor::watch(&self, watched: Watched) -> Watch`：一个在看的人，看整页（`Watched::Everything`）或只看事实条摘要（`Watched::Summary`，`Watched` 定义在 `channels::wire::monitor`）。两类分开计数。`Watch` 被丢弃时这个人就不再算数；它可以跨线程持有（socket 线程持有，采样线程计数）。
 - `Monitor::tick(&mut self, read: impl FnOnce(Watched) -> Sample)`：每秒调用一次。有人看整页时以 `Watched::Everything` 调用 `read` 一次；只有看摘要的人时以 `Watched::Summary` 调用，读的一方只读本进程；把结果放进历史，满 300 个时丢掉最旧的。没人在看时不调用 `read`，并释放历史占的内存。
 - `Monitor::is_watched(&self) -> bool`：此刻有没有人持有 `Watch`，不论哪一类。
-- `Monitor::watch(&self) -> Watch`：一个在看的人。`Watch` 被丢弃时这个人就不再算数；它可以跨线程持有（socket 线程持有，采样线程计数）。
-- `Monitor::tick(&mut self, read: impl FnOnce() -> Sample)`：每秒调用一次。有人在看时调用 `read` 一次并把结果放进历史，满 300 个时丢掉最旧的；没人在看时不调用 `read`，并释放历史占的内存。
 - `Monitor::history(&self) -> impl Iterator<Item = &Sample>`：从最旧到最新。
 - 没有失败路径：计数是 `AtomicUsize` 的加减，历史的容量在第一次放入时一次预留。
 
@@ -4342,14 +4337,6 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 **测试。** `monitor::tests`：没人看时 `read` 一次也不被调用、历史为空，人走了以后历史被释放；放入 301 个点后只剩最后 300 个、从旧到新；只有看摘要的人时 `read` 收到 `Summary`，再来一个看整页的人时收到 `Everything`，他走了以后回到 `Summary`。
 
-**本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 8-92；线上的一对监视帧见 channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 8-91 的规则算出。`sprawling top` 经这对帧看监视器，见 8-93。事实条摘要 `client/src/views/facts.svelte` 经 `WatchSummary` 看监视器，只显示本进程的 CPU 与工作集；只有它在看时采样线程只读 `OwnProcess`，不打开 `sysinfo`。其余尚未落地：采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
-
-## 8-91 `sprawling top` 的输出：一行 JSON 与一屏曲线（`bin::monitor::top`，形状：projection）
-
-`sprawling top <city>` 读 8-90 的历史，按 stdout 是不是终端选一种输出。本模块只把历史投影成文本，不碰终端、不碰 socket：判断 stdout 是不是终端、每秒重画一次、从城里取历史，都是调用方的事。
-**测试。** `monitor::tests`：没人看时 `read` 一次也不被调用、历史为空，人走了以后历史被释放；放入 301 个点后只剩最后 300 个、从旧到新。
-
-**本节接口的当前状态。** 监视器的其余部分尚未落地：生产的计数器读取（核心进程的 CPU、private、工作集、读写字节；Job Object 的汇总与逐进程明细并归到 run；整机 CPU、可用内存；卷的剩余空间与磁盘延迟），其余计数器的来源（内存已定为 `sysinfo`，见下；其余的是 `sysinfo` 还是只取需要的几个平台接口，按体积与启动时间实测后定在这里），每秒调用 `tick` 并把新读数发到 `MonitorFeed::samples` 的采样任务（线上的一对监视帧已在，channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计；在采样任务落地前，看的会话收不到读数），WebUI 监视页接到路由与监视帧上（面板本身 `client/src/views/monitor.svelte` 已在：打开时调用传入的 `watch`、关闭时调用它返回的释放函数，曲线按面板宽度取最近的点，读数与曲线由 `client/src/core/monitor.ts` 按 8-95 的规则算出；它还没有路由，也没有帧可读）与事实条摘要，`sprawling top <city>`（终端里是交互界面，stdout 不是终端时每秒一行 JSON）（两种输出的投影见 8-95；命令本身、终端的重画与交互尚未落地），以及采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
 **本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 8-96；线上的一对监视帧见 channels-SPEC.md 8-47：会话发 `Watch` 时经 `serving::worker` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 8-95 的规则算出。`sprawling top` 经这对帧看监视器，见 8-97。事实条摘要 `client/src/views/facts.svelte` 经 `WatchSummary` 看监视器，只显示本进程的 CPU 与工作集；只有它在看时采样线程只读 `OwnProcess`，不打开 `sysinfo`。其余尚未落地：采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
 
 **内存的读数**（`bin::monitor::memory`）：整机物理内存与可用内存经 `sysinfo`（只开 `system` 特性，只刷新 RAM）一次读出成 `Memory { physical, available }`，这是城里读内存的唯一一处；计划推进按它决定下一行是否排队（§8-46-3，只管计划行；其他入口的现状见那里）。平台不报时两项都是零，此时不算紧。取 `sysinfo`，因为它是对外只给安全接口的现成路，本 crate 不写 `unsafe`。
@@ -4402,7 +4389,7 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 **测试。** `monitor::sampler::tests`：有人看时一拍把读到的那一个读数发给订阅者；没人看时不读、不发。`monitor::counters::tests`：读本进程得到非零的工作集、整机可用内存与卷剩余空间。`monitor::counters::own_process::tests`：第一次读数的 CPU 为 0，本进程忙过一段之后第二次读数的 CPU 大于 0，工作集与 private 非零。
 
-**本节接口的当前状态。** 整机可用内存经 8-94 的 `bin::monitor::memory` 读出，与计划推进的内存闸（§8-46-3）读同一处。核心自己的健康（记账队列深度、持久水位线落后多少、relay 往返与事件到屏幕的 p50、排队的 run、S5.9M 的降级状态）与 Job Object 的汇总和逐进程明细尚未接入，这几项读数现为 0，缺的是来源而不是采样：派出的命令没有装进 Job Object（派出进程的内存上限在 runtime-SPEC §8-13-3 未决），所以没有 job 可读；排队的 run 没有计数，`Flight` 只在 assembly 线程里知道在跑的数目（`in_flight`），等 lane 的计划行不计；其余几项要各自的所有者先公开一个跨线程可读的计数。磁盘延迟没有字段。本进程的累计读写字节在 Linux 以外读作 0（决定 1）。一拍里剩下的大头是 `sysinfo` 的整机 CPU（0.7–8 ms）与磁盘（0.2–0.8 ms），离「采样一次 ≤ 50 µs」还差这两项；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
+**本节接口的当前状态。** 整机可用内存经 8-94 的 `bin::monitor::memory` 读出，与计划推进的内存闸（§8-46-3）读同一处。核心健康里记账队列深度与持久水位线的两项经 8-98 的 `Health` 读出；其余几项现为 0，缺的是来源而不是采样，8-98 的当前状态逐项写明。派出的命令按 run 装进各自的 Job Object，`runtime::Backlog::processes` 给出每个 run 此刻的进程（runtime-SPEC §8-13-3）；按这些 pid 读每个进程的内存与 CPU、并把逐 run 的明细送上线，还没有做：`Sample` 是一行固定的 13 个数，逐 run 的明细要一种新的帧（WIRE_V 加一）。磁盘延迟没有字段。本进程的累计读写字节在 Linux 以外读作 0（决定 1）。一拍里剩下的大头是 `sysinfo` 的整机 CPU（0.7–8 ms）与磁盘（0.2–0.8 ms），离「采样一次 ≤ 50 µs」还差这两项；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
 
 ## 8-97 `sprawling top`：经线协议看监视器（`bin::wire_client::watching`，形状：adapter）
 
@@ -4421,6 +4408,28 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 2. 沉默 5 s 即结束，而不是永远等：读数每秒一个，5 个空拍说明城已停或已不再发，一个 agent 读到 EOF 比读到永远的阻塞有用。重新考虑的条件：采样的节拍变长。
 
 **测试。** `wire_client::watching::tests`：一帧读数在 `Lines` 下是一行 JSON 加换行，在 `Screen` 下是清屏序列接一屏；不是读数的帧什么也不输出、不进历史。
+
+## 8-98 核心健康：记账队列与持久水位线跨线程可读（`bin::monitor::health`，形状：数据）
+
+`Sample` 里核心健康的两项由记账线程与 lane 在各自的线程上改，由采样线程（8-96）读：`ledger_queue_depth` 是 lane 经 relay 交给记账线程、还在队列里没被取走的 append 条数；`durable_lag` 是记账线程已取进一批、这批的磁盘屏障还没返回、所以还没有答复的条数。两项都以记录条数计。它们的属主是 `assembly::relay`：只有它知道一条 append 何时进队、何时被取、何时变得持久；本模块只给它一处能跨线程读的地方。
+
+**接口。**
+
+- `Health`：`Clone`，同一只 `Arc` 里的两个 `AtomicU64`；克隆是同一份计数的另一个句柄。
+- 写（只由 `assembly::relay` 调）：`asked(&self)`——一条 append 进队之前；`withdrawn(&self)`——进队失败（记账线程已不在），收回那一次 `asked`；`taken(&self, n: u64)`——记账线程取出 `n` 条放进一批，队列减 `n`、未持久加 `n`；`answered(&self, n: u64)`——这一批的屏障返回、答复发出，未持久减 `n`。
+- 读：`read(&self, into: Sample) -> Sample`——把此刻的两项填进 `into`，其余字段原样。
+- `RelayGate::open()` 开一份新的 `Health`，`RelayGate::health()` 交出它的句柄；worker 起好时把 `Flight` 里那只 gate 的句柄经 `Started.health` 交给 `listening`，`listening` 交给采样线程：`spawn_sampler(monitor, samples, volume, health)`，每一拍的读数都经 `Health::read`，摘要与整页都有，因为读它只是两次原子读。
+- 没有失败路径。减法饱和：计数是给人看的读数，两条线程各自的加减在某一刻读到的先后可以错开，饱和让一个瞬间的错位读成 0 而不是一个巨大的数。
+
+**决定。**
+
+1. 计数放在 relay 进队、取出、答复这三处，而不是去数 `mpsc` 队列的长度：标准库的 `mpsc` 不报长度，而且队列里还有 claim、回家的 run 与命令，它们不是 append。被否：记账线程每一轮开头把自己看到的队列长度写进一个原子数——它只在记账线程醒着时更新，而队列最长的时候正是记账线程在写盘、没醒的时候。
+2. 计数的类型放在 `bin::monitor`，由 assembly 持有并写入：依赖朝 assembly → monitor，与 `monitor::memory` 相同；monitor 不点名 assembly。
+3. 用 `Relaxed` 次序：两项互不约束，读数不参与任何决定（与 8-96 决定 3 同一个重开条件）。
+
+**测试。** `assembly::relay::tests` 的 `the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable`：一条 lane 的 append 进队后，记账线程服务之前读到队列 1、未持久 0；服务之后两项都回到 0，append 拿到了答复。
+
+**本节接口的当前状态。** `Sample` 余下的核心健康字段仍读作 0：`relay_p50_nanos` 与 `event_to_screen_p50_nanos` 要一个按次记录往返时间的直方图，属主分别是 relay 与 socket 的发送一侧，都还没有；`queued_runs` 没有一处权威的计数——计划行在 `Flight::full` 为真时停在 `pursue` 的循环外，没有被数进任何队列，人派的 run 在满时的去向见 §8-46-3。S5.9M 的降级状态没有 `Sample` 字段。
 
 ## 8-94 城所在卷快满时不接新活（`bin::monitor::volume`，形状：adapter；`bin::assembly::commanding::shedding`，形状：decision）
 

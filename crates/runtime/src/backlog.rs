@@ -68,6 +68,7 @@ impl Default for Backlog {
 struct Table {
     next: u64,
     members: BTreeMap<BacklogId, Member>,
+    jobs: jobs::Jobs,
 }
 
 impl Backlog {
@@ -324,6 +325,7 @@ impl Backlog {
             .table
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        table.jobs.forget(owner);
         let mut released = 0usize;
         for member in table.members.values_mut() {
             if let Body::Command { claim, child, .. } = &mut member.body
@@ -375,22 +377,18 @@ impl Backlog {
         table.next = table.next.saturating_add(1);
         Ok(BacklogId(table.next))
     }
-
-    fn enrol(&self, id: BacklogId, member: Member) -> Result<(), AxError> {
-        let mut table = self.hold()?;
-        table.members.insert(id, member);
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests;
 
+mod jobs;
 mod member;
 mod report;
 mod scratch;
 mod tail;
 pub mod waiting;
+pub use jobs::RunProcesses;
 use member::{Body, Claim, Member, RunState, collect, storage};
 pub use report::{BacklogKind, Finished, Standing, Started};
 use scratch::Scratch;
