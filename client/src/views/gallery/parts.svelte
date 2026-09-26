@@ -225,9 +225,10 @@ and arrives red at once; `:user-invalid` is the browser reading
   </div>
 </Case>
 
-<!-- Stacked as the settings page stacks them: the open list covers the second trigger. -->
+<!-- Stacked as the settings page stacks them: the open list covers the second trigger.
+The list is positioned and takes no room, so `pb-output` (the list's own max height) grows the section to hold it. -->
 <Case label="combobox · open on click, nothing chosen">
-  <div class="flex flex-col gap-base">
+  <div class="flex flex-col gap-base pb-output">
     <Combobox label={say($lang, "setup_main")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
       choices={modelChoices} value={model} onPick={pickModel} starts="open" />
     <Combobox label={say($lang, "setup_digest")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
