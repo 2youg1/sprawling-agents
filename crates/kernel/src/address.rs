@@ -135,6 +135,15 @@ impl Address {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// What this place or resident is called: the last segment, which is
+    /// the word a person typed when they made it. The whole address reads
+    /// like a path; the last segment reads like somebody. The grammar
+    /// admits no empty segment, so there is always one to give.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        self.0.rsplit('/').next().unwrap_or(&self.0)
+    }
 }
 
 impl std::fmt::Display for Address {

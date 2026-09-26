@@ -819,3 +819,12 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 **为什么不放进 `survey`**：几何的家是 `browser::survey`（§8-26），这两条本应是它的读数；本节先作为门自己的性质落地，因为改 `crates/browser` 与改门不能同一个提交，而这两条要在修提示框与选择框之前先对今天的 gallery 报红。**重议条件**：`survey` 下一次增加读数时，两条迁进去，本文件删掉。
 
 **本节属门禁机具，与产品代码分开提交。**
+
+### 8-33 `depmap` 也读一个 crate 之内的方向（`depmap::directions`，形状 1 判定）
+
+**接口**：`depmap` 除了 crate 边与 `pub trait`，再读 ARCHITECTURE.md 的 ```` ```directions ```` 围栏块。每行 `模块路径: Rust 路径, Rust 路径`，模块路径是仓库相对、不带扩展名的路径（`crates/sprawling/src/views` 覆盖 `views.rs` 与 `views/` 下每个 `.rs`），右边是这个模块的产品代码永不写出的路径（`crate::assembly`）。违例报出文件与行号；块里点名的模块在树上不存在也是违例；块缺失或行无冒号是文档错误（`XtaskError::Doc`），不当作「没什么可判」。
+
+**读法**：按行读文本。注释行不算代码；测试不算产品代码：名为 `tests.rs` 的文件、`tests` 目录下的文件、`#[cfg(test)]` 下的那个条目（以 `;` 结尾则一行，否则直到花括号闭合）都跳过，因为测试可以经装配点造夹具，而被测模块并不因此依赖装配点。路径按整段匹配，`crate::assembly_line` 不算 `crate::assembly`。`use crate::{assembly, …}` 这种分组写法读不出来；这是按行文本读法的代价，块里的路径按树上实际的写法登记。
+
+**决定**：模块方向写在 ARCHITECTURE.md 与 crate 边同一节，由同一道门读。**败给的方案**：一个在 sprawling 里扫自己源码的测试——它判的是树的形状而不是行为，放在被判的 crate 里会让产品 crate 知道自己的源码路径；也败给新开一道门，因为方向就是依赖图的一部分，门名册不必为它多一行。**重议条件**：某个 crate 的模块要按图而不是按禁止表来判（例如要求整个 crate 无环），那时改为从 `use` 解析出模块图。
+

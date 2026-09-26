@@ -13,10 +13,11 @@ use kernel::Payload;
 use kernel::event::record::{LoginStarted, SecretCaptured};
 use kernel::{AxCode, AxError, EventKind};
 
+use crate::held_vault::{poisoned_vault, resolving};
 use crate::serving::random_token;
 
 use super::super::{RunWorker, now_ms};
-use super::{Credential, Entered, PROBE_TIMEOUT_MS, poisoned_vault, subscription};
+use super::{Credential, Entered, PROBE_TIMEOUT_MS, subscription};
 
 /// How a credential reached the vault, as its `secret_captured` record
 /// states it.
@@ -345,15 +346,4 @@ fn not_approved_yet(provider: &str, seconds: u64) -> AxError {
         "approve the login on the page this city opened, then enter the code again; \
          the vendor asks for {seconds} seconds between tries"
     ))
-}
-
-/// One resolver over one vault. A fresh one per operation, because
-/// `SecretResolver` is spent by the endpoint it is handed to.
-pub(crate) fn resolving(
-    vault: Arc<std::sync::Mutex<gateway::Custodian>>,
-) -> gateway::SecretResolver {
-    Box::new(move |reference: &kernel::SecretRef| {
-        let held = vault.lock().map_err(|_| poisoned_vault())?;
-        held.resolve(reference)
-    })
 }

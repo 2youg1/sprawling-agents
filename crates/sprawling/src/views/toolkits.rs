@@ -14,11 +14,11 @@
 //! back from the consent page they were sent to, never on a timer.
 //!
 //! Where the key lives, which proxy rule reaches the broker and who
-//! this city is to it are all `assembly::toolkits`'s to answer, because
+//! this city is to it are all `toolkit_broker`'s to answer, because
 //! the command behind the button on this page has to agree with them.
 
 use super::holding::Views;
-use crate::assembly::broker_for;
+use crate::toolkit_broker::broker_for;
 
 impl Views {
     /// The shelf, or why there is no shelf to show.

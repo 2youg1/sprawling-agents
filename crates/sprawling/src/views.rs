@@ -25,6 +25,7 @@
 pub(super) mod answered;
 pub(super) mod answering;
 pub(super) mod archives;
+pub(super) mod building_page;
 pub(super) mod commits;
 pub(super) mod cost_of;
 pub(super) mod document;

@@ -166,6 +166,19 @@ channels: kernel
 sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels
 ```
 
+Inside one crate the compiler sees no layering: `sprawling` builds as one
+unit whichever way its modules name each other. The block below is the
+machine authority for the direction of the edges that matter there, also
+read by `cargo xtask depmap`. Each line names a module and the paths its
+production code never names; tests may still build a fixture through the
+assembly point. `bin::assembly` knows every concrete type, so the modules
+it assembles never name it back (sprawling-SPEC 8-92).
+
+```directions
+crates/sprawling/src/doctor: crate::assembly
+crates/sprawling/src/views: crate::assembly
+```
+
 What each unit owns is stated once, in §1's figure. It is not repeated
 here: the two lists drifted apart while both were maintained by hand, and
 `collab` was carrying a duty in one that its source had never had.

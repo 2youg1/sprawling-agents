@@ -30,7 +30,7 @@ pub(crate) enum Visited {
 /// Refuses a directory that is not a city. One building that will not
 /// read is not an error; it is a `Visited::Unreadable` in the list.
 pub(crate) fn visit(city_root: &Path) -> Result<Vec<Visited>, AxError> {
-    if crate::assembly::has_history(city_root)? == crate::assembly::History::Absent {
+    if city::has_history(city_root)? == city::History::Absent {
         return Err(AxError::failure(
             AxCode::PathNotFound,
             "visit a city",

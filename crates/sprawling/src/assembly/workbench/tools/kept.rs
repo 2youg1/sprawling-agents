@@ -16,8 +16,8 @@ use kernel::{
 use serde_json::{Map, Value};
 use zeroize::Zeroizing;
 
-use super::super::super::credentials::poisoned_vault;
 use super::super::super::dispatching::custody::kept_text;
+use crate::held_vault::poisoned_vault;
 
 #[cfg(test)]
 mod tests;

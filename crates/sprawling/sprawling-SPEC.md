@@ -4009,15 +4009,30 @@ pub(in crate::assembly) struct Flight {
 
 **从账本重建视图是视图自己的事：`Views::rebuild`（`bin::views::holding`）。** 它与 `Standing::fold` 共用 `views::known_records`，即校验已经解析过的那些记录，按账本顺序；一条校验放行为可忽略的行不交给任何折叠。assembly 从 views 取用它，方向与组装点知道读面一致。
 
-仍然指回 assembly 的边，以及它们各自要去的地方：
+仍然指回 assembly 的边只剩 serving 一组，`directions` 块因此还没有 serving 那一行。每一处名字与它背后的事实：
 
-| 从 | 用到 assembly 的 | 去处 |
+| serving 里的文件 | 用到 assembly 的 | 那份事实 |
 |---|---|---|
-| `views` | `DOC_BYTES_MAX` 与 `read_building`、`broker_for`、`McpLink`、`resolving` | 各自归到它所折叠或读取的那份事实的模块，assembly 从那里取用 |
-| `doctor::visit` | `has_history`、`History` | 城有没有历史是账本的事实，归到读账本的那一层 |
-| `serving` | `RunWorker`、`Serving`、`now_ms`、`acp_dispatch`、`drive_run` 与 `DriveContext`、`Driven`、`Driving` | serving 承载 worker 的线程与 lane；断开这组边要先决定 `attending` 与 `pool` 是归 assembly 还是把 assembly 用到的 `CommandDesk`、`relay`、`pool` 移出 serving |
+| `worker`（`listen`） | `acp_dispatch` | 开城时把 ACP 入站接到命令台上 |
+| `attending`（`spawn_worker`、`attend`） | `RunWorker`、`Serving`、`now_ms` | 造出那个写者并在它的线程上一条条处理命令 |
+| `pool` | `drive_run`、`DriveContext`、`Driven`、`Driving` | 一条 lane 驱动一个 run |
+| `journal` | `now_ms` | 给一行日志打上时间 |
 
-反方向（assembly 用 serving 的 `CommandDesk`、`relay`、`pool`、`random_token`、`open_vault`，用 views 的 `Governance`、`Views`、`pursued`、`session_opened`，用 doctor 的 `Machine`、`host`、`report`）是组装点应有的方向，保留。
+装配根依赖传输层，反过来不行：`CommandDesk`、`relay` 与 `pool` 驱动 run，属于装配，要移进 assembly；serving 只留传输（`door`、`serve`、`folding`），构造时拿到 assembly 给它的句柄。**未定的是那个句柄的类型。** 传输往 `CommandDesk` 投命令，写者从它取命令；它若住进 assembly，serving 写出它的类型名就又是一条指回 assembly 的边。能定下这件事的证据有两种：serving 投命令时是否只需要一个 `Fn(Command) -> Posted` 那样的闭包（那样类型名留在 assembly，serving 只持闭包），或者命令台本身就是传输与装配之间的一个中立模块（那样它移到二者之外，两边都依赖它）。`relay` 持有 `pool::Arrival`，所以 `pool` 与 `relay` 要在同一次改动里一起移，否则会在 serving 与 assembly 之间留下一条新的反向边。
+
+反方向（assembly 用 serving 的 `random_token`、`open_vault`，用 views 的 `Governance`、`Views`、`pursued`、`session_opened`，用 doctor 的 `Machine`、`host`、`report`）是组装点应有的方向，保留；assembly 今天也用 serving 的 `CommandDesk`、`relay`、`pool`，这三样随上一段的移动进 assembly。
+
+**方向由门守。** ARCHITECTURE.md 的 `directions` 块逐个模块写下它的产品代码永不写出的路径，`cargo xtask depmap` 读它（xtask-SPEC 8-33）。一条边断开，它那一行随同一次改动进块。doctor 一行已在块里：城有没有历史由 `city::has_history` 回答（city-SPEC 8-29），doctor 与装配点都从那里取用。
+
+views 一行也在块里。读面用到的五样东西各归其主，装配点从那里取用：
+
+| 事实 | 住处 | 理由 |
+|---|---|---|
+| 一个居民或房间叫什么 | `kernel::Address::name`（kernel-SPEC `Address`） | 地址的最后一段是地址自己的事实；城的名册与楼的页面原先各写一份 |
+| 一栋楼的页面、`DOC_BYTES_MAX` | `bin::views::building_page` | 页面是一个读面：按问的那一刻读盘，不持有第二份 |
+| 一台 MCP server 经哪种传输到达（`McpLink`） | `bin::mcp_link` | 三种传输（`mcp_stdio`、`mcp_http`、`mcp_sse`）各是一个顶层模块，把它们合成 `protocol::Outbound` 的那个枚举与它们同层；读面经 `protocol` 的握手与列工具说话 |
+| broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `bin::toolkit_broker` | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是装配点的 |
+| 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `bin::held_vault` | 装配点、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
 
 
 ### 8-93 保温的门：run 的模型调用经 `Warmed` 走，落地后留在 `RunWorker` 上（`bin::assembly::keeping_warm`，形状 1 数据）

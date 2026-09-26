@@ -29,7 +29,6 @@
 //! than as a graph; the one sibling reach is `credentials::dialect_headers`,
 //! which the dispatching modules read where the credentials module keeps it.
 
-mod building_page;
 mod chain_watch;
 mod collaborating;
 mod commanding;
@@ -54,11 +53,9 @@ mod toolkits;
 mod waking;
 mod workbench;
 
-pub(crate) use building_page::{DOC_BYTES_MAX, read_building};
 use collaborating::Collaborating;
 use commanding::entrance::Entrance;
 use credentials::held::Credentials;
-pub(crate) use credentials::signing::resolving;
 use credentials::subscription::Expiries;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
 use dispatching::running::Continuation;
@@ -73,16 +70,15 @@ pub(crate) use folds::Standing;
 pub(crate) use folds::fold_city;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 use genesis::city_segment;
-pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
+pub use genesis::{Adopt, InitReport, form_city, init_city};
 pub(crate) use lifetime::Closing;
 use lifetime::LedgerOpening;
 use mcp::mounts_under;
-use naming::{building_of, governed_of, name_of, not_built, scope_of};
+use naming::{building_of, governed_of, not_built, scope_of};
 use plans::Reporter;
 use plans::held::{PlanHolders, Planning};
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
-pub(crate) use toolkits::broker_for;
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 
 use std::path::PathBuf;
@@ -300,3 +296,19 @@ impl RunWorker {
     reason = "test code"
 )]
 pub(super) mod fixture;
+
+/// What a person reads on a building's page after the commands that
+/// shape the building: the page is `views::building_page`, the commands
+/// are this module's, and the tests drive the commands.
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
+    reason = "test code"
+)]
+mod building_page_tests;

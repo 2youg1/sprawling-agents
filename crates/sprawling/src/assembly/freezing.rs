@@ -12,7 +12,7 @@ use kernel::{Address, AxCode, AxError};
 use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot, SegmentSource};
 use runtime::run::RunPlan;
 
-use super::{Assignment, Given, RunWorker, Site, Workbench, city_segment, held, name_of};
+use super::{Assignment, Given, RunWorker, Site, Workbench, city_segment, held};
 use model_note::model_note;
 use run_slot::{Predecessor, run_segment};
 
@@ -271,7 +271,7 @@ impl RunWorker {
         // segment is identical for every agent in the city and is
         // cached as such, and a name in it would make one copy per
         // agent of the largest stable block in the prompt.
-        let mut resident = format!("Your name: {}\n\n", name_of(addr)).into_bytes();
+        let mut resident = format!("Your name: {}\n\n", addr.name()).into_bytes();
         resident.extend_from_slice(&site.identity.segment_bytes());
         resident.push(NEWLINE);
         resident.extend_from_slice(
