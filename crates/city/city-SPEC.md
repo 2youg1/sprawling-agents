@@ -156,7 +156,19 @@ pub fn adopt(city_root: &Path, addr: &Address) -> Result<Building, AxError>;
 pub fn adopted_payload(building: &Building) -> Result<Payload, AxError>;          // adopted: true
 pub fn configured_payload(building: &Building, wrote: Written)
     -> Result<Payload, AxError>;                              // building_configured
+
+// building/removal.rs（形状 2 值类型＋一个实例化动作）
+pub struct Removed { /* addr、kept —— 私有 */ }
+impl Removed {
+    pub fn addr(&self) -> &Address;
+    pub fn kept(&self) -> &str;          // 楼的文件现在所在处，相对城根、以 / 分段
+}
+pub fn remove(city_root: &Path, addr: &Address) -> Result<Removed, AxError>;   // city::remove_building
+pub fn removed_payload(removed: &Removed) -> Result<Payload, AxError>;         // building_removed
 ```
+
+- **移走楼＝把目录整个搬进 `.sprawling/removed/<名>`，不删一个字节**：人造的东西一样不丢，楼的历史仍在 Ledger 里，`building_removed` 记下它搬去了哪里。同名的楼第二次被移走时落在 `<名>-2`、`<名>-3`……第一个空位，已搬走的那份不被覆盖。搬用 `std::fs::rename`：同一卷上是一步，半途失败时楼要么还在原处、要么已整个到位。放在 reserved prefix 下，是因为 `all` 不列点开头的目录，而写域够不到那里——被移走的楼不再是楼，也不能被居民改动。找回＝人把目录搬回城根，再 `adopt`。
+- **拒绝**：房间地址（`lab/room1` 不是楼，`AxCode::InvalidArgs`）；City Hall（`HALL_BUILDING`，城自己的楼，地址由城定，`InvalidArgs`）；没有目录的地址（`InvalidArgs`）；搬不动（文件被占用等，`StorageFatal`，恢复：关掉占用它的程序再试）。有活跃 run 的楼由 sprawling 在调用前拒绝——本模块不知道哪些 run 在跑。
 
 - **模板名只有一个家**：`parse` 不再另列一张字符串表，而是拿 `ALL` 里每一个的 `name()` 去比；拒词里的合法集也由同一趟生成。于是加一个模板只改枚举与 `name()` 两处，而「解析认得的集合」与「拒词列出的集合」在类型上是同一个（Roadmap 7.14）。`Hall` 的名字取 `kernel::consts_policy::HALL_BUILDING`：City Hall 是唯一一栋地址由城而不是由人定的楼，模板名与那个地址是同一个词。
 
