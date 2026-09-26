@@ -50,5 +50,19 @@ export function notices(
   scene: Scene,
 ): readonly [Heard, readonly ApprovalItem[]] {
   const ids = new Set(items.map((item) => item.id));
-  return [{ snapshot: "taken", ids }, []];
+  const next: Heard = { snapshot: "taken", ids };
+  switch (heard.snapshot) {
+    case "pending":
+      return [next, []];
+    case "taken":
+      return [next, open(scene) ? items.filter((item) => raises(heard.ids, item, scene)) : []];
+  }
+}
+
+function open(scene: Scene): boolean {
+  return scene.notifying === "on" && scene.focus === "blurred" && scene.elapsed >= WARMUP_MS;
+}
+
+function raises(known: ReadonlySet<ApprovalId>, item: ApprovalItem, scene: Scene): boolean {
+  return !known.has(item.id) && item.actor !== scene.watching;
 }
