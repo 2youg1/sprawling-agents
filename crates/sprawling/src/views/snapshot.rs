@@ -11,10 +11,12 @@ use kernel::{AxCode, AxError, B3Hash};
 
 use super::Views;
 
-/// Changed whenever a fold rule or a field of `Views` changes within one
-/// version of this binary. A new version discards every snapshot anyway,
-/// because `views_fold_version` hashes the version in with this.
-const VIEWS_FOLD_RULES: &str = "views-fold-1";
+/// Changed whenever a fold rule or the encoding of `Views` changes within
+/// one version of this binary; a new version discards every snapshot
+/// anyway, because `views_fold_version` hashes the version in with this.
+/// The suffix is the digest of a fixed fixture's encoding, which the
+/// tests beside this file hold, so the encoding cannot move alone.
+const VIEWS_FOLD_RULES: &str = "views-fold-4a888d6d08824453";
 
 /// The `fold_version` a views snapshot is cut and accepted under.
 pub(crate) fn views_fold_version() -> u32 {

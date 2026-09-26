@@ -67,6 +67,10 @@ pub(crate) fn start_views(ledger_dir: &Path) -> Result<StartedViews, AxError> {
 /// at the last line it folded, then where the start began written to
 /// `log` (sprawling-SPEC 8-91).
 ///
+/// A cut that fails is a `Refuse` line in `log`, not an error: the
+/// snapshot only shortens the next start, which folds from the older
+/// snapshot or from genesis to the same views.
+///
 /// # Errors
 /// Those of [`start_views`].
 pub(crate) fn start_served_views(
@@ -74,8 +78,16 @@ pub(crate) fn start_served_views(
     log: &mut Diagnostics,
 ) -> Result<Views, AxError> {
     let started = start_views(ledger_dir)?;
-    cut_views_snapshot(ledger_dir, &started)?;
-    started.report_start(log);
+    if let Err(fault) = cut_views_snapshot(ledger_dir, &started) {
+        log.write(
+            Level::Refuse,
+            started.site(),
+            &format!(
+                "the views snapshot was not cut: {fault}; serving goes on, and the next start folds from the older snapshot or from genesis"
+            ),
+        );
+    }
+    log.write(Level::Effect, started.site(), &started.from.to_string());
     Ok(started.views)
 }
 
@@ -97,14 +109,13 @@ fn cut_views_snapshot(ledger_dir: &Path, started: &StartedViews) -> Result<(), A
 }
 
 impl StartedViews {
-    /// Say where this start began and, when not from the snapshot, why.
-    fn report_start(&self, log: &mut Diagnostics) {
-        let site = Site {
+    /// Where a line about this start sits: the last line it folded.
+    fn site(&self) -> Site<'static> {
+        Site {
             run: RunId::CITY,
             seq: self.last.as_ref().map_or(Seq::FIRST, |(seq, _)| *seq),
             module: "bin::assembly",
-        };
-        log.write(Level::Effect, site, &self.from.to_string());
+        }
     }
 }
 
