@@ -25,16 +25,23 @@ use serde_json::Value;
 
 use super::images::ImageBytes;
 use super::responses;
+use crate::provider::preset::ChatSpelling;
 use crate::{anthropic, openai};
 
+/// One canonical request as `kind`'s wire spells it.
+///
+/// `spelling` is read by the chat face alone: the other two faces each
+/// have one spelling, and the chat face's three vendor-decided fields
+/// are the host's to state (`provider::preset::chat_spelling`).
 pub fn request_wire(
     kind: DialectKind,
     req: &ChatRequest,
     images: &ImageBytes,
+    spelling: ChatSpelling,
 ) -> Result<Value, AxError> {
     match kind {
         DialectKind::Anthropic => anthropic::request(req, images),
-        DialectKind::OpenAi => openai::request(req, images),
+        DialectKind::OpenAi => openai::request(req, images, spelling),
         DialectKind::OpenAiResponses => responses::request(req, images),
     }
 }
@@ -170,14 +177,26 @@ mod tests {
     #[test]
     fn anthropic_sees_a_picture_as_a_base64_source_block() {
         let (chat, images) = sample_seeing();
-        let wire = request_wire(DialectKind::Anthropic, &chat, &images).unwrap();
+        let wire = request_wire(
+            DialectKind::Anthropic,
+            &chat,
+            &images,
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         insta::assert_snapshot!(serde_json::to_string_pretty(&wire).unwrap());
     }
 
     #[test]
     fn openai_sees_a_picture_as_a_data_url_part() {
         let (chat, images) = sample_seeing();
-        let wire = request_wire(DialectKind::OpenAi, &chat, &images).unwrap();
+        let wire = request_wire(
+            DialectKind::OpenAi,
+            &chat,
+            &images,
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         insta::assert_snapshot!(serde_json::to_string_pretty(&wire).unwrap());
     }
 
@@ -187,7 +206,13 @@ mod tests {
         // the `tool` message stays text, and the attachment lands in the
         // user message immediately after it.
         let (chat, images) = sample_seeing();
-        let wire = request_wire(DialectKind::OpenAi, &chat, &images).unwrap();
+        let wire = request_wire(
+            DialectKind::OpenAi,
+            &chat,
+            &images,
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         let messages = wire["messages"].as_array().unwrap();
         let at = messages
             .iter()
@@ -205,7 +230,13 @@ mod tests {
     #[test]
     fn a_picture_whose_bytes_nobody_resolved_is_refused() {
         let (chat, _) = sample_seeing();
-        let err = request_wire(DialectKind::Anthropic, &chat, &ImageBytes::default()).unwrap_err();
+        let err = request_wire(
+            DialectKind::Anthropic,
+            &chat,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap_err();
         assert_eq!(*err.code(), kernel::AxCode::WireMismatch);
     }
 
@@ -215,6 +246,7 @@ mod tests {
             DialectKind::Anthropic,
             &sample_request(),
             &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
         )
         .unwrap();
         insta::assert_snapshot!(serde_json::to_string_pretty(&wire).unwrap());
@@ -226,6 +258,7 @@ mod tests {
             DialectKind::OpenAi,
             &sample_request(),
             &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
         )
         .unwrap();
         insta::assert_snapshot!(serde_json::to_string_pretty(&wire).unwrap());
@@ -237,6 +270,7 @@ mod tests {
             DialectKind::Anthropic,
             &sample_request(),
             &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
         )
         .unwrap();
         let system = wire["system"].as_array().unwrap();
@@ -247,7 +281,13 @@ mod tests {
         );
         let mut unmarked = sample_request();
         unmarked.system[1].cache = false;
-        let wire = request_wire(DialectKind::Anthropic, &unmarked, &ImageBytes::default()).unwrap();
+        let wire = request_wire(
+            DialectKind::Anthropic,
+            &unmarked,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         assert!(wire["system"][1].get("cache_control").is_none());
     }
 
@@ -256,7 +296,13 @@ mod tests {
         let mut req = sample_request();
         let tail = req.messages.len() - 1;
         req.breakpoint = kernel::MessageBreakpoint::Tail;
-        let wire = request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap();
+        let wire = request_wire(
+            DialectKind::Anthropic,
+            &req,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         let messages = wire["messages"].as_array().unwrap();
         let blocks = messages[tail]["content"].as_array().unwrap();
         assert_eq!(
@@ -274,10 +320,22 @@ mod tests {
     #[test]
     fn tool_shapes_survive_both_request_dialects() {
         let req = sample_request();
-        let anthropic = request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap();
+        let anthropic = request_wire(
+            DialectKind::Anthropic,
+            &req,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         assert_eq!(anthropic["tools"][0]["name"], "exec");
         assert_eq!(anthropic["tools"][0]["input_schema"]["type"], "object");
-        let openai = request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap();
+        let openai = request_wire(
+            DialectKind::OpenAi,
+            &req,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         assert_eq!(openai["tools"][0]["function"]["name"], "exec");
         assert_eq!(
             openai["tools"][0]["function"]["parameters"]["type"],
@@ -307,7 +365,13 @@ mod tests {
                 signature: "WaUjzkyp".to_owned(),
             },
         );
-        let out = request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap();
+        let out = request_wire(
+            DialectKind::OpenAi,
+            &req,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         assert!(
             !out.to_string().contains("WaUjzkyp"),
             "a signature the other provider cannot verify does not belong on its wire"
@@ -319,10 +383,15 @@ mod tests {
     fn effort_rides_the_wire_each_dialect_spells_it_its_own_way() {
         let mut req = sample_request();
         assert!(
-            request_wire(DialectKind::Anthropic, &req, &ImageBytes::default())
-                .unwrap()
-                .get("effort")
-                .is_none(),
+            request_wire(
+                DialectKind::Anthropic,
+                &req,
+                &ImageBytes::default(),
+                ChatSpelling::DOCUMENTED
+            )
+            .unwrap()
+            .get("effort")
+            .is_none(),
             "an unstated effort writes no field: the provider's default is its own business"
         );
 
@@ -330,23 +399,124 @@ mod tests {
         // and nowhere else; the chat face's own field is
         // `reasoning_effort`, a string at the top level.
         req.effort = Some(Effort::High);
-        let anthropic = request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap();
-        assert_eq!(anthropic["output_config"], serde_json::json!({ "effort": "high" }));
+        let anthropic = request_wire(
+            DialectKind::Anthropic,
+            &req,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
+        assert_eq!(
+            anthropic["output_config"],
+            serde_json::json!({ "effort": "high" })
+        );
         assert!(anthropic.get("effort").is_none(), "{anthropic}");
-        let openai = request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap();
+        let openai = request_wire(
+            DialectKind::OpenAi,
+            &req,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         assert_eq!(openai["reasoning_effort"], "high");
         assert!(openai.get("reasoning").is_none(), "{openai}");
 
         // The one place the two dialects part: not thinking is an effort
         // value on one wire and a different field on the other.
         req.effort = Some(Effort::None);
-        let anthropic = request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap();
+        let anthropic = request_wire(
+            DialectKind::Anthropic,
+            &req,
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         assert_eq!(anthropic["thinking"]["type"], "disabled");
         assert!(anthropic.get("output_config").is_none());
         assert_eq!(
-            request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap()["reasoning_effort"],
+            request_wire(
+                DialectKind::OpenAi,
+                &req,
+                &ImageBytes::default(),
+                ChatSpelling::DOCUMENTED
+            )
+            .unwrap()["reasoning_effort"],
             "none"
         );
+    }
+
+    fn chat_spelled(spelling: ChatSpelling, req: &ChatRequest) -> Value {
+        request_wire(DialectKind::OpenAi, req, &ImageBytes::default(), spelling).unwrap()
+    }
+
+    /// OpenAI's reasoning models answer 400 to `max_tokens`, and a
+    /// server that reads only `max_tokens` drops a ceiling written
+    /// under the other name; the host decides which name is read.
+    #[test]
+    fn the_chat_face_writes_the_ceiling_under_the_name_the_host_reads() {
+        use crate::provider::preset::CeilingField;
+        let req = sample_request();
+        let documented = chat_spelled(ChatSpelling::DOCUMENTED, &req);
+        assert_eq!(documented["max_tokens"], 4096);
+        assert!(documented.get("max_completion_tokens").is_none());
+        let replaced = chat_spelled(
+            ChatSpelling {
+                ceiling: CeilingField::MaxCompletionTokens,
+                ..ChatSpelling::DOCUMENTED
+            },
+            &req,
+        );
+        assert_eq!(replaced["max_completion_tokens"], 4096);
+        assert!(replaced.get("max_tokens").is_none(), "{replaced}");
+    }
+
+    /// DeepSeek's thinking mode answers 400 to a request with tools
+    /// whose history lacks the earlier `reasoning_content`, and every
+    /// dispatch in this city carries tools.
+    #[test]
+    fn a_host_that_reads_reasoning_back_gets_the_text_and_never_the_signature() {
+        use crate::provider::preset::ReasoningReturn;
+        let mut req = sample_request();
+        req.messages.to_mut()[1].content.insert(
+            0,
+            ContentBlock::Thinking {
+                thinking: "two parts".to_owned(),
+                signature: "WaUjzkyp".to_owned(),
+            },
+        );
+        let returned = chat_spelled(
+            ChatSpelling {
+                reasoning: ReasoningReturn::AsReasoningContent,
+                ..ChatSpelling::DOCUMENTED
+            },
+            &req,
+        );
+        let assistant = returned["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["role"] == "assistant")
+            .unwrap();
+        assert_eq!(assistant["reasoning_content"], "two parts");
+        assert!(!returned.to_string().contains("WaUjzkyp"));
+        let dropped = chat_spelled(ChatSpelling::DOCUMENTED, &req);
+        assert!(!dropped.to_string().contains("reasoning_content"));
+    }
+
+    #[test]
+    fn a_host_with_its_own_reasoning_object_is_sent_that_object() {
+        use crate::provider::preset::EffortField;
+        let mut req = sample_request();
+        req.effort = Some(Effort::Max);
+        let wire = chat_spelled(
+            ChatSpelling {
+                effort: EffortField::ReasoningObject,
+                ..ChatSpelling::DOCUMENTED
+            },
+            &req,
+        );
+        assert_eq!(wire["reasoning"], serde_json::json!({ "effort": "max" }));
+        assert!(wire.get("reasoning_effort").is_none(), "{wire}");
     }
 
     #[test]
@@ -361,13 +531,23 @@ mod tests {
         ] {
             req.effort = Some(level);
             assert_eq!(
-                request_wire(DialectKind::Anthropic, &req, &ImageBytes::default()).unwrap()
-                    ["output_config"]["effort"],
+                request_wire(
+                    DialectKind::Anthropic,
+                    &req,
+                    &ImageBytes::default(),
+                    ChatSpelling::DOCUMENTED
+                )
+                .unwrap()["output_config"]["effort"],
                 spelling
             );
             assert_eq!(
-                request_wire(DialectKind::OpenAi, &req, &ImageBytes::default()).unwrap()
-                    ["reasoning_effort"],
+                request_wire(
+                    DialectKind::OpenAi,
+                    &req,
+                    &ImageBytes::default(),
+                    ChatSpelling::DOCUMENTED
+                )
+                .unwrap()["reasoning_effort"],
                 spelling
             );
         }

@@ -60,8 +60,73 @@ pub struct HostPreset {
     /// first at lookup time. Empty where the endpoint states its own
     /// facts in its model list, which outranks this table anyway.
     pub models: &'static [ModelPreset],
-    /// Where `base_path` and `dialect` were read.
+    /// How this vendor spells what its chat face leaves to the vendor.
+    pub chat: ChatSpelling,
+    /// The header this vendor asks to carry one conversation's id, so
+    /// that its routing and prompt cache see a conversation as one.
+    pub session_header: Option<&'static str>,
+    /// Where `base_path`, `dialect`, `chat` and `session_header` were
+    /// read.
     pub source: &'static str,
+}
+
+/// The three fields of the OpenAI-compatible chat face whose spelling
+/// each vendor's documentation decides for itself.
+///
+/// One value because the three are read together, at the one place a
+/// chat request is written, and a host that states one states all
+/// three.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChatSpelling {
+    pub ceiling: CeilingField,
+    pub effort: EffortField,
+    pub reasoning: ReasoningReturn,
+}
+
+impl ChatSpelling {
+    /// What a host this table does not list is sent.
+    ///
+    /// `max_tokens` although the OpenAI specification deprecates it:
+    /// the servers on this machine and most compatible servers read
+    /// only that name, and a ceiling under a name a server ignores is a
+    /// ceiling silently dropped. `reasoning_effort` because it is the
+    /// specification's own field. An earlier turn's reasoning is not
+    /// sent back, because the specification's assistant message has no
+    /// field that carries it.
+    pub const DOCUMENTED: ChatSpelling = ChatSpelling {
+        ceiling: CeilingField::MaxTokens,
+        effort: EffortField::ReasoningEffort,
+        reasoning: ReasoningReturn::Dropped,
+    };
+}
+
+/// Which field carries the output ceiling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CeilingField {
+    MaxTokens,
+    /// The specification's replacement; OpenAI's reasoning models
+    /// answer 400 to `max_tokens`.
+    MaxCompletionTokens,
+}
+
+/// Which field carries how hard to think.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffortField {
+    /// A string at the top level, as the specification spells it.
+    ReasoningEffort,
+    /// `reasoning: { effort }`, OpenRouter's own parameter and the one
+    /// its documentation lets carry `max`.
+    ReasoningObject,
+}
+
+/// Whether an earlier turn's reasoning goes back to the provider.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReasoningReturn {
+    Dropped,
+    /// As `reasoning_content` on the assistant message it came with.
+    /// DeepSeek answers 400 to a request with tools whose history
+    /// lacks it.
+    AsReasoningContent,
 }
 
 /// What one vendor documents about a family of models.
@@ -91,6 +156,23 @@ pub fn for_host(host: &str) -> Option<&'static HostPreset> {
     PRESETS.iter().find(|row| row.host == host)
 }
 
+/// How the chat face at one base URL is spelled.
+#[must_use]
+pub fn chat_spelling(base_url: &str) -> ChatSpelling {
+    host_row(base_url).map_or(ChatSpelling::DOCUMENTED, |row| row.chat)
+}
+
+/// The header the vendor at one base URL asks a conversation's id in.
+#[must_use]
+pub fn session_header(base_url: &str) -> Option<&'static str> {
+    host_row(base_url)?.session_header
+}
+
+fn host_row(base_url: &str) -> Option<&'static HostPreset> {
+    let (host, _, _) = crate::reach::split(base_url)?;
+    for_host(&host)
+}
+
 /// The row for one model at one base URL.
 ///
 /// The host decides which vendor's rows are consulted, so a proxy that
@@ -103,9 +185,8 @@ pub fn for_host(host: &str) -> Option<&'static HostPreset> {
 /// answers.
 #[must_use]
 pub fn model_for(base_url: &str, id: &str) -> Option<&'static ModelPreset> {
-    let (host, _, _) = crate::reach::split(base_url)?;
-    let rows = for_host(&host)?;
-    rows.models
+    host_row(base_url)?
+        .models
         .iter()
         .filter(|row| id.starts_with(row.id_prefix))
         .max_by_key(|row| row.id_prefix.len())
@@ -163,10 +244,60 @@ mod tests {
         assert_eq!(path_of("api.moonshot.cn"), Some("/v1"));
         assert_eq!(
             path_of("generativelanguage.googleapis.com"),
-            Some("/v1beta")
+            Some("/v1beta/openai")
         );
+        assert_eq!(path_of("api.deepseek.com"), Some("/"));
+        assert_eq!(path_of("open.bigmodel.cn"), Some("/api/paas/v4"));
         assert_eq!(path_of("api.anthropic.com"), Some("/v1"));
         assert_eq!(path_of("llm.example.test"), None);
+    }
+
+    /// A bare host becomes the URL the vendor's documentation prints:
+    /// the chat face straight under the host for DeepSeek, and under
+    /// `/openai` for Gemini, whose `/v1beta` alone is another shape.
+    #[test]
+    fn a_bare_host_reaches_the_chat_face_its_vendor_documents() {
+        use crate::router::{DialectHint, normalise_entered};
+        let chat_url = |entered: &str| {
+            let stored = normalise_entered(entered, DialectHint::Chat).unwrap();
+            crate::router::join(&stored.base_url, "chat/completions")
+        };
+        assert_eq!(
+            chat_url("api.deepseek.com"),
+            "https://api.deepseek.com/chat/completions"
+        );
+        assert_eq!(
+            normalise_entered("api.deepseek.com", DialectHint::Chat)
+                .unwrap()
+                .base_url,
+            "https://api.deepseek.com",
+            "a stored base URL carries no trailing slash"
+        );
+        assert_eq!(
+            chat_url("https://generativelanguage.googleapis.com"),
+            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        );
+    }
+
+    #[test]
+    fn the_chat_spelling_and_the_session_header_are_the_hosts() {
+        assert_eq!(
+            chat_spelling("https://api.openai.com/v1").ceiling,
+            CeilingField::MaxCompletionTokens
+        );
+        assert_eq!(
+            chat_spelling("https://api.deepseek.com").reasoning,
+            ReasoningReturn::AsReasoningContent
+        );
+        assert_eq!(
+            chat_spelling("http://127.0.0.1:11434/v1"),
+            ChatSpelling::DOCUMENTED
+        );
+        assert_eq!(
+            session_header("https://opencode.ai/zen/go/v1"),
+            Some("x-opencode-session")
+        );
+        assert_eq!(session_header("https://api.deepseek.com"), None);
     }
 
     #[test]

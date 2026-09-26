@@ -204,7 +204,12 @@ impl Endpoint {
         let mut chat = req.chat.clone();
         chat.model = self.config.model.clone();
         let images = self.pictures_for(&chat)?;
-        let mut wire = request_wire(self.config.dialect, &chat, &images)?;
+        let mut wire = request_wire(
+            self.config.dialect,
+            &chat,
+            &images,
+            crate::provider::preset::chat_spelling(&self.config.base_url),
+        )?;
         for (pointer, value) in &self.config.overrides {
             apply_override(&mut wire, pointer, value)?;
         }

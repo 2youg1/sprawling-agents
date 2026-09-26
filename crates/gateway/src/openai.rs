@@ -34,6 +34,7 @@ use serde_json::{Map, Value, json};
 
 use crate::dialect::ImageBytes;
 use crate::mismatch::{as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero};
+use crate::provider::preset::ChatSpelling;
 
 mod stream;
 
@@ -119,7 +120,11 @@ fn pictures_of(content: &[ContentBlock], images: &ImageBytes) -> Result<Vec<Valu
     Ok(parts)
 }
 
-pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, AxError> {
+pub(crate) fn request(
+    req: &ChatRequest,
+    images: &ImageBytes,
+    _spelling: ChatSpelling,
+) -> Result<Value, AxError> {
     let mut messages = Vec::new();
     if !req.system.is_empty() {
         // Explicit breakpoints have no OpenAI wire slot; the marker drops

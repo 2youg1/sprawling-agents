@@ -39,6 +39,7 @@
 use kernel::{ChatMessage, ChatRequest, ContentBlock, DialectKind, Role, SystemBlock};
 
 use crate::dialect::{ImageBytes, request_wire};
+use crate::provider::preset::ChatSpelling;
 use crate::provider::registry::{ConnectionKind, Family};
 
 /// Every way this city connects, so a connection added without a
@@ -86,7 +87,13 @@ fn dispatch() -> ChatRequest<'static> {
 
 /// The system text as it leaves for the endpoint, in either shape.
 fn system_on_the_wire(kind: ConnectionKind, chat: &ChatRequest) -> String {
-    let wire = request_wire(kind.wire(), chat, &ImageBytes::default()).unwrap();
+    let wire = request_wire(
+        kind.wire(),
+        chat,
+        &ImageBytes::default(),
+        ChatSpelling::DOCUMENTED,
+    )
+    .unwrap();
     match kind.wire() {
         DialectKind::Anthropic => wire["system"]
             .as_array()
@@ -114,8 +121,20 @@ fn system_on_the_wire(kind: ConnectionKind, chat: &ChatRequest) -> String {
 #[test]
 fn two_dispatches_of_one_configuration_send_the_same_bytes() {
     for kind in EVERY_CONNECTION {
-        let first = request_wire(kind.wire(), &dispatch(), &ImageBytes::default()).unwrap();
-        let second = request_wire(kind.wire(), &dispatch(), &ImageBytes::default()).unwrap();
+        let first = request_wire(
+            kind.wire(),
+            &dispatch(),
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
+        let second = request_wire(
+            kind.wire(),
+            &dispatch(),
+            &ImageBytes::default(),
+            ChatSpelling::DOCUMENTED,
+        )
+        .unwrap();
         assert_eq!(
             serde_json::to_string(&first).unwrap(),
             serde_json::to_string(&second).unwrap(),

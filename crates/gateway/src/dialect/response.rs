@@ -162,6 +162,7 @@ mod tests {
             DialectKind::Anthropic,
             &req,
             &crate::dialect::ImageBytes::default(),
+            crate::provider::preset::ChatSpelling::DOCUMENTED,
         )
         .unwrap();
         assert_eq!(out["messages"][1]["content"][0], wire["content"][0]);
