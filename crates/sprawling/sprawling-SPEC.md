@@ -3544,3 +3544,46 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 2. 交互界面不给每种事件写说明：一行只画信封字段加压缩后的 `data`，详情画通用 JSON 树，事件种类再多也不加一行。
 3. 树为主（D-15）：城 › 楼 › 房间 › 会话 › run › 回合 › 调用，分叉挂在父 run 的分叉点下，每个节点只有一个父；委派、敲门、handback 是详情里的链接，不是树的边。被否掉的：列表加详情为主（人要在交错的行里自己拼出一件活）；fx 式 JSON 树为主（就地展开推走下面的行，也看不出分叉）。
 4. 行选择与 run 折叠都消费 `memory::LedgerIndex` 这一个索引，不自己数段文件（memory-SPEC §8：`memory` 不对外暴露段）。
+
+## 8-91 `sprawling view`：给人的一面（`bin::main::view::keys`、`bin::main::view::arrange`、`bin::main::view::frame`、`bin::main::view::detail`）
+
+**形状。** 四个纯模块，不碰终端也不碰盘。`keys` 是 decision（ARCHITECTURE §9 形状 3）：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。读终端、进 raw 模式、跟随服务中的城是下一阶段的 adapter（见 §3），它只调用这四个模块。
+
+```rust
+// bin::main::view::keys
+pub(super) enum Key { Char(char), Up, Down, Left, Right, Enter, Tab, Esc, PageUp, PageDown, Home, End }
+pub(super) enum Action { Up, Down, PageUp, PageDown, First, Last, Collapse, Expand, SwitchLens, OpenDetail, CloseDetail, Quit }
+pub(super) fn action_for(key: Key) -> Option<Action>;
+// bin::main::view::arrange
+pub(super) enum NodeKey { City, Building(String), Room(Address), Session(Address, Option<Seq>), Run(RunId) }
+pub(super) struct Entry { key: NodeKey, depth: usize, parent: Option<usize>, seq: Seq, label: String, detail: serde_json::Value }
+pub(super) fn arrange(runs: &[RunLine]) -> Vec<Entry>;
+// bin::main::view::frame
+pub(super) struct Row { seq: Seq, run: RunId, line: String }
+pub(super) enum Lens { Tree, Records }
+pub(super) struct Face;
+impl Face {
+    pub(super) fn open(runs: &[RunLine], records: Vec<Row>, size: Size) -> Face;
+    pub(super) fn apply(&mut self, action: Action);
+    pub(super) fn resize(&mut self, size: Size);
+    pub(super) fn frame(&self) -> Vec<String>;
+    pub(super) fn is_closed(&self) -> bool;
+}
+// bin::main::view::detail
+pub(super) fn json_lines(value: &serde_json::Value) -> Vec<String>;
+```
+
+**键。** `j`/`↓` 下一行，`k`/`↑` 上一行，`h`/`←` 折叠（已折叠时跳到父），`l`/`→` 展开（已展开时进第一个子），`PageDown`/`PageUp` 翻一屏，`g`/`Home` 第一行，`G`/`End` 最后一行，`Tab` 换透镜，`Enter` 进全屏详情，`Esc` 退出全屏详情，`q` 关掉查看器。别的键没有动作。与 WebUI 的 run 板同一套键（D-15）。
+
+**树。** 城 › 楼（地址的第一段）› 房间（整个地址）› 会话（`RunLine.session`，没有就是房间的第一段 stretch）› run。父 run 在账本里时，run 挂在父 run 下面（分叉挂在分叉点下，标 `fork @<at_seq>`）；否则挂在自己的会话下；没有地址的 run 直接挂在城下。同一个父下的子按 `first_seq` 排；接替的 run 带 `after <predecessor>`。每个节点只有一个父。回合与调用这两层是下一阶段（§3）。
+
+**打开时的光标。** 最新的 `active` run；没有就是最新的 run；一个 run 都没有就是城。只展开它的祖先。等人批的 run 优先这一条要等 run 投影带上「等人」状态（§3）。
+
+**两个透镜共用选中物。** `Tab` 从树到账本：选中第一条 `seq ≥` 节点 `seq` 的行（run 的 `seq` 是它的 `first_seq`，别的节点是子树里最早的 `first_seq`）。从账本到树：选中这行所属的 run 节点并展开它的祖先；城自己的行选中城。
+
+**帧。** 宽度 ≥ `SIDE_PANE_MIN_WIDTH`（110 列）时右侧常驻详情栏，左右各占一半，中间一列 `|`；窄时只画当前透镜，`Enter` 进全屏详情。全屏详情在任何宽度下都占满整屏。每行按字符截到栏宽；光标行以 `>` 开头；列表滚动到光标恰好可见。树行是缩进 + `+`（有子、折叠）/`-`（展开）/空格 + 标签；账本行是原行。详情对 run 节点画 `RunLine::to_json()`，对账本行画解析后的 JSON，解析不了就画原文字符串。
+
+**决定。**
+
+1. 键到动作是一张纯表，帧是 `Face` 的纯函数；终端 adapter 只做读键、调 `apply`、写 `frame()`。被否掉的：在事件循环里直接改光标——那样每个动作只能在真终端里测。
+2. 全屏详情在宽屏上也占满整屏，而不是在宽屏上忽略 `Enter`：同一个键在任何宽度下意思一样，大记录也能用满宽度看。
