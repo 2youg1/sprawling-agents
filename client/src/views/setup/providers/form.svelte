@@ -65,6 +65,10 @@
   let note = $state<string | null>(null);
   let report = $state<AxError | null>(null);
   let looking = $state(false);
+  // The attach this form sent and is waiting on, with the endpoints
+  // answer that stood when it left: the form starts over only once a
+  // newer answer lists the endpoint, and a refusal keeps every field.
+  let attaching = $state.raw<{ readonly id: string; readonly before: unknown } | null>(null);
   let busy = $state(false);
   let chosen = $state<readonly ModelRow[]>([]);
   // What the URL box held before the city answered with another
@@ -114,10 +118,25 @@
   // refusals no open page is responsible for.
   $effect(() => {
     const refused = $belief.refusal;
-    if (refused === null || !looking) return;
+    if (refused === null || (!looking && attaching === null)) return;
     report = refused;
     looking = false;
+    attaching = null;
     u.conn.dismissRefusal();
+  });
+  // The city took the endpoint: the answer after the one that stood when
+  // the attach left lists it. The form starts over for the next provider.
+  $effect(() => {
+    const now = $attached;
+    if (attaching === null || now === attaching.before || now === undefined || !("endpoints" in now)) return;
+    const taken = attaching.id;
+    if (!now.endpoints.endpoints.some((each) => each.name === taken)) return;
+    attaching = null;
+    draft = freshDraft();
+    held = null;
+    chosen = [];
+    rewritten = null;
+    onAttached?.();
   });
   // An endpoint that answered an empty list answered: the wait ends on
   // the answer rather than on its length.
@@ -207,19 +226,15 @@
     report = null;
     withKey((e) => {
       const rows = chosen;
+      const before = get(attached);
       if (!u.send(attachEndpoint(e, rows.map((row) => row.id)))) return;
       for (const row of rows) {
         if (row.tag !== null) u.send(selectModel(e.id, row.id, row.tag, row.ceilings));
       }
-      // The form starts over for the next provider. Only a
-      // registration that went through clears it: a refusal keeps
-      // every field, which is the one thing a person filling in a key
-      // cannot be asked to do twice.
-      draft = freshDraft();
-      held = null;
-      chosen = [];
-      rewritten = null;
-      onAttached?.();
+      // Only a registration that went through clears the form: a
+      // refusal keeps every field, which is the one thing a person
+      // filling in a key cannot be asked to do twice.
+      attaching = { id: e.id, before };
     });
   }
 </script>
