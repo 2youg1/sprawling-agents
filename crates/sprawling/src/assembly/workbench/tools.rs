@@ -257,24 +257,20 @@ fn run_taint(at: &Assignment) -> Result<kernel::TaintSet, AxError> {
 }
 
 impl RunWorker {
-    /// What this run's building may read by a path its model chose: the
-    /// read bound, closed over the building and this city's rules
-    /// (city-SPEC 8-2).
+    /// What this run's building may read by a path its model chose: the read bound, closed over
+    /// the building and this city's rules (city-SPEC 8-2).
     ///
-    /// Another building's rules are read each time a path lands in it,
-    /// not here, so a run that stays in its own building never pays for
-    /// them, and a building made confidential after this dispatch is
-    /// closed from that moment (city-SPEC 12.2). What was read stays
-    /// for this run while the file's stamp holds (city-SPEC 12.3).
+    /// Another building's rules are read each time a path lands in it, not here, so a run that
+    /// stays in its own building never pays for them, and a building made confidential after this
+    /// dispatch is closed from that moment (city-SPEC 12.2). What was read stays for this run
+    /// while the file's stamp holds (city-SPEC 12.3).
     fn read_bound(&self, site: &Site) -> runtime::ReadBound {
         let rules = city::RulesCache::new(&self.city_root);
         let home = site.building.addr().clone();
         std::sync::Arc::new(move |target: &Address| {
             kernel::address::may_read(&home, target, || {
                 let holder = city::Building::of(target)?;
-                rules
-                    .load(holder.addr())
-                    .map(|rules| rules.policy().confidential)
+                rules.load(holder.addr()).map(|r| r.policy().confidential)
             })
         })
     }
