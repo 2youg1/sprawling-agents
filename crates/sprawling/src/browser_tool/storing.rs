@@ -42,7 +42,7 @@ impl BrowserTool {
         SHOT_MAX_EDGE_PX.admit(shot.width(), shot.height())?;
         let hash = self
             .cas
-            .put(shot.bytes())
+            .put_for(shot.bytes(), &self.origin)
             .map_err(memory::MemoryError::into_ax)?;
         let locator = Locator::cas(hash);
         let picture = ImageRef {

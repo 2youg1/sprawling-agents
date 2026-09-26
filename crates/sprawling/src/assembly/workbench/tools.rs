@@ -116,6 +116,7 @@ impl RunWorker {
             &site.write_root,
             std::sync::Arc::clone(&catalog),
             std::sync::Arc::clone(&bound),
+            &kernel::layout::CityLayout::new(&self.city_root).cas(),
         )?;
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
@@ -206,9 +207,14 @@ impl RunWorker {
         // reason above - what keeps their position keeps the cache.
         // `city::policy` refuses both settings on a confidential
         // building, so neither is ever reached there.
-        for tool in
-            crate::browser_tool::for_rules(&self.city_root, site.building.addr(), &site.rules)?
-        {
+        for tool in crate::browser_tool::for_rules(
+            &self.city_root,
+            &memory::BlockOrigin {
+                run: site.run_id,
+                building: site.building.addr().clone(),
+            },
+            &site.rules,
+        )? {
             admitted.push(Box::new(tool));
         }
         // External tools, for a building whose configuration names a

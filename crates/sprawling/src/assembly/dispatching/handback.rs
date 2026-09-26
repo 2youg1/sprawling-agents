@@ -43,7 +43,13 @@ impl RunWorker {
         );
         let digest = self
             .cas
-            .put(account.as_bytes())
+            .put_for(
+                account.as_bytes(),
+                &memory::BlockOrigin {
+                    run: child.run,
+                    building: child.addr.clone(),
+                },
+            )
             .map_err(memory::MemoryError::into_ax)?;
         let claim = collab::Claim::new(
             collab::NodeId::parse(child.addr.as_str())?,

@@ -56,6 +56,10 @@ pub(crate) fn package_exec(
                 cas: &mut world.cas,
                 city_root: &world.root,
                 room: &world.address,
+                origin: memory::BlockOrigin {
+                    run: kernel::RunId::CITY,
+                    building: world.address.clone(),
+                },
             },
             table: &world.table,
             history: &mut world.history,

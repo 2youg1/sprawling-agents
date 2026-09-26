@@ -7,11 +7,18 @@ use super::*;
 use crate::catalog::CatalogEntry;
 
 mod doors;
+mod locators;
 
 fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
     let catalog = Arc::new(Mutex::new(Catalog::new()));
     let everywhere: ReadBound = Arc::new(|_: &kernel::Address| kernel::ReadVerdict::Open);
-    let tool = ReadTool::new(root, Arc::clone(&catalog), everywhere).unwrap();
+    let tool = ReadTool::new(
+        root,
+        Arc::clone(&catalog),
+        everywhere,
+        Path::new("no-store"),
+    )
+    .unwrap();
     (tool, catalog)
 }
 

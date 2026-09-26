@@ -1505,6 +1505,24 @@ const NEARBY_CAP: usize = 16;
 - **列目录是尽力而为**：目录列不出或名字不是 Unicode 时 `nearby` 为空，调用方要的拒因是「没命中」本身。
 - **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（city-SPEC §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
 
+#### 8-29-5 打开一个 Locator：`cas:` 与 `file:`（`runtime::tools::read::locator`）
+
+```rust
+// read::locator
+pub(super) fn open_locator(asked: &str, city_root: &Path, store: &Path,
+                           bound: &dyn Fn(&Address) -> ReadVerdict) -> Option<Result<String, AxError>>;
+/// cas: 块按哪栋楼判读取界的唯一判定处。
+fn judged_at(hash: &B3Hash, origins: &[memory::BlockOrigin],
+             bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Address, AxError>;
+// ReadTool::new(city_root, catalog, bound, block_store: &Path)：块仓是城的，run 可能写在没有自己块仓的 worktree 里。
+```
+
+- **以 `cas:` 或 `file:` 开头的参数是 Locator**，按 `Locator::parse` 判形，判不过即 `E_INVALID_ARGS`；其余参数走 catalog 与普通路径，不受影响（一个城内地址不含冒号，两者不相交）。
+- **`cas:` 块按存块时记下的楼判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个。来源是 `Cas::put_for` 在存块时写下的（memory-SPEC §8-3）：一个块为几栋楼存过就有几条来源，取读者能读的第一栋；一栋都读不了就取第一条来源，让 `admit` 按那栋楼的理由拒绝；没有来源的块（上架的技能包、从未存过的哈希）＝`E_GATE_DENIED`，恢复语让它改读块所出自的 `file:`。只按楼判、不按 run 判：读得了那栋楼的文件就读得了为那栋楼存下的字节，而 run 只记作出处。另一条路是按账本里哪一行写了这个哈希来判，落选：模型写的文字（例如委派的 `goal`）会落进带 `addr` 的行，那样的归属可以伪造。`file:<addr>@<oid>` 按 `<addr>` 判。
+- **`file:` 在该 oid 上做 git 读**（`memory::blob_at`，memory-SPEC §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
+- **范围**：`cas:` 带的范围照 Locator 本身只交回那一段（`Cas::get_range`）；`file:` 带范围＝`E_INVALID_ARGS`，恢复语让它去掉范围改用 `offset`／`limit`——提交里的文件没有一份按范围读的实现，而 `offset`／`limit` 已答同一个问题。之后都按 `offset`／`limit` 切（§8-29-1）。字节不是 UTF-8＝`E_INVALID_ARGS`，read 只交文本。
+- **为 run 存块的调用方都走 `put_for`**：转录（`Transcript::materialise`，记房间）、卸载的原件（`offload::tee`，记命令所在的房间，来源随 `OffloadSite` 传入）、截图（`bin::browser_tool`，记这栋楼）、交接单 must-read 里的规范文档（`bin::assembly::freezing`，记 run 所在的房间）、run 的任务书（`bin::assembly::dispatching::running`，记房间；run id 由任务书的定位符派生，所以先 `put` 取得哈希，run 立起后再 `put_for` 补记来源）、子 run 的交回说明（`bin::assembly::dispatching::handback`，记子 run 与它的房间）。仍走 `put` 的有两类：上架的技能包不是为某个 run 存的，读不到它的 `cas:`，它按 catalog 名读；冻结前缀的各段（`intern_prefix`）只为让账本里的前缀可审计，一个段为同一栋楼的所有 run 共用，不作为定位符交给任何 run。
+
 ### 8-30 runtime::tools::search（形状 1 判定＋形状 4 适配器）
 
 **问题**：十三件工具里没有一件能找东西。找一个符号只有两条路——写 Python（要可选的 CPython-WASI 构件，很多机器上根本没有），或走 shell（Windows 上是 `findstr`，而 shell 本身是楼级配置可以关掉的）。旧对话有了一个地址，而**没有检索的地址比没有地址更糟**：模型被告知那里有东西，却够不着。

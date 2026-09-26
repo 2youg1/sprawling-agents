@@ -21,11 +21,14 @@ pub const REST_DIR: &str = ".rest";
 /// Where offloaded bytes live: the CAS for the original, and the room
 /// whose `REST_DIR` holds the materialized rest file. The room travels
 /// as its city address because the model's read tool resolves every
-/// path from the city root.
+/// path from the city root. `origin` is the run and building the
+/// original is pinned for, so that a `cas:` read of it is judged where
+/// the output was made.
 pub struct OffloadSite<'a> {
     pub cas: &'a mut Cas,
     pub city_root: &'a Path,
     pub room: &'a Address,
+    pub origin: memory::BlockOrigin,
 }
 
 /// The outcome: a substitute that fits the cap, the original pinned in
@@ -107,7 +110,10 @@ pub(crate) struct Tee {
 /// and 4 in one call, so no cutter can run without the way back
 /// existing first. Repeating it on the same bytes is idempotent.
 pub(crate) fn tee(bytes: &[u8], site: &mut OffloadSite<'_>) -> Result<Tee, AxError> {
-    let hash = site.cas.put(bytes).map_err(memory::MemoryError::into_ax)?;
+    let hash = site
+        .cas
+        .put_for(bytes, &site.origin)
+        .map_err(memory::MemoryError::into_ax)?;
     let original = Locator::cas(hash);
     let rest_path = materialized(bytes, site, &original)?;
     Ok(Tee {
@@ -227,8 +233,15 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<St
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    pub(crate) fn origin() -> memory::BlockOrigin {
+        memory::BlockOrigin {
+            run: kernel::RunId::from_bytes([7; 16]),
+            building: kernel::Address::parse("lab").unwrap(),
+        }
+    }
 
     fn site(dir: &tempfile::TempDir) -> (Cas, Address) {
         let cas = Cas::open(&dir.path().join("cas")).unwrap();
@@ -243,6 +256,7 @@ mod tests {
             cas: &mut cas,
             city_root: dir.path(),
             room: &room,
+            origin: origin(),
         };
         let original: Vec<u8> = (0..40_000u32)
             .map(|i| u8::try_from(i % 251).unwrap())
@@ -288,6 +302,7 @@ mod tests {
             cas: &mut cas,
             city_root: dir.path(),
             room: &room,
+            origin: origin(),
         };
         let original = vec![3u8; 30_000];
         let record = offload(&original, 2_048, &mut s).unwrap();
@@ -301,6 +316,23 @@ mod tests {
     }
 
     #[test]
+    fn the_original_is_pinned_for_the_run_and_building_it_was_cut_for() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut cas, room) = site(&dir);
+        let mut s = OffloadSite {
+            cas: &mut cas,
+            city_root: dir.path(),
+            room: &room,
+            origin: origin(),
+        };
+        let record = offload(&vec![3u8; 30_000], 2_048, &mut s).unwrap();
+        let Locator::Cas { hash, .. } = &record.original else {
+            panic!("expected a cas locator");
+        };
+        assert_eq!(s.cas.origins(hash).unwrap(), vec![origin()]);
+    }
+
+    #[test]
     fn same_bytes_offload_to_the_same_locator() {
         let dir = tempfile::tempdir().unwrap();
         let (mut cas, room) = site(&dir);
@@ -308,6 +340,7 @@ mod tests {
             cas: &mut cas,
             city_root: dir.path(),
             room: &room,
+            origin: origin(),
         };
         let original = vec![7u8; 30_000];
         let one = offload(&original, 2_048, &mut s).unwrap();
@@ -327,6 +360,7 @@ mod tests {
             cas: &mut cas,
             city_root: dir.path(),
             room: &room,
+            origin: origin(),
         };
         let err = offload(b"small", 4_096, &mut s).unwrap_err();
         assert_eq!(*err.code(), AxCode::InvalidArgs);

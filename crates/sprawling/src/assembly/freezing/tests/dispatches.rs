@@ -170,6 +170,28 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
         .as_array()
         .expect("the handoff carries its must-read list");
     assert_eq!(must_read.len(), 3, "city, building, job: {must_read:?}");
+
+    // Every stored entry of that list is pinned to the room the run
+    // works in, so `read` there admits it instead of refusing a block
+    // with no origin.
+    let unreadable: Vec<String> = must_read
+        .iter()
+        .filter_map(|entry| kernel::Locator::parse(entry.as_str()?).ok())
+        .filter_map(|locator| match locator {
+            kernel::Locator::Cas { hash, .. } => Some(hash),
+            _ => None,
+        })
+        .filter(|hash| {
+            !worker
+                .cas
+                .origins(hash)
+                .unwrap()
+                .iter()
+                .any(|origin| origin.building == room)
+        })
+        .map(|hash| hash.to_string())
+        .collect();
+    assert_eq!(unreadable, Vec::<String>::new(), "{must_read:?}");
 }
 
 /// The prefix carries what it tells the agent to read.

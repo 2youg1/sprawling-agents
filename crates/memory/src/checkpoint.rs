@@ -30,7 +30,7 @@
 //! `ensure_base` and `land` move HEAD, because a worktree branches from
 //! a commit and offered work has to be on a branch.
 
-mod fence;
+pub(crate) mod fence;
 mod provenance;
 mod scan;
 

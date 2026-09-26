@@ -338,6 +338,12 @@ impl RunWorker {
         // when the building is laid out, and a model asked to recite the
         // list from memory gets one entry wrong eventually.
         let mut must_read = Vec::new();
+        // Put for this run at this building, so the next session's `read`
+        // judges each norm where it was read from rather than refusing it.
+        let origin = memory::BlockOrigin {
+            run: site.run_id,
+            building: addr.clone(),
+        };
         for norm in city::norms(&self.city_root, addr)? {
             let bytes = std::fs::read(&norm).map_err(|err| {
                 AxError::failure(
@@ -347,7 +353,10 @@ impl RunWorker {
                 )
                 .with_recovery("fix the file's permissions, or remove it from the building")
             })?;
-            let hash = self.cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
+            let hash = self
+                .cas
+                .put_for(&bytes, &origin)
+                .map_err(memory::MemoryError::into_ax)?;
             must_read.push(Locator::cas(hash));
         }
         must_read.push(job);
