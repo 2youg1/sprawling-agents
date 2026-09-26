@@ -107,3 +107,20 @@ proptest! {
         prop_assert_eq!(resumed_end, end);
     }
 }
+
+/// A snapshot is a cache the Ledger rebuilds; the advice for a failed
+/// write is about the snapshot, not the ledger's torn tail.
+#[test]
+fn a_snapshot_write_failure_gives_snapshot_advice() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("snapshot");
+    std::fs::write(&dir, b"a file where the directory goes").unwrap();
+    let snapshot = ChainSnapshot::cut(3, Seq::new(0), &chain(1, 0)[0], b"views".to_vec());
+
+    let refused = write_snapshot(&dir, &snapshot).unwrap_err().into_ax();
+
+    assert_eq!(
+        (refused.code(), refused.recovery().contains("tail-truncate")),
+        (&kernel::AxCode::StorageFatal, false)
+    );
+}

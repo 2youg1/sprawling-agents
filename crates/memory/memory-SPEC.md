@@ -820,6 +820,7 @@ pub enum MemoryError {                      // thiserror；crate 根
     Alias { op: &'static str, path: PathBuf, kind: alias::AliasKind },  // → E_OUTSIDE_WRITE_DOMAIN（8-25）
     LedgerHeld { dir: PathBuf },            // 另一个 JsonlLedger 持着这座城的账本（8-1）→ E_LEDGER_HELD
     LedgerBroken { dir: PathBuf, at: Seq }, // 一波的写或 sync 失败过，重开前拒绝之后每一波（8-1）→ E_STORAGE_FATAL
+    Snapshot { op: &'static str, path: PathBuf, source: io::Error },  // 快照读写被盘拒绝（8-26）→ E_STORAGE_FATAL，恢复说的是快照
 }
 impl MemoryError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
 pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) -> MemoryError;
@@ -827,6 +828,7 @@ pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) ->
 
 - **为什么是独立模块**：§7 的登记条件是「≥3 处跨模块汇聚」，今天是十二处。
 - **为什么带着 `io_err` 走**：它是 `MemoryError::Io` 的构造子，而一个值的构造子与它的定义同住。四个模块（cas／bundle／digest_cache／index）只为取它而 import jsonl，那是一条指错了方向的依赖。
+- **快照的 I/O 失败有自己的变体**：`Io` 的恢复建议说的是账本（停机，重开会截掉撕裂的尾巴），对快照是错的——快照是账本随时能重建的缓存。`Snapshot` 与 `Io` 同码（盘拒绝了写，多半账本也写不进），恢复则说：删掉这份快照、腾出盘，下次启动从创世折叠。被否：让 `Io` 的恢复按 `op` 分支——一个变体两种建议，读恢复的人得先知道 `op` 的全集。
 - **公开名是 `memory::MemoryError`**（`lib.rs` 重导出）：模块住处不进公共面，api-baseline 不随它动。
 
 ### 8-15 memory::vfs（形状 3 端口）

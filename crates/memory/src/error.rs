@@ -110,6 +110,15 @@ pub enum MemoryError {
         #[source]
         source: AxError,
     },
+    /// The disk refused a snapshot read or write. A snapshot is a cache
+    /// the Ledger rebuilds, so its advice differs from `Io`'s (8-26).
+    #[error("{op} failed at {path}: {source}")]
+    Snapshot {
+        op: &'static str,
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 }
 
 impl MemoryError {
@@ -185,6 +194,13 @@ impl MemoryError {
             }
             // An absent seq is the caller asking for a line that was
             // never written — not damage, so not a storage fault.
+            MemoryError::Snapshot { op, path, source } => {
+                AxError::failure(AxCode::StorageFatal, op, path.display().to_string())
+                    .with_recovery(format!(
+                        "storage failed ({source}); a snapshot is rebuilt from the ledger, so                          remove {} and free the disk; the next start folds from genesis",
+                        path.display()
+                    ))
+            }
             MemoryError::SeqMissing { seq } => {
                 AxError::failure(AxCode::InvalidArgs, "read ledger line", seq.to_string())
                     .with_recovery("ask for a seq the ledger actually holds")

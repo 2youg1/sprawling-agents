@@ -17,7 +17,7 @@ use std::path::Path;
 use kernel::ledger::chain_hash;
 use kernel::{AxError, B3Hash, Seq};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::MemoryError;
 use crate::jsonl::LineCheck;
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
@@ -143,29 +143,29 @@ impl ChainSnapshot {
 /// there.
 ///
 /// # Errors
-/// `MemoryError::Io` naming the step that failed.
+/// `MemoryError::Snapshot` naming the step that failed.
 pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), MemoryError> {
     let mut vfs = RealFs::new();
     let (file, staged) = (dir.join(FILE), dir.join(STAGED));
     vfs.create_dir_all(dir)
-        .map_err(io_err("create snapshot dir", dir))?;
+        .map_err(refused("create snapshot dir", dir))?;
     if vfs.exists(&staged) {
         vfs.remove_file(&staged)
-            .map_err(io_err("remove staged snapshot", &staged))?;
+            .map_err(refused("remove staged snapshot", &staged))?;
     }
     vfs.append(&staged, &snapshot.encode())
-        .map_err(io_err("write staged snapshot", &staged))?;
+        .map_err(refused("write staged snapshot", &staged))?;
     vfs.sync_data(&staged)
-        .map_err(io_err("sync staged snapshot", &staged))?;
+        .map_err(refused("sync staged snapshot", &staged))?;
     vfs.rename(&staged, &file)
-        .map_err(io_err("rename staged snapshot", &file))?;
-    vfs.sync_dir(dir).map_err(io_err("sync snapshot dir", dir))
+        .map_err(refused("rename staged snapshot", &file))?;
+    vfs.sync_dir(dir).map_err(refused("sync snapshot dir", dir))
 }
 
 /// Read the snapshot `dir` holds.
 ///
 /// # Errors
-/// `MemoryError::Io` when the file exists and cannot be read; bytes that
+/// `MemoryError::Snapshot` when the file exists and cannot be read; bytes that
 /// are not a snapshot are `StoredSnapshot::Damaged`, not an error.
 pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, MemoryError> {
     let file = dir.join(FILE);
@@ -173,8 +173,15 @@ pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, MemoryError> {
         Ok(bytes) => Ok(ChainSnapshot::decode(&bytes)
             .map_or_else(StoredSnapshot::Damaged, StoredSnapshot::Present)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(StoredSnapshot::Absent),
-        Err(e) => Err(io_err("read snapshot", &file)(e)),
+        Err(e) => Err(refused("read snapshot", &file)(e)),
     }
+}
+
+/// The constructor of a snapshot's I/O failure, as `io_err` is the
+/// ledger's.
+fn refused(op: &'static str, path: &Path) -> impl FnOnce(std::io::Error) -> MemoryError {
+    let path = path.to_path_buf();
+    move |source| MemoryError::Snapshot { op, path, source }
 }
 
 #[cfg(test)]
