@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxError, EventKind, RunId};
 
-use super::super::{Agreed, Assignment, Given, RunWorker, now_ms, run_id_for};
+use super::super::{Agreed, Assignment, Given, RunWorker, Stamping, now_ms, run_id_for};
 use super::Site;
 
 /// What a commit this run makes is signed with.
@@ -96,11 +96,6 @@ impl Site {
 pub(in crate::assembly) struct Placing<'a> {
     pub(in crate::assembly) city_root: &'a Path,
     pub(in crate::assembly) city: kernel::B3Hash,
-    /// The key of the command this dispatch answers, stamped on the one
-    /// line the placement writes: for a review dispatch whose rules did
-    /// not change it is the only line that carries the key, and a
-    /// restart recognises the command again from it.
-    pub(in crate::assembly) command: Option<kernel::IdemKey>,
 }
 
 impl Site {
@@ -112,6 +107,10 @@ impl Site {
     /// The fence goes up first: a worktree branches from a commit, so
     /// the city needs one before it can lend anything out.
     ///
+    /// `worktree_opened` carries the command's key: for a review dispatch
+    /// whose rules did not change it is the one line that does, and a
+    /// restart recognises the command again from it.
+    ///
     /// # Errors
     /// Propagates whatever the checkpoint or the worktree says about
     /// lending a tree out, and the ledger's refusal of the line that
@@ -120,7 +119,7 @@ impl Site {
         &mut self,
         addr: &Address,
         placing: &Placing<'_>,
-        ledger: &mut L,
+        lines: &mut Stamping<'_, L>,
     ) -> Result<(), AxError> {
         if !self.rules.review() {
             return Ok(());
@@ -145,20 +144,17 @@ impl Site {
             .map_err(memory::MemoryError::into_ax)?
             .claim(&tree_of(addr)?, &super::tree_scope(&self.building))
             .map_err(memory::MemoryError::into_ax)?;
-        ledger.append(kernel::EventDraft {
-            run: self.run_id,
-            t: now_ms()?,
-            who: self.who.clone(),
-            addr: Some(addr.clone()),
-            kind: EventKind::WorktreeOpened,
-            data: crate::assembly::commanding::entrance::stamped(
-                placing.command,
-                claimed
+        lines.record_for(
+            self.run_id,
+            crate::effect::Line {
+                who: self.who.clone(),
+                addr: addr.clone(),
+                kind: EventKind::WorktreeOpened,
+                data: claimed
                     .opened_payload()
                     .map_err(memory::MemoryError::into_ax)?,
-            )?,
-            ig: false,
-        })?;
+            },
+        )?;
         self.write_root = claimed.path().to_path_buf();
         self.branch = Some(claimed.name().as_str().to_owned());
         self.lease = Some(claimed);

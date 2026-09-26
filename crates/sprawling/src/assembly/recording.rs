@@ -16,6 +16,46 @@ use crate::effect;
 
 use super::{RunWorker, now_ms};
 
+/// A ledger a dispatch's preparation writes through, with the key of the
+/// command that dispatch answers, so a line written without the worker
+/// is stamped by the rule [`RunWorker::record_for`] follows and a restart
+/// still recognises the command from it (sprawling-SPEC.md 8-93).
+pub(in crate::assembly) struct Stamping<'a, L> {
+    pub(in crate::assembly) ledger: &'a mut L,
+    pub(in crate::assembly) command: Option<kernel::IdemKey>,
+}
+
+impl<L: Ledger> Stamping<'_, L> {
+    /// Appends one line on behalf of `run`, stamped with the command's
+    /// key when there is one.
+    ///
+    /// # Errors
+    /// Propagates a payload that will not take the key, a clock this
+    /// machine will not read, and the ledger's refusal of the line.
+    pub(in crate::assembly) fn record_for(
+        &mut self,
+        run: RunId,
+        line: effect::Line,
+    ) -> Result<(), AxError> {
+        let effect::Line {
+            who,
+            addr,
+            kind,
+            data,
+        } = line;
+        self.ledger.append(EventDraft {
+            run,
+            t: now_ms()?,
+            who,
+            addr: Some(addr),
+            kind,
+            data: super::commanding::entrance::stamped(self.command, data)?,
+            ig: false,
+        })?;
+        Ok(())
+    }
+}
+
 impl RunWorker {
     /// Writes one diagnostic line, anchored to where the ledger stands.
     pub(super) fn note(&mut self, level: runtime::diagnostics::Level, module: &str, message: &str) {

@@ -9,8 +9,8 @@ use kernel::Locator;
 use kernel::{AxCode, AxError};
 
 use super::super::{
-    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site, Sweep,
-    Workbench, held, now_ms,
+    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site,
+    Stamping, Sweep, Workbench, held, now_ms,
 };
 use super::{Assignment, Given};
 
@@ -124,9 +124,11 @@ impl RunWorker {
             &super::super::workbench::Placing {
                 city_root: &self.city_root,
                 city: self.city_hash()?,
+            },
+            &mut Stamping {
+                ledger: &mut self.ledger,
                 command: self.doorstep.entrance.carrying(),
             },
-            &mut self.ledger,
         )?;
         let desks = self.open_desks(&site, &at.addr)?;
 
@@ -149,7 +151,14 @@ impl RunWorker {
         // predecessor's answers is what says whether the handoff lost
         // something.
         if let Some(handed) = at.succession.as_ref() {
-            self.probe_after(&mut site, &plan, handed)?;
+            site.probe_after(
+                &plan,
+                handed,
+                &mut Stamping {
+                    ledger: &mut self.ledger,
+                    command: self.doorstep.entrance.carrying(),
+                },
+            )?;
         }
 
         let fence_scope = site.fence_scope()?;
