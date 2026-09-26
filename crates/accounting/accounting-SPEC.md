@@ -37,6 +37,7 @@
 
 ## 3 假设与歧义
 
+- `Machine` 端口的签名还没定。worker 用到的两处是 `doctor_install`（跑一条人同意过的安装命令）与 `look_at_this_machine`（`doctor::report()`，交回 `channels::DoctorAnswer`）。未定的是：`install` 收 `bin::doctor::Runnable`——它只由 `Recipe::command` 造出，持有它就证明这条命令被问过——还是收 program 与 args；前者要求 `Runnable` 与 `Requirement`、`Presence` 一起搬到本 crate 或更低处。能定下它的证据是：`views`／`doctor`／`serving` 之间的环断开之后（sprawling-SPEC.md 8-92 的表），`doctor` 的类型还被谁用。红测不能对着现在的代码去跑 `DoctorInstall`，因为那会在宿主上真的启动包管理器；它要从 `DoctorRefresh` 进，看诊断里 worker 数到的条目数。
 - `views` 在读侧与写侧各有一份 `Governance`，搬进本 crate 时哪一侧拥有这个类型，取决于 `bin::views` 与 `bin::assembly` 之间的环断在哪里（sprawling-SPEC.md 8-92 的表）。
 
 ## 4 现状分析
@@ -143,6 +144,7 @@ impl RunWorker {
 - **worker 读的每一个时刻都经 `RunWorker.clock`**：它写的行、它量的耗时、它排的期限。lane 线程从 `DriveContext` 拿到同一个时钟的克隆，所以一个 run 的行与 worker 自己的行读的是同一个钟。worker 调用的自由函数（`captured_until`、`reach_of`）把时刻或时钟当参数收下，不自己采样。
 - **worker 之外的两个读点用 `SystemClock`**：`form_city`（city 在任何 worker 存在之前诞生）与 `serving::journal`（诊断日志行的时间，不是城的记录）。`RunWorker::new` 打开 ledger 时 worker 还不存在，也用 `SystemClock`。
 - **固定值**：`RunWorker::new` 与 `over` 装上 `SystemClock`；`with_clock` 是唯一换掉它的门。`Send + Sync` 与 `Arc`，是因为 lane 线程与 worker 同时读它。
+- **等待也读这个钟**：lane 等 provider 的退避时，一片一片地睡，直到这个钟过了期限。所以一个永远不走的脚本钟，会让遇上退避的 run 一直等下去；脚本要让钟往前走。
 
 ## 12 决策
 

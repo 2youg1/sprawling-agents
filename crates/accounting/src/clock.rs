@@ -13,6 +13,10 @@ use kernel::{AxError, TimeMs};
 /// Every line the worker writes, every duration it measures and every
 /// deadline it keeps is read here, so a scripted clock replays a whole
 /// dispatch at the times the script chose.
+///
+/// A lane waiting out a provider's back-off sleeps until this clock
+/// passes the deadline, so a scripted clock that never moves holds such
+/// a run for as long as it stands still.
 pub trait Clock {
     /// # Errors
     /// A clock that cannot be read, such as a wall clock set before the
