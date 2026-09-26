@@ -11,9 +11,11 @@
   // is a run's start, coloured by what that run is doing now, and the
   // quiet stretch runs from the oldest run still going to now.
   //
-  // On a wide page a row is one line; on a narrow one the bar takes a
-  // line of its own under the counts, so neither the names nor the bar
-  // shrink to a sliver. Picking a row opens the building's panel, as
+  // Where the table is wide a row is one line; where it is narrow the
+  // bar takes a line of its own under the counts, so neither the names
+  // nor the bar shrink to a sliver. The table asks its own width rather
+  // than the page's, because the picked building's panel can stand
+  // beside it and take half the page. Picking a row opens the building's panel, as
   // picking its tower in the drawing does.
   import { fill, say } from "../../core/lang";
   import { ago } from "../../core/time";
@@ -48,10 +50,10 @@
   }
 </script>
 
-<section class="flex min-w-0 flex-col" aria-label={say($lang, "city_table")}>
+<section class="@container/table flex w-full min-w-0 flex-col" aria-label={say($lang, "city_table")}>
   <div class="flex min-w-0 flex-wrap items-end gap-x-base border-b border-edge pb-tight font-mono figure text-note text-text-quiet" aria-hidden="true">
-    <span class="hidden min-w-0 flex-1 @lg/page:block"></span>
-    <span class="relative h-base w-full shrink-0 @lg/page:w-[40%]">
+    <span class="hidden min-w-0 flex-1 @lg/table:block"></span>
+    <span class="relative h-base w-full shrink-0 @lg/table:w-[40%]">
       {#each FOLDS.filter((fold) => fold.minutes > 0) as fold (fold.minutes)}
         <span class="absolute top-0 border-l border-edge-input pl-tight" style:left="{String(fold.at)}%">{fill(say($lang, "runs_minus"), { n: String(fold.minutes) })}</span>
       {/each}
@@ -94,7 +96,7 @@
               {row.latest === null ? say($lang, "city_table_none") : ago($lang, row.latest, now)}
             </span>
           </span>
-          <span class="relative h-snug w-full shrink-0 @lg/page:w-[40%]" aria-hidden="true">
+          <span class="relative h-snug w-full shrink-0 @lg/table:w-[40%]" aria-hidden="true">
             <span class="absolute inset-0 border-r border-edge-input"></span>
             {#if row.since !== null}
               {@const live = stretch(row.since)}
