@@ -162,7 +162,7 @@ fn restoring_refuses_every_spelling_windows_folds_onto_the_git_link() {
     let (trees, first, _) = city(dir.path());
     let mine = trees.claim(&name("node-1"), &[]).unwrap();
 
-    for alias in [".git.", ".git ", ".git::$DATA"] {
+    for alias in [".git.", ".git ", ".git::$DATA", "GIT~1"] {
         let refused = trees.restore_file(&mine, &first, Path::new(alias));
 
         assert!(refused.is_err(), "{alias:?}: {refused:?}");
@@ -185,22 +185,9 @@ fn restoring_through_a_hard_link_leaves_the_linked_file_untouched() {
     if restored.is_ok() {
         assert_eq!(
             (read(mine.path()), theirs_now),
-            (
-                "first
-"
-                .to_owned(),
-                "second
-"
-                .to_owned()
-            )
+            ("first\n".to_owned(), "second\n".to_owned())
         );
     } else {
-        assert_eq!(
-            theirs_now,
-            "second
-"
-            .to_owned(),
-            "{restored:?}"
-        );
+        assert_eq!(theirs_now, "second\n".to_owned(), "{restored:?}");
     }
 }

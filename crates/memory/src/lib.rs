@@ -24,9 +24,6 @@ mod reserved;
 mod jsonl;
 
 pub use jsonl::WriteObserver;
-// One line on purpose: the index-file rule permits single-line `use`
-// declarations only, and rustfmt wraps the list at 100 columns.
-#[rustfmt::skip]
 pub use jsonl::{CheckedLine, LineCheck, LineFault, read_line};
 pub use jsonl::{JsonlLedger, OpenReport, TailTruncation, ledger_segments_at, read_raw_lines_at};
 pub use jsonl::{TailLine, TailLines};

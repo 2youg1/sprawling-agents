@@ -12,7 +12,7 @@
 //! directory entry, so a hard link at the name is broken rather than
 //! written through.
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -83,8 +83,21 @@ fn staging_path(path: &Path) -> Result<PathBuf, MemoryError> {
             "a bundle file needs a file name of its own",
         ))
     })?;
-    let mut staged = OsString::from(".");
+    let mut staged = OsString::from(STAGING_PREFIX);
     staged.push(name);
-    staged.push(".part");
+    staged.push(STAGING_SUFFIX);
     Ok(path.with_file_name(staged))
 }
+
+/// Whether `name` is spelled the way [`staging_path`] names a staging
+/// file. A restore cut short leaves one under the city root, and it is
+/// half of a write, not a file of the city.
+pub(crate) fn is_staging_name(name: &OsStr) -> bool {
+    let spelled = name.as_encoded_bytes();
+    spelled.len() > STAGING_PREFIX.len().saturating_add(STAGING_SUFFIX.len())
+        && spelled.starts_with(STAGING_PREFIX.as_bytes())
+        && spelled.ends_with(STAGING_SUFFIX.as_bytes())
+}
+
+const STAGING_PREFIX: &str = ".";
+const STAGING_SUFFIX: &str = ".part";

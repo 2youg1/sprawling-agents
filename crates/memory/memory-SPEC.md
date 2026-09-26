@@ -42,6 +42,9 @@
 4. **存储写失败码**：`append` 的 Io 失败映射 `E_STORAGE_FATAL`（装载期第 5 码，进程级 fatal）。
 5. **硬链接的判定按平台分两半，两半都写在这里。** junction 与 symlink 都是重解析点，`file_type().is_symlink()` 对两者同真，故合为 `AliasKind::Link`，在每一扇写门字面拒绝。硬链接在 Unix 由 `std::os::unix::fs::MetadataExt::nlink` 判定：`nlink>1` 的普通文件即 `AliasKind::HardLink`，同样在构造点字面拒绝；在 Windows 稳定版 `std` 读不到链接计数（`MetadataExt::number_of_links` 属未稳定特性 `windows_by_handle`，`std::fs::hard_link_count` 不存在），而 `unsafe_code` 全库 forbid、其豁免不得引入本 workspace，故 Windows 上硬链接臂由**写入恒落新 entry** 兜住（bundle 经 `bundle::landing::land` 写同目录暂存文件再 `rename` 覆盖，`runtime::tools::edit` 写前移除该名再建；两者都换掉目录项而不写穿旧 inode）——穿透在结构上不可能，只是不报拒。被否：为读链接计数引入窄 FFI（撞 unsafe 定规）或夜间特性（撞稳定工具链定规）。**重开参数**：Windows `std` 出现稳定的 `number_of_links` 或等价 API 时，把该臂并入构造点字面拒绝；Unix `nlink` 语义若变化，改 `kind_at` 一处。
 6. **`first_seen` 的那一次折叠放在哪里未定。** 现在它在本进程第一次遇到缺文件的切片时整段读取各段（8-24），所以启动后的第一次新 room 派活仍付一遍全账本读与一段大小的瞬时内存。候选是并进启动时 `verify_ledger_dir` 已有的那一遍，或放到 lane 上预先折好；判定它的证据是 94 MB 账本上启动时长与首次派活时延的同仪表读数。
+7. **合并的检出先于干线的比较并交换。** `worktree::trees` 的 `apply` 先把节点的树写进城的工作目录，再用 `reference_matching` 移动干线；两步之间干线若被别处移动，比较并交换失败，工作目录却已是节点的树，下一次 checkpoint 会把这份差读成人的编辑。开城时账本的独占锁（8-1）使同一座城只有一个写者，所以窗口只在一个进程内的两次合并之间打开。候选是先做比较并交换、再以旧干线为显式基线检出（`CheckoutBuilder` 的 baseline），或比较并交换失败时撤回检出；判定它的证据是一个在两次合并之间移动干线的 citysim 场景。
+8. **取回一个文件抄的是被替换文件的权限，不是 point 上那一项的 `filemode`。** `worktree::back` 的 `restore_file` 经 `bundle::landing::land`（`Bits::OfReplaced`）落盘，所以在 Unix 上，point 上可执行、树里此刻不可执行的文件取回后仍不可执行；被删后再取回的文件取新建默认值。Windows 没有可执行位，不受影响。改法是由 `entry.filemode()` 推出权限，需要给 `landing::Bits` 添一臂；判定它的证据是一个 Unix 上取回脚本的场景。
+9. **`checkpoint::fence` 的 family 1 只做了一部分。** `file_discarded` 的载荷仍由 fence 手工拼成 `Map`，`taint_promoted`、`cross_building_transfer`、`secret_egress_blocked` 三种还没有各自的结构体。未定的是这些结构体住在 kernel 的事件表旁边还是 memory 里；判定它的证据是它们的第二个写者出现在哪个 crate。
 
 ## 4 现状分析
 
@@ -304,7 +307,7 @@ impl Cas {
 pub struct BlockOrigin { pub run: RunId, pub building: Address }
 ```
 
-**块的来源在存块时记下，不事后推断。** 为一个 run 存块的调用方（转录、卸载、截图）走 `put_for`；上架的技能包是全城的，走 `put`，不带来源。来源记录在 `<dir>/from/<hex 前 2>/<hex64>`，一行一个 `<run> <address>`：同一份字节可能为两栋楼各存一次，所以一个块可以有多个来源，同一来源再存不重复记。记录追加后 `sync_data`＋`sync_dir`。读回来不成形的行（崩溃截断的追加尾）不授予任何东西——读取界往关的一侧失败。另一条路是按账本里哪一行写了这个哈希来推断来源，落选：模型写的文字会落进带地址的行，那样的归属可以伪造。
+**块的来源在存块时记下，不事后推断。** 为一个 run 存块的调用方（转录、卸载、截图）走 `put_for`；上架的技能包是全城的，走 `put`，不带来源。来源记录在 `<dir>/from/<hex 前 2>/<hex64>`，一行一个 `<run> <address>`：同一份字节可能为两栋楼各存一次，所以一个块可以有多个来源，同一来源再存不重复记。记录追加后 `sync_data`＋`sync_dir`。读回来不成形的行（崩溃截断的追加尾）不授予任何东西——读取界往关的一侧失败。已有字节不以换行结尾时（一次崩溃截断的追加尾），新记录前先补一个换行：否则新行接在残尾后面，读回时与残尾一起被丢，而 `put_for` 已经返回了 `Ok`。另一条路是按账本里哪一行写了这个哈希来推断来源，落选：模型写的文字会落进带地址的行，那样的归属可以伪造。
 
 布局：`<dir>/b3/<hex 前 2>/<hex64>`；临时件 `<dir>/tmp/<hex64>.part`（内容定名：同内容并发写者汇合于同一目标，无随机源；残留 tmp 先 truncate 再写）。put 四步：hash→已存在即去重返回→写 tmp＋`sync_data`→`rename`＋`sync_dir`（分片目录）。范围取回越界＝`RangeOutOfBounds`（fail-closed，不静默夹取）；`L` 式行切分按 `\n`，末行无终止符同计一行；返回字节含行间 `\n`、不含末行终止符；`B` 式按 0 起闭区间直切。
 rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_dir` 前不存活，断电即整体消失（源已移除）——看似比真实更损，但 put 尚未返回 Ok，无可观察效果被丢失，A3 点 2 的断言面（已命名对象恒不腐蚀）不受影响。
@@ -348,6 +351,7 @@ impl LineReader<'_> {
 
 - **索引不落盘，只有一段常驻内存**：建表只有一遍扫描（`index/ledger.rs` 的 `walk`），两个入口共用它：`rebuild` 自己定位每一行，`folding` 让折叠交回它已读出的位置；`Views` 持有它并在每次查询前 `refresh`。此前那份 `index.cache` 旁挂物已整体删除：`persist` 在 `db3a342` 之后的树里零生产调用者，读取方因此是在读一份没人写的文件，而「一份没人写的旁挂物」既是永不命中的空转，又是第二个可失效的“答案来源”。删掉的是写与读两半，`Folded`、`fold_segment`、`rebuild` 与 `refresh` 全部保留，故 `rebuild` 仍是「从段重建」。
 - **seq 是隐式的，每行只存一个 `u64`**：内核给行连续编号，所以一行的 seq 就是它在列里的位置加 `base`，列里只存段名字典 id 与偏移拼成的一个字。五万行的账本在索引里占 400 KB，显式 seq 列加 (id, 偏移) 对的布局要 1.2 MB（每行 24 B，`a_contiguous_ledger_costs_eight_bytes_per_record` 钉住 8 B）。损坏的账本仍要能索引，因为修复路径靠它：低于 `base` 的 seq、远到要让空洞多于行数才够得着的 seq（拉长后列里的空洞数超过 `max(列里的行数, 64)`；界按行数而不按列长算，因为按列长算时每个被接受的 seq 都能让列翻倍）、段 id 超过 16 位或偏移超过 48 位的位置，都进 `outliers`；一个 seq 只在两处之一，重复写保留最后的位置，`seqs()` 把两处按序归并。**被否：只留列、把列外行丢掉**——被丢的行对每个读者都不可见；**被否：空洞无上限地拉长列**——一个被写坏成 2^60 的 seq 会让索引去分配 2^63 字节。`doubling_seqs_leave_the_column_bounded_by_its_lines` 钉住这条界；`fold/tests.rs` 的 map 形 oracle 对全部查询（含 `seqs()` 正反两向与两端交替）判等。
+- **`base` 由第一条插入的行定下，之后不再移动。** 这第一条行的 seq 若已损坏且很大，其后每一条健康的行都低于 `base`，全部落进 `outliers`：答案仍然正确，每行 8 B 的布局却失去了，一行按 `BTreeMap` 的节点计价。接受这笔代价，因为它只出现在首行损坏的账本上，而那样的账本本来走修复路径；列外行多于列内行时重定 `base` 是候选的改法，判定它的证据是一个首行 seq 损坏的真实账本在索引里的常驻字节。
 - **取行走游标，而不是每行一次 open ＋逐字节 read**：一次 `History`／`RunHistory` 查询要取一段连续的 seq，而每一行重开段文件、再一次一个字节 `read` 到换行的读法，系统调用数与行长同阶。句柄因此住进 `LineReader`：段名不变即不重开，读用 `BufReader::read_until(b'\n')`，一次填充服务多行。
   - **实测**（5 万条账本，windows-x86_64 NVMe，每种模式 200 行）：顺序读（`history`）**0.89 µs／行**；逆序读（`run_history`）**5.82 µs／行**；随机跳读 **14.9 µs／行**。
   - **位置自持**：游标记住下一行的偏移，与所求偏移相同即不 seek（顺序读全程零 seek），不同则绝对 seek 并弃缓冲。`run_history` 逆序读每行付一次 seek 与一次缓冲填充，仍是常数次系统调用。
@@ -422,6 +426,7 @@ pub struct Unpriced { pub calls: u64, pub tokens: u64 }
 - 现状与待接点（不造假数据）：SKILL 机制属 Library，故 `by_skill` 恒入兵底桶 `no_skill`，取材契约定为 `tool_result.data.skill`（字串，权重同字节数）；派生执行面属 collab，故 `by_run` 为“每 Run 自身花费”，`run_started.parent` 链的父子归并待派生落地后接。两处均不影响 A20：兵底桶仍参与求和，五维各自恒等 total。
 - 读取契约定死三条——`prompt_assembled` 携 `segments:[{slot,len}]`（两种载荷形均有此二字段）与可选 `window_bytes`（缺即不设 window 桶）；`tool_result` 携 `name` 与 `bytes`；`model_returned` 携 `billed_usd_micros`。**无权威计费额即归因零**（估算等于臆造钱，宁不报），但这次调用记入 `unpriced`：`calls` 加一，`tokens` 加上它 `usage` 的四项 token 之和（缺 `usage` 即加零）。没有它，一座只用订阅登录或本地模型的城跑了多少次都是 total 0，读者分不出「没跑」与「跑了没有报价」；token 是这时唯一量得到的用量。无权重基础即入诚实桶 `unattributed`／`no_tool`（不静默丢）。工具权重只属一波：结算即清，下一调用不继承上波。A20 除四断言外另以 256 例 proptest 钉（任意金额×权重组合均恒等）。
 - 取材：`model_returned.data.billed_usd_micros`（权威计费额）；`prompt_assembled` 逐段 len；`tool_result` 的 name。每维度独立分割同一总额：by_run/by_actor 按事件归属；by_segment 按该 model_returned 所属 run 最近一条 prompt_assembled 的段 len 最大余额法分割（四段＋window 桶：入窗历史份额）——段权重按 run 分键，因为 runtime 每个 run 只写一条 prompt_assembled（其后的回合载荷不变即不再写），账本上交错的另一个 run 的 prompt_assembled 不是这次调用的基础；by_tool 按前一波 tool_result 字节最大余额法（无波则 no_tool 桶）。最大余额法使每维度和恒精确＝total（A20 的整数保证）。
+- **段位基准按 run 保存，run 冻结即丢。** 一次整账本折叠会遇到城里有过的每一个 run；`run_frozen` 是终态，其后不再有该 run 的调用，所以它最近一次 `prompt_assembled` 的段位基准随之移除，常驻量只随在跑的 run 数增长，不随城的历史增长。
 
 ### 8-17 memory::checkpoint::provenance（形状 2 值）
 
@@ -798,7 +803,7 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 - **什么算城里的文件：`travels` 一个家（形状 1 判定）。** 导出端与恢复端问同一个谓词：根层 `.sprawling`（其内容经 ledger／cas 两张门各走各的）与任何深度的 `.git`（受保护元数据，写下即提权）不算城文件；楼自己的 `.sprawling`（`RULES.toml` 等治理字节）**随行**，它是城的一部分。名字引自 kernel 的名单（12.3 定规），不重拼字符串。两侧的策略不同且必须不同：导出端**跳过**（选择带走什么，源城里的簿记本来就不走），恢复端**拒绝**（全成或全拒——一份夹带 `.git` 的 bundle 是伪造品，恢复它就是在落 hooks）。
 - **git 历史随行（`bundle::history`，形状 4 适配器；git2）。** 城根若是 git 仓库，`export` 用 `git2::PackBuilder` 把每条引用所达的全部对象（沿 revwalk 的提交与树，外加每个引用目标的递归闭包，覆盖附注标签）打成 `history/history.pack`，把引用写成 `history/refs`（每行 `<oid> <name>` 或 `ref:<target> <name>`，`HEAD` 在内）；城根不是仓库时 bundle 没有 `history/`，恢复端也不建仓库。`restore` 在复制任何东西之前拒绝已有 `.git` 的城根（`MemoryError::Bundle { op: "restore" }`），复制后 `git2::Repository::init` 一个新仓库，经 `Odb::packwriter` 写入包（libgit2 边写边建索引并校验每个对象），再逐条立引用、按 `HEAD` 读出树写入索引，使 `git status` 只报导出时未提交的改动。**`hooks/` 与 `config` 永不复制**：bundle 里只有包与引用两样，仓库的配置与钩子来自新 init，于是一份伪造的 bundle 没有落钩子的路。引用名只收 `HEAD` 与 `refs/` 之下、且过 `git2::Reference::is_valid_name` 的名字，其余整次拒绝。被否：直接复制 `.git` 目录（会带上 hooks 与 config，正是 8-12 要拒的东西）；`git bundle` 子进程（引外部二进制，且 bundle 格式的解析不在本进程的校验之内）。
 - **v0.0.6 的 bundle 导入其仓库而不是整体拒绝。** v0.0.6 的导出把城根的 `.git` 整个复制进 `city/.git`，清单的 `files` 也数了它的文件。恢复端见到 `city/.git` 是目录、而 bundle 没有 `history/` 时，把它当作一份旧式历史：以 `git2::Repository::open_bare` 只读打开，按导出端同一段打包逻辑（同一个引用名准入）得到包与引用，再走同一个 `History::land`；`city/.git` 下的文件既不拒也不复制，清单的 `files` 减去它们的个数再比。`hooks/` 与 `config` 依旧只来自新 init。仍整次拒绝：`history/` 与 `city/.git` 同在（v0.0.7 的导出从不写后者，二者同在即伪造）、`city/.git` 不是能打开的仓库、`city/.git/objects/info/alternates` 或 `city/.git/commondir` 存在（`open_bare` 会顺着前者把 bundle 之外任一仓库的对象读进包，顺着后者把 `objects`、`refs` 与 `packed-refs` 整个换成它所写路径下的那一份，伪造的 bundle 借此把 bundle 之外的对象与引用带进新城；v0.0.6 的导出从不写二者，因为城根的仓库既不借用别处的对象库，也不是别处仓库的 worktree），以及任何更深处的 `.git`（那是别的仓库，导入它不在本契约内）。被否：继续整体拒绝（v0.0.6 用户的备份因此恢复不了，而其中的对象与引用正是本节已有的导入路径能安全接住的）。
-- **别名永不落盘（8-25）。** `walk` 见到任一链接拒绝整次操作；bundle 的每一次落盘只走 `bundle::landing::land`（形状 4 适配器）：它按值收下 `alias::WriteTarget`，让清过的目标被消费而不是查完即丢。bundle 的目标由 `WriteTarget::within(op, root, path)` 清出：`root` 是人给的根（导出时是 bundle 目录，恢复时是城根），只查 `path` 与它和 `root` 之间的每一级目录，不查 `root` 本身及其上——城根放在哪里是人选的，`/home` 指向 `var/home`、macOS 的 `$TMPDIR` 经 `/var` 这样的链接不是 run 能造出来的写路径。不在 `root` 之下的路径退回到查到文件系统根，所以界只会放宽人选的那一段。被否：沿用 `WriteTarget::at` 查到文件系统根（城只要放在链接下面，导出与恢复就整次失败）。字节先写同目录的暂存文件 `.<name>.part`、`sync_data`，再把原权限抄到暂存文件上，最后 `rename` 覆盖并 `sync_dir`。原权限按 `landing::Bits` 取：复制城文件时取源文件的（可执行位、只读位随文件走，导出再恢复后不丢），写清单与历史时取被覆盖文件的（没有就用新建默认值）。`rename` 换的是目录项，所以硬链接臂同样由此保证，且不存在「名已删、字节未落」的丢文件窗口。权限在 `sync_data` 之后才抄：只读位一旦落上，Windows 不再允许以写句柄打开该文件。被否：写前移除该名再建（失败即丢文件，且按 umask 新建，丢可执行位）；就地截断重写（写穿硬链接，崩溃留半个文件）。链接臂是拒绝不是跳过——对照组的 “skipped N files” 就是宽容部分还原。悬空链接在列举中不可见（`is_file`／`is_dir` 走不到它），但落盘必须先过 `WriteTarget`，故恒拒仍然成立。
+- **别名永不落盘（8-25）。** `walk` 见到任一链接拒绝整次操作；bundle 的每一次落盘只走 `bundle::landing::land`（形状 4 适配器）：它按值收下 `alias::WriteTarget`，让清过的目标被消费而不是查完即丢。bundle 的目标由 `WriteTarget::within(op, root, path)` 清出：`root` 是人给的根（导出时是 bundle 目录，恢复时是城根），只查 `path` 与它和 `root` 之间的每一级目录，不查 `root` 本身及其上——城根放在哪里是人选的，`/home` 指向 `var/home`、macOS 的 `$TMPDIR` 经 `/var` 这样的链接不是 run 能造出来的写路径。不在 `root` 之下的路径退回到查到文件系统根，所以界只会放宽人选的那一段。被否：沿用 `WriteTarget::at` 查到文件系统根（城只要放在链接下面，导出与恢复就整次失败）。字节先写同目录的暂存文件 `.<name>.part`（这个拼写只在 `landing` 定义一处；导出不把合这个拼写的名字当城文件带走，因为恢复中途崩溃会把暂存文件留在城根下）、`sync_data`，再把原权限抄到暂存文件上，最后 `rename` 覆盖并 `sync_dir`。原权限按 `landing::Bits` 取：复制城文件时取源文件的（可执行位、只读位随文件走，导出再恢复后不丢），写清单与历史时取被覆盖文件的（没有就用新建默认值）。`rename` 换的是目录项，所以硬链接臂同样由此保证，且不存在「名已删、字节未落」的丢文件窗口。权限在 `sync_data` 之后才抄：只读位一旦落上，Windows 不再允许以写句柄打开该文件。被否：写前移除该名再建（失败即丢文件，且按 umask 新建，丢可执行位）；就地截断重写（写穿硬链接，崩溃留半个文件）。链接臂是拒绝不是跳过——对照组的 “skipped N files” 就是宽容部分还原。悬空链接在列举中不可见（`is_file`／`is_dir` 走不到它），但落盘必须先过 `WriteTarget`，故恒拒仍然成立。
 
 ### 8-14 memory::error（形状 2 值）
 
@@ -815,6 +820,7 @@ pub enum MemoryError {                      // thiserror；crate 根
     Alias { op: &'static str, path: PathBuf, kind: alias::AliasKind },  // → E_OUTSIDE_WRITE_DOMAIN（8-25）
     LedgerHeld { dir: PathBuf },            // 另一个 JsonlLedger 持着这座城的账本（8-1）→ E_LEDGER_HELD
     LedgerBroken { dir: PathBuf, at: Seq }, // 一波的写或 sync 失败过，重开前拒绝之后每一波（8-1）→ E_STORAGE_FATAL
+    Snapshot { op: &'static str, path: PathBuf, source: io::Error },  // 快照读写被盘拒绝（8-26）→ E_STORAGE_FATAL，恢复说的是快照
 }
 impl MemoryError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
 pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) -> MemoryError;
@@ -822,6 +828,7 @@ pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) ->
 
 - **为什么是独立模块**：§7 的登记条件是「≥3 处跨模块汇聚」，今天是十二处。
 - **为什么带着 `io_err` 走**：它是 `MemoryError::Io` 的构造子，而一个值的构造子与它的定义同住。四个模块（cas／bundle／digest_cache／index）只为取它而 import jsonl，那是一条指错了方向的依赖。
+- **快照的 I/O 失败有自己的变体**：`Io` 的恢复建议说的是账本（停机，重开会截掉撕裂的尾巴），对快照是错的——快照是账本随时能重建的缓存。`Snapshot` 与 `Io` 同码（盘拒绝了写，多半账本也写不进），恢复则说：删掉这份快照、腾出盘，下次启动从创世折叠。被否：让 `Io` 的恢复按 `op` 分支——一个变体两种建议，读恢复的人得先知道 `op` 的全集。
 - **公开名是 `memory::MemoryError`**（`lib.rs` 重导出）：模块住处不进公共面，api-baseline 不随它动。
 
 ### 8-15 memory::vfs（形状 3 端口）
@@ -870,6 +877,7 @@ impl Vfs for RealFs { … }
 
 - **唯一的状态是那个句柄**：追写与 sync 走同一个句柄，所以被做持久的就是刚写的那些字节（979.7 µs／条降至 576.6 µs／条）。
 - **句柄命名的是文件不是路径**：`rename`／`remove_file`／`truncate` 前必须 `release`。两条断言随这个模块走，它们问的是「之后字节落在哪个文件里」。
+- **`rename` 是原子替换，在 Windows 上也是**：Windows 拒绝把文件改名到一个只读文件上（拒绝访问），而 `Vfs::rename` 的契约是替换。所以在 Windows 上，改名因无权被拒且目标是只读文件时，先清掉目标的只读位再改名一次；别的原因的拒绝原样返回。成功路径不多花一次系统调用。两步之间崩溃，目标内容不变、只丢只读位；暂存文件已带原权限（8-25），重做一次落盘即复原。被否：在 `bundle::landing` 里先清目标的位——那要给端口加一个方法，而规则属于「替换」本身，所有经 `rename` 的替换都该守它。
 
 ## 8.5 两个设计
 
@@ -1138,9 +1146,9 @@ impl Worktrees {
 
 **回到过去不移动 HEAD。** 选「新 session ＋ 一棵停在那一点提交上的独立工作区」，否决「把城的 HEAD 检出到那一点」：后者会在别的 run 正写着的时候改掉它们落地的基线，而 Lean 模型里干线恒不被任何一步改动，正是这条的形式化。分支在那一点上新建，名字就是 `WorktreeName`，与 `claim` 同一套名字。
 
-**拒绝，不覆盖。** `claim_at` 在三种情况下拒：名字登记着一棵活树，或者已有同名分支（那是一条已有的工作线，覆盖它就是冲掉别人的写入）→ `WorktreeBusy`（`E_WORKTREE_BUSY`，恢复：换一个名字）；point 不是城仓库里的提交 → `Worktree{op:"find the point to go back to"}`。城的工作树超过上限 → `WorktreeBusy`，与 `claim` 同一个预检（`refuse_oversized`）。拒后城内文件、干线与所有分支都不变；分支建好而检出失败时，这条专为它新建的分支随即删掉，否则它会以一条没人开始的工作线占住这个名字。检出与 `claim` 走同一个 `add_tree`，放树的位置与别名判定只有一处。它不像 `claim` 那样自愈一个目录已丢的登记：回到过去总取新名字，碰上旧名字就是调用方的错。
+**拒绝，不覆盖。** `claim_at` 在三种情况下拒：名字登记着一棵活树，或者已有同名分支（那是一条已有的工作线，覆盖它就是冲掉别人的写入）→ `WorktreeBusy`（`E_WORKTREE_BUSY`，恢复：换一个名字）；point 不是城仓库里的提交 → `Worktree{op:"find the point to go back to"}`。城的工作树超过上限 → `WorktreeBusy`，与 `claim` 同一个预检（`refuse_oversized`）。拒后城内文件、干线与所有分支都不变；分支建好而检出失败时，这条专为它新建的分支随即删掉，否则它会以一条没人开始的工作线占住这个名字。这次删除本身失败时，分支留下，返回的 `Worktree{op:"remove the branch of a tree that did not open"}` 同时带着检出失败的原因：调用方知道有一条孤儿分支占着这个名字，换一个名字即可继续。检出与 `claim` 走同一个 `add_tree`，放树的位置与别名判定只有一处。它不像 `claim` 那样自愈一个目录已丢的登记：回到过去总取新名字，碰上旧名字就是调用方的错。
 
-**取回只写自己的树。** `restore_file` 只接受相对路径且不含 `..`，不接受 `RESERVED_PREFIX` 之下的路径，也不接受任何以 `.` 或空格结尾、或含 `:` 的段——Win32 把这些拼写折叠到另一个名字上（`.git.`、`.git `、`.git::$DATA` 都指向树的 `.git` 链接），逐段比较挡不住它们；写入目标是 `lease.path()` 下的那个文件，经 `alias::WriteTarget` 判定（8-25）。point 上是 blob 即按原字节经 `bundle::landing::land` 落盘（同目录暂存、`sync_data`、抄原权限、`rename` 覆盖、`sync_dir`，8-25），所以经硬链接指向别的树或干线的名字只被换掉目录项，那一头的字节不动，崩溃也不留半个文件；point 上没有即删除，这就是「恢复到那一点」的含义；目录与子模块不是一个文件，拒。
+**取回只写自己的树。** `restore_file` 只接受相对路径且不含 `..`，不接受 `RESERVED_PREFIX` 之下的路径，也不接受任何以 `.` 或空格结尾、含 `:`、或含 `~` 后跟数字的段——Win32 把这些拼写折叠到另一个名字上（`.git.`、`.git `、`.git::$DATA` 都指向树的 `.git` 链接，卷生成 8.3 短名时 `GIT~1` 也是），逐段比较挡不住它们；写入目标是 `lease.path()` 下的那个文件，经 `alias::WriteTarget` 判定（8-25）。point 上是 blob 即按原字节经 `bundle::landing::land` 落盘（同目录暂存、`sync_data`、抄原权限、`rename` 覆盖、`sync_dir`，8-25），所以经硬链接指向别的树或干线的名字只被换掉目录项，那一头的字节不动，崩溃也不留半个文件；point 上没有即删除，这就是「恢复到那一点」的含义；目录与子模块不是一个文件，拒。
 
 **现状。** 本模块是统一历史的第一段。「分叉」与「取回」的事件种类（`went_back`、`file_restored`）已在 kernel 事件表里。其余几段尚不存在：服务端把账本加 git 投影成一棵血缘树的读者面，以及网页上把楼页的提交、改动、回收站与对话页的分叉合成一页的「历史」页。它们到来之前，`claim_at` 与 `restore_file` 没有生产调用者。
 ### 8-29 `memory::blob`：一次提交里一个文件的字节（形状 4 adapter）

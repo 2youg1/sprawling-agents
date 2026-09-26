@@ -167,6 +167,10 @@ impl Worktrees {
 /// `path` as the disk spells it: the whole path when it exists, else its
 /// parent resolved and the last component kept, else `path` unchanged. A
 /// crash may have removed the tree's own directory while its home stays.
+///
+/// A path that cannot be resolved keeps its spelling rather than failing
+/// the sweep: the sweep then fails closed, because a registration spelled
+/// differently from the home it is compared with is left alone.
 fn resolved(path: &Path) -> PathBuf {
     std::fs::canonicalize(path)
         .or_else(|_| match (path.parent(), path.file_name()) {
