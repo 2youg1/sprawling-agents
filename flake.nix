@@ -71,16 +71,17 @@
           pkgs.bun
           pkgs.cargo-deny
           pkgs.git
+          pkgs.elan
+          pkgs.uv
         ];
 
         # The one required row this shell cannot answer, named here so
-        # that it stays one. `nightly-rustdoc` is what cargo-public-api
-        # reads, it arrives through rustup, and NixOS cannot start a
-        # rustup-downloaded toolchain at all - which is the reason this
-        # flake exists, stated at the head of the file. So the `apisync`
-        # gate is the single part of `just check` a NixOS shell does not
-        # hold, and CI's `gates` job is where it is held.
-        uncoveredRows = [ "nightly-rustdoc" ];
+        # that it stays one. `rustup` is how every other platform gets
+        # the toolchain `rust-toolchain.toml` pins, and NixOS cannot
+        # start a rustup-downloaded toolchain at all - which is the
+        # reason this flake exists, stated at the head of the file. The
+        # shell carries that toolchain itself instead.
+        uncoveredRows = [ "rustup" ];
 
         # aws-lc-sys compiles the AWS-LC C sources, so a shell without cmake
         # and a C compiler fails on `cargo build` rather than on anything a
@@ -151,9 +152,10 @@
 
         # A devshell that stops short of `just check` fails here rather
         # than at the desk of the person who entered it. `just prereqs
-        # list` prints one `class<TAB>name` row per tool, this check
-        # looks each required row up on the PATH the devshell builds, and
-        # a row added to the justfile without a package beside it in
+        # list` prints one `class<TAB>name<TAB>probe` row per tool, this
+        # check runs each required row's probe on the PATH the devshell
+        # builds, skipping a `-` probe the doctor alone can answer, and a
+        # row added to the doctor's table without a package beside it in
         # `tools` turns red. The exception list is checked in the other
         # direction too: an entry that is no longer a required row is a
         # stale excuse and fails, so it cannot outlive the tool.
@@ -168,15 +170,16 @@
               tab=$(printf '\t')
               just --justfile ${self}/justfile --working-directory . prereqs list > rows
               missing=""
-              while IFS="$tab" read -r class name; do
+              while IFS="$tab" read -r class name probe; do
                 [ "$class" = required ] || continue
+                [ "$probe" = - ] && continue
                 case " $uncovered " in
                   *" $name "*) echo "not covered by nix, by decision: $name"; continue ;;
                 esac
-                command -v "$name" >/dev/null 2>&1 || missing="$missing $name"
+                eval "$probe" >/dev/null 2>&1 || missing="$missing $name"
               done < rows
               for name in $uncovered; do
-                grep -qxF "required$tab$name" rows || {
+                grep -q "^required$tab$name$tab" rows || {
                   echo "$name is no longer a required row; drop it from uncoveredRows" >&2
                   exit 1
                 }

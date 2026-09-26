@@ -12,7 +12,7 @@ just prereqs                  # every other tool the loop needs, with the instal
 just check                    # fmt + clippy (-D warnings, --all-features) + two feature-combination checks + the Lean design models + nextest + the client bundle + every machine gate + the client's own checks
 ```
 
-The `prereqs` recipe is the only list of the tools the loop needs, and `just check` opens with it so that a missing tool is named in milliseconds. `build-web` runs inside `check` because `render` and `npm` judge the built client, and refuse when it is absent.
+The `prereqs` recipe reads the only list of the tools the loop needs, the develop tier of the doctor's table, and `just check` opens with it so that a missing tool is named in milliseconds. `build-web` runs inside `check` because `render` and `npm` judge the built client, and refuse when it is absent.
 
 | Command | What it does |
 |---|---|
