@@ -3,9 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the backlog's scratch directories are held to: one name per
-//! member of one backlog of one process, and never a name two of them
-//! could both produce.
+//! What the backlog is held to from inside: one scratch directory name
+//! per member of one backlog of one process, and a run's end that
+//! reaches every command the run left running.
 
 use super::Backlog;
 
@@ -47,4 +47,63 @@ fn two_members_of_one_backlog_name_different_directories() {
         mine.scratch.dir(mine.mint().unwrap()),
         mine.scratch.dir(mine.mint().unwrap())
     );
+}
+
+/// A command that outlives the window by `seconds`, started for `owner`.
+fn a_background_command(backlog: &Backlog, owner: kernel::RunId, seconds: u8) {
+    let mut slow = if cfg!(windows) {
+        let mut command = std::process::Command::new("ping");
+        command.args(["-n", &seconds.to_string(), "127.0.0.1"]);
+        command
+    } else {
+        let mut command = std::process::Command::new("sleep");
+        command.arg(seconds.to_string());
+        command
+    };
+    slow.current_dir(std::env::temp_dir());
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    let started = backlog.run(owner, &addr, "slow".to_owned(), slow).unwrap();
+    assert!(matches!(started, crate::Started::Backgrounded { .. }));
+}
+
+/// A run's end reaches the table even after another thread died holding
+/// it. `release` is called from `ExecTool`'s drop, which has nobody to
+/// hand a failure to, so a release that could fail would leave the
+/// ended run's commands running for a run that no longer exists.
+#[test]
+fn a_release_reaches_a_table_a_dead_thread_left_locked() {
+    let backlog = Backlog::with_window(crate::PollBudget::new(1, 1));
+    let ended = kernel::RunId::from_bytes([1; 16]);
+    a_background_command(&backlog, ended, 2);
+    let table = backlog.table.clone();
+    let died = std::thread::spawn(move || {
+        let _held = table.lock().unwrap();
+        panic!("the thread dies holding the table");
+    })
+    .join();
+    assert!(died.is_err() && backlog.table.is_poisoned());
+    assert_eq!(backlog.release(ended), 1);
+}
+
+/// A run's end terminates what it left running: nothing can read its
+/// outcome any more, and a sandboxed command's copied tree is deleted
+/// in the same drop that releases it.
+#[test]
+fn a_release_terminates_what_the_ended_run_left_running() {
+    let backlog = Backlog::with_window(crate::PollBudget::new(1, 1));
+    let (ended, other) = (
+        kernel::RunId::from_bytes([1; 16]),
+        kernel::RunId::from_bytes([2; 16]),
+    );
+    a_background_command(&backlog, ended, 60);
+    backlog.release(ended);
+    let addr = kernel::Address::parse("vault/room1").unwrap();
+    for _ in 0..250 {
+        assert!(backlog.harvest(other).unwrap().is_empty());
+        if backlog.standing(&addr).unwrap().is_empty() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    panic!("a released command is still running five seconds later");
 }

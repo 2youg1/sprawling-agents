@@ -277,26 +277,36 @@ impl Backlog {
         Ok(done)
     }
 
-    /// Marks every background command `owner` started as owed to
-    /// nobody, and returns how many there were. The run has ended, so no
-    /// later tool result of its own can carry them; the next harvest by
-    /// any run lets their process handles and files go without reading
-    /// their output to anyone.
+    /// Terminates every background command `owner` started, marks each
+    /// as owed to nobody, and returns how many there were. The run has
+    /// ended, so no later tool result of its own can carry them; the
+    /// next harvest by any run lets their process handles and files go
+    /// without reading their output to anyone.
     ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` when the table cannot be reached.
-    pub fn release(&self, owner: RunId) -> Result<usize, AxError> {
-        let mut table = self.hold()?;
+    /// Infallible by construction: lowering a claim and killing a
+    /// process hold on any state of the table, so a table a dead thread
+    /// left locked is still reached, while every other call keeps
+    /// answering `E_STORAGE_FATAL`. The caller is a drop, which has
+    /// nobody to hand a failure to.
+    pub fn release(&self, owner: RunId) -> usize {
+        let mut table = self
+            .table
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut released = 0usize;
         for member in table.members.values_mut() {
-            if let Body::Command { claim, .. } = &mut member.body
+            if let Body::Command { claim, child, .. } = &mut member.body
                 && *claim == Claim::Run(owner)
             {
                 *claim = Claim::Nobody;
+                // A process that already exited cannot be killed, and
+                // one that cannot be killed is reaped by the next harvest
+                // like any member that stops on its own.
+                drop(child.kill());
                 released = released.saturating_add(1);
             }
         }
-        Ok(released)
+        released
     }
 
     /// What is still running at or under one address.
@@ -377,7 +387,7 @@ impl Backlog {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "test code")]
 mod tests;
 
 mod member;
