@@ -45,6 +45,7 @@ mod endpoint;
 mod governance;
 mod log;
 mod modality;
+mod provider;
 mod run;
 mod tool;
 mod turn;
@@ -61,6 +62,7 @@ pub use governance::{
 };
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
+pub use provider::{ProviderDegraded, VaultFellBack};
 pub use run::{EvalRun, EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
