@@ -9,9 +9,10 @@
 use serde::{Deserialize, Serialize};
 
 use super::code::AxCode;
+use super::provider::ProviderFailureKind;
 use super::refusal::GateRefusal;
 
-/// The unified error shape: seven wire fields, serialized in declaration
+/// The unified error shape: eight wire fields, the last two absent unless set, serialized in declaration
 /// order (determinism rule 6). The model is the recovery subject: `nearby`
 /// and `recovery` must hold directly executable information, not apologies.
 ///
@@ -37,6 +38,8 @@ struct ErrorDetail {
     retriable: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     gate: Option<GateRefusal>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    provider: Option<ProviderFailureKind>,
 }
 
 /// An error that still owes the reader its recovery sentence.
@@ -69,6 +72,7 @@ impl AxError {
                     recovery: String::new(),
                     retriable: false,
                     gate: None,
+                    provider: None,
                 }),
             },
         }
@@ -85,6 +89,20 @@ impl AxError {
     ) -> ErrorDraft {
         let mut draft = AxError::failure(code, action, subject);
         draft.pending.detail.gate = Some(gate);
+        draft
+    }
+
+    /// An `E_PROVIDER` error that names the kind of failure a model
+    /// call met; the kind alone decides whether the request may go out
+    /// again.
+    pub fn provider(
+        kind: ProviderFailureKind,
+        action: impl Into<String>,
+        subject: impl Into<String>,
+    ) -> ErrorDraft {
+        let mut draft = AxError::failure(AxCode::Provider, action, subject);
+        draft.pending.detail.retriable = kind.is_retriable();
+        draft.pending.detail.provider = Some(kind);
         draft
     }
 
@@ -114,6 +132,10 @@ impl AxError {
 
     pub fn gate(&self) -> Option<&GateRefusal> {
         self.detail.gate.as_ref()
+    }
+
+    pub fn provider_failure(&self) -> Option<ProviderFailureKind> {
+        self.detail.provider
     }
 
     /// Replaces the recovery sentence of an error raised further down,

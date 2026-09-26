@@ -74,7 +74,7 @@ pub use config::{McpServer, McpTransport, SecondThreshold};
 pub use delegation::{Delegate, DelegateKind, DelegationVerdict, Delegator, Depth};
 pub use discard::Restoration;
 pub use discard::{DenyReason, Discard, DiscardForecast, DiscardRequest, DiscardVerdict};
-pub use error::{AxCode, AxError, Carrier, ErrorDraft, GateRefusal};
+pub use error::{AxCode, AxError, Carrier, ErrorDraft, GateRefusal, ProviderFailureKind};
 pub use event::{EventDraft, EventKind, EventRecord, EventRef, Payload};
 pub use event::{RunId, Seq, TimeMs, WindowClass};
 pub use gate::GateOutcome;

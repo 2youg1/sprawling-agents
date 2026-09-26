@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, DialectKind, Proxying, SecretRef};
+use kernel::{AxCode, AxError, DialectKind, ProviderFailureKind, Proxying, SecretRef};
 use serde_json::Value;
 
 use super::header::HeaderValue;
@@ -131,13 +131,11 @@ fn transport_detail(err: &reqwest::Error) -> String {
 /// What failed about one provider call, said by the call site that saw
 /// it rather than guessed later from the text of a message.
 ///
-/// **This enum is the one home of "may this be tried again".** An
-/// exchange that never completed carries no answer, so the same request
-/// may go out again; an answer the city refuses would be refused
-/// identically next time. Before this type every call site built its
-/// own error and none opted in, which made the default
-/// `Retries::UntilHalted` worth zero retries in practice — one
-/// transient disconnect ended a sub-run for good.
+/// Its [`ProviderFailureKind`] is what the wire carries and what decides
+/// "may this be tried again". Without that one decision every call site
+/// built its own error and none opted in, which made the default
+/// `Retries::UntilHalted` worth zero retries in practice — one transient
+/// disconnect ended a sub-run for good.
 #[derive(Debug)]
 pub(crate) enum ProviderFailure<'e> {
     /// The exchange never completed: the request did not reach the
@@ -179,14 +177,16 @@ impl ProviderFailure<'_> {
         }
     }
 
-    fn retriable(&self) -> bool {
+    fn kind(&self) -> ProviderFailureKind {
         match self {
-            ProviderFailure::Exchange(_)
-            | ProviderFailure::Cut(_)
-            | ProviderFailure::Silence { .. } => true,
-            ProviderFailure::Refused { .. }
-            | ProviderFailure::Unreadable(_)
-            | ProviderFailure::Unbuilt(_) => false,
+            ProviderFailure::Exchange(_) => ProviderFailureKind::Exchange,
+            ProviderFailure::Cut(_) => ProviderFailureKind::Cut,
+            ProviderFailure::Silence { .. } => ProviderFailureKind::Silence,
+            ProviderFailure::Refused { status, .. } => ProviderFailureKind::Refused {
+                status: u32::from(status.as_u16()),
+            },
+            ProviderFailure::Unreadable(_) => ProviderFailureKind::Unreadable,
+            ProviderFailure::Unbuilt(_) => ProviderFailureKind::Unbuilt,
         }
     }
 
@@ -209,16 +209,10 @@ impl ProviderFailure<'_> {
     }
 }
 
-/// One provider failure as an `E_PROVIDER` error, its retriability and
-/// its way out taken from [`ProviderFailure`], never decided here.
+/// One provider failure as an `E_PROVIDER` error, its kind and its way
+/// out taken from [`ProviderFailure`], never decided here.
 pub(crate) fn provider_err(action: &str, failure: &ProviderFailure<'_>) -> AxError {
-    let draft = AxError::failure(AxCode::Provider, action, failure.subject());
-    let draft = if failure.retriable() {
-        draft.retriable()
-    } else {
-        draft
-    };
-    draft.with_recovery(failure.recovery())
+    AxError::provider(failure.kind(), action, failure.subject()).with_recovery(failure.recovery())
 }
 
 /// Applies one JSON-pointer override, creating missing object segments.

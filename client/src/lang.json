@@ -1387,6 +1387,30 @@
     "en": "what the city is telling you",
     "zh": "城里的动静"
   },
+  "provider_cut": {
+    "en": "the answer stopped part-way; the same request is worth sending again",
+    "zh": "回答中途断了，同一个请求值得再发一次"
+  },
+  "provider_exchange": {
+    "en": "the request never completed; the same request is worth sending again",
+    "zh": "请求没有完成，同一个请求值得再发一次"
+  },
+  "provider_refused": {
+    "en": "the provider refused with {status}; check this endpoint's model name, key and dialect",
+    "zh": "供应方以 {status} 拒绝了请求：检查这个接口的模型名、密钥和接口形态"
+  },
+  "provider_silence": {
+    "en": "the provider went silent mid-answer; the same request is worth sending again",
+    "zh": "供应方回答到一半不再出声，同一个请求值得再发一次"
+  },
+  "provider_unbuilt": {
+    "en": "this side could not build the request; check this endpoint's base_url and extra headers",
+    "zh": "这一侧没能造出请求：检查这个接口的 base_url 和附加请求头"
+  },
+  "provider_unreadable": {
+    "en": "the provider answered in a shape the city cannot read; check this endpoint's dialect",
+    "zh": "供应方的回答城读不懂：检查这个接口的接口形态"
+  },
   "rec_archive": {
     "en": "the archive",
     "zh": "归档"

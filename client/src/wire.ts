@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 40 as const;
+export const WIRE_V = 41 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7" as const;
+export const WIRE_HASH = "fa28135c18a4a63a0aac8e80fd089649f35950060c1baf0cd5ae3c80f58d6730" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -1505,7 +1505,35 @@ export const GateRefusal = Schema.Struct({
 export type GateRefusal = typeof GateRefusal.Type;
 
 /**
- * The unified error shape: seven wire fields, serialized in declaration
+ * The kind of one provider failure, as the call site that saw it named
+ * it. It travels on the wire so a page can say it in the reader's own
+ * language; the city's recovery sentence stays beside it for the fold.
+ */
+export const ProviderFailureKind = Schema.Union(
+  Schema.Struct({
+    kind: Schema.Literal("exchange"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("cut"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("silence"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("refused"),
+    status: Schema.Int,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("unreadable"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("unbuilt"),
+  }),
+).annotations({ identifier: "ProviderFailureKind" });
+export type ProviderFailureKind = typeof ProviderFailureKind.Type;
+
+/**
+ * The unified error shape: eight wire fields, the last two absent unless set, serialized in declaration
  * order (determinism rule 6). The model is the recovery subject: `nearby`
  * and `recovery` must hold directly executable information, not apologies.
  * 
@@ -1518,6 +1546,7 @@ export const AxError = Schema.Struct({
   code: AxCode,
   gate: Schema.optional(Schema.NullOr(GateRefusal)),
   nearby: Schema.Array(Schema.String),
+  provider: Schema.optional(Schema.NullOr(ProviderFailureKind)),
   recovery: Schema.String,
   retriable: Schema.Boolean,
   subject: Schema.String,

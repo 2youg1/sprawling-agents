@@ -161,11 +161,14 @@ pub struct GateRefusal {                // three-part refusal；三段必填
     rule: String, violation: String, alternative: String,
 }
 
-pub struct AxError {                    // 七字段，序列化字段序＝声明序
+pub struct AxError {                    // 八字段，序列化字段序＝声明序；后两个缺席时不上线
     code: AxCode, action: String, subject: String,
     nearby: Vec<String>, recovery: String, retriable: bool,
-    gate: Option<GateRefusal>,
+    gate: Option<GateRefusal>, provider: Option<ProviderFailureKind>,
 }
+
+pub enum ProviderFailureKind { Exchange, Cut, Silence, Refused { status: u32 }, Unreadable, Unbuilt }  // 携 serde，内标签 kind
+impl ProviderFailureKind { pub fn is_retriable(self) -> bool; }
 
 pub enum Carrier { Event(EventKind), Loadtime }
 impl AxCode {
@@ -182,7 +185,10 @@ impl AxError {
     pub fn failure(code: AxCode, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     /// Gate refusal. Sets `gate` to the mandatory three parts.
     pub fn refusal(code: AxCode, action: impl Into<String>, subject: impl Into<String>, gate: GateRefusal) -> ErrorDraft;
+    /// 模型调用失败的 E_PROVIDER：种类在场，`retriable` 由种类决定。
+    pub fn provider(kind: ProviderFailureKind, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     pub fn code(&self) -> &AxCode;  pub fn gate(&self) -> Option<&GateRefusal>;
+    pub fn provider_failure(&self) -> Option<ProviderFailureKind>;
     /// 改写下层抛上来的恢复语；与 `ErrorDraft::with_recovery` 分名，因为它毁掉一句而不是补上第一句。
     #[must_use] pub fn rewrite_recovery(self, recovery: impl Into<String>) -> Self;
 }
@@ -195,6 +201,8 @@ impl ErrorDraft {
     pub fn with_recovery(self, recovery: impl Into<String>) -> AxError;   // 唯一出口
 }
 ```
+
+**供应方失败的种类上线，句子不上线**：`provider` 只在 `AxError::provider` 造出的 E_PROVIDER 上在场（gateway 的 `provider_err` 是它的调用处；不是模型调用的 E_PROVIDER，如连接器的 http 客户端，不带种类）。客户端按 `kind` 从 `lang.json` 取人读的出路，城写的 `recovery` 折进「城的原话」供排错；城若只给英文句子，中文界面就只能照抄英文。「能不能再试一次」也由种类一处决定（`is_retriable`）：未完成的交换（`exchange`／`cut`／`silence`）可重试，供应方已回答的拒绝与读不懂的回答（`refused`／`unreadable`）以及这一侧没造出来的请求（`unbuilt`）不可重试。**被否**：在 gateway 里另留一张「可否重试」表——种类与重试判定会成为同一事实的两个权威。
 
 **H-01 定案：取 typestate，不取四参**。路线图 §13.1 原定 `failure(code, action, subject, recovery)` 四参必填，此处改记为 typestate，理由三条：其一，`refusal` 已占满四参，再塞恢复语就是第五参，越过参数上限；其二，恢复语只剩 `ErrorDraft::with_recovery` 一个设定处，四参方案则要把 `with_recovery` 留作改写器，同一个名字两份职责；其三，四参要重写全部 641 个调用点，typestate 只动缺恢复语的那些，改动面恰好等于缺陷面。关门理由随之由「每处四实参」改为「编译通过」——恢复语必填这条现在由类型系统执行，grep 执行不了它。`AxError` 一经存在即已完工，`with_nearby`／`retriable` 只在 draft 上，故链式调用中 `with_recovery` 恒为最后一环。
 

@@ -143,7 +143,9 @@ use serde::{Deserialize, Serialize};
 ///    new session; an older page would meet a code it cannot decode.
 /// 40: a pursuit's verdict is the kernel's kind, not an English clause,
 ///    so a page takes its words from its own language table.
-pub const WIRE_V: u32 = 40;
+/// 41: an `E_PROVIDER` error from a model call names the kind of failure
+///    (`provider`), so a page can say it in the reader's language.
+pub const WIRE_V: u32 = 41;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
