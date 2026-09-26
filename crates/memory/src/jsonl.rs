@@ -12,7 +12,8 @@
 //!   about the byte shape.
 //! - `append_all` is one durability barrier per wave: `Ok` means every
 //!   line is written and synced; on `Err` the in-memory state has not
-//!   advanced and torn bytes are the next open's tail recovery.
+//!   advanced, torn bytes are the next open's tail recovery, and the
+//!   handle refuses every later wave until that open (`barrier`).
 //! - open never rewrites while browsing: the version probe fires before
 //!   any repair; only the last segment is ever truncated, and only at a
 //!   torn boundary.

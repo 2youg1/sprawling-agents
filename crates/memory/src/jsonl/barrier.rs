@@ -6,6 +6,41 @@
 //! The durability barrier's state: whether the ledger's in-memory
 //! position still names what the disk holds (memory-SPEC 8-1).
 
+use std::path::Path;
+
+use kernel::Seq;
+
+use crate::error::MemoryError;
+
+/// Whether the ledger's in-memory position is the end of what its
+/// segments hold.
+///
+/// A wave breaks the barrier before its first byte goes out and mends
+/// it only after every segment it touched is synced. A write that dies
+/// partway leaves bytes the position does not account for - a torn
+/// line, or whole lines whose sync failed - and a wave appended after
+/// them would sit behind bytes the next open truncates, so its `Ok`
+/// would claim a record the disk then loses. Only open reads the tail
+/// and knows what is there; a broken handle refuses every later wave.
+pub(crate) enum Barrier {
+    Whole,
+    Broken,
+}
+
+impl Barrier {
+    /// `Ok` while the position is the end of the segments; otherwise the
+    /// refusal that sends the caller to a reopen.
+    pub(crate) fn admit(&self, dir: &Path, at: Seq) -> Result<(), MemoryError> {
+        match self {
+            Barrier::Whole => Ok(()),
+            Barrier::Broken => Err(MemoryError::LedgerBroken {
+                dir: dir.to_path_buf(),
+                at,
+            }),
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

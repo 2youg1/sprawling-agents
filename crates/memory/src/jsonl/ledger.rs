@@ -34,6 +34,9 @@ pub struct JsonlLedger {
     pub(crate) next_seq: Seq,
     pub(crate) prev: B3Hash,
     pub(crate) roll_bytes: u64,
+    /// Whether `seg_len`, `next_seq` and `prev` still name the end of
+    /// the segments; a failed wave leaves it broken until a reopen.
+    pub(crate) barrier: super::barrier::Barrier,
     /// The per-room projection of what this ledger appends, laid down
     /// after a wave is durable. `None` for a ledger opened directly in a
     /// directory that is not a city's, which has no buildings to file

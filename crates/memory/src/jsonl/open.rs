@@ -83,6 +83,7 @@ impl JsonlLedger {
             next_seq: Seq::FIRST,
             prev: GENESIS_PREV,
             roll_bytes: SEGMENT_ROLL_BYTES,
+            barrier: super::barrier::Barrier::Whole,
             // The projection exists only when this ledger is a city's:
             // it is what tells a writer handed the ledger directory
             // alone where the buildings' sessions lie. A store opened

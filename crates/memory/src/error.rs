@@ -98,6 +98,11 @@ pub enum MemoryError {
     /// or a second ledger in this one (memory-SPEC 8-1).
     #[error("the ledger at {dir} is held by another writer")]
     LedgerHeld { dir: PathBuf },
+    /// A wave's write or barrier failed, so what the disk holds past
+    /// `at` is unknown to this handle; only a reopen can judge it
+    /// (memory-SPEC 8-1).
+    #[error("the ledger at {} lost its barrier at seq {}", dir.display(), at.value())]
+    LedgerBroken { dir: PathBuf, at: kernel::Seq },
 }
 
 impl MemoryError {
@@ -198,6 +203,15 @@ impl MemoryError {
             .with_recovery(
                 "another sprawling process is serving or changing this city; stop it \
                  (Ctrl-C in its terminal, or /quit in its console), then run this again",
+            ),
+            MemoryError::LedgerBroken { dir, at } => AxError::failure(
+                AxCode::StorageFatal,
+                "append to the ledger",
+                format!("{} at seq {}", dir.display(), at.value()),
+            )
+            .with_recovery(
+                "a write to this ledger failed earlier; free the disk or fix the device, \
+                 then restart sprawling so that opening the ledger repairs its tail",
             ),
             MemoryError::Alias { op, path, kind } => {
                 AxError::failure(AxCode::OutsideWriteDomain, op, path.display().to_string())
