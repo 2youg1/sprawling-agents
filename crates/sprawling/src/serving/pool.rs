@@ -36,6 +36,11 @@ use crate::monitor::memory::Memory;
 /// somewhere that can count to somewhere that cannot.
 pub(crate) const DRIVING_LANES: u32 = 4;
 
+/// The share of physical memory a new run leaves free: one part in
+/// this many. A share rather than a byte count, because a byte count
+/// suits one class of machine (sprawling-SPEC.md 8-46-3).
+const RESERVE_SHARE: u64 = 10;
+
 /// One run, home from its lane: which run it was, and what its drive
 /// left behind. The two travel together because neither is anything
 /// without the other — a `Driven` names no run, and a run id says
@@ -153,11 +158,16 @@ impl DrivingPool {
 
 /// Whether one more run may start: a lane is free, and either no run is
 /// driving or the machine keeps a tenth of its physical memory free.
-fn admits(in_flight: u32, lanes: u32, _memory: Memory) -> bool {
-    in_flight < lanes
+fn admits(in_flight: u32, lanes: u32, memory: Memory) -> bool {
+    let tight = memory
+        .physical
+        .checked_div(RESERVE_SHARE)
+        .is_some_and(|reserve| memory.available < reserve);
+    in_flight < lanes && (in_flight == 0 || !tight)
 }
 
 #[cfg(test)]
+#[allow(clippy::arithmetic_side_effects)]
 mod tests {
     use super::admits;
     use crate::monitor::memory::Memory;
