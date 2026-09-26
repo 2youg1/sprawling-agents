@@ -47,8 +47,10 @@ fn same_input_same_bytes_same_hashes() {
     let two = FrozenPrefix::assemble(c2, b2, r2, run2).unwrap();
     assert_eq!(one.segment_hashes(), two.segment_hashes());
     assert_eq!(
-        one.prompt_payload().unwrap(),
-        two.prompt_payload().unwrap(),
+        one.prompt_payload(&BreakpointPlan::for_conversation(&[]))
+            .unwrap(),
+        two.prompt_payload(&BreakpointPlan::for_conversation(&[]))
+            .unwrap(),
         "A4: same input, same payload bytes"
     );
 }
@@ -64,7 +66,12 @@ fn slot_order_is_enforced() {
 fn payload_names_all_four_slots_in_order() {
     let (c, b, r, run) = four();
     let prefix = FrozenPrefix::assemble(c, b, r, run).unwrap();
-    let json = serde_json::to_value(prefix.prompt_payload().unwrap()).unwrap();
+    let json = serde_json::to_value(
+        prefix
+            .prompt_payload(&BreakpointPlan::for_conversation(&[]))
+            .unwrap(),
+    )
+    .unwrap();
     let slots: Vec<&str> = json["segments"]
         .as_array()
         .unwrap()
@@ -105,10 +112,18 @@ fn built_prefix_is_deterministic_and_notes_account_everything() {
     let one = build_prefix(plan()).unwrap();
     let two = build_prefix(plan()).unwrap();
     assert_eq!(one.segment_hashes(), two.segment_hashes());
-    let payload = serde_json::to_value(one.prompt_payload().unwrap()).unwrap();
+    let payload = serde_json::to_value(
+        one.prompt_payload(&BreakpointPlan::for_conversation(&[]))
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         payload,
-        serde_json::to_value(two.prompt_payload().unwrap()).unwrap(),
+        serde_json::to_value(
+            two.prompt_payload(&BreakpointPlan::for_conversation(&[]))
+                .unwrap()
+        )
+        .unwrap(),
         "A4: same plan, same payload bytes"
     );
     // Cross-slot dedup: city.md loads once, the second hit is noted.
@@ -124,8 +139,12 @@ fn built_prefix_is_deterministic_and_notes_account_everything() {
             .iter()
             .any(|s| s["addr"] == "b/missing.md" && s["reason"] == "unreadable")
     );
-    // Breakpoints: all four segment edges, never more.
-    assert_eq!(payload["breakpoints"].as_array().unwrap().len(), 4);
+    // Breakpoints: the edges the plan marks, and no tail on a request
+    // with no conversation - the record names only what the wire carries.
+    assert_eq!(
+        payload["breakpoints"],
+        serde_json::json!(["city", "building", "resident"])
+    );
 }
 
 #[test]
@@ -143,7 +162,12 @@ fn oversized_documents_truncate_with_an_explicit_marker() {
     let text = String::from_utf8(run_bytes).unwrap();
     assert!(text.len() <= 32, "cap holds including the marker");
     assert!(text.contains("[truncated: "), "never a silent tail drop");
-    let payload = serde_json::to_value(prefix.prompt_payload().unwrap()).unwrap();
+    let payload = serde_json::to_value(
+        prefix
+            .prompt_payload(&BreakpointPlan::for_conversation(&[]))
+            .unwrap(),
+    )
+    .unwrap();
     let source = &payload["segments"][3]["sources"][0];
     assert_eq!(source["marker"], true);
     let kept = source["kept"].as_u64().unwrap();
@@ -209,7 +233,12 @@ fn a_summary_source_carries_its_producer_into_the_row() {
         producer: Some(SummaryProducer::Unknown),
     }];
     let built = build_prefix(p).unwrap();
-    let json = serde_json::to_value(built.prompt_payload().unwrap()).unwrap();
+    let json = serde_json::to_value(
+        built
+            .prompt_payload(&BreakpointPlan::for_conversation(&[]))
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         json["segments"][0]["sources"][0]["producer"],
         serde_json::json!({ "written": { "model": "model-a", "generation": 2 } })
@@ -242,7 +271,10 @@ fn the_payload_a_build_wrote_reads_back_with_its_producer_intact() {
         bytes: Some(b"# old work".to_vec()),
         producer: Some(written.clone()),
     }];
-    let payload = build_prefix(p).unwrap().prompt_payload().unwrap();
+    let payload = build_prefix(p)
+        .unwrap()
+        .prompt_payload(&BreakpointPlan::for_conversation(&[]))
+        .unwrap();
     let read: PromptAssembled = payload.read().unwrap();
     let answered = |slot: usize| -> Vec<SummaryProducer> {
         read.segments[slot]

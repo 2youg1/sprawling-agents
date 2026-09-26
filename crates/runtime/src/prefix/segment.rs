@@ -17,6 +17,8 @@
 use kernel::event::record::{PromptSource, SummaryProducer};
 use kernel::{Address, AxCode, AxError, B3Hash, SystemBlock};
 
+use super::BreakpointPlan;
+
 /// The four slots in stability order; the order is the cache economics.
 /// Exactly four — deliberately exhaustive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,17 +200,13 @@ fn prefix_drifted(subject: String) -> AxError {
 }
 
 /// The same assertion over the copy of the segments a request carries:
-/// four system blocks, the segment edges before the last carrying their
-/// cache breakpoints, hashed and compared against the hashes the run
+/// four system blocks, hashed and compared against the hashes the run
 /// froze. The request is what the provider reads, so this is the check
 /// that the wire form and the record agree.
 ///
-/// The breakpoint plan is checked here too, because it is part of what
-/// the wire must say: every edge but the last carries one ("lost its
-/// cache breakpoint"), and the last edge carries none, because the
-/// fourth breakpoint is the tail anchor on the conversation and a
-/// request carrying five is one the provider refuses
-/// (`CACHE_BREAKPOINTS_MAX`).
+/// The edge breakpoints are checked here too, against
+/// [`BreakpointPlan::marks_edge`], because the record states the plan
+/// and the wire must carry what the record states.
 ///
 /// # Errors
 /// A request that does not carry four blocks, one that moved a
@@ -227,16 +225,18 @@ pub fn verified_system_hashes(
     let blocks = [first, second, third, fourth];
     let mut fresh: [B3Hash; 4] = [B3Hash::digest(b""); 4];
     for (index, (block, expected)) in blocks.iter().zip(frozen.iter()).enumerate() {
+        let marked = SegmentSlot::ALL
+            .get(index)
+            .is_some_and(|slot| BreakpointPlan::marks_edge(*slot));
         let slot = SegmentSlot::ALL
             .get(index)
             .map_or("unknown", |slot| slot.as_str());
-        let tail_edge = index.saturating_add(1) == blocks.len();
-        if tail_edge && block.cache {
+        if block.cache && !marked {
             return Err(prefix_drifted(format!(
-                "the {slot} segment carries a cache breakpoint the tail anchor already holds"
+                "the {slot} segment carries a cache breakpoint the plan does not put there"
             )));
         }
-        if !tail_edge && !block.cache {
+        if !block.cache && marked {
             return Err(prefix_drifted(format!(
                 "the {slot} segment lost its cache breakpoint"
             )));

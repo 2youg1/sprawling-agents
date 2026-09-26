@@ -18,9 +18,12 @@ use kernel::{Address, AxCode, AxError, B3Hash, Payload, SystemBlock};
 
 use crate::elision::{self, Elided};
 
+mod breakpoint;
 mod segment;
 
 pub(crate) mod shape;
+
+pub use breakpoint::{Breakpoint, BreakpointPlan};
 
 pub(crate) use segment::ANOTHER_ADDRESS;
 pub use segment::{FrozenSegment, SegmentSlot, SegmentSource};
@@ -261,17 +264,14 @@ impl FrozenPrefix {
     }
 
     /// The wire form of the frozen prefix: four system blocks, each
-    /// segment edge but the last carrying an explicit cache breakpoint.
-    /// The fourth breakpoint is the tail anchor on the conversation
-    /// ([`shape::anchor_tail`]), so a request stays inside the provider's
-    /// ceiling while its whole body remains cacheable.
+    /// carrying the edge breakpoint [`BreakpointPlan::marks_edge`] gives
+    /// its slot.
     /// Segments must be UTF-8 (build_prefix guarantees it; hand-built
     /// test prefixes must comply to reach the wire).
     pub fn system_blocks(&self) -> Result<Vec<SystemBlock>, AxError> {
         self.segments()
             .iter()
-            .enumerate()
-            .map(|(index, segment)| {
+            .map(|segment| {
                 let text = std::str::from_utf8(segment.bytes())
                     .map_err(|_| {
                         AxError::failure(
@@ -288,7 +288,7 @@ impl FrozenPrefix {
                     .to_owned();
                 Ok(SystemBlock {
                     text,
-                    cache: index.saturating_add(1) < self.segments().len(),
+                    cache: BreakpointPlan::marks_edge(segment.slot()),
                 })
             })
             .collect()
@@ -329,7 +329,7 @@ impl FrozenPrefix {
 
     /// The `prompt_assembled` payload: four rows, each naming its slot,
     /// its hash, its length, the documents it was assembled from and
-    /// what it left out.
+    /// what it left out, and the breakpoints `plan` puts in the request.
     ///
     /// One branch, not two. The source rows are read back by an offline
     /// rebuild (A15, C16) and by the page that shows a person what
@@ -341,7 +341,7 @@ impl FrozenPrefix {
     /// # Errors
     /// A segment longer than `u64` can hold, and a payload the Ledger
     /// refuses.
-    pub fn prompt_payload(&self) -> Result<Payload, AxError> {
+    pub fn prompt_payload(&self, plan: &BreakpointPlan) -> Result<Payload, AxError> {
         let mut segments = Vec::new();
         for (index, segment) in self.segments().into_iter().enumerate() {
             let len = u64::try_from(segment.bytes().len()).map_err(|_| {
@@ -370,9 +370,10 @@ impl FrozenPrefix {
         }
         Payload::of(&PromptAssembled {
             segments,
-            breakpoints: SegmentSlot::ALL
-                .iter()
-                .map(|slot| slot.as_str().to_owned())
+            breakpoints: plan
+                .breakpoints()
+                .into_iter()
+                .map(|breakpoint| breakpoint.as_str().to_owned())
                 .collect(),
         })
     }

@@ -288,7 +288,7 @@ pub struct ChatMessage {
     /// A request-side annotation, deliberately outside serde: the bytes
     /// a ledger or a transcript records are the same with and without
     /// it, which is what lets the marker move without the recorded
-    /// conversation moving. `runtime::prefix::shape::anchor_tail` is the
+    /// conversation moving. `runtime::prefix::BreakpointPlan` is the
     /// only producer, and it anchors the tail - so everything a request
     /// carries, trailing tool results included, sits inside the region a
     /// later request can hit.

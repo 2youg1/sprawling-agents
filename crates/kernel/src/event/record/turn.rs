@@ -17,7 +17,7 @@ use crate::locator::B3Hash;
 use crate::model::{ModelUsage, StopReason};
 
 /// `prompt_assembled`: the four segments a request was built from, and
-/// the cache breakpoints between them.
+/// the cache breakpoints it carried.
 ///
 /// This is the line an offline rebuild reads (A15): every segment says
 /// which documents went into it and how much of each one survived the
@@ -28,9 +28,11 @@ use crate::model::{ModelUsage, StopReason};
 pub struct PromptAssembled {
     #[serde(default)]
     pub segments: Vec<PromptSegment>,
-    /// The slot names, in the order the prefix concatenates them. The
-    /// spelling of a slot has one author, `runtime::prefix::SegmentSlot`,
-    /// and this key carries what that author printed.
+    /// The explicit cache breakpoints the request carried, in request
+    /// order: a slot name for a segment edge, `tail` for the last
+    /// message. The plan has one author, `runtime::prefix::BreakpointPlan`,
+    /// and this key carries what that author printed. A ledger written
+    /// before the plan existed holds the four slot names here instead.
     #[serde(default)]
     pub breakpoints: Vec<String>,
 }
