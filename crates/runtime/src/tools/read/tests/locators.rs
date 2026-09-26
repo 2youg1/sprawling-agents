@@ -42,7 +42,7 @@ fn git(root: &Path, args: &[&str]) -> String {
 }
 
 #[test]
-fn a_cas_block_is_read_at_the_building_that_referenced_it() {
+fn every_cas_block_is_refused_until_its_building_is_recorded_at_store_time() {
     let dir = tempfile::tempdir().unwrap();
     let cas_dir = kernel::layout::CityLayout::new(dir.path()).cas();
     let mut cas = memory::Cas::open(&cas_dir).unwrap();
@@ -69,9 +69,7 @@ fn a_cas_block_is_read_at_the_building_that_referenced_it() {
     )
     .unwrap();
 
-    let read = tool.invoke(&call(&format!("cas:b3-{in_lab}"))).unwrap();
-    assert_eq!(read.result.as_map()["text"], "lab notes\n");
-    for refused in [in_vault, stray] {
+    for refused in [in_lab, in_vault, stray] {
         let err = tool
             .invoke(&call(&format!("cas:b3-{refused}")))
             .unwrap_err();

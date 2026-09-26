@@ -57,7 +57,7 @@ fn read_admitted(
              spells it",
         )
     })?;
-    super::super::chosen_path::admit(judged_at(&locator, &blocks.owner)?.as_str(), "read", bound)?;
+    super::super::chosen_path::admit(judged_at(&locator)?.as_str(), "read", bound)?;
     let bytes = match &locator {
         Locator::Cas { hash, range } => {
             let cas = memory::Cas::open(&blocks.store).map_err(MemoryError::into_ax)?;
@@ -97,26 +97,23 @@ fn read_admitted(
 }
 
 /// The address whose read bound decides a Locator: a `file:` at its own
-/// address, a `cas:` block at the ledger line of this lineage that
-/// referenced it.
+/// address. A `cas:` block is refused whatever its hash, because the
+/// store keeps no record of the building a block was put for, and a
+/// hash spelled in a ledger line proves nothing about where its bytes
+/// came from: model-written text reaches lines that carry an address.
 ///
 /// # Errors
-/// `E_GATE_DENIED` when no line of this run or its predecessor
-/// referenced the block, and whatever the owner lookup reports.
-fn judged_at(locator: &Locator, owner: &BlockOwner) -> Result<Address, AxError> {
+/// `E_GATE_DENIED` for every `cas:` block.
+fn judged_at(locator: &Locator) -> Result<Address, AxError> {
     match locator {
         Locator::File { address, .. } => Ok(address.clone()),
-        Locator::Cas { hash, .. } => owner(hash)?.ok_or_else(|| {
-            AxError::failure(
-                AxCode::GateDenied,
-                "read",
-                format!("cas:b3-{hash} was not referenced by this run or its predecessor"),
-            )
-            .with_recovery(
-                "a content block is read only when a ledger line of this run or its \
-                 predecessor referenced it, because that line says which building the bytes \
-                 belong to",
-            )
-        }),
+        Locator::Cas { hash, .. } => Err(AxError::failure(
+            AxCode::GateDenied,
+            "read",
+            format!("cas:b3-{hash} has no recorded building"),
+        )
+        .with_recovery(
+            "read the file the block was taken from as `file:<address>@<commit>`; a content              block is read only once the store records which building it was put for",
+        )),
     }
 }

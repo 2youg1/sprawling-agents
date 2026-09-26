@@ -33,8 +33,10 @@ pub fn blob_at(
     let tree = commit
         .tree()
         .map_err(git_err("read the tree of a commit"))?;
-    let Ok(entry) = tree.get_path(Path::new(addr.as_str())) else {
-        return Ok(None);
+    let entry = match tree.get_path(Path::new(addr.as_str())) {
+        Ok(entry) => entry,
+        Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(None),
+        Err(err) => return Err(git_err("find a path in a commit's tree")(err)),
     };
     match entry.kind() {
         Some(git2::ObjectType::Blob) => repo
