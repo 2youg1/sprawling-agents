@@ -19,7 +19,7 @@ fn lay_out(dir: &Path, lines: &[Vec<u8>], firsts: &[u64]) {
         let end = firsts.get(i + 1).map_or(lines.len(), |next| *next as usize);
         let body: Vec<u8> = lines[*first as usize..end]
             .iter()
-            .flat_map(|line| line.iter().copied().chain([b'\n']))
+            .flat_map(|line| line.iter().copied().chain(*b"\n"))
             .collect();
         std::fs::write(dir.join(segment_file_name(Seq::new(*first))), body).unwrap();
     }
