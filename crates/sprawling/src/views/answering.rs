@@ -23,6 +23,12 @@
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+use kernel::{Address, AxCode, AxError};
+
+use super::git_status::GitStatusAsk;
 use super::holding::Views;
 
 mod history;
@@ -37,6 +43,73 @@ use crate::assembly::read_building;
 /// two start looking alike.
 fn unavailable(query: String) -> channels::Answer {
     channels::Answer::Unavailable { query }
+}
+
+/// Answers one query from the views the fold shares with every reader,
+/// holding them only while [`Views::prepare`] copies out what the query
+/// needs: the disk, git or network read in [`Prepared::finish`] runs
+/// after the lock is released, so the fold never waits on it.
+///
+/// # Errors
+/// `StorageFatal` when a panic poisoned the view lock: the views no
+/// longer follow the ledger, and only a restart rebuilds them.
+pub(crate) fn answer_outside_the_lock(
+    views: &Mutex<Views>,
+    query: &channels::Query,
+) -> Result<channels::Answer, AxError> {
+    let prepared = views
+        .lock()
+        .map_err(|_| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "read the city views",
+                "the view lock is poisoned",
+            )
+            .with_recovery("restart the server; its views rebuild from the ledger")
+        })?
+        .prepare(query);
+    Ok(prepared.finish())
+}
+
+/// A query's answer split at the view lock: what the views settled while
+/// held, or the small data a read of the disk, git or network needs,
+/// copied out so that read can run with the lock released.
+pub(crate) enum Prepared {
+    /// Answered from the views alone.
+    Held(channels::Answer),
+    /// The working tree of one building against its last fence.
+    GitStatus(GitStatusAsk),
+    /// The person's own settings file.
+    Preferences,
+    /// The configuration ladder of one address.
+    Config { city_root: PathBuf, addr: Address },
+    /// The release page, which leaves this machine.
+    Release,
+}
+
+impl Prepared {
+    /// Does the read the views left for after the lock, and answers.
+    pub(crate) fn finish(self) -> channels::Answer {
+        match self {
+            Self::Held(answer) => answer,
+            Self::GitStatus(ask) => ask.read(),
+            // A settings file that cannot be read is "I could not
+            // look", not an empty set of preferences.
+            Self::Preferences => match crate::person::read() {
+                Ok(settled) => channels::Answer::Preferences(Box::new(settled)),
+                Err(_) => unavailable("Preferences".to_owned()),
+            },
+            // A ladder that cannot be read is "I could not look": the
+            // files are the person's own and the page says so rather
+            // than drawing figures nothing on disk states.
+            Self::Config { city_root, addr } => match config_answer(&city_root, &addr) {
+                Ok(answer) => channels::Answer::Config(Box::new(answer)),
+                Err(_) => unavailable(format!("Config({})", addr.as_str())),
+            },
+            // Leaves this machine, and only on a press (channels-SPEC 8-36).
+            Self::Release => channels::Answer::Release(Box::new(crate::release::answer())),
+        }
+    }
 }
 
 impl Views {
@@ -80,11 +153,18 @@ impl Views {
         }
     }
 
-    /// Answers one query. Every arm either answers or names itself
+    /// Answers one query in one call, lock or no lock.
+    #[cfg(test)]
+    pub(crate) fn answer(&mut self, query: &channels::Query) -> channels::Answer {
+        self.prepare(query).finish()
+    }
+
+    /// Answers one query, or copies out what its read of the disk, git
+    /// or network needs. Every arm either answers or names itself
     /// unavailable; none of them returns an empty result that a reader
     /// would mistake for an empty city.
-    pub(crate) fn answer(&mut self, query: &channels::Query) -> channels::Answer {
-        match query {
+    pub(crate) fn prepare(&mut self, query: &channels::Query) -> Prepared {
+        Prepared::Held(match query {
             channels::Query::CityView => {
                 let runs: Vec<channels::RunSummary> = self
                     .hot
@@ -196,20 +276,14 @@ impl Views {
             // Read at every asking rather than held: the file is one a
             // person also edits, and a copy kept in this fold would
             // answer with what it said the last time somebody used a
-            // page. A file that cannot be read is "I could not look",
-            // which is what the settings page draws its own state
-            // from.
-            channels::Query::Preferences => match crate::person::read() {
-                Ok(settled) => channels::Answer::Preferences(Box::new(settled)),
-                Err(_) => unavailable("Preferences".to_owned()),
-            },
-            // A ladder that cannot be read is "I could not look": the
-            // files are the person's own and the page says so rather
-            // than drawing figures nothing on disk states.
-            channels::Query::Config { addr } => match config_answer(&self.city_root, addr) {
-                Ok(answer) => channels::Answer::Config(Box::new(answer)),
-                Err(_) => unavailable(format!("Config({})", addr.as_str())),
-            },
+            // page.
+            channels::Query::Preferences => return Prepared::Preferences,
+            channels::Query::Config { addr } => {
+                return Prepared::Config {
+                    city_root: self.city_root.clone(),
+                    addr: addr.clone(),
+                };
+            }
             channels::Query::Content { locator } => match self.content_answer(locator) {
                 Some(answer) => channels::Answer::Content(Box::new(answer)),
                 None => unavailable(format!("Content({locator})")),
@@ -218,12 +292,9 @@ impl Views {
                 Some(answer) => channels::Answer::Skills(Box::new(answer)),
                 None => unavailable(format!("Skills({})", building.as_str())),
             },
-            channels::Query::GitStatus { building } => match self.git_status_answer(building) {
-                Some(answer) => channels::Answer::GitStatus(Box::new(answer)),
-                None => channels::Answer::Unavailable {
-                    query: format!("GitStatus({})", building.as_str()),
-                },
-            },
+            channels::Query::GitStatus { building } => {
+                return Prepared::GitStatus(self.git_status_ask(building));
+            }
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }
@@ -234,10 +305,7 @@ impl Views {
             channels::Query::Toolkits => {
                 channels::Answer::Toolkits(Box::new(self.toolkits_answer()))
             }
-            // Leaves this machine, and only on a press (channels-SPEC 8-36).
-            channels::Query::Release => {
-                channels::Answer::Release(Box::new(crate::release::answer()))
-            }
+            channels::Query::Release => return Prepared::Release,
             channels::Query::BuildingView { addr } => {
                 let root = self.city_root.clone();
                 let plan = self.plans.of(&root, addr);
@@ -264,7 +332,7 @@ impl Views {
                 channels::Answer::Archive(self.search_archives(needle))
             }
             channels::Query::Metrics => channels::Answer::Metrics(Box::new(self.metrics())),
-        }
+        })
     }
 }
 

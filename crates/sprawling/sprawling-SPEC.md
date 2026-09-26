@@ -3054,7 +3054,8 @@ fn content_answer(&self, locator: &Locator) -> Option<channels::ContentAnswer>;
 // views::skills
 fn skills_answer(&self, building: &Address) -> Option<channels::SkillsAnswer>;
 // views::git_status
-fn git_status_answer(&self, building: &Address) -> Option<channels::GitStatusAnswer>;
+fn git_status_ask(&self, building: &Address) -> GitStatusAsk; // 锁内：城根、楼、最近一次围栏
+impl GitStatusAsk { fn read(self) -> channels::Answer; } // 锁外：读工作树（8-92）
 ```
 
 **五条口径：**
@@ -3062,7 +3063,7 @@ fn git_status_answer(&self, building: &Address) -> Option<channels::GitStatusAns
 1. **`prefix_answer` 取该 run 最早的一条 `prompt_assembled`。** prefix 一次冻结管一次 run 的一生，之后每一轮记的是同样四个哈希；取最早的那一条，一次没走过第一轮的 run 也仍有答案。
 2. **字节的可读性判定只有一处。** `views::document` 的 `read_bytes` 同时服务树上的文件与仓库里的对象——什么样的字节算文本，不取决于它被存在哪里。
 3. **技能的书架在被问的那一刻扫盘，而 pin 出自历史。** `city::Library` 是书架的权威，旁边再留一份索引就是磁盘说法的第二份副本；而「哪些 run 用过」折自 `run_started` 里那张 `skills` 表（`Views::skill_pins`，键为名字与哈希成对），不是第二次扫盘。
-4. **`git_status_answer` 的比较基准取自历史而不是 HEAD。** 该楼最近一条 `checkpoint_committed`／`pr_merged` 就是基准，它由 `commits_answer(Some(building), None, 1)` 给出——变更栏旁边显示的那一行，正是提交列表打开时的第一行。
+4. **`git_status_ask` 的比较基准取自历史而不是 HEAD。** 该楼最近一条 `checkpoint_committed`／`pr_merged` 就是基准，它由 `commits_answer(Some(building), None, 1)` 给出——变更栏旁边显示的那一行，正是提交列表打开时的第一行。
 5. **仓库句柄按次打开。** 这是投影里唯一一处伸向它不拥有的目录的读；跨重建留着的句柄会活得比开它的那座城还长。
 
 ### 8-68 `bin::release`：这是哪一版，以及唯一一次去问注册表（形状 4 适配器）
@@ -3488,7 +3489,32 @@ pub(super) fn spawn_folding(
 
 **线程随写线程结束。** `attend` 返回后写线程丢掉 `RunWorker`（连同观察者与 `machine`），通道随之关闭，折叠线程把通道里剩下的折完、广播完再退出；写线程 join 它之后才结束，所以 `serve` 对写线程的 join 也等到了最后一次广播。
 
-**尚未做到的（本节接口的当前状态）**：查询仍在锁内作答，`GitStatus` 等做 I/O 的查询仍在锁内做 I/O，所以读者之间、以及读者与折叠线程之间仍会互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取、把 I/O 移到锁外（锁内只取所需的小数据），是这一接口余下的两步。
+**尚未做到的（本节接口的当前状态）**：不做 I/O 的查询仍在锁内作答，所以读者之间、以及读者与折叠线程之间仍会为这段纯内存的时间互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取，是这一接口余下的一步。做 I/O 的查询怎样离开锁，见 8-92。
+
+### 8-92 做 I/O 的查询只在锁内取小数据，I/O 在锁外做（`bin::views::answering`）
+
+```rust
+// bin::views::answering —— shape: projection
+pub(crate) enum Prepared {
+    Held(channels::Answer),          // 视图自己答完了
+    GitStatus(GitStatusAsk),         // 锁内取了楼的地址与最近一次围栏，锁外读工作树
+    Preferences,                     // 锁外读这个人的设置文件
+    Config { city_root: PathBuf, addr: Address }, // 锁外读配置阶梯
+    Release,                         // 锁外问发布页，离开这台机器
+}
+impl Views { pub(crate) fn prepare(&mut self, query: &channels::Query) -> Prepared; }
+impl Prepared { pub(crate) fn finish(self) -> channels::Answer; }
+pub(crate) fn answer_outside_the_lock(
+    views: &Mutex<Views>,
+    query: &channels::Query,
+) -> Result<channels::Answer, AxError>; // StorageFatal「read the city views」：锁中毒，恢复办法是重启服务
+```
+
+**锁只罩住 `prepare`。** `answer_outside_the_lock` 锁住视图，`prepare` 把查询要的小数据（地址、围栏那一行、城根路径）拷出来，放锁，再由 `finish` 做磁盘、git 或网络的 I/O。控制面（socket 与终端）的查询都经过它。被拒：在锁内跑 `git status`——变更页开着时每次刷新都持锁几十毫秒，折叠线程等它，run 的相邻事件到达客户端的间隔就被这个页面拉长。
+
+**变体是穷尽的枚举，而不是一个 `Box<dyn FnOnce>`。** 每种锁外的 I/O 有名字，`match` 列全，新加一种要在这里写出它锁内拿什么；闭包会把这件事藏进调用点。
+
+**`Content`、`Skills`、`Document`、`Hunks`、档案检索仍在锁内读盘**（本节接口的当前状态）：它们要的小数据还没有拆出来，拆法与 `GitStatus` 相同。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 

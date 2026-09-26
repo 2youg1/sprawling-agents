@@ -354,3 +354,59 @@ fn a_roadmap_that_cannot_be_parsed_reports_its_rows_rather_than_a_number() {
         "an unreadable plan has no denominator, and no percentage"
     );
 }
+
+/// The fold takes the same lock a reader does, so a reader that ran
+/// `git status` under it held every event behind that walk of the disk.
+#[test]
+fn a_git_status_reader_does_not_hold_the_views_while_git_reads_the_disk() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
+
+    let dir = tempfile::tempdir().unwrap();
+    git2::Repository::init(dir.path()).unwrap();
+    let lab = dir.path().join("lab");
+    std::fs::create_dir(&lab).unwrap();
+    for n in 0..2000 {
+        std::fs::write(lab.join(format!("f{n}.txt")), "x").unwrap();
+    }
+    let views = Arc::new(Mutex::new(Views::new(dir.path())));
+    let query = channels::Query::GitStatus {
+        building: Address::parse("lab").unwrap(),
+    };
+    let solo = (0..3)
+        .map(|_| {
+            let asked = Instant::now();
+            let answer = crate::views::answer_outside_the_lock(&views, &query).unwrap();
+            assert!(
+                matches!(answer, channels::Answer::GitStatus(_)),
+                "{answer:?}"
+            );
+            asked.elapsed()
+        })
+        .min()
+        .unwrap();
+
+    let done = Arc::new(AtomicBool::new(false));
+    let reader = {
+        let (views, query, done) = (Arc::clone(&views), query.clone(), Arc::clone(&done));
+        std::thread::spawn(move || {
+            for _ in 0..8 {
+                crate::views::answer_outside_the_lock(&views, &query).unwrap();
+            }
+            done.store(true, Ordering::SeqCst);
+        })
+    };
+    let mut longest = Duration::ZERO;
+    while !done.load(Ordering::SeqCst) {
+        let asked = Instant::now();
+        drop(views.lock().unwrap());
+        longest = longest.max(asked.elapsed());
+        std::thread::yield_now();
+    }
+    reader.join().unwrap();
+    assert!(
+        longest * 4 < solo,
+        "the fold waited {longest:?} for the views while one git status takes {solo:?}"
+    );
+}
