@@ -44,19 +44,17 @@
 </script>
 
 <script lang="ts">
-  import { Option } from "effect";
   import { readAnswer } from "../core/answered";
   import { QUERIES } from "../core/asking";
   import { halt, pursue, release, removeBuilding } from "../core/commands";
   import { fill, say } from "../core/lang";
   import { pursuitClause } from "../core/pursuit";
   import { removalOf } from "../core/removal";
-  import { go, roomIn, roomOf, toFragment } from "../core/route";
+  import { toFragment } from "../core/route";
   import { within } from "../core/belief/live";
   import { buildingIsShut } from "../core/scope";
   import { ui } from "../ui";
-  import type { Address, BuildingAnswer, Query } from "../wire";
-  import { Address as AddressSchema } from "../wire";
+  import type { Address, Query } from "../wire";
   import Badge from "./parts/badge.svelte";
   import Button from "./parts/button.svelte";
   import Unanswered from "./parts/unanswered.svelte";
@@ -68,6 +66,7 @@
   import Skills from "./building/skills.svelte";
   import Status from "./building/status.svelte";
   import Tree from "./building/tree.svelte";
+  import Rooms from "./building/rooms.svelte";
 
   interface Props {
     readonly address: Address;
@@ -83,8 +82,6 @@
   let shown = $state.raw<Shown>(PLAN);
   let treeOpen = $state(false);
   let goal = $state("");
-  let roomName = $state("");
-  const named = $derived(roomIn(address, roomName));
   let goalField = $state<HTMLInputElement | undefined>(undefined);
 
   const question = $derived<Query>({ building_view: { addr: address } });
@@ -133,69 +130,12 @@
     }
   }
 
-  // A room is opened by talking in it: the talk page's first dispatch
-  // to `<building>/<name>` opens that room, so no model has to name it.
-  function talkIn(): void {
-    if (Option.isNone(named)) return;
-    go(u.bar, { kind: "talk", address: named.value });
-    roomName = "";
-  }
-
   // How many runs are working at or below a room, which is what the
   // rooms column lights its dots for.
   function livingIn(room: Address): number {
     return $belief.live.filter((run) => within(run, room)).length;
   }
 </script>
-
-{#snippet rooms(answer: BuildingAnswer)}
-  <div>
-    <h2 class="mb-base text-label font-label text-text-quiet">{say($lang, "bld_rooms")}</h2>
-    {#if answer.rooms.length > 0}
-      <ul class="text-note">
-        {#each answer.rooms as name (name)}
-          {const room = AddressSchema.make(`${answer.addr}/${name}`)}
-          <li>
-            <button
-              type="button"
-              class="flex h-step w-full items-center gap-snug rounded-control px-snug text-left leading-none text-text-quiet hover:bg-chrome"
-              onclick={() => {
-                pick({ at: room, kind: "directory" });
-              }}
-            >
-              <span class="min-w-0 flex-1 truncate">{roomOf(room)}</span>
-              {#if livingIn(room) > 0}
-                <Badge
-                  text={fill(say($lang, "city_active"), { n: String(livingIn(room)) })}
-                  weight="live"
-                  dot
-                />
-              {/if}
-            </button>
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="text-note text-text-faint">{say($lang, "bld_no_rooms")}</p>
-    {/if}
-    <div class="mt-base flex items-center gap-snug">
-      <input
-        class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-faint"
-        aria-label={say($lang, "bld_room_name")}
-        placeholder={say($lang, "bld_room_name")}
-        bind:value={roomName}
-        onkeydown={(event) => {
-          if (event.key === "Enter") talkIn();
-        }}
-      />
-      <Button
-        label={say($lang, "bld_room_talk")}
-        tone={Option.isSome(named) ? "primary" : "secondary"}
-        onPress={talkIn}
-      />
-    </div>
-  </div>
-{/snippet}
 
 <div class="flex min-h-0 w-full flex-1 flex-col">
   <header
@@ -369,8 +309,7 @@
         <Tree root={address} {picked} onPick={pick} />
         {#if building !== undefined}
           <div class="mt-base border-t border-edge pt-base @wide/page:hidden">
-            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-            {@render rooms(building)}
+            <Rooms answer={building} living={livingIn} onPick={(room) => { pick({ at: room, kind: "directory" }); }} />
           </div>
         {/if}
       </div>
@@ -401,8 +340,7 @@
       aria-label={say($lang, "bld_rooms")}
     >
       {#if building !== undefined}
-        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-        {@render rooms(building)}
+        <Rooms answer={building} living={livingIn} onPick={(room) => { pick({ at: room, kind: "directory" }); }} />
       {/if}
     </aside>
   </div>

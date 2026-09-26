@@ -39,8 +39,9 @@
   import type { View } from "../core/route";
   import { cityIsShut, CITY } from "../core/scope";
   import { completed } from "../core/completion";
-  import { SECTIONS, offered, reached } from "../core/slash";
-  import type { Reached, Section, Slash, SlashHands } from "../core/slash";
+  import { offered } from "../core/slash";
+  import { SECTIONS, reached } from "../core/slash_hands";
+  import type { Reached, Section, Slash, SlashHands } from "../core/slash_hands";
   import { ui } from "../ui";
   import { Address } from "../wire";
   import Empty from "./parts/empty.svelte";
