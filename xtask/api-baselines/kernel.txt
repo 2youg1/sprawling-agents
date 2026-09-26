@@ -134,6 +134,7 @@ impl kernel::config::SandboxLimits
 impl kernel::config::SandboxLimits
 impl kernel::config::SecondThreshold
 impl kernel::config::SecondThreshold
+impl kernel::degradation::Degradation
 impl kernel::delegation::Delegate
 impl kernel::delegation::Delegate
 impl kernel::delegation::DelegateKind
@@ -348,6 +349,12 @@ pub const kernel::consts_policy::SANDBOX_FUEL_DEFAULT: u64
 pub const kernel::consts_policy::SECRET_ENTROPY_MIN: kernel::consts_policy::Ratio
 pub const kernel::consts_policy::STARTUP_BUDGET_TOKENS: u64
 pub const kernel::consts_policy::WORKTREE_MAX_BYTES: u64
+pub const kernel::degradation::CPU_SATURATED_DELAY: core::time::Duration
+pub const kernel::degradation::DISK_SLOW_FACTOR: u32
+pub const kernel::degradation::DISK_SLOW_MIN: core::time::Duration
+pub const kernel::degradation::FREE_SPACE_FLOOR_DIVISOR: u64
+pub const kernel::degradation::FREE_SPACE_FLOOR_MAX: u64
+pub const kernel::degradation::FREE_SPACE_FLOOR_MIN: u64
 pub const kernel::gate::DOORS: [kernel::gate::DoorId; 9]
 pub const kernel::idem::IDEM_DERIVE_V: u8
 pub const kernel::layout::ARCHIVE_DIR: &str
@@ -468,6 +475,8 @@ pub enum kernel::config::ClockStampGranularity
 pub enum kernel::config::McpTransport
 pub enum kernel::consts_external::LogVersion
 pub enum kernel::consts_external::SecretCharset
+pub enum kernel::degradation::Degradation
+pub enum kernel::degradation::Recovery
 pub enum kernel::delegation::DelegateKind
 pub enum kernel::delegation::DelegationVerdict
 pub enum kernel::delegation::Depth
@@ -820,6 +829,10 @@ pub fn kernel::config::SecondThreshold::try_from(u64) -> core::result::Result<ke
 pub fn kernel::config::SecondThreshold::try_from(u64) -> core::result::Result<kernel::config::SecondThreshold, kernel::AxError>
 pub fn kernel::config::freeze(&kernel::config::LayeredValue<kernel::config::ClockStampGranularity>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::ClockZone>>, &kernel::config::LayeredValue<kernel::Effort>, &kernel::config::LayeredValue<kernel::config::SandboxLimits>, &kernel::config::LayeredValue<alloc::vec::Vec<kernel::config::McpServer>>, &kernel::config::LayeredValue<kernel::config::SecondThreshold>) -> kernel::config::FrozenConfig
 pub fn kernel::consts_external::readable_log_v(u64) -> kernel::consts_external::LogVersion
+pub fn kernel::degradation::Degradation::recovery(&self) -> kernel::degradation::Recovery
+pub fn kernel::degradation::admit_work(&kernel::degradation::ResourceReadings) -> kernel::backpressure::Admission
+pub fn kernel::degradation::assess(&kernel::degradation::ResourceReadings) -> impl core::iter::traits::iterator::Iterator<Item = kernel::degradation::Degradation>
+pub fn kernel::degradation::free_space_floor(u64) -> u64
 pub fn kernel::delegation::Delegate::kind(&self) -> &kernel::delegation::DelegateKind
 pub fn kernel::delegation::Delegate::kind(&self) -> &kernel::delegation::DelegateKind
 pub fn kernel::delegation::DelegateKind::as_str(self) -> &'static str
@@ -1601,6 +1614,7 @@ pub kernel::SecretSpan::len: usize
 pub kernel::SecretSpan::provider: core::option::Option<&'static str>
 pub kernel::SecretSpan::start: usize
 pub kernel::ShedReason::CapacityExhausted
+pub kernel::ShedReason::DiskLow
 pub kernel::Span::len: u32
 pub kernel::Span::start: u32
 pub kernel::Span::token: kernel::highlight::Token
@@ -1694,6 +1708,7 @@ pub kernel::backpressure::ItemMeta::cost: u64
 pub kernel::backpressure::QueueStats::capacity: u64
 pub kernel::backpressure::QueueStats::depth: u64
 pub kernel::backpressure::ShedReason::CapacityExhausted
+pub kernel::backpressure::ShedReason::DiskLow
 pub kernel::blockage::Blockage::reaches: alloc::vec::Vec<kernel::node_id::NodeId>
 pub kernel::blockage::Blockage::source: kernel::node_id::NodeId
 pub kernel::blockage::Blockage::why: kernel::StopCause
@@ -1774,6 +1789,27 @@ pub kernel::consts_external::SecretShape::prefix: &'static str
 pub kernel::consts_external::SecretShape::provider: &'static str
 pub kernel::consts_policy::Ratio::den: u32
 pub kernel::consts_policy::Ratio::num: u32
+pub kernel::degradation::Degradation::CpuSaturated
+pub kernel::degradation::Degradation::CpuSaturated::schedule_delay: core::time::Duration
+pub kernel::degradation::Degradation::DiskLow
+pub kernel::degradation::Degradation::DiskLow::floor_bytes: u64
+pub kernel::degradation::Degradation::DiskLow::free_bytes: u64
+pub kernel::degradation::Degradation::DiskSlow
+pub kernel::degradation::Degradation::DiskSlow::commit_floor: core::time::Duration
+pub kernel::degradation::Degradation::DiskSlow::durable_lag: core::time::Duration
+pub kernel::degradation::Degradation::MemoryTight
+pub kernel::degradation::Degradation::MemoryTight::queued_runs: u32
+pub kernel::degradation::Recovery::FreeDiskSpace
+pub kernel::degradation::Recovery::FreeDiskSpace::at_least_bytes: u64
+pub kernel::degradation::Recovery::FreeMemory
+pub kernel::degradation::Recovery::ReduceCpuLoad
+pub kernel::degradation::Recovery::ReduceDiskLoad
+pub kernel::degradation::ResourceReadings::commit_floor: core::time::Duration
+pub kernel::degradation::ResourceReadings::durable_lag: core::time::Duration
+pub kernel::degradation::ResourceReadings::free_bytes: u64
+pub kernel::degradation::ResourceReadings::queued_runs: u32
+pub kernel::degradation::ResourceReadings::schedule_delay: core::time::Duration
+pub kernel::degradation::ResourceReadings::volume_bytes: u64
 pub kernel::delegation::DelegateKind::Ephemeral
 pub kernel::delegation::DelegateKind::Resident
 pub kernel::delegation::DelegationVerdict::Allow
@@ -2360,6 +2396,7 @@ pub mod kernel::completion
 pub mod kernel::config
 pub mod kernel::consts_external
 pub mod kernel::consts_policy
+pub mod kernel::degradation
 pub mod kernel::delegation
 pub mod kernel::discard
 pub mod kernel::error
@@ -2511,6 +2548,7 @@ pub struct kernel::config::SandboxLimits
 pub struct kernel::config::SecondThreshold(_)
 pub struct kernel::consts_external::SecretShape
 pub struct kernel::consts_policy::Ratio
+pub struct kernel::degradation::ResourceReadings
 pub struct kernel::delegation::Delegate
 pub struct kernel::delegation::Delegator(_)
 pub struct kernel::discard::Discard
