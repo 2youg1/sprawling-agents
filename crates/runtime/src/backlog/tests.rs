@@ -3,6 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+
 //! What the backlog is held to from inside: one scratch directory name
 //! per member of one backlog of one process, and a run's end that
 //! reaches every command the run left running.
