@@ -19,9 +19,7 @@
 #            and the two feature combinations `just features` runs
 #   test     the suite; the only job that produces trybuild scratch
 #   gates    the machine gates (`cargo xtask gates` names them), the
-#            client bundle they judge, and the nightly rustdoc apisync
-#            needs (27s of a 27.5s gate run - it is why the other gates
-#            no longer queue behind a compile)
+#            client bundle they judge
 #   client   the client's own linter, typecheck and tests
 #   proof    the kernel propositions kani can hold, against real MIR;
 #            the one job with a prerequisite, `changes` below
@@ -246,7 +244,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      # `guard` and `apisync` judge every commit in a range, and the range
+      # `guard` judges every commit in a range, and the range
       # is the whole change-set under review. This step used to take
       # `fetch-depth: 2` under a note saying no workflow passed a range.
       # The note was true and it was the hole: guard judged the tip commit
@@ -263,19 +261,11 @@ jobs:
         with:
           shared-key: gates
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-public-api
       # The render and npm gates judge artifacts, not sources: without
       # `target/web-dist` and `client/node_modules` they refuse rather
       # than skip, and this job once reported green on twelve gates
       # while claiming fourteen.
       - uses: ./.github/actions/client-artifacts
-      # The apisync gate reads rustdoc JSON, which is nightly-only. It
-      # fails closed when the toolchain is missing rather than skipping,
-      # so a job without this line stops here instead of passing.
-      - name: nightly toolchain (rustdoc JSON for apisync)
-        run: rustup toolchain install nightly --profile minimal
       # base..head for a pull request, before..after for a push. A push
       # that rewrote history leaves `before` unreachable in a fresh clone,
       # and a first push has no `before` at all; both fall back to HEAD and
