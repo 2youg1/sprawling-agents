@@ -110,7 +110,6 @@ impl Conversation {
     pub fn push_assistant(&mut self, content: Vec<ContentBlock>) {
         if !content.is_empty() {
             self.messages.push(ChatMessage {
-                cache: false,
                 role: Role::Assistant,
                 content,
             });
@@ -137,7 +136,6 @@ impl Conversation {
                 self.sent = self.sent.min(reopened);
             }
             _ => self.messages.push(ChatMessage {
-                cache: false,
                 role: Role::User,
                 content: results,
             }),
@@ -167,7 +165,6 @@ impl Conversation {
             Some(last) if last.role == Role::User && open => last.content.extend(blocks),
             Some(last) if last.role == Role::User => self.held.extend(blocks),
             _ => self.messages.push(ChatMessage {
-                cache: false,
                 role: Role::User,
                 content: blocks,
             }),

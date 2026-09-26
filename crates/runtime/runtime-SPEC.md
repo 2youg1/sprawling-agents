@@ -176,7 +176,7 @@ pub struct TurnReport { /* refs、model_returned_ref、wave_len —— getter �
 impl Turn<Assembling> {
     pub fn begin(run: RunId, who: String, t: TimeMs) -> Turn<Assembling>;
     /// Boundary 1 (组装前). Cancel here consumes before any model bytes.
-    pub fn assemble(self, interrupt: Interrupt, ledger: &mut dyn Ledger, prompt: RunPrompt<'_>, …)
+    pub fn assemble<'c>(self, interrupt: Interrupt, ledger: &mut dyn Ledger, prompt: RunPrompt<'_>, …)
         -> Result<PhaseOutcome<Turn<Calling>>, AxError>;          // 每 run 一条 prompt_assembled（§8-39 第 5 条）
 }
 impl Turn<Calling> {
@@ -344,11 +344,11 @@ pub fn resume(handoff: &Handoff, new_run: RunId) -> ResumeSeed;
 
 ```rust
 // kernel::model 增（缝上 canonical 会话类型，kernel-SPEC §8-24 同集改）：
-// ChatRequest { system: Vec<SystemBlock>, messages: Vec<ChatMessage>, tools: Vec<ToolDef> }
+// ChatRequest<'a> { system: Vec<SystemBlock>, messages: Cow<'a, [ChatMessage]>, tools: Cow<'a, [ToolDef]>, breakpoint: MessageBreakpoint }
 // SystemBlock { text, cache }；ChatMessage { role, content: Vec<ContentBlock> }；Role { User, Assistant }
 // ContentBlock { Text{text} | ToolUse{id,name,input:Payload} | ToolResult{tool_use_id,content,is_error} }
 // ToolDef { name, description, input_schema: Payload }；ModelUsage 四整数；StopReason { EndTurn, ToolUse, MaxTokens }
-// ModelRequest 增 chat: ChatRequest；ModelReturn 增 usage: Option<ModelUsage>、stop: Option<StopReason>、billed: Option<UsdMicros>
+// ModelRequest<'a> 增 chat: ChatRequest<'a>；ModelReturn 增 usage: Option<ModelUsage>、stop: Option<StopReason>、billed: Option<UsdMicros>
 
 pub struct Window { /* messages: Vec<ChatMessage> —— 私有；执行器持有，逐回合推进 */ }
 impl Window { pub fn new() -> Window;
@@ -366,9 +366,9 @@ impl CallShape { pub fn verified_against(&self, frozen: &CallShape) -> Result<()
                     // 模型目录行（gateway::market::ModelEntry）；effort 解自 kernel::FrozenConfig，
                     // Run 内恒不变——改它就换缓存前缀（理由与出处在 kernel-SPEC §8-22）
 impl Turn<Assembling> {
-    pub fn assemble(self, interrupt: Interrupt, ledger: &mut dyn Ledger, prompt: RunPrompt<'_>,
-                    conversation: &Conversation, tools: &[ToolDef], shape: &CallShape)
-        -> Result<PhaseOutcome<Turn<Calling>>, AxError>;   // Calling 相私持已组 ChatRequest；prompt_assembled 载荷长入
+    pub fn assemble<'c>(self, interrupt: Interrupt, ledger: &mut dyn Ledger, prompt: RunPrompt<'_>,
+                    conversation: &'c Conversation, tools: &'c [ToolDef], shape: &CallShape)
+        -> Result<PhaseOutcome<Turn<Calling<'c>>>, AxError>;   // Calling<'c> 相私持已组 ChatRequest，借用 conversation 与 tools（'c），调用返回前会话不动；prompt_assembled 载荷长入
 }
 pub struct RunPrompt<'r> { /* prefix: &'r FrozenPrefix, recorded: &'r mut PromptRecord */ }
 impl<'r> RunPrompt<'r> { pub fn new(prefix: &'r FrozenPrefix, recorded: &'r mut PromptRecord) -> RunPrompt<'r>; }
@@ -403,14 +403,14 @@ pub fn build_prefix(plan: PrefixPlan) -> Result<PrefixBuild, AxError>;
 - **它是 `Catalog::expand` 的第一个调用者**：在它之前，一栋楼的阅览室能报出一个 skill 的名字而永远交不出它。
 - 截断：文件超段位余额即截到边界，原处留 ASCII 标记（文本与切口规则属 `runtime::elision`，§8-42），恒不静默丢尾；标记字节从段预算先扣。
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读。
-- 断点只有一个作者：`prefix::BreakpointPlan`（`prefix/breakpoint.rs`，形状 1 判定，纯函数）。`BreakpointPlan::for_conversation(&[ChatMessage])` 决定一次请求实际发出的断点：前三段（city／building／resident）的段界各一个，对话非空时尾消息再一个，合计 ≤ `CACHE_BREAKPOINTS_MAX`（4）；run 段界不放，因为尾锚紧随其后已覆盖它。`FrozenPrefix::system_blocks()` 以 `BreakpointPlan::marks_edge(slot)` 标 system 块，`BreakpointPlan::mark` 标消息，`prompt_payload(&plan)` 把 `plan.breakpoints()` 逐个拼成 `breakpoints` 行（段界写 slot 名，尾写 `tail`）；`verified_system_hashes` 以同一个 `marks_edge` 核对线上的块。兼容格式只负责拼写（Anthropic：被标记消息的最后一块带 `cache_control`），不决定任何断点。
+- 断点只有一个作者：`prefix::BreakpointPlan`（`prefix/breakpoint.rs`，形状 1 判定，纯函数）。`BreakpointPlan::for_conversation(&[ChatMessage])` 决定一次请求实际发出的断点：前三段（city／building／resident）的段界各一个，对话非空时尾消息再一个，合计 ≤ `CACHE_BREAKPOINTS_MAX`（4）；run 段界不放，因为尾锚紧随其后已覆盖它。`FrozenPrefix::system_blocks()` 以 `BreakpointPlan::marks_edge(slot)` 标 system 块，`BreakpointPlan::message_breakpoint` 标请求（回合借用会话，不复制它，kernel-SPEC §12.6），`prompt_payload(&plan)` 把 `plan.breakpoints()` 逐个拼成 `breakpoints` 行（段界写 slot 名，尾写 `tail`）；`verified_system_hashes` 以同一个 `marks_edge` 核对线上的块。兼容格式只负责拼写（Anthropic：被标记消息的最后一块带 `cache_control`），不决定任何断点。
 ```rust
 pub enum Breakpoint { Edge(SegmentSlot), Tail }
 pub struct BreakpointPlan { /* tail: Option<usize> */ }
 impl BreakpointPlan {
     pub fn for_conversation(messages: &[ChatMessage]) -> BreakpointPlan;
     pub fn marks_edge(slot: SegmentSlot) -> bool;
-    pub fn mark(&self, messages: &mut [ChatMessage]);
+    pub fn message_breakpoint(&self) -> MessageBreakpoint;   // 写进 ChatRequest.breakpoint；会话本身不动
     pub fn breakpoints(&self) -> Vec<Breakpoint>;
 }
 ```

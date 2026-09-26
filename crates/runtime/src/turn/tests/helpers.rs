@@ -82,6 +82,12 @@ pub(super) fn prefix() -> FrozenPrefix {
     .unwrap()
 }
 
+/// A conversation that outlives the turn borrowing it, for tests that
+/// assemble from nothing.
+pub(super) fn blank_conversation() -> &'static Conversation {
+    Box::leak(Box::new(Conversation::new()))
+}
+
 pub(super) fn run_id() -> RunId {
     RunId::parse("0198f6a2-7c4a-7bbb-9d1e-00000000000a").unwrap()
 }

@@ -57,7 +57,7 @@ const EVERY_CONNECTION: [ConnectionKind; 7] = [
 /// built here rather than taken from a shared sample: this file states
 /// the case it guards, and a sample edited for another test would
 /// quietly change what is guarded.
-fn dispatch() -> ChatRequest {
+fn dispatch() -> ChatRequest<'static> {
     ChatRequest {
         model: "a-model".to_owned(),
         max_tokens: kernel::Ceiling::new(4096),
@@ -72,13 +72,14 @@ fn dispatch() -> ChatRequest {
             },
         ],
         messages: vec![ChatMessage {
-            cache: false,
             role: Role::User,
             content: vec![ContentBlock::Text {
                 text: "Task: probe".to_owned(),
             }],
-        }],
-        tools: Vec::new(),
+        }]
+        .into(),
+        tools: std::borrow::Cow::Borrowed(&[]),
+        breakpoint: kernel::MessageBreakpoint::Unmarked,
         effort: None,
     }
 }

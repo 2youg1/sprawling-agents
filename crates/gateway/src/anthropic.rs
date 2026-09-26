@@ -134,7 +134,7 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
         root.insert("system".to_owned(), Value::Array(system));
     }
     let mut messages = Vec::new();
-    for message in &req.messages {
+    for (index, message) in req.messages.iter().enumerate() {
         let role = role_str(message.role);
         let mut blocks = message
             .content
@@ -143,7 +143,7 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
             .collect::<Result<Vec<Value>, AxError>>()?;
         // This wire carries a message's breakpoint on its last block:
         // the cached region ends where that block ends.
-        if message.cache
+        if req.carries_breakpoint(index)
             && let Some(Value::Object(last)) = blocks.last_mut()
         {
             last.insert("cache_control".to_owned(), json!({ "type": "ephemeral" }));

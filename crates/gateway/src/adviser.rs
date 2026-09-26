@@ -104,7 +104,6 @@ impl AdviserClient {
         let word = ask_word(question.ask)?;
         let mut messages = window.to_vec();
         messages.push(ChatMessage {
-            cache: false,
             role: Role::User,
             content: vec![ContentBlock::Text {
                 text: question_text(&word, &question),
@@ -124,8 +123,9 @@ impl AdviserClient {
                     text: INSTRUCTION.to_owned(),
                     cache: false,
                 }],
-                messages,
-                tools: Vec::new(),
+                messages: std::borrow::Cow::Owned(messages),
+                tools: std::borrow::Cow::Borrowed(&[]),
+                breakpoint: kernel::MessageBreakpoint::Unmarked,
                 effort: None,
             },
         };

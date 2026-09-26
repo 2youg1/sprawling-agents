@@ -46,7 +46,7 @@ pub(super) struct ModelCall<'a> {
     journal: &'a mut Journal,
     ledger: &'a mut dyn Ledger,
     model: &'a mut dyn Model,
-    request: &'a ModelRequest,
+    request: &'a ModelRequest<'a>,
     streamed: bool,
 }
 
@@ -57,7 +57,7 @@ impl<'a> ModelCall<'a> {
         journal: &'a mut Journal,
         ledger: &'a mut dyn Ledger,
         model: &'a mut dyn Model,
-        request: &'a ModelRequest,
+        request: &'a ModelRequest<'a>,
     ) -> ModelCall<'a> {
         ModelCall {
             journal,

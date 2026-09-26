@@ -94,7 +94,7 @@ mod tests {
     use super::*;
     use kernel::{B3Hash, BuildingPolicy};
 
-    fn req() -> ModelRequest {
+    fn req() -> ModelRequest<'static> {
         ModelRequest {
             policy: BuildingPolicy::default(),
             segments: [B3Hash::digest(b"x"); 4],

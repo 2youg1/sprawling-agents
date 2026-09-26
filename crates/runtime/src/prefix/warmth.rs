@@ -27,7 +27,7 @@ pub struct Warmth {
 /// A prefix's last real request, and its cache as last seen.
 #[derive(Debug, Clone)]
 struct Kept {
-    request: ModelRequest,
+    request: ModelRequest<'static>,
     cache: CacheUse,
 }
 
@@ -51,7 +51,7 @@ impl Warmth {
         self.kept.insert(
             request.segments,
             Kept {
-                request: request.clone(),
+                request: request.clone().into_owned(),
                 cache: CacheUse::sent(at_ms),
             },
         );
@@ -94,7 +94,7 @@ impl Warmth {
 /// The last real request, asking for one output token: the cache hits on
 /// the prefix bytes whatever the ceiling, so one token is the lowest
 /// price a renewal can pay.
-fn renewal_of(request: &ModelRequest) -> ModelRequest {
+fn renewal_of(request: &ModelRequest<'static>) -> ModelRequest<'static> {
     let mut renewal = request.clone();
     renewal.chat.max_tokens = Ceiling::new(1);
     renewal
@@ -196,12 +196,12 @@ mod tests {
     /// Counts what reaches the provider, and keeps each request it saw.
     #[derive(Default)]
     struct Provider {
-        seen: Vec<ModelRequest>,
+        seen: Vec<ModelRequest<'static>>,
     }
 
     impl Model for Provider {
         fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
-            self.seen.push(req.clone());
+            self.seen.push(req.clone().into_owned());
             Ok(ModelReturn::bare(
                 kernel::model::message_payload(&[ContentBlock::Text {
                     text: "warm".to_owned(),
@@ -212,7 +212,7 @@ mod tests {
         }
     }
 
-    fn request() -> ModelRequest {
+    fn request() -> ModelRequest<'static> {
         ModelRequest {
             policy: BuildingPolicy::default(),
             segments: [B3Hash::digest(b"prefix"); 4],
@@ -257,7 +257,7 @@ mod tests {
 
     /// What reached the provider behind a [`Warmed`] door, read after
     /// the door owns the provider.
-    type Seen = std::sync::Arc<std::sync::Mutex<Vec<ModelRequest>>>;
+    type Seen = std::sync::Arc<std::sync::Mutex<Vec<ModelRequest<'static>>>>;
 
     struct Behind(Seen);
 
@@ -265,7 +265,7 @@ mod tests {
         fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
             let mut provider = Provider::default();
             let answer = provider.call(req);
-            self.0.lock().unwrap().push(req.clone());
+            self.0.lock().unwrap().push(req.clone().into_owned());
             answer
         }
     }

@@ -22,7 +22,7 @@ pub use usage::ModelUsage;
 pub use window::Window;
 pub use wire::{
     BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind,
-    Effort, Increment, ModelTag, Role, StopReason, SystemBlock, ToolDef,
+    Effort, Increment, MessageBreakpoint, ModelTag, Role, StopReason, SystemBlock, ToolDef,
 };
 
 use crate::error::AxError;

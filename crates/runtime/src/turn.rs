@@ -17,6 +17,8 @@
 //! All events of one turn share the timestamp given to [`Turn::begin`]:
 //! order is `seq`'s business, time is a parameter, never sampled.
 
+use std::borrow::Cow;
+
 use kernel::event::record::{CancelReceived, ModelReturned, SteerReceived};
 use kernel::model::content_from_message;
 use kernel::{
@@ -57,9 +59,9 @@ pub struct Turn<S> {
 pub struct Assembling(());
 
 #[derive(Debug)]
-pub struct Calling {
+pub struct Calling<'c> {
     segments: [B3Hash; 4],
-    chat: ChatRequest,
+    chat: ChatRequest<'c>,
 }
 
 #[derive(Debug)]
@@ -96,15 +98,15 @@ impl Turn<Assembling> {
     /// catalog's tool defs; appends `prompt_assembled` with the prefix's
     /// full source notes unless the run has already recorded that same
     /// payload.
-    pub fn assemble(
+    pub fn assemble<'c>(
         mut self,
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
         prompt: RunPrompt<'_>,
-        conversation: &Conversation,
-        tools: &[ToolDef],
+        conversation: &'c Conversation,
+        tools: &'c [ToolDef],
         shape: &CallShape,
-    ) -> Result<PhaseOutcome<Turn<Calling>>, AxError> {
+    ) -> Result<PhaseOutcome<Turn<Calling<'c>>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
@@ -123,15 +125,15 @@ impl Turn<Assembling> {
                 .append_authored(ledger, Authored::PromptAssembled, payload.clone())?;
             prompt.recorded.remember(payload);
         }
-        let mut chat = ChatRequest {
+        let chat = ChatRequest {
             model: shape.model.clone(),
             max_tokens: shape.max_tokens,
             system: prompt.prefix.system_blocks()?,
-            messages: conversation.messages().to_vec(),
-            tools: tools.to_vec(),
+            messages: Cow::Borrowed(conversation.messages()),
+            tools: Cow::Borrowed(tools),
+            breakpoint: plan.message_breakpoint(),
             effort: shape.effort,
         };
-        plan.mark(&mut chat.messages);
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,
             state: Calling { segments, chat },
@@ -139,7 +141,7 @@ impl Turn<Assembling> {
     }
 }
 
-impl Turn<Calling> {
+impl Turn<Calling<'_>> {
     /// Boundary 2 (before the provider call). Appends `model_called` and
     /// `model_returned`; a provider Err propagates after nothing but the
     /// boundary consumption touched the ledger. The reads `generating`

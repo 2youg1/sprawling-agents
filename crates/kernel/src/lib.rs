@@ -87,7 +87,7 @@ pub use ledger::{GENESIS_PREV, Ledger};
 pub use locator::{B3Hash, GitOid, Locator, Range};
 pub use model::{BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock};
 pub use model::{DialectKind, EarlyCalls, Effort, ImageRef, ImageType};
-pub use model::{Increment, Increments, Model};
+pub use model::{Increment, Increments, MessageBreakpoint, Model};
 pub use model::{Mode, Window};
 pub use model::{ModelRequest, ModelReturn, ModelTag, ModelUsage, Role, StopReason};
 pub use model::{SystemBlock, ToolDef};
