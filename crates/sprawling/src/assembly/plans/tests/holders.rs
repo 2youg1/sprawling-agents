@@ -209,6 +209,50 @@ fn a_landing_refused_part_way_hands_back_only_the_nodes_it_did_not_close() {
     );
 }
 
+/// A run that claims a node and splits it holds nothing afterwards, and
+/// the split line is the parent's fate: a landing that succeeds owes no
+/// hand-back line after it (sprawling-SPEC.md 8-42-8).
+#[test]
+fn a_split_closes_the_claim_on_its_parent() {
+    use crate::assembly::fixture::*;
+    let dir = city_with_plan(PLAN_TWO_FREE_ROWS);
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "taking a row",
+                "tu_1",
+                "plan",
+                serde_json::json!({ "action": "claim", "node": "1" }),
+            ),
+            tool_completion(
+                "cutting it up",
+                "tu_2",
+                "plan",
+                serde_json::json!({
+                    "action": "split",
+                    "node": "1",
+                    "parts": ["run the cable", "test the element"]
+                }),
+            ),
+            completion("done", None),
+        ],
+    );
+    let worker = worker_over_faults(dir.path(), None);
+    let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
+    let landed = worker.handle(dispatch(b"split and land"));
+    drop(provider);
+
+    assert_eq!(
+        (landed.is_ok(), plan_lines(&worker)),
+        (
+            true,
+            owned(&[("roadmap_claimed", "1"), ("roadmap_split", "1")])
+        ),
+        "the split closes node 1; nothing is handed back after it"
+    );
+}
+
 /// A city whose building `lab` has `plan` as its roadmap.
 fn city_with_plan(plan: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
