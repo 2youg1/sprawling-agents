@@ -173,7 +173,7 @@ composer's send button, which is the retry. -->
                 leave(toast);
               }}
             />
-            {#each recoveryFor(toast.error.code) as recovery (recoveryLabel(recovery, $lang))}
+            {#each recoveryFor(toast.error) as recovery (recoveryLabel(recovery, $lang))}
               {@const why = recoveryWhy(u, recovery, toast)}
               <Button
                 tone="quiet"

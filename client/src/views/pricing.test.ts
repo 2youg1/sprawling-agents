@@ -10,8 +10,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { costReading } from "./pricing";
-import { UsdMicros, type CostAnswer } from "../wire";
+import { costReading, runSpend } from "./pricing";
+import { RunId, UsdMicros, type CostAnswer } from "../wire";
 
 function answer(total: number, calls: number, tokens: number): CostAnswer {
   return {
@@ -36,5 +36,15 @@ describe("a zero total is read by whether any call went unpriced", () => {
 
   test("a priced total is priced even beside unpriced calls", () => {
     expect(costReading(answer(700, 2, 1_542))).toEqual({ kind: "priced" });
+  });
+});
+
+describe("the facts row reads a run's spend only when a run is moving", () => {
+  test("no run moving says nothing, even when the cost answer is unavailable", () => {
+    expect(runSpend({ kind: "unavailable", query: "cost" }, null)).toEqual({ kind: "none" });
+  });
+
+  test("a moving run with an unreadable cost answer says so", () => {
+    expect(runSpend({ kind: "unavailable", query: "cost" }, RunId.make("00000000-0000-4000-8000-000000000001"))).toEqual({ kind: "unreadable" });
   });
 });

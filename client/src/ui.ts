@@ -52,7 +52,10 @@ export interface Ui {
   // three views share: the dot on the rail, the rail's badge, and the
   // tab's title. Before this each of them folded the same answer by
   // hand, and a fourth reader would have folded it a fourth time.
-  readonly approvals: Readable<readonly ApprovalItem[]>;
+  // `undefined` until the city first answers: an empty list is a
+  // snapshot, and a reader that took the placeholder for one (the
+  // notifier's first snapshot) would raise every item that follows.
+  readonly approvals: Readable<readonly ApprovalItem[] | undefined>;
   readonly bar: AddressBar;
   readonly origin: string;
   // The pairing code this page was opened with, as the city's HTTP
@@ -100,8 +103,7 @@ function readied(value: Opening): Ui {
     mode,
     approvals: derived(
       value.conn.asking.ask(QUERIES.approvals),
-      (answer) => (answer !== undefined && "approvals" in answer ? answer.approvals.items : []),
-      [],
+      (answer) => (answer !== undefined && "approvals" in answer ? answer.approvals.items : undefined),
     ),
     chooseEffort: effort.set,
     chooseMode: mode.set,

@@ -43,7 +43,7 @@
   import { usd } from "../core/time";
   import { ui } from "../ui";
   import type { Address, Answer, Autonomy } from "../wire";
-  import { costReading } from "./pricing";
+  import { costReading, runSpend } from "./pricing";
 
   // How loudly a cell is drawn. Exhaustive, and it is the whole of the
   // difference between the two kinds of fact on this strip: a setting
@@ -172,13 +172,17 @@
   const spendingWeight = $derived<Weight>(spendingRead.kind === "unavailable" ? "alerting" : "reading");
 
   const thisRun = $derived.by((): string => {
-    const run = $moving;
-    const held = spending;
-    if (spendingRead.kind === "unavailable") return say($lang, "facts_unreadable");
-    if (run === null || held === undefined) return NOTHING;
-    if (costReading(held).kind === "unpriced") return say($lang, "cost_none");
-    const found = held.by_run.find(([name]) => name === run.run);
-    return found === undefined ? usd(0) : usd(found[1]);
+    const spent = runSpend(spendingRead, $moving?.run ?? null);
+    switch (spent.kind) {
+      case "none":
+        return NOTHING;
+      case "unreadable":
+        return say($lang, "facts_unreadable");
+      case "unpriced":
+        return say($lang, "cost_none");
+      case "spent":
+        return usd(spent.micros);
+    }
   });
 
   const thisCity = $derived.by((): string => {

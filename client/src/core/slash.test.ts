@@ -11,7 +11,7 @@ import { Address, RunId, Seq } from "../wire";
 import type { Command, Origin } from "../wire";
 import type { View } from "./route";
 import { SLASH, find, offered, parse } from "./slash";
-import type { Slash, SlashCall, SlashHands } from "./slash";
+import type { Slash, SlashCall, SlashHands } from "./slash_hands";
 import { completed } from "./completion";
 import { forkAsked } from "./forking";
 
