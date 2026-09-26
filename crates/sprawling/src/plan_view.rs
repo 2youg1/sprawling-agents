@@ -161,7 +161,9 @@ impl PlanView {
     /// Puts back a plan read with the cache released, unless a record
     /// folded since it was asked for may have moved it.
     fn remember(&mut self, fresh: FreshPlan) {
-        self.read.insert(fresh.addr, fresh.reading);
+        if self.generation(&fresh.addr) == fresh.asked_at {
+            self.read.insert(fresh.addr, fresh.reading);
+        }
     }
 
     fn generation(&self, addr: &Address) -> Generation {
