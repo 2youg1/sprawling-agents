@@ -19,6 +19,7 @@ use super::ledger::{
     JsonlLedger, OpenReport, PriorSegment, SEGMENT_ROLL_BYTES, TailBoundary, TailTruncation,
     WriterLock, complete_lines, is_segment, segment_file_name,
 };
+use super::verify::{LineCheck, LineFault};
 
 impl JsonlLedger {
     /// Production entrance: std filesystem underneath, and the ledger
@@ -232,79 +233,68 @@ impl JsonlLedger {
     /// bytes; on return the ledger state points at the surviving tail.
     fn recover_tail(&mut self, segments: &[PathBuf], last: &Path) -> Result<u64, MemoryError> {
         let boundary = self.boundary(segments, last)?;
-        let mut run_prev = boundary.prev;
-        let mut run_seq = boundary.next_seq;
+        let mut check = LineCheck::after(boundary.prev, boundary.next_seq);
         let prior = boundary.prior;
         let bytes = self.vfs.read(last).map_err(io_err("read segment", last))?;
         let (lines, _terminated_len) = complete_lines(&bytes);
 
         let mut valid_len = 0usize;
         for (index, line) in lines.iter().enumerate() {
-            let parsed = EventRecord::parse_line(line);
-            // What a version refuses, it refuses by name. A line this
-            // build cannot read is not tail damage, and truncating it as
-            // if it were would delete a newer build's history; the two
-            // refusals used to be one, and both came out saying the
-            // chain did not continue (memory-SPEC 8-1).
-            if let Ok(record) = &parsed {
-                let v = u64::from(record.v());
-                let at = u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1);
-                match readable_log_v(v) {
-                    LogVersion::Current | LogVersion::Older => {}
-                    LogVersion::Ahead => {
-                        return Err(MemoryError::VersionAhead {
-                            path: last.to_path_buf(),
-                            v,
-                        });
-                    }
-                    LogVersion::NotAVersion => {
-                        return Err(MemoryError::Envelope {
-                            path: last.to_path_buf(),
-                            line: at,
-                            source: unversioned(v),
-                        });
-                    }
+            let at = u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1);
+            let fault = match check.advance(line) {
+                Ok(_) => {
+                    valid_len = valid_len.saturating_add(line.len()).saturating_add(1);
+                    continue;
                 }
-            }
-            let ok = match &parsed {
-                Ok(record) => record.prev() == run_prev && record.seq() == run_seq,
-                Err(_) => false,
+                Err(fault) => fault,
             };
-            if !ok {
-                // A tear only ever damages the tail and never leaves a
-                // record behind. A break is refused — not truncated — when
-                // the breaking line parses (a fork: a second writer
-                // continued the same prev) or intact records still follow
-                // it (non-tail damage); truncating either would delete
-                // lawful history. Newline-bearing garbage is no record.
-                let later_intact = lines
+            // What a version refuses, it refuses by name: a line this
+            // build cannot read is not tail damage, and truncating it
+            // would delete a newer build's history (memory-SPEC 8-1).
+            // A tear only ever damages the tail and never leaves a record
+            // behind, so a break is refused - not truncated - when the
+            // breaking line carries an envelope (a fork: a second writer
+            // continued the same prev) or intact records still follow it
+            // (non-tail damage). Newline-bearing garbage is no record.
+            let later_intact = || {
+                lines
                     .iter()
                     .skip(index.saturating_add(1))
-                    .any(|l| EventRecord::parse_line(l).is_ok());
-                if parsed.is_ok() || later_intact {
-                    return Err(MemoryError::Envelope {
+                    .any(|l| LineCheck::carries_envelope(l))
+            };
+            let source = match fault {
+                LineFault::VersionAhead(v) => {
+                    return Err(MemoryError::VersionAhead {
                         path: last.to_path_buf(),
-                        line: u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1),
-                        source: AxError::failure(
-                            AxCode::InvalidArgs,
-                            "verify chain",
-                            "a line does not continue the chain",
-                        )
-                        .with_recovery(
-                            "run `sprawling replay <ledger-dir>` to see the first line \
-                             that breaks, then restore that segment from its \
-                             checkpoint commit",
-                        ),
+                        v,
                     });
                 }
-                break;
-            }
-            run_prev = chain_hash(line);
-            run_seq = run_seq
-                .next()
-                .map_err(|source| MemoryError::Draft { source })?;
-            valid_len = valid_len.saturating_add(line.len()).saturating_add(1);
+                LineFault::NotAVersion(v) => unversioned(v),
+                LineFault::NotALine(_) if !later_intact() => break,
+                LineFault::ChainBreak | LineFault::SeqGap { .. } | LineFault::NotALine(_) => {
+                    AxError::failure(
+                        AxCode::InvalidArgs,
+                        "verify chain",
+                        "a line does not continue the chain",
+                    )
+                    .with_recovery(
+                        "run `sprawling replay <ledger-dir>` to see the first line \
+                     that breaks, then restore that segment from its \
+                     checkpoint commit",
+                    )
+                }
+                other @ (LineFault::UnknownKind(_)
+                | LineFault::NotCanonical(_)
+                | LineFault::SeqExhausted(_)) => other.into_ax(at),
+            };
+            return Err(MemoryError::Envelope {
+                path: last.to_path_buf(),
+                line: at,
+                source,
+            });
         }
+        let run_prev = check.prev();
+        let run_seq = check.expected();
 
         let total = bytes.len();
         let dropped = u64::try_from(total.saturating_sub(valid_len)).unwrap_or(u64::MAX);

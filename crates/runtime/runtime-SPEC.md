@@ -94,6 +94,8 @@ impl VerifiedLedger {
 /// Offline chain verification (A2). Errors carry the failing line number in
 /// `subject`. Refuses: v > EVENT_LOG_V (direction-aware), broken prev chain,
 /// seq gaps, non-canonical bytes, unknown kind without `ig:true`.
+/// 逐行判定不住在这里：每一行经 `memory::LineCheck::advance`，拒词经 `LineFault::into_ax`
+/// ——与 `JsonlLedger::open` 的尾段扫描同一份检查（memory-SPEC §8-1）。
 pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError>;
 /// Convenience over a jsonl directory: memory::jsonl::read_raw_lines + verify.
 /// 无段目录与空账本在此同形（均得空 VerifiedLedger）——本函数的调用方均自持城根算出路径；

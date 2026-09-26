@@ -27,7 +27,9 @@
 mod append;
 mod ledger;
 mod open;
+mod verify;
 
 pub use append::{ledger_segments_at, read_raw_lines_at};
 pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
 pub(crate) use ledger::{complete_lines, segment_first_seq, segment_names};
+pub use verify::{CheckedLine, LineCheck, LineFault};
