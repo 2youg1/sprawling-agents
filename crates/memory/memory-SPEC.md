@@ -446,6 +446,11 @@ impl Checkpoint {
     /// pointed at by refs/sprawling/runs/<run>/<oid>. HEAD does not move.
     /// Returns the checkpoint_committed payload
     /// {oid, scope, files, model, effort} (the last two: §8-18).
+    /// `files` 只列这一次 fence 改动了的路径（新增、修改、删除），按字节序：
+    /// 比的是暂存前后两份 index 的 (路径, blob) 对。列全部已跟踪路径会让
+    /// 5,000 个文件的楼每一波往账本里写 5,000 条路径，而读者要的是
+    /// 这一波碰过什么。首个 fence 与 `ensure_base`
+    /// 面对空 index，所以照旧列出它们提交的每一个文件。
     pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
