@@ -996,7 +996,7 @@ impl PlanView {
 
 - **值住在工人身上，事实住在账本里。** `kernel::Pursuit` 由 `Delegator::root()` 铸出，而这座城里**唯一一处 `Delegator::root()` 就在 `RunWorker::over`**——于是「子代理不能让全城通宵干活」是一件关于代码的事实，而不是一条谁去遵守的规则。设置／暂停／恢复／清除各落一条 `pursuit_changed`，`Views` 折它来画，重启后工人从同一批记录把值重新铸出来。两处折叠都经 `Payload::read::<kernel::event::record::PursuitChanged>` 与它的 `held` 读这一行，读不回的一行让折叠报错而不是被跳过：跳过它，一座被清除目标的楼在重启后会继续追下去。
 - **`Views` 不持 `Pursuit`，只持文本与状态**：一个能铸出 `Pursuit` 的视图，就是那道守卫上的第二扇门。判定仍由 `kernel::observe_pursuit` 给出，措辞由 `verdict_line` 一处写出——页面、控制台与日志说同一句话。
-- **`pursue` 会终止，理由在集合上而不在计数器上**：认领把节点移出就绪集，而一个结束时还持有节点的 run 会把它留成 Blocked（`ClaimDesk::abandon`），所以就绪集严格变小；唯一让它变大的是拆分，而那是这座城找到了更多活，不是在打转。派活之后若该节点仍在就绪集里，循环停下并留一条诊断——**看的是集合本身，不是一个凭空定的上限。**
+- **`pursue` 会终止，理由在集合上而不在计数器上**：认领把节点移出就绪集，而一个结束时还持有节点的 run 会把它留成 Blocked（`ClaimDesk::abandon`），所以就绪集严格变小；唯一让它变大的是拆分，而那是这座城找到了更多活，不是在打转。派活之后若该节点仍在就绪集里，追求暂停并留一条诊断——**看的是集合本身，不是一个凭空定的上限。**
 
 ## 8-36 一个节点红了，站在它后面的人会知道（`tell_whoever_is_behind`）
 
@@ -2397,21 +2397,22 @@ admission 上排队**——§8-42-3 早就写下这句话，这里把它从设�
 
 ### 8-46-4 `pursue` 拿走整个 ready set（`bin::assembly::plans::pursuing`）
 
-今天的 `pursue` 是「取一个 → 跑完 → 再取一个」，一次只有一轮活。这里把它搬进 `plans` 下的一个自己的模块
-（`plans.rs` 留 `set_pursuit` 与读计划的那几个私有方法；子模块看得见父模块的私有项，所以这次拆分没有把任何字段变公开），
-并改成：
+`pursue` 住 `plans` 下自己的模块（`plans.rs` 留 `set_pursuit` 与读计划的那几个私有方法；子模块看得见父模块的
+私有项，所以没有字段因此变公开）。**它由事件推进，不是命令里的一个循环**：命令台只在主循环里读，
+一个在 `Pursue` 命令里转到底的循环会把 `Pause`、`Clear`、`Halt`、新派活、审批与排程全都关在门外。
 
-1. 读整个 ready set；对其中每一个节点，只要车道没满就 `prepare_dispatch` 并交给池。
-2. 车道满了就不再取：`kernel::observe(state, &ready, in_flight)` 的 `in_flight` 参数**第一次有真值**，
-   于是「没什么可取但有人在跑」如实答 `Waiting { in_flight }`，而不是像今天那样恒传 0。
+1. `set_pursuit` 记下 `pursuit_changed` 之后调一次 `pursue`：读整个 ready set，对其中每一个节点，只要车道没满就
+   `prepare_dispatch` 并交给池，然后**返回**，命令台随即空出来。
+2. 车道满了就不再取：`kernel::observe(state, &ready, in_flight)` 的 `in_flight` 是真值，
+   于是「没什么可取但有人在跑」如实答 `Waiting { in_flight }`。
    **已经在别人手上的节点不在问它的那个 ready set 里**：ready 的意思是「现在可以有人接手」，
    而一个已经被接手的节点不能被接手两次。过滤在调用点做，依据仍然是 `kernel::pursuit` 的。
-3. 等：调 `serve_flight`（relay 请求排在一切之前，§8-42-2），再看有没有 `Driven` 到达。
-4. 到达即 `land`，**按到达顺序**（§8-42-1），落完账再回到第 1 步——一轮活结束可能让新的节点变 ready。
-   一轮活回来时它那个节点仍然 ready，说明这一轮什么也没认领：记一条 `Refuse` 诊断，并停止再取新活
-   （在跑的活照样等回来落账），这与此前那条「不再派它一次」的规矩是同一条。
-5. 这个追求自己的行都回家了且 ready 空 ＝ `Finished`，退出。**它不等 desk 派的活**：
-   那些活由主循环接，一个追求等它们就是把两件不相干的事捕到一起。
+3. 每一轮活落地之后，`serve_flight` 调 `advance_pursuits`：落地的是某个追求的一行（`Landed::Row`）而那个节点
+   仍然 ready，说明这一轮什么也没认领——记一条 `Refuse` 诊断，并经 `set_pursuit` 把这个追求**暂停**，
+   `pursuit_changed` 因此写下 `pause`，页面不再说「working on …」，人 `Resume` 即可再试；然后对每一个
+   追求再取一次 ready work。任何一轮活落地都可能空出车道或让新节点变 ready，所以不只看自己的行。
+4. 这一步取活失败（计划读不出、派活被拒）落一条 `Refuse` 诊断，不让刚落地的那一轮活的结局跟着失败：
+   两件事没有因果。
 
 **账本上的写者仍然只有一个**：车道线程手上唯一的 `kernel::Ledger` 是 `Relay`，`JsonlLedger` 一步不离记账线程。
 `RelayGate` 由 `pursue` 自己开一扇，发出去的 `Relay` 与它一一对应；`serving/worker.rs` 主循环里那一扇仍在，

@@ -309,3 +309,58 @@ fn excerpt(history: &str, at: usize) -> String {
         .map_or(history.len(), |line| at.saturating_add(line));
     history.get(start..end).unwrap_or_default().to_owned()
 }
+
+/// Setting a pursuit starts its rows and gives the desk back: `Pause`,
+/// `Halt` and every other command are read by the main loop, and a
+/// pursuit that drove its rows to the end inside the command kept them
+/// all out. The rows still land, through the same loop.
+#[test]
+fn a_pursuit_gives_the_desk_back_while_its_rows_drive() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
+    std::fs::write(
+        dir.path().join("lab").join(city::ROADMAP_FILE),
+        PLAN_ONE_FREE_ROW,
+    )
+    .unwrap();
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![completion("wire-the-kiln", None), completion("done", None)],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::SelectModel {
+            endpoint: channels::ProviderName::parse("house").unwrap(),
+            model: "m-local".to_owned(),
+            tag: kernel::ModelTag::Digest,
+            context_tokens: kernel::Window::new(32_768),
+            max_output_tokens: kernel::Ceiling::new(4_096),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"digest"),
+        })
+        .unwrap();
+    let lab = Address::parse("lab").unwrap();
+    worker
+        .set_pursuit(
+            &lab,
+            channels::PursuitStep::Set {
+                goal: "fire the kiln".to_owned(),
+            },
+        )
+        .unwrap();
+    assert!(
+        worker.driving(),
+        "the pursuit returned before its row came home"
+    );
+    worker.land_the_rest().unwrap();
+    let history =
+        std::fs::read_to_string(report.ledger_dir.join("segment-000000.jsonl")).unwrap_or_default();
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let frozen = verified
+        .raw_lines()
+        .iter()
+        .filter(|line| String::from_utf8_lossy(line).contains("\"kind\":\"run_frozen\""))
+        .count();
+    assert_eq!(frozen, 1, "the row still landed: {history}");
+}
