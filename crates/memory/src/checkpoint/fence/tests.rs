@@ -370,3 +370,34 @@ fn restore_leaves_a_file_the_person_made_after_the_discard() {
         (true, "the person's newer file".to_owned())
     );
 }
+
+#[test]
+fn restore_refuses_a_link_on_the_path_and_writes_nothing_outside_the_city() {
+    let tmp = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/doomed.txt", "about to go");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let pre = checkpoint
+        .wave_pre(
+            &["work".to_owned()],
+            TimeMs::new(1_700_000_000_000),
+            &resident(),
+        )
+        .unwrap();
+    let pre_oid = GitOid::parse(&oid_of(&pre)).unwrap();
+    std::fs::remove_dir_all(tmp.path().join("work")).unwrap();
+    assert!(
+        crate::alias::tests::place_link(false, outside.path(), &tmp.path().join("work")),
+        "the fixture could not make a link"
+    );
+
+    let restored = checkpoint.restore(&Address::parse("work/doomed.txt").unwrap(), &pre_oid);
+
+    assert_eq!(
+        (
+            restored.is_err(),
+            outside.path().join("doomed.txt").exists()
+        ),
+        (true, false)
+    );
+}
