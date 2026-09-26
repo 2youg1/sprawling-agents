@@ -980,8 +980,8 @@
     "zh": "这一条要管理员权限，页面从不申请，请在终端里运行"
   },
   "machine_install_press": {
-    "en": "gets it from {source}; this changes the computer, so it runs only when you press install",
-    "zh": "从 {source} 获取；这会改动这台电脑，所以只在你按下「安装」时运行"
+    "en": "{source}; this changes the computer, so it runs only when you press install",
+    "zh": "{source}；这会改动这台电脑，所以只在你按下「安装」时运行"
   },
   "machine_install_all": {
     "en": "install the {count} missing",
@@ -3488,28 +3488,28 @@
     "zh": "同类有一个即可，已经有了"
   },
   "machine_source_brew": {
-    "en": "Homebrew",
-    "zh": "Homebrew"
+    "en": "installed through Homebrew",
+    "zh": "经 Homebrew 安装"
   },
   "machine_source_cargo": {
-    "en": "crates.io, built on this computer by cargo",
-    "zh": "crates.io，由 cargo 在本机编译"
+    "en": "source code from crates.io, compiled by cargo on this computer",
+    "zh": "从 crates.io 下载源码，由 cargo 在这台电脑上编译"
   },
   "machine_source_elan": {
-    "en": "the Lean project, through elan",
-    "zh": "Lean 官方，经 elan"
+    "en": "downloaded from the Lean project by elan",
+    "zh": "由 elan 从 Lean 官方下载"
   },
   "machine_source_rustup": {
-    "en": "the Rust project, through rustup",
-    "zh": "Rust 官方，经 rustup"
+    "en": "downloaded from the Rust project by rustup",
+    "zh": "由 rustup 从 Rust 官方下载"
   },
   "machine_source_uv": {
-    "en": "python-build-standalone, through uv",
-    "zh": "python-build-standalone，经 uv"
+    "en": "a python-build-standalone build, downloaded by uv",
+    "zh": "由 uv 下载的 python-build-standalone 构建"
   },
   "machine_source_winget": {
-    "en": "winget, the Windows package manager",
-    "zh": "winget（Windows 的包管理器）"
+    "en": "installed through winget, the Windows package manager",
+    "zh": "经 winget（Windows 的包管理器）安装"
   },
   "machine_step_done": {
     "en": "installed",
