@@ -98,11 +98,10 @@ impl Keeper {
             Value::Array(items) => {
                 let mut changed = None;
                 for (at, item) in items.iter().enumerate() {
-                    if let Some(kept) = self.kept_value(side, item)? {
-                        if let Some(slot) = changed.get_or_insert_with(|| items.clone()).get_mut(at)
-                        {
-                            *slot = kept;
-                        }
+                    if let Some(kept) = self.kept_value(side, item)?
+                        && let Some(slot) = changed.get_or_insert_with(|| items.clone()).get_mut(at)
+                    {
+                        *slot = kept;
                     }
                 }
                 Ok(changed.map(Value::Array))
