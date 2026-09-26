@@ -3,7 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Who gets woken, and where the work lands.
+//! Taking on work: the run id a dispatch derives, the ACP request
+//! turned into that dispatch, and `agree_to_work`, which decides whether
+//! the city may take it before anything is written.
 
 use kernel::{Address, AxCode, AxError};
 use kernel::{Locator, RunId, TimeMs};

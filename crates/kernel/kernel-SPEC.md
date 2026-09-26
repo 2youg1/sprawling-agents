@@ -1424,7 +1424,7 @@ pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
 ```
 
 **为什么在 kernel 而不在产地**：三处需要这个形状——`memory::changes` 从两棵树上读出它、
-`channels::wire` 携它、`web` 画它——而 `channels` 看不见 `memory`。定义两份再互相转换，
+`channels::wire` 携它、客户端画它——而 `channels` 看不见 `memory`。定义两份再互相转换，
 就是「一个文件变更是什么」有两个定义，而漂开的总是没人看的那个。这与 `Restoration` 当初落在这里
 是同一条理由。
 
@@ -1455,8 +1455,9 @@ pub fn markdown(text: &str) -> Vec<Span>;
 **缝在 `markdown(&str) -> Vec<Span>` 这个签名上**：将来真需要语法引擎时，它去服务端、
 线格式那时再长。
 
-**在 kernel 而不在 web**：同 `kernel::change` 的理由——无 I/O、无时钟、输出穷举枚，
-而且服务端有一天也要用它。`channels` 转出类型与函数，`web` 调用。
+**在 kernel 而不在客户端**：同 `kernel::change` 的理由——无 I/O、无时钟、输出穷举枚，
+而且服务端有一天也要用它。`channels` 转出类型与函数；现在没有 Rust 调用者，客户端用自己的
+`client/src/core/prose.ts`。
 
 **偏移量恒在字符边界上**：切片由客户端拿着 `start`/`len` 去做，落在多字节字符中间的
 偏移会让一页中文文档直接炸。一条断言钉住：每一个 span 都切得出来。
