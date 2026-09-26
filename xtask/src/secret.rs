@@ -51,9 +51,9 @@ const EXPOSE_WHITELIST: [&str; 6] = [
     // onward is a `Redeemed`, which yields plaintext only to whoever
     // names `Redeemed::plaintext` in the last slot before the wire.
     // Listed rather than redeemed one layer up, because the
-    // alternative put plaintext in `bin::assembly`, which is what this
+    // alternative put plaintext in the composition root, which is what this
     // list exists to prevent.
-    "crates/sprawling/src/mcp_redeeming.rs",
+    "crates/protocol/src/mcp/redeeming.rs",
     // The broker that holds an outside application's OAuth is reached
     // with a project key in an `x-api-key` header, which is the same
     // last slot before the wire as the two redemption points above. The
