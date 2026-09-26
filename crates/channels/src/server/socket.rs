@@ -22,7 +22,7 @@ use crate::reception::inbound::Inbound;
 use crate::reception::{SessionState, SessionStep, Stream, WelcomeFacts, decide_frame};
 use crate::wire::{Answered, Ask, AskOutcome, Sample, ServerFrame};
 
-use super::config::ShellState;
+use super::config::{Answering, ShellState};
 use super::reply::{Delivered, Reply};
 
 pub(crate) async fn upgrade(
@@ -88,45 +88,7 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         }
                     }
                     SessionStep::Answer(ask) => {
-                        // Answering reads the disk and takes a lock, and
-                        // it ran here, inside the task that owns this
-                        // socket. One `RunHistory` therefore held a
-                        // tokio worker thread for the whole read: this
-                        // peer received no pushed event for as long as
-                        // it lasted, and enough people opening a session
-                        // at once could occupy every worker the runtime
-                        // has. The blocking pool is where a synchronous
-                        // read belongs, and this stays true however fast
-                        // the read becomes.
-                        let answering = Arc::clone(&state.queries);
-                        let Ask { ask_id, query } = *ask;
-                        let outcome =
-                            tokio::task::spawn_blocking(move || answering(query)).await;
-                        let (as_of, outcome) = match outcome {
-                            Ok((as_of, Ok(answer))) => (as_of, AskOutcome::Answer(answer)),
-                            Ok((as_of, Err(error))) => (as_of, AskOutcome::Refusal(error)),
-                            // The pool dropped the work, which means the
-                            // runtime is going down; say so rather than
-                            // leave the page waiting on a frame that
-                            // will never come. Nothing was read, so the
-                            // answer is dated at the start of history.
-                            Err(_) => (
-                                Seq::FIRST,
-                                AskOutcome::Refusal(
-                                    AxError::failure(
-                                        AxCode::StorageFatal,
-                                        "answer a query",
-                                        "the answering task did not finish",
-                                    )
-                                    .with_recovery("ask again; if it repeats, restart the server"),
-                                ),
-                            ),
-                        };
-                        let frame = ServerFrame::Answered(Box::new(Answered {
-                            ask_id,
-                            as_of,
-                            outcome,
-                        }));
+                        let frame = answered(Arc::clone(&state.queries), *ask).await;
                         if send(&mut socket, &frame).await.is_err() {
                             return;
                         }
@@ -253,6 +215,42 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
             }
         }
     }
+}
+
+/// The frame that answers one question, read on the blocking pool.
+///
+/// Answering reads the disk and takes a lock. Run inside the task that
+/// owns the socket, one `RunHistory` would hold a tokio worker for the
+/// whole read: the peer would receive no pushed event for as long as it
+/// lasted, and enough people opening a session at once could occupy
+/// every worker the runtime has. The blocking pool is where a
+/// synchronous read belongs, and this stays true however fast the read
+/// becomes.
+async fn answered(answering: Answering, Ask { ask_id, query }: Ask) -> ServerFrame {
+    let (as_of, outcome) = match tokio::task::spawn_blocking(move || answering(query)).await {
+        Ok((as_of, Ok(answer))) => (as_of, AskOutcome::Answer(answer)),
+        Ok((as_of, Err(error))) => (as_of, AskOutcome::Refusal(error)),
+        // The pool dropped the work, which means the runtime is going
+        // down; say so rather than leave the page waiting on a frame
+        // that will never come. Nothing was read, so the answer is
+        // dated at the start of history.
+        Err(_) => (
+            Seq::FIRST,
+            AskOutcome::Refusal(
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "answer a query",
+                    "the answering task did not finish",
+                )
+                .with_recovery("ask again; if it repeats, restart the server"),
+            ),
+        ),
+    };
+    ServerFrame::Answered(Box::new(Answered {
+        ask_id,
+        as_of,
+        outcome,
+    }))
 }
 
 /// What a watching session holds: the token that counts it, and its
