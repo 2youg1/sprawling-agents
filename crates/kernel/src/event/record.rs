@@ -40,6 +40,7 @@
 
 mod adviser;
 mod checkpoint;
+mod credential;
 mod governance;
 mod log;
 mod modality;
@@ -51,6 +52,7 @@ pub use adviser::{
     AdviserAnswer, AdviserAnswered, AdviserAsk, AdviserAsked, AdviserFailure, AdviserFellBack,
 };
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
+pub use credential::{LoginStarted, SecretCaptured, ToolkitLinkOpened};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     SpineDocumentWritten, autonomy_word,

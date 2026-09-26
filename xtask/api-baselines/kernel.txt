@@ -1961,6 +1961,9 @@ pub kernel::event::record::EvidenceCite::seq: kernel::Seq
 pub kernel::event::record::GovernedDocumentWritten::bytes: usize
 pub kernel::event::record::GovernedDocumentWritten::which: alloc::string::String
 pub kernel::event::record::LogTruncated::dropped_bytes: u64
+pub kernel::event::record::LoginStarted::auth_url: alloc::string::String
+pub kernel::event::record::LoginStarted::provider: alloc::string::String
+pub kernel::event::record::LoginStarted::user_code: core::option::Option<alloc::string::String>
 pub kernel::event::record::ModelCalled::model: alloc::string::String
 pub kernel::event::record::ModelCalled::segments: alloc::vec::Vec<kernel::locator::B3Hash>
 pub kernel::event::record::ModelReturned::billed_usd_micros: core::option::Option<kernel::budget::UsdMicros>
@@ -2001,6 +2004,9 @@ pub kernel::event::record::RunStarted::parent: core::option::Option<kernel::RunI
 pub kernel::event::record::RunStarted::predecessor: core::option::Option<kernel::RunId>
 pub kernel::event::record::RunStarted::skills: alloc::vec::Vec<kernel::event::record::SkillPin>
 pub kernel::event::record::RunStarted::task: alloc::string::String
+pub kernel::event::record::SecretCaptured::expires_at: core::option::Option<u64>
+pub kernel::event::record::SecretCaptured::origin: alloc::string::String
+pub kernel::event::record::SecretCaptured::reference: kernel::SecretRef
 pub kernel::event::record::SessionOpened::carried: bool
 pub kernel::event::record::SessionOpened::from: core::option::Option<kernel::Origin>
 pub kernel::event::record::ShapeChanged::Compared
@@ -2036,6 +2042,7 @@ pub kernel::event::record::ToolCalled::subject: core::option::Option<alloc::stri
 pub kernel::event::record::ToolResult::answer: kernel::event::record::ToolAnswer
 pub kernel::event::record::ToolResult::name: kernel::tool::ToolName
 pub kernel::event::record::ToolResult::tool_use_id: alloc::string::String
+pub kernel::event::record::ToolkitLinkOpened::toolkit: alloc::string::String
 pub kernel::gate::ConnectorCall::label: &'a kernel::tool::ServerLabel
 pub kernel::gate::ConnectorCall::tool: &'a kernel::tool::ToolName
 pub kernel::gate::DoorId::Attach
@@ -2509,6 +2516,7 @@ pub struct kernel::event::record::EmbeddingCalled
 pub struct kernel::event::record::EvidenceCite
 pub struct kernel::event::record::GovernedDocumentWritten
 pub struct kernel::event::record::LogTruncated
+pub struct kernel::event::record::LoginStarted
 pub struct kernel::event::record::ModelCalled
 pub struct kernel::event::record::ModelReturned
 pub struct kernel::event::record::PromptAssembled
@@ -2520,6 +2528,7 @@ pub struct kernel::event::record::RerankCalled
 pub struct kernel::event::record::RunForked
 pub struct kernel::event::record::RunFrozen
 pub struct kernel::event::record::RunStarted
+pub struct kernel::event::record::SecretCaptured
 pub struct kernel::event::record::SessionOpened
 pub struct kernel::event::record::ShapePart
 pub struct kernel::event::record::SkillPin
@@ -2527,6 +2536,7 @@ pub struct kernel::event::record::SpineDocumentWritten
 pub struct kernel::event::record::SteerReceived
 pub struct kernel::event::record::ToolCalled
 pub struct kernel::event::record::ToolResult
+pub struct kernel::event::record::ToolkitLinkOpened
 pub struct kernel::gate::ConnectorCall<'a>
 pub struct kernel::gate::EgressAllowlist
 pub struct kernel::goal::GoalEntry

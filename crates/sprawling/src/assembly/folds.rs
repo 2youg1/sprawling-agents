@@ -80,7 +80,7 @@ impl Standing {
                 governance.absorb(record.kind(), record.run(), record.addr(), record.data())?;
                 collaboration.absorb(record)?;
                 entrance.absorb(record.data());
-                expiries.absorb(record.kind(), record.data());
+                expiries.absorb(record.kind(), record.data())?;
                 origins.absorb(record.kind(), record.addr(), record.data())?;
             }
         }

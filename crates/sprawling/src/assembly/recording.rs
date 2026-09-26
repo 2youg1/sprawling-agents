@@ -98,7 +98,7 @@ impl RunWorker {
         // dispatch about a session the process has already recorded.
         self.origins.absorb(kind, addr.as_ref(), &data)?;
         self.governance.absorb(kind, RunId::CITY, None, &data)?;
-        self.expiries.absorb(kind, &data);
+        self.expiries.absorb(kind, &data)?;
         self.book.apply_payload(kind, &data)
     }
 

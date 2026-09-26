@@ -430,6 +430,15 @@ pub struct AdviserAnswered { pub subject: String, #[serde(flatten)] pub answer: 
 pub enum AdviserFailure { Unavailable, Timeout, Unreadable }
 pub struct AdviserFellBack { pub subject: String, pub reason: AdviserFailure }
 
+// record::credential：F3 家族里凭据进出的三行。`ref` 是 SecretRef 而不是 String，
+// 语法之外的引用读不成这一行（Payload::read 报 E_WIRE_MISMATCH），不再被读者各自静默跳过。
+pub struct SecretCaptured { #[serde(rename = "ref")] pub reference: SecretRef,
+                            #[serde(default)] pub origin: String,   // enrolment | pasted | <provider>-subscription | <provider>-renewal
+                            pub expires_at: Option<u64> }           // 缺席即省略，不写 null
+pub struct LoginStarted { pub provider: String, pub auth_url: String,
+                          pub user_code: Option<String> }           // 只有设备码登录才有；缺席即省略
+pub struct ToolkitLinkOpened { pub toolkit: String }
+
 pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
                         pub subject: Option<String> }   // 键缺席读作 None
 pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
