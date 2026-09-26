@@ -16,47 +16,19 @@
 //! skill edited since is visible as a run pinned to a hash no shelf
 //! holds any more.
 
+use std::collections::BTreeMap;
+use std::path::Path;
+
 use kernel::{Address, B3Hash, EventRecord, RunId};
 
 use super::holding::Views;
 
-impl Views {
-    /// Every shelf one building reads from, with the runs that pinned
-    /// each holding.
-    ///
-    /// `None` for a building whose shelves will not scan and for one
-    /// whose rules will not load. Both are a broken installation rather
-    /// than an empty one: `Unavailable` says the view could not look,
-    /// while an empty list would say this building can do nothing. A
-    /// building with no rules file does admit nothing, and `city::load`
-    /// answers that case with the default rules rather than a failure.
-    pub(super) fn skills_answer(&self, building: &Address) -> Option<channels::SkillsAnswer> {
-        let home = crate::home::Home::detect().ok()?;
-        let shelves = city::Library::scan(&self.city_root, Some(building), home.path()).ok()?;
-        // What this building's reading room admits, so a page can show
-        // the stock and the choice in one list.
-        let rules = city::load(&self.city_root, building).ok()?;
-        let admitted: Vec<String> = rules.reading_room().to_vec();
-        let skills = shelves
-            .all()
-            .into_iter()
-            .map(|holding| channels::SkillLine {
-                name: holding.name.clone(),
-                section: holding.section.clone(),
-                shelf: shelf_of(&holding.shelf),
-                disclosure: holding.disclosure.clone(),
-                hash: holding.hash,
-                admitted: admitted.iter().any(|name| name == &holding.name),
-                pinned_by: self.pinned_by(&holding.name, &holding.hash),
-            })
-            .collect();
-        Some(channels::SkillsAnswer {
-            building: building.clone(),
-            skills,
-            missing: shelves.missing(&admitted),
-        })
-    }
+/// Which runs were frozen with each skill, by its name and the hash it
+/// had: the fold's half of the skills page, copied out under the view
+/// lock so the shelves can be scanned after it.
+pub(super) type SkillPins = BTreeMap<(String, B3Hash), Vec<RunId>>;
 
+impl Views {
     /// Files which skills one `run_started` says that run was frozen
     /// with.
     ///
@@ -76,20 +48,59 @@ impl Views {
             }
         }
     }
+}
 
-    /// The runs frozen with this exact name and hash pinned, oldest
-    /// first.
-    ///
-    /// The hash as well as the name, because a skill edited between two
-    /// runs is two different documents under one name, and a list that
-    /// matched on the name alone would claim the older run read what
-    /// the newer one did.
-    fn pinned_by(&self, name: &str, hash: &B3Hash) -> Vec<RunId> {
-        self.skill_pins
-            .get(&(name.to_owned(), *hash))
-            .cloned()
-            .unwrap_or_default()
-    }
+/// Every shelf one building reads from, with the runs that pinned
+/// each holding.
+///
+/// `None` for a building whose shelves will not scan and for one
+/// whose rules will not load. Both are a broken installation rather
+/// than an empty one: `Unavailable` says the view could not look,
+/// while an empty list would say this building can do nothing. A
+/// building with no rules file does admit nothing, and `city::load`
+/// answers that case with the default rules rather than a failure.
+pub(super) fn skills_answer(
+    city_root: &Path,
+    building: &Address,
+    pins: &SkillPins,
+) -> Option<channels::SkillsAnswer> {
+    let home = crate::home::Home::detect().ok()?;
+    let shelves = city::Library::scan(city_root, Some(building), home.path()).ok()?;
+    // What this building's reading room admits, so a page can show
+    // the stock and the choice in one list.
+    let rules = city::load(city_root, building).ok()?;
+    let admitted: Vec<String> = rules.reading_room().to_vec();
+    let skills = shelves
+        .all()
+        .into_iter()
+        .map(|holding| channels::SkillLine {
+            name: holding.name.clone(),
+            section: holding.section.clone(),
+            shelf: shelf_of(&holding.shelf),
+            disclosure: holding.disclosure.clone(),
+            hash: holding.hash,
+            admitted: admitted.iter().any(|name| name == &holding.name),
+            pinned_by: pinned_by(pins, &holding.name, &holding.hash),
+        })
+        .collect();
+    Some(channels::SkillsAnswer {
+        building: building.clone(),
+        skills,
+        missing: shelves.missing(&admitted),
+    })
+}
+
+/// The runs frozen with this exact name and hash pinned, oldest
+/// first.
+///
+/// The hash as well as the name, because a skill edited between two
+/// runs is two different documents under one name, and a list that
+/// matched on the name alone would claim the older run read what
+/// the newer one did.
+fn pinned_by(pins: &SkillPins, name: &str, hash: &B3Hash) -> Vec<RunId> {
+    pins.get(&(name.to_owned(), *hash))
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// Which shelf a holding sits on, and where its document is.

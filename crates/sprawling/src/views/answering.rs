@@ -31,7 +31,7 @@ use super::holding::Views;
 use super::prepared::{Prepared, unavailable};
 
 mod history;
-use super::lines::{buildings_of, endpoints_answer, summarize};
+use super::lines::{endpoints_answer, summarize};
 
 /// Answers one query from the views the fold shares with every reader,
 /// holding them only while [`Views::prepare`] copies out what the query
@@ -72,7 +72,9 @@ impl Views {
         }
     }
 
-    /// How much of everything this city is holding right now.
+    /// How much of everything this city is holding right now, but for
+    /// the building count, which `Prepared::finish` reads off the
+    /// directory once the lock is released.
     ///
     /// A count that cannot be expressed is reported as the largest
     /// count this wire can carry rather than dropped: a saturated
@@ -83,7 +85,7 @@ impl Views {
             events: self.events,
             runs_active: self.hot.active_count(),
             runs_frozen: self.hot.frozen_count(),
-            buildings: u64::try_from(buildings_of(&self.city_root).len()).unwrap_or(u64::MAX),
+            buildings: 0,
             approvals_waiting: u64::try_from(self.governance.pending.len()).unwrap_or(u64::MAX),
             signals_waiting: self
                 .waiting
@@ -230,10 +232,13 @@ impl Views {
                     locator: locator.clone(),
                 };
             }
-            channels::Query::Skills { building } => match self.skills_answer(building) {
-                Some(answer) => channels::Answer::Skills(Box::new(answer)),
-                None => unavailable(format!("Skills({})", building.as_str())),
-            },
+            channels::Query::Skills { building } => {
+                return Prepared::Skills {
+                    city_root: self.city_root.clone(),
+                    building: building.clone(),
+                    pins: self.skill_pins.clone(),
+                };
+            }
             channels::Query::GitStatus { building } => {
                 return Prepared::GitStatus(self.git_status_ask(building));
             }
@@ -273,7 +278,12 @@ impl Views {
                     needle: needle.clone(),
                 };
             }
-            channels::Query::Metrics => channels::Answer::Metrics(Box::new(self.metrics())),
+            channels::Query::Metrics => {
+                return Prepared::Metrics {
+                    city_root: self.city_root.clone(),
+                    held: self.metrics(),
+                };
+            }
         })
     }
 }

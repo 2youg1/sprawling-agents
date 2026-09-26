@@ -19,9 +19,11 @@ use super::archives::search_archives;
 use super::document::document_answer;
 use super::git_status::GitStatusAsk;
 use super::hunks::hunks_answer;
+use super::lines::buildings_of;
 use super::lines::config_answer;
 use super::listing::listing_answer;
 use super::prefix::content_answer;
+use super::skills::{SkillPins, skills_answer};
 use crate::assembly::read_building;
 use crate::plan_view::PlanReading;
 
@@ -70,6 +72,18 @@ pub(crate) enum Prepared {
     },
     /// Every building's archive shelves, searched for one needle.
     Archives { city_root: PathBuf, needle: String },
+    /// One building's shelves, beside which runs pinned each holding.
+    Skills {
+        city_root: PathBuf,
+        building: Address,
+        pins: SkillPins,
+    },
+    /// The vital signs: every figure the fold holds, and the building
+    /// count, which only the directory can give, still to read.
+    Metrics {
+        city_root: PathBuf,
+        held: channels::MetricsAnswer,
+    },
     /// One level of the tree.
     Listing {
         city_root: PathBuf,
@@ -157,6 +171,23 @@ impl Prepared {
             },
             Self::Archives { city_root, needle } => {
                 channels::Answer::Archive(search_archives(&city_root, &needle))
+            }
+            Self::Skills {
+                city_root,
+                building,
+                pins,
+            } => match skills_answer(&city_root, &building, &pins) {
+                Some(answer) => channels::Answer::Skills(Box::new(answer)),
+                None => unavailable(format!("Skills({})", building.as_str())),
+            },
+            // A count that cannot be expressed is reported as the largest
+            // count this wire can carry, for the reason every figure of
+            // `Views::metrics` is.
+            Self::Metrics { city_root, held } => {
+                channels::Answer::Metrics(Box::new(channels::MetricsAnswer {
+                    buildings: u64::try_from(buildings_of(&city_root).len()).unwrap_or(u64::MAX),
+                    ..held
+                }))
             }
         }
     }

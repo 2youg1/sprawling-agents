@@ -3508,6 +3508,8 @@ pub(crate) enum Prepared {
     Hunks { city_root: PathBuf, oid_a: GitOid, oid_b: GitOid, path: String }, // 锁外读一个文件的补丁
     Content { city_root: PathBuf, locator: Locator }, // 锁外读内容仓库里的一个对象
     Archives { city_root: PathBuf, needle: String }, // 锁外逐楼读档案架
+    Skills { city_root: PathBuf, building: Address, pins: SkillPins }, // 锁内拷出钉住表，锁外扫书架
+    Metrics { city_root: PathBuf, held: channels::MetricsAnswer },   // 锁内填好折叠里的数，锁外数楼
     Release,                         // 锁外经网络问发布页
 }
 // bin::views::answering
@@ -3525,7 +3527,9 @@ pub(crate) fn answer_outside_the_lock(
 
 **`Prepared` 与它的 `finish` 自成一个模块。** `answering` 管「一个查询在锁内拿什么」，`prepared` 管「锁外怎样把它读完」；两者分开，锁外新添一种读法时不必动锁内那张表。
 
-**`Skills`、`Prefix`、`Metrics` 的楼数仍在锁内读盘，`BuildingView` 的计划第一次被问时也在锁内读盘**（本节接口的当前状态）：`Skills` 还要锁内拷出折叠好的钉住表，`Prefix` 还要锁内拷出那条 `prompt_assembled` 记录，拆法与 `GitStatus` 相同。`Commit`、`Commits` 只读折叠，不在此列。
+**`Skills` 在锁内拷走整张钉住表。** 表的大小是「run 数 × 每个 run 钉住的技能数」，拷它是纯内存的一段；按这栋楼的书架先筛再拷，就得在锁内扫书架，正是要挪出去的那次读盘。
+
+**`Prefix` 仍在锁内读账本，`BuildingView` 的计划第一次被问时也在锁内读盘**（本节接口的当前状态）：`Prefix` 找那条 `prompt_assembled` 记录要刷新视图持有的账本索引，索引是可变的缓存，拆开它要等视图以 `Arc<ViewsSnapshot>` 发布（8-89）。`Commit`、`Commits` 只读折叠，不在此列。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 

@@ -548,3 +548,36 @@ fn git_store_and_archive_readers_read_after_the_views_are_released() {
         "{read:?}"
     );
 }
+
+/// The skills page scans the shelves, and the vital signs count the
+/// buildings, after the views are released: a building raised between
+/// `prepare` and `finish` is one each of them sees.
+#[test]
+fn the_shelves_and_the_building_count_are_read_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let queries = [
+        channels::Query::Skills {
+            building: Address::parse("lab").unwrap(),
+        },
+        channels::Query::Metrics,
+    ];
+    let prepared: Vec<_> = queries.iter().map(|query| views.prepare(query)).collect();
+    let shelf = kernel::layout::CityLayout::new(dir.path())
+        .building_skills(&Address::parse("lab").unwrap())
+        .join("utilities");
+    std::fs::create_dir_all(&shelf).unwrap();
+    std::fs::write(
+        shelf.join("diffing.md"),
+        "This lab's own rule
+",
+    )
+    .unwrap();
+
+    let read: Vec<_> = prepared
+        .into_iter()
+        .map(|prepared| prepared.finish())
+        .collect();
+    let fresh: Vec<_> = queries.iter().map(|query| views.answer(query)).collect();
+    assert_eq!(read, fresh);
+}
