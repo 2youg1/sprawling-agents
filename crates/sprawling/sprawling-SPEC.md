@@ -3602,7 +3602,8 @@ impl RunWorker {
 **原因**：评审 run 的树以 run id 为名，只在 `release_lease` 里归还；进程死在一轮中间时，登记、目录与分支永远留着（F10），一棵最多 `WORKTREE_MAX_BYTES`。
 
 - **在哪里做**：`RunWorker::over` 在开账之后调 `memory::Worktrees::sweep_abandoned(city_root, &[])`。`held` 为空，因为账本的独占锁保证此刻没有别的进程在用这座城，而这个 worker 还没有派出任何一轮；`over` 是 `serve`、`resume` 与 `form_city` 共同的构造点，所以每条开城路径都清扫。
-- **失败不挡开城**：清扫失败（例如 Windows 上一个文件还被别的程序打开）写进 `Diagnostics` 的一条 warn，城照常打开；留下的树下一次开城再收。一棵收不走的树不该让人进不了自己的城。
+- **失败不挡开城**：清扫失败（例如 Windows 上一个文件还被别的程序打开）以 `Level::Effect` 写进 `Diagnostics`，城照常打开；留下的树下一次开城再收。一棵收不走的树不该让人进不了自己的城。
+- **收走了什么也说**：收走至少一棵时，同一级别写一行，列出名字；什么都没收时不写。
 - **不碰的东西**：人加的 worktree、人的分支、带着未进 HEAD 的提交的租约分支、`refs/sprawling/runs/` 下的栅栏引用（memory-SPEC §8-9）。
 
 **本节测试**：`memory::worktree::sweep::tests` 的三条：崩溃留下的租约被收走；栅栏引用留下；活着的 run 的树留下。
