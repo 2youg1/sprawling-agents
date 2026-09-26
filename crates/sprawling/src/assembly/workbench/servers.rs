@@ -6,7 +6,7 @@
 //! The external tools a building's configuration names, each already
 //! connected to its server or left out and named in the diagnostics.
 
-use super::super::{RunWorker, connect_mcp, now_ms, transport_site};
+use super::super::{RunWorker, now_ms, transport_site};
 
 impl RunWorker {
     /// The external tools this run may reach, each already connected to
@@ -53,7 +53,10 @@ impl RunWorker {
             // failure used to be filed under `bin::mcp_stdio`, which
             // sent the last reader who followed it to the wrong file.
             let site = transport_site(&server.transport);
-            match connect_mcp(server, write_root, confidential, &resolve) {
+            match self
+                .connectors
+                .connect(server, write_root, confidential, &resolve)
+            {
                 Ok((tools, opened)) => {
                     self.note(
                         runtime::diagnostics::Level::Effect,

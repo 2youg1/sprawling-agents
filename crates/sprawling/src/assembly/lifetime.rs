@@ -13,8 +13,8 @@
 //! leave" is asking one question from two ends.
 
 use super::{
-    Collaborating, Credentials, Doorstep, Flight, GatewayModels, Planning, RoomQueues, RunWorker,
-    Standing, city_segment, now_ms,
+    Collaborating, Credentials, Doorstep, Flight, GatewayModels, McpServers, Planning, RoomQueues,
+    RunWorker, Standing, city_segment, now_ms,
 };
 use std::path::Path;
 
@@ -99,6 +99,7 @@ impl RunWorker {
             origins,
             flight: Flight::open(),
             models: Box::new(GatewayModels),
+            connectors: Box::new(McpServers),
         })
     }
 

@@ -74,7 +74,7 @@ use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 use genesis::city_segment;
 pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
 pub(crate) use mcp::McpLink;
-use mcp::{connect_mcp, mounts_under, transport_site};
+use mcp::{McpServers, mounts_under, transport_site};
 use models::GatewayModels;
 use naming::{building_of, governed_of, name_of, not_built, scope_of};
 use plans::Reporter;
@@ -229,6 +229,9 @@ pub struct RunWorker {
     /// (`models`). Received rather than built, so a second factory can
     /// drive a dispatch this worker accounts for.
     models: Box<dyn accounting::ModelFactory + Send>,
+    /// Connects the MCP servers a building's configuration names
+    /// (`mcp`). Received for the same reason `models` is.
+    connectors: Box<dyn accounting::Connectors + Send>,
 }
 
 impl RunWorker {

@@ -3,44 +3,68 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reaching the MCP servers a building's configuration names.
+//! Reaching the MCP servers a building's configuration names: the
+//! production `accounting::Connectors`, and the one door that swaps it
+//! for another (accounting-SPEC.md 8-2).
 
 use kernel::{Address, AxError};
 
-/// Starts one server and turns what it offers into tools.
-///
-/// The connection opens with the lifecycle the specification defines -
-/// `initialize`, then `notifications/initialized` - and only then asks
-/// what it offers. What the handshake learns is written to the
-/// diagnostics rather than branched on: negotiating a version needs a
-/// second version this build can speak before it can decide anything.
-pub(super) fn connect_mcp(
-    server: &kernel::McpServer,
-    write_root: &std::path::Path,
-    confidential: bool,
-    resolve: &gateway::SecretResolver,
-) -> Result<(Vec<protocol::McpTool>, protocol::Handshake), AxError> {
-    use protocol::Outbound as _;
+use super::RunWorker;
 
-    // The run's own root, which exists whether or not this building
-    // lends its runs a worktree.
-    let mut handle = McpLink::open(&server.transport, write_root, resolve)?;
-    let mut rpc = protocol::Rpc::new();
-    let opened = protocol::handshake(&mut handle, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE)?;
-    let listing = handle.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)?;
-    let listed = protocol::tools_from(&server.label, &protocol::Rpc::read(&listing)?)?;
-    let mut tools = Vec::new();
-    for entry in listed {
-        // One connection, one handle per tool: two of them would be two
-        // answers to what the same label offers.
-        tools.push(protocol::McpTool::new(
-            entry.meta,
-            entry.remote,
-            Box::new(handle.clone()),
-            confidential,
-        )?);
+/// Reaches each server the way its `[[mcp]]` table says: a child
+/// process over stdio, or a remote endpoint over HTTP or SSE.
+pub(crate) struct McpServers;
+
+impl accounting::Connectors for McpServers {
+    /// The connection opens with the lifecycle the specification
+    /// defines - `initialize`, then `notifications/initialized` - and
+    /// only then asks what it offers. What the handshake learns is
+    /// written to the diagnostics rather than branched on: negotiating a
+    /// version needs a second version this build can speak before it can
+    /// decide anything.
+    fn connect(
+        &self,
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+        confidential: bool,
+        resolve: &gateway::SecretResolver,
+    ) -> Result<(Vec<protocol::McpTool>, protocol::Handshake), AxError> {
+        use protocol::Outbound as _;
+
+        // The run's own root, which exists whether or not this building
+        // lends its runs a worktree.
+        let mut handle = McpLink::open(&server.transport, write_root, resolve)?;
+        let mut rpc = protocol::Rpc::new();
+        let opened = protocol::handshake(&mut handle, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE)?;
+        let listing = handle.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)?;
+        let listed = protocol::tools_from(&server.label, &protocol::Rpc::read(&listing)?)?;
+        let mut tools = Vec::new();
+        for entry in listed {
+            // One connection, one handle per tool: two of them would be
+            // two answers to what the same label offers.
+            tools.push(protocol::McpTool::new(
+                entry.meta,
+                entry.remote,
+                Box::new(handle.clone()),
+                confidential,
+            )?);
+        }
+        Ok((tools, opened))
     }
-    Ok((tools, opened))
+}
+
+impl RunWorker {
+    /// The same worker, reaching every MCP server through `connectors`
+    /// instead of starting the ones a building's configuration names.
+    ///
+    /// The door citysim and the dispatch tests drive a worker through:
+    /// what a server offers is theirs to script, while refusing servers
+    /// to a confidential building and leaving a failed one out stay the
+    /// worker's.
+    #[must_use]
+    pub fn with_connectors(self, connectors: Box<dyn accounting::Connectors + Send>) -> RunWorker {
+        RunWorker { connectors, ..self }
+    }
 }
 
 /// Which module a reader should open when a server misbehaves.

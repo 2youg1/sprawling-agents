@@ -10,14 +10,14 @@
 | 模块 | 这个模块回答的问题 | §8 |
 |---|---|---|
 | `models` | 一次 run 或一次命名调用，拿什么模型适配器去说话 | 8-1 |
+| `connectors` | 一栋楼配置里写的 MCP server，怎样连上并变成工具 | 8-2 |
 
-目标形状里还有三个端口与一批搬迁，现在都还不在本 crate：
+目标形状里还有两个端口与一批搬迁，现在都还不在本 crate：
 
 | 端口 | 它回答的问题 | 现在的住处 |
 |---|---|---|
 | `Clock` | 现在几点 | `bin::assembly::now_ms`，唯一采样点 |
 | `Machine` | city 所在的主机上有哪些工具，以及装上一个 | `bin::doctor::probe::Machine`，`pub(crate)` |
-| `Connectors` | 一栋楼连哪些 MCP server | `bin::assembly::mcp` |
 
 `RunWorker` 的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例与 `views` 仍在 `crates/sprawling/src/assembly` 与 `crates/sprawling/src/views`。
 
@@ -31,6 +31,8 @@
 | `an_unnamed_dispatch_is_named_by_the_model_the_worker_was_handed` | 命名调用（没有 session 的 dispatch）也走端口：房间的名字是脚本 digest 模型给的那个词。 |
 | `a_confidential_building_refuses_before_the_factory_is_asked` | 机密楼的拒绝在 worker 的选择里，不在工厂里：端点不在本机时 dispatch 以 `GateDenied` 被拒，脚本工厂一次也没被问到。换掉工厂不能绕开机密。 |
 
+第四条在 `crates/sprawling/tests/connectors.rs`：`a_run_is_offered_the_tools_the_worker_was_handed`。楼的配置写了一个 MCP server，它的命令在本机不存在；worker 接收了一个脚本 `Connectors`，它给出一个工具。只要 worker 还自己启动 server，这个 server 就起不来，模型收到的工具表里也就没有那个工具。
+
 ## 3 假设与歧义
 
 - `Clock` 端口要不要连带 `last_tick` 与调度器一起搬：`last_tick` 是 `RunWorker` 字段，它的读法随六个对象一起定。能定下它的证据是：计划组搬进本 crate 之后，调度器还剩几个调用 `now_ms` 的地方。
@@ -38,7 +40,7 @@
 
 ## 4 现状分析
 
-本 crate 现有一个端口 `ModelFactory`。生产适配器在装配根（`bin::assembly::models`），第二实现在 `crates/sprawling/tests/model_factory.rs`。
+本 crate 现有两个端口。`ModelFactory` 的生产适配器在装配根（`bin::assembly::models`），第二实现在 `crates/sprawling/tests/model_factory.rs`；`Connectors` 的生产适配器是 `bin::assembly::mcp::McpServers`，第二实现在 `crates/sprawling/tests/connectors.rs`。
 
 ## 5 权威信源
 
@@ -46,13 +48,15 @@ ARCHITECTURE.md §3（依赖律与 `depmap`）、§4（端口表）、§11（V6 
 
 ## 6 命名统一
 
-ModelFactory｜accounting thread｜Chosen｜Redemption。「适配器」专指 `kernel::Model` 的一个实现；「端口」专指本 crate 声明、外层实现的 trait。
+ModelFactory｜Connectors｜accounting thread｜Chosen｜Redemption。「适配器」专指 `kernel::Model` 的一个实现；「端口」专指本 crate 声明、外层实现的 trait。
 
 ## 7 模块边界
 
 - 怎样按 endpoint、dialect、凭据造出一个适配器，归 `gateway::adapter_for`：本 crate 只声明「造一个」这个动作。
 - 挑哪个模型（`EndpointBook::select`）与何时续期凭据，归 `RunWorker`：端口拿到的是已经选好的 `Chosen` 与已经兑换好的 `Redemption`。
 - 把生产适配器接到 worker 上，归装配根 `bin::assembly`。
+- MCP 的生命周期（`initialize`、`notifications/initialized`、`tools/list`）怎样说，归 `protocol`；一个工具能不能在机密楼里存在，归 `protocol::McpTool::new`。端口只声明「连上一个 server，交回它的工具」。
+- 机密楼根本不启动 server，这一步在 worker 的 `mcp_tools` 里、端口被问到之前。
 
 ## 8 接口先行
 
@@ -86,8 +90,39 @@ impl RunWorker {
 - **固定值**：`RunWorker::new` 与 `over` 装上 `GatewayModels`；`with_models` 是唯一换掉它的门。
 - **一致性套件**：端口的断言就是 §2 那条测试——拿到的适配器必须就是被调用的那一个。
 
+### 8-2 accounting::connectors（形状 3 端口）
+
+```rust
+pub trait Connectors {
+    /// # Errors
+    /// Whatever starting the server, its handshake or its listing
+    /// refuses.
+    fn connect(
+        &self,
+        server: &kernel::McpServer,
+        write_root: &std::path::Path,
+        confidential: bool,
+        resolve: &gateway::SecretResolver,
+    ) -> Result<(Vec<protocol::McpTool>, protocol::Handshake), AxError>;
+}
+```
+
+```rust
+// bin::assembly::mcp（形状 4 适配器）
+pub(crate) struct McpServers;             // 生产：McpLink::open + protocol::handshake + tools/list
+impl RunWorker {
+    pub fn with_connectors(self, connectors: Box<dyn accounting::Connectors + Send>) -> RunWorker;
+}
+```
+
+- **失败**：原样传 `McpLink::open`、`protocol::handshake` 与 `protocol::tools_from` 的 `AxError`。worker 把失败写进 diagnostics、把这个 server 留在外面，run 照常开始；端口不另造错误码。
+- **`confidential` 原样传给 `McpTool::new`**：那是工具层的权威。worker 在机密楼里一个 server 都不启动，所以生产路径上它总是 `false`；它仍在签名里，是为了任何实现都不能造出一个绕过工具层拒绝的工具。
+- **固定值**：`RunWorker::new` 与 `over` 装上 `McpServers`；`with_connectors` 是唯一换掉它的门。
+- **依赖**：本 crate 因此依赖 `protocol`（ARCHITECTURE.md §3 的 `depmap`）。
+
 ## 12 决策
 
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只依赖 `kernel` 与 `gateway` 的接口类型。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。
 2. **`with_models` 是一个消费 `self` 的方法，而不是 `new` 的第四个参数。** 理由：生产只有一种工厂，`new` 的每个调用方（serve、doctor、测试）都会写同一个 `GatewayModels`；换工厂的只有 citysim 与测试。被否决的做法：`new` 加参数——四个调用点重复同一个值，而这个值只有一个权威。
 3. **端口参数是 `Chosen` 与 `Redemption`，不含 dialect 头。** 理由：dialect 头由 `Chosen` 的 dialect 决定，把它交给调用方算，两个调用点就各有一份拼法。被否决的做法：照抄 `gateway::adapter_for` 的三参数签名。
+4. **`Connectors` 交回整条连接（握手之后的工具与握手结果），而不是一个裸的 `protocol::Outbound`。** 理由：一个 server 的每个工具各持有同一条链接的一份克隆，而 `Outbound` 是 trait object，不能克隆；交回裸链接，worker 就得再要一个「造链接」的工厂。被否决的做法：端口只负责 `McpLink::open`——那要多一个端口，而握手的说法本来就归 `protocol`，不归 worker。
