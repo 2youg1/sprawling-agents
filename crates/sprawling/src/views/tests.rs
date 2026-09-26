@@ -698,3 +698,58 @@ fn a_plan_nobody_has_read_yet_is_read_after_the_views_are_released() {
 
     assert_eq!(prepared.finish(), Views::new(dir.path()).answer(&query));
 }
+
+/// The history, a named range, one run's transcript, its rounds and its
+/// evidence are read out of the ledger after the views are released: a
+/// line appended between `prepare` and `finish` is one each answer shows.
+#[test]
+fn the_ledger_readers_read_after_the_views_are_released() {
+    use kernel::Ledger;
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let run = RunId::from_bytes([7u8; 16]);
+    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+        .unwrap()
+        .0;
+    let appended_at = ledger.position();
+    let mut views = Views::new(dir.path());
+    let queries = [
+        channels::Query::History {
+            before: None,
+            limit: 50,
+        },
+        channels::Query::HistoryRange {
+            from: appended_at,
+            to: appended_at,
+            limit: 50,
+        },
+        channels::Query::RunHistory {
+            run,
+            before: None,
+            limit: 50,
+        },
+        channels::Query::Rounds { run },
+        channels::Query::Evidence { run },
+    ];
+    let prepared: Vec<_> = queries.iter().map(|query| views.prepare(query)).collect();
+    let data = serde_json::json!({ "segments": [] });
+    ledger
+        .append(kernel::EventDraft {
+            run,
+            t: kernel::TimeMs::new(1_000),
+            who: "lab/room1".to_owned(),
+            addr: Some(Address::parse("lab/room1").unwrap()),
+            kind: EventKind::PromptAssembled,
+            data: Payload::new(data.as_object().unwrap().clone()).unwrap(),
+            ig: false,
+        })
+        .unwrap();
+    drop(ledger);
+
+    let read: Vec<_> = prepared
+        .into_iter()
+        .map(|prepared| prepared.finish())
+        .collect();
+    let fresh: Vec<_> = queries.iter().map(|query| views.answer(query)).collect();
+    assert_eq!(read, fresh);
+}

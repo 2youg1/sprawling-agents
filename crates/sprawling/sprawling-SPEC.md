@@ -3514,6 +3514,11 @@ pub(crate) enum Prepared {
     Skills { city_root: PathBuf, building: Address, pins: SkillPins }, // 锁内拷出钉住表，锁外扫书架
     Metrics { city_root: PathBuf, held: channels::MetricsAnswer },   // 锁内填好折叠里的数，锁外数楼
     Release,                         // 锁外经网络问发布页
+    History { ledger: LedgerAsk, before: Option<Seq>, limit: u32 },      // 锁外刷新索引、读一段历史
+    HistoryRange { ledger: LedgerAsk, from: Seq, to: Seq, limit: u32 },  // 锁外读一个区间
+    RunHistory { ledger: LedgerAsk, run: RunId, before: Option<Seq>, limit: u32 }, // 锁外读一个 run 的记录
+    Rounds { ledger: LedgerAsk, run: RunId },                            // 锁外读一个 run 的记录再折成回合
+    Evidence { ledger: LedgerAsk, run: RunId },                          // 锁外读一个 run 留下的定位符
 }
 // bin::views::answering
 impl Views { pub(crate) fn prepare(&self, query: &channels::Query) -> Prepared; } // 只读视图
@@ -3544,6 +3549,8 @@ pub(crate) struct CityAsk { city_root: PathBuf, plans: Arc<Mutex<PlanView>>, hel
 impl CityAsk { pub(super) fn read(self) -> channels::Answer; } // 锁外列楼的目录、读计划、算每个追求的判词
 // bin::views::prefix
 pub(crate) struct PrefixAsk { city_root: PathBuf, run: RunId, first: Option<Seq>, index: Arc<Mutex<memory::LedgerIndex>> }
+// bin::views::prepared
+pub(crate) struct LedgerAsk { city_root: PathBuf, index: Arc<Mutex<memory::LedgerIndex>> } // 历史、回合与证据带出视图锁的那一份账本
 impl PrefixAsk { pub(super) fn read(self) -> channels::Answer; } // 读不到那一行或内容仓库打不开：Unavailable
 ```
 
@@ -3555,7 +3562,7 @@ impl PrefixAsk { pub(super) fn read(self) -> channels::Answer; } // 读不到那
 
 **`CityView` 与 `BuildingView` 都在锁外读盘。** `prepare` 只拷 run 摘要、停工的范围、各追求（地址、目标、状态）与在飞的 run 数，`CityAsk::read` 在锁外列楼的目录，用 `plans_of` 取这些楼与各追求所在地址的计划，再算楼的进度与每个追求的判词。`BuildingView` 带出计划缓存的 `Arc`，在 `finish` 里读楼的目录并用同一个 `plans_of` 取它的计划。
 
-**仍在锁内读盘的**（本节接口的当前状态）：`History`、`HistoryRange`、`RunHistory`、`Rounds`、`Evidence` 在锁内刷新并读账本索引；它们只要像 `Prefix` 一样把索引的 `Arc` 带出去。`Commit`、`Commits` 只读折叠，不在此列。
+**历史、回合与证据只带出账本。** `History`、`HistoryRange`、`RunHistory`、`Rounds`、`Evidence` 不读折叠里的任何东西，`prepare` 只拷城根并克隆索引的 `Arc`（`LedgerAsk`），刷新索引、读行、折成回合或挑出定位符都在 `finish` 里做。于是在锁内作答的查询都只读折叠，不碰盘：`Commit`、`Commits` 也在此列。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 
