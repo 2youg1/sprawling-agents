@@ -17,9 +17,9 @@ const DELTAS = 2_000;
 // and at this size that is a frame's worth of work per token.
 const BUDGET_US = 20;
 // One animation frame of stream, and what folding it may spend with a
-// subscriber that reads the whole run table, as the views do: a quarter
-// of a 16 ms frame. Telling that subscriber once per delta instead of
-// once per frame is a pass over every run per token.
+// subscriber that reads the whole run table: a quarter of a 16 ms frame.
+// A delta into a run the table holds wakes only that run's readers, so
+// the subscriber hears the city's answer and no token after it.
 const FRAME_DELTAS = 50;
 const FRAMES = 40;
 const FRAME_BUDGET_US = 4000;
