@@ -11,18 +11,18 @@
 //! Consumes [`VerifiedLedger`] only: replay and fork share one rebuilder,
 //! so fork correctness and replay correctness are the same assertion.
 
-use kernel::event::record::{
-    ModelReturned, RunForked, RunStarted, SteerReceived, ToolAnswer, ToolResult,
-};
+use kernel::event::record::{ModelReturned, RunStarted, SteerReceived, ToolAnswer, ToolResult};
 use kernel::model::content_from_message;
-use kernel::{
-    Address, AxCode, AxError, ChatMessage, ContentBlock, EventDraft, EventKind, EventRecord,
-    Payload, RunId, Seq, TimeMs,
-};
+use kernel::{AxCode, AxError, ChatMessage, ContentBlock, EventKind, EventRecord, RunId, Seq};
 
 use crate::compaction::Exchange;
 use crate::conversation::{Conversation, Opening};
 use crate::replay::{VerifiedLedger, VerifiedLine};
+
+mod lineage;
+
+pub use lineage::fork_draft;
+use lineage::forked_from;
 
 /// The fork prefix: raw lines `0..=at_seq`, byte-exact. Past the tail is
 /// `E_INVALID_ARGS`, never a silent clamp.
@@ -124,6 +124,11 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
     };
 
     let mut conversation = Conversation::new();
+    // A mother that was herself a branch opened with her own mother's
+    // conversation, which lives on the grandmother's lines, not hers.
+    if let Some(origin) = forked_from(mother, owner, index)? {
+        conversation.push_inherited(&inherited(mother, origin)?.messages);
+    }
     let mut at = Seq::FIRST;
     let mut open: Option<Wave> = None;
     for line in mother
@@ -354,34 +359,6 @@ fn outside(mother: &VerifiedLedger, at_seq: Seq) -> AxError {
     .with_recovery(match mother.tail_seq() {
         Some(tail) => format!("the mother sequence ends at seq {}", tail.value()),
         None => "the mother sequence is empty".to_string(),
-    })
-}
-
-/// The `run_forked` draft for the city Ledger; the caller supplies the
-/// new run id, the room it lands in, and the clock reading.
-pub fn fork_draft(
-    origin: kernel::Origin,
-    new_run: RunId,
-    addr: Address,
-    t: TimeMs,
-    who: String,
-) -> Result<EventDraft, AxError> {
-    let data = Payload::of(&RunForked {
-        from: origin.run,
-        at_seq: origin.at_seq,
-    })?;
-    Ok(EventDraft {
-        run: new_run,
-        t,
-        who,
-        // The room is on the line because a fold that rebuilds what each
-        // room's session still owes reads it here: the new run's id says
-        // which run continues which, and the address says whose session
-        // has been served.
-        addr: Some(addr),
-        kind: EventKind::RunForked,
-        data,
-        ig: false,
     })
 }
 
