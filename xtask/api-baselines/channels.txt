@@ -57,6 +57,7 @@ pub channels::Answer::Registry(channels::RegistryAnswer)
 pub channels::Answer::Release(alloc::boxed::Box<channels::ReleaseAnswer>)
 pub channels::Answer::Rounds(alloc::boxed::Box<channels::RoundsAnswer>)
 pub channels::Answer::Run(core::option::Option<channels::RunSummary>)
+pub channels::Answer::RunCosts(channels::RunCostsAnswer)
 pub channels::Answer::Skills(alloc::boxed::Box<channels::SkillsAnswer>)
 pub channels::Answer::Toolkits(alloc::boxed::Box<channels::ToolkitsAnswer>)
 pub channels::Answer::Unavailable
@@ -680,6 +681,8 @@ pub channels::Query::RegistryView
 pub channels::Query::Release
 pub channels::Query::Rounds
 pub channels::Query::Rounds::run: kernel::event::identity::RunId
+pub channels::Query::RunCosts
+pub channels::Query::RunCosts::runs: alloc::vec::Vec<kernel::event::identity::RunId>
 pub channels::Query::RunHistory
 pub channels::Query::RunHistory::before: core::option::Option<kernel::event::identity::Seq>
 pub channels::Query::RunHistory::limit: u32
@@ -709,6 +712,8 @@ pub channels::RoundsAnswer::opened_at: core::option::Option<kernel::locator::Git
 pub channels::RoundsAnswer::opening: core::option::Option<channels::Opening>
 pub channels::RoundsAnswer::run: kernel::event::identity::RunId
 pub channels::RoundsAnswer::turns: alloc::vec::Vec<channels::Turn>
+pub channels::RunCostsAnswer::asked: alloc::vec::Vec<kernel::event::identity::RunId>
+pub channels::RunCostsAnswer::runs: alloc::vec::Vec<(kernel::event::identity::RunId, kernel::budget::UsdMicros)>
 pub channels::RunSummary::addr: core::option::Option<kernel::address::Address>
 pub channels::RunSummary::frozen: bool
 pub channels::RunSummary::last_kind: kernel::event::kind::EventKind
@@ -819,7 +824,8 @@ pub const channels::BODY_PX_MIN: u32
 pub const channels::COMMAND_NAMES: [&str; 28]
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 34]
+pub const channels::QUERY_NAMES: [&str; 35]
+pub const channels::RUN_COSTS_MAX: usize
 pub const channels::WIRE_V: u32
 pub enum channels::Admission
 pub enum channels::Answer
@@ -1009,6 +1015,7 @@ pub struct channels::RegistryLine
 pub struct channels::ReleaseLine
 pub struct channels::Reply(_)
 pub struct channels::RoundsAnswer
+pub struct channels::RunCostsAnswer
 pub struct channels::RunSummary
 pub struct channels::ServeConfig
 pub struct channels::SettledEffort
