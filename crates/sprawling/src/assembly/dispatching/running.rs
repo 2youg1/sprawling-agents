@@ -122,6 +122,18 @@ impl RunWorker {
         // row of locals every phase below would then have to be handed
         // one at a time.
         let mut site = self.stand_up(agreed, &at, &given)?;
+        // The run id is derived from the job locator, so the brief's
+        // origin can only be recorded once the run stands; the bytes are
+        // already durable and this put adds the origin record alone.
+        self.cas
+            .put_for(
+                given.brief.segment_text().as_bytes(),
+                &memory::BlockOrigin {
+                    run: site.run_id,
+                    building: at.addr.clone(),
+                },
+            )
+            .map_err(memory::MemoryError::into_ax)?;
         let desks = self.open_desks(&site, &at.addr)?;
 
         // What the model may see, what routes the call it makes, and
