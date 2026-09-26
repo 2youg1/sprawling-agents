@@ -75,6 +75,7 @@ Trades in the market as {who}.
         effort: None,
         mode: runtime::Mode::Up,
         tainted: false,
+        dispatched_by: kernel::event::Who::Person,
         origin: None,
     };
     let effects = vec![
@@ -124,6 +125,7 @@ fn a_half_filed_shelf_is_unwound() {
         effort: None,
         mode: runtime::Mode::Up,
         tainted: false,
+        dispatched_by: kernel::event::Who::Person,
         origin: None,
     };
     let effects = vec![
@@ -205,6 +207,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
                 parent: None,
                 succession: None,
                 tainted: false,
+                dispatched_by: kernel::event::Who::Person,
                 origin: None,
             },
             "read what is waiting".to_owned(),

@@ -127,6 +127,7 @@ impl RunWorker {
                     origin: None,
                     succession: None,
                     tainted: false,
+                    dispatched_by: kernel::event::Who::City,
                 },
                 format!("Plan node {next}: {item}"),
                 goal,

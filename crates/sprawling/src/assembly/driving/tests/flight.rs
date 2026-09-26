@@ -27,6 +27,7 @@ fn asked(addr: &str) -> Assignment {
         parent: None,
         succession: None,
         tainted: false,
+        dispatched_by: kernel::event::Who::Person,
         origin: None,
     }
 }

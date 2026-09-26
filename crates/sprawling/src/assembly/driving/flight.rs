@@ -314,6 +314,7 @@ impl RunWorker {
             parent: None,
             succession: None,
             tainted: matches!(because, Unasked::Arrival),
+            dispatched_by: kernel::event::Who::City,
         };
         match self.dispatch_into_lane(at, task, goal, Owing::unasked(because)) {
             Ok(run) => Some(run),

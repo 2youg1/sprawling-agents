@@ -151,7 +151,7 @@ fn opening(records: &[EventRecord]) -> Option<channels::Opening> {
                 task: started.task,
                 goal: started.goal,
                 at: record.t(),
-                dispatched_by: None,
+                dispatched_by: started.dispatched_by,
             }
         })
 }

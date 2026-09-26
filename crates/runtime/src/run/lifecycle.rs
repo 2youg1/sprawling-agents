@@ -89,7 +89,7 @@ impl Run<Active> {
             parent: plan.parent,
             predecessor: plan.predecessor,
             skills: plan.skills.clone(),
-            dispatched_by: None,
+            dispatched_by: Some(plan.dispatched_by.clone()),
         };
         ledger.append(EventDraft {
             run: plan.run,

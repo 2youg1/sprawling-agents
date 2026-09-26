@@ -138,7 +138,7 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-pub const WIRE_V: u32 = 39;
+pub const WIRE_V: u32 = 40;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
