@@ -37,7 +37,9 @@ use kernel::{Address, AxCode, AxError, B3Hash, Seq};
 
 use crate::auth;
 use crate::command::WireCommand;
-use crate::wire::{ClientFrame, Hello, Lagged, Query, WIRE_V, Welcome, schema_hash};
+use crate::wire::{
+    ClientFrame, Hello, Lagged, Monitoring, Query, WIRE_V, Watched, Welcome, schema_hash,
+};
 
 /// Which face the listener presents, and the credential it demands.
 ///
@@ -210,6 +212,10 @@ pub enum SessionStep {
     Deliver(Box<WireCommand>),
     /// Evaluate this query and answer it.
     Answer(Box<Query>),
+    /// Count this session as watching the monitor and send it readings.
+    Watch(Watched),
+    /// Stop counting this session and stop sending it readings.
+    Release,
     /// Send this refusal; `close` ends the session afterwards.
     Refuse { error: Box<AxError>, close: bool },
 }
@@ -257,6 +263,13 @@ pub fn decide_frame(
         },
         (SessionState::Live, ClientFrame::Command(command)) => SessionStep::Deliver(command),
         (SessionState::Live, ClientFrame::Query(query)) => SessionStep::Answer(Box::new(query)),
+        (SessionState::Live, ClientFrame::Monitor(Monitoring::Watch)) => {
+            SessionStep::Watch(Watched::Everything)
+        }
+        (SessionState::Live, ClientFrame::Monitor(Monitoring::WatchSummary)) => {
+            SessionStep::Watch(Watched::Summary)
+        }
+        (SessionState::Live, ClientFrame::Monitor(Monitoring::Release)) => SessionStep::Release,
         (SessionState::Live, ClientFrame::Hello(_)) => SessionStep::Refuse {
             error: Box::new(
                 AxError::failure(

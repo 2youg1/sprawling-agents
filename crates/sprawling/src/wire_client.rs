@@ -27,9 +27,12 @@ mod ending;
 /// Enrolment is a credential handed to an HTTP route rather than a
 /// frame spoken on the socket, so it has its own file.
 mod enrolment;
+/// `sprawling top` holds its socket open until the city stops.
+mod watching;
 
 use ending::{Ending, Reply};
 pub(crate) use enrolment::{enrol, split_reference};
+pub(crate) use watching::{Output, top};
 
 /// What came back before the city went quiet.
 pub(crate) struct Heard {

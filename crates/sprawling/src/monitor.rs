@@ -10,11 +10,15 @@
 //! holds no memory. Where the counters come from is the caller's
 //! reading function; this module touches no platform interface.
 
+pub(crate) mod counters;
+pub(crate) mod sampler;
 pub mod top;
 
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+pub use channels::{Sample, Watched};
 
 /// Samples kept: one a second for five minutes.
 pub const CAPACITY: usize = 300;
@@ -30,29 +34,11 @@ const _: () = assert!(
     "the monitor history outgrew HISTORY_BUDGET"
 );
 
-/// One reading of every counter the monitor shows, in integers because
-/// it travels on the wire.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize)]
-pub struct Sample {
-    pub core_cpu_permille: u64,
-    pub core_private_bytes: u64,
-    pub core_working_set_bytes: u64,
-    pub core_read_bytes: u64,
-    pub core_written_bytes: u64,
-    pub machine_cpu_permille: u64,
-    pub machine_available_bytes: u64,
-    pub volume_free_bytes: u64,
-    pub ledger_queue_depth: u64,
-    pub durable_lag: u64,
-    pub relay_p50_nanos: u64,
-    pub event_to_screen_p50_nanos: u64,
-    pub queued_runs: u64,
-}
-
-/// The watcher count and the history it gates.
+/// The two watcher counts and the history they gate.
 #[derive(Debug, Default)]
 pub struct Monitor {
-    watchers: Arc<AtomicUsize>,
+    page_watchers: Arc<AtomicUsize>,
+    summary_watchers: Arc<AtomicUsize>,
     history: VecDeque<Sample>,
 }
 
@@ -69,29 +55,55 @@ impl Monitor {
         Self::default()
     }
 
-    /// Counts one more watcher until the returned [`Watch`] is dropped.
+    /// Counts one more watcher of `watched` until the returned [`Watch`]
+    /// is dropped.
     #[must_use]
-    pub fn watch(&self) -> Watch {
-        self.watchers.fetch_add(1, Ordering::Relaxed);
+    pub fn watch(&self, watched: Watched) -> Watch {
+        let watchers = match watched {
+            Watched::Everything => &self.page_watchers,
+            Watched::Summary => &self.summary_watchers,
+        };
+        watchers.fetch_add(1, Ordering::Relaxed);
         Watch {
-            watchers: Arc::clone(&self.watchers),
+            watchers: Arc::clone(watchers),
         }
     }
 
-    /// Called once a second. While somebody watches, calls `read` once
-    /// and keeps its sample, dropping the oldest beyond [`CAPACITY`];
-    /// while nobody does, calls nothing and releases the history.
-    pub fn tick(&mut self, read: impl FnOnce() -> Sample) {
-        if self.watchers.load(Ordering::Relaxed) == 0 {
+    /// Called once a second. While somebody watches, calls `read` once,
+    /// with [`Watched::Everything`] when anybody watches the whole page
+    /// and [`Watched::Summary`] when only summaries are watched, and
+    /// keeps its sample, dropping the oldest beyond [`CAPACITY`]; while
+    /// nobody does, calls nothing and releases the history.
+    pub fn tick(&mut self, read: impl FnOnce(Watched) -> Sample) {
+        let Some(watched) = self.watched() else {
             self.history = VecDeque::new();
             return;
-        }
+        };
         if self.history.len() == CAPACITY {
             self.history.pop_front();
         }
         self.history
             .reserve_exact(CAPACITY.saturating_sub(self.history.len()));
-        self.history.push_back(read());
+        self.history.push_back(read(watched));
+    }
+
+    /// Whether anybody holds a [`Watch`] right now.
+    #[must_use]
+    pub fn is_watched(&self) -> bool {
+        self.watched().is_some()
+    }
+
+    /// The most anybody watches right now: the whole page when anybody
+    /// does, else the summary when anybody watches that.
+    fn watched(&self) -> Option<Watched> {
+        let watching = |watchers: &AtomicUsize| watchers.load(Ordering::Relaxed) > 0;
+        if watching(&self.page_watchers) {
+            Some(Watched::Everything)
+        } else if watching(&self.summary_watchers) {
+            Some(Watched::Summary)
+        } else {
+            None
+        }
     }
 
     /// The kept samples, oldest first.

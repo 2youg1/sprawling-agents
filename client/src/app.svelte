@@ -37,6 +37,7 @@
   import Cost from "./views/cost.svelte";
   import Facts from "./views/facts.svelte";
   import Mcp from "./views/mcp.svelte";
+  import Monitor from "./views/monitor.svelte";
   import Palette from "./views/palette.svelte";
   import Rail from "./views/rail.svelte";
   import RecordView from "./views/record.svelte";
@@ -59,6 +60,7 @@
   const lang = u.lang;
   const approvals = u.approvals;
   const belief = u.conn.belief;
+  const samples = u.conn.monitor.samples;
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const bindings = keymap();
 
@@ -347,6 +349,8 @@
         <Registry />
       {:else if view.kind === "welcome"}
         <Welcome />
+      {:else if view.kind === "monitor"}
+        <Monitor samples={$samples} watch={u.conn.monitor.watch} />
       {:else if view.kind === "gallery"}
         <!-- The storybook and its fixture tables are a chunk of their
              own, fetched only when a person opens `#/gallery`, so the

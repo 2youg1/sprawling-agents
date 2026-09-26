@@ -8,7 +8,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { rows, sparkline, type Sample } from "./monitor";
+import type { Sample } from "../wire";
+import { rows, sparkline } from "./monitor";
 
 const GIB = 1024 ** 3;
 

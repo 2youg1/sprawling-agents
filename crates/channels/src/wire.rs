@@ -138,9 +138,14 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-pub const WIRE_V: u32 = 38;
+/// 39: the performance monitor travels. A session says it is watching
+///    with `ClientFrame::Monitor` and receives one `ServerFrame::Monitor`
+///    reading a second until it releases or closes.
+pub const WIRE_V: u32 = 39;
+mod monitor;
 mod query;
 
+pub use monitor::{Monitoring, Sample, Watched};
 pub use query::{QUERY_NAMES, Query};
 
 use crate::answer::Answer;
@@ -223,6 +228,7 @@ pub enum ClientFrame {
     Hello(Hello),
     Command(Box<WireCommand>),
     Query(Query),
+    Monitor(Monitoring),
 }
 
 /// Everything a server may send. Events are the push half; a `Refusal`
@@ -272,6 +278,8 @@ pub enum ServerFrame {
     /// records that do not exist, and a reader that missed one has lost
     /// nothing it could have acted on.
     Lagged(Lagged),
+    /// One monitor reading, sent only to a session that is watching.
+    Monitor(Sample),
 }
 
 /// Ledger records that never reached a peer, named by both ends.
@@ -340,55 +348,5 @@ pub struct LogLine {
 }
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
-mod tests {
-    use super::*;
-
-    /// The table is the variant list, so what is left to check is that
-    /// one frame reads back the entry the generator wrote for it.
-    #[test]
-    fn a_query_names_itself_with_its_entry_in_the_table() {
-        assert_eq!(Query::CityView.name(), "CityView");
-        assert!(QUERY_NAMES.contains(&Query::CityView.name()));
-        assert!(QUERY_NAMES.contains(&Query::Release.name()));
-    }
-
-    #[test]
-    fn a_client_frame_round_trips_through_json() {
-        let frame = ClientFrame::Query(Query::CityView);
-        let text = serde_json::to_string(&frame).unwrap();
-        let back: ClientFrame = serde_json::from_str(&text).unwrap();
-        assert_eq!(frame, back);
-    }
-
-    /// The document names both roots, every command by its wire name,
-    /// and the one frame a socket cannot spell as a value nothing
-    /// satisfies — so the client generated from it refuses the same
-    /// bytes the server refuses.
-    #[cfg(feature = "schema")]
-    #[test]
-    fn the_schema_document_holds_both_roots_and_every_command() {
-        let document = wire_schema();
-        let defs = document.get("$defs").and_then(|d| d.as_object()).unwrap();
-        assert!(defs.contains_key("ClientFrame"), "client root");
-        assert!(defs.contains_key("ServerFrame"), "server root");
-        let command = serde_json::to_string(defs.get("Command").unwrap()).unwrap();
-        for name in COMMAND_NAMES {
-            let mut snake = String::new();
-            for (index, ch) in name.chars().enumerate() {
-                if ch.is_ascii_uppercase() && index > 0 {
-                    snake.push('_');
-                }
-                snake.push(ch.to_ascii_lowercase());
-            }
-            assert!(
-                command.contains(&format!("\"{snake}\"")),
-                "{name} on the wire"
-            );
-        }
-        assert!(
-            defs.get("NoSecret") == Some(&serde_json::Value::Bool(false)),
-            "a credential over the wire satisfies nothing"
-        );
-        assert_eq!(wire_schema(), document, "the document is a pure function");
-    }
-}
+#[path = "wire/tests.rs"]
+mod tests;

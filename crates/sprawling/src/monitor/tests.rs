@@ -13,7 +13,7 @@
 
 use std::cell::Cell;
 
-use super::{CAPACITY, Monitor, Sample};
+use super::{CAPACITY, Monitor, Sample, Watched};
 
 fn labelled(n: u64) -> Sample {
     Sample {
@@ -25,7 +25,7 @@ fn labelled(n: u64) -> Sample {
 #[test]
 fn nobody_watching_reads_no_counter_and_keeps_no_history() {
     let reads = Cell::new(0_u32);
-    let read = || {
+    let read = |_| {
         reads.set(reads.get() + 1);
         labelled(1)
     };
@@ -34,7 +34,7 @@ fn nobody_watching_reads_no_counter_and_keeps_no_history() {
     monitor.tick(read);
     assert_eq!((reads.get(), monitor.history().count()), (0, 0));
 
-    let watch = monitor.watch();
+    let watch = monitor.watch(Watched::Everything);
     monitor.tick(read);
     assert_eq!((reads.get(), monitor.history().count()), (1, 1));
 
@@ -47,11 +47,38 @@ fn nobody_watching_reads_no_counter_and_keeps_no_history() {
 #[test]
 fn history_keeps_the_last_300_samples_oldest_first() {
     let mut monitor = Monitor::new();
-    let _watch = monitor.watch();
+    let _watch = monitor.watch(Watched::Everything);
     for n in 0..=300 {
-        monitor.tick(|| labelled(n));
+        monitor.tick(|_| labelled(n));
     }
     let kept: Vec<u64> = monitor.history().map(|s| s.core_cpu_permille).collect();
     assert_eq!(kept, (1..=300).collect::<Vec<u64>>());
     assert_eq!(monitor.history.capacity(), CAPACITY);
+}
+
+#[test]
+fn only_summaries_watching_reads_the_summary_alone() {
+    let mut monitor = Monitor::new();
+    let mut asked = Vec::new();
+    let mut tick = |monitor: &mut Monitor| {
+        monitor.tick(|watched| {
+            asked.push(watched);
+            Sample::default()
+        });
+    };
+    let summary = monitor.watch(Watched::Summary);
+    tick(&mut monitor);
+    let page = monitor.watch(Watched::Everything);
+    tick(&mut monitor);
+    drop(page);
+    tick(&mut monitor);
+    drop(summary);
+    tick(&mut monitor);
+    assert_eq!(
+        (asked, monitor.is_watched()),
+        (
+            vec![Watched::Summary, Watched::Everything, Watched::Summary],
+            false
+        )
+    );
 }
