@@ -117,8 +117,7 @@ impl Flight {
             .collect()
     }
 
-    /// Takes one staged dispatch into a lane of its own, which prepares
-    /// and drives it.
+    /// Takes one staged dispatch into a lane, which prepares and drives it.
     ///
     /// # Errors
     /// Propagates the pool's refusal to start a thread, and its refusal
@@ -317,17 +316,12 @@ impl RunWorker {
     }
 
     /// Stages one dispatch on this thread and takes it into a lane, which
-    /// prepares and drives it, so the desk is free again before the
-    /// review tree is placed, a server has shaken hands, or the run has
-    /// finished.
+    /// prepares and drives it, so the desk is free again before a tree is
+    /// placed or a server has shaken hands (sprawling-SPEC.md 8-93).
     ///
-    /// This is the person's entrance. What the city decides for a
-    /// dispatch — agreeing to the work, opening the room, writing the
-    /// brief, standing the run up — happens here, on the accounting
-    /// thread, and is finished by the time this returns; what waits on
-    /// the disk or on another process is the lane's (sprawling-SPEC.md
-    /// 8-93). What continues is the run, not the command, which is why
-    /// the idempotency key settles at take-off (sprawling-SPEC.md 8-46-2).
+    /// This is the person's entrance. What continues is the run, not the
+    /// command, which is why the idempotency key settles at take-off
+    /// (sprawling-SPEC.md 8-46-2).
     ///
     /// # Errors
     /// Propagates every refusal a dispatch can owe before it costs
