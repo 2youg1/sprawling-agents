@@ -148,7 +148,12 @@ pub(super) fn last_line(
 ) -> Result<Option<(Seq, Vec<u8>)>, AxError> {
     index
         .tail_seq()
-        .map(|seq| index.reader(ledger_dir).line_at(seq).map(|line| (seq, line)))
+        .map(|seq| {
+            index
+                .reader(ledger_dir)
+                .line_at(seq)
+                .map(|line| (seq, line))
+        })
         .transpose()
         .map_err(MemoryError::into_ax)
 }
