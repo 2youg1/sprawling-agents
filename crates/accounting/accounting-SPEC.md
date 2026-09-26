@@ -76,7 +76,7 @@ ModelFactory｜Connectors｜Clock｜Machine｜Recipe｜Runnable｜accounting thr
 | `toolkit_broker` | 搬进本 crate | 一个外部应用的 broker 钥匙登记在哪 | 纯函数，`views::toolkits` 与连接动作读同一组事实 |
 | `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经 `Machine` 端口 | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文） |
 | `monitor::memory::read`、`monitor::volume::read` | 经端口 | 新工作进门时读内存与卷的余量 | 读主机的计数器；`read_volume` 已经这样交进来 |
-| `serving::door::random_token` | 经端口 | 签名要的随机令牌 | 熵由主机给，随机源从装配根注入（ARCHITECTURE.md §10） |
+| `serving::door::random_token` | 随 `credentials` 搬进本 crate | OAuth 登录的 verifier 与 state | 它的熵必须不可预测：一个第三方能预测的 verifier 就是一个第三方能完成的登录，所以没有哪个脚本场景可以换掉它，端口在这里只会开一个让它变得可预测的门；它经 `getrandom` 这个安全接口取熵，不启动任何东西 |
 | `revealing` | 经端口：`RunWorker` 的 `reveal` 字段，一个 `fn` 指针（sprawling-SPEC.md 8-60） | `Reveal` 在主机的文件管理器里打开一个地址 | 启动主机的一个程序 |
 | `browser_tool` | 经端口 | 按楼的规则给 run 的浏览器工具 | 启动浏览器，经 BiDi 说话 |
 | `release` | 经端口 | `views` 回答 `Release` 查询 | 向 npm 注册表发请求 |
