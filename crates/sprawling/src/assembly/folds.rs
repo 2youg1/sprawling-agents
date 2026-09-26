@@ -69,22 +69,14 @@ impl Standing {
     /// the history, which `what_a_worker_holds_is_what_a_restart_rebuilds`
     /// holds. A snapshot that fails verification or does not decode is
     /// never trusted; the whole history is verified and folded instead.
-    /// The whole chain is audited first, because `fork` and `adopt` open a
-    /// worker with no chain watch beside it and the snapshot's fit checks
-    /// only the line at its seq.
     ///
     /// # Errors
-    /// The audit's reason when the chain is broken, and propagates chain verification of what is folded and whatever a
+    /// Propagates chain verification of what is folded and whatever a
     /// fold says about a payload it cannot read; a cut that fails is in
     /// `cut`, not here.
     pub(crate) fn fold(ledger_dir: &Path) -> Result<Standing, AxError> {
         if !ledger_dir.exists() {
             return StandingFolds::empty(ledger_dir).settle(Ok(()));
-        }
-        if let memory::ChainAudit::Broken(reason) =
-            memory::audit_chain(ledger_dir).map_err(memory::MemoryError::into_ax)?
-        {
-            return Err(reason);
         }
         let started = snapshot_start::start::<StandingFolds>(ledger_dir)?;
         let cut = snapshot_start::cut(ledger_dir, &started);

@@ -3503,7 +3503,7 @@ impl RunWorker {
 
 **被拒：审计放在启动路径上同步做完再开端口。** 那正是要去掉的全链读取；审计的价值在于它不挡首字节。
 
-**本节接口的当前状态**：`Views`（8-91）与 `Standing`（8-92）都从快照起步，只折尾部；快照之前的行只有这次审计会看。
+**本节接口的当前状态**：`Views`（8-91）与 `Standing`（8-92）都从快照起步，只折尾部；快照之前的行在起步时由 `Standing::fold` 的同步审计（8-92）看过一遍，起步之后被改坏的行只有这次后台审计会看。所以 `serve` 起步时整条链被读两遍：一遍同步、挡在首字节之前，一遍在这里的后台线程上；上面「被拒」的同步审计因此实际上在启动路径上。要把它从首字节前拿掉，服务中的 worker 得在审计证明链完好之前不接受命令，而写者现在只在审计返回 `Broken` 时才停。
 
 ### 8-91 视图从快照起步：编码、切快照、只折尾部（`bin::views::snapshot`、`bin::assembly::folds::snapshot_start`、`bin::assembly::folds::views_start`）
 
@@ -3562,6 +3562,8 @@ pub(in crate::assembly) fn from_json_text<'de, T: DeserializeOwned, D: Deseriali
 **快照存的是还没 settle 的折叠。** `Standing` 里的 `Collaboration` 是 `CollaborationFold::settle` 的结果：信号的入队与消费按工作发生的顺序到达，队列要到最后一行之后才能算出；尾部再折进来时还要那些被搁置的信号，所以快照存 `CollaborationFold`，不存 `Collaboration`。六个折叠对一条记录的处理只写在 `StandingFolds::absorb` 一处，从创世与从快照起步都走它。
 
 **postcard 装不下的字段写成 JSON 文本。** `Entrance.refused` 里的 `AxError` 用 `#[serde(flatten)]`，postcard 不支持；`CollaborationFold.enqueued` 里的信号带 `Payload`（JSON 值），postcard 读不回来。前者整张表经 `as_json_text` 写成一段 JSON 文本；后者先经写者自己的 `Signal::enqueued_payload` 变回入队记录的载荷，读回时经它的逆 `Signal::from_payload`，所以信号的形状只有一处定义。`Entrance.carrying` 是本进程正在执行的命令，不是从历史折出来的，不进快照。**被否：给 `AxError` 另写一份不带 flatten 的编码。** 那是这个类型的第二份拼写，线上的 JSON 形状与快照的形状会各自漂移。
+
+**起步之前先审计整条链。** `Standing::fold` 先同步跑一次 `memory::audit_chain`，只有它返回 `Whole` 才调 `start::<StandingFolds>`；`Broken(reason)` 原样返回，worker 打不开，读不了账本同样拒绝。起步本身看不到快照之前的行：`fit` 只核对快照那一行，`JsonlLedger::open` 的尾部扫描只读最后一段；`fork`、`adopt` 与一次性命令打开的 worker 旁边也没有后台审计（8-90）。于是某个封好的段里一行被改写成另一行，仍然规范、仍接得上前一行，只断了下一行的 `prev`，除了这次审计谁都看不到；有了它，从快照起步绝不接受一条全量折叠会拒绝的链。审计是流式的，只算哈希不解析、不折叠，内存为 O(1)，但每次打开 worker 都要读一遍整条链的字节。**被否：只在旁边没有后台审计的 worker 上审计。** `Standing` 决定 worker 接不接一条命令，服务中的 worker 在后台审计跑完之前就会按一段没证明过的历史接受命令，而写者只在审计返回 `Broken` 时才停。
 
 **每次打开 worker 都切。** `Standing::fold` 先 `start::<StandingFolds>`，折过了快照之后的行就切一份新快照，再 settle。切不成不是折叠的错：结果放在 `Standing.cut` 里，`RunWorker::over` 把它写成一条 `Refuse` 诊断，worker 照常打开，理由与 8-91 相同。账本目录不存在时什么也不读、不切。
 
