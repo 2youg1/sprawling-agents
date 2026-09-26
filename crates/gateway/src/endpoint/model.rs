@@ -133,7 +133,7 @@ impl Endpoint {
     reason = "test code"
 )]
 mod tests {
-    use super::super::fakes::{config, request};
+    use super::super::fakes::{config, fake_provider, request};
     use super::super::redemption::redemption;
     use super::*;
     use kernel::BuildingPolicy;
@@ -187,5 +187,27 @@ mod tests {
         let err = endpoint.call(&confidential).unwrap_err();
         assert_eq!(err.code(), &AxCode::GateDenied);
         assert!(err.recovery().contains("local model"));
+    }
+
+    /// **A provider that ignores `stream: true` still answers.** Many
+    /// OpenAI-compatible servers, local ones most of all, reply to a
+    /// stream request with one `application/json` body. Read as frames
+    /// it holds none, so the call failed as a cut stream although the
+    /// whole answer had arrived, and the run backed off and asked again.
+    #[test]
+    fn a_whole_body_answering_a_stream_request_is_the_answer_a_call_returns() {
+        let body = serde_json::json!({
+            "content": [ { "type": "text", "text": "whole" } ],
+            "stop_reason": "end_turn",
+            "usage": { "input_tokens": 1, "output_tokens": 1 },
+        })
+        .to_string();
+        let (url, server) = fake_provider(vec![(200, body.clone()), (200, body)], false);
+        let mut endpoint = Endpoint::new(config(&url), redemption()).unwrap();
+        let called = endpoint.call(&request()).unwrap();
+        let mut onto = |_held: &kernel::Increment| {};
+        let streamed = endpoint.call_streaming(&request(), &mut onto).unwrap();
+        assert_eq!(streamed, called);
+        assert!(server.join().unwrap()[1].contains("\"stream\":true"));
     }
 }

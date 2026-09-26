@@ -493,6 +493,8 @@ ARCHITECTURE §6 gateway 表逐行状态翻转；§6 接线台账登记（endpoi
 
 **结算答案只有一个解析器。** 直接把流读成 `ChatResponse` 会立刻长出第二个权威：同一个回复，流式路径与阻塞路径可能得出两个结论。重装成非流式形状是这条口径的全部实现。
 
+**不理会 `stream: true` 的供应方照样作答。** 流式请求的响应头里，`content-type` 的媒体类型是 `application/json` 时，这份 body 就是一个已定答案：`stream` 把它交给阻塞路径同一个 `response_from_wire`，不当帧读，返回的 `ModelReturn` 与 `call` 对同一份 body 的返回相等。不少 OpenAI 兼容的服务端（本地的居多）不理会这个字段，整段作答；当帧读，它一帧也没有，调用便以「流在结算帧前结束」失败，一次已完整到达的回答被当成截断，watchdog 随之退避重试。媒体类型缺席或是 `text/event-stream` 时照帧读，因为请求要的是流。落选的是「嗅探首行是 `{` 还是 `data:`」：HTTP 已经用 content-type 说了 body 是什么，另立一套判定只会与它分歧。
+
 **`increment_of` 只认散文。** 各 dialect 各读各的：Anthropic 读 `delta.type == "text_delta"` 的 `delta.text`；OpenAI 读 `choices[0].delta.content`。**工具参数与 thinking 块一律不报**：半个工具参数不是短一点的工具参数，而 thinking 块是替 provider 转交签名用的、不是拿来发表的。它不返回 `Result`——一个读不出来的增量就是不显示的增量，一个显示细节不得有能力弄失败一次本来正常的调用。
 
 **思考块的 signature 与文本走两条 delta，两条都要收。** Anthropic 把一个 thinking 块拆成 `thinking_delta`（正文）与 `signature_delta`（签名）两串增量，而 `content_block_start` 给出的那份 signature 恒为空串。`settled` 因此按 index 累积 signature 并在重装时写回，与 `partial_json` 同形。**空 signature 在 `block_from` 升为 `E_WIRE_MISMATCH`**：provider 拿签名去核验它自己发出的那段推理，空的那份带进下一回合就是一个 400，而这座城此刻还说不出为什么——拒在产生它的那一回合，报的才是「流把签名丢了」。两条往返（settled→`response_from_wire`→`request_wire`）逐字节相等由 `anthropic/stream.rs` 的测试钉住。
