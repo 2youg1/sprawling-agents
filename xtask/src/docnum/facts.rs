@@ -125,6 +125,12 @@ const FACTS: [Fact; 19] = [
         recount: |root, _arg| adversary_seed(root),
     },
     Fact {
+        key: "workspace_version",
+        home: "the root Cargo.toml, [workspace.package] version",
+        takes: None,
+        recount: |root, _arg| workspace_version(root),
+    },
+    Fact {
         key: "dep_version",
         home: "the version this workspace pins in its manifests",
         takes: Some("the crate"),
@@ -245,6 +251,22 @@ pub(crate) fn root_manifest(root: &Path) -> Result<toml::Value, XtaskError> {
     })
 }
 
+/// The version every member inherits, which the newest `CHANGELOG.md`
+/// section names in its heading.
+fn workspace_version(root: &Path) -> Result<String, XtaskError> {
+    root_manifest(root)?
+        .get("workspace")
+        .and_then(|workspace| workspace.get("package"))
+        .and_then(|package| package.get("version"))
+        .and_then(toml::Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| XtaskError::Doc {
+            file: "Cargo.toml".to_owned(),
+            msg: "no `[workspace.package] version`, so the release a document names cannot be                   recounted"
+                .to_owned(),
+        })
+}
+
 /// The register row a fact names, parsed from `xtask/budgets.toml`.
 fn register_row(root: &Path, row: &str) -> Result<toml::Value, XtaskError> {
     budget::register(root)?
@@ -354,6 +376,25 @@ mod tests {
             Some("2,759".into())
         );
         assert!(value(&root, "budget_figure:views_rebuild_per_mb").is_err());
+    }
+
+    #[test]
+    fn the_workspace_version_is_read_from_the_root_manifest() {
+        let fixture = std::env::temp_dir().join(format!("docnum-version-{}", std::process::id()));
+        std::fs::create_dir_all(&fixture).unwrap();
+        std::fs::write(
+            fixture.join("Cargo.toml"),
+            "[workspace]
+members = []
+
+[workspace.package]
+version = \"9.8.7\"
+",
+        )
+        .unwrap();
+        let read = value(&fixture, "workspace_version");
+        std::fs::remove_dir_all(&fixture).unwrap();
+        assert_eq!(read.unwrap(), Some("9.8.7".into()));
     }
 
     #[test]

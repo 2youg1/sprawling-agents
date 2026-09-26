@@ -3,25 +3,500 @@
 Every release is a tag of the form `v<version>-Pre-alpha-<YYMMDD>`. The date is
 part of the name because a pre-alpha version number says almost nothing about
 how old the tree is, and how old the tree is, is what a reader of a pre-alpha
-release most needs to know.
+release most needs to know. A section written before its release is cut is
+headed by the version the workspace manifest carries and the release's name,
+and takes its tag when the release is cut.
 
-Each entry records what changed and, where a number is claimed, the class of
-machine that produced it. Wall-clock figures are readings from a four-core
-laptop with 16 GB of memory and never gates — a slow runner is not a defect. Byte counts are gated, because a byte count does not depend on how
-busy the machine was.
+Each entry records what changed. A wall-clock figure names the class of
+machine that produced it, because the same figure from a busier or slower
+machine is a different reading, not a regression; wall-clock figures are
+readings and never gates. Byte counts are gated, because a byte count does not
+depend on how busy the machine was.
 
 The three releases before this file existed are reconstructed here from their
 release notes and their commits.
 
 ---
 
-## Unreleased
+## <!-- xtask:begin workspace_version -->0.0.7<!-- xtask:end --> citior
 
-**This is what V0.0.6 will carry, and no tag carries it yet.** The version in
-`Cargo.toml` still reads the released one on purpose: it is raised once, in a
-single change, when the work behind this section is finished, so a tree that
-announces a version is a tree somebody cut. Read every entry below as landed
-in the repository and unpublished.
+Pre-alpha. Nothing in this section has been published yet: it records what
+landed in the repository after `v0.0.6-Pre-alpha-260922`. WIRE_V
+<!-- xtask:begin wire_v -->41<!-- xtask:end -->, recounted from
+`channels::WIRE_V` while this section is unreleased.
+
+This section quotes no wall-clock figure. The measurements that would price
+this release's changes are taken after it, so the entries below say what the
+code does and leave how fast it does it to those readings.
+
+### The client stands on Svelte
+
+The page has now stood on three frameworks, and both moves had one cause. Each
+time, the client had become hard to change, and the framework under it was
+about to ask for a rewrite anyway: Dioxus's next line is in pre-release
+(`0.8.0-alpha.1`, with `0.7.10` the newest stable), and Solid 2.0 is in release
+candidates (`2.0.0-rc.6`) that rebuild the reactive core the 1.9 client was
+written against. A rewrite owed to the next major version was coming either
+way, so it went to a line that is not about to move: Svelte 5, the stable line
+since October 2024. Between Svelte 5 and Vue, Svelte was chosen for what it
+leaves in the built page: reactivity compiled into the bundle, no virtual DOM
+and no runtime diff, so a streamed token re-evaluates the signals it touched
+rather than a component tree. The client speaks only the WebSocket protocol in
+`crates/channels`, which is what keeps replacing it a job for the client alone.
+
+- The client's runtime dependencies are `svelte`, `effect`, `@lezer/highlight`
+  and nine lezer grammars. Effect still has the one job of decoding the wire;
+  the lezer packages colour code and load only when a page shows code.
+  `cargo xtask npm` holds the list in both directions, so a deleted package
+  fails the gate as loudly as an added one. (xtask/src/npm.rs:63)
+- The eslint bridge kept for `eslint-plugin-solid`'s type gap left with the
+  plugin; `eslint-plugin-svelte` types through `defineConfig()`. (client/eslint.config.ts:8)
+- `AGENTS.md`, `ARCHITECTURE.md`, `README.md` and `README.zh-CN.md` name the
+  framework the manifest names. (README.md:47)
+
+### One writer, and a history that survives a crash
+
+- A city has one writer across processes. `JsonlLedger::open` takes
+  `.sprawling/ledger.lock` before it reads or repairs a segment, and a second
+  `serve`, `resume` or `up` on the same city is refused with `E_LEDGER_HELD`
+  and a recovery that says how to stop the holder. `serve` binds its port
+  before it opens the writer, and a serve refused by the lock hands the port
+  back. (crates/memory/src/jsonl/ledger.rs:84)
+- Reopening a city after two writers continued the same line no longer
+  deletes the second writer's records: a break on a later line of the last
+  segment is refused as a broken chain instead of truncated as a torn tail. (crates/memory/src/jsonl/tail.rs:11)
+- A wave whose write fails partway leaves the handle refusing every later
+  wave, so nothing is written behind torn bytes. A Lean model
+  (`adversary/design/Durability.lean`) proves that every record a handle
+  answered `Ok` for survives tail recovery on reopen. (crates/memory/src/jsonl/barrier.rs:44)
+- Open and replay judge a line through one per-line check, so a correctly
+  chained line of a kind this build ignores is accepted by both. (crates/memory/src/chain_audit.rs:64)
+- A ledger payload may nest 126 levels. The writer refuses deeper, where it
+  used to write a line that replay then refused, and depth is judged before the
+  float scan walks the value. (crates/kernel/src/event/payload.rs:22)
+- The whole chain is audited segment by segment in constant memory, and a
+  broken chain stops the writer: every later command is refused with the
+  audit's own error. (crates/memory/src/chain_audit.rs:68)
+- A served city runs that audit in the background, beside the writer rather
+  than in front of it; an audit that cannot read the ledger stops the writer
+  the same way. (crates/sprawling/src/assembly/chain_watch.rs:27)
+- The views start from a snapshot of themselves. The snapshot is written whole
+  (staged, synced, renamed), fits only the line it was cut at, and a damaged or
+  mismatched one falls back to a fold from the first line, so losing it costs
+  time and never history. A served city folds only the lines after it; a
+  one-shot read, and a worker opened by `fork` or `adopt`, audit the whole
+  chain before they trust one. (crates/memory/src/snapshot/start.rs:59)
+- Startup folds stream the history one segment at a time and build the ledger
+  index in the same pass, where they used to hold every raw line and every
+  record at once. (crates/sprawling/src/assembly/folds.rs:93)
+- The ledger index holds one 64-bit word per line, the seq implied by its
+  place. (crates/memory/src/index/fold/entries.rs:12)
+- What opening a ledger cut from a torn tail reaches the person: `resume`
+  prints it and `serve` writes it to stderr. (crates/sprawling/src/assembly/lifetime.rs:56)
+
+### A run reads and writes only where it may
+
+- The read bound has one judgement, `kernel::address::may_read`: a run's own
+  building is open, another building is open unless its rules say
+  confidential, and a building whose rules do not read is closed. `read`,
+  `search` and the transcripts they reach all ask it. (crates/kernel/src/address.rs:184)
+- A link or junction is judged where it lands, so a link from an open building
+  into a confidential one, into `.sprawling`, or out of the city reads
+  nothing. A search that meets a link it cannot resolve says so, and a search
+  from the city root names a building whose rules could not be read instead of
+  passing it over as empty. (crates/runtime/src/tools/chosen_path.rs:102)
+- `.git` is protected metadata beside `.sprawling`, matched in any letter
+  case, and no write passes through a link. (crates/kernel/src/address.rs:40)
+- A run that took in outside content — a web page, an MCP answer, the
+  person's own browser — carries that taint to the command door, and `exec`
+  from it is refused with `E_TAINTED_ACTION`. The taint is labelled with where
+  it came from. (crates/kernel/src/error/code.rs:160)
+- A provider key pasted into a dispatch, or written by a resident through
+  `edit`, goes to the vault; the text, the request, the ledger and `JOB.md`
+  keep a `secret:pasted/...` reference. (crates/sprawling/src/assembly/dispatching/custody.rs:19)
+- The same custody covers the arguments and results of every tool on the
+  bench. (crates/sprawling/src/assembly/workbench/tools/kept.rs:63)
+- A credential written into an endpoint's `base_url`, as `user:key@` or in the
+  query, is refused before it reaches the ledger. (crates/gateway/src/router/normalise.rs:191)
+- A pull request merge refuses with `E_VERSION_CONFLICT`, naming every path,
+  when it would overwrite an uncommitted change in the city folder. It used to
+  replace the person's edit without a record. (crates/memory/src/error.rs:85)
+- A background command's output returns only to the run that started it; the
+  next run to call `exec` no longer receives another run's stdout. When a run
+  ends, the commands it left running are terminated. (crates/runtime/src/backlog.rs:107)
+- A run's `RULES.toml` is read once while the file's stamp holds, instead of
+  once per path per call. (crates/city/src/policy/cache.rs:6)
+- An export carries the city's git history as a pack, and a restore rebuilds
+  the repository from it. A v0.0.6 bundle, which copied `.git` whole, restores
+  as history too; a bundle whose `.git` borrows objects through `alternates` or
+  a `commondir` is refused. The manifest counts the history's packs and refs,
+  and restore checks them before it writes anything, so a restore is still all
+  or nothing. Every bundle write is staged, synced and renamed. (crates/memory/src/bundle/history.rs:6)
+- Restoring a discarded file refuses a link on its path, a file the person
+  made after the discard, and a reserved address. (crates/memory/src/checkpoint/fence.rs:217)
+- A fence is pinned by a reference named for its own commit, so `git gc` can
+  no longer prune a commit a discard's restoration points into. (crates/memory/src/checkpoint/fence.rs:30)
+
+### Providers fail the way they failed
+
+- 408, 429 and every 5xx are asked again; other refusals are final. The
+  recovery sentence is derived from the same classification. (crates/gateway/src/endpoint/failure.rs:153)
+- A retriable failure waits before the next try: 500 ms, doubled for each
+  failure in a row, capped at 60 s, and reset by the first answered turn. A
+  halt reaches a run while it waits. (crates/runtime/src/watchdog.rs:165)
+- A provider that names its wait (`retry-after`) is not asked sooner, and each
+  run backs off on its own jittered schedule, so runs cut by one outage do not
+  all ask again in step. (crates/gateway/src/endpoint/failure.rs:200)
+- An error has three retry answers: yes, no, and unknown — the request left
+  and its answer was lost, so the provider may have run and billed it. A cut
+  stream and a silence timeout are unknown. (crates/gateway/src/endpoint/failure.rs:162)
+- An error frame in the middle of an Anthropic stream, an OpenAI error chunk
+  and a Responses error event are the failure they report, where they used to
+  be dropped and read as a cut. (crates/gateway/src/anthropic/stream.rs:178)
+- An MCP answer lost after the call left is marked as an effect nobody saw;
+  a call that never left stays retriable. (crates/protocol/src/mcp/broker.rs:353)
+- A refusal that names the context window is `Overflow`, not retriable, with
+  `/new --carry` or a wider model as the way out. (crates/gateway/src/endpoint/failure.rs:61)
+- A failure reaches the page with its kind, so a Chinese page words it in
+  Chinese instead of showing the city's English sentence. (client/src/core/provider_failure.ts:7)
+- A city with no model chosen answers `E_MODEL_UNCHOSEN`, whose one recovery
+  is the settings page. (crates/kernel/src/error/code.rs:168)
+- A local model streams through the same endpoint as any other, where it used
+  to answer in one burst at the end; a stream request answered with a whole
+  JSON body is read as that body. (crates/gateway/src/endpoint/adapter.rs:20)
+- One HTTP client per endpoint, where every call built its own. (crates/gateway/src/endpoint/transport.rs:28)
+- An MCP server's SSE stream is bounded by its opening instead of ended by it,
+  so it no longer drops 15 s after connecting. (crates/protocol/src/mcp/sse.rs:18)
+- A subscription token stays a bearer token when the settings are saved again. (crates/sprawling/src/assembly/credentials/subscription.rs:51)
+- `input_tokens` means the whole prompt in every compatible format, and a
+  cached token is no longer billed at the input price as well as the cache
+  price. (crates/kernel/src/model/usage.rs:28)
+- A price row with no figure leaves a call unbilled instead of billing it 0,
+  and the cost answer carries how many calls no provider priced, so a city on a
+  subscription or a local model reads as unpriced rather than idle. (crates/memory/src/attribution/report.rs:68)
+- The Codex login row redirects to `127.0.0.1`, following upstream. (crates/gateway/src/oauth_profiles.rs:106)
+
+### What a run's conversation carries
+
+- Cancel and Steer reach a run that a lane is driving, and a steer inside a
+  tool wave is recorded. (crates/sprawling/src/assembly/driving/flight.rs:306)
+- A steer that arrives after a request was assembled waits for the next tool
+  results instead of rewriting the message already sent, and a branch rebuilds
+  it at the same place. (crates/runtime/src/conversation.rs:56)
+- The person's words reach the request once. (crates/runtime/src/conversation.rs:15)
+- A cut tool result names its rest file by its address in the room, which the
+  `read` tool accepts. (crates/runtime/src/sieve.rs:25)
+- A branch of a branch opens with the grandmother's conversation, and a
+  carried session names the previous run's transcript. (crates/sprawling/src/assembly/freezing.rs:186)
+- A frozen handoff is the room's own `Handoff.md`, pinned; the docs now say
+  that `/new` without `--carry` discards the only copy of it. (crates/city/src/spine_files.rs:10)
+- `status` reports the token count of the call that asked. (crates/runtime/src/turn/wave.rs:133)
+- A turn's exchange is compacted only after the whole tool wave has landed,
+  once per turn, and `compaction::plan` alone decides whether it fits. (crates/runtime/src/compaction.rs:205)
+- A failed stream is asked once more through the blocking door when it failed
+  as a wire mismatch; each recovery step answers recovered, failed or skipped,
+  and a skip hands the same error on. (crates/runtime/src/turn/recovery.rs:33)
+- A model's note, `.sprawling/models/<endpoint>/<model>.md`, ends the system
+  prompt sent to that model. (crates/sprawling/src/assembly/freezing/model_note.rs:41)
+- A room is named by rule from the task's first four ASCII words, never by a
+  model, so the first provider call of a dispatch is the run itself. (crates/sprawling/src/assembly/dispatching/session.rs:68)
+
+### Tools, fences and the prompt cache
+
+- A read the model hands over while it is still generating starts during the
+  generation. A Lean model (`adversary/design/Speculating.lean`) proves this
+  leaves the ledger as serial execution writes it. (crates/runtime/src/turn/speculation.rs:20)
+- The leading reads of a tool wave run at once, and the ledger holds the same
+  lines a serial wave writes. (crates/runtime/src/turn/wave.rs:39)
+- A fence is skipped for an empty or read-only wave, stages the paths the wave
+  wrote rather than the whole scope, and lists in its payload only the paths
+  it changed. A failed call widens the next fence to the write domain, and a
+  building's first fence is written at adoption as one pack. (crates/runtime/src/run/fence.rs:6)
+- Cache breakpoints have one author: the three segment edges and the tail
+  message. The Anthropic request now marks the tail message, and
+  `prompt_assembled` records the breakpoints a request really carried. (crates/runtime/src/prefix/breakpoint.rs:24)
+- Each assembled request writes `prompt_shape_compared`: the tool table's and
+  the conversation's shape, the region that changed since the request before
+  it, and the most bytes the request can be billed as input. The four segment
+  hashes stay on `prompt_assembled`. (crates/kernel/src/event/record/turn.rs:197)
+- `prompt_assembled` is written once per run and again only when the payload
+  differs. (crates/runtime/src/turn.rs:98)
+- Keep-warm is a setting, off by default: `[cache] keep_warm` in a layer's
+  `CONFIG.toml`. When on, a prefix a real request used is renewed once, just
+  before the provider's five-minute cache would expire, by resending its last
+  request with one output token; each renewal's usage or refusal is a
+  `cache_renewed` line. (crates/city/src/config_layers.rs:242)
+- A run cannot rewrite the rules that judge it: the `rules` and `city` tools
+  keep `Effect::Govern`, which is refused on every call. (crates/city/src/city_tool.rs:18)
+- Every dispatch books the documents it stands under. The city's
+  `CONFIG.toml`, and the building's `CONFIG.toml` and `RULES.toml` when the
+  building exists, are hashed, and one that differs from what was last booked
+  gets a `rules_changed` line with the before and after digests before the run
+  starts. (crates/sprawling/src/assembly/dispatching/agreeing.rs:184)
+- A screenshot can cover a rectangle, an element, or several elements, and
+  one function reads an element's box for both `measure` and the survey. A
+  capture larger than the cap is taken once more at a lower pixel density
+  instead of being refused. A quality outside 0–100 is refused by the browser
+  and the desktop tools alike, where the browser clamped it and the desktop
+  replaced it with 85. (crates/browser/src/shot.rs:181)
+- A limit that refuses writes its own refusal in four parts, and no looser
+  limit can be built outside the kernel. (crates/kernel/src/policy_limit.rs:7)
+- An MCP answer whose text passes 16 KiB reaches the model the way a long
+  command output does: stored whole, with a substitute in the window. A
+  document converter joins a building as one more stdio MCP server, and
+  `docs/operating.md` shows the entry. (crates/runtime/src/pipeline/connector.rs:31)
+
+### Plans, claims and the people in a building
+
+- A resident writes `Roadmap.md` and the other spine documents through the
+  city. `PutSpine` carries the text the sender started from, a stale base is
+  refused with `E_VERSION_CONFLICT`, and the write lands as
+  `SpineDocumentWritten` before anything else. (crates/channels/src/command/kind.rs:341)
+- A plan is measured in two figures: the count of leaves, which says how many
+  pieces the plan turned out to have, and the weighted share, which says how
+  much of the whole those pieces stand for. Shares are counted in integer
+  billionths, so no float reaches a plan. (crates/kernel/src/share.rs:35)
+- `plan` asks whether a node must be expanded, and a split reports what is
+  left. (crates/collab/src/claim_tool/tool.rs:75)
+- A run that ends holding a plan row turns it Blocked instead of leaving it In
+  progress. (crates/sprawling/src/assembly/plans/held.rs:97)
+- A claim on a plan node is decided by the accounting thread when the run
+  asks, first asker winning, and `roadmap_claimed` is written then. Every way a
+  run comes home closes the claims it holds, node by node as each closing line
+  reaches the ledger; a split closes its parent. (crates/collab/src/claim_tool.rs:56)
+- A workshop hands down only the nodes that are ready, keeps its graph per
+  room, and hands down the next ready set when a node comes back. A knock at an
+  occupied room waits for it, a handback wakes the resident who asked, and one
+  conversation stops at 64 woken runs across its branches. A pursuit moves on
+  when its runs land, without holding the desk while they drive. (crates/collab/src/workshop.rs:199)
+- A standing goal on a building with no plan is refused with
+  `E_PLAN_MISSING` and a button that puts a request for a plan in the
+  composer; a plan that cannot be read keeps its own error. (crates/sprawling/src/assembly/plans.rs:161)
+- A verification run checks each citation against the version pinned for
+  review: a quote of an earlier draft does not hold even when its words
+  match. `citysim` compares a red team's conclusions with and without that run. (crates/collab/src/citation.rs:61)
+- After a restart, a building the person cleared no longer pursues again, a
+  rejected pull request is not offered for review again, and a taken signal
+  leaves the inbox. Each came from a fold that skipped a line it could not
+  read; those folds now refuse it. (crates/sprawling/src/views/holding.rs:52)
+
+### The city answers without waiting on its writer
+
+- The views are folded on their own thread, and readers read a published
+  snapshot of them without a lock; a query that reads disk, git or the network
+  does it after the snapshot is let go. (crates/sprawling/src/serving/folding.rs:6)
+- The accounting thread sleeps on one queue and wakes for what it serves.
+  A Lean model (`adversary/design/Attending.lean`) proves a waiting message
+  is served by the next wake. (crates/sprawling/src/assembly/driving/flight.rs:46)
+- Each committed record is spelled as an event frame once, before the
+  broadcast. A seq gap is owed to a socket as `Lagged`. (crates/channels/src/server/committed.rs:8)
+- The city view carries the active runs and the 32 newest frozen ones; an
+  older run still answers its own view and its cost from the ledger. An
+  8,000-run city view falls from 1,234,534 bytes to under 16 KiB. (crates/memory/src/hot.rs:105)
+- A question travels with an `ask_id` and its answer comes back under it,
+  dated by the first seq the answer does not reflect. (crates/channels/src/wire/ask.rs:29)
+- A reconnect fetches what it missed from the last seq the page folded, and a
+  welcome from another ledger (a new epoch) makes the page rebuild. (client/src/core/socket.ts:165)
+- An MCP server an earlier run started is reached again rather than restarted
+  for every dispatch; a stdio server that has exited is started again. (crates/sprawling/src/assembly/workbench/servers.rs:6)
+- A room under review keeps one worktree across its runs, checked out to its
+  scope only. (crates/memory/src/worktree/trees/kept.rs:6)
+- The view thread and the socket's workers stand one step above normal
+  priority, and every command `exec` dispatches starts one step below: the
+  below-normal class on Windows, `nice` on Unix, and `ionice` as well on
+  Linux. `[core] priority = "normal"` in `~/.sprawling/config.toml` keeps the
+  core at normal, and the doctor and the machine page say where the core
+  stands. (crates/runtime/src/tools/exec/yielding.rs:26)
+- A plan's next row waits while another run drives and less than a tenth of
+  physical memory is available. (crates/sprawling/src/monitor/memory.rs:15)
+- A dispatch on a volume close to full is refused before anything is written,
+  and the refusal says how many bytes to free. (crates/sprawling/src/assembly/commanding/shedding.rs:20)
+
+### The terminal
+
+- One command table and a pure parser stand in front of every verb: `--help`
+  no longer runs `up` or `install`, an unknown flag is refused, and a
+  misspelled verb is answered with the nearest name. (crates/sprawling/src/main/grammar.rs:62)
+- Exit codes are one table: 0 done, 1 refused, 2 a command line (or a `call`
+  frame) that cannot be read, 3 quiet before the awaited answer or event, 4
+  nothing at the address answered as a city. A refusal is a failure line, a
+  recovery line and the nearest names to a person, and one JSON line to a
+  program (`--json`). (crates/sprawling/src/main/exit.rs:21)
+- `call` ends on its answer instead of waiting out the quiet window, and
+  `call --until <kind>` ends on the event it names. (crates/sprawling/src/wire_client.rs:24)
+- `doctor` writes its heading at once and asks every item in parallel. (crates/sprawling/src/doctor.rs:242)
+- `sprawling dispatch` mints its own key, runs on the model `-m` names, waits
+  for its own run, and exits 3 when silence ends the wait early. A run naming
+  no model continues on its room's frozen one. (crates/sprawling/src/main/dispatch.rs:25)
+- The console gives each typed line its own key and offers only the verbs the
+  wire carries. `Query::Release` is renamed `Query::NewestRelease`. (crates/sprawling/src/console/language.rs:11)
+- `sprawling view` prints ledger lines filtered by kind, address and text,
+  and runs with their parents. (crates/sprawling/src/main/view.rs:12)
+- A person viewing a whole city gets a raw-terminal face: it opens on the run
+  waiting for the person, reads its first screen from the ledger's tail,
+  follows the ledger while open, and unfolds a run into rounds and calls. (crates/sprawling/src/main/view.rs:253)
+- `sprawling check <city>` reads every city TOML file and places each refusal
+  at its line and column. (crates/city/src/check.rs:63)
+- `sprawling top` watches a city's counters over the wire, one screen when the
+  output is a terminal and one JSON line per sample otherwise. (crates/sprawling/src/monitor/top.rs:6)
+- `sprawling up --supervise` serves in a child and resumes it after a crash,
+  until three crashes in a minute. (crates/sprawling/src/supervising.rs:23)
+- A serve that failed says so in the room's handoff, with its cause,
+  instead of recording that the person closed the city.
+  (crates/sprawling/src/assembly/lifetime.rs:72)
+
+### The screens
+
+- A reading thread stays where the reader is; it follows the foot only when
+  the reader is already there. A room opens at its newest words. (client/src/views/talk.svelte:202)
+- A streaming reply lays out each block as it closes, instead of jumping into
+  shape at the end. (client/src/core/prose.ts:158)
+- A notice's way out acts on the composer's room; a refused line goes back
+  into the composer. (client/src/views/notice_recovery.ts:82)
+- Without a main model, the welcome leads with the provider. A dispatch to a
+  building is followed to the room its run started in. (client/src/views/welcome.svelte:38)
+- The address bar decodes a room named in any script; a fork shows where it
+  went and whom it came from. (client/src/core/route.ts:143)
+- A question the city could not answer is drawn as unavailable, with a way to
+  ask again, instead of loading for ever. (client/src/core/answered.ts:22)
+- A hidden tab keeps draining its queue; a wire mismatch offers a reload
+  rather than a reconnect; the tab icon tells its states apart by shape; words
+  typed while the link is down wait for it. (client/src/core/socket.ts:82)
+- Browser notifications for approvals, behind a switch that starts off. (client/src/core/prefs.ts:118)
+- Code is coloured by its grammar from a lazily loaded chunk; a patch shows
+  both line numbers; an opened tool call draws its arguments; an approval card
+  draws what it asks about. (client/src/views/parts/code.ts:28)
+- A path inside the city opens in VS Code or VS Code Insiders. (client/src/core/editor.ts:34)
+- The city page draws its runs as a lineage tree with a time bar each, waiting
+  runs first. (client/src/views/runs/lineage.ts:42)
+- The run page opens on a time lens — the model speaking, tools running, the
+  person being waited on — under a summary line, and names who dispatched the
+  run. (client/src/views/run/lanes.ts:26)
+- A monitor follows a run's code and terminal, with comment, revert and
+  open-in-editor on every hunk; a running command's output reaches the page
+  while it runs. (client/src/views/monitor/ansi.ts:30)
+- A results-only mode for a room and for the city. (client/src/core/results.ts:25)
+- A performance panel at `#/monitor`; the city samples only while somebody
+  watches. (crates/sprawling/src/monitor.rs:6)
+- A discarded file comes back from the recycle bin. (crates/memory/src/checkpoint/fence.rs:217)
+- A building can be removed from its page: its directory moves under
+  `.sprawling/removed/` with every file kept, and a busy building says why it
+  cannot be. (crates/city/src/building/removal.rs:59)
+- Slash verbs: `/stop` cancels, `/halt` and `/release` pair, `/clear` starts
+  a new session, `/diff` opens the run; a mistyped scope halts nothing. (client/src/core/slash.ts:76)
+- The model pill names the model the session answers with; choosing another
+  opens a new session. (client/src/views/palette.svelte:96)
+- Grey text a person reads takes the faint ink or darker; the disabled ink
+  appears only on a disabled control. (xtask/src/color.rs:37)
+- The cost page tells an unpriced city from an idle one. (crates/memory/src/attribution/report.rs:68)
+- A timeout's heading names the question the page asked. (client/src/views/parts/combobox.svelte:48)
+- A narrow screen keeps the risk readings, the palette and the rail in bounds. (client/src/views/palette.svelte:96)
+- The Mayor is 市长 on a Chinese screen; an empty list says where its contents
+  come from; an idle building can still be halted. (client/src/lang.json:287)
+- The tuning defaults a page shows are answered with the layer that stated
+  them, and the endpoint form leaves its tuning to the city instead of
+  spelling figures of its own. (crates/channels/src/answer/config.rs:85)
+
+### Skills
+
+- `skills/` carries seven skills — `sdd`, `tutor`, `translation`, `why`,
+  `how`, `blast-radius` and `authority-review` — as a shelf in the layout
+  other agent harnesses read, mounted read-only through `[skills] shelves`
+  and shipped in the release archive. (xtask/src/package/contents.rs:74)
+- `sdd`, `tutor` and `translation` carry MPL-2.0. The other four are modified
+  adaptations of MIT-licensed skills from `cursor/plugins` and keep that
+  licence; `skills/LICENSES.md` travels with them. (skills/LICENSES.md:1)
+- A skill may be a directory, and `read` opens its files by `<name>/<path>`.
+  A read that misses lists the nearest existing entries and points at
+  `search`. (crates/runtime/src/tools/read/miss.rs:6)
+- `read` opens `cas:` and `file:` locators, judged at the building the bytes
+  were stored for. (crates/runtime/src/tools/read/locator.rs:6)
+
+### What the machines check
+
+- Gates run in parallel and report in roster order; an unknown gate name is
+  refused. (xtask/src/gates.rs:159)
+- The `features` and `slices` gates and the history half of `guard` are
+  gone; `apisync` left the roster, and the public surfaces of `kernel` and
+  `channels` are checked nightly. The file budget counts production lines. (.github/workflows/ci.yml:195)
+- A commit that changes gate machinery together with the source it judges
+  carries the trailer `Verdict: user-approved`, spelled exactly so. No gate
+  reads history any more; `cargo xtask commits <base>..<tip>` judges every
+  subject and trailer in a range, and CI runs it on the change-set.
+  (xtask/src/commits.rs:16)
+- Every CI job calls a recipe of `just check`, and `just check` builds the
+  Lean design models. (justfile:29)
+- The handshake hash covers the event kind names, so a renamed kind is
+  refused at the handshake. (crates/channels/src/wire.rs:73)
+- `lexicon` reads `lang.json`. (xtask/src/lexicon.rs:6)
+- The render gate measures crushed text and clipped popovers. (xtask/src/render/room.rs:9)
+- The colour gate admits the disabled ink only behind a disabled variant. (xtask/src/color.rs:37)
+- The secret gate reports a labelled hex key and no longer reads a whole
+  PascalCase identifier as one. (crates/kernel/src/secret/hex_run.rs:11)
+- The release walker does not enter nested worktrees. (xtask/src/walk.rs:14)
+- Every text file is LF in the index. (.gitattributes:1)
+- `SPRAWLING_E2E_REQUIRED=1` turns an absent end-to-end variable red. Both
+  test suites judge addresses against one table. `SECURITY.md` names the one
+  channel for reporting a vulnerability. (crates/sprawling/tests/e2e.rs:18)
+- Every SPEC names section 12 Decisions. (crates/accounting/accounting-SPEC.md:372)
+- `just check-all` runs every phase to the end, and `just check-branch`
+  judges one branch. (justfile:37)
+- `xtask` refuses to judge a checkout other than the one it was built from. (xtask/src/root.rs:6)
+- `just mem` reads private, peak private and working set of a named process or
+  of an empty city it serves itself; every bench reading carries its floor. (xtask/src/mem.rs:6)
+- The embedded client is the bundle the workspace built, wherever
+  `CARGO_TARGET_DIR` points. (crates/sprawling/build.rs:9)
+
+### Removed
+
+- The Zig leaf and `crates/mem`: nothing called it, and safe Rust scanned as
+  fast.
+- The `eval` crate; the handoff probe moved under the assembly, the
+  instruments into `citysim`.
+- `Command::Takeover` and `Command::Rollback`, which nothing carried out, and
+  their two event words.
+- `gateway::Native`.
+- `kernel::highlight`, which nothing called.
+- Naming a room with a model.
+- `SummaryProducer`: nothing produces a summary. (crates/runtime/runtime-SPEC.md:1014)
+
+### Built, and not reachable yet
+
+- `city::install_skill` installs a skill package whole, after a static
+  precheck that walks directory handles, refuses links and reparse points,
+  and bounds a package at 32 MiB. No command, tool or page calls it. (crates/city/src/lib.rs:65)
+- Going back opens a new tree at an earlier point and restores one file from
+  it, recorded as `went_back` and `file_restored`. No command reaches it. (crates/memory/src/worktree/back.rs:6)
+
+### A release says where it was built
+
+- Every archive a release attaches carries a build-provenance attestation,
+  signed through Sigstore by the workflow run that built it, before the
+  archive is attached; a failed attestation stops the release. `gh
+  attestation verify <archive> --repo 2youg1/sprawling` checks one, and
+  `docs/getting-started.md` shows how. (.github/workflows/release.yml:231)
+- The installers still check only the archive's sha256, which shows that the
+  download arrived whole and not who built it: `install.sh` and
+  `install.ps1` verify no signature and no attestation. (install.sh:152)
+
+### Known and unfixed
+
+- The page draws nothing for `log_truncated`. (client/src/core/belief/fold.ts:101)
+- A dispatched command has no memory cap: the one safe interface on Windows
+  is refused to an ordinary account. (crates/runtime/src/tools/exec/yielding.rs:26)
+- The memory wait holds only a plan's next row; other entrances start a run
+  without it. (crates/sprawling/src/monitor/memory.rs:15)
+- A kept worktree of a closed room is never reclaimed. (crates/memory/src/worktree/trees/kept.rs:6)
+- On Windows and macOS the monitor reads 0 for the process's own I/O bytes.
+  (crates/sprawling/src/monitor/counters/own_process.rs:53)
+
+---
+
+## v0.0.6-Pre-alpha-260922
+
+Reconstructed from the record the tag carried under *Unreleased*, checked
+against the code at the tag, and from the commits that landed after that
+record was last written. WIRE_V 34.
 
 ### A binary knows which release it is, and will say so when asked
 
@@ -31,436 +506,166 @@ naive comparison a person or a script would write reported the newest
 published release as the older one. Neither spelling could be compared
 with the other because nothing decoded both.
 
-- `kernel::Release` is the one authority for how a release is spelled
-  and how two of them order. `xtask channel` converts through it to
-  publish and a running binary converts through it to read the registry
-  back, so the version this project publishes and the version it
-  recognises cannot drift apart. `Ord` is derived over version then
-  date, which is the order npm itself would put the same two strings in.
-- The release workflow passes its tag to the build. A binary built any
-  other way reports itself as built from source rather than guessing at
-  a release it is not, and `status` says which of the two it is.
-- `sprawling version` answers, as do `--version` and `-V`; all three
-  used to land in `unknown subcommand`. The version line now carries the
-  day the release was cut, read from what is compiled in and costing no
-  network.
+- `kernel::Release` is the one authority for how a release is spelled and how
+  two of them order. `xtask channel` converts through it to publish and a
+  running binary converts through it to read the registry back. `Ord` is
+  derived over version then date, the order npm itself would put the same two
+  strings in.
+- The release workflow passes its tag to the build. A binary built any other
+  way reports itself as built from source, and `status` says which of the two
+  it is.
+- `sprawling version` answers, as do `--version` and `-V`; all three used to
+  land in `unknown subcommand`. The version line carries the day the release
+  was cut.
 
 ### Checking for a newer release is manual, and updating is not offered
 
-`sprawling status --check` is the only command in this binary that
-reaches the internet, and `Query::Release` is the only query that does.
-Both run because somebody asked: no timer, no probe on connect, no check
-folded into another command. `QUICKSTART.md` opens by promising that
-nothing was installed and nothing outside the folder was written, and a
-binary that polled a registry on its own schedule would be spending that
-sentence on a question nobody asked.
+`sprawling status --check` is the only command in this binary that reaches the
+internet, and `Query::Release` is the only query that does. Both run because
+somebody asked: no timer, no probe on connect, no check folded into another
+command.
 
-- The source is npm's `latest` dist-tag, not GitHub. Every release here
-  is a pre-release and `GET /releases/latest` excludes those by design —
-  it answers 404 for this repository — so the endpoint that looks right
-  is the one that would have been wrong.
-- Three answers, not two: where a release stands, that this binary is
-  not a release at all, or that the registry could not be read. The
-  third carries the staged reading `kernel::reach` already defines, so a
-  person behind a proxy is told where the call stopped rather than that
-  it failed. The exit code reports whether the question was answered,
-  never what the answer was.
-- Nothing updates anything. `sprawling install` owns the archive path
-  and npm owns its own, so both the terminal and the **machine** page
-  print the command and stop.
-- WIRE_V <!-- xtask:begin wire_v -->41<!-- xtask:end -->, recounted from `channels::WIRE_V` while this section is still unreleased.
+- The source is npm's `latest` dist-tag, not GitHub: every release here is a
+  pre-release, and `GET /releases/latest` excludes those.
+- Three answers: where a release stands, that this binary is not a release,
+  or that the registry could not be read, with the stage `kernel::reach`
+  names so a person behind a proxy is told where the call stopped. The exit
+  code reports whether the question was answered, never what the answer was.
+- Nothing updates anything. The terminal and the **machine** page print the
+  command and stop.
 
 ### An error with nothing to do about it can no longer be written
 
-`AxError::failure` now returns a draft, and only `with_recovery` turns a
-draft into an error. A refusal that states what failed and leaves the reader
-standing there is not a shape this code can spell any more.
+`AxError::failure` returns a draft, and only `with_recovery` turns a draft into
+an error.
 
-- 172 errors carried an empty recovery line. Each now names a key to press,
-  a file to edit, or a command to run; six whose subject could not carry a
+- 172 errors carried an empty recovery line. Each now names a key to press, a
+  file to edit, or a command to run; six whose subject could not carry a
   recovery had the subject corrected as well.
-- The five files that grew past four hundred lines under that change were
-  split along what each part owns rather than at the midpoint.
 
 ### A new variant is a compile error at every reader
 
-44 `#[non_exhaustive]` attributes are gone, and with them 45 wildcard arms
-the compiler had already proved unreachable. The attribute was buying
-nothing and costing the one thing that matters here: a wire shape that was
-offered and answered `null` could exist only because the match downstream
-had a default arm.
+- 44 `#[non_exhaustive]` attributes are gone, and with them 45 wildcard arms
+  the compiler had already proved unreachable.
+- Four clippy lints join the deny list, and the 37 discarded `Result`s and the
+  boolean parameters they turned up are gone with them.
+- The approval, governance and signal payloads are serde structs read and
+  written through `Payload::of` and `Payload::read`, and a verdict this build
+  cannot read is a read failure instead of a default.
 
-- Four clippy lints join the deny list, and the 37 discarded `Result`s and
-  the boolean parameters they turned up are gone with them.
-- One exception, stated once with its reason: a gate in `xtask` reads syn's
-  tree and serde_json's value, and neither can be made exhaustive from here.
-- The first three ledger payloads have serde structs instead of hand-written
-  maps, each proved byte-for-byte against the map it replaces on real
-  fixtures. `Payload::of` and `Payload::read` are the only two doors.
+### Where a city keeps things, and a document reaches disk whole
 
-### One home for where a city keeps things, and a document reaches disk whole
-
-Every directory and file name a city keeps is read off `kernel::layout`, and
-the constants that sat beside it in `city` are deleted. A document is now
-written through one door that renames it into place, one writer at a time,
-under a typed shelf key, so a machine that loses power mid-write leaves the
-old file rather than half of the new one.
-
-- `config_layers::Ladder` makes the configuration layers a value. Adding the
-  person's layer is one arm the compiler checks in one place, where it used
-  to be three hand-written reads.
-- A directory this city cannot read says so instead of reading as empty.
+- The directories and the files every layer shares — `ledger`, `cas`,
+  `library`, `CONFIG.toml`, `FILTERS.toml`, `JOB.md`, `Handoff.md`,
+  `URBANITE.md` among them — are read off `kernel::layout`. The document
+  names only the city reads, such as `RULES.toml`, `Memo.md` and
+  `SCHEDULE.toml`, stay in `city`.
+- A document is written through one door that renames it into place, one
+  writer at a time, so a power loss mid-write leaves the old file.
+- `config_layers::Ladder` makes the configuration layers a value, and a
+  directory the city cannot read says so instead of reading as empty.
+- The on-disk `views/`, `memory::projection` and the `redb` dependency are
+  gone: a city's views live in the process and rebuild from the Ledger.
 
 ### How an endpoint is connected is decided once, at attach
 
-`ConnectionKind` is resolved after the pasted URL has been normalised, is
-written into `endpoint_attached`, and is read back by `Query::Config`. No
-call path re-derives it, and the responses shape a person pasted is no
-longer dropped by a dialect enum that had only two variants.
+- `ConnectionKind` is resolved after the pasted URL is normalised, written
+  into `endpoint_attached`, and read back by `Query::Config`; the responses
+  format a person pasted is no longer dropped.
+- One output ceiling ladder answers for every model: the person, the
+  provider's model list, a preset row citing its source, then the city's
+  default, and the decision says which rung answered.
+- A provider failure that completed no exchange is asked again, where the
+  default retry setting used to mean no retry at all.
+- A device-code login finishes a subscription sign-in, and xAI and Kimi
+  attach through the same command steps as the other two families.
+- Provider intelligence is followed from four vendors' own harnesses; which
+  repository, path and commit was read stays in
+  [`docs/third-party.md`](docs/third-party.md) section 1.
 
-- One output ceiling ladder answers for every model: the person, then the
-  provider's own model list, then a preset row citing the page it was read
-  from, then the city's policy default. The decision carries which rung
-  answered, so a truncated run is read off the account.
-- Two dispatches of one configuration build the same system prefix, byte for
-  byte, and that is an assertion rather than a hope.
-- Provider intelligence is followed from four vendors' own harnesses, one
-  per family this city signs in to directly; `earendil-works/pi` is retired
-  as a source, because Anthropic's subscription login is implemented here.
-  Which repository, which path, and which commit was read stays in one place
-  that a daily workflow parses: [`docs/third-party.md`](docs/third-party.md)
-  section 1.
-
-### Six defects a person would have met on the default path
+### Defects a person would have met on the default path
 
 - A thinking block's signature survives the Anthropic stream, so the next
-  turn is not refused by the provider.
-- A tool call cut in half is refused instead of sent as a call with no
-  arguments.
-- An MCP server can no longer hand this city a message larger than 8 MiB
-  into the memory of the process that is also its only writer.
+  turn is not refused.
+- A tool call cut in half is refused instead of sent with no arguments.
+- An MCP server can no longer hand the city a message larger than 8 MiB.
 - The built-in price table reports its own failure, and an OAuth callback is
   split with its `state` checked.
-- The file count a bundle export used to certify from its own destination is
-  compared field by field against the source, so half a city going missing
-  is noticed.
-- A question the city never answers says so after fifteen seconds instead of
-  leaving a skeleton on the screen, and the run table forgets runs the city
-  has stopped listing.
+- A bundle export compares its file count field by field against the source.
+- A question the city never answers says so after fifteen seconds, and the
+  run table forgets runs the city stopped listing.
+- `/transcribe` and `/enroll` ask for the pairing token: an exposed city used
+  to let anyone who reached the port write into a vault route and spend money
+  transcribing.
 
 ### The screens
 
-- A conversation has a second column: the artefact the last tool produced, a
-  file with line numbers or what a command printed. Tool calls fold to one
-  sentence counted from the turn report, with no new event to carry it.
-- No UI library, and now each part states the WAI-ARIA pattern it
-  implements, its key table, and where focus returns; twelve places where
-  the implementation does not match yet are named with their line numbers.
-- Navigation is Ctrl/Cmd and a digit. The g-prefix chord, its timer and the
-  rail hint that explained it are gone, and the registry screen has a route
-  at last — it had none.
+- A conversation has a second column: the artefact the last tool produced.
+  Tool calls fold to one sentence.
+- Each part states the WAI-ARIA pattern it implements, its key table, and
+  where focus returns.
+- Navigation is Ctrl/Cmd and a digit, and the registry screen has a route.
 - Six numbers the city already counted reach the city page, four empty
-  screens say what to do next, a field says it is wrong while it is being
-  typed, and an endpoint says when it is on this computer.
+  screens say what to do next, a field says it is wrong while it is typed,
+  and an endpoint says when it is local.
 - 26 `outline-none` are gone, so the focus ring is visible again; 33 `title`
-  attributes become a hint both a keyboard and a touch screen reach.
-- A thread stays where the reader is: streaming appends no longer steal the
-  reading position, and the view follows only when the reader is at the foot.
+  attributes become a hint a keyboard and a touch screen both reach.
 
 ### A door decides, and a question is a person's
 
-A Gate used to have a third answer — hand this decision to a person —
-and the documentation described the approval queue as where those
-landed. A door that cannot decide is a door whose rule nobody wrote, so
-the verdict is now `Allow` or `Deny` and the queue holds what only a
-person can answer: a design question a resident asked. `Autonomy` says
-who answers those, and it has two values rather than three.
+A Gate answers `Allow` or `Deny`, and one door, `attach`, answers `Ask`: what
+it would grant is the reading right over every login the person's own browser
+holds, so no rule of the city can answer it. The approval queue holds what
+only a person can answer — that question, and a design question a resident
+asked. `Autonomy` has two values, `Owner` and `Delegate`.
 
-- The glossary, the operating guide, the getting-started pages in both
-  languages and `LLM.md` say the same thing about it, which is that an
-  action is never asked about. Where a policy used to mark an item as
-  the person's, what stays for the person is a tainted question, which
-  no policy waives.
+### What another harness on the same computer already knows
 
-### What another harness on this machine already knows
-
-A person who reaches this product has usually told another agent
-harness where their models are, and typing the same base URL a second
-time is the first thing this product asked of them.
-
-- Codex's `[model_providers.*]` and pi's `providers` are read once into
-  rows this city can attach: the name, the address, the wire, and the
-  models the entry lists. Both grammars were settled against their own
-  authority — Codex's by giving its binary a file with each key set to
-  the wrong type and reading which key it named, pi's from the model
-  documentation that ships beside that program.
-- **One direction, and no credential.** Nothing is written back and
-  nothing is watched, so two tools never become two authorities on one
-  setting; and a row says where the other harness keeps its key — an
-  environment variable, a command, or its own file — and never what the
-  key is.
-- An entry this city cannot attach is reported by name with the reason,
-  because a person who configured six providers and is offered four has
-  to be told which two were left out. A wire this city has no dialect
-  for is one of those reasons, and Codex's only supported wire is one:
-  the entry arrives with its address and its variable filled in, and
-  the dialect left for the person.
+- Codex's `[model_providers.*]` and pi's `providers` are read once into rows
+  the city can attach: name, address, wire and the models listed.
+- One direction, and no credential: nothing is written back, and a row says
+  where the other harness keeps its key, never what the key is.
+- An entry the city cannot attach is reported by name with the reason.
 
 ### The adversary asks what a saved setting reads back as
 
-A setting is saved into a file a person also edits by hand and read
-back by a fold the page draws from, which is two homes for one fact.
-The out-of-tree property checker now drives arbitrary sequences of
-`configure_building` through the wire and holds three relations after
-each one: the answer states the last figure written, the building's own
-`CONFIG.toml` states that figure and no earlier one, and the layer
-above states none of them. It was demonstrated to bite — held against
-the first write instead of the last, it shrinks to a two-step
-counterexample. 21 checks, and a run of the new one takes 26 s on a
-four-core Windows machine with a debug binary.
+The out-of-tree property checker drives arbitrary sequences of
+`configure_building` and holds three relations after each: the answer states
+the last figure written, the building's `CONFIG.toml` states that figure, and
+the layer above states none of them. 21 checks; a run of the new one takes
+26 s on a four-core Windows machine with a debug binary.
 
 ### The adversary asks what a person settled, and says which seed it used
 
-The property above is about a file the city owns. What a person settles
-about their own reading of the city lives one rung further out, in
-`~/.sprawling/config.toml`, and the same question has to be answered
-there: after any sequence of `PutPreferences`, the file on disk, the
-answer `Query::Preferences` gives, and the city's own configuration
-have to agree about what was written and about whose it is. The checker
-drives that sequence and holds four relations after it, the fourth
-being that the city states none of it — a preference travels with the
-machine, so a city copied to another machine must arrive without one.
-The served city is pointed at a throwaway home directory, so running
-the suite cannot touch the preferences of whoever started it.
-
-A seed that does not parse used to become the default one. The report
-then named a seed the run had not used, and the reproduction line it
-printed reproduced a different trace. `SPRAWLING_SEED` is now read into
-three states — stated, unstated, unreadable — and an unreadable one ends
-the process with a third exit code before a city is raised, because a
-misspelled seed is not evidence about the product. Every run prints the
-seed it actually used.
+After any sequence of `PutPreferences`, the file on disk, the answer
+`Query::Preferences` gives and the city's own configuration agree, and the
+city states none of it. The served city points at a throwaway home
+directory. `SPRAWLING_SEED` is read as stated, unstated or unreadable, and an
+unreadable one ends the run with its own exit code; every run prints the seed
+it used.
 
 ### What the machines check
 
-- Every number `ARCHITECTURE.md` and `LLM.md` quote is recounted by
-  `cargo xtask docnum` from the code that decides it.
-- A budget may be counted in something other than bytes. The register's
-  gated rows carry a unit, the three keys a row states its budget, its
-  best reading and its slack under are derived from that unit, and
-  `dependency_count` is the first row of the second kind: how many
-  packages `Cargo.lock` resolves, ratcheted, and answerable in a
-  checkout nobody has compiled. That count had four homes at four
-  different values; it is taken once now, and the documents that quote
-  it and the gate that prices it read the same reading.
-- `specalign` reconciles every kernel enum variant by variant, which caught
-  `SecretCharset::Base36Lower` against the `UpperBase36` the kernel compiles.
-- Five harnesses that were written and never proved are retired to the tests
-  that already hold them, each with its reason; one solvable harness takes
-  their place, leaving three harnesses, three proofs and no markers.
-- Three fuzz targets cover the three surfaces a stranger reaches: an inbound
-  wire frame, a configuration file, an MCP answer.
+- `cargo xtask docnum` recounts every number `ARCHITECTURE.md` and `LLM.md`
+  quote.
+- A budget row carries a unit; `dependency_count`, how many packages
+  `Cargo.lock` resolves, is the first row not counted in bytes.
+- `specalign` reconciles every kernel enum variant by variant.
+- Three kani harnesses, three proofs.
+- Six fuzz targets, three of them on the surfaces a stranger reaches: an
+  inbound wire frame, a configuration file, an MCP answer.
 - `just check-desktop` compiles, lints, tests and licence-checks the desktop
-  connector, and a gate reconciles its lint table with the root.
-- `just prereqs` is the one list of what this machine needs, and `AGENTS.md`,
-  `CONTRIBUTING` and `flake.nix` point at it. Two builds of one tree are
-  compared nightly.
+  connector.
+- `just prereqs` is the one list of what a development machine needs. Two
+  builds of one tree are compared nightly.
+- The release binary is built at `opt-level = "z"`: 6,927,360 B against
+  11,150,336 B at level 3.
 
-### The repository ships skills of its own
+### Carried, and not selected yet
 
-`skills/` carries six - `sdd`, `tutor`, `translation`, `why`, `how` and
-`blast-radius` - and the directory is a skill shelf in the layout every harness
-on this machine files a skill as, so a city mounts it read-only through
-`[skills] shelves` and a person loads it in pi or claude unchanged. The release
-archive carries the directory as itself (`cargo xtask package`), so a person who
-unpacks a release finds the skills where the harnesses look. Until now the
-skill surfaces had nothing real to load: the library scan, the catalog and the
-Reading Room were exercised against generated stubs, and a person testing them
-by hand had no skill to pick up.
-
-**They are the first files in this tree the MPL notice does not govern.** The
-first three are English translations and adaptations of the author's own
-Chinese-language open-source skills - CC BY-NC 4.0 here, licensed that way only
-within this project while the originals remain AGPL-3.0-or-later. The last
-three are the author's modified adaptations of pstack's skills and keep their
-MIT licence, each naming the one who modified it. `skills/LICENSES.md` travels
-with them; `docs/third-party.md` §5 records the terms, `README.md` the
-acknowledgment.
-
-### A resident writes the spine documents it lives in
-
-A building keeps its long work in `Roadmap.md` and the job a run starts
-from in the rest of its spine. Until tonight the only hand that could
-write them was the one at the file system: `plan` reaches `Roadmap.md`
-and `edit` the others from inside the city, so a write could land on top
-of a file that had just moved.
-
-- `PutSpine` carries the text the sender started from. The write is a
-  read-modify-write through `city::document`, and a stale `base` is
-  refused rather than overwritten - the sender writes once more against
-  what is there now.
-- The write lands as `SpineDocumentWritten` before it becomes anything
-  else, recording without re-running. The plan table hears it as stale:
-  a person's write to `Roadmap.md` moves the plan like any other, so the
-  table is re-read rather than trusted.
-
-### A plan is measured in two figures
-
-Either completion figure alone misleads (kernel::completion): the count
-of leaves says how many pieces the plan turned out to have, and the
-weighted share says how much of the whole those pieces stand for.
-
-- `client/src/core/share.ts` counts shares of a whole in integer
-  billionths - the one place a share is counted, so no float reaches a
-  plan.
-- The plan view draws both figures, and the skyline reads done and
-  blocked as fractions of the same whole.
-
-### The client stands on Svelte
-
-The browser page moved from Solid to Svelte 5. What the architecture
-promises does not move with it: the client is still replaceable,
-written against the WebSocket protocol in `crates/channels`, and its
-runtime dependencies are still exactly two - `svelte` and `effect` -
-with the one job Effect has, decoding the wire, unchanged.
-
-- The Solid-era `tseslint.config` bridge, kept for
-  `eslint-plugin-solid`'s type gap, left with the plugin it served;
-  `eslint-plugin-svelte` types cleanly through `defineConfig()`.
-- `cargo xtask npm` holds the two runtime dependencies in both
-  directions, so a deleted `svelte` fails the gate as loudly as an
-  added UI kit.
-- The move left its name behind in two values: the manifest and the
-  gate said `svelte` while `AGENTS.md`, `ARCHITECTURE.md`, `README.md`
-  and `README.zh-CN.md` still said Solid. Every one of them reads from
-  the one authority now.
-
-
-### A tool call is routed before it is made, and parsed once
-
-The dispatch path between the wire and a tool did a linear scan of the
-registry and parsed the same argument bytes as often as three times. A
-call now finds its handler through a table built at compile time, and the
-argument envelope is borrowed rather than re-decoded, so the bytes a tool
-is handed are the bytes that arrived.
-
-- `crates/kernel/src/tool` holds the one routing table; the oracle is the
-  scan it replaces, and a property test holds the two to the same answer
-  for every name.
-- The microbenchmark reports p50, p95 and p99 per dispatch and fails the
-  build above a threshold, so the number is a reading rather than a
-  claim. fx's published "10µs" is not carried as a promise: it is a
-  figure from outside that repository, and this one states which segment
-  it measured.
-
-### The prompt cache shape is a fact on the ledger
-
-A request's prefix, tool table and window can move between two calls of
-one run, and which of them moved decides whether a provider's cache hits.
-Each assembled request now writes `prompt_shape_compared` with the four
-prefix segment hashes, the tool table's hash and the run's, and names the
-region that changed since the request before it.
-
-- The breakpoint sits at the last user or assistant anchor rather than at
-  the tail: a tool result past the breakpoint is exactly the ~50% hit
-  rate eve's own harness recorded.
-- `Query::Config` answers the second context-reminder rung beside the
-  layer that stated it, and the settings page writes it through
-  `ConfigureBuilding` — one field on a frame that already asks what a
-  building's runs are governed by, rather than a second frame for one
-  question.
-- The ledger's bytes change because the city writes a new line, so the P0
-  golden and the a9 expectations move with it; the regenerated fixture
-  was compared kind by kind against the committed one, and differs by
-  three `prompt_shape_compared` lines and nothing else.
-
-### A skill install is judged before it lands
-
-A skill package or a resident's own skill reached the shelf by being
-copied there. It now passes a static precheck first — nothing is
-executed, symbolic links are refused, name conflicts are refused, and a
-directory that changes between the check and the swap refuses the whole
-install — and lands through a staging directory that is exchanged in one
-step.
-
-- The content hash goes into the CAS and the provenance is recorded, so a
-  shelved document's origin is checkable afterwards and reinstalling the
-  same bytes is idempotent.
-- `city::install_skill` is one entry point taking the store it registers
-  with, which is how the same code serves the CLI and a resident.
-
-### The wire stops promising verbs it cannot carry
-
-`Command::Takeover` and `Command::Rollback` were parseable and had no
-executor: the assembler answered `not_built` to both, so a client could
-draw a button that never worked. Both frames are gone, `WIRE_V` moves
-35 → 36, and the two event words with no producer (`rollback_applied`,
-`takeover_started`) leave in the same change.
-
-- **Rollback is a branch and a git restore**, recorded as the ruling it
-  is: a run does not rewrite the rules that judge it, and the file is
-  where a rule's diff, history and revert already live.
-- `RulesChanged` closes the other half: a hand edit to `RULES.toml` or
-  `CONFIG.toml` reaches the ledger before it takes effect, its payload
-  carries the before and after digests rather than the text, and a file
-  that moved underneath is refused with `E_VERSION_CONFLICT` instead of
-  overwritten.
-- One SPEC said the governance door existed and another said it had been
-  deleted while the code stood with the second; the city's document now
-  agrees with the code, in the change that touched both.
-
-### A plan's compression waits for the turn, and says who produced it
-
-Two things were true of compaction at once: it could replace a snapshot
-while a tool wave was still landing, and a digest it produced named
-neither the model nor the generation that produced it.
-
-- Compression happens only at the recording boundary, after the whole
-  wave has landed, and the decision lives in `compaction::plan` rather
-  than beside the turn.
-- Every summary carries its producing model and generation in the ledger
-  event; a summary whose producer is absent reads back as **unknown**, an
-  answer distinct from a generation spelled `0`.
-- The model-call recovery path returns `recovered | failed | skipped` per
-  segment, and `skipped` carries the stable code of the failure before it
-  rather than swallowing it.
-
-### The city can weigh itself, and its kernel has a byte-level home
-
-Three pieces arrived together, because each is what the others are
-measured against: the measurement surfaces, the starting numbers, and a
-place for byte-level work that is not unsafe Rust.
-
-- `zig/` builds a static library whose FFI face is one thin crate
-  (`crates/mem`) — the second and last place in this tree where
-  `unsafe_code` is `deny` rather than `forbid`, and each `unsafe` block
-  states the precondition that makes it sound. The Zig caches and install
-  tree are built under cargo's output directory, so a build never writes
-  a machine's absolute paths into the source tree.
-- Four load scenarios (runs in parallel, a large ledger fold, a large
-  worktree placement, a long streamed session) report RAM as an average
-  and a peak, and latency at p50/p95/p99 with the persistence commit as a
-  separate figure — a flush on an ordinary disk has a physical floor that
-  must not stand in for the harness's own cost.
-- The first onboarding actions are measured rather than optimised:
-  install, start-up, a new workspace and a new session each report
-  whether they can reach the second tier, what they actually measure and
-  which piece costs the most. Optimising them is future work, and the
-  durability red lines — signature verification and `fsync` — are not
-  part of it.
-
-### A deletion inside the grace window, and a download that is verified
-
-- Deleting a skill or an MCP server asks for confirmation only where the
-  deletion cannot be taken back; where the bytes are still in the store
-  and reinstalling them is idempotent, the action happens and an undo
-  window stands beside it.
-- A release artifact is verified before it is installed: the signature
-  format, the public key's home and the archive-bomb limits are written
-  down, `install.sh`, `install.ps1` and the npm shim check bytes against
-  the signature, and an unsigned artifact is refused by name rather than
-  accepted quietly. The signing key's custody is a separate decision and
-  is not answered here.
+- A third vault backend, one encrypted file opened by a passphrase
+  (ChaCha20-Poly1305 per entry, the key derived by Argon2id). No probe
+  selects it.
 
 ---
 

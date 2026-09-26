@@ -435,7 +435,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **判据三条**：① 区段的文字等于它的事实当场的读数，不等即红，恢复语是 `cargo xtask docnum --write`；② 区段命名的事实必须在 `FACTS` 数组里，否则红，拒词列出全部已知键；③ 标记不闭合、区段套区段、或多出一个收尾标记，即红——一段读不出来的标记不得被当作没有标记。**`--write` 撞上未知事实时整份文件不写**：跳过它会让文档看起来刚重生过，而其中一个数字仍是旧的。
 
-**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`channels::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `channels::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `channels` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
+**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`channels::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `channels::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `channels` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
 
 **一张图也是一个事实。** `crate_graph` 把 `ARCHITECTURE.md` §3 的 `depmap` 块画成一段 mermaid `flowchart TD`：块里每个 crate 一行，每条允许的边一个箭头（依赖方指向被依赖方），不做传递约简，因为约简掉的边正是 `depmap` 允许、读者要查的那一条。生成函数 `depmap::graph` 与门用同一个 `parse_block` 读块，故图与门不会读出两张依赖表；手画一张依赖图，就是依赖表的第二个权威。值自带 ```` ```mermaid ```` 围栏，标记放在围栏之外，因为 mermaid 不认 HTML 注释。
 
