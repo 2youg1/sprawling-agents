@@ -16,6 +16,7 @@ use crate::error::{MemoryError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
+use super::barrier::Barrier;
 use super::ledger::{JsonlLedger, WriteObserver, complete_lines, is_segment, segment_file_name};
 
 impl JsonlLedger {
@@ -43,6 +44,7 @@ impl JsonlLedger {
     /// Group commit: one durability barrier for the whole wave
     /// (memory-SPEC 3-1: the batch is what the wave delivered).
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, MemoryError> {
+        self.barrier.admit(&self.dir, self.next_seq)?;
         if drafts.is_empty() {
             return Ok(Vec::new());
         }
@@ -83,6 +85,7 @@ impl JsonlLedger {
             cur_len = cur_len.saturating_add(line_len);
         }
 
+        self.barrier = Barrier::Broken;
         for (path, bytes) in &writes {
             self.vfs
                 .append(path, bytes)
@@ -99,6 +102,7 @@ impl JsonlLedger {
                 .map_err(io_err("sync ledger dir", &self.dir.clone()))?;
         }
 
+        self.barrier = Barrier::Whole;
         self.seg_path = cur_path;
         self.seg_len = cur_len;
         self.next_seq = seq;

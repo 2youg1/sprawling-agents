@@ -113,6 +113,7 @@ impl JsonlLedger {
     pub(crate) fn open_with(vfs: Box<dyn Vfs>, dir: &Path, now: TimeMs) -> …;  // 测试注入点
     /// Group commit: one durability barrier for the whole wave.
     /// Ok ⇒ every line of the wave is on its segment and synced.
+    /// 一波的写或 sync 失败过，此后每一波都答 `LedgerBroken`，直到重开。
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, MemoryError>;
     pub fn read_raw_lines(&self) -> Result<Vec<Vec<u8>>, MemoryError>;   // 实例读面
     /// 写路径观察者（至多一个，后装者取代前装者）。只在**整波持久化完成后**逐条回调：
@@ -181,6 +182,22 @@ impl WriterLock {
 
 **open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`（只读这一行：`jsonl::first_line` 用 `Vfs::read_at` 从 4 KiB 的窗口读起、每次加倍，见到第一个 `\n` 或文件尽头即停；不见 `\n` 的首行是撕裂行，答「无行」，交给尾部恢复。整段读进来再切第一行，会让单段账本在 open 时被读两遍）——判定一律经 `kernel::consts_external::readable_log_v`（M-16）：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续，本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`），跨段 prev 以前段末行验证；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
 **append_all 五步**：逐 draft：seq=next、`EventRecord::from_draft`、`canonical_line`、必要时滚段；写段；单次 `sync_data`（跨段波对每个触及段各一次）；更新 prev/next_seq；铸 refs。任何 Io 错误⇒整波失败，内存态不前进（下次 open 断尾清理半行）。
+
+**屏障状态 `jsonl::barrier`（形状 2 值）**：内存里的位置（`seg_len`、`next_seq`、`prev`）必须就是段的末尾，账本答出的 `Ok` 才能都在重开后的账本里找到。
+
+```rust
+pub(crate) enum Barrier { Whole, Broken }
+impl Barrier {
+    /// Whole ⇒ Ok；Broken ⇒ MemoryError::LedgerBroken { dir, at: next_seq }。
+    pub(crate) fn admit(&self, dir: &Path, at: Seq) -> Result<(), MemoryError>;
+}
+```
+
+- 一波在写出第一个字节之前把屏障置为 `Broken`，在它触及的每一段都 sync 完（以及新段的 `sync_dir`）之后才置回 `Whole`；`append_all` 进门先 `admit`，空波也一样。
+- 原因：写到一半死掉的波会在段尾留下位置不认识的字节——撕裂的半行，或 sync 失败的整行。在它后面再写的一波，会接在下次 open 要截掉的那段字节之后，它的 `Ok` 就说了一条盘上没有的记录（`barrier.rs` 的 `no_append_after_a_failed_barrier_claims_a_record_the_disk_loses`）。能判断段尾有什么的只有 open，所以坏了的句柄拒绝之后的每一波。
+- 性质「句柄答过 `Ok` 的每个 seq 重开后都在」由 `adversary/design/Durability.lean` 对任意一串波证明（`answered_survives_reopen`），并给出不守屏障时的反例（`withoutBarrier`）；`lake build Design` 证明它。
+- 被否：失败后把位置退回或前推到盘上真实的末尾。写失败时句柄不知道落下了多少字节，sync 失败后页缓存里的字节是否还会落盘也不知道；猜一个位置，就是用猜测替 open 的断尾恢复作答。
+- 重开参数：出现后台组提交（记账线程发布「已持久到 seq N」的水位线）之后，sync 失败不再发生在 `append_all` 里，屏障状态随水位线一起搬到记账线程。
 
 ### 8-2 memory::fault_fs
 
@@ -685,6 +702,7 @@ pub enum MemoryError {                      // thiserror；crate 根
     Worktree / WorktreeBusy / MergeStale / MergeWouldDiscard, // worktree
     Alias { op: &'static str, path: PathBuf, kind: alias::AliasKind },  // → E_OUTSIDE_WRITE_DOMAIN（8-25）
     LedgerHeld { dir: PathBuf },            // 另一个 JsonlLedger 持着这座城的账本（8-1）→ E_LEDGER_HELD
+    LedgerBroken { dir: PathBuf, at: Seq }, // 一波的写或 sync 失败过，重开前拒绝之后每一波（8-1）→ E_STORAGE_FATAL
 }
 impl MemoryError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
 pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) -> MemoryError;
@@ -775,6 +793,7 @@ impl Vfs for RealFs { … }
 - `MergeWouldDiscard`→`E_VERSION_CONFLICT`：不可定义掉——人的未提交改动在城市目录里，机器无权决定它与节点的活谁留下；能定义掉的「静默覆盖」已由 SAFE 检出定义掉。
 - `Worktree`→`E_STORAGE_FATAL`：不可定义掉——仓库与文件系统是外部世界；能定义掉的那部分（名字走出目录）已由 `WorktreeName` 在构造点定义掉。
 - `Alias`→`E_OUTSIDE_WRITE_DOMAIN`：不可定义掉——名字与它指向的文件之间隔着一个链接是外部文件系统的事实；能定义掉的那部分（一次写入经链接穿透）已由 `WriteTarget` 在构造点定义掉，recovery 恒为「换成普通文件后重试」，故被拒的 run 不会卡死。Unix 上硬链接臂就在这个码下（`nlink>1` 即拒）；Windows 上链接计数不可判定（§3.5），由落盘纪律拆别名而非报拒。
+- `LedgerBroken`→`E_STORAGE_FATAL`：不可定义掉——写与 sync 的失败来自介质；能定义掉的那部分（失败之后再写的一波被下次 open 截掉，却已答了 `Ok`）已由 `Barrier` 定义掉。recovery 是修好盘之后重启，由 open 修段尾。
 - `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读（段中损坏非尾部＝不可自动修复，指出路径交人决定）。
 - `LedgerHeld`→`E_LEDGER_HELD`（装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各跑一次 `up`／`serve`／`resume`）。能定义掉的那部分已经定义掉：锁先于一切读写，被拒的一方不会先写下任何东西。recovery 说明持锁的是另一个 sprawling 进程，以及怎样停下它。
   锁路径的权威是 jsonl：`WriterLock::take` 从账本目录自己推出同级的 `<目录名>.lock`，不问 `CityLayout`。原因：会话切片路径只有 `memory::sessions` 一个权威，而从账本目录反推城根是 `of_ledger` 的活；另一种做法——由调用方传入锁路径——要改 `open` 的签名和它的每个调用方，却只换来同一个文件名。代价是夹具、bench、fuzz 的账本目录也各多一个锁文件，而「一个目录一个写者」对它们同样成立。
