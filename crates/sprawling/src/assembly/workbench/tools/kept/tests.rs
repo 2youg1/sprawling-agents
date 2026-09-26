@@ -81,6 +81,15 @@ fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab/room1")).unwrap();
+    // Ignored, as a person keeps a key file: a key the checkpoint would
+    // stage is refused there before any tool runs, which is a different
+    // door from the one this test is about.
+    std::fs::write(
+        dir.path().join("lab/room1/.gitignore"),
+        "keys.md
+",
+    )
+    .unwrap();
     std::fs::write(
         dir.path().join("lab/room1/keys.md"),
         format!("token = {key}\n"),
