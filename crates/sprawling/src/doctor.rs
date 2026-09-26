@@ -223,7 +223,8 @@ pub(crate) struct Requirement {
     pub(crate) need: Need,
     /// What having it lets a person do, in one clause of the terminal
     /// report's English. The page words it itself, under
-    /// `machine_enables_<name>` in `client/src/lang.json`.
+    /// `machine_enables_<name>` in `client/src/lang.json`, a hyphen in
+    /// the name spelled `_`.
     pub(crate) enables: &'static str,
     pub(crate) detect: Detection,
     /// The item's own site, for a reader who wants to know what it is

@@ -321,7 +321,7 @@ fn every_item_has_the_page_clause_in_both_languages() {
         .iter()
         .map(|requirement| requirement.name)
         .filter(|name| {
-            let entry = &words[format!("machine_enables_{name}")];
+            let entry = &words[format!("machine_enables_{}", name.replace('-', "_"))];
             ["en", "zh"]
                 .iter()
                 .any(|lang| entry[lang].as_str().is_none_or(str::is_empty))
