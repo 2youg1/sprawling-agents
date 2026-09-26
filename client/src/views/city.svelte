@@ -87,14 +87,14 @@
         >
           <span class="min-w-0 flex-1 truncate font-mono">{row.addr}</span>
           {#if row.done !== null}
-            <span class="shrink-0 font-mono text-text-disabled">{row.done}</span>
+            <span class="shrink-0 font-mono text-text-faint">{row.done}</span>
           {/if}
         </button>
       {/each}
     </nav>
     <section class="flex min-h-0 min-w-0 flex-1 flex-col justify-center overflow-auto px-pane py-base">
       {#if city === undefined}
-        <p class="text-center text-text-disabled">…</p>
+        <p class="text-center text-text-faint">…</p>
       {:else if city.buildings.length > 0}
         <Skyline
           {city}

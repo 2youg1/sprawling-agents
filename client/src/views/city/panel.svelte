@@ -123,7 +123,7 @@
               ></span>
               <span class="min-w-0 flex-1 truncate text-text-quiet">{run.task ?? run.run}</span>
               {#if run.started !== null}
-                <span class="shrink-0 text-text-disabled">{clock($lang, run.started)}</span>
+                <span class="shrink-0 text-text-faint">{clock($lang, run.started)}</span>
               {/if}
             </a>
           </li>

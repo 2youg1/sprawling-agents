@@ -308,7 +308,7 @@
   <textarea
     bind:this={box}
     bind:value={text}
-    class="block max-h-output w-full resize-none overflow-y-auto bg-transparent text-body leading-relaxed text-text field-sizing-content placeholder:text-text-disabled"
+    class="block max-h-output w-full resize-none overflow-y-auto bg-transparent text-body leading-relaxed text-text field-sizing-content placeholder:text-text-faint"
     rows={1}
     {placeholder}
     aria-label={placeholder}
@@ -327,7 +327,7 @@
           type="button"
           class={[
             "relative flex h-control-sm shrink-0 items-center gap-tight rounded-pill px-base text-note before:absolute before:-inset-snug before:content-['']",
-            $taking ? "bg-alert text-on-accent" : $transcribing ? "bg-raised text-text-disabled" : "bg-raised text-text-quiet hover:bg-raised-hover",
+            $taking ? "bg-alert text-on-accent" : $transcribing ? "bg-raised aria-disabled:text-text-disabled" : "bg-raised text-text-quiet hover:bg-raised-hover",
           ]}
           aria-disabled={$transcribing}
           onclick={() => {
@@ -360,7 +360,7 @@
         class={[
           "flex h-control-lg items-center gap-snug rounded-control px-base text-label transition-[background-color,color,opacity,transform]",
           "duration-100 ease-standard active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100",
-          text.trim() === "" && !handed ? "bg-raised text-text-disabled" : "bg-accent text-on-accent hover:bg-accent-hover",
+          text.trim() === "" && !handed ? "bg-raised aria-disabled:text-text-disabled" : "bg-accent text-on-accent hover:bg-accent-hover",
         ]}
         aria-disabled={text.trim() === ""}
         onclick={(event) => {

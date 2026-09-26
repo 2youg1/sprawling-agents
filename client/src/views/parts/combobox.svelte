@@ -177,7 +177,7 @@
 			{#if chosen !== undefined}
 				{chosen.label}
 			{:else}
-				<span class="text-text-disabled">{placeholder}</span>
+				<span class="text-text-faint">{placeholder}</span>
 			{/if}
 		</span>
 	</button>
@@ -191,7 +191,7 @@
 			<input
 				bind:this={search}
 				bind:value={query}
-				class="mb-tight h-control w-full rounded-control bg-raised px-base text-body text-text placeholder:text-text-disabled"
+				class="mb-tight h-control w-full rounded-control bg-raised px-base text-body text-text placeholder:text-text-faint"
 				{placeholder}
 				aria-label={label}
 				role="combobox"

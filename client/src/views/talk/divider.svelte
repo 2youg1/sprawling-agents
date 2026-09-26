@@ -79,7 +79,7 @@
   </div>
 {/if}
 {#if line !== null}
-  <div class="mt-tight flex items-center gap-base text-note text-text-disabled">
+  <div class="mt-tight flex items-center gap-base text-note text-text-faint">
     <span class="h-px flex-1 bg-raised"></span>
     {#if href !== null}
       <a {href} class="hover:text-text-quiet">{line}</a>
