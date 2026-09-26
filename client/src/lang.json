@@ -2619,9 +2619,17 @@
     "en": "allow",
     "zh": "允许"
   },
+  "wait_bin": {
+    "en": "open the recycle bin",
+    "zh": "打开回收站"
+  },
   "wait_deny": {
     "en": "deny",
     "zh": "拒绝"
+  },
+  "wait_deny_keeps": {
+    "en": "deny stops the work and undoes nothing; files a run deleted are kept in the recycle bin.",
+    "zh": "拒绝只停下这件活，不撤销已经发生的事；run 删掉的文件留在回收站里。"
   },
   "wait_from": {
     "en": "{actor} asks",

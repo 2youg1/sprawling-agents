@@ -57,6 +57,7 @@
 <script lang="ts">
   import { approve } from "../../core/commands";
   import { fill, say } from "../../core/lang";
+  import { toFragment } from "../../core/route";
   import { ago } from "../../core/time";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
@@ -96,6 +97,15 @@
     </div>
     <p class="my-snug text-body leading-relaxed">{group.first.action_desc}</p>
     <Asked locator={group.first.artifact} />
+    <!-- "Deny" reads like "give the files back", and it is not: it
+        stops the work and undoes nothing, so the card names the place
+        that does bring a file back. -->
+    <p class="mb-snug text-note text-text-faint">
+      {say($lang, "wait_deny_keeps")}
+      <a class="underline hover:text-text" href={toFragment({ kind: "record", lens: "bin" })}>
+        {say($lang, "wait_bin")}
+      </a>
+    </p>
     <div class="flex flex-wrap items-center gap-snug text-note">
       {#if group.items.length > 1}
         <span class="text-text-faint">
