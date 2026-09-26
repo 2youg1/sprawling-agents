@@ -40,7 +40,12 @@ worker 的两个读写面 `effect` 与 `plan_view`、以及 worker 与 `views` �
 
 ## 3 假设与歧义
 
-- `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，所以 citysim（不依赖 `sprawling`）仍驱动不了一次 dispatch。它们搬进本 crate 的次序与边界由 §7 的归属表和 §12-9 至 §12-12 定下；每一个经端口进来的 `bin` 模块，端口的签名在搬动用到它的那一部分时写进 §8。
+- `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，`views` 还在 `crates/sprawling/src/views`，所以 citysim（不依赖 `sprawling`）仍驱动不了一次 dispatch。归属由 §7 的表和 §12-9 至 §12-12 定下；还没做的按这个次序：
+  1. 还缺的端口。`revealing`（`RunWorker.reveal`）、`monitor::memory`（`DrivingPool` 的 `read_memory`）与 `monitor::volume`（`RunWorker.read_volume`）已经是交进来的 `fn` 指针；还直接碰 `bin` 的是 `views::prepared` 回答 `NewestRelease` 时调的 `release::answer`（它和 doctor 的答案、vault 一样是 served 的城交给 views 的事实，归 `views::served`）、`workbench::tools` 调的 `browser_tool::for_rules`、`workbench::engine` 读的 `doctor::host` 与 `Presence`，以及 `commanding::machine` 查的 `doctor::REQUIREMENTS` 与 `Platform`。
+  2. `views` 搬进本 crate。它的测试里有一部分造一个 worker（`views/tests.rs` 经 `crate::assembly` 的 fixture，`document`、`listing`、`skills` 的测试调 `init_city`），它们要么随 worker 搬、要么先留在 `sprawling` 经 `views` 的公开面测。
+  3. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）；`genesis`、`listening`、`attending`、`chain_watch` 与生产适配器留在装配根（§12-12）。
+  4. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。
+  5. 每搬走一个模块，它在 sprawling-SPEC.md 里的那一节就搬进本 SPEC（8-7、8-8、8-9 就是这样来的）。
 - `views::mcp_health` 自己用 `protocol::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`protocol` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 
 ## 4 现状分析
