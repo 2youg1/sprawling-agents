@@ -234,7 +234,9 @@ fn opening_a_single_segment_ledger_reads_it_once() {
     });
     let dir = Path::new("l");
     let (mut ledger, _) = JsonlLedger::open_faulty(fs.clone(), dir, TimeMs::new(0)).unwrap();
-    let drafts = (0..2_000).map(|t| draft(EventKind::RunStarted, t)).collect();
+    let drafts = (0..2_000)
+        .map(|t| draft(EventKind::RunStarted, t))
+        .collect();
     ledger.append_all(drafts).unwrap();
     let segment_len: u64 = ledger
         .read_raw_lines()

@@ -25,9 +25,11 @@
 //! `Box<dyn Vfs>`.
 
 mod append;
+mod first_line;
 mod ledger;
 mod open;
 
 pub use append::{ledger_segments_at, read_raw_lines_at};
+pub(crate) use first_line::first_line;
 pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
 pub(crate) use ledger::{complete_lines, segment_first_seq, segment_names};

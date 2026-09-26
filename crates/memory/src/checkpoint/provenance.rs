@@ -24,9 +24,8 @@ use kernel::event::record::CommitAttribution;
 use kernel::{Address, B3Hash, Effort, RunId};
 
 use crate::error::MemoryError;
-use crate::jsonl::ledger_segments_at;
+use crate::jsonl::{first_line, ledger_segments_at};
 use crate::real_fs::RealFs;
-use crate::vfs::Vfs;
 
 /// The model a run was given, and the thinking budget it was asked for.
 ///
@@ -97,16 +96,15 @@ impl Provenance {
     pub fn city_of(ledger_dir: &Path) -> Result<B3Hash, MemoryError> {
         let vfs = RealFs::new();
         for segment in ledger_segments_at(ledger_dir)? {
-            let bytes = vfs.read(&segment).map_err(|source| MemoryError::Io {
+            let first = first_line(&vfs, &segment).map_err(|source| MemoryError::Io {
                 op: "read the genesis line",
                 path: segment.clone(),
                 source,
             })?;
-            let first = match bytes.split(|byte| *byte == b'\n').next() {
-                Some(line) if !line.is_empty() => line,
+            match first {
+                Some(line) if !line.is_empty() => return Ok(kernel::ledger::chain_hash(&line)),
                 _ => continue,
-            };
-            return Ok(kernel::ledger::chain_hash(first));
+            }
         }
         Err(MemoryError::Checkpoint {
             op: "read the city's genesis line",
