@@ -49,6 +49,7 @@
         number: n + 1,
         opened: Seq.make(n * 100),
         t: TimeMs.make(at),
+        model: n < 30 ? "large-1" : "small-2",
         used: { input: Tokens.make(12_000 + n * 400), output: Tokens.make(900 + n * 20), cached: Tokens.make(n * 300) },
         spent: UsdMicros.make(40_000 + n * 1_000),
       };

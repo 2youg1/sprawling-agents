@@ -3056,6 +3056,10 @@
     "en": "{n} turns",
     "zh": "{n} 个回合"
   },
+  "run_head_model": {
+    "en": "model",
+    "zh": "模型"
+  },
   "run_head_origin": {
     "en": "from",
     "zh": "来处"

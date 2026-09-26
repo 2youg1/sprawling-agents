@@ -19,7 +19,7 @@
   import { clock, count, lasted, usd } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, Closing, Turn } from "../../wire";
-  import { figuresOf } from "./lanes";
+  import { figuresOf, modelsOf } from "./lanes";
 
   interface Props {
     readonly turns: readonly Turn[];
@@ -34,6 +34,7 @@
   const { turns, doing, closing, room, from, to }: Props = $props();
   const lang = ui().lang;
   const figures = $derived(figuresOf(turns));
+  const models = $derived(modelsOf(turns));
 </script>
 
 <dl
@@ -64,6 +65,14 @@
     <dd class="font-mono text-text">{usd(figures.usd)}</dd>
     <dd class="text-text-quiet">{fill(say($lang, "run_head_turns"), { n: String(turns.length) })}</dd>
   </div>
+  {#if models.length > 0}
+    <div class="flex min-w-0 flex-wrap items-baseline gap-x-snug">
+      <dt class="text-text-quiet">{say($lang, "run_head_model")}</dt>
+      {#each models as model (model)}
+        <dd class="min-w-0 truncate font-mono text-text">{model}</dd>
+      {/each}
+    </div>
+  {/if}
   {#if room !== null}
     <div class="flex min-w-0 flex-wrap items-baseline gap-x-snug">
       <dt class="text-text-quiet">{say($lang, "run_head_origin")}</dt>

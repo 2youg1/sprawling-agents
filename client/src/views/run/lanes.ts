@@ -152,3 +152,10 @@ export function figuresOf(turns: readonly Turn[]): Figures {
     { input: 0, output: 0, cached: 0, usd: 0 },
   );
 }
+
+// Every model the run asked, in the order it first asked each one: a run
+// that fell back to a second model midway names both, because a single
+// name would be wrong for half of its turns.
+export function modelsOf(turns: readonly Turn[]): readonly string[] {
+  return [...new Set(turns.flatMap((turn) => turn.model ?? []))];
+}

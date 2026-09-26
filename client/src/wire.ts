@@ -1951,6 +1951,7 @@ export type Used = typeof Used.Type;
  */
 export const Turn = Schema.Struct({
   calls: Schema.Array(Call),
+  model: Schema.optional(Schema.NullOr(Schema.String)),
   notes: Schema.Array(Note),
   number: Schema.Int,
   opened: Seq,

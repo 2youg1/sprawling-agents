@@ -154,7 +154,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                     number,
                     opened: record.seq(),
                     t: record.t(),
-                    model: None,
+                    model: channels::text(record.data().as_map().get("model")),
                     said: None,
                     thought: None,
                     spent: None,
