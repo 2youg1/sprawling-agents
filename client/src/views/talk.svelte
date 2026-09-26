@@ -36,6 +36,7 @@
   import Forking from "./talk/forking.svelte";
   import type { Boundary, ForkPlan } from "./talk/forking";
   import Thread from "./talk/thread.svelte";
+  import Showing from "./shared/showing.svelte";
   import { anchorAt, footOf } from "./talk/anchoring";
   import type { Anchoring } from "./talk/anchoring";
   import { NOTHING, artifactsIn } from "./talk/trace";
@@ -293,6 +294,7 @@
             <div class="w-full">{@render composer()}</div>
           </div>
         {:else}
+          <div class="mb-base flex justify-end"><Showing /></div>
           <Divider {earlier} {who} boundary={story} onFork={doFork} onRetry={send} />
           {#each shown as run (run.run)}
             <Thread {run} {who} onFork={doFork} onRetry={send} />

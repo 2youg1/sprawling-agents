@@ -44,10 +44,46 @@ export function drawsCalls(showing: Showing): boolean {
   return showing === "whole";
 }
 
+// Which of the three a run is in, or nothing when it is in none.
 export function outcomeOf(run: RunBelief): Outcome | null {
-  return null;
+  const doing = run.doing;
+  switch (doing.kind) {
+    case "waiting":
+      return "waiting";
+    case "frozen":
+      switch (doing.completion) {
+        case "done":
+          return "done";
+        case "cancelled":
+          return null;
+        // A run that ended without naming how did not report done.
+        case null:
+        default:
+          return "failed";
+      }
+    case "unknown":
+    case "thinking":
+    case "calling":
+      return null;
+  }
 }
 
+// One pass sorts the city into the three outcomes; only the runs of an
+// outcome are then ordered, and only its first `first` are kept.
 export function resultsOf(runs: Iterable<RunBelief>, first: number): readonly Group[] {
-  return [];
+  const held: Record<Outcome, RunBelief[]> = { waiting: [], failed: [], done: [] };
+  for (const run of runs) {
+    const outcome = outcomeOf(run);
+    if (outcome !== null) held[outcome].push(run);
+  }
+  return OUTCOMES.map((outcome) => ({
+    outcome,
+    first: held[outcome].sort(newestFirst).slice(0, first),
+    total: held[outcome].length,
+  }));
+}
+
+// A run with no start time is placed after every run that has one.
+function newestFirst(a: RunBelief, b: RunBelief): number {
+  return (b.started ?? -1) - (a.started ?? -1);
 }

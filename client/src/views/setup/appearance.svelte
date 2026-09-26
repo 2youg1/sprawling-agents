@@ -55,6 +55,7 @@
   import type { FieldProps } from "../parts/field.svelte";
   import Glyph from "../parts/glyph.svelte";
   import Segmented from "../parts/segmented.svelte";
+  import Showing from "../shared/showing.svelte";
   import {
     CHROMA_WORDS,
     DENSITY_WORDS,
@@ -362,5 +363,11 @@
     />
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {@render foot(undefined, "motion")}
+  </div>
+
+  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
+    <span class="text-label font-label text-text">{say($lang, "showing_label")}</span>
+    <p class="text-note text-text-faint">{say($lang, "showing_note")}</p>
+    <Showing />
   </div>
 </div>

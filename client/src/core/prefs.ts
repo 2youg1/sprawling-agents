@@ -37,6 +37,8 @@ import type { Lang } from "./lang";
 import { langOf } from "./lang";
 import { browserRows } from "./rows";
 import type { Rows } from "./rows";
+import { SHOWINGS } from "./results";
+import type { Showing } from "./results";
 import type { Proxying } from "../wire";
 
 // ------------------------------------------------------------- the rows
@@ -69,6 +71,10 @@ const ROWS = {
   // on every form they open; an endpoint already attached keeps the
   // rule the city recorded for it.
   proxying: "sprawling.network.proxying",
+  // Whether a room and the city open drawing the whole of what runs did
+  // or only their results. The switch on either page writes it, so the
+  // last choice is the default the next page opens with.
+  showing: "sprawling.showing",
   // One unsent message per place a person writes, kept across a reload
   // or a page change; the rest of the name is the room or the run.
   draft: "sprawling.draft.",
@@ -177,6 +183,7 @@ export interface Preferences {
   readonly rail: Rail;
   readonly appearance: Appearance;
   readonly proxying: Proxying;
+  readonly showing: Showing;
 }
 
 // Who keeps these preferences between one visit and the next.
@@ -220,6 +227,7 @@ export interface PreferenceDoor {
   readonly setRail: (rail: Rail) => void;
   readonly setAppearance: (next: Appearance) => void;
   readonly setProxying: (rule: Proxying) => void;
+  readonly setShowing: (showing: Showing) => void;
   // The chord the person set for one action, or `""` for an action
   // they left alone. The spelling is the keymap's grammar, not this
   // file's: what is kept here is a name and a string.
@@ -300,6 +308,7 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
     rail: readOne(RAILS, rows.getItem(ROWS.rail), "glyphs"),
     appearance: readAppearance(rows),
     proxying: readOne(PROXYINGS, rows.getItem(ROWS.proxying), "except_local"),
+    showing: readOne(SHOWINGS, rows.getItem(ROWS.showing), "whole"),
   };
 }
 
@@ -313,6 +322,7 @@ function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.rail, next.rail);
   writeAppearance(rows, next.appearance);
   rows.setItem(ROWS.proxying, next.proxying);
+  rows.setItem(ROWS.showing, next.showing);
 }
 
 // The door onto one store. A test hands it a map and its own language
@@ -351,6 +361,9 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     },
     setProxying(proxying) {
       settle({ ...get(held), proxying });
+    },
+    setShowing(showing) {
+      settle({ ...get(held), showing });
     },
     chord: (action) => rows.getItem(ROWS.chord + action) ?? "",
     setChord(action, spelled) {

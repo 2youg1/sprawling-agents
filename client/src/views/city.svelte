@@ -24,8 +24,10 @@
   import { ui } from "../ui";
   import Bar from "./city/bar.svelte";
   import Panel from "./city/panel.svelte";
+  import Results from "./city/results.svelte";
   import Skyline from "./city/skyline.svelte";
   import EmptyState from "./parts/empty.svelte";
+  import Showing from "./shared/showing.svelte";
 
   // The five marks the drawing carries, and the order a reader meets
   // them in.
@@ -41,6 +43,7 @@
   const u = ui();
   const { lang } = u;
   const answer = u.conn.asking.ask(QUERIES.city);
+  const held = u.prefs.held;
 
   let picked = $state.raw<Address | null>(null);
 
@@ -93,7 +96,10 @@
       {/each}
     </nav>
     <section class="flex min-h-0 min-w-0 flex-1 flex-col justify-center overflow-auto px-pane py-base">
-      {#if city === undefined}
+      <div class="flex justify-end pb-snug"><Showing /></div>
+      {#if $held.showing === "results"}
+        <Results />
+      {:else if city === undefined}
         <p class="text-center text-text-disabled">…</p>
       {:else if city.buildings.length > 0}
         <Skyline
