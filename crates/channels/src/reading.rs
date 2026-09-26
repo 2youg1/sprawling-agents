@@ -160,7 +160,13 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
         // into the payload. A payload that will not read back as one is
         // kept as the failure to read it rather than rendered as a
         // refusal this build invented, or dropped as if nothing refused.
-        EventKind::GateDenied | EventKind::BudgetLimit | EventKind::ProviderDegraded => {
+        EventKind::GateDenied | EventKind::BudgetLimit => {
+            Some(match record.data().read::<AxError>() {
+                Ok(error) => Note::Refused { error, at },
+                Err(err) => unreadable(kind, &err, at),
+            })
+        }
+        EventKind::ProviderDegraded => {
             let value = serde_json::Value::Object(map.clone());
             Some(match serde_json::from_value(value) {
                 Ok(error) => Note::Refused { error, at },
