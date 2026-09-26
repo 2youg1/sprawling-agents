@@ -2338,6 +2338,18 @@ impl Engine {
 
 `effect` 是 `Effect::Egress`：浏览器打开的每个 URL 都离开运行中的机器，所以它过出网门，confidential 楼因此天然拿不到它。
 
+**worker 经它被交到的 `fn` 指针拿这些工具**：
+
+```rust
+/// 楼的规则要的浏览器工具：先是楼自己的，再是这个人声明过的那一个。
+pub type Browsers = fn(&Path, &memory::BlockOrigin, &city::BuildingRules) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
+impl RunWorker {
+    pub fn with_browsers(self, browsers: Browsers) -> RunWorker;   // 生产装 browser_tool::for_rules
+}
+```
+
+`lay_out_workbench` 调的是 `RunWorker.browsers`，不直接调 `browser_tool::for_rules`：本模块起浏览器、经 BiDi 说话，worker 搬进 `accounting` 时它留在 `sprawling`（accounting-SPEC.md §7、§12-10）。换掉它放不宽机密：`city::policy` 在机密楼上拒绝 `browser` 与 `usersbrowser` 两项设置，楼的规则里就没有要浏览器的那一句。钉住它的测试是 `crates/sprawling/tests/browsers.rs` 的 `a_run_is_offered_the_browser_the_worker_was_handed`。
+
 ### 8-45-3 截图成为证据
 
 一次 `screenshot` 的落点有三处，缺一处这张图就不是证据：
