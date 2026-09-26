@@ -49,14 +49,13 @@ impl Window {
     /// The dispatch lines: deterministic from `run_started`'s recorded
     /// inputs, hence rebuildable.
     ///
-    /// No pointer to the job file. Its text is the run segment of the
-    /// frozen prefix, so a line sending the agent to fetch what it has
-    /// already been handed costs a turn and buys nothing; the content
-    /// hash that line used to carry is recorded twice in the ledger,
-    /// which is where provenance belongs.
+    /// The job file's text is the run segment of the frozen prefix, so
+    /// the assigned opening names it rather than repeating it: the run
+    /// segment is not cached, and a pasted task written here again
+    /// would be paid for twice on every turn.
     pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening) {
         self.push_user_text(match opening {
-            Opening::FromJob => format!("Task: {task}\nGoal: {goal}"),
+            Opening::FromJob => format!("The task is in JOB.md above.\nGoal: {goal}"),
             // The person's own line, unwrapped. A conversational turn
             // dressed in field labels reads as a form, and a form is
             // answered with a form.
