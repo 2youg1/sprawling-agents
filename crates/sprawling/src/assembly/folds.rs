@@ -97,24 +97,16 @@ impl Standing {
     }
 }
 
-/// Rebuilds the views from the ledger on disk. This is the disposability
-/// of a projection exercised on every start: nothing is persisted, and
-/// the answer is the same as if the process had been running all along.
+/// The views of the ledger on disk, from its snapshot when one fits
+/// (sprawling-SPEC 8-91). A reader that serves nothing: it cuts no
+/// snapshot, so a one-shot query writes nothing to disk.
 ///
 /// # Errors
-/// Propagates chain verification failures; a city whose history does not
-/// verify is not one whose views should be served.
+/// Propagates chain verification failures of the lines it folds; a city
+/// whose history does not verify is not one whose views should be
+/// served.
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
-    let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
-    let city_root = ledger_dir
-        .parent()
-        .and_then(Path::parent)
-        .unwrap_or(ledger_dir);
-    let mut views = Views::new(city_root);
-    for record in known_records(&verified) {
-        views.apply(record)?;
-    }
-    Ok(views)
+    start_views(ledger_dir).map(|started| started.views)
 }
 
 /// The records the per-line check already parsed, in ledger order.

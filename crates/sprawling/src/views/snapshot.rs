@@ -31,7 +31,9 @@ impl Views {
     pub(crate) fn encode(&self) -> Result<Vec<u8>, AxError> {
         postcard::to_allocvec(self).map_err(|fault| {
             AxError::failure(AxCode::StorageFatal, "encode the views", fault.to_string())
-                .with_recovery("restart the server; the views fold from the ledger without a snapshot")
+                .with_recovery(
+                    "restart the server; the views fold from the ledger without a snapshot",
+                )
         })
     }
 

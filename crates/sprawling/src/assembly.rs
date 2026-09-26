@@ -64,7 +64,7 @@ pub(crate) use driving::lane::{DriveContext, drive_run};
 use driving::owing::{Owed, Owing, Unasked};
 pub(crate) use driving::{Driven, Driving};
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
-pub(crate) use folds::{Standing, rebuild_views};
+pub(crate) use folds::{Standing, cut_views_snapshot, rebuild_views, start_views};
 use genesis::city_segment;
 pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
 pub(crate) use mcp::McpLink;

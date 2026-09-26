@@ -35,15 +35,16 @@ use crate::assembly::{ledger_dir, rebuild_views};
 
 /// Answers one query out of a city's own history, without serving it.
 ///
-/// The views are folded, asked, and thrown away, so this costs one pass
-/// over the ledger and leaves nothing behind. **It is the same
+/// The views are folded, asked, and thrown away: from the snapshot a
+/// served city cut when one fits, from genesis otherwise, and nothing is
+/// left behind. **It is the same
 /// [`Views::answer`] a served city answers from**: a command line that
 /// read the history its own way would be a second answer to one
 /// question, and the one that drifted would be the one nobody was
 /// looking at.
 ///
 /// # Errors
-/// Propagates a history that does not verify and a record that will not
+/// Propagates folded lines that do not verify and a record that will not
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {
