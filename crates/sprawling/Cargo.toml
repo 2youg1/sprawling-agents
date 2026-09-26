@@ -6,6 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+accounting = { path = "../accounting" }
 kernel = { path = "../kernel" }
 memory = { path = "../memory" }
 runtime = { path = "../runtime" }

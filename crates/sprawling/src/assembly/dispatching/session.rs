@@ -10,7 +10,6 @@ use kernel::{Address, AxCode, AxError};
 
 use super::super::RunWorker;
 use super::{NAME_THE_WORK, NAME_TOKENS};
-use crate::assembly::credentials::dialect_headers;
 
 impl RunWorker {
     /// Where a dispatch works: the room a named session opens, or the
@@ -92,14 +91,7 @@ impl RunWorker {
                      digest model that runs on this machine",
                 )
             })?;
-        let adapter = gateway::adapter_for(
-            &chosen,
-            self.redemption()?,
-            dialect_headers(chosen.endpoint.dialect)
-                .into_iter()
-                .map(|(name, value)| (name, value.spelled()))
-                .collect(),
-        )?;
+        let adapter = self.models.build(&chosen, self.redemption()?)?;
         Ok(NamingCall {
             adapter,
             model: chosen.entry.id.clone(),

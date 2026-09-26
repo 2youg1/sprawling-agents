@@ -1,0 +1,13 @@
+[package]
+name = "accounting"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+kernel = { path = "../kernel" }
+gateway = { path = "../gateway" }
+
+[lints]
+workspace = true

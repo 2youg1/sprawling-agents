@@ -41,6 +41,7 @@ mod freezing;
 mod genesis;
 mod lifetime;
 mod mcp;
+mod models;
 mod naming;
 mod plans;
 mod probing;
@@ -74,6 +75,7 @@ use genesis::city_segment;
 pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
 pub(crate) use mcp::McpLink;
 use mcp::{connect_mcp, mounts_under, transport_site};
+use models::GatewayModels;
 use naming::{building_of, governed_of, name_of, not_built, scope_of};
 use plans::Reporter;
 use plans::held::{PlanHolders, Planning};
@@ -223,6 +225,10 @@ pub struct RunWorker {
     /// running. One per city, so the number of runs a city drives at once
     /// has one answer (sprawling-SPEC.md 8-46-2).
     flight: Flight,
+    /// Builds the adapter each run and each naming call talks to
+    /// (`models`). Received rather than built, so a second factory can
+    /// drive a dispatch this worker accounts for.
+    models: Box<dyn accounting::ModelFactory + Send>,
 }
 
 impl RunWorker {

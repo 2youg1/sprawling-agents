@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "accounting"
+version = "0.0.6"
+dependencies = [
+ "gateway",
+ "kernel",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2632,6 +2640,7 @@ dependencies = [
 name = "sprawling"
 version = "0.0.6"
 dependencies = [
+ "accounting",
  "browser",
  "channels",
  "city",
