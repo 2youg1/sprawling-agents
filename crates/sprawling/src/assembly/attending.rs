@@ -90,10 +90,18 @@ pub(super) struct Outward {
 pub(super) struct Started {
     pub(super) thread: std::thread::JoinHandle<()>,
     pub(super) vault: Arc<std::sync::Mutex<gateway::Custodian>>,
+    /// The accounting queue's counts, for the monitor (sprawling-SPEC.md 8-98).
+    pub(super) health: crate::monitor::health::Health,
 }
 
 pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started, AxError> {
-    type Opened = Result<Arc<std::sync::Mutex<gateway::Custodian>>, AxError>;
+    type Opened = Result<
+        (
+            Arc<std::sync::Mutex<gateway::Custodian>>,
+            crate::monitor::health::Health,
+        ),
+        AxError,
+    >;
     let (ready_tx, ready_rx) = mpsc::sync_channel::<Opened>(0);
     let Opening {
         city_root: worker_root,
@@ -153,7 +161,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                         drop(ready_tx.send(Err(err)));
                         return;
                     }
-                    drop(ready_tx.send(Ok(worker.vault_handle())));
+                    drop(ready_tx.send(Ok((worker.vault_handle(), worker.flight.health()))));
                     worker
                 }
                 Err(err) => {
@@ -207,13 +215,13 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             )
             .with_recovery("check process thread limits")
         })?;
-    let vault = match ready_rx.recv() {
+    let (vault, health) = match ready_rx.recv() {
         // Lent rather than opened a second time: "a credential is
         // redeemed at the last moment, through one door" stops being
         // true the moment there are two handles on the same secrets.
-        Ok(Ok(vault)) => {
+        Ok(Ok((vault, health))) => {
             lend(Arc::clone(&vault));
-            vault
+            (vault, health)
         }
         Ok(Err(err)) => return Err(err),
         Err(_) => {
@@ -228,6 +236,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     Ok(Started {
         thread: worker_thread,
         vault,
+        health,
     })
 }
 

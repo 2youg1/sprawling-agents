@@ -13,6 +13,7 @@ use kernel::{AxCode, AxError};
 use tokio::sync::broadcast;
 
 use super::counters::Counters;
+use super::health::Health;
 use super::{Monitor, Sample};
 
 const BEAT: Duration = Duration::from_secs(1);
@@ -26,10 +27,11 @@ pub(crate) fn spawn_sampler(
     monitor: Weak<Mutex<Monitor>>,
     samples: broadcast::Sender<Sample>,
     volume: std::path::PathBuf,
+    health: Health,
 ) -> Result<(), AxError> {
     std::thread::Builder::new()
         .name("sprawling-monitor".to_owned())
-        .spawn(move || sample_until_dropped(&monitor, &samples, volume))
+        .spawn(move || sample_until_dropped(&monitor, &samples, volume, &health))
         .map(drop)
         .map_err(|source| {
             AxError::failure(
@@ -45,6 +47,7 @@ fn sample_until_dropped(
     monitor: &Weak<Mutex<Monitor>>,
     samples: &broadcast::Sender<Sample>,
     volume: std::path::PathBuf,
+    health: &Health,
 ) {
     let mut counters: Option<Counters> = None;
     loop {
@@ -53,9 +56,11 @@ fn sample_until_dropped(
             return;
         };
         beat(&monitor, samples, |watched| {
-            counters
-                .get_or_insert_with(|| Counters::open(volume.clone()))
-                .read(watched, BEAT)
+            health.read(
+                counters
+                    .get_or_insert_with(|| Counters::open(volume.clone()))
+                    .read(watched, BEAT),
+            )
         });
         if !lock(&monitor).is_watched() {
             counters = None;

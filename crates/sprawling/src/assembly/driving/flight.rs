@@ -89,6 +89,12 @@ impl Flight {
         self.pool.in_flight()
     }
 
+    /// The accounting queue's counts, for the sampler's thread
+    /// (sprawling-SPEC.md 8-98).
+    pub(in crate::assembly) fn health(&self) -> crate::monitor::health::Health {
+        self.gate.health()
+    }
+
     /// Whether a new run waits: every lane is taken, or memory is tight.
     /// The concurrency wall a caller reads before it prepares work it
     /// cannot start; the memory is read here, at the moment it decides.

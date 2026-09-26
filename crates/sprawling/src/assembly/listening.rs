@@ -186,6 +186,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let Started {
         thread: worker_thread,
         vault: city_vault,
+        health,
     } = spawn_worker(
         Opening {
             city_root: city_root.to_path_buf(),
@@ -226,7 +227,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         logs,
         outputs,
         outputs_so_far: Arc::new(move || kept_reader.so_far()),
-        monitor: watched(city_root)?,
+        monitor: watched(city_root, health)?,
         city: city_name,
         head,
         epoch,
@@ -325,13 +326,17 @@ impl Listening {
 ///
 /// # Errors
 /// `StorageFatal` when the sampler's thread cannot be started.
-fn watched(city_root: &std::path::Path) -> Result<channels::MonitorFeed, AxError> {
+fn watched(
+    city_root: &std::path::Path,
+    health: crate::monitor::health::Health,
+) -> Result<channels::MonitorFeed, AxError> {
     let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
     let samples = tokio::sync::broadcast::channel(1).0;
     crate::monitor::sampler::spawn_sampler(
         Arc::downgrade(&monitor),
         samples.clone(),
         city_root.to_path_buf(),
+        health,
     )?;
     Ok(channels::MonitorFeed {
         watch: Arc::new(move |watched| -> Box<dyn Send> {
