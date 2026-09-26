@@ -279,3 +279,53 @@ fn every_key_the_viewer_reads_names_its_action() {
         assert_eq!(action_for(key), action, "{key:?}");
     }
 }
+
+fn ledger_row(seq: u64, kind: channels::EventKind, data: serde_json::Value) -> Row {
+    let record = channels::EventRecord::from_draft(
+        channels::EventDraft {
+            run: run(2),
+            t: channels::TimeMs::new(seq),
+            who: "yard/b".to_owned(),
+            addr: None,
+            kind,
+            data: channels::Payload::new(data.as_object().unwrap().clone()).unwrap(),
+            ig: false,
+        },
+        Seq::new(seq),
+        channels::B3Hash::digest(b"prev"),
+    );
+    Row {
+        seq: Seq::new(seq),
+        run: run(2),
+        line: String::from_utf8(record.canonical_line().unwrap()).unwrap(),
+    }
+}
+
+/// Opening a run folds its lines into rounds, and each round holds the
+/// calls made in it.
+#[test]
+fn expanding_a_run_shows_its_rounds_and_their_calls() {
+    let runs = vec![line(2, "yard/b", (3, 5), Some(memory::RunPhase::Active))];
+    let records = vec![
+        ledger_row(3, channels::EventKind::ModelCalled, serde_json::json!({})),
+        ledger_row(
+            4,
+            channels::EventKind::ToolCalled,
+            serde_json::json!({ "id": "c1", "name": "read", "subject": "a.rs" }),
+        ),
+        ledger_row(5, channels::EventKind::ModelCalled, serde_json::json!({})),
+    ];
+    let mut face = Face::open(&runs, records, NARROW);
+    for action in [Action::Expand, Action::Down, Action::Expand] {
+        face.apply(action);
+    }
+    assert_eq!(
+        face.frame()[4..],
+        [
+            format!("         - run {R2} active #3..5"),
+            ">          - round 1 @3".to_owned(),
+            "               read a.rs".to_owned(),
+            "             round 2 @5".to_owned(),
+        ]
+    );
+}
