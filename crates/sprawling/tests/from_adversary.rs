@@ -56,7 +56,7 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
             effort: None,
         })
         .unwrap_err();
-    assert_eq!(*refused2.code(), AxCode::ConfigInvalid);
+    assert_eq!(*refused2.code(), AxCode::ModelUnchosen);
     // A refusal is a promise in three parts; a code with no way forward
     // keeps only one of them.
     assert!(!refused2.recovery().is_empty());

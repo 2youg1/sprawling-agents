@@ -108,7 +108,7 @@ impl EndpointBook {
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError> {
         let choice = self.chosen.get(&tag).ok_or_else(|| {
             AxError::failure(
-                AxCode::ConfigInvalid,
+                AxCode::ModelUnchosen,
                 format!("choose the {tag} model"),
                 "no model is chosen for this tag",
             )
@@ -288,7 +288,7 @@ mod tests {
         let err = EndpointBook::new()
             .select(ModelTag::Digest, &BuildingPolicy::default())
             .unwrap_err();
-        assert_eq!(*err.code(), AxCode::ConfigInvalid);
+        assert_eq!(*err.code(), AxCode::ModelUnchosen);
         assert!(err.recovery().contains("settings page"));
     }
 

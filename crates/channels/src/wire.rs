@@ -138,7 +138,10 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-pub const WIRE_V: u32 = 38;
+/// 39: `E_MODEL_UNCHOSEN` joins the error codes. A city with no model
+///    chosen used to refuse with `E_CONFIG_INVALID`, whose recovery is a
+///    new session; an older page would meet a code it cannot decode.
+pub const WIRE_V: u32 = 39;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
