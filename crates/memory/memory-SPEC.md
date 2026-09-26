@@ -918,7 +918,7 @@ impl ChainSnapshot {
     pub fn seq(&self) -> Seq;
     pub fn views(&self) -> &[u8];
     pub fn fit(&self, line_at_seq: &[u8]) -> SnapshotFit;              // 定位读到的那一行是否就是切点那一行
-    pub fn resume(&self) -> Result<LineCheck, MemoryError>;           // 切点之后的链状态：prev = line_hash，expected = seq + 1
+    pub fn resume(&self) -> Result<LineCheck, AxError>;               // 切点之后的链状态：prev = line_hash，expected = seq + 1；seq 已是最后一个时是 Seq::next 的错误
 }
 pub enum SnapshotFit { Fits, Stale }
 pub enum StoredSnapshot { Absent, Damaged(String), Present(ChainSnapshot) }
