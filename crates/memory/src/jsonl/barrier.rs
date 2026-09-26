@@ -5,6 +5,11 @@
 
 //! The durability barrier's state: whether the ledger's in-memory
 //! position still names what the disk holds (memory-SPEC 8-1).
+//!
+//! `adversary/design/Durability.lean` states the property this holds -
+//! every seq a handle answered `Ok` for survives a reopen - and proves it
+//! for any run of waves, with the counterexample for a handle that keeps
+//! writing after a failed wave.
 
 use std::path::Path;
 

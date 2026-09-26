@@ -195,6 +195,7 @@ impl Barrier {
 
 - 一波在写出第一个字节之前把屏障置为 `Broken`，在它触及的每一段都 sync 完（以及新段的 `sync_dir`）之后才置回 `Whole`；`append_all` 进门先 `admit`，空波也一样。
 - 原因：写到一半死掉的波会在段尾留下位置不认识的字节——撕裂的半行，或 sync 失败的整行。在它后面再写的一波，会接在下次 open 要截掉的那段字节之后，它的 `Ok` 就说了一条盘上没有的记录（`barrier.rs` 的 `no_append_after_a_failed_barrier_claims_a_record_the_disk_loses`）。能判断段尾有什么的只有 open，所以坏了的句柄拒绝之后的每一波。
+- 性质「句柄答过 `Ok` 的每个 seq 重开后都在」由 `adversary/design/Durability.lean` 对任意一串波证明（`answered_survives_reopen`），并给出不守屏障时的反例（`withoutBarrier`）；`lake build Design` 证明它。
 - 被否：失败后把位置退回或前推到盘上真实的末尾。写失败时句柄不知道落下了多少字节，sync 失败后页缓存里的字节是否还会落盘也不知道；猜一个位置，就是用猜测替 open 的断尾恢复作答。
 - 重开参数：出现后台组提交（记账线程发布「已持久到 seq N」的水位线）之后，sync 失败不再发生在 `append_all` 里，屏障状态随水位线一起搬到记账线程。
 

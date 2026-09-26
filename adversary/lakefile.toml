@@ -28,7 +28,7 @@ srcDir = "src"
 [[lean_lib]]
 name = "Design"
 srcDir = "design"
-roots = ["Attending"]
+roots = ["Attending", "Durability"]
 
 [[lean_exe]]
 name = "adversary"
