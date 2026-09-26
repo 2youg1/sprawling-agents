@@ -281,3 +281,52 @@ fn a_second_writer_of_a_ledger_outside_any_city_is_refused() {
         "a second writer opened a ledger another writer holds"
     );
 }
+
+/// Two writers that each continued the same `prev` leave a fork: every
+/// line after the fork point is a complete, lawful record. Reopening
+/// must refuse and leave all of them on disk, because truncating would
+/// delete the other writer's history.
+#[test]
+fn a_fork_after_the_first_line_is_refused_and_keeps_every_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    ledger
+        .append_all(vec![
+            draft(EventKind::CityInitialized, 1),
+            draft(EventKind::BuildingCreated, 2),
+        ])
+        .unwrap();
+    let seg = only_segment(dir.path());
+    let fork_point = fs::read(&seg).unwrap();
+    ledger
+        .append_all(vec![draft(EventKind::BuildingCreated, 3)])
+        .unwrap();
+    drop(ledger);
+    let first_writer = fs::read(&seg).unwrap();
+
+    // The second writer continues from the same fork point.
+    fs::write(&seg, &fork_point).unwrap();
+    let (mut second, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    second
+        .append_all(vec![
+            draft(EventKind::BuildingCreated, 4),
+            draft(EventKind::BuildingCreated, 5),
+        ])
+        .unwrap();
+    drop(second);
+    let mut forked = first_writer;
+    forked.extend_from_slice(&fs::read(&seg).unwrap()[fork_point.len()..]);
+    fs::write(&seg, &forked).unwrap();
+
+    let outcome = JsonlLedger::open(dir.path(), TimeMs::new(9));
+    assert_eq!(
+        fs::read(&seg).unwrap(),
+        forked,
+        "reopening must not delete lawful history"
+    );
+    let err = outcome.err().expect("a forked ledger must refuse to open");
+    let MemoryError::Envelope { line, .. } = &err else {
+        panic!("expected Envelope, got {err:?}");
+    };
+    assert_eq!(*line, 4, "the refusal names the first line after the fork");
+}
