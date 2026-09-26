@@ -161,13 +161,16 @@
 
   // The label of one recovery action. A command is spelled as itself
   // in both languages; a link action has no spelling and takes the
-  // word its own row carries (client-SPEC 4-10, `core/recovering.ts`).
+  // word its own row carries, and so does a form (client-SPEC 4-10,
+  // 4-35a, `core/recovering.ts`).
   function wordOf(lang: Lang, recovery: Recovery): string {
     switch (recovery.kind) {
       case "command":
         return recovery.spelled;
       case "reconnect":
         return say(lang, recovery.verb);
+      case "form":
+        return say(lang, recovery.label);
     }
   }
 </script>
@@ -281,7 +284,7 @@ sit above these in the shipped drawer and keep their own fixture. -->
             count={entry.count}
           >
             {#snippet actions()}
-              {#each recoveryFor(entry.code) as recovery (recovery.kind === "command" ? recovery.spelled : recovery.verb)}
+              {#each recoveryFor(entry.code) as recovery (wordOf($lang, recovery))}
                 <Button label={wordOf($lang, recovery)} tone="quiet" />
               {/each}
             {/snippet}
@@ -309,7 +312,7 @@ rather than into a taller corner. -->
         count={toast.count}
       >
         {#snippet actions()}
-          {#each recoveryFor(toast.code) as recovery (recovery.kind === "command" ? recovery.spelled : recovery.verb)}
+          {#each recoveryFor(toast.code) as recovery (wordOf($lang, recovery))}
             <Button label={wordOf($lang, recovery)} tone="quiet" />
           {/each}
         {/snippet}

@@ -171,13 +171,13 @@
               }}
             />
             {#each recoveryFor(toast.error.code) as recovery (recoveryLabel(recovery, $lang))}
-              {@const why = recoveryWhy(u, recovery, toast.about)}
+              {@const why = recoveryWhy(u, recovery, toast)}
               <Button
                 tone="quiet"
                 label={recoveryLabel(recovery, $lang)}
                 {...why === undefined ? {} : { why: say($lang, why) }}
                 onPress={() => {
-                  recover(u, recovery, toast.about);
+                  recover(u, recovery, toast);
                 }}
               />
             {/each}

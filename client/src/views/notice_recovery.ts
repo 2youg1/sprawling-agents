@@ -19,6 +19,10 @@
 // picker that chooses it lives on the talk screen (ux A6), so its deed
 // lands on that screen, in the room the refusal names. A spelling this
 // file does not know runs nothing rather than a guess at what it meant.
+//
+// **A form recovery writes and moves; it never sends** (client-SPEC
+// 4-35a). It fills the draft door of the room it names and moves there,
+// and the dispatch that follows is the one the person presses.
 
 import { Option, Schema } from "effect";
 import { get } from "svelte/store";
@@ -28,14 +32,22 @@ import type { Belief } from "../core/belief";
 import type { Key, Lang } from "../core/lang";
 import { say } from "../core/lang";
 import type { Recovery } from "../core/recovering";
+import { formOf } from "../core/recovering";
 import { readRunId } from "../core/run_id";
 import type { Ui } from "../ui";
 import { Address } from "../wire";
-import type { RunId } from "../wire";
+import type { AxError, RunId } from "../wire";
 
 // What a refusal's subject names, when this build can name it. The same
 // reading `core/belief` stamps onto a notice.
 export type About = Address | RunId | null;
+
+// One refusal as a notice holds it: the city's own error, and what its
+// subject names.
+export interface Refused {
+  readonly error: AxError;
+  readonly about: About;
+}
 
 // The phrase each command recovery is offered under, keyed by the
 // spelling `core/recovering.ts` hands out. A spelling this table does
@@ -81,11 +93,19 @@ function targetFor(u: Ui, about: About): Target {
 // a command is labelled by its spelling's own phrase where the table
 // above knows one.
 export function recoveryLabel(recovery: Recovery, lang: Lang): string {
-  if (recovery.kind === "reconnect") {
-    return say(lang, recovery.verb);
+  switch (recovery.kind) {
+    case "reconnect":
+      return say(lang, recovery.verb);
+    case "form":
+      return say(lang, recovery.label);
+    case "command":
+      return commandLabel(recovery.spelled, lang);
   }
-  const key = VERBS[recovery.spelled];
-  return key === undefined ? recovery.spelled : say(lang, key);
+}
+
+function commandLabel(spelled: string, lang: Lang): string {
+  const key = VERBS[spelled];
+  return key === undefined ? spelled : say(lang, key);
 }
 
 // Why a recovery cannot be pressed right now, as a `lang.json` key - or
@@ -93,11 +113,14 @@ export function recoveryLabel(recovery: Recovery, lang: Lang): string {
 // refusal whose subject is a sentence offers its deeds greyed rather
 // than guessing at a room (SPEC 7-2: `aria-disabled` keeps the control
 // in the Tab order with its reason readable).
-export function recoveryWhy(u: Ui, recovery: Recovery, about: About): Key | undefined {
+export function recoveryWhy(u: Ui, recovery: Recovery, refused: Refused): Key | undefined {
   if (recovery.kind === "reconnect") {
     return undefined;
   }
-  const target = targetFor(u, about);
+  if (recovery.kind === "form") {
+    return Option.isNone(formOf(recovery.room, refused.error.subject, "")) ? NO_TARGET : undefined;
+  }
+  const target = targetFor(u, refused.about);
   if (recovery.spelled === "/stop") {
     return target.run === null && target.room === null ? NO_TARGET : undefined;
   }
@@ -108,12 +131,20 @@ export function recoveryWhy(u: Ui, recovery: Recovery, about: About): Key | unde
 // is the command behind `/new`, sent without a line through a box - and
 // `/stop` stops what the refusal names: its run, or everything in the
 // room it names.
-export function recover(u: Ui, recovery: Recovery, about: About): void {
+export function recover(u: Ui, recovery: Recovery, refused: Refused): void {
   if (recovery.kind === "reconnect") {
     u.conn.retry();
     return;
   }
-  const target = targetFor(u, about);
+  if (recovery.kind === "form") {
+    const words = say(get(u.lang), recovery.words);
+    Option.map(formOf(recovery.room, refused.error.subject, words), (form) => {
+      u.prefs.setDraft(form.room, form.draft);
+      u.go({ kind: "talk", address: form.room });
+    });
+    return;
+  }
+  const target = targetFor(u, refused.about);
   switch (recovery.spelled) {
     case "/new":
       if (target.room !== null) {
