@@ -5,7 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // A file the way a tool handed it over: which file it was, which line
-// each row is, and enough colour to tell a comment from a string.
+// each row is, and its grammar's colours (`inked.svelte`).
 //
 // **Read-only by construction.** There is no editor here, no minimap
 // and no language server: this view answers "what did that call
@@ -15,18 +15,6 @@
 // The row that names the file also carries the one secondary action:
 // copy, shown when the pointer or the keyboard is inside this view and
 // nowhere else, so the code is the only thing that greets the eye.
-
-import type { Ink } from "./code";
-
-// Every colour comes from `theme.css`; this file states no value. The
-// fifth ink is the plain text around the four the theme distinguishes.
-const PAINT: Record<Ink, string> = {
-  plain: "",
-  comment: "text-text-disabled",
-  string: "text-alert",
-  number: "text-accent",
-  word: "text-text",
-};
 
 // How long the copy receipt holds its check mark: long enough to see
 // one, short enough that the mark never becomes the button's face.
@@ -51,7 +39,7 @@ const SHAPE =
 <script lang="ts">
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
-  import { painted } from "./code";
+  import Inked from "./inked.svelte";
 
   interface Props {
     // The file this came from, as the tool named it. An empty string
@@ -65,7 +53,6 @@ const SHAPE =
 
   const { lang } = ui();
 
-  const pieces = $derived(painted(text, path));
   // Crumbs carry their own identity so a path whose segment repeats -
   // `src/.../src/...` - keys no two rows alike.
   const crumbs = $derived(
@@ -133,7 +120,7 @@ const SHAPE =
   <div class="min-h-0 flex-1 overflow-auto">
     <div class="flex min-w-max font-mono text-note leading-relaxed">
       <pre class="sticky left-0 shrink-0 select-none bg-chrome px-snug text-right text-text-disabled" aria-hidden="true">{gutter}</pre>
-      <pre class="px-snug text-text-quiet">{#each pieces as piece (piece)}<span class={PAINT[piece.ink]}>{piece.text}</span>{/each}</pre>
+      <pre class="px-snug text-text-quiet"><Inked {text} source={path} /></pre>
     </div>
   </div>
 </div>
