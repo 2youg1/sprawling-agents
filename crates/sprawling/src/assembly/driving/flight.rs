@@ -26,7 +26,7 @@ use super::super::{Continuation, Driven, Owed, Owing, RunWorker, Unasked};
 use super::{Driving, lane::DriveContext};
 use crate::assembly::booking::OpenClaims;
 use crate::assembly::pool::{Arrival, DRIVING_LANES, DrivingPool};
-use crate::assembly::relay::{Patience, Relay, RelayGate, Wake};
+use crate::assembly::relay::{Drained, Patience, Relay, RelayGate, Wake};
 
 /// One run in a lane: everything the city does once the drive is home,
 /// and what that landing is owed.
@@ -206,11 +206,14 @@ impl RunWorker {
         } else {
             Patience::Now
         };
-        let written = self
-            .flight
-            .gate
-            .serve(patience, &mut self.ledger, &mut self.flight.homes);
+        let Drained { written, goals } =
+            self.flight
+                .gate
+                .serve(patience, &mut self.ledger, &mut self.flight.homes);
         self.show_relayed(written);
+        for ask in goals {
+            self.answer_goal(ask);
+        }
         let Some(arrival) = self.flight.arrived() else {
             return Ok(Landed::Nothing);
         };

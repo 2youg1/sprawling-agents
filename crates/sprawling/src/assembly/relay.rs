@@ -19,6 +19,7 @@ use kernel::{AxCode, AxError, EventDraft, EventRef, Ledger};
 
 use super::booking::{ClaimAsk, ClaimBook};
 use super::pool::Arrival;
+use super::registering::GoalAsk;
 
 /// One append, and the address its answer goes back to.
 ///
@@ -43,6 +44,8 @@ pub(crate) enum Wake {
     Relay(RelayRequest),
     /// A lane's claim on a plan node, decided in queue order.
     Claim(ClaimAsk),
+    /// A lane's goal registration, decided against the city's register.
+    Goal(GoalAsk),
     /// A run home from its lane, boxed because it carries a whole
     /// drive's outcome.
     Home(Box<Arrival>),
@@ -50,6 +53,18 @@ pub(crate) enum Wake {
     Command,
     /// The city is stopping; the desk says so too.
     Close,
+}
+
+/// What one look at the queue leaves the accounting thread.
+pub(crate) struct Drained {
+    /// Every line the ledger took, in ledger order: a line a lane wrote
+    /// is history as much as one the accounting thread wrote, so the
+    /// same folds are shown it (sprawling-SPEC.md 8-90).
+    pub(crate) written: Vec<EventDraft>,
+    /// Registrations in arrival order, left to the thread that holds the
+    /// goal register: a copy of the register here would be a second
+    /// answer to who holds the ground (sprawling-SPEC.md 8-42-8).
+    pub(crate) goals: Vec<GoalAsk>,
 }
 
 /// How long one look at the queue may wait for its first wake.
@@ -132,24 +147,21 @@ impl RelayGate {
 
     /// Waits as `patience` allows for the first wake, then takes every
     /// wake already queued: relay requests are written before anything
-    /// lands (sprawling-SPEC.md 8-42-2), runs home go on `homes` in
-    /// arrival order, and a command or a close only ends the wait.
+    /// lands (sprawling-SPEC.md 8-42-2), claims are answered in queue
+    /// order, runs home go on `homes` and goal registrations into the
+    /// returned [`Drained`] in arrival order, and a command or a close
+    /// only ends the wait.
     ///
     /// **Everything queued rides one disk barrier**, which costs the
     /// same for fifty records as for one. Each answer still goes back
     /// only after the write is durable, because that is what makes an
     /// `EventRef` a reference to a history that exists.
-    ///
-    /// Hands back every line the ledger took in this look, in ledger
-    /// order: a line a lane wrote is history as much as one the
-    /// accounting thread wrote, so the caller shows each one to the
-    /// same folds (sprawling-SPEC.md 8-90).
     pub(crate) fn serve(
         &mut self,
         patience: Patience,
         ledger: &mut impl Ledger,
         homes: &mut VecDeque<Arrival>,
-    ) -> Vec<EventDraft> {
+    ) -> Drained {
         // The gate's own sender keeps the queue connected: empty is "not yet".
         let first = match patience {
             Patience::Now => self.wakes.try_recv().ok(),
@@ -157,6 +169,7 @@ impl RelayGate {
             Patience::Unbounded => self.wakes.recv().ok(),
         };
         let mut written = Vec::new();
+        let mut goals = Vec::new();
         let mut drafts = Vec::new();
         let mut senders = Vec::new();
         let queued = std::iter::from_fn(|| self.wakes.try_recv().ok());
@@ -167,12 +180,13 @@ impl RelayGate {
                     senders.push(back);
                 }
                 Wake::Claim(ask) => written.extend(self.booked.answer(ask, ledger)),
+                Wake::Goal(ask) => goals.push(ask),
                 Wake::Home(arrival) => homes.push_back(*arrival),
                 Wake::Command | Wake::Close => {}
             }
         }
         if senders.is_empty() {
-            return written;
+            return Drained { written, goals };
         }
         let kept = drafts.clone();
         match ledger.append_all(drafts) {
@@ -192,7 +206,7 @@ impl RelayGate {
                 }
             }
         }
-        written
+        Drained { written, goals }
     }
 }
 

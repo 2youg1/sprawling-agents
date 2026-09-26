@@ -84,7 +84,11 @@ fn two_runs_registering_one_ground_side_by_side_leave_one_holder() {
     )
     .unwrap();
     let tool = |run: u8, room: &str| {
-        let desk = worker.goal_desk(RunId::from_bytes([run; 16]), &format!("potter@lab.{run}"));
+        let desk = worker.goal_desk(
+            RunId::from_bytes([run; 16]),
+            &Address::parse(room).unwrap(),
+            &format!("potter@lab.{run}"),
+        );
         collab::GoalTool::new(
             Address::parse(room).unwrap(),
             std::sync::Arc::new(std::sync::Mutex::new(desk)),

@@ -31,7 +31,7 @@ pub use claim_effect::{ClaimEffect, evidence_of, still_true};
 pub use claim_tool::{Booking, ClaimDesk, ClaimTool};
 pub use delegate_tool::{DelegateDesk, DelegateTool, Delegated};
 pub use fanin::{Artifact, Claim, FanIn, Joined, PrivateQuestion};
-pub use goal_tool::{GoalDesk, GoalEffect, GoalTool};
+pub use goal_tool::{GoalBooking, GoalDesk, GoalTool, conflict_refusal};
 pub use handback::Handback;
 pub use inbox::{Inbox, Signal};
 pub use pr::{Open, Pr, Verified};

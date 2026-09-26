@@ -1949,10 +1949,13 @@ impl RelayGate {
     pub(crate) fn bell(&self) -> mpsc::Sender<Wake>;
     /// 按 `patience` 等第一条消息，再用 `try_recv` 把排在后面的一次取尽：relay 请求**合成一道屏障**
     /// 写下去，回家的活按到达次序放进 `homes`，Command 与 Close 只负责唤醒。
-    /// 返回账本在这一次里收下的每一行，按账本次序：记账线程随后把它们交给自己的各份折叠。
+    /// 认领按队列次序当场答复；目标登记不在这里答，按到达次序交回。
     pub(crate) fn serve(&mut self, patience: Patience, ledger: &mut impl kernel::Ledger,
-                        homes: &mut VecDeque<Arrival>) -> Vec<EventDraft>;
+                        homes: &mut VecDeque<Arrival>) -> Drained;
 }
+/// 一次看队列留给记账线程的东西：账本收下的每一行（按账本次序，交给各份折叠），
+/// 与等着目标表答复的登记（按到达次序，交给 `RunWorker::answer_goal`）。
+pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goals: Vec<GoalAsk> }
 ```
 
 **为什么 `append` 阻塞**：`kernel::Ledger` 的契约写着「`Ok(ref)` 意味着这条记录在那个适配器的介质里已经耐久」。
@@ -2119,7 +2122,7 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
   `city::roadmap`、`Claims::of` 拒绝重放——余下的就是本轮全部的认领。计划那一步之后的失败（书架、请求、租约、结论）不再补行，
   因为那时认领已经合上，补一条放回行会让历史说一个已完成的节点又被放回。落地成功而追加失败时返回追加的错误；落地已经失败时
   返回落地的原错误，追加的失败记进诊断——账本已经拒绝过一行，第二次拒绝不改变人要做的事。认领在它的收尾行（finished、blocked、released 或拆分父节点的 split）写上账本时就算关闭——拆分之后这一轮什么也不持有，split 行就是父节点的去向，不等 `Roadmap.md` 改写返回：改写被拒（`E_VERSION_CONFLICT` 或文件不可写）时收尾行已在账上，不再补放回行。
-- **目标登记同一条路**（`bin::assembly::registering`）：`goal` 工具的桌子不留目标表的副本，只铸 id、拼 `GoalEntry`，
+- **目标登记同一条路**（`bin::assembly::registering`，形状 4 适配器）：`goal` 工具的桌子不留目标表的副本，只铸 id、拼 `GoalEntry`，
   经 `registering::booking` 把它作为 `Wake::Goal` 送上同一条队列并阻塞等回信。`serve` 不自己答它，而是按到达次序交回；
   记账线程在给各份折叠看过这一次写下的行之后逐个答复（`RunWorker::answer_goal`）：对着全城的目标表
   `collab::arbitrate`，不撞就先把 `goal_registered` 写上账本，撞了就先写 `goal_conflict`（载荷 `collab::conflict_payload`），

@@ -55,6 +55,7 @@ mod plans;
 mod pool;
 mod probing;
 mod recording;
+mod registering;
 mod relay;
 mod reviewing;
 mod rooms;

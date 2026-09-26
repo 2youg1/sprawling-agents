@@ -116,7 +116,7 @@ fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands
 /// A claim's line is written when the model makes it, so a run whose
 /// landing fails before its plan settles still owes the history the
 /// line that closes it: the claim, then the node handed back
-/// (sprawling-SPEC.md 8-42-8). The goal's line is the one lost here
+/// (sprawling-SPEC.md 8-42-8). The signal's line is the one lost here
 /// because landing writes it before the plan's.
 #[test]
 fn a_claim_whose_landing_failed_is_handed_back() {
@@ -132,24 +132,24 @@ fn a_claim_whose_landing_failed_is_handed_back() {
                 serde_json::json!({ "action": "claim", "node": "1" }),
             ),
             tool_completion(
-                "staking ground",
+                "telling a neighbour",
                 "tu_2",
-                "goal",
+                "signal",
                 serde_json::json!({
-                    "statement": "rewrite the kiln notes",
-                    "paths": ["lab/room1/notes.md"],
-                    "standing": true,
+                    "action": "send",
+                    "to": "lab/room2",
+                    "text": "the kiln row is mine",
                 }),
             ),
             completion("done", None),
         ],
     );
-    let worker = worker_over_faults(dir.path(), Some("goal_registered"));
+    let worker = worker_over_faults(dir.path(), Some("signal_enqueued"));
     let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
     let landed = worker.handle(channels::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
-        task: "take a row and stake the notes".to_owned(),
-        goal: "one claim, one goal".to_owned(),
+        task: "take a row and tell a neighbour".to_owned(),
+        goal: "one claim, one signal".to_owned(),
         mode: kernel::Mode::PlanGoal,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lost goal"),
         session: None,

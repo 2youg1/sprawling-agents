@@ -11,6 +11,10 @@
 //! joins them into something a resident can call, and refuses to
 //! register anything that clashed.
 //!
+//! The register is the city's, not the desk's: two runs dispatched side
+//! by side read the same register, so the desk hands each entry to the
+//! authority every run asks ([`GoalBooking`]) and keeps no copy.
+//!
 //! A refusal is where the design lives. "No" alone teaches a model to
 //! rephrase and try again, so the refusal carries the level that decides
 //! the clash — wait for the other goal, go and agree with its owner, or
@@ -24,46 +28,52 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use crate::arbiter::{Level, arbitrate};
+use crate::arbiter::Level;
 
-/// What the run did to the city's goal register. Exhaustive for the
-/// same reason as `SignalEffect`: a variant the worker does not record
-/// is a claim the city never made.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GoalEffect {
-    /// Nothing held this ground; the claim stands once it is recorded.
-    Registered(GoalEntry),
-    /// Someone was here first. The level says who settles it.
-    Conflicted { entry: GoalEntry, level: Level },
+/// The authority that decides a registration at the call: it arbitrates
+/// the entry against the whole register, records the outcome, and
+/// answers. In the city that authority is the accounting thread, reached
+/// through the relay.
+pub struct GoalBooking(Box<Ask>);
+
+/// Registers one entry, or refuses it with [`conflict_refusal`] because
+/// the ground is held. Handed the whole entry, because the authority
+/// records it as it registers it.
+type Ask = dyn FnMut(&GoalEntry) -> Result<(), AxError> + Send;
+
+impl GoalBooking {
+    /// `ask`'s refusal reaches the model unchanged.
+    #[must_use]
+    pub fn new(ask: impl FnMut(&GoalEntry) -> Result<(), AxError> + Send + 'static) -> GoalBooking {
+        GoalBooking(Box::new(ask))
+    }
 }
 
-/// The run's side of the goal register: what the city already holds,
-/// plus what this run has claimed that the ledger does not know yet.
+impl std::fmt::Debug for GoalBooking {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("GoalBooking")
+    }
+}
+
+/// The run's side of the goal register: who registers, the ids it mints,
+/// and the authority that decides each registration.
 #[derive(Debug)]
 pub struct GoalDesk {
     run: RunId,
     owner: String,
-    registered: Vec<GoalEntry>,
-    effects: Vec<GoalEffect>,
     minted: u32,
+    booking: GoalBooking,
 }
 
 impl GoalDesk {
     #[must_use]
-    pub fn new(run: RunId, owner: String, registered: Vec<GoalEntry>) -> GoalDesk {
+    pub fn new(run: RunId, owner: String, booking: GoalBooking) -> GoalDesk {
         GoalDesk {
             run,
             owner,
-            registered,
-            effects: Vec::new(),
             minted: 0,
+            booking,
         }
-    }
-
-    /// What the worker has to record, drained so it cannot be recorded
-    /// twice.
-    pub fn take_effects(&mut self) -> Vec<GoalEffect> {
-        std::mem::take(&mut self.effects)
     }
 
     fn mint(&mut self) -> Result<GoalId, AxError> {
@@ -111,27 +121,25 @@ impl GoalDesk {
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
         };
-        match arbitrate(&self.registered, &entry) {
-            None => {
-                let mut result = Map::new();
-                result.insert("id".to_owned(), Value::String(entry.id.as_str().to_owned()));
-                result.insert("registered".to_owned(), Value::Bool(true));
-                self.registered.push(entry.clone());
-                self.effects.push(GoalEffect::Registered(entry));
-                Payload::new(result)
-            }
-            Some(level) => {
-                let refusal = AxError::failure(
-                    AxCode::GoalConflict,
-                    "register a goal",
-                    entry.statement.clone(),
-                )
-                .with_recovery(next_move(&level));
-                self.effects.push(GoalEffect::Conflicted { entry, level });
-                Err(refusal)
-            }
-        }
+        (self.booking.0)(&entry)?;
+        let mut result = Map::new();
+        result.insert("id".to_owned(), Value::String(entry.id.as_str().to_owned()));
+        result.insert("registered".to_owned(), Value::Bool(true));
+        Payload::new(result)
     }
+}
+
+/// The refusal a model is handed when `entry` clashes: `E_GOAL_CONFLICT`,
+/// with the one move the level that decides the clash leaves it. Spelled
+/// here alone, so the authority that arbitrates says it the one way.
+#[must_use]
+pub fn conflict_refusal(entry: &GoalEntry, level: &Level) -> AxError {
+    AxError::failure(
+        AxCode::GoalConflict,
+        "register a goal",
+        entry.statement.clone(),
+    )
+    .with_recovery(next_move(level))
 }
 
 /// The third part of the refusal: one thing to do, named after the level
@@ -286,14 +294,23 @@ fn strings(args: &Map<String, Value>, key: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
-    fn tool(registered: Vec<GoalEntry>) -> (GoalTool, Arc<Mutex<GoalDesk>>) {
+    /// A goal tool whose authority is a register held in the test: it
+    /// arbitrates as the accounting thread does and keeps what it takes.
+    fn tool(registered: Vec<GoalEntry>) -> GoalTool {
+        let mut held = registered;
+        let booking = GoalBooking::new(move |entry| match crate::arbitrate(&held, entry) {
+            None => {
+                held.push(entry.clone());
+                Ok(())
+            }
+            Some(level) => Err(conflict_refusal(entry, &level)),
+        });
         let desk = Arc::new(Mutex::new(GoalDesk::new(
             RunId::CITY,
             "potter@lab.1".to_owned(),
-            registered,
+            booking,
         )));
-        let tool = GoalTool::new(Address::parse("lab/room1").unwrap(), Arc::clone(&desk)).unwrap();
-        (tool, desk)
+        GoalTool::new(Address::parse("lab/room1").unwrap(), desk).unwrap()
     }
 
     fn call(args: Value) -> ToolCall {
@@ -316,7 +333,7 @@ mod tests {
 
     #[test]
     fn a_clear_claim_registers_and_the_next_one_in_the_same_run_sees_it() {
-        let (tool, desk) = tool(Vec::new());
+        let tool = tool(Vec::new());
         tool.invoke(&call(serde_json::json!({
             "statement": "rewrite the notes",
             "paths": ["lab/room1/notes.md"],
@@ -326,19 +343,16 @@ mod tests {
             "statement": "rewrite them again",
             "paths": ["lab/room1/notes.md"],
         })));
-        assert!(
-            second.is_err(),
+        assert_eq!(
+            second.map_err(|refusal| *refusal.code()).err(),
+            Some(AxCode::GoalConflict),
             "a run that could claim the same ground twice would not be claiming anything"
         );
-        let effects = desk.lock().unwrap().take_effects();
-        assert_eq!(effects.len(), 2);
-        assert!(matches!(effects[0], GoalEffect::Registered(_)));
-        assert!(matches!(effects[1], GoalEffect::Conflicted { .. }));
     }
 
     #[test]
     fn a_claim_on_held_ground_is_refused_with_the_level_that_decides_it() {
-        let (tool, _desk) = tool(vec![held("g-held", "lab/room1", true)]);
+        let tool = tool(vec![held("g-held", "lab/room1", true)]);
         let refusal = tool
             .invoke(&call(serde_json::json!({
                 "statement": "repaint the room",
@@ -357,7 +371,7 @@ mod tests {
 
     #[test]
     fn a_reading_that_no_machine_can_do_goes_to_a_resident_not_to_the_person() {
-        let (tool, _desk) = tool(vec![held("g-held", "lab/room1", true)]);
+        let tool = tool(vec![held("g-held", "lab/room1", true)]);
         let refusal = tool
             .invoke(&call(serde_json::json!({
                 "statement": "also keep the kiln",
@@ -374,7 +388,7 @@ mod tests {
 
     #[test]
     fn a_goal_that_claims_nothing_is_refused() {
-        let (tool, _desk) = tool(Vec::new());
+        let tool = tool(Vec::new());
         let refusal = tool
             .invoke(&call(serde_json::json!({ "statement": "be helpful" })))
             .unwrap_err();
