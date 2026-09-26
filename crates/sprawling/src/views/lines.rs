@@ -258,8 +258,8 @@ mod tests {
     use kernel::Address;
 
     /// A value no file states is still answered, with the default named
-    /// as the layer it came from; a page told `null` has to keep its own
-    /// copy of the default to draw anything.
+    /// as the layer it came from and the domain a file may state; a page
+    /// told `null` has to keep its own copy of both to draw anything.
     #[test]
     fn an_unstated_second_rung_is_answered_with_the_default_as_its_layer() {
         let dir = tempfile::tempdir().unwrap();
@@ -270,6 +270,10 @@ mod tests {
             Some(&serde_json::json!({
                 "percent": kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT,
                 "from": "default",
+                "domain": {
+                    "min": kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
+                    "max": kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
+                },
             }))
         );
     }
