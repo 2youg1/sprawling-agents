@@ -59,7 +59,7 @@ pub(crate) struct SseServer {
     messages: String,
     headers: Arc<Vec<Redeemed>>,
     client: reqwest::blocking::Client,
-    events: Arc<Mutex<Receiver<String>>>,
+    events: Arc<Mutex<Receiver<Result<String, AxError>>>>,
 }
 
 impl std::fmt::Debug for SseServer {
@@ -85,24 +85,30 @@ impl SseServer {
         headers: &[(String, String)],
         resolve: &gateway::SecretResolver,
     ) -> Result<SseServer, AxError> {
+        SseServer::open_within(url, headers, resolve, ANNOUNCEMENT_PATIENCE)
+    }
+
+    /// [`SseServer::open`] with the announcement's deadline named, so a
+    /// test can wait on a stream for less than the fifteen seconds a
+    /// person is given.
+    fn open_within(
+        url: &str,
+        headers: &[(String, String)],
+        resolve: &gateway::SecretResolver,
+        announcement: Duration,
+    ) -> Result<SseServer, AxError> {
         let headers = Arc::new(redeem(headers, resolve, "reach an mcp server")?);
         let client = client_for(url)?;
-        let mut request = client
-            .get(url)
-            .header("accept", "text/event-stream")
-            .timeout(ANNOUNCEMENT_PATIENCE);
+        // No request-level timeout: reqwest counts it until the body is
+        // read to the end, and this body is the whole conversation.
+        let mut request = client.get(url).header("accept", "text/event-stream");
         for header in headers.iter() {
             request = request.header(header.name(), header.plaintext());
         }
-        let response = request.send().map_err(|err| unreachable(url, &err))?;
-        let status = response.status().as_u16();
-        if !(200..300).contains(&status) {
-            return Err(refused(url, status));
-        }
-        let events = read_in_a_thread(url, response)?;
+        let events = read_in_a_thread(url, request)?;
         let announced = events
-            .recv_timeout(ANNOUNCEMENT_PATIENCE)
-            .map_err(|_| silent(url))?;
+            .recv_timeout(announcement)
+            .map_err(|_| silent(url))??;
         let messages = resolved_against(url, &announced)?;
         Ok(SseServer {
             messages,
@@ -167,7 +173,7 @@ impl protocol::Outbound for SseServer {
                     format!("{}: the stream ended", self.messages),
                 )
                 .with_recovery("the server closed the stream; dispatch again to open a new one"),
-            })
+            })?
     }
 
     /// A notification is posted and nothing is read back, because the
@@ -177,20 +183,36 @@ impl protocol::Outbound for SseServer {
     }
 }
 
-/// The reader thread: one `data:` line at a time, onto a channel this
-/// side can wait on with a deadline.
+/// The reader thread: it opens the stream, then passes one `data:` line
+/// at a time onto a channel this side can wait on with a deadline.
+///
+/// Opening happens on the thread so that a server that accepts the
+/// connection and never answers is bounded by the deadline this side
+/// waits with, not by a timeout on the request that would also end the
+/// stream. A stream that cannot be opened sends its refusal as the
+/// first and only message.
 ///
 /// Comments, event names and the reconnection hints of the event-stream
 /// grammar are dropped rather than parsed: this transport carries JSON
 /// messages, and every one of them is a `data:` line.
 fn read_in_a_thread(
     url: &str,
-    response: reqwest::blocking::Response,
-) -> Result<Receiver<String>, AxError> {
+    request: reqwest::blocking::RequestBuilder,
+) -> Result<Receiver<Result<String, AxError>>, AxError> {
     let (sender, events) = std::sync::mpsc::channel();
+    let opened_at = url.to_owned();
     std::thread::Builder::new()
         .name("mcp-sse".to_owned())
         .spawn(move || {
+            let response = match opened(&opened_at, request) {
+                Ok(response) => response,
+                Err(refusal) => {
+                    // Nobody may be waiting any more; the refusal has
+                    // then been reported as silence already.
+                    drop(sender.send(Err(refusal)));
+                    return;
+                }
+            };
             for line in std::io::BufReader::new(response).lines() {
                 // Either end finishing ends the reader: a closed stream
                 // means the server is gone, and a closed channel means
@@ -199,7 +221,7 @@ fn read_in_a_thread(
                 let Some(data) = text.strip_prefix("data:") else {
                     continue;
                 };
-                if sender.send(data.trim().to_owned()).is_err() {
+                if sender.send(Ok(data.trim().to_owned())).is_err() {
                     break;
                 }
             }
@@ -213,6 +235,18 @@ fn read_in_a_thread(
             .with_recovery("the machine refused a thread to read this server's stream")
         })?;
     Ok(events)
+}
+
+fn opened(
+    url: &str,
+    request: reqwest::blocking::RequestBuilder,
+) -> Result<reqwest::blocking::Response, AxError> {
+    let response = request.send().map_err(|err| unreachable(url, &err))?;
+    let status = response.status().as_u16();
+    if (200..300).contains(&status) {
+        return Ok(response);
+    }
+    Err(refused(url, status))
 }
 
 /// Where messages go, from what the stream announced.
@@ -255,6 +289,10 @@ fn client_for(url: &str) -> Result<reqwest::blocking::Client, AxError> {
         // behind a content delivery network refuses a client that will
         // not say what it is.
         .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")))
+        // The blocking client's default whole-request timeout (30 s)
+        // would end the stream as surely as a request-level one; every
+        // post names its own patience instead.
+        .timeout(None)
         .build()
         .map_err(|err| {
             AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
@@ -320,41 +358,4 @@ fn unreachable(url: &str, err: &reqwest::Error) -> AxError {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::*;
-
-    /// A path is what a server behind a proxy announces, and it is
-    /// resolved against the address this city actually reached.
-    #[test]
-    fn an_announced_path_is_resolved_against_the_streams_own_address() {
-        assert_eq!(
-            resolved_against("https://example.test/sse", "/messages?sessionId=7").unwrap(),
-            "https://example.test/messages?sessionId=7"
-        );
-    }
-
-    /// A whole url is taken as it stands: a server that names another
-    /// host means that host.
-    #[test]
-    fn an_announced_url_is_taken_as_it_stands() {
-        assert_eq!(
-            resolved_against("https://example.test/sse", "https://other.test/messages").unwrap(),
-            "https://other.test/messages"
-        );
-    }
-
-    /// A server that answers 401 is up, understood the request and wants
-    /// an account. That is a different answer from a server that is
-    /// down, and the code says so.
-    #[test]
-    fn a_server_wanting_an_account_refuses_with_the_credential_code() {
-        assert_eq!(
-            refused("https://example.test/sse", 401).code(),
-            &AxCode::CredentialMissing
-        );
-        assert_eq!(
-            refused("https://example.test/sse", 502).code(),
-            &AxCode::ToolUnavailable
-        );
-    }
-}
+mod tests;
