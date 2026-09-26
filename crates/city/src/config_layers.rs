@@ -210,7 +210,7 @@ impl ConfigLayer {
             sandbox,
             mcp,
             second_threshold,
-            keep_warm: None,
+            keep_warm: file.cache.map(|section| section.keep_warm),
             // The paths are kept as written: turning `~` into a
             // directory needs this person's home, which is not this
             // module's to read, and a value stored half-resolved would
