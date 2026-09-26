@@ -33,6 +33,7 @@
 import { get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
+import { EDITORS, type Opening } from "./editor";
 import type { Lang } from "./lang";
 import { langOf } from "./lang";
 import { browserRows } from "./rows";
@@ -75,6 +76,8 @@ const ROWS = {
   // One chord per action the person rebound; the rest of the name is
   // the action. An action left at its shipped chord has no row.
   chord: "sprawling.key.",
+  editor: "sprawling.editor",
+  cityFolder: "sprawling.editor.folder",
 } as const;
 
 // ------------------------------------------------------------ appearance
@@ -229,6 +232,9 @@ export interface PreferenceDoor {
   // the box that owns it reads it once when it mounts.
   readonly draft: (at: string) => string;
   readonly setDraft: (at: string, text: string) => void;
+  // Facts of the machine this browser runs on, never the city's (client-SPEC 4-39).
+  readonly editor: () => Pick<Opening, "editor" | "folder">;
+  readonly setEditor: (next: Pick<Opening, "editor" | "folder">) => void;
 }
 
 // A stored word, or the posture this client ships with when the row is
@@ -367,6 +373,14 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
       } else {
         rows.setItem(ROWS.draft + at, text);
       }
+    },
+    editor: () => ({
+      editor: readOne(EDITORS, rows.getItem(ROWS.editor), "none"),
+      folder: rows.getItem(ROWS.cityFolder) ?? "",
+    }),
+    setEditor(next) {
+      rows.setItem(ROWS.editor, next.editor);
+      rows.setItem(ROWS.cityFolder, next.folder);
     },
   };
 }
