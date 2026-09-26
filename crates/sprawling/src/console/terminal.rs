@@ -151,14 +151,14 @@ pub(crate) fn start(
     terminal: Terminal,
     desk: Arc<crate::serving::CommandDesk>,
     answering: Answering,
-    mut watching: tokio::sync::broadcast::Receiver<kernel::EventRecord>,
+    mut watching: tokio::sync::broadcast::Receiver<channels::Committed>,
 ) {
     // What happened, printed as it happens, one JSON object per line -
     // the same shape `sprawling call` prints, because a second rendering
     // would be a second description of every event kind.
     std::thread::spawn(move || {
-        while let Ok(record) = watching.blocking_recv() {
-            if let Ok(text) = serde_json::to_string(&record) {
+        while let Ok(committed) = watching.blocking_recv() {
+            if let Ok(text) = serde_json::to_string(committed.record()) {
                 println!("{text}");
             }
         }

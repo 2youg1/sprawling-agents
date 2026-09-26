@@ -354,8 +354,12 @@ impl Stream {
     #[must_use]
     pub(crate) fn before(self, next: Seq) -> (Option<Lagged>, Stream) {
         let lag = match self {
-            Stream::Even(_) => None,
-            Stream::Owed(delivered) => decide_lag(delivered, next),
+            // A record that never reached the broadcast leaves only a gap
+            // in `seq`; before anything was delivered there is no gap.
+            Stream::Even(None) => None,
+            Stream::Even(delivered @ Some(_)) | Stream::Owed(delivered) => {
+                decide_lag(delivered, next)
+            }
         };
         (lag, Stream::Even(Some(next)))
     }

@@ -40,8 +40,9 @@ pub struct Journal {
 impl Journal {
     #[must_use]
     pub fn new() -> Journal {
-        let (lines, _watching) = tokio::sync::broadcast::channel(DEPTH);
-        Journal { lines }
+        Journal {
+            lines: tokio::sync::broadcast::Sender::new(DEPTH),
+        }
     }
 
     /// The sink a `Diagnostics` is built with: every admitted line to

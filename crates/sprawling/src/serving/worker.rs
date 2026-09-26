@@ -135,12 +135,12 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // The event fan-out, and the one writer that feeds it. The worker
     // owns the ledger, so a city has a single writer no matter how many
     // tabs are open; the socket tasks only read from the broadcast.
-    let (events, _first) = tokio::sync::broadcast::channel(1024);
+    let events = tokio::sync::broadcast::Sender::new(1024);
     // Increments, on their own channel. Smaller and separate: an
     // increment nobody received is nothing, and sharing the event
     // channel would let a talkative model push records out of a slow
     // reader's window.
-    let (deltas, _watching) = tokio::sync::broadcast::channel(256);
+    let deltas = tokio::sync::broadcast::Sender::new(256);
     // The process log, on the third channel. Its sender was made before
     // the `Diagnostics` was, because the sink is what writes into it.
     let logs = journal.lines();

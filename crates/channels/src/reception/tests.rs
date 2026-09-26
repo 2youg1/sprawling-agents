@@ -253,6 +253,24 @@ fn a_skip_is_reported_once_and_the_debt_settles_at_the_next_record() {
     );
 }
 
+/// A record that never reached the broadcast leaves no `Lagged` on the
+/// subscription; the gap in `seq` is the only trace, and it is owed.
+#[test]
+fn a_seq_gap_with_nothing_skipped_is_owed_as_a_range() {
+    let (_, delivered) = Stream::opening().before(Seq::new(7));
+    let (lag, settled) = delivered.before(Seq::new(9));
+    assert_eq!(
+        (lag, settled),
+        (
+            Some(Lagged {
+                from: Seq::new(8),
+                to: Seq::new(8)
+            }),
+            Stream::Even(Some(Seq::new(9)))
+        )
+    );
+}
+
 #[test]
 fn a_session_that_has_not_been_welcomed_owes_no_range() {
     // Its view begins at the welcome; what a page needs of what came

@@ -83,7 +83,7 @@ pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
 pub use server::{AcpProgress, AcpSink, TranscribeSink};
 #[cfg(feature = "server")]
-pub use server::{Bound, Delivered, Reply, ServeConfig, bind, router, serve};
+pub use server::{Bound, Committed, Delivered, Reply, ServeConfig, bind, router, serve};
 #[cfg(feature = "schema")]
 pub use wire::wire_schema;
 pub use wire::{ClientFrame, Delta, ServerFrame};

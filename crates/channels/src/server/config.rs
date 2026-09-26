@@ -25,7 +25,7 @@ use axum::http::{StatusCode, header};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{MethodRouter, get, post};
-use kernel::{Address, AxError, EventRecord, Sealed};
+use kernel::{Address, AxError, Sealed};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
@@ -35,6 +35,7 @@ use crate::command::{Command, WireCommand};
 use crate::reception::{Admission, BindFace, Door, Pairing, decide_admission, offered_pairing};
 use crate::wire::Query;
 
+use super::committed::Committed;
 use super::reply::{Reply, refusal_text};
 
 mod enrolment;
@@ -91,7 +92,7 @@ pub struct ServeConfig {
     pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync>,
     /// The event fan-out. This crate only subscribes; the writer is
     /// whoever owns the Ledger, because the ledger line is the event.
-    pub events: broadcast::Sender<EventRecord>,
+    pub events: broadcast::Sender<Committed>,
     /// What a model is saying, while it is still saying it.
     ///
     /// A second channel rather than a second variant on the first,
@@ -125,7 +126,7 @@ pub struct ServeConfig {
 pub(crate) struct ShellState {
     pub(crate) client: Arc<ClientAssets>,
     pub(crate) commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync>,
-    pub(crate) events: broadcast::Sender<EventRecord>,
+    pub(crate) events: broadcast::Sender<Committed>,
     pub(crate) deltas: broadcast::Sender<crate::wire::Delta>,
     pub(crate) logs: broadcast::Sender<crate::wire::LogLine>,
     pub(crate) queries: Arc<dyn Fn(Query) -> Result<Answer, AxError> + Send + Sync>,

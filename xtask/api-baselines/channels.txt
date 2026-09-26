@@ -2,6 +2,7 @@ impl channels::Aggregate
 impl channels::BindFace
 impl channels::CityLabel
 impl channels::ClientAssets
+impl channels::Committed
 impl channels::Intervention
 impl channels::Note
 impl channels::PairingToken
@@ -721,7 +722,7 @@ pub channels::ServeConfig::city: core::option::Option<kernel::address::Address>
 pub channels::ServeConfig::client: alloc::sync::Arc<channels::ClientAssets>
 pub channels::ServeConfig::commands: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::WireCommand, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::deltas: tokio::sync::broadcast::Sender<channels::Delta>
-pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<kernel::event::payload::EventRecord>
+pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<channels::Committed>
 pub channels::ServeConfig::logs: tokio::sync::broadcast::Sender<channels::LogLine>
 pub channels::ServeConfig::queries: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Query) -> core::result::Result<channels::Answer, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::secrets: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Command<kernel::secret::sealed::Sealed<alloc::string::String>>, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
@@ -893,6 +894,8 @@ pub fn channels::ClientAssets::lookup(&self, &str) -> channels::AssetReply
 pub fn channels::Command::from(channels::WireCommand) -> Self
 pub fn channels::Command<Secret>::idem(&self) -> core::option::Option<&kernel::idem::IdemKey>
 pub fn channels::Command<Secret>::name(&self) -> &'static str
+pub fn channels::Committed::new(kernel::event::payload::EventRecord) -> core::result::Result<channels::Committed, kernel::error::shape::AxError>
+pub fn channels::Committed::record(&self) -> &kernel::event::payload::EventRecord
 pub fn channels::Intervention::as_str(self) -> &'static str
 pub fn channels::NoSecret::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn channels::NoSecret::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
@@ -952,6 +955,7 @@ pub struct channels::CityLabel(_)
 pub struct channels::Closing
 pub struct channels::CommitAnswer
 pub struct channels::CommitsAnswer
+pub struct channels::Committed
 pub struct channels::ConfigAnswer
 pub struct channels::ContentAnswer
 pub struct channels::CostAnswer

@@ -116,7 +116,8 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
                 let reference = place.to_string();
                 match worker_of(&worker) {
                     Worker::Stores => {
-                        let _ = answering.send(captured(&reference));
+                        let _ =
+                            answering.send(channels::Committed::new(captured(&reference)).unwrap());
                     }
                     Worker::Refuses => {
                         let _ = reply.refuse(
