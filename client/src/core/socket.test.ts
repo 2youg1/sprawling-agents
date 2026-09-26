@@ -70,7 +70,38 @@ const realTimers = {
   clearTimeout: globalThis.clearTimeout,
   requestAnimationFrame: globalThis.requestAnimationFrame,
   WebSocket: globalThis.WebSocket,
+  document: globalThis.document,
 };
+
+// A page the browser has hidden: it never calls an animation frame, and
+// it tells the page when it is shown again through the one listener kept
+// here.
+function hide(): { show: () => void } {
+  const heard: (() => void)[] = [];
+  const page = {
+    visibilityState: "hidden",
+    documentElement: { lang: "en" },
+    addEventListener: (_type: string, listener: () => void): void => {
+      heard.push(listener);
+    },
+  };
+  Object.assign(globalThis, {
+    document: page,
+    requestAnimationFrame: (): number => 0,
+  });
+  return {
+    show: () => {
+      page.visibilityState = "visible";
+      for (const listener of heard) listener();
+    },
+  };
+}
+
+function runBooked(): void {
+  for (const entry of booked.splice(0)) {
+    if (!entry.cancelled) entry.run();
+  }
+}
 
 afterEach(() => {
   Object.assign(globalThis, realTimers);
@@ -138,5 +169,38 @@ describe("the browser half", () => {
       updates: 2,
       saying: "abc",
     });
+  });
+  // A browser stops calling animation frames in a hidden tab, so a page
+  // that drained only on a paint held every frame - an approval request
+  // included - until the person came back to the tab.
+  test("drains on a timer while the page is hidden", () => {
+    install();
+    hide();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    const first = FakeSocket.opened[0];
+    first?.onopen?.();
+    const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null };
+    first?.onmessage?.({ data: JSON.stringify({ welcome }) });
+    const run = "00000000-0000-4000-8000-000000000001";
+    first?.onmessage?.({ data: JSON.stringify({ delta: { run, increment: { said: "a" } } }) });
+    runBooked();
+
+    expect(get(conn.belief).runs[run]?.saying).toBe("a");
+  });
+
+  // A tab shown again while the ladder waits tries at once: the person is
+  // looking now, and the rung's remaining seconds are seconds of a blank
+  // page.
+  test("retries at once when a hidden page in backoff is shown", () => {
+    install();
+    const page = hide();
+    openConnection("ws://city.invalid/ws", null, "en");
+    const first = FakeSocket.opened[0];
+    first?.onopen?.();
+    first?.onclose?.();
+    page.show();
+
+    expect({ opened: FakeSocket.opened.length, waiting: booked.filter((entry) => !entry.cancelled).length })
+      .toEqual({ opened: 2, waiting: 0 });
   });
 });

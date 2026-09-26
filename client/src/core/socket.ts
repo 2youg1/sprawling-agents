@@ -83,6 +83,10 @@ export function bearing(token: string | null): Readonly<Record<string, string>> 
   return token === null ? {} : { authorization: `Bearer ${token}` };
 }
 
+function hidden(): boolean {
+  return typeof document !== "undefined" && document.visibilityState === "hidden";
+}
+
 // The address of this city's socket, derived from the page's own origin:
 // a client served by the city it talks to needs no configured endpoint.
 export function socketUrl(location: Location): string {
@@ -325,7 +329,10 @@ export function openConnection(
       queue.push(frame);
       if (!scheduled) {
         scheduled = true;
-        requestAnimationFrame(drain);
+        // A hidden tab is never painted, so it drains on a timer instead;
+        // otherwise an approval request waits for the person to come back.
+        if (hidden()) setTimeout(drain, 0);
+        else requestAnimationFrame(drain);
       }
     };
     const closed = () => {
@@ -336,6 +343,19 @@ export function openConnection(
     opened.onclose = closed;
     opened.onerror = closed;
   }
+
+  // Either way the queue drains now: going hidden, the paint it waits
+  // for will not come, and shown again, the person is looking. Shown, the
+  // ladder's wait is spent too - `wait_elapsed` is the machine's own door
+  // back to `opening`, and it opens only from backoff.
+  function visibilityChanged(): void {
+    if (queue.length > 0) drain();
+    if (hidden() || reconnect === null) return;
+    clearTimeout(reconnect);
+    reconnect = null;
+    step({ kind: "wait_elapsed" });
+  }
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibilityChanged);
 
   const [begun, first] = start(link);
   link = begun;
