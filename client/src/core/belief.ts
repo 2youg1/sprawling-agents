@@ -21,7 +21,7 @@ import type { Readable } from "svelte/store";
 import { readProbed } from "./probed";
 import { PHASES, moves } from "./doing";
 import type { Doing } from "./doing";
-import { completionOf, haltOf, sessionStart, taskOf, toolCall } from "./reading";
+import { askOf, branchOf, completionOf, haltOf, sessionStart, taskOf, toolCall } from "./reading";
 import { sameScope } from "./scope";
 
 import { CITY_RUN, Seq, TimeMs } from "../wire";
@@ -40,16 +40,19 @@ function unseen(run: RunId, at: Seq): RunBelief {
     task: null,
     lastSeq: at,
     doing: { kind: "unknown" },
+    pr: null,
+    ask: null,
     local: true,
     saying: "",
     thinking: "",
   };
 }
 
-// What an answer says a frozen run's ending was. The completion is the
-// record's, and an answer carries none, so a run this page never
-// streamed is frozen with nothing to cite.
-function frozen(held: RunBelief | undefined): Doing {
+// What an answer says a frozen run's ending was: the completion it
+// names, else the one this page folded, else an ending nobody stated.
+function frozen(summary: RunSummary, held: RunBelief | undefined): Doing {
+  const completion = summary.completion ?? null;
+  if (completion !== null) return { kind: "frozen", completion };
   return held?.doing.kind === "frozen" ? held.doing : PHASES.run_frozen;
 }
 
@@ -63,7 +66,8 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
   // row's to state, and the answer settles nothing else but that.
   if (held !== undefined && held.lastSeq >= summary.last_seq) {
     const at = held.started ?? summary.started ?? null;
-    return { ...held, addr: held.addr ?? summary.addr ?? null, started: at, local: false };
+    const pr = held.pr ?? summary.pr ?? null;
+    return { ...held, addr: held.addr ?? summary.addr ?? null, started: at, pr, local: false };
   }
   // The answer is the newer reading. Its `last_kind` states the phase
   // where the kind does; a kind that states none leaves what the page
@@ -76,7 +80,9 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
     started: summary.started ?? held?.started ?? null,
     task: held?.task ?? null,
     lastSeq: summary.last_seq,
-    doing: summary.frozen ? frozen(held) : (stated ?? held?.doing ?? { kind: "unknown" }),
+    doing: summary.frozen ? frozen(summary, held) : (stated ?? held?.doing ?? { kind: "unknown" }),
+    pr: summary.pr ?? held?.pr ?? null,
+    ask: summary.ask ?? null,
     local: false,
     saying: held?.saying ?? "",
     thinking: held?.thinking ?? "",
@@ -86,7 +92,8 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
 // One record forward, answering the run it produced and the name of the
 // first field in it this build could not read.
 function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] {
-  const moved: RunBelief = { ...held, lastSeq: record.seq };
+  // Every record ends the ask; only the request itself states one.
+  const moved: RunBelief = { ...held, lastSeq: record.seq, ask: null };
   switch (record.kind) {
     case "run_started": {
       const [task, bad] = taskOf(record);
@@ -114,8 +121,14 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     }
     case "tool_result":
       return [{ ...moved, doing: PHASES.tool_result }, null];
-    case "approval_requested":
-      return [{ ...moved, doing: PHASES.approval_requested }, null];
+    case "approval_requested": {
+      const [ask, bad] = askOf(record);
+      return [{ ...moved, doing: PHASES.approval_requested, ask }, bad];
+    }
+    case "pr_opened": {
+      const [pr, bad] = branchOf(record);
+      return [{ ...moved, pr }, bad];
+    }
     case "run_frozen": {
       const [completion, bad] = completionOf(record);
       return [
@@ -145,7 +158,7 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
     case "draft_resolved": case "goal_registered": case "goal_conflict":
     case "arbitration_verdict": case "pursuit_changed": case "repair_started":
     case "repair_reused": case "worktree_opened": case "checkpoint_committed":
-    case "handoff_written": case "pr_opened": case "pr_merged":
+    case "handoff_written": case "pr_merged":
     case "pr_rejected": case "roadmap_claimed": case "roadmap_finished":
     case "roadmap_released": case "roadmap_split": case "roadmap_blocked":
     case "endpoint_attached": case "endpoint_lost": case "endpoint_probed":

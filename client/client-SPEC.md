@@ -407,7 +407,8 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 ### 12-3 只看结果模式里，人取消的 run 不进任何一类
 
 - **决策**：`outcomeOf` 把 `completion = done` 记为刚完成，`cancelled` 不列，未名的结局（`completion = null`）记为「已结束」，其余冻结（`limit` 与此后新增的词）记为失败；在跑的 run 不列。
-- **理由**：前三类是人要处理的东西。取消是人自己做的，结果他已知道。`RunSummary` 不带 completion，页面重载后从 `CityAnswer` 得知的每个冻结 run 都是未名结局；把它们记为失败会把完成了的 run 说成失败，所以它们单列一类，不声称不知道的结局。
-- **重开参数（已结束）**：`RunSummary` 带上 completion 且 `belief.adopted` 填入它时，「已结束」只剩真正未名的结局，届时可以重议它是否并入失败。
+- **理由**：前三类是人要处理的东西。取消是人自己做的，结果他已知道。`belief.adopted` 把 `RunSummary.completion` 填进冻结的 run，所以重载后结局照旧；「已结束」只剩流与答都没看到 `run_frozen` 的 run（热视图只见一段尾巴时），把它们记为失败会把完成了的 run 说成失败，所以单列一类，不声称不知道的结局。
+- **重开参数（已结束）**：服务端的热视图总能看到每个 run 的 `run_frozen` 时，「已结束」永远为空，可以删去这一类。
+- **一行末尾写什么**：刚完成写产出与 `RunBelief.pr`（PR 以分支为名，城里的 PR 没有编号）；等你写 `RunBelief.ask`（`approval_requested` 的 `action_desc`，下一条记录即清空，与 `RunSummary.ask` 同一规则）；失败写 completion。
 - **被击败的备选**：把取消也记为失败——会把人自己的动作当成要他处理的事，挤掉真正失败的前 N 条。
 - **重开参数**：取消可以由人以外的一方发起（例如预算或上级 run 撤回）时，那部分取消应当按失败列出。

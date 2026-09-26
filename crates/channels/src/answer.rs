@@ -102,6 +102,15 @@ pub struct RunSummary {
     pub addr: Option<Address>,
     /// When the run began, from the same record.
     pub started: Option<TimeMs>,
+    /// How the run ended, as its `run_frozen` record says. Absent while
+    /// it runs, and when the view never saw the freeze.
+    pub completion: Option<String>,
+    /// The branch of the last pull request the run opened; a pull
+    /// request in the city is named by its branch and has no number.
+    pub pr: Option<String>,
+    /// What the run waits for the person to allow. Present exactly when
+    /// `last_kind` is `approval_requested`.
+    pub ask: Option<String>,
 }
 
 /// What the settings page reads back: what is attached, and what each

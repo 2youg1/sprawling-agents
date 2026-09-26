@@ -34,6 +34,8 @@ function runAt(index: number): RunBelief {
     task: `task ${String(index)}`,
     lastSeq: Seq.make(1),
     doing: POSTURES[index % POSTURES.length] ?? { kind: "unknown" },
+    pr: null,
+    ask: null,
     local: false,
     saying: "",
     thinking: "",

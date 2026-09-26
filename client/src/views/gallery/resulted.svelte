@@ -22,7 +22,7 @@
   function record(index: number, at: number, kind: EventKind, data: Record<string, unknown>): EventRecord {
     return {
       run: RunId.make(`0199c0de-0000-4000-8000-${index.toString(16).padStart(12, "0")}`),
-      seq: Seq.make(index * 2 + (kind === "run_started" ? 1 : 2)),
+      seq: Seq.make(index * 3 + (kind === "run_started" ? 1 : kind === "pr_opened" ? 2 : 3)),
       kind,
       t: TimeMs.make(at),
       who: "city",
@@ -36,8 +36,8 @@
   // Each run starts some minutes ago; then it asks, stops short,
   // finishes or keeps going.
   const ENDINGS: readonly (readonly [number, EventKind, Record<string, unknown>] | null)[] = [
-    [1, "approval_requested", {}],
-    [52, "approval_requested", {}],
+    [1, "approval_requested", { action_desc: "run cargo publish --dry-run outside the sandbox" }],
+    [52, "approval_requested", { action_desc: "send a request to api.github.com" }],
     [3, "run_frozen", { completion: "limit" }],
     [70, "run_frozen", { completion: "failed" }],
     ...[2, 8, 14, 33, 47, 95, 130, 180].map((ago): readonly [number, EventKind, Record<string, unknown>] => [
@@ -48,11 +48,22 @@
     null,
   ];
 
+  // The finished runs that opened a pull request, by their index above.
+  const PULLED: ReadonlyMap<number, string> = new Map([
+    [4, "ledger-composer"],
+    [7, "glossary-dedup"],
+  ]);
+
   export function recordsAt(now: number): readonly EventRecord[] {
     return ENDINGS.flatMap((ending, index) => {
       const began = now - (ending?.[0] ?? 0) * 60_000;
       const opened = record(index, began, "run_started", { task: `task ${String(index)}` });
-      return ending === null ? [opened] : [opened, record(index, began + 30_000, ending[1], ending[2])];
+      if (ending === null) return [opened];
+      const ended = record(index, began + 30_000, ending[1], ending[2]);
+      const pr = PULLED.get(index);
+      return pr === undefined
+        ? [opened, ended]
+        : [opened, record(index, began + 20_000, "pr_opened", { branch: pr }), ended];
     });
   }
 

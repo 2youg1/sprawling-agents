@@ -244,5 +244,8 @@ pub(crate) fn summarize(run: RunId, hot: &memory::RunHot) -> channels::RunSummar
         last_kind: hot.last_kind,
         addr: hot.addr.clone(),
         started: hot.started,
+        completion: hot.completion.clone(),
+        pr: hot.pr.clone(),
+        ask: hot.ask.clone(),
     }
 }

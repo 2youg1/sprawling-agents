@@ -28,10 +28,9 @@ export const SHOWINGS: readonly Showing[] = ["whole", "results"];
 // them. A run still working, and a run the person cancelled themselves,
 // is none of these: the first has no result yet and the second is a
 // result the person already knows.
-// A run that froze without naming how is "ended": the city answer never
-// names the ending (RunSummary carries no completion), so after a reload
-// every frozen run the page did not stream arrives that way, and calling
-// it failed would claim what nobody reported.
+// A run that froze without naming how is "ended": neither the stream nor
+// the city answer saw its `run_frozen` record, and calling it failed
+// would claim what nobody reported.
 export type Outcome = "waiting" | "failed" | "done" | "ended";
 export const OUTCOMES: readonly Outcome[] = ["waiting", "failed", "done", "ended"];
 

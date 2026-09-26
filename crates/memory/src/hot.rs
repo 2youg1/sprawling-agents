@@ -78,6 +78,23 @@ impl RunHot {
             self.addr = record.addr().cloned();
             self.started = Some(record.t());
         }
+        let stated = |field: &str| {
+            record
+                .data()
+                .as_map()
+                .get(field)
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        };
+        if kind == EventKind::RunFrozen {
+            self.completion = stated("completion");
+        }
+        if kind == EventKind::PrOpened {
+            self.pr = stated("branch");
+        }
+        self.ask = (kind == EventKind::ApprovalRequested)
+            .then(|| stated("action_desc"))
+            .flatten();
     }
 }
 
@@ -240,7 +257,10 @@ mod tests {
 
     fn stating(run: RunId, seq: u64, kind: EventKind, field: &str, value: &str) -> EventRecord {
         let mut data = serde_json::Map::new();
-        data.insert(field.to_owned(), serde_json::Value::String(value.to_owned()));
+        data.insert(
+            field.to_owned(),
+            serde_json::Value::String(value.to_owned()),
+        );
         let draft = EventDraft {
             run,
             t: TimeMs::new(seq),
@@ -261,13 +281,25 @@ mod tests {
         let mut view = HotView::new();
         let run = RunId::from_bytes([5u8; 16]);
         view.apply(&record(run, 0, EventKind::RunStarted)).unwrap();
-        view.apply(&stating(run, 1, EventKind::ApprovalRequested, "action_desc", "publish"))
-            .unwrap();
+        view.apply(&stating(
+            run,
+            1,
+            EventKind::ApprovalRequested,
+            "action_desc",
+            "publish",
+        ))
+        .unwrap();
         assert_eq!(view.get(&run).unwrap().ask.as_deref(), Some("publish"));
         view.apply(&record(run, 2, EventKind::ToolCalled)).unwrap();
         assert_eq!(view.get(&run).unwrap().ask, None, "the run moved on");
-        view.apply(&stating(run, 3, EventKind::PrOpened, "branch", "gate-btree"))
-            .unwrap();
+        view.apply(&stating(
+            run,
+            3,
+            EventKind::PrOpened,
+            "branch",
+            "gate-btree",
+        ))
+        .unwrap();
         view.apply(&stating(run, 4, EventKind::RunFrozen, "completion", "done"))
             .unwrap();
         let hot = view.get(&run).unwrap();

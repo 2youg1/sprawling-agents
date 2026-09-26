@@ -35,8 +35,8 @@
   const listed = $derived(groups.reduce((sum, group) => sum + group.total, 0));
   const tabs = $derived<readonly Choice<Tab>[]>([
     { value: "all", label: fill(say($lang, "results_tab"), { name: say($lang, "results_all"), n: String(listed) }) },
-    // "ended" is the posture a reload leaves every frozen run in; it
-    // earns a tab only when some run is in it.
+    // "ended" is a frozen run whose ending nobody saw; it earns a tab
+    // only when some run is in it.
     ...groups
       .filter((group) => group.outcome !== "ended" || group.total > 0)
       .map((group) => ({
@@ -106,6 +106,11 @@
               <span class="min-w-0 flex-1 truncate text-body text-text">{run.task ?? run.run}</span>
               {#if outcome === "done"}
                 <Produced run={run.run} />
+                {#if run.pr !== null}
+                  <span class="shrink-0 text-text-quiet">{fill(say($lang, "results_row_pr"), { pr: run.pr })}</span>
+                {/if}
+              {:else if outcome === "waiting" && run.ask !== null}
+                <span class="min-w-0 shrink truncate text-text">{fill(say($lang, "results_row_ask"), { ask: run.ask })}</span>
               {:else if outcome === "failed" && run.doing.kind === "frozen" && run.doing.completion !== null}
                 <span class="shrink-0 text-text-quiet">{run.doing.completion}</span>
               {/if}
