@@ -2317,7 +2317,7 @@
   },
   "talk_column_effort": {
     "en": "effort",
-    "zh": "effort"
+    "zh": "强度"
   },
   "talk_column_model": {
     "en": "model",
@@ -3019,5 +3019,9 @@
   "run_doing_frozen": {
     "en": "wrapped up",
     "zh": "已收尾"
+  },
+  "bld_halt_idle": {
+    "en": "nothing is running in this building",
+    "zh": "这栋楼里没有在跑的派活"
   }
 }

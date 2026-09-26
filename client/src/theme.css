@@ -953,12 +953,16 @@ nav[data-rail] {
  * The pinned posture is not named here either, for the reason it never
  * was: the view writes the open width as a class, and a rule outside
  * every layer would overrule it. */
-nav[data-rail="glyphs"]:hover {
+/* A page picked from the opened column closes it at once: the pointer
+ * is still over the rail, and a column left open would cover the page
+ * the person just asked for. `data-tucked` holds from that click until
+ * the pointer leaves, and the view owns it. */
+nav[data-rail="glyphs"]:not([data-tucked]):hover {
   width: var(--spacing-rail-open);
   box-shadow: var(--shadow-float);
   transition-delay: 120ms;
 }
-nav[data-rail="glyphs"]:hover .rail-label {
+nav[data-rail="glyphs"]:not([data-tucked]):hover .rail-label {
   display: block;
 }
 
@@ -1131,6 +1135,13 @@ nav[data-rail="glyphs"]:hover .rail-label {
     outline: 2px solid var(--color-accent);
     outline-color: color-mix(in oklch, var(--color-accent) 60%, transparent);
     outline-offset: 2px;
+  }
+  /* An element with `tabindex="-1"` is focused only by script - a page
+   * heading taking focus after a route change, for a screen reader -
+   * and never by Tab, so a ring on it marks nothing a keyboard can
+   * reach and reads as a selected input. */
+  [tabindex="-1"]:focus-visible {
+    outline: none;
   }
   /* Text is shaped for the screen it lands on, not the one it was
    * drawn on: legibility over speed, optical sizing where the face has

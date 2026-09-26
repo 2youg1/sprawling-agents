@@ -23,13 +23,20 @@ are drawn in. -->
   const { lang } = u;
 </script>
 
-<div class="min-w-0 grow basis-[9rem]">
-  <Combobox
-    label={spec.label}
-    placeholder={spec.placeholder}
-    empty={say($lang, "part_no_match")}
-    choices={spec.choices}
-    value={spec.value}
-    onPick={spec.pick}
-  />
+<!-- The name is drawn beside the box because three boxes of the same
+shape told a sighted reader nothing about which was which; the box's
+own accessible name already carries it, so the drawn copy is hidden
+from a screen reader rather than read twice. -->
+<div class="flex min-w-0 grow basis-[9rem] items-center gap-snug">
+  <span class="shrink-0 text-note text-text-faint" aria-hidden="true">{spec.label}</span>
+  <div class="min-w-0 grow">
+    <Combobox
+      label={spec.label}
+      placeholder={spec.placeholder}
+      empty={say($lang, "part_no_match")}
+      choices={spec.choices}
+      value={spec.value}
+      onPick={spec.pick}
+    />
+  </div>
 </div>

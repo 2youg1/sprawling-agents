@@ -73,6 +73,10 @@
   // What a name does while the rail is collapsed. Written on every name
   // the rail can show, so one stylesheet rule reveals them all on hover
   // and this file decides only the pinned case.
+  // Set by a click on a page link, cleared when the pointer leaves: the
+  // stylesheet keeps the hover-opened column shut while it is set.
+  let tucked = $state(false);
+
   const label = $derived(`rail-label truncate ${posture === "named" ? "block" : "hidden"}`);
 
   const active = $derived(
@@ -118,6 +122,10 @@
 <div class="relative h-full shrink-0 transition-[width] duration-200 motion-reduce:transition-none {column}">
   <nav
     data-rail={posture}
+    data-tucked={tucked ? "" : undefined}
+    onpointerleave={() => {
+      tucked = false;
+    }}
     class={[
       "absolute inset-y-0 left-0 z-10 flex flex-col gap-tight border-r border-edge bg-chrome py-snug",
       "transition-[width] duration-200 motion-reduce:transition-none",
@@ -155,6 +163,9 @@
           <a
             href={toFragment(item.view)}
             aria-current={here(item)}
+            onclick={() => {
+              tucked = true;
+            }}
             aria-labelledby={hint}
             class="relative flex h-rail w-full items-center gap-base px-base text-label text-text-faint hover:bg-chrome hover:text-text aria-[current=page]:text-text"
           >
