@@ -39,10 +39,10 @@
 
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
-  import { CHROMAS, DENSITIES, FACES, LIGHTINGS, MOTIONS } from "../../core/prefs";
+  import { CHROMAS, DENSITIES, FACES, LIGHTINGS, MOTIONS } from "../../core/appearance";
   import { sizingOf } from "../../core/sizing";
   import { BODY_PX } from "../../wire";
-  import type { Appearance } from "../../core/prefs";
+  import type { Appearance } from "../../core/appearance";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";

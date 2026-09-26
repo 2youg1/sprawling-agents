@@ -17,7 +17,8 @@ import { get } from "svelte/store";
 
 import { QUERIES } from "./asking";
 import { putPreferences } from "./commands";
-import type { Appearance, PreferenceDoor, Preferences } from "./prefs";
+import type { Appearance } from "./appearance";
+import type { PreferenceDoor, Preferences } from "./prefs";
 import type { Connection } from "./socket";
 import type { Appearance as WireAppearance, PreferencesAnswer } from "../wire";
 
