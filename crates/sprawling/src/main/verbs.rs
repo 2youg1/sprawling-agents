@@ -163,6 +163,7 @@ pub(super) const VERBS: &[Row] = &[
                 Value("n"),
                 "how long a silence ends the answer",
             ),
+            flag("--json", Nothing, "write a refusal as one line of json"),
         ],
         says: "send one wire frame, print every frame back",
         effect: Effect::Changes,

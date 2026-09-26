@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The subcommands that move a city's data rather than stand a city up:
-//! `call`, `enrol`, `install`, `export`, `restore`, `fork`, `adopt`,
+//! `enrol`, `install`, `export`, `restore`, `fork`, `adopt`,
 //! `replay` and `status`.
 //!
 //! Each function here owns only the part a person sees — the usage
@@ -14,97 +14,24 @@
 //! `router` already read and returns an `ExitCode` instead of a value:
 //! for an agent driving this binary, the exit code is the result.
 //!
-//! Exit codes are a vocabulary rather than a habit: 0 the work was
-//! done, 1 the city or this machine refused, 2 this command line was not
-//! readable, and 3 (`call` only) nothing came back before the quiet
-//! window closed. A refusal carrying an `AxError` is printed by
-//! `city::report`, so its failure line and its recovery line have one
-//! spelling across the whole binary.
+//! Exit codes are the vocabulary `exit::Exit` defines. A refusal
+//! carrying an `AxError` is printed by `city::report`, so its failure
+//! line and its recovery line have one spelling across the whole binary.
 //!
 //! The point a reader most often gets wrong: `fork`, `adopt`, `replay`
 //! and `export` read the city directory directly and never speak to a
-//! serving process, while `call` and `enrol` speak only over the wire
-//! and never touch the directory — the two halves of this module reach
-//! the same city by routes that share nothing.
+//! serving process, while `enrol` (like `calling::call`) speaks only over
+//! the wire and never touches the directory — the two routes to the same
+//! city share nothing.
 
 use super::city::report;
 use super::grammar::Arguments;
-use super::router::{client_summary, flag_value, log_floor, log_levels};
+use super::router::{client_summary, log_floor, log_levels};
 use super::version::{check, cut};
 use super::{DEPENDENCIES, install, wire_client};
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, serving};
 use std::process::ExitCode;
-
-/// Sends one frame over the wire and prints everything that comes back.
-///
-/// An agent driving this learns the outcome from the exit code rather
-/// than by parsing JSON, and the code says exactly what was observed:
-/// 0 the city answered, 1 the city refused, 2 this command line was not
-/// readable, 3 the city said nothing before the quiet window closed.
-/// The last one is its own code because silence is not acceptance - the
-/// city may still be working - and reading it as either of the other
-/// two is how a failure becomes a success (sprawling-SPEC.md 8-41).
-pub(super) fn call(args: &[String]) -> ExitCode {
-    let Some(frame) = args.get(1).filter(|a| !a.starts_with("--")) else {
-        eprintln!(
-            "usage: sprawling call <frame-json|-> [--at host:port] [--token T] [--quiet-ms N]"
-        );
-        eprintln!("exit: 0 answered, 1 refused, 2 this command line, 3 nothing came back");
-        eprintln!("commands: {}", channels::COMMAND_NAMES.join(", "));
-        eprintln!("queries:  {}", channels::QUERY_NAMES.join(", "));
-        return ExitCode::from(2);
-    };
-    // `-` reads the frame from stdin, which is how a frame too long for
-    // one command line, or one a script generated, gets in.
-    let frame = if frame == "-" {
-        match std::io::read_to_string(std::io::stdin()) {
-            Ok(text) => text,
-            Err(err) => {
-                eprintln!("could not read the frame from stdin: {err}");
-                return ExitCode::FAILURE;
-            }
-        }
-    } else {
-        frame.clone()
-    };
-    let at = flag_value(args, "--at").unwrap_or_else(|| DEFAULT_AT.to_owned());
-    let token = flag_value(args, "--token");
-    let quiet = match flag_value(args, "--quiet-ms") {
-        None => 2_000,
-        Some(raw) => match raw.parse::<u64>() {
-            Ok(ms) => ms,
-            Err(_) => {
-                eprintln!("not a number of milliseconds: {raw}");
-                return ExitCode::from(2);
-            }
-        },
-    };
-    match wire_client::call(
-        &at,
-        &frame,
-        token.as_deref(),
-        std::time::Duration::from_millis(quiet),
-    ) {
-        Ok(heard) => {
-            eprintln!("{} frame(s), {} refusal(s)", heard.frames, heard.refusals);
-            match heard.spoken() {
-                wire_client::Spoken::Refused => ExitCode::FAILURE,
-                wire_client::Spoken::Answered => ExitCode::SUCCESS,
-                wire_client::Spoken::Quiet => {
-                    eprintln!(
-                        "nothing came back inside {quiet}ms: the city may still be working on it"
-                    );
-                    eprintln!(
-                        "recovery: ask again with a longer --quiet-ms, or read the city's own log"
-                    );
-                    ExitCode::from(3)
-                }
-            }
-        }
-        Err(err) => report(err),
-    }
-}
 
 /// Hands a credential to a city on this machine, reading it from stdin.
 ///

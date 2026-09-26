@@ -73,8 +73,11 @@ The cost page shows shares against the authoritative total rather than normalisi
 |---|---|---|
 | 0 | the city answered inside the window, and refused nothing | go on |
 | 1 | the city refused; the refusal is the last frame printed, with its recovery line | read the refusal and act on it |
-| 2 | this command line was not readable - a missing frame, a bad `--quiet-ms`, an unknown subcommand | fix the command; the city was never asked |
+| 2 | this command line was not readable - a missing frame, a frame the wire cannot carry, a bad `--quiet-ms`, an unknown subcommand | fix the command; the city was never asked |
 | 3 | the frame went out and **nothing came back** before the window closed | the city may still be working: ask again with a longer `--quiet-ms`, or read the city's own log |
+| 4 | nothing at `--at` answered as a city | start the city, or point `--at` at the one that is running |
+
+With `--json`, a refusal this binary writes itself, rather than a frame the city sent, is written to stderr as one JSON line with the same fields as the refusal frame, so a script reads both with one parser.
 
 **3 is not a failure and not a success.** A refusal that takes longer than the window - a provider probe with a 15 second timeout behind it, for example - used to leave this command exiting 0, so an agent branching on the exit code read a refusal it never received as a success. Silence now has its own code, and 0 and 1 keep meaning exactly what they say.
 

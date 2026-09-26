@@ -1736,7 +1736,8 @@ impl Heard { pub(crate) fn spoken(&self) -> Spoken; }
 | `Refused` | 1 | 城在窗口内拒绝了这一帧 |
 | `Answered` | 0 | 城在窗口内答了话，且没有拒绝 |
 | `Quiet` | 3 | 帧发出去了，窗口内**一帧都没回来**——城是否受理，此处无法断言 |
-| （用法错误） | 2 | 参数不是这条命令能读的东西；与城无关 |
+| （用法错误） | 2 | 参数或帧不是这条命令能读的东西；帧在开 socket 之前解析，所以与城无关 |
+| （没有城） | 4 | `--at` 那里没有东西完成握手；帧没有被任何城听见 |
 
 - **`answers` 与 `frames` 是两件事**。握手的 `Welcome` 也是一帧，故 `frames` 恒 ≥ 1；能区分静默的只有
   「命令发出**之后**回来的帧数」。把这一个数放进 `Heard` 而不是在壳里减一，是因为「减一」会把握手协议的形状
@@ -3549,3 +3550,35 @@ impl RunWorker {
 - **被否：只把 `notice` 写进 `Diagnostics`**。`serve` 默认不开日志，`resume` 用的是 `Diagnostics::off()`，写进去就等于没说。
 
 **本节测试**：`assembly::lifetime::tests::a_torn_tail_is_told_in_the_startup_scan`：写一座城，在账尾追加半行，`RunWorker::new` 后 `startup_scan().summary()` 必须说出截掉的字节数。
+
+## 8-91 退出码是一张表（`bin::main::exit`、`bin::main::calling`、`bin::main::refusal`、`bin::wire_client`）
+
+```rust
+pub(super) enum Exit { Done, Refused, Line, Quiet, NoCity }   // 0 1 2 3 4
+impl From<Exit> for std::process::ExitCode;
+pub(crate) enum Unheard { Unreadable(AxError), NoCity(AxError), Broken(AxError) }
+pub(crate) fn call(at: &str, frame: &str, token: Option<&str>, quiet: Duration) -> Result<Heard, Unheard>;
+pub(super) enum Form { Human, Json }
+pub(super) fn written(err: &AxError, form: Form) -> String;
+```
+
+| 码 | `Exit` | 它断言的事实 |
+|---|---|---|
+| 0 | `Done` | 做完了 |
+| 1 | `Refused` | 城或所在机器拒绝了，stderr 上有 `AxError` 的失败行与 recovery 行 |
+| 2 | `Line` | 这条命令行读不懂，包括 `call` 的帧不是 wire 能载的东西 |
+| 3 | `Quiet` | `call`：帧发出去了，安静窗口内什么都没回来 |
+| 4 | `NoCity` | `--at` 那里没有城在答：连不上，或连上了却没有回握手 |
+
+`Exit` 是退出码的唯一定义；数字只在 `From<Exit> for ExitCode` 里出现一次。`wire_client::call` 用 `Unheard` 说清没听到回答的原因：帧解析失败是 `Unreadable`（映射到 2），连接、发送问候或等 `Welcome` 失败是 `NoCity`（映射到 4），握手之后连接断了或本进程起不了 runtime 是 `Broken`（映射到 1）。三者都照常在 stderr 上印 `AxError` 的失败行与 recovery 行。
+
+拒绝怎么写由 `refusal::written` 一处决定，它只管文字，不管写到哪里；调用方把结果写到 stderr。`Form::Human` 是失败行、`recovery:` 行，`AxError` 带 `nearby` 时再加一行 `nearby: a, b`，给人读的拒绝也指出附近能用的名字。`Form::Json` 是一行 `AxError` 的 serde（与 wire 上 `Refusal` 同形），反序列化回来与原值相等。`call` 带 `--json` 时用 `Form::Json`，其余调用方用 `Form::Human`。
+
+**本节接口的当前状态。** 只有 `call` 返回 `Exit`；其余动词仍返回 `ExitCode`，经 `city::report` 得 1。`--json` 目前只有 `call` 接受。还没做的是：其余动词的 `--json`、kernel 的命令行错误码（先改 kernel-SPEC 的 `AxCode` 表）、以及「动词 × 模式（终端、管道、`--json`）→ 退出码与输出流」的整张表。`doctor` 已经只在 stdout 是终端且没有 `NO_COLOR` 时着色（§8-59）。
+
+**决定。**
+
+1. 没有城单列为 4，而不与 1 共用。1 说的是城读了这一帧并拒绝，一个 agent 据此改帧重试；没有城时帧没有被任何城读过，该做的是起城或改 `--at`。两件事共用一个码，就把后者读成了前者。
+2. 帧写错退 2 而不是 1。帧在开 socket 之前解析，错在这条命令行本身，与城无关；被否决的备选是沿用 `WireMismatch` 的 1，它让一个拼错的帧和城的真实拒绝无法区分。
+3. 握手之后断开归 1 而不是 4。那时已经有城答过 `Welcome`，城在；断开是这次对话的失败，不是地址上没有城。
+4. `--json` 的拒绝是 `AxError` 自己的 serde，而不是另起一个命令行专用的 JSON 形状。wire 上的 `Refusal` 已经是这个形状，一个 agent 用同一个反序列化读城的拒绝和命令行的拒绝；另起一种形状，就要在两处维持同一组字段。

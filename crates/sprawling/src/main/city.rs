@@ -29,7 +29,9 @@
 #[path = "city/opening.rs"]
 mod opening;
 
+use super::exit::Exit;
 use super::grammar::Arguments;
+use super::refusal::{Form, written};
 use super::router::{client_summary, default_city_location, flag_value, log_floor, log_levels};
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 use kernel::consts_policy::DEFAULT_AT;
@@ -151,9 +153,8 @@ pub(super) fn init(read: &Arguments) -> ExitCode {
 }
 
 pub(super) fn report(err: kernel::AxError) -> ExitCode {
-    eprintln!("{err}");
-    eprintln!("recovery: {}", err.recovery());
-    ExitCode::FAILURE
+    eprint!("{}", written(&err, Form::Human));
+    Exit::Refused.into()
 }
 
 /// Binds the control surface. Loopback unless an address says otherwise,

@@ -58,6 +58,20 @@ pub(crate) enum Spoken {
     Quiet,
 }
 
+/// Why nothing was heard: the three failures `call` tells apart,
+/// because each asks the caller for a different next step.
+#[derive(Debug)]
+pub(crate) enum Unheard {
+    /// The frame is not one this wire can carry; nothing was sent.
+    Unreadable(AxError),
+    /// Nothing at the address completed the greeting, so no city heard
+    /// the frame.
+    NoCity(AxError),
+    /// The conversation started and then broke, or this process could
+    /// not start one.
+    Broken(AxError),
+}
+
 impl Heard {
     /// Refusal first, because a refusal that also carried events is
     /// still a refusal; silence last, because it is only silence when
@@ -115,29 +129,33 @@ pub(crate) fn call(
     frame: &str,
     token: Option<&str>,
     quiet: Duration,
-) -> Result<Heard, AxError> {
+) -> Result<Heard, Unheard> {
     // The frame is parsed before the socket is opened: a typo should
     // cost nothing and should be reported against the text a person
     // wrote, not against whatever the server made of it.
-    let outgoing: channels::ClientFrame = serde_json::from_str(frame)
-        .map_err(|err| malformed("read the frame to send", &err.to_string()))?;
-    let body = serde_json::to_string(&outgoing)
-        .map_err(|err| malformed("encode the frame to send", &err.to_string()))?;
+    let outgoing: channels::ClientFrame = serde_json::from_str(frame).map_err(|err| {
+        Unheard::Unreadable(malformed("read the frame to send", &err.to_string()))
+    })?;
+    let body = serde_json::to_string(&outgoing).map_err(|err| {
+        Unheard::Unreadable(malformed("encode the frame to send", &err.to_string()))
+    })?;
     let greeting = serde_json::to_string(&hello(token))
-        .map_err(|err| malformed("encode the greeting", &err.to_string()))?;
+        .map_err(|err| Unheard::Broken(malformed("encode the greeting", &err.to_string())))?;
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|err| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "start the async runtime",
-                err.to_string(),
-            )
-            .with_recovery(
-                "close some programs and try again: this machine would not give the \
+            Unheard::Broken(
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "start the async runtime",
+                    err.to_string(),
+                )
+                .with_recovery(
+                    "close some programs and try again: this machine would not give the \
                  process the thread the connection needs",
+                ),
             )
         })?;
     let sending = Sending {
@@ -159,15 +177,16 @@ async fn converse(
     greeting: &str,
     sending: &Sending,
     quiet: Duration,
-) -> Result<Heard, AxError> {
+) -> Result<Heard, Unheard> {
     let url = format!("ws://{at}/ws");
+    let no_city = |why: String| Unheard::NoCity(unreachable_city(at, &why));
     let (mut socket, _) = tokio_tungstenite::connect_async(&url)
         .await
-        .map_err(|err| unreachable_city(at, &err.to_string()))?;
+        .map_err(|err| no_city(err.to_string()))?;
     socket
         .send(Message::Text(greeting.into()))
         .await
-        .map_err(|err| unreachable_city(at, &err.to_string()))?;
+        .map_err(|err| no_city(err.to_string()))?;
 
     let mut heard = Heard {
         frames: 0,
@@ -177,7 +196,9 @@ async fn converse(
     // The greeting is answered before anything else is sent: a client
     // that shouted its command at a server which then refused the
     // handshake would have to guess whether the command was seen.
-    let welcome = next_frame(&mut socket, quiet).await?;
+    let welcome = next_frame(&mut socket, quiet)
+        .await
+        .map_err(Unheard::NoCity)?;
     match welcome {
         Some(text) => {
             report(&text, &Reply::of(&text), &mut heard);
@@ -185,14 +206,17 @@ async fn converse(
                 return Ok(heard);
             }
         }
-        None => return Err(unreachable_city(at, "no answer to the greeting")),
+        None => return Err(no_city("no answer to the greeting".to_owned())),
     }
 
     socket
         .send(Message::Text(sending.body.as_str().into()))
         .await
-        .map_err(|err| unreachable_city(at, &err.to_string()))?;
-    while let Some(text) = next_frame(&mut socket, quiet).await? {
+        .map_err(|err| Unheard::Broken(unreachable_city(at, &err.to_string())))?;
+    while let Some(text) = next_frame(&mut socket, quiet)
+        .await
+        .map_err(Unheard::Broken)?
+    {
         let reply = Reply::of(&text);
         report(&text, &reply, &mut heard);
         heard.answers = heard.answers.saturating_add(1);

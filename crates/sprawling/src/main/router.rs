@@ -14,8 +14,9 @@
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::firstrun;
 
+use super::calling::call;
 use super::city::{init, resume, serve, up, up_at, use_folder};
-use super::data::{adopt, call, enrol, export, fork, install, replay, restore, status};
+use super::data::{adopt, enrol, export, fork, install, replay, restore, status};
 use super::grammar::{Arguments, Invocation, parse};
 use super::verbs::{self, Verb};
 use super::{CLIENT_COMPLETE, CLIENT_FILES};
@@ -71,7 +72,7 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
         Verb::Up => up(read, args),
         Verb::Install => install(args),
         Verb::Doctor => sprawling::doctor::verb(args),
-        Verb::Call => call(args),
+        Verb::Call => call(args).into(),
         Verb::Enrol => enrol(read),
         Verb::Serve => serve(nth(1), nth(2), args),
         Verb::Export => export(nth(1), nth(2)),
