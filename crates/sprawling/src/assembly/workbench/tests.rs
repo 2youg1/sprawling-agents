@@ -373,8 +373,8 @@ fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
 
 /// The city's genesis hash is read from the ledger once and remembered:
 /// it is the one fact about a city that cannot change without the city
-/// being a different one, and every fence, landing and merge used to
-/// re-read the front of the history to learn it (sprawling-SPEC.md 8-51).
+/// being a different one, so no fence, landing or merge re-reads the
+/// front of the history to learn it (sprawling-SPEC.md 8-51).
 #[test]
 fn the_citys_genesis_hash_is_read_once_and_survives_the_ledger_going_away() {
     let dir = tempfile::tempdir().unwrap();

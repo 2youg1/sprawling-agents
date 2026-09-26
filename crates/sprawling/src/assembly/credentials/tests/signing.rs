@@ -221,9 +221,9 @@ fn a_login_for_a_provider_this_build_has_no_flow_for_is_refused_by_name() {
 
 /// Which face a finished login attaches on is the family's statement,
 /// read through the connection the registration is. The Codex
-/// subscription answers on the responses face, and a second mapping
-/// from the provider word `openai` to a dialect used to attach it on
-/// the chat face — where its first call is a 404.
+/// subscription answers on the responses face; a second mapping from
+/// the provider word `openai` to a dialect would attach it on the chat
+/// face, where its first call is a 404.
 #[test]
 fn a_subscription_is_attached_on_the_face_its_family_answers_on() {
     for row in gateway::OAUTH_PROFILES {

@@ -89,10 +89,9 @@ mod tests {
         assert_eq!(Keying::decide(at("0.0.0.0:8787"), false), Keying::Mint);
     }
 
-    /// The cell that used to be a refusal. An address reachable from
-    /// elsewhere with nothing configured was the one combination
-    /// `decide_bind` turned away; it now grows a key instead, and the
-    /// guard is satisfied rather than moved.
+    /// An address reachable from elsewhere with nothing configured grows
+    /// a key rather than being turned away, so the guard is satisfied
+    /// rather than moved.
     #[test]
     fn an_address_beyond_this_machine_never_ends_up_without_a_key() {
         for raw in ["0.0.0.0:8787", "192.168.1.10:8787", "[::]:8787"] {

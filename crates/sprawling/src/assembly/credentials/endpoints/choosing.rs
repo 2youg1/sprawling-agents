@@ -95,7 +95,7 @@ impl RunWorker {
         // default is the last rung rather than a number invented at the
         // call site (gateway-SPEC.md 8-17). Because the ladder always
         // answers, a model no catalogue knows can still be called on the
-        // Anthropic wire, which is what B-01 was.
+        // Anthropic wire.
         let resolved = gateway::OutputCeiling::resolve(
             gateway::Stated {
                 person: max_output_tokens,

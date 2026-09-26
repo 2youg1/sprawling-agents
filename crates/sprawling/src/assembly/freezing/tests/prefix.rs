@@ -161,10 +161,9 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
     );
 }
 
-/// Two of the four segments used to be nowhere but the prompt: their
-/// hashes were on the ledger and nothing held the bytes, so "what was
-/// this agent told" had no answer. Every segment is interned now, and
-/// `Query::Prefix` is the read that proves it.
+/// Every one of the four segments is interned: a hash on the ledger with
+/// nothing holding its bytes would leave "what was this agent told"
+/// without an answer. `Query::Prefix` is the read that proves it.
 #[test]
 fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     let dir = tempfile::tempdir().unwrap();

@@ -5,12 +5,10 @@
 
 //! What a frozen run runs under.
 //!
-//! **Two spend ceilings used to be asserted here and are gone**
-//!: work handed down and work an answer carried on were each
-//! checked against the `BudgetCap` that sent them. There is no such
-//! ceiling to carry now — nobody can price a piece of work before it
-//! runs, and the one brake is `Halt`. What a run is still frozen under
-//! is the effort its configuration layer states, which is the case below.
+//! **No spend ceiling is carried with work**: nobody can price a piece
+//! of work before it runs, and the one brake is `Halt`. What a run is
+//! frozen under is the effort its configuration layer states, which is
+//! the case below.
 
 use crate::assembly::fixture::*;
 use crate::assembly::*;

@@ -181,10 +181,10 @@ fn a_half_filed_shelf_is_unwound() {
     );
 }
 
-/// A drive that failed used to take the room's queue with it: `land`
-/// returned at the drive's own outcome, before anything was given
-/// back, so the signals the room was holding vanished exactly when the
-/// disk went wrong. What was borrowed now goes back first.
+/// A drive that failed must not take the room's queue with it: were
+/// `land` to return at the drive's own outcome, before anything was
+/// given back, the signals the room was holding would vanish exactly
+/// when the disk went wrong. What was borrowed goes back first.
 #[test]
 fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
     let dir = tempfile::tempdir().unwrap();

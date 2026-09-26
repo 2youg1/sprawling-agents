@@ -223,9 +223,9 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
 
 /// The identifier is a function of the job, the address and the
 /// millisecond, and nothing else. Two jobs dispatched into the same
-/// millisecond are two runs: the hexadecimal round trip this used to
-/// make had two failure points that both answered zero, and a city
-/// whose runs share an identifier cannot be read back at all.
+/// millisecond are two runs. A hexadecimal round trip would add two
+/// failure points that both answer zero, and a city whose runs share an
+/// identifier cannot be read back at all.
 #[test]
 fn two_jobs_at_one_millisecond_get_two_run_ids() {
     let addr = Address::parse("lab/room1").unwrap();

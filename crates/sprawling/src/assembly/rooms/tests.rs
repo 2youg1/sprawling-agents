@@ -30,10 +30,10 @@ fn spoken(id: &str, to: &Address) -> collab::Signal {
     .unwrap()
 }
 
-/// Two runs in one room used to take a queue each, and the one that
-/// landed second wrote over the first: every signal the first had
-/// collected disappeared although the ledger said it arrived. The
-/// second run now works at a spare it returns nothing from.
+/// Two runs in one room must not take a queue each: the one that landed
+/// second would write over the first, and every signal the first had
+/// collected would disappear although the ledger said it arrived. The
+/// second run works at a spare it returns nothing from.
 #[test]
 fn a_second_run_in_one_room_does_not_take_the_queue_away_from_the_first() {
     let mut rooms = RoomQueues::folded(std::collections::BTreeMap::new());
@@ -57,9 +57,9 @@ fn a_second_run_in_one_room_does_not_take_the_queue_away_from_the_first() {
     assert!(rooms.at_home(&at).is_some(), "the holder gave it back");
 }
 
-/// What is said to a room while its queue is out used to land in a
-/// fresh queue that the returning run then overwrote. It now waits in
-/// the room's own entry and is delivered when the queue comes home.
+/// What is said to a room while its queue is out waits in the room's
+/// own entry and is delivered when the queue comes home, rather than in
+/// a fresh queue that the returning run would overwrite.
 #[test]
 fn what_arrives_while_the_queue_is_out_is_waiting_when_it_comes_home() {
     let mut rooms = RoomQueues::folded(std::collections::BTreeMap::new());
@@ -83,8 +83,8 @@ fn what_arrives_while_the_queue_is_out_is_waiting_when_it_comes_home() {
     );
 }
 
-/// A queue that failed on its way home used to be a queue the city
-/// forgot it had. It comes home whatever the signals that waited do.
+/// A queue that fails on its way home is still a queue the city has:
+/// it comes home whatever the signals that waited do.
 #[test]
 fn the_queue_comes_home_even_when_a_signal_that_waited_is_refused() {
     let at = room();

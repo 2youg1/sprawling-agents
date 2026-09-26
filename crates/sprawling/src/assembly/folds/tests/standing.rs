@@ -289,10 +289,10 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
     assert!(restarted.halted.is_empty());
 }
 
-/// The expiry table used to be written only by the process that logged
-/// in: a restart found it empty, renewed nothing, and met each expiry
-/// as a 401 in the middle of a run. It is folded from the capture
-/// records like every other book the worker keeps.
+/// The expiry table is folded from the capture records like every other
+/// book the worker keeps. Written only by the process that logged in, it
+/// would leave a restart with an empty table that renews nothing and
+/// meets each expiry as a 401 in the middle of a run.
 #[test]
 fn when_a_subscription_credential_expires_survives_a_restart() {
     let dir = tempfile::tempdir().unwrap();

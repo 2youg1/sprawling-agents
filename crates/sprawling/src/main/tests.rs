@@ -19,10 +19,10 @@ use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 
 /// A place with no ledger in it is not a verified chain.
 ///
-/// `replay` used to answer `chain verified: 0 line(s), tail seq none`
-/// and exit 0 for an empty directory and for a city directory alike,
-/// because a ledger with no events reads the same way. A scripted
-/// integrity check pointed at the wrong argument scored a pass.
+/// `replay` must not answer `chain verified: 0 line(s), tail seq none`
+/// and exit 0 for an empty directory as it does for a city with no
+/// events, or a scripted integrity check pointed at the wrong argument
+/// scores a pass.
 #[test]
 fn a_place_holding_no_ledger_is_refused_rather_than_verified() {
     let dir = tempfile::tempdir().unwrap();
@@ -66,8 +66,8 @@ fn embedded_client_table_is_present_and_marked() {
 /// The binary embeds the bundle `just build-web` wrote into the
 /// workspace, wherever cargo puts its own output.
 ///
-/// With `CARGO_TARGET_DIR` pointing outside the workspace, the build
-/// script used to look for the bundle there, found nothing, and shipped
+/// With `CARGO_TARGET_DIR` pointing outside the workspace, a build
+/// script that looked for the bundle there would find nothing and ship
 /// the placeholder page beside a real bundle it never read. Under the
 /// default target directory both places coincide, so this test can only
 /// tell the two readings apart where the variable is set.
@@ -114,9 +114,9 @@ fn files_under(root: &std::path::Path, dir: &std::path::Path, found: &mut Vec<St
 /// reaches its own code, and none of these touch a city that exists.
 ///
 /// A frame the wire cannot carry is this command line's fault (2), and
-/// an address where nothing answers is no city at all (4); both used to
-/// exit 1, which an agent reads as "the city refused" and answers by
-/// fixing a frame the city never saw.
+/// an address where nothing answers is no city at all (4). Neither is
+/// 1, which an agent reads as "the city refused" and answers by fixing
+/// a frame the city never saw.
 #[test]
 fn each_way_a_call_ends_has_its_own_exit_code() {
     use super::calling::call;

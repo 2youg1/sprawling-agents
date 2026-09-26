@@ -139,8 +139,8 @@ fn open_lab(dir: &std::path::Path) {
 /// that would change how hard it thinks is refused with the session
 /// left exactly as it was.
 ///
-/// This is the property roadmap 17.2 guards at the supply layer, moved
-/// to the seam that can break it: the blocks a person pays to have
+/// This is the cache property of the supply layer, checked at the seam
+/// that can break it: the blocks a person pays to have
 /// cached are only identical across two dispatches while the shape that
 /// renders them is frozen with the session. A silent `effort` write is
 /// how it broke, and the refusal is the way out — the two ways to keep
