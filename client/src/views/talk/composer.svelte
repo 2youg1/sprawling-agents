@@ -180,7 +180,7 @@
   const rooms = $derived(
     roomsKnown(
       $cityAnswer !== undefined && "city" in $cityAnswer ? $cityAnswer.city.buildings : [],
-      Object.values($belief.runs),
+      $belief.rooms.keys(),
     ),
   );
   // The run this box would steer: what a typed `/stop` reaches too.
@@ -227,7 +227,7 @@
         go: u.go,
         here,
         live,
-        runs: Object.values($belief.runs),
+        belief: get(belief),
         models,
         effort: get(effort),
         setEffort: (level) => {

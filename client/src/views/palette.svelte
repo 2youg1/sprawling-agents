@@ -27,7 +27,7 @@
   // focusable with `aria-disabled` so the reason is reachable (7-2).
   import { Option, Schema } from "effect";
   import { onMount } from "svelte";
-  import { SvelteSet } from "svelte/reactivity";
+  import { heldIn } from "../core/belief/rooms";
 
   import { QUERIES } from "../core/asking";
   import { halt, release } from "../core/commands";
@@ -150,11 +150,8 @@
         out.push(goTo({ kind: "building", address: building.addr }, building.addr, say($lang, "palette_building")));
       }
     }
-    const rooms = new SvelteSet<string>();
-    for (const run of Object.values($belief.runs)) {
-      if (run.addr !== null && run.addr !== MAYOR) rooms.add(run.addr);
-    }
-    for (const room of rooms) {
+    for (const room of $belief.rooms.keys()) {
+      if (room === MAYOR) continue;
       const address = Option.getOrNull(Schema.decodeOption(Address)(room));
       if (address !== null) {
         out.push(goTo({ kind: "talk", address }, room, say($lang, "palette_room")));
@@ -180,12 +177,7 @@
   const live = $derived(reached($belief.live.at(-1)));
 
   function newest(room: string): Reached | null {
-    return reached(
-      Object.values($belief.runs)
-        .filter((run) => run.addr === room)
-        .sort((a, b) => (b.started ?? 0) - (a.started ?? 0))
-        .at(0),
-    );
+    return reached(heldIn($belief, room).at(-1));
   }
 
   // Why a verb cannot run from this box, as a `lang.json` key. Every
