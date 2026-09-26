@@ -40,6 +40,9 @@ use crate::serving::standing::CorePriority;
 /// spelling and read under another is a setting that never takes
 /// effect.
 const UI: &str = "ui";
+/// The section and key of the one core setting (sprawling-SPEC.md 8-93).
+const CORE: &str = "core";
+const PRIORITY: &str = "priority";
 
 /// Everything this person settled, as their file states it.
 ///
@@ -94,8 +97,22 @@ pub(crate) fn core_priority() -> Result<CorePriority, AxError> {
 }
 
 fn stated_core_priority(file: &Path) -> Result<CorePriority, AxError> {
-    drop(document(file)?);
-    Ok(CorePriority::Raised)
+    match document(file)?
+        .get(CORE)
+        .and_then(|core| core.get(PRIORITY))
+    {
+        None => Ok(CorePriority::Raised),
+        Some(toml::Value::String(level)) if level == "raised" => Ok(CorePriority::Raised),
+        Some(toml::Value::String(level)) if level == "normal" => Ok(CorePriority::Normal),
+        Some(other) => Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "read whether the core stands above normal",
+            format!("{}: [{CORE}] {PRIORITY} = {other}", file.display()),
+        )
+        .with_recovery(
+            "write priority = \"raised\" or priority = \"normal\" under [core], or delete the line",
+        )),
+    }
 }
 
 /// Where this person's file is. The home directory is `home::Home`'s

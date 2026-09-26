@@ -10,6 +10,7 @@ use kernel::EventRecord;
 
 use super::spawn_folding;
 use crate::assembly::init_city;
+use crate::serving::standing::CorePriority;
 use crate::views::Views;
 
 /// A reader holding the views - the changes page running `git status`
@@ -24,7 +25,7 @@ fn the_writer_does_not_wait_for_a_reader_holding_the_views() {
     let genesis = EventRecord::parse_line(verified.raw_lines().first().unwrap()).unwrap();
     let views = Arc::new(Mutex::new(Views::new(dir.path())));
     let (to_clients, mut heard) = tokio::sync::broadcast::channel(8);
-    let mut folding = spawn_folding(Arc::clone(&views), to_clients).unwrap();
+    let mut folding = spawn_folding(Arc::clone(&views), to_clients, CorePriority::Raised).unwrap();
 
     let reader = views.lock().unwrap();
     let (written, returned) = mpsc::channel();

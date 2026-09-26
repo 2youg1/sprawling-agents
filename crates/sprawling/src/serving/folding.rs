@@ -46,12 +46,13 @@ enum Following {
 pub(super) fn spawn_folding(
     views: Arc<Mutex<Views>>,
     to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+    setting: CorePriority,
 ) -> Result<Folding, AxError> {
     let (committed, arriving) = mpsc::channel::<Fold>();
     let examined = committed.clone();
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
-        .spawn(move || fold_until_closed(&views, &arriving, &to_clients))
+        .spawn(move || fold_until_closed(&views, &arriving, &to_clients, setting))
         .map_err(|source| {
             AxError::failure(
                 AxCode::StorageFatal,
@@ -90,8 +91,9 @@ fn fold_until_closed(
     views: &Mutex<Views>,
     arriving: &mpsc::Receiver<Fold>,
     to_clients: &tokio::sync::broadcast::Sender<EventRecord>,
+    setting: CorePriority,
 ) {
-    let mut core = CoreThread::raise("sprawling-views", CorePriority::Raised, Instant::now());
+    let mut core = CoreThread::raise("sprawling-views", setting, Instant::now());
     let mut following = Following::Live;
     for fold in arriving {
         let woke = Instant::now();
