@@ -390,7 +390,7 @@ pub fn effort_word(effort: kernel::Effort) -> String;
 ### 8-8 memory::checkpoint（形状 4；git2）
 
 ```rust
-pub struct Checkpoint { /* repo: git2::Repository、fences: u64 —— 私有 */ }
+pub struct Checkpoint { /* repo: git2::Repository、last: Option<git2::Oid> —— 私有 */ }
 impl Checkpoint {
     pub fn open(city_root: &Path) -> Result<Checkpoint, MemoryError>;      // 无仓即 init（创世提交由 ensure_base 产）
     /// Commits once when the repository has no HEAD, and never otherwise.
@@ -399,7 +399,7 @@ impl Checkpoint {
     /// would move the trunk under every request already waiting.
     pub fn ensure_base(&mut self, scope: &str, t: TimeMs, of: &Provenance) -> Result<Option<Payload>, MemoryError>;
     /// Pre-wave fence: add -A within scope, then a **dangling** commit
-    /// pointed at by refs/sprawling/runs/<run>/<seq>. HEAD does not move.
+    /// pointed at by refs/sprawling/runs/<run>/<oid>. HEAD does not move.
     /// Returns the checkpoint_committed payload
     /// {oid, scope, files, model, effort} (the last two: §8-18).
     pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
@@ -420,16 +420,20 @@ impl Checkpoint {
   城是围绕人已有的文件夹形成的，而每一次工具波往人自己的分支历史里写一个
   `checkpoint:` 提交时，一个被采纳的仓库每波长一格。`wave_pre` 因此写一个
   **dangling commit**（`update_ref = None`，父为当前 HEAD 提交，无 HEAD 时无父），
-  再把引用 `refs/sprawling/runs/<run>/<seq>` 指向它。`git log HEAD` 因此跨波不增长，
+  再把引用 `refs/sprawling/runs/<run>/<oid>` 指向它。`git log HEAD` 因此跨波不增长，
   而 oid 可 checkout、`wave_post` 与 `memory::changes` 从 oid 工作。
 - **被否的另一条路：把栅栏留在 HEAD。** 它让人的历史被机器的簿记淹没——一天的工作里
   几百个 `checkpoint:` 行，人自己的提交夹在中间找不到。留在 HEAD 唯一买到的是
   「不用写引用」，而写一个引用是一行。
-- **`<seq>` 用 Checkpoint 自己每次 open 起算的计数器，不用账本 seq。** 理由是简单：
-  栅栏是在一个拿不到账本位置的闭包里升起的（`runtime::bench` 的预测栅栏尤其如此），
-  把账本位置穿到那里要多一个参数与一条新的耦合。引用只是**给人找路用的**，
-  权威是账本里的 oid；两个 open 的计数器撞名时后写的引用覆盖前一个，而被覆盖的
-  提交仍由账本里的 oid 指得到。
+- **引用名是提交自己的 oid：`refs/sprawling/runs/<run>/<oid>`，不设计数器。** 一个 run 经
+  不止一个 handle 升栅栏——lane 自己的栅栏点与 `runtime::bench` 的预测网各开一个 `Checkpoint`，
+  而 `file_discarded` 的还原指向哪个 handle 升起的那一道都可能。引用是这道提交**唯一的钉子**：
+  账本里的 oid 不让 git 保留任何对象，`git gc` 回收一切没有引用可达的提交，回收站随之失效。
+  以 oid 为名，名字的唯一性由提交本身担保，不再有第二个计数权威；同一道栅栏（同树、同父、同刻）
+  就是同一个提交、同一个引用，重写它是幂等的。被否：每个 handle 各自计数（两个 handle 同从 0 起，
+  后写的引用强制覆盖前一个，前一道提交从此无钉）；跨 handle 共享一个计数器或借用账本 seq（都要把
+  一个位置穿进拿不到它的闭包，多一条耦合，而名字只需要唯一，不需要有序——顺序由账本给）。
+  **翻案条件**：哪一天引用需要表达顺序（例如按先后清理旧栅栏），顺序仍应读账本，而不是回到计数器。
 - **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。
 - **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，栅栏不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让栅栏静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
 - **提交时间是注入时刻的整秒**：`TimeMs` 是 `u64` 毫秒，除以 1000 后恒落在 `i64` 内，换算仍走 `i64::try_from` 且失败时报 `Checkpoint { op: "stamp the commit" }`，而不是写成 1970。
@@ -478,7 +482,7 @@ pub fn between(city_root: &Path, base: GitOid, head: Head)
 但先测再调，未测到慢之前多一张表就是多一份要同步的状态。
 
 `wave_pre` 不写 `HEAD`，而是写一个
-dangling commit 并由 `refs/sprawling/runs/<run>/<seq>` 指住（见 8-8）。本模块只读不写，
+dangling commit 并由 `refs/sprawling/runs/<run>/<oid>` 指住（见 8-8）。本模块只读不写，
 从 oid 工作。
 
 ### 8-9 memory::worktree（形状 4 适配器＋形状 2 值类型；git2）
