@@ -20,7 +20,8 @@
 mod toolchain;
 
 use super::family::{CHROMIUM_ROW, GECKO_ROW, WEBKIT_ROW};
-use super::{Detection, Need, PerPlatform, Recipe, Requirement, Tier};
+use super::{Detection, Need, PerPlatform, Platform, Recipe, Requirement, Tier};
+use kernel::{AxCode, AxError};
 
 /// The environment variable a person may point at a CPython-WASI
 /// component with. Spelled here and nowhere else: the exec tool asks
@@ -44,6 +45,37 @@ pub(crate) const SHELL: &str = "shell";
 pub(crate) const SANDBOX_ENGINE: &str = "sandbox-engine";
 pub(crate) const SPRAWLING_DESKTOP: &str = "sprawling-desktop";
 pub(crate) const FFMPEG: &str = "ffmpeg";
+
+/// How this build installs `item` on this platform: the table's own
+/// query, handed to the worker (sprawling-SPEC.md, `doctor_install`).
+///
+/// # Errors
+/// `InvalidArgs` for a name the table does not carry - the page asked
+/// about an item this build does not know, so re-reading what the city
+/// answered is the way out - and `ToolUnavailable` on a platform this
+/// project has no recipe for.
+pub(crate) fn recipe_for(item: &str) -> Result<&'static Recipe, AxError> {
+    let requirement = REQUIREMENTS
+        .iter()
+        .find(|requirement| requirement.name == item)
+        .ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "install a tool",
+                format!("{item}: this city checks for no such item"),
+            )
+            .with_recovery("ask this machine again and install one of the items it answered with")
+        })?;
+    let Some(platform) = Platform::current() else {
+        return Err(AxError::failure(
+            AxCode::ToolUnavailable,
+            "install a tool",
+            format!("{item}: this platform has no recipe in this project"),
+        )
+        .with_recovery("install it the way this operating system installs software"));
+    };
+    Ok(requirement.recipe.at(platform))
+}
 
 /// A program nobody installs outside the search path.
 const NOWHERE: PerPlatform<&[&str]> = PerPlatform {

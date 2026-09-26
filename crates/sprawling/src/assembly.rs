@@ -295,6 +295,11 @@ pub struct RunWorker {
     /// a browser tool starts a browser on the host (sprawling-SPEC.md
     /// 8-45-2).
     browsers: Browsers,
+    /// How this build installs one named item on this platform
+    /// (`doctor::recipe_for`). Received rather than read, because the
+    /// requirement table stays with the doctor (sprawling-SPEC.md,
+    /// `doctor_install`).
+    recipe_for: fn(&str) -> Result<&'static accounting::Recipe, AxError>,
 }
 
 impl RunWorker {

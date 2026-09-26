@@ -213,6 +213,7 @@ impl RunWorker {
             read_volume: crate::monitor::volume::read,
             reveal: crate::revealing::reveal,
             browsers: crate::browser_tool::for_rules,
+            recipe_for: crate::doctor::recipe_for,
         };
         worker.sweep_abandoned_trees();
         Ok(worker)

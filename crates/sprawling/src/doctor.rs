@@ -43,7 +43,7 @@ pub(crate) use presence::{Absence, Fault, Presence, Version};
 pub(crate) use probe::{Machine, ThisMachine};
 pub(crate) use report::answer;
 pub use screen::verb;
-pub(crate) use table::REQUIREMENTS;
+pub(crate) use table::{REQUIREMENTS, recipe_for};
 
 use accounting::Recipe;
 
