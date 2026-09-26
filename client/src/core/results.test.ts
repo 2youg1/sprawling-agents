@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunBelief } from "./belief/shape";
 import type { Doing } from "./doing";
-import { FIRST, drawsCalls, resultsOf } from "./results";
+import { FIRST, drawsCalls, producedOf, resultsOf } from "./results";
 import { RunId, Seq, TimeMs } from "../wire";
 
 // The fixture city of the contract: two hundred runs, forty of each of
@@ -64,5 +64,17 @@ describe("results-only mode", () => {
     const perCityUs = ((performance.now() - start) * 1000) / rounds;
     console.log(`city_results runs=${String(RUNS)} first=${String(FIRST)} per_city_us=${perCityUs.toFixed(1)}`);
     expect(perCityUs).toBeLessThanOrEqual(BUDGET_US);
+  });
+});
+
+describe("the produced line", () => {
+  test("counts every file and the lines of the ones that have lines", () => {
+    expect(
+      producedOf([
+        { path: "a.rs", how: "modified", lines: { counted: { added: 3, removed: 1 } } },
+        { path: "b.rs", how: "added", lines: { counted: { added: 10, removed: 0 } } },
+        { path: "c.png", how: { renamed: { from: "d.png" } }, lines: "binary" },
+      ]),
+    ).toEqual({ files: 3, added: 13, removed: 1 });
   });
 });

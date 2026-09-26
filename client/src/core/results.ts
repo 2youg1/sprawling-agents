@@ -17,6 +17,7 @@
 // thousands of runs draws the same few dozen rows as a city of ten.
 
 import type { RunBelief } from "./belief/shape";
+import type { FileChange } from "../wire";
 
 // How much of a conversation or a city is drawn. `whole` is the
 // posture this client ships with.
@@ -86,4 +87,17 @@ export function resultsOf(runs: Iterable<RunBelief>, first: number): readonly Gr
 // A run with no start time is placed after every run that has one.
 function newestFirst(a: RunBelief, b: RunBelief): number {
   return (b.started ?? -1) - (a.started ?? -1);
+}
+
+// What a finished run changed, as the one line under its outcome
+// divider states it. A binary file is a file that changed but adds no
+// lines: counting it as `+0 −0` would report a measurement nobody made.
+export interface Produced {
+  readonly files: number;
+  readonly added: number;
+  readonly removed: number;
+}
+
+export function producedOf(files: readonly FileChange[]): Produced {
+  return { files: 0, added: 0, removed: 0 };
 }
