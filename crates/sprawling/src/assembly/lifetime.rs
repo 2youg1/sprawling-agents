@@ -19,6 +19,21 @@ use std::sync::Arc;
 use kernel::{AxError, EventKind, Locator};
 use memory::{Cas, JsonlLedger};
 
+/// Why the city is closing, carried from whoever decided it to the
+/// line that records it.
+///
+/// Exhaustive rather than a flag, because the handoff says a different
+/// thing for each: a close the person chose and a close serving forced
+/// are different facts for the next session, and a record that spelled
+/// both as the first would claim a choice nobody made.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Closing {
+    /// The person stopped the city from the keyboard.
+    Chosen,
+    /// Serving failed and took the city down; `cause` is what failed.
+    Broken { cause: String },
+}
+
 impl RunWorker {
     /// # Errors
     /// Propagates whatever opening the ledger or the store reports, and
@@ -115,7 +130,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates the handoff's refusal of an empty must-read list, and
     /// the ledger's refusal to take the line.
-    pub(crate) fn close_city(&mut self) -> Result<(), AxError> {
+    pub(crate) fn close_city(&mut self, _why: &Closing) -> Result<(), AxError> {
         // The city's own norm, not a building's: `city::norms` answers
         // for a run at an address, and this line belongs to the city.
         // Through the same reader the prefix uses. What this city's
