@@ -35,7 +35,7 @@ pub(super) struct Size {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Lens {
+enum Lens {
     Tree,
     Records,
 }
@@ -129,10 +129,6 @@ impl Face {
 
     pub(super) fn is_closed(&self) -> bool {
         self.life == Life::Closed
-    }
-
-    pub(super) fn lens(&self) -> Lens {
-        self.lens
     }
 
     /// The frame for the current size, one string per terminal row.

@@ -15,6 +15,7 @@ city = { path = "../city" }
 collab = { path = "../collab" }
 browser = { path = "../browser" }
 protocol = { path = "../protocol" }
+crossterm = { workspace = true }
 futures-util = { workspace = true }
 getrandom = { workspace = true }
 reqwest = { workspace = true }

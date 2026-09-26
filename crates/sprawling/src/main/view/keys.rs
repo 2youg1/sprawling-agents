@@ -22,6 +22,8 @@ pub(super) enum Key {
     PageDown,
     Home,
     End,
+    /// Ctrl-C, which raw mode delivers as a key instead of a signal.
+    Interrupt,
 }
 
 /// Everything a person can ask the viewer to do. None of it changes the
@@ -56,7 +58,7 @@ pub(super) fn action_for(key: Key) -> Option<Action> {
         Key::Tab => Some(Action::SwitchLens),
         Key::Enter => Some(Action::OpenDetail),
         Key::Esc => Some(Action::CloseDetail),
-        Key::Char('q') => Some(Action::Quit),
+        Key::Char('q') | Key::Interrupt => Some(Action::Quit),
         Key::Char(_) => None,
     }
 }

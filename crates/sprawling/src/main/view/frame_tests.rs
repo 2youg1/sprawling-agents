@@ -12,7 +12,7 @@
     reason = "test code"
 )]
 
-use super::frame::{Face, Lens, Row, Size};
+use super::frame::{Face, Row, Size};
 use super::keys::{Action, Key, action_for};
 use kernel::{Address, RunId, Seq};
 use sprawling::lineage::RunLine;
@@ -147,7 +147,6 @@ fn collapse_climbs_then_folds_and_expand_unfolds_then_descends() {
 #[test]
 fn switching_lens_keeps_the_selected_thing() {
     let records = after(&[Action::SwitchLens], NARROW);
-    assert_eq!(records.lens(), Lens::Records);
     assert_eq!(
         cursor_line(&records),
         format!(r#">{{"seq":3,"run":"{R2}"}}"#)
@@ -156,7 +155,6 @@ fn switching_lens_keeps_the_selected_thing() {
         &[Action::SwitchLens, Action::Down, Action::SwitchLens],
         NARROW,
     );
-    assert_eq!(back.lens(), Lens::Tree);
     assert_eq!(
         cursor_line(&back),
         format!(">        + run {R1} ended #1..4")
@@ -209,6 +207,7 @@ fn every_key_the_viewer_reads_names_its_action() {
         (Key::Enter, Some(Action::OpenDetail)),
         (Key::Esc, Some(Action::CloseDetail)),
         (Key::Char('q'), Some(Action::Quit)),
+        (Key::Interrupt, Some(Action::Quit)),
         (Key::Char('x'), None),
     ];
     for (key, action) in table {
