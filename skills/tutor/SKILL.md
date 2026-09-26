@@ -1,10 +1,10 @@
 ---
 name: tutor
 description: "Discovery teaching: take one specific person to the level where they can diagnose a subject, driven by dialogue, verifiable outcomes, and the learner's own words as evidence, producing no courseware. Use when the user asks to be taught something, to start or continue a learning track, to record its progress, or to judge how far someone has gotten."
-license: CC BY-NC 4.0
+license: MPL-2.0
 ---
 
-> **Provenance and license.** The original of this skill is 2youg1's own Chinese-language open-source skill, published under AGPL-3.0-or-later. This file is its English translation and adaptation, and the license is changed **only within this project**: it carries CC BY-NC 4.0 here, while the original remains AGPL-3.0-or-later. Reuse owes credit to the author, and no commercial use without separate permission.
+> **Provenance and license.** The original of this skill is 2youg1's own Chinese-language open-source skill, published under AGPL-3.0-or-later. This file is its English translation and adaptation by the same author, and it carries MPL-2.0 here, the license of the rest of this repository; the original remains AGPL-3.0-or-later.
 
 # Discovery Teaching
 
