@@ -71,7 +71,7 @@ pub(crate) use driving::{Driven, Driving};
 pub(crate) use folds::Standing;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 use genesis::city_segment;
-pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
+pub use genesis::{Adopt, InitReport, form_city, init_city};
 pub(crate) use mcp::McpLink;
 use mcp::{connect_mcp, mounts_under, transport_site};
 use naming::{building_of, governed_of, name_of, not_built, scope_of};

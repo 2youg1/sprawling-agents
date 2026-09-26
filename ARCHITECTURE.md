@@ -177,6 +177,7 @@ assembly point. `bin::assembly` knows every concrete type, so the modules
 it assembles never name it back (sprawling-SPEC 8-92).
 
 ```directions
+crates/sprawling/src/doctor: crate::assembly
 ```
 
 What each unit owns is stated once, in §1's figure. It is not repeated
