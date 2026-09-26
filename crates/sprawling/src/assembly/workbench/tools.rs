@@ -264,14 +264,17 @@ impl RunWorker {
     /// Another building's rules are read each time a path lands in it,
     /// not here, so a run that stays in its own building never pays for
     /// them, and a building made confidential after this dispatch is
-    /// closed from that moment (city-SPEC 12.2).
+    /// closed from that moment (city-SPEC 12.2). What was read stays
+    /// for this run while the file's stamp holds (city-SPEC 12.3).
     fn read_bound(&self, site: &Site) -> runtime::ReadBound {
-        let city_root = self.city_root.clone();
+        let rules = city::RulesCache::new(&self.city_root);
         let home = site.building.addr().clone();
         std::sync::Arc::new(move |target: &Address| {
             kernel::address::may_read(&home, target, || {
                 let holder = city::Building::of(target)?;
-                city::load(&city_root, holder.addr()).map(|rules| rules.policy().confidential)
+                rules
+                    .load(holder.addr())
+                    .map(|rules| rules.policy().confidential)
             })
         })
     }

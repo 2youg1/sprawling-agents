@@ -402,6 +402,16 @@ what = "bytes read by one LedgerIndex::refresh that folds a single appended reco
 measured_by = "cargo test -p memory --lib -- --nocapture a_refresh_reads_the_appended_tail_rather_than_the_segment (the test prints the Refreshed::Appended reading beside the segment length)"
 status = "measured, not gated: 191 B read out of a 76,180 B segment, which is the one appended record and nothing else (2026-09, 401-record fixture). The test asserts the equality rather than a threshold, so a gate here would be a second authority over the same claim"
 
+# One rules lookup the read bound makes when a model-chosen path lands in
+# another building. `city::RulesCache` keeps what a run read while the
+# file's modification time and length hold, so a repeat costs one stat
+# instead of a read and a TOML evaluation. On Windows the stat opens a
+# handle, which is the floor of this design.
+[rules_lookup]
+what = "ns per rules lookup for another building, a fresh city::load against city::RulesCache::load, alternating rounds"
+measured_by = "cargo test --release -p city --lib rules_lookup_reading -- --ignored --nocapture"
+status = "measured, not gated: median of 15 rounds of 2000, three runs, load 186,793-212,885 ns against cache 76,112-91,730 ns (release test profile, Windows NTFS, sixteen cores shared by eight build lanes)"
+
 # Read amplification on a range retrieval: the bytes a `Vfs` hands back
 # while `Cas::get_range` answers, over the bytes in the answer.
 #
