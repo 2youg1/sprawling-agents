@@ -24,6 +24,10 @@ tokio-tungstenite = { workspace = true }
 # The person's own layer is TOML for the reason a city's CONFIG.toml is:
 # it is a file somebody edits by hand while the city is stopped.
 toml = { workspace = true }
+# A core thread raises itself above the commands it dispatches; the
+# crate's surface is safe, so no foreign call lives in this crate
+# (sprawling-SPEC.md 8-93).
+thread-priority = "3.1"
 zeroize = { workspace = true }
 
 [features]

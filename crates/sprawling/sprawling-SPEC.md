@@ -3582,3 +3582,37 @@ pub(super) fn written(err: &AxError, form: Form) -> String;
 2. 帧写错退 2 而不是 1。帧在开 socket 之前解析，错在这条命令行本身，与城无关；被否决的备选是沿用 `WireMismatch` 的 1，它让一个拼错的帧和城的真实拒绝无法区分。
 3. 握手之后断开归 1 而不是 4。那时已经有城答过 `Welcome`，城在；断开是这次对话的失败，不是地址上没有城。
 4. `--json` 的拒绝是 `AxError` 自己的 serde，而不是另起一个命令行专用的 JSON 形状。wire 上的 `Refusal` 已经是这个形状，一个 agent 用同一个反序列化读城的拒绝和命令行的拒绝；另起一种形状，就要在两处维持同一组字段。
+
+## 8-93 核心线程站在正常档之上，空转就降回（`bin::serving::standing`，形状：状态机）
+
+agent 派出的命令从低于正常的档位起动（runtime-SPEC §8-13-3）；本节把另一半补上：核心自己的线程——写线程 `sprawling-runs`（记账）与视图线程 `sprawling-views`——起动时各把自己升到正常档之上一级，于是一台被构建占满的机器上，记账与折叠仍排在派出的命令前面。升在线程一级而不是进程一级：进程档位在 Windows 上要对自身句柄调 `SetPriorityClass`，没有安全接口；线程档位有。
+
+```rust
+// bin::serving::standing —— shape: state machine
+pub(crate) enum CorePriority { Raised, Normal }   // 人的设置；Normal 即「关掉高优先级」
+pub(crate) enum Standing { Raised, Normal(Held) } // 这条线程实际站在哪一档
+pub(crate) enum Held { ByTheSetting, Refused(String), ByTheValve }
+pub(crate) fn raise_this_thread(setting: CorePriority) -> Standing;
+pub(crate) fn lower_this_thread() -> Standing;
+pub(crate) struct Valve;                           // 忙了多久，是否该降回
+impl Valve {
+    pub(crate) fn new(limit: Duration, now: Instant) -> Self;
+    pub(crate) fn record(&mut self, woke: Instant, slept: Instant); // 一次醒来到下一次阻塞
+    pub(crate) fn verdict(&self) -> Verdict;                         // Keep | Lower
+}
+pub(crate) const BUSY_LIMIT: Duration; // 10 s
+```
+
+- **升到哪一档**：`thread-priority` 的跨平台值 70，在 Windows 上是 `THREAD_PRIORITY_ABOVE_NORMAL`（正常档进程里基准优先级 9，派出的 `BELOW_NORMAL_PRIORITY_CLASS` 子进程是 6）。Unix 上升档要 `CAP_SYS_NICE`；没有时操作系统拒绝，线程留在正常档，`Standing::Normal(Held::Refused(原因))` 把原因带回来——相对效果由子进程的 `nice` 给出，不靠这一步。
+- **设置**：`CorePriority::Normal` 让 `raise_this_thread` 不调任何平台接口，返回 `Standing::Normal(Held::ByTheSetting)`。
+- **安全阀**：升了档的线程若空转，会拖住整台机器。每条升档线程带一个 `Valve`，每处理完一件事记一次「醒来—再次阻塞」；窗口长 `BUSY_LIMIT`，窗口走完时忙的时间占到窗口的 15/16 以上，`verdict` 变成 `Lower`，并且此后一直是 `Lower`。线程见到 `Lower` 就调 `lower_this_thread` 回到正常档，向标准错误写一行说给人：哪条线程、忙了多久、已降回正常档。时间作参数传入，`Valve` 本身不读钟，所以它的判定可以用编造的时刻在测试里逐点验证。
+- **量的是墙钟，不是 CPU 时间**：线程在两次阻塞之间走过的墙钟时间就是它占着核的时间的上界；升了档的线程很少被抢占，二者接近。读线程自己的 CPU 时间在 Windows 上是 `GetThreadTimes`，没有安全接口。
+- 证据：`crates/sprawling/src/serving/standing/tests.rs` 的 `a_raised_core_thread_stands_above_normal`（Windows 臂：升档后 `GetThreadPriority` 读回 `AboveNormal`）与 `a_thread_busy_through_the_window_is_lowered`（忙满一个窗口的线程被判降回，忙一半的不被判）。
+
+**决定**
+
+1. 线程档位取第一档「安全 Rust」：`thread-priority` 对外只给安全接口（内部的 `SetThreadPriority`／`GetThreadPriority` 由它负责），不需要 Zig 叶子——一次只传句柄与常量的调用没有 `(ptr, len)` 边界可以放在 Zig 后面，Rust 侧调用 `extern` 的那一处 `unsafe` 也省不掉。被否：本仓自己写 `unsafe` 调 `SetPriorityClass` 把整个进程升到 `HIGH_PRIORITY_CLASS`——没有测量表明它全局最佳，而且会把 tokio 的每条线程与所有空转风险一起升上去。重开参数：出现只有进程档才能挡住的延迟（线程档升满后 relay 往返 p50 满载与空闲之比仍大于 1.2）。
+2. 安全阀量墙钟而不量 CPU 时间：读线程 CPU 时间没有第一档的路；墙钟只会高估忙的程度，所以阀只会降得早，不会降得晚。重开参数：出现对外只给安全接口、读线程 CPU 时间的 crate。
+3. 降回之后不再升：一条线程空转过一次，就说明它的工作量不配占在派出的命令前面，反复升降只会让人看到忽快忽慢。
+
+**尚未做到的（本节接口的当前状态）**：`CorePriority` 的来源——人的配置文件里关掉高优先级的那一项——还没有读者，两条线程收到的都是 `CorePriority::Raised`；降回时写的是标准错误而不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）；socket 服务在 tokio 的线程上，还没有升档；doctor 还不报告每个平台实际站在哪一档。

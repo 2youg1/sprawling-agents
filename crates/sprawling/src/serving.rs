@@ -35,6 +35,7 @@ pub(crate) mod journal;
 pub(crate) mod pool;
 pub(crate) mod relay;
 pub(super) mod serve;
+mod standing;
 #[cfg(test)]
 mod tests;
 pub(super) mod worker;

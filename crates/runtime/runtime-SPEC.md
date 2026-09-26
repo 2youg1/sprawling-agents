@@ -595,7 +595,7 @@ pub(super) fn one_level_down(Command) -> Command;
 
 **决定（M78，平台调用的取法）**：子进程的 CPU 优先级取第一档「安全 Rust」——`creation_flags` 与 `nice` 都是对外只给安全接口的现成路，不需要 Zig 叶子，也不需要 Lean 证明边界。**被否**：①起动后再对子进程调 `SetPriorityClass`／`setpriority`——要 FFI（`unsafe` 或 Zig 叶子），且子进程在改档之前已经以正常档跑了一段；②Unix 上用 `CommandExt::pre_exec` 调 `nice(2)`——`pre_exec` 本身是 `unsafe`。**重开参数**：Unix 主机上出现不带 `nice` 的受支持平台，或测得多包一层 `nice` 的起动开销占到一条命令墙钟时间的可见比例。
 
-**未决（§3 口径）**：本节只落了 S5.9L 的第一段。剩下的各段各有自己的平台调用：核心自己升到 `HIGH_PRIORITY_CLASS` 与空转安全阀（对自身进程改档，标准库没有安全接口）、后台线程的后台模式与子进程 IO 优先级（`PROCESS_MODE_BACKGROUND_BEGIN` 只能由进程自己设，`ionice` 在 Unix）、带内存上限的 Job Object（即 §8-13-2 的 `WindowsJobObject` 臂）、重命令共用的额度池与按可用内存排队的 run 数、doctor 说出每个平台实际得到的档位、以及「后台负载占满所有核时 relay 往返与事件到屏幕的 p50 与空闲之比 ≤ 1.2」的实测与 budgets 行。这些要么需要 Zig 叶子或 Lean 边界，要么需要在满载机器上实测；落地时各写进本节。
+**未决（§3 口径）**：核心线程升到正常档之上一级与空转安全阀在 sprawling-SPEC §8-93。其余几段各卡在一个事实上：带内存上限的 Job Object（§8-13-2 的 `WindowsJobObject` 臂）——`win32job` 2.0.3 是对外只给安全接口的唯一现成路，但它只能设每个进程的工作集上下界（`JOB_OBJECT_LIMIT_WORKINGSET`，超出时换页而不是拒绝分配），整个 job 的提交内存上限（`JOB_OBJECT_LIMIT_JOB_MEMORY`）所在的字段是 crate 私有的，要么等它公开这一项，要么按平台调用规则另择一路；重命令共用的额度池与按可用内存排队的 run 数要先有整机可用内存的读数（`bin::monitor` 的采样由调用方给出读数，本身不读平台）；Unix 子进程的 IO 优先级（`nice` 外再包 `ionice -c 2 -n 7`）先红与转绿只能在 Linux 上看到。
 
 ### 8-14 runtime::tools 四件（形状 4；tools.rs 为纯索引）
 
