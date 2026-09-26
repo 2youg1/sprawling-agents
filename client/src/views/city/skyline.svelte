@@ -19,7 +19,7 @@
   // `glow` or `ground` a second time.
 
   import type { RunBelief } from "../../core/belief";
-  import { within } from "../../core/belief/live";
+  import { heldWithin } from "../../core/belief/rooms";
   import { fill, say } from "../../core/lang";
   import { fraction } from "../../core/share";
   import { ui } from "../../ui";
@@ -214,8 +214,7 @@
   }
 
   const drawing = $derived.by((): Drawing => {
-    const runs = Object.values($belief.runs).sort((a, b) => (a.started ?? 0) - (b.started ?? 0));
-    const of = (addr: string): RunBelief[] => runs.filter((run) => within(run, addr));
+    const of = (addr: string): RunBelief[] => heldWithin($belief, addr);
     const hall = city.buildings.find((each) => each.addr === "hall");
     const others = city.buildings
       .filter((each) => each.addr !== "hall")
