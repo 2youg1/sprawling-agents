@@ -19,8 +19,8 @@ use crate::assembly::*;
 
 fn speaking_signal(id: &str, room: &Address) -> collab::Signal {
     collab::Signal::new(
-        collab::SignalId::parse(id).unwrap(),
-        collab::SignalKind::Mention,
+        kernel::event::record::SignalId::parse(id).unwrap(),
+        kernel::event::record::SignalKind::Mention,
         "ito".to_owned(),
         room.clone(),
         kernel::Version::new(1),

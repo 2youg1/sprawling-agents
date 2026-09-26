@@ -89,12 +89,12 @@ impl RunWorker {
                 serde_json::Value::String(notice.line.clone()),
             );
             sent.push(collab::SignalEffect::Enqueued(collab::Signal::new(
-                collab::SignalId::parse(&format!(
+                kernel::event::record::SignalId::parse(&format!(
                     "blocked-{}-{}",
                     building.as_str().replace('/', "-"),
                     notice.about
                 ))?,
-                collab::SignalKind::Mention,
+                kernel::event::record::SignalKind::Mention,
                 who.to_owned(),
                 to,
                 kernel::Version::FIRST,

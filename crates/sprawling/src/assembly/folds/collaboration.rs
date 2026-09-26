@@ -93,7 +93,9 @@ impl CollaborationFold {
                 // it cannot read: a consumption skipped here is a
                 // signal the rebuild believes is still waiting, and a
                 // resident is handed it a second time.
-                let taken = collab::SignalConsumed::from_payload(record.data())?;
+                let taken = record
+                    .data()
+                    .read::<kernel::event::record::SignalConsumed>()?;
                 self.consumed.insert(taken.id.as_str().to_owned());
             }
             EventKind::GoalRegistered => self.goals.push(record.data().read()?),

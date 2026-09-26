@@ -28,8 +28,8 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
     // The two lines exactly as `effect` writes them: the consumption
     // carries only the id and the taker, and its room is the line's addr.
     let signal = collab::Signal::new(
-        collab::SignalId::parse("sig-1").unwrap(),
-        collab::SignalKind::Thread,
+        kernel::event::record::SignalId::parse("sig-1").unwrap(),
+        kernel::event::record::SignalKind::Thread,
         "lab/room2".to_owned(),
         room.clone(),
         kernel::Version::new(1),

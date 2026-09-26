@@ -81,8 +81,9 @@ fn draft(n: u64) -> Result<EventDraft, String> {
     // A signal line as `collab` writes it, so the fold scenario reads
     // every line through the reader production uses.
     let signal = collab::Signal::new(
-        collab::SignalId::parse(&format!("bench-s{n}")).map_err(|e| e.to_string())?,
-        collab::SignalKind::Mention,
+        kernel::event::record::SignalId::parse(&format!("bench-s{n}"))
+            .map_err(|e| e.to_string())?,
+        kernel::event::record::SignalKind::Mention,
         "bench".to_owned(),
         room.clone(),
         kernel::Version::new(1),

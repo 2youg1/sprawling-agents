@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What residents did together: the goals a building pursues, and the
-//! ground two goals met on.
+//! What residents did together: the goals a building pursues, the
+//! ground two goals met on, and the signals they send one another.
 //!
 //! `goal_registered` has no struct here: its payload is the
 //! [`GoalEntry`](crate::GoalEntry) the goal register holds, written and
@@ -12,7 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{AxCode, AxError, GoalId, PursuitState};
+use crate::{Address, AxCode, AxError, GoalId, Payload, PursuitState, TimeMs, Version};
 
 /// `goal_conflict`: a goal that asked for ground another goal holds,
 /// and how far up the settling had to go.
@@ -85,11 +85,156 @@ impl PursuitChanged {
     }
 }
 
+/// `signal_enqueued`: the signal itself, and the line it waits in.
+///
+/// `collab::Signal` writes it and reads it back; the queue rebuilt after
+/// a restart and every view of what is waiting read the same struct, so
+/// the seven keys have one spelling.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalEnqueued {
+    pub id: SignalId,
+    pub kind: SignalKind,
+    pub from: String,
+    pub room: Address,
+    pub room_version: Version,
+    pub payload: Payload,
+    pub at: TimeMs,
+    /// Written for a reader outside collab and never trusted on the way
+    /// back: the lane is derived from `kind`, and reading a stored copy
+    /// would let a line say which lane it took while the derivation says
+    /// another. Absent on a line written before the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lane: Option<Lane>,
+}
+
+/// `signal_consumed`: which signal was taken, and by whom. The content
+/// is already in the enqueue line, and history does not need it twice.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalConsumed {
+    pub id: SignalId,
+    pub by: String,
+}
+
+/// Which line a signal waits in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Lane {
+    Urgent,
+    Ordinary,
+}
+
+/// A signal's identity, and the thing duplicates are recognised by.
+///
+/// It serializes as the string [`SignalId::parse`] accepted and reads
+/// back through that same parse, so a ledger line carrying an id meets
+/// the grammar once rather than once per reader.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct SignalId(String);
+
+impl TryFrom<String> for SignalId {
+    type Error = AxError;
+
+    fn try_from(raw: String) -> Result<SignalId, AxError> {
+        SignalId::parse(&raw)
+    }
+}
+
+impl From<SignalId> for String {
+    fn from(id: SignalId) -> String {
+        id.0
+    }
+}
+
+impl SignalId {
+    /// # Errors
+    /// Refuses an empty id and one carrying whitespace: an id is
+    /// compared, logged and replayed, and all three go wrong quietly
+    /// when it can contain a space.
+    pub fn parse(raw: &str) -> Result<SignalId, AxError> {
+        if raw.is_empty() || raw.chars().any(char::is_whitespace) {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "read a signal id",
+                format!("{raw:?}"),
+            )
+            .with_recovery(
+                "use a non-empty id with no whitespace, such as a run id and a counter",
+            ));
+        }
+        Ok(SignalId(raw.to_owned()))
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// What kind of communication a signal is. `Steer` is a fourth kind
+/// rather than a flag beside the other three: it is the only one that
+/// overtakes, and urgency has to belong to the signal for one id to
+/// always take one lane.
+///
+/// Its serde form goes through [`SignalKind::as_str`] and
+/// [`SignalKind::parse`] rather than through a derived renaming, so the
+/// four wire words are spelled in one place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub enum SignalKind {
+    Mention,
+    Thread,
+    Broadcast,
+    Steer,
+}
+
+impl SignalKind {
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SignalKind::Mention => "mention",
+            SignalKind::Thread => "thread",
+            SignalKind::Broadcast => "broadcast",
+            SignalKind::Steer => "steer",
+        }
+    }
+
+    /// # Errors
+    /// Refuses a kind this version does not know.
+    pub fn parse(raw: &str) -> Result<SignalKind, AxError> {
+        match raw {
+            "mention" => Ok(SignalKind::Mention),
+            "thread" => Ok(SignalKind::Thread),
+            "broadcast" => Ok(SignalKind::Broadcast),
+            "steer" => Ok(SignalKind::Steer),
+            other => {
+                Err(
+                    AxError::failure(AxCode::InvalidArgs, "read a signal kind", other.to_owned())
+                        .with_recovery("mention, thread, broadcast or steer"),
+                )
+            }
+        }
+    }
+}
+
+impl TryFrom<String> for SignalKind {
+    type Error = AxError;
+
+    fn try_from(raw: String) -> Result<SignalKind, AxError> {
+        SignalKind::parse(&raw)
+    }
+}
+
+impl From<SignalKind> for String {
+    fn from(kind: SignalKind) -> String {
+        kind.as_str().to_owned()
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {
     use super::*;
-    use crate::event::Payload;
 
     /// The bytes `bin::assembly::plans` wrote by hand: `step` always,
     /// `goal` only while a pursuit is still held.

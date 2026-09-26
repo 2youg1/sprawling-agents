@@ -209,7 +209,9 @@ impl Views {
                 self.waiting.entry(room).or_default().push(line);
             }
             EventKind::SignalConsumed => {
-                let taken = collab::SignalConsumed::from_payload(record.data())?;
+                let taken = record
+                    .data()
+                    .read::<kernel::event::record::SignalConsumed>()?;
                 if let Some(queue) = record.addr().and_then(|room| self.waiting.get_mut(room)) {
                     queue.retain(|held| held.id != taken.id.as_str());
                 }

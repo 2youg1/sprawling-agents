@@ -421,6 +421,13 @@ pub struct GoalConflict { pub goal: GoalId, pub with: GoalId, pub level: Conflic
 #[serde(rename_all = "snake_case")] pub enum ConflictLevel { Serialize, Arbitrate }
 // goal_registered 的载荷就是 GoalEntry 本身，不另立 struct：目标表持有的正是它
 impl PursuitChanged { pub fn held(self) -> Result<Option<(String, PursuitState)>, AxError>; }
+pub struct SignalEnqueued { pub id: SignalId, pub kind: SignalKind, pub from: String, pub room: Address,
+                            pub room_version: Version, pub payload: Payload, pub at: TimeMs,
+                            pub lane: Option<Lane> }   // lane 写出给 collab 之外的读者，回读不采信：它由 kind 推出
+pub struct SignalConsumed { pub id: SignalId, pub by: String }   // 内容已在 enqueue 行里，不写第二遍
+#[serde(rename_all = "snake_case")] pub enum Lane { Urgent, Ordinary }
+pub struct SignalId(String);                       // 非空、无空白；serde 经 parse／as_str
+pub enum SignalKind { Mention, Thread, Broadcast, Steer }   // serde 经 parse／as_str，四个线上词只一处
 pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
                              pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }
 pub struct RerankCalled { pub model: String, pub passages: u64, pub ranks: u64,

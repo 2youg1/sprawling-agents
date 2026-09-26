@@ -57,9 +57,8 @@ Signal｜Inbox｜Steer｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitrati
 ### 8-1 collab::inbox（形状 2 值类型＋形状 7 投影）
 
 ```rust
-pub struct SignalId(String);                       // 非空、无空白；去重的依据；serde 经 parse／as_str
-pub enum SignalKind { Mention, Thread, Broadcast, Steer }   // serde 经 parse／as_str，四个线上词只一处
-pub enum Lane { Urgent, Ordinary }                 // 由 kind 推出，不由调用方给
+// SignalId、SignalKind、Lane 与两条线的载荷 SignalEnqueued／SignalConsumed 住 kernel::event::record
+// （kernel-SPEC §8-4）：它们是 Ledger 行的形状，折叠与视图不经 collab 也要读
 pub struct Signal { /* id、kind、from、room、room_version、payload、at —— 私有 */ }
 impl Signal {
     pub fn new(id: SignalId, kind: SignalKind, from: String, room: Address,
@@ -68,10 +67,6 @@ impl Signal {
     pub fn enqueued_payload(&self) -> Result<Payload, AxError>;   // signal_enqueued
     pub fn consumed_payload(&self, by: &str) -> Result<Payload, AxError>;   // signal_consumed
     pub fn from_payload(payload: &Payload) -> Result<Signal, AxError>;      // enqueued_payload 的逆
-}
-pub struct SignalConsumed { pub id: SignalId, pub by: String }   // signal_consumed 的键，唯一权威
-impl SignalConsumed {
-    pub fn from_payload(payload: &Payload) -> Result<SignalConsumed, AxError>;
 }
 pub struct Inbox { /* 两条 memory::EventQueue＋bandwidth —— 私有 */ }
 impl Inbox {
@@ -92,7 +87,7 @@ impl Inbox {
 - **pull bandwidth 在接收方**：发送方推不动接收方的上下文窗口；一次 `pull` 最多取 bandwidth 件，Signal 在 prefix 里恒占零字节，常驻的只是 `status` 的 `signals_pending`。
 - **洪水交给 backpressure**：`deliver` 返回 `kernel::Admission`，削峰判定住 `kernel::backpressure`，计数住队列；本模块不自定义第二套限流。
 - **`E_SIGNAL_UNKNOWN` 已定义掉**：本模块自写自读载荷，kind 是穷尽枚举，一个本版本不认的 kind 只能来自更新的二进制写的 Ledger，而那已由版本方向门（`E_LOG_VERSION_UNSUPPORTED`）拒在外面；同一句话里不认的 kind 在本版本写入面也拼不出来（`SignalKind::parse` 拒它，报 `E_INVALID_ARGS`）。实测佐证：删除前全仓只有 `kernel::error` 自己提到它，零生产者。实施：删 `AxCode::SignalUnknown`，AxCode 36 → 35，kernel-SPEC §8-1 表随之删行。
-- **两条线上形状各有一个 serde 结构（7.7）**：`signal_enqueued` 的七个键住私有的 `SignalLine`，`signal_consumed` 的两个键住 `SignalConsumed`，写经 `Payload::of`、读经 `Payload::read`。此前同一批键在本文件里手拼一遍又手挑一遍，`lane` 的两个词也另拼一处。`lane` 仍然写出去给 crate 外的读者，但**回读时不采信**——它由 `kind` 推出，读一份存下来的副本就会让一条行说它走了另一条 lane。写在旧行上的读法不变：`lane` 缺席即照旧推出。
+- **两条线上形状各有一个 serde 结构（7.7）**：`signal_enqueued` 的键住 kernel 的 `SignalEnqueued`，`signal_consumed` 的两个键住 kernel 的 `SignalConsumed`，写经 `Payload::of`、读经 `Payload::read`，与其余 EventKind 的载荷同住一处；`Lane` 的推导（`Signal::lane`）留在本 crate。`lane` 仍然写出去给 crate 外的读者，但**回读时不采信**——它由 `kind` 推出，读一份存下来的副本就会让一条行说它走了另一条 lane。写在旧行上的读法不变：`lane` 缺席即照旧推出。
 - **`Signal::from_payload` 是 `enqueued_payload` 的逆**：没有它，投影重建就要在仓库里长出第二份 Signal 解析器。重建方式是**先筛后送**：从 Ledger 收齐 `signal_enqueued` 与 `signal_consumed` 两组 id，只把未被消费的按原序 `deliver` 一遍——于是队列不需要「按 id 删除」这个不属于队列的动作。
 
 ### 8-2 collab::steer（形状 2 值类型）
@@ -505,18 +500,12 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 
 **apisync 未重写基线。** `OpenRequest` 的定义模块从 `pr_tool` 移到私有的 `pr_tool::request`，公开路径仍是 `collab::OpenRequest`，`cargo xtask apisync` 对 collab 无差异。
 
-### 8-15 collab::inbox 目录化
+### 8-15 collab::inbox 的文件
 
-`inbox.rs` 原有 543 行，超出 400 行的文件上限，按「一个文件回答一个问题」切成四份：
+- `inbox.rs`——`Signal` 及其构造、访问器、`lane`、两条记录 `enqueued_payload`／`consumed_payload` 与逆 `from_payload`，以及接收侧 `Inbox` 的 `new`／`deliver`／`pull`／`take_steer`／`pending`。带参数豁免的 `Signal::new` 留在本文件。
+- `inbox/tests.rs`——去重、lane 次序、bandwidth 与两条记录，经生产入口。
 
-- `inbox.rs`（341 行）——`Lane`、`Signal` 及其构造、访问器、`lane`、两条记录 `enqueued_payload`／`consumed_payload`、私有的 `wire`／`from_wire` 与 `broken`，以及接收侧 `Inbox` 的 `new`／`deliver`／`pull`／`take_steer`／`pending`。它同时是索引位置，声明 `mod signal_id;`／`mod signal_kind;` 并 `pub use` 两个类型，因此 `lib.rs` 与 crate 外的 `use` 一行未改。带参数豁免的 `Signal::new` 留在本文件。
-- `inbox/signal_id.rs`（37 行）——`SignalId` 与它的 `parse`／`as_str`：重复投递靠什么被认出。
-- `inbox/signal_kind.rs`（50 行）——`SignalKind` 与它的 `as_str`／`parse`：四种通信各自的线上名字。
-- `inbox/tests.rs`（141 行）——原内联 `mod tests` 原样迁出，断言、名字与 7 个 `#[test]` 一个未动。
-
-**无字段开放。** `SignalId` 的元组字段仍是私有，两个子模块都只暴露原有的公开方法。
-
-**apisync 未重写基线。** `SignalId` 与 `SignalKind` 的定义模块从 `inbox` 移到私有的 `inbox::signal_id`／`inbox::signal_kind`，公开路径仍是 `collab::SignalId`／`collab::SignalKind`，`cargo xtask apisync` 对 collab 无差异。
+`SignalId`、`SignalKind`、`Lane` 不在本 crate：它们是 `signal_enqueued`／`signal_consumed` 两行的字段类型，与行的 struct 同住 `kernel::event::record`，于是折叠与视图读这两行时只依赖 kernel。本 crate 不再转出它们，调用方写 `kernel::event::record::SignalId`，路径只有一条。
 
 ### 8-16 collab::workshop_tool 目录化
 
