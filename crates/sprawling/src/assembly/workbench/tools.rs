@@ -61,12 +61,9 @@ impl RunWorker {
             self.vault_handle(),
             self.ledger.position().value(),
         );
-        // Who this run can reach, read once at dispatch and frozen with
-        // it. Nothing here can move under the run: the assembly is
-        // single-threaded, so no second run executes while this one
-        // drives, and a signal this run sends is delivered after the
-        // drive returns. The same value answers the `neighbours` tool
-        // and the count `status` reports.
+        // Who this run can reach, frozen at dispatch: the assembly runs
+        // one run at a time and a signal lands after the drive returns,
+        // so nothing moves under it. It answers `neighbours` and `status`.
         let seen =
             city::Neighbourhood::scan(&self.city_root, site.building.addr(), addr, &|room| {
                 self.rooms.pending(room)
