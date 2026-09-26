@@ -386,3 +386,7 @@ mod tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod booking_tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+mod catalog_tests;

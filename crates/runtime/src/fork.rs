@@ -292,3 +292,6 @@ pub use indexed::inherited_indexed;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod compaction_tests;

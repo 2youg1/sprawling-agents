@@ -118,7 +118,9 @@ fn frozen_runs_beyond_the_recent_few_leave_a_tombstone() {
     );
 }
 
-fn stating(run: RunId, seq: u64, kind: EventKind, field: &str, value: &str) -> EventRecord {
+/// A record whose payload states one field: `said` is the field and its value.
+fn stating(run: RunId, seq: u64, kind: EventKind, said: (&str, &str)) -> EventRecord {
+    let (field, value) = said;
     let mut data = serde_json::Map::new();
     data.insert(
         field.to_owned(),
@@ -148,8 +150,7 @@ fn the_fold_keeps_the_ending_the_pull_request_and_the_ask() {
         run,
         1,
         EventKind::ApprovalRequested,
-        "action_desc",
-        "publish",
+        ("action_desc", "publish"),
     ))
     .unwrap();
     assert_eq!(view.get(&run).unwrap().ask.as_deref(), Some("publish"));
@@ -159,12 +160,16 @@ fn the_fold_keeps_the_ending_the_pull_request_and_the_ask() {
         run,
         3,
         EventKind::PrOpened,
-        "branch",
-        "gate-btree",
+        ("branch", "gate-btree"),
     ))
     .unwrap();
-    view.apply(&stating(run, 4, EventKind::RunFrozen, "completion", "done"))
-        .unwrap();
+    view.apply(&stating(
+        run,
+        4,
+        EventKind::RunFrozen,
+        ("completion", "done"),
+    ))
+    .unwrap();
     let hot = view.get(&run).unwrap();
     assert_eq!(
         (hot.completion.as_deref(), hot.pr.as_deref()),
