@@ -72,7 +72,7 @@
     />
   </div>
   {#if bands.length === 0}
-    <p class="mt-wide text-note text-text-disabled">{say($lang, "results_none")}</p>
+    <p class="mt-wide text-note text-text-faint">{say($lang, "results_none")}</p>
   {/if}
   {#each bands as band (band.recency)}
     <section class="mt-wide" aria-label={say($lang, `results_${band.recency}`)}>

@@ -157,14 +157,14 @@
         {#each calls.slice(rows.first, rows.end) as placed, at (rows.first + at)}
           {@const took = tookOf(placed.call)}
           <li class="flex h-control-sm items-center gap-snug">
-            <span class="w-figure shrink-0 font-mono text-text-disabled"
+            <span class="w-figure shrink-0 font-mono text-text-faint"
               >{fill(say($lang, "run_turn_n"), { n: String(placed.turn) })}</span
             >
             <span class={["shrink-0 font-mono", placed.call.outcome === "failed" ? "text-alert" : "text-text"]}
               >{placed.call.tool}</span
             >
             <span class="min-w-0 flex-1 truncate font-mono text-text-quiet">{placed.call.subject ?? ""}</span>
-            <span class="shrink-0 font-mono text-text-disabled"
+            <span class="shrink-0 font-mono text-text-faint"
               >{took === null ? "" : lasted(took)}</span
             >
           </li>

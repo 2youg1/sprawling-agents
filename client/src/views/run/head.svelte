@@ -84,7 +84,7 @@
         <a href={toFragment({ kind: "building", address: buildingOf(room) })} class="text-text-faint"
           >{buildingOf(room)}</a
         >
-        <span class="text-text-disabled">/</span>
+        <span class="text-text-faint">/</span>
         <a href={toFragment({ kind: "talk", address: room })} class="text-text">{roomOf(room)}</a>
       </dd>
     </div>

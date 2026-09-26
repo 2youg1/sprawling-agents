@@ -12,6 +12,7 @@ use crate::event::Payload;
 /// Asserts the meta is complete and the identity is fail-closed:
 /// a wrong-name call is refused with `E_INVALID_ARGS`, and the tool
 /// still answers after refusing (no poisoned state).
+#[cfg(feature = "conformance")]
 #[allow(
     clippy::panic,
     clippy::expect_used,

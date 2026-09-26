@@ -32,7 +32,7 @@ use super::{Broker, Connection};
 /// A broker this crate controls: answers each accepted connection with
 /// the next `(status, body)` in turn, and hands back every request it
 /// read once the list is spent.
-fn fake_broker(answers: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<Vec<String>>) {
+fn scripted_broker(answers: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<Vec<String>>) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let origin = format!("http://{}/", listener.local_addr().unwrap());
     let handle = std::thread::spawn(move || {
@@ -98,7 +98,7 @@ fn a_shelf_joins_the_directory_with_this_person_s_standings() {
         "items": [{ "toolkit_slug": "github", "status": "ACTIVE", "alias": "octocat" }]
     })
     .to_string();
-    let (url, handle) = fake_broker(vec![(200, directory), (200, standings)]);
+    let (url, handle) = scripted_broker(vec![(200, directory), (200, standings)]);
     let broker = Broker::at(&url, key()).unwrap();
 
     let shelf = broker.shelf("acme").unwrap();
@@ -132,7 +132,7 @@ fn a_shelf_joins_the_directory_with_this_person_s_standings() {
 fn connecting_reuses_an_auth_config_rather_than_making_a_second() {
     let held = serde_json::json!({ "items": [{ "id": "ac_kept" }] }).to_string();
     let opened = serde_json::json!({ "redirect_url": "https://consent.example/abc" }).to_string();
-    let (url, handle) = fake_broker(vec![(200, held), (200, opened)]);
+    let (url, handle) = scripted_broker(vec![(200, held), (200, opened)]);
     let broker = Broker::at(&url, key()).unwrap();
 
     let page = broker.connect("github", "acme").unwrap();
@@ -156,7 +156,7 @@ fn connecting_creates_a_managed_config_when_the_project_has_none() {
     let none = serde_json::json!({ "items": [] }).to_string();
     let made = serde_json::json!({ "id": "ac_new" }).to_string();
     let opened = serde_json::json!({ "redirect_url": "https://consent.example/x" }).to_string();
-    let (url, handle) = fake_broker(vec![(200, none), (200, made), (200, opened)]);
+    let (url, handle) = scripted_broker(vec![(200, none), (200, made), (200, opened)]);
     let broker = Broker::at(&url, key()).unwrap();
 
     assert!(broker.connect("github", "acme").is_ok());
@@ -175,7 +175,7 @@ fn a_slug_reaches_the_query_string_percent_encoded() {
     let none = serde_json::json!({ "items": [] }).to_string();
     let made = serde_json::json!({ "id": "ac_new" }).to_string();
     let opened = serde_json::json!({ "redirect_url": "https://consent.example/x" }).to_string();
-    let (url, handle) = fake_broker(vec![(200, none), (200, made), (200, opened)]);
+    let (url, handle) = scripted_broker(vec![(200, none), (200, made), (200, opened)]);
     let broker = Broker::at(&url, key()).unwrap();
 
     let _ = broker.connect("git hub/../admin", "acme");
@@ -190,7 +190,7 @@ fn a_slug_reaches_the_query_string_percent_encoded() {
 
 #[test]
 fn a_refused_key_reads_as_a_missing_credential_rather_than_a_provider_fault() {
-    let (url, handle) = fake_broker(vec![(401, "{}".to_owned())]);
+    let (url, handle) = scripted_broker(vec![(401, "{}".to_owned())]);
     let broker = Broker::at(&url, key()).unwrap();
 
     let refusal = broker.shelf("acme").unwrap_err();
@@ -215,7 +215,7 @@ fn a_failed_connection_keeps_the_reason_the_broker_gave() {
         }]
     })
     .to_string();
-    let (url, handle) = fake_broker(vec![(200, directory), (200, standings)]);
+    let (url, handle) = scripted_broker(vec![(200, directory), (200, standings)]);
     let broker = Broker::at(&url, key()).unwrap();
 
     let shelf = broker.shelf("acme").unwrap();
@@ -237,7 +237,7 @@ fn a_status_this_build_has_not_heard_of_offers_the_button_again() {
         "items": [{ "toolkit_slug": "github", "status": "SOMETHING_NEW" }]
     })
     .to_string();
-    let (url, handle) = fake_broker(vec![(200, directory), (200, standings)]);
+    let (url, handle) = scripted_broker(vec![(200, directory), (200, standings)]);
     let broker = Broker::at(&url, key()).unwrap();
 
     let shelf = broker.shelf("acme").unwrap();
