@@ -23,13 +23,16 @@
 use std::path::{Path, PathBuf};
 
 use kernel::{
-    Address, AxCode, AxError, CostTier, Effect, Payload, ReadVerdict, RenderIntent, Temporal, Tool,
-    ToolCall, ToolMeta, ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
+    ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
+mod descent;
+
 use super::chosen_path::{self, ReadBound, Walked};
 use crate::elision::{self, Elided};
+use descent::{Entry, admissible};
 
 /// How many hits one call may bring back. A search that filled the
 /// window would be a search nobody can afford to run twice.
@@ -218,8 +221,10 @@ impl SearchTool {
                     // Reversed, because the stack hands back what was
                     // pushed last and the answer is in name order.
                     for name in entries.into_iter().rev() {
-                        if let Some(child) = admissible(&rel, &name, &*self.bound) {
-                            pending.push((path.join(&name), child));
+                        match admissible(&rel, &name, &*self.bound) {
+                            Entry::Descend(child) => pending.push((path.join(&name), child)),
+                            Entry::Unread { child, why } => found.could_not_look(&child, why),
+                            Entry::Passed => {}
                         }
                     }
                 }
@@ -315,34 +320,6 @@ fn sorted_entries(path: &Path) -> std::io::Result<Vec<String>> {
         .collect();
     names.sort();
     Ok(names)
-}
-
-/// The child address the walk may descend to, or nothing.
-///
-/// Reservedness is asked of `kernel::Address`, the same primitive
-/// `read` reaches through `chosen_path`; a name that cannot be an
-/// address at all — one holding a backslash, a colon, a control
-/// character — is left alone, because this city cannot say where it is.
-/// Git's own metadata is inside that predicate too (kernel-SPEC 8-73),
-/// and scanning an object store yields hits nobody can act on.
-///
-/// The read bound is asked only at the city root: it answers for a
-/// building, a building is a top-level address, and all below one
-/// shares its answer, so no file costs another read of the rules.
-fn admissible(rel: &str, name: &str, bound: &dyn Fn(&Address) -> ReadVerdict) -> Option<String> {
-    let child = if rel.is_empty() {
-        name.to_owned()
-    } else {
-        format!("{rel}/{name}")
-    };
-    let addr = Address::parse(&child).ok()?;
-    if addr.is_reserved() {
-        return None;
-    }
-    if rel.is_empty() && !matches!(bound(&addr), ReadVerdict::Open) {
-        return None;
-    }
-    Some(child)
 }
 
 impl Tool for SearchTool {

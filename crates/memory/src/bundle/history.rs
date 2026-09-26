@@ -37,6 +37,39 @@ fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
     }
 }
 
+/// How much history a bundle's `history/` directory holds, the count
+/// its manifest states and a restore checks before it copies anything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct Carried {
+    pub(crate) packs: u64,
+    pub(crate) refs: u64,
+}
+
+impl Carried {
+    /// Counts the packs and ref lines under `bundle`'s history
+    /// directory; a bundle with none carries zero of each.
+    ///
+    /// # Errors
+    /// I/O failures naming the path.
+    pub(crate) fn of(vfs: &dyn Vfs, bundle: &Path) -> Result<Carried, MemoryError> {
+        let dir = bundle.join(HISTORY);
+        let at = dir.join(REFS);
+        let refs = match vfs.exists(&at) {
+            true => vfs
+                .read(&at)
+                .map_err(io_err("read the history refs", &at))?
+                .split(|byte| *byte == b'\n')
+                .filter(|line| !line.is_empty())
+                .count(),
+            false => 0,
+        };
+        Ok(Carried {
+            packs: u64::from(vfs.exists(&dir.join(PACK))),
+            refs: u64::try_from(refs).map_err(|_| malformed(&at))?,
+        })
+    }
+}
+
 /// Packs the history of the repository at `city_root` into `dest`.
 /// A city that is no repository has no history, and its bundle carries
 /// no history directory.
@@ -164,6 +197,29 @@ impl History {
             };
             (pack, text, at)
         } else {
+            // `open_bare` reads objects through `alternates` and resolves
+            // objects and refs against the path `commondir` names, both in
+            // stores the bundle never carried, so either one refuses.
+            for borrowed in [
+                whole.join("objects").join("info").join("alternates"),
+                whole.join("commondir"),
+            ] {
+                match borrowed.symlink_metadata() {
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(err) => {
+                        return Err(io_err("inspect borrowed history storage", &borrowed)(err));
+                    }
+                    Ok(_) => {
+                        return Err(MemoryError::Bundle {
+                            op: "restore",
+                            detail: format!(
+                                "{} borrows history from outside the bundle",
+                                borrowed.display()
+                            ),
+                        });
+                    }
+                }
+            }
             let repo = git2::Repository::open_bare(&whole).map_err(|err| MemoryError::Bundle {
                 op: "restore",
                 detail: format!(
