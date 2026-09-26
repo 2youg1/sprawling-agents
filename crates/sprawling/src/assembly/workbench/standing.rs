@@ -125,6 +125,7 @@ impl RunWorker {
             building,
             rules,
             model,
+            provider,
             adapter,
             retries,
         } = agreed;
@@ -205,6 +206,7 @@ impl RunWorker {
             rules,
             config,
             model,
+            provider,
             adapter: Some(adapter),
             identity,
             who,

@@ -136,6 +136,7 @@ impl RunWorker {
         self.renew_if_stale(&chosen.endpoint.name.clone())?;
         let chosen = self.book.select(kernel::ModelTag::Main, rules.policy())?;
         let model = chosen.entry.clone();
+        let provider = chosen.endpoint.name.clone();
         let adapter = gateway::adapter_for(
             &chosen,
             self.redemption()?,
@@ -152,6 +153,7 @@ impl RunWorker {
             building,
             rules,
             model,
+            provider,
             adapter,
             retries,
         })
