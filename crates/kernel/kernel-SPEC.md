@@ -2102,3 +2102,28 @@ impl CityLayout {
 - `SANDBOX_FUEL_DEFAULT`：`SandboxLimits.fuel` 是裸 `u64`，域未设。
 - `STARTUP_BUDGET_TOKENS`／`BYTES_PER_TOKEN`／`LOOP_REPEAT_THRESHOLD`／`OFFLOAD_MIN_BYTES`／`DRAFT_HELD_ESCALATE`／`EDIT_WAR_FREEZE`／`DISCARD_FILES_MAX`／`DISCARD_RETENTION_DAYS`：算术输入或判定输入，无拒因句式，保持裸数即是正确形状。
 - `PREFIX_SLOTS`：域已在类型上（`NonZeroU64`），不迁。
+
+### 8-74 `kernel::keep_warm`：缓存保温的设置与判定（形状 1 判定）
+
+**设置与判定住 kernel，因为读它的两处互不依赖**：`city::config_layers` 把 `[cache] keep_warm` 读成这个值，runtime 按它排续期；两个 crate 只共有 kernel，所以枚举的拼法与「何时续期」只能在这里各有一处定义。
+
+```rust
+/// 城的保温设置。默认 Off：Off 时本模块不排任何续期，城不会多发一条请求。
+#[derive(Default)] #[serde(rename_all = "snake_case")]   // 缺省 Off
+pub enum KeepWarm { Off, FiveMinute }
+/// 一个前缀的缓存状态：最近一次真实请求带它发出的时刻，与缓存最近一次被刷新的时刻（毫秒）。
+pub struct CacheUse { /* used_ms、refreshed_ms —— 私有；refreshed_ms ≥ used_ms 由构造保证 */ }
+impl CacheUse {
+    pub fn sent(at_ms: u64) -> CacheUse;                  // 一条真实请求带着它发出
+    pub fn renewed(self, at_ms: u64) -> CacheUse;         // 一条续期请求刷新了它，不改 used_ms
+}
+/// 下一条续期请求的发出时刻；None＝不续期。lead_ms 是调用方测得的到 provider 的往返时长，
+/// 续期提前这么久发出，使 provider 在 TTL 到期前读到它。
+pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u64>;
+```
+
+- 判定：`FiveMinute` 时，续期时刻＝`refreshed_ms + PROMPT_CACHE_TTL_SECS·1000 − lead_ms`（饱和减）；该时刻距 `used_ms` 超过一个 TTL 即不续期。所以「最近 5 分钟内用过」与缓存寿命是同一个常数 `consts_external::PROMPT_CACHE_TTL_SECS`，不另立第二个 300。一次真实使用最多换来一次续期：续期不改 `used_ms`，第二次续期的时刻必然离真实使用超过一个 TTL。
+- `lead_ms` 由调用方对所连 provider 实测给出，不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
+- 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。
+- 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（city-SPEC §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
+- 现状：设置与判定已落地，按判定排定时器并经 gateway 发出续期请求尚未接线，因此今天任何配置下城都不发续期请求。

@@ -237,29 +237,6 @@ pub fn verified_system_hashes(system: &[SystemBlock], frozen: &[B3Hash; 4]) -> R
 - 分段哈希经 `B3Hash::digest`（kernel 唯一哈希产地）；A4（同输入同字节）由 golden 断言，A15 重建器随 S3。
 - trybuild 反例：`FrozenSegment::from(TimeMs)`／把 TimeMs 传进 assemble —— 无转换路径，编译不过（ClockStamp 等类型落地后同规逐个加反例）。
 
-#### 8-4-2 runtime::prefix::keep_warm（形状 1 判定；缓存保温的唯一判定处）
-
-```rust
-/// 城的保温设置。默认 Off：Off 时本模块不排任何续期，城不会多发一条请求。
-#[derive(Default)] #[serde(rename_all = "snake_case")]
-pub enum KeepWarm { #[default] Off, FiveMinute }
-/// 一个前缀的缓存状态：最近一次真实请求带它发出的时刻，与缓存最近一次被刷新的时刻（毫秒）。
-pub struct CacheUse { /* used_ms、refreshed_ms —— 私有；refreshed_ms ≥ used_ms 由构造保证 */ }
-impl CacheUse {
-    pub fn sent(at_ms: u64) -> CacheUse;                  // 一条真实请求带着它发出
-    pub fn renewed(self, at_ms: u64) -> CacheUse;         // 一条续期请求刷新了它，不改 used_ms
-}
-/// 下一条续期请求的发出时刻；None＝不续期。lead_ms 是调用方测得的到 provider 的往返时长，
-/// 续期提前这么久发出，使 provider 在 TTL 到期前读到它。
-pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u64>;
-```
-
-- 判定：`FiveMinute` 时，续期时刻＝`refreshed_ms + PROMPT_CACHE_TTL_SECS·1000 − lead_ms`（饱和减）；该时刻距 `used_ms` 超过一个 TTL 即不续期。所以「最近 5 分钟内用过」与缓存寿命是同一个常数 `kernel::consts_external::PROMPT_CACHE_TTL_SECS`，不另立第二个 300。一次真实使用最多换来一次续期：续期不改 `used_ms`，第二次续期的时刻必然离真实使用超过一个 TTL。
-- `lead_ms` 由调用方对所连 provider 实测给出，不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
-- 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。
-- 续期请求带的断点沿用 `prefix::breakpoint::BreakpointPlan`，本模块不决定断点。
-- 现状：判定已落地；城／楼配置键 `[cache] keep_warm` 的解析、按判定排定时器并经 gateway 发出续期请求，这两处尚未接线，因此今天任何配置下城都不发续期请求。
-
 ### 8-5 runtime::handoff（形状 2）
 
 ```rust
