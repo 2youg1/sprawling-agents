@@ -196,7 +196,7 @@ impl Prepared {
             },
             // A settings file that cannot be read is "I could not
             // look", not an empty set of preferences.
-            Self::Preferences => match crate::person::read() {
+            Self::Preferences => match accounting::person::read() {
                 Ok(settled) => channels::Answer::Preferences(Box::new(settled)),
                 Err(_) => unavailable("Preferences".to_owned()),
             },

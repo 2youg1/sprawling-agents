@@ -11,6 +11,8 @@
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
+use accounting::person::CorePriority;
+
 /// The monotonic sampling point: how long a thread stayed busy is a span,
 /// and a wall clock that steps would misstate it (sprawling-SPEC.md
 /// 8-93). Here rather than beside the wall clock in `bin::assembly`,
@@ -26,13 +28,6 @@ pub(crate) fn monotonic_now() -> Instant {
 
 /// How long a raised thread may stay busy before the valve lowers it.
 pub(crate) const BUSY_LIMIT: Duration = Duration::from_secs(10);
-
-/// Whether the core's threads are raised: the setting a person turns off.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CorePriority {
-    Raised,
-    Normal,
-}
 
 /// Where a thread actually stands after asking.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,7 +118,7 @@ impl CoreThread {
 /// when it cannot be read: raising has a machine-wide cost, so it waits
 /// for a reading that allows it.
 pub fn setting_telling_a_refusal() -> CorePriority {
-    crate::person::core_priority().unwrap_or_else(|err| {
+    accounting::person::core_priority().unwrap_or_else(|err| {
         eprintln!("the core stays at normal priority: {err}");
         CorePriority::Normal
     })

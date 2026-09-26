@@ -175,7 +175,7 @@ impl Absence {
                 format!("{variable} names {}, which is not there", path.display())
             }
             Absence::NoComponent { dir } => format!("no component at {}", dir.display()),
-            Absence::NoHome => crate::home::NO_HOME.to_owned(),
+            Absence::NoHome => accounting::home::NO_HOME.to_owned(),
             Absence::NotInThisBuild => "not in this build".to_owned(),
         }
     }

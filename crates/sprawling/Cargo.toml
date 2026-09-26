@@ -32,8 +32,7 @@ sysinfo = { version = "0.37", default-features = false, features = ["system", "d
 cpu-time = "1"
 memory-stats = "1.2"
 tokio-tungstenite = { workspace = true }
-# The person's own layer is TOML for the reason a city's CONFIG.toml is:
-# it is a file somebody edits by hand while the city is stopped.
+# Codex keeps its provider table in TOML, and `import` reads it.
 toml = { workspace = true }
 # A core thread raises itself above the commands it dispatches; the
 # crate's surface is safe, so no foreign call lives in this crate

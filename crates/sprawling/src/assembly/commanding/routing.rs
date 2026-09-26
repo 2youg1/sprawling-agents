@@ -203,7 +203,7 @@ impl RunWorker {
             // own layer and no run can observe it, so a record of it
             // in the city's one history would travel to every machine
             // that city is copied to.
-            channels::Command::PutPreferences { patch, .. } => crate::person::put(patch),
+            channels::Command::PutPreferences { patch, .. } => accounting::person::put(patch),
             channels::Command::PutShelved { name, .. } => Err(not_built(
                 "write a shelved document",
                 name.clone(),

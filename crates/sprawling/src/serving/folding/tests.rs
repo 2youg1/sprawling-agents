@@ -10,8 +10,8 @@ use kernel::EventRecord;
 
 use super::{Broadcast, Copies, spawn_folding};
 use crate::assembly::init_city;
-use crate::serving::standing::CorePriority;
 use crate::views::{Published, Views, answer_outside_the_lock};
+use accounting::person::CorePriority;
 
 /// A reader in the middle of a query holds up neither the writer nor the
 /// fold: the observer returns, and the record is folded and broadcast,

@@ -19,7 +19,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::home::Home;
+use accounting::home::Home;
 
 /// How long the WebUI waits for its own city. Everything a city does
 /// before it binds - verifying the chain, folding the views, starting the
@@ -71,7 +71,7 @@ pub enum BesideBinary {
 pub fn default_city(exe_dir: &Path, home: Option<&Home>, beside: BesideBinary) -> PathBuf {
     match (beside, home) {
         (BesideBinary::Writable, _) | (BesideBinary::ReadOnly, None) => {
-            exe_dir.join(crate::home::CITY_DIR)
+            exe_dir.join(accounting::home::CITY_DIR)
         }
         (BesideBinary::ReadOnly, Some(home)) => home.default_city(),
     }

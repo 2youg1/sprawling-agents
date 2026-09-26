@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one layer that is the person's rather than a city's
-//! (sprawling-SPEC.md section 8-77).
+//! (accounting-SPEC.md section 8-8).
 //!
 //! What somebody settled about how they read their cities — the
 //! language, the appearance, the chords they rebound — lives in
@@ -33,7 +33,6 @@ use channels::{PreferencePatch, PreferencesAnswer};
 use kernel::{AxCode, AxError};
 
 use crate::home::Home;
-use crate::serving::standing::CorePriority;
 
 /// The section of the person's file these live under. Written once:
 /// the reader and the writer name it, and a section written under one
@@ -55,7 +54,7 @@ const PRIORITY: &str = "priority";
 /// `E_CONFIG_INVALID` for a file that does not parse or holds a key
 /// this version does not read, and `E_STORAGE_FATAL` for a file that
 /// exists and cannot be read.
-pub(crate) fn read() -> Result<PreferencesAnswer, AxError> {
+pub fn read() -> Result<PreferencesAnswer, AxError> {
     stated(&file()?)
 }
 
@@ -65,7 +64,7 @@ pub(crate) fn read() -> Result<PreferencesAnswer, AxError> {
 /// # Errors
 /// Everything [`read`] returns, and `E_STORAGE_FATAL` for a file that
 /// cannot be replaced.
-pub(crate) fn put(patch: PreferencePatch) -> Result<(), AxError> {
+pub fn put(patch: PreferencePatch) -> Result<(), AxError> {
     land(&file()?, patch)
 }
 
@@ -84,6 +83,13 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
     })
 }
 
+/// Whether the core's threads are raised: the setting a person turns off.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CorePriority {
+    Raised,
+    Normal,
+}
+
 /// Whether the core's threads stand above normal: `priority` in the
 /// `[core]` section, `"raised"` when absent (sprawling-SPEC.md 8-93).
 ///
@@ -92,7 +98,7 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
 /// As [`read`] for a file that cannot be read or parsed, and
 /// `ConfigInvalid` for a `priority` that is neither `"raised"` nor
 /// `"normal"`.
-pub(crate) fn core_priority() -> Result<CorePriority, AxError> {
+pub fn core_priority() -> Result<CorePriority, AxError> {
     stated_core_priority(&file()?)
 }
 

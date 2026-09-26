@@ -10,8 +10,9 @@ use std::sync::{Arc, Mutex, mpsc};
 
 use kernel::{AxCode, AxError, EventRecord};
 
-use super::standing::{CorePriority, CoreThread, monotonic_now};
+use super::standing::{CoreThread, monotonic_now};
 use crate::views::{Published, Views};
+use accounting::person::CorePriority;
 
 /// The places the writer thread hands the views what it wrote, and the
 /// thread that folds it.

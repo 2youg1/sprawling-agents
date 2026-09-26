@@ -24,7 +24,7 @@ use kernel::{AxCode, AxError};
 
 use super::provider::Imported;
 use super::{codex, pi};
-use crate::home::Home;
+use accounting::home::Home;
 
 /// Codex's directory under the home directory, and the file in it.
 const CODEX_DIR: &str = ".codex";

@@ -13,6 +13,9 @@ city = { path = "../city" }
 collab = { path = "../collab" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The person's own layer is TOML for the reason a city's CONFIG.toml is:
+# it is a file somebody edits by hand while the city is stopped.
+toml = { workspace = true }
 # The vocabulary only: the port hands back a wire answer and never listens.
 channels = { path = "../channels", default-features = false }
 

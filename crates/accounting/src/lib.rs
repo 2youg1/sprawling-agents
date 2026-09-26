@@ -19,9 +19,13 @@
 mod clock;
 mod connectors;
 pub mod effect;
+pub mod held_vault;
+pub mod home;
 mod machine;
 mod models;
+pub mod person;
 pub mod plan_view;
+pub mod toolkit_broker;
 
 pub use clock::Clock;
 pub use connectors::{Connectors, Reached};

@@ -42,7 +42,7 @@ fn hearing(
         let recording = gateway::Recording::new(bytes, gateway::AudioType::of_media_type(&media)?)?;
         let speaking = views
             .snapshot()
-            .transcriber(crate::held_vault::resolving(Arc::clone(&vault)))?;
+            .transcriber(accounting::held_vault::resolving(Arc::clone(&vault)))?;
         speaking.transcribe(&recording)
     })
 }

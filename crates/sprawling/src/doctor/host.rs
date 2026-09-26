@@ -36,9 +36,9 @@ pub(crate) const ENGINE_CARRIED: bool = cfg!(feature = "sandbox");
 /// The absence is an answer here rather than a failure: a probe that
 /// cannot look reports the component as missing, with
 /// `Absence::NoHome` carrying the reason to the report
-/// (`crate::home` owns the derivation).
+/// (`accounting::home` owns the derivation).
 pub(crate) fn components_dir() -> Option<PathBuf> {
-    match crate::home::Home::detect() {
+    match accounting::home::Home::detect() {
         Ok(home) => Some(home.components()),
         Err(_) => None,
     }
