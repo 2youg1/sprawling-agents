@@ -3,7 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Who gets woken, and where the work lands.
+//! Taking on work: the run id a dispatch derives, the ACP request
+//! turned into that dispatch, and `agree_to_work`, which decides whether
+//! the city may take it before anything is written.
 
 use kernel::{Address, AxCode, AxError};
 use kernel::{Locator, RunId, TimeMs};
@@ -128,13 +130,19 @@ impl RunWorker {
         // reach, so they are read before one is chosen.
         let building = city::Building::of(addr)?;
         let rules = city::load(&self.city_root, building.addr())?;
-        let chosen = self.book.select(kernel::ModelTag::Main, rules.policy())?;
+        let chosen = self
+            .credentials
+            .book
+            .select(kernel::ModelTag::Main, rules.policy())?;
         // A subscription credential that expires mid-run is a run that
         // dies on its second turn, so it is renewed before the run
         // starts rather than after a call comes back refused. The
         // endpoint a login attached carries the provider's own name.
         self.renew_if_stale(&chosen.endpoint.name.clone())?;
-        let chosen = self.book.select(kernel::ModelTag::Main, rules.policy())?;
+        let chosen = self
+            .credentials
+            .book
+            .select(kernel::ModelTag::Main, rules.policy())?;
         let model = chosen.entry.clone();
         let provider = chosen.endpoint.name.clone();
         let adapter = gateway::adapter_for(
@@ -145,10 +153,7 @@ impl RunWorker {
                 .map(|(name, value)| (name, value.spelled()))
                 .collect(),
         )?;
-        let retries = match chosen.endpoint.tuning.request_max_retries {
-            gateway::Retries::AtMost(ceiling) => runtime::Retries::AtMost(ceiling),
-            gateway::Retries::UntilHalted => runtime::Retries::UntilHalted,
-        };
+        let retries = chosen.endpoint.tuning.request_max_retries;
         Ok(Agreed {
             building,
             rules,

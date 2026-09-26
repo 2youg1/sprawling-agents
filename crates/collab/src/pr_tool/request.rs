@@ -47,6 +47,19 @@ impl OpenRequest {
         data.read()
     }
 
+    /// The `pr_rejected` record: the request as it was offered, who
+    /// refused it, and why.
+    ///
+    /// # Errors
+    /// Propagates the payload's refusal to hold what it was given.
+    pub fn rejected_payload(&self, by: String, why: String) -> Result<Payload, AxError> {
+        Payload::of(&RejectedRequest {
+            request: self.clone(),
+            by,
+            why,
+        })
+    }
+
     /// The `pr_merged` record: the request as it was judged, plus what
     /// the merge produced.
     ///
@@ -96,4 +109,14 @@ pub struct MergedRequest {
     /// answered from the ledger rather than from git.
     #[serde(flatten)]
     pub by: CommitAttribution,
+}
+
+/// `pr_rejected`: the request as it was offered, the resident or the
+/// mode that refused it, and the reason it was handed back with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RejectedRequest {
+    #[serde(flatten)]
+    pub request: OpenRequest,
+    pub by: String,
+    pub why: String,
 }

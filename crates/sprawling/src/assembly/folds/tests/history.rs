@@ -6,7 +6,6 @@
 //! What a page reads back out of a history: the city, one session, and
 //! where a slice that stopped early resumes.
 
-use super::super::*;
 use crate::assembly::*;
 
 /// The live page could see nothing from before it opened, because
@@ -30,7 +29,7 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
             })
             .unwrap();
     }
-    let mut views = rebuild_views(&report.ledger_dir).unwrap();
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
 
     let channels::Answer::History(tail) = views.answer(&channels::Query::History {
         before: None,
@@ -94,7 +93,7 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
             })
             .unwrap();
     }
-    let mut views = rebuild_views(&report.ledger_dir).unwrap();
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
 
     // Everything a fresh city writes belongs to the city's own run,
     // so asking for it gets those records and asking for a session
@@ -151,7 +150,7 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
             })
             .unwrap();
     }
-    let mut views = rebuild_views(&report.ledger_dir).unwrap();
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
 
     // One record at a time, so the walk stops on the limit well
     // before it reaches the genesis line.

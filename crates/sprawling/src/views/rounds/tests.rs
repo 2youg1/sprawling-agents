@@ -247,7 +247,7 @@ fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
     }
     drop(ledger);
 
-    let mut views = crate::assembly::rebuild_views(&report.ledger_dir).unwrap();
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let channels::Answer::Rounds(answer) = views.answer(&channels::Query::Rounds { run }) else {
         panic!("Rounds answers with rounds");
     };
@@ -316,7 +316,7 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
     }
     drop(ledger);
 
-    let mut views = crate::assembly::rebuild_views(&report.ledger_dir).unwrap();
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let channels::Answer::Rounds(answer) = views.answer(&channels::Query::Rounds { run }) else {
         panic!("Rounds answers with rounds");
     };

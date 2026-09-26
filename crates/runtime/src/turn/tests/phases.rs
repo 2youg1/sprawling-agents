@@ -13,7 +13,7 @@
 
 use super::super::*;
 use super::helpers::*;
-use crate::window::Opening;
+use crate::conversation::Opening;
 use kernel::ToolOutcome;
 
 #[test]
@@ -22,15 +22,15 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
     let mut model = OneShotModel {
         calls: vec![probe_call()],
     };
-    let mut window = Window::new();
-    window.push_task_lines("probe the city", "one probe", Opening::FromJob);
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob);
     let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
     let turn = advance(
         turn.assemble(
             Interrupt::None,
             &mut ledger,
             &prefix(),
-            &window,
+            &conversation,
             &[],
             &shape(),
         )
@@ -82,7 +82,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
         report.model_returned().kind(),
         kernel::EventKind::ModelReturned
     );
-    // Window-folding material mirrors the ledger content.
+    // Conversation-folding material mirrors the ledger content.
     assert_eq!(report.assistant().len(), 1);
     assert_eq!(report.wave_results().len(), 1);
     match &report.wave_results()[0] {
@@ -115,7 +115,7 @@ fn cancel_at_the_call_boundary_stops_before_any_model_bytes() {
             Interrupt::None,
             &mut ledger,
             &prefix(),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )
@@ -155,7 +155,7 @@ fn steer_at_a_boundary_records_and_advances() {
             },
             &mut ledger,
             &prefix(),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )
@@ -200,7 +200,7 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
             Interrupt::None,
             &mut ledger,
             &prefix(),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )
@@ -256,7 +256,7 @@ fn the_ledger_chain_stays_verifiable_after_a_turn() {
             Interrupt::None,
             &mut ledger,
             &prefix(),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )
@@ -308,7 +308,7 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
             Interrupt::None,
             &mut ledger,
             &prefix(),
-            &Window::new(),
+            &Conversation::new(),
             &[],
             &shape(),
         )

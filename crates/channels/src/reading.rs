@@ -17,8 +17,10 @@
 //! rather than an error, because a view that hid a record it could not
 //! parse would be a view that lies about what happened.
 
-use kernel::event::record::CheckpointCommitted;
-use kernel::{EventKind, EventRecord, Seq};
+use kernel::event::record::{
+    CheckpointCommitted, FileDiscarded, FiredAction, ProviderDegraded, WatchdogFired,
+};
+use kernel::{AxCode, AxError, EventKind, EventRecord, Seq};
 
 use crate::answer::{Note, Output, Used};
 
@@ -160,16 +162,23 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
         // into the payload. A payload that will not read back as one is
         // kept as the failure to read it rather than rendered as a
         // refusal this build invented, or dropped as if nothing refused.
-        EventKind::GateDenied
-        | EventKind::BudgetLimit
-        | EventKind::WatchdogFired
-        | EventKind::ProviderDegraded => {
-            let value = serde_json::Value::Object(map.clone());
-            Some(match serde_json::from_value(value) {
+        EventKind::GateDenied | EventKind::BudgetLimit => {
+            Some(match record.data().read::<AxError>() {
                 Ok(error) => Note::Refused { error, at },
                 Err(err) => unreadable(kind, &err, at),
             })
         }
+        // The vault's fallback to session memory shares this kind and
+        // changed nothing a turn did.
+        EventKind::ProviderDegraded => match record.data().read() {
+            Ok(ProviderDegraded::Refused(error)) => Some(Note::Refused { error, at }),
+            Ok(ProviderDegraded::VaultFellBack(_)) => None,
+            Err(err) => Some(unreadable(kind, &err, at)),
+        },
+        EventKind::WatchdogFired => match record.data().read::<WatchdogFired>() {
+            Ok(fired) => backed_off(fired.action, at),
+            Err(err) => Some(unreadable(kind, &err, at)),
+        },
         EventKind::ApprovalRequested => Some(Note::Waiting { at }),
         // The job pin that opens a dispatch is a `checkpoint_committed`
         // naming no commit, and the record type says so rather than
@@ -189,14 +198,41 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
             said: text(map.get("text")).unwrap_or_default(),
             at,
         }),
-        EventKind::FileDiscarded => Some(Note::Discarded {
-            count: map
-                .get("paths")
-                .and_then(serde_json::Value::as_array)
-                .map_or(1, Vec::len),
-            at,
+        EventKind::FileDiscarded => Some(match record.data().read::<FileDiscarded>() {
+            Ok(discarded) => Note::Discarded {
+                count: discarded.paths.len(),
+                at,
+            },
+            Err(err) => unreadable(kind, &err, at),
         }),
         _ => None,
+    }
+}
+
+/// A back-off is the provider's refusal, waited out: the line keeps the
+/// failure's stable code and subject, and they are shown as that
+/// refusal. A steer and a freeze earn no note of their own, because the
+/// steer and the frozen run are lines of their own.
+fn backed_off(action: FiredAction, at: Seq) -> Option<Note> {
+    match action {
+        FiredAction::BackOff {
+            until_ms,
+            code,
+            subject,
+        } => Some(match AxCode::parse(&code) {
+            Some(code) => Note::Refused {
+                error: AxError::failure(code, "call the provider", subject).with_recovery(format!(
+                    "the watchdog calls again no earlier than {until_ms} ms"
+                )),
+                at,
+            },
+            None => unreadable(
+                EventKind::WatchdogFired,
+                &format!("unknown code {code}"),
+                at,
+            ),
+        }),
+        FiredAction::Steer { .. } | FiredAction::Freeze { .. } => None,
     }
 }
 

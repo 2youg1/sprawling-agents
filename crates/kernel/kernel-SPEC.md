@@ -76,6 +76,7 @@ Stage 2 追加：
 6. **浮点拒绝在构造点**：Ledger 载荷禁浮点（确定性七条之 6）由 `Payload::new` 与其 `Deserialize` 双侧执行，serde_json 数字非 i64/u64 可表示即拒。
 7. **存储写失败码**（S2 期初定）：增装载期第 5 码 `E_STORAGE_FATAL`（AxCode 36）承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
 8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。
+9. **没有写方的 kind 不定型**：`credential_lent`、`backpressure_shed`、`digest_invalidated` 在 `EventKind` 里有名字，但本树没有任何写方。结构体要以写方的字节为准（record 模块规则 1），没有写方就没有可对齐的字节，故它们留在 `record` 之外，与 F1 家族的无写方 kind 同理；哪天出现写方，它的第一版就经 `Payload::of` 写，结构体随之落在 `record` 下。
 
 ## 4 现状分析
 
@@ -140,6 +141,7 @@ gate ──▶ 上述全部（组合面）＋idem
 - 不做 I/O、不采样时钟、不生成随机数——RunId／时间戳／种子全部由调用方注入；`uuid` 依赖仅用于解析与格式化，恒不启用生成特性。
 - 不实现任何端口——`Ledger` 的实现住 memory 与 citysim；kernel 只声明 trait 与链语义纯函数。
 - 不认识文件系统、明文凭证与颜色——canonicalize、Vault、OKLCH 各归其效果面模块。
+- 不持 Markdown 词法器——界面读文档时由客户端 `client/src/core/prose.ts` 分词，Rust 侧没有调用者；在 kernel 再放一份只会与客户端那份悄悄分叉。服务端真要分词的那一天，词法器随它的第一个调用者一起进来。
 
 ## 8 接口先行（按模块分章）
 
@@ -313,6 +315,8 @@ impl Locator {
     /// Fail-closed: anything not exactly the grammar is E_LOCATOR_INVALID.
     /// Unknown scheme or algorithm tag is an error, never a fallback path.
     pub fn parse(raw: &str) -> Result<Self, AxError>;
+    /// The whole object behind a digest the caller already holds; no range.
+    pub const fn cas(hash: B3Hash) -> Self;
 }
 impl fmt::Display for Locator { /* 规范拼写往返：parse(x).to_string() == 规范形 */ }
 ```
@@ -322,6 +326,7 @@ impl fmt::Display for Locator { /* 规范拼写往返：parse(x).to_string() == 
 - 十六进制恒小写（规范字节唯一化）；大写拒。`b3-` 外的算法标签拒（对扩展开放：新标签＝新 variant，旧解析不宽容）。
 - `SecretRef`（`secret:`）恒不入本文法——`secret:` 前缀命中即 `E_LOCATOR_INVALID`，两套解析器分立（类型层理由）。
 - serde：字符串形（Display/parse 往返）。
+- `Locator::cas(hash)` 是手里已有 `B3Hash`（通常是 `Cas::put` 的回答）时的唯一构造法：一个 digest 本就合文法，拼成文本再 `parse` 回来只是多了一次分配、一次解析，外加一个恒不发生的错误分支，调用方还得为它写 `?`。
 - `B3Hash::from_bytes([u8;32])`／`to_hex()`；`Range` 构造校验 `from<=to`（Lines 另 `from>=1`）。
 - S2 增 `B3Hash::digest(bytes: &[u8]) -> B3Hash`（blake3 直算）：全库内容哈希的唯一产地——prefix 分段哈希与 stall 指纹均经此，不在 kernel 外直呼 blake3（一个哈希一个家）。`chain_hash` 保留为链语义专名（内部改经 digest）。
 
@@ -389,6 +394,9 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub skills: Vec<SkillPin>,          // 空亦写出
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
+pub struct EvalRun { pub probe: String, pub version: u32, pub predecessor: RunId,  // eval_run：交接探针的一次读数
+                    pub kept: u32, pub lost: Vec<u32>,       // lost 是答案不同的题号
+                    pub before: Vec<String>, pub after: Vec<String> }   // 全部必填，空亦写出
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
@@ -410,6 +418,18 @@ pub mod autonomy_word {                          // owner | delegate:<resident>
     pub fn read(word: &str) -> Result<Autonomy, AxError>;
 }
 pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
+pub struct FileDiscarded { pub paths: Vec<String>,            // `file:<path>`，git 认的名字 Address 未必认
+                           pub restoration: Option<Restoration> } // 缺或方案不识：None，paths 照读
+pub struct DiscardRestored { pub paths: Vec<String> }
+pub struct AssetArchived { #[serde(default = "fact")] pub kind: String,
+                           #[serde(default)] pub day: u64, #[serde(default)] pub subject: String }
+pub struct PursuitChanged { pub step: PursuitMove,       // goal 只在 clear 之后缺席
+                            pub goal: Option<String> }
+#[serde(rename_all = "snake_case")] pub enum PursuitMove { Set, Pause, Resume, Clear }
+pub struct GoalConflict { pub goal: GoalId, pub with: GoalId, pub level: ConflictLevel }
+#[serde(rename_all = "snake_case")] pub enum ConflictLevel { Serialize, Arbitrate }
+// goal_registered 的载荷就是 GoalEntry 本身，不另立 struct：目标表持有的正是它
+impl PursuitChanged { pub fn held(self) -> Result<Option<(String, PursuitState)>, AxError>; }
 pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
                              pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }
 pub struct RerankCalled { pub model: String, pub passages: u64, pub ranks: u64,
@@ -426,18 +446,99 @@ pub struct AdviserAnswered { pub subject: String, #[serde(flatten)] pub answer: 
 pub enum AdviserFailure { Unavailable, Timeout, Unreadable }
 pub struct AdviserFellBack { pub subject: String, pub reason: AdviserFailure }
 
+// record::credential：F3 家族里凭据进出的三行。`ref` 是 SecretRef 而不是 String，
+// 语法之外的引用读不成这一行（Payload::read 报 E_WIRE_MISMATCH），不再被读者各自静默跳过。
+pub struct SecretCaptured { #[serde(rename = "ref")] pub reference: SecretRef,
+                            #[serde(default)] pub origin: String,   // enrolment | pasted | <provider>-subscription | <provider>-renewal
+                            pub expires_at: Option<u64> }           // 缺席即省略，不写 null
+pub struct LoginStarted { pub provider: String, pub auth_url: String,
+                          pub user_code: Option<String> }           // 只有设备码登录才有；缺席即省略
+pub struct ToolkitLinkOpened { pub toolkit: String }
+
+// record::endpoint：F3 家族里「哪个 model 替哪个 tag 作答」的两行。gateway 的 EndpointBook
+// 只经 Payload::read 读它们；InputKinds 随之归 kernel（gateway::InputKinds 是它的再导出），
+// 因为账本行的值要用 kernel 自己的类型。
+#[serde(rename_all = "snake_case")] #[derive(Default)]
+pub enum InputKinds { #[default] Text, TextImage }
+pub struct ModelSelected { pub tag: ModelTag, pub endpoint: String, pub model: String,
+                           pub context_tokens: u64,
+                           #[serde(default)] pub max_output_tokens: Option<u64>, // 总是写出，缺席写 null
+                           pub ceiling_from: Option<String>,   // person|upstream|preset|policy；缺席即省略
+                           #[serde(default)] pub input: InputKinds, // 旧行没有这个键，读作 Text
+                           pub input_price: UsdMicros, pub output_price: UsdMicros,
+                           pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
+impl ModelSelected { pub fn ceiling(&self) -> Option<Ceiling>; }   // 0 与 null 同读作「未声明」
+pub struct EndpointLost { pub name: String }
+pub struct EndpointAttached { pub name: String, pub base_url: String, pub dialect: DialectKind,
+                              pub auth: Option<SecretRef>,          // 引用，从不是密钥；缺席即省略
+                              pub auth_header: Option<String>,      // 非 bearer 时凭据所在的 header
+                              pub models: Vec<String>,              // 空亦写出
+                              pub connection_kind: Option<String>,  // 旧行没有，读者按 dialect 回推
+                              #[serde(default = true)] pub probed: bool,
+                              pub tuning: Option<AttachedTuning> }  // 什么都没设就省略；不是对象读作未设
+pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u64>,
+                            pub stream_idle_timeout_ms: Option<u64>, pub request_max_retries: Option<u32>,
+                            pub proxying: Option<Proxying>,        // 默认值省略
+                            pub extra_headers: Vec<(String, String)>, pub overrides: Vec<(String, String)> }
+// AttachedTuning 的每个键缺席读作未设、在而读不懂也读作未设（行不被拒）：编造一个期限比没有期限更难解释。
+// EndpointAttached 顶层的键则不然：probed、auth、connection_kind 在而读不懂，整行读不成（E_WIRE_MISMATCH），
+// 因为把一个没探到的端点读成探到过，是在书里放进一个没人够得着的端点。
+
+// record::probe：endpoint_probed，一次探测在挂上任何东西之前看到的。ModelFacts 随之归 kernel
+// （gateway::ModelFacts 是它的再导出，读一行 /models 的 gateway::endpoint::models::facts_of 仍归 gateway），
+// 因为账本行的值要用 kernel 自己的类型。
+pub struct ModelFacts { pub id: String, pub context_tokens: Option<u64>, pub max_output_tokens: Option<Ceiling>,
+                        pub input_modalities: Vec<String>, pub input_price: Option<String>,
+                        pub output_price: Option<String> }        // 缺席写 null，行没说就是没说
+pub struct EndpointProbed { pub name: String, pub base_url: String, pub reach: Reach,
+                            pub models: Vec<String>, pub facts: Vec<ModelFacts>,   // 读不到列表时两者都写空
+                            pub failed: Option<ProbeFailure> }                   // 缺席即省略
+pub struct ProbeFailure { pub code: String, pub subject: String }
+// record::provider：provider_degraded 有两个写方、两种形状，一个 untagged enum 让读者靠读来分，
+// 不靠猜键：E_PROVIDER 经 kernel::error 的 carrier 表平铺写成 AxError 本身；vault 启动探针退到
+// session memory 时写 VaultFellBack。两者都不是的行读不成（E_WIRE_MISMATCH）。
+#[serde(untagged)] pub enum ProviderDegraded { Refused(AxError), VaultFellBack(VaultFellBack) }
+pub struct VaultFellBack { pub component: String,     // 探针写 vault
+                           pub fallback: String,      // 探针写 session-memory
+                           pub persistence: String,   // gateway::Persistence 的自有拼法
+                           pub reason: String }
+// channels::note_of 只把 Refused 记成回合上的 Note::Refused；VaultFellBack 没改变任何回合，不出 note。
+
 pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
                         pub subject: Option<String> }   // 键缺席读作 None
 pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
                         #[serde(flatten)] pub answer: ToolAnswer }
 #[serde(untagged)]
 pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
+
+pub struct CityInitialized {}           // 城名在信封的 addr
+pub struct BuildingCreated { pub addr: Address, pub template: String,
+                             pub adopted: bool }   // false 时不写出
+pub struct BuildingConfigured { pub addr: Address, pub sandbox: bool, pub mcp: bool,
+                                pub desktop: bool, pub context: bool }
+pub struct CancelReceived {}
+pub struct HandoffWritten { pub must_read: Vec<Locator>, pub overview: String,
+    pub progress: String, pub context: String, pub next_step: String }
+pub struct WatchdogFired { #[serde(flatten)] pub action: FiredAction,
+                           pub corrections: u32, pub provider_failures: u32 }
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum FiredAction { Steer { text: String },
+                       BackOff { until_ms: u64, code: String, subject: String },
+                       Freeze { reason: String } }
+pub struct GateChecked {}               // 无生产写方：结构是决定
+pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked，无写方：结构是决定
 ```
 
 已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`tool_called`／`tool_result`、
 `checkpoint_committed`、`approval_resolved`、`autonomy_changed`、`city_halted`、
 `governed_document_written`、`embedding_called`／`rerank_called`、
 `adviser_asked`／`adviser_answered`／`adviser_fell_back`；
+`city_initialized`、`building_created`、`building_configured`、`cancel_received`、
+`handoff_written`、`watchdog_fired`、`gate_checked`、`policy_created`／`policy_revoked`；
+`gate_denied`、`budget_limit` 的载荷是平铺的 `AxError`，`approval_requested` 的是 `ApprovalItem`，
+`result_offloaded` 的是 `runtime::sieve::ResultOffloaded`（它平铺筛子的账，筛子在 runtime），不另立结构；
+`watchdog_fired` 的读方 `channels::note_of` 把 `BackOff` 读成它等待的那次拒绝（码与主语照录），
+`Steer`／`Freeze` 不出 note——纠偏与冻结各有自己的行；
 `pr_merged` 借 `CommitAttribution` 记「谁做的这次提交」，其余键待该族迁移。
 未列入的 kind 仍由调用点手写读取。
 
@@ -1424,7 +1525,7 @@ pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
 ```
 
 **为什么在 kernel 而不在产地**：三处需要这个形状——`memory::changes` 从两棵树上读出它、
-`channels::wire` 携它、`web` 画它——而 `channels` 看不见 `memory`。定义两份再互相转换，
+`channels::wire` 携它、客户端画它——而 `channels` 看不见 `memory`。定义两份再互相转换，
 就是「一个文件变更是什么」有两个定义，而漂开的总是没人看的那个。这与 `Restoration` 当初落在这里
 是同一条理由。
 
@@ -1436,34 +1537,6 @@ pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
 
 **没有任何字段能装补丁文本**：补丁文本就是文件内容，而文件内容离开运行中的机器是
 `secret::scan` 存在的理由。hunk 必须单独请求并同样受扫，所以它拼不进这个类型。
-
-### 8-31 kernel::highlight（形状 1 判定）
-
-```rust
-pub enum Token { Heading, Strong, Emphasis, Code, Fence, Meta, Link, Marker, Quote }
-pub struct Span { pub start: u32, pub len: u32, pub token: Token }
-pub fn markdown(text: &str) -> Vec<Span>;
-```
-
-**落点只有一个，而它全是 Markdown。** 界面唯一读文件的地方是 `BuildingDoc.text`，
-而 `read_building` 只收 `RULES.toml` 与楼根目录下的 `*.md`。agent 写给下一个 agent 的计划与
-交接就是这些文件，而人读它们时需要的是标题、列表、行内代码与围栏块彼此分开。
-
-**为什么不上线不上服务端。** 另一种方案是服务端分词、线上走 span，理由是 syntect 在 wasm 里太重。
-那条理由对 syntect 成立，对一个 Markdown 词法器不成立——它就几 KB。为一个尚不存在的第二实现
-先把线格式撑大，是 ARCHITECTURE 明禁的「以假想复用为理由的抽象」。
-**缝在 `markdown(&str) -> Vec<Span>` 这个签名上**：将来真需要语法引擎时，它去服务端、
-线格式那时再长。
-
-**在 kernel 而不在 web**：同 `kernel::change` 的理由——无 I/O、无时钟、输出穷举枚，
-而且服务端有一天也要用它。`channels` 转出类型与函数，`web` 调用。
-
-**偏移量恒在字符边界上**：切片由客户端拿着 `start`/`len` 去做，落在多字节字符中间的
-偏移会让一页中文文档直接炸。一条断言钉住：每一个 span 都切得出来。
-
-**Span 恒不重叠、按 `start` 升序**：重叠的 span 让渲染方必须自己决定谁赢，
-那就是把词法规则的一半搬到了视图里。围栏块内部整块是 `Code`，不再分词——
-本版没有语法引擎，而把 `**x**` 在 Rust 代码里读成粗体是在编造。
 
 ### 8-28 C17 从「首段」扩到「任一段」（形状 2 value 的一条原语）
 
@@ -1758,17 +1831,6 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 文法、`B3Hash`／`GitOid`／`Range`／`Locator` 四型与全部解析、呈现、十六进制原语都留在原路径，
 故规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／
 `clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
-
-### 8-41 kernel::highlight 目录化
-
-`highlight.rs`（437）只作一次切分：原内联 `mod tests` 整段迁到 `highlight/tests.rs`（12 个 `#[test]`，
-断言与名字一字不动，`use super::*` 原样保留，两个夹具 `cut`／`tokens` 随测试同迁、不复制），
-父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份含 `clippy::arithmetic_side_effects` 的
-`#[allow(...)]` 列表。`highlight.rs` 剩 304 行：`Token`／`Span` 两型、`markdown` 与全部行内词法
-原语（`read_line`／`marker_len`／`opens_fence`／`fence_len`／`inline`／`scan`／`links`／`claim`／
-`push`）都留在原路径 —— `scan` 带 `argument_count` 豁免，键 `crates/kernel/src/highlight.rs::scan`，
-因此不得搬家。规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：
-`cargo check`／`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
 
 ### 8-42 kernel::tool 目录化
 

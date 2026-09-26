@@ -72,7 +72,7 @@ pub(super) fn attach_provider(
 /// workshop scenario in this module raises, and a diagnostic that guessed
 /// wider would print the whole history.
 pub(super) fn node_lines(city_root: &Path) -> Vec<String> {
-    runtime::replay::verify_ledger_dir(&ledger_dir(city_root))
+    runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(city_root).ledger())
         .map(|verified| {
             verified
                 .raw_lines()
@@ -205,7 +205,11 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
             effort: None,
         })
         .unwrap();
-    let joined = worker.joins.get(&room).map_or(0, |j| j.artifacts().count());
+    let joined = worker
+        .collaborating
+        .joins
+        .get(&room)
+        .map_or(0, |j| j.artifacts().count());
     // Why a missing handback is worth a paragraph: the failure is a
     // race in what the provider was asked, so the answer is which
     // run got what, not which line the cell says is false.

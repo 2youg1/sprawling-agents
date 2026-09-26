@@ -35,15 +35,15 @@ pub enum Opening {
 
 /// The run's conversation history, owned by the executor and folded
 /// forward turn by turn. Frozen-prefix bytes never live here — the
-/// window is the volatile half of the request.
+/// conversation is the volatile half of the request.
 #[derive(Debug, Clone, Default)]
-pub struct Window {
+pub struct Conversation {
     messages: Vec<ChatMessage>,
 }
 
-impl Window {
-    pub fn new() -> Window {
-        Window::default()
+impl Conversation {
+    pub fn new() -> Conversation {
+        Conversation::default()
     }
 
     /// The dispatch lines: deterministic from `run_started`'s recorded

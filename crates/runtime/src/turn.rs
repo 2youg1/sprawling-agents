@@ -17,7 +17,7 @@
 //! All events of one turn share the timestamp given to [`Turn::begin`]:
 //! order is `seq`'s business, time is a parameter, never sampled.
 
-use kernel::event::record::{ModelReturned, SteerReceived};
+use kernel::event::record::{CancelReceived, ModelReturned, SteerReceived};
 use kernel::model::content_from_message;
 use kernel::{
     AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, EventRef, Ledger, Model,
@@ -25,8 +25,8 @@ use kernel::{
 };
 
 use crate::compaction::Exchange;
+use crate::conversation::Conversation;
 use crate::prefix::FrozenPrefix;
-use crate::window::Window;
 
 mod boundary;
 mod ledger;
@@ -95,7 +95,7 @@ impl Turn<Assembling> {
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
         prefix: &FrozenPrefix,
-        window: &Window,
+        conversation: &Conversation,
         tools: &[ToolDef],
         shape: &CallShape,
     ) -> Result<PhaseOutcome<Turn<Calling>>, AxError> {
@@ -114,7 +114,7 @@ impl Turn<Assembling> {
             model: shape.model.clone(),
             max_tokens: shape.max_tokens,
             system: prefix.system_blocks()?,
-            messages: window.messages().to_vec(),
+            messages: conversation.messages().to_vec(),
             tools: tools.to_vec(),
             effort: shape.effort,
         };
@@ -262,8 +262,11 @@ impl<S> Turn<S> {
     /// halted between two calls, so both endings are one line written in
     /// one place.
     fn cancel_here(&mut self, ledger: &mut dyn Ledger) -> Result<TurnCancelled, AxError> {
-        self.journal
-            .append_authored(ledger, Authored::CancelReceived, Payload::empty())?;
+        self.journal.append_authored(
+            ledger,
+            Authored::CancelReceived,
+            Payload::of(&CancelReceived {})?,
+        )?;
         Ok(TurnCancelled {
             refs: self.journal.take_refs(),
         })

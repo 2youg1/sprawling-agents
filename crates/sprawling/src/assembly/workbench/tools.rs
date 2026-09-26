@@ -69,7 +69,7 @@ impl RunWorker {
         // and the count `status` reports.
         let seen =
             city::Neighbourhood::scan(&self.city_root, site.building.addr(), addr, &|room| {
-                self.rooms.pending(room)
+                self.collaborating.rooms.pending(room)
             })?;
         // Where this run stands, carried rather than worked out: a run
         // that inferred its own depth would be one wrong answer away
@@ -302,7 +302,7 @@ impl RunWorker {
                 run: site.run_id,
             },
             machine.engine,
-            self.backlog.clone(),
+            self.flight.backlog.clone(),
         )
     }
 
@@ -310,7 +310,7 @@ impl RunWorker {
     /// already been handed back.
     ///
     /// The held artifacts are copied rather than lent: the authority is
-    /// `self.joins`, folded from the ledger's handback lines, and a desk
+    /// `self.collaborating.joins`, folded from the ledger's handback lines, and a desk
     /// that took it away would leave the worker unable to answer the
     /// same question after the run.
     ///
@@ -323,7 +323,7 @@ impl RunWorker {
         delegates: &std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     ) -> Result<collab::WorkshopTool, AxError> {
         let mut held = collab::FanIn::new();
-        if let Some(existing) = self.joins.get(addr) {
+        if let Some(existing) = self.collaborating.joins.get(addr) {
             for artifact in existing.artifacts() {
                 held.accept(artifact.clone());
             }
@@ -368,10 +368,10 @@ impl RunWorker {
                 trust: &self.governance.autonomy,
                 context_tokens: site.model.context_tokens,
                 neighbours: reach.seen.residents(),
-                // What this resident already holds, so a model asking
-                // what it may touch is answered from the same list the
-                // conflict check reads.
+                // What this resident already holds, so a model asking what it may
+                // touch is answered from the same list the conflict check reads.
                 locks: self
+                    .collaborating
                     .goals
                     .iter()
                     .filter(|entry| entry.owner == site.who)
@@ -394,6 +394,6 @@ impl RunWorker {
             }),
         )?;
         // The thirteenth line: what this run started and left running.
-        Ok(tool.reporting(self.backlog.clone()))
+        Ok(tool.reporting(self.flight.backlog.clone()))
     }
 }

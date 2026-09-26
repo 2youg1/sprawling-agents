@@ -202,6 +202,17 @@ mod tests {
         );
     }
 
+    /// A `probed` the line spells as something other than a yes or a
+    /// no is not a probe that succeeded: reading it as one would put an
+    /// endpoint nobody reached into the book as reached.
+    #[test]
+    fn an_unreadable_probed_is_refused_rather_than_read_as_probed() {
+        let endpoint = attached("house", "https://api.example.test/v1");
+        let mut map = attached_payload(&endpoint).unwrap().as_map().clone();
+        map.insert("probed".to_owned(), serde_json::Value::from("no"));
+        assert!(super::super::payload::read_attached(&Payload::new(map).unwrap()).is_err());
+    }
+
     #[test]
     fn the_payload_carries_a_reference_and_never_a_credential() {
         let endpoint = attached("house", "https://api.example.test/v1");

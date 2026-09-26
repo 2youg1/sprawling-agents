@@ -41,7 +41,7 @@ impl RunWorker {
             reach: reach_of(&endpoint.base_url, endpoint.tuning.proxying)?,
             served: self.probe(&endpoint),
         };
-        let payload = probed_payload(&endpoint.name, &endpoint.base_url, &found)?;
+        let payload = probed_payload(&endpoint.name, &endpoint.base_url, found)?;
         self.record(EventKind::EndpointProbed, payload)
     }
 
@@ -109,6 +109,7 @@ impl RunWorker {
         header: Option<String>,
     ) -> gateway::AuthSpec {
         let archived = self
+            .credentials
             .book
             .endpoints()
             .find(|endpoint| endpoint.name == name)
@@ -346,7 +347,7 @@ mod tests {
                 ),
             })
             .unwrap();
-        let (_, _, entry) = worker.book.choices().next().unwrap();
+        let (_, _, entry) = worker.credentials.book.choices().next().unwrap();
         assert_eq!(
             entry.max_output_tokens,
             kernel::Ceiling::new(4_096),

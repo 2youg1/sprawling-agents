@@ -227,6 +227,28 @@ fn a_refusal_that_will_not_read_back_stays_in_the_turn_as_unreadable() {
     }
 }
 
+/// A discard whose paths will not read back is said as that, rather
+/// than counted as one file this build invented: the count is what a
+/// person weighs when deciding whether to restore.
+#[test]
+fn a_discard_that_will_not_read_back_stays_in_the_turn_as_unreadable() {
+    let events = [
+        asked(1),
+        record(
+            2,
+            EventKind::FileDiscarded,
+            serde_json::json!({ "paths": "file:a" }),
+        ),
+    ];
+    match turns(&events)[0].notes.as_slice() {
+        [Note::Unreadable { cause, at }] => {
+            assert!(cause.starts_with("FileDiscarded"), "{cause}");
+            assert_eq!(*at, Seq::new(2));
+        }
+        other => panic!("the failure to read is kept, got {other:?}"),
+    }
+}
+
 /// The oid is what a change list is addressed by, so a spelling this
 /// build cannot parse leaves no row to click: a checkpoint nothing can
 /// be asked about is worse than a checkpoint that is not shown, because

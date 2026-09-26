@@ -43,6 +43,7 @@ impl RunWorker {
             max_output_tokens,
         } = ceilings;
         let known = self
+            .credentials
             .book
             .endpoints()
             .find(|candidate| candidate.name == endpoint)
@@ -70,7 +71,7 @@ impl RunWorker {
             .with_recovery("choose one of the models the endpoint listed"));
         }
         let priced = gateway::MarketSnapshot::builtin()?.lookup(&model).cloned();
-        let registered = registered_as(&self.book, tag, &endpoint, &model);
+        let registered = registered_as(&self.credentials.book, tag, &endpoint, &model);
         // What the person stated outranks what they stated before, which
         // outranks the catalogue, and what none of the three states
         // stays unstated. **The old reading of an unknown model was

@@ -279,6 +279,8 @@ pub const fn kernel::budget::UsdMicros::new(u64) -> kernel::budget::UsdMicros
 pub const fn kernel::budget::UsdMicros::new(u64) -> kernel::budget::UsdMicros
 pub const fn kernel::locator::B3Hash::from_bytes([u8; 32]) -> Self
 pub const fn kernel::locator::B3Hash::from_bytes([u8; 32]) -> Self
+pub const fn kernel::locator::Locator::cas(kernel::locator::B3Hash) -> Self
+pub const fn kernel::locator::Locator::cas(kernel::locator::B3Hash) -> Self
 pub const fn kernel::retries::Retries::of(core::option::Option<u32>) -> kernel::retries::Retries
 pub const fn kernel::retries::Retries::of(core::option::Option<u32>) -> kernel::retries::Retries
 pub const fn kernel::retries::Retries::stated(self) -> core::option::Option<u32>
@@ -449,7 +451,6 @@ pub enum kernel::StopCause
 pub enum kernel::StopReason
 pub enum kernel::Temporal
 pub enum kernel::Through
-pub enum kernel::Token
 pub enum kernel::VersionVerdict
 pub enum kernel::WindowClass
 pub enum kernel::WriteDomain
@@ -489,6 +490,8 @@ pub enum kernel::event::record::AdviserAnswer
 pub enum kernel::event::record::AdviserAsk
 pub enum kernel::event::record::AdviserFailure
 pub enum kernel::event::record::CheckpointCommitted
+pub enum kernel::event::record::FiredAction
+pub enum kernel::event::record::InputKinds
 pub enum kernel::event::record::PartChange
 pub enum kernel::event::record::ShapeChanged
 pub enum kernel::event::record::SkipReason
@@ -500,7 +503,6 @@ pub enum kernel::gate::EgressTarget
 pub enum kernel::gate::GateOutcome
 pub enum kernel::goal::GoalResource
 pub enum kernel::goal::GoalVerdict
-pub enum kernel::highlight::Token
 pub enum kernel::keep_warm::KeepWarm
 pub enum kernel::locator::Locator
 pub enum kernel::locator::Range
@@ -845,6 +847,7 @@ pub fn kernel::event::Who::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fm
 pub fn kernel::event::Who::parse(&str) -> core::result::Result<kernel::event::Who, kernel::AxError>
 pub fn kernel::event::Who::resident(kernel::address::Address) -> core::result::Result<kernel::event::Who, kernel::AxError>
 pub fn kernel::event::Who::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+pub fn kernel::event::record::ModelSelected::ceiling(&self) -> core::option::Option<kernel::Ceiling>
 pub fn kernel::event::record::PromptSource::producer(&self) -> kernel::event::record::SummaryProducer
 pub fn kernel::event::record::RunFrozen::of(&kernel::completion::Completion) -> kernel::event::record::RunFrozen
 pub fn kernel::event::record::ToolCalled::subject_of(&kernel::Payload) -> core::option::Option<alloc::string::String>
@@ -869,7 +872,6 @@ pub fn kernel::goal::GoalId::as_str(&self) -> &str
 pub fn kernel::goal::GoalId::new(impl core::convert::Into<alloc::string::String>) -> core::option::Option<kernel::goal::GoalId>
 pub fn kernel::goal::GoalId::new(impl core::convert::Into<alloc::string::String>) -> core::option::Option<kernel::goal::GoalId>
 pub fn kernel::goal::detect_conflict(&[kernel::goal::GoalEntry], &kernel::goal::GoalEntry) -> kernel::goal::GoalVerdict
-pub fn kernel::highlight::markdown(&str) -> alloc::vec::Vec<kernel::highlight::Span>
 pub fn kernel::idem::Duplicate::key(&self) -> &kernel::idem::IdemKey
 pub fn kernel::idem::Duplicate::key(&self) -> &kernel::idem::IdemKey
 pub fn kernel::idem::IdemGuard::key(&self) -> &kernel::idem::IdemKey
@@ -1609,9 +1611,6 @@ pub kernel::SecretSpan::len: usize
 pub kernel::SecretSpan::provider: core::option::Option<&'static str>
 pub kernel::SecretSpan::start: usize
 pub kernel::ShedReason::CapacityExhausted
-pub kernel::Span::len: u32
-pub kernel::Span::start: u32
-pub kernel::Span::token: kernel::highlight::Token
 pub kernel::StallVerdict::Ok
 pub kernel::StallVerdict::Stall
 pub kernel::StallVerdict::Stall::repeats: u32
@@ -1636,15 +1635,6 @@ pub kernel::Through::Disabled
 pub kernel::Through::Environment(alloc::string::String)
 pub kernel::Through::Excluded
 pub kernel::Through::LocalAddress
-pub kernel::Token::Code
-pub kernel::Token::Emphasis
-pub kernel::Token::Fence
-pub kernel::Token::Heading
-pub kernel::Token::Link
-pub kernel::Token::Marker
-pub kernel::Token::Meta
-pub kernel::Token::Quote
-pub kernel::Token::Strong
 pub kernel::ToolCall::args: kernel::Payload
 pub kernel::ToolCall::id: alloc::string::String
 pub kernel::ToolCall::name: kernel::tool::ToolName
@@ -1958,8 +1948,26 @@ pub kernel::event::record::AdviserFellBack::subject: alloc::string::String
 pub kernel::event::record::ApprovalResolved::cluster: kernel::approval::ClusterKey
 pub kernel::event::record::ApprovalResolved::id: kernel::approval::ApprovalId
 pub kernel::event::record::ApprovalResolved::verdict: kernel::approval::Ruling
+pub kernel::event::record::AssetArchived::day: u64
+pub kernel::event::record::AssetArchived::kind: alloc::string::String
+pub kernel::event::record::AssetArchived::subject: alloc::string::String
+pub kernel::event::record::AttachedTuning::extra_headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub kernel::event::record::AttachedTuning::label: core::option::Option<alloc::string::String>
+pub kernel::event::record::AttachedTuning::overrides: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub kernel::event::record::AttachedTuning::proxying: core::option::Option<kernel::reach::Proxying>
+pub kernel::event::record::AttachedTuning::request_max_retries: core::option::Option<u32>
+pub kernel::event::record::AttachedTuning::stream_idle_timeout_ms: core::option::Option<u64>
+pub kernel::event::record::AttachedTuning::timeout_ms: core::option::Option<u64>
 pub kernel::event::record::AutonomyChanged::autonomy: kernel::approval::Autonomy
 pub kernel::event::record::AutonomyChanged::scope: kernel::event::Scope
+pub kernel::event::record::BuildingConfigured::addr: kernel::address::Address
+pub kernel::event::record::BuildingConfigured::context: bool
+pub kernel::event::record::BuildingConfigured::desktop: bool
+pub kernel::event::record::BuildingConfigured::mcp: bool
+pub kernel::event::record::BuildingConfigured::sandbox: bool
+pub kernel::event::record::BuildingCreated::addr: kernel::address::Address
+pub kernel::event::record::BuildingCreated::adopted: bool
+pub kernel::event::record::BuildingCreated::template: alloc::string::String
 pub kernel::event::record::CheckpointCommitted::Committed(kernel::event::record::Commit)
 pub kernel::event::record::CheckpointCommitted::JobPinned
 pub kernel::event::record::CheckpointCommitted::JobPinned::job: kernel::locator::Locator
@@ -1972,16 +1980,54 @@ pub kernel::event::record::Commit::scope: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::CommitAttribution::effort: core::option::Option<kernel::Effort>
 pub kernel::event::record::CommitAttribution::model: alloc::string::String
 pub kernel::event::record::CommitAttribution::predecessor: core::option::Option<kernel::RunId>
+pub kernel::event::record::DiscardRestored::paths: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::EmbeddingCalled::dimensions: core::option::Option<u64>
 pub kernel::event::record::EmbeddingCalled::inputs: u64
 pub kernel::event::record::EmbeddingCalled::model: alloc::string::String
 pub kernel::event::record::EmbeddingCalled::prompt_tokens: core::option::Option<kernel::budget::Tokens>
 pub kernel::event::record::EmbeddingCalled::vectors: u64
+pub kernel::event::record::EndpointAttached::auth: core::option::Option<kernel::SecretRef>
+pub kernel::event::record::EndpointAttached::auth_header: core::option::Option<alloc::string::String>
+pub kernel::event::record::EndpointAttached::base_url: alloc::string::String
+pub kernel::event::record::EndpointAttached::connection_kind: core::option::Option<alloc::string::String>
+pub kernel::event::record::EndpointAttached::dialect: kernel::DialectKind
+pub kernel::event::record::EndpointAttached::models: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::EndpointAttached::name: alloc::string::String
+pub kernel::event::record::EndpointAttached::probed: bool
+pub kernel::event::record::EndpointAttached::tuning: core::option::Option<kernel::event::record::AttachedTuning>
+pub kernel::event::record::EndpointLost::name: alloc::string::String
+pub kernel::event::record::EvalRun::after: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::EvalRun::before: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::EvalRun::kept: u32
+pub kernel::event::record::EvalRun::lost: alloc::vec::Vec<u32>
+pub kernel::event::record::EvalRun::predecessor: kernel::RunId
+pub kernel::event::record::EvalRun::probe: alloc::string::String
+pub kernel::event::record::EvalRun::version: u32
 pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
 pub kernel::event::record::EvidenceCite::seq: kernel::Seq
+pub kernel::event::record::FileDiscarded::paths: alloc::vec::Vec<alloc::string::String>
+pub kernel::event::record::FileDiscarded::restoration: core::option::Option<kernel::Restoration>
+pub kernel::event::record::FiredAction::BackOff
+pub kernel::event::record::FiredAction::BackOff::code: alloc::string::String
+pub kernel::event::record::FiredAction::BackOff::subject: alloc::string::String
+pub kernel::event::record::FiredAction::BackOff::until_ms: u64
+pub kernel::event::record::FiredAction::Freeze
+pub kernel::event::record::FiredAction::Freeze::reason: alloc::string::String
+pub kernel::event::record::FiredAction::Steer
+pub kernel::event::record::FiredAction::Steer::text: alloc::string::String
 pub kernel::event::record::GovernedDocumentWritten::bytes: usize
 pub kernel::event::record::GovernedDocumentWritten::which: alloc::string::String
+pub kernel::event::record::HandoffWritten::context: alloc::string::String
+pub kernel::event::record::HandoffWritten::must_read: alloc::vec::Vec<kernel::locator::Locator>
+pub kernel::event::record::HandoffWritten::next_step: alloc::string::String
+pub kernel::event::record::HandoffWritten::overview: alloc::string::String
+pub kernel::event::record::HandoffWritten::progress: alloc::string::String
+pub kernel::event::record::InputKinds::Text
+pub kernel::event::record::InputKinds::TextImage
 pub kernel::event::record::LogTruncated::dropped_bytes: u64
+pub kernel::event::record::LoginStarted::auth_url: alloc::string::String
+pub kernel::event::record::LoginStarted::provider: alloc::string::String
+pub kernel::event::record::LoginStarted::user_code: core::option::Option<alloc::string::String>
 pub kernel::event::record::ModelCalled::model: alloc::string::String
 pub kernel::event::record::ModelCalled::segments: alloc::vec::Vec<kernel::locator::B3Hash>
 pub kernel::event::record::ModelReturned::billed_usd_micros: core::option::Option<kernel::budget::UsdMicros>
@@ -1989,8 +2035,20 @@ pub kernel::event::record::ModelReturned::calls: u64
 pub kernel::event::record::ModelReturned::message: kernel::Payload
 pub kernel::event::record::ModelReturned::stop: core::option::Option<kernel::StopReason>
 pub kernel::event::record::ModelReturned::usage: core::option::Option<kernel::ModelUsage>
+pub kernel::event::record::ModelSelected::cache_read_price: kernel::budget::UsdMicros
+pub kernel::event::record::ModelSelected::cache_write_price: kernel::budget::UsdMicros
+pub kernel::event::record::ModelSelected::ceiling_from: core::option::Option<alloc::string::String>
+pub kernel::event::record::ModelSelected::context_tokens: u64
+pub kernel::event::record::ModelSelected::endpoint: alloc::string::String
+pub kernel::event::record::ModelSelected::input: kernel::event::record::InputKinds
+pub kernel::event::record::ModelSelected::input_price: kernel::budget::UsdMicros
+pub kernel::event::record::ModelSelected::max_output_tokens: core::option::Option<u64>
+pub kernel::event::record::ModelSelected::model: alloc::string::String
+pub kernel::event::record::ModelSelected::output_price: kernel::budget::UsdMicros
+pub kernel::event::record::ModelSelected::tag: kernel::ModelTag
 pub kernel::event::record::PartChange::Moved
 pub kernel::event::record::PartChange::Same
+pub kernel::event::record::PolicyChanged::id: alloc::string::String
 pub kernel::event::record::PromptAssembled::breakpoints: alloc::vec::Vec<alloc::string::String>
 pub kernel::event::record::PromptAssembled::segments: alloc::vec::Vec<kernel::event::record::PromptSegment>
 pub kernel::event::record::PromptSegment::hash: kernel::locator::B3Hash
@@ -2022,6 +2080,9 @@ pub kernel::event::record::RunStarted::parent: core::option::Option<kernel::RunI
 pub kernel::event::record::RunStarted::predecessor: core::option::Option<kernel::RunId>
 pub kernel::event::record::RunStarted::skills: alloc::vec::Vec<kernel::event::record::SkillPin>
 pub kernel::event::record::RunStarted::task: alloc::string::String
+pub kernel::event::record::SecretCaptured::expires_at: core::option::Option<u64>
+pub kernel::event::record::SecretCaptured::origin: alloc::string::String
+pub kernel::event::record::SecretCaptured::reference: kernel::SecretRef
 pub kernel::event::record::SessionOpened::carried: bool
 pub kernel::event::record::SessionOpened::from: core::option::Option<kernel::Origin>
 pub kernel::event::record::ShapeChanged::Compared
@@ -2057,6 +2118,10 @@ pub kernel::event::record::ToolCalled::subject: core::option::Option<alloc::stri
 pub kernel::event::record::ToolResult::answer: kernel::event::record::ToolAnswer
 pub kernel::event::record::ToolResult::name: kernel::tool::ToolName
 pub kernel::event::record::ToolResult::tool_use_id: alloc::string::String
+pub kernel::event::record::ToolkitLinkOpened::toolkit: alloc::string::String
+pub kernel::event::record::WatchdogFired::action: kernel::event::record::FiredAction
+pub kernel::event::record::WatchdogFired::corrections: u32
+pub kernel::event::record::WatchdogFired::provider_failures: u32
 pub kernel::gate::ConnectorCall::label: &'a kernel::tool::ServerLabel
 pub kernel::gate::ConnectorCall::tool: &'a kernel::tool::ToolName
 pub kernel::gate::DoorId::Attach
@@ -2093,18 +2158,6 @@ pub kernel::goal::GoalResource::Path(kernel::address::Address)
 pub kernel::goal::GoalVerdict::Clear
 pub kernel::goal::GoalVerdict::Conflict
 pub kernel::goal::GoalVerdict::Conflict::with: kernel::goal::GoalId
-pub kernel::highlight::Span::len: u32
-pub kernel::highlight::Span::start: u32
-pub kernel::highlight::Span::token: kernel::highlight::Token
-pub kernel::highlight::Token::Code
-pub kernel::highlight::Token::Emphasis
-pub kernel::highlight::Token::Fence
-pub kernel::highlight::Token::Heading
-pub kernel::highlight::Token::Link
-pub kernel::highlight::Token::Marker
-pub kernel::highlight::Token::Meta
-pub kernel::highlight::Token::Quote
-pub kernel::highlight::Token::Strong
 pub kernel::keep_warm::KeepWarm::FiveMinute
 pub kernel::keep_warm::KeepWarm::Off
 pub kernel::locator::Locator::Cas
@@ -2378,7 +2431,6 @@ pub mod kernel::event::record
 pub mod kernel::event::record::autonomy_word
 pub mod kernel::gate
 pub mod kernel::goal
-pub mod kernel::highlight
 pub mod kernel::idem
 pub mod kernel::keep_warm
 pub mod kernel::layout
@@ -2477,7 +2529,6 @@ pub struct kernel::Seq(_)
 pub struct kernel::ServerLabel(_)
 pub struct kernel::SessionName(_)
 pub struct kernel::Share(_)
-pub struct kernel::Span
 pub struct kernel::SystemBlock
 pub struct kernel::TaintSet(_)
 pub struct kernel::TaintSource(_)
@@ -2539,16 +2590,32 @@ pub struct kernel::event::record::AdviserAnswered
 pub struct kernel::event::record::AdviserAsked
 pub struct kernel::event::record::AdviserFellBack
 pub struct kernel::event::record::ApprovalResolved
+pub struct kernel::event::record::AssetArchived
+pub struct kernel::event::record::AttachedTuning
 pub struct kernel::event::record::AutonomyChanged
+pub struct kernel::event::record::BuildingConfigured
+pub struct kernel::event::record::BuildingCreated
+pub struct kernel::event::record::CancelReceived
 pub struct kernel::event::record::CityHalted
+pub struct kernel::event::record::CityInitialized
 pub struct kernel::event::record::Commit
 pub struct kernel::event::record::CommitAttribution
+pub struct kernel::event::record::DiscardRestored
 pub struct kernel::event::record::EmbeddingCalled
+pub struct kernel::event::record::EndpointAttached
+pub struct kernel::event::record::EndpointLost
+pub struct kernel::event::record::EvalRun
 pub struct kernel::event::record::EvidenceCite
+pub struct kernel::event::record::FileDiscarded
+pub struct kernel::event::record::GateChecked
 pub struct kernel::event::record::GovernedDocumentWritten
+pub struct kernel::event::record::HandoffWritten
 pub struct kernel::event::record::LogTruncated
+pub struct kernel::event::record::LoginStarted
 pub struct kernel::event::record::ModelCalled
 pub struct kernel::event::record::ModelReturned
+pub struct kernel::event::record::ModelSelected
+pub struct kernel::event::record::PolicyChanged
 pub struct kernel::event::record::PromptAssembled
 pub struct kernel::event::record::PromptSegment
 pub struct kernel::event::record::PromptShapeCompared
@@ -2558,6 +2625,7 @@ pub struct kernel::event::record::RerankCalled
 pub struct kernel::event::record::RunForked
 pub struct kernel::event::record::RunFrozen
 pub struct kernel::event::record::RunStarted
+pub struct kernel::event::record::SecretCaptured
 pub struct kernel::event::record::SessionOpened
 pub struct kernel::event::record::ShapePart
 pub struct kernel::event::record::SkillPin
@@ -2565,11 +2633,12 @@ pub struct kernel::event::record::SpineDocumentWritten
 pub struct kernel::event::record::SteerReceived
 pub struct kernel::event::record::ToolCalled
 pub struct kernel::event::record::ToolResult
+pub struct kernel::event::record::ToolkitLinkOpened
+pub struct kernel::event::record::WatchdogFired
 pub struct kernel::gate::ConnectorCall<'a>
 pub struct kernel::gate::EgressAllowlist
 pub struct kernel::goal::GoalEntry
 pub struct kernel::goal::GoalId(_)
-pub struct kernel::highlight::Span
 pub struct kernel::idem::Duplicate
 pub struct kernel::idem::IdemGuard
 pub struct kernel::idem::IdemKey

@@ -105,7 +105,7 @@ pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError>;
 
 流程：逐行①envelope 探查（serde_json::Value：v/seq/prev/kind/ig 键）；②v 判向（>EVENT_LOG_V 即 `E_LOG_VERSION_UNSUPPORTED`）；③链续（`chain_hash` 复算对拍 prev，首行对 GENESIS_PREV）；④seq 连续（自 FIRST 起）；⑤kind 已知→`parse_line` 全解＋规范复验＋`to_ref`；未知＋`ig:true`→记 IgnoredUnknown；未知无 ig→`E_LOG_VERSION_UNSUPPORTED`（subject=kind＋行号）。链与 seq 对一切行（含 ignored）成立。
 
-**「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 的四个生产调用方（`fold`、`rebuild_views`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
+**「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 的四个生产调用方（`fold`、`Views::rebuild`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
 
 故依据归给**拿到人输入路径的那一层**：`sprawling replay <ledger-dir>` 先问 `memory::ledger_segments_at`，一段都没有就报 `E_PATH_NOT_FOUND`（sprawling-SPEC §12）。先例取自本仓库：`xtask guard` 在无提交时说 `no commits yet, nothing to judge`，而不说通过。**空账本本身仍然合法**：`verify_lines(vec![])` 照旧返回空 `VerifiedLedger`。
 
@@ -126,7 +126,7 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
 pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 ```
 
-**`inherited` 是「分叉」这个词真正的执行体，而它是重建而不是复制。** 一个 run 的 window 由持有它的循环逐回合折起来，进程一停就没有了；折它的那些记录都在账本上。这个函数走母 run 自己的线——开场任务读 `run_started`、助手消息读 `model_returned`、工具结果读 `tool_result`、人中途说的话读 `steer_received`——并把它们**折过流动循环折过的那同一个 `Window` 类型**，所以一条分支拿到的次序就是母亲发出去的次序，而不是对同一批记录的第二次读法。**账本已经过一次脱敏**，分支继承的是母亲真正发出去的那份文本。
+**`inherited` 是「分叉」这个词真正的执行体，而它是重建而不是复制。** 一个 run 的 conversation 由持有它的循环逐回合折起来，进程一停就没有了；折它的那些记录都在账本上。这个函数走母 run 自己的线——开场任务读 `run_started`、助手消息读 `model_returned`、工具结果读 `tool_result`、人中途说的话读 `steer_received`——并把它们**折过流动循环折过的那同一个 `Conversation` 类型**，所以一条分支拿到的次序就是母亲发出去的次序，而不是对同一批记录的第二次读法。**账本已经过一次脱敏**，分支继承的是母亲真正发出去的那份文本。
 
 **切点只有一处权威，而且它往回退。** 一次工具波是好几行，只有它的末尾是能切的地方：`tool_called` 已写、`tool_result` 未写的中间，是一条「assistant 消息的工具调用没有答案」的半个回合，任何 provider 都拒。所以 `inherited` 维护一个「开着的一波」，命中中途就退回上一次安全点，并在 `Inherited::at` 里如实回报它**实际用到**的那一行——调用方把这一行写进 `run_forked`，于是页面显示的分叉点与模型真正拿到的那一段是同一个事实。
 
@@ -134,12 +134,12 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 
 **`addr` 落在 `run_forked` 的那一行上**：新 run 的 id 说的是「谁继续谁」，而地址说的是**哪个房间的这次继承已经用掉了**——`assembly::folds::session` 只用这两个字段回答「这个房间的当前一段是否还欠一段对话」。
 
-### 8-3 runtime::turn（形状 5 typestate 机）＋bench／window
+### 8-3 runtime::turn（形状 5 typestate 机）＋bench／conversation
 
-**一个 typestate 机、一张工作台、一份会话历史，三种形状住一个文件。** 1,716 → 918（turn）＋740（bench）＋109（window）。
+**一个 typestate 机、一张工作台、一份会话历史，三种形状住一个文件。** 1,716 → 918（turn）＋740（bench）＋109（conversation）。
 - `bench`（形状 1 判定）：`ToolBench`／`BenchOutcome` 与三条必要前提次序（去重先于副作用；exec 的 discard 预报先于 Write 门；Deny 以 `tool_result` 回去而不结束回合）。它拥有的是**次序**；工具本身以 `Box<dyn Tool>` 递入，沙盒在缝上，副作用不归它。
   **它原本坐在第一个 `mod tests` 之后**——没有边界的地方，新代码落在光标所在的行。
-- `window`（形状 2 值）：`Window`／`Opening`。一条不变量在每一个入口上成立——**连续的 user 内容并进已开的那条消息，而不另开一条**；steer、工具结果与开场任务是同一条规则的三扇门。
+- `conversation`（形状 2 值）：`Conversation`／`Opening`。它是会话，不是 transcript（冻结后写下的逐 run 文件），也不是 `kernel::Window`（上下文大小）。一条不变量在每一个入口上成立——**连续的 user 内容并进已开的那条消息，而不另开一条**；steer、工具结果与开场任务是同一条规则的三扇门。
 - 公开面只改定义模块，**不新增任何根重导出**（`runtime::Opening` 原就在根上；`ToolBench` 原就只能走模块路径，今天仍然）。
 
 ```rust
@@ -328,7 +328,7 @@ impl CallShape { pub fn verified_against(&self, frozen: &CallShape) -> Result<()
                     // Run 内恒不变——改它就换缓存前缀（理由与出处在 kernel-SPEC §8-22）
 impl Turn<Assembling> {
     pub fn assemble(self, interrupt: Interrupt, ledger: &mut dyn Ledger, prefix: &FrozenPrefix,
-                    window: &Window, tools: &[ToolDef], shape: &CallShape)
+                    conversation: &Conversation, tools: &[ToolDef], shape: &CallShape)
         -> Result<PhaseOutcome<Turn<Calling>>, AxError>;   // Calling 相私持已组 ChatRequest；prompt_assembled 载荷长入
 }
 // Interrupt 增 Steer { source: String, text: String }：边界消费→追加 steer_received（in-window）→照常 Advanced（不终止回合）；
@@ -402,7 +402,7 @@ pub struct Adviser { /* answer —— 私有 */ }
 impl Adviser { pub fn none() -> Adviser;
                pub fn with(answer: impl FnMut(&Ask, &Window) -> Result<AdviserAnswer, AdviserFailure>
                                  + Send + 'static) -> Adviser;
-               pub fn consult(&mut self, ask: Ask, window: &Window, elapsed_ms: u64) -> Consultation; }
+               pub fn consult(&mut self, ask: Ask, conversation: &Conversation, elapsed_ms: u64) -> Consultation; }
 ```
 
 - 定序（H-08 之后）：**判定由 `compaction::plan` 一处给出**，答 `Shrink { Keep, Cut(Strategy), MustOffload }`。`Keep` →原样；`MustOffload`（结构化、未知内容、以及非 UTF-8 字节）与「`Cut` 且 `len ≥ OFFLOAD_MIN_BYTES`」→ 有 `OffloadSite` 就 offload；`Cut` 而无站点或不够大 → `compaction::shorten` 按已定的 `Strategy` 裁。**`MustOffload` 而无站点是一次带恢复语的 `Err`，不是私自的字节切**：截半的结构化数据看上去仍可解析，那正是它比缺席更糟的理由，而旧的 `byte_cut` 让 pipeline 当场推翻 compaction 的定规——一条规则两个家。`byte_cut` 随之删除。标记仍由 `elision` 产出且只出现一次。
@@ -434,16 +434,11 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<st
 
 ```rust
 pub struct Watchdog { /* corrections: u32、provider_failures: u32、retries: Retries —— 私有，逐 Run 一实例 */ }
-#[derive(Default)] pub enum Retries { #[default] UntilHalted, AtMost(u32) }
+// retries 的类型是 kernel::Retries（§8-43）
 pub enum Disposal { Proceed, CorrectiveSteer { text: String },
                                      BackOff { until: TimeMs, code: AxCode, subject: String },
                                      Freeze { reason: FreezeReason } }
-pub struct WatchdogFired { #[serde(flatten)] pub action: FiredAction,
-                           pub corrections: u32, pub provider_failures: u32 }
-#[serde(tag = "action", rename_all = "snake_case")]
-pub enum FiredAction { Steer { text: String },
-                       BackOff { until_ms: u64, code: String, subject: String },
-                       Freeze { reason: String } }
+// fired_payload 写的是 kernel::event::record::WatchdogFired（kernel-SPEC §8-4），本 crate 不另声明其形状
 pub enum FreezeReason { Stall, ProviderRefused }
 impl Watchdog {
     pub fn new(retries: Retries) -> Watchdog;
@@ -461,7 +456,7 @@ impl Watchdog {
 - **`runtime::run::drive` 是那个调用方**：一次可重试的失败写一条 `watchdog_fired` 再重来，于是历史里第二条 `model_called` 就是人读到的那次重试，而不是一次无声的重复。节奏归 `Watchdog` 的退避表：`drive` 先把 `Watchdog` 给的 `until` 写进 `watchdog_fired`，再交给 `RunHooks::wait` 等到那一刻，于是历史许诺的「不早于 `until_ms`」与下一条 `model_called` 一致。**等待是 `Halt` 够得着一个没有回合在飞的 run 的地方**：`wait` 答 `Halted` 时 run 以 `Cancelled` 冻住，不再发下一次调用。落选的是「等完再问 `interrupt`」：退避长到一分钟，一个晚一分钟才生效的刹车不是刹车。装配层的 `wait` 以 50 ms 为片睡到 `until`，每片问一次是否停下；等待中到达的 steer 留到下一个安全点，不在等待里被吞掉。计数时钟（citysim、离线重放）答 `Allowed` 且不等，因为它重放的东西不在真实时间里等待。
 - **为什么删掉 `WATCHDOG_PROVIDER_RETRIES=2`。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。`retriable` 是产错处已经知道的事实（默认 false，fail-closed），拿它分类比在这里重新猜一遍强。
 - **`ProviderExhausted` 改名 `ProviderRefused`。** 既然没有重试预算了，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。载荷里的 `reason` 字串同改为 `provider_refused`。
-- fired_payload 的形状由 `WatchdogFired` 独家拼出：`drive` 此前对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，于是一份历史里有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
+- fired_payload 的形状由 `kernel::event::record::WatchdogFired`（kernel-SPEC §8-4）独家拼出：`drive` 此前对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，于是一份历史里有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
 
 ### 8-10 runtime::clock（形状 1；纯格式化不采样）
 
@@ -528,10 +523,10 @@ pub fn dev_entry() -> CatalogEntry;   // 一行披露，全部细则归 expansio
 ### 8-12b runtime::mode 原有面
 
 ```rust
-pub enum Mode { PlanGoal, Up, Sc, Ud, Experiment }
-impl Mode { pub fn as_str(&self) -> &'static str;              // "plan_goal" | "up" | "sc" | "ud" | "experiment"
-            pub fn catalog_entry(&self) -> CatalogEntry }      // 含 PlanGoal 退出条件四列
+pub fn catalog_entry(mode: kernel::Mode) -> CatalogEntry;     // 含 PlanGoal 退出条件四列
 ```
+
+哪些 mode 存在、各自拼成什么词，只由 `kernel::Mode` 回答（线、账本与配置文件都读它）；本模块只持每个 mode 准入什么、目录里怎么介绍它。runtime 不再有自己的 `Mode`：两份同成员的枚举要靠装配层一个五臂恒等的 `match` 维系，新增一个 mode 时那是第二处必须同步改的地方。
 
 ### 8-13 runtime::sandbox（缝清单文件，形状 3＋4）
 
@@ -1531,7 +1526,7 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 ```rust
 pub struct Transcript { run: RunId, lines: Vec<String>, redacted: u32 }   // 私有字段，一处构造
 impl Transcript {
-    pub fn of(run: RunId, window: &Window) -> Result<Transcript, AxError>;  // 逐消息序列化、扫描
+    pub fn of(run: RunId, conversation: &Conversation) -> Result<Transcript, AxError>;  // 逐消息序列化、扫描
     pub fn address(room: &Address, run: RunId) -> Result<Address, AxError>; // `<room>/<run-id>.jsonl`，纯函数：路径在跑之前就已知
     pub fn materialise(&self, cas: &mut Cas, city_root: &Path, room: &Address) -> Result<TranscriptRecord, AxError>;
     pub fn lines(&self) -> &[String];  pub fn redacted(&self) -> u32;
@@ -1790,7 +1785,7 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 
 ### 8-43 重试上限住 kernel
 
-`Retries` 曾经在 gateway 与 runtime 各有一份，两个臂相同、文档相同，而两个 crate 互不依赖——于是这个事实除了 kernel 无处可住。现在它住 `kernel::retries`：gateway 用它决定要不要再发一次请求，`Watchdog` 用它决定要不要冻结这次运行。`runtime::Retries` 是对它的再导出，不是第二份定义。
+两个 crate 互不依赖，而 gateway 决定要不要再发一次请求、`Watchdog` 决定要不要冻结这次运行，读的是同一个事实——所以 `Retries` 住 `kernel::retries`，两边都直接用 `kernel::Retries`，不再导出别名：别名让读者以为有两个类型，调用点于是写出一个两臂恒等的 `match` 去「转换」它们。
 
 ### 8-44 runtime::compaction::exchange（形状 2 值＋形状 1 判定）：回合边界的压缩
 

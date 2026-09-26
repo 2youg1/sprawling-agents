@@ -347,7 +347,7 @@ impl RunWorker {
                 .with_recovery("fix the file's permissions, or remove it from the building")
             })?;
             let hash = self.cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
-            must_read.push(Locator::parse(&format!("cas:b3-{hash}"))?);
+            must_read.push(Locator::cas(hash));
         }
         must_read.push(job);
         // The address is a pure function of the room and the run, so

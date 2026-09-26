@@ -150,6 +150,25 @@ pub struct RunForked {
     pub at_seq: Seq,
 }
 
+/// `eval_run`: the handoff probe asked of a successor, compared with
+/// what its predecessor answered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct EvalRun {
+    /// The probe's name and version, which together fix its questions.
+    pub probe: String,
+    pub version: u32,
+    /// The run whose answers are the reference.
+    pub predecessor: RunId,
+    /// How many answers the successor kept.
+    pub kept: u32,
+    /// The question indices whose answers differ, in order.
+    pub lost: Vec<u32>,
+    /// The predecessor's answers and the successor's, one per question.
+    pub before: Vec<String>,
+    pub after: Vec<String>,
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

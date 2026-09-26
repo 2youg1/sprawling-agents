@@ -79,7 +79,7 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let agreed = self.agree_to_work(&at.addr)?;
         let call = self.naming_call(agreed.rules.policy())?;
-        let back = self.namings.back.clone();
+        let back = self.doorstep.namings.back.clone();
         let bell = self.bell();
         std::thread::Builder::new()
             .name("sprawling-naming".to_owned())
@@ -105,15 +105,15 @@ impl RunWorker {
                 )
                 .with_recovery("check process thread limits, or name the room yourself")
             })?;
-        self.namings.pending = self.namings.pending.saturating_add(1);
+        self.doorstep.namings.pending = self.doorstep.namings.pending.saturating_add(1);
         Ok(())
     }
 
     /// Takes every dispatch whose name came home into a lane, and hands
     /// each refusal back to whoever asked.
     pub(in crate::assembly) fn dispatch_the_named(&mut self) {
-        while let Ok(named) = self.namings.home.try_recv() {
-            self.namings.pending = self.namings.pending.saturating_sub(1);
+        while let Ok(named) = self.doorstep.namings.home.try_recv() {
+            self.doorstep.namings.pending = self.doorstep.namings.pending.saturating_sub(1);
             let Named {
                 mut at,
                 task,

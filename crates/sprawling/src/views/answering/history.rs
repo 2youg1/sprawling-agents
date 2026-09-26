@@ -8,7 +8,6 @@
 
 use kernel::EventRecord;
 
-use crate::assembly::ledger_dir;
 use crate::views::holding::Views;
 
 impl Views {
@@ -28,7 +27,7 @@ impl Views {
             records: Vec::new(),
             earlier: None,
         };
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         if self.index.refresh(&dir).is_err() {
             return empty;
         }
@@ -96,7 +95,7 @@ impl Views {
         if to < from {
             return empty;
         }
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         if self.index.refresh(&dir).is_err() {
             return empty;
         }
@@ -155,7 +154,7 @@ impl Views {
             records: Vec::new(),
             earlier: None,
         };
-        let dir = ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         if self.index.refresh(&dir).is_err() {
             return empty;
         }

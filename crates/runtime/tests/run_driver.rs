@@ -201,7 +201,7 @@ fn plan() -> RunPlan {
         policy: BuildingPolicy::default(),
         tools: Vec::new(),
         skills: Vec::new(),
-        retries: runtime::Retries::UntilHalted,
+        retries: kernel::Retries::UntilHalted,
     }
 }
 
@@ -319,7 +319,7 @@ fn a_retriable_failure_is_made_again_up_to_the_number_the_person_set() {
         deltas: None,
     };
     let plan = RunPlan {
-        retries: runtime::Retries::AtMost(2),
+        retries: kernel::Retries::AtMost(2),
         ..plan()
     };
 
@@ -365,7 +365,7 @@ fn a_ceiling_that_is_reached_ends_the_run() {
         deltas: None,
     };
     let plan = RunPlan {
-        retries: runtime::Retries::AtMost(1),
+        retries: kernel::Retries::AtMost(1),
         ..plan()
     };
 

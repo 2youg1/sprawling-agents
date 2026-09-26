@@ -5,7 +5,6 @@
 
 //! The wire's words and the kernel's, translated one way each.
 
-use kernel::EventRecord;
 use kernel::{Address, AxCode, AxError};
 
 /// What this agent is called: the last segment of its address, which is
@@ -14,23 +13,6 @@ use kernel::{Address, AxCode, AxError};
 /// name reads more like somebody than like a path.
 pub(super) fn name_of(addr: &Address) -> &str {
     addr.as_str().rsplit('/').next().unwrap_or(addr.as_str())
-}
-
-/// The discipline a wire frame names, in the word `runtime` evaluates.
-///
-/// Total, with no default: the wire used to carry free text that this
-/// matched against four words and answered every other word with
-/// planning, so a client that misspelled `experiment` got a planning
-/// run and no refusal. The two sets now have the same five members,
-/// and a mode added to either without the other is a compile error.
-pub(super) fn mode_of(mode: channels::Mode) -> runtime::Mode {
-    match mode {
-        channels::Mode::PlanGoal => runtime::Mode::PlanGoal,
-        channels::Mode::Up => runtime::Mode::Up,
-        channels::Mode::Sc => runtime::Mode::Sc,
-        channels::Mode::Ud => runtime::Mode::Ud,
-        channels::Mode::Experiment => runtime::Mode::Experiment,
-    }
 }
 
 /// Which governed document a wire frame names. Total: the two sets have
@@ -61,11 +43,6 @@ pub(super) fn not_built(action: &'static str, subject: String, instead: &'static
 /// The building an address belongs to: its first segment.
 pub(super) fn building_of(addr: &Address) -> Option<Address> {
     Address::parse(addr.as_str().split('/').next()?).ok()
-}
-
-/// Which plan node a `roadmap_*` record names.
-pub(super) fn plan_node_of(record: &EventRecord) -> Option<kernel::NodeId> {
-    kernel::NodeId::parse(record.data().as_map().get("node")?.as_str()?).ok()
 }
 
 /// Which scope a wire frame names, in the value the ledger records.

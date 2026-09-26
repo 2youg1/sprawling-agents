@@ -5,13 +5,16 @@
 
 //! What this city can sign in as, and what it may call.
 //!
-//! The values and the readings live here; `signing` holds the login
-//! and the vault, `endpoints` what may be called.
+//! The values and the readings live here; `held` is what the worker
+//! keeps (the book, the vault, the expiries, the logins begun),
+//! `signing` the login and the vault's use, `endpoints` what may be
+//! called.
 
 use kernel::{AxCode, AxError};
 
 mod endpoints;
 mod environment;
+pub(super) mod held;
 mod probing;
 pub(super) mod signing;
 pub(super) mod subscription;
@@ -115,7 +118,7 @@ pub(super) fn tuning_of(
         timeout_ms: stated(wire.timeout_ms),
         request_max_retries: wire
             .request_max_retries
-            .map_or(gateway::Retries::UntilHalted, gateway::Retries::AtMost),
+            .map_or(kernel::Retries::UntilHalted, kernel::Retries::AtMost),
         stream_idle_timeout_ms: stated(wire.stream_idle_timeout_ms),
         extra_headers,
         overrides: wire
