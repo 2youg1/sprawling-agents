@@ -347,7 +347,7 @@ pub enum EventKind { CityInitialized, /* …余下 variant 与两分见本节表
 pub enum WindowClass { InWindow, RecordOnly }
 impl EventKind {
     pub fn window_class(&self) -> WindowClass;  // 穷尽 match；二分权威
-    pub const ALL: [EventKind; 72];             // 与本节表同一名册：specalign 与计数断言的数据面
+    pub const ALL: [EventKind; N];              // N＝本节表的行数；与本节表同一名册：specalign 与计数断言的数据面
 }
 
 pub struct Payload(serde_json::Map<String, Value>);
@@ -608,7 +608,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 - 铸造纪律：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
-**EventKind 78 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
+**EventKind 全集与二分（specalign 数据面；「入窗」＝InWindow）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
@@ -687,7 +687,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 供应商与模态 | `embedding_called` | record-only（一次嵌入调用入账：模型、请求多少条、回来多少个向量、调用方要的维度与 provider 自报的 token。向量本身不在此处——与 `model_called` 不携请求体同理，它是可从记录的输入重算的派生值，存两份就是同一件事有两个家） |
 | 供应商与模态 | `rerank_called` | record-only（同形：passages 与 ranks 各记一个数。服务端排好的名次就是答案，不在本城重排，故不在此处再写一份序） |
 | 顾问 | `adviser_asked` | record-only（问了一次判断：问题种类（noul／score／choice）与对象。问本身不决定任何字节） |
-| 顾问 | `adviser_answered` | **in-window**（重放不再问顾问，读到的是这条答案：它决定一件东西留不留在窗口里，因此它决定模型请求字节。**这也是「入窗」从 8 变 9 的那一条**） |
+| 顾问 | `adviser_answered` | **in-window**（重放不再问顾问，读到的是这条答案：它决定一件东西留不留在窗口里，因此它决定模型请求字节） |
 | 顾问 | `adviser_fell_back` | record-only（没有可用的顾问答案，确定性策略作答，reason 是 `unavailable`／`timeout`／`unreadable` 之一。没有这条，顾问塑形的窗口与城自己策略塑形的窗口会折出同一段历史） |
 | 保温 | `cache_renewed` | record-only（保温续期一次入账，写在房间地址下：成功时携 provider 自报的四个 token 数与它自报的账单额，失败时携 provider 的拒绝原样（`AxError`）。续期只重发前缀、不改变任何一次请求的字节，所以不入窗；记下它是为了让人从历史里读出保温花了多少） |
 
@@ -1085,8 +1085,8 @@ pub enum WriteMoment { BeforeReport, AfterFeedback, OnPlanChange }
 ```
 
 - **本模块只管文法，结构归 `plan`。** `check_*` 答「写得像不像一张 roadmap」；这些行**彼此怎么挂、各值多少、哪个能动**是 `kernel::plan` 的事。分开是因为两种坏法的修法不同：一行写错了改那一行，依赖成环了要重想这件事怎么排。
-- **六列，且索引是路径**。`| # | Item | Weight | Needs | Status | Evidence |`。`2.3.1` 挂在 `2.3` 下，于是**一张表就说清了多级计划**，不需要第二个文件描述层级；`Weight` 是同一父下诸行之间的**比例**（空格＝1，整层同乘不变），`Needs` 是必须先完成的行。旧四列表**不是被兼容而是被报告**：把四列当六列读会把状态词读进 weight 格，所以 `check_roadmap_shape` 报 `4 columns` 并让整栋楼落到 `Progress::Unplanned`——**一份读不懂的计划没有分母，这件事必须看得见。**
-- **拼写单套且不区分大小写**：运行时文档全面英文化后，中英两套拼写会成为「一个 Resident 允许写什么」的第二个权威；而大小写不入契约是因为 `done` 这类行表达的事实表装得下，把它判成 Malformed 等于拿一个读者不接受的理由把该行逐出分母。**线上拼写另有一套**（`snake_case` 标识符）：线帧是给程序读的，表格是给人读的，让客户端硬编码 `Awaiting approval` 正是短语表存在要防的事。
+- **六列，且索引是路径**。`| # | Item | Weight | Needs | Status | Evidence |`。`2.3.1` 挂在 `2.3` 下，于是**一张表就说清了多级计划**，不需要第二个文件描述层级；`Weight` 是同一父下诸行之间的**比例**（空格＝1，整层同乘不变），`Needs` 是必须先完成的行。四列表**不是被兼容而是被报告**：把四列当六列读会把状态词读进 weight 格，所以 `check_roadmap_shape` 报 `4 columns` 并让整栋楼落到 `Progress::Unplanned`——**一份读不懂的计划没有分母，这件事必须看得见。**
+- **拼写单套且不区分大小写**：运行时文档是英文，中英两套拼写会成为「一个 Resident 允许写什么」的第二个权威；而大小写不入契约是因为 `done` 这类行表达的事实表装得下，把它判成 Malformed 等于拿一个读者不接受的理由把该行逐出分母。**线上拼写另有一套**（`snake_case` 标识符）：线帧是给程序读的，表格是给人读的，让客户端硬编码 `Awaiting approval` 正是短语表存在要防的事。
 - **写者与读者同住**：`set_roadmap_status` 与 `insert_children` 是这张表仅有的两个编辑入口，两者共用同一段「哪几行是这张表」的判定（`locate_table`／`body_row`）。三条契约不变：只改首个表；输出行规范化，故**同一次改写两次得到同一字节**；`Done` 缺证据恒拒（`E_EVIDENCE_MISSING`）。
 - **`insert_children` 只往后编号，不补空位**：一个计划索引是一个名字，复用它等于悄悄搬走别人的证据。子节点落在父节点**最后一个后代之后**，于是阅读顺序不变、昨天看到的编号今天仍指同一件活。
 - **`WriteMoment` 有消费者**：正因为可写时刻是封闭的，读者才可以在两次写之间**持有已解析的树**而不是每问一次就把每栋楼的文件重解析一遍（`accounting::plan_view`）。
@@ -1191,7 +1191,7 @@ pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Pau
 pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> PursuitVerdict;
 ```
 
-- **不叫 Endless，按它是什么命名**：本仓已有三处叫 standing 的东西（`assembly::Standing`、`city::Standing`、`GoalEntry.standing`），再加一个会让词汇表出现第四个含义。
+- **不叫 Endless，按它是什么命名**：本仓已有好几处叫 standing 的类型（如 `city::wizard::Standing`、`assembly::folds::Standing`、`GoalEntry.standing`），再加一个会让这个词再多一个含义。
 - **一个社会停下来不是因为有人喊停，是因为没有就绪的活了。** 依据只此一条：就绪集为空**且**没有在途的 run。两半都要——就绪集空而四个 run 在跑，意思是活在别人手上，不是活干完了。
 - **钱明确不是停机条件**。本仓的成本面受众是 Agent（给它优化的材料），不是刹车；一个读预算的停机条件回答的是一个这里没人问的问题。
 - **`observe` 收状态而不收 `Pursuit`**：判定不依赖目标说了什么，而一个必须先持有 `Pursuit` 才能发问的读者，等于要拿深度零位才能**读**这座城。**声明是被守的动作，看不是。**
@@ -1218,7 +1218,7 @@ pub enum Progress { Planned(PlannedProgress), Unplanned(UnplannedProgress) }
 ```
 
 - 两态分两 struct 而非 enum 携字段：百分比方法只能长在 Planned 上，Unplanned 拿不到——「界面拿不到百分比就画不出百分比」的类型形态。
-- `EventRef` 新增 `pub fn kind(&self) -> EventKind`（Evidence 校验需读 kind；公开面变更随本 SPEC 同集）。
+- `EventRef` 有 `pub fn kind(&self) -> EventKind`：Evidence 校验需读 kind。
 
 ### 8-21 kernel::approval
 
@@ -1528,7 +1528,7 @@ pub fn forecast(arm: &ExecArm) -> DiscardForecast;
 
 - **decide 表**：Unplanned → Deny{NoRestoration}（无还原不可构造，使 Planned 恒有 plan）；Planned 且 taint 非空 → Deny{Tainted}（恒，无视规模）；余 Allow。判序固定，确定可重放。
 - **规模与归属不改答（§12「默认 YOLO」）**：一次 Planned 删除恒带 `Restoration`，因此恒可回滚；文件数、字节数、别人登记过的 asset 都不让删除停下来问人。删除的上界另有家：write domain 决定一个 resident 够得到哪些文件，registry 保存把 asset 放回去所需的凭据。
-- **forecast 三臂预判力递减**：Program 读 `(path, args)` 整体——basename ∈ {rm, rmdir, del} 或 git 携 reset --hard/clean 或 find 携 -delete；Python/Shell 子串表（rm 、rmdir、-delete、git reset --hard、git clean、os.remove、shutil.rmtree、os.unlink；Shell 另含 `>` 截断重定向）——可被混淆绕过，恒保守；git 兑底在 S3 checkpoint。子串表是 pub(crate) 数据面。
+- **forecast 三臂预判力递减**：Program 读 `(path, args)` 整体——basename ∈ {rm, rmdir, del} 或 git 携 reset --hard/clean 或 find 携 -delete；Python/Shell 子串表（rm 、rmdir、-delete、git reset --hard、git clean、os.remove、shutil.rmtree、os.unlink；Shell 另含 `>` 截断重定向）——可被混淆绕过，恒保守；git 栅栏兜底（`memory::checkpoint`）。子串表是 pub(crate) 数据面。
 - 同文件 `#[test]` 守 Discard 门 fail-closed：Unplanned 恒 Deny；Tainted 恒 Deny（kani 不接手，理由见 §2）。
 
 ### 8-27 kernel::gate
@@ -1638,7 +1638,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 **A（选中）：规范字节住 kernel**——`EventRecord::canonical_line` 是全库唯一字节产地，jsonl／citysim 内存 Ledger／replay 三个消费者共用；conformance 断言 4 因此可写。杠杆：V8「三平台字节一致」收敛为一个函数的性质；换适配器不换字节。
 **B（落选）：各适配器自产字节**（kernel 只给结构体，序列化归落盘方）——貌似「端口薄」，实则把规范散进每个适配器：内存 Ledger 与 jsonl 各持一份 serde 配置，漂移即 A19/A15 失真，而 conformance 只能对拍两实现、无法指认哪份是规范。落选理由：链对原始字节计算，字节即语义，语义必须一处。翻案条件：出现「同一记录合法多形」的需求（现设计明拒此需求）。
 
-**第二对（error 侧）**：carrier 声明在 `AxCode::carrier()` 穷尽 match（选中）vs 分立静态表 `[(AxCode, Carrier); 35]`。选中方案让「新增码忘配 carrier」成为编译错误（非穷尽 match 不过编译）；静态表则要靠测试数分支。落选表的唯一优势是 specalign 好解析——但 specalign 对齐的是 SPEC 表与 enum，match 臂同样可数。
+**第二对（error 侧）**：carrier 声明在 `AxCode::carrier()` 穷尽 match（选中）vs 分立静态表 `[(AxCode, Carrier); N]`。选中方案让「新增码忘配 carrier」成为编译错误（非穷尽 match 不过编译）；静态表则要靠测试数分支。落选表的唯一优势是 specalign 好解析——但 specalign 对齐的是 SPEC 表与 enum，match 臂同样可数。
 
 **第三对（gate 侧）**：各门分立函数（选中）vs 单一 `gate::check(ActionEnvelope) -> GateOutcome` 总入口。总入口看似接口更窄，实则要造一个能同时表达五种异质入参的胖信封（写目标、出网目标、预算梯、审批决定、删除请求的交集形状），每门只读其中一角——胖信封即接口谎言，且无法逐门 kani（状态空间相乘）。五函数共享 GateOutcome 与 refusal 塑形纪律，组合在调用方（效果层按 Effect 字段选门）。落选的总入口若日后出现（如 wire 面需单帧过门），作为薄路由层另立，不回收五函数。
 
@@ -1650,7 +1650,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 ## 10 实现逻辑
 
-0. **AxError 内部装箱**：`{ code, Box<其余六字段> }`，serde flatten 保持 wire 形与字段序不变。理由：AxError 走每一道缝的返回位，扁平七字段 176 字节超 `result_large_err` 阈（128）；装箱后 16 字节，接口与序列化形态零变化。
+0. **AxError 内部装箱**：`{ code, Box<ErrorDetail> }`，serde flatten 保持 wire 形与字段序不变。理由：AxError 走每一道缝的返回位，扁平结构超过 clippy `result_large_err` 的阈值；装箱后只剩码与一个指针，接口与序列化形态不变。
 1. 全模块零 I/O、零时钟、零随机；BTreeMap/BTreeSet only（Payload 经 serde_json::Map 默认 BTreeMap 间接满足）。
 2. hex 编解码手写（16 行内，查表小写），不引 hex crate——C12 精神：依赖面只进钉版清单所列。
 3. `EventKind`/`AxCode` 的 serde 呈现名逐 variant `#[serde(rename = …)]`（AxCode）与 `#[serde(rename_all = "snake_case")]`（EventKind）；`as_str` 与 serde 用同一份拼写（单测对拍）。
@@ -1722,17 +1722,6 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 **重开参数**：出现一类没有 `Restoration` 的效果——那时的正确做法是让它不可拼写，而不是把 `Escalate` 加回来。
 
-### 12.2 定规：上下文提醒第二道阈值的缺省与合法域只有一个家，可选覆盖走既有配置梯子
-
-`Verdict: user-approved`
-
-**决定**：第二道阈值缺省 65% 与合法域 30–90（含端点）的唯一家是 `consts_policy`（`CTX_REMINDER_SECOND_DEFAULT`／`CTX_REMINDER_SECOND_MIN`／`CTX_REMINDER_SECOND_MAX`）；可选覆盖走 `config_layers` 既有三层梯子（`LayeredValue` 整值上梯、Run 起点冻结、解析点拒），域外在解析点拒、拒因带合法域、不钳位。25% 第一道阈值不在此列，值与行为不动。
-
-**理由**：写 handoff 的紧急度因工作方式而异，阈值应由人定。域的下限来自噪声——早于 30% 的提醒每次 run 都来。域的上限来自算术——阈值越晚，「剩余预算仍够写 handoff 并 `succeed`」这句提醒越可能说不出口；让这句话从算术派生是收窄它的正解，在那之前 90 是宽容的上端。
-
-**被否**：①第四种配置机制（浏览器偏好存储）——同一个值两个家，浏览器副本会越过文件成为第二个权威（client-SPEC 4-28 同一条理）；②域外钳位——钳位把一个写错的值变成一个没人被告知的决定。
-
-**重开参数**：出现「提醒到得太晚、handoff 写不下」的实际数据时，重开的是上限 90，不是本定规。
 ### 12.2 定规：回滚＝分支＋git 还原
 
 `Verdict: user-approved`
@@ -1756,10 +1745,6 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 **被否**：①维持调用点手拼拒因（现状）——上限改动要靠人记得三处句子，漏一处即两种拒因；②一个泛型 `PolicyLimit<R>` 加标签参数——句式仍要按标签分支，只是把三个 `admit` 压成一个 match，可交换面反而变宽；③给类型留 getter 或 `Display` 让调用点自拼句子——那正是第二种拒因的入口。
 
 **重开参数**：出现可由人移动的上限（像第二道阈值那样进 `CONFIG.toml`）时，构造点改为解析式（域外在解析点拒、拒因带合法域），本定规「拒因从类型给出」不动。
-
-### 12.3 定规：受保护元数据名单只有 kernel::address 一个家
-
-`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`memory::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是内存侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 memory 的别名族规则承担（memory-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
 
 ### 12.4 定规：kernel 不拆 crate
 
@@ -1791,6 +1776,22 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 **重开参数**：某个兼容格式需要把断点放在非末条消息上。
 
+### 12.7 定规：上下文提醒第二道阈值的缺省与合法域只有一个家，可选覆盖走既有配置梯子
+
+`Verdict: user-approved`
+
+**决定**：第二道阈值缺省 65% 与合法域 30–90（含端点）的唯一家是 `consts_policy`（`CTX_REMINDER_SECOND_DEFAULT`／`CTX_REMINDER_SECOND_MIN`／`CTX_REMINDER_SECOND_MAX`）；可选覆盖走 `config_layers` 既有三层梯子（`LayeredValue` 整值上梯、Run 起点冻结、解析点拒），域外在解析点拒、拒因带合法域、不钳位。25% 第一道阈值不在此列，值与行为不动。
+
+**理由**：写 handoff 的紧急度因工作方式而异，阈值应由人定。域的下限来自噪声——早于 30% 的提醒每次 run 都来。域的上限来自算术——阈值越晚，「剩余预算仍够写 handoff 并 `succeed`」这句提醒越可能说不出口；让这句话从算术派生是收窄它的正解，在那之前 90 是宽容的上端。
+
+**被否**：①第四种配置机制（浏览器偏好存储）——同一个值两个家，浏览器副本会越过文件成为第二个权威（client-SPEC 4-28 同一条理）；②域外钳位——钳位把一个写错的值变成一个没人被告知的决定。
+
+**重开参数**：出现「提醒到得太晚、handoff 写不下」的实际数据时，重开的是上限 90，不是本定规。
+
+### 12.8 定规：受保护元数据名单只有 kernel::address 一个家
+
+`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`memory::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是内存侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 memory 的别名族规则承担（memory-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
+
 ## 13 依赖选型
 
 `serde`＋`serde_json`（规范字节与载荷）；`thiserror`（Display/Error derive）；`blake3`（唯一哈希）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）；`secrecy`＋`zeroize`（Sealed）。版本由根 `Cargo.toml` 与 `Cargo.lock` 给出。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
@@ -1814,7 +1815,7 @@ memory::jsonl／memory::cas／runtime::replay／runtime::fork／citysim 全部�
 
 ## 16 测试与约束
 
-- 单测（各模块文件内 `#[cfg(test)]`，测试模块头挂放宽 allow）：serde 拼写对拍（as_str×serde×表）；EventKind 计数与 in-window 计数（以 `ALL` 数）；carrier 全映射非重复覆盖 35；构造子不变量（refusal 三段在场、failure 无 gate、retriable 默认 false）；Payload 拒浮点（含嵌套）；Address/Locator 拒绝面正反例；Seq/Version checked 溢出；IdemKey 版本字节在场。
+- 单测（各模块文件内 `#[cfg(test)]`，测试模块头挂放宽 allow）：serde 拼写对拍（as_str×serde×表）；EventKind 计数与 in-window 计数（以 `ALL` 数）；carrier 全映射非重复覆盖 `AxCode::ALL`；构造子不变量（refusal 三段在场、failure 无 gate、`retry` 默认 `Retry::No`）；Payload 拒浮点（含嵌套）；Address/Locator 拒绝面正反例；Seq/Version checked 溢出；IdemKey 版本字节在场。
 - proptest：`Address::parse` 往返与 `is_within` 自反/传递/反对称；`Locator` Display↔parse 往返；`IdemKey` 重算恒等＋近旁输入不等样例；`Payload` 任意整数树恒过、含浮点树恒拒。
 - golden（insta）：创世行＋一条 `building_created` 的 `canonical_line` 字节。
 - 读界（§8-2 `may_read`）：`address::tests` 的三类读者矩阵——本楼读本楼、他楼读非机密楼、楼外读机密楼，外加机密楼读自己与读他楼——逐格判出 `ReadVerdict`；规则闭包在目标落在读者本楼时被调用即失败；规则读不出判 `RulesUnreadable` 且原样带回那条 `AxError`。
