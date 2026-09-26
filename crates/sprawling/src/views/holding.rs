@@ -192,6 +192,13 @@ impl Views {
         self.attribution
             .apply(record)
             .map_err(memory::MemoryError::into_ax)?;
+        // A freeze may evict a run and a late record may land on one;
+        // either way its money is folded back from the Ledger on demand
+        // (sprawling-SPEC section 8-90), so the row goes with it.
+        if record.kind() == EventKind::RunFrozen || self.hot.was_evicted(&record.run()) {
+            let hot = &self.hot;
+            self.attribution.retain_runs(|run| !hot.was_evicted(run));
+        }
         self.book.apply(record)?;
         // The one governance fold, shown this line exactly as the
         // worker's own copy is shown it.
