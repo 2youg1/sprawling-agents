@@ -147,3 +147,34 @@ fn a_one_shot_read_refuses_a_line_edited_before_the_snapshot() {
 
     assert_eq!(read, Err(reason));
 }
+
+#[test]
+fn a_snapshot_that_cannot_be_cut_is_reported_and_the_views_still_serve() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ledger, worker) = cut_then_raise(dir.path(), 3..4);
+    drop(worker);
+    // A directory where the cut stages its file: removing it as a file
+    // fails on every platform, and the read path never looks there.
+    std::fs::create_dir_all(snapshots(dir.path()).join("chain.snap.staged/held")).unwrap();
+    let said = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let heard = std::sync::Arc::clone(&said);
+    let mut log = Diagnostics::new(
+        Level::Effect,
+        Box::new(move |entry: runtime::diagnostics::Entry<'_>| {
+            heard
+                .lock()
+                .unwrap()
+                .push((entry.level, entry.message.to_owned()));
+        }),
+    );
+
+    let served = start_served_views(&ledger, &mut log).map(|_| ());
+
+    assert_eq!(served, Ok(()));
+    let said = said.lock().unwrap();
+    assert!(
+        said.iter()
+            .any(|(level, message)| *level == Level::Refuse && message.contains("snapshot")),
+        "{said:?}"
+    );
+}

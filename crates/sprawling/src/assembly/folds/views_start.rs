@@ -63,12 +63,28 @@ pub(crate) fn start_views(ledger_dir: &Path) -> Result<StartedViews, AxError> {
     }
 }
 
+/// The views `serve` starts with: [`start_views`], then a snapshot cut
+/// at the last line it folded, then where the start began written to
+/// `log` (sprawling-SPEC 8-91).
+///
+/// # Errors
+/// Those of [`start_views`].
+pub(crate) fn start_served_views(
+    ledger_dir: &Path,
+    log: &mut Diagnostics,
+) -> Result<Views, AxError> {
+    let started = start_views(ledger_dir)?;
+    cut_views_snapshot(ledger_dir, &started)?;
+    started.report_start(log);
+    Ok(started.views)
+}
+
 /// Cut a snapshot of `started` at the last line it folded; nothing when
 /// it folded nothing past the snapshot it resumed from.
 ///
 /// # Errors
 /// An encoding failure and an I/O failure writing the snapshot.
-pub(crate) fn cut_views_snapshot(ledger_dir: &Path, started: &StartedViews) -> Result<(), AxError> {
+fn cut_views_snapshot(ledger_dir: &Path, started: &StartedViews) -> Result<(), AxError> {
     let Some((seq, line)) = &started.last else {
         return Ok(());
     };
@@ -82,7 +98,7 @@ pub(crate) fn cut_views_snapshot(ledger_dir: &Path, started: &StartedViews) -> R
 
 impl StartedViews {
     /// Say where this start began and, when not from the snapshot, why.
-    pub(crate) fn report_start(&self, log: &mut Diagnostics) {
+    fn report_start(&self, log: &mut Diagnostics) {
         let site = Site {
             run: RunId::CITY,
             seq: self.last.as_ref().map_or(Seq::FIRST, |(seq, _)| *seq),

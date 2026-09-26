@@ -24,7 +24,7 @@ use super::attending::{Outward, Started, spawn_worker};
 use super::desk::CommandDesk;
 use super::serve::Opening;
 use super::serve::Serving;
-use crate::assembly::{acp_dispatch, cut_views_snapshot, ledger_dir, start_views};
+use crate::assembly::{acp_dispatch, ledger_dir, start_served_views};
 use crate::views::Views;
 
 /// One recording in, one line of text back.
@@ -150,11 +150,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // From the snapshot when one fits, and a fresh one cut at the last
     // line so the next start folds only what arrives after this one
     // (sprawling-SPEC 8-91).
-    let ledger = ledger_dir(city_root);
-    let started = start_views(&ledger)?;
-    cut_views_snapshot(&ledger, &started)?;
-    started.report_start(&mut log);
-    let rebuilt = started.views;
+    let rebuilt = start_served_views(&ledger_dir(city_root), &mut log)?;
     // This machine is not asked here (sprawling-SPEC.md 8-54): the
     // table is thirty-two items, most of them a program started and
     // asked its version, and a serve that waited for all of them holds
