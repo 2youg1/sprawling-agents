@@ -123,8 +123,9 @@ fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
     let window = crate::PollBudget::new(40, 10);
     let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let seen = pieces.clone();
-    let backlog = Backlog::with_window(window)
-        .with_sink(super::Sink::new(move |chunk| seen.lock().unwrap().push(chunk)));
+    let backlog = Backlog::with_window(window).with_sink(super::Sink::new(move |chunk| {
+        seen.lock().unwrap().push(chunk)
+    }));
     let mut talking = if cfg!(windows) {
         let mut command = std::process::Command::new("cmd");
         command.args(["/C", "echo live& ping -n 3 127.0.0.1 >NUL"]);
@@ -137,15 +138,22 @@ fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
     talking.current_dir(std::env::temp_dir());
     let owner = kernel::RunId::from_bytes([3; 16]);
     let addr = kernel::Address::parse("vault/room1").unwrap();
-    let started = backlog.run(owner, &addr, "talking".to_owned(), talking).unwrap();
+    let started = backlog
+        .run(owner, &addr, "talking".to_owned(), talking)
+        .unwrap();
     assert!(matches!(started, crate::Started::Backgrounded { .. }));
     let pieces = pieces.lock().unwrap();
     assert!(pieces.iter().all(|piece| piece.run == owner
         && piece.stream == super::Stream::Out
         && piece.bytes.len() <= window.read_per_poll().div_ceil(2)));
-    let out: Vec<u8> = pieces.iter().flat_map(|piece| piece.bytes.clone()).collect();
+    let out: Vec<u8> = pieces
+        .iter()
+        .flat_map(|piece| piece.bytes.clone())
+        .collect();
     assert!(
         String::from_utf8_lossy(&out).starts_with("live"),
         "the sink saw {out:?} before the window closed"
     );
+    drop(pieces);
+    backlog.release(owner);
 }

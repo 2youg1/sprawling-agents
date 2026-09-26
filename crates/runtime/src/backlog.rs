@@ -146,6 +146,7 @@ impl Backlog {
                 },
             },
         )?;
+        let mut tail = Tail::default();
         for _ in 0..self.window.polls() {
             if let Some(exit) = self.settle(id)? {
                 let (stdout, stderr) = collect(&dir);
@@ -154,6 +155,9 @@ impl Backlog {
                     stdout,
                     stderr,
                 });
+            }
+            if let Some(sink) = &self.sink {
+                tail.follow(&dir, (owner, id), self.window.read_per_poll(), sink);
             }
             std::thread::sleep(self.window.interval());
         }
@@ -375,6 +379,6 @@ pub mod waiting;
 use member::{Body, Claim, Member, RunState, collect, storage};
 pub use report::{BacklogKind, Finished, Standing, Started};
 use scratch::Scratch;
-pub use tail::{Chunk, Sink, Stream};
 use tail::Tail;
+pub use tail::{Chunk, Sink, Stream};
 pub use waiting::{Exit, PollBudget, Unseen};
