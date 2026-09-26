@@ -12,9 +12,9 @@
 //! never names, and this module reads every file of that module for them.
 //!
 //! The reading is by text, one line at a time. A comment line is not
-//! code, and a test is not production: a file named `tests.rs`, a file
-//! under a `tests` directory, and the item under a `#[cfg(test)]` line
-//! are skipped, because a test may build its fixture through the
+//! code, and a test is not production: a file named `tests.rs` or
+//! ending in `_tests.rs`, a file under a `tests` directory, and the item
+//! under a `#[cfg(test)]` line are skipped, because a test may build its fixture through the
 //! assembly point without the module it tests depending on it.
 
 use std::collections::BTreeSet;
@@ -134,8 +134,9 @@ fn files_of(root: &Path, module: &str) -> Result<Vec<std::path::PathBuf>, XtaskE
 }
 
 fn is_test_file(rel: &str) -> bool {
-    rel.split('/')
-        .any(|segment| segment == "tests" || segment == "tests.rs")
+    rel.split('/').any(|segment| {
+        segment == "tests" || segment == "tests.rs" || segment.ends_with("_tests.rs")
+    })
 }
 
 /// Every production line that names a forbidden path, with its 1-based
@@ -239,6 +240,21 @@ mod tests {
                 module: "crates/x/src/views".to_owned(),
                 forbidden: forbidden(),
             }]
+        );
+    }
+
+    /// A test module split off beside the code it judges is named
+    /// `<subject>_tests.rs`, and is test code as much as `tests.rs` is.
+    #[test]
+    fn a_split_off_test_file_is_not_production() {
+        assert_eq!(
+            [
+                "crates/x/src/views/standing_tests.rs",
+                "crates/x/src/views/tests/holding.rs",
+                "crates/x/src/views/testsuite.rs",
+            ]
+            .map(is_test_file),
+            [true, true, false]
         );
     }
 
