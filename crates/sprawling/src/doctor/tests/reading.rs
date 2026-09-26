@@ -97,7 +97,7 @@ fn the_report_is_grouped_into_required_and_recommended() {
     let findings = examine(&ScriptedMachine::missing(&[]));
     let required: Vec<&str> = findings
         .iter()
-        .filter(|found| Part::of(found) == Part::Required)
+        .filter(|found| Part::of(found.requirement) == Part::Required)
         .map(|found| found.requirement.name)
         .collect();
     assert_eq!(
@@ -109,7 +109,7 @@ fn the_report_is_grouped_into_required_and_recommended() {
         findings
             .iter()
             .filter(|found| found.requirement.tier == Tier::Develop)
-            .all(|found| Part::of(found) == Part::Recommended),
+            .all(|found| Part::of(found.requirement) == Part::Recommended),
         "a person who only wants to run a city is not told they are short a fuzzer"
     );
 }
@@ -282,13 +282,7 @@ fn the_first_row_is_written_while_the_other_items_are_still_asked() {
 
     let first = REQUIREMENTS
         .iter()
-        .find(|requirement| {
-            let finding = Finding {
-                requirement,
-                presence: Presence::Absent(Absence::NotOnSearchPath),
-            };
-            Part::of(&finding) == Part::Required
-        })
+        .find(|requirement| Part::of(requirement) == Part::Required)
         .unwrap()
         .name;
     let screen = Arc::new(Mutex::new(String::new()));

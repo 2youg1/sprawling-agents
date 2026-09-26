@@ -20,7 +20,7 @@
 use std::ffi::OsString;
 
 use super::family::member_at;
-use super::{Detection, Finding, Need, Presence, Tier};
+use super::{Detection, Finding, Need, Presence, Requirement, Tier};
 
 /// Whether this report may use colour.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -112,8 +112,8 @@ pub(crate) enum Part {
 impl Part {
     pub(crate) const ALL: [Part; 2] = [Part::Required, Part::Recommended];
 
-    pub(crate) fn of(finding: &Finding) -> Part {
-        match (finding.requirement.tier, finding.requirement.need) {
+    pub(crate) fn of(requirement: &Requirement) -> Part {
+        match (requirement.tier, requirement.need) {
             (Tier::Use, Need::Required | Need::OneOf(_)) => Part::Required,
             (Tier::Use, Need::Optional) | (Tier::Develop, _) => Part::Recommended,
         }
@@ -233,7 +233,10 @@ pub(crate) fn count(findings: &[Finding], part: Part) -> Counted {
     let mut here: usize = 0;
     let mut wanted: usize = 0;
     let mut groups: Vec<(super::Group, bool)> = Vec::new();
-    for finding in findings.iter().filter(|found| Part::of(found) == part) {
+    for finding in findings
+        .iter()
+        .filter(|found| Part::of(found.requirement) == part)
+    {
         let usable = finding.presence.usable();
         match finding.requirement.need {
             Need::Required | Need::Optional => {

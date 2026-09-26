@@ -29,8 +29,8 @@ use super::needs::{lack_line, lacks};
 use super::paint::{Ink, Part, row, summary};
 use super::visit::{Visited, unreadable_line, visit};
 use super::{
-    Finding, Machine, PATIENCE, Platform, ThisMachine, Tier, Verdict, examine, verdict,
-    verdict_line,
+    Finding, Machine, PATIENCE, Platform, REQUIREMENTS, ThisMachine, Tier, Verdict, examine,
+    examine_each, verdict, verdict_line,
 };
 
 /// What the command line asked for. The default checks and changes
@@ -130,14 +130,9 @@ pub(crate) fn run<R: BufRead, W: Write>(
     // The heading is on the screen before the probes start, so a person
     // waiting on a slow tool is not looking at an empty terminal.
     out.flush()?;
-    let findings = examine(machine);
-    for part in Part::ALL {
-        writeln!(out, "{}\n", part.heading())?;
-        for finding in findings.iter().filter(|found| Part::of(found) == part) {
-            writeln!(out, "{}", row(finding, asked.ink))?;
-        }
-        writeln!(out)?;
-    }
+    let mut rows = Rows::new(out, asked.ink);
+    let findings = examine_each(machine, |index, finding| rows.answered(index, finding))?;
+    rows.close()?;
     for line in priority_lines(&machine.core_standing()) {
         writeln!(out, "{line}")?;
     }
@@ -158,6 +153,95 @@ pub(crate) fn run<R: BufRead, W: Write>(
     }
     writeln!(out)?;
     Ok(ready)
+}
+
+/// The two parts of the report, written row by row as the probes answer:
+/// a row goes out once it and every row above it on the screen have
+/// answered, so the layout is the same on every run however the answers
+/// race (sprawling-SPEC.md section 8-59).
+struct Rows<'o, W: Write> {
+    out: &'o mut W,
+    ink: Ink,
+    /// For each table index, where its row stands on the screen.
+    place: Vec<usize>,
+    /// For each screen position, its part and, once answered, its row.
+    lines: Vec<(Part, Option<String>)>,
+    written: usize,
+    /// How many parts have their heading on the screen.
+    opened: usize,
+}
+
+impl<'o, W: Write> Rows<'o, W> {
+    fn new(out: &'o mut W, ink: Ink) -> Self {
+        let screen_order: Vec<(usize, Part)> = Part::ALL
+            .into_iter()
+            .flat_map(|part| {
+                REQUIREMENTS
+                    .iter()
+                    .enumerate()
+                    .filter(move |(_, requirement)| Part::of(requirement) == part)
+                    .map(move |(index, _)| (index, part))
+            })
+            .collect();
+        let mut place = vec![0; REQUIREMENTS.len()];
+        for (position, (index, _)) in screen_order.iter().enumerate() {
+            if let Some(slot) = place.get_mut(*index) {
+                *slot = position;
+            }
+        }
+        Rows {
+            out,
+            ink,
+            place,
+            lines: screen_order
+                .into_iter()
+                .map(|(_, part)| (part, None))
+                .collect(),
+            written: 0,
+            opened: 0,
+        }
+    }
+
+    fn answered(&mut self, index: usize, finding: &Finding) -> std::io::Result<()> {
+        if let Some((_, line)) = self.place.get(index).and_then(|at| self.lines.get_mut(*at)) {
+            *line = Some(row(finding, self.ink));
+        }
+        while let Some((part, Some(line))) = self.lines.get(self.written) {
+            let (rank, line) = (rank(*part), line.clone());
+            self.open_through(rank)?;
+            writeln!(self.out, "{line}")?;
+            self.written = self.written.saturating_add(1);
+        }
+        self.out.flush()
+    }
+
+    /// Writes the heading of every part up to the one ranked `rank`,
+    /// closing the part before each with a blank line.
+    fn open_through(&mut self, rank: usize) -> std::io::Result<()> {
+        while self.opened <= rank {
+            if self.opened > 0 {
+                writeln!(self.out)?;
+            }
+            if let Some(part) = Part::ALL.get(self.opened) {
+                writeln!(self.out, "{}\n", part.heading())?;
+            }
+            self.opened = self.opened.saturating_add(1);
+        }
+        Ok(())
+    }
+
+    /// Opens the parts no row reached, and closes the last one.
+    fn close(mut self) -> std::io::Result<()> {
+        self.open_through(Part::ALL.len().saturating_sub(1))?;
+        writeln!(self.out)
+    }
+}
+
+fn rank(part: Part) -> usize {
+    match part {
+        Part::Required => 0,
+        Part::Recommended => 1,
+    }
 }
 
 /// The part that says where this machine lets the core's threads stand.
