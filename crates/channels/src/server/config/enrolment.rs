@@ -156,8 +156,8 @@ pub(super) async fn accept_enrolment(
 /// The reference a `secret_captured` record states, when that record is
 /// the one this request is waiting for.
 ///
-/// The reply quotes the record rather than the text the route assembled,
-/// so the reference a person is handed is the one the vault stored: two
+/// The reply is the reference the record states, spelled as
+/// `SecretRef` spells it, rather than the text the route assembled: two
 /// spellings of one place agree until either is changed, and a record is
 /// what the vault itself said.
 fn stored_reference(record: &EventRecord, place: &SecretRef) -> Option<String> {

@@ -13,9 +13,11 @@
 //! step 12: the same fold, on both sides of the wire). One authority,
 //! two callers.
 //!
-//! Pure and fail-open: a payload this build cannot read produces `None`
-//! rather than an error, because a view that hid a record it could not
-//! parse would be a view that lies about what happened.
+//! Pure and fail-open: a field this build cannot read produces `None`
+//! rather than an error, and a note whose payload will not read back as
+//! its kind becomes a `Note::Unreadable` naming the failure, because a
+//! view that hid a record it could not parse would be a view that lies
+//! about what happened.
 
 use kernel::event::record::{
     CheckpointCommitted, FileDiscarded, FiredAction, ProviderDegraded, WatchdogFired,
@@ -213,8 +215,10 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
 
 /// A back-off is the provider's refusal, waited out: the line keeps the
 /// failure's stable code and subject, and they are shown as that
-/// refusal. A steer and a freeze earn no note of their own, because the
-/// steer and the frozen run are lines of their own.
+/// refusal. The line records only the code and the subject, so the
+/// action and the recovery are composed here from the kind of line it is,
+/// not read back. A steer and a freeze earn no note of their own, because
+/// the steer and the frozen run are lines of their own.
 fn backed_off(action: FiredAction, at: Seq) -> Option<Note> {
     match action {
         FiredAction::BackOff {
