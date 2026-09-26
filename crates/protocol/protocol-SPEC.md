@@ -47,6 +47,7 @@
 ## 7 模块边界
 
 - **字节怎么走**归本 crate 的三种传输（`mcp::stdio`、`mcp::http`、`mcp::sse`，见 §8-17）：子进程的拉起、期限与回收，HTTP 会话与事件流都住这里。装配层只决定一栋楼按配置连哪几台 server。
+- **哪家 broker 替人持外部应用的 OAuth**也归本 crate（`mcp::broker`，见 §8-18）：出网政策仍只在 `gateway::client_for`。
 - **一条消息能有多大**归本 crate（`mcp::reading`）：上限是 MCP 这个协议的事实，不是某一种传输的事实；两个传输各写一个数字就是两条会漂的上限。每种传输拥有自己 reader 的形式（线程、管道、`sync_channel`），它把字节交给 `read_one_message` 并接受它的拒绝。
 - **准不准出网**归 `kernel::gate` 的 egress 门：外部工具声明 `Effect::Egress`，路由到那道门；本 crate 只在 confidential 一位上做构造点拒（更早、更硬）。
 - **回来的东西算什么**归 `kernel::taint`：与 L0 工具同落 `kernel::tool` 缝，故自动进污染环，本 crate 无解包面。
@@ -214,6 +215,26 @@ pub fn echoing(answer: &str) -> (String, Vec<String>); // 对每行都回同一�
 - **子进程回收逻辑原样搬移**：期限到即杀子进程，理由见 `mcp::stdio` 的模块文档。
 - **`echoing` 在 `conformance` 后面**：装配层的测试要起同一个假 server；产品二进制不带它（`xtask artifact`）。
 - 失败码不变：各传输沿用 §12 的 `E_TIMEOUT`／`E_WIRE_MISMATCH`／`E_TOOL_UNAVAILABLE`，HTTP 与 SSE 在 401／403 抬 `E_CREDENTIAL_MISSING`，客户端构造不成抬 `E_CONFIG_INVALID`。
+
+### 8-18 外包 OAuth 的 broker（形状 4 适配器；三个调用，别无其它）
+
+```rust
+// mcp::broker：唯一知道某台 server 属于 Composio 的模块
+pub struct Broker { /* 私有：client、Sealed<String> 项目密钥、base url */ }
+impl Broker {
+    pub fn new(key: kernel::Sealed<String>, rule: kernel::Proxying) -> Result<Broker, AxError>;
+    pub fn shelf(&self, user: &str) -> Result<Vec<Toolkit>, AxError>;   // 目录 × 此人的状态
+    pub fn connect(&self, slug: &str, user: &str) -> Result<String, AxError>; // 同意页地址
+}
+pub struct Toolkit { pub slug: String, pub name: String, pub auth: String, pub standing: Connection }
+pub enum Connection { Absent, Awaiting { consent_url: String }, Connected { alias: String }, Refused { refusal: AxError } }
+```
+
+- **住 `protocol::mcp`，不住 `gateway`**：它回答的是「连哪台 MCP server 上的哪个应用」，与三种传输同属一件事；出网的两条政策（代理规则、HTTP 客户端的构造）仍只在 `gateway::client_for` 一处，broker 经它取客户端，测试的 `Broker::at` 也一样（`Proxying::ExceptLocal` 对回环地址不走代理），所以本库之内没有第二个构造点。拒绝的另一方案是留在 `gateway`：那样 MCP 一分为二，`gateway` 要知道一家 MCP 服务的目录形状。
+- **返回自己的词汇，不返回线上形状**：装配层把 `Toolkit`／`Connection` 映成 `channels::ToolkitLine`，与它把握手映成 `McpState` 同一做法。
+- **只有一家 broker，所以没有 trait**：第二家外包服务才是这条缝的第二个实现。
+- 失败码：401／403 抬 `E_CREDENTIAL_MISSING`；408／429／5xx 抬可重试的 `E_PROVIDER`；其余状态、读不出的答案与接不上 base 的路径抬 `E_PROVIDER`。接不上的路径在 recovery 里报出本模块的路径（`module_path!()`），模块再搬家也不漂。
+- 字段按防御方式读：缺一个字段少一行，不毁整张答案；测试里的假 server 是本 crate 对 broker 所发内容的陈述。
 
 ### 8-14 protocol 目录化（形状：主类型居索引，方法按簇归文件）
 

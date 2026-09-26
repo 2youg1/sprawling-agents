@@ -204,3 +204,16 @@ fn a_status_this_build_has_not_heard_of_offers_the_button_again() {
     assert_eq!(shelf[0].standing, Connection::Absent);
     drop(handle.join());
 }
+
+#[test]
+fn a_path_that_cannot_be_addressed_is_filed_under_the_module_that_builds_it() {
+    let broker = Broker::at("mailto:nobody", key()).unwrap();
+
+    let refused = broker.shelf("acme").unwrap_err();
+
+    assert!(
+        refused.recovery().contains("protocol::mcp::broker"),
+        "the recovery names the module a reader should open: {}",
+        refused.recovery()
+    );
+}
