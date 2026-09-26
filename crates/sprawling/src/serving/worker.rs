@@ -296,12 +296,7 @@ impl Listening {
                 })
             }
         };
-        desk.close(match &served {
-            Ok(()) => Closing::Chosen,
-            Err(failure) => Closing::Broken {
-                cause: failure.to_string(),
-            },
-        });
+        desk.close(Closing::of(&served));
         // Joined rather than left to the process exit: the handoff is
         // written by that thread, and a main that returned first would end
         // the process before the line it exists to write.

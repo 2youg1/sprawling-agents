@@ -40,7 +40,10 @@ impl Closing {
     /// failure, so a failed serve is never recorded as the person's choice.
     pub(crate) fn of(served: &Result<(), AxError>) -> Self {
         match served {
-            Ok(()) | Err(_) => Self::Chosen,
+            Ok(()) => Self::Chosen,
+            Err(failure) => Self::Broken {
+                cause: failure.to_string(),
+            },
         }
     }
 }
