@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A Locator is read where the bytes belong: a `cas:` block at the
-//! building of the ledger line that referenced it, a `file:` at its
-//! address, and a block nobody in this lineage referenced not at all.
+//! building it was put for, a `file:` at its address, and a block put
+//! for no building not at all.
 
 use super::*;
 
@@ -42,34 +42,53 @@ fn git(root: &Path, args: &[&str]) -> String {
 }
 
 #[test]
-fn every_cas_block_is_refused_until_its_building_is_recorded_at_store_time() {
+fn a_cas_block_is_read_at_the_building_it_was_put_for() {
     let dir = tempfile::tempdir().unwrap();
     let cas_dir = kernel::layout::CityLayout::new(dir.path()).cas();
     let mut cas = memory::Cas::open(&cas_dir).unwrap();
-    let in_lab = cas.put(b"lab notes\n").unwrap();
-    let in_vault = cas.put(b"vault notes\n").unwrap();
-    let stray = kernel::B3Hash::digest(b"never referenced");
-    let owner: BlockOwner = Arc::new(move |hash: &kernel::B3Hash| {
-        Ok(if *hash == in_lab {
-            Some(kernel::Address::parse("lab").unwrap())
-        } else if *hash == in_vault {
-            Some(kernel::Address::parse("vault").unwrap())
-        } else {
-            None
-        })
-    });
+    let put_in = |building: &str| memory::BlockOrigin {
+        run: kernel::RunId::from_bytes([7; 16]),
+        building: kernel::Address::parse(building).unwrap(),
+    };
+    let in_lab = cas
+        .put_for(
+            b"lab notes
+",
+            &put_in("lab"),
+        )
+        .unwrap();
+    let in_vault = cas
+        .put_for(
+            b"vault notes
+",
+            &put_in("vault"),
+        )
+        .unwrap();
+    let with_no_origin = cas
+        .put(
+            b"shelved
+",
+        )
+        .unwrap();
+    let stray = kernel::B3Hash::digest(b"never put");
     let mut tool = ReadTool::new(
         dir.path(),
         Arc::new(Mutex::new(Catalog::new())),
         only_lab(),
         Blocks {
             store: cas_dir,
-            owner,
+            owner: Arc::new(|_: &kernel::B3Hash| Ok(None)),
         },
     )
     .unwrap();
 
-    for refused in [in_lab, in_vault, stray] {
+    let read = tool.invoke(&call(&format!("cas:b3-{in_lab}"))).unwrap();
+    assert_eq!(
+        read.result.as_map()["text"],
+        "lab notes
+"
+    );
+    for refused in [in_vault, with_no_origin, stray] {
         let err = tool
             .invoke(&call(&format!("cas:b3-{refused}")))
             .unwrap_err();

@@ -46,7 +46,7 @@ pub use bundle::{Bundle, MANIFEST, Manifest, open_restored};
 
 mod cas;
 
-pub use cas::Cas;
+pub use cas::{BlockOrigin, Cas};
 
 mod index;
 

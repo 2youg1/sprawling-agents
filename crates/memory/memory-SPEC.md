@@ -246,6 +246,10 @@ impl Cas {
     pub(crate) fn open_with(vfs: Box<dyn Vfs>, dir: &Path) -> …;    // 测试注入点
     /// Content-addressed put: tmp + rename, dedup by existence.
     pub fn put(&mut self, bytes: &[u8]) -> Result<B3Hash, MemoryError>;
+    /// put＋记下这块是为哪个 run、哪栋楼存的；两者都落盘才返回 Ok。
+    pub fn put_for(&mut self, bytes: &[u8], origin: &BlockOrigin) -> Result<B3Hash, MemoryError>;
+    /// 这块的全部来源，先存先列；没记过来源的块与没见过的哈希都是空表。
+    pub fn origins(&self, hash: &B3Hash) -> Result<Vec<BlockOrigin>, MemoryError>;
     pub fn contains(&self, hash: &B3Hash) -> bool;                  // 存在判定无可失败面，不包 Result
     /// Full read re-verifies the hash (cheap: BLAKE3 GB/s); mismatch ⇒ CasCorrupt.
     pub fn get(&self, hash: &B3Hash) -> Result<Vec<u8>, MemoryError>;
@@ -258,6 +262,12 @@ impl Cas {
 **范围读只读要答的那一段，并且不校验。** 取回走 `Vfs::read_at`：`B` 式一次定位读取 `to-from+1` 字节，**短答即越界**（文件到头了，拒而不夹取）；`L` 式自对象开头按 64 KiB 块扫换行，扫到第 `to` 行的终止符即止，付的是答案**之前**的字节，从不付答案之后的字节。语义仍归 `memory::cas::ranges` 一处（`of_object`），`Cas::get_range` 只做存在判定与路径解析。
 
 **两条路里选了「不校验，调用方明示接受」，另一条（分块哈希）落选。** 一个对象的地址覆盖整份内容，拿它校验一个片段就必须把整份读回来重算 BLAKE3——那正是本条要去掉的代价。要让片段可校验就得改写入面：put 时另存一棵分块哈希树（BLAKE3 的可验证流式形态），于是每个对象多一份旁挂物、多一条要与对象保持同步的事实、并且旧对象无树可用。买到的是「范围读能发现位腐烂」，而位腐烂**已经**由 `get` 的全读复算发现，且 §12 已把 `CasCorrupt` 记为不可定义掉的外部事故。因此：**范围读信任 put 时的校验，需要地址被证明的调用方走 `get`**；这句话在 `cas/ranges.rs` 的模块文档里逐字重复一遍，因为改那段代码的人先读的是它。
+
+```rust
+pub struct BlockOrigin { pub run: RunId, pub building: Address }
+```
+
+**块的来源在存块时记下，不事后推断。** 为一个 run 存块的调用方（转录、卸载、截图）走 `put_for`；上架的技能包是全城的，走 `put`，不带来源。来源记录在 `<dir>/from/<hex 前 2>/<hex64>`，一行一个 `<run> <address>`：同一份字节可能为两栋楼各存一次，所以一个块可以有多个来源，同一来源再存不重复记。记录追加后 `sync_data`＋`sync_dir`。读回来不成形的行（崩溃截断的追加尾）不授予任何东西——读取界往关的一侧失败。另一条路是按账本里哪一行写了这个哈希来推断来源，落选：模型写的文字会落进带地址的行，那样的归属可以伪造。
 
 布局：`<dir>/b3/<hex 前 2>/<hex64>`；临时件 `<dir>/tmp/<hex64>.part`（内容定名：同内容并发写者汇合于同一目标，无随机源；残留 tmp 先 truncate 再写）。put 四步：hash→已存在即去重返回→写 tmp＋`sync_data`→`rename`＋`sync_dir`（分片目录）。范围取回越界＝`RangeOutOfBounds`（fail-closed，不静默夹取）；`L` 式行切分按 `\n`，末行无终止符同计一行；返回字节含行间 `\n`、不含末行终止符；`B` 式按 0 起闭区间直切。
 rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_dir` 前不存活，断电即整体消失（源已移除）——看似比真实更损，但 put 尚未返回 Ok，无可观察效果被丢失，A3 点 2 的断言面（已命名对象恒不腐蚀）不受影响。
