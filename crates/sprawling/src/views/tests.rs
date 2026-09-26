@@ -461,6 +461,37 @@ fn the_building_page_reads_its_directory_after_the_views_are_released() {
     assert_eq!(answer, views.answer(&query));
 }
 
+/// The city page lists the buildings and reads their plans after the
+/// views are released: a building raised between `prepare` and `finish`
+/// is one the answer shows, and its plan is the one on disk then.
+#[test]
+fn the_city_page_lists_its_buildings_and_reads_their_plans_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let prepared = views.prepare(&channels::Query::CityView);
+    std::fs::create_dir(dir.path().join("lab")).unwrap();
+    std::fs::write(
+        dir.path().join("lab").join("Roadmap.md"),
+        "| # | Item | Weight | Needs | Status | Evidence |\n\
+         |---|------|--------|-------|--------|----------|\n\
+         | 1 | groundwork | 1 |  | Not started |  |\n",
+    )
+    .unwrap();
+
+    let read = prepared.finish();
+    let channels::Answer::City(city) = &read else {
+        panic!("CityView answers with a city: {read:?}");
+    };
+    assert_eq!(
+        city.buildings
+            .iter()
+            .map(|line| (line.addr.as_str().to_owned(), line.ready))
+            .collect::<Vec<_>>(),
+        vec![("lab".to_owned(), 1)]
+    );
+    assert_eq!(read, views.prepare(&channels::Query::CityView).finish());
+}
+
 /// A change list, a patch, a stored object and an archive search read the
 /// disk after the views are released: a city that appears between
 /// `prepare` and `finish` is the one each of them reports.
