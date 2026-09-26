@@ -30,6 +30,7 @@
 //! which the dispatching modules read where the credentials module keeps it.
 
 mod building_page;
+mod chain_watch;
 mod commanding;
 mod credentials;
 mod dispatching;

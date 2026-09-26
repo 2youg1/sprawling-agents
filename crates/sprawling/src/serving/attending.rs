@@ -69,6 +69,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         notice: vault_notice,
         log,
         held,
+        audit_log,
     } = opening;
     let Outward {
         desk: worker_desk,
@@ -98,6 +99,13 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                         eprintln!("{notice}");
                     }
                     worker.open_for_service(vault_notice);
+                    // Detached: the audit holds no part of the writer,
+                    // and what it finds reaches the writer through the
+                    // halt it attached (sprawling-SPEC.md 8-90).
+                    if let Err(err) = worker.audit_chain_in_background(audit_log) {
+                        drop(ready_tx.send(Err(err)));
+                        return;
+                    }
                     drop(ready_tx.send(Ok(worker.vault_handle())));
                     worker
                 }

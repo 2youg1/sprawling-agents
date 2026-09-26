@@ -82,8 +82,11 @@ mod snapshot;
 
 pub use snapshot::ChainSnapshot;
 pub use snapshot::SnapshotFit;
+pub use snapshot::SnapshotStart;
 pub use snapshot::StoredSnapshot;
+pub use snapshot::WholeFold;
 pub use snapshot::read_snapshot;
+pub use snapshot::start_from_snapshot;
 pub use snapshot::write_snapshot;
 
 mod digest_cache;

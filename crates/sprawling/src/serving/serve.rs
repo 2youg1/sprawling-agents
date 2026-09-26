@@ -69,4 +69,8 @@ pub(super) struct Opening {
         memory::OpenReport,
         crate::assembly::Standing,
     ),
+    /// The chain audit's own voice: the same sink and the same floor as
+    /// `log`, held apart because the audit thread never touches the
+    /// writer (sprawling-SPEC.md 8-90).
+    pub(super) audit_log: runtime::diagnostics::Diagnostics,
 }

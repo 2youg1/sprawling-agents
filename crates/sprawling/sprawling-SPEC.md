@@ -3553,6 +3553,28 @@ pub(crate) fn answer_outside_the_lock(
 
 **`Prefix` 仍在锁内读账本，`BuildingView` 的计划第一次被问时也在锁内读盘**（本节接口的当前状态）：`Prefix` 找那条 `prompt_assembled` 记录要刷新视图持有的账本索引，索引是可变的缓存，拆开它要等视图以 `Arc<ViewsSnapshot>` 发布（8-89）。`Commit`、`Commits` 只读折叠，不在此列。
 
+### 8-90 服务中的城在后台审计整条链，链断了写者就停（`bin::assembly::chain_watch`）
+
+```rust
+// bin::assembly::chain_watch —— shape: adapter
+impl RunWorker {
+    pub(crate) fn audit_chain_in_background(
+        &mut self,
+        log: runtime::diagnostics::Diagnostics,
+    ) -> Result<std::thread::JoinHandle<()>, AxError>; // StorageFatal「start the chain audit」：线程起不来
+}
+```
+
+**一次调用，接上停机再起线程。** 它新建一个 `memory::ChainHalt`，先经 `JsonlLedger::halt_on` 接到这个 worker 的写者上，再在名为 `sprawling-chain-audit` 的线程上跑 `memory::audit_chain`（memory-SPEC 8-27）。线程只持有账本目录、停机值和自己的 `Diagnostics`，不碰写者，所以写线程从不等审计。`serve` 的写线程在 `open_for_service` 之后调用它；起不来的线程与起不来的写线程一样，让 `serve` 失败。citysim 与测试不走这条路，所以它们的时序里没有第二个线程。
+
+**结果作为诊断推给页面。** 审计线程的 `Diagnostics` 与写者的那一份同一个落点（`serving::Journal` 的 sink）、同一个级别下限，所以页面在日志里读到这一行：`Whole` 写一条 `Effect`，给出核对过的行数；`Broken(reason)` 先 `trip(reason)`，再写一条 `Refuse`，内容就是审计的原因与恢复办法；读账本本身失败（`MemoryError`）写一条 `Refuse`，但不跳闸，因为没读完的审计没有证明链断了。
+
+**视图不需要第二个停机值。** 视图只折写者已经写下的记录（8-89），写者停了，视图也就不再有新工作；给视图再接一个 `ChainHalt` 会让「这座城还收不收工作」有两处定义。被拒的命令经写者的 `MemoryError::ChainHalted` 回到页面，说的与诊断是同一句话。
+
+**被拒：审计放在启动路径上同步做完再开端口。** 那正是要去掉的全链读取；审计的价值在于它不挡首字节。
+
+**本节接口的当前状态**：启动仍由 `rebuild_views` 与 `Standing::fold` 全量校验并折叠，所以审计目前只抓启动之后才坏掉的行。启动改走 `memory::start_from_snapshot`（memory-SPEC 8-28）只折尾部，需要先有 `Views` 与 `Standing` 的字节编码：它们持有 `memory::HotView`、`memory::Attribution`、`gateway::EndpointBook` 等字段私有的类型，所以编码要由各自的 crate 各给一份，而不是在这个 crate 里写第二份。那时一个没读完的审计也要停写，因为快照在审计通过之前没有被证明。
+
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 
 **形状。** `main/verbs.rs` 是 data：一张静态表 `VERBS`，每个动词一行 `Row { verb, name, aliases, positionals, flags, says, effect }`。位置参数是 `(名字, Need::Required | Need::Optional)`；标志是 `Flag { name, takes: Takes::Nothing | Takes::Value(<占位名>), says }`；`effect` 是 `Effect::ReadsOnly | Effect::Changes`，标出这个动词运行时会不会改一座城或它所在的主机。总览（`help`、`--help`）、单个动词的帮助（`help <verb>`、`<verb> --help`）与首屏退出时的清单都由这张表生成，没有第二份手写的命令清单或用法字符串。

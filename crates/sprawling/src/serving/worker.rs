@@ -180,6 +180,11 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             city_root: city_root.to_path_buf(),
             vault,
             notice: vault_notice,
+            audit_log: log
+                .floor()
+                .map_or_else(runtime::diagnostics::Diagnostics::off, |floor| {
+                    runtime::diagnostics::Diagnostics::new(floor, journal.sink())
+                }),
             log,
             held,
         },
