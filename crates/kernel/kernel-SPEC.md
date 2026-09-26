@@ -1217,7 +1217,13 @@ pub trait Tool: Send {
     /// must return E_INVALID_ARGS, never route silently.
     fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError>;   // 默认 `GateSubject::None`
+    fn writes(&self, call: &ToolCall) -> Writes;   // 默认按 `meta().effect`：`Read` → `Nothing`，其余 → `Domain`
 }
+pub enum Writes { Nothing, Paths(Vec<Address>), Domain }
+// Tool::writes 的返回：一条跑完的调用可能写了城里树上的哪些路径，由工具自己的文法读出来（M-17）。
+// `Paths` 只给确知自己写了哪些文件的工具（`edit` 答它的 `path`）；说不清的（`exec`、协作桌、改规则）答 `Domain`，
+// fence 于是扫整个写域。默认实现不猜：只有声明 `Effect::Read` 的工具答 `Nothing`。
+// `Writes::and` 合并两条答案：`Domain` 吸收一切，`Nothing` 是单位元，两组 `Paths` 取并集。
 #[cfg(feature = "conformance")]
 pub fn assert_tool_conformance<T: Tool>(tool: &mut T);   // 八字段完备＋name 文法＋错名调用拒收
 

@@ -468,6 +468,9 @@ impl Checkpoint {
     /// 5,000 个文件的楼每一波往账本里写 5,000 条路径，而读者要的是
     /// 这一波碰过什么。首个 fence 与 `ensure_base`
     /// 面对空 index，所以照旧列出它们提交的每一个文件。
+    /// `scopes` 的每一项可以是目录前缀，也可以是一个文件：lane 在只知道
+    /// 这一波写了哪些文件时只把它们交进来（runtime-SPEC §8-45），所以每项
+    /// 生成两条 pathspec，它本身与 `<它>/*`。
     pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
