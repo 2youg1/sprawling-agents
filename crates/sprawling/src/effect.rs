@@ -250,8 +250,13 @@ impl Landing {
 /// at all is written.
 pub(crate) enum Claims {
     Landed(Box<Landing>),
-    /// The nodes that moved, so a person can be told which.
-    Stale(Vec<String>),
+    /// The nodes that moved, so a person can be told which, and the
+    /// `roadmap_released` lines that close the claims this run already
+    /// put on the ledger when the model made them.
+    Stale {
+        nodes: Vec<String>,
+        released: Box<Landing>,
+    },
 }
 
 impl Claims {
@@ -291,12 +296,24 @@ impl Claims {
             .map(|effect| effect.id().to_string())
             .collect();
         if !stale.is_empty() {
-            return Ok(Claims::Stale(stale));
+            return Ok(Claims::Stale {
+                nodes: stale,
+                released: Box::new(Landing {
+                    lines: released(effects, room, who)?,
+                    then: Then::Nothing,
+                }),
+            });
         }
         let mut lines = Vec::new();
         let mut text = on_disk.to_owned();
         for effect in effects {
             text = effect.apply(&text)?;
+            // The claim's line went on the ledger when the accounting
+            // thread booked it (`serving::booking`); writing it again
+            // here would count the node as claimed twice.
+            if let collab::ClaimEffect::Claimed { .. } = effect {
+                continue;
+            }
             lines.push(Line {
                 who: who.to_owned(),
                 addr: room.clone(),
@@ -316,6 +333,40 @@ impl Claims {
             },
         })))
     }
+}
+
+/// A `roadmap_released` line for each claim the accounting thread
+/// booked, for a landing that writes nothing else: without it the
+/// history reads the node as held by this run for ever.
+fn released(
+    effects: &[collab::ClaimEffect],
+    room: &Address,
+    who: &str,
+) -> Result<Vec<Line>, AxError> {
+    effects
+        .iter()
+        .filter_map(|effect| match effect {
+            collab::ClaimEffect::Claimed { id, item } => Some(collab::ClaimEffect::PutDown {
+                id: id.clone(),
+                item: item.clone(),
+                exit: kernel::PlanExit::Stopped {
+                    id: id.clone(),
+                    why: kernel::StopCause::HandedBack {
+                        note: "the plan moved before this run landed".to_owned(),
+                    },
+                },
+            }),
+            collab::ClaimEffect::PutDown { .. } | collab::ClaimEffect::Split { .. } => None,
+        })
+        .map(|put_down| {
+            Ok(Line {
+                who: who.to_owned(),
+                addr: room.clone(),
+                kind: put_down.kind(),
+                data: put_down.payload(who)?,
+            })
+        })
+        .collect()
 }
 
 /// The `goal_registered` payload is the entry itself. One shape, written
@@ -400,7 +451,7 @@ mod tests {
                 Then::Roadmap { text, .. } => text,
                 _ => panic!("a claim lands on the plan"),
             },
-            Claims::Stale(nodes) => panic!("{nodes:?} read as moved"),
+            Claims::Stale { nodes, .. } => panic!("{nodes:?} read as moved"),
         }
     }
 

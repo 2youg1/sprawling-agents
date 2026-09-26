@@ -84,8 +84,12 @@ impl RunWorker {
             plan_text,
             crate::serving::booking::booking(
                 self.bell(),
-                site.building.addr().clone(),
-                site.run_id,
+                crate::serving::booking::Claimant {
+                    building: site.building.addr().clone(),
+                    room: addr.clone(),
+                    run: site.run_id,
+                    who: site.who.clone(),
+                },
             ),
         )));
 

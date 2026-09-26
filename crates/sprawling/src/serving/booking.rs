@@ -11,21 +11,36 @@
 //! The accounting thread sees every claim in the order the lanes send
 //! them, so the first run to ask for a node takes it and the second is
 //! refused before it spends a call on the node (sprawling-SPEC.md 8-42-8).
-//! A booking lasts until its run comes home and lands, which is when the
-//! file on disk starts to say who held the node.
+//! The claim's `roadmap_claimed` line is appended as the node is booked,
+//! so the history says who holds a node from the moment the model took
+//! it rather than from the moment its run lands. A booking lasts until
+//! its run comes home and lands, which is when the file on disk starts
+//! to say who held the node.
 
 use std::collections::BTreeMap;
 use std::sync::mpsc;
 
-use kernel::{Address, AxCode, AxError, NodeId, RunId};
+use kernel::{Address, AxCode, AxError, EventDraft, Ledger, NodeId, RunId};
 
 use super::relay::Wake;
 
-/// One claim, and the address its answer goes back to.
+/// Who a run's claims are made for. The four travel together from the
+/// run's dispatch to every claim it makes.
+pub(crate) struct Claimant {
+    /// The building whose plan the claimed nodes belong to.
+    pub(crate) building: Address,
+    /// The room the run works in, which the claim's line is filed under.
+    pub(crate) room: Address,
+    pub(crate) run: RunId,
+    pub(crate) who: String,
+}
+
+/// One claim, its `roadmap_claimed` line, and the address its answer
+/// goes back to.
 pub(crate) struct ClaimAsk {
     building: Address,
     node: NodeId,
-    run: RunId,
+    line: EventDraft,
     back: mpsc::SyncSender<Result<(), AxError>>,
 }
 
@@ -37,25 +52,32 @@ pub(crate) struct ClaimBook {
 }
 
 impl ClaimBook {
-    /// Books the node for the asking run, or refuses because another run
-    /// in flight holds it, and sends the answer back to the lane.
-    pub(crate) fn answer(&mut self, ask: ClaimAsk) {
+    /// Appends the claim's line and books the node for the asking run,
+    /// or refuses because another run in flight holds it, and sends the
+    /// answer back to the lane. A line the ledger refuses books nothing,
+    /// so no run holds a node the history does not show it holding.
+    pub(crate) fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger) {
         let ClaimAsk {
             building,
             node,
-            run,
+            line,
             back,
         } = ask;
-        let holder = *self.held.entry((building, node.clone())).or_insert(run);
-        let answer = if holder == run {
-            Ok(())
-        } else {
-            Err(AxError::failure(
+        let run = line.run;
+        let key = (building, node);
+        let answer = match self.held.get(&key).copied() {
+            Some(holder) if holder != run => Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "claim a plan node",
-                format!("{node} was claimed by {holder}, which is still working on it"),
+                format!(
+                    "{} was claimed by {holder}, which is still working on it",
+                    key.1
+                ),
             )
-            .with_recovery("list the plan and claim a node that is ready"))
+            .with_recovery("list the plan and claim a node that is ready")),
+            Some(_) | None => ledger.append(line).map(|_| {
+                self.held.insert(key, run);
+            }),
         };
         // A lane that stopped listening keeps its booking until it comes
         // home, which is what a lane that heard the answer would do.
@@ -70,13 +92,23 @@ impl ClaimBook {
 
 /// The booking a run's plan desk asks through: a claim carried on the
 /// accounting thread's one queue and waited for, like a relay append.
-pub(crate) fn booking(bell: mpsc::Sender<Wake>, building: Address, run: RunId) -> collab::Booking {
-    collab::Booking::new(move |node: &NodeId| {
+/// The claim's instant is taken when the model makes it.
+pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking {
+    collab::Booking::new(move |claim: &collab::ClaimEffect| {
+        let line = EventDraft {
+            run: claimant.run,
+            t: crate::assembly::now_ms()?,
+            who: claimant.who.clone(),
+            addr: Some(claimant.room.clone()),
+            kind: claim.kind(),
+            data: claim.payload(&claimant.who)?,
+            ig: false,
+        };
         let (back, answer) = mpsc::sync_channel(0);
         bell.send(Wake::Claim(ClaimAsk {
-            building: building.clone(),
-            node: node.clone(),
-            run,
+            building: claimant.building.clone(),
+            node: claim.id().clone(),
+            line,
             back,
         }))
         .map_err(|_| gone("the accounting thread is no longer taking claims"))?;
@@ -96,17 +128,56 @@ fn gone(why: &str) -> AxError {
 mod tests {
     use std::sync::mpsc;
 
-    use super::{ClaimAsk, ClaimBook};
-    use kernel::{Address, NodeId, RunId};
+    use super::{ClaimAsk, ClaimBook, Claimant};
+    use kernel::{Address, AxError, EventDraft, EventKind, EventRef, NodeId, RunId};
+
+    /// The ledger the accounting thread writes to, keeping every line.
+    #[derive(Default)]
+    struct Kept(Vec<EventDraft>);
+
+    impl kernel::Ledger for Kept {
+        fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
+            let seq = u64::try_from(self.0.len()).unwrap().saturating_add(1);
+            self.0.push(draft.clone());
+            Ok(
+                kernel::EventRecord::from_draft(draft, kernel::Seq::new(seq), kernel::GENESIS_PREV)
+                    .to_ref(),
+            )
+        }
+    }
+
+    fn claimant(run: u8) -> Claimant {
+        Claimant {
+            building: Address::parse("lab").unwrap(),
+            room: Address::parse("lab/room1").unwrap(),
+            run: RunId::from_bytes([run; 16]),
+            who: format!("potter@lab.{run}"),
+        }
+    }
 
     fn ask(book: &mut ClaimBook, run: u8) -> bool {
         let (back, answer) = mpsc::sync_channel(1);
-        book.answer(ClaimAsk {
-            building: Address::parse("lab").unwrap(),
-            node: NodeId::parse("1").unwrap(),
-            run: RunId::from_bytes([run; 16]),
-            back,
-        });
+        let claim = collab::ClaimEffect::Claimed {
+            id: NodeId::parse("1").unwrap(),
+            item: "wire the kiln".to_owned(),
+        };
+        book.answer(
+            ClaimAsk {
+                building: Address::parse("lab").unwrap(),
+                node: claim.id().clone(),
+                line: EventDraft {
+                    run: RunId::from_bytes([run; 16]),
+                    t: kernel::TimeMs::new(0),
+                    who: "potter".to_owned(),
+                    addr: None,
+                    kind: claim.kind(),
+                    data: claim.payload("potter").unwrap(),
+                    ig: false,
+                },
+                back,
+            },
+            &mut Kept::default(),
+        );
         answer.recv().unwrap().is_ok()
     }
 
@@ -123,14 +194,6 @@ mod tests {
         assert_eq!((first, second, after_landing), (true, false, true));
     }
 
-    struct Unwritten;
-
-    impl kernel::Ledger for Unwritten {
-        fn append(&mut self, _: kernel::EventDraft) -> Result<kernel::EventRef, kernel::AxError> {
-            Err(super::gone("a claim writes nothing to the ledger"))
-        }
-    }
-
     fn plan_tool(bell: mpsc::Sender<super::Wake>, run: u8) -> collab::ClaimTool {
         let desk = collab::ClaimDesk::new(
             format!("potter@lab.{run}"),
@@ -142,11 +205,7 @@ mod tests {
              | 1 | wire the kiln | 1 |  | Not started |  |
 "
             .to_owned(),
-            super::booking(
-                bell,
-                Address::parse("lab").unwrap(),
-                RunId::from_bytes([run; 16]),
-            ),
+            super::booking(bell, claimant(run)),
         );
         collab::ClaimTool::new(std::sync::Arc::new(std::sync::Mutex::new(desk))).unwrap()
     }
@@ -154,7 +213,8 @@ mod tests {
     /// Two runs in flight read node 1 as ready from one snapshot. Their
     /// desks ask through the production booking, the accounting thread
     /// serves the queue, and the second claim is refused at the call with
-    /// the holder named.
+    /// the holder named. The one claim that was taken is on the ledger
+    /// before either run lands, and the refused one left no line.
     #[test]
     fn two_runs_claiming_one_node_through_the_served_gate_leave_one_holder() {
         use kernel::Tool;
@@ -175,20 +235,30 @@ mod tests {
             let taken = first.invoke(&call).is_ok();
             (taken, second.invoke(&call).map_err(|e| format!("{e:?}")))
         });
-        let mut homes = std::collections::VecDeque::new();
+        let (mut homes, mut ledger) = (std::collections::VecDeque::new(), Kept::default());
         while !lanes.is_finished() {
             gate.serve(
                 crate::serving::relay::Patience::For(std::time::Duration::from_millis(5)),
-                &mut Unwritten,
+                &mut ledger,
                 &mut homes,
             );
         }
         let (taken, refused) = lanes.join().unwrap();
         let holder = RunId::from_bytes([1; 16]).to_string();
+        let claims: Vec<(RunId, Option<String>)> = ledger
+            .0
+            .iter()
+            .filter(|line| line.kind == EventKind::RoadmapClaimed)
+            .map(|line| (line.run, line.addr.as_ref().map(ToString::to_string)))
+            .collect();
         assert_eq!(
-            (taken, refused.map_err(|e| e.contains(&holder))),
-            (true, Err(true)),
-            "the first run takes node 1 and the second is refused naming the first"
+            (taken, refused.map_err(|e| e.contains(&holder)), claims),
+            (
+                true,
+                Err(true),
+                vec![(RunId::from_bytes([1; 16]), Some("lab/room1".to_owned()))]
+            ),
+            "the first run takes node 1, its claim is on the ledger at the call, and the second is refused naming the first"
         );
     }
 }

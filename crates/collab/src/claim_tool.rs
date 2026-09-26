@@ -62,14 +62,17 @@ pub struct ClaimDesk {
 /// authority is the accounting thread, reached through the relay.
 pub struct Booking(Box<Ask>);
 
-/// Books one node for the run the booking belongs to.
-type Ask = dyn FnMut(&NodeId) -> Result<(), AxError> + Send;
+/// Books one node for the run the booking belongs to. It is handed the
+/// whole claim rather than the node alone, because the authority records
+/// the claim as it books it and the claim's line is the effect's own.
+type Ask = dyn FnMut(&ClaimEffect) -> Result<(), AxError> + Send;
 
 impl Booking {
-    /// `ask` books the node for this run, or refuses because another run
-    /// holds it; its refusal reaches the model unchanged.
+    /// `ask` books the node for this run and records the claim, or
+    /// refuses because another run holds it; its refusal reaches the
+    /// model unchanged.
     #[must_use]
-    pub fn new(ask: impl FnMut(&NodeId) -> Result<(), AxError> + Send + 'static) -> Booking {
+    pub fn new(ask: impl FnMut(&ClaimEffect) -> Result<(), AxError> + Send + 'static) -> Booking {
         Booking(Box::new(ask))
     }
 }
@@ -229,17 +232,18 @@ impl ClaimDesk {
         }
         let tree = self.tree()?;
         let held = tree.claim(id)?;
-        // The desk's copy answers first because its refusal names a
-        // ready node; the booking answers for every run dispatched beside
-        // this one, and nothing is written until it has.
-        (self.booking.0)(id)?;
         let item = tree
             .get(id)
             .map_or_else(String::new, |node| node.row.item.clone());
-        self.take(ClaimEffect::Claimed {
+        let claimed = ClaimEffect::Claimed {
             id: id.clone(),
             item: item.clone(),
-        })?;
+        };
+        // The desk's copy answers first because its refusal names a
+        // ready node; the booking answers for every run dispatched beside
+        // this one, and nothing is written until it has.
+        (self.booking.0)(&claimed)?;
+        self.take(claimed)?;
         self.held = Some(held);
         let mut result = Map::new();
         result.insert("node".to_owned(), Value::String(id.to_string()));

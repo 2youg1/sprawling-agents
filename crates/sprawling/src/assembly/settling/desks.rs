@@ -126,7 +126,8 @@ impl RunWorker {
                         conversations,
                     )?;
                 }
-                effect::Claims::Stale(nodes) => {
+                effect::Claims::Stale { nodes, released } => {
+                    self.settle(at, run_id, *released, conversations)?;
                     for node in nodes {
                         self.note(
                             runtime::diagnostics::Level::Refuse,

@@ -22,8 +22,8 @@ const PLAN: &str = "\
 /// one set of booked nodes, the first asker wins.
 fn book(booked: &Arc<Mutex<BTreeSet<NodeId>>>) -> Booking {
     let booked = Arc::clone(booked);
-    Booking::new(move |node| {
-        if booked.lock().unwrap().insert(node.clone()) {
+    Booking::new(move |claim| {
+        if booked.lock().unwrap().insert(claim.id().clone()) {
             Ok(())
         } else {
             Err(

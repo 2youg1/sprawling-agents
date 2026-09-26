@@ -160,7 +160,7 @@ impl RelayGate {
                     drafts.push(draft);
                     senders.push(back);
                 }
-                Wake::Claim(ask) => self.booked.answer(ask),
+                Wake::Claim(ask) => self.booked.answer(ask, ledger),
                 Wake::Home(arrival) => homes.push_back(*arrival),
                 Wake::Command | Wake::Close => {}
             }
