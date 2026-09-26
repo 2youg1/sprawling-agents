@@ -95,7 +95,11 @@ fn a_worker_refuses_a_line_rewritten_before_the_snapshot_in_a_sealed_segment() {
     let lines: Vec<&[u8]> = bytes.split_inclusive(|held| *held == b'\n').collect();
     let (sealed, open_segment) = lines.split_at(usize::try_from(cut.seq().value()).unwrap());
     let mut sealed = sealed.concat();
-    let at = sealed.windows(4).position(|held| held == b"\"t\":").unwrap() + 4;
+    let at = sealed
+        .windows(4)
+        .position(|held| held == b"\"t\":")
+        .unwrap()
+        + 4;
     assert!(at < lines[0].len(), "the first line carries no timestamp");
     sealed[at] = if sealed[at] == b'1' { b'2' } else { b'1' };
     std::fs::write(&segment, sealed).unwrap();
