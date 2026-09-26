@@ -96,6 +96,10 @@ impl RunWorker {
     ) -> Result<Self, AxError> {
         let now = now_ms()?;
         let dir = ledger_dir(city_root);
+        // Holding the one writer is what makes every worktree lock a
+        // lock nobody alive holds (memory-SPEC 8-9).
+        memory::Worktrees::lift_abandoned_leases(city_root, &ledger)
+            .map_err(memory::MemoryError::into_ax)?;
         let Standing {
             book,
             governance,

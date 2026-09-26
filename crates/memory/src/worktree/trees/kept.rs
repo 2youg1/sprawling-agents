@@ -23,6 +23,49 @@ pub(super) enum Standing {
 }
 
 impl Worktrees {
+    /// Lifts every lease a previous writer of this city left behind.
+    ///
+    /// A city has one writer, and `_writer` is the proof that the caller
+    /// is it: while it is held, no lock can belong to a run that is
+    /// still alive, so every lock is one a dead process never gave
+    /// back. A city with no repository has no trees to free.
+    ///
+    /// # Errors
+    /// Propagates a repository that cannot list, read or unlock its
+    /// trees.
+    pub fn lift_abandoned_leases(
+        city_root: &std::path::Path,
+        _writer: &crate::JsonlLedger,
+    ) -> Result<(), MemoryError> {
+        let refuse = |op: &'static str, err: git2::Error| MemoryError::Worktree {
+            op,
+            detail: format!("{}: {err}", city_root.display()),
+        };
+        let repo = match git2::Repository::open(city_root) {
+            Ok(repo) => repo,
+            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
+            Err(err) => return Err(refuse("open the city repository", err)),
+        };
+        let names = repo
+            .worktrees()
+            .map_err(|err| refuse("list worktrees", err))?;
+        for name in names.iter().flatten().flatten() {
+            let tree = repo
+                .find_worktree(name)
+                .map_err(|err| refuse("find a worktree", err))?;
+            let lock = tree
+                .is_locked()
+                .map_err(|err| refuse("read a worktree lock", err))?;
+            match lock {
+                git2::WorktreeLockStatus::Locked(_) => tree
+                    .unlock()
+                    .map_err(|err| refuse("unlock a worktree", err))?,
+                git2::WorktreeLockStatus::Unlocked => {}
+            }
+        }
+        Ok(())
+    }
+
     /// Where `name` stands: held under a lock, kept on disk for its
     /// node, or not there at all.
     ///
