@@ -74,7 +74,8 @@ pub(crate) async fn serve(city_root, addr, token, index_html, model) -> Result<(
 
 ```rust
 pub(crate) struct Views { city_root, hot: HotView, attribution: Attribution, approvals: BTreeMap<String, ApprovalSummary> }
-impl Views { fn apply(&mut self, &EventRecord) -> Result<(), AxError>; fn answer(&self, &Query) -> Answer; }
+impl Views { fn apply(&mut self, &EventRecord) -> Result<(), AxError>; fn prepare(&mut self, &Query) -> Prepared; }
+impl Prepared { fn finish(self) -> Answer; }                                 // 锁外读盘，见 8-92
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError>;   // 启动时冷重建
 fn read_spine(city_root: &Path) -> Vec<BuildingProgress>;                    // 查询时读盘
 ```
@@ -2051,8 +2052,8 @@ pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer
 而 `Views` 的一生是 `holding` 的；另一个理由是 `assembly.rs` 已站在 400 行预算上（开工时
 401 行），而为一行重导出把一道门推得更红是拿门当对手。
 
-一次性折叠这座城的账本并回答一个 Query，然后把视图扔掉。**它与被端上来的城答的是同一个
-`Views::answer`**——若 CLI 自己另写一份读法，同一个问题在这座城里就有两个答案，
+一次性折叠这座城的账本并回答一个 Query，然后把视图扔掉。**它与被端上来的城读的是同一条路：
+`answer_outside_the_lock` 用的 `Views::prepare` 与 `Prepared::finish`**——若 CLI 自己另写一份读法，同一个问题在这座城里就有两个答案，
 而漂开的总是没人看的那一个。链先被 `runtime::replay::verify_ledger_dir` 验过：
 历史不成立的城，它的视图不该被端出来。
 
