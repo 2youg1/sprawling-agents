@@ -3,14 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use kernel::EventRecord;
 
 use super::spawn_folding;
 use crate::assembly::init_city;
-use crate::views::Views;
+use crate::views::{Published, Views, answer_outside_the_lock};
 
 /// A reader in the middle of a query holds up neither the writer nor the
 /// fold: the observer returns, and the record is folded and broadcast,
@@ -21,11 +21,13 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
     let report = init_city(dir.path()).unwrap();
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let genesis = EventRecord::parse_line(verified.raw_lines().first().unwrap()).unwrap();
-    let views = Arc::new(Mutex::new(Views::new(dir.path())));
+    let unfolded = Views::new(dir.path());
+    let spare = unfolded.unfolded_twin();
+    let views = Arc::new(Published::new(unfolded));
     let (to_clients, mut heard) = tokio::sync::broadcast::channel(8);
-    let mut folding = spawn_folding(Arc::clone(&views), to_clients).unwrap();
+    let mut folding = spawn_folding(Arc::clone(&views), spare, to_clients).unwrap();
 
-    let reader = views.lock().unwrap();
+    let reader = views.snapshot();
     let (written, returned) = mpsc::channel();
     let sent = genesis.clone();
     let writer = std::thread::spawn(move || {
@@ -43,13 +45,13 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
     );
 
     let folding = writer.join().unwrap();
-    drop((folding.observer, folding.machine));
+    drop((folding.observer, folding.machine, folding.lend));
     folding.thread.join().unwrap();
     let mut folded_here = Views::new(dir.path());
     folded_here.apply(&genesis).unwrap();
     let city = channels::Query::CityView;
     assert_eq!(
-        views.lock().unwrap().answer(&city),
+        answer_outside_the_lock(&views, &city),
         folded_here.answer(&city)
     );
 }

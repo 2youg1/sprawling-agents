@@ -3,20 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The thread the views are folded on, so the writer never waits for a
-//! reader (sprawling-SPEC.md 8-93).
+//! The thread the views are folded on and published from, so neither
+//! the writer nor the fold waits for a reader (sprawling-SPEC.md 8-93).
 
 use std::sync::{Arc, Mutex, mpsc};
 
 use kernel::{AxCode, AxError, EventRecord};
 
-use crate::views::Views;
+use crate::views::{Published, Views};
 
-/// The two places the writer thread hands the views what it wrote, and
-/// the thread that folds it.
+/// The places the writer thread hands the views what it wrote, and the
+/// thread that folds it.
 pub(super) struct Folding {
     pub(super) observer: Box<dyn FnMut(&EventRecord) + Send>,
     pub(super) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    pub(super) lend: Box<dyn FnOnce(Arc<Mutex<gateway::Custodian>>) + Send>,
     pub(super) thread: std::thread::JoinHandle<()>,
 }
 
@@ -24,32 +25,28 @@ pub(super) struct Folding {
 enum Fold {
     Committed(EventRecord),
     Examined(channels::DoctorAnswer),
+    Lent(Arc<Mutex<gateway::Custodian>>),
 }
 
-/// Whether the views still follow the ledger. Once a panic has poisoned
-/// the lock the fold stops, because a half-applied record leaves state
-/// no later record can be trusted to correct.
-enum Following {
-    Live,
-    Stopped,
-}
-
-/// Starts the view fold.
+/// Starts the view fold over `published` and its unpublished twin
+/// `spare`, which must have folded the same records.
 ///
-/// Both halves only queue: the writer's cost per record is one channel
+/// Every half only queues: the writer's cost per record is one channel
 /// send, whatever a reader is doing with the views.
 ///
 /// # Errors
 /// `StorageFatal` when the thread cannot be started.
 pub(super) fn spawn_folding(
-    views: Arc<Mutex<Views>>,
+    published: Arc<Published>,
+    spare: Views,
     to_clients: tokio::sync::broadcast::Sender<EventRecord>,
 ) -> Result<Folding, AxError> {
     let (committed, arriving) = mpsc::channel::<Fold>();
     let examined = committed.clone();
+    let lent = committed.clone();
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
-        .spawn(move || fold_until_closed(&views, &arriving, &to_clients))
+        .spawn(move || fold_until_closed(&published, spare, &arriving, &to_clients))
         .map_err(|source| {
             AxError::failure(
                 AxCode::StorageFatal,
@@ -74,56 +71,75 @@ pub(super) fn spawn_folding(
                 );
             }
         }),
+        lend: Box::new(move |vault: Arc<Mutex<gateway::Custodian>>| {
+            if lent.send(Fold::Lent(vault)).is_err() {
+                eprintln!(
+                    "the view fold has ended; a tool server that needs a credential is not reached until the server restarts"
+                );
+            }
+        }),
         thread,
     })
 }
 
-/// Folds each arrival, then broadcasts it, until every sender is gone.
+/// Folds every arrival already queued into the spare copy, publishes it,
+/// broadcasts the records, then folds the same batch into the copy it
+/// replaced, until every sender is gone.
 ///
-/// The broadcast follows the fold so a client that queries on hearing a
-/// record finds it already folded.
+/// The broadcast follows the publication so a client that queries on
+/// hearing a record finds it already folded.
 fn fold_until_closed(
-    views: &Mutex<Views>,
+    published: &Published,
+    mut spare: Views,
     arriving: &mpsc::Receiver<Fold>,
     to_clients: &tokio::sync::broadcast::Sender<EventRecord>,
 ) {
-    let mut following = Following::Live;
-    for fold in arriving {
-        following = match following {
-            Following::Live => fold_one(views, &fold),
-            Following::Stopped => Following::Stopped,
-        };
-        if let Fold::Committed(record) = fold {
-            // A send with no subscribers is not a failure: a city with
-            // no browser open is a city doing its work.
-            drop(to_clients.send(record));
+    while let Ok(first) = arriving.recv() {
+        let batch: Vec<Fold> = std::iter::once(first).chain(arriving.try_iter()).collect();
+        fold_batch(&mut spare, &batch);
+        let retired = published.replace(Arc::new(spare));
+        for fold in &batch {
+            if let Fold::Committed(record) = fold {
+                // A send with no subscribers is not a failure: a city
+                // with no browser open is a city doing its work.
+                drop(to_clients.send(record.clone()));
+            }
+        }
+        spare = reclaim(retired);
+        fold_batch(&mut spare, &batch);
+    }
+}
+
+fn fold_batch(views: &mut Views, batch: &[Fold]) {
+    for fold in batch {
+        match fold {
+            // A record the views refuse to fold is reported and skipped:
+            // the ledger already has it, and a view that stopped the
+            // fold would make history hostage to a projection.
+            Fold::Committed(record) => {
+                if let Err(err) = views.apply(record) {
+                    eprintln!("view fold refused {}: {err}", record.seq().value());
+                }
+            }
+            Fold::Examined(found) => views.found_on_this_machine(found.clone()),
+            Fold::Lent(vault) => views.lend_the_vault(Arc::clone(vault)),
         }
     }
 }
 
-fn fold_one(views: &Mutex<Views>, fold: &Fold) -> Following {
-    let Ok(mut held) = views.lock() else {
-        let at = match fold {
-            Fold::Committed(record) => format!("record {}", record.seq().value()),
-            Fold::Examined(_) => "this machine's check".to_owned(),
-        };
-        eprintln!(
-            "the view lock is poisoned; the views stop before {at} and no longer follow the ledger - restart the server to rebuild them from it"
-        );
-        return Following::Stopped;
-    };
-    match fold {
-        // A record the views refuse to fold is reported and skipped:
-        // the ledger already has it, and a view that stopped the fold
-        // would make history hostage to a projection.
-        Fold::Committed(record) => {
-            if let Err(err) = held.apply(record) {
-                eprintln!("view fold refused {}: {err}", record.seq().value());
+/// Takes the replaced copy back once the readers that took it before the
+/// swap have let go, which they do as soon as `prepare` has copied out
+/// what a query needs.
+fn reclaim(mut retired: Arc<Views>) -> Views {
+    loop {
+        match Arc::try_unwrap(retired) {
+            Ok(views) => return views,
+            Err(held) => {
+                retired = held;
+                std::thread::yield_now();
             }
         }
-        Fold::Examined(found) => held.found_on_this_machine(found.clone()),
     }
-    Following::Live
 }
 
 #[cfg(test)]

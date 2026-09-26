@@ -51,7 +51,7 @@ mod standing_tests;
 mod tests;
 pub(super) mod toolkits;
 
-pub(crate) use answering::answer_outside_the_lock;
+pub(crate) use answering::{Published, answer_outside_the_lock};
 pub(crate) use governance::Governance;
 pub(crate) use holding::Views;
 pub use holding::ask;

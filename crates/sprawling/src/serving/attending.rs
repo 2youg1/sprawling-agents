@@ -34,7 +34,7 @@ use super::folding::{Folding, spawn_folding};
 use super::relay::Patience;
 use super::serve::Opening;
 use crate::assembly::{RunWorker, Serving, now_ms};
-use crate::views::Views;
+use crate::views::{Published, Views};
 
 /// Where a worker's work goes, and where it comes from.
 ///
@@ -44,7 +44,10 @@ use crate::views::Views;
 /// run's increments.
 pub(super) struct Outward {
     pub(super) desk: Arc<CommandDesk>,
-    pub(super) views: Arc<std::sync::Mutex<Views>>,
+    pub(super) views: Arc<Published>,
+    /// The unpublished twin of `views`, folded over the same records
+    /// (sprawling-SPEC.md 8-93).
+    pub(super) spare: Views,
     pub(super) to_clients: tokio::sync::broadcast::Sender<EventRecord>,
     pub(super) to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
 }
@@ -72,6 +75,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let Outward {
         desk: worker_desk,
         views,
+        spare,
         to_clients,
         to_watchers,
     } = outward;
@@ -81,8 +85,9 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let Folding {
         observer,
         machine,
+        lend,
         thread: fold_thread,
-    } = spawn_folding(views, to_clients)?;
+    } = spawn_folding(views, spare, to_clients)?;
     // The one sanctioned thread besides the runtime's own. The ledger is
     // opened *inside* it and never leaves: a city has one writer, and the
     // type never has to cross a thread boundary to prove it.
@@ -141,7 +146,13 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             .with_recovery("check process thread limits")
         })?;
     let vault = match ready_rx.recv() {
-        Ok(Ok(vault)) => vault,
+        // Lent rather than opened a second time: "a credential is
+        // redeemed at the last moment, through one door" stops being
+        // true the moment there are two handles on the same secrets.
+        Ok(Ok(vault)) => {
+            lend(Arc::clone(&vault));
+            vault
+        }
         Ok(Err(err)) => return Err(err),
         Err(_) => {
             return Err(AxError::failure(

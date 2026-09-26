@@ -104,15 +104,35 @@ impl Standing {
 /// verify is not one whose views should be served.
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
     let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
-    let city_root = ledger_dir
-        .parent()
-        .and_then(Path::parent)
-        .unwrap_or(ledger_dir);
-    let mut views = Views::new(city_root);
+    let mut views = Views::new(city_root_of(ledger_dir));
     for record in known_records(&verified) {
         views.apply(record)?;
     }
     Ok(views)
+}
+
+/// The views twice over from one verification pass, the second sharing
+/// the first's ledger index and plan cache: the pair a served city's
+/// fold thread alternates between (sprawling-SPEC.md 8-93).
+///
+/// # Errors
+/// As [`rebuild_views`].
+pub(crate) fn rebuild_twin_views(ledger_dir: &Path) -> Result<(Views, Views), AxError> {
+    let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
+    let mut views = Views::new(city_root_of(ledger_dir));
+    let mut twin = views.unfolded_twin();
+    for record in known_records(&verified) {
+        views.apply(record)?;
+        twin.apply(record)?;
+    }
+    Ok((views, twin))
+}
+
+fn city_root_of(ledger_dir: &Path) -> &Path {
+    ledger_dir
+        .parent()
+        .and_then(Path::parent)
+        .unwrap_or(ledger_dir)
 }
 
 /// The records the per-line check already parsed, in ledger order.

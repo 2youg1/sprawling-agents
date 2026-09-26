@@ -162,6 +162,36 @@ pub(crate) struct Views {
 
 impl Views {
     pub(crate) fn new(city_root: &Path) -> Views {
+        // An unreadable ledger directory is not a reason to refuse to
+        // start: the index is disposable, every refresh tries again, and
+        // a city with no ledger yet is the ordinary first run.
+        Views::sharing(
+            city_root,
+            std::sync::Arc::new(std::sync::Mutex::new(
+                memory::LedgerIndex::rebuild(&ledger_dir(city_root))
+                    .unwrap_or_else(|_| memory::LedgerIndex::empty()),
+            )),
+            std::sync::Arc::default(),
+        )
+    }
+
+    /// A second, empty fold over the same city that shares this one's
+    /// ledger index and plan cache: both are caches of the disk rather
+    /// than folded state, so the two copies the fold thread alternates
+    /// between keep one of each (sprawling-SPEC.md 8-93).
+    pub(crate) fn unfolded_twin(&self) -> Views {
+        Views::sharing(
+            &self.city_root,
+            std::sync::Arc::clone(&self.index),
+            std::sync::Arc::clone(&self.plans),
+        )
+    }
+
+    fn sharing(
+        city_root: &Path,
+        index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
+        plans: std::sync::Arc<std::sync::Mutex<crate::plan_view::PlanView>>,
+    ) -> Views {
         Views {
             city_root: city_root.to_path_buf(),
             hot: memory::HotView::new(),
@@ -177,15 +207,9 @@ impl Views {
             predecessors: std::collections::BTreeMap::new(),
             skill_pins: std::collections::BTreeMap::new(),
             events: 0,
-            // An unreadable ledger directory is not a reason to refuse to
-            // start: the index is disposable, every refresh tries again,
-            // and a city with no ledger yet is the ordinary first run.
-            index: std::sync::Arc::new(std::sync::Mutex::new(
-                memory::LedgerIndex::rebuild(&ledger_dir(city_root))
-                    .unwrap_or_else(|_| memory::LedgerIndex::empty()),
-            )),
+            index,
             first_prompts: std::collections::BTreeMap::new(),
-            plans: std::sync::Arc::default(),
+            plans,
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
             claims: std::collections::BTreeMap::new(),

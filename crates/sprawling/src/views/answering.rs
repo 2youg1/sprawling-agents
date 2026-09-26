@@ -23,9 +23,7 @@
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
-use std::sync::Mutex;
-
-use kernel::{AxCode, AxError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use super::holding::Views;
 use super::prepared::{LedgerAsk, Prepared, unavailable};
@@ -33,30 +31,49 @@ use super::prepared::{LedgerAsk, Prepared, unavailable};
 mod history;
 use super::lines::{endpoints_answer, summarize};
 
-/// Answers one query from the views the fold shares with every reader,
-/// holding them only while [`Views::prepare`] copies out what the query
-/// needs: the disk, git or network read in [`Prepared::finish`] runs
-/// after the lock is released, so the fold never waits on it.
+/// The views the fold last finished, handed to every reader
+/// (sprawling-SPEC.md 8-93).
 ///
-/// # Errors
-/// `StorageFatal` when a panic poisoned the view lock: the views no
-/// longer follow the ledger, and only a restart rebuilds them.
+/// The lock covers one `Arc` copy or swap and nothing that can panic,
+/// so even a poisoned lock holds a whole `Arc`, and it is read as one.
+pub(crate) struct Published {
+    current: Mutex<Arc<Views>>,
+}
+
+impl Published {
+    pub(crate) fn new(views: Views) -> Published {
+        Published {
+            current: Mutex::new(Arc::new(views)),
+        }
+    }
+
+    /// The views as the fold last published them. Held only while a
+    /// query copies out what it needs, because the fold takes a retired
+    /// copy back only once no reader holds it.
+    pub(crate) fn snapshot(&self) -> Arc<Views> {
+        Arc::clone(&self.current.lock().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    /// Publishes `latest` and hands back the copy it replaces, which is
+    /// dropped or reclaimed outside the lock.
+    pub(crate) fn replace(&self, latest: Arc<Views>) -> Arc<Views> {
+        std::mem::replace(
+            &mut *self.current.lock().unwrap_or_else(PoisonError::into_inner),
+            latest,
+        )
+    }
+}
+
+/// Answers one query from a snapshot of the views, holding it only while
+/// [`Views::prepare`] copies out what the query needs: the disk, git or
+/// network read in [`Prepared::finish`] runs after the snapshot is let
+/// go, so neither the fold nor another reader waits on it.
 pub(crate) fn answer_outside_the_lock(
-    views: &Mutex<Views>,
+    views: &Published,
     query: &channels::Query,
-) -> Result<channels::Answer, AxError> {
-    let prepared = views
-        .lock()
-        .map_err(|_| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "read the city views",
-                "the view lock is poisoned",
-            )
-            .with_recovery("restart the server; its views rebuild from the ledger")
-        })?
-        .prepare(query);
-    Ok(prepared.finish())
+) -> channels::Answer {
+    let prepared = views.snapshot().prepare(query);
+    prepared.finish()
 }
 
 impl Views {
