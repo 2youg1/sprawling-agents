@@ -362,3 +362,37 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
         "{kinds:?}"
     );
 }
+
+/// A request lives for one call, so assembling it borrows the
+/// conversation and the tool table instead of copying either: a long
+/// conversation would otherwise be copied once per turn.
+#[test]
+fn assembling_borrows_the_conversation_and_the_tools() {
+    let mut ledger = TestLedger::new();
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob);
+    let tools = [kernel::ToolDef {
+        name: kernel::ToolName::parse("exec").unwrap(),
+        description: "run a command".to_owned(),
+        input_schema: Payload::empty(),
+    }];
+    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let calling = advance(
+        turn.assemble(
+            Interrupt::None,
+            &mut ledger,
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
+            &conversation,
+            &tools,
+            &shape(),
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        (
+            calling.state.chat.messages.as_ptr(),
+            calling.state.chat.tools.as_ptr()
+        ),
+        (conversation.messages().as_ptr(), tools.as_ptr())
+    );
+}
