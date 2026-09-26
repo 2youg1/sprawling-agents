@@ -34,21 +34,23 @@ impl MachineClass {
     }
 }
 
-/// The four heavy-load classes, one bench scenario each.
+/// The five heavy-load classes, one bench scenario each.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Load {
     MultiRunParallel,
     LargeLedgerFold,
     LargeWorktreePlacement,
+    KeptWorktreeReclaim,
     LongSessionForwarding,
 }
 
 impl Load {
     /// Every variant, so a caller that walks the roster cannot leave one out.
-    pub(crate) const ALL: [Load; 4] = [
+    pub(crate) const ALL: [Load; 5] = [
         Load::MultiRunParallel,
         Load::LargeLedgerFold,
         Load::LargeWorktreePlacement,
+        Load::KeptWorktreeReclaim,
         Load::LongSessionForwarding,
     ];
 
@@ -58,6 +60,7 @@ impl Load {
             Load::MultiRunParallel => "multi_run_parallel",
             Load::LargeLedgerFold => "large_ledger_fold",
             Load::LargeWorktreePlacement => "large_worktree_placement",
+            Load::KeptWorktreeReclaim => "kept_worktree_reclaim",
             Load::LongSessionForwarding => "long_session_forwarding",
         }
     }

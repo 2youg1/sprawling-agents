@@ -227,13 +227,13 @@ pub fn first_byte(binary: &Path, city: &Path, samples: usize) -> Result<Samples,
 
 ### 8-6 负载场景骨架与读数行（bench，T13 第一段）
 
-四个负载场景各一个一键复测的 bench 场景：多 run 并行（`multi_run_parallel`）、大账本 fold（`large_ledger_fold`）、大 worktree 放置（`large_worktree_placement`）、长会话流式转发（`long_session_forwarding`）。测量面仍是既有那一家：`just bench`（本 crate 的 bench Main）产读数，`xtask/budgets.toml` 记基线行，不另造仪表。剧本执行器继续用计数时钟；本 crate 内凡计时都住在 bench Main 的模块树里，采样点仍是 `bench::stamp()` 那一个。
+五个负载场景各一个一键复测的 bench 场景：多 run 并行（`multi_run_parallel`）、大账本 fold（`large_ledger_fold`）、大 worktree 放置（`large_worktree_placement`）、再领一棵留着的 worktree（`kept_worktree_reclaim`）、长会话流式转发（`long_session_forwarding`）。测量面仍是既有那一家：`just bench`（本 crate 的 bench Main）产读数，`xtask/budgets.toml` 记基线行，不另造仪表。剧本执行器继续用计数时钟；本 crate 内凡计时都住在 bench Main 的模块树里，采样点仍是 `bench::stamp()` 那一个。
 
 读数形（`bench::reading`，shape 2 value，一次构造点）：
 
 ```rust
 pub enum MachineClass { General }   // 参照类属：盘、内存、CPU 均为一般水平
-pub enum Load { MultiRunParallel, LargeLedgerFold, LargeWorktreePlacement, LongSessionForwarding }
+pub enum Load { MultiRunParallel, LargeLedgerFold, LargeWorktreePlacement, KeptWorktreeReclaim, LongSessionForwarding }
 pub enum SubMetric { Harness, Persist, Whole }
 pub struct Reading { /* load, sub, machine, samples, p50, p95, p99 */ }
 impl Reading {
@@ -272,6 +272,7 @@ pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
 | `multi_run_parallel` | `kernel::Ledger` 端口（MemLedger 与 JsonlLedger 两个适配器各跑一遍），数条 lane 经 mpsc 汇到一个 accounting thread | `harness`＋`persist` |
 | `large_ledger_fold` | `sprawling::ask`，重建每个视图的生产全路径 | `harness` |
 | `large_worktree_placement` | `memory::Checkpoint::ensure_base` 之后 `Worktrees::claim`／`release` | `whole` |
+| `kept_worktree_reclaim` | 同一座城里同一个节点的第二次及以后的 `Worktrees::claim`，其间干线不动（memory-SPEC 8-9 的再领） | `whole` |
 | `long_session_forwarding` | `channels::ServerFrame::Event` 装帧＋序列化，即 socket 之前的本地半段 | `harness` |
 
 失败出口：域错误按其 `AxError`（动作/主体/稳定码/恢复语）格式化成一行；bench 自身的失败（零样本）构造 `AxError::failure(AxCode::InvalidArgs, …)`＋`with_recovery`，不新增码（§9-16 的口径）；Main 打 `bench failed: …` 且退出非零（既有形）。

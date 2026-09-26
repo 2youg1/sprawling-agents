@@ -44,7 +44,7 @@ fn keys(line: &str) -> Vec<&str> {
 }
 
 #[test]
-fn the_four_load_scenarios_rerun_and_emit_the_stable_format() {
+fn every_load_scenario_reruns_and_emits_the_stable_format() {
     let fixture = small();
     for round in 0..2 {
         let dir = tempfile::tempdir().unwrap();
