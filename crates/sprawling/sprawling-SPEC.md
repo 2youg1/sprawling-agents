@@ -3547,7 +3547,7 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 
 ## 8-91 `sprawling view`：给人的一面（`bin::main::view::keys`、`bin::main::view::arrange`、`bin::main::view::frame`、`bin::main::view::detail`、`bin::main::view::follow`、`bin::main::view::terminal`）
 
-**形状。** 四个纯模块，不碰终端也不碰盘。`keys` 是 decision：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。`follow` 是 adapter：持有常驻的 `LedgerIndex` 与 lineage 折叠，`open` 一遍读完账本（折 lineage、收 `records` 行），`poll` 只折上次之后追加的行。`terminal` 是 adapter：stdout 是终端且没有任何过滤参数时，`view` 用 `follow` 读城，进 raw 模式与备用屏，读键、调 `apply`、画 `frame()`，退出时无论成败都把终端还原。它不做任何决定。尚未做的：从尾部倒读首屏、回合与调用两层、T8–T12 的 `ttyprobe` 验收。
+**形状。** 四个纯模块，不碰终端也不碰盘。`keys` 是 decision：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。`follow` 是 adapter：持有常驻的 `LedgerIndex` 与 lineage 折叠，`open` 一遍读完账本（折 lineage、收 `records` 行），`poll` 只折上次之后追加的行。`terminal` 是 adapter：stdout 是终端且没有任何过滤参数时，`view` 用 `follow` 读城，进 raw 模式与备用屏，读键、调 `apply`、画 `frame()`，退出时无论成败都把终端还原。它不做任何决定。尚未做的：从尾部倒读首屏、回合与调用两层、T8–T12 的 `ttyprobe` 验收。从尾部倒读要 `memory` 先给出一个从段尾往回读行的读者，或者 run 索引的快照：`LedgerIndex::rebuild` 在回答第一个 seq 之前就把每一段读全、每行都解析，所以只在 `view` 这一侧倒着折，首屏仍要付整本账本的读取；lineage 与 `HotView` 又都是按 seq 正向的折叠，窗口里没有 `run_started` 的 run 缺地址与状态，要由后台的整遍折叠补上。回合与调用两层要 lib 给出 `views::rounds::turns` 的公开投影，并在展开一个 run 时才折它的记录。
 
 ```rust
 // bin::main::view::keys
