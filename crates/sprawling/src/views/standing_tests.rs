@@ -319,3 +319,32 @@ fn an_evicted_run_still_answers_what_it_cost() {
     );
 }
 
+/// The attribution kept a row for every run the city ever billed; once
+/// the hot view evicts a run its row goes too, the money stays in the
+/// total, and the cold side still answers what the run cost.
+#[test]
+fn the_attribution_holds_only_the_runs_the_hot_view_holds() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = a_city_whose_first_billed_run_was_evicted(dir.path());
+    let recent = u64::try_from(memory::RECENT_FROZEN).unwrap();
+    let billed: u64 = (0..=recent).map(|i| 1_000 + i).sum();
+    let report = views.attribution.report();
+    assert_eq!(
+        (
+            views.attribution.billed_to(&billed_run(0)),
+            report.by_run.len(),
+            report.total
+        ),
+        (None, memory::RECENT_FROZEN, kernel::UsdMicros::new(billed))
+    );
+    let asked = channels::Query::RunCosts {
+        runs: vec![billed_run(0)],
+    };
+    assert_eq!(
+        views.answer(&asked),
+        channels::Answer::RunCosts(channels::RunCostsAnswer {
+            asked: vec![billed_run(0)],
+            runs: vec![(billed_run(0), kernel::UsdMicros::new(1_000))],
+        })
+    );
+}
