@@ -3064,6 +3064,10 @@
     "en": "from",
     "zh": "来处"
   },
+  "run_head_dispatched_by": {
+    "en": "dispatched by",
+    "zh": "由谁派来"
+  },
   "run_river": {
     "en": "where the time went, by turn",
     "zh": "时间花在哪，按回合"

@@ -26,12 +26,16 @@
     readonly doing: Doing | undefined;
     readonly closing: Closing | null;
     readonly room: Address | null;
+    // Who sent the run, as its run_started records it: `person`, `city`
+    // or the address of the resident that did; null when the ledger
+    // does not say.
+    readonly dispatchedBy: string | null;
     // The first and last moments the page knows of, in ms.
     readonly from: number | null;
     readonly to: number | null;
   }
 
-  const { turns, doing, closing, room, from, to }: Props = $props();
+  const { turns, doing, closing, room, dispatchedBy, from, to }: Props = $props();
   const lang = ui().lang;
   const figures = $derived(figuresOf(turns));
   const models = $derived(modelsOf(turns));
@@ -83,6 +87,12 @@
         <span class="text-text-disabled">/</span>
         <a href={toFragment({ kind: "talk", address: room })} class="text-text">{roomOf(room)}</a>
       </dd>
+    </div>
+  {/if}
+  {#if dispatchedBy !== null}
+    <div class="flex min-w-0 flex-wrap items-baseline gap-x-snug">
+      <dt class="text-text-quiet">{say($lang, "run_head_dispatched_by")}</dt>
+      <dd class="min-w-0 truncate font-mono text-text">{dispatchedBy}</dd>
     </div>
   {/if}
 </dl>

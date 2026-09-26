@@ -79,6 +79,7 @@
     doing={{ kind: "calling", tool: "exec", subject: "just check" }}
     closing={null}
     room={ROOM}
+    dispatchedBy="person"
     from={START}
     to={endOf(LIVE)}
   />
@@ -91,6 +92,7 @@
     doing={{ kind: "frozen", completion: "done" }}
     closing={{ at: TimeMs.make(endOf(LONG)), completion: "done" }}
     room={ROOM}
+    dispatchedBy="shop/planner"
     from={START}
     to={endOf(LONG)}
   />
