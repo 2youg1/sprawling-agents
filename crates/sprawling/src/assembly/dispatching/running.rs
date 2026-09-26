@@ -5,13 +5,13 @@
 
 //! Who gets woken, and where the work lands.
 
+use kernel::AxError;
 use kernel::Locator;
-use kernel::{AxCode, AxError};
 
 use super::super::{
-    Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site,
-    Stamping, Sweep, Workbench, held,
+    Desks, Driven, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site, Sweep, held,
 };
+use super::preparing::{Flown, LaneHalf, Staged};
 use super::{Assignment, Given};
 
 /// What the city built for a dispatch before the drive, and needs
@@ -23,37 +23,36 @@ use super::{Assignment, Given};
 /// that run comes home (sprawling-SPEC.md 8-46-2). Either way there is
 /// one per run, and nothing in it is shared.
 pub(in crate::assembly) struct Continuation {
-    at: Assignment,
-    site: Site,
     desks: Desks,
-    workbench: Workbench,
     job_locator: Locator,
     /// This run's place in the backlog, given back where the run ends.
     member: Option<runtime::BacklogId>,
 }
 
 impl RunWorker {
-    /// Everything the city does for a dispatch before anything is
-    /// driven: agreeing to the work, opening the room, writing the
-    /// brief, standing the run up, laying out its bench, freezing its
-    /// plan.
+    /// Everything the city decides for a dispatch before anything waits
+    /// on the disk or on another process: agreeing to the work, opening
+    /// the room, writing the brief, standing the run up, lending its
+    /// desks, rebuilding the conversation it inherits.
     ///
-    /// It hands back the drive and what that drive will need afterwards.
-    /// Every line it writes goes through this worker on this thread,
-    /// before any lane exists.
+    /// It hands back what the lane prepares and drives, and what the
+    /// landing will need afterwards. Every line it writes goes through
+    /// this worker on this thread; the review tree, the bench with its
+    /// MCP servers and the frozen plan are the lane's
+    /// (sprawling-SPEC.md 8-93).
     ///
     /// # Errors
     /// Propagates every refusal a dispatch can owe before it costs
     /// anything, and the failures of the phases that follow it.
-    pub(in crate::assembly) fn prepare_dispatch(
+    pub(in crate::assembly) fn stage_dispatch(
         &mut self,
         mut at: Assignment,
         task: String,
         goal: String,
-    ) -> Result<(Driving, Continuation), AxError> {
+    ) -> Result<(Staged, Continuation), AxError> {
         // The reading `xtask/budgets.toml [prepare_dispatch_ms]` states:
         // what a dispatch spends on the accounting thread before a lane
-        // takes the drive. Read from the city's own clock rather than
+        // takes it. Read from the city's own clock rather than
         // from a profiler, because the figure that matters is the one
         // taken on the thread no append is served on.
         let began = self.clock.now()?;
@@ -131,77 +130,17 @@ impl RunWorker {
                 },
             )
             .map_err(memory::MemoryError::into_ax)?;
-        site.place_tree(
-            &at.addr,
-            &super::super::workbench::Placing {
-                city_root: &self.city_root,
-                city: self.city_hash()?,
-                clock: &*self.clock,
-                fence_gate: &self.flight.fence_gate,
-            },
-            &mut Stamping {
-                ledger: &mut self.ledger,
-                command: self.doorstep.entrance.carrying(),
-                clock: &*self.clock,
-            },
-        )?;
+        // The branch is the tree's name, so the desks opened here know it
+        // while the lane still places the tree.
+        site.name_tree(&at.addr)?;
         let desks = self.open_desks(&site, &at.addr)?;
-
-        // What the model may see, what routes the call it makes, and
-        // who it may hand work down to: one phase, one value.
-        let mut workbench = self.laying(&site.who)?.lay_out_workbench(
-            &site,
-            &desks.for_bench(),
-            &at,
-            &job_locator,
-        )?;
-        // The plan this run is frozen with, and the handoff that says
-        // what to read to pick it up again: one phase, because the
-        // handoff quotes the plan and the plan is what the prefix was
-        // assembled for.
+        // The conversation this run opens with is rebuilt here, where
+        // the ledger's index is held and its lineage line is written.
         let inherited = self.inherited(&at, site.run_id)?;
-        let (plan, handoff) = super::super::freezing::Freezing {
-            city_root: &self.city_root,
-            cas: &mut self.cas,
-            inherited,
-            carried_from: self.origins.carried_from(&at.addr),
-        }
-        .freeze_plan(&site, &workbench, &at, given)?;
-        // The freeze begins the room's session: what a carried session
-        // was owed is spent, and this run is the room's last.
+        let carried_from = self.origins.carried_from(&at.addr);
+        // The run begins the room's session: what a carried session was
+        // owed is spent, and this run is the room's last.
         self.origins.started(&at.addr, site.run_id);
-        // The probe's second reading, over what this successor was
-        // handed and before it takes a turn: the comparison with the
-        // predecessor's answers is what says whether the handoff lost
-        // something.
-        if let Some(handed) = at.succession.as_ref() {
-            site.probe_after(
-                &plan,
-                handed,
-                &mut Stamping {
-                    ledger: &mut self.ledger,
-                    command: self.doorstep.entrance.carrying(),
-                    clock: &*self.clock,
-                },
-            )?;
-        }
-
-        let fence_scope = site.fence_scope()?;
-        // The adapter moves into the drive and comes home in `Driven`:
-        // `Site` gains and loses no field over one dispatch. `Option`
-        // is the move's vehicle, not a new state: it is `Some` on both
-        // sides of the call, and `None` between is unobservable. The
-        // refusal names the invariant rather than panicking on it:
-        // a site without an adapter is a defect in `stand_up`, and
-        // the person who dispatched deserves that address.
-        let Some(adapter) = site.adapter.take() else {
-            return Err(AxError::failure(
-                AxCode::ConfigInvalid,
-                "carry the adapter into the drive",
-                "the site arrived without one",
-            )
-            .with_recovery("report this: stand_up always seats an adapter"));
-        };
         // A run somebody handed down stands in the backlog while it
         // drives, so a halt on its building reaches it; a root run is
         // ended by `Cancel`, which is a different verb.
@@ -212,32 +151,26 @@ impl RunWorker {
             )?),
             None => None,
         };
+        let lane = LaneHalf {
+            given,
+            job_locator: job_locator.clone(),
+            desks: desks.for_bench(),
+            laying: self.laying(&site.who)?,
+            inherited,
+            carried_from,
+            member,
+            command: self.doorstep.entrance.carrying(),
+        };
         let spent = self.clock.now()?.value().saturating_sub(began.value());
         self.note(
             runtime::diagnostics::Level::Trace,
             "bin::assembly",
             &format!("prepare_dispatch took {spent} ms for {}", at.addr.as_str()),
         );
-        let driving = Driving {
-            adapter,
-            bench: workbench.take_bench()?,
-            signals: std::sync::Arc::clone(&desks.signals),
-            write_root: site.write_root.clone(),
-            fence_scope,
-            run_id: site.run_id,
-            of: site.provenance(self.city_hash()?, &at.addr),
-            sieving: super::super::driving::Sieving::for_run(&self.city_root, &site, &at.addr)?,
-            member,
-            plan,
-            handoff,
-        };
         Ok((
-            driving,
+            Staged::new(at, site, lane),
             Continuation {
-                at,
-                site,
                 desks,
-                workbench,
                 job_locator,
                 member,
             },
@@ -267,18 +200,20 @@ impl RunWorker {
     pub(in crate::assembly) fn land(
         &mut self,
         continuation: Continuation,
-        driven: Result<Driven, AxError>,
+        flown: Flown,
         owing: Owing,
         open_claims: &mut crate::assembly::booking::OpenClaims,
     ) -> Result<Landed, AxError> {
         let Continuation {
-            at,
-            mut site,
             desks,
-            workbench,
             job_locator,
             member,
         } = continuation;
+        let Flown {
+            at,
+            mut site,
+            driven,
+        } = flown;
         // Read before the obligation moves on: this run's place in the
         // conversation is what a signal it sends carries forward, and
         // `settle_desks` below is where those signals are spoken.
@@ -296,6 +231,7 @@ impl RunWorker {
             fenced,
             ran,
             mut raised,
+            workbench,
         } = driven?;
         site.adapter = Some(home);
         self.settle_desks(

@@ -201,8 +201,8 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         std::collections::BTreeMap::from([(room.clone(), waiting)]),
     );
 
-    let (driving, continuation) = worker
-        .prepare_dispatch(
+    let (staged, continuation) = worker
+        .stage_dispatch(
             Assignment {
                 addr: room.clone(),
                 session: None,
@@ -224,7 +224,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         0,
         "the queue is out with the run that is driving"
     );
-    drop(driving);
+    let crate::assembly::dispatching::preparing::Staged { at, site, .. } = staged;
 
     let failed = kernel::AxError::failure(
         kernel::AxCode::StorageFatal,
@@ -236,7 +236,11 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
     let err = worker
         .land(
             continuation,
-            Err(failed),
+            crate::assembly::dispatching::preparing::Flown {
+                at,
+                site,
+                driven: Err(failed),
+            },
             Owing::unasked(crate::assembly::Unasked::Knock),
             &mut open_claims,
         )

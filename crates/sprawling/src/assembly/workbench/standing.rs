@@ -172,6 +172,22 @@ impl Site {
     }
 }
 
+impl Site {
+    /// Names the branch a room under review works on before its tree is
+    /// placed. The branch is the tree's name, a function of the room
+    /// alone, so the desks opened on the accounting thread know it while
+    /// the lane still places the tree (sprawling-SPEC.md 8-93).
+    ///
+    /// # Errors
+    /// Propagates a room whose tree name will not parse.
+    pub(in crate::assembly) fn name_tree(&mut self, addr: &Address) -> Result<(), AxError> {
+        if self.rules.review() {
+            self.branch = Some(tree_of(addr)?.as_str().to_owned());
+        }
+        Ok(())
+    }
+}
+
 impl RunWorker {
     /// Settles where this run stands, once the city has agreed to take
     /// the work.

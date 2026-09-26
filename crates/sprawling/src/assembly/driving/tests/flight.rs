@@ -46,9 +46,10 @@ pub(super) fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
 /// **Two pieces of work a person sent go into two lanes**, and the
 /// accounting thread lands both.
 ///
-/// The assertion that bites is the last one: driven one at a time, the
-/// second run's first line comes after the first run has frozen, so the
-/// set of runs that had started by then is one rather than two.
+/// The assertion that bites is the count of lanes in the air before the
+/// loop that lands them runs: driven one at a time, the second waits.
+/// The history cannot say it, because each run prepares in its own lane
+/// and how its first line interleaves with the other's freeze is a race.
 #[test]
 fn two_dispatches_from_the_desk_drive_at_once() {
     let dir = tempfile::tempdir().unwrap();
@@ -88,7 +89,11 @@ fn two_dispatches_from_the_desk_drive_at_once() {
             Owing::asked(channels::Reply::nowhere()),
         )
         .unwrap();
-    assert!(worker.driving(), "both drives are in the air");
+    assert_eq!(
+        worker.flight.in_flight(),
+        2,
+        "both drives are in the air before either is landed"
+    );
     worker.land_the_rest().unwrap();
     drop(provider);
 
@@ -125,20 +130,6 @@ fn two_dispatches_from_the_desk_drive_at_once() {
             "{run} called a model before the line that says it started"
         );
     }
-
-    // What serial driving cannot do: by the time the first run freezes,
-    // the second has already started.
-    let started_before_the_first_freeze: std::collections::BTreeSet<String> = lines
-        .iter()
-        .take_while(|line| line["kind"] != "run_frozen")
-        .filter(|line| line["kind"] == "run_started")
-        .map(|line| line["run"].as_str().unwrap_or_default().to_owned())
-        .collect();
-    assert_eq!(
-        started_before_the_first_freeze.len(),
-        2,
-        "both runs were going before either finished: {started_before_the_first_freeze:?}"
-    );
     let frozen = lines
         .iter()
         .filter(|line| line["kind"] == "run_frozen")

@@ -5,7 +5,7 @@
 
 //! One drive, and what it leaves behind.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use kernel::RunId;
 use kernel::{Address, AxError};
@@ -66,13 +66,18 @@ pub(crate) struct Driving {
     /// one thing.
     pub(crate) plan: RunPlan,
     pub(crate) handoff: runtime::handoff::Handoff,
+    /// The rest of the bench, which the drive carries home for the
+    /// landing to read: who the run handed work to, and whether it asked
+    /// to be replaced.
+    pub(in crate::assembly) workbench: super::Workbench,
 }
 
 /// What the sieve needs from the city for one run: a store to pin the
 /// original in, the room the model reads the rest from, the
 /// filter table frozen with the run, and what this run already saw.
 pub(crate) struct Sieving {
-    pub(crate) cas: memory::Cas,
+    /// The store the lanes share, taken for the length of one package.
+    pub(crate) cas: std::sync::Arc<std::sync::Mutex<memory::Cas>>,
     pub(crate) city_root: PathBuf,
     pub(crate) room: Address,
     /// The run and room an original is pinned for.
@@ -91,12 +96,13 @@ impl Sieving {
         call: &kernel::ToolCall,
         outcome: kernel::ToolOutcome,
     ) -> Result<kernel::ToolOutcome, AxError> {
+        let mut cas = super::held(&self.cas, "take the lanes' store")?;
         package_exec(
             call,
             outcome,
             SieveSite {
                 offload: runtime::offload::OffloadSite {
-                    cas: &mut self.cas,
+                    cas: &mut cas,
                     city_root: &self.city_root,
                     room: &self.room,
                     origin: self.origin.clone(),
@@ -128,30 +134,27 @@ pub(crate) struct Driven {
     /// answers Allow or Deny, and the only question left is the
     /// sweep's, which is raised after the drive hands the ledger back.
     pub(crate) raised: Vec<kernel::ApprovalItem>,
+    /// The bench the drive was handed, home for the landing.
+    pub(in crate::assembly) workbench: super::Workbench,
 }
 
 impl Sieving {
     /// What the sieve needs from this city for one run.
     ///
-    /// The store is a second handle on the same CAS rather than a loan
-    /// of the worker's: the store is content-addressed and written
-    /// through a temporary file, so two handles are one library, and a
-    /// drive that borrowed the worker's could not leave the thread the
-    /// worker lives on. The rest directory sits inside the room, which
-    /// is the one place a model-chosen path is allowed to read from;
-    /// the offload makes it when it first writes a rest file.
-    ///
-    /// # Errors
-    /// Propagates a store that will not open.
+    /// The store is the handle the lanes share rather than a loan of
+    /// the worker's: a drive that borrowed the worker's could not leave
+    /// the thread the worker lives on, and a handle opened here would
+    /// sweep the half-written objects of every other lane's put. The
+    /// rest directory sits inside the room, which is the one place a
+    /// model-chosen path is allowed to read from; the offload makes it
+    /// when it first writes a rest file.
     pub(in crate::assembly) fn for_run(
-        city_root: &Path,
+        store: &std::sync::Arc<std::sync::Mutex<memory::Cas>>,
         site: &Site,
         addr: &Address,
-    ) -> Result<Sieving, AxError> {
-        let cas = memory::Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
-            .map_err(memory::MemoryError::into_ax)?;
-        Ok(Sieving {
-            cas,
+    ) -> Sieving {
+        Sieving {
+            cas: std::sync::Arc::clone(store),
             city_root: site.write_root.clone(),
             room: addr.clone(),
             origin: memory::BlockOrigin {
@@ -160,7 +163,7 @@ impl Sieving {
             },
             table: site.filters.clone(),
             history: runtime::SieveHistory::default(),
-        })
+        }
     }
 }
 

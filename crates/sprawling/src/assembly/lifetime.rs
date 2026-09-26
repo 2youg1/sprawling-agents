@@ -172,6 +172,10 @@ impl RunWorker {
         }
         let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
+        let lane_store = std::sync::Arc::new(std::sync::Mutex::new(
+            Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
+                .map_err(memory::MemoryError::into_ax)?,
+        ));
         // The one place a `Delegator` is minted in this process, which
         // is what makes "a sub-agent cannot set the city working" a
         // fact about the code rather than a rule somebody follows.
@@ -183,6 +187,7 @@ impl RunWorker {
             ledger,
             opening: LedgerOpening::from(report),
             cas,
+            lane_store,
             credentials: Credentials::opened(book, expiries, vault),
             serving: None,
             governance,

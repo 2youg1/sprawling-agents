@@ -163,6 +163,7 @@ pub(crate) struct Dispatched {
 pub(super) mod agreeing;
 pub(super) mod custody;
 pub(super) mod handback;
+pub(super) mod preparing;
 pub(super) mod running;
 pub(super) mod session;
 pub(super) mod session_shape;

@@ -115,7 +115,7 @@ impl RunWorker {
                 "kernel::pursuit",
                 &format!("{} takes {next}: {item}", addr.as_str()),
             );
-            let (driving, continuation) = self.prepare_dispatch(
+            let (staged, continuation) = self.stage_dispatch(
                 Assignment {
                     addr: addr.clone(),
                     session: None,
@@ -131,7 +131,7 @@ impl RunWorker {
                 format!("Plan node {next}: {item}"),
                 goal,
             )?;
-            self.take_row_into_lane(driving, addr.clone(), next, continuation)?;
+            self.take_row_into_lane(staged, addr.clone(), next, continuation)?;
         }
         Ok(())
     }

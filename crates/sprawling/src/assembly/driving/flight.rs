@@ -22,9 +22,10 @@ use std::sync::mpsc;
 
 use kernel::{Address, AxCode, AxError, NodeId, RunId};
 
-use super::super::{Continuation, Driven, Owed, Owing, RunWorker, Unasked};
-use super::{Driving, lane::DriveContext};
+use super::super::{Continuation, Owed, Owing, RunWorker, Unasked};
+use super::lane::DriveContext;
 use crate::assembly::booking::OpenClaims;
+use crate::assembly::dispatching::preparing::{Flown, Staged};
 use crate::assembly::pool::{Arrival, DRIVING_LANES, DrivingPool};
 use crate::assembly::relay::{Patience, Relay, RelayGate, Wake};
 
@@ -116,19 +117,20 @@ impl Flight {
             .collect()
     }
 
-    /// Takes one prepared drive into a lane of its own.
+    /// Takes one staged dispatch into a lane of its own, which prepares
+    /// and drives it.
     ///
     /// # Errors
     /// Propagates the pool's refusal to start a thread, and its refusal
     /// of a run that is already driving.
     fn take(
         &mut self,
-        driving: Driving,
+        staged: Staged,
         context: DriveContext,
         carried: InLane,
     ) -> Result<RunId, AxError> {
-        let run = driving.run_id;
-        self.pool.start(driving, self.issue(), context)?;
+        let run = staged.run_id();
+        self.pool.start(staged, self.issue(), context)?;
         self.driving.insert(run, carried);
         Ok(run)
     }
@@ -147,7 +149,7 @@ impl Flight {
     /// table does not know is a defect in [`Self::take`], and landing
     /// it blind would settle a run against nothing.
     fn arrived(&mut self) -> Option<Result<Home, AxError>> {
-        let Arrival { run, driven } = match self.pool.landed(self.homes.pop_front()?) {
+        let Arrival { run, flown } = match self.pool.landed(self.homes.pop_front()?) {
             Ok(arrival) => arrival,
             Err(err) => return Some(Err(err)),
         };
@@ -167,7 +169,7 @@ impl Flight {
         // again, so no claim is answered between the release and the
         // plan on disk saying how the run's nodes ended.
         Some(Ok(Home {
-            driven,
+            flown,
             continuation,
             owing,
             open_claims: self.gate.booked.release(run),
@@ -177,7 +179,7 @@ impl Flight {
 
 /// One run home from its lane, with everything the city kept for it.
 struct Home {
-    driven: Result<Driven, AxError>,
+    flown: Flown,
     continuation: Continuation,
     owing: Owing,
     open_claims: OpenClaims,
@@ -228,7 +230,7 @@ impl RunWorker {
             }
         }
         let Home {
-            driven,
+            flown,
             continuation,
             owing,
             mut open_claims,
@@ -237,7 +239,7 @@ impl RunWorker {
         // takes it over and the refusal below still has to reach the
         // person who asked for the run this one replaced.
         let reply = owing.reply();
-        let landed = self.land(continuation, driven, owing, &mut open_claims);
+        let landed = self.land(continuation, flown, owing, &mut open_claims);
         let given_back = self.give_back_claims(open_claims);
         match landed {
             Ok(landed) => {
@@ -314,15 +316,18 @@ impl RunWorker {
         Ok(())
     }
 
-    /// Prepares one dispatch on this thread and takes the drive into a
-    /// lane, so the desk is free again before the run has finished.
+    /// Stages one dispatch on this thread and takes it into a lane, which
+    /// prepares and drives it, so the desk is free again before the
+    /// review tree is placed, a server has shaken hands, or the run has
+    /// finished.
     ///
-    /// This is the person's entrance. Everything the city writes before
-    /// a model is called — agreeing to the work, opening the room,
-    /// writing the brief, standing the run up — happens here, on the
-    /// accounting thread, and is finished by the time this returns. What
-    /// continues is the run, not the command, which is why the
-    /// idempotency key settles at take-off (sprawling-SPEC.md 8-46-2).
+    /// This is the person's entrance. What the city decides for a
+    /// dispatch — agreeing to the work, opening the room, writing the
+    /// brief, standing the run up — happens here, on the accounting
+    /// thread, and is finished by the time this returns; what waits on
+    /// the disk or on another process is the lane's (sprawling-SPEC.md
+    /// 8-93). What continues is the run, not the command, which is why
+    /// the idempotency key settles at take-off (sprawling-SPEC.md 8-46-2).
     ///
     /// # Errors
     /// Propagates every refusal a dispatch can owe before it costs
@@ -334,10 +339,10 @@ impl RunWorker {
         goal: String,
         owing: Owing,
     ) -> Result<RunId, AxError> {
-        let (driving, continuation) = self.prepare_dispatch(at, task, goal)?;
+        let (staged, continuation) = self.stage_dispatch(at, task, goal)?;
         let context = self.drive_context();
         self.flight.take(
-            driving,
+            staged,
             context,
             InLane {
                 continuation,
@@ -394,20 +399,20 @@ impl RunWorker {
         }
     }
 
-    /// Puts a prepared drive into a lane on a pursuit's behalf.
+    /// Puts a staged dispatch into a lane on a pursuit's behalf.
     ///
     /// # Errors
     /// Propagates the pool's refusal to start a lane.
     pub(in crate::assembly) fn take_row_into_lane(
         &mut self,
-        driving: Driving,
+        staged: Staged,
         addr: Address,
         node: NodeId,
         continuation: Continuation,
     ) -> Result<RunId, AxError> {
         let context = self.drive_context();
         self.flight.take(
-            driving,
+            staged,
             context,
             InLane {
                 continuation,

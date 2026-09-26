@@ -45,6 +45,8 @@ pub(in crate::assembly) struct Laying {
     backlog: runtime::Backlog,
     /// The city's one fence at a time (`driving::lane::DriveContext`).
     pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    /// The store the lanes share (`RunWorker::lane_store`).
+    pub(in crate::assembly) store: std::sync::Arc<std::sync::Mutex<memory::Cas>>,
     notes: super::recording::Notes,
     clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
     /// Where the ledger stood when the dispatch was staged: what the
@@ -95,6 +97,7 @@ impl super::RunWorker {
             connectors: std::sync::Arc::clone(&self.connectors),
             backlog: self.flight.backlog.clone(),
             fence_gate: std::sync::Arc::clone(&self.flight.fence_gate),
+            store: std::sync::Arc::clone(&self.lane_store),
             notes: self.log.clone(),
             clock: std::sync::Arc::clone(&self.clock),
             staged_at: self.ledger.position(),

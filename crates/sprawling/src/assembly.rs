@@ -210,6 +210,11 @@ pub struct RunWorker {
     /// What opening `ledger` repaired, kept until a person is told.
     opening: LedgerOpening,
     cas: Cas,
+    /// The store every lane writes through: one handle, opened with the
+    /// worker, because opening a store sweeps its half-written objects
+    /// and a lane that opened its own would sweep another lane's put
+    /// (sprawling-SPEC.md 8-93).
+    lane_store: Arc<std::sync::Mutex<Cas>>,
     /// Whose identity this city can call which model under
     /// (`credentials::held`).
     credentials: Credentials,
