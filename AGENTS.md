@@ -17,6 +17,8 @@ The `prereqs` recipe is the only list of the tools the loop needs, and `just che
 | Command | What it does |
 |---|---|
 | `just check` | the whole check; *Verification* says when it runs |
+| `just check-branch [base]` | the branch check of *Verification* tier 2 on `<base>...HEAD`, running every step even after one fails; a green result is recorded against the tree, and a clean worktree on a recorded tree returns at once |
+| `just check-all [phase...]` | every phase of `just check`, each run even after another failed, the chains that share no target at the same time; one log per phase and `phases.tsv` (phase, exit code, seconds) under `$CARGO_TARGET_DIR/check-all`; named phases run alone |
 | `just gates` | the machine gates alone, then the supply-chain read |
 | `cargo xtask gates <name>...` | the named gates only; `cargo xtask gates --list` prints the roster, one name per line |
 | `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `channels` without `server` |
@@ -37,8 +39,8 @@ The `prereqs` recipe is the only list of the tools the loop needs, and `just che
 Feedback in seconds keeps each step honest and the whole check takes minutes, so verification runs in three tiers: the first catches a defect in the change, the second a change that breaks its neighbours, the third two branches that are each green and wrong together.
 
 1. **While iterating, run the narrowest command that can fail for the change**, as soon as the change exists: `cargo nextest run -p <crate> -E '<filter>'` naming the new test and the tests of the modules you changed; `cargo clippy -p <crate> --all-targets --all-features -- -D warnings`; `cargo check -p <dependent>` for each direct dependent (`cargo tree --workspace -i <crate> --depth 1`) after a `pub` surface changed; `cargo xtask gates <name>...` naming the gates that judge the files you touched; and `cargo fmt --check`, which compiles nothing. Leave whole suites, the artifact gates (`render`, `budget`, `npm`) and release builds to the next tiers unless the change is about them.
-2. **Before a branch merges, run the branch check once**: the whole test suites of the crates the branch changed, the tests in their dependents that name what changed, clippy on those crates, `cargo fmt --check`, and every gate that reads sources, adding `render`, `budget` and `npm` after `just build-web` when the branch touched `client/`.
-3. **`just check` runs once on the tree that merges a batch of branches into `main`, and `main` advances only when it is green.** When it is red, rerun the failing step with `--no-fail-fast` so one run lists every failure, confirm each fix with the narrowest command that shows it, and then run `just check` again.
+2. **Before a branch merges, run the branch check once**, `just check-branch <base>`: the whole test suites of the crates the branch changed, the tests in their dependents that name what changed, clippy on those crates, `cargo fmt --check`, and every gate that reads sources, adding `render`, `budget` and `npm` after `just build-web` when the branch touched `client/`.
+3. **`just check` runs once on the tree that merges a batch of branches into `main`, and `main` advances only when it is green.** The merge runs it as `just check-all`, so one run lists every failure; rerun a red phase alone with `just check-all <phase>`, confirm each fix with the narrowest command that shows it, and then run `just check-all` again.
 
 A green result belongs to the tree it ran on: record it with `git rev-parse HEAD^{tree}`, and rerun it on that tree only when something outside the tree, such as the toolchain, changed.
 
