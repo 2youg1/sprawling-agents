@@ -162,7 +162,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
         // city that had been running for a month.
         addr: kernel::layout::CityLayout::new(city_root).city_address(),
         kind: EventKind::CityInitialized,
-        data: Payload::empty(),
+        data: Payload::of(&kernel::event::record::CityInitialized {})?,
         ig: false,
     })?;
     let city_md = city_root.join(city::CITY_FILE);
