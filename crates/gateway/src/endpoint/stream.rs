@@ -58,12 +58,7 @@ impl Endpoint {
                 );
             }
         }
-        let request = self.authorize(
-            self.client
-                .post(&self.config.base_url)
-                .header("content-type", "application/json")
-                .header("accept", "text/event-stream"),
-        )?;
+        let request = self.chat_post(req)?.header("accept", "text/event-stream");
         // **A streamed call carries no deadline of its own.** The
         // transport reads the whole body under one deadline, so any
         // figure written here would cut an answer for being long; the

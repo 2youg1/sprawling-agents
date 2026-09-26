@@ -305,10 +305,11 @@ pub(super) enum WholeRequest {
 ///
 /// The proxy rule is the city's own: a tool server carries no setting of
 /// its own, and a proxy in front of a server on this machine answers for
-/// something else entirely. The client says what it is, because a hosted
-/// server behind a content delivery network refuses one that will not:
-/// reaching Exa's endpoint without a user agent answers 403
-/// `browser_signature_banned` before any MCP message is read.
+/// something else entirely. The client says what it is through
+/// `gateway::client_for`, because a hosted server behind a content
+/// delivery network refuses one that will not: reaching Exa's endpoint
+/// without a user agent answers 403 `browser_signature_banned` before
+/// any MCP message is read.
 ///
 /// # Errors
 /// `AxCode::ConfigInvalid` when this machine cannot build the client.
@@ -316,8 +317,7 @@ pub(super) fn client_for(
     url: &str,
     whole_request: WholeRequest,
 ) -> Result<reqwest::blocking::Client, AxError> {
-    let builder = gateway::client_for(kernel::Proxying::ExceptLocal, url)
-        .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")));
+    let builder = gateway::client_for(kernel::Proxying::ExceptLocal, url);
     match whole_request {
         WholeRequest::DefaultTimeout => builder,
         WholeRequest::Unbounded => builder.timeout(None),

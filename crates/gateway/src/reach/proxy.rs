@@ -59,12 +59,19 @@ pub fn through(rule: Proxying, base_url: &str) -> Through {
     }
 }
 
-/// An HTTP client that reaches this URL the way the person settled it.
+/// An HTTP client that reaches this URL the way the person settled it,
+/// and names this city as the client.
 ///
 /// The caller adds its own deadline and whatever else it needs; what it
-/// may not do is decide the proxy again.
+/// may not do is decide the proxy again. The name is here, once, for
+/// every outbound call, because servers refuse a request that will not
+/// say what sent it: OpenCode Go asks each client to identify itself by
+/// its own name rather than an HTTP library's, and a hosted MCP server
+/// behind a content delivery network answers 403 to a request with no
+/// user agent at all.
 pub fn client_for(rule: Proxying, base_url: &str) -> reqwest::blocking::ClientBuilder {
-    let builder = reqwest::blocking::Client::builder();
+    let builder = reqwest::blocking::Client::builder()
+        .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")));
     match through(rule, base_url) {
         Through::LocalAddress | Through::Disabled => builder.no_proxy(),
         Through::Direct | Through::Environment(_) | Through::Excluded => builder,

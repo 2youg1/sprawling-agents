@@ -48,8 +48,27 @@ pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
 }
 
 /// The id one conversation carries to a host that asks for one.
-pub(crate) fn conversation_id(_req: &ModelRequest) -> Result<String, AxError> {
-    Ok(String::new())
+///
+/// Derived rather than stored: the frozen prefix and the first message
+/// are the same on every turn of one conversation and differ between
+/// two, so the digest of the two is stable where it has to be without
+/// a second record of what a conversation is. The digest carries none
+/// of the text it was taken over.
+///
+/// # Errors
+/// `E_WIRE_MISMATCH` when the first message will not serialise.
+pub(crate) fn conversation_id(req: &ModelRequest) -> Result<String, AxError> {
+    let mut held = Vec::new();
+    for segment in &req.segments {
+        held.extend_from_slice(segment.as_bytes());
+    }
+    if let Some(opening) = req.chat.messages.first() {
+        held.extend(
+            serde_json::to_vec(opening)
+                .map_err(|err| crate::mismatch::mismatch("messages[0]", &err.to_string()))?,
+        );
+    }
+    Ok(kernel::B3Hash::digest(&held).to_string())
 }
 
 impl Endpoint {
@@ -104,6 +123,36 @@ impl Endpoint {
         facts.sort_by(|left, right| left.id.cmp(&right.id));
         facts.dedup_by(|left, right| left.id == right.id);
         Ok(facts)
+    }
+
+    /// The POST one chat request leaves in: every header this endpoint
+    /// adds, and the conversation's id where the host asks for one.
+    ///
+    /// A header the person named in `extra_headers` is theirs, so the
+    /// id is not written a second time under the same name.
+    ///
+    /// # Errors
+    /// Propagates a redemption failure and an unserialisable opening
+    /// message.
+    pub(super) fn chat_post(
+        &self,
+        req: &ModelRequest,
+    ) -> Result<reqwest::blocking::RequestBuilder, AxError> {
+        let request = self
+            .client
+            .post(&self.config.base_url)
+            .header("content-type", "application/json");
+        let named_by_person = |name: &str| {
+            self.config
+                .extra_headers
+                .iter()
+                .any(|(given, _)| given.eq_ignore_ascii_case(name))
+        };
+        let request = match crate::provider::preset::session_header(&self.config.base_url) {
+            Some(name) if !named_by_person(name) => request.header(name, conversation_id(req)?),
+            Some(_) | None => request,
+        };
+        self.authorize(request)
     }
 
     /// Every header this endpoint adds, written in the last slot
@@ -315,6 +364,14 @@ mod tests {
         // Auth header, extra header, override and model name all landed.
         assert!(seen[0].contains("x-api-key: sk-test-0123456789"));
         assert!(seen[0].contains("anthropic-version: 2023-06-01"));
+        // Every call names this city as its client.
+        assert!(
+            seen[0]
+                .to_ascii_lowercase()
+                .contains(concat!("user-agent: sprawling/", env!("CARGO_PKG_VERSION"))),
+            "{}",
+            seen[0]
+        );
         assert!(seen[0].contains("\"user_id\":\"city\""));
         assert!(seen[0].contains("\"model\":\"provider-model\""));
     }
