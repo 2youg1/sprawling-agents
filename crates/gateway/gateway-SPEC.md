@@ -1,8 +1,8 @@
 # gateway-SPEC.md
 
-> crate：`gateway`（lib，依赖 kernel）。本 SPEC 先于代码存在（十七节）。
-> Stage 3 模块：dialect／endpoint／credential（内缝 Vault）／oauth_profiles／market／cost；`admission` 与 `fallback` 已按 H-02 删除（§8-6、§8-11）；router 属 P1 不在本版。
-> 本 crate 覆盖的语义：模型路由；provider 客户端自写＋认证两半；Custody；市场快照与成本；model 缝；provider 侧准入。
+> crate：`gateway`（lib，依赖 kernel）。本 SPEC 先于代码存在。
+> 模块：dialect（及 anthropic／openai／mismatch）／endpoint／credential（内缝 Vault）／oauth_profiles／market／cost／router／provider／reach／transcribe／adviser。
+> 本 crate 覆盖的语义：模型路由；provider 客户端自写＋认证两半；Custody；市场快照与成本；model 缝。
 
 ## 1 需求分解
 
@@ -11,27 +11,32 @@
 | `dialect` | 城内规范 Anthropic Messages 与 OpenAI Chat 的双向纯函数翻译；保断点位／工具形状／usage |
 | `endpoint` | 自写线格式 HTTP 客户端（reqwest blocking＋rustls）实现 `kernel::Model`；逐字段请求覆盖；回环与远端同一适配器（§8-3） |
 | `credential`＋`oauth_profiles` | Custody 效果半（scan 命中→入 Vault→原位替换 SecretRef）；兑付（组请求末格 expose，credential_lent）；describe；持久性探测；OAuth 流程（代码）＋情报表（数据） |
-| `market`＋`cost` | 模型目录快照＋钉版回滚；per-call 入账（权威计费额优先）。provider 侧并发上限曾住 `admission`，因零调用者删除，重新长出来的条件见 §8-6 |
+| `market`＋`cost` | 模型目录快照＋钉版回滚；per-call 入账（权威计费额优先）。本 crate 不设 provider 侧准入与备用端点（§8-6、§8-11） |
+| `router` | Endpoint 簿：从 Ledger 重建的已登记端点与每个标签的选择；一次取模型只答一问（§8-9） |
+| `provider` | 厂商文档写下来一次：host 预设、输出上限的事实梯、一个端点怎么连（§8-17、§8-18） |
+| `reach` | 哪些调用走这台电脑的代理，与一次分段读数（§8-15） |
+| `transcribe` | 把一段录音变成一行字的可选设施（§8-12） |
+| `adviser` | 一次顾问咨询，走既有登记面（§8-23） |
 
 ## 2 验收标准
 
 - dialect：golden（两 Dialect 各一请求一响应）＋proptest 往返（响应侧 wire→canonical→重渲染 wire 逐字段等值；请求侧断点位／工具形状／文本字节无失）。
 - endpoint：对回环假 provider 服务的半流中断（SSE 截断→E_PROVIDER 且不产伪 ModelReturn）＋幂等重试（同 IdemKey 重发，对外恰一次效果——由调用方 dedup 看守，endpoint 自身无重试暗策略）。
-- credential：A13 链——人交出的值进金库（`set`，名字由调用方给）→`secret_captured` 入账（无明文无哈希前缀，写者是装配层 `credentials::signing`）→配置只见 `secret:`→resolve 兑付产 `credential_lent`→`describe` 恒不返回值。**外来字节的扫描与就地替换不在本 crate**：那是 `runtime::redact`，本 crate 不留第二份。探测三态（跨重启／仅本次开机／仅本进程）可注入验证。
+- credential：A13 链——人交出的值进金库（`set`，名字由调用方给）→`secret_captured` 入账（无明文无哈希前缀，写者是装配层 `credentials::signing`）→配置只见 `secret:`→resolve 兑付产 `credential_lent`→`describe` 恒不返回值。**外来字节的扫描与就地替换不在本 crate**：那是 `runtime::redact`，本 crate 不留第二份。持久性四档（§8-21）可注入验证。
 - 调优：一个端点从表单与从导入两条路径附着后，`Query::Config` 回答的超时与重试相同；未调过的端点读到的三个默认值来自 `EndpointTuning::DEFAULTS` 而非任何第二处。
 - cost：权威计费额在场则恒胜价目推算；两源不一致时以权威为准并记差额；A20 的取材面（对账断言住 memory::attribution）。
 
 ## 3 假设与歧义
 
-- **本地推理**＝指向回环地址的 OpenAI 兼容服务（llama.cpp/ollama 一类），与远端同走 `Endpoint`（§8-3）。本地引擎进程管理不属本 crate（P4 产品化再议）。
-- **tokio 不引入**：turn 是同步函数面，endpoint 用 `reqwest::blocking`（内部自管运行时线程，不出接口）。B.7 的 tokio 行推迟到 S4 channels（首个真异步消费者），偏离已记（§13）。
+- **本地推理**＝指向回环地址的 OpenAI 兼容服务（llama.cpp/ollama 一类），与远端同走 `Endpoint`（§8-3）。本地引擎进程管理不属本 crate。
+- **tokio 不引入**：turn 是同步函数面，endpoint 用 `reqwest::blocking`（内部自管运行时线程，不出接口），为一个 HTTP 调用把 async 传染到全库不值。
 - 线格式 JSON 允许浮点（temperature 等 provider 字段）：dialect 是翻译面不是判定路径；判定路径（cost／market 价目）恒整数。
-- **提前交出的调用在 runtime 一侧还没有消费者。** `Endpoint` 经 `Model::call_speculating`（kernel SPEC「模型端口第三扇门」）在 `content_block_stop` 到达时交出完整调用；runtime 还没有据此提前启动只读工具。它必须守住的性质已由 `adversary/design/Speculating.lean` 证明：推测结果不是事件，账本顺序与串行执行相同，前提是只提前启动排在第一个写调用之前的只读调用。OpenAI 两种兼容格式在结算前不交出调用：它们的调用在哪一帧完整，线上没有一帧明说。
+- **只有 Anthropic 兼容格式在结算前交出调用。** `Endpoint` 经 `Model::call_speculating`（kernel SPEC「模型端口第三扇门」）在 `content_block_stop` 到达时交出完整调用，消费方是 `runtime::turn::speculation`（runtime-SPEC §8-3），它守的性质由 `adversary/design/Speculating.lean` 证明。OpenAI 两种兼容格式在结算前不交出调用：它们的调用在哪一帧完整，线上没有一帧明说。
 - OAuth 活体流程不可在 CI 验证：流程状态机与请求构造以形状测试看守，端到端属人工清单。
 
 ## 4 现状分析
 
-空壳 lib。无既有公开面（api-baseline 自此起算）。
+公开面就是 `lib.rs` 的再导出；crate 根只再导出别的 crate 叫得出名字的项（§12）。
 
 ## 5 权威信源
 
@@ -51,7 +56,7 @@ dialect ───────────────▶ anthropic／openai（�
 anthropic／openai ──────▶ mismatch（共用的读取器与拒词；单向，无环）
 credential ──▶ 内缝 Vault（pub(crate) trait：keyring 生产适配器＋会话内存第二适配器）
 oauth_profiles（数据面，零分支）◀── credential（流程消费情报）
-market／cost：纯判定与数据面，被 endpoint 与 S3 回合层消费
+market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 ```
 
 **market**：`ModelEntry.max_output_tokens: Option<Ceiling>`——一次回答能吐多少字是**模型的事实**，不是调用处的选择；探测接口不返回它，故它随模型登记入目录行。**这一列为空时由谁来答，现在写在 §8-17 的事实梯里，而不再是各兼容格式各自的默认**：`openai` 不写 `max_tokens`、`anthropic` 写不出请求于是拒（`E_CONFIG_INVALID`），是同一个缺口在两条线上的两种后果，而登记时梯子已经把它补上。尚未登记的本地模型沿用 `local` 行的保守上限，登记面（§8-9）接管后改为人确认过的行。
@@ -64,41 +69,39 @@ market／cost：纯判定与数据面，被 endpoint 与 S3 回合层消费
 
 ### 8-1 gateway::dialect（形状 1 判定函数族）＋anthropic／openai／mismatch
 
-城内规范会话类型住 `kernel::model`（缝上类型，S3 只加）；本模块只做 canonical↔wire 翻译，纯函数、无 I/O、无状态。
+城内规范会话类型住 `kernel::model`（缝上类型）；本模块只做 canonical↔wire 翻译，纯函数、无 I/O、无状态。
 
-**一个文件里两家 provider 的字段知识交错排列，现在各住各家。** 1,280 → 512＋352（anthropic）＋393（openai）＋88（mismatch）。
-切缝不是行数而是**变化的理由**：一家 provider 改了它的形状，只有它那一个文件动；而本模块顶上那句「改之前先读 provider 自己的文档」只有跟它指的那堆字段同居一处才真的被读到，所以两张文档链接表各自跟着它的 dialect 走。
-- `dialect` 剩五个入口，每个一条 `match kind`，封闭集为二；不认得的 dialect 恒拒而不拿较近的那一家近似。跨 dialect 的断言（两向往返、两种强度拼写、float 拒收）留在这里，因为它们测的就是路由的契约。
-- `mismatch` 是两家共用的四个读取器（`require`／`as_str`／`tokens_or_zero`／`payload_from`）与三句拒词（`mismatch`／`stream_cut`／`unspelled_effort`）。**依赖是单向的**：dialect → 两家 → mismatch，谁都不回头指。
-**两家各自再切分一次，把流的拼接搬出去。** 图的翻译把 `openai.rs` 顶到 443 行、`anthropic.rs` 顶到 398 行，而文件上限是 400。切的仍是变化的理由：`increment_of`／`settled` 回答的是「一串 SSE 帧如何合成一份完整答案」，与「一个请求如何写上线」是两件事，且两家的流帧形状各自变。归 `anthropic/stream.rs`（110）与 `openai/stream.rs`（116），父文件各以一行 `pub(crate) use stream::{increment_of, settled};` 保住路径，`dialect` 一字未改。
+**两家 provider 的字段知识各住各家。** 切缝是**变化的理由**：一家 provider 改了它的形状，只有它那一个文件动；而本模块顶上那句「改之前先读 provider 自己的文档」只有跟它指的那堆字段同居一处才真的被读到，所以两张文档链接表各自跟着它的 dialect 走。
+- `dialect` 的每个入口是一条 `match kind`，对 `DialectKind` 穷尽；不认得的 dialect 恒拒而不拿较近的那一家近似。跨 dialect 的断言（两向往返、两种强度拼写、float 拒收）留在这里，因为它们测的就是路由的契约。
+- `mismatch` 是两家共用的四个读取器（`require`／`as_str`／`tokens_or_zero`／`payload_from`）与拒词（`mismatch`／`mismatch_found`／`stream_cut`）。**依赖是单向的**：dialect → 两家 → mismatch，谁都不回头指。
+**两家各自把流的拼接放进自己的 `stream.rs`。** 切的仍是变化的理由：`increment_of`／`settled` 回答的是「一串 SSE 帧如何合成一份完整答案」，与「一个请求如何写上线」是两件事，且两家的流帧形状各自变。归 `anthropic/stream.rs` 与 `openai/stream.rs`，父文件各以一行 `pub(crate) use stream::{increment_of, settled};` 再导出。
 
 - 只属一家的东西跟着它：`empty_answer`（空答案）、`joined_text`与 `effort_field` 入 openai；`role_str`、`stop_from`／`stop_str`、`block_wire`／`block_from`、`effort_fields` 入 anthropic。
 
-**每一条形状不匹配都带出路，而空答案不再被当成形状不匹配**。真机派活时拿到 `E_WIRE_MISMATCH: translate wire on response.choices: expected array`，**`recovery` 为空串**——一条让人无从下手的拒绝，而 `AxError` 的契约写着 `recovery` 必须是可直接执行的信息。两处修正：
+**每一条形状不匹配都带出路，而空答案不是形状不匹配**。`AxError` 的契约写着 `recovery` 必须是可直接执行的信息，所以：
 
-- `mismatch()` 统一携一句出路（对一句 dialect 选错与 base url 写错）。这是 25 个调用点共用的那一句。
-- **`choices` 为 `null` 不是形状问题**，单独报 `E_PROVIDER`：信封是对的、字段都在、只是答案被丢了。实测来源：一家 OpenAI 兼容的托管端点在 `max_tokens` 高于所选模型的上限时，**既不拒也不答**，回 HTTP 200 携 `"choices": null` 与全零 usage。同一家端点上限因模型而异（实测：一个模型在 1024 与 2048 之间就翻，另一个 8192 仍然正常），故**恒不把某个上限写进代码**：那是对侧的数字，写下来就是第二个会漂的权威。拒词只指向该改的那一项（max output tokens），并标 `retriable`。
+- `mismatch()` 统一携一句出路（对一句 dialect 选错与 base url 写错），每个调用点共用这一句。
+- **`choices` 为 `null` 不是形状问题**，单独报 `E_PROVIDER`：信封是对的、字段都在、只是答案被丢了。OpenAI 兼容的托管端点可能在 `max_tokens` 高于所选模型的上限时**既不拒也不答**，回 HTTP 200 携 `"choices": null` 与全零 usage；同一家端点的上限因模型而异，故**恒不把某个上限写进代码**：那是对侧的数字，写下来就是第二个会漂的权威。拒词只指向该改的那一项（max output tokens），并标 `retriable`。
 
 ```rust
-pub enum DialectKind { Anthropic, OpenAi }
-pub fn request_wire(kind: DialectKind, req: &ChatRequest) -> Result<serde_json::Value, AxError>;
+pub enum DialectKind { Anthropic, OpenAi, OpenAiResponses }   // 定义在 kernel::model::wire；第三支见 §8-20
+pub fn request_wire(kind: DialectKind, req: &ChatRequest, images: &ImageBytes) -> Result<serde_json::Value, AxError>;
 pub fn response_from_wire(kind: DialectKind, wire: &serde_json::Value) -> Result<ChatResponse, AxError>;
 #[cfg(test)]
 pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<serde_json::Value, AxError>;
                                     // 响应侧的反方向只供测试：造 provider 回复、证往返（wire→canonical→wire 等值）；生产里没有调用者，所以不编进发行的二进制
 ```
 
-- **保三样**：①断点位——canonical 的 `cache: true` 标记翻到 Anthropic 侧＝`cache_control{type:"ephemeral"}`，system 块逐块原位，被标记的消息落在它的最后一块上（缓存区到这一块结束为止）；断点放在哪由 `runtime::prefix::BreakpointPlan` 决定，兼容格式只拼写；OpenAI 侧无显式断点（供应商缓存是隐式前缀匹配），翻译**记录性丢弃**（文档声明，不静默）；②工具形状——`ToolDef{name, description, input_schema}`↔Anthropic `tools[]`／OpenAI `tools[{type:"function",function:{…}}]`，逐字段；tool_use↔tool_calls（id/name/args 无失）；③usage——Anthropic `usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`／OpenAI `usage{prompt_tokens,completion_tokens,prompt_tokens_details.cached_tokens}`→`ModelUsage` 四整数字段，缺失字段取 0。
-- **保三样**：①断点位——canonical 的 `cache: true` 标记翻到 Anthropic 侧＝`cache_control{type:"ephemeral"}`，逐块原位；OpenAI 侧无显式断点（供应商缓存是隐式前缀匹配），翻译**记录性丢弃**（文档声明，不静默）；②工具形状——`ToolDef{name, description, input_schema}`↔Anthropic `tools[]`／OpenAI `tools[{type:"function",function:{…}}]`，逐字段；tool_use↔tool_calls（id/name/args 无失）；③usage——Anthropic `usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`／OpenAI `usage{prompt_tokens,completion_tokens,prompt_tokens_details.cached_tokens}`→`ModelUsage` 四整数字段加 `dialect`，缺失字段取 0。`input_tokens` 在每个兼容格式下都是整个 prompt（kernel-SPEC `ModelUsage`）：OpenAI 两面的 `prompt_tokens`／`input_tokens` 本就含缓存部分，照抄；Anthropic 的 `input_tokens` 只数未命中缓存的部分，解析时加上 `cache_read_input_tokens` 与 `cache_creation_input_tokens`，写回线上时减回去。`cost::settle` 按输入价计的是 `input_tokens` 减去两个缓存数。
+- **保三样**：①断点位——canonical 的 `cache: true` 标记翻到 Anthropic 侧＝`cache_control{type:"ephemeral"}`，system 块逐块原位，被标记的消息落在它的最后一块上（缓存区到这一块结束为止）；断点放在哪由 `runtime::prefix::BreakpointPlan` 决定，兼容格式只拼写；OpenAI 侧无显式断点（供应商缓存是隐式前缀匹配），翻译**记录性丢弃**（文档声明，不静默）；②工具形状——`ToolDef{name, description, input_schema}`↔Anthropic `tools[]`／OpenAI `tools[{type:"function",function:{…}}]`，逐字段；tool_use↔tool_calls（id/name/args 无失）；③usage——Anthropic `usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`／OpenAI `usage{prompt_tokens,completion_tokens,prompt_tokens_details.cached_tokens}`→`ModelUsage` 四整数字段加 `dialect`，缺失字段取 0。`input_tokens` 在每个兼容格式下都是整个 prompt（kernel-SPEC `ModelUsage`）：OpenAI 两面的 `prompt_tokens`／`input_tokens` 本就含缓存部分，照抄；Anthropic 的 `input_tokens` 只数未命中缓存的部分，解析时加上 `cache_read_input_tokens` 与 `cache_creation_input_tokens`，写回线上时减回去。`cost::settle` 按输入价计的是 `input_tokens` 减去两个缓存数。
 - 未知 wire 字段：请求侧不产（我们只写自己声明的字段＋overrides）；响应侧忽略未知键、缺必需键报 `E_WIRE_MISMATCH`（subject 写键路径）。
-- canonical 枚举（Role／StopReason／ContentBlock）是闭的，本模块对每一支写出真实的臂；新增一支即在两种兼容格式里同时编译失败，这正是要的（G-22）。原先的 fail-closed 通配臂连同 `mismatch::unspelled_effort` 一并删除：它们恒不可达；wire JSON 键序＝serde_json BTreeMap 字典序（确定性，对端语义无关）。
+- canonical 枚举（Role／StopReason／ContentBlock）是闭的，本模块对每一支写出真实的臂；新增一支即在两种兼容格式里同时编译失败，这正是要的，所以没有 fail-closed 通配臂；wire JSON 键序＝serde_json BTreeMap 字典序（确定性，对端语义无关）。
 - `E_ENDPOINT_DIALECT_UNSUPPORTED`：DialectKind 之外的兼容格式请求（wire 探查失败）；本模块两码之外不新增。
 
 **思考块与思考强度的两侧翻译**
 
 保的第四样：**思考块。**Anthropic 侧两向逐字，`thinking`（携 `signature`）与 `redacted_thinking`（携 `data`）各自原位往返；canonical→wire→canonical 与 wire→canonical→wire 两条往返均逐字节相等。理由是 provider 官方规定而非我们的偏好：改动即 400，报文指名这两个块 cannot be modified（kernel-SPEC §8-24 引原文）。
 
-OpenAI 侧无对应物：出向翻译**记录性丢弃**思考块（同断点位的现行口径：文档声明，不静默），因为 Chat Completions 拼不出该形状且它也不要求回传；canonical 记录不受影响，重放仍能从 canonical 重推出当时实发字节（dialect 是纯函数）。入向则相反：OpenAI 回的推理摘要不伪造成 `Thinking`（它没有可回传的 signature）。
+OpenAI 侧无对应物：出向翻译**记录性丢弃**思考块（与断点位同一规则：文档声明，不静默），因为 Chat Completions 拼不出该形状且它也不要求回传；canonical 记录不受影响，重放仍能从 canonical 重推出当时实发字节（dialect 是纯函数）。入向则相反：OpenAI 回的推理摘要不伪造成 `Thinking`（它没有可回传的 signature）。
 
 强度映射表（`ChatRequest.effort`，缺席即不写字段）：
 
@@ -108,7 +111,7 @@ OpenAI 侧无对应物：出向翻译**记录性丢弃**思考块（同断点位
 | `None` | `thinking:{type:"disabled"}` | `reasoning:{effort:"none"}` |
 | `Low`／`Medium`／`High`／`XHigh`／`Max` | `effort:"…"` | `reasoning:{effort:"…"}` |
 
-两种兼容格式都拼得出全部六级，**唯一差别是「不思考」写在哪个字段**：Anthropic 的 `effort` 只收五级，无 `none`。通配臂仍 fail-closed，但它现在只能被「日后新增且尚未教会写的级别」触发（同 `role_str`／`stop_str` 的既有习惯）。
+两种兼容格式都拼得出全部六级，**唯一差别是「不思考」写在哪个字段**：Anthropic 的 `effort` 只收五级，无 `none`。`Effort` 是闭的，映射对每一级写出真实的臂，新增一级即在两种兼容格式里同时编译失败。
 
 **缓存后果写在这里，因为它是选型理由**：官方排错文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」。故强度住 `FrozenConfig`（kernel-SPEC §8-22），Run 内不可变；本模块只负责把已冻结的值翻上线。
 
@@ -117,7 +120,7 @@ OpenAI 侧无对应物：出向翻译**记录性丢弃**思考块（同断点位
 **两条 wire 上的图**
 
 ```rust
-// gateway::dialect::images（新文件；形状 2 value）
+// gateway::dialect::images（形状 2 value）
 pub struct ImageBytes(BTreeMap<String, Vec<u8>>);   // 键＝Locator 的规范拼写
 impl ImageBytes {
     pub fn insert(&mut self, at: &Locator, bytes: Vec<u8>);
@@ -134,7 +137,7 @@ pub fn request_wire(kind: DialectKind, req: &ChatRequest, images: &ImageBytes)
 - **locator 解不出字节即 `E_WIRE_MISMATCH`**（fail-closed）：一张描述存在、字节不在的图，发上线就是一个模型看不见的空位。
 - **Anthropic 侧**：Image 块→`{type:"image", source:{type:"base64", media_type:…, data:…}}`；带 `attachments` 的 tool_result 的 `content` 由字符串改写为块数组 `[{type:"text",text},{type:"image",…}…]`（无附件时仍写字符串，既有 golden 字节不变）。两处形状都是 provider 自己的：<https://platform.claude.com/docs/en/build-with-claude/vision>。
 - **OpenAI 侧**：user 消息的 `content` 由字符串改写为部件数组 `[{type:"text",text},{type:"image_url",image_url:{url:"data:<mime>;base64,…"}}]`。
-- **本兼容格式多一项记录性丢失：tool 消息拿不了图**。Chat Completions 的 `role:"tool"` 只收字符串 `content`，所以 tool_result 的 `attachments` 不随它走，而是落到紧跟其后的一条 user 消息里。图没丢，丢的是「这张图是那次工具调用的结果」这层归属；同断点位与思考块的现行口径，**文档声明，不静默**，写在 `openai.rs` 顶上那张丢失清单里并由测试钉住。
+- **本兼容格式多一项记录性丢失：tool 消息拿不了图**。Chat Completions 的 `role:"tool"` 只收字符串 `content`，所以 tool_result 的 `attachments` 不随它走，而是落到紧跟其后的一条 user 消息里。图没丢，丢的是「这张图是那次工具调用的结果」这层归属；与断点位、思考块同一规则，**文档声明，不静默**，写在 `openai.rs` 顶上那张丢失清单里并由测试钉住。
 - **base64 依赖**：`base64 0.22` 本就在 `Cargo.lock` 的图里（reqwest／git2 一系已携），直接命名不向锁里添包；自己写一份编码器才是新权威。
 
 ### 8-2 gateway::endpoint（形状 4 适配器）
@@ -163,15 +166,15 @@ impl kernel::Model for Endpoint { /* call：ChatRequest（req.chat）→dialect�
 ```
 
 - **组请求五步**：canonical→`request_wire`→逐条应用 overrides（JSON Pointer，后者胜）→认证头兑付（`resolver` 取 `Sealed`，`expose()` 只在写头那一格，写完即 drop 零化）→POST。响应四步：状态码判定（429/5xx→E_PROVIDER 携 retry 语义；4xx→E_PROVIDER 携 provider 错误体摘要）→`response_from_wire`→usage 抽取→`ModelReturn`。
-- **半流中断**：SSE 流截断（连接断／不完整事件）＝`E_PROVIDER`，恒不产部分 ModelReturn；S3 先落非流式全量路径，流式属只加（接口不变，config 增 `stream: bool` 字段即可）。
+- **半流中断**：SSE 流截断（连接断／不完整事件）＝`E_PROVIDER`，恒不产部分 ModelReturn；流式读法见 §8-13。
 - **无暗重试**：重试是 watchdog 的决策（上限的唯一表示是 `Retries`，§8-16），endpoint 一次调用恰一次 HTTP 往返；幂等由调用方 IdemKey dedup 看守。
-- base_url＝完整端点 URL（逐字段哲学，不拼路径）；EndpointConfig 增 pricing: Option<ModelEntry>（结算在适配器内以便 ModelReturn 携 billed 入账；权威额线上无标准槽位，现行恒 PriceSheet 源）；reqwest 0.13 的 rustls feature 名＝`rustls`（非 0.12 的 rustls-tls）；非流式先行，半流中断以截断 body 实测（E_PROVIDER，恒不产部分 ModelReturn）；kernel::ModelReturn 增 usage/stop/billed 三字段＋bare()/from_response() 两构造面（kernel-SPEC §8-24 同集）。
-- `.expose(` 白名单（xtask secret）：`endpoint/call.rs` 是 gateway 侧唯一的合法出现点（另加 `credential/oauth/flow.rs` 的刷新）。**两种凭证在同一句里写上线**：`authorize` 既写注册带的那条，也写人在自定义头里放的 `HeaderValue::Redeemed`；三个请求写入点（`call`、`stream`、`list_models`）都只调它，谁都不再自己遍历 `extra_headers`。
-- **越过接口读字段的那一处收回来了**（H-08，叶子 8.8）。`Endpoint` 的 `config`／`client`／`redemption` 由 `pub(crate)` 降为 `pub(super)`，出了 `endpoint/` 取不到；`transcribe` 改走 `post_bytes` 与 `model()`。于是「一次 POST 如何发出、非 2xx 如何变成 `AxError`、对侧正文如何不被回显」在本 crate 里只有一份答案。转写面仍保留它自己那句恢复语（`rewrite_recovery`）：线上出了什么事是端点的事，人接下来能做什么是设施的事。
+- base_url＝完整端点 URL（逐字段哲学，不拼路径）；`EndpointConfig.pricing: Option<ModelEntry>` 让结算在适配器内完成，`ModelReturn` 因此携 usage／stop／billed 入账（kernel-SPEC §8-24；权威额线上无标准槽位，现行恒 PriceSheet 源）；TLS 取 reqwest 0.13 的 `rustls` feature。
+- `.expose(` 白名单（`xtask/src/secret.rs` 的 `EXPOSE_WHITELIST`，全表以它为准）：gateway 侧的合法出现点是 `endpoint/call.rs`（端点调用）与 `credential/oauth/flow.rs`（续期）。**两种凭证在同一句里写上线**：`authorize` 既写注册带的那条，也写人在自定义头里放的 `HeaderValue::Redeemed`；三个请求写入点（`call`、`stream`、`list_models`）都只调它，谁都不自己遍历 `extra_headers`。
+- **`Endpoint` 的字段不出 `endpoint/`**：`config`／`client`／`redemption` 是 `pub(super)`；`transcribe` 走 `post_bytes` 与 `model()`。于是「一次 POST 如何发出、非 2xx 如何变成 `AxError`、对侧正文如何不被回显」在本 crate 里只有一份答案。转写面仍保留它自己那句恢复语（`rewrite_recovery`）：线上出了什么事是端点的事，人接下来能做什么是设施的事。
 
 **图的兑付面与两句拒绝**
 
-两型一构造面住新文件 `endpoint/redemption.rs`（`config.rs` 加完为 457 行，越了 400 行上限；切的理由不是行数而是职责：「一个端点在线上兑什么」与「一个端点配成什么样」各自变化）：
+两型一构造面住 `endpoint/redemption.rs`（切的理由是职责：「一个端点在线上兑什么」与「一个端点配成什么样」各自变化）：
 
 ```rust
 pub type ImageResolver = Arc<dyn Fn(&Locator) -> Result<Vec<u8>, AxError> + Send + Sync>;
@@ -222,8 +225,8 @@ impl Custodian {
     pub fn custody(&self) -> Custody;                          // 探测的结论：哪一家、能留多久、平台服务的原话
     pub fn set(&mut self, reference: &SecretRef, value: Zeroizing<String>) -> Result<(), AxError>;
                                     // 遮蔽即拒；空值即未配置；入参取 Zeroizing 非 Sealed：
-                                    // `.expose(` 白名单恒三文件（定义处＋两解封点），Custody 是库不是 sink——
-                                    // 持 Sealed 者恒密封直至线上；S4 PutSecret 在自己边界内转 Zeroizing。
+                                    // `.expose(` 只在 EXPOSE_WHITELIST 所列的解封点，Custody 是库不是 sink——
+                                    // 持 Sealed 者恒密封直至线上；PutSecret 命令在自己边界内转 Zeroizing。
     pub fn resolve(&self, reference: &SecretRef) -> Result<Sealed<String>, AxError>;   // 未命中→E_CREDENTIAL_MISSING；恒不跨操作缓存
     pub fn describe(&self, reference: &SecretRef) -> Described;                        // 恒不返回值
 }
@@ -233,8 +236,8 @@ impl Custodian {
 - **一次探测的结论是一个值，不是三个读取口**：哪一家、能留多久、平台服务自己说了什么，三答出自同一次往返——分成三处报就可能说出「平台服务能用」与「重启什么都没了」这一对让人无从下手的答案。`custody()` 从 `describe` 与 `resolve` 所读的那批字段铸出，故它说不出一个两个读口都没在用的 store；`refusal` 是平台服务自己的拒词，它成事时与本城自选时皆 `None`。
 - **Linux 存在内核 keyring，不存在 secret service，理由是发布产物。** 发布的 Linux 归档是一份静态 musl 二进制（`x86_64-unknown-linux-musl`），而 secret service 走 D-Bus，树因此另到 `libdbus-sys`，那要求链接宿主的 glibc D-Bus——一份静态二进制与一个 D-Bus 凭据库不能同时为真。故 keyring 的 Linux 特性取 `linux-native`（keyutils，纯 syscall，不需要会话总线、不需要动态库、容器里同样成立），不取 `sync-secret-service`。代价写在类型上而不是写在注释里：内核 keyring 是内存，重启即清，故 `KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`SOURCE` 恒为 `kernel-keyring`。
 - **等级只说一次，凡报它的地方都读同一处。** `Persistence::consequence()` 是「这个等级让人付出什么」的唯一权威句；`describe` 报状态（`source`＋`persistence`），`resolve` 未命中时把这句接在 recovery 后面——重启吃掉的 key 因此读作「重启清了内核 keyring，请再输一次」，而不是读作「你从来没配过」。探测成功不产 `provider_degraded`：Linux 上那是健康路径，每次启动报一条假警报只会让这个 kind 没人再读。
-- realm/name 由调用方给定，本模块不生成名字：订阅线走 `credentials::subscription` 的逐供应方定名，API key 走 S4 命令面的 `PutSecret`。**恒无计数器命名**——按捕获次序编号会让同一个值每场会话换一个名、两个值跨会话撞同一个名，于是旧账本里的引用兑到别人的凭据。一个值的短名若要由内容导出，口径只有 `runtime::redact::fingerprint` 一处。
-- OAuth 两流程（PKCE／设备码）＝代码：`pub fn oauth_begin(profile, …) -> RedirectPending` 与 `pub fn device_login_begin(profile, now_ms, timeout_ms) -> OauthPending`（§8-22），兑付分别是 `oauth_redeem` 与 `DeviceLogin::ask`。两条路的第二步都由 S4 命令面驱动，恒不在本 crate 里取时钟、取随机或替人等待。续期＝到期前 resolve 触发 refresh 构造。
+- realm/name 由调用方给定，本模块不生成名字：订阅线走 `credentials::subscription` 的逐供应方定名，API key 走 `PutSecret` 命令。**恒无计数器命名**——按捕获次序编号会让同一个值每场会话换一个名、两个值跨会话撞同一个名，于是旧账本里的引用兑到别人的凭据。一个值的短名若要由内容导出，口径只有 `runtime::redact::fingerprint` 一处。
+- OAuth 两流程（PKCE／设备码）＝代码：`pub fn oauth_begin(profile, …) -> RedirectPending` 与 `pub fn device_login_begin(profile, now_ms, timeout_ms) -> OauthPending`（§8-22），兑付分别是 `oauth_redeem` 与 `DeviceLogin::ask`。两条路的第二步都由命令面驱动，恒不在本 crate 里取时钟、取随机或替人等待。续期＝到期前 resolve 触发 refresh 构造。
 - 环境变量是只读来源（键形 `SPRAWLING_SECRET_<REALM>_<NAME>`）：`describe.writable=false`；`set` 撞遮蔽即拒并指名遮蔽者；读取器可注入（edition 2024 的 set_var 不安全，测试恒不改进程环境）。
 - A13 值正确性经真 Endpoint＋回环假服务在线断言（set→vault→resolve→写头，服务侧见原值）——credential 自身零 `.expose(`；PKCE 以 RFC 7636 Appendix B 向量钉实（S256，sha2 为外部协议事实非第二哈希权威）；base64url／percent-encode 自写纯函数；probe() 对真平台服务的验证属装配期人工清单（测试不擅动开发者凭证库）。
 
@@ -260,29 +263,27 @@ pub fn profile(provider: &str) -> Option<&'static OauthProfile>;   // 按 realm 
 ```
 
 - 内容自 `docs/third-party.md` §1 逐行指名并每日监视的上游路径（跟情报不跟代码）；上游变更检测是周任务不是 CI 门。缺项留空串——宁缺毋错，在 `oauth_begin` 处 fail-closed。
-- **四家一张表，键是 family**（叶子 14.3 / F-25 · §20.3 的定规：不 spawn、不 vendored、不装外部 CLI）。测试钉住「每个 `Family` 恰一行」与「每个 realm 恰一家」：少一行的那一家在界面上就是登不进去，两行共用一个 realm 就是把两个人的凭据存进同一格。
+- **四家一张表，键是 family**（定规：不起子进程、不内嵌上游代码、不装外部 CLI）。测试钉住「每个 `Family` 恰一行」与「每个 realm 恰一家」：少一行的那一家在界面上就是登不进去，两行共用一个 realm 就是把两个人的凭据存进同一格。
 - **流程读 grant 而不假定 grant**：`oauth_begin` 对 `DeviceCode` 一行三段式拒并指名它答的那种授权，因为按重定向的路子给设备码流程拼一个 URL，是在向厂商要一个它从未承诺的回跳。
-- **今天填到什么程度，逐行说清楚**（源见 `docs/third-party.md` §1 的监视路径，每一行读到上游哪个提交记在该节的 `Tracked to` 列）：
-  - `Codex`／realm `openai`：issuer `https://auth.openai.com`、`/oauth/authorize`、`/oauth/token`、六个 scope、client id 与回环回跳 `http://127.0.0.1:1455/auth/callback` 均取自被监视的 `codex-rs/login/`（`server.rs` 与上游登录管理器那个文件）。**回环回跳写 IPv4 回环字面量而不写 `localhost`**：RFC 8252 §8.3 不推荐 `localhost`，因为这个名字可能被解析到非回环接口，也可能被主机上的防火墙拦下；上游登录服务器发出的正是这个拼写，而回跳地址在授权请求与兑付请求里必须逐字节一致，所以本表跟它走。测试对表里每一个 `http://` 回跳断言其主机是回环 IP 字面量。`api_base` 为 `https://chatgpt.com/backend-api/codex`，取自被监视的 `codex-rs/model-provider-info/`：订阅态的每一种 auth mode 都选这个 base，`https://api.openai.com/v1` 只服务 API key。这个 base 答的是 responses 面，而 responses 笔已在 §8-20 落地，故本行填实——**一次登录完成即 attach，attach 用哪支笔由 `Family::Codex` 说了算**（§8-18），不再由 realm 词二次推断。
-  - `ClaudeCode`／realm `anthropic`：照旧，本城自己实现的那一份。
+- **每一行填到什么程度**（源见 `docs/third-party.md` §1 的监视路径，每一行读到上游哪个提交记在该节的 `Tracked to` 列）：
+  - `Codex`／realm `openai`：issuer `https://auth.openai.com`、`/oauth/authorize`、`/oauth/token`、六个 scope、client id 与回环回跳 `http://127.0.0.1:1455/auth/callback` 均取自被监视的 `codex-rs/login/`（`server.rs` 与上游登录管理器那个文件）。**回环回跳写 IPv4 回环字面量而不写 `localhost`**：RFC 8252 §8.3 不推荐 `localhost`，因为这个名字可能被解析到非回环接口，也可能被主机上的防火墙拦下；上游登录服务器发出的正是这个拼写，而回跳地址在授权请求与兑付请求里必须逐字节一致，所以本表跟它走。测试对表里每一个 `http://` 回跳断言其主机是回环 IP 字面量。`api_base` 为 `https://chatgpt.com/backend-api/codex`，取自被监视的 `codex-rs/model-provider-info/`：订阅态的每一种 auth mode 都选这个 base，`https://api.openai.com/v1` 只服务 API key。这个 base 答的是 responses 面，而 responses 笔见 §8-20，故本行填实——**一次登录完成即 attach，attach 用哪支笔由 `Family::Codex` 说了算**（§8-18），不由 realm 词二次推断。
+  - `ClaudeCode`／realm `anthropic`：本城自己实现的那一份。
   - `GrokBuild`／realm `xai`：**设备码那条路已填实，浏览器回跳那条仍空着**。被监视的 `crates/codegen/xai-grok-login/src/device_code.rs` 与同一 crate 的 `config.rs` 陈述了 issuer、client id、十个 scope、`https://auth.x.ai/oauth2/device/code` 与 `https://auth.x.ai/oauth2/token`，这几个常量不经 discovery 即可驱动，故本行以 `Grant::DeviceCode` 填实。`auth_endpoint` 留空是因为浏览器回跳那条路的 issuer 与回跳地址由运行时读到的 OIDC discovery 文档陈述，钉在这里就是给那份文档造第二个家。`api_base` 是厂商文档上的 `https://api.x.ai/v1`。
   - `KimiCli`／realm `kimi`：client id、`https://auth.kimi.com/api/oauth/device_authorization`、`https://auth.kimi.com/api/oauth/token` 与设备码授权取自被监视的 `src/kimi_cli/auth/oauth.py`；`api_base` 为 `https://api.kimi.com/coding/v1`，取自 `platforms.py` 的 Kimi Code 一行——**不是** `api.moonshot.cn`／`.ai`，那两个是按 key 计费的开放平台而不是订阅面。
-- **设备码登录已整条打通（叶子 14.3，本次落地），记法见 §8-22**；`xai` 与 `kimi` 两家因此与另外两家走同一条命令面，不再只能以 API key attach。**此处更正本节上一版记下的那条决定**：它要求 `channels::LoginStep` 增第三步，理由是「设备码登录的第二步人什么也粘不回来」。这条前提不成立——人手里有一样东西可以粘回来，就是城刚给他看的那个 user code。于是第二步不必新增：`Code { code }` 在设备码这家读作「我已在厂商页上同意，这是你给我看的那个码」，两种授权因此共用同一对命令步，客户端与 wire 一字未改。**没有跟着改的另一件要说清楚**：城不自行轮询，人按一次就问一次——在城的工作线程里替一个人等上半小时，会把整座城停在那里。RFC 8628 §3.5 的两条硬规则并没有因此松掉，它们由 `DeviceLogin` 在发送之前执行（见 §8-22）。**仍然缺的一件**：xAI 浏览器回跳那条路的 discovery 读取，它不改本表的形状。
+- **设备码登录整条打通，记法见 §8-22**；`xai` 与 `kimi` 两家与另外两家走同一条命令面。设备码登录不另设命令步：人手里有一样东西可以粘回来，就是城刚给他看的那个 user code，所以 `Code { code }` 在设备码这家读作「我已在厂商页上同意，这是你给我看的那个码」，两种授权因此共用同一对命令步。**城不自行轮询**：人按一次就问一次——在城的工作线程里替一个人等上半小时，会把整座城停在那里。RFC 8628 §3.5 的两条硬规则并没有因此松掉，它们由 `DeviceLogin` 在发送之前执行（见 §8-22）。**仍然缺的一件**：xAI 浏览器回跳那条路的 discovery 读取，它不改本表的形状。
 - **兑付真的发出去（credential＋oauth_profiles）**：`pub fn oauth_redeem(profile, pending, code, timeout_ms) -> Result<OauthTokens, AxError>` 真正把 POST 发出去，`OauthTokens { access, refresh, expires_in_s }` 两个密文恒裹在 `Zeroizing` 里且 `Debug` 手写成 `<redacted>`——`Zeroizing` 自己的 `Debug` 会打印明文，派生一个就等于把活令牌交给第一条格式化它的 panic 信息。**发送住 credential 而不住 endpoint**：本模块就是整条 OAuth 流程，把「造请求」与「发请求」分到两个模块，就是让一次兑付有两个权威。**拒词恒不引用对侧正文**：令牌端点的错误页里可能带着刚用过的 code。`OauthProfile` 增 `api_base`（该 provider 的 API 根，登录完成后据它自动 attach；空串＝fail-closed，与空端点同口径）。
 - **续期与兑付共用一次发送（credential）**：`oauth_refresh(profile, refresh: &Sealed<String>, timeout_ms)` 与兑付**共用一次发送**（`exchange::post_json`；设备码那条走同一模块的 `post_form`），故「拒词不引用对侧正文」只写一次、也只可能对一次。入参是 `Sealed<String>` 而不是 `&str`：明文只在**线前最后一格**出现，这与 endpoint 是同一类兑付点，故本文件同期进 `xtask secret` 的 expose 白名单——**放宽白名单而不是在调用点绕开它**，因为绕开的写法会让装配层持明文，而那正是这张名单存在的理由。
 - **回跳带回的是 `code#state`，两半各有各的去处（在 `credential::oauth_redeem_request` 执行）**：`redeemed_code(pasted, pending)` 按 `#` 拆开人粘回来的那一行，左半是去兑付的 code，右半在场即必须与 `pending.state` 逐字节相等，不等即 `E_INVALID_ARGS`。不拆就把整行当 code 发出去，provider 回一个 `invalid_grant`；不核对 state 就等于本进程接受了一次它没有发起过的回跳，而 OAuth 2.0 要求发过 state 的客户端必须核对它。右半缺席按「人只复制了 code」处理而不拒——这是回跳落在人自己浏览器里时的常态。**两句拒词恒不回显粘贴内容**：那一行里带着一个活的授权码。
 - **`state != code_verifier`（在 `credential::oauth_begin` 执行）**：两个值答的是不同的问题——verifier 证明「来兑的就是当初请求的那个客户端」，state 证明「这次回跳对应本进程发起的那次请求」。互用就是把一个证明做两遍、另一个一遍不做，且已有 provider 直接以 `400 invalid_grant` 拒。**在构造点拒而不交给接线的人记住**：这正是一份照上游抄来的实现会具有的形状。
-- **迁出为独立 crate：未做，理由写在这里**。迁出的前提是一个**仓库外**的、持自有许可的上游存在；它今天不存在。在本仓库里建一个「另一个许可的目录」只会同时得到两件坏事：MPL 头门要么被改得认不出它、要么给它戟上一顶不属于它的帽子，而两者都不是迁出。因此只做两件真实可做的：表缺失时恒三段式拒（已在），以及 NOTICE 义务归 `xtask` 的 `release` 门。
+- **不迁出为独立 crate**。迁出的前提是一个**仓库外**的、持自有许可的上游存在；它不存在。在本仓库里建一个「另一个许可的目录」只会同时得到两件坏事：MPL 头门要么被改得认不出它、要么给它戟上一顶不属于它的帽子，而两者都不是迁出。因此只做两件真实可做的：表缺失时恒三段式拒（已在），以及 NOTICE 义务归 `xtask` 的 `release` 门。
 
-### 8-6 gateway::admission —— 已删除（H-02，叶子 8.2）
+### 8-6 不设 provider 侧准入
 
-本模块连同 `AdmissionState`／`AdmissionVerdict`／`ProviderOutcome` 与四个 `ADMISSION_*` 常量一并删除，`lib.rs` 的三行导出同删。
+本 crate 没有并发上限与最小发起间隔的闸。一条没有调用者的缝是一份会与真路径分叉的第二权威，而线上每一次模型调用都不会去问它。
 
-**判定依据**：它在生产路径上一个调用者也没有——全树只有 `lib.rs` 的重导出与 `fallback` 对它的引用，而 `fallback` 自身同样无人调用。一条没有调用者的缝不是缝，是一份将来会与真路径分叉的第二权威：它写着「并发上限 4、最小间隔 250 ms」，而线上每一次模型调用都不问它。
+**要接时接在哪**：并发与最小发起间隔是对方计费的闸，接在 `runtime::run::drive` 的每次模型调用前后，状态随端点名住装配层的 run 工人。它的判定要把「名额占满」与「等到某一刻」分成两臂：一个可能已经过去的等待时刻会让调用方忙等。
 
-**它本该接在哪，写在这里，因为删除不等于这个问题没有了**：并发与最小发起间隔是对方计费的闸，要接就接在 `runtime::run::drive` 的每次模型调用前后（`admit` / `on_dispatch` / `on_outcome`），状态随端点名住 `RunWorker`。接的时候要一并修掉删除前就带着的缺陷：名额占满时 `admit` 返回的 `Hold { until: next_allowed_at }` 那个时刻可能已经过去，照它等待即忙等，所以 `AdmissionVerdict` 要把 `Saturated` 与 `Hold { until }` 分开。这份接线跨 `gateway`／`runtime`／`sprawling` 三个 crate，不在本片的文件边界内，故先删后接：git 里留着的实现比树上留着的空缝更诚实。
-
-**代价**：429 不再加宽间隔，`provider_degraded` 事件由 `E_PROVIDER` 的 carrier 产出而不再由退避判定产出。
+**代价**：429 的等待由对端的 `retry-after` 提示与 watchdog 的退避表给出（§12），`provider_degraded` 事件由 `E_PROVIDER` 的 carrier 产出。
 
 ### 8-7 gateway::market（形状 6 数据面＋快照）
 
@@ -340,39 +341,37 @@ pub fn attached_payload(&AttachedEndpoint) -> Result<Payload, AxError>;      // 
 pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> Result<Payload, AxError>;  // model_selected 同上
 ```
 
-- **一次取模型只答一问**：用哪个模型、在哪个端点上。「不答时怎么办」曾是第二问，随 §8-11 一并删除。
+- **一次取模型只答一问**：用哪个模型、在哪个端点上。「不答时怎么办」不是本 crate 的问题（§8-11）。
 - **三种不答，三个码**：这一类标签没人选过＝`E_MODEL_UNCHOSEN`（出路：去设置页接供应方、选模型）；选过的端点已不在＝`E_CONFIG_INVALID`；confidential 楼的选择会让字节离开运行中的机器＝`E_GATE_DENIED`。「没选」单独成码，因为它是一座新城的第一个状态，客户端要按码给「去设置」，而 `E_CONFIG_INVALID` 在别处还答「会话中途换了模型」，那里的出路是开新对话。
 
 - **为何不是 duty pool**：多 Agent 功能未成形之前，职责池没有消费者，而没人读的权威只会漂。降为 `ModelTag` 两值枚举（`Main`／`Digest`）：**标签因为有人按它取模型而存在**，新增一个标签的前提是先有调用方。
 - **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `apply_payload`（写入路径，手里是刚要写的 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
 - **confidential 在选型点再守一次**：非回环 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出运行中的机器」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
 - **路径归兼容格式**：人输入 base URL（provider 文档就是那么印的），`messages`／`chat/completions`／`models` 由兼容格式拼。这与 `EndpointConfig.base_url`「完整端点 URL、不拼路径」并不矛盾：适配器保持字面，拼路径的是上层登记面。
-- **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的 id 是对端自己说的；`false` ＝ 探测失败而人自己报了型号，城照登。载荷里缺 `probed` 键读作 `true`，于是本键之前写下的每一条 `endpoint_attached` 重放不变——**旧记录的含义没有改，改的是新记录能多说一句**。
-- **`AuthSpec::for_dialect` 是凭证头的唯一产地**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`，因为 config.rs 已 397 行、行数门限 400**：为了过门而把测试删短是拿门当对手，而「凭证头归兼容格式」本来就是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`bin::assembly::credentials::endpoints::endpoint_of`）不再自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
+- **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的 id 是对端自己说的；`false` ＝ 探测失败而人自己报了型号，城照登。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
+- **`AuthSpec::for_dialect` 是凭证头的唯一产地**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`**：「凭证头归兼容格式」是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`bin::assembly::credentials::endpoints::endpoint_of`）不自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
 
 ### 8-10 gateway::endpoint 探测面
 
 ```rust
-impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<String>, AxError>; }
+impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, AxError>; }
 ```
 
-两家一方都在 `GET .../models` 返回 `{"data":[{"id":..}]}`，**都不返回价目与 token 上限**——所以探测只取 id，两个 token 数字由人在登记时确认。探测与正式调用共用同一个兑付路径（`authorize`）：两套认证拼法就是两个权威，而漂开的总是没人看的那个。
+两家一方都在 `GET .../models` 返回 `{"data":[{"id":..}]}`，**都不返回价目**——探测取对端报出的事实（`ModelFacts`，§8-16），对端没报的 token 数字由人在登记时确认。探测与正式调用共用同一个兑付路径（`authorize`）：两套认证拼法就是两个权威，而漂开的总是没人看的那个。
 
-**探测不是登记的前提**。上一段的「两家都返回」只对那两家为真：网关与 Anthropic 兼容格式的第三方多半根本不服务 `/models`，于是一条本可用的线路被一个它从未承诺过的接口挡在城外。新规则三行：探测成功→按对端报的 id 收窄（旧行为不动，`probed=true`）；探测失败且人报了型号→按人报的登记（`probed=false`，并按 `effect` 级写一条诊断，点名探测的错——**登记确实发生了，被拒的只是探测**，用 `refuse` 级会说成这次登记被门拒了，那是假话）；探测失败且人没报型号→仍然拒绝，恢复语改为「把要用的 model id 报上来，再登记一次」，因为此时城手里一个可调用的名字都没有。
+**探测不是登记的前提**。上一段的「两家都返回」只对那两家为真：网关与 Anthropic 兼容格式的第三方多半根本不服务 `/models`，于是一条本可用的线路被一个它从未承诺过的接口挡在城外。三行规则：探测成功→按对端报的 id 收窄（`probed=true`）；探测失败且人报了型号→按人报的登记（`probed=false`，并按 `effect` 级写一条诊断，点名探测的错——**登记确实发生了，被拒的只是探测**，用 `refuse` 级会说成这次登记被门拒了，那是假话）；探测失败且人没报型号→仍然拒绝，恢复语改为「把要用的 model id 报上来，再登记一次」，因为此时城手里一个可调用的名字都没有。
 
 **四个参照实现一致**：pi、codex、opencode、Claude Code 都让人**声明**模型清单，发现是可选的（Claude Code 默认关闭、3 秒超时、失败静默）。把可选的发现当成必选的准入，是本仓自己加的限制，不是外部事实。
 
-**「路径归兼容格式」现在也管凭证头**：Anthropic 的 API key 走 `x-api-key`（`Authorization: Bearer` 只发给短时联邦令牌），OpenAI 兼容格式走 `Bearer`；人显式填的头名恒优先。见 §8-9 `AuthSpec::for_dialect`。落选的是「让登记页必填头名」：那把一个兼容格式自己就知道的事推给了人，而人填错的代价是一个 401。
+**「路径归兼容格式」也管凭证头**：Anthropic 的 API key 走 `x-api-key`（`Authorization: Bearer` 只发给短时联邦令牌），OpenAI 兼容格式走 `Bearer`；人显式填的头名恒优先。见 §8-9 `AuthSpec::for_dialect`。落选的是「让登记页必填头名」：那把一个兼容格式自己就知道的事推给了人，而人填错的代价是一个 401。
 
-**`adapter_for` 住 `endpoint/adapter.rs`**：装配线（每个 chosen 造一个 Endpoint，§8-3）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。调用期限不再是这里的常量：它是 `EndpointTuning::DEFAULTS.timeout_ms`（§8-16），`adapter_for` 读 `call_timeout_ms()`——一个默认值该住在它所默认的那个设置旁边。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（兼容格式要的头是兼容格式的事，搬家留待日后：`dialect_headers` 住凭据是历史位置，此处只动 adapter 线）。
+**`adapter_for` 住 `endpoint/adapter.rs`**：装配线（每个 chosen 造一个 Endpoint，§8-3）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。调用期限是 `EndpointTuning::DEFAULTS.timeout_ms`（§8-16），`adapter_for` 读 `call_timeout_ms()`——一个默认值该住在它所默认的那个设置旁边。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（它住装配层的凭据簇 `crates/sprawling/src/assembly/credentials.rs`；兼容格式要的头按理是兼容格式的事，是否搬进本 crate 未定）。
 
-### 8-11 gateway::fallback —— 已删除（H-02，叶子 8.2）
+### 8-11 不设备用端点
 
-本模块连同 `Fallback`／`Retreat`／`retreat_payload`、`Chosen.fallback`、`Choice.fallback` 与 `selected_payload` 的 `fallback_endpoint`／`fallback_model` 两个键一并删除；`Settled` 随之消失，`selected_payload` 直接收 `ceiling_from: Option<CeilingSource>`。
+一个标签只选一个端点与一个模型；`selected_payload` 直接收 `ceiling_from: Option<CeilingSource>`。线上没有设备用端点的字段，而一个在生产里只有一臂的「两臂的值」，另一臂就是给一个还不存在的设置面预留的权威。**带 `fallback_endpoint`／`fallback_model` 键的记录照样读得回**：`read_choice` 不取这两个键，与它对待任何本书不拥有的键同一口径，测试钉住「带着这两个键的 `model_selected` 仍读成它所述的那次选择」。
 
-**判定依据**：`Fallback::Then` 在生产里写不出来——线上没有设它的字段，装配层恒写 `Fallback::None`，`retreat` 与 `retreat_payload` 零调用者。于是一个「两臂的值」在生产里只有一臂，另一臂是给一个还不存在的设置面预留的权威。**旧记录仍读得回**：`read_choice` 对这两个键不再取值，与它对待任何本书不拥有的键同一口径，测试钉住「带着退避键的 `model_selected` 仍读成它所述的那次选择」。
-
-**要重新长出来的条件**：设置面上真有人能为一个标签指定备用端点与备用模型，且 `runtime` 侧有一处在失败时读它。那一天它连同 §8-6 的退避一起回来，而不是单独回来——`MoveTo.not_before` 的唯一来源是退避阶梯。
+**重开的参数**：设置面上有人能为一个标签指定备用端点与备用模型，且 `runtime` 侧有一处在失败时读它。那时备用端点与 §8-6 的准入一起设计，因为何时改投备用端点只能由退避节奏回答。
 
 ### 8-12 gateway::transcribe（`transcriber` 形状 4 适配器，`recording` 形状 2 值，`wire` 形状 1 判定）
 
@@ -414,11 +413,11 @@ impl Transcriber {
 
 **没配就是一句具名的拒绝，不是一个空串。** `Transcriber::absent()` 上的 `transcribe` 恒返回三段式 `E_TOOL_UNAVAILABLE`：action ＝ `transcribe a recording`，subject ＝ `this city has no transcription endpoint attached`，recovery 指出两条人能立刻做的路（登记一个服务 `audio/transcriptions` 的 endpoint，或者改用打字）。**为何复用 `E_TOOL_UNAVAILABLE` 而不新增一码**：基表里这一码的语义正是「这次部署里没有这项设施」，而 `E_CONFIG_INVALID` 会说成人填错了什么——什么都没填错，这项设施本就是可选的；`E_BROWSER_UNAVAILABLE` 那样的专码属于模型会调用的 tool，转写不是 tool 而是界面设施。码表是 kernel 全城权威且按「能否定义掉」逐码守着，为一件已有码能如实表达的事把它撑大，就是给同一个事实立第二个名字。
 
-**凭据只有一条路，请求也只有一条。** `Transcriber` 内部持一个真的 `Endpoint`（`DialectKind::OpenAi`、`Redemption::without_images`、`pricing: None`），整次 POST 由 `Endpoint::post_bytes` 发（§8-2），认证头由 `Endpoint::authorize` 写——与聊天调用、与 `list_models` 探测是同一格兑付。头名由 `AuthSpec::for_dialect` 定（§8-9），登记面不再自己在 Bearer 与具名头之间选。**恒不为转写开第二个持凭据的地方**：两处持凭据就是两处会漏。
+**凭据只有一条路，请求也只有一条。** `Transcriber` 内部持一个真的 `Endpoint`（`DialectKind::OpenAi`、`Redemption::without_images`、`pricing: None`），整次 POST 由 `Endpoint::post_bytes` 发（§8-2），认证头由 `Endpoint::authorize` 写——与聊天调用、与 `list_models` 探测是同一格兑付。头名由 `AuthSpec::for_dialect` 定（§8-9），登记面不自己在 Bearer 与具名头之间选。**恒不为转写开第二个持凭据的地方**：两处持凭据就是两处会漏。
 
 **哪个端点答这类活，由账本说了算，装配只有一处。** `transcriber_for` 与 `adapter_for` 是同一句话的两半：`EndpointBook::select` 给出 `Chosen`，这两个自由函数各自把那个选择变成一件可调用的设施。调用方自己拼一个 `TranscriberConfig`，就是给「base URL 与凭据在哪里合流」立第二个地点。**容器从 content-type 读而不从文件名猜**：`AudioType::of_media_type` 是那一步的唯一入口，认不得的容器当场拒。
 
-**路径归兼容格式。** 人填 base URL（provider 文档就那么印），`audio/transcriptions` 由 `transcribe::wire` 拼，拼法复用 `router::attached::join`（该函数因此升为 `pub(crate)`）——「base URL 加上兼容格式自己的路径」在城里只有一个算法。
+**路径归兼容格式。** 人填 base URL（provider 文档就那么印），`audio/transcriptions` 由 `transcribe::wire` 拼，拼法复用 `router::attached::join`（`pub(crate)`）——「base URL 加上兼容格式自己的路径」在城里只有一个算法。
 
 **多部分请求体自写，不引 reqwest 的 `multipart` feature。** 本 crate 自写线格式是既定选型（§8.5），而 `multipart/form-data` 只是两个字段加一条分界线；引 feature 要动根清单与 `Cargo.lock` 两个共享权威，换来的代码比自写的还多。分界线是**确定性的**：常量种子起头，只要它作为子串出现在录音里就加一个 `-` 再试，录音有限故必然终止；同一份 `(model, Recording)` 因此永远拼出同一串字节，重放能重推当时实发的请求。
 
@@ -436,7 +435,7 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 
 **为何 `Recording` 是值而不是一对参数**：字节与它的格式永远同行，且两条不变量（非空、不超 `RECORDING_MAX_BYTES`）只在 `new` 一处守；无 setter。**为何 `wire` 与 `transcriber` 分家**：「这段多部分请求体长什么样」是纯数据的判定、可逐字节断言，「怎么把它发出去并兑付凭据」要一个 socket——两件事变化的理由不同。
 
-**线上还没有这个动词。** 语音输入是前端功能而前端已冻结；本节只交付服务端半，故 `channels` 无新帧、`Command` 无新变体、wiring 门辖区不变。客户端要照着建的三件事是端点名、请求形与拒绝码。
+**线上的入口是 `channels` 的 `POST /transcribe`**（`crates/channels/src/reception/admission.rs`），经 `TranscribeSink` 交到这里；它不是 `Command` 的变体。
 
 ## 8.5 两个设计（crate 级）
 
@@ -446,7 +445,7 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 
 ## 9 工作流程
 
-回合层组 `ChatRequest`（prefix 四段＋窗口历史）→endpoint.call（dialect 翻译＋兑付＋HTTP）→cost.settle→model_returned 载荷（usage＋billed）→attribution（memory 侧）摊回。credential 独立线：启动 probe→set（S4 命令面或订阅登录写入）→resolve（组请求末格）。
+回合层组 `ChatRequest`（prefix 四段＋窗口历史）→endpoint.call（dialect 翻译＋兑付＋HTTP）→cost.settle→model_returned 载荷（usage＋billed）→attribution（memory 侧）摊回。credential 独立线：启动 probe→set（`PutSecret` 命令或订阅登录写入）→resolve（组请求末格）。
 
 ## 10 实现逻辑
 
@@ -454,13 +453,12 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 
 ## 11 边界枚举
 
-空 messages（合法：首轮）；空 tools（不写 tools 键）；SSE 半流（S3 非流式先行，流式只加）；429 携 retry-after；usage 缺席（取 0，CostSource=PriceSheet）；权威计费额为 0（合法，免费档）；base_url 尾斜线；overrides 指向不存在的路径（创建）；OAuth profile 字段空串（oauth_begin fail-closed）；Vault 探测三候选全败（会话内存＋provider_degraded）；遮蔽写入；空串凭证（视同未配置）。
+空 messages（合法：首轮）；空 tools（不写 tools 键）；SSE 半流（E_PROVIDER，不产部分 ModelReturn）；429 携 retry-after；usage 缺席（取 0，CostSource=PriceSheet）；权威计费额为 0（合法，免费档）；base_url 尾斜线；overrides 指向不存在的路径（创建）；OAuth profile 字段空串（oauth_begin fail-closed）；平台服务探测失败（会话内存＋provider_degraded）；遮蔽写入；空串凭证（视同未配置）。
 
 ## 12 Decisions
 
 - `E_PROVIDER`：不可定义掉——网络与对端是本 crate 的本质失败面；subject 写状态码与端点名，恒不含请求体。
 - **「能否再试一次」只有一个家：`endpoint::failure::ProviderFailure`**。调用点只说它看见了哪一种失败，retriable 与恢复语由该枚举一处给出，恒不在调用点第二次判定。往返未完成（send／execute／读体／读帧／静默超时）＝`Exchange`／`Cut`／`Silence`，按请求是否已经发出分两态（kernel 的三态 `Retry`）：连接没建起来的 `Exchange` 标 `Yes`，请求没有到达对端；其余标 `Unknown`，因为请求已经发出、回答丢了，对端也许已经算完并计了费，恢复语如实说出这一点。对端已答非 2xx＝`Refused`，按状态码分两类：408（对端等请求等到超时）、429（限流）、5xx（含 Anthropic 的 529 过载）是对端说「现在忙或坏了」，同一请求稍后可能成功，标 `retriable`，恢复语说由 watchdog 退避后再问；其余 4xx 是对端说「这个请求本身不对」，不标，恢复语指向端点的模型名、凭证与兼容格式。body 形状不可读（`Unreadable`）与本侧 `.build()` 失败（`Unbuilt`，确定性重演同一失败）不标。retriable 只是 opt-in：退避节奏与上限住 runtime 的 watchdog，本 crate 不循环。对端在可重试的拒绝上给了等待时长时，`Refused` 把它带进 `AxError::retry_after_ms`（`ErrorDraft::retriable_after`）：先读 `retry-after-ms`（毫秒，OpenAI 发它），再读 `retry-after` 的秒数形式；HTTP 日期形式不读，落回 watchdog 自己的退避表，因为把日期换成时长要在本 crate 采样时钟，而时钟只在 `bin::assembly` 采样。读不成数的头同样不读，不报错：它只是一个提示，退避表本身已经成立。对端在已答 200 的流里报错＝`Reported { kind }`，三种兼容格式各有一种拼法：Anthropic 发 `type: error` 帧，`kind` 取 `error.type`；OpenAI chat 发一个带 `error` 对象而没有 `choices` 的块，`kind` 取 `error.code`，没有 code 时取 `error.type`（限流把类别放在 `type`、原因放在 `code`）；Responses 发 `type: error` 事件，`kind` 取顶层 `code`。分类只在 `ProviderFailure::retry` 一处：OpenAI 的 `server_error`、`rate_limit_exceeded` 与 Anthropic 的 `overloaded_error`、`api_error`、`rate_limit_error`、`timeout_error` 是对端说「现在忙或坏了」，标 `Yes`；其余（如 `insufficient_quota`、`invalid_prompt`）不标。主题只点名那个类型，不引对端的 message，与 `Refused` 不引 body 同理。落选的是把它当作普通的流中断：那样对端说出的原因被丢掉，读者只看见「流没有说完」。流在给出停止原因之前结束（`mismatch::stream_cut`）标 `Unknown`，与 `Cut` 同理。
-- **「能否再试一次」只有一个家：`endpoint::failure::ProviderFailure`**。调用点只说它看见了哪一种失败，retriable 与恢复语由该枚举一处给出，恒不在调用点第二次判定。往返未完成（send／execute／读体／读帧／静默超时）＝`Exchange`／`Cut`／`Silence`，标 `retriable`。对端已答非 2xx＝`Refused`，按状态码分两类：408（对端等请求等到超时）、429（限流）、5xx（含 Anthropic 的 529 过载）是对端说「现在忙或坏了」，同一请求稍后可能成功，标 `retriable`，恢复语说由 watchdog 退避后再问；其余 4xx 是对端说「这个请求本身不对」，不标，恢复语指向端点的模型名、凭证与兼容格式。body 形状不可读（`Unreadable`）与本侧 `.build()` 失败（`Unbuilt`，确定性重演同一失败）不标。retriable 只是 opt-in：退避节奏与上限住 runtime 的 watchdog，本 crate 不循环。
 - **窗口溢出是自己的一族：`Overflow`**。对端以 400 或 413 拒绝、且拒词（小写比对）含 `context_length_exceeded`、`prompt is too long`、`maximum context length` 或 `context window` 之一，由 `ProviderFailure::refusal(url, status, &body)` 判为 `Overflow`，否则为 `Refused`；读不出拒词的拒绝只按状态码算 `Refused`。`Overflow` 不标 retriable（同一请求再发一遍同样放不下），恢复语写城里真有的出路：`/new --carry` 带着摘要开新会话，或换一个窗口更大的模型。`Refused` 的恢复语让人去查模型名、凭证与兼容格式，对溢出而言这三项都没错，照做只会改坏。对侧正文只读来分类，subject 仍只写 URL 与状态码，恒不回显。落选的是「只按 413 判溢出」：两家兼容格式都用 400 报窗口溢出，只看状态码会漏掉最常见的那一种。
 - `E_WIRE_MISMATCH`：不可定义掉——对端响应形状漂移是外部事实；subject 写键路径。
 - `E_ENDPOINT_DIALECT_UNSUPPORTED`：不可定义掉——用户可配任意 external provider，兼容格式探查失败必须可报。
@@ -470,22 +468,22 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 
 ## 13 依赖选型
 
-- `reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls-tls", "json"] }`——钉版表钉 rustls；blocking 理由见 §8.5。2026-08 复核：0.13.4 现行。
-- `keyring = "3"`——平台凭证服务绑定（B.7「平台凭证服务绑定」行）；MIT/Apache。
+- `reqwest`（workspace 依赖，`default-features = false`，features 以根 `Cargo.toml` 为准：`blocking`／`rustls`／`json`／`http2` 等）——TLS 钉 rustls；blocking 理由见 §8.5。
+- `keyring = "3"`——平台凭证服务绑定；MIT/Apache。
 - `secrecy`／`zeroize`：workspace 既钉。serde_json：wire 面。
-- **tokio 不引**（偏离 B.7 引入期列，理由 §3；S4 channels 首个真异步消费者时引入）。
+- **不引 tokio**：理由见 §3。
 
 ## 14 硬编码声明
 
-`transcribe::recording::RECORDING_MAX_BYTES = 25 MiB`（§8-12：OpenAI 音频面自己印的上限，provider 侧工程参数，非城策口径，不入 `consts_policy`；改须本 SPEC 同集）与 `wire::BOUNDARY_SEED`（同上，分界线种子）；`EndpointTuning::DEFAULTS` 三个默认值（§8-16，端点调优默认值的唯一住处，改须本 SPEC 同集）；oauth_profiles 表（§8-5，数据面即定义处）；market 内置目录（`builtin()`，S3 收录城内实际使用的模型行，价目随 Stage 复核）。三者全 pub(crate) 数据面，改动须本 SPEC 同集变更。
+`transcribe::recording::RECORDING_MAX_BYTES = 25 MiB`（§8-12：OpenAI 音频面自己印的上限，provider 侧工程参数，非城策口径，不入 `consts_policy`；改须本 SPEC 同集）与 `wire::BOUNDARY_SEED`（同上，分界线种子）；`EndpointTuning::DEFAULTS` 三个默认值（§8-16，端点调优默认值的唯一住处，改须本 SPEC 同集）；oauth_profiles 表（§8-5，数据面即定义处）；market 内置目录（`builtin()`，收录城内实际使用的模型行）。三者全 pub(crate) 数据面，改动须本 SPEC 同集变更。
 
 ## 15 影响面
 
-kernel::model 增 canonical 会话类型（kernel-SPEC §8-24 同集改；specalign 若辖新枚举则表同集落）；runtime 回合层消费 ChatRequest；memory::attribution 消费 model_returned 新载荷字段；citysim ScriptModel 改收 ChatRequest（同一缝）。
+kernel::model 持 canonical 会话类型（kernel-SPEC §8-24）；runtime 回合层消费 ChatRequest；memory::attribution 消费 model_returned 的 usage 与 billed 字段；citysim ScriptModel 收同一个 ChatRequest（同一缝）。
 
 ## 16 测试与约束
 
-golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返、usage 保值、断点位保序；endpoint 对回环假服务的状态码矩阵（200/429/500/截断体）；credential：内存 Vault 全流程＋探测注入；admission 重演等值；cost 权威胜出＋溢出拒绝。约束：clippy 零告警；无 `unwrap`；`.expose(` 只在 endpoint/call.rs。
+golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返、usage 保值、断点位保序；endpoint 对回环假服务的状态码矩阵（200/429/500/截断体）；credential：内存 Vault 全流程＋探测注入；cost 权威胜出＋溢出拒绝。约束：clippy 零告警；无 `unwrap`；`.expose(` 只在 `EXPOSE_WHITELIST` 所列文件。
 
 ## 17 模型体验
 
@@ -493,13 +491,13 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 
 ## 18 文档同步
 
-ARCHITECTURE §6 gateway 表逐行状态翻转；§6 接线台账登记（endpoint 生产消费者＝S3 回合层与 assembly；credential 消费者＝endpoint＋S4 PutSecret）；kernel-SPEC §8-24 同集改（落 canonical 类型时）；api-baseline 含 gateway 起算（SPEC 既存，apisync 自动入集）。
+模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 kernel-SPEC §8-24 同一变更集。endpoint 的生产消费者是 runtime 回合层与 `bin::assembly`；credential 的消费者是 endpoint 与 `PutSecret` 命令。
 
-### 逐字读一次调用（形状 3 适配器）
+### 8-13 逐字读一次调用（形状 3 适配器）
 
 `Endpoint` 覆盖 `Model::call_streaming`：请求带 `stream: true`，逐行读 `data:`，把每一帧交给 `dialect::increment_of`，最后 `dialect::settled_from_stream` 把收集到的帧重装成**这个 dialect 非流式的那个形状**，再交给同一个 `response_from_wire`。
 
-**「逐行」指的是响应体到达的节奏，而不是一个已经读完的字符串的行。** 先前的实现先 `response.text()` 把整个 body 读完，再在 `body.lines()` 的循环里逐条 `onto`——于是请求确实带了 `stream: true`、provider 确实分次答，而全部增量在模型已经停下之后的同一毫秒里一起发出。对一个真供应方的计时：`model_called` 在 1.9 s，25 条 delta 在 11.9 s 的同一毫秒，随后 `model_returned`。**改成把 `Response` 当 `std::io::Read` 包进 `BufReader` 逐行读**：一帧到达即交一帧。否决「把转发搬到 socket 任务那一层去查锁」：`to_watchers` 是非阻塞广播，帧压根没有到达那里，往下游找只会找到一个不存在的原因。**验收形式**：假供应方先写开头几帧并 flush，**然后等调用方回报「第一条增量已转出」才写剩下的**；读完再回放的实现永远回报不了，服务器自己就是断言，测试侧不读时钟。
+**「逐行」指的是响应体到达的节奏，而不是一个已经读完的字符串的行。** `Response` 当 `std::io::Read` 包进 `BufReader` 逐行读，一帧到达即交一帧；先把整个 body 读完再逐行转发，会让全部增量在模型停下之后的同一毫秒里一起发出。否决「把转发搬到 socket 任务那一层去查锁」：`to_watchers` 是非阻塞广播，帧压根没有到达那里，往下游找只会找到一个不存在的原因。**验收形式**：假供应方先写开头几帧并 flush，**然后等调用方回报「第一条增量已转出」才写剩下的**；读完再回放的实现永远回报不了，服务器自己就是断言，测试侧不读时钟。
 
 **结算答案只有一个解析器。** 直接把流读成 `ChatResponse` 会立刻长出第二个权威：同一个回复，流式路径与阻塞路径可能得出两个结论。重装成非流式形状是这条口径的全部实现。
 
