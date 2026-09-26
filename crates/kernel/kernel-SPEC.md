@@ -1008,7 +1008,7 @@ impl Pursuit {
     pub fn pause(&mut self);
     pub fn resume(&mut self);
 }
-pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Paused, Finished }
+pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Paused, Finished }  // 携 serde，内标签 kind
 pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> PursuitVerdict;
 ```
 
@@ -1017,6 +1017,7 @@ pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> Pursuit
 - **钱明确不是停机条件**。本仓的成本面受众是 Agent（给它优化的材料），不是刹车；一个读预算的停机条件回答的是一个这里没人问的问题。
 - **`observe` 收状态而不收 `Pursuit`**：判定不依赖目标说了什么，而一个必须先持有 `Pursuit` 才能发问的读者，等于要拿深度零位才能**读**这座城。**声明是被守的动作，看不是。**
 - **子代理拼不出来**：`declare` 收 `&Delegator`，而 `Delegate` 造不出一个（trybuild `delegate_declares_pursuit`）。与 `delegation` 同一个两层守卫，理由也同一个：一个能让全城通宵干活的子代理，就是一个能替你决定通宵干什么的子代理。
+- **`PursuitVerdict` 原样上线**：线上是 `{"kind":"work","next":"2.3"}` 这类内标签形状，`PursuitLine.verdict` 就是它。人读的那句话由客户端按 `kind` 从 `lang.json` 取词；城若在线上给一句英文，中文界面就只能照抄英文，而两边各写一份措辞就是同一句话的两个权威。
 - **pause 与 clear 是两件事，都要**：暂停留着目标，清除把它丢掉（丢掉值本身，于是不会被误恢复）。取消一个 **run** 是第三件事，住在 run 那边。
 
 ### 8-20 kernel::completion

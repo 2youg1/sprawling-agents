@@ -211,6 +211,22 @@
     "en": "pursue",
     "zh": "持续推进"
   },
+  "bld_pursuit_finished": {
+    "en": "finished: nothing is ready and nobody is working",
+    "zh": "已完成：没有就绪的活，也没有 run 在做"
+  },
+  "bld_pursuit_paused": {
+    "en": "paused",
+    "zh": "已暂停"
+  },
+  "bld_pursuit_waiting": {
+    "en": "waiting for {runs} run(s) still going",
+    "zh": "在等 {runs} 个还没结束的 run"
+  },
+  "bld_pursuit_working": {
+    "en": "working on {node}",
+    "zh": "正在做 {node}"
+  },
   "bld_release": {
     "en": "/release {addr}",
     "zh": "/release {addr}"

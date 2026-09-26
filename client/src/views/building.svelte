@@ -47,6 +47,7 @@
   import { QUERIES } from "../core/asking";
   import { halt, pursue, release } from "../core/commands";
   import { fill, say } from "../core/lang";
+  import { pursuitClause } from "../core/pursuit";
   import { roomOf, toFragment } from "../core/route";
   import { buildingIsShut } from "../core/scope";
   import { ui } from "../ui";
@@ -208,7 +209,7 @@
         ]}
       ></span>
       <span class="min-w-0 flex-1 truncate text-note text-text-quiet">{pursuit.goal}</span>
-      <span class="font-mono text-note text-text-disabled">{pursuit.verdict}</span>
+      <span class="font-mono text-note text-text-disabled">{pursuitClause($lang, pursuit.verdict)}</span>
       <Button
         label={pursuit.state === "running" ? say($lang, "bld_pause") : say($lang, "bld_resume")}
         tone="quiet"

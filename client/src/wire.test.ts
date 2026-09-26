@@ -80,7 +80,7 @@ describe("server frames", () => {
               ready: 1,
             },
           ],
-          pursuits: [{ addr: "acme", goal: "ship it", state: "running", verdict: "working on 2.3" }],
+          pursuits: [{ addr: "acme", goal: "ship it", state: "running", verdict: { kind: "work", next: "2.3" } }],
           halted: [],
         },
       },

@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 39 as const;
+export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94" as const;
+export const WIRE_HASH = "05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -488,6 +488,32 @@ export const PursuitState = Schema.Literal("running", "paused").annotations({ id
 export type PursuitState = typeof PursuitState.Type;
 
 /**
+ * What a city holding a pursuit does next. Exhaustive: every arm is
+ * something the caller has to do, and a fifth would be a state nobody
+ * wrote an action for.
+ * 
+ * Carries serde because the page says it: the wire holds the kind, and
+ * the client takes the words for each kind from its own `lang.json`.
+ */
+export const PursuitVerdict = Schema.Union(
+  Schema.Struct({
+    kind: Schema.Literal("work"),
+    next: NodeId,
+  }),
+  Schema.Struct({
+    in_flight: Schema.Int,
+    kind: Schema.Literal("waiting"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("paused"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("finished"),
+  }),
+).annotations({ identifier: "PursuitVerdict" });
+export type PursuitVerdict = typeof PursuitVerdict.Type;
+
+/**
  * A city's standing goal, if it has one.
  * 
  * `verdict` is the city's own reading of whether there is anything left
@@ -498,7 +524,7 @@ export const PursuitLine = Schema.Struct({
   addr: Address,
   goal: Schema.String,
   state: PursuitState,
-  verdict: Schema.String,
+  verdict: PursuitVerdict,
 }).annotations({ identifier: "PursuitLine" });
 export type PursuitLine = typeof PursuitLine.Type;
 

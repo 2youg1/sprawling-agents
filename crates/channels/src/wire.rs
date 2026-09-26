@@ -141,7 +141,9 @@ use serde::{Deserialize, Serialize};
 /// 39: `E_MODEL_UNCHOSEN` joins the error codes. A city with no model
 ///    chosen used to refuse with `E_CONFIG_INVALID`, whose recovery is a
 ///    new session; an older page would meet a code it cannot decode.
-pub const WIRE_V: u32 = 39;
+/// 40: a pursuit's verdict is the kernel's kind, not an English clause,
+///    so a page takes its words from its own language table.
+pub const WIRE_V: u32 = 40;
 mod query;
 
 pub use query::{QUERY_NAMES, Query};
