@@ -71,10 +71,10 @@ pub struct SecondDomain {
 /// What an endpoint that settled nothing is called with.
 ///
 /// **These are the gateway's figures, read out rather than restated.**
-/// The endpoint form used to ship its own three numbers as placeholder
-/// text, so an endpoint attached through the form and one attached by
-/// import behaved differently while the person had filled in nothing;
-/// the form now draws what this carries, and the numbers have one home.
+/// A form that shipped its own numbers as placeholder text would make
+/// an endpoint attached through the form and one attached by import
+/// behave differently while the person had filled in nothing; the form
+/// draws what this carries, and the numbers have one home.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TuningDefaults {

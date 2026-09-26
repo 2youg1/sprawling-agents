@@ -14,10 +14,10 @@
 //! [`Command::PutPreferences`](crate::Command).
 //!
 //! **Every value set a selector offers is declared once, here.** A
-//! browser used to hold its own list of the words it would accept, so
-//! an option the city stopped offering stayed pickable until somebody
-//! noticed; the client now reads these enums out of the generated
-//! schema, and an option it can draw is an option this build can load.
+//! browser holding its own list of the words it would accept would keep
+//! an option the city stopped offering pickable until somebody noticed;
+//! the client reads these enums out of the generated schema, so an
+//! option it can draw is an option this build can load.
 //!
 //! One named change per fact rather than one whole-record write: two
 //! screens that each settle one thing must not be able to overwrite
@@ -283,8 +283,8 @@ mod tests {
         assert_eq!(back, PreferencePatch::Lang(Lang::Zh));
     }
 
-    /// The silent repair this type exists to delete: a word no build
-    /// offers used to become the posture the client ships with.
+    /// No silent repair: a word no build offers is not turned into the
+    /// posture the client ships with.
     #[test]
     fn a_word_no_build_offers_is_refused_rather_than_repaired() {
         assert!(serde_json::from_str::<Lighting>("\"sepia\"").is_err());

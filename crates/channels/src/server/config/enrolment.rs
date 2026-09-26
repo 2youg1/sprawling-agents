@@ -45,7 +45,7 @@ pub(super) async fn accept_enrolment(
     // One place decides whether a realm and a name name a vault place,
     // and this route asks it rather than spelling `secret:<realm>/<name>`
     // itself: text assembled here could name a place no later reader
-    // resolves, and the 201 answered with that text (roadmap M-22).
+    // resolves, and the 201 would answer with that text.
     let place = match SecretRef::new(&realm, &name) {
         Ok(place) => place,
         Err(err) => {

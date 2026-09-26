@@ -144,8 +144,8 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                     // A slow client does not hold the writer back: the
                     // subscription leaves it behind and the Ledger answers
                     // the range it lost. It is told which range that is, so
-                    // it can ask; before this, the middle of the stream
-                    // vanished and nothing said so.
+                    // it can ask rather than lose the middle of the
+                    // stream in silence.
                     Err(broadcast::error::RecvError::Lagged(_)) => {
                         stream = stream.skipped(phase == SessionState::Live);
                     }

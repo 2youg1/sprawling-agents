@@ -30,8 +30,8 @@ pub enum Query {
     /// or at the tail when that is absent.
     ///
     /// The server broadcasts what happens next and never what happened,
-    /// so a page opened today saw a city that had been running for a
-    /// month as an empty one. Bounded because the whole ledger is not a
+    /// so a page that only listened would see a city that had been
+    /// running for a month as an empty one. Bounded because the whole ledger is not a
     /// thing to put on a socket, and paged backwards because what a
     /// reader wants first is the end.
     History {
@@ -168,9 +168,8 @@ pub enum Query {
     /// draw a session without reimplementing the fold.
     ///
     /// Bounded by [`HISTORY_MAX`](crate::HISTORY_MAX) records, which is
-    /// the same slice the client used to ask for with
-    /// [`Query::RunHistory`]: moving the fold must not quietly change
-    /// how much of a session it can see.
+    /// the same slice [`Query::RunHistory`] answers: where the fold runs
+    /// must not change how much of a session it can see.
     Rounds {
         run: RunId,
     },
@@ -195,8 +194,7 @@ pub enum Query {
     /// One directory of the city, one level deep; `None` is the root.
     ///
     /// The tree is the product - a building is a directory and a room
-    /// is one inside it - and until this existed nothing on the wire
-    /// could open a room. One level per question, so looking at a room
+    /// is one inside it - and this is the frame that opens a room. One level per question, so looking at a room
     /// never pays for the ledger segments beside it.
     Listing {
         at: Option<Address>,

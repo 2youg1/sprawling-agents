@@ -7,16 +7,13 @@
 //! the enum, the name of each variant, and the table the schema hash is
 //! built from.
 //!
-//! **A frame's spelling used to have three homes.** The variant said
-//! `RunHistory`, a hand-written `match` arm said `"RunHistory"`, and a
-//! hand-written array said `"RunHistory"` a third time; the handshake
-//! hash read only the array. An exhaustive `match` stops a new variant
-//! from compiling without a name, and stops nothing at all about a new
-//! variant missing from the array — so the array was guarded by a test
-//! that listed every variant a fourth time, and by two counts written
-//! as literals. This macro deletes all of that: the variant list is the
-//! only place a frame is spelled, and the table cannot disagree with it
-//! because the table is the list.
+//! **A frame's spelling has one home.** A variant, a hand-written
+//! `match` arm and a hand-written array would spell `RunHistory` three
+//! times, and the handshake hash reads only the array; an exhaustive
+//! `match` stops a new variant from compiling without a name and stops
+//! nothing about a new variant missing from the array. Here the variant
+//! list is the only place a frame is spelled, and the table cannot
+//! disagree with it because the table is the list.
 //!
 //! **The table is in declaration order**, which is the order the
 //! handshake hash mixes the names in. Moving a variant therefore

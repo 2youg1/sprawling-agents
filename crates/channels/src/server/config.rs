@@ -237,10 +237,10 @@ pub struct AcpProgress {
 /// reads a field out of it.** The grammar of an inbound request is
 /// `protocol::Incoming`, whose `parse` is the only constructor and
 /// therefore the only place the rules about it hold; a struct here
-/// with the same four fields used to be deserialized first and copied
-/// across field by field, which left `parse` with no caller outside
-/// its own tests and carried the plaintext token into a value that
-/// derives `Debug`. The token is read where it is judged, below, and
+/// with the same four fields, deserialized first and copied across
+/// field by field, would leave `parse` with no caller outside its own
+/// tests and carry the plaintext token into a value that derives
+/// `Debug`. The token is read where it is judged, below, and
 /// travels no further.
 pub type AcpSink =
     Arc<dyn Fn(&serde_json::Value, Pairing) -> Result<AcpProgress, AxError> + Send + Sync>;

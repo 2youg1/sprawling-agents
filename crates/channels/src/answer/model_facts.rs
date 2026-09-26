@@ -10,12 +10,10 @@ use serde::{Deserialize, Serialize};
 
 /// One model an endpoint serves, with what the endpoint said about it.
 ///
-/// **An endpoint's list used to arrive as bare ids.** Everything the
-/// provider stated beside each id — the window, the ceiling, what the
-/// model accepts, what it costs — was read at attach, used once to
-/// settle a ceiling, and then dropped, so a person choosing a model saw
-/// a name and nothing to choose by. This is that statement, carried to
-/// the page that shows the list.
+/// **An endpoint's list is more than bare ids.** Everything the
+/// provider states beside each id — the window, the ceiling, what the
+/// model accepts, what it costs — is what a person chooses a model by.
+/// This is that statement, carried to the page that shows the list.
 ///
 /// **Every field is what the upstream said, not what this city
 /// concluded.** Absence means the row said nothing; it never means

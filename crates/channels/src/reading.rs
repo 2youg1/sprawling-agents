@@ -43,10 +43,9 @@ pub fn said_in(message: &serde_json::Value) -> Option<String> {
 
 /// What the model thought, out of the same message.
 ///
-/// **This used to be withheld, and the reason it was no longer holds.**
-/// Thinking blocks are carried end to end because the provider verifies
-/// the signature it issued against them, and that made them look like
-/// transport rather than content. For a model that spends most of a
+/// **Answered, although the blocks look like transport.** Thinking
+/// blocks are carried end to end because the provider verifies the
+/// signature it issued against them. For a model that spends most of a
 /// call reasoning, withholding them leaves a person watching an empty
 /// thread for minutes and then reading two sentences - so the reasoning
 /// is answered as its own field, and the page folds it away beside the
