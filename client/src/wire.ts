@@ -3014,6 +3014,7 @@ export type LogLine = typeof LogLine.Type;
  */
 export const Welcome = Schema.Struct({
   city: Schema.optional(Schema.NullOr(Address)),
+  epoch: Schema.optional(Schema.NullOr(B3Hash)),
   resume_from: Schema.optional(Schema.NullOr(Seq)),
   schema: B3Hash,
   wire_v: Schema.Int,

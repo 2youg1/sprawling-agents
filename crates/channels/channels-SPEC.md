@@ -23,6 +23,7 @@
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
   **当前 golden**：`655d38fee9b266e84681324441296e8106975927f9c6939fa1e5c2620320e72c`；**WIRE_V ＝ 40**（`CityAnswer.runs` 只带活跃的跑与最近冻结的几个 → sprawling-SPEC §8-90；按名字问旧跑花了多少 `Query::RunCosts` → §8-21；错误码 `E_MODEL_UNCHOSEN` → kernel-SPEC `AxCode`；事件种类 `rules_changed` → kernel-SPEC §8-4；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   **当前 golden**：`05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7`；**WIRE_V ＝ 40**（事件种类 `rules_changed` → kernel-SPEC §8-4；问与答按 `ask_id` 配对、答带 `as_of` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 38**（回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -49,6 +50,7 @@
 - **`control` 自持鉴权与幂等，独立成模块**。ARCHITECTURE §6 预留了「做不到则并入 server」的退路，这里不需要它：`control` 持有一条 `server` 不知道也不该知道的策略——**哪些 Command 是干预，以及一次干预必须留下什么**（「任何中断都以 Handoff 收尾，下一位拿得到完整现场」）。那是判定，不是转调。
 - **`auth` 收回了一块放错位置的逻辑**：常数时间比较曾写在 `server` 里，那是因为 `auth` 尚未建。令牌的**整个生命周期**（铸造、展示形、摘要、比对）收进 `auth`，`server::decide_handshake` 改为调用它。这不是重构的赔罪，是模块建成后把属于它的东西放回去。
 - **Signal 不在 Command 面**：`Attach{notify}` 产 Signal，但 Signal 的投递与消费住 `collab::inbox`。channels 只是产地。
+- **`Welcome.resume_from` 读自 `LedgerHead`，`Welcome.epoch` 是创世记录的链哈希**：`decide_frame` 的第四个参数是 `WelcomeFacts { city, head, epoch }`——城名、账本头与 epoch 合成一个值，因为 `decide_frame` 已占满 4 个参数。`LedgerHead` 是 `ServeConfig.head` 递进来的一个 `AtomicU64`：装配层以重建视图时读到的最后一条记录的 `seq` 起头，折叠线程在每条记录**广播之前**把头推到它的 `seq`，socket 在 hello 时读一次。头放在原子量里而不放在视图锁里，因为读者可能长时间持有视图，而 hello 跑在 tokio 任务上，读头只是一次 Acquire load。先推头、后广播，加上会话在 hello 之前已订阅事件流，保证 `resume_from` 之后的记录必在流上：头之前而在订阅之后广播的记录会同时出现在流上与补拉里，所以边界上只可能重复、不可能缺失。`epoch` 是 `kernel::ledger::chain_hash(创世行)`，装配层在重建视图时读一次，由 `ServeConfig.epoch` 递进来：同一份账本的 epoch 永不改变，换了账本（重新 init、换了城目录）epoch 必变，所以客户端见到与上次不同的 epoch 就丢弃 belief、按快照重建，而不是拿旧水位去新账本里补拉。
 
 ## 4 现状分析
 
@@ -133,7 +135,8 @@ pub fn schema_hash() -> B3Hash;        // blake3("sprawling/wire/" || WIRE_V 小
 pub enum ClientFrame { Hello(Hello), Command(Box<Command>), Query(Query) }
 pub enum ServerFrame { Welcome(Welcome), Event(Box<EventRecord>), Reply(Box<Reply>), Refusal(Box<AxError>) }
 pub struct Hello   { pub wire_v: u32, pub schema: B3Hash, pub token: Option<Sealed<String>> }
-pub struct Welcome { pub wire_v: u32, pub schema: B3Hash, pub resume_from: Option<Seq> }
+pub struct Welcome { pub wire_v: u32, pub schema: B3Hash, pub resume_from: Option<Seq>, pub city: Option<Address>, pub epoch: Option<B3Hash> }
+// resume_from：账本头（最后广播的记录）的 seq，读自 ServeConfig.head: Arc<LedgerHead>；客户端据此把断线期间的缺口经 HistoryRange 补齐（client-SPEC 4-39）。
 ```
 
 **三个形状决定及其理由**：

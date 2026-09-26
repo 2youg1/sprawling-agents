@@ -141,6 +141,8 @@ export interface BeliefStore {
   readonly refused: (error: AxError | null) => void;
   readonly named: (city: string | null) => void;
   readonly noticesSeen: () => void;
+  // Drops every fold: what the page held came from another ledger.
+  readonly forget: () => void;
   // Runs `folds` and tells subscribers once, after the last of them:
   // a burst of records between two paints is one update and one paint.
   // Batches nest; only the outermost one publishes.
@@ -152,7 +154,7 @@ export function createBelief(now: () => number): BeliefStore {
   // subscribers about it. They differ only inside a batch; reading the
   // local rather than the store keeps a fold from subscribing and
   // unsubscribing once per record.
-  let current: Belief = {
+  const empty = (): Belief => ({
     runs: runTable({}),
     live: [],
     rooms: new Map(),
@@ -165,7 +167,8 @@ export function createBelief(now: () => number): BeliefStore {
     sessions: {},
     probed: null,
     logs: [],
-  };
+  });
+  let current: Belief = empty();
   const store = writable<Belief>(current);
   let depth = 0;
 
@@ -388,5 +391,9 @@ export function createBelief(now: () => number): BeliefStore {
     written({ ...held, notices: held.notices.map((each) => ({ ...each, seen: true })) });
   }
 
-  return { belief: store, adoptCity, apply, say, logged, refused, named, noticesSeen, batch };
+  function forget(): void {
+    written(empty());
+  }
+
+  return { belief: store, adoptCity, apply, say, logged, refused, named, noticesSeen, forget, batch };
 }

@@ -321,6 +321,7 @@ mod tests {
                         schema: channels::schema_hash(),
                         resume_from: None,
                         city: None,
+                        epoch: None,
                     }))
                     .unwrap();
                 socket.send(Message::Text(welcome.into())).await.unwrap();
@@ -373,6 +374,7 @@ mod tests {
                         schema: channels::schema_hash(),
                         resume_from: None,
                         city: None,
+                        epoch: None,
                     }),
                     channels::ServerFrame::Answered(Box::new(channels::Answered {
                         ask_id: channels::AskId(1),

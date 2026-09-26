@@ -30,7 +30,7 @@ use std::time::Duration;
 use kernel::{AxCode, AxError, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
-use super::folding::{Folding, spawn_folding};
+use super::folding::{Broadcast, Folding, spawn_folding};
 use super::relay::Patience;
 use super::serve::Opening;
 use crate::assembly::{RunWorker, Serving, now_ms};
@@ -47,6 +47,7 @@ pub(super) struct Outward {
     pub(super) views: Arc<std::sync::Mutex<Views>>,
     pub(super) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
     pub(super) to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
+    pub(super) head: Arc<channels::LedgerHead>,
 }
 
 /// The thread, and the one thing it opens that something else needs.
@@ -76,6 +77,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         views,
         to_clients,
         to_watchers,
+        head,
     } = outward;
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
@@ -84,7 +86,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         observer,
         machine,
         thread: fold_thread,
-    } = spawn_folding(views, to_clients)?;
+    } = spawn_folding(views, Broadcast { to_clients, head })?;
     // The one sanctioned thread besides the runtime's own. The ledger was
     // opened, its writer lock taken, before the history was folded; it
     // moves into this thread and never leaves: a city has one writer.

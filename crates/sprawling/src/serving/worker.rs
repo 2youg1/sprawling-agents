@@ -164,6 +164,10 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         Arc::new(move |query: channels::Query| answer_outside_the_lock(&query_views, &query));
     // Read once, at startup, from the views the ledger just rebuilt.
     let city_name = views.lock().ok().and_then(|views| views.city());
+    let epoch = views.lock().ok().and_then(|views| views.epoch());
+    let head = Arc::new(channels::LedgerHead::at(
+        views.lock().ok().and_then(|views| views.head()),
+    ));
     // The in-process Command set, not the wire one: the enrolment
     // route delivers a sealed credential here, and no wire frame can.
     let desk = Arc::new(CommandDesk::new());
@@ -193,6 +197,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             views: Arc::clone(&views),
             to_clients: events.clone(),
             to_watchers: deltas.clone(),
+            head: Arc::clone(&head),
         },
     )?;
 
@@ -217,6 +222,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         deltas,
         logs,
         city: city_name,
+        head,
+        epoch,
         secrets: Arc::new(move |command: channels::Command, reply: channels::Reply| {
             // The route waits for whichever comes first, so the
             // reply address is the credential's own request rather

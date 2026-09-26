@@ -92,7 +92,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 40,
+        WIRE_V, 41,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
@@ -116,7 +116,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "655d38fee9b266e84681324441296e8106975927f9c6939fa1e5c2620320e72c";
+const WIRE_SCHEMA_GOLDEN: &str = "c4a706cc4bcb1ff98458fc905bbb6c6838b8a79ad39e7676a4afade62d02fdc5";
 
 // -------------------------------------------------------------- binding face
 
@@ -172,6 +172,7 @@ fn a_mismatched_schema_hash_is_rejected_before_anything_else() {
         schema: schema_hash(),
         resume_from: Some(Seq::new(7)),
         city: None,
+        epoch: None,
     };
     assert!(matches!(
         decide_handshake(&good, &expected, &loose()),
@@ -204,6 +205,7 @@ fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
         schema: schema_hash(),
         resume_from: None,
         city: None,
+        epoch: None,
     };
     let secret = kernel::B3Hash::digest(b"pair-me-0123456789");
     let paired = BindFace::Exposed { token: secret };

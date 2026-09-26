@@ -102,7 +102,11 @@ pub struct Hello {
 pub struct Welcome {
     pub wire_v: u32,
     pub schema: B3Hash,
-    /// Where the Event stream resumes, so a reconnect leaves no gap.
+    /// The seq of the last record the city had broadcast when this welcome
+    /// was sent. Every later record follows on the live stream, so a
+    /// client that reconnects fetches the records after its own mark up to
+    /// and including this seq; a record at the boundary may arrive twice,
+    /// and none arrives not at all.
     pub resume_from: Option<Seq>,
     /// Which city answered. The handshake is where a connection learns
     /// whose city it is: the name is in the Ledger's first record, and a
@@ -110,6 +114,10 @@ pub struct Welcome {
     /// have to display "no city" over a city that has been running for a
     /// month.
     pub city: Option<Address>,
+    /// Which ledger answered: the chain hash of its first line. A client
+    /// whose mark came from a welcome with another epoch holds positions
+    /// in a different history, and rebuilds rather than resumes.
+    pub epoch: Option<B3Hash>,
 }
 
 /// Everything a client may send.
