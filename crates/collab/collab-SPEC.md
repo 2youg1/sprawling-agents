@@ -143,7 +143,9 @@ impl Workshop {
     pub fn new(contracts: Vec<NodeContract>) -> Result<Workshop, AxError>;  // 重名／悬空依赖／环，三者在构造点拒
     pub fn schedule(&self) -> Vec<NodeId>;                                  // 确定性：同图同序
     pub fn ready(&self, done: &BTreeSet<NodeId>) -> Vec<NodeId>;            // 可并行者即扇出
+    pub fn split(&self, done: &BTreeSet<NodeId>) -> LaidOut;                // schedule／handed = ready(done)／waiting
 }
+pub struct LaidOut { pub schedule: Vec<NodeId>, pub handed: Vec<NodeId>, pub waiting: Vec<NodeId> }
 ```
 
 - **调度确定性是判负与重放的前提**：有序集合＋按 id 破平，故交付顺序不同也排出同一序。环在构造点拒并点名——一个存在的 Workshop 是一个跑得完的 Workshop。
@@ -159,7 +161,7 @@ pub struct WorkshopDesk { /* who、laid_out: Option<Workshop>、joined: FanIn �
 impl WorkshopDesk {
     pub fn new(who: String, joined: FanIn) -> WorkshopDesk;
     pub fn lay_out(&mut self, contracts: Vec<NodeContract>, delegates: &mut DelegateDesk)
-        -> Result<Vec<NodeId>, AxError>;         // 只派 ready(已汇合的节点) 那一组，按 id 序
+        -> Result<LaidOut, AxError>;             // 只派 split(已汇合的节点).handed，按 id 序
     pub fn question(&self) -> Result<PrivateQuestion, AxError>;
     pub fn judge(&self, answer: &str) -> Result<Joined, AxError>;
     pub fn accept(&mut self, artifact: Artifact);

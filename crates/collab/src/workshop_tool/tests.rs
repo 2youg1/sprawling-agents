@@ -76,10 +76,7 @@ fn joined(room: &str) -> Artifact {
 #[test]
 fn only_the_nodes_whose_dependencies_have_joined_are_handed_down() {
     let (mut first, _desk, delegates) = tool();
-    let graph = serde_json::json!([
-        node("lab/writer", &["lab/reader"]),
-        node("lab/reader", &[]),
-    ]);
+    let graph = serde_json::json!([node("lab/writer", &["lab/reader"]), node("lab/reader", &[]),]);
     let outcome = first.invoke(&lay_out(graph.clone())).unwrap();
     let handed = delegates.lock().unwrap().take();
     let rooms: Vec<&str> = handed.iter().map(|work| work.room.as_str()).collect();

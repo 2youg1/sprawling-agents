@@ -9,8 +9,8 @@
 //! Three verbs, because three different things happen. `lay_out` turns a
 //! list of nodes into a graph that can finish - duplicates, dangling
 //! dependencies and cycles are refused at construction, so a workshop
-//! that exists is one that terminates - and hands each node down in
-//! schedule order. `question` asks what the join wants answered before
+//! that exists is one that terminates - and hands down the nodes whose
+//! dependencies have already joined. `question` asks what the join wants answered before
 //! anybody may judge it. `judge` answers it.
 //!
 //! **Nothing here starts a run and nothing here decides who may.** Every
@@ -33,7 +33,7 @@ use serde_json::{Map, Value};
 
 use crate::delegate_tool::{DelegateDesk, Delegated};
 use crate::fanin::{Artifact, FanIn, Joined, PrivateQuestion};
-use crate::workshop::{NodeContract, NodeId, Workshop};
+use crate::workshop::{LaidOut, NodeContract, NodeId, Workshop};
 
 /// One run's workshop: the graph it laid out, and what has come back to
 /// the room it works in.
@@ -57,8 +57,10 @@ impl WorkshopDesk {
         }
     }
 
-    /// Accepts a graph and hands every node down, in the order the graph
-    /// itself decides.
+    /// Accepts a graph and hands down its ready set: the nodes whose
+    /// dependencies this room's join already holds. A node started before
+    /// its dependency hands back would read an output that does not
+    /// exist yet, so it waits for a later run to lay the graph out again.
     ///
     /// # Errors
     /// Propagates the graph's own refusals - a duplicate id, a
@@ -70,7 +72,7 @@ impl WorkshopDesk {
         &mut self,
         contracts: Vec<NodeContract>,
         delegates: &mut DelegateDesk,
-    ) -> Result<Vec<NodeId>, AxError> {
+    ) -> Result<LaidOut, AxError> {
         if self.laid_out.is_some() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -83,10 +85,13 @@ impl WorkshopDesk {
             ));
         }
         let workshop = Workshop::new(contracts)?;
-        let schedule = workshop.schedule();
-        // Asked before anything is kept: a graph half handed down is a
-        // graph whose remaining nodes nobody will start.
-        for id in &schedule {
+        let done: BTreeSet<NodeId> = self
+            .joined
+            .artifacts()
+            .map(|artifact| artifact.node().clone())
+            .collect();
+        let laid = workshop.split(&done);
+        for id in &laid.handed {
             let contract = workshop.contract(id).ok_or_else(|| {
                 AxError::failure(
                     AxCode::InvalidArgs,
@@ -107,7 +112,7 @@ impl WorkshopDesk {
             })?;
         }
         self.laid_out = Some(workshop);
-        Ok(schedule)
+        Ok(laid)
     }
 
     /// What the join asks before it will take a verdict.
@@ -328,19 +333,21 @@ impl Tool for WorkshopTool {
                     .delegates
                     .lock()
                     .map_err(|_| poisoned("the delegation desk"))?;
-                let schedule = desk.lay_out(contracts, &mut delegates)?;
-                out.insert(
-                    "schedule".to_owned(),
-                    Value::Array(
-                        schedule
-                            .iter()
-                            .map(|id| Value::String(id.as_str().to_owned()))
-                            .collect(),
-                    ),
-                );
+                let laid = desk.lay_out(contracts, &mut delegates)?;
+                for (field, ids) in [
+                    ("schedule", &laid.schedule),
+                    ("handed", &laid.handed),
+                    ("waiting", &laid.waiting),
+                ] {
+                    let names = ids.iter().map(|id| Value::String(id.as_str().to_owned()));
+                    out.insert(field.to_owned(), Value::Array(names.collect()));
+                }
                 out.insert(
                     "starts".to_owned(),
-                    Value::String("when this turn settles, in that order".to_owned()),
+                    Value::String(
+                        "`handed` when this turn settles; `waiting` once its dependencies hand                          back and a later session lays this graph out again"
+                            .to_owned(),
+                    ),
                 );
             }
             Op::Question => {

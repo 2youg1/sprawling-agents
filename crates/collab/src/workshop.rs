@@ -196,6 +196,15 @@ impl NodeContract {
     }
 }
 
+/// A graph split by what has already joined: the whole order, the ready
+/// set handed down now, and the nodes still waiting on a dependency.
+#[derive(Debug)]
+pub struct LaidOut {
+    pub schedule: Vec<NodeId>,
+    pub handed: Vec<NodeId>,
+    pub waiting: Vec<NodeId>,
+}
+
 /// A graph of contracts that can actually be run.
 #[derive(Debug)]
 pub struct Workshop {
@@ -276,6 +285,24 @@ impl Workshop {
             .filter(|contract| contract.depends_on().all(|need| done.contains(need)))
             .map(|contract| contract.id().clone())
             .collect()
+    }
+
+    /// The graph split by `done`: [`Workshop::ready`] is what may start,
+    /// and every other node not yet done waits.
+    #[must_use]
+    pub fn split(&self, done: &BTreeSet<NodeId>) -> LaidOut {
+        let handed = self.ready(done);
+        let schedule = self.order();
+        let waiting = schedule
+            .iter()
+            .filter(|id| !done.contains(id) && !handed.contains(id))
+            .cloned()
+            .collect();
+        LaidOut {
+            schedule,
+            handed,
+            waiting,
+        }
     }
 
     #[must_use]
