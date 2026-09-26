@@ -314,7 +314,7 @@ impl Claims {
                 // here would count the node as claimed twice.
                 collab::ClaimEffect::Claimed { .. } => continue,
                 collab::ClaimEffect::PutDown { id, .. } => Some(id.clone()),
-                collab::ClaimEffect::Split { .. } => None,
+                collab::ClaimEffect::Split { parent, .. } => Some(parent.clone()),
             };
             lines.push(Closing {
                 line: Line {
