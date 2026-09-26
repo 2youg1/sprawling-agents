@@ -265,3 +265,31 @@ proptest! {
         prop_assert_eq!(sum(&report.by_skill), expected);
     }
 }
+
+#[test]
+fn a_call_is_split_by_its_own_runs_prompt_not_the_latest_in_the_ledger() {
+    let first = RunId::from_bytes([3u8; 16]);
+    let second = RunId::from_bytes([4u8; 16]);
+    let mut attribution = Attribution::new();
+    for row in [
+        prompt(first, "alice", 0, [1000, 0, 0, 0], 0),
+        prompt(second, "bob", 1, [0, 1000, 0, 0], 0),
+        record(
+            first,
+            "alice",
+            2,
+            EventKind::ModelReturned,
+            serde_json::json!({ "billed_usd_micros": 100u64 }),
+        ),
+    ] {
+        attribution.apply(&row).unwrap();
+    }
+    let billed: Vec<(String, u64)> = attribution
+        .report()
+        .by_segment
+        .into_iter()
+        .map(|(slot, share)| (slot, share.get()))
+        .filter(|(_, share)| *share > 0)
+        .collect();
+    assert_eq!(billed, vec![("city".to_owned(), 100)]);
+}
