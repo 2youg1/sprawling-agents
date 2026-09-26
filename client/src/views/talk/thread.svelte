@@ -129,7 +129,7 @@
   const closedAt = $derived(answer?.closing?.at ?? null);
   // A frozen run that said nothing at all is one card with the reason
   // and a way out, not one grey box per turn (ux: the zero-output run).
-  const emptyRun = $derived(frozen && turns.every((turn) => (turn.said ?? "") === ""));
+  const emptyRun = $derived(frozen && read.kind === "held" && turns.every((turn) => (turn.said ?? "") === ""));
   const why = $derived.by((): string | null => {
     const stopped = turns.at(-1)?.stopped ?? null;
     return stopped === null || FINISHED.includes(stopped) ? null : stopped;
