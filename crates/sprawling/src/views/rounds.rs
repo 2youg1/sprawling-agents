@@ -113,24 +113,22 @@ fn answer_waits(turns: &mut [channels::Turn], asked: &[EventRecord], city: &[Eve
     let ids: BTreeMap<kernel::Seq, String> = asked
         .iter()
         .filter(|record| record.kind() == EventKind::ApprovalRequested)
-        .filter_map(
-            |record| match record.data().read::<kernel::ApprovalItem>() {
-                Ok(item) => Some((record.seq(), item.id.as_str().to_owned())),
-                Err(_) => None,
-            },
-        )
+        .filter_map(|record| {
+            let item = record.data().read::<kernel::ApprovalItem>().ok()?;
+            Some((record.seq(), item.id.as_str().to_owned()))
+        })
         .collect();
     let answers: BTreeMap<String, kernel::TimeMs> = city
         .iter()
         .filter(|record| record.kind() == EventKind::ApprovalResolved)
-        .filter_map(|record| match record.data().read::<ApprovalResolved>() {
-            Ok(ruled) => Some((ruled.id.as_str().to_owned(), record.t())),
-            Err(_) => None,
+        .filter_map(|record| {
+            let ruled = record.data().read::<ApprovalResolved>().ok()?;
+            Some((ruled.id.as_str().to_owned(), record.t()))
         })
         .collect();
     for note in turns.iter_mut().flat_map(|turn| turn.notes.iter_mut()) {
         if let channels::Note::Waiting { at, answered, .. } = note {
-            *answered = ids.get(at).and(None);
+            *answered = ids.get(at).and_then(|id| answers.get(id)).copied();
         }
     }
 }

@@ -20,7 +20,7 @@
 // hundred columns are at most four hundred boxes; the call list draws
 // the rows in view plus `OVERSCAN` on each side.
 
-import type { Call, Turn } from "../../wire";
+import { TimeMs, type Call, type Turn } from "../../wire";
 
 export type Share = "model" | "tool" | "person";
 export const SHARES: readonly Share[] = ["model", "tool", "person"];
@@ -56,19 +56,24 @@ export function stretchesOf(turns: readonly Turn[], end: number, tail: Share | n
     const to = Math.max(turn.t, turns[at + 1]?.t ?? end);
     const whole = (share: Share): Stretch[] => [{ share, turn: turn.number, from: turn.t, to }];
     if (at === turns.length - 1 && tail !== null) return whole(tail);
-    const asked = turn.notes.flatMap((note) => ("waiting" in note ? [note.waiting.t] : []));
-    if (asked.length > 0) return waited(turn, Math.min(to, Math.max(turn.t, Math.min(...asked))), to);
-    return worked(turn, to);
+    const waits = turn.notes.flatMap((note) => ("waiting" in note ? [note.waiting] : []));
+    const first = waits[0];
+    if (first === undefined) return worked(turn, to);
+    const within = (moment: number): number => Math.min(to, Math.max(turn.t, moment));
+    const since = within(first.t);
+    return waited(turn, { since, until: Math.max(since, within(waits.at(-1)?.answered ?? to)) }, to);
   });
 }
 
-// A turn that stopped for a person, cut where the request was recorded:
-// before it like any other turn, after it the person's to the end of
-// the turn, because when the answer came is not on the wire.
-function waited(turn: Turn, since: number, to: number): Stretch[] {
-  const before = { ...turn, calls: turn.calls.filter((call) => call.called < since) };
-  const person: Stretch = { share: "person", turn: turn.number, from: since, to };
-  return [...worked(before, since), person].filter((part) => part.to > part.from);
+// A turn that stopped for a person, cut where the request and the answer
+// were recorded: the person holds the span between, and either side is
+// cut like any other turn by the calls made there. An answer the wire
+// does not carry leaves the rest of the turn the person's.
+function waited(turn: Turn, wait: { readonly since: number; readonly until: number }, to: number): Stretch[] {
+  const before = { ...turn, calls: turn.calls.filter((call) => call.called < wait.since) };
+  const after = { ...turn, t: TimeMs.make(wait.until), calls: turn.calls.filter((call) => call.called >= wait.until) };
+  const person: Stretch = { share: "person", turn: turn.number, from: wait.since, to: wait.until };
+  return [...worked(before, wait.since), person, ...worked(after, to)].filter((part) => part.to > part.from);
 }
 
 function worked(turn: Turn, to: number): Stretch[] {

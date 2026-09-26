@@ -42,7 +42,7 @@
         called: TimeMs.make(at + 1_000 + c * 600),
         answered: TimeMs.make(at + 1_400 + c * 600),
       }));
-      const notes: Note[] = n === 17 ? [{ waiting: { at: Seq.make(n * 100 + 99), t: TimeMs.make(at + 4_000) } }] : [];
+      const notes: Note[] = n === 17 ? [{ waiting: { at: Seq.make(n * 100 + 99), t: TimeMs.make(at + 4_000), answered: TimeMs.make(at + 9_000) } }] : [];
       const turn: Turn = {
         calls,
         notes,
