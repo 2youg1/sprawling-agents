@@ -4,12 +4,15 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a person reads off the report: four status words, two sections,
-//! colour a terminal may refuse, and a version column no vendor banner
-//! can push off the screen (sprawling-SPEC.md section 8-59).
+//! the level the core's threads get, colour a terminal may refuse, and a
+//! version column no vendor banner can push off the screen
+//! (sprawling-SPEC.md sections 8-59 and 8-40).
 
 use super::{ScriptedMachine, finding_for};
 use crate::doctor::paint::{Counted, Ink, Part, Status, count, row, summary};
+use crate::doctor::screen::{Asked, run};
 use crate::doctor::{Fault, Finding, Presence, REQUIREMENTS, Tier, Version, examine};
+use crate::serving::standing::{Held, Standing};
 
 /// Four status words, one per state, so a person reads the column
 /// rather than the sentence - and an item nobody is waiting for is
@@ -203,5 +206,35 @@ fn the_heading_is_written_before_any_item_is_asked() {
     assert!(
         !machine.asked_in_silence.load(Ordering::SeqCst),
         "an item was asked about while the screen was still empty"
+    );
+}
+
+/// A Unix machine without `CAP_SYS_NICE` refuses the raise; the doctor
+/// says the core stands at normal and why, rather than nothing.
+#[test]
+fn the_doctor_says_where_the_platform_lets_the_core_stand() {
+    let machine = ScriptedMachine::missing(&[]).standing(Standing::Normal(Held::Refused(
+        "Operation not permitted".to_owned(),
+    )));
+    let mut nobody = std::io::Cursor::new(Vec::new());
+    let mut screen: Vec<u8> = Vec::new();
+    run(
+        &Asked {
+            install: false,
+            city: None,
+            explain: None,
+            ink: Ink::Plain,
+        },
+        &machine,
+        &mut nobody,
+        &mut screen,
+    )
+    .unwrap();
+    let shown = String::from_utf8(screen).unwrap();
+    assert!(
+        shown.contains(
+            "  priority - where the core's threads stand\n\n    core threads    normal, the platform refused: Operation not permitted\n\n"
+        ),
+        "{shown}"
     );
 }
