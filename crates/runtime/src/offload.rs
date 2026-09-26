@@ -291,10 +291,8 @@ mod tests {
         };
         let original = vec![3u8; 30_000];
         let record = offload(&original, 2_048, &mut s).unwrap();
-        let admitted = crate::tools::chosen_path::admit(&record.rest_path, "read", &|_| {
-            kernel::ReadVerdict::Open
-        })
-        .unwrap();
+        let admitted =
+            crate::tools::admit(&record.rest_path, "read", &|_| kernel::ReadVerdict::Open).unwrap();
         assert_eq!(
             std::fs::read(dir.path().join(admitted.as_str())).unwrap(),
             original,

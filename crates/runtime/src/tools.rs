@@ -5,7 +5,7 @@
 
 //! The L0 three. Index only: no logic lives here.
 
-pub(crate) mod chosen_path;
+mod chosen_path;
 mod edit;
 mod exec;
 mod read;
@@ -14,6 +14,8 @@ mod status;
 mod succeed;
 
 pub use chosen_path::ReadBound;
+#[cfg(test)]
+pub(crate) use chosen_path::admit;
 pub use edit::EditTool;
 pub use edit::version_of;
 pub use exec::parse_arm;
