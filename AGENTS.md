@@ -138,7 +138,6 @@ Violating any of these turns CI red with a message naming the rule, the violatio
 | A white-box check written in Rust beside the code it judges; a check that enters the way a stranger does written in Lean under `adversary/`. | `xtask boundary` |
 | Nothing written for a test compiled into the binary a person downloads. | `xtask artifact` |
 | One name per concept, taken from the glossary. | `xtask lexicon` |
-| Each crate's committed baseline equal to its live public surface; the crate's SPEC moved in the same change-set as a baseline edit. | `xtask apisync` |
 | Credentials as `secret:realm/name` references; plaintext reaches the vault and nowhere else. | `xtask secret` |
 | Colour taken from the `@theme` block in `client/src/theme.css`, expressed as a ratio of the gamut limit. | `xtask color` |
 | Every word a reader is given taken from `client/src/lang.json`. | `xtask wording` |

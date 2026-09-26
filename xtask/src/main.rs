@@ -189,7 +189,7 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(err) => report::internal_failure(&err),
         },
-        Some("apisync") => report::finish("apisync", apisync::check(&root, range.as_deref())),
+        Some("apisync") => report::finish("apisync", apisync::check(&root)),
         Some("header") => report::finish("header", header::check(&root)),
         Some("lexicon") => report::finish("lexicon", lexicon::check(&root)),
         Some("length") => report::finish("length", length::check(&root)),
@@ -276,7 +276,7 @@ struct Tool {
 const TOOLS: [Tool; 12] = [
     Tool {
         call: "gates [<gate>...] [--range a..b]",
-        gives: "every gate, or only the named ones; --range bounds the commits `apisync` and `guard` judge",
+        gives: "every gate, or only the named ones; --range bounds the commits `guard` judges",
     },
     Tool {
         call: "gates --list",

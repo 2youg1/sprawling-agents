@@ -321,34 +321,6 @@ pub(crate) fn changed_paths(root: &Path, sha: &str) -> Result<Vec<String>, Xtask
     )
 }
 
-/// Paths with their one-letter status (A/M/D/R...) for gates that must
-/// tell creation apart from modification.
-pub(crate) fn changed_paths_with_status(
-    root: &Path,
-    sha: &str,
-) -> Result<Vec<(char, String)>, XtaskError> {
-    let lines = git_lines(
-        root,
-        &[
-            "diff-tree",
-            "--no-commit-id",
-            "--name-status",
-            "-r",
-            "--root",
-            sha,
-        ],
-    )?;
-    Ok(lines
-        .iter()
-        .filter_map(|line| {
-            let mut parts = line.split_whitespace();
-            let status = parts.next()?.chars().next()?;
-            let path = parts.next_back()?.to_owned();
-            Some((status, path))
-        })
-        .collect())
-}
-
 fn git_text(root: &Path, args: &[&str]) -> Result<String, XtaskError> {
     let output = Command::new("git")
         .args(args)
