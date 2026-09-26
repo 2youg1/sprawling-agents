@@ -55,6 +55,7 @@
   import type { FieldProps } from "../parts/field.svelte";
   import Glyph from "../parts/glyph.svelte";
   import Segmented from "../parts/segmented.svelte";
+  import Notifying from "./notifying.svelte";
   import {
     CHROMA_WORDS,
     DENSITY_WORDS,
@@ -363,4 +364,5 @@
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {@render foot(undefined, "motion")}
   </div>
+  <Notifying />
 </div>

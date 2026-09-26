@@ -40,6 +40,7 @@
   import Facts from "./views/facts.svelte";
   import LinkBanner from "./views/link_banner.svelte";
   import Mcp from "./views/mcp.svelte";
+  import Notifier from "./views/notifier.svelte";
   import Palette from "./views/palette.svelte";
   import Rail from "./views/rail.svelte";
   import RecordView from "./views/record.svelte";
@@ -306,6 +307,7 @@
 
 <svelte:window onhashchange={follow} onkeydown={keys} />
 
+<Notifier {view} />
 <div class="relative flex h-screen bg-page font-sans text-body text-text">
   <a
     href="#main"

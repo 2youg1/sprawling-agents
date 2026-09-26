@@ -144,16 +144,17 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `idem.ts` | 2 值 | `mintIdem()` |
 | `mark.ts` | 4 适配器 | `markOf({ waiting, working, link })` 判定四态：链路不在 `live` 时为 `untold`（页面此刻没被告知，城里的事可能已经变了，图标不替没人说过的话作证），否则有待人决定的事为 `waiting`、有 run 在动为 `live`、其余为 `quiet`；`paintMark(document, mark)` 把令牌解算成引擎实际会画的颜色，由 `markSvg` 拼成 SVG data URL 写进 `<link rel="icon">`。四态各是一个形状——`quiet` 空心环、`live` 实心圆、`waiting` 菱形、`untold` 一道横杠——因为标签栏很小，分不清强调色与警示色的人仍分得清环与菱形；零颜色字面量 |
 | `rows.ts` | 4 适配器 | `Rows { getItem, setItem, removeItem }`、`memory()`、`browserRows()`：浏览器存储那一扇门，三处会抛的拒绝（禁用存储、配额为零、写时配额满）在这里各变成一个值 |
-| `prefs.ts` | 6 数据 | `Preferences { lang, welcomed, panel, appearance, proxying }`、`Keeper = "browser" \| "city"`、`PreferenceDoor { held, keeper, adopt, setLang, setWelcomed, setPanel, setAppearance, setProxying, chord(action), setChord, draft(at), setDraft }`、`loadPreferences(rows, browserLang)`、`preferences()`；**全客户端每一个存储键的拼写都只在这个文件的 `ROWS` 里**（草稿键 `sprawling.draft.<房间或 run>`、快捷键 `sprawling.key.<action>`） |
+| `prefs.ts` | 6 数据 | `Preferences { lang, welcomed, panel, appearance, proxying, notifying }`、`Keeper = "browser" \| "city"`、`PreferenceDoor { held, keeper, adopt, setLang, setWelcomed, setPanel, setAppearance, setProxying, chord(action), setChord, draft(at), setDraft }`、`loadPreferences(rows, browserLang)`、`preferences()`；**全客户端每一个存储键的拼写都只在这个文件的 `ROWS` 里**（草稿键 `sprawling.draft.<房间或 run>`、快捷键 `sprawling.key.<action>`） |
 | `prose.ts` | 1 判定 | `blocks(text) -> Block[]`, `inline(text) -> Inline[]`：Markdown 读成数据，永不 innerHTML |
 | `route.ts` | 1 判定 | 见 §3-2 |
 | `time.ts` | 1 判定 | `ago`, `clock`, `count`, `usd`, `kib` |
+| `notify.ts` | 1 判定 | `notices(heard, items, scene) -> [Heard, ApprovalItem[]]`：哪些待批事项变成一条浏览器通知。`Heard` 是「快照未到」或「已算过的 `ApprovalId` 集」；`Scene { notifying, focus, elapsed, watching }`。只对需要人决定的事（`approval_queue` 的答）发，四道闸全过才发：窗口失焦、过了预热期 `WARMUP_MS`、不在首个快照里也不在已算过的集里、不是正在看的那个地址（`item.actor`）。每个见过的 id 都记进 `Heard`，所以一件事在任何一道闸下被放过一次就永远不再弹。适配器是 `views/notifier.svelte`（权限为 `granted` 才 `new Notification`），开关是 `prefs.ts` 的 `notifying`，默认 `off` |
 
 `src/ui.ts` 是视图拿到的一切，一个上下文、一个取法：`setUi(value)` 由 `app.svelte` 挂载时调一次；后代组件在初始化期调 `ui(): Ui` 拿到 `{ conn, prefs, lang, effort, approvals, bar, origin, pairing, now, chooseEffort, go, send, hearing }`。旧的 `useUi`／`useSay`／`useGo`／`useCommand`／`useHearing`／`useApprovals` 等透传壳收敛成这一个门（AGENTS：不做只改名的壳）。**词不是上下文**：`core/lang.ts` 的 `say(lang, key, slots)` 保持纯函数，模板写 `say($lang, key)`，`$lang` 的订阅就是换语言时重画的来源。`pairing` 是开这一页的地址栏上的配对码，两扇会动作的 HTTP 门要它。
 
 ## 6 视图（免 SPEC，列出以便定位）
 
-`views/parts/tip.svelte` 提示（见设计 4-18）；`views/parts/code.svelte` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.svelte` 左栏；`views/talk.svelte` ＋ `talk/{thread,calls,composer,waiting}.svelte` 对话 ＋ `talk/artifact.svelte` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.svelte` ＋ `city/{bar,panel,skyline,marks}.svelte` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.svelte`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.svelte` ＋ `building/{tree,commits}.svelte`；`views/changes.svelte`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.svelte`；`views/setup.svelte` ＋ `setup/{providers,models,skills,appearance,keys}.svelte`（skills 组见设计 4-31）＋ `setup/kept.svelte`（一个组的答案由谁保管，见设计 4-29）；`views/shared/{provider,effort,buildings}.svelte`（欢迎页与设置页共用的三件，`buildings.svelte` 的第二个座位是 `#/mcp`）；`views/machine.svelte`（doctor 的答）；`views/desktop.svelte`（一栋楼的桌面白名单）；`views/mcp.svelte`；`views/welcome.svelte`；`views/record.svelte`；`views/cost.svelte`；`views/palette.svelte`；`views/refusal.svelte`；`views/prose.svelte`；`views/gallery.svelte`。
+`views/parts/tip.svelte` 提示（见设计 4-18）；`views/parts/code.svelte` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.svelte` 左栏；`views/talk.svelte` ＋ `talk/{thread,calls,composer,waiting}.svelte` 对话 ＋ `talk/artifact.svelte` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.svelte` ＋ `city/{bar,panel,skyline,marks}.svelte` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.svelte`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.svelte` ＋ `building/{tree,commits}.svelte`；`views/changes.svelte`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.svelte`；`views/setup.svelte` ＋ `setup/{providers,models,skills,appearance,keys}.svelte`（skills 组见设计 4-31）＋ `setup/kept.svelte`（一个组的答案由谁保管，见设计 4-29）；`views/shared/{provider,effort,buildings}.svelte`（欢迎页与设置页共用的三件，`buildings.svelte` 的第二个座位是 `#/mcp`）；`views/machine.svelte`（doctor 的答）；`views/notifier.svelte`（不画任何东西，`core/notify.ts` 的适配器）＋ `setup/notifying.svelte`（外观组里的通知开关）；`views/desktop.svelte`（一栋楼的桌面白名单）；`views/mcp.svelte`；`views/welcome.svelte`；`views/record.svelte`；`views/cost.svelte`；`views/palette.svelte`；`views/refusal.svelte`；`views/prose.svelte`；`views/gallery.svelte`。
 
 **`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（偏好走 `core/rows.ts` 那扇门，没有 localStorage 时是一张只活一次会话的表）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。`app.svelte` 用动态 `import()` 取 `views/gallery.svelte`，所以画廊与它的夹具表是 bundle 里单独的一块，只在打开 `#/gallery` 时下载：其余路由首屏不再为它付字节，而 `frontend_artifact` 称的是整个 dist，这一块仍在其中。
 
@@ -432,3 +433,9 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **被击败的备选**：`run_started` 带上派活帧的 `IdemKey`，按键精确认领。它更严：两个页面同时往同一栋楼派同一句话时，今天的认法两边都会认第一个起来的 run（两个都是这个人自己派的，所以链接不会指向别人的活）。它要改线协议、`WIRE_V` 进位，归到改线协议的那一组。
 - **重开参数**：同一栋楼里同一句任务的并发派活成为常态（例如一个页面批量派活），或城开始改写任务原文（去空白、加前缀），就按被击败的备选改为按 `IdemKey` 认领。
 
+### 12-5 浏览器通知只报需要人决定的事，默认关闭
+
+- **决策**：`core/notify.ts` 的纯函数只从 `approval_queue` 的答里挑新到的待批事项；四道闸（失焦、预热期、快照里的旧事不算新、正在看的地址不弹）全过才交给 `views/notifier.svelte` 发出。设置页「外观」组里的开关默认 `off`，打开时才向浏览器要权限，开关只存在这个浏览器（`sprawling.notify`），因为通知权限本身就是每个浏览器各自授予的。
+- **理由**：通知打断的是人在别处做的事，所以只配给「没有人就停下」的那一类——run 的进度、完成与拒绝都不需要人回答，已经由标签页的标题与图标承担。预热期与快照闸挡住的是同一个错：页面刚打开或重连时，答里的每一件事对这一页都是「第一次见」，却不是新发生的。
+- **被击败的备选**：对每个完成、每个拒绝也发通知，或默认打开。前者把需要回答的那一条淹在不需要回答的里面；后者让浏览器在人还没理解这一页时就弹出权限请求。
+- **重开参数**：城开始产出第二类必须由人回答、却不经 `approval_queue` 的事（例如一个问句），这张表就要把它也读进来；或者通知改由城经 Web Push 发出（页面关闭时也要报），开关就该跟着偏好一起存进城。

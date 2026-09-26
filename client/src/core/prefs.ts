@@ -38,6 +38,7 @@ import { langOf } from "./lang";
 import { browserRows } from "./rows";
 import type { Rows } from "./rows";
 import type { Proxying } from "../wire";
+import type { Notifying } from "./notify";
 
 // ------------------------------------------------------------- the rows
 
@@ -69,6 +70,9 @@ const ROWS = {
   // on every form they open; an endpoint already attached keeps the
   // rule the city recorded for it.
   proxying: "sprawling.network.proxying",
+  // Whether this browser raises a notification for an approval that
+  // arrives while the window is away (client-SPEC 12-5).
+  notifying: "sprawling.notify",
   // One unsent message per place a person writes, kept across a reload
   // or a page change; the rest of the name is the room or the run.
   draft: "sprawling.draft.",
@@ -116,6 +120,7 @@ export const RAILS: readonly Rail[] = ["glyphs", "named", "away"];
 export const CHROMAS: readonly Chroma[] = ["full", "off"];
 export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
 const PROXYINGS: readonly Proxying[] = ["except_local", "always", "never"];
+export const NOTIFYINGS: readonly Notifying[] = ["off", "on"];
 
 // The sizes a person may ask for. The floor is the smallest size the
 // colour gate has to hold its contrast tiers at, and the ceiling is
@@ -177,6 +182,7 @@ export interface Preferences {
   readonly rail: Rail;
   readonly appearance: Appearance;
   readonly proxying: Proxying;
+  readonly notifying: Notifying;
 }
 
 // Who keeps these preferences between one visit and the next.
@@ -220,6 +226,7 @@ export interface PreferenceDoor {
   readonly setRail: (rail: Rail) => void;
   readonly setAppearance: (next: Appearance) => void;
   readonly setProxying: (rule: Proxying) => void;
+  readonly setNotifying: (switched: Notifying) => void;
   // The chord the person set for one action, or `""` for an action
   // they left alone. The spelling is the keymap's grammar, not this
   // file's: what is kept here is a name and a string.
@@ -300,6 +307,7 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
     rail: readOne(RAILS, rows.getItem(ROWS.rail), "glyphs"),
     appearance: readAppearance(rows),
     proxying: readOne(PROXYINGS, rows.getItem(ROWS.proxying), "except_local"),
+    notifying: readOne(NOTIFYINGS, rows.getItem(ROWS.notifying), "off"),
   };
 }
 
@@ -313,6 +321,7 @@ function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.rail, next.rail);
   writeAppearance(rows, next.appearance);
   rows.setItem(ROWS.proxying, next.proxying);
+  rows.setItem(ROWS.notifying, next.notifying);
 }
 
 // The door onto one store. A test hands it a map and its own language
@@ -351,6 +360,9 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     },
     setProxying(proxying) {
       settle({ ...get(held), proxying });
+    },
+    setNotifying(notifying) {
+      settle({ ...get(held), notifying });
     },
     chord: (action) => rows.getItem(ROWS.chord + action) ?? "",
     setChord(action, spelled) {
