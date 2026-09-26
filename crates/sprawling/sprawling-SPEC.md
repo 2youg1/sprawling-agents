@@ -3477,6 +3477,7 @@ pub(super) struct Folding {
 pub(super) fn spawn_folding(
     views: Arc<Mutex<Views>>,
     to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+    setting: CorePriority, // 视图线程是否升档（8-93）
 ) -> Result<Folding, AxError>; // StorageFatal「start the view fold」：线程起不来
 ```
 
@@ -3585,34 +3586,43 @@ pub(super) fn written(err: &AxError, form: Form) -> String;
 
 ## 8-93 核心线程站在正常档之上，空转就降回（`bin::serving::standing`，形状：状态机）
 
-agent 派出的命令从低于正常的档位起动（runtime-SPEC §8-13-3）；本节把另一半补上：核心自己的线程——写线程 `sprawling-runs`（记账）与视图线程 `sprawling-views`——起动时各把自己升到正常档之上一级，于是一台被构建占满的机器上，记账与折叠仍排在派出的命令前面。升在线程一级而不是进程一级：进程档位在 Windows 上要对自身句柄调 `SetPriorityClass`，没有安全接口；线程档位有。
+agent 派出的命令从低于正常的档位起动（runtime-SPEC §8-13-3）；本节补上另一半：核心自己的线程起动时把自己升到正常档之上一级，于是一台被构建占满的机器上，视图的折叠与广播仍排在派出的命令前面。升在线程一级而不是进程一级：进程档位在 Windows 上要对自身句柄调 `SetPriorityClass`，没有安全接口；线程档位有。
 
 ```rust
 // bin::serving::standing —— shape: state machine
 pub(crate) enum CorePriority { Raised, Normal }   // 人的设置；Normal 即「关掉高优先级」
 pub(crate) enum Standing { Raised, Normal(Held) } // 这条线程实际站在哪一档
 pub(crate) enum Held { ByTheSetting, Refused(String), ByTheValve }
+pub(crate) enum Verdict { Keep, Lower }
+pub(crate) const BUSY_LIMIT: Duration;            // 10 s
 pub(crate) fn raise_this_thread(setting: CorePriority) -> Standing;
-pub(crate) fn lower_this_thread() -> Standing;
+pub(crate) fn lower_this_thread() -> Result<Standing, thread_priority::Error>;
 pub(crate) struct Valve;                           // 忙了多久，是否该降回
 impl Valve {
     pub(crate) fn new(limit: Duration, now: Instant) -> Self;
     pub(crate) fn record(&mut self, woke: Instant, slept: Instant); // 一次醒来到下一次阻塞
-    pub(crate) fn verdict(&self) -> Verdict;                         // Keep | Lower
+    pub(crate) fn verdict(&self) -> Verdict;
 }
-pub(crate) const BUSY_LIMIT: Duration; // 10 s
+pub(crate) struct CoreThread;                      // 一条核心线程的档位与它的阀
+impl CoreThread {
+    pub(crate) fn raise(name: &'static str, setting: CorePriority, now: Instant) -> Self;
+    pub(crate) fn record_turn_lowering_when_busy(&mut self, woke: Instant, slept: Instant);
+}
+// bin::person
+pub(crate) fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
 ```
 
-- **升到哪一档**：`thread-priority` 的跨平台值 70，在 Windows 上是 `THREAD_PRIORITY_ABOVE_NORMAL`（正常档进程里基准优先级 9，派出的 `BELOW_NORMAL_PRIORITY_CLASS` 子进程是 6）。Unix 上升档要 `CAP_SYS_NICE`；没有时操作系统拒绝，线程留在正常档，`Standing::Normal(Held::Refused(原因))` 把原因带回来——相对效果由子进程的 `nice` 给出，不靠这一步。
-- **设置**：`CorePriority::Normal` 让 `raise_this_thread` 不调任何平台接口，返回 `Standing::Normal(Held::ByTheSetting)`。
-- **安全阀**：升了档的线程若空转，会拖住整台机器。每条升档线程带一个 `Valve`，每处理完一件事记一次「醒来—再次阻塞」；窗口长 `BUSY_LIMIT`，窗口走完时忙的时间占到窗口的 15/16 以上，`verdict` 变成 `Lower`，并且此后一直是 `Lower`。线程见到 `Lower` 就调 `lower_this_thread` 回到正常档，向标准错误写一行说给人：哪条线程、忙了多久、已降回正常档。时间作参数传入，`Valve` 本身不读钟，所以它的判定可以用编造的时刻在测试里逐点验证。
-- **量的是墙钟，不是 CPU 时间**：线程在两次阻塞之间走过的墙钟时间就是它占着核的时间的上界；升了档的线程很少被抢占，二者接近。读线程自己的 CPU 时间在 Windows 上是 `GetThreadTimes`，没有安全接口。
-- 证据：`crates/sprawling/src/serving/standing/tests.rs` 的 `a_raised_core_thread_stands_above_normal`（Windows 臂：升档后 `GetThreadPriority` 读回 `AboveNormal`）与 `a_thread_busy_through_the_window_is_lowered`（忙满一个窗口的线程被判降回，忙一半的不被判）。
+- **升到哪一档**：`thread-priority` 的跨平台值 70，在 Windows 上是 `THREAD_PRIORITY_ABOVE_NORMAL`（正常档进程里基准优先级 9，派出的 `BELOW_NORMAL_PRIORITY_CLASS` 子进程是 6）；降回用 50，即正常档。Unix 上升档要 `CAP_SYS_NICE`；没有时操作系统拒绝，线程留在正常档，`Standing::Normal(Held::Refused(原因))` 把原因带回来，`CoreThread::raise` 向标准错误说一次——相对效果由子进程的 `nice` 给出，不靠这一步。
+- **设置**：人的配置文件（`Home::person_config`，即 `config.toml`）里 `[core]` 一节的 `priority`，`"raised"` 或 `"normal"`，缺省为 `"raised"`。`"normal"` 让 `raise_this_thread` 不调任何平台接口，返回 `Standing::Normal(Held::ByTheSetting)`。文件读不了、解析不了或值拼错时，服务照常起动，核心留在正常档，并向标准错误说出拒绝与恢复办法：升档是有全机代价的一方，要有一个说「可以」的读数才做。设置在服务起动时读一次，改了要重启服务。
+- **安全阀**：升了档的线程若空转，会拖住整台机器。每条升档线程带一个 `Valve`，每处理完一件事记一次「醒来—再次阻塞」；窗口从上一个窗口关上时开始，第一件结束在窗口开出 `BUSY_LIMIT` 之后的事关上它；关上时忙的时间占到窗口的 15/16 以上，`verdict` 变成 `Lower`，此后一直是 `Lower`。`record_turn_lowering_when_busy` 见到站在升档上的线程得了 `Lower`，就调 `lower_this_thread` 回到正常档，并向标准错误写一行说给人：哪条线程、忙满了多少秒、已降回正常档。时间作参数传入，`Valve` 本身不读钟，所以它的判定可以用编造的时刻逐点验证。
+- **量的是墙钟，不是 CPU 时间**：线程在两次阻塞之间走过的墙钟时间是它占着核的时间的上界；升了档的线程很少被抢占，二者接近。
+- **哪些线程**：视图线程 `sprawling-views`（`bin::serving::folding`）起动时升档，每折完、广播完一件记一次。
+- 证据：`crates/sprawling/src/serving/standing/tests.rs` 的 `a_raised_core_thread_stands_above_normal`（Windows 臂：升档后读回 `AboveNormal`）与 `a_thread_busy_through_the_window_is_lowered`（忙满一个窗口的线程判降回，忙一半的不判）；`crates/sprawling/src/person.rs` 的 `a_person_who_turns_the_raise_off_gets_normal_priority`。
 
 **决定**
 
-1. 线程档位取第一档「安全 Rust」：`thread-priority` 对外只给安全接口（内部的 `SetThreadPriority`／`GetThreadPriority` 由它负责），不需要 Zig 叶子——一次只传句柄与常量的调用没有 `(ptr, len)` 边界可以放在 Zig 后面，Rust 侧调用 `extern` 的那一处 `unsafe` 也省不掉。被否：本仓自己写 `unsafe` 调 `SetPriorityClass` 把整个进程升到 `HIGH_PRIORITY_CLASS`——没有测量表明它全局最佳，而且会把 tokio 的每条线程与所有空转风险一起升上去。重开参数：出现只有进程档才能挡住的延迟（线程档升满后 relay 往返 p50 满载与空闲之比仍大于 1.2）。
-2. 安全阀量墙钟而不量 CPU 时间：读线程 CPU 时间没有第一档的路；墙钟只会高估忙的程度，所以阀只会降得早，不会降得晚。重开参数：出现对外只给安全接口、读线程 CPU 时间的 crate。
-3. 降回之后不再升：一条线程空转过一次，就说明它的工作量不配占在派出的命令前面，反复升降只会让人看到忽快忽慢。
+1. 线程档位取第一档「安全 Rust」：`thread-priority`（MIT）对外只给安全接口，内部的 `SetThreadPriority`／`GetThreadPriority` 由它负责，本仓不写 `unsafe`。不取 Zig 叶子：一次只传句柄与常量的调用没有 `(ptr, len)` 边界可以放在 Zig 后面，Rust 侧调用 `extern` 的那一处 `unsafe` 也省不掉。被否：本仓自己写 `unsafe` 调 `SetPriorityClass`，把整个进程升到 `HIGH_PRIORITY_CLASS`——没有测量表明它全局最佳，而且会把 tokio 的每条线程连同它们的空转风险一起升上去。重开参数：线程档升满之后，后台负载占满所有核时 relay 往返 p50 与空闲之比仍大于 1.2。
+2. 安全阀量墙钟而不量 CPU 时间：读线程自己的 CPU 时间在 Windows 上是 `GetThreadTimes`，没有第一档的路；墙钟只会高估忙的程度，所以阀只会降得早，不会降得晚。重开参数：出现对外只给安全接口、读线程 CPU 时间的 crate。
+3. 降回之后不再升：一条线程忙满过一个窗口，就说明它的工作量不该排在派出的命令前面；反复升降只会让人看到忽快忽慢。
 
-**尚未做到的（本节接口的当前状态）**：`CorePriority` 的来源——人的配置文件里关掉高优先级的那一项——还没有读者，两条线程收到的都是 `CorePriority::Raised`；降回时写的是标准错误而不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）；socket 服务在 tokio 的线程上，还没有升档；doctor 还不报告每个平台实际站在哪一档。
+**尚未做到的（本节接口的当前状态）**：写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。socket 服务在 tokio 的线程上，还没有升档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。doctor 还不报告每个平台实际站在哪一档。
