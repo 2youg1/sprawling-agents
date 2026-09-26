@@ -4090,7 +4090,7 @@ impl RunWorker {
 
 **接口。**
 - `install.sh` 读 `SPRAWLING_API`：发布列表的地址，缺省是 `https://api.github.com/repos/${SPRAWLING_REPO}/releases`。设了它，列表（`?per_page=1`）与单个 tag（`/tags/<tag>`）都从这个地址问；归档的下载地址仍然取自列表里每个资产的 `browser_download_url`，不由脚本拼。这个变量同样服务镜像与 GitHub Enterprise，它不是只为测试开的口子。
-- `.github/install-loopback.sh <archive-dir>`：`<archive-dir>` 里恰好一份 `.zip`（`just package` 在一个 matrix 行上产出的那份）。脚本在 `127.0.0.1` 上起 `python3 -m http.server`（端口取 0，由内核分配，从服务的第一行读出），写一份与 GitHub 同形的发布列表（`tag_name`；每个资产的 `name`、`size`、`digest: sha256:<hex>`、`browser_download_url`），然后以沙箱 `HOME` 跑 `install.sh`，最后执行 `$HOME/.local/bin/sprawling status`，打印第一行。
+- `.github/install-loopback.sh <archive-dir>`：`<archive-dir>` 里恰好一份 `.zip`（`just package` 在一个 matrix 行上产出的那份）。脚本在 `127.0.0.1` 上起 `python3 -m http.server`（端口取 0，由内核分配，从服务的第一行读出），写一份与 GitHub 同形的发布列表（`tag_name`；每个资产的 `name`、`size`、`digest: sha256:<hex>`、`browser_download_url`），然后以沙箱 `HOME` 跑 `install.sh`，最后执行 `sprawling install` 放进沙箱 `HOME` 的 `.local` 下 `bin` 里的那个文件的 `status`，打印第一行。
 - 判定，三条都成立才绿：`install.sh` 退出 0；落位的文件与归档里的 `sprawling` 逐字节相同（`cmp`）；落位的二进制的 `status` 第一行以 `sprawling ` 开头。任何一条不成立，脚本以非 0 退出并说出是哪一条。
 - 离机的请求一律失败：脚本给 `install.sh` 设 `https_proxy`／`http_proxy` 指向 `127.0.0.1:9`，`no_proxy=127.0.0.1`。所以一个不认 `SPRAWLING_API` 的 `install.sh` 不会偷偷装上 GitHub 上已发布的那一版，而是在第一次请求就红。
 - `release.yml` 的 `archive` job 在 `just package` 之后、上传之前对 macOS 与 Linux 两行调它；Windows 那一行走 `install.ps1`，不在本节。
