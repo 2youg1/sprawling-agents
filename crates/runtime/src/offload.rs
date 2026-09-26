@@ -90,7 +90,10 @@ pub(crate) struct Tee {
 /// and 4 in one call, so no cutter can run without the way back
 /// existing first. Repeating it on the same bytes is idempotent.
 pub(crate) fn tee(bytes: &[u8], site: &mut OffloadSite<'_>) -> Result<Tee, AxError> {
-    let hash = site.cas.put(bytes).map_err(memory::MemoryError::into_ax)?;
+    let hash = site
+        .cas
+        .put_for(bytes, &site.origin)
+        .map_err(memory::MemoryError::into_ax)?;
     let original = Locator::parse(&format!("cas:b3-{hash}"))?;
     let rest_path = site.environment.join(rest_file_name(&original));
     materialize(bytes, &rest_path)?;
