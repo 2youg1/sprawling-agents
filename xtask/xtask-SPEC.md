@@ -459,7 +459,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（depmap 围栏块）、§4（�
 
 **`skills/` 随归档走，整树收录（形状 2 行）。** 发布物是人解压即用的那一份：一座城对着解压出来的目录找 skill，zip 里没有 `skills/`，拿到发布物的人就测不了 skill 相关的一切。故归档内容表加一个变体 `Packaged::Skills`，**按相对路径排序整树收录**——skill 的名单归那个目录管，逐文件抄一张清单就是给它安第二个家；目录缺失即拒，恢复语与 `Document` 同形。随树同行的是 `skills/LICENSES.md`：MIT 要求版权与许可全文随副本走，CC BY-NC 要求署名，两者都由它承载，于是义务跟着文件走到树外的任何一份副本。
 
-**两条属人裁决在此记录。** ①**`skills/` 下的文档不披 MPL 头，MPL 文件头扫描以 `.rs` 为界**（该门本来就只扫 `.rs`，此裁决把「跳过 Markdown」从现状升为成文规则）：文档的许可证是它自己的 frontmatter 与 `docs/third-party.md` §5，给 CC BY-NC 或 MIT 的文档披 MPL 头就是错述它的条款；被击败的替代方案是逐文件豁免名单，它把一条能写成边界规则的事实变成一张会过期的名单。②**pstack 改编件（`why`／`how`／`blast-radius`）保持 MIT，且每件注明改编者是 2youg1**：改编声明与上游版权行、许可全文一起落在各件的来源注与 `skills/LICENSES.md`——一份不说谁改过的改本，藏的正是它现在是什么。
+**两条属人裁决在此记录。** ①**`skills/` 下的文档不披 MPL 头，MPL 文件头扫描以 `.rs` 为界**（该门本来就只扫 `.rs`，此裁决把「跳过 Markdown」从现状升为成文规则）：文档的许可证是它自己的 frontmatter 与 `docs/third-party.md` §5，给 MIT 的文档披 MPL 头就是错述它的条款；被击败的替代方案是逐文件豁免名单，它把一条能写成边界规则的事实变成一张会过期的名单。②**pstack 改编件（`why`／`how`／`blast-radius`）保持 MIT，且每件注明改编者是 2youg1**：改编声明与上游版权行、许可全文一起落在各件的来源注与 `skills/LICENSES.md`——一份不说谁改过的改本，藏的正是它现在是什么。
 
 ### 8-12 `npm`：`client/` 的依赖面（形状 1 判定）
 
