@@ -112,7 +112,8 @@ pub(crate) fn run(
             }
         }
         let Some(left) = knocks.checked_sub(1) else {
-            return Err(overran(item, runnable, patience, &stop(&mut child)));
+            let waited = Waited { patience, log };
+            return Err(overran(item, runnable, &waited, &stop(&mut child)));
         };
         knocks = left;
         std::thread::sleep(TICK);
@@ -165,9 +166,16 @@ pub(super) fn stop(child: &mut Child) -> Option<String> {
     }
 }
 
+/// How long an install was given, and where what it printed meanwhile
+/// went: the two facts a person reads when the knocks ran out.
+struct Waited<'a> {
+    patience: u32,
+    log: &'a Path,
+}
+
 /// The knocks ran out with the program still running.
-fn overran(item: &str, runnable: &Runnable, patience: u32, stopping: &Option<String>) -> AxError {
-    let seconds = TICK.saturating_mul(patience).as_secs();
+fn overran(item: &str, runnable: &Runnable, waited: &Waited, stopping: &Option<String>) -> AxError {
+    let seconds = TICK.saturating_mul(waited.patience).as_secs();
     let aftermath = match stopping {
         None => "it was stopped".to_owned(),
         Some(trouble) => trouble.clone(),
@@ -180,10 +188,11 @@ fn overran(item: &str, runnable: &Runnable, patience: u32, stopping: &Option<Str
             runnable.spelled()
         ),
     )
-    .with_recovery(
-        "run this line yourself in a terminal: an installer that asks a question gets no answer \
-         from this city, because it is started without a terminal to ask on",
-    )
+    .with_recovery(format!(
+        "run this line yourself in a terminal, where it can take as long as it needs and ask \
+         what it wants to ask; what it printed before it was stopped is in {}",
+        waited.log.display()
+    ))
 }
 
 /// The child could not be watched, which is not the same as failing.
