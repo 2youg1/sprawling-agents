@@ -52,6 +52,7 @@ pub struct Attribution {
     segment_weights: BTreeMap<RunId, Vec<(String, u64)>>,
     tool_weights: BTreeMap<String, u64>,
     skill_weights: BTreeMap<String, u64>,
+    unpriced: Unpriced,
 }
 
 pub struct AttributionReport {
@@ -61,6 +62,17 @@ pub struct AttributionReport {
     pub by_segment: Vec<(String, UsdMicros)>,
     pub by_tool: Vec<(String, UsdMicros)>,
     pub by_skill: Vec<(String, UsdMicros)>,
+    pub unpriced: Unpriced,
+}
+
+/// The model calls that came back with no authoritative amount. They
+/// add nothing to `total`, so without this count a city whose provider
+/// never prices a call reads the same as a city that never ran one; the
+/// tokens are the one measure of their use the ledger does hold.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Unpriced {
+    pub calls: u64,
+    pub tokens: u64,
 }
 
 impl Attribution {
@@ -117,6 +129,11 @@ impl Attribution {
                 else {
                     // A call with no authoritative amount attributes
                     // nothing. Estimating here would invent money.
+                    self.unpriced.calls = self.unpriced.calls.saturating_add(1);
+                    self.unpriced.tokens = self
+                        .unpriced
+                        .tokens
+                        .saturating_add(usage_tokens(record.data().as_map()));
                     self.tool_weights.clear();
                     self.skill_weights.clear();
                     return Ok(());
@@ -181,8 +198,24 @@ impl Attribution {
             by_segment: quantify(&self.by_segment),
             by_tool: quantify(&self.by_tool),
             by_skill: quantify(&self.by_skill),
+            unpriced: self.unpriced,
         }
     }
+}
+
+/// The four token counts of one `model_returned`'s `usage`, summed; a
+/// call that reported no usage used no tokens anyone measured.
+fn usage_tokens(data: &serde_json::Map<String, Value>) -> u64 {
+    let usage = data.get("usage");
+    [
+        "input_tokens",
+        "output_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens",
+    ]
+    .into_iter()
+    .filter_map(|field| usage.and_then(|u| u.get(field)).and_then(Value::as_u64))
+    .fold(0, u64::saturating_add)
 }
 
 #[cfg(test)]

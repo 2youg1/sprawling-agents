@@ -36,6 +36,7 @@
   import { usd } from "../core/time";
   import { ui } from "../ui";
   import type { Address, Answer, Autonomy } from "../wire";
+  import { costReading } from "./pricing";
 
   // How loudly a cell is drawn. Exhaustive, and it is the whole of the
   // difference between the two kinds of fact on this strip: a setting
@@ -140,6 +141,7 @@
     const held = spending;
     if (spendingRead.kind === "unavailable") return say($lang, "facts_unreadable");
     if (run === null || held === undefined) return NOTHING;
+    if (costReading(held).kind === "unpriced") return say($lang, "cost_none");
     const found = held.by_run.find(([name]) => name === run.run);
     return found === undefined ? usd(0) : usd(found[1]);
   });
@@ -147,7 +149,8 @@
   const thisCity = $derived.by((): string => {
     const held = spending;
     if (spendingRead.kind === "unavailable") return say($lang, "facts_unreadable");
-    return held === undefined ? NOTHING : usd(held.total);
+    if (held === undefined) return NOTHING;
+    return costReading(held).kind === "unpriced" ? say($lang, "cost_none") : usd(held.total);
   });
 
   const autonomyRead = $derived(

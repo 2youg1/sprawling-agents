@@ -395,6 +395,10 @@
     "en": "cost",
     "zh": "成本"
   },
+  "cost_unpriced": {
+    "en": "{calls} model calls came back with no price; they used {tokens} tokens",
+    "zh": "{calls} 次模型调用没有报价，共用了 {tokens} 个 token"
+  },
   "context_second_save": {
     "en": "write it",
     "zh": "写入"

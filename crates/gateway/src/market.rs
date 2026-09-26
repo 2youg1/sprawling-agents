@@ -40,6 +40,23 @@ pub struct ModelEntry {
     pub cache_write_price: UsdMicros,
 }
 
+impl ModelEntry {
+    /// Whether this row names any price at all. A row whose four prices
+    /// are zero is what the pick point writes for a model the catalogue
+    /// does not know, and what a local model carries; neither is a
+    /// measured price of zero.
+    pub fn states_a_price(&self) -> bool {
+        [
+            self.input_price,
+            self.output_price,
+            self.cache_read_price,
+            self.cache_write_price,
+        ]
+        .iter()
+        .any(|price| price.get() > 0)
+    }
+}
+
 /// A versioned snapshot; lookups are by provider model id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarketSnapshot {

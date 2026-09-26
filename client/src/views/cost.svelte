@@ -7,8 +7,9 @@
 // Cost in five cuts of one authoritative total. Shares are drawn
 // against `total`, never against the sum of the rows, so an
 // unattributed remainder stays visible. A provider that reported no
-// price leaves the total at zero, and the page says so rather than
-// printing $0.00 as if it were a measurement.
+// price leaves the total at zero; the server counts those calls and
+// their tokens, and the page states that count rather than printing
+// $0.00 as if it were a measurement or calling the city idle.
 //
 // **The total and the by-run cut are two questions and stay apart**
 // (client-SPEC 7D): one is what this city has spent, the other is who
@@ -21,7 +22,7 @@
 // attribute, not a switch of this page's own.
 
 import type { Key } from "../core/lang";
-import type { UsdMicros } from "../wire";
+import type { UnpricedCalls, UsdMicros } from "../wire";
 
 type Cut = "by_run" | "by_actor" | "by_segment" | "by_tool" | "by_skill";
 const CUTS: readonly Cut[] = ["by_run", "by_actor", "by_segment", "by_tool", "by_skill"];
@@ -42,11 +43,12 @@ const TITLES: Record<Cut, Key> = {
   import { QUERIES } from "../core/asking";
   import { readAnswer } from "../core/answered";
   import { MAYOR, toFragment } from "../core/route";
-  import { say } from "../core/lang";
+  import { fill, say } from "../core/lang";
   import { usd } from "../core/time";
   import { ui } from "../ui";
   import EmptyState from "./parts/empty.svelte";
   import Unanswered from "./parts/unanswered.svelte";
+  import { costReading } from "./pricing";
 
   const u = ui();
   const lang = u.lang;
@@ -54,7 +56,14 @@ const TITLES: Record<Cut, Key> = {
 
   const read = $derived(readAnswer($asked, (held) => ("cost" in held ? held.cost : undefined)));
   const answer = $derived(read.kind === "held" ? read.value : undefined);
+  const reading = $derived(answer === undefined ? undefined : costReading(answer));
 </script>
+
+{#snippet unpriced(count: UnpricedCalls)}
+  <p class="mb-wide text-note text-text-quiet">
+    {fill(say($lang, "cost_unpriced"), { calls: String(count.calls), tokens: String(count.tokens) })}
+  </p>
+{/snippet}
 
 {#snippet cut(rows: readonly (readonly [string, UsdMicros])[], total: UsdMicros)}
   <ul class="text-note">
@@ -83,9 +92,12 @@ const TITLES: Record<Cut, Key> = {
   </div>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.cost} />
-  {:else if answer === undefined}
+  {:else if answer === undefined || reading === undefined}
     <p class="text-text-disabled">…</p>
-  {:else if answer.total <= 0}
+  {:else if reading.kind === "unpriced"}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+    {@render unpriced(answer.unpriced)}
+  {:else if reading.kind === "idle"}
     <!-- Nothing has been spent, which reads exactly like a page that
     failed to load unless the page says which one it is. Spending starts
     with a run, and a run starts in the conversation with the Mayor. -->
@@ -100,6 +112,10 @@ const TITLES: Record<Cut, Key> = {
       {/snippet}
     </EmptyState>
   {:else}
+    {#if answer.unpriced.calls > 0}
+      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+      {@render unpriced(answer.unpriced)}
+    {/if}
     <div class="grid gap-wide grid-cols-[repeat(auto-fit,minmax(320px,1fr))]">
       {#each CUTS as each (each)}
         <section>

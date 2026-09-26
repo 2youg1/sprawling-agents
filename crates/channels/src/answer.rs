@@ -208,6 +208,19 @@ pub struct CostAnswer {
     pub by_segment: Vec<(String, UsdMicros)>,
     pub by_tool: Vec<(String, UsdMicros)>,
     pub by_skill: Vec<(String, UsdMicros)>,
+    /// The calls no provider priced, which `total` cannot show.
+    pub unpriced: UnpricedCalls,
+}
+
+/// The model calls that came back with no authoritative amount, and the
+/// tokens they used. A city whose provider never prices a call has a
+/// zero `total` after any number of runs; this is what tells that city
+/// apart from one where nothing ran.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct UnpricedCalls {
+    pub calls: u64,
+    pub tokens: u64,
 }
 
 /// What a query returns. `Unavailable` is a real answer: a view this

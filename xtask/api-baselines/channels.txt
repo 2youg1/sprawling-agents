@@ -322,6 +322,7 @@ pub channels::CostAnswer::by_segment: alloc::vec::Vec<(alloc::string::String, ke
 pub channels::CostAnswer::by_skill: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub channels::CostAnswer::by_tool: alloc::vec::Vec<(alloc::string::String, kernel::budget::UsdMicros)>
 pub channels::CostAnswer::total: kernel::budget::UsdMicros
+pub channels::CostAnswer::unpriced: channels::UnpricedCalls
 pub channels::CostOfAnswer::node: kernel::node_id::NodeId
 pub channels::CostOfAnswer::runs: alloc::vec::Vec<(kernel::event::identity::RunId, kernel::budget::UsdMicros)>
 pub channels::CostOfAnswer::spent: kernel::budget::UsdMicros
@@ -822,6 +823,8 @@ pub channels::Turn::stopped: core::option::Option<alloc::string::String>
 pub channels::Turn::t: kernel::event::identity::TimeMs
 pub channels::Turn::thought: core::option::Option<alloc::string::String>
 pub channels::Turn::used: core::option::Option<channels::Used>
+pub channels::UnpricedCalls::calls: u64
+pub channels::UnpricedCalls::tokens: u64
 pub channels::Upstream::address: alloc::string::String
 pub channels::Upstream::label: channels::CityLabel
 pub channels::Upstream::token_digest: core::option::Option<kernel::locator::B3Hash>
@@ -1052,6 +1055,7 @@ pub struct channels::ToolkitLine
 pub struct channels::ToolkitSlug(_)
 pub struct channels::TuningDefaults
 pub struct channels::Turn
+pub struct channels::UnpricedCalls
 pub struct channels::Upstream
 pub struct channels::Used
 pub struct channels::Welcome
