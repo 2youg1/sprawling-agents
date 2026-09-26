@@ -8,6 +8,7 @@
 //! and the views, and back to normal once the thread has kept a core
 //! busy through a whole window (sprawling-SPEC.md 8-93).
 
+use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
 /// How long a raised thread may stay busy before the valve lowers it.
@@ -120,10 +121,36 @@ pub(crate) fn setting_telling_a_refusal() -> CorePriority {
 ///
 /// The runtime's own failure to start.
 pub(crate) fn serving_runtime(setting: CorePriority) -> std::io::Result<tokio::runtime::Runtime> {
-    drop(setting);
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
+        .on_thread_unpark(move || worker_woke(setting, Instant::now()))
+        .on_thread_park(|| worker_slept(Instant::now()))
         .build()
+}
+
+thread_local! {
+    /// A runtime worker's standing and valve, and when it last woke;
+    /// made at its first wake, because only workers park and unpark and
+    /// a blocking-pool thread must never stand raised without a valve.
+    static WORKER: RefCell<Option<(CoreThread, Instant)>> = const { RefCell::new(None) };
+}
+
+/// Raises the worker at its first wake, and marks when each turn began.
+fn worker_woke(setting: CorePriority, now: Instant) {
+    WORKER.with_borrow_mut(|worker| match worker {
+        Some((_, woke)) => *woke = now,
+        None => *worker = Some((CoreThread::raise("tokio-runtime-worker", setting, now), now)),
+    });
+}
+
+/// Records the turn that just ended, lowering the worker when it has
+/// kept a core busy through a window.
+fn worker_slept(now: Instant) {
+    WORKER.with_borrow_mut(|worker| {
+        if let Some((core, woke)) = worker {
+            core.record_turn_lowering_when_busy(*woke, now);
+        }
+    });
 }
 
 /// Raises the calling thread one step above normal, unless the setting
