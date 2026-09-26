@@ -38,7 +38,12 @@ export function livened(live: readonly RunBelief[], run: RunBelief): readonly Ru
 
 // Whether a run is in this room or a room below it.
 export function within(run: RunBelief, room: string): boolean {
-  return run.addr !== null && (run.addr === room || run.addr.startsWith(`${room}/`));
+  return run.addr !== null && inside(run.addr, room);
+}
+
+// Whether an address is this room or a room below it.
+export function inside(addr: string, room: string): boolean {
+  return addr === room || addr.startsWith(`${room}/`);
 }
 
 // The newest working run of one room: the run a message typed there

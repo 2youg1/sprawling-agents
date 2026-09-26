@@ -123,7 +123,7 @@ test("the runs of a room cost the room, not the city", () => {
   const store = createBelief(() => 0);
   // A city of `RUNS` runs spread over a hundred rooms under the hall.
   const rooms = 100;
-  const roomOf = (index: number): Address => Address.make(`hall/r${index % rooms}`);
+  const roomOf = (index: number): Address => Address.make(`hall/r${String(index % rooms)}`);
   store.adoptCity({
     active: WORKING,
     buildings: [],

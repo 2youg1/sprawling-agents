@@ -61,6 +61,9 @@ export interface Belief {
   // The runs that have not frozen, oldest start first: the one answer
   // to which runs are working (`live.ts`).
   live: readonly RunBelief[];
+  // The ids of the runs each room has held, oldest start first
+  // (`rooms.ts`).
+  rooms: ReadonlyMap<string, readonly RunId[]>;
   halted: HaltScope[];
   // The ledger position the list of shut scopes is current to. Two
   // writers touch the list - an answer states the whole of it and a
