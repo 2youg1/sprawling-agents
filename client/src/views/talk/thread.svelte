@@ -15,6 +15,7 @@
   // own words, a reply, a call - carries the one fork action. Hovering
   // or focusing shows it; the `fork.here` chord answers for the entry
   // under the hand (roadmap S2, ux A7).
+  import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import type { RunBelief } from "../../core/belief";
   import { keymap } from "../../core/keys";
@@ -22,13 +23,17 @@
   import { toFragment } from "../../core/route";
   import { clock, count, usd } from "../../core/time";
   import type { Snippet } from "svelte";
-  import type { Note, RoundsAnswer, RunId, Turn } from "../../wire";
+  import type { Query, RunId, Turn } from "../../wire";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
   import Prose from "../prose.svelte";
   import Calls from "./calls.svelte";
   import ForkButton from "./fork_button.svelte";
+  import NoteLine from "./note_line.svelte";
+  import Person from "./person.svelte";
   import { callWord } from "./calls";
+  import { noteAt } from "./note_line";
   import { planFork } from "./forking";
   import { silentRun, silentTurn } from "./silence";
   import type { Phase } from "./silence";
@@ -73,11 +78,10 @@
   // once for this run and follows this id for the thread's life.
   // svelte-ignore state_referenced_locally (the capture is the point: the question is minted once, for the run this thread is keyed to)
   const readRun: RunId = run.run;
-  const rounds = u.conn.asking.ask({ rounds: { run: readRun } });
-  const answer = $derived.by((): RoundsAnswer | undefined => {
-    const held = $rounds;
-    return held !== undefined && "rounds" in held ? held.rounds : undefined;
-  });
+  const question: Query = { rounds: { run: readRun } };
+  const rounds = u.conn.asking.ask(question);
+  const read = $derived(readAnswer($rounds, (held) => ("rounds" in held ? held.rounds : undefined)));
+  const answer = $derived(read.kind === "held" ? read.value : undefined);
   const turns = $derived(answer?.turns ?? []);
   const task = $derived(answer?.opening?.task ?? run.task ?? "");
   // The opening task is a person's words like any other, and rides the
@@ -128,7 +132,7 @@
   const closedAt = $derived(answer?.closing?.at ?? null);
   // A frozen run that said nothing at all is one card with the reason
   // and a way out, not one grey box per turn (ux: the zero-output run).
-  const emptyRun = $derived(silentRun(turns, phase));
+  const emptyRun = $derived(read.kind === "held" && silentRun(turns, phase));
   const why = $derived.by((): string | null => {
     const stopped = turns.at(-1)?.stopped ?? null;
     return stopped === null || FINISHED.includes(stopped) ? null : stopped;
@@ -152,17 +156,6 @@
         return "";
     }
   });
-
-  // One note's own line in the Ledger, which is what a list of notes is
-  // keyed on: every variant carries one.
-  function noteAt(note: Note): number {
-    if ("arrived" in note) return note.arrived.at;
-    if ("refused" in note) return note.refused.at;
-    if ("fenced" in note) return note.fenced.at;
-    if ("waiting" in note) return note.waiting.at;
-    if ("unreadable" in note) return note.unreadable.at;
-    return note.discarded.at;
-  }
 
   // The branch a call's action asks for: the entry carries the turn it
   // sits in, so the plan is built here where both are in hand.
@@ -202,36 +195,11 @@
   // The checker types a `{#snippet}` name as a void call, which the
   // lint lane rejects inside a render tag. Each name is taken again as
   // its `Snippet` type, and the template renders that.
-  const person: Snippet<Parameters<typeof drawPerson>> = drawPerson;
   const reasoning: Snippet<Parameters<typeof drawReasoning>> = drawReasoning;
-  const noteLine: Snippet<Parameters<typeof drawNoteLine>> = drawNoteLine;
   const turnView: Snippet<Parameters<typeof drawTurnView>> = drawTurnView;
 </script>
 
 <svelte:window onkeydown={forkKey} />
-
-<!-- What a person said, and what the model said, are drawn as different
-kinds of thing rather than as the same thing with different labels.
-
-**A person is a shape; the model is the page.** A filled bubble,
-right-aligned and held to 83% of the column, reads as one utterance; an
-answer with no container at all, running the full measure, reads as a
-document. -->
-{#snippet drawPerson(text: string, label: string, at: number | undefined, entry: ForkEntry | null)}
-  <div class="group relative my-base flex flex-col items-end">
-    {#if entry !== null && onFork !== undefined}
-      <ForkButton {entry} run={run.run} {onFork} onHover={hoverFork} />
-    {/if}
-    <div
-      class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap"
-    >
-      {text}
-    </div>
-    <div class="mt-tight text-note text-text-disabled">
-      {label}{#if at !== undefined} · {clock($lang, at)}{/if}
-    </div>
-  </div>
-{/snippet}
 
 <!-- How the model got to what it said, folded away.
 
@@ -255,33 +223,6 @@ fold below it does. -->
   </details>
 {/snippet}
 
-<!-- What else a turn came to beside what it said. `fenced` draws
-nothing: a commit the run fenced is a fact for the run page, and the
-thread's question is what this turn did or waits on. -->
-{#snippet drawNoteLine(note: Note, turn: Turn)}
-  {#if "arrived" in note}
-    {@render person(note.arrived.said, note.arrived.from, undefined, {
-      kind: "message",
-      turn,
-      text: note.arrived.said,
-    })}
-  {:else if "refused" in note}
-    {@const error = note.refused.error}
-    <div class="my-snug rounded-card border border-alert/40 px-base py-snug text-note text-text-quiet">
-      <span class="text-alert">{error.code}</span> · {error.action} · {error.subject}
-      {#if error.recovery !== ""}
-        <div class="mt-tight text-text-faint">{error.recovery}</div>
-      {/if}
-    </div>
-  {:else if "waiting" in note}
-    <div class="my-snug text-note text-alert">{say($lang, "talk_waiting_you")}</div>
-  {:else if "discarded" in note}
-    <div class="my-snug text-note text-text-faint">
-      {fill(say($lang, "talk_discarded"), { n: String(note.discarded.count) })}
-    </div>
-  {/if}
-{/snippet}
-
 <!-- One round of the model: what it reasoned, what it called, what it
 said, and what that cost. -->
 {#snippet drawTurnView(turn: Turn, showEmpty: boolean)}
@@ -294,7 +235,7 @@ said, and what that cost. -->
       <ForkButton entry={{ kind: "turn", turn }} run={run.run} {onFork} onHover={hoverFork} />
     {/if}
     {#each turn.notes.filter((note) => "arrived" in note) as note (noteAt(note))}
-      {@render noteLine(note, turn)}
+      <NoteLine {note} {turn} run={run.run} {onFork} onHover={hoverFork} />
     {/each}
     {#if turn.thought}
       {@render reasoning(turn.thought, false)}
@@ -328,14 +269,25 @@ said, and what that cost. -->
       <div class="my-snug text-note text-alert">{fill(say($lang, "talk_cut_off"), { why: cut })}</div>
     {/if}
     {#each turn.notes.filter((note) => !("arrived" in note)) as note (noteAt(note))}
-      {@render noteLine(note, turn)}
+      <NoteLine {note} {turn} run={run.run} {onFork} onHover={hoverFork} />
     {/each}
   </div>
 {/snippet}
 
 <section aria-label={run.run} class={frozen ? "settled" : undefined}>
   {#if task !== ""}
-    {@render person(task, say($lang, "talk_you"), run.started ?? undefined, taskEntry)}
+    <Person
+      text={task}
+      label={say($lang, "talk_you")}
+      at={run.started ?? undefined}
+      entry={taskEntry}
+      run={run.run}
+      {onFork}
+      onHover={hoverFork}
+    />
+  {/if}
+  {#if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={question} />
   {/if}
   {#each turns as turn (turn.opened)}
     {@render turnView(turn, !emptyRun)}

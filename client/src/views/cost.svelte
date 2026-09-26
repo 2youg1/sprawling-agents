@@ -40,21 +40,20 @@ const TITLES: Record<Cut, Key> = {
 
 <script lang="ts">
   import { QUERIES } from "../core/asking";
+  import { readAnswer } from "../core/answered";
   import { MAYOR, toFragment } from "../core/route";
   import { say } from "../core/lang";
   import { usd } from "../core/time";
   import { ui } from "../ui";
-  import type { CostAnswer } from "../wire";
   import EmptyState from "./parts/empty.svelte";
+  import Unanswered from "./parts/unanswered.svelte";
 
   const u = ui();
   const lang = u.lang;
   const asked = u.conn.asking.ask(QUERIES.cost);
 
-  const answer = $derived.by((): CostAnswer | undefined => {
-    const held = $asked;
-    return held !== undefined && "cost" in held ? held.cost : undefined;
-  });
+  const read = $derived(readAnswer($asked, (held) => ("cost" in held ? held.cost : undefined)));
+  const answer = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 
 {#snippet cut(rows: readonly (readonly [string, UsdMicros])[], total: UsdMicros)}
@@ -82,7 +81,9 @@ const TITLES: Record<Cut, Key> = {
       </span>
     {/if}
   </div>
-  {#if answer === undefined}
+  {#if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={QUERIES.cost} />
+  {:else if answer === undefined}
     <p class="text-text-disabled">…</p>
   {:else if answer.total <= 0}
     <!-- Nothing has been spent, which reads exactly like a page that

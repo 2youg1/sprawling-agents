@@ -16,12 +16,14 @@
   // one of the two seats `mx-auto` is allowed in (client-SPEC 4-33) -
   // while numbered lines grow to their longest line and scroll, because
   // code and tables are never capped.
+  import { readAnswer } from "../../core/answered";
   import { putSpine } from "../../core/commands";
   import { fill, say } from "../../core/lang";
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
-  import { Address, type DocumentAnswer, type SpineDocument } from "../../wire";
+  import { Address, type Query, type SpineDocument } from "../../wire";
   import Path from "../parts/path.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
   import Prose from "../prose.svelte";
 
   // The four documents a person may write through this door. `PutSpine`
@@ -44,16 +46,12 @@
   const u = ui();
   const lang = u.lang;
 
-  const asked = $derived(u.conn.asking.ask({ document: { at } }));
-  // Three answers, not two: still asking, the city says the file is
-  // not there, or the head itself. `null` is the missing file and
-  // `undefined` is the wait, which the Solid reading kept apart by the
-  // same two values.
-  const doc = $derived.by((): DocumentAnswer | null | undefined => {
-    const answer = $asked;
-    if (answer === undefined) return undefined;
-    return "document" in answer ? answer.document : null;
-  });
+  const question = $derived<Query>({ document: { at } });
+  const asked = $derived(u.conn.asking.ask(question));
+  // Three readings, not two: still asking, the city could not look (a
+  // file it does not hold answers this way too), or the head itself.
+  const read = $derived(readAnswer($asked, (answer) => ("document" in answer ? answer.document : undefined)));
+  const doc = $derived(read.kind === "held" ? read.value : undefined);
 
   const markdown = $derived(at.endsWith(".md"));
   let raw = $state(false);
@@ -72,7 +70,7 @@
 
   function change(): void {
     const held = doc;
-    if (held === undefined || held === null) return;
+    if (held === undefined) return;
     draft = held.text;
     editing = true;
   }
@@ -83,12 +81,12 @@
   function save(): void {
     const to = spine;
     const held = doc;
-    if (to === null || held === undefined || held === null) return;
+    if (to === null || held === undefined) return;
     if (u.send(putSpine(to.building, to.which, held.text, draft))) editing = false;
   }
 
   const lines = $derived(
-    doc === undefined || doc === null
+    doc === undefined
       ? []
       : doc.text.split("\n").map((text) => ({ text })),
   );
@@ -100,11 +98,11 @@
 <div class="flex min-h-0 flex-1 flex-col">
   <div class="flex items-center gap-base pb-snug font-mono text-note text-text-faint">
     <Path path={at} base={root} />
-    {#if doc !== undefined && doc !== null}
+    {#if doc !== undefined}
       <span class="text-text-disabled">{kib(doc.bytes)}</span>
     {/if}
     <span class="flex-1"></span>
-    {#if markdown && doc !== undefined && doc !== null && !doc.binary}
+    {#if markdown && doc !== undefined && !doc.binary}
       <button
         type="button"
         class={[
@@ -129,11 +127,11 @@
       {/if}
     {/if}
   </div>
-  {#if doc === undefined}
+  {#if read.kind === "asking"}
     <p class="text-text-disabled">…</p>
-  {:else if doc === null}
-    <p class="text-text-disabled">{say($lang, "file_missing")}</p>
-  {:else}
+  {:else if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={question} />
+  {:else if doc !== undefined}
     <div class="min-h-0 flex-1 overflow-auto rounded-panel bg-chrome/60 p-pane">
       {#if doc.binary}
         <p class="text-text-faint">{fill(say($lang, "file_binary"), { kib: kib(doc.bytes) })}</p>

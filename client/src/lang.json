@@ -1,4 +1,8 @@
 {
+  "answer_unavailable": {
+    "en": "the city could not answer {query}",
+    "zh": "城答不上 {query}"
+  },
   "appearance_body": {
     "en": "body size",
     "zh": "正文字号"
@@ -575,6 +579,10 @@
     "en": "none: the machine itself",
     "zh": "无：宿主机本身"
   },
+  "facts_unreadable": {
+    "en": "could not read",
+    "zh": "读不出"
+  },
   "file_binary": {
     "en": "binary · {kib}",
     "zh": "二进制 · {kib}"
@@ -590,10 +598,6 @@
   "file_discard": {
     "en": "leave it",
     "zh": "不改了"
-  },
-  "file_missing": {
-    "en": "missing",
-    "zh": "不存在"
   },
   "file_truncated": {
     "en": "first {kib} of {total}",
@@ -2491,6 +2495,14 @@
   "talk_tokens": {
     "en": "{n} tokens",
     "zh": "{n} 个 token"
+  },
+  "talk_unreadable": {
+    "en": "record {at} did not read back",
+    "zh": "第 {at} 条记录读不回来"
+  },
+  "talk_unreadable_read": {
+    "en": "read it in the Ledger",
+    "zh": "到账本里看"
   },
   "talk_waiting_you": {
     "en": "waiting for you",

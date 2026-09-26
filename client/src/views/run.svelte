@@ -20,6 +20,7 @@
   import { readable } from "svelte/store";
   import type { Readable } from "svelte/store";
 
+  import { readAnswer } from "../core/answered";
   import { adopted } from "../core/belief";
   import { cancel, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
@@ -31,9 +32,9 @@
   import { Address } from "../wire";
   import type {
     Answer,
-    EvidenceItem,
     EvidenceKind,
     GitOid,
+    Query,
     RunId,
     RoundsAnswer,
     RunSummary,
@@ -43,6 +44,7 @@
   import Changes from "./changes.svelte";
   import EmptyState from "./parts/empty.svelte";
   import Path from "./parts/path.svelte";
+  import Unanswered from "./parts/unanswered.svelte";
   import Tabs from "./parts/tabs.svelte";
   import type { Lens } from "./parts/tabs.svelte";
   import Prompt from "./run/prompt.svelte";
@@ -119,13 +121,12 @@
   // The evidence question exists only while its lens is open: a
   // watched answer is refreshed when stale, and nobody is looking at
   // this one between visits.
-  const evidenceStore = $derived(
-    current === "evidence" ? u.conn.asking.ask({ evidence: { run } }) : NOTHING,
+  const evidenceQuestion = $derived<Query>({ evidence: { run } });
+  const evidenceStore = $derived(current === "evidence" ? u.conn.asking.ask(evidenceQuestion) : NOTHING);
+  const evidenceRead = $derived(
+    readAnswer($evidenceStore, (held) => ("evidence" in held ? held.evidence.items : undefined)),
   );
-  const items = $derived.by((): readonly EvidenceItem[] | undefined => {
-    const held = $evidenceStore;
-    return held !== undefined && "evidence" in held ? held.evidence.items : undefined;
-  });
+  const items = $derived(evidenceRead.kind === "held" ? evidenceRead.value : undefined);
 
   const peak = $derived(peakOf(turns));
   const seen = $derived(seenOf(turns));
@@ -281,7 +282,9 @@
       <EmptyState missing="run_no_fence" />
     {/if}
   {:else if eye.id === "evidence"}
-    {#if items === undefined}
+    {#if evidenceRead.kind === "unavailable"}
+      <Unanswered query={evidenceRead.query} asked={evidenceQuestion} />
+    {:else if items === undefined}
       <p class="text-text-disabled">…</p>
     {:else if items.length > 0}
       <ul class="text-note">

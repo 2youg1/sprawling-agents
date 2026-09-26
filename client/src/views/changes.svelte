@@ -18,10 +18,12 @@
   import { readable } from "svelte/store";
   import type { Readable } from "svelte/store";
 
+  import { readAnswer } from "../core/answered";
   import { fill, say } from "../core/lang";
   import { ui } from "../ui";
-  import type { Answer, FileChange, GitOid, HunksAnswer } from "../wire";
+  import type { Answer, GitOid, Query } from "../wire";
   import { howWord, linesWord } from "./changes";
+  import Unanswered from "./parts/unanswered.svelte";
 
   interface Props {
     readonly base: GitOid;
@@ -39,24 +41,21 @@
 
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
 
-  const asked = $derived(u.conn.asking.ask({ changes: { base, head } }));
-  const files = $derived.by((): readonly FileChange[] | undefined => {
-    const held = $asked;
-    return held !== undefined && "changes" in held ? held.changes.files : undefined;
-  });
+  const question = $derived<Query>({ changes: { base, head } });
+  const asked = $derived(u.conn.asking.ask(question));
+  const read = $derived(readAnswer($asked, (held) => ("changes" in held ? held.changes.files : undefined)));
+  const files = $derived(read.kind === "held" ? read.value : undefined);
 
   // The patch under the open row. The question exists only while a row
   // is open and both ends are named; `NOTHING` keeps the read below a
   // subscription to a store rather than a subscription to nothing.
-  const patchStore = $derived.by((): Readable<Answer | undefined> => {
+  const patchQuestion = $derived.by((): Query | null => {
     const at = open;
-    if (at === null || head === null) return NOTHING;
-    return u.conn.asking.ask({ hunks: { oid_a: base, oid_b: head, path: at } });
+    return at === null || head === null ? null : { hunks: { oid_a: base, oid_b: head, path: at } };
   });
-  const patch = $derived.by((): HunksAnswer | undefined => {
-    const held = $patchStore;
-    return held !== undefined && "hunks" in held ? held.hunks : undefined;
-  });
+  const patchStore = $derived(patchQuestion === null ? NOTHING : u.conn.asking.ask(patchQuestion));
+  const patchRead = $derived(readAnswer($patchStore, (held) => ("hunks" in held ? held.hunks : undefined)));
+  const patch = $derived(patchRead.kind === "held" ? patchRead.value : undefined);
 
   function toggle(path: string): void {
     open = open === path ? null : path;
@@ -71,7 +70,9 @@
   }
 </script>
 
-{#if files === undefined}
+{#if read.kind === "unavailable"}
+  <Unanswered query={read.query} asked={question} />
+{:else if files === undefined}
   <p class="text-text-disabled">…</p>
 {:else if files.length > 0}
   <ul class="text-note">
@@ -92,6 +93,8 @@
         {#if open === file.path}
           {#if head === null}
             <p class="pb-base text-text-disabled">{say($lang, "run_patch_needs_fence")}</p>
+          {:else if patchRead.kind === "unavailable" && patchQuestion !== null}
+            <Unanswered query={patchRead.query} asked={patchQuestion} />
           {:else if patch === undefined}
             <p class="text-text-disabled">…</p>
           {:else}

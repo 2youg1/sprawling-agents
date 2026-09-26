@@ -28,13 +28,14 @@
   import { derived } from "svelte/store";
   import type { Readable } from "svelte/store";
 
+  import { readAnswer } from "../core/answered";
   import { QUERIES } from "../core/asking";
   import type { RunBelief } from "../core/belief";
   import { fill, say } from "../core/lang";
   import { buildingOf } from "../core/route";
   import { usd } from "../core/time";
   import { ui } from "../ui";
-  import type { Address, Answer, Autonomy, CostAnswer, GovernanceAnswer } from "../wire";
+  import type { Address, Answer, Autonomy } from "../wire";
 
   // How loudly a cell is drawn. Exhaustive, and it is the whole of the
   // difference between the two kinds of fact on this strip: a setting
@@ -131,14 +132,17 @@
     );
   });
 
-  const spending = $derived.by((): CostAnswer | undefined => {
-    const held = $cost;
-    return held !== undefined && "cost" in held ? held.cost : undefined;
-  });
+  // A question the city could not answer is a cell that alerts with its
+  // own word, not the dash an unset fact draws: the dash would say the
+  // city spent nothing or chose nothing.
+  const spendingRead = $derived(readAnswer($cost, (held) => ("cost" in held ? held.cost : undefined)));
+  const spending = $derived(spendingRead.kind === "held" ? spendingRead.value : undefined);
+  const spendingWeight = $derived<Weight>(spendingRead.kind === "unavailable" ? "alerting" : "reading");
 
   const thisRun = $derived.by((): string => {
     const run = $moving;
     const held = spending;
+    if (spendingRead.kind === "unavailable") return say($lang, "facts_unreadable");
     if (run === null || held === undefined) return NOTHING;
     const found = held.by_run.find(([name]) => name === run.run);
     return found === undefined ? usd(0) : usd(found[1]);
@@ -146,13 +150,13 @@
 
   const thisCity = $derived.by((): string => {
     const held = spending;
+    if (spendingRead.kind === "unavailable") return say($lang, "facts_unreadable");
     return held === undefined ? NOTHING : usd(held.total);
   });
 
-  const autonomy = $derived.by((): GovernanceAnswer | undefined => {
-    const held = $governance;
-    return held !== undefined && "governance" in held ? held.governance : undefined;
-  });
+  const autonomyRead = $derived(
+    readAnswer($governance, (held) => ("governance" in held ? held.governance : undefined)),
+  );
 
   const sandbox = $derived.by((): { readonly value: string; readonly weight: Weight } => {
     const held = $boxed;
@@ -182,8 +186,8 @@
         value: $effort ?? NOTHING,
         weight: "setting",
       },
-      { key: "run", label: say($lang, "facts_run"), value: thisRun, weight: "reading" },
-      { key: "city", label: say($lang, "facts_city"), value: thisCity, weight: "reading" },
+      { key: "run", label: say($lang, "facts_run"), value: thisRun, weight: spendingWeight },
+      { key: "city", label: say($lang, "facts_city"), value: thisCity, weight: spendingWeight },
       {
         key: "link",
         label: say($lang, "facts_link"),
@@ -193,8 +197,11 @@
       {
         key: "autonomy",
         label: say($lang, "facts_autonomy"),
-        value: autonomyWord(autonomy?.autonomy),
-        weight: "reading",
+        value:
+          autonomyRead.kind === "unavailable"
+            ? say($lang, "facts_unreadable")
+            : autonomyWord(autonomyRead.kind === "held" ? autonomyRead.value.autonomy : undefined),
+        weight: autonomyRead.kind === "unavailable" ? "alerting" : "reading",
       },
       { key: "sandbox", label: say($lang, "facts_sandbox"), value: boxedIn.value, weight: boxedIn.weight },
     ];

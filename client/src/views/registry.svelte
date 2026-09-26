@@ -18,19 +18,18 @@ export { default as RegistryTable } from "./registry/table.svelte";
 
 <script lang="ts">
   import { QUERIES } from "../core/asking";
+  import { readAnswer } from "../core/answered";
   import { say } from "../core/lang";
   import { ui } from "../ui";
-  import type { RegistryAnswer } from "../wire";
+  import Unanswered from "./parts/unanswered.svelte";
   import Table from "./registry/table.svelte";
 
   const u = ui();
   const lang = u.lang;
   const asked = u.conn.asking.ask(QUERIES.registry);
 
-  const answer = $derived.by((): RegistryAnswer | undefined => {
-    const held = $asked;
-    return held !== undefined && "registry" in held ? held.registry : undefined;
-  });
+  const read = $derived(readAnswer($asked, (held) => ("registry" in held ? held.registry : undefined)));
+  const answer = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 
 <!-- The screen: the one question, and the table that draws its answer.
@@ -38,7 +37,9 @@ A table is not capped by content kind (client-SPEC 4-33) - it grows with
 its container and scrolls sideways rather than break a value. -->
 <div class="w-full px-pane py-wide">
   <h1 class="mb-wide text-title font-title" tabindex="-1">{say($lang, "nav_registry")}</h1>
-  {#if answer === undefined}
+  {#if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={QUERIES.registry} />
+  {:else if answer === undefined}
     <p class="text-text-disabled">…</p>
   {:else}
     <Table assets={answer.assets} />
