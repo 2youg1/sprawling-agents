@@ -61,5 +61,8 @@ pub(crate) trait Vfs: Send {
     /// directory-handle sync primitive there — memory-SPEC 3-3).
     fn sync_dir(&mut self, dir: &Path) -> io::Result<()>;
     fn remove_file(&mut self, path: &Path) -> io::Result<()>;
+    /// Gives `to` the permissions `from` carries, so a file written
+    /// anew keeps what the file it stands for allowed.
+    fn copy_permissions(&mut self, from: &Path, to: &Path) -> io::Result<()>;
     fn exists(&self, path: &Path) -> bool;
 }
