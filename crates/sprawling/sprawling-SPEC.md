@@ -3589,3 +3589,21 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 **测试。** `monitor::sampler::tests`：有人看时一拍把读到的那一个读数发给订阅者；没人看时不读、不发。`monitor::counters::tests`：读本进程得到非零的工作集、整机可用内存与卷剩余空间。
 
 **本节接口的当前状态。** 核心自己的健康（记账队列深度、持久水位线落后多少、relay 往返与事件到屏幕的 p50、排队的 run、S5.9M 的降级状态）与 Job Object 的汇总和逐进程明细尚未接入，这几项读数现为 0；磁盘延迟没有字段。本进程的读数要达到 ≤ 50 µs，得换一条只问本进程的路径（Windows 上是本进程句柄上的内存、CPU 时间与 I/O 计数，而不是整张进程表）；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
+
+## 8-93 `sprawling top`：经线协议看监视器（`bin::wire_client::watching`，形状：adapter）
+
+`sprawling top [--at host:port] [--token T]` 与 `call` 一样经 `--at` 找到一座在跑的城（默认同一个 `DEFAULT_AT`），握手后发 `ClientFrame::Monitor(Watch)`，此后每收到一个 `ServerFrame::Monitor` 就输出一次，直到城关闭连接或人按 Ctrl-C。城是由地址找到的，而不是由城名：一座城的地址就是它被 `serve`/`up` 时占的端口，`call` 与 `enrol` 已经这样找城。
+
+**接口。**
+
+- `Output::{Screen, Lines}`：stdout 是终端时为 `Screen`，否则为 `Lines`（`std::io::IsTerminal`）。
+- `shown(text: &str, history: &mut VecDeque<Sample>, output: Output, curve_width: usize) -> Option<String>`：收到的一帧文本变成要写到 stdout 的文字。不是监视读数的帧（欢迎、事件等）返回 `None`。读数先放进 `history`（满 `monitor::CAPACITY` 丢最旧的），`Lines` 返回 8-91 的 `json_line` 加一个换行；`Screen` 返回清屏并把光标移到左上角的 `ESC[H ESC[2J`，接 8-91 的 `screen(history, curve_width)` 与换行。`json_line` 失败时返回 `None`（8-91：实际不会出现）。
+- `top(at: &str, token: Option<&str>, output: Output) -> Result<(), AxError>`：连接、握手、发 `Watch`、逐帧调用 `shown` 并写出。连不上、握手被拒与读帧出错沿用 `call` 的错误（`E_WIRE_MISMATCH` 等）；连续 5 s 没有一帧视为城已停，正常返回。
+- 曲线宽度：环境变量 `COLUMNS` 能读成数时取它减去标签与读数占的 36 列，否则按 80 列算（44 个点）；标准库不给终端尺寸，不为这一个数引入依赖。
+
+**决定。**
+
+1. 文字由纯函数 `shown` 算出，socket 与 stdout 留在 `top`：一帧变成哪几个字节可以用整串比较来测，而连接只在端到端里测。
+2. 沉默 5 s 即结束，而不是永远等：读数每秒一个，5 个空拍说明城已停或已不再发，一个 agent 读到 EOF 比读到永远的阻塞有用。重新考虑的条件：采样的节拍变长。
+
+**测试。** `wire_client::watching::tests`：一帧读数在 `Lines` 下是一行 JSON 加换行，在 `Screen` 下是清屏序列接一屏；不是读数的帧什么也不输出、不进历史。
