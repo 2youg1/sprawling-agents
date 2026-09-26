@@ -474,7 +474,7 @@ struct CollaborationFold { … }   // 暂存 enqueued／consumed，`settle` 产 
 
 `rebuild_book`／`rebuild_governance`／`rebuild_collaboration` 三个函数删除。
 
-- `Standing::fold` 与 `rebuild_views` 折叠的是 `runtime::replay::VerifiedLedger::lines()` 里那份已解析的记录，不再对原始行调第二次 `EventRecord::parse_line`。理由有二：同一行只解析一次；更要紧的是，逐行检查放行的 `ig: true` 未知种类行（`VerifiedLine::IgnoredUnknown`）在第二次解析时会失败，于是一份能通过验证的历史却起不了城。两个折叠对 `IgnoredUnknown` 都跳过，与 `runtime::fork` 的读法一致。由 `a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary` 判定。
+- `Standing::fold` 与 `rebuild_views` 折叠的是 `runtime::replay::fold_ledger_dir` 逐行借出的已解析记录，不再对原始行调第二次 `EventRecord::parse_line`。理由有二：同一行只解析一次；更要紧的是，逐行检查放行的 `ig: true` 未知种类行（`VerifiedLine::IgnoredUnknown`）在第二次解析时会失败，于是一份能通过验证的历史却起不了城。两个折叠对 `IgnoredUnknown` 都跳过，与 `runtime::fork` 的读法一致。由 `a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary` 判定。
 - serve 只验证并折叠历史一遍：`fold_city` 在 serve 线程上先 `JsonlLedger::open`（取得写锁、修复撕裂尾），再经 `runtime::replay::fold_ledger_dir` 逐段流式读一次，每条已知记录先给 `Views::apply`、再给 `Standing` 的折叠；打开的账本与折好的 `Standing` 作为一个值经 `serving::serve::Opening` 交给 `RunWorker::holding`，worker 线程既不再打开账本、也不再读史。两个折叠对同一份记录作答，所以 worker 判定用的治理与页面读到的治理出自同一遍，不会因两遍之间账本变了而不等。`RunWorker::new`／`over` 仍自己折，它们的调用者（genesis、命令行、测试）手里没有现成的 `Standing`。`Standing` 是 worker 判定的依据，所以它必须在写锁之下折：锁先于读史取得，别的进程在折叠与打开之间追加的一行（例如 `CityHalted`）就无从落在 worker 的治理之外。serve 要求账本目录已存在（`init` 建好的城市），`JsonlLedger::open` 对缺失目录报错。
 - `Standing::fold` 与 `rebuild_views` 同走 `fold_ledger_dir`：三处启动折叠都不再同时持有全部原始行与全部记录，常驻的只是一段字节与一条记录。
 - `LedgerIndex` 在 `fold_ledger_dir` 的同一遍里建：`fold_city` 与 `rebuild_views` 把那一遍返回的索引交给 `Views::hold_index`，`Views::new` 只放一个空索引，不再另扫一遍历史；没经过折叠的 `Views`（测试、命令行）在第一次查询前由 `refresh` 补齐。`Standing::fold` 不要索引，丢弃它。

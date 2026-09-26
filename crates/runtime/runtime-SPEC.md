@@ -101,7 +101,7 @@ pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError>;
 /// 无段目录与空账本在此同形（均得空 VerifiedLedger）——本函数的调用方均自持城根算出路径；
 /// 区分二者是「从人那里拿到路径」的一层的事（§11；sprawling-SPEC §12）。
 pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError>;
-/// 流式折叠：逐段读（`memory::read_segment`），每行过同一个 `LineCheck`，已知记录借给 `each`
+/// 流式折叠：经 `memory::LedgerIndex::folding` 一次一段地读，每行过同一个 `LineCheck`，已知记录借给 `each`
 /// 后即丢；ignorable 行只入链不入折。每行只读一次、只解析一次，顺序即账本序，结果确定。
 /// 常驻的是一段字节与一条记录，而不是 `VerifiedLedger` 的全部原始行与全部记录——
 /// 启动折叠（`fold_city`、`Standing::fold`、`rebuild_views`）只要折的结果，不要行本身，走这一面；
