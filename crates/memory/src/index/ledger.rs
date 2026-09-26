@@ -298,7 +298,11 @@ fn walk<E>(
                     None => folded.insert_line(&name, offset, body),
                 }
             }
-            offset = offset.saturating_add(u64::try_from(line.len()).unwrap_or(0));
+            let len = u64::try_from(line.len())
+                .map_err(std::io::Error::other)
+                .map_err(io_err("measure segment line", &path))
+                .map_err(&lift)?;
+            offset = offset.saturating_add(len);
         }
         folded.scanned.insert(name, offset);
     }

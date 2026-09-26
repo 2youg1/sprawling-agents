@@ -292,7 +292,7 @@ mod tests {
             .map(|line| u64::try_from(line.len().saturating_add(1)).unwrap())
             .sum();
         eprintln!(
-            "ledger_append_ops: {first} disk ops for the first record, {second} for              every one after it, {bytes} B on disk for two records"
+            "ledger_append_ops: {first} disk ops for the first record, {second} for \n             every one after it, {bytes} B on disk for two records"
         );
         assert!(
             first > second,

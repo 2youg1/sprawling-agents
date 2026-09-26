@@ -29,6 +29,7 @@ use crate::error::MemoryError;
 /// every later wave until the position is true again: either
 /// `jsonl::unwind` has cut the segments back to their length before the
 /// failed wave, or a reopen has read the tail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Barrier {
     Whole,
     Broken,

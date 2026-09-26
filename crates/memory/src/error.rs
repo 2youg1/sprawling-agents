@@ -9,7 +9,7 @@
 //! **Why this is a module of its own.** memory-SPEC 7 recorded
 //! the condition when the type was born: it lived beside the ledger
 //! while fewer than three modules aggregated here, and moved out at
-//! three. Twelve modules import it today, and nine of its fifteen
+//! three. Twelve modules import it today, and most of its
 //! variants describe failures the ledger cannot produce — a corrupt CAS
 //! object, a bundle that is not a city, a worktree that is behind
 //! the trunk. Executing a decision whose stated condition has arrived
