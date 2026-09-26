@@ -13,7 +13,7 @@
 use super::{CrashBudget, Next};
 use crate::assembly::{Closing, now_ms};
 use kernel::{AxCode, AxError};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 /// How a supervised city stopped being supervised.
@@ -32,16 +32,42 @@ enum Launch {
     Again,
 }
 
+/// What `serve_city` decided for the child `serve`; this file only turns
+/// the decisions into flags, so neither is worked out a second time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Child {
+    /// The person's flags with their values, less `--supervise` and the
+    /// four flags `first` and `console` stand for.
+    pub forwarded: Vec<String>,
+    /// Whether the first child opens the browser; every later one leaves it.
+    pub first: Window,
+    /// Whether every child enters the console.
+    pub console: Console,
+}
+
+/// Whether a child `serve` opens the person's browser.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Window {
+    Open,
+    Leave,
+}
+
+/// Whether a child `serve` enters the city's console.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Console {
+    Enter,
+    Skip,
+}
+
 /// Serves `city` at `addr` in a child process and raises it again after
 /// each crash until the person closes it or the crash budget runs out.
 ///
-/// `line` is the command line `up` or `serve` received; `--supervise` is
-/// taken out and the rest reaches every child `serve` unchanged.
+/// `child` carries what the unsupervised run would have decided.
 ///
 /// # Errors
 /// Returns the failure to find this binary, to start a child, or to read
 /// the clock; a child that fails is a crash, not an error.
-pub fn supervise(city: &Path, addr: &str, line: &[String]) -> Result<Ended, AxError> {
+pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxError> {
     let exe = std::env::current_exe().map_err(|err| {
         AxError::failure(AxCode::PathNotFound, "find this binary", err.to_string())
             .with_recovery("run the binary by its path rather than through a shim")
@@ -49,7 +75,7 @@ pub fn supervise(city: &Path, addr: &str, line: &[String]) -> Result<Ended, AxEr
     let mut budget = CrashBudget::fresh();
     let mut launch = Launch::First;
     loop {
-        let served = run(&exe, &serve_line(city, addr, line, launch))?;
+        let served = run(&exe, &serve_line(city, addr, child, launch))?;
         launch = Launch::Again;
         match budget.after(&Closing::of(&served), now_ms()?) {
             Next::Stop => return Ok(Ended::Chosen),
@@ -83,7 +109,7 @@ fn lifted() -> bool {
 }
 
 /// Runs one child to its end and reads its exit as served or failed.
-fn run(exe: &PathBuf, args: &[String]) -> Result<Result<(), AxError>, AxError> {
+fn run(exe: &Path, args: &[String]) -> Result<Result<(), AxError>, AxError> {
     let status = Command::new(exe).args(args).status().map_err(|err| {
         AxError::failure(
             AxCode::StorageFatal,
@@ -104,41 +130,26 @@ fn run(exe: &PathBuf, args: &[String]) -> Result<Result<(), AxError>, AxError> {
     })
 }
 
-fn serve_line(city: &Path, addr: &str, line: &[String], launch: Launch) -> Vec<String> {
-    let wants_up = line.first().is_some_and(|verb| verb == "up");
-    let opens = match launch {
-        Launch::First
-            if !line.iter().any(|a| a == "--no-open")
-                && (wants_up || line.iter().any(|a| a == "--open")) =>
-        {
-            "--open"
+fn serve_line(city: &Path, addr: &str, child: &Child, launch: Launch) -> Vec<String> {
+    let opens = match (launch, child.first) {
+        (Launch::First, Window::Open) => "--open",
+        (Launch::First, Window::Leave) | (Launch::Again, Window::Open | Window::Leave) => {
+            "--no-open"
         }
-        Launch::First | Launch::Again => "--no-open",
     };
-    let console = wants_up && !line.iter().any(|a| a == "--no-console");
+    let console = match child.console {
+        Console::Enter => "--console",
+        Console::Skip => "--no-console",
+    };
     [
         "serve".to_owned(),
         city.display().to_string(),
         addr.to_owned(),
     ]
     .into_iter()
-    .chain(flags(line).filter(|a| a != "--open" && a != "--no-open"))
-    .chain(std::iter::once(opens.to_owned()))
-    .chain(console.then(|| "--console".to_owned()))
+    .chain(child.forwarded.iter().cloned())
+    .chain([opens.to_owned(), console.to_owned()])
     .collect()
-}
-
-/// The flags of `line`, without its verb, its positionals, or `--supervise`.
-fn flags(line: &[String]) -> impl Iterator<Item = String> + '_ {
-    let mut takes_value = false;
-    line.iter()
-        .filter(move |word| {
-            let keep = takes_value || word.starts_with("--");
-            takes_value = matches!(word.as_str(), "--log" | "--web-dir");
-            keep
-        })
-        .filter(|word| *word != "--supervise")
-        .cloned()
 }
 
 fn resume_line(city: &Path) -> Vec<String> {
@@ -152,10 +163,32 @@ mod tests {
 
     #[test]
     fn a_child_of_up_no_open_does_not_enter_the_console() {
-        let line: Vec<String> = ["up", "c", "--no-open", "--supervise"]
+        let child = Child {
+            forwarded: vec!["--log".to_owned(), "debug".to_owned()],
+            first: Window::Leave,
+            console: Console::Skip,
+        };
+        let line = serve_line(Path::new("c"), "127.0.0.1:1", &child, Launch::First);
+        assert_eq!(
+            line,
+            [
+                "serve",
+                "c",
+                "127.0.0.1:1",
+                "--log",
+                "debug",
+                "--no-open",
+                "--no-console"
+            ]
             .map(str::to_owned)
-            .to_vec();
-        let child = serve_line(Path::new("c"), "127.0.0.1:1", &line, Launch::First);
-        assert!(!child.iter().any(|word| word == "--console"), "{child:?}");
+            .to_vec()
+        );
+        let opened = Child {
+            first: Window::Open,
+            console: Console::Enter,
+            ..child
+        };
+        let again = serve_line(Path::new("c"), "127.0.0.1:1", &opened, Launch::Again);
+        assert_eq!(again[5..], ["--no-open".to_owned(), "--console".to_owned()]);
     }
 }

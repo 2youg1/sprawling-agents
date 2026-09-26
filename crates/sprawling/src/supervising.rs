@@ -12,7 +12,7 @@
 
 mod children;
 
-pub use children::{Ended, supervise};
+pub use children::{Child, Console, Ended, Window, supervise};
 
 use crate::assembly::Closing;
 use kernel::TimeMs;
