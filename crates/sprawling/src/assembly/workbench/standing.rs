@@ -100,6 +100,10 @@ pub(in crate::assembly) struct Placing<'a> {
     pub(in crate::assembly) city: kernel::B3Hash,
     /// What time it is, for the base commit a first placement makes.
     pub(in crate::assembly) clock: &'a (dyn accounting::Clock + Send + Sync),
+    /// The city's one fence at a time: a first placement commits the
+    /// city's index, which every fence also stages and commits
+    /// (sprawling-SPEC.md 8-46-13).
+    pub(in crate::assembly) fence_gate: &'a std::sync::Mutex<()>,
 }
 
 impl Site {
@@ -140,10 +144,12 @@ impl Site {
                 effort: self.config.effort,
             },
         );
+        let turn = super::held(placing.fence_gate, "take the fence gate")?;
         memory::Checkpoint::open(placing.city_root)
             .map_err(memory::MemoryError::into_ax)?
             .ensure_base(&[addr.as_str().to_owned()], placing.clock.now()?, &of)
             .map_err(memory::MemoryError::into_ax)?;
+        drop(turn);
         let claimed = memory::Worktrees::open(placing.city_root)
             .map_err(memory::MemoryError::into_ax)?
             .claim(&tree_of(addr)?, &super::tree_scope(&self.building))

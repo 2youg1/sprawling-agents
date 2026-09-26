@@ -8,9 +8,9 @@
 
 use accounting::Reached;
 
-use super::super::RunWorker;
+use super::Laying;
 
-impl RunWorker {
+impl Laying {
     /// The external tools this run may reach, each already connected to
     /// its server.
     ///
@@ -22,7 +22,7 @@ impl RunWorker {
     /// must equal what actually runs, and a building whose external
     /// service is down today is still a building that can work today.
     pub(in crate::assembly) fn mcp_tools(
-        &mut self,
+        &self,
         config: &kernel::FrozenConfig,
         write_root: &std::path::Path,
         confidential: bool,
@@ -49,7 +49,7 @@ impl RunWorker {
         // not say how much.
         let began = self.clock.now();
         let mut offered = Vec::new();
-        let resolve = self.resolver();
+        let resolve = crate::held_vault::resolving(std::sync::Arc::clone(&self.vault));
         for server in &config.mcp {
             // The module a reader is sent to is the transport that
             // failed, not whichever one was written first.

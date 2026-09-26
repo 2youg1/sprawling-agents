@@ -27,7 +27,7 @@ pub trait Connectors {
     /// Whatever starting the server, its handshake or its listing
     /// refuses.
     fn connect(
-        &mut self,
+        &self,
         server: &kernel::McpServer,
         write_root: &std::path::Path,
         confidential: bool,

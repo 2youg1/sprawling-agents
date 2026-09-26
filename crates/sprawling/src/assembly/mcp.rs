@@ -45,7 +45,7 @@ struct Resident {
 
 impl accounting::Connectors for Residents {
     fn connect(
-        &mut self,
+        &self,
         server: &kernel::McpServer,
         write_root: &std::path::Path,
         confidential: bool,
@@ -126,8 +126,14 @@ impl RunWorker {
     /// to a confidential building and leaving a failed one out stay the
     /// worker's.
     #[must_use]
-    pub fn with_connectors(self, connectors: Box<dyn accounting::Connectors + Send>) -> RunWorker {
-        RunWorker { connectors, ..self }
+    pub fn with_connectors(
+        self,
+        connectors: Box<dyn accounting::Connectors + Send + Sync>,
+    ) -> RunWorker {
+        RunWorker {
+            connectors: std::sync::Arc::from(connectors),
+            ..self
+        }
     }
 }
 
@@ -352,7 +358,7 @@ mod tests {
         init_city(dir.path()).unwrap();
         let (command, args) = protocol::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
-        let mut worker = RunWorker::new(
+        let worker = RunWorker::new(
             dir.path(),
             gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
@@ -360,20 +366,31 @@ mod tests {
         .unwrap();
         let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
 
-        let offered = worker.mcp_tools(&config, dir.path(), false);
+        let offered = worker
+            .laying("")
+            .unwrap()
+            .mcp_tools(&config, dir.path(), false);
         assert_eq!(offered.len(), 1);
         assert_eq!(kernel::Tool::meta(&offered[0]).name.as_str(), "apps_ping");
         assert_eq!(offered[0].remote(), "ping");
 
         assert!(
-            worker.mcp_tools(&config, dir.path(), true).is_empty(),
+            worker
+                .laying("")
+                .unwrap()
+                .mcp_tools(&config, dir.path(), true)
+                .is_empty(),
             "a confidential building holds no outbound tool, and starts nothing to hold one"
         );
 
         write_server_table(dir.path(), "lab", "sprawling-no-such-server", &[]);
         let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
         assert!(
-            worker.mcp_tools(&config, dir.path(), false).is_empty(),
+            worker
+                .laying("")
+                .unwrap()
+                .mcp_tools(&config, dir.path(), false)
+                .is_empty(),
             "a service that is down today does not stop the building from working today"
         );
     }
@@ -450,7 +467,7 @@ mod tests {
         let starts = dir.path().join("starts.txt");
         let (command, args) = protocol::counting_starts(SERVER_ANSWER, &starts);
         write_server_table(dir.path(), "lab", &command, &args);
-        let mut worker = RunWorker::new(
+        let worker = RunWorker::new(
             dir.path(),
             gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
@@ -458,9 +475,15 @@ mod tests {
         .unwrap();
         let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
 
-        let first = worker.mcp_tools(&config, dir.path(), false);
+        let first = worker
+            .laying("")
+            .unwrap()
+            .mcp_tools(&config, dir.path(), false);
         drop(first);
-        let second = worker.mcp_tools(&config, dir.path(), false);
+        let second = worker
+            .laying("")
+            .unwrap()
+            .mcp_tools(&config, dir.path(), false);
 
         assert_eq!(
             second.len(),
@@ -494,8 +517,12 @@ mod tests {
         let opener = {
             let gate = gate.clone();
             std::thread::spawn(move || {
-                drop(heard.recv_timeout(std::time::Duration::from_secs(10)));
-                std::fs::write(&gate, "").unwrap();
+                if heard
+                    .recv_timeout(std::time::Duration::from_secs(10))
+                    .is_err()
+                {
+                    std::fs::write(&gate, "").unwrap();
+                }
             })
         };
 
@@ -513,9 +540,8 @@ mod tests {
             reply: channels::Reply::nowhere(),
         });
         let answered_before_the_handshake = !gate.exists();
-        // An opener that already gave up has no ear left, and the gate
-        // it opened is all this test needs from it.
-        drop(answered.send(()));
+        std::fs::write(&gate, "").unwrap();
+        drop(answered);
         opener.join().unwrap();
         worker.land_the_rest().unwrap();
 

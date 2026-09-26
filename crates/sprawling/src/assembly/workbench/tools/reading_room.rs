@@ -9,9 +9,9 @@
 use kernel::{Address, AxError};
 
 use super::held;
-use crate::assembly::RunWorker;
+use crate::assembly::workbench::Laying;
 
-impl RunWorker {
+impl Laying {
     /// Admits the skills this building's own file names, and says which
     /// of them are not on the shelves.
     ///
@@ -24,7 +24,7 @@ impl RunWorker {
     /// Propagates a shelf that cannot be read and an entry the catalog
     /// refuses.
     pub(super) fn admit_reading_room(
-        &mut self,
+        &self,
         catalog: &std::sync::Arc<std::sync::Mutex<runtime::Catalog>>,
         rules: &city::BuildingRules,
         building: &city::Building,

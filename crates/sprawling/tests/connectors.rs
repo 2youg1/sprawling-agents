@@ -72,7 +72,7 @@ struct Scripted;
 
 impl accounting::Connectors for Scripted {
     fn connect(
-        &mut self,
+        &self,
         server: &kernel::McpServer,
         _write_root: &std::path::Path,
         confidential: bool,

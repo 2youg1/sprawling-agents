@@ -137,6 +137,7 @@ impl RunWorker {
                 city_root: &self.city_root,
                 city: self.city_hash()?,
                 clock: &*self.clock,
+                fence_gate: &self.flight.fence_gate,
             },
             &mut Stamping {
                 ledger: &mut self.ledger,
@@ -148,7 +149,12 @@ impl RunWorker {
 
         // What the model may see, what routes the call it makes, and
         // who it may hand work down to: one phase, one value.
-        let mut workbench = self.lay_out_workbench(&site, &desks, &at, &job_locator)?;
+        let mut workbench = self.laying(&site.who)?.lay_out_workbench(
+            &site,
+            &desks.for_bench(),
+            &at,
+            &job_locator,
+        )?;
         // The plan this run is frozen with, and the handoff that says
         // what to read to pick it up again: one phase, because the
         // handoff quotes the plan and the plan is what the prefix was

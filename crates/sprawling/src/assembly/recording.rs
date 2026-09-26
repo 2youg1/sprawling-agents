@@ -59,15 +59,54 @@ impl<L: Ledger> Stamping<'_, L> {
     }
 }
 
+/// The diagnostic log's write end: the worker holds one, and each lane
+/// preparing a dispatch holds a clone (sprawling-SPEC.md 8-93).
+///
+/// Shared rather than lent, because nothing reads a line back: where a
+/// line lands decides nothing, so two threads writing to one log need
+/// only take turns.
+#[derive(Clone)]
+pub(in crate::assembly) struct Notes(
+    std::sync::Arc<std::sync::Mutex<runtime::diagnostics::Diagnostics>>,
+);
+
+impl Notes {
+    pub(in crate::assembly) fn over(log: runtime::diagnostics::Diagnostics) -> Notes {
+        Notes(std::sync::Arc::new(std::sync::Mutex::new(log)))
+    }
+
+    /// Writes one line for the city, anchored at `seq`.
+    ///
+    /// A lock a dead thread left behind is written through all the
+    /// same: every write is one step under the lock, so the log inside
+    /// it is whole, and losing the line would hide the fault it names.
+    pub(in crate::assembly) fn write(
+        &self,
+        level: runtime::diagnostics::Level,
+        seq: kernel::Seq,
+        module: &str,
+        message: &str,
+    ) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .write(
+                level,
+                runtime::diagnostics::Site {
+                    run: RunId::CITY,
+                    seq,
+                    module,
+                },
+                message,
+            );
+    }
+}
+
 impl RunWorker {
     /// Writes one diagnostic line, anchored to where the ledger stands.
     pub(super) fn note(&mut self, level: runtime::diagnostics::Level, module: &str, message: &str) {
-        let site = runtime::diagnostics::Site {
-            run: RunId::CITY,
-            seq: self.ledger.position(),
-            module,
-        };
-        self.log.write(level, site, message);
+        self.log
+            .write(level, self.ledger.position(), module, message);
     }
 
     /// Appends one city record and folds it into the worker's own book.
