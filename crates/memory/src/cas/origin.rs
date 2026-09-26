@@ -36,6 +36,7 @@ impl Cas {
         let hash = self.put(bytes)?;
         let line = format!("{} {}", origin.run, origin.building.as_str());
         let (shard_dir, path) = self.origin_path(&hash);
+        let mut record = format!("{line}\n");
         if self.vfs.exists(&path) {
             let held = self
                 .vfs
@@ -47,12 +48,17 @@ impl Cas {
             {
                 return Ok(hash);
             }
+            // A crash can cut an append short; the new record starts on
+            // a line of its own, or it would read back as part of that tail.
+            if held.last().is_some_and(|byte| *byte != b'\n') {
+                record.insert(0, '\n');
+            }
         }
         self.vfs
             .create_dir_all(&shard_dir)
             .map_err(io_err("create cas origin shard", &shard_dir))?;
         self.vfs
-            .append(&path, format!("{line}\n").as_bytes())
+            .append(&path, record.as_bytes())
             .map_err(io_err("record cas origin", &path))?;
         self.vfs
             .sync_data(&path)
@@ -94,5 +100,38 @@ impl Cas {
         let shard_dir = self.dir.join("from").join(hex.get(..2).unwrap_or("00"));
         let path = shard_dir.join(&hex);
         (shard_dir, path)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use std::io::Write;
+
+    use super::*;
+
+    #[test]
+    fn an_origin_appended_after_a_torn_tail_still_reads_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cas = Cas::open(dir.path()).unwrap();
+        let put_in = |building: &str| BlockOrigin {
+            run: RunId::from_bytes([7; 16]),
+            building: Address::parse(building).unwrap(),
+        };
+        let hash = cas.put_for(b"notes\n", &put_in("lab")).unwrap();
+        let (_, path) = cas.origin_path(&hash);
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap()
+            .write_all(b"0000 torn")
+            .unwrap();
+
+        cas.put_for(b"notes\n", &put_in("vault")).unwrap();
+
+        assert_eq!(
+            cas.origins(&hash).unwrap(),
+            vec![put_in("lab"), put_in("vault")]
+        );
     }
 }
