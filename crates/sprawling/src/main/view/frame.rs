@@ -16,7 +16,7 @@ use super::arrange::{Entry, NodeKey, arrange};
 use super::detail::{json_lines, line_lines};
 use super::follow::Row;
 use super::keys::Action;
-use super::list::{cut, has_children, scrolled, tree_lines, visible};
+use super::list::{beside, cut, has_children, scrolled, tree_lines, visible};
 use super::rounds::{Rounds, fold};
 
 /// From this many columns on, the detail pane stays open on the right.
@@ -52,6 +52,13 @@ enum Step {
     On(usize),
 }
 
+/// How much of the ledger `records` holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reach {
+    Window,
+    Whole,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Life {
     Open,
@@ -69,6 +76,7 @@ pub(super) struct Face {
     expanded: BTreeSet<usize>,
     detail: Detail,
     life: Life,
+    reach: Reach,
     size: Size,
 }
 
@@ -105,6 +113,7 @@ impl Face {
             expanded: BTreeSet::new(),
             detail: Detail::Pane,
             life: Life::Open,
+            reach: Reach::Whole,
             size,
         };
         face.select_entry(tree_at);
@@ -113,11 +122,28 @@ impl Face {
 
     /// The face over the newest lines only, while the whole fold runs.
     pub(super) fn open_window(runs: &[RunLine], window: Vec<Row>, size: Size) -> Face {
-        Face::open(runs, window, size)
+        Face {
+            reach: Reach::Window,
+            ..Face::open(runs, window, size)
+        }
     }
 
-    /// Takes the whole fold in place of the window.
-    pub(super) fn fill(&mut self, _runs: &[RunLine], _whole: Vec<Row>) {}
+    /// Takes the whole fold in place of the window: the lineage, and every
+    /// line, the ones older than the window before it. The same node and
+    /// the same line stay selected, and every opened run is folded again.
+    pub(super) fn fill(&mut self, runs: &[RunLine], whole: Vec<Row>) {
+        let line_seq = self.records.get(self.record_at).map(|row| row.seq);
+        self.records = whole;
+        self.record_at = self.first_record_from(line_seq);
+        let opened: Vec<RunId> = self.rounds.keys().copied().collect();
+        for run in opened {
+            self.rounds.insert(run, fold(run, &self.records));
+        }
+        self.runs = runs.to_vec();
+        self.reach = Reach::Whole;
+        self.rearrange();
+        self.open_ancestors(self.tree_at);
+    }
 
     pub(super) fn apply(&mut self, action: Action) {
         let page = self.size.rows.max(1);
@@ -205,9 +231,23 @@ impl Face {
         self.life == Life::Closed
     }
 
-    /// The frame for the current size, one string per terminal row.
+    /// The frame for the current size, one string per terminal row; the
+    /// last one is the status line while the window is being filled.
     pub(super) fn frame(&self) -> Vec<String> {
-        let Size { columns, rows } = self.size;
+        match self.reach {
+            Reach::Whole => self.body(self.size.rows),
+            Reach::Window => {
+                let rows = self.size.rows.saturating_sub(1);
+                let mut lines = self.body(rows);
+                lines.resize(rows, String::new());
+                lines.push(cut(FILLING, self.size.columns));
+                lines
+            }
+        }
+    }
+
+    fn body(&self, rows: usize) -> Vec<String> {
+        let columns = self.size.columns;
         let detail = self.detail_lines();
         if self.detail == Detail::Full {
             return detail
@@ -220,18 +260,7 @@ impl Face {
         if columns < SIDE_PANE_MIN_WIDTH {
             return list.iter().map(|line| cut(line, columns)).collect();
         }
-        let left = columns / 2;
-        let right = columns.saturating_sub(left).saturating_sub(1);
-        (0..rows)
-            .map(|at| {
-                let side = |lines: &[String]| lines.get(at).map_or("", String::as_str).to_owned();
-                format!(
-                    "{:<left$}|{}",
-                    cut(&side(&list), left),
-                    cut(&side(&detail), right)
-                )
-            })
-            .collect()
+        beside(&list, &detail, columns, rows)
     }
 
     fn step(&mut self, step: Step) {
@@ -291,12 +320,8 @@ impl Face {
     fn switch_lens(&mut self) {
         match self.lens {
             Lens::Tree => {
-                let seq = self.entries.get(self.tree_at).map(|entry| entry.seq);
-                self.record_at = seq.map_or(0, |seq| {
-                    self.records
-                        .partition_point(|row| row.seq < seq)
-                        .min(self.records.len().saturating_sub(1))
-                });
+                self.record_at =
+                    self.first_record_from(self.entries.get(self.tree_at).map(|entry| entry.seq));
                 self.lens = Lens::Records;
             }
             Lens::Records => {
@@ -315,6 +340,15 @@ impl Face {
                 self.lens = Lens::Tree;
             }
         }
+    }
+
+    /// The first line at or after `seq`, or the last line.
+    fn first_record_from(&self, seq: Option<kernel::Seq>) -> usize {
+        seq.map_or(0, |seq| {
+            self.records
+                .partition_point(|row| row.seq < seq)
+                .min(self.records.len().saturating_sub(1))
+        })
     }
 
     /// Selects entry `at` in the tree and opens every ancestor of it.

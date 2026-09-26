@@ -5,7 +5,8 @@
 
 //! The list half of the person's face of `sprawling view`
 //! (sprawling-SPEC.md 8-91): which tree rows are shown, how each is
-//! marked, and the window of rows that keeps the cursor on screen.
+//! marked, the window of rows that keeps the cursor on screen, and the
+//! list set beside the detail pane.
 
 use std::collections::BTreeSet;
 
@@ -75,6 +76,28 @@ pub(super) fn scrolled(lines: Vec<String>, cursor: usize, rows: usize) -> Vec<St
         .skip(skip)
         .take(rows)
         .map(|(at, line)| format!("{}{line}", if at == cursor { '>' } else { ' ' }))
+        .collect()
+}
+
+/// The list on the left half and the detail on the right, split by a
+/// column of `|`.
+pub(super) fn beside(
+    list: &[String],
+    detail: &[String],
+    columns: usize,
+    rows: usize,
+) -> Vec<String> {
+    let left = columns / 2;
+    let right = columns.saturating_sub(left).saturating_sub(1);
+    let side = |lines: &[String], at: usize| lines.get(at).map_or("", String::as_str).to_owned();
+    (0..rows)
+        .map(|at| {
+            format!(
+                "{:<left$}|{}",
+                cut(&side(list, at), left),
+                cut(&side(detail, at), right)
+            )
+        })
         .collect()
 }
 

@@ -16,7 +16,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::{cursor, execute, queue, style, terminal};
 
 use super::ViewError;
-use super::follow::{FOLLOW_TICK, Follow};
+use super::follow::{FOLLOW_TICK, Follow, Polled};
 use super::frame::{Face, Size};
 use super::keys::{Key, action_for};
 
@@ -26,7 +26,7 @@ use super::keys::{Key, action_for};
 pub(super) fn show(dir: &Path) -> Result<(), ViewError> {
     let (mut follow, (runs, records)) = Follow::open(dir)?;
     let (columns, rows) = terminal::size()?;
-    let mut face = Face::open(&runs, records, size_of(columns, rows));
+    let mut face = Face::open_window(&runs, records, size_of(columns, rows));
     let mut out = BufWriter::new(std::io::stdout());
     terminal::enable_raw_mode()?;
     let looped = execute!(out, terminal::EnterAlternateScreen, cursor::Hide)
@@ -42,10 +42,12 @@ fn run_loop(face: &mut Face, follow: &mut Follow, out: &mut impl Write) -> Resul
     while !face.is_closed() {
         draw(face, out)?;
         while !crossterm::event::poll(FOLLOW_TICK)? {
-            if let Some((runs, appended)) = follow.poll()? {
-                face.follow(&runs, appended);
-                draw(face, out)?;
+            match follow.poll()? {
+                Some(Polled::Filled((runs, whole))) => face.fill(&runs, whole),
+                Some(Polled::Appended((runs, appended))) => face.follow(&runs, appended),
+                None => continue,
             }
+            draw(face, out)?;
         }
         match crossterm::event::read()? {
             Event::Key(pressed) => {

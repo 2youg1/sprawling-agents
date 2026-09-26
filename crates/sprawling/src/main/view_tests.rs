@@ -118,7 +118,7 @@ fn write_city_ledger(dir: &Path) -> Vec<Vec<u8>> {
         (run(2), yard, EventKind::ApprovalRequested, asked_by_2),
         (RunId::CITY, None, EventKind::ApprovalResolved, answered_2),
     ];
-    let mut prev = B3Hash::digest(b"");
+    let mut prev = kernel::GENESIS_PREV;
     let mut blob = Vec::new();
     let mut lines = Vec::new();
     for (seq, (run, addr, kind, data)) in script.into_iter().enumerate() {
@@ -143,14 +143,24 @@ fn write_city_ledger(dir: &Path) -> Vec<Vec<u8>> {
     lines
 }
 
-/// A run that starts after the viewer opened is in the next poll, with
-/// only the line that started it; a poll with nothing new takes nothing.
+/// The first window of a short ledger is all of it, and the whole fold
+/// arrives in a later poll; a run that starts after that is in the next
+/// poll, with only the line that started it; a poll with nothing new
+/// takes nothing.
 #[test]
 fn follow_takes_a_run_that_started_after_the_viewer_opened() {
     let dir = tempfile::tempdir().unwrap();
     let lines = write_city_ledger(dir.path());
     let (mut follow, (runs, rows)) = super::follow::Follow::open(dir.path()).unwrap();
     assert_eq!((runs.len(), rows.len()), (4, lines.len()));
+    let filled = (0..10_000).find_map(|_| {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        follow.poll().unwrap()
+    });
+    let Some(super::follow::Polled::Filled((_, whole))) = filled else {
+        panic!("the whole fold never arrived");
+    };
+    assert_eq!(whole, rows);
     let draft = EventDraft {
         run: run(5),
         t: TimeMs::new(99),
@@ -179,7 +189,9 @@ fn follow_takes_a_run_that_started_after_the_viewer_opened() {
         .concat(),
     )
     .unwrap();
-    let (runs, rows) = follow.poll().unwrap().expect("the appended run");
+    let Some(super::follow::Polled::Appended((runs, rows))) = follow.poll().unwrap() else {
+        panic!("the appended run never arrived");
+    };
     assert_eq!(runs.last().map(|line| line.run), Some(run(5)));
     assert_eq!(
         rows.iter()
