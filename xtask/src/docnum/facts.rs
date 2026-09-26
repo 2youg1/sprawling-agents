@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::report::XtaskError;
-use crate::{budget, gates, proof, walk};
+use crate::{architecture, budget, depmap, gates, proof, walk};
 
 mod recount;
 
@@ -39,7 +39,7 @@ pub(super) struct Fact {
 }
 
 /// Every fact a managed span may name.
-const FACTS: [Fact; 18] = [
+const FACTS: [Fact; 19] = [
     Fact {
         key: "wire_v",
         home: "channels::WIRE_V",
@@ -111,6 +111,12 @@ const FACTS: [Fact; 18] = [
         home: "the #[test] attributes in the tree",
         takes: None,
         recount: |root, _arg| recount::test_functions(root),
+    },
+    Fact {
+        key: "crate_graph",
+        home: "the depmap block in ARCHITECTURE.md section 3",
+        takes: None,
+        recount: |root, _arg| depmap::graph(&walk::read_text(&root.join(architecture::PATH))?),
     },
     Fact {
         key: "adversary_seed",

@@ -56,8 +56,21 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 /// # Errors
 /// When `text` holds no closed depmap block, as [`check`] refuses it.
 pub(crate) fn graph(text: &str) -> Result<String, XtaskError> {
-    let _allowed = parse_block(text)?;
-    Ok(String::new())
+    let lines = parse_block(text)?.into_iter().flat_map(|(name, deps)| {
+        if deps.is_empty() {
+            vec![format!("    {name}")]
+        } else {
+            deps.into_iter()
+                .map(|dep| format!("    {name} --> {dep}"))
+                .collect()
+        }
+    });
+    Ok(["```mermaid".to_owned(), "flowchart TD".to_owned()]
+        .into_iter()
+        .chain(lines)
+        .chain(["```".to_owned()])
+        .collect::<Vec<_>>()
+        .join("\n"))
 }
 
 /// Parse the ```depmap fenced block: `name:` or `name: dep, dep`.
@@ -267,23 +280,18 @@ mod tests {
 
     #[test]
     fn the_crate_graph_draws_every_allowed_edge_from_dependent_to_dependency() {
-        let text = "x
-```depmap
-kernel:
-memory: kernel
-runtime: kernel, memory
-```
-";
-        assert_eq!(
-            graph(text).unwrap(),
-            "```mermaid
-flowchart TD
-    kernel
-    memory --> kernel
-                 runtime --> kernel
-    runtime --> memory
-```"
-        );
+        let text = "x\n```depmap\nkernel:\nmemory: kernel\nruntime: kernel, memory\n```\n";
+        let expected = [
+            "```mermaid",
+            "flowchart TD",
+            "    kernel",
+            "    memory --> kernel",
+            "    runtime --> kernel",
+            "    runtime --> memory",
+            "```",
+        ]
+        .join("\n");
+        assert_eq!(graph(text).unwrap(), expected);
     }
 
     #[test]
