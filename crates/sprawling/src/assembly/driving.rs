@@ -8,7 +8,7 @@
 use std::path::PathBuf;
 
 use kernel::RunId;
-use kernel::{Address, AxCode, AxError};
+use kernel::{Address, AxError};
 use runtime::bench::ToolBench;
 use runtime::run::RunPlan;
 use runtime::{SieveSite, package_exec};
@@ -68,11 +68,11 @@ pub(crate) struct Driving {
 }
 
 /// What the sieve needs from the city for one run: a store to pin the
-/// original in, a directory the model can read the rest from, the
+/// original in, the room the model reads the rest from, the
 /// filter table frozen with the run, and what this run already saw.
 pub(crate) struct Sieving {
     pub(crate) cas: memory::Cas,
-    pub(crate) environment: PathBuf,
+    pub(crate) room: PathBuf,
     pub(crate) table: runtime::FilterTable,
     pub(crate) history: runtime::SieveHistory,
 }
@@ -93,7 +93,7 @@ impl Sieving {
             SieveSite {
                 offload: runtime::offload::OffloadSite {
                     cas: &mut self.cas,
-                    environment: &self.environment,
+                    room: &self.room,
                 },
                 table: &self.table,
                 history: &mut self.history,
@@ -132,11 +132,11 @@ impl RunWorker {
     /// through a temporary file, so two handles are one library, and a
     /// drive that borrowed the worker's could not leave the thread the
     /// worker lives on. The rest directory sits inside the room, which
-    /// is the one place a model-chosen path is allowed to read from.
+    /// is the one place a model-chosen path is allowed to read from;
+    /// the offload makes it when it first writes a rest file.
     ///
     /// # Errors
-    /// Propagates a store that will not open and a rest directory that
-    /// cannot be made.
+    /// Propagates a store that will not open.
     pub(in crate::assembly) fn sieving_for(
         &self,
         site: &Site,
@@ -144,18 +144,9 @@ impl RunWorker {
     ) -> Result<Sieving, AxError> {
         let cas = memory::Cas::open(&kernel::layout::CityLayout::new(&self.city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
-        let environment = site.write_root.join(addr.as_str()).join(".rest");
-        std::fs::create_dir_all(&environment).map_err(|err| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "make the rest directory",
-                format!("{}: {err}", environment.display()),
-            )
-            .with_recovery("make the room writable")
-        })?;
         Ok(Sieving {
             cas,
-            environment,
+            room: site.write_root.join(addr.as_str()),
             table: site.filters.clone(),
             history: runtime::SieveHistory::default(),
         })

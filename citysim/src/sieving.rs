@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The sieve's world in a scenario: a CAS and an environment directory
-//! for the tee, one filter table, and the run's history. An `exec`
+//! The sieve's world in a scenario: a CAS and a room whose rest
+//! directory holds the tee, one filter table, and the run's history. An `exec`
 //! result goes through `runtime::package_exec`, the same door the city
 //! uses, so the window a scenario replays is the window the product
 //! showed.
@@ -19,7 +19,7 @@ use runtime::{FilterTable, SieveHistory, SieveSite};
 
 pub struct SieveWorld {
     pub cas: Cas,
-    pub environment: PathBuf,
+    pub room: PathBuf,
     pub table: FilterTable,
     history: SieveHistory,
 }
@@ -30,8 +30,8 @@ impl SieveWorld {
     /// content-addressed and a rest file is written once.
     pub fn open(root: &std::path::Path, table: FilterTable) -> Result<SieveWorld, AxError> {
         let cas = Cas::open(&root.join("cas")).map_err(memory::MemoryError::into_ax)?;
-        let environment = root.join("env");
-        std::fs::create_dir_all(&environment).map_err(|err| {
+        let room = root.join("room");
+        std::fs::create_dir_all(&room).map_err(|err| {
             AxError::failure(AxCode::StorageFatal, "open sieve world", err.to_string())
                 .with_recovery(
                     "free space on this disk, or point the scenario root at a \
@@ -40,7 +40,7 @@ impl SieveWorld {
         })?;
         Ok(SieveWorld {
             cas,
-            environment,
+            room,
             table,
             history: SieveHistory::default(),
         })
@@ -60,7 +60,7 @@ pub(crate) fn package_exec(
         SieveSite {
             offload: OffloadSite {
                 cas: &mut world.cas,
-                environment: &world.environment,
+                room: &world.room,
             },
             table: &world.table,
             history: &mut world.history,

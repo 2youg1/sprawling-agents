@@ -157,7 +157,9 @@ fn the_window_holds_the_diagnostics_and_the_way_back_and_only_the_news_the_secon
     let account = &results[0]["data"]["result"]["sieve"][0];
     let original = account["original"].as_str().unwrap();
     assert!(original.starts_with("cas:b3-"));
-    assert!(std::path::Path::new(account["rest_path"].as_str().unwrap()).exists());
+    let rest_path = account["rest_path"].as_str().unwrap();
+    assert!(rest_path.starts_with("./.rest/rest-"), "{rest_path}");
+    assert!(dir.path().join("room").join(rest_path).exists());
     let second = results[1]["data"]["result"]["content"].as_str().unwrap();
     assert!(second.contains("error[E0425]"), "{second}");
     assert!(second.contains("[unchanged:"), "{second}");

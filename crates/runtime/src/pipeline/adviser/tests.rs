@@ -203,7 +203,7 @@ fn an_advisers_not_needed_acts_only_where_a_store_could_hold_it() {
             reminder: None,
             offload: Some(OffloadSite {
                 cas: &mut cas,
-                environment: &env,
+                room: &env,
             }),
             sieve: None,
             adviser: Some(consultation),
@@ -227,7 +227,7 @@ fn an_advisers_not_needed_acts_only_where_a_store_could_hold_it() {
             reminder: None,
             offload: Some(OffloadSite {
                 cas: &mut cas,
-                environment: &env,
+                room: &env,
             }),
             sieve: None,
             adviser: Some(consultation),

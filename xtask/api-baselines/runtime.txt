@@ -154,6 +154,7 @@ pub const runtime::backlog::waiting::PollBudget::DEFAULT: runtime::backlog::wait
 pub const runtime::diagnostics::Level::ALL: [runtime::diagnostics::Level; 5]
 pub const runtime::diagnostics::Level::DEFAULT: runtime::diagnostics::Level
 pub const runtime::mode::DEV_ENTRY: &str
+pub const runtime::offload::REST_DIR: &str
 pub const runtime::pipeline::exec::EXEC_CAP_BYTES: u64
 pub const runtime::sieve::HEAD_LINES: usize
 pub const runtime::sieve::MAX_TOTAL_LINES: usize
@@ -480,7 +481,7 @@ pub fn runtime::mode::admits(runtime::mode::Mode, &runtime::mode::Produced) -> r
 pub fn runtime::mode::dev_entry() -> runtime::catalog::CatalogEntry
 pub fn runtime::offload(&[u8], u64, &mut runtime::offload::OffloadSite<'_>) -> core::result::Result<runtime::offload::OffloadRecord, kernel::error::shape::AxError>
 pub fn runtime::offload::offload(&[u8], u64, &mut runtime::offload::OffloadSite<'_>) -> core::result::Result<runtime::offload::OffloadRecord, kernel::error::shape::AxError>
-pub fn runtime::offload::rematerialize(&kernel::locator::Locator, &mut runtime::offload::OffloadSite<'_>) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
+pub fn runtime::offload::rematerialize(&kernel::locator::Locator, &mut runtime::offload::OffloadSite<'_>) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub fn runtime::package(&[u8], runtime::pipeline::PackContext<'_>) -> core::result::Result<runtime::pipeline::Packaged, kernel::error::shape::AxError>
 pub fn runtime::package_exec(&kernel::tool::ToolCall, kernel::tool::ToolOutcome, runtime::pipeline::exec::SieveSite<'_>, core::option::Option<runtime::clock::ClockStamp>) -> core::result::Result<kernel::tool::ToolOutcome, kernel::error::shape::AxError>
 pub fn runtime::parse_arm(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> core::result::Result<kernel::tool::ExecArm, kernel::error::shape::AxError>
@@ -522,7 +523,7 @@ pub fn runtime::redact::Marker::spell(self, &[u8]) -> alloc::string::String
 pub fn runtime::redact::fingerprint(&[u8]) -> alloc::string::String
 pub fn runtime::redact::redact(&serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> (serde_json::map::Map<alloc::string::String, serde_json::value::Value>, u32)
 pub fn runtime::redact::redact_text(&str, runtime::redact::Marker) -> (alloc::string::String, u32)
-pub fn runtime::rematerialize(&kernel::locator::Locator, &mut runtime::offload::OffloadSite<'_>) -> core::result::Result<std::path::PathBuf, kernel::error::shape::AxError>
+pub fn runtime::rematerialize(&kernel::locator::Locator, &mut runtime::offload::OffloadSite<'_>) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError>
 pub fn runtime::reminder::ContextGauge::new(kernel::budget::Tokens, core::option::Option<kernel::config::SecondThreshold>) -> runtime::reminder::ContextGauge
 pub fn runtime::reminder::ContextGauge::new(kernel::budget::Tokens, core::option::Option<kernel::config::SecondThreshold>) -> runtime::reminder::ContextGauge
 pub fn runtime::reminder::ContextGauge::observe(&mut self, kernel::budget::Tokens) -> core::option::Option<runtime::reminder::ContextReminder>
@@ -766,10 +767,10 @@ pub runtime::NextCall::Allowed
 pub runtime::NextCall::Halted
 pub runtime::OffloadRecord::original: kernel::locator::Locator
 pub runtime::OffloadRecord::original_len: u64
-pub runtime::OffloadRecord::rest_path: std::path::PathBuf
+pub runtime::OffloadRecord::rest_path: alloc::string::String
 pub runtime::OffloadRecord::substitute: alloc::vec::Vec<u8>
 pub runtime::OffloadSite::cas: &'a mut memory::cas::Cas
-pub runtime::OffloadSite::environment: &'a std::path::Path
+pub runtime::OffloadSite::room: &'a std::path::Path
 pub runtime::Opening::FromJob
 pub runtime::Opening::WithPerson
 pub runtime::PackContext::adviser: core::option::Option<runtime::pipeline::adviser::Consultation>
@@ -865,7 +866,7 @@ pub runtime::SieveRecord::filter: alloc::string::String
 pub runtime::SieveRecord::lines_in: u64
 pub runtime::SieveRecord::lines_out: u64
 pub runtime::SieveRecord::original: kernel::locator::Locator
-pub runtime::SieveRecord::rest_path: std::path::PathBuf
+pub runtime::SieveRecord::rest_path: alloc::string::String
 pub runtime::SieveRecord::stages: alloc::vec::Vec<runtime::sieve::record::StageReport>
 pub runtime::SieveRecord::text: alloc::string::String
 pub runtime::SieveRequest::exit_code: core::option::Option<i64>
@@ -1045,10 +1046,10 @@ pub runtime::mode::Produced::held_out: core::option::Option<bool>
 pub runtime::mode::Produced::tests_passed: core::option::Option<bool>
 pub runtime::offload::OffloadRecord::original: kernel::locator::Locator
 pub runtime::offload::OffloadRecord::original_len: u64
-pub runtime::offload::OffloadRecord::rest_path: std::path::PathBuf
+pub runtime::offload::OffloadRecord::rest_path: alloc::string::String
 pub runtime::offload::OffloadRecord::substitute: alloc::vec::Vec<u8>
 pub runtime::offload::OffloadSite::cas: &'a mut memory::cas::Cas
-pub runtime::offload::OffloadSite::environment: &'a std::path::Path
+pub runtime::offload::OffloadSite::room: &'a std::path::Path
 pub runtime::pipeline::Ask::kind: kernel::event::record::adviser::AdviserAsk
 pub runtime::pipeline::Ask::material: core::option::Option<alloc::string::String>
 pub runtime::pipeline::Ask::options: alloc::vec::Vec<alloc::string::String>
@@ -1195,7 +1196,7 @@ pub runtime::sieve::SieveRecord::filter: alloc::string::String
 pub runtime::sieve::SieveRecord::lines_in: u64
 pub runtime::sieve::SieveRecord::lines_out: u64
 pub runtime::sieve::SieveRecord::original: kernel::locator::Locator
-pub runtime::sieve::SieveRecord::rest_path: std::path::PathBuf
+pub runtime::sieve::SieveRecord::rest_path: alloc::string::String
 pub runtime::sieve::SieveRecord::stages: alloc::vec::Vec<runtime::sieve::record::StageReport>
 pub runtime::sieve::SieveRecord::text: alloc::string::String
 pub runtime::sieve::Sieved::Cut(runtime::sieve::record::SieveRecord)
@@ -1251,7 +1252,7 @@ pub runtime::sieve::record::SieveRecord::filter: alloc::string::String
 pub runtime::sieve::record::SieveRecord::lines_in: u64
 pub runtime::sieve::record::SieveRecord::lines_out: u64
 pub runtime::sieve::record::SieveRecord::original: kernel::locator::Locator
-pub runtime::sieve::record::SieveRecord::rest_path: std::path::PathBuf
+pub runtime::sieve::record::SieveRecord::rest_path: alloc::string::String
 pub runtime::sieve::record::SieveRecord::stages: alloc::vec::Vec<runtime::sieve::record::StageReport>
 pub runtime::sieve::record::SieveRecord::text: alloc::string::String
 pub runtime::sieve::record::Sieved::Cut(runtime::sieve::record::SieveRecord)
