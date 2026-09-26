@@ -167,7 +167,7 @@ eval: kernel, memory
 browser: kernel
 protocol: kernel
 channels: kernel
-accounting: kernel, gateway, protocol, channels
+accounting: kernel, gateway, protocol, channels, city, collab
 sprawling: kernel, memory, gateway, runtime, collab, city, eval, browser, protocol, channels, accounting
 ```
 
