@@ -287,3 +287,128 @@ fn an_arrival_that_starts_work_is_refused_exec() {
         "a tainted run's exec reached past the command door: {answered}"
     );
 }
+
+/// Every `run_started` line the history holds, oldest first.
+fn runs_started(ledger_dir: &std::path::Path) -> Vec<String> {
+    runtime::replay::verify_ledger_dir(ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .filter(|line| line.contains("\"kind\":\"run_started\""))
+        .collect()
+}
+
+/// Gives the room at `addr` somebody to wake.
+fn move_in(city: &std::path::Path, addr: &str) {
+    let room = addr
+        .split('/')
+        .fold(city.to_path_buf(), |at, part| at.join(part));
+    std::fs::create_dir_all(&room).unwrap();
+    std::fs::write(
+        room.join(city::URBANITE_FILE),
+        "# URBANITE.md\n\nWorks here.\n",
+    )
+    .unwrap();
+}
+
+/// A knock at a room whose queue is out with a run starts nothing: a
+/// second run there would read a spare inbox that nothing is delivered
+/// into, while the signal waits for the holder. When the holder gives
+/// the queue back the same knock goes out, and the run it starts finds
+/// the signal at home (sprawling-SPEC.md 8-46-12).
+#[test]
+fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    move_in(dir.path(), "market/hana");
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("answered", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let hana = Address::parse("market/hana").unwrap();
+    let working = RunId::from_bytes([7u8; 16]);
+    let lent = worker.collaborating.rooms.lend(&hana, working);
+    worker.doorstep.knocks.push(Knock {
+        addr: hana.clone(),
+        from: "market/ito".to_owned(),
+        mode: kernel::Mode::PlanGoal,
+        conversations: 0,
+    });
+    worker.answer_knocks();
+    worker.land_the_rest().unwrap();
+    assert_eq!(
+        runs_started(&report.ledger_dir),
+        Vec::<String>::new(),
+        "nobody is woken in a room somebody is already working in"
+    );
+    worker.vacate(&hana, working, lent.inbox).unwrap();
+    worker.answer_knocks();
+    worker.land_the_rest().unwrap();
+    let started = runs_started(&report.ledger_dir);
+    assert_eq!(
+        started.len(),
+        1,
+        "the knock goes out once the room is empty: {started:?}"
+    );
+    assert!(started[0].contains("market/hana"), "{}", started[0]);
+}
+
+/// What a delegate hands back wakes the resident who asked for it, by
+/// the same decision an ordinary signal takes: the brief names the room
+/// that spoke, so the parent's next turn is a run of its own rather
+/// than a person dispatching it again (sprawling-SPEC.md 8-46-12).
+#[test]
+fn what_comes_back_wakes_the_resident_who_asked_for_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    city::create_building(
+        dir.path(),
+        &Address::parse("lab").unwrap(),
+        city::BuildingTemplate::Minimal,
+    )
+    .unwrap();
+    move_in(dir.path(), "lab/lead");
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "handing it down",
+                "tu_1",
+                "delegate",
+                serde_json::json!({
+                    "room": "lab/helper",
+                    "task": "measure the thing",
+                    "goal": "a number, then stop",
+                }),
+            ),
+            completion("handed down", None),
+            completion("measured", None),
+            completion("read what came back", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/lead").unwrap(),
+            task: "get it measured".to_owned(),
+            goal: "the number is written down, then stop".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+    let started = runs_started(&report.ledger_dir);
+    assert_eq!(
+        started.len(),
+        3,
+        "the lead, the helper, the lead again: {started:?}"
+    );
+    assert!(started[2].contains("lab/lead"), "{}", started[2]);
+    assert!(
+        provider
+            .bodies()
+            .join("\n")
+            .contains("@lab/helper signalled you"),
+        "the woken lead is told which room handed back"
+    );
+}

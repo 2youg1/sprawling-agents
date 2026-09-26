@@ -179,6 +179,20 @@ impl RunWorker {
         Ok(())
     }
 
+    /// Takes the queue of the room at `addr` back from the run that held
+    /// it.
+    ///
+    /// # Errors
+    /// Propagates the room table's refusal of the return.
+    pub(super) fn vacate(
+        &mut self,
+        addr: &Address,
+        from: kernel::RunId,
+        returned: collab::Inbox,
+    ) -> Result<(), AxError> {
+        self.collaborating.rooms.give_back(addr, from, returned)
+    }
+
     /// Starts a run for everyone who was spoken to while nobody was
     /// home.
     ///

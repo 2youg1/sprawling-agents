@@ -2615,8 +2615,20 @@ fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32
   读它。继任超限在 `conclude` 里判：诊断落 `Refuse`，拒绝随 `hand_back` 回给要这轮活的
   那一位（`Asked` 到人，`Child` 到父房间，无人时成诊断行），**本轮活照常 `discharge`**
   ——链断在第一端，不能把已经跑完的那一轮的结局一起吞掉。
+- **敲门先看房间里有没有人**。`answer_knocks` 在派一敲之前问 `RoomQueues::worked_by`：房间的队列
+  借出去了，就说明有一轮活正在那里读，此时再派一轮只会拿到一个空的备用信箱（`QueueTenure::ASpare`），
+  而信在 `Lent.waiting` 里要等持有者落地才回家。所以这一敲不派，存进 `Doorstep.deferred`（每个房间
+  一敲），持有者 `give_back` 之后由 `return_borrowed` 放回 `knocks`，本轮落地末尾的 `answer_knocks`
+  再派它——这时信已经在房间队列里，新一轮活读得到。判定只在派的那一刻做一次，而不是在 `knock` 入队时，
+  因为从入队到派出之间 `conclude` 可能已经把别的活派进同一个房间。
+- **handback 与普通的信走同一个敲门判定**。`discharge` 的 `Child` 分支投完 handback、派完图里新就绪的
+  节点之后，调用同一个 `knock`：说话者是子房间，模式是子活的模式，对话计数是子活继承来的那一个
+  （敲醒时照常加一）。父房间的图还有节点在外面时不敲——那几个节点会各自回来，最后一个回来、图被丢下时
+  才敲一次，免得每回来一个节点就花一轮父的真跑。父房间没有 `URBANITE.md` 时照旧不敲，结果在它的信箱里等人。
 
-**本章测试**：`owing::tests` 里两个边界（上限减一放行、到达上限拒绝，拒绝码
+**本章测试**：`assembly::waking::tests` 里 `a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave`
+（房间借出时一敲不开 run，归还之后同一敲开 run）与 `what_comes_back_wakes_the_resident_who_asked_for_it`
+（子活落地后父房间的居民被敲醒，brief 写明是子房间说的话）；`owing::tests` 里两个边界（上限减一放行、到达上限拒绝，拒绝码
 `E_LOOP_SUSPECTED` 且恢复语非空）；`assembly::waking::tests` 里一条 `conversations: u32::MAX`
 的敲门不开始任何 run（对照：既有的 `a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke`
 证明上限之下一敲照常开跑）。
