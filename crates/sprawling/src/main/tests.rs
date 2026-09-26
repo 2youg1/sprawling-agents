@@ -128,6 +128,9 @@ fn each_way_a_call_ends_has_its_own_exit_code() {
         .unwrap()
         .to_string();
     let words = |line: &[&str]| line.iter().map(ToString::to_string).collect::<Vec<_>>();
+    // A frame the city would read, so each row after it fails on the
+    // one thing the row names.
+    const ASK: &str = r#"{"ask":{"ask_id":1,"query":"city_view"}}"#;
     let table = [
         (words(&["call"]), Exit::Line),
         (words(&["call", "{not json", "--at", &vacant]), Exit::Line),
@@ -135,23 +138,9 @@ fn each_way_a_call_ends_has_its_own_exit_code() {
             words(&["call", "{\"query\":\"no_such\"}", "--at", &vacant]),
             Exit::Line,
         ),
-        (
-            words(&["call", "{\"query\":\"city_view\"}", "--quiet-ms", "soon"]),
-            Exit::Line,
-        ),
-        (
-            words(&[
-                "call",
-                "{\"query\":\"city_view\"}",
-                "--until",
-                "no_such_kind",
-            ]),
-            Exit::Line,
-        ),
-        (
-            words(&["call", "{\"query\":\"city_view\"}", "--at", &vacant]),
-            Exit::NoCity,
-        ),
+        (words(&["call", ASK, "--quiet-ms", "soon"]), Exit::Line),
+        (words(&["call", ASK, "--until", "no_such_kind"]), Exit::Line),
+        (words(&["call", ASK, "--at", &vacant]), Exit::NoCity),
     ];
     let observed = table
         .iter()
