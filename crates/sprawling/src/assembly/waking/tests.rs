@@ -168,10 +168,7 @@ fn an_arrival_lands_where_the_watch_table_says_and_starts_tainted() {
         .iter()
         .map(|line| String::from_utf8_lossy(line).into_owned())
         .collect::<Vec<String>>()
-        .join(
-            "
-",
-        );
+        .join("\n");
     assert!(
         history.contains("run_started"),
         "a source that starts work starts work"
@@ -218,10 +215,7 @@ addr = \"lab/room1\"
         .iter()
         .map(|line| String::from_utf8_lossy(line).into_owned())
         .collect::<Vec<String>>()
-        .join(
-            "
-",
-        );
+        .join("\n");
     assert!(
         !history.contains("run_started"),
         "arriving from outside is not by itself a reason to spend a model"

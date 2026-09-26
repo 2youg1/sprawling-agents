@@ -123,9 +123,7 @@ pub(crate) fn run<R: BufRead, W: Write>(
     let platform = Platform::current().map_or("this platform", Platform::as_str);
     writeln!(
         out,
-        "
-  this machine ({platform}), against what this city needs:
-"
+        "\n  this machine ({platform}), against what this city needs:\n"
     )?;
     // The heading is on the screen before the probes start, so a person
     // waiting on a slow tool is not looking at an empty terminal.
@@ -195,9 +193,7 @@ fn report_city<W: Write>(
 ) -> std::io::Result<bool> {
     writeln!(
         out,
-        "
-  the city at {}, building by building:
-",
+        "\n  the city at {}, building by building:\n",
         city.display()
     )?;
     let visited = match visit(city) {

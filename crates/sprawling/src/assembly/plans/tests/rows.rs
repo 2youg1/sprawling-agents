@@ -166,10 +166,7 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
         .iter()
         .map(|line| String::from_utf8_lossy(line).into_owned())
         .collect::<Vec<String>>()
-        .join(
-            "
-",
-        );
+        .join("\n");
     assert_eq!(
         history.matches("roadmap_claimed").count(),
         1,
@@ -309,10 +306,7 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
         .iter()
         .map(|line| String::from_utf8_lossy(line).into_owned())
         .collect::<Vec<String>>()
-        .join(
-            "
-",
-        );
+        .join("\n");
     assert!(history.contains("roadmap_finished"));
 }
 

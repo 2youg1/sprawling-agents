@@ -337,10 +337,7 @@ fn mentioned(history: &str, word: &str) -> String {
     if out.is_empty() {
         out = vec!["(no line names it)"];
     }
-    out.join(
-        "
-",
-    )
+    out.join("\n")
 }
 
 fn excerpt(history: &str, at: usize) -> String {
