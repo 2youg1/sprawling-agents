@@ -389,13 +389,11 @@ impl Backlog {
 #[cfg(test)]
 mod tests;
 
-mod capping;
 mod member;
 mod report;
 mod scratch;
 pub mod waiting;
 use member::{Body, Claim, Member, RunState, collect, storage};
-pub use capping::ResidentCap;
 pub use report::{BacklogKind, Finished, Standing, Started};
 use scratch::Scratch;
 pub use waiting::{Exit, PollBudget, Unseen};

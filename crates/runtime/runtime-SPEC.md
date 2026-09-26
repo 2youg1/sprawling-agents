@@ -595,30 +595,7 @@ pub(super) fn one_level_down(Command) -> Command;
 
 **决定（M78，平台调用的取法）**：子进程的 CPU 优先级取第一档「安全 Rust」——`creation_flags` 与 `nice` 都是对外只给安全接口的现成路，不需要 Zig 叶子，也不需要 Lean 证明边界。**被否**：①起动后再对子进程调 `SetPriorityClass`／`setpriority`——要 FFI（`unsafe` 或 Zig 叶子），且子进程在改档之前已经以正常档跑了一段；②Unix 上用 `CommandExt::pre_exec` 调 `nice(2)`——`pre_exec` 本身是 `unsafe`。**重开参数**：Unix 主机上出现不带 `nice` 的受支持平台，或测得多包一层 `nice` 的起动开销占到一条命令墙钟时间的可见比例。
 
-**未决（§3 口径）**：核心线程升到正常档之上一级与空转安全阀在 sprawling-SPEC §8-93；派出进程的常驻内存上限在 §8-13-4。重命令共用的额度池与按可用内存排队的 run 数尚未落地：可用内存的读数取 `sysinfo`（sprawling-SPEC §8-94 的计数器来源），池的大小由测得的核数与可用内存推出，哪些命令算重由城配置给默认表。
-
-### 8-13-4 runtime::backlog::capping（派出进程的常驻内存上限；形状 4 adapter）
-
-一条失控的构建能把整台机器的物理内存吃光，核心的记账、视图与 socket 随之被换出。本模块只做一件事：给 backlog 刚起动的子进程配一个常驻内存上限。它放在 backlog 下而不在 exec 下，因为放进 job 只能在 spawn 之后做，而 spawn 只在 `Backlog::run` 里（§8-14）。
-
-```rust
-pub struct ResidentCap(u64);                       // 一个派出进程最多常驻的字节数
-impl ResidentCap {
-    pub fn of_machine(physical: u64) -> Option<ResidentCap>;   // 物理内存的一半；小于下界时 None
-    pub fn bytes(self) -> u64;
-}
-impl Backlog { pub fn capped(self, cap: ResidentCap) -> Backlog; }
-pub(super) fn hold(child: &Child, cap: ResidentCap) -> Result<Job /* Windows */ | () /* Unix */, AxError>;
-```
-
-- **Windows**：spawn 之后立即建一个 job，经 `win32job` 2.0.3 的安全接口 `ExtendedLimitInfo::limit_working_memory` 设 `JOB_OBJECT_LIMIT_WORKINGSET`（下界 `MIN_RESIDENT` = 204 800 字节，即 Windows 给新进程的默认最小工作集，所以上限只加一个天花板、不多占内存；上界是 `ResidentCap`），再 `assign_process`。句柄随即关闭：job 在其中最后一个进程退出前一直存在，限额随之有效，harness 不读它。**这一上限限的是常驻（工作集），不是提交量**：超出时系统把页换出而不是拒绝分配，所以它保护的是别的进程的物理内存，不保护页面文件；它按进程计，job 里的每个进程各自受同一上限，不是整个 job 的总和。
-- **窗口**：子进程从 spawn 到 `assign_process` 之间不受上限，这段是两次系统调用的时长；它在这段里起动的孙进程不进 job。接受这一窗口，因为 `CREATE_SUSPENDED` 起动再恢复要 FFI（`ResumeThread`）。
-- **Unix**：`hold` 什么也不做。Linux 不执行 `RLIMIT_RSS`，而 `RLIMIT_AS` 限的是地址空间（构建工具常常预留远超所用的地址空间），且在子进程里设它要 `pre_exec`，那是 `unsafe`。
-- **上限的取值**：`of_machine` 取物理内存的一半，由 `bin::assembly` 在开城时量一次物理内存（sprawling-SPEC §8-94 的 `sysinfo` 读数）后经 `Backlog::capped` 给出；不给时 backlog 不设上限（测试的 backlog 即如此）。取一半而不是常数，是因为常数只适合某一类机器；一半让一个进程最多占去一半物理内存，另一半留给核心与人的其他程序。
-- 失败：建 job、设限额或放进 job 失败时，已起动的子进程被杀掉，`run` 返回 `E_TOOL_UNAVAILABLE`（动作 `cap a command's memory`，恢复「check that this process may create a job object」）：不受上限地跑下去会让这一保护静默失效。
-- 证据：`crates/runtime/src/backlog/capping.rs` 的 `a_dispatched_process_holds_at_most_its_cap_resident`——起动一个子进程并 `hold`，断言 job 的进程表里有它，且 job 的限额是这一上限（只在 Windows 上编译与运行）。
-
-**决定（M91，人可推翻的编排者裁决）**：先用 `win32job` 公开的工作集上限。**被否**：①作业级提交上限 `JOB_OBJECT_LIMIT_JOB_MEMORY`——`win32job` 里设它的字段是 crate 私有的，`process-wrap` 10.0.1 与 `windows-spawn` 0.1.0 也不设它，自己调 `SetInformationJobObject` 要 FFI；②`process-wrap` 的 `JobObject`——它只设关闭即杀。**重开参数**：一个对外只给安全接口的 crate 公开 `JOB_OBJECT_LIMIT_JOB_MEMORY`（那时换成作业级提交上限），或测得工作集上限让某条真实构建的墙钟时间明显变长。
+**未决（§3 口径）**：核心线程升到正常档之上一级与空转安全阀在 sprawling-SPEC §8-93；派出进程的内存上限尚未落地，卡在一个事实上：`win32job` 2.0.3 对外只公开 job 的工作集上限（`limit_working_memory`，即 `JOB_OBJECT_LIMIT_WORKINGSET`，限的是常驻而不是提交量，按进程计），而在未提权的账户下设这一项被系统拒绝——`SetInformationJobObject` 返回 `ERROR_PRIVILEGE_NOT_HELD`（os error 1314，「客户端没有所需的特权」），普通账户的令牌里没有这一项要的特权，启用特权要 `AdjustTokenPrivileges`，是 FFI。于是这条路在普通账户上让每条派出命令都起动失败，或者静默不设上限，两者都不可取。作业级提交上限（`JOB_OBJECT_LIMIT_JOB_MEMORY`）不要特权，但设它的字段在 `win32job` 里是 crate 私有的，`process-wrap` 10.0.1 与 `windows-spawn` 0.1.0 也不设它。重开参数：一个对外只给安全接口的 crate 公开 `JOB_OBJECT_LIMIT_JOB_MEMORY` 或 `JOB_OBJECT_LIMIT_PROCESS_MEMORY`，或者人裁决为这一处系统调用写 Zig 叶子（平台调用规则的第二档）。重命令共用的额度池与按可用内存排队的 run 数尚未落地：可用内存的读数取 `sysinfo`（sprawling-SPEC §8-94 的计数器来源），池的大小由测得的核数与可用内存推出，哪些命令算重由城配置给默认表。
 
 ### 8-14 runtime::tools 四件（形状 4；tools.rs 为纯索引）
 

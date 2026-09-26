@@ -21,11 +21,6 @@ toml.workspace = true
 wasmtime = { version = "48", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
 wasmtime-wasi = { version = "48", optional = true }
 
-# A dispatched process's resident cap (runtime-SPEC 8-13-4): the one
-# crate whose public surface is safe and sets a job's working-set limit.
-[target.'cfg(windows)'.dependencies]
-win32job = "2.0.3"
-
 [features]
 wasm = ["dep:wasmtime", "dep:wasmtime-wasi"]
 conformance = ["kernel/conformance"]
