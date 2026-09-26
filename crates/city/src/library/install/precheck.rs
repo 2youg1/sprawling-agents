@@ -15,6 +15,12 @@
 //! over are not the package's to file, and where it points can change
 //! between this check and the landing.
 //!
+//! A package is walked by directory handles: its root is opened from
+//! its parent without following a link, and every item beneath is
+//! opened by name relative to the directory handle that listed it, so a
+//! directory swapped for a link after its judgement is outside anything
+//! the walk can open.
+//!
 //! The reading keeps every byte it read - one snapshot per item - and
 //! hashes exactly those bytes, so the landing writes what was judged and
 //! the recheck before it compares one hash that covers every item.
@@ -24,6 +30,8 @@ use std::io::Read;
 use std::ops::Range;
 use std::path::Path;
 
+use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
+use cap_std::fs::{Dir, OpenOptions};
 use kernel::{AxCode, AxError, B3Hash};
 
 use crate::library::reading;
@@ -94,32 +102,41 @@ fn unlinked(path: &Path) -> Result<Metadata, AxError> {
 }
 
 /// Reads a package whole: every item under it, in canonical order, and
-/// [`reading::SKILL_FILE`] among them as text the scan can read.
+/// [`reading::SKILL_FILE`] among them as text the scan can read. Every
+/// byte is read through a chain of directory handles from the package's
+/// root, each opened without following a link.
 fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
-    let root = std::fs::canonicalize(dir).map_err(|err| source_io(dir, &err))?;
     let mut found = Vec::new();
-    let mut open = vec![(dir.to_path_buf(), String::new())];
+    let mut open = vec![(open_root(dir)?, String::new())];
     while let Some((at, prefix)) = open.pop() {
-        let listed = reading::read_dir(&at)?;
-        stays_under(&root, &at, &prefix)?;
+        let listed = at
+            .entries()
+            .map_err(|err| source_io(&dir.join(&prefix), &err))?;
         for entry in listed {
-            let path = format!("{prefix}{}", reading::spelled(&entry)?);
-            let meta = unlinked(&entry)?;
-            if meta.is_dir() {
-                open.push((entry.clone(), format!("{path}/")));
-            } else if !meta.is_file() {
-                return Err(not_a_source(&entry, "it is neither a directory nor a file"));
+            let entry = entry.map_err(|err| source_io(&dir.join(&prefix), &err))?;
+            let shown = dir.join(&prefix).join(entry.file_name());
+            let path = format!("{prefix}{}", reading::spelled(&shown)?);
+            let kind = entry.file_type().map_err(|err| source_io(&shown, &err))?;
+            if kind.is_symlink() {
+                return Err(refuses_link(&shown));
+            } else if kind.is_dir() {
+                open.push((
+                    open_directory(&at, &entry.file_name(), &shown)?,
+                    format!("{path}/"),
+                ));
+                found.push((path, None));
+            } else if kind.is_file() {
+                found.push((path, Some(read_file(&at, &entry.file_name(), &shown)?)));
+            } else {
+                return Err(not_a_source(&shown, "it is neither a directory nor a file"));
             }
-            found.push((path, entry, meta));
         }
     }
     found.sort_by(|left, right| left.0.cmp(&right.0));
     let mut stored = PACKAGE_HEADER.to_vec();
     let mut items = Vec::with_capacity(found.len());
-    for (path, entry, meta) in found {
-        let item = append_item(&mut stored, path.clone(), &entry, &meta)?;
-        stays_under(&root, &entry, &path)?;
-        items.push(item);
+    for (path, bytes) in found {
+        items.push(append_item(&mut stored, path, bytes.as_deref(), dir)?);
     }
     let document = items.iter().find_map(|item| match item {
         Item::File(path, bytes) if path == reading::SKILL_FILE => Some(bytes.clone()),
@@ -141,25 +158,70 @@ fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
     })
 }
 
+/// Opens the package's root from its parent, without following a link.
+fn open_root(dir: &Path) -> Result<Dir, AxError> {
+    let Some(leaf) = dir.file_name() else {
+        return Err(not_a_source(dir, "it names no directory"));
+    };
+    let parent = dir
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let parent = Dir::open_ambient_dir(parent, cap_std::ambient_authority())
+        .map_err(|err| source_io(dir, &err))?;
+    open_directory(&parent, leaf, dir)
+}
+
+/// Opens one directory by name relative to the handle that listed it,
+/// and refuses when what the handle holds is not a plain directory.
+fn open_directory(at: &Dir, name: &std::ffi::OsStr, shown: &Path) -> Result<Dir, AxError> {
+    let handle = at
+        .open_dir_nofollow(name)
+        .map_err(|err| source_io(shown, &err))?
+        .into_std_file();
+    let meta = handle.metadata().map_err(|err| source_io(shown, &err))?;
+    if !(meta.is_dir() && plain(&meta)) {
+        return Err(refuses_link(shown));
+    }
+    Ok(Dir::from_std_file(handle))
+}
+
+/// Reads one file by name relative to the handle that listed it,
+/// without following a link, and refuses what is not a plain file.
+fn read_file(at: &Dir, name: &std::ffi::OsStr, shown: &Path) -> Result<Vec<u8>, AxError> {
+    let mut options = OpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
+    let mut file = at
+        .open_with(name, &options)
+        .map_err(|err| source_io(shown, &err))?
+        .into_std();
+    let meta = file.metadata().map_err(|err| source_io(shown, &err))?;
+    if !(meta.is_file() && plain(&meta)) {
+        return Err(refuses_link(shown));
+    }
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)
+        .map_err(|err| source_io(shown, &err))?;
+    Ok(bytes)
+}
+
 /// Appends one item to the canonical string: its kind, its
 /// length-prefixed path and, for a file, its length-prefixed bytes.
 fn append_item(
     stored: &mut Vec<u8>,
     path: String,
-    entry: &Path,
-    meta: &Metadata,
+    bytes: Option<&[u8]>,
+    package: &Path,
 ) -> Result<Item, AxError> {
-    let tag = if meta.is_dir() { b'd' } else { b'f' };
-    stored.push(tag);
-    append_len(stored, path.len(), entry)?;
+    stored.push(if bytes.is_some() { b'f' } else { b'd' });
+    append_len(stored, path.len(), package)?;
     stored.extend_from_slice(path.as_bytes());
-    if meta.is_dir() {
+    let Some(bytes) = bytes else {
         return Ok(Item::Directory(path));
-    }
-    let bytes = read_unlinked(entry, meta)?;
-    append_len(stored, bytes.len(), entry)?;
+    };
+    append_len(stored, bytes.len(), package)?;
     let start = stored.len();
-    stored.extend_from_slice(&bytes);
+    stored.extend_from_slice(bytes);
     Ok(Item::File(path, start..stored.len()))
 }
 
@@ -187,24 +249,6 @@ fn inspect_document(file: &Path) -> Result<Inspected, AxError> {
         stored,
         hash,
     })
-}
-
-/// Refuses when `path` no longer resolves to `relative` beneath the
-/// package's canonical `root`: a directory on the way swapped for a link
-/// after its judgement sends the listing or the read somewhere else, and
-/// resolving every component again after the listing or the read finds
-/// it, unless the swap is undone inside that window.
-fn stays_under(root: &Path, path: &Path, relative: &str) -> Result<(), AxError> {
-    let expected = relative
-        .split('/')
-        .filter(|segment| !segment.is_empty())
-        .fold(root.to_path_buf(), |at, segment| at.join(segment));
-    let resolved = std::fs::canonicalize(path).map_err(|err| source_io(path, &err))?;
-    if resolved == expected {
-        Ok(())
-    } else {
-        Err(refuses_link(path))
-    }
 }
 
 /// Reads a file judged not to be a link, and refuses when what the open
@@ -255,9 +299,21 @@ fn same_file(judged: &Metadata, opened: &Metadata) -> bool {
 /// would land and hash as if they were the skill.
 #[cfg(windows)]
 fn same_file(_judged: &Metadata, opened: &Metadata) -> bool {
+    opened.is_file() && plain(opened)
+}
+
+/// Whether an opened handle holds the item itself: on Windows, no reparse
+/// point of any kind, for the reason [`same_file`] gives.
+#[cfg(windows)]
+fn plain(opened: &Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
-    opened.is_file() && opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0
+    opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0
+}
+
+#[cfg(not(windows))]
+fn plain(opened: &Metadata) -> bool {
+    !opened.file_type().is_symlink()
 }
 
 /// The scan reads a skill document as text, so a document it could not
