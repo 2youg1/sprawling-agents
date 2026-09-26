@@ -31,16 +31,15 @@
 
 <script lang="ts">
   import { fill, say } from "../../core/lang";
-  import type { Key } from "../../core/lang";
   import { SvelteSet } from "svelte/reactivity";
 
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";
   import { statusLook } from "../parts/glyph";
-  import type { Status } from "../parts/glyph";
   import { FOLDS, along } from "./fold";
-  import type { Phase, Row } from "./lineage";
+  import type { Row } from "./lineage";
   import { phaseOf, rowsOf, windowOf } from "./lineage";
+  import { PHASES, PHASE_FILL as FILL, PHASE_STATUS as STATUS, PHASE_WORD as WORD } from "./phase";
 
   const { runs, now, level = 1 }: RunsBoardProps = $props();
   const { lang } = ui();
@@ -49,11 +48,7 @@
   // drawn rows rather than padding.
   const MARGIN = 12;
 
-  const STATUS: Record<Phase, Status> = { model: "live", tool: "live", person: "waiting", idle: "idle", done: "done" };
-  const FILL: Record<Phase, string> = { model: "bg-accent", tool: "bg-accent-solid", person: "bg-alert", idle: "bg-edge-input", done: "bg-text-disabled" };
-  const WORD: Record<Phase, Key> = { model: "run_doing_thinking", tool: "run_doing_calling", person: "run_doing_waiting", idle: "runs_phase_idle", done: "run_doing_frozen" };
   const INK = { quiet: "text-text-quiet", live: "text-accent", alert: "text-alert" } as const;
-  const PHASES: readonly Phase[] = ["model", "tool", "person", "idle", "done"];
 
   const folded = new SvelteSet<string>();
   let scrolled = $state(0);

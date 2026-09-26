@@ -31,7 +31,7 @@ describe("building table", () => {
       [
         run("r1", "shop/checkout", 1_000, { kind: "thinking" }),
         run("r2", "shop/admin", 3_000, { kind: "waiting" }),
-        run("r3", "docs/zh", 2_000, { kind: "frozen" }),
+        run("r3", "docs/zh", 2_000, { kind: "frozen", completion: null }),
         run("r4", "docs", 4_000, { kind: "unknown" }),
         run("r5", "gone/room", 5_000, { kind: "thinking" }),
       ],
