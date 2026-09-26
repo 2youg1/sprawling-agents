@@ -257,4 +257,19 @@ describe("asking", () => {
     expect(driver.sent, "record 7 is news").toHaveLength(2);
     watching();
   });
+
+  // A view that has folded nothing answers with the first seq as the next
+  // one it has not folded, so the genesis record that lands afterwards is
+  // news rather than something the answer already holds.
+  test("an answer read before genesis is stale once genesis lands", () => {
+    const driver = driven();
+    const watching = driver.ask.ask(QUERIES.city).subscribe(() => undefined);
+    driver.ask.answered(nth(driver, 0), Seq.make(0), answer({
+      city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
+    }));
+    driver.ask.invalidate(record(0));
+    driver.pass(300);
+    expect(driver.sent, "the genesis record is news").toHaveLength(2);
+    watching();
+  });
 });
