@@ -232,6 +232,12 @@
         u.send(halted ? release({ building: address }) : halt({ building: address }));
       }}
     />
+    <!-- Halt still shuts an idle building to new work and ends its backlog
+         (glossary: Halt), so the control stays live and only says that
+         nothing runs here now. -->
+    {#if !halted && livingIn(address) === 0}
+      <span class="text-note text-text-quiet">{say($lang, "bld_halt_idle")}</span>
+    {/if}
     <span class="@lg/page:hidden">
       <Button
         label={say($lang, "bld_tree")}

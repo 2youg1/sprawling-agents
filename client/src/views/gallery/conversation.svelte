@@ -48,14 +48,27 @@
     { kind: "unknown" },
   ];
 
-  // How many characters of a live turn are drawn faint. Kept in step
-  // with `thread` by being shown here at several lengths rather than
-  // by a second copy of the number: what this page is for is deciding
-  // whether the number is right.
+  // A live turn at several lengths, drawn by the thread's own `Saying`:
+  // the faint edge at the growing end, and - in the last - a list, a
+  // table and a code block already closed and laid out while the
+  // paragraph after them is still arriving.
   const SAYING = [
     "on",
     "on it — reading the city",
     "on it — reading the city, then writing the plan it asks for",
+    [
+      "- `crates/kernel`",
+      "- **Ledger**",
+      "",
+      "| step | what |",
+      "|---|---|",
+      "| 1 | read |",
+      "",
+      "```rust",
+      "fn main() {}",
+      "```",
+      "then the plan it asks",
+    ].join("\n"),
   ];
 
   // The mother run the forked segment branches from: an id in the
@@ -71,6 +84,7 @@
   import { ui } from "../../ui";
   import Popover from "../parts/popover.svelte";
   import Composer from "../talk/composer.svelte";
+  import Saying from "../talk/saying.svelte";
   import { WaitingCards } from "../talk/waiting.svelte";
   import Asked from "../talk/asked.svelte";
   import Case from "./case.svelte";
@@ -133,7 +147,7 @@
 
 {#each SAYING as text (text)}
   <Case label={`saying · ${String(text.length)}`}>
-    <div class="whitespace-pre-wrap leading-relaxed text-body">{text.slice(0, -10)}<span class="text-text-faint">{text.slice(-10)}</span><span class="ml-tight inline-block h-caret w-hair animate-pulse bg-accent align-text-bottom"></span></div>
+    <Saying {text} who={say($lang, "talk_resident")} />
   </Case>
 {/each}
 

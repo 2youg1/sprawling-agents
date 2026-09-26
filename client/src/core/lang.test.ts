@@ -45,6 +45,19 @@ describe("lang", () => {
     }
   });
 
+  // A domain role is a word in the reader's language: the rail, the
+  // palette and the key sheet all name the Mayor's page, and a Chinese
+  // screen that names it in English reads as untranslated.
+  test("no Chinese phrase names the Mayor in English", () => {
+    for (const [key, phrase] of Object.entries(table)) {
+      expect(phrase.zh, `${key} says Mayor in English`).not.toContain("Mayor");
+    }
+  });
+
+  test("one of a count is said in the singular", () => {
+    expect(fill(say("en", "session_previous"), { n: "1" })).not.toContain("1 rounds");
+  });
+
   test("both languages of a sentence ask for the same values", () => {
     for (const [key, phrase] of Object.entries(table)) {
       expect(slotsOf(phrase.zh), `${key} fills different slots`).toEqual(

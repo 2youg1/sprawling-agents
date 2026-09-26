@@ -90,7 +90,9 @@
        out to have; the figure beside it is the weighted share, which
        moves when a branch is divided generously. A reader seeing both
        can tell work finished from work redistributed. -->
-  {#if "planned" in answer.progress}
+  <!-- A plan with no leaves has no progress to show: a bar at zero
+       reads as work stalled rather than work not yet planned. -->
+  {#if "planned" in answer.progress && answer.progress.planned.total > 0}
     <div class="mb-base flex items-center gap-base">
       <Progress
         label={say($lang, "plan_progress")}
@@ -103,7 +105,7 @@
         })}</span
       >
     </div>
-  {:else}
+  {:else if "unplanned" in answer.progress}
     <p class="mb-base text-note text-text-faint">
       {fill(say($lang, "plan_unplanned"), { steps: String(answer.progress.unplanned.steps) })}
     </p>

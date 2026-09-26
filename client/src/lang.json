@@ -344,8 +344,8 @@
     "zh": "这段来自哪个文件"
   },
   "commits_empty": {
-    "en": "no commits",
-    "zh": "没有提交"
+    "en": "no commits yet: a run's work lands here when it commits in this building",
+    "zh": "还没有提交：派活在这栋楼里提交后，会出现在这里"
   },
   "commits_first": {
     "en": "the first commit",
@@ -1165,7 +1165,7 @@
   },
   "nav_mayor": {
     "en": "the Mayor",
-    "zh": "Mayor"
+    "zh": "市长"
   },
   "nav_mcp": {
     "en": "MCP",
@@ -1340,8 +1340,8 @@
     "zh": "城外的路径打不开"
   },
   "plan_empty": {
-    "en": "no plan yet",
-    "zh": "还没有计划"
+    "en": "no plan yet: the Mayor hands each building its part of the city's plan",
+    "zh": "还没有计划：市长会把城市计划中属于这栋楼的部分交给它"
   },
   "plan_item": {
     "en": "item",
@@ -1712,8 +1712,8 @@
     "zh": "这个界面看起来怎样"
   },
   "setup_group_hint_advanced": {
-    "en": "the record itself, and the doors out of it",
-    "zh": "账本本身，以及离开它的路径"
+    "en": "the welcome walk, from its first step",
+    "zh": "从第一步重走欢迎页"
   },
   "setup_group_hint_accounts": {
     "en": "who the city may call, and with which key",
@@ -2080,8 +2080,8 @@
     "zh": "请求重试上限"
   },
   "setup_rerun": {
-    "en": "run again",
-    "zh": "再走一遍"
+    "en": "walk the welcome again",
+    "zh": "再走一遍欢迎页"
   },
   "setup_select_all": {
     "en": "choose all",
@@ -2164,8 +2164,8 @@
     "zh": "已进阅览室"
   },
   "skills_empty": {
-    "en": "no shelf in this city holds anything",
-    "zh": "这座城的书架上还什么都没有"
+    "en": "no shelf in this city holds anything: a skill is a folder with a SKILL.md placed on a shelf",
+    "zh": "这座城的书架上还什么都没有：技能是放在书架上、带 SKILL.md 的文件夹"
   },
   "skills_external": {
     "en": "shelf {n} · {path}",
@@ -2317,7 +2317,7 @@
   },
   "talk_column_effort": {
     "en": "effort",
-    "zh": "effort"
+    "zh": "强度"
   },
   "talk_column_model": {
     "en": "model",
@@ -2430,7 +2430,7 @@
   },
   "talk_placeholder_mayor": {
     "en": "to the Mayor…",
-    "zh": "对 Mayor 说…"
+    "zh": "对市长说…"
   },
   "talk_placeholder_room": {
     "en": "to {room}…",
@@ -2689,7 +2689,7 @@
     "zh": "新对话 · {at}"
   },
   "session_previous": {
-    "en": "earlier · {n} rounds",
+    "en": "earlier rounds · {n}",
     "zh": "上一段 · {n} 轮"
   },
   "ui_browser_found": {
@@ -3151,5 +3151,9 @@
   "wait_asks": {
     "en": "what it asks about",
     "zh": "它问的内容"
+  },
+  "bld_halt_idle": {
+    "en": "nothing runs here now; halting refuses new work",
+    "zh": "这栋楼现在没有在跑的派活；叫停会拒收新活"
   }
 }

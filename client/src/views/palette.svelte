@@ -31,6 +31,8 @@
 
   import { QUERIES } from "../core/asking";
   import { halt, release } from "../core/commands";
+  import { LABELS } from "../core/keys";
+  import type { Action } from "../core/keys";
   import type { Key } from "../core/lang";
   import { LANGS, endonym, say } from "../core/lang";
   import { MAYOR, current, toFragment } from "../core/route";
@@ -42,10 +44,14 @@
   import { ui } from "../ui";
   import { Address } from "../wire";
   import Empty from "./parts/empty.svelte";
+  import { Kbd } from "./parts/kbd.svelte";
 
   interface Entry {
     readonly label: string;
     readonly hint: string;
+    // Present on a page a key reaches: the row shows that key's chord
+    // where other rows show their hint.
+    readonly action?: Action | undefined;
     readonly act: () => void;
     // Present means the verb cannot run here, and names why.
     readonly why?: Key | undefined;
@@ -113,15 +119,19 @@
         u.go(to);
       },
     });
+    // A page a key reaches is called what the key sheet and the rail
+    // call it, and shows the chord rather than its address.
+    const page = (action: Action, to: View): Entry => ({ ...goTo(to, say($lang, LABELS[action])), action });
     const out: Entry[] = [
-      goTo({ kind: "talk", address: MAYOR }, say($lang, "nav_mayor")),
-      goTo({ kind: "city" }, say($lang, "nav_city")),
-      goTo({ kind: "setup" }, say($lang, "nav_settings")),
-      goTo({ kind: "mcp" }, say($lang, "nav_mcp")),
-      goTo({ kind: "record", lens: "ledger" }, say($lang, "rec_ledger")),
+      page("go.talk", { kind: "talk", address: MAYOR }),
+      page("go.city", { kind: "city" }),
+      page("go.setup", { kind: "setup" }),
+      page("go.mcp", { kind: "mcp" }),
+      page("go.registry", { kind: "registry" }),
+      page("go.record", { kind: "record", lens: "ledger" }),
       goTo({ kind: "record", lens: "archive" }, say($lang, "rec_archive")),
       goTo({ kind: "record", lens: "bin" }, say($lang, "rec_bin")),
-      goTo({ kind: "cost" }, say($lang, "cost_title")),
+      page("go.cost", { kind: "cost" }),
       goTo({ kind: "welcome" }, say($lang, "setup_rerun")),
     ];
     out.push({
@@ -385,7 +395,14 @@ click on the scrim is the pointer's extra way out, not the only one. -->
               }}
             >
               <span class="truncate font-mono">{entry.label}</span>
-              <span class="shrink-0 text-note text-text-disabled">{entry.hint}</span>
+              <span class="shrink-0 text-note text-text-disabled">
+                {#if entry.action === undefined}
+                  {entry.hint}
+                {:else}
+                  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; svelte-check types this imported snippet fine, and typescript-eslint does not resolve exports of another .svelte module) -->
+                  {@render Kbd({ action: entry.action })}
+                {/if}
+              </span>
             </button>
           </li>
         {/each}

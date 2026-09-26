@@ -32,6 +32,7 @@
   import ForkButton from "./fork_button.svelte";
   import NoteLine from "./note_line.svelte";
   import Person from "./person.svelte";
+  import Saying from "./saying.svelte";
   import { callWord } from "./calls";
   import { noteAt } from "./note_line";
   import { planFork } from "./forking";
@@ -43,11 +44,6 @@
   // Anything else - the ceiling, and whatever a provider adds next - is
   // a reply that was cut off, and a reader is told so.
   const FINISHED: readonly string[] = ["end_turn", "tool_use"];
-
-  // How many characters at the growing edge are drawn faint. Wide enough
-  // that text emerges instead of appearing, narrow enough that the band a
-  // reader's eye sits on is not the shimmering one.
-  const EDGE = 10;
 
   interface Props {
     readonly run: RunBelief;
@@ -120,15 +116,10 @@
     }
   });
   // The turn being said right now is not yet in the rounds; it is the
-  // page's own text until the record holds it.
+  // page's own text until the record holds it. When the call returns,
+  // belief clears `saying` and the settled record takes over, so nothing
+  // has to decide when the growing text stops growing.
   const streaming = $derived(!frozen && run.saying.length > 0);
-  // The last few characters are drawn faint, so text emerges rather than
-  // appearing. Derived from the text and nothing else: no timer, no
-  // queue, no per-character node. When the call returns, belief clears
-  // `saying` and the settled record takes over, so nothing has to decide
-  // when the edge stops being an edge.
-  const settled = $derived(run.saying.slice(0, -EDGE));
-  const edge = $derived(run.saying.slice(-EDGE));
   const closedAt = $derived(answer?.closing?.at ?? null);
   // A frozen run that said nothing at all is one card with the reason
   // and a way out, not one grey box per turn (ux: the zero-output run).
@@ -299,14 +290,7 @@ said, and what that cost. -->
     {@render reasoning(run.thinking, true)}
   {/if}
   {#if streaming}
-    <div class="my-base text-body">
-      <div class="mb-tight text-note text-text-disabled">{who}</div>
-      <div class="whitespace-pre-wrap leading-relaxed">
-        {settled}<span class="text-text-faint">{edge}</span><span
-          class="blink ml-tight inline-block size-[6px] bg-accent align-baseline"
-        ></span>
-      </div>
-    </div>
+    <Saying text={run.saying} {who} />
   {/if}
   {#if emptyRun}
     <!-- The zero-output run: the reason it stopped and one way out, the

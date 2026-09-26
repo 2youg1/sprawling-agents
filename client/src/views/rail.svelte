@@ -33,6 +33,7 @@
   // beside it pins the rail, so neither control answers for the other.
 
   import type { Rail } from "../core/prefs";
+  import { LABELS } from "../core/keys";
   import type { Action } from "../core/keys";
   import { MAYOR, toFragment } from "../core/route";
   import type { View } from "../core/route";
@@ -56,8 +57,7 @@
   interface Item {
     readonly key: "talk" | "city" | "record" | "cost" | "setup";
     readonly view: View;
-    // Already in the person's language.
-    readonly label: string;
+    // Also what the page is called, read from the key table.
     readonly action: Action;
     readonly glyph: GlyphName;
     readonly badge?: number | undefined;
@@ -70,6 +70,10 @@
   const belief = u.conn.belief;
   const approvals = u.approvals;
 
+  // Set by a pointer click on a page link (not Enter), cleared when the pointer leaves: the
+  // stylesheet keeps the hover-opened column shut while it is set.
+  let tucked = $state(false);
+
   // What a name does while the rail is collapsed. Written on every name
   // the rail can show, so one stylesheet rule reveals them all on hover
   // and this file decides only the pinned case.
@@ -81,12 +85,14 @@
   const waiting = $derived($approvals.length);
   const halted = $derived(cityIsShut($belief.halted));
 
+  // The name each page goes by is the name its key goes by, so the rail,
+  // the palette and the key sheet cannot call one page two things.
   const items = $derived.by((): Item[] => [
-    { key: "talk", view: { kind: "talk", address: MAYOR }, label: say($lang, "nav_mayor"), action: "go.talk", glyph: "talk" },
-    { key: "city", view: { kind: "city" }, label: say($lang, "nav_city"), action: "go.city", glyph: "city", badge: active },
-    { key: "record", view: { kind: "record", lens: "ledger" }, label: say($lang, "nav_the_record"), action: "go.record", glyph: "record" },
-    { key: "cost", view: { kind: "cost" }, label: say($lang, "cost_title"), action: "go.cost", glyph: "cost" },
-    { key: "setup", view: { kind: "setup" }, label: say($lang, "nav_settings"), action: "go.setup", glyph: "setup" },
+    { key: "talk", view: { kind: "talk", address: MAYOR }, action: "go.talk", glyph: "talk" },
+    { key: "city", view: { kind: "city" }, action: "go.city", glyph: "city", badge: active },
+    { key: "record", view: { kind: "record", lens: "ledger" }, action: "go.record", glyph: "record" },
+    { key: "cost", view: { kind: "cost" }, action: "go.cost", glyph: "cost" },
+    { key: "setup", view: { kind: "setup" }, action: "go.setup", glyph: "setup" },
   ]);
 
   function here(item: Item): "page" | undefined {
@@ -115,6 +121,10 @@
 <div class="relative h-full shrink-0 transition-[width] duration-200 motion-reduce:transition-none {column}">
   <nav
     data-rail={posture}
+    data-tucked={tucked ? "" : undefined}
+    onpointerleave={() => {
+      tucked = false;
+    }}
     class={[
       "absolute inset-y-0 left-0 z-10 flex flex-col gap-tight border-r border-edge bg-chrome py-snug",
       "transition-[width] duration-200 motion-reduce:transition-none",
@@ -147,11 +157,14 @@
       </div>
     {/if}
     {#each items as item (item.key)}
-      <Tip text={item.label}>
+      <Tip text={say($lang, LABELS[item.action])}>
         {#snippet children(hint: string)}
           <a
             href={toFragment(item.view)}
             aria-current={here(item)}
+            onclick={(e) => {
+              tucked = e.detail > 0;
+            }}
             aria-labelledby={hint}
             class="relative flex h-rail w-full items-center gap-base px-base text-label text-text-faint hover:bg-chrome hover:text-text aria-[current=page]:text-text"
           >
@@ -164,12 +177,12 @@
                    the row below does spend a coloured token, because
                    that one counts people waiting on an answer. -->
               {#if (item.badge ?? 0) > 0}
-                <span class="absolute -top-tight -right-tight">
-                  <Badge text={String(item.badge ?? 0)} weight="quiet" />
+                <span class="absolute -top-snug -right-snug">
+                  <Badge text={String(item.badge ?? 0)} weight="quiet" seat="corner" />
                 </span>
               {/if}
             </span>
-            <span class="{label} flex-1">{item.label}</span>
+            <span class="{label} flex-1">{say($lang, LABELS[item.action])}</span>
             <span class={label}>
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; svelte-check types this imported snippet fine, and typescript-eslint does not resolve exports of another .svelte module) -->
               {@render Kbd({ action: item.action })}
@@ -188,8 +201,8 @@
           >
             <span class="relative shrink-0">
               <Glyph name="hand" />
-              <span class="absolute -top-tight -right-tight">
-                <Badge text={String(waiting)} weight="alert" />
+              <span class="absolute -top-snug -right-snug">
+                <Badge text={String(waiting)} weight="alert" seat="corner" />
               </span>
             </span>
             <span class="{label} flex-1">{fill(say($lang, "nav_waiting"), { n: String(waiting) })}</span>

@@ -25,6 +25,7 @@ export interface BadgeProps {
   readonly status?: Status;
   readonly weight?: undefined;
   readonly dot?: undefined;
+  readonly seat?: Seat;
 }
 
 export interface BadgeTierProps {
@@ -35,7 +36,12 @@ export interface BadgeTierProps {
   readonly weight?: Weight;
   // A state reads better with a mark beside it; a count does not.
   readonly dot?: boolean;
+  // Where the badge sits: in a line of text, or pinned to the corner of
+  // a glyph, where it has to stay smaller than what it marks.
+  readonly seat?: Seat;
 }
+
+export type Seat = "inline" | "corner";
 
 // The resting paint of a tier and the fill of its round mark.
 const PAINT: Record<Weight, string> = {
@@ -50,15 +56,17 @@ const DOT: Record<Weight, string> = {
   alert: "bg-alert",
 };
 
-const SHAPE =
-  "inline-flex items-center gap-tight rounded-pill px-snug py-tight text-note whitespace-nowrap";
+const SHAPE: Record<Seat, string> = {
+  inline: "inline-flex items-center gap-tight rounded-pill px-snug py-tight text-note whitespace-nowrap",
+  corner: "inline-flex items-center rounded-pill px-hair text-tally leading-none whitespace-nowrap",
+};
 </script>
 
 <script lang="ts">
   import { statusLook } from "./glyph";
   import Glyph from "./glyph.svelte";
 
-  const { text, status, weight, dot }: BadgeProps | BadgeTierProps = $props();
+  const { text, status, weight, dot, seat }: BadgeProps | BadgeTierProps = $props();
 
   // The one reading of what this badge is marked with. Everything below
   // is four readers of these two lines and nothing else.
@@ -68,7 +76,7 @@ const SHAPE =
   const tier = $derived(look === undefined ? (weight ?? "quiet") : look.weight);
 </script>
 
-<span class={[SHAPE, PAINT[tier]]}>
+<span class={[SHAPE[seat ?? "inline"], PAINT[tier]]}>
   {#if look !== undefined}
     <Glyph name={look.glyph} size="sm" class="shrink-0" />
   {:else if dot === true}
