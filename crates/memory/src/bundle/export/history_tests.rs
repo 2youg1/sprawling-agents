@@ -50,6 +50,45 @@ fn a_v006_bundle_that_borrows_objects_from_elsewhere_is_refused() {
     );
 }
 
+/// `open_bare` resolves `objects`, `refs` and `packed-refs` against the
+/// path a `commondir` file names, so a forged bundle that names another
+/// repository would pack that repository's history into the restored city.
+#[test]
+fn a_v006_bundle_that_borrows_a_common_dir_is_refused() {
+    let home = tempfile::tempdir().unwrap();
+    city_with(1, home.path());
+    committed_twice(home.path());
+    let carried = tempfile::tempdir().unwrap();
+    Bundle::export(home.path(), carried.path()).unwrap();
+    std::fs::remove_dir_all(carried.path().join(super::history::HISTORY)).unwrap();
+    let whole = carried.path().join(CITY).join(".git");
+    let copied = copy_dir(&home.path().join(".git"), &whole);
+    let lender = tempfile::tempdir().unwrap();
+    city_with(1, lender.path());
+    committed_twice(lender.path());
+    std::fs::write(
+        whole.join("commondir"),
+        lender
+            .path()
+            .join(".git")
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/"),
+    )
+    .unwrap();
+    let at = carried.path().join(MANIFEST);
+    let mut manifest = Manifest::from_json(&std::fs::read(&at).unwrap(), &at).unwrap();
+    manifest.files = manifest.files.saturating_add(copied).saturating_add(1);
+    manifest.history = super::history::Carried::default();
+    std::fs::write(&at, manifest.to_json()).unwrap();
+
+    let elsewhere = tempfile::tempdir().unwrap();
+    let restored = Bundle::restore(carried.path(), elsewhere.path()).map_err(|e| e.to_string());
+    assert!(
+        restored.as_ref().is_err_and(|e| e.contains("commondir")),
+        "{restored:?}"
+    );
+}
+
 /// A bundle that lost its pack still has refs naming the objects
 /// it held, so restoring it would land files and a ledger beside a
 /// history that points at nothing.

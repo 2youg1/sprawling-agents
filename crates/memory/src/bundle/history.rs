@@ -197,17 +197,28 @@ impl History {
             };
             (pack, text, at)
         } else {
-            let borrowed = whole.join("objects").join("info").join("alternates");
-            // `open_bare` would read objects through it from stores the
-            // bundle never carried, so its presence alone refuses.
-            if borrowed.symlink_metadata().is_ok() {
-                return Err(MemoryError::Bundle {
-                    op: "restore",
-                    detail: format!(
-                        "{} borrows objects from outside the bundle",
-                        borrowed.display()
-                    ),
-                });
+            // `open_bare` reads objects through `alternates` and resolves
+            // objects and refs against the path `commondir` names, both in
+            // stores the bundle never carried, so either one refuses.
+            for borrowed in [
+                whole.join("objects").join("info").join("alternates"),
+                whole.join("commondir"),
+            ] {
+                match borrowed.symlink_metadata() {
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(err) => {
+                        return Err(io_err("inspect borrowed history storage", &borrowed)(err));
+                    }
+                    Ok(_) => {
+                        return Err(MemoryError::Bundle {
+                            op: "restore",
+                            detail: format!(
+                                "{} borrows history from outside the bundle",
+                                borrowed.display()
+                            ),
+                        });
+                    }
+                }
             }
             let repo = git2::Repository::open_bare(&whole).map_err(|err| MemoryError::Bundle {
                 op: "restore",
