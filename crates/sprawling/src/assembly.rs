@@ -30,6 +30,7 @@
 //! which the dispatching modules read where the credentials module keeps it.
 
 mod building_page;
+mod collaborating;
 mod commanding;
 mod credentials;
 mod dispatching;
@@ -51,6 +52,7 @@ mod waking;
 mod workbench;
 
 pub(crate) use building_page::{DOC_BYTES_MAX, read_building};
+use collaborating::Collaborating;
 use commanding::entrance::Entrance;
 use credentials::held::Credentials;
 pub(crate) use credentials::signing::resolving;
@@ -198,22 +200,8 @@ pub struct RunWorker {
     /// keeps the endpoint book: an answer is decided synchronously,
     /// before the record it just wrote has reached any observer.
     governance: Governance,
-    /// What is waiting for each room, folded from the signal records,
-    /// and which run is reading it. A dispatch lends its room's queue
-    /// to the signal tool and takes it back when the drive ends, and
-    /// `rooms` is what holds that to one queue per room.
-    pub(in crate::assembly) rooms: RoomQueues,
-    /// What each room already got back from work it handed down. Kept
-    /// beside the inboxes because it is folded from the same lines and
-    /// belongs to the same room.
-    pub(super) joins: std::collections::BTreeMap<Address, collab::FanIn>,
-    /// The requests waiting for someone to check them, folded from the
-    /// pull request records.
-    pub(super) requests: Vec<collab::OpenRequest>,
-    /// The ground residents have claimed, folded from `goal_registered`
-    /// in the order the claims were made — which is the order the
-    /// conflict check reads them in.
-    pub(super) goals: Vec<kernel::GoalEntry>,
+    /// What residents are handing one another (`collaborating`).
+    collaborating: Collaborating,
     /// What each building is working towards, and the depth-zero
     /// position that lets one be declared. Held by the worker because
     /// the worker is what acts on it; rebuilt from the records on open,

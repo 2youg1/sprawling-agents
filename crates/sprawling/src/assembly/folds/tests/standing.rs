@@ -55,6 +55,7 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
 
     let rebuilt = Standing::fold(&report.ledger_dir).unwrap().collaboration;
     let live_queues: std::collections::BTreeMap<String, u32> = worker
+        .collaborating
         .rooms
         .queued()
         .into_iter()
@@ -71,12 +72,12 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
         "a queue the working city holds is a queue a restart finds"
     );
     assert_eq!(
-        worker.goals.len(),
+        worker.collaborating.goals.len(),
         rebuilt.goals.len(),
         "the ground claimed is folded from one rule"
     );
     assert_eq!(
-        worker.requests.len(),
+        worker.collaborating.requests.len(),
         rebuilt.requests.len(),
         "the register of open requests is folded from one rule"
     );

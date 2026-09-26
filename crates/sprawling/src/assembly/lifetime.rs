@@ -13,7 +13,8 @@
 //! leave" is asking one question from two ends.
 
 use super::{
-    Credentials, Flight, Namings, RoomQueues, RunWorker, Standing, city_segment, ledger_dir, now_ms,
+    Collaborating, Credentials, Flight, Namings, RoomQueues, RunWorker, Standing, city_segment,
+    ledger_dir, now_ms,
 };
 use std::path::Path;
 
@@ -81,12 +82,14 @@ impl RunWorker {
             credentials: Credentials::opened(book, expiries, vault),
             serving: None,
             governance,
-            rooms: RoomQueues::folded(collaboration.inboxes),
-            joins: collaboration.joins,
+            collaborating: Collaborating {
+                rooms: RoomQueues::folded(collaboration.inboxes),
+                joins: collaboration.joins,
+                requests: collaboration.requests,
+                goals: collaboration.goals,
+            },
             pursuits,
             plan_holders: collaboration.plan_holders,
-            goals: collaboration.goals,
-            requests: collaboration.requests,
             delegator,
             last_tick: now,
             log,
