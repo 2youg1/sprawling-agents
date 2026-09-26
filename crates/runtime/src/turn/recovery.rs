@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The model-call recovery pipeline: the call chain's middle error layer
-//! (runtime-SPEC.md §8-44). `gateway` decides whether the same request
+//! (runtime-SPEC.md §8-49). `gateway` decides whether the same request
 //! may go out again; a segment repairs the failures an identical second
 //! request would fail on again; `crate::Watchdog` disposes of the rest.
 //! The segment contract is three exhaustive answers, and a skip hands

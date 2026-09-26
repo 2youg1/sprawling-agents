@@ -1,8 +1,6 @@
 # runtime-SPEC.md
 
 > crate：`runtime`。本 SPEC 先于代码存在；实现不多不少地遵守本文。
-> Stage 1 两模块（replay／fork）＋Stage 2 三模块最小形（turn／prefix／handoff，§8-3…§8-5）。
-> Stage 3 增章：完备化（§8-6）＋pipeline／offload（§8-7／§8-8）＋watchdog（§8-9）＋clock／catalog／mode（§8-10…§8-12)＋sandbox 缝（§8-13）＋tools 三件（§8-14）。
 
 ## 1 需求分解
 
@@ -18,7 +16,13 @@
 | `clock`＋`catalog`＋`mode` | ClockStamp 纯格式化＋渐进披露三类条目＋五 mode 枚举 |
 | `watchdog` | 处置面分级（纠正 Steer→停滞→冻结）；依据只从 kernel::stall 来 |
 | `sandbox` | 缝（trait）＋wasmtime fuel 生产适配器＋直通/故障两替身；A10 三断言 |
-| `tools/` 三件 | exec 三臂／edit 乐观并发／status 十二字段＋ToolBench 按 Effect 过门 |
+| `tools/` | exec 三臂／edit 乐观并发／read 区间读／search／status／succeed，与模型选路的唯一判定 `chosen_path`（§8-14、§8-29–§8-33） |
+| `bench`＋`conversation` | ToolBench 按 Effect 过门（§8-14、§8-46）；会话历史的唯一持有者（§8-3、§8-47） |
+| `run` | Dispatch → N 回合 → 冻结的事件序唯一权威（§8-15、§8-45） |
+| `digest`＋`diagnostics` | 冻结时的结构化摘要（§8-16）；给人读的诊断行（§8-17、§8-38） |
+| `sieve`＋`compaction`＋`elision` | 工具输出的确定性压缩（§8-27）；按内容分类的缩短判定（§8-7）与回合边界的压缩（§8-44）；「这里被剪过」的唯一标记（§8-42） |
+| `backlog` | 后台命令与委派 run 的全城一张表，halt 由此停得住（§8-28） |
+| `reminder`＋`redact`＋`transcript` | 上下文提醒（§8-34）；进账本前的打码（§8-41）；逐 run 的对话文件（§8-32） |
 
 「replay 只重演不重执行」的含义：重演＝验证链与重建记录序列；入窗重建器（C16/A15）随 prefix 组装加入，与分叉共用本模块的验证输出。
 
@@ -41,7 +45,7 @@
 
 ## 4 现状分析
 
-空壳。verify 为 O(n) 全量；消费面（测试/夹具/citysim）规模千行级，无性能议题；seq→偏移索引归 memory::index。
+verify 为 O(n) 全量；消费面（测试/夹具/citysim）规模千行级，无性能议题；seq→偏移索引归 memory::index。
 
 ## 5 权威信源
 
@@ -59,7 +63,7 @@ replay、verify、VerifiedLedger、VerifiedLine、fork prefix、`at_seq`。不�
 replay ──▶ kernel(event/ledger/error)、memory(jsonl::read_raw_lines)
 fork   ──▶ replay(VerifiedLedger)、kernel
 turn   ──▶ kernel(ledger/event/error/tool/model)、prefix(FrozenPrefix)
-turn/recovery ──▶ turn(ledger 的 Journal)、kernel(model/error)   // 模型调用恢复管线（§8-44）
+turn/recovery ──▶ turn(ledger 的 Journal)、kernel(model/error)   // 模型调用恢复管线（§8-49）
 prefix ──▶ kernel(locator::B3Hash/event::Payload/error)
 handoff──▶ kernel(locator/event/error)
 pipeline ──▶ offload、sieve、clock、kernel(tool)
@@ -149,27 +153,24 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 **写账本的那一方走索引（`fork::indexed`）。** 持有账本的 worker 为一次分支重建只需要母 run 自己的那几行：`inherited_indexed` 用 `LedgerIndex::line_at` 读 `at_seq` 那一行定出母 run，再按 `run_seqs_before` 只读这条 run 的行，每一行先过 `memory::read_line`——它与验链门逐行所用的 `LineCheck::advance` 共用同一条分类规则：已知 kind 解析成记录，带 `ig` 的新 kind 跳过，其余（撕裂、不规范、无 `ig` 的未知 kind）以 `LineFault` 的码拒绝；切点与消息都由 `fold_run` 一处判定。它不验链：worker 是这本账唯一的写者，打开时已经过尾部恢复；而 `verify_ledger_dir` 为这一问把整本历史读进内存、逐行验链再解析（94 MB 的账本上是 +67 MiB 的瞬时内存）。拒绝写成人能照做的话：`at_seq` 不在索引里是 `outside`，恢复语给出母序列止于哪个 seq，母 run 在这之前没有 `run_started` 是同一条 `E_INVALID_ARGS`。
 **母亲自己是分支时，先重建她开场时继承的那段。** 流动循环里母亲的窗口以 `RunPlan::inherited` 开头，那段对话不在她自己的线上；她的 `run_forked`（`run` 是她、`from`／`at_seq` 指向祖母的切点）才是它的出处。所以 `inherited` 先找属主 run 的 `run_forked`，按其 `at_seq` 递归重建祖母的对话，经 `push_inherited` 放在最前，再折母亲自己的线——与 `Run::begin` 同一顺序。递归只往账本更早处走（`at_seq` 必须早于那条 `run_forked`，否则拒），所以一定终止。
 
-**上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`inherited` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
 
 **`addr` 落在 `run_forked` 的那一行上**：新 run 的 id 说的是「谁继续谁」，而地址说的是**哪个房间的这次继承已经用掉了**——`assembly::folds::session` 只用这两个字段回答「这个房间的当前一段是否还欠一段对话」。
 
 ### 8-3 runtime::turn（形状 5 typestate 机）＋bench／conversation
 
-**一个 typestate 机、一张工作台、一份会话历史，三种形状住一个文件。** 1,716 → 918（turn）＋740（bench）＋109（conversation）。
+**一个 typestate 机、一张工作台、一份会话历史，三种形状三个模块。**
 - `bench`（形状 1 判定）：`ToolBench`／`BenchOutcome` 与三条必要前提次序（去重先于副作用；exec 的 discard 预报先于 Write 门；Deny 以 `tool_result` 回去而不结束回合）。它拥有的是**次序**；工具本身以 `Box<dyn Tool>` 递入，沙盒在缝上，副作用不归它。
-  **它原本坐在第一个 `mod tests` 之后**——没有边界的地方，新代码落在光标所在的行。
 - `conversation`（形状 2 值）：`Conversation`／`Opening`。它是会话，不是 transcript（冻结后写下的逐 run 文件），也不是 `kernel::Window`（上下文大小）。一条不变量在每一个入口上成立——**连续的 user 内容并进已开的那条消息，而不另开一条**；steer、工具结果与开场任务是同一条规则的三扇门。
-- 公开面只改定义模块，**不新增任何根重导出**（`runtime::Opening` 原就在根上；`ToolBench` 原就只能走模块路径，今天仍然）。
+- 根重导出：`runtime::Opening` 在根上；`ToolBench` 只经 `runtime::bench`。
 
 ```rust
 pub struct Turn<S> { /* journal（run、who、t、refs、redacted）、state —— 全私有；相内数据在别的相不可表示 */ }
 pub struct Assembling(/* 私有 */);  pub struct Calling { /* prefix 哈希 */ }
 pub struct ToolWave { /* calls */ }   pub struct Recording { /* refs */ }
 
-pub enum Interrupt { None, Cancel }    // Steer variant 随 S3 只加（消费方传值不 match，开放无痛）
+pub enum Interrupt { None, Cancel, Steer { source: String, text: String } }
 pub enum PhaseOutcome<Next> { Advanced(Next), Cancelled(TurnCancelled) }
-// PhaseOutcome 刻意穷尽：新结局必须逼每个执行器表态，不得掉 catch-all；
-// G-22 之后全库枚举皆闭，这一条不再是判定输出的例外规则，而是常规。
+// PhaseOutcome 刻意穷尽：新结局必须逼每个执行器表态，不得掉 catch-all（全库枚举皆闭）。
 pub struct TurnCancelled { /* refs：含 cancel_received —— 私有，getter 取 */ }
 pub struct TurnReport { /* refs、model_returned_ref、wave_len —— getter 取 */ }
 
@@ -199,7 +200,7 @@ impl Turn<ToolWave> {
     /// Boundary 3 (工具执行前)；per call tool_called + tool_result，按调用序入账。
     /// 开头连续的 Effect::Read 调用同时执行，结果进重排缓冲；
     /// 第一条非只读调用等它们全部收齐后再开始，此后串行。
-    /// still_going 在每条 call 之前被问一次（B-70，见 §8-28-2）。
+    /// still_going 在每条 call 之前被问一次（见 §8-28-2）。
     /// 一条入账失败即返回，排在它后面的已放行只读调用不入账：`admit` 对 Effect::Read
     /// 不写去重表、taint 与检查点，所以它们没有留下账本不知道的状态。
     pub fn execute_concurrent(self, interrupt: Interrupt, ledger: &mut dyn Ledger,
@@ -226,7 +227,7 @@ impl Turn<Recording> {
 - **相变函数携 `&mut dyn Ledger`，相内字段私有**；无返回既往相的方法；跳相／相内取消／字面量构造中间相，三者编译不过（trybuild）。
 - **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。**工具波内的每条 call 同样是一道边界**（B-70）：一波是 N 件副作用而不是一件，于是 `execute_concurrent` 在每条 call 之前问 `still_going`，答案交给同一个 `consume_boundary`：Cancel 写下同一条 `cancel_received`，Steer 写下同一条 `steer_received`——消费中断的地方仍然只有一处。
 - **四取消点**：组装前／provider 调用前／工具执行前／派生前，四点全住本模块。第四点由 `Turn<Recording>::record` 收边界快照，故 `record` 与前三相同形——收 `Interrupt`、答 `PhaseOutcome`。它买到的是别处买不到的一件事：**一个回合把活派下去之后、子 Run 起来之前，仍停得住**；`calls_made == 0` 的收尾回合尤其如此，那一刻在第四点之前根本没有下一个边界。
-- **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。S3 接真 dialect 时只加字段。
+- **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。
 - **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名那条今天走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
 - **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
 - **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行段与并行段共用，所以账本字节与串行执行完全一致（`tests/run_driver.rs` 与 `turn/tests/concurrent.rs` 对拍）。第一条非只读调用就是 fence：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
@@ -241,9 +242,9 @@ pub(crate) const ANOTHER_ADDRESS: &str =
     "send this task to another address, which opens a session of its own";
 ```
 
-- **一个事实一个家**：「一个被冻住的会话怎么出去」先前在两处各拼一遍（`prefix::segment::prefix_drifted` 与 `turn::report::shape_moved`），两句话说的是同一件事，而两份拼写可以各自漂。现在动词只拼一遍，两条拒绝各自接上它们自己的解释。
-- **拒绝不得指名一个不存在的动词**：先前的恢复语是「open a new session, or fork this run」——这两件事前端都做不到：同一个地址上开第二个 session 没有任何 Command，`Fork` 写下血统却没有任何 dispatch 路径消费它。**一句指向不存在动词的恢复语，比没有恢复语更坏**：人按它去找，找不到，然后以为是自己没找到。
-- **这句话随动词走**：`OpenSession`（`/new`）上线后，改的是这一个常量，而不是去两处各改一遍。
+- **一个事实一个家**：「一个被冻住的会话怎么出去」只拼一遍，`prefix::segment::prefix_drifted` 与 `turn::report::shape_moved` 两条拒绝各自接上它们自己的解释；两份拼写会各自漂。
+- **拒绝不得指名一个不存在的动词**：恢复语只指向每个客户端都有的那件事——把任务发到另一个地址。**一句指向不存在动词的恢复语，比没有恢复语更坏**：人按它去找，找不到，然后以为是自己没找到。
+- **这句话随动词走**：线上有 `Command::OpenSession`；恢复语要改指它时，改的是这一个常量，而不是去两处各改一遍。
 
 ### 8-4 runtime::prefix（形状 5＋2）
 
@@ -276,7 +277,7 @@ pub fn verified_system_hashes(system: &[SystemBlock], frozen: &[B3Hash; 4]) -> R
 // 闭集 `SkipReason { Duplicate, Unreadable, NotUtf8, NoBudget }`，不再是四个手写字符串）。
 ```
 
-- 段序即缓存经济：类型把四段位置写死，断点与各段上限属 S3 完备化（只加字段）。
+- 段序即缓存经济：类型把四段位置写死，断点与各段上限见 §8-6。
 - **`segment_hashes()` 返回构造时缓存值，`verified_segment_hashes()` 才是权威。** 一个事实（这段字节的哈希）只有一个权威：`FrozenSegment::assembled` 在构造时算一次，每次派活前从将发的字节重算一次并与它比对。两者不一致意味着模型将读到的字节不是运行冻结的那一份，而那正是「同一事件序列逐字节重放」所依赖的东西，故拒绝而非警告。
 - 分段哈希经 `B3Hash::digest`（kernel 唯一哈希产地）；A4（同输入同字节）由 golden 断言，A15 重建器随 S3。
 - trybuild 反例：`FrozenSegment::from(TimeMs)`／把 TimeMs 传进 assemble —— 无转换路径，编译不过（ClockStamp 等类型落地后同规逐个加反例）。
@@ -328,7 +329,7 @@ pub struct Handoff { /* must_read、overview、progress、context、next_step �
 impl Handoff {
     /// Sole constructor: must-read non-empty; every
     /// entry is an already-parsed Locator by type. Five sections always
-    /// present; prose quality is the probe's business (P1), not the type's.
+    /// present; prose quality is the handoff probe's business, not the type's.
     pub fn new(must_read: Vec<Locator>, overview: String, progress: String,
                context: String, next_step: String) -> Result<Handoff, AxError>;   // 空 must_read → E_INVALID_ARGS
     pub fn must_read(&self) -> &[Locator];  pub fn payload(&self) -> Result<Payload, AxError>;  // handoff_written 载荷
@@ -339,8 +340,8 @@ pub struct ResumeSeed { pub run: RunId, pub must_read: Vec<Locator> }
 pub fn resume(handoff: &Handoff, new_run: RunId) -> ResumeSeed;
 ```
 
-- **载荷即这五个字段**：`payload` 是 `Payload::of(self)`，键名由字段名给出，此前在此处又手写了一遍。只派生 `Serialize`：`new` 是持有一个 `Handoff` 的唯一路径，能从一行账本反造一个的读方会绕过它对空 must-read 的拒绝。
-- 「下一步」段首列用户指定动作、must-read 规范类机器填：内容约束属生产者（S3 回合层／P2 spine_files），类型只强制结构。
+- **载荷即这五个字段**：`payload` 是 `Payload::of(self)`，键名由字段名给出，不另手写一遍。只派生 `Serialize`：`new` 是持有一个 `Handoff` 的唯一路径，能从一行账本反造一个的读方会绕过它对空 must-read 的拒绝。
+- 「下一步」段首列用户指定动作、must-read 规范类机器填：内容约束属生产者（回合层与 spine 文件），类型只强制结构。
 - Run<Frozen> 无解冻：resume 不收 Run 值，只收 Handoff——「旧 Run 醒来」在签名上无法拼写。
 
 ### 8-6 turn／prefix／handoff 完备化（形状不变，参数长入）
@@ -1005,7 +1006,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 ## 12 Decisions
 
-- 恢复层不造码（§8-44）：恢复段的失败恒是它拿到的那个类型化错误，可定义性随原码走；该层改变的只是「同样的请求再发一次」与「换一扇门再问一次」之间的选择。
+- 恢复层不造码（§8-49）：恢复段的失败恒是它拿到的那个类型化错误，可定义性随原码走；该层改变的只是「同样的请求再发一次」与「换一扇门再问一次」之间的选择。
 
 - `E_INVALID_ARGS`（at_seq 越界）：不可定义掉——「从已冻结 Run 最后事件之后分叉」是用户可达输入（§19.1 点名）；静默夹取是被明拒的替代。
 - `E_LOG_VERSION_UNSUPPORTED`（v 判向＋未知 kind 无 ig）：不可定义掉——数据比二进制长寿。
@@ -1020,7 +1021,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 **被否**：保留字段与 `mint` 等将来接上——死机制照样要维护、要进公开面，而接上时的口径（谁写的、第几代）应由那时真实的摘要生产者决定，不是预先猜好。
 
 **重开参数**：出现一条把模型写的摘要放进前缀的生产路径时，重开本条，指纹随那条路径一起设计。
-### 12.1 定规：回合边界的压缩只在收尾边界换快照
+### 12.2 定规：回合边界的压缩只在收尾边界换快照
 - **决定**：一回合的 exchange 只允许在 `Turn<Recording>::record` 的收尾边界被压缩替换，时机是工具波全落地之后、一回合一次；判定由 `compaction::plan` 一处给出（8-44），`turn.rs` 不写任何阈值比较；`runtime::fork` 在同一边界重放同一判定。
 - **理由**：压缩若在波中换快照，它看见的是半截波，分组与 `fork` 的逐回合重建不同，同一历史会折出两种字节，分支与母亲分叉——这正是确定性回放（ARCHITECTURE §10）要排除的失败。收尾边界是这一波的唯一完整分组点。
 - **击败的备选**：①逐结果在波中压缩——分组随落地次序漂移，重放无法复现；②在 `turn.rs` 写一份阈值判断——「装不装得下」已经有一个家（`compaction::plan`），第二个家会各自漂移；③在边界把 `MustOffload` 的文本换成引用——这扇门没有 store，且城里没有工具解析得了引用，模型拿到的将是一条跟不上的指针，故该类文本原样保留、以 Ledger 为回路。
@@ -1792,7 +1793,7 @@ impl ContextReminder { pub fn render(&self) -> String; }
 
 **改这一格的入口**：`channels::Command::ConfigureBuilding` 的 `context_second_threshold`（channels-SPEC §8-45）写的就是 `RunPlan.second_threshold` 读的那一格——写入落那一级的 `[context] second_threshold`，下一个 Run 起点冻结时读到；正在跑的那个 Run 不受影响（冻结的理由见 kernel-SPEC §8-22）。
 
-### 8-29 回合不再有上限
+### 8-48 回合没有上限
 
 `RunPlan` 去掉 `budget_turns` 与 `budget`，`drive` 的 `while turns < budget` 变成 `loop`。一次跑的结束只有三种来路：一回合作出结论、一次带 carrier 事件的失败（写进历史后冻结为 cancelled）、或一个安全点送到的中断。
 
@@ -1950,7 +1951,7 @@ pub fn splice(text: &str, front: usize, back: usize, place: Elided) -> Cut;
 
 **关门测试**（`elision::tests` 与 `compaction::tests`）：`splice` 的 `dropped` 加上去掉标记后的长度恒等于输入长度——**对任意一对下标成立**，包括落在字符内部的与顺序颠倒的一对（proptest 量化，不是举例）；任何切口落在字符边界；`compact` 对一段日志报出的丢弃量与幸存字节数加起来是原文长度。
 
-### 8-44 turn::recovery —— 模型调用恢复管线的段契约（形状 2 值＋形状 3 内缝）
+### 8-49 turn::recovery —— 模型调用恢复管线的段契约（形状 2 值＋形状 3 内缝）
 
 **错误分层三层各管一段。**「同一个请求还能不能再发一次」（`AxError::retry`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
 **错误分层三层各管一段。**「同一个请求还能不能再发一次」（`is_retriable`）的唯一家是 `gateway::endpoint::failure::ProviderFailure`；本模块的恢复段只修**同样的请求再发一次也注定同样失败**的形状类失败——换一扇门再问一次；可重试失败与「再发也一样」的拒词归 `runtime::watchdog`（§8-9）处置。三层互指互不越权：`ProviderFailure` 对可重试族的恢复语写的就是 "the watchdog decides retry or failover"，段对那一族恒 `Skipped`。
