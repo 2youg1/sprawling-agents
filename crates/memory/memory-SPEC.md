@@ -496,7 +496,7 @@ impl Checkpoint {
 - **`wave_post` 只问存在性，不问内容**：sweep 要的是「pre 提交树里的哪个 blob 从工作区消失了」，而这是一个存在问题——对树里的每个 blob 做一次 `symlink_metadata`，`NotFound` 即删除。**不碰 `diff_tree_to_workdir`**：它为每一个与树对上号的路径求哈希（libgit2 的 `git_diff__oid_for_entry`），而工作区里有城自己刚写完又改动的文件（session 投影，以及任何还开着写句柄的文件）；Windows 的目录枚举尺寸对这样的文件可以落后于句柄里的真实长度，libgit2 拿这个过期尺寸去 `git_odb__hashfd`，读到比声明尺寸多的字节使剩余计数下溢，最后把整次 sweep 拒成 `E_WORKTREE_BUSY`——写路径完全正确，读路径却对城市自己的写入过敏。
   - 被否：每波走 `diff_tree_to_workdir`。它省的是「每一波付整棵树的钱」，而那棵树是**这次栅栏自己的写域**（`wave_pre` 刚逐文件走过一遍），不是全城；sweep 只报 `Deleted`，而 `Deleted` 是存在问题不是内容问题。被否：`Path::exists()`——它跟随软链，一个悬空软链会被当成删除，`symlink_metadata` 不会。
   - 输出仍然在本模块排序而不信 walk 的顺序：**这批行落账的顺序是重放要复现的东西**。
-- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存用 `add_all`＋`update_all` 两步（后者含删除），glob 限于 `<scope>/*`；**session 切片永不进 add**（`CityLayout::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
+- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存用 `add_all`＋`update_all` 两步（后者含删除），glob 限于 `<scope>/*`；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
 - 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何栅栏——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 - **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `memory::alias`：任一链接使**整波拒绝**（`MemoryError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在栅栏侧是**跳过**而非拒绝（`memory::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。
@@ -777,7 +777,7 @@ impl Vfs for RealFs { … }
 - `Alias`→`E_OUTSIDE_WRITE_DOMAIN`：不可定义掉——名字与它指向的文件之间隔着一个链接是外部文件系统的事实；能定义掉的那部分（一次写入经链接穿透）已由 `WriteTarget` 在构造点定义掉，recovery 恒为「换成普通文件后重试」，故被拒的 run 不会卡死。Unix 上硬链接臂就在这个码下（`nlink>1` 即拒）；Windows 上链接计数不可判定（§3.5），由落盘纪律拆别名而非报拒。
 - `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读（段中损坏非尾部＝不可自动修复，指出路径交人决定）。
 - `LedgerHeld`→`E_LEDGER_HELD`（装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各跑一次 `up`／`serve`／`resume`）。能定义掉的那部分已经定义掉：锁先于一切读写，被拒的一方不会先写下任何东西。recovery 说明持锁的是另一个 sprawling 进程，以及怎样停下它。
-  锁路径的权威是 jsonl：`WriterLock::take` 从账本目录自己推出同级的 `<目录名>.lock`，不问 `CityLayout`。原因：会话切片路径只有 `memory::sessions` 一个权威（`xtask slices` 把 `of_ledger` 也算作点名那条路径），而从账本目录反推城根正是 `of_ledger` 的活；另一种做法——由调用方传入锁路径——要改 `open` 的签名和它的每个调用方，却只换来同一个文件名。代价是夹具、bench、fuzz 的账本目录也各多一个锁文件，而「一个目录一个写者」对它们同样成立。
+  锁路径的权威是 jsonl：`WriterLock::take` 从账本目录自己推出同级的 `<目录名>.lock`，不问 `CityLayout`。原因：会话切片路径只有 `memory::sessions` 一个权威，而从账本目录反推城根是 `of_ledger` 的活；另一种做法——由调用方传入锁路径——要改 `open` 的签名和它的每个调用方，却只换来同一个文件名。代价是夹具、bench、fuzz 的账本目录也各多一个锁文件，而「一个目录一个写者」对它们同样成立。
 
 ## 13 依赖选型
 
@@ -894,15 +894,15 @@ impl Sessions {
 pub(crate) const SLICE_MAGIC: &str = "slices v1";
 ```
 
-**账本不拆链。** 一条链、一个写者、一本完整历史（`docs/glossary.md` 的 one Ledger 与 one writer）一个字不改；工作区里出现的是一份**从账本投影出来、可删可重建的切片**：一个 room 一个文件，落在它所属 Building 的 `.sprawling/sessions/` 下，地址的嵌套就是文件的嵌套。**城自己的那条记录（地址即城名）不落任何切片**：那个地址是城，不是城里的 Building，给它落一份就会在城根里造一个与城同名的目录（kernel-SPEC 8-56 的 `city_address`）。路径由 `kernel::layout::CityLayout::session_slice` 给出（kernel-SPEC 8-56），本模块是它唯一的调用者；`xtask slices` 门钉住这句话。
+**账本不拆链。** 一条链、一个写者、一本完整历史（`docs/glossary.md` 的 one Ledger 与 one writer）一个字不改；工作区里出现的是一份**从账本投影出来、可删可重建的切片**：一个 room 一个文件，落在它所属 Building 的 `.sprawling/sessions/` 下，地址的嵌套就是文件的嵌套。**城自己的那条记录（地址即城名）不落任何切片**：那个地址是城，不是城里的 Building，给它落一份就会在城根里造一个与城同名的目录（kernel-SPEC 8-56 的 `city_address`）。路径由本模块的私有函数 `session_slice` 从 `CityLayout::root` 推出，目录名 `SESSIONS_DIR` 也是私有常量；crate 内唯一对外的是谓词 `pub(crate) fn is_session_projection(relative: &Path) -> bool`，供栅栏判断一条路径是不是切片。可见性就是这句话的守卫：别的模块写不出切片的路径，也就写不出切片的读者。被击败的替代是把路径留在 `kernel::layout` 再用文本扫描拦住别的调用点——扫描只认拼写，绕开一次别名就放行。
 
-**只有账务线程写，而且写在账本落盘之后。** 入口是 `JsonlLedger::append_all`：一段 wave 全部 `sync_data` 之后才逐条 `absorb`。投影写失败不改变账本的返回值——历史已经在盘上，可弃物不得让它的调用方吃到一次假失败——但拒绝被报出（一行 `eprintln!`）而不是被吞掉。**投影永不进栅栏。** `checkpoint::stage_scopes` 跳过任何 `sessions` 下的路径（`CityLayout::is_session_projection`）：它还在被账务线程追加，而 git 的暂存要读它以为已经知道的文件；一个仍在长的文件会把整波拒成 `E_WORKTREE_BUSY`（8-8）。可弃物因此从不进历史，也不进任何 diff 的读者面。
+**只有账务线程写，而且写在账本落盘之后。** 入口是 `JsonlLedger::append_all`：一段 wave 全部 `sync_data` 之后才逐条 `absorb`。投影写失败不改变账本的返回值——历史已经在盘上，可弃物不得让它的调用方吃到一次假失败——但拒绝被报出（一行 `eprintln!`）而不是被吞掉。**投影永不进栅栏。** `checkpoint::stage_scopes` 跳过任何 `sessions` 下的路径（`is_session_projection`）：它还在被账务线程追加，而 git 的暂存要读它以为已经知道的文件；一个仍在长的文件会把整波拒成 `E_WORKTREE_BUSY`（8-8）。可弃物因此从不进历史，也不进任何 diff 的读者面。
 
 **头部是唯一的疑点。** 每份切片首行是 `slices v1 <first_seq>`，即该文件第一条记录的 seq。文件不存在、魔数不符、或首行 seq 与头部不符 → 整份重建：扫账本、按地址过滤、按账本序写下，不写迁移代码。进程重启后接上已有文件时，先校验头部与内容，再从账本把漏掉的尾巴补齐；段名带首 seq，故不可能含新记录的段不打开。断在半行的尾巴先截掉再续，与账本自己的 tail recovery 同一条读法。
 
 **重建逐字节相同。** 每一行都是账本 `canonical_line` 的副本，头部由内容决定（首条记录的 seq），所以删掉整个 `sessions/` 再放一遍得到同样的字节——`deleting_the_sessions_directory_and_replaying_the_ledger_restores_the_bytes` 钉住它。
 
-**产品不读它做判断。** 它只给人的眼睛与城外 agent 的 `read`；`runtime` 的 `read` 工具照旧拒绝 `.sprawling`，城里任何模块想据此决策都被 `slices` 门拦下。
+**产品不读它做判断。** 它只给人的眼睛与城外 agent 的 `read`；`runtime` 的 `read` 工具照旧拒绝 `.sprawling`，城里别的模块连它的路径都拼不出（路径推导是 `memory::sessions` 的私有项）。
 
 **自带的 `RealFs`，不借账本那条缝。** `RealFs` 同一时刻只持一个追加句柄，写投影会把账本的热句柄挤掉；投影可弃，不该让主干为它付句柄开销。代价是投影不参与 `FaultFs` 的断电模型：断电后它可能落后，下一次 attach 补齐，这正是它可重建的含义。
 

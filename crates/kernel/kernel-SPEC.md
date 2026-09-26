@@ -2011,7 +2011,6 @@ pub fn is_reserved(&self) -> bool;                  // 改：eq_ignore_ascii_cas
 pub const LEDGER_DIR: &str = "ledger";
 pub const CAS_DIR: &str = "cas";
 pub const LIBRARY_DIR: &str = "library";
-pub const SESSIONS_DIR: &str = "sessions";
 pub const BUILDING_SHELF: &str = "skills";
 pub const CONFIG_FILE: &str = "CONFIG.toml";
 pub const FILTERS_FILE: &str = "FILTERS.toml";
@@ -2035,8 +2034,6 @@ impl CityLayout {
     pub fn job(&self, addr: &Address) -> PathBuf;               // <scope>/JOB.md
     pub fn handoff(&self, room: &Address) -> PathBuf;           // <scope>/Handoff.md
     pub fn urbanite(&self, addr: &Address) -> PathBuf;          // <scope>/URBANITE.md
-    pub fn session_slice(&self, room: &Address) -> PathBuf;     // <首段>/.sprawling/sessions/<其余>.jsonl
-    pub fn is_session_projection(relative: &Path) -> bool;     // 某层 sessions 下的路径（栅栏永不暂存）
     pub fn city_address(&self) -> Option<Address>;             // 城自己的名字：根目录名，能拼成地址时
     pub fn of_ledger(dir: &Path) -> Option<CityLayout>;         // ledger() 的逆：从账本目录取回城根
 }
@@ -2049,7 +2046,7 @@ impl CityLayout {
 3. **`RESERVED_PREFIX` 仍住在 `kernel::address`，本模块引用它。** 它是地址文法的一部分——`is_reserved` 是写域与读路径共用的谓词（8-2、8-55）——而不是一条布局规定。布局这一侧只决定「什么落在保留子树里」：治理一个 scope 的文件（`CONFIG.toml`、`FILTERS.toml`、`skills`）落在该 scope 的 `.sprawling/` 下，于是没有任何写域够得到它们；居民自己写的文件（`JOB.md`、`Handoff.md`、`URBANITE.md`、`Archive/`）落在明处。这条摆放规则由单元测试逐个方法核对，而不是靠注释重申。
 4. **逐段 push 而不是整串 join。** 一个地址在 Windows 与在 Linux 必须落成同一个目录树；整串 join 把 `/` 交给平台去解释，逐段 push 不给它这个机会。此前 city 内部两种拼法并存，本模块只留前一种。
 5. **一个落点一个方法，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威（Roadmap §19.3 第 5 条）。后续新增一类文件时，先在此加方法与常量，再写调用点。
-6. **`session_slice` 是唯一一个按「首段是楼」读地址的方法。** Room 的地址就是 session 的身份，而 Building 是地址的第一段：地址里楼以下的部分就落成楼自己 sessions 下的目录嵌套，一个 run 不点名 session 时就在楼自己的地址上工作，文件于是叫楼的名字。这条路只被 `memory::sessions` 这一个写者引用，`xtask` 的 `slices` 门钉住这句话。
+6. **session 切片的路径不在此处。** 切片是账本的可弃投影，只有 `memory::sessions` 一个写者、没有读者；它的目录名与路径推导是该模块的私有项（memory-SPEC 8-24），于是「别处点名这条路」在编译期就写不出来，不必再靠文本扫描去拦。
 7. **`of_ledger` 是 `ledger` 的逆，为「只拿到账本目录」的写者而存在。** 账本的写者手里只有它打开的那一个目录，而切片落在城根之下，故城根必须能从这一个输入反推回来；逆运算住在具名常量所在的同一模块里，任何调用点都不许用 `parent().parent()` 重新拼一遍。不是 `ledger()` 形状的目录不是城（夹具、bundle 的校验台、直接打开的存储），回答 `None`。
 
 ### 8-72 `kernel::retries`：失败的调用再试几次（形状 2 值类型）

@@ -27,7 +27,7 @@ fn city(root: &Path) -> PathBuf {
 }
 
 fn slice_of(root: &Path, room: &str) -> PathBuf {
-    CityLayout::new(root).session_slice(&Address::parse(room).unwrap())
+    session_slice(&CityLayout::new(root), &Address::parse(room).unwrap())
 }
 
 /// Every file under the sessions of `webapp`, by relative path.
@@ -262,4 +262,62 @@ fn the_city_s_own_record_gets_no_slice() {
         !tmp.path().join(&name).exists(),
         "no directory named after the city stands inside it"
     );
+}
+
+#[test]
+fn a_session_slice_lives_under_the_sessions_of_its_first_segment() {
+    let root = Path::new("/city");
+    let sessions = root.join("webapp").join(RESERVED_PREFIX).join(SESSIONS_DIR);
+    for (room, file) in [
+        ("webapp/api-rewrite", sessions.join("api-rewrite.jsonl")),
+        // A room one level below a room keeps its own path: the nesting
+        // of the address is the nesting of the files.
+        (
+            "webapp/backend/db-migration",
+            sessions.join("backend").join("db-migration.jsonl"),
+        ),
+        // A run that named no session works at the building's address.
+        ("webapp", sessions.join("webapp.jsonl")),
+    ] {
+        assert_eq!(slice_of(root, room), file, "{room}");
+    }
+}
+
+#[test]
+fn a_session_slice_is_out_of_every_write_domain() {
+    let spelled = slice_of(Path::new("/city"), "lab/room1")
+        .to_string_lossy()
+        .replace('\\', "/");
+    let as_address = spelled.trim_start_matches("/city/").to_owned();
+    assert!(
+        Address::parse(&as_address).unwrap().is_reserved(),
+        "{spelled} is not in a reserved subtree"
+    );
+}
+
+#[test]
+fn a_fence_can_tell_a_session_slice_from_a_promise() {
+    for spelled in [
+        "lab/.sprawling/sessions/room1.jsonl",
+        "lab/room1/.sprawling/sessions/room1.jsonl",
+        "lab/.SPRAWLING/sessions/x",
+    ] {
+        assert!(
+            is_session_projection(Path::new(spelled)),
+            "{spelled} is a session slice"
+        );
+    }
+    for spelled in [
+        "lab/.sprawling/CONFIG.toml",
+        "lab/.sprawling/skills/one/SKILL.md",
+        "lab/room1/JOB.md",
+        "sessions/room1.jsonl",
+        "lab/room1/sessions/notes.md",
+        "lab/.sprawling/library/sessions.md",
+    ] {
+        assert!(
+            !is_session_projection(Path::new(spelled)),
+            "{spelled} is a person's or a promise, not a slice"
+        );
+    }
 }
