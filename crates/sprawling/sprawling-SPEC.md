@@ -2019,13 +2019,20 @@ Approval Inbox，人的待答队列。
 
 ```rust
 pub(crate) struct Claimant { pub(crate) building: Address, pub(crate) room: Address, pub(crate) run: RunId, pub(crate) who: String }
-pub(crate) struct ClaimAsk { /* building、node、roadmap_claimed 那一行的 EventDraft、回信的 SyncSender —— 私有 */ }
+pub(crate) struct ClaimAsk { /* building、node、roadmap_claimed 那一行的 EventDraft、放回行 effect::Line、回信的 SyncSender —— 私有 */ }
 #[derive(Default)]
-pub(crate) struct ClaimBook { /* (building, node) → 在飞的 RunId —— 私有 */ }
+pub(crate) struct ClaimBook { /* (building, node) → 在飞的 RunId 与放回行 —— 私有 */ }
 impl ClaimBook {
     pub(crate) fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger); // 入账并登记，或拒绝；然后回信
-    pub(crate) fn release(&mut self, run: RunId);        // 这轮活回家时放开它持有的节点
+    pub(crate) fn release(&mut self, run: RunId) -> OpenClaims; // 这轮活回家时放开它持有的节点，交出它们的放回行
 }
+#[must_use] pub(crate) struct OpenClaims { /* run 与放回行 —— 私有 */ }
+impl OpenClaims {
+    pub(crate) fn closed(&mut self);                         // 落地已为它们写下结局：不再放回
+    pub(crate) fn owed(self) -> (RunId, Vec<effect::Line>);  // 尚未合上的放回行，归在哪一轮活名下
+}
+// effect.rs：放回行的唯一拼法，陈旧落地的 released() 与车道的认领共用
+pub(crate) fn handed_back(claim: &ClaimEffect, note: &str, room: &Address, who: &str) -> Result<Option<Line>, AxError>;
 pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking;
 ```
 
@@ -2049,15 +2056,17 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
   那时替换以 `E_VERSION_CONFLICT` 拒绝，行已在账本上而文件未动，错误原样交给 `settle` 的调用方。
 - **回家的每一条路都要合上本轮开着的认领**：`roadmap_claimed` 在调用时入账，所以每一条认领都得有一条 `roadmap_released`
   或完成行把它合上，否则重启后 `folds::collaboration` 把那个节点读成永远被那间房占着，`plans` 还会给它发阻塞通知。
-  今天合上它的只有 `settle_desks` 里的两条路：`Claims::Landed`（放下／完成行）与 `Claims::Stale`（`released()`）。
-  **未定：驱动返回 `Err`（`running.rs` 的 `driven?`），或 `settle_desks` 在更早的 `?` 上失败（清扫、`city::roadmap`、
-  `Claims::of` 拒绝重放）时，本轮的认领行没有合上行。** 定下它的办法：`ClaimBook::release` 返回本轮仍开着的认领，
-  由回家那一处在落地失败的每条路上为它们追加 `HandedBack` 行，使回家成为合上认领的唯一一处；证据是一条红测——
-  一轮认领后驱动失败的活，历史里认领行之后跟着一条放回行。
-- **未定：目标登记**。`goal_registered` 仍在落地时由工人写下，目标登记还没走「调用时由记账线程判定并先入账」这条路；
+  车道在调用那一刻把认领行与它的放回行（`PutDown`，`StopCause::HandedBack`，说明这轮活回家却没有落地）一起拼好交给记账线程，
+  `ClaimBook` 登记节点时连放回行一起记下；`Flight::arrived` 放开这轮活时 `release` 交出仍登记着的放回行（`OpenClaims`），
+  随 `Home` 交给落地。`settle_desks` 的计划那一步把效应落下之后（`Claims::Landed` 的放下／完成行，或 `Claims::Stale` 的
+  `released()`）调 `OpenClaims::closed`。落地结束后，不论成败，`serve_flight` 经 `record_for` 追加余下的放回行（时刻在追加时取，
+  各份折叠照常看见它们）：落地在计划那一步之前的任何一个 `?` 上失败——驱动本身返回 `Err`（`driven?`）、目标行、清扫、
+  `city::roadmap`、`Claims::of` 拒绝重放——余下的就是本轮全部的认领。计划那一步之后的失败（书架、请求、租约、结论）不再补行，
+  因为那时认领已经合上，补一条放回行会让历史说一个已完成的节点又被放回。落地成功而追加失败时返回追加的错误；落地已经失败时
+  返回落地的原错误，追加的失败记进诊断——账本已经拒绝过一行，第二次拒绝不改变人要做的事。- **未定：目标登记**。`goal_registered` 仍在落地时由工人写下，目标登记还没走「调用时由记账线程判定并先入账」这条路；
   两轮并排的活登记同一片地，第二个要到落地才知道。能定下它的证据：一条红测——两轮活从同一份目标登记表出发登记同一片地，
   第二个在调用时被拒。
-- 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes/)'`；
+- 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes|a_claim_whose_landing_failed/)'`；
   `cargo nextest run -p collab -E 'test(/two_runs_read_as_ready/)'` 在桌子一侧钉住「第二个认领当场被拒、什么都不留」。
 
 ## 8-41 一次提交出自哪次运行，从账本回答（`bin::views::commits`、`sprawling whose`）
