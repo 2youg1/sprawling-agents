@@ -289,8 +289,8 @@ pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
 pub const kernel::DOORS: [kernel::gate::DoorId; 9]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 74]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 74]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::GIT_METADATA: &str
 pub const kernel::IDEM_DERIVE_V: u8
@@ -1332,6 +1332,7 @@ pub kernel::EventKind::BackpressureShed
 pub kernel::EventKind::BudgetLimit
 pub kernel::EventKind::BuildingConfigured
 pub kernel::EventKind::BuildingCreated
+pub kernel::EventKind::BuildingRemoved
 pub kernel::EventKind::CancelReceived
 pub kernel::EventKind::CheckpointCommitted
 pub kernel::EventKind::CityHalted
@@ -1856,6 +1857,7 @@ pub kernel::event::EventKind::BackpressureShed
 pub kernel::event::EventKind::BudgetLimit
 pub kernel::event::EventKind::BuildingConfigured
 pub kernel::event::EventKind::BuildingCreated
+pub kernel::event::EventKind::BuildingRemoved
 pub kernel::event::EventKind::CancelReceived
 pub kernel::event::EventKind::CheckpointCommitted
 pub kernel::event::EventKind::CityHalted
