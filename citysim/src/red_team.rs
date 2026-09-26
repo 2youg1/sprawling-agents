@@ -121,7 +121,7 @@ fn verdict(arm: Arm, claim: &Claim, pinned: &Locator, draft: &str) -> Kept {
         Arm::Unverified => Kept::Yes,
         Arm::Verified => match claim.citation.against(pinned, draft.as_bytes()) {
             Reading::Holds => Kept::Yes,
-            Reading::OtherVersion | Reading::OutOfRange | Reading::Differs { .. } => Kept::Yes,
+            Reading::OtherVersion | Reading::OutOfRange | Reading::Differs { .. } => Kept::No,
         },
     }
 }
