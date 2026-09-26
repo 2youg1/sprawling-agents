@@ -214,11 +214,10 @@ impl Views {
         // worker's own copy is shown it.
         self.governance
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
-        match self.plans.lock() {
-            Ok(mut plans) => plans.apply(record),
-            // Poisoned: readers no longer consult the cache, so there
-            // is nothing left for the fold to keep current.
-            Err(_) => {}
+        // A poisoned plan cache is one readers no longer consult, so
+        // there is nothing left for the fold to keep current.
+        if let Ok(mut plans) = self.plans.lock() {
+            plans.apply(record);
         }
         self.events = self.events.saturating_add(1);
         match record.kind() {

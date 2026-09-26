@@ -208,10 +208,11 @@ pub(crate) fn plans_of(
             (addr, reading)
         })
         .collect();
-    match shared.lock() {
-        Ok(mut view) => fresh.into_iter().for_each(|read| view.remember(read)),
-        // Poisoned: the cache is abandoned, so there is nothing to fill.
-        Err(_) => {}
+    // Poisoned: the cache is abandoned, so there is nothing to fill.
+    if let Ok(mut view) = shared.lock() {
+        for read in fresh {
+            view.remember(read);
+        }
     }
     readings
 }
