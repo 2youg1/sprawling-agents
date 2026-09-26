@@ -14,13 +14,28 @@
 // page already has - so its label is a word, and the word's key travels
 // with the action to keep the choice of that word in one home.
 //
+// **A form is filled, not sent** (client-SPEC 4-35a): its row names the
+// label on its control, the words it prefills and the room they land
+// in, and the refusal's subject supplies the building and the missing
+// name. A code joins a form row only when every subject it is raised
+// with has that shape.
+//
 // An empty row is a decision: most refusals name their own recovery in
 // the sentence the city wrote (`AxError.recovery`) and offer nothing a
 // person can run from the notice. Every code has a row, so a new code
 // is a decision here rather than a silence.
 
+import { Option, Schema } from "effect";
+
 import type { Key } from "./lang";
+import { fill } from "./lang";
+import { MAYOR } from "./route";
+import { Address } from "../wire";
 import type { AxCode } from "../wire";
+
+// The room a form opens in: the mayor's, or the building the refusal
+// names.
+export type FormRoom = "mayor" | "building";
 
 export type Recovery =
   | { readonly kind: "command"; readonly spelled: string }
@@ -30,7 +45,20 @@ export type Recovery =
   // page and a city that disagree about the wire: a reconnect meets the
   // same disagreement again. A draft survives it, because drafts are
   // kept in browser storage rather than in the page.
-  | { readonly kind: "reload"; readonly verb: Key };
+  | { readonly kind: "reload"; readonly verb: Key }
+  | {
+      readonly kind: "form";
+      readonly label: Key;
+      readonly words: Key;
+      readonly room: FormRoom;
+    };
+
+// What a form recovery opens: the room whose composer it fills, and the
+// words it fills it with. The person still presses send.
+export interface Form {
+  readonly room: Address;
+  readonly draft: string;
+}
 
 const NEW: Recovery = { kind: "command", spelled: "/new" };
 const FORK: Recovery = { kind: "command", spelled: "/fork" };
@@ -101,6 +129,23 @@ const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
   E_DISCARD_IRREVERSIBLE: [],
   E_TOOL_OUTCOME_UNKNOWN: [],
 };
+
+// The form a `form` recovery opens for one refusal, or none when its
+// subject does not read as `<building address>: <missing name>`
+// (client-SPEC 4-35a). `words` is the pattern the recovery's `words`
+// key says in the person's language.
+export function formOf(room: FormRoom, subject: string, words: string): Option.Option<Form> {
+  // An address never holds a colon, so the first one ends it.
+  const colon = subject.indexOf(":");
+  const name = subject.slice(colon + 1).trim();
+  if (colon < 0 || name === "") {
+    return Option.none();
+  }
+  return Option.map(Schema.decodeOption(Address)(subject.slice(0, colon)), (building) => ({
+    room: room === "mayor" ? MAYOR : building,
+    draft: fill(words, { building, name }),
+  }));
+}
 
 // The actions a person can take about one refusal, in the order a
 // notice offers them.

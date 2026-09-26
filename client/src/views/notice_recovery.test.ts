@@ -13,6 +13,7 @@ import type { Ui } from "../ui";
 import { Address } from "../wire";
 import type { Command } from "../wire";
 import { recover, recoveryWhy } from "./notice_recovery";
+import type { Refused } from "./notice_recovery";
 
 const NEW: Recovery = { kind: "command", spelled: "/new" };
 const FORK: Recovery = { kind: "command", spelled: "/fork" };
@@ -22,6 +23,17 @@ const FORK: Recovery = { kind: "command", spelled: "/fork" };
 // `about` as one.
 const SENTENCE = "the model changed from `fake-small` to `fake-chat`";
 const FOLDED = Option.getOrNull(Schema.decodeOption(Address)(SENTENCE));
+const REFUSED: Refused = {
+  error: {
+    code: "E_CONFIG_INVALID",
+    action: "open a session",
+    subject: SENTENCE,
+    recovery: "open a new session or fork",
+    nearby: [],
+    retriable: false,
+  },
+  about: FOLDED,
+};
 
 const COMPOSER = Address.make("hall/mayor");
 
@@ -44,7 +56,7 @@ function standingIn(room: Address): { readonly u: Ui; readonly sent: Command[] }
 describe("a notice's way out", () => {
   test("opens the new session in the composer's room, not the subject", () => {
     const { u, sent } = standingIn(COMPOSER);
-    recover(u, NEW, FOLDED);
+    recover(u, NEW, REFUSED);
     expect(sent.map((command) => ("open_session" in command ? command.open_session.addr : null))).toEqual([
       COMPOSER,
     ]);
@@ -52,6 +64,6 @@ describe("a notice's way out", () => {
 
   test("is offered where there is a composer, whatever the subject says", () => {
     const { u } = standingIn(COMPOSER);
-    expect(recoveryWhy(u, FORK, null)).toBeUndefined();
+    expect(recoveryWhy(u, FORK, { ...REFUSED, about: null })).toBeUndefined();
   });
 });

@@ -210,7 +210,7 @@ second mark next to it. -->
         tone="quiet"
         label={recoveryLabel(lever, $lang)}
         onPress={() => {
-          recover(u, lever, null);
+          recover(u, lever, { error: $link.error, about: null });
         }}
       />
     {/if}
@@ -258,13 +258,13 @@ second mark next to it. -->
               >
                 {#snippet actions()}
                   {#each recoveryFor(notice.error.code) as recovery (recoveryLabel(recovery, $lang))}
-                    {@const why = recoveryWhy(u, recovery, notice.about)}
+                    {@const why = recoveryWhy(u, recovery, notice)}
                     <Button
                       tone="quiet"
                       label={recoveryLabel(recovery, $lang)}
                       {...why === undefined ? {} : { why: say($lang, why) }}
                       onPress={() => {
-                        recover(u, recovery, notice.about);
+                        recover(u, recovery, notice);
                       }}
                     />
                   {/each}
