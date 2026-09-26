@@ -61,5 +61,5 @@ pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, Ski
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,
-    PromptSkip, PromptSource, ShapeChanged, ShapePart, SkipReason, SteerReceived, SummaryProducer,
+    PromptSkip, PromptSource, ShapeChanged, ShapePart, SkipReason, SteerReceived,
 };

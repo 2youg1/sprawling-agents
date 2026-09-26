@@ -76,7 +76,6 @@ fn a15_rebuild_matches_the_recorded_segment_hashes() {
     let source = |addr: &str| SourceDoc {
         addr: Address::parse(addr).unwrap(),
         bytes: docs.get(addr).map(|s| s.as_bytes().to_vec()),
-        producer: None,
     };
     let plan = PrefixPlan {
         city: vec![source("city.md")],

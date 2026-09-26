@@ -12,10 +12,6 @@
     reason = "test code"
 )]
 
-use std::num::NonZeroU32;
-
-use kernel::event::record::SummaryProducer;
-
 use super::*;
 
 /// Both halves of one caller's work: decide, then carry it out. The
@@ -211,49 +207,4 @@ fn something_within_budget_is_left_exactly_alone() {
     let cut = compacted(text, ByteLen::new(4_096));
     assert_eq!(cut.place, Elided::Nothing);
     assert_eq!(cut.text, text);
-}
-
-#[test]
-fn the_first_summary_is_generation_one_and_each_next_one_higher() {
-    let first = mint("model-a", None);
-    assert_eq!(
-        first,
-        SummaryProducer::Written {
-            model: "model-a".to_owned(),
-            generation: NonZeroU32::MIN
-        },
-        "the first summary of a chain is generation one"
-    );
-    let second = mint("model-b", Some(&first));
-    assert_eq!(
-        second,
-        SummaryProducer::Written {
-            model: "model-b".to_owned(),
-            generation: NonZeroU32::new(2).unwrap()
-        },
-        "换模型后代数接着数，生产者换成新模型"
-    );
-}
-
-#[test]
-fn a_chain_nobody_counted_stays_unknown() {
-    assert_eq!(
-        mint("", None),
-        SummaryProducer::Unknown,
-        "来源缺失记未知：没有模型名就没有生产者"
-    );
-    assert_eq!(
-        mint("model-b", Some(&SummaryProducer::Unknown)),
-        SummaryProducer::Unknown,
-        "永不补猜：给一条没人数过的链补代数就是补猜"
-    );
-    let deepest = SummaryProducer::Written {
-        model: "model-a".to_owned(),
-        generation: NonZeroU32::new(u32::MAX).unwrap(),
-    };
-    assert_eq!(
-        mint("model-b", Some(&deepest)),
-        SummaryProducer::Unknown,
-        "数不下的代数是未知，不是回绕的 0——零与未知是两件事"
-    );
 }

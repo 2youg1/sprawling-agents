@@ -388,6 +388,8 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub skills: Vec<SkillPin>,          // 空亦写出
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
+pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64 }
+    // prompt_assembled 的一行来源；不带摘要生产者指纹：没有路径产出摘要（runtime-SPEC §12.1）。旧行里多出的 producer 键读时忽略
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
