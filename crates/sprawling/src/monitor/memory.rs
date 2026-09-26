@@ -16,10 +16,20 @@ pub(crate) struct Memory {
     pub(crate) available: u64,
 }
 
-/// Reads this machine's memory now, through a platform handle opened
-/// for this one reading.
+thread_local! {
+    /// The handle `read` refreshes, kept per thread so a reading pays the
+    /// platform call and not a new handle, with no lock between threads.
+    static SYSTEM: std::cell::Cell<Option<System>> = const { std::cell::Cell::new(None) };
+}
+
+/// Reads this machine's memory now, through this thread's kept handle.
 pub(crate) fn read() -> Memory {
-    refreshed(&mut System::new())
+    SYSTEM.with(|kept| {
+        let mut system = kept.take().unwrap_or_else(System::new);
+        let memory = refreshed(&mut system);
+        kept.set(Some(system));
+        memory
+    })
 }
 
 /// Reads this machine's memory through a handle the caller keeps, as the
