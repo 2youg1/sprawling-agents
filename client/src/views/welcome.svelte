@@ -77,7 +77,7 @@
         <span class="flex min-w-0 flex-col gap-tight">
           <span class="flex min-w-0 flex-wrap items-baseline gap-snug">
             <span class="text-label font-label">{say($lang, "welcome_card_provider")}</span>
-            <span class="text-note text-accent">{say($lang, "welcome_card_provider_first")}</span>
+            <span class="text-note font-label text-text">{say($lang, "welcome_card_provider_first")}</span>
           </span>
           <span class="text-note text-text-quiet">{say($lang, "welcome_card_provider_hint")}</span>
         </span>
