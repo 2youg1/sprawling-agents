@@ -2228,8 +2228,8 @@
     "zh": "等价的 config.toml"
   },
   "setup_toml_unread": {
-    "en": "nothing here can read the city's config.toml yet",
-    "zh": "这一版还读不到城的 config.toml"
+    "en": "this page does not print config.toml line by line",
+    "zh": "这一页不逐行列出 config.toml"
   },
   "setup_transcribe": {
     "en": "transcribe · hears (needs an ASR model such as whisper; a text model cannot go here)",

@@ -10,10 +10,11 @@
   // the body rather than standing as a third column: a block that costs
   // the body its width is a block nobody reads (client-SPEC 4-36). What
   // stands inside is the one sentence this build can say about the file
-  // - it cannot be read here - and no second spelling of the file
-  // itself. `Query::Config` answers would fill it, each value beside the
-  // layer it came from (client-SPEC 4-30); until the page asks, this is
-  // the empty state and nothing here hand-spells a line of `config.toml`.
+  // - this page does not print it - and no second spelling of the file
+  // itself. `Query::Config` answers one setting at a time beside the
+  // control that owns it, such as the context rung, each value beside
+  // the layer it came from (client-SPEC 4-30); nothing here hand-spells
+  // a line of `config.toml`.
 
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
