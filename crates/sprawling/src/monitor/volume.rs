@@ -11,9 +11,12 @@ use std::path::Path;
 use kernel::degradation::VolumeSpace;
 use sysinfo::Disks;
 
-/// Lists the disks once and reads the one that holds `city`.
+/// Lists the disks once and reads the one that holds `city`, resolved
+/// against the working directory first: no mount point is a prefix of a
+/// relative path.
 pub(crate) fn read(city: &Path) -> Option<VolumeSpace> {
-    space(&Disks::new_with_refreshed_list(), city)
+    let city = std::path::absolute(city).ok()?;
+    space(&Disks::new_with_refreshed_list(), &city)
 }
 
 /// The free space and capacity of the disk whose mount point is the
