@@ -76,7 +76,9 @@ sandbox ──▶ wasmtime（feature `wasm` 内藏；缝声明恒在）
 tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、memory(cas 经 pipeline)
 ```
 
-**本 crate 本版不做什么（否定式三条）**：
+上图只画各模块的主要依赖；crate 之间的依赖以 ARCHITECTURE 的 `depmap` 块为准，文件清单以它的模块图为准。
+
+**replay／fork 不做什么（否定式三条；本 crate 的其余模块，如 `tools::exec` 与 `backlog`，执行真效果）**：
 - 不重执行任何效果——verify 恒不调工具、不出网、不写盘。
 - 不生成 RunId——新 Run 身份由调用方注入（kernel 禁随机的同一纪律）。
 - 不读 projection——重放的唯一输入是 Ledger 原始行（历史只有一份）。

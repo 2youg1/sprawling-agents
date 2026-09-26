@@ -55,7 +55,9 @@ fn provider_wobble() -> AxError {
         "https://example answered 503",
     )
     .retriable()
-    .with_recovery("the watchdog decides retry or failover; admission widens the interval")
+    .with_recovery(
+        "the watchdog backs off and sends the same request again, until the run's retry limit or a Halt",
+    )
 }
 
 fn request() -> ModelRequest<'static> {
