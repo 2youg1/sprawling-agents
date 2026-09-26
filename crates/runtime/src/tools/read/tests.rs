@@ -348,7 +348,7 @@ fn a_link_is_judged_by_where_it_lands() {
 
 /// The reading room admits a package whole: `<name>/<path>` opens a file
 /// beside the package's `SKILL.md`, and a path that climbs out of the
-/// package is refused rather than resolved.
+/// package, by its segments or through a link, is refused.
 #[test]
 fn a_package_the_reading_room_admits_opens_by_name_and_path() {
     let dir = tempfile::tempdir().unwrap();
@@ -369,6 +369,13 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
         })
         .unwrap();
 
+    super::super::chosen_path::make_link(&package.join("out"), &dir.path().join(".sprawling"));
+    let err = tool.invoke(&call("review/out/CONFIG.toml")).unwrap_err();
+    assert_eq!(
+        err.code(),
+        &AxCode::GateDenied,
+        "a link led out of the package"
+    );
     let outcome = tool.invoke(&call("review/scripts/check.sh")).unwrap();
     assert_eq!(outcome.result.as_map()["text"], "git diff\n");
     for climbing in ["review/../../CONFIG.toml", "review/./SKILL.md", "review/"] {

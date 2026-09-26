@@ -289,9 +289,9 @@ impl ReadTool {
             };
         }
         if let Ok(catalog) = self.catalog.lock()
-            && let Some(inside) = package::open_in_package(&catalog, asked)
+            && let Some(inside) = package::open_in_package(&catalog, &self.city_root, asked)
         {
-            return Ok(Found::File(self.under_city(&inside?)));
+            return inside.map(Found::File);
         }
         // The judgement every model-chosen path gets, in the one place
         // it is written. `search` asks the same function the same
