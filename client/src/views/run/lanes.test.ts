@@ -13,8 +13,17 @@ import { describe, expect, test } from "bun:test";
 import { Seq, TimeMs, type Call, type Note, type Turn } from "../../wire";
 import { OVERSCAN, callsOf, columnsOf, stretchesOf, windowOf } from "./lanes";
 
-function call(n: number): Call {
-  return { tool: "read", subject: `f${String(n)}`, arguments: null, outcome: "answered", at: Seq.make(n), output: null };
+function call(n: number, called = 0, answered: number | null = null): Call {
+  return {
+    tool: "read",
+    subject: `f${String(n)}`,
+    arguments: null,
+    outcome: answered === null ? "waiting" : "answered",
+    at: Seq.make(n),
+    output: null,
+    called: TimeMs.make(called),
+    answered: answered === null ? null : TimeMs.make(answered),
+  };
 }
 
 function turn(number: number, t: number, calls: readonly Call[], notes: readonly Note[] = []): Turn {
@@ -25,7 +34,7 @@ describe("the time lens", () => {
   test("a turn is held by the person when it waited, by tools when it called, by the model otherwise", () => {
     const turns = [
       turn(1, 0, []),
-      turn(2, 10, [call(1)]),
+      turn(2, 10, [call(1, 10, 30)]),
       turn(3, 30, [], [{ waiting: { at: Seq.make(9) } }]),
       turn(4, 45, []),
     ];
@@ -36,6 +45,19 @@ describe("the time lens", () => {
       { share: "model", turn: 4, from: 45, to: 60 },
     ]);
     expect(stretchesOf(turns, 60, "tool").at(-1)?.share).toBe("tool");
+  });
+
+  // Two calls overlap between 14 and 22; the model spoke before the
+  // first and after the last answer, and those are its own stretches.
+  test("a turn that called tools is cut where its calls were measured", () => {
+    const turns = [turn(1, 10, [call(1, 14, 20), call(2, 16, 22)]), turn(2, 30, [call(3, 31)])];
+    expect(stretchesOf(turns, 40, null)).toEqual([
+      { share: "model", turn: 1, from: 10, to: 14 },
+      { share: "tool", turn: 1, from: 14, to: 22 },
+      { share: "model", turn: 1, from: 22, to: 30 },
+      { share: "model", turn: 2, from: 30, to: 31 },
+      { share: "tool", turn: 2, from: 31, to: 40 },
+    ]);
   });
 
   // Ten thousand turns across four hundred columns: a lane is at most

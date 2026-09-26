@@ -20,7 +20,7 @@
   import { ui } from "../../ui";
   import type { Turn } from "../../wire";
   import type { Share } from "./lanes";
-  import { SHARES, callsOf, columnsOf, stretchesOf, windowOf } from "./lanes";
+  import { SHARES, callsOf, columnsOf, stretchesOf, tookOf, windowOf } from "./lanes";
 
   interface Props {
     readonly turns: readonly Turn[];
@@ -119,6 +119,7 @@
       <div style:height="{rows.first * row}px"></div>
       <ol class="text-note" bind:offsetHeight={drawn}>
         {#each calls.slice(rows.first, rows.end) as placed, at (rows.first + at)}
+          {@const took = tookOf(placed.call)}
           <li class="flex h-control-sm items-center gap-snug">
             <span class="w-figure shrink-0 font-mono text-text-disabled"
               >{fill(say($lang, "run_turn_n"), { n: String(placed.turn) })}</span
@@ -127,6 +128,9 @@
               >{placed.call.tool}</span
             >
             <span class="min-w-0 flex-1 truncate font-mono text-text-quiet">{placed.call.subject ?? ""}</span>
+            <span class="shrink-0 font-mono text-text-disabled"
+              >{took === null ? "" : lasted(took)}</span
+            >
           </li>
         {/each}
       </ol>

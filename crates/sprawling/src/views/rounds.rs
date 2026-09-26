@@ -225,6 +225,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                 {
                     call.outcome = outcome;
                     call.output = said.and_then(channels::output_in);
+                    call.answered = Some(record.t());
                 }
             }
             kind => {

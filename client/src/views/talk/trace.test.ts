@@ -16,6 +16,8 @@ function call(tool: string, subject: string | null, head: string | null): Call {
     outcome: head === null ? "waiting" : "answered",
     at: Seq.make(1),
     output: head === null ? null : { head, cut: 0 },
+    called: TimeMs.make(0),
+    answered: head === null ? null : TimeMs.make(1),
   };
 }
 

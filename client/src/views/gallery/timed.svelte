@@ -31,6 +31,7 @@
     const next = seeded();
     let at = START;
     return Array.from({ length: count }, (_, n) => {
+      const span = n === 17 ? 140_000 : 4_000 + Math.floor(next() * 30_000);
       const calls: Call[] = Array.from({ length: n % 4 === 3 ? 0 : callsEach }, (_, c) => ({
         tool: ["read", "search", "edit", "exec"][c % 4] ?? "read",
         subject: `crates/city/src/part_${String((n * 7 + c) % 97)}.rs`,
@@ -38,6 +39,8 @@
         outcome: (n + c) % 23 === 0 ? "failed" : "answered",
         at: Seq.make(n * 100 + c),
         output: null,
+        called: TimeMs.make(at + 1_000 + c * 600),
+        answered: TimeMs.make(at + 1_400 + c * 600),
       }));
       const notes: Note[] = n === 17 ? [{ waiting: { at: Seq.make(n * 100 + 99) } }] : [];
       const turn: Turn = {
@@ -49,7 +52,7 @@
         used: { input: Tokens.make(12_000 + n * 400), output: Tokens.make(900 + n * 20), cached: Tokens.make(n * 300) },
         spent: UsdMicros.make(40_000 + n * 1_000),
       };
-      at += n === 17 ? 140_000 : 4_000 + Math.floor(next() * 30_000);
+      at += span;
       return turn;
     });
   }

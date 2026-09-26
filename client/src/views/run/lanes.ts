@@ -7,10 +7,12 @@
 // stretch of the run's clock, the lanes those stretches fall into, and
 // how many boxes and rows the page may hold for them.
 //
-// **A turn is the finest clock the wire carries.** `Turn.t` is when the
-// model was asked; a tool call and a wait for approval carry a `Seq`
-// and no time, so a turn is drawn in the lane of what it came to - it
-// waited for the person, it called tools, or the model only spoke -
+// **A tool call carries its own clock.** `Call.called` and
+// `Call.answered` are the Ledger times of the call and its result, so a
+// turn that called tools is cut where they were measured: the model
+// from `Turn.t` to the first call, tools until the last answer, the
+// model again after it. A wait for approval still carries a `Seq` and
+// no time, so a turn that waited is drawn whole in the person's lane
 // rather than cut into parts whose lengths nobody measured.
 //
 // **The page holds a bounded number of boxes.** A lane is sampled once
@@ -50,17 +52,27 @@ export const OVERSCAN = 8;
 // `tail` is what a live run is doing now, which decides its last
 // stretch; a run that is over passes `null`.
 export function stretchesOf(turns: readonly Turn[], end: number, tail: Share | null): readonly Stretch[] {
-  return turns.map((turn, at) => ({
-    share: at === turns.length - 1 && tail !== null ? tail : shareOf(turn),
-    turn: turn.number,
-    from: turn.t,
-    to: Math.max(turn.t, turns[at + 1]?.t ?? end),
-  }));
+  return turns.flatMap((turn, at) => {
+    const to = Math.max(turn.t, turns[at + 1]?.t ?? end);
+    const whole = (share: Share): Stretch[] => [{ share, turn: turn.number, from: turn.t, to }];
+    if (at === turns.length - 1 && tail !== null) return whole(tail);
+    if (turn.notes.some((note) => "waiting" in note)) return whole("person");
+    if (turn.calls.length === 0) return whole("model");
+    return cut(turn.number, turn.t, to, turn.calls);
+  });
 }
 
-function shareOf(turn: Turn): Share {
-  if (turn.notes.some((note) => "waiting" in note)) return "person";
-  return turn.calls.length > 0 ? "tool" : "model";
+// A turn that called tools, cut at the first call and the last answer;
+// a call still running holds the tool lane to the end of the turn.
+function cut(number: number, from: number, to: number, calls: readonly Call[]): Stretch[] {
+  const first = Math.max(from, Math.min(...calls.map((call) => call.called)));
+  const last = Math.min(to, Math.max(...calls.map((call) => call.answered ?? to)));
+  const parts: readonly Stretch[] = [
+    { share: "model", turn: number, from, to: first },
+    { share: "tool", turn: number, from: first, to: Math.max(first, last) },
+    { share: "model", turn: number, from: Math.max(first, last), to },
+  ];
+  return parts.filter((part) => part.to > part.from);
 }
 
 // The stretches as boxes over `columns` columns spanning `from`..`to`:
@@ -109,6 +121,12 @@ export function windowOf(total: number, row: number, top: number, height: number
 export interface Placed {
   readonly turn: number;
   readonly call: Call;
+}
+
+// How long a call took, measured; `null` while it has not answered.
+export function tookOf(call: Call): number | null {
+  const answered = call.answered ?? null;
+  return answered === null ? null : answered - call.called;
 }
 
 export function callsOf(turns: readonly Turn[]): readonly Placed[] {
