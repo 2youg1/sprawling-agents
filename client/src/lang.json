@@ -267,10 +267,6 @@
     "en": "how the city stands",
     "zh": "这座城的状态栏"
   },
-  "city_buildings": {
-    "en": "buildings",
-    "zh": "楼"
-  },
   "city_done_percent": {
     "en": "{percent}% done",
     "zh": "完成 {percent}%"
@@ -3163,5 +3159,53 @@
   "bld_halt_idle": {
     "en": "nothing runs here now; halting refuses new work",
     "zh": "这栋楼现在没有在跑的派活；叫停会拒收新活"
+  },
+  "runs_title": {
+    "en": "runs",
+    "zh": "全城 run"
+  },
+  "runs_counts": {
+    "en": "{asking} waiting for you · {runs} runs",
+    "zh": "{asking} 个在等你 · 共 {runs} 个 run"
+  },
+  "runs_asking": {
+    "en": "waiting for you",
+    "zh": "等你"
+  },
+  "runs_legend": {
+    "en": "what each run is doing",
+    "zh": "每个 run 在做什么"
+  },
+  "runs_tree": {
+    "en": "every run in the city, by building and room",
+    "zh": "全城的 run，按楼与房间排"
+  },
+  "runs_phase_idle": {
+    "en": "idle",
+    "zh": "空闲"
+  },
+  "runs_untitled": {
+    "en": "no task named yet",
+    "zh": "尚未写明任务"
+  },
+  "runs_minus": {
+    "en": "−{n} min",
+    "zh": "−{n} 分"
+  },
+  "runs_now": {
+    "en": "now",
+    "zh": "现在"
+  },
+  "runs_keys": {
+    "en": "j and k move, h and l fold",
+    "zh": "j、k 上下移动，h、l 折叠与展开"
+  },
+  "gallery_runs_board": {
+    "en": "the runs board, with runs waiting for the person",
+    "zh": "全城 run 板，有 run 在等人"
+  },
+  "gallery_runs_many": {
+    "en": "the runs board with 1,200 runs: only the rows on screen are drawn",
+    "zh": "1200 个 run 的全城 run 板：只画屏幕上的行"
   }
 }
