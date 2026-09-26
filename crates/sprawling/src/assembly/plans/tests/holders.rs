@@ -211,7 +211,9 @@ fn a_landing_refused_part_way_hands_back_only_the_nodes_it_did_not_close() {
 
 /// A run that claims a node and splits it holds nothing afterwards, and
 /// the split line is the parent's fate: a landing that succeeds owes no
-/// hand-back line after it (sprawling-SPEC.md 8-42-8).
+/// hand-back line after it, and neither the live holders nor a restart's
+/// fold of the same history show the parent held (sprawling-SPEC.md
+/// 8-42-8, 8-91).
 #[test]
 fn a_split_closes_the_claim_on_its_parent() {
     use crate::assembly::fixture::*;
@@ -238,18 +240,38 @@ fn a_split_closes_the_claim_on_its_parent() {
             completion("done", None),
         ],
     );
-    let worker = worker_over_faults(dir.path(), None);
+    // On disk rather than over a fault layer, because the restart's fold
+    // reads the ledger directory.
+    let worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
     let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
     let landed = worker.handle(dispatch(b"split and land"));
     drop(provider);
+    let building = Address::parse("lab").unwrap();
+    let rebuilt = Standing::fold(&kernel::layout::CityLayout::new(dir.path()).ledger())
+        .unwrap()
+        .collaboration
+        .plan_holders
+        .in_building(&building);
 
     assert_eq!(
-        (landed.is_ok(), plan_lines(&worker)),
+        (
+            landed.is_ok(),
+            plan_lines(&worker),
+            rebuilt,
+            worker.holders_in(&building)
+        ),
         (
             true,
-            owned(&[("roadmap_claimed", "1"), ("roadmap_split", "1")])
+            owned(&[("roadmap_claimed", "1"), ("roadmap_split", "1")]),
+            std::collections::BTreeMap::new(),
+            std::collections::BTreeMap::new()
         ),
-        "the split closes node 1; nothing is handed back after it"
+        "the split closes node 1; nothing is handed back after it, and no fold holds it"
     );
 }
 
