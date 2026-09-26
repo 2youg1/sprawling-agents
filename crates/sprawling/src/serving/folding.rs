@@ -7,7 +7,7 @@
 //! the writer nor the fold waits for a reader (sprawling-SPEC.md 8-93).
 
 use std::sync::{Arc, Mutex, mpsc};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use kernel::{AxCode, AxError, EventRecord};
 
@@ -104,7 +104,9 @@ pub(crate) fn spawn_folding(
 /// folds every arrival already queued into the spare copy, publishes it,
 /// broadcasts the records, and folds the same batch into the copy it
 /// replaced, until every sender is gone; the thread is lowered if it
-/// keeps a core busy (sprawling-SPEC.md 8-93).
+/// keeps a core busy (sprawling-SPEC.md 8-93). A views snapshot is cut
+/// from the spare copy when the [`Cadence`] says one is due, and once
+/// more when the channel closes (sprawling-SPEC.md 8-91).
 ///
 /// The broadcast follows the publication so a client that queries on
 /// hearing a record finds it already folded.
@@ -112,9 +114,10 @@ fn fold_until_closed(
     copies: Copies,
     arriving: &mpsc::Receiver<Fold>,
     broadcast: &Broadcast,
-    (setting, _clock): (CorePriority, fn() -> Instant),
+    (setting, clock): (CorePriority, fn() -> Instant),
 ) {
     let mut core = CoreThread::raise("sprawling-views", setting, monotonic_now());
+    let mut cadence = Cadence::default();
     let Copies {
         published,
         mut spare,
@@ -122,7 +125,9 @@ fn fold_until_closed(
     while let Ok(first) = arriving.recv() {
         let woke = monotonic_now();
         let batch: Vec<Fold> = std::iter::once(first).chain(arriving.try_iter()).collect();
-        fold_batch(&mut spare, &batch);
+        let fold_started = clock();
+        let verdict = fold_batch(&mut spare, &batch);
+        let fold_cost = clock().saturating_duration_since(fold_started);
         let retired = published.replace(Arc::new(spare));
         for fold in &batch {
             if let Fold::Committed(record) = fold {
@@ -131,8 +136,111 @@ fn fold_until_closed(
         }
         spare = reclaim(retired);
         fold_batch(&mut spare, &batch);
+        cadence.folded(fold_cost, last_committed(&batch), verdict);
+        if let Some(record) = cadence.due() {
+            cut_views_snapshot(&spare, &record, clock, &mut cadence);
+        }
         core.record_turn_lowering_when_busy(woke, monotonic_now());
     }
+    if let Some(record) = cadence.uncut() {
+        cut_views_snapshot(&spare, &record, clock, &mut cadence);
+    }
+}
+
+/// How many times the cost of one cut the fold must spend before the
+/// next: cutting takes at most a tenth of the fold thread's time
+/// (sprawling-SPEC.md 8-91).
+const CUT_SHARE_INVERSE: u32 = 10;
+
+/// When the fold thread cuts the next views snapshot, from the fold time
+/// spent since the last cut and what that cut cost, both measured here
+/// (sprawling-SPEC.md 8-91).
+#[derive(Default)]
+struct Cadence {
+    folded_since_cut: Duration,
+    last_cut_cost: Option<Duration>,
+    /// The last record folded and not yet under a snapshot.
+    uncut: Option<EventRecord>,
+    cutting: Cutting,
+}
+
+/// Whether the views may still be cut: a snapshot of views that refused
+/// a record would let a start accept history a whole fold refuses.
+#[derive(Default)]
+enum Cutting {
+    #[default]
+    Open,
+    StoppedByRefusal,
+}
+
+/// How the views took one batch.
+enum Folded {
+    Clean,
+    Refused,
+}
+
+impl Cadence {
+    /// Counts a batch folded in `cost`, ending at `last` when it carried
+    /// a committed record.
+    fn folded(&mut self, cost: Duration, last: Option<&EventRecord>, verdict: Folded) {
+        self.folded_since_cut = self.folded_since_cut.saturating_add(cost);
+        if let Some(record) = last {
+            self.uncut = Some(record.clone());
+        }
+        match verdict {
+            Folded::Clean => {}
+            Folded::Refused => self.cutting = Cutting::StoppedByRefusal,
+        }
+    }
+
+    /// The record a snapshot is due at now, when one is.
+    fn due(&self) -> Option<EventRecord> {
+        let spent_enough = self
+            .last_cut_cost
+            .is_none_or(|cut| self.folded_since_cut >= cut.saturating_mul(CUT_SHARE_INVERSE));
+        self.uncut().filter(|_| spent_enough)
+    }
+
+    /// The last record folded since the last cut, while cutting is open.
+    fn uncut(&self) -> Option<EventRecord> {
+        match self.cutting {
+            Cutting::Open => self.uncut.clone(),
+            Cutting::StoppedByRefusal => None,
+        }
+    }
+
+    /// Starts counting afresh after a cut that took `cost`.
+    fn cut(&mut self, cost: Duration) {
+        self.last_cut_cost = Some(cost);
+        self.folded_since_cut = Duration::ZERO;
+        self.uncut = None;
+    }
+}
+
+/// Cuts a snapshot of `views` at `record` and tells `cadence` what it
+/// cost. A cut that fails is reported and serving goes on: the snapshot
+/// only shortens the next start.
+fn cut_views_snapshot(
+    views: &Views,
+    record: &EventRecord,
+    clock: fn() -> Instant,
+    cadence: &mut Cadence,
+) {
+    let started = clock();
+    if let Err(fault) = views.cut_snapshot_at(record) {
+        eprintln!(
+            "the views snapshot was not cut at record {}: {fault}; serving goes on, and the next start folds a longer tail",
+            record.seq().value()
+        );
+    }
+    cadence.cut(clock().saturating_duration_since(started));
+}
+
+fn last_committed(batch: &[Fold]) -> Option<&EventRecord> {
+    batch.iter().rev().find_map(|fold| match fold {
+        Fold::Committed(record) => Some(record),
+        Fold::Examined(_) | Fold::Lent(_) => None,
+    })
 }
 
 /// Moves the head past `record` and sends it to every client. The frame
@@ -152,21 +260,29 @@ fn send_committed(broadcast: &Broadcast, record: &EventRecord) {
     }
 }
 
-fn fold_batch(views: &mut Views, batch: &[Fold]) {
-    for fold in batch {
-        match fold {
+fn fold_batch(views: &mut Views, batch: &[Fold]) -> Folded {
+    batch
+        .iter()
+        .fold(Folded::Clean, |verdict, fold| match fold {
             // A record the views refuse to fold is reported and skipped:
-            // the ledger already has it, and a view that stopped the
-            // fold would make history hostage to a projection.
-            Fold::Committed(record) => {
-                if let Err(err) = views.apply(record) {
+            // the ledger already has it, and a view that stopped the fold
+            // would make history hostage to a projection.
+            Fold::Committed(record) => match views.apply(record) {
+                Ok(()) => verdict,
+                Err(err) => {
                     eprintln!("view fold refused {}: {err}", record.seq().value());
+                    Folded::Refused
                 }
+            },
+            Fold::Examined(found) => {
+                views.found_on_this_machine(found.clone());
+                verdict
             }
-            Fold::Examined(found) => views.found_on_this_machine(found.clone()),
-            Fold::Lent(vault) => views.lend_the_vault(Arc::clone(vault)),
-        }
-    }
+            Fold::Lent(vault) => {
+                views.lend_the_vault(Arc::clone(vault));
+                verdict
+            }
+        })
 }
 
 /// Takes the replaced copy back once the readers that took it before the
