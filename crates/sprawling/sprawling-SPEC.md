@@ -3624,20 +3624,20 @@ pub(in crate::assembly) struct Kept { /* 每个房间一扇门 */ }
 impl Kept {
     pub(in crate::assembly) fn keep(&mut self, room: String, door: Door); // next_due 为 None 的门直接丢弃
     pub(in crate::assembly) fn next_due(&self) -> Option<u64>;         // 所有门里最早的一次续期
-    pub(in crate::assembly) fn renew_due(&mut self, now_ms: u64) -> Result<(), AxError>;
+    pub(in crate::assembly) fn renew_due(&mut self, now_ms: u64) -> Vec<(Address, CacheRenewed)>;
 }
 impl RunWorker {
     pub(crate) fn warm_due(&self) -> Option<u64>;
-    pub(crate) fn renew_warm(&mut self, now: TimeMs); // 失败写进诊断日志，不停城
+    pub(crate) fn renew_warm(&mut self, now: TimeMs); // 每次续期写一条 cache_renewed；写不进账本才进诊断日志
 }
 ```
 
 `dispatching::agreeing` 选定适配器后，用 `city::keep_warm(city_root, building)` 读到的设置和 `assembly::now_ms` 这一个采样点，把它包成 `Door`；`Agreed`、`Site`、`Driving`、`Driven` 与 `driving::lane` 带的都是这扇门，所以 run 发出的每个请求都进了保温账（runtime-SPEC 8-4-2），转向循环不知道保温存在。`settling::landing` 在 run 结束时把门交给 `Kept`，按房间地址存：同一房间后来的 run 换掉前一扇门，因为后一个前缀才是下一次会用到的。`next_due` 为 `None` 的门（设置为 `Off`，或已续过一次）不留，所以默认设置下 `Kept` 一直是空的，worker 不多占一个字节，也不多发一个请求。
 
-`serving::attending` 的空闲分支先照旧读日程，再调用 `renew_warm(now)`，下一次睡眠取「距下次读日程」与「距 `warm_due`」中较短者，所以一次续期不会等到日程的整点之后。续期失败不停城，与日程读取失败同样处理：写进诊断日志，下一次空闲再看。
+`serving::attending` 的空闲分支先照旧读日程，再调用 `renew_warm(now)`，下一次睡眠取「距下次读日程」与「距 `warm_due`」中较短者，所以一次续期不会等到日程的整点之后。每次续期，不论成败，都在房间地址下写一条 `cache_renewed`（kernel-SPEC 8-4）：成功时是 provider 自报的用量与账单额，失败时是它的拒绝原样，所以人从账本上读得出保温花了多少、哪个 provider 拒了续期。续期失败不停城；只有这条记录本身写不进账本时才写进诊断日志，与日程读取失败同样处理。
 
-失败：`renew_due` 传回模型的失败原样；一扇门失败不妨碍其他门续期，传回第一个失败，失败的门被丢弃，所以拒绝续期的 provider 不会在每次醒来时再被问一遍。
+失败：`renew_due` 不传回 `Err`，每扇到期的门各得一条结果，模型的失败原样放进 `CacheRenewed::Refused`；一扇门失败不妨碍其他门续期，失败的门被丢弃，所以拒绝续期的 provider 不会在每次醒来时再被问一遍。
 
-当前状态：每次续期的用量还没有写成事件（要在 `kernel/src/event/kind.rs` 追加一个种类并更新 kernel-SPEC 的事件表）；lead 由门在每次调用前后量出（runtime-SPEC 8-4-2）。
+当前状态：保温已完整：设置默认关、默认下不发任何额外请求，打开后到期前续期一次，每次续期的用量或拒绝都记在账本上；lead 由门在每次调用前后量出（runtime-SPEC 8-4-2）。
 
 决定：门按房间存，而不是按 run 存。按 run 存时，一个房间连续跑十次会留下十扇门，其中九扇续的是已经被下一个前缀覆盖的缓存，花的钱没有用处；按房间存时门的数目以房间数为上限。重新考虑的条件：同一房间里并行的会话各有自己的前缀。

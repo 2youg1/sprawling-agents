@@ -527,11 +527,15 @@ pub enum FiredAction { Steer { text: String },
                        Freeze { reason: String } }
 pub struct GateChecked {}               // 无生产写方：结构是决定
 pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked，无写方：结构是决定
+#[serde(untagged)] pub enum CacheRenewed {   // cache_renewed：先试 Refused，因为 Answered 的字段全可缺
+    Refused { refused: AxError },
+    Answered { usage: Option<ModelUsage>, billed_usd_micros: Option<UsdMicros> },
+}
 ```
 
 已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`tool_called`／`tool_result`、
 `checkpoint_committed`、`approval_resolved`、`autonomy_changed`、`city_halted`、
-`governed_document_written`、`embedding_called`／`rerank_called`、
+`governed_document_written`、`embedding_called`／`rerank_called`、`cache_renewed`、
 `adviser_asked`／`adviser_answered`／`adviser_fell_back`；
 `city_initialized`、`building_created`、`building_configured`、`cancel_received`、
 `handoff_written`、`watchdog_fired`、`gate_checked`、`policy_created`／`policy_revoked`；
@@ -658,6 +662,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 顾问 | `adviser_asked` | record-only（问了一次判断：问题种类（noul／score／choice）与对象。问本身不决定任何字节） |
 | 顾问 | `adviser_answered` | **in-window**（重放不再问顾问，读到的是这条答案：它决定一件东西留不留在窗口里，因此它决定模型请求字节。**这也是「入窗」从 8 变 9 的那一条**） |
 | 顾问 | `adviser_fell_back` | record-only（没有可用的顾问答案，确定性策略作答，reason 是 `unavailable`／`timeout`／`unreadable` 之一。没有这条，顾问塑形的窗口与城自己策略塑形的窗口会折出同一段历史） |
+| 保温 | `cache_renewed` | record-only（保温续期一次入账，写在房间地址下：成功时携 provider 自报的四个 token 数与它自报的账单额，失败时携 provider 的拒绝原样（`AxError`）。续期只重发前缀、不改变任何一次请求的字节，所以不入窗；记下它是为了让人从历史里读出保温花了多少） |
 
 二分依据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 
