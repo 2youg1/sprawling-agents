@@ -430,6 +430,11 @@ mod tests {
     /// has not been answered yet holds up the lanes asking for its own
     /// server and nobody else (sprawling-SPEC.md 8-4).
     #[test]
+    #[allow(
+        clippy::disallowed_methods,
+        clippy::arithmetic_side_effects,
+        reason = "test code: how long a server is waited for is read off the wall clock"
+    )]
     fn a_server_still_shaking_hands_keeps_no_other_server_waiting() {
         let dir = tempfile::tempdir().unwrap();
         let (starts, gate) = (dir.path().join("starts.txt"), dir.path().join("open"));

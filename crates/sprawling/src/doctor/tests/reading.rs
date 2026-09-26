@@ -241,6 +241,11 @@ fn the_first_row_is_written_while_the_other_items_are_still_asked() {
         }
     }
     impl Machine for Waiting {
+        #[allow(
+            clippy::disallowed_methods,
+            clippy::arithmetic_side_effects,
+            reason = "test code: how long a probe waits for the first row is read off the wall clock"
+        )]
         fn look(&self, requirement: &Requirement) -> Presence {
             if requirement.name != self.first {
                 let giving_up = Instant::now() + Duration::from_secs(1);

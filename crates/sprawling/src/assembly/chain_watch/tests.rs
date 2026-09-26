@@ -15,7 +15,11 @@ fn break_the_first_line(city_root: &Path) {
         .unwrap()
         .remove(0);
     let mut bytes = std::fs::read(&first).unwrap();
-    let at = bytes.windows(4).position(|held| held == b"\"t\":").unwrap() + 4;
+    let at = bytes
+        .windows(4)
+        .position(|held| held == b"\"t\":")
+        .and_then(|key| key.checked_add(4))
+        .unwrap();
     bytes[at] = if bytes[at] == b'1' { b'2' } else { b'1' };
     std::fs::write(&first, bytes).unwrap();
 }

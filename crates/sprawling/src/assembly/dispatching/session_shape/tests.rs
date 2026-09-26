@@ -88,28 +88,11 @@ fn ask(addr: &Address, effort: Option<kernel::Effort>, key: &[u8]) -> channels::
 
 /// A dispatch that names the model it runs on.
 fn ask_on(addr: &Address, model: &str, key: &[u8]) -> channels::Command {
-    match ask(addr, None, key) {
-        channels::Command::Dispatch {
-            addr,
-            task,
-            goal,
-            mode,
-            idem,
-            session,
-            effort,
-            ..
-        } => channels::Command::Dispatch {
-            addr,
-            task,
-            goal,
-            mode,
-            idem,
-            session,
-            effort,
-            model: Some(model.to_owned()),
-        },
-        other => other,
+    let mut dispatch = ask(addr, None, key);
+    if let channels::Command::Dispatch { model: named, .. } = &mut dispatch {
+        *named = Some(model.to_owned());
     }
+    dispatch
 }
 
 fn choose(worker: &mut RunWorker, model: &str, key: &[u8]) {

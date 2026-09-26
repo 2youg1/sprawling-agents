@@ -108,6 +108,11 @@ fn the_fold_thread_cuts_a_snapshot_a_later_read_resumes_from() {
 /// The first record broadcast within `patience`, polled rather than
 /// awaited so a fold that never broadcasts fails the test instead of
 /// hanging it.
+#[allow(
+    clippy::disallowed_methods,
+    clippy::arithmetic_side_effects,
+    reason = "test code: the patience is read off the wall clock"
+)]
 fn heard_within(
     heard: &mut tokio::sync::broadcast::Receiver<channels::Committed>,
     patience: Duration,
