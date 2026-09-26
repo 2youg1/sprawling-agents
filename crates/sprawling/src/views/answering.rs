@@ -36,6 +36,7 @@ use super::listing::listing_answer;
 mod history;
 use super::lines::{buildings_of, config_answer, endpoints_answer, summarize};
 use crate::assembly::read_building;
+use crate::plan_view::PlanReading;
 
 /// The answer to a question this city could not look up.
 ///
@@ -94,6 +95,12 @@ pub(crate) enum Prepared {
     },
     /// The head of one file.
     Document { city_root: PathBuf, at: Address },
+    /// One building's directory, beside the plan the views folded.
+    Building {
+        city_root: PathBuf,
+        addr: Address,
+        plan: PlanReading,
+    },
 }
 
 impl Prepared {
@@ -129,6 +136,16 @@ impl Prepared {
                     None => unavailable(query),
                 }
             }
+            Self::Building {
+                city_root,
+                addr,
+                plan,
+            } => match read_building(&city_root, &addr, plan) {
+                Some(answer) => channels::Answer::Building(Box::new(answer)),
+                // A building nobody raised is not an empty building. The
+                // page needs to be able to tell those apart.
+                None => unavailable(format!("BuildingView({})", addr.as_str())),
+            },
         }
     }
 }
@@ -329,16 +346,13 @@ impl Views {
             }
             channels::Query::Release => return Prepared::Release,
             channels::Query::BuildingView { addr } => {
-                let root = self.city_root.clone();
-                let plan = self.plans.of(&root, addr);
-                match read_building(&root, addr, plan) {
-                    Some(answer) => channels::Answer::Building(Box::new(answer)),
-                    // A building nobody raised is not an empty building. The
-                    // page needs to be able to tell those apart.
-                    None => channels::Answer::Unavailable {
-                        query: format!("BuildingView({})", addr.as_str()),
-                    },
-                }
+                let city_root = self.city_root.clone();
+                let plan = self.plans.of(&city_root, addr);
+                return Prepared::Building {
+                    city_root,
+                    addr: addr.clone(),
+                    plan,
+                };
             }
             channels::Query::InboxView { addr } => channels::Answer::Inbox(channels::InboxAnswer {
                 addr: addr.clone(),

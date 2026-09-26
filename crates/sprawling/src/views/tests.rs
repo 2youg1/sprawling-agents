@@ -442,3 +442,23 @@ fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
         )
     );
 }
+
+/// The building page walks the building's directory after the views are
+/// released; only its plan, folded and cached, is read under them.
+#[test]
+fn the_building_page_reads_its_directory_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let query = channels::Query::BuildingView {
+        addr: Address::parse("lab").unwrap(),
+    };
+    let prepared = views.prepare(&query);
+    std::fs::create_dir(dir.path().join("lab")).unwrap();
+
+    let answer = prepared.finish();
+    assert!(
+        matches!(answer, channels::Answer::Building(_)),
+        "{answer:?}"
+    );
+    assert_eq!(answer, views.answer(&query));
+}
