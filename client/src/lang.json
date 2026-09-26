@@ -2083,6 +2083,10 @@
     "en": "run again",
     "zh": "再走一遍"
   },
+  "setup_retries_until_halted": {
+    "en": "until halted",
+    "zh": "直到叫停"
+  },
   "setup_select_all": {
     "en": "choose all",
     "zh": "全选"

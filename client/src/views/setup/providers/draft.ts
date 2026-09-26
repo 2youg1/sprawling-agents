@@ -31,7 +31,7 @@ import { referenceFor, referenceText } from "../../../core/enrol";
 import type { Key } from "../../../core/lang";
 import { get } from "svelte/store";
 import { preferences } from "../../../core/prefs";
-import type { Proxying } from "../../../wire";
+import type { Proxying, TuningDefaults } from "../../../wire";
 import type { Choice, Group } from "../../parts/segmented";
 
 // What a provider id may be spelled with, which is what a TOML table key
@@ -200,18 +200,48 @@ export function wireChoices(): readonly Choice<WireApi>[] {
   }));
 }
 
+// The three tuning boxes start empty. An empty box is sent as absence,
+// and absence is what the city answers with its own figures
+// (`gateway::EndpointTuning::DEFAULTS`), so an endpoint attached from an
+// untouched form is tuned exactly as one attached from a `config.toml`
+// that states nothing. The figures are shown, not held: see
+// `tuningHints`.
 const FRESH: Omit<Draft, "proxying"> = {
   id: { kind: "derived" },
   label: { kind: "derived" },
   baseUrl: "",
   wireApi: "chat",
   key: "",
-  timeoutMs: "60000",
-  requestRetries: "4",
-  streamIdleMs: "300000",
+  timeoutMs: "",
+  requestRetries: "",
+  streamIdleMs: "",
   headers: [],
   overrides: [],
 };
+
+// The three boxes whose emptiness means "the city's own figure".
+export type TuningField = "timeoutMs" | "requestRetries" | "streamIdleMs";
+
+// What each empty tuning box shows: the figure the city would call this
+// endpoint with, as `Query::Config` stated it, and nothing until the
+// city has answered. A retry ceiling the city leaves absent has no
+// number, so it is shown as `untilHalted`; an idle bound it leaves
+// absent is the call's own bound, which is the box above it.
+export function tuningHints(
+  draft: Draft,
+  defaults: TuningDefaults | undefined,
+  untilHalted: string,
+): Readonly<Record<TuningField, string>> {
+  if (defaults === undefined) {
+    return { timeoutMs: "", requestRetries: "", streamIdleMs: "" };
+  }
+  const timeout = figureIn(draft.timeoutMs) ?? defaults.timeout_ms;
+  return {
+    timeoutMs: String(defaults.timeout_ms),
+    requestRetries: String(defaults.request_max_retries ?? untilHalted),
+    streamIdleMs: String(defaults.stream_idle_timeout_ms ?? timeout),
+  };
+}
 
 // An empty form, carrying the proxy rule this machine was last told to
 // start new endpoints with.
@@ -221,7 +251,7 @@ export function freshDraft(): Draft {
 
 // A box of digits, or nothing. An empty box and a box holding letters
 // both mean "the city's own", which is what absence is on the wire.
-function figureIn(text: string): number | null {
+export function figureIn(text: string): number | null {
   const trimmed = text.trim();
   return /^[0-9]+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : null;
 }
