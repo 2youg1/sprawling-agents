@@ -142,7 +142,6 @@ impl kernel::delegation::Delegator
 impl kernel::delegation::Delegator
 impl kernel::event::Scope
 impl kernel::event::Who
-impl kernel::event::record::PromptSource
 impl kernel::event::record::RunFrozen
 impl kernel::event::record::ToolCalled
 impl kernel::gate::DoorId
