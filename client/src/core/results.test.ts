@@ -69,6 +69,24 @@ describe("results-only mode", () => {
     expect(outcomeOf(run)).toBe("ended");
   });
 
+  test("a reloaded run keeps the ending, pull request and ask the answer names", () => {
+    const summary = { last_seq: Seq.make(9), run: RunId.make(runAt(1).run), who: "a" };
+    const done = adopted(
+      { ...summary, frozen: true, last_kind: "run_frozen", completion: "done", pr: "gate-btree" },
+      undefined,
+    );
+    const waiting = adopted(
+      { ...summary, frozen: false, last_kind: "approval_requested", ask: "publish" },
+      undefined,
+    );
+    expect([outcomeOf(done), done.pr, outcomeOf(waiting), waiting.ask]).toEqual([
+      "done",
+      "gate-btree",
+      "waiting",
+      "publish",
+    ]);
+  });
+
   test("triaging the two-hundred-run city stays inside a tenth of a frame", () => {
     const rounds = 200;
     const start = performance.now();
