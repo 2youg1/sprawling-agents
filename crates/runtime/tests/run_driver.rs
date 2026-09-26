@@ -1165,8 +1165,6 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
 
     let seen = seen.borrow();
     // The breakpoint is a request-side annotation, so a message prints
-    eprintln!("SEEN0={}
-SEEN1={}", seen[0], seen.get(1).cloned().unwrap_or_default());
     // the same in every request that carries it: every byte before the
     // closing bracket is the request already sent.
     let first = seen[0].strip_suffix(']').unwrap();
