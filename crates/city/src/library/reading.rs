@@ -53,30 +53,44 @@ pub(super) fn shelve(
             continue;
         }
         for item in read_dir(&section)? {
-            let Some((name, document)) = filed(&item)? else {
-                continue;
-            };
-            if !plain_name(&name) {
-                continue;
+            if let Some(holding) = holding_at(city_root, shelf, &section_name, &item)? {
+                holdings.insert(ShelfKey::of(&holding.name), holding);
             }
-            let text = read_holding(&document)?;
-            // The address is read back off the path the layout chose,
-            // so a shelf that moves cannot leave the addresses of what
-            // sits on it pointing at where it used to be.
-            let addr = address_of(city_root, &document)?;
-            let package = (document != item)
-                .then(|| address_of(city_root, &item))
-                .transpose()?;
-            holdings.insert(
-                ShelfKey::of(&name),
-                Holding {
-                    package,
-                    ..Holding::of(name, section_name.clone(), &text, shelf.at(addr))
-                },
-            );
         }
     }
     Ok(())
+}
+
+/// The holding one item on a section shelf is, or `None` when it is not
+/// one: the one derivation the scan and an install's read-back share.
+///
+/// # Errors
+/// Propagates a holding that cannot be read, a name this machine spells
+/// outside Unicode, and a path the city cannot spell as an address.
+pub(super) fn holding_at(
+    city_root: &Path,
+    shelf: &OwnShelf,
+    section: &str,
+    item: &Path,
+) -> Result<Option<Holding>, AxError> {
+    let Some((name, document)) = filed(item)? else {
+        return Ok(None);
+    };
+    if !plain_name(&name) {
+        return Ok(None);
+    }
+    let text = read_holding(&document)?;
+    // The address is read back off the path the layout chose, so a
+    // shelf that moves cannot leave the addresses of what sits on it
+    // pointing at where it used to be.
+    let addr = address_of(city_root, &document)?;
+    let package = (document != item)
+        .then(|| address_of(city_root, item))
+        .transpose()?;
+    Ok(Some(Holding {
+        package,
+        ..Holding::of(name, section.to_owned(), &text, shelf.at(addr))
+    }))
 }
 
 /// What one item on a section shelf holds, as its name and the document
