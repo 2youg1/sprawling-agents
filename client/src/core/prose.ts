@@ -147,3 +147,27 @@ export function blocks(text: string): Block[] {
   flush();
   return out;
 }
+
+// Where the blocks that can no longer change end, in a text still being
+// said: everything before the returned index is laid out as blocks,
+// everything after it is the open tail drawn as it arrives.
+// A block is closed by a blank line outside a fence, by the fence that
+// ends a code block, or - for a heading, which is one line - by its own
+// line break. A single line break closes nothing else, because the next
+// line may still join the paragraph, list or table above it.
+export function closedUpTo(text: string): number {
+  let closed = 0;
+  let fenced = false;
+  let start = 0;
+  for (let end = text.indexOf("\n"); end !== -1; end = text.indexOf("\n", start)) {
+    const line = text.slice(start, end);
+    start = end + 1;
+    if (line.startsWith("```")) {
+      fenced = !fenced;
+      if (!fenced) closed = start;
+    } else if (!fenced && (line.trim() === "" || /^#{1,6}\s/.test(line))) {
+      closed = start;
+    }
+  }
+  return closed;
+}
