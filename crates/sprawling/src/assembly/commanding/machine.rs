@@ -77,8 +77,16 @@ impl RunWorker {
             "bin::doctor",
             &format!("installed {item}; this city looked again"),
         );
-        self.look_at_this_machine();
-        Ok(())
+        let found = self.machine.report();
+        let here = found.items.iter().any(|each| {
+            each.name == item && matches!(each.state, channels::DoctorState::Present { .. })
+        });
+        self.show_this_machine(found);
+        if here {
+            Ok(())
+        } else {
+            Err(still_absent(item))
+        }
     }
 
     /// Asks this machine every question the requirement table holds,
@@ -100,6 +108,12 @@ impl RunWorker {
 
     pub(in crate::assembly) fn look_at_this_machine(&mut self) {
         let found = self.machine.report();
+        self.show_this_machine(found);
+    }
+
+    /// Hands one answer about this machine to whoever is showing it,
+    /// and writes the line that says it was taken.
+    fn show_this_machine(&mut self, found: channels::DoctorAnswer) {
         let items = found.items.len();
         if let Some(serving) = self.serving.as_ref() {
             (serving.machine)(found);
@@ -110,6 +124,20 @@ impl RunWorker {
             &format!("looked at this machine again: {items} item(s)"),
         );
     }
+}
+
+/// The package manager said it succeeded and this city still cannot
+/// find the item: the refusal that ends this install for a page walking
+/// a list of them (sprawling-SPEC.md section 8-64).
+fn still_absent(item: &str) -> AxError {
+    AxError::failure(
+        kernel::AxCode::ToolUnavailable,
+        "install a tool",
+        format!("{item}: the installer finished, and this city still cannot find it"),
+    )
+    .with_recovery(
+        "restart this city so it reads the search path the installer changed, then check again",
+    )
 }
 
 #[cfg(test)]
@@ -162,12 +190,40 @@ mod tests {
     }
 
     /// Installs nothing and remembers what it was asked to install.
-    struct Recording(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
+    /// After an install it reports the item present, or nothing at all
+    /// when it stands for a package manager that said it succeeded and
+    /// left the program where this city does not look.
+    struct Recording(std::sync::Arc<std::sync::Mutex<Vec<String>>>, Finds);
+
+    enum Finds {
+        WhatWasInstalled,
+        Nothing,
+    }
 
     impl accounting::Machine for Recording {
         fn report(&self) -> channels::DoctorAnswer {
+            let items = match self.1 {
+                Finds::Nothing => Vec::new(),
+                Finds::WhatWasInstalled => self
+                    .0
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|_installed| channels::DoctorItem {
+                        name: SCRIPTED.to_owned(),
+                        tier: channels::DoctorTier::Develop,
+                        need: channels::DoctorNeed::Required,
+                        homepage: None,
+                        state: channels::DoctorState::Present {
+                            at: "/bin/scripted-tool".to_owned(),
+                            version: channels::DoctorVersion::Silent,
+                        },
+                        install: channels::DoctorInstall::UnknownPlatform,
+                    })
+                    .collect(),
+            };
             channels::DoctorAnswer {
-                items: Vec::new(),
+                items,
                 tiers: Vec::new(),
                 sandbox: channels::DoctorSandbox {
                     arm: channels::DoctorSandboxArm::CopiedTree,
@@ -202,8 +258,10 @@ mod tests {
     fn an_install_takes_its_recipe_from_the_table_the_worker_was_handed() {
         let dir = tempfile::tempdir().unwrap();
         let installed = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let mut worker =
-            worker(dir.path()).with_machine(Box::new(Recording(std::sync::Arc::clone(&installed))));
+        let mut worker = worker(dir.path()).with_machine(Box::new(Recording(
+            std::sync::Arc::clone(&installed),
+            Finds::WhatWasInstalled,
+        )));
         worker.recipe_for_with(scripted_table);
 
         let told = worker
@@ -217,6 +275,29 @@ mod tests {
                 vec!["scripted-tool: scripted-installer scripted-tool".to_owned()]
             )
         );
+    }
+
+    /// A package manager that reports success while this city still
+    /// cannot find the item ends the install with a refusal naming it,
+    /// so a page walking a list of installs knows this one is over.
+    #[test]
+    fn an_install_that_leaves_the_item_absent_is_refused_by_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let installed = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut worker = worker(dir.path()).with_machine(Box::new(Recording(
+            std::sync::Arc::clone(&installed),
+            Finds::Nothing,
+        )));
+        worker.recipe_for_with(scripted_table);
+
+        let told = worker.doctor_install(SCRIPTED).map_err(|refusal| {
+            (
+                *refusal.code(),
+                refusal.subject().starts_with("scripted-tool:"),
+            )
+        });
+
+        assert_eq!(told, Err((kernel::AxCode::ToolUnavailable, true)));
     }
 
     #[test]

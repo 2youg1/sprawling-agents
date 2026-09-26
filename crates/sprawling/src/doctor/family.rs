@@ -144,17 +144,21 @@ pub(crate) const CHROMIUM_ROW: Requirement = Requirement {
               version must match the browser found here",
     detect: Detection::Family(Family::Chromium),
     homepage: Some("https://www.chromium.org/"),
-    recipe: PerPlatform {
-        windows: Recipe::Command {
-            program: "winget",
-            args: &["install", "--id", "Google.Chrome", "-e"],
-        },
-        macos: Recipe::Command {
-            program: "brew",
-            args: &["install", "--cask", "google-chrome"],
-        },
-        linux: Recipe::Print("sudo apt install chromium"),
+    recipe: CHROMIUM_RECIPE,
+};
+
+/// How a Chromium browser is installed here; the browser tool's row and
+/// the render gate's row both install it this way.
+pub(crate) const CHROMIUM_RECIPE: PerPlatform<Recipe> = PerPlatform {
+    windows: Recipe::Command {
+        program: "winget",
+        args: &["install", "--id", "Google.Chrome", "-e"],
     },
+    macos: Recipe::Command {
+        program: "brew",
+        args: &["install", "--cask", "google-chrome"],
+    },
+    linux: Recipe::Print("sudo apt install chromium"),
 };
 
 /// The WebKit row: Safari through its driver, on macOS and nowhere

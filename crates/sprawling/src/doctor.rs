@@ -193,6 +193,14 @@ pub(crate) enum Detection {
         version_arg: &'static str,
         places: PerPlatform<&'static [&'static str]>,
     },
+    /// A program on the search path that lists what it manages; the
+    /// item is here when one line it prints starts with `line`. An
+    /// empty `line` asks only that it printed a line at all.
+    Listed {
+        program: &'static str,
+        args: &'static [&'static str],
+        line: &'static str,
+    },
     /// A file this city keeps at machine level. The variable wins when
     /// it is set, and a set variable that names nothing is reported
     /// rather than fallen through; otherwise the file is looked for

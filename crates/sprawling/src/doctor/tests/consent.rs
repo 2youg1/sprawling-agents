@@ -54,7 +54,8 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
     );
 
     let machine = ScriptedMachine::missing(&["just", "git"]);
-    let mut agreed = std::io::Cursor::new(b"y\nn\n".to_vec());
+    // The table asks about git before just: it is in install order.
+    let mut agreed = std::io::Cursor::new(b"n\ny\n".to_vec());
     let mut screen: Vec<u8> = Vec::new();
     run(
         &Asked {

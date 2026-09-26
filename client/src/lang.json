@@ -852,16 +852,16 @@
     "zh": "没能问到"
   },
   "machine_enables_bun": {
-    "en": "the JavaScript and TypeScript work beside this workspace",
-    "zh": "本工作区旁边的 JavaScript 与 TypeScript 工作"
+    "en": "just build-web and the client's checks, which the artifact gates judge",
+    "zh": "just build-web 与客户端自己的检查，产物门要看它们的结果"
   },
   "machine_enables_cargo_audit": {
     "en": "cargo audit, which reads this lockfile against the RustSec advisories",
     "zh": "cargo audit，按 RustSec 公告检查本仓库的 lockfile"
   },
   "machine_enables_cargo_deny": {
-    "en": "cargo deny check, which just gates runs over deny.toml when it is here",
-    "zh": "cargo deny check；装了它时，just gates 用它检查 deny.toml"
+    "en": "just deny, the supply-chain read just gates ends with; CI runs it on every push",
+    "zh": "just deny，just gates 最后那一步供应链检查；CI 每次推送都会跑"
   },
   "machine_enables_cargo_fuzz": {
     "en": "just fuzz <target>, which needs a nightly toolchain as well",
@@ -876,8 +876,8 @@
     "zh": "just mutants，检验内核被改动后测试能否发现"
   },
   "machine_enables_cargo_nextest": {
-    "en": "the test runner every gate in this repository calls",
-    "zh": "本仓库每道门都调用的测试运行器"
+    "en": "just test, the test runner every check here calls",
+    "zh": "just test，这里每道检查都调用的测试运行器"
   },
   "machine_enables_chromedriver": {
     "en": "the browser tool against Chrome, Brave, Chromium or Vivaldi",
@@ -892,8 +892,8 @@
     "zh": "cargo clippy -D warnings，本工作区的 lint 在这里生效"
   },
   "machine_enables_elan": {
-    "en": "the adversary: property checks that drive the shipped binary over the wire",
-    "zh": "adversary：经线上协议驱动发布版二进制的性质检查"
+    "en": "the Lean toolchain manager that just models and just adversary run through",
+    "zh": "Lean 工具链管理器，just models 与 just adversary 经它运行"
   },
   "machine_enables_ffmpeg": {
     "en": "an mp4 from the desktop connector's recorder; without it, a frame sequence",
@@ -904,16 +904,16 @@
     "zh": "浏览器工具，城与浏览器之间不隔驱动；Firefox、Zen、LibreWolf、Waterfox、Floorp 与 Firefox Developer 都算，Tor Browser 也算，但要人亲手确认"
   },
   "machine_enables_git": {
-    "en": "restoration: a discarded file points at a checkpoint commit",
-    "zh": "恢复：丢弃的文件指向一个检查点提交"
+    "en": "version control for this repository, and restoring a discarded file from its checkpoint",
+    "zh": "本仓库的版本控制，也用来从检查点找回丢弃的文件"
   },
   "machine_enables_just": {
     "en": "just check, the check every change here closes on",
     "zh": "just check，这里每一处改动都以它收尾"
   },
   "machine_enables_kani": {
-    "en": "proving a property against real MIR, on Linux only",
-    "zh": "对真实的 MIR 证明性质，只在 Linux 上可用"
+    "en": "just proof, proving a property against real MIR, on Linux only",
+    "zh": "just proof，对真实的 MIR 证明性质，只在 Linux 上可用"
   },
   "machine_enables_msedgedriver": {
     "en": "the browser tool against Edge, which every Windows machine already has",
@@ -924,12 +924,12 @@
     "zh": "exec 工具的 python 一支，在沙箱里运行，没有套接字"
   },
   "machine_enables_rustfmt": {
-    "en": "cargo fmt --check, the first half of just check",
-    "zh": "cargo fmt --check，just check 的前一半"
+    "en": "cargo fmt --check, the first step of just check",
+    "zh": "cargo fmt --check，just check 的第一步"
   },
   "machine_enables_rustup": {
-    "en": "the toolchain rust-toolchain.toml pins, installed when first needed",
-    "zh": "rust-toolchain.toml 指定的工具链，第一次用到时安装"
+    "en": "cargo and the Rust toolchain rust-toolchain.toml pins, fetched on first use",
+    "zh": "cargo 与 rust-toolchain.toml 钉住的 Rust 工具链，第一次用到时下载"
   },
   "machine_enables_sandbox_engine": {
     "en": "the exec tool's program and python arms, fuel-metered and with no socket",
@@ -946,6 +946,26 @@
   "machine_enables_webkit": {
     "en": "the browser tool against Safari, experimentally: BiDi support is partial and safaridriver --enable has to be run once",
     "zh": "对 Safari 使用浏览器工具，尚属试验：BiDi 支持不全，且须先运行一次 safaridriver --enable"
+  },
+  "machine_enables_cargo_public_api": {
+    "en": "cargo xtask apisync, which the nightly job runs; it reads a nightly rustdoc as well",
+    "zh": "cargo xtask apisync，夜间任务会跑它；它还要一个 nightly 的 rustdoc"
+  },
+  "machine_enables_lean": {
+    "en": "just models, the Lean design models, at the version adversary/lean-toolchain pins",
+    "zh": "just models 跑的 Lean 设计模型，版本是 adversary/lean-toolchain 钉住的那个"
+  },
+  "machine_enables_python": {
+    "en": "Python for the probes and data transforms, installed and managed by uv",
+    "zh": "探针与数据转换用的 Python，由 uv 安装和管理"
+  },
+  "machine_enables_render_browser": {
+    "en": "cargo xtask render, which measures the built client in a headless Chromium browser",
+    "zh": "cargo xtask render，用无头 Chromium 浏览器量构建好的客户端"
+  },
+  "machine_enables_uv": {
+    "en": "the Python this repository's probes and maintenance scripts run on",
+    "zh": "本仓库探针与维护脚本所用的 Python"
   },
   "machine_install": {
     "en": "install",

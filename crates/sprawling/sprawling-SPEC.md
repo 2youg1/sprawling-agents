@@ -2888,13 +2888,26 @@ pub(super) fn installed_at(program: &str, start_menu: &str) -> Option<PathBuf>;
 
 **本章验收**：只装 Zen 的 Windows 机器上 `cargo run -p sprawling -- doctor` 报 `gecko present … (zen)` 且 `ready to use`。
 
-## 8-58 justfile 真正用到的那几件 Rust 工具（`bin::doctor::table::toolchain`）
+## 8-58 一次装齐开发这份代码要的全部工具（`bin::doctor::table::toolchain`、`just prereqs`）
 
-**原因**：Develop 档只列 `rustup`、`just`、`cargo-nextest`、`bun`、`git`，而 `just check` 还要 `cargo fmt` 与 `cargo clippy`，`just gates` 要 `cargo deny`，`just mutants`、`just fuzz` 各要一件。一个人按 doctor 装齐了，第一次 `just check` 仍然红。
+**原因**：一个人在一台新机器上想开发 sprawling，要的是 Git、`rust-toolchain.toml` 钉住的 Rust 工具链连同 rustfmt 与 clippy、just、cargo-nextest、cargo-deny、bun、`adversary/lean-toolchain` 钉住的 Lean（经 elan）、Python（经 uv），以及 render 门要的那个 Chromium 系浏览器。这份清单若在 doctor 的表与 `just prereqs` 里各写一份，一份加了 Lean 另一份没加，照着其中一份装齐的人照样在另一份面前红。
 
-- **八行**：`rustfmt`、`clippy`（rustup component，探测的是 rustup 放在 PATH 上的 `rustfmt` 与 `cargo-clippy`，装法 `rustup component add`）、`cargo-deny`、`cargo-audit`、`cargo-mutants`、`cargo-fuzz`（还要 nightly）、`cargo-llvm-cov`、`kani`（只在 Linux 有构建，另两个平台如实说明）。
-- **只有 `rustfmt` 与 `clippy` 是 `Required`**：它们在 `just check` 里跑，缺了改动就合不上。其余每一件由一条人主动跑的 recipe 调用，故是 `Optional`，`enables` 指名是哪一条 recipe——`just gates` 在 cargo-deny 缺席时明说「CI 会跑」，doctor 把它报成必需就与 justfile 说了两套话。
-- **`same_command` 一处拼写三平台**：这些工具三平台装法相同，三列各抄一遍只会让其中一列悄悄落后。
+```rust
+// bin::doctor::table::toolchain（形状 6 data）
+pub(super) const DEVELOP: [Requirement; N];   // Develop 档的全部行，按安装先后排列
+const LEAN_PIN: &str;                         // include_str!("adversary/lean-toolchain")，去掉行尾
+// bin::doctor（Detection 多一支）
+Detection::Listed { program, args, line }     // 程序在，且它按 args 列出的某一行以 line 开头才算在
+// bin::doctor::table
+pub(crate) fn prereqs() -> String;            // Develop 档渲染成 prereqs.tsv 的全文
+```
+
+- **表是权威，`just prereqs` 读它的渲染**：`crates/sprawling/src/doctor/table/prereqs.tsv` 每行 `class<TAB>name<TAB>program<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`，由 `table::prereqs()` 从 Develop 档渲染；测试 `the_prereqs_file_is_the_develop_tier_rendered` 要求文件逐字等于渲染结果，不等时把应有的全文印出来。`just prereqs` 在编译之前跑，只能读文件而不能问二进制，所以读的是这份渲染而不是另一张清单；`command -v <program>` 是它的探测，`program` 为 `-` 的行（浏览器家族）归 doctor 与 render 门自己去找。被否决的备选：justfile 当权威、doctor 在编译期读它——justfile 不写三平台的装法，doctor 就得再拼一遍。
+- **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、rustup、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、elan、lean、uv、python，以及 cargo-audit、cargo-mutants、cargo-fuzz、cargo-llvm-cov、kani、cargo-public-api）。于是没装 Lean 的机器上 `just check` 仍与没有 `adversary/` 时一样，而页面的「全部安装」照样把 Lean 装上。
+- **行序就是安装顺序**：后一行的装法用到前一行装出的程序——rustup 之后才有 `rustup component add` 与 `cargo install`，elan 之后才有 `elan toolchain install`，uv 之后才有 `uv python install`。页面的「全部安装」按表序逐项跑，所以顺序写在表里而不是写在页面上。
+- **Lean 的版本只写在 `adversary/lean-toolchain`**：`LEAN_PIN` 是那个文件的 `include_str!`（`str::trim_ascii_end` 在 const 里去掉换行），装法是 `elan toolchain install <pin>`，探测是 `elan toolchain list` 里有以 pin 开头的一行。换 Lean 版本只改那一个文件。
+- **Windows 上能用 winget 的都用 winget**：Git、rustup、just、bun、uv、Chrome；elan 在 winget 上没有包，官方装法是一段 PowerShell 脚本，按 §8-40 只印不跑，这是 Windows 上唯一一条要人自己贴的线。cargo-nextest、cargo-deny 与其余 cargo 工具没有 winget 包，走 `cargo install --locked`。
+- **`same_command` 一处拼写三平台**：三平台装法相同的工具只写一次，三列各抄一遍只会让其中一列悄悄落后。
 
 ## 8-59 CLI 自己的样子：一张表，四个状态词，一句下一步（`bin::doctor::paint`、`bin::doctor::screen`）
 
@@ -2999,7 +3012,9 @@ impl Recipe {
 pub struct Runnable<'a> { /* 私有：program、args */ }
 // bin::doctor::running（本二进制起安装程序的唯一一处）
 pub(crate) const PATIENCE: u32 = 3_600; // knocks, TICK apart
-pub(crate) fn run(item: &str, runnable: &accounting::Runnable, patience: u32) -> Result<(), AxError>;
+pub(crate) fn run(item: &str, runnable: &accounting::Runnable, patience: u32, log: &Path) -> Result<(), AxError>;
+// bin::doctor::host：一项安装的输出写到哪个文件
+pub(crate) fn install_log(item: &str) -> PathBuf; // <系统临时目录>/sprawling-install/<item>.log
 // bin::assembly::commanding::machine：worker 经 RunWorker.machine（accounting::Machine）探与装，生产实现是 doctor::ThisMachine；终端的 --install 经同一个 accounting::Machine::install
 impl RunWorker {
     pub(in crate::assembly) fn doctor_install(&mut self, item: &str) -> Result<(), AxError>;
@@ -3012,9 +3027,10 @@ pub(crate) fn recipe_for(item: &str) -> Result<&'static accounting::Recipe, AxEr
 - **查表与取平台在表旁边的 `doctor::recipe_for`，写进度行在 `doctor_install`**：worker 搬进 `accounting` 时需求表留在 `sprawling`（accounting-SPEC.md §7），所以 worker 经打开时交给它的 `RunWorker.recipe_for` 这个 `fn` 指针拿配方，而不是自己读 `REQUIREMENTS`。它不是一层穿透：它是表的查法，与表同住 `doctor::table`，一个名字要不要被拒只在那里回答。进度行仍由 `doctor_install` 写，写的时刻因此就是安装到达的时刻。钉住这条的测试是 `an_install_takes_its_recipe_from_the_table_the_worker_was_handed`。
 - **只跑 `Recipe::Command`，走的是终端那条 `Machine::install`**，不是第二个安装器。`Print` 与 `Manual` 各自带着「人自己去做什么」被拒：管道进 shell 的脚本是没人读过的代码，这条纪律不因请求来自页面而松一格。需求表里没有的名字在起任何进程之前就被拒，因为页面问的是这份构建不认识的东西。
 - **「这条配方这座城可不可以跑」只有 `Recipe::command` 一个家**（H-12）。它要么给出 `Runnable`，要么给出那句带恢复语的拒绝；终端（`screen`）、页面（`commanding::machine`）与机器适配器（`probe`）三处都问它，所以同一条打印配方在三扇门后读到的是同一句话。`Machine::install` 收的是 `Runnable` 而不是 `Recipe`，于是「不可跑的配方」在这一层已经不可表达，`runnable()` 与 `probe` 里那第二段措辞随之删除。
-- **`bin::doctor::running` 是本二进制起安装程序的唯一一处，等待有上限**（B-25／F-10）。三件事一起成立：`stdin`／`stdout`／`stderr` 一律 `Stdio::null()`，于是要人同意源协议、要人输密码的包管理器立刻读到输入结束而不是坐在一台没有人的终端前；等待是 `try_wait` 的**计数敲门**，而不是 `Command::status()` 那种没有尽头的阻塞；敲完即杀掉子进程并带着 `E_TIMEOUT` 返回，恢复语是「自己在终端里跑这一行」。**上限用敲门次数而不是墙钟，因为本二进制读时钟的地方只有 `bin::assembly` 一处**（ARCHITECTURE §10 第 4 条）；这同时让上限可断言——测试要三次敲门就得到三次，而对着墙钟的断言问的是它跑在哪台机器上。`PATIENCE = 3_600` 次 × `TICK = 50ms` = 180 秒，只有这一个家。杀不掉或收不了尸都写进那条错误的主题——本城起的一个停不掉的进程是人必须知道的事实。
+- **`bin::doctor::running` 是本二进制起安装程序的唯一一处，等待有上限**（B-25／F-10）。三件事一起成立：`stdin` 是 `Stdio::null()`，于是要人同意源协议、要人输密码的包管理器立刻读到输入结束而不是坐在一台没有人的终端前；等待是 `try_wait` 的**计数敲门**，而不是 `Command::status()` 那种没有尽头的阻塞；敲完即杀掉子进程并带着 `E_TIMEOUT` 返回，恢复语是「自己在终端里跑这一行」。**上限用敲门次数而不是墙钟，因为本二进制读时钟的地方只有 `bin::assembly` 一处**（ARCHITECTURE §10 第 4 条）；这同时让上限可断言——测试要三次敲门就得到三次，而对着墙钟的断言问的是它跑在哪台机器上。`PATIENCE = 3_600` 次 × `TICK = 50ms` = 180 秒，只有这一个家。杀不掉或收不了尸都写进那条错误的主题——本城起的一个停不掉的进程是人必须知道的事实。
+- **每一项的输出一份文件**：`stdout` 与 `stderr` 写进 `host::install_log(item)`，每次安装从空文件写起。安装失败时，人要的是包管理器自己说了什么；这份文件的路径写进开始那一行日志，也写进失败的恢复语。放在系统临时目录而不是 `~/.sprawling/components/` 下，因为 components 下一个名字对应的目录本身就是 `Detection::Component` 的探测对象。
 - **进度就是日志行**（`bin::doctor` 模块名）。安装是本城起的一个进程并等它，值得报告的两件事——将要跑什么、怎么结束——正好是一行日志的形状；第二条进度通道会是同一件事的第二个权威。
-- **`doctor_install` 装完自己再探一遍**：装完仍答启动快照的城，会告诉人他刚装的东西还是没有。
+- **`doctor_install` 装完自己再探一遍，探不到就拒绝**：装完仍答启动快照的城，会告诉人他刚装的东西还是没有。包管理器报成功而这座城仍找不到这一项（最常见的是它装进了本进程启动之后才加进 PATH 的目录），`doctor_install` 在交出新答案之后以 `E_TOOL_UNAVAILABLE` 拒绝，主题以 `<item>:` 开头，恢复语是重启这座城。于是每一次安装恰好以两种方式之一结束——新答案里这一项在，或者一条点名这一项的拒绝——页面的「全部安装」按这两种结局逐项往下走，而不必读日志行的措辞。钉住它的测试是 `an_install_that_leaves_the_item_absent_is_refused_by_name`。
 - **答案不入账本**：机器有什么不是这座城里发生的事——它在本进程之外被改变，写进历史就是写进一份会错的历史。它沿 `RunWorker::examine` 这个 sink 交给服务层的 views，与开城那一次写进去的是同一处。没有 sink 的 worker（命令行逐条驱动的那种）照样探、照样写那一行日志：一个行为取决于有没有人在看的动词，是两个动词。
 - **跑在写线程上，代价有上限**：探测是十几个程序各被起一次的几秒钟，安装是一个包管理器，两者都占住其他命令排的那条队。但另一条路更糟——让读去起进程，会拿着 views 的锁把其他每一次读都堵住，而且没人要求它这么做。**此条先前接受的是「占住写线程」本身，那在无期限时等于永远**：一个等在输入上的安装程序会让 `Halt` 与 `Cancel` 都进不来，而那正是人最需要它们的一刻。故代价此后由 `PATIENCE × TICK` 封顶（上一条），写线程最多被一次安装占住 180 秒。
 
