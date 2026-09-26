@@ -75,3 +75,37 @@ fn a_base_fence_beside_history_is_filed_and_leaves_later_fences_on_disk() {
         (head, true, true, 2)
     );
 }
+
+/// A base fence refused by the staged-secret scan leaves the disk as it
+/// found it: no index entry and no HEAD names an object that only the
+/// in-memory store held, so a wave fence over the cleaned folder commits.
+#[test]
+fn a_refused_base_fence_leaves_no_reference_to_objects_it_never_wrote() {
+    let tmp = tempfile::tempdir().unwrap();
+    let shop = tmp.path().join("shop");
+    std::fs::create_dir_all(&shop).unwrap();
+    std::fs::write(shop.join("a.md"), "a").unwrap();
+    let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    std::fs::write(shop.join("key.env"), format!("KEY={token}")).unwrap();
+
+    let refused = Checkpoint::open(tmp.path()).unwrap().base_fence(
+        &["shop".to_owned()],
+        TimeMs::new(1_000),
+        &resident(),
+        &mut |_| {},
+    );
+    std::fs::remove_file(shop.join("key.env")).unwrap();
+    let wave = Checkpoint::open(tmp.path()).unwrap().wave_pre(
+        &["shop".to_owned()],
+        TimeMs::new(2_000),
+        &resident(),
+    );
+
+    assert_eq!(
+        (
+            matches!(refused, Err(MemoryError::SecretEgress { .. })),
+            wave.map(|_| ()).map_err(|err| err.to_string()),
+        ),
+        (true, Ok(()))
+    );
+}
