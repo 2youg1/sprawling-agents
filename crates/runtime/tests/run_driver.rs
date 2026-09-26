@@ -912,7 +912,7 @@ impl kernel::Tool for MeetingRead {
     fn invoke(&self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if let Some(meeting) = &self.meeting {
             let mut started = meeting.started.lock().unwrap();
-            *started += 1;
+            *started = started.saturating_add(1);
             meeting.arrived.notify_all();
             let (started, _) = meeting
                 .arrived
@@ -959,7 +959,7 @@ impl Placed {
 
     fn key(&mut self, call: &ToolCall) -> kernel::IdemKey {
         let at = self.next;
-        self.next += 1;
+        self.next = at.saturating_add(1);
         kernel::IdemKey::derive(
             &RunId::from_bytes([7; 16]),
             kernel::Seq::new(at),

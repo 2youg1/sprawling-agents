@@ -56,7 +56,7 @@ impl Placed {
 
     fn key(&mut self) -> IdemKey {
         let at = self.next;
-        self.next += 1;
+        self.next = at.saturating_add(1);
         IdemKey::derive(&run_id(), Seq::new(at), b"read")
     }
 

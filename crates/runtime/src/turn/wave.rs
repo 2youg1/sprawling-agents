@@ -166,9 +166,9 @@ impl Turn<ToolWave> {
                 standing @ (Interrupt::None | Interrupt::Steer { .. }) => going.push(standing),
             }
         }
-        let leading = calls.get(..going.len()).unwrap_or_default();
+        let leading: Vec<&ToolCall> = calls.iter().take(going.len()).collect();
         let admitted: Vec<Admitted> = leading.iter().map(|call| tools.admit(call, t)).collect();
-        let mut answers = all_at_once(&*tools, leading, &admitted).into_iter();
+        let mut answers = all_at_once(&*tools, &leading, &admitted).into_iter();
         for ((call, standing), admission) in leading.iter().zip(going).zip(admitted) {
             if let Some(cancelled) = self.consume_boundary(standing, ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
@@ -302,7 +302,7 @@ fn alone(
 /// returns.
 fn all_at_once(
     tools: &dyn ConcurrentInvoke,
-    calls: &[ToolCall],
+    calls: &[&ToolCall],
     admitted: &[Admitted],
 ) -> Vec<Result<ToolOutcome, AxError>> {
     let running: Vec<(&ToolCall, Result<&dyn Tool, AxError>)> = calls
@@ -310,7 +310,7 @@ fn all_at_once(
         .zip(admitted)
         .filter_map(|(call, admission)| match admission {
             Admitted::Answered(_) => None,
-            Admitted::Cleared(ticket) => Some((call, tools.tool(ticket))),
+            Admitted::Cleared(ticket) => Some((*call, tools.tool(ticket))),
         })
         .collect();
     let run = |(call, tool): &(&ToolCall, Result<&dyn Tool, AxError>)| match tool {
