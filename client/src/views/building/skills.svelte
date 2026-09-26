@@ -90,7 +90,7 @@
 <div>
   <h2 class="mb-base text-heading font-heading">{say($lang, "bld_skills")}</h2>
   {#if answer === undefined}
-    <p class="text-text-disabled">…</p>
+    <p class="text-text-faint">…</p>
   {:else}
     {#if answer.skills.length > 0}
       <ul>
@@ -106,7 +106,7 @@
               }}
             >
               <span class="shrink-0 font-mono text-text-quiet">{skill.name}</span>
-              <span class="shrink-0 text-text-disabled">{place.word}</span>
+              <span class="shrink-0 text-text-faint">{place.word}</span>
               <span class="min-w-0 flex-1 truncate text-text-faint">{skill.disclosure}</span>
               <!-- The two trailing qualifiers shrink; they do not hold
                   their width against the row. Five cells were `shrink-0`
@@ -117,10 +117,10 @@
                   because they are what identifies the row; whether it is
                   admitted and who pinned it are qualifiers, and a
                   qualifier that has to be cut short is still read. -->
-              <span class="min-w-0 truncate text-text-disabled">
+              <span class="min-w-0 truncate text-text-faint">
                 {skill.admitted ? say($lang, "skills_admitted") : say($lang, "skills_not_admitted")}
               </span>
-              <span class="min-w-0 truncate text-text-disabled">
+              <span class="min-w-0 truncate text-text-faint">
                 {skill.pinned_by.length > 0
                   ? fill(say($lang, "skills_used_by"), { n: String(skill.pinned_by.length) })
                   : say($lang, "skills_used_never")}

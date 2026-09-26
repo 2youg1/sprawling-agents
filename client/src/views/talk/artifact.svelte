@@ -172,7 +172,7 @@
 
 {#snippet cut(call: Call)}
   {#if (call.output?.cut ?? 0) > 0}
-    <p class="border-t border-edge px-snug py-tight text-note text-text-disabled">
+    <p class="border-t border-edge px-snug py-tight text-note text-text-faint">
       {fill(say($lang, "run_cut"), { n: String(call.output?.cut ?? 0) })}
     </p>
   {/if}

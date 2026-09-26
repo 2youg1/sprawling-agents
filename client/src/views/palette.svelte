@@ -310,7 +310,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
   >
     <input
       bind:this={box}
-      class="w-full rounded-control bg-raised px-base py-snug text-body placeholder:text-text-disabled"
+      class="w-full rounded-control bg-raised px-base py-snug text-body placeholder:text-text-faint"
       placeholder={say($lang, "palette_placeholder")}
       value={query}
       oninput={(event) => {
@@ -349,7 +349,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
                 type="button"
                 class={[
                   "flex w-full items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body",
-                  entry.why === undefined ? "hover:bg-raised" : "text-text-disabled",
+                  entry.why === undefined ? "hover:bg-raised" : "aria-disabled:text-text-disabled",
                   at === cursor ? "bg-raised" : "",
                 ]}
                 aria-disabled={entry.why !== undefined}
@@ -361,7 +361,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
                 }}
               >
                 <span class="truncate font-mono">{entry.label}</span>
-                <span class="shrink-0 text-note text-text-disabled">
+                <span class="shrink-0 text-note text-text-faint">
                   {entry.why === undefined ? entry.hint : say($lang, entry.why)}
                 </span>
               </button>
@@ -385,7 +385,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
               }}
             >
               <span class="truncate font-mono">{entry.label}</span>
-              <span class="shrink-0 text-note text-text-disabled">{entry.hint}</span>
+              <span class="shrink-0 text-note text-text-faint">{entry.hint}</span>
             </button>
           </li>
         {/each}

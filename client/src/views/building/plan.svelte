@@ -128,7 +128,7 @@
               <td class="py-snug pr-snug {row.status === 'done' ? 'text-text-faint' : 'text-text'}">
                 {row.item}
                 {#if row.needs.length > 0}
-                  <span class="ml-snug text-text-disabled">← {row.needs.join(", ")}</span>
+                  <span class="ml-snug text-text-faint">← {row.needs.join(", ")}</span>
                 {/if}
               </td>
               <td class="py-snug whitespace-nowrap text-right">

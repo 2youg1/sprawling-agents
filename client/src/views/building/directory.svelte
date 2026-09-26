@@ -112,7 +112,7 @@
 </script>
 
 {#if entries === undefined}
-  <p class="text-text-disabled">…</p>
+  <p class="text-text-faint">…</p>
 {:else}
   {const kind = kindOf(at, entries)}
   <div>
@@ -151,10 +151,10 @@
                 <span class="min-w-0 flex-1 truncate text-text-quiet">{run.task ?? run.run}</span>
                 <span class="shrink-0 text-text-faint">{posture(run.doing)}</span>
                 {#if micros !== null && micros !== 0}
-                  <span class="shrink-0 text-text-disabled">{usd(micros)}</span>
+                  <span class="shrink-0 text-text-faint">{usd(micros)}</span>
                 {/if}
                 {#if run.started}
-                  <span class="shrink-0 text-text-disabled">{clock($lang, run.started)}</span>
+                  <span class="shrink-0 text-text-faint">{clock($lang, run.started)}</span>
                 {/if}
               </a>
             </li>
@@ -186,7 +186,7 @@
             />
             <span class="flex-1"></span>
             {#if entry.kind !== "directory"}
-              <span class="shrink-0 font-mono text-text-disabled">{kib(entry.kind.file.bytes)}</span>
+              <span class="shrink-0 font-mono text-text-faint">{kib(entry.kind.file.bytes)}</span>
             {/if}
           </li>
         {/each}

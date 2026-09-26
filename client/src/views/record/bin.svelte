@@ -46,7 +46,7 @@ function keyOf(row: DiscardLine): string {
 </script>
 
 {#if rows === undefined}
-  <p class="text-text-disabled">…</p>
+  <p class="text-text-faint">…</p>
 {:else if rows.length === 0}
   <p class="text-text-faint">{say($lang, "bin_empty")}</p>
 {:else}
@@ -58,7 +58,7 @@ function keyOf(row: DiscardLine): string {
             <Path path={row.path} />
           </span>
           <span class="text-text-faint">{clock($lang, row.at)}</span>
-          <span class={row.restored ? "text-text-disabled" : "text-alert"}>
+          <span class={row.restored ? "text-text-faint" : "text-alert"}>
             {row.restored ? say($lang, "bin_restored") : say($lang, "bin_gone")}
           </span>
         </div>

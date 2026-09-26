@@ -93,7 +93,7 @@ function chordMarks(action: Action): readonly string[] {
   <span class={["inline-flex items-center gap-tight", props.class]}>
     {#each chordMarks(props.action) as mark (mark)}
       <kbd
-        class="rounded-control px-tight font-mono text-note leading-none text-text-disabled no-underline"
+        class="rounded-control px-tight font-mono text-note leading-none text-text-quiet no-underline"
         >{mark}</kbd
       >
     {/each}

@@ -77,7 +77,7 @@ export function desktopScopeAt(addr: Address): Address {
 
 <div class="flex flex-col gap-snug">
   <textarea
-    class="min-h-output w-full rounded-control bg-raised px-base py-snug font-mono text-note text-text placeholder:text-text-disabled"
+    class="min-h-output w-full rounded-control bg-raised px-base py-snug font-mono text-note text-text placeholder:text-text-faint"
     aria-label={say($lang, "desktop_allowlist")}
     placeholder={say($lang, "desktop_empty")}
     bind:value={draft}
@@ -93,9 +93,9 @@ export function desktopScopeAt(addr: Address): Address {
       onPress={save}
     />
     {#if !edited && onDisk === ""}
-      <span class="text-note text-text-disabled">{say($lang, "desktop_none")}</span>
+      <span class="text-note text-text-faint">{say($lang, "desktop_none")}</span>
     {/if}
     <span class="flex-1"></span>
-    <code class="truncate font-mono text-note text-text-disabled">{desktopScopeAt(addr)}</code>
+    <code class="truncate font-mono text-note text-text-faint">{desktopScopeAt(addr)}</code>
   </div>
 </div>

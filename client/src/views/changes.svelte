@@ -72,7 +72,7 @@
 </script>
 
 {#if files === undefined}
-  <p class="text-text-disabled">…</p>
+  <p class="text-text-faint">…</p>
 {:else if files.length > 0}
   <ul class="text-note">
     {#each files as file (file.path)}
@@ -87,13 +87,13 @@
         >
           <span class="w-figure shrink-0 text-text-faint">{howWord($lang, file.how)}</span>
           <span class="flex-1 truncate font-mono text-text-quiet">{file.path}</span>
-          <span class="shrink-0 font-mono text-text-disabled">{linesWord($lang, file.lines)}</span>
+          <span class="shrink-0 font-mono text-text-faint">{linesWord($lang, file.lines)}</span>
         </button>
         {#if open === file.path}
           {#if head === null}
-            <p class="pb-base text-text-disabled">{say($lang, "run_patch_needs_fence")}</p>
+            <p class="pb-base text-text-faint">{say($lang, "run_patch_needs_fence")}</p>
           {:else if patch === undefined}
-            <p class="text-text-disabled">…</p>
+            <p class="text-text-faint">…</p>
           {:else}
             <div class="pb-base">
               <!-- Tight against the tag on purpose: a `<pre>` renders
@@ -101,7 +101,7 @@
                    become the first line of the patch. -->
               <pre
                 class="overflow-x-auto rounded-card border border-edge bg-page p-base font-mono text-note leading-relaxed"
-              >{#each patch.lines as line (line.number)}<div class={lineInk(line.text)}>{line.text}</div>{/each}{#each patch.withheld as withheld (withheld.number)}<div class="text-text-disabled">{fill(say($lang, "run_withheld"), { n: String(withheld.number), reason: withheld.reason })}</div>{/each}</pre>
+              >{#each patch.lines as line (line.number)}<div class={lineInk(line.text)}>{line.text}</div>{/each}{#each patch.withheld as withheld (withheld.number)}<div class="text-text-faint">{fill(say($lang, "run_withheld"), { n: String(withheld.number), reason: withheld.reason })}</div>{/each}</pre>
             </div>
           {/if}
         {/if}

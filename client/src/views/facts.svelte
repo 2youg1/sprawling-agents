@@ -219,7 +219,7 @@ unlabelled numbers in it to navigate into. -->
       {#if cell.weight === "alerting"}
         <span aria-hidden="true" class="self-center text-alert">!</span>
       {/if}
-      <span class="text-text-disabled">{cell.label}</span>
+      <span class="text-text-quiet">{cell.label}</span>
       <span class={["figure", INK[cell.weight]]}>{cell.value}</span>
     </span>
   {/each}

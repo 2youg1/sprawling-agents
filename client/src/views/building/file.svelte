@@ -101,7 +101,7 @@
   <div class="flex items-center gap-base pb-snug font-mono text-note text-text-faint">
     <Path path={at} base={root} />
     {#if doc !== undefined && doc !== null}
-      <span class="text-text-disabled">{kib(doc.bytes)}</span>
+      <span class="text-text-faint">{kib(doc.bytes)}</span>
     {/if}
     <span class="flex-1"></span>
     {#if markdown && doc !== undefined && doc !== null && !doc.binary}
@@ -109,7 +109,7 @@
         type="button"
         class={[
           "h-control-sm rounded-pill px-snug text-note",
-          raw ? "bg-raised text-text" : "text-text-disabled hover:text-text-quiet",
+          raw ? "bg-raised text-text" : "text-text-faint hover:text-text-quiet",
         ]}
         onclick={() => {
           raw = !raw;
@@ -121,7 +121,7 @@
       {#if spine !== null && !editing}
         <button
           type="button"
-          class="h-control-sm rounded-pill px-snug text-note text-text-disabled hover:text-text-quiet"
+          class="h-control-sm rounded-pill px-snug text-note text-text-faint hover:text-text-quiet"
           onclick={change}
         >
           {say($lang, "file_edit")}
@@ -130,9 +130,9 @@
     {/if}
   </div>
   {#if doc === undefined}
-    <p class="text-text-disabled">…</p>
+    <p class="text-text-faint">…</p>
   {:else if doc === null}
-    <p class="text-text-disabled">{say($lang, "file_missing")}</p>
+    <p class="text-text-faint">{say($lang, "file_missing")}</p>
   {:else}
     <div class="min-h-0 flex-1 overflow-auto rounded-panel bg-chrome/60 p-pane">
       {#if doc.binary}
@@ -159,7 +159,7 @@
             </button>
             <button
               type="button"
-              class="h-control-sm rounded-pill px-snug text-note text-text-disabled hover:text-text-quiet"
+              class="h-control-sm rounded-pill px-snug text-note text-text-faint hover:text-text-quiet"
               onclick={() => {
                 editing = false;
               }}
@@ -179,7 +179,7 @@
             {#each lines as line, index (line)}
               <li class="flex whitespace-pre">
                 <span
-                  class="shrink-0 select-none pr-base text-right text-text-disabled"
+                  class="shrink-0 select-none pr-base text-right text-text-faint"
                   style:width={gutter}>{index + 1}</span
                 >
                 <span>{line.text}</span>

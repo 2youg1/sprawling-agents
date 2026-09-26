@@ -39,7 +39,7 @@ its container and scrolls sideways rather than break a value. -->
 <div class="w-full px-pane py-wide">
   <h1 class="mb-wide text-title font-title" tabindex="-1">{say($lang, "nav_registry")}</h1>
   {#if answer === undefined}
-    <p class="text-text-disabled">…</p>
+    <p class="text-text-faint">…</p>
   {:else}
     <Table assets={answer.assets} />
   {/if}

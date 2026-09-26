@@ -144,7 +144,7 @@
       {#each commit.lineage.slice(1) as run (run)}
         <a
           href={toFragment({ kind: "run", run })}
-          class="font-mono text-text-disabled hover:text-text-quiet">{run.slice(0, 8)}</a
+          class="font-mono text-text-faint hover:text-text-quiet">{run.slice(0, 8)}</a
         >
       {/each}
     </p>
@@ -166,17 +166,17 @@
         <Glyph
           name="chevron"
           size="sm"
-          class="shrink-0 text-text-disabled transition-transform {isOpen ? 'rotate-90' : ''}"
+          class="shrink-0 text-text-faint transition-transform {isOpen ? 'rotate-90' : ''}"
         />
         <span class="truncate font-mono text-text-quiet">{commit.actor}</span>
         <span class="shrink-0 font-mono text-text-faint">{shortOid(commit.oid)}</span>
         {#if commit.model !== ""}
-          <span class="hidden shrink-0 truncate text-text-disabled md:inline"
+          <span class="hidden shrink-0 truncate text-text-faint md:inline"
             >{commit.model}{effortTail(commit.effort)}</span
           >
         {/if}
         {#if commit.spent > 0}
-          <span class="hidden shrink-0 text-text-disabled md:inline"
+          <span class="hidden shrink-0 text-text-faint md:inline"
             >{fill(say($lang, "commits_spent"), { usd: usd(commit.spent) })}</span
           >
         {/if}
@@ -199,7 +199,7 @@
         {#snippet children(hint)}
           <a
             href={toFragment({ kind: "run", run: commit.run })}
-            class="shrink-0 whitespace-nowrap text-text-disabled hover:text-text-quiet"
+            class="shrink-0 whitespace-nowrap text-text-faint hover:text-text-quiet"
             aria-describedby={hint}>{clock($lang, commit.at)}</a
           >
         {/snippet}
@@ -240,7 +240,7 @@
         {#if older !== null}
           <Changes base={older.oid} head={commit.oid} />
         {:else}
-          <p class="text-text-disabled">{last ? say($lang, "commits_first") : "…"}</p>
+          <p class="text-text-faint">{last ? say($lang, "commits_first") : "…"}</p>
         {/if}
       </div>
     {/if}
@@ -265,9 +265,9 @@
       <p class="text-text-faint">{say($lang, "commits_empty")}</p>
     {/if}
   {:else}
-    <p class="text-text-disabled">…</p>
+    <p class="text-text-faint">…</p>
   {/if}
   {#if pages.more}
-    <p class="py-base text-center text-text-disabled">…</p>
+    <p class="py-base text-center text-text-faint">…</p>
   {/if}
 </div>

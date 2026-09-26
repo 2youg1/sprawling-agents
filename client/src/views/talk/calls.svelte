@@ -62,7 +62,7 @@
      (roadmap S2). -->
 <details class="my-tight text-note text-text-faint">
   <summary
-    class="cursor-pointer rounded-control px-tight marker:text-text-disabled hover:bg-chrome hover:text-text-quiet"
+    class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:bg-chrome hover:text-text-quiet"
   >
     {summary}
   </summary>
@@ -96,7 +96,7 @@
           {@const output = call.output}
           <pre
             class="mt-tight max-h-output overflow-auto rounded-card border border-edge bg-page p-snug font-mono text-note text-text-quiet"
-          >{output.cut > 0 ? `${output.head}\n` : output.head}{#if output.cut > 0}<span class="text-text-disabled">{fill(say($lang, "run_cut"), { n: String(output.cut) })}</span>{/if}</pre>
+          >{output.cut > 0 ? `${output.head}\n` : output.head}{#if output.cut > 0}<span class="text-text-faint">{fill(say($lang, "run_cut"), { n: String(output.cut) })}</span>{/if}</pre>
           {#if output.cut > 0}
             <a
               class="text-note text-text-faint hover:text-text-quiet"

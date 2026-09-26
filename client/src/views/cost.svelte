@@ -83,7 +83,7 @@ const TITLES: Record<Cut, Key> = {
     {/if}
   </div>
   {#if answer === undefined}
-    <p class="text-text-disabled">…</p>
+    <p class="text-text-faint">…</p>
   {:else if answer.total <= 0}
     <!-- Nothing has been spent, which reads exactly like a page that
     failed to load unless the page says which one it is. Spending starts
@@ -107,7 +107,7 @@ const TITLES: Record<Cut, Key> = {
             <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
             {@render cut(answer[each], answer.total)}
           {:else}
-            <p class="text-note text-text-disabled">—</p>
+            <p class="text-note text-text-faint">—</p>
           {/if}
         </section>
       {/each}
