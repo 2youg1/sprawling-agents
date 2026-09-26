@@ -26,10 +26,10 @@ use kernel::{
 
 use crate::compaction::Exchange;
 use crate::conversation::Conversation;
-use crate::prefix::FrozenPrefix;
 
 mod boundary;
 mod ledger;
+mod prompt;
 mod recovery;
 mod report;
 mod wave;
@@ -37,6 +37,7 @@ mod wave;
 use ledger::{Authored, Carried, Journal};
 
 pub use boundary::{Interrupt, NextCall, PhaseOutcome, TurnCancelled};
+pub use prompt::{PromptRecord, RunPrompt};
 pub use report::{CallShape, TurnReport};
 pub use wave::ConcurrentInvoke;
 
@@ -90,12 +91,13 @@ impl Turn<Assembling> {
     /// Boundary 1 (before assembly). Builds the canonical request from
     /// the frozen prefix (system blocks), the window (messages) and the
     /// catalog's tool defs; appends `prompt_assembled` with the prefix's
-    /// full source notes.
+    /// full source notes unless the run has already recorded that same
+    /// payload.
     pub fn assemble(
         mut self,
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
-        prefix: &FrozenPrefix,
+        prompt: RunPrompt<'_>,
         conversation: &Conversation,
         tools: &[ToolDef],
         shape: &CallShape,
@@ -107,18 +109,21 @@ impl Turn<Assembling> {
         // will carry and checked against what the session froze. It
         // comes before `prompt_assembled` is written: a refusal must not
         // leave a line describing a prefix the city will not send.
-        let segments = prefix.verified_segment_hashes()?;
+        let segments = prompt.prefix.verified_segment_hashes()?;
         // One plan decides every breakpoint: the system blocks, the tail
         // message and the record all read it, so the record names only
         // breakpoints this request carries.
         let plan = crate::prefix::BreakpointPlan::for_conversation(conversation.messages());
-        let prompt = prefix.prompt_payload(&plan)?;
-        self.journal
-            .append_authored(ledger, Authored::PromptAssembled, prompt)?;
+        let payload = prompt.prefix.prompt_payload(&plan)?;
+        if !prompt.recorded.holds(&payload) {
+            self.journal
+                .append_authored(ledger, Authored::PromptAssembled, payload.clone())?;
+            prompt.recorded.remember(payload);
+        }
         let mut chat = ChatRequest {
             model: shape.model.clone(),
             max_tokens: shape.max_tokens,
-            system: prefix.system_blocks()?,
+            system: prompt.prefix.system_blocks()?,
             messages: conversation.messages().to_vec(),
             tools: tools.to_vec(),
             effort: shape.effort,

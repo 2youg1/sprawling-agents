@@ -17,7 +17,7 @@ use crate::conversation::Conversation;
 use crate::handoff::Handoff;
 use crate::prefix::shape::PromptShape;
 use crate::reminder::ContextGauge;
-use crate::turn::{Interrupt, PhaseOutcome, Turn, TurnReport};
+use crate::turn::{Interrupt, PhaseOutcome, RunPrompt, Turn, TurnReport};
 
 use super::fence::{Fence, FencePolicy};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
@@ -118,6 +118,7 @@ impl Run<Active> {
                 last_turn_t: None,
                 gauge,
                 prior_shape: None,
+                prompt: crate::turn::PromptRecord::default(),
                 fence: FencePolicy::opening(),
             },
         })
@@ -146,7 +147,7 @@ impl Run<Active> {
         let turn = match turn.assemble(
             opening,
             ledger,
-            &self.plan.prefix,
+            RunPrompt::new(&self.plan.prefix, &mut self.state.prompt),
             &self.state.conversation,
             &self.plan.tools,
             &self.plan.shape,

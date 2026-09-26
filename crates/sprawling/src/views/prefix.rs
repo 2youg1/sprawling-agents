@@ -47,9 +47,9 @@ impl Views {
     /// The `prompt_assembled` record that opened this run.
     ///
     /// The oldest one, not the newest: the prefix is frozen once for
-    /// the life of a run and every later turn records the same four
-    /// hashes, so any of them says the same thing and the first is the
-    /// one a run that never got past turn one still has.
+    /// the life of a run, so a run writes this record once and a later
+    /// line of the same run carries the same four hashes (runtime-SPEC
+    /// section 8-39, item 5); the first is the one every run has.
     fn first_prompt(&mut self, run: RunId) -> Option<EventRecord> {
         let dir = crate::assembly::ledger_dir(&self.city_root);
         self.index.refresh(&dir).ok()?;

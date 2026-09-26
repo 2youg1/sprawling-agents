@@ -9,7 +9,8 @@
 //! and the city runs the same driver against real ones.
 //!
 //! Event order (no cancel, natural conclusion):
-//! checkpoint_committed, run_started, then per turn prompt_assembled,
+//! checkpoint_committed, run_started, prompt_assembled once per run
+//! (runtime-SPEC §8-39 item 5), then per turn prompt_shape_compared,
 //! model_called, model_returned, (tool_called, tool_result)*, and finally
 //! handoff_written, run_frozen.
 
