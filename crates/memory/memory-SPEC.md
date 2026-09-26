@@ -478,7 +478,7 @@ impl Checkpoint {
   而 oid 可 checkout、`wave_post` 与 `memory::changes` 从 oid 工作。
 - **`restore` 只写工作区那一个文件。** 还原是把人丢掉的东西放回原处，不是一次提交：
   写 index 或移动 HEAD 会让「人还原了一个文件」在他自己的分支历史里长出一格。
-  `Address` 只管路径的拼写，不管盘上把它解析到哪（kernel 把链接解析交给效应层），所以路径上已存在的任一段是符号链接或 junction 就拒绝，不跟随；
+  `Address` 只管路径的拼写，不管盘上把它解析到哪（kernel 把链接解析交给效应层），所以路径上工作区根以下已存在的任一段是符号链接或 junction 就拒绝（`MemoryError::Alias`），不跟随——这条问的是 `alias::WriteTarget::within`，写落在它放行的那个值上，与其它写门同一条链接规则；
   目标处已有文件且字节与 blob 不同时拒绝（恢复：把现有文件挪开再还原），字节相同即视为已还原；写用 `create_new`，不覆盖在检查之后出现的文件。
   还原不持 `fence_gate`：与同一栋楼里正在跑的波并发时，由上面的 `create_new` 拒绝而不是覆盖。
   提交能被找到，靠的是上一条的引用；没有它，`git gc` 之后 `restore` 答「找不到提交」。
