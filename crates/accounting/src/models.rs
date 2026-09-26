@@ -12,12 +12,14 @@ use kernel::AxError;
 ///
 /// The worker has already chosen the model and redeemed the credential
 /// by the time it asks, so an implementation decides only how the
-/// adapter is made - never which model, and never when a credential is
-/// renewed.
+/// adapter is made - never which model, never when a credential is
+/// renewed, and never whether a confidential building may reach it:
+/// the worker's choice refused a remote model before this is called,
+/// so no implementation can widen that rule.
 pub trait ModelFactory {
     /// # Errors
-    /// Whatever building the adapter refuses: a malformed endpoint, or a
-    /// confidential building's bytes asked to leave this machine.
+    /// Whatever building the adapter refuses, such as a malformed
+    /// endpoint.
     fn build(
         &self,
         chosen: &gateway::Chosen<'_>,

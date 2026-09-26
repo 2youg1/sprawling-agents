@@ -23,7 +23,13 @@
 
 ## 2 验收标准
 
-一个接收了脚本 `ModelFactory` 的 `RunWorker`，其 dispatch 走到脚本模型，而不是走到端点簿里登记的那个端点：`a_dispatch_reaches_the_model_the_worker_was_handed`（`crates/sprawling/tests/model_factory.rs`）。端点指向一个拒绝连接的 loopback 端口，所以只要 worker 还自己造适配器，这次 run 就碰不到脚本模型，历史里也就没有脚本写下的那句回答。
+三条断言，都在 `crates/sprawling/tests/model_factory.rs`，都驱动一个接收了脚本 `ModelFactory` 的 `RunWorker`：
+
+| 测试 | 它钉住的事 |
+|---|---|
+| `a_dispatch_reaches_the_model_the_worker_was_handed` | run 的模型走端口。端点指向一个拒绝连接的 loopback 端口，所以只要 worker 还自己造适配器，这次 run 就碰不到脚本模型，历史里也就没有脚本写下的那句回答。 |
+| `an_unnamed_dispatch_is_named_by_the_model_the_worker_was_handed` | 命名调用（没有 session 的 dispatch）也走端口：房间的名字是脚本 digest 模型给的那个词。 |
+| `a_confidential_building_refuses_before_the_factory_is_asked` | 机密楼的拒绝在 worker 的选择里，不在工厂里：端点不在本机时 dispatch 以 `GateDenied` 被拒，脚本工厂一次也没被问到。换掉工厂不能绕开机密。 |
 
 ## 3 假设与歧义
 
@@ -55,8 +61,9 @@ ModelFactory｜accounting thread｜Chosen｜Redemption。「适配器」专指 `
 ```rust
 pub trait ModelFactory {
     /// # Errors
-    /// Whatever building the adapter refuses: a malformed endpoint, a
-    /// confidential building's bytes asked to leave the machine.
+    /// Whatever building the adapter refuses, such as a malformed
+    /// endpoint. Confidentiality is not decided here: the worker has
+    /// already refused a remote model under the building's policy.
     fn build(
         &self,
         chosen: &gateway::Chosen<'_>,
@@ -74,6 +81,7 @@ impl RunWorker {
 ```
 
 - **失败**：原样传 `gateway::adapter_for` 的 `AxError`（它自带 action、subject、code 与 recovery）；端口不另造错误码。
+- **机密不归端口**：端口被问到之前，worker 已经在楼的 policy 下调过 `EndpointBook::select`；机密楼配上不在本机的端点，在那里就以 `GateDenied` 被拒，端口根本不会被调用。所以任何一个实现——生产的也好，脚本的也好——都放不宽这条规则。`gateway` 的 `Endpoint` 在调用时按请求的 policy 再拒一次，那是适配器自己的防线，不是这条规则的权威。
 - **两处调用点，一个端口**：dispatch 的同意阶段（`agreeing`）与命名调用（`session::naming_call`）都经 `RunWorker.models` 造适配器。dialect 头在生产适配器里算一次，两个调用点不再各拼一遍。
 - **固定值**：`RunWorker::new` 与 `over` 装上 `GatewayModels`；`with_models` 是唯一换掉它的门。
 - **一致性套件**：端口的断言就是 §2 那条测试——拿到的适配器必须就是被调用的那一个。
