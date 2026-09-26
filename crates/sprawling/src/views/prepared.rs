@@ -11,11 +11,14 @@
 //! that module decides what a query takes while the fold waits, and this
 //! one how the read is done while it does not.
 
+use std::collections::BTreeSet;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use kernel::{Address, GitOid, Locator};
 
 use super::archives::search_archives;
+use super::city::CityAsk;
 use super::document::document_answer;
 use super::git_status::GitStatusAsk;
 use super::hunks::hunks_answer;
@@ -25,7 +28,7 @@ use super::listing::listing_answer;
 use super::prefix::{PrefixAsk, content_answer};
 use super::skills::{SkillPins, skills_answer};
 use crate::assembly::read_building;
-use crate::plan_view::PlanAsk;
+use crate::plan_view::{PlanView, plans_of};
 
 /// The answer to a question this city could not look up.
 ///
@@ -91,12 +94,14 @@ pub(crate) enum Prepared {
     },
     /// The head of one file.
     Document { city_root: PathBuf, at: Address },
-    /// One building's directory, beside its plan: described from the
-    /// cache, or still to read.
+    /// Every building's progress and every pursuit's verdict, with the
+    /// buildings still to list and their plans still to read.
+    City(CityAsk),
+    /// One building's directory and its plan.
     Building {
         city_root: PathBuf,
         addr: Address,
-        plan: PlanAsk,
+        plans: Arc<Mutex<PlanView>>,
     },
     /// The prompt one run was frozen with: a ledger line and the store.
     Prefix(PrefixAsk),
@@ -109,6 +114,7 @@ impl Prepared {
             Self::Held(answer) => answer,
             Self::GitStatus(ask) => ask.read(),
             Self::Prefix(ask) => ask.read(),
+            Self::City(ask) => ask.read(),
             // A settings file that cannot be read is "I could not
             // look", not an empty set of preferences.
             Self::Preferences => match crate::person::read() {
@@ -139,8 +145,11 @@ impl Prepared {
             Self::Building {
                 city_root,
                 addr,
-                plan,
-            } => match read_building(&city_root, &addr, plan.read(&city_root, &addr)) {
+                plans,
+            } => match plans_of(&plans, &city_root, BTreeSet::from([addr.clone()]))
+                .remove(&addr)
+                .and_then(|plan| read_building(&city_root, &addr, plan))
+            {
                 Some(answer) => channels::Answer::Building(Box::new(answer)),
                 // A building nobody raised is not an empty building. The
                 // page needs to be able to tell those apart.

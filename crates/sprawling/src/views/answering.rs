@@ -112,25 +112,9 @@ impl Views {
     /// or network needs. Every arm either answers or names itself
     /// unavailable; none of them returns an empty result that a reader
     /// would mistake for an empty city.
-    pub(crate) fn prepare(&mut self, query: &channels::Query) -> Prepared {
+    pub(crate) fn prepare(&self, query: &channels::Query) -> Prepared {
         Prepared::Held(match query {
-            channels::Query::CityView => {
-                let runs: Vec<channels::RunSummary> = self
-                    .hot
-                    .runs()
-                    .map(|(run, hot)| summarize(*run, hot))
-                    .collect();
-                let active = self.hot.active_count();
-                let frozen = self.hot.frozen_count();
-                channels::Answer::City(channels::CityAnswer {
-                    runs,
-                    active,
-                    frozen,
-                    buildings: self.spine(),
-                    pursuits: self.pursuit_lines(),
-                    halted: self.governance.halted.iter().map(named).collect(),
-                })
-            }
+            channels::Query::CityView => return Prepared::City(self.city_ask()),
             channels::Query::RunView { run } => {
                 channels::Answer::Run(self.hot.get(run).map(|hot| summarize(*run, hot)))
             }
@@ -254,7 +238,7 @@ impl Views {
                 return Prepared::Building {
                     city_root: self.city_root.clone(),
                     addr: addr.clone(),
-                    plan: self.plans.ask(addr),
+                    plans: std::sync::Arc::clone(&self.plans),
                 };
             }
             channels::Query::InboxView { addr } => channels::Answer::Inbox(channels::InboxAnswer {
@@ -280,18 +264,5 @@ impl Views {
                 };
             }
         })
-    }
-}
-
-/// One shut scope in the shape a `halt` frame names it.
-///
-/// The ledger keeps `Scope` and its own spelling; a page is answered in
-/// the vocabulary it would use to ask, so nothing on the other side has
-/// to take a string apart to know which building it is looking at.
-fn named(scope: &kernel::event::Scope) -> channels::HaltScope {
-    match scope {
-        kernel::event::Scope::City => channels::HaltScope::City,
-        kernel::event::Scope::Building(addr) => channels::HaltScope::Building(addr.clone()),
-        kernel::event::Scope::Workshop(addr) => channels::HaltScope::Workshop(addr.clone()),
     }
 }

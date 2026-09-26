@@ -237,3 +237,25 @@ fn every_event_kind_has_a_reach() {
         "these kinds move a plan and every other kind leaves it where it was"
     );
 }
+
+/// A plan read with the cache released is not put back when a record
+/// moved it in the meantime: the file on disk has changed, and the
+/// cache would go on answering with the table it replaced.
+#[test]
+fn a_plan_read_before_a_record_moved_it_is_not_put_back() {
+    let dir = city(PLAN);
+    let mut view = PlanView::default();
+    let (_, fresh) = view.ask(&addr()).read(dir.path(), &addr());
+
+    std::fs::write(dir.path().join("lab").join("Roadmap.md"), "gone").unwrap();
+    view.apply(&record(
+        EventKind::RoadmapSplit,
+        serde_json::json!({"node": "1", "by": "mason@lab.1"}),
+    ));
+    view.remember(fresh.unwrap());
+
+    assert!(
+        view.of(dir.path(), &addr()).rows.is_empty(),
+        "the stale read was put back"
+    );
+}

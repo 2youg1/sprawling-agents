@@ -975,7 +975,7 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 `CityView` 与 `Metrics` 过去每被问一次，就把每栋楼的 `Roadmap.md` 从盘上读出来重新解析一遍。页面是轮询的，而一份计划一小时改不了几次——这是**为一个几乎不变的答案，按提问频率付钱**。
 
 ```rust
-pub(crate) struct PlanView { /* read、causes —— 私有 */ }
+pub(crate) struct PlanView { /* read、causes、每栋楼与全城的代数 —— 私有 */ }
 pub(crate) struct PlanReading {
     pub(crate) progress: Progress,
     pub(crate) problems: Vec<String>,
@@ -985,8 +985,8 @@ pub(crate) struct PlanReading {
 }
 impl PlanView {
     pub(crate) fn apply(&mut self, record: &EventRecord);
-    pub(crate) fn of(&mut self, city_root: &Path, addr: &Address) -> PlanReading;
 }
+pub(crate) fn plans_of(shared: &Mutex<PlanView>, city_root: &Path, addrs: BTreeSet<Address>) -> BTreeMap<Address, PlanReading>; // 锁外读盘，见 8-92
 ```
 
 - **文件仍然是计划**。变的只是谁去读：`kernel::WriteMoment` 说这张表只在三个时刻被写，而每一个时刻都是一条记录，于是折叠记录、只在有记录点到那栋楼时才回去读文件。

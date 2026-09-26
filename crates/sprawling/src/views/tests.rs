@@ -414,7 +414,7 @@ effort = \"low\"
 #[test]
 fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
-    let mut views = Views::new(dir.path());
+    let views = Views::new(dir.path());
     let at = Address::parse("notes").unwrap();
     let document = views.prepare(&channels::Query::Document { at: at.clone() });
     let listing = views.prepare(&channels::Query::Listing { at: None });
@@ -467,7 +467,7 @@ fn the_building_page_reads_its_directory_after_the_views_are_released() {
 #[test]
 fn the_city_page_lists_its_buildings_and_reads_their_plans_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
-    let mut views = Views::new(dir.path());
+    let views = Views::new(dir.path());
     let prepared = views.prepare(&channels::Query::CityView);
     std::fs::create_dir(dir.path().join("lab")).unwrap();
     std::fs::write(

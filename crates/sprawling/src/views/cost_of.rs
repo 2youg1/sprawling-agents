@@ -22,7 +22,7 @@ impl Views {
     /// A node nobody has claimed answers zero with an empty list rather
     /// than `Unavailable`: "no run has held this node" is a true answer,
     /// while `Unavailable` says the view could not look.
-    pub(super) fn cost_of_answer(&mut self, node: &NodeId) -> channels::CostOfAnswer {
+    pub(super) fn cost_of_answer(&self, node: &NodeId) -> channels::CostOfAnswer {
         let held = self.claims.get(node).cloned().unwrap_or_default();
         let report = self.attribution.report();
         let mut runs: Vec<(RunId, UsdMicros)> = Vec::with_capacity(held.len());

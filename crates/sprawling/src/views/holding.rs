@@ -29,8 +29,7 @@ use kernel::{Address, AxError, EventKind, EventRecord};
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
-use super::lines::verdict_line;
-use super::lines::{buildings_of, discard_lines, pursuit_from, registry_line, signal_line};
+use super::lines::{discard_lines, pursuit_from, registry_line, signal_line};
 use crate::assembly::{ledger_dir, rebuild_views};
 
 /// Answers one query out of a city's own history, without serving it.
@@ -122,7 +121,12 @@ pub(crate) struct Views {
     pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
-    pub(super) plans: crate::plan_view::PlanView,
+    ///
+    /// Behind a lock of its own so a reader reads a plan off the disk
+    /// with the views released and puts it back afterwards; the fold
+    /// holds it only to forget what a record may have moved
+    /// (sprawling-SPEC.md 8-92).
+    pub(super) plans: std::sync::Arc<std::sync::Mutex<crate::plan_view::PlanView>>,
     /// What each building is working towards, folded from the records
     /// that said so. The goal text and its state, not the value itself:
     /// declaring a pursuit takes the depth-zero position, and a view
@@ -181,7 +185,7 @@ impl Views {
                     .unwrap_or_else(|_| memory::LedgerIndex::empty()),
             )),
             first_prompts: std::collections::BTreeMap::new(),
-            plans: crate::plan_view::PlanView::default(),
+            plans: std::sync::Arc::default(),
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
             claims: std::collections::BTreeMap::new(),
@@ -210,7 +214,12 @@ impl Views {
         // worker's own copy is shown it.
         self.governance
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
-        self.plans.apply(record);
+        match self.plans.lock() {
+            Ok(mut plans) => plans.apply(record),
+            // Poisoned: readers no longer consult the cache, so there
+            // is nothing left for the fold to keep current.
+            Err(_) => {}
+        }
         self.events = self.events.saturating_add(1);
         match record.kind() {
             EventKind::CityInitialized => {
@@ -286,51 +295,6 @@ impl Views {
             _ => {}
         }
         Ok(())
-    }
-
-    /// One entry per building, with its plan as the projection last read
-    /// it.
-    pub(super) fn spine(&mut self) -> Vec<channels::BuildingProgress> {
-        let root = self.city_root.clone();
-        buildings_of(&root)
-            .into_iter()
-            .map(|addr| {
-                let reading = self.plans.of(&root, &addr);
-                channels::BuildingProgress {
-                    addr,
-                    progress: reading.progress,
-                    problems: reading.problems,
-                    blocked: reading.blocked,
-                    ready: u32::try_from(reading.ready.len()).unwrap_or(u32::MAX),
-                }
-            })
-            .collect()
-    }
-
-    /// What each pursuit is doing, as the city reads it.
-    ///
-    /// The verdict is computed here rather than on the page, so the stop
-    /// condition has one authority: a client that worked out for itself
-    /// whether a city had finished would be the second.
-    pub(super) fn pursuit_lines(&mut self) -> Vec<channels::PursuitLine> {
-        let root = self.city_root.clone();
-        let held: Vec<(Address, String, kernel::PursuitState)> = self
-            .pursuits
-            .iter()
-            .map(|(addr, (goal, state))| (addr.clone(), goal.clone(), *state))
-            .collect();
-        let in_flight = u32::try_from(self.hot.active_count()).unwrap_or(u32::MAX);
-        let mut out = Vec::new();
-        for (addr, goal, state) in held {
-            let ready = self.plans.of(&root, &addr).ready;
-            out.push(channels::PursuitLine {
-                goal,
-                state,
-                verdict: verdict_line(kernel::pursuit::observe(state, &ready, in_flight)),
-                addr,
-            });
-        }
-        out
     }
 
     /// What this city is called: what its first record says, and for a

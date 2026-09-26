@@ -20,7 +20,7 @@ impl Views {
     /// already maps a sequence to a byte offset. An unreadable line ends
     /// the slice rather than emptying it - what was read is still true.
     pub(super) fn history(
-        &mut self,
+        &self,
         before: Option<kernel::Seq>,
         limit: u32,
     ) -> channels::HistoryAnswer {
@@ -85,7 +85,7 @@ impl Views {
     /// for - the gaps the Ledger really has are not ranges this can fill,
     /// and a cursor pointing past one would have the page ask for ever.
     pub(super) fn history_range(
-        &mut self,
+        &self,
         from: kernel::Seq,
         to: kernel::Seq,
         limit: u32,
@@ -152,7 +152,7 @@ impl Views {
     /// seek. A line that will not read ends the slice rather than
     /// emptying it - what was read is still true.
     pub(super) fn run_history(
-        &mut self,
+        &self,
         run: kernel::RunId,
         before: Option<kernel::Seq>,
         limit: u32,

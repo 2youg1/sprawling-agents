@@ -33,7 +33,7 @@ impl Views {
     /// quietly change how much of a session it can see. A line that will
     /// not read ends the slice rather than emptying it - what was read is
     /// still true.
-    pub(super) fn records_of(&mut self, run: RunId) -> Vec<EventRecord> {
+    pub(super) fn records_of(&self, run: RunId) -> Vec<EventRecord> {
         let dir = crate::assembly::ledger_dir(&self.city_root);
         let Ok(mut index) = self.index.lock() else {
             return Vec::new();
@@ -59,7 +59,7 @@ impl Views {
     }
 
     /// One session, folded into the rounds a person reads.
-    pub(super) fn rounds_answer(&mut self, run: RunId) -> channels::RoundsAnswer {
+    pub(super) fn rounds_answer(&self, run: RunId) -> channels::RoundsAnswer {
         let records = self.records_of(run);
         let turns = turns(records.iter());
         channels::RoundsAnswer {

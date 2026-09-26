@@ -27,8 +27,9 @@
 //! is in the `roadmap_blocked` record, and putting a second copy of it
 //! in the table would be a second authority for the same sentence.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::sync::Mutex;
 
 use kernel::{
     Address, Blockage, EventKind, EventRecord, NodeId, PlanTree, Progress, RedNode, RoadmapShape,
@@ -50,6 +51,29 @@ pub(crate) struct PlanView {
     read: BTreeMap<Address, Reading>,
     /// Why each red node is red, folded from the records that said so.
     causes: BTreeMap<Address, BTreeMap<NodeId, StopCause>>,
+    /// How many records may have moved each building's plan. A plan
+    /// read with the cache released is put back only when this has not
+    /// moved since it was asked for.
+    moved: BTreeMap<Address, u64>,
+    /// How many records with no address may have moved every plan.
+    moved_all: u64,
+}
+
+/// Where the fold stood on one building's plan when a reader asked for
+/// it: equal again at the write-back when no record moved that plan in
+/// between.
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+struct Generation {
+    all: u64,
+    one: u64,
+}
+
+/// A plan read off the disk with the cache released, waiting to be put
+/// back.
+struct FreshPlan {
+    addr: Address,
+    asked_at: Generation,
+    reading: Reading,
 }
 
 /// What a page is told about one building's plan.
@@ -81,9 +105,14 @@ impl PlanView {
             // (sprawling-SPEC.md 8-76).
             if !matches!(reach, PlanReach::Untouched) {
                 self.read.clear();
+                self.moved_all = self.moved_all.wrapping_add(1);
             }
             return;
         };
+        if !matches!(reach, PlanReach::Untouched) {
+            let moved = self.moved.entry(building.clone()).or_default();
+            *moved = moved.wrapping_add(1);
+        }
         match reach {
             PlanReach::Untouched => {}
             PlanReach::Stale => {
@@ -105,45 +134,123 @@ impl PlanView {
     }
 
     /// What one building's plan says, reading the file only when the
-    /// fold says it may have moved.
+    /// fold says it may have moved: the three steps [`plans_of`] takes
+    /// around its lock, taken in one.
+    #[cfg(test)]
     pub(crate) fn of(&mut self, city_root: &Path, addr: &Address) -> PlanReading {
-        let reading = self
-            .read
-            .entry(addr.clone())
-            .or_insert_with(|| read_plan(city_root, addr));
-        describe(reading, self.causes.get(addr))
+        let (reading, fresh) = self.ask(addr).read(city_root, addr);
+        if let Some(fresh) = fresh {
+            self.remember(fresh);
+        }
+        reading
     }
 
     /// What one building's plan says as far as the cache holds it,
-    /// without reading the disk: the views are held while this runs,
-    /// and a plan nobody has read yet is left to [`PlanAsk::read`].
-    pub(crate) fn ask(&self, addr: &Address) -> PlanAsk {
+    /// without reading the disk: the cache is held while this runs, and
+    /// a plan nobody has read yet is left to [`PlanAsk::read`].
+    fn ask(&self, addr: &Address) -> PlanAsk {
         match self.read.get(addr) {
             Some(reading) => PlanAsk::Held(describe(reading, self.causes.get(addr))),
             None => PlanAsk::Unread {
                 causes: self.causes.get(addr).cloned().unwrap_or_default(),
+                asked_at: self.generation(addr),
             },
+        }
+    }
+
+    /// Puts back a plan read with the cache released, unless a record
+    /// folded since it was asked for may have moved it.
+    fn remember(&mut self, fresh: FreshPlan) {
+        self.read.insert(fresh.addr, fresh.reading);
+    }
+
+    fn generation(&self, addr: &Address) -> Generation {
+        Generation {
+            all: self.moved_all,
+            one: self.moved.get(addr).copied().unwrap_or_default(),
         }
     }
 }
 
+/// Every named building's plan: described from the cache while it is
+/// held, read off the disk once it is released, and put back only when
+/// no record moved that plan in between (sprawling-SPEC.md 8-92).
+///
+/// A poisoned cache is not consulted again: the fold stopped moving it
+/// when it was poisoned, so every plan is read off the disk, and a red
+/// node's sentence falls back to the status word the table carries.
+pub(crate) fn plans_of(
+    shared: &Mutex<PlanView>,
+    city_root: &Path,
+    addrs: BTreeSet<Address>,
+) -> BTreeMap<Address, PlanReading> {
+    let asks: Vec<(Address, PlanAsk)> = match shared.lock() {
+        Ok(view) => addrs
+            .into_iter()
+            .map(|addr| {
+                let ask = view.ask(&addr);
+                (addr, ask)
+            })
+            .collect(),
+        Err(_) => addrs
+            .into_iter()
+            .map(|addr| (addr, PlanAsk::uncached()))
+            .collect(),
+    };
+    let mut fresh = Vec::new();
+    let readings = asks
+        .into_iter()
+        .map(|(addr, ask)| {
+            let (reading, read) = ask.read(city_root, &addr);
+            fresh.extend(read);
+            (addr, reading)
+        })
+        .collect();
+    match shared.lock() {
+        Ok(mut view) => fresh.into_iter().for_each(|read| view.remember(read)),
+        // Poisoned: the cache is abandoned, so there is nothing to fill.
+        Err(_) => {}
+    }
+    readings
+}
+
 /// One building's plan as `PlanView::ask` left it for after the lock.
-pub(crate) enum PlanAsk {
+enum PlanAsk {
     /// The cached plan, described.
     Held(PlanReading),
-    /// A plan nobody has read since it last moved, and why each of its
-    /// red nodes is red, to describe the table once it is read.
-    Unread { causes: BTreeMap<NodeId, StopCause> },
+    /// A plan nobody has read since it last moved, why each of its red
+    /// nodes is red, and where the fold stood when it was asked for.
+    Unread {
+        causes: BTreeMap<NodeId, StopCause>,
+        asked_at: Generation,
+    },
 }
 
 impl PlanAsk {
-    /// The plan, reading the file when the cache did not hold it. What
-    /// is read here is not put back: a record folded since `ask` may
-    /// already have made it stale (sprawling-SPEC.md 8-92).
-    pub(crate) fn read(self, city_root: &Path, addr: &Address) -> PlanReading {
+    /// A plan read with no cache behind it.
+    fn uncached() -> Self {
+        Self::Unread {
+            causes: BTreeMap::new(),
+            asked_at: Generation::default(),
+        }
+    }
+
+    /// The plan, reading the file when the cache did not hold it, and
+    /// what was read, for [`PlanView::remember`] to put back.
+    fn read(self, city_root: &Path, addr: &Address) -> (PlanReading, Option<FreshPlan>) {
         match self {
-            Self::Held(reading) => reading,
-            Self::Unread { causes } => describe(&read_plan(city_root, addr), Some(&causes)),
+            Self::Held(reading) => (reading, None),
+            Self::Unread { causes, asked_at } => {
+                let reading = read_plan(city_root, addr);
+                (
+                    describe(&reading, Some(&causes)),
+                    Some(FreshPlan {
+                        addr: addr.clone(),
+                        asked_at,
+                        reading,
+                    }),
+                )
+            }
         }
     }
 }
