@@ -39,19 +39,63 @@
     tool: POSTURE_WORD.calling,
     person: POSTURE_WORD.waiting,
   };
+  // The height every call row takes (`h-control-sm`), which also sizes
+  // the spacers standing in for the rows not drawn.
+  const ROW_TOKEN = "--spacing-control-sm";
   const FILL: Record<Share, string> = {
     model: "bg-accent",
     tool: "bg-accent-solid",
     person: "bg-alert",
   };
 
-  // Measured, not assumed: the lane's width decides how many columns
-  // it samples, and the drawn rows' height how many rows fit.
+  // One observer reports every size the lens reads, and what it reports
+  // lands on the next frame. Written inside the report, a size would
+  // redraw the lanes and the rows while the browser is still reporting
+  // sizes, and the browser names that a ResizeObserver loop.
   let width = $state(0);
-  let row = $state(0);
-  let drawn = $state(0);
-  let top = $state(0);
   let height = $state(0);
+  let top = $state(0);
+  // The row token, read once from the stylesheet that sizes each row:
+  // the spacers are counted in the same token, so the list is as long
+  // as its calls whichever rows are drawn, and nothing drawn feeds back
+  // into the window.
+  let row = $state(0);
+  let list: Element | null = null;
+  let frame = 0;
+  const seen = { width: 0, height: 0 };
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.target === list) seen.height = entry.contentRect.height;
+      else seen.width = entry.contentRect.width;
+    }
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      width = seen.width;
+      height = seen.height;
+    });
+  });
+  $effect(() => () => {
+    cancelAnimationFrame(frame);
+    observer.disconnect();
+  });
+
+  function sizesTrack(node: Element): () => void {
+    observer.observe(node);
+    return () => {
+      observer.unobserve(node);
+    };
+  }
+
+  function sizesList(node: Element): () => void {
+    list = node;
+    const token = Number.parseFloat(getComputedStyle(node).getPropertyValue(ROW_TOKEN));
+    row = Number.isFinite(token) ? token : 0;
+    observer.observe(node);
+    return () => {
+      observer.unobserve(node);
+      list = null;
+    };
+  }
 
   const whole = $derived(Math.max(1, to - from));
   const stretches = $derived(stretchesOf(turns, to, tail));
@@ -59,14 +103,6 @@
   const lanes = $derived(columnsOf(stretches, from, to, columns));
   const calls = $derived(callsOf(turns));
   const rows = $derived(windowOf(calls.length, row, top, height));
-
-  // The first window is drawn before any row has been measured; its
-  // height divided by its rows is the row height every later window
-  // uses.
-  $effect(() => {
-    const shown = rows.end - rows.first;
-    if (shown > 0 && drawn > 0) row = drawn / shown;
-  });
 
   function spentOn(share: Share): number {
     return stretches
@@ -92,7 +128,7 @@
           <span class="truncate text-text">{say($lang, WORD[share])}</span>
           <span class="font-mono text-text-quiet">{percent(spentOn(share))}</span>
         </div>
-        <div class="relative h-control-sm flex-1 border-t border-edge" bind:clientWidth={width}>
+        <div class="relative h-control-sm flex-1 border-t border-edge" {@attach sizesTrack}>
           {#each lanes.filter((each) => each.share === share) as box (box.first)}
             <span
               class={["absolute top-1/2 h-dot -translate-y-1/2 rounded-pill", FILL[share]]}
@@ -111,13 +147,13 @@
   {#if calls.length > 0}
     <div
       class="max-h-tree overflow-auto border-y border-edge"
-      bind:clientHeight={height}
+      {@attach sizesList}
       onscroll={(event) => {
         top = event.currentTarget.scrollTop;
       }}
     >
-      <div style:height="{rows.first * row}px"></div>
-      <ol class="text-note" bind:offsetHeight={drawn}>
+      <div style:height="calc(var({ROW_TOKEN}) * {rows.first})"></div>
+      <ol class="text-note">
         {#each calls.slice(rows.first, rows.end) as placed, at (rows.first + at)}
           {@const took = tookOf(placed.call)}
           <li class="flex h-control-sm items-center gap-snug">
@@ -134,7 +170,7 @@
           </li>
         {/each}
       </ol>
-      <div style:height="{(calls.length - rows.end) * row}px"></div>
+      <div style:height="calc(var({ROW_TOKEN}) * {calls.length - rows.end})"></div>
     </div>
   {:else}
     <p class="text-note text-text-faint">{say($lang, "run_no_calls")}</p>
