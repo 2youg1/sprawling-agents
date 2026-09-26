@@ -8,6 +8,7 @@ import { get } from "svelte/store";
 
 import { createBelief } from "../belief";
 import { newestWorking } from "./live";
+import { heldIn, heldWithin } from "./rooms";
 import type { RunBelief } from "./shape";
 import type { CityAnswer, EventKind, EventRecord, RunSummary } from "../../wire";
 import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
@@ -115,5 +116,45 @@ test("the newest working run of a room costs the working runs, not the city", ()
     after: newestWorking(get(store.belief), room)?.run,
     elsewhere: newestWorking(get(store.belief), "hall"),
   }).toEqual({ steady: runId(WORKING - 1), after: runId(WORKING - 2), elsewhere: undefined });
+  expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
+});
+
+test("the runs of a room cost the room, not the city", () => {
+  const store = createBelief(() => 0);
+  // A city of `RUNS` runs spread over a hundred rooms under the hall.
+  const rooms = 100;
+  const roomOf = (index: number): Address => Address.make(`hall/r${index % rooms}`);
+  store.adoptCity({
+    active: WORKING,
+    buildings: [],
+    frozen: RUNS - WORKING,
+    halted: [],
+    pursuits: [],
+    runs: Array.from({ length: RUNS }, (_, index) => listed(RUNS - 1 - index, roomOf(RUNS - 1 - index))),
+  });
+  const reads = 200;
+  const records = Array.from({ length: 2 * reads }, (_, each) =>
+    record(each % WORKING, each + 2, "tool_result"),
+  );
+  let start = 0;
+  let held = 0;
+  for (const [at, each] of records.entries()) {
+    if (at === reads) start = performance.now();
+    store.apply(each);
+    held += heldIn(get(store.belief), roomOf(0)).length;
+  }
+  const perRecordUs = ((performance.now() - start) * 1000) / reads;
+  const belief = get(store.belief);
+  expect({
+    held,
+    first: heldIn(belief, roomOf(1)).slice(0, 3).map((run) => run.run),
+    within: heldWithin(belief, "hall").length,
+    none: heldIn(belief, "hall").length,
+  }).toEqual({
+    held: 2 * reads * (RUNS / rooms),
+    first: [runId(1), runId(1 + rooms), runId(1 + 2 * rooms)],
+    within: RUNS,
+    none: 0,
+  });
   expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
 });
