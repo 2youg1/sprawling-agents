@@ -44,7 +44,11 @@ impl ChainHalt {
     }
 
     pub(crate) fn admit(&self) -> Result<(), MemoryError> {
-        Ok(())
+        self.0.get().map_or(Ok(()), |reason| {
+            Err(MemoryError::ChainHalted {
+                source: reason.clone(),
+            })
+        })
     }
 }
 
@@ -62,8 +66,31 @@ impl JsonlLedger {
 /// # Errors
 /// `MemoryError::Io` when a segment cannot be listed, opened or read.
 pub fn audit_chain(dir: &Path) -> Result<ChainAudit, MemoryError> {
-    drop(ledger_segments_at(dir)?);
-    Ok(ChainAudit::Whole { lines: 0 })
+    let mut check = LineCheck::at_genesis();
+    let mut lines: u64 = 0;
+    let mut line = Vec::new();
+    for segment in ledger_segments_at(dir)? {
+        let file = File::open(&segment).map_err(io_err("open a segment to audit", &segment))?;
+        let mut reader = BufReader::new(file);
+        loop {
+            line.clear();
+            reader
+                .read_until(b'\n', &mut line)
+                .map_err(io_err("read a segment to audit", &segment))?;
+            // End of file, or a torn tail that is not a line yet.
+            let Some(complete) = line.strip_suffix(b"\n") else {
+                break;
+            };
+            if complete.is_empty() {
+                continue;
+            }
+            lines = lines.saturating_add(1);
+            if let Err(fault) = check.advance(complete) {
+                return Ok(ChainAudit::Broken(fault.into_ax(lines)));
+            }
+        }
+    }
+    Ok(ChainAudit::Whole { lines })
 }
 
 #[cfg(test)]
