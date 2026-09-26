@@ -3626,7 +3626,7 @@ pub(crate) fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid
 **决定**
 
 1. 线程档位取第一档「安全 Rust」：`thread-priority`（MIT）对外只给安全接口，内部的 `SetThreadPriority`／`GetThreadPriority` 由它负责，本仓不写 `unsafe`。不取 Zig 叶子：一次只传句柄与常量的调用没有 `(ptr, len)` 边界可以放在 Zig 后面，Rust 侧调用 `extern` 的那一处 `unsafe` 也省不掉。被否：本仓自己写 `unsafe` 调 `SetPriorityClass`，把整个进程升到 `HIGH_PRIORITY_CLASS`——没有测量表明它全局最佳，而且会把 tokio 的每条线程连同它们的空转风险一起升上去。重开参数：线程档升满之后，后台负载占满所有核时 relay 往返 p50 与空闲之比仍大于 1.2。
-2. 安全阀量墙钟而不量 CPU 时间：读线程自己的 CPU 时间在 Windows 上是 `GetThreadTimes`，没有第一档的路；墙钟只会高估忙的程度，所以阀只会降得早，不会降得晚。重开参数：出现对外只给安全接口、读线程 CPU 时间的 crate。
+2. 安全阀量墙钟而不量 CPU 时间：读线程自己的 CPU 时间在 Windows 上是 `GetThreadTimes`，没有第一档的路；在一轮之内，墙钟只会高估忙的程度，所以对已经结束的轮，阀只会判得早，不会判得晚。阀只在一轮结束时判：一条从不停放的 tokio worker（持续有任务时，tokio 的维护性 `park_timeout(0)` 不调停放与唤醒回调）和一次不返回的折叠都没有「轮结束」，所以它们一直留在升档上，阀对它们不起作用。重开参数：出现对外只给安全接口、读线程 CPU 时间的 crate。
 3. 降回之后不再升：一条线程忙满过一个窗口，就说明它的工作量不该排在派出的命令前面；反复升降只会让人看到忽快忽慢。
 
-**尚未做到的（本节接口的当前状态）**：写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。doctor 还不报告每个平台实际站在哪一档。
+**尚未做到的（本节接口的当前状态）**：阀只在一轮结束时判定（决定 2），所以一条持续有任务、从不停放的 worker 和一次不返回的折叠永远不会被降回，而这正是阀要防的情形；在忙的期间也作判定——tokio worker 按每次任务轮询记（`tokio_unstable` 下的 `on_before_task_poll`／`on_after_task_poll`），或在每次唤醒与任务边界处拿正在进行的一轮已走过的时间比窗口——是这一接口余下的一步。写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（事件种类表的一行加 kernel-SPEC 的表）。doctor 还不报告每个平台实际站在哪一档。
