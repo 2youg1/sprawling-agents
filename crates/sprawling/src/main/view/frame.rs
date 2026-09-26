@@ -16,7 +16,8 @@ use super::arrange::{Entry, NodeKey, arrange};
 use super::detail::{json_lines, line_lines};
 use super::follow::Row;
 use super::keys::Action;
-use super::rounds::{Rounds, fold, leaf_mark};
+use super::list::{cut, has_children, scrolled, tree_lines, visible};
+use super::rounds::{Rounds, fold};
 
 /// From this many columns on, the detail pane stays open on the right.
 pub(super) const SIDE_PANE_MIN_WIDTH: usize = 110;
@@ -228,7 +229,7 @@ impl Face {
         };
         match self.lens {
             Lens::Tree => {
-                let shown = self.visible();
+                let shown = visible(&self.entries, &self.expanded);
                 let at = shown.iter().position(|at| *at == self.tree_at).unwrap_or(0);
                 if let Some(entry) = shown.get(move_by(at, shown.len())) {
                     self.tree_at = *entry;
@@ -265,7 +266,7 @@ impl Face {
             self.rounds.insert(run, fold(run, &self.records));
             self.rearrange();
         }
-        if !self.has_children(self.tree_at) {
+        if !has_children(&self.entries, self.tree_at) {
             return;
         }
         if !self.expanded.insert(self.tree_at) {
@@ -304,33 +305,6 @@ impl Face {
         }
     }
 
-    fn visible(&self) -> Vec<usize> {
-        let mut shown = Vec::new();
-        for (at, entry) in self.entries.iter().enumerate() {
-            if entry.parent.is_none_or(|parent| self.is_open(parent)) {
-                shown.push(at);
-            }
-        }
-        shown
-    }
-
-    fn is_open(&self, at: usize) -> bool {
-        let mut cursor = Some(at);
-        while let Some(at) = cursor {
-            if !self.expanded.contains(&at) {
-                return false;
-            }
-            cursor = self.entries.get(at).and_then(|entry| entry.parent);
-        }
-        true
-    }
-
-    fn has_children(&self, at: usize) -> bool {
-        self.entries
-            .get(at.saturating_add(1))
-            .is_some_and(|next| next.parent == Some(at))
-    }
-
     /// Selects entry `at` in the tree and opens every ancestor of it.
     fn select_entry(&mut self, at: usize) {
         self.tree_at = at;
@@ -346,37 +320,19 @@ impl Face {
     }
 
     fn list_lines(&self, rows: usize) -> Vec<String> {
-        let (lines, cursor): (Vec<String>, usize) = match self.lens {
+        match self.lens {
             Lens::Tree => {
-                let shown = self.visible();
+                let shown = visible(&self.entries, &self.expanded);
                 let cursor = shown.iter().position(|at| *at == self.tree_at).unwrap_or(0);
-                let lines = shown
-                    .iter()
-                    .filter_map(|at| self.entries.get(*at).map(|entry| (*at, entry)))
-                    .map(|(at, entry)| {
-                        let mark = match (self.has_children(at), self.expanded.contains(&at)) {
-                            (false, _) => leaf_mark(&self.rounds, &entry.key),
-                            (true, true) => '-',
-                            (true, false) => '+',
-                        };
-                        format!("{}{mark} {}", "  ".repeat(entry.depth), entry.label)
-                    })
-                    .collect();
-                (lines, cursor)
+                let lines = tree_lines(&self.entries, &shown, &self.expanded, &self.rounds);
+                scrolled(lines, cursor, rows)
             }
-            Lens::Records => (
+            Lens::Records => scrolled(
                 self.records.iter().map(|row| row.line.clone()).collect(),
                 self.record_at,
+                rows,
             ),
-        };
-        let skip = cursor.saturating_add(1).saturating_sub(rows);
-        lines
-            .into_iter()
-            .enumerate()
-            .skip(skip)
-            .take(rows)
-            .map(|(at, line)| format!("{}{line}", if at == cursor { '>' } else { ' ' }))
-            .collect()
+        }
     }
 
     fn detail_lines(&self) -> Vec<String> {
@@ -393,8 +349,4 @@ impl Face {
                 .unwrap_or_default(),
         }
     }
-}
-
-fn cut(line: &str, width: usize) -> String {
-    line.chars().take(width).collect()
 }
