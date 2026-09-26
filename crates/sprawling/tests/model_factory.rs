@@ -3,10 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A dispatch driven against a model the worker was handed
+//! A dispatch driven against the models the worker was handed
 //! (accounting-SPEC.md section 2).
 //!
-//! The endpoint the city is pointed at refuses every connection, so the
+//! The endpoint the city is pointed at refuses every connection, so a
 //! scripted answer can reach the history only through the factory the
 //! worker received. A worker that still built its own adapter out of the
 //! endpoint book would call the dead port and never meet the script.
@@ -19,41 +19,62 @@
     reason = "test code"
 )]
 
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
 use kernel::{
-    Address, AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
+    Address, AxCode, AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
     ModelReturn, RunId, Seq,
 };
 use sprawling::assembly;
 
 const LAB: &str = "lab";
-const MODEL: &str = "scripted";
+const MAIN: &str = "scripted";
+const DIGEST: &str = "namer";
 const ANSWER: &str = "the answer the script wrote";
+/// A legal session name, so a digest model that says it names the room.
+const ROOM: &str = "orchard";
 
-/// Answers every call with the same text and no tool calls, so the run
+/// Answers every call with the same text and no tool calls, so a run
 /// ends on its first turn.
-struct Script;
+struct Script(&'static str);
 
 impl Model for Script {
     fn call(&mut self, _req: &ModelRequest) -> Result<ModelReturn, AxError> {
         Ok(ModelReturn::bare(
             kernel::model::message_payload(&[ContentBlock::Text {
-                text: ANSWER.to_owned(),
+                text: self.0.to_owned(),
             }])?,
             Vec::new(),
         ))
     }
 }
 
-struct Scripted;
+/// Hands out a `Script` for every model, and keeps the id of each model
+/// it was asked for.
+struct Scripted {
+    says: &'static str,
+    asked: Arc<Mutex<Vec<String>>>,
+}
 
 impl accounting::ModelFactory for Scripted {
     fn build(
         &self,
-        _chosen: &gateway::Chosen<'_>,
+        chosen: &gateway::Chosen<'_>,
         _redemption: gateway::Redemption,
     ) -> Result<Box<dyn Model + Send>, AxError> {
-        Ok(Box::new(Script))
+        self.asked.lock().unwrap().push(chosen.entry.id.clone());
+        Ok(Box::new(Script(self.says)))
     }
+}
+
+fn scripted(says: &'static str) -> (Scripted, Arc<Mutex<Vec<String>>>) {
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let factory = Scripted {
+        says,
+        asked: Arc::clone(&asked),
+    };
+    (factory, asked)
 }
 
 /// A loopback address nothing listens on: bound once for a free port,
@@ -69,28 +90,34 @@ fn idem(what: &[u8]) -> IdemKey {
     IdemKey::derive(&RunId::CITY, Seq::FIRST, what)
 }
 
-#[test]
-fn a_dispatch_reaches_the_model_the_worker_was_handed() {
-    let dir = tempfile::tempdir().unwrap();
-    let raised = assembly::init_city(dir.path()).unwrap();
+/// A city whose main and digest models both sit on `base_url`, whose
+/// one building is raised from `template`, and whose worker reaches
+/// every model through `factory`; with the directory its ledger is in.
+fn city_on(
+    dir: &Path,
+    base_url: String,
+    template: &str,
+    factory: Scripted,
+) -> (assembly::RunWorker, PathBuf) {
+    let raised = assembly::init_city(dir).unwrap();
     let mut worker = assembly::RunWorker::new(
-        dir.path(),
+        dir,
         gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
     )
     .unwrap()
-    .with_models(Box::new(Scripted));
+    .with_models(Box::new(factory));
     let endpoint = channels::ProviderName::parse("dead").unwrap();
     worker
         .handle(channels::Command::AttachEndpoint {
             name: endpoint.clone(),
-            base_url: refusing_url(),
+            base_url,
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
-            admit: vec![MODEL.to_owned()],
+            admit: vec![MAIN.to_owned(), DIGEST.to_owned()],
             // One try, briefly: a worker that still calls the dead port
-            // should fail this test at once rather than retry into it.
+            // should fail its test at once rather than retry into it.
             tuning: channels::EndpointTuning {
                 timeout_ms: Some(2_000),
                 request_max_retries: Some(0),
@@ -99,45 +126,110 @@ fn a_dispatch_reaches_the_model_the_worker_was_handed() {
             idem: idem(b"attach"),
         })
         .unwrap();
-    worker
-        .handle(channels::Command::SelectModel {
-            endpoint,
-            model: MODEL.to_owned(),
-            tag: kernel::ModelTag::Main,
-            context_tokens: kernel::Window::new(32_768),
-            max_output_tokens: kernel::Ceiling::new(1_024),
-            idem: idem(b"select"),
-        })
-        .unwrap();
+    for (tag, model) in [
+        (kernel::ModelTag::Main, MAIN),
+        (kernel::ModelTag::Digest, DIGEST),
+    ] {
+        worker
+            .handle(channels::Command::SelectModel {
+                endpoint: endpoint.clone(),
+                model: model.to_owned(),
+                tag,
+                context_tokens: kernel::Window::new(32_768),
+                max_output_tokens: kernel::Ceiling::new(1_024),
+                idem: idem(model.as_bytes()),
+            })
+            .unwrap();
+    }
     worker
         .handle(channels::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: channels::TemplateName::parse(template).unwrap(),
             idem: idem(b"create"),
         })
         .unwrap();
-    // Judged on the history rather than on this result: a run that met
-    // the dead port is a history with a failure in it, not necessarily a
-    // refused command.
-    let dispatched = worker.handle(channels::Command::Dispatch {
+    (worker, raised.ledger_dir)
+}
+
+fn dispatch(
+    worker: &mut assembly::RunWorker,
+    session: Option<kernel::SessionName>,
+) -> Result<(), AxError> {
+    worker.handle(channels::Command::Dispatch {
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
         goal: "one answer from the model this worker was handed".to_owned(),
         mode: kernel::Mode::PlanGoal,
         idem: idem(b"dispatch"),
-        // Named, so the room is opened rather than named by the digest
-        // model: this test is about the run's model and nothing else.
-        session: Some(kernel::SessionName::parse("s1").unwrap()),
+        session,
         effort: None,
-    });
+    })
+}
 
-    let verified = runtime::replay::verify_ledger_dir(&raised.ledger_dir).unwrap();
-    let scripted = verified.raw_lines().iter().any(|line| {
-        EventRecord::parse_line(line).unwrap().kind() == EventKind::ModelReturned
-            && String::from_utf8_lossy(line).contains(ANSWER)
-    });
+/// Whether the history holds a line of `kind` that carries `text`.
+fn history_says(ledger: &Path, kind: EventKind, text: &str) -> bool {
+    runtime::replay::verify_ledger_dir(ledger)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .any(|line| {
+            EventRecord::parse_line(line).unwrap().kind() == kind
+                && String::from_utf8_lossy(line).contains(text)
+        })
+}
+
+#[test]
+fn a_dispatch_reaches_the_model_the_worker_was_handed() {
+    let dir = tempfile::tempdir().unwrap();
+    let (factory, _) = scripted(ANSWER);
+    let (mut worker, ledger) = city_on(dir.path(), refusing_url(), "minimal", factory);
+    // Named, so the room is opened rather than named by the digest
+    // model: this test is about the run's model and nothing else.
+    // Judged on the history rather than on this result: a run that met
+    // the dead port is a history with a failure in it, not necessarily a
+    // refused command.
+    let dispatched = dispatch(&mut worker, Some(kernel::SessionName::parse("s1").unwrap()));
+
     assert!(
-        scripted,
+        history_says(&ledger, EventKind::ModelReturned, ANSWER),
         "the run never heard the scripted model (the dispatch answered {dispatched:?})"
+    );
+}
+
+#[test]
+fn an_unnamed_dispatch_is_named_by_the_model_the_worker_was_handed() {
+    let dir = tempfile::tempdir().unwrap();
+    let (factory, _) = scripted(ROOM);
+    let (mut worker, ledger) = city_on(dir.path(), refusing_url(), "minimal", factory);
+    // No session, so the digest model names the room before the run
+    // starts. A naming call that built its own adapter would call the
+    // dead port, and no run would start in the room the script named.
+    let dispatched = dispatch(&mut worker, None);
+
+    assert!(
+        history_says(&ledger, EventKind::RunStarted, &format!("{LAB}/{ROOM}")),
+        "no run started in the room the scripted digest model named (the dispatch answered \
+         {dispatched:?})"
+    );
+}
+
+#[test]
+fn a_confidential_building_refuses_before_the_factory_is_asked() {
+    let dir = tempfile::tempdir().unwrap();
+    let (factory, asked) = scripted(ANSWER);
+    // A documentation address (RFC 5737): not on this machine, and
+    // never dialled, because the refusal comes before any adapter.
+    let (mut worker, _) = city_on(
+        dir.path(),
+        "http://192.0.2.1/v1".to_owned(),
+        "confidential",
+        factory,
+    );
+    let refused = dispatch(&mut worker, Some(kernel::SessionName::parse("s1").unwrap()))
+        .map_err(|err| err.code().clone());
+
+    assert_eq!(
+        (refused, asked.lock().unwrap().clone()),
+        (Err(AxCode::GateDenied), Vec::<String>::new())
     );
 }
