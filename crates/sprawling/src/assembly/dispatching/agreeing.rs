@@ -133,10 +133,8 @@ impl RunWorker {
         // reach, so they are read before one is chosen.
         let building = city::Building::of(addr)?;
         let rules = city::load(&self.city_root, building.addr())?;
-        // A run that names no model - a successor, a wake knock, a
-        // follow-up without `-m` - continues on what the room froze.
         let own = city::own_layer(&self.city_root, addr)?;
-        let tag = self.tag_for(at.model.as_deref().or(own.model()))?;
+        let tag = self.tag_for(at.model.as_deref(), own.model())?;
         let chosen = self.credentials.book.select(tag, rules.policy())?;
         // A subscription credential that expires mid-run is a run that
         // dies on its second turn, so it is renewed before the run
@@ -225,28 +223,45 @@ impl RunWorker {
         Ok(())
     }
 
-    /// The tag whose registration a dispatch runs on: `main` when
-    /// neither it nor its room named a model, else the tag the named id was registered under,
-    /// so the endpoint, the window and the policy check come with it.
+    /// The tag whose registration a dispatch runs on, so the endpoint,
+    /// the window and the policy check come with the model.
+    ///
+    /// A model the dispatch names runs under the tag that registered
+    /// it. A dispatch that names none - a successor, a wake knock, a
+    /// follow-up without `-m` - continues on the model its room froze
+    /// while a tag still registers it, and otherwise runs on `main`:
+    /// the session's shape check then refuses the moved model with the
+    /// way out a person can take (sprawling-SPEC.md 8-79), which a
+    /// refusal here could not name.
     ///
     /// # Errors
-    /// Refuses an id no tag registered, before anything is written.
-    fn tag_for(&self, model: Option<&str>) -> Result<kernel::ModelTag, AxError> {
-        let Some(id) = model else {
-            return Ok(kernel::ModelTag::Main);
+    /// Refuses a named id no tag registered, before anything is written.
+    fn tag_for(
+        &self,
+        named: Option<&str>,
+        frozen: Option<&str>,
+    ) -> Result<kernel::ModelTag, AxError> {
+        let Some(id) = named else {
+            return Ok(frozen
+                .and_then(|id| self.tag_registering(id))
+                .unwrap_or(kernel::ModelTag::Main));
         };
+        self.tag_registering(id).ok_or_else(|| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "dispatch work",
+                format!("no tag registers the model {id}"),
+            )
+            .with_recovery("register it under a tag on the settings page, then dispatch again")
+        })
+    }
+
+    /// The tag the model `id` is registered under, if any is.
+    fn tag_registering(&self, id: &str) -> Option<kernel::ModelTag> {
         self.credentials
             .book
             .choices()
             .find_map(|(tag, _, entry)| (entry.id == id).then_some(tag))
-            .ok_or_else(|| {
-                AxError::failure(
-                    AxCode::ConfigInvalid,
-                    "dispatch work",
-                    format!("no tag registers the model {id}"),
-                )
-                .with_recovery("register it under a tag on the settings page, then dispatch again")
-            })
     }
 }
 
