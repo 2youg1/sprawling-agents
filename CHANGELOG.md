@@ -5,23 +5,22 @@ part of the name because a pre-alpha version number says almost nothing about
 how old the tree is, and how old the tree is, is what a reader of a pre-alpha
 release most needs to know.
 
-Each entry records what changed and, where a number is claimed, the class of
-machine that produced it. Wall-clock figures are readings from a four-core
-laptop with 16 GB of memory and never gates — a slow runner is not a defect. Byte counts are gated, because a byte count does not depend on how
-busy the machine was.
+Each entry records what changed. A wall-clock figure names the class of
+machine that produced it, because the same figure from a busier or slower
+machine is a different reading, not a regression; wall-clock figures are
+readings and never gates. Byte counts are gated, because a byte count does not
+depend on how busy the machine was.
 
 The three releases before this file existed are reconstructed here from their
 release notes and their commits.
 
 ---
 
-## Unreleased
+## v0.0.6-Pre-alpha-260922
 
-**This is what V0.0.6 will carry, and no tag carries it yet.** The version in
-`Cargo.toml` still reads the released one on purpose: it is raised once, in a
-single change, when the work behind this section is finished, so a tree that
-announces a version is a tree somebody cut. Read every entry below as landed
-in the repository and unpublished.
+Reconstructed from the record the tag carried under *Unreleased*, checked
+against the code at the tag, and from the commits that landed after that
+record was last written. WIRE_V 34.
 
 ### A binary knows which release it is, and will say so when asked
 
@@ -31,436 +30,166 @@ naive comparison a person or a script would write reported the newest
 published release as the older one. Neither spelling could be compared
 with the other because nothing decoded both.
 
-- `kernel::Release` is the one authority for how a release is spelled
-  and how two of them order. `xtask channel` converts through it to
-  publish and a running binary converts through it to read the registry
-  back, so the version this project publishes and the version it
-  recognises cannot drift apart. `Ord` is derived over version then
-  date, which is the order npm itself would put the same two strings in.
-- The release workflow passes its tag to the build. A binary built any
-  other way reports itself as built from source rather than guessing at
-  a release it is not, and `status` says which of the two it is.
-- `sprawling version` answers, as do `--version` and `-V`; all three
-  used to land in `unknown subcommand`. The version line now carries the
-  day the release was cut, read from what is compiled in and costing no
-  network.
+- `kernel::Release` is the one authority for how a release is spelled and how
+  two of them order. `xtask channel` converts through it to publish and a
+  running binary converts through it to read the registry back. `Ord` is
+  derived over version then date, the order npm itself would put the same two
+  strings in.
+- The release workflow passes its tag to the build. A binary built any other
+  way reports itself as built from source, and `status` says which of the two
+  it is.
+- `sprawling version` answers, as do `--version` and `-V`; all three used to
+  land in `unknown subcommand`. The version line carries the day the release
+  was cut.
 
 ### Checking for a newer release is manual, and updating is not offered
 
-`sprawling status --check` is the only command in this binary that
-reaches the internet, and `Query::Release` is the only query that does.
-Both run because somebody asked: no timer, no probe on connect, no check
-folded into another command. `QUICKSTART.md` opens by promising that
-nothing was installed and nothing outside the folder was written, and a
-binary that polled a registry on its own schedule would be spending that
-sentence on a question nobody asked.
+`sprawling status --check` is the only command in this binary that reaches the
+internet, and `Query::Release` is the only query that does. Both run because
+somebody asked: no timer, no probe on connect, no check folded into another
+command.
 
-- The source is npm's `latest` dist-tag, not GitHub. Every release here
-  is a pre-release and `GET /releases/latest` excludes those by design —
-  it answers 404 for this repository — so the endpoint that looks right
-  is the one that would have been wrong.
-- Three answers, not two: where a release stands, that this binary is
-  not a release at all, or that the registry could not be read. The
-  third carries the staged reading `kernel::reach` already defines, so a
-  person behind a proxy is told where the call stopped rather than that
-  it failed. The exit code reports whether the question was answered,
-  never what the answer was.
-- Nothing updates anything. `sprawling install` owns the archive path
-  and npm owns its own, so both the terminal and the **machine** page
-  print the command and stop.
-- WIRE_V <!-- xtask:begin wire_v -->41<!-- xtask:end -->, recounted from `channels::WIRE_V` while this section is still unreleased.
+- The source is npm's `latest` dist-tag, not GitHub: every release here is a
+  pre-release, and `GET /releases/latest` excludes those.
+- Three answers: where a release stands, that this binary is not a release,
+  or that the registry could not be read, with the stage `kernel::reach`
+  names so a person behind a proxy is told where the call stopped. The exit
+  code reports whether the question was answered, never what the answer was.
+- Nothing updates anything. The terminal and the **machine** page print the
+  command and stop.
 
 ### An error with nothing to do about it can no longer be written
 
-`AxError::failure` now returns a draft, and only `with_recovery` turns a
-draft into an error. A refusal that states what failed and leaves the reader
-standing there is not a shape this code can spell any more.
+`AxError::failure` returns a draft, and only `with_recovery` turns a draft into
+an error.
 
-- 172 errors carried an empty recovery line. Each now names a key to press,
-  a file to edit, or a command to run; six whose subject could not carry a
+- 172 errors carried an empty recovery line. Each now names a key to press, a
+  file to edit, or a command to run; six whose subject could not carry a
   recovery had the subject corrected as well.
-- The five files that grew past four hundred lines under that change were
-  split along what each part owns rather than at the midpoint.
 
 ### A new variant is a compile error at every reader
 
-44 `#[non_exhaustive]` attributes are gone, and with them 45 wildcard arms
-the compiler had already proved unreachable. The attribute was buying
-nothing and costing the one thing that matters here: a wire shape that was
-offered and answered `null` could exist only because the match downstream
-had a default arm.
+- 44 `#[non_exhaustive]` attributes are gone, and with them 45 wildcard arms
+  the compiler had already proved unreachable.
+- Four clippy lints join the deny list, and the 37 discarded `Result`s and the
+  boolean parameters they turned up are gone with them.
+- The approval, governance and signal payloads are serde structs read and
+  written through `Payload::of` and `Payload::read`, and a verdict this build
+  cannot read is a read failure instead of a default.
 
-- Four clippy lints join the deny list, and the 37 discarded `Result`s and
-  the boolean parameters they turned up are gone with them.
-- One exception, stated once with its reason: a gate in `xtask` reads syn's
-  tree and serde_json's value, and neither can be made exhaustive from here.
-- The first three ledger payloads have serde structs instead of hand-written
-  maps, each proved byte-for-byte against the map it replaces on real
-  fixtures. `Payload::of` and `Payload::read` are the only two doors.
+### Where a city keeps things, and a document reaches disk whole
 
-### One home for where a city keeps things, and a document reaches disk whole
-
-Every directory and file name a city keeps is read off `kernel::layout`, and
-the constants that sat beside it in `city` are deleted. A document is now
-written through one door that renames it into place, one writer at a time,
-under a typed shelf key, so a machine that loses power mid-write leaves the
-old file rather than half of the new one.
-
-- `config_layers::Ladder` makes the configuration layers a value. Adding the
-  person's layer is one arm the compiler checks in one place, where it used
-  to be three hand-written reads.
-- A directory this city cannot read says so instead of reading as empty.
+- The directories and the files every layer shares — `ledger`, `cas`,
+  `library`, `CONFIG.toml`, `FILTERS.toml`, `JOB.md`, `Handoff.md`,
+  `URBANITE.md` among them — are read off `kernel::layout`. The document
+  names only the city reads, such as `RULES.toml`, `Memo.md` and
+  `SCHEDULE.toml`, stay in `city`.
+- A document is written through one door that renames it into place, one
+  writer at a time, so a power loss mid-write leaves the old file.
+- `config_layers::Ladder` makes the configuration layers a value, and a
+  directory the city cannot read says so instead of reading as empty.
+- The on-disk `views/`, `memory::projection` and the `redb` dependency are
+  gone: a city's views live in the process and rebuild from the Ledger.
 
 ### How an endpoint is connected is decided once, at attach
 
-`ConnectionKind` is resolved after the pasted URL has been normalised, is
-written into `endpoint_attached`, and is read back by `Query::Config`. No
-call path re-derives it, and the responses shape a person pasted is no
-longer dropped by a dialect enum that had only two variants.
+- `ConnectionKind` is resolved after the pasted URL is normalised, written
+  into `endpoint_attached`, and read back by `Query::Config`; the responses
+  format a person pasted is no longer dropped.
+- One output ceiling ladder answers for every model: the person, the
+  provider's model list, a preset row citing its source, then the city's
+  default, and the decision says which rung answered.
+- A provider failure that completed no exchange is asked again, where the
+  default retry setting used to mean no retry at all.
+- A device-code login finishes a subscription sign-in, and xAI and Kimi
+  attach through the same command steps as the other two families.
+- Provider intelligence is followed from four vendors' own harnesses; which
+  repository, path and commit was read stays in
+  [`docs/third-party.md`](docs/third-party.md) section 1.
 
-- One output ceiling ladder answers for every model: the person, then the
-  provider's own model list, then a preset row citing the page it was read
-  from, then the city's policy default. The decision carries which rung
-  answered, so a truncated run is read off the account.
-- Two dispatches of one configuration build the same system prefix, byte for
-  byte, and that is an assertion rather than a hope.
-- Provider intelligence is followed from four vendors' own harnesses, one
-  per family this city signs in to directly; `earendil-works/pi` is retired
-  as a source, because Anthropic's subscription login is implemented here.
-  Which repository, which path, and which commit was read stays in one place
-  that a daily workflow parses: [`docs/third-party.md`](docs/third-party.md)
-  section 1.
-
-### Six defects a person would have met on the default path
+### Defects a person would have met on the default path
 
 - A thinking block's signature survives the Anthropic stream, so the next
-  turn is not refused by the provider.
-- A tool call cut in half is refused instead of sent as a call with no
-  arguments.
-- An MCP server can no longer hand this city a message larger than 8 MiB
-  into the memory of the process that is also its only writer.
+  turn is not refused.
+- A tool call cut in half is refused instead of sent with no arguments.
+- An MCP server can no longer hand the city a message larger than 8 MiB.
 - The built-in price table reports its own failure, and an OAuth callback is
   split with its `state` checked.
-- The file count a bundle export used to certify from its own destination is
-  compared field by field against the source, so half a city going missing
-  is noticed.
-- A question the city never answers says so after fifteen seconds instead of
-  leaving a skeleton on the screen, and the run table forgets runs the city
-  has stopped listing.
+- A bundle export compares its file count field by field against the source.
+- A question the city never answers says so after fifteen seconds, and the
+  run table forgets runs the city stopped listing.
+- `/transcribe` and `/enroll` ask for the pairing token: an exposed city used
+  to let anyone who reached the port write into a vault route and spend money
+  transcribing.
 
 ### The screens
 
-- A conversation has a second column: the artefact the last tool produced, a
-  file with line numbers or what a command printed. Tool calls fold to one
-  sentence counted from the turn report, with no new event to carry it.
-- No UI library, and now each part states the WAI-ARIA pattern it
-  implements, its key table, and where focus returns; twelve places where
-  the implementation does not match yet are named with their line numbers.
-- Navigation is Ctrl/Cmd and a digit. The g-prefix chord, its timer and the
-  rail hint that explained it are gone, and the registry screen has a route
-  at last — it had none.
+- A conversation has a second column: the artefact the last tool produced.
+  Tool calls fold to one sentence.
+- Each part states the WAI-ARIA pattern it implements, its key table, and
+  where focus returns.
+- Navigation is Ctrl/Cmd and a digit, and the registry screen has a route.
 - Six numbers the city already counted reach the city page, four empty
-  screens say what to do next, a field says it is wrong while it is being
-  typed, and an endpoint says when it is on this computer.
+  screens say what to do next, a field says it is wrong while it is typed,
+  and an endpoint says when it is local.
 - 26 `outline-none` are gone, so the focus ring is visible again; 33 `title`
-  attributes become a hint both a keyboard and a touch screen reach.
-- A thread stays where the reader is: streaming appends no longer steal the
-  reading position, and the view follows only when the reader is at the foot.
+  attributes become a hint a keyboard and a touch screen both reach.
 
 ### A door decides, and a question is a person's
 
-A Gate used to have a third answer — hand this decision to a person —
-and the documentation described the approval queue as where those
-landed. A door that cannot decide is a door whose rule nobody wrote, so
-the verdict is now `Allow` or `Deny` and the queue holds what only a
-person can answer: a design question a resident asked. `Autonomy` says
-who answers those, and it has two values rather than three.
+A Gate answers `Allow` or `Deny`, and one door, `attach`, answers `Ask`: what
+it would grant is the reading right over every login the person's own browser
+holds, so no rule of the city can answer it. The approval queue holds what
+only a person can answer — that question, and a design question a resident
+asked. `Autonomy` has two values, `Owner` and `Delegate`.
 
-- The glossary, the operating guide, the getting-started pages in both
-  languages and `LLM.md` say the same thing about it, which is that an
-  action is never asked about. Where a policy used to mark an item as
-  the person's, what stays for the person is a tainted question, which
-  no policy waives.
+### What another harness on the same computer already knows
 
-### What another harness on this machine already knows
-
-A person who reaches this product has usually told another agent
-harness where their models are, and typing the same base URL a second
-time is the first thing this product asked of them.
-
-- Codex's `[model_providers.*]` and pi's `providers` are read once into
-  rows this city can attach: the name, the address, the wire, and the
-  models the entry lists. Both grammars were settled against their own
-  authority — Codex's by giving its binary a file with each key set to
-  the wrong type and reading which key it named, pi's from the model
-  documentation that ships beside that program.
-- **One direction, and no credential.** Nothing is written back and
-  nothing is watched, so two tools never become two authorities on one
-  setting; and a row says where the other harness keeps its key — an
-  environment variable, a command, or its own file — and never what the
-  key is.
-- An entry this city cannot attach is reported by name with the reason,
-  because a person who configured six providers and is offered four has
-  to be told which two were left out. A wire this city has no dialect
-  for is one of those reasons, and Codex's only supported wire is one:
-  the entry arrives with its address and its variable filled in, and
-  the dialect left for the person.
+- Codex's `[model_providers.*]` and pi's `providers` are read once into rows
+  the city can attach: name, address, wire and the models listed.
+- One direction, and no credential: nothing is written back, and a row says
+  where the other harness keeps its key, never what the key is.
+- An entry the city cannot attach is reported by name with the reason.
 
 ### The adversary asks what a saved setting reads back as
 
-A setting is saved into a file a person also edits by hand and read
-back by a fold the page draws from, which is two homes for one fact.
-The out-of-tree property checker now drives arbitrary sequences of
-`configure_building` through the wire and holds three relations after
-each one: the answer states the last figure written, the building's own
-`CONFIG.toml` states that figure and no earlier one, and the layer
-above states none of them. It was demonstrated to bite — held against
-the first write instead of the last, it shrinks to a two-step
-counterexample. 21 checks, and a run of the new one takes 26 s on a
-four-core Windows machine with a debug binary.
+The out-of-tree property checker drives arbitrary sequences of
+`configure_building` and holds three relations after each: the answer states
+the last figure written, the building's `CONFIG.toml` states that figure, and
+the layer above states none of them. 21 checks; a run of the new one takes
+26 s on a four-core Windows machine with a debug binary.
 
 ### The adversary asks what a person settled, and says which seed it used
 
-The property above is about a file the city owns. What a person settles
-about their own reading of the city lives one rung further out, in
-`~/.sprawling/config.toml`, and the same question has to be answered
-there: after any sequence of `PutPreferences`, the file on disk, the
-answer `Query::Preferences` gives, and the city's own configuration
-have to agree about what was written and about whose it is. The checker
-drives that sequence and holds four relations after it, the fourth
-being that the city states none of it — a preference travels with the
-machine, so a city copied to another machine must arrive without one.
-The served city is pointed at a throwaway home directory, so running
-the suite cannot touch the preferences of whoever started it.
-
-A seed that does not parse used to become the default one. The report
-then named a seed the run had not used, and the reproduction line it
-printed reproduced a different trace. `SPRAWLING_SEED` is now read into
-three states — stated, unstated, unreadable — and an unreadable one ends
-the process with a third exit code before a city is raised, because a
-misspelled seed is not evidence about the product. Every run prints the
-seed it actually used.
+After any sequence of `PutPreferences`, the file on disk, the answer
+`Query::Preferences` gives and the city's own configuration agree, and the
+city states none of it. The served city points at a throwaway home
+directory. `SPRAWLING_SEED` is read as stated, unstated or unreadable, and an
+unreadable one ends the run with its own exit code; every run prints the seed
+it used.
 
 ### What the machines check
 
-- Every number `ARCHITECTURE.md` and `LLM.md` quote is recounted by
-  `cargo xtask docnum` from the code that decides it.
-- A budget may be counted in something other than bytes. The register's
-  gated rows carry a unit, the three keys a row states its budget, its
-  best reading and its slack under are derived from that unit, and
-  `dependency_count` is the first row of the second kind: how many
-  packages `Cargo.lock` resolves, ratcheted, and answerable in a
-  checkout nobody has compiled. That count had four homes at four
-  different values; it is taken once now, and the documents that quote
-  it and the gate that prices it read the same reading.
-- `specalign` reconciles every kernel enum variant by variant, which caught
-  `SecretCharset::Base36Lower` against the `UpperBase36` the kernel compiles.
-- Five harnesses that were written and never proved are retired to the tests
-  that already hold them, each with its reason; one solvable harness takes
-  their place, leaving three harnesses, three proofs and no markers.
-- Three fuzz targets cover the three surfaces a stranger reaches: an inbound
-  wire frame, a configuration file, an MCP answer.
+- `cargo xtask docnum` recounts every number `ARCHITECTURE.md` and `LLM.md`
+  quote.
+- A budget row carries a unit; `dependency_count`, how many packages
+  `Cargo.lock` resolves, is the first row not counted in bytes.
+- `specalign` reconciles every kernel enum variant by variant.
+- Three kani harnesses, three proofs.
+- Six fuzz targets, three of them on the surfaces a stranger reaches: an
+  inbound wire frame, a configuration file, an MCP answer.
 - `just check-desktop` compiles, lints, tests and licence-checks the desktop
-  connector, and a gate reconciles its lint table with the root.
-- `just prereqs` is the one list of what this machine needs, and `AGENTS.md`,
-  `CONTRIBUTING` and `flake.nix` point at it. Two builds of one tree are
-  compared nightly.
+  connector.
+- `just prereqs` is the one list of what a development machine needs. Two
+  builds of one tree are compared nightly.
+- The release binary is built at `opt-level = "z"`: 6,927,360 B against
+  11,150,336 B at level 3.
 
-### The repository ships skills of its own
+### Carried, and not selected yet
 
-`skills/` carries six - `sdd`, `tutor`, `translation`, `why`, `how` and
-`blast-radius` - and the directory is a skill shelf in the layout every harness
-on this machine files a skill as, so a city mounts it read-only through
-`[skills] shelves` and a person loads it in pi or claude unchanged. The release
-archive carries the directory as itself (`cargo xtask package`), so a person who
-unpacks a release finds the skills where the harnesses look. Until now the
-skill surfaces had nothing real to load: the library scan, the catalog and the
-Reading Room were exercised against generated stubs, and a person testing them
-by hand had no skill to pick up.
-
-**They are the first files in this tree the MPL notice does not govern.** The
-first three are English translations and adaptations of the author's own
-Chinese-language open-source skills - CC BY-NC 4.0 here, licensed that way only
-within this project while the originals remain AGPL-3.0-or-later. The last
-three are the author's modified adaptations of pstack's skills and keep their
-MIT licence, each naming the one who modified it. `skills/LICENSES.md` travels
-with them; `docs/third-party.md` §5 records the terms, `README.md` the
-acknowledgment.
-
-### A resident writes the spine documents it lives in
-
-A building keeps its long work in `Roadmap.md` and the job a run starts
-from in the rest of its spine. Until tonight the only hand that could
-write them was the one at the file system: `plan` reaches `Roadmap.md`
-and `edit` the others from inside the city, so a write could land on top
-of a file that had just moved.
-
-- `PutSpine` carries the text the sender started from. The write is a
-  read-modify-write through `city::document`, and a stale `base` is
-  refused rather than overwritten - the sender writes once more against
-  what is there now.
-- The write lands as `SpineDocumentWritten` before it becomes anything
-  else, recording without re-running. The plan table hears it as stale:
-  a person's write to `Roadmap.md` moves the plan like any other, so the
-  table is re-read rather than trusted.
-
-### A plan is measured in two figures
-
-Either completion figure alone misleads (kernel::completion): the count
-of leaves says how many pieces the plan turned out to have, and the
-weighted share says how much of the whole those pieces stand for.
-
-- `client/src/core/share.ts` counts shares of a whole in integer
-  billionths - the one place a share is counted, so no float reaches a
-  plan.
-- The plan view draws both figures, and the skyline reads done and
-  blocked as fractions of the same whole.
-
-### The client stands on Svelte
-
-The browser page moved from Solid to Svelte 5. What the architecture
-promises does not move with it: the client is still replaceable,
-written against the WebSocket protocol in `crates/channels`, and its
-runtime dependencies are still exactly two - `svelte` and `effect` -
-with the one job Effect has, decoding the wire, unchanged.
-
-- The Solid-era `tseslint.config` bridge, kept for
-  `eslint-plugin-solid`'s type gap, left with the plugin it served;
-  `eslint-plugin-svelte` types cleanly through `defineConfig()`.
-- `cargo xtask npm` holds the two runtime dependencies in both
-  directions, so a deleted `svelte` fails the gate as loudly as an
-  added UI kit.
-- The move left its name behind in two values: the manifest and the
-  gate said `svelte` while `AGENTS.md`, `ARCHITECTURE.md`, `README.md`
-  and `README.zh-CN.md` still said Solid. Every one of them reads from
-  the one authority now.
-
-
-### A tool call is routed before it is made, and parsed once
-
-The dispatch path between the wire and a tool did a linear scan of the
-registry and parsed the same argument bytes as often as three times. A
-call now finds its handler through a table built at compile time, and the
-argument envelope is borrowed rather than re-decoded, so the bytes a tool
-is handed are the bytes that arrived.
-
-- `crates/kernel/src/tool` holds the one routing table; the oracle is the
-  scan it replaces, and a property test holds the two to the same answer
-  for every name.
-- The microbenchmark reports p50, p95 and p99 per dispatch and fails the
-  build above a threshold, so the number is a reading rather than a
-  claim. fx's published "10µs" is not carried as a promise: it is a
-  figure from outside that repository, and this one states which segment
-  it measured.
-
-### The prompt cache shape is a fact on the ledger
-
-A request's prefix, tool table and window can move between two calls of
-one run, and which of them moved decides whether a provider's cache hits.
-Each assembled request now writes `prompt_shape_compared` with the four
-prefix segment hashes, the tool table's hash and the run's, and names the
-region that changed since the request before it.
-
-- The breakpoint sits at the last user or assistant anchor rather than at
-  the tail: a tool result past the breakpoint is exactly the ~50% hit
-  rate eve's own harness recorded.
-- `Query::Config` answers the second context-reminder rung beside the
-  layer that stated it, and the settings page writes it through
-  `ConfigureBuilding` — one field on a frame that already asks what a
-  building's runs are governed by, rather than a second frame for one
-  question.
-- The ledger's bytes change because the city writes a new line, so the P0
-  golden and the a9 expectations move with it; the regenerated fixture
-  was compared kind by kind against the committed one, and differs by
-  three `prompt_shape_compared` lines and nothing else.
-
-### A skill install is judged before it lands
-
-A skill package or a resident's own skill reached the shelf by being
-copied there. It now passes a static precheck first — nothing is
-executed, symbolic links are refused, name conflicts are refused, and a
-directory that changes between the check and the swap refuses the whole
-install — and lands through a staging directory that is exchanged in one
-step.
-
-- The content hash goes into the CAS and the provenance is recorded, so a
-  shelved document's origin is checkable afterwards and reinstalling the
-  same bytes is idempotent.
-- `city::install_skill` is one entry point taking the store it registers
-  with, which is how the same code serves the CLI and a resident.
-
-### The wire stops promising verbs it cannot carry
-
-`Command::Takeover` and `Command::Rollback` were parseable and had no
-executor: the assembler answered `not_built` to both, so a client could
-draw a button that never worked. Both frames are gone, `WIRE_V` moves
-35 → 36, and the two event words with no producer (`rollback_applied`,
-`takeover_started`) leave in the same change.
-
-- **Rollback is a branch and a git restore**, recorded as the ruling it
-  is: a run does not rewrite the rules that judge it, and the file is
-  where a rule's diff, history and revert already live.
-- `RulesChanged` closes the other half: a hand edit to `RULES.toml` or
-  `CONFIG.toml` reaches the ledger before it takes effect, its payload
-  carries the before and after digests rather than the text, and a file
-  that moved underneath is refused with `E_VERSION_CONFLICT` instead of
-  overwritten.
-- One SPEC said the governance door existed and another said it had been
-  deleted while the code stood with the second; the city's document now
-  agrees with the code, in the change that touched both.
-
-### A plan's compression waits for the turn, and says who produced it
-
-Two things were true of compaction at once: it could replace a snapshot
-while a tool wave was still landing, and a digest it produced named
-neither the model nor the generation that produced it.
-
-- Compression happens only at the recording boundary, after the whole
-  wave has landed, and the decision lives in `compaction::plan` rather
-  than beside the turn.
-- Every summary carries its producing model and generation in the ledger
-  event; a summary whose producer is absent reads back as **unknown**, an
-  answer distinct from a generation spelled `0`.
-- The model-call recovery path returns `recovered | failed | skipped` per
-  segment, and `skipped` carries the stable code of the failure before it
-  rather than swallowing it.
-
-### The city can weigh itself, and its kernel has a byte-level home
-
-Three pieces arrived together, because each is what the others are
-measured against: the measurement surfaces, the starting numbers, and a
-place for byte-level work that is not unsafe Rust.
-
-- `zig/` builds a static library whose FFI face is one thin crate
-  (`crates/mem`) — the second and last place in this tree where
-  `unsafe_code` is `deny` rather than `forbid`, and each `unsafe` block
-  states the precondition that makes it sound. The Zig caches and install
-  tree are built under cargo's output directory, so a build never writes
-  a machine's absolute paths into the source tree.
-- Four load scenarios (runs in parallel, a large ledger fold, a large
-  worktree placement, a long streamed session) report RAM as an average
-  and a peak, and latency at p50/p95/p99 with the persistence commit as a
-  separate figure — a flush on an ordinary disk has a physical floor that
-  must not stand in for the harness's own cost.
-- The first onboarding actions are measured rather than optimised:
-  install, start-up, a new workspace and a new session each report
-  whether they can reach the second tier, what they actually measure and
-  which piece costs the most. Optimising them is future work, and the
-  durability red lines — signature verification and `fsync` — are not
-  part of it.
-
-### A deletion inside the grace window, and a download that is verified
-
-- Deleting a skill or an MCP server asks for confirmation only where the
-  deletion cannot be taken back; where the bytes are still in the store
-  and reinstalling them is idempotent, the action happens and an undo
-  window stands beside it.
-- A release artifact is verified before it is installed: the signature
-  format, the public key's home and the archive-bomb limits are written
-  down, `install.sh`, `install.ps1` and the npm shim check bytes against
-  the signature, and an unsigned artifact is refused by name rather than
-  accepted quietly. The signing key's custody is a separate decision and
-  is not answered here.
+- A third vault backend, one encrypted file opened by a passphrase
+  (ChaCha20-Poly1305 per entry, the key derived by Argon2id). No probe
+  selects it.
 
 ---
 
