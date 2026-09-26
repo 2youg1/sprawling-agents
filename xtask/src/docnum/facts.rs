@@ -351,6 +351,25 @@ mod tests {
     }
 
     #[test]
+    fn the_workspace_version_is_read_from_the_root_manifest() {
+        let fixture = std::env::temp_dir().join(format!("docnum-version-{}", std::process::id()));
+        std::fs::create_dir_all(&fixture).unwrap();
+        std::fs::write(
+            fixture.join("Cargo.toml"),
+            "[workspace]
+members = []
+
+[workspace.package]
+version = \"9.8.7\"
+",
+        )
+        .unwrap();
+        let read = value(&fixture, "workspace_version");
+        std::fs::remove_dir_all(&fixture).unwrap();
+        assert_eq!(read.unwrap(), Some("9.8.7".into()));
+    }
+
+    #[test]
     fn the_package_roster_comes_from_the_root_manifest() {
         let found = packages(&root()).unwrap();
         assert!(found.contains("crates/kernel"));

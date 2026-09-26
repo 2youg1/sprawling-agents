@@ -556,7 +556,7 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 
 **判据三条**：① 区段的文字等于它的事实今天的读数，不等即红，恢复语是 `cargo xtask docnum --write`；② 区段命名的事实必须在 `FACTS` 数组里，否则红，拒词列出全部已知键；③ 标记不闭合、区段套区段、或多出一个收尾标记，即红——一段读不出来的标记不得被当作没有标记。**`--write` 撞上未知事实时整份文件不写**：跳过它会让文档看起来刚重生过，而其中一个数字仍是旧的。
 
-**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`channels::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `channels::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `channels` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
+**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`channels::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `channels::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `channels` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
 
 **带参数的四族，键写成 `<事实>:<参数>`**：`dep_version:<crate>`（读工作区与各成员清单钉的版本；同一个 crate 在两处钉成两个版本时，这个读数本身就是拒绝）、`budget_bytes:<行>` 与 `budget_reading:<行>`（`xtask/budgets.toml` 那一行的预算与读数，按文档的写法分三位一组）、`budget_headroom:<行>`（两者之比，四舍五入到一位小数）、`budget_figure:<行>.<字段>`（那一行任一整数字段，分三位一组、不带单位，单位由字段名给出；缺 `.字段` 即拒绝）。同一个读数只住在 `budgets.toml` 的一行里，文档里每处引用它的地方都是这一族的标记，不是第二份手写的数。一个生成器服务一族事实，于是加一个被引用的版本号或预算行不需要加一行代码。
 
