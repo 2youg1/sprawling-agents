@@ -72,7 +72,7 @@ pub(super) struct Assignment {
 /// without its first.
 pub(super) struct Handover {
     pub(super) predecessor: RunId,
-    pub(super) before: eval::Answers,
+    pub(super) before: super::probing::probe::Answers,
 }
 
 impl Assignment {

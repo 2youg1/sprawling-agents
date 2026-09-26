@@ -10,10 +10,11 @@ kernel = { path = "../crates/kernel", features = ["conformance"] }
 memory = { path = "../crates/memory" }
 runtime = { path = "../crates/runtime" }
 gateway = { path = "../crates/gateway" }
-eval = { path = "../crates/eval" }
 channels = { path = "../crates/channels" }
 sprawling = { path = "../crates/sprawling" }
 serde_json.workspace = true
+# The nesting instrument reads the TOML shape it grades (citysim-SPEC.md 8-8).
+toml.workspace = true
 # The install action prices the release archive's digest and its unpack
 # (citysim-SPEC.md 8-5): sha2 is the digest the release publishes, zip
 # is the archive format `cargo xtask package` writes.

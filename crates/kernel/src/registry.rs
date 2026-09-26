@@ -124,7 +124,7 @@ impl Registry {
         }
     }
 
-    /// Promotion registers standing only; scoring is eval's (P3). An
+    /// Promotion registers standing only; scoring is an instrument's (citysim). An
     /// unregistered locator cannot be an asset — assets are promoted
     /// artifacts, not free-floating paths.
     pub fn promote_asset(&mut self, locator: &Locator) -> Result<RegisterVerdict, AxError> {
