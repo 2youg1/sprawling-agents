@@ -579,6 +579,24 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 
 **未决（§3 口径）**：副本是「一条命令一份」的直译，代价与工作树成正比；一棵带构建缓存的工作树会在每条命令上付一次复制。界内的取舍已定（越界拒而不是部分复制），但「一条命令一份」与「一个工具一份＋每命令同步」哪个对真正的工作树更合适，需要一次实测（一棵真实 room 的复制耗时与其命令数）才能定。
 
+### 8-13-3 runtime::tools::exec::yielding（派出的命令降一级；形状 4 adapter）
+
+agent 派出去的构建、测试与 sprawling 的记账、视图、socket 服务抢同一批核；控制面必须赢，所以 exec 派出的每一条宿主命令都以低于核心的优先级起动，而不是继承核心的优先级。本模块只做「把一条 `Command` 改成降一级起动」这一件事，不决定哪条命令要降——凡经 `through_the_backlog` 的命令一律降，那是全部宿主子进程的唯一产地（§8-14），故降级只有这一处权威。
+
+```rust
+pub(super) fn one_level_down(Command) -> Command;
+```
+
+- **Windows**：`BELOW_NORMAL_PRIORITY_CLASS`（`0x0000_4000`，`WinBase.h`），经标准库的安全接口 `std::os::windows::process::CommandExt::creation_flags` 在创建时给出，不需要管理员，也不需要 `unsafe`。是绝对档位而非相对档位：核心在正常档时，子进程低一档。
+- **Unix**：包一层 `nice -n 10 <program> <args>`，工作目录与环境变量逐项搬到外层命令上。`nice` 是 POSIX 规定的工具；增量是相对的，所以子进程总比核心低 10 个 nice 单位，不需要 `CAP_SYS_NICE`（降优先级从不需要特权）。
+- **次序**：降级在清环境与放置之前做，于是 `env_clear` 与环境白名单落在最外层命令上，沙箱的包装（`LinuxNamespaces` 的 wrapper）再包住降过级的命令；优先级沿进程树继承，所以 wrapper 下的真命令同样低一档。
+- 失败：本模块不造码。Unix 上找不到 `nice` 时，spawn 在 backlog 里以 `E_TOOL_UNAVAILABLE` 报出，与找不到程序同一条路。
+- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_dispatched_command_runs_below_the_core`——同一条读自身优先级的命令，直接起动一次、经 exec 起动一次，断言后者的档位严格低于前者。
+
+**决定（M78，平台调用的取法）**：子进程的 CPU 优先级取第一档「安全 Rust」——`creation_flags` 与 `nice` 都是对外只给安全接口的现成路，不需要 Zig 叶子，也不需要 Lean 证明边界。**被否**：①起动后再对子进程调 `SetPriorityClass`／`setpriority`——要 FFI（`unsafe` 或 Zig 叶子），且子进程在改档之前已经以正常档跑了一段；②Unix 上用 `CommandExt::pre_exec` 调 `nice(2)`——`pre_exec` 本身是 `unsafe`。**重开参数**：Unix 主机上出现不带 `nice` 的受支持平台，或测得多包一层 `nice` 的起动开销占到一条命令墙钟时间的可见比例。
+
+**未决（§3 口径）**：本节只落了 S5.9L 的第一段。剩下的各段各有自己的平台调用：核心自己升到 `HIGH_PRIORITY_CLASS` 与空转安全阀（对自身进程改档，标准库没有安全接口）、后台线程的后台模式与子进程 IO 优先级（`PROCESS_MODE_BACKGROUND_BEGIN` 只能由进程自己设，`ionice` 在 Unix）、带内存上限的 Job Object（即 §8-13-2 的 `WindowsJobObject` 臂）、重命令共用的额度池与按可用内存排队的 run 数、doctor 说出每个平台实际得到的档位、以及「后台负载占满所有核时 relay 往返与事件到屏幕的 p50 与空闲之比 ≤ 1.2」的实测与 budgets 行。这些要么需要 Zig 叶子或 Lean 边界，要么需要在满载机器上实测；落地时各写进本节。
+
 ### 8-14 runtime::tools 四件（形状 4；tools.rs 为纯索引）
 
 ```rust
