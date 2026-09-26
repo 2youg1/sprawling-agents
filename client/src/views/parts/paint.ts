@@ -19,7 +19,7 @@ interface Grammar {
   parse(text: string): Tree;
 }
 
-// The grammars this build carries. The tsx and jsx dialects share the
+// The grammars this build carries. The tsx and jsx variants share the
 // JavaScript grammar with TypeScript and differ in the flags it takes.
 type Family =
   | "cpp" | "css" | "go" | "java" | "javascript" | "json" | "jsx"
@@ -77,7 +77,7 @@ const INK = new Map<string, Ink>([
   ["word", "word"],
 ]);
 
-// A grammar is built once per page: the TypeScript dialect is a new
+// A grammar is built once per page: the TypeScript variant is a new
 // parser each time it is configured, and a screen repaints often.
 const loaded = new Map<Family, Promise<Grammar>>();
 
