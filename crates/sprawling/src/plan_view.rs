@@ -178,26 +178,22 @@ impl PlanView {
 /// held, read off the disk once it is released, and put back only when
 /// no record moved that plan in between (sprawling-SPEC.md 8-92).
 ///
-/// A poisoned cache is not consulted again: the fold stopped moving it
-/// when it was poisoned, so every plan is read off the disk, and a red
-/// node's sentence falls back to the status word the table carries.
+/// A poisoned cache is taken back by [`PlanView::take_back`], so a panic
+/// under the lock costs the parsed plans and never a stop cause.
 pub(crate) fn plans_of(
     shared: &Mutex<PlanView>,
     city_root: &Path,
     addrs: BTreeSet<Address>,
 ) -> BTreeMap<Address, PlanReading> {
-    let asks: Vec<(Address, PlanAsk)> = match shared.lock() {
-        Ok(view) => addrs
+    let asks: Vec<(Address, PlanAsk)> = {
+        let view = PlanView::take_back(shared);
+        addrs
             .into_iter()
             .map(|addr| {
                 let ask = view.ask(&addr);
                 (addr, ask)
             })
-            .collect(),
-        Err(_) => addrs
-            .into_iter()
-            .map(|addr| (addr, PlanAsk::uncached()))
-            .collect(),
+            .collect()
     };
     let mut fresh = Vec::new();
     let readings = asks
@@ -208,13 +204,32 @@ pub(crate) fn plans_of(
             (addr, reading)
         })
         .collect();
-    // Poisoned: the cache is abandoned, so there is nothing to fill.
-    if let Ok(mut view) = shared.lock() {
-        for read in fresh {
-            view.remember(read);
-        }
+    let mut view = PlanView::take_back(shared);
+    for read in fresh {
+        view.remember(read);
     }
     readings
+}
+
+impl PlanView {
+    /// Locks the cache, taking it back when a panic poisoned it.
+    ///
+    /// The panic may have torn a parsed plan or a generation, so those
+    /// are dropped and every plan is read off the disk again, and a
+    /// read already in flight is refused at its write-back. The stop
+    /// causes are kept: they are written whole by one map insert, and
+    /// without them a red node's sentence would fall back to the
+    /// status word with nobody told why.
+    pub(crate) fn take_back(shared: &Mutex<Self>) -> std::sync::MutexGuard<'_, Self> {
+        shared.lock().unwrap_or_else(|poisoned| {
+            let mut view = poisoned.into_inner();
+            view.read.clear();
+            view.moved.clear();
+            view.moved_all = view.moved_all.wrapping_add(1);
+            shared.clear_poison();
+            view
+        })
+    }
 }
 
 /// One building's plan as `PlanView::ask` left it for after the lock.
@@ -230,14 +245,6 @@ enum PlanAsk {
 }
 
 impl PlanAsk {
-    /// A plan read with no cache behind it.
-    fn uncached() -> Self {
-        Self::Unread {
-            causes: BTreeMap::new(),
-            asked_at: Generation::default(),
-        }
-    }
-
     /// The plan, reading the file when the cache did not hold it, and
     /// what was read, for [`PlanView::remember`] to put back.
     fn read(self, city_root: &Path, addr: &Address) -> (PlanReading, Option<FreshPlan>) {

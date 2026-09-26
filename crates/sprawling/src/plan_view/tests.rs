@@ -259,3 +259,33 @@ fn a_plan_read_before_a_record_moved_it_is_not_put_back() {
         "the stale read was put back"
     );
 }
+
+/// A panic under the plan lock loses no stop cause: the next holder
+/// takes the cache back, drops the readings the panic may have torn,
+/// and the red node still carries the sentence its record gave.
+#[test]
+fn a_poisoned_plan_cache_is_taken_back_with_its_causes() {
+    let dir = city(PLAN);
+    let shared = std::sync::Arc::new(Mutex::new(PlanView::default()));
+    shared.lock().unwrap().apply(&record(
+        EventKind::RoadmapBlocked,
+        serde_json::json!({
+            "node": "1", "by": "mason@lab.1",
+            "why": {"blocked": {"note": "the quarry is shut"}}
+        }),
+    ));
+    let held = std::sync::Arc::clone(&shared);
+    let _ = std::thread::spawn(move || {
+        let _guard = held.lock().unwrap();
+        panic!("a reader panics while it holds the plans");
+    })
+    .join();
+    assert!(shared.is_poisoned());
+
+    let read = plans_of(&shared, dir.path(), BTreeSet::from([addr()]));
+    assert_eq!(
+        read[&addr()].blocked[0].line,
+        "branch 1 is stuck at 1: the quarry is shut"
+    );
+    assert!(!shared.is_poisoned(), "the cache is taken back");
+}
