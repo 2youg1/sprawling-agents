@@ -3081,6 +3081,7 @@ pub(crate) fn asked(args: &[String], no_color: Option<OsString>) -> Asked;   // 
 - **必备／推荐两段**：必备 = Use 档里挡路的项（`Required` 与 `OneOf`），其余全是推荐（Use 档的可选项加整个 Develop 档）。`Part::of` 是这条划分的唯一权威，页面的两栏读的是同一批字段。
 - **颜色是一份终端可以拒绝的提议**：`NO_COLOR`（无论它设成什么）与 `--no-color` 任一即可，且 `paint` 自己不读环境——ink 是 `screen` 决定后传进来的值，于是测试不必动运行中的机器上的变量就能要到两种答案。
 - **先说话，再探测；探测并行**：标题行在第一项探测开始之前就写出并 flush，于是人面对的不是一块空屏；`examine` 为表里每一项各开一个作用域线程同时问，整份报告的等待是最慢那一项而不是所有项之和（逐项串行时首行要等 2.5 秒）。线程数就是表的行数，不按机器调：每项的成本是等一个子进程回答，不是占一个核。`Machine: Sync` 因此是 trait 的一部分。
+- **每一行在它能写的那一刻写出**：`examine_each` 把每项的答复按答到的次序交给调用者，屏幕按屏幕次序（先「required」各项、再「recommended」各项，各自保持表序）缓存行文，某一行连同它前面的所有行都答了，就立刻写出并 flush。于是第一行在屏幕次序里第一项答到时就出现，而不是等最慢那一项。不按答到的次序直接写，是因为行归在两个标题之下，按答到的次序写会让行落到错的标题下，并让同一台机器的两次报告排法不同；代价是一项慢的会压住它后面的行，而这份等待由 `running` 的 patience 封顶。
 - **总结与下一步**：两段各一行 `n / m ready`（一组算一件），末行是从这里往下的那一条命令——必备齐了是 `sprawling up`，不齐是 `sprawling doctor --install`。
 
 **本章测试**：`one_row_per_item_carries_one_of_four_status_words`、`no_color_is_honoured_from_the_environment_and_from_the_flag`、`a_version_is_the_number_out_of_whatever_the_tool_printed`、`the_report_is_grouped_into_required_and_recommended`、`a_family_of_browsers_counts_once_in_the_summary`。
