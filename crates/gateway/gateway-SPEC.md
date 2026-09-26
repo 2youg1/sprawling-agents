@@ -190,7 +190,7 @@ impl Endpoint { pub fn new(config: EndpointConfig, redemption: Redemption) -> Re
 
 - **本地模型也流式输出**：`call_streaming` 是 `Endpoint` 的门，回环端点因此请求里带 `stream: true`，delta 帧逐帧交给调用方。另设一个只实现 `call` 的本地适配器，等于让最朴素的那类端点（回环、无凭证、无覆盖）的回答在模型写完后才一次涌到页面上。
 - **机密楼的拒绝不因回环而放宽**：`Endpoint` 的两扇门对 `confidential` 一律拒绝（§8-2），回环端点走的也是这两扇门，所以没有哪条路能让机密楼绕过它。
-- **每个 endpoint 一个 HTTP 客户端**（`endpoint/transport.rs`，形状 4 适配器）：`EndpointBook` 为每个登记的 endpoint 持有一个 `Transport`——一个在第一次调用时才建、此后被每次调用克隆共用的 `reqwest::blocking::Client`。`Chosen` 带着它（`pub(crate) transport`），`adapter_for` 经 `Endpoint::over(transport, config, redemption)` 取客户端，于是同一 endpoint 上的每个 run、给工作起名的调用和顾问调用共用一个客户端。理由是本机线程与稳定性：每个 blocking 客户端各起一条 `reqwest-internal-sync-runtime` 线程和自己的连接池，按调用建客户端时，同时跑 N 个 run 就有 N 条这样的线程，每次调用还要重新握手。`EndpointAttached` 重新登记同名 endpoint 时换一个新的 `Transport`（tuning 里的超时与 `proxying` 可能变了），`EndpointLost` 连同它一起删除。`Endpoint::new` 仍为探针和测试建一个只属于自己的客户端，建法与 `Transport` 是同一个函数。
+- **每个 endpoint 一个 HTTP 客户端**（`endpoint/transport.rs`，形状 4 适配器）：`EndpointBook` 为每个登记的 endpoint 持有一个 `Transport`——一个在第一次调用时才建、此后被每次调用克隆共用的 `reqwest::blocking::Client`。`Chosen` 带着它（`pub(crate) transport`），`adapter_for` 经 `Endpoint::over(transport, config, redemption)` 取客户端，于是同一 endpoint 上的每个 run、给工作起名的调用和顾问调用共用一个客户端。理由是进程内的线程数与稳定性：每个 blocking 客户端各起一条 `reqwest-internal-sync-runtime` 线程和自己的连接池，按调用建客户端时，同时跑 N 个 run 就有 N 条这样的线程，每次调用还要重新握手。`EndpointAttached` 重新登记同名 endpoint 时换一个新的 `Transport`（tuning 里的超时与 `proxying` 可能变了），`EndpointLost` 连同它一起删除。`Endpoint::new` 仍为探针和测试建一个只属于自己的客户端，建法与 `Transport` 是同一个函数。
   - 否决的方案：在折叠 `EndpointAttached` 时立即建客户端。折叠会因传输原因失败，重放整座城时还会为每个 endpoint 各起一条线程，而这些 endpoint 可能一次都不被调用。
 - 否决的方案：保留一个包着 `Endpoint` 的本地类型只为在构造时断言回环。它唯一的读者是 `adapter_for` 里那道 `is_local()` 判断——同一个判定两处写，而它什么都不多拦：凭证、头覆盖、体覆盖本来就让回环端点走通用路径。
 
