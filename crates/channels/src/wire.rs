@@ -24,7 +24,7 @@
 //! the mapping point is the assembly layer, and an unknown value is an error
 //! there, never a guess.
 
-use kernel::{Address, AxError, B3Hash, EventRecord, RunId, Seq, TimeMs};
+use kernel::{Address, AxError, B3Hash, EventKind, EventRecord, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
 /// Wire format version. Bumped whenever the frame grammar changes shape in a
@@ -55,6 +55,10 @@ pub fn schema_hash() -> B3Hash {
         material.push(b'Q');
         material.extend_from_slice(name.as_bytes());
     }
+    for kind in EventKind::ALL {
+        material.push(b'E');
+        material.extend_from_slice(format!("{kind:?}").as_bytes());
+    }
     B3Hash::digest(&material)
 }
 
@@ -62,8 +66,8 @@ pub fn schema_hash() -> B3Hash {
 /// [`ClientFrame`] or [`ServerFrame`], under `$defs`, both roots included.
 ///
 /// This is what `cargo xtask wire-ts` generates the client from. It is
-/// not what the handshake compares: [`schema_hash`] reads the version and
-/// the two name tables and nothing else, so a doc comment edited here
+/// not what the handshake compares: [`schema_hash`] reads the version,
+/// the two frame name tables and the event kind names and nothing else, so a doc comment edited here
 /// moves this document and leaves every connected page connected. Pure:
 /// same build, same bytes.
 #[cfg(feature = "schema")]

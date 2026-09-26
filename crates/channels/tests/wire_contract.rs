@@ -116,7 +116,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "ec0edce8d6c76a2f93d3a8957bf92bb7fe9277d466d45dacbce9dd7c438cf510";
+const WIRE_SCHEMA_GOLDEN: &str = "f46eadb3e708ced74ccfab98b624e3083163ad2ec019fe8f21512b57b004e0b0";
 
 // -------------------------------------------------------------- binding face
 
