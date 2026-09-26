@@ -151,7 +151,11 @@ impl Entries {
         self.column
             .len()
             .saturating_mul(size_of::<u64>())
-            .saturating_add(self.outliers.len().saturating_mul(size_of::<(Seq, usize, u64)>()))
+            .saturating_add(
+                self.outliers
+                    .len()
+                    .saturating_mul(size_of::<(Seq, usize, u64)>()),
+            )
     }
 }
 
