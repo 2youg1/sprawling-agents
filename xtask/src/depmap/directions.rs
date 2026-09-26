@@ -232,6 +232,17 @@ mod tests {
     }
 
     #[test]
+    fn a_brace_inside_a_literal_does_not_extend_a_test_item() {
+        let source = "#[cfg(test)]\n\
+                      mod tests {\n\
+                          fn g() { let open = \"{\"; let close = '}'; let quoted: &'static str = \"\\\"{\"; }\n\
+                      }\n\
+                      fn h() { crate::assembly::now_ms(); }\n";
+        let forbidden = forbidden();
+        assert_eq!(named(source, &forbidden), vec![(5, "crate::assembly")]);
+    }
+
+    #[test]
     fn the_block_reads_modules_and_paths() {
         let text = "```directions\n# comment\ncrates/x/src/views: crate::assembly\n```\n";
         assert_eq!(

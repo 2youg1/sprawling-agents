@@ -836,7 +836,7 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **接口**：`depmap` 除了 crate 边与 `pub trait`，再读 ARCHITECTURE.md 的 ```` ```directions ```` 围栏块。每行 `模块路径: Rust 路径, Rust 路径`，模块路径是仓库相对、不带扩展名的路径（`crates/sprawling/src/views` 覆盖 `views.rs` 与 `views/` 下每个 `.rs`），右边是这个模块的产品代码永不写出的路径（`crate::assembly`）。违例报出文件与行号；块里点名的模块在树上不存在也是违例；块缺失或行无冒号是文档错误（`XtaskError::Doc`），不当作「没什么可判」。
 
-**读法**：按行读文本。注释行不算代码；测试不算产品代码：名为 `tests.rs` 或以 `_tests.rs` 结尾的文件（本仓把拆出去的测试模块命名为 `<主题>_tests.rs`，如 `views/standing_tests.rs`）、`tests` 目录下的文件、`#[cfg(test)]` 下的那个条目（以 `;` 结尾则一行，否则直到花括号闭合）都跳过，因为测试可以经装配点造夹具，而被测模块并不因此依赖装配点。路径按整段匹配，`crate::assembly_line` 不算 `crate::assembly`。`use crate::{assembly, …}` 这种分组写法读不出来；这是按行文本读法的代价，块里的路径按树上实际的写法登记。
+**读法**：按行读文本。注释行不算代码；测试不算产品代码：名为 `tests.rs` 或以 `_tests.rs` 结尾的文件（本仓把拆出去的测试模块命名为 `<主题>_tests.rs`，如 `views/standing_tests.rs`）、`tests` 目录下的文件、`#[cfg(test)]` 下的那个条目（以 `;` 结尾则一行，否则直到花括号闭合；数花括号之前先去掉本行的字符串与字符字面量，因为 `"{"` 里的花括号不开块，照数会让跳过延续到条目之后，把后面的产品代码悄悄漏判）都跳过，因为测试可以经装配点造夹具，而被测模块并不因此依赖装配点。路径按整段匹配，`crate::assembly_line` 不算 `crate::assembly`。读不出来的写法有四种：`use crate::{assembly, …}` 这种分组写法、`super::assembly` 与 `super::super::assembly` 这种相对路径、拆在几行上的路径、经另一模块 `pub(crate) use` 转出的装配点条目；跨行的字符串字面量里的花括号也照数。这是按行文本读法的代价，块里的路径按树上实际的写法登记；要堵上它们，改为用 `syn` 解析 `use` 树并把相对路径解析成 `crate::` 形式。
 
 **决定**：模块方向写在 ARCHITECTURE.md 与 crate 边同一节，由同一道门读。**败给的方案**：一个在 sprawling 里扫自己源码的测试——它判的是树的形状而不是行为，放在被判的 crate 里会让产品 crate 知道自己的源码路径；也败给新开一道门，因为方向就是依赖图的一部分，门名册不必为它多一行。**重议条件**：某个 crate 的模块要按图而不是按禁止表来判（例如要求整个 crate 无环），那时改为从 `use` 解析出模块图。
 
