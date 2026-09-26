@@ -203,6 +203,29 @@ mod tests {
     }
 
     #[test]
+    fn a_request_that_went_out_and_lost_its_answer_says_its_effect_is_unknown() {
+        let cut = std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "the body stopped");
+        let headers = reqwest::header::HeaderMap::new();
+        let refused = |code: u16| ProviderFailure::Refused {
+            url: "http://house/v1",
+            status: reqwest::StatusCode::from_u16(code).unwrap(),
+            headers: &headers,
+        };
+        let retry = |failure: &ProviderFailure<'_>| {
+            serde_json::to_value(provider_err("call provider", failure)).unwrap()["retry"].clone()
+        };
+        assert_eq!(
+            [
+                retry(&ProviderFailure::Cut(&cut)),
+                retry(&ProviderFailure::Silence { quiet_ms: 5 }),
+                retry(&refused(503)),
+                retry(&refused(400)),
+            ],
+            ["unknown", "unknown", "yes", "no"]
+        );
+    }
+
+    #[test]
     fn a_wait_the_provider_names_travels_with_the_failure() {
         let told = |code: u16, header: [&'static str; 2]| {
             let mut headers = reqwest::header::HeaderMap::new();
