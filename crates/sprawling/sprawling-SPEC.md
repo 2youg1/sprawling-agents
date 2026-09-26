@@ -3347,7 +3347,7 @@ pub(super) fn rule_name(task: &str) -> Result<SessionName, AxError>;
 
 **规则**：派到一栋楼（地址只有一段、旁边没有 session）上的活，房间名由 `rule_name` 从任务原文里取：按非 ASCII 字母数字字符切词，丢掉空词，取前四个，转小写，用 `-` 连起来；每个词最多留前 15 个字符（`RULE_WORD_MAX`），所以四个词加三个连字符最长 63 个字符，总在 `SessionName::parse` 的上限 64 之内，规则名永远是合法的 session 名。一个 ASCII 词也没有、或这些词拼出城自己保留的名字而被 `SessionName::parse` 拒绝时，名字是 `work`。重名由 `city::open_room` 加序号（`work`、`work-2`……），规则本身不查盘。
 
-**为什么**：模型的回答不受字符集约束，而 `SessionName::parse` 接受任何不含分隔符的文字：一个回了「收到。」的模型会让 run 落进人找不到的房间 `shop/收到。`。问模型要名字还挡在首字前面：派活要先等一次完整的非流式调用，再发出 run 的请求。规则名在记账线程上用几微秒算出，不读 book、不读 vault、不起线程，派活帧到达后发出的第一条 provider 请求就是 run 本身（`a_bare_building_is_named_by_rule_and_the_run_is_the_first_call`）。机密楼的任务原文也不会为了起名离开这台机器。
+**为什么**：模型的回答不受字符集约束，而 `SessionName::parse` 接受任何不含分隔符的文字：一个回了「收到。」的模型会让 run 落进人找不到的房间 `shop/收到。`。问模型要名字还挡在首字前面：派活要先等一次完整的非流式调用，再发出 run 的请求。规则名在记账线程上用几微秒算出，不读 book、不读 vault、不起线程，派活帧到达后发出的第一条 provider 请求就是 run 本身（`a_bare_building_is_named_by_rule_and_the_run_is_the_first_call`）。机密楼的任务原文也不会为了起名被发给任何模型。
 
 **决定**：完全不调用模型起名。**败给的方案**：保留模型起名，放到 run 开始之后，再校验长度与字符集、失败时回落到规则名。那样房间要么在 run 开始后改名（房间是 dispatch 在盘上写的第一件事，ARCHITECTURE §5 第 3 步，run 的文件已经在里面），要么多出一个只为改名存在的线程与在飞计数；一个人要一个好找的名字时，发到 `building/name` 就有。只含非 ASCII 文字的任务都叫 `work`、`work-2`，这是这条规则的代价；让它重新值得调用模型的参数是：一个名字能在 run 开始前、不增加首字延迟地取到。
 
