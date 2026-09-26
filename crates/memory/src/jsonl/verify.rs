@@ -100,13 +100,7 @@ impl LineCheck {
     /// Judge one line (without its `\n`) and, when it passes, advance the
     /// chain past it. A fault leaves the state where it was.
     pub fn advance(&mut self, raw: &[u8]) -> Result<CheckedLine, LineFault> {
-        let envelope: Envelope = serde_json::from_slice(raw)
-            .map_err(|e| LineFault::NotALine(format!("not a ledger line: {e}")))?;
-        match readable_log_v(envelope.v) {
-            LogVersion::Current | LogVersion::Older => {}
-            LogVersion::Ahead => return Err(LineFault::VersionAhead(envelope.v)),
-            LogVersion::NotAVersion => return Err(LineFault::NotAVersion(envelope.v)),
-        }
+        let envelope = readable_envelope(raw)?;
         if envelope.prev != self.prev {
             return Err(LineFault::ChainBreak);
         }
@@ -116,17 +110,50 @@ impl LineCheck {
                 expected: self.expected,
             });
         }
-        let known = EventKind::deserialize(
-            IntoDeserializer::<serde::de::value::Error>::into_deserializer(envelope.kind.as_ref()),
-        );
-        let checked = match known {
-            Ok(_) => CheckedLine::Known(canonical_record(raw)?),
-            Err(_) if envelope.ig => CheckedLine::IgnoredUnknown(envelope.seq),
-            Err(_) => return Err(LineFault::UnknownKind(envelope.kind.into_owned())),
-        };
+        let checked = classify(raw, envelope)?;
         self.expected = self.expected.next().map_err(LineFault::SeqExhausted)?;
         self.prev = chain_hash(raw);
         Ok(checked)
+    }
+
+    /// Everything `advance` asks of one line except where it sits in the
+    /// chain, for a reader that links the chain from the other end
+    /// (`jsonl::tail`): the line passes or fails here exactly as it
+    /// would going forward.
+    pub(super) fn judge(raw: &[u8]) -> Result<Judged, LineFault> {
+        let envelope = readable_envelope(raw)?;
+        let (seq, prev) = (envelope.seq, envelope.prev);
+        let checked = classify(raw, envelope)?;
+        Ok(Judged { seq, prev, checked })
+    }
+}
+
+/// One line judged on its own: the chain position it claims, and what
+/// it is.
+pub(super) struct Judged {
+    pub(super) seq: Seq,
+    pub(super) prev: B3Hash,
+    pub(super) checked: CheckedLine,
+}
+
+fn readable_envelope(raw: &[u8]) -> Result<Envelope<'_>, LineFault> {
+    let envelope: Envelope = serde_json::from_slice(raw)
+        .map_err(|e| LineFault::NotALine(format!("not a ledger line: {e}")))?;
+    match readable_log_v(envelope.v) {
+        LogVersion::Current | LogVersion::Older => Ok(envelope),
+        LogVersion::Ahead => Err(LineFault::VersionAhead(envelope.v)),
+        LogVersion::NotAVersion => Err(LineFault::NotAVersion(envelope.v)),
+    }
+}
+
+fn classify(raw: &[u8], envelope: Envelope<'_>) -> Result<CheckedLine, LineFault> {
+    let known = EventKind::deserialize(
+        IntoDeserializer::<serde::de::value::Error>::into_deserializer(envelope.kind.as_ref()),
+    );
+    match known {
+        Ok(_) => Ok(CheckedLine::Known(canonical_record(raw)?)),
+        Err(_) if envelope.ig => Ok(CheckedLine::IgnoredUnknown(envelope.seq)),
+        Err(_) => Err(LineFault::UnknownKind(envelope.kind.into_owned())),
     }
 }
 
