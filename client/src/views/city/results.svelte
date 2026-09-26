@@ -26,11 +26,12 @@
     waiting: "text-alert",
     failed: "text-alert",
     done: "text-text-quiet",
+    ended: "text-text-quiet",
   };
 </script>
 
 <div class="mx-auto w-full max-w-page">
-  <div class="grid grid-cols-3 gap-base">
+  <div class="grid grid-cols-4 gap-base">
     {#each groups as group (group.outcome)}
       <div class="rounded-card border border-edge px-base py-snug">
         <div class="text-note {INK[group.outcome]}">{say($lang, `results_${group.outcome}`)}</div>

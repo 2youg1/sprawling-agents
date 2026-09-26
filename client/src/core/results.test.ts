@@ -7,7 +7,8 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunBelief } from "./belief/shape";
 import type { Doing } from "./doing";
-import { FIRST, drawsCalls, producedOf, resultsOf } from "./results";
+import { adopted } from "./belief";
+import { FIRST, drawsCalls, outcomeOf, producedOf, resultsOf } from "./results";
 import { RunId, Seq, TimeMs } from "../wire";
 
 // The fixture city of the contract: two hundred runs, forty of each of
@@ -54,7 +55,18 @@ describe("results-only mode", () => {
       ["waiting", 40, ["task 195", "task 190", "task 185", "task 180", "task 175"]],
       ["failed", 40, ["task 196", "task 191", "task 186", "task 181", "task 176"]],
       ["done", 40, ["task 197", "task 192", "task 187", "task 182", "task 177"]],
+      ["ended", 0, []],
     ]);
+  });
+
+  test("a run the city answer reports frozen has ended, not failed", () => {
+    // The shape production takes after a reload: the page never streamed
+    // the run, so the answer's `last_kind` is all it knows of the ending.
+    const run = adopted(
+      { frozen: true, last_kind: "run_frozen", last_seq: Seq.make(9), run: RunId.make(runAt(1).run), who: "a" },
+      undefined,
+    );
+    expect(outcomeOf(run)).toBe("ended");
   });
 
   test("triaging the two-hundred-run city stays inside a tenth of a frame", () => {

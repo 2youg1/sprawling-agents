@@ -28,8 +28,12 @@ export const SHOWINGS: readonly Showing[] = ["whole", "results"];
 // them. A run still working, and a run the person cancelled themselves,
 // is none of these: the first has no result yet and the second is a
 // result the person already knows.
-export type Outcome = "waiting" | "failed" | "done";
-export const OUTCOMES: readonly Outcome[] = ["waiting", "failed", "done"];
+// A run that froze without naming how is "ended": the city answer never
+// names the ending (RunSummary carries no completion), so after a reload
+// every frozen run the page did not stream arrives that way, and calling
+// it failed would claim what nobody reported.
+export type Outcome = "waiting" | "failed" | "done" | "ended";
+export const OUTCOMES: readonly Outcome[] = ["waiting", "failed", "done", "ended"];
 
 // How many runs of one outcome the city draws before "n more".
 export const FIRST = 5;
@@ -57,8 +61,8 @@ export function outcomeOf(run: RunBelief): Outcome | null {
           return "done";
         case "cancelled":
           return null;
-        // A run that ended without naming how did not report done.
         case null:
+          return "ended";
         default:
           return "failed";
       }
@@ -72,7 +76,7 @@ export function outcomeOf(run: RunBelief): Outcome | null {
 // One pass sorts the city into the three outcomes; only the runs of an
 // outcome are then ordered, and only its first `first` are kept.
 export function resultsOf(runs: Iterable<RunBelief>, first: number): readonly Group[] {
-  const held: Record<Outcome, RunBelief[]> = { waiting: [], failed: [], done: [] };
+  const held: Record<Outcome, RunBelief[]> = { waiting: [], failed: [], done: [], ended: [] };
   for (const run of runs) {
     const outcome = outcomeOf(run);
     if (outcome !== null) held[outcome].push(run);

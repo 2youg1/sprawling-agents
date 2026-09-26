@@ -3044,6 +3044,10 @@
     "en": "just finished",
     "zh": "刚完成"
   },
+  "results_ended": {
+    "en": "ended",
+    "zh": "已结束"
+  },
   "results_more": {
     "en": "{n} more",
     "zh": "还有 {n} 条"

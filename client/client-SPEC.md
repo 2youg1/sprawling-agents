@@ -142,7 +142,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `idem.ts` | 2 值 | `mintIdem()` |
 | `mark.ts` | 4 适配器 | `paintMark(document, quiet \| live \| waiting)`：把令牌解算成引擎实际会画的颜色，拼成 SVG data URL 写进 `<link rel="icon">`；零颜色字面量 |
 | `rows.ts` | 4 适配器 | `Rows { getItem, setItem, removeItem }`、`memory()`、`browserRows()`：浏览器存储那一扇门，三处会抛的拒绝（禁用存储、配额为零、写时配额满）在这里各变成一个值 |
-| `results.ts` | 1 判定 | `Showing = whole \| results`、`drawsCalls(showing)`（房间在 `results` 下不挂载 `calls.svelte` 与推理折叠）、`Outcome = waiting \| failed \| done`、`outcomeOf(run)`、`resultsOf(runs, first) -> Group { outcome, first, total }[]`（一遍分三类，每类按 `started` 新到旧只留前 `first` 条，`FIRST = 5`）；`producedOf(files) -> Produced { files, added, removed }`（房间在 `results` 下结局分隔线之下的产出一行：改了几个文件、共加减几行；二进制文件计入文件数、不计行数，因为 `Lines::binary` 没有行数可加）；只看结果模式「画什么」的唯一判定处。200 个 run 的夹具城分类耗时由 `results.test.ts` 判定并打印 `city_results` 行，登记于 `xtask/budgets.toml` |
+| `results.ts` | 1 判定 | `Showing = whole \| results`、`drawsCalls(showing)`（房间在 `results` 下不挂载 `calls.svelte` 与推理折叠）、`Outcome = waiting \| failed \| done \| ended`、`outcomeOf(run)`、`resultsOf(runs, first) -> Group { outcome, first, total }[]`（一遍分四类，每类按 `started` 新到旧只留前 `first` 条，`FIRST = 5`）；`producedOf(files) -> Produced { files, added, removed }`（房间在 `results` 下结局分隔线之下的产出一行：改了几个文件、共加减几行；二进制文件计入文件数、不计行数，因为 `Lines::binary` 没有行数可加）；只看结果模式「画什么」的唯一判定处。200 个 run 的夹具城分类耗时由 `results.test.ts` 判定并打印 `city_results` 行，登记于 `xtask/budgets.toml` |
 | `prefs.ts` | 6 数据 | `Preferences { lang, welcomed, panel, appearance, proxying, showing }`、`Keeper = "browser" \| "city"`、`PreferenceDoor { held, keeper, adopt, setLang, setWelcomed, setPanel, setAppearance, setProxying, setShowing, chord(action), setChord, draft(at), setDraft }`、`loadPreferences(rows, browserLang)`、`preferences()`；**全客户端每一个存储键的拼写都只在这个文件的 `ROWS` 里**（草稿键 `sprawling.draft.<房间或 run>`、快捷键 `sprawling.key.<action>`） |
 | `prose.ts` | 1 判定 | `blocks(text) -> Block[]`, `inline(text) -> Inline[]`：Markdown 读成数据，永不 innerHTML |
 | `route.ts` | 1 判定 | 见 §3-2 |
@@ -406,7 +406,8 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 ### 12-3 只看结果模式里，人取消的 run 不进任何一类
 
-- **决策**：`outcomeOf` 把 `completion = done` 记为刚完成，`cancelled` 不列，其余冻结（`limit`、未名的结局与此后新增的词）记为失败；在跑的 run 不列。
-- **理由**：三类是人要处理的东西。取消是人自己做的，结果他已知道；没有说明怎么结束的 run 没有报告完成，按失败给人看，比悄悄漏掉安全。
+- **决策**：`outcomeOf` 把 `completion = done` 记为刚完成，`cancelled` 不列，未名的结局（`completion = null`）记为「已结束」，其余冻结（`limit` 与此后新增的词）记为失败；在跑的 run 不列。
+- **理由**：前三类是人要处理的东西。取消是人自己做的，结果他已知道。`RunSummary` 不带 completion，页面重载后从 `CityAnswer` 得知的每个冻结 run 都是未名结局；把它们记为失败会把完成了的 run 说成失败，所以它们单列一类，不声称不知道的结局。
+- **重开参数（已结束）**：`RunSummary` 带上 completion 且 `belief.adopted` 填入它时，「已结束」只剩真正未名的结局，届时可以重议它是否并入失败。
 - **被击败的备选**：把取消也记为失败——会把人自己的动作当成要他处理的事，挤掉真正失败的前 N 条。
 - **重开参数**：取消可以由人以外的一方发起（例如预算或上级 run 撤回）时，那部分取消应当按失败列出。
