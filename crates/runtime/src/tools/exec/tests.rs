@@ -425,6 +425,32 @@ fn a_dispatched_command_runs_below_the_core() {
     );
 }
 
+/// `ionice` with no arguments prints the IO class it itself runs in, so
+/// run through exec it reads back the level a dispatched command gets.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
+    let chamber = tempfile::tempdir().unwrap();
+    let patient = Backlog::with_window(crate::backlog::PollBudget::new(3000, 20));
+    let mut tool = ExecTool::new(
+        setup(chamber.path(), None, None),
+        Box::new(EchoSandbox::new()),
+        patient,
+    )
+    .unwrap();
+    let outcome = tool
+        .invoke(&call(serde_json::json!({
+            "program": { "path": "ionice", "args": [] }
+        })))
+        .unwrap();
+    let result = serde_json::to_value(&outcome.result).unwrap();
+    assert_eq!(
+        result["stdout"].as_str().map(str::trim),
+        Some("best-effort: prio 7"),
+        "{result}"
+    );
+}
+
 /// `nice` starts even when the program it is asked to run does not exist,
 /// so without a lookup of its own a missing program would come back as a
 /// settled exit 127 instead of the typed refusal with its recovery.
