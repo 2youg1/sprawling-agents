@@ -8,12 +8,11 @@
 //!
 //! A rung is a scope that may state a value, and the ladder is every
 //! rung that exists for one address, read once, in order from the
-//! farthest to the nearest. Before this module each concern was
-//! resolved by naming the three scopes again — one read per scope, one
-//! field per scope, three times over — so adding a rung meant editing
-//! every concern, and a rung added to one concern and forgotten in the
-//! next would have been a silent difference in what a run is governed
-//! by.
+//! farthest to the nearest. Resolving each concern by naming the three
+//! scopes again — one read per scope, one field per scope, three times
+//! over — would make adding a rung an edit to every concern, and a rung
+//! added to one concern and forgotten in the next would be a silent
+//! difference in what a run is governed by.
 //!
 //! Here a rung is named twice: as a variant of [`Layer`], and as the
 //! arm of [`Ladder::resolve`] that says which slot of a

@@ -7,10 +7,10 @@
 //! being (city-SPEC.md section 8-13).
 //!
 //! A room is where one session keeps its files, which is what
-//! `ARCHITECTURE.md` section 6 has always said of `JOB.md`. What was
-//! missing is that nothing opened a room for a session that did not name
-//! one, so every dispatch a person typed by hand landed in the same
-//! address and the second one wrote over the first one's work.
+//! `ARCHITECTURE.md` section 6 says of `JOB.md`. This module opens a
+//! room for a session that does not name one, so two dispatches a person
+//! types by hand land in two addresses and the second does not write
+//! over the first one's work.
 
 use std::path::Path;
 
@@ -24,9 +24,8 @@ const SUFFIX_LIMIT: u32 = 999;
 
 /// The rooms this building has, in address order.
 ///
-/// One authority for what counts as a room, because there were three:
-/// the building page walked the directory itself, and so did two
-/// city-level readers. A room is a direct subdirectory whose name an
+/// One authority for what counts as a room, read by the building page
+/// and by the city-level readers alike. A room is a direct subdirectory whose name an
 /// address can hold, which is exactly how rooms come into being -
 /// [`open`] and delegation both create one level down. Dot directories
 /// are not rooms (that is what keeps the reserved subtree out), and

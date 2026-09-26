@@ -85,9 +85,9 @@ impl OwnShelf {
 /// A key rather than a string, and one made in a single place, because
 /// the shelves and the reading-room list have to agree on what counts
 /// as the same holding. Filing by section and name while admitting by
-/// name alone let one name sit on the shelves twice, so a building's
-/// own copy of a skill no longer replaced the city's — which is the
-/// rule the whole nearer-shelf-wins design rests on.
+/// name alone would let one name sit on the shelves twice, so a
+/// building's own copy of a skill would not replace the city's — which
+/// is the rule the whole nearer-shelf-wins design rests on.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct ShelfKey(String);
 

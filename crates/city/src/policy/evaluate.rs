@@ -8,14 +8,12 @@
 //! **Every key this version reads is a field of [`Written`].** A key it
 //! does not know is refused rather than passed over, and a key is a key
 //! only where the grammar puts one — which is the whole reason this
-//! file is TOML and the prose beside it is not. Until it was split out,
-//! the reader matched `confidential:`, `write:`, `review:`, `browser:`,
-//! `usersbrowser:` and `desktop:` on *any* line of `BUILDING.md`, so a
-//! sentence under "How work is done here" that began `desktop: true`
-//! granted this machine's desktop, and a `write:` line nobody wrote at
-//! all resolved to `Everything`. Both of those failed towards the
-//! permissive side, which is the one direction a permission reader may
-//! never fail in.
+//! file is TOML and the prose beside it is not. A reader that matched
+//! `confidential:`, `write:` or `desktop:` on *any* line of a prose
+//! file would let a sentence that began `desktop: true` grant this
+//! machine's desktop, and would resolve a `write:` line nobody wrote to
+//! `Everything`. Both fail towards the permissive side, which is the one
+//! direction a permission reader may never fail in.
 //!
 //! There is no second document. The prefix carries this file's own
 //! bytes, so the prose a resident reads and the settings the city
@@ -33,7 +31,7 @@ use super::{BuildingRules, RULES_FILE, UserBrowser, UserBrowserEndpoint};
 /// One struct, so the set of keys this version reads is a thing the
 /// compiler holds rather than a list some reader has to stay in step
 /// with. `write` and `confidential` have no default: they are the two
-/// answers whose absence used to resolve to the permissive side.
+/// answers whose absence would otherwise resolve to the permissive side.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Written {
@@ -126,9 +124,9 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
     let reach = DomainReach::parse(&written.write)?;
     let mut write_prefixes = Vec::with_capacity(written.prefixes.len());
     for prefix in &written.prefixes {
-        // Propagated rather than skipped. A prefix the grammar refuses
-        // used to be dropped where it was read, which left a building
-        // writing less than the person granted it and said so nowhere.
+        // Propagated rather than skipped. A prefix the grammar refuses,
+        // dropped where it was read, would leave a building writing less
+        // than the person granted it and saying so nowhere.
         write_prefixes.push(Address::parse(prefix)?);
     }
     let usersbrowser = match written.usersbrowser {
