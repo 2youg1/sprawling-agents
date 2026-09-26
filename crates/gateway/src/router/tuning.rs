@@ -104,17 +104,6 @@ impl EndpointTuning {
             .or(Self::DEFAULTS.stream_idle_timeout_ms)
     }
 
-    /// Whether this endpoint is called the way any endpoint would be.
-    ///
-    /// The local adapter has no header surface and no override surface,
-    /// so an endpoint that asks for either must take the general path
-    /// even when it sits on this machine. Asking here keeps that
-    /// judgement in one place rather than in the routing that reads it.
-    #[must_use]
-    pub fn is_plain(&self) -> bool {
-        self.extra_headers.is_empty() && self.overrides.is_empty()
-    }
-
     /// The overrides as the values they spell.
     ///
     /// The reading is total and has one rule: text that parses as JSON
@@ -171,21 +160,6 @@ mod tests {
                 ),
                 ("/metadata".to_owned(), serde_json::json!({"user": "city"})),
             ]
-        );
-    }
-
-    /// A local server reached with a header of its own is still reached
-    /// through the general adapter, which is the only one that can send
-    /// the header.
-    #[test]
-    fn an_endpoint_that_asks_for_a_header_is_not_called_plainly() {
-        assert!(EndpointTuning::default().is_plain());
-        assert!(
-            !EndpointTuning {
-                extra_headers: vec![("x-tenant".to_owned(), HeaderValue::Plain("east".to_owned()))],
-                ..EndpointTuning::default()
-            }
-            .is_plain()
         );
     }
 

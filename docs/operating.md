@@ -160,7 +160,7 @@ Signing in to a provider means knowing four things: authorization endpoint, toke
 | change how a login is begun, finished or renewed | `gateway::credential` |
 | use an API key instead | the settings page: base URL, dialect, key |
 | speak a third dialect | `gateway::dialect`, a pure two-way translation with the canonical shape in the middle |
-| run a local model | `gateway::native` — local inference never goes through the outbound gateway |
+| run a local model | the settings page: a loopback base URL and the OpenAI dialect; `gateway::endpoint` takes a loopback address off the proxy and streams it like any other |
 
 **What you cannot move out**: credential custody. Plaintext reaches the platform credential service and nothing else, configuration holds a `secret:realm/name` reference, and that is part of what the product promises rather than an implementation detail.
 

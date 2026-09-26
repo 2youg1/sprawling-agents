@@ -21,7 +21,8 @@ use serde_json::Value;
 
 use crate::dialect::{ImageBytes, request_wire};
 
-use super::config::{AuthSpec, Endpoint, ProviderFailure, apply_override, provider_err};
+use super::config::{AuthSpec, Endpoint, apply_override};
+use super::failure::{ProviderFailure, provider_err};
 use super::header::HeaderValue;
 use super::models::ModelFacts;
 

@@ -15,6 +15,7 @@ mod fold;
 mod ledger;
 mod reader;
 
+pub use fold::Located;
 pub use ledger::LedgerIndex;
 pub use ledger::Refreshed;
 pub use reader::LineReader;

@@ -5,9 +5,9 @@
 
 //! A worker opened over a history, and the city closed in the record.
 //!
-//! The two ends of one lifetime: `RunWorker::new` and `over` are
-//! LOADING - the worker folds what the ledger says before it acts on
-//! anything - and `close_city` is UNLOADING, the one line that says a
+//! The two ends of one lifetime: `RunWorker::new`, `over` and
+//! `holding` are LOADING - the worker folds, or is handed, what the
+//! ledger says before it acts on anything - and `close_city` is UNLOADING, the one line that says a
 //! stop was chosen rather than suffered. They sit together because a
 //! reader asking "what does a restart find" and "what does a close
 //! leave" is asking one question from two ends.
@@ -55,8 +55,20 @@ impl RunWorker {
         log: runtime::diagnostics::Diagnostics,
         ledger: JsonlLedger,
     ) -> Result<Self, AxError> {
+        let standing = Standing::fold(&ledger_dir(city_root))?;
+        RunWorker::holding(city_root, vault, log, (ledger, standing))
+    }
+
+    ///
+    /// `holding` takes a ledger already opened, its writer lock held, and
+    /// the standing folded from it under that lock.
+    pub(crate) fn holding(
+        city_root: &Path,
+        vault: gateway::Custodian,
+        log: runtime::diagnostics::Diagnostics,
+        (ledger, standing): (JsonlLedger, Standing),
+    ) -> Result<Self, AxError> {
         let now = now_ms()?;
-        let dir = ledger_dir(city_root);
         let Standing {
             book,
             governance,
@@ -64,7 +76,7 @@ impl RunWorker {
             entrance,
             expiries,
             origins,
-        } = Standing::fold(&dir)?;
+        } = standing;
         let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(memory::MemoryError::into_ax)?;
         // The one place a `Delegator` is minted in this process, which

@@ -54,6 +54,103 @@ fn unknown_kind_without_ig_speaks_direction() {
     assert_eq!(err.code(), &AxCode::LogVersionUnsupported);
 }
 
+fn next_line(prev: &[u8], seq: u64) -> Vec<u8> {
+    let draft = EventDraft {
+        run: RunId::CITY,
+        t: TimeMs::new(0),
+        who: "city".to_string(),
+        addr: None,
+        kind: kernel::EventKind::CityInitialized,
+        data: Payload::empty(),
+        ig: false,
+    };
+    EventRecord::from_draft(draft, Seq::new(seq), chain_hash(prev))
+        .canonical_line()
+        .unwrap()
+}
+
+#[test]
+fn the_index_covers_exactly_the_history_the_fold_saw() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("ledger-00000000000000000000.jsonl");
+    let first = genesis_line();
+    let second = next_line(&first, 1);
+    let late = [
+        next_line(&second, 2),
+        b"
+"
+        .to_vec(),
+    ]
+    .concat();
+    std::fs::write(
+        &path,
+        [
+            first,
+            b"
+"
+            .to_vec(),
+            second,
+            b"
+"
+            .to_vec(),
+        ]
+        .concat(),
+    )
+    .unwrap();
+    let mut folded = Vec::new();
+    let index = fold_ledger_dir(dir.path(), |record| {
+        folded.push(record.seq());
+        if record.seq() == Seq::new(1) {
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&path)
+                .unwrap();
+            file.write_all(&late).unwrap();
+        }
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(
+        (folded, index.tail_seq(), index.len()),
+        (vec![Seq::FIRST, Seq::new(1)], Some(Seq::new(1)), 2)
+    );
+}
+
+#[test]
+fn a_fold_reads_the_history_line_by_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = genesis_line();
+    let second = future_line(&first, 1, false);
+    let segment = [
+        first,
+        b"
+"
+        .to_vec(),
+        second,
+        b"
+"
+        .to_vec(),
+    ]
+    .concat();
+    std::fs::write(
+        dir.path().join("ledger-00000000000000000000.jsonl"),
+        segment,
+    )
+    .unwrap();
+    let mut folded = Vec::new();
+    let refused = fold_ledger_dir(dir.path(), |record| {
+        folded.push(record.seq());
+        Ok(())
+    })
+    .err()
+    .unwrap();
+    assert_eq!(
+        (folded, refused.code()),
+        (vec![Seq::FIRST], &AxCode::LogVersionUnsupported)
+    );
+}
+
 #[test]
 fn higher_v_is_refused_before_anything_else() {
     let line = br#"{"v":2,"seq":0,"prev":"0000000000000000000000000000000000000000000000000000000000000000","kind":"x"}"#;
