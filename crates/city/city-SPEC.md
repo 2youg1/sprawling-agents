@@ -96,7 +96,14 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError>;
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
 pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
 pub fn rules_path(city_root: &Path, addr: &Address) -> PathBuf;
+pub struct RulesCache { /* city_root、按楼存的 (mtime, len) 与规则 —— 私有 */ }
+impl RulesCache {
+    pub fn new(city_root: &Path) -> RulesCache;
+    pub fn load(&self, addr: &Address) -> Result<Arc<BuildingRules>, AxError>;
+}
 ```
+
+`RulesCache`（`policy/cache.rs`，形状 1 判定）：一个 run 一份，读界的闭包持有它。`load` 先对 `RULES.toml` 做一次 stat，(mtime, len) 与上次读到的相同就交回留着的规则，不同或第一次就走 `load` 读盘求值并按这次 stat 的戳留下。文件不存在或 stat 失败时不留任何东西、每次都走 `load`，于是「没有 RULES.toml」与「被替代的旧文档」两条的答案与不缓存时逐字相同。锁中毒时同样退回 `load`。失败与 `load` 相同，失败不留。决定见 §12.3。
 
 - **规则是一份 TOML，散文没有另起一份文件**：这份文件先前是 Markdown，读者在**任意一行**上匹配 `confidential:`／`write:`／`review:`／`browser:`／`usersbrowser:`／`desktop:`，于是「How work is done here」里一句以 `desktop = true` 开头的话就授予了宿主机的桌面，而一栋没写 `write:` 的楼落到 `Everything`。两处都朝宽松的一侧失败，那是权限读者唯一不许失败的方向。改成 TOML 之后键只在文法给出键的位置成立，`deny_unknown_fields` 让拼错成为一条消息而不是一次静默缺席，`confidential` 与 `write` 都不再有缺省。**散文留在同一份文件里**，作 `does` 与 `conventions` 两个键：拆成两份文档同样能关掉撞键，代价是一栋楼有两种说法且可以互相矛盾。居民拿到的就是这份文件本身的字节，所以城判定的与 agent 读到的是同一串。
 
@@ -602,6 +609,16 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 
 **重开参数**：一次跨楼读的规则读取（一个小文件加一次 TOML 求值）相对该次 `read` 本身的读盘不再可忽略时——例如城的规则搬进一张随账本折叠的内存表，读规则不再触盘——冻结与现读的延迟差消失，可以重议；安全那一条不随它消失，重议时须给出新楼与改规则两种情形下仍然关上的办法。
 
+### 12.3 定规：一个 run 内按 (mtime, len) 留住他楼的规则
+
+**决定**：读界的闭包持有一份 `RulesCache`，一个 run 一份。同一栋他楼的规则，文件的 mtime 与长度都没变时不再读盘求值；任一变了就重读。
+
+**理由**：一次不带路径的 `search` 在城根下走进每一栋他楼，一个 run 反复读同一栋楼，每次都读一个小文件再做一次 TOML 求值；stat 一次的代价低于读加求值。§12.2 的安全一条仍然成立：改规则就改了文件，mtime 随之前进，下一次 stat 就重读；把 `confidential = false` 改成 `true` 连长度也变了，所以即便 mtime 的粒度粗到同一刻内写两次，这一次翻转也逃不过长度。
+
+**被否**：按内容哈希作键——要先读完整个文件，省下的只剩求值；run 之间共享一份——run 的寿命是缓存失效的天然边界，跨 run 的表要自己回答何时丢，而多出来的只有第一次读。
+
+**重开参数**：若某个文件系统的 mtime 粒度粗到同一刻内能写出等长而意义不同的规则并且真有人这样改，键要加上内容哈希或 inode 变更计数。
+
 ## 13 依赖选型
 
 只依赖 `kernel`（拓扑硬约束）＋ std。dev 依赖 `tempfile`。
@@ -858,6 +875,7 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 pub(crate) fn replace(path: &Path, body: &[u8]) -> Result<(), AxError>;
 pub fn edit<T>(path: &Path, act: impl FnOnce(&Held<'_>) -> Result<T, AxError>)
     -> Result<T, AxError>;                        // 门面上是 city::edit_document
+pub fn edit_against(path: &Path, base: &[u8], body: &[u8]) -> Result<(), AxError>;
 pub struct Held<'a> { /* 私有 */ }
 impl Held<'_> { pub fn replace(&self, body: &[u8]) -> Result<(), AxError>; }
 ```
@@ -868,6 +886,7 @@ impl Held<'_> { pub fn replace(&self, body: &[u8]) -> Result<(), AxError>; }
 
 - **要么整份，要么不动**：字节先落到目标同目录的暂存文件，`sync_all` 把它交到设备上，再由一次 `rename` 把它放到位。覆盖式 `rename` 在本项目支持的每一种文件系统上是一个操作，所以读者拿到的是旧版或新版，没有第三种。
 - **同一刻只有一个写者**：一份文档的读-改-写在本进程内互斥。`Held` 只能从 `edit` 里拿到，于是「改写期间锁是持有的」由类型成立，而不是由每个调用点记得成立。
+- **`edit_against` 是有第二个写者那份文档的门**：四份 spine 文档（以及楼的规则），人手在编辑器里与城的命令流同时在写，而本进程的锁对编辑器毫无约束。写者有权替换的只是它起手时读到的那份正文（`base`），文件已经变了就拒而不覆写，报 `E_VERSION_CONFLICT`；`base` 为空即「这份文档本不该存在」，同一条规则读在它的起点。「文件被人动过就拒」这条规则全城只在这里判定，`put_spine` 经它写。
 
 **暂存文件名固定为 `.<文件名>.staging`**：写者在 flush 与 rename 之间被杀会留下它，固定名让下一次写复用同一个位置，而不是攒出一目录谁也说不清归属的碎片；点前缀使城里每一处扫描都跳过它（扫描一律跳过点开头的项）。
 
@@ -877,7 +896,7 @@ impl Held<'_> { pub fn replace(&self, body: &[u8]) -> Result<(), AxError>; }
 
 **`create_new` 那一族不归本模块**：`spine_files::write_new`、`building::create`、`gitignore::seal_room` 要的是「独占地认领一个名字」，而 `OpenOptions::create_new` 已经把认领与拒绝合成一个操作。把它们改道本模块只会让一条已经成立的规则多一个家。
 
-**错误面**：`E_STORAGE_FATAL`，主题是失败的那条路径与操作系统的原话，恢复语一句——把目录改成可写、确认磁盘有空间，然后重存。八个写面此前各写一遍这句话，现在是一份。
+**错误面**：`E_STORAGE_FATAL`，主题是失败的那条路径与操作系统的原话，恢复语一句——把目录改成可写、确认磁盘有空间，然后重存。八个写面此前各写一遍这句话，现在是一份。经 `edit_against` 另有一个码：`E_VERSION_CONFLICT`，含义是「文件不再是你起手时的那份」，恢复语是重读再发。它与 `runtime::tools::edit`、`library::install` 报同一件事的码相同，客户端已有它的词条，故不是新开的一种失败。
 
 **关门条件**：断电模拟——任意时刻杀进程，`CONFIG.toml` 要么是旧版要么是新版。逼近它的是四条测试：一个读者在另一线程反复替换 512 KiB 文档时每次都读到完整的旧版或新版；被杀的写者留下的暂存文件既不是那份文档、也不挡下一次写；两个线程各二百次读-改-写之后计数是四百；一份文档把它上面的目录一并带来。
 

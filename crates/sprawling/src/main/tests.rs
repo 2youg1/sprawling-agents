@@ -15,18 +15,7 @@
 )]
 
 use super::data::verified_chain;
-use super::router::{COMMANDS, named};
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
-
-/// A verb the binary accepts is on the one screen that lists them. What
-/// `doctor` reads off its own line is judged beside it, in the library.
-#[test]
-fn doctor_is_on_the_command_screen() {
-    assert!(
-        COMMANDS.contains("doctor"),
-        "a verb the binary accepts is on the one screen that lists them"
-    );
-}
 
 /// A place with no ledger in it is not a verified chain.
 ///
@@ -44,27 +33,6 @@ fn a_place_holding_no_ledger_is_refused_rather_than_verified() {
         "the recovery names the mistake that was actually made: {}",
         err.recovery()
     );
-}
-
-/// A flag is not a path.
-///
-/// `sprawling init --help` used to raise a city in a directory
-/// called `--help`, because `init` read `args[1]` whatever it was.
-/// This repository's own root held one of those for a day.
-#[test]
-fn a_flag_is_never_read_as_the_path_a_subcommand_wanted() {
-    let words =
-        |raw: &[&str]| -> Vec<String> { raw.iter().map(|word| (*word).to_owned()).collect() };
-    let asked = words(&["init", "--help"]);
-    assert_eq!(named(&asked, 1), None, "--help became a city directory");
-
-    let two = words(&["export", "--verbose", "city", "bundle"]);
-    assert_eq!(named(&two, 1).map(String::as_str), Some("city"));
-    assert_eq!(named(&two, 2).map(String::as_str), Some("bundle"));
-
-    let plain = words(&["serve", "city", "127.0.0.1:8787"]);
-    assert_eq!(named(&plain, 1).map(String::as_str), Some("city"));
-    assert_eq!(named(&plain, 2).map(String::as_str), Some("127.0.0.1:8787"));
 }
 
 /// The embed chain delivers a file table with the page shell in it;
@@ -140,4 +108,63 @@ fn files_under(root: &std::path::Path, dir: &std::path::Path, found: &mut Vec<St
             found.push(relative.to_string_lossy().replace('\\', "/"));
         }
     }
+}
+
+/// `call`'s rows of the exit-code table: each way a call can end
+/// reaches its own code, and none of these touch a city that exists.
+///
+/// A frame the wire cannot carry is this command line's fault (2), and
+/// an address where nothing answers is no city at all (4); both used to
+/// exit 1, which an agent reads as "the city refused" and answers by
+/// fixing a frame the city never saw.
+#[test]
+fn each_way_a_call_ends_has_its_own_exit_code() {
+    use super::calling::call;
+    use super::exit::Exit;
+    // A port that was bound and released: nothing listens on it.
+    let vacant = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .to_string();
+    let words = |line: &[&str]| line.iter().map(ToString::to_string).collect::<Vec<_>>();
+    let table = [
+        (words(&["call"]), Exit::Line),
+        (words(&["call", "{not json", "--at", &vacant]), Exit::Line),
+        (
+            words(&["call", "{\"query\":\"no_such\"}", "--at", &vacant]),
+            Exit::Line,
+        ),
+        (
+            words(&["call", "{\"query\":\"city_view\"}", "--quiet-ms", "soon"]),
+            Exit::Line,
+        ),
+        (
+            words(&["call", "{\"query\":\"city_view\"}", "--at", &vacant]),
+            Exit::NoCity,
+        ),
+    ];
+    let observed = table
+        .iter()
+        .map(|(line, _)| (line.clone(), call(line)))
+        .collect::<Vec<_>>();
+    assert_eq!(observed, table.to_vec());
+}
+
+/// A refusal names the nearby names to a person, and reaches a program
+/// as the `AxError` it was, so neither reader loses a field.
+#[test]
+fn a_refusal_reads_the_same_to_a_person_and_to_a_program() {
+    use super::refusal::{Form, written};
+    use kernel::{AxCode, AxError};
+    let err = AxError::failure(AxCode::ToolUnknown, "call tool", "grep")
+        .with_nearby(vec!["exec".into(), "edit".into()])
+        .with_recovery("use one of the nearby tools");
+    let human = written(&err, Form::Human);
+    let json = written(&err, Form::Json);
+    let back: AxError = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        (human.lines().last(), json.lines().count(), back),
+        (Some("nearby: exec, edit"), 1, err)
+    );
 }

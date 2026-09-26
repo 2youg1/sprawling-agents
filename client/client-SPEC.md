@@ -113,7 +113,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **4-33 版式三则：内容对齐外壳，宽度按内容种类，网格列有最小宽。**
   **其一，正文列的左缘是左栏右缘加 `pane`，`mx-auto` 不再出现在任何页面容器上。** 左栏是每一页唯一的固定参照物，一个居中的岛在 1920 宽的窗口里离它三百多像素，人的眼睛要在两个坐标系之间来回跳；`mx-auto` 此后只允许出现在阅读列内部（对话线程、长文档）。**其二，宽度分三档按内容封顶，不按页面封顶**：`measure`（520）给段落、`talk`（760）给对话、`page`（1040）给带表格的表单，表格与代码块不封顶、随容器长到 `wide`（1120）。同一页的不同区块各取各的档——整页取最窄的那一档，正是设置页正文被挤成 360 px 的原因。**其三，一个网格列的最小宽度是 320 px**：`grid-cols-[repeat(auto-fit,minmax(320px,1fr))]`，不用断点，因为断点问的是容器而列宽问的是内容。表格的列另行规定：文本列 `min-w-[12ch]`、数字列 `w-figure`、id 列 `min-w-[24ch]`，超出容器就横向滚动——**永不逐字折行**，`wrap-anywhere` 从 `setup/models.svelte` 删除。
 - **4-34 度量令牌：控件高度、图标网格、圆角、阴影两级、触达面。** 此前没有控件高度这条令牌，于是每个视图自己拼 `py-tight`／`py-snug`，同一行里三个按钮高 26、28、30 px。令牌是 `--spacing-control-sm|control|control-lg`（28／32／36）、`--spacing-glyph-sm|glyph`（16／20，图标画在哪个方格里就住哪个方格）、圆角 `control 6｜card 8｜panel 12`、阴影两级（`shadow-float` 弹层、`shadow-sheet` 抽屉与 dialog；`shadow-composer` 与 `shadow-float` 是两个名字一个值，前者在本条落地时删除）。**有影的面不画边，有边的面不画影**，弹层例外。触达面：桌面 ≥ 28×28、触屏 ≥ 44×44，小于这个的图标按钮用 `::before` 扩热区。图标收进 `parts/glyph.svelte` 一个 `Glyph name=…` 与一张路径表——六个文件各画各的 `<svg>` 是同一套图形的六个家；城市插画不是图标，留在原处。
-- **4-35 通知是三个座位、一个组件。** 一切拒绝与提示都由 `parts/notice.svelte` 画，座位由调用方给：**inline**（有归属表单的拒绝，紧贴出错的字段，随字段编辑清除）、**toast**（无归属页面的拒绝与连接断开，右下角，宽 `min(480px, 100vw − rail − 2·pane)`，至多三条，`role="alert"`，8 秒自动收起、悬停暂停）、**drawer**（栏顶圆点点开，贴左栏右缘的全高抽屉，宽 440，Esc 与点外部关闭）。**今天 AxError 的三段式在三处各手写一遍**（`views/notices.svelte`、`views/refusal.svelte`、`parts/notice.svelte`），本条把它收成一处。抽屉按天分组，每条是标题（`lang.json` 的 `err_<code>`，如 `err_E_CONFIG_INVALID`）、时间、同 `code+subject` 的计数徽标，英文原句折叠进等宽详情。**动作由 `core/recovering.ts` 的一张表从 `code` 映射到动词**，toast 与抽屉都读它——两个读者各写一张表就是同一个事实的两个家。**toast 在右下而不是左下**：左下压着左栏展开后的悬停区。
+- **4-35 通知是三个座位、一个组件。** 一切拒绝与提示都由 `parts/notice.svelte` 画，座位由调用方给：**inline**（有归属表单的拒绝，紧贴出错的字段，随字段编辑清除）、**toast**（无归属页面的拒绝与连接断开，右下角，宽 `min(480px, 100vw − rail − 2·pane)`，至多三条，`role="alert"`，8 秒自动收起、悬停暂停）、**drawer**（栏顶圆点点开，贴左栏右缘的全高抽屉，宽 440，Esc 与点外部关闭）。**今天 AxError 的三段式在三处各手写一遍**（`views/notices.svelte`、`views/refusal.svelte`、`parts/notice.svelte`），本条把它收成一处。抽屉按天分组，每条是标题（`lang.json` 的 `err_<code>`，如 `err_E_CONFIG_INVALID`）、时间、同 `code+subject` 的计数徽标，英文原句折叠进等宽详情。**动作由 `core/recovering.ts` 的一张表从 `code` 映射到动词**，toast 与抽屉都读它——两个读者各写一张表就是同一个事实的两个家。**动作只作用于 composer 所在的房间**（`views/notice_recovery.ts`）：`/new` 与 `/fork` 的房间取自地址栏——对话页的地址，或 run 页那个 run 的房间——从不取自拒绝的 subject，因为地址语法接受一句带空格和反引号的话，把 subject 当地址读会在一句错误原文上开出一栋楼；`/stop` 只在 subject 是 run id 时停那个 run（run id 的语法窄到装不下一句话），否则停 composer 所在的房间；没有 composer 的页面上动作置灰（`act_no_target`）。**toast 在右下而不是左下**：左下压着左栏展开后的悬停区。
 - **4-36 设置页是左锚定的两栏，`config.toml` 折进正文底部；每个设置项是一张卡。** 分组导航 200 px 竖排、当前组 `aria-current="page"` 加左侧 2 px accent 条（7B 允许的第二处）；正文 `flex-1 min-w-0` 左对齐，每组一个 `<h1>` 与一行说明（4-10 的例外：这行说的是这一组此刻管什么，不是这一屏是干什么）。`config.toml` 从常驻第三栏改为正文底部的可折叠区块，默认收起——**它是校对工具而不是设置项**，常驻占 300 px 是正文被挤到 360 px 的直接原因。**卡片语法**：标题（label 600）＋一句说明（note faint）＋控件＋卡脚（左：一句约束或状态；右：需要提交的才有按钮），立即生效的控件没有按钮，改动后卡脚出现「已保存 ✓」。今天同一屏里 `title`／`heading`／`note` 三级标题叠在 80 px 内的写法随之取消：**一屏一个 `title`，其下只用 `label`**。
 
 
@@ -153,7 +153,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 `views/parts/tip.svelte` 提示（见设计 4-18）；`views/parts/code.svelte` 只读代码视图（面包屑＋行号＋词法着色，见设计 4-26）；`views/rail.svelte` 左栏；`views/talk.svelte` ＋ `talk/{thread,calls,composer,waiting}.svelte` 对话 ＋ `talk/artifact.svelte` 制品面板 ＋ `talk/trace.ts`（工具调用的分类，两个读者共用，见设计 4-26）；`views/city.svelte` ＋ `city/{bar,panel,skyline,marks}.svelte` ＋ `city/shape.ts`（超椭圆路径）；`views/registry.svelte`（`Query::RegistryView`：这座城决定留下来的东西，一行一件，见设计 4-24）；`views/building.svelte` ＋ `building/{tree,commits}.svelte`；`views/changes.svelte`（`Changes`／`Hunks` 的一份读法，run 页与楼页共用）；`views/run.svelte`；`views/setup.svelte` ＋ `setup/{providers,models,skills,appearance,keys}.svelte`（skills 组见设计 4-31）＋ `setup/kept.svelte`（一个组的答案由谁保管，见设计 4-29）；`views/shared/{provider,effort,buildings}.svelte`（欢迎页与设置页共用的三件，`buildings.svelte` 的第二个座位是 `#/mcp`）；`views/machine.svelte`（doctor 的答）；`views/desktop.svelte`（一栋楼的桌面白名单）；`views/mcp.svelte`；`views/welcome.svelte`；`views/record.svelte`；`views/cost.svelte`；`views/palette.svelte`；`views/refusal.svelte`；`views/prose.svelte`；`views/gallery.svelte`。
 
-**`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（偏好走 `core/rows.ts` 那扇门，没有 localStorage 时是一张只活一次会话的表）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。
+**`#/gallery` 是一条路由而不是一个构建开关**，因为量它的那道门应当打开一个人真正跑的 bundle；夹具不需要城（偏好走 `core/rows.ts` 那扇门，没有 localStorage 时是一张只活一次会话的表）。每个能进入多种状态的屏幕在那里各有一份夹具，`cargo xtask render` 打开真引擎读它。`app.svelte` 用动态 `import()` 取 `views/gallery.svelte`，所以画廊与它的夹具表是 bundle 里单独的一块，只在打开 `#/gallery` 时下载：其余路由首屏不再为它付字节，而 `frontend_artifact` 称的是整个 dist，这一块仍在其中。
 
 **左栏是覆盖而不是推挤**：外层 `<div>` 只在钉开（`[`）时取 `w-rail-open`，`<nav>` 绝对定位、hover 时自宽并加投影；正文的左边因此不随指针越过左缘而重排。
 
@@ -377,6 +377,22 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 **开关卡的控件不在卡里**：它在对话旁边，卡关着的时候也够得到。头里再放一个就是同一份状态的第二个查看处，而关着的那一种情况仍然需要外面那一个。参考图在头里放叉，是因为它的面板没有别的地方可关。
 
+## 7G 从零到第一次派活：一条按键路径
+
+一座没有主模型的城里，第一次派活只有一条路，每一步的下一步都在上一步的落点上。**欢迎页把「接上一家供应商」放在第一张并标「先做这一步」**，「派活」卡仍是链接，提示改为「接上供应商后可用」；有了主模型，供应商卡消失。`#/gallery` 的 `welcome ·` 夹具画三态（无供应方、有供应方无主模型、有主模型），各在 390 与 1440 两个页宽，由 `cargo xtask render` 量。
+
+| 起点 | 键 | 落点 |
+|---|---|---|
+| `#/welcome`，无主模型 | Tab 到第一张卡，Enter | `#/setup` 的 accounts 组 |
+| accounts 组的挂载表单 | 填写，Enter 提交 | 端点卡出现在列表顶部 |
+| 端点卡之后 | Tab 到 `main` 的模型选择框，方向键选定 | 事实条的「模型」格显示所选模型 |
+| 左栏或 `#/welcome` 的「派活」卡 | Enter | `#/talk/hall/mayor`，composer 取焦 |
+| composer | Enter | 派活帧发出 |
+
+**这条路今天有两处还不是一步：** 第三行的选择框在设置页的末尾，1440×900 的窗口里要滚动才看得到，挂上第一家供应方后它既不紧跟在卡下，也不取焦；最后一行在无主模型时仍发出派活帧，由城拒绝，composer 的发送按钮尚未换成去 `#/setup` 的链接。两处都改完时，上表每一行的落点都不需要一次滚动或一次无效的按键。
+
+**拒绝框画城给的出路。** 同一个码覆盖几种原因（`E_CONFIG_INVALID` 既是「没选模型」也是「会话中途换了模型」），所以 `err_<code>` 的标题只说拒绝的种类，不说原因；`parts/notice.svelte` 把城写的 `recovery` 句子不折叠地放在标题下，动作与主体留在折叠里（12-3）。
+
 ## 8 验收
 
 `bun run lint`、`bun run typecheck`、`bun run test`（110 条）三样绿，`cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这三条脚本的一条线。
@@ -402,3 +418,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：两者给同样的逐键粒度——读 `runs[id].saying` 的 effect 只因这个 run 这个字段重跑，遍历表的读者只因 run 的增删重跑（`belief/grain.svelte.test.ts` 判定）。记录的写法让十余个按 `runs[id]`、`Object.values(runs)` 读表的视图一行不改。在 R = 1e4、一帧 50 个 delta、一个读全表的订阅者下，每帧折叠从约 470–540 µs 降到约 30–40 µs（`belief/fold_cost.test.ts`，同一仪表前后交错测），因为 delta 不再让订阅者走一遍表。
 - **被击败的备选**：`SvelteMap<RunId, RunBelief>`。粒度相同，但每个读者都得改成 `get`／`values()`，且对已有键 `set` 新值时，有遍历读者就会连带推进迭代版本。
 - **重开参数**：视图改由 belief 暴露的派生索引读表（不再直接下标）时，表的容器可以换，读者迁移的成本就不再存在。
+
+### 12-3 拒绝框的正文是城写的出路，不是按码查的原因
+
+**决定：** `parts/notice.svelte` 把 `AxError.recovery` 画在标题下、折叠之外；`err_<code>` 的标题只说拒绝的种类。**理由：** 一个码在城里有多种原因，按码写死的标题（如「模型已冻结」）在「没选模型」时说错了原因，而把城的原话折起来，人会先去按那些与这次拒绝无关的按钮。`recovery` 是唯一知道原因的句子。**胜过的方案：** 给每个原因一个客户端文案——做不到，客户端只看得见码；按原因分码是服务端改线协议的事，那之后出路表才能按码给出「去设置」。

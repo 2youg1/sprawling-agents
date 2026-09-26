@@ -138,8 +138,11 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-/// 39: a question carries the asking side's own number, and its answer
-///    or refusal comes back under it with the ledger position it was read at.
+/// 39: `rules_changed` joins the event kinds, carrying which governing
+///    document moved as a closed word; an older page would meet a kind
+///    it cannot decode in the history it folds. A question carries the
+///    asking side's own number, and its answer or refusal comes back
+///    under it with the ledger position it was read at.
 pub const WIRE_V: u32 = 39;
 mod ask;
 mod query;

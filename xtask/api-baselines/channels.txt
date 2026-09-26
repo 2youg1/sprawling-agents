@@ -19,7 +19,8 @@ impl serde_core::ser::Serialize for channels::NoSecret
 impl<'de> serde_core::de::Deserialize<'de> for channels::NoSecret
 impl<Secret> channels::Command<Secret>
 impl<Secret> channels::Command<Secret>
-pub async fn channels::serve(channels::ServeConfig) -> core::result::Result<(), kernel::error::shape::AxError>
+pub async fn channels::bind(core::net::socket_addr::SocketAddr, core::option::Option<kernel::locator::B3Hash>) -> core::result::Result<channels::Bound, kernel::error::shape::AxError>
+pub async fn channels::serve(channels::Bound, channels::ServeConfig) -> core::result::Result<(), kernel::error::shape::AxError>
 pub channels::AcpProgress::finished: bool
 pub channels::AcpProgress::run: alloc::string::String
 pub channels::AcpProgress::turns: u32
@@ -723,7 +724,6 @@ pub channels::RunSummary::run: kernel::event::identity::RunId
 pub channels::RunSummary::started: core::option::Option<kernel::event::identity::TimeMs>
 pub channels::RunSummary::who: alloc::string::String
 pub channels::ServeConfig::acp: channels::AcpSink
-pub channels::ServeConfig::addr: core::net::socket_addr::SocketAddr
 pub channels::ServeConfig::city: core::option::Option<kernel::address::Address>
 pub channels::ServeConfig::client: alloc::sync::Arc<channels::ClientAssets>
 pub channels::ServeConfig::commands: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::WireCommand, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
@@ -732,7 +732,6 @@ pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<kernel::event:
 pub channels::ServeConfig::logs: tokio::sync::broadcast::Sender<channels::LogLine>
 pub channels::ServeConfig::queries: channels::Answering
 pub channels::ServeConfig::secrets: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Command<kernel::secret::sealed::Sealed<alloc::string::String>>, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
-pub channels::ServeConfig::token_digest: core::option::Option<kernel::locator::B3Hash>
 pub channels::ServeConfig::transcribe_sink: channels::TranscribeSink
 pub channels::ServerFrame::Answered(alloc::boxed::Box<channels::Answered>)
 pub channels::ServerFrame::Delta(channels::Delta)
@@ -951,6 +950,7 @@ pub struct channels::Ask
 pub struct channels::AskId(pub u32)
 pub struct channels::BlockedLine
 pub struct channels::BodyOverride
+pub struct channels::Bound
 pub struct channels::BuildingAnswer
 pub struct channels::BuildingDoc
 pub struct channels::BuildingProgress
@@ -1080,13 +1080,10 @@ pub use channels::Sealed
 pub use channels::Seq
 pub use channels::ServerLabel
 pub use channels::SessionName
-pub use channels::Span
 pub use channels::TimeMs
-pub use channels::Token
 pub use channels::Tokens
 pub use channels::UnplannedProgress
 pub use channels::UsdMicros
 pub use channels::WHOLE_PPB
 pub use channels::Window
 pub use channels::WriteDomain
-pub use channels::markdown

@@ -39,7 +39,7 @@ pub(super) struct Fact {
 }
 
 /// Every fact a managed span may name.
-const FACTS: [Fact; 17] = [
+const FACTS: [Fact; 18] = [
     Fact {
         key: "wire_v",
         home: "channels::WIRE_V",
@@ -141,6 +141,12 @@ const FACTS: [Fact; 17] = [
         home: "the budget over the reading, both from xtask/budgets.toml",
         takes: Some("the register row"),
         recount: recount::headroom,
+    },
+    Fact {
+        key: "budget_figure",
+        home: "the named integer field of that row in xtask/budgets.toml",
+        takes: Some("the register row and its field, as `row.field`"),
+        recount: recount::figure,
     },
 ];
 
@@ -332,6 +338,16 @@ mod tests {
                 .unwrap()
                 .is_some_and(|read| read.contains(','))
         );
+    }
+
+    #[test]
+    fn a_register_figure_is_quoted_from_its_row_and_field() {
+        let root = root();
+        assert_eq!(
+            value(&root, "budget_figure:views_rebuild_per_mb.best_p50_ms").unwrap(),
+            Some("2,759".into())
+        );
+        assert!(value(&root, "budget_figure:views_rebuild_per_mb").is_err());
     }
 
     #[test]

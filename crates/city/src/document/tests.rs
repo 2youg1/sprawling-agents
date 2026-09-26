@@ -111,3 +111,27 @@ fn a_document_brings_its_directories_with_it() {
     replace(&path, b"# the task\n").unwrap();
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "# the task\n");
 }
+
+/// The guard a document with two writers is written under: what gets
+/// replaced is the text the writer started from, so a file somebody else
+/// changed in the meantime is refused rather than written over. The
+/// empty base is the same rule read at the document's start, where a
+/// file that is already there is not what the writer expected to find.
+#[test]
+fn a_document_that_moved_under_its_writer_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("Roadmap.md");
+    edit_against(&path, b"", b"first").unwrap();
+    edit_against(&path, b"first", b"second").unwrap();
+
+    let err = edit_against(&path, b"first", b"third").unwrap_err();
+    assert_eq!(err.code(), &AxCode::VersionConflict);
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "second",
+        "a refused write changed the document anyway"
+    );
+    let err = edit_against(&path, b"", b"fourth").unwrap_err();
+    assert_eq!(err.code(), &AxCode::VersionConflict);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "second");
+}

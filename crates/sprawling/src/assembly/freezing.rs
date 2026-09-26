@@ -13,6 +13,7 @@ use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot, SegmentSource};
 use runtime::run::RunPlan;
 
 use super::{Assignment, Given, RunWorker, Site, Workbench, city_segment, held, name_of};
+use model_note::model_note;
 use run_slot::{Predecessor, run_segment, task_line};
 
 /// Bytes about to be frozen into one slot, and the documents they were
@@ -217,6 +218,33 @@ impl RunWorker {
         Ok(())
     }
 
+    /// The run slot: the task, and after it the note the person keeps
+    /// for the model this run is sent to, which therefore ends the
+    /// system prompt (sprawling-SPEC 8-85).
+    ///
+    /// # Errors
+    /// Propagates a run segment that will not read and a note that is
+    /// there and will not read.
+    fn assemble_run_slot(
+        &self,
+        site: &Site,
+        at: &Assignment,
+        brief: &city::RunBrief,
+    ) -> Result<Assembled, AxError> {
+        let mut slot = Assembled::of_nothing(run_segment(
+            &self.city_root,
+            brief,
+            Predecessor {
+                room: &at.addr,
+                run: at.predecessor(),
+            },
+        )?);
+        if let Some(note) = model_note(&self.city_root, &site.provider, &site.model.id)? {
+            slot.extend(note.at, &note.bytes);
+        }
+        Ok(slot)
+    }
+
     pub(super) fn freeze_plan(
         &mut self,
         site: &Site,
@@ -258,15 +286,8 @@ impl RunWorker {
             building_segment(&self.city_root, addr, site.building.addr())?
                 .freeze(SegmentSlot::Building),
             Assembled::of_nothing(resident).freeze(SegmentSlot::Resident),
-            Assembled::of_nothing(run_segment(
-                &self.city_root,
-                &brief,
-                Predecessor {
-                    room: addr,
-                    run: at.predecessor(),
-                },
-            )?)
-            .freeze(SegmentSlot::Run),
+            self.assemble_run_slot(site, at, &brief)?
+                .freeze(SegmentSlot::Run),
         )?;
         self.intern_prefix(&prefix)?;
 
@@ -326,7 +347,7 @@ impl RunWorker {
                 .with_recovery("fix the file's permissions, or remove it from the building")
             })?;
             let hash = self.cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
-            must_read.push(Locator::parse(&format!("cas:b3-{hash}"))?);
+            must_read.push(Locator::cas(hash));
         }
         must_read.push(job);
         // The address is a pure function of the room and the run, so
@@ -351,6 +372,7 @@ impl RunWorker {
 /// Where a session's origin becomes a conversation, declared here because a
 /// module lives where the crate root says it does.
 mod inherited;
+mod model_note;
 mod run_slot;
 
 #[cfg(test)]

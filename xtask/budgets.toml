@@ -181,7 +181,6 @@ names = [
   "crates/collab/src/workshop.rs::new",            # 9
   "crates/collab/src/inbox.rs::new",               # 7
   "crates/collab/src/signal_tool.rs::new",         # 6
-  "crates/kernel/src/highlight.rs::scan",          # 6
   "crates/runtime/src/turn.rs::assemble",          # 6
   "crates/sprawling/src/effect.rs::of",            # 6
   "crates/sprawling/src/effect.rs::shelf",         # 6
@@ -238,13 +237,6 @@ status = "gated, with a register of the files that predate the rule"
 # `cargo xtask wire-ts` writes it from the Rust wire, so its length is a
 # fact about the generator; the gate reads the exemption from the banner
 # the generator puts at the top rather than from a path written here.
-#
-# `crates/web/src/lang.rs` (3,444 lines) and `crates/web/src/theme.rs`
-# (1,019) are not here: their module-map rows state the shape `data`, and
-# the same exemption the function rule grants them holds for the file
-# rule, for the same reason. A table of every word the client says, and a
-# table of every colour it may produce, are looked things up in rather
-# than navigated.
 #
 # `xtask/src/length.rs` is on this list, which is correct: the gate that
 # states the rule is not exempt from it.
@@ -402,6 +394,16 @@ what = "bytes read by one LedgerIndex::refresh that folds a single appended reco
 measured_by = "cargo test -p memory --lib -- --nocapture a_refresh_reads_the_appended_tail_rather_than_the_segment (the test prints the Refreshed::Appended reading beside the segment length)"
 status = "measured, not gated: 191 B read out of a 76,180 B segment, which is the one appended record and nothing else (2026-09, 401-record fixture). The test asserts the equality rather than a threshold, so a gate here would be a second authority over the same claim"
 
+# One rules lookup the read bound makes when a model-chosen path lands in
+# another building. `city::RulesCache` keeps what a run read while the
+# file's modification time and length hold, so a repeat costs one stat
+# instead of a read and a TOML evaluation. On Windows the stat opens a
+# handle, which is the floor of this design.
+[rules_lookup]
+what = "ns per rules lookup for another building, a fresh city::load against city::RulesCache::load, alternating rounds"
+measured_by = "cargo test --release -p city --lib rules_lookup_reading -- --ignored --nocapture"
+status = "measured, not gated: median of 15 rounds of 2000, three runs, load 186,793-212,885 ns against cache 76,112-91,730 ns (release test profile, Windows NTFS, sixteen cores shared by eight build lanes)"
+
 # Read amplification on a range retrieval: the bytes a `Vfs` hands back
 # while `Cas::get_range` answers, over the bytes in the answer.
 #
@@ -468,15 +470,23 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 #
 # The denominator removes the fixture's size from the figure, which is
 # what made the rows above it facts about a machine rather than about
-# the design. The reading now exists and the ceiling still does not:
-# `xtask budget` reads two units, bytes and packages, so a
-# `best_ms_per_mb` key written here today would be data nobody reads.
-# Gating this row is the unit's work, not the reading's, and the
-# reading had to come first either way.
+# the design. The reading exists and the ceiling does not: `xtask
+# budget` reads two units, bytes and packages, and gating this row is
+# that unit's work, not the reading's.
+#
+# **One reading, one home.** The large-ledger fold of `just bench` is
+# this same rebuild under the registered fixture, so its p50/p95/p99
+# live here and ARCHITECTURE.md quotes them through `cargo xtask docnum`
+# (`budget_figure:views_rebuild_per_mb.<field>`) rather than typing a
+# second copy.
 [views_rebuild_per_mb]
 what = "milliseconds to rebuild every view, per megabyte of ledger folded"
 measured_by = "just bench (citysim bench bin, release), over a ledger large enough that the fold rather than the open dominates: the bench writes 50,000 records into a scratch city and drives the whole production rebuild through `sprawling::ask`, which verifies the chain, parses every line and folds it into every view before answering one CityView"
-status = "measured, not gated: 34.1 ms/MB on windows-x86_64, 16 cores, NVMe (2026-09-21, release) - p50 428.9 ms to rebuild 12.57 MB of ledger, 50,000 records, 5 rebuilds. A ceiling waits on `xtask budget` learning a time unit; until then a figure written as `budget_ms` would be read by nobody"
+fold_records = 50000
+best_p50_ms = 2759
+best_p95_ms = 3765
+best_p99_ms = 3765
+status = "measured, not gated: windows-x86_64, 16 cores, NVMe, release, 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`). The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
 
 # What a dispatch spends before the model is called: opening the room,
 # writing the brief, standing the run up, and assembling the tools -

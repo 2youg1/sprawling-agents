@@ -27,9 +27,13 @@ fn subject_of(scopes: &[String]) -> String {
 }
 
 /// Where a wave fence is filed: under `refs/sprawling/`, which no
-/// branch listing, push or `git log` walks by accident.
-fn fence_ref(of: &Provenance, seq: u64) -> String {
-    format!("refs/sprawling/runs/{}/{seq}", of.run())
+/// branch listing, push or `git log` walks by accident, and named by the
+/// commit itself. A run fences through more than one handle - the lane's
+/// own and the bench's forecast net - and the reference is the only thing
+/// that keeps a fence from `git gc`, so its name cannot come from a count
+/// that a second handle also keeps.
+fn fence_ref(of: &Provenance, oid: git2::Oid) -> String {
+    format!("refs/sprawling/runs/{}/{oid}", of.run())
 }
 
 /// The `checkpoint_committed` payload, in one place so a fence and a
@@ -63,10 +67,6 @@ pub struct Checkpoint {
     /// The last commit this handle made, fence or landing. The scan
     /// compares against it, because a fence no longer moves HEAD.
     pub(crate) last: Option<git2::Oid>,
-    /// How many fences this handle has raised. The name only has to be
-    /// unique among them: the Ledger's `oid` answers every question
-    /// about a wave, and the reference only keeps the commit reachable.
-    fences: u64,
 }
 
 pub(crate) fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
@@ -96,11 +96,7 @@ impl Checkpoint {
         repo.config()
             .and_then(|mut config| config.set_bool("core.autocrlf", false))
             .map_err(git_err("pin the repository's line endings"))?;
-        Ok(Checkpoint {
-            repo,
-            last: None,
-            fences: 0,
-        })
+        Ok(Checkpoint { repo, last: None })
     }
 
     /// Makes sure the city has one commit, and makes no more than that.
@@ -146,7 +142,7 @@ impl Checkpoint {
     ///
     /// **The branch does not move**: the commit is written
     /// with no reference update and pointed at by
-    /// `refs/sprawling/runs/<run>/<seq>`, so a person whose own folder
+    /// `refs/sprawling/runs/<run>/<oid>`, so a person whose own folder
     /// became this city keeps their own history instead of one
     /// `checkpoint:` line per tool wave. The oid means what it always
     /// meant - the tree is there and `wave_post` restores from it.
@@ -168,10 +164,8 @@ impl Checkpoint {
             subject: &subject_of(scopes),
             onto_head: false,
         })?;
-        let seq = self.fences;
-        self.fences = self.fences.saturating_add(1);
         self.repo
-            .reference(&fence_ref(of, seq), oid, true, "sprawling: a wave fence")
+            .reference(&fence_ref(of, oid), oid, true, "sprawling: a wave fence")
             .map_err(git_err("file a wave fence"))?;
         committed(oid, of, scopes, files)
     }

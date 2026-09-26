@@ -173,6 +173,11 @@ impl Vfs for RealFs {
         std::fs::remove_file(path)
     }
 
+    fn copy_permissions(&mut self, from: &Path, to: &Path) -> io::Result<()> {
+        self.release(to);
+        std::fs::set_permissions(to, std::fs::metadata(from)?.permissions())
+    }
+
     fn exists(&self, path: &Path) -> bool {
         path.is_file()
     }

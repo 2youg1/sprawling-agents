@@ -3,47 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Gate: a public API change must pass through the crate's SPEC in the
-//! same change-set. Two assertions chain it: (1) the committed baseline
-//! equals the live `cargo public-api` surface, so an API change forces a
-//! baseline edit; (2) a baseline edit in a commit requires the crate's
-//! SPEC touched in that commit. Width is not judged — that needs a
-//! human; only "interface changed => documentation moved" is machinable.
+//! `cargo xtask apisync`: the committed public-surface baselines of the
+//! two crates whose surface is read outside this repository equal the
+//! live `cargo public-api` surface. Not a gate: the nightly job runs it,
+//! and whether an interface change belongs in a SPEC is a reviewer's call
+//! (xtask-SPEC §8-32).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::report::{Violation, XtaskError};
-use crate::{guard, walk};
+use crate::walk;
 
 const BASELINE_DIR: &str = "xtask/api-baselines";
 
-/// The sync contract covers exactly the lib crates that have a SPEC —
-/// SPEC-first means the SPEC exists before the surface does; a bin crate
-/// has no public API to baseline (its SPEC still gates via assertion 2's
-/// path discipline when it grows one).
-fn spec_crates(root: &Path) -> Result<Vec<String>, XtaskError> {
-    let crates_dir = root.join("crates");
-    let entries = std::fs::read_dir(&crates_dir).map_err(|source| XtaskError::Io {
-        path: crates_dir.display().to_string(),
-        source,
-    })?;
-    let mut found = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|source| XtaskError::Io {
-            path: crates_dir.display().to_string(),
-            source,
-        })?;
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let has_spec = entry.path().join(format!("{name}-SPEC.md")).is_file();
-        let is_lib = entry.path().join("src").join("lib.rs").is_file();
-        if has_spec && is_lib {
-            found.push(name);
-        }
-    }
-    found.sort();
-    Ok(found)
-}
+/// The crates whose public surface is a seam other code reads across a
+/// process or a repository boundary; every other crate's surface is held
+/// by the compiler at its call sites.
+const SEAM_CRATES: [&str; 2] = ["channels", "kernel"];
 
 /// The live surface, normalized to trimmed non-empty lines. Derived and
 /// blanket impls are omitted (-sss): they move with the toolchain, not
@@ -95,19 +72,16 @@ fn baseline_path(root: &Path, krate: &str) -> PathBuf {
     root.join(BASELINE_DIR).join(format!("{krate}.txt"))
 }
 
-pub(crate) fn check(root: &Path, range: Option<&str>) -> Result<Vec<Violation>, XtaskError> {
+pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    let crates = spec_crates(root)?;
-
-    // (1) Baseline freshness: live surface == committed baseline.
-    for krate in &crates {
+    for krate in SEAM_CRATES {
         let path = baseline_path(root, krate);
         let rel = walk::rel(root, &path);
         let Ok(committed) = std::fs::read_to_string(&path) else {
             violations.push(Violation {
                 gate: "apisync",
                 location: rel,
-                rule: "every SPEC-bearing crate carries a public-api baseline".to_owned(),
+                rule: "every seam crate carries a public-api baseline".to_owned(),
                 violation: format!("no baseline for `{krate}`"),
                 alternative: "run `cargo xtask apisync --write` and commit the baseline \
                               together with the SPEC"
@@ -129,52 +103,20 @@ pub(crate) fn check(root: &Path, range: Option<&str>) -> Result<Vec<Violation>, 
         }
     }
 
-    // (2) Same-change-set discipline: baseline edits require SPEC edits.
-    let commits = match range {
-        Some(spec) => guard::git_lines(root, &["rev-list", spec])?,
-        // An unborn repository has nothing to judge.
-        None => guard::git_lines(root, &["rev-list", "-1", "HEAD"]).unwrap_or_default(),
-    };
-    for commit in &commits {
-        let changed = guard::changed_paths_with_status(root, commit)?;
-        for krate in &crates {
-            let baseline_rel = format!("{BASELINE_DIR}/{krate}.txt");
-            let spec_rel = format!("crates/{krate}/{krate}-SPEC.md");
-            // Creation ('A') is the sync point being established, not an
-            // interface change; only a modified baseline demands the SPEC.
-            let baseline_modified = changed
-                .iter()
-                .any(|(status, p)| p == &baseline_rel && *status != 'A');
-            if baseline_modified && !changed.iter().any(|(_, p)| p == &spec_rel) {
-                violations.push(Violation {
-                    gate: "apisync",
-                    location: format!("commit {commit}"),
-                    rule: "a public API change passes through the crate SPEC (C8 discipline)"
-                        .to_owned(),
-                    violation: format!(
-                        "baseline `{baseline_rel}` changed without touching `{spec_rel}`"
-                    ),
-                    alternative: "amend the commit to update the SPEC alongside the \
-                                  interface, or revert the interface change"
-                        .to_owned(),
-                });
-            }
-        }
-    }
     Ok(violations)
 }
 
-/// `cargo xtask apisync --write`: regenerate every baseline. The only
-/// files this gate ever writes.
+/// `cargo xtask apisync --write`: regenerate every seam baseline. The
+/// only files this command ever writes.
 pub(crate) fn write(root: &Path) -> Result<(), XtaskError> {
     let dir = root.join(BASELINE_DIR);
     std::fs::create_dir_all(&dir).map_err(|source| XtaskError::Io {
         path: dir.display().to_string(),
         source,
     })?;
-    for krate in spec_crates(root)? {
-        let live = live_api(root, &krate)?;
-        let path = baseline_path(root, &krate);
+    for krate in SEAM_CRATES {
+        let live = live_api(root, krate)?;
+        let path = baseline_path(root, krate);
         std::fs::write(&path, live).map_err(|source| XtaskError::Io {
             path: path.display().to_string(),
             source,

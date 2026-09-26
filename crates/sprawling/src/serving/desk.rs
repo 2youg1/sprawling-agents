@@ -195,11 +195,25 @@ impl CommandDesk {
     /// Work already accepted is finished first: a close that dropped a
     /// queued command would make "stopped" and "lost" the same thing in
     /// the record. Waiting is the one queue's job, which a post rings.
-    pub(crate) fn next(&self) -> DeskWait<'_> {
+    ///
+    /// A Cancel or Steer naming a run `driving` answers for stays where
+    /// it is: it is that lane's to lift at its next safe point, through
+    /// [`Self::interrupt_for`]. The thread asking here wakes on every
+    /// post and a lane reads only at its safe points, so handing it out
+    /// here would refuse it as though no run answered
+    /// (sprawling-SPEC.md 8-42-1).
+    pub(crate) fn next(&self, driving: impl Fn(RunId) -> bool) -> DeskWait<'_> {
         let Ok(mut waiting) = self.waiting.lock() else {
             return DeskWait::Gone;
         };
-        match waiting.queue.pop_front() {
+        let for_a_lane = |posted: &Posted| match channels::classify(&posted.command) {
+            channels::ControlVerdict::Intervene { run: Some(run), .. } => driving(run),
+            channels::ControlVerdict::Intervene { run: None, .. }
+            | channels::ControlVerdict::NotAnIntervention
+            | channels::ControlVerdict::Refuse(_) => false,
+        };
+        let first = waiting.queue.iter().position(|posted| !for_a_lane(posted));
+        match first.and_then(|at| waiting.queue.remove(at)) {
             Some(posted) => self.carrying(posted),
             None if self.closing.load(std::sync::atomic::Ordering::Acquire) => DeskWait::Close,
             None => DeskWait::Idle,

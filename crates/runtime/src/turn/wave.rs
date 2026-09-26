@@ -10,7 +10,7 @@ use kernel::{AxCode, AxError, ContentBlock, Ledger, Payload, ToolCall, ToolOutco
 
 use crate::compaction::Exchange;
 
-use super::{Carried, Interrupt, NextCall, PhaseOutcome, Recording, ToolWave, Turn};
+use super::{Carried, Interrupt, PhaseOutcome, Recording, ToolWave, Turn};
 
 /// What the model reads back as the text of a tool result: the same
 /// payload the ledger keeps, printed once so the two cannot disagree.
@@ -42,13 +42,16 @@ impl Turn<ToolWave> {
     /// `still_going` is asked before every call, with that call's index.
     /// One question per wave left a halted scope running whatever the
     /// model asked for in one reply: eight edits are eight effects, and
-    /// the person who stopped the city waited for all of them.
+    /// the person who stopped the city waited for all of them. What it
+    /// answers is consumed through the one boundary consumer, so a steer
+    /// between two calls is recorded here, before the next assembly
+    /// hands it to the model.
     pub fn execute(
         mut self,
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
         invoke: &mut dyn FnMut(&ToolCall) -> Result<ToolOutcome, AxError>,
-        still_going: &mut dyn FnMut(u32) -> NextCall,
+        still_going: &mut dyn FnMut(u32) -> Interrupt,
     ) -> Result<PhaseOutcome<Turn<Recording>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
@@ -63,14 +66,11 @@ impl Turn<ToolWave> {
             // did.
             let standing = still_going(index);
             index = index.saturating_add(1);
-            match standing {
-                NextCall::Allowed => {}
-                // Through the same door a phase boundary takes, so a
-                // wave that stops leaves the one `cancel_received` line
-                // every other ending leaves.
-                NextCall::Halted => {
-                    return Ok(PhaseOutcome::Cancelled(self.cancel_here(ledger)?));
-                }
+            // Through the same door a phase boundary takes, so a wave
+            // that stops leaves the one `cancel_received` line every
+            // other ending leaves, and a steer its `steer_received`.
+            if let Some(cancelled) = self.consume_boundary(standing, ledger)? {
+                return Ok(PhaseOutcome::Cancelled(cancelled));
             }
             let called = ToolCalled {
                 id: call.id.clone(),

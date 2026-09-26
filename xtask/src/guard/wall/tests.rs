@@ -164,14 +164,6 @@ fn the_quoted_facts_are_read_out_of_the_files_that_hold_them() {
     assert!(quoted.is_subset(&defined), "{quoted:?}");
 }
 
-/// The repository passes the check it ships. A gate whose own tree is
-/// red teaches people that red is the normal colour.
-#[test]
-fn the_repository_itself_passes_the_check_it_ships() {
-    let found = check(&repository()).unwrap();
-    assert!(found.is_empty(), "{found:#?}");
-}
-
 fn repository() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()

@@ -200,7 +200,7 @@ pub(crate) fn local_url(bind: SocketAddr) -> String;
 - **「同级目录可不可写」是二元枚举而不是 bool**（Roadmap G-25）：`writability` 产出 `BesideBinary`，`default_city` 只收它，于是这一个事实在探测端与决定端是同一个拼写，调用点读起来是 `BesideBinary::ReadOnly` 而不是一个无名的 `false`。
 - **回退路径只有 `bin::home` 一处权威**：`~/sprawling/city` 由 `Home::default_city()` 给出，`firstrun` 不再自己拼 `join("sprawling").join("city")`（Roadmap G-10 的第四处）；目录名 `city` 由 `home::CITY_DIR` 一处定义，exe 同级与家目录两种落点共用它。
 - **开浏览器恒非致命**：`open_in_browser` 失败只记一行，`serve` 照跑——URL 在这之前已经打印。命名不取 `browser`：`crates/browser` 已占住「Agent 驱动真实浏览器」这个概念，一名一义。
-- **横幅给人读**：city 目录、WebUI 的完整 URL、客户端完整与否、`Ctrl-C` 停城，四行。bind 是未指定地址（`0.0.0.0`）时 URL 仍给回环形，因为那才是运行中的机器打得开的那一个。
+- **横幅给人读**：city 目录、WebUI 的完整 URL、客户端完整与否、`Ctrl-C` 停城，四行。bind 是未指定地址（`0.0.0.0`）时 URL 仍给回环形，因为那才是运行中的机器打得开的那一个。横幅在端口已经绑定、写者已经持锁之后才印（§8-88）。
 
 **交付形态**：`just package` 产 `sprawling-<version>-<target>.zip`＝二进制＋`start.cmd`／`start.sh`＋`QUICKSTART.md`；裸 exe 不再单独作附件，双击的目标因此永远是启动器。`release.yml` 由 tag 触发，三平台各跑 `just dist`，`xtask budget` 在打包前拦下页壳客户端（`CLIENT_COMPLETE=false` 的二进制），通过后才附件。手工上传的产物来历不明，是本次全部症状的链头，这条把它关掉。
 
@@ -253,7 +253,8 @@ pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/na
 ```
 
 - **握手在进程内算，不手抄**。`WIRE_V` 与 `schema_hash()` 直接取自 `channels`，故改一条命令名字时本客户端**不可能**落后。因此删掉了那个一次性的 Python 探针——它在工作区外复刻了 `schema_hash()` 与 `IdemKey::derive()`，那本身就是第二个权威。
-- **一帧发出，所有帧收回，直到城安静**。“安静”是一段无帧的时长（`--quiet-ms`，默认 2000），而不是帧数：一条 Dispatch 会产生多少事件是城的事，客户端猬不到。
+- **一个查询恰好一个答复，收到就走**。发出的是 `Query` 时，`call` 在收到第一帧 `Answer` 或 `Refusal` 时打印它并退出，之前推来的 `Event`／`Log`／`Delta` 照样逐行打印；城的答复在十几毫秒内到达，再等一整段安静窗口只是让进程白占两秒。安静窗口在这里只剩上限的作用：答复迟迟不来时，`call` 仍按「安静」退出（退出码 3）。
+- **一条命令收到城安静为止**。发出的是 `Command` 时，“安静”是一段无帧的时长（`--quiet-ms`，默认 2000），而不是帧数：一条 Dispatch 会产生多少事件是城的事，客户端猜不到。何时结束由 `wire_client::Ending` 一处决定，按发出帧的种类穷尽匹配（被否决的备选：把「收到答复就走」做成一个布尔参数——它会让 `call(…, false)` 这样的调用点说不出自己在等什么）。
 - **输出是 JSONL，一行一帧**。发明一种人看的排版就是为 wire 里的每一个类型再写一遍它长什么样，而那份渲染一定会漂。
 - **退出码带信息**：收到过 `Refusal` 退 1，否则退 0。一个驱动它的 agent 不应当为了知道「成不成」去解析 JSON。
 - **`enrol` 只从 stdin 读，恒不从 argv 读**。argv 进进程表、进 shell 历史、进父进程的日志；这比浏览器路径更好的地方就在这里，因为页面那条路要先把明文拿进一个标签页的内存。**输出只有引用**，恒不回显值。
@@ -340,7 +341,7 @@ fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> 
 
 ```rust
 // bin::assembly
-struct Knock { addr: Address, from: String, mode: runtime::Mode, conversations: u32 }
+struct Knock { addr: Address, from: String, mode: kernel::Mode, conversations: u32 }
 impl RunWorker {
     fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
     fn answer_knocks(&mut self);   // 成波排干，循环而非递归
@@ -394,7 +395,8 @@ pub fn init_city(&Path) -> Result<InitReport, AxError>;
 pub fn form_city(&Path, Adopt) -> Result<InitReport, AxError>;
 pub fn open_vault() -> (gateway::Custodian, Option<Payload>);
 pub struct Serving { /* 八个字段全 pub：调用方构造它 */ }
-pub async fn serve(Serving) -> Result<(), AxError>;
+pub async fn listen(Serving) -> Result<Listening, AxError>;   // §8-88
+impl Listening { pub async fn serve(self) -> Result<(), AxError>; }
 pub struct ScanReport { pub waiting_approvals: usize /* lines、closed_calls 不跨出 */ }
 impl ScanReport { pub fn summary(&self) -> String; }
 pub struct RunWorker;
@@ -427,7 +429,7 @@ pub fn open_when_ready(SocketAddr, String);
 - **零行为变更**：`main.rs` 只改开头的声明块（七行 `mod` → 两行 `mod` ＋ 一行 `use sprawling::{assembly, console, firstrun}`），其余调用点逐字节不变。`Cargo.toml` 不改：Cargo 对同一 package 自动发现 `src/lib.rs` 与 `src/main.rs` 两个 target，OUT_DIR 对两者相同，`include!(client_embed.rs)` 与 `DEPENDENCIES` 因此留在 `main.rs` 原地。
 - **红**：`crates/sprawling/tests/assembly_door.rs` 走 `init_city → RunWorker::new → handle(Command::CreateBuilding) → 读 InitReport.ledger_dir 下的账本`，断言 `building_created` 落账。改动之前它连编译都过不去（`sprawling` 这个 crate 名不存在），这就是「这条测试咬得动」的证据。
 - **门禁连带**：`apisync` 把 `sprawling` 纳入契约，`xtask/api-baselines/sprawling.txt` 随之生成（`guard` 的 `PRODUCED_PREFIXES` 已豁免该目录，不需 `Verdict:`）；`header` 要求 `lib.rs` 与新测试文件各带三行 MPL 通告；`modmap` 对 `*/lib.rs` 自动按索引文件判定，只准 `mod`／`use`／`pub use`／注释／属性——facade 因此只能是声明，正是要的形状。
-- **一处文档更正**：ARCHITECTURE.md §3 写着「citysim is a second assembly layer: the same code with simulated adapters」。此句与现实不符——`citysim/Cargo.toml` 依赖 kernel／memory／runtime／gateway／eval，其中没有 sprawling；`run_scenario` 手工构造 `RunPlan`，够到的最高层是 `runtime::run::drive`。这次改动使 assembly **可被依赖**，但没有让 citysim 依赖它：模型适配器仍由 `adapter_for` 从 `EndpointBook` 内部构造，那条缝要不要倒置是另一个决定。按 AGENTS.md「reality wins and the document is corrected first, with its reason」，先把这句改成现实。
+- **一处文档更正**：ARCHITECTURE.md §3 写着「citysim is a second assembly layer: the same code with simulated adapters」。此句与现实不符——`citysim/Cargo.toml` 依赖 kernel／memory／runtime／gateway，其中没有 sprawling；`run_scenario` 手工构造 `RunPlan`，够到的最高层是 `runtime::run::drive`。这次改动使 assembly **可被依赖**，但没有让 citysim 依赖它：模型适配器仍由 `adapter_for` 从 `EndpointBook` 内部构造，那条缝要不要倒置是另一个决定。按 AGENTS.md「reality wins and the document is corrected first, with its reason」，先把这句改成现实。
 
 ## 8-16 读不了的计划不再被报成被人改过的计划
 
@@ -469,6 +471,9 @@ struct CollaborationFold { … }   // 暂存 enqueued／consumed，`settle` 产 
 ```
 
 `rebuild_book`／`rebuild_governance`／`rebuild_collaboration` 三个函数删除。
+
+- `Standing::fold` 与 `rebuild_views` 折叠的是 `runtime::replay::VerifiedLedger::lines()` 里那份已解析的记录，不再对原始行调第二次 `EventRecord::parse_line`。理由有二：同一行只解析一次；更要紧的是，逐行检查放行的 `ig: true` 未知种类行（`VerifiedLine::IgnoredUnknown`）在第二次解析时会失败，于是一份能通过验证的历史却起不了城。两个折叠对 `IgnoredUnknown` 都跳过，与 `runtime::fork` 的读法一致。由 `a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary` 判定。
+- 尚未落地的部分：`Views`、`Standing` 与 `LedgerIndex` 合成一个 `CityFold`，在同一遍里建立，并让 `Governance` 与 `EndpointBook` 各只留一份；验收是 5 万条记录时首字节 ≤ 500 ms、l100k 启动峰值 ≤ 稳定值 + 8 MiB。这需要 `serving::attending::spawn_worker` 把 serve 线程上折好的 `Standing` 交给 `RunWorker`，而不是让 `RunWorker::new` 再读一遍。
 
 - **这不是缺陷修复**。三处实现漂移的假设（`rebuild_governance` 管 `granted` 与 `CityHalted`，`govern` 不管，`answer_approval`／`set_admission` 各自直改字段）不成立：新测试 `what_a_worker_holds_is_what_a_restart_rebuilds` 否定了它——派一次活、发一条信号之后，活 worker 与重建结果逐项相等。那条测试因此不是这次的红，而是让合并安全的护栏；它同时把一条四处代码都依赖、却从未被断言过的形状-7 性质变成了可红的。
 - **以测量收口而非以红转绿收口**，理由写在上一条：没有可咬的红，因为没有缺陷。实测（windows-x86_64、16 核，release，外部探针经 `sprawling` 的 lib 门驱动 `RunWorker::new`）：
@@ -668,6 +673,7 @@ self.record_for(…, EventKind::AssetArchived, …)?;          // 后落账
 struct Governance {
     pending: BTreeMap<String, ApprovalItem>, autonomy: Autonomy,
     granted: Vec<ClusterKey>, halted: BTreeSet<kernel::event::Scope>,
+    rules: BTreeMap<(kernel::event::Scope, GoverningDocument), B3Hash>, // 从 rules_changed 折；每份治理文档上次记下的摘要（§8-40）
     sent: BTreeMap<RunId, Sent>,          // 从 run_started 折；task、goal、budget
     origins: BTreeMap<String, BlockedJob>, // 从 approval_requested 折；答复时 O(log n)
 }
@@ -1070,9 +1076,9 @@ justfile／CI 无涉；S4 前端框架结论书将改写 build.rs 拷贝源与 `
 
 ### 不搬走什么，以及这件事本身的发现
 
-`NAME_THE_WORK`、`NAME_TOKENS`、`mode_of`、`not_built`、`Reporter`、`building_of`、`plan_node_of`
+`not_built`、`Reporter`、`building_of`、`plan_node_of`
 在原文件里**物理上坐在 `Views` 那一簇的中间**，而它们的使用者是 `RunWorker` 与 `CollaborationFold`：
-`not_built` 六处、`Reporter` 三处、`mode_of` 一处，`Views` 一处都不用。
+`not_built` 六处、`Reporter` 三处，`Views` 一处都不用。
 **这就是那个文件长成这样的机制**——没有边界的地方，新东西落在光标所在的行，而不是落在它属于的地方。
 
 ### 验收
@@ -1196,6 +1202,26 @@ invert the model seam，仍未动手。**这里不假装做过它。**
 两者都是纯删除，所以 `guard::strikes_only_exemptions` 放行，不需要 `Verdict:` trailer；
 budgets.toml 里那两段已经失真的注释单独一枚提交改，因为改注释会让豁免形状判定失效。
 
+### 交接探针（`bin::assembly::probing::probe`，形状 2 值类型）
+
+探针的唯一生产调用点是 `bin::assembly::probing`，所以它住在调用者之下，不另占产品拓扑的一个单元（仪器与探针分家的理由见 citysim-SPEC §3-6）。
+
+```rust
+pub(crate) struct ProbeId { pub(crate) name: String, pub(crate) version: u32 }
+pub(crate) struct Probe { /* id、questions —— 私有 */ }
+impl Probe {
+    pub(crate) fn new(id: ProbeId, questions: Vec<String>) -> Result<Probe, AxError>;
+    pub(crate) fn answered(&self, answers: Vec<String>) -> Result<Answers, AxError>;  // 数目对不上即拒
+}
+pub(crate) struct Comparison { pub(crate) kept: u32, pub(crate) lost: Vec<u32> }
+pub(crate) fn compare(before: &Answers, after: &Answers) -> Result<Comparison, AxError>;
+pub(crate) fn handoff_probe() -> Result<Probe, AxError>;   // 名 handoff、版本 1、固定四问
+```
+
+- **跨版本比较恒拒**：问题改过的探针是另一件仪器，混算测的是仪器不是被测物。`handoff_probe` 是数据不是判定：问题改了就是版本 2。
+- **报位置不报分数**：`lost` 是问题的序号，人自己去读那两个答案——一个摘要在这里正好会掩盖它要报告的那类损失。
+- **探针不去采集**：问问题的是 `probing` 驱动的一个 Run；`probe` 只持问题与比较，恒不在它所测量的那条回路里。
+
 ## 8-40 先判定后动手：一次派活在城答应之前不写任何东西
 
 `prepare_dispatch` 的开篇注释一字不差地写着这条规矩——「Nothing is written before the city agrees to take
@@ -1285,7 +1311,7 @@ pub(super) struct Assignment {
     /// 那间房里的跑从此想多久，当调用方说了。写进房间自己的配置层，
     /// 所以它答不到房间存在之前去。
     effort: Option<kernel::Effort>,
-    mode: runtime::Mode,
+    mode: kernel::Mode,
     budget: kernel::BudgetCap,
     parent: Option<RunId>,
 }
@@ -1300,6 +1326,7 @@ effort: None`，那正是 `session_for`／`room_for` 对它们本来就有的答
 
 ```rust
 let agreed = self.agree_to_work(&at.addr)?;        // 只读；第一条拒绝在这里
+self.book_rules(&agreed.building)?;                // 答应之后的第一句：rules_changed 先落账再生效
 let session = self.session_for(&at.addr, at.session.take(), &task, agreed.rules.policy())?;
 // ↑ 可能花一次 Digest 调用，而那次调用带着这座楼的策略
 at.addr = self.room_for(at.addr, session.as_ref())?;                  // ← 第一次写
@@ -1322,6 +1349,24 @@ let mut site = self.stand_up(agreed, &at, &given)?;
 
 **验收**：`assembly::dispatching::tests::a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine`——
 confidential 楼、主模型与城同机、Digest 端点在机器之外，往楼名派活以 `E_GATE_DENIED` 告终，任务原文不上任何一条线。
+
+**`book_rules` 是答应之后的第一句：改规则先落账再生效**。派工是规则的生效点：人手改 `RULES.toml`／`CONFIG.toml`
+之后，城在下一次派工时才把新规则交给一个 run。`RunWorker::book_rules(&Building)` 把 city 层的 `CONFIG.toml`，
+以及这栋楼**真实存在**时它自己的 `CONFIG.toml` 与 `RULES.toml`，逐份对比治理 fold 上次记下的摘要（`Governance.rules`，§8-25），
+动了就先落一行 `rules_changed` 再让 run 起步。载荷携 scope、`which: GoverningDocument`（一栋楼两份，scope 单独说不清是哪份）、
+before、after 与字节数，恒不携正文；`before` 缺席即开账行，此后本行的 `after` 等于下一行的 `before`，链断本身就说明有人绕过一切门改了文件。
+摘要状态只由 fold 从 `rules_changed` 行得出，重启重建同一本账。缺席的文件按零字节记摘要，与 `city::load` 把缺席读成普通楼是同一个判断。
+读不了的文件以 `E_STORAGE_FATAL` 拒绝这次派工：一个 run 不能站在城说不清的规则之下。
+
+- **记在 `agree_to_work` 之后，不在它之前**：本节的规矩是城答应之前不写任何东西，一次被拒的派工因此不留行。
+  被否：`prepare_dispatch` 的第一句——停城、被拒的模型也会先落一行账，拒绝不再是「什么都没写」。
+- **只为存在的楼记账**：楼的根目录不存在时，只记 city 层那一份。
+  理由：往一个打错的楼名派活会给不存在的楼开账，账上就多出一座城没有的楼。存在与否用 `try_exists` 问，问不出来按读不了拒绝，而不是当作不存在。
+- **记账点在派工（生效点），不在写入门**：这两份文件有一个在编辑器里动笔的写者，写入门看不见那次写入；
+  生效点看见的是文档本身，两种写者一视同仁。每一个入口——人的派工、城自发的活、计划自己的一行——都经 `prepare_dispatch` 起步。
+
+验收：`assembly::driving::tests::flight` 的三条 `rules_changed` 测试——首见开账、链上前后相接并先于它治理的 run 的每一行、
+重启 fold 出同一本账；往不存在的楼派活只记 city 层一行。
 
 **`halted_by` 并入 `agree_to_work`**：它本来就是唯一守住的那道门，
 现在与其余五道站在一起，于是「城答应什么」读一处就够。
@@ -1691,7 +1736,8 @@ impl Heard { pub(crate) fn spoken(&self) -> Spoken; }
 | `Refused` | 1 | 城在窗口内拒绝了这一帧 |
 | `Answered` | 0 | 城在窗口内答了话，且没有拒绝 |
 | `Quiet` | 3 | 帧发出去了，窗口内**一帧都没回来**——城是否受理，此处无法断言 |
-| （用法错误） | 2 | 参数不是这条命令能读的东西；与城无关 |
+| （用法错误） | 2 | 参数或帧不是这条命令能读的东西；帧在开 socket 之前解析，所以与城无关 |
+| （没有城） | 4 | `--at` 那里没有东西完成握手；帧没有被任何城听见 |
 
 - **`answers` 与 `frames` 是两件事**。握手的 `Welcome` 也是一帧，故 `frames` 恒 ≥ 1；能区分静默的只有
   「命令发出**之后**回来的帧数」。把这一个数放进 `Heard` 而不是在壳里减一，是因为「减一」会把握手协议的形状
@@ -1811,6 +1857,16 @@ socket 上的一次对话与 HTTP 上的一次托管是两件事，同处一个�
 一次派活借走、结束还回（`driving.rs` 的 `self.interrupts.take()`）。一个池意味着同时有 N 轮活在问
 「有人打断我吗」，于是这个钩子从「借走一个」变成「每轮活各注册一份」：`CommandDesk::interrupt_for`
 本来就按 `RunId` 挑命令，这里只是让 N 份 `Relay` 各自带一份指向同一张桌子的注册。
+
+**车道在驾驶的那轮活，它的 Cancel／Steer 留在桌上等车道来取**。记账线程每次被敲醒都读桌子，车道只在安全点读，
+所以两个读者抢同一条命令时几乎总是记账线程先到——它若照 FIFO 取走，路由只能答「没有在飞的 run 认这个 id」，
+而那轮活其实正在跑。于是 `CommandDesk::next(driving)` 带一个「这个 run 此刻在车道上吗」的判定（由
+`RunWorker::drives` 回答，它读 `Flight.driving` 那一张表）：命中的 Cancel／Steer 原位留下，只归
+`interrupt_for` 取；排在它后面的命令照常往下走。挑哪一条、Cancel 压过 Steer 仍只由 `interrupt_for` 一处决定，
+桌子上的这个判定只决定「谁有资格取」。那轮活落地后 `drives` 转为否，还留在桌上的那条才交给路由，
+拒绝的措辞此时是真的。**另一条路被否决**：记账线程先取走、再塞进车道的一个信箱，会让「Cancel 压过 Steer」
+在桌子与信箱两处各判一次。判定与派活都在记账线程上，派活把 run 登记进 `Flight.driving` 之前不会读下一条命令，
+所以「刚派出、还没登记」的窗口不存在。
 
 ### 8-42-2 `bin::serving::relay`——`kernel::Ledger` 的第三个适配器
 
@@ -2583,7 +2639,7 @@ impl Owing {
     /// 继任者接过的同一份义务：接力向前一跳，超上限即 `E_LOOP_SUSPECTED`。
     fn after_succession(&self) -> Result<Owing, AxError>;
 }
-struct Knock { addr: Address, from: String, mode: runtime::Mode, conversations: u32 }
+struct Knock { addr: Address, from: String, mode: kernel::Mode, conversations: u32 }
 fn knock(&mut self, signal: &Signal, speaker: &Address, mode, conversations: u32) -> Result<(), AxError>;
 ```
 
@@ -2859,6 +2915,7 @@ pub(crate) fn asked(args: &[String], no_color: Option<OsString>) -> Asked;   // 
 - **版本只取第一段数字**：先找带点的十进制串（`133.0.3`、`2.43.0`），没有的话取第一个含数字的词并截到 12 个字符（ffmpeg 的 `N-125649-g8d`）。整行贴出会把其它列挤出屏幕，而 `Copyright … 2000-2026` 里的年份正是「取第一个数字」这条更笨的规则会取到的东西。
 - **必备／推荐两段**：必备 = Use 档里挡路的项（`Required` 与 `OneOf`），其余全是推荐（Use 档的可选项加整个 Develop 档）。`Part::of` 是这条划分的唯一权威，页面的两栏读的是同一批字段。
 - **颜色是一份终端可以拒绝的提议**：`NO_COLOR`（无论它设成什么）与 `--no-color` 任一即可，且 `paint` 自己不读环境——ink 是 `screen` 决定后传进来的值，于是测试不必动运行中的机器上的变量就能要到两种答案。
+- **先说话，再探测；探测并行**：标题行在第一项探测开始之前就写出并 flush，于是人面对的不是一块空屏；`examine` 为表里每一项各开一个作用域线程同时问，整份报告的等待是最慢那一项而不是所有项之和（逐项串行时首行要等 2.5 秒）。线程数就是表的行数，不按机器调：每项的成本是等一个子进程回答，不是占一个核。`Machine: Sync` 因此是 trait 的一部分。
 - **总结与下一步**：两段各一行 `n / m ready`（一组算一件），末行是从这里往下的那一条命令——必备齐了是 `sprawling up`，不齐是 `sprawling doctor --install`。
 
 **本章测试**：`one_row_per_item_carries_one_of_four_status_words`、`no_color_is_honoured_from_the_environment_and_from_the_flag`、`a_version_is_the_number_out_of_whatever_the_tool_printed`、`the_report_is_grouped_into_required_and_recommended`、`a_family_of_browsers_counts_once_in_the_summary`。
@@ -2888,7 +2945,7 @@ pub(super) fn tuning_of(wire: channels::EndpointTuning) -> gateway::EndpointTuni
 
 - **`probe_endpoint` 不再因读不出模型表而拒绝**。它记一条 `endpoint_probed`，里面是分段读数（`gateway::reach` 量出，时间由调用方戳，采样点仍只有 `bin::assembly`）、模型表、以及读不出时那条拒绝自己的 code 与 subject。理由是这四段对填表的人是四个不同的下一步，而作为一次拒绝返回时它们在界面上塌成传输库的一句话。**它仍会拒绝的两件事**：凭据引用拼不出来、载荷账本不收——两者都没走到发请求那一步，因此没有读数可报。
 - **`attach_endpoint` 的拒绝语义一个字没改**：probe 失败而人没点名任何模型，仍然是拒绝，因为那样的城连一个可调用的模型 id 都没有。
-- **probe 按调用时的那套头与期限发出**：一个需要自定义请求头的网关，在 probe 不带那个头时答 401，人于是读到「密钥无效」，而那把密钥是好的。`request_max_retries` 在这里被兑现一次——设置页上有人正在等这一个请求；模型调用的那一份由同一个数走另一条路兑现：`dispatching::agreeing` 在选定端点处把它读成 `runtime::Retries` 冻进 `RunPlan`，`runtime::run::drive` 据此决定一次可重试的失败之后还有没有下一次。
+- **probe 按调用时的那套头与期限发出**：一个需要自定义请求头的网关，在 probe 不带那个头时答 401，人于是读到「密钥无效」，而那把密钥是好的。`request_max_retries` 在这里被兑现一次——设置页上有人正在等这一个请求；模型调用的那一份由同一个数走另一条路兑现：`dispatching::agreeing` 在选定端点处把这个 `kernel::Retries` 原样冻进 `RunPlan`，`runtime::run::drive` 据此决定一次可重试的失败之后还有没有下一次。
 - **`tuning_of` 是线上词汇与 gateway 词汇之间唯一的翻译点**：零读成缺省（清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成），空名字的头与不以 `/` 开头的 pointer 被丢掉（表单在人打字时留着空行），`stream_idle_timeout_ms` 成为 `stream_deadline_ms`。
 - **`EndpointsAnswer` 的每一行带 `label`**，取 `AttachedEndpoint::label()`，缺省即 name。
 
@@ -2962,7 +3019,8 @@ impl SseServer {
 impl protocol::Outbound for SseServer { /* call：先 POST 再等流；notify：只 POST */ }
 ```
 
-- **先开流，再说话**：规范让 server 把消息端点作为第一个事件播出来，故在流开口之前无处可投。开流因此自带期限（15 s），一台始终不播端点的 server 被拒，而不是被投到一个猜出来的路径上。播出的多半是一条路径而不是整条地址，故按流自己的地址解析——一台在反向代理后面的 server 只知道它自己那条路径。
+- **先开流，再说话**：规范让 server 把消息端点作为第一个事件播出来，故在流开口之前无处可投。开流因此自带期限（15 s），一台始终不播端点的 server 被拒，而不是被投到一个猜出来的路径上。
+- **15 s 只管「开口并播出端点」，不管流本身**：reqwest 的请求级 `timeout` 从连接一直算到响应体读完，而这条流的响应体就是整段对话，挂在 GET 上它会在 15 s 后把一条好好的流掐断，此后每次调用都读到「流已结束」。故 GET 不带请求级期限，连同发送一起放进读取线程；读取线程送出的第一条要么是开流失败（`Err`，原样是 `unreachable`／`refused` 的那条错误），要么是播出的端点，这一侧对这第一条带 15 s 期限等——连不上、不答头、不播端点三种挂法都落在同一个期限里，而流一旦开口就只由每次调用自己的 `patience` 约束。阻塞 client 自带 30 s 的整请求默认期限，同理对这条流致命，故 client 以 `timeout(None)` 建成，每次 POST 各带自己的 `patience`。播出的多半是一条路径而不是整条地址，故按流自己的地址解析——一台在反向代理后面的 server 只知道它自己那条路径。
 - **读取线程与 `bin::mcp_stdio` 同形、同理由**：读流没有自己的期限，故一条线程把阻塞读变成这一侧可以带期限等的通道；丢掉最后一个句柄即丢掉接收端，下一次发送结束读取线程。
 - **一次 POST 不是一个答**：对侧用 202 收下并一言不发，答随后作为事件到达。故 `call` 先投再等流，`notify` 投完即止。
 - **克隆共用同一条流**：一台 server 是一次对话，无论一次 Run 握着它几件工具；两条流会让一次调用的答落在调用方没有在读的那一条上。
@@ -3101,13 +3159,6 @@ impl RunWorker { fn halted_by(&self, addr: &Address) -> Option<kernel::event::Sc
 
 **本章测试**：`an_unreadable_approval_item_stops_the_fold`（`assembly::folds::tests`）、`an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted`（`kernel::event::record::governance`）。
 
-### 8-75 给活取名失败时，人被告知的是真正的原因（`assembly::dispatching::session::name_the_work`；Roadmap B-54）
-
-- **缺陷**：七处 `.ok()?` 把凭据兑不出、适配器造不出、调用没回来、回复读不懂全部折成一个 `None`，而调用方把 `None` 一律翻成「自己给房间取个名字」。一个 provider 连不上的人被指去填一个字段。
-- **改法**：`name_the_work` 返回 `Result<Option<SessionName>, AxError>`。`Ok(None)` 只留给「模型答了，而它答的不是一个合法的会话名」——包括回复里一个字都没有。其余每一条按它本来的错误上抛，`session_for` 的三段式拒绝因此只在真的该由人补名字时出现。
-
-**本章测试**：类型即判定依据——`Ok(None)` 只有一个来源，编译器守住其余每一条错误路径；既有的 `a_confidential_building_will_not_name_a_room_with_a_model_off_this_machine`（`assembly::dispatching::tests`）仍钉住「该由人补名字」那一条走到三段式拒绝。
-
 ### 8-76 哪些记录会动计划，是一张穷尽表（`plan_view::may_move_plan`；Roadmap B-55）
 
 ```rust
@@ -3208,10 +3259,11 @@ fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<Strin
 - **一条规则一个家**：`endpoint_of` 是 probe 与 attach 共用的那道门，空引用的读法因此只有它一处，`ProbeEndpoint` 与 `AttachEndpoint` 不可能对同一个空框给出两种答案。
 - **空不是删，删是另一个动词**：`DetachEndpoint` 已在，它说的才是「拿掉」。一个既能表示「不改」又能表示「删掉」的字段，会让每一次不相干的编辑都带着删除凭据的风险。
 - **留引用、重算头**：归档的是 `AuthSpec`（头 + 引用），沿用的只是引用，头按这次进来的接口形态重算——同一把 key 从 chat 面挪到 messages 面要从 `Authorization: Bearer` 变成 `x-api-key`，照抄旧头会对一把好 key 答 401。人自己命名的头仍然压过推导，`Credential::Absent` 因此带着 `header`。
+- **订阅令牌只走 `Authorization: Bearer`**：头由引用的种类与接口形态一处推出（`bin::assembly::credentials::subscription::auth_for`），`Absent`、`Key`、`Subscription` 三条路都经过它。引用名为 `oauth` 的是某家订阅的 access token，厂商只认 Bearer，所以它不随 messages 面改成 `x-api-key`；否则只改了超时的一次重存就会让 Claude 订阅开始答 401，手工填 `secret:anthropic/oauth` 接上也会落到同一个错头。人自己命名的头照旧压过推导。被否决的备选：按归档的头原样沿用——那会让 API key 在换面时带着旧头 401。
 - **前端说的话此后是真话**：`lang.json` 的 `setup_key_stored`（「此名下已有密钥，留空则沿用」）先前只在表单自己还记得引用时出现，而城当时并不沿用。现在城沿用，那句话改为在**城说这个 id 有凭据**时出现——一句话一个家，不新增第二个键。
 - **被否决的备选**：① 把 `secret:realm/name` 放进 `EndpointSummary` 让表单送回来——凭据引用是城的内政，上线只为让页面把它原样送回，等于给同一个事实开第二个家，还多一条泄露面；② 让表单按约定重新拼出引用（`referenceOf(id)`）——那只对这张表单自己登记过的 key 成立，`import` 与环境变量来的端点引用不同名，会把别人的引用送进这一个端点。
 
-**本章测试**：`credentials::tests::endpoints::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用。
+**本章测试**：`credentials::tests::kept::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用；`credentials::tests::kept::a_subscription_token_keeps_its_bearer_header_when_the_settings_are_saved_again`——messages 面上以订阅引用接上、再空框重存，模型表请求都带 `authorization: Bearer`，端点的 `auth` 仍是 `Bearer`。
 
 ### 8-82 同一个地址上的新一段：`/new`（`bin::assembly::commanding::sessions`、`Command::OpenSession`、`EventKind::SessionOpened`）
 
@@ -3277,7 +3329,7 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 | 仪表 | 场景 | 读数 |
 |---|---|---|
 | `instrument_relay_round_trip` | 一轮活停在它的第一次模型调用上（provider 不作答），于是循环处在「有车道在跑」的那个形状里；另一条线程拿 `measuring_relay` 连续追加 200 条，逐条计时 | `store=disk`：城自己的 `JsonlLedger`，每条一道屏障；`store=memory`：同一个 `JsonlLedger` 开在 `memory::FaultFs` 上，屏障是一次内存拷贝；另给 `store=memory` 不过河时自己的追加耗时，两者之差就是过河本身 |
-| `instrument_dispatch_gap` | 移植自 perf-latency 的双派活场景：run A 在 `lab/east` 跑 30 个 `status` 回合；A 的第五次模型调用到达时，往楼 `lab`（不带房间，于是要请 digest 模型取名）派 run B，provider 把取名那次调用压 3 s | A 相邻两条记录 `t` 之差的最大值与中位数，单位 ms |
+| `instrument_dispatch_gap` | 移植自 perf-latency 的双派活场景：run A 在 `lab/east` 跑 30 个 `status` 回合；A 的第五次模型调用到达时，往楼 `lab`（不带房间，按 8-86 的规则取名）派 run B；provider 把任何含取名提示的调用压 3 s，所以一旦派活重新向模型要名字，读数会显示出来 | A 相邻两条记录 `t` 之差的最大值与中位数，单位 ms |
 
 `instrument_relay_round_trip` 另断言内存存储过河的 p50 不超过 1 ms（`ROUND_TRIP_P50`）：那条往返里除了一次内存拷贝全是 harness，所以它量的就是 harness。磁盘存储只报读数不断言：它的中位数是设备的 fsync，这是物理下限，因机器而异，一个写死的毫秒数只对一类机器成立；它与内存那一行之差才是磁盘的份额。目标还有一条没写成断言：内存存储过河的 p50 不超过 10 µs，它只在 `--release` 下有意义，而 `crossing=none` 那一行在调试构建里已是 20 µs 量级。
 
@@ -3286,6 +3338,79 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 **决定**：仪表放在 crate 内的测试里，而不是给 citysim 开一扇公共门。relay、`serve_flight` 与 desk 都是 `pub(crate)`；为量它们而开的公共面没有生产调用者，而且要进 apisync 基线。**败给的方案**：citysim 经 `RunWorker::handle(Dispatch)` 从外面驱动，再用 provider 两次请求之间的空隙推算 relay 往返。那个空隙里还有围栏（每波 20–90 ms）与工具，推算出来的是每回合剩余，不是一次往返。
 
 **重开参数**：两件仪表只经过 desk、relay 与 provider 三个面；`attend` 的等法再怎么改，只要这三个面不变，仪表就不用改。
+
+### 8-85 每个模型一段追加提示词（`bin::assembly::freezing::model_note`，形状 4 适配器）
+
+同一套城规、楼规与身份，交给不同的模型时常常要补一两句只对那个模型说的话（例如某个模型爱省略测试输出，某个模型需要被提醒先读再改）。这段话放在城里一处、按 provider 与模型分文件：
+
+```rust
+pub(super) const MODELS_DIR: &str = "models";            // <city>/.sprawling/models/<provider>/<model>.md
+pub(super) struct ModelNote { pub(super) at: Address, pub(super) bytes: Vec<u8> }
+/// 这次派活选中的 endpoint 名与模型 id 下的那段话；文件不在即 None。
+pub(super) fn model_note(city_root: &Path, provider: &str, model: &str) -> Result<Option<ModelNote>, AxError>;
+```
+
+- **位置只有一处，在城一级的保留区里**：`<city>/.sprawling/models/<provider>/<model>.md`，`<provider>` 是派活时选中的 endpoint 名（`AttachEndpoint` 的 `name`），`<model>` 是模型 id 原样。放在保留区而不是城根，是因为城根下的目录名就是楼的地址，一栋叫 `models` 的楼会与它撞名；保留区也是居民写不到的地方，一段约束模型的话不该由被约束的模型改写。楼一级不设第二处：两处就要回答「楼的那段覆盖还是追加城的那段」，而今天没有一个读者需要这个区分。
+- **追加在 run 段末尾，因而在整段 system prompt 的末尾。** 与楼段接 `AGENTS.md` 走同一扇门（`Assembled::extend`：空一行接上，记一行来源）。它随 run 段一同冻结、一同入库，整个 run 内字节不动，所以每一回合的缓存前缀都盖得住它；`prompt_assembled` 的 run 段哈希盖住它的字节，来源行写出它的地址与长度，WebUI 的提示词视图（sprawling-SPEC §8-67）因此照原样列出「这个 run 用的是哪个模型的哪一段」。重放读的是账本里那一行，不重新读文件，故逐字节一致。
+- **文件不在，行为逐字节与没有这个功能时相同**：run 段不多一个字节，来源表不多一行。
+- **文件在却读不出**（权限、目录占位、不是文件）是 `E_STORAGE_FATAL`，指名那条路径，派活被拒；不静默跳过，理由与 `city_segment` 相同：人写下的那段话静静躺在盘上没被读，而 run 照着缺了它的提示词干活，没有人会被告知。
+- **地址先于路径。** 位置先按地址文法拼出（`Address::parse`），再落到盘上。模型 id 若含地址文法拒绝的字符（`:`、`\`、`.`／`..` 段），它在城里就没有可指名的那段话，按「没有文件」处理；先拼路径再读则会让一个含 `..` 的 id 读到保留区以外的文件。
+- **被否决的备选**：把它做成第五段。四段恒四是 `FrozenPrefix` 的类型（runtime-SPEC §8-4），`verified_system_hashes` 与 `rebuild_prefix` 都按四段对拍；为一段随模型而变、随 run 冻结的文字加一个槽位，要改的是三个 crate 的冻结不变量，换来的只是一个本来就能从来源行读出的边界。重开条件：有读者需要按模型单独缓存这段话（例如跨 run 的缓存断点放在它之前）。
+
+**本章测试**：`freezing::tests::model_note::a_note_for_the_chosen_model_ends_the_system_prompt`——为 `house/m-local` 放一个文件，派活发出的请求里最后一条 system 消息以这段文字结尾；`freezing::tests::model_note::a_note_for_another_model_is_not_sent`——别的模型的那段话不出现。
+
+### 8-86 房间名按规则取，起名不调用模型（`bin::assembly::dispatching::session`）
+
+```rust
+// bin::assembly::dispatching::session —— shape: decision（`session_for`、`rule_name`）
+/// 人给了名字、或地址已含房间时原样返回；地址只有一段且没有名字时返回 `rule_name(task)`。不调用模型。
+pub(super) fn session_for(addr: &Address, session: Option<SessionName>, task: &str) -> Result<Option<SessionName>, AxError>;
+/// 任务原文里前四个 ASCII 字母数字词，小写，用 `-` 连起来；一个也没有、或拼出保留名时是 `work`。
+/// 结果总是合法的 session 名；`SessionName::parse` 仍是判定者，所以签名带着它的错误。
+pub(super) fn rule_name(task: &str) -> Result<SessionName, AxError>;
+```
+
+**规则**：派到一栋楼（地址只有一段、旁边没有 session）上的活，房间名由 `rule_name` 从任务原文里取：按非 ASCII 字母数字字符切词，丢掉空词，取前四个，转小写，用 `-` 连起来；每个词最多留前 15 个字符（`RULE_WORD_MAX`），所以四个词加三个连字符最长 63 个字符，总在 `SessionName::parse` 的上限 64 之内，规则名永远是合法的 session 名。一个 ASCII 词也没有、或这些词拼出城自己保留的名字而被 `SessionName::parse` 拒绝时，名字是 `work`。重名由 `city::open_room` 加序号（`work`、`work-2`……），规则本身不查盘。
+
+**为什么**：模型的回答不受字符集约束，而 `SessionName::parse` 接受任何不含分隔符的文字：一个回了「收到。」的模型会让 run 落进人找不到的房间 `shop/收到。`。问模型要名字还挡在首字前面：派活要先等一次完整的非流式调用，再发出 run 的请求。规则名在记账线程上用几微秒算出，不读 book、不读 vault、不起线程，派活帧到达后发出的第一条 provider 请求就是 run 本身（`a_bare_building_is_named_by_rule_and_the_run_is_the_first_call`）。机密楼的任务原文也不会为了起名被发给任何模型。
+
+**决定**：完全不调用模型起名。**败给的方案**：保留模型起名，放到 run 开始之后，再校验长度与字符集、失败时回落到规则名。那样房间要么在 run 开始后改名（房间是 dispatch 在盘上写的第一件事，ARCHITECTURE §5 第 3 步，run 的文件已经在里面），要么多出一个只为改名存在的线程与在飞计数；一个人要一个好找的名字时，发到 `building/name` 就有。只含非 ASCII 文字的任务都叫 `work`、`work-2`，这是这条规则的代价；让它重新值得调用模型的参数是：一个名字能在 run 开始前、不增加首字延迟地取到。
+
+### 8-87 粘进派活里的 key 进 vault，文字里只留引用（`bin::assembly::dispatching::custody`）
+
+**原因**：人在页面上把一把 provider key 粘进任务或目标时，这段文字原样进了三处：发给模型的请求、账本里的派活记录、房间里的 `JOB.md`。三处都能被城里的居民 `grep` 到，账本还会随城搬走；而 `kernel::secret::scan` 早已能认出这些形状，只是派活这道门从不问它。
+
+```rust
+// bin::assembly::dispatching::custody（形状 4 适配器）
+impl RunWorker {
+    /// 把文字里每一段 provider 形状的 key 存进 vault，原处换成它的 `secret:` 引用。
+    pub(in crate::assembly) fn take_custody(&mut self, text: String) -> Result<String, AxError>;
+}
+```
+
+- **一道门，一处权威**：调用点是 `prepare_dispatch` 里 `agree_to_work` 之后、`session_for` 之前。人打的派活、外面敲门的唤醒、计划推进起的活都经过这里，所以三种入口不会各有一套规矩；放在同意之后，是因为存 key 是一次写入，而城不肯接的活什么都不写；放在命名之前，是因为命名要把任务文字发给摘要模型。
+- **认什么由 `kernel::secret::scan` 定**：只换形状表命中的段（`SecretSpan::provider` 为 `Some`）。熵命中不换：提示里的提交哈希、校验和也是高熵串，换掉它们，居民就读不到它要处理的那个值，而形状表列出的前缀不会出现在这类值里。
+- **存进现有的 `gateway::Custodian`**：它按机器选后端——系统的凭据服务，或用口令派生密钥、逐条 ChaCha20-Poly1305 加密的 `encrypted-file`（gateway-SPEC 8-21）。另起一把 AES-GCM 密钥就是同一件事的第二个家，也会多出一处密钥要保管。
+- **引用是 `secret:pasted/<provider>-<seq>`**，`<seq>` 是存这把 key 时账本的下一个序号。每存一把 key 都追加一条 `secret_captured`（`origin: "pasted"`），所以序号不会重复：同一毫秒的两次派活也不会让后一把覆盖前一把。名字里不放时间，也不放随机数，citysim 回放时仍逐字节一致；也不放 key 的哈希或尾巴，`secret_captured` 的规矩是记录行里不带明文，也不带哈希前缀。
+- **失败**：vault 拒绝写入时整个派活失败，错误原样返回（`E_CONFIG_INVALID`，恢复语由 vault 给出）。此时房间和 `JOB.md` 都还没写；如果照原文继续派活，正是这一节要堵的泄露。
+- **被否决的备选**：① 在页面上拦下粘贴，让人先去设置页登记——人粘 key 的时候，多半就是要居民用它，拦下来只会让人换个地方再粘一次；② 在请求出门时替换——账本和 `JOB.md` 在出门之前就已写下原文。
+
+**居民写的文件**：居民往城里写文字只有一道门，`edit` 工具（`runtime::EditTool`）。装配台登记它时包上一层 `bin::assembly::workbench::tools::kept`：
+
+```rust
+// bin::assembly::workbench::tools::kept（形状 4 适配器）
+pub(in crate::assembly) struct KeptEdit { /* runtime::EditTool, vault, 名字前缀, 计数 */ }
+impl kernel::Tool for KeptEdit { /* invoke: 先把 `new` 交给 custody，再交给 EditTool */ }
+```
+
+- 同一段替换逻辑：派活文字和 `new` 参数都经过 `custody::kept_text`，所以认什么、怎么切、切歪了怎么报错只有一处。
+- **引用是 `secret:written/<provider>-<pos>-<n>`**：`<pos>` 是装配台摆出时账本的位置，每次派活在摆台之前都写过记录，所以两次派活的 `<pos>` 不同；`<n>` 是这次派活里第几把。工具运行在 drive 里，拿不到 `&mut RunWorker`，写不了账本，所以不能像派活那样用存 key 时的下一个序号。
+- 写进文件、回给模型的 diff 里只有引用；vault 拒绝写入时这次 `edit` 失败，文件不动。
+- **被否决的备选**：在 `runtime::EditTool` 里扫描——那要让 `runtime` 认得 vault，而 vault 属于装配层；包一层就不必改 `runtime` 的公开面。
+
+**尚未覆盖**：① 居民写的 key 没有 `secret_captured` 记录，因为工具拿不到账本；要补就得把引用放进一张 desk，drive 结束后由装配层补记。② 工具输出（`runtime::tools` 的结果）还没经过 custody，它的入口是外部内容的那一道门。③ 模型回复里的工具参数原样进账本；`exec` 写的文件不经过 `edit`。
+
+**本章测试**：`assembly::dispatching::custody::tests::a_pasted_key_reaches_the_vault_and_nothing_else`——任务文字里夹一把 `sk-ant-` 形状的 key 派活，断言：模型收到的每个请求、城目录下的每个文件（账本和 `JOB.md` 都在其中）都不含原文；请求里带着 `secret:pasted/anthropic-…` 引用；vault 按这个引用解出的正是原文。`assembly::workbench::tools::kept::tests::a_written_key_reaches_the_vault_and_not_the_file`——模型用 `edit` 新建一个含 key 的文件，断言：文件里没有原文，只有 `secret:written/anthropic-…` 引用，vault 按这个引用解出原文。
 
 ## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
 
@@ -3307,4 +3432,153 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 
 **一句话规则**：City.md 的每一句都必须对 `EPHEMERAL_SEGMENT` 扮下的工人成立——它只有 `JOB.md`、不共享楼、不写 Memo。不成立的降级到 `RULES.toml` 或模式的 catalog 条目，**不降级到 `URBANITE.md`**：那份文件坐在常驻自己的地址上，它改得动，把城级规则放进去等于让被约束者起草规则（`hall.rs` 把市长与书记的身份放在保留子树，理由同一条）。
 
-**`crates/eval::ablation` 是这一章的尺**：它按段落切除文档、报出每段独占哪些能力。当前读数是 12 段、32 项能力、**全部独占**（无一 `Restated`），即每项能力恰好一个家。
+**`citysim::ablation` 是这一章的尺**：它按段落切除文档、报出每段独占哪些能力。当前读数是 12 段、32 项能力、**全部独占**（无一 `Restated`），即每项能力恰好一个家。
+
+## 8-88 开城的次序：先占端口，再写第一行，最后才说 running（`bin::serving::worker`、`main::city`）
+
+**原因**：一座城曾经可以同时有两个写者。第二个进程对同一座城执行 `serve` 时，写者线程在 bind 之前就已经打开；bind 失败后它照常收口，往账本里写了一行「人主动关城」的 handoff。那是没有人做过的事，而且是一次分叉：两个进程各自用同一个 `prev` 写了同一个 seq。`sprawling is running.` 这行横幅则在这一切之前就印了出来。
+
+**次序**，`serving::listen` 是它唯一的定义：
+1. 判定绑定面，然后 bind（`channels::bind`，channels-SPEC §8-46）。端口被占、或者暴露的地址没有令牌，都在这里拒绝，账本一字未动。
+2. 建 CAS 目录，从账本重建视图（只读）。
+3. 开写者线程：`RunWorker::new` → `JsonlLedger::open` 先取写者锁（memory-SPEC §8-1），再做断尾恢复，再 `open_for_service`。锁被别的进程持着，就是 `E_LEDGER_HELD`；已经绑定的监听器随之放掉，账本一字未动。
+4. 返回 `Listening`。到这一步，一次 serve 能做的拒绝都已经做完。
+
+然后调用方印横幅、打开浏览器，再调用 `Listening::serve` 开始应答。
+
+```rust
+pub async fn listen(serving: Serving) -> Result<Listening, AxError>;
+#[must_use] pub struct Listening { /* Bound、ServeConfig、命令台、应答函数、写者线程、控制台 —— 私有 */ }
+impl Listening {
+    /// 应答，直到人停城；返回前 join 写者线程。
+    pub async fn serve(self) -> Result<(), AxError>;
+}
+```
+
+- **横幅排在后面，是类型排的**：`serve_city` 只有拿到 `Listening` 才走得到印横幅的那一段（`main::city::print_banner`），`listen` 失败就报错退出。所以「running」只在监听已经开始、写者已经持锁之后出现。日志级别那一行和「这个终端就是控制台」两行跟在横幅后面；控制台本身在 `Listening::serve` 里才启动，它的输出因此也排在横幅之后。
+- **bind 在取锁之前**：锁在 `JsonlLedger::open` 里取，而 `open` 可能做断尾恢复、写一行 `log_truncated`。要把取锁挪到 bind 之前，就得把取锁从打开里拆出来，给城的写者第二个入口。bind 在前的代价是：同一座城、同一个端口上的第二个 `serve`／`up` 报的是端口被占（`E_CONFIG_INVALID`，recovery 叫人停掉占着端口的进程），而不是 `E_LEDGER_HELD`。两种拒绝都发生在写任何东西之前。
+- **`resume`、`fork`、`adopt` 不 bind**，它们直接经 `RunWorker::new` 打开账本，所以城在服务时，它们得到 `E_LEDGER_HELD`。
+- **`form_city` 把自己开的写者交给 `RunWorker::over`**，而不是写完头两行之后再用 `RunWorker::new` 开第二个。同一个进程里的两个 `JsonlLedger` 各有一份 seq 与 prev；有了写者锁，这种情形在打开时就被拒。
+- **被否：保留单个 `serve(Serving)`，把横幅做成 `Serving` 里的一个回调**。回调在库的异步任务里执行，打印什么、何时打印就由库决定。两步的形状让调用方自己决定监听开始后做什么，库只保证那个时刻已经到了。
+- **`Listening` 不 serve 就丢掉，写者线程会一直等到进程结束**，也写不出 handoff；`#[must_use]` 让这种写法在编译时就有警告。
+- **重开参数**：如果出现一个在 `listen` 返回之后仍可能失败、失败时又需要收回横幅的步骤，就重新考虑这个切分。
+
+**本章测试**：`serving::tests::a_serve_refused_at_the_socket_writes_no_line`：测试自己先占住端口，`listen` 返回错误，账本的每一行与之前逐字节相同。锁的那一半由 memory 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go` 守住。
+
+### 8-89 视图在自己的线程上折叠，写线程不等读者（`bin::serving::folding`）
+
+```rust
+// bin::serving::folding —— shape: adapter
+pub(super) struct Folding {
+    pub(super) observer: Box<dyn FnMut(&EventRecord) + Send>,
+    pub(super) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    pub(super) thread: std::thread::JoinHandle<()>,
+}
+pub(super) fn spawn_folding(
+    views: Arc<Mutex<Views>>,
+    to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+) -> Result<Folding, AxError>; // StorageFatal「start the view fold」：线程起不来
+```
+
+**写线程只做一次 `send`。** 观察者（`observer`）与机器体检的落点（`machine`）都只把一份 `Fold`（一条已提交的记录，或一份 `DoctorAnswer`）放进无界 `mpsc` 通道，然后返回；名为 `sprawling-views` 的线程按到达顺序取出，锁住 `Views` 折叠，放锁之后才把记录广播给客户端。被拒：观察者在写线程上直接 `lock()`，读者（例如变更页的 `GitStatus` 在锁内跑 `git status`）持锁多久，写线程的下一次落盘就晚多久——一个 run 相邻事件的间隔被一个页面拉长。
+
+**广播排在折叠之后。** 客户端收到一条记录再去查询，查到的视图已经含有这条记录；把广播留在写线程上会让事件先于视图到达。代价是广播会等读者，写线程不会。
+
+**锁中毒要说出来。** 中毒之后视图不再折叠（半折的状态不可信），第一次遇到时向标准错误写一条诊断，指出从哪条记录起视图停在了哪里、以及恢复办法（重启服务，视图从 Ledger 重建）；此后的记录照常广播。只写一次，因为之后每条记录都是同一个事实。
+
+**线程随写线程结束。** `attend` 返回后写线程丢掉 `RunWorker`（连同观察者与 `machine`），通道随之关闭，折叠线程把通道里剩下的折完、广播完再退出；写线程 join 它之后才结束，所以 `serve` 对写线程的 join 也等到了最后一次广播。
+
+**尚未做到的（本节接口的当前状态）**：查询仍在锁内作答，`GitStatus` 等做 I/O 的查询仍在锁内做 I/O，所以读者之间、以及读者与折叠线程之间仍会互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取、把 I/O 移到锁外（锁内只取所需的小数据），是这一接口余下的两步。
+
+## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
+
+**形状。** `main/verbs.rs` 是 data：一张静态表 `VERBS`，每个动词一行 `Row { verb, name, aliases, positionals, flags, says, effect }`。位置参数是 `(名字, Need::Required | Need::Optional)`；标志是 `Flag { name, takes: Takes::Nothing | Takes::Value(<占位名>), says }`；`effect` 是 `Effect::ReadsOnly | Effect::Changes`，标出这个动词运行时会不会改一座城或它所在的主机。总览（`help`、`--help`）、单个动词的帮助（`help <verb>`、`<verb> --help`）与首屏退出时的清单都由这张表生成，没有第二份手写的命令清单或用法字符串。
+
+`main/grammar.rs` 是 grammar：纯函数，不做 I/O。
+
+```rust
+pub(super) fn parse(words: &[String]) -> Result<Invocation, LineError>;
+pub(super) enum Invocation { FirstScreen, Overview, Help(Verb), Version, Run(Verb, Arguments) }
+impl Arguments {
+    pub(super) fn positional(&self, nth: usize) -> Option<&String>; // 从 1 数
+    pub(super) fn has(&self, flag: &str) -> bool;
+    pub(super) fn value(&self, flag: &str) -> Option<&str>;        // 同一标志给两次，后者胜
+}
+pub(super) enum LineError {
+    UnknownVerb { given, nearest }, UnknownFlag { verb, given, nearest },
+    MissingValue { verb, flag }, MissingPositional { verb, name }, ExtraPositional { verb, given },
+}
+```
+
+**优先规则。** `--version`/`-V` 出现在任何位置都得 `Version`；其次 `--help`/`-h` 出现在任何位置都得那个动词的 `Help`（没有动词时得 `Overview`）。两者都在任何动词运行之前决定，所以 `up --help` 不写创世记录、`install --help` 不改 PATH。`version` 是 `status` 的别名，`enroll` 是 `enrol` 的别名。
+
+**标志与位置参数。** 以 `--` 开头的词（单独的 `-` 除外，它是 `call` 的「从 stdin 读帧」）只按该动词这一行的标志表读；带值的标志吃掉下一个词，所以 `serve <city> --log debug` 的地址取默认值而不是 `debug`。表里没有的标志是 `UnknownFlag`，多出来的位置参数是 `ExtraPositional`，缺了必填的位置参数是 `MissingPositional`。
+
+**命令行错误。** 每个 `LineError` 在 stderr 上写一行 `sprawling: <哪个参数、错在哪>. Did you mean '<最近的合法写法>'?`，退出码 2，不再倾倒整张表。恢复语就是那条「最近的写法」：`nearest` 取与所敲的词共享最长前缀（至多四个字符）的已知名字，所以 `stauts` 得 `["status"]`。
+
+**本节接口的当前状态。** `call`、`enrol`、`install`、`fork`、`status`、`serve` 的标志值与 `doctor` 的全部参数，仍由各自的函数从原始 argv 读（`router::flag_value`、`args.iter().any`），解析器只替它们校验；改为只读 `Arguments` 之后 `flag_value` 删除。README、README.zh-CN、LLM.md、`docs/operating.md` 里的命令语法块还是手写的，改由 `cargo xtask docnum` 从这张表生成（一个名为 `cli_verbs` 的受管区块）是下一步；`nearest` 与 `console::language` 里找近似动词的那一份是同一条规则的两份，合并到一处也是下一步。
+
+**决定。**
+
+1. 不用 clap。命令表是数据，解析器约两百行；启动时间几乎全是操作系统的开销（Windows x86-64 桌面级机器上，`--version` 首字节 7.98 ms，空进程下限 5.40 ms），没有给一个参数库的依赖、编译时间与体积留出位置。重新考虑的条件：动词需要子动词或 shell 补全以外的、这张表表达不了的结构。
+2. 不用 `+` 前缀区分动词。现有动词不改名，一个词仍然是一个动词，文档与肌肉记忆都不必迁移。
+## 8-90 开城时修过什么，要说给人（`bin::assembly::lifetime`、`bin::assembly::genesis`、`bin::serving::attending`）
+
+**原因**：`JsonlLedger::open` 在断尾恢复时截掉撑裂的尾行，并返回 `OpenReport`（memory-SPEC §8-1）。账上虽然多了一行 `log_truncated`，但页面不画它，CLI 也不读它；`RunWorker::new` 与 `form_city` 把报告丢掉，人于是不知道上一次进程死时丢了几个字节。
+
+**形状**：值（形状 2）。`RunWorker` 持有 `LedgerOpening`，它是 `OpenReport` 在本 crate 的类型化状态，只由 `LedgerOpening::from(OpenReport)` 生成：
+
+```rust
+pub(crate) enum LedgerOpening { Intact, TailDropped { bytes: u64 } }
+impl From<memory::OpenReport> for LedgerOpening { … }
+impl LedgerOpening {
+    /// 给人看的一句：截掉了什么、为什么、怎么恢复；`Intact` 答 `None`。
+    pub(crate) fn notice(self) -> Option<String>;
+}
+impl RunWorker {
+    // 第四个参数就是 JsonlLedger::open 返回的那一对：账与它开时修过什么一起到，调用方没法只交一半。
+    pub(crate) fn over(&Path, Custodian, Diagnostics, (JsonlLedger, OpenReport)) -> Result<Self, AxError>;
+    pub(crate) fn opening(&self) -> LedgerOpening;
+}
+```
+
+- **到人的两条路**：`sprawling resume` 的 `ScanReport::summary()` 在断尾时多一句 `notice()`；`sprawling serve` 的写者线程在开账之后、`open_for_service` 之前把同一句印到 stderr，先于横幅出现。两处读的都是同一个 `notice()`，措辞只有这一个来源。
+- **`form_city` 不丢报告**：它只在目录没有账本时开账，报告因此恒为 `Intact`；它照样把 `open` 返回的那一对原样交给 `over`，让「worker 知道自己的账是怎么开的」对每条构造路径都成立，而不是靠一句注释说这里不会发生。
+- **恢复**：截掉的是进程死时没写完的那一行，它之前的每一行都已按链校验。人要做的是确认最后一次动作是否需要重做；要逐字节看原状，就在再次打开之前从备份拷回 `.ledger`。
+- **仍未到页面**：页面对 `log_truncated` 什么也不画（`client/src/core/belief.ts` 把它归进不显示的一组）。让城页说出这件事，需要一个视图字段与客户端的一个位置，这是本节接口尚未覆盖的一半。
+- **不进公开面**：`ScanReport::summary()` 是跨出 crate 的唯一读法，`LedgerOpening` 因此留在 `pub(crate)`，`apisync` 基线不动。
+- **被否：只把 `notice` 写进 `Diagnostics`**。`serve` 默认不开日志，`resume` 用的是 `Diagnostics::off()`，写进去就等于没说。
+
+**本节测试**：`assembly::lifetime::tests::a_torn_tail_is_told_in_the_startup_scan`：写一座城，在账尾追加半行，`RunWorker::new` 后 `startup_scan().summary()` 必须说出截掉的字节数。
+
+## 8-91 退出码是一张表（`bin::main::exit`、`bin::main::calling`、`bin::main::refusal`、`bin::wire_client`）
+
+```rust
+pub(super) enum Exit { Done, Refused, Line, Quiet, NoCity }   // 0 1 2 3 4
+impl From<Exit> for std::process::ExitCode;
+pub(crate) enum Unheard { Unreadable(AxError), NoCity(AxError), Broken(AxError) }
+pub(crate) fn call(at: &str, frame: &str, token: Option<&str>, quiet: Duration) -> Result<Heard, Unheard>;
+pub(super) enum Form { Human, Json }
+pub(super) fn written(err: &AxError, form: Form) -> String;
+```
+
+| 码 | `Exit` | 它断言的事实 |
+|---|---|---|
+| 0 | `Done` | 做完了 |
+| 1 | `Refused` | 城或所在机器拒绝了，stderr 上有 `AxError` 的失败行与 recovery 行 |
+| 2 | `Line` | 这条命令行读不懂，包括 `call` 的帧不是 wire 能载的东西 |
+| 3 | `Quiet` | `call`：帧发出去了，安静窗口内什么都没回来 |
+| 4 | `NoCity` | `--at` 那里没有城在答：连不上，或连上了却没有回握手 |
+
+`Exit` 是退出码的唯一定义；数字只在 `From<Exit> for ExitCode` 里出现一次。`wire_client::call` 用 `Unheard` 说清没听到回答的原因：帧解析失败是 `Unreadable`（映射到 2），连接、发送问候或等 `Welcome` 失败是 `NoCity`（映射到 4），握手之后连接断了或本进程起不了 runtime 是 `Broken`（映射到 1）。三者都照常在 stderr 上印 `AxError` 的失败行与 recovery 行。
+
+拒绝怎么写由 `refusal::written` 一处决定，它只管文字，不管写到哪里；调用方把结果写到 stderr。`Form::Human` 是失败行、`recovery:` 行，`AxError` 带 `nearby` 时再加一行 `nearby: a, b`，给人读的拒绝也指出附近能用的名字。`Form::Json` 是一行 `AxError` 的 serde（与 wire 上 `Refusal` 同形），反序列化回来与原值相等。`call` 带 `--json` 时用 `Form::Json`，其余调用方用 `Form::Human`。
+
+**本节接口的当前状态。** 只有 `call` 返回 `Exit`；其余动词仍返回 `ExitCode`，经 `city::report` 得 1。`--json` 目前只有 `call` 接受。还没做的是：其余动词的 `--json`、kernel 的命令行错误码（先改 kernel-SPEC 的 `AxCode` 表）、以及「动词 × 模式（终端、管道、`--json`）→ 退出码与输出流」的整张表。`doctor` 已经只在 stdout 是终端且没有 `NO_COLOR` 时着色（§8-59）。
+
+**决定。**
+
+1. 没有城单列为 4，而不与 1 共用。1 说的是城读了这一帧并拒绝，一个 agent 据此改帧重试；没有城时帧没有被任何城读过，该做的是起城或改 `--at`。两件事共用一个码，就把后者读成了前者。
+2. 帧写错退 2 而不是 1。帧在开 socket 之前解析，错在这条命令行本身，与城无关；被否决的备选是沿用 `WireMismatch` 的 1，它让一个拼错的帧和城的真实拒绝无法区分。
+3. 握手之后断开归 1 而不是 4。那时已经有城答过 `Welcome`，城在；断开是这次对话的失败，不是地址上没有城。
+4. `--json` 的拒绝是 `AxError` 自己的 serde，而不是另起一个命令行专用的 JSON 形状。wire 上的 `Refusal` 已经是这个形状，一个 agent 用同一个反序列化读城的拒绝和命令行的拒绝；另起一种形状，就要在两处维持同一组字段。

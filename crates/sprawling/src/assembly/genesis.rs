@@ -150,7 +150,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
         )
     })?;
     let now = now_ms()?;
-    let (mut ledger, _report) =
+    let (mut ledger, report) =
         JsonlLedger::open(&dir, now).map_err(memory::MemoryError::into_ax)?;
     let genesis = ledger.append(EventDraft {
         run: RunId::CITY,
@@ -205,7 +205,14 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
     // from. Both happen after line zero, because a building is recorded
     // against a city and there is no city before then.
     let (vault, _notice) = open_vault();
-    let mut worker = RunWorker::new(city_root, vault, runtime::diagnostics::Diagnostics::off())?;
+    // The writer that wrote line zero goes on writing: a second one
+    // opened here would be refused the city's writer lock.
+    let mut worker = RunWorker::over(
+        city_root,
+        vault,
+        runtime::diagnostics::Diagnostics::off(),
+        (ledger, report),
+    )?;
     let plan = city::CityPlan::new(None)?;
     let (hall, template) = plan.hall();
     worker.create_building(hall.clone(), template.name())?;
@@ -333,6 +340,7 @@ impl RunWorker {
             closed = closed.saturating_add(1);
         }
         Ok(ScanReport {
+            opening: self.opening,
             lines: verified.raw_lines().len(),
             closed_calls: closed,
             waiting_approvals: self.governance.pending.len(),

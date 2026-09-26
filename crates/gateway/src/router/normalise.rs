@@ -130,6 +130,7 @@ pub fn normalise(
         Some((scheme, rest)) => (Some(scheme.to_ascii_lowercase()), rest),
         None => (None, trimmed),
     };
+    refuse_credentials(locator)?;
     if let Some(scheme) = given_scheme.as_deref()
         && scheme != "http"
         && scheme != "https"
@@ -179,12 +180,59 @@ pub fn normalise(
         | DialectHint::Messages) => settled,
     };
     Ok(Normalised {
-        base_url: format!("{scheme}://{}{path}{suffix}", lowercase_host(authority)),
+        base_url: format!(
+            "{scheme}://{}{path}{suffix}",
+            authority.to_ascii_lowercase()
+        ),
         dialect,
     })
 }
 
-/// The one refusal this module makes, so that every rejected URL names
+/// Refuse a URL that carries a credential, before any part of it is
+/// stored, probed or echoed: the base URL rides in ledger payloads that
+/// every socket receives, and a ledger line cannot be taken back.
+///
+/// The refusal names neither the URL nor the value, because the error
+/// itself travels to the socket.
+fn refuse_credentials(locator: &str) -> Result<(), AxError> {
+    let (address, suffix) = split_suffix(locator);
+    let authority = address
+        .split_once('/')
+        .map_or(address, |(authority, _)| authority);
+    let found = if authority.contains('@') {
+        "a user name or password written before the host"
+    } else if query_carries_credential(&suffix) {
+        "a credential written into the query"
+    } else {
+        return Ok(());
+    };
+    Err(AxError::failure(
+        AxCode::ConfigInvalid,
+        "read the endpoint URL",
+        format!("the URL carries {found}"),
+    )
+    .with_recovery(
+        "remove the key from the URL and enter it as the endpoint's key, which the city keeps in the vault"
+            .to_owned(),
+    ))
+}
+
+/// Whether a parameter is named as a credential or holds a value the
+/// city's scanner recognises as one. Both judgements are
+/// `kernel::secret`'s, so this module adds no second definition of
+/// what a credential looks like.
+fn query_carries_credential(suffix: &str) -> bool {
+    suffix
+        .trim_start_matches(['?', '#'])
+        .split(['&', '#'])
+        .any(|pair| {
+            let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
+            kernel::secret::names_a_credential(name)
+                || !kernel::secret::scan(value.as_bytes()).is_empty()
+        })
+}
+
+/// The refusal for every URL rejected on its shape, so that each names
 /// the same action and carries a recovery the form can print.
 fn refusal(entered: &str, subject: impl Into<String>, recovery: &str) -> AxError {
     AxError::failure(
@@ -282,15 +330,6 @@ fn resolve_dialect(
         },
         (DialectHint::Unset, chosen) => chosen,
         (from_url, _) => from_url,
-    }
-}
-
-/// Lower-case the host of an authority and leave any credentials in it
-/// alone: a host is case-insensitive and a password is not.
-fn lowercase_host(authority: &str) -> String {
-    match authority.rsplit_once('@') {
-        Some((userinfo, hostport)) => format!("{userinfo}@{}", hostport.to_ascii_lowercase()),
-        None => authority.to_ascii_lowercase(),
     }
 }
 

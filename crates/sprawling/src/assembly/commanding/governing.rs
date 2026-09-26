@@ -207,12 +207,12 @@ impl RunWorker {
     /// Writes one of a building's own spine documents, and records that
     /// it happened.
     ///
-    /// A read-modify-write through `city::document`, so a resident
-    /// writing `Roadmap.md` through `plan` cannot be lost between this
-    /// frame's read and its write. `base` is the text the sender started
-    /// from, and a file that has moved is refused: these documents have
-    /// two writers, which is exactly the case [`Self::put_document`]
-    /// says it does not have, so the two doors hold different guards.
+    /// Written through `city::edit_against`, so a resident writing
+    /// `Roadmap.md` through `plan` cannot be lost between this frame's
+    /// read and its write. `base` is the text the sender started from,
+    /// and a file that has moved is refused: these documents have two
+    /// writers, which is exactly the case [`Self::put_document`] says it
+    /// does not have, so the two doors hold different guards.
     ///
     /// # Errors
     /// Refuses when the file is no longer the text the sender started
@@ -228,29 +228,7 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let name = spine_name(which);
         let path = self.city_root.join(building.as_str()).join(name);
-        city::edit_document(&path, |held| {
-            let on_disk = match std::fs::read(&path) {
-                Ok(bytes) => bytes,
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-                Err(err) => {
-                    return Err(AxError::failure(
-                        AxCode::StorageFatal,
-                        format!("read {name}"),
-                        format!("{}: {err}", path.display()),
-                    )
-                    .with_recovery("fix the file's permissions, then send the change again"));
-                }
-            };
-            if on_disk != base.as_bytes() {
-                return Err(AxError::failure(
-                    AxCode::InvalidArgs,
-                    format!("write {name}"),
-                    "the file is no longer the text you started from",
-                )
-                .with_recovery("read the file again and send the change once more"));
-            }
-            held.replace(body.as_bytes())
-        })?;
+        city::edit_against(&path, base.as_bytes(), body.as_bytes())?;
         self.record(
             EventKind::SpineDocumentWritten,
             Payload::of(&SpineDocumentWritten {

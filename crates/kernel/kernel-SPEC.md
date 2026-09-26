@@ -11,7 +11,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 
 | 模块 | 形状（ARCHITECTURE §7） | 一句话 |
 |---|---|---|
-| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 37（S2 期初增 `E_STORAGE_FATAL`，删 `E_SIGNAL_UNKNOWN`，S1 增 `E_BUSY`）；carrier 声明位 |
+| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 38（其中装载期六码）；carrier 声明位 |
 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
 | `event` | 2 值类型 | EventKind 72（二分共 9 条入窗）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
@@ -140,6 +140,7 @@ gate ──▶ 上述全部（组合面）＋idem
 - 不做 I/O、不采样时钟、不生成随机数——RunId／时间戳／种子全部由调用方注入；`uuid` 依赖仅用于解析与格式化，恒不启用生成特性。
 - 不实现任何端口——`Ledger` 的实现住 memory 与 citysim；kernel 只声明 trait 与链语义纯函数。
 - 不认识文件系统、明文凭证与颜色——canonicalize、Vault、OKLCH 各归其效果面模块。
+- 不持 Markdown 词法器——界面读文档时由客户端 `client/src/core/prose.ts` 分词，Rust 侧没有调用者；在 kernel 再放一份只会与客户端那份悄悄分叉。服务端真要分词的那一天，词法器随它的第一个调用者一起进来。
 
 ## 8 接口先行（按模块分章）
 
@@ -155,7 +156,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 
 ```rust
                       // C8：对扩展开放
-pub enum AxCode { PathNotFound, /* …37 variant，serde 呈现名见下表 */ }
+pub enum AxCode { PathNotFound, /* …38 variant，serde 呈现名见下表 */ }
 
 pub struct GateRefusal {                // three-part refusal；三段必填
     rule: String, violation: String, alternative: String,
@@ -200,7 +201,7 @@ impl ErrorDraft {
 
 「gate 码走 `refusal`」由构造纪律＋单测保证；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
-**AxCode 37 全集与 carrier 对应（specalign 数据面）**
+**AxCode 38 全集与 carrier 对应（specalign 数据面）**
 
 > 协作组由六降为五——`E_SIGNAL_UNKNOWN` 已定义掉（三码之一；理由与实测见 `collab-SPEC.md` §8-1）。删除时全仓只有本文件提到它，零生产者。剩下两码（`E_WORKTREE_BUSY`／`E_DIGEST_SUSPECT`）已在各自 SPEC 里答过「能否定义掉」，答案是能保留——它们各自有一个真实的运行期情境。
 
@@ -240,12 +241,13 @@ impl ErrorDraft {
 | 治理与设施 | `E_ENDPOINT_DIALECT_UNSUPPORTED` | `endpoint_lost` |
 | 治理与设施 | `E_WIRE_MISMATCH` | 装载期（无 carrier） |
 | 治理与设施 | `E_LOG_VERSION_UNSUPPORTED` | 装载期（无 carrier） |
+| 治理与设施 | `E_LEDGER_HELD` | 装载期（无 carrier） |
 | 隐私与 Discard | `E_SECRET_EGRESS` | `gate_denied` |
 | 隐私与 Discard | `E_DISCARD_IRREVERSIBLE` | `gate_denied` |
 | 背压 | `E_BACKPRESSURE_SHED` | `tool_result` |
 | 运行未知 | `E_TOOL_OUTCOME_UNKNOWN` | `tool_result` |
 
-装载期五码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED`）＝C9 唯一例外白名单，封闭且不得增长（第 5 码于 S2 期初增补）；`Carrier::Loadtime` 即其类型面。
+装载期六码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的条件只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 §12。
 `E_BUSY` 的 carrier 与 `E_WORKTREE_BUSY` 一样是 `tool_result`，而两者的区别在名字里：那一个说的是工作树这个机制，这一个说的是**同一个地址上有 run 正在工作**，拒绝里点名那条 run，调用方据此先停它再动手。
 两条呈现约束：`E_SECRET_EGRESS` 的 subject 只写 SecretRef 与位置、恒不回显命中字节；`E_DISCARD_IRREVERSIBLE` 的 alternative 必须可执行。执行点在各生产模块（S2），此处记为 carrier 表随附契约。
 
@@ -312,6 +314,8 @@ impl Locator {
     /// Fail-closed: anything not exactly the grammar is E_LOCATOR_INVALID.
     /// Unknown scheme or algorithm tag is an error, never a fallback path.
     pub fn parse(raw: &str) -> Result<Self, AxError>;
+    /// The whole object behind a digest the caller already holds; no range.
+    pub const fn cas(hash: B3Hash) -> Self;
 }
 impl fmt::Display for Locator { /* 规范拼写往返：parse(x).to_string() == 规范形 */ }
 ```
@@ -321,6 +325,7 @@ impl fmt::Display for Locator { /* 规范拼写往返：parse(x).to_string() == 
 - 十六进制恒小写（规范字节唯一化）；大写拒。`b3-` 外的算法标签拒（对扩展开放：新标签＝新 variant，旧解析不宽容）。
 - `SecretRef`（`secret:`）恒不入本文法——`secret:` 前缀命中即 `E_LOCATOR_INVALID`，两套解析器分立（类型层理由）。
 - serde：字符串形（Display/parse 往返）。
+- `Locator::cas(hash)` 是手里已有 `B3Hash`（通常是 `Cas::put` 的回答）时的唯一构造法：一个 digest 本就合文法，拼成文本再 `parse` 回来只是多了一次分配、一次解析，外加一个恒不发生的错误分支，调用方还得为它写 `?`。
 - `B3Hash::from_bytes([u8;32])`／`to_hex()`；`Range` 构造校验 `from<=to`（Lines 另 `from>=1`）。
 - S2 增 `B3Hash::digest(bytes: &[u8]) -> B3Hash`（blake3 直算）：全库内容哈希的唯一产地——prefix 分段哈希与 stall 指纹均经此，不在 kernel 外直呼 blake3（一个哈希一个家）。`chain_hash` 保留为链语义专名（内部改经 digest）。
 
@@ -409,6 +414,9 @@ pub mod autonomy_word {                          // owner | delegate:<resident>
     pub fn read(word: &str) -> Result<Autonomy, AxError>;
 }
 pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
+pub struct RulesChanged { pub scope: Scope, pub which: GoverningDocument,
+                          pub before: Option<B3Hash>, pub after: B3Hash, pub bytes: usize }
+pub enum GoverningDocument { Rules, Config }     // serde: "RULES.toml" | "CONFIG.toml"
 pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
                              pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }
 pub struct RerankCalled { pub model: String, pub passages: u64, pub ranks: u64,
@@ -479,7 +487,6 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
 **EventKind 74 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
-**EventKind 72 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
@@ -550,6 +557,7 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 | 隐私与 Discard | `autonomy_changed` | record-only |
 | 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 | 治理与设施 | `spine_document_written` | record-only（人写下某楼自己的 spine 文档之一，载荷携 building、which 与字节数，恒不携正文。与上一行分开是因为这几份有第二个写者，写入携起手正文并可能被拒） |
+| 治理与设施 | `rules_changed` | record-only（一次派发所站的规则文档之一换了内容（城的 `CONFIG.toml`，楼的 `CONFIG.toml` 与 `RULES.toml`）：载荷携 scope、which（`RULES.toml`／`CONFIG.toml`，枚举 `GoverningDocument`）、前后两枚摘要与字节数，恒不携正文。在准入（`agree_to_work`）之后、第一次读规则之前落账——先落账再生效；准入拒绝的派发与不存在的楼不记。`before` 缺席即开账行；本行的 `after` 等于同一文档下一行的 `before`，断链本身说明有人绕过一切门改了文件） |
 | 治理与设施 | `toolkit_link_opened` | record-only（人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（channels-SPEC §8-31）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人） |
 | 供应商与模态 | `embedding_called` | record-only（一次嵌入调用入账：模型、请求多少条、回来多少个向量、调用方要的维度与 provider 自报的 token。向量本身不在此处——与 `model_called` 不携请求体同理，它是可从记录的输入重算的派生值，存两份就是同一件事有两个家） |
 | 供应商与模态 | `rerank_called` | record-only（同形：passages 与 ranks 各记一个数。服务端排好的名次就是答案，不在本城重排，故不在此处再写一份序） |
@@ -1423,7 +1431,7 @@ pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
 ```
 
 **为什么在 kernel 而不在产地**：三处需要这个形状——`memory::changes` 从两棵树上读出它、
-`channels::wire` 携它、`web` 画它——而 `channels` 看不见 `memory`。定义两份再互相转换，
+`channels::wire` 携它、客户端画它——而 `channels` 看不见 `memory`。定义两份再互相转换，
 就是「一个文件变更是什么」有两个定义，而漂开的总是没人看的那个。这与 `Restoration` 当初落在这里
 是同一条理由。
 
@@ -1435,34 +1443,6 @@ pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
 
 **没有任何字段能装补丁文本**：补丁文本就是文件内容，而文件内容离开运行中的机器是
 `secret::scan` 存在的理由。hunk 必须单独请求并同样受扫，所以它拼不进这个类型。
-
-### 8-31 kernel::highlight（形状 1 判定）
-
-```rust
-pub enum Token { Heading, Strong, Emphasis, Code, Fence, Meta, Link, Marker, Quote }
-pub struct Span { pub start: u32, pub len: u32, pub token: Token }
-pub fn markdown(text: &str) -> Vec<Span>;
-```
-
-**落点只有一个，而它全是 Markdown。** 界面唯一读文件的地方是 `BuildingDoc.text`，
-而 `read_building` 只收 `RULES.toml` 与楼根目录下的 `*.md`。agent 写给下一个 agent 的计划与
-交接就是这些文件，而人读它们时需要的是标题、列表、行内代码与围栏块彼此分开。
-
-**为什么不上线不上服务端。** 另一种方案是服务端分词、线上走 span，理由是 syntect 在 wasm 里太重。
-那条理由对 syntect 成立，对一个 Markdown 词法器不成立——它就几 KB。为一个尚不存在的第二实现
-先把线格式撑大，是 ARCHITECTURE 明禁的「以假想复用为理由的抽象」。
-**缝在 `markdown(&str) -> Vec<Span>` 这个签名上**：将来真需要语法引擎时，它去服务端、
-线格式那时再长。
-
-**在 kernel 而不在 web**：同 `kernel::change` 的理由——无 I/O、无时钟、输出穷举枚，
-而且服务端有一天也要用它。`channels` 转出类型与函数，`web` 调用。
-
-**偏移量恒在字符边界上**：切片由客户端拿着 `start`/`len` 去做，落在多字节字符中间的
-偏移会让一页中文文档直接炸。一条断言钉住：每一个 span 都切得出来。
-
-**Span 恒不重叠、按 `start` 升序**：重叠的 span 让渲染方必须自己决定谁赢，
-那就是把词法规则的一半搬到了视图里。围栏块内部整块是 `Code`，不再分词——
-本版没有语法引擎，而把 `**x**` 在 Rust 代码里读成粗体是在编造。
 
 ### 8-28 C17 从「首段」扩到「任一段」（形状 2 value 的一条原语）
 
@@ -1498,7 +1478,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 1. 全模块零 I/O、零时钟、零随机；BTreeMap/BTreeSet only（Payload 经 serde_json::Map 默认 BTreeMap 间接满足）。
 2. hex 编解码手写（16 行内，查表小写），不引 hex crate——C12 精神：依赖面只进钉版清单所列。
 3. `EventKind`/`AxCode` 的 serde 呈现名逐 variant `#[serde(rename = …)]`（AxCode）与 `#[serde(rename_all = "snake_case")]`（EventKind）；`as_str` 与 serde 用同一份拼写（单测对拍）。
-4. `Payload` 校验递归下降 serde_json::Value：`Number::is_i64 || is_u64` 之外即拒；数组与对象深入。递归深度由输入方（我们自己的写方）有界，读侧 parse_line 对深度不设限但对浮点恒拒。
+4. `Payload` 校验先判深度、再拒浮点：深度检查逐层迭代，不占调用栈；浮点检查递归下降 serde_json::Value，`Number::is_i64 || is_u64` 之外即拒，数组与对象深入。次序是这条递归的界：它只走深度检查已放行的至多 `PAYLOAD_DEPTH_MAX` 层，一个程序拼出的深嵌套值因此在深度处被拒，不会先把写方的栈耗尽。读侧 parse_line 的深度由 serde_json 的递归上限封住，对浮点恒拒。
 5. `canonical_line` 用 `serde_json::to_vec`；`addr`/`ig` 的省略由 `skip_serializing_if` 表达；无 pretty、无空格。
 
 ## 11 边界枚举
@@ -1530,6 +1510,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 - `E_VERSION_CONFLICT`（verdict 映射在 S3）：不可定义掉——乐观并发的存在理由就是冲突可发生。
 - `E_LOG_VERSION_UNSUPPORTED`／`E_CAS_CORRUPT`：住装载期白名单，产生地在 memory/runtime（见各自 SPEC）。
 - `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；memory 的 Io 映射已改正（memory-SPEC §12）。
+- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 memory 的写者锁先于一切读写定义掉（memory-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
 
 S2 激活的码（逐码答「能否定义掉」）：
 
@@ -1756,17 +1737,6 @@ apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／
 文法、`B3Hash`／`GitOid`／`Range`／`Locator` 四型与全部解析、呈现、十六进制原语都留在原路径，
 故规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／
 `clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
-
-### 8-41 kernel::highlight 目录化
-
-`highlight.rs`（437）只作一次切分：原内联 `mod tests` 整段迁到 `highlight/tests.rs`（12 个 `#[test]`，
-断言与名字一字不动，`use super::*` 原样保留，两个夹具 `cut`／`tokens` 随测试同迁、不复制），
-父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份含 `clippy::arithmetic_side_effects` 的
-`#[allow(...)]` 列表。`highlight.rs` 剩 304 行：`Token`／`Span` 两型、`markdown` 与全部行内词法
-原语（`read_line`／`marker_len`／`opens_fence`／`fence_len`／`inline`／`scan`／`links`／`claim`／
-`push`）都留在原路径 —— `scan` 带 `argument_count` 豁免，键 `crates/kernel/src/highlight.rs::scan`，
-因此不得搬家。规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：
-`cargo check`／`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
 
 ### 8-42 kernel::tool 目录化
 
@@ -2009,7 +1979,6 @@ pub fn is_reserved(&self) -> bool;                  // 改：eq_ignore_ascii_cas
 pub const LEDGER_DIR: &str = "ledger";
 pub const CAS_DIR: &str = "cas";
 pub const LIBRARY_DIR: &str = "library";
-pub const SESSIONS_DIR: &str = "sessions";
 pub const BUILDING_SHELF: &str = "skills";
 pub const CONFIG_FILE: &str = "CONFIG.toml";
 pub const FILTERS_FILE: &str = "FILTERS.toml";
@@ -2033,8 +2002,6 @@ impl CityLayout {
     pub fn job(&self, addr: &Address) -> PathBuf;               // <scope>/JOB.md
     pub fn handoff(&self, room: &Address) -> PathBuf;           // <scope>/Handoff.md
     pub fn urbanite(&self, addr: &Address) -> PathBuf;          // <scope>/URBANITE.md
-    pub fn session_slice(&self, room: &Address) -> PathBuf;     // <首段>/.sprawling/sessions/<其余>.jsonl
-    pub fn is_session_projection(relative: &Path) -> bool;     // 某层 sessions 下的路径（栅栏永不暂存）
     pub fn city_address(&self) -> Option<Address>;             // 城自己的名字：根目录名，能拼成地址时
     pub fn of_ledger(dir: &Path) -> Option<CityLayout>;         // ledger() 的逆：从账本目录取回城根
 }
@@ -2047,7 +2014,7 @@ impl CityLayout {
 3. **`RESERVED_PREFIX` 仍住在 `kernel::address`，本模块引用它。** 它是地址文法的一部分——`is_reserved` 是写域与读路径共用的谓词（8-2、8-55）——而不是一条布局规定。布局这一侧只决定「什么落在保留子树里」：治理一个 scope 的文件（`CONFIG.toml`、`FILTERS.toml`、`skills`）落在该 scope 的 `.sprawling/` 下，于是没有任何写域够得到它们；居民自己写的文件（`JOB.md`、`Handoff.md`、`URBANITE.md`、`Archive/`）落在明处。这条摆放规则由单元测试逐个方法核对，而不是靠注释重申。
 4. **逐段 push 而不是整串 join。** 一个地址在 Windows 与在 Linux 必须落成同一个目录树；整串 join 把 `/` 交给平台去解释，逐段 push 不给它这个机会。此前 city 内部两种拼法并存，本模块只留前一种。
 5. **一个落点一个方法，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威（Roadmap §19.3 第 5 条）。后续新增一类文件时，先在此加方法与常量，再写调用点。
-6. **`session_slice` 是唯一一个按「首段是楼」读地址的方法。** Room 的地址就是 session 的身份，而 Building 是地址的第一段：地址里楼以下的部分就落成楼自己 sessions 下的目录嵌套，一个 run 不点名 session 时就在楼自己的地址上工作，文件于是叫楼的名字。这条路只被 `memory::sessions` 这一个写者引用，`xtask` 的 `slices` 门钉住这句话。
+6. **session 切片的路径不在此处。** 切片是账本的可弃投影，只有 `memory::sessions` 一个写者、没有读者；它的目录名与路径推导是该模块的私有项（memory-SPEC 8-24），于是「别处点名这条路」在编译期就写不出来，不必再靠文本扫描去拦。
 7. **`of_ledger` 是 `ledger` 的逆，为「只拿到账本目录」的写者而存在。** 账本的写者手里只有它打开的那一个目录，而切片落在城根之下，故城根必须能从这一个输入反推回来；逆运算住在具名常量所在的同一模块里，任何调用点都不许用 `parent().parent()` 重新拼一遍。不是 `ledger()` 形状的目录不是城（夹具、bundle 的校验台、直接打开的存储），回答 `None`。
 
 ### 8-72 `kernel::retries`：失败的调用再试几次（形状 2 值类型）

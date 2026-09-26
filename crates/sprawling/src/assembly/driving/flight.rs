@@ -233,6 +233,12 @@ impl RunWorker {
         self.flight.in_flight() > 0
     }
 
+    /// Whether `run` is in a lane right now, and so reads its own Cancel
+    /// and Steer off the desk at its safe points.
+    pub(crate) fn drives(&self, run: RunId) -> bool {
+        self.flight.driving.contains_key(&run)
+    }
+
     /// Serves the crossing and lands runs until no lane is left.
     ///
     /// What a closing city does before it writes its handoff: a lane
@@ -303,7 +309,7 @@ impl RunWorker {
             origin: None,
             session: None,
             effort: None,
-            mode: runtime::Mode::PlanGoal,
+            mode: kernel::Mode::PlanGoal,
             parent: None,
             succession: None,
             tainted: matches!(because, Unasked::Arrival),
