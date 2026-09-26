@@ -354,6 +354,8 @@ impl Payload {
     /// 写侧唯一门：record 结构 -> 载荷；非对象即 E_INVALID_ARGS。
     pub fn of(record: &impl Serialize) -> Result<Self, AxError>;
     /// 读侧唯一门：载荷 -> record 结构；读不动即 E_WIRE_MISMATCH。
+    /// 借出而不复制：serde_json 的 `&Map` 反序列化器直接读持有的载荷，
+    /// 读一次只分配 T 自己拥有的字段，不先克隆整张 map。
     pub fn read<T: DeserializeOwned>(&self) -> Result<T, AxError>;
 }
 

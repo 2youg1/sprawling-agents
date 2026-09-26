@@ -203,3 +203,44 @@ fn a_payload_too_deep_is_refused_for_its_depth_before_its_floats_are_walked() {
     assert_eq!(err.code(), &AxCode::InvalidArgs);
     assert!(err.recovery().contains("CAS"), "{err}");
 }
+
+/// How a string reached the reader: lent out of the payload the ledger
+/// already holds, or handed over as a fresh copy.
+#[derive(Debug, PartialEq)]
+enum Handed {
+    Lent,
+    Copied,
+}
+
+impl<'de> serde::Deserialize<'de> for Handed {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Probe;
+        impl<'de> serde::de::Visitor<'de> for Probe {
+            type Value = Handed;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a string")
+            }
+            fn visit_borrowed_str<E>(self, _: &'de str) -> Result<Handed, E> {
+                Ok(Handed::Lent)
+            }
+            fn visit_str<E>(self, _: &str) -> Result<Handed, E> {
+                Ok(Handed::Copied)
+            }
+            fn visit_string<E>(self, _: String) -> Result<Handed, E> {
+                Ok(Handed::Copied)
+            }
+        }
+        deserializer.deserialize_str(Probe)
+    }
+}
+
+#[derive(Debug, PartialEq, serde::Deserialize)]
+struct Held {
+    body: Handed,
+}
+
+#[test]
+fn read_lends_the_payload_instead_of_copying_it() {
+    let payload = Payload::new(Map::from_iter([("body".to_owned(), json!("x".repeat(64)))])).unwrap();
+    assert_eq!(payload.read::<Held>().unwrap(), Held { body: Handed::Lent });
+}
