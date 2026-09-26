@@ -37,8 +37,8 @@
   import type { View } from "../core/route";
   import { cityIsShut, CITY } from "../core/scope";
   import { completed } from "../core/completion";
-  import { offered, reached } from "../core/slash";
-  import type { Reached, Slash, SlashHands } from "../core/slash";
+  import { SECTIONS, offered, reached } from "../core/slash";
+  import type { Reached, Section, Slash, SlashHands } from "../core/slash";
   import { ui } from "../ui";
   import { Address } from "../wire";
   import Empty from "./parts/empty.svelte";
@@ -51,36 +51,12 @@
     readonly why?: Key | undefined;
   }
 
-  // The three sections a verb falls under, and the word for each,
-  // decided by the spelling both halves of the slash seam already
-  // share.
-  const SECTIONS = ["actions", "navigation", "sessions"] as const;
-  type Section = (typeof SECTIONS)[number];
+  // The word for each section a verb names for itself in `core/slash.ts`.
   const SECTION_WORD: Readonly<Record<Section, Key>> = {
     actions: "palette_group_actions",
     navigation: "palette_group_navigation",
     sessions: "palette_group_sessions",
   };
-  const SECTION: Readonly<Record<string, Section>> = {
-    "/dispatch": "sessions",
-    "/steer": "sessions",
-    "/new": "sessions",
-    "/fork": "sessions",
-    "/go": "navigation",
-    "/mcp": "navigation",
-    "/doctor": "navigation",
-    "/stop": "actions",
-    "/release": "actions",
-    "/raise": "actions",
-    "/model": "actions",
-    "/effort": "actions",
-    "/help": "actions",
-    "/clear": "actions",
-  };
-  // A verb `core/slash.ts` grew before this screen classified it lands
-  // with the actions - visible and runnable, which is how its section
-  // gets named next time.
-  const sectionOf = (spelling: string): Section => SECTION[spelling] ?? "actions";
 
   const u = ui();
   const { lang } = u;
@@ -206,6 +182,7 @@
       case "/dispatch":
         return here === null ? NEEDS_ROOM : undefined;
       case "/steer":
+      case "/stop":
         return live === null ? NEEDS_RUN : undefined;
       case "/model":
         return models.length === 0 ? NEEDS_MODEL : undefined;
@@ -252,25 +229,27 @@
     }
   }
 
-  const commands = $derived.by((): Entry[] =>
-    offered(query.trim()).map((each) => ({
-      label: each.grammar === "" ? each.spelling : `${each.spelling} ${each.grammar}`,
-      hint: say($lang, each.about),
-      why: whyFor(each.spelling),
-      act: () => {
-        runSlash(each);
-      },
-    })),
-  );
-
   // The slash list as three labelled sections, in the order the
   // question is usually asked: what to do, where to go, what session.
-  const grouped = $derived.by(() =>
-    SECTIONS.map((section) => ({
+  // Each verb names its section itself, and the flat list the cursor
+  // walks is read in the same order the sections draw it.
+  const grouped = $derived.by((): { section: Section; entries: Entry[] }[] => {
+    const typed = offered(query.trim());
+    return SECTIONS.map((section) => ({
       section,
-      entries: commands.filter((entry) => sectionOf(entry.label.split(" ").at(0) ?? "") === section),
-    })).filter((group) => group.entries.length > 0),
-  );
+      entries: typed
+        .filter((each) => each.section === section)
+        .map((each) => ({
+          label: each.grammar === "" ? each.spelling : `${each.spelling} ${each.grammar}`,
+          hint: say($lang, each.about),
+          why: whyFor(each.spelling),
+          act: () => {
+            runSlash(each);
+          },
+        })),
+    })).filter((group) => group.entries.length > 0);
+  });
+  const commands = $derived(grouped.flatMap((group) => group.entries));
 
   const shown = $derived.by((): Entry[] => {
     const needle = query.trim().toLowerCase();
