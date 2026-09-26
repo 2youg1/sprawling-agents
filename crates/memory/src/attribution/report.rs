@@ -32,7 +32,7 @@ pub(crate) const WINDOW_SLOT: &str = "window";
 
 use std::collections::BTreeMap;
 
-use kernel::{EventKind, EventRecord, UsdMicros};
+use kernel::{EventKind, EventRecord, RunId, UsdMicros};
 use serde_json::Value;
 
 use crate::error::MemoryError;
@@ -45,9 +45,11 @@ pub struct Attribution {
     by_tool: BTreeMap<String, u64>,
     by_skill: BTreeMap<String, u64>,
     total: u64,
-    /// Basis for the next model_returned: the most recent prefix shape
-    /// and the tool bytes returned since the previous call.
-    segment_weights: Vec<(String, u64)>,
+    /// Basis for the next model_returned: each run's most recent prefix
+    /// shape, and the tool bytes returned since the previous call. The
+    /// shape is keyed by run because a run records its prompt once, so
+    /// the latest `prompt_assembled` in the ledger may be another run's.
+    segment_weights: BTreeMap<RunId, Vec<(String, u64)>>,
     tool_weights: BTreeMap<String, u64>,
     skill_weights: BTreeMap<String, u64>,
 }
@@ -75,7 +77,8 @@ impl Attribution {
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError> {
         match record.kind() {
             EventKind::PromptAssembled => {
-                self.segment_weights = segment_weights(record.data().as_map());
+                self.segment_weights
+                    .insert(record.run(), segment_weights(record.data().as_map()));
             }
             EventKind::ToolResult => {
                 let name = record
@@ -121,7 +124,11 @@ impl Attribution {
                 self.total = self.total.saturating_add(billed);
                 add(&mut self.by_run, &record.run().to_string(), billed);
                 add(&mut self.by_actor, record.who(), billed);
-                for (bucket, share) in split(billed, &self.segment_weights, NO_SEGMENT) {
+                let segment_basis = self
+                    .segment_weights
+                    .get(&record.run())
+                    .map_or(&[][..], Vec::as_slice);
+                for (bucket, share) in split(billed, segment_basis, NO_SEGMENT) {
                     add(&mut self.by_segment, &bucket, share);
                 }
                 let tool_basis: Vec<(String, u64)> = self
