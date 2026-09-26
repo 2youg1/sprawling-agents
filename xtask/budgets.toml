@@ -468,15 +468,23 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 #
 # The denominator removes the fixture's size from the figure, which is
 # what made the rows above it facts about a machine rather than about
-# the design. The reading now exists and the ceiling still does not:
-# `xtask budget` reads two units, bytes and packages, so a
-# `best_ms_per_mb` key written here today would be data nobody reads.
-# Gating this row is the unit's work, not the reading's, and the
-# reading had to come first either way.
+# the design. The reading exists and the ceiling does not: `xtask
+# budget` reads two units, bytes and packages, and gating this row is
+# that unit's work, not the reading's.
+#
+# **One reading, one home.** The large-ledger fold of `just bench` is
+# this same rebuild under the registered fixture, so its p50/p95/p99
+# live here and ARCHITECTURE.md quotes them through `cargo xtask docnum`
+# (`budget_figure:views_rebuild_per_mb.<field>`) rather than typing a
+# second copy.
 [views_rebuild_per_mb]
 what = "milliseconds to rebuild every view, per megabyte of ledger folded"
 measured_by = "just bench (citysim bench bin, release), over a ledger large enough that the fold rather than the open dominates: the bench writes 50,000 records into a scratch city and drives the whole production rebuild through `sprawling::ask`, which verifies the chain, parses every line and folds it into every view before answering one CityView"
-status = "measured, not gated: 34.1 ms/MB on windows-x86_64, 16 cores, NVMe (2026-09-21, release) - p50 428.9 ms to rebuild 12.57 MB of ledger, 50,000 records, 5 rebuilds. A ceiling waits on `xtask budget` learning a time unit; until then a figure written as `budget_ms` would be read by nobody"
+fold_records = 50000
+best_p50_ms = 2759
+best_p95_ms = 3765
+best_p99_ms = 3765
+status = "measured, not gated: windows-x86_64, 16 cores, NVMe, release, 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`). The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
 
 # What a dispatch spends before the model is called: opening the room,
 # writing the brief, standing the run up, and assembling the tools -

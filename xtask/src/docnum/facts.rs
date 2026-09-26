@@ -335,6 +335,16 @@ mod tests {
     }
 
     #[test]
+    fn a_register_figure_is_quoted_from_its_row_and_field() {
+        let root = root();
+        assert_eq!(
+            value(&root, "budget_figure:views_rebuild_per_mb.best_p50_ms").unwrap(),
+            Some("2,759".into())
+        );
+        assert!(value(&root, "budget_figure:views_rebuild_per_mb").is_err());
+    }
+
+    #[test]
     fn the_package_roster_comes_from_the_root_manifest() {
         let found = packages(&root()).unwrap();
         assert!(found.contains("crates/kernel"));
