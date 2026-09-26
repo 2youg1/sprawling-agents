@@ -93,6 +93,20 @@ const NO_OPEN: Flag = flag(
     "leave the screen alone (so does SPRAWLING_OPEN=never)",
 );
 const AT: Flag = flag("--at", Value("addr"), "the served city to talk to");
+/// `up` forwards its line to the same `serve_city` that `serve` runs, so the
+/// two rows share one flag set and cannot drift apart.
+const SERVED: &[Flag] = &[
+    OPEN,
+    NO_OPEN,
+    flag("--console", Nothing, "enter the city's console"),
+    flag("--no-console", Nothing, "do not enter the console"),
+    LOG,
+    flag(
+        "--web-dir",
+        Value("dir"),
+        "read the client from <dir> on every request",
+    ),
+];
 
 /// The table. Its order is the order the overview prints.
 pub(super) const VERBS: &[Row] = &[
@@ -101,7 +115,7 @@ pub(super) const VERBS: &[Row] = &[
         name: "up",
         aliases: &[],
         positionals: &[("city", Optional), ("addr", Optional)],
-        flags: &[NO_OPEN, LOG],
+        flags: SERVED,
         says: "raise a city here if needed, serve it, open the WebUI",
         effect: Effect::Changes,
     },
@@ -123,18 +137,7 @@ pub(super) const VERBS: &[Row] = &[
         name: "serve",
         aliases: &[],
         positionals: &[("city", Required), ("addr", Optional)],
-        flags: &[
-            OPEN,
-            NO_OPEN,
-            flag("--console", Nothing, "enter the city's console"),
-            flag("--no-console", Nothing, "do not enter the console"),
-            LOG,
-            flag(
-                "--web-dir",
-                Value("dir"),
-                "read the client from <dir> on every request",
-            ),
-        ],
+        flags: SERVED,
         says: "serve a city that already exists",
         effect: Effect::Changes,
     },
@@ -248,6 +251,7 @@ pub(super) const VERBS: &[Row] = &[
                 Value("code"),
                 "connect a refusal code to this machine",
             ),
+            flag("--no-color", Nothing, "print without colour"),
         ],
         says: "what this machine has against what a city needs",
         effect: Effect::ReadsOnly,

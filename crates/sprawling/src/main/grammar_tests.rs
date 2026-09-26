@@ -64,3 +64,34 @@ fn an_unknown_flag_is_refused() {
         Err(LineError::UnknownFlag { verb: "replay", .. })
     ));
 }
+
+/// Every flag a verb body reads from the raw line (`city.rs` `serve_city`,
+/// which `up` reaches too, and `doctor/screen.rs`) must pass the table, or
+/// the parser refuses a flag that works.
+#[test]
+fn every_flag_a_body_reads_passes_the_table() {
+    let served: &[&[&str]] = &[
+        &["--open"],
+        &["--no-open"],
+        &["--console"],
+        &["--no-console"],
+        &["--log", "debug"],
+        &["--web-dir", "dir"],
+    ];
+    for verb in ["up", "serve"] {
+        for flag in served {
+            let line = [&[verb, "city"][..], flag].concat();
+            assert!(
+                matches!(parse(&words(&line)), Ok(Invocation::Run(..))),
+                "{line:?} is refused"
+            );
+        }
+    }
+    for flag in [&["--install"][..], &["--explain", "E1"], &["--no-color"]] {
+        let line = [&["doctor"][..], flag].concat();
+        assert!(
+            matches!(parse(&words(&line)), Ok(Invocation::Run(..))),
+            "{line:?} is refused"
+        );
+    }
+}
