@@ -178,6 +178,7 @@
   import { recoveryFor } from "../../core/recovering";
   import { ui } from "../../ui";
   import Banner from "../parts/banner.svelte";
+  import LinkBanner from "../link_banner.svelte";
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";
   import Cheatsheet from "../parts/kbd.svelte";
@@ -216,6 +217,10 @@
       <Button label={say($lang, "city_release")} tone="secondary" />
     {/snippet}
   </Banner>
+</Case>
+
+<Case label="banner · the link is lost">
+  <LinkBanner attempt={3} unsent={1} onRetry={() => undefined} />
 </Case>
 
 <Case label="keys · the sheet every chord is read on">

@@ -33,6 +33,7 @@ import type { Asking } from "./asking";
 import { createBelief } from "./belief";
 import type { Belief } from "./belief";
 import { decodeFrame, encodeFrame } from "./frames";
+import { createUnsent, isSpeech } from "./unsent";
 import { langOf, say } from "./lang";
 import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
@@ -42,9 +43,11 @@ export interface Connection {
   readonly state: Readable<LinkState>;
   readonly belief: Readable<Belief>;
   readonly asking: Asking;
-  // Sends one command; false when the link is not live, in which case
-  // nothing was sent and the person should be told rather than left to
-  // wonder.
+  // Words said while the link is down, waiting for the next welcome.
+  readonly unsent: Readable<number>;
+  // Sends one command, or holds it in `unsent` when it is words and the
+  // link is down; false when neither happened, and the person should be
+  // told rather than left to wonder.
   readonly command: (command: Command) => boolean;
   readonly retry: () => void;
   readonly dismissRefusal: () => void;
@@ -107,6 +110,7 @@ export function openConnection(
   const now = () => Date.now();
   const state = writable<LinkState>(link.state);
   const store = createBelief(now);
+  const unsent = createUnsent();
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
@@ -217,6 +221,7 @@ export function openConnection(
         fetching = null;
         askGap();
         asking.reconnected();
+        unsent.release((command) => sendText(encodeFrame({ command })));
         return;
       case "deliver": {
         // The field this build could not read, if any, is reported here
@@ -351,9 +356,15 @@ export function openConnection(
   function visibilityChanged(): void {
     if (queue.length > 0) drain();
     if (hidden() || reconnect === null) return;
-    clearTimeout(reconnect);
+    step(unbook({ kind: "wait_elapsed" }));
+  }
+
+  // Cancels the attempt the ladder booked, for an event that opens the
+  // link now instead.
+  function unbook(event: LinkEvent): LinkEvent {
+    if (reconnect !== null) clearTimeout(reconnect);
     reconnect = null;
-    step({ kind: "wait_elapsed" });
+    return event;
   }
   if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibilityChanged);
 
@@ -366,11 +377,15 @@ export function openConnection(
     state,
     belief: store.belief,
     asking,
+    unsent: unsent.count,
     command(command) {
-      return isLive(link) && sendText(encodeFrame({ command }));
+      if (isLive(link)) return sendText(encodeFrame({ command }));
+      if (!isSpeech(command)) return false;
+      unsent.hold(command);
+      return true;
     },
     retry() {
-      step({ kind: "retry" });
+      step(unbook({ kind: "retry" }));
     },
     dismissRefusal() {
       store.refused(null);

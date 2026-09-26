@@ -6,8 +6,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
+import { steer } from "./commands";
 import { openConnection } from "./socket";
-import { WIRE_HASH, WIRE_V } from "../wire";
+import { RunId, WIRE_HASH, WIRE_V } from "../wire";
 
 // One fake socket per `new WebSocket(...)`, kept so a test can deliver
 // a frame and read whether the browser half closed it.
@@ -202,5 +203,29 @@ describe("the browser half", () => {
 
     expect({ opened: FakeSocket.opened.length, waiting: booked.filter((entry) => !entry.cancelled).length })
       .toEqual({ opened: 2, waiting: 0 });
+  });
+  // Words said while the link is down are the person's, not the socket's:
+  // they wait for the city and go out, in order, once it greets again,
+  // and the banner counts them meanwhile.
+  test("holds words said off the link and sends them on the welcome", () => {
+    install();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    const welcome = JSON.stringify({ welcome: { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null } });
+    FakeSocket.opened[0]?.onopen?.();
+    FakeSocket.opened[0]?.onclose?.();
+    const words = steer(RunId.make("00000000-0000-4000-8000-000000000001"), "and the tests");
+    const accepted = conn.command(words);
+    const held = get(conn.unsent);
+    runBooked();
+    const second = FakeSocket.opened[1];
+    second?.onopen?.();
+    second?.onmessage?.({ data: welcome });
+
+    expect({ accepted, held, after: get(conn.unsent), sent: second?.sent.slice(1) }).toEqual({
+      accepted: true,
+      held: 1,
+      after: 0,
+      sent: [JSON.stringify({ command: words })],
+    });
   });
 });

@@ -140,6 +140,7 @@ export function ui(): Ui {
         invalidate: () => undefined,
         reconnected: () => undefined,
       },
+      unsent: readable(0),
       command: () => false,
       retry: () => undefined,
       dismissRefusal: () => undefined,
