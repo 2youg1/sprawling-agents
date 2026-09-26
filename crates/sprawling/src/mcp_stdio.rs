@@ -298,6 +298,23 @@ pub(crate) fn echoing(answer: &str) -> (String, Vec<String>) {
     }
 }
 
+/// The server [`echoing`] builds, which also writes one line to
+/// `starts` each time it is started, so a test can count how many
+/// children a sequence of dispatches cost.
+#[cfg(test)]
+pub(crate) fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>) {
+    let (command, mut args) = echoing(answer);
+    let mark = if cfg!(windows) {
+        format!("Add-Content -LiteralPath '{}' -Value s; ", starts.display())
+    } else {
+        format!("echo s >> '{}'; ", starts.display())
+    };
+    if let Some(script) = args.last_mut() {
+        script.insert_str(0, &mark);
+    }
+    (command, args)
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

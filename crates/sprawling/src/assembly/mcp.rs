@@ -323,4 +323,31 @@ mod tests {
             "a service that is down today does not stop the building from working today"
         );
     }
+
+    #[test]
+    fn a_second_dispatch_reaches_the_server_the_first_one_started() {
+        let dir = tempfile::tempdir().unwrap();
+        init_city(dir.path()).unwrap();
+        let starts = dir.path().join("starts.txt");
+        let (command, args) = crate::mcp_stdio::counting_starts(SERVER_ANSWER, &starts);
+        write_server_table(dir.path(), "lab", &command, &args);
+        let mut worker = RunWorker::new(
+            dir.path(),
+            gateway::Custodian::in_memory(),
+            runtime::diagnostics::Diagnostics::off(),
+        )
+        .unwrap();
+        let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
+
+        let first = worker.mcp_tools(&config, dir.path(), false);
+        drop(first);
+        let second = worker.mcp_tools(&config, dir.path(), false);
+
+        assert_eq!(second.len(), 1, "the resident connection still offers its tool");
+        assert_eq!(
+            std::fs::read_to_string(&starts).unwrap().lines().count(),
+            1,
+            "two dispatches to one building started its server once"
+        );
+    }
 }
