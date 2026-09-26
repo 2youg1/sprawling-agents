@@ -70,7 +70,15 @@ pub(crate) fn beat(
     samples: &broadcast::Sender<Sample>,
     read: impl FnOnce() -> Sample,
 ) {
-    let _ = (monitor, samples, read);
+    let mut fresh = None;
+    lock(monitor).tick(|| *fresh.insert(read()));
+    if let Some(sample) = fresh {
+        match samples.send(sample) {
+            // No subscriber is not a failure: a session that stopped
+            // watching between the tick and the send asked for nothing.
+            Ok(_) | Err(broadcast::error::SendError(_)) => {}
+        }
+    }
 }
 
 /// A poisoned lock guards no half-written state: the watcher count is

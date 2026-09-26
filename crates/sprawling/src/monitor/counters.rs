@@ -12,9 +12,7 @@
 
 use std::path::PathBuf;
 
-use sysinfo::{
-    Disks, MemoryRefreshKind, Pid, ProcessRefreshKind, ProcessesToUpdate, System,
-};
+use sysinfo::{Disks, MemoryRefreshKind, Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
 use super::Sample;
 
@@ -41,17 +39,54 @@ impl Counters {
     /// Refreshes every counter and reads one sample. The core-health
     /// fields are not read here yet and stay 0 (8-92, current state).
     pub(crate) fn read(&mut self) -> Sample {
-        let _ = (
-            &self.system,
-            &self.disks,
-            self.pid,
-            &self.volume,
-            MemoryRefreshKind::nothing(),
-            ProcessRefreshKind::nothing(),
-            ProcessesToUpdate::All,
+        self.system.refresh_cpu_usage();
+        self.system
+            .refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
+        self.system.refresh_processes_specifics(
+            ProcessesToUpdate::Some(&[self.pid]),
+            true,
+            ProcessRefreshKind::nothing()
+                .with_cpu()
+                .with_memory()
+                .with_disk_usage(),
         );
-        Sample::default()
+        self.disks.refresh(true);
+        let cores = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+        let core = self.system.process(self.pid);
+        let disk = core.map(sysinfo::Process::disk_usage);
+        Sample {
+            core_cpu_permille: core.map_or(0, |process| permille(process.cpu_usage(), cores)),
+            core_private_bytes: core.map_or(0, sysinfo::Process::virtual_memory),
+            core_working_set_bytes: core.map_or(0, sysinfo::Process::memory),
+            core_read_bytes: disk.map_or(0, |usage| usage.total_read_bytes),
+            core_written_bytes: disk.map_or(0, |usage| usage.total_written_bytes),
+            machine_cpu_permille: permille(self.system.global_cpu_usage(), 1),
+            machine_available_bytes: self.system.available_memory(),
+            volume_free_bytes: self.volume_free_bytes(),
+            ..Sample::default()
+        }
     }
+
+    /// The free space of the disk whose mount point is the longest
+    /// prefix of the city's path.
+    fn volume_free_bytes(&self) -> u64 {
+        self.disks
+            .list()
+            .iter()
+            .filter(|disk| self.volume.starts_with(disk.mount_point()))
+            .max_by_key(|disk| disk.mount_point().components().count())
+            .map_or(0, sysinfo::Disk::available_space)
+    }
+}
+
+/// A load in percent spread over `cores`, as permille of the whole.
+#[expect(
+    clippy::as_conversions,
+    reason = "sysinfo reports load only as f32; it is clamped to 0..=1000 first, so the cast is exact to the permille"
+)]
+fn permille(percent: f32, cores: usize) -> u64 {
+    let spread = u16::try_from(cores).map_or(f32::from(u16::MAX), f32::from);
+    (percent / spread * 10.0).clamp(0.0, 1000.0) as u64
 }
 
 #[cfg(test)]
