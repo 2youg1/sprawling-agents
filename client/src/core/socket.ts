@@ -217,6 +217,10 @@ export function openConnection(
       asking.reconnected();
       return;
     }
+    // A lagged gap still pending was folded-only because the answers of
+    // the open socket had seen it; those answers died with the socket,
+    // so its records now mark stale what they touch like the new gap's.
+    gaps.splice(0, gaps.length, ...gaps.map((gap): Gap => ({ ...gap, records: "invalidating" })));
     if (head > owed) gaps.push({ at: Seq.make(owed + 1), to: head, records: "invalidating" });
     asking.resumed();
   }
