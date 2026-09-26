@@ -10,7 +10,7 @@ use kernel::EventRecord;
 
 use super::{Broadcast, Copies, spawn_folding};
 use crate::assembly::init_city;
-use crate::serving::standing::CorePriority;
+use crate::serving::standing::{CorePriority, monotonic_now};
 use crate::views::snapshot::start::{FoldStart, start};
 use crate::views::{Published, Views, answer_outside_the_lock};
 
@@ -36,13 +36,8 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
         published: Arc::clone(&views),
         spare,
     };
-    let mut folding = spawn_folding(
-        copies,
-        broadcast,
-        CorePriority::Raised,
-        std::time::Instant::now,
-    )
-    .unwrap();
+    let mut folding =
+        spawn_folding(copies, broadcast, CorePriority::Raised, monotonic_now).unwrap();
 
     let reader = views.snapshot();
     let (written, returned) = mpsc::channel();
@@ -97,13 +92,8 @@ fn the_fold_thread_cuts_a_snapshot_a_later_read_resumes_from() {
         to_clients: tokio::sync::broadcast::channel(8).0,
         head: Arc::new(channels::LedgerHead::default()),
     };
-    let mut folding = spawn_folding(
-        copies,
-        broadcast,
-        CorePriority::Normal,
-        std::time::Instant::now,
-    )
-    .unwrap();
+    let mut folding =
+        spawn_folding(copies, broadcast, CorePriority::Normal, monotonic_now).unwrap();
     for record in &records {
         (folding.observer)(record);
     }

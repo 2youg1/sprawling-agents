@@ -131,7 +131,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         },
         Broadcast { to_clients, head },
         setting,
-        std::time::Instant::now,
+        crate::serving::standing::monotonic_now,
     )?;
     // The one sanctioned thread besides the runtime's own. The ledger was
     // opened, its writer lock taken, before the history was folded; it
