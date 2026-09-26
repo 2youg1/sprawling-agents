@@ -157,12 +157,15 @@ export interface NoticeDay {
 // Twelve refusals across three days, newest day first. The subjects
 // span three rooms and two runs, so the rows have something to merge
 // on - a code that repeats under one subject - and something not to.
+// The frozen-model refusal carries the sentence the runtime writes as
+// its subject (`crates/runtime/src/turn/report.rs`), because a subject
+// that is not a room is the case the notice's ways out must survive.
 export const NOTICE_DAYS: readonly NoticeDay[] = [
   {
     heading: "notices_today",
     rows: [
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
-      { code: "E_CONFIG_INVALID", action: "dispatch", subject: "hall/mayor", at: "09:12", count: 2,
+      { code: "E_CONFIG_INVALID", action: "dispatch", subject: "the model changed from `fake-small` to `fake-chat`", at: "09:12", count: 2,
         // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "the room is frozen against this session; set main back in setup, or run /new" },
       // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
