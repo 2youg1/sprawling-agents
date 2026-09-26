@@ -3526,6 +3526,7 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 - `Monitor::new()`：不分配。
 - `Monitor::watch(&self) -> Watch`：一个在看的人。`Watch` 被丢弃时这个人就不再算数；它可以跨线程持有（socket 线程持有，采样线程计数）。
 - `Monitor::tick(&mut self, read: impl FnOnce() -> Sample)`：每秒调用一次。有人在看时调用 `read` 一次并把结果放进历史，满 300 个时丢掉最旧的；没人在看时不调用 `read`，并释放历史占的内存。
+- `Monitor::is_watched(&self) -> bool`：此刻有没有人持有 `Watch`。
 - `Monitor::history(&self) -> impl Iterator<Item = &Sample>`：从最旧到最新。
 - 没有失败路径：计数是 `AtomicUsize` 的加减，历史的容量在第一次放入时一次预留。
 
@@ -3565,3 +3566,26 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 5. WebUI 面板在浏览器里按同样的规则自己算读数与曲线（`client/src/core/monitor.ts`），而不是让城把画好的行随帧发过去。曲线取多少个点取决于面板在屏幕上有多宽，只有浏览器知道；标签要从 `lang.json` 取两种语言，终端这一侧只有英文。代价是分级与单位换算在 Rust 与 TypeScript 各写一遍，两边由同一组样本对照：`client/src/core/monitor.test.ts` 用的样本与期望读数和 `monitor::top::tests` 的一屏测试逐项相同，改规则时两份测试的期望一起改；没有机器门把这两份期望绑在一起。重新考虑的条件：监视帧改为携带已画好的行，或者面板改用非字符的画法。
 
 **测试。** `monitor::top::tests`：一行 JSON 解析回来正好是 13 个键、值等于读数、不含换行；0 到 7 画成 `▁▂▃▄▅▆▇█`，宽度不足时只画最新的几个，全部相等时画 `▁`；两份样本的一屏逐行等于预期的 13 行，没有样本时为空。
+
+## 8-92 采样线程与计数器读取（`bin::monitor::sampler`、`bin::monitor::counters`，形状：状态机 / adapter）
+
+8-90 的 `Monitor` 只回答「有没有人在看」与「看到了哪 300 个点」；每秒调用一次 `tick`、把新读数发给看的会话、以及读数从哪个平台接口来，是这两个模块的事。
+
+**接口。**
+
+- `sampler::beat(monitor: &Mutex<Monitor>, samples: &broadcast::Sender<Sample>, read: impl FnOnce() -> Sample)`：一拍。调用 `Monitor::tick(read)`；这一拍读了计数器，就把这一个读数发到 `samples`（即 `channels::MonitorFeed::samples`）。没人在看时 `read` 不被调用，什么也不发。发送时一个订阅者也没有不是失败：看的会话在两拍之间走了，它没有错过自己要的东西。锁中毒时照常取用：计数是原子的，历史是完整的 `VecDeque`，中毒不留下写了一半的状态。
+- `sampler::spawn_sampler(monitor: Weak<Mutex<Monitor>>, samples: broadcast::Sender<Sample>) -> Result<(), AxError>`：起名为 `sprawling-monitor` 的线程，每秒一拍，读数来自 `counters::Counters`。线程只持 `Weak`：`ServeConfig` 连同 `MonitorFeed::watch` 被丢弃后 `upgrade` 失败，线程在下一拍结束。起不了线程时返回 `StorageFatal`，recovery 是检查进程的线程上限（与 `serving::folding` 相同）。
+- `counters::Counters::open(volume: PathBuf) -> Counters` 与 `Counters::read(&mut self) -> Sample`：核心进程的 CPU（千分比，按两次读数之间累计 CPU 时间与墙钟、核数算出）、private（Windows 上是 PrivateUsage，其他平台是虚拟内存）、工作集、累计读写字节；整机 CPU（千分比）、可用内存；城所在卷的剩余空间。第一次读数没有上一次可比，两项 CPU 为 0。`Counters` 只在有人看时存在：`beat` 之后历史为空（没人看）时采样线程丢掉它，平台句柄与进程表不常驻。
+
+**定下的值。** 一拍的间隔 1 s（8-90 的「每秒一点」）；线程名 `sprawling-monitor`。
+
+**决定。**
+
+1. 计数器来源是 `sysinfo`，关掉默认特性、只开 `system` 与 `disk`。本工作区 `unsafe_code = forbid`，「只取需要的几个接口」在这里只能是另一个把平台调用包成安全接口的 crate，所以比较的是同一个 crate 的两种裁剪，以一个空的 release 探针（`lto`、`codegen-units = 1`、`strip`）实测：FIGURES。重新考虑的条件：出现只读本进程与整机计数、体积显著更小的安全接口 crate，或者 `unsafe_code` 的政策改变。
+2. 采样放在一条自己的线程上，而不是 tokio 任务：它每秒做一次阻塞的系统调用，放进异步运行时会占住一个工作线程；它与 `serving::folding` 一样是一条命名线程。没人看时线程每秒醒一次、读一个原子数，不读计数器也不留内存（8-90 决定 1）。
+3. 读数经 `Sample` 发出，不在这里换单位：换单位是 8-91 与 `client/src/core/monitor.ts` 的事。
+4. `f32` 的整机 CPU 负载是 `sysinfo` 唯一给出的形式，先截到 `0..=100` 再换成千分比；这一处 `as` 以 `#[expect]` 注明，它是本模块唯一的浮点。
+
+**测试。** `monitor::sampler::tests`：有人看时一拍把读到的那一个读数发给订阅者；没人看时不读、不发。`monitor::counters::tests`：读本进程得到非零的工作集、整机可用内存与卷剩余空间。
+
+**本节接口的当前状态。** 核心自己的健康（记账队列深度、持久水位线落后多少、relay 往返与事件到屏幕的 p50、排队的 run、S5.9M 的降级状态）与 Job Object 的汇总和逐进程明细尚未接入，这几项读数现为 0；磁盘延迟没有字段。采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。

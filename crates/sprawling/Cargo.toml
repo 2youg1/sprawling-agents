@@ -21,6 +21,9 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+# The monitor's counters (sprawling-SPEC.md 8-92): only the process,
+# memory and disk tables, not the default component, network and user ones.
+sysinfo = { version = "0.37", default-features = false, features = ["system", "disk"] }
 tokio-tungstenite = { workspace = true }
 # The person's own layer is TOML for the reason a city's CONFIG.toml is:
 # it is a file somebody edits by hand while the city is stopped.

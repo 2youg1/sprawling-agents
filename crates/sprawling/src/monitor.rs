@@ -10,6 +10,8 @@
 //! holds no memory. Where the counters come from is the caller's
 //! reading function; this module touches no platform interface.
 
+pub(crate) mod counters;
+pub(crate) mod sampler;
 pub mod top;
 
 use std::collections::VecDeque;
@@ -75,6 +77,12 @@ impl Monitor {
         self.history
             .reserve_exact(CAPACITY.saturating_sub(self.history.len()));
         self.history.push_back(read());
+    }
+
+    /// Whether anybody holds a [`Watch`] right now.
+    #[must_use]
+    pub fn is_watched(&self) -> bool {
+        self.watchers.load(Ordering::Relaxed) > 0
     }
 
     /// The kept samples, oldest first.
