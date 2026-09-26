@@ -515,6 +515,7 @@ module = [
   { name = "protocol::mcp::tools", file = "crates/protocol/src/mcp/tools.rs", owns = "listing, naming, calling", shape = "adapter", since = "P4", status = "built", spec = "protocol-SPEC.md#8-1" },
   { name = "protocol::mcp::outbound", file = "crates/protocol/src/mcp/outbound.rs", owns = "one line per request", shape = "adapter", since = "P4", status = "built", spec = "protocol-SPEC.md#8-1" },
   { name = "protocol::mcp::reading", file = "crates/protocol/src/mcp/reading.rs", owns = "one framed message, and the ceiling above which a server is refused", shape = "adapter", since = "P4", status = "built", spec = "protocol-SPEC.md#8-15" },
+  { name = "accounting::clock", file = "crates/accounting/src/clock.rs", owns = "the port a worker and its lanes read the time through", shape = "port", since = "V0.0.7", status = "built", spec = "accounting-SPEC.md#8-3" },
   { name = "accounting::connectors", file = "crates/accounting/src/connectors.rs", owns = "the port a worker connects each MCP server a building names through", shape = "port", since = "V0.0.7", status = "built", spec = "accounting-SPEC.md#8-2" },
   { name = "accounting::models", file = "crates/accounting/src/models.rs", owns = "the port a worker builds each model adapter through", shape = "port", since = "V0.0.7", status = "built", spec = "accounting-SPEC.md#8-1" },
   { name = "protocol::acp", file = "crates/protocol/src/acp.rs", owns = "the other direction: an outside editor driving this city", shape = "decision", since = "P4", status = "built", spec = "protocol-SPEC.md#8-2" },
