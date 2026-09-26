@@ -392,4 +392,17 @@ mod tests {
             .unwrap_err();
         assert!(refused.subject().contains("no subject"));
     }
+
+    #[test]
+    fn a_govern_refusal_tells_the_model_its_recovery_without_a_run_of_spaces() {
+        let scope = GateSubject::Scope("work".to_owned());
+        let mut bench = bench_with(stub("ruler", Effect::Govern, scope));
+        let refused = bench
+            .invoke(&call("ruler", kernel::Payload::empty()), &key(5), at())
+            .unwrap_err();
+        assert_eq!(
+            refused.recovery(),
+            "edit the scope's `CONFIG.toml`, or the building's `RULES.toml`, and dispatch again"
+        );
+    }
 }

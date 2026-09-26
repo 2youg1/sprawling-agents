@@ -42,6 +42,7 @@ fn a_long_connector_answer_is_stored_and_paged_rather_than_read_whole() {
             cas: &mut cas,
             city_root: &env,
             room: &room,
+            origin: crate::offload::tests::origin(),
         },
     )
     .unwrap();
@@ -64,6 +65,7 @@ fn a_long_connector_answer_is_stored_and_paged_rather_than_read_whole() {
             cas: &mut cas,
             city_root: &env,
             room: &room,
+            origin: crate::offload::tests::origin(),
         },
     )
     .unwrap();
