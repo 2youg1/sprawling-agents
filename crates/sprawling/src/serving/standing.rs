@@ -5,8 +5,9 @@
 
 //! The priority a core thread stands at: one step above normal, so the
 //! commands it dispatches one step below never outrank the accounting
-//! and the views, and back to normal once the thread has kept a core
-//! busy through a whole window (sprawling-SPEC.md 8-93).
+//! and the views, and back to normal when a turn ends having kept a core
+//! busy through a whole window; the valve judges only at a turn's end
+//! (sprawling-SPEC.md 8-93, decision 2).
 
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
