@@ -390,7 +390,9 @@ fn a_run_naming_no_model_runs_on_the_room_frozen_one() {
         })
         .unwrap();
     let room = Address::parse("lab/room1").unwrap();
-    worker.handle(ask_on(&room, "m-other", b"dispatch-1")).unwrap();
+    worker
+        .handle(ask_on(&room, "m-other", b"dispatch-1"))
+        .unwrap();
     let second = worker.handle(ask(&room, None, b"dispatch-2"));
     assert!(second.is_ok(), "{second:?}");
 }

@@ -130,7 +130,10 @@ impl RunWorker {
         // reach, so they are read before one is chosen.
         let building = city::Building::of(addr)?;
         let rules = city::load(&self.city_root, building.addr())?;
-        let tag = self.tag_for(at.model.as_deref())?;
+        // A run that names no model - a successor, a wake knock, a
+        // follow-up without `-m` - continues on what the room froze.
+        let own = city::own_layer(&self.city_root, addr)?;
+        let tag = self.tag_for(at.model.as_deref().or(own.model()))?;
         let chosen = self.book.select(tag, rules.policy())?;
         // A subscription credential that expires mid-run is a run that
         // dies on its second turn, so it is renewed before the run
@@ -162,8 +165,8 @@ impl RunWorker {
         })
     }
 
-    /// The tag whose registration a dispatch runs on: `main` when it
-    /// named no model, else the tag the named id was registered under,
+    /// The tag whose registration a dispatch runs on: `main` when
+    /// neither it nor its room named a model, else the tag the named id was registered under,
     /// so the endpoint, the window and the policy check come with it.
     ///
     /// # Errors
