@@ -1611,6 +1611,326 @@
     "en": "search the archive",
     "zh": "搜索归档"
   },
+  "event_city_initialized": {
+    "en": "the city was raised",
+    "zh": "城建起来了"
+  },
+  "event_building_created": {
+    "en": "a building was raised",
+    "zh": "新建了一栋楼"
+  },
+  "event_run_started": {
+    "en": "a run started",
+    "zh": "一次 run 开始了"
+  },
+  "event_run_forked": {
+    "en": "a run was forked from another",
+    "zh": "从另一次 run 分叉出一次 run"
+  },
+  "event_prompt_assembled": {
+    "en": "a prompt was put together",
+    "zh": "拼好了一份 prompt"
+  },
+  "event_model_called": {
+    "en": "the model was called",
+    "zh": "调用了模型"
+  },
+  "event_model_returned": {
+    "en": "the model answered",
+    "zh": "模型答复了"
+  },
+  "event_tool_called": {
+    "en": "a tool was called",
+    "zh": "调用了一个工具"
+  },
+  "event_tool_result": {
+    "en": "a tool gave its result",
+    "zh": "工具交回了结果"
+  },
+  "event_result_offloaded": {
+    "en": "a long result was set aside",
+    "zh": "一段过长的结果被另存"
+  },
+  "event_gate_checked": {
+    "en": "a gate was checked",
+    "zh": "检查了一道关卡"
+  },
+  "event_gate_denied": {
+    "en": "a gate refused",
+    "zh": "一道关卡拒绝了"
+  },
+  "event_checkpoint_committed": {
+    "en": "a checkpoint was committed",
+    "zh": "提交了一个检查点"
+  },
+  "event_handoff_written": {
+    "en": "a handoff was written",
+    "zh": "写下了一份交接"
+  },
+  "event_steer_received": {
+    "en": "the person steered a run",
+    "zh": "你给一次 run 追加了话"
+  },
+  "event_cancel_received": {
+    "en": "a run was asked to stop",
+    "zh": "有人要求一次 run 停下"
+  },
+  "event_watchdog_fired": {
+    "en": "the watchdog stopped a stalled run",
+    "zh": "看门狗叫停了一次停滞的 run"
+  },
+  "event_budget_limit": {
+    "en": "a run reached its budget",
+    "zh": "一次 run 花到了预算上限"
+  },
+  "event_run_frozen": {
+    "en": "a run ended",
+    "zh": "一次 run 收尾了"
+  },
+  "event_log_truncated": {
+    "en": "the log was cut short",
+    "zh": "日志被截短了"
+  },
+  "event_signal_enqueued": {
+    "en": "a signal was queued",
+    "zh": "排进了一个信号"
+  },
+  "event_signal_consumed": {
+    "en": "a signal was taken up",
+    "zh": "一个信号被接走了"
+  },
+  "event_draft_held": {
+    "en": "a draft was held for review",
+    "zh": "一份草稿被扣下待审"
+  },
+  "event_draft_resolved": {
+    "en": "a held draft was settled",
+    "zh": "被扣下的草稿有了结果"
+  },
+  "event_goal_registered": {
+    "en": "a goal was registered",
+    "zh": "登记了一个目标"
+  },
+  "event_goal_conflict": {
+    "en": "two goals conflicted",
+    "zh": "两个目标冲突了"
+  },
+  "event_arbitration_verdict": {
+    "en": "a conflict was arbitrated",
+    "zh": "冲突有了裁决"
+  },
+  "event_repair_started": {
+    "en": "a repair started",
+    "zh": "开始了一次修复"
+  },
+  "event_repair_reused": {
+    "en": "an earlier repair was reused",
+    "zh": "沿用了先前的修复"
+  },
+  "event_worktree_opened": {
+    "en": "a worktree was opened",
+    "zh": "开了一个工作树"
+  },
+  "event_pr_opened": {
+    "en": "a pull request was opened",
+    "zh": "开了一个合并请求"
+  },
+  "event_pr_merged": {
+    "en": "a pull request was merged",
+    "zh": "合并了一个合并请求"
+  },
+  "event_pr_rejected": {
+    "en": "a pull request was rejected",
+    "zh": "拒绝了一个合并请求"
+  },
+  "event_roadmap_claimed": {
+    "en": "a roadmap item was claimed",
+    "zh": "认领了一项路线图条目"
+  },
+  "event_roadmap_finished": {
+    "en": "a roadmap item was finished",
+    "zh": "完成了一项路线图条目"
+  },
+  "event_roadmap_released": {
+    "en": "a roadmap item was let go",
+    "zh": "放下了一项路线图条目"
+  },
+  "event_approval_requested": {
+    "en": "a run asked for approval",
+    "zh": "一次 run 请求批准"
+  },
+  "event_approval_resolved": {
+    "en": "an approval was answered",
+    "zh": "一项审批有了答复"
+  },
+  "event_policy_created": {
+    "en": "a policy was set",
+    "zh": "定下了一条策略"
+  },
+  "event_policy_revoked": {
+    "en": "a policy was withdrawn",
+    "zh": "撤回了一条策略"
+  },
+  "event_taint_promoted": {
+    "en": "a taint was raised",
+    "zh": "污点等级被调高"
+  },
+  "event_cross_building_transfer": {
+    "en": "something moved between buildings",
+    "zh": "有东西在两栋楼之间转交"
+  },
+  "event_city_halted": {
+    "en": "work was stopped or released",
+    "zh": "停工或复工"
+  },
+  "event_backpressure_shed": {
+    "en": "work was shed under load",
+    "zh": "负载过高，丢下了一些活"
+  },
+  "event_digest_invalidated": {
+    "en": "a digest went stale",
+    "zh": "一份摘要过期了"
+  },
+  "event_endpoint_attached": {
+    "en": "a provider was attached",
+    "zh": "接上了一家供应方"
+  },
+  "event_endpoint_lost": {
+    "en": "a provider was lost",
+    "zh": "丢了一家供应方"
+  },
+  "event_model_selected": {
+    "en": "a model was chosen",
+    "zh": "选定了一个模型"
+  },
+  "event_provider_degraded": {
+    "en": "a provider slowed or failed",
+    "zh": "供应方变慢或出错"
+  },
+  "event_login_started": {
+    "en": "a sign-in started",
+    "zh": "开始了一次登录"
+  },
+  "event_eval_run": {
+    "en": "an evaluation ran",
+    "zh": "跑了一次评测"
+  },
+  "event_asset_archived": {
+    "en": "an asset was filed",
+    "zh": "登记留存了一项产物"
+  },
+  "event_credential_lent": {
+    "en": "a credential was lent to a run",
+    "zh": "把一份凭据借给了一次 run"
+  },
+  "event_secret_captured": {
+    "en": "a secret was caught and vaulted",
+    "zh": "截下一份密钥并存入保险库"
+  },
+  "event_secret_egress_blocked": {
+    "en": "a secret was stopped from leaving",
+    "zh": "拦下了一份要外发的密钥"
+  },
+  "event_file_discarded": {
+    "en": "a file was discarded",
+    "zh": "丢弃了一个文件"
+  },
+  "event_discard_restored": {
+    "en": "a discarded file was restored",
+    "zh": "找回了一个丢弃的文件"
+  },
+  "event_autonomy_changed": {
+    "en": "who answers approvals changed",
+    "zh": "改了由谁来批"
+  },
+  "event_went_back": {
+    "en": "a run went back to an earlier step",
+    "zh": "一次 run 退回到先前一步"
+  },
+  "event_file_restored": {
+    "en": "a file was restored",
+    "zh": "恢复了一个文件"
+  },
+  "event_building_configured": {
+    "en": "a building was configured",
+    "zh": "改了一栋楼的设置"
+  },
+  "event_building_removed": {
+    "en": "a building was removed",
+    "zh": "移除了一栋楼"
+  },
+  "event_session_opened": {
+    "en": "a session was opened",
+    "zh": "开了一场对话"
+  },
+  "event_prompt_shape_compared": {
+    "en": "two prompt shapes were compared",
+    "zh": "比较了两种 prompt 形状"
+  },
+  "event_roadmap_split": {
+    "en": "a roadmap item was split",
+    "zh": "拆分了一项路线图条目"
+  },
+  "event_roadmap_blocked": {
+    "en": "a roadmap item was blocked",
+    "zh": "一项路线图条目被卡住"
+  },
+  "event_pursuit_changed": {
+    "en": "the standing goal changed",
+    "zh": "长期目标变了"
+  },
+  "event_endpoint_probed": {
+    "en": "a provider was probed",
+    "zh": "试探了一家供应方"
+  },
+  "event_governed_document_written": {
+    "en": "a governing document was saved",
+    "zh": "保存了一份治理文件"
+  },
+  "event_spine_document_written": {
+    "en": "a spine document was saved",
+    "zh": "保存了一份骨架文件"
+  },
+  "event_rules_changed": {
+    "en": "the rules changed",
+    "zh": "规则改了"
+  },
+  "event_toolkit_link_opened": {
+    "en": "a toolkit link was opened",
+    "zh": "打开了一个工具包链接"
+  },
+  "event_embedding_called": {
+    "en": "an embedding was computed",
+    "zh": "算了一次嵌入"
+  },
+  "event_rerank_called": {
+    "en": "results were reranked",
+    "zh": "重排了一次结果"
+  },
+  "event_adviser_asked": {
+    "en": "an adviser was asked",
+    "zh": "问了一位顾问"
+  },
+  "event_adviser_answered": {
+    "en": "an adviser answered",
+    "zh": "顾问答复了"
+  },
+  "event_adviser_fell_back": {
+    "en": "an adviser fell back",
+    "zh": "顾问退回了备选"
+  },
+  "event_cache_renewed": {
+    "en": "a prompt cache was renewed",
+    "zh": "续了一次 prompt 缓存"
+  },
+  "rec_raw": {
+    "en": "the record as written",
+    "zh": "原始记录"
+  },
+  "rec_by": {
+    "en": "by {who}",
+    "zh": "由 {who}"
+  },
   "region_composer": {
     "en": "what to say",
     "zh": "要说的话"
@@ -3395,9 +3715,21 @@
     "en": "idle",
     "zh": "空闲"
   },
+  "runs_phase_stopped": {
+    "en": "stopped",
+    "zh": "已叫停"
+  },
+  "runs_phase_capped": {
+    "en": "ran out of budget",
+    "zh": "花到上限"
+  },
   "runs_untitled": {
     "en": "no task named yet",
     "zh": "尚未写明任务"
+  },
+  "runs_untitled_in": {
+    "en": "a run in {addr}",
+    "zh": "{addr} 里的一次 run"
   },
   "runs_minus": {
     "en": "−{n} min",
