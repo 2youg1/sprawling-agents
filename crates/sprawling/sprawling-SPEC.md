@@ -154,7 +154,7 @@ fn random_token(bytes: usize) -> Result<String, AxError>;          // OS 熵，�
 
 | 查询 | 出处 | 口径 |
 |---|---|---|
-| `InboxView` | 折 `signal_enqueued` 减 `signal_consumed` | **看队列不靠消费**：`Inbox::pull` 要拿走才给得出内容，一个看一眼就把东西取走的视图会改变它所报告的对象 |
+| `InboxView` | 折 `signal_enqueued` 减 `signal_consumed`：前者经 `collab::Signal::from_payload` 读、按它的 `room` 入队，后者经 `collab::SignalConsumed::from_payload` 读、按这一行的 `addr` 出队（`signal_consumed` 只写 `id` 与 `by`，房间在行的地址上）；读不回的一行让折叠报错而不是被跳过 | **看队列不靠消费**：`Inbox::pull` 要拿走才给得出内容，一个看一眼就把东西取走的视图会改变它所报告的对象。**与写者同一把尺**：视图自己按键名读这两行时，消费行里没有 `room`，被取走的信号在视图里永远等着 |
 | `DiscardView` | 折 `file_discarded`／`discard_restored`，按路径归键 | 每行自带回去的路（`restoration`）；还原是**关掉它开的那一行**，不是另开一行 |
 | `RegistryView` | 折 `asset_archived` | 「这座城认定值得留下的东西」；空表就是空表，与「本版本答不了」在类型上已经不可混淆 |
 | `ArchiveSearch` | 被问的那一刻读盘（同 `BuildingView`） | 文件是权威，另存索引就是第二个权威 |
