@@ -1320,6 +1320,6 @@ pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
 Command::RestoreDiscard { restoration: Restoration, idem: IdemKey }
 ```
 
-- **帧里带的是那一行的 `restoration` 原样**，不是路径。`DiscardView` 的每一行已经带着它自己的回去的路（`Restoration`），页面把它交回来；城要是改成按路径去查，就得在写线程上为一次还原把整份历史再折一遍，而那一行本来就在页面手里。一个伪造的 `Tracked` 能做到的最多是把城自己历史里的某个文件写回城里它自己的路径——`Address` 爬不出城。
+- **帧里带的是那一行的 `restoration` 原样**，不是路径。`DiscardView` 的每一行已经带着它自己的回去的路（`Restoration`），页面把它交回来；城要是改成按路径去查，就得在写线程上为一次还原把整份历史再折一遍，而那一行本来就在页面手里。一个伪造的 `Tracked` 能做到的最多是把城自己历史里的某个文件写回城里它自己的路径——`Address` 爬不出城，`restore` 拒绝 `Address::is_reserved` 的地址，所以受保护的元数据子树（`.sprawling/`、`.git/`）不经这条路写入。
 - **三种路，三个回答**：`Tracked(file:<addr>@<oid>)` 由装配层经 `memory::Checkpoint::restore` 写回，再追加 `discard_restored`（载荷与它关掉的那条 `file_discarded` 同形：`paths` 与 `restoration`），`DiscardView` 据此把那一行标成已还原；`Interred` 答 `E_INVALID_ARGS`，recovery 说从内容仓库取回尚未接线；`Rebuildable` 答 `E_INVALID_ARGS`，recovery 就是那条重建的理由——没有存着的字节可放回去。带 `range` 的定位符同样被拒：还原的是整个文件。
 - **被否：`RestoreDiscard { path }`**。见第一条；另外，同一路径可以被丢两次，只给路径说不清要回到哪一次。
