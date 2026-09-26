@@ -18,12 +18,12 @@ use crate::assembly::*;
 
 /// A dispatch as the desk delivers one: a person's work, sent to a room
 /// that already exists.
-fn asked(addr: &str) -> Assignment {
+pub(super) fn asked(addr: &str) -> Assignment {
     Assignment {
         addr: Address::parse(addr).unwrap(),
         session: None,
         effort: None,
-        mode: runtime::Mode::PlanGoal,
+        mode: kernel::Mode::PlanGoal,
         parent: None,
         succession: None,
         tainted: false,
@@ -32,7 +32,7 @@ fn asked(addr: &str) -> Assignment {
 }
 
 /// Every line of the city's history, parsed, oldest first.
-fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
+pub(super) fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
         .raw_lines()

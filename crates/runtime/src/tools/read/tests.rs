@@ -106,10 +106,7 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
 fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
     let dir = tempfile::tempdir().unwrap();
     let (mut tool, catalog) = tool(dir.path());
-    catalog
-        .lock()
-        .unwrap()
-        .set_mode(crate::mode::Mode::Experiment);
+    catalog.lock().unwrap().set_mode(kernel::Mode::Experiment);
 
     let mode = tool.invoke(&call("mode:experiment")).unwrap();
     let said = mode.result.as_map()["text"].as_str().unwrap_or_default();

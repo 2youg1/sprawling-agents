@@ -47,7 +47,7 @@ pub use commits::{CommitAnswer, CommitsAnswer};
 pub use config::{ConfigAnswer, ConfigLayer, SettledEffort, SettledSecond, TuningDefaults};
 pub use cost_of::CostOfAnswer;
 pub use doctor::DoctorSandboxMissing;
-pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
@@ -329,7 +329,7 @@ pub struct DiscardLine {
     /// sentence about it.
     ///
     /// Composing the sentence is the interface's job and it already has
-    /// one authority for it (`web::approval::ReturnPath`); a server that
+    /// one authority for it (`client/src/views/record/bin.svelte`); a server that
     /// also rendered the plan into words would be the second. `None`
     /// means the record names a scheme this build cannot read, which the
     /// interface shows as a row it will not invent an action for - the

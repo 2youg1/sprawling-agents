@@ -44,7 +44,7 @@ impl RunWorker {
         // each of them. Held apart from the whole-phase reading because
         // it is the part a resident connection table would remove, and
         // a figure that mixed the two could not say how much.
-        let began = now_ms().ok();
+        let began = now_ms();
         let mut offered = Vec::new();
         let resolve = self.resolver();
         for server in &config.mcp {
@@ -77,18 +77,26 @@ impl RunWorker {
         }
         // A clock this machine would not read is not a reason to lose
         // the tools: the reading is diagnostic, the connections are the
-        // work.
-        if let (Some(began), Ok(ended)) = (began, now_ms()) {
-            let spent = ended.value().saturating_sub(began.value());
-            self.note(
-                runtime::diagnostics::Level::Trace,
+        // work. The clock's failure is still said, with its recovery,
+        // rather than leaving a reader to wonder why the line is absent.
+        match (began, now_ms()) {
+            (Ok(began), Ok(ended)) => {
+                let spent = ended.value().saturating_sub(began.value());
+                self.note(
+                    runtime::diagnostics::Level::Trace,
+                    "bin::assembly",
+                    &format!(
+                        "mcp_tools took {spent} ms over {} declared server(s), offering {} tool(s)",
+                        config.mcp.len(),
+                        offered.len()
+                    ),
+                );
+            }
+            (Err(clock), _) | (_, Err(clock)) => self.note(
+                runtime::diagnostics::Level::Refuse,
                 "bin::assembly",
-                &format!(
-                    "mcp_tools took {spent} ms over {} declared server(s), offering {} tool(s)",
-                    config.mcp.len(),
-                    offered.len()
-                ),
-            );
+                &format!("mcp_tools went unmeasured: {clock}; {}", clock.recovery()),
+            ),
         }
         offered
     }

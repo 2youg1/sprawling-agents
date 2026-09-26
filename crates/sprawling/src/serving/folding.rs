@@ -10,6 +10,8 @@ use std::sync::{Arc, Mutex, mpsc};
 
 use kernel::{AxCode, AxError, EventRecord};
 
+use super::standing::{CorePriority, CoreThread};
+use crate::assembly::monotonic_now;
 use crate::views::Views;
 
 /// The two places the writer thread hands the views what it wrote, and
@@ -44,12 +46,13 @@ enum Following {
 pub(super) fn spawn_folding(
     views: Arc<Mutex<Views>>,
     to_clients: tokio::sync::broadcast::Sender<EventRecord>,
+    setting: CorePriority,
 ) -> Result<Folding, AxError> {
     let (committed, arriving) = mpsc::channel::<Fold>();
     let examined = committed.clone();
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
-        .spawn(move || fold_until_closed(&views, &arriving, &to_clients))
+        .spawn(move || fold_until_closed(&views, &arriving, &to_clients, setting))
         .map_err(|source| {
             AxError::failure(
                 AxCode::StorageFatal,
@@ -78,7 +81,9 @@ pub(super) fn spawn_folding(
     })
 }
 
-/// Folds each arrival, then broadcasts it, until every sender is gone.
+/// Raises this thread above the commands the city dispatches, then
+/// folds each arrival and broadcasts it until every sender is gone,
+/// lowering the thread if it keeps a core busy (sprawling-SPEC.md 8-93).
 ///
 /// The broadcast follows the fold so a client that queries on hearing a
 /// record finds it already folded.
@@ -86,9 +91,12 @@ fn fold_until_closed(
     views: &Mutex<Views>,
     arriving: &mpsc::Receiver<Fold>,
     to_clients: &tokio::sync::broadcast::Sender<EventRecord>,
+    setting: CorePriority,
 ) {
+    let mut core = CoreThread::raise("sprawling-views", setting, monotonic_now());
     let mut following = Following::Live;
     for fold in arriving {
+        let woke = monotonic_now();
         following = match following {
             Following::Live => fold_one(views, &fold),
             Following::Stopped => Following::Stopped,
@@ -98,6 +106,7 @@ fn fold_until_closed(
             // no browser open is a city doing its work.
             drop(to_clients.send(record));
         }
+        core.record_turn_lowering_when_busy(woke, monotonic_now());
     }
 }
 

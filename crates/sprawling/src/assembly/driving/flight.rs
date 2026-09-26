@@ -79,10 +79,11 @@ impl Flight {
         self.pool.in_flight()
     }
 
-    /// Whether every lane is taken. The concurrency wall a caller reads
-    /// before it prepares work it cannot start.
+    /// Whether a new run waits: every lane is taken, or memory is tight.
+    /// The concurrency wall a caller reads before it prepares work it
+    /// cannot start; the memory is read here, at the moment it decides.
     pub(in crate::assembly) fn full(&self) -> bool {
-        self.pool.full()
+        self.pool.full(crate::monitor::memory::read())
     }
 
     /// The plan rows one pursuit has in lanes: how many, and which
@@ -193,7 +194,6 @@ impl RunWorker {
         self.flight
             .gate
             .serve(patience, &mut self.ledger, &mut self.flight.homes);
-        self.dispatch_the_named();
         let Some(arrival) = self.flight.arrived() else {
             return Ok(Landed::Nothing);
         };
@@ -231,7 +231,7 @@ impl RunWorker {
 
     /// Whether any run is driving right now.
     pub(crate) fn driving(&self) -> bool {
-        self.flight.in_flight() > 0 || self.namings.pending()
+        self.flight.in_flight() > 0
     }
 
     /// Whether `run` is in a lane right now, and so reads its own Cancel
@@ -310,7 +310,7 @@ impl RunWorker {
             origin: None,
             session: None,
             effort: None,
-            mode: runtime::Mode::PlanGoal,
+            mode: kernel::Mode::PlanGoal,
             parent: None,
             succession: None,
             tainted: matches!(because, Unasked::Arrival),

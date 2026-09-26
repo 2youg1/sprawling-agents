@@ -13,13 +13,13 @@
 
 use std::io::BufRead as _;
 
-use kernel::{AxError, ModelRequest, ModelReturn, UsdMicros};
+use kernel::{AxError, ModelRequest, ModelReturn};
 use serde_json::Value;
 
-use crate::cost;
 use crate::dialect;
 
-use super::config::{Endpoint, ProviderFailure, provider_err};
+use super::config::Endpoint;
+use super::failure::{ProviderFailure, provider_err};
 
 impl Endpoint {
     /// One call, with the body read as it arrives.
@@ -66,7 +66,7 @@ impl Endpoint {
         // **A streamed call carries no deadline of its own.** The
         // transport reads the whole body under one deadline, so any
         // figure written here would cut an answer for being long; the
-        // bound a person set is a silence, and [`Endpoint::frames_of`]
+        // bound a person set is a silence, and [`Endpoint::lines_of`]
         // is where it is applied.
         let mut sending = request
             .json(&wire)
@@ -87,20 +87,40 @@ impl Endpoint {
                 },
             ));
         }
-        let frames = self.frames_of(response, onto)?;
-        // A cut stream is a provider failure, never a shortened reply:
-        // a return is built from the settled frame, and a body that
-        // ended before that frame arrived has none.
-        let settled = dialect::settled_from_stream(self.config.dialect, &frames)?;
-        let resp = dialect::response_from_wire(self.config.dialect, &settled)?;
-        let billed: Option<UsdMicros> = match &self.config.pricing {
-            Some(entry) => Some(cost::settle(&resp.usage, None, entry)?.billed),
-            None => None,
+        // A provider that ignores `stream: true` answers with the
+        // settled body itself, and HTTP says so in the media type; read
+        // as frames it holds none and would fail as a cut stream.
+        let settled = if answers_whole(&response) {
+            let mut body = String::new();
+            self.lines_of(response, |line| {
+                body.push_str(&line);
+                body.push('\n');
+            })?;
+            serde_json::from_str(&body).map_err(|err| {
+                provider_err(
+                    "read provider response",
+                    &ProviderFailure::Unreadable(err.to_string()),
+                )
+            })?
+        } else {
+            let mut frames = Vec::new();
+            self.lines_of(response, |line| {
+                if let Some(frame) = frame_of(&line) {
+                    if let Some(held) = dialect::increment_of(self.config.dialect, &frame) {
+                        onto(&held);
+                    }
+                    frames.push(frame);
+                }
+            })?;
+            // A cut stream is a provider failure, never a shortened
+            // reply: a return is built from the settled frame, and a
+            // body that ended before that frame arrived has none.
+            dialect::settled_from_stream(self.config.dialect, &frames)?
         };
-        ModelReturn::from_response(resp, billed)
+        self.returned(&settled)
     }
 
-    /// Every frame the provider wrote, forwarded as it lands and given
+    /// Every line of the body, handed to `each` as it lands and given
     /// up on after one silence too long.
     ///
     /// **The body is read on a thread of its own so that a silence can
@@ -115,11 +135,11 @@ impl Endpoint {
     /// on it until the provider closes it. Ending the call is what a
     /// person asked for; ending the connection is the provider's, and
     /// no answer of ours can take it away from them.
-    fn frames_of(
+    fn lines_of(
         &self,
         response: reqwest::blocking::Response,
-        onto: kernel::Increments<'_>,
-    ) -> Result<Vec<Value>, AxError> {
+        mut each: impl FnMut(String),
+    ) -> Result<(), AxError> {
         // The stream's own bound when it has one, and the settled
         // call's when it does not: a stream nobody bounded separately
         // is still not allowed to go quiet forever.
@@ -137,7 +157,6 @@ impl Endpoint {
                 }
             }
         });
-        let mut frames = Vec::new();
         loop {
             let line = match arriving.recv_timeout(quiet) {
                 Ok(Ok(line)) => line,
@@ -149,7 +168,7 @@ impl Endpoint {
                 }
                 // The reader reached the end of the body and dropped
                 // its end of the channel, which is how a stream ends.
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return Ok(frames),
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return Ok(()),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     return Err(provider_err(
                         "read provider response",
@@ -157,30 +176,37 @@ impl Endpoint {
                     ));
                 }
             };
-            let Some(payload) = line.strip_prefix("data:") else {
-                continue;
-            };
-            let payload = payload.trim();
-            // The sentinel one dialect ends with. It is not JSON, and
-            // treating it as an unreadable frame would turn every
-            // successful stream into a warning.
-            if payload.is_empty() || payload == "[DONE]" {
-                continue;
-            }
-            // A frame this build cannot read is skipped rather than
-            // fatal: providers add event types, and a person watching
-            // text arrive must not lose a call because one of them was
-            // new. What cannot be skipped is the settled answer, and
-            // the caller checks that.
-            let Ok(frame) = serde_json::from_str::<Value>(payload) else {
-                continue;
-            };
-            if let Some(held) = dialect::increment_of(self.config.dialect, &frame) {
-                onto(&held);
-            }
-            frames.push(frame);
+            each(line);
         }
     }
+}
+
+/// Whether the provider answered with one settled body rather than a
+/// stream: the media type says `application/json`. An absent type is
+/// read as the stream the request asked for.
+fn answers_whole(response: &reqwest::blocking::Response) -> bool {
+    response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .is_some_and(|media| media.trim().eq_ignore_ascii_case("application/json"))
+}
+
+/// The frame one line of an event stream carries, when it carries one.
+fn frame_of(line: &str) -> Option<Value> {
+    let payload = line.strip_prefix("data:")?.trim();
+    // The sentinel one dialect ends with. It is not JSON, and treating
+    // it as an unreadable frame would turn every successful stream into
+    // a warning.
+    if payload.is_empty() || payload == "[DONE]" {
+        return None;
+    }
+    // A frame this build cannot read is skipped rather than fatal:
+    // providers add event types, and a person watching text arrive must
+    // not lose a call because one of them was new. What cannot be
+    // skipped is the settled answer, and the caller checks that.
+    serde_json::from_str::<Value>(payload).ok()
 }
 
 #[cfg(test)]

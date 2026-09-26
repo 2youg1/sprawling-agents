@@ -20,6 +20,15 @@ fn cas_locator_roundtrips() {
     assert_eq!(Locator::parse(&bytes).unwrap().to_string(), bytes);
 }
 
+/// The seven callers that once spelled `cas:b3-{hash}` and parsed it
+/// back now call `Locator::cas`; this is the equivalence they rely on.
+#[test]
+fn cas_constructor_is_the_parsed_spelling_of_its_digest() {
+    let hash = B3Hash::digest(b"stored bytes");
+    let parsed = Locator::parse(&format!("cas:b3-{hash}")).unwrap();
+    assert_eq!(Locator::cas(hash), parsed);
+}
+
 #[test]
 fn file_locator_roundtrips_and_splits_on_last_at() {
     let raw = format!("file:role@building.1/notes.md@{OID}");

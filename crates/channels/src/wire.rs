@@ -138,13 +138,18 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-/// 39: the performance monitor travels. A session says it is watching
+/// 39: `rules_changed` joins the event kinds, carrying which governing
+///    document moved as a closed word; an older page would meet a kind
+///    it cannot decode in the history it folds.
+/// 40: the performance monitor travels. A session says it is watching
 ///    with `ClientFrame::Monitor` and receives one `ServerFrame::Monitor`
 ///    reading a second until it releases or closes.
-/// 40: a session may watch only the fact bar's summary.
+/// 41: the doctor's answer names where the core's threads stand, so an
+///    older page would meet a field it cannot decode.
+/// 42: a session may watch only the fact bar's summary.
 ///    `Monitoring::WatchSummary` makes the city read this process alone
 ///    for it, and an older city would refuse the spelling.
-pub const WIRE_V: u32 = 40;
+pub const WIRE_V: u32 = 42;
 mod monitor;
 mod query;
 

@@ -30,6 +30,8 @@
   import ForkButton from "./fork_button.svelte";
   import { callWord } from "./calls";
   import { planFork } from "./forking";
+  import { silentRun, silentTurn } from "./silence";
+  import type { Phase } from "./silence";
   import type { ForkEntry, ForkPlan } from "./forking";
 
   // The provider's own words for a reply that ended the way replies end.
@@ -95,6 +97,7 @@
     return held.endpoints.chosen.find((each) => each.tag === "main")?.max_output_tokens ?? null;
   });
   const frozen = $derived(run.doing.kind === "frozen");
+  const phase = $derived<Phase>(frozen ? "frozen" : "live");
   const completion = $derived.by((): string => {
     const word =
       answer?.closing?.completion ??
@@ -125,7 +128,7 @@
   const closedAt = $derived(answer?.closing?.at ?? null);
   // A frozen run that said nothing at all is one card with the reason
   // and a way out, not one grey box per turn (ux: the zero-output run).
-  const emptyRun = $derived(frozen && turns.every((turn) => (turn.said ?? "") === ""));
+  const emptyRun = $derived(silentRun(turns, phase));
   const why = $derived.by((): string | null => {
     const stopped = turns.at(-1)?.stopped ?? null;
     return stopped === null || FINISHED.includes(stopped) ? null : stopped;
@@ -284,7 +287,7 @@ said, and what that cost. -->
 {#snippet drawTurnView(turn: Turn, showEmpty: boolean)}
   {@const tokens = turn.used === null || turn.used === undefined ? null : turn.used.input + turn.used.output}
   {@const spent = turn.spent === null || turn.spent === undefined || turn.spent === 0 ? null : turn.spent}
-  {@const empty = (turn.said ?? "") === "" && turn.calls.length === 0}
+  {@const empty = silentTurn(turn, phase)}
   {@const cut = turn.stopped === null || turn.stopped === undefined || FINISHED.includes(turn.stopped) ? null : turn.stopped}
   <div class="group relative my-base">
     {#if onFork !== undefined}

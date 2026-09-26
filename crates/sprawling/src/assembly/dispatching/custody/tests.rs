@@ -63,6 +63,10 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
         })
         .unwrap();
 
+    // The worker holds a byte-range lock on a city file while it lives,
+    // and Windows refuses a read of a locked range; drop it before the scan.
+    let vault = worker.vault_handle();
+    drop(worker);
     let asked = provider.bodies().join("\n");
     assert!(!asked.contains(&key), "a request carried the key: {asked}");
     let at = asked
@@ -73,16 +77,12 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
         .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '/' | '-' | '_' | '.'))
         .collect();
     let reference = kernel::SecretRef::parse(&reference).unwrap();
-    let vault = worker.vault_handle();
     let held = vault.lock().unwrap().resolve(&reference).unwrap();
     assert_eq!(
         *held.into_vault_value(),
         key,
         "the vault holds the key itself"
     );
-    // The open city holds its ledger lock file, and Windows refuses to
-    // read a locked range, so the city is closed before its files are read.
-    drop(worker);
     assert_eq!(
         files_holding(dir.path(), key.as_bytes()),
         Vec::<std::path::PathBuf>::new(),

@@ -14,7 +14,9 @@
 //! them equal.
 
 use kernel::event::Scope;
-use kernel::event::record::{Admittance, AutonomyChanged, CityHalted};
+use kernel::event::record::{
+    Admittance, AutonomyChanged, CityHalted, GoverningDocument, RulesChanged,
+};
 use kernel::{Address, AxError, EventKind, Payload, RunId};
 
 /// The work an answered item was holding up.
@@ -49,6 +51,10 @@ pub(crate) struct Governance {
     /// everything else the panel shows, so a restarted city is still
     /// halted.
     pub(crate) halted: std::collections::BTreeSet<Scope>,
+    /// What each governing document was last booked as, by scope and
+    /// document. Folded from `rules_changed`, so a restarted city knows
+    /// what the account already covers and books only what moved.
+    pub(crate) rules: std::collections::BTreeMap<(Scope, GoverningDocument), kernel::B3Hash>,
     /// What each run was sent to do, by run.
     ///
     /// Never pruned, and one short entry per run - the same growth class
@@ -71,6 +77,7 @@ impl Governance {
             autonomy: kernel::consts_policy::AUTONOMY_DEFAULT,
             granted: Vec::new(),
             halted: std::collections::BTreeSet::new(),
+            rules: std::collections::BTreeMap::new(),
             sent: std::collections::BTreeMap::new(),
             origins: std::collections::BTreeMap::new(),
         }
@@ -170,6 +177,11 @@ impl Governance {
                         self.halted.remove(&shut.scope);
                     }
                 }
+            }
+            EventKind::RulesChanged => {
+                let changed = payload.read::<RulesChanged>()?;
+                self.rules
+                    .insert((changed.scope, changed.which), changed.after);
             }
             _ => {}
         }

@@ -5,7 +5,7 @@
 
 // The performance panel's reading of the monitor history: a row per
 // counter with its latest reading and its curve, drawn exactly as
-// `sprawling top` draws them (sprawling-SPEC 8-91), so a person at the
+// `sprawling top` draws them (sprawling-SPEC 8-95), so a person at the
 // page and an agent at the terminal read one sample the same way.
 // `monitor.test.ts` holds this to the fixture `bin::monitor::top`'s own
 // screen test uses.

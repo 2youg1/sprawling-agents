@@ -5,7 +5,7 @@
 
 //! This process's own counters, read through its own handle rather than
 //! the whole process table, so one reading costs about a microsecond
-//! (sprawling-SPEC.md 8-92).
+//! (sprawling-SPEC.md 8-96).
 
 use std::time::Duration;
 
@@ -83,7 +83,7 @@ fn storage_bytes() -> StorageBytes {
 }
 
 /// Elsewhere the counter is reachable only through `unsafe`, which this
-/// workspace forbids, so both read 0 (sprawling-SPEC.md 8-92, decision 1).
+/// workspace forbids, so both read 0 (sprawling-SPEC.md 8-96, decision 1).
 #[cfg(not(target_os = "linux"))]
 fn storage_bytes() -> StorageBytes {
     StorageBytes::default()

@@ -28,7 +28,7 @@
 // second way of getting the same answer.
 
 import type { Key } from "../../core/lang";
-import type { DoctorItem } from "../../wire";
+import type { DoctorCore, DoctorItem } from "../../wire";
 import type { Weight } from "../parts/glyph";
 import type { Tone } from "../parts/button.svelte";
 import type { Offer } from "../setup/dependencies";
@@ -49,6 +49,24 @@ function weightOf(item: DoctorItem): Weight {
 // **No offer takes the primary tone** (ux-upgrades A11): install is a
 // per-card act, and a row's act is not the one button a screen is for.
 // The screen's single primary is `check again`, above the cards.
+// The level the core's threads stand at, and the platform's own words
+// when it refused: those are the platform's to choose, not the page's.
+function coreOf(core: DoctorCore): { readonly key: Key; readonly said: string | null } {
+  if (typeof core !== "string") {
+    return "refused" in core
+      ? { key: "machine_core_refused", said: core.refused.said }
+      : { key: "machine_core_unasked", said: core.unasked.said };
+  }
+  switch (core) {
+    case "raised":
+      return { key: "machine_core_raised", said: null };
+    case "held_by_setting":
+      return { key: "machine_core_held", said: null };
+    case "lowered_by_valve":
+      return { key: "machine_core_lowered", said: null };
+  }
+}
+
 const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = {
   press: { tone: "secondary", why: null },
   by_hand: { tone: "quiet", why: "machine_install_by_hand" },
@@ -80,6 +98,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   const second = $derived(recommended(answer));
   const missedUse = $derived(outstanding(answer, "use"));
   const missedDevelop = $derived(outstanding(answer, "develop"));
+  const core = $derived(coreOf(answer.core));
 
   // One program, and everything a person decides about it from one
   // card: the name, the state, the version, what it enables, and the
@@ -181,4 +200,11 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
   {@render column(say($lang, "machine_required"), missedUse, first)}
   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
   {@render column(say($lang, "machine_recommended"), missedDevelop, second)}
+  <p class="flex min-w-0 flex-wrap items-baseline gap-tight text-note">
+    <span class="text-text-quiet">{say($lang, "machine_core")}</span>
+    <span class="text-text">{say($lang, core.key)}</span>
+    {#if core.said !== null}
+      <span class="min-w-0 break-words text-text-faint">{core.said}</span>
+    {/if}
+  </p>
 </div>

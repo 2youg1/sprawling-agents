@@ -12,9 +12,11 @@
 // so what has to stay in view is a place in text that is already
 // there, not an element that moved.
 //
-// The judgement answers "was the viewport at the foot before this
-// append", so the caller records it on every scroll and reads it again
-// before following. The distance from the foot is
+// A room opens at the foot and follows: the scroller measures the top
+// when it mounts, and that is where the browser put it, not a place the
+// person chose. After that the judgement answers "was the viewport at the
+// foot before this append", so the caller records it on every scroll the
+// person makes and reads it again before following. The distance from the foot is
 // `scrollHeight - scrollTop - clientHeight`, and a distance below
 // `FOOT_TOLERANCE` counts as the foot. Exactly at the tolerance is
 // already a place the person chose, so it holds.
@@ -48,11 +50,19 @@ export function footOf(box: Element): Foot {
   };
 }
 
+// What moved the viewport: the room opening, or a scroll measured after it.
+export type Moment = { readonly kind: "opened" } | { readonly kind: "scrolled"; readonly foot: Foot };
+
 // Decide whether the growing edge keeps the viewport where it is. A
 // viewport past the foot - rubber-band scrolling on its way back -
 // reads as the foot rather than as a failure.
-export function anchorAt(foot: Foot): Anchoring {
-  return foot.scrollHeight - foot.scrollTop - foot.clientHeight < FOOT_TOLERANCE
-    ? "follow"
-    : "hold";
+export function anchorAt(moment: Moment): Anchoring {
+  switch (moment.kind) {
+    case "opened":
+      return "follow";
+    case "scrolled": {
+      const { scrollHeight, scrollTop, clientHeight } = moment.foot;
+      return scrollHeight - scrollTop - clientHeight < FOOT_TOLERANCE ? "follow" : "hold";
+    }
+  }
 }

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `sprawling top`: watch a served city's monitor over the wire and
-//! write each reading to stdout (sprawling-SPEC.md 8-93).
+//! write each reading to stdout (sprawling-SPEC.md 8-97).
 
 use std::collections::VecDeque;
 use std::io::Write;

@@ -10,10 +10,12 @@
   // there is no separate "next" to press: walking the welcome and
   // starting the work are the same gesture.
   //
-  // **The provider card goes away once a main model exists** - its
-  // whole reason for being here is the one gap that makes the city ask
-  // for setup, and a card pointing at a finished errand is a card
-  // nobody should meet.
+  // **Without a main model the provider card comes first and says so**
+  // - it is the one step every other card waits on, and a person who
+  // assigns work before it meets a refusal instead of a run. The work
+  // card stays a link, but its hint says what it is waiting for. Once a
+  // main model exists the provider card goes away: a card pointing at a
+  // finished errand is a card nobody should meet.
   //
   // **`assign work` writes through the draft door.** The composer box
   // in the room the card opens reads its first text from
@@ -26,6 +28,14 @@
   import { say } from "../core/lang";
   import { MAYOR, toFragment } from "../core/route";
   import { ui } from "../ui";
+
+  interface Props {
+    // Whether this layout is the page or a region inside one: a
+    // document may have exactly one heading of the page's own rank.
+    readonly rank?: "page" | "section" | undefined;
+  }
+
+  const { rank = "page" }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -51,19 +61,12 @@
 </script>
 
 <div class="flex min-w-0 flex-1 flex-col px-pane pt-[18vh] pb-section">
-  <h1 tabindex="-1" class="mb-wide text-title font-title">{say($lang, "welcome_title")}</h1>
-  <div class="grid w-full max-w-page grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-base">
-    <a
-      href={toFragment({ kind: "talk", address: MAYOR })}
-      class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors duration-100 ease-standard hover:bg-raised-hover"
-      onclick={assignWork}
-    >
-      <Glyph name="talk" class="mt-tight shrink-0 text-text-quiet" />
-      <span class="flex min-w-0 flex-col gap-tight">
-        <span class="text-label font-label">{say($lang, "welcome_card_work")}</span>
-        <span class="text-note text-text-quiet">{say($lang, "welcome_card_work_hint")}</span>
-      </span>
-    </a>
+  {#if rank === "page"}
+    <h1 tabindex="-1" class="mb-wide text-title font-title">{say($lang, "welcome_title")}</h1>
+  {:else}
+    <h2 class="mb-wide text-title font-title">{say($lang, "welcome_title")}</h2>
+  {/if}
+  <div class="grid w-full max-w-page grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-base">
     {#if !mainReady}
       <a
         href={toFragment({ kind: "setup" })}
@@ -72,11 +75,27 @@
       >
         <Glyph name="setup" class="mt-tight shrink-0 text-text-quiet" />
         <span class="flex min-w-0 flex-col gap-tight">
-          <span class="text-label font-label">{say($lang, "welcome_card_provider")}</span>
+          <span class="flex min-w-0 flex-wrap items-baseline gap-snug">
+            <span class="text-label font-label">{say($lang, "welcome_card_provider")}</span>
+            <span class="text-note font-label text-text">{say($lang, "welcome_card_provider_first")}</span>
+          </span>
           <span class="text-note text-text-quiet">{say($lang, "welcome_card_provider_hint")}</span>
         </span>
       </a>
     {/if}
+    <a
+      href={toFragment({ kind: "talk", address: MAYOR })}
+      class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors duration-100 ease-standard hover:bg-raised-hover"
+      onclick={assignWork}
+    >
+      <Glyph name="talk" class="mt-tight shrink-0 text-text-quiet" />
+      <span class="flex min-w-0 flex-col gap-tight">
+        <span class="text-label font-label">{say($lang, "welcome_card_work")}</span>
+        <span class="text-note text-text-quiet">
+          {say($lang, mainReady ? "welcome_card_work_hint" : "welcome_card_work_hint_unready")}
+        </span>
+      </span>
+    </a>
     <a
       href={toFragment({ kind: "city" })}
       class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors duration-100 ease-standard hover:bg-raised-hover"

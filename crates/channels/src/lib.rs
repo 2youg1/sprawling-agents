@@ -7,8 +7,8 @@
 //! read-only multi-city aggregation.
 //!
 //! The kernel types that appear on this crate's own signatures are
-//! re-exported below. `web` depends on `channels` and on nothing else
-//! (ARCHITECTURE section 2), so a client that cannot name `EventRecord`
+//! re-exported below. The client reads the wire and nothing else
+//! (ARCHITECTURE section 8), so a client that cannot name `EventRecord`
 //! cannot read the frames it is sent; a boundary crate that hands out
 //! frames owes the vocabulary to read them.
 
@@ -45,7 +45,7 @@ pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
 pub use answer::{CostOfAnswer, EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use answer::{Decision, GovernanceAnswer};
-pub use answer::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use answer::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
@@ -67,9 +67,7 @@ pub use command::{Carry, Command, WireCommand};
 pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret};
 pub use command::{PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
-pub use kernel::highlight::markdown;
 pub use kernel::{FileChange, How, Lines};
-pub use kernel::{Span, Token};
 pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
 pub use preference::{BODY_PX_MAX, BODY_PX_MIN, PreferencePatch, PreferencesAnswer};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};

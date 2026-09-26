@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The platform counters one [`Sample`] is read from: this process, the
-//! machine, and the volume the city lives on (sprawling-SPEC.md 8-92).
+//! machine, and the volume the city lives on (sprawling-SPEC.md 8-96).
 //!
 //! A `Counters` exists only while somebody watches; the sampler drops it
 //! when the last watcher leaves, so its handles and process table are
@@ -50,7 +50,7 @@ impl Counters {
     /// Reads one sample; `elapsed` is the wall time since the previous
     /// reading. [`Watched::Summary`] reads this process alone and closes
     /// the machine's handles. The core-health fields are not read here
-    /// and stay 0 (8-92, current state).
+    /// and stay 0 (8-96, current state).
     pub(crate) fn read(&mut self, watched: Watched, elapsed: Duration) -> Sample {
         let core = self.own.read(elapsed);
         let own = Sample {

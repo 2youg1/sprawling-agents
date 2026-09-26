@@ -57,6 +57,9 @@
     // fixture that needs a second answer writes the match itself,
     // because only it knows which question it meant.
     readonly answers?: (query: Query) => Answer | undefined;
+    // A refusal that arrives after mounting, the way a command's answer
+    // does: set it from inside the fixture to answer what it sent.
+    readonly refusing?: AxError | null;
     readonly children: Snippet;
   }
 </script>
@@ -70,7 +73,7 @@
   import type { Connection } from "../../core/socket";
   import { setUi, ui } from "../../ui";
 
-  const { link, unread, waiting, answers, children }: StandProps = $props();
+  const { link, unread, waiting, answers, refusing, children }: StandProps = $props();
 
   // The city as this fixture meets it: the real one, or the stand
   // before this one while several stands mount in turn.
@@ -113,6 +116,9 @@
     kept.refused(error);
   }
   kept.refused(null);
+  $effect(() => {
+    if (refusing !== undefined && refusing !== null) kept.refused(refusing);
+  });
 
   // The question every stand-in answers, and the fixture's own.
   // Anything neither of them names is `undefined`, which is what a

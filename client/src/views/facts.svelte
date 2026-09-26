@@ -25,7 +25,7 @@
   // page, so it asks the city for the cheapest reading there is - its
   // own process, about a microsecond a second - and never opens the
   // machine-wide counters the monitor panel pays for (sprawling-SPEC
-  // 8-90).
+  // 8-94).
   //
   // **Nothing here is a control.** A cell is read, never pressed: the
   // strip is 28px of note-sized text with no target in it, which is

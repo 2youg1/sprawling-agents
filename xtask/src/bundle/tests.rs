@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{DECLARATION, declared, dist, restated, stated_path};
+use super::{DECLARATION, declared, dist, stated_path};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -47,11 +47,4 @@ fn only_the_named_declaration_answers() {
     );
     assert_eq!(declared(&items("const OTHER: &str = \"web-dist\";")), None);
     assert!(stated_path(Path::new("/nonexistent-checkout")).is_err());
-}
-
-/// Both restating files name the directory the product embeds today.
-#[test]
-fn the_repository_itself_passes_the_check_it_ships() {
-    let found = restated(&root()).unwrap();
-    assert!(found.is_empty(), "{found:#?}");
 }

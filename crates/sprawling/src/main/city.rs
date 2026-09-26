@@ -29,7 +29,9 @@
 #[path = "city/opening.rs"]
 mod opening;
 
+use super::exit::Exit;
 use super::grammar::Arguments;
+use super::refusal::{Form, written};
 use super::router::{client_summary, default_city_location, flag_value, log_floor, log_levels};
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 use kernel::consts_policy::DEFAULT_AT;
@@ -151,9 +153,8 @@ pub(super) fn init(read: &Arguments) -> ExitCode {
 }
 
 pub(super) fn report(err: kernel::AxError) -> ExitCode {
-    eprintln!("{err}");
-    eprintln!("recovery: {}", err.recovery());
-    ExitCode::FAILURE
+    eprint!("{}", written(&err, Form::Human));
+    Exit::Refused.into()
 }
 
 /// Binds the control surface. Loopback unless an address says otherwise,
@@ -221,13 +222,16 @@ pub(super) fn serve_city(
         Err(err) => return report(err),
     };
     let token = keyed.code().map(str::to_owned);
-    let runtime = match tokio::runtime::Runtime::new() {
-        Ok(runtime) => runtime,
-        Err(err) => {
-            eprintln!("could not start the async runtime: {err}");
-            return ExitCode::FAILURE;
-        }
-    };
+    // The socket's workers stand above the commands the city dispatches
+    // (sprawling-SPEC.md 8-93).
+    let runtime =
+        match serving::standing::serving_runtime(serving::standing::setting_telling_a_refusal()) {
+            Ok(runtime) => runtime,
+            Err(err) => {
+                eprintln!("could not start the async runtime: {err}");
+                return ExitCode::FAILURE;
+            }
+        };
     let client_line = match &client {
         channels::ClientAssets::Disk(dir) => {
             format!("read per request from {}", dir.display())

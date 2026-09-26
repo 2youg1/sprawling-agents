@@ -194,11 +194,10 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
 /// runs started before the first freeze is a fact only concurrency can
 /// produce, and it is the fact a person is promised.
 ///
-/// The three naming calls are spent on the accounting thread before any
-/// lane is handed a drive, so the scripted replies below are consumed in
-/// the order they are written; the turns that follow are concurrent and
-/// all get the same last reply, which is what keeps this test's provider
-/// script order-free where the order is not this test's to decide.
+/// Each node's room is named by rule, so no reply is spent on a name;
+/// the turns are concurrent and all get the same reply, which is what
+/// keeps this test's provider script order-free where the order is not
+/// this test's to decide.
 #[test]
 fn three_ready_nodes_drive_three_runs_at_once() {
     let dir = tempfile::tempdir().unwrap();
@@ -210,28 +209,9 @@ fn three_ready_nodes_drive_three_runs_at_once() {
         PLAN_THREE_FREE_ROWS,
     )
     .unwrap();
-    let (base_url, _provider) = fake_openai(
-        &["m-local"],
-        vec![
-            completion("wire-the-kiln", None),
-            completion("glaze-tests", None),
-            completion("stack-the-shelves", None),
-            completion("nothing left to do", None),
-        ],
-    );
+    let (base_url, _provider) =
+        fake_openai(&["m-local"], vec![completion("nothing left to do", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    // The small model that names a room. A pursuit dispatches into the
-    // building, so every node needs a room of its own before it has one.
-    worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
-            model: "m-local".to_owned(),
-            tag: kernel::ModelTag::Digest,
-            context_tokens: kernel::Window::new(32_768),
-            max_output_tokens: kernel::Ceiling::new(4_096),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"digest"),
-        })
-        .unwrap();
     worker
         .handle(channels::Command::Pursue {
             addr: Address::parse("lab").unwrap(),

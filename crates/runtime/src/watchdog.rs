@@ -11,10 +11,8 @@
 //! Terminal-only watchdogs kill recoverable sessions; that lesson is the
 //! reason this type exists.
 
-use kernel::{AxCode, AxError, Payload, StallVerdict, TimeMs};
+use kernel::{AxCode, AxError, Payload, Retries, StallVerdict, TimeMs};
 use serde::{Deserialize, Serialize};
-
-pub use kernel::Retries;
 
 /// One watchdog per run: it holds the correction history and the ceiling
 /// the person set on retries, nothing else.

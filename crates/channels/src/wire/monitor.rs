@@ -29,7 +29,7 @@ pub enum Watched {
 }
 
 /// One reading of every counter the monitor shows, in integers because
-/// it travels on the wire (sprawling-SPEC.md 8-90).
+/// it travels on the wire (sprawling-SPEC.md 8-94).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Sample {

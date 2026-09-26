@@ -36,8 +36,10 @@
   import Anchored from "./gallery/anchored.svelte";
   import Conversation from "./gallery/conversation.svelte";
   import Filed from "./gallery/filed.svelte";
+  import FirstRun from "./gallery/first_run.svelte";
   import Hints from "./gallery/hints.svelte";
   import Keepers from "./gallery/kept.svelte";
+  import RefusedLine from "./gallery/refused_line.svelte";
   import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
   import Presences from "./gallery/presence.svelte";
@@ -72,8 +74,10 @@
 <div class="w-full min-w-0 px-pane py-pane">
   <h1 class="mb-wide text-heading text-text">{say($lang, "gallery_title")}</h1>
   <Hints />
+  <FirstRun />
   <Presences />
   <Conversation />
+  <RefusedLine />
   <Anchored />
   <Produced />
   <Filed />
