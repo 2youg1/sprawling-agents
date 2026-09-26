@@ -24,7 +24,7 @@
 
 - **wire**：Command 恰 30 个 variant、Query 恰 35 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`676cc8466f916e04bfcc460a007c0e8f26fef303cbd8d19f10fe55759c2343ee`；**WIRE_V ＝ 41**（帧表与查询表的当前内容见 §8 各章）。
+  **当前 golden**：`b9ab170a03bb161ccd28562314a4607d7d0f5aa7f8e90afe2492596f5c78f776`；**WIRE_V ＝ 42**（帧表与查询表的当前内容见 §8 各章）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`**：一个会话的历史按 run 取。`Query::History` 是城全局的最后一页，按它在客户端过滤，一个较早的会话就不在那一页里；`Query::RunView` 回答「这个 run 在不在、走到哪」，不回答「这个会话是什么」。
@@ -1041,7 +1041,7 @@ pub enum ReleaseAnswer {
 
 **升版的代价是 `wire.ts` 重生与客户端同改，与改动数量无关，分两次就是付两次**，所以能同时落地的线上改动放进同一次升版。以下各件与 §8-38 同属一次升版。
 
-**一、`mode` 是 `kernel::model::Mode`，不是自由文本。** 自由文本的 mode 要由上游把认不出的词落到某个默认值上，于是拼错 `experiment` 得到一个规划 run 和零句话。`Mode` 是 `plan_goal｜up｜sc｜ud｜experiment` 的闭集，未知词在反序列化处即拒。**定义落在 kernel 而不是 channels**：与 `DialectKind` 同一条依赖倒置，wire 携带它、`runtime` 求值它，两边都不得指名对方。`carried_name` 因此只剩三个真正开放的名字（provider／template／toolkit）——**值集开放才进那个宏，闭集不进**。
+**一、`mode` 是 `kernel::model::Mode`，不是自由文本。** 自由文本的 mode 要由上游把认不出的词落到某个默认值上，于是拼错 `experiment` 得到一个规划 run 和零句话。`Mode` 是 `chat｜plan_goal｜up｜sc｜ud｜experiment` 的闭集，未知词在反序列化处即拒。**定义落在 kernel 而不是 channels**：与 `DialectKind` 同一条依赖倒置，wire 携带它、`runtime` 求值它，两边都不得指名对方。`carried_name` 因此只剩三个真正开放的名字（provider／template／toolkit）——**值集开放才进那个宏，闭集不进**。
 
 **二、`context_tokens` 是 `Option<Window>`。** `Window` 与 `Ceiling` 同形（非零新类型）而**不是同一个类型**：一个界定模型能读多少，一个界定它能写多少，互换仍能编译的两个数不该共用一个名字。零在类型上不存在，缺席是 `null`；旧编码把「没人填」写成 `0`，于是上下文提醒拿一段对话去比对一个没人给过的数。
 

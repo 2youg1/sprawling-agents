@@ -593,6 +593,8 @@ pub fn dev_entry() -> CatalogEntry;   // 一行披露，全部细则归 expansio
 pub fn catalog_entry(mode: kernel::Mode) -> CatalogEntry;     // 含 PlanGoal 退出条件四列
 ```
 
+`Chat` 的目录行只有一句：专心同人交谈，就对方说的话作答；`admits` 对它恒为 `Lands`。除这一行提示之外它什么也不做，它存在的理由是让一句闲话不被当成一件要计划的活。
+
 哪些 mode 存在、各自拼成什么词，只由 `kernel::Mode` 回答（线、账本与配置文件都读它）；本模块只持每个 mode 准入什么、目录里怎么介绍它。runtime 不再有自己的 `Mode`：两份同成员的枚举要靠装配层一个五臂恒等的 `match` 维系，新增一个 mode 时那是第二处必须同步改的地方。
 
 ### 8-13 runtime::sandbox（缝清单文件，形状 3＋4）

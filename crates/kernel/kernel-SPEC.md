@@ -2152,7 +2152,7 @@ impl CityLayout {
 
 `model/` 下多两个文件，各收一个「没人说过」的编码。
 
-**`model::Mode`**——`PlanGoal｜Up｜Sc｜Ud｜Experiment`，wire 词 `plan_goal｜up｜sc｜ud｜experiment`，`as_str` 写、serde 读，一条遍历式断言钉住往返同词。
+**`model::Mode`**——`Chat｜PlanGoal｜Up｜Sc｜Ud｜Experiment`，wire 词 `chat｜plan_goal｜up｜sc｜ud｜experiment`，`as_str` 写、serde 读，一条遍历式断言钉住往返同词。`Mode::ALL` 的次序就是控件列出的次序，`Chat` 排第一，因为一个人在对话框里打的一句话首先是在说话，而不是在派一件要计划的活。
 
 为什么定义在这里而不在 `runtime`：**与 `DialectKind` 同一条依赖倒置**——线上携带它，`runtime::mode` 求值它（哪种模式准落什么），而 channels 不依赖 runtime，runtime 也不依赖 channels。两个外层 crate 都要叫出这个名字，谁都不得指名对方，所以名字住在这里。本枚举只说**有哪几种**；每一种准什么，仍旧只有 `runtime::mode` 一处回答。
 

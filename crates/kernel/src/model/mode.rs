@@ -23,6 +23,9 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Mode {
+    /// Talk with the person: answer what they said. First, because a
+    /// sentence typed into a conversation is talk before it is work.
+    Chat,
     /// Work out what to do and write it down; change nothing.
     PlanGoal,
     /// Build one asset that carries its own tests.
@@ -38,7 +41,8 @@ pub enum Mode {
 
 impl Mode {
     /// Every mode, in the order a control offers them.
-    pub const ALL: [Mode; 5] = [
+    pub const ALL: [Mode; 6] = [
+        Mode::Chat,
         Mode::PlanGoal,
         Mode::Up,
         Mode::Sc,
@@ -51,6 +55,7 @@ impl Mode {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Mode::Chat => "chat",
             Mode::PlanGoal => "plan_goal",
             Mode::Up => "up",
             Mode::Sc => "sc",
