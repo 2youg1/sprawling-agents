@@ -184,6 +184,11 @@ pub(crate) struct Views {
     /// value.
     #[serde(skip)]
     pub(super) vault: Option<std::sync::Arc<std::sync::Mutex<gateway::Custodian>>>,
+    /// Asks the registry which release is newest; set by
+    /// `views::served`. `None` is a `Views` nobody served, and it
+    /// answers `Unavailable` rather than leaving this machine.
+    #[serde(skip)]
+    pub(super) registry: Option<fn() -> channels::ReleaseAnswer>,
 }
 
 impl Views {
@@ -267,6 +272,7 @@ impl Views {
             claims: std::collections::BTreeMap::new(),
             machine: None,
             vault: None,
+            registry: None,
         }
     }
 

@@ -62,7 +62,7 @@ pub(crate) enum Prepared {
     /// The configuration ladder of one address.
     Config { city_root: PathBuf, addr: Address },
     /// The release page, which leaves this machine.
-    Release,
+    Release(Option<fn() -> channels::ReleaseAnswer>),
     /// What changed between a checkpoint and a later one, or the
     /// working tree.
     Changes {
@@ -207,8 +207,10 @@ impl Prepared {
                 Ok(answer) => channels::Answer::Config(Box::new(answer)),
                 Err(_) => unavailable(format!("Config({})", addr.as_str())),
             },
-            // Leaves this machine, and only on a press (channels-SPEC 8-36).
-            Self::Release => channels::Answer::Release(Box::new(crate::release::answer())),
+            // Leaves this machine, and only on a press (channels-SPEC 8-36),
+            // through the registry a served city handed the views.
+            Self::Release(Some(newest)) => channels::Answer::Release(Box::new(newest())),
+            Self::Release(None) => unavailable("NewestRelease".to_owned()),
             Self::Listing { city_root, at } => {
                 channels::Answer::Listing(listing_answer(&city_root, at))
             }

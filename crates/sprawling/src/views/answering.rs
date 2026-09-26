@@ -330,7 +330,7 @@ impl Views {
                 };
             }
             channels::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
-            channels::Query::NewestRelease => return Prepared::Release,
+            channels::Query::NewestRelease => return Prepared::Release(self.registry),
             channels::Query::BuildingView { addr } => {
                 return Prepared::Building {
                     city_root: self.city_root.clone(),

@@ -397,7 +397,7 @@ effort = \"low\"
     assert!(config.effort.is_some(), "{config:?}");
     assert!(matches!(
         views.prepare(&channels::Query::NewestRelease),
-        super::prepared::Prepared::Release
+        super::prepared::Prepared::Release(_)
     ));
 }
 
