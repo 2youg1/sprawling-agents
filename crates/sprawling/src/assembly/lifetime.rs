@@ -141,3 +141,42 @@ impl RunWorker {
         self.record(EventKind::HandoffWritten, handoff.payload()?)
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+mod tests {
+    use crate::assembly::{RunWorker, init_city, ledger_dir};
+    use std::io::Write;
+
+    /// A crash mid-write leaves half a line; the next open cuts it and
+    /// the person who runs `resume` has to be told what was cut.
+    #[test]
+    fn a_torn_tail_is_told_in_the_startup_scan() {
+        let dir = tempfile::tempdir().unwrap();
+        init_city(dir.path()).unwrap();
+        let segment = memory::ledger_segments_at(&ledger_dir(dir.path()))
+            .unwrap()
+            .pop()
+            .unwrap();
+        let torn = b"{\"v\":1,\"seq\":99,\"half";
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&segment)
+            .unwrap()
+            .write_all(torn)
+            .unwrap();
+
+        let mut worker = RunWorker::new(
+            dir.path(),
+            gateway::Custodian::in_memory(),
+            runtime::diagnostics::Diagnostics::off(),
+        )
+        .unwrap();
+        let summary = worker.startup_scan().unwrap().summary();
+
+        assert!(
+            summary.contains(&format!("{} byte(s)", torn.len())),
+            "the scan must say how much of the tail was cut: {summary}"
+        );
+    }
+}
