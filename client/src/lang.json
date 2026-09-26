@@ -3111,5 +3111,21 @@
   "setup_editor_folder_help": {
     "en": "An absolute path. Only a file inside it gets a link.",
     "zh": "填绝对路径。只有这个文件夹里的文件会有链接。"
+  },
+  "mon_comment": {
+    "en": "comment",
+    "zh": "写意见"
+  },
+  "mon_revert": {
+    "en": "revert this hunk",
+    "zh": "撤回这块"
+  },
+  "mon_comment_draft": {
+    "en": "About {path}, line {line}: ",
+    "zh": "关于 {path} 第 {line} 行："
+  },
+  "mon_revert_steer": {
+    "en": "Revert this change in {path} with the edit tool, against the file's current version. Replace\n```\n{now}\n```\nwith\n```\n{was}\n```",
+    "zh": "请用 edit 工具、基于 {path} 的当前版本撤回这处改动。把\n```\n{now}\n```\n换回\n```\n{was}\n```"
   }
 }

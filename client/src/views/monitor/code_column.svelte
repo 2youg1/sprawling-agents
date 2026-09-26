@@ -10,21 +10,43 @@
 // line its new one, so a person can find either in the file. The file
 // header sticks to the top while its hunks scroll under it, which keeps
 // the question "which file am I in" answered without looking up.
+//
+// Each hunk carries the person's three actions on it, and each goes
+// through a door the city already has: a comment is a steer to this run,
+// drafted and left for the person to finish; a revert is a steer asking
+// the agent to take the hunk back with its edit tool, which fences the
+// write by the file's version and records it in the ledger; and opening
+// is a link the browser hands to the editor the person chose, drawn
+// only when `editorLink` answers one.
 </script>
 
 <script lang="ts">
+  import { editorLink } from "../../core/editor";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import { painted } from "../parts/code";
   import { PAINT } from "../parts/code.svelte";
-  import type { Sign, Touched } from "./trace";
+  import { lineOf, reverseOf } from "./hunk";
+  import type { Hunk, Sign, Touched } from "./trace";
 
   interface Props {
     readonly files: readonly Touched[];
+    // Puts a steer in front of the person to finish and send.
+    readonly onDraft: (text: string) => void;
+    // Sends a steer to the run as it stands.
+    readonly onSteer: (text: string) => void;
   }
 
-  const { files }: Props = $props();
-  const { lang } = ui();
+  const { files, onDraft, onSteer }: Props = $props();
+  const { lang, prefs } = ui();
+
+  const filled = (key: "mon_comment_draft" | "mon_revert_steer", path: string, hunk: Hunk): string => {
+    // One pass with a function, so a hunk's own text is never read as a
+    // placeholder or as a `$&` replacement pattern.
+    const fill: Record<string, string> = { path, line: String(lineOf(hunk)), ...reverseOf(hunk) };
+    return say($lang, key).replace(/\{(path|line|now|was)\}/g, (spelled, name: string) => fill[name] ?? spelled);
+  };
+  const ACTION = "inline-flex h-control-sm items-center rounded-control px-snug text-label text-text-quiet hover:bg-raised";
 
   const ROW: Record<Sign, string> = { added: "bg-accent/10", removed: "bg-alert/12", kept: "" };
   const SIGN: Record<Sign, string> = { added: "+", removed: "−", kept: "" };
@@ -43,6 +65,28 @@
       >
     </div>
     {#each file.hunks as hunk, h (h)}
+      {@const opening = editorLink({ ...prefs.editor(), path: file.path, line: lineOf(hunk) })}
+      <div class="flex justify-end gap-tight border-b border-edge bg-page px-snug">
+        <button
+          type="button"
+          class={ACTION}
+          onclick={() => {
+            onDraft(filled("mon_comment_draft", file.path, hunk));
+          }}
+          >{say($lang, "mon_comment")}</button
+        >
+        <button
+          type="button"
+          class={ACTION}
+          onclick={() => {
+            onSteer(filled("mon_revert_steer", file.path, hunk));
+          }}
+          >{say($lang, "mon_revert")}</button
+        >
+        {#if opening !== null}
+          <a class={ACTION} href={opening}>{say($lang, "setup_editor")}</a>
+        {/if}
+      </div>
       <div class="border-b border-edge bg-page font-mono text-note leading-[1.65]">
         {#each hunk.lines as line, at (at)}
           <div class="flex {ROW[line.sign]}">

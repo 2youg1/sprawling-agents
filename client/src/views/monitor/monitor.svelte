@@ -31,9 +31,11 @@
 
   interface Props {
     readonly turns: readonly Turn[];
+    readonly onDraft: (text: string) => void;
+    readonly onSteer: (text: string) => void;
   }
 
-  const { turns }: Props = $props();
+  const { turns, onDraft, onSteer }: Props = $props();
   const { lang } = ui();
 
   type Following = "following" | "paused";
@@ -137,7 +139,7 @@
       ontouchmove={() => (following = "paused")}
       onkeydown={scrolledBy}
     >
-      <CodeColumn files={trace.files} />
+      <CodeColumn files={trace.files} {onDraft} {onSteer} />
     </div>
     {#if terminal === "open"}
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (the pane takes focus so the keyboard can scroll it, and a scrolling key pauses following) -->
