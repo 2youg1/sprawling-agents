@@ -727,14 +727,15 @@ pub struct EditTool { /* city_root、writable: WriteDomain —— 私有 */ }
 impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Diff、temporal=Timeless */ }
 // new(city_root, addr, writable: WriteDomain)：writable＝该 Run 的写域（rules.write_domain()）。
 // 每次调用先判路径后碰盘：Address::parse 杀穿越（..／绝对路径／空段），WriteDomain::admits 杀域外与
-// reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。此前只有工具静态声明过门，
-// 模型选的 path 未经任何判定直接落盘——那是一个真漏洞，修在权威处而非 bench 里的第二份判定。
+// reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。工具静态声明的 Effect 只说它会写，
+// 模型选的 path 要在这里判——判定住权威处，而不是 bench 里的第二份判定。
 // args：{path, base_version, old, new}；version＝内容 B3Hash 前 16 hex；check_base 拒即 E_VERSION_CONFLICT；
 // old 必唯一命中（零命中／多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff＋new_version（逐次 diff 即回档粒度）
 
 // tools/read.rs —— 一个参数，两条路
-pub struct ReadTool { /* city_root、catalog: Rc<RefCell<Catalog>> —— 私有 */ }
-impl ReadTool { pub fn new(city_root: &Path, catalog: Rc<RefCell<Catalog>>) -> Result<ReadTool, AxError>; }
+pub struct ReadTool { /* city_root、catalog: Arc<Mutex<Catalog>>、bound、block_store —— 私有 */ }
+impl ReadTool { pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>, bound: ReadBound, block_store: &Path)
+    -> Result<ReadTool, AxError>; }   // bound 见 §8-29-1，block_store 见 §8-29-5
 impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render=Generic、temporal=Timeless */ }
 // args：{path}。先问 catalog，再当作地址。
 // 创建臂：base_version=="new"（16 hex 永拼不出，无碰撞）→ 文件必不存在（存在＝E_VERSION_CONFLICT 报真实版本），
@@ -744,12 +745,12 @@ impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render
 
 // tools/status.rs —— 十三字段
 pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode,
-    pub ctx_limit: Tokens, pub budget_usd: UsdMicros, pub budget_tokens: Tokens, pub trust: String,
+    pub ctx_limit: Tokens, pub trust: String,
     pub write_domain: String, pub locks: Vec<String>, pub worktree_path: String, pub worktree_disk: ByteLen,
-    pub signals_pending: u32, pub children: Vec<ChildStatus>, pub now: Option<ClockStamp>,
+    pub signals_pending: u32, pub now: Option<ClockStamp>,
     pub provider_mode: ProviderMode, pub neighbours: u32 }   // neighbours 在末尾，渲染序与声明序同一
 pub enum ProviderMode { Normal, Degraded, LocalOnly }
-pub struct ChildStatus { pub room: Address, pub kind: DelegateKind }   // 重塑
+pub struct ChildStatus { pub room: Address, pub kind: DelegateKind }
 pub struct StatusTool { /* snapshot＋ children: Box<dyn Fn() -> Vec<ChildStatus> + Send> ＋ backlog: Option<Backlog> */ }
 impl StatusTool {
     pub fn watching(snapshot: StatusSnapshot, children: Box<dyn Fn() -> Vec<ChildStatus> + Send>) -> Result<StatusTool, AxError>;
@@ -758,9 +759,9 @@ impl StatusTool {
 }
 impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timestamped、render=Generic；渲染序末尾追加 backlog 一行 */ }
 
-// ToolBench 住 turn.rs：按 Effect 过门是回合层职责，不另立 bench 模块。
+// ToolBench 住 runtime::bench（§8-3）：按 Effect 过门是回合层的次序，工具本身以 Box<dyn Tool> 递入。
 
-- **`children` 为何重塑**：旧形状 `{run, phase, ctx_used, ctx_lock}` 预设子已在跑。真实情形是子 Run 在父嚽结之后才开，故父自己那一跑里 **子既无 run id 也无上下文读数**——四个字段里三个只能填零，而零与未知是两件事。现形状只携得出口的两件：派到哪个房间、哪一类代理。
+- **`children` 只携地址与代理类别**：子 Run 在父嚽结之后才开，故父自己那一跑里 **子既无 run id 也无上下文读数**——四个字段里三个只能填零，而零与未知是两件事。现形状只携得出口的两件：派到哪个房间、哪一类代理。
 - **`ctx` 的用量为何现读**：快照在派发时冻结，那时还没有任何一次调用，冻结的用量只能是零，而且整跑都是零——一个照 City.md 去问 `status` 的模型会被告知窗口是空的。用量住 `ContextReading`：Run 每回合把 provider 报的 `input_tokens` 写进去，`status` 被调用时读出，所以报的是本跑最近一次已完成调用的计数。上限 `ctx_limit` 仍在快照里，因为它整跑不变。
 - **`neighbours` 追加在末尾而不插入到 `signals_pending` 旁边**：冻结序存在的理由是字段表增长时居民的习惯仍可迁移，而一次插入会把前十二行里的一半挪位。它只报**人数**不报名单：名单长度随人口增长，而 `status` 是一份定长文本（`render_children` 已为同一条理由被压成一行）；详情归 `neighbours` 工具，city-SPEC §8-15b。
 - **数的是人，不是地址**：一间没人站着的房间没有读者，把它计入会让 `neighbours: 3` 读起来像「有三个人可以说话」而实际上一个都没有。空房间仍然在工具的答案里，因为它对 delegate 与搬入是真信息。
@@ -806,15 +807,15 @@ pub struct ToolBench { /* route: kernel::tool::route::ToolRoute、domain: WriteD
                           taint: TaintSet、seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>、
                           prior_public_egress: bool —— 私有。`seen` 是「这把键答过没有、答了什么」的唯一一张表：键只在工具真正答过之后才写入，门拒/语法拒不留条目，故重试不算重放。 */ }
 impl ToolBench {
-    pub fn new(domain: WriteDomain, registry: Registry) -> ToolBench;
+    pub fn new(domain: WriteDomain) -> ToolBench;
     pub fn register(&mut self, tool: Box<dyn Tool>) -> Result<(), AxError>;
     /// Gate routing by declared Effect（收进回合层，executor 归还薄形）：
     /// exec 先 forecast（Suspected → **强制 checkpoint 先行**，见下）；Write → domain 门；
-    /// Egress → egress 门（target 由调用自报 host，不自报即 E_INVALID_ARGS）；Spend → 门已接但 P1 前无实例；
-    /// Spawn → delegation 门（恒 Escalate；granted 命中即放行，未命中即 Pending）；
-    /// Govern → govern 门（同形；提案正文由调用的 `text` 参数取，进 action_desc 供人过目）；
-    /// Deny → 以 refusal 作 tool_result 回流（不吞掉回合）；Escalate → BenchOutcome::Pending 回流（S3 无应答面）。
-    pub fn invoke(&mut self, call: &ToolCall, key: &IdemKey, ctx: &GateContext)
+    /// Egress → egress 门（subject 由工具从自己的参数读出）；Spend → 门已接，本构建无声明它的工具；
+    /// Spawn → 无门（派生深度是类型，`gate::spawn` 在派活处判）；Govern → 恒拒（run 不改判它的规则，
+    /// 规则在 CONFIG.toml 与楼的 RULES.toml 里由人改）；
+    /// Deny 与门的提问（E_APPROVAL_PENDING）都以 `Refused` 作 tool_result 回流，不吞掉回合。
+    pub fn invoke(&mut self, call: &ToolCall, key: &IdemKey, now: TimeMs)
         -> Result<BenchOutcome, AxError>;
     // invoke 是下面三段按序串起来的一条调用，三段各自公开，供并行的工具波分开用：
     /// 串行的放行：去重、各道门、exec 的 forecast fence。答得出的（重放、门拒、门问）当场答，
@@ -829,16 +830,15 @@ impl ToolBench {
     /// 并行波按调用序逐条调它，所以 `seen` 与 `taint` 的写入次序与串行波相同。
     pub fn account(&mut self, ticket: Ticket, answered: Result<ToolOutcome, AxError>)
         -> Result<BenchOutcome, AxError>;
-    // T15 预编译路由（A1）：名字→处理器由 `kernel::tool::route::ToolRoute` 在登记时排序一次，
+    // 预编译路由：名字→处理器由 `kernel::tool::route::ToolRoute` 在登记时排序一次，
     // 每次调用**一次**二分探测即得处理器（meta/subject/invoke 同一把借用）；
     // 被否：维持 BTreeMap 双探测（一次调用查两次＋每次探测的 String 分配——fx 反例的本仓对应物）。
     // 上面那句「按 Effect 过门」自己的名字住 `Doors`（domain/taint/sandbox/prior 四件同行值，
     // 自拥门判与失败形）：`None` 即此门已开，工具可跑；`Some` 即门已代这次调用给出答案。
     // 与 route 的同一把借用不相斥（字段级不相交借用），故一次探测服务整条链。
-    fn admit(&mut self, call: &ToolCall, name: &str, effect: &Effect, ctx: &GateContext)
+    fn admit(&mut self, call: &ToolCall, name: &str, effect: &Effect, subject: &GateSubject)
         -> Result<Option<BenchOutcome>, AxError>;
-    /// 一扇门的判定对本 bench 意味着什么。三处 Escalate 的「人已经允过的
-    /// cluster 不再问第二遍」原本各写一遍，现在只住这里。
+    /// 一扇门的判定对本 bench 意味着什么：Allow 放行，Deny 与 Ask 都是 `Refused`。
     fn settled(&self, outcome: GateOutcome) -> Option<BenchOutcome>;
     /// 同形：两处出网判定的「首次公开出网要记下来」只住这里。
     fn crossed(&mut self, outcome: EgressOutcome) -> Option<BenchOutcome>;
@@ -856,27 +856,17 @@ impl ToolBench {
     /// 条目要有 actor（问谁）与 artifact（看什么）；两者都不在一次工具调用里。
     /// 未给即拒（fail-closed）——一个人问不到的派生就是没人批准的派生。
     pub fn for_job(self, asking: Address, job: Locator) -> ToolBench;
-    /// A cluster the person already allowed. An escalation whose
-    /// cluster is granted runs instead of parking, which is what lets an
-    /// answer carry the work on rather than send it back to the door it
-    /// was just let through. Granted per **cluster**, because that is the
-    /// unit the person was shown and answered in.
-    ///
-    /// The caller folds these from `approval_resolved`; the bench does
-    /// not read history, because it runs inside a drive that owns the
-    /// ledger and a second reader of that would be a second answer.
-    pub fn grant(&mut self, cluster: ClusterKey);
 }
 ```
 
 - L0 三件恒列 prefix（City.md 只放这一级）；catalog 只收 L2——L0 不进 catalog（名字即文档）但 tool_defs 恒含三件（wire 面要 schema）。
 - **否决「Suspected → Discard 门」**：它与 kernel 既有设计冲突，以 kernel 为准。理由：`DiscardRequest` 只有 `Planned`／`Unplanned` 两变体，而 `decide` 对 `Unplanned` **恒判 Deny(NoRestoration)**——把 forecast 的预判包成 Unplanned 送进门，等于让任何含 `rm ` 的 exec 调用全被拒。`kernel::discard` 的注释早已写明正确意图：「text prediction is obfuscatable by design — hits route conservatively, and the git checkpoint net (S3) is the honest backstop」。故 **Suspected 不拒而围栏**：强制 `checkpoint.wave_pre` 先行再放行，删掉的东西因而可回档；**无 checkpoint 网时才拒**（`E_TOOL_UNAVAILABLE`），因为「无保护地跑」是唯一没人选择的结局。此路由使 A14 的先行半链在 exec 臂上机械成立。
 - ToolBench 持 `Option<Checkpoint>` 具体类型而非新 trait：checkpoint 只有一个实现，为尚不存在的第二实现引缝会造空抽象（AGENTS.md：trait 只在已有第二实现的缝上引入）。
-- **`BenchOutcome` 去掉 `#[non_exhaustive]`**：它是判定输出，两个下游各背着一条永不执行的 `_ =>`，而那正是 §7「新增一种答案而不回答它就不编译」要护的东西。收口是编译红：摘掉属性即得两条 `unreachable pattern`（citysim 一条、sprawling 一条），`-D warnings` 下即错，删掉它们才绿。下游从此必须穷尽匹配四臂。**G-22（叶子 7.10）把这一条推到全库**：本 crate 再无 `#[non_exhaustive]`，`Interrupt`／`Disposal`／`FreezeReason`／`Mode`／`SandboxExit`／`ProviderMode`／`SafePoint`／`Level` 八个枚举同期撤下，`clock.rs` 与 `bench/admit.rs` 的三条通配臂随之删除。
-- **三条规则各回到一处**：`invoke` 曾为 246 行，是 `length` 门报出的两个对象之一。拆它时量到三处重复：① `GateOutcome::Escalate` 的「granted 命中即放行」写了**三遍**（Write／Spawn／Govern）；② `EgressOutcome` 的「首次公开出网要记下来」写了**两遍**（Connector／Egress）；③ `serde_json::to_vec` 扫描参数写了两遍。三条都是规则而不是巧合：一份人给过的允许在三个地方各有一份实现，就是三个可以各自漂走的权威。归位后：`settled` 一处、`crossed` 一处，`admit` 成为那个 `match &effect` 自己的名字。尺寸 246 → 65（`admit` 139、`settled` 11、`crossed` 13）。行为逐字不变，公开面不变。
-- `BenchOutcome` 四态：`Ran{outcome, fenced}`（fenced 携围栏 oid，供波后补记）／`Refused{refusal}`（回流不终止回合）／`Pending{item}`／`Duplicate`。dedup 先于任何副作用；**key 在工具答过之后才记入 `seen`**，故被门拒的调用重试不算重放。**判重是 `seen` 上的一次 O(log n) 查找**，不抄键、不另立一张「领过权」的集合：第二张集合记的是 `seen` 键集的同一个事实，两份拷贝迟早分叉。工具按 `ToolName` 登记，`invoke` 以调用自带的名字查表，路由一次调用不分配。
+- **`BenchOutcome` 穷尽**：它是判定输出，下游必须穷尽匹配三臂——新增一种答案而不回答它就不编译（§7）；本 crate 的枚举全部如此，没有 `#[non_exhaustive]`，也没有通配臂。
+- **三条规则各有一处**：`GateOutcome` 对本 bench 意味着什么只住 `settled`（Allow 放行、Deny 与 Ask 都以 `Refused` 回流），「首次公开出网要记下来」只住 `crossed`，参数的秘密扫描只序列化一次；`admit` 是那个 `match effect` 自己的名字。一份规则在几处各有一份实现，就是几个可以各自漂走的权威。
+- `BenchOutcome` 三态：`Ran{outcome, fenced}`（fenced 携围栏 oid，供波后补记）／`Refused{refusal}`（回流不终止回合；门的提问也走这一臂）／`Duplicate{outcome}`。dedup 先于任何副作用；**key 在工具答过之后才记入 `seen`**，故被门拒的调用重试不算重放。**判重是 `seen` 上的一次 O(log n) 查找**，不抄键、不另立一张「领过权」的集合：第二张集合记的是 `seen` 键集的同一个事实，两份拷贝迟早分叉。工具按 `ToolName` 登记，`invoke` 以调用自带的名字查表，路由一次调用不分配。
 - status 的 result 是**按冻结序渲染的文本**而非 JSON 对象：`serde_json::Map` 对键排序，JSON 对象没有读者可依赖的序，「冻结序」会悄悄变成字母序。序是「模型读到的东西」的属性，故落在模型读到的地方。
-- 注意无 Egress／Spend 工具实例（出网代理 P1）：两门路由代码落地以测试替身驱动，接线台账仍记「计划内待接」至真实例出现。
+- 声明 `Egress` 的生产工具是浏览器工具（`bin::browser_tool`）；声明 `Spend` 的工具本构建没有，那扇门以测试替身驱动。
 
 ### 8-15 runtime::run（形状 5 typestate 机；**run 事件序的唯一权威**）
 
