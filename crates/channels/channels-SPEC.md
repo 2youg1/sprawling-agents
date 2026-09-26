@@ -1305,15 +1305,15 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 pub struct AskId(u32);                          // 形状 2；页面按连接单调铸造，服务端只回显、不判定
 pub struct Ask { pub ask_id: AskId, pub query: Query }
 ClientFrame::Ask(Ask)                           // 取代 ClientFrame::Query(Query)
-pub struct Answered { pub ask_id: AskId, pub as_of: Seq, pub outcome: Outcome }
-pub enum Outcome { Answer(Answer), Refusal(AxError) }
+pub struct Answered { pub ask_id: AskId, pub as_of: Seq, pub outcome: AskOutcome }
+pub enum AskOutcome { Answer(Answer), Refusal(AxError) }
 ServerFrame::Answered(Box<Answered>)            // 取代 ServerFrame::Answer；对一问的拒绝也走这里
 ```
 
 **今天一个答复回到哪一问，是页面猜出来的。** `client/src/core/asking.ts` 用 `keyOfAnswer` 从答复的内容反推问题的键，推不出时用 `kindsOf` 按种类取最早的那一问；两个同种、参数不同的问题同时在途（两个 run 的 `RunView`），就只能按到达顺序配。这张反推表是「问什么」的第二个权威：`Query` 每加一条，表就得跟着加一行，漏一行的后果是一个永远不落地的答（`E_WIRE_MISMATCH`）。
 
 - **配对的键由问的一方铸造**：`AskId` 在页面上按连接单调递增，服务端原样回显，不检查唯一——配对是页面的事，服务端判一次就是第二个家。重连后页面清空在途表，旧连接的 id 不会再来。
-- **拒绝也带 `ask_id`**：对一问的拒绝今天走不带编号的 `ServerFrame::Refusal`，页面无法知道哪一问落空；`Outcome::Refusal` 让它落到那一问上。命令的拒绝仍走 `Refusal`，那条路不变。
+- **拒绝也带 `ask_id`**：对一问的拒绝今天走不带编号的 `ServerFrame::Refusal`，页面无法知道哪一问落空；`AskOutcome::Refusal` 让它落到那一问上。命令的拒绝仍走 `Refusal`，那条路不变。
 - **`as_of` 是下界**：答复一方在读之前取账本头，与答复一同返回；答复至少反映到 `as_of` 为止的事。页面据此判陈旧：一条 `seq > as_of` 且够得着这一问的事件把它标陈旧，而 `seq <= as_of` 的事件不再触发重问。取在读之前而不是之后，是因为读的过程中落账的事件只会让页面多问一次，永远不会让它留着一个旧答。
 - **`WIRE_V` 加一**，`client/src/wire.ts` 随之重新生成；帧名换了（`query`→`ask`，`answer`→`answered`），旧页面在握手处被拒，而不是发出服务端读不懂的帧。
 - **页面一侧**：`asking.ts` 的在途表以 `AskId` 为键，`keyOfAnswer`、`kindsOf` 与按到达顺序的配对一并删除；`ask` 的返回类型按问题名收窄到对应的答复字段。
