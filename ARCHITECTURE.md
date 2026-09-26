@@ -610,7 +610,7 @@ than typed.
 
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
-| Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->523,827 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->4.0×<!-- xtask:end --> headroom | yes |
+| Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->547,848 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->3.8×<!-- xtask:end --> headroom | yes |
 | The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->11,523,584 B<!-- xtask:end -->, client included | yes |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:resident_empty_idle -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:resident_empty_idle -->2,469,888 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤5 ms, p99 ≤20 ms | 0.97 ms / 1.61 ms on one NVMe machine | no |
