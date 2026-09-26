@@ -61,7 +61,7 @@
 </script>
 
 <section class="mb-wide" aria-label={label}>
-  <div class="mb-tight text-note text-text-disabled">{label}</div>
+  <div class="mb-tight text-note text-text-faint">{label}</div>
   <!-- Two branches rather than one clever box: a stated width is a
   definite width, so the frame can shrink to it, while a default one
   has to come from the column the page already gives, and a `w-full`

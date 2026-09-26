@@ -46,7 +46,7 @@ action. -->
   >
     {text}
   </div>
-  <div class="mt-tight text-note text-text-disabled">
+  <div class="mt-tight text-note text-text-faint">
     {label}{#if at !== undefined} · {clock($lang, at)}{/if}
   </div>
 </div>

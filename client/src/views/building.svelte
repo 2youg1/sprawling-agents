@@ -167,7 +167,7 @@
       {say($lang, "nav_city")}
     </a>
     <!-- wording-ok: the path separator between two addresses, hidden from readers -->
-    <span class="text-text-disabled" aria-hidden="true">/</span>
+    <span class="text-text-faint" aria-hidden="true">/</span>
     <h1 class="text-title font-title" tabindex="-1">{address}</h1>
     {#if done !== null}
       <Badge
@@ -178,13 +178,13 @@
       />
     {/if}
     <!-- wording-ok: a drawn flag marking where the standing goal lives, hidden from readers -->
-    <span class="text-text-disabled" aria-hidden="true">⚑</span>
+    <span class="text-text-faint" aria-hidden="true">⚑</span>
     {#if pursuit === undefined}
       <!-- The field wears the same box as every other input, and its button
            is always there, so a person reads it as a place to type rather
            than as a label. -->
       <input
-        class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-disabled"
+        class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-faint"
         placeholder={fill(say($lang, "bld_goal_placeholder"), { addr: address })}
         bind:value={goal}
         onkeydown={(event) => {
@@ -206,7 +206,7 @@
         ]}
       ></span>
       <span class="min-w-0 flex-1 truncate text-note text-text-quiet">{pursuit.goal}</span>
-      <span class="font-mono text-note text-text-disabled">{pursuit.verdict}</span>
+      <span class="font-mono text-note text-text-faint">{pursuit.verdict}</span>
       <Button
         label={pursuit.state === "running" ? say($lang, "bld_pause") : say($lang, "bld_resume")}
         tone="quiet"
@@ -264,7 +264,7 @@
           pick(PLAN);
         }}
       >
-        <span class="flex w-base shrink-0 justify-center text-text-disabled">≡</span>
+        <span class="flex w-base shrink-0 justify-center text-text-faint">≡</span>
         <span class="ml-tight">{say($lang, "bld_plan")}</span>
       </button>
       <button
@@ -279,7 +279,7 @@
         }}
       >
         <!-- wording-ok: the git branch mark naming the commits list, hidden from readers -->
-        <span class="flex w-base shrink-0 justify-center font-mono text-text-disabled">⎇</span>
+        <span class="flex w-base shrink-0 justify-center font-mono text-text-faint">⎇</span>
         <span class="ml-tight">{say($lang, "bld_commits")}</span>
       </button>
       <button
@@ -294,7 +294,7 @@
         }}
       >
         <!-- wording-ok: the plus-minus mark naming the changes list, hidden from readers -->
-        <span class="flex w-base shrink-0 justify-center font-mono text-text-disabled">±</span>
+        <span class="flex w-base shrink-0 justify-center font-mono text-text-faint">±</span>
         <span class="ml-tight">{say($lang, "bld_changes")}</span>
       </button>
       <button
@@ -309,7 +309,7 @@
         }}
       >
         <!-- wording-ok: the asterisk mark naming the skills list, hidden from readers -->
-        <span class="flex w-base shrink-0 justify-center text-text-disabled">✳</span>
+        <span class="flex w-base shrink-0 justify-center text-text-faint">✳</span>
         <span class="ml-tight">{say($lang, "bld_skills")}</span>
       </button>
       <Tree root={address} {picked} onPick={pick} />
@@ -321,7 +321,7 @@
         {:else if read.kind === "unavailable"}
           <Unanswered query={read.query} asked={question} />
         {:else}
-          <p class="text-text-disabled">…</p>
+          <p class="text-text-faint">…</p>
         {/if}
       {:else if shown.kind === "commits"}
         <Commits building={address} />

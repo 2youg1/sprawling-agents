@@ -293,7 +293,7 @@
         {/if}
         {#if runs.length === 0}
           <div class="flex flex-col items-center gap-base py-section text-center">
-            <p class="text-heading font-heading text-text-disabled">
+            <p class="text-heading font-heading text-text-faint">
               {isMayor
                 ? say($lang, "talk_empty_mayor")
                 : fill(say($lang, "talk_empty_room"), { room: who })}

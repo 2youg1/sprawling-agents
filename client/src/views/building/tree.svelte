@@ -120,9 +120,9 @@
 {:else}
   <ul class={nesting === 0 ? "" : "ml-base border-l border-edge pl-tight"}>
     {#if entries === undefined}
-      <li class="h-step pl-wide text-note leading-none text-text-disabled">…</li>
+      <li class="h-step pl-wide text-note leading-none text-text-faint">…</li>
     {:else if entries.length === 0}
-      <li class="h-step pl-wide text-note leading-none text-text-disabled">
+      <li class="h-step pl-wide text-note leading-none text-text-faint">
         {say($lang, "tree_empty")}
       </li>
     {:else}
@@ -140,7 +140,7 @@
               picked?.at === here
                 ? "bg-raised text-text"
                 : hidden
-                  ? "text-text-disabled"
+                  ? "text-text-faint"
                   : "text-text-quiet",
             ]}
             aria-expanded={isDir ? openNow : undefined}
@@ -161,7 +161,7 @@
                   name="chevron"
                   size="sm"
                   class={[
-                    "shrink-0 text-text-disabled transition-transform motion-reduce:transition-none",
+                    "shrink-0 text-text-faint transition-transform motion-reduce:transition-none",
                     openNow ? "rotate-90" : "",
                   ]}
                 />
@@ -169,7 +169,7 @@
                 <Tip text={say($lang, "tree_transcript")}>
                   {#snippet children(hint: string)}
                     <!-- wording-ok: a typographic arrow, named by the hint it is labelled by -->
-                    <span class="text-text-disabled" role="img" aria-labelledby={hint}>↗</span>
+                    <span class="text-text-faint" role="img" aria-labelledby={hint}>↗</span>
                   {/snippet}
                 </Tip>
               {/if}
@@ -190,7 +190,7 @@
             {/if}
             <span class="flex-1"></span>
             {#if entry.kind !== "directory"}
-              <span class="hidden shrink-0 whitespace-nowrap font-mono text-text-disabled group-hover/row:inline">
+              <span class="hidden shrink-0 whitespace-nowrap font-mono text-text-faint group-hover/row:inline">
                 {kib(entry.kind.file.bytes)}
               </span>
             {/if}

@@ -263,9 +263,11 @@
 </script>
 
 <!-- Escape, answered by the shell's key handler, closes this box; the
-click on the scrim is the pointer's extra way out, not the only one. -->
+click on the scrim is the pointer's extra way out, not the only one.
+It stands above the rail, whose drawer is `z-10`: on a narrow window the
+rail would otherwise cover the left half of the box. -->
 <div
-  class="fixed inset-0 flex items-start justify-center bg-page/70 pt-section"
+  class="fixed inset-0 z-20 flex items-start justify-center bg-page/70 px-snug pt-section"
   role="presentation"
   onclick={(event) => {
     if (event.target === event.currentTarget) onClose();
@@ -278,7 +280,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
   >
     <input
       bind:this={box}
-      class="w-full rounded-control bg-raised px-base py-snug text-body placeholder:text-text-disabled"
+      class="w-full rounded-control bg-raised px-base py-snug text-body placeholder:text-text-faint"
       placeholder={say($lang, "palette_placeholder")}
       value={query}
       oninput={(event) => {
@@ -317,7 +319,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
                 type="button"
                 class={[
                   "flex w-full items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body",
-                  entry.why === undefined ? "hover:bg-raised" : "text-text-disabled",
+                  entry.why === undefined ? "hover:bg-raised" : "aria-disabled:text-text-disabled",
                   at === cursor ? "bg-raised" : "",
                 ]}
                 aria-disabled={entry.why !== undefined}
@@ -329,7 +331,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
                 }}
               >
                 <span class="truncate font-mono">{entry.label}</span>
-                <span class="shrink-0 text-note text-text-disabled">
+                <span class="shrink-0 text-note text-text-faint">
                   {entry.why === undefined ? entry.hint : say($lang, entry.why)}
                 </span>
               </button>
@@ -353,7 +355,7 @@ click on the scrim is the pointer's extra way out, not the only one. -->
               }}
             >
               <span class="truncate font-mono">{entry.label}</span>
-              <span class="shrink-0 text-note text-text-disabled">
+              <span class="shrink-0 text-note text-text-faint">
                 {#if entry.action === undefined}
                   {entry.hint}
                 {:else}

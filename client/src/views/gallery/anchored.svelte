@@ -53,11 +53,11 @@
       <div class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap">
         {line.text}
       </div>
-      <div class="mt-tight text-note text-text-disabled">{say($lang, "talk_you")}</div>
+      <div class="mt-tight text-note text-text-faint">{say($lang, "talk_you")}</div>
     </div>
   {:else}
     <div class="my-base text-body">
-      <div class="mb-tight text-note text-text-disabled">{say($lang, "talk_resident")}</div>
+      <div class="mb-tight text-note text-text-faint">{say($lang, "talk_resident")}</div>
       <div class="whitespace-pre-wrap leading-relaxed">{line.text}</div>
     </div>
   {/if}
@@ -68,7 +68,7 @@
      the cursor the `blink` animation carries. -->
 {#snippet arriving()}
   <div class="my-base text-body">
-    <div class="mb-tight text-note text-text-disabled">{say($lang, "talk_resident")}</div>
+    <div class="mb-tight text-note text-text-faint">{say($lang, "talk_resident")}</div>
     <div class="whitespace-pre-wrap leading-relaxed">
       {SETTLED}<span class="text-text-faint">{EDGE}</span><span
         class="blink ml-tight inline-block size-[6px] bg-accent align-baseline"

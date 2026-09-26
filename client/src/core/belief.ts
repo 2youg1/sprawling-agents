@@ -21,7 +21,7 @@ import type { Readable } from "svelte/store";
 
 import { readProbed } from "./probed";
 import { PHASES } from "./doing";
-import { completionOf, haltOf, sessionStart, taskOf, toolCall } from "./reading";
+import { completionOf, haltOf, modelOf, sessionStart, taskOf, toolCall } from "./reading";
 import { sameScope } from "./scope";
 
 import { CITY_RUN, Seq, TimeMs } from "../wire";
@@ -44,6 +44,7 @@ function unseen(run: RunId, at: Seq): RunBelief {
     task: null,
     lastSeq: at,
     doing: { kind: "unknown" },
+    model: null,
     local: true,
     saying: "",
     thinking: "",
@@ -68,8 +69,13 @@ function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] 
         bad,
       ];
     }
-    case "model_called":
-      return [{ ...moved, doing: PHASES.model_called, saying: "", thinking: "" }, null];
+    case "model_called": {
+      const [model, bad] = modelOf(record);
+      return [
+        { ...moved, doing: PHASES.model_called, model: model ?? held.model, saying: "", thinking: "" },
+        bad,
+      ];
+    }
     case "model_returned":
       return [{ ...moved, saying: "", thinking: "" }, null];
     case "tool_called": {

@@ -3230,5 +3230,13 @@
   "ask_late_title": {
     "en": "no answer came back to the {query} question",
     "zh": "{query} 这个问题没有等到回答"
+  },
+  "talk_model_kept": {
+    "en": "this session",
+    "zh": "本会话"
+  },
+  "talk_model_locked": {
+    "en": "model, kept by this session: another model opens a new session",
+    "zh": "模型，本会话固定：换模型会开一个新会话"
   }
 }

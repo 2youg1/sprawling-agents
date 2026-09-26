@@ -116,6 +116,12 @@ export function toolCall(record: EventRecord): [ToolCall, string | null] {
   return [{ name: name.value, subject: subject.value }, first(name, subject)];
 }
 
+// `ModelCalled::model`: the model this call went to.
+export function modelOf(record: EventRecord): [string | null, string | null] {
+  const held = required(record, "model");
+  return [held.value, first(held)];
+}
+
 // `RunFrozen::completion`, which names how the run ended. The words are
 // `Completion::name`'s, and this reader passes them on unopened: a page
 // that mapped them to an enum here would be a second place that decides

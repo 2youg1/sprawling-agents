@@ -22,6 +22,7 @@ function run(id: RunId, addr: string, task: string, at: number): RunBelief {
     task,
     lastSeq: Seq.make(at),
     doing: { kind: "thinking" },
+    model: null,
     local: false,
     saying: "",
     thinking: "",

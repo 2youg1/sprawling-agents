@@ -64,7 +64,7 @@
   // plain fill it is read against a surface one step up, and takes the
   // full text token the rest of the page is set in.
   const ink = (choice: Choice<V>): string => {
-    if (choice.why !== undefined) return "text-text-disabled";
+    if (choice.why !== undefined) return "aria-disabled:text-text-disabled";
     if (choice.value !== held) return "text-text-quiet hover:text-text";
     return toneOf(choice.group) === "alert" ? "text-on-accent" : "text-text";
   };

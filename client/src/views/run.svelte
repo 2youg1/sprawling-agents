@@ -194,7 +194,7 @@
       {#if shown !== undefined}
         <Thread run={shown} who={roomWord(room)} />
       {:else}
-        <p class="text-text-disabled">…</p>
+        <p class="text-text-faint">…</p>
       {/if}
       {#if live}
         <div class="mt-wide">
@@ -219,7 +219,7 @@
           <ul class="text-note">
             {#each turns as turn (turn.number)}
               <li class="my-tight flex items-center gap-snug">
-                <span class="w-figure shrink-0 text-text-disabled"
+                <span class="w-figure shrink-0 text-text-faint"
                   >{fill(say($lang, "run_turn_n"), { n: String(turn.number) })}</span
                 >
                 <!-- The legend under the list names the three colours,
@@ -242,7 +242,7 @@
               </li>
             {/each}
           </ul>
-          <p class="mt-snug text-note text-text-disabled">
+          <p class="mt-snug text-note text-text-faint">
             <span class="mr-base"><span class="inline-block size-dot rounded-pill bg-mark"></span>
               {say($lang, "run_cached")}</span>
             <span class="mr-base"><span class="inline-block size-dot rounded-pill bg-accent"></span>
@@ -266,7 +266,7 @@
             {#each seen as [file, n] (file)}
               <li class="my-tight flex items-center justify-between gap-base">
                 <Path path={file} onOpen={opening(file)} />
-                <span class="shrink-0 text-text-disabled">{n > 1 ? `×${String(n)}` : ""}</span>
+                <span class="shrink-0 text-text-faint">{n > 1 ? `×${String(n)}` : ""}</span>
               </li>
             {/each}
           </ul>
@@ -285,7 +285,7 @@
     {#if evidenceRead.kind === "unavailable"}
       <Unanswered query={evidenceRead.query} asked={evidenceQuestion} />
     {:else if items === undefined}
-      <p class="text-text-disabled">…</p>
+      <p class="text-text-faint">…</p>
     {:else if items.length > 0}
       <ul class="text-note">
         {#each items as item (item.at)}
@@ -293,11 +293,11 @@
             <span class="w-figure shrink-0 text-text-faint">{say($lang, EVIDENCE_WORD[item.kind])}</span>
             <span class="flex-1 truncate font-mono text-text-quiet">{item.locator}</span>
             {#if item.picture !== null && item.picture !== undefined}
-              <span class="text-text-disabled"
+              <span class="text-text-faint"
                 >{item.picture.width}×{item.picture.height} {item.picture.media_type}</span
               >
             {/if}
-            <span class="text-text-disabled">#{item.at}</span>
+            <span class="text-text-faint">#{item.at}</span>
           </li>
         {/each}
       </ul>
@@ -314,11 +314,11 @@
         href={toFragment({ kind: "building", address: buildingOf(room) })}
         class="text-note text-text-faint">{buildingOf(room)}</a
       >
-      <span class="text-text-disabled">/</span>
+      <span class="text-text-faint">/</span>
       <a href={toFragment({ kind: "talk", address: room })} class="text-note text-text-faint"
         >{roomOf(room)}</a
       >
-      <span class="text-text-disabled">/</span>
+      <span class="text-text-faint">/</span>
     {/if}
     <!-- The run's own id when nothing has named the task yet. The
          summary's `who` is not offered here: it is the resident, and a

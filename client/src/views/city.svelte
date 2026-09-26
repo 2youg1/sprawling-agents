@@ -62,7 +62,7 @@
       {#if read.kind === "unavailable"}
         <Unanswered query={read.query} asked={QUERIES.city} />
       {:else if city === undefined}
-        <p class="text-center text-text-disabled">…</p>
+        <p class="text-center text-text-faint">…</p>
       {:else if city.buildings.length > 0}
         <Skyline
           {city}

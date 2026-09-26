@@ -203,9 +203,9 @@ fold below it does. -->
 {#snippet drawReasoning(text: string, live: boolean)}
   <details class="my-tight text-note text-text-faint" open={live}>
     <summary
-      class="cursor-pointer rounded-control px-tight marker:text-text-disabled hover:bg-chrome hover:text-text-quiet"
+      class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:bg-chrome hover:text-text-quiet"
     >
-      <span class="text-text-disabled">{say($lang, "talk_reasoning")}</span>
+      <span class="text-text-faint">{say($lang, "talk_reasoning")}</span>
       {fill(say($lang, "talk_reasoning_length"), { n: count(text.length) })}
     </summary>
     <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">
@@ -241,7 +241,7 @@ said, and what that cost. -->
     {/if}
     {#if turn.said}
       <div class="text-body">
-        <div class="mb-tight text-note text-text-disabled">
+        <div class="mb-tight text-note text-text-faint">
           {who}
           {#if tokens !== null} · {fill(say($lang, "talk_tokens"), { n: count(tokens) })}{/if}
           {#if spent !== null} · {usd(spent)}{/if}
@@ -323,7 +323,7 @@ said, and what that cost. -->
     </div>
   {/if}
   {#if frozen}
-    <div class="my-wide flex items-center gap-base text-note text-text-disabled" role="status">
+    <div class="my-wide flex items-center gap-base text-note text-text-faint" role="status">
       <span class="h-px flex-1 bg-raised"></span>
       <a href={toFragment({ kind: "run", run: run.run })} class="hover:text-text-quiet">
         {completion}{#if closedAt !== null} · {clock($lang, closedAt)}{/if}

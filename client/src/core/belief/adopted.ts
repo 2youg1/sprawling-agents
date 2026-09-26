@@ -39,6 +39,7 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
     task: held?.task ?? null,
     lastSeq: summary.last_seq,
     doing: summary.frozen ? frozen(held) : (stated ?? held?.doing ?? { kind: "unknown" }),
+    model: held?.model ?? null,
     local: false,
     saying: held?.saying ?? "",
     thinking: held?.thinking ?? "",

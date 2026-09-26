@@ -16,7 +16,7 @@ import type { Ink } from "./code";
 // fifth ink is the plain text around the four the theme distinguishes.
 const PAINT: Record<Ink, string> = {
   plain: "",
-  comment: "text-text-disabled",
+  comment: "text-text-faint",
   string: "text-alert",
   number: "text-accent",
   word: "text-text",

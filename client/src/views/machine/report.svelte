@@ -114,7 +114,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
       {/if}
       <Badge text={say($lang, stateKey(item.state))} weight={weightOf(item)} dot />
       {#if item.need === "optional"}
-        <span class="text-note text-text-disabled">{say($lang, "machine_optional")}</span>
+        <span class="text-note text-text-faint">{say($lang, "machine_optional")}</span>
       {/if}
       <span class="min-w-0 flex-1"></span>
       {#if said !== null}
@@ -123,7 +123,7 @@ const OFFER: Record<Offer, { readonly tone: Tone; readonly why: Key | null }> = 
     </div>
     <p class="text-note text-text-faint">{item.enables}</p>
     {#if how === null}
-      <span class="text-note text-text-disabled">{say($lang, "machine_no_recipe")}</span>
+      <span class="text-note text-text-faint">{say($lang, "machine_no_recipe")}</span>
     {:else}
       <div class="flex min-w-0 flex-col gap-snug">
         <!-- A command cut at the card's edge cannot be typed, and a

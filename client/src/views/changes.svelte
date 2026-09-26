@@ -85,7 +85,7 @@
 {#if read.kind === "unavailable"}
   <Unanswered query={read.query} asked={question} />
 {:else if files === undefined}
-  <p class="text-text-disabled">…</p>
+  <p class="text-text-faint">…</p>
 {:else if files.length > 0}
   <ul class="text-note">
     {#each files as file (file.path)}
@@ -100,15 +100,15 @@
         >
           <span class="w-figure shrink-0 text-text-faint">{howWord($lang, file.how)}</span>
           <span class="flex-1 truncate font-mono text-text-quiet">{file.path}</span>
-          <span class="shrink-0 font-mono text-text-disabled">{linesWord($lang, file.lines)}</span>
+          <span class="shrink-0 font-mono text-text-faint">{linesWord($lang, file.lines)}</span>
         </button>
         {#if open === file.path}
           {#if head === null}
-            <p class="pb-base text-text-disabled">{say($lang, "run_patch_needs_fence")}</p>
+            <p class="pb-base text-text-faint">{say($lang, "run_patch_needs_fence")}</p>
           {:else if patchRead.kind === "unavailable" && patchQuestion !== null}
             <Unanswered query={patchRead.query} asked={patchQuestion} />
           {:else if patch === undefined}
-            <p class="text-text-disabled">…</p>
+            <p class="text-text-faint">…</p>
           {:else}
             <div class="pb-base">
               <!-- Rows rather than one `<pre>`: each line carries its
@@ -119,7 +119,7 @@
               >
                 {#each numbered(patch) as line (line.number)}
                   {#if line.kind === "withheld"}
-                    <div class="px-base text-text-disabled">
+                    <div class="px-base text-text-faint">
                       {fill(say($lang, "run_withheld"), { n: String(line.number), reason: line.reason })}
                     </div>
                   {:else if line.kind === "head"}
@@ -136,14 +136,14 @@
                     {@const now = line.kind === "removed" ? null : line.new}
                     <div class="flex {INK[line.kind]}">
                       {#if talk === undefined}
-                        <span class="flex shrink-0 text-text-disabled select-none">
+                        <span class="flex shrink-0 text-text-faint select-none">
                           <span class="w-[5ch] pr-tight text-right">{old ?? ""}</span>
                           <span class="w-[5ch] pr-tight text-right">{now ?? ""}</span>
                         </span>
                       {:else}
                         {@const to = talk}
                         <a
-                          class="flex shrink-0 text-text-disabled select-none hover:bg-chrome hover:text-text-quiet"
+                          class="flex shrink-0 text-text-faint select-none hover:bg-chrome hover:text-text-quiet"
                           href={toFragment({ kind: "talk", address: to })}
                           aria-label={fill(say($lang, "change_line_quote"), { n: String(now ?? old ?? line.number) })}
                           onclick={() => {

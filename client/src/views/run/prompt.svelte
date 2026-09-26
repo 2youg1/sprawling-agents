@@ -96,10 +96,10 @@
         <Glyph
           name="chevron"
           size="sm"
-          class="shrink-0 text-text-disabled transition-transform {isOpen ? 'rotate-90' : ''}"
+          class="shrink-0 text-text-faint transition-transform {isOpen ? 'rotate-90' : ''}"
         />
         <span class="shrink-0 text-text-quiet">{say($lang, SLOT_WORD[each.slot])}</span>
-        <span class="shrink-0 text-text-disabled">
+        <span class="shrink-0 text-text-faint">
           {fill(say($lang, "run_prompt_bytes"), { n: count(each.bytes) })}
         </span>
         {#if !each.stored}
@@ -155,7 +155,7 @@
 {/snippet}
 
 {#if segments === undefined}
-  <p class="text-text-disabled">…</p>
+  <p class="text-text-faint">…</p>
 {:else if segments.length > 0}
   <ul>
     {#each segments as each (each.hash)}

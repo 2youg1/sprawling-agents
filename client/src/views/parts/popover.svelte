@@ -186,7 +186,7 @@
   <div class="flex gap-snug">
     {#each columns as pane, at (pane.id)}
       <div class="flex min-w-0 flex-col">
-        <div class="mb-tight px-snug text-note text-text-disabled">
+        <div class="mb-tight px-snug text-note text-text-faint">
           {say($lang, pane.label)}
         </div>
         <ul
@@ -237,7 +237,7 @@
                 </span>
                 {#if item.secondary !== undefined}
                   <span
-                    class="min-w-0 max-w-[20ch] line-clamp-2 text-note text-text-disabled"
+                    class="min-w-0 max-w-[20ch] line-clamp-2 text-note text-text-faint"
                     >{item.secondary}</span
                   >
                 {/if}
