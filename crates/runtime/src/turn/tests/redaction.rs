@@ -64,7 +64,7 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );
@@ -151,7 +151,7 @@ fn the_wave_result_block_keeps_what_the_ledger_drops() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );

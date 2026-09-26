@@ -243,7 +243,7 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            Some(&mut sink),
+            Generating::Watched(&mut sink),
         )
         .unwrap(),
     );
@@ -307,7 +307,7 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            Some(&mut sink),
+            Generating::Watched(&mut sink),
         )
         .unwrap_err();
     assert_eq!(

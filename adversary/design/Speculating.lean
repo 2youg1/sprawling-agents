@@ -7,9 +7,10 @@
 # Starting read-only tools while the model is still generating.
 
 Specifies the early handover in `crates/gateway/src/anthropic/stream.rs`
-(`completed_call`) and the rule the runtime turn loop in
-`crates/runtime/src/turn/wave.rs` must keep when it acts on a handed-over
-call (gateway-SPEC.md section 8). The Rust code is the authority on how these
+(`completed_call`) and the rule the runtime turn loop keeps when it acts on
+a handed-over call: `crates/runtime/src/turn/speculation.rs` starts the reads
+and caches them by position, and `crates/runtime/src/turn/wave.rs` records
+them (gateway-SPEC.md section 8, runtime-SPEC.md section 8-3). The Rust code is the authority on how these
 properties hold; this model is the authority on which properties must hold.
 
 The decoder hands over each tool call the moment its `content_block_stop`

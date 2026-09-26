@@ -42,7 +42,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );
@@ -127,7 +127,7 @@ fn cancel_at_the_call_boundary_stops_before_any_model_bytes() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap();
     match outcome {
@@ -167,7 +167,7 @@ fn steer_at_a_boundary_records_and_advances() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );
@@ -212,7 +212,7 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );
@@ -268,7 +268,7 @@ fn the_ledger_chain_stays_verifiable_after_a_turn() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );
@@ -320,7 +320,7 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );

@@ -946,23 +946,16 @@ struct Placed {
 
 impl Placed {
     fn with(meeting: Option<std::sync::Arc<Meeting>>) -> Placed {
+        Placed::of(Box::new(MeetingRead {
+            meta: read_meta(),
+            meeting,
+        }))
+    }
+
+    fn of(read: Box<dyn kernel::Tool>) -> Placed {
         let domain = kernel::WriteDomain::new(vec![Address::parse("lab").unwrap()]).unwrap();
         let mut bench = runtime::bench::ToolBench::new(domain);
-        bench
-            .register(Box::new(MeetingRead {
-                meta: kernel::ToolMeta {
-                    name: ToolName::parse("read").unwrap(),
-                    disclosure: "reads a file".to_owned(),
-                    params: Payload::empty(),
-                    effect: kernel::Effect::Read,
-                    cost_tier: kernel::CostTier::Free,
-                    timeout: None,
-                    render: kernel::RenderIntent::Generic,
-                    temporal: kernel::Temporal::Timeless,
-                },
-                meeting,
-            }))
-            .unwrap();
+        bench.register(read).unwrap();
         Placed { bench, next: 0 }
     }
 
@@ -974,6 +967,19 @@ impl Placed {
             kernel::Seq::new(at),
             call.id.as_bytes(),
         )
+    }
+}
+
+fn read_meta() -> kernel::ToolMeta {
+    kernel::ToolMeta {
+        name: ToolName::parse("read").unwrap(),
+        disclosure: "reads a file".to_owned(),
+        params: Payload::empty(),
+        effect: kernel::Effect::Read,
+        cost_tier: kernel::CostTier::Free,
+        timeout: None,
+        render: kernel::RenderIntent::Generic,
+        temporal: kernel::Temporal::Timeless,
     }
 }
 
@@ -1001,6 +1007,10 @@ impl runtime::ConcurrentInvoke for Placed {
             }
             Err(refused) => runtime::Admitted::Answered(Err(refused)),
         }
+    }
+
+    fn ahead(&self, call: &ToolCall) -> Option<&dyn kernel::Tool> {
+        self.bench.tool_named(&call.name)
     }
 
     fn tool(&self, ticket: &runtime::bench::Ticket) -> Result<&dyn kernel::Tool, AxError> {
@@ -1113,4 +1123,111 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
         "the steer lands after the result it arrived during: {}",
         seen[1]
     );
+}
+
+/// How long the generating model writes text after it hands its read
+/// over, and how long that read takes to answer.
+const WRITING: std::time::Duration = std::time::Duration::from_millis(500);
+const READING: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// A read-only tool that takes `READING` to answer.
+struct SlowRead;
+
+impl kernel::Tool for SlowRead {
+    fn meta(&self) -> &kernel::ToolMeta {
+        static META: std::sync::OnceLock<kernel::ToolMeta> = std::sync::OnceLock::new();
+        META.get_or_init(read_meta)
+    }
+
+    fn invoke(&self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
+        std::thread::sleep(READING);
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    }
+}
+
+/// A streaming model that hands each call of its wave over as the call
+/// completes, then writes text for `WRITING` before its answer settles.
+struct GeneratingModel {
+    waves: Vec<Vec<ToolCall>>,
+}
+
+impl Model for GeneratingModel {
+    fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        self.call_speculating(req, &mut |_: &kernel::Increment| {}, &mut |_: &ToolCall| {})
+    }
+
+    fn call_speculating(
+        &mut self,
+        _req: &ModelRequest,
+        _onto: kernel::Increments<'_>,
+        early: kernel::EarlyCalls<'_>,
+    ) -> Result<ModelReturn, AxError> {
+        let calls = if self.waves.is_empty() {
+            Vec::new()
+        } else {
+            self.waves.remove(0)
+        };
+        calls.iter().for_each(|call| early(call));
+        if !calls.is_empty() {
+            std::thread::sleep(WRITING);
+        }
+        Ok(ModelReturn::bare(
+            message_payload(&[ContentBlock::Text {
+                text: "reading".to_owned(),
+            }])
+            .unwrap(),
+            calls,
+        ))
+    }
+}
+
+fn one_read_while_generating(
+    invoke: &mut dyn runtime::ConcurrentInvoke,
+) -> (RecordingLedger, std::time::Duration) {
+    let mut ledger = RecordingLedger::new();
+    let mut model = GeneratingModel {
+        waves: vec![vec![ToolCall {
+            id: "r1".to_owned(),
+            name: ToolName::parse("read").unwrap(),
+            args: Payload::empty(),
+        }]],
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+    let began = std::time::Instant::now();
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    (ledger, began.elapsed())
+}
+
+/// A read the model hands over before it finishes writing runs while it
+/// writes: the turn takes about the longer of the two, not their sum,
+/// and the ledger is the one the same read leaves when it runs after the
+/// answer settles.
+#[test]
+fn a_read_handed_over_while_the_model_writes_runs_during_the_writing() {
+    let mut one_by_one = Placed::of(Box::new(SlowRead));
+    let mut invoke = |call: &ToolCall, t: TimeMs| {
+        let key = one_by_one.key(call);
+        one_by_one.bench.invoke(call, &key, t).and_then(answer)
+    };
+    let (serial, _) = one_read_while_generating(&mut invoke);
+
+    let (speculated, took) = one_read_while_generating(&mut Placed::of(Box::new(SlowRead)));
+
+    assert!(
+        took < WRITING + READING,
+        "the read waited for the model to finish writing: the run took {took:?}"
+    );
+    assert_eq!(speculated.lines, serial.lines);
 }

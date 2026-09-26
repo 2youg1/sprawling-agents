@@ -17,7 +17,7 @@ use crate::conversation::Conversation;
 use crate::handoff::Handoff;
 use crate::prefix::shape::PromptShape;
 use crate::reminder::ContextGauge;
-use crate::turn::{Interrupt, PhaseOutcome, RunPrompt, Turn, TurnReport};
+use crate::turn::{Generating, Interrupt, PhaseOutcome, RunPrompt, Turn, TurnReport};
 
 use super::fence::{Fence, FencePolicy};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
@@ -185,9 +185,12 @@ impl Run<Active> {
             ledger,
             model,
             &self.plan.policy,
-            // Reborrowed rather than moved: the sink belongs to the
-            // hooks and every later turn needs it too.
-            hooks.deltas.as_deref_mut(),
+            // Reborrowed rather than moved: the sink and the tool face
+            // belong to the hooks and every later turn needs them too.
+            Generating::Speculating {
+                deltas: hooks.deltas.as_deref_mut(),
+                tools: &*hooks.invoke,
+            },
         )? {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
