@@ -28,48 +28,9 @@ mod ending;
 /// frame spoken on the socket, so it has its own file.
 mod enrolment;
 
-use ending::{Ending, Reply};
+use ending::{Echo, Reply};
+pub(crate) use ending::{Ending, Heard, Milestone, Spoken};
 pub(crate) use enrolment::{enrol, split_reference};
-
-/// What came back before the city went quiet.
-pub(crate) struct Heard {
-    pub(crate) frames: u32,
-    pub(crate) refusals: u32,
-    /// Frames that arrived *after* the frame was sent.
-    ///
-    /// Counted apart from `frames` because the handshake's `Welcome` is
-    /// a frame too, so `frames` is never zero and cannot tell silence
-    /// from an answer. Subtracting one at the caller would copy the
-    /// shape of the handshake into a second place.
-    pub(crate) answers: u32,
-}
-
-/// What the city did about the frame it was sent. Exhaustive: these
-/// three are what a caller can learn inside one quiet window, and the
-/// exit code `sprawling call` returns is one per arm.
-pub(crate) enum Spoken {
-    /// The city refused, inside the window.
-    Refused,
-    /// The city answered, inside the window, and refused nothing.
-    Answered,
-    /// The frame went out and nothing came back before the window
-    /// closed. Whether the city took the work is not knowable here, so
-    /// this is neither of the other two.
-    Quiet,
-}
-
-impl Heard {
-    /// Refusal first, because a refusal that also carried events is
-    /// still a refusal; silence last, because it is only silence when
-    /// nothing at all arrived.
-    pub(crate) fn spoken(&self) -> Spoken {
-        match (self.refusals, self.answers) {
-            (0, 0) => Spoken::Quiet,
-            (0, _) => Spoken::Answered,
-            _ => Spoken::Refused,
-        }
-    }
-}
 
 /// The greeting this build sends, computed rather than transcribed.
 fn hello(token: Option<&str>) -> channels::ClientFrame {
@@ -121,7 +82,22 @@ pub(crate) fn call(
     // wrote, not against whatever the server made of it.
     let outgoing: channels::ClientFrame = serde_json::from_str(frame)
         .map_err(|err| malformed("read the frame to send", &err.to_string()))?;
-    let body = serde_json::to_string(&outgoing)
+    send(at, &outgoing, token, quiet, Ending::of(&outgoing))
+}
+
+/// Sends a frame this process built and prints what comes back until
+/// `ending`; [`call`] is this with the ending its frame's kind decides.
+///
+/// # Errors
+/// As [`call`], less the frame this process could not read.
+pub(crate) fn send(
+    at: &str,
+    outgoing: &channels::ClientFrame,
+    token: Option<&str>,
+    quiet: Duration,
+    ending: Ending,
+) -> Result<Heard, AxError> {
+    let body = serde_json::to_string(outgoing)
         .map_err(|err| malformed("encode the frame to send", &err.to_string()))?;
     let greeting = serde_json::to_string(&hello(token))
         .map_err(|err| malformed("encode the greeting", &err.to_string()))?;
@@ -140,11 +116,8 @@ pub(crate) fn call(
                  process the thread the connection needs",
             )
         })?;
-    let sending = Sending {
-        body,
-        ending: Ending::of(&outgoing),
-    };
-    runtime.block_on(converse(at, &greeting, &sending, quiet))
+    let mut sending = Sending { body, ending };
+    runtime.block_on(converse(at, &greeting, &mut sending, quiet))
 }
 
 /// The frame on its way out, and when to stop listening for what it
@@ -157,7 +130,7 @@ struct Sending {
 async fn converse(
     at: &str,
     greeting: &str,
-    sending: &Sending,
+    sending: &mut Sending,
     quiet: Duration,
 ) -> Result<Heard, AxError> {
     let url = format!("ws://{at}/ws");
@@ -173,6 +146,7 @@ async fn converse(
         frames: 0,
         refusals: 0,
         answers: 0,
+        run: None,
     };
     // The greeting is answered before anything else is sent: a client
     // that shouted its command at a server which then refused the
@@ -180,7 +154,7 @@ async fn converse(
     let welcome = next_frame(&mut socket, quiet).await?;
     match welcome {
         Some(text) => {
-            report(&text, &Reply::of(&text), &mut heard);
+            report(&text, &Reply::of(&text), &sending.ending.echo(), &mut heard);
             if heard.refusals > 0 {
                 return Ok(heard);
             }
@@ -194,12 +168,13 @@ async fn converse(
         .map_err(|err| unreachable_city(at, &err.to_string()))?;
     while let Some(text) = next_frame(&mut socket, quiet).await? {
         let reply = Reply::of(&text);
-        report(&text, &reply, &mut heard);
+        report(&text, &reply, &sending.ending.echo(), &mut heard);
         heard.answers = heard.answers.saturating_add(1);
         if sending.ending.ends_on(&reply) {
             break;
         }
     }
+    heard.run = sending.ending.run();
     // Closing rather than dropping: a city that is told the peer has
     // gone stops holding a session open for it.
     let _closed = socket.close(None).await;
@@ -239,12 +214,15 @@ where
 /// Printed as it arrived rather than reformatted: inventing a display
 /// form here would be a second, drifting description of every type on
 /// the wire.
-fn report(text: &str, reply: &Reply, heard: &mut Heard) {
-    println!("{text}");
+fn report(text: &str, reply: &Reply, echo: &Echo, heard: &mut Heard) {
+    match echo {
+        Echo::Stdout => println!("{text}"),
+        Echo::Stderr => eprintln!("{text}"),
+    }
     heard.frames = heard.frames.saturating_add(1);
     match reply {
         Reply::Refusal => heard.refusals = heard.refusals.saturating_add(1),
-        Reply::Answer | Reply::Other => {}
+        Reply::Answer | Reply::Run { .. } | Reply::Other => {}
     }
 }
 

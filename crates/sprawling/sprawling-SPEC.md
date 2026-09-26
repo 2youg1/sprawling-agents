@@ -248,6 +248,7 @@ pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
 // bin::wire_client（形状 4 adapter）
 pub(crate) struct Heard { pub frames: u32, pub refusals: u32 }
 pub(crate) fn call(at: &str, frame: &str, token: Option<&str>, quiet: Duration) -> Result<Heard, AxError>;
+pub(crate) fn send(at: &str, outgoing: &channels::ClientFrame, token: Option<&str>, quiet: Duration, ending: Ending) -> Result<Heard, AxError>;  // Heard 另带 run: Option<RunId>
 pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<String, AxError>;
 pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/name"
 ```
@@ -255,6 +256,8 @@ pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/na
 - **握手在进程内算，不手抄**。`WIRE_V` 与 `schema_hash()` 直接取自 `channels`，故改一条命令名字时本客户端**不可能**落后。因此删掉了那个一次性的 Python 探针——它在工作区外复刻了 `schema_hash()` 与 `IdemKey::derive()`，那本身就是第二个权威。
 - **一个查询恰好一个答复，收到就走**。发出的是 `Query` 时，`call` 在收到第一帧 `Answer` 或 `Refusal` 时打印它并退出，之前推来的 `Event`／`Log`／`Delta` 照样逐行打印；城的答复在十几毫秒内到达，再等一整段安静窗口只是让进程白占两秒。安静窗口在这里只剩上限的作用：答复迟迟不来时，`call` 仍按「安静」退出（退出码 3）。
 - **一条命令收到城安静为止**。发出的是 `Command` 时，“安静”是一段无帧的时长（`--quiet-ms`，默认 2000），而不是帧数：一条 Dispatch 会产生多少事件是城的事，客户端猜不到。何时结束由 `wire_client::Ending` 一处决定，按发出帧的种类穷尽匹配（被否决的备选：把「收到答复就走」做成一个布尔参数——它会让 `call(…, false)` 这样的调用点说不出自己在等什么）。
+- **`sprawling dispatch <addr> <task> [--detach] [--at] [--token]`（`bin::main::dispatch`，形状 adapter）是一次派活的整条路**：进程内铸幂等键（`IdemKey::derive(RunId::CITY, Seq::FIRST, 16 字节 OS 熵)`，与控制台每行一把键同一个构造；键从命令行拿进来就等于让人或 agent 再抄一遍 wire 的键格式），模式取 `Mode::PlanGoal`、强度与目标留空、`session` 为 `None`（地址是楼时城向模型要房间名，是房间时续写那个会话）。结束条件是 `Ending::OnRun { under, until, run }`：`under` 是派去的地址，第一条 `addr` 等于它或在它之下的 `run_started` 认定这次的 run，`until = Milestone::Frozen` 时等到**那个** run 的 `run_frozen`（别的 run 冻结不算），`until = Milestone::Started`（`--detach`）时收到 `run_started` 就走；两者收到 `Refusal` 都立即结束，安静窗口（默认 2000 ms，run 进行中每来一帧都重新计时）只作上限。`--detach` 的 stdout 只有 run id 一行，逐帧 JSONL 改走 stderr，于是 `id=$(sprawling dispatch --detach …)` 可直接用；不带 `--detach` 时逐帧 JSONL 走 stdout，与 `call` 一致。退出码表与 `call` 同一张：0 答复、1 拒绝、2 命令行、3 安静。被否决的备选：让 `dispatch` 拼一段 JSON 再交给 `call`——`call` 按帧种类决定何时结束，一条 Command 只能等安静，而一次 run 的长短是模型的事，安静窗口要么截断它要么让每次派活白等。
+- **`-m/--model` 未做，缺的是 wire 字段**：`WireCommand::Dispatch` 不带模型；`SelectModel` 改的是整座城某个 tag 的模型，拿它冒充一次性的选择会在别人的 run 底下换模型。要做须给 `Dispatch` 加可选 `model`（`WIRE_V` 加一、`client/src/wire.ts` 重生成），由装配在这次 run 的冻结配置里覆盖 tag 的解析结果。
 - **输出是 JSONL，一行一帧**。发明一种人看的排版就是为 wire 里的每一个类型再写一遍它长什么样，而那份渲染一定会漂。
 - **退出码带信息**：收到过 `Refusal` 退 1，否则退 0。一个驱动它的 agent 不应当为了知道「成不成」去解析 JSON。
 - **`enrol` 只从 stdin 读，恒不从 argv 读**。argv 进进程表、进 shell 历史、进父进程的日志；这比浏览器路径更好的地方就在这里，因为页面那条路要先把明文拿进一个标签页的内存。**输出只有引用**，恒不回显值。

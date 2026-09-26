@@ -3,37 +3,129 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! When `sprawling call` stops listening (sprawling-SPEC.md section
-//! 8-10): a query ends on its one reply, a command on the city's quiet.
+//! When a wire client stops listening, and what it heard by then
+//! (sprawling-SPEC.md section 8-10): a query ends on its one reply, a
+//! command on the city's quiet, and a dispatch on its run's milestone.
 
-/// When a call stops listening, decided once by the kind of frame sent.
+use kernel::{Address, EventKind, RunId};
+
+/// What came back before the client stopped listening.
+pub(crate) struct Heard {
+    pub(crate) frames: u32,
+    pub(crate) refusals: u32,
+    /// Frames that arrived *after* the frame was sent.
+    ///
+    /// Counted apart from `frames` because the handshake's `Welcome` is
+    /// a frame too, so `frames` is never zero and cannot tell silence
+    /// from an answer. Subtracting one at the caller would copy the
+    /// shape of the handshake into a second place.
+    pub(crate) answers: u32,
+    /// The run a dispatch started, when an [`Ending::OnRun`] saw it.
+    pub(crate) run: Option<RunId>,
+}
+
+/// What the city did about the frame it was sent. Exhaustive: these
+/// three are what a caller can learn inside one quiet window, and the
+/// exit code `sprawling call` returns is one per arm.
+pub(crate) enum Spoken {
+    /// The city refused, inside the window.
+    Refused,
+    /// The city answered, inside the window, and refused nothing.
+    Answered,
+    /// The frame went out and nothing came back before the window
+    /// closed. Whether the city took the work is not knowable here, so
+    /// this is neither of the other two.
+    Quiet,
+}
+
+impl Heard {
+    /// Refusal first, because a refusal that also carried events is
+    /// still a refusal; silence last, because it is only silence when
+    /// nothing at all arrived.
+    pub(crate) fn spoken(&self) -> Spoken {
+        match (self.refusals, self.answers) {
+            (0, 0) => Spoken::Quiet,
+            (0, _) => Spoken::Answered,
+            _ => Spoken::Refused,
+        }
+    }
+}
+
+/// When a client stops listening.
 ///
 /// A frame that has exactly one reply ends on that reply; a command's
 /// consequences are the city's business, so a command ends when the
-/// city has been quiet for the window. The window still bounds a reply
-/// that never comes.
-pub(super) enum Ending {
+/// city has been quiet for the window. A dispatch whose caller waits on
+/// its run ends on that run's milestone. The window still bounds a
+/// reply that never comes.
+pub(crate) enum Ending {
     OnReply,
     OnQuiet,
+    /// The run started under `under` reaches `until`; `run` is that run
+    /// once its `run_started` has arrived.
+    OnRun {
+        under: Address,
+        until: Milestone,
+        run: Option<RunId>,
+    },
+}
+
+/// Which point in a dispatched run's life ends the wait.
+pub(crate) enum Milestone {
+    /// `--detach`: the run exists.
+    Started,
+    /// The run has frozen, however it ended.
+    Frozen,
 }
 
 impl Ending {
     /// A query is answered once, and a greeting on a live session is
     /// refused once (`channels::reception`), so both have one reply.
-    pub(super) fn of(sent: &channels::ClientFrame) -> Self {
+    pub(crate) fn of(sent: &channels::ClientFrame) -> Self {
         match sent {
             channels::ClientFrame::Query(_) | channels::ClientFrame::Hello(_) => Self::OnReply,
             channels::ClientFrame::Command(_) => Self::OnQuiet,
         }
     }
 
-    pub(super) fn ends_on(&self, frame: &Reply) -> bool {
+    /// Reads one frame and says whether listening ends with it. An
+    /// [`Ending::OnRun`] also learns its run here, from the first
+    /// `run_started` at or under the address it dispatched to.
+    pub(super) fn ends_on(&mut self, frame: &Reply) -> bool {
         match (self, frame) {
-            (Self::OnReply, Reply::Answer | Reply::Refusal) => true,
-            (Self::OnReply, Reply::Other)
-            | (Self::OnQuiet, Reply::Answer | Reply::Refusal | Reply::Other) => false,
+            (Self::OnReply, Reply::Answer | Reply::Refusal)
+            | (Self::OnRun { .. }, Reply::Refusal) => true,
+            (Self::OnReply, Reply::Other | Reply::Run { .. })
+            | (Self::OnQuiet, Reply::Answer | Reply::Refusal | Reply::Other | Reply::Run { .. })
+            | (Self::OnRun { .. }, Reply::Answer | Reply::Other) => false,
+            (Self::OnRun { .. }, Reply::Run { .. }) => false,
         }
     }
+
+    /// The run an [`Ending::OnRun`] saw start.
+    pub(super) fn run(&self) -> Option<RunId> {
+        match self {
+            Self::OnRun { run, .. } => *run,
+            Self::OnReply | Self::OnQuiet => None,
+        }
+    }
+
+    /// Where the frames go: `--detach` keeps stdout for the run id alone.
+    pub(super) fn echo(&self) -> Echo {
+        match self {
+            Self::OnRun {
+                until: Milestone::Started,
+                ..
+            } => Echo::Stderr,
+            Self::OnReply | Self::OnQuiet | Self::OnRun { .. } => Echo::Stdout,
+        }
+    }
+}
+
+/// The stream every frame heard is printed on.
+pub(super) enum Echo {
+    Stdout,
+    Stderr,
 }
 
 /// What one frame from the city is, as far as counting and ending go.
@@ -44,6 +136,12 @@ impl Ending {
 pub(super) enum Reply {
     Answer,
     Refusal,
+    /// A run's `run_started` or `run_frozen`, with where it ran.
+    Run {
+        kind: EventKind,
+        run: RunId,
+        addr: Option<Address>,
+    },
     Other,
 }
 
@@ -52,6 +150,15 @@ impl Reply {
         match serde_json::from_str::<channels::ServerFrame>(text) {
             Ok(channels::ServerFrame::Answer(_)) => Self::Answer,
             Ok(channels::ServerFrame::Refusal(_)) => Self::Refusal,
+            Ok(channels::ServerFrame::Event(record))
+                if matches!(record.kind(), EventKind::RunStarted | EventKind::RunFrozen) =>
+            {
+                Self::Run {
+                    kind: record.kind(),
+                    run: record.run(),
+                    addr: record.addr().cloned(),
+                }
+            }
             Ok(
                 channels::ServerFrame::Welcome(_)
                 | channels::ServerFrame::Event(_)
@@ -63,5 +170,60 @@ impl Reply {
             // simply not one that ends the call.
             Err(_) => Self::Other,
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::{Address, Ending, EventKind, Milestone, Reply, RunId};
+
+    fn run_event(kind: EventKind, run: RunId, addr: &str) -> Reply {
+        Reply::Run {
+            kind,
+            run,
+            addr: Some(Address::parse(addr).unwrap()),
+        }
+    }
+
+    /// A dispatch into a building waits for the run that started in one
+    /// of its rooms, and another run freezing meanwhile does not end it.
+    #[test]
+    fn a_dispatch_ends_when_its_own_run_freezes() {
+        let ours = RunId::from_bytes([1; 16]);
+        let theirs = RunId::from_bytes([2; 16]);
+        let mut ending = Ending::OnRun {
+            under: Address::parse("watchtower").unwrap(),
+            until: Milestone::Frozen,
+            run: None,
+        };
+        let heard = [
+            run_event(EventKind::RunStarted, theirs, "elsewhere/room"),
+            run_event(EventKind::RunStarted, ours, "watchtower/first-look"),
+            run_event(EventKind::RunFrozen, theirs, "elsewhere/room"),
+            run_event(EventKind::RunFrozen, ours, "watchtower/first-look"),
+        ]
+        .iter()
+        .map(|reply| ending.ends_on(reply))
+        .collect::<Vec<_>>();
+        assert_eq!(heard, [false, false, false, true]);
+        assert_eq!(ending.run(), Some(ours));
+    }
+
+    /// `--detach` ends on the run's start, with the run known.
+    #[test]
+    fn a_detached_dispatch_ends_when_its_run_starts() {
+        let ours = RunId::from_bytes([1; 16]);
+        let mut ending = Ending::OnRun {
+            under: Address::parse("watchtower/first-look").unwrap(),
+            until: Milestone::Started,
+            run: None,
+        };
+        let ended = ending.ends_on(&run_event(
+            EventKind::RunStarted,
+            ours,
+            "watchtower/first-look",
+        ));
+        assert_eq!((ended, ending.run()), (true, Some(ours)));
     }
 }
