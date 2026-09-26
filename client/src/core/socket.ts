@@ -39,7 +39,7 @@ import type { Tail } from "./live_output";
 import { decodeFrame, encodeFrame } from "./frames";
 import { createUnsent, isSpeech } from "./unsent";
 import { langOf, say } from "./lang";
-import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord } from "./link";
+import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord, unsentCommand } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import { AskId, Seq } from "../wire";
 import type { Command, EventRecord, HistoryRangeAnswer, Query, RunId, ServerFrame } from "../wire";
@@ -478,7 +478,11 @@ export function openConnection(
     live,
     command(command) {
       if (isLive(link)) return sendText(encodeFrame({ command }));
-      if (isRefused(link) || !isSpeech(command)) return false;
+      if (isRefused(link)) return false;
+      if (!isSpeech(command)) {
+        store.refused(unsentCommand(lang, Object.keys(command).join()));
+        return false;
+      }
       unsent.hold(command);
       return true;
     },

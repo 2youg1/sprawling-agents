@@ -743,6 +743,14 @@
     "en": "refused",
     "zh": "被拒绝"
   },
+  "link_send_action": {
+    "en": "send a command to the city",
+    "zh": "把一条命令发给城"
+  },
+  "link_send_when_connected": {
+    "en": "wait until the page says it is connected, then do it again",
+    "zh": "等页面显示已连接，再做一次"
+  },
   "link_retry": {
     "en": "try again",
     "zh": "再试一次"
