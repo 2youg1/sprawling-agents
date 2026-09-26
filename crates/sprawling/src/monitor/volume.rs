@@ -24,7 +24,7 @@ pub(crate) fn read(city: &Path) -> Option<VolumeSpace> {
     )
 }
 
-/// `\?\C:\city` respelled `C:\city`, the spelling mount points carry.
+/// `\\?\C:\city` respelled `C:\city`, the spelling mount points carry.
 fn without_verbatim_disk(path: &Path) -> PathBuf {
     let mut components = path.components();
     match components.next() {
