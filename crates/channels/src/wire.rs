@@ -352,6 +352,14 @@ mod tests {
         assert!(QUERY_NAMES.contains(&Query::Release.name()));
     }
 
+    /// The query that asks npm is named for what it answers, so it
+    /// cannot be read as the verb that releases a halted scope.
+    #[test]
+    fn the_newest_release_query_is_not_spelled_like_the_release_verb() {
+        assert!(QUERY_NAMES.contains(&"NewestRelease"));
+        assert!(!QUERY_NAMES.contains(&"Release"));
+    }
+
     #[test]
     fn a_client_frame_round_trips_through_json() {
         let frame = ClientFrame::Query(Query::CityView);
