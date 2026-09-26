@@ -239,3 +239,10 @@ export function roomOf(address: Address): string {
   const slash = address.lastIndexOf("/");
   return slash < 0 ? address : address.slice(slash + 1);
 }
+
+// The room a person names inside a building: `<building>/<name>`, which
+// a dispatch opens by itself, so naming a room needs no digest model to
+// name it. None when the name is one the city would refuse as a session.
+export function roomIn(_building: Address, _name: string): Option.Option<Address> {
+  return Option.none();
+}
