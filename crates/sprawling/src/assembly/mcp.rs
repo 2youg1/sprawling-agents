@@ -16,7 +16,7 @@ use kernel::{Address, AxError};
 /// another working directory once it runs.
 #[derive(Default)]
 pub(crate) struct Residents {
-    held: Vec<Resident>,
+    held: std::sync::Mutex<Vec<Resident>>,
 }
 
 /// One connected server and what it offered when it connected.
@@ -50,24 +50,20 @@ impl Residents {
     /// listing, and `protocol::McpTool::new`'s refusal on a confidential
     /// building.
     pub(crate) fn tools(
-        &mut self,
+        &self,
         server: &kernel::McpServer,
         write_root: &std::path::Path,
         confidential: bool,
         resolve: &gateway::SecretResolver,
     ) -> Result<(Vec<protocol::McpTool>, Reached), AxError> {
-        self.held
-            .retain(|held| !(held.serves(server, write_root) && held.link.has_ended()));
-        if let Some(held) = self
-            .held
-            .iter()
-            .find(|held| held.serves(server, write_root))
-        {
+        let mut table = super::workbench::held(&self.held, "reach an mcp server")?;
+        table.retain(|held| !(held.serves(server, write_root) && held.link.has_ended()));
+        if let Some(held) = table.iter().find(|held| held.serves(server, write_root)) {
             return Ok((held.tools(confidential)?, Reached::Resident));
         }
         let (resident, opened) = Resident::connect(server, write_root, resolve)?;
         let tools = resident.tools(confidential)?;
-        self.held.push(resident);
+        table.push(resident);
         Ok((tools, Reached::Connected(opened)))
     }
 }
@@ -420,6 +416,74 @@ mod tests {
             worker.mcp_tools(&config, dir.path(), false).is_empty(),
             "a service that is down today does not stop the building from working today"
         );
+    }
+
+    /// A stdio declaration under `label`, as a building's `[[mcp]]`
+    /// table would carry it.
+    fn stdio_server(label: &str, (command, args): (String, Vec<String>)) -> kernel::McpServer {
+        kernel::McpServer {
+            label: kernel::ServerLabel::parse(label).unwrap(),
+            transport: kernel::McpTransport::Stdio {
+                command,
+                args,
+                env: Vec::new(),
+            },
+        }
+    }
+
+    fn no_secrets() -> gateway::SecretResolver {
+        Box::new(|_| {
+            Err(AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "resolve a secret",
+                "this server declares none",
+            )
+            .with_recovery("give the test server no secret"))
+        })
+    }
+
+    /// How many tools `server` offered, and whether this call connected
+    /// it, in a shape a lane's thread can hand back.
+    fn reach(residents: &Residents, server: &kernel::McpServer, root: &Path) -> (usize, bool) {
+        let (tools, reached) = residents.tools(server, root, false, &no_secrets()).unwrap();
+        (tools.len(), matches!(reached, Reached::Connected(_)))
+    }
+
+    /// Two lanes reaching two servers share one table: a handshake that
+    /// has not been answered yet holds up the lanes asking for its own
+    /// server and nobody else (sprawling-SPEC.md 8-4).
+    #[test]
+    fn a_server_still_shaking_hands_keeps_no_other_server_waiting() {
+        let dir = tempfile::tempdir().unwrap();
+        let (starts, gate) = (dir.path().join("starts.txt"), dir.path().join("open"));
+        let slow = stdio_server(
+            "slow",
+            crate::mcp_stdio::gated(SERVER_ANSWER, &starts, &gate),
+        );
+        let quick = stdio_server("quick", crate::mcp_stdio::echoing(SERVER_ANSWER));
+        let residents = Residents::default();
+
+        std::thread::scope(|scope| {
+            let waiting = scope.spawn(|| reach(&residents, &slow, dir.path()));
+            let patience = std::time::Instant::now() + std::time::Duration::from_secs(60);
+            while !starts.exists() && std::time::Instant::now() < patience {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            assert!(starts.exists(), "the gated server started");
+            let other = scope.spawn(|| reach(&residents, &quick, dir.path()));
+            let patience = std::time::Instant::now() + std::time::Duration::from_secs(30);
+            while !other.is_finished() && std::time::Instant::now() < patience {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            let answered_while_the_first_waited = other.is_finished() && !waiting.is_finished();
+            std::fs::write(&gate, "").unwrap();
+            assert_eq!(waiting.join().unwrap(), (1, true));
+            assert_eq!(other.join().unwrap(), (1, true));
+            assert!(
+                answered_while_the_first_waited,
+                "the second server was reached while the first still shook hands"
+            );
+        });
     }
 
     #[test]

@@ -314,6 +314,30 @@ pub(crate) fn echoing(answer: &str) -> (String, Vec<String>) {
     }
 }
 
+/// The server [`counting_starts`] builds, which after its start line
+/// reads nothing until `gate` exists, so a test holds a handshake open
+/// for as long as it needs and sees, from `starts`, that it has begun.
+#[cfg(test)]
+pub(crate) fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>) {
+    let (command, mut args) = counting_starts(answer, starts);
+    let wait = if cfg!(windows) {
+        format!(
+            "while(!(Test-Path -LiteralPath '{}')){{Start-Sleep -Milliseconds 5}}; ",
+            gate.display()
+        )
+    } else {
+        format!(
+            "while [ ! -e '{}' ]; do sleep 0.005; done; ",
+            gate.display()
+        )
+    };
+    if let Some(script) = args.last_mut() {
+        let after_mark = script.find("; ").map_or(0, |at| at.saturating_add(2));
+        script.insert_str(after_mark, &wait);
+    }
+    (command, args)
+}
+
 /// The server [`echoing`] builds, which also writes one line to
 /// `starts` each time it is started, so a test can count how many
 /// children a sequence of dispatches cost.
