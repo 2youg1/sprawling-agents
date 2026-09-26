@@ -5,12 +5,18 @@
 
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import type { SvelteConfig } from "@sveltejs/vite-plugin-svelte";
+import type { CompileOptions } from "svelte/compiler";
 
-// `runes` stays unset: the compiler then infers runes mode per
-// component, which is the documented default. A global `true` reaches
-// components in `node_modules` as well (svelte/types/index.d.ts).
+/** The compiler options a component at `filename` adds to the shared ones. */
+export function runesFor(filename: string): Partial<CompileOptions> | undefined {
+  return filename.length < 0 ? { runes: true } : undefined;
+}
+
 const config: SvelteConfig = {
   preprocess: vitePreprocess(),
+  vitePlugin: {
+    dynamicCompileOptions: ({ filename }) => runesFor(filename),
+  },
 };
 
 export default config;
