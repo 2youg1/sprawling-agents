@@ -73,7 +73,7 @@ impl StopCause {
 /// A node this run holds.
 ///
 /// **There is no third way to put it down.** The type has one private
-/// field, so it is minted only by [`PlanTree::claim`], and it is
+/// field, so it is minted only by [`super::PlanTree::claim`], and it is
 /// consumed only by [`Held::finish`] and [`Held::stop`] — one takes
 /// evidence, the other takes a cause. A run that simply stops working
 /// leaves the value with its owner, and the owner's freeze path spends

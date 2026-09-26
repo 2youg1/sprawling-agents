@@ -7,84 +7,59 @@
 
 ## 1 需求分解
 
-kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖，不持有任何落盘物。Stage 1 落地九个模块，每个可独立完成、独立验收：
+kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖，不持有任何落盘物。下表是其余模块都建在其上的九个基础模块；kernel 的全部模块、各自的形状与章节锚由 `architecture.toml` 的模块图给出，本文不另列第二份。
 
 | 模块 | 形状（ARCHITECTURE §7） | 一句话 |
 |---|---|---|
-| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 38（其中装载期六码）；carrier 声明位 |
+| `error` | 2 值类型＋6 数据面 | AxError＝码加一份装箱的细节，经 ErrorDraft 构造，恢复语必填；AxCode 全集与装载期码；carrier 声明位 |
 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
-| `event` | 2 值类型 | EventKind 78（二分共 9 条入窗）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
+| `event` | 2 值类型 | EventKind 全集；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
 | `version` | 2 值类型 | 乐观并发：Version 单调值＋base 新鲜度判定 |
 | `idem` | 2 值类型 | IdemKey 确定性派生（BLAKE3 XOF 16 字节＋版本字节） |
-| `consts_external` | 6 数据面 | 外部事实常量 5 项 |
-| `consts_policy` | 6 数据面 | 政策常量 16 项（已落 13，3 项随类型延后，见 §8-8） |
+| `consts_external` | 6 数据面 | 外部事实常量 |
+| `consts_policy` | 6 数据面 | 政策常量 |
 | `ledger` | 3 端口 | 唯一写入口 trait；链语义（GENESIS_PREV／chain_hash）；conformance 套件 |
 
-Stage 2 落地其余 18 个 kernel 模块（§8-10…§8-27）。**施工序＝依赖序**：
-
-| 施工批 | 模块 | 理由 |
-|---|---|---|
-| 骨架端口 | `config` `tool`(port) `model`(port) | turn 相变函数携两 port，骨架先于决断面 |
-| 决断地基 | `taint` | 一切携 Taint 的动作依赖它 |
-| 四判定 | `write_domain` `budget` `backpressure` `stall` | 无互依，可同时落地 |
-| 登记与委派 | `goal` `repair` `delegation` `registry` | registry 供 discard 门查 Asset |
-| 完成与审批 | `spine` `completion` `approval` | Inbox只装设计问题；门不产出审批项 |
-| 隐私与删除 | `secret` `discard` | Egress/Discard 两门的判定输入 |
-| 组合面 | `gate` | `DOORS` 各门消费上述全部，故最后 |
-
-已有章节只加不改。
 
 ## 2 验收标准
 
 - 每模块单测过 workspace lints（非测试代码零 unwrap/expect/panic/索引切片/裸算术/as）。
-- `EventKind` 与 `AxCode` 的 variant 名册与本文 §8-4／§8-1 表逐 variant 一致（S2 起 `xtask specalign` 机器断言）。
+- `EventKind` 与 `AxCode` 的 variant 名册与本文 §8-4／§8-1 表逐 variant 一致，由 `xtask specalign` 断言。
 - 每个 EventKind 恰属 in-window／record-only 之一；两分与条数见 §8-4 表。
-- 每个 AxCode 恰有一个 carrier 声明；装载期白名单恰 5 码且封闭。
+- 每个 AxCode 恰有一个 carrier 声明；装载期白名单封闭（`AxCode::carrier` 里落到 `Carrier::Loadtime` 的那一臂）。
 - golden EventRecord：规范字节入 insta 快照，跨平台逐字节稳定。
 - proptest：Address 解析拒绝面、is_within 前缀性质、Locator 往返、IdemKey 重算不变。
 - conformance 套件对任意 `impl Ledger` 可跑（由 citysim 内存 Ledger 第二实现证明）。
 
-Stage 2 追加：
-
-- 类型加固十项全部有型可指；trybuild 八反例全集编译失败。
+- 类型加固十项全部有型可指；`crates/kernel/tests/ui` 的 trybuild 反例全部编译失败。
 - kani 三 harness 入库（`#[cfg(kani)]`）：kani 没有 Windows 宿主，每条性质配 proptest 镜像本地可跑，kani 本体入 CI Linux job。
-- **三条全被 CI 证，理由不是成本而是信息**：`backpressure::verification::admit_is_total_and_monotone_in_depth`（41s）、`backpressure::verification::an_overflowing_sum_never_admits`、`secret::scan::verification::log2_q10_is_total`（53s）——任意 u64 上的全函数性、单调性、溢出时的 fail-closed 与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：三条的循环界要么没有循环，要么是常数（`log2_q10` 十次），CBMC 自己推得出来。
+- **三条全被 CI 证，理由不是成本而是信息**：`backpressure::verification::admit_is_total_and_monotone_in_depth`、`backpressure::verification::an_overflowing_sum_never_admits`、`secret::scan::verification::log2_q10_is_total`——任意 u64 上的全函数性、单调性、溢出时的 fail-closed 与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：三条的循环界要么没有循环，要么是常数（`log2_q10` 十次），CBMC 自己推得出来。
 - **入库的 harness 恒被证，这是本节的收口条件**：写了不证的 harness 让「本仓有 kani 覆盖」这句话比事实强，故一条性质要么以求解器解得动的形状入库，要么按下一条记为已关闭的决定并从源码删除。
 - **纪律在这里，名单不在这里**：每条不证的 harness 上方带一行 `// not-proved: <理由>`，`cargo xtask proof` 读这行来跳过它并打印理由，`cargo xtask proof --list` 打印今天将被证的名单。**源码标记是名单的唯一权威**，本文因此只写「不证要写明理由」这条纪律，不再养第二份清单。**今天没有一条 harness 带这行标记**：机制留着，是给下一条写得出、暂时证不动的性质一个当场说明自己的地方。
-- **五条「写了不证」的 harness 已注销，这是一个已关闭的决定**（W10 · 15.3）。五条按两类原因删除，删除面同时记在此处与它们原先所在模块的注释里：
-
-  | 已删除的 harness | 为什么这条性质不适合 kani | 今天由谁守 |
-  |---|---|---|
-  | `discard::verdict::verification::unplanned_never_allows` | 判一次 discard 要 `Vec<Address>` 与 `Registry`，CBMC 推不出它们内部循环的上界 | 同文件 `#[test]` |
-  | `discard::verdict::verification::tainted_never_allows` | 同上，另加 `BTreeSet<TaintSource>`；无界跑了六小时、`--default-unwind 32` 又跑了 45 分钟，两次都卡在这一条，两次都没有判决 | 同文件 `#[test]` |
-  | `secret::scan::verification::entropy_is_total_on_short_inputs` | 输入域是真的（四字节任意），卡住它的是形状：`entropy_millibits_per_char` 对 256 槽计数表逐槽调 `log2_q10`，每次调用十轮 u128 平方，交给求解器约 **2,560 次符号非线性乘法**，十五分钟不返回。要证得先有一个「单槽」函数，而产品代码里没有这个函数，为了证明而造一个就是给同一条规则开第二个家 | `scan_is_total_and_in_bounds`（proptest）＋ `log2_q10_is_total`（kani） |
-  | `taint::verification::join_never_drops_a_source` | 命题的载体是 `BTreeSet<String>`；取两个具体 label 则退化成一条更贵的单测 | `join_output_contains_both_inputs`（proptest） |
-  | `write_domain::verification::reserved_is_never_within` | 判定的入参恒是 `Address`（内含 `String`）；取一个具体地址同样退化成单测 | `reserved_target_is_outside_even_for_an_empty_domain`（`#[test]`） |
-
-  **全局 unwind 界已被实验证伪，不是这类问题的解法**：删除的理由是命题的载体是堆集合或非线性算术，不是界没调对。补进来的是 `an_overflowing_sum_never_admits`——`depth + cost` 溢出时恒 Shed，对任意 u64 成立，而它旁边的 `#[test]` 只钉住了 `u64::MAX` 一个点。
+- **命题的载体是堆集合或非线性算术的性质不交给 kani**，由同文件的 `#[test]` 或 proptest 守：CBMC 推不出 `Vec`、`BTreeSet`、`String` 内部循环的上界，全局 unwind 界也解不开它，而取几个具体值则退化成一条更贵的单测。按这条规则由测试守的性质：discard 的「Unplanned 恒 Deny」「Tainted 恒 Deny」（`discard/verdict.rs` 的 `#[test]`）、taint 的并集单调（proptest `join_output_contains_both_inputs`）、保留子树恒不在写域内（`#[test]` `reserved_target_is_outside_even_for_an_empty_domain`）、熵扫描的全函数性（proptest `scan_is_total_and_in_bounds`；它逐槽调 `log2_q10`，交给求解器是数千次符号非线性乘法）。`an_overflowing_sum_never_admits` 守 `depth + cost` 溢出时恒 Shed，对任意 u64 成立。
 - three-part refusal 矩阵：`DOORS` 每道门每条 Deny 路径的 refusal 三段非空且 alternative 可执行。
-- conformance feature 全量导出：Ledger＋Tool＋Model 三套件（sandbox 随 S3）。
+- conformance feature 全量导出：Ledger＋Tool＋Model 三套件。
 
 ## 3 假设与歧义
 
 1. **Locator 范围语义**：`L<a>-<b>` 行号 1 起、闭区间（编辑器与 sed 先例）；`B<a>-<b>` 字节偏移 0 起、闭区间（HTTP Range 先例）。两者均要求 `a<=b`，`L` 另要求 `a>=1`。
-2. **Address 附加拒绝面**：设计点名拒绝绝对路径、`..`、空段、非 UTF-8；本文在同一 fail-closed 精神下追加拒绝反斜杠、`.` 段、首尾 `/`、控制字符与 NUL、`:`（Windows 盘符与 NTFS ADS 两面一式拒）、以点或空白结尾的段（S-01，见 8-55）。放宽属「对扩展开放」，收紧后不再放回。
-3. **git-oid 长度**：S3 引 git2 前按 40 位十六进制小写受理（SHA-1 仓库）；其它长度 fail-closed 拒。SHA-256 仓库支持届时按方向加长度分支。
+2. **Address 附加拒绝面**：设计点名拒绝绝对路径、`..`、空段、非 UTF-8；本文在同一 fail-closed 精神下追加拒绝反斜杠、`.` 段、首尾 `/`、控制字符与 NUL、`:`（Windows 盘符与 NTFS ADS 两面一式拒）、以点或空白结尾的段（见 8-55）。放宽属「对扩展开放」，收紧后不再放回。
+3. **git-oid 长度**：按 40 位十六进制小写受理（SHA-1 仓库）；其它长度 fail-closed 拒。SHA-256 仓库尚不受理：要受理它，`locator` 按仓库的对象格式加一条长度分支。
 4. **`run` 字段恒在**：city 级事件（`city_initialized`、`log_truncated` 等）无所属 Run，取 `RunId::CITY`（nil UUID）哨兵值；uuid v7 的时间戳位保证真实 Run 恒不与 nil 撞。
-5. **`who` 字段是自由字符串**：actor 文法属 city::resident（P1）；届时收紧为类型，本文届时更新。
+5. **信封的 `who` 是字符串**：`EventDraft.who` 与 `EventRecord.who` 按字符串读写；载荷里的行动者用闭集 `kernel::event::Who { City, Person, Resident(Address) }`（`event/who.rs`，如 `RunStarted.dispatched_by`）。信封收紧为 `Who` 要连带账本旧行的读兼容，尚未决定。
 6. **浮点拒绝在构造点**：Ledger 载荷禁浮点（确定性七条之 6）由 `Payload::new` 与其 `Deserialize` 双侧执行，serde_json 数字非 i64/u64 可表示即拒。
-7. **存储写失败码**（S2 期初定）：增装载期第 5 码 `E_STORAGE_FATAL`（AxCode 36）承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
+7. **存储写失败码**：装载期码 `E_STORAGE_FATAL` 承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
 8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。浮点与深度在同一趟迭代遍历里判，只用一个 `(值, 层数)` 栈：不递归，所以敌意载荷耗不掉写方的栈；一个载荷只分配这一次，落选的是两趟分开的遍历（深度一趟、浮点一趟递归），它每层、每个节点各分配一个 `Vec`，在 dev 构建上对同一份两百来个节点的载荷交错计时，慢三倍多（每次约 58 µs 对 17 µs）。
-9. **没有写方的 kind 不定型**：`credential_lent`、`backpressure_shed`、`digest_invalidated` 在 `EventKind` 里有名字，但本树没有任何写方。结构体要以写方的字节为准（record 模块规则 1），没有写方就没有可对齐的字节，故它们留在 `record` 之外，与 F1 家族的无写方 kind 同理；哪天出现写方，它的第一版就经 `Payload::of` 写，结构体随之落在 `record` 下。
+9. **没有写方的 kind 不定型**：`credential_lent`、`backpressure_shed`、`digest_invalidated` 在 `EventKind` 里有名字，但本树没有任何写方。结构体要以写方的字节为准（record 模块规则 1），没有写方就没有可对齐的字节，故它们留在 `record` 之外；哪天出现写方，它的第一版就经 `Payload::of` 写，结构体随之落在 `record` 下。
 
 ## 4 现状分析
 
-kernel 为 S0 空壳（lib.rs 仅 crate 文档）。无既有实现约束；性能敏感点唯一：chain_hash 落在单写者关键路径（选 BLAKE3 的理由），除此之外全部远离热路径。
+性能敏感点唯一：chain_hash 落在单写者关键路径（选 BLAKE3 的理由），除此之外全部远离热路径。
 
 ## 5 权威信源
 
-**改这些类型前先读 provider 官方文档**（链接已同步入 `crates/kernel/src/model.rs` 与 `crates/gateway/src/dialect.rs` 的模块注释，以便下一位先看权威再动手）：
+**改这些类型前先读 provider 官方文档**（链接也写在 `crates/gateway/src/anthropic.rs` 与 `crates/gateway/src/openai.rs` 的模块注释里，以便下一位先看权威再动手）：
 
 | 主题 | 出处 |
 |---|---|
@@ -116,7 +91,7 @@ version ──（自足）
 ledger ──▶ event、error、locator(B3Hash)
 ```
 
-Stage 2 新增使用边（同 crate 内）：
+判定模块的使用边（同 crate 内；此后新增的模块及其边以 `architecture.toml` 的模块图为准）：
 
 ```
 taint ──（自足）
@@ -145,29 +120,29 @@ gate ──▶ 上述全部（组合面）＋idem
 
 ## 8 接口先行（按模块分章）
 
-**本 crate 无 `#[non_exhaustive]`**（G-22 / 叶子 7.10，2026 判定，取代原先「冻结面开放、判定输出穷尽」的两分）。原分界给 `AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 等冻结面标了开放，代价是 gateway / runtime / sprawling 写下四十余条永远打不到的 `_ =>`；而它们本该是新增变体那天的编译错误——B-03（`responses` 可选却返回 null）正是这样长出来的。**每个枚举都是闭的，穷尽性交给编译器。**
+**本 crate 无 `#[non_exhaustive]`：每个枚举都是闭的，穷尽性交给编译器。** 给 `AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 这类面标开放，下游就得写永远打不到的 `_ =>`，而新增一个变体本该在每个没处理它的读者那里成为编译错误。
 
 ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提：工作区之外没有下游，`#[non_exhaustive]` 在这里买不到任何兼容性。**重开参数**：任一 kernel 类型发布到 crates.io 的那天——那天起工作区之外才有读者，兼容性才第一次值钱。
 
-外部开放枚举（`serde_json::Value`、`std::io::ErrorKind`、`git2::Delta`、tungstenite 的帧类型）与 `EventKind` 这种六十余支的词汇表仍会逼出通配臂：前者不归我们关，后者穷举一遍就是 `EventKind` 的第二份拷贝。这两类各带 `#[expect(clippy::wildcard_enum_match_arm, reason = …)]`，理由写在当处；除此之外通配臂即红。
+外部开放枚举（`serde_json::Value`、`std::io::ErrorKind`、`git2::Delta`、tungstenite 的帧类型）与 `EventKind` 这样的词汇表仍会逼出通配臂：前者不归我们关，后者穷举一遍就是 `EventKind` 的第二份拷贝。这两类各带 `#[expect(clippy::wildcard_enum_match_arm, reason = …)]`，理由写在当处；除此之外通配臂即红。
 
 ### 8-1 kernel::error
 
 **类型**：
 
 ```rust
-                      // C8：对扩展开放
-pub enum AxCode { PathNotFound, /* …39 variant，serde 呈现名见下表 */ }
+pub enum AxCode { PathNotFound, /* …其余 variant，serde 呈现名见下表 */ }
 
 pub struct GateRefusal {                // three-part refusal；三段必填
     rule: String, violation: String, alternative: String,
 }
 
-pub struct AxError {                    // 七字段加一个可缺字段，序列化字段序＝声明序
-    code: AxCode, action: String, subject: String,
-    nearby: Vec<String>, recovery: String, retry: Retry,
+pub struct AxError { code: AxCode, detail: Box<ErrorDetail> }   // 线上是扁平的一个对象，序列化字段序＝声明序
+struct ErrorDetail {
+    action: String, subject: String, nearby: Vec<String>, recovery: String, retry: Retry,
     retry_after_ms: Option<u64>,        // 缺省即不写出；只随 Retry::Yes 出现
     gate: Option<GateRefusal>,
+    provider: Option<ProviderFailureKind>, // 缺席时不上线
 }
 
 /// 同一个请求能否再发一次，连同它的效果是否已经落地；线上拼作 "yes"／"no"／"unknown"。
@@ -176,7 +151,6 @@ pub enum Retry {
     No,       // 同一请求再发一次注定同样失败：不可以
     Unknown,  // 请求已经发出而回答丢了，效果是否落地无从得知：不知道
 }
-// AxError 另有 `provider: Option<ProviderFailureKind>`，排在 `gate` 之后，缺席时不上线。
 pub enum ProviderFailureKind {  // 携 serde，内标签 kind
     Exchange, Cut, Silence, Refused { status: u32 }, Overflow { status: u32 }, Unreadable, Reported, Unbuilt,
 }
@@ -218,17 +192,17 @@ impl ErrorDraft {
 
 **供应方失败的种类上线，句子不上线**：`provider` 只在 `AxError::provider` 造出的 E_PROVIDER 上在场（gateway 的 `provider_err` 是它的调用处；不是模型调用的 E_PROVIDER，如连接器的 http 客户端，不带种类）。客户端按 `kind` 从 `lang.json` 取人读的出路，城写的 `recovery` 折进「城的原话」供排错；城若只给英文句子，中文界面就只能照抄英文。种类不判「能不能再试一次」：那一判住在 gateway 的 `ProviderFailure::retry`，因为它要看种类之外的东西——连接是否建起（`Exchange` 分 `Yes` 与 `Unknown`）、拒绝的状态码（408／429／5xx 可重试）、流中报错的类型。**被否**：让种类另带一个 `is_retriable`——它看不见这些，会与 `retry` 成为同一事实的两个已经不一致的权威。
 
-**H-01 定案：取 typestate，不取四参**。路线图 §13.1 原定 `failure(code, action, subject, recovery)` 四参必填，此处改记为 typestate，理由三条：其一，`refusal` 已占满四参，再塞恢复语就是第五参，越过参数上限；其二，恢复语只剩 `ErrorDraft::with_recovery` 一个设定处，四参方案则要把 `with_recovery` 留作改写器，同一个名字两份职责；其三，四参要重写全部 641 个调用点，typestate 只动缺恢复语的那些，改动面恰好等于缺陷面。关门理由随之由「每处四实参」改为「编译通过」——恢复语必填这条现在由类型系统执行，grep 执行不了它。`AxError` 一经存在即已完工，`with_nearby`／`retriable` 只在 draft 上，故链式调用中 `with_recovery` 恒为最后一环。
+**恢复语必填由 typestate 执行，不由四参构造子执行**：`refusal` 已占满四参，再塞恢复语就是第五参，越过参数上限；而恢复语只有 `ErrorDraft::with_recovery` 一个设定处，四参方案则要把 `with_recovery` 留作改写器，同一个名字两份职责。于是「每个 AxError 带恢复语」由编译器检查，grep 查不了它。`AxError` 一经存在即已完工，`with_nearby`／`retriable` 只在 draft 上，故链式调用中 `with_recovery` 恒为最后一环。
 
-**`retry_after_ms` 是失败方对「再问之前至少等多久」的陈述**，读取处是 `AxError::retry_after_ms() -> Option<u64>`。它只能经 `retriable_after` 写入，而该方法同时置 `Retry::Yes`；`effect_unknown` 置 `Unknown` 时一并清掉它，所以无论构造器按什么次序调用，「不是 `Yes` 却带等待」都拼不出来。`None` 时字段不上线、不入账，旧的账本记录照读（`serde(default)`）。
+**`retry_after_ms` 是失败方对「再问之前至少等多久」的陈述**，读取处是 `AxError::retry_after_ms() -> Option<u64>`。它只能经 `retriable_after` 写入，而该方法同时置 `Retry::Yes`；`effect_unknown` 置 `Unknown` 时一并清掉它，所以无论构造器按什么次序调用，「不是 `Yes` 却带等待」都拼不出来。`None` 时字段不上线、不入账；账本里没有这个键的行读作 `None`（`serde(default)`）。
 
-**`retry` 是三态信封，不是布尔。** 一个 `bool` 只能说「可以」与「不可以」，于是请求已经发出、回答却丢了的那一类失败（流中断、静默超时、发送途中断开）只能被说成「可以」，而那是假话：对端也许已经执行了它、计了费，一个有副作用的动作再发一次就是第二次副作用。第三态 `Unknown` 把「效果是否已经落地」说进信封，决定再发与否的是知道这个动作是否幂等的调用方（runtime 的 watchdog 对一次模型调用照样退避重问，因为它的效果只是一份城里从未收到的回答）。落选的是另加一个 `landed: bool` 字段：「可以」蕴含未落地、「不可以」与落地无关，两字段会拼出「可以且已落地」这样没有意义的组合。线上字段名随之由 `retriable` 改为 `retry`，`WIRE_V` 加一；旧账本记录里的 `retriable: true/false` 照读为 `Yes`／`No`。落选的是把等待时长写进 `recovery` 文本：那是给读者的一句话，重试节奏的持有者（runtime 的 watchdog）不该从句子里解析数字。
+**`retry` 是三态信封，不是布尔。** 一个 `bool` 只能说「可以」与「不可以」，于是请求已经发出、回答却丢了的那一类失败（流中断、静默超时、发送途中断开）只能被说成「可以」，而那是假话：对端也许已经执行了它、计了费，一个有副作用的动作再发一次就是第二次副作用。第三态 `Unknown` 把「效果是否已经落地」说进信封，决定再发与否的是知道这个动作是否幂等的调用方（runtime 的 watchdog 对一次模型调用照样退避重问，因为它的效果只是一份城里从未收到的回答）。落选的是另加一个 `landed: bool` 字段：「可以」蕴含未落地、「不可以」与落地无关，两字段会拼出「可以且已落地」这样没有意义的组合。线上字段名是 `retry`；`serde(alias = "retriable")` 让账本里写作 `retriable: true/false` 的行读作 `Yes`／`No`。落选的是把等待时长写进 `recovery` 文本：那是给读者的一句话，重试节奏的持有者（runtime 的 watchdog）不该从句子里解析数字。
 
-「gate 码走 `refusal`」由构造纪律＋单测保证；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
+「gate 码走 `refusal`」由构造纪律＋单测保证；`kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
-**AxCode 39 全集与 carrier 对应（specalign 数据面）**
+**AxCode 全集与 carrier 对应（specalign 数据面）**
 
-> 协作组由六降为五——`E_SIGNAL_UNKNOWN` 已定义掉（三码之一；理由与实测见 `collab-SPEC.md` §8-1）。删除时全仓只有本文件提到它，零生产者。剩下两码（`E_WORKTREE_BUSY`／`E_DIGEST_SUSPECT`）已在各自 SPEC 里答过「能否定义掉」，答案是能保留——它们各自有一个真实的运行期情境。
+> 协作组的 `E_WORKTREE_BUSY` 与 `E_DIGEST_SUSPECT` 在各自 SPEC 里答过「能否定义掉」：不能，各自有一个真实的运行期情境。
 
 
 | 组 | AxCode | carrier event |
@@ -276,7 +250,7 @@ impl ErrorDraft {
 
 装载期六码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的条件只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 §12。
 `E_BUSY` 的 carrier 与 `E_WORKTREE_BUSY` 一样是 `tool_result`，而两者的区别在名字里：那一个说的是工作树这个机制，这一个说的是**同一个地址上有 run 正在工作**，拒绝里点名那条 run，调用方据此先停它再动手。
-两条呈现约束：`E_SECRET_EGRESS` 的 subject 只写 SecretRef 与位置、恒不回显命中字节；`E_DISCARD_IRREVERSIBLE` 的 alternative 必须可执行。执行点在各生产模块（S2），此处记为 carrier 表随附契约。
+两条呈现约束：`E_SECRET_EGRESS` 的 subject 只写 SecretRef 与位置、恒不回显命中字节；`E_DISCARD_IRREVERSIBLE` 的 alternative 必须可执行。执行点在各生产模块，此处记为 carrier 表随附契约。
 
 **carrier() 依赖 `EventKind`**：故它与 `event` 模块同一变更集落码；本表与其余全部（AxError／GateRefusal／AxCode／serde／构造子）不依赖它。
 
@@ -411,10 +385,10 @@ impl EventRecord {
 pub struct EventRef { seq: Seq, kind: EventKind }   // 字段私有；无公开构造子
 ```
 
-**`kernel::event::record`——每个 `EventKind` 一个 serde 结构（G-15 / 7.7）**
+**`kernel::event::record`——每个 `EventKind` 一个 serde 结构**
 
-载荷的键从此只在这里拼写一次；`Payload::of` 与 `Payload::read` 是它与账本之间仅有的两扇门，
-调用点不再手写 `insert("k")` 与 `get("k")`。
+载荷的键只在这里拼写一次；`Payload::of` 与 `Payload::read` 是它与账本之间仅有的两扇门，
+调用点不手写 `insert("k")` 与 `get("k")`。
 
 ```rust
 pub struct SkillPin { pub name: String, pub hash: B3Hash }   // hash 必填
@@ -611,14 +585,13 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
   `None` 是这次调用的参数没有指名任何东西，是一个真实状态而不是失败。
 
 `ApprovalResolved.verdict` 是 `Ruling` 本身而不是 `format!("{verdict:?}")` 的小写词：
-旧写法让两个读方各自与字面量比较，认不出的词在一处读作拒、在另一处读作准（M-21）；
-现在认不出的词是一次读失败，不是一个默认值。三键均不 `default`——`approval_resolved`
+两个读方若各自与字面量比较，认不出的词就会在一处读作拒、在另一处读作准；
+所以认不出的词是一次读失败，不是一个默认值。三键均不 `default`——`approval_resolved`
 自诞生起就无条件写出这三键，缺 verdict 的行该拒而不该猜。
 `AutonomyChanged` 与 `CityHalted` 的四个值都有类型：作用域是 [`Scope`]，
-「关／开」是 `Admittance`，「谁来答」是 `Autonomy`。三条小文法此前分别由
-`sprawling::assembly` 的 `format!` 写出、由每个读方的 `split_once(':')` 读回，
-认不出的词在一处读作「开」、在另一处读作「人自己答」；现在拼法只有这一处，
-认不出的词是一次 `E_WIRE_MISMATCH`。**已落盘的行照常读**：三种拼法逐字未变，
+「关／开」是 `Admittance`，「谁来答」是 `Autonomy`。三条小文法只在 `record` 拼写与读回，
+写方与每个读方都经这里，
+认不出的词是一次 `E_WIRE_MISMATCH`，不会在一处读作「开」、在另一处读作「人自己答」。**已落盘的行照常读**：三种拼法逐字未变，
 而 `autonomy_changed` 的 `scope` 键在它存在之前写下的行里缺席，那样的行指的是整座城，
 `city_wide` 就这样读它。
 
@@ -637,7 +610,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 需要新 `EventKind` 与账本版本，故记录在此而不在此处做。
 
 - 序列化细节：`addr` 为 None 与 `ig` 为 false 时省略键；其余八键恒在；键序＝声明序 `v,run,seq,prev,t,who,addr,kind,data,ig`。此即 V8 跨平台字节一致的规范。
-- 铸造纪律（15.3-1）：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
+- 铸造纪律：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
 **EventKind 78 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
@@ -761,7 +734,7 @@ impl Duplicate { pub fn key(&self) -> &IdemKey; }
 pub fn claim(seen: &mut BTreeSet<IdemKey>, key: IdemKey) -> Result<IdemGuard, Duplicate>;
 ```
 
-- **`IdemGuard` 取代 `gate::dedup`（F-20）**：旧模块把 `BTreeSet::contains` 改名并把 bool 包成两变体枚举，是穿透层。新形状把「在任何不可重放的副作用之前判重」这条写在注释里的顺序约束变成编译期约束：副作用入口收 `&IdemGuard`，而 guard 只有 `claim` 造得出。seen 集合仍是调用方的状态，kernel 不持有任何状态。
+- **`IdemGuard` 是判重的凭证**：它把「在任何不可重放的副作用之前判重」这条顺序约束变成编译期约束：副作用入口收 `&IdemGuard`，而 guard 只有 `claim` 造得出。seen 集合仍是调用方的状态，kernel 不持有任何状态。
 
 serde：字符串形。动作规范化（action_canonical 的构造规则）属工具面——它在那一面有且只有一个实现，`ToolCall::action`（§8-23）；本模块只定派生函数与框架。
 
@@ -782,14 +755,14 @@ pub enum SecretCharset { Base62, Base64Url, HexLower, UpperBase36 }
 pub const SECRET_SHAPES: [SecretShape; N] = [ /* 公开 provider 令牌形状，见 §14 */ ];
 ```
 
-`SECRET_SHAPES` 是数据不是代码（零分支）；消费者是 S2 `kernel::secret::scan` 与 `xtask secret`。
+`SECRET_SHAPES` 是数据不是代码（零分支）；消费者是 `kernel::secret::scan` 与 `xtask secret`。
 
-**`readable_log_v`（M-16）**：本模块的章程原写「零分支」，现改为「数据，以及只读这些数据的分类」，
+**`readable_log_v`**：本模块是数据，以及只读这些数据的分类，
 理由是这条判定除了 `EVENT_LOG_V` 什么都不读，而它可能待的每一个别处都会成为
 「本构建打得开哪些账本」的第二个家。四态穷尽：`Current`＝本构建所写；`Older`＝1 以上、
 低于本版本，读得开（账本只追加，旧行仍是它的历史）；`Ahead`＝更新的构建所写，整条拒读
 而不部分解读；`NotAVersion`＝低于任何构建写过的首版本（含 `0`），是损坏或外来行而非旧行。
-拒读理由由此说版本而不说链——`memory::jsonl::open` 的两个读方此前对 v0 各给一套说法。
+拒读理由由此说版本而不说链，`memory::jsonl::open` 的两个读方对 v0 给同一套说法。
 
 ### 8-8 kernel::consts_policy
 
@@ -833,7 +806,7 @@ pub const IMAGE_QUALITY: ImageQuality = ImageQuality::new(100);            // �
 
 `AUTONOMY_DEFAULT` 与 `CLOCK_STAMP_DEFAULT` 带类型（分别是 `Autonomy` 与 `ClockStampGranularity`）；`IMAGE_MAX_BYTES`／`IMAGES_PER_TURN`／`IMAGE_QUALITY`／`CLOCK_ZONES_MAX` 带 `policy_limit` 类型（§8-73），其余为数。`SUBAGENT_CTX_LOCK_DEFAULT` 永不落地——子代理上下文锁不存在。
 
-**两项随 §12「默认 YOLO」这条规则删去**：`POLICY_IDLE_DAYS`（长期豁免机制不存在，闲置过期无对象）与 `DISCARD_BYTES_MAX`（规模不再改变删除的判决，见 §8-26）。`DISCARD_FILES_MAX` 留下，它今天的读者是 `sprawling` 的清扫阈值。
+按 §12「默认 YOLO」，规模不改变删除的判决（§8-26），所以没有字节上限常量；`DISCARD_FILES_MAX` 的读者是 `sprawling` 的清扫阈值。
 
 ### 8-9 kernel::ledger（缝清单文件，全库五真缝之一）
 
@@ -1734,7 +1707,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 - `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；memory 的 Io 映射已改正（memory-SPEC §12）。
 - `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 memory 的写者锁先于一切读写定义掉（memory-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
 
-S2 激活的码（逐码答「能否定义掉」）：
+其余的码（逐码答「能否定义掉」）：
 
 - `E_OUTSIDE_WRITE_DOMAIN`：不可——写目标是运行期输入，类型只能封构造后非法，封不住越域目标。
 - `E_GATE_DENIED`：不可——Undoable 门与 Egress 主机门用它；其余门各有专码。
@@ -1750,11 +1723,11 @@ S2 激活的码（逐码答「能否定义掉」）：
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
 - `E_MODEL_UNCHOSEN`（这一类模型还没有人选定）：不可——城在没接供应方、没选模型时也要能开，所以「这一类没有模型」是人可达的状态。它不并进 `E_CONFIG_INVALID`：那一码还答「会话中途换了模型」「端点已不在」等情形，出路各不相同（去设置 对 开新对话），而客户端只能按码给出路。生产者只有 `gateway::router` 的 `EndpointBook::select`；账本此刻可写，所以 carrier 是 `tool_result`，不进装载期白名单。
 
-其余未激活码随其生产模块的 SPEC 章逐码作答（S3+）。
+未在本节列出的码，其「能否定义掉」写在生产它的模块所属 SPEC 章。
 
 ### 12.1 定规：默认 YOLO，门只答放行或拦住
 
-`Verdict: user-approved`（Roadmap §6 定规 2；§19.3 第 2、6 条为其前置与补充）
+`Verdict: user-approved`
 
 **决定**：删 `GateOutcome::Escalate`；今天会升级问人的六类各得一个固定答案（表在 §8-27）；Inbox只装设计问题（§8-21）；`Autonomy` 二态、默认 `Owner`。
 
@@ -1764,7 +1737,7 @@ S2 激活的码（逐码答「能否定义掉」）：
 
 **同集删净**：`GateContext`、`gate::item`、`gate::commitment`、`gate::govern`、`gate::delegation`、`gate::dedup`（由 `idem::claim` 与 `IdemGuard` 接替，§8-6）、`PolicyClass`／`PolicyMatcher`／`Policy`／`PolicyApplication`／`PolicyExpiry`／`PolicyRevocation`／`match_item`／`expiry`／`POLICY_IDLE_DAYS`、`ApprovalSource`、`AnswerVerdict::HumanOnly`、`Autonomy::Deferred`、`EscalateReason`／`DISCARD_BYTES_MAX`。
 
-**前置已兑现（§19.3 第 2 条）**：「tainted → Deny」不再是恒假分支——`gate::undoable` 与 `gate::discard` 两处按 taint 真的改答，`gate::conformance::taint_readers` 是这条的机器面，单测逐门断言。
+**「tainted → Deny」是真分支**：`gate::undoable` 与 `gate::discard` 按 taint 改答，`gate::conformance::taint_readers` 是这条的机器面，单测逐门断言。
 
 **重开参数**：出现一类没有 `Restoration` 的效果——那时的正确做法是让它不可拼写，而不是把 `Escalate` 加回来。
 
@@ -1839,7 +1812,7 @@ S2 激活的码（逐码答「能否定义掉」）：
 
 ## 13 依赖选型
 
-`serde`＋`serde_json`（规范字节与载荷；B.7 钉版）；`thiserror`（Display/Error derive；B.7）；`blake3`（唯一哈希，B.7 钉 S1；1.8.6 现行 stable）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）。S2 增：`secrecy` 0.10.3＋`zeroize` 1.9.0（Sealed；B.7 钉 Stage 2–3，2026-08 复核为最新）。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
+`serde`＋`serde_json`（规范字节与载荷）；`thiserror`（Display/Error derive）；`blake3`（唯一哈希）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）；`secrecy`＋`zeroize`（Sealed）。版本由根 `Cargo.toml` 与 `Cargo.lock` 给出。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
 
 ## 14 硬编码声明
 
@@ -1850,17 +1823,13 @@ S2 激活的码（逐码答「能否定义掉」）：
 - `SECRET_SHAPES` 条目（公开 provider 令牌前缀，随外界增补）：`sk-ant-`（Anthropic）、`sk-proj-`（OpenAI）、`ghp_`/`gho_`（GitHub）、`AKIA`（AWS AccessKeyId）、`glpat-`（GitLab）、`xoxb-`（Slack）、`AIza`（Google API key）、`sk-or-v1-`（OpenRouter）、`sk-ai-v1-`（zenmux）、`gsk_`（Groq）。字符集与长度按各 provider 公开文档；条目形状见 §8-7。
 - **聚合型转发商的令牌体是纯小写十六进制，故它们必须有形状条目而不能依赖熵侦测器**。熵侦测器的 `mixed_alphabet` 要求同时出现大写、小写与数字，这一条件本身是对的（城自己的 blake3 十六进制与 uuid 均单一大小写，否则每一行账本都会亮），但它使 `sk-or-v1-` 与 `sk-ai-v1-` 这类 64 位小写十六进制令牌两道侦测器都不响——形状表是它们唯一的网。S2 模块头早已写明「全小写的密钥避开本侦测器」，本条是那句话的具体后果。
 
-Stage 2 追加：
-
-- **`SUBAGENT_CTX_LOCK_DEFAULT = Tokens(65_536)`**（本 SPEC 定值，携证据）：主流上下文窗口 128k–200k token；Ephemeral 适用面（一次检索/摘要/跑测）按 20 回合×每回合约 3k token 上界估 60k；取 2^16 使锁高于任务上界、低于最小主流窗口之半——内耗循环在母窗口三分之一处被机械截断，正常任务不受掤。待 EVAL（P3）重估。
 - `AUTONOMY_DEFAULT = Autonomy::Owner`、`CLOCK_STAMP_DEFAULT = ClockStampGranularity::Off`（直写，随类型落位）。
 - 定点 log2 小数位数 10（熵判定内部事务）；`ENTROPY_SPAN_MIN_BYTES = 20`（熵侦测器最短跨度：主流 API key 最短约 20 字符；pub(crate)，改动随本 SPEC）。
 - `HEX_SPAN_MIN_BYTES = 32`、`HEX_ENTROPY_MIN_MILLIBITS = 3100`（hex 侦测器，pub(crate)，改动随本 SPEC）。证据：以固定种子的 splitmix 生成每档长度各 1000 个随机小写 hex 样本，以产品的 `entropy_millibits_per_char` 读数（最小／均值／最大，millibit）：28 字符 2952／3553／3922；32 字符 3144／3610／3929；40 字符 3307／3691／3933；48 字符 3404／3751／3933；64 字符 3544／3819／3970。32 是常见密钥最短的 128 bit；3100 让 32 字符及以上的全部样本通过，又高于 8 个符号均匀出现的 3000（如 `0f1e2d3c` 重复），把有规律的 hex 挡在外面。
-- Roadmap 状态五值与 Memo 六字段的中文拼写：P2 spine_files 模板落盘时复审是否双语。
 
 ## 15 影响面
 
-memory::jsonl／memory::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；S2 全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本文同一变更集（apisync 机器看守）。`consts_policy` 三项延后条目是显式债务。
+memory::jsonl／memory::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本文同一变更集（apisync 机器看守）。
 
 ## 16 测试与约束
 
@@ -1878,16 +1847,14 @@ memory::jsonl／memory::cas／runtime::replay／runtime::fork／citysim 全部�
 
 ## 18 文档同步
 
-- ARCHITECTURE.md §6 kernel 表：状态逐模块翻为已建。
-- 本文 §8-4／§8-1 两表是 S2 `xtask specalign` 的数据面：改 enum 必同集改表。
-- `consts_policy` 三项延后：锁、Autonomy、时钟档三项随各自的类型落地，§8-8 与 §14 已登。
-- 设计缺口（存储写失败码）：已消——S2 期初增 `E_STORAGE_FATAL`。
+- 本文 §8-4／§8-1 两表是 `xtask specalign` 的数据面：改 enum 必同集改表。
+- `pub trait` 只能声明在 seam 清单文件里（ARCHITECTURE §4；kernel 的是 `ledger.rs`、`tool.rs`、`model.rs`），由 `xtask depmap` 检查；所以这些模块拆成目录时，trait 留在原路径。
 
 
 ### 模型端口多一扇门：说到一半的话
 
 ```rust
-pub type Increments<'a> = &'a mut dyn FnMut(&str);
+pub type Increments<'a> = &'a mut dyn FnMut(&Increment);   // Increment 见 8-53
 
 pub trait Model {
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError>;
@@ -1896,7 +1863,7 @@ pub trait Model {
 }
 ```
 
-**默认实现是必要前提。** 它让「没有流的适配器」成为诚实的而不是坏的：调用方在同一时刻拿到同一个 `ModelReturn`，只是没看到任何增量。citysim 的脚本模型、离线重放、`gateway::native` 都不必改一个字。
+**默认实现是必要前提。** 它让「没有流的适配器」成为诚实的而不是坏的：调用方在同一时刻拿到同一个 `ModelReturn`，只是没看到任何增量。citysim 的脚本模型与离线重放不覆盖它。
 
 **`Increments` 一个参数、无返回值，是刻意的。** 增量不是判断：下游任何东西都不得据它分支，而一个能拒绝的 sink 会让一个显示细节有能力弄失败一次调用。
 
@@ -1919,126 +1886,20 @@ fn call_speculating(&mut self, req: &ModelRequest, onto: Increments<'_>, early: 
 
 **默认实现落回 `call_streaming`、什么也不提前交出。** 这对没有流、或其兼容格式在结算前说不出一个调用何时完整的适配器是诚实的：调用方只是没有提前量，拿到的 `ModelReturn` 不变。落选的是给 `call_streaming` 加第三个参数：那会让每个适配器与每个调用点都改签名，而只有一个兼容格式说得出块何时结束。
 
-## 8-48 `kernel::node_id`：`NodeId` 搬出 `plan`，成为自己的模块
+## 8-48 `kernel::node_id`：计划节点的地址（形状 2 值）
 
 `kernel::plan` 的模块表行是 `decision`：树判定什么可以开工、一个枝值多少、一个持有节点走两个出口里的哪一个。
-`NodeId` 不判定任何事——它只说清「一个良构地址长什么样」，并在**唯一的构造点**把别的一律拒掉，
-好让下游没有一处需要再问一遍。那是 `value`，§9 的形状 2。一个文件装两个形状，正是 §9 说该分家的依据。
+`NodeId` 不判定任何事——它只说清「一个良构地址长什么样」，并在**唯一的构造点** `parse` 把别的一律拒掉，
+好让下游没有一处需要再问一遍。那是 `value`，§9 的形状 2，所以它住自己的模块 `kernel::node_id`，公开路径是 `kernel::NodeId`。
 
-**手写的 `Deserialize` 是这次搬迁里唯一需要小心的东西**，它也正是这个类型存在的理由：
-derive 出来的那个会把线上任意字符串收下、交回一个从没过过 `parse` 的 `NodeId`。搬家时它跟着走，没有被 derive 顶替。
-
-**公开路径一字未动**：`kernel::NodeId` 仍是 `kernel::NodeId`，因为 `lib.rs` 的 `pub use` 吸收了这次移动。
-`cargo public-api` 记的是**定义模块**，所以 `channels` 与 `collab` 的基线里
-`kernel::plan::NodeId` 变成了 `kernel::node_id::NodeId`——**签名的形状没变，变的是它在哪儿被定义**。
-两份基线因此同变更集重生，两份 SPEC 各记一行。
-
-1,085 → 958，`[file_length.predating]` 里的那一行随之划掉。
-
-### 8-36 kernel::gate 目录化（形状：判定簇即目录）
-
-`gate.rs`（875 行）按判定簇切为 `gate/` 目录：`domain.rs`（73–107）、`egress.rs`（117–289，
-含 `EgressTarget`／`EgressOutcome`／`EgressAllowlist`）、`spend.rs`（294–321）、
-`commitment.rs`（325–362，含 `CommitmentDecision`）、`govern.rs`（366–510，
-`discard`／`delegation`／`govern`／`spawn`＋`PROPOSAL_EXCERPT`）、`dedup.rs`（514–528，
-含 `DedupVerdict`）。共享私有 `item()`（50–68）归 `gate/item.rs`（`pub(crate)`，
-四门 Escalate 的唯一造项点）。`GateContext`／`GateOutcome` 留 `gate.rs`（改索引文件，
-零逻辑）。**这一节记的是当时那次切分**；此后「默认 YOLO」这条规则删去 `commitment.rs`／`govern.rs`／
-`item.rs`／`dedup.rs`，今天的 `gate/` 是 `domain`／`egress`／`discard`／`spawn`／`undoable`
-五个文件加 `gate.rs` 的门册（§8-27）。簇间零调用边（各门只调 `item`＋本簇外模块判定函数）；对外签名逐字节不变。
-完成检查：SPEC 同变更集 → modmap＋apisync 绿 → citysim 同种子字节重放。
-
-### 8-37 kernel::plan／spine 目录化（形状：树／份额／节点／阻塞）
-
-`plan.rs`（958 行）按节点类型（`plan/node.rs`：`StopCause`／`Held`／`PlanExit`／`PlanNode`）／
-树结构（`plan/tree.rs`：`PlanTree` 的安置／断言／除法／查询／`claim`／`progress`，测试住 `plan/tree/tests.rs`）／
-份额分发（`plan/share.rs`：`hand_out` 提为 `pub(crate)` 自由函数，`PlanTree.nodes` 开 `pub(crate)` 可见）／
-阻塞查询（`plan/blocking.rs`：`refusal`／`first_cycle` 提为 `pub(crate)` 自由函数）四簇切目录；
-`Held` 增 `pub(crate) of` 构造器（原元组构造跨文件不可见），`PlanTree` 补回其 `derive(Debug, Clone, PartialEq, Eq)`；
-`spine.rs`（883 行）按行类型（`spine/row.rs`：`RoadmapStatus`／`EvidenceCell`／`RoadmapRow`／
-`RoadmapShape`／`NewChild`／`ROADMAP_COLUMNS`／拼写表）／文法（`spine/grammar.rs`：`parse_status` 移入、
-`locate_table` 等四私有函数开 `pub(crate)`、测试住文件内）／改写（`spine/rewrite.rs`：
-`draw_row`／`set_roadmap_status`／`insert_children`／`well_formed`／`rewrite`，测试住
-`spine/rewrite/tests.rs`）／备忘（`spine/memo.rs`：`MEMO_OUTLINE_FIELDS`／`check_memo_shape`／
-`ScopeChange`／`WriteMoment`）四簇切目录；`spine.rs` 剩 38 行索引。
-依赖单向：`plan` 用 `spine` 的行类型，`spine` 不反向用 `plan`。对外签名逐字节不变。
-完成检查：同 8-36。
-
-### 8-38 kernel 值簇目录化（形状：值归值，判归判）
-
-`event.rs`（775）按标识（`event/identity.rs`：`RunId`／`Seq`／`TimeMs`）／种（`event/kind.rs`）／
-载荷（`event/payload.rs`：`Payload`／`EventDraft`／`EventRecord`／`EventRef`，insta 快照随测搬
-`event/snapshots/` 并改名）切分；`error.rs`（464）按码（`error/code.rs`）／拒（`error/refusal.rs`）／
-形（`error/shape.rs`，避 `module_inception`）切分；`discard.rs`（561）按请求（`discard/request.rs`）／
-判定（`discard/verdict.rs`，含 kani）／预报（`discard/forecast.rs`，含 proptest）切分；`secret.rs`（441）按
-跨度（`secret/span.rs`）／扫描（`secret/scan.rs`，含 kani＋proptest）／封存（`secret/sealed.rs`）切分。
-各改索引零逻辑，对外签名逐字节不变（下游 11 基线仅规范路径记法，各 SPEC §6 同集一句；
-secret 门白名单随 `sealed.rs` 搬家）。完成检查：同 8-36。
-
-### 8-39 kernel::model 目录化
-
-`model.rs`（516）切成四文件：`model/wire.rs` 收线上会话的词汇（dialect 无关的规范形）（`BuildingPolicy`／`Role`／
-`StopReason`／`SystemBlock`／`DialectKind`／`ModelTag`／`Effort`／`ContentBlock`／`ChatMessage`／
-`ToolDef`／`ChatRequest` 含 `empty`／`ChatResponse`）；`model/usage.rs` 收 `ModelUsage` 与它的行形（`UsageRow`，版本换算只在这里）；`model/seam.rs` 收一次调用两个方向
-所载之物与内容↔载荷两转换（`ModelRequest`／`ModelReturn` 含 `bare`／`from_response`、`message_payload`／
-`content_from_message`）；`model/conformance.rs` 收 feature 门后的一致性断言；
-`model/tests.rs` 收原 `mod tests`（6 个 `#[test]`，断言与名字不动，补 `AxCode`／`Payload`／`B3Hash`／
-`Map` 四行 `use`，因父文件不再直接引它们）。`model.rs` 剩 75 行：`//!` 文档、两 `mod`、两 `pub use`、
-`Increments` 与 `pub trait Model` —— **trait 必须留在原路径**，`xtask depmap` 只准 seam 清单文件
-（ARCHITECTURE §3 记的正是 `crates/kernel/src/model.rs`）声明 `pub trait`。
-无字段开放（子模块间只引 `pub` 类型）。`lib.rs` 的 13 行再导出一字未改，故公共面路径不变、
-apisync 未重写基线。完成检查：`cargo check`／`clippy -D warnings`／`nextest`（205 passed）／
-`xtask modmap`／`length`／`header`／`apisync` 全绿。
-
-### 8-40 kernel::locator 目录化
-
-`locator.rs`（477）只作一次切分：原内联 `mod tests` 整段迁到 `locator/tests.rs`（8 个 `#[test]`
-含 2 条 `proptest!`，断言与名字一字不动，`use super::*` 与 `use crate::error::AxCode` 原样保留），
-父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份 `#[allow(...)]` 列表。`locator.rs` 剩 375 行：
-文法、`B3Hash`／`GitOid`／`Range`／`Locator` 四型与全部解析、呈现、十六进制原语都留在原路径，
-故规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／
-`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
-
-### 8-42 kernel::tool 目录化
-
-`tool.rs`（430）只作一次切分：原内联 `mod tests` 整段迁到 `tool/tests.rs`（6 个 `#[test]`，断言与名字
-一字不动，`use super::*` 原样保留），父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份
-`#[allow(...)]` 列表。`tool.rs` 剩 332 行：`ToolName`／`ServerLabel`／`TimeoutMs`／`Effect`／
-`Temporal`／`CostTier`／`RenderIntent`／`ToolMeta`／`ToolCall`／`ToolOutcome`／`ExecArm` 与
-`pub trait Tool`、feature 门后的 `conformance` 子模块都留在原路径 —— **trait 必须留在原路径**，
-`xtask depmap` 只准 seam 清单文件（ARCHITECTURE §3 记的正是 `crates/kernel/src/tool.rs`）
-声明 `pub trait`。规范路径与公共面逐字节不变，apisync 未重写基线。无字段开放。完成检查：
-`cargo check`／`clippy -D warnings`／`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
-
-### 8-43 kernel::config 目录化
-
-`config.rs`（418）只作一次切分：原内联 `mod tests` 整段迁到 `config/tests.rs`（9 个 `#[test]`，断言与
-名字一字不动，`use super::*` 与 `use std::collections::BTreeSet` 原样保留），父文件尾部改留
-`#[cfg(test)] mod tests;` 并原样带上那份 `#[allow(...)]` 列表。`config.rs` 剩 193 行：
-`ClockStampGranularity`／`LayeredValue`／`ClockZone`／`SandboxLimits`／`McpServer`／
-`McpTransport`／`FrozenConfig`／`LiveConfig` 与 `freeze` 都留在原路径 —— `freeze` 带
-`argument_count` 豁免，键 `crates/kernel/src/config.rs::freeze`，因此不得搬家。规范路径与公共面
-逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／`clippy -D warnings`／
-`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
-
-### 8-44 kernel::approval 目录化
-
-`approval.rs`（413）只作一次切分：原内联 `mod tests` 整段迁到 `approval/tests.rs`（3 个 `#[test]`，
-断言与名字一字不动，`use super::*` 与三个夹具 `item`／`policy`／`resident` 原样保留，缩进整体退
-四格），父文件尾部改留 `#[cfg(test)] mod tests;` 并原样带上那份 `#[allow(...)]` 列表。
-`approval.rs` 剩 262 行：`ApprovalId`／`ApprovalSource`／`ApprovalClass`／`ClusterKey`／
-`ApprovalItem`／`PolicyClass`／`PolicyMatcher`／`PolicyVerdict`／`Policy`／`PolicyApplication`／
-`PolicyExpiry`／`PolicyRevocation`／`Autonomy`／`Answerer`／`AnswerVerdict` 与
-`match_item`／`expiry`／`may_answer` 全部留在原路径（**这一节记的是当时那次切分**；此后
-「默认 YOLO」这条规则删去长期豁免机制的全部类型与 `ApprovalSource`，今天的清单见 §8-21），kernel 作为依赖树根，公共面的规范路径
-逐字节不变，apisync 未重写基线。无字段开放。完成检查：`cargo check`／`clippy -D warnings`／
-`nextest`／`xtask modmap`／`length`／`header`／`apisync` 全绿。
+**`Deserialize` 是手写的，走 `parse`**，这也是这个类型存在的理由：
+derive 出来的那个会把线上任意字符串收下、交回一个从没过过 `parse` 的 `NodeId`。
 
 ### 8-45 kernel::schema（形状 4 adapter）——线上每个值的 JSON Schema，从 serde 读的那一份声明派生
 
 **需求**：客户端（`client/src/wire.ts`）由 Rust 的 wire 类型生成，而 wire 携带的值大半是 kernel 的（`RunId`／`Seq`／`Address`／`EventRecord`／`AxError`／`ApprovalItem`……）。它们的 JSON 形状必须有且只有一个权威，而那个权威已经存在：类型声明上的 `#[serde(...)]`。
 
-**接口**：feature `schema`（缺省关，`schemars` 为可选依赖）。开启时，每个出现在帧里的类型带 `#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]`——派生宏读的正是 serde 读的那些属性（`rename_all`／`transparent`／`flatten`／`skip_serializing_if`／`deny_unknown_fields`／`try_from`），所以形状不可能与编码漂开。派生说不出语法的七个值在 `crates/kernel/src/schema.rs` 里各写一条 `impl JsonSchema`：一律是带 `pattern` 的 `string`，`AxCode` 的 `enum` 取自 `AxCode::ALL`——同一张表既产 `as_str` 也产 schema。前五个（`AxCode`／`IdemKey`／`B3Hash`／`GitOid`／`Locator`）的 serde 本就是手写的；第六个 `Address` 的 serde 是 `transparent`，派生因此只说得出「一个字符串」，而客户端要知道的恰是哪些字符串算数——`ADDRESS_PATTERN` 把 `Address::parse` 收的那套语法写成一条正则（`\p{Cc}` 即 `char::is_control`，`\p{White_Space}` 即 `char::is_whitespace`，读它的引擎一律开 Unicode 语义），`cargo xtask wire-ts` 据此发出 `Schema.pattern`，客户端不再自备一份语法。`ServerLabel` 同理：它的 serde 经 `try_from = "String"`，派生只说得出「一个字符串」，`SERVER_LABEL_PATTERN`（`^[a-z0-9]+$`）把 `ServerLabel::parse` 收的那套语法写成一条正则，MCP 页用 `Schema.is(ServerLabel)` 判标签，不再自备第二份文法（自备的那份曾把 `9lives` 拒掉、把 `my-docs` 放过，两头都与城分歧）。判定权威仍是 `Address::parse`：它答得出**违反了哪一条**，那是一个人需要的。这七条住一个文件而不是各回原文件，因为 `locator.rs` 已有 375 行，三条 impl 会把它推过 400 行预算；文件只装 `impl` 与它们引用的形状字符串，一处判定也没有。
+**接口**：feature `schema`（缺省关，`schemars` 为可选依赖）。开启时，每个出现在帧里的类型带 `#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]`——派生宏读的正是 serde 读的那些属性（`rename_all`／`transparent`／`flatten`／`skip_serializing_if`／`deny_unknown_fields`／`try_from`），所以形状不可能与编码漂开。派生说不出语法的值在 `crates/kernel/src/schema.rs` 里各写一条 `impl JsonSchema`：一律是带 `pattern` 的 `string`，`AxCode` 的 `enum` 取自 `AxCode::ALL`——同一张表既产 `as_str` 也产 schema。前五个（`AxCode`／`IdemKey`／`B3Hash`／`GitOid`／`Locator`）的 serde 本就是手写的；第六个 `Address` 的 serde 是 `transparent`，派生因此只说得出「一个字符串」，而客户端要知道的恰是哪些字符串算数——`ADDRESS_PATTERN` 把 `Address::parse` 收的那套语法写成一条正则（`\p{Cc}` 即 `char::is_control`，`\p{White_Space}` 即 `char::is_whitespace`，读它的引擎一律开 Unicode 语义），`cargo xtask wire-ts` 据此发出 `Schema.pattern`，客户端不再自备一份语法。`ServerLabel` 同理：它的 serde 经 `try_from = "String"`，派生只说得出「一个字符串」，`SERVER_LABEL_PATTERN`（`^[a-z0-9]+$`）把 `ServerLabel::parse` 收的那套语法写成一条正则，MCP 页用 `Schema.is(ServerLabel)` 判标签，不自备第二份文法。判定权威仍是 `Address::parse`：它答得出**违反了哪一条**，那是一个人需要的。这些 impl 住一个文件而不是各回原文件，因为它们不是所在模块的判定，而 `locator.rs` 再收三条就越过文件行数上限；文件只装 `impl` 与它们引用的形状字符串，一处判定也没有。
 
 **缺省公开面不变**：feature 关着时 `cargo public-api -p kernel` 逐字节同以前，基线不动；`--all-features` 下多出的只是 `JsonSchema` 实现。产品二进制不开它。
 
