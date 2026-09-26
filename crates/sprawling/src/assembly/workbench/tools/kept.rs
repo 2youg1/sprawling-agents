@@ -41,6 +41,23 @@ impl Side {
     }
 }
 
+/// What a key found in a tool's arguments or result is replaced with.
+enum InPlace {
+    Kept(SecretRef),
+    /// The vault refused a key in a result the tool has already produced:
+    /// the model reads this marker, never the key, and the call stands.
+    Withheld(AxCode),
+}
+
+impl std::fmt::Display for InPlace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InPlace::Kept(reference) => write!(f, "{reference}"),
+            InPlace::Withheld(code) => write!(f, "[key withheld: {code}]"),
+        }
+    }
+}
+
 /// The vault and the naming every tool of one run shares, so that no
 /// two tools keep two keys under one name.
 pub(in crate::assembly) struct Keeper {
@@ -91,13 +108,25 @@ impl Keeper {
         Ok(reference)
     }
 
+    /// What stands in `key`'s place. A refused key in the arguments stops
+    /// the call before the tool acts; a refused key in a result is
+    /// withheld, because the tool has already acted and an error would
+    /// invite the model to act again.
+    fn in_place(&self, side: Side, provider: &str, key: &str) -> Result<InPlace, AxError> {
+        match (side, self.keep(side, provider, key)) {
+            (Side::Written | Side::Output, Ok(reference)) => Ok(InPlace::Kept(reference)),
+            (Side::Written, Err(err)) => Err(err),
+            (Side::Output, Err(err)) => Ok(InPlace::Withheld(*err.code())),
+        }
+    }
+
     /// `value` with every key in every string kept, or `None` when no
     /// string held one, so an untouched value is handed on uncopied.
     fn kept_value(&self, side: Side, value: &Value) -> Result<Option<Value>, AxError> {
         match value {
             Value::String(text) => {
                 Ok(
-                    kept_text(text, |provider, key| self.keep(side, provider, key))?
+                    kept_text(text, |provider, key| self.in_place(side, provider, key))?
                         .map(Value::String),
                 )
             }
@@ -160,9 +189,9 @@ impl Tool for Kept {
     }
 
     /// # Errors
-    /// Everything the tool refuses, and the vault refusing a key: a key
-    /// in the arguments then stops the tool before it runs, and a key in
-    /// the result stops the result before the model reads it.
+    /// Everything the tool refuses, and the vault refusing a key in the
+    /// arguments, which stops the tool before it runs. A key the vault
+    /// refuses in the result is withheld instead (`InPlace::Withheld`).
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         let outcome = match self.keeper.kept_payload(Side::Written, &call.args)? {
             Some(args) => self.tool.invoke(&ToolCall {
