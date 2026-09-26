@@ -458,6 +458,7 @@ module = [
   { name = "channels::assets", file = "crates/channels/src/assets.rs", owns = "the client the browser downloads, and which bytes answer which path", shape = "adapter", since = "V3", status = "built", spec = "channels-SPEC.md#8-2" },
   { name = "channels::server", file = "crates/channels/src/server.rs", owns = "the listening end; the judgements are pure and the socket makes none", shape = "adapter", since = "S4", status = "built", spec = "channels-SPEC.md#8-2" },
   { name = "channels::server::config", file = "crates/channels/src/server/config.rs", owns = "routes and bodies", shape = "adapter", since = "S4", status = "built", spec = "channels-SPEC.md#8-2" },
+  { name = "channels::server::committed", file = "crates/channels/src/server/committed.rs", owns = "a committed record and its one wire frame", shape = "adapter", since = "S5", status = "built", spec = "channels-SPEC.md#8-47" },
   { name = "channels::server::reply", file = "crates/channels/src/server/reply.rs", owns = "deliveries and refusals", shape = "adapter", since = "S4", status = "built", spec = "channels-SPEC.md#8-2" },
   { name = "channels::server::socket", file = "crates/channels/src/server/socket.rs", owns = "sessions, assets, uploads", shape = "adapter", since = "S4", status = "built", spec = "channels-SPEC.md#8-2" },
   { name = "channels::server::listener", file = "crates/channels/src/server/listener.rs", owns = "the port a city takes before it opens, and serving on it", shape = "adapter", since = "V0.0.7", status = "built", spec = "channels-SPEC.md#8-46" },
