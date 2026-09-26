@@ -128,6 +128,12 @@ pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, MemoryError>;
 /// 现在只有一个：`sprawling replay`，它的路径是人敲的（sprawling-SPEC §12）。
 /// 段名规则因此只住 `is_segment` 一处，不被谁再拼一遍。
 pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, MemoryError>;
+/// 一段的字节，只读、不走 open；`lines()` 给出该段完整且非空的行（撕裂尾不是行，留给 open 判）。
+/// 流式读者逐段调用它：常驻的只有当前一段，不是全史——`runtime::replay::fold_ledger_dir` 靠它
+/// 把启动峰值从「全部原始行＋全部记录」降到「一段＋一条记录」。`read_raw_lines_at` 是它的调用者，
+/// 完整行的规则因此只住 `complete_lines` 一处。三者住 `jsonl::reading`（`append.rs` 已近 400 行上限）。
+pub fn read_segment(segment: &Path) -> Result<SegmentBytes, MemoryError>;
+impl SegmentBytes { pub fn lines(&self) -> impl Iterator<Item = &[u8]>; }
 impl kernel::Ledger for JsonlLedger { /* append = append_all(vec![d]) */ }
 #[cfg(feature = "conformance")] impl LedgerInspect for JsonlLedger { … }
 // 测试可调滚动阈：roll_bytes 字段＋#[cfg(test)] 设定器；生产恒为 SEGMENT_ROLL_BYTES。
