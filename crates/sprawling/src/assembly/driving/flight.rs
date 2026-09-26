@@ -206,9 +206,11 @@ impl RunWorker {
         } else {
             Patience::Now
         };
-        self.flight
+        let written = self
+            .flight
             .gate
             .serve(patience, &mut self.ledger, &mut self.flight.homes);
+        self.show_relayed(written);
         let Some(arrival) = self.flight.arrived() else {
             return Ok(Landed::Nothing);
         };

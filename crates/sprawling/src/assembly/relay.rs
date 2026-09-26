@@ -139,18 +139,24 @@ impl RelayGate {
     /// same for fifty records as for one. Each answer still goes back
     /// only after the write is durable, because that is what makes an
     /// `EventRef` a reference to a history that exists.
+    ///
+    /// Hands back every line the ledger took in this look, in ledger
+    /// order: a line a lane wrote is history as much as one the
+    /// accounting thread wrote, so the caller shows each one to the
+    /// same folds (sprawling-SPEC.md 8-90).
     pub(crate) fn serve(
         &mut self,
         patience: Patience,
         ledger: &mut impl Ledger,
         homes: &mut VecDeque<Arrival>,
-    ) {
+    ) -> Vec<EventDraft> {
         // The gate's own sender keeps the queue connected: empty is "not yet".
         let first = match patience {
             Patience::Now => self.wakes.try_recv().ok(),
             Patience::For(wait) => self.wakes.recv_timeout(wait).ok(),
             Patience::Unbounded => self.wakes.recv().ok(),
         };
+        let mut written = Vec::new();
         let mut drafts = Vec::new();
         let mut senders = Vec::new();
         let queued = std::iter::from_fn(|| self.wakes.try_recv().ok());
@@ -160,14 +166,15 @@ impl RelayGate {
                     drafts.push(draft);
                     senders.push(back);
                 }
-                Wake::Claim(ask) => self.booked.answer(ask, ledger),
+                Wake::Claim(ask) => written.extend(self.booked.answer(ask, ledger)),
                 Wake::Home(arrival) => homes.push_back(*arrival),
                 Wake::Command | Wake::Close => {}
             }
         }
         if senders.is_empty() {
-            return;
+            return written;
         }
+        let kept = drafts.clone();
         match ledger.append_all(drafts) {
             Ok(echoes) => {
                 // Positional, the port's own promise: a sender with no echo
@@ -177,6 +184,7 @@ impl RelayGate {
                     // history is what the city believes, and it was written before this send.
                     drop(back.send(Ok(echo)));
                 }
+                written.extend(kept);
             }
             Err(refused) => {
                 for back in senders {
@@ -184,6 +192,7 @@ impl RelayGate {
                 }
             }
         }
+        written
     }
 }
 
