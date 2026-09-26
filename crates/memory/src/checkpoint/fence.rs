@@ -264,7 +264,8 @@ impl Checkpoint {
     /// # Errors
     /// A commit the repository no longer holds (the fence reference is
     /// what keeps one), a path that commit does not hold as a file, a
-    /// bare repository, and a write the file system refuses;
+    /// bare repository, an address in the protected metadata subtree
+    /// (`Address::is_reserved`), and a write the file system refuses;
     /// `MemoryError::Alias` when a symbolic link or junction sits on the
     /// path below the working tree, because `Address` bounds the
     /// spelling of a path and not where the disk resolves it.
@@ -273,6 +274,11 @@ impl Checkpoint {
             op: "restore a discarded file",
             detail,
         };
+        if address.is_reserved() {
+            return Err(refused(format!(
+                "{address} is protected metadata; the city writes it through its own gates, not a restore"
+            )));
+        }
         let commit = git2::Oid::from_str(&oid.to_string())
             .and_then(|oid| self.repo.find_commit(oid))
             .map_err(git_err("find the restoration commit"))?;
