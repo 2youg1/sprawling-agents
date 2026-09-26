@@ -106,6 +106,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         mut log,
         journal,
         console,
+        core,
     } = serving;
     let city_root = city_root.as_path();
     let token_digest = match token.as_deref() {
@@ -198,6 +199,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
                 }),
             log,
             held,
+            core,
         },
         Outward {
             desk: Arc::clone(&desk),

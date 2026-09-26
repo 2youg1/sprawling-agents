@@ -42,4 +42,8 @@ pub struct Serving {
     /// here would carry nothing.
     pub journal: crate::serving::Journal,
     pub console: Option<crate::console::Terminal>,
+    /// The person's `[core] priority`, read once by the caller, so the
+    /// socket's workers and the core's own threads stand on one reading
+    /// and a refusal to read it is told once (sprawling-SPEC.md 8-93).
+    pub core: crate::serving::CorePriority,
 }

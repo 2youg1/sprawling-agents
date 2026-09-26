@@ -256,7 +256,8 @@ pub(super) fn serve_city(
     let token = keyed.code().map(str::to_owned);
     // The socket's workers stand above the commands the city dispatches
     // (sprawling-SPEC.md 8-93).
-    let runtime = match serving::serving_runtime(serving::setting_telling_a_refusal()) {
+    let core = serving::setting_telling_a_refusal();
+    let runtime = match serving::serving_runtime(core) {
         Ok(runtime) => runtime,
         Err(err) => {
             eprintln!("could not start the async runtime: {err}");
@@ -309,6 +310,7 @@ pub(super) fn serve_city(
         log,
         journal,
         console,
+        core,
     })) {
         Ok(listening) => listening,
         Err(err) => return report(err),
