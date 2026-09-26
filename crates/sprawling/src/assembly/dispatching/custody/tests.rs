@@ -65,11 +65,6 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
 
     let asked = provider.bodies().join("\n");
     assert!(!asked.contains(&key), "a request carried the key: {asked}");
-    assert_eq!(
-        files_holding(dir.path(), key.as_bytes()),
-        Vec::<std::path::PathBuf>::new(),
-        "the key was written into the city"
-    );
     let at = asked
         .find("secret:pasted/")
         .expect("the request carries the reference in the key's place");
@@ -84,5 +79,13 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
         *held.into_vault_value(),
         key,
         "the vault holds the key itself"
+    );
+    // The open city holds its ledger lock file, and Windows refuses to
+    // read a locked range, so the city is closed before its files are read.
+    drop(worker);
+    assert_eq!(
+        files_holding(dir.path(), key.as_bytes()),
+        Vec::<std::path::PathBuf>::new(),
+        "the key was written into the city"
     );
 }
