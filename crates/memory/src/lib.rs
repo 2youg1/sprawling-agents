@@ -71,6 +71,14 @@ pub use queue::EventQueue;
 pub use queue::QueueItem;
 pub use queue::QueueLane;
 
+mod snapshot;
+
+pub use snapshot::ChainSnapshot;
+pub use snapshot::SnapshotFit;
+pub use snapshot::StoredSnapshot;
+pub use snapshot::read_snapshot;
+pub use snapshot::write_snapshot;
+
 mod digest_cache;
 
 pub use digest_cache::DigestCache;
