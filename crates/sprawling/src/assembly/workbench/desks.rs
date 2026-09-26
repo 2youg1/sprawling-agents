@@ -8,7 +8,7 @@
 
 use kernel::{Address, AxError};
 
-use super::super::{RunWorker, now_ms};
+use super::super::RunWorker;
 use super::{Desks, Site};
 
 impl RunWorker {
@@ -57,7 +57,7 @@ impl RunWorker {
             addr.clone(),
             site.who.clone(),
             site.building.addr().clone(),
-            now_ms()?,
+            self.clock.now()?,
             lent.inbox,
         )));
         let goals = std::sync::Arc::new(std::sync::Mutex::new(collab::GoalDesk::new(
@@ -89,6 +89,7 @@ impl RunWorker {
                     room: addr.clone(),
                     run: site.run_id,
                     who: site.who.clone(),
+                    clock: std::sync::Arc::clone(&self.clock),
                 },
             ),
         )));

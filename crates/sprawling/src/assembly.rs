@@ -42,6 +42,7 @@ mod genesis;
 mod keeping_warm;
 mod lifetime;
 mod mcp;
+mod models;
 mod naming;
 mod plans;
 mod probing;
@@ -74,6 +75,7 @@ pub use genesis::{Adopt, InitReport, form_city, init_city};
 pub(crate) use lifetime::Closing;
 use lifetime::LedgerOpening;
 use mcp::mounts_under;
+use models::GatewayModels;
 use naming::{building_of, governed_of, not_built, scope_of};
 use plans::Reporter;
 use plans::held::{PlanHolders, Planning};
@@ -96,31 +98,37 @@ use runtime::Interrupt;
 #[cfg(test)]
 use std::path::Path;
 
-/// The single sanctioned sampling point (clippy.toml disallowed-methods). Everything below this call takes `TimeMs` as a
-/// parameter.
-pub(crate) fn now_ms() -> Result<TimeMs, AxError> {
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "the one sampling point: Main injects time"
-    )]
-    let elapsed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|err| {
-            AxError::failure(AxCode::ConfigInvalid, "sample wall clock", err.to_string())
-                .with_recovery("fix the system clock; it reads before the unix epoch")
+/// The wall clock: the single sanctioned sampling point (clippy.toml
+/// disallowed-methods), and the production `accounting::Clock`
+/// (accounting-SPEC.md 8-3). Everything below it takes `TimeMs` as a
+/// parameter or reads the clock it was handed.
+pub(crate) struct SystemClock;
+
+impl accounting::Clock for SystemClock {
+    fn now(&self) -> Result<TimeMs, AxError> {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the one sampling point: Main injects time"
+        )]
+        let elapsed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|err| {
+                AxError::failure(AxCode::ConfigInvalid, "sample wall clock", err.to_string())
+                    .with_recovery("fix the system clock; it reads before the unix epoch")
+            })?;
+        let millis = u64::try_from(elapsed.as_millis()).map_err(|_| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "sample wall clock",
+                "beyond u64 millis",
+            )
+            .with_recovery(
+                "set this machine's clock to the present day; it reads more than half a \
+                 billion years after the unix epoch",
+            )
         })?;
-    let millis = u64::try_from(elapsed.as_millis()).map_err(|_| {
-        AxError::failure(
-            AxCode::ConfigInvalid,
-            "sample wall clock",
-            "beyond u64 millis",
-        )
-        .with_recovery(
-            "set this machine's clock to the present day; it reads more than half a \
-             billion years after the unix epoch",
-        )
-    })?;
-    Ok(TimeMs::new(millis))
+        Ok(TimeMs::new(millis))
+    }
 }
 
 /// What the startup scan found and repaired.
@@ -222,9 +230,6 @@ pub struct RunWorker {
     /// What reached the city's door and has not yet become a run
     /// (`doorstep`).
     doorstep: Doorstep,
-    /// Every MCP server a run of this worker reached, still connected
-    /// (`assembly::mcp::Residents`).
-    pub(in crate::assembly) mcp: mcp::Residents,
     /// What each room's current session branched from, until the run
     /// that begins it is written (`assembly::folds::session`).
     pub(in crate::assembly) origins: SessionOrigins,
@@ -241,6 +246,18 @@ pub struct RunWorker {
     /// The keep-warm doors of runs that have landed, one per room
     /// (`keeping_warm`); empty under the default setting.
     warm: keeping_warm::Kept,
+    /// Builds the adapter each run talks to (`models`). Received rather
+    /// than built, so a second factory can drive a dispatch this worker
+    /// accounts for.
+    models: Box<dyn accounting::ModelFactory + Send>,
+    /// Connects the MCP servers a building's configuration names, and
+    /// keeps them connected between runs (`mcp::Residents`). Received
+    /// for the same reason `models` is.
+    connectors: Box<dyn accounting::Connectors + Send>,
+    /// What time it is, for this worker and every lane it drives
+    /// (`SystemClock`). Shared, because a lane reads it while the
+    /// worker does.
+    pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
 }
 
 impl RunWorker {

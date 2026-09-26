@@ -80,7 +80,7 @@ impl Default for Journal {
 fn carried(entry: Entry<'_>) -> channels::LogLine {
     channels::LogLine {
         seq: entry.site.seq,
-        t: crate::assembly::now_ms().ok(),
+        t: accounting::Clock::now(&crate::assembly::SystemClock).ok(),
         level: level(entry.level),
         module: entry.site.module.to_owned(),
         run: (entry.site.run != kernel::RunId::CITY).then_some(entry.site.run),

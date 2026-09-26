@@ -11,7 +11,7 @@
 //! samples the clock, and prints what the person needs to see.
 
 use super::{CrashBudget, Next};
-use crate::assembly::{Closing, now_ms};
+use crate::assembly::{Closing, SystemClock};
 use kernel::{AxCode, AxError};
 use std::path::Path;
 use std::process::Command;
@@ -77,7 +77,7 @@ pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxErro
     loop {
         let served = run(&exe, &serve_line(city, addr, child, launch))?;
         launch = Launch::Again;
-        match budget.after(&Closing::of(&served), now_ms()?) {
+        match budget.after(&Closing::of(&served), accounting::Clock::now(&SystemClock)?) {
             Next::Stop => return Ok(Ended::Chosen),
             Next::Restart(kept) => {
                 budget = kept;

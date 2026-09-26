@@ -16,7 +16,7 @@ use memory::JsonlLedger;
 use crate::serving::open_vault;
 
 use super::freezing::Assembled;
-use super::{RunWorker, ScanReport, now_ms};
+use super::{RunWorker, ScanReport, SystemClock};
 
 /// The city segment of every prefix, and a file the person is meant to
 /// edit: `init` writes it into the city, and every later run reads that
@@ -113,7 +113,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
              write, then run `sprawling init` again",
         )
     })?;
-    let now = now_ms()?;
+    let now = accounting::Clock::now(&SystemClock)?;
     let (mut ledger, report) =
         JsonlLedger::open(&dir, now).map_err(memory::MemoryError::into_ax)?;
     let genesis = ledger.append(EventDraft {
@@ -301,7 +301,7 @@ impl RunWorker {
                 | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
             });
             let Some(call) = call else { continue };
-            let draft = runtime::replay::outcome_unknown_draft(&call, now_ms()?)?;
+            let draft = runtime::replay::outcome_unknown_draft(&call, self.clock.now()?)?;
             self.ledger.append(draft)?;
             closed = closed.saturating_add(1);
         }

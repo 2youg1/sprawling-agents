@@ -16,7 +16,6 @@ use crate::serving::CommandDesk;
 
 use super::super::RunWorker;
 use super::{Agreed, Assignment};
-use crate::assembly::credentials::dialect_headers;
 
 /// A run's identity, derived rather than drawn: the same job dispatched
 /// at the same millisecond to the same address is the same run, and no
@@ -147,21 +146,15 @@ impl RunWorker {
         let chosen = self.credentials.book.select(tag, rules.policy())?;
         let model = chosen.entry.clone();
         let provider = chosen.endpoint.name.clone();
-        let adapter = gateway::adapter_for(
-            &chosen,
-            self.redemption()?,
-            dialect_headers(chosen.endpoint.dialect)
-                .into_iter()
-                .map(|(name, value)| (name, value.spelled()))
-                .collect(),
-        )?;
+        let adapter = self.models.build(&chosen, self.redemption()?)?;
         // Every request the run sends goes through the keep-warm door,
         // so a landed run can have its prefix renewed (sprawling-SPEC
         // 8-93); under the default setting the door only forwards.
+        let clock = std::sync::Arc::clone(&self.clock);
         let adapter = crate::assembly::keeping_warm::Door::new(
             adapter,
             city::keep_warm(&self.city_root, building.addr())?,
-            crate::assembly::now_ms,
+            Box::new(move || clock.now()),
         );
         let retries = chosen.endpoint.tuning.request_max_retries;
         Ok(Agreed {

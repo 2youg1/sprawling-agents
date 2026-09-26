@@ -174,6 +174,7 @@ impl RunWorker {
                 .map(|at| std::sync::Arc::clone(&at.interrupts)),
             fence_gate: std::sync::Arc::clone(&self.flight.fence_gate),
             backlog: self.flight.backlog.clone(),
+            clock: std::sync::Arc::clone(&self.clock),
         }
     }
 }

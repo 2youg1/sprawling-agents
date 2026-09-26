@@ -259,7 +259,12 @@ fn in_memory_ledger(dir: &std::path::Path) -> (memory::JsonlLedger, memory::Open
         cut_on_write: None,
         torn_tail: memory::TornTail::None,
     });
-    memory::JsonlLedger::open_faulty(fs, dir, now_ms().unwrap()).unwrap()
+    memory::JsonlLedger::open_faulty(
+        fs,
+        dir,
+        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
+    )
+    .unwrap()
 }
 
 /// A city with one building and one room in it, under ordinary rules.
@@ -299,7 +304,7 @@ fn nowhere() -> channels::Reply {
 fn marker() -> kernel::EventDraft {
     kernel::EventDraft {
         run: RunId::CITY,
-        t: now_ms().unwrap(),
+        t: accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
         who: "city".to_owned(),
         addr: None,
         kind: kernel::EventKind::CityInitialized,

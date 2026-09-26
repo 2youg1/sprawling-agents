@@ -9,7 +9,7 @@ use kernel::AxError;
 
 use crate::effect;
 
-use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held, now_ms};
+use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held};
 
 impl RunWorker {
     /// Settles the four desks that leave lines behind, in the order the
@@ -87,7 +87,7 @@ impl RunWorker {
                         class: kernel::ApprovalClass::Question,
                         detail: addr.as_str().to_owned(),
                     },
-                    created: now_ms()?,
+                    created: self.clock.now()?,
                     tainted: false,
                 };
                 sweep.raised.push(item);
@@ -161,7 +161,7 @@ impl RunWorker {
             held(&desks.shelf, "settle the shelf")?.take_effects(),
             write_root,
             building.addr(),
-            now_ms()?,
+            self.clock.now()?,
             addr,
             who,
         )?;

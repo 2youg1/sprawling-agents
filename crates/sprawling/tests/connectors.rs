@@ -1,0 +1,195 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! A run offered the MCP tools the worker was handed
+//! (accounting-SPEC.md section 2).
+//!
+//! The building names a server whose command does not exist on any
+//! machine, so its tool can reach the model only through the connectors
+//! the worker received. A worker that still started its own servers
+//! would fail to start this one and offer the model nothing.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+
+use std::io::Write as _;
+use std::sync::{Arc, Mutex};
+
+use kernel::{
+    Address, AxError, ContentBlock, IdemKey, Model, ModelRequest, ModelReturn, RunId, Seq,
+};
+use sprawling::assembly;
+
+const LAB: &str = "lab";
+const MODEL: &str = "scripted";
+/// What the scripted server lists: one tool, which the city offers the
+/// model under the server's label.
+const LISTING: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"name\":\"ping\",\"description\":\"answer with pong\",\"inputSchema\":{\"type\":\"object\"}}]}}";
+const OFFERED: &str = "apps_ping";
+
+/// Keeps the name of every tool it is offered, and ends the run on its
+/// first turn.
+struct Listening(Arc<Mutex<Vec<String>>>);
+
+impl Model for Listening {
+    fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        self.0.lock().unwrap().extend(
+            req.chat
+                .tools
+                .iter()
+                .map(|tool| tool.name.as_str().to_owned()),
+        );
+        Ok(ModelReturn::bare(
+            kernel::model::message_payload(&[ContentBlock::Text {
+                text: "done".to_owned(),
+            }])?,
+            Vec::new(),
+        ))
+    }
+}
+
+struct Listeners(Arc<Mutex<Vec<String>>>);
+
+impl accounting::ModelFactory for Listeners {
+    fn build(
+        &self,
+        _chosen: &gateway::Chosen<'_>,
+        _redemption: gateway::Redemption,
+    ) -> Result<Box<dyn Model + Send>, AxError> {
+        Ok(Box::new(Listening(Arc::clone(&self.0))))
+    }
+}
+
+/// Answers every server with `LISTING`, without starting anything.
+struct Scripted;
+
+impl accounting::Connectors for Scripted {
+    fn connect(
+        &mut self,
+        server: &kernel::McpServer,
+        _write_root: &std::path::Path,
+        confidential: bool,
+        _resolve: &gateway::SecretResolver,
+    ) -> Result<(Vec<protocol::McpTool>, accounting::Reached), AxError> {
+        let tools = protocol::tools_from(&server.label, &protocol::Rpc::read(LISTING)?)?
+            .into_iter()
+            .map(|entry| {
+                protocol::McpTool::new(
+                    entry.meta,
+                    entry.remote,
+                    Box::new(protocol::ScriptedOutbound::new()),
+                    confidential,
+                )
+            })
+            .collect::<Result<Vec<_>, AxError>>()?;
+        let opened = protocol::Handshake {
+            protocol_version: protocol::PROTOCOL_VERSION.to_owned(),
+            server: "scripted".to_owned(),
+        };
+        Ok((tools, accounting::Reached::Connected(opened)))
+    }
+}
+
+/// A loopback address nothing listens on: bound once for a free port,
+/// then released.
+fn refusing_url() -> String {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    format!("http://127.0.0.1:{port}/v1")
+}
+
+fn idem(what: &[u8]) -> IdemKey {
+    IdemKey::derive(&RunId::CITY, Seq::FIRST, what)
+}
+
+/// Appends a `[[mcp]]` table naming a server no machine has to the
+/// building layer.
+fn name_an_absent_server(city_root: &std::path::Path) {
+    let path = city::config_path(
+        city_root,
+        &Address::parse(LAB).unwrap(),
+        city::Layer::Building,
+    )
+    .unwrap();
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .unwrap()
+        .write_all(
+            b"\n[[mcp]]\nlabel = \"apps\"\ncommand = \"sprawling-no-such-server\"\nargs = []\n",
+        )
+        .unwrap();
+}
+
+#[test]
+fn a_run_is_offered_the_tools_the_worker_was_handed() {
+    let dir = tempfile::tempdir().unwrap();
+    assembly::init_city(dir.path()).unwrap();
+    let offered = Arc::new(Mutex::new(Vec::new()));
+    let mut worker = assembly::RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap()
+    .with_models(Box::new(Listeners(Arc::clone(&offered))))
+    .with_connectors(Box::new(Scripted));
+    let endpoint = channels::ProviderName::parse("dead").unwrap();
+    worker
+        .handle(channels::Command::AttachEndpoint {
+            name: endpoint.clone(),
+            base_url: refusing_url(),
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            admit: vec![MODEL.to_owned()],
+            tuning: channels::EndpointTuning::default(),
+            idem: idem(b"attach"),
+        })
+        .unwrap();
+    worker
+        .handle(channels::Command::SelectModel {
+            endpoint,
+            model: MODEL.to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: kernel::Window::new(32_768),
+            max_output_tokens: kernel::Ceiling::new(1_024),
+            idem: idem(b"select"),
+        })
+        .unwrap();
+    worker
+        .handle(channels::Command::CreateBuilding {
+            addr: Address::parse(LAB).unwrap(),
+            template: channels::TemplateName::parse("minimal").unwrap(),
+            idem: idem(b"create"),
+        })
+        .unwrap();
+    name_an_absent_server(dir.path());
+    let dispatched = worker.handle(channels::Command::Dispatch {
+        addr: Address::parse(LAB).unwrap(),
+        task: "Answer.".to_owned(),
+        goal: "one turn with the tools this worker was handed".to_owned(),
+        mode: kernel::Mode::PlanGoal,
+        idem: idem(b"dispatch"),
+        session: Some(kernel::SessionName::parse("s1").unwrap()),
+        effort: None,
+        model: None,
+    });
+
+    assert!(
+        offered.lock().unwrap().iter().any(|name| name == OFFERED),
+        "the model was never offered {OFFERED}: offered {:?}, and the dispatch answered \
+         {dispatched:?}",
+        offered.lock().unwrap()
+    );
+}

@@ -10,7 +10,7 @@ use kernel::{AxCode, AxError};
 
 use super::super::{
     Desks, Driven, Driving, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site, Sweep,
-    Workbench, held, now_ms,
+    Workbench, held,
 };
 use super::{Assignment, Given};
 
@@ -56,7 +56,7 @@ impl RunWorker {
         // takes the drive. Read from the city's own clock rather than
         // from a profiler, because the figure that matters is the one
         // taken on the thread no append is served on.
-        let began = now_ms()?;
+        let began = self.clock.now()?;
         // Nothing is written before the city agrees to take the work:
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
@@ -163,7 +163,7 @@ impl RunWorker {
             )?),
             None => None,
         };
-        let spent = now_ms()?.value().saturating_sub(began.value());
+        let spent = self.clock.now()?.value().saturating_sub(began.value());
         self.note(
             runtime::diagnostics::Level::Trace,
             "bin::assembly",

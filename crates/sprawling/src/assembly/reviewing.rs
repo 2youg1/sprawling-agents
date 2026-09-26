@@ -9,7 +9,7 @@ use kernel::{AxError, EventKind};
 
 use crate::effect;
 
-use super::{Assignment, RunWorker, Site, held, now_ms};
+use super::{Assignment, RunWorker, Site, held};
 
 impl RunWorker {
     /// Settles what a run asked of the request register.
@@ -58,7 +58,7 @@ impl RunWorker {
                         // merge (memory-SPEC 8-8).
                         let at = memory::Checkpoint::open(write_root)
                             .map_err(memory::MemoryError::into_ax)?
-                            .land(now_ms()?, &of, &format!("offer: {fence_scope}"))
+                            .land(self.clock.now()?, &of, &format!("offer: {fence_scope}"))
                             .map_err(memory::MemoryError::into_ax)?;
                         let request = collab::OpenRequest {
                             node: collab::NodeId::parse(&branch)?,
@@ -141,7 +141,7 @@ impl RunWorker {
                         // person never read (sprawling-SPEC.md 8-49).
                         planned
                             .apply(&memory::Landing {
-                                t: now_ms()?,
+                                t: self.clock.now()?,
                                 of: &of,
                                 subject: &format!("merge: {}", request.branch),
                                 reviewed_by_person: false,

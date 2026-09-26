@@ -143,7 +143,8 @@ pub(crate) fn fold_city(
     ledger_dir: &Path,
 ) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
     let (ledger, report) =
-        JsonlLedger::open(ledger_dir, super::now_ms()?).map_err(memory::MemoryError::into_ax)?;
+        JsonlLedger::open(ledger_dir, accounting::Clock::now(&super::SystemClock)?)
+            .map_err(memory::MemoryError::into_ax)?;
     let mut views = Views::over(ledger_dir);
     let mut standing = StandingFold::new();
     let index = fold_ledger_dir(ledger_dir, |record| {

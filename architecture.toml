@@ -550,6 +550,9 @@ module = [
   { name = "protocol::mcp::link", file = "crates/protocol/src/mcp/link.rs", owns = "one reachable server whichever transport reaches it, and the module a reader opens when it misbehaves", shape = "adapter", since = "V0.0.7", status = "built", spec = "protocol-SPEC.md#8-17" },
   { name = "protocol::mcp::broker", file = "crates/protocol/src/mcp/broker.rs", owns = "the one module allowed to know which broker holds an outside application's OAuth: the directory, an auth config and the consent page, in three calls and nothing else", shape = "adapter", since = "V5", status = "built", spec = "protocol-SPEC.md#8-18" },
   { name = "protocol::mcp::broker::tests", file = "crates/protocol/src/mcp/broker/tests.rs", owns = "what this crate believes the broker sends, stated against a server it controls", shape = "adapter", since = "V5", status = "built", spec = "protocol-SPEC.md#8-18" },
+  { name = "accounting::clock", file = "crates/accounting/src/clock.rs", owns = "the port a worker and its lanes read the time through", shape = "port", since = "V0.0.7", status = "built", spec = "accounting-SPEC.md#8-3" },
+  { name = "accounting::connectors", file = "crates/accounting/src/connectors.rs", owns = "the port a worker connects each MCP server a building names through", shape = "port", since = "V0.0.7", status = "built", spec = "accounting-SPEC.md#8-2" },
+  { name = "accounting::models", file = "crates/accounting/src/models.rs", owns = "the port a worker builds each model adapter through", shape = "port", since = "V0.0.7", status = "built", spec = "accounting-SPEC.md#8-1" },
   { name = "protocol::acp", file = "crates/protocol/src/acp.rs", owns = "the other direction: an outside editor driving this city", shape = "decision", since = "P4", status = "built", spec = "protocol-SPEC.md#8-2" },
   { name = "bin::main", file = "crates/sprawling/src/main.rs", owns = "the command line, each subcommand refused honestly until it exists", shape = "adapter", since = "S0", status = "built", spec = "sprawling-SPEC.md#8-30" },
   { name = "bin::main::router", file = "crates/sprawling/src/main/router.rs", owns = "one read command line in, one subcommand out", shape = "adapter", since = "S0", status = "built", spec = "sprawling-SPEC.md#8-89" },
@@ -600,7 +603,8 @@ module = [
   { name = "bin::assembly::credentials::tests::endpoints", file = "crates/sprawling/src/assembly/credentials/tests/endpoints.rs", owns = "which models a city may reach, and what an adapter redeems at the wire", shape = "adapter", since = "V3", status = "built", spec = "sprawling-SPEC.md#8-50" },
   { name = "bin::assembly::credentials::tests::kept", file = "crates/sprawling/src/assembly/credentials/tests/kept.rs", owns = "an empty key box is not a request to remove the key this city keeps for that endpoint", shape = "adapter", since = "V0.0.6", status = "built", spec = "sprawling-SPEC.md#8-81" },
   { name = "bin::assembly::credentials::tests::signing", file = "crates/sprawling/src/assembly/credentials/tests/signing.rs", owns = "how a credential enters this city", shape = "adapter", since = "V3", status = "built", spec = "sprawling-SPEC.md#8-39" },
-  { name = "bin::assembly::mcp", file = "crates/sprawling/src/assembly/mcp.rs", owns = "reaching the MCP servers a building's configuration names", shape = "adapter", since = "V3", status = "built", spec = "sprawling-SPEC.md#8-39" },
+  { name = "bin::assembly::mcp", file = "crates/sprawling/src/assembly/mcp.rs", owns = "the production connectors: reaching the MCP servers a building's configuration names, and the one door that hands a worker others", shape = "adapter", since = "V3", status = "built", spec = "sprawling-SPEC.md#8-39" },
+  { name = "bin::assembly::models", file = "crates/sprawling/src/assembly/models.rs", owns = "the production model factory, and the one door that hands a worker another", shape = "adapter", since = "V0.0.7", status = "built", spec = "accounting-SPEC.md#8-1" },
   { name = "bin::assembly::doorstep", file = "crates/sprawling/src/assembly/doorstep.rs", owns = "what reached the city's door and has not yet become a run: the keys of the commands it answered, the residents spoken to while nobody was home, and the dispatches waiting on a room name", shape = "data", since = "V0.0.7", status = "built", spec = "sprawling-SPEC.md#8-91" },
   { name = "bin::assembly::keeping_warm", file = "crates/sprawling/src/assembly/keeping_warm.rs", owns = "the keep-warm door every run's model calls go through, and the doors a worker keeps after landing, one per room, renewed when due and each renewal written to the ledger", shape = "data", since = "V0.0.7", status = "built", spec = "sprawling-SPEC.md#8-93" },
   { name = "bin::assembly::dispatching", file = "crates/sprawling/src/assembly/dispatching.rs", owns = "one dispatch, from what a person asked to the run that froze", shape = "adapter", since = "V3", status = "built", spec = "sprawling-SPEC.md#8-39" },
@@ -858,6 +862,9 @@ duty = "space, identity, and the documents a building keeps"
 
 [family.channels]
 duty = "the process boundary"
+
+[family.accounting]
+duty = "the city's one writer, and the ports it reaches outside itself through"
 
 [family.desktop]
 duty = "out of tree: this Windows desktop, offered as an MCP server"

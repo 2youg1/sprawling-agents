@@ -12,7 +12,7 @@ use kernel::{Address, AxError, EventKind, RunId};
 
 use crate::effect;
 
-use super::super::{Agreed, Assignment, Given, RunWorker, now_ms, run_id_for};
+use super::super::{Agreed, Assignment, Given, RunWorker, run_id_for};
 use super::Site;
 
 /// What a commit this run makes is signed with.
@@ -144,7 +144,7 @@ impl RunWorker {
         // The run's identity is fixed before the tools are built: three
         // of them mint ids from it, and an id minted from a run that did
         // not exist yet would not be the same id on a replay.
-        let run_id = run_id_for(&given.job, addr, now_ms()?);
+        let run_id = run_id_for(&given.job, addr, self.clock.now()?);
         // What this run was sent to do, held for as long as anything it
         // raises is still waiting. `run_started` carries the same three
         // facts and a restarted worker folds them from there; this is the
@@ -177,7 +177,7 @@ impl RunWorker {
             );
             memory::Checkpoint::open(&self.city_root)
                 .map_err(memory::MemoryError::into_ax)?
-                .ensure_base(&[addr.as_str().to_owned()], now_ms()?, &of)
+                .ensure_base(&[addr.as_str().to_owned()], self.clock.now()?, &of)
                 .map_err(memory::MemoryError::into_ax)?;
             let trees =
                 memory::Worktrees::open(&self.city_root).map_err(memory::MemoryError::into_ax)?;

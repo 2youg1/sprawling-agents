@@ -46,6 +46,8 @@ shipped one happens to be written in is a replaceable fact.
 │        │           concrete type, samples the clock, hands   │
 │        │           out seeds, and starts every task          │
 │        │                                                     │
+│        ├── accounting ─ the ports the one writer reaches     │
+│        │              outside itself through                 │
 │        ├── runtime ── turns, tools, sandbox, watchdog, fork  │
 │        ├── collab  ── inbox, signals, claims, delegation,    │
 │        │              workshop, fan-in, pull requests        │
@@ -163,7 +165,8 @@ city: kernel
 browser: kernel
 protocol: kernel, gateway
 channels: kernel
-sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels
+accounting: kernel, gateway, protocol
+sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels, accounting
 ```
 
 Inside one crate the compiler sees no layering: `sprawling` builds as one
@@ -211,13 +214,14 @@ moves up into the assembly layer.
 `xtask` and `citysim` are workspace members outside the product graph.
 **citysim drives the turn loop a second time**: `runtime::run::drive` with
 simulated adapters — a scripted model, scripted tools, an in-memory Ledger
-— which is how a script reproduces a run. It stops below `bin::assembly`,
-whose `RunWorker` builds its model adapter out of the endpoint book rather
-than receiving one; the dispatch policy above that line is held by that
-module's own tests. `sprawling` carries a lib target so the policy is at
-least *reachable* — an integration test enters by the same door
-`channels::server` uses — and inverting the model seam is what a seeded
-scenario would still need.
+— which is how a script reproduces a run. It stops below `bin::assembly`:
+`RunWorker` receives its model adapters through `accounting::ModelFactory`,
+its MCP servers through `accounting::Connectors` and its time through
+`accounting::Clock`, and integration tests
+drive a dispatch against scripted ones by the same door `channels::server`
+uses, but the worker itself still lives in
+`sprawling`, which citysim does not depend on. Moving the worker into
+`accounting` is what a seeded scenario still needs.
 
 ## 4 Seams
 
@@ -237,6 +241,9 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `bin::assembly::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `protocol::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
+| `accounting::models` | crates/accounting/src/models.rs | `bin::assembly::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
+| `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::SystemClock`: the wall clock, the one sampling point | the stopped clock in `crates/sprawling/tests/clock.rs` |
+| `accounting::connectors` | crates/accounting/src/connectors.rs | `bin::assembly::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
 
 The *second adapter* column has no checker: a seam whose double was
 deleted would still read as real here. That is a known hole, not a
@@ -605,9 +612,10 @@ display lists rather than bitmaps: the preconditions for bitmap comparison
 are paid for — placement is a pure function of the id, painter order is
 total, projection and its inverse are exact — but there is no rasteriser.
 V6 stops below `bin::assembly` (§3): a scripted scenario reproduces a run,
-not a dispatch, because `RunWorker` builds its model adapter instead of
-receiving one; what holds the dispatch policy is that module's own tests,
-plus the integration tests the lib target makes possible. And the tree
+not a dispatch, because `RunWorker` still lives in `sprawling` rather than in
+`accounting`; what holds the dispatch policy is that module's own tests,
+plus the integration tests that hand the worker a scripted
+`accounting::ModelFactory`. And the tree
 holds 3 kani harnesses, all of which CI proves in under a minute each — a
 harness that builds a `Vec`, a `String` or a `BTreeSet` gives CBMC loops it
 cannot bound, and one over symbolic non-linear arithmetic gives the solver

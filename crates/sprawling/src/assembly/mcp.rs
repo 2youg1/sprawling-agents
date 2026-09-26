@@ -3,9 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reaching the MCP servers a building's configuration names.
+//! Reaching the MCP servers a building's configuration names: the
+//! production `accounting::Connectors`, and the one door that swaps it
+//! for another (accounting-SPEC.md 8-2).
 
+use accounting::Reached;
 use kernel::{Address, AxError};
+
+use super::RunWorker;
 
 /// Every MCP server this worker has reached, kept connected between
 /// runs, so a dispatch pays for a child and a handshake only when its
@@ -29,15 +34,7 @@ struct Resident {
     listed: Vec<(kernel::ToolMeta, String)>,
 }
 
-/// How this dispatch reached a server.
-pub(crate) enum Reached {
-    /// Started, or opened, and shaken hands with during this dispatch.
-    Connected(protocol::Handshake),
-    /// Connected by an earlier run and still running.
-    Resident,
-}
-
-impl Residents {
+impl accounting::Connectors for Residents {
     /// The tools `server` offers, over the connection an earlier run left
     /// when its child still runs, and over a new one otherwise.
     ///
@@ -49,7 +46,7 @@ impl Residents {
     /// Propagates the transport's refusal to open, a failed handshake or
     /// listing, and `protocol::McpTool::new`'s refusal on a confidential
     /// building.
-    pub(crate) fn tools(
+    fn connect(
         &mut self,
         server: &kernel::McpServer,
         write_root: &std::path::Path,
@@ -69,6 +66,20 @@ impl Residents {
         let tools = resident.tools(confidential)?;
         self.held.push(resident);
         Ok((tools, Reached::Connected(opened)))
+    }
+}
+
+impl RunWorker {
+    /// The same worker, reaching every MCP server through `connectors`
+    /// instead of starting the ones a building's configuration names.
+    ///
+    /// The door citysim and the dispatch tests drive a worker through:
+    /// what a server offers is theirs to script, while refusing servers
+    /// to a confidential building and leaving a failed one out stay the
+    /// worker's.
+    #[must_use]
+    pub fn with_connectors(self, connectors: Box<dyn accounting::Connectors + Send>) -> RunWorker {
+        RunWorker { connectors, ..self }
     }
 }
 

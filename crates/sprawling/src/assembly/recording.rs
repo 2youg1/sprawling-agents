@@ -15,7 +15,7 @@ use kernel::{Address, AxError, EventDraft, EventKind, Ledger, Payload, RunId};
 use crate::effect;
 use crate::serving::booking::OpenClaims;
 
-use super::{RunWorker, now_ms};
+use super::RunWorker;
 
 impl RunWorker {
     /// Writes one diagnostic line, anchored to where the ledger stands.
@@ -54,7 +54,7 @@ impl RunWorker {
         run: RunId,
         origin: kernel::Origin,
     ) -> Result<(), AxError> {
-        let t = now_ms()?;
+        let t = self.clock.now()?;
         let draft = runtime::fork::fork_draft(origin, run, addr.clone(), t, "owner".to_owned())?;
         self.ledger.append(draft)?;
         self.origins.spent(addr);
@@ -85,7 +85,7 @@ impl RunWorker {
         let data = self.doorstep.entrance.stamp(data)?;
         let draft = EventDraft {
             run: RunId::CITY,
-            t: now_ms()?,
+            t: self.clock.now()?,
             who: "owner".to_owned(),
             addr: addr.clone(),
             kind,
@@ -144,7 +144,7 @@ impl RunWorker {
         let data = self.doorstep.entrance.stamp(data)?;
         self.ledger.append(EventDraft {
             run,
-            t: now_ms()?,
+            t: self.clock.now()?,
             who,
             addr: Some(addr.clone()),
             kind,

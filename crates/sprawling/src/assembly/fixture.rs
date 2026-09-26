@@ -74,7 +74,7 @@ pub(super) fn worker_over_faults(root: &Path, cut: Option<&'static str>) -> RunW
     let opened = memory::JsonlLedger::open_faulty(
         fs,
         &kernel::layout::CityLayout::new(root).ledger(),
-        now_ms().unwrap(),
+        accounting::Clock::now(&SystemClock).unwrap(),
     )
     .unwrap();
     RunWorker::over(

@@ -39,7 +39,7 @@ impl RunWorker {
         let entered = entered.resolved()?;
         let endpoint = self.endpoint_of(entered)?;
         let found = Probing {
-            reach: reach_of(&endpoint.base_url, endpoint.tuning.proxying)?,
+            reach: reach_of(&endpoint.base_url, endpoint.tuning.proxying, &*self.clock)?,
             served: self.probe(&endpoint),
         };
         let payload = probed_payload(&endpoint.name, &endpoint.base_url, found)?;

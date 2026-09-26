@@ -6,8 +6,9 @@
 //! The external tools a building's configuration names, each already
 //! connected to its server or left out and named in the diagnostics.
 
-use super::super::mcp::Reached;
-use super::super::{RunWorker, now_ms};
+use accounting::Reached;
+
+use super::super::RunWorker;
 
 impl RunWorker {
     /// The external tools this run may reach, each already connected to
@@ -46,14 +47,17 @@ impl RunWorker {
         // it is the part the resident connection table removes on every
         // dispatch after the first, and a figure that mixed the two could
         // not say how much.
-        let began = now_ms();
+        let began = self.clock.now();
         let mut offered = Vec::new();
         let resolve = self.resolver();
         for server in &config.mcp {
             // The module a reader is sent to is the transport that
             // failed, not whichever one was written first.
             let site = protocol::McpLink::site(&server.transport);
-            match self.mcp.tools(server, write_root, confidential, &resolve) {
+            match self
+                .connectors
+                .connect(server, write_root, confidential, &resolve)
+            {
                 Ok((tools, reached)) => {
                     let how = match reached {
                         Reached::Connected(opened) => {
@@ -83,7 +87,7 @@ impl RunWorker {
         // the tools: the reading is diagnostic, the connections are the
         // work. The clock's failure is still said, with its recovery,
         // rather than leaving a reader to wonder why the line is absent.
-        match (began, now_ms()) {
+        match (began, self.clock.now()) {
             (Ok(began), Ok(ended)) => {
                 let spent = ended.value().saturating_sub(began.value());
                 self.note(

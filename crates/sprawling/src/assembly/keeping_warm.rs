@@ -13,9 +13,13 @@ use kernel::{Address, AxError, EventKind, ModelReturn, TimeMs};
 use std::collections::BTreeMap;
 
 /// The chosen adapter, wrapped so every request a run sends enters the
-/// keep-warm account (runtime-SPEC 8-4-2), timed on the city's one
-/// sampling point.
-pub(crate) type Door = runtime::prefix::warmth::Warmed<fn() -> Result<TimeMs, AxError>>;
+/// keep-warm account (runtime-SPEC 8-4-2), timed on the worker's own
+/// clock (accounting-SPEC.md 8-3).
+pub(crate) type Door = runtime::prefix::warmth::Warmed<DoorClock>;
+
+/// What a door reads the time through: the worker's clock, carried into
+/// the lane the run is driven on.
+pub(crate) type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
 
 /// The doors that still owe a renewal, one per room.
 ///
@@ -169,7 +173,7 @@ mod tests {
 
     /// A door that sent one real request at `USED_AT`.
     fn door_after_one_run(setting: KeepWarm, provider: Provider) -> Door {
-        let clock: fn() -> Result<TimeMs, AxError> = || Ok(TimeMs::new(USED_AT));
+        let clock: DoorClock = Box::new(|| Ok(TimeMs::new(USED_AT)));
         let mut door = Door::new(Box::new(provider), setting, clock);
         door.call(&ModelRequest {
             policy: BuildingPolicy::default(),

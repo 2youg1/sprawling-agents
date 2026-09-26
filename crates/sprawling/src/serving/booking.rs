@@ -27,8 +27,9 @@ use kernel::{Address, AxCode, AxError, EventDraft, Ledger, NodeId, RunId};
 use super::relay::Wake;
 use crate::effect;
 
-/// Who a run's claims are made for. The four travel together from the
-/// run's dispatch to every claim it makes.
+/// Who a run's claims are made for, and the clock their lines are
+/// stamped by. The five travel together from the run's dispatch to
+/// every claim it makes.
 pub(crate) struct Claimant {
     /// The building whose plan the claimed nodes belong to.
     pub(crate) building: Address,
@@ -36,6 +37,8 @@ pub(crate) struct Claimant {
     pub(crate) room: Address,
     pub(crate) run: RunId,
     pub(crate) who: String,
+    /// The worker's own clock (accounting-SPEC.md 8-3).
+    pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
 }
 
 /// One claim, its `roadmap_claimed` line, the line that would hand the
@@ -143,7 +146,7 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
     collab::Booking::new(move |claim: &collab::ClaimEffect| {
         let line = EventDraft {
             run: claimant.run,
-            t: crate::assembly::now_ms()?,
+            t: claimant.clock.now()?,
             who: claimant.who.clone(),
             addr: Some(claimant.room.clone()),
             kind: claim.kind(),
@@ -216,6 +219,7 @@ mod tests {
             room: Address::parse("lab/room1").unwrap(),
             run: RunId::from_bytes([run; 16]),
             who: format!("potter@lab.{run}"),
+            clock: std::sync::Arc::new(crate::assembly::SystemClock),
         }
     }
 

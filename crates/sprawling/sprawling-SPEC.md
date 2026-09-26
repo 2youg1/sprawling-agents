@@ -879,7 +879,7 @@ impl RunWorker {
 
 **尺寸**：`dispatch_in` 495 → **423**；`open_desks` 76。十行的 `Desks` 手工构造（原在驱动之前）随之消失：归位值由相位自己交出来，不再由调用方拼。
 
-**它以什么收口**：纯结构，无可咬的红。五张桌子的构造顺序、`now_ms()` 的采样位置、`inboxes.remove` 与 `pending()` 的先后均逐字不变。143 条 `sprawling` 测试全绿，其中 `a_signal_one_run_sends_is_read_by_the_run_that_pulls_it` 与 `a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke` 走的就是“队列借出去、再收回”这一支。
+**它以什么收口**：纯结构，无可咬的红。五张桌子的构造顺序、采钟的位置、`inboxes.remove` 与 `pending()` 的先后均逐字不变。143 条 `sprawling` 测试全绿，其中 `a_signal_one_run_sends_is_read_by_the_run_that_pulls_it` 与 `a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke` 走的就是“队列借出去、再收回”这一支。
 
 **第八次拆分：工作台（§5 步 6）。**
 
@@ -989,7 +989,7 @@ impl CommandDesk {
 struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 ```
 
-**「让 `ToolBench::seen` 从账本重建」量完是错的**。键由 `(run_id, 本次驱动内的位次, action)` 铸成（§8-28），而 `run_id_for(job, addr, now_ms())` 把采钟拌进了身份，**没有任何生产路径会用同一个 `run_id` 再驱动一次**：审批放行后接着干的那段活，是 `answer_approval` 重新 `dispatch_in` 出来的一次**新 run**（§8-25），`resume` 只验链并把丢了结果的调用关成 unknown（ARCH §5 末）。往 `ToolBench::seen` 里播种历史，播进去的键在那一层永远比不中——那是把可测的防御换成不可测的死代码，正是 §8-28 拒绝过的那件事。
+**「让 `ToolBench::seen` 从账本重建」量完是错的**。键由 `(run_id, 本次驱动内的位次, action)` 铸成（§8-28），而 `run_id_for(job, addr, clock.now())` 把采钟拌进了身份，**没有任何生产路径会用同一个 `run_id` 再驱动一次**：审批放行后接着干的那段活，是 `answer_approval` 重新 `dispatch_in` 出来的一次**新 run**（§8-25），`resume` 只验链并把丢了结果的调用关成 unknown（ARCH §5 末）。往 `ToolBench::seen` 里播种历史，播进去的键在那一层永远比不中——那是把可测的防御换成不可测的死代码，正是 §8-28 拒绝过的那件事。
 
 **没人守的那道门在上一层，而它今天就在漏钱**。`channels::wire` 的模块文档写着「每一条改状态的 Command 都带 `IdemKey`……『双击两次开出两个 Run』在这个类型里拼不出来」，而 `run_command` 的每一条臂都用 `..` 把 `idem` 丢掉：全库没有一处读 `Command::idem()`（只有 `channels/tests/wire_contract.rs` 与 `web::reach` 的两条测试读它）。四个发送端却都是照「服务端会去重」写的——`web::app::dispatch_command` 铸 `addr|task`、`web::city_view::create_command` 铸 `addr`、`console::dispatch` 铸 `console:addr:task`、`acp_dispatch` 铸 `acp:addr:task`，同一次提交两次就是同一把键；`web::reach` 甚至有一条测试叫 `saving_twice_configures_once`，它断言的却只是两条命令的键相等，**「只配置一次」这半句今天由谁兑现，答案是没有人**。于是双击一次、编辑器超时重发一次、控制台重敲一行，都是两次全款的模型账单。
 
@@ -1410,7 +1410,7 @@ before、after 与字节数，恒不携正文；`before` 缺席即开账行，�
 **`halted_by` 并入 `agree_to_work`**：它本来就是唯一守住的那道门，
 现在与其余五道站在一起，于是「城答应什么」读一处就够。
 
-**采钟点不动**（ARCH §10）：`run_id_for` 的 `now_ms()` 仍在 `renew_if_stale` 之后，
+**采钟点不动**（ARCH §10）：`run_id_for` 读的 `clock.now()` 仍在 `renew_if_stale` 之后，
 采样次数与相对先后逐字不变；变的只是两者之间多了几次文件写，而那不是任何账本值的输入。
 
 ### 谁答哪一个错误码，逐字不变
@@ -4017,6 +4017,9 @@ pub(in crate::assembly) struct Flight {
 | `attending`（`spawn_worker`、`attend`） | `RunWorker`、`Serving`、`now_ms` | 造出那个写者并在它的线程上一条条处理命令 |
 | `pool` | `drive_run`、`DriveContext`、`Driven`、`Driving` | 一条 lane 驱动一个 run |
 | `journal` | `now_ms` | 给一行日志打上时间 |
+| `views` | `DOC_BYTES_MAX` 与 `read_building`、`broker_for`、`McpLink`、`resolving` | 各自归到它所折叠或读取的那份事实的模块，assembly 从那里取用 |
+| `doctor::visit` | `has_history`、`History` | 城有没有历史是账本的事实，归到读账本的那一层 |
+| `serving` | `RunWorker`、`Serving`、`SystemClock`、`acp_dispatch`、`drive_run` 与 `DriveContext`、`Driven`、`Driving` | serving 承载 worker 的线程与 lane；断开这组边要先决定 `attending` 与 `pool` 是归 assembly 还是把 assembly 用到的 `CommandDesk`、`relay`、`pool` 移出 serving |
 
 装配根依赖传输层，反过来不行：`CommandDesk`、`relay` 与 `pool` 驱动 run，属于装配，要移进 assembly；serving 只留传输（`door`、`serve`、`folding`），构造时拿到 assembly 给它的句柄。**未定的是那个句柄的类型。** 传输往 `CommandDesk` 投命令，写者从它取命令；它若住进 assembly，serving 写出它的类型名就又是一条指回 assembly 的边。能定下这件事的证据有两种：serving 投命令时是否只需要一个 `Fn(Command) -> Posted` 那样的闭包（那样类型名留在 assembly，serving 只持闭包），或者命令台本身就是传输与装配之间的一个中立模块（那样它移到二者之外，两边都依赖它）。`relay` 持有 `pool::Arrival`，所以 `pool` 与 `relay` 要在同一次改动里一起移，否则会在 serving 与 assembly 之间留下一条新的反向边。
 

@@ -13,8 +13,8 @@
 //! leave" is asking one question from two ends.
 
 use super::{
-    Collaborating, Credentials, Doorstep, Flight, Planning, RoomQueues, RunWorker, Standing,
-    city_segment, now_ms,
+    Collaborating, Credentials, Doorstep, Flight, GatewayModels, Planning, RoomQueues, RunWorker,
+    Standing, SystemClock, city_segment,
 };
 use std::path::Path;
 
@@ -101,7 +101,7 @@ impl RunWorker {
     ) -> Result<Self, AxError> {
         let opened = JsonlLedger::open(
             &kernel::layout::CityLayout::new(city_root).ledger(),
-            now_ms()?,
+            accounting::Clock::now(&SystemClock)?,
         )
         .map_err(memory::MemoryError::into_ax)?;
         RunWorker::over(city_root, vault, log, opened)
@@ -142,7 +142,7 @@ impl RunWorker {
         log: runtime::diagnostics::Diagnostics,
         (ledger, report, standing): (JsonlLedger, OpenReport, Standing),
     ) -> Result<Self, AxError> {
-        let now = now_ms()?;
+        let now = accounting::Clock::now(&SystemClock)?;
         // Holding the one writer is what makes every worktree lock a
         // lock nobody alive holds (memory-SPEC 8-9).
         memory::Worktrees::lift_abandoned_leases(city_root, &ledger)
@@ -187,11 +187,13 @@ impl RunWorker {
             last_tick: now,
             log,
             doorstep: Doorstep::opened(entrance),
-            mcp: super::mcp::Residents::default(),
             origins,
             flight: Flight::open(),
             index: memory::LedgerIndex::empty(),
             warm: super::keeping_warm::Kept::default(),
+            models: Box::new(GatewayModels),
+            connectors: Box::new(super::mcp::Residents::default()),
+            clock: std::sync::Arc::new(SystemClock),
         };
         worker.sweep_abandoned_trees();
         Ok(worker)
@@ -277,6 +279,21 @@ impl RunWorker {
             "the city is closing; its handoff is on the ledger",
         );
         self.record(EventKind::HandoffWritten, handoff.payload()?)
+    }
+
+    /// The same worker, reading every time through `clock` instead of
+    /// the wall clock (accounting-SPEC.md 8-3).
+    ///
+    /// The door citysim and the tests drive a worker through: when
+    /// things happen is theirs to script, while what the worker writes
+    /// at those times stays its own. The ledger was opened before this
+    /// door, at the wall clock's time.
+    #[must_use]
+    pub fn with_clock(
+        self,
+        clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
+    ) -> RunWorker {
+        RunWorker { clock, ..self }
     }
 }
 

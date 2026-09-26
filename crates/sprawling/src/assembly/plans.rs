@@ -11,7 +11,7 @@ use kernel::{Payload, RunId};
 
 use crate::effect;
 
-use super::{Assignment, RunWorker, now_ms};
+use super::{Assignment, RunWorker};
 
 /// The run reporting a change to the plan: which run, of which
 /// building, as whom. Three values that always travel together and are
@@ -99,7 +99,7 @@ impl RunWorker {
                 to,
                 kernel::Version::FIRST,
                 Payload::new(payload)?,
-                now_ms()?,
+                self.clock.now()?,
             )?));
         }
         if sent.is_empty() {
