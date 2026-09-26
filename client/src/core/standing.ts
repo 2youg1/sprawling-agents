@@ -20,6 +20,8 @@ export function standing<T>(
   held: Answer | undefined,
   pick: (answer: Answer) => T | undefined,
 ): Standing<T> {
-  const value = held === undefined ? undefined : pick(held);
+  if (held === undefined) return { kind: "asking" };
+  if ("unavailable" in held) return { kind: "unavailable" };
+  const value = pick(held);
   return value === undefined ? { kind: "asking" } : { kind: "answered", value };
 }

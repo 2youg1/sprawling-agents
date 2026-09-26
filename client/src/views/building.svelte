@@ -49,6 +49,7 @@
   import { fill, say } from "../core/lang";
   import { roomOf, toFragment } from "../core/route";
   import { buildingIsShut } from "../core/scope";
+  import { standing } from "../core/standing";
   import { ui } from "../ui";
   import type { Address, BuildingAnswer } from "../wire";
   import { Address as AddressSchema } from "../wire";
@@ -78,10 +79,10 @@
   let goal = $state("");
 
   const asked = $derived(u.conn.asking.ask({ building_view: { addr: address } }));
-  const building = $derived.by((): BuildingAnswer | undefined => {
-    const held = $asked;
-    return held !== undefined && "building" in held ? held.building : undefined;
-  });
+  const plan = $derived(standing($asked, (held) => ("building" in held ? held.building : undefined)));
+  const building = $derived.by((): BuildingAnswer | undefined =>
+    plan.kind === "answered" ? plan.value : undefined,
+  );
 
   const city = u.conn.asking.ask(QUERIES.city);
   const pursuit = $derived.by(() => {
@@ -312,8 +313,10 @@
     </aside>
     <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-pane py-base">
       {#if shown.kind === "plan"}
-        {#if building !== undefined}
-          <Plan answer={building} />
+        {#if plan.kind === "answered"}
+          <Plan answer={plan.value} />
+        {:else if plan.kind === "unavailable"}
+          <p class="text-text-quiet">{say($lang, "answer_unavailable")}</p>
         {:else}
           <p class="text-text-disabled">…</p>
         {/if}

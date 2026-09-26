@@ -57,6 +57,7 @@
 </script>
 
 <script lang="ts">
+  import { standing } from "../../core/standing";
   import { ui } from "../../ui";
   import type { SkillsAnswer } from "../../wire";
   import type { Picked } from "./tree.svelte";
@@ -72,10 +73,10 @@
   const lang = u.lang;
 
   const asked = $derived(u.conn.asking.ask({ skills: { building } }));
-  const answer = $derived.by((): SkillsAnswer | undefined => {
-    const held = $asked;
-    return held !== undefined && "skills" in held ? held.skills : undefined;
-  });
+  const shelves = $derived(standing($asked, (held) => ("skills" in held ? held.skills : undefined)));
+  const answer = $derived.by((): SkillsAnswer | undefined =>
+    shelves.kind === "answered" ? shelves.value : undefined,
+  );
 
   // A row this city cannot open is not a button's promise. An external
   // shelf is read-only and lives outside every address this client can
@@ -89,7 +90,9 @@
 
 <div>
   <h2 class="mb-base text-heading font-heading">{say($lang, "bld_skills")}</h2>
-  {#if answer === undefined}
+  {#if shelves.kind === "unavailable"}
+    <p class="text-text-quiet">{say($lang, "answer_unavailable")}</p>
+  {:else if answer === undefined}
     <p class="text-text-disabled">…</p>
   {:else}
     {#if answer.skills.length > 0}

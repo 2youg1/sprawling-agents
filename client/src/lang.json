@@ -3023,5 +3023,9 @@
   "cost_unpriced": {
     "en": "{n} runs so far, and no provider reported a price for them, so there is no amount to show",
     "zh": "已经派了 {n} 次活，provider 没有给它们报价，所以这里没有金额"
+  },
+  "answer_unavailable": {
+    "en": "the city cannot answer this: the building or the record it names cannot be read",
+    "zh": "城答不了这一问：它说的楼或记录读不到"
   }
 }
