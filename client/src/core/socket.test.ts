@@ -184,4 +184,39 @@ describe("the browser half", () => {
 
     expect(asked).toEqual([{ query: { history_range: { from: 11, to: 60, limit: 200 } } }]);
   });
+  // A welcome from another ledger - the city was made again - names a
+  // head the old mark means nothing against: the page forgets what it
+  // folded and asks everything again rather than fetching a range.
+  test("rebuilds from a snapshot when the ledger's epoch changed", () => {
+    install();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    const first = FakeSocket.opened[0];
+    first?.onopen?.();
+    const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: 10, city: null, epoch: "a".repeat(64) };
+    first?.onmessage?.({ data: JSON.stringify({ welcome }) });
+    const record = {
+      seq: 10,
+      prev: "0".repeat(64),
+      t: 1,
+      v: 1,
+      who: "city",
+      run: "00000000-0000-4000-8000-000000000001",
+      kind: "log_truncated",
+      data: {},
+    };
+    first?.onmessage?.({ data: JSON.stringify({ event: record }) });
+    const stop = conn.asking.ask("metrics").subscribe(() => undefined);
+    const before = booked.length;
+    first?.onclose?.();
+    booked[before]?.run();
+    const second = FakeSocket.opened[1];
+    second?.onopen?.();
+    const renewed = { ...welcome, resume_from: 60, epoch: "b".repeat(64) };
+    second?.onmessage?.({ data: JSON.stringify({ welcome: renewed }) });
+
+    const asked: unknown[] | undefined = second?.sent.slice(1).map((text): unknown => JSON.parse(text));
+    stop();
+
+    expect(asked).toEqual([{ query: "metrics" }]);
+  });
 });
