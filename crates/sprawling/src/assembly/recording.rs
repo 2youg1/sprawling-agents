@@ -96,7 +96,8 @@ impl RunWorker {
         // here, because the worker's own books are what its next decision
         // reads: a fold updated only on the rebuild path would answer a
         // dispatch about a session the process has already recorded.
-        self.origins.absorb(kind, addr.as_ref(), &data)?;
+        self.origins
+            .absorb(kind, RunId::CITY, addr.as_ref(), &data)?;
         self.governance.absorb(kind, RunId::CITY, None, &data)?;
         self.expiries.absorb(kind, &data);
         self.book.apply_payload(kind, &data)

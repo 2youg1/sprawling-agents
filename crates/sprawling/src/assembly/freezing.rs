@@ -235,7 +235,7 @@ impl RunWorker {
             brief,
             Predecessor {
                 room: &at.addr,
-                run: at.predecessor(),
+                run: at.predecessor().or(self.origins.carried_from(&at.addr)),
             },
         )?);
         if let Some(note) = model_note(&self.city_root, &site.provider, &site.model.id)? {
@@ -351,6 +351,7 @@ impl RunWorker {
         }
         must_read.push(job);
         let handoff = self.frozen_handoff(&plan, must_read)?;
+        self.origins.started(addr, site.run_id);
         Ok((plan, handoff))
     }
 }

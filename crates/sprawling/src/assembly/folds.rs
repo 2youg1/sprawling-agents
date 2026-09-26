@@ -81,7 +81,7 @@ impl Standing {
                 collaboration.absorb(record)?;
                 entrance.absorb(record.data());
                 expiries.absorb(record.kind(), record.data());
-                origins.absorb(record.kind(), record.addr(), record.data())?;
+                origins.absorb(record.kind(), record.run(), record.addr(), record.data())?;
             }
         }
         Ok(Standing {
