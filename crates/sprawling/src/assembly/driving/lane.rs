@@ -12,7 +12,7 @@
 //! drive needs from the city arrives in [`DriveContext`], which is four
 //! handles that clone, and the ledger arrives as a parameter — the
 //! accounting thread hands its own, and a lane hands a
-//! [`Relay`](crate::serving::Relay).
+//! [`Relay`](crate::assembly::relay::Relay).
 
 use kernel::{AxError, Ledger};
 use kernel::{RunId, TimeMs};
@@ -141,7 +141,7 @@ impl Interrupting {
             // desk records the consumption before it reports the refusal.
             // A safe point is not the place to stop a run over a message it
             // cannot act on, which is the answer the person's own entrance
-            // gives an empty steer (serving::desk). What must not happen is
+            // gives an empty steer (assembly::desk). What must not happen is
             // the two arriving here as one case; they do not.
             Err(_) => Interrupt::None,
         }

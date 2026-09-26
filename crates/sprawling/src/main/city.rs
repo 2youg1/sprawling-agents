@@ -11,7 +11,7 @@
 //! directory that holds no history, settle the pairing key before
 //! anything binds, choose where the client bundle comes from, build the
 //! diagnostics sink, attach the console, hand one `serving::Serving` to
-//! `serving::listen`, and print the banner only once that has taken the
+//! `assembly::listen`, and print the banner only once that has taken the
 //! port and the city's writer. `up`, the first screen and `serve`
 //! differ only in what they do before they arrive there and in whether
 //! they open a browser, so none of them re-derives the sequence.
@@ -256,7 +256,7 @@ pub(super) fn serve_city(
     // The one sink a diagnostic line leaves this process through: the
     // terminal, and the page that has the log lens open. Made before
     // the `Diagnostics` because the sink is what writes into it.
-    let journal = serving::Journal::new();
+    let journal = serving::Journal::new(assembly::now_ms);
     let floor = match log_floor(args) {
         Ok(floor) => floor,
         Err(unknown) => {
@@ -288,7 +288,7 @@ pub(super) fn serve_city(
     // The port and the writer are both taken before a word is printed:
     // a banner saying "running" over a port another process holds was a
     // claim the city could not keep (sprawling-SPEC.md 8-88).
-    let listening = match runtime.block_on(serving::listen(serving::Serving {
+    let listening = match runtime.block_on(assembly::listen(serving::Serving {
         city_root: city.to_path_buf(),
         addr: bind,
         token,

@@ -24,8 +24,8 @@ use kernel::{Address, AxCode, AxError, NodeId, RunId};
 
 use super::super::{Continuation, Driven, Owed, Owing, RunWorker, Unasked};
 use super::{Driving, lane::DriveContext};
-use crate::serving::pool::{Arrival, DRIVING_LANES, DrivingPool};
-use crate::serving::relay::{Patience, Relay, RelayGate, Wake};
+use crate::assembly::pool::{Arrival, DRIVING_LANES, DrivingPool};
+use crate::assembly::relay::{Patience, Relay, RelayGate, Wake};
 
 /// One run in a lane: everything the city does once the drive is home,
 /// and what that landing is owed.

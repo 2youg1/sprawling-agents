@@ -21,7 +21,10 @@
 //! clock sample, the two hooks a live control surface installs, and the
 //! door a `Command` enters by. The lines it appends live in
 //! `recording`; opening and closing in `lifetime`; the test fixtures in
-//! `fixture`.
+//! `fixture`. The thread the worker runs on is started here too: the
+//! port is taken and the writer opened in `listening`, the writer's loop
+//! is `attending`, commands wait on the `desk`, and runs are driven on
+//! the lanes of the `pool` and write back through the `relay`.
 //!
 //! The `use` block below is where the submodules see each other. A
 //! submodule imports from `super`, so what one part of the assembly
@@ -29,9 +32,11 @@
 //! than as a graph; the one sibling reach is `credentials::dialect_headers`,
 //! which the dispatching modules read where the credentials module keeps it.
 
+mod attending;
 mod collaborating;
 mod commanding;
 mod credentials;
+mod desk;
 mod dispatching;
 mod doorstep;
 mod driving;
@@ -39,11 +44,14 @@ mod folds;
 mod freezing;
 mod genesis;
 mod lifetime;
+mod listening;
 mod mcp;
 mod naming;
 mod plans;
+mod pool;
 mod probing;
 mod recording;
+mod relay;
 mod reviewing;
 mod rooms;
 mod settling;
@@ -56,6 +64,7 @@ use commanding::entrance::Entrance;
 use credentials::held::Credentials;
 use credentials::subscription::Expiries;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
+pub(crate) use desk::{CommandDesk, Posted};
 use dispatching::asking_name::Namings;
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
@@ -69,6 +78,7 @@ pub(crate) use folds::Standing;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 use genesis::city_segment;
 pub use genesis::{Adopt, InitReport, form_city, init_city};
+pub use listening::{Listening, listen};
 use mcp::{connect_mcp, mounts_under, transport_site};
 use naming::{building_of, governed_of, not_built, scope_of};
 use plans::Reporter;
@@ -93,8 +103,13 @@ use runtime::Interrupt;
 use std::path::Path;
 
 /// The single sanctioned sampling point (clippy.toml disallowed-methods). Everything below this call takes `TimeMs` as a
-/// parameter.
-pub(crate) fn now_ms() -> Result<TimeMs, AxError> {
+/// parameter; what samples it outside this module is handed this function
+/// at construction, as the process log is.
+///
+/// # Errors
+/// `E_CONFIG_INVALID` when the system clock reads before the unix epoch,
+/// or beyond what `u64` milliseconds can count.
+pub fn now_ms() -> Result<TimeMs, AxError> {
     #[expect(
         clippy::disallowed_methods,
         reason = "the one sampling point: Main injects time"

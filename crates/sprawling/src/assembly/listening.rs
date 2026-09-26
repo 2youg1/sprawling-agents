@@ -8,7 +8,7 @@
 //!
 //! Three things happen here and nothing else: the port is taken and the
 //! one writer thread is started with the ledger inside it
-//! (`serving::attending`), in that order ([`listen`]); the socket is
+//! (`assembly::attending`), in that order ([`listen`]); the socket is
 //! handed the sinks it may reach the city through; and the whole of it
 //! is stopped when the person stops it ([`Listening::serve`]).
 //!
@@ -20,11 +20,10 @@ use std::sync::Arc;
 
 use kernel::{AxCode, AxError};
 
-use super::attending::{Outward, Started, spawn_worker};
+use super::acp_dispatch;
+use super::attending::{Opening, Outward, Started, spawn_worker};
 use super::desk::CommandDesk;
-use super::serve::Opening;
-use super::serve::Serving;
-use crate::assembly::acp_dispatch;
+use crate::serving::Serving;
 use crate::views::Views;
 
 /// One recording in, one line of text back.
@@ -306,3 +305,6 @@ impl Listening {
         served
     }
 }
+
+#[cfg(test)]
+mod tests;

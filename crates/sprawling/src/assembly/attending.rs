@@ -27,14 +27,29 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, EventRecord, RunId};
+use kernel::{AxCode, AxError, EventRecord, Payload, RunId};
 
 use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
-use super::folding::{Folding, spawn_folding};
 use super::relay::Patience;
-use super::serve::Opening;
-use crate::assembly::{RunWorker, Serving, now_ms};
+use super::{RunWorker, Serving, now_ms};
+use crate::serving::folding::{Folding, spawn_folding};
 use crate::views::Views;
+
+/// What a worker is opened with: where the city is, whose keys it may
+/// redeem, what the vault turned out to be, and where its diagnostics
+/// go.
+///
+/// Four values that always travel together and are never chosen
+/// independently - `listen` settles all four before it has a thread to
+/// hand them to - so they travel as one, as `Reporter` does.
+pub(super) struct Opening {
+    pub(super) city_root: std::path::PathBuf,
+    pub(super) vault: gateway::Custodian,
+    /// What the vault probe found, on its way to the ledger as a
+    /// disclosure. Consumed by the first `open_for_service`.
+    pub(super) notice: Option<Payload>,
+    pub(super) log: runtime::diagnostics::Diagnostics,
+}
 
 /// Where a worker's work goes, and where it comes from.
 ///

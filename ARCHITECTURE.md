@@ -178,6 +178,7 @@ it assembles never name it back (sprawling-SPEC 8-92).
 
 ```directions
 crates/sprawling/src/doctor: crate::assembly
+crates/sprawling/src/serving: crate::assembly
 crates/sprawling/src/views: crate::assembly
 ```
 
@@ -537,7 +538,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
+| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::assembly::pool`, the attending worker under `bin::assembly` and the fold under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
 | 4 | Seeded RNG handed out from one place | assembly derives per session |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |

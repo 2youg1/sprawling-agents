@@ -14,10 +14,10 @@ use crate::views::Views;
 
 /// The two places the writer thread hands the views what it wrote, and
 /// the thread that folds it.
-pub(super) struct Folding {
-    pub(super) observer: Box<dyn FnMut(&EventRecord) + Send>,
-    pub(super) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
-    pub(super) thread: std::thread::JoinHandle<()>,
+pub(crate) struct Folding {
+    pub(crate) observer: Box<dyn FnMut(&EventRecord) + Send>,
+    pub(crate) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    pub(crate) thread: std::thread::JoinHandle<()>,
 }
 
 /// What the writer thread hands the view fold, in the order it wrote it.
@@ -41,7 +41,7 @@ enum Following {
 ///
 /// # Errors
 /// `StorageFatal` when the thread cannot be started.
-pub(super) fn spawn_folding(
+pub(crate) fn spawn_folding(
     views: Arc<Mutex<Views>>,
     to_clients: tokio::sync::broadcast::Sender<EventRecord>,
 ) -> Result<Folding, AxError> {

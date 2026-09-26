@@ -14,10 +14,10 @@
     reason = "test code"
 )]
 
+use crate::assembly::CommandDesk;
+use crate::assembly::desk::DeskWait;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
-use crate::serving::CommandDesk;
-use crate::serving::desk::DeskWait;
 
 #[test]
 fn a_scheduled_job_starts_by_itself_and_only_once_per_firing() {
