@@ -142,15 +142,16 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
 #[test]
 fn a_registration_survives_the_process_that_made_it() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    let report = init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-small", "m-large"], Vec::new());
     let worker = worker_with_provider(dir.path(), &base_url, "m-large").unwrap();
 
     // The book is a projection: throwing it away and rebuilding from
     // the ledger has to produce the same answer, or what the city
     // can call depends on a process that has already exited.
-    let rebuilt = Standing::fold(&ledger_dir(dir.path())).unwrap().book;
+    let rebuilt = Standing::fold(&report.ledger_dir).unwrap().book;
     let live = worker
+        .credentials
         .book
         .select(kernel::ModelTag::Main, &kernel::BuildingPolicy::default())
         .unwrap();
@@ -312,7 +313,7 @@ fn init_writes_genesis_and_refuses_a_second_birth() {
 #[test]
 fn the_startup_scan_closes_dangling_calls_once_and_reports_the_rest() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    let raised = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         gateway::Custodian::in_memory(),
@@ -350,7 +351,7 @@ fn the_startup_scan_closes_dangling_calls_once_and_reports_the_rest() {
     // The account now shows an outcome; a second scan repairs nothing.
     let again = worker.startup_scan().unwrap();
     assert_eq!(again.closed_calls, 0, "the repair is idempotent");
-    let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
+    let verified = runtime::replay::verify_ledger_dir(&raised.ledger_dir).unwrap();
     let closed = verified.lines().iter().any(|line| match line {
         runtime::replay::VerifiedLine::Known { record, .. } => {
             record.kind() == EventKind::ToolResult
@@ -390,7 +391,7 @@ fn a_new_city_delegates_its_approvals_to_the_clerk_on_the_record() {
 #[test]
 fn a_ledger_that_cannot_be_listed_is_an_error_not_an_empty_city() {
     let dir = tempfile::tempdir().unwrap();
-    let ledger = ledger_dir(dir.path());
+    let ledger = kernel::layout::CityLayout::new(dir.path()).ledger();
     std::fs::create_dir_all(ledger.parent().unwrap()).unwrap();
     std::fs::write(&ledger, b"not a directory").unwrap();
     assert!(has_history(dir.path()).is_err());

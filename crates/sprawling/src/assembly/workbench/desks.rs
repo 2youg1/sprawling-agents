@@ -42,7 +42,7 @@ impl RunWorker {
             site.branch
                 .as_deref()
                 .and_then(|name| collab::NodeId::parse(name).ok()),
-            self.requests.clone(),
+            self.collaborating.requests.clone(),
         )));
 
         // The room's queue is lent to the desk for the length of the
@@ -50,7 +50,7 @@ impl RunWorker {
         // loan rather than the queue being lifted out of it, so a
         // second run in the same room is answered instead of being
         // handed a queue that would overwrite the first one's.
-        let lent = self.rooms.lend(addr, site.run_id);
+        let lent = self.collaborating.rooms.lend(addr, site.run_id);
         let waiting = lent.inbox.pending();
         let signals = std::sync::Arc::new(std::sync::Mutex::new(collab::SignalDesk::new(
             site.run_id,
@@ -63,7 +63,7 @@ impl RunWorker {
         let goals = std::sync::Arc::new(std::sync::Mutex::new(collab::GoalDesk::new(
             site.run_id,
             site.who.clone(),
-            self.goals.clone(),
+            self.collaborating.goals.clone(),
         )));
 
         // The plan is shared ground, so it is read from and written back

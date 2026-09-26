@@ -44,7 +44,7 @@ impl RunWorker {
         match then {
             effect::Then::Nothing => Ok(()),
             effect::Then::Deliver(signals) => {
-                let knocks_mark = self.knocks.len();
+                let knocks_mark = self.doorstep.knocks.len();
                 let outcome = (|| {
                     for signal in &signals {
                         // The room table decides what a delivery means,
@@ -53,7 +53,7 @@ impl RunWorker {
                         // spelled once, there, because the line is
                         // already on the ledger and a line no queue
                         // holds is a torn city.
-                        self.rooms.deliver(signal)?;
+                        self.collaborating.rooms.deliver(signal)?;
                         // Somebody was spoken to. Whether that starts a run
                         // is decided in one place, so that the two ways of
                         // reaching a resident stay one decision. The
@@ -71,13 +71,13 @@ impl RunWorker {
                         // are cut back to the mark. Delivered signals stay
                         // delivered — the queue has no recall — and the
                         // ledger says exactly which ones those are.
-                        self.knocks.truncate(knocks_mark);
+                        self.doorstep.knocks.truncate(knocks_mark);
                         Err(err)
                     }
                 }
             }
             effect::Then::Hold(entries) => {
-                self.goals.extend(entries);
+                self.collaborating.goals.extend(entries);
                 Ok(())
             }
             // The replacement is whole or not at all, so a refusal

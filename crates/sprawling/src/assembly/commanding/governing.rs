@@ -41,7 +41,7 @@ impl RunWorker {
                     Some(addr.clone())
                 }
             };
-            let reached = self.backlog.halt(within.as_ref())?;
+            let reached = self.flight.backlog.halt(within.as_ref())?;
             if reached > 0 {
                 self.note(
                     runtime::diagnostics::Level::Effect,

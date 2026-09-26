@@ -231,7 +231,7 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
 
     // The same answer arrives from a cold rebuild: a view is
     // disposable exactly to the extent that this holds.
-    let mut rebuilt = rebuild_views(&report.ledger_dir).unwrap();
+    let mut rebuilt = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let channels::Answer::City(again) = rebuilt.answer(&channels::Query::CityView) else {
         panic!("CityView answers with a city");
     };
@@ -291,7 +291,7 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
     )
     .expect("the fence oid is forty hex digits");
 
-    let mut views = rebuild_views(&report.ledger_dir).unwrap();
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let channels::Answer::Commit(said) = views.answer(&channels::Query::Commit { oid }) else {
         panic!("a commit this city made answers which run wrote it");
     };

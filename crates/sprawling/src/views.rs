@@ -8,7 +8,7 @@
 //!
 //! **Why it is a projection and not part of the assembly point.** Nothing
 //! here decides anything or reaches a provider: it folds records into the
-//! answers a client asks for, and `rebuild_views` throws the whole thing
+//! answers a client asks for, and `Views::rebuild` throws the whole thing
 //! away and folds the ledger again to get the same bytes. That is
 //! ARCHITECTURE.md section 9 shape 7, while `bin::assembly` is an
 //! adapter - and a file holding two shapes is what section 9 says a split
@@ -50,9 +50,9 @@ mod tests;
 pub(super) mod toolkits;
 
 pub(crate) use governance::Governance;
-pub(crate) use holding::Views;
 pub use holding::ask;
-pub(crate) use lines::pursuit_from;
+pub(crate) use holding::{Views, known_records};
+pub(crate) use lines::pursued;
 /// What a `session_opened` line says the session branched from, if
 /// anything.
 ///

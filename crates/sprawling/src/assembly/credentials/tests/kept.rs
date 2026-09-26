@@ -77,6 +77,7 @@ fn an_empty_key_keeps_the_credential_this_city_has_archived() {
         "every ask about a keyed endpoint carries its key; heads were:\n{asked:#?}"
     );
     let kept = worker
+        .credentials
         .book
         .endpoints()
         .find(|endpoint| endpoint.name == "kept")
@@ -145,6 +146,7 @@ fn a_subscription_token_keeps_its_bearer_header_when_the_settings_are_saved_agai
         "a subscription token is a bearer token on every ask; heads were:\n{asked:#?}"
     );
     let kept = worker
+        .credentials
         .book
         .endpoints()
         .find(|endpoint| endpoint.name == "anthropic")
