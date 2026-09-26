@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use kernel::{Address, GitOid, Locator};
+use kernel::{Address, GitOid, Locator, RunId, Seq};
 
 use super::archives::search_archives;
 use super::city::CityAsk;
@@ -105,6 +105,38 @@ pub(crate) enum Prepared {
     },
     /// The prompt one run was frozen with: a ledger line and the store.
     Prefix(PrefixAsk),
+    /// A bounded slice of the history ending before a cursor.
+    History {
+        ledger: LedgerAsk,
+        before: Option<Seq>,
+        limit: u32,
+    },
+    /// One named range of the history.
+    HistoryRange {
+        ledger: LedgerAsk,
+        from: Seq,
+        to: Seq,
+        limit: u32,
+    },
+    /// One run's own records ending before a cursor.
+    RunHistory {
+        ledger: LedgerAsk,
+        run: RunId,
+        before: Option<Seq>,
+        limit: u32,
+    },
+    /// One run's records, folded into the rounds a person reads.
+    Rounds { ledger: LedgerAsk, run: RunId },
+    /// Every locator one run left behind.
+    Evidence { ledger: LedgerAsk, run: RunId },
+}
+
+/// The ledger as a history reader carries it out of the view lock: where
+/// it lives, and its index, which has a lock of its own that only
+/// readers wait on (sprawling-SPEC.md 8-92).
+pub(crate) struct LedgerAsk {
+    pub(super) city_root: PathBuf,
+    pub(super) index: Arc<Mutex<memory::LedgerIndex>>,
 }
 
 impl Prepared {
@@ -115,6 +147,29 @@ impl Prepared {
             Self::GitStatus(ask) => ask.read(),
             Self::Prefix(ask) => ask.read(),
             Self::City(ask) => ask.read(),
+            Self::History {
+                ledger,
+                before,
+                limit,
+            } => channels::Answer::History(Box::new(ledger.history(before, limit))),
+            Self::HistoryRange {
+                ledger,
+                from,
+                to,
+                limit,
+            } => channels::Answer::HistoryRange(Box::new(ledger.history_range(from, to, limit))),
+            Self::RunHistory {
+                ledger,
+                run,
+                before,
+                limit,
+            } => channels::Answer::History(Box::new(ledger.run_history(run, before, limit))),
+            Self::Rounds { ledger, run } => {
+                channels::Answer::Rounds(Box::new(ledger.rounds_answer(run)))
+            }
+            Self::Evidence { ledger, run } => {
+                channels::Answer::Evidence(ledger.evidence_answer(run))
+            }
             // A settings file that cannot be read is "I could not
             // look", not an empty set of preferences.
             Self::Preferences => match crate::person::read() {

@@ -9,9 +9,9 @@
 use kernel::EventRecord;
 
 use crate::assembly::ledger_dir;
-use crate::views::holding::Views;
+use crate::views::prepared::LedgerAsk;
 
-impl Views {
+impl LedgerAsk {
     /// A bounded slice of the one history, ending just before `before`
     /// or at the tail.
     ///
@@ -19,7 +19,7 @@ impl Views {
     /// records would be a second copy of the only history, and the index
     /// already maps a sequence to a byte offset. An unreadable line ends
     /// the slice rather than emptying it - what was read is still true.
-    pub(super) fn history(
+    pub(in crate::views) fn history(
         &self,
         before: Option<kernel::Seq>,
         limit: u32,
@@ -84,7 +84,7 @@ impl Views {
     /// It also ends the walk, so `next` says nothing more can be asked
     /// for - the gaps the Ledger really has are not ranges this can fill,
     /// and a cursor pointing past one would have the page ask for ever.
-    pub(super) fn history_range(
+    pub(in crate::views) fn history_range(
         &self,
         from: kernel::Seq,
         to: kernel::Seq,
@@ -151,7 +151,7 @@ impl Views {
     /// answer is delivered in and the order the cursor walks without a
     /// seek. A line that will not read ends the slice rather than
     /// emptying it - what was read is still true.
-    pub(super) fn run_history(
+    pub(in crate::views) fn run_history(
         &self,
         run: kernel::RunId,
         before: Option<kernel::Seq>,

@@ -28,7 +28,7 @@ use std::sync::Mutex;
 use kernel::{AxCode, AxError};
 
 use super::holding::Views;
-use super::prepared::{Prepared, unavailable};
+use super::prepared::{LedgerAsk, Prepared, unavailable};
 
 mod history;
 use super::lines::{endpoints_answer, summarize};
@@ -102,6 +102,14 @@ impl Views {
         }
     }
 
+    /// The ledger as a history reader takes it out of the view lock.
+    pub(super) fn ledger_ask(&self) -> LedgerAsk {
+        LedgerAsk {
+            city_root: self.city_root.clone(),
+            index: std::sync::Arc::clone(&self.index),
+        }
+    }
+
     /// Answers one query in one call, lock or no lock.
     #[cfg(test)]
     pub(crate) fn answer(&mut self, query: &channels::Query) -> channels::Answer {
@@ -141,13 +149,27 @@ impl Views {
                 }))
             }
             channels::Query::History { before, limit } => {
-                channels::Answer::History(Box::new(self.history(*before, *limit)))
+                return Prepared::History {
+                    ledger: self.ledger_ask(),
+                    before: *before,
+                    limit: *limit,
+                };
             }
             channels::Query::HistoryRange { from, to, limit } => {
-                channels::Answer::HistoryRange(Box::new(self.history_range(*from, *to, *limit)))
+                return Prepared::HistoryRange {
+                    ledger: self.ledger_ask(),
+                    from: *from,
+                    to: *to,
+                    limit: *limit,
+                };
             }
             channels::Query::RunHistory { run, before, limit } => {
-                channels::Answer::History(Box::new(self.run_history(*run, *before, *limit)))
+                return Prepared::RunHistory {
+                    ledger: self.ledger_ask(),
+                    run: *run,
+                    before: *before,
+                    limit: *limit,
+                };
             }
             channels::Query::Changes { base, head } => {
                 return Prepared::Changes {
@@ -173,10 +195,16 @@ impl Views {
             // Three readings answered here so a second client draws a
             // session without folding the ledger itself.
             channels::Query::Rounds { run } => {
-                channels::Answer::Rounds(Box::new(self.rounds_answer(*run)))
+                return Prepared::Rounds {
+                    ledger: self.ledger_ask(),
+                    run: *run,
+                };
             }
             channels::Query::Evidence { run } => {
-                channels::Answer::Evidence(self.evidence_answer(*run))
+                return Prepared::Evidence {
+                    ledger: self.ledger_ask(),
+                    run: *run,
+                };
             }
             channels::Query::CostOf { node } => channels::Answer::CostOf(self.cost_of_answer(node)),
             // The tree itself, one level and one file at a time.

@@ -19,9 +19,9 @@
 use channels::{EventKind, EventRecord, RunId};
 use kernel::Locator;
 
-use super::holding::Views;
+use super::prepared::LedgerAsk;
 
-impl Views {
+impl LedgerAsk {
     /// Every locator this run left behind, oldest first.
     pub(super) fn evidence_answer(&self, run: RunId) -> channels::EvidenceAnswer {
         let items = self

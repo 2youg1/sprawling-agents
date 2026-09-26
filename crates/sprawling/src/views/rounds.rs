@@ -22,9 +22,9 @@ mod tests;
 
 use channels::{EventKind, EventRecord, RunId, UsdMicros};
 
-use super::holding::Views;
+use super::prepared::LedgerAsk;
 
-impl Views {
+impl LedgerAsk {
     /// The newest [`channels::HISTORY_MAX`] records of one run, oldest
     /// first.
     ///
