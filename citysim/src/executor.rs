@@ -242,7 +242,7 @@ pub fn run_scenario_on(
         placed.set(at.saturating_add(1));
         let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);
         let temporal = bench
-            .meta_of(call.name.as_str())
+            .meta_of(&call.name)
             .map_or(Temporal::Timeless, |meta| meta.temporal);
         match bench.invoke(call, &key, t)? {
             // A replay carries the first call's own result, and is

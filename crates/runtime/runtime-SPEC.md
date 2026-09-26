@@ -677,8 +677,8 @@ pub fn redact_text(text: &str, marker: Marker) -> (String, u32);
 pub fn fingerprint(found: &[u8]) -> String;      // b3 前十六位
 
 pub struct ToolBench { /* route: kernel::tool::route::ToolRoute、domain: WriteDomain、
-                          taint: TaintSet、claimed: BTreeSet<IdemKey>、answers: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>、
-                          prior_public_egress: bool —— 私有。`claimed` 与 `answers` 各答一问：这把键领过权没有，它答了什么。claim 未遂（门拒/语法拒）不留 answer，故重试不算重放；两表同函数内同步写入。 */ }
+                          taint: TaintSet、seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>、
+                          prior_public_egress: bool —— 私有。`seen` 是「这把键答过没有、答了什么」的唯一一张表：键只在工具真正答过之后才写入，门拒/语法拒不留条目，故重试不算重放。 */ }
 impl ToolBench {
     pub fn new(domain: WriteDomain, registry: Registry) -> ToolBench;
     pub fn register(&mut self, tool: Box<dyn Tool>) -> Result<(), AxError>;
@@ -704,7 +704,7 @@ impl ToolBench {
     /// 同形：两处出网判定的「首次公开出网要记下来」只住这里。
     fn crossed(&mut self, outcome: EgressOutcome) -> Option<BenchOutcome>;
     /// 包信封的调用者要读 `temporal` 才知道时钟行该不该发。
-    pub fn meta_of(&self, name: &str) -> Option<&ToolMeta>;
+    pub fn meta_of(&self, name: &ToolName) -> Option<&ToolMeta>;
     /// 栅栏署名随网一起交给 bench。一个没有 `Provenance` 的栅栏
     /// 写不出 `Sprawling-Run:`，而预测栅栏恰恰是在一个拿不到运行上下文的
     /// 闭包里升起的，所以它在装配时就被交下。
@@ -735,7 +735,7 @@ impl ToolBench {
 - ToolBench 持 `Option<Checkpoint>` 具体类型而非新 trait：checkpoint 只有一个实现，为尚不存在的第二实现引缝会造空抽象（AGENTS.md：trait 只在已有第二实现的缝上引入）。
 - **`BenchOutcome` 去掉 `#[non_exhaustive]`**：它是判定输出，两个下游各背着一条永不执行的 `_ =>`，而那正是 §7「新增一种答案而不回答它就不编译」要护的东西。收口是编译红：摘掉属性即得两条 `unreachable pattern`（citysim 一条、sprawling 一条），`-D warnings` 下即错，删掉它们才绿。下游从此必须穷尽匹配四臂。**G-22（叶子 7.10）把这一条推到全库**：本 crate 再无 `#[non_exhaustive]`，`Interrupt`／`Disposal`／`FreezeReason`／`Mode`／`SandboxExit`／`ProviderMode`／`SafePoint`／`Level` 八个枚举同期撤下，`clock.rs` 与 `bench/admit.rs` 的三条通配臂随之删除。
 - **三条规则各回到一处**：`invoke` 曾为 246 行，是 `length` 门报出的两个对象之一。拆它时量到三处重复：① `GateOutcome::Escalate` 的「granted 命中即放行」写了**三遍**（Write／Spawn／Govern）；② `EgressOutcome` 的「首次公开出网要记下来」写了**两遍**（Connector／Egress）；③ `serde_json::to_vec` 扫描参数写了两遍。三条都是规则而不是巧合：一份人给过的允许在三个地方各有一份实现，就是三个可以各自漂走的权威。归位后：`settled` 一处、`crossed` 一处，`admit` 成为那个 `match &effect` 自己的名字。尺寸 246 → 65（`admit` 139、`settled` 11、`crossed` 13）。行为逐字不变，公开面不变。
-- `BenchOutcome` 四态：`Ran{outcome, fenced}`（fenced 携围栏 oid，供波后补记）／`Refused{refusal}`（回流不终止回合）／`Pending{item}`／`Duplicate`。dedup 先于任何副作用；**key 在过门之后才记入 answers**，故被门拒的调用重试不算重放。**dedup 的判重再不付 O(n)**：曾经每次调用把 `answers` 的全部键抄一遍成临时 `BTreeSet` 才喂 `idem::claim`（工具波一长，每调用线性涨）；现在 `claimed` 是真持久集，`idem::claim`（kernel，判定的唯一权威）写它，判重与登记各一次 O(log n)。
+- `BenchOutcome` 四态：`Ran{outcome, fenced}`（fenced 携围栏 oid，供波后补记）／`Refused{refusal}`（回流不终止回合）／`Pending{item}`／`Duplicate`。dedup 先于任何副作用；**key 在工具答过之后才记入 `seen`**，故被门拒的调用重试不算重放。**判重是 `seen` 上的一次 O(log n) 查找**，不抄键、不另立一张「领过权」的集合：第二张集合记的是 `seen` 键集的同一个事实，两份拷贝迟早分叉。工具按 `ToolName` 登记，`invoke` 以调用自带的名字查表，路由一次调用不分配。
 - status 的 result 是**按冻结序渲染的文本**而非 JSON 对象：`serde_json::Map` 对键排序，JSON 对象没有读者可依赖的序，「冻结序」会悄悄变成字母序。序是「模型读到的东西」的属性，故落在模型读到的地方。
 - 注意无 Egress／Spend 工具实例（出网代理 P1）：两门路由代码落地以测试替身驱动，接线台账仍记「计划内待接」至真实例出现。
 
