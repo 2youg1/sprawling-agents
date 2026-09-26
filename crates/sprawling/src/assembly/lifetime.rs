@@ -211,6 +211,7 @@ impl RunWorker {
             machine: Box::new(ThisMachine::new(Platform::current(), PATIENCE)),
             clock: std::sync::Arc::new(SystemClock),
             read_volume: crate::monitor::volume::read,
+            reveal: crate::revealing::reveal,
         };
         worker.sweep_abandoned_trees();
         Ok(worker)

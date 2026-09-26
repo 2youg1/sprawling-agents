@@ -278,6 +278,10 @@ pub struct RunWorker {
     /// Reads the city's volume at the door new work enters by
     /// (sprawling-SPEC.md 8-94).
     read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
+    /// Hands one of this city's paths to the desktop's file manager
+    /// (`revealing::reveal`). Received rather than called, because it
+    /// starts a program on the host (sprawling-SPEC.md 8-60).
+    reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,
 }
 
 impl RunWorker {
