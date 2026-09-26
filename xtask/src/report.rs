@@ -39,6 +39,14 @@ pub(crate) enum XtaskError {
         "run gate `{name}`: the gate panicked (gate-panicked); run `cargo xtask gates {name}` to see the panic alone"
     )]
     GatePanicked { name: &'static str },
+    #[error(
+        "judge tree {here}: this xtask was built from {built} (stale-build); run `cargo clean -p xtask` and the command again, so cargo rebuilds it from this tree"
+    )]
+    StaleBuild { built: String, here: String },
+    #[error(
+        "judge tree: no directory from {cwd} upward holds xtask/Cargo.toml (no-checkout); run the command from inside the checkout it should judge"
+    )]
+    NoCheckout { cwd: String },
 }
 
 pub(crate) fn render(violations: &[Violation]) {
