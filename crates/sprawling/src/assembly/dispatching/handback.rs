@@ -29,6 +29,9 @@ impl RunWorker {
     /// `Completion::Done` is something the city observed, and a producer
     /// verifying itself is what `Claim::verified` refuses.
     ///
+    /// Returns the signal it delivered, which is what a knock at the
+    /// parent's room is made from.
+    ///
     /// # Errors
     /// Propagates the store's refusal of the account, an address that
     /// does not name a node, and the ledger's refusal of the signal.
@@ -36,7 +39,7 @@ impl RunWorker {
         &mut self,
         parent: &Address,
         child: &Dispatched,
-    ) -> Result<(), kernel::AxError> {
+    ) -> Result<collab::Signal, kernel::AxError> {
         let account = format!(
             "room: {}\nby: {}\nending: {}\n",
             child.addr.as_str(),
@@ -91,7 +94,7 @@ impl RunWorker {
                 .or_default()
                 .accept(artifact);
         }
-        Ok(())
+        Ok(signal)
     }
 
     /// Hands down the nodes of the parent room's graph that its join has

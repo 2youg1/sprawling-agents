@@ -155,13 +155,7 @@ impl RunWorker {
         conversations: u32,
     ) -> Result<(), AxError> {
         let room = signal.room();
-        if room == speaker
-            || self
-                .doorstep
-                .knocks
-                .iter()
-                .any(|queued| &queued.addr == room)
-        {
+        if room == speaker {
             return Ok(());
         }
         if !matches!(
@@ -170,7 +164,7 @@ impl RunWorker {
         ) {
             return Ok(());
         }
-        self.doorstep.knocks.push(Knock {
+        self.doorstep.queue(Knock {
             addr: room.clone(),
             from: signal.from().to_owned(),
             mode,
@@ -180,7 +174,11 @@ impl RunWorker {
     }
 
     /// Takes the queue of the room at `addr` back from the run that held
-    /// it.
+    /// it, and sends the knock that waited for that run to leave.
+    ///
+    /// The knock goes out even when the return is refused: the queue
+    /// comes home either way, with every signal delivered before the
+    /// refusal in it, and those are what the knock is for.
     ///
     /// # Errors
     /// Propagates the room table's refusal of the return.
@@ -190,7 +188,9 @@ impl RunWorker {
         from: kernel::RunId,
         returned: collab::Inbox,
     ) -> Result<(), AxError> {
-        self.collaborating.rooms.give_back(addr, from, returned)
+        let given_back = self.collaborating.rooms.give_back(addr, from, returned);
+        self.doorstep.vacated(addr);
+        given_back
     }
 
     /// Starts a run for everyone who was spoken to while nobody was
@@ -210,6 +210,15 @@ impl RunWorker {
     /// over it would punish the wrong run.
     pub(super) fn answer_knocks(&mut self) {
         for knock in std::mem::take(&mut self.doorstep.knocks) {
+            // Decided at the moment of dispatch rather than at the push,
+            // because `conclude` may have sent other work into the room
+            // since. A second run there would read a spare inbox while
+            // the signal waits for the holder (sprawling-SPEC.md
+            // 8-46-12).
+            if self.collaborating.rooms.worked_by(&knock.addr).is_some() {
+                self.doorstep.defer(knock);
+                continue;
+            }
             // The chain is bounded here rather than at the push: a knock
             // that has already gone as far as it may is stepped over
             // like one that cannot be answered, so the run that spoke is
