@@ -52,14 +52,14 @@ impl Views {
 /// A slug this crate will not carry drops the row instead of drawing it
 /// under a placeholder: the only thing a person can do with such a row
 /// is press it, and pressing it could not name what to connect.
-fn line_of(toolkit: gateway::Toolkit) -> Option<channels::ToolkitLine> {
+fn line_of(toolkit: protocol::Toolkit) -> Option<channels::ToolkitLine> {
     let standing = match toolkit.standing {
-        gateway::Connection::Absent => channels::Standing::Absent,
-        gateway::Connection::Awaiting { consent_url } => {
+        protocol::Connection::Absent => channels::Standing::Absent,
+        protocol::Connection::Awaiting { consent_url } => {
             channels::Standing::Awaiting { consent_url }
         }
-        gateway::Connection::Connected { alias } => channels::Standing::Connected { alias },
-        gateway::Connection::Refused { refusal } => channels::Standing::Refused {
+        protocol::Connection::Connected { alias } => channels::Standing::Connected { alias },
+        protocol::Connection::Refused { refusal } => channels::Standing::Refused {
             refusal: Box::new(refusal),
         },
     };
