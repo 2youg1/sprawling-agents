@@ -3079,5 +3079,13 @@
   "monitor_waiting": {
     "en": "waiting for the first sample",
     "zh": "等待第一次采样"
+  },
+  "facts_core": {
+    "en": "core",
+    "zh": "核心"
+  },
+  "facts_core_reading": {
+    "en": "{cpu} cpu · {memory}",
+    "zh": "CPU {cpu} · {memory}"
   }
 }

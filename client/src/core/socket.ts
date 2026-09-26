@@ -52,7 +52,7 @@ export interface Connection {
   readonly dismissRefusal: () => void;
   // Everything in the bell has now been looked at.
   readonly markNoticesSeen: () => void;
-  readonly monitor: Pick<Watching, "samples" | "watch">;
+  readonly monitor: Pick<Watching, "samples" | "watch" | "watchSummary">;
 }
 
 // The pairing code the host put on the URL that opened this page. An

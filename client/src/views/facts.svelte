@@ -21,6 +21,12 @@
   // `by_run` and `total` - so two cells here are still one question on
   // the wire.
   //
+  // **The core cell watches only the summary.** The strip is on every
+  // page, so it asks the city for the cheapest reading there is - its
+  // own process, about a microsecond a second - and never opens the
+  // machine-wide counters the monitor panel pays for (sprawling-SPEC
+  // 8-90).
+  //
   // **Nothing here is a control.** A cell is read, never pressed: the
   // strip is 28px of note-sized text with no target in it, which is
   // what lets it be this short.
@@ -31,6 +37,7 @@
   import { QUERIES } from "../core/asking";
   import type { RunBelief } from "../core/belief";
   import { fill, say } from "../core/lang";
+  import { summary } from "../core/monitor";
   import { buildingOf } from "../core/route";
   import { usd } from "../core/time";
   import { ui } from "../ui";
@@ -56,6 +63,10 @@
     readonly label: string;
     readonly value: string;
     readonly weight: Weight;
+    // A cell that changes every second is left out of what the strip's
+    // `role="status"` announces, or a screen reader would say it once
+    // a second.
+    readonly announced?: "silently";
   }
 
   // The dash a cell shows when the fact has no value yet. One spelling,
@@ -71,6 +82,9 @@
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const cost = u.conn.asking.ask(QUERIES.cost);
   const governance = u.conn.asking.ask(QUERIES.governance);
+  const samples = u.conn.monitor.samples;
+
+  $effect(() => u.conn.monitor.watchSummary());
 
   // The run that is going. The strip speaks for one run because a
   // person watching a city is watching the thing that is moving; when
@@ -172,6 +186,11 @@
     };
   });
 
+  const core = $derived.by((): string => {
+    const latest = $samples.at(-1);
+    return latest === undefined ? NOTHING : fill(say($lang, "facts_core_reading"), summary(latest));
+  });
+
   const cells = $derived.by((): Cell[] => {
     const boxedIn = sandbox;
     return [
@@ -197,6 +216,13 @@
         weight: "reading",
       },
       { key: "sandbox", label: say($lang, "facts_sandbox"), value: boxedIn.value, weight: boxedIn.weight },
+      {
+        key: "core",
+        label: say($lang, "facts_core"),
+        value: core,
+        weight: "reading",
+        announced: "silently",
+      },
     ];
   });
 </script>
@@ -215,7 +241,10 @@ unlabelled numbers in it to navigate into. -->
     leading edge and a glyph, declared once in `theme.css` as `asks`.
     Colour alone would be invisible in a forced-colour mode, which is
     where it is needed most. -->
-    <span class={["flex shrink-0 items-baseline gap-tight", cell.weight === "alerting" ? "asks" : ""]}>
+    <span
+      class={["flex shrink-0 items-baseline gap-tight", cell.weight === "alerting" ? "asks" : ""]}
+      aria-live={cell.announced === "silently" ? "off" : undefined}
+    >
       {#if cell.weight === "alerting"}
         <span aria-hidden="true" class="self-center text-alert">!</span>
       {/if}

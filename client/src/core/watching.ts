@@ -7,15 +7,17 @@
 // readings it has been sent (channels-SPEC 8-47).
 //
 // **The city samples only while somebody watches**, so this page says
-// `watch` when its first panel opens and `release` when its last one
-// closes, and says `watch` again on a new connection: the city forgets
-// a session's watch when the socket closes.
+// the most any of its watchers wants: `watch` while a monitor panel is
+// open, `watch_summary` while only the fact bar's summary is, which the
+// city answers by reading its own process alone, and `release` when
+// neither is. It says it again on a new connection: the city forgets a
+// session's watch when the socket closes.
 
 import { writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import { encodeFrame } from "./frames";
-import type { Sample } from "../wire";
+import type { Monitoring, Sample } from "../wire";
 
 // The readings kept: one a second for five minutes, the length of the
 // history `bin::monitor::CAPACITY` keeps on the city's side.
@@ -23,40 +25,63 @@ const KEPT = 300;
 
 export interface Watching {
   readonly samples: Readable<readonly Sample[]>;
-  // Starts watching; the returned function stops this watcher.
+  // Starts watching the whole monitor; the returned function stops
+  // this watcher.
   readonly watch: () => () => void;
+  // Starts watching the summary alone; the returned function stops
+  // this watcher.
+  readonly watchSummary: () => () => void;
   readonly sampled: (sample: Sample) => void;
   readonly reconnected: () => void;
 }
 
 export function createWatching(sendText: (text: string) => boolean): Watching {
   const samples = writable<readonly Sample[]>([]);
-  let watchers = 0;
+  let pages = 0;
+  let summaries = 0;
+  let said: Monitoring = "release";
 
-  function say(monitor: "watch" | "release"): void {
-    sendText(encodeFrame({ monitor }));
+  function wanted(): Monitoring {
+    if (pages > 0) return "watch";
+    if (summaries > 0) return "watch_summary";
+    return "release";
+  }
+
+  function settle(): void {
+    const now = wanted();
+    if (now === said) return;
+    said = now;
+    sendText(encodeFrame({ monitor: now }));
+    if (now === "release") samples.set([]);
+  }
+
+  function watcher(count: (by: 1 | -1) => void): () => void {
+    count(1);
+    settle();
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      count(-1);
+      settle();
+    };
   }
 
   return {
     samples,
-    watch() {
-      watchers += 1;
-      if (watchers === 1) say("watch");
-      let released = false;
-      return () => {
-        if (released) return;
-        released = true;
-        watchers -= 1;
-        if (watchers > 0) return;
-        say("release");
-        samples.set([]);
-      };
-    },
+    watch: () =>
+      watcher((by) => {
+        pages += by;
+      }),
+    watchSummary: () =>
+      watcher((by) => {
+        summaries += by;
+      }),
     sampled(sample) {
       samples.update((held) => [...held.slice(held.length >= KEPT ? 1 : 0), sample]);
     },
     reconnected() {
-      if (watchers > 0) say("watch");
+      if (said !== "release") sendText(encodeFrame({ monitor: said }));
     },
   };
 }
