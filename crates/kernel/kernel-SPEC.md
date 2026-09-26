@@ -245,6 +245,7 @@ impl ErrorDraft {
 | 隐私与 Discard | `E_DISCARD_IRREVERSIBLE` | `gate_denied` |
 | 背压 | `E_BACKPRESSURE_SHED` | `tool_result` |
 | 运行未知 | `E_TOOL_OUTCOME_UNKNOWN` | `tool_result` |
+| 计划 | `E_PLAN_MISSING` | `tool_result` |
 
 装载期六码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的条件只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 §12。
 `E_BUSY` 的 carrier 与 `E_WORKTREE_BUSY` 一样是 `tool_result`，而两者的区别在名字里：那一个说的是工作树这个机制，这一个说的是**同一个地址上有 run 正在工作**，拒绝里点名那条 run，调用方据此先停它再动手。
@@ -1544,6 +1545,7 @@ S2 激活的码（逐码答「能否定义掉」）：
 - `E_DELEGATION_DEPTH`：不消解（明裁：边界反馈优于沉默缺席）。
 - `E_APPROVAL_PENDING`／`E_APPROVAL_DENIED`：不可——一个设计问题停住提问的那个 run，而人可以答「不」；两者都是用户可达状态。`E_APPROVAL_PENDING` 有一个门的生产者：`gate::attach` 的 Ask（§8-27），它请求的是人的动作而不是 Approval Inbox 里的一条答案，所以不产生 `ApprovalItem`；`E_APPROVAL_DENIED` 仍只由人答题面对产生。
 - `E_EVIDENCE_MISSING`：部分定义掉——无证据 Done 已不可构造（类型半）；构造时拒绝仍需此码（运行时半，A6 双守）。
+- `E_PLAN_MISSING`：不可——没有计划的楼上设常设目标，pursuit 找不到一步可做就当场「完成」，人看到的是一句 `finished` 而什么也没发生。这一码在设目标时拒绝，`subject` 恒为 `<楼地址>: <常设目标>`，客户端据此给出「让市长写计划」的预填表单（client-SPEC 4-35a），由人提交。人定的是拒绝加按钮，胜过「先让市长自动写计划」：后者替人派出一次有成本的 run，而人只是想设一个目标。
 - `E_SECRET_EGRESS`／`E_DISCARD_IRREVERSIBLE`：不可——两门存在的理由即这两类越界可发生；类型已把「无 Restoration 的 Discard 值」定义掉，Unplanned 请求（exec 预判路）是剩余不可消部分。
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
 
