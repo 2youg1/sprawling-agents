@@ -226,10 +226,15 @@ fn same_file(judged: &Metadata, opened: &Metadata) -> bool {
 }
 
 /// On Windows the open did not follow a link, so a plain file behind the
-/// handle is the path's own file.
-#[cfg(not(unix))]
+/// handle is the path's own file. Any other reparse point - a cloud
+/// placeholder, a deduplicated file - is refused too: opened without
+/// following, its bytes are the stub's rather than the file's, and they
+/// would land and hash as if they were the skill.
+#[cfg(windows)]
 fn same_file(_judged: &Metadata, opened: &Metadata) -> bool {
-    opened.is_file()
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    opened.is_file() && opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0
 }
 
 /// The scan reads a skill document as text, so a document it could not
