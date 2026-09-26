@@ -337,10 +337,18 @@ pub channels::DoctorAbsence::NotOnSearchPath
 pub channels::DoctorAbsence::VariableNamesNothing
 pub channels::DoctorAbsence::VariableNamesNothing::path: alloc::string::String
 pub channels::DoctorAbsence::VariableNamesNothing::variable: alloc::string::String
+pub channels::DoctorAnswer::core: channels::DoctorCore
 pub channels::DoctorAnswer::custody: channels::DoctorCustody
 pub channels::DoctorAnswer::items: alloc::vec::Vec<channels::DoctorItem>
 pub channels::DoctorAnswer::sandbox: channels::DoctorSandbox
 pub channels::DoctorAnswer::tiers: alloc::vec::Vec<channels::DoctorVerdict>
+pub channels::DoctorCore::HeldBySetting
+pub channels::DoctorCore::LoweredByValve
+pub channels::DoctorCore::Raised
+pub channels::DoctorCore::Refused
+pub channels::DoctorCore::Refused::said: alloc::string::String
+pub channels::DoctorCore::Unasked
+pub channels::DoctorCore::Unasked::said: alloc::string::String
 pub channels::DoctorCoverage::Kept
 pub channels::DoctorCoverage::NotKept
 pub channels::DoctorCustody::keeps: channels::DoctorCustodyLifetime
@@ -858,6 +866,7 @@ pub enum channels::ControlVerdict
 pub enum channels::Delivered
 pub enum channels::Density
 pub enum channels::DoctorAbsence
+pub enum channels::DoctorCore
 pub enum channels::DoctorCoverage
 pub enum channels::DoctorCustodyLifetime
 pub enum channels::DoctorCustodyStore

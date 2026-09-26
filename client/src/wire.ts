@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 40 as const;
+export const WIRE_V = 41 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7" as const;
+export const WIRE_HASH = "fa28135c18a4a63a0aac8e80fd089649f35950060c1baf0cd5ae3c80f58d6730" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -806,6 +806,28 @@ export const DiscardAnswer = Schema.Struct({
 export type DiscardAnswer = typeof DiscardAnswer.Type;
 
 /**
+ * The level this machine gives the core's threads under the person's
+ * setting (sprawling-SPEC 8-93). The dispatched commands are not here:
+ * they always start one level below, and lowering is never refused.
+ */
+export const DoctorCore = Schema.Union(
+  Schema.Literal("raised"),
+  Schema.Literal("held_by_setting"),
+  Schema.Struct({
+    refused: Schema.Struct({
+      said: Schema.String,
+    }),
+  }),
+  Schema.Literal("lowered_by_valve"),
+  Schema.Struct({
+    unasked: Schema.Struct({
+      said: Schema.String,
+    }),
+  }),
+).annotations({ identifier: "DoctorCore" });
+export type DoctorCore = typeof DoctorCore.Type;
+
+/**
  * How long a value the store keeps stays reachable.
  */
 export const DoctorCustodyLifetime = Schema.Literal("across_reboots", "with_passphrase", "until_reboot", "this_process").annotations({ identifier: "DoctorCustodyLifetime" });
@@ -1032,6 +1054,7 @@ export type DoctorVerdict = typeof DoctorVerdict.Type;
  * This machine, item by item, with a verdict for each tier.
  */
 export const DoctorAnswer = Schema.Struct({
+  core: DoctorCore,
   custody: DoctorCustody,
   items: Schema.Array(DoctorItem),
   sandbox: DoctorSandbox,

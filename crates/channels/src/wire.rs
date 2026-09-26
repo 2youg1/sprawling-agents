@@ -144,7 +144,7 @@ use serde::{Deserialize, Serialize};
 /// 40: the performance monitor travels. A session says it is watching
 ///    with `ClientFrame::Monitor` and receives one `ServerFrame::Monitor`
 ///    reading a second until it releases or closes.
-pub const WIRE_V: u32 = 40;
+pub const WIRE_V: u32 = 41;
 mod monitor;
 mod query;
 
