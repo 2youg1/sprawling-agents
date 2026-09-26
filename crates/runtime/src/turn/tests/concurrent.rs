@@ -134,7 +134,7 @@ fn wave_of(ledger: &mut TestLedger, calls: Vec<ToolCall>) -> Turn<ToolWave> {
             ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     )

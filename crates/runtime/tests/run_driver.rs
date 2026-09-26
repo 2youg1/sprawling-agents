@@ -1002,6 +1002,10 @@ impl runtime::ConcurrentInvoke for Placed {
         }
     }
 
+    fn ahead(&self, call: &ToolCall) -> Option<&dyn kernel::Tool> {
+        self.bench.tool_named(call.name.as_str())
+    }
+
     fn tool(&self, ticket: &runtime::bench::Ticket) -> Result<&dyn kernel::Tool, AxError> {
         self.bench.tool_for(ticket)
     }

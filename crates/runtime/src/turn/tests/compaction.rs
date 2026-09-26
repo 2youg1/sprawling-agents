@@ -120,7 +120,7 @@ fn the_snapshot_is_replaced_at_the_closing_boundary_and_not_before() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );
@@ -214,7 +214,7 @@ fn a_threshold_crossed_mid_wave_compacts_once_over_the_whole_exchange() {
             &mut ledger,
             &mut model,
             &BuildingPolicy::default(),
-            None,
+            Generating::Unwatched,
         )
         .unwrap(),
     );

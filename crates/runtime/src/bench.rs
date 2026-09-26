@@ -295,19 +295,25 @@ impl ToolBench {
     /// # Errors
     /// A ticket naming a tool this bench does not hold.
     pub fn tool_for(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError> {
-        let Some(tool) = self.tools.get(&ticket.name) else {
-            return Err(AxError::failure(
+        self.tool_named(&ticket.name).ok_or_else(|| {
+            AxError::failure(
                 AxCode::ToolUnavailable,
                 "invoke tool",
                 format!("no tool named `{}` is registered", ticket.name),
             )
             .with_nearby(self.tools.keys().cloned().collect())
             .with_recovery(
-                "call one of the tools listed beside this error; those are the tools \
-                 this run holds",
-            ));
-        };
-        Ok(tool.as_ref())
+                "call one of the tools listed beside this error; those are the tools                  this run holds",
+            )
+        })
+    }
+
+    /// The tool registered under `name`, lent out before any call to it
+    /// is cleared, so a read the model hands over can start while it is
+    /// still generating (runtime-SPEC §8-3). A name this bench does not
+    /// hold starts nothing early; admitting the call reports it.
+    pub fn tool_named(&self, name: &str) -> Option<&dyn Tool> {
+        self.tools.get(name).map(AsRef::as_ref)
     }
 
     /// Records what a cleared call answered. A concurrent wave accounts

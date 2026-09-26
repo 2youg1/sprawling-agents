@@ -133,6 +133,10 @@ impl ConcurrentInvoke for Placing<'_> {
         }
     }
 
+    fn ahead(&self, call: &ToolCall) -> Option<&dyn Tool> {
+        self.bench.tool_named(call.name.as_str())
+    }
+
     fn tool(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError> {
         self.bench.tool_for(ticket)
     }

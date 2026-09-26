@@ -4,6 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Boundary 3: the tool wave, accounted in call order.
+//!
+//! The reads a turn started while the model was still generating
+//! (`super::speculation`) are accounted here like every other call, each
+//! taking its cached result; `adversary/design/Speculating.lean` is the
+//! authority on why that leaves the Ledger serial execution writes.
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{
@@ -46,6 +51,13 @@ pub trait ConcurrentInvoke {
     /// The effect the call's tool declares. `None` is a tool the
     /// catalog does not know, which is not read-only.
     fn effect_of(&self, call: &ToolCall) -> Option<Effect>;
+    /// The tool a read-only call would run on, lent out before the call
+    /// is admitted so it can start while the model is still generating.
+    /// What it returns reaches the model only if `admit` later clears the
+    /// same call. `None`, the default, starts nothing early.
+    fn ahead(&self, _call: &ToolCall) -> Option<&dyn Tool> {
+        None
+    }
     /// Stage one, serial in call order: whether the call may run, at the
     /// turn's stamp. An answer that needs no tool (a replay, a door's
     /// refusal) comes back here.
@@ -168,15 +180,19 @@ impl Turn<ToolWave> {
         }
         let leading: Vec<&ToolCall> = calls.iter().take(going.len()).collect();
         let admitted: Vec<Admitted> = leading.iter().map(|call| tools.admit(call, t)).collect();
-        let mut answers = all_at_once(&*tools, &leading, &admitted).into_iter();
-        for ((call, standing), admission) in leading.iter().zip(going).zip(admitted) {
+        let early = std::mem::take(&mut self.state.speculated).answers_for(&leading);
+        let mut answers = all_at_once(&*tools, &leading, &admitted, &early).into_iter();
+        for (((call, standing), admission), cached) in
+            leading.iter().zip(going).zip(admitted).zip(early)
+        {
             if let Some(cancelled) = self.consume_boundary(standing, ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
             }
             let answered = match admission {
                 Admitted::Answered(answered) => answered,
                 Admitted::Cleared(ticket) => {
-                    let ran = answers.next().unwrap_or_else(|| Err(lost_answer()));
+                    let ran = cached
+                        .unwrap_or_else(|| answers.next().unwrap_or_else(|| Err(lost_answer())));
                     tools.account(call, ticket, ran)
                 }
             };
@@ -294,23 +310,25 @@ fn alone(
     }
 }
 
-/// Runs the tool of every cleared call at once and answers in call
-/// order, one answer per cleared call: the reorder buffer. The first
-/// runs on this thread, so a wave of one read starts no thread at all.
-/// The scope is this module's exception to the one spawn point
-/// (ARCHITECTURE §10 rule 3): every thread it starts is joined before it
-/// returns.
+/// Runs the tool of every cleared call that holds no answer from while
+/// the model was generating, all at once, and answers in call order, one
+/// answer per such call: the reorder buffer. The first runs on this
+/// thread, so a wave of one read starts no thread at all. The scope is
+/// this module's exception to the one spawn point (ARCHITECTURE §10
+/// rule 3): every thread it starts is joined before it returns.
 fn all_at_once(
     tools: &dyn ConcurrentInvoke,
     calls: &[&ToolCall],
     admitted: &[Admitted],
+    early: &[Option<Result<ToolOutcome, AxError>>],
 ) -> Vec<Result<ToolOutcome, AxError>> {
     let running: Vec<(&ToolCall, Result<&dyn Tool, AxError>)> = calls
         .iter()
         .zip(admitted)
-        .filter_map(|(call, admission)| match admission {
-            Admitted::Answered(_) => None,
-            Admitted::Cleared(ticket) => Some((*call, tools.tool(ticket))),
+        .zip(early)
+        .filter_map(|((call, admission), cached)| match (admission, cached) {
+            (Admitted::Cleared(ticket), None) => Some((*call, tools.tool(ticket))),
+            (Admitted::Cleared(_), Some(_)) | (Admitted::Answered(_), _) => None,
         })
         .collect();
     let run = |(call, tool): &(&ToolCall, Result<&dyn Tool, AxError>)| match tool {
@@ -335,7 +353,7 @@ fn all_at_once(
     })
 }
 
-fn lost_answer() -> AxError {
+pub(super) fn lost_answer() -> AxError {
     AxError::failure(
         AxCode::ToolUnavailable,
         "run a read-only tool call",

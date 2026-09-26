@@ -14,6 +14,7 @@ use kernel::event::record::ModelCalled;
 use kernel::{AxCode, AxError, Increment, Ledger, Model, ModelRequest, ModelReturn, Payload};
 
 use super::ledger::{Authored, Journal};
+use super::speculation::{Generating, Speculated, call_ahead};
 
 /// What one segment answered when it was offered a failed call.
 /// Exhaustive and closed: a fourth answer forces every caller to decide
@@ -84,31 +85,43 @@ impl<'a> ModelCall<'a> {
     }
 
     /// Makes the call and runs the recovery pipeline over its failure.
-    /// The streaming door when somebody is watching, the blocking one
-    /// when nobody is; both owe the same `ModelReturn`, and the record
-    /// below is written from that return in either case. The three
-    /// answers fold to one `Result` here: whether a segment skipped is
-    /// the pipeline's own account, and the turn wants the return or the
-    /// one error that carries the story.
+    /// `generating` picks the door; every door owes the same
+    /// `ModelReturn`, and the record below is written from that return
+    /// in each case. The three answers fold to one `Result` here:
+    /// whether a segment skipped is the pipeline's own account, and the
+    /// turn wants the return or the one error that carries the story. A
+    /// repaired return carries no reads started early: they belong to
+    /// the attempt that failed.
     ///
     /// # Errors
     /// The failure no segment repaired (`Skipped`, unchanged), or the
     /// repair's own failure (`Failed`).
-    pub(super) fn ask<'sink>(
+    pub(super) fn ask(
         &mut self,
         segments: &mut [&mut dyn Segment],
-        onto: Option<&mut (dyn FnMut(&Increment) + 'sink)>,
-    ) -> Result<ModelReturn, AxError> {
-        self.streamed = onto.is_some();
+        generating: Generating<'_, '_>,
+    ) -> Result<(ModelReturn, Speculated), AxError> {
         self.record()?;
-        let first = match onto {
-            Some(sink) => self.model.call_streaming(self.request, sink),
-            None => self.model.call(self.request),
+        let settled = |value| (value, Speculated::default());
+        let (streamed, first) = match generating {
+            Generating::Unwatched => (false, self.model.call(self.request).map(settled)),
+            Generating::Watched(sink) => (
+                true,
+                self.model.call_streaming(self.request, sink).map(settled),
+            ),
+            Generating::Speculating { deltas, tools } => (
+                true,
+                match deltas {
+                    Some(sink) => call_ahead(self.model, self.request, sink, tools),
+                    None => call_ahead(self.model, self.request, &mut |_: &Increment| {}, tools),
+                },
+            ),
         };
+        self.streamed = streamed;
         match first {
             Ok(value) => Ok(value),
             Err(failure) => match recover(segments, self, failure) {
-                SegmentOutcome::Recovered(value) => Ok(value),
+                SegmentOutcome::Recovered(value) => Ok(settled(value)),
                 SegmentOutcome::Failed(err) | SegmentOutcome::Skipped(err) => Err(err),
             },
         }
