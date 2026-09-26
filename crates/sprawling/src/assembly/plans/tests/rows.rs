@@ -138,7 +138,7 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
     );
     // The claim's line is written when the model makes it, so the
     // refusal went to the model as the claim's answer and the run went on.
-    assert!(outcome.is_ok(), "a refused claim ends the claim, not the run");
+    assert!(outcome.is_ok(), "the run goes on past a refused claim");
 }
 
 #[test]
