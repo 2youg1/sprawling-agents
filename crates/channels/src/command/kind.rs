@@ -63,7 +63,7 @@ pub enum Command<Secret = Sealed<String>> {
         /// model the city registered under some tag, so it arrives with
         /// the endpoint and the window it was registered with; an id the
         /// city never registered is refused before anything is written
-        /// (channels-SPEC.md section 8-48).
+        /// (channels-SPEC.md section 8-48c).
         model: Option<String>,
     },
     /// One step of a subscription login. Which step is named rather
