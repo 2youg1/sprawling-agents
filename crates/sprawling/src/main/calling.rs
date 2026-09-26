@@ -82,9 +82,13 @@ pub(super) fn call(args: &[String]) -> Exit {
             }
         }
         Err(unheard) => {
-            let (Unheard::Unreadable(err) | Unheard::NoCity(err) | Unheard::Broken(err)) = &unheard;
+            let (exit, err) = match &unheard {
+                Unheard::Unreadable(err) => (Exit::Line, err),
+                Unheard::NoCity(err) => (Exit::NoCity, err),
+                Unheard::Broken(err) => (Exit::Refused, err),
+            };
             refused(err);
-            Exit::Refused
+            exit
         }
     }
 }
