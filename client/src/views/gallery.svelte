@@ -36,6 +36,7 @@
   import Anchored from "./gallery/anchored.svelte";
   import Conversation from "./gallery/conversation.svelte";
   import Filed from "./gallery/filed.svelte";
+  import Followed from "./gallery/followed.svelte";
   import Hints from "./gallery/hints.svelte";
   import Keepers from "./gallery/kept.svelte";
   import Parts from "./gallery/parts.svelte";
@@ -73,6 +74,7 @@
   <Hints />
   <Presences />
   <Conversation />
+  <Followed />
   <Anchored />
   <Produced />
   <Filed />

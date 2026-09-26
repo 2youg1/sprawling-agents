@@ -27,6 +27,22 @@ export function sentFrom(from: Address, task: string, runs: Readonly<Record<RunI
   return { from, task, known: new Set(Object.values(runs).map((run) => run.run)) };
 }
 
-export function landingOf(_sent: Sent, _runs: Readonly<Record<RunId, RunBelief>>): Landing {
-  return { kind: "pending" };
+// The first run to start after the dispatch that carries its words and
+// sits in its room or under it. `shopfront` is not under `shop`: the
+// room is compared a whole segment at a time.
+export function landingOf(sent: Sent, runs: Readonly<Record<RunId, RunBelief>>): Landing {
+  const under = `${sent.from}/`;
+  const opened = Object.values(runs)
+    .filter(
+      (run) =>
+        !sent.known.has(run.run) &&
+        run.task === sent.task &&
+        run.addr !== null &&
+        (run.addr === sent.from || run.addr.startsWith(under)),
+    )
+    .sort((a, b) => (a.started ?? 0) - (b.started ?? 0) || a.lastSeq - b.lastSeq)
+    .at(0);
+  const addr = opened?.addr ?? null;
+  if (opened === undefined || addr === null) return { kind: "pending" };
+  return addr === sent.from ? { kind: "here" } : { kind: "elsewhere", run: opened.run, addr };
 }
