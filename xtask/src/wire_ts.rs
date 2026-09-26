@@ -26,7 +26,7 @@ const TARGET: &str = concat!(crate::walk::client_src!(), "/wire.ts");
 
 /// What the generated file states before any type: the wire version
 /// both ends compare, the schema hash the server checks, and the run
-/// identity a city-level record carries. Three values that always
+/// identity a city-level record carries, and the body size range. Values that always
 /// travel together and are never chosen independently, so they travel
 /// as one.
 pub(super) struct Constants {
@@ -36,6 +36,16 @@ pub(super) struct Constants {
     /// out by hand, and a client that spells this identity differently
     /// folds every city-level record into a run that does not exist.
     pub(super) city_run: String,
+    /// `channels::BODY_PX_MIN` and `BODY_PX_MAX`, the body sizes the
+    /// `[ui]` writer accepts; the appearance page offers this range
+    /// rather than a copy of its own.
+    pub(super) body_px: BodyPx,
+}
+
+/// The smallest and the largest body size a person may ask for.
+pub(super) struct BodyPx {
+    pub(super) min: u32,
+    pub(super) max: u32,
 }
 
 /// The text the wire produces now.
@@ -49,6 +59,10 @@ fn render() -> Result<String, XtaskError> {
         wire_v: channels::WIRE_V,
         hash: channels::schema_hash().to_string(),
         city_run: kernel::RunId::CITY.to_string(),
+        body_px: BodyPx {
+            min: channels::BODY_PX_MIN,
+            max: channels::BODY_PX_MAX,
+        },
     };
     emit::emit(&channels::wire_schema(), &constants).map_err(|refused| XtaskError::Doc {
         file: format!("channels::wire_schema at {}", refused.at),

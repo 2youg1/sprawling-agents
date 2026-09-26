@@ -10,9 +10,9 @@
 
 use serde_json::{Value, json};
 
-use super::Constants;
 use super::emit::emit;
 use super::first_difference;
+use super::{BodyPx, Constants};
 
 fn document(defs: Value) -> Value {
     json!({ "$defs": defs })
@@ -25,6 +25,7 @@ fn constants() -> Constants {
         wire_v: 13,
         hash: "ab12".to_owned(),
         city_run: "00000000-0000-0000-0000-000000000000".to_owned(),
+        body_px: BodyPx { min: 12, max: 20 },
     }
 }
 
