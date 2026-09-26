@@ -243,7 +243,7 @@ pub fn drive(
     hooks: &mut RunHooks<'_>,
     handoff: &Handoff,
 ) -> Result<Run<Frozen>, AxError> {
-    let mut watchdog = crate::Watchdog::new(plan.retries);
+    let mut watchdog = crate::Watchdog::new(plan.retries, plan.run);
     let mut run = Run::dispatch(plan, ledger, hooks)?;
     let ending = loop {
         match run.advance(ledger, model, hooks) {

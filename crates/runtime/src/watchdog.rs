@@ -11,7 +11,7 @@
 //! Terminal-only watchdogs kill recoverable sessions; that lesson is the
 //! reason this type exists.
 
-use kernel::{AxCode, AxError, Payload, Retries, Retry, StallVerdict, TimeMs};
+use kernel::{AxCode, AxError, Payload, Retries, Retry, RunId, StallVerdict, TimeMs};
 use serde::{Deserialize, Serialize};
 
 /// One watchdog per run: it holds the correction history and the ceiling
@@ -80,7 +80,7 @@ impl FreezeReason {
 
 impl Watchdog {
     #[must_use]
-    pub fn new(retries: Retries) -> Watchdog {
+    pub fn new(retries: Retries, _run: RunId) -> Watchdog {
         Watchdog {
             retries,
             ..Watchdog::default()
@@ -258,9 +258,59 @@ mod tests {
     use kernel::ActionFingerprint;
     use kernel::stall::observe;
 
+    /// The schedule's floor for each failure in a row, before jitter.
+    const BASES: [u64; 9] = [
+        500, 1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 60_000, 60_000,
+    ];
+
+    /// A uuid v7 run id; runs that differ only in `tail` started in the
+    /// same millisecond.
+    fn run(tail: u8) -> RunId {
+        let mut bytes = [
+            0x01, 0x93, 0x2a, 0x7c, 0x10, 0x00, 0x70, 0x00, 0x80, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        bytes[15] = tail;
+        RunId::from_bytes(bytes)
+    }
+
+    /// The waits one watchdog hands out for `count` retriable failures
+    /// in a row, measured from zero.
+    fn waits(dog: &mut Watchdog, count: usize) -> Vec<u64> {
+        (0..count)
+            .map(
+                |_| match dog.on_provider_failure(&provider_error(true), TimeMs::new(0)) {
+                    Disposal::BackOff { until, .. } => until.value(),
+                    other => panic!("a retriable failure under its ceiling backs off: {other:?}"),
+                },
+            )
+            .collect()
+    }
+
+    fn within_schedule(waits: &[u64]) -> bool {
+        waits
+            .iter()
+            .zip(BASES)
+            .all(|(wait, base)| (base..=base + base / 2).contains(wait))
+    }
+
+    /// Runs cut by the same outage in the same millisecond spread their
+    /// next calls instead of arriving together, and one run replays its
+    /// own waits byte for byte.
+    #[test]
+    fn each_run_waits_its_own_jittered_schedule() {
+        let schedule = |tail: u8| waits(&mut Watchdog::new(Retries::UntilHalted, run(tail)), 9);
+        let (first, second) = (schedule(1), schedule(2));
+        assert!(
+            within_schedule(&first) && within_schedule(&second),
+            "{first:?} {second:?}"
+        );
+        assert_eq!(first, schedule(1), "the same run waits the same schedule");
+        assert_ne!(first, second, "two runs do not ask again in step");
+    }
+
     #[test]
     fn disposal_is_graded_steer_first_freeze_second() {
-        let mut dog = Watchdog::new(Retries::UntilHalted);
+        let mut dog = Watchdog::new(Retries::UntilHalted, run(1));
         let same = ActionFingerprint::derive(b"exec identical");
         let sample = vec![same, same, same];
         let verdict = observe(&sample);
@@ -287,7 +337,7 @@ mod tests {
 
     #[test]
     fn ok_verdicts_never_dispose() {
-        let mut dog = Watchdog::new(Retries::UntilHalted);
+        let mut dog = Watchdog::new(Retries::UntilHalted, run(1));
         assert_eq!(dog.on_stall(&StallVerdict::Ok), Disposal::Proceed);
         assert_eq!(dog.on_stall(&StallVerdict::Ok), Disposal::Proceed);
     }
@@ -300,7 +350,7 @@ mod tests {
 
     #[test]
     fn a_failure_the_provider_will_repeat_stops_after_one() {
-        let mut dog = Watchdog::new(Retries::UntilHalted);
+        let mut dog = Watchdog::new(Retries::UntilHalted, run(1));
         assert_eq!(
             dog.on_provider_failure(&provider_error(false), TimeMs::new(9_000)),
             Disposal::Freeze {
@@ -312,25 +362,20 @@ mod tests {
 
     #[test]
     fn an_answer_ends_the_streak_the_backoff_counts() {
-        let mut dog = Watchdog::new(Retries::AtMost(2));
-        let wait = |dog: &mut Watchdog| match dog
-            .on_provider_failure(&provider_error(true), TimeMs::new(0))
-        {
-            Disposal::BackOff { until, .. } => until.value(),
-            other => panic!("a retriable failure under its ceiling backs off: {other:?}"),
-        };
-        assert_eq!([wait(&mut dog), wait(&mut dog)], [500, 1_000]);
+        let mut dog = Watchdog::new(Retries::AtMost(2), run(1));
+        let before = waits(&mut dog, 2);
+        assert!(within_schedule(&before), "{before:?}");
         dog.on_provider_answered();
         assert_eq!(
-            [wait(&mut dog), wait(&mut dog)],
-            [500, 1_000],
+            waits(&mut dog, 2),
+            before,
             "an outage after a recovery starts from the first wait, under a fresh ceiling"
         );
     }
 
     #[test]
     fn a_retriable_failure_backs_off_and_never_freezes_by_itself() {
-        let mut dog = Watchdog::new(Retries::UntilHalted);
+        let mut dog = Watchdog::new(Retries::UntilHalted, run(1));
         let waits: Vec<u64> = (0..64u64)
             .map(
                 |_| match dog.on_provider_failure(&provider_error(true), TimeMs::new(1_000)) {
@@ -341,14 +386,15 @@ mod tests {
                 },
             )
             .collect();
-        assert_eq!(
-            waits[..9],
-            [
-                500, 1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 60_000, 60_000
-            ],
-            "each failure in a row doubles the wait, up to a minute"
+        assert!(
+            within_schedule(&waits),
+            "each failure in a row doubles the wait, up to a minute: {waits:?}"
         );
-        assert!(waits[9..].iter().all(|wait| *wait == 60_000));
+        assert!(
+            waits[9..]
+                .iter()
+                .all(|wait| (60_000..=90_000).contains(wait))
+        );
         let payload = serde_json::to_value(
             dog.fired_payload(&Disposal::BackOff {
                 until: TimeMs::new(1_000),
@@ -367,9 +413,13 @@ mod tests {
         );
     }
 
+    fn waits_of_fresh_run() -> Vec<u64> {
+        waits(&mut Watchdog::new(Retries::UntilHalted, run(1)), 2)
+    }
+
     #[test]
     fn a_provider_that_names_its_wait_is_not_asked_sooner() {
-        let mut dog = Watchdog::new(Retries::UntilHalted);
+        let mut dog = Watchdog::new(Retries::UntilHalted, run(1));
         let told = |wait_ms: u64| {
             AxError::failure(AxCode::Provider, "call the model", "answered 429")
                 .retriable_after(wait_ms)
@@ -385,9 +435,10 @@ mod tests {
                 },
             )
             .to_vec();
+        let own = waits_of_fresh_run();
         assert_eq!(
             waits,
-            [30_000, 1_000],
+            [30_000, own[1]],
             "the longer of the provider's word and the schedule's own wait"
         );
     }

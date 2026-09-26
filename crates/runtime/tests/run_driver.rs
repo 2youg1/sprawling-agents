@@ -766,7 +766,7 @@ fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
 }
 
 /// A provider answering 500 in a row is asked again on a backoff that
-/// doubles, each wait is the moment the history records, and a halt that
+/// doubles (plus the run's jitter), each wait is the moment the history records, and a halt that
 /// lands during a wait stops the run there. Before the wait hook the
 /// loop asked again at once, recorded a wait it never took, and a root
 /// run had no safe point inside the retry for a halt to reach.
@@ -820,7 +820,14 @@ fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
         .collect();
     let backoffs: Vec<u64> = fired.iter().map(|(t, until)| until - t).collect();
     let untils: Vec<u64> = fired.iter().map(|(_, until)| *until).collect();
-    assert_eq!(backoffs, vec![500, 1_000, 2_000], "the wait doubles");
+    assert!(
+        backoffs
+            .iter()
+            .zip([500, 1_000, 2_000])
+            .all(|(wait, base)| (base..=base + base / 2).contains(wait))
+            && backoffs.len() == 3,
+        "the wait doubles, plus at most half again of jitter: {backoffs:?}"
+    );
     assert_eq!(waited, untils, "the run waits for the moment it records");
     assert_eq!(*attempts.borrow(), 3, "no call goes out after the halt");
     assert!(matches!(frozen.completion(), Completion::Cancelled));
