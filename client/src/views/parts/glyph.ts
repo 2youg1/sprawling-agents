@@ -51,7 +51,13 @@ export type GlyphName =
   // Two crossed strokes: refused.
   | "cross"
   // One stroke that lands: done.
-  | "check";
+  | "check"
+  // A wrench: a tool is at work.
+  | "tool"
+  // A square, the stop key of every player: somebody stopped it.
+  | "stopped"
+  // A line that runs into a wall: it ran out of what it was allowed.
+  | "capped";
 
 export const GLYPHS: Record<GlyphName, string> = {
   talk: "M3 5.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2z",
@@ -68,6 +74,9 @@ export const GLYPHS: Record<GlyphName, string> = {
   pulse: "M2.5 10.5h3l2.5-5.5 3.5 10 2.5-4.5h3.5",
   cross: "M5.5 5.5l9 9M14.5 5.5l-9 9",
   check: "M4 10.5l4 4 8-9",
+  tool: "M13.5 3a3.5 3.5 0 0 0-3.3 4.7L3.5 14.4l2.1 2.1 6.7-6.7A3.5 3.5 0 0 0 17 6.5l-2.2.7-2-2 .7-2.2z",
+  stopped: "M6 6h8v8H6z",
+  capped: "M3 10h10M10 7l3 3-3 3M16 4v12",
 };
 
 // The three paint tiers a mark may take (client-SPEC 4-32). They are

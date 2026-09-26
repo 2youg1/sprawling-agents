@@ -148,7 +148,7 @@ function isLevel(raw: string): raw is LogLevel {
     <span class="text-note text-text-faint">{say($lang, "log_window")}</span>
   </div>
   {#if shown.length === 0}
-    <EmptyState missing="log_empty" />
+    <EmptyState missing="log_empty" seat="region" />
   {:else}
     <ul class="font-mono text-note">
       {#each [...shown].reverse() as line (line.seq)}

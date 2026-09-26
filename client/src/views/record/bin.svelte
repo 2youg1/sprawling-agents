@@ -34,6 +34,7 @@ function keyOf(row: DiscardLine): string {
   import { restoreDiscard } from "../../core/commands";
   import { clock } from "../../core/time";
   import { ui } from "../../ui";
+  import EmptyState from "../parts/empty.svelte";
   import Path from "../parts/path.svelte";
 
   const u = ui();
@@ -50,7 +51,7 @@ function keyOf(row: DiscardLine): string {
 {#if rows === undefined}
   <p class="text-text-faint">…</p>
 {:else if rows.length === 0}
-  <p class="text-text-faint">{say($lang, "bin_empty")}</p>
+  <EmptyState missing="bin_nothing" seat="region" />
 {:else}
   <ul class="text-note">
     {#each rows as row (keyOf(row))}

@@ -44,9 +44,9 @@
 </script>
 
 <Case label="monitor · before the first sample">
-  <Monitor samples={[]} {watch} />
+  <Monitor samples={[]} {watch} rank="section" />
 </Case>
 
 <Case label="monitor · five minutes of samples">
-  <Monitor samples={FULL} {watch} />
+  <Monitor samples={FULL} {watch} rank="section" />
 </Case>

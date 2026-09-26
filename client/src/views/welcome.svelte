@@ -60,13 +60,16 @@
   }
 </script>
 
-<div class="flex min-w-0 flex-1 flex-col px-pane pt-[18vh] pb-section">
+<!-- The welcome has no rail and no strip of facts, so it is the one
+page drawn in the middle of the window: one column the width of a page,
+its title and its three doors sharing one left edge. -->
+<div class="mx-auto flex w-full max-w-page min-w-0 flex-1 flex-col px-wide pt-[18vh] pb-section">
   {#if rank === "page"}
     <h1 tabindex="-1" class="mb-wide text-title font-title">{say($lang, "welcome_title")}</h1>
   {:else}
     <h2 class="mb-wide text-title font-title">{say($lang, "welcome_title")}</h2>
   {/if}
-  <div class="grid w-full max-w-page grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-base">
+  <div class="grid w-full grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-base">
     {#if !mainReady}
       <a
         href={toFragment({ kind: "setup" })}

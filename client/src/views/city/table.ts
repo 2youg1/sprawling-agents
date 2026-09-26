@@ -14,7 +14,7 @@
 
 import type { Address, BuildingProgress } from "../../wire";
 import type { BoardRun, Phase } from "../runs/lineage";
-import { guide, phaseOf, placeByNeed, placeOf } from "../runs/lineage";
+import { ended, guide, phaseOf, placeByNeed, placeOf } from "../runs/lineage";
 
 // One run's start on a building's bar, coloured by what the run is
 // doing now.
@@ -53,13 +53,13 @@ function rowOf(addr: Address, runs: readonly BoardRun[], place: string): Buildin
     .flatMap((run) => (run.started === null ? [] : [{ run: run.run, at: run.started, phase: phaseOf(run.doing) }]))
     .sort((a, b) => a.at - b.at || a.run.localeCompare(b.run));
   const phases = runs.map((run) => phaseOf(run.doing));
-  const going = starts.filter((start) => start.phase !== "done");
+  const going = starts.filter((start) => !ended(start.phase));
   return {
     addr,
     guide: place,
     waiting: phases.filter((phase) => phase === "person").length,
-    working: phases.filter((phase) => phase !== "person" && phase !== "done").length,
-    done: phases.filter((phase) => phase === "done").length,
+    working: phases.filter((phase) => phase !== "person" && !ended(phase)).length,
+    done: phases.filter(ended).length,
     latest: starts.at(-1)?.at ?? null,
     since: going[0]?.at ?? null,
     starts,

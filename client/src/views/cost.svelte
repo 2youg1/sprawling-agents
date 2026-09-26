@@ -47,6 +47,7 @@ const TITLES: Record<Cut, Key> = {
   import { usd } from "../core/time";
   import { ui } from "../ui";
   import EmptyState from "./parts/empty.svelte";
+  import Page from "./parts/page.svelte";
   import Unanswered from "./parts/unanswered.svelte";
   import { costReading } from "./pricing";
 
@@ -60,7 +61,7 @@ const TITLES: Record<Cut, Key> = {
 </script>
 
 {#snippet unpriced(count: UnpricedCalls)}
-  <p class="mb-wide text-note text-text-quiet">
+  <p class="text-note text-text-quiet">
     {fill(say($lang, "cost_unpriced"), { calls: String(count.calls), tokens: String(count.tokens) })}
   </p>
 {/snippet}
@@ -81,15 +82,24 @@ const TITLES: Record<Cut, Key> = {
   </ul>
 {/snippet}
 
-<div class="w-full max-w-page px-pane py-wide">
-  <div class="mb-wide flex items-baseline justify-between">
-    <h1 class="text-title font-title" tabindex="-1">{say($lang, "cost_title")}</h1>
-    {#if answer !== undefined}
+{#snippet total()}
+  <!-- An idle city states no figure at all: the empty state under the
+  header already says nothing was spent, and a total of zero beside it
+  would read as a measurement. -->
+  {#if answer !== undefined && reading !== undefined && reading.kind !== "idle"}
+    <span class="flex items-baseline gap-snug">
+      <span class="text-note text-text-quiet">{say($lang, "cost_total")}</span>
       <span class="text-figure font-figure">
-        {answer.total > 0 ? usd(answer.total) : say($lang, "cost_none")}
+        {reading.kind === "priced" ? usd(answer.total) : say($lang, "cost_none")}
       </span>
-    {/if}
-  </div>
+    </span>
+  {/if}
+{/snippet}
+
+<!-- The total stands at the right end of the header line, the one place
+a figure about the whole page goes; the cuts under it take the page's
+width in as many columns as it holds. -->
+<Page title={say($lang, "cost_title")} aside={total}>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.cost} />
   {:else if answer === undefined || reading === undefined}
@@ -101,11 +111,11 @@ const TITLES: Record<Cut, Key> = {
     <!-- Nothing has been spent, which reads exactly like a page that
     failed to load unless the page says which one it is. Spending starts
     with a run, and a run starts in the conversation with the Mayor. -->
-    <EmptyState missing="cost_empty">
+    <EmptyState missing="cost_empty" seat="region">
       {#snippet action()}
         <a
           href={toFragment({ kind: "talk", address: MAYOR })}
-          class="rounded-control bg-accent px-base py-snug text-label text-on-accent hover:bg-accent-hover"
+          class="inline-flex h-control items-center rounded-control bg-accent px-base text-label text-on-accent hover:bg-accent-hover"
         >
           {say($lang, "city_ask_mayor")}
         </a>
@@ -116,10 +126,10 @@ const TITLES: Record<Cut, Key> = {
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render unpriced(answer.unpriced)}
     {/if}
-    <div class="grid gap-wide grid-cols-[repeat(auto-fit,minmax(320px,1fr))]">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-wide">
       {#each CUTS as each (each)}
-        <section>
-          <h2 class="mb-snug text-label font-label text-text-quiet">{say($lang, TITLES[each])}</h2>
+        <section class="flex min-w-0 flex-col gap-snug rounded-card bg-raised px-pane py-base">
+          <h2 class="text-label font-label text-text-quiet">{say($lang, TITLES[each])}</h2>
           {#if answer[each].length > 0}
             <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
             {@render cut(answer[each], answer.total)}
@@ -130,4 +140,4 @@ const TITLES: Record<Cut, Key> = {
       {/each}
     </div>
   {/if}
-</div>
+</Page>

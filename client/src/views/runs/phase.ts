@@ -8,12 +8,22 @@
 // one legend.
 
 import type { Key } from "../../core/lang";
-import type { Status } from "../parts/glyph";
+import type { GlyphName, Weight } from "../parts/glyph";
 import type { Phase } from "./lineage";
 
-export const PHASES: readonly Phase[] = ["model", "tool", "person", "idle", "done"];
+export const PHASES: readonly Phase[] = ["model", "tool", "person", "idle", "done", "stopped", "capped"];
 
-export const PHASE_STATUS: Record<Phase, Status> = { model: "live", tool: "live", person: "waiting", idle: "idle", done: "done" };
+// The mark a run's row carries: each ending its own drawing, because a
+// forced-colours mode repaints the ink and leaves only the shape.
+export const PHASE_MARK: Record<Phase, { readonly glyph: GlyphName; readonly weight: Weight }> = {
+  model: { glyph: "pulse", weight: "live" },
+  tool: { glyph: "tool", weight: "live" },
+  person: { glyph: "hand", weight: "alert" },
+  idle: { glyph: "ring", weight: "quiet" },
+  done: { glyph: "check", weight: "quiet" },
+  stopped: { glyph: "stopped", weight: "quiet" },
+  capped: { glyph: "capped", weight: "alert" },
+};
 
 export const PHASE_FILL: Record<Phase, string> = {
   model: "bg-accent",
@@ -21,6 +31,8 @@ export const PHASE_FILL: Record<Phase, string> = {
   person: "bg-alert",
   idle: "bg-edge-input",
   done: "bg-text-disabled",
+  stopped: "bg-text-disabled",
+  capped: "bg-alert",
 };
 
 export const PHASE_WORD: Record<Phase, Key> = {
@@ -29,4 +41,6 @@ export const PHASE_WORD: Record<Phase, Key> = {
   person: "run_doing_waiting",
   idle: "runs_phase_idle",
   done: "run_doing_frozen",
+  stopped: "runs_phase_stopped",
+  capped: "runs_phase_capped",
 };

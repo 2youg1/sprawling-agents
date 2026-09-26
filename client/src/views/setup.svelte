@@ -239,9 +239,13 @@
     {/each}
   </nav>
 
-  <div class="flex min-w-0 max-w-page flex-1 flex-col gap-wide">
-    <div class={["flex min-w-0 flex-col gap-base", WIDTH[shown]]}>
-      <header class="flex flex-wrap items-baseline gap-base">
+  <!-- The group's header is the page frame's header (`parts/page`),
+  spelled here because this page's title follows the group; the body and
+  the city's own `config.toml` stand side by side once there is room,
+  the file as the side panel of every group. -->
+  <div class="flex min-w-0 flex-1 flex-col gap-wide">
+    <header class="flex min-w-0 flex-col gap-tight border-b border-edge pb-base">
+      <div class="flex flex-wrap items-center gap-base">
         {#if rank === "page"}
           <h1 class="text-title font-title" tabindex="-1" bind:this={heading}>
             {say($lang, HEADING[shown])}
@@ -252,91 +256,90 @@
         {#if PREFERRED.includes(shown)}
           <Kept keeper={$keeper} />
         {/if}
-      </header>
+      </div>
       {#if hint !== null}
-        <p class="text-note text-text-faint">{say($lang, hint)}</p>
+        <p class="text-note text-text-quiet">{say($lang, hint)}</p>
       {/if}
-      <div class="flex min-w-0 flex-col gap-base">
-        {#if shown === "accounts"}
-          <div class="flex flex-col gap-wide">
-            <!-- **The form and the file sit side by side once there is
-                room.** The form takes the conversation's 760 rather than
-                a measure, because what a person pastes into it is a base
-                URL and a key and 520 cut both off; the proofing block
-                drops back under the body on a narrow container
-                (client-SPEC 4-33, 4-36). -->
-            <div
-              class="flex min-w-0 flex-col gap-wide @wide/page:flex-row @wide/page:items-start @wide/page:gap-section"
-            >
-              <div class="min-w-0 max-w-talk flex-1">
+    </header>
+    <!-- The dependency group lays its cards out in its own columns and
+    needs the whole row for them, so there the file stays under the body. -->
+    <div class={["flex min-w-0 flex-col gap-wide", shown === "tools" ? "" : "@wide/page:flex-row @wide/page:items-start @wide/page:gap-section"]}>
+      <div class="min-w-0 flex-1">
+        <div class={["flex min-w-0 flex-col gap-base", WIDTH[shown]]}>
+          {#if shown === "accounts"}
+            <div class="flex flex-col gap-wide">
+              <!-- The form takes the conversation's 760 rather than a
+                  measure, because what a person pastes into it is a base
+                  URL and a key and 520 cut both off (client-SPEC 4-33,
+                  4-36). -->
+              <div class="min-w-0 max-w-talk">
                 <ProviderDoor />
               </div>
-              <div class="min-w-0 @wide/page:sticky @wide/page:top-0 @wide/page:w-tree @wide/page:shrink-0">
-                <Toml />
+              <div class="flex flex-col gap-base">
+                <h2 class="text-label font-label text-text-quiet">{say($lang, "setup_models")}</h2>
+                {#if answer !== undefined}
+                  <ModelChoice {answer} />
+                {/if}
               </div>
             </div>
-            <div class="flex flex-col gap-base">
-              <h2 class="text-label font-label text-text-quiet">{say($lang, "setup_models")}</h2>
-              {#if answer !== undefined}
-                <ModelChoice {answer} />
-              {/if}
+          {:else if shown === "run"}
+            <div class="grid grid-fit items-start gap-base">
+              <div class="min-w-0 rounded-card bg-raised px-base py-snug">
+                <EffortSection />
+              </div>
+              <GovernedSection />
+              <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
+                <span class="text-label font-label text-text">{say($lang, "setup_autonomy")}</span>
+                <p class="text-note text-text-faint">{say($lang, "setup_autonomy_note")}</p>
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render autonomyControl()}
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render foot(undefined, "autonomy")}
+                <Decided />
+              </div>
             </div>
-          </div>
-        {:else if shown === "run"}
-          <div class="flex flex-col gap-wide">
-            <EffortSection />
-            <GovernedSection />
+          {:else if shown === "network"}
             <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-              <span class="text-label font-label text-text">{say($lang, "setup_autonomy")}</span>
-              <p class="text-note text-text-faint">{say($lang, "setup_autonomy_note")}</p>
+              <span class="text-label font-label text-text">{say($lang, "setup_network_default")}</span>
+              <p class="text-note text-text-faint">{say($lang, "setup_network_new_only")}</p>
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-              {@render autonomyControl()}
+              {@render proxyingControl()}
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-              {@render foot(undefined, "autonomy")}
-              <Decided />
+              {@render foot(ruleNote !== undefined ? say($lang, ruleNote) : undefined, "proxying")}
             </div>
-          </div>
-        {:else if shown === "network"}
-          <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-            <span class="text-label font-label text-text">{say($lang, "setup_network_default")}</span>
-            <p class="text-note text-text-faint">{say($lang, "setup_network_new_only")}</p>
-            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-            {@render proxyingControl()}
-            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-            {@render foot(ruleNote !== undefined ? say($lang, ruleNote) : undefined, "proxying")}
-          </div>
-        {:else if shown === "tools"}
-          {#if dependency !== undefined}
-            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-            {@render dependency()}
-          {:else}
-            <Machine />
+          {:else if shown === "tools"}
+            {#if dependency !== undefined}
+              <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+              {@render dependency()}
+            {:else}
+              <Machine />
+            {/if}
+          {:else if shown === "skills"}
+            <SkillsSection />
+          {:else if shown === "appearance"}
+            <div class="grid grid-fit items-start gap-base">
+              <AppearanceSection />
+              <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
+                <span class="text-label font-label text-text">{say($lang, "setup_language")}</span>
+                <p class="text-note text-text-faint">{say($lang, "setup_language_note")}</p>
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render languageControl()}
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render foot(undefined, "language")}
+              </div>
+            </div>
+          {:else if shown === "keys"}
+            <KeysSection />
+          {:else if shown === "advanced"}
+            <AdvancedSection />
+          {:else if shown === "about"}
+            <Release />
           {/if}
-        {:else if shown === "skills"}
-          <SkillsSection />
-        {:else if shown === "appearance"}
-          <div class="flex flex-col gap-wide">
-            <AppearanceSection />
-            <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-              <span class="text-label font-label text-text">{say($lang, "setup_language")}</span>
-              <p class="text-note text-text-faint">{say($lang, "setup_language_note")}</p>
-              <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-              {@render languageControl()}
-              <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-              {@render foot(undefined, "language")}
-            </div>
-          </div>
-        {:else if shown === "keys"}
-          <KeysSection />
-        {:else if shown === "advanced"}
-          <AdvancedSection />
-        {:else if shown === "about"}
-          <Release />
-        {/if}
+        </div>
+      </div>
+      <div class="min-w-0 @wide/page:sticky @wide/page:top-0 @wide/page:w-tree @wide/page:shrink-0">
+        <Toml />
       </div>
     </div>
-    {#if shown !== "accounts"}
-      <Toml />
-    {/if}
   </div>
 </div>

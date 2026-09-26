@@ -21,6 +21,7 @@ export { default as RegistryTable } from "./registry/table.svelte";
   import { readAnswer } from "../core/answered";
   import { say } from "../core/lang";
   import { ui } from "../ui";
+  import Page from "./parts/page.svelte";
   import Unanswered from "./parts/unanswered.svelte";
   import Table from "./registry/table.svelte";
 
@@ -35,8 +36,7 @@ export { default as RegistryTable } from "./registry/table.svelte";
 <!-- The screen: the one question, and the table that draws its answer.
 A table is not capped by content kind (client-SPEC 4-33) - it grows with
 its container and scrolls sideways rather than break a value. -->
-<div class="w-full px-pane py-wide">
-  <h1 class="mb-wide text-title font-title" tabindex="-1">{say($lang, "nav_registry")}</h1>
+<Page title={say($lang, "nav_registry")}>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.registry} />
   {:else if answer === undefined}
@@ -44,4 +44,4 @@ its container and scrolls sideways rather than break a value. -->
   {:else}
     <Table assets={answer.assets} />
   {/if}
-</div>
+</Page>

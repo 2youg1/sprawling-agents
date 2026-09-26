@@ -40,7 +40,9 @@
     { kind: "frozen", completion: null },
     { kind: "unknown" },
     { kind: "thinking" },
-    { kind: "frozen", completion: null },
+    { kind: "frozen", completion: "cancelled" },
+    { kind: "frozen", completion: "limit" },
+    { kind: "frozen", completion: "done" },
   ];
 
   function idOf(n: number): string {

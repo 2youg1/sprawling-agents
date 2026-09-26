@@ -36,8 +36,11 @@ export function boardRuns(runs: Readonly<Record<string, RunBelief>>): BoardRun[]
   return Object.values(runs).map(({ run, addr, task, started, doing }) => ({ run, addr, task, started, ended: null, doing }));
 }
 
-// The phase a run's bar is coloured by: whose turn it is.
-export type Phase = "model" | "tool" | "person" | "idle" | "done";
+// The phase a run's bar is coloured by: whose turn it is, and for a
+// run that has ended, how it ended. A run somebody stopped and a run
+// that ran out of budget are not a run that finished, and drawing all
+// three with one check mark told a person their cancelled work was done.
+export type Phase = "model" | "tool" | "person" | "idle" | "done" | "stopped" | "capped";
 
 export function phaseOf(doing: Doing): Phase {
   switch (doing.kind) {
@@ -50,8 +53,13 @@ export function phaseOf(doing: Doing): Phase {
     case "unknown":
       return "idle";
     case "frozen":
-      return "done";
+      return doing.completion === "cancelled" ? "stopped" : doing.completion === "limit" ? "capped" : "done";
   }
+}
+
+// Whether a phase is one a run ends in.
+export function ended(phase: Phase): boolean {
+  return phase === "done" || phase === "stopped" || phase === "capped";
 }
 
 export type Row =
