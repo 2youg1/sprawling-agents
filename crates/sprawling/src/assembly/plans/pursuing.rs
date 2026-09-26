@@ -19,7 +19,7 @@
 use kernel::{Address, AxError, NodeId};
 
 use super::super::{Assignment, Landed, RunWorker};
-use crate::serving::relay::Patience;
+use crate::assembly::relay::Patience;
 
 /// Why one pass over the ready set stopped taking work.
 ///

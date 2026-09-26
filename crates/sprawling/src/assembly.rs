@@ -21,7 +21,10 @@
 //! clock sample, the two hooks a live control surface installs, and the
 //! door a `Command` enters by. The lines it appends live in
 //! `recording`; opening and closing in `lifetime`; the test fixtures in
-//! `fixture`.
+//! `fixture`. The thread the worker runs on is started here too: the
+//! port is taken and the writer opened in `listening`, the writer's loop
+//! is `attending`, commands wait on the `desk`, and runs are driven on
+//! the lanes of the `pool` and write back through the `relay`.
 //!
 //! The `use` block below is where the submodules see each other. A
 //! submodule imports from `super`, so what one part of the assembly
@@ -29,10 +32,11 @@
 //! than as a graph; the one sibling reach is `credentials::dialect_headers`,
 //! which the dispatching modules read where the credentials module keeps it.
 
-mod building_page;
+mod attending;
 mod collaborating;
 mod commanding;
 mod credentials;
+mod desk;
 mod dispatching;
 mod doorstep;
 mod driving;
@@ -40,12 +44,15 @@ mod folds;
 mod freezing;
 mod genesis;
 mod lifetime;
+mod listening;
 mod mcp;
 mod models;
 mod naming;
 mod plans;
+mod pool;
 mod probing;
 mod recording;
+mod relay;
 mod reviewing;
 mod rooms;
 mod settling;
@@ -53,13 +60,12 @@ mod toolkits;
 mod waking;
 mod workbench;
 
-pub(crate) use building_page::{DOC_BYTES_MAX, read_building};
 use collaborating::Collaborating;
 use commanding::entrance::Entrance;
 use credentials::held::Credentials;
-pub(crate) use credentials::signing::resolving;
 use credentials::subscription::Expiries;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
+pub(crate) use desk::{CommandDesk, Posted};
 use dispatching::asking_name::Namings;
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
@@ -72,16 +78,15 @@ pub(crate) use driving::{Driven, Driving};
 pub(crate) use folds::Standing;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 use genesis::city_segment;
-pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
-pub(crate) use mcp::McpLink;
+pub use genesis::{Adopt, InitReport, form_city, init_city};
+pub use listening::{Listening, listen};
 use mcp::{McpServers, mounts_under, transport_site};
 use models::GatewayModels;
-use naming::{building_of, governed_of, name_of, not_built, scope_of};
+use naming::{building_of, governed_of, not_built, scope_of};
 use plans::Reporter;
 use plans::held::{PlanHolders, Planning};
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
-pub(crate) use toolkits::broker_for;
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 
 use std::path::PathBuf;
@@ -99,37 +104,46 @@ use runtime::Interrupt;
 #[cfg(test)]
 use std::path::Path;
 
-/// The wall clock: the single sanctioned sampling point (clippy.toml
-/// disallowed-methods), and the production `accounting::Clock`
-/// (accounting-SPEC.md 8-3). Everything below it takes `TimeMs` as a
-/// parameter or reads the clock it was handed.
+/// The wall clock as the worker reads it: the production
+/// `accounting::Clock` (accounting-SPEC.md 8-3). It samples through
+/// `now_ms`, so the process has one sampling point.
 pub(crate) struct SystemClock;
 
 impl accounting::Clock for SystemClock {
     fn now(&self) -> Result<TimeMs, AxError> {
-        #[expect(
-            clippy::disallowed_methods,
-            reason = "the one sampling point: Main injects time"
-        )]
-        let elapsed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|err| {
-                AxError::failure(AxCode::ConfigInvalid, "sample wall clock", err.to_string())
-                    .with_recovery("fix the system clock; it reads before the unix epoch")
-            })?;
-        let millis = u64::try_from(elapsed.as_millis()).map_err(|_| {
-            AxError::failure(
-                AxCode::ConfigInvalid,
-                "sample wall clock",
-                "beyond u64 millis",
-            )
-            .with_recovery(
-                "set this machine's clock to the present day; it reads more than half a \
-                 billion years after the unix epoch",
-            )
-        })?;
-        Ok(TimeMs::new(millis))
+        now_ms()
     }
+}
+
+/// The single sanctioned sampling point (clippy.toml disallowed-methods). Everything below this call takes `TimeMs` as a
+/// parameter; what samples it outside this module is handed this function
+/// at construction, as the process log is.
+///
+/// # Errors
+/// `E_CONFIG_INVALID` when the system clock reads before the unix epoch,
+/// or beyond what `u64` milliseconds can count.
+pub fn now_ms() -> Result<TimeMs, AxError> {
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the one sampling point: Main injects time"
+    )]
+    let elapsed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|err| {
+            AxError::failure(AxCode::ConfigInvalid, "sample wall clock", err.to_string())
+                .with_recovery("fix the system clock; it reads before the unix epoch")
+        })?;
+    let millis = u64::try_from(elapsed.as_millis()).map_err(|_| {
+        AxError::failure(
+            AxCode::ConfigInvalid,
+            "sample wall clock",
+            "beyond u64 millis",
+        )
+        .with_recovery(
+            "set this machine's clock to the present day; it reads more than half a              billion years after the unix epoch",
+        )
+    })?;
+    Ok(TimeMs::new(millis))
 }
 
 /// What the startup scan found and repaired.
@@ -297,3 +311,19 @@ impl RunWorker {
     reason = "test code"
 )]
 pub(super) mod fixture;
+
+/// What a person reads on a building's page after the commands that
+/// shape the building: the page is `views::building_page`, the commands
+/// are this module's, and the tests drive the commands.
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
+    clippy::let_underscore_must_use,
+    clippy::let_underscore_untyped,
+    reason = "test code"
+)]
+mod building_page_tests;

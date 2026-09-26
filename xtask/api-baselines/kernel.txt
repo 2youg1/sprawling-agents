@@ -755,6 +755,8 @@ pub fn kernel::address::Address::is_reserved(&self) -> bool
 pub fn kernel::address::Address::is_reserved(&self) -> bool
 pub fn kernel::address::Address::is_within(&self, &kernel::address::Address) -> bool
 pub fn kernel::address::Address::is_within(&self, &kernel::address::Address) -> bool
+pub fn kernel::address::Address::name(&self) -> &str
+pub fn kernel::address::Address::name(&self) -> &str
 pub fn kernel::address::Address::parse(&str) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::address::Address::parse(&str) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::address::SessionName::as_str(&self) -> &str

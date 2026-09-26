@@ -14,9 +14,9 @@
 
 use kernel::Address;
 
+use super::building_page::DOC_BYTES_MAX;
 use super::holding::Views;
 use super::listing::resolve;
-use crate::assembly::DOC_BYTES_MAX;
 
 /// How far into a file the text judgement looks. Deep enough that a
 /// ledger segment or a Markdown file with one odd byte far down is

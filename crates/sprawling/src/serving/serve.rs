@@ -3,20 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two values a serve travels on: [`Serving`], everything one
-//! served city is made of, and [`Opening`], everything the writer
-//! thread is opened with.
+//! The value a serve travels on: [`Serving`], everything one served
+//! city is made of.
 //!
-//! Data only. Nothing here binds, spawns or writes; `serving::worker`
-//! consumes [`Serving`] and `serving::attending` consumes [`Opening`].
-//! Keeping the shapes apart from the code that acts on them is what
-//! lets one caller settle every field before any thread exists.
+//! Data only. Nothing here binds, spawns or writes; `assembly::listen`
+//! consumes [`Serving`] and splits the writer thread's share of it off
+//! as `assembly::attending::Opening`. Keeping the shape apart from the
+//! code that acts on it is what lets one caller settle every field
+//! before any thread exists.
 //!
-//! The point a reader most often gets wrong: the two values face
-//! opposite ways. [`Serving`] is public, so every field of it is part
-//! of what an embedder of this library writes and a field added to it
-//! breaks them; [`Opening`] is visible only inside `serving`, so the
-//! writer thread's parameters may be reshaped freely.
+//! [`Serving`] is public, so every field of it is part of what an
+//! embedder of this library writes, and a field added to it breaks them.
 
 use std::net::SocketAddr;
 
@@ -45,20 +42,4 @@ pub struct Serving {
     /// here would carry nothing.
     pub journal: crate::serving::Journal,
     pub console: Option<crate::console::Terminal>,
-}
-
-/// What a worker is opened with: where the city is, whose keys it may
-/// redeem, what the vault turned out to be, and where its diagnostics
-/// go.
-///
-/// Four values that always travel together and are never chosen
-/// independently - `serve` settles all four before it has a thread to
-/// hand them to - so they travel as one, as `Reporter` does.
-pub(super) struct Opening {
-    pub(super) city_root: std::path::PathBuf,
-    pub(super) vault: gateway::Custodian,
-    /// What the vault probe found, on its way to the ledger as a
-    /// disclosure. Consumed by the first `open_for_service`.
-    pub(super) notice: Option<Payload>,
-    pub(super) log: runtime::diagnostics::Diagnostics,
 }

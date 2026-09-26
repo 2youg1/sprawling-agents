@@ -13,6 +13,7 @@ mod config_layers;
 mod document;
 mod gitignore;
 mod governed;
+mod history;
 mod library;
 mod neighbourhood;
 mod neighbours_tool;
@@ -48,6 +49,7 @@ pub use config_layers::{own_layer, write_session};
 pub use config_layers::{settled_effort, settled_second, write_effort, write_mcp, write_sandbox};
 pub use document::{Held, edit as edit_document};
 pub use governed::{Governed, PREFERENCES_FILE, write_governed};
+pub use history::{History, has_history};
 // Where each of these files sits is `kernel::layout`'s answer, and the
 // names are re-exported rather than restated so that a caller reading
 // `city::CONFIG_TOML` and the layout that places it cannot disagree.

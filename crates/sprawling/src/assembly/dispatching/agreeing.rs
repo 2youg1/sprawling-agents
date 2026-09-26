@@ -10,7 +10,7 @@
 use kernel::{Address, AxCode, AxError};
 use kernel::{Locator, RunId, TimeMs};
 
-use crate::serving::CommandDesk;
+use crate::assembly::CommandDesk;
 
 use super::super::RunWorker;
 use super::Agreed;

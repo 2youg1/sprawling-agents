@@ -171,6 +171,20 @@ accounting: kernel, gateway, protocol
 sprawling: kernel, memory, gateway, runtime, collab, city, eval, browser, protocol, channels, accounting
 ```
 
+Inside one crate the compiler sees no layering: `sprawling` builds as one
+unit whichever way its modules name each other. The block below is the
+machine authority for the direction of the edges that matter there, also
+read by `cargo xtask depmap`. Each line names a module and the paths its
+production code never names; tests may still build a fixture through the
+assembly point. `bin::assembly` knows every concrete type, so the modules
+it assembles never name it back (sprawling-SPEC 8-92).
+
+```directions
+crates/sprawling/src/doctor: crate::assembly
+crates/sprawling/src/serving: crate::assembly
+crates/sprawling/src/views: crate::assembly
+```
+
 What each unit owns is stated once, in §1's figure. It is not repeated
 here: the two lists drifted apart while both were maintained by hand, and
 `collab` was carrying a duty in one that its source had never had.
@@ -531,7 +545,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
+| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::assembly::pool`, the attending worker under `bin::assembly` and the fold under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
 | 4 | Seeded RNG handed out from one place | assembly derives per session |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |

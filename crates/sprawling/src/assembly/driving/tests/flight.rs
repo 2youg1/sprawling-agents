@@ -227,14 +227,14 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
         pace,
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let desk = Arc::new(crate::serving::CommandDesk::new());
+    let desk = Arc::new(crate::assembly::CommandDesk::new());
     let asking = Arc::clone(&desk);
     worker.serve(only_interrupts(Arc::new(move |run| {
         asking.interrupt_for(run)
     })));
     let attending = {
         let desk = Arc::clone(&desk);
-        std::thread::spawn(move || crate::serving::attending::attend(&mut worker, &desk))
+        std::thread::spawn(move || crate::assembly::attending::attend(&mut worker, &desk))
     };
     let key = |material: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, material);
     desk.post(

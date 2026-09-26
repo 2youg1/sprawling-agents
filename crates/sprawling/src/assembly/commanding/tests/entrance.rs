@@ -7,7 +7,7 @@
 //!
 //! What these pin: the wire makes all 23 state-changing commands carry
 //! an `IdemKey` so that a retry is harmless, and until this door read it
-//! nothing in the city did. `serving::desk` collapses a repeat that is
+//! nothing in the city did. `assembly::desk` collapses a repeat that is
 //! still queued or still running; a repeat that arrives after the first
 //! one finished used to be a second effect.
 
@@ -22,9 +22,9 @@
     reason = "test code"
 )]
 
+use crate::assembly::Posted;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
-use crate::serving::Posted;
 
 /// Every room that has been opened under one building.
 fn rooms_under(city_root: &Path, building: &str) -> Vec<String> {

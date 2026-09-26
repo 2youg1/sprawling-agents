@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::views::building_page::read_building;
 
 /// The rules a person may read on the building page are the rules
 /// the city obeys, and the page reads them from a directory the

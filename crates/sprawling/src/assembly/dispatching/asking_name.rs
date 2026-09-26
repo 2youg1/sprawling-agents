@@ -21,7 +21,7 @@ use kernel::{AxCode, AxError};
 
 use super::super::{Assignment, Owing, RunWorker};
 use super::session::unnamed;
-use crate::serving::relay::Wake;
+use crate::assembly::relay::Wake;
 
 /// The names still being asked for, and the way they come home.
 pub(in crate::assembly) struct Namings {

@@ -10,6 +10,7 @@
 use kernel::{Address, AxError};
 
 use super::RunWorker;
+use crate::mcp_link::McpLink;
 
 /// Reaches each server the way its `[[mcp]]` table says: a child
 /// process over stdio, or a remote endpoint over HTTP or SSE.
@@ -73,78 +74,6 @@ pub(super) fn transport_site(transport: &kernel::McpTransport) -> &'static str {
         kernel::McpTransport::Stdio { .. } => "bin::mcp_stdio",
         kernel::McpTransport::Http { .. } => "bin::mcp_http",
         kernel::McpTransport::Sse { .. } => "bin::mcp_sse",
-    }
-}
-
-/// One reachable server, whichever way it is reached.
-///
-/// The three transports differ in where the bytes go and in nothing
-/// else, so the difference is spent here and the wiring above stays one
-/// path.
-#[derive(Clone)]
-pub(crate) enum McpLink {
-    Stdio(crate::mcp_stdio::StdioServer),
-    Http(crate::mcp_http::HttpServer),
-    Sse(crate::mcp_sse::SseServer),
-}
-
-impl McpLink {
-    /// Opens one server as its transport says it is reached.
-    ///
-    /// `write_root` is the run's own root, which exists whether or not
-    /// this building lends its runs a worktree; a child process starts
-    /// there and nowhere else.
-    ///
-    /// # Errors
-    /// Propagates each transport's own refusal to open, every one of
-    /// which names the server and what a person can do about it.
-    pub(crate) fn open(
-        transport: &kernel::McpTransport,
-        write_root: &std::path::Path,
-        resolve: &gateway::SecretResolver,
-    ) -> Result<McpLink, AxError> {
-        match *transport {
-            kernel::McpTransport::Stdio {
-                ref command,
-                ref args,
-                ref env,
-            } => {
-                let env = crate::mcp_redeeming::redeem(env, resolve, "start an mcp server")?;
-                Ok(McpLink::Stdio(crate::mcp_stdio::StdioServer::start(
-                    command, args, &env, write_root,
-                )?))
-            }
-            kernel::McpTransport::Http {
-                ref url,
-                ref headers,
-            } => Ok(McpLink::Http(crate::mcp_http::HttpServer::open(
-                url, headers, resolve,
-            )?)),
-            kernel::McpTransport::Sse {
-                ref url,
-                ref headers,
-            } => Ok(McpLink::Sse(crate::mcp_sse::SseServer::open(
-                url, headers, resolve,
-            )?)),
-        }
-    }
-}
-
-impl protocol::Outbound for McpLink {
-    fn call(&mut self, line: &str, patience: kernel::TimeoutMs) -> Result<String, AxError> {
-        match *self {
-            McpLink::Stdio(ref mut held) => held.call(line, patience),
-            McpLink::Http(ref mut held) => held.call(line, patience),
-            McpLink::Sse(ref mut held) => held.call(line, patience),
-        }
-    }
-
-    fn notify(&mut self, line: &str, patience: kernel::TimeoutMs) -> Result<(), AxError> {
-        match *self {
-            McpLink::Stdio(ref mut held) => held.notify(line, patience),
-            McpLink::Http(ref mut held) => held.notify(line, patience),
-            McpLink::Sse(ref mut held) => held.notify(line, patience),
-        }
     }
 }
 

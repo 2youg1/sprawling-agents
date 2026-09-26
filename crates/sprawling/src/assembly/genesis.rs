@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use city::{History, has_history};
 use kernel::event::record::AutonomyChanged;
 use kernel::{Address, AxCode, AxError, EventDraft, EventKind, EventRef};
 use kernel::{Ledger, Payload, RunId};
@@ -64,43 +65,6 @@ pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing 
         }
     }
     city::survey(&entries, history == History::Present)
-}
-
-/// Whether a directory carries a city's history.
-///
-/// Two answers, so a caller cannot read a third state into a `false`: a
-/// ledger directory that is missing or empty is `Absent`, and one with
-/// an entry is `Present`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum History {
-    Absent,
-    Present,
-}
-
-/// Whether this directory already carries a city's history.
-///
-/// The one fact `init` refuses on and `up` branches on, read from one
-/// place so the two can never disagree about what counts as a city.
-///
-/// # Errors
-/// `StorageFatal` when the ledger directory is there but cannot be
-/// listed: calling that `Absent` would let `init` write a second genesis
-/// over a city it merely failed to read.
-pub fn has_history(city_root: &Path) -> Result<History, AxError> {
-    let dir = kernel::layout::CityLayout::new(city_root).ledger();
-    match std::fs::read_dir(&dir) {
-        Ok(mut entries) => Ok(match entries.next() {
-            Some(_) => History::Present,
-            None => History::Absent,
-        }),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(History::Absent),
-        Err(err) => Err(AxError::failure(
-            AxCode::StorageFatal,
-            "read city history",
-            format!("{}: {err}", dir.display()),
-        )
-        .with_recovery("make the ledger directory readable, or name a different city directory")),
-    }
 }
 
 /// `sprawling init <dir>`: the genesis write. The city is born when

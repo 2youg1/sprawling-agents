@@ -11,7 +11,7 @@
 //! directory that holds no history, settle the pairing key before
 //! anything binds, choose where the client bundle comes from, build the
 //! diagnostics sink, attach the console, hand one `serving::Serving` to
-//! `serving::listen`, and print the banner only once that has taken the
+//! `assembly::listen`, and print the banner only once that has taken the
 //! port and the city's writer. `up`, the first screen and `serve`
 //! differ only in what they do before they arrive there and in whether
 //! they open a browser, so none of them re-derives the sequence.
@@ -65,11 +65,11 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
-    let history = match assembly::has_history(folder) {
+    let history = match city::has_history(folder) {
         Ok(history) => history,
         Err(err) => return report(err),
     };
-    if history == assembly::History::Present {
+    if history == city::History::Present {
         println!("{} is already a city; opening it", folder.display());
         return serve_city(folder, DEFAULT_AT, &[], opening(&[], Open::Browser));
     }
@@ -114,11 +114,11 @@ pub(super) fn report_standing(report: &assembly::InitReport) {
 /// and the launcher in the release archive both arrive here, so the
 /// sequence has exactly one definition and `init` and `serve` keep theirs.
 pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitCode {
-    let history = match assembly::has_history(city) {
+    let history = match city::has_history(city) {
         Ok(history) => history,
         Err(err) => return report(err),
     };
-    if history == assembly::History::Absent {
+    if history == city::History::Absent {
         match assembly::init_city(city) {
             Ok(raised) => println!(
                 "city raised at {} (genesis seq {})",
@@ -196,11 +196,11 @@ pub(super) fn serve_city(
     // A directory with no history is not a city, and saying so beats the
     // storage layer's report that it could not list a ledger directory -
     // which is true, unhelpful, and names a path nobody chose.
-    let history = match assembly::has_history(city) {
+    let history = match city::has_history(city) {
         Ok(history) => history,
         Err(err) => return report(err),
     };
-    if history == assembly::History::Absent {
+    if history == city::History::Absent {
         eprintln!("no city at {}", city.display());
         eprintln!(
             "recovery: `sprawling up {0}` raises one and serves it",
@@ -256,7 +256,7 @@ pub(super) fn serve_city(
     // The one sink a diagnostic line leaves this process through: the
     // terminal, and the page that has the log lens open. Made before
     // the `Diagnostics` because the sink is what writes into it.
-    let journal = serving::Journal::new();
+    let journal = serving::Journal::new(assembly::now_ms);
     let floor = match log_floor(args) {
         Ok(floor) => floor,
         Err(unknown) => {
@@ -288,7 +288,7 @@ pub(super) fn serve_city(
     // The port and the writer are both taken before a word is printed:
     // a banner saying "running" over a port another process holds was a
     // claim the city could not keep (sprawling-SPEC.md 8-88).
-    let listening = match runtime.block_on(serving::listen(serving::Serving {
+    let listening = match runtime.block_on(assembly::listen(serving::Serving {
         city_root: city.to_path_buf(),
         addr: bind,
         token,
