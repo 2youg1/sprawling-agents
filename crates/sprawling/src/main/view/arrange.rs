@@ -45,7 +45,10 @@ pub(super) fn arrange(runs: &[RunLine]) -> Vec<Entry> {
     let mut first: BTreeMap<NodeKey, Seq> = BTreeMap::new();
     for line in &ordered {
         let mut chain = vec![NodeKey::Run(line.run)];
-        match (line.parent.filter(|parent| known.contains_key(parent)), &line.addr) {
+        match (
+            line.parent.filter(|parent| known.contains_key(parent)),
+            &line.addr,
+        ) {
             (Some(parent), _) => chain.push(NodeKey::Run(parent)),
             (None, Some(addr)) => chain.extend([
                 NodeKey::Session(addr.clone(), line.session),
@@ -82,7 +85,14 @@ pub(super) fn arrange(runs: &[RunLine]) -> Vec<Entry> {
                 .rev()
                 .map(|child| (child.clone(), below, Some(at))),
         );
-        entries.push(Entry { key, depth, parent, seq, label, detail });
+        entries.push(Entry {
+            key,
+            depth,
+            parent,
+            seq,
+            label,
+            detail,
+        });
     }
     entries
 }

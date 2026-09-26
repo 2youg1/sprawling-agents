@@ -137,7 +137,10 @@ fn collapse_climbs_then_folds_and_expand_unfolds_then_descends() {
     let lab = after(&[Action::First, Action::Down, Action::Expand], NARROW);
     assert_eq!(cursor_line(&lab), ">  - lab");
     assert!(lab.frame().contains(&"     + lab/a".to_owned()));
-    let room = after(&[Action::First, Action::Down, Action::Expand, Action::Expand], NARROW);
+    let room = after(
+        &[Action::First, Action::Down, Action::Expand, Action::Expand],
+        NARROW,
+    );
     assert_eq!(cursor_line(&room), ">    + lab/a");
 }
 
@@ -145,10 +148,19 @@ fn collapse_climbs_then_folds_and_expand_unfolds_then_descends() {
 fn switching_lens_keeps_the_selected_thing() {
     let records = after(&[Action::SwitchLens], NARROW);
     assert_eq!(records.lens(), Lens::Records);
-    assert_eq!(cursor_line(&records), format!(r#">{{"seq":3,"run":"{R2}"}}"#));
-    let back = after(&[Action::SwitchLens, Action::Down, Action::SwitchLens], NARROW);
+    assert_eq!(
+        cursor_line(&records),
+        format!(r#">{{"seq":3,"run":"{R2}"}}"#)
+    );
+    let back = after(
+        &[Action::SwitchLens, Action::Down, Action::SwitchLens],
+        NARROW,
+    );
     assert_eq!(back.lens(), Lens::Tree);
-    assert_eq!(cursor_line(&back), format!(">        + run {R1} ended #1..4"));
+    assert_eq!(
+        cursor_line(&back),
+        format!(">        + run {R1} ended #1..4")
+    );
 }
 
 #[test]

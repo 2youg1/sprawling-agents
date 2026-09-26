@@ -46,6 +46,13 @@ enum Detail {
     Full,
 }
 
+/// How far a movement goes; `usize::MAX` stops at the end.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Step {
+    Back(usize),
+    On(usize),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Life {
     Open,
@@ -71,15 +78,17 @@ impl Face {
         let entries = arrange(runs);
         let latest = |active_only: bool| {
             runs.iter()
-                .filter(|line| {
-                    !active_only || line.state == Some(memory::RunPhase::Active)
-                })
+                .filter(|line| !active_only || line.state == Some(memory::RunPhase::Active))
                 .max_by_key(|line| line.first_seq)
                 .map(|line| line.run)
         };
         let chosen = latest(true).or_else(|| latest(false));
         let tree_at = chosen
-            .and_then(|run| entries.iter().position(|entry| entry.key == NodeKey::Run(run)))
+            .and_then(|run| {
+                entries
+                    .iter()
+                    .position(|entry| entry.key == NodeKey::Run(run))
+            })
             .unwrap_or(0);
         let mut face = Face {
             entries,
@@ -97,7 +106,21 @@ impl Face {
     }
 
     pub(super) fn apply(&mut self, action: Action) {
-        let _ = action;
+        let page = self.size.rows.max(1);
+        match action {
+            Action::Up => self.step(Step::Back(1)),
+            Action::Down => self.step(Step::On(1)),
+            Action::PageUp => self.step(Step::Back(page)),
+            Action::PageDown => self.step(Step::On(page)),
+            Action::First => self.step(Step::Back(usize::MAX)),
+            Action::Last => self.step(Step::On(usize::MAX)),
+            Action::Collapse => self.collapse(),
+            Action::Expand => self.expand(),
+            Action::SwitchLens => self.switch_lens(),
+            Action::OpenDetail => self.detail = Detail::Full,
+            Action::CloseDetail => self.detail = Detail::Pane,
+            Action::Quit => self.life = Life::Closed,
+        }
     }
 
     pub(super) fn resize(&mut self, size: Size) {
@@ -117,7 +140,11 @@ impl Face {
         let Size { columns, rows } = self.size;
         let detail = self.detail_lines();
         if self.detail == Detail::Full {
-            return detail.iter().take(rows).map(|line| cut(line, columns)).collect();
+            return detail
+                .iter()
+                .take(rows)
+                .map(|line| cut(line, columns))
+                .collect();
         }
         let list = self.list_lines(rows);
         if columns < SIDE_PANE_MIN_WIDTH {
@@ -128,9 +155,87 @@ impl Face {
         (0..rows)
             .map(|at| {
                 let side = |lines: &[String]| lines.get(at).map_or("", String::as_str).to_owned();
-                format!("{:<left$}|{}", cut(&side(&list), left), cut(&side(&detail), right))
+                format!(
+                    "{:<left$}|{}",
+                    cut(&side(&list), left),
+                    cut(&side(&detail), right)
+                )
             })
             .collect()
+    }
+
+    fn step(&mut self, step: Step) {
+        let move_by = |at: usize, len: usize| match step {
+            Step::Back(by) => at.saturating_sub(by),
+            Step::On(by) => at.saturating_add(by).min(len.saturating_sub(1)),
+        };
+        match self.lens {
+            Lens::Tree => {
+                let shown = self.visible();
+                let at = shown.iter().position(|at| *at == self.tree_at).unwrap_or(0);
+                if let Some(entry) = shown.get(move_by(at, shown.len())) {
+                    self.tree_at = *entry;
+                }
+            }
+            Lens::Records => self.record_at = move_by(self.record_at, self.records.len()),
+        }
+    }
+
+    /// Folds an open node; on a folded or childless one, climbs to its
+    /// parent. The records lens has nothing to fold.
+    fn collapse(&mut self) {
+        if self.lens == Lens::Records {
+            return;
+        }
+        if !self.expanded.remove(&self.tree_at)
+            && let Some(parent) = self
+                .entries
+                .get(self.tree_at)
+                .and_then(|entry| entry.parent)
+        {
+            self.tree_at = parent;
+        }
+    }
+
+    /// Unfolds a folded node; on an open one, descends to its first child.
+    fn expand(&mut self) {
+        if self.lens == Lens::Records || !self.has_children(self.tree_at) {
+            return;
+        }
+        if !self.expanded.insert(self.tree_at) {
+            self.tree_at = self.tree_at.saturating_add(1);
+        }
+    }
+
+    /// Moves to the other lens with the same thing selected: a node's
+    /// earliest line, or the run node a line belongs to.
+    fn switch_lens(&mut self) {
+        match self.lens {
+            Lens::Tree => {
+                let seq = self.entries.get(self.tree_at).map(|entry| entry.seq);
+                self.record_at = seq.map_or(0, |seq| {
+                    self.records
+                        .partition_point(|row| row.seq < seq)
+                        .min(self.records.len().saturating_sub(1))
+                });
+                self.lens = Lens::Records;
+            }
+            Lens::Records => {
+                let key = self.records.get(self.record_at).map(|row| {
+                    if row.run == RunId::CITY {
+                        NodeKey::City
+                    } else {
+                        NodeKey::Run(row.run)
+                    }
+                });
+                if let Some(at) =
+                    key.and_then(|key| self.entries.iter().position(|entry| entry.key == key))
+                {
+                    self.select_entry(at);
+                }
+                self.lens = Lens::Tree;
+            }
+        }
     }
 
     fn visible(&self) -> Vec<usize> {
