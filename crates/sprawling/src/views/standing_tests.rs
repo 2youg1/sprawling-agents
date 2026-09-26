@@ -134,3 +134,56 @@ fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
     assert!(bytes <= 16 * 1024, "city_view is {bytes} bytes");
     assert_eq!((listed, city.active, city.frozen), (newest, 0, RUNS));
 }
+
+/// A cost view used to name every run a city ever billed (sprawling-SPEC
+/// section 8-90); it names every active run and the few billed most,
+/// while `total` still sums them all.
+#[test]
+fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {
+    const RUNS: u64 = 8_000;
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let room = Address::parse("lab/room1").unwrap();
+    let run_of = |i: u64| RunId::from_bytes(u128::from(i + 1).to_be_bytes());
+    let billed = |micros: u64| {
+        let mut data = serde_json::Map::new();
+        data.insert(
+            "billed_usd_micros".to_owned(),
+            serde_json::Value::from(micros),
+        );
+        data
+    };
+    let mut seq = 0;
+    let mut fold = |run: RunId, kind: EventKind, data| {
+        seq += 1;
+        views
+            .apply(&view_record(seq, run, kind, &room, data))
+            .unwrap();
+    };
+    for i in 0..=RUNS {
+        fold(run_of(i), EventKind::RunStarted, serde_json::Map::new());
+        let micros = if i == RUNS { 1 } else { i + 1 };
+        fold(run_of(i), EventKind::ModelReturned, billed(micros));
+        if i < RUNS {
+            fold(run_of(i), EventKind::RunFrozen, serde_json::Map::new());
+        }
+    }
+
+    let channels::Answer::Cost(cost) = views.answer(&channels::Query::CostView) else {
+        panic!("CostView answers with a cost");
+    };
+    let top = u64::try_from(super::answering::TOP_BILLED).unwrap();
+    let mut named: Vec<(String, u64)> = (RUNS - top..=RUNS)
+        .map(|i| (run_of(i).to_string(), if i == RUNS { 1 } else { i + 1 }))
+        .collect();
+    named.sort();
+    let listed: Vec<(String, u64)> = cost
+        .by_run
+        .iter()
+        .map(|(run, usd)| (run.clone(), usd.get()))
+        .collect();
+    assert_eq!(
+        (listed, cost.total.get()),
+        (named, RUNS * (RUNS + 1) / 2 + 1)
+    );
+}

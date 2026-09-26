@@ -29,6 +29,11 @@ mod history;
 use super::lines::{buildings_of, config_answer, endpoints_answer, summarize};
 use crate::assembly::read_building;
 
+/// How many runs a cost view names besides every active one: a bound
+/// on the size of an answer on the wire, not a machine reading, so it is
+/// a constant (sprawling-SPEC section 8-90).
+pub(super) const TOP_BILLED: usize = 32;
+
 /// The answer to a question this city could not look up.
 ///
 /// One shape, named once: a reader that met an empty city and a reader
