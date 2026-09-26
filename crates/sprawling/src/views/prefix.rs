@@ -16,33 +16,30 @@
 //! the two a reader is looking at, because the first is a store that
 //! was pruned and the second is a slot the city had nothing to put in.
 
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::path::Path;
 
 use kernel::{Address, B3Hash, EventKind, EventRecord, Locator, RunId, Seq};
 
 use super::document::read_bytes;
 use super::holding::Views;
-use super::prepared::unavailable;
+use super::prepared::{LedgerAsk, unavailable};
 
 /// What a `Prefix` question takes out of the views: where the run's
-/// first prompt sits on the ledger, and the index that finds the line.
+/// first prompt sits on the ledger, and the ledger that holds the line.
 /// The line and the store are read by [`PrefixAsk::read`], after the
 /// views are released.
 pub(crate) struct PrefixAsk {
-    city_root: PathBuf,
+    ledger: LedgerAsk,
     run: RunId,
     first: Option<Seq>,
-    index: Arc<Mutex<memory::LedgerIndex>>,
 }
 
 impl Views {
     pub(super) fn prefix_ask(&self, run: RunId) -> PrefixAsk {
         PrefixAsk {
-            city_root: self.city_root.clone(),
+            ledger: self.ledger_ask(),
             run,
             first: self.first_prompts.get(&run).copied(),
-            index: Arc::clone(&self.index),
         }
     }
 }
@@ -66,7 +63,7 @@ impl PrefixAsk {
 
     fn segments(&self) -> Option<Vec<channels::PrefixSegment>> {
         let record = self.first_prompt()?;
-        let store = store(&self.city_root)?;
+        let store = store(&self.ledger.city_root)?;
         Some(
             record
                 .data()
@@ -89,9 +86,9 @@ impl PrefixAsk {
     /// cut short can leave an offset pointing at another line.
     fn first_prompt(&self) -> Option<EventRecord> {
         let seq = self.first?;
-        let dir = crate::assembly::ledger_dir(&self.city_root);
+        let dir = crate::assembly::ledger_dir(&self.ledger.city_root);
         let line = {
-            let mut index = self.index.lock().ok()?;
+            let mut index = self.ledger.index.lock().ok()?;
             index.refresh(&dir).ok()?;
             index.reader(&dir).line_at(seq).ok()?
         };

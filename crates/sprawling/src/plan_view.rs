@@ -32,9 +32,12 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use kernel::{
-    Address, Blockage, EventKind, EventRecord, NodeId, PlanTree, Progress, RedNode, RoadmapShape,
+    Address, Blockage, EventRecord, NodeId, PlanTree, Progress, RedNode, RoadmapShape,
     RoadmapStatus, StopCause, UnplannedProgress,
 };
+
+mod reach;
+use reach::{PlanReach, building_of, cause_of, may_move_plan, node_of};
 
 /// What one building's plan came to when it was last read.
 enum Reading {
@@ -58,6 +61,13 @@ pub(crate) struct PlanView {
     /// How many records with no address may have moved every plan.
     moved_all: u64,
 }
+
+/// How many buildings keep a generation of their own before every one
+/// of them is folded into the city-wide count. A city that has named
+/// more buildings than this then refuses the reads in flight at that
+/// moment, once each, instead of holding a map that grows with every
+/// building it ever named.
+const GENERATIONS_HELD: usize = 1024;
 
 /// Where the fold stood on one building's plan when a reader asked for
 /// it: equal again at the write-back when no record moved that plan in
@@ -365,121 +375,6 @@ fn unplanned() -> Progress {
         steps: 0,
         budget: kernel::BudgetUse::default(),
     })
-}
-
-/// How far one record reaches into what this view holds.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum PlanReach {
-    /// The kind cannot move a plan, so every parsed copy still stands.
-    Untouched,
-    /// The plan may have moved and the parsed copy is out of date.
-    Stale,
-    /// Out of date, and the node the record names is no longer stopped.
-    NodeFreed,
-    /// Out of date, and the node the record names has stopped, for the
-    /// reason the record carries.
-    NodeStopped,
-}
-
-/// Which records can move a plan. Exhaustive on purpose: a kind added
-/// to the vocabulary without an answer here is a compile error rather
-/// than a stale table nobody notices (sprawling-SPEC.md 8-76).
-fn may_move_plan(kind: EventKind) -> PlanReach {
-    match kind {
-        EventKind::RoadmapFinished | EventKind::RoadmapReleased => PlanReach::NodeFreed,
-        EventKind::RoadmapBlocked => PlanReach::NodeStopped,
-        EventKind::CityInitialized
-        | EventKind::BuildingCreated
-        | EventKind::CheckpointCommitted
-        | EventKind::RunFrozen
-        | EventKind::RoadmapClaimed
-        | EventKind::RoadmapSplit
-        // A person's write to `Roadmap.md` moves the plan like any
-        // other, so the table is re-read rather than trusted.
-        | EventKind::SpineDocumentWritten => PlanReach::Stale,
-        EventKind::BuildingConfigured
-        | EventKind::SessionOpened
-        | EventKind::RunStarted
-        | EventKind::RunForked
-        | EventKind::PromptAssembled
-        // The cache shape measures one request; it names no plan row.
-        | EventKind::PromptShapeCompared
-        | EventKind::ModelCalled
-        | EventKind::ModelReturned
-        | EventKind::ToolCalled
-        | EventKind::ToolResult
-        | EventKind::ResultOffloaded
-        | EventKind::GateChecked
-        | EventKind::GateDenied
-        | EventKind::HandoffWritten
-        | EventKind::SteerReceived
-        | EventKind::CancelReceived
-        | EventKind::WatchdogFired
-        | EventKind::BudgetLimit
-        | EventKind::LogTruncated
-        | EventKind::SignalEnqueued
-        | EventKind::SignalConsumed
-        | EventKind::DraftHeld
-        | EventKind::DraftResolved
-        | EventKind::GoalRegistered
-        | EventKind::GoalConflict
-        | EventKind::ArbitrationVerdict
-        | EventKind::RepairStarted
-        | EventKind::RepairReused
-        | EventKind::WorktreeOpened
-        | EventKind::PrOpened
-        | EventKind::PrMerged
-        | EventKind::PrRejected
-        | EventKind::PursuitChanged
-        | EventKind::ApprovalRequested
-        | EventKind::ApprovalResolved
-        | EventKind::PolicyCreated
-        | EventKind::PolicyRevoked
-        | EventKind::TaintPromoted
-        | EventKind::CrossBuildingTransfer
-        | EventKind::CityHalted
-        | EventKind::BackpressureShed
-        | EventKind::DigestInvalidated
-        | EventKind::EndpointAttached
-        | EventKind::EndpointProbed
-        | EventKind::EndpointLost
-        | EventKind::ModelSelected
-        | EventKind::ProviderDegraded
-        | EventKind::LoginStarted
-        | EventKind::EvalRun
-        | EventKind::AssetArchived
-        | EventKind::CredentialLent
-        | EventKind::SecretCaptured
-        | EventKind::SecretEgressBlocked
-        | EventKind::FileDiscarded
-        | EventKind::DiscardRestored
-        | EventKind::AutonomyChanged
-        | EventKind::GovernedDocumentWritten
-        | EventKind::RulesChanged
-        | EventKind::ToolkitLinkOpened
-        // A call to an embeddings or rerank face, and every line an
-        // adviser consultation writes, are about the window one run is
-        // given: none of them names a plan row.
-        | EventKind::EmbeddingCalled
-        | EventKind::RerankCalled
-        | EventKind::AdviserAsked
-        | EventKind::AdviserAnswered
-        | EventKind::AdviserFellBack => PlanReach::Untouched,
-    }
-}
-
-/// The building an address belongs to: its first segment.
-fn building_of(addr: &Address) -> Option<Address> {
-    let head = addr.as_str().split('/').next()?;
-    Address::parse(head).ok()
-}
-
-fn node_of(record: &EventRecord) -> Option<NodeId> {
-    NodeId::parse(record.data().as_map().get("node")?.as_str()?).ok()
-}
-
-fn cause_of(record: &EventRecord) -> Option<StopCause> {
-    serde_json::from_value(record.data().as_map().get("why")?.clone()).ok()
 }
 
 #[cfg(test)]

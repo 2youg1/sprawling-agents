@@ -3162,7 +3162,7 @@ impl RunWorker { fn halted_by(&self, addr: &Address) -> Option<kernel::event::Sc
 
 **本章测试**：`an_unreadable_approval_item_stops_the_fold`（`assembly::folds::tests`）、`an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted`（`kernel::event::record::governance`）。
 
-### 8-76 哪些记录会动计划，是一张穷尽表（`plan_view::may_move_plan`；Roadmap B-55）
+### 8-76 哪些记录会动计划，是一张穷尽表（`plan_view::reach::may_move_plan`；Roadmap B-55）
 
 ```rust
 enum PlanReach { Untouched, Stale, NodeFreed, NodeStopped }
@@ -3571,7 +3571,7 @@ impl PrefixAsk { pub(super) fn read(self) -> channels::Answer; } // 读不到那
 
 **第一条 `prompt_assembled` 的序号由折叠记下。** `apply` 为每个 run 记它第一条 `prompt_assembled` 的 `Seq`（每个 run 一个数），`finish` 只读这一行；原先是锁内倒着读这个 run 的每一行找它。整条记录不进折叠：四段的来源表随文档数增长，而每个会话多占的内存是这个进程要压低的量。
 
-**计划缓存有自己的锁，回填看代数。** `Views` 持 `Arc<Mutex<PlanView>>`：折叠在 `apply` 里锁它作废读数，读者只在锁内做纯内存的描述，读表在锁外。`PlanView` 为每栋楼记一个代数，任何可能动到这栋楼计划的记录（`apply` 作废它的那一刻）都让代数加一，不带地址的这类记录让全城的代数加一。`plans_of` 在第一次锁内给每栋没读过的楼拷出停因表与当时的代数，锁外读表，第二次锁内只放回代数仍相等的读数：两次锁之间折进来的记录可能刚让这份读数过时，放回去就会让缓存一直报旧计划，直到下一条动它的记录。被拒：读到的一律不回填——每次问都要重读每栋楼的表，这正是缓存要省掉的读盘。计划缓存的锁中毒时，下一个持锁者（读者或折叠）用 `PlanView::take_back` 把它收回：丢掉读数与代数（恐慌可能撕了它们，于是每栋楼重读一次表，在途的回填因全城代数加一而被拒），保留停因表（每条停因由一次插入整条写入），再解除中毒。被拒：中毒后弃用缓存——那样每个红节点的句子都悄悄退回表格上的状态词，没人知道为什么；而视图锁那种 `StorageFatal` 在这里代价过高，因为缓存里没有一样东西是恐慌能弄假而重读修不回来的。
+**计划缓存有自己的锁，回填看代数。** `Views` 持 `Arc<Mutex<PlanView>>`：折叠在 `apply` 里锁它作废读数，读者只在锁内做纯内存的描述，读表在锁外。`PlanView` 为每栋楼记一个代数，任何可能动到这栋楼计划的记录（`apply` 作废它的那一刻）都让代数加一，不带地址的这类记录让全城的代数加一。每楼的代数最多记 1024 栋（`GENERATIONS_HELD`）：再来一栋新楼时全部清掉、全城代数加一，于是在途的回填各被拒一次，而不是让这张表随进程见过的每栋楼增长；只清每楼的数而不动全城的数是错的，因为清零后那栋楼再动一次，它的数又回到读者问时的值。`plans_of` 在第一次锁内给每栋没读过的楼拷出停因表与当时的代数，锁外读表，第二次锁内只放回代数仍相等的读数：两次锁之间折进来的记录可能刚让这份读数过时，放回去就会让缓存一直报旧计划，直到下一条动它的记录。被拒：读到的一律不回填——每次问都要重读每栋楼的表，这正是缓存要省掉的读盘。计划缓存的锁中毒时，下一个持锁者（读者或折叠）用 `PlanView::take_back` 把它收回：丢掉读数与代数（恐慌可能撕了它们，于是每栋楼重读一次表，在途的回填因全城代数加一而被拒），保留停因表（每条停因由一次插入整条写入），再解除中毒。被拒：中毒后弃用缓存——那样每个红节点的句子都悄悄退回表格上的状态词，没人知道为什么；而视图锁那种 `StorageFatal` 在这里代价过高，因为缓存里没有一样东西是恐慌能弄假而重读修不回来的。
 
 **`CityView` 与 `BuildingView` 都在锁外读盘。** `prepare` 只拷 run 摘要、停工的范围、各追求（地址、目标、状态）与在飞的 run 数，`CityAsk::read` 在锁外列楼的目录，用 `plans_of` 取这些楼与各追求所在地址的计划，再算楼的进度与每个追求的判词。`BuildingView` 带出计划缓存的 `Arc`，在 `finish` 里读楼的目录并用同一个 `plans_of` 取它的计划。
 
