@@ -249,16 +249,18 @@
   </header>
 
   <div class="flex min-h-0 flex-1 flex-col @lg/page:flex-row">
+    <!-- Below the tree's width the four pages stay on screen as one row
+         that scrolls sideways, and the files toggle opens the tree with
+         the rooms under it: hiding the pages behind "files" left a narrow
+         screen with the plan and no visible way to the other three. -->
     <aside
-      class={[
-        "shrink-0 overflow-y-auto border-edge px-snug py-base @lg/page:block @lg/page:w-tree @lg/page:border-r",
-        treeOpen ? "block border-b" : "hidden",
-      ]}
+      class="shrink-0 border-b border-edge px-snug py-base @lg/page:w-tree @lg/page:overflow-y-auto @lg/page:border-r @lg/page:border-b-0"
     >
+      <div class="flex gap-tight overflow-x-auto @lg/page:flex-col @lg/page:gap-0 @lg/page:overflow-visible">
       <button
         type="button"
         class={[
-          "mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none",
+          "flex h-step shrink-0 items-center rounded-control pl-tight pr-snug text-left text-note leading-none @lg/page:mb-tight @lg/page:w-full",
           shown.kind === "plan" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome",
         ]}
         aria-current={shown.kind === "plan" ? "true" : undefined}
@@ -272,7 +274,7 @@
       <button
         type="button"
         class={[
-          "mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none",
+          "flex h-step shrink-0 items-center rounded-control pl-tight pr-snug text-left text-note leading-none @lg/page:mb-tight @lg/page:w-full",
           shown.kind === "commits" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome",
         ]}
         aria-current={shown.kind === "commits" ? "true" : undefined}
@@ -287,7 +289,7 @@
       <button
         type="button"
         class={[
-          "mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none",
+          "flex h-step shrink-0 items-center rounded-control pl-tight pr-snug text-left text-note leading-none @lg/page:mb-tight @lg/page:w-full",
           shown.kind === "changes" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome",
         ]}
         aria-current={shown.kind === "changes" ? "true" : undefined}
@@ -302,7 +304,7 @@
       <button
         type="button"
         class={[
-          "mb-tight flex h-step w-full items-center rounded-control pl-tight pr-snug text-left text-note leading-none",
+          "flex h-step shrink-0 items-center rounded-control pl-tight pr-snug text-left text-note leading-none @lg/page:mb-tight @lg/page:w-full",
           shown.kind === "skills" ? "bg-raised text-text" : "text-text-quiet hover:bg-chrome",
         ]}
         aria-current={shown.kind === "skills" ? "true" : undefined}
@@ -314,7 +316,16 @@
         <span class="flex w-base shrink-0 justify-center text-text-disabled">✳</span>
         <span class="ml-tight">{say($lang, "bld_skills")}</span>
       </button>
-      <Tree root={address} {picked} onPick={pick} />
+      </div>
+      <div class={[treeOpen ? "mt-base block" : "hidden", "@lg/page:mt-tight @lg/page:block"]}>
+        <Tree root={address} {picked} onPick={pick} />
+        {#if building !== undefined}
+          <div class="mt-base border-t border-edge pt-base @wide/page:hidden">
+            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+            {@render rooms(building)}
+          </div>
+        {/if}
+      </div>
     </aside>
     <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-pane py-base">
       {#if shown.kind === "plan"}
