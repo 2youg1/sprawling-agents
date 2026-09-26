@@ -179,10 +179,7 @@ pub(crate) fn start(
 /// once rather than at every line this file prints.
 fn say<W: Write>(out: &mut W, line: &str) {
     drop(out.write_all(line.as_bytes()));
-    drop(out.write_all(
-        b"
-",
-    ));
+    drop(out.write_all(b"\n"));
 }
 
 /// The loop, over any reader and writer so a test can drive it.

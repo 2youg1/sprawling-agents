@@ -43,7 +43,8 @@ impl RunWorker {
                 runtime::diagnostics::Level::Refuse,
                 "kernel::pursuit",
                 &format!(
-                    "{node} is still ready after a run took it; the pursuit pauses rather than                      dispatching it again"
+                    "{node} is still ready after a run took it; the pursuit pauses rather than \
+                     dispatching it again"
                 ),
             );
             if let Err(err) = self.set_pursuit(addr, channels::PursuitStep::Pause) {

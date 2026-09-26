@@ -20,15 +20,8 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
     std::fs::create_dir_all(building.join("room2")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
     let note = building.join("room1").join("notes.md");
-    std::fs::write(
-        &note, b"before
-",
-    )
-    .unwrap();
-    let version = runtime::version_of(
-        b"before
-",
-    );
+    std::fs::write(&note, b"before\n").unwrap();
+    let version = runtime::version_of(b"before\n");
 
     let (base_url, _provider) = fake_openai(
         &["m-local"],
@@ -151,9 +144,9 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
 
     assert_eq!(
         std::fs::read_to_string(&note).unwrap(),
-        "before
-",
-        "the line saying the work was merged never landed, so the building must still stand              on what it had"
+        "before\n",
+        "the line saying the work was merged never landed, so the building must still stand \
+         on what it had"
     );
     assert!(
         outcome.is_err(),

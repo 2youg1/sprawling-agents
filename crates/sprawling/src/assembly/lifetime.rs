@@ -162,7 +162,7 @@ impl RunWorker {
                 runtime::diagnostics::Level::Refuse,
                 runtime::diagnostics::Site {
                     run: kernel::RunId::CITY,
-                    seq: kernel::Seq::FIRST,
+                    seq: ledger.position(),
                     module: "bin::assembly",
                 },
                 &format!(
@@ -287,7 +287,8 @@ impl RunWorker {
             ),
             Closing::Broken { cause } => (
                 format!("the city stopped because serving failed: {cause}"),
-                "not a choice: serving failed, and the command in hand finished first".to_owned(),
+                "not a choice: serving failed; the ledger holds every line that landed before it"
+                    .to_owned(),
                 "fix what the failure names, then `sprawling serve` on this directory".to_owned(),
             ),
         };

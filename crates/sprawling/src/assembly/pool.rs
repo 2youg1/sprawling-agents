@@ -103,6 +103,14 @@ impl DrivingPool {
 
     /// How many runs are driving right now. The `in_flight` half of the
     /// stop condition in `kernel::pursuit`.
+    ///
+    /// A drive in the waiting queue is not counted, although it has
+    /// already written its `run_started` line. The drain check stays
+    /// sound only because a drive waits solely while [`Self::full`]
+    /// holds, `full` never holds with no run driving, and
+    /// [`Self::start_waiting`] runs whenever a lane comes home: so this
+    /// reads zero only when nothing waits either. A change that lets a
+    /// drive wait for another reason counts the waiting drives here.
     pub(crate) fn in_flight(&self) -> u32 {
         u32::try_from(self.running.len()).unwrap_or(u32::MAX)
     }

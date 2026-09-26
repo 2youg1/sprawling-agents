@@ -314,7 +314,7 @@ pub(crate) fn snake(camel: &str) -> String;
 - **`/web` 携配对令牌**，故没有人需要手拷一串东西。令牌在 `serve` 里只被读一次，控制台拿到的是那一次的副本，不重新读环境。
 - **Ctrl-C 已是有序收口**：`serve` 在 `channels::serve` 与 `tokio::signal::ctrl_c` 之间 `select!`。收到信号后先停止接受连接，再 `CommandDesk::close(Closing::Chosen)` 告诉 worker，worker **在读队列的同一处**读到它，于是正在跑的那条命令先跑完，`handoff_written` 是最后一行而不是某一行的中间。主线程 join worker 线程再返回——先返回的 main 会在那一行写出来之前结束进程。
   - **`DeskWait::Close` 与 `Gone` 不是一回事**：前者是城要停了，值一份 Handoff；后者是桌子自己坏了，那座城已经写不出 Handoff 了。
-  - **收口带着它的缘由**：`CommandDesk::close(Closing)`，`Closing` 是穷尽枚举（`bin::assembly::lifetime`）：`Chosen`——人按了 Ctrl-C；`Broken { cause }`——`channels::serve` 返回了错误，或信号处理器装不上。`serve` 只从 `select!` 的结果里判这一次：`Ok` 即 `Chosen`，`Err` 即 `Broken`，错误的文字就是 `cause`。`close_city(&Closing)` 按缘由写 handoff：只有 `Chosen` 写「the city was closed by the person running it」；`Broken` 写「the city stopped because serving failed」并带上 `cause`，下一步是先修 `cause` 点名的东西。**原因**：没有人做过的事不能记成人做的；一份把失败写成人主动关城的交接件，会让下一任以为什么都没坏。**否决的方案**：失败时不写 handoff——那样失败与崩溃在记录里又成了同一种沉默，而 worker 此时仍然写得出这一行。
+  - **收口带着它的缘由**：`CommandDesk::close(Closing)`，`Closing` 是穷尽枚举（`bin::assembly::lifetime`）：`Chosen`——人按了 Ctrl-C；`Broken { cause }`——`channels::serve` 返回了错误。信号处理器装不上不是 `Broken`：`serve` 在标准错误上说一句，然后继续等 `channels::serve`，城照常服务，只是 Ctrl-C 回到不写 handoff 的硬停；装不上信号处理器只拿走了有序收口，没有坏掉服务，为它关掉一座正常服务的城是把小故障放大成停城。`serve` 只从 `select!` 的结果里判这一次：`Ok` 即 `Chosen`，`Err` 即 `Broken`，错误的文字就是 `cause`。`close_city(&Closing)` 按缘由写 handoff：只有 `Chosen` 写「the city was closed by the person running it」；`Broken` 写「the city stopped because serving failed」并带上 `cause`，下一步是先修 `cause` 点名的东西。**原因**：没有人做过的事不能记成人做的；一份把失败写成人主动关城的交接件，会让下一任以为什么都没坏。**否决的方案**：失败时不写 handoff——那样失败与崩溃在记录里又成了同一种沉默，而 worker 此时仍然写得出这一行。
   - **收口不是一条 Command**：能被拼出来的线上帧就是陌生人停掉别人城市的一条路。`closing` 是台子上的一个 `OnceLock<Closing>`，只有起城的那个进程按得动；先到的缘由作数，第二次 `close` 不改写它。
   - **Windows 交两个信号，本城两个都收**：控制台会发 Ctrl-C 与 Ctrl-Break。一座在其中一个上有序收口、在另一个上暴死的城，等于同一个手势有两种行为，而决定用哪一种的是人碰巧按了哪个键。其他平台只有一个。
   - **代价**：根 `Cargo.toml` 给 tokio 开 `signal` feature。unix 上它引入 `signal-hook-registry`（Apache-2.0/MIT，deny 表内），依赖数 496 → 497。
@@ -3821,7 +3821,7 @@ pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics)
 
 **两个折叠，一条起步路径。** 视图与 `Standing`（8-92）各有一份快照，放在 `<city>/.sprawling/snapshot/` 下各自的目录（`views/`、`standing/`）里，各有自己的 `fold_version`，因为两者的编码各自改变；核对快照、折尾部、退回全量折叠、切快照只在 `snapshot::start` 写一次，由 `SnapshotFold` 接两种折叠。**被否：两个折叠共用一份快照。** 那让只改了一边编码的构建丢掉两边的快照，而且 `Standing` 在每个 worker 打开时就切，视图在 `serve` 起步时和服务中的折叠线程上切，两者的最后一行并不总相同。
 
-**起步只折尾部。** `start_views` 即 `start::<Views>`，它调 `memory::start_from_snapshot(ledger_dir, <city>/.sprawling/snapshot/views/, views_fold_version())`（memory-SPEC 8-28）。`Resume`：解码快照里的 views，再用 `ChainSnapshot::resume()` 给出的 `LineCheck` 逐行核对并折尾部——尾部仍然过同一个逐行检查，行号从 `seq + 1` 数起。`Whole`：与没有快照时完全相同，`runtime::replay::verify_lines` 从创世核对并折叠。快照之前的行在起步时不再逐行核对：切快照时它们已经过一次完整的核对（从创世或从上一份快照起），`fit` 用一行的链哈希证明它们还是那些行；之后被改坏的行在服务中的城里由后台的 `audit_chain`（8-90）抓住；一次性的查询（`views::ask` 经 `Views::rebuild`）旁边没有后台审计，所以 `Views::rebuild` 经 `start_audited::<Views>` 起步：先同步跑一次 `memory::audit_chain`，只有它返回 `Whole` 才从快照起步作答，`Broken(reason)` 与读不了账本都原样拒绝。**被否：一次性查询从创世全量折叠。** 审计是流式的，只算哈希不解析、不折叠，内存为 O(1)；全量折叠还要解析每条记录并建出整份视图，同样读一遍账本却多花解析与折叠。**快照校验失败绝不信任它**：任何一种 `WholeFold` 都走全量折叠，原因放在 `from` 里；`serve` 把它作为一条 `Effect` 诊断写进日志，说明这次从哪里起步、为什么。
+**起步只折尾部。** `start::<Views>` 调 `memory::start_from_snapshot(ledger_dir, <city>/.sprawling/snapshot/views/, views_fold_version())`（memory-SPEC 8-28）。`Resume`：解码快照里的 views，再用 `ChainSnapshot::resume()` 给出的 `LineCheck` 逐行核对并折尾部——尾部仍然过同一个逐行检查，行号从 `seq + 1` 数起。`Whole`：与没有快照时完全相同，`runtime::replay::verify_lines` 从创世核对并折叠。快照之前的行在起步时不再逐行核对：切快照时它们已经过一次完整的核对（从创世或从上一份快照起），`fit` 用一行的链哈希证明它们还是那些行；之后被改坏的行在服务中的城里由后台的 `audit_chain`（8-90）抓住；一次性的查询（`views::ask` 经 `Views::rebuild`）旁边没有后台审计，所以 `Views::rebuild` 经 `start_audited::<Views>` 起步：先同步跑一次 `memory::audit_chain`，只有它返回 `Whole` 才从快照起步作答，`Broken(reason)` 与读不了账本都原样拒绝。**被否：一次性查询从创世全量折叠。** 审计是流式的，只算哈希不解析、不折叠，内存为 O(1)；全量折叠还要解析每条记录并建出整份视图，同样读一遍账本却多花解析与折叠。**快照校验失败绝不信任它**：任何一种 `WholeFold` 都走全量折叠，原因放在 `from` 里；`serve` 把它作为一条 `Effect` 诊断写进日志，说明这次从哪里起步、为什么。
 
 **尚未做到的（本节接口的当前状态）**：查询仍在锁内作答，`GitStatus` 等做 I/O 的查询仍在锁内做 I/O，所以读者之间、以及读者与折叠线程之间仍会互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取、把 I/O 移到锁外（锁内只取所需的小数据），是这一接口余下的两步。
 **切快照：服务起步时，折叠越过快照就切一次。** `serve` 的写线程调 `start_served_views`：它先经 `fold_city` 从创世折视图，与 worker 的 `Standing` 同一遍读历史，再在折过的最后一行切一份视图快照（`snapshot::start::cut_at`），最后交出视图；账本还没有一行时什么也不写。`serve` 不从视图快照起步：`Standing` 要在同一遍里折，两份快照又在不同时刻切，从视图快照起步只会多一遍读，而不是少一遍。这个频率不含常数：切一次的代价是一次编码加一次 `sync`，与视图大小成正比；它省下的是下一次起步重折这段尾部的时间，与尾部长度成正比，而尾部只在上次起步之后增长。一次性的查询（`views::ask`）经 `Views::rebuild` 只读快照，不切：读命令不写盘。**写不下快照不让 `serve` 失败**：失败写成一条 `Refuse` 诊断，内容是失败原因与恢复办法，视图照常交出。快照只是下一次起步的捷径：没切成，下一次起步从旧快照或从创世多折一段，结果逐字节相同，只慢一些；而账本写不下时历史本身就缺了，两者不能同样对待。**被否：写不下快照就让 `serve` 失败。** 那让一个只影响下次起步速度的故障（快照目录满、权限错）挡住整座城。
@@ -3850,9 +3850,9 @@ pub(in crate::assembly) fn from_json_text<'de, T: DeserializeOwned, D: Deseriali
 
 **每次打开 worker 都切。** `Standing::fold` 先 `start::<StandingFolds>`，折过了快照之后的行就切一份新快照，再 settle。切不成不是折叠的错：结果放在 `Standing.cut` 里，`RunWorker::over` 把它写成一条 `Refuse` 诊断，worker 照常打开，理由与 8-91 相同。账本目录不存在时什么也不读、不切。
 
-**`fold_version`**：blake3(`CARGO_PKG_VERSION` ‖ `STANDING_FOLD_RULES`) 的前四字节（LE）；同一版本内改了折叠规则或 `StandingFolds` 的字段，改 `STANDING_FOLD_RULES`。
+**`fold_version`**：blake3(`CARGO_PKG_VERSION` ‖ `STANDING_FOLD_RULES`) 的前四字节（LE）；同一版本内改了折叠规则或 `StandingFolds` 的字段，改 `STANDING_FOLD_RULES`。这条规则由 `assembly::folds::standing_start::tests` 机器核对：常量写成 `standing-fold-<16 位十六进制>`，后缀是一份固定夹具（两条手写记录，一条信号入队、一条认领，填进协作折叠的信号队列与计划持有表；时间与序号都是常数）折出的 `StandingFolds` 的 postcard 编码的 blake3 摘要前 16 位，编码一变测试就给出新值。
 
-**本节接口的当前状态**：`STANDING_FOLD_RULES` 还没有像 `VIEWS_FOLD_RULES` 那样钉上一份夹具编码的摘要，改了编码而忘了改常量时，同一版本的二进制会接受旧快照并在 `decode` 失败后退回全量折叠，或在字段顺序不变、含义变了时接受它；钉摘要需要一份填满六个折叠的固定夹具。
+**本节接口的当前状态**：夹具只填了协作折叠；另外五个折叠（`EndpointBook`、`Governance`、`Entrance`、`Expiries`、`SessionOrigins`）在夹具里是空的，摘要只钉住它们空时的编码。其中一个在非空时改了编码（字段顺序不变、含义变了）而忘了改常量，同一版本的二进制仍会接受旧快照；给夹具补上这五个折叠各自的一条记录即可合上。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 
@@ -4044,11 +4044,11 @@ impl RunWorker {
   ```
 
   `Closing::Chosen` → `Stop`；`Closing::Broken` 记下这一刻，丢掉距今已满 `CRASH_WINDOW_MS` 的旧崩溃，窗口里凑满 `CRASH_LIMIT` 次即 `Degraded`，否则 `Restart`。
-- `bin::supervising::children`（形状 4 adapter）：`pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxError>`，`pub enum Ended { Chosen, Degraded }`。它起子进程、等它退出、按退出状态造一个 `Result<(), AxError>` 交给 `Closing::of`，再把结果交给 `CrashBudget::after`，自己不做判断。
+- `bin::supervising::children`（形状 4 adapter）：`pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxError>`，`pub enum Ended { Chosen, Degraded }`。它起子进程、等它退出、按退出状态造一个 `Result<(), AxError>` 交给 `Closing::of`，再把结果交给 `CrashBudget::after`，自己不做判断。交给 `after` 的时刻是守护起步以来经过的毫秒数，取自单调时钟 `serving::standing::monotonic_now`，不是墙钟：系统把墙钟往回拨会让一次旧崩溃一直留在窗口里，往前拨会让一次新崩溃提前出窗口。
 
 **子进程怎么读成 `Closing`。** 退出码 0 是 `serve` 在人按 Ctrl-C 后有序收口的结果，读作 `Chosen`，守护随之结束；其余一切（非零码、被信号杀掉而没有码）读作 `Broken`，`cause` 是退出状态的文字。这一次读法只有 `Closing::of` 一处，守护不另造一套分类。
 
-**degraded 要人显式解除。** 窗口里第三次崩溃后守护不再重启，打印最后一次的 `cause` 与崩溃次数，然后等标准输入的一行：人按 Enter 即解除（预算清零，`resume` 后再 `serve`）；读到 EOF（没有人在）即以失败退出。**原因**：一个 60 s 内崩了三次的服务，再拉起来多半还是崩，且每次崩溃都可能留下一条悬空调用；让它无限重启是把一个需要人看的故障藏进循环里。**否决的方案**：指数退避后永远重试——那样故障永远不会被人看见。
+**degraded 要人显式解除。** 窗口里第三次崩溃后守护不再重启，打印最后一次的 `cause` 与崩溃次数，然后等标准输入的一行：人按 Enter 即解除（预算清零，`resume` 后再 `serve`）；读到 EOF（没有人在）即以失败退出；终端读不了时先打印读失败的原因，再同样以失败退出。**原因**：一个 60 s 内崩了三次的服务，再拉起来多半还是崩，且每次崩溃都可能留下一条悬空调用；让它无限重启是把一个需要人看的故障藏进循环里。**否决的方案**：指数退避后永远重试——那样故障永远不会被人看见。
 
 **子进程的那一行。** 开不开浏览器（`opening()`）与进不进控制台（`wanted`）都由 `serve_city` 算一次，守护只把结果变成 flag：`pub struct Child { forwarded, first: Window, console: Console }`。只有第一次起的子进程带 `--open`（当 `opening()` 判为 `Open::Browser`），之后每次都带 `--no-open`，因为重启不该每次弹一个新窗口；子进程带 `--console` 当且仅当不带 `--supervise` 的同一行会进控制台，否则带 `--no-console`。其余 flag 由 bin 的 `verbs::forwarded` 按 `SERVED` 表的 `Takes::Value` 连同其值原样转给 `serve`，守护不再解析 argv。子进程继承这个终端。
 

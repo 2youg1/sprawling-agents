@@ -279,13 +279,10 @@ mod tests {
         let desk = collab::ClaimDesk::new(
             format!("potter@lab.{run}"),
             Address::parse("lab/room1").unwrap(),
-            "# Roadmap
-
-| # | Item | Weight | Needs | Status | Evidence |
-             |---|------|--------|-------|--------|----------|
-             | 1 | wire the kiln | 1 |  | Not started |  |
-"
-            .to_owned(),
+            "# Roadmap\n\n| # | Item | Weight | Needs | Status | Evidence |\n\
+             |---|------|--------|-------|--------|----------|\n\
+             | 1 | wire the kiln | 1 |  | Not started |  |\n"
+                .to_owned(),
             super::booking(bell, claimant(run)),
         );
         collab::ClaimTool::new(std::sync::Arc::new(std::sync::Mutex::new(desk))).unwrap()

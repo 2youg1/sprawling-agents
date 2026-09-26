@@ -325,6 +325,10 @@ fn a_split_closes_the_claim_on_its_parent() {
         .plan_holders
         .in_building(&building);
 
+    // The rebuilt fold is what guards the split today. The worker half
+    // holds trivially until `RelayGate::serve` passes the claim it books
+    // through `RunWorker::absorb`: the live table never sees the
+    // call-time `roadmap_claimed`, so it is empty with or without a split.
     assert_eq!(
         (
             landed.is_ok(),

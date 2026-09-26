@@ -80,3 +80,38 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
         "the restoration closes the row the discard opened"
     );
 }
+
+#[test]
+fn a_way_back_the_bin_does_not_write_is_refused_in_one_readable_sentence() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    init_city(root).unwrap();
+    let mut worker = RunWorker::new(
+        root,
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    let stored = kernel::Locator::cas(kernel::B3Hash::digest(b"a stored object"));
+
+    let refusal = worker
+        .handle(channels::Command::RestoreDiscard {
+            restoration: kernel::Restoration::Tracked(stored.clone()),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"restore"),
+        })
+        .unwrap_err();
+
+    assert_eq!(
+        refusal,
+        kernel::AxError::failure(
+            kernel::AxCode::InvalidArgs,
+            "restore a discarded file",
+            stored.to_string(),
+        )
+        .with_recovery(
+            "restore the whole file: a way back that names a part of one, or no file, is not one \
+             the recycle bin writes"
+        ),
+        "the person reads the recovery as one sentence, with no run of blanks inside it"
+    );
+}

@@ -293,21 +293,23 @@ impl Listening {
         // then the worker is told - it reads that where it reads its queue,
         // so whatever command is running finishes and the handoff is the
         // last line rather than a line in the middle of one.
+        let mut serving = std::pin::pin!(channels::serve(bound, config));
         let served = tokio::select! {
-            result = channels::serve(bound, config) => result,
-            signal = closed_by_hand() => {
+            result = &mut serving => result,
+            signal = closed_by_hand() => match signal {
+                Ok(()) => Ok(()),
                 // A signal handler that cannot be installed is worth saying
-                // out loud: the city keeps serving, and the person now knows
-                // that Ctrl-C will be the hard stop it always was.
-                signal.map_err(|source| {
-                    AxError::failure(
-                        AxCode::StorageFatal,
-                        "listen for an orderly close",
-                        source.to_string(),
-                    )
-                    .with_recovery("stop the city from the console instead; /quit closes it")
-                })
-            }
+                // out loud, and not worth closing the city over: it keeps
+                // serving, and the person now knows that Ctrl-C will be the
+                // hard stop it always was.
+                Err(source) => {
+                    eprintln!(
+                        "an orderly close cannot be listened for ({source}); the city keeps \
+                         serving, and Ctrl-C ends it without a handoff"
+                    );
+                    serving.await
+                }
+            },
         };
         desk.close(Closing::of(&served));
         // Joined rather than left to the process exit: the handoff is
