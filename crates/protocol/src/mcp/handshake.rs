@@ -3,28 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reaching a Model Context Protocol server.
-//!
-//! The city does not know any particular server. Which one a building
-//! talks to is that building's configuration; what this module knows is
-//! the protocol, and the protocol is the same whether the far end is a
-//! hosted catalogue of a thousand applications or a script somebody
-//! wrote this morning.
-//!
-//! Two things about the current revision shape the code. The list of
-//! tools may not vary per connection, which is the same rule as freezing
-//! a run's tool table — the two arrived from opposite directions and
-//! agree, so the tool table is read once and frozen with the run. And
-//! every connection opens with the lifecycle the specification defines:
-//! `initialize`, then a `notifications/initialized` notification, before
-//! any other request. That is why the seam has two methods rather than
-//! one — a notification is a message with no answer, and pretending it
-//! has one is how a client ends up waiting for a 202 with no body.
-//!
-//! Everything a server returns is other people's text. It lands on the
-//! same tool seam as the local tools, so it enters the taint ring the
-//! same way, and there is no unwrapping face here.
-
 //! MCP handshake: initialize, initialized, ready.
 
 use super::outbound::Outbound;
@@ -47,11 +25,9 @@ pub struct Handshake {
 
 /// Opens a connection: `initialize`, then `notifications/initialized`.
 ///
-/// One authority for the lifecycle, above both transports. Before this
-/// existed, both of them opened with `server/discover` - a method the
-/// specification does not define - and a hosted server answered
-/// `-32601: Method not found` to the first thing this city ever said to
-/// it.
+/// One authority for the lifecycle, above every transport, because the
+/// specification requires `initialize` before any other request and a
+/// transport that opened its own way would drift from the others.
 ///
 /// # Errors
 /// Refuses a far end that will not answer `initialize`, and one whose
@@ -343,7 +319,7 @@ mod tests {
     }
 
     /// What opening one connection costs, which is what a standing
-    /// connection table would save per dispatch (K-05).
+    /// connection table would save per dispatch (protocol-SPEC 8-16).
     ///
     /// Two answered requests and one notification, per server, every
     /// time: `initialize`, `notifications/initialized`, `tools/list`.
@@ -351,8 +327,7 @@ mod tests {
     /// the same on every machine and the time is not - and because this
     /// city samples the clock in one place, which is not a test. The
     /// cost a standing table would remove is the process start and the
-    /// round trips, and both belong to the assembly layer that owns the
-    /// transport (protocol-SPEC 8-16).
+    /// round trips, and both belong to the transports.
     #[test]
     fn opening_one_connection_costs_two_round_trips_and_one_notification() {
         let mut server = Counting {
