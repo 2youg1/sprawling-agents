@@ -130,6 +130,11 @@ impl Face {
         self.size = size;
     }
 
+    /// Takes the lineage and the lines appended since the last look.
+    pub(super) fn follow(&mut self, runs: &[RunLine], appended: Vec<Row>) {
+        drop((runs, appended));
+    }
+
     pub(super) fn is_closed(&self) -> bool {
         self.life == Life::Closed
     }

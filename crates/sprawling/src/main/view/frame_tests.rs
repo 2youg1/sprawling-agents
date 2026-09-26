@@ -109,6 +109,52 @@ fn opens_on_the_run_waiting_for_the_person_before_any_active_run() {
     );
 }
 
+/// A run that starts while the viewer is open appears with its
+/// ancestors unfolded, and the cursor and folds the person left stay.
+#[test]
+fn a_run_that_starts_while_following_appears_and_the_cursor_stays() {
+    let mut face = city(NARROW);
+    let runs = vec![
+        line(1, "lab/a", (1, 4), None),
+        line(2, "yard/b", (3, 8), Some(memory::RunPhase::Active)),
+        RunLine {
+            parent: Some(run(1)),
+            forked_at: Some(Seq::new(2)),
+            ..line(3, "lab/a", (5, 7), Some(memory::RunPhase::Frozen))
+        },
+        RunLine {
+            session: Some(Seq::new(9)),
+            predecessor: Some(run(1)),
+            ..line(4, "lab/a", (10, 11), None)
+        },
+        line(5, "lab/c", (12, 12), Some(memory::RunPhase::Active)),
+    ];
+    let appended = vec![Row {
+        seq: Seq::new(12),
+        run: run(5),
+        line: "{}".to_owned(),
+    }];
+    face.follow(&runs, appended);
+    assert_eq!(
+        face.frame(),
+        vec![
+            " - city".to_owned(),
+            "   - lab".to_owned(),
+            "     + lab/a".to_owned(),
+            "     - lab/c".to_owned(),
+            "       - session (first stretch)".to_owned(),
+            "           run 0198f6a2-7c4a-7bbb-9d1e-000000000005 active #12..12".to_owned(),
+            "   - yard".to_owned(),
+            "     - yard/b".to_owned(),
+            "       - session (first stretch)".to_owned(),
+            format!(">          run {R2} active #3..8"),
+        ]
+    );
+    face.apply(Action::SwitchLens);
+    face.apply(Action::Last);
+    assert_eq!(cursor_line(&face), ">{}");
+}
+
 #[test]
 fn opens_on_the_latest_active_run_with_only_its_ancestors_open() {
     assert_eq!(
