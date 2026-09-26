@@ -107,106 +107,140 @@ impl PlanView {
     /// What one building's plan says, reading the file only when the
     /// fold says it may have moved.
     pub(crate) fn of(&mut self, city_root: &Path, addr: &Address) -> PlanReading {
-        if !self.read.contains_key(addr) {
-            let reading = match city::roadmap(city_root, addr) {
-                // A plan that cannot be opened is not a plan somebody
-                // wrote badly. Read as an empty document it would come
-                // back as "no table found", which sends a person to
-                // edit a table when the file will not open.
-                Err(err) => Reading::Unreadable(vec![err.to_string()]),
-                Ok(text) => match kernel::spine::check_roadmap_shape(&text) {
-                    RoadmapShape::WellFormed { rows } => match PlanTree::build(rows) {
-                        Ok(tree) => Reading::Tree(Box::new(tree)),
-                        Err(refusal) => Reading::Unreadable(vec![refusal.to_string()]),
-                    },
-                    RoadmapShape::Malformed { problems } => Reading::Unreadable(problems),
-                },
-            };
-            self.read.insert(addr.clone(), reading);
-        }
+        let reading = self
+            .read
+            .entry(addr.clone())
+            .or_insert_with(|| read_plan(city_root, addr));
+        describe(reading, self.causes.get(addr))
+    }
+
+    /// What one building's plan says as far as the cache holds it,
+    /// without reading the disk: the views are held while this runs,
+    /// and a plan nobody has read yet is left to [`PlanAsk::read`].
+    pub(crate) fn ask(&self, addr: &Address) -> PlanAsk {
         match self.read.get(addr) {
-            Some(Reading::Tree(tree)) => self.describe(addr, tree),
-            Some(Reading::Unreadable(problems)) => PlanReading {
-                progress: unplanned(),
-                problems: problems.clone(),
-                rows: Vec::new(),
-                blocked: Vec::new(),
-                ready: Vec::new(),
-            },
-            None => PlanReading {
-                progress: unplanned(),
-                problems: Vec::new(),
-                rows: Vec::new(),
-                blocked: Vec::new(),
-                ready: Vec::new(),
+            Some(reading) => PlanAsk::Held(describe(reading, self.causes.get(addr))),
+            None => PlanAsk::Unread {
+                causes: self.causes.get(addr).cloned().unwrap_or_default(),
             },
         }
     }
+}
 
-    fn describe(&self, addr: &Address, tree: &PlanTree) -> PlanReading {
-        let ready = tree.ready();
-        let rows = tree
-            .nodes()
-            .map(|node| channels::PlanRow {
-                node: node.row.id.clone(),
-                item: node.row.item.clone(),
-                status: node.row.status,
-                share_ppb: node.share.ppb(),
-                needs: node.row.needs.clone(),
-                ready: ready.contains(&node.row.id),
-                leaf: node.is_leaf(),
-                evidence: match &node.row.evidence {
-                    kernel::EvidenceCell::Present(locator) => Some(locator.to_string()),
-                    kernel::EvidenceCell::Empty | kernel::EvidenceCell::Invalid { .. } => None,
-                },
-            })
-            .collect();
-        let blocked = self
-            .blockages(addr, tree)
-            .into_iter()
-            .map(|blockage| channels::BlockedLine {
-                line: blockage.line(),
-                waiting: u32::try_from(blockage.reaches.len()).unwrap_or(u32::MAX),
-                source: blockage.source,
-            })
-            .collect();
-        PlanReading {
-            progress: tree.progress(),
-            problems: Vec::new(),
-            rows,
-            blocked,
-            ready,
+/// One building's plan as `PlanView::ask` left it for after the lock.
+pub(crate) enum PlanAsk {
+    /// The cached plan, described.
+    Held(PlanReading),
+    /// A plan nobody has read since it last moved, and why each of its
+    /// red nodes is red, to describe the table once it is read.
+    Unread { causes: BTreeMap<NodeId, StopCause> },
+}
+
+impl PlanAsk {
+    /// The plan, reading the file when the cache did not hold it. What
+    /// is read here is not put back: a record folded since `ask` may
+    /// already have made it stale (sprawling-SPEC.md 8-92).
+    pub(crate) fn read(self, city_root: &Path, addr: &Address) -> PlanReading {
+        match self {
+            Self::Held(reading) => reading,
+            Self::Unread { causes } => describe(&read_plan(city_root, addr), Some(&causes)),
         }
     }
+}
 
-    /// The red nodes of one building, and how far each one reaches.
-    ///
-    /// The table says which nodes are red; the fold says why. A node the
-    /// table calls blocked with no record behind it is still red — the
-    /// sentence is then the status word itself, because a row a person
-    /// edited by hand is still a row that says the work has stopped.
-    fn blockages(&self, addr: &Address, tree: &PlanTree) -> Vec<Blockage> {
-        let known = self.causes.get(addr);
-        let red: Vec<RedNode> = tree
-            .nodes()
-            .filter(|node| {
-                matches!(
-                    node.row.status,
-                    RoadmapStatus::Blocked | RoadmapStatus::AwaitingApproval
-                )
-            })
-            .map(|node| RedNode {
-                at: node.row.id.clone(),
-                why: known
-                    .and_then(|held| held.get(&node.row.id))
-                    .cloned()
-                    .unwrap_or_else(|| StopCause::Blocked {
-                        note: format!("the plan says `{}`", node.row.status.spelling()),
-                    }),
-            })
-            .collect();
-        kernel::blockage::spread(tree, &red)
+/// One building's plan file, parsed.
+fn read_plan(city_root: &Path, addr: &Address) -> Reading {
+    match city::roadmap(city_root, addr) {
+        // A plan that cannot be opened is not a plan somebody wrote
+        // badly. Read as an empty document it would come back as "no
+        // table found", which sends a person to edit a table when the
+        // file will not open.
+        Err(err) => Reading::Unreadable(vec![err.to_string()]),
+        Ok(text) => match kernel::spine::check_roadmap_shape(&text) {
+            RoadmapShape::WellFormed { rows } => match PlanTree::build(rows) {
+                Ok(tree) => Reading::Tree(Box::new(tree)),
+                Err(refusal) => Reading::Unreadable(vec![refusal.to_string()]),
+            },
+            RoadmapShape::Malformed { problems } => Reading::Unreadable(problems),
+        },
     }
+}
+
+/// What a page is told about one reading, given why its red nodes are red.
+fn describe(reading: &Reading, causes: Option<&BTreeMap<NodeId, StopCause>>) -> PlanReading {
+    match reading {
+        Reading::Tree(tree) => describe_tree(tree, causes),
+        Reading::Unreadable(problems) => PlanReading {
+            progress: unplanned(),
+            problems: problems.clone(),
+            rows: Vec::new(),
+            blocked: Vec::new(),
+            ready: Vec::new(),
+        },
+    }
+}
+
+fn describe_tree(tree: &PlanTree, causes: Option<&BTreeMap<NodeId, StopCause>>) -> PlanReading {
+    let ready = tree.ready();
+    let rows = tree
+        .nodes()
+        .map(|node| channels::PlanRow {
+            node: node.row.id.clone(),
+            item: node.row.item.clone(),
+            status: node.row.status,
+            share_ppb: node.share.ppb(),
+            needs: node.row.needs.clone(),
+            ready: ready.contains(&node.row.id),
+            leaf: node.is_leaf(),
+            evidence: match &node.row.evidence {
+                kernel::EvidenceCell::Present(locator) => Some(locator.to_string()),
+                kernel::EvidenceCell::Empty | kernel::EvidenceCell::Invalid { .. } => None,
+            },
+        })
+        .collect();
+    let blocked = blockages(tree, causes)
+        .into_iter()
+        .map(|blockage| channels::BlockedLine {
+            line: blockage.line(),
+            waiting: u32::try_from(blockage.reaches.len()).unwrap_or(u32::MAX),
+            source: blockage.source,
+        })
+        .collect();
+    PlanReading {
+        progress: tree.progress(),
+        problems: Vec::new(),
+        rows,
+        blocked,
+        ready,
+    }
+}
+
+/// The red nodes of one building, and how far each one reaches.
+///
+/// The table says which nodes are red; the fold says why. A node the
+/// table calls blocked with no record behind it is still red — the
+/// sentence is then the status word itself, because a row a person
+/// edited by hand is still a row that says the work has stopped.
+fn blockages(tree: &PlanTree, known: Option<&BTreeMap<NodeId, StopCause>>) -> Vec<Blockage> {
+    let red: Vec<RedNode> = tree
+        .nodes()
+        .filter(|node| {
+            matches!(
+                node.row.status,
+                RoadmapStatus::Blocked | RoadmapStatus::AwaitingApproval
+            )
+        })
+        .map(|node| RedNode {
+            at: node.row.id.clone(),
+            why: known
+                .and_then(|held| held.get(&node.row.id))
+                .cloned()
+                .unwrap_or_else(|| StopCause::Blocked {
+                    note: format!("the plan says `{}`", node.row.status.spelling()),
+                }),
+        })
+        .collect();
+    kernel::blockage::spread(tree, &red)
 }
 
 fn unplanned() -> Progress {

@@ -3507,7 +3507,7 @@ impl Listening {
 
 **本章测试**：`serving::tests::a_serve_refused_at_the_socket_writes_no_line`：测试自己先占住端口，`listen` 返回错误，账本的每一行与之前逐字节相同。锁的那一半由 memory 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go` 守住。
 
-### 8-89 视图在自己的线程上折叠，写线程不等读者（`bin::serving::folding`）
+### 8-93 视图在自己的线程上折叠，写线程不等读者（`bin::serving::folding`）
 
 ```rust
 // bin::serving::folding —— shape: adapter
@@ -3531,7 +3531,7 @@ pub(super) fn spawn_folding(
 
 **线程随写线程结束。** `attend` 返回后写线程丢掉 `RunWorker`（连同观察者与 `machine`），通道随之关闭，折叠线程把通道里剩下的折完、广播完再退出；写线程 join 它之后才结束，所以 `serve` 对写线程的 join 也等到了最后一次广播。
 
-**尚未做到的（本节接口的当前状态）**：不做 I/O 的查询仍在锁内作答，所以读者之间、以及读者与折叠线程之间仍会为这段纯内存的时间互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取，是这一接口余下的一步。做 I/O 的查询怎样离开锁，见 8-92。
+**尚未做到的（本节接口的当前状态）**：不做 I/O 的查询仍在锁内作答，所以读者之间、以及读者与折叠线程之间仍会为这段纯内存的时间互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取，是这一接口余下的一步。它要求 `prepare` 只读视图（`&self`）：账本索引已搬到自己的锁里，`BuildingView` 不再填计划缓存，剩下 `CityView` 填计划缓存这一处可变读。做 I/O 的查询怎样离开锁，见 8-92。
 
 ### 8-92 做 I/O 的查询只在锁内取小数据，I/O 在锁外做（`bin::views::answering`、`bin::views::prepared`）
 
@@ -3544,7 +3544,8 @@ pub(crate) enum Prepared {
     Config { city_root: PathBuf, addr: Address }, // 锁外读配置阶梯
     Listing { city_root: PathBuf, at: Option<Address> }, // 锁外列一层目录
     Document { city_root: PathBuf, at: Address },       // 锁外读一个文件的开头
-    Building { city_root: PathBuf, addr: Address, plan: PlanReading }, // 锁内取折叠好的计划，锁外读楼的目录
+    Building { city_root: PathBuf, addr: Address, plan: PlanAsk }, // 锁内取缓存的计划或它的停因，锁外读楼的目录（与没读过的计划）
+    Prefix(PrefixAsk),               // 锁内取折叠记下的那条记录的序号，锁外读账本那一行与内容仓库
     Changes { city_root: PathBuf, base: GitOid, head: Option<GitOid> }, // 锁外让 git 比较两个检查点
     Hunks { city_root: PathBuf, oid_a: GitOid, oid_b: GitOid, path: String }, // 锁外读一个文件的补丁
     Content { city_root: PathBuf, locator: Locator }, // 锁外读内容仓库里的一个对象
@@ -3570,7 +3571,26 @@ pub(crate) fn answer_outside_the_lock(
 
 **`Skills` 在锁内拷走整张钉住表。** 表的大小是「run 数 × 每个 run 钉住的技能数」，拷它是纯内存的一段；按这栋楼的书架先筛再拷，就得在锁内扫书架，正是要挪出去的那次读盘。
 
-**`Prefix` 仍在锁内读账本，`BuildingView` 的计划第一次被问时也在锁内读盘**（本节接口的当前状态）：`Prefix` 找那条 `prompt_assembled` 记录要刷新视图持有的账本索引，索引是可变的缓存，拆开它要等视图以 `Arc<ViewsSnapshot>` 发布（8-89）。`Commit`、`Commits` 只读折叠，不在此列。
+```rust
+// bin::plan_view
+pub(crate) enum PlanAsk {
+    Held(PlanReading),                                   // 缓存里有：锁内描述完
+    Unread { causes: BTreeMap<NodeId, StopCause> },      // 没读过：锁内拷出这栋楼的停因，锁外读表
+}
+impl PlanView { pub(crate) fn ask(&self, addr: &Address) -> PlanAsk; } // 只读缓存，恒不读盘
+impl PlanAsk { pub(crate) fn read(self, city_root: &Path, addr: &Address) -> PlanReading; }
+// bin::views::prefix
+pub(crate) struct PrefixAsk { city_root: PathBuf, run: RunId, first: Option<Seq>, index: Arc<Mutex<memory::LedgerIndex>> }
+impl PrefixAsk { pub(super) fn read(self) -> channels::Answer; } // 读不到那一行或内容仓库打不开：Unavailable
+```
+
+**账本索引有自己的锁。** 索引是账本文件的缓存，折叠从不碰它（它在查询时才刷新），所以它不属于视图的锁：`Views` 持 `Arc<Mutex<memory::LedgerIndex>>`，`Prefix` 把这只 `Arc` 带出视图的锁，在 `finish` 里锁索引、刷新、读一行。读者之间仍为索引互等，折叠线程不等。索引的锁中毒时，读它的查询按「刷新失败」作答（`Prefix` 答 `Unavailable`，历史答空页），因为半刷新的偏移表会把别的行当成要找的那一行。被拒：`finish` 里另建一份索引——那是整本账本的一次扫描（五万条约 14 ms），比锁内那一段还长。
+
+**第一条 `prompt_assembled` 的序号由折叠记下。** `apply` 为每个 run 记它第一条 `prompt_assembled` 的 `Seq`（每个 run 一个数），`finish` 只读这一行；原先是锁内倒着读这个 run 的每一行找它。整条记录不进折叠：四段的来源表随文档数增长，而每个会话多占的内存是这个进程要压低的量。
+
+**没读过的计划在锁外读，读到的不回填缓存。** `ask` 只看缓存：有就锁内描述完（纯内存），没有就拷出这栋楼的停因表，`read` 在锁外读表、解析、描述。回填要在 `finish` 之后再锁一次，而这之间到达的记录可能刚让这份读数过时，回填就把旧计划放回缓存；所以缓存只由 `CityView` 的 `spine` 与 `pursuit_lines` 填（它们仍在锁内读盘，见下）。
+
+**仍在锁内读盘的**（本节接口的当前状态）：`CityView` 列楼的目录并读每栋楼没读过的计划；`History`、`HistoryRange`、`RunHistory`、`Rounds`、`Evidence` 在锁内刷新并读账本索引。前者要把楼的清单与计划读数拆成锁外的一步；后者只要像 `Prefix` 一样把索引的 `Arc` 带出去。`Commit`、`Commits` 只读折叠，不在此列。
 
 ### 8-90 服务中的城在后台审计整条链，链断了写者就停（`bin::assembly::chain_watch`）
 

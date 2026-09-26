@@ -31,10 +31,13 @@ impl Views {
             earlier: None,
         };
         let dir = ledger_dir(&self.city_root);
-        if self.index.refresh(&dir).is_err() {
+        let Ok(mut index) = self.index.lock() else {
+            return empty;
+        };
+        if index.refresh(&dir).is_err() {
             return empty;
         }
-        let Some(tail) = self.index.tail_seq() else {
+        let Some(tail) = index.tail_seq() else {
             return empty;
         };
         let end = match before {
@@ -52,7 +55,7 @@ impl Views {
         let want = u64::from(limit.clamp(1, channels::HISTORY_MAX));
         let start = end.value().saturating_sub(want.saturating_sub(1));
         let mut records = Vec::new();
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         for value in start..=end.value() {
             let Ok(line) = reader.line_at(kernel::Seq::new(value)) else {
                 break;
@@ -99,7 +102,10 @@ impl Views {
             return empty;
         }
         let dir = ledger_dir(&self.city_root);
-        if self.index.refresh(&dir).is_err() {
+        let Ok(mut index) = self.index.lock() else {
+            return empty;
+        };
+        if index.refresh(&dir).is_err() {
             return empty;
         }
         let want = u64::from(limit.clamp(1, channels::HISTORY_MAX));
@@ -108,7 +114,7 @@ impl Views {
             .saturating_add(want.saturating_sub(1))
             .min(to.value());
         let mut records = Vec::new();
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         // A walk that stopped early found no line at that sequence, which
         // means the Ledger ends there: nothing beyond it can be asked for
         // either, and a cursor pointing past it would have the page ask for
@@ -158,15 +164,17 @@ impl Views {
             earlier: None,
         };
         let dir = ledger_dir(&self.city_root);
-        if self.index.refresh(&dir).is_err() {
+        let Ok(mut index) = self.index.lock() else {
+            return empty;
+        };
+        if index.refresh(&dir).is_err() {
             return empty;
         }
         let want = usize::try_from(limit.clamp(1, channels::HISTORY_MAX)).unwrap_or(1);
         // One more than was asked for: whether this session wrote
         // anything older is exactly what `earlier` reports, and taking
         // one extra sequence answers it without a second question.
-        let mut newest: Vec<kernel::Seq> = self
-            .index
+        let mut newest: Vec<kernel::Seq> = index
             .run_seqs_before(run, before)
             .take(want.saturating_add(1))
             .collect();
@@ -177,7 +185,7 @@ impl Views {
         let earlier = has_older.then(|| newest.last().copied()).flatten();
         newest.reverse();
         let mut records = Vec::with_capacity(newest.len());
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         for seq in newest {
             let Ok(line) = reader.line_at(seq) else {
                 break;
@@ -225,10 +233,11 @@ impl Views {
         mut apply: impl FnMut(&EventRecord) -> Result<(), memory::MemoryError>,
     ) -> Option<()> {
         let dir = ledger_dir(&self.city_root);
-        self.index.refresh(&dir).ok()?;
-        let mut oldest_first: Vec<kernel::Seq> = self.index.run_seqs_before(run, None).collect();
+        let mut index = self.index.lock().ok()?;
+        index.refresh(&dir).ok()?;
+        let mut oldest_first: Vec<kernel::Seq> = index.run_seqs_before(run, None).collect();
         oldest_first.reverse();
-        let mut reader = self.index.reader(&dir);
+        let mut reader = index.reader(&dir);
         for seq in oldest_first {
             let line = reader.line_at(seq).ok()?;
             apply(&EventRecord::parse_line(&line).ok()?).ok()?;

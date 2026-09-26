@@ -91,7 +91,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let setting = setting_telling_a_refusal();
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
-    // (sprawling-SPEC.md 8-89).
+    // (sprawling-SPEC.md 8-93).
     let Folding {
         observer,
         machine,

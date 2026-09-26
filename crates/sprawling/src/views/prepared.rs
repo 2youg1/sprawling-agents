@@ -22,10 +22,10 @@ use super::hunks::hunks_answer;
 use super::lines::buildings_of;
 use super::lines::config_answer;
 use super::listing::listing_answer;
-use super::prefix::content_answer;
+use super::prefix::{PrefixAsk, content_answer};
 use super::skills::{SkillPins, skills_answer};
 use crate::assembly::read_building;
-use crate::plan_view::PlanReading;
+use crate::plan_view::PlanAsk;
 
 /// The answer to a question this city could not look up.
 ///
@@ -91,12 +91,15 @@ pub(crate) enum Prepared {
     },
     /// The head of one file.
     Document { city_root: PathBuf, at: Address },
-    /// One building's directory, beside the plan the views folded.
+    /// One building's directory, beside its plan: described from the
+    /// cache, or still to read.
     Building {
         city_root: PathBuf,
         addr: Address,
-        plan: PlanReading,
+        plan: PlanAsk,
     },
+    /// The prompt one run was frozen with: a ledger line and the store.
+    Prefix(PrefixAsk),
 }
 
 impl Prepared {
@@ -105,6 +108,7 @@ impl Prepared {
         match self {
             Self::Held(answer) => answer,
             Self::GitStatus(ask) => ask.read(),
+            Self::Prefix(ask) => ask.read(),
             // A settings file that cannot be read is "I could not
             // look", not an empty set of preferences.
             Self::Preferences => match crate::person::read() {
@@ -136,7 +140,7 @@ impl Prepared {
                 city_root,
                 addr,
                 plan,
-            } => match read_building(&city_root, &addr, plan) {
+            } => match read_building(&city_root, &addr, plan.read(&city_root, &addr)) {
                 Some(answer) => channels::Answer::Building(Box::new(answer)),
                 // A building nobody raised is not an empty building. The
                 // page needs to be able to tell those apart.

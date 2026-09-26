@@ -124,7 +124,15 @@ pub(crate) struct Views {
     /// asked - 14.4 ms of it on a fifty thousand record ledger. Held, the
     /// same question costs one directory listing and the bytes that are
     /// actually new.
-    pub(super) index: memory::LedgerIndex,
+    ///
+    /// Behind a lock of its own because the fold never touches it: a
+    /// query carries the `Arc` out of the view lock and reads the
+    /// ledger with only readers waiting on it (sprawling-SPEC.md 8-92).
+    pub(super) index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
+    /// Where each run's first `prompt_assembled` record sits, so the
+    /// prompt a page asks for is one ledger line rather than a walk
+    /// back through the whole run.
+    pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
     pub(super) plans: crate::plan_view::PlanView,
@@ -183,7 +191,8 @@ impl Views {
             next_unfolded: kernel::Seq::FIRST,
             // Empty until a fold hands over the index it built, or the
             // first query refreshes it: the history is not read here.
-            index: memory::LedgerIndex::empty(),
+            index: std::sync::Arc::new(std::sync::Mutex::new(memory::LedgerIndex::empty())),
+            first_prompts: std::collections::BTreeMap::new(),
             plans: crate::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
@@ -196,7 +205,7 @@ impl Views {
     /// Takes the index the fold that built these views read the history
     /// into, so serving does not scan the history a second time.
     pub(crate) fn hold_index(&mut self, index: memory::LedgerIndex) {
-        self.index = index;
+        self.index = std::sync::Arc::new(std::sync::Mutex::new(index));
     }
 
     /// The first seq this view has not folded: an answer read from here
@@ -297,6 +306,11 @@ impl Views {
                 }
             }
             EventKind::ApprovalResolved => self.fold_ruling(record)?,
+            EventKind::PromptAssembled => {
+                self.first_prompts
+                    .entry(record.run())
+                    .or_insert(record.seq());
+            }
             _ => {}
         }
         Ok(())
