@@ -22,8 +22,8 @@
 //! register; a gate refusal is not a clash at all, because the run
 //! that was refused holds no ground to clash over.
 
+use kernel::event::record::{ConflictLevel, GoalConflict};
 use kernel::{AxError, GoalEntry, GoalId, GoalResource, GoalVerdict, Payload};
-use serde_json::{Map, Value};
 
 /// Who settles this clash.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,18 +70,15 @@ pub fn arbitrate(registered: &[GoalEntry], candidate: &GoalEntry) -> Option<Leve
 /// # Errors
 /// Propagates the payload's refusal to hold what it was given.
 pub fn conflict_payload(candidate: &GoalEntry, level: &Level) -> Result<Payload, AxError> {
-    let mut map = Map::new();
-    map.insert(
-        "goal".to_owned(),
-        Value::String(candidate.id.as_str().to_owned()),
-    );
-    let (with, name) = match level {
-        Level::Serialize { after } => (after, "serialize"),
-        Level::Arbitrate { with } => (with, "arbitrate"),
+    let (with, level) = match level {
+        Level::Serialize { after } => (after, ConflictLevel::Serialize),
+        Level::Arbitrate { with } => (with, ConflictLevel::Arbitrate),
     };
-    map.insert("with".to_owned(), Value::String(with.as_str().to_owned()));
-    map.insert("level".to_owned(), Value::String(name.to_owned()));
-    Payload::new(map)
+    Payload::of(&GoalConflict {
+        goal: candidate.id.clone(),
+        with: with.clone(),
+        level,
+    })
 }
 
 #[cfg(test)]
@@ -159,22 +156,27 @@ mod tests {
         let level = Level::Arbitrate {
             with: GoalId::new("a").unwrap(),
         };
-        let payload = conflict_payload(&goal("b", "lab/one", true), &level).unwrap();
-        let map = payload.as_map();
-        assert_eq!(map.get("goal").and_then(Value::as_str), Some("b"));
-        assert_eq!(map.get("with").and_then(Value::as_str), Some("a"));
-        assert_eq!(map.get("level").and_then(Value::as_str), Some("arbitrate"));
-
-        let serialized = conflict_payload(
-            &goal("b", "lab/one", false),
-            &Level::Serialize {
-                after: GoalId::new("a").unwrap(),
-            },
-        )
-        .unwrap();
+        let read = |level: &Level| {
+            conflict_payload(&goal("b", "lab/one", true), level)
+                .unwrap()
+                .read::<GoalConflict>()
+                .unwrap()
+        };
+        let a = GoalId::new("a").unwrap();
         assert_eq!(
-            serialized.as_map().get("level").and_then(Value::as_str),
-            Some("serialize")
+            (read(&level), read(&Level::Serialize { after: a.clone() })),
+            (
+                GoalConflict {
+                    goal: GoalId::new("b").unwrap(),
+                    with: a.clone(),
+                    level: ConflictLevel::Arbitrate,
+                },
+                GoalConflict {
+                    goal: GoalId::new("b").unwrap(),
+                    with: a,
+                    level: ConflictLevel::Serialize,
+                },
+            )
         );
     }
 }

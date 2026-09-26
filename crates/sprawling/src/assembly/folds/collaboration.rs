@@ -9,7 +9,6 @@
 use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-use crate::effect;
 use crate::views::pursued;
 
 use super::super::{building_of, plan_node_of};
@@ -97,7 +96,7 @@ impl CollaborationFold {
                 let taken = collab::SignalConsumed::from_payload(record.data())?;
                 self.consumed.insert(taken.id.as_str().to_owned());
             }
-            EventKind::GoalRegistered => self.goals.push(effect::goal_from_payload(record.data())?),
+            EventKind::GoalRegistered => self.goals.push(record.data().read()?),
             EventKind::RoadmapClaimed => {
                 if let (Some(building), Some(node), Some(room)) = (
                     record.addr().and_then(building_of),

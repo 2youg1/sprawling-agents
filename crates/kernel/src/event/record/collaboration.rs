@@ -3,11 +3,37 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What residents did together: the goals a building pursues.
+//! What residents did together: the goals a building pursues, and the
+//! ground two goals met on.
+//!
+//! `goal_registered` has no struct here: its payload is the
+//! [`GoalEntry`](crate::GoalEntry) the goal register holds, written and
+//! read through `Payload::of` and `Payload::read` like every record.
 
 use serde::{Deserialize, Serialize};
 
-use crate::{AxCode, AxError, PursuitState};
+use crate::{AxCode, AxError, GoalId, PursuitState};
+
+/// `goal_conflict`: a goal that asked for ground another goal holds,
+/// and how far up the settling had to go.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct GoalConflict {
+    pub goal: GoalId,
+    pub with: GoalId,
+    pub level: ConflictLevel,
+}
+
+/// Which level settles a `goal_conflict`: `serialize` runs the goal
+/// after the one it met, `arbitrate` hands both statements to a
+/// resident.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum ConflictLevel {
+    Serialize,
+    Arbitrate,
+}
 
 /// `pursuit_changed`: one step a person took on a building's pursuit,
 /// and the goal the building holds after it.
@@ -96,6 +122,42 @@ mod tests {
                 Some(("read the meter".to_owned(), PursuitState::Paused)),
                 None
             )
+        );
+    }
+
+    /// The bytes `collab::arbiter::conflict_payload` wrote by hand, and
+    /// the `goal_registered` entry, which serde wrote from `GoalEntry`.
+    #[test]
+    fn a_goal_line_writes_the_keys_the_hand_written_map_wrote() {
+        let conflict = GoalConflict {
+            goal: GoalId::new("b").unwrap(),
+            with: GoalId::new("a").unwrap(),
+            level: ConflictLevel::Arbitrate,
+        };
+        let entry = crate::GoalEntry {
+            id: GoalId::new("a").unwrap(),
+            owner: "lab/a".to_owned(),
+            resources: vec![crate::GoalResource::External("the printer".to_owned())],
+            statement: "print".to_owned(),
+            standing: true,
+        };
+        let bytes = |payload: Payload| serde_json::to_string(&payload).unwrap();
+        assert_eq!(
+            (
+                bytes(Payload::of(&conflict).unwrap()),
+                bytes(Payload::of(&entry).unwrap()),
+            ),
+            (
+                r#"{"goal":"b","level":"arbitrate","with":"a"}"#.to_owned(),
+                r#"{"id":"a","owner":"lab/a","resources":[{"external":"the printer"}],"standing":true,"statement":"print"}"#.to_owned(),
+            )
+        );
+        assert_eq!(
+            Payload::of(&conflict)
+                .unwrap()
+                .read::<GoalConflict>()
+                .unwrap(),
+            conflict
         );
     }
 }

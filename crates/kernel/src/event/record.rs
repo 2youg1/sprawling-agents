@@ -52,7 +52,7 @@ pub use adviser::{
     AdviserAnswer, AdviserAnswered, AdviserAsk, AdviserAsked, AdviserFailure, AdviserFellBack,
 };
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
-pub use collaboration::{PursuitChanged, PursuitMove};
+pub use collaboration::{ConflictLevel, GoalConflict, PursuitChanged, PursuitMove};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     SpineDocumentWritten, autonomy_word,

@@ -417,6 +417,9 @@ pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
 pub struct PursuitChanged { pub step: PursuitMove,       // goal 只在 clear 之后缺席
                             pub goal: Option<String> }
 #[serde(rename_all = "snake_case")] pub enum PursuitMove { Set, Pause, Resume, Clear }
+pub struct GoalConflict { pub goal: GoalId, pub with: GoalId, pub level: ConflictLevel }
+#[serde(rename_all = "snake_case")] pub enum ConflictLevel { Serialize, Arbitrate }
+// goal_registered 的载荷就是 GoalEntry 本身，不另立 struct：目标表持有的正是它
 impl PursuitChanged { pub fn held(self) -> Result<Option<(String, PursuitState)>, AxError>; }
 pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
                              pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }

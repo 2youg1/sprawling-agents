@@ -219,6 +219,7 @@ pub fn arbitrate(registered: &[GoalEntry], candidate: &GoalEntry) -> Option<Leve
 pub fn conflict_payload(candidate: &GoalEntry, level: &Level) -> Result<Payload, AxError>;
 ```
 
+- **`goal_conflict` 的形状归 kernel**：`conflict_payload` 把 `Level` 译成 `kernel::event::record::GoalConflict` 再经 `Payload::of` 写出，读者经 `Payload::read` 读回同一个 struct；本模块只拥有「哪一级」的判定。
 - **检测进 kernel，仲裁不进**：`kernel::goal::detect_conflict` 只答「撞没撞」；本模块答「谁来裁」。
 - **判序固定**（机械 → 读）：同一对目标恒落同一级，重放才可比。
 - **机械可判的只有一种形状**：双方都 claim 路径，且常设性一高一低——「常设的先走」不需要任何判断。其余（两个常设、外部资源同名）都要读目标陈述，那是模型的活。

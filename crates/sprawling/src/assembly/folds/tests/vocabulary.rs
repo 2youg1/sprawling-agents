@@ -44,21 +44,37 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
 /// person cleared would go on pursuing after a restart.
 #[test]
 fn a_pursuit_line_the_build_cannot_read_stops_the_fold() {
+    let line = unreadable(
+        kernel::EventKind::PursuitChanged,
+        serde_json::json!({ "step": "abandon", "goal": "read the meter" }),
+    );
+    assert!(CollaborationFold::default().absorb(&line).is_err());
+}
+
+/// A goal line this build cannot read is a mismatch of vocabulary, the
+/// same refusal every other record read gives, so the recovery a person
+/// is handed is to replay with the build that wrote it.
+#[test]
+fn a_goal_line_the_build_cannot_read_is_a_wire_mismatch() {
+    let line = unreadable(
+        kernel::EventKind::GoalRegistered,
+        serde_json::json!({ "id": "a", "owner": "lab/a" }),
+    );
+    let refused = CollaborationFold::default()
+        .absorb(&line)
+        .map_err(|err| err.code().clone());
+    assert_eq!(refused, Err(kernel::AxCode::WireMismatch));
+}
+
+fn unreadable(kind: kernel::EventKind, data: serde_json::Value) -> EventRecord {
     let draft = kernel::EventDraft {
         run: RunId::CITY,
         t: kernel::TimeMs::new(0),
         who: "person".into(),
         addr: Some(Address::parse("lab").unwrap()),
-        kind: kernel::EventKind::PursuitChanged,
-        data: kernel::Payload::new(
-            serde_json::json!({ "step": "abandon", "goal": "read the meter" })
-                .as_object()
-                .unwrap()
-                .clone(),
-        )
-        .unwrap(),
+        kind,
+        data: kernel::Payload::new(data.as_object().unwrap().clone()).unwrap(),
         ig: false,
     };
-    let line = EventRecord::from_draft(draft, kernel::Seq::FIRST, kernel::ledger::GENESIS_PREV);
-    assert!(CollaborationFold::default().absorb(&line).is_err());
+    EventRecord::from_draft(draft, kernel::Seq::FIRST, kernel::ledger::GENESIS_PREV)
 }
