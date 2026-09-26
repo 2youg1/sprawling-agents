@@ -26,6 +26,8 @@ mod servers;
 mod standing;
 mod tools;
 
+pub(super) use standing::Placing;
+
 /// Who checks a delegate's own done check. Not the delegate: the whole
 /// point of `Claim::verified` is that a producer's verdict on its own
 /// work is not verification.

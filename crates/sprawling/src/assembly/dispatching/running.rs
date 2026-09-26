@@ -119,6 +119,15 @@ impl RunWorker {
         // row of locals every phase below would then have to be handed
         // one at a time.
         let mut site = self.stand_up(agreed, &at, &given)?;
+        site.place_tree(
+            &at.addr,
+            &super::super::workbench::Placing {
+                city_root: &self.city_root,
+                city: self.city_hash()?,
+                command: self.doorstep.entrance.carrying(),
+            },
+            &mut self.ledger,
+        )?;
         let desks = self.open_desks(&site, &at.addr)?;
 
         // What the model may see, what routes the call it makes, and

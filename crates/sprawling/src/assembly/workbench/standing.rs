@@ -10,8 +10,6 @@ use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxError, EventKind, RunId};
 
-use crate::effect;
-
 use super::super::{Agreed, Assignment, Given, RunWorker, now_ms, run_id_for};
 use super::Site;
 
@@ -92,6 +90,79 @@ impl Site {
     }
 }
 
+/// What placing a room's tree reads from the city, as values rather
+/// than as the worker that holds them, so the placement runs on
+/// whichever thread prepares the run (sprawling-SPEC.md 8-93).
+pub(in crate::assembly) struct Placing<'a> {
+    pub(in crate::assembly) city_root: &'a Path,
+    pub(in crate::assembly) city: kernel::B3Hash,
+    /// The key of the command this dispatch answers, stamped on the one
+    /// line the placement writes: for a review dispatch whose rules did
+    /// not change it is the only line that carries the key, and a
+    /// restart recognises the command again from it.
+    pub(in crate::assembly) command: Option<kernel::IdemKey>,
+}
+
+impl Site {
+    /// Lends a room under review its tree, kept between the room's runs,
+    /// and points this run's writes there instead of at the city: nothing
+    /// it writes is visible until somebody else checks it. A building
+    /// that asks for no review is left writing in the city.
+    ///
+    /// The fence goes up first: a worktree branches from a commit, so
+    /// the city needs one before it can lend anything out.
+    ///
+    /// # Errors
+    /// Propagates whatever the checkpoint or the worktree says about
+    /// lending a tree out, and the ledger's refusal of the line that
+    /// records it.
+    pub(in crate::assembly) fn place_tree<L: kernel::Ledger>(
+        &mut self,
+        addr: &Address,
+        placing: &Placing<'_>,
+        ledger: &mut L,
+    ) -> Result<(), AxError> {
+        if !self.rules.review() {
+            return Ok(());
+        }
+        // The base commit carries the same trailers every other commit
+        // the city makes carries, so the first line of an adopted
+        // repository's history already says which session put it there.
+        let of = provenance(
+            placing.city,
+            addr,
+            self.run_id,
+            memory::ModelChoice {
+                id: self.model.id.clone(),
+                effort: self.config.effort,
+            },
+        );
+        memory::Checkpoint::open(placing.city_root)
+            .map_err(memory::MemoryError::into_ax)?
+            .ensure_base(&[addr.as_str().to_owned()], now_ms()?, &of)
+            .map_err(memory::MemoryError::into_ax)?;
+        let claimed = memory::Worktrees::open(placing.city_root)
+            .map_err(memory::MemoryError::into_ax)?
+            .claim(&tree_of(addr)?, &super::tree_scope(&self.building))
+            .map_err(memory::MemoryError::into_ax)?;
+        ledger.append(kernel::EventDraft {
+            run: self.run_id,
+            t: now_ms()?,
+            who: self.who.clone(),
+            addr: Some(addr.clone()),
+            kind: EventKind::WorktreeOpened,
+            data: claimed
+                .opened_payload()
+                .map_err(memory::MemoryError::into_ax)?,
+            ig: false,
+        })?;
+        self.write_root = claimed.path().to_path_buf();
+        self.branch = Some(claimed.name().as_str().to_owned());
+        self.lease = Some(claimed);
+        Ok(())
+    }
+}
+
 impl RunWorker {
     /// Settles where this run stands, once the city has agreed to take
     /// the work.
@@ -99,10 +170,11 @@ impl RunWorker {
     /// What the agreement answered arrives as `agreed` rather than being
     /// asked again: asking twice would put a second authority behind a
     /// credential renewal that may reach the network. What is left is
-    /// one phase because it interlocks - a lease is opened in the run's
-    /// name, and the run's id is minted after that renewal - so cutting it
-    /// apart would move a clock sample, which a structural change may
-    /// not relocate.
+    /// one phase because it interlocks - the run's id is minted after
+    /// that renewal - so cutting it apart would move a clock sample,
+    /// which a structural change may not relocate. The tree a room under
+    /// review writes in is placed afterwards by [`Site::place_tree`],
+    /// which needs nothing from this worker (sprawling-SPEC.md 8-93).
     ///
     /// The frozen configuration is read here rather than in the
     /// agreement, and the reason is the room: a dispatch that names an
@@ -152,55 +224,6 @@ impl RunWorker {
         // from so the two cannot say different things.
         self.governance.sent(run_id, &given.task, &given.goal);
 
-        // A building under review gives every room its own tree, kept
-        // between the room's runs, and a run writes there instead of in
-        // the city. Nothing it writes is
-        // visible until somebody else checks it — the losing line of the
-        // design made physical rather than promised.
-        //
-        // The fence goes up first: a worktree branches from a commit, so
-        // the city needs one before it can lend anything out.
-        let mut lease = None;
-        if rules.review() {
-            // The base commit carries the same trailers every other
-            // commit the city makes carries, so the first
-            // line of an adopted repository's history already says which
-            // session put it there.
-            let of = provenance(
-                self.city_hash()?,
-                addr,
-                run_id,
-                memory::ModelChoice {
-                    id: model.id.clone(),
-                    effort: config.effort,
-                },
-            );
-            memory::Checkpoint::open(&self.city_root)
-                .map_err(memory::MemoryError::into_ax)?
-                .ensure_base(&[addr.as_str().to_owned()], now_ms()?, &of)
-                .map_err(memory::MemoryError::into_ax)?;
-            let trees =
-                memory::Worktrees::open(&self.city_root).map_err(memory::MemoryError::into_ax)?;
-            let claimed = trees
-                .claim(&tree_of(addr)?, &super::tree_scope(&building))
-                .map_err(memory::MemoryError::into_ax)?;
-            self.record_for(
-                run_id,
-                effect::Line {
-                    who: who.to_owned(),
-                    addr: addr.clone(),
-                    kind: EventKind::WorktreeOpened,
-                    data: claimed
-                        .opened_payload()
-                        .map_err(memory::MemoryError::into_ax)?,
-                },
-            )?;
-            lease = Some(claimed);
-        }
-        let write_root = lease
-            .as_ref()
-            .map_or_else(|| self.city_root.clone(), |held| held.path().to_path_buf());
-        let branch = lease.as_ref().map(|held| held.name().as_str().to_owned());
         let filters = filter_table(&self.city_root, building.addr())?;
         Ok(Site {
             building,
@@ -213,9 +236,9 @@ impl RunWorker {
             who,
             run_id,
             predecessor: at.predecessor(),
-            lease,
-            write_root,
-            branch,
+            lease: None,
+            write_root: self.city_root.clone(),
+            branch: None,
             filters,
             retries,
         })

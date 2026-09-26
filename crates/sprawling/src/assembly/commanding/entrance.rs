@@ -67,6 +67,12 @@ impl Entrance {
         }
     }
 
+    /// The key of the command being carried out, which every record
+    /// that command writes carries, on whichever thread it is written.
+    pub(in crate::assembly) fn carrying(&self) -> Option<IdemKey> {
+        self.carrying
+    }
+
     /// Puts the key of the command in flight on the record it is
     /// writing, so a restart reads back what this city has done.
     ///
