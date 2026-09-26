@@ -224,14 +224,14 @@ impl Freezing<'_> {
         brief: &city::RunBrief,
     ) -> Result<Assembled, AxError> {
         let mut slot = Assembled::of_nothing(run_segment(
-            &self.city_root,
+            self.city_root,
             brief,
             Predecessor {
                 room: &at.addr,
                 run: at.predecessor().or(self.carried_from),
             },
         )?);
-        if let Some(note) = model_note(&self.city_root, &site.provider, &site.model.id)? {
+        if let Some(note) = model_note(self.city_root, &site.provider, &site.model.id)? {
             slot.extend(note.at, &note.bytes);
         }
         Ok(slot)
@@ -286,8 +286,8 @@ impl Freezing<'_> {
                 .as_bytes(),
         );
         let prefix = FrozenPrefix::assemble(
-            city_segment(&self.city_root)?.freeze(SegmentSlot::City),
-            building_segment(&self.city_root, addr, site.building.addr())?
+            city_segment(self.city_root)?.freeze(SegmentSlot::City),
+            building_segment(self.city_root, addr, site.building.addr())?
                 .freeze(SegmentSlot::Building),
             Assembled::of_nothing(resident).freeze(SegmentSlot::Resident),
             self.assemble_run_slot(site, at, &brief)?
@@ -349,7 +349,7 @@ impl Freezing<'_> {
             run: site.run_id,
             building: addr.clone(),
         };
-        for norm in city::norms(&self.city_root, addr)? {
+        for norm in city::norms(self.city_root, addr)? {
             let bytes = std::fs::read(&norm).map_err(|err| {
                 AxError::failure(
                     AxCode::StorageFatal,

@@ -31,8 +31,13 @@ pub(in crate::assembly) struct Planning {
     /// `city::edit_against`, and in a test a writer that refuses, because
     /// a read-only file does not stop the rename over it where the
     /// directory is writable (sprawling-SPEC.md 8-42-8).
-    pub(in crate::assembly) write_plan: fn(&Path, &[u8], &[u8]) -> Result<(), AxError>,
+    pub(in crate::assembly) write_plan: PlanWriter,
 }
+
+/// Replaces the plan at a path with new text, given the text it was read
+/// as, so a plan changed underneath the writer is refused rather than
+/// overwritten.
+pub(in crate::assembly) type PlanWriter = fn(&Path, &[u8], &[u8]) -> Result<(), AxError>;
 
 impl Planning {
     /// Shows one line the worker wrote to the part of planning that is

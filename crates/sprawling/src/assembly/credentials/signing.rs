@@ -51,10 +51,8 @@ fn captured_until(
     origin: String,
     expires_in_s: Option<u64>,
 ) -> Result<SecretCaptured, AxError> {
-    let expires_at = match expires_in_s {
-        Some(seconds) => Some(now.value().saturating_add(seconds.saturating_mul(1_000))),
-        None => None,
-    };
+    let expires_at =
+        expires_in_s.map(|seconds| now.value().saturating_add(seconds.saturating_mul(1_000)));
     Ok(SecretCaptured {
         reference,
         origin,
