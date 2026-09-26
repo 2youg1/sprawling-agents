@@ -116,3 +116,25 @@ export function offerOf(item: DoctorItem): Offer {
   if ("present" in item.state) return "held";
   return runnable(item.install) ? "press" : "by_hand";
 }
+
+// Whether an absent required card is one the tier still waits for, or a
+// spare the tier has done without.
+//
+// The wire spells an interchangeable member - any one browser driver
+// will do - as `required`, and the city's verdict names such a group
+// under the group's own name rather than the card's. So an absent
+// required card the verdict does not name is a member of a group, and
+// when every name the verdict gives is a card of its own, no group is
+// still short: the card is a spare, drawn quiet and captioned with the
+// rule instead of the warning a card the city waits for carries.
+export type Absence = "wanted" | "spare";
+
+export function absenceOf(
+  item: DoctorItem,
+  missing: readonly string[] | null,
+  items: readonly DoctorItem[],
+): Absence {
+  if (!("absent" in item.state) || missing === null || missing.includes(item.name)) return "wanted";
+  const named = (name: string) => items.some((each) => each.name === name);
+  return missing.every(named) ? "spare" : "wanted";
+}

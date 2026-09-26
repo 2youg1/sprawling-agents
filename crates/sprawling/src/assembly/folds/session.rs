@@ -111,6 +111,7 @@ impl SessionOrigins {
             EventKind::CityInitialized
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured
+            | EventKind::BuildingRemoved
             | EventKind::PromptAssembled
             | EventKind::PromptShapeCompared
             | EventKind::ModelCalled

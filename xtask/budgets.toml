@@ -652,3 +652,16 @@ status = "measured, not gated here: per frame with the `$state` run table 30-37 
 what = "one event frame decoded from its text, by the hot decoder and by the Effect schema it stands in for"
 measured_by = "cd client && bun scripts/frame_cost.ts (prints one client_frame_decode line: the fastest of 15 batches of 2000 decodes, per path)"
 status = "measured, not gated: hot 1.8-3.9 us against 16-28 us for the schema path, interleaved on the same instrument (bun 1.4, x86_64 desktop class, 16 cores). The same floor read 3.7-8.6 us with 32 busy loops beside it, so a wall-clock bound held as a unit test failed on a loaded machine; the register records the reading and nothing gates it"
+
+# What one streamed token costs the page while a reply is still arriving
+# (T12): script plus the layout the token forces. The raw shape drew the
+# whole growing text in one pre-wrapped node and laid it out as blocks
+# only when the record took over, so each token re-laid the whole reply
+# and the turn jumped at the end. The block shape (`talk/saying.svelte`)
+# lays out each block as it closes and keeps only the open tail as text.
+# Headless Edge rounds its clock to 0.1 ms, so the mean over every token
+# carries the finer figure. Not gated: a wall-clock reading is the machine's.
+[stream_relayout]
+what = "one streamed token in a live turn: script plus forced layout, and how far the turn jumps when the record takes over"
+measured_by = "cd client && bun scripts/relayout.ts - headless Edge, a 2,753-character reply with lists, tables, code and headings in 689 four-character tokens, 7 interleaved rounds of each shape"
+status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs each - raw shape mean 426-441 us, p99 1.0 ms, takeover 3.8-4.3 ms, jump 793 px; block shape mean 72-80 us, p99 0.5-0.6 ms, takeover 2.5-2.8 ms, jump 0 px"

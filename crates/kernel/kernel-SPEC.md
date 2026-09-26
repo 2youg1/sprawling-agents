@@ -629,13 +629,14 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 - 铸造纪律（15.3-1）：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有使字面量伪造编译不过（trybuild 反例）。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
-**EventKind 74 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
+**EventKind 75 全集与二分（specalign 数据面；「入窗」＝InWindow，共 9）**：
 
 | 组 | kind | 窗类 |
 |---|---|---|
 | 创世与空间 | `city_initialized` | record-only（创世行，prev＝64 个 0） |
 | 创世与空间 | `building_created` | record-only |
 | 创世与空间 | `building_configured` | record-only |
+| 创世与空间 | `building_removed` | record-only（人把一栋楼移出城：载荷携 addr 与 kept——文件搬到 reserved subtree 下的哪里；不删一个字节，楼写过的每一行留在账里） |
 | 基集 | `session_opened` | record-only（新的一段从哪里开始；`prompt_assembled` 记的是它之后给了那一跑什么） |
 | 基集 | `run_started` | record-only |
 | 基集 | `run_forked` | record-only |

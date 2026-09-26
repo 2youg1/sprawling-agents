@@ -99,6 +99,23 @@
     },
   );
 
+  // The level the ladder settles where the moving run works, shown when
+  // the selector over the composer has stated none - which is when the
+  // file is what the next dispatch there would carry.
+  const settled = derived<Readable<Address | null>, Answer | undefined>(
+    derived(moving, (run) => run?.addr ?? null),
+    (addr, set) => {
+      if (addr === null) {
+        set(undefined);
+        return;
+      }
+      return u.conn.asking.ask({ config: { addr } }).subscribe(set);
+    },
+  );
+  const settledEffort = derived(settled, (answer) =>
+    answer !== undefined && "config" in answer ? (answer.config.effort?.effort ?? null) : null,
+  );
+
   // Exhaustive over `Autonomy`, which is a literal on one arm and a
   // struct on the other: the string arm is the owner, and anything
   // else is somebody the owner named.
@@ -186,7 +203,7 @@
       {
         key: "effort",
         label: say($lang, "talk_effort"),
-        value: $effort ?? NOTHING,
+        value: $effort ?? $settledEffort ?? NOTHING,
         weight: "setting",
       },
       { key: "run", label: say($lang, "facts_run"), value: thisRun, weight: spendingWeight },

@@ -3290,5 +3290,53 @@
   "talk_model_locked": {
     "en": "model, kept by this session: another model opens a new session",
     "zh": "模型，本会话固定：换模型会开一个新会话"
+  },
+  "bld_remove": {
+    "en": "Remove {addr}",
+    "zh": "移走 {addr}"
+  },
+  "bld_remove_busy": {
+    "en": "stop the runs here before removing this building",
+    "zh": "先停下这里在跑的派活，再移走这栋楼"
+  },
+  "bld_remove_title": {
+    "en": "Remove {addr} from the city?",
+    "zh": "把 {addr} 移出城？"
+  },
+  "bld_remove_detail": {
+    "en": "Its files move to .sprawling/removed and its history stays in the ledger. Move the folder back to the city root and adopt it to bring it back.",
+    "zh": "它的文件搬到 .sprawling/removed，历史留在 ledger 里。把文件夹搬回城的根目录再收编，就能找回。"
+  },
+  "machine_spare": {
+    "en": "one of a kind that needs only one, and another is here",
+    "zh": "同类有一个即可，已经有了"
+  },
+  "setup_effort_standing": {
+    "en": "in force at {addr}: {effort}, from {from}",
+    "zh": "{addr} 现在的档位：{effort}，来自{from}"
+  },
+  "setup_effort_unstated": {
+    "en": "in force at {addr}: no level stated, so the provider decides",
+    "zh": "{addr} 现在没有写档位，由供应方决定"
+  },
+  "setup_effort_from_city": {
+    "en": "the city's CONFIG.toml",
+    "zh": "城的 CONFIG.toml"
+  },
+  "setup_effort_from_building": {
+    "en": "this building's own file",
+    "zh": "这栋楼自己的文件"
+  },
+  "setup_effort_from_default": {
+    "en": "the city's built-in default",
+    "zh": "城的内置默认值"
+  },
+  "setup_effort_from_resident": {
+    "en": "the room's own file",
+    "zh": "这个房间自己的文件"
+  },
+  "setup_effort_where": {
+    "en": "to choose another level for one conversation, use the third box under the composer",
+    "zh": "要为一段对话另选档位，用对话框下方的第三格"
   }
 }

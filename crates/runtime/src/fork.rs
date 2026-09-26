@@ -146,6 +146,7 @@ fn fold_run<'a>(
             EventKind::CityInitialized
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured
+            | EventKind::BuildingRemoved
             | EventKind::SessionOpened
             | EventKind::RunForked
             | EventKind::PromptAssembled

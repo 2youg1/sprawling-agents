@@ -25,6 +25,13 @@
   // this client can honestly offer: the city writes that level into the
   // room it opens, and every run in that room then holds it.
   //
+  // **The level in force is read, never kept.** `Query::Config` answers
+  // for an address rather than for the city, because the ladder has a
+  // building's rung; the section asks for the first building in the
+  // city's own order and names it beside the level, so the answer is
+  // exactly as wide as what was asked. A city with no building yet
+  // shows no line, because nothing would say which rung is in play.
+  //
   // The welcome walk and the settings page both show this, so the
   // paragraph cannot be present on one page and missing from the other.
   // The words are in `lang.json` like every other word a reader is
@@ -32,14 +39,42 @@
 </script>
 
 <script lang="ts">
-  import { say } from "../../core/lang";
+  import { readable } from "svelte/store";
+  import { QUERIES } from "../../core/asking";
+  import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
 
-  const { lang } = ui();
+  const u = ui();
+  const { lang } = u;
+  const city = u.conn.asking.ask(QUERIES.city);
+
+  const first = $derived.by(() => {
+    const held = $city;
+    if (held === undefined || !("city" in held)) return null;
+    return [...held.city.buildings].map((each) => each.addr).sort((a, b) => a.localeCompare(b))[0] ?? null;
+  });
+  const config = $derived(first === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: first } }));
+
+  const standing = $derived.by((): string | null => {
+    const answer = $config;
+    if (first === null || answer === undefined || !("config" in answer)) return null;
+    const settled = answer.config.effort;
+    return settled === null || settled === undefined
+      ? fill(say($lang, "setup_effort_unstated"), { addr: first })
+      : fill(say($lang, "setup_effort_standing"), {
+          addr: first,
+          effort: settled.effort,
+          from: say($lang, `setup_effort_from_${settled.from}`),
+        });
+  });
 </script>
 
 <div class="flex flex-col gap-base">
   <p class="text-note text-text-quiet">{say($lang, "setup_effort")}</p>
   <p class="max-w-measure text-note leading-relaxed text-text-faint">{say($lang, "setup_effort_essay")}</p>
+  {#if standing !== null}
+    <p class="max-w-measure text-note text-text">{standing}</p>
+  {/if}
   <p class="max-w-measure text-note text-text-quiet">{say($lang, "setup_effort_city")}</p>
+  <p class="max-w-measure text-note text-text-quiet">{say($lang, "setup_effort_where")}</p>
 </div>

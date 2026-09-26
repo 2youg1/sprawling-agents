@@ -33,8 +33,9 @@
   // does to each content kind is what a person meets.
   //
   // The machine below is this section's own: three required programs,
-  // one of them here and two missing, and one optional driver with no
-  // recipe for this platform. It is a different survey from the one
+  // one of them here and two missing, a pair of interchangeable drivers
+  // of which one is here - so the other is a spare, drawn quiet - and
+  // one optional driver with no recipe for this platform. It is a different survey from the one
   // `screens.svelte` draws, whose subject is the sandbox arm and the
   // tier verdicts; this one's subject is the width of a card at the
   // front of a grid.
@@ -82,6 +83,22 @@
         enables: "the search a resident runs before it writes anything",
         state: { absent: { absence: "not_on_search_path" } },
         install: { manual: { how: "download the release archive and put rg on PATH" } },
+      },
+      {
+        name: "geckodriver",
+        tier: "use",
+        need: "required",
+        enables: "the browser tool against Gecko",
+        state: { present: { at: "/usr/bin/geckodriver", version: "silent" } },
+        install: { command: { spelled: "cargo install geckodriver" } },
+      },
+      {
+        name: "msedgedriver",
+        tier: "use",
+        need: "required",
+        enables: "the browser tool against Edge",
+        state: { absent: { absence: "not_on_search_path" } },
+        install: { manual: { how: "download the driver that matches the installed Edge" } },
       },
       {
         name: "chromedriver",

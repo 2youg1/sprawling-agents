@@ -3795,3 +3795,19 @@ impl RunWorker {
 
 1. 守护与服务是两个进程，不是同一进程里的一个 `catch_unwind`：一次 abort、栈溢出或内存耗尽不回到 unwind，只有进程边界接得住。
 2. 退出码 2（命令行被拒、没有城）也算崩溃，交给预算，而不单列一种「不必重启」：那是第二套分类；三次之内它就进 degraded，人看得见原因。
+
+## 8-90 移走一栋楼（`bin::assembly::commanding::removing`，形状 3 决定；channels-SPEC §19、city-SPEC §8-3）
+
+```rust
+impl RunWorker {
+    pub(in crate::assembly) fn remove_building(&mut self, addr: &Address) -> Result<(), AxError>;
+}
+impl RoomQueues {
+    pub(in crate::assembly) fn worked_within(&self, building: &Address) -> Option<(Address, RunId)>;
+}
+```
+
+- `Command::RemoveBuilding` 走这里。城拥有 `city::remove_building` 不知道的两件事：楼里有没有 run 正在跑，以及 Ledger 记什么。
+- **一个拒绝**：楼里某个房间的队列正借给一个 run（`worked_within`），拒 `E_BUSY`，主语点名房间与 run，恢复是先停下它。房间队列是城里唯一说「这里有人在干活」的账，另开一本会与它分歧；逐个看全部房间，因为地址序把 `lab-2` 排在 `lab` 与 `lab/room1` 之间，按前缀截区间会漏。
+- **先搬后记**：文件先搬进 `.sprawling/removed/`，再写 `building_removed`（载荷 addr、kept），因为这一行说的是「已经搬了」。楼以前写过的每一行都留在账里，什么都不删。
+- 客户端（`client/src/core/removal.ts`）在 City Hall 上不画这个控件，楼里有 run 在跑时画成不可用并说明原因；确认走 `parts/dialog`。城仍自己拒这两种情况，页面只是不把一个只会被拒的按钮交给人。

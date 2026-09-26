@@ -46,15 +46,15 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // Twenty-eight commands, thirty-five queries. The count is not a style
+    // Twenty-nine commands, thirty-five queries. The count is not a style
     // choice - it is the wire's closed surface.
-    assert_eq!(COMMAND_NAMES.len(), 28, "command table");
+    assert_eq!(COMMAND_NAMES.len(), 29, "command table");
     assert_eq!(QUERY_NAMES.len(), 35, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 28, "command names are distinct");
+    assert_eq!(sorted.len(), 29, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
@@ -92,7 +92,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 41,
+        WIRE_V, 40,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
@@ -435,6 +435,10 @@ title = \"a window\"
         Command::CreateBuilding {
             addr: addr.clone(),
             template: channels::TemplateName::parse("workshop").unwrap(),
+            idem,
+        },
+        Command::RemoveBuilding {
+            addr: addr.clone(),
             idem,
         },
         Command::PutSecret {
