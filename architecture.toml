@@ -110,6 +110,7 @@ module = [
   { name = "kernel::discard::verdict", file = "crates/kernel/src/discard/verdict.rs", owns = "the decision table", shape = "decision", since = "S2", status = "built", spec = "kernel-SPEC.md#8-26" },
   { name = "kernel::discard::forecast", file = "crates/kernel/src/discard/forecast.rs", owns = "reading a command whole before it runs", shape = "decision", since = "S2", status = "built", spec = "kernel-SPEC.md#8-26" },
   { name = "kernel::error::code", file = "crates/kernel/src/error/code.rs", owns = "the closed code set and its carrier events", shape = "decision", since = "S1", status = "built", spec = "kernel-SPEC.md#8-1" },
+  { name = "kernel::error::provider", file = "crates/kernel/src/error/provider.rs", owns = "the kind of one provider failure, and whether that kind is worth asking again", shape = "decision", since = "V0.0.6", status = "built", spec = "kernel-SPEC.md#8-1" },
   { name = "kernel::error::refusal", file = "crates/kernel/src/error/refusal.rs", owns = "the three mandatory parts", shape = "decision", since = "S1", status = "built", spec = "kernel-SPEC.md#8-1" },
   { name = "kernel::error::shape", file = "crates/kernel/src/error/shape.rs", owns = "the one error shape of the whole city", shape = "decision", since = "S1", status = "built", spec = "kernel-SPEC.md#8-1" },
   { name = "kernel::change", file = "crates/kernel/src/change.rs", owns = "what moved between two checkpoints; a binary file cannot be spelled as one that moved nothing", shape = "value", since = "R2", status = "built", spec = "kernel-SPEC.md#8-30" },
