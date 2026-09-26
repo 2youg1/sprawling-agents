@@ -47,7 +47,7 @@ pub struct TuningDefaults {
 ///
 /// `Default` is "nothing was settled", which is what the caller sends
 /// when it has no opinion and what an older record replays as.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct EndpointTuning {
     /// What to call this endpoint on screen; absent means its id.
     pub label: Option<String>,

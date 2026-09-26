@@ -1027,7 +1027,7 @@ pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, MemoryError>;
 - **核对只看一行。** 启动时按 `seq` 做一次定位读，`fit` 比较那一行的 `chain_hash` 与 `line_hash`：相等时，在摘要单射的前提下（`adversary` 的 `Sprawling.Chain` 持有这条假设），快照所折的行就是盘上账本的前缀；`Stale` 时调用方丢弃快照，全量折叠。`fold_version` 不等同样丢弃：折叠规则变了，旧状态不再是新规则折出来的。
 - **「快照加尾部 ≡ 全量折叠」** 由 `adversary/src/Sprawling/Snapshot.lean` 对任意折叠、任意切点证明（`snapshotPlusTailIsWhole`、`resumeIsWhole`）；Rust 侧由 proptest 在随机账本与随机切点上持有同一性质，折叠取链检查本身：从 `resume()` 出发走尾部，接受的行与终态都等于从创世走全程。
 - **被否：只存 `seq` 不存 `line_hash`。** 账本被换成另一条同长的链时，只比 `seq` 会把别人的视图接到这条链的尾部上；多 32 字节换来的是一次定位读就能拒绝。
-- 仍未落地的阶段：`Views` 的字节编码，以及启动路径在 8-28 的判定之上只折尾部。
+- `Views` 从这里起步并由服务起步时切快照（sprawling-SPEC 8-91）；`Standing` 仍从创世折叠。
 
 ### 8-27 `memory::chain_audit`：全链审计与写者停机（形状 7 投影：把整条链折成一个判定）
 
@@ -1045,7 +1045,7 @@ impl JsonlLedger { pub fn halt_on(&mut self, halt: ChainHalt); }
 
 - **按段流式，一次只持一行。** `audit_chain` 按 `ledger_segments_at` 的顺序逐段打开，用一个复用的行缓冲逐行喂给 `LineCheck`（8-1 的同一个逐行检查，没有第二份规则），所以内存与账本长度无关；文件末尾没有 `
 ` 的撕裂字节不是一行，留给 `open` 判（与 `read_raw_lines_at` 同一口径）。第一行不过就停，答 `Broken(fault.into_ax(行号))`：原因、行号与恢复办法都是人读得懂的，页面把它原样作为诊断显示。I/O 本身失败才是 `MemoryError`。
-- **审计是查询，停机是命令。** `audit_chain` 不改任何状态；调用方（后台线程，唯一的起点在 `bin::assembly`）拿到 `Broken` 后调 `ChainHalt::trip`。停机值在写者与视图之间共享：写者经 `halt_on` 接上同一个值，之后每次 `append_all` 在组帧之前先问它，已跳闸就返回 `MemoryError::ChainHalted`，`into_ax` 原样交出那条审计原因，所以被拒的写与页面诊断说的是同一句话。
+- **审计是查询，停机是命令。** `audit_chain` 不改任何状态；调用方（后台线程，唯一的起点在 `bin::assembly`）拿到 `Broken`、或审计没读完（`MemoryError`）时调 `ChainHalt::trip`：从快照起步的视图只有这次审计会看快照之前的行，没被证明的链与断链一样不能再往后写。停机值在写者与视图之间共享：写者经 `halt_on` 接上同一个值，之后每次 `append_all` 在组帧之前先问它，已跳闸就返回 `MemoryError::ChainHalted`，`into_ax` 原样交出那条审计原因，所以被拒的写与页面诊断说的是同一句话。
 - **只能跳闸，不能复位。** `OnceLock` 让「停机后又恢复写」在类型上不可表达：链断了，接在断链后面的每一行都是在错的历史上写的；复位要人修好账本后重开这座城，那时是一个新的 `ChainHalt`。**被否：`AtomicBool`**——它能被写回 `false`，而且带不出原因。
 - **被否：审计一失败就 panic 退出进程。** 进程没了，页面也就收不到原因；停写不停读，人还能看见城停在哪、为什么停。
 - 服务中的城由 `bin::assembly::chain_watch`（sprawling-SPEC 8-90）起这条后台线程并接上停机值；视图只折写者写下的记录，所以不另接停机值。

@@ -22,13 +22,13 @@ use crate::error::MemoryError;
 /// A Run's phase as the hot view sees it. Freezing is terminal here:
 /// the ledger may keep appending to a frozen Run's history, but the
 /// phase never travels backwards.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RunPhase {
     Active,
     Frozen,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RunHot {
     pub phase: RunPhase,
     pub last_seq: Seq,
@@ -104,7 +104,7 @@ impl RunHot {
 /// (memory-SPEC section 8-5).
 pub const RECENT_FROZEN: usize = 32;
 
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct HotView {
     runs: BTreeMap<RunId, RunHot>,
     /// Frozen runs pushed out of `runs`, by id alone. Freezing is

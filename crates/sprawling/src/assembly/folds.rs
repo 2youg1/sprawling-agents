@@ -22,10 +22,13 @@ use super::{Entrance, Expiries};
 
 mod collaboration;
 mod session;
+mod views_start;
 
 use collaboration::CollaborationFold;
 pub(super) use collaboration::{Collaboration, INBOX_CAPACITY, new_inbox};
 pub(super) use session::SessionOrigins;
+pub(crate) use views_start::start_served_views;
+use views_start::start_views;
 
 /// Everything a worker inherits from a history it did not write.
 ///
@@ -155,19 +158,24 @@ pub(crate) fn fold_city(
     Ok((views, (ledger, report, standing.settle()?)))
 }
 
-/// Rebuilds the views from the ledger on disk. This is the disposability
-/// of a projection exercised on every start: nothing is persisted, and
-/// the answer is the same as if the process had been running all along.
+/// The views of the ledger on disk, from its snapshot when one fits
+/// (sprawling-SPEC 8-91). A reader that serves nothing: it cuts no
+/// snapshot, so a one-shot query writes nothing to disk.
+///
+/// The whole chain is audited first, because no background audit runs
+/// beside a one-shot read and the snapshot's fit checks only the line at
+/// its seq: without the audit a line edited before that seq would be
+/// answered from.
 ///
 /// # Errors
-/// Propagates chain verification failures; a city whose history does not
-/// verify is not one whose views should be served.
+/// The audit's reason when the chain is broken or cannot be read, and
+/// the verification failures of the lines it folds; a city whose history
+/// does not verify is not one whose views should be served.
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
-    let mut views = Views::new(city_root_of(ledger_dir));
-    let index = fold_ledger_dir(ledger_dir, |record| views.apply(record))?;
-    views.adopt_epoch(epoch_of(&index, ledger_dir)?);
-    views.hold_index(index);
-    Ok(views)
+    match memory::audit_chain(ledger_dir).map_err(memory::MemoryError::into_ax)? {
+        memory::ChainAudit::Whole { .. } => start_views(ledger_dir).map(|(views, _)| views),
+        memory::ChainAudit::Broken(reason) => Err(reason),
+    }
 }
 
 /// The city a ledger directory belongs to, two levels up.

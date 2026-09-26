@@ -44,6 +44,7 @@ pub(super) mod prepared;
 pub(super) mod rounds;
 pub(super) mod served;
 pub(super) mod skills;
+pub(super) mod snapshot;
 #[cfg(test)]
 mod standing_tests;
 #[cfg(test)]
@@ -55,3 +56,4 @@ pub(crate) use governance::Governance;
 pub(crate) use holding::Views;
 pub use holding::ask;
 pub(crate) use lines::pursued;
+pub(crate) use snapshot::views_fold_version;

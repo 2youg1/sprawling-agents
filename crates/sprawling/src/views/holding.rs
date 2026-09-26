@@ -37,15 +37,17 @@ use crate::assembly::{ledger_dir, rebuild_views};
 
 /// Answers one query out of a city's own history, without serving it.
 ///
-/// The views are folded, asked, and thrown away, so this costs one pass
-/// over the ledger and leaves nothing behind. **It is the same
+/// The views are folded, asked, and thrown away: from the snapshot a
+/// served city cut when one fits, from genesis otherwise, and nothing is
+/// left behind. **It is the same
 /// [`Views::prepare`] a served city answers from**: a command line that
 /// read the history its own way would be a second answer to one
 /// question, and the one that drifted would be the one nobody was
 /// looking at.
 ///
 /// # Errors
-/// Propagates a history that does not verify and a record that will not
+/// Propagates a chain the whole-ledger audit finds broken or cannot
+/// read, folded lines that do not verify, and a record that will not
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {
@@ -57,7 +59,13 @@ pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer
 /// The derived views a query reads. They are rebuilt from the ledger at
 /// startup and folded forward by the write observer, so deleting them
 /// costs nothing but the rebuild — the ledger remains the only history.
+///
+/// The encoding a snapshot holds (sprawling-SPEC 8-91) leaves out the
+/// four fields that are not folded from the ledger; `Views::decode`
+/// takes them from `Views::new`.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct Views {
+    #[serde(skip)]
     pub(super) city_root: PathBuf,
     pub(super) hot: memory::HotView,
     pub(super) attribution: memory::Attribution,
@@ -78,10 +86,10 @@ pub(crate) struct Views {
     pub(super) city: Option<Address>,
     /// The seq of the last record shown to [`Views::apply`], which is
     /// where the served ledger head starts before the fold moves it.
-    head: Option<kernel::Seq>,
+    pub(super) head: Option<kernel::Seq>,
     /// The chain hash of the ledger's first line, which names this
     /// history for its whole life (channels-SPEC, `Welcome.epoch`).
-    epoch: Option<kernel::B3Hash>,
+    pub(super) epoch: Option<kernel::B3Hash>,
     /// What waits in each room, folded from the signal records. Held
     /// here rather than read off a queue: a queue answers by being
     /// consumed, and a view that consumed what it showed would change
@@ -117,6 +125,7 @@ pub(crate) struct Views {
     /// until genesis is folded, so "nothing folded" never reads as
     /// "genesis folded".
     pub(super) next_unfolded: kernel::Seq,
+    #[serde(skip, default = "super::snapshot::fresh_index")]
     /// seq to byte offset, held rather than rebuilt.
     ///
     /// Rebuilding it read the whole side cache and allocated a `String`
@@ -160,12 +169,14 @@ pub(crate) struct Views {
     /// a city nobody has asked yet - every city that has just been
     /// served - and it answers `Unavailable` rather than an empty
     /// machine.
+    #[serde(skip)]
     pub(super) machine: Option<channels::DoctorAnswer>,
     /// The vault the worker opened; set by `views::served`. `None` is a
     /// `Views` nobody served - a rebuild, a test - and a server wanting
     /// a credential then reports that it could not be redeemed rather
     /// than reaching out with the reference as though it were the
     /// value.
+    #[serde(skip)]
     pub(super) vault: Option<std::sync::Arc<std::sync::Mutex<gateway::Custodian>>>,
 }
 
@@ -191,7 +202,7 @@ impl Views {
             next_unfolded: kernel::Seq::FIRST,
             // Empty until a fold hands over the index it built, or the
             // first query refreshes it: the history is not read here.
-            index: std::sync::Arc::new(std::sync::Mutex::new(memory::LedgerIndex::empty())),
+            index: super::snapshot::fresh_index(),
             first_prompts: std::collections::BTreeMap::new(),
             plans: crate::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),

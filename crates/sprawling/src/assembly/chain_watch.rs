@@ -46,9 +46,10 @@ impl RunWorker {
     }
 }
 
-/// Runs the audit, trips `halt` on a proven break, and says what it
-/// found. A ledger that could not be read is reported and trips
-/// nothing: an audit that did not finish proved no line broken.
+/// Runs the audit, trips `halt` unless it proved the whole chain, and
+/// says what it found. A ledger that could not be read trips it too: an
+/// audit that did not finish proved nothing whole, and a view resumed
+/// from a snapshot has only this audit reading the lines before it.
 fn report_audit(dir: &Path, halt: &memory::ChainHalt, at: Seq, mut log: Diagnostics) {
     let (level, message) = match memory::audit_chain(dir) {
         Ok(memory::ChainAudit::Whole { lines }) => (
@@ -65,13 +66,12 @@ fn report_audit(dir: &Path, halt: &memory::ChainHalt, at: Seq, mut log: Diagnost
         }
         Err(err) => {
             let err = err.into_ax();
-            (
-                Level::Refuse,
-                format!(
-                    "the chain audit could not read the ledger: {err}; {}",
-                    err.recovery()
-                ),
-            )
+            let message = format!(
+                "the ledger stopped taking writes: the chain audit could not read it: {err}; {}",
+                err.recovery()
+            );
+            halt.trip(err);
+            (Level::Refuse, message)
         }
     };
     let site = Site {

@@ -23,7 +23,7 @@
 /// Exhaustive rather than a count with a sentinel: "keep trying until
 /// somebody stops this" and "try four times" are different intentions,
 /// and a number cannot spell the first one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum Retries {
     /// No ceiling. What stops the run is `Halt`, the city's one brake.
     /// This is what a person who settled nothing asked for.

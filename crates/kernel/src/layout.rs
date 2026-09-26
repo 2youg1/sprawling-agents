@@ -33,6 +33,9 @@ use crate::{Address, RESERVED_PREFIX};
 pub const LEDGER_DIR: &str = "ledger";
 /// The content-addressed object store, under the city's reserved subtree.
 pub const CAS_DIR: &str = "cas";
+/// What the views held after one ledger line, under the city's reserved
+/// subtree; a projection a start may discard.
+pub const SNAPSHOT_DIR: &str = "snapshot";
 /// The city's shelves of skills, under the city's reserved subtree.
 pub const LIBRARY_DIR: &str = "library";
 /// A building's own shelf of skills, under that building's reserved
@@ -101,6 +104,12 @@ impl CityLayout {
     #[must_use]
     pub fn ledger(&self) -> PathBuf {
         self.governed_root().join(LEDGER_DIR)
+    }
+
+    /// The snapshot a start resumes the views from.
+    #[must_use]
+    pub fn snapshot(&self) -> PathBuf {
+        self.governed_root().join(SNAPSHOT_DIR)
     }
 
     /// The whole city's object store.

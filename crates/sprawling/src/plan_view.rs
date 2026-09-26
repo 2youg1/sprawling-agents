@@ -45,8 +45,12 @@ enum Reading {
 }
 
 /// The plans of a city.
-#[derive(Default)]
+///
+/// A snapshot keeps only `causes`: `read` is a cache of parsed plan
+/// files, and a start re-reads a plan the first time it is asked.
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(crate) struct PlanView {
+    #[serde(skip)]
     read: BTreeMap<Address, Reading>,
     /// Why each red node is red, folded from the records that said so.
     causes: BTreeMap<Address, BTreeMap<NodeId, StopCause>>,

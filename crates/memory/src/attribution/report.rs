@@ -37,7 +37,7 @@ use serde_json::Value;
 
 use crate::error::MemoryError;
 
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct Attribution {
     by_run: BTreeMap<String, u64>,
     by_actor: BTreeMap<String, u64>,
@@ -69,7 +69,7 @@ pub struct AttributionReport {
 /// add nothing to `total`, so without this count a city whose provider
 /// never prices a call reads the same as a city that never ran one; the
 /// tokens are the one measure of their use the ledger does hold.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Unpriced {
     pub calls: u64,
     pub tokens: u64,

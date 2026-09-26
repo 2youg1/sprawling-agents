@@ -38,14 +38,14 @@ pub struct Chosen<'b> {
     pub(crate) transport: &'b Transport,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Choice {
     pub(crate) endpoint: String,
     pub(crate) entry: ModelEntry,
 }
 
 /// Every endpoint and every choice, rebuilt from the event stream.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct EndpointBook {
     endpoints: BTreeMap<String, Held>,
     chosen: BTreeMap<ModelTag, Choice>,
@@ -54,9 +54,12 @@ pub struct EndpointBook {
 /// One attached endpoint and the client its calls share. A second
 /// registration under the same name replaces both, because the tuning
 /// the client was built from may have changed.
-#[derive(Debug, Clone)]
+/// A snapshot keeps the endpoint alone: the client is built again on
+/// first use, as it is after an attachment.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct Held {
     endpoint: AttachedEndpoint,
+    #[serde(skip)]
     transport: Transport,
 }
 
