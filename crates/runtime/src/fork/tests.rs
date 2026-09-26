@@ -25,7 +25,7 @@
 use kernel::event::record::{ModelReturned, RunStarted, ToolAnswer, ToolCalled, ToolResult};
 use kernel::{Address, ContentBlock, EventDraft, EventKind, Payload, Role, RunId, Seq, TimeMs};
 
-use crate::replay::{self, VerifiedLedger};
+use super::Inherited;
 
 fn room() -> Address {
     Address::parse("lab/room1").unwrap()
@@ -46,11 +46,30 @@ fn line(kind: EventKind, data: Payload) -> EventDraft {
 
 /// A run that made one turn: a task, a reply that asked for a call, the
 /// call, and its result.
-fn mother() -> VerifiedLedger {
+fn mother() -> Mother {
     let dir = tempfile::tempdir().unwrap();
     let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
     ledger.append_all(mother_drafts()).unwrap();
-    replay::verify_ledger_dir(dir.path()).unwrap()
+    drop(ledger);
+    Mother::written(dir)
+}
+
+/// A mother's ledger on disk and the index its only writer keeps over it.
+struct Mother {
+    dir: tempfile::TempDir,
+    index: memory::LedgerIndex,
+}
+
+impl Mother {
+    fn written(dir: tempfile::TempDir) -> Mother {
+        let mut index = memory::LedgerIndex::empty();
+        index.refresh(dir.path()).unwrap();
+        Mother { dir, index }
+    }
+
+    fn inherited(&self, at: Seq) -> Result<Inherited, kernel::AxError> {
+        super::inherited_indexed(&self.index, self.dir.path(), at)
+    }
 }
 
 /// The mother's four lines, as drafts.
@@ -108,11 +127,11 @@ fn mother_drafts() -> Vec<EventDraft> {
     ]
 }
 
-/// A mother run with a line of a newer kind inside it: the verified door
-/// skips the line, and the indexed door production calls reaches the same
-/// rebuild rather than refusing it.
+/// A mother run with a line of a newer kind inside it: the rebuild skips
+/// the line and reaches the conversation the same run holds without it,
+/// rather than refusing it.
 #[test]
-fn both_doors_rebuild_a_mother_run_holding_a_line_of_a_newer_kind() {
+fn a_mother_run_holding_a_line_of_a_newer_kind_rebuilds_without_it() {
     let dir = tempfile::tempdir().unwrap();
     let drafts = mother_drafts();
     let (head, tail) = drafts.split_at(2);
@@ -142,13 +161,14 @@ fn both_doors_rebuild_a_mother_run_holding_a_line_of_a_newer_kind() {
         let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
         ledger.append_all(tail.to_vec()).unwrap();
     }
-    let verified = replay::verify_ledger_dir(dir.path()).unwrap();
-    let at = verified.tail_seq().unwrap();
-    let mut index = memory::LedgerIndex::empty();
-    index.refresh(dir.path()).unwrap();
+    let with_newer = Mother::written(dir).inherited(Seq::new(4)).unwrap();
+    let without = mother().inherited(Seq::new(3)).unwrap();
     assert_eq!(
-        super::inherited_indexed(&index, dir.path(), at).unwrap(),
-        super::inherited(&verified, at).unwrap()
+        with_newer,
+        Inherited {
+            at: Seq::new(4),
+            ..without
+        }
     );
 }
 
@@ -156,8 +176,7 @@ fn both_doors_rebuild_a_mother_run_holding_a_line_of_a_newer_kind() {
 /// the live loop folds through.
 #[test]
 fn a_branch_inherits_the_mother_window_message_for_message() {
-    let verified = mother();
-    let inherited = crate::fork::inherited(&verified, Seq::new(3)).unwrap();
+    let inherited = mother().inherited(Seq::new(3)).unwrap();
     assert_eq!(inherited.at, Seq::new(3));
 
     let mut expected = crate::conversation::Conversation::new();
@@ -186,12 +205,12 @@ fn a_branch_inherits_the_mother_window_message_for_message() {
 /// nothing answers is a shape no provider accepts.
 #[test]
 fn a_cut_inside_a_wave_moves_back_to_the_safe_point() {
-    let verified = mother();
+    let mother = mother();
 
     // Line 2 is the call and line 3 its result, so a branch at the call
     // itself ends at the reply that asked for it - and the reply is
     // dropped too, because a call with no answer is half an exchange.
-    let at_call = crate::fork::inherited(&verified, Seq::new(2)).unwrap();
+    let at_call = mother.inherited(Seq::new(2)).unwrap();
     assert_eq!(at_call.at, Seq::new(0));
     assert!(
         at_call
@@ -204,7 +223,7 @@ fn a_cut_inside_a_wave_moves_back_to_the_safe_point() {
 
     // A branch at the run's first line inherits the task and nothing
     // else, which is a conversation one message old.
-    let at_open = crate::fork::inherited(&verified, Seq::new(0)).unwrap();
+    let at_open = mother.inherited(Seq::new(0)).unwrap();
     assert_eq!(at_open.at, Seq::new(0));
     assert_eq!(at_open.messages.len(), 1);
 }
@@ -213,8 +232,8 @@ fn a_cut_inside_a_wave_moves_back_to_the_safe_point() {
 /// settles it: where the sequence ends.
 #[test]
 fn a_cut_the_history_does_not_hold_is_refused() {
-    let verified = mother();
-    let err = crate::fork::inherited(&verified, Seq::new(99)).unwrap_err();
+    let mother = mother();
+    let err = mother.inherited(Seq::new(99)).unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::InvalidArgs);
     assert!(err.recovery().contains("ends at seq 3"), "{err}");
 }
@@ -284,8 +303,8 @@ fn a_branch_inherits_the_compacted_exchange_not_the_raw_records() {
         ),
     ];
     ledger.append_all(drafts.to_vec()).unwrap();
-    let verified = replay::verify_ledger_dir(dir.path()).unwrap();
-    let inherited = crate::fork::inherited(&verified, Seq::new(3)).unwrap();
+    drop(ledger);
+    let inherited = Mother::written(dir).inherited(Seq::new(3)).unwrap();
 
     let mut exchange = crate::compaction::Exchange::new();
     exchange.push_assistant(vec![ContentBlock::Text {

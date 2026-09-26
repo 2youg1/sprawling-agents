@@ -60,7 +60,7 @@ pub struct RunPlan {
     /// It is the window's material and not the prefix's: a prefix segment
     /// is a document a person can read and edit, while this is what the
     /// model said and what the tools answered, and the ledger is where
-    /// those live (`runtime::fork::inherited` rebuilds them from it).
+    /// those live (`runtime::fork::inherited_indexed` rebuilds them from it).
     pub inherited: Vec<ChatMessage>,
     pub shape: CallShape,
     /// Where the context reminder's second rung sits for this run: the

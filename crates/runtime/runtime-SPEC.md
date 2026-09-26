@@ -121,22 +121,21 @@ pub fn prefix(mother: &VerifiedLedger, at_seq: Seq) -> Result<Vec<Vec<u8>>, AxEr
 pub fn fork_draft(origin: Origin, new_run: RunId, addr: Address, t: TimeMs, who: String)
     -> Result<EventDraft, AxError>;      // data = {"from": …, "at_seq": …}
 /// What a new session inherits: the mother's conversation, rebuilt from
-/// her own records, cut at the last line a conversation can be cut at.
-pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxError>;
-/// The same rebuild through the ledger's resident index: the named line
-/// for its run, then that run's own lines, and nothing else read.
+/// her own records, cut at the last line a conversation can be cut at,
+/// read through the ledger's resident index: the named line for its run,
+/// then that run's own lines, and nothing else read.
 pub fn inherited_indexed(index: &memory::LedgerIndex, dir: &Path, at_seq: Seq)
     -> Result<Inherited, AxError>;
 pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 ```
 
-**`inherited` 是「分叉」这个词真正的执行体，而它是重建而不是复制。** 一个 run 的 conversation 由持有它的循环逐回合折起来，进程一停就没有了；折它的那些记录都在账本上。这个函数走母 run 自己的线——开场任务读 `run_started`、助手消息读 `model_returned`、工具结果读 `tool_result`、人中途说的话读 `steer_received`——并把它们**折过流动循环折过的那同一个 `Conversation` 类型**，所以一条分支拿到的次序就是母亲发出去的次序，而不是对同一批记录的第二次读法。**账本已经过一次脱敏**，分支继承的是母亲真正发出去的那份文本。
+**`inherited_indexed` 是「分叉」这个词真正的执行体，而它是重建而不是复制。** 一个 run 的 conversation 由持有它的循环逐回合折起来，进程一停就没有了；折它的那些记录都在账本上。这个函数走母 run 自己的线——开场任务读 `run_started`、助手消息读 `model_returned`、工具结果读 `tool_result`、人中途说的话读 `steer_received`——并把它们**折过流动循环折过的那同一个 `Conversation` 类型**，所以一条分支拿到的次序就是母亲发出去的次序，而不是对同一批记录的第二次读法。**账本已经过一次脱敏**，分支继承的是母亲真正发出去的那份文本。
 
-**切点只有一处权威，而且它往回退。** 一次工具波是好几行，只有它的末尾是能切的地方：`tool_called` 已写、`tool_result` 未写的中间，是一条「assistant 消息的工具调用没有答案」的半个回合，任何 provider 都拒。所以 `inherited` 维护一个「开着的一波」，命中中途就退回上一次安全点，并在 `Inherited::at` 里如实回报它**实际用到**的那一行——调用方把这一行写进 `run_forked`，于是页面显示的分叉点与模型真正拿到的那一段是同一个事实。
+**切点只有一处权威，而且它往回退。** 一次工具波是好几行，只有它的末尾是能切的地方：`tool_called` 已写、`tool_result` 未写的中间，是一条「assistant 消息的工具调用没有答案」的半个回合，任何 provider 都拒。所以折叠（`fold_run`）维护一个「开着的一波」，命中中途就退回上一次安全点，并在 `Inherited::at` 里如实回报它**实际用到**的那一行——调用方把这一行写进 `run_forked`，于是页面显示的分叉点与模型真正拿到的那一段是同一个事实。
 
-**上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`inherited` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
+**上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`fold_run` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
 
-**写账本的那一方走索引（`fork::indexed`）。** 持有账本的 worker 为一次分支重建只需要母 run 自己的那几行：`inherited_indexed` 用 `LedgerIndex::line_at` 读 `at_seq` 那一行定出母 run，再按 `run_seqs_before` 只读这条 run 的行，每一行先过 `memory::read_line`——它与验链门逐行所用的 `LineCheck::advance` 共用同一条分类规则：已知 kind 解析成记录，带 `ig` 的新 kind 跳过，其余（撕裂、不规范、无 `ig` 的未知 kind）以 `LineFault` 的码拒绝；折叠与 `inherited` 共用同一个 `fold_run`，所以两扇门的切点与消息是同一个判定。它不验链：worker 是这本账唯一的写者，打开时已经过尾部恢复；而 `verify_ledger_dir` 为这一问把整本历史读进内存、逐行验链再解析（94 MB 的账本上是 +67 MiB 的瞬时内存）。拒绝与 `inherited` 同词：`at_seq` 不在索引里是 `outside`，母 run 在这之前没有 `run_started` 是同一条 `E_INVALID_ARGS`。
+**写账本的那一方走索引（`fork::indexed`）。** 持有账本的 worker 为一次分支重建只需要母 run 自己的那几行：`inherited_indexed` 用 `LedgerIndex::line_at` 读 `at_seq` 那一行定出母 run，再按 `run_seqs_before` 只读这条 run 的行，每一行先过 `memory::read_line`——它与验链门逐行所用的 `LineCheck::advance` 共用同一条分类规则：已知 kind 解析成记录，带 `ig` 的新 kind 跳过，其余（撕裂、不规范、无 `ig` 的未知 kind）以 `LineFault` 的码拒绝；切点与消息都由 `fold_run` 一处判定。它不验链：worker 是这本账唯一的写者，打开时已经过尾部恢复；而 `verify_ledger_dir` 为这一问把整本历史读进内存、逐行验链再解析（94 MB 的账本上是 +67 MiB 的瞬时内存）。拒绝写成人能照做的话：`at_seq` 不在索引里是 `outside`，恢复语给出母序列止于哪个 seq，母 run 在这之前没有 `run_started` 是同一条 `E_INVALID_ARGS`。
 
 **`addr` 落在 `run_forked` 的那一行上**：新 run 的 id 说的是「谁继续谁」，而地址说的是**哪个房间的这次继承已经用掉了**——`assembly::folds::session` 只用这两个字段回答「这个房间的当前一段是否还欠一段对话」。
 
@@ -856,7 +855,7 @@ impl Diagnostics {
 
 **第二对（S2，turn 侧）**：中断作相变入参（选中）vs 独立 `cancel()` 方法。后者表面更直观，但 cancel 方法可在任意持有点被调＝相内中断可表示，A9 退化成时序约定；选中方案把边界快照做成相变函数的形参，相内无入口，结构即断言。代价：调用方每相必须显式给 Interrupt（哪怕 None）——这个啰嗦是刎意的：它迫使执行器在每个边界问一次信号面。
 
-**首对（S1）：fork 消费 VerifiedLedger**（CLI 的 `fork` 与 `prefix` 仍如此；账本唯一的写者为分支重建走 `inherited_indexed`，理由见 8-2：写者打开账本时已验过，再验一次整链只为读一条 run 的几行，代价随历史长度增长）——分叉前必先验链，类型上把「从未验证的序列分叉」做成不可表示；分叉正确性与重放正确性因此是同一条断言。
+**首对（S1）：fork 消费 VerifiedLedger**（CLI 的 `fork` 与 `prefix` 仍如此；分支的对话重建只有 `inherited_indexed` 一扇门，理由见 8-2：账本唯一的写者打开账本时已验过，再验一次整链只为读一条 run 的几行，代价随历史长度增长）——分叉前必先验链，类型上把「从未验证的序列分叉」做成不可表示；分叉正确性与重放正确性因此是同一条断言。
 **B（落选）：fork 直接吃原始行**（`prefix(lines: &[Vec<u8>], at_seq)`）——少一次验证成本，但打开「对损坏历史分叉」的路径，且 at_seq↔行号对应要自行重解 envelope＝第二解析权威。落选理由：验证成本 O(n) 在分叉频率下可忽略，而不变量 14（citysim 检查器）需要的正是 A 的类型保证。另 `verify_dir` 命名族落选：与 `verify_ledger_dir` 二选一，取后者（dir 一词泛滥易撞 S3 worktree 面）。
 
 ## 9 工作流程
@@ -1750,7 +1749,7 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 
 - **eve 的空响应 nudge 段**：「一条什么都没说的回复」意味着什么，§8-37 的 `concluded` 是唯一判定处（`Completion::Limit`），调用层再判一次就是第二个家，而 nudge 重发还会改写那条以供应方真实报文钉住的剧本。参数：有"空响应是瞬态"的实测数据时，与 §8-37 一同重开。
 - **eve 的「剔除被拒工具后重发」段**：本仓的 provider 拒绝从不回引 body（`ProviderFailure::Refused`），没有类型化触发点可依，靠错误文本嗅探即造脆弱权威；无声砍工具是能力的静默降级，与"拒答即声明"相悖。参数：gateway 的拒绝族带上类型化的拒绝面之后重开。
-- **eve 的「补悬空 tool_result 后重发」段**：回合窗口按构造无悬空调用（被取消的回合不入窗；`inherited` 遇开波回退到上一安全点），触发点不存在；账本侧关帐的权威在 `replay::resume`，不写第二份。参数：出现能把悬空对话推进窗口的新入口时重开。
+- **eve 的「补悬空 tool_result 后重发」段**：回合窗口按构造无悬空调用（被取消的回合不入窗；`fold_run` 遇开波回退到上一安全点），触发点不存在；账本侧关帐的权威在 `replay::resume`，不写第二份。参数：出现能把悬空对话推进窗口的新入口时重开。
 - **盲重试段（对可重试失败原样重发）**：该判定属于 watchdog 与 `gateway::admission`（§8-9：watchdog 只判断还有没有下一次），段越权即第二个重试权威。
 - **`Skipped` 无载荷（unit 变体）**：结构上确实吞不掉错误，但"这一段转手的是哪个错误"也在答案里读不出来了，而谁把什么交给谁正是段契约要陈述的事实。
 - **段＝闭枚举（形状 6）**：多段场景只能靠触发点拼装，契约测不直接，且新修复进来即改枚举与全部 match。trait 的第二实现是测试里的记账段（本仓缝规则认可的替身一族：测试时钟、计数店）。
@@ -1767,8 +1766,8 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 - **波中永不换快照**：半落地的波会让压缩按半截分组，而 `fork` 是一回合一回合同一值重建的——两边分组不同就是同一历史两种字节，分支从此与母亲分叉。故收集期不压、只在收尾边界对全波一次压；红测用「全波分组与半波分组产出不同字节」钉住这一点。
 - **`MustOffload` 在这扇门上不动文本**：它要的是整块离窗留引用，而这扇门没有 store（tee 在落地管线那一侧），城里也没有工具解析得了引用——所以文本留原样。回路不是窗口：进这扇门的文本恒等于账上 `model_returned.data.content` 与 `tool_result` 里的那一份（`turn/wave.rs` 只打印一次、`fork` 由同一条记录重建），而 `exec` 结果在落地时已被管线裁过或 tee 过——原件在 CAS、账上有 `result_offloaded` 指过去。两条路都没有「只存在于窗口里」的字节。
 - **thinking 与 redacted thinking 永不碰**：thinking 块带覆盖其字节的签名，redacted 形态是封好的密文。
-- **`runtime::fork` 同边界重放**：`inherited` 的 `Wave` 持同一个 `Exchange`，在波收齐（或整波丢弃）的同一点 `compact()`——live 折叠与离线重建因此同源同字节，C16 的承诺由这条对拍承接。
-- **唯一的失败**：`Exchange::compact` 在一段文本计不进 `u64` 时以 `E_INVALID_ARGS` 报（动作＝压缩这一回合的 exchange，主体＝那段文本，recovery 指向本模块）——这是「没有人解析得了的窗口字节」，不是可恢复的压缩结果。live 路径（`record`）与回放路径（`inherited`）在同一个值上走同一次判定，故同一段文本两边同样拒，回放不会因为压缩而少一条分支。
+- **`runtime::fork` 同边界重放**：`fold_run` 的 `Wave` 持同一个 `Exchange`，在波收齐（或整波丢弃）的同一点 `compact()`——live 折叠与离线重建因此同源同字节，C16 的承诺由这条对拍承接。
+- **唯一的失败**：`Exchange::compact` 在一段文本计不进 `u64` 时以 `E_INVALID_ARGS` 报（动作＝压缩这一回合的 exchange，主体＝那段文本，recovery 指向本模块）——这是「没有人解析得了的窗口字节」，不是可恢复的压缩结果。live 路径（`record`）与回放路径（`fold_run`）在同一个值上走同一次判定，故同一段文本两边同样拒，回放不会因为压缩而少一条分支。
 - **数字一个家**：预算只住 `consts_policy::EXCHANGE_BUDGET_BYTES`，本文件不复写它的值。
 
 ### 8-45 runtime::run::fence（形状 1 判定；**一波前立不立 fence 的唯一权威**）
