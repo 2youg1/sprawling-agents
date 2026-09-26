@@ -83,9 +83,6 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
         key,
         "the vault holds the key itself"
     );
-    // The open city holds its ledger lock file, and Windows refuses to
-    // read a locked range, so the city is closed before its files are read.
-    drop(worker);
     assert_eq!(
         files_holding(dir.path(), key.as_bytes()),
         Vec::<std::path::PathBuf>::new(),
