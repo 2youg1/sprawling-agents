@@ -15,7 +15,9 @@
 //! so the history says who holds a node from the moment the model took
 //! it rather than from the moment its run lands. A booking lasts until
 //! its run comes home and lands, which is when the file on disk starts
-//! to say who held the node.
+//! to say who held the node; the run's landing is handed the lines that
+//! give its still-booked nodes back, and writes those its plan did not
+//! close, so every claim on the history is closed.
 
 use std::collections::BTreeMap;
 use std::sync::mpsc;
@@ -23,6 +25,7 @@ use std::sync::mpsc;
 use kernel::{Address, AxCode, AxError, EventDraft, Ledger, NodeId, RunId};
 
 use super::relay::Wake;
+use crate::effect;
 
 /// Who a run's claims are made for. The four travel together from the
 /// run's dispatch to every claim it makes.
@@ -35,20 +38,49 @@ pub(crate) struct Claimant {
     pub(crate) who: String,
 }
 
-/// One claim, its `roadmap_claimed` line, and the address its answer
-/// goes back to.
+/// One claim, its `roadmap_claimed` line, the line that would hand the
+/// node back, and the address its answer goes back to.
 pub(crate) struct ClaimAsk {
     building: Address,
     node: NodeId,
     line: EventDraft,
+    put_back: effect::Line,
     back: mpsc::SyncSender<Result<(), AxError>>,
+}
+
+/// One node booked for a run in flight, and the line that gives it back
+/// if the run comes home without landing its plan.
+struct Booked {
+    run: RunId,
+    put_back: effect::Line,
 }
 
 /// Which run holds which node of which building's plan while those runs
 /// are in flight.
 #[derive(Default)]
 pub(crate) struct ClaimBook {
-    held: BTreeMap<(Address, NodeId), RunId>,
+    held: BTreeMap<(Address, NodeId), Booked>,
+}
+
+/// The lines that give back the nodes a run still had booked when it
+/// came home. Its landing closes them by settling its plan; whatever it
+/// did not close is still owed to the history.
+#[must_use = "a claim written at call time stays open on the history until its put-back line is written"]
+pub(crate) struct OpenClaims {
+    run: RunId,
+    put_backs: Vec<effect::Line>,
+}
+
+impl OpenClaims {
+    /// The plan's own landing wrote how each of these claims ended.
+    pub(crate) fn closed(&mut self) {
+        self.put_backs.clear();
+    }
+
+    /// The run these claims belong to, and the lines still owed for them.
+    pub(crate) fn owed(self) -> (RunId, Vec<effect::Line>) {
+        (self.run, self.put_backs)
+    }
 }
 
 impl ClaimBook {
@@ -61,11 +93,12 @@ impl ClaimBook {
             building,
             node,
             line,
+            put_back,
             back,
         } = ask;
         let run = line.run;
         let key = (building, node);
-        let answer = match self.held.get(&key).copied() {
+        let answer = match self.held.get(&key).map(|booked| booked.run) {
             Some(holder) if holder != run => Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "claim a plan node",
@@ -76,7 +109,7 @@ impl ClaimBook {
             )
             .with_recovery("list the plan and claim a node that is ready")),
             Some(_) | None => ledger.append(line).map(|_| {
-                self.held.insert(key, run);
+                self.held.insert(key, Booked { run, put_back });
             }),
         };
         // A lane that stopped listening keeps its booking until it comes
@@ -84,9 +117,17 @@ impl ClaimBook {
         drop(back.send(answer));
     }
 
-    /// Lets go of every node the run held, once it has come home.
-    pub(crate) fn release(&mut self, run: RunId) {
-        self.held.retain(|_, holder| *holder != run);
+    /// Lets go of every node the run held, once it has come home, and
+    /// hands over the lines that give them back.
+    pub(crate) fn release(&mut self, run: RunId) -> OpenClaims {
+        let (theirs, others): (BTreeMap<_, _>, BTreeMap<_, _>) = std::mem::take(&mut self.held)
+            .into_iter()
+            .partition(|(_, booked)| booked.run == run);
+        self.held = others;
+        OpenClaims {
+            run,
+            put_backs: theirs.into_values().map(|booked| booked.put_back).collect(),
+        }
     }
 }
 
@@ -104,11 +145,29 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
             data: claim.payload(&claimant.who)?,
             ig: false,
         };
+        let put_back = effect::handed_back(
+            claim,
+            "this run came home without landing its plan",
+            &claimant.room,
+            &claimant.who,
+        )?
+        .ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "claim a plan node",
+                format!(
+                    "{} was asked for by an effect that is not a claim",
+                    claim.id()
+                ),
+            )
+            .with_recovery("report this against collab::claim_tool: its desk books claims alone")
+        })?;
         let (back, answer) = mpsc::sync_channel(0);
         bell.send(Wake::Claim(ClaimAsk {
             building: claimant.building.clone(),
             node: claim.id().clone(),
             line,
+            put_back,
             back,
         }))
         .map_err(|_| gone("the accounting thread is no longer taking claims"))?;
@@ -174,6 +233,14 @@ mod tests {
                     data: claim.payload("potter").unwrap(),
                     ig: false,
                 },
+                put_back: crate::effect::handed_back(
+                    &claim,
+                    "came home",
+                    &Address::parse("lab/room1").unwrap(),
+                    "potter",
+                )
+                .unwrap()
+                .unwrap(),
                 back,
             },
             &mut Kept::default(),
@@ -189,7 +256,7 @@ mod tests {
         let mut book = ClaimBook::default();
         let first = ask(&mut book, 1);
         let second = ask(&mut book, 2);
-        book.release(RunId::from_bytes([1; 16]));
+        drop(book.release(RunId::from_bytes([1; 16])));
         let after_landing = ask(&mut book, 2);
         assert_eq!((first, second, after_landing), (true, false, true));
     }

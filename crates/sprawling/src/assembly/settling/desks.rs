@@ -38,6 +38,7 @@ impl RunWorker {
         let Settling {
             sweep,
             conversations,
+            open_claims,
         } = settling;
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
         let (write_root, building) = (site.write_root.as_path(), &site.building);
@@ -115,6 +116,7 @@ impl RunWorker {
             {
                 effect::Claims::Landed(taken) => {
                     self.settle(at, run_id, *taken, conversations)?;
+                    open_claims.closed();
                     self.tell_whoever_is_behind(
                         at,
                         Reporter {
@@ -128,6 +130,7 @@ impl RunWorker {
                 }
                 effect::Claims::Stale { nodes, released } => {
                     self.settle(at, run_id, *released, conversations)?;
+                    open_claims.closed();
                     for node in nodes {
                         self.note(
                             runtime::diagnostics::Level::Refuse,

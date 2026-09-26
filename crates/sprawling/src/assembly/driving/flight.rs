@@ -24,6 +24,7 @@ use kernel::{Address, AxCode, AxError, NodeId, RunId};
 
 use super::super::{Continuation, Driven, Owed, Owing, RunWorker, Unasked};
 use super::{Driving, lane::DriveContext};
+use crate::serving::booking::OpenClaims;
 use crate::serving::pool::{Arrival, DRIVING_LANES, DrivingPool};
 use crate::serving::relay::{Patience, Relay, RelayGate, Wake};
 
@@ -149,10 +150,6 @@ impl Flight {
             Ok(arrival) => arrival,
             Err(err) => return Some(Err(err)),
         };
-        // Its landing runs on this thread before the queue is served
-        // again, so no claim is answered between the release and the
-        // plan on disk saying how the run's nodes ended.
-        self.gate.booked.release(run);
         let Some(InLane {
             continuation,
             owing,
@@ -165,10 +162,14 @@ impl Flight {
             )
             .with_recovery("report this: a lane is entered and recorded together")));
         };
+        // Its landing runs on this thread before the queue is served
+        // again, so no claim is answered between the release and the
+        // plan on disk saying how the run's nodes ended.
         Some(Ok(Home {
             driven,
             continuation,
             owing,
+            open_claims: self.gate.booked.release(run),
         }))
     }
 }
@@ -178,6 +179,7 @@ struct Home {
     driven: Result<Driven, AxError>,
     continuation: Continuation,
     owing: Owing,
+    open_claims: OpenClaims,
 }
 
 impl RunWorker {
@@ -213,18 +215,42 @@ impl RunWorker {
             driven,
             continuation,
             owing,
+            mut open_claims,
         } = arrival?;
         // Read before the obligation is spent, because a successor
         // takes it over and the refusal below still has to reach the
         // person who asked for the run this one replaced.
         let reply = owing.reply();
-        match self.land(continuation, driven, owing) {
-            Ok(landed) => Ok(landed),
+        let landed = self.land(continuation, driven, owing, &mut open_claims);
+        let given_back = self.give_back_claims(open_claims);
+        match landed {
+            Ok(landed) => given_back.map(|()| landed),
             Err(err) => {
+                if let Err(lost) = given_back {
+                    self.note(
+                        runtime::diagnostics::Level::Refuse,
+                        "serving::booking",
+                        &format!("a claim of a run whose landing failed stays open: {lost}"),
+                    );
+                }
                 self.hand_back(&reply, err.clone());
                 Err(err)
             }
         }
+    }
+
+    /// Writes the lines that give back every node a run still had booked
+    /// when its landing ended without settling its plan: the claim went
+    /// on the history at call time, so only this closes it
+    /// (sprawling-SPEC.md 8-42-8).
+    ///
+    /// # Errors
+    /// Propagates the first line the ledger refuses.
+    fn give_back_claims(&mut self, open_claims: OpenClaims) -> Result<(), AxError> {
+        let (run, put_backs) = open_claims.owed();
+        put_backs
+            .into_iter()
+            .try_for_each(|line| self.record_for(run, line))
     }
 
     /// A write face issued by the same gate the lanes write through, for

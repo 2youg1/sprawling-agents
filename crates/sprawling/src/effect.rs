@@ -336,28 +336,46 @@ fn released(
 ) -> Result<Vec<Line>, AxError> {
     effects
         .iter()
-        .filter_map(|effect| match effect {
-            collab::ClaimEffect::Claimed { id, item } => Some(collab::ClaimEffect::PutDown {
-                id: id.clone(),
-                item: item.clone(),
-                exit: kernel::PlanExit::Stopped {
-                    id: id.clone(),
-                    why: kernel::StopCause::HandedBack {
-                        note: "the plan moved before this run landed".to_owned(),
-                    },
-                },
-            }),
-            collab::ClaimEffect::PutDown { .. } | collab::ClaimEffect::Split { .. } => None,
-        })
-        .map(|put_down| {
-            Ok(Line {
-                who: who.to_owned(),
-                addr: room.clone(),
-                kind: put_down.kind(),
-                data: put_down.payload(who)?,
-            })
+        .filter_map(|effect| {
+            handed_back(effect, "the plan moved before this run landed", room, who).transpose()
         })
         .collect()
+}
+
+/// The `roadmap_released` line that hands a claimed node back, saying
+/// why in `note`, or `None` for an effect that is not a claim. The one
+/// shape both a stale landing and a run that came home without landing
+/// close a claim with (sprawling-SPEC.md 8-42-8).
+///
+/// # Errors
+/// Propagates a payload that will not build.
+pub(crate) fn handed_back(
+    claim: &collab::ClaimEffect,
+    note: &str,
+    room: &Address,
+    who: &str,
+) -> Result<Option<Line>, AxError> {
+    let put_down = match claim {
+        collab::ClaimEffect::Claimed { id, item } => collab::ClaimEffect::PutDown {
+            id: id.clone(),
+            item: item.clone(),
+            exit: kernel::PlanExit::Stopped {
+                id: id.clone(),
+                why: kernel::StopCause::HandedBack {
+                    note: note.to_owned(),
+                },
+            },
+        },
+        collab::ClaimEffect::PutDown { .. } | collab::ClaimEffect::Split { .. } => {
+            return Ok(None);
+        }
+    };
+    Ok(Some(Line {
+        who: who.to_owned(),
+        addr: room.clone(),
+        kind: put_down.kind(),
+        data: put_down.payload(who)?,
+    }))
 }
 
 #[cfg(test)]
