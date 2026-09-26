@@ -15,6 +15,15 @@
 use std::process::{Child, ExitStatus};
 use std::time::Duration;
 
+use kernel::AxError;
+
+use super::{BacklogId, Body, Claim, Member};
+
+/// The rate a watched command's output is read at, 64 KiB a second:
+/// several times what a person reads on a page, and small enough that a
+/// flooding child costs each poll a bounded copy (runtime-SPEC 8-28-3).
+const READ_BYTES_PER_MS: u64 = 64;
+
 /// The short window a caller blocks for, counted in polls.
 ///
 /// Injected rather than read from a constant where the waiting happens.
@@ -47,6 +56,13 @@ impl PollBudget {
 
     pub(super) fn interval(self) -> Duration {
         Duration::from_millis(self.interval_ms)
+    }
+
+    /// How many bytes of a running command's output one poll reads:
+    /// proportional to the interval, so a longer interval reads more per
+    /// visit and the rate a page is fed stays the same.
+    pub(super) fn read_per_poll(self) -> usize {
+        usize::try_from(self.interval_ms.saturating_mul(READ_BYTES_PER_MS)).unwrap_or(usize::MAX)
     }
 }
 
@@ -136,6 +152,42 @@ impl Unseen {
                  not known"
             }
         }
+    }
+}
+
+impl super::Backlog {
+    /// Whether this member has stopped. Removing it here is what keeps
+    /// [`super::Backlog::harvest`] from reporting a result its own caller is
+    /// about to return.
+    pub(super) fn settle(&self, id: BacklogId) -> Result<Option<Exit>, AxError> {
+        let mut table = self.hold()?;
+        let Some(Member {
+            body: Body::Command { child, .. },
+            ..
+        }) = table.members.get_mut(&id)
+        else {
+            return Ok(Some(Exit::Unknown {
+                why: Unseen::LeftTheTable,
+            }));
+        };
+        let stopped = Exit::polled(child);
+        if stopped.is_some() {
+            table.members.remove(&id);
+        }
+        Ok(stopped)
+    }
+
+    pub(super) fn hand_over(&self, id: BacklogId) -> Result<(), AxError> {
+        let mut table = self.hold()?;
+        if let Some(Member {
+            body: Body::Command { claim, .. },
+            ..
+        }) = table.members.get_mut(&id)
+            && let Claim::Window(owner) = *claim
+        {
+            *claim = Claim::Run(owner);
+        }
+        Ok(())
     }
 }
 

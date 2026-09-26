@@ -55,6 +55,7 @@ pub struct Backlog {
     table: std::sync::Arc<std::sync::Mutex<Table>>,
     scratch: Scratch,
     window: PollBudget,
+    sink: Option<Sink>,
 }
 
 impl Default for Backlog {
@@ -83,6 +84,17 @@ impl Backlog {
             table: std::sync::Arc::default(),
             scratch: Scratch::open(),
             window,
+            sink: None,
+        }
+    }
+
+    /// The same table, handing what a command writes to `sink` while
+    /// the command is still inside its window (runtime-SPEC 8-28-3).
+    #[must_use]
+    pub fn with_sink(self, sink: Sink) -> Backlog {
+        Backlog {
+            sink: Some(sink),
+            ..self
         }
     }
 
@@ -350,40 +362,6 @@ impl Backlog {
         table.members.insert(id, member);
         Ok(())
     }
-
-    /// Whether this member has stopped. Removing it here is what keeps
-    /// [`Backlog::harvest`] from reporting a result its own caller is
-    /// about to return.
-    fn settle(&self, id: BacklogId) -> Result<Option<Exit>, AxError> {
-        let mut table = self.hold()?;
-        let Some(Member {
-            body: Body::Command { child, .. },
-            ..
-        }) = table.members.get_mut(&id)
-        else {
-            return Ok(Some(Exit::Unknown {
-                why: Unseen::LeftTheTable,
-            }));
-        };
-        let stopped = Exit::polled(child);
-        if stopped.is_some() {
-            table.members.remove(&id);
-        }
-        Ok(stopped)
-    }
-
-    fn hand_over(&self, id: BacklogId) -> Result<(), AxError> {
-        let mut table = self.hold()?;
-        if let Some(Member {
-            body: Body::Command { claim, .. },
-            ..
-        }) = table.members.get_mut(&id)
-            && let Claim::Window(owner) = *claim
-        {
-            *claim = Claim::Run(owner);
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -392,8 +370,11 @@ mod tests;
 mod member;
 mod report;
 mod scratch;
+mod tail;
 pub mod waiting;
 use member::{Body, Claim, Member, RunState, collect, storage};
 pub use report::{BacklogKind, Finished, Standing, Started};
 use scratch::Scratch;
+pub use tail::{Chunk, Sink, Stream};
+use tail::Tail;
 pub use waiting::{Exit, PollBudget, Unseen};
