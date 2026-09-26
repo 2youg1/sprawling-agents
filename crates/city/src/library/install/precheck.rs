@@ -103,10 +103,10 @@ fn unlinked(path: &Path) -> Result<Metadata, AxError> {
 /// [`reading::SKILL_FILE`] among them as text the scan can read.
 fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
     let mut found = walk::items(dir)?;
-    found.sort_by(|left, right| left.0.cmp(&right.0));
+    found.sort_by(|left, right| left.path.cmp(&right.path));
     let mut stored = PACKAGE_HEADER.to_vec();
     let mut items = Vec::with_capacity(found.len());
-    for (path, bytes) in found {
+    for walk::Found { path, bytes } in found {
         items.push(append_item(&mut stored, path, bytes.as_deref(), dir)?);
     }
     let document = items.iter().find_map(|item| match item {

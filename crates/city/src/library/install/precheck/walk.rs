@@ -34,15 +34,20 @@ use crate::library::reading;
 /// can hold twice.
 pub(in crate::library::install) const PACKAGE_BYTES_LIMIT: u64 = 32 * 1024 * 1024;
 
-/// Every item under the package at `dir`, by its `/`-joined path
-/// relative to the package, in the order the walk met it: a directory
-/// as `None`, a file as its bytes.
+/// One item the walk met: its path relative to the package with
+/// segments joined by `/`, and a file's bytes (`None` for a directory).
+pub(super) struct Found {
+    pub(super) path: String,
+    pub(super) bytes: Option<Vec<u8>>,
+}
+
+/// Every item under the package at `dir`, in the order the walk met it.
 ///
 /// # Errors
 /// `E_INVALID_ARGS` for a link, an item that is neither a directory nor
 /// a file, and a package past [`PACKAGE_BYTES_LIMIT`]; the precheck's
 /// storage refusals for what could not be listed, opened or read.
-pub(super) fn items(dir: &Path) -> Result<Vec<(String, Option<Vec<u8>>)>, AxError> {
+pub(super) fn items(dir: &Path) -> Result<Vec<Found>, AxError> {
     let mut found = Vec::new();
     let mut budget = PACKAGE_BYTES_LIMIT;
     let mut open = vec![(open_root(dir)?, String::new())];
@@ -60,10 +65,13 @@ pub(super) fn items(dir: &Path) -> Result<Vec<(String, Option<Vec<u8>>)>, AxErro
             } else if kind.is_dir() {
                 let opened = open_directory(&at, &entry.file_name(), &shown)?;
                 open.push((opened, format!("{path}/")));
-                found.push((path, None));
+                found.push(Found { path, bytes: None });
             } else if kind.is_file() {
                 let bytes = read_file(&at, &entry.file_name(), &shown, &mut budget)?;
-                found.push((path, Some(bytes)));
+                found.push(Found {
+                    path,
+                    bytes: Some(bytes),
+                });
             } else {
                 return Err(not_a_source(&shown, "it is neither a directory nor a file"));
             }
