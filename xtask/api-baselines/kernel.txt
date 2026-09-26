@@ -361,7 +361,6 @@ pub const kernel::layout::HANDOFF_FILE: &str
 pub const kernel::layout::JOB_FILE: &str
 pub const kernel::layout::LEDGER_DIR: &str
 pub const kernel::layout::LIBRARY_DIR: &str
-pub const kernel::layout::SESSIONS_DIR: &str
 pub const kernel::layout::URBANITE_FILE: &str
 pub const kernel::ledger::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::node_id::NODE_DEPTH_MAX: usize
@@ -889,7 +888,6 @@ pub fn kernel::layout::CityLayout::city_filters(&self) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::config(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::filters(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::handoff(&self, &kernel::address::Address) -> std::path::PathBuf
-pub fn kernel::layout::CityLayout::is_session_projection(&std::path::Path) -> bool
 pub fn kernel::layout::CityLayout::job(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::ledger(&self) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::library(&self) -> std::path::PathBuf
@@ -897,7 +895,6 @@ pub fn kernel::layout::CityLayout::new(&std::path::Path) -> Self
 pub fn kernel::layout::CityLayout::of_ledger(&std::path::Path) -> core::option::Option<kernel::layout::CityLayout>
 pub fn kernel::layout::CityLayout::root(&self) -> &std::path::Path
 pub fn kernel::layout::CityLayout::scope(&self, &kernel::address::Address) -> std::path::PathBuf
-pub fn kernel::layout::CityLayout::session_slice(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::urbanite(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::ledger::Ledger::append(&mut self, kernel::EventDraft) -> core::result::Result<kernel::EventRef, kernel::AxError>
 pub fn kernel::ledger::Ledger::append_all(&mut self, alloc::vec::Vec<kernel::EventDraft>) -> core::result::Result<alloc::vec::Vec<kernel::EventRef>, kernel::AxError>
