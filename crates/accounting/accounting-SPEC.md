@@ -15,8 +15,12 @@
 | `machine` | city 所在的主机上有哪些工具，以及装上一个人同意过的那一个 | 8-4 |
 | `effect` | 一张桌子留下的效应，怎样先成为账本行、再成为这座城 | 8-5 |
 | `plan_view` | 每栋楼的计划，折叠记录而只在记录点到它时重读 | 8-6 |
+| `home` | 这个人的家目录在哪，本产品在它下面放什么 | 8-7 |
+| `person` | 这个人自己定下的那一层：偏好与核心线程的档位 | 8-8 |
+| `held_vault` | 一个锁着的 vault 怎样变成解析器，锁中毒时怎样拒绝 | 8-9 |
+| `toolkit_broker` | 一个外部应用的 broker 钥匙登记在哪，这座城对它是谁 | 8-9 |
 
-worker 的两个读写面 `effect` 与 `plan_view` 已在本 crate；`RunWorker` 的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例与 `views` 仍在 `crates/sprawling/src/assembly` 与 `crates/sprawling/src/views`。
+worker 的两个读写面 `effect` 与 `plan_view`、以及 worker 与 `views` 共用的四个叶子模块 `home`、`person`、`held_vault`、`toolkit_broker` 已在本 crate；`RunWorker` 的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例与 `views` 仍在 `crates/sprawling/src/assembly` 与 `crates/sprawling/src/views`，按 §7 的归属表搬。
 
 ## 2 验收标准
 
@@ -304,6 +308,62 @@ impl PlanView {
 - **它是投影不是副本**：这里不存计划说了什么，只存**上一次读到的时候它是什么**，并在任何可能改变它的事情发生时丢掉。删掉整个它、把同一批记录再折一遍，得到同样的字节——因为它做的全部事情就是折叠。
 - **它折的唯一一件文件装不下的事，是节点为什么红**。表格有位置说 `Blocked`；人需要的那句话在 `roadmap_blocked` 的记录里，在表里再放一份就是同一句话的第二个权威。没有记录撑着的 `Blocked` 行仍然算红，措辞退回状态词本身——一个人手改的行仍然是一行说着活停了的行。
 - **`BuildingView` 也走这一份**：楼的对象页从这里拿计划，只有文档、房间与档案仍在被问的那一刻读盘。让对象页自己再解析一次，就是「什么卡住了、为什么」有两个答案，而只有一个在折记录。
+
+### 8-7 accounting::home：这个人的家目录，以及本产品放在它下面的东西（形状 4 适配器）
+
+```rust
+pub const CITY_DIR: &str;                       // "city"，exe 同级的默认城
+pub const NO_HOME: &str;                        // detect 的拒绝与 doctor 的报告共用这一句
+pub struct Home { /* root —— 私有 */ }
+impl Home {
+    pub fn detect() -> Result<Home, AxError>;   // USERPROFILE，其次 HOME；E_PATH_NOT_FOUND
+    pub fn at(root: impl Into<PathBuf>) -> Home; // detect 读完环境后造的就是它；比较路径的调用方不读环境直接造
+    pub fn path(&self) -> &Path;
+    pub fn components(&self) -> PathBuf;        // ~/.sprawling/components
+    pub fn person_config(&self) -> PathBuf;     // ~/.sprawling/config.toml
+    pub fn default_city(&self) -> PathBuf;      // ~/sprawling/city
+}
+```
+
+**五条口径：**
+
+1. **三处派生合一。** `doctor::host::components_dir`、`install::dirs`、`main::router::default_city_location` 此前各读一遍 `USERPROFILE || HOME`，而 C 章 3.1 的人层配置本要写第四遍（Roadmap G-10）。读环境的地方只此一处，其余全部由它派生。
+2. **住在本 crate，因为读者跨三处。** `person`、`views::skills` 与 run 的阅览室在本 crate，`doctor` 在 `sprawling` 的库那一半，`install` 与 `router` 在它的二进制那一半；`sprawling` 的两半都够得到本 crate，本 crate 够不到它们。
+3. **`detect` 失败是类型化错误，调用方各自决定是否致命。** 探组件时家目录缺席只是「看不到」，报告里由 `Absence::NoHome` 说明；装二进制时 Windows 还有 `LOCALAPPDATA` 可落，两者皆无才由 `install::no_home` 拒绝。两处都显式 `match` 错误臂而不是 `.ok()`，于是「没有家目录」是一个被做过的决定。
+4. **城不住点目录，因为城是这个人的东西。** `default_city()` 给 `~/sprawling/city`：点目录下装的是与这台电脑绑定的状态（组件、这个人的配置层），而一座城是人要打开、编辑、备份、拷到另一台机器上的工作，看不见的城是备份不了的城。`Absence::NoHome` 那句「neither USERPROFILE nor HOME is set」由 `accounting::home::NO_HOME` 一处定义，`detect` 的拒绝与 doctor 的报告读的是同一句。
+5. **`~/.sprawling` 与城里的保留子树共用 `kernel::RESERVED_PREFIX`。** 这是本产品拥有的那一个点目录名，一个名字一个家；它在家目录下装的是属于这个人的东西，不属于任何一座城。`person_config()` 用小写 `config.toml`，与城内各层的 `CONFIG.toml` 不同名——两者是不同的层，同名会诱使某个读者把其中一个当成另一个。本模块只给路径，读写与分层归配置阶梯（H-10）。
+
+### 8-8 accounting::person：这个人自己的那一层（形状 4 适配器；叶子 3.1）
+
+```rust
+pub fn read() -> Result<PreferencesAnswer, AxError>;       // Query::Preferences 的全部
+pub fn put(patch: PreferencePatch) -> Result<(), AxError>; // Command::PutPreferences 的全部
+pub enum CorePriority { Raised, Normal }                   // 人的设置；Normal 即「关掉高优先级」
+pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
+```
+
+- **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
+- **`[ui]` 一节就是 `PreferencesAnswer` 的序列化**（channels-SPEC §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
+- **别的节原样留下**：写是一次读-改-写，经 `city::edit_document`（city-SPEC §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
+- **读不动的文件不覆写**：解析失败报 `E_CONFIG_INVALID`，主题带上文件与是哪一节，恢复语请人手工修或删掉那一节重选。能读回来的才配被改写——写它的人是唯一能修它的人。
+- **不入账**：偏好不属于城的历史，任何 run 都观测不到它。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`adversary/src/Sprawling/Person.lean`，叶子 5.6）。
+- **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。
+
+**本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`（`accounting::person::tests`）。
+- **`CorePriority` 住在这里而不在 `bin::serving::standing`**：它是这份文件里 `[core] priority` 读出来的值；真去抬高一条线程的做法归 `serving::standing`（sprawling-SPEC.md 8-93），它从这里取值。
+
+### 8-9 accounting::held_vault 与 accounting::toolkit_broker：读面与写者共用的两组事实（形状 2 值类型）
+
+```rust
+// accounting::held_vault
+pub fn resolving(vault: Arc<Mutex<gateway::Custodian>>) -> gateway::SecretResolver;
+pub fn poisoned_vault() -> AxError;   // E_STORAGE_FATAL：vault 的锁中毒
+// accounting::toolkit_broker
+pub fn broker_for(/* toolkit 地址、城根、vault */) -> Result<Option<(protocol::Broker, String)>, AxError>;
+```
+
+- **一个锁着的 vault 的解析器与锁中毒时的拒绝各只有一处**：装配点、读面与 serving 都要一次性的解析器，拒绝的措辞只写一次。
+- **broker 的钥匙登记在哪、这座城对 broker 是谁，页面与命令读同一组事实**：连接动作 `connect_toolkit` 仍是 worker 的。
 
 ## 12 决策
 

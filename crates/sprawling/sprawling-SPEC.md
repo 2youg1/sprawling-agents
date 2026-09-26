@@ -197,9 +197,9 @@ pub(crate) fn local_url(bind: SocketAddr) -> String;
 - **`up <dir>`＝序列的唯一定义**：目录里没有 ledger 就先 `init`，随后 `serve`，随后开浏览器。无参屏与 `start.cmd` 都落到它，`init`／`serve` 仍各自独立可用——一段序列一处权威。
 - **genesis 要人同意**：写 Ledger 第 0 行是全系统唯一一次不可撤销的语义写入，不因「有人双击了一个文件」而发生。无参屏在按键**之前**把最终路径显示出来，人按回车才开城；`q` 退出并打印命令表。
 - **非交互 stdin 无此问**：`read_line` 得 EOF（管道、CI、无人值守）即 `Quit`，主流程打印命令表退 2。这条让该路径在没有 TTY 的地方也可测。
-- **默认位置取 exe 同级 `city/`**：整座城随文件夹可拷、可备、可删，与「一座城市就是一个目录」同构。`writability` 探到不可写（解压进 Program Files）就回退到 `Home::default_city()`（§8-70）；回退可见而非暗中，因为路径印在第一屏上。
+- **默认位置取 exe 同级 `city/`**：整座城随文件夹可拷、可备、可删，与「一座城市就是一个目录」同构。`writability` 探到不可写（解压进 Program Files）就回退到 `Home::default_city()`（accounting-SPEC.md 8-7）；回退可见而非暗中，因为路径印在第一屏上。
 - **「同级目录可不可写」是二元枚举而不是 bool**（Roadmap G-25）：`writability` 产出 `BesideBinary`，`default_city` 只收它，于是这一个事实在探测端与决定端是同一个拼写，调用点读起来是 `BesideBinary::ReadOnly` 而不是一个无名的 `false`。
-- **回退路径只有 `bin::home` 一处权威**：`~/sprawling/city` 由 `Home::default_city()` 给出，`firstrun` 不再自己拼 `join("sprawling").join("city")`（Roadmap G-10 的第四处）；目录名 `city` 由 `home::CITY_DIR` 一处定义，exe 同级与家目录两种落点共用它。
+- **回退路径只有 `accounting::home` 一处权威**：`~/sprawling/city` 由 `Home::default_city()` 给出，`firstrun` 不再自己拼 `join("sprawling").join("city")`（Roadmap G-10 的第四处）；目录名 `city` 由 `home::CITY_DIR` 一处定义，exe 同级与家目录两种落点共用它。
 - **开浏览器恒非致命**：`open_in_browser` 失败只记一行，`serve` 照跑——URL 在这之前已经打印。命名不取 `browser`：`crates/browser` 已占住「Agent 驱动真实浏览器」这个概念，一名一义。
 - **横幅给人读**：city 目录、WebUI 的完整 URL、客户端完整与否、`Ctrl-C` 停城，四行。bind 是未指定地址（`0.0.0.0`）时 URL 仍给回环形，因为那才是运行中的机器打得开的那一个。横幅在端口已经绑定、写者已经持锁之后才印（§8-88）。
 
@@ -3267,27 +3267,6 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 
 **attach 就是一次真调用。** `admit` 为空表示「这个端点服务什么就收什么」，于是登记当场去问它的模型清单——一把被拒的 key 在 attach 处就被回绝，走不到派活。故三个用例都把 attach 与派活串成一个 `Result` 来判，而不是假定拒绝只会在最后一步出现。
 
-### 8-70 `bin::home`：这个人的家目录，以及本产品放在它下面的东西（形状 4 适配器）
-
-```rust
-pub struct Home { /* root —— 私有 */ }
-impl Home {
-    pub fn detect() -> Result<Home, AxError>;   // USERPROFILE，其次 HOME；E_PATH_NOT_FOUND
-    pub fn path(&self) -> &Path;
-    pub fn components(&self) -> PathBuf;        // ~/.sprawling/components
-    pub fn person_config(&self) -> PathBuf;     // ~/.sprawling/config.toml
-    pub fn default_city(&self) -> PathBuf;      // ~/sprawling/city
-}
-```
-
-**五条口径：**
-
-1. **三处派生合一。** `doctor::host::components_dir`、`install::dirs`、`main::router::default_city_location` 此前各读一遍 `USERPROFILE || HOME`，而 C 章 3.1 的人层配置本要写第四遍（Roadmap G-10）。读环境的地方只此一处，其余全部由它派生。
-2. **住在库那一半，因为读者跨两半。** `doctor` 是库模块，`install` 与 `router` 是二进制模块，而二进制够得到库、库够不到二进制。模块名仍按模块表的写法叫 `bin::home`。
-3. **`detect` 失败是类型化错误，调用方各自决定是否致命。** 探组件时家目录缺席只是「看不到」，报告里由 `Absence::NoHome` 说明；装二进制时 Windows 还有 `LOCALAPPDATA` 可落，两者皆无才由 `install::no_home` 拒绝。两处都显式 `match` 错误臂而不是 `.ok()`，于是「没有家目录」是一个被做过的决定。
-4. **城不住点目录，因为城是这个人的东西。** `default_city()` 给 `~/sprawling/city`：点目录下装的是与这台电脑绑定的状态（组件、这个人的配置层），而一座城是人要打开、编辑、备份、拷到另一台机器上的工作，看不见的城是备份不了的城。`Absence::NoHome` 那句「neither USERPROFILE nor HOME is set」由 `home::NO_HOME` 一处定义，`detect` 的拒绝与 doctor 的报告读的是同一句。
-5. **`~/.sprawling` 与城里的保留子树共用 `kernel::RESERVED_PREFIX`。** 这是本产品拥有的那一个点目录名，一个名字一个家；它在家目录下装的是属于这个人的东西，不属于任何一座城。`person_config()` 用小写 `config.toml`，与城内各层的 `CONFIG.toml` 不同名——两者是不同的层，同名会诱使某个读者把其中一个当成另一个。本模块只给路径，读写与分层归配置阶梯（H-10）。
-
 ### 8-71 空着的上限不是被抹掉的上限（`credentials::endpoints::select_model`）
 
 - **缺陷**：设置页每次选模型都把整行发上来，于是一个人重选自己已经登记过的模型，就把当初填的上限用一个空框覆盖掉了；下一次 messages 兼容格式的调用因为写不出 `max_tokens` 被拒（A 章 B-01 的第二段）。`None` 从此表示「这次没说」，而不是「这次要清空」。
@@ -3300,7 +3279,7 @@ impl Home {
 
 **单向，一次性。** 这个人机器上已经有 Codex 或 pi 的配置，里面写着他早就填好的 provider：主机、兼容格式、默认路径、模型 id。本城把它读进来，变成一串 `Command`，然后就结束——不订阅那个文件，不回写，不做持续同步。理由是权威：那些文件的权威是它们自己的工具，本城若持续跟随，同一个事实就有了两个家。
 
-**四个模块，各答一个问题。** `import::machine` 只答「那份配置在运行这座城的机器上的哪里」，`~` 经 `bin::home::Home` 解析而不是自己拼；`import::codex` 与 `import::pi` 各拥有一种文法，读不懂的键是错误而不是被跳过；`import::provider` 是读出来的东西在本城词汇里的样子，两种文法都折到它上面，于是「一个 provider 是什么」只有一处定义。
+**四个模块，各答一个问题。** `import::machine` 只答「那份配置在运行这座城的机器上的哪里」，`~` 经 `accounting::home::Home` 解析而不是自己拼；`import::codex` 与 `import::pi` 各拥有一种文法，读不懂的键是错误而不是被跳过；`import::provider` 是读出来的东西在本城词汇里的样子，两种文法都折到它上面，于是「一个 provider 是什么」只有一处定义。
 
 **没查证的字段不写。** 上游文法里本城不确定的键一律登记为待查并留空，而不是猜一个默认值填进去——一个猜出来的 base URL 会在 404 之后让人去查一件本城自己编的事实。
 
@@ -3341,22 +3320,6 @@ fn may_move_plan(kind: EventKind) -> PlanReach;
 - **仍未收进来的一类**：`pr_merged` 同样会把文件落进楼里，今天读作 `Untouched`。改它要连着改 `views::commits` 的期望，故单列一条叶子，不混进本节。
 
 **本章测试**：`a_record_with_no_address_stales_every_plan_it_could_have_moved`、`every_event_kind_has_a_reach`（`plan_view::tests`）。
-
-### 8-77 `bin::person`：这个人自己的那一层（形状 4 适配器；叶子 3.1）
-
-```rust
-pub(crate) fn read() -> Result<PreferencesAnswer, AxError>;      // Query::Preferences 的全部
-pub(crate) fn put(patch: PreferencePatch) -> Result<(), AxError>;// Command::PutPreferences 的全部
-```
-
-- **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `bin::home`（§8-70）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
-- **`[ui]` 一节就是 `PreferencesAnswer` 的序列化**（channels-SPEC §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
-- **别的节原样留下**：写是一次读-改-写，经 `city::edit_document`（city-SPEC §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
-- **读不动的文件不覆写**：解析失败报 `E_CONFIG_INVALID`，主题带上文件与是哪一节，恢复语请人手工修或删掉那一节重选。能读回来的才配被改写——写它的人是唯一能修它的人。
-- **不入账**：偏好不属于城的历史，任何 run 都观测不到它。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`adversary/src/Sprawling/Person.lean`，叶子 5.6）。
-- **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。
-
-**本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`（`person::tests`）。
 
 ### 8-78 一次派活在会计线程上花了多久，城自己说出来（`assembly::dispatching::running`、`assembly::workbench::servers`；Roadmap 11.5、K-05）
 
@@ -4175,8 +4138,8 @@ pub(in crate::assembly) struct Flight {
 | 一个居民或房间叫什么 | `kernel::Address::name`（kernel-SPEC `Address`） | 地址的最后一段是地址自己的事实；城的名册与楼的页面原先各写一份 |
 | 一栋楼的页面、`DOC_BYTES_MAX` | `bin::views::building_page` | 页面是一个读面：按问的那一刻读盘，不持有第二份 |
 | 一台 MCP server 经哪种传输到达（`McpLink`） | `bin::mcp_link` | 三种传输（`mcp_stdio`、`mcp_http`、`mcp_sse`）各是一个顶层模块，把它们合成 `protocol::Outbound` 的那个枚举与它们同层；读面经 `protocol` 的握手与列工具说话 |
-| broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `bin::toolkit_broker` | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是装配点的 |
-| 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `bin::held_vault` | 装配点、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
+| broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `accounting::toolkit_broker`（accounting-SPEC.md 8-9） | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是装配点的 |
+| 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `accounting::held_vault`（accounting-SPEC.md 8-9） | 装配点、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
 
 
 ### 8-93 保温的门：run 的模型调用经 `Warmed` 走，落地后留在 `RunWorker` 上（`bin::assembly::keeping_warm`，形状 1 数据）
@@ -4278,7 +4241,6 @@ agent 派出的命令从低于正常的档位起动（runtime-SPEC §8-13-3）�
 
 ```rust
 // bin::serving::standing —— shape: state machine
-pub(crate) enum CorePriority { Raised, Normal }   // 人的设置；Normal 即「关掉高优先级」
 pub(crate) enum Standing { Raised, Normal(Held) } // 这条线程实际站在哪一档
 pub(crate) enum Held { ByTheSetting, Refused(String), ByTheValve }
 pub(crate) enum Verdict { Keep, Lower }
@@ -4300,8 +4262,9 @@ pub(crate) fn setting_telling_a_refusal() -> CorePriority; // 读不了就 Norma
 pub(crate) fn serving_runtime(setting: CorePriority) -> std::io::Result<tokio::runtime::Runtime>;
 // bin::assembly
 pub(crate) fn monotonic_now() -> Instant; // 单调钟的唯一取样点，与 now_ms 并列；阀量的是时长，墙钟会跳
-// bin::person
-pub(crate) fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
+// accounting::person（accounting-SPEC.md 8-8）
+pub enum CorePriority { Raised, Normal }                 // 人的设置；Normal 即「关掉高优先级」
+pub fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
 ```
 
 - **升到哪一档**：`thread-priority` 的跨平台值 70，在 Windows 上是 `THREAD_PRIORITY_ABOVE_NORMAL`（正常档进程里基准优先级 9，派出的 `BELOW_NORMAL_PRIORITY_CLASS` 子进程是 6）；降回用 50，即正常档。Unix 上升档要 `CAP_SYS_NICE`；没有时操作系统拒绝，线程留在正常档，`Standing::Normal(Held::Refused(原因))` 把原因带回来，`CoreThread::raise` 向标准错误说一次——相对效果由子进程的 `nice` 给出，不靠这一步。
