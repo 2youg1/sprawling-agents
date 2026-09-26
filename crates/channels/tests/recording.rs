@@ -57,9 +57,12 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
         }),
         events,
         queries: Arc::new(|_| {
-            Ok(Answer::Unavailable {
-                query: "none".to_owned(),
-            })
+            (
+                kernel::Seq::FIRST,
+                Ok(Answer::Unavailable {
+                    query: "none".to_owned(),
+                }),
+            )
         }),
         secrets: Arc::new(|_: Command<kernel::Sealed<String>>, _: Reply| Ok(())),
         acp: Arc::new(|_, _| {

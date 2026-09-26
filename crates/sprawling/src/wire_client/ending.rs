@@ -22,7 +22,7 @@ impl Ending {
     /// refused once (`channels::reception`), so both have one reply.
     pub(super) fn of(sent: &channels::ClientFrame) -> Self {
         match sent {
-            channels::ClientFrame::Query(_) | channels::ClientFrame::Hello(_) => Self::OnReply,
+            channels::ClientFrame::Ask(_) | channels::ClientFrame::Hello(_) => Self::OnReply,
             channels::ClientFrame::Command(_) => Self::OnQuiet,
         }
     }
@@ -50,7 +50,10 @@ pub(super) enum Reply {
 impl Reply {
     pub(super) fn of(text: &str) -> Self {
         match serde_json::from_str::<channels::ServerFrame>(text) {
-            Ok(channels::ServerFrame::Answer(_)) => Self::Answer,
+            Ok(channels::ServerFrame::Answered(answered)) => match answered.outcome {
+                channels::AskOutcome::Answer(_) => Self::Answer,
+                channels::AskOutcome::Refusal(_) => Self::Refusal,
+            },
             Ok(channels::ServerFrame::Refusal(_)) => Self::Refusal,
             Ok(
                 channels::ServerFrame::Welcome(_)

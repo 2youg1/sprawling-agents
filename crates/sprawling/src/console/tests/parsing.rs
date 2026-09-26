@@ -90,7 +90,10 @@ fn a_query_with_no_arguments_is_the_bare_name() {
     };
     assert!(matches!(
         *frame,
-        channels::ClientFrame::Query(channels::Query::CityView)
+        channels::ClientFrame::Ask(channels::Ask {
+            query: channels::Query::CityView,
+            ..
+        })
     ));
 }
 #[test]
@@ -99,7 +102,10 @@ fn a_query_that_needs_an_argument_takes_it_as_json() {
         panic!("archive_search takes a needle");
     };
     match *frame {
-        channels::ClientFrame::Query(channels::Query::ArchiveSearch { needle }) => {
+        channels::ClientFrame::Ask(channels::Ask {
+            query: channels::Query::ArchiveSearch { needle },
+            ..
+        }) => {
             assert_eq!(needle, "beam");
         }
         _ => panic!("the frame is the query that was named"),

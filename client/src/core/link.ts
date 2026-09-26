@@ -9,7 +9,7 @@
 // without a socket. Ported from `crates/web/src/socket/link.rs`.
 
 import type {
-  Answer,
+  Answered,
   AxError,
   ClientFrame,
   Delta,
@@ -56,7 +56,7 @@ export type LinkAction =
   | { readonly kind: "send"; readonly frame: ClientFrame }
   | { readonly kind: "welcomed"; readonly welcome: Welcome }
   | { readonly kind: "deliver"; readonly event: EventRecord }
-  | { readonly kind: "answered"; readonly answer: Answer }
+  | { readonly kind: "answered"; readonly answered: Answered }
   | { readonly kind: "saying"; readonly delta: Delta }
   // One line of the process log. Not history: it has no sequence of
   // its own, it is never written down, and a page that missed one has
@@ -243,8 +243,13 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   if ("event" in frame) {
     return [link, { kind: "deliver", event: frame.event }];
   }
-  if ("answer" in frame) {
-    return [link, { kind: "answered", answer: frame.answer }];
+  if ("answered" in frame) {
+    // A question refused for the wire itself ends the link like any other
+    // wire refusal; every other outcome goes back under its own id.
+    const { outcome } = frame.answered;
+    return "refusal" in outcome && outcome.refusal.code === "E_WIRE_MISMATCH"
+      ? refuse(link, outcome.refusal)
+      : [link, { kind: "answered", answered: frame.answered }];
   }
   if ("delta" in frame) {
     return [link, { kind: "saying", delta: frame.delta }];

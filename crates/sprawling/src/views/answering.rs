@@ -44,25 +44,32 @@ pub(super) const TOP_BILLED: usize = 32;
 /// needs: the disk, git or network read in [`Prepared::finish`] runs
 /// after the lock is released, so the fold never waits on it.
 ///
+/// The answer is dated under the same lock its copy is taken under, so
+/// the date is exactly the first record the answer does not reflect.
+///
 /// # Errors
 /// `StorageFatal` when a panic poisoned the view lock: the views no
-/// longer follow the ledger, and only a restart rebuilds them.
+/// longer follow the ledger, and only a restart rebuilds them. The date
+/// is then the first seq, which every record follows.
 pub(crate) fn answer_outside_the_lock(
     views: &Mutex<Views>,
     query: &channels::Query,
-) -> Result<channels::Answer, AxError> {
-    let prepared = views
-        .lock()
-        .map_err(|_| {
-            AxError::failure(
+) -> (kernel::Seq, Result<channels::Answer, AxError>) {
+    let Ok(mut held) = views.lock() else {
+        return (
+            kernel::Seq::FIRST,
+            Err(AxError::failure(
                 AxCode::StorageFatal,
                 "read the city views",
                 "the view lock is poisoned",
             )
-            .with_recovery("restart the server; its views rebuild from the ledger")
-        })?
-        .prepare(query);
-    Ok(prepared.finish())
+            .with_recovery("restart the server; its views rebuild from the ledger")),
+        );
+    };
+    let as_of = held.next_unfolded();
+    let prepared = held.prepare(query);
+    drop(held);
+    (as_of, Ok(prepared.finish()))
 }
 
 impl Views {

@@ -155,10 +155,15 @@ fn wire_frame(verb: &str, tail: &str) -> Line {
     let framed = match (known_command, known_query) {
         (Some(name), _) => format!("{{\"command\":{{{}:{body}}}}}", quoted(name)),
         (None, Some(name)) => {
+            // The console answers in place, so every question it asks
+            // carries the same number: nothing waits to be paired.
             if tail.is_empty() {
-                format!("{{\"query\":{}}}", quoted(name))
+                format!("{{\"ask\":{{\"ask_id\":0,\"query\":{}}}}}", quoted(name))
             } else {
-                format!("{{\"query\":{{{}:{body}}}}}", quoted(name))
+                format!(
+                    "{{\"ask\":{{\"ask_id\":0,\"query\":{{{}:{body}}}}}}}",
+                    quoted(name)
+                )
             }
         }
         (None, None) => {

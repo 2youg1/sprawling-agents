@@ -25,7 +25,7 @@ use axum::http::{StatusCode, header};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{MethodRouter, get, post};
-use kernel::{Address, AxError, Sealed};
+use kernel::{Address, AxError, Sealed, Seq};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
@@ -42,6 +42,12 @@ mod enrolment;
 
 use super::socket::{accept_acp, accept_recording, serve_asset, serve_index, upgrade};
 use enrolment::accept_enrolment;
+/// Answers a query from the city's derived views, with the ledger
+/// position the answer was read at. Synchronous: a query reads a
+/// projection, and a projection that needed to block would be a query
+/// pretending to be a command.
+pub type Answering = Arc<dyn Fn(Query) -> (Seq, Result<Answer, AxError>) + Send + Sync>;
+
 pub type SecretSink =
     Arc<dyn Fn(Command<Sealed<String>>, Reply) -> Result<(), AxError> + Send + Sync>;
 
@@ -109,10 +115,8 @@ pub struct ServeConfig {
     /// lost nothing. Sharing the event channel would let a city running
     /// at the `wire` floor push history out of that reader's window.
     pub logs: broadcast::Sender<crate::wire::LogLine>,
-    /// Answers a query from the city's derived views. Synchronous: a
-    /// query reads a projection, and a projection that needed to block
-    /// would be a query pretending to be a command.
-    pub queries: Arc<dyn Fn(Query) -> Result<Answer, AxError> + Send + Sync>,
+    /// Answers a query from the city's derived views.
+    pub queries: Answering,
     /// Where an enrolled credential goes. Takes the full [`Command`] and
     /// not [`WireCommand`]: this is the one sink whose input has no byte
     /// form, which is what keeps enrolment a local act.
@@ -129,7 +133,7 @@ pub(crate) struct ShellState {
     pub(crate) events: broadcast::Sender<Committed>,
     pub(crate) deltas: broadcast::Sender<crate::wire::Delta>,
     pub(crate) logs: broadcast::Sender<crate::wire::LogLine>,
-    pub(crate) queries: Arc<dyn Fn(Query) -> Result<Answer, AxError> + Send + Sync>,
+    pub(crate) queries: Answering,
     pub(crate) secrets: SecretSink,
     pub(crate) acp: AcpSink,
     pub(crate) transcribe_sink: TranscribeSink,

@@ -82,11 +82,12 @@ pub use reception::{decide_admission, offered_pairing};
 #[cfg(feature = "server")]
 pub use reception::{decide_bind, decide_handshake};
 #[cfg(feature = "server")]
-pub use server::{AcpProgress, AcpSink, TranscribeSink};
+pub use server::{AcpProgress, AcpSink, Answering, TranscribeSink};
 #[cfg(feature = "server")]
 pub use server::{Bound, Committed, Delivered, Reply, ServeConfig, bind, router, serve};
 #[cfg(feature = "schema")]
 pub use wire::wire_schema;
+pub use wire::{Answered, Ask, AskId, AskOutcome};
 pub use wire::{ClientFrame, Delta, ServerFrame};
 pub use wire::{Hello, Query, Welcome};
 pub use wire::{Lagged, LogLevel, LogLine};

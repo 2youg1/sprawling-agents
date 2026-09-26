@@ -6,10 +6,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
-import { QUERIES, createAsking, keyOf } from "./asking";
+import { HELD_CAP, QUERIES, createAsking, keyOf } from "./asking";
 import type { Reported } from "./asking";
 import type { Key } from "./lang";
-import { Address, Query } from "../wire";
+import { Address, AskId, B3Hash, Query, RunId, Seq, TimeMs } from "../wire";
+import type { Answer, AskOutcome, EventRecord } from "../wire";
 
 // Every question the wire lets a page ask by name alone. The union is
 // generated, so this reads the same table the city answers from.
@@ -29,6 +30,8 @@ interface Driven {
   readonly ask: ReturnType<typeof createAsking>;
   readonly reports: [Key, Reported][];
   readonly sent: string[];
+  // The id of each question that went out, in send order.
+  readonly ids: AskId[];
   readonly pass: (ms: number) => void;
 }
 
@@ -49,11 +52,14 @@ function driven(send: (query: Query) => boolean = () => true): Driven {
   });
   const reports: [Key, Reported][] = [];
   const sent: string[] = [];
+  const ids: AskId[] = [];
   const ask = createAsking(
     (query) => {
-      const went = send(query);
-      if (went) sent.push(keyOf(query));
-      return went;
+      if (!send(query)) return null;
+      sent.push(keyOf(query));
+      const askId = AskId.make(ids.length + 1);
+      ids.push(askId);
+      return askId;
     },
     () => at,
     (phrase, error) => reports.push([phrase, error]),
@@ -62,6 +68,7 @@ function driven(send: (query: Query) => boolean = () => true): Driven {
     ask,
     reports,
     sent,
+    ids,
     // Time passes, then every timer that was due in it fires once, in
     // the order it was booked - which is how a browser would do it.
     pass: (ms: number) => {
@@ -72,6 +79,27 @@ function driven(send: (query: Query) => boolean = () => true): Driven {
         timer.run();
       }
     },
+  };
+}
+
+const answer = (value: Answer): AskOutcome => ({ answer: value });
+
+// The id the n-th question went out under. The driver mints from 1, so
+// a question that never went out answers under 0 and lands nowhere.
+function nth(driver: Driven, at: number): AskId {
+  return driver.ids[at] ?? AskId.make(0);
+}
+
+function record(at: number): EventRecord {
+  return {
+    run: RunId.make("00000000-0000-0000-0000-000000000000"),
+    seq: Seq.make(at),
+    kind: "run_started",
+    t: TimeMs.make(at),
+    who: "hall/mayor",
+    prev: B3Hash.make("0".repeat(64)),
+    v: 1,
+    data: {},
   };
 }
 
@@ -88,36 +116,24 @@ describe("asking", () => {
     expect(Object.keys(QUERIES)).toHaveLength(nullaryQueries().length);
   });
 
-  test("an answer with no subject of its own settles the question by name", () => {
-    const asked: string[] = [];
-    const asking = createAsking(
-      (query) => {
-        asked.push(keyOf(query));
-        return true;
-      },
-      () => 0,
-      () => undefined,
-    );
-    const shelf = asking.ask(QUERIES.toolkits);
-    expect(asked).toEqual([keyOf(QUERIES.toolkits)]);
+  test("an answer settles the question that went out under its id", () => {
+    const driver = driven();
+    const shelf = driver.ask.ask(QUERIES.toolkits);
+    expect(driver.sent).toEqual([keyOf(QUERIES.toolkits)]);
     expect(get(shelf)).toBeUndefined();
 
-    asking.answered({ toolkits: "unenrolled" });
+    driver.ask.answered(nth(driver, 0), Seq.make(1), answer({ toolkits: "unenrolled" }));
     expect(get(shelf)).toEqual({ toolkits: "unenrolled" });
   });
 
   test("a question stays unanswered until its own answer lands", () => {
-    const asking = createAsking(
-      () => true,
-      () => 0,
-      () => undefined,
-    );
-    const doctor = asking.ask(QUERIES.doctor);
-    const city = asking.ask(QUERIES.city);
+    const driver = driven();
+    const doctor = driver.ask.ask(QUERIES.doctor);
+    const city = driver.ask.ask(QUERIES.city);
 
-    asking.answered({
+    driver.ask.answered(nth(driver, 1), Seq.make(1), answer({
       city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
-    });
+    }));
     expect(get(doctor)).toBeUndefined();
     expect(get(city)).toBeDefined();
   });
@@ -149,7 +165,7 @@ describe("asking", () => {
     driver.pass(16_000);
     expect(driver.reports).toHaveLength(1);
 
-    driver.ask.answered({ toolkits: "unenrolled" });
+    driver.ask.answered(nth(driver, 0), Seq.make(1), answer({ toolkits: "unenrolled" }));
     expect(get(toolkits)).toEqual({ toolkits: "unenrolled" });
     expect(driver.reports, "a late answer is not an unplaceable one").toHaveLength(1);
   });
@@ -163,7 +179,7 @@ describe("asking", () => {
     const driver = driven();
     driver.ask.ask(QUERIES.doctor);
 
-    driver.ask.answered({ mcp_health: { addr: Address.make("hall/mayor"), servers: [] } });
+    driver.ask.answered(AskId.make(99), Seq.make(1), answer({ mcp_health: { addr: Address.make("hall/mayor"), servers: [] } }));
     expect(driver.reports).toEqual([]);
 
     driver.pass(16_000);
@@ -200,5 +216,64 @@ describe("asking", () => {
 
     driver.pass(30_000);
     expect(driver.reports).toHaveLength(0);
+  });
+
+  // A long-lived tab visits more buildings than it keeps on screen, so
+  // what it holds is bounded: past the cap the answer used least
+  // recently and watched by nobody goes, and asking it again goes out.
+  test("past the cap the least recently used unwatched answer is dropped", () => {
+    const driver = driven();
+    const health = (at: number): Query => ({ mcp_health: { addr: Address.make(`hall/a${String(at)}`) } });
+    const fill = (from: number): void => {
+      for (let at = from; at <= HELD_CAP; at += 1) {
+        driver.ask.ask(health(at));
+        driver.ask.answered(nth(driver, at), Seq.make(1), answer({ mcp_health: { addr: Address.make(`hall/a${String(at)}`), servers: [] } }));
+      }
+    };
+    const watching = driver.ask.ask(health(0)).subscribe(() => undefined);
+    driver.ask.answered(nth(driver, 0), Seq.make(1), answer({ mcp_health: { addr: Address.make("hall/a0"), servers: [] } }));
+    fill(1);
+    const sent = driver.sent.length;
+
+    driver.ask.ask(health(0));
+    expect(driver.sent, "a watched answer is never dropped").toHaveLength(sent);
+    driver.ask.ask(health(1));
+    expect(driver.sent, "the least recently used one was").toHaveLength(sent + 1);
+    watching();
+  });
+
+  // The answer names the ledger position it was read at, so a record it
+  // already holds - one that arrived while the question was out, or one
+  // at or before that position afterwards - does not ask the city again.
+  test("a record the answer already holds marks nothing stale", () => {
+    const driver = driven();
+    const watching = driver.ask.ask(QUERIES.city).subscribe(() => undefined);
+    driver.ask.invalidate(record(5));
+    driver.ask.answered(nth(driver, 0), Seq.make(7), answer({
+      city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
+    }));
+    driver.ask.invalidate(record(6));
+    driver.pass(300);
+    expect(driver.sent, "records 5 and 6 are inside the answer").toHaveLength(1);
+
+    driver.ask.invalidate(record(7));
+    driver.pass(300);
+    expect(driver.sent, "record 7 is news").toHaveLength(2);
+    watching();
+  });
+
+  // A view that has folded nothing answers with the first seq as the next
+  // one it has not folded, so the genesis record that lands afterwards is
+  // news rather than something the answer already holds.
+  test("an answer read before genesis is stale once genesis lands", () => {
+    const driver = driven();
+    const watching = driver.ask.ask(QUERIES.city).subscribe(() => undefined);
+    driver.ask.answered(nth(driver, 0), Seq.make(0), answer({
+      city: { active: 0, buildings: [], frozen: 0, halted: [], pursuits: [], runs: [] },
+    }));
+    driver.ask.invalidate(record(0));
+    driver.pass(300);
+    expect(driver.sent, "the genesis record is news").toHaveLength(2);
+    watching();
   });
 });

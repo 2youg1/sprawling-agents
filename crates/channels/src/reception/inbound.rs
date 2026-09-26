@@ -96,7 +96,7 @@ impl Inbound {
 )]
 mod tests {
     use super::*;
-    use crate::wire::{Query, schema_hash};
+    use crate::wire::{Ask, AskId, Query, schema_hash};
 
     /// The frame a client one wire version ahead sends: this build has
     /// no reading for it, and what the peer must be told is that the
@@ -146,8 +146,11 @@ mod tests {
             Ok(ClientFrame::Hello(said)) if said.wire_v == WIRE_V
         ));
         assert!(matches!(
-            inbound.read(r#"{"query":"city_view"}"#),
-            Ok(ClientFrame::Query(Query::CityView))
+            inbound.read(r#"{"ask":{"ask_id":7,"query":"city_view"}}"#),
+            Ok(ClientFrame::Ask(Ask {
+                ask_id: AskId(7),
+                query: Query::CityView
+            }))
         ));
         assert_eq!(inbound.unreadable, 0);
     }

@@ -149,7 +149,10 @@ fn a_live_session_delivers_commands_and_answers_queries() {
     assert!(matches!(
         decide_frame(
             SessionState::Live,
-            ClientFrame::Query(crate::wire::Query::CityView),
+            ClientFrame::Ask(crate::wire::Ask {
+                ask_id: crate::wire::AskId(1),
+                query: crate::wire::Query::CityView,
+            }),
             &unpaired(),
             None
         ),

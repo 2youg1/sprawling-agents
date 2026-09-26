@@ -63,6 +63,9 @@ pub channels::Answer::Skills(alloc::boxed::Box<channels::SkillsAnswer>)
 pub channels::Answer::Toolkits(alloc::boxed::Box<channels::ToolkitsAnswer>)
 pub channels::Answer::Unavailable
 pub channels::Answer::Unavailable::query: alloc::string::String
+pub channels::Answered::as_of: kernel::event::identity::Seq
+pub channels::Answered::ask_id: channels::AskId
+pub channels::Answered::outcome: channels::AskOutcome
 pub channels::Appearance::body_px: core::option::Option<u32>
 pub channels::Appearance::chroma: channels::Chroma
 pub channels::Appearance::density: channels::Density
@@ -82,6 +85,10 @@ pub channels::ArchiveHit::subject: alloc::string::String
 pub channels::ArchiveLine::day: u64
 pub channels::ArchiveLine::kind: alloc::string::String
 pub channels::ArchiveLine::subject: alloc::string::String
+pub channels::Ask::ask_id: channels::AskId
+pub channels::Ask::query: channels::Query
+pub channels::AskOutcome::Answer(channels::Answer)
+pub channels::AskOutcome::Refusal(kernel::error::shape::AxError)
 pub channels::AssetReply::Found
 pub channels::AssetReply::Found::bytes: alloc::vec::Vec<u8>
 pub channels::AssetReply::Found::content_type: &'static str
@@ -144,9 +151,9 @@ pub channels::CityAnswer::pursuits: alloc::vec::Vec<channels::PursuitLine>
 pub channels::CityAnswer::runs: alloc::vec::Vec<channels::RunSummary>
 pub channels::ClientAssets::Disk(std::path::PathBuf)
 pub channels::ClientAssets::Embedded(&'static [channels::EmbeddedFile])
+pub channels::ClientFrame::Ask(channels::Ask)
 pub channels::ClientFrame::Command(alloc::boxed::Box<channels::WireCommand>)
 pub channels::ClientFrame::Hello(channels::Hello)
-pub channels::ClientFrame::Query(channels::Query)
 pub channels::Closing::at: kernel::event::identity::TimeMs
 pub channels::Closing::completion: alloc::string::String
 pub channels::Command::Approve
@@ -732,10 +739,10 @@ pub channels::ServeConfig::commands: alloc::sync::Arc<(dyn core::ops::function::
 pub channels::ServeConfig::deltas: tokio::sync::broadcast::Sender<channels::Delta>
 pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<channels::Committed>
 pub channels::ServeConfig::logs: tokio::sync::broadcast::Sender<channels::LogLine>
-pub channels::ServeConfig::queries: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Query) -> core::result::Result<channels::Answer, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
+pub channels::ServeConfig::queries: channels::Answering
 pub channels::ServeConfig::secrets: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Command<kernel::secret::sealed::Sealed<alloc::string::String>>, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::transcribe_sink: channels::TranscribeSink
-pub channels::ServerFrame::Answer(alloc::boxed::Box<channels::Answer>)
+pub channels::ServerFrame::Answered(alloc::boxed::Box<channels::Answered>)
 pub channels::ServerFrame::Delta(channels::Delta)
 pub channels::ServerFrame::Event(alloc::boxed::Box<kernel::event::payload::EventRecord>)
 pub channels::ServerFrame::Lagged(channels::Lagged)
@@ -744,7 +751,7 @@ pub channels::ServerFrame::Refusal(alloc::boxed::Box<kernel::error::shape::AxErr
 pub channels::ServerFrame::Welcome(channels::Welcome)
 pub channels::SessionState::AwaitingHello
 pub channels::SessionState::Live
-pub channels::SessionStep::Answer(alloc::boxed::Box<channels::Query>)
+pub channels::SessionStep::Answer(alloc::boxed::Box<channels::Ask>)
 pub channels::SessionStep::Deliver(alloc::boxed::Box<channels::WireCommand>)
 pub channels::SessionStep::Refuse
 pub channels::SessionStep::Refuse::close: bool
@@ -833,6 +840,7 @@ pub const channels::RUN_COSTS_MAX: usize
 pub const channels::WIRE_V: u32
 pub enum channels::Admission
 pub enum channels::Answer
+pub enum channels::AskOutcome
 pub enum channels::AssetReply
 pub enum channels::BindFace
 pub enum channels::BindVerdict
@@ -944,11 +952,14 @@ pub fn channels::verify(core::option::Option<&str>, &kernel::locator::B3Hash) ->
 pub mod channels
 pub struct channels::AcpProgress
 pub struct channels::Aggregate
+pub struct channels::Answered
 pub struct channels::Appearance
 pub struct channels::ApprovalsAnswer
 pub struct channels::ArchiveAnswer
 pub struct channels::ArchiveHit
 pub struct channels::ArchiveLine
+pub struct channels::Ask
+pub struct channels::AskId(pub u32)
 pub struct channels::BlockedLine
 pub struct channels::BodyOverride
 pub struct channels::Bound
@@ -1041,6 +1052,7 @@ pub struct channels::Used
 pub struct channels::Welcome
 pub struct channels::Withheld
 pub type channels::AcpSink = alloc::sync::Arc<(dyn core::ops::function::Fn(&serde_json::value::Value, channels::Pairing) -> core::result::Result<channels::AcpProgress, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
+pub type channels::Answering = alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Query) -> (kernel::event::identity::Seq, core::result::Result<channels::Answer, kernel::error::shape::AxError>) + core::marker::Send + core::marker::Sync)>
 pub type channels::TranscribeSink = alloc::sync::Arc<(dyn core::ops::function::Fn(alloc::vec::Vec<u8>, alloc::string::String) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type channels::WireCommand = channels::Command<channels::NoSecret>
 pub use channels::Address

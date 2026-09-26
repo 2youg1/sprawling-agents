@@ -37,6 +37,7 @@ import { createUnsent, isSpeech } from "./unsent";
 import { langOf, say } from "./lang";
 import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
+import { AskId } from "../wire";
 import type { Command, HistoryRangeAnswer, Query, Seq, ServerFrame } from "../wire";
 
 export interface Connection {
@@ -121,11 +122,24 @@ export function openConnection(
   // filled waits its turn and nothing is dropped between them.
   const gaps: Gap[] = [];
   let fetching: Seq | null = null;
+  // The id the page in flight went out under: its answer is recognised
+  // by the id, never by its content.
+  let gapAsk: AskId | null = null;
+  // The last id this connection's page minted. One counter for every
+  // question, so the gap walk and the views never share an id.
+  let lastAsk = 0;
   // The attempt the ladder scheduled, held so a link that turns out to
   // be refused can cancel it. A refused link that left this running
   // would reopen the socket behind a message telling the person the
   // opposite.
   let reconnect: ReturnType<typeof setTimeout> | null = null;
+
+  // Sends one question under a fresh id; null when the socket is not open.
+  function sendAsk(query: Query): AskId | null {
+    lastAsk = lastAsk >= 0xffff_ffff ? 1 : lastAsk + 1;
+    const askId = AskId.make(lastAsk);
+    return sendText(encodeFrame({ ask: { ask_id: askId, query } })) ? askId : null;
+  }
 
   function sendText(text: string): boolean {
     if (socket?.readyState !== WebSocket.OPEN) {
@@ -136,20 +150,14 @@ export function openConnection(
   }
 
   // Asks for one page of the oldest range still owed, and only when none
-  // is in flight: the wire carries no request id, so a second question
-  // for the same range would be an answer this page cannot tell apart
-  // from the first.
+  // is in flight: the next page starts at the cursor the last one returned.
   function askGap(): void {
     const front = gaps[0];
     if (front === undefined || fetching !== null) {
       return;
     }
     fetching = front.at;
-    sendText(
-      encodeFrame({
-        query: { history_range: { from: front.at, to: front.to, limit: GAP_PAGE } },
-      }),
-    );
+    gapAsk = sendAsk({ history_range: { from: front.at, to: front.to, limit: GAP_PAGE } });
   }
 
   // The records of one page of a gap, folded like any other record: what
@@ -187,7 +195,7 @@ export function openConnection(
   }
 
   const asking = createAsking(
-    (query: Query) => (isLive(link) ? sendText(encodeFrame({ query })) : false),
+    (query: Query) => (isLive(link) ? sendAsk(query) : null),
     now,
     // A question that never came back lands where every other refusal
     // lands: the corner
@@ -219,6 +227,7 @@ export function openConnection(
         // asked for, so the walk starts its front range again rather than
         // waiting for a page that will never arrive.
         fetching = null;
+        gapAsk = null;
         askGap();
         asking.reconnected();
         unsent.release((command) => sendText(encodeFrame({ command })));
@@ -233,19 +242,23 @@ export function openConnection(
         if (bad !== null) store.refused(unreadableRecord(lang, bad));
         return;
       }
-      case "answered":
-        if ("history_range" in action.answer) {
+      case "answered": {
+        const { ask_id, as_of, outcome } = action.answered;
+        if ("refusal" in outcome) store.refused(outcome.refusal);
+        if (ask_id === gapAsk) {
           // The one answer that is this page's own question rather than a
           // view's: it settles no held question, so it is folded here and
           // never reaches the asking.
-          filled(action.answer.history_range);
+          gapAsk = null;
+          if ("answer" in outcome && "history_range" in outcome.answer) filled(outcome.answer.history_range);
           return;
         }
-        if ("city" in action.answer) {
-          store.adoptCity(action.answer.city);
+        if ("answer" in outcome && "city" in outcome.answer) {
+          store.adoptCity(outcome.answer.city);
         }
-        asking.answered(action.answer);
+        asking.answered(ask_id, as_of, outcome);
         return;
+      }
       case "saying":
         store.say(action.delta);
         return;

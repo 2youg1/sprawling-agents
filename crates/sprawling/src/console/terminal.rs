@@ -50,14 +50,11 @@ pub struct Terminal {
     pub bind: SocketAddr,
 }
 
-/// The one function that turns a question into an answer, shared with
-/// the socket rather than reimplemented beside it.
-///
-/// `assembly::serve` builds it once and hands the same `Arc` to both
-/// surfaces, so a number this console prints and a number a browser
-/// draws cannot disagree: they are one call.
-pub(crate) type Answering =
-    Arc<dyn Fn(channels::Query) -> Result<channels::Answer, kernel::AxError> + Send + Sync>;
+// The one function that turns a question into an answer, shared with
+// the socket rather than reimplemented beside it: `assembly::serve`
+// builds it once and hands the same `Arc` to both surfaces, so a number
+// this console prints and a number a browser draws cannot disagree.
+pub(crate) use channels::Answering;
 use kernel::Address;
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
@@ -225,8 +222,8 @@ pub(super) fn drive<R: BufRead, W: Write>(
                 // owns them, so this screen renders a number it never
                 // computes. A city too busy to answer still has a port.
                 let vitals = match answering(channels::Query::Metrics) {
-                    Ok(channels::Answer::Metrics(vitals)) => Some(*vitals),
-                    Ok(_) | Err(_) => None,
+                    (_, Ok(channels::Answer::Metrics(vitals))) => Some(*vitals),
+                    (_, Ok(_) | Err(_)) => None,
                 };
                 say(out, &serving(terminal, vitals.as_ref(), std::process::id()));
             }
@@ -285,7 +282,7 @@ fn post<W: Write>(
         // refused later. It goes to the same function the socket calls,
         // so a person inside a city stops being told to open a second
         // terminal and ask it from outside.
-        channels::ClientFrame::Query(query) => answer(answering, query, out),
+        channels::ClientFrame::Ask(ask) => answer(answering, ask.query, out),
         channels::ClientFrame::Hello(_) => {
             say(out, "  this console is already inside the city");
         }
@@ -299,7 +296,10 @@ fn post<W: Write>(
 /// belong to the browser; a console that drew them would be serving two
 /// masters at once.
 fn answer<W: Write>(answering: &Answering, query: channels::Query, out: &mut W) {
-    match answering(query) {
+    // The console prints each answer where it was asked, so it pairs
+    // nothing and has no use for the date the answer was read at.
+    let (_as_of, answered) = answering(query);
+    match answered {
         Ok(answer) => match serde_json::to_string(&answer) {
             Ok(text) => {
                 say(out, &text);

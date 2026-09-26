@@ -99,9 +99,12 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         }),
         events: events.clone(),
         queries: Arc::new(|_| {
-            Ok(Answer::Unavailable {
-                query: "none".to_owned(),
-            })
+            (
+                kernel::Seq::FIRST,
+                Ok(Answer::Unavailable {
+                    query: "none".to_owned(),
+                }),
+            )
         }),
         secrets: Arc::new(
             move |command: Command<kernel::Sealed<String>>, reply: Reply| {

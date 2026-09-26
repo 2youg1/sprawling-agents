@@ -22,6 +22,7 @@
 - **wire**：Command 恰 28 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
   **当前 golden**：`655d38fee9b266e84681324441296e8106975927f9c6939fa1e5c2620320e72c`；**WIRE_V ＝ 40**（`CityAnswer.runs` 只带活跃的跑与最近冻结的几个 → sprawling-SPEC §8-90；按名字问旧跑花了多少 `Query::RunCosts` → §8-21；错误码 `E_MODEL_UNCHOSEN` → kernel-SPEC `AxCode`；事件种类 `rules_changed` → kernel-SPEC §8-4；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7`；**WIRE_V ＝ 40**（事件种类 `rules_changed` → kernel-SPEC §8-4；问与答按 `ask_id` 配对、答带 `as_of` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -1348,3 +1349,21 @@ Command::RestoreDiscard { restoration: Restoration, idem: IdemKey }
 - **帧里带的是那一行的 `restoration` 原样**，不是路径。`DiscardView` 的每一行已经带着它自己的回去的路（`Restoration`），页面把它交回来；城要是改成按路径去查，就得在写线程上为一次还原把整份历史再折一遍，而那一行本来就在页面手里。一个伪造的 `Tracked` 能做到的最多是把城自己历史里的某个文件写回城里它自己的路径——`Address` 爬不出城，`restore` 拒绝 `Address::is_reserved` 的地址，所以受保护的元数据子树（`.sprawling/`、`.git/`）不经这条路写入。
 - **三种路，三个回答**：`Tracked(file:<addr>@<oid>)` 由装配层经 `memory::Checkpoint::restore` 写回，再追加 `discard_restored`（载荷与它关掉的那条 `file_discarded` 同形：`paths` 与 `restoration`），`DiscardView` 据此把那一行标成已还原；`Interred` 答 `E_INVALID_ARGS`，recovery 说从内容仓库取回尚未接线；`Rebuildable` 答 `E_INVALID_ARGS`，recovery 就是那条重建的理由——没有存着的字节可放回去。带 `range` 的定位符同样被拒：还原的是整个文件。
 - **被否：`RestoreDiscard { path }`**。见第一条；另外，同一路径可以被丢两次，只给路径说不清要回到哪一次。
+### 8-47 问与答按 `ask_id` 配对，答带 `as_of`
+
+```rust
+pub struct AskId(pub u32);                      // 形状 2；页面按连接铸造，服务端只回显、不判定
+pub struct Ask { pub ask_id: AskId, pub query: Query }
+ClientFrame::Ask(Ask)
+pub struct Answered { pub ask_id: AskId, pub as_of: Seq, pub outcome: AskOutcome }
+pub enum AskOutcome { Answer(Answer), Refusal(AxError) }
+ServerFrame::Answered(Box<Answered>)            // 对一问的拒绝也走这里
+```
+
+**一个答复回到哪一问，由问的一方铸造的编号决定，而不是从答复的内容反推。** 从内容反推需要一张「答复字段 → 问题键」的表，那是「问什么」的第二个权威：`Query` 每加一条，表就得跟着加一行，漏一行的后果是一个永远不落地的答；两个同种、参数不同的问题同时在途时，内容也分不出它们。
+
+- **配对的键由问的一方铸造**：`AskId` 在页面上按连接递增（到 `u32` 上限回到 1），服务端原样回显，不检查唯一——配对是页面的事，服务端再判一次就是第二个家。重连后页面清空在途表，旧连接的 id 不会再来。区间补拉（§8-41）与视图的问共用这一个计数器，两者的 id 不会相撞。
+- **拒绝也带 `ask_id`**：`AskOutcome::Refusal` 让对一问的拒绝落到那一问上，那一问回到陈旧状态，由下一个观看者再问；拒绝本身仍交给页面的拒绝角落。拒绝码是 `E_WIRE_MISMATCH` 时整条连接停下，与 `ServerFrame::Refusal` 同一规则。命令的拒绝仍走 `ServerFrame::Refusal`。
+- **`as_of` 是答复尚未反映的第一个 `seq`**：`sprawling` 在视图锁内先取视图下一条待折叠记录的 `seq`，再读答复，二者在同一把锁下，所以答复恰好反映 `seq < as_of` 的全部记录、不含其余。什么都没折叠的视图答 `Seq::FIRST`：`Seq::FIRST` 是创世那一行的编号，若 `as_of` 取「最后折叠的一条」，「什么都没折叠」与「已折叠创世」就拼成同一个值，创世之前问出的答复会把随后到来的创世当成已含，从此不再重问。视图锁中毒时 `as_of` 为 `Seq::FIRST`，结果是拒绝。页面据此判陈旧：`seq < as_of` 的事件已在答复里，不再触发重问；问在途时到达的事件记下它的 `seq`，答复的 `as_of` 大于它时，这次陈旧随答复一起消掉。
+- **帧名随之换了**（`query`→`ask`，`answer`→`answered`），`WIRE_V` 加一；旧页面在握手处被拒，而不是发出服务端读不懂的帧。
+- **`sprawling console` 只有一问在途**，所以它的问一律用 `AskId(0)`，并且不读回 id。

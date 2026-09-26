@@ -106,7 +106,7 @@ fn unreachable_city(at: &str, why: &str) -> AxError {
 fn malformed(what: &str, why: &str) -> AxError {
     AxError::failure(AxCode::WireMismatch, what, why.to_owned()).with_recovery(
         "a frame is one JSON object: {\"command\":{\"dispatch\":{..}}} or \
-         {\"query\":\"city_view\"}; `sprawling call` with no frame lists every name",
+         {\"ask\":{\"ask_id\":1,\"query\":\"city_view\"}}; `sprawling call` with no frame lists every name",
     )
 }
 
@@ -333,7 +333,7 @@ mod tests {
         let at = format!("127.0.0.1:{}", port.recv().unwrap());
         let heard = super::call(
             &at,
-            "{\"query\":\"city_view\"}",
+            "{\"ask\":{\"ask_id\":1,\"query\":\"city_view\"}}",
             None,
             Duration::from_millis(200),
         )
@@ -374,7 +374,11 @@ mod tests {
                         resume_from: None,
                         city: None,
                     }),
-                    channels::ServerFrame::Answer(Box::new(channels::Answer::Run(None))),
+                    channels::ServerFrame::Answered(Box::new(channels::Answered {
+                        ask_id: channels::AskId(1),
+                        as_of: kernel::Seq::FIRST,
+                        outcome: channels::AskOutcome::Answer(channels::Answer::Run(None)),
+                    })),
                 ] {
                     let text = serde_json::to_string(&said).unwrap();
                     socket.send(Message::Text(text.into())).await.unwrap();
@@ -387,7 +391,13 @@ mod tests {
 
         let at = format!("127.0.0.1:{}", port.recv().unwrap());
         let began = std::time::Instant::now();
-        let heard = super::call(&at, "{\"query\":\"city_view\"}", None, quiet).unwrap();
+        let heard = super::call(
+            &at,
+            "{\"ask\":{\"ask_id\":1,\"query\":\"city_view\"}}",
+            None,
+            quiet,
+        )
+        .unwrap();
         let waited = began.elapsed();
         assert!(matches!(heard.spoken(), Spoken::Answered));
         assert!(

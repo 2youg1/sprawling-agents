@@ -50,14 +50,17 @@ pub(super) fn vitals() -> channels::MetricsAnswer {
 
 /// The one function the socket calls, standing in for the views.
 pub(super) fn answering() -> Answering {
-    Arc::new(|query: channels::Query| match query {
-        channels::Query::Metrics => Ok(channels::Answer::Metrics(Box::new(vitals()))),
-        other => Err(kernel::AxError::failure(
-            kernel::AxCode::ConfigInvalid,
-            "answer a question",
-            format!("{} is not scripted here", other.name()),
-        )
-        .with_recovery("this test answers Metrics and nothing else")),
+    Arc::new(|query: channels::Query| {
+        let answer = match query {
+            channels::Query::Metrics => Ok(channels::Answer::Metrics(Box::new(vitals()))),
+            other => Err(kernel::AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "answer a question",
+                format!("{} is not scripted here", other.name()),
+            )
+            .with_recovery("this test answers Metrics and nothing else")),
+        };
+        (kernel::Seq::FIRST, answer)
     })
 }
 

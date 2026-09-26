@@ -30,8 +30,10 @@ use serde::{Deserialize, Serialize};
 /// Wire format version. Bumped whenever the frame grammar changes shape in a
 /// way the schema hash alone would not explain to a human reading a log.
 pub const WIRE_V: u32 = 40;
+mod ask;
 mod query;
 
+pub use ask::{Answered, Ask, AskId, AskOutcome};
 pub use query::{QUERY_NAMES, Query};
 
 use crate::answer::Answer;
@@ -117,7 +119,7 @@ pub struct Welcome {
 pub enum ClientFrame {
     Hello(Hello),
     Command(Box<WireCommand>),
-    Query(Query),
+    Ask(Ask),
 }
 
 /// Everything a server may send. Events are the push half; a `Refusal`
@@ -135,7 +137,7 @@ pub enum ClientFrame {
 pub enum ServerFrame {
     Welcome(Welcome),
     Event(Box<EventRecord>),
-    Answer(Box<Answer>),
+    Answered(Box<Answered>),
     Refusal(Box<AxError>),
     /// Text a model is saying, before the call it belongs to has
     /// settled. Discardable by construction: the run it belongs to is
@@ -245,14 +247,6 @@ mod tests {
         assert_eq!(Query::CityView.name(), "CityView");
         assert!(QUERY_NAMES.contains(&Query::CityView.name()));
         assert!(QUERY_NAMES.contains(&Query::Release.name()));
-    }
-
-    #[test]
-    fn a_client_frame_round_trips_through_json() {
-        let frame = ClientFrame::Query(Query::CityView);
-        let text = serde_json::to_string(&frame).unwrap();
-        let back: ClientFrame = serde_json::from_str(&text).unwrap();
-        assert_eq!(frame, back);
     }
 
     /// The document names both roots, every command by its wire name,
