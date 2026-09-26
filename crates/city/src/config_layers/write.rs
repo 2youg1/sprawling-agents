@@ -10,11 +10,10 @@
 //! reads and what a person edits by hand are one file.
 //!
 //! Every write is a read-modify-write of a file a person also edits, so
-//! all three of them go through [`change`]: the file is held against
+//! every one of them goes through [`change`]: the file is held against
 //! every other writer in this process while it is read, and the new
-//! content replaces it whole. Three write paths, each reading and
-//! truncating on its own, could each drop what the other two had just
-//! saved.
+//! content replaces it whole. Write paths that each read and truncate
+//! on their own could each drop what another had just saved.
 
 use std::path::Path;
 
@@ -27,25 +26,9 @@ use kernel::{
 use super::{Layer, path};
 use crate::document;
 
-/// Writes the thinking effort into one scope's own configuration.
-///
-/// The layer is where the choice belongs rather than a second store: a
-/// session picks an effort once, it is written into that room's
-/// `CONFIG.toml`, and the ladder that already resolves city → building →
-/// room is what every later run in that room reads. Other keys in the
-/// file are preserved, because a person may have written them.
-///
-/// # Errors
-/// Propagates a file that exists and cannot be read or parsed - a
-/// configuration this build cannot understand is not one to overwrite -
-/// and a directory that cannot be written.
-pub fn write_effort(city_root: &Path, addr: &Address, effort: Effort) -> Result<(), AxError> {
-    change(city_root, addr, Layer::Resident, Change::Effort(effort))
-}
-
 /// Writes the sandbox limits into one scope's own configuration.
 ///
-/// Same door as [`write_effort`] and the same reason: the ladder that
+/// Same door as [`super::write_session`] and the same reason: the ladder that
 /// resolves city → building → room is already the authority on what a
 /// run may reach, and a second store would be a second answer. Other
 /// keys are preserved, because a person may have written them.
@@ -65,7 +48,7 @@ pub fn write_sandbox(
 /// Writes the context reminder's second rung into one scope's own
 /// configuration.
 ///
-/// Same door as [`write_effort`] and the same reason: the ladder that
+/// Same door as [`super::write_session`] and the same reason: the ladder that
 /// resolves city → building → room is the only store. The value arrives
 /// already taken by `kernel::config::SecondThreshold`'s one construction
 /// point, so an out-of-domain percent is refused where the file is
@@ -187,7 +170,6 @@ pub(super) enum Change<'a> {
     /// inverse of `Session`, and the one change here that takes
     /// something out of a file rather than stating it.
     Forget,
-    Effort(Effort),
     Sandbox(&'a SandboxLimits),
     Mcp(&'a [McpServer]),
     /// The context reminder's second rung. Arrives already taken by
@@ -229,10 +211,6 @@ impl Change<'_> {
                 if emptied {
                     document.remove("model");
                 }
-            }
-            Change::Effort(effort) => {
-                table(document, "model", file)?
-                    .insert("effort".to_owned(), spelled(*effort, file)?);
             }
             Change::Sandbox(limits) => {
                 let spelled = toml::Value::try_from(*limits)

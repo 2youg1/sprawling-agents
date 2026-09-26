@@ -425,7 +425,6 @@ impl ClaimDesk {
 /// 调用时判定认领的那个权威；城里是记账线程（sprawling-SPEC 8-42-8）。
 pub struct Booking(Box<dyn FnMut(&ClaimEffect) -> Result<(), AxError> + Send>);
 impl Booking { pub fn new(ask: impl FnMut(&ClaimEffect) -> Result<(), AxError> + Send + 'static) -> Booking; }
-pub fn evidence_of(text: &str, id: &NodeId) -> Option<Locator>;
 pub fn still_true(text: &str, effect: &ClaimEffect) -> bool;
 pub struct ClaimTool { /* meta、Rc<RefCell<ClaimDesk>> —— 私有 */ }
 impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, AxError>; }

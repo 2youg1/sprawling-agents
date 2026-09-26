@@ -17,7 +17,7 @@
 | `spine_files` | 一栋楼开局有哪几份文档，一件活的 JOB.md 落在哪 | 8-5 |
 | `schedule` | 到点发车：谁在什么节奏上自己开始 | 8-6 |
 | `archive`、`library` | 东西存哪里、怎么找回来 | 待写 |
-| `office`、`wizard` | OFFICE.md；建城向导与搬家 | 待写 |
+| `office`、`wizard` | OFFICE.md；建城向导 | 待写 |
 | `neighbourhood`、`neighbours_tool` | 这座城有哪些地方，我身边站着谁，我该跟谁说话 | 8-15 |
 
 ## 2 验收标准
@@ -204,7 +204,7 @@ pub fn settled_effort(city_root: &Path, addr: &Address)
 pub fn settled_second(city_root: &Path, addr: &Address)
     -> Result<Option<(SecondThreshold, Layer)>, AxError>;  // 第二道阈值，同上
 pub fn write_second_threshold(city_root: &Path, addr: &Address, layer: Layer,
-    threshold: SecondThreshold) -> Result<(), AxError>;    // 与 write_effort 同一扇门
+    threshold: SecondThreshold) -> Result<(), AxError>;    // 与 write_session 同一扇门
 
 // config_layers::ladder（crate 内）
 impl Layer {
@@ -223,7 +223,7 @@ impl Ladder {
 
 **来源与值一起答**（叶子 3.3）：`settled_effort` 与 `load` 爬同一条梯子，区别只在它把说出这个值的那一级留着而不是丢掉。只被告知结果的设置页说不出「这是这间房自己写的」还是「这是全城都有的」，于是它只能把三份文件各读一遍、把同一条梯子再爬一次——**同一个问题两个答案，就是从第二次爬梯开始的**。谁压过谁仍由 `kernel::LayeredValue::resolve` 判：`tagged` 只负责「哪一级填哪一格」，`resolve` 是 `tagged` 去掉那一级，所以这条映射在本 crate 里只有一处。`None` 是整条梯子什么都没说，也就是这座城有意把强度交给供应方，而不是替人填一档。`settled_second` 是同一条路的第二个值：第二道提醒阈值也说得出是那一级写的。
 
-**写面与读面同源**：`write_second_threshold` 与 `write_effort` 走同一扇门（读—改—写整份 `CONFIG.toml`，别人写的键原样保留），收的值已经是 `SecondThreshold`——域在那一个构造点判定过，写面不再判一次；要值的字符串形状或拒因句式，答案在 `kernel::config`。
+**写面与读面同源**：`write_second_threshold` 与 `write_session` 走同一扇门（读—改—写整份 `CONFIG.toml`，别人写的键原样保留），收的值已经是 `SecondThreshold`——域在那一个构造点判定过，写面不再判一次；要值的字符串形状或拒因句式，答案在 `kernel::config`。
 
 **`own_layer` 答的是另一个问题**：梯子回答「一个 Run 被什么治理」，它回答「这个地址自己写下了什么」。差别正是它存在的理由——城或楼那一级给出的默认值不是这个地址做的选择，所以它不能当作选择的记录。文件是地址自己的那份 `CONFIG.toml`（`Layer::Resident` 的落点，也就是会话写的那一份），哪怕梯子把同一份文件当作两级里更远的级读了一次；地址就是楼时两者是同一个文件，所以那种地址自己就是它的会话（§8-14）。
 
@@ -397,13 +397,9 @@ impl CityPlan {
     pub fn dirs(&self) -> &[Address];
     pub fn first(&self) -> Option<&(Address, BuildingTemplate)>;
 }
-pub struct Relocation { pub from: Address, pub to: Address, pub crosses_building: bool }
-pub fn relocate(from: &Address, to: &Address) -> Result<Relocation, AxError>;
 ```
 
-- **两件都是判定，不是动作**：新城由什么构成、一次搬家蕴含什么，在这里以值给出；建目录与落事件归 bin。这个切分使「一句指令建一座城」可以在不建城的条件下被断言。
-- **搬家恒不是改名**：一个 Address 同时决定写域、默认上下文与上报对象，所以搬家是换写域，而**历史留在它发生的地方**。一座会为了配合新地址而改写历史的城，「这件事是在哪儿做的」就没有答案了。
-- **恒不得搬到楼根**：住在楼根等于从侧门拿到整栋楼的写域。
+- **是判定，不是动作**：新城由什么构成，在这里以值给出；建目录与落事件归 bin。这个切分使「一句指令建一座城」可以在不建城的条件下被断言。
 - **`city::office` 已并入 `config_layers` 并删行**：三层配置（City／Building／Resident）已是完整的梯子，OFFICE.md 没有任何一条自有规则，第四层只会成为「同一个设置在哪儿写」的第二个答案。
 
 ### 8-15 city::neighbourhood（形状 1 判定＋形状 2 值类型）
@@ -478,18 +474,17 @@ pub fn write_sandbox(city_root: &Path, addr: &Address, layer: Layer, limits: &Sa
 pub fn write_mcp(city_root: &Path, addr: &Address, layer: Layer, servers: &[McpServer]) -> Result<(), AxError>;
 ```
 
-- **与 `write_effort` 同一道门**：梯子（城→楼→房间）本就是「一个 Run 被什么治理」的权威，第二个存储就是第二个答案。其余键原样保留，因为可能是人手写的。
+- **与 `write_session` 同一道门**：梯子（城→楼→房间）本就是「一个 Run 被什么治理」的权威，第二个存储就是第二个答案。其余键原样保留，因为可能是人手写的。
 - **写出的字节必须是 `ConfigFile` 读得回来的那种**：`McpServer` 的 serde 形状是嵌套的，而文件语法是平的（`label` ＋ `command`/`args`/`env` 或 `url`/`headers`/`transport`）。写面照文件语法拼，本 crate 内一处正读一处反写，两者对不上时编译不会说话、测试会——一条往返测试逐支覆盖三种 transport。`Sse` 一行必写出 `transport = "sse"`：缺省是 `http`，不写就会被读回成另一种 transport。
 - **空的 `mcp` 表要写出来而不是省略**：省略即继承上一级，而一个人删掉最后一台服务器不是想继承一台。
 - **`env` 与 `headers` 逐值判定凭据，落盘之前就拒**（S-07）：一个值只要不是 `SecretRef::parse` 认得的 `secret:realm/name`，名字命中 `kernel::names_a_credential` 或值命中 `kernel::scan` 即以 `AxCode::ConfigInvalid` 拒，恢复语指向金库。判定在 `write_mcp` 进 `change` 之前逐对做，因此一次被拒的写入一个字节都没落；拒绝文字报出是哪一台服务器、哪一张表、哪一个名字，因为人手里只有那句话。**理由是这份文件进版本库**：楼的 `CONFIG.toml` 由 `city::gitignore` 放行进历史（§8-21），写进去的 key 就在这个项目的每一次克隆里。**判定不重建**：「什么叫凭据」是 `kernel::secret` 的答案，与 `[sandbox] env_passthrough` 走 `EnvVarName::parse` 是同一个权威的两次调用。
 - **读面今天不判这一条**：手写进 `CONFIG.toml` 的明文 key 仍然读得回来。补齐要让 `ConfigLayer::parse` 调同一个谓词，那时谓词升为 `pub(crate)` 并只有一处实现。
-- **三个写面只有一条写路径**：四者各自把要说的话包成 `Change`（穷尽：`Session` / `Effort` / `Sandbox` / `Mcp`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。`[model]` 那一节的三个值由同一条 `table` 找到或建出，免得三处对「该写进哪张表」各有各的说法。
+- **所有写面只有一条写路径**：各自把要说的话包成 `Change`（穷尽：`Session` / `Forget` / `Sandbox` / `Mcp` / `SecondThreshold`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。`[model]` 那一节的三个值由同一条 `table` 找到或建出，免得三处对「该写进哪张表」各有各的说法。
 
 ### 8-14 一次会话选一次：模型与思考强度
 
 ```rust
 pub fn write_session(city_root: &Path, addr: &Address, model: &str, effort: Option<Effort>) -> Result<(), AxError>;
-pub fn write_effort(city_root: &Path, addr: &Address, effort: Effort) -> Result<(), AxError>;
 ```
 
 思考强度放在派活按钮旁边，因为一次会话反正只选一次；而会话选定的模型也写进同一份文件，因为供应的 prompt 缓存对着的正是这两个值。
@@ -497,9 +492,8 @@ pub fn write_effort(city_root: &Path, addr: &Address, effort: Effort) -> Result<
 - **一次写下一个会话冻下的两样东西**：`write_session` 落 `[model] name`，并在人选了强度时落 `[model] effort`。模型总写下（一个模型总在指某个东西），强度只在人说了时写下：缺席不是一个值，而是「让供应方决定」，写出来就是把一个没人做的选择记成记录。
 - **写进那一层，而不是另存一份**：选择落到会话自己房间的 `CONFIG.toml`，由已有的 city → building → room 阶梯解析。第二个存处就是第二个答案。
 - **这份记录是会话的，不是运行时的设定**：一个 Run 用哪个模型仍由 endpoint book 选，强度仍爬同一条梯子——两者决定会话从哪里开始。房间写下来的只是它当初从哪里开始，所以登记面之后搬了家，是下次派活拒掉的分歧，而不是它默默执行的变更（`sprawling-SPEC §8-79`）。
-- **只改 `[model]` 表里的键**：文件里其它键是人写的，读出来、改一个值、写回去，与另外三个写面同走 §8-4b 的那一条写路径。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
-- **`write_effort` 仍在**：它只写强度一个键，供没有会话记录的地址（手搭的房间、`city` 自己的单测）用。派活面走的是 `write_session`，因为那次派活同时也在记下模型。
-- **两扇门都只写 Resident 层**，层级不由调用方给：派活按钮旁边选的强度属于这一次会话的房间。需要按层写强度时，签名要多一个 `Layer` 参数，那是一次公开面变更。
+- **只改 `[model]` 表里的键**：文件里其它键是人写的，读出来、改一个值、写回去，与其余写面同走 §8-4b 的那一条写路径。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
+- **只写 Resident 层**，层级不由调用方给：派活按钮旁边选的强度属于这一次会话的房间。需要按层写强度时，签名要多一个 `Layer` 参数，那是一次公开面变更。
 - **落点就是地址自己的 `CONFIG.toml`**，所以这个房间跑的 Run 读得到、改不了自己的档位；地址就是楼时它就是楼自己那份文件，也就是楼根上的会话（§8-4 的 `own_layer`）。
 
 ### 8-14b 一段会话开始：清掉冻下的形状与交接槽位（`city::session`）
@@ -640,6 +634,16 @@ bin `RunWorker::dispatch` → `Identity::load(city_root, addr)` → `segment_byt
 
 **重开参数**：若某个文件系统的 mtime 粒度粗到同一刻内能写出等长而意义不同的规则并且真有人这样改，键要加上内容哈希或 inode 变更计数。
 
+### 12.4 没有生产调用者的公开面不留
+
+**决定**：本 crate 的每个公开函数都有一个生产调用者。所以没有单写强度的门（派活与会话都经 `write_session` 写强度），也没有搬家的判定（全仓没有一个动作会搬家）。
+
+**理由**：一个只有测试在调的公开函数，是一条没有人在生产里执行的规则：它的测试证明的是一段不会跑的代码，而它的签名让读者以为那扇门是开的。单写强度的门还会让「强度写在哪一张表里」有第二个写者，与 `write_session` 各自拼 `[model] effort`。
+
+**被否**：为将来的功能先立判定——搬家真的上线时，判定连同它的四条规矩（不是改名、历史留在原址、不落楼根、不碰保留子树）从 git 取回，那时它有第一个调用者，也就有第一个能判它对不对的测试。
+
+**重开参数**：出现一个会搬家的动作，或一个没有会话记录却要写强度的生产调用点。
+
 ## 13 依赖选型
 
 只依赖 `kernel`（拓扑硬约束）＋ std。dev 依赖 `tempfile`。
@@ -699,7 +703,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 681 行一份文件切成三份，读面与写面各占一份，测试单独一份：
 
 - `config_layers.rs`（300 行）：`CONFIG_FILE`、`Layer`、`path`，以及读面 `ConfigLayer::parse`／`load`／`read_layer`／`refuse` 与四个 `serde` 段落类型。它回答「哪三份文件、怎么读」，仍是本节开头那份接口块的家。
-- `config_layers/write.rs`（160 行）：`write_effort`、`write_mcp`、`write_sandbox` 与它们私有的 `read_document`／`write_document`／`refuse_file`。写面自成一簇的缝在于它只经 `path` 与 `Layer` 回到读面，不碰 `ConfigLayer` 的任何字段。`config_layers.rs` 以 `pub use write::{write_effort, write_mcp, write_sandbox};` 重导出，`lib.rs` 的三行门面与 crate 内所有 `use` 一字未改。
+- `config_layers/write.rs`：`write_mcp`、`write_sandbox`、`write_second_threshold` 与它们私有的 `read_document`／`write_document`／`refuse_file`。写面自成一簇的缝在于它只经 `path` 与 `Layer` 回到读面，不碰 `ConfigLayer` 的任何字段。`config_layers.rs` 以 `pub use write::{write_mcp, write_sandbox, write_second_threshold};` 重导出，`lib.rs` 的三行门面与 crate 内所有 `use` 一字未改。
 - `config_layers/tests.rs`（245 行）：原内联 `mod tests` 整体迁出，11 个 `#[test]` 与其断言逐字不动。
 
 **无字段开放**：没有为跨文件引用把任何私有字段升成 `pub(crate)`／`pub(super)`；`write.rs` 用到的 `path` 与 `Layer` 本来就是公开面。
