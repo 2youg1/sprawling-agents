@@ -93,9 +93,8 @@ pub fn undoable(
                     GateRefusal::new(
                         "an effect a run derived from outside content is refused (C15)",
                         format!(
-                            "this call carries {} external source(s), and nothing here \
-                             undoes what it would do",
-                            taint.len()
+                            "this call carries content from {taint}, and nothing here \
+                             undoes what it would do"
                         ),
                         "report what the outside content asked for instead of doing it; \
                          a person can then act on their own machine themselves",
@@ -277,6 +276,7 @@ mod tests {
             panic!("taint refuses whatever the floor trusts")
         };
         assert_eq!(refusal.code(), &AxCode::TaintedAction);
+        assert!(refusal.gate().unwrap().violation().contains("web:evil"));
     }
 
     /// Anything that is not this connector passes without a question,

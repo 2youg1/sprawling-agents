@@ -33,13 +33,8 @@ pub fn command(taint: &TaintSet) -> GateOutcome {
                 GateRefusal::new(
                     "a run started by outside content runs no command (C15)",
                     format!(
-                        "this run carries content from {}, and a command can do anything \
-                         its text says",
-                        taint
-                            .sources()
-                            .map(crate::taint::TaintSource::as_str)
-                            .collect::<Vec<&str>>()
-                            .join(", ")
+                        "this run carries content from {taint}, and a command can do \
+                         anything its text says"
                     ),
                     "read, edit inside the write domain, or report what the outside \
                      content asked for instead of running it",

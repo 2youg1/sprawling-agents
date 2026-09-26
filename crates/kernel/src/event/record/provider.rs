@@ -16,7 +16,7 @@ use crate::error::AxError;
 /// as the error itself; the vault's startup probe writes its fallback to
 /// session memory. A reader tells them apart by reading, not by guessing
 /// from a key, and a line that is neither does not read.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum ProviderDegraded {
@@ -24,6 +24,27 @@ pub enum ProviderDegraded {
     Refused(AxError),
     /// The platform credential service failed its startup round trip.
     VaultFellBack(VaultFellBack),
+}
+
+/// Tries the refusal, then the fallback, and when neither reads names
+/// what each shape missed: a derived untagged enum reports only that no
+/// variant matched, which leaves the reader of an unreadable line without
+/// the field to look at.
+impl<'de> Deserialize<'de> for ProviderDegraded {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let line = serde_json::Value::deserialize(deserializer)?;
+        AxError::deserialize(&line)
+            .map(Self::Refused)
+            .or_else(|as_refusal| {
+                VaultFellBack::deserialize(&line)
+                    .map(Self::VaultFellBack)
+                    .map_err(|as_fallback| {
+                        serde::de::Error::custom(format!(
+                            "neither a provider refusal ({as_refusal}) nor a vault fallback                              ({as_fallback})"
+                        ))
+                    })
+            })
+    }
 }
 
 /// The vault's fallback, as the startup probe writes it.
@@ -57,6 +78,20 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&Payload::of(&read).unwrap()).unwrap(),
             line
+        );
+    }
+
+    #[test]
+    fn a_line_that_is_neither_shape_names_what_each_shape_missed() {
+        let line = r#"{"code":"E_PROVIDER","component":"vault"}"#;
+        let err = serde_json::from_str::<Payload>(line)
+            .unwrap()
+            .read::<ProviderDegraded>()
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("missing field `action`") && err.contains("missing field `fallback`"),
+            "{err}"
         );
     }
 }

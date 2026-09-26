@@ -75,7 +75,7 @@ Stage 2 追加：
 5. **`who` 字段是自由字符串**：actor 文法属 city::resident（P1）；届时收紧为类型，本文届时更新。
 6. **浮点拒绝在构造点**：Ledger 载荷禁浮点（确定性七条之 6）由 `Payload::new` 与其 `Deserialize` 双侧执行，serde_json 数字非 i64/u64 可表示即拒。
 7. **存储写失败码**（S2 期初定）：增装载期第 5 码 `E_STORAGE_FATAL`（AxCode 36）承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
-8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。
+8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。浮点与深度在同一趟迭代遍历里判，只用一个 `(值, 层数)` 栈：不递归，所以敌意载荷耗不掉写方的栈；一个载荷只分配这一次，落选的是两趟分开的遍历（深度一趟、浮点一趟递归），它每层、每个节点各分配一个 `Vec`，在 dev 构建上对同一份两百来个节点的载荷交错计时，慢三倍多（每次约 58 µs 对 17 µs）。
 9. **没有写方的 kind 不定型**：`credential_lent`、`backpressure_shed`、`digest_invalidated` 在 `EventKind` 里有名字，但本树没有任何写方。结构体要以写方的字节为准（record 模块规则 1），没有写方就没有可对齐的字节，故它们留在 `record` 之外，与 F1 家族的无写方 kind 同理；哪天出现写方，它的第一版就经 `Payload::of` 写，结构体随之落在 `record` 下。
 
 ## 4 现状分析
@@ -220,7 +220,7 @@ impl ErrorDraft {
 
 **H-01 定案：取 typestate，不取四参**。路线图 §13.1 原定 `failure(code, action, subject, recovery)` 四参必填，此处改记为 typestate，理由三条：其一，`refusal` 已占满四参，再塞恢复语就是第五参，越过参数上限；其二，恢复语只剩 `ErrorDraft::with_recovery` 一个设定处，四参方案则要把 `with_recovery` 留作改写器，同一个名字两份职责；其三，四参要重写全部 641 个调用点，typestate 只动缺恢复语的那些，改动面恰好等于缺陷面。关门理由随之由「每处四实参」改为「编译通过」——恢复语必填这条现在由类型系统执行，grep 执行不了它。`AxError` 一经存在即已完工，`with_nearby`／`retriable` 只在 draft 上，故链式调用中 `with_recovery` 恒为最后一环。
 
-**`retry_after_ms` 是失败方对「再问之前至少等多久」的陈述**，读取处是 `AxError::retry_after_ms() -> Option<u64>`。它只能经 `retriable_after` 写入，而该方法同时置 `Retry::Yes`，故「不可重试却带等待」拼不出来。`None` 时字段不上线、不入账，旧的账本记录照读（`serde(default)`）。
+**`retry_after_ms` 是失败方对「再问之前至少等多久」的陈述**，读取处是 `AxError::retry_after_ms() -> Option<u64>`。它只能经 `retriable_after` 写入，而该方法同时置 `Retry::Yes`；`effect_unknown` 置 `Unknown` 时一并清掉它，所以无论构造器按什么次序调用，「不是 `Yes` 却带等待」都拼不出来。`None` 时字段不上线、不入账，旧的账本记录照读（`serde(default)`）。
 
 **`retry` 是三态信封，不是布尔。** 一个 `bool` 只能说「可以」与「不可以」，于是请求已经发出、回答却丢了的那一类失败（流中断、静默超时、发送途中断开）只能被说成「可以」，而那是假话：对端也许已经执行了它、计了费，一个有副作用的动作再发一次就是第二次副作用。第三态 `Unknown` 把「效果是否已经落地」说进信封，决定再发与否的是知道这个动作是否幂等的调用方（runtime 的 watchdog 对一次模型调用照样退避重问，因为它的效果只是一份城里从未收到的回答）。落选的是另加一个 `landed: bool` 字段：「可以」蕴含未落地、「不可以」与落地无关，两字段会拼出「可以且已落地」这样没有意义的组合。线上字段名随之由 `retriable` 改为 `retry`，`WIRE_V` 加一；旧账本记录里的 `retriable: true/false` 照读为 `Yes`／`No`。落选的是把等待时长写进 `recovery` 文本：那是给读者的一句话，重试节奏的持有者（runtime 的 watchdog）不该从句子里解析数字。
 
@@ -550,7 +550,9 @@ pub struct EndpointProbed { pub name: String, pub base_url: String, pub reach: R
 pub struct ProbeFailure { pub code: String, pub subject: String }
 // record::provider：provider_degraded 有两个写方、两种形状，一个 untagged enum 让读者靠读来分，
 // 不靠猜键：E_PROVIDER 经 kernel::error 的 carrier 表平铺写成 AxError 本身；vault 启动探针退到
-// session memory 时写 VaultFellBack。两者都不是的行读不成（E_WIRE_MISMATCH）。
+// session memory 时写 VaultFellBack。两者都不是的行读不成（E_WIRE_MISMATCH），错误里并列两种
+// 形状各自缺的那个字段：Deserialize 手写，先试 AxError 再试 VaultFellBack；派生的 untagged 只会说
+// 「没有一个变体匹配」，Note::Unreadable 就给不出该去看哪个字段。写出仍是 untagged。
 #[serde(untagged)] pub enum ProviderDegraded { Refused(AxError), VaultFellBack(VaultFellBack) }
 pub struct VaultFellBack { pub component: String,     // 探针写 vault
                            pub fallback: String,      // 探针写 session-memory
@@ -877,6 +879,7 @@ pub struct TaintSource(String);            // 非空来源标签（如 "web:exam
 pub struct TaintSet(BTreeSet<TaintSource>); // 空集＝内生数据；并集半格
 impl TaintSet { pub fn empty() -> Self;  pub fn union(&self, other: &TaintSet) -> TaintSet;
                 pub fn is_empty(&self) -> bool;  pub fn contains(&self, s: &TaintSource) -> bool; }
+impl Display for TaintSet;                  // 来源标签按集合次序以 ", " 连接
 
 pub struct Tainted<T> { /* value, taint —— 字段私有 */ }
 impl<T> Tainted<T> {
@@ -892,6 +895,7 @@ impl<T> Tainted<T> {
 ```
 
 - **无解包面**：无 `into_inner`、无 `Deref`、字段私有——「摘干净再传下游」编译不过（trybuild 反例）。`map` 取 `FnOnce(&T)`（借用入参），闭包无法把所有权搬出环外。
+- **C15 拒绝说来源只有一种说法**：`command`、`undoable`、`domain` 三扇门的违规句都写「carries content from {taint}」，经 `TaintSet` 的 `Display` 点出每个来源的标签。落选的是只报个数：个数告诉读者有外来内容，却不告诉他该去查哪一个来源。
 - **Tainted 恒不 serde**：`Deserialize` 即第二构造入口，伪造空 Taint 即洗白；`TaintSet` 可 serde（事件载荷需要来源清单）。
 - kani：`join` 输出 taint ⊇ 两入参（并集单调不丢）；proptest 镜像同性质（kani 没有 Windows 宿主，CI Linux 跑）。
 - 上游错误文本、摘要继承、动作构造器强制并集：均在消费方模块（discard／approval／gate，以及 S3 的 pipeline／digest）逐处落实，本模块只供类型。

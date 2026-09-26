@@ -217,9 +217,11 @@ impl ErrorDraft {
     }
 
     /// Declares that the request went out and its answer was lost, so
-    /// whether its effect landed is not known.
+    /// whether its effect landed is not known. Drops any wait set
+    /// before it, because a wait belongs to `Retry::Yes` alone.
     pub fn effect_unknown(mut self) -> Self {
         self.pending.detail.retry = Retry::Unknown;
+        self.pending.detail.retry_after_ms = None;
         self
     }
 
@@ -297,6 +299,15 @@ mod tests {
                 .retry()
         };
         assert_eq!([retry(true), retry(false)], [Retry::Yes, Retry::No]);
+    }
+
+    #[test]
+    fn an_unknown_effect_carries_no_wait_whatever_the_builder_order() {
+        let err = AxError::failure(AxCode::Provider, "call model", "s")
+            .retriable_after(1_500)
+            .effect_unknown()
+            .with_recovery("r");
+        assert_eq!((err.retry(), err.retry_after_ms()), (Retry::Unknown, None));
     }
 
     #[test]
