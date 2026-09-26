@@ -35,7 +35,7 @@
   import { QUERIES } from "../../../core/asking";
   import { attachEndpoint, probeEndpoint, selectModel } from "../../../core/commands";
   import type { Endpoint, WireApi } from "../../../core/commands";
-  import { enrol, keyField, referenceFor } from "../../../core/enrol";
+  import { enrol, keyField, referenceFor, secretFor } from "../../../core/enrol";
   import type { Enrolment, StoredKey } from "../../../core/enrol";
   import { fill, say } from "../../../core/lang";
   import { normalisedFrom } from "../../../core/probed";
@@ -184,13 +184,14 @@
   }
 
   // The key is enrolled on the action that needs it, under the id the
-  // form says now. A blank box carries no reference and keeps whatever
-  // is already filed under that id; a box with something in it
-  // replaces it.
+  // form says now. A blank box carries the reference this form enrolled
+  // for that id, if any: listing the models clears the box, and the
+  // attach that follows must not arrive without the key it just filed.
+  // A box with something in it replaces what is filed.
   function withKey(then: (e: Endpoint) => void): void {
     const typed = draft.key.trim();
     if (typed === "") {
-      then(endpointOf(draft, null));
+      then(endpointOf(draft, secretFor(held, id)));
       return;
     }
     busy = true;
