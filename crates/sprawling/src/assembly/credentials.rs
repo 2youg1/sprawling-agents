@@ -5,8 +5,10 @@
 
 //! What this city can sign in as, and what it may call.
 //!
-//! The values and the readings live here; `signing` holds the login
-//! and the vault, `endpoints` what may be called.
+//! The values and the readings live here; `held` is what the worker
+//! keeps (the book, the vault, the expiries, the logins begun),
+//! `signing` the login and the vault's use, `endpoints` what may be
+//! called.
 
 use kernel::{AxCode, AxError};
 
