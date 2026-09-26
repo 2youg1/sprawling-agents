@@ -55,7 +55,7 @@ ModelFactory｜Connectors｜Clock｜Machine｜Recipe｜Runnable｜accounting thr
 - 把生产适配器接到 worker 上，归装配根 `bin::assembly`。
 - MCP 的生命周期（`initialize`、`notifications/initialized`、`tools/list`）怎样说，归 `protocol`；一个工具能不能在机密楼里存在，归 `protocol::McpTool::new`。端口只声明「连上一个 server，交回它的工具」。
 - 机密楼根本不启动 server，这一步在 worker 的 `mcp_tools` 里、端口被问到之前。
-- 主机上有什么、每一项怎样判定、怎样折叠成一页，归 `bin::doctor`（它是这台机器有什么的唯一权威）；一条安装配方能不能跑，归 `Recipe::command`；worker 只决定一个名字在不在需求表里、这个平台有没有配方。
+- 主机上有什么、每一项怎样判定、怎样折叠成一页，归 `bin::doctor`（city 所在主机有什么，它是唯一权威）；一条安装配方能不能跑，归 `Recipe::command`；worker 只决定一个名字在不在需求表里、这个平台有没有配方。
 
 ## 8 接口先行
 
