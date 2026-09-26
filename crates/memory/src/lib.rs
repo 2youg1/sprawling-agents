@@ -28,7 +28,10 @@ pub use jsonl::WriteObserver;
 // declarations only, and rustfmt wraps the list at 100 columns.
 #[rustfmt::skip]
 pub use jsonl::{CheckedLine, LineCheck, LineFault};
-pub use jsonl::{JsonlLedger, OpenReport, TailTruncation, ledger_segments_at, read_raw_lines_at};
+pub use jsonl::{
+    JsonlLedger, OpenReport, SegmentBytes, TailTruncation, ledger_segments_at, read_raw_lines_at,
+    read_segment,
+};
 
 // The projection the Ledger lays down beside each building: one file per
 // room, disposable, read by nobody in the product (memory-SPEC 8-24).

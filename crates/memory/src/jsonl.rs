@@ -28,10 +28,11 @@ mod append;
 mod first_line;
 mod ledger;
 mod open;
+mod reading;
 mod verify;
 
-pub use append::{ledger_segments_at, read_raw_lines_at};
 pub(crate) use first_line::first_line;
 pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
 pub(crate) use ledger::{complete_lines, segment_first_seq, segment_names};
+pub use reading::{SegmentBytes, ledger_segments_at, read_raw_lines_at, read_segment};
 pub use verify::{CheckedLine, LineCheck, LineFault};

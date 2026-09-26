@@ -59,10 +59,22 @@ fn a_fold_reads_the_history_line_by_line() {
     let dir = tempfile::tempdir().unwrap();
     let first = genesis_line();
     let second = future_line(&first, 1, false);
-    let segment = [first, b"
-".to_vec(), second, b"
-".to_vec()].concat();
-    std::fs::write(dir.path().join("ledger-00000000000000000000.jsonl"), segment).unwrap();
+    let segment = [
+        first,
+        b"
+"
+        .to_vec(),
+        second,
+        b"
+"
+        .to_vec(),
+    ]
+    .concat();
+    std::fs::write(
+        dir.path().join("ledger-00000000000000000000.jsonl"),
+        segment,
+    )
+    .unwrap();
     let mut folded = Vec::new();
     let refused = fold_ledger_dir(dir.path(), |record| {
         folded.push(record.seq());

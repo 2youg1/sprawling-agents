@@ -104,9 +104,16 @@ pub fn fold_ledger_dir(
     dir: &Path,
     mut each: impl FnMut(&EventRecord) -> Result<(), AxError>,
 ) -> Result<(), AxError> {
-    for line in verify_ledger_dir(dir)?.lines() {
-        if let VerifiedLine::Known { record, .. } = line {
-            each(record)?;
+    let mut check = LineCheck::at_genesis();
+    let mut line_no = 0u64;
+    for segment in memory::ledger_segments_at(dir).map_err(memory::MemoryError::into_ax)? {
+        let bytes = memory::read_segment(&segment).map_err(memory::MemoryError::into_ax)?;
+        for raw in bytes.lines() {
+            line_no = line_no.saturating_add(1);
+            match check.advance(raw).map_err(|fault| fault.into_ax(line_no))? {
+                CheckedLine::Known(record) => each(&record)?,
+                CheckedLine::IgnoredUnknown(_) => {}
+            }
         }
     }
     Ok(())
