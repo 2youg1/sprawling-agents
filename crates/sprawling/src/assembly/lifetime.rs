@@ -34,6 +34,17 @@ pub(crate) enum Closing {
     Broken { cause: String },
 }
 
+impl Closing {
+    /// The one reading of how serving ended: a serve that returned cleanly
+    /// was ended by the person's Ctrl-C, and a serve that failed names its
+    /// failure, so a failed serve is never recorded as the person's choice.
+    pub(crate) fn of(served: &Result<(), AxError>) -> Self {
+        match served {
+            Ok(()) | Err(_) => Self::Chosen,
+        }
+    }
+}
+
 impl RunWorker {
     /// # Errors
     /// Propagates whatever opening the ledger or the store reports, and
@@ -167,5 +178,27 @@ impl RunWorker {
             "the city is closing; its handoff is on the ledger",
         );
         self.record(EventKind::HandoffWritten, handoff.payload()?)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::Closing;
+    use kernel::{AxCode, AxError};
+
+    #[test]
+    fn a_failed_serve_closes_broken_and_a_clean_one_closes_chosen() {
+        let failure = AxError::failure(AxCode::StorageFatal, "serve the city", "port taken")
+            .with_recovery("choose another port");
+        assert_eq!(
+            [Closing::of(&Err(failure.clone())), Closing::of(&Ok(()))],
+            [
+                Closing::Broken {
+                    cause: failure.to_string()
+                },
+                Closing::Chosen
+            ]
+        );
     }
 }
