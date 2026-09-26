@@ -45,7 +45,7 @@ pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
 pub use answer::{CostOfAnswer, EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use answer::{Decision, GovernanceAnswer};
-pub use answer::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use answer::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};

@@ -47,7 +47,7 @@ pub use commits::{CommitAnswer, CommitsAnswer};
 pub use config::{ConfigAnswer, ConfigLayer, SettledEffort, SettledSecond, TuningDefaults};
 pub use cost_of::CostOfAnswer;
 pub use doctor::DoctorSandboxMissing;
-pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorFault, DoctorInstall, DoctorItem};
+pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};

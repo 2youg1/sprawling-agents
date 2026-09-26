@@ -823,7 +823,8 @@ ConfigureBuilding { addr: Address, sandbox: Option<SandboxLimits>, mcp: Option<V
 Doctor,                                   // → Answer::Doctor(Box<DoctorAnswer>)
 
 pub struct DoctorAnswer { pub items: Vec<DoctorItem>, pub tiers: Vec<DoctorVerdict>,
-                          pub sandbox: DoctorSandbox, pub custody: DoctorCustody }
+                          pub sandbox: DoctorSandbox, pub custody: DoctorCustody,
+                          pub core: DoctorCore }
 pub struct DoctorItem { pub name: String, pub tier: DoctorTier, pub need: DoctorNeed,
                         pub enables: String, pub state: DoctorState, pub install: DoctorInstall }
 pub enum DoctorTier { Use, Develop }
@@ -848,6 +849,7 @@ pub struct DoctorCustody { pub store: DoctorCustodyStore, pub keeps: DoctorCusto
                            pub refusal: Option<String> }
 pub enum DoctorCustodyStore { PlatformService, EncryptedFile, SessionMemory }
 pub enum DoctorCustodyLifetime { AcrossReboots, WithPassphrase, UntilReboot, ThisProcess }
+pub enum DoctorCore { Raised, HeldBySetting, Refused { said }, LoweredByValve, Unasked { said } }
 ```
 
 - **每一种状态都是枚举，不是句子**。终端那份报告是一台机器的散文，而浏览器说两种语言；线上若携措辞，页面的用词就成了服务端的选择。唯一的例外是 `enables`——那是需求表自己关于「有了它能做什么」的一句话，读者推不出来，这条答案里也没有别的字段装得下它。
@@ -855,6 +857,7 @@ pub enum DoctorCustodyLifetime { AcrossReboots, WithPassphrase, UntilReboot, Thi
 - **`install` 把平台不明单列一支**。三个平台之外的机器上，本项目没有任何配方；此时拼一条别的平台的命令是错的，沉默也是错的。
 - **沙箱的保证逐轴作答，不是一句「已隔离」**：`coverage` 逐轴一行，`Kept`／`NotKept` 两个字而不是布尔——页面两态都要有词，布尔会让每个读者自己给 `false` 选一个。它存在的理由，是 agent 在动手前要读得到哪几条保证没成立。臂与轴的定义住 `runtime-SPEC §8-13-2`（`Confinement` 与 `Guarantee`），线上重拼一份，逐臂对应只住 `sprawling::doctor::report` 的穷尽匹配——上游加一臂即编译红。
 - **凭据的存放与寿命一起答，`refusal` 是平台服务自己的话**：三者同出 `gateway::Custodian::probe` 的一次往返（`gateway::Custody`，gateway-SPEC §8-4；寿命的全部档位见 §8-21），线上重拼 `Store` 与 `Persistence` 两套词，逐臂对应同住 `sprawling::doctor::report`；`refusal` 缺席读作服务没有拒——或该 store 由城自选，没有服务可拒。
+- **核心线程站在哪一档，`said` 是平台自己的话**：`core` 是主机此刻会给核心线程的档位（sprawling-SPEC §8-93、§8-40）——升到正常档之上一级、按人的 `[core] priority` 留在正常档、平台拒绝（Unix 上没有 `CAP_SYS_NICE`）、被安全阀降回，或 doctor 没能问到。派出的命令不在这里：它们总是低一档，降档从不被拒（runtime-SPEC §8-13-3）。
 - **服务端**：`sprawling::doctor::report` 把 findings 与这两道整机读数折成本形状，`Views` 存一份（sprawling-SPEC §8-54）。
 
 ### 8-24 `Query::Commits`：一座楼做过的提交，倒序分页（WIRE_V 17→18）
