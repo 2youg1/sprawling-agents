@@ -255,7 +255,7 @@ pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u
 ```
 
 - 判定：`FiveMinute` 时，续期时刻＝`refreshed_ms + PROMPT_CACHE_TTL_SECS·1000 − lead_ms`（饱和减）；该时刻距 `used_ms` 超过一个 TTL 即不续期。所以「最近 5 分钟内用过」与缓存寿命是同一个常数 `kernel::consts_external::PROMPT_CACHE_TTL_SECS`，不另立第二个 300。一次真实使用最多换来一次续期：续期不改 `used_ms`，第二次续期的时刻必然离真实使用超过一个 TTL。
-- `lead_ms` 由调用方按本机实测给出，不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
+- `lead_ms` 由调用方对所连 provider 实测给出，不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
 - 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。
 - 续期请求带的断点沿用 `prefix::breakpoint::BreakpointPlan`，本模块不决定断点。
 - 现状：判定已落地；城／楼配置键 `[cache] keep_warm` 的解析、按判定排定时器并经 gateway 发出续期请求，这两处尚未接线，因此今天任何配置下城都不发续期请求。
