@@ -33,6 +33,7 @@
   import Glyph from "./parts/glyph.svelte";
   import Segmented from "./parts/segmented.svelte";
   import Release from "./release.svelte";
+  import AdvancedSection from "./setup/advanced.svelte";
   import { saveReceipt } from "./setup/appearance";
   import AppearanceSection from "./setup/appearance.svelte";
   import Kept from "./setup/kept.svelte";
@@ -379,14 +380,7 @@
         {:else if shown === "keys"}
           <KeysSection />
         {:else if shown === "advanced"}
-          <!-- The door back into the welcome walk: a link, because it
-              moves the address bar like every other way off this page. -->
-          <a
-            href={toFragment({ kind: "welcome" })}
-            class="inline-flex h-control w-fit items-center rounded-control bg-raised px-base text-label hover:bg-raised-hover"
-          >
-            {say($lang, "setup_rerun")}
-          </a>
+          <AdvancedSection />
         {:else if shown === "about"}
           <Release />
         {/if}
