@@ -324,6 +324,28 @@ mod tests {
         );
     }
 
+    /// The city root is the person's choice, so a link above it is
+    /// where they keep the city rather than a write a run redirected.
+    #[test]
+    fn a_city_kept_under_a_link_exports_and_restores() {
+        let tmp = tempfile::tempdir().unwrap();
+        let real = tmp.path().join("real");
+        std::fs::create_dir_all(&real).unwrap();
+        let via = tmp.path().join("via");
+        if !crate::alias::tests::place_link(false, &real, &via) {
+            return;
+        }
+        let (city, carried, elsewhere) = (via.join("city"), via.join("bk"), via.join("back"));
+        std::fs::create_dir_all(&city).unwrap();
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        city_with(1, &city);
+        let outcome = Bundle::export(&city, &carried)
+            .and_then(|_| Bundle::restore(&carried, &elsewhere))
+            .map(|_| ())
+            .map_err(|err| err.to_string());
+        assert_eq!(outcome, Ok(()));
+    }
+
     #[test]
     fn nothing_under_the_reserved_prefix_travels_as_a_city_file() {
         let home = tempfile::tempdir().unwrap();
