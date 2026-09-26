@@ -42,6 +42,7 @@
 1. **verify 的规范复验**：v1 无升级器链，故对每行断言 `canonical_line(parse_line(raw)) == raw`（写方规范性质）。未来 v>1 经升级器读入后此断言只对原版字节成立——届时随升级器一并改约（本文更新）。
 2. **fork 的 run_forked 落账**：事件写入母城 Ledger 由调用方（runtime 回合层／citysim）执行；fork 只产 EventDraft 与前缀，不持 Ledger 句柄——保持纯函数形。
 3. **同一套重建器**：A15 与 A19 共用 verify 输出；重建器＝verified 行序列本身。
+4. **前缀续期未接线**：`prefix::warmth` 的 `Warmed` 与记账已在（§8-4-2），而 run 结束后按 `next_due` 醒来发续期的那条循环还没有；接上它要先定续期的 usage 记成哪一种事件。
 
 ## 4 现状分析
 
@@ -319,7 +320,7 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call
 ```
 
 - `lead_ms` 不是常量：`Warmed` 把每次经它发出的调用（真实请求与续期）的往返时长记为下一次续期的提前量，所以提前量跟着所连的 provider 与链路走，不按某一类机器调校。流式调用的往返含生成时长，只会让续期提前，不会让它晚于缓存过期。
-- 现状：`Warmed` 与记账已落地；run 结束后把 `Warmed` 留在 worker 上、在唯一 spawn 点的 attend 循环里按 `next_due` 醒来发续期、把续期的 usage 记成事件，尚未接线。
+- 未接线（§3）：run 结束后把 `Warmed` 留在 worker 上、在唯一 spawn 点的 attend 循环里按 `next_due` 醒来发续期、把续期的 usage 记成事件。
 
 ### 8-5 runtime::handoff（形状 2）
 
@@ -1360,12 +1361,12 @@ pub fn package_connector(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Resu
 
 ### 8-28 runtime::backlog（形状 4 适配器＋形状 6 数据面）
 
-**问题**：`turn.rs` 首段写明中断只在相位边界被消费，而 `Command::output()` 阻塞在系统调用里、不在边界上，所以一条挂死的命令 `halt` 停不住。删掉花费预算与回合上限之后，这是全仓唯一一处无界失效。
+**问题**：`turn.rs` 首段写明中断只在相位边界被消费，而 `Command::output()` 阻塞在系统调用里、不在边界上，所以一条挂死的命令若不入表，`halt` 停不住；没有回合上限与花销上限的城里，这会是一处无界失效。
 
 **设计**：一张表，成员是后台 exec 子进程与 `delegate` 子 run。
 
 - **`exec` 恒经此表**，不设 `background` 参数——两条路径就是两个权威，而有洞的那条永远是没人想起的那条。
-- 先阻塞等一个短窗口（**10 s**），短命令因而感觉上仍是同步的；超时则返回一个句柄并继续在后台跑，结果落**起它的那个 run 的下一次 `exec` 结果的尾部**，恒不落别的 run。这正是 `docs/City.md` 已经写给 agent 的那句话（「Do not wait for a long task. Start it, continue with other work, and read the result when it arrives at the end of a later tool result.」），今天对 exec 不成立。
+- 先阻塞等一个短窗口（**10 s**），短命令因而感觉上仍是同步的；超时则返回一个句柄并继续在后台跑，结果落**起它的那个 run 的下一次 `exec` 结果的尾部**，恒不落别的 run。给 agent 的说法是「长任务不要干等：起了它，做别的，结果到了会接在后面的工具结果尾部」。
 - `halt {scope}` 遍历该表并终止其成员；工作线程不再进入阻塞系统调用，halt 因而真的停得住。
 - `status` 报告表中属于本 run 的成员：几条在跑、各自跑了多久。
 
@@ -1438,11 +1439,11 @@ impl Backlog {
 
 **红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
-#### 8-28-3 exec 输出的实时流（已接：读增量、装配点注入、线上帧、服务端与页面两段缓冲）
+#### 8-28-3 exec 输出的实时流：读增量、装配点注入、线上帧、服务端与页面两段缓冲
 
 **现状**：一个 `exec` 调用的 stdout／stderr 只在调用结束时随工具结果进账本，页面（client 的监视器）在那之前只看得到「运行中」。第 2 条让输出写进 scratch 下的 `out`／`err` 两个文件，所以实时流不需要改子进程怎么写，只需要有人在它还在写时读这两个文件的增量。
 
-**已接的一段——`runtime::backlog::tail`（shape：adapter）**：
+**读增量——`runtime::backlog::tail`（shape：adapter）**：
 
 ```rust
 pub enum Stream { Out, Err }                          // 恒不是 bool
@@ -1459,16 +1460,16 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 
 - 窗口里的读停在交给后台那一刻，偏移随成员进表；此后本 run 的每次 `harvest` 对它自己的、仍在跑的后台命令从同一偏移接着读。块在放开表锁之后才交给 sink，所以 sink 慢不会让表上其他调用等它。
 
-**已接的第二段——装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `channels::LiveOutput`（channels-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
+**装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `channels::LiveOutput`（channels-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
 
-**已接的第三段——页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
+**页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
 
-**已接的第四段——服务端缓冲**：`sprawling::serving::output_ring`（sprawling-SPEC §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（channels-SPEC §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
+**服务端缓冲**：`sprawling::serving::output_ring`（sprawling-SPEC §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（channels-SPEC §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
 
 **设计**（四段共同遵守的规则）：
 
 - **读的地方是短窗口的轮询，不另起线程**。`Backlog::run` 每一拍轮询在 `settle` 之后按上次的偏移读两个文件新增的字节，交给调用方注入的一个 sink；窗口外交给后台的命令由 `harvest` 那一拍同样读增量。sink 缺席（citysim、replay、没人看的城）时一个字节都不读，行为与今天相同。
-- **每拍读的字节有上界**，按 `PollBudget` 的间隔推出而不写死：一拍最多读 `READ_PER_POLL` 字节，读不完的留到下一拍，所以一个刷屏的子进程让页面落后，而不让轮询变慢。
+- **每拍读的字节有上界**，按 `PollBudget` 的间隔推出而不写死：一拍最多读 `PollBudget::read_per_poll()` 字节，即 `interval_ms × READ_BYTES_PER_MS`，间隔越长每拍读得越多、喂给页面的速率不变；读不完的留到下一拍，所以一个刷屏的子进程让页面落后，而不让轮询变慢。
 - **服务端每个 run 一个有界环形缓冲**，按字节计上界，满了丢最旧的整块；后来打开 run 页的会话先拿到缓冲里的内容，再接实时帧。丢了多少不上线：`LiveOutput` 没有这一栏，而加一栏要让 `WIRE_V` 再加一，换来的只是预览里的一个数——调用落账时整段输出本来就会到。缓冲在这次调用的 `tool_returned` 落账时清空，因为那时账本里的结果是这段输出唯一的权威。
 - **线上是一种新的 `ServerFrame`**，与 `Delta` 同一条规则：可丢弃，不带账本序号，调用的结果落账时页面扔掉它，两者不一致时账本赢。这一帧让 `WIRE_V` 加一并重新生成 `client/src/wire.ts`。
 - **页面也是有界环形缓冲**，按行计，监视器的终端记录画它；溢出的行数照 `mon_lines_cut` 的样子说出来。
@@ -1696,7 +1697,7 @@ impl Run<Frozen> { pub fn transcript(&self) -> Result<Transcript, AxError>; pub 
 
 **深度守恒**：succession 与 `delegate` 是两个动词。`delegate` 让深度加一；succession 不加。`Assignment::depth()` 从 `parent` 推出，继任者**继承前任的 `parent`**（而不是以前任为 parent），所以深度按构造守恒，工具表因而与前任逐名相同——`delegate` 在内。红测试：继任者的工具表与前任逐名相等。
 
-**账本**：`Assignment`／`RunPlan` 增 `predecessor: Option<RunId>`，写进 `run_started` 的 `predecessor` 键；`Provenance` 增同一指针（memory-SPEC §8-17：第六条 trailer `Sprawling-Predecessor`，仅在有前任时出现；`model_fields` 同时写 `predecessor`）。`bin::views` 从 `run_started` 折出 `predecessors: BTreeMap<RunId, RunId>`，`Query::Commit` 的答 `CommitAnswer` 增 `lineage: Vec<RunId>`——本跑在前，逐级向前到第一任（WIRE_V 14→15，channels-SPEC §8-18）。红测试：三次接替后 lineage 有四个 run。
+**账本**：`Assignment`／`RunPlan` 增 `predecessor: Option<RunId>`，写进 `run_started` 的 `predecessor` 键；`Provenance` 增同一指针（memory-SPEC §8-17：第六条 trailer `Sprawling-Predecessor`，仅在有前任时出现；`model_fields` 同时写 `predecessor`）。`bin::views` 从 `run_started` 折出 `predecessors: BTreeMap<RunId, RunId>`，`Query::Commit` 的答 `CommitAnswer` 增 `lineage: Vec<RunId>`——本跑在前，逐级向前到第一任（channels-SPEC §8-18）。红测试：三次接替后 lineage 有四个 run。
 
 **Handoff 从楼搬到房间**：`city::handoff(city_root, room)`／`handoff_path(city_root, room)` 读写 `<city>/<room>/Handoff.md`；模板在 `city::open_room` 打开房间时铺下，楼级 `lay_out` 不再铺它。理由是同楼并发：一栋楼一份 Handoff，两个房间同时冻结就是两份内容抢一个文件。
 
@@ -1724,7 +1725,7 @@ impl ContextReminder { pub fn render(&self) -> String; }
 
 `second` 来自 `RunPlan.second_threshold`：配置梯子冻结的值，`None`＝没有一层说话，取 `CTX_REMINDER_SECOND_DEFAULT`，「缺席取默认」只在这一个构造点判定。`window == 0`（簿上没写）恒不响：没有分母就没有百分比，与 `UnplannedProgress` 同一条理。整数算术：`used * 100 / window` 用 checked 乘法。
 
-**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`RunPlan` 增 `context: ContextReading`，Run 在每回合观察之前把同一个 `input_tokens` 记进去，装配层把同一格交给 `StatusTool::metering`——只有一处写，窗口提醒与 `status` 读的是同一个数；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Window::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
+**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`RunPlan` 增 `context: ContextReading`，Run 在每回合观察之前把同一个 `input_tokens` 记进去，装配层把同一格交给 `StatusTool::metering`——只有一处写，窗口提醒与 `status` 读的是同一个数；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Conversation::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
 
 **改这一格的入口**：`channels::Command::ConfigureBuilding` 的 `context_second_threshold`（channels-SPEC §8-45）写的就是 `RunPlan.second_threshold` 读的那一格——写入落那一级的 `[context] second_threshold`，下一个 Run 起点冻结时读到；正在跑的那个 Run 不受影响（冻结的理由见 kernel-SPEC §8-22）。
 
@@ -1801,7 +1802,7 @@ impl FrozenSegment {
 1. **来源行只有一个作者。** `prompt_payload` 的两条分支合成一条：每一行的 `slot`／`hash`／`len`／`sources`／`skipped` 都从段本身取，`breakpoints` 恒上线。由此，在城里装配的 prefix 与照计划装配的 prefix 在同样的键下写同样的行，`rebuild_prefix` 读的仍是它一直在读的那四个键（`addr`／`kept`／`marker`／`dropped`）。
 2. **`marker` 由 `dropped > 0` 派生而不是独立字段。** 两个互相蕴含的字段是两个可以互相矛盾的字段。
 3. **没有来源文档的段写空表而不是省略键。** resident 段由身份与目录拼成，不出自任何文件；空表说的是「它不来自文档」，缺席的键说的是「不知道」。
-4. **`breakpoints` 记本次请求实际发出的断点，而不是四个 slot 名。** 行由 `BreakpointPlan::breakpoints()` 拼出，值是段界的 slot 名与 `tail`。类型仍是 `Vec<String>`、键名不变、`#[serde(default)]`，所以旧账照读：旧构建写的是 `["city","building","resident","run"]`，那是 slot 清单，其中 `run` 段界从未在请求里出现过。**被否**：保留 slot 清单另加一个 `plan` 键——那样账上仍有一行名为断点却不是断点的数据，读者要自己知道该信哪一个。
+4. **`breakpoints` 记本次请求实际发出的断点，而不是四个 slot 名。** 行由 `BreakpointPlan::breakpoints()` 拼出，值是段界的 slot 名与 `tail`。类型仍是 `Vec<String>`、键名不变、`#[serde(default)]`，所以写着 `["city","building","resident","run"]` 的记录照读：那是 slot 清单，其中 `run` 段界从未在请求里出现过。**被否**：保留 slot 清单另加一个 `plan` 键——那样账上仍有一行名为断点却不是断点的数据，读者要自己知道该信哪一个。
 
 5. **`prompt_assembled` 每个 run 只写一条。** `turn::prompt::PromptRecord` 记着本 run 最后写下的载荷；`assemble` 照常算出本回合的载荷，与之相等就不写，不等才写并记住。prefix 在 run 内冻结，断点计划只随「对话是否为空」变，所以此后各回合的行是第一条的逐字拷贝；回合间真正会动的请求区域由 `prompt_shape_compared` 逐回合记，尾锚恒落在最后一条消息上，无须逐回合重述。比较的是载荷本身而不是「是不是第一回合」：哪天某个回合的载荷真的变了，账上就多一条，账本不会替一个请求声称它没带的断点。读者据此按 run 取段：`memory::attribution` 以 run 为键保存段权重（memory-SPEC），`sprawling::views::prefix` 读一跑的第一条。旧账每回合一条，照读，因为同一 run 的各条相同。**被否**：之后的回合写一条引用首条的短记录——它不携任何读者需要的事实，只多一行链。
 
