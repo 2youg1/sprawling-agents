@@ -29,7 +29,7 @@ pub(crate) const COUNT: usize = 21;
 /// One gate: the name a person types, and the check it runs.
 pub(crate) struct Gate {
     pub(crate) name: &'static str,
-    check: fn(&Path, Option<&str>) -> Result<Vec<Violation>, XtaskError>,
+    check: fn(&Path) -> Result<Vec<Violation>, XtaskError>,
 }
 
 /// Every gate, in the order a run reports them. The only roster: `--list`,
@@ -37,88 +37,88 @@ pub(crate) struct Gate {
 pub(crate) const GATES: [Gate; COUNT] = [
     Gate {
         name: "header",
-        check: |root, _| header::check(root),
+        check: header::check,
     },
     Gate {
         name: "lexicon",
-        check: |root, _| lexicon::check(root),
+        check: lexicon::check,
     },
     Gate {
         name: "modmap",
-        check: |root, _| modmap::check(root),
+        check: modmap::check,
     },
     Gate {
         name: "length",
-        check: |root, _| length::check(root),
+        check: length::check,
     },
     Gate {
         name: "boundary",
-        check: |root, _| boundary::check(root),
+        check: boundary::check,
     },
     // `slices` judges which code may name one path, so it walks sources
     // the way `boundary` walks them and sits beside it.
     Gate {
         name: "slices",
-        check: |root, _| slices::check(root),
+        check: slices::check,
     },
     Gate {
         name: "artifact",
-        check: |root, _| artifact::check(root),
+        check: artifact::check,
     },
     Gate {
         name: "depmap",
-        check: |root, _| depmap::check(root),
+        check: depmap::check,
     },
     Gate {
         name: "npm",
-        check: |root, _| npm::check(root),
+        check: npm::check,
     },
     Gate {
         name: "secret",
-        check: |root, _| secret::check(root),
+        check: secret::check,
     },
     Gate {
         name: "color",
-        check: |root, _| color::check(root),
+        check: color::check,
     },
     Gate {
         name: "wording",
-        check: |root, _| wording::check(root),
+        check: wording::check,
     },
     Gate {
         name: "render",
-        check: |root, _| render::check(root),
+        check: render::check,
     },
     Gate {
         name: "wiring",
-        check: |root, _| wiring::check(root),
+        check: wiring::check,
     },
     // `wire-ts` renders the client's wire types in this process and
     // compares one file; it sits beside `wiring` because both judge the
     // same socket seam.
     Gate {
         name: "wire-ts",
-        check: |root, _| wire_ts::check(root),
+        check: wire_ts::check,
     },
     Gate {
         name: "docnum",
-        check: |root, _| docnum::check(root),
+        check: docnum::check,
     },
     Gate {
         name: "proof",
-        check: |root, _| proof::check(root),
+        check: proof::check,
     },
     Gate {
         name: "budget",
-        check: |root, _| budget::check(root),
+        check: budget::check,
     },
     Gate {
         name: "specalign",
-        check: |root, _| specalign::check(root),
+        check: specalign::check,
     },
     Gate {
         name: "release",
-        check: |root, _| release::check(root),
+        check: release::check,
     },
     Gate {
         name: "guard",
@@ -150,12 +150,12 @@ pub(crate) fn select(names: &[String]) -> Result<Vec<&'static Gate>, XtaskError>
 
 /// Run the gates `names` selects and report them together; the gates
 /// judge in parallel, and the report keeps roster order.
-pub(crate) fn run(root: &Path, range: Option<&str>, names: &[String]) -> ExitCode {
+pub(crate) fn run(root: &Path, names: &[String]) -> ExitCode {
     let gates = match select(names) {
         Ok(gates) => gates,
         Err(err) => return report::internal_failure(&err),
     };
-    report::finish_all(judge(&gates, root, range))
+    report::finish_all(judge(&gates, root))
 }
 
 /// Every gate's verdict, in the order `gates` lists them. Each gate
@@ -165,12 +165,11 @@ pub(crate) fn run(root: &Path, range: Option<&str>, names: &[String]) -> ExitCod
 fn judge(
     gates: &[&'static Gate],
     root: &Path,
-    range: Option<&str>,
 ) -> Vec<(&'static str, Result<Vec<Violation>, XtaskError>)> {
     thread::scope(|scope| {
         gates
             .iter()
-            .map(|gate| (gate.name, scope.spawn(move || (gate.check)(root, range))))
+            .map(|gate| (gate.name, scope.spawn(move || (gate.check)(root))))
             .collect::<Vec<_>>()
             .into_iter()
             .map(|(name, verdict)| {
@@ -197,7 +196,7 @@ mod tests {
 
     static JUDGED_ON: Mutex<Vec<ThreadId>> = Mutex::new(Vec::new());
 
-    fn record(_: &Path, _: Option<&str>) -> Result<Vec<Violation>, XtaskError> {
+    fn record(_: &Path) -> Result<Vec<Violation>, XtaskError> {
         JUDGED_ON.lock().unwrap().push(thread::current().id());
         Ok(Vec::new())
     }
@@ -213,7 +212,7 @@ mod tests {
 
     #[test]
     fn gates_judge_off_the_calling_thread_and_report_in_roster_order() {
-        let names: Vec<&str> = judge(&[&FIRST, &SECOND], Path::new("."), None)
+        let names: Vec<&str> = judge(&[&FIRST, &SECOND], Path::new("."))
             .into_iter()
             .map(|(name, _)| name)
             .collect();

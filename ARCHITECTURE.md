@@ -443,7 +443,7 @@ the part worth knowing before starting, not after.
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a file with no entry, and an entry whose file is gone |
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
 | the page | `client/` + client-SPEC | its own lint, typecheck and tests; the bundle is measured against a byte budget |
-| a gate itself | `xtask/` + xtask-SPEC | `guard` asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
+| a gate itself | `xtask/` + xtask-SPEC | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
 
 Two documents sit beside this one rather than inside it: operating a
 city — swapping a provider, pointing at another MCP server, running a
@@ -680,7 +680,7 @@ model time back and buys nothing from the Ledger.
   every entry a position that a person maintained.
 - **Adding an entry is the registration step**: it lands in the same change
   as the file, before the file is written.
-- **Removing an entry requires a ruling** — `cargo xtask guard` refuses the
-  commit otherwise, because an entry that quietly disappears is a rule that
+- **Removing an entry requires a ruling**, recorded as a `Verdict:` trailer
+  and held by review, because an entry that quietly disappears is a rule that
   quietly stops being enforced.
 

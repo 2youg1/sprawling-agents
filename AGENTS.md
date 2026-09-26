@@ -149,10 +149,10 @@ Violating any of these turns CI red with a message naming the rule, the violatio
 | The kani harness roster read out of the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, and a harness left unproved cites where that was decided. | `xtask proof` |
 | Sizes inside their budget, badges in step with the artifacts. | `xtask budget` |
 | Nothing published that names one machine's home directory, its working notes, or a document this tree does not contain. | `xtask release` |
-| **Fix the cause when a gate goes red.** | `xtask guard` |
+| `desktop/`'s copy of the workspace lint table, metadata and shared dependency versions equal to the workspace's, key by key. | `xtask guard` |
 
-- Loosening a gate **in the change that the gate is failing** requires an explicit ruling from the person, recorded as a `Verdict:` trailer. That is the one universal escape hatch, and this is what closes it.
-- Re-pricing a rule **in a commit of its own** is ordinary work and needs no ruling. `xtask guard` looks for the pair — gate machinery and the source those gates judge, changed together without a trailer. One side alone never meets the rule.
+- **Fix the cause when a gate goes red.** Loosening a gate **in the change that the gate is failing** requires an explicit ruling from the person, recorded as a `Verdict:` trailer. Review holds this rule; no gate reads commit history.
+- Re-pricing a rule **in a commit of its own** is ordinary work and needs no ruling.
 - **Every rule that excludes an architecture carries the parameter that made it right.** When that parameter moves, re-argue the rule instead of obeying it. Rules that exclude a *defect* — the panic bans, the arithmetic bans, the determinism rules — carry no such condition, because nothing about them expires.
 
 ## The view layer
@@ -205,7 +205,7 @@ So the first group of rules below is about what you write into the product, and 
 
 - The first line is `card-<stage>.<index>: <what>`, for example `card-S4.02: the wire, and the two frames a socket cannot spell`.
 - The body records **what you found**, since what you did is already in the diff: a gate that changed your design, a red-to-green transition that exposed a real defect, a choice between two approaches whose reason the result does not show.
-- A commit touching anything the `guard` row covers carries a `Verdict: user-approved` trailer. The wording of the ruling stays with the person; the trailer records that there was one.
+- A commit that loosens a gate beside the source that gate judges carries a `Verdict: user-approved` trailer. The wording of the ruling stays with the person; the trailer records that there was one.
 
 ## Where the authorities are
 
