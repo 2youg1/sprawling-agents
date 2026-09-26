@@ -144,6 +144,13 @@ pub struct Call {
     /// What it said, bounded. `None` when the call has not answered, or
     /// when the result carried nothing this build can read as text.
     pub output: Option<Output>,
+    /// When the Ledger wrote the call, read from that record the way
+    /// [`Turn::t`] is, so a replayed session keeps its original times.
+    pub called: TimeMs,
+    /// When the Ledger wrote the result paired with this call. `None`
+    /// exactly when `outcome` is [`Outcome::Waiting`]: the two are set by
+    /// one pairing, and an answer outside the window is not guessed.
+    pub answered: Option<TimeMs>,
 }
 
 /// One turn: the model was asked, and this is what came of it.

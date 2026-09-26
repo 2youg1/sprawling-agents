@@ -178,6 +178,8 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                     outcome: channels::Outcome::Waiting,
                     at: record.seq(),
                     output: None,
+                    called: record.t(),
+                    answered: None,
                 };
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;
@@ -223,6 +225,7 @@ pub(crate) fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> V
                 {
                     call.outcome = outcome;
                     call.output = said.and_then(channels::output_in);
+                    call.answered = Some(record.t());
                 }
             }
             kind => {

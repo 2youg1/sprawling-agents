@@ -47,6 +47,7 @@
   import Switches from "./gallery/switches.svelte";
   import Tables from "./gallery/tables.svelte";
   import Monitored from "./gallery/monitored.svelte";
+  import Timed from "./gallery/timed.svelte";
 
   const { lang } = ui();
 
@@ -85,4 +86,5 @@
   <Parts />
   <Switches />
   <Monitored />
+  <Timed />
 </div>
