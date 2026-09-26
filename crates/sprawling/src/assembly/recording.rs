@@ -81,7 +81,7 @@ impl RunWorker {
         // The key of the command in flight goes on the record it is
         // writing, and nowhere else: that is how a restarted city reads
         // out of its own history what it has already carried out.
-        let data = self.doorstep.entrance.stamp(data)?;
+        let data = super::commanding::entrance::stamped(self.doorstep.entrance.carrying(), data)?;
         let draft = EventDraft {
             run: RunId::CITY,
             t: now_ms()?,
@@ -110,7 +110,7 @@ impl RunWorker {
             kind,
             data,
         } = line;
-        let data = self.doorstep.entrance.stamp(data)?;
+        let data = super::commanding::entrance::stamped(self.doorstep.entrance.carrying(), data)?;
         self.ledger.append(EventDraft {
             run,
             t: now_ms()?,

@@ -151,9 +151,12 @@ impl Site {
             who: self.who.clone(),
             addr: Some(addr.clone()),
             kind: EventKind::WorktreeOpened,
-            data: claimed
-                .opened_payload()
-                .map_err(memory::MemoryError::into_ax)?,
+            data: crate::assembly::commanding::entrance::stamped(
+                placing.command,
+                claimed
+                    .opened_payload()
+                    .map_err(memory::MemoryError::into_ax)?,
+            )?,
             ig: false,
         })?;
         self.write_root = claimed.path().to_path_buf();
