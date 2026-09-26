@@ -63,23 +63,25 @@ pub(crate) struct ClaimBook {
 }
 
 /// The lines that give back the nodes a run still had booked when it
-/// came home. Its landing closes them by settling its plan; whatever it
-/// did not close is still owed to the history.
+/// came home. Its landing closes each node as that node's closing line
+/// reaches the ledger; whatever it did not close is still owed to the
+/// history.
 #[must_use = "a claim written at call time stays open on the history until its put-back line is written"]
 pub(crate) struct OpenClaims {
     run: RunId,
-    put_backs: Vec<effect::Line>,
+    put_backs: BTreeMap<NodeId, effect::Line>,
 }
 
 impl OpenClaims {
-    /// The plan's own landing wrote how each of these claims ended.
-    pub(crate) fn closed(&mut self) {
-        self.put_backs.clear();
+    /// A line that closes `node`'s claim is on the ledger, so the last
+    /// line the history holds for it no longer reads it as held.
+    pub(crate) fn close(&mut self, node: &NodeId) {
+        self.put_backs.remove(node);
     }
 
     /// The run these claims belong to, and the lines still owed for them.
     pub(crate) fn owed(self) -> (RunId, Vec<effect::Line>) {
-        (self.run, self.put_backs)
+        (self.run, self.put_backs.into_values().collect())
     }
 }
 
@@ -126,7 +128,10 @@ impl ClaimBook {
         self.held = others;
         OpenClaims {
             run,
-            put_backs: theirs.into_values().map(|booked| booked.put_back).collect(),
+            put_backs: theirs
+                .into_iter()
+                .map(|((_, node), booked)| (node, booked.put_back))
+                .collect(),
         }
     }
 }

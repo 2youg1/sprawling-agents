@@ -96,7 +96,7 @@ impl RunWorker {
             // The replacement is whole or not at all, so a refusal
             // leaves the file at `base` with nothing to roll back.
             effect::Then::Roadmap { path, base, text } => {
-                city::edit_against(&path, base.as_bytes(), text.as_bytes())
+                (self.planning.write_plan)(&path, base.as_bytes(), text.as_bytes())
             }
             effect::Then::Shelf(filings) => {
                 let mut written = Vec::new();

@@ -21,7 +21,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxError, EventKind, Payload, TimeMs};
+use kernel::{Address, AxError, EventKind, NodeId, Payload, TimeMs};
 
 /// One line of the history, attributed to whoever caused it.
 ///
@@ -72,12 +72,19 @@ pub(crate) struct Filing {
 ///
 /// Both fields are private, and `then` leaves only through
 /// [`Landing::record`].
-pub(crate) struct Landing {
-    lines: Vec<Line>,
+pub(crate) struct Landing<L = Line> {
+    lines: Vec<L>,
     then: Then,
 }
 
-impl Landing {
+/// One line of a plan's landing and the node whose claim it closes; a
+/// split closes nothing.
+pub(crate) struct Closing {
+    pub(crate) line: Line,
+    pub(crate) closes: Option<NodeId>,
+}
+
+impl<L> Landing<L> {
     /// Appends every line, then hands back the change that follows them.
     ///
     /// # Errors
@@ -86,14 +93,16 @@ impl Landing {
     /// that never receives it cannot apply it.
     pub(crate) fn record(
         self,
-        append: &mut impl FnMut(Line) -> Result<(), AxError>,
+        append: &mut impl FnMut(L) -> Result<(), AxError>,
     ) -> Result<Then, AxError> {
         for line in self.lines {
             append(line)?;
         }
         Ok(self.then)
     }
+}
 
+impl Landing {
     /// What a run said, and what it read out of its own queue.
     ///
     /// # Errors
@@ -240,13 +249,13 @@ impl Landing {
 /// all of them are replayed onto it, or one of them does not and nothing
 /// at all is written.
 pub(crate) enum Claims {
-    Landed(Box<Landing>),
+    Landed(Box<Landing<Closing>>),
     /// The nodes that moved, so a person can be told which, and the
     /// `roadmap_released` lines that close the claims this run already
     /// put on the ledger when the model made them.
     Stale {
         nodes: Vec<String>,
-        released: Box<Landing>,
+        released: Box<Landing<Closing>>,
     },
 }
 
@@ -299,20 +308,25 @@ impl Claims {
         let mut text = on_disk.to_owned();
         for effect in effects {
             text = effect.apply(&text)?;
-            // The claim's line went on the ledger when the accounting
-            // thread booked it (`serving::booking`); writing it again
-            // here would count the node as claimed twice.
-            if let collab::ClaimEffect::Claimed { .. } = effect {
-                continue;
-            }
-            lines.push(Line {
-                who: who.to_owned(),
-                addr: room.clone(),
-                // Which record this is, is the effect's own answer: the
-                // exit decided it, and a second match here would be a
-                // second opinion about what a stop means.
-                kind: effect.kind(),
-                data: effect.payload(who)?,
+            let closes = match effect {
+                // The claim's line went on the ledger when the accounting
+                // thread booked it (`serving::booking`); writing it again
+                // here would count the node as claimed twice.
+                collab::ClaimEffect::Claimed { .. } => continue,
+                collab::ClaimEffect::PutDown { id, .. } => Some(id.clone()),
+                collab::ClaimEffect::Split { .. } => None,
+            };
+            lines.push(Closing {
+                line: Line {
+                    who: who.to_owned(),
+                    addr: room.clone(),
+                    // Which record this is, is the effect's own answer: the
+                    // exit decided it, and a second match here would be a
+                    // second opinion about what a stop means.
+                    kind: effect.kind(),
+                    data: effect.payload(who)?,
+                },
+                closes,
             });
         }
         Ok(Claims::Landed(Box::new(Landing {
@@ -333,11 +347,14 @@ fn released(
     effects: &[collab::ClaimEffect],
     room: &Address,
     who: &str,
-) -> Result<Vec<Line>, AxError> {
+) -> Result<Vec<Closing>, AxError> {
     effects
         .iter()
         .filter_map(|effect| {
-            handed_back(effect, "the plan moved before this run landed", room, who).transpose()
+            let closes = Some(effect.id().clone());
+            let line = handed_back(effect, "the plan moved before this run landed", room, who);
+            line.map(|line| line.map(|line| Closing { line, closes }))
+                .transpose()
         })
         .collect()
 }
