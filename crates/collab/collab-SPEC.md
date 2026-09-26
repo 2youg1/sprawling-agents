@@ -405,8 +405,8 @@ impl ClaimDesk {
     pub fn abandon(&mut self) -> Result<(), AxError>;   // 冻结路径花掉仍被持有的 Held
 }
 /// 调用时判定认领的那个权威；城里是记账线程（sprawling-SPEC 8-42-8）。
-pub struct Booking(Box<dyn FnMut(&NodeId) -> Result<(), AxError> + Send>);
-impl Booking { pub fn new(ask: impl FnMut(&NodeId) -> Result<(), AxError> + Send + 'static) -> Booking; }
+pub struct Booking(Box<dyn FnMut(&ClaimEffect) -> Result<(), AxError> + Send>);
+impl Booking { pub fn new(ask: impl FnMut(&ClaimEffect) -> Result<(), AxError> + Send + 'static) -> Booking; }
 pub fn evidence_of(text: &str, id: &NodeId) -> Option<Locator>;
 pub fn still_true(text: &str, effect: &ClaimEffect) -> bool;
 pub struct ClaimTool { /* meta、Rc<RefCell<ClaimDesk>> —— 私有 */ }
@@ -423,6 +423,8 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
   所以 `claim` 先让 `PlanTree::claim` 在副本上判（它的拒词能指向一个就绪节点），再问 `Booking`；`Booking` 拒绝时，
   桌子不持有节点、不排效应、不改文本，拒词原样交给模型。`Booking` 记的是「哪轮在飞的活持有哪个节点」，
   只活到那轮活落地为止，落地之后回答这个问题的仍是文件——所以它不是第二份认领登记表。
+  `Booking` 拿到的是整条 `ClaimEffect::Claimed` 而不只是节点号，因为权威在登记的同时把这条认领记进账本，
+  而那一行的种类与载荷只由 `ClaimEffect::kind`／`payload` 定义。
 - **一次 drive 只持有一个节点**，理由与旧版同：一个 Run 同时占两个节点，两个节点的进度都读不出来。
 - **计划门禁就是那个 `Held` 值**：它由 `PlanTree::claim` 铸出，只能花在 `finish`（绿）或 `stop`（红／交回）上。**没有第三个出口**——一个只是结束了的 run 由 `abandon` 把它花在 `FrozeWithoutEvidence` 上，于是「认领了却没交代」这一态在冻结之后不可达。这正是 `blockage` 里红色的来处。
 - **`split` 之后本次 drive 不再持有那根枝**：它拿到的那件活现在是几片，它接下来该拿其中一片。写盘前先把新文本重新解析并 `PlanTree::build` 一次，**拆不出合法树就一个字节都不写**。拆分结果除 `node` 与 `children` 外带 `unfinished`：该节点下尚未 `Done` 的子节点数，由拆完的树数出，不由调用者声明。

@@ -2018,32 +2018,38 @@ Approval Inbox，人的待答队列。
 交给记账线程判定：它按队列次序看见每一个认领，先问的拿到节点，后问的当场被拒，一次模型调用都不白花。
 
 ```rust
-pub(crate) struct ClaimAsk { /* building、node、run、回信的 SyncSender —— 私有 */ }
+pub(crate) struct Claimant { pub(crate) building: Address, pub(crate) room: Address, pub(crate) run: RunId, pub(crate) who: String }
+pub(crate) struct ClaimAsk { /* building、node、roadmap_claimed 那一行的 EventDraft、回信的 SyncSender —— 私有 */ }
 #[derive(Default)]
 pub(crate) struct ClaimBook { /* (building, node) → 在飞的 RunId —— 私有 */ }
 impl ClaimBook {
-    pub(crate) fn answer(&mut self, ask: ClaimAsk);      // 记下或拒绝，并回信
+    pub(crate) fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger); // 入账并登记，或拒绝；然后回信
     pub(crate) fn release(&mut self, run: RunId);        // 这轮活回家时放开它持有的节点
 }
-pub(crate) fn booking(bell: mpsc::Sender<Wake>, building: Address, run: RunId) -> collab::Booking;
+pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking;
 ```
 
 - **走同一条队列**：认领是 `Wake::Claim`，与 relay 的 append 同在记账线程那一条队列上（8-42-4），而不是第二条通道；
   `RelayGate` 持有 `ClaimBook`，`serve` 在排空队列时逐个答复。车道阻塞在一个 rendezvous 通道上等回信，与 append 一样。
 - **拒词**：`InvalidArgs`，动作 `claim a plan node`，说出节点与持有它的 run，恢复是「list the plan and claim a node that is ready」。
   记账线程已经不在时是 `StorageFatal`，与 relay 的 `gone` 同一形状。
+- **先入账再登记**：`answer` 接受认领时，在记账线程上把 `roadmap_claimed` 追加进账本，追加成功才登记节点并回 `Ok`；
+  账本拒绝那一行时不登记，拒绝原样回给模型——于是没有哪轮活持有一个历史上看不出它持有的节点。那一行由车道在调用那一刻
+  用 `ClaimEffect::kind`／`payload` 拼好（时刻取自 `assembly::now_ms`），归在那轮活的房间下；`Claimant` 是派活时就定下、
+  随每次认领一起走的四个值。被拒的认领不留任何一行。
 - **登记持续到那轮活回家**：`Flight::arrived` 放开它，而它的落地在同一线程上、在下一次 `serve` 之前跑完，
   所以没有任何认领会在「放开」与「盘上的计划写明节点结局」之间被答复。
 - **落地时的 `still_true` 比对保留为兜底**（`effect::Claims::of`）：一条车道在别人落地之后才用旧副本认领一个已经做完的节点，
-  这里不拦它，落地时仍被丢弃并告诉人。
+  这里不拦它，落地时仍被丢弃并告诉人。那条认领已在账本上，所以 `Claims::Stale` 带着给每条认领补的 `roadmap_released`
+  （`StopCause::HandedBack`，说明是计划在落地前变了）一起落账；只丢弃不补，`folds::collaboration` 会把那一行读成永远有人占着。
+  落地成功时 `Claims::of` 照样重放 `Claimed` 改文本，但不再写它的行，否则同一次认领在历史里数成两次。
 - **落地重放效应，不写桌子的副本**：`Claims::of` 把本轮的效应按次序经 `ClaimEffect::apply` 重放到落地时读到的盘上文本，
   `Then::Roadmap` 带着那份文本作基线，经 `city::edit_against` 替换。桌子的副本是派活那一刻的文件，写它会把别的轮在这期间落下的行
   改回派活时的状态；重放只动本轮碰过的行。基线与读盘之间只隔同一线程上的落账，能在这里改动文件的只有城外的写者（人的编辑器），
   那时替换以 `E_VERSION_CONFLICT` 拒绝，行已在账本上而文件未动，错误原样交给 `settle` 的调用方。
-- **未定：认领入账与目标登记**。`roadmap_claimed` 仍在落地时由工人写下，而不是在记账线程答复认领时写下；
-  目标登记也还没走这条路。先入账要同时定下落地被判 stale 时那条已在账本上的认领怎么收场：`folds::collaboration` 把
-  `roadmap_claimed` 读成持有，只丢弃不补一条 `roadmap_released` 会让那一行在历史里永远有人占着。
-  能定下它们的证据：一条红测——认领被答复之后、那轮活落地之前，账本上已有这条认领。
+- **未定：目标登记**。`goal_registered` 仍在落地时由工人写下，目标登记还没走「调用时由记账线程判定并先入账」这条路；
+  两轮并排的活登记同一片地，第二个要到落地才知道。能定下它的证据：一条红测——两轮活从同一份目标登记表出发登记同一片地，
+  第二个在调用时被拒。
 - 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes/)'`；
   `cargo nextest run -p collab -E 'test(/two_runs_read_as_ready/)'` 在桌子一侧钉住「第二个认领当场被拒、什么都不留」。
 
