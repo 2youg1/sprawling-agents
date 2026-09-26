@@ -13,8 +13,8 @@
 
 use std::collections::BTreeMap;
 
-use kernel::keep_warm::{CacheUse, KeepWarm};
-use kernel::{AxError, B3Hash, Model, ModelRequest, ModelReturn};
+use kernel::keep_warm::{CacheUse, KeepWarm, renewal_due};
+use kernel::{AxError, B3Hash, Ceiling, Model, ModelRequest, ModelReturn};
 
 /// Keep-warm bookkeeping for the prefixes one session has sent.
 #[derive(Debug, Clone)]
@@ -44,6 +44,10 @@ impl Warmth {
 
     /// A real request carrying `request.segments` was sent at `at_ms`.
     pub fn sent(&mut self, request: &ModelRequest, at_ms: u64) {
+        match self.setting {
+            KeepWarm::Off => return,
+            KeepWarm::FiveMinute => {}
+        }
         self.kept.insert(
             request.segments,
             Kept {
@@ -56,7 +60,10 @@ impl Warmth {
     /// The instant the earliest renewal is sent, or `None` when no prefix
     /// is to be renewed and a timer need not wake.
     pub fn next_due(&self) -> Option<u64> {
-        None
+        self.kept
+            .values()
+            .filter_map(|kept| renewal_due(self.setting, kept.cache, self.lead_ms))
+            .min()
     }
 
     /// Sends, through `model`, every renewal due by `now_ms` and returns
@@ -68,21 +75,42 @@ impl Warmth {
     pub fn renew_due(
         &mut self,
         model: &mut dyn Model,
-        _now_ms: u64,
+        now_ms: u64,
     ) -> Result<Vec<ModelReturn>, AxError> {
+        let (setting, lead_ms) = (self.setting, self.lead_ms);
         self.kept
-            .values()
-            .map(|kept| model.call(&kept.request))
-            .collect()
+            .retain(|_, kept| renewal_due(setting, kept.cache, lead_ms).is_some());
+        let mut answers = Vec::new();
+        for kept in self.kept.values_mut() {
+            if renewal_due(setting, kept.cache, lead_ms).is_some_and(|due| due <= now_ms) {
+                answers.push(model.call(&renewal_of(&kept.request))?);
+                kept.cache = kept.cache.renewed(now_ms);
+            }
+        }
+        Ok(answers)
     }
 }
 
+/// The last real request, asking for one output token: the cache hits on
+/// the prefix bytes whatever the ceiling, so one token is the lowest
+/// price a renewal can pay.
+fn renewal_of(request: &ModelRequest) -> ModelRequest {
+    let mut renewal = request.clone();
+    renewal.chat.max_tokens = Ceiling::new(1);
+    renewal
+}
+
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 mod tests {
     use super::*;
     use kernel::consts_external::PROMPT_CACHE_TTL_SECS;
-    use kernel::{BuildingPolicy, Ceiling, ChatRequest, ContentBlock};
+    use kernel::{BuildingPolicy, ChatRequest, ContentBlock};
 
     const TTL_MS: u64 = PROMPT_CACHE_TTL_SECS * 1000;
     const LEAD_MS: u64 = 2_000;
@@ -130,7 +158,11 @@ mod tests {
         warmth.sent(&request(), USED_AT);
         assert_eq!(warmth.next_due(), None);
         wake_through_two_lifetimes(&mut warmth, &mut provider);
-        assert!(provider.seen.is_empty(), "{} renewals sent", provider.seen.len());
+        assert!(
+            provider.seen.is_empty(),
+            "{} renewals sent",
+            provider.seen.len()
+        );
     }
 
     #[test]
