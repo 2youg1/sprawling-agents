@@ -176,6 +176,10 @@ pub enum Retry {
     No,       // 同一请求再发一次注定同样失败：不可以
     Unknown,  // 请求已经发出而回答丢了，效果是否落地无从得知：不知道
 }
+// AxError 另有 `provider: Option<ProviderFailureKind>`，排在 `gate` 之后，缺席时不上线。
+pub enum ProviderFailureKind {  // 携 serde，内标签 kind
+    Exchange, Cut, Silence, Refused { status: u32 }, Overflow { status: u32 }, Unreadable, Reported, Unbuilt,
+}
 
 pub enum Carrier { Event(EventKind), Loadtime }
 impl AxCode {
@@ -192,8 +196,11 @@ impl AxError {
     pub fn failure(code: AxCode, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     /// Gate refusal. Sets `gate` to the mandatory three parts.
     pub fn refusal(code: AxCode, action: impl Into<String>, subject: impl Into<String>, gate: GateRefusal) -> ErrorDraft;
+    /// 模型调用失败的 E_PROVIDER：种类在场；`retry` 起于 `No`，由 gateway 的 `ProviderFailure::retry` 在 draft 上设定。
+    pub fn provider(kind: ProviderFailureKind, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     pub fn code(&self) -> &AxCode;  pub fn gate(&self) -> Option<&GateRefusal>;
     pub fn retry(&self) -> Retry;
+    pub fn provider_failure(&self) -> Option<ProviderFailureKind>;
     /// 改写下层抛上来的恢复语；与 `ErrorDraft::with_recovery` 分名，因为它毁掉一句而不是补上第一句。
     #[must_use] pub fn rewrite_recovery(self, recovery: impl Into<String>) -> Self;
 }
@@ -208,6 +215,8 @@ impl ErrorDraft {
     pub fn with_recovery(self, recovery: impl Into<String>) -> AxError;   // 唯一出口
 }
 ```
+
+**供应方失败的种类上线，句子不上线**：`provider` 只在 `AxError::provider` 造出的 E_PROVIDER 上在场（gateway 的 `provider_err` 是它的调用处；不是模型调用的 E_PROVIDER，如连接器的 http 客户端，不带种类）。客户端按 `kind` 从 `lang.json` 取人读的出路，城写的 `recovery` 折进「城的原话」供排错；城若只给英文句子，中文界面就只能照抄英文。种类不判「能不能再试一次」：那一判住在 gateway 的 `ProviderFailure::retry`，因为它要看种类之外的东西——连接是否建起（`Exchange` 分 `Yes` 与 `Unknown`）、拒绝的状态码（408／429／5xx 可重试）、流中报错的类型。**被否**：让种类另带一个 `is_retriable`——它看不见这些，会与 `retry` 成为同一事实的两个已经不一致的权威。
 
 **H-01 定案：取 typestate，不取四参**。路线图 §13.1 原定 `failure(code, action, subject, recovery)` 四参必填，此处改记为 typestate，理由三条：其一，`refusal` 已占满四参，再塞恢复语就是第五参，越过参数上限；其二，恢复语只剩 `ErrorDraft::with_recovery` 一个设定处，四参方案则要把 `with_recovery` 留作改写器，同一个名字两份职责；其三，四参要重写全部 641 个调用点，typestate 只动缺恢复语的那些，改动面恰好等于缺陷面。关门理由随之由「每处四实参」改为「编译通过」——恢复语必填这条现在由类型系统执行，grep 执行不了它。`AxError` 一经存在即已完工，`with_nearby`／`retriable` 只在 draft 上，故链式调用中 `with_recovery` 恒为最后一环。
 
@@ -1148,7 +1157,7 @@ impl Pursuit {
     pub fn pause(&mut self);
     pub fn resume(&mut self);
 }
-pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Paused, Finished }
+pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Paused, Finished }  // 携 serde，内标签 kind
 pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> PursuitVerdict;
 ```
 
@@ -1157,6 +1166,7 @@ pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> Pursuit
 - **钱明确不是停机条件**。本仓的成本面受众是 Agent（给它优化的材料），不是刹车；一个读预算的停机条件回答的是一个这里没人问的问题。
 - **`observe` 收状态而不收 `Pursuit`**：判定不依赖目标说了什么，而一个必须先持有 `Pursuit` 才能发问的读者，等于要拿深度零位才能**读**这座城。**声明是被守的动作，看不是。**
 - **子代理拼不出来**：`declare` 收 `&Delegator`，而 `Delegate` 造不出一个（trybuild `delegate_declares_pursuit`）。与 `delegation` 同一个两层守卫，理由也同一个：一个能让全城通宵干活的子代理，就是一个能替你决定通宵干什么的子代理。
+- **`PursuitVerdict` 原样上线**：线上是 `{"kind":"work","next":"2.3"}` 这类内标签形状，`PursuitLine.verdict` 就是它。人读的那句话由客户端按 `kind` 从 `lang.json` 取词；城若在线上给一句英文，中文界面就只能照抄英文，而两边各写一份措辞就是同一句话的两个权威。
 - **pause 与 clear 是两件事，都要**：暂停留着目标，清除把它丢掉（丢掉值本身，于是不会被误恢复）。取消一个 **run** 是第三件事，住在 run 那边。
 
 ### 8-20 kernel::completion

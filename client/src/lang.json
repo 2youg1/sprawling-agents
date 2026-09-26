@@ -215,6 +215,22 @@
     "en": "set as standing goal",
     "zh": "设为常设目标"
   },
+  "bld_pursuit_finished": {
+    "en": "finished: nothing is ready and nobody is working",
+    "zh": "已完成：没有就绪的活，也没有 run 在做"
+  },
+  "bld_pursuit_paused": {
+    "en": "paused",
+    "zh": "已暂停"
+  },
+  "bld_pursuit_waiting": {
+    "en": "waiting for {runs} run(s) still going",
+    "zh": "在等 {runs} 个还没结束的 run"
+  },
+  "bld_pursuit_working": {
+    "en": "working on {node}",
+    "zh": "正在做 {node}"
+  },
   "bld_release": {
     "en": "/release {addr}",
     "zh": "/release {addr}"
@@ -1374,6 +1390,42 @@
   "presence_title": {
     "en": "what the city is telling you",
     "zh": "城里的动静"
+  },
+  "provider_cut": {
+    "en": "the answer stopped part-way; the same request is worth sending again",
+    "zh": "回答中途断了，同一个请求值得再发一次"
+  },
+  "provider_exchange": {
+    "en": "the request never completed; the same request is worth sending again",
+    "zh": "请求没有完成，同一个请求值得再发一次"
+  },
+  "provider_overflow": {
+    "en": "the conversation no longer fits this model's window (the provider answered {status}); start a new session that keeps the summary, or choose a model with a larger window",
+    "zh": "对话已经放不进这个模型的窗口（供应方回答 {status}）：开一个带摘要的新会话，或换一个窗口更大的模型"
+  },
+  "provider_refused": {
+    "en": "the provider refused with {status}; check this endpoint's model name, key and dialect",
+    "zh": "供应方以 {status} 拒绝了请求：检查这个接口的模型名、密钥和接口形态"
+  },
+  "provider_refused_busy": {
+    "en": "the provider answered {status}: busy or broken for now; the same request is worth sending again",
+    "zh": "供应方回答 {status}，表示它此刻忙或出了故障，同一个请求值得再发一次"
+  },
+  "provider_reported": {
+    "en": "the provider reported an error part-way through its answer",
+    "zh": "供应方在回答中途报了错"
+  },
+  "provider_silence": {
+    "en": "the provider went silent mid-answer; the same request is worth sending again",
+    "zh": "供应方回答到一半不再出声，同一个请求值得再发一次"
+  },
+  "provider_unbuilt": {
+    "en": "this side could not build the request; check this endpoint's base_url and extra headers",
+    "zh": "这一侧没能造出请求：检查这个接口的 base_url 和附加请求头"
+  },
+  "provider_unreadable": {
+    "en": "the provider answered in a shape the city cannot read; check this endpoint's dialect",
+    "zh": "供应方的回答城读不懂：检查这个接口的接口形态"
   },
   "rec_archive": {
     "en": "the archive",

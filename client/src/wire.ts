@@ -488,6 +488,32 @@ export const PursuitState = Schema.Literal("running", "paused").annotations({ id
 export type PursuitState = typeof PursuitState.Type;
 
 /**
+ * What a city holding a pursuit does next. Exhaustive: every arm is
+ * something the caller has to do, and a fifth would be a state nobody
+ * wrote an action for.
+ * 
+ * Carries serde because the page says it: the wire holds the kind, and
+ * the client takes the words for each kind from its own `lang.json`.
+ */
+export const PursuitVerdict = Schema.Union(
+  Schema.Struct({
+    kind: Schema.Literal("work"),
+    next: NodeId,
+  }),
+  Schema.Struct({
+    in_flight: Schema.Int,
+    kind: Schema.Literal("waiting"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("paused"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("finished"),
+  }),
+).annotations({ identifier: "PursuitVerdict" });
+export type PursuitVerdict = typeof PursuitVerdict.Type;
+
+/**
  * A city's standing goal, if it has one.
  * 
  * `verdict` is the city's own reading of whether there is anything left
@@ -498,7 +524,7 @@ export const PursuitLine = Schema.Struct({
   addr: Address,
   goal: Schema.String,
   state: PursuitState,
-  verdict: Schema.String,
+  verdict: PursuitVerdict,
 }).annotations({ identifier: "PursuitLine" });
 export type PursuitLine = typeof PursuitLine.Type;
 
@@ -1506,6 +1532,41 @@ export const GateRefusal = Schema.Struct({
 export type GateRefusal = typeof GateRefusal.Type;
 
 /**
+ * The kind of one provider failure, as the call site that saw it named
+ * it. It travels on the wire so a page can say it in the reader's own
+ * language; the city's recovery sentence stays beside it for the fold.
+ */
+export const ProviderFailureKind = Schema.Union(
+  Schema.Struct({
+    kind: Schema.Literal("exchange"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("cut"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("silence"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("refused"),
+    status: Schema.Int,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("overflow"),
+    status: Schema.Int,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("unreadable"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("reported"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("unbuilt"),
+  }),
+).annotations({ identifier: "ProviderFailureKind" });
+export type ProviderFailureKind = typeof ProviderFailureKind.Type;
+
+/**
  * Whether the same request may go out again, said together with
  * whether its effect already landed. On the wire `"yes"`, `"no"` or
  * `"unknown"`; a ledger record written as `retriable: true/false`
@@ -1519,7 +1580,7 @@ export const Retry = Schema.Union(
 export type Retry = typeof Retry.Type;
 
 /**
- * The unified error shape: seven wire fields and one that is left out
+ * The unified error shape: seven wire fields and two that are left out
  * when absent, serialized in declaration order (determinism rule 6).
  * The model is the recovery subject: `nearby` and `recovery` must hold
  * directly executable information, not apologies.
@@ -1533,6 +1594,7 @@ export const AxError = Schema.Struct({
   code: AxCode,
   gate: Schema.optional(Schema.NullOr(GateRefusal)),
   nearby: Schema.Array(Schema.String),
+  provider: Schema.optional(Schema.NullOr(ProviderFailureKind)),
   recovery: Schema.String,
   retry: Retry,
   retry_after_ms: Schema.optional(Schema.NullOr(Schema.Int)),

@@ -1018,7 +1018,8 @@ impl PlanView {
 ## 8-35 谁在追一个目标，谁替它派活（`RunWorker.pursuits`）
 
 - **值住在工人身上，事实住在账本里。** `kernel::Pursuit` 由 `Delegator::root()` 铸出，而这座城里**唯一一处 `Delegator::root()` 就在 `RunWorker::over`**——于是「子代理不能让全城通宵干活」是一件关于代码的事实，而不是一条谁去遵守的规则。设置／暂停／恢复／清除各落一条 `pursuit_changed`，`Views` 折它来画，重启后工人从同一批记录把值重新铸出来。两处折叠都经 `Payload::read::<kernel::event::record::PursuitChanged>` 与它的 `held` 读这一行，读不回的一行让折叠报错而不是被跳过：跳过它，一座被清除目标的楼在重启后会继续追下去。
-- **`Views` 不持 `Pursuit`，只持文本与状态**：一个能铸出 `Pursuit` 的视图，就是那道守卫上的第二扇门。判定仍由 `kernel::observe_pursuit` 给出，措辞由 `verdict_line` 一处写出——页面、控制台与日志说同一句话。
+- **值住在工人身上，事实住在账本里。** `kernel::Pursuit` 由 `Delegator::root()` 铸出，而这座城里**唯一一处 `Delegator::root()` 就在 `RunWorker::over`**——于是「子代理不能让全城通宵干活」是一件关于代码的事实，而不是一条谁去遵守的规则。设置／暂停／恢复／清除各落一条 `pursuit_changed`，`Views` 折它来画，重启后工人从同一批记录把值重新铸出来。
+- **`Views` 不持 `Pursuit`，只持文本与状态**：一个能铸出 `Pursuit` 的视图，就是那道守卫上的第二扇门。判定仍由 `kernel::pursuit::observe` 给出，并以 `kernel::PursuitVerdict` 原样放进 `PursuitLine.verdict`；城不替它写句子，人读的措辞只在客户端的 `lang.json` 里按种类取。
 - **`pursue` 会终止，理由在集合上而不在计数器上**：认领把节点移出就绪集，而一个结束时还持有节点的 run 会把它留成 Blocked（`ClaimDesk::abandon`），所以就绪集严格变小；唯一让它变大的是拆分，而那是这座城找到了更多活，不是在打转。派活之后若该节点仍在就绪集里，循环停下并留一条诊断——**看的是集合本身，不是一个凭空定的上限。**
 
 ## 8-36 一个节点红了，站在它后面的人会知道（`tell_whoever_is_behind`）
@@ -1091,7 +1092,7 @@ justfile／CI 无涉；S4 前端框架结论书将改写 build.rs 拷贝源与 `
 
 ### 搬走什么
 
-`Views` 结构与它的两个 `impl`、`endpoints_answer`、`verdict_line`、`pursuit_from`、`buildings_of`、
+`Views` 结构与它的两个 `impl`、`endpoints_answer`、`pursuit_from`、`buildings_of`、
 `signal_line`、`discard_lines`、`registry_line`、`summarize`，以及**咬它们的那十条断言**。
 测试跟着被测的东西走：一份留在原处的断言会让下一个人以为那里还有代码。
 

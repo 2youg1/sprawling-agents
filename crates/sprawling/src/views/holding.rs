@@ -30,7 +30,6 @@ use kernel::{Address, AxError, EventKind, EventRecord};
 // Where a city keeps its ledger and how a building reads off disk are
 // `bin::assembly`'s: it forms the city that laid them out. Borrowed
 // rather than copied, so "where the ledger lives" keeps one answer.
-use super::lines::verdict_line;
 use super::lines::{
     buildings_of, discard_lines, pursued, registry_line, restored_paths, signal_line,
 };
@@ -341,7 +340,7 @@ impl Views {
             out.push(channels::PursuitLine {
                 goal,
                 state,
-                verdict: verdict_line(kernel::pursuit::observe(state, &ready, in_flight)),
+                verdict: kernel::pursuit::observe(state, &ready, in_flight),
                 addr,
             });
         }

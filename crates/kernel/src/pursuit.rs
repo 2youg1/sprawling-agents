@@ -106,7 +106,12 @@ impl Pursuit {
 /// What a city holding a pursuit does next. Exhaustive: every arm is
 /// something the caller has to do, and a fifth would be a state nobody
 /// wrote an action for.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Carries serde because the page says it: the wire holds the kind, and
+/// the client takes the words for each kind from its own `lang.json`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PursuitVerdict {
     /// Start this node. The first of the ready set, so the order is the
     /// plan's own and two cities with the same plan pick the same node.
