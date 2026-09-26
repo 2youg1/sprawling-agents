@@ -13,6 +13,7 @@
 //! left off.
 
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 
 use kernel::{Address, EventKind, EventRecord, RunId, Seq, TimeMs};
 
@@ -39,6 +40,45 @@ pub struct RunHot {
     pub addr: Option<Address>,
     /// When the run began, from the same record.
     pub started: Option<TimeMs>,
+    /// How the run ended, from its `run_frozen` record's `completion`.
+    pub completion: Option<String>,
+    /// The branch of the last pull request the run opened: the city's
+    /// pull requests are named by their branch and carry no number.
+    pub pr: Option<String>,
+    /// What the run waits for the person to allow. Present exactly while
+    /// the run's last record is an `approval_requested`, so it cannot say
+    /// a run waits when `last_kind` says it moved on.
+    pub ask: Option<String>,
+}
+
+impl RunHot {
+    fn first_seen(record: &EventRecord) -> RunHot {
+        RunHot {
+            phase: RunPhase::Active,
+            last_seq: record.seq(),
+            last_kind: record.kind(),
+            who: record.who().to_owned(),
+            addr: None,
+            started: None,
+            completion: None,
+            pr: None,
+            ask: None,
+        }
+    }
+
+    /// Folds one record that is newer than everything this run has seen.
+    fn absorb(&mut self, record: &EventRecord) {
+        let kind = record.kind();
+        self.last_seq = record.seq();
+        self.last_kind = kind;
+        if kind == EventKind::RunFrozen {
+            self.phase = RunPhase::Frozen;
+        }
+        if kind == EventKind::RunStarted {
+            self.addr = record.addr().cloned();
+            self.started = Some(record.t());
+        }
+    }
 }
 
 #[derive(Default)]
@@ -64,42 +104,14 @@ impl HotView {
         if run == RunId::CITY {
             return Ok(());
         }
-        let seq = record.seq();
-        let kind = record.kind();
-        match self.runs.get_mut(&run) {
-            Some(hot) => {
-                if seq <= hot.last_seq {
-                    return Ok(());
-                }
-                hot.last_seq = seq;
-                hot.last_kind = kind;
-                if kind == EventKind::RunFrozen {
-                    hot.phase = RunPhase::Frozen;
-                }
-                if kind == EventKind::RunStarted {
-                    hot.addr = record.addr().cloned();
-                    hot.started = Some(record.t());
+        match self.runs.entry(run) {
+            Entry::Occupied(held) => {
+                let hot = held.into_mut();
+                if record.seq() > hot.last_seq {
+                    hot.absorb(record);
                 }
             }
-            None => {
-                let phase = if kind == EventKind::RunFrozen {
-                    RunPhase::Frozen
-                } else {
-                    RunPhase::Active
-                };
-                let opened = kind == EventKind::RunStarted;
-                self.runs.insert(
-                    run,
-                    RunHot {
-                        phase,
-                        last_seq: seq,
-                        last_kind: kind,
-                        who: record.who().to_owned(),
-                        addr: opened.then(|| record.addr().cloned()).flatten(),
-                        started: opened.then(|| record.t()),
-                    },
-                );
-            }
+            Entry::Vacant(slot) => slot.insert(RunHot::first_seen(record)).absorb(record),
         }
         Ok(())
     }
@@ -224,6 +236,45 @@ mod tests {
         .unwrap();
         assert_eq!(view.get(&run).unwrap().addr, Some(room));
         assert_eq!(view.get(&run).unwrap().started, Some(TimeMs::new(1_700)));
+    }
+
+    fn stating(run: RunId, seq: u64, kind: EventKind, field: &str, value: &str) -> EventRecord {
+        let mut data = serde_json::Map::new();
+        data.insert(field.to_owned(), serde_json::Value::String(value.to_owned()));
+        let draft = EventDraft {
+            run,
+            t: TimeMs::new(seq),
+            who: "resident".to_owned(),
+            addr: None,
+            kind,
+            data: Payload::new(data).unwrap(),
+            ig: false,
+        };
+        EventRecord::from_draft(draft, Seq::new(seq), B3Hash::digest(b""))
+    }
+
+    /// The results city reads a reloaded run's ending, its pull request
+    /// and what it waits for from `city_view` alone, so the fold keeps
+    /// all three; the ask lives only while the request is the last word.
+    #[test]
+    fn the_fold_keeps_the_ending_the_pull_request_and_the_ask() {
+        let mut view = HotView::new();
+        let run = RunId::from_bytes([5u8; 16]);
+        view.apply(&record(run, 0, EventKind::RunStarted)).unwrap();
+        view.apply(&stating(run, 1, EventKind::ApprovalRequested, "action_desc", "publish"))
+            .unwrap();
+        assert_eq!(view.get(&run).unwrap().ask.as_deref(), Some("publish"));
+        view.apply(&record(run, 2, EventKind::ToolCalled)).unwrap();
+        assert_eq!(view.get(&run).unwrap().ask, None, "the run moved on");
+        view.apply(&stating(run, 3, EventKind::PrOpened, "branch", "gate-btree"))
+            .unwrap();
+        view.apply(&stating(run, 4, EventKind::RunFrozen, "completion", "done"))
+            .unwrap();
+        let hot = view.get(&run).unwrap();
+        assert_eq!(
+            (hot.completion.as_deref(), hot.pr.as_deref()),
+            (Some("done"), Some("gate-btree"))
+        );
     }
 
     #[test]

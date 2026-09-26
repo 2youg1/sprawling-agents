@@ -1316,6 +1316,23 @@ pub struct Call {
 - **为什么要上线**：run 页的时间透镜原本只能按回合着色，一个回合里模型说话与工具运行各占多久，线上没有数；有了这两个时刻，透镜画的是量出来的段，而不是按回合结局推断的整段。
 - **被否：只带一个时长**。时长丢了起点，页面画不出调用在时间轴上的位置，也就排不出并发的两次调用。
 
+### 8-48 `WIRE_V` 40：一行 run 带上它的结局、它开的 PR 与它等的事
+
+```rust
+pub struct RunSummary {
+    // …既有字段…
+    pub completion: Option<String>, // run_frozen.completion；未冻结或窗口外为 None
+    pub pr: Option<String>,         // 最近一条 pr_opened 的 branch（城里的 PR 以分支为名）
+    pub ask: Option<String>,        // 最后一条记录是 approval_requested 时，它的 action_desc
+}
+```
+
+- **为什么要上线**：只看结果的城把冻结的 run 分成做完、失败与已结束，并在一行末尾写出 PR 或等你做的事。页面重载后它只有 `city_view` 的答，没有这三件，每个冻结 run 都落进「已结束」，等你的 run 只知道在等、不知道等什么。
+- **三件都由 `memory::RunHot` 折出**（memory-SPEC §8-5），`summarize` 照抄，不读账本。
+- **`ask` 只在 `last_kind` 为 `approval_requested` 时有值**：页面判断等待用的是 `last_kind`，`ask` 跟着同一条记录走，二者不会一个说在等、一个说不等。
+- **`pr` 是分支名而不是数字**：城里的 PR 是 `collab::OpenRequest`，它的身份是分支（`node` 由分支解析而来），账本里没有别的编号；编一个序号就是给人一个线外查不到的名字。
+- **被否：把 `Rounds.closing` 让城逐行去问**。那是每行一次查询，一座两百个 run 的城首屏要问两百次，而这三件热视图本来就在折。
+
 ### 8-46 先占住端口，再交出城：`bind` 与 `serve` 分成两步
 
 ```rust
