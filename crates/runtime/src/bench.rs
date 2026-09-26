@@ -103,9 +103,12 @@ pub enum BenchOutcome {
     /// The tool ran; this is its result. `fenced` carries the commit
     /// the wave was fenced against when the forecast suspected a
     /// discard, so the post-wave sweep knows what to restore from.
+    /// `wrote` is the tool's own account of what the call may have
+    /// written, which the next fence stages (runtime-SPEC 8-45).
     Ran {
         outcome: ToolOutcome,
         fenced: Option<String>,
+        wrote: kernel::Writes,
     },
     /// A gate refused, or asked. Either way the answer travels back as
     /// a tool_result, which keeps the turn alive and tells the model
@@ -117,6 +120,21 @@ pub enum BenchOutcome {
     /// is owed the first result: an error here would teach the model a
     /// call failed when it succeeded.
     Duplicate { outcome: ToolOutcome },
+}
+
+/// Each registered tool's answer to what it may write, by declared effect.
+pub struct DeclaredWrites(BTreeMap<ToolName, kernel::Writes>);
+
+impl DeclaredWrites {
+    /// A name the bench does not hold answers `Domain`: the call will be
+    /// refused, and a guess that it writes nothing is the one guess that
+    /// could leave a write outside every fence.
+    pub fn of(&self, call: &ToolCall) -> kernel::Writes {
+        self.0
+            .get(&call.name)
+            .cloned()
+            .unwrap_or(kernel::Writes::Domain)
+    }
 }
 
 impl ToolBench {
@@ -171,6 +189,18 @@ impl ToolBench {
         }
         self.tools.insert(name, tool);
         Ok(())
+    }
+
+    /// What each registered tool may write, read off its declared
+    /// effect alone, taken out before the bench is lent to the run so the
+    /// fence policy can ask it while a wave waits (runtime-SPEC 8-45).
+    pub fn declared_writes(&self) -> DeclaredWrites {
+        DeclaredWrites(
+            self.tools
+                .iter()
+                .map(|(name, tool)| (name.clone(), kernel::Writes::of(&tool.meta().effect)))
+                .collect(),
+        )
     }
 
     pub fn taint_mut(&mut self) -> &mut TaintSet {
@@ -281,7 +311,12 @@ impl ToolBench {
         });
         self.seen.insert(*key, answered.clone());
         let outcome = answered?;
-        Ok(BenchOutcome::Ran { outcome, fenced })
+        let wrote = tool.writes(call);
+        Ok(BenchOutcome::Ran {
+            outcome,
+            fenced,
+            wrote,
+        })
     }
 }
 

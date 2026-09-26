@@ -106,11 +106,11 @@ pub use worktree::Worktrees;
 
 mod checkpoint;
 
-pub use checkpoint::Checkpoint;
 pub use checkpoint::ModelChoice;
 pub use checkpoint::Provenance;
 pub use checkpoint::effort_word;
 pub use checkpoint::recorded_effort;
+pub use checkpoint::{BaseProgress, Checkpoint};
 
 mod blob;
 mod changes;

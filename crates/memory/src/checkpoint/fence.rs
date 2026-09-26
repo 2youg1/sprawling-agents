@@ -20,7 +20,7 @@ use super::scan::CommitPlan;
 /// How a fence names itself in a commit subject. The whole set, because
 /// a fence that showed one of several prefixes would read like a fence
 /// that staged one of them.
-fn subject_of(scopes: &[String]) -> String {
+pub(super) fn subject_of(scopes: &[String]) -> String {
     if scopes.is_empty() {
         return "checkpoint: .".to_owned();
     }
@@ -33,7 +33,7 @@ fn subject_of(scopes: &[String]) -> String {
 /// own and the bench's forecast net - and the reference is the only thing
 /// that keeps a fence from `git gc`, so its name cannot come from a count
 /// that a second handle also keeps.
-fn fence_ref(of: &Provenance, oid: git2::Oid) -> String {
+pub(super) fn fence_ref(of: &Provenance, oid: git2::Oid) -> String {
     format!("refs/sprawling/runs/{}/{oid}", of.run())
 }
 
@@ -43,7 +43,7 @@ fn fence_ref(of: &Provenance, oid: git2::Oid) -> String {
 /// It carries what the commit's own trailers carry that the record
 /// cannot say for itself: the model and the effort. The run and the
 /// actor are the record's identity and are not repeated here.
-fn committed(
+pub(super) fn committed(
     oid: git2::Oid,
     of: &Provenance,
     scopes: &[String],

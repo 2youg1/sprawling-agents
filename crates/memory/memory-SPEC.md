@@ -518,7 +518,25 @@ impl Checkpoint {
     /// 5,000 个文件的楼每一波往账本里写 5,000 条路径，而读者要的是
     /// 这一波碰过什么。首个 fence 与 `ensure_base`
     /// 面对空 index，所以照旧列出它们提交的每一个文件。
+    /// `scopes` 的每一项可以是目录前缀，也可以是一个文件：lane 在只知道
+    /// 这一波写了哪些文件时只把它们交进来（runtime-SPEC §8-45）。工作区里是
+    /// 文件、或工作区没有而 index 记为文件的项，按字面路径 `add_path`／
+    /// `remove_path`，过同一道 `StageFilter` 与同一条 ignore 规则；其余的项
+    /// 生成两条 pathspec，它本身与 `<它>/*`，交给一次 `add_all`。只拿 pathspec
+    /// 走两个文件，5,000 个文件的写域上中位数 107 ms，字面暂存 61 ms（同上仪表）。
+    /// pathspec 里每项仍是**字面路径**：地址文法允许 `[` `]` `*` `?`，所以这些
+    /// 字节各自包进单字符类（`[[]`）再交给 libgit2，否则 `notes[1]` 会匹配 `notes1`。
     pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
+    /// 一栋楼的基线 fence（`checkpoint::base`）：暂存 `scopes`、扫描、提交，
+    /// 全部对象先写进内存里的对象库（mempack），最后作为**一个 pack** 落盘。
+    /// 无 HEAD 时提交移动 HEAD（等于 `ensure_base`），否则与 wave fence 同样
+    /// 悬空并挂在 `refs/sprawling/runs/<run>/<oid>`。`progress` 依次收到
+    /// `Staged { files }` 与 `Packed { bytes }`。取 `self` 的所有权：mempack 装在
+    /// 这个 handle 的对象库上，handle 一放下它就跟着消失，之后的 fence 不会
+    /// 把对象写进一个再也不落盘的内存库。index 与 HEAD（或 fence ref）只在
+    /// pack 落盘之后才写：之前任何一步失败（staged secret、pack 被拒、崩溃），
+    /// 盘上的 index 与引用都保持原样，不会指向从未落盘的对象。
+    pub fn base_fence(self, scopes: &[String], t: TimeMs, of: &Provenance, progress: &mut dyn FnMut(BaseProgress)) -> Result<Payload, MemoryError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
     pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, MemoryError>;
@@ -564,6 +582,7 @@ impl Checkpoint {
   后写的引用强制覆盖前一个，前一道提交从此无钉）；跨 handle 共享一个计数器或借用账本 seq（都要把
   一个位置穿进拿不到它的闭包，多一条耦合，而名字只需要唯一，不需要有序——顺序由账本给）。
   **翻案条件**：哪一天引用需要表达顺序（例如按先后清理旧栅栏），顺序仍应读账本，而不是回到计数器。
+- **基线 fence 在收楼时做，写成一个 pack**：一栋 5,000 个文件的楼，第一次派活的第一道 fence 要给每个文件求哈希并写 5,000 个松散对象，每个都是一次建文件；这笔钱挪到 `sprawling adopt`（以及开城时的 `Adopt::EveryFolder`）付，写法是 mempack：对象库换成「内存库在前、盘上的对象目录作只读备用」，暂存与提交产生的对象全进内存，`Mempack::dump` 出一个 pack，经仓库自己的对象库 `packwriter` 落盘（它同时写 `.idx`）。之后 run 的第一道 fence 面对的是一份暖 index：libgit2 按 stat 跳过没变的文件，只剩一次目录遍历。**被否**：收楼时直接调 `wave_pre`——每个 blob 一个松散对象，在旋转盘上是 5,000 次随机写，而 pack 是一次顺序写。**被否**：把 mempack 长期装在城的 handle 上——装上就卸不掉，之后每道 fence 的对象都会留在一个没人 dump 的内存库里，进程一退就丢。
 - **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。
 - **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，栅栏不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让栅栏静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
 - **提交时间是注入时刻的整秒**：`TimeMs` 是 `u64` 毫秒，除以 1000 后恒落在 `i64` 内，换算仍走 `i64::try_from` 且失败时报 `Checkpoint { op: "stamp the commit" }`，而不是写成 1970。
@@ -577,7 +596,7 @@ impl Checkpoint {
 - **`wave_post` 只问存在性，不问内容**：sweep 要的是「pre 提交树里的哪个 blob 从工作区消失了」，而这是一个存在问题——对树里的每个 blob 做一次 `symlink_metadata`，`NotFound` 即删除。**不碰 `diff_tree_to_workdir`**：它为每一个与树对上号的路径求哈希（libgit2 的 `git_diff__oid_for_entry`），而工作区里有城自己刚写完又改动的文件（session 投影，以及任何还开着写句柄的文件）；Windows 的目录枚举尺寸对这样的文件可以落后于句柄里的真实长度，libgit2 拿这个过期尺寸去 `git_odb__hashfd`，读到比声明尺寸多的字节使剩余计数下溢，最后把整次 sweep 拒成 `E_WORKTREE_BUSY`——写路径完全正确，读路径却对城市自己的写入过敏。
   - 被否：每波走 `diff_tree_to_workdir`。它省的是「每一波付整棵树的钱」，而那棵树是**这次栅栏自己的写域**（`wave_pre` 刚逐文件走过一遍），不是全城；sweep 只报 `Deleted`，而 `Deleted` 是存在问题不是内容问题。被否：`Path::exists()`——它跟随软链，一个悬空软链会被当成删除，`symlink_metadata` 不会。
   - 输出仍然在本模块排序而不信 walk 的顺序：**这批行落账的顺序是重放要复现的东西**。
-- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存用 `add_all`＋`update_all` 两步（后者含删除），glob 限于 `<scope>/*`；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
+- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存只用一次 `add_all`：libgit2 把 index 与工作区比一遍（按 stat 跳过没变的文件），新增、修改、删除都在这一遍里暂存；再跑一遍 `update_all` 是把同一个写域重走一次，5,000 个文件的写域上稳态 fence 的中位数因此从 104 ms 降到 71–78 ms（未优化构建，16 核、SSD，同一仪表交错测三次）。暂存规则只写在 `wave_pre` 的文档里（点名文件的 scope 走字面 `add_path`/`remove_path`，点名前缀的 scope 走字面 glob 加 `<glob>/*`）；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
 - 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何栅栏——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 - **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `memory::alias`：任一链接使**整波拒绝**（`MemoryError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在栅栏侧是**跳过**而非拒绝（`memory::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。

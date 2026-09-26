@@ -419,7 +419,7 @@ impl RunWorker {
     pub fn handle(&mut self, channels::Command) -> Result<(), AxError>;
     pub fn startup_scan(&mut self) -> Result<ScanReport, AxError>;
     pub fn fork(&mut self, RunId, Seq, Option<Address>) -> Result<RunId, AxError>;
-    pub fn adopt_building(&mut self, Address) -> Result<(), AxError>;
+    pub fn adopt_building(&mut self, Address) -> Result<(), AxError>;   // 收楼即立基线 fence（memory-SPEC 8-8 base_fence），进度写诊断
 }
 
 // console

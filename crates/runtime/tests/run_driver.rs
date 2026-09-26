@@ -248,6 +248,7 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -315,6 +316,7 @@ fn a_retriable_failure_is_made_again_up_to_the_number_the_person_set() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -361,6 +363,7 @@ fn a_ceiling_that_is_reached_ends_the_run() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -397,6 +400,7 @@ fn a_run_ends_when_its_work_runs_out_rather_than_at_a_ceiling() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -433,6 +437,7 @@ fn a_cancel_at_a_safe_point_freezes_inside_the_interrupted_turn() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -478,6 +483,7 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
             now: &mut now,
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
+            writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
             invoke: &mut invoke,
             wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
             deltas: None,
@@ -520,6 +526,7 @@ fn a_run_that_calls_nothing_puts_up_no_fence() {
             now: &mut now,
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
+            writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
             invoke: &mut invoke,
             wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
             deltas: None,
@@ -528,6 +535,44 @@ fn a_run_that_calls_nothing_puts_up_no_fence() {
         assert!(matches!(frozen.completion(), Completion::Done(_)));
     }
     // Nothing ran and nothing will: the tree is the one the run opened on.
+    assert_eq!(fenced, Vec::<u64>::new());
+}
+
+/// A wave whose every call only reads changes no file: it needs no fence
+/// before it, and the closing turn after it has no writes to carry.
+#[test]
+fn a_read_only_wave_puts_up_no_fence() {
+    let mut ledger = RecordingLedger::new();
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+        waves: vec![vec![call("t-1")]],
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut fenced: Vec<u64> = Vec::new();
+    let mut fence = |t: TimeMs| {
+        fenced.push(t.value());
+        Ok(Payload::empty())
+    };
+    {
+        let mut hooks = RunHooks {
+            now: &mut now,
+            interrupt: &mut interrupt,
+            fence: Some(&mut fence),
+            writes: &|_: &kernel::ToolCall| kernel::Writes::Nothing,
+            invoke: &mut invoke,
+            wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+            deltas: None,
+        };
+        let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+        assert!(matches!(frozen.completion(), Completion::Done(_)));
+    }
     assert_eq!(fenced, Vec::<u64>::new());
 }
 
@@ -550,6 +595,7 @@ fn advance_reports_each_turn_so_a_caller_can_stop_between_them() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -598,6 +644,7 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -649,6 +696,7 @@ fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts()
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -699,6 +747,7 @@ fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -751,6 +800,7 @@ fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,
@@ -800,6 +850,7 @@ fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut wait,
         deltas: None,
@@ -865,6 +916,7 @@ fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
         now: &mut now,
         interrupt: &mut interrupt,
         fence: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
         deltas: None,

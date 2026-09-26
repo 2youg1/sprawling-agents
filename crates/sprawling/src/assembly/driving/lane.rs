@@ -211,6 +211,7 @@ pub(crate) fn drive_run<L: Ledger>(
         fence_gate,
     } = context;
     let mut now = || now_ms();
+    let declared = bench.declared_writes();
     let mut fence_point =
         memory::Checkpoint::open(&write_root).map_err(memory::MemoryError::into_ax)?;
     // What the bench fenced, so the sweep afterwards knows which commit
@@ -218,6 +219,10 @@ pub(crate) fn drive_run<L: Ledger>(
     let fenced: std::rc::Rc<std::cell::RefCell<Vec<String>>> =
         std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let fenced_by_bench = std::rc::Rc::clone(&fenced);
+    // What the calls since the last fence said they wrote, which is what
+    // the next fence stages (runtime-SPEC 8-45). It opens as the whole
+    // domain: no commit of this run vouches yet for the tree it opened on.
+    let wrote = std::cell::RefCell::new(kernel::Writes::Domain);
     let asking = std::cell::RefCell::new(Interrupting {
         run_id,
         member,
@@ -270,14 +275,24 @@ pub(crate) fn drive_run<L: Ledger>(
             // and both run; the same position replayed is one key, which
             // is what deduplication is for.
             let key = kernel::IdemKey::derive(&run_id, kernel::Seq::new(at), &call.action()?);
-            match bench.invoke(call, &key, t)? {
+            // A call that failed may have failed partway through its
+            // writes, and its own account of them no longer holds, so the
+            // next fence walks the whole domain (runtime-SPEC 8-45).
+            let answered = bench.invoke(call, &key, t).inspect_err(|_| {
+                let so_far = wrote.replace(kernel::Writes::Nothing);
+                wrote.replace(so_far.and(kernel::Writes::Domain));
+            })?;
+            match answered {
                 BenchOutcome::Ran {
                     outcome,
                     fenced: at,
+                    wrote: this,
                 } => {
                     if let Some(oid) = at {
                         fenced.borrow_mut().push(oid);
                     }
+                    let so_far = wrote.replace(kernel::Writes::Nothing);
+                    wrote.replace(so_far.and(this));
                     if call.name.as_str() != kernel::ToolName::EXEC {
                         return Ok(outcome);
                     }
@@ -321,8 +336,9 @@ pub(crate) fn drive_run<L: Ledger>(
             let _one_at_a_time = fence_gate
                 .lock()
                 .map_err(|_| poison("this city's fence gate"))?;
+            let scope = staged_scope(wrote.replace(kernel::Writes::Nothing), &fence_scope);
             let payload = fence_point
-                .wave_pre(&fence_scope, t, &of)
+                .wave_pre(&scope, t, &of)
                 .map_err(memory::MemoryError::into_ax)?;
             if let Some(oid) = payload
                 .as_map()
@@ -350,6 +366,7 @@ pub(crate) fn drive_run<L: Ledger>(
             now: &mut now,
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
+            writes: &|call: &kernel::ToolCall| declared.of(call),
             invoke: &mut invoke,
             wait: &mut wait,
             deltas: watching.is_some().then_some(&mut watched),
@@ -366,4 +383,15 @@ pub(crate) fn drive_run<L: Ledger>(
         // raises a question, and it raises it after this returns.
         raised: Vec::new(),
     })
+}
+
+/// What the next fence stages: the paths the calls since the last fence
+/// said they wrote, or the whole write domain when one of them could not
+/// say (runtime-SPEC 8-45). `Nothing` is the run's first fence, before
+/// any call has run, and no commit of this run vouches for the tree yet.
+fn staged_scope(wrote: kernel::Writes, domain: &[String]) -> Vec<String> {
+    match wrote {
+        kernel::Writes::Paths(paths) => paths.iter().map(|path| path.as_str().to_owned()).collect(),
+        kernel::Writes::Nothing | kernel::Writes::Domain => domain.to_vec(),
+    }
 }
