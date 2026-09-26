@@ -64,9 +64,15 @@ pub(super) fn shelve(
             // so a shelf that moves cannot leave the addresses of what
             // sits on it pointing at where it used to be.
             let addr = address_of(city_root, &document)?;
+            let package = (document != item)
+                .then(|| address_of(city_root, &item))
+                .transpose()?;
             holdings.insert(
                 ShelfKey::of(&name),
-                Holding::of(name, section_name.clone(), &text, shelf.at(addr)),
+                Holding {
+                    package,
+                    ..Holding::of(name, section_name.clone(), &text, shelf.at(addr))
+                },
             );
         }
     }

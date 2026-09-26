@@ -325,7 +325,7 @@ pub enum Shelf {
     External { index: u32, path: String },
 }
 impl Shelf { pub fn address(&self) -> Option<&Address>; }
-pub struct Holding { pub name, pub section, pub disclosure, pub hash, pub shelf: Shelf }
+pub struct Holding { pub name, pub section, pub disclosure, pub hash, pub shelf: Shelf, pub package: Option<Address> }
 pub struct Library { /* BTreeMap<ShelfKey, Holding> —— 私有，ShelfKey 由 name 造 */ }
 impl Library {
     pub fn scan(city_root: &Path, building: Option<&Address>, home: &Path) -> Result<Library, AxError>;
@@ -352,7 +352,7 @@ pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxErr
 - **外部路径里的 `~` 指这个人自己的 home，home 以参数传入**：读环境不是本 crate 的活（`bin::assembly` 给出 `Home`），因此测试扫的是测试自己造的目录。committed 的城配置里不放一台机器的绝对路径，这正是 `~` 存在的理由。不是 `~` 开头也不是绝对路径的条目在解释处即拒，恢复语说出这条规则。
 - **同一名的优先级是 building > library > external（外部按数组序）**：按最远的架先上、近的盖上去，于是城自己的存货盖过别的程序的目录——城留下一个名字时，那个名字指城的 skill；楼的自己一份又盖过城的。外部条目排到最后，因为它是别人写的：一份目录不是一个权威。
 - **目录的架次由 `Shelf` 的臂序给出**：`Library::all` 先按 `Shelf::catalog_position`——城库、楼架、外部架按 `[skills] shelves` 的数组序——再按 `(section, name)`。位置是对三条臂的穷尽 match，不另立一张次序表；加一条臂而不在这里安置它，本 crate 编译不过。外部持有者没有 section，若把全部持有者按 `(section, name)` 排，别人的目录会排到城自己的存货之前，那正是上一条优先级的反面。
-- **一件藏品可以是一个目录**：section 书架上的一项是 `<name>.md` 一份文档，或 `<name>/` 一个包——包里的 `SKILL.md`（`SKILL_FILE`，与外部书架同一布局）就是这件持有：catalog 只列它的第一行，`Holding::shelf` 指向它，`hash` 是它的字节。包里其余文件不是持有，留在架上由 `read` 按 `<名>/<相对路径>` 打开（runtime-SPEC §8-29-3）；只列一行是常驻上下文不随包膨胀的原因。没有 `SKILL.md` 的目录不是藏品，跳过而不报——与外部书架同形。
+- **一件藏品可以是一个目录**：section 书架上的一项是 `<name>.md` 一份文档，或 `<name>/` 一个包——包里的 `SKILL.md`（`SKILL_FILE`，与外部书架同一布局）就是这件持有：catalog 只列它的第一行，`Holding::shelf` 指向它，`hash` 是它的字节，`Holding::package` 是包目录的地址——一件藏品是不是包由扫描在这里说出，读包的一方不从地址的写法去猜：一份恰好叫 `SKILL.md` 的单文档会让整个 section 被当成包，把阅览室没准入的藏品一并交出去。单文档与城外书架上的持有 `package` 为 `None`（后者没有地址）。包里其余文件不是持有，留在架上由 `read` 按 `<名>/<相对路径>` 打开（runtime-SPEC §8-29-3）；只列一行是常驻上下文不随包膨胀的原因。没有 `SKILL.md` 的目录不是藏品，跳过而不报——与外部书架同形。
 - **`Holding` 不再携 `path`**：落点由 `Shelf` 说出（城内的两个臂就是地址），而多一个 `PathBuf` 就是同一件事的第二个家，且两层书架下必有一个是错的（§8-12 对 `holding_address` 的同一条理由）。
 ### 8-10 city::wizard（形状 1 判定＋形状 2 值类型；含 survey）
 

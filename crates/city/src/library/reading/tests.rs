@@ -32,11 +32,20 @@ fn a_package_on_a_section_shelf_is_one_holding_at_its_skill_file() {
     );
     assert_eq!(
         library.all(),
-        vec![&Holding::of(
-            "review".to_owned(),
-            "utilities".to_owned(),
-            "# Review a diff\n\nbody\n",
-            Shelf::Library(Address::parse(&skill).unwrap()),
-        )]
+        vec![&Holding {
+            package: Some(
+                Address::parse(&format!(
+                    "{}/{LIBRARY_DIR}/utilities/review",
+                    kernel::RESERVED_PREFIX
+                ))
+                .unwrap()
+            ),
+            ..Holding::of(
+                "review".to_owned(),
+                "utilities".to_owned(),
+                "# Review a diff\n\nbody\n",
+                Shelf::Library(Address::parse(&skill).unwrap()),
+            )
+        }]
     );
 }

@@ -76,6 +76,7 @@ fn a_package_the_reading_room_admits_opens_by_name_and_path() {
             disclosure: "how this building reviews".to_owned(),
             expansion: ".sprawling/library/review/SKILL.md".to_owned(),
             hash: None,
+            package: Some(".sprawling/library/review".to_owned()),
         })
         .unwrap();
 
@@ -133,5 +134,34 @@ fn a_file_absent_at_the_check_is_not_opened_later() {
     assert!(
         matches!(&refused, Err(err) if err.code() == &AxCode::InvalidArgs),
         "a file absent at the check was opened through a link placed after it: {refused:?}"
+    );
+}
+
+/// A single document that happens to be called `SKILL.md` is not a
+/// package: its section holds skills the reading room did not admit.
+#[test]
+fn a_document_named_like_a_package_opens_nothing_beside_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let section = dir.path().join(".sprawling").join("library").join("ops");
+    std::fs::create_dir_all(&section).unwrap();
+    std::fs::write(section.join("SKILL.md"), "how ops works\n").unwrap();
+    std::fs::write(section.join("deploy.md"), "not admitted\n").unwrap();
+    let (mut tool, catalog) = tool(dir.path());
+    catalog
+        .lock()
+        .unwrap()
+        .admit_skill(CatalogEntry {
+            name: "SKILL".to_owned(),
+            disclosure: "how ops works".to_owned(),
+            expansion: ".sprawling/library/ops/SKILL.md".to_owned(),
+            hash: None,
+            package: None,
+        })
+        .unwrap();
+
+    let refused = tool.invoke(&call("SKILL/deploy.md"));
+    assert!(
+        refused.is_err(),
+        "a skill the reading room did not admit was read beside a document: {refused:?}"
     );
 }

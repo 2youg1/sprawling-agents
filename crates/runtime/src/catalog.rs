@@ -32,6 +32,10 @@ pub struct CatalogEntry {
     /// read. `None` for an entry the catalog holds as text of its own,
     /// which has no document to change behind anybody's back.
     pub hash: Option<B3Hash>,
+    /// The package directory, when the skill is filed as one: the files
+    /// beside its document open by `<name>/<path>`. Said by the shelf's
+    /// scan, never guessed from how `expansion` is spelled.
+    pub package: Option<String>,
 }
 
 /// What a second-level disclosure turns out to be.
@@ -42,8 +46,12 @@ pub struct CatalogEntry {
 /// in for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expansion {
-    /// A skill, and the address it is kept at.
-    Skill { addr: String },
+    /// A skill, the address it is kept at, and its package directory
+    /// when it is filed as one.
+    Skill {
+        addr: String,
+        package: Option<String>,
+    },
     /// Text the catalog holds: the mode's own discipline, or the
     /// developer entry's.
     Said { text: String },
@@ -212,6 +220,7 @@ impl Catalog {
         if let Some(entry) = self.skills.get(name) {
             return Some(Expansion::Skill {
                 addr: entry.expansion.clone(),
+                package: entry.package.clone(),
             });
         }
         if let Some(mode) = self.mode {
@@ -267,6 +276,7 @@ mod tests {
                 disclosure: "review a diff".to_owned(),
                 expansion: "run it before merging".to_owned(),
                 hash: Some(B3Hash::digest(b"review a diff")),
+                package: None,
             })
             .unwrap();
         catalog.set_mode(Mode::PlanGoal);

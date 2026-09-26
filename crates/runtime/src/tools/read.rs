@@ -281,7 +281,7 @@ impl ReadTool {
         })?;
         if let Some(expansion) = catalog.expand(asked) {
             return match expansion {
-                Expansion::Skill { addr } => {
+                Expansion::Skill { addr, .. } => {
                     let addr = kernel::Address::parse(&addr).map_err(|err| {
                         AxError::failure(
                             AxCode::ConfigInvalid,

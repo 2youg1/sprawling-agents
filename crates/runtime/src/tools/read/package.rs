@@ -13,7 +13,6 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::layout::SKILL_FILE;
 use kernel::{Address, AxCode, AxError};
 
 use super::Found;
@@ -24,8 +23,10 @@ use crate::tools::chosen_path::real_location;
 /// Where `<name>/<path>` lands when `name` is a package in the catalog.
 ///
 /// `None` when the first segment is not a package the catalog holds -
-/// no such name, a single-document skill, or an entry the catalog
-/// speaks itself - so the caller goes on to the ordinary path.
+/// no such name, a single-document skill however its file is named, or
+/// an entry the catalog speaks itself - so the caller goes on to the
+/// ordinary path. Which entries are packages is the shelf scan's to
+/// say, and it says so in `CatalogEntry::package`.
 ///
 /// # Errors
 /// Refuses a path inside the package with an empty, `.` or `..`
@@ -40,10 +41,14 @@ pub(super) fn open_in_package(
     asked: &str,
 ) -> Option<Result<Found, AxError>> {
     let (name, inside) = asked.split_once('/')?;
-    let Some(Expansion::Skill { addr }) = catalog.expand(name) else {
+    let Some(Expansion::Skill {
+        package: Some(package),
+        ..
+    }) = catalog.expand(name)
+    else {
         return None;
     };
-    let package = addr.strip_suffix(SKILL_FILE)?.strip_suffix('/')?;
+    let package = package.as_str();
     Some(within(package, inside, asked).and_then(|target| {
         let shelf = under(
             &real_location(city_root, "read", asked)?.into_path(),

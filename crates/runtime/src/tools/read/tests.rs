@@ -91,6 +91,7 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
             disclosure: "how this building reviews".to_owned(),
             expansion: ".sprawling/library/review.md".to_owned(),
             hash: None,
+            package: None,
         })
         .unwrap();
 
