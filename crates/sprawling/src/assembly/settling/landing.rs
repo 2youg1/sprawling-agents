@@ -296,7 +296,7 @@ impl RunWorker {
             // until the third succession.
             let before = self.probe_before(adapter.as_mut(), &frozen, &who)?;
             if let Some(door) = adapter {
-                self.warm.keep(addr.as_str().to_owned(), door);
+                self.warm.keep(addr.clone(), door);
             }
             let plan = frozen.plan();
             // **The obligation moves with the work.** A successor is the
@@ -327,7 +327,7 @@ impl RunWorker {
         // What this run sent stays warm for the room's next run
         // (sprawling-SPEC 8-93).
         if let Some(door) = adapter {
-            self.warm.keep(addr.as_str().to_owned(), door);
+            self.warm.keep(addr.clone(), door);
         }
         self.discharge(
             owing,

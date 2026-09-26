@@ -7,7 +7,9 @@
 //! worker keeps once the run has landed (sprawling-SPEC.md 8-93).
 
 use super::RunWorker;
-use kernel::{AxError, TimeMs};
+use kernel::event::Payload;
+use kernel::event::record::CacheRenewed;
+use kernel::{Address, AxError, EventKind, ModelReturn, TimeMs};
 use std::collections::BTreeMap;
 
 /// The chosen adapter, wrapped so every request a run sends enters the
@@ -22,14 +24,14 @@ pub(crate) type Door = runtime::prefix::warmth::Warmed<fn() -> Result<TimeMs, Ax
 /// pay to keep a cache nobody reads.
 #[derive(Default)]
 pub(in crate::assembly) struct Kept {
-    doors: BTreeMap<String, Door>,
+    doors: BTreeMap<Address, Door>,
 }
 
 impl Kept {
     /// Keeps `door` for `room` when it owes a renewal, replacing that
     /// room's earlier door; a door that owes none is dropped here, which
     /// is why the default setting leaves this empty.
-    pub(in crate::assembly) fn keep(&mut self, room: String, door: Door) {
+    pub(in crate::assembly) fn keep(&mut self, room: Address, door: Door) {
         if door.next_due().is_some() {
             self.doors.insert(room, door);
         } else {
@@ -42,28 +44,34 @@ impl Kept {
         self.doors.values().filter_map(Door::next_due).min()
     }
 
-    /// Sends every renewal due by `now_ms`, then lets go of the doors
+    /// Sends every renewal due by `now_ms` and returns what each one
+    /// cost or why it was refused, by room; then lets go of the doors
     /// that owe nothing more and of the doors whose renewal failed: a
     /// provider that refused a renewal is not asked again every wake.
-    ///
-    /// # Errors
-    /// The first door's failure; the doors after it still renew.
-    pub(in crate::assembly) fn renew_due(&mut self, now_ms: u64) -> Result<(), AxError> {
-        let mut first_failure = None;
-        self.doors.retain(|_, door| {
+    pub(in crate::assembly) fn renew_due(&mut self, now_ms: u64) -> Vec<(Address, CacheRenewed)> {
+        let mut renewals = Vec::new();
+        self.doors.retain(|room, door| {
             let renewed = match door.next_due() {
-                Some(due) if due <= now_ms => door.renew_due(now_ms).map(drop),
-                Some(_) | None => Ok(()),
+                Some(due) if due <= now_ms => door.renew_due(now_ms),
+                Some(_) | None => Ok(Vec::new()),
             };
             match renewed {
-                Ok(()) => door.next_due().is_some(),
-                Err(err) => {
-                    first_failure.get_or_insert(err);
+                Ok(_answers) => door.next_due().is_some(),
+                Err(refused) => {
+                    renewals.push((room.clone(), CacheRenewed::Refused { refused }));
                     false
                 }
             }
         });
-        first_failure.map_or(Ok(()), Err)
+        renewals
+    }
+}
+
+/// The cost a provider reported for one renewal.
+fn answered(answer: ModelReturn) -> CacheRenewed {
+    CacheRenewed::Answered {
+        usage: answer.usage,
+        billed_usd_micros: answer.billed_usd_micros,
     }
 }
 
@@ -73,16 +81,21 @@ impl RunWorker {
         self.warm.next_due()
     }
 
-    /// Renews whatever is due at `now`. A failed renewal is written to
-    /// the diagnostic log and does not stop the city, as a schedule that
-    /// cannot be read does not.
+    /// Renews whatever is due at `now` and writes one `cache_renewed`
+    /// line per renewal under its room, answered or refused. Only a line
+    /// the ledger would not take goes to the diagnostic log, and it does
+    /// not stop the city, as a schedule that cannot be read does not.
     pub(crate) fn renew_warm(&mut self, now: TimeMs) {
-        if let Err(err) = self.warm.renew_due(now.value()) {
-            self.note(
-                runtime::diagnostics::Level::Effect,
-                "bin::assembly::keeping_warm",
-                &format!("a keep-warm renewal failed: {err}"),
-            );
+        for (room, renewed) in self.warm.renew_due(now.value()) {
+            let written = Payload::of(&renewed)
+                .and_then(|line| self.record_at(EventKind::CacheRenewed, room, line));
+            if let Err(err) = written {
+                self.note(
+                    runtime::diagnostics::Level::Effect,
+                    "bin::assembly::keeping_warm",
+                    &format!("a keep-warm renewal was not recorded: {err}"),
+                );
+            }
         }
     }
 }
@@ -98,8 +111,8 @@ mod tests {
     use super::*;
     use kernel::consts_external::PROMPT_CACHE_TTL_SECS;
     use kernel::{
-        B3Hash, BuildingPolicy, Ceiling, ChatRequest, ContentBlock, KeepWarm, Model, ModelRequest,
-        ModelReturn,
+        AxCode, B3Hash, BuildingPolicy, Ceiling, ChatRequest, ContentBlock, KeepWarm, Model,
+        ModelRequest, ModelUsage, Tokens,
     };
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -107,41 +120,83 @@ mod tests {
     const USED_AT: u64 = 1_000_000;
     const TTL_MS: u64 = PROMPT_CACHE_TTL_SECS * 1000;
 
-    /// Counts the calls that reach the provider.
-    struct Provider(Arc<AtomicUsize>);
+    /// What the answering provider reports each call cost.
+    fn usage() -> ModelUsage {
+        ModelUsage {
+            input_tokens: Tokens::new(3),
+            output_tokens: Tokens::new(1),
+            cache_read_tokens: Tokens::new(4096),
+            cache_write_tokens: Tokens::new(0),
+        }
+    }
+
+    fn refusal() -> AxError {
+        AxError::failure(AxCode::Provider, "renew a cached prefix", "rate limited")
+            .with_recovery("renewal is skipped until the next real request")
+    }
+
+    /// Counts the calls that reach the provider; from the call numbered
+    /// `refuses_from` on, it refuses.
+    struct Provider {
+        calls: Arc<AtomicUsize>,
+        refuses_from: usize,
+    }
 
     impl Model for Provider {
         fn call(&mut self, _req: &ModelRequest) -> Result<ModelReturn, AxError> {
-            self.0.fetch_add(1, Ordering::SeqCst);
-            Ok(ModelReturn::bare(
+            if self.calls.fetch_add(1, Ordering::SeqCst) >= self.refuses_from {
+                return Err(refusal());
+            }
+            let mut answer = ModelReturn::bare(
                 kernel::model::message_payload(&[ContentBlock::Text {
                     text: "warm".to_owned(),
                 }])
                 .unwrap(),
                 Vec::new(),
-            ))
+            );
+            answer.usage = Some(usage());
+            Ok(answer)
         }
     }
 
-    /// A worker that kept the door of one run which sent one request,
-    /// woken at every second through two cache lifetimes; returns how
-    /// many calls reached the provider in all.
-    fn calls_after_one_run(setting: KeepWarm) -> usize {
-        let calls = Arc::new(AtomicUsize::new(0));
+    /// A door that sent one real request at `USED_AT`.
+    fn door_after_one_run(setting: KeepWarm, provider: Provider) -> Door {
         let clock: fn() -> Result<TimeMs, AxError> = || Ok(TimeMs::new(USED_AT));
-        let mut door = Door::new(Box::new(Provider(calls.clone())), setting, clock);
+        let mut door = Door::new(Box::new(provider), setting, clock);
         door.call(&ModelRequest {
             policy: BuildingPolicy::default(),
             segments: [B3Hash::digest(b"prefix"); 4],
             chat: ChatRequest::empty("script", Ceiling::new(512).unwrap()),
         })
         .unwrap();
-        let mut kept = Kept::default();
-        kept.keep("city/room".to_owned(), door);
-        for now in (USED_AT..=USED_AT + 2 * TTL_MS).step_by(1_000) {
-            kept.renew_due(now).unwrap();
-        }
+        door
+    }
+
+    /// Wakes `kept` at every second through two cache lifetimes and
+    /// returns every renewal it reported.
+    fn renewals_through_two_lifetimes(kept: &mut Kept) -> Vec<(Address, CacheRenewed)> {
+        let renewals = (USED_AT..=USED_AT + 2 * TTL_MS)
+            .step_by(1_000)
+            .flat_map(|now| kept.renew_due(now))
+            .collect();
         assert_eq!(kept.next_due(), None);
+        renewals
+    }
+
+    /// A worker that kept the door of one run which sent one request;
+    /// returns how many calls reached the provider in all.
+    fn calls_after_one_run(setting: KeepWarm) -> usize {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let door = door_after_one_run(
+            setting,
+            Provider {
+                calls: calls.clone(),
+                refuses_from: usize::MAX,
+            },
+        );
+        let mut kept = Kept::default();
+        kept.keep(Address::parse("city/room").unwrap(), door);
+        renewals_through_two_lifetimes(&mut kept);
         calls.load(Ordering::SeqCst)
     }
 
@@ -153,5 +208,37 @@ mod tests {
     #[test]
     fn a_worker_on_five_minute_renews_a_landed_run_once_when_due() {
         assert_eq!(calls_after_one_run(KeepWarm::FiveMinute), 2);
+    }
+
+    #[test]
+    fn every_renewal_reports_its_cost_or_its_refusal_under_its_room() {
+        let (answering, refusing) = (
+            Address::parse("city/answering").unwrap(),
+            Address::parse("city/refusing").unwrap(),
+        );
+        let mut kept = Kept::default();
+        for (room, refuses_from) in [(&answering, usize::MAX), (&refusing, 1)] {
+            let provider = Provider {
+                calls: Arc::new(AtomicUsize::new(0)),
+                refuses_from,
+            };
+            kept.keep(
+                room.clone(),
+                door_after_one_run(KeepWarm::FiveMinute, provider),
+            );
+        }
+        assert_eq!(
+            renewals_through_two_lifetimes(&mut kept),
+            vec![
+                (
+                    answering,
+                    CacheRenewed::Answered {
+                        usage: Some(usage()),
+                        billed_usd_micros: None,
+                    }
+                ),
+                (refusing, CacheRenewed::Refused { refused: refusal() }),
+            ]
+        );
     }
 }

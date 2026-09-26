@@ -163,6 +163,12 @@ pub enum EventKind {
     /// it a window an adviser shaped and a window the city's own policy
     /// shaped would fold to the same history.
     AdviserFellBack,
+
+    // Keep-warm (1).
+    /// One keep-warm renewal a worker sent for a room's cached prefix:
+    /// what the provider reported it cost, or its refusal. The request is
+    /// absent because it resends a prefix the run already recorded.
+    CacheRenewed,
 }
 
 /// The two-way partition; the sole criterion is "does the payload decide
@@ -176,7 +182,7 @@ pub enum WindowClass {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and (from S2 on) `xtask specalign`.
-    pub const ALL: [EventKind; 73] = [
+    pub const ALL: [EventKind; 74] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -250,6 +256,7 @@ impl EventKind {
         EventKind::AdviserAsked,
         EventKind::AdviserAnswered,
         EventKind::AdviserFellBack,
+        EventKind::CacheRenewed,
     ];
 
     /// The partition authority. Exhaustive on purpose: adding a variant
@@ -344,7 +351,10 @@ impl EventKind {
             // move itself is written.
             | EventKind::AdviserFellBack
             | EventKind::GovernedDocumentWritten
-            | EventKind::SpineDocumentWritten => WindowClass::RecordOnly,
+            | EventKind::SpineDocumentWritten
+            // A renewal resends a prefix already on the wire and changes
+            // no byte of any later request; the line records its cost.
+            | EventKind::CacheRenewed => WindowClass::RecordOnly,
         }
     }
 }

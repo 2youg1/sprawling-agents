@@ -262,7 +262,8 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
             | EventKind::RerankCalled
             | EventKind::AdviserAsked
             | EventKind::AdviserAnswered
-            | EventKind::AdviserFellBack => {}
+            | EventKind::AdviserFellBack
+            | EventKind::CacheRenewed => {}
         }
     }
     // A wave the cut landed inside is dropped whole: the assistant

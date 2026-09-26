@@ -312,7 +312,8 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::RerankCalled
         | EventKind::AdviserAsked
         | EventKind::AdviserAnswered
-        | EventKind::AdviserFellBack => PlanReach::Untouched,
+        | EventKind::AdviserFellBack
+        | EventKind::CacheRenewed => PlanReach::Untouched,
     }
 }
 
