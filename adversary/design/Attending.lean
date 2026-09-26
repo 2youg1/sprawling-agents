@@ -6,7 +6,7 @@
 /-!
 # The accounting thread and its one inbox.
 
-Specifies `crates/sprawling/src/serving/attending.rs`, the loop `attend`: the
+Specifies `crates/sprawling/src/assembly/attending.rs`, the loop `attend`: the
 one thread that writes a city's Ledger, and the three mouths it serves - a
 lane's relay request, a run home from its lane, a command from the desk - plus
 the desk closing. The Rust code is the authority on how the loop holds these
