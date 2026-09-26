@@ -500,7 +500,7 @@ mod tests {
     /// A dispatch whose server has not answered its handshake yet leaves
     /// the desk free: the command is answered on the accounting thread,
     /// and the lane that will drive the run is the one that waits for
-    /// the server (sprawling-SPEC.md 8-93).
+    /// the server (sprawling-SPEC.md 8-113).
     #[test]
     fn a_dispatch_whose_server_still_shakes_hands_leaves_the_desk_free() {
         let dir = tempfile::tempdir().unwrap();

@@ -313,7 +313,7 @@ impl RunWorker {
             return Ok(Landed::Elsewhere);
         }
         // What this run sent stays warm for the room's next run
-        // (sprawling-SPEC 8-93).
+        // (sprawling-SPEC 8-112).
         if let Some(door) = adapter {
             self.warm.keep(addr.clone(), door);
         }

@@ -5,7 +5,7 @@
 
 //! Whose identity this city can call which model under: the part of the
 //! worker's state that `endpoint_attached`, `model_selected`,
-//! `endpoint_lost` and `secret_captured` change (sprawling-SPEC.md 8-90).
+//! `endpoint_lost` and `secret_captured` change (sprawling-SPEC.md 8-110).
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};

@@ -309,7 +309,7 @@ fn segments_of_a_review_dispatch() -> Vec<(String, String)> {
 }
 
 /// Preparing a dispatch moves off the accounting thread without moving
-/// a byte of the prefix it freezes (sprawling-SPEC.md 8-93): the hashes
+/// a byte of the prefix it freezes (sprawling-SPEC.md 8-113): the hashes
 /// below were taken from the path that prepares everything on the
 /// accounting thread, and a room under review is where the move reaches
 /// furthest, because its tree is placed in the lane. A change that means

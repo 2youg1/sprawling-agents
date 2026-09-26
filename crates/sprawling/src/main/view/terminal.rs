@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The terminal the person's face of `sprawling view` runs in
-//! (sprawling-SPEC.md 8-91): read keys, apply the action each names, and
+//! (sprawling-SPEC.md 8-117): read keys, apply the action each names, and
 //! draw the frame the face returns; between keys, take what the ledger
 //! grew by. Every
 //! decision is in `keys` and `frame`; this file only moves bytes.

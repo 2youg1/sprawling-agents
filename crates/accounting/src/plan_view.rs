@@ -202,7 +202,7 @@ impl PlanView {
 
 /// Every named building's plan: described from the cache while it is
 /// held, read off the disk once it is released, and put back only when
-/// no record moved that plan in between (sprawling-SPEC.md 8-92).
+/// no record moved that plan in between (sprawling-SPEC.md 8-100).
 ///
 /// A poisoned cache is taken back by [`PlanView::take_back`], so a panic
 /// under the lock costs the parsed plans and never a stop cause.

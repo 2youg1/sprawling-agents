@@ -105,7 +105,7 @@ pub(crate) fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, Ax
 /// [`start`] once an audit of the whole chain returns `Whole`, so a start
 /// from the snapshot never accepts a chain a whole fold would refuse: the
 /// snapshot's fit checks only the line at its seq, and the ledger open
-/// scans only the last segment (sprawling-SPEC 8-92).
+/// scans only the last segment (sprawling-SPEC 8-101).
 ///
 /// # Errors
 /// The audit's reason when the chain is broken or cannot be read, and

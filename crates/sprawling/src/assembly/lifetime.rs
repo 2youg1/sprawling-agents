@@ -23,7 +23,7 @@ use kernel::{AxError, EventKind, Locator};
 use memory::{Cas, JsonlLedger, OpenReport};
 
 /// What opening the ledger repaired before this worker read a line of
-/// it (sprawling-SPEC.md 8-90). The ledger records the cut as
+/// it (sprawling-SPEC.md 8-102). The ledger records the cut as
 /// `log_truncated`, but no page draws that line, so the worker keeps
 /// this value to tell the person at the two doors a city opens through.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -223,7 +223,7 @@ impl RunWorker {
         Ok(worker)
     }
 
-    /// Takes back the trees a crash left behind (sprawling-SPEC 8-93).
+    /// Takes back the trees a crash left behind (sprawling-SPEC 8-108).
     ///
     /// Nothing is held yet: the ledger this worker holds is locked to
     /// this process, and no run has been dispatched. A tree that will

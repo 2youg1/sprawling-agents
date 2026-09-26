@@ -237,7 +237,7 @@ impl RoomQueues {
     }
 
     /// [`RoomQueues::pending`] for every room holding anything, read at
-    /// once, for a bench laid out off this thread (sprawling-SPEC.md 8-93).
+    /// once, for a bench laid out off this thread (sprawling-SPEC.md 8-113).
     pub(in crate::assembly) fn waiting(&self) -> BTreeMap<Address, u32> {
         self.rooms
             .keys()

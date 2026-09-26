@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The read-only verb that shows one city's Ledger from disk
-//! (sprawling-SPEC.md 8-93).
+//! (sprawling-SPEC.md 8-105).
 //!
 //! What it writes is what an agent already parses: Ledger lines byte for
 //! byte, or with `--runs` one JSON line per run from

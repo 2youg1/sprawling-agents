@@ -155,7 +155,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         &mut log,
     )?;
     // The fold thread alternates between two copies, so the second is
-    // made here from the first (sprawling-SPEC.md 8-93).
+    // made here from the first (sprawling-SPEC.md 8-99).
     rebuilt.ask_the_registry_through(crate::release::answer);
     let spare = rebuilt.twin()?;
     // This machine is not asked here (sprawling-SPEC.md 8-54): the

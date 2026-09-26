@@ -26,7 +26,7 @@ impl Laying {
     /// It reads the city through [`Laying`] rather than the worker, so it
     /// runs in the lane that drives the run: an MCP server that still
     /// shakes hands holds up that lane and nothing else
-    /// (sprawling-SPEC.md 8-93).
+    /// (sprawling-SPEC.md 8-113).
     ///
     /// The catalogue and the bench are one phase because they are one
     /// registration: the catalogue is what the model was told exists,

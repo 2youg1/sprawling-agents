@@ -193,7 +193,7 @@ impl RunWorker {
     /// is decided and its pursuit minted first, then `pursuit_changed` is
     /// appended, then the worker holds the result, so a failed append
     /// leaves nothing a restart would not fold back (sprawling-SPEC.md
-    /// 8-91).
+    /// 8-111).
     ///
     /// A goal is declared through the depth-zero position this Desk
     /// holds, which is the runtime half of the guard the type already
@@ -214,7 +214,7 @@ impl RunWorker {
         };
         // Decided and minted first, held only once the ledger has the
         // line: a failed append leaves the process holding what a restart
-        // would fold (sprawling-SPEC.md 8-91).
+        // would fold (sprawling-SPEC.md 8-111).
         let change = match step {
             channels::PursuitStep::Set { goal } => {
                 // A pursuit works through the plan's ready steps, so on a

@@ -30,7 +30,7 @@ pub(super) use standing::Placing;
 
 /// What laying out a run's bench reads from the city: handles that
 /// clone, and values read when the dispatch was staged, so the bench is
-/// laid out in the lane that drives the run (sprawling-SPEC.md 8-93).
+/// laid out in the lane that drives the run (sprawling-SPEC.md 8-113).
 ///
 /// The folds the accounting thread rewrites - who has mail waiting, who
 /// holds which goal, how far the city trusts its residents - arrive as

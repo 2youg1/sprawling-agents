@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `sprawling call`: one frame over the wire, and the exit code that
-//! says what was observed (sprawling-SPEC.md 8-41, 8-91).
+//! says what was observed (sprawling-SPEC.md 8-41, 8-103).
 
 use super::exit::Exit;
 use super::refusal::{Form, written};

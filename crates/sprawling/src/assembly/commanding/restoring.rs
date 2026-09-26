@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Putting one recycle-bin row back by the way back it carries
-//! (sprawling-SPEC §8-92).
+//! (sprawling-SPEC §8-107).
 
 use crate::assembly::RunWorker;
 use kernel::{AxCode, AxError, EventKind, Locator, Payload, Restoration};
@@ -52,7 +52,7 @@ impl RunWorker {
             .and_then(|fence| fence.restore(address, oid))
             .map_err(memory::MemoryError::into_ax)?;
         // The same shape as the `file_discarded` it closes, so one
-        // reader folds both (§8-92).
+        // reader folds both (§8-107).
         let restored = Payload::new(serde_json::Map::from_iter([
             (
                 "paths".to_owned(),

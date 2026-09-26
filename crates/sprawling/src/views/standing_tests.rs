@@ -94,7 +94,7 @@ fn a_run_in_the_city_view_says_which_room_it_works_in() {
 }
 
 /// A city that has run thousands of times used to put every run it ever
-/// held on the wire at each asking (sprawling-SPEC section 8-90): 8,000
+/// held on the wire at each asking (sprawling-SPEC section 8-106): 8,000
 /// runs made a 1.37 MB city view, fetched again after every record.
 #[test]
 fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
@@ -147,7 +147,7 @@ fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
 }
 
 /// A cost view used to name every run a city ever billed (sprawling-SPEC
-/// section 8-90); it names every active run and the few billed most,
+/// section 8-106); it names every active run and the few billed most,
 /// while `total` still sums them all.
 #[test]
 fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {

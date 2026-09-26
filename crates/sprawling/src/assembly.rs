@@ -223,7 +223,7 @@ pub struct RunWorker {
     /// The store every lane writes through: one handle, opened with the
     /// worker, because opening a store sweeps its half-written objects
     /// and a lane that opened its own would sweep another lane's put
-    /// (sprawling-SPEC.md 8-93).
+    /// (sprawling-SPEC.md 8-113).
     lane_store: Arc<std::sync::Mutex<Cas>>,
     /// Whose identity this city can call which model under
     /// (`credentials::held`).
@@ -281,7 +281,7 @@ pub struct RunWorker {
     /// Connects the MCP servers a building's configuration names, and
     /// keeps them connected between runs (`mcp::Residents`). Received
     /// for the same reason `models` is. Shared, because the lane that
-    /// prepares a dispatch connects its servers (sprawling-SPEC.md 8-93).
+    /// prepares a dispatch connects its servers (sprawling-SPEC.md 8-113).
     connectors: Arc<dyn accounting::Connectors + Send + Sync>,
     /// Looks at the machine this city runs on and installs onto it
     /// (`doctor::ThisMachine`). Received for the same reason `models`
@@ -292,7 +292,7 @@ pub struct RunWorker {
     /// worker does.
     pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
     /// Reads the city's volume at the door new work enters by
-    /// (sprawling-SPEC.md 8-94).
+    /// (sprawling-SPEC.md 8-116).
     read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
     /// Hands one of this city's paths to the desktop's file manager
     /// (`revealing::reveal`). Received rather than called, because it

@@ -172,7 +172,7 @@ fn addressed(city_root: &Path, path: &Path) -> Result<Address, AxError> {
 
 /// What freezing a plan reads from outside the run's own site, as
 /// values rather than as the worker that holds them, so a plan can be
-/// frozen on whichever thread prepares the run (sprawling-SPEC.md 8-93).
+/// frozen on whichever thread prepares the run (sprawling-SPEC.md 8-113).
 pub(super) struct Freezing<'a> {
     pub(super) city_root: &'a Path,
     /// The store the prefix and the norms are pinned in. Content

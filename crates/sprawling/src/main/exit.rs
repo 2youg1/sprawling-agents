@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The exit codes this binary speaks, one variant per code
-//! (sprawling-SPEC.md 8-91).
+//! (sprawling-SPEC.md 8-103).
 //!
 //! For an agent driving the binary the exit code is the result, so each
 //! code asserts one fact and no two facts share a code: a city that is

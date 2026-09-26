@@ -6,7 +6,7 @@
 //! The city page split at the view lock: the runs, the shut scopes and
 //! the pursuits copied out of the fold, and the buildings listed and
 //! their plans read once the views are released (sprawling-SPEC.md
-//! 8-92).
+//! 8-100).
 //!
 //! **Why the directory is listed here and not in the fold.** A building
 //! is a directory a person or an agent can make without a record, so

@@ -16,7 +16,7 @@ use crate::assembly::dispatching::preparing::Staged;
 impl RunWorker {
     /// Stages one dispatch on this thread and takes it into a lane, which
     /// prepares and drives it, so the desk is free again before a tree is
-    /// placed or a server has shaken hands (sprawling-SPEC.md 8-93).
+    /// placed or a server has shaken hands (sprawling-SPEC.md 8-113).
     ///
     /// This is the person's entrance. What continues is the run, not the
     /// command, which is why the idempotency key settles at take-off

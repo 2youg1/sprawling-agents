@@ -39,7 +39,7 @@ impl RunWorker {
     /// landing will need afterwards. Every line it writes goes through
     /// this worker on this thread; the review tree, the bench with its
     /// MCP servers and the frozen plan are the lane's
-    /// (sprawling-SPEC.md 8-93).
+    /// (sprawling-SPEC.md 8-113).
     ///
     /// # Errors
     /// Propagates every refusal a dispatch can owe before it costs
@@ -228,7 +228,7 @@ impl RunWorker {
         // A lane that placed the tree and then failed leaves no sweep to
         // read it, so the tree goes back before the failure does; kept,
         // it would answer every later dispatch to the room with
-        // WorktreeBusy until the worker restarts (sprawling-SPEC.md 8-93).
+        // WorktreeBusy until the worker restarts (sprawling-SPEC.md 8-113).
         let driven = match driven {
             Ok(driven) => driven,
             Err(failure) => {

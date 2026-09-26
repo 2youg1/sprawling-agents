@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The verb that reads every TOML file a city holds and prints each
-//! refusal as `path:line:column: code: message` (sprawling-SPEC.md 8-92).
+//! refusal as `path:line:column: code: message` (sprawling-SPEC.md 8-104).
 //! What is refused, and where, is `city::check`'s; this file only
 //! spells it in the shape an editor and a terminal can jump to.
 

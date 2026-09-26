@@ -60,7 +60,7 @@ pub(crate) enum Wake {
 pub(crate) struct Drained {
     /// Every line the ledger took, in ledger order: a line a lane wrote
     /// is history as much as one the accounting thread wrote, so the
-    /// same folds are shown it (sprawling-SPEC.md 8-90).
+    /// same folds are shown it (sprawling-SPEC.md 8-110).
     pub(crate) written: Vec<EventDraft>,
     /// Registrations in arrival order, left to the thread that holds the
     /// goal register: a copy of the register here would be a second

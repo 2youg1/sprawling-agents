@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The thread the views are folded on and published from, so neither
-//! the writer nor the fold waits for a reader (sprawling-SPEC.md 8-93).
+//! the writer nor the fold waits for a reader (sprawling-SPEC.md 8-99).
 
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
@@ -33,7 +33,7 @@ enum Fold {
 
 /// The two copies of the views the fold alternates between: the one
 /// readers are handed, and its unpublished twin, which must have folded
-/// the same records (sprawling-SPEC.md 8-93).
+/// the same records (sprawling-SPEC.md 8-99).
 pub(crate) struct Copies {
     pub(crate) published: Arc<Published>,
     pub(crate) spare: Views,

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one drawing every record gets in the detail pane: an indented
-//! JSON tree (sprawling-SPEC.md 8-91). No event kind has a drawing of
+//! JSON tree (sprawling-SPEC.md 8-117). No event kind has a drawing of
 //! its own, so a new kind needs no line here.
 
 use serde_json::Value;

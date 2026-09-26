@@ -188,7 +188,7 @@ impl LedgerAsk {
     /// The summary of a run the hot view evicted, folded from that run's
     /// own records in the Ledger through a `memory::HotView` holding it
     /// alone, so the cold side maps a record to a row by the same rule
-    /// as the hot one (sprawling-SPEC section 8-90).
+    /// as the hot one (sprawling-SPEC section 8-106).
     ///
     /// `None` when the records cannot be read: an evicted run always has
     /// some, so the caller answers that it could not look.

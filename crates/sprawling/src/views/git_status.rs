@@ -22,7 +22,7 @@
 //! **The walk of the disk happens after the views are released.** The
 //! views hand over only the fence and the root; `git status` over a
 //! large tree takes tens of milliseconds, and the fold waits for every
-//! one of them it is run under (sprawling-SPEC.md 8-92).
+//! one of them it is run under (sprawling-SPEC.md 8-100).
 
 use std::path::PathBuf;
 
