@@ -308,6 +308,10 @@
             </p>
             <div class="w-full">{@render composer()}</div>
           </div>
+          <!-- The queue is drawn in an empty room too: "N waiting" links
+              to the mayor's room, which a person who only worked in a
+              building has never spoken in. -->
+          <Waiting />
         {:else}
           <div class="mb-base flex justify-end"><Showing /></div>
           {#if drawsCalls($held.showing)}
