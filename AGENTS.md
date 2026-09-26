@@ -133,7 +133,7 @@ Violating any of these turns CI red with a message naming the rule, the violatio
 | The Rust rules above: no panics, checked arithmetic, no `unsafe`. | workspace lints, `-D warnings` |
 | Module map registered; sizes inside 200/4/400. | `xtask modmap`, `xtask length` |
 | `pub(crate)` by default; `pub` traits only on the seam list. | `xtask depmap` |
-| The client's lockfile in step with its manifest, its runtime dependencies exactly `svelte` and `effect`, every licence on the list `deny.toml` permits. | `xtask npm` |
+| The client's lockfile in step with its manifest, its runtime dependencies exactly the list `RUNTIME` in `xtask/src/npm.rs` names (`svelte`, `effect`, and the `@lezer` highlighter), every licence on the list `deny.toml` permits. | `xtask npm` |
 | The MPL-2.0 notice then the copyright line, at the top of every `.rs` file. | `xtask header` |
 | A white-box check written in Rust beside the code it judges; a check that enters the way a stranger does written in Lean under `adversary/`. | `xtask boundary` |
 | Nothing written for a test compiled into the binary a person downloads. | `xtask artifact` |

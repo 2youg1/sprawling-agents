@@ -60,8 +60,24 @@ const PERMITTED: &str = "deny.toml";
 
 /// What may reach a person's browser. Exactly these, in both
 /// directions: a gate that only refused additions would wave through the
-/// day `svelte` is deleted by accident.
-const RUNTIME: [&str; 2] = ["effect", "svelte"];
+/// day `svelte` is deleted by accident. The `@lezer` packages are the
+/// syntax highlighter and its grammars, which ship as a lazy chunk the
+/// first screen never downloads (client-SPEC 4-26); no UI library is
+/// among them (client-SPEC section 7).
+const RUNTIME: [&str; 12] = [
+    "@lezer/cpp",
+    "@lezer/css",
+    "@lezer/go",
+    "@lezer/highlight",
+    "@lezer/java",
+    "@lezer/javascript",
+    "@lezer/json",
+    "@lezer/python",
+    "@lezer/rust",
+    "@lezer/yaml",
+    "effect",
+    "svelte",
+];
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     if !root.join(CLIENT).is_dir() {
@@ -165,7 +181,7 @@ fn stale(what: String) -> Violation {
     }
 }
 
-/// The runtime dependencies are exactly the two that were decided on.
+/// The runtime dependencies are exactly the ones `RUNTIME` names.
 fn judge_runtime(manifest: &Manifest, out: &mut Vec<Violation>) {
     let allowed: BTreeSet<&str> = RUNTIME.into_iter().collect();
     let asked: BTreeSet<&str> = manifest.runtime.keys().map(String::as_str).collect();
@@ -189,7 +205,7 @@ fn runtime_violation(what: String) -> Violation {
         location: MANIFEST.to_owned(),
         rule: format!(
             "the client's runtime dependencies are exactly {}",
-            RUNTIME.join(" and ")
+            RUNTIME.join(", ")
         ),
         violation: what,
         alternative: "put the package in devDependencies if it is toolchain, or record the \
