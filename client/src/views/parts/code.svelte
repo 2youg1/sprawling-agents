@@ -20,7 +20,7 @@ import type { Ink } from "./code";
 
 // Every colour comes from `theme.css`; this file states no value. The
 // fifth ink is the plain text around the four the theme distinguishes.
-const PAINT: Record<Ink, string> = {
+export const PAINT: Record<Ink, string> = {
   plain: "",
   comment: "text-text-disabled",
   string: "text-alert",

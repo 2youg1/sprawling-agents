@@ -13,11 +13,13 @@
 import { describe, expect, test } from "bun:test";
 import { Schema } from "effect";
 
-import { Turn } from "../../wire";
+import { Seq, Turn } from "../../wire";
 import { traceOf } from "./trace";
 
 const turn = (number: number, calls: readonly unknown[]): Turn =>
   Schema.decodeUnknownSync(Turn)({ number, calls, notes: [], opened: number * 10, t: number * 1000 });
+
+const at = (n: number): Seq => Seq.make(n);
 
 const exec = turn(1, [
   {
@@ -62,8 +64,8 @@ describe("a run's turns read as a terminal record and a code column", () => {
   test("an exec call is its command, both streams and its exit code", () => {
     const { entries } = traceOf([exec]);
     expect(entries).toEqual([
-      { kind: "command", at: 11, text: "cargo test", stdout: "ok\n", stderr: "warn\n", ending: { kind: "code", code: 101 }, cut: 0 },
-      { kind: "command", at: 12, text: "git status", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0 },
+      { kind: "command", at: at(11), text: "cargo test", stdout: "ok\n", stderr: "warn\n", ending: { kind: "code", code: 101 }, cut: 0 },
+      { kind: "command", at: at(12), text: "git status", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0 },
     ]);
   });
 
@@ -73,7 +75,7 @@ describe("a run's turns read as a terminal record and a code column", () => {
       {
         path: "src/lib.rs",
         how: "modified",
-        at: 21,
+        at: at(21),
         hunks: [
           {
             lines: [
@@ -85,8 +87,8 @@ describe("a run's turns read as a terminal record and a code column", () => {
         ],
       },
     ]);
-    expect(trace.latest).toEqual({ kind: "entry", at: 22 });
-    expect(traceOf([exec]).latest).toEqual({ kind: "entry", at: 12 });
+    expect(trace.latest).toEqual({ kind: "entry", at: at(22) });
+    expect(traceOf([exec]).latest).toEqual({ kind: "entry", at: at(12) });
     expect(traceOf([turn(2, edit.calls.slice(0, 1))]).latest).toEqual({ kind: "file", path: "src/lib.rs" });
   });
 });
