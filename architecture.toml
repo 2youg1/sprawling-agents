@@ -162,6 +162,7 @@ module = [
   { name = "memory::worktree::name", file = "crates/memory/src/worktree/name.rs", owns = "one segment, no escape", shape = "adapter", since = "P2", status = "built", spec = "memory-SPEC.md#8-9" },
   { name = "memory::worktree::lease", file = "crates/memory/src/worktree/lease.rs", owns = "a held tree and its measure", shape = "adapter", since = "P2", status = "built", spec = "memory-SPEC.md#8-9" },
   { name = "memory::worktree::trees", file = "crates/memory/src/worktree/trees.rs", owns = "claim, merge, release", shape = "adapter", since = "P2", status = "built", spec = "memory-SPEC.md#8-9" },
+  { name = "memory::worktree::trees::kept", file = "crates/memory/src/worktree/trees/kept.rs", owns = "a tree kept for its node: held, kept or absent, and reattaching it", shape = "adapter", since = "P2", status = "built", spec = "memory-SPEC.md#8-9" },
   { name = "memory::worktree::trees::tests", file = "crates/memory/src/worktree/trees/tests.rs", owns = "the worktree fixtures", shape = "adapter", since = "P2", status = "built", spec = "memory-SPEC.md#8-9" },
   { name = "memory::queue", file = "crates/memory/src/queue.rs", owns = "one queue implementation serving three lanes", shape = "value", since = "S3", status = "built", spec = "memory-SPEC.md#8-10" },
   { name = "memory::snapshot", file = "crates/memory/src/snapshot.rs", owns = "what a fold held after one ledger line, named by that line's chain hash", shape = "projection", since = "S5", status = "built", spec = "memory-SPEC.md#8-26" },
