@@ -71,6 +71,10 @@ pub(crate) struct DrivingPool {
     /// counted, rather than in threads parked on the provider's
     /// admission.
     waiting: VecDeque<Waiting>,
+    /// Where `full` reads how much memory this machine has free. Handed
+    /// in rather than read here, because reading it reaches the host
+    /// (sprawling-SPEC.md 8-46-3).
+    read_memory: fn() -> Memory,
 }
 
 /// One prepared drive and the two things its lane will be given.
@@ -81,12 +85,17 @@ struct Waiting {
 }
 
 impl DrivingPool {
-    pub(crate) fn open(lanes: u32, home: mpsc::Sender<Wake>) -> DrivingPool {
+    pub(crate) fn open(
+        lanes: u32,
+        home: mpsc::Sender<Wake>,
+        read_memory: fn() -> Memory,
+    ) -> DrivingPool {
         DrivingPool {
             lanes: lanes.max(1),
             home,
             running: std::collections::BTreeMap::new(),
             waiting: VecDeque::new(),
+            read_memory,
         }
     }
 
@@ -98,8 +107,8 @@ impl DrivingPool {
 
     /// Whether a new run waits: every lane is taken, or memory is
     /// tight while another run is driving (sprawling-SPEC.md 8-46-3).
-    pub(crate) fn full(&self, memory: Memory) -> bool {
-        !admits(self.in_flight(), self.lanes, memory)
+    pub(crate) fn full(&self) -> bool {
+        !admits(self.in_flight(), self.lanes, (self.read_memory)())
     }
 
     /// Takes one drive into a lane of its own, or into the queue when
@@ -133,7 +142,7 @@ impl DrivingPool {
             )
             .with_recovery("report this: one run drives once"));
         }
-        if self.full(crate::monitor::memory::read()) {
+        if self.full() {
             self.waiting.push_back(Waiting {
                 driving,
                 ledger,
@@ -154,7 +163,7 @@ impl DrivingPool {
         let mut refused = Vec::new();
         // Memory is read at each start, because every lane started here
         // is a run the next reading has to make room for.
-        while !self.full(crate::monitor::memory::read()) {
+        while !self.full() {
             let Some(Waiting {
                 driving,
                 ledger,
@@ -239,10 +248,32 @@ fn admits(in_flight: u32, lanes: u32, memory: Memory) -> bool {
 #[cfg(test)]
 #[allow(clippy::arithmetic_side_effects)]
 mod tests {
-    use super::admits;
+    use super::{DrivingPool, admits};
     use crate::monitor::memory::Memory;
+    use kernel::RunId;
 
     const GIB: u64 = 1 << 30;
+
+    /// A sixteenth of the machine's memory free.
+    fn tight() -> Memory {
+        Memory {
+            physical: 16 * GIB,
+            available: GIB,
+        }
+    }
+
+    /// With one run driving, a pool whose reader says memory is tight is
+    /// full, whatever the machine running the test has free: the reading
+    /// is the one it was handed, so a scenario can make a machine tight.
+    #[test]
+    fn a_pool_judges_memory_by_the_reader_it_was_handed() {
+        let (home, _arrivals) = std::sync::mpsc::channel();
+        let mut pool = DrivingPool::open(4, home, tight);
+        pool.running
+            .insert(RunId::from_bytes([1u8; 16]), std::thread::spawn(|| {}));
+
+        assert!(pool.full());
+    }
 
     /// A machine with a sixteenth of its memory left starts no second
     /// run beside the first, and still starts the first, so a city on a

@@ -203,7 +203,7 @@ impl RunWorker {
             log,
             doorstep: Doorstep::opened(entrance),
             origins,
-            flight: Flight::open(),
+            flight: Flight::open(crate::monitor::memory::read),
             index: memory::LedgerIndex::empty(),
             warm: super::keeping_warm::Kept::default(),
             models: Box::new(GatewayModels),
