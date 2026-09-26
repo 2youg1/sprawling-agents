@@ -81,7 +81,8 @@
 
   // The cost view names the active runs and the few billed most; the
   // rest of this building's runs are asked for by name, newest first,
-  // and the server answers as many as one page holds.
+  // in one question, and the server answers only the newest
+  // RUN_COSTS_MAX of them; older cold runs show no figure.
   const cold = $derived.by(() => {
     const held = $cost;
     if (held === undefined || !("cost" in held)) return [];
