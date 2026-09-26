@@ -14,9 +14,9 @@ use crate::vfs::Vfs;
 
 use super::files::{
     copy_city_files, copy_tree, count_files, count_records, head_of, only_city_files, walk,
-    write_file,
 };
 use super::history::{self, History};
+use super::landing::{Bits, land};
 use super::manifest::{CAS, CITY, LEDGER, MANIFEST, Manifest};
 
 /// One count taken on the city against the same count taken on the
@@ -91,7 +91,12 @@ impl Bundle {
             });
         }
         let target = WriteTarget::at("write a bundle manifest", &dest.join(MANIFEST))?;
-        write_file(vfs.as_mut(), &target, manifest.to_json().as_bytes())?;
+        land(
+            vfs.as_mut(),
+            target,
+            manifest.to_json().as_bytes(),
+            Bits::OfReplaced,
+        )?;
         Ok(manifest)
     }
 

@@ -17,6 +17,8 @@ use crate::error::{MemoryError, io_err};
 use crate::jsonl::JsonlLedger;
 use crate::vfs::Vfs;
 
+use super::landing::{Bits, land};
+
 use super::manifest::RESERVED;
 
 pub(crate) fn head_of(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<String, MemoryError> {
@@ -210,7 +212,7 @@ pub(crate) fn copy_tree(vfs: &mut dyn Vfs, from: &Path, to: &Path) -> Result<u64
         let bytes = vfs
             .read(&path)
             .map_err(io_err("read a bundle file", &path))?;
-        write_file(vfs, &cleared, &bytes)?;
+        land(vfs, cleared, &bytes, Bits::Of(&path))?;
         copied = copied.saturating_add(1);
     }
     Ok(copied)
@@ -250,7 +252,7 @@ pub(crate) fn copy_city_files(
         let bytes = vfs
             .read(&path)
             .map_err(io_err("read a bundle file", &path))?;
-        write_file(vfs, &cleared, &bytes)?;
+        land(vfs, cleared, &bytes, Bits::Of(&path))?;
         copied = copied.saturating_add(1);
     }
     Ok(copied)
@@ -268,23 +270,6 @@ pub(crate) fn count_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryError
         count = count.saturating_add(1);
     }
     Ok(count)
-}
-
-/// Writes one bundle file under a target the alias rule has cleared.
-pub(crate) fn write_file(
-    vfs: &mut dyn Vfs,
-    target: &WriteTarget,
-    bytes: &[u8],
-) -> Result<(), MemoryError> {
-    let path = target.as_path();
-    if vfs.exists(path) {
-        vfs.remove_file(path)
-            .map_err(io_err("replace a bundle file", path))?;
-    }
-    vfs.append(path, bytes)
-        .map_err(io_err("write a bundle file", path))?;
-    vfs.sync_data(path)
-        .map_err(io_err("flush a bundle file", path))
 }
 
 /// Opens the restored ledger, so the city is one a writer can continue.

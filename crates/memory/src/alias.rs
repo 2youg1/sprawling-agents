@@ -153,7 +153,7 @@ impl WriteTarget {
 )]
 pub(crate) mod tests {
     use super::*;
-    use crate::bundle::files::write_file;
+    use crate::bundle::landing::{Bits, land};
     use crate::real_fs::RealFs;
 
     /// Places a junction at `to` leading to `from` (a symlink off
@@ -291,7 +291,7 @@ pub(crate) mod tests {
                     Ok(cleared) => {
                         // The face lands the write in a fresh entry:
                         // every other name of the inode keeps its bytes.
-                        write_file(&mut vfs, &cleared, b"landed").unwrap();
+                        land(&mut vfs, cleared, b"landed", Bits::OfReplaced).unwrap();
                     }
                     Err(MemoryError::Alias { .. }) => {}
                     Err(other) => panic!("{other}"),
