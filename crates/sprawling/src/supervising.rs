@@ -53,9 +53,18 @@ impl CrashBudget {
     pub(crate) fn after(mut self, closing: &Closing, at: TimeMs) -> Next {
         match closing {
             Closing::Chosen => Next::Stop,
-            Closing::Broken { cause: _ } => {
+            Closing::Broken { cause } => {
+                self.crashes
+                    .retain(|crash| at.value().saturating_sub(crash.value()) < CRASH_WINDOW_MS);
                 self.crashes.push(at);
-                Next::Restart(self)
+                if self.crashes.len() >= CRASH_LIMIT {
+                    Next::Degraded {
+                        crashes: self.crashes.len(),
+                        cause: cause.clone(),
+                    }
+                } else {
+                    Next::Restart(self)
+                }
             }
         }
     }

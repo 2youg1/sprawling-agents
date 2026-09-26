@@ -59,7 +59,9 @@ pub fn supervise(city: &Path, addr: &str, line: &[String]) -> Result<Ended, AxEr
             }
             Next::Degraded { crashes, cause } => {
                 eprintln!("supervise: {crashes} crashes inside a minute; the last one: {cause}");
-                eprintln!("supervise: the city stays down. Press Enter to try again, or close this terminal.");
+                eprintln!(
+                    "supervise: the city stays down. Press Enter to try again, or close this terminal."
+                );
                 if !lifted() {
                     return Ok(Ended::Degraded);
                 }
@@ -68,7 +70,9 @@ pub fn supervise(city: &Path, addr: &str, line: &[String]) -> Result<Ended, AxEr
         }
         // A resume that fails is printed by the child itself; the serve
         // after it meets the same fault and spends the budget.
-        run(&exe, &resume_line(city))?;
+        if let Err(failure) = run(&exe, &resume_line(city))? {
+            eprintln!("supervise: resume did not finish ({failure}); serving anyway");
+        }
     }
 }
 
@@ -112,12 +116,16 @@ fn serve_line(city: &Path, addr: &str, line: &[String], launch: Launch) -> Vec<S
         Launch::First | Launch::Again => "--no-open",
     };
     let console = wants_up && !line.iter().any(|a| a == "--no-console");
-    ["serve".to_owned(), city.display().to_string(), addr.to_owned()]
-        .into_iter()
-        .chain(flags(line).filter(|a| a != "--open" && a != "--no-open"))
-        .chain(std::iter::once(opens.to_owned()))
-        .chain(console.then(|| "--console".to_owned()))
-        .collect()
+    [
+        "serve".to_owned(),
+        city.display().to_string(),
+        addr.to_owned(),
+    ]
+    .into_iter()
+    .chain(flags(line).filter(|a| a != "--open" && a != "--no-open"))
+    .chain(std::iter::once(opens.to_owned()))
+    .chain(console.then(|| "--console".to_owned()))
+    .collect()
 }
 
 /// The flags of `line`, without its verb, its positionals, or `--supervise`.

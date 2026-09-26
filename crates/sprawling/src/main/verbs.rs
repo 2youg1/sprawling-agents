@@ -100,6 +100,11 @@ const SERVED: &[Flag] = &[
     NO_OPEN,
     flag("--console", Nothing, "enter the city's console"),
     flag("--no-console", Nothing, "do not enter the console"),
+    flag(
+        "--supervise",
+        Nothing,
+        "serve in a child process, resume and serve again after a crash",
+    ),
     LOG,
     flag(
         "--web-dir",

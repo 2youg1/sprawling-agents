@@ -198,6 +198,16 @@ pub(super) fn serve_city(
         eprintln!("recovery: give host:port, for example {DEFAULT_AT}");
         return ExitCode::from(2);
     };
+    // After the refusals a restart could not cure, so a mistyped line
+    // is refused once here rather than spending the crash budget
+    // (sprawling-SPEC.md 8-90).
+    if args.iter().any(|a| a == "--supervise") {
+        return match sprawling::supervising::supervise(city, raw, args) {
+            Ok(sprawling::supervising::Ended::Chosen) => ExitCode::SUCCESS,
+            Ok(sprawling::supervising::Ended::Degraded) => ExitCode::FAILURE,
+            Err(err) => report(err),
+        };
+    }
     // The client source: embedded by default; a directory for the
     // development loop, read per request so an edit shows on refresh.
     let client = match flag_value(args, "--web-dir") {
