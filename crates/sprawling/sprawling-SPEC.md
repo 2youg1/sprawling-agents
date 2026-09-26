@@ -2041,7 +2041,9 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, building: Address, run: RunId) -
   改回派活时的状态；重放只动本轮碰过的行。基线与读盘之间只隔同一线程上的落账，能在这里改动文件的只有城外的写者（人的编辑器），
   那时替换以 `E_VERSION_CONFLICT` 拒绝，行已在账本上而文件未动，错误原样交给 `settle` 的调用方。
 - **未定：认领入账与目标登记**。`roadmap_claimed` 仍在落地时由工人写下，而不是在记账线程答复认领时写下；
-  目标登记也还没走这条路。能定下它们的证据：一条红测——认领被答复之后、那轮活落地之前，账本上已有这条认领。
+  目标登记也还没走这条路。先入账要同时定下落地被判 stale 时那条已在账本上的认领怎么收场：`folds::collaboration` 把
+  `roadmap_claimed` 读成持有，只丢弃不补一条 `roadmap_released` 会让那一行在历史里永远有人占着。
+  能定下它们的证据：一条红测——认领被答复之后、那轮活落地之前，账本上已有这条认领。
 - 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes/)'`；
   `cargo nextest run -p collab -E 'test(/two_runs_read_as_ready/)'` 在桌子一侧钉住「第二个认领当场被拒、什么都不留」。
 
