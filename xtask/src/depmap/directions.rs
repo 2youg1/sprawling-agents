@@ -285,6 +285,34 @@ mod tests {
     }
 
     #[test]
+    fn a_missing_module_is_reported_and_a_test_file_is_not_judged() {
+        let root = std::env::temp_dir().join(format!("depmap-directions-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let views = root.join("crates/x/src/views");
+        std::fs::create_dir_all(&views).unwrap();
+        std::fs::write(root.join("crates/x/src/views.rs"), "fn f() {}\n").unwrap();
+        std::fs::write(views.join("tests.rs"), "use crate::assembly::Fixture;\n").unwrap();
+        let text = "```directions\n\
+                    crates/x/src/gone: crate::assembly\n\
+                    crates/x/src/views: crate::assembly\n\
+                    ```\n";
+        let mut violations = Vec::new();
+        check(&root, text, &mut violations).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        let found: Vec<(String, String)> = violations
+            .into_iter()
+            .map(|v| (v.location, v.violation))
+            .collect();
+        assert_eq!(
+            found,
+            vec![(
+                format!("{ARCH} ```directions crates/x/src/gone"),
+                "no `crates/x/src/gone.rs` and no `crates/x/src/gone/` directory".to_owned()
+            )]
+        );
+    }
+
+    #[test]
     fn the_block_reads_modules_and_paths() {
         let text = "```directions\n# comment\ncrates/x/src/views: crate::assembly\n```\n";
         assert_eq!(
