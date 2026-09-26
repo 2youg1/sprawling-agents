@@ -107,7 +107,7 @@ fn the_snapshot_is_replaced_at_the_closing_boundary_and_not_before() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &window,
             &[],
             &shape(),
@@ -201,7 +201,7 @@ fn a_threshold_crossed_mid_wave_compacts_once_over_the_whole_exchange() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &window,
             &[],
             &shape(),

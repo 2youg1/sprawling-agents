@@ -51,7 +51,7 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &Window::new(),
             &[],
             &shape(),
@@ -138,7 +138,7 @@ fn the_wave_result_block_keeps_what_the_ledger_drops() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &Window::new(),
             &[],
             &shape(),

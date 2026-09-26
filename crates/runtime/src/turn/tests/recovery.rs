@@ -226,7 +226,7 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &window,
             &[],
             &shape(),
@@ -293,7 +293,7 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &Window::new(),
             &[],
             &shape(),

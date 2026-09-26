@@ -29,7 +29,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &window,
             &[],
             &shape(),
@@ -114,7 +114,7 @@ fn cancel_at_the_call_boundary_stops_before_any_model_bytes() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &Window::new(),
             &[],
             &shape(),
@@ -154,7 +154,7 @@ fn steer_at_a_boundary_records_and_advances() {
                 text: "prefer the short route".to_owned(),
             },
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &Window::new(),
             &[],
             &shape(),
@@ -199,7 +199,7 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &Window::new(),
             &[],
             &shape(),
@@ -255,7 +255,7 @@ fn the_ledger_chain_stays_verifiable_after_a_turn() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &Window::new(),
             &[],
             &shape(),
@@ -307,7 +307,7 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
         turn.assemble(
             Interrupt::None,
             &mut ledger,
-            &prefix(),
+            RunPrompt::new(&prefix(), &mut PromptRecord::default()),
             &Window::new(),
             &[],
             &shape(),

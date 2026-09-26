@@ -281,8 +281,8 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
     assert_eq!(stamps[1], 1);
     assert_eq!(stamps[2], 2);
     assert_eq!(stamps[8], 3);
-    assert_eq!(stamps[12], 4);
-    assert_eq!(stamps[13], 5);
+    assert_eq!(stamps[11], 4);
+    assert_eq!(stamps[12], 5);
 }
 
 /// There is no ceiling to reach, so a run goes on until its

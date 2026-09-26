@@ -174,6 +174,9 @@ pub struct Active {
     /// the next one is compared against. `None` before the first
     /// request, and that absence is the `FirstRequest` a record states.
     prior_shape: Option<crate::prefix::shape::PromptShape>,
+    /// The `prompt_assembled` payload this run wrote last, which a turn
+    /// does not write again (runtime-SPEC.md section 8-39, item 5).
+    prompt: crate::turn::PromptRecord,
     /// Whether the next wave needs a fence (§8-45).
     fence: fence::FencePolicy,
 }

@@ -295,7 +295,6 @@ impl Turn<Assembling> {
 pub struct RunPrompt<'r> { /* prefix: &'r FrozenPrefix, recorded: &'r mut PromptRecord */ }
 impl<'r> RunPrompt<'r> { pub fn new(prefix: &'r FrozenPrefix, recorded: &'r mut PromptRecord) -> RunPrompt<'r>; }
 #[derive(Default)] pub struct PromptRecord { /* written: Option<Payload> */ }   // 住 Run 的 Active 态，跨回合
-}
 // Interrupt 增 Steer { source: String, text: String }：边界消费→追加 steer_received（in-window）→照常 Advanced（不终止回合）；
 // 文本回折入 Window 归执行器（它持 Window 与 Steer 原文），呼应「追加在结果末尾」。
 // TurnReport 长入：model_content: Vec<ContentBlock>（助手内容）与 wave_results: Vec<ContentBlock>（ToolResult 块）——
