@@ -44,7 +44,7 @@ pub use session::{own_layer, write_session};
 pub use settled::{settled_effort, settled_second};
 pub(crate) use shelves::SHELVES_KEY;
 pub use shelves::city_shelves;
-pub use write::{write_effort, write_mcp, write_sandbox, write_second_threshold};
+pub use write::{write_mcp, write_sandbox, write_second_threshold};
 
 use ladder::Ladder;
 // The refusal shapes every reader in this module answers with.

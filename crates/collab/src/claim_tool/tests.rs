@@ -11,8 +11,23 @@ use super::tool::ACTIONS;
 use super::*;
 // The desk produces the effects; whether one still holds is
 // `claim_effect`'s question, asked here against a real desk run.
-use crate::claim_effect::{evidence_of, still_true};
-use kernel::spine::set_roadmap_status;
+use crate::claim_effect::still_true;
+use kernel::spine::{check_roadmap_shape, set_roadmap_status};
+use kernel::{EvidenceCell, Locator, RoadmapShape};
+
+/// The plan's evidence column for one node, read back the way a person
+/// reading the file would: the reader half of what `finish` writes.
+fn evidence_of(text: &str, id: &NodeId) -> Option<Locator> {
+    let RoadmapShape::WellFormed { rows } = check_roadmap_shape(text) else {
+        return None;
+    };
+    rows.iter()
+        .find(|row| &row.id == id)
+        .and_then(|row| match &row.evidence {
+            EvidenceCell::Present(locator) => Some(locator.clone()),
+            EvidenceCell::Empty | EvidenceCell::Invalid { .. } => None,
+        })
+}
 
 const PLAN: &str = "\
 # Roadmap

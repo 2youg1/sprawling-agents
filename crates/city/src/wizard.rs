@@ -3,20 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Starting a city, and moving a resident inside one.
+//! Starting a city.
 //!
-//! Both are decisions rather than actions. What a new city consists of
-//! and what a move implies are answered here as values; making the
-//! directories and writing the events is the binary's work. That split
-//! is what lets "one instruction builds a city" be tested without
-//! building one.
-//!
-//! A move is the harder of the two, and the reason is that an address
-//! decides three things at once: where the resident may write, what it
-//! reads by default, and who it reports to. Moving is therefore never a
-//! rename — it is a new write domain, and the history stays where it
-//! happened. A city that rewrote history to match a new address would be
-//! a city where "this is where it was done" has no answer.
+//! This is a decision rather than an action. What a new city consists of
+//! is answered here as a value; making the directories and writing the
+//! events is the binary's work. That split is what lets "one instruction
+//! builds a city" be tested without building one.
 
 use kernel::{Address, AxCode, AxError, RESERVED_PREFIX};
 
@@ -170,70 +162,6 @@ impl CityPlan {
     }
 }
 
-/// What moving a resident implies. Every field is something a caller has
-/// to act on; nothing here is decoration.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Relocation {
-    /// Where the resident was. Its history stays addressed to this.
-    pub from: Address,
-    /// Where it will be, and therefore what it may write.
-    pub to: Address,
-    /// Whether the move crosses buildings. A move inside one building
-    /// changes a desk; a move between two changes an employer, and the
-    /// reading room, the policy and the archive all change with it.
-    pub crosses_building: bool,
-}
-
-/// Decides a move.
-///
-/// # Errors
-/// Refuses a move to or from the reserved subtree, a move onto the same
-/// address, and a move to an address that is not a room. The last one is
-/// the interesting refusal: a resident lives in a room, and letting one
-/// live at a building's root would give it the whole building's write
-/// domain by a side door.
-pub fn relocate(from: &Address, to: &Address) -> Result<Relocation, AxError> {
-    for addr in [from, to] {
-        if addr.is_reserved() {
-            return Err(AxError::failure(
-                AxCode::OutsideWriteDomain,
-                "relocate a resident",
-                addr.as_str().to_owned(),
-            )
-            .with_recovery("the city's own subtree houses nobody"));
-        }
-    }
-    if from == to {
-        return Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "relocate a resident",
-            from.as_str().to_owned(),
-        )
-        .with_recovery("name a different room; a move to the same address is not a move"));
-    }
-    if !to.as_str().contains('/') {
-        return Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "relocate a resident",
-            to.as_str().to_owned(),
-        )
-        .with_recovery(
-            "name a room inside a building; living at a building's root would hand over the \
-             whole building's write domain",
-        ));
-    }
-    let crosses_building = building_of(from) != building_of(to);
-    Ok(Relocation {
-        from: from.clone(),
-        to: to.clone(),
-        crosses_building,
-    })
-}
-
-fn building_of(addr: &Address) -> &str {
-    addr.as_str().split('/').next().unwrap_or(addr.as_str())
-}
-
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -293,10 +221,6 @@ mod tests {
         );
     }
 
-    fn addr(raw: &str) -> Address {
-        Address::parse(raw).unwrap()
-    }
-
     #[test]
     fn one_instruction_plans_a_city_with_somewhere_to_work_in_it() {
         let plan = CityPlan::new(Some(("lab", "minimal"))).unwrap();
@@ -328,41 +252,5 @@ mod tests {
         assert!(reserved.recovery().contains("another name"));
         let room = CityPlan::new(Some(("lab/room1", "minimal"))).unwrap_err();
         assert!(room.recovery().contains("not a room"));
-    }
-
-    #[test]
-    fn a_move_between_buildings_is_a_different_thing_from_a_move_inside_one() {
-        let inside = relocate(&addr("lab/room1"), &addr("lab/room2")).unwrap();
-        assert!(!inside.crosses_building);
-        let across = relocate(&addr("lab/room1"), &addr("mill/room1")).unwrap();
-        assert!(
-            across.crosses_building,
-            "the reading room, the policy and the archive all change with the employer"
-        );
-    }
-
-    #[test]
-    fn a_move_keeps_the_old_address_because_that_is_where_the_work_happened() {
-        let move_ = relocate(&addr("lab/room1"), &addr("mill/room1")).unwrap();
-        assert_eq!(
-            move_.from.as_str(),
-            "lab/room1",
-            "history stays addressed to where it happened; a rename would delete that answer"
-        );
-    }
-
-    #[test]
-    fn nobody_may_move_to_a_buildings_root_or_into_the_reserved_subtree() {
-        let root = relocate(&addr("lab/room1"), &addr("mill")).unwrap_err();
-        assert!(root.recovery().contains("whole building's write domain"));
-        let reserved = relocate(&addr("lab/room1"), &addr(RESERVED_PREFIX)).unwrap_err();
-        assert_eq!(reserved.code(), &AxCode::OutsideWriteDomain);
-        assert!(relocate(&addr(RESERVED_PREFIX), &addr("lab/room1")).is_err());
-    }
-
-    #[test]
-    fn a_move_to_the_same_address_is_refused_rather_than_quietly_doing_nothing() {
-        let err = relocate(&addr("lab/room1"), &addr("lab/room1")).unwrap_err();
-        assert_eq!(err.code(), &AxCode::InvalidArgs);
     }
 }

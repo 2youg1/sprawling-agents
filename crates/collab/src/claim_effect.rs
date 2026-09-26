@@ -15,7 +15,7 @@
 
 use kernel::event::record::{RoadmapMoved, RoadmapStep};
 use kernel::spine::{check_roadmap_shape, insert_children, set_roadmap_status};
-use kernel::{AxError, EvidenceCell, Locator, NewChild, NodeId, Payload, PlanExit};
+use kernel::{AxError, NewChild, NodeId, Payload, PlanExit};
 use kernel::{RoadmapShape, RoadmapStatus};
 
 /// What the run did to the plan. Exhaustive on purpose, like the other
@@ -141,22 +141,6 @@ impl ClaimEffect {
             step,
         })
     }
-}
-
-/// Whether the plan's evidence column can be retrieved for this node —
-/// the reader half of the same contract `set_roadmap_status` enforces on
-/// the writing side.
-#[must_use]
-pub fn evidence_of(text: &str, id: &NodeId) -> Option<Locator> {
-    let RoadmapShape::WellFormed { rows } = check_roadmap_shape(text) else {
-        return None;
-    };
-    rows.iter()
-        .find(|row| &row.id == id)
-        .and_then(|row| match &row.evidence {
-            EvidenceCell::Present(locator) => Some(locator.clone()),
-            EvidenceCell::Empty | EvidenceCell::Invalid { .. } => None,
-        })
 }
 
 /// Whether the node on disk still holds what the effect assumed. The
