@@ -104,6 +104,14 @@ futures-util = { version = "0.3", default-features = false, features = ["sink"] 
 # the tree as a transitive dependency, so this adds a name rather than a
 # crate.
 getrandom = "0.4"
+# A skill package is read by walking directory handles, never by
+# re-resolving a path: a directory swapped for a link after its judgement
+# is then outside anything the walk can open (city-SPEC section 8-28).
+# The standard library has no handle-relative open; these two crates are
+# that open in safe Rust, and cap-primitives beneath them is already in
+# the lock beneath wasmtime-wasi, under the same licence.
+cap-std = "4"
+cap-fs-ext = "4"
 # One HTTP client for the whole workspace: gateway speaks to providers,
 # the bin speaks to MCP servers reached over HTTP, and two version
 # authorities for one client is how two TLS stacks end up in one binary.

@@ -15,6 +15,10 @@
 //! over are not the package's to file, and where it points can change
 //! between this check and the landing.
 //!
+//! A package is read by [`walk`], which opens every item relative to
+//! the directory handle that listed it; a resident's document has no
+//! directory to walk and is judged by its own path.
+//!
 //! The reading keeps every byte it read - one snapshot per item - and
 //! hashes exactly those bytes, so the landing writes what was judged and
 //! the recheck before it compares one hash that covers every item.
@@ -28,6 +32,8 @@ use kernel::{AxCode, AxError, B3Hash};
 
 use crate::library::reading;
 use crate::library::shelf::{HOLDING_EXT, holding_name};
+
+pub(super) mod walk;
 
 /// The first bytes of a package's canonical string, so a document that
 /// happens to read like one is never taken for a package in the store.
@@ -96,30 +102,12 @@ fn unlinked(path: &Path) -> Result<Metadata, AxError> {
 /// Reads a package whole: every item under it, in canonical order, and
 /// [`reading::SKILL_FILE`] among them as text the scan can read.
 fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
-    let root = std::fs::canonicalize(dir).map_err(|err| source_io(dir, &err))?;
-    let mut found = Vec::new();
-    let mut open = vec![(dir.to_path_buf(), String::new())];
-    while let Some((at, prefix)) = open.pop() {
-        let listed = reading::read_dir(&at)?;
-        stays_under(&root, &at, &prefix)?;
-        for entry in listed {
-            let path = format!("{prefix}{}", reading::spelled(&entry)?);
-            let meta = unlinked(&entry)?;
-            if meta.is_dir() {
-                open.push((entry.clone(), format!("{path}/")));
-            } else if !meta.is_file() {
-                return Err(not_a_source(&entry, "it is neither a directory nor a file"));
-            }
-            found.push((path, entry, meta));
-        }
-    }
-    found.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut found = walk::items(dir)?;
+    found.sort_by(|left, right| left.path.cmp(&right.path));
     let mut stored = PACKAGE_HEADER.to_vec();
     let mut items = Vec::with_capacity(found.len());
-    for (path, entry, meta) in found {
-        let item = append_item(&mut stored, path.clone(), &entry, &meta)?;
-        stays_under(&root, &entry, &path)?;
-        items.push(item);
+    for walk::Found { path, bytes } in found {
+        items.push(append_item(&mut stored, path, bytes.as_deref(), dir)?);
     }
     let document = items.iter().find_map(|item| match item {
         Item::File(path, bytes) if path == reading::SKILL_FILE => Some(bytes.clone()),
@@ -146,20 +134,18 @@ fn inspect_package(dir: &Path) -> Result<Inspected, AxError> {
 fn append_item(
     stored: &mut Vec<u8>,
     path: String,
-    entry: &Path,
-    meta: &Metadata,
+    bytes: Option<&[u8]>,
+    package: &Path,
 ) -> Result<Item, AxError> {
-    let tag = if meta.is_dir() { b'd' } else { b'f' };
-    stored.push(tag);
-    append_len(stored, path.len(), entry)?;
+    stored.push(if bytes.is_some() { b'f' } else { b'd' });
+    append_len(stored, path.len(), package)?;
     stored.extend_from_slice(path.as_bytes());
-    if meta.is_dir() {
+    let Some(bytes) = bytes else {
         return Ok(Item::Directory(path));
-    }
-    let bytes = read_unlinked(entry, meta)?;
-    append_len(stored, bytes.len(), entry)?;
+    };
+    append_len(stored, bytes.len(), package)?;
     let start = stored.len();
-    stored.extend_from_slice(&bytes);
+    stored.extend_from_slice(bytes);
     Ok(Item::File(path, start..stored.len()))
 }
 
@@ -187,24 +173,6 @@ fn inspect_document(file: &Path) -> Result<Inspected, AxError> {
         stored,
         hash,
     })
-}
-
-/// Refuses when `path` no longer resolves to `relative` beneath the
-/// package's canonical `root`: a directory on the way swapped for a link
-/// after its judgement sends the listing or the read somewhere else, and
-/// resolving every component again after the listing or the read finds
-/// it, unless the swap is undone inside that window.
-fn stays_under(root: &Path, path: &Path, relative: &str) -> Result<(), AxError> {
-    let expected = relative
-        .split('/')
-        .filter(|segment| !segment.is_empty())
-        .fold(root.to_path_buf(), |at, segment| at.join(segment));
-    let resolved = std::fs::canonicalize(path).map_err(|err| source_io(path, &err))?;
-    if resolved == expected {
-        Ok(())
-    } else {
-        Err(refuses_link(path))
-    }
 }
 
 /// Reads a file judged not to be a link, and refuses when what the open
@@ -255,9 +223,21 @@ fn same_file(judged: &Metadata, opened: &Metadata) -> bool {
 /// would land and hash as if they were the skill.
 #[cfg(windows)]
 fn same_file(_judged: &Metadata, opened: &Metadata) -> bool {
+    opened.is_file() && plain(opened)
+}
+
+/// Whether an opened handle holds the item itself: on Windows, no reparse
+/// point of any kind, for the reason [`same_file`] gives.
+#[cfg(windows)]
+pub(super) fn plain(opened: &Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
-    opened.is_file() && opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0
+    opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0
+}
+
+#[cfg(not(windows))]
+pub(super) fn plain(opened: &Metadata) -> bool {
+    !opened.file_type().is_symlink()
 }
 
 /// The scan reads a skill document as text, so a document it could not
@@ -269,7 +249,7 @@ fn require_text(path: &Path, bytes: Option<&[u8]>) -> Result<(), AxError> {
     }
 }
 
-fn refuses_link(path: &Path) -> AxError {
+pub(super) fn refuses_link(path: &Path) -> AxError {
     AxError::failure(
         AxCode::InvalidArgs,
         "install a skill",
@@ -284,7 +264,7 @@ fn refuses_link(path: &Path) -> AxError {
     )
 }
 
-fn not_a_source(path: &Path, why: &str) -> AxError {
+pub(super) fn not_a_source(path: &Path, why: &str) -> AxError {
     AxError::failure(
         AxCode::InvalidArgs,
         "install a skill",
@@ -297,7 +277,7 @@ fn not_a_source(path: &Path, why: &str) -> AxError {
     ))
 }
 
-fn source_io(path: &Path, err: &std::io::Error) -> AxError {
+pub(super) fn source_io(path: &Path, err: &std::io::Error) -> AxError {
     if err.kind() == std::io::ErrorKind::NotFound {
         return AxError::failure(
             AxCode::PathNotFound,

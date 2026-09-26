@@ -92,6 +92,16 @@ pub(crate) enum TreeEntry<'a> {
 pub(crate) fn place_tree(target: &Path, entries: &[TreeEntry<'_>]) -> Result<(), AxError> {
     let slot = slot(target);
     let _guard = slot.lock().unwrap_or_else(PoisonError::into_inner);
+    match std::fs::symlink_metadata(target) {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Ok(_) => {
+            return Err(storage(
+                target,
+                "is already there, and a tree is placed rather than laid over one".to_owned(),
+            ));
+        }
+        Err(err) => return Err(storage(target, err.to_string())),
+    }
     let dir = target
         .parent()
         .ok_or_else(|| storage(target, "a tree needs a directory to sit in".to_owned()))?;
