@@ -31,7 +31,6 @@ use snapshot_start::SnapshotFold;
 use standing_start::StandingFolds;
 pub(super) use standing_start::{as_json_text, from_json_text};
 pub(crate) use views_start::start_served_views;
-use views_start::start_views;
 
 /// Everything a worker inherits from a history it did not write.
 ///
@@ -84,12 +83,7 @@ impl Standing {
         if !ledger_dir.exists() {
             return StandingFolds::empty(ledger_dir).settle(Ok(()));
         }
-        if let memory::ChainAudit::Broken(reason) =
-            memory::audit_chain(ledger_dir).map_err(memory::MemoryError::into_ax)?
-        {
-            return Err(reason);
-        }
-        let started = snapshot_start::start::<StandingFolds>(ledger_dir)?;
+        let started = snapshot_start::start_audited::<StandingFolds>(ledger_dir)?;
         let cut = snapshot_start::cut(ledger_dir, &started);
         started.folded.settle(cut)
     }
@@ -109,10 +103,7 @@ impl Standing {
 /// the verification failures of the lines it folds; a city whose history
 /// does not verify is not one whose views should be served.
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
-    match memory::audit_chain(ledger_dir).map_err(memory::MemoryError::into_ax)? {
-        memory::ChainAudit::Whole { .. } => start_views(ledger_dir).map(|started| started.folded),
-        memory::ChainAudit::Broken(reason) => Err(reason),
-    }
+    snapshot_start::start_audited::<Views>(ledger_dir).map(|started| started.folded)
 }
 
 /// The records the per-line check already parsed, in ledger order.
