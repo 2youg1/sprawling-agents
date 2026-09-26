@@ -21,11 +21,15 @@ use super::{Entrance, Expiries};
 
 mod collaboration;
 mod session;
+mod snapshot_start;
+mod standing_start;
 mod views_start;
 
-use collaboration::CollaborationFold;
 pub(super) use collaboration::{Collaboration, INBOX_CAPACITY, new_inbox};
 pub(super) use session::SessionOrigins;
+use snapshot_start::SnapshotFold;
+use standing_start::StandingFolds;
+pub(super) use standing_start::{as_json_text, from_json_text};
 pub(crate) use views_start::start_served_views;
 use views_start::start_views;
 
@@ -50,6 +54,9 @@ pub(crate) struct Standing {
     /// What each room's current session branched from, until the run
     /// that begins it is written.
     pub(super) origins: SessionOrigins,
+    /// Whether the snapshot of these folds was cut. Not an error of the
+    /// fold: a snapshot only shortens the next start.
+    pub(super) cut: Result<(), AxError>,
 }
 
 impl Standing {
@@ -70,31 +77,14 @@ impl Standing {
     /// Propagates chain verification and whatever a fold says about a
     /// payload it cannot read.
     pub(crate) fn fold(ledger_dir: &Path) -> Result<Standing, AxError> {
-        let mut book = gateway::EndpointBook::new();
-        let mut governance = Governance::empty();
-        let mut collaboration = CollaborationFold::default();
-        let mut entrance = Entrance::default();
-        let mut expiries = Expiries::default();
-        let mut origins = SessionOrigins::default();
+        let mut folds = StandingFolds::empty(ledger_dir);
         if ledger_dir.exists() {
             let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
             for record in known_records(&verified) {
-                book.apply(record)?;
-                governance.absorb(record.kind(), record.run(), record.addr(), record.data())?;
-                collaboration.absorb(record)?;
-                entrance.absorb(record.data());
-                expiries.absorb(record.kind(), record.data());
-                origins.absorb(record.kind(), record.addr(), record.data())?;
+                folds.absorb(record)?;
             }
         }
-        Ok(Standing {
-            book,
-            governance,
-            collaboration: collaboration.settle()?,
-            entrance,
-            expiries,
-            origins,
-        })
+        folds.settle(Ok(()))
     }
 }
 
@@ -113,7 +103,7 @@ impl Standing {
 /// does not verify is not one whose views should be served.
 pub(crate) fn rebuild_views(ledger_dir: &Path) -> Result<Views, AxError> {
     match memory::audit_chain(ledger_dir).map_err(memory::MemoryError::into_ax)? {
-        memory::ChainAudit::Whole { .. } => start_views(ledger_dir).map(|started| started.views),
+        memory::ChainAudit::Whole { .. } => start_views(ledger_dir).map(|started| started.folded),
         memory::ChainAudit::Broken(reason) => Err(reason),
     }
 }

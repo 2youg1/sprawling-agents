@@ -8,9 +8,10 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, RunId};
-use memory::StoredSnapshot;
+use kernel::{Address, RunId, Seq};
+use memory::{StoredSnapshot, WholeFold};
 
+use super::super::snapshot_start::{FoldStart, snapshot_dir};
 use super::*;
 use crate::assembly::{RunWorker, init_city};
 
@@ -27,7 +28,7 @@ fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
 }
 
 fn snapshots(city: &Path) -> PathBuf {
-    kernel::layout::CityLayout::new(city).snapshot()
+    snapshot_dir::<Views>(city)
 }
 
 /// A city with three buildings, a snapshot cut after them, then `more`
@@ -41,7 +42,7 @@ fn cut_then_raise(city: &Path, more: std::ops::Range<u8>) -> (PathBuf, RunWorker
     )
     .unwrap();
     raise(&mut worker, 0..3);
-    cut_views_snapshot(&ledger, &start_views(&ledger).unwrap()).unwrap();
+    cut(&ledger, &start_views(&ledger).unwrap()).unwrap();
     let cut = memory::read_snapshot(&snapshots(city)).unwrap();
     assert!(matches!(cut, StoredSnapshot::Present(_)), "{cut:?}");
     raise(&mut worker, more);
@@ -51,8 +52,8 @@ fn cut_then_raise(city: &Path, more: std::ops::Range<u8>) -> (PathBuf, RunWorker
 fn from_genesis(city: &Path, ledger: &Path) -> Vec<u8> {
     std::fs::remove_dir_all(snapshots(city)).unwrap();
     let whole = start_views(ledger).unwrap();
-    assert_eq!(whole.from, ViewsStart::Whole(WholeFold::NoSnapshot));
-    whole.views.encode().unwrap()
+    assert_eq!(whole.from, FoldStart::Whole(WholeFold::NoSnapshot));
+    whole.folded.encode().unwrap()
 }
 
 #[test]
@@ -68,9 +69,9 @@ fn a_start_after_a_cut_folds_only_the_tail_into_the_same_views() {
 
     let resumed = start_views(&ledger).unwrap();
 
-    assert_eq!(resumed.from, ViewsStart::Resumed { tail });
+    assert_eq!(resumed.from, FoldStart::Resumed { tail });
     assert_eq!(
-        resumed.views.encode().unwrap(),
+        resumed.folded.encode().unwrap(),
         from_genesis(dir.path(), &ledger)
     );
 }
@@ -92,12 +93,12 @@ fn a_tampered_snapshot_is_refused_and_the_whole_history_is_folded() {
     let refused = start_views(&ledger).unwrap();
 
     assert!(
-        matches!(refused.from, ViewsStart::Whole(WholeFold::Damaged(_))),
+        matches!(refused.from, FoldStart::Whole(WholeFold::Damaged(_))),
         "{:?}",
         refused.from
     );
     assert_eq!(
-        refused.views.encode().unwrap(),
+        refused.folded.encode().unwrap(),
         from_genesis(dir.path(), &ledger)
     );
 }
@@ -119,12 +120,12 @@ fn views_a_snapshot_cannot_decode_are_folded_from_genesis() {
     let refused = start_views(&ledger).unwrap();
 
     assert!(
-        matches!(refused.from, ViewsStart::Whole(WholeFold::Damaged(_))),
+        matches!(refused.from, FoldStart::Whole(WholeFold::Damaged(_))),
         "{:?}",
         refused.from
     );
     assert_eq!(
-        refused.views.encode().unwrap(),
+        refused.folded.encode().unwrap(),
         from_genesis(dir.path(), &ledger)
     );
 }

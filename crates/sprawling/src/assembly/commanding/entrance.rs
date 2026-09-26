@@ -24,16 +24,22 @@ use kernel::{AxError, IdemKey, Payload};
 /// restarts can find in its own history what it has already carried out.
 pub(in crate::assembly) const IDEM_FIELD: &str = "idem";
 
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(in crate::assembly) struct Entrance {
     /// Every key this city has answered, from its history and from this
     /// process. `BTreeSet` because it is on a decision path.
     seen: BTreeSet<IdemKey>,
     /// The refusals among them. A key that is `seen` and absent here
     /// was carried out, and the answer to its repeat is silence.
+    #[serde(
+        serialize_with = "crate::assembly::folds::as_json_text",
+        deserialize_with = "crate::assembly::folds::from_json_text"
+    )]
     refused: BTreeMap<IdemKey, AxError>,
     /// The key of the command being carried out right now, which is
-    /// what stamps the records that command writes.
+    /// what stamps the records that command writes. Not folded from the
+    /// history, so a snapshot does not hold it.
+    #[serde(skip)]
     carrying: Option<IdemKey>,
 }
 

@@ -60,7 +60,7 @@ impl Collaboration {
 /// queue is `enqueued` minus `consumed` and the two arrive in whatever
 /// order the work happened in. Nothing else here needs a second look, so
 /// nothing else is staged.
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(super) struct CollaborationFold {
     pub(super) goals: Vec<kernel::GoalEntry>,
     /// What each building was last told to work towards. Text and
@@ -74,6 +74,10 @@ pub(super) struct CollaborationFold {
     plan_holders:
         std::collections::BTreeMap<Address, std::collections::BTreeMap<kernel::NodeId, String>>,
     pub(super) requests: Vec<collab::OpenRequest>,
+    #[serde(
+        serialize_with = "enqueued_as_text",
+        deserialize_with = "enqueued_from_text"
+    )]
     enqueued: Vec<collab::Signal>,
     consumed: std::collections::BTreeSet<String>,
 }
@@ -198,3 +202,28 @@ pub(in crate::assembly) fn new_inbox() -> collab::Inbox {
 pub(in crate::assembly) const INBOX_CAPACITY: u64 = 256;
 
 pub(super) const SIGNAL_BANDWIDTH: u32 = 4;
+
+/// The signals still waiting, in a snapshot, as the `signal_enqueued`
+/// payloads they were folded from: the writer's own inverse reads them
+/// back, and a payload is JSON, which postcard cannot carry.
+fn enqueued_as_text<S: serde::Serializer>(
+    enqueued: &[collab::Signal],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let payloads = enqueued
+        .iter()
+        .map(collab::Signal::enqueued_payload)
+        .collect::<Result<Vec<_>, AxError>>()
+        .map_err(serde::ser::Error::custom)?;
+    super::as_json_text(&payloads, serializer)
+}
+
+fn enqueued_from_text<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<collab::Signal>, D::Error> {
+    super::from_json_text::<Vec<kernel::Payload>, D>(deserializer)?
+        .iter()
+        .map(collab::Signal::from_payload)
+        .collect::<Result<Vec<_>, AxError>>()
+        .map_err(serde::de::Error::custom)
+}
