@@ -3226,5 +3226,9 @@
   "slash_diff": {
     "en": "open the changes of the run in this room",
     "zh": "打开此房间 run 的改动"
+  },
+  "ask_late_title": {
+    "en": "no answer came back to the {query} question",
+    "zh": "{query} 这个问题没有等到回答"
   }
 }

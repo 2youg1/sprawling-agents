@@ -18,12 +18,14 @@
 // holds marks nothing stale. An answer that matches nothing, and a
 // question nothing answers, are reported.
 
+import { Option, Schema } from "effect";
 import { writable } from "svelte/store";
 import type { Readable, Writable } from "svelte/store";
 
 import type { Key } from "./lang";
 import { reachOf, reaches } from "./staleness";
-import type { Address, Answer, AskId, AskOutcome, AxCode, AxError, EventRecord, Query, Seq } from "../wire";
+import { Query } from "../wire";
+import type { Address, Answer, AskId, AskOutcome, AxCode, AxError, EventRecord, Seq } from "../wire";
 
 const PACE_MS = 250;
 
@@ -104,6 +106,15 @@ function minted(code: AxCode, action: string, subject: string): Reported {
 }
 
 export const keyOf = (query: Query): string => JSON.stringify(query);
+
+const readKey = Schema.decodeOption(Schema.parseJson(Query));
+
+// The wire name of the question a refusal this page minted names, read
+// back from the subject `minted` was given; `null` for a subject the
+// city wrote, which never spells a question.
+export function askedIn(subject: string): string | null {
+  return Option.match(readKey(subject), { onNone: () => null, onSome: nameOf });
+}
 
 // The wire name of a query, as `Query::name` spells it.
 function nameOf(query: Query): string {
