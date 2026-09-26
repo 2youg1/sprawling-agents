@@ -607,8 +607,9 @@ status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized b
 # What the client pays to fold one animation frame of stream into the
 # belief, with one subscriber reading the run table the way the views do.
 # A fold that told subscribers once per record paid the table's length
-# once per record; `belief.batch` tells them once per frame.
+# once per record; `belief.batch` tells them once per frame, and a token
+# into a run the `$state` table holds tells them nothing at all.
 [client_fold]
 what = "one animation frame of 50 token deltas folded into a belief of R runs, one subscriber reading the run table"
 measured_by = "bun test --conditions=browser client/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds R=1e4 to 4000 us)"
-status = "measured, not gated here: per frame 99-102 us at R=1e2, 54-107 us at R=1e3, 1031-1145 us at R=1e4 with belief.batch, against 224-233 us, 5245-7845 us and 55452-63622 us with one publish per delta (bun 1.4, x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"
+status = "measured, not gated here: per frame with the `$state` run table 30-37 us at R=1e3 and 30-54 us at R=1e4, and 30 us at R=1e2 once warm (the first size measured pays the runes runtime warm-up, 94-330 us), against 29-34 us, 58-73 us and 471-539 us with belief.batch alone, interleaved on the same instrument (bun 1.4, x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"
