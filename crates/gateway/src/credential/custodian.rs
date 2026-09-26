@@ -193,7 +193,7 @@ impl Custodian {
     /// is `Zeroizing`, not `Sealed`: `Sealed` unseals only at the two
     /// wire redemption points, and custody is a store, not a sink —
     /// callers holding a `Sealed` keep it sealed all the way to the wire
-    /// (the S4 command face converts inside its own boundary).
+    /// (the `PutSecret` command converts inside its own boundary).
     pub fn set(&mut self, reference: &SecretRef, value: Zeroizing<String>) -> Result<(), AxError> {
         if value.is_empty() {
             return Err(AxError::failure(

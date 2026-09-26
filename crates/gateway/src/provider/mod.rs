@@ -25,10 +25,10 @@
 pub mod ceiling;
 // Both are re-exported by the crate root, so the attach path in
 // `bin::assembly` reaches them by name the day `WIRE_V` carries
-// `connection_kind` (roadmap 4.5).
+// `connection_kind`.
 pub mod modality;
 pub mod preset;
 pub mod registry;
-/// The guard on the system prefix this city sends (roadmap 17.2).
+/// The guard on the system prefix this city sends.
 #[cfg(test)]
 mod stability;

@@ -13,9 +13,9 @@
 //! relearned each time the field list grows - which is why the last
 //! field went on the end rather than beside the one it belongs with.
 //!
-//! **No ceiling is reported, because there is none**. What
-//! stands where a spend ceiling used to is the context reading, which is
-//! tokens a run has actually used against the window it was given.
+//! **No ceiling is reported, because there is none**. The context
+//! reading reports what bounds a run: the tokens it has actually used
+//! against the window it was given.
 //!
 //! Nothing here samples. The snapshot is frozen at dispatch, and what
 //! moves while the run goes on - its children, its backlog, its context

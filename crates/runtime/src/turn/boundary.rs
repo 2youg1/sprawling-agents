@@ -35,7 +35,7 @@ pub enum NextCall {
 }
 
 /// A phase change either advances or ends the turn at the boundary.
-/// Exhaustive, as every enum in this workspace now is: a new outcome
+/// Exhaustive, as every enum in this workspace is: a new outcome
 /// must force every executor to decide, not fall through a catch-all.
 #[derive(Debug)]
 pub enum PhaseOutcome<Next> {

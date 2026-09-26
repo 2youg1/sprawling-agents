@@ -5,8 +5,8 @@
 
 //! The external-provider adapter: a self-written wire-format client over
 //! a plain HTTP transport. One call, one HTTP
-//! round trip: retries and failover are the watchdog's and admission's
-//! decisions, never a hidden loop here.
+//! round trip: whether to try again is the watchdog's decision, never a
+//! hidden loop here.
 //!
 //! Credentials resolve at the last moment: the `Sealed` value is exposed
 //! only while the auth header is written, then dropped (zeroized).

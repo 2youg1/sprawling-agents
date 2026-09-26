@@ -6,17 +6,13 @@
 //! How one registered endpoint is connected, decided once (shape 1
 //! decision).
 //!
-//! **Today three modules each hold a piece of this answer and none of
-//! them can state it.** The dialect says which of two request writers
-//! runs, the credential says whether a key or a subscription login
-//! pays, and the ceiling ladder says what the call may write; a person
-//! asking "how is this endpoint connected" gets three partial answers
-//! that agree only until one of them is changed. The registration path
-//! makes it worse by throwing a fact away: an endpoint the person
-//! entered as a responses URL used to be stored as
-//! `DialectKind::OpenAi`, because the stored enum had no third
-//! variant, and every later reader had to guess what the person
-//! pasted.
+//! Three modules each hold a piece of this answer and none of them can
+//! state it: the dialect says which request writer runs, the credential
+//! says whether a key or a subscription login pays, and the ceiling
+//! ladder says what the call may write. Three partial answers agree
+//! only until one of them is changed, and a registration that folded a
+//! responses URL into the chat dialect would leave every later reader
+//! guessing what the person pasted.
 //!
 //! [`ConnectionKind`] is that one answer. It is resolved once, at
 //! attach, after normalisation has folded the pasted URL, the person's
@@ -25,9 +21,8 @@
 //! re-derives it**, which is the whole point: a fact derived twice is a
 //! fact that can differ twice.
 //!
-//! A responses URL is now called on the responses face. Until this
-//! build wrote that face, [`ConnectionKind::wire`] answered `OpenAi`
-//! for it — the registration was right and the call was not.
+//! A responses URL is called on the responses face:
+//! [`ConnectionKind::wire`] answers `OpenAiResponses` for it.
 //!
 //! What this module does not hold: the request bytes (`dialect`), the
 //! header a key travels in (`endpoint::auth`), and the login flow of a
@@ -283,9 +278,9 @@ mod tests {
         );
     }
 
-    /// The fact the registration path used to throw away: a responses
-    /// URL stored as `DialectKind::OpenAi` reached every later reader
-    /// as a chat endpoint, and was called on the chat path.
+    /// A responses URL stored as `DialectKind::OpenAi` would reach
+    /// every later reader as a chat endpoint, and be called on the chat
+    /// path.
     #[test]
     fn a_responses_url_is_registered_and_called_on_the_responses_face() {
         let kind = resolve(DialectHint::Responses, None).unwrap();

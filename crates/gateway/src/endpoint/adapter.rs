@@ -5,10 +5,9 @@
 
 //! Which adapter a chosen model gets, and why.
 //!
-//! The assembly point used to own this choice as `RunWorker::adapter_for`:
-//! a credential cluster holding an assembly line. The choice reads only
-//! the chosen endpoint and a redemption closure, so it lives here, next
-//! to the adapters it mints — one wiring place, not two.
+//! The choice reads only the chosen endpoint and a redemption closure,
+//! so it lives here, next to the adapters it mints, rather than in the
+//! assembly point's credential cluster — one wiring place, not two.
 
 use kernel::AxError;
 

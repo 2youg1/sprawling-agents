@@ -291,13 +291,11 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
 }
 
 /// There is no ceiling to reach, so a run goes on until its
-/// own work runs out. The script here is longer than the turn ceiling
-/// this driver used to carry, and the run still ends by concluding
-/// rather than by being cut off.
+/// own work runs out. The script here is long, and the run still ends
+/// by concluding rather than by being cut off.
 /// The number a person enters on the provider form is what decides how
-/// many times a failed call is made again. Before this, nothing read it:
-/// the watchdog counted provider failures against no ceiling and had no
-/// caller at all, so one 503 ended a run.
+/// many times a failed call is made again, so one 503 does not end a
+/// run.
 #[test]
 fn a_retriable_failure_is_made_again_up_to_the_number_the_person_set() {
     let attempts = std::rc::Rc::new(std::cell::RefCell::new(0));

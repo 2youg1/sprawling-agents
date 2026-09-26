@@ -5,7 +5,7 @@
 
 //! The guard on one property of the supply layer: **under one
 //! configuration, two dispatches send the same system prefix, byte for
-//! byte** (roadmap 17.2).
+//! byte**.
 //!
 //! The property exists because of what a third-party endpoint does with
 //! a prompt. A compatible relay keys its prompt cache on the whole

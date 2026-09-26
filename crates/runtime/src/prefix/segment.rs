@@ -174,11 +174,9 @@ impl SegmentSource {
 /// words the verb is spelled with.
 ///
 /// Every refusal meaning "this session cannot take this turn" ends
-/// here, so no refusal promises a verb the wire does not carry: there
-/// is no command that opens a second session at one address, and a
-/// forked run is recorded without anything driving it (runtime-SPEC.md
-/// section 8-4-1). When such a verb arrives, this sentence is where it
-/// is spelled, once.
+/// here, so no refusal promises a verb the wire does not carry: every
+/// client can send a task to another address, and this sentence is
+/// where that way out is spelled, once (runtime-SPEC.md section 8-4-1).
 pub(crate) const ANOTHER_ADDRESS: &str =
     "send this task to another address, which opens a session of its own";
 

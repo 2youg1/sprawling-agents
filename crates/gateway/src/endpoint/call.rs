@@ -5,8 +5,8 @@
 
 //! The external-provider adapter: a self-written wire-format client over
 //! a plain HTTP transport. One call, one HTTP
-//! round trip: retries and failover are the watchdog's and admission's
-//! decisions, never a hidden loop here.
+//! round trip: whether to try again is the watchdog's decision, never a
+//! hidden loop here.
 //!
 //! Credentials resolve at the last moment: the `Sealed` value is exposed
 //! only while the auth header is written, then dropped (zeroized).
@@ -145,9 +145,8 @@ impl Endpoint {
     /// build, answered as JSON.
     ///
     /// The audio face sends a multipart form rather than a dialect's
-    /// request body, and it used to reach through this type for the
-    /// transport, the deadline and the status rule. It asks for them
-    /// here instead, so that "how a POST leaves this city, what a
+    /// request body. It asks this type for the transport, the deadline
+    /// and the status rule, so that "how a POST leaves this city, what a
     /// non-2xx becomes, and whether the provider's body is quoted
     /// back" is answered once for every caller.
     ///

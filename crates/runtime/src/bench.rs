@@ -263,7 +263,7 @@ impl ToolBench {
         };
         let effect = tool.meta().effect.clone();
         let wrote = tool.writes(call);
-        // What the call is about, in the tool's own grammar (M-17).
+        // What the call is about, in the tool's own grammar.
         // Read before any door: a subject this tool cannot read is a
         // call no door may judge.
         let subject = tool.subject(call)?;

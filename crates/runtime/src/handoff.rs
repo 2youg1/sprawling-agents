@@ -11,8 +11,8 @@ use kernel::event::record::HandoffWritten;
 use kernel::{AxCode, AxError, Locator, Payload, RunId};
 
 /// Five sections, always present: must-read / overview / progress /
-/// context / next step. Prose quality is the probe's business (P1); the
-/// type enforces structure only.
+/// context / next step. Prose quality is the handoff probe's business;
+/// the type enforces structure only.
 ///
 /// It writes a [`HandoffWritten`], whose field names are the line's
 /// keys, and is never read back from one: [`Handoff::new`] is the only

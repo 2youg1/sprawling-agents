@@ -8,8 +8,8 @@
 //!
 //! `runtime::turn` consumes an interruption at a phase boundary. A child
 //! process waited on inside a system call is not at a phase boundary, so
-//! before this module a hung command could not be stopped at all. Every
-//! command therefore enters this table before it is waited on: the wait
+//! a command blocked there cannot be stopped. Every command therefore
+//! enters this table before it is waited on: the wait
 //! is a bounded number of short polls against a member somebody else can
 //! reach, rather than one blocking call nobody can interrupt.
 //!
@@ -214,8 +214,7 @@ impl Backlog {
     /// Stops every member inside a scope, or every member in the city
     /// when no scope is named. Returns how many were reached.
     ///
-    /// This is the sentence `runtime::turn` could not previously make
-    /// true: a member is stopped where it stands, and the run that
+    /// A member is stopped where it stands, and the run that
     /// started it comes back to its next boundary rather than staying
     /// inside a system call. A run member is marked rather than killed:
     /// it comes back to its own next safe point and cancels there.

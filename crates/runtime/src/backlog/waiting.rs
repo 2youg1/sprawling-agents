@@ -75,10 +75,9 @@ impl Default for PollBudget {
 
 /// How a child process stopped.
 ///
-/// Three answers rather than one number. `-1` used to mean "it returned
-/// minus one", "a signal stopped it" and "this city never found out",
-/// and the reader of a tool result could not tell which of the three had
-/// happened - while a program that really does return minus one is
+/// Three answers rather than one number: one integer cannot tell "it
+/// returned minus one", "a signal stopped it" and "this city never found
+/// out" apart, and a program that really does return minus one is
 /// ordinary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Exit {

@@ -105,9 +105,9 @@ pub struct SieveAccount {
 /// `result_offloaded`: where a result went when it left the window,
 /// and what the sieve did to it on the way.
 ///
-/// The one authority for this line's keys. They used to be written by
-/// hand twice - once by the sieve and once by the plain offload path -
-/// so a reader folding a history met two shapes for one kind.
+/// The one authority for this line's keys: the sieve and the plain
+/// offload path both write through it, so a reader folding a history
+/// meets one shape for one kind.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResultOffloaded {
     /// Where the whole result is kept.

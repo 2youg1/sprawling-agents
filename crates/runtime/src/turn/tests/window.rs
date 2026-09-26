@@ -41,8 +41,8 @@ fn a_session_with_a_person_opens_in_the_persons_own_words() {
 }
 
 /// The job file's text is the prefix's run segment, so nothing sends
-/// the agent to fetch what it was already handed. Before this, the
-/// opening line carried a `cas:` hash no tool in the city can resolve.
+/// the agent to fetch what it was already handed, and no opening line
+/// carries a `cas:` hash no tool in the city can resolve.
 #[test]
 fn no_opening_line_points_at_a_file_the_agent_already_has() {
     for (goal, opening) in [
