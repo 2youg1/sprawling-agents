@@ -39,5 +39,5 @@ pub use pr_tool::{MergedRequest, OpenRequest, PrDesk, PrEffect, PrTool, Rejected
 pub use signal_tool::{SignalDesk, SignalEffect, SignalTool};
 pub use steer::{AgentSteer, Steer};
 pub use triage::{Arrival, Landing, Reflex, Rule, Triage};
-pub use workshop::{LaidOut, NodeContract, NodeId, Workshop};
+pub use workshop::{LaidOut, NodeContract, NodeId, Underway, Workshop};
 pub use workshop_tool::{WorkshopDesk, WorkshopTool};

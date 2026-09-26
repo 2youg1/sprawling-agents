@@ -15,6 +15,7 @@ fn tool() -> (
     let desk = std::sync::Arc::new(std::sync::Mutex::new(WorkshopDesk::new(
         "lab/room1".to_owned(),
         FanIn::new(),
+        std::collections::BTreeSet::new(),
     )));
     let delegates = std::sync::Arc::new(std::sync::Mutex::new(DelegateDesk::new(
         Depth::Root,

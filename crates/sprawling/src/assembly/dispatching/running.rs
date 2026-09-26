@@ -288,6 +288,7 @@ impl RunWorker {
                 driven,
                 raised,
                 delegates: &workbench.delegates,
+                workshop: &desks.workshop,
                 succession: &workbench.succession,
                 owing,
             },

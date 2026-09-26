@@ -26,41 +26,46 @@
 use std::collections::BTreeSet;
 
 use kernel::{
-    Address, AxCode, AxError, CostTier, DelegateKind, Effect, Payload, RenderIntent, Temporal,
-    Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
+    ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
-use crate::delegate_tool::{DelegateDesk, Delegated};
+use crate::delegate_tool::DelegateDesk;
 use crate::fanin::{Artifact, FanIn, Joined, PrivateQuestion};
-use crate::workshop::{LaidOut, NodeContract, NodeId, Workshop};
+use crate::workshop::{LaidOut, NodeContract, NodeId, Underway, Workshop};
 
 /// One run's workshop: the graph it laid out, and what has come back to
 /// the room it works in.
 #[derive(Debug)]
 pub struct WorkshopDesk {
     who: String,
-    laid_out: Option<Workshop>,
+    /// What the room handed down before this run, until a graph is laid
+    /// out and takes it over.
+    handed: BTreeSet<NodeId>,
+    underway: Option<Underway>,
     joined: FanIn,
 }
 
 impl WorkshopDesk {
-    /// `joined` is what the city already holds for this room, folded
-    /// from the handbacks its earlier runs received. A join outlives one
-    /// run because the nodes do: a child starts after its parent froze.
+    /// `joined` is what the room's earlier runs got back and `handed` what
+    /// it already handed down. Both outlive one run because the nodes do:
+    /// a child starts after its parent froze.
     #[must_use]
-    pub fn new(who: String, joined: FanIn) -> WorkshopDesk {
+    pub fn new(who: String, joined: FanIn, handed: BTreeSet<NodeId>) -> WorkshopDesk {
         WorkshopDesk {
             who,
-            laid_out: None,
+            handed,
+            underway: None,
             joined,
         }
     }
 
     /// Accepts a graph and hands down its ready set: the nodes whose
-    /// dependencies this room's join already holds. A node started before
-    /// its dependency hands back would read an output that does not
-    /// exist yet, so it waits for a later run to lay the graph out again.
+    /// dependencies this room's join already holds and that the room has
+    /// not handed down yet. A node started before its dependency hands
+    /// back would read an output that does not exist yet, so it waits,
+    /// and the city hands it down when that handback lands.
     ///
     /// # Errors
     /// Propagates the graph's own refusals - a duplicate id, a
@@ -73,46 +78,48 @@ impl WorkshopDesk {
         contracts: Vec<NodeContract>,
         delegates: &mut DelegateDesk,
     ) -> Result<LaidOut, AxError> {
-        if self.laid_out.is_some() {
+        if self.underway.is_some() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "lay out a workshop",
                 "this run already laid one out",
             )
             .with_recovery(
-                "one graph per session; add the work to the next session's graph, or hand a \
-                 single extra piece down with `delegate`",
+                "one graph per session; add the work to the next session's graph, or hand a                  single extra piece down with `delegate`",
             ));
         }
-        let workshop = Workshop::new(contracts)?;
         let done: BTreeSet<NodeId> = self
             .joined
             .artifacts()
             .map(|artifact| artifact.node().clone())
             .collect();
-        let laid = workshop.split(&done);
-        for id in &laid.handed {
-            let contract = workshop.contract(id).ok_or_else(|| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "lay out a workshop",
-                    format!("{} is scheduled and has no contract", id.as_str()),
-                )
-                .with_recovery(format!(
-                    "remove `{}` from the `depends_on` of every node, or add a node \
-                     for it: the schedule holds a room no node describes",
-                    id.as_str()
-                ))
-            })?;
-            delegates.ask(Delegated {
-                room: contract.write_domain().clone(),
-                task: contract.job_text(),
-                goal: contract.done_check().to_owned(),
-                kind: DelegateKind::Ephemeral,
-            })?;
+        let mut underway = Underway::new(
+            Workshop::new(contracts)?,
+            self.handed.clone(),
+            delegates.beside(),
+        );
+        let mut handed = Vec::new();
+        for work in underway.hand_next(&done)? {
+            handed.push(NodeId::parse(work.room.as_str())?);
+            delegates.ask(work)?;
         }
-        self.laid_out = Some(workshop);
-        Ok(laid)
+        let schedule = underway.schedule();
+        let waiting = schedule
+            .iter()
+            .filter(|id| !done.contains(id) && !underway.handed().contains(id))
+            .cloned()
+            .collect();
+        self.underway = Some(underway);
+        Ok(LaidOut {
+            schedule,
+            handed,
+            waiting,
+        })
+    }
+
+    /// The graph this run laid out, for the city to keep beside the join.
+    pub fn take_underway(&mut self) -> Option<Underway> {
+        self.underway.take()
     }
 
     /// What the join asks before it will take a verdict.

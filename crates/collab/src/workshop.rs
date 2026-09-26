@@ -287,24 +287,6 @@ impl Workshop {
             .collect()
     }
 
-    /// The graph split by `done`: [`Workshop::ready`] is what may start,
-    /// and every other node not yet done waits.
-    #[must_use]
-    pub fn split(&self, done: &BTreeSet<NodeId>) -> LaidOut {
-        let handed = self.ready(done);
-        let schedule = self.order();
-        let waiting = schedule
-            .iter()
-            .filter(|id| !done.contains(id) && !handed.contains(id))
-            .cloned()
-            .collect();
-        LaidOut {
-            schedule,
-            handed,
-            waiting,
-        }
-    }
-
     #[must_use]
     pub fn contract(&self, id: &NodeId) -> Option<&NodeContract> {
         self.nodes.get(id)
@@ -357,6 +339,10 @@ impl Workshop {
         out
     }
 }
+
+mod underway;
+
+pub use underway::Underway;
 
 #[cfg(test)]
 #[allow(

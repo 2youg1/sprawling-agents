@@ -11,11 +11,13 @@
 //! file that prepares a dispatch and lands it: the reader's question
 //! here is what a parent learns, not what a child did.
 
+use std::collections::BTreeSet;
+
 use kernel::{Address, EventKind, Locator};
 
 use crate::effect;
 
-use super::super::{CITY_VERIFIER, RunWorker, now_ms};
+use super::super::{Assignment, CITY_VERIFIER, Owing, RunWorker, now_ms};
 use super::Dispatched;
 
 impl RunWorker {
@@ -88,6 +90,61 @@ impl RunWorker {
                 .entry(parent.clone())
                 .or_default()
                 .accept(artifact);
+        }
+        Ok(())
+    }
+
+    /// Hands down the nodes of the parent room's graph that its join has
+    /// just made ready, the way the node that handed back was handed
+    /// down: under the same parent run, in the same mode, owing the same
+    /// room. The graph is dropped once every node has joined.
+    ///
+    /// # Errors
+    /// Propagates the delegate desk's refusal and whatever starting a
+    /// node reports.
+    pub(in crate::assembly) fn hand_down_what_is_ready(
+        &mut self,
+        parent: &Address,
+        sibling: &Assignment,
+        owing: &Owing,
+    ) -> Result<(), kernel::AxError> {
+        let done: BTreeSet<collab::NodeId> =
+            self.collaborating
+                .joins
+                .get(parent)
+                .map_or_else(BTreeSet::new, |join| {
+                    join.artifacts()
+                        .map(|artifact| artifact.node().clone())
+                        .collect()
+                });
+        let Some(underway) = self.collaborating.workshops.get_mut(parent) else {
+            return Ok(());
+        };
+        let ready = underway.hand_next(&done)?;
+        if underway.is_joined(&done) {
+            self.collaborating.workshops.remove(parent);
+        }
+        for work in ready {
+            self.note(
+                runtime::diagnostics::Level::Effect,
+                "collab::workshop",
+                &format!("{} handed work to {}", parent.as_str(), work.room.as_str()),
+            );
+            self.dispatch_into_lane(
+                Assignment {
+                    addr: work.room,
+                    session: None,
+                    effort: None,
+                    mode: sibling.mode,
+                    origin: None,
+                    parent: sibling.parent,
+                    succession: None,
+                    tainted: sibling.tainted,
+                },
+                work.task,
+                work.goal,
+                owing.child(parent.clone()),
+            )?;
         }
         Ok(())
     }

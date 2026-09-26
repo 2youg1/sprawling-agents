@@ -184,7 +184,7 @@ pub struct WorkshopTool { /* 模型那一面：op ∈ {lay_out, question, judge}
 - **节点的 `JOB.md` 就是契约本身**（`NodeContract::job_text`），不写摘要：摘要即第二个权威。
 - **节点 id 就是它的房间地址**，与 `Handback::node()` 同一取法；于是一个节点的身份只有一处。
 - **图先自证可跑，再交出去**：`Workshop::new` 在构造点拒重名／悬空依赖／环，故一张图若有节点没派出去，原因只能是它的依赖还没汇合，不会是图本身跑不完。
-- **只派就绪集，`depends_on` 在运行时生效**：`lay_out` 交给派生台的是 `Workshop::ready(done)`，`done` 是这个房间的 join 已收下 Artifact 的节点。一个依赖未汇合的节点若也立刻派出，它读到的是还不存在的产出。工具的回答里 `schedule` 是整张图的序，`handed` 是这次真正派出去的那一组，其余节点在 `waiting` 里。
+- **只派就绪集，`depends_on` 在运行时生效**：`lay_out` 交给派生台的是 `Underway::hand_next(done)`，即 `Workshop::ready(done)` 中这个房间尚未派过的节点，`done` 是这个房间的 join 已收下 Artifact 的节点。一个依赖未汇合的节点若也立刻派出，它读到的是还不存在的产出。工具的回答里 `schedule` 是整张图的序，`handed` 是这次真正派出去的那一组，其余节点在 `waiting` 里。
 - **下一组就绪集在 handback 到达时派出**：`lay_out` 摆出的 `Underway` 在 run 结束时由装配层收走，与这个房间的 join 并排按房间保存（`Collaborating.workshops`）。一个节点的 handback 汇入父房间的 join 之后，装配层对同一个 `Underway` 调 `hand_next`，新就绪的节点按上一个兄弟节点的派法（同一个父 run、同一个 mode）派进 lane；所有节点都汇合后这张图即删去。于是后来的 session 不必再摆一次图，工作也会继续。再摆同一张图仍然允许，但桌子带着这个房间的已派集开张，在飞的节点不会被再派一次；再摆出的 `Underway` 取代旧的那张。图只在内存里：进程重启后它不在了，这时由这个房间后来的某个 Run 再摆一次，join 已收下的节点被跳过。
 - **一个 Run 一张图**：第二次 `lay_out` 即拒，因为一个 session 里两张图是「这次在造什么」的两个答案。
 - **join 属房间而不属 Run**：子在父冻结之后才开，故 `FanIn` 由装配层按房间保存（`RunWorker.joins`），并与 inbox 折自同一批 `signal_enqueued` 行。`judge` 的围栏见 8-5：答案是 artifact 的全文，拒词恒不回显答案。

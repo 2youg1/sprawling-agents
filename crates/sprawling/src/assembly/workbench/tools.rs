@@ -194,7 +194,10 @@ impl RunWorker {
                 admitted.push(Box::new(collab::DelegateTool::new(std::sync::Arc::clone(
                     &delegates,
                 ))?));
-                admitted.push(Box::new(self.workshop_tool(site, addr, &delegates)?));
+                admitted.push(Box::new(collab::WorkshopTool::new(
+                    std::sync::Arc::clone(&desks.workshop),
+                    std::sync::Arc::clone(&delegates),
+                )?));
             }
             city::Vocation::Plans => {
                 admitted.push(Box::new(city::CityTool::new(&self.city_root)?));
@@ -305,35 +308,6 @@ impl RunWorker {
             machine.engine,
             self.flight.backlog.clone(),
         )
-    }
-
-    /// Builds the build floor's own tool, holding what this room has
-    /// already been handed back.
-    ///
-    /// The held artifacts are copied rather than lent: the authority is
-    /// `self.collaborating.joins`, folded from the ledger's handback lines, and a desk
-    /// that took it away would leave the worker unable to answer the
-    /// same question after the run.
-    ///
-    /// # Errors
-    /// Propagates whatever the tool says about its own construction.
-    fn workshop_tool(
-        &self,
-        site: &Site,
-        addr: &Address,
-        delegates: &std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
-    ) -> Result<collab::WorkshopTool, AxError> {
-        let mut held = collab::FanIn::new();
-        if let Some(existing) = self.collaborating.joins.get(addr) {
-            for artifact in existing.artifacts() {
-                held.accept(artifact.clone());
-            }
-        }
-        let workshop = std::sync::Arc::new(std::sync::Mutex::new(collab::WorkshopDesk::new(
-            site.who.clone(),
-            held,
-        )));
-        collab::WorkshopTool::new(workshop, std::sync::Arc::clone(delegates))
     }
 
     /// Builds the one tool that answers what this run is, to itself.
