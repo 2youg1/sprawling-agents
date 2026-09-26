@@ -72,7 +72,10 @@ pub enum Note {
     Fenced { oid: GitOid, at: Seq },
     /// This turn stopped for a person. What waits and who answers is the
     /// approval queue's; copying it here would be a third authority.
-    Waiting { at: Seq },
+    /// `t` is when the Ledger recorded the request, so the wait is cut
+    /// where it began; when it ended is recorded under the city's own
+    /// run and is not on this note.
+    Waiting { at: Seq, t: TimeMs },
     /// A word arrived - from the person watching, or from another
     /// address that reached this one.
     Arrived { from: String, said: String, at: Seq },
@@ -94,7 +97,7 @@ impl Note {
         match *self {
             Self::Refused { at, .. }
             | Self::Fenced { at, .. }
-            | Self::Waiting { at }
+            | Self::Waiting { at, .. }
             | Self::Arrived { at, .. }
             | Self::Discarded { at, .. }
             | Self::Unreadable { at, .. } => at,

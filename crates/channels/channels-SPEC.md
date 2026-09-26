@@ -1302,7 +1302,7 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 - **线的背面是同一件事**：写入经 `city::write_second_threshold` 落到那一级的 `CONFIG.toml` 的 `[context] second_threshold`，与 `write_effort` 同一扇门（读—改—写整份文件，别人的键原样保留）；`building_configured` 的载荷因此从三面到四面（`Written::context`）。
 - **`WIRE_V` 的路不单独走**：36→37 记的是这一次面变——给既有命名帧加字段是「语法换形而名字没换」那一类（字段名不进 `COMMAND_NAMES`），与 §8-44 的 35→36 无关；两次都在 §8-1 的 golden 里看得见。
 
-### 8-47 `WIRE_V` 39：一次工具调用带上它的起止时刻，一个回合带上它问的模型
+### 8-47 `WIRE_V` 39：一次工具调用带上它的起止时刻，一个回合带上它问的模型与它开始等人的时刻
 
 ```rust
 pub struct Call {
@@ -1314,6 +1314,10 @@ pub struct Turn {
     // …既有字段…
     pub model: Option<String>,     // 开这个回合的 model_called 记下的 model
 }
+pub enum Note {
+    // …
+    Waiting { at: Seq, t: TimeMs },  // approval_requested 那条记录的 t
+}
 ```
 
 - **时刻读自账本记录，不读此处的时钟**：与 `Turn.t` 同理，重放的会话报它当初的时刻。`called` 不是 `Option`：一次调用由一条 `EventRecord` 折出，它总带读数。`answered` 与 `outcome` 同时写、同一次配对——`outcome` 为 `Waiting` 时它必为 `None`，窗口外答的调用也是 `None`，不猜。
@@ -1321,6 +1325,7 @@ pub struct Turn {
 - **被否：只带一个时长**。时长丢了起点，页面画不出调用在时间轴上的位置，也就排不出并发的两次调用。
 - **模型名挂在回合上，不挂在答案上**：`model_called` 每问一次记一次 `model`，一次 run 中途换模型（降级、换端点）时，逐回合的名字才是账本写下的事实；run 页统计栏的「模型」格取最后一个回合的名字，前后不同时列出各个名字。读法与 `Call.subject` 同：取那一键的文本，读不出为 `None`，页面不画名字而不猜。
 - **被否：`RoundsAnswer.model` 一个字段**。那得在折叠里挑一个回合的名字当整次 run 的名字，换过模型的 run 上它说错一半。
+- **等人从哪一刻开始，读自请求记录**：`Note::Waiting.t` 是 `approval_requested` 那条记录的 `t`，与 `Call.called` 同理不是 `Option`。等到哪一刻结束不在这里：`approval_resolved` 记在城自己的 run 下，这个 run 的记录里没有它，按 approval id 把答复配回请求要治理折叠记下答复时刻，那一半今天不上线。
 
 ### 8-46 先占住端口，再交出城：`bind` 与 `serve` 分成两步
 

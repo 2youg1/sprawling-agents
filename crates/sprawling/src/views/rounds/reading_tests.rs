@@ -281,7 +281,10 @@ fn a_turn_waiting_on_a_person_says_so_without_copying_the_queue() {
     ];
     assert_eq!(
         turns(&events)[0].notes,
-        vec![Note::Waiting { at: Seq::new(2) }]
+        vec![Note::Waiting {
+            at: Seq::new(2),
+            t: TimeMs::new(2)
+        }]
     );
 }
 
