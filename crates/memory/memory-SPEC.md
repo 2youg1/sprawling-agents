@@ -135,6 +135,19 @@ pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, MemoryError>;
 /// 库外的流式读者不逐段读，走 `LedgerIndex::folding`（8-4），那一遍同时建索引。三者住 `jsonl::reading`。
 pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, MemoryError>;
 impl SegmentBytes { pub(crate) fn lines(&self) -> impl Iterator<Item = &[u8]>; }
+/// 从账本尾部倒着读：最新的一行先出，逐段往前，段内从段尾往回按窗口读（窗口从一页起倍增，
+/// 与 `first_line` 同一条规则，故一行无论多长，读到的字节至多是它自身的两倍）。
+/// 只要最后 N 条的读者（`sprawling view` 的首屏）因此只付这 N 条的字节，而不是整本账本。
+/// 每行过的检查与正向读者相同：信封、版本方向、kind 的有类型／可忽略之分、写者规范回显，
+/// 这些住 `LineCheck::judge` 一处；链改成倒着接：这一行的 `chain_hash` 必须等于较新那行的 `prev`，
+/// 它的 `seq.next()` 必须等于较新那行的 `seq`，seq 为 `FIRST` 的行的 `prev` 必须是 `GENESIS_PREV`。
+/// 不合格的行以 `MemoryError::Envelope` 报出，行号是链给它的位置（较新那行的 seq 值，即 1 起的行号；最新一行没有较新者，记作第 0 行），之后迭代结束。撕裂尾（最后一个 `\n` 之后的字节）
+/// 不是行，跳过，与 `lines()` 同一规则。住 `jsonl::tail`。
+/// 被否掉的：先 `read_raw_lines_at` 再取末尾——首屏要付整本账本的读取，正是这个读者要去掉的。
+pub struct TailLines { /* 段路径（倒序）、当前段的未读偏移与缓冲、较新一行的 seq 与 prev */ }
+pub struct TailLine { pub raw: Vec<u8>, pub checked: CheckedLine }
+impl TailLines { pub fn at(dir: &Path) -> Result<Self, MemoryError>; }
+impl Iterator for TailLines { type Item = Result<TailLine, MemoryError>; }
 impl kernel::Ledger for JsonlLedger { /* append = append_all(vec![d]) */ }
 #[cfg(feature = "conformance")] impl LedgerInspect for JsonlLedger { … }
 // 测试可调滚动阈：roll_bytes 字段＋#[cfg(test)] 设定器；生产恒为 SEGMENT_ROLL_BYTES。

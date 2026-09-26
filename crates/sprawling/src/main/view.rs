@@ -14,7 +14,7 @@
 use super::city::report;
 use super::grammar::{Arguments, nearest};
 use kernel::{AxError, EventKind, EventRecord, RunId, Seq};
-use std::io::{BufWriter, ErrorKind, Write};
+use std::io::{BufWriter, ErrorKind, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -73,6 +73,8 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
     let mut out = BufWriter::new(std::io::stdout().lock());
     let written = if read.has("--runs") {
         write_runs(&dir, &mut out)
+    } else if chosen.is_everything() && std::io::stdout().is_terminal() {
+        terminal::show(&dir)
     } else {
         write_records(&dir, &chosen, &mut out)
     };
@@ -89,6 +91,22 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
 }
 
 impl Selection {
+    /// Whether no condition narrows the lines: only then does a person
+    /// at a terminal get the interactive face instead of the lines.
+    fn is_everything(&self) -> bool {
+        matches!(
+            self,
+            Selection {
+                tail: None,
+                from: None,
+                run: None,
+                kind: None,
+                who: None,
+                grep: None
+            }
+        )
+    }
+
     fn read(read: &Arguments) -> Result<Selection, String> {
         let number = |flag: &str| -> Result<Option<u64>, String> {
             read.value(flag)
@@ -236,3 +254,23 @@ pub(super) fn write_runs(dir: &Path, out: &mut impl Write) -> Result<(), ViewErr
 #[cfg(test)]
 #[path = "view_tests.rs"]
 mod tests;
+
+#[path = "view/arrange.rs"]
+mod arrange;
+#[path = "view/detail.rs"]
+mod detail;
+#[path = "view/follow.rs"]
+mod follow;
+#[path = "view/frame.rs"]
+mod frame;
+#[cfg(test)]
+#[path = "view/frame_tests.rs"]
+mod frame_tests;
+#[path = "view/keys.rs"]
+mod keys;
+#[path = "view/list.rs"]
+mod list;
+#[path = "view/rounds.rs"]
+mod rounds;
+#[path = "view/terminal.rs"]
+mod terminal;

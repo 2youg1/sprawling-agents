@@ -115,6 +115,25 @@ impl LineCheck {
         self.prev = chain_hash(raw);
         Ok(checked)
     }
+
+    /// Everything `advance` asks of one line except where it sits in the
+    /// chain, for a reader that links the chain from the other end
+    /// (`jsonl::tail`): the line passes or fails here exactly as it
+    /// would going forward.
+    pub(super) fn judge(raw: &[u8]) -> Result<Judged, LineFault> {
+        let envelope = readable_envelope(raw)?;
+        let (seq, prev) = (envelope.seq, envelope.prev);
+        let checked = classify(envelope, raw)?;
+        Ok(Judged { seq, prev, checked })
+    }
+}
+
+/// One line judged on its own: the chain position it claims, and what
+/// it is.
+pub(super) struct Judged {
+    pub(super) seq: Seq,
+    pub(super) prev: B3Hash,
+    pub(super) checked: CheckedLine,
 }
 
 /// Judge one line (without its newline) as a record this build reads,
