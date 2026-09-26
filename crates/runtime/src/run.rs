@@ -137,6 +137,10 @@ pub struct RunHooks<'a> {
     /// The pre-wave checkpoint fence. `None` runs without a net, which
     /// the tool layer refuses for anything that can delete.
     pub fence: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,
+    /// What a call may write, by its declared effect, asked before the
+    /// wave runs: a wave whose every call answers `Nothing` changes no
+    /// file, so it needs no fence of its own (§8-45).
+    pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes,
     /// Runs one tool call. The turn's stamp rides along because the tool
     /// layer stamps results and derives idempotency keys from it, and a
     /// caller that sampled its own clock there would be a second time

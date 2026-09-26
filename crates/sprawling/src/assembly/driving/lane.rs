@@ -211,6 +211,7 @@ pub(crate) fn drive_run<L: Ledger>(
         fence_gate,
     } = context;
     let mut now = || now_ms();
+    let declared = bench.declared_writes();
     let mut fence_point =
         memory::Checkpoint::open(&write_root).map_err(memory::MemoryError::into_ax)?;
     // What the bench fenced, so the sweep afterwards knows which commit
@@ -365,6 +366,7 @@ pub(crate) fn drive_run<L: Ledger>(
             now: &mut now,
             interrupt: &mut interrupt,
             fence: Some(&mut fence),
+            writes: &|call: &kernel::ToolCall| declared.of(call),
             invoke: &mut invoke,
             wait: &mut wait,
             deltas: watching.is_some().then_some(&mut watched),
