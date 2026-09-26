@@ -260,7 +260,7 @@ budget:
 # The wall-clock readings, never gated: citysim's load scenarios, then
 # the two instruments that drive the city's own accounting loop - a relay
 # round trip and the gap a second dispatch leaves in a running one
-# (sprawling-SPEC.md 8-83).
+# (sprawling-SPEC.md 8-84).
 bench:
     cargo run --release -p citysim --bin bench
     cargo nextest run -p sprawling --release --run-ignored only -E 'test(/::instrument_/)' --no-capture
