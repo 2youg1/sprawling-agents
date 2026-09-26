@@ -46,6 +46,7 @@ impl JsonlLedger {
         if drafts.is_empty() {
             return Ok(Vec::new());
         }
+        self.finish_unwind()?;
         let mut seq = self.next_seq;
         let mut prev = self.prev;
         let mut cur_path = self.seg_path.clone();
@@ -83,21 +84,7 @@ impl JsonlLedger {
             cur_len = cur_len.saturating_add(line_len);
         }
 
-        for (path, bytes) in &writes {
-            self.vfs
-                .append(path, bytes)
-                .map_err(io_err("append event line", path))?;
-        }
-        for (path, _) in &writes {
-            self.vfs
-                .sync_data(path)
-                .map_err(io_err("sync segment", path))?;
-        }
-        if !created.is_empty() {
-            self.vfs
-                .sync_dir(&self.dir.clone())
-                .map_err(io_err("sync ledger dir", &self.dir.clone()))?;
-        }
+        self.write_wave(&writes, created)?;
 
         self.seg_path = cur_path;
         self.seg_len = cur_len;

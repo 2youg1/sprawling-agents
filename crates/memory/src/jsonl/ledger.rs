@@ -45,6 +45,9 @@ pub struct JsonlLedger {
     /// directory that is not a city's ledger, and on the fault model,
     /// whose disk no other process can reach.
     pub(crate) lock: Option<WriterLock>,
+    /// The segments a failed wave created, while restoring the disk to
+    /// its length before that wave is still owed (`jsonl::unwind`).
+    pub(crate) pending_unwind: Option<Vec<PathBuf>>,
 }
 
 /// This process's exclusive hold on a city's Ledger, released when the
