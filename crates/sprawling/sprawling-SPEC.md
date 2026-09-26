@@ -4395,7 +4395,7 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 **测试。** `monitor::sampler::tests`：有人看时一拍把读到的那一个读数发给订阅者；没人看时不读、不发。`monitor::counters::tests`：读本进程得到非零的工作集、整机可用内存与卷剩余空间。`monitor::counters::own_process::tests`：第一次读数的 CPU 为 0，本进程忙过一段之后第二次读数的 CPU 大于 0，工作集与 private 非零。
 
-**本节接口的当前状态。** 整机可用内存经 8-94 的 `bin::monitor::memory` 读出，与计划推进的内存闸（§8-46-3）读同一处。核心自己的健康（记账队列深度、持久水位线落后多少、relay 往返与事件到屏幕的 p50、排队的 run、S5.9M 的降级状态）与 Job Object 的汇总和逐进程明细尚未接入，这几项读数现为 0，缺的是来源而不是采样：派出的命令没有装进 Job Object（派出进程的内存上限在 runtime-SPEC §8-13-3 未决），所以没有 job 可读；排队的 run 没有计数，`Flight` 只在 assembly 线程里知道在跑的数目（`in_flight`），等 lane 的计划行不计；其余几项要各自的所有者先公开一个跨线程可读的计数。磁盘延迟没有字段。本进程的累计读写字节在 Linux 以外读作 0（决定 1）。一拍里剩下的大头是 `sysinfo` 的整机 CPU（0.7–8 ms）与磁盘（0.2–0.8 ms），离「采样一次 ≤ 50 µs」还差这两项；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
+**本节接口的当前状态。** 整机可用内存经 8-94 的 `bin::monitor::memory` 读出，与计划推进的内存闸（§8-46-3）读同一处。核心健康里记账队列深度与持久水位线的两项经 8-98 的 `Health` 读出；其余几项现为 0，缺的是来源而不是采样，8-98 的当前状态逐项写明。派出的命令按 run 装进各自的 Job Object，`runtime::Backlog::processes` 给出每个 run 此刻的进程（runtime-SPEC §8-13-3）；按这些 pid 读每个进程的内存与 CPU、并把逐 run 的明细送上线，还没有做：`Sample` 是一行固定的 13 个数，逐 run 的明细要一种新的帧（WIRE_V 加一）。磁盘延迟没有字段。本进程的累计读写字节在 Linux 以外读作 0（决定 1）。一拍里剩下的大头是 `sysinfo` 的整机 CPU（0.7–8 ms）与磁盘（0.2–0.8 ms），离「采样一次 ≤ 50 µs」还差这两项；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
 
 ## 8-97 `sprawling top`：经线协议看监视器（`bin::wire_client::watching`，形状：adapter）
 
@@ -4414,6 +4414,28 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 2. 沉默 5 s 即结束，而不是永远等：读数每秒一个，5 个空拍说明城已停或已不再发，一个 agent 读到 EOF 比读到永远的阻塞有用。重新考虑的条件：采样的节拍变长。
 
 **测试。** `wire_client::watching::tests`：一帧读数在 `Lines` 下是一行 JSON 加换行，在 `Screen` 下是清屏序列接一屏；不是读数的帧什么也不输出、不进历史。
+
+## 8-98 核心健康：记账队列与持久水位线跨线程可读（`bin::monitor::health`，形状：数据）
+
+`Sample` 里核心健康的两项由记账线程与 lane 在各自的线程上改，由采样线程（8-96）读：`ledger_queue_depth` 是 lane 经 relay 交给记账线程、还在队列里没被取走的 append 条数；`durable_lag` 是记账线程已取进一批、这批的磁盘屏障还没返回、所以还没有答复的条数。两项都以记录条数计。它们的属主是 `assembly::relay`：只有它知道一条 append 何时进队、何时被取、何时变得持久；本模块只给它一处能跨线程读的地方。
+
+**接口。**
+
+- `Health`：`Clone`，同一只 `Arc` 里的两个 `AtomicU64`；克隆是同一份计数的另一个句柄。
+- 写（只由 `assembly::relay` 调）：`asked(&self)`——一条 append 进队之前；`withdrawn(&self)`——进队失败（记账线程已不在），收回那一次 `asked`；`taken(&self, n: u64)`——记账线程取出 `n` 条放进一批，队列减 `n`、未持久加 `n`；`answered(&self, n: u64)`——这一批的屏障返回、答复发出，未持久减 `n`。
+- 读：`read(&self, into: Sample) -> Sample`——把此刻的两项填进 `into`，其余字段原样。
+- `RelayGate::open()` 开一份新的 `Health`，`RelayGate::health()` 交出它的句柄；`Flight::health()` 转交 gate 的那一份；worker 起好时经 `Started.health` 把它交给 `listening`，`listening` 交给采样线程：`spawn_sampler(monitor, samples, volume, health)`，每一拍的读数都经 `Health::read`，摘要与整页都有，因为读它只是两次原子读。
+- 没有失败路径。减法饱和：计数是给人看的读数，两条线程各自的加减在某一刻读到的先后可以错开，饱和让一个瞬间的错位读成 0 而不是一个巨大的数。
+
+**决定。**
+
+1. 计数放在 relay 进队、取出、答复这三处，而不是去数 `mpsc` 队列的长度：标准库的 `mpsc` 不报长度，而且队列里还有 claim、回家的 run 与命令，它们不是 append。被否：记账线程每一轮开头把自己看到的队列长度写进一个原子数——它只在记账线程醒着时更新，而队列最长的时候正是记账线程在写盘、没醒的时候。
+2. 计数的类型放在 `bin::monitor`，由 assembly 持有并写入：依赖朝 assembly → monitor，与 `monitor::memory` 相同；monitor 不点名 assembly。
+3. 用 `Relaxed` 次序：两项互不约束，读数不参与任何决定（与 8-96 决定 3 同一个重开条件）。
+
+**测试。** `assembly::relay::tests` 的 `the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable`：一条 lane 的 append 进队后，记账线程服务之前读到队列 1、未持久 0；服务之后两项都回到 0，append 拿到了答复。
+
+**本节接口的当前状态。** `Sample` 余下的核心健康字段仍读作 0：`relay_p50_nanos` 与 `event_to_screen_p50_nanos` 要一个按次记录往返时间的直方图，属主分别是 relay 与 socket 的发送一侧，都还没有；`queued_runs` 没有一处权威的计数——计划行在 `Flight::full` 为真时停在 `pursue` 的循环外，没有被数进任何队列，人派的 run 在满时的去向见 §8-46-3。S5.9M 的降级状态没有 `Sample` 字段。
 
 ## 8-94 城所在卷快满时不接新活（`bin::monitor::volume`，形状：adapter；`bin::assembly::commanding::shedding`，形状：decision）
 

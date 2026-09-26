@@ -19,6 +19,7 @@ use kernel::{AxCode, AxError, EventDraft, EventRef, Ledger};
 
 use super::booking::{ClaimAsk, ClaimBook};
 use super::pool::Arrival;
+use crate::monitor::health::Health;
 
 /// One append, and the address its answer goes back to.
 ///
@@ -71,6 +72,7 @@ pub(crate) enum Patience {
 #[derive(Clone)]
 pub(crate) struct Relay {
     asking: mpsc::Sender<Wake>,
+    health: Health,
 }
 
 impl Ledger for Relay {
@@ -106,6 +108,9 @@ pub(crate) struct RelayGate {
     wakes: mpsc::Receiver<Wake>,
     issuing: mpsc::Sender<Wake>,
     pub(crate) booked: ClaimBook,
+    /// How many appends wait and how many are not yet durable
+    /// (sprawling-SPEC.md 8-98).
+    health: Health,
 }
 
 impl RelayGate {
@@ -115,13 +120,20 @@ impl RelayGate {
             wakes,
             issuing,
             booked: ClaimBook::default(),
+            health: Health::default(),
         }
+    }
+
+    /// A handle onto this gate's counts, for the sampler's thread.
+    pub(crate) fn health(&self) -> Health {
+        self.health.clone()
     }
 
     /// One handle for one driving thread.
     pub(crate) fn issue(&self) -> Relay {
         Relay {
             asking: self.issuing.clone(),
+            health: self.health.clone(),
         }
     }
 
@@ -306,6 +318,82 @@ mod tests {
             ig: false,
         });
         assert!(refused.is_err(), "a writer that is gone is not a success");
+    }
+
+    /// A lane's append counts as queued until the accounting thread takes
+    /// it, then as not yet durable until its batch is written, then as
+    /// neither (sprawling-SPEC.md 8-98).
+    #[test]
+    fn the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable() {
+        use crate::monitor::health::Health;
+        fn standing(health: &Health) -> (u64, u64) {
+            let read = health.read(crate::monitor::Sample::default());
+            (read.ledger_queue_depth, read.durable_lag)
+        }
+        struct Watching {
+            health: Health,
+            during: Option<(u64, u64)>,
+        }
+        impl Ledger for Watching {
+            fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
+                self.append_all(vec![draft])?
+                    .into_iter()
+                    .next()
+                    .ok_or_else(|| super::gone("a wave of one answered with nothing"))
+            }
+
+            fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
+                self.during = Some(standing(&self.health));
+                Ok(drafts
+                    .into_iter()
+                    .map(|draft| {
+                        kernel::EventRecord::from_draft(
+                            draft,
+                            kernel::Seq::new(1),
+                            kernel::GENESIS_PREV,
+                        )
+                        .to_ref()
+                    })
+                    .collect())
+            }
+        }
+
+        let mut gate = RelayGate::open();
+        let health = gate.health();
+        let mut relay = gate.issue();
+        let lane = std::thread::spawn(move || {
+            relay.append(EventDraft {
+                run: kernel::RunId::CITY,
+                t: kernel::TimeMs::new(1),
+                who: "city".to_owned(),
+                addr: None,
+                kind: kernel::EventKind::CityInitialized,
+                data: kernel::Payload::empty(),
+                ig: false,
+            })
+        });
+        let mut before = standing(&health);
+        for _ in 0..500 {
+            if before == (1, 0) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            before = standing(&health);
+        }
+        let mut store = Watching {
+            health: health.clone(),
+            during: None,
+        };
+        gate.serve(
+            Patience::Unbounded,
+            &mut store,
+            &mut std::collections::VecDeque::new(),
+        );
+        assert!(lane.join().unwrap().is_ok(), "the lane is answered");
+        assert_eq!(
+            (before, store.during, standing(&health)),
+            ((1, 0), Some((0, 1)), (0, 0))
+        );
     }
 
     /// **The measurement this batching exists for, expressed as a
