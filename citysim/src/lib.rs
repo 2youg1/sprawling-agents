@@ -22,6 +22,7 @@ mod mem_ledger;
 mod metabolism;
 #[cfg(test)]
 mod nesting;
+mod red_team;
 #[cfg(test)]
 mod score;
 mod script_model;
@@ -32,6 +33,7 @@ mod suite;
 pub use checker::check_chain;
 pub use executor::{CancelPoint, Scenario, ScenarioReport, run_scenario, run_scenario_on};
 pub use mem_ledger::MemLedger;
+pub use red_team::{Arm, Case, Claim, Comparison, Plant, compare};
 pub use script_model::{ScriptModel, concluding};
 pub use script_tools::{ScriptTool, ScriptToolSet};
 pub use sieving::SieveWorld;

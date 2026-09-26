@@ -10,6 +10,7 @@ kernel = { path = "../crates/kernel", features = ["conformance"] }
 memory = { path = "../crates/memory" }
 runtime = { path = "../crates/runtime" }
 gateway = { path = "../crates/gateway" }
+collab = { path = "../crates/collab" }
 channels = { path = "../crates/channels" }
 sprawling = { path = "../crates/sprawling" }
 serde_json.workspace = true

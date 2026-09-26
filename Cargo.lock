@@ -401,6 +401,7 @@ name = "citysim"
 version = "0.0.6"
 dependencies = [
  "channels",
+ "collab",
  "gateway",
  "kernel",
  "memory",
