@@ -212,6 +212,16 @@ jobs:
       - name: build the client, the binary, and the archive
         shell: bash
         run: just package "${{ matrix.target }}"
+      # The archive goes through the door a person uses before it is
+      # uploaded: install.sh asks a release list served from 127.0.0.1,
+      # downloads, verifies and places the binary, and the placed file is
+      # compared byte for byte with the archive's and asked its version.
+      # Windows installs through install.ps1, which this step does not run
+      # (sprawling-SPEC.md section 8-94).
+      - name: install the archive with install.sh from a loopback release
+        if: runner.os != 'Windows'
+        shell: bash
+        run: sh .github/install-loopback.sh target/package
       - uses: actions/upload-artifact@v7
         with:
           name: archive-${{ matrix.os }}${{ matrix.target && format('-{0}', matrix.target) || '' }}
@@ -222,14 +232,29 @@ jobs:
     needs: [verify, archive]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # `id-token: write` lets the attestation step mint the OIDC token that
+    # Sigstore exchanges for a short-lived signing certificate, so no
+    # private key exists anywhere; `attestations: write` lets it store the
+    # result against this repository. `xtask artifact` reads this job and
+    # refuses it when either grant, the step, or its order is missing.
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true
+      # Before the archives are attached, never after: a failure here then
+      # stops the release instead of leaving archives on the tag that
+      # `gh attestation verify` cannot vouch for. The glob is word for word
+      # the one `gh release create` attaches below.
+      - name: attest where each archive was built
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: assets/*.zip
       - name: attach the archives to the tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
