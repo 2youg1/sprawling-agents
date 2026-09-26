@@ -178,7 +178,7 @@ impl Turn<ToolWave> {
                               still_going: &mut dyn FnMut(u32) -> NextCall)
         -> Result<PhaseOutcome<Turn<Recording>>, AxError>;
 }
-pub struct ConcurrentInvoke<'a> {
+pub struct ConcurrentInvoke<'a> {   // 在 crate 根重导出：runtime::ConcurrentInvoke
     pub invoke: &'a (dyn Fn(&ToolCall) -> Result<ToolOutcome, AxError> + Sync),
     pub effect_of: &'a dyn Fn(&ToolCall) -> Option<Effect>,   // None＝目录不认识的工具，按非只读处理
 }

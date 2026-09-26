@@ -81,8 +81,7 @@ pub use replay::{VerifiedLedger, VerifiedLine};
 pub use run::{Advance, Run, RunHooks, RunPlan, SafePoint, drive};
 pub use sieve::{CommandKey, FilterTable, SieveHistory, SieveRecord, Sieved, sieve};
 pub use transcript::{Transcript, TranscriptRecord};
-pub use turn::{
-    ConcurrentInvoke, Interrupt, NextCall, PhaseOutcome, Turn, TurnCancelled, TurnReport,
-};
+pub use turn::ConcurrentInvoke;
+pub use turn::{Interrupt, NextCall, PhaseOutcome, Turn, TurnCancelled, TurnReport};
 pub use watchdog::{Disposal, FreezeReason, Retries, Watchdog};
 pub use window::Opening;
