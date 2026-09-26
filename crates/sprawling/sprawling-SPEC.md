@@ -532,7 +532,7 @@ ARCHITECTURE.md §2 把 wasmtime 列进技术栈并声明了代价（「Cost: an
 
 **原因（两处，同一个不对称）**：控制台与 socket 拿的是同一张桌子（`CommandDesk`）与同一条事件流，唯独**读**这一路没接上。
 
-1. `console::post` 对 `ClientFrame::Query` 只印一句「a question is answered over the wire: `sprawling call '…'`」——它请人开第二个终端，去问一座人已经身处其中的城。而 `assembly::serve` 早已构造出 `queries: Arc<dyn Fn(Query) -> Result<Answer, AxError>>` 并只交给 socket。§8-11 自述「查询的答案在控制台以 JSONL 逐行输出，与 `sprawling call` 同形」——**这句话今天是假的**，这次改动使它为真。
+1. `console::post` 对 `ClientFrame::Ask` 只印一句「a question is answered over the wire: `sprawling call '…'`」——它请人开第二个终端，去问一座人已经身处其中的城。而 `assembly::serve` 早已构造出 `queries: channels::Answering` 并只交给 socket。§8-11 自述「查询的答案在控制台以 JSONL 逐行输出，与 `sprawling call` 同形」——**这句话今天是假的**，这次改动使它为真。
 2. `serve_city` 起城时印的四行（city／WebUI／client）随事件流滚走。一个远程盯着城的人于是再也看不到自己开在哪个端口、有几条 run 在跑。
 
 ```rust

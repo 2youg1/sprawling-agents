@@ -138,9 +138,13 @@ use serde::{Deserialize, Serialize};
 ///    carries the cause where a refusal or a fence whose payload did
 ///    not read back used to leave no note at all, so an older page would
 ///    meet a variant it cannot decode.
-pub const WIRE_V: u32 = 38;
+/// 39: a question carries the asking side's own number, and its answer
+///    or refusal comes back under it with the ledger position it was read at.
+pub const WIRE_V: u32 = 39;
+mod ask;
 mod query;
 
+pub use ask::{Answered, Ask, AskId, AskOutcome};
 pub use query::{QUERY_NAMES, Query};
 
 use crate::answer::Answer;
@@ -222,7 +226,7 @@ pub struct Welcome {
 pub enum ClientFrame {
     Hello(Hello),
     Command(Box<WireCommand>),
-    Query(Query),
+    Ask(Ask),
 }
 
 /// Everything a server may send. Events are the push half; a `Refusal`
@@ -240,7 +244,7 @@ pub enum ClientFrame {
 pub enum ServerFrame {
     Welcome(Welcome),
     Event(Box<EventRecord>),
-    Answer(Box<Answer>),
+    Answered(Box<Answered>),
     Refusal(Box<AxError>),
     /// Text a model is saying, before the call it belongs to has
     /// settled. Discardable by construction: the run it belongs to is
@@ -354,7 +358,10 @@ mod tests {
 
     #[test]
     fn a_client_frame_round_trips_through_json() {
-        let frame = ClientFrame::Query(Query::CityView);
+        let frame = ClientFrame::Ask(Ask {
+            ask_id: AskId(7),
+            query: Query::CityView,
+        });
         let text = serde_json::to_string(&frame).unwrap();
         let back: ClientFrame = serde_json::from_str(&text).unwrap();
         assert_eq!(frame, back);

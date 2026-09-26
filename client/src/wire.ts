@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 38 as const;
+export const WIRE_V = 39 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "ec0edce8d6c76a2f93d3a8957bf92bb7fe9277d466d45dacbce9dd7c438cf510" as const;
+export const WIRE_HASH = "7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -2218,6 +2218,187 @@ export const Answer = Schema.Union(
 export type Answer = typeof Answer.Type;
 
 /**
+ * The asking side's own number for one question, minted monotonically
+ * per connection and echoed on the answer.
+ */
+export const AskId = Schema.Int.pipe(Schema.brand("AskId"));
+export type AskId = typeof AskId.Type;
+
+/**
+ * Whether the question was answered or refused. A refusal of a question
+ * travels here rather than as a bare `Refusal` frame, so the page knows
+ * which question fell through.
+ */
+export const AskOutcome = Schema.Union(
+  Schema.Struct({
+    answer: Answer,
+  }),
+  Schema.Struct({
+    refusal: AxError,
+  }),
+).annotations({ identifier: "AskOutcome" });
+export type AskOutcome = typeof AskOutcome.Type;
+
+/**
+ * The reply to one [`Ask`].
+ * 
+ * `as_of` is the ledger position sampled before the read, so the answer
+ * reflects at least every record up to it: a record folded during the
+ * read can only make a page ask once more, never keep a stale answer.
+ */
+export const Answered = Schema.Struct({
+  as_of: Seq,
+  ask_id: AskId,
+  outcome: AskOutcome,
+}).annotations({ identifier: "Answered" });
+export type Answered = typeof Answered.Type;
+
+/**
+ * Queries read state. They are cacheable and free of side effects, so none
+ * carries an `IdemKey` - a Query that needed one would have stopped being a
+ * Query.
+ */
+export const Query = Schema.Union(
+  Schema.Literal("city_view", "approval_queue", "metrics", "cost_view", "registry_view", "discard_view"),
+  Schema.Struct({
+    history: Schema.Struct({
+      before: Schema.optional(Schema.NullOr(Seq)),
+      limit: Schema.Int,
+    }),
+  }),
+  Schema.Struct({
+    run_history: Schema.Struct({
+      before: Schema.optional(Schema.NullOr(Seq)),
+      limit: Schema.Int,
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    history_range: Schema.Struct({
+      from: Seq,
+      limit: Schema.Int,
+      to: Seq,
+    }),
+  }),
+  Schema.Struct({
+    changes: Schema.Struct({
+      base: GitOid,
+      head: Schema.optional(Schema.NullOr(GitOid)),
+    }),
+  }),
+  Schema.Struct({
+    hunks: Schema.Struct({
+      oid_a: GitOid,
+      oid_b: GitOid,
+      path: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    commit: Schema.Struct({
+      oid: GitOid,
+    }),
+  }),
+  Schema.Struct({
+    run_view: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    inbox_view: Schema.Struct({
+      addr: Address,
+    }),
+  }),
+  Schema.Struct({
+    archive_search: Schema.Struct({
+      needle: Schema.String,
+    }),
+  }),
+  Schema.Literal("endpoint_view"),
+  Schema.Struct({
+    building_view: Schema.Struct({
+      addr: Address,
+    }),
+  }),
+  Schema.Literal("governance"),
+  Schema.Struct({
+    rounds: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    evidence: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    cost_of: Schema.Struct({
+      node: NodeId,
+    }),
+  }),
+  Schema.Struct({
+    listing: Schema.Struct({
+      at: Schema.optional(Schema.NullOr(Address)),
+    }),
+  }),
+  Schema.Struct({
+    document: Schema.Struct({
+      at: Address,
+    }),
+  }),
+  Schema.Struct({
+    commits: Schema.Struct({
+      before: Schema.optional(Schema.NullOr(Seq)),
+      building: Schema.optional(Schema.NullOr(Address)),
+      limit: Schema.Int,
+    }),
+  }),
+  Schema.Literal("doctor"),
+  Schema.Struct({
+    prefix: Schema.Struct({
+      run: RunId,
+    }),
+  }),
+  Schema.Struct({
+    content: Schema.Struct({
+      locator: Locator,
+    }),
+  }),
+  Schema.Struct({
+    skills: Schema.Struct({
+      building: Address,
+    }),
+  }),
+  Schema.Struct({
+    git_status: Schema.Struct({
+      building: Address,
+    }),
+  }),
+  Schema.Struct({
+    mcp_health: Schema.Struct({
+      addr: Address,
+    }),
+  }),
+  Schema.Literal("toolkits"),
+  Schema.Literal("release"),
+  Schema.Literal("preferences"),
+  Schema.Struct({
+    config: Schema.Struct({
+      addr: Address,
+    }),
+  }),
+).annotations({ identifier: "Query" });
+export type Query = typeof Query.Type;
+
+/**
+ * One question, carrying the number its answer will come back under.
+ */
+export const Ask = Schema.Struct({
+  ask_id: AskId,
+  query: Query,
+}).annotations({ identifier: "Ask" });
+export type Ask = typeof Ask.Type;
+
+/**
  * One field written into every request body this endpoint receives.
  * 
  * `pointer` is a JSON pointer (`/temperature`, `/reasoning/effort`),
@@ -2699,142 +2880,6 @@ export const Hello = Schema.Struct({
 export type Hello = typeof Hello.Type;
 
 /**
- * Queries read state. They are cacheable and free of side effects, so none
- * carries an `IdemKey` - a Query that needed one would have stopped being a
- * Query.
- */
-export const Query = Schema.Union(
-  Schema.Literal("city_view", "approval_queue", "metrics", "cost_view", "registry_view", "discard_view"),
-  Schema.Struct({
-    history: Schema.Struct({
-      before: Schema.optional(Schema.NullOr(Seq)),
-      limit: Schema.Int,
-    }),
-  }),
-  Schema.Struct({
-    run_history: Schema.Struct({
-      before: Schema.optional(Schema.NullOr(Seq)),
-      limit: Schema.Int,
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    history_range: Schema.Struct({
-      from: Seq,
-      limit: Schema.Int,
-      to: Seq,
-    }),
-  }),
-  Schema.Struct({
-    changes: Schema.Struct({
-      base: GitOid,
-      head: Schema.optional(Schema.NullOr(GitOid)),
-    }),
-  }),
-  Schema.Struct({
-    hunks: Schema.Struct({
-      oid_a: GitOid,
-      oid_b: GitOid,
-      path: Schema.String,
-    }),
-  }),
-  Schema.Struct({
-    commit: Schema.Struct({
-      oid: GitOid,
-    }),
-  }),
-  Schema.Struct({
-    run_view: Schema.Struct({
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    inbox_view: Schema.Struct({
-      addr: Address,
-    }),
-  }),
-  Schema.Struct({
-    archive_search: Schema.Struct({
-      needle: Schema.String,
-    }),
-  }),
-  Schema.Literal("endpoint_view"),
-  Schema.Struct({
-    building_view: Schema.Struct({
-      addr: Address,
-    }),
-  }),
-  Schema.Literal("governance"),
-  Schema.Struct({
-    rounds: Schema.Struct({
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    evidence: Schema.Struct({
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    cost_of: Schema.Struct({
-      node: NodeId,
-    }),
-  }),
-  Schema.Struct({
-    listing: Schema.Struct({
-      at: Schema.optional(Schema.NullOr(Address)),
-    }),
-  }),
-  Schema.Struct({
-    document: Schema.Struct({
-      at: Address,
-    }),
-  }),
-  Schema.Struct({
-    commits: Schema.Struct({
-      before: Schema.optional(Schema.NullOr(Seq)),
-      building: Schema.optional(Schema.NullOr(Address)),
-      limit: Schema.Int,
-    }),
-  }),
-  Schema.Literal("doctor"),
-  Schema.Struct({
-    prefix: Schema.Struct({
-      run: RunId,
-    }),
-  }),
-  Schema.Struct({
-    content: Schema.Struct({
-      locator: Locator,
-    }),
-  }),
-  Schema.Struct({
-    skills: Schema.Struct({
-      building: Address,
-    }),
-  }),
-  Schema.Struct({
-    git_status: Schema.Struct({
-      building: Address,
-    }),
-  }),
-  Schema.Struct({
-    mcp_health: Schema.Struct({
-      addr: Address,
-    }),
-  }),
-  Schema.Literal("toolkits"),
-  Schema.Literal("release"),
-  Schema.Literal("preferences"),
-  Schema.Struct({
-    config: Schema.Struct({
-      addr: Address,
-    }),
-  }),
-).annotations({ identifier: "Query" });
-export type Query = typeof Query.Type;
-
-/**
  * Everything a client may send.
  */
 export const ClientFrame = Schema.Union(
@@ -2845,7 +2890,7 @@ export const ClientFrame = Schema.Union(
     command: Command,
   }),
   Schema.Struct({
-    query: Query,
+    ask: Ask,
   }),
 ).annotations({ identifier: "ClientFrame" });
 export type ClientFrame = typeof ClientFrame.Type;
@@ -2955,7 +3000,7 @@ export const ServerFrame = Schema.Union(
     event: EventRecord,
   }),
   Schema.Struct({
-    answer: Answer,
+    answered: Answered,
   }),
   Schema.Struct({
     refusal: AxError,

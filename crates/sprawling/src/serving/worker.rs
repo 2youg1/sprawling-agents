@@ -136,17 +136,21 @@ pub async fn serve(serving: Serving) -> Result<(), AxError> {
     // Built once and handed to both surfaces below. The socket and the
     // terminal are two ways into one city, and this is the read half of
     // what makes that literally true rather than a claim.
-    let answering: crate::console::Answering = Arc::new(move |query: channels::Query| {
-        let mut views = query_views.lock().map_err(|_| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "read the city views",
-                "the view lock is poisoned",
-            )
-            .with_recovery("restart the server; its views rebuild from the ledger")
-        })?;
-        Ok(views.answer(&query))
-    });
+    // The answer is dated under the same lock it is read under, so the
+    // date is exactly the last record the answer reflects.
+    let answering: crate::console::Answering =
+        Arc::new(move |query: channels::Query| match query_views.lock() {
+            Ok(mut views) => (views.folded_to(), Ok(views.answer(&query))),
+            Err(_) => (
+                kernel::Seq::FIRST,
+                Err(AxError::failure(
+                    AxCode::StorageFatal,
+                    "read the city views",
+                    "the view lock is poisoned",
+                )
+                .with_recovery("restart the server; its views rebuild from the ledger")),
+            ),
+        });
     // Read once, at startup, from the views the ledger just rebuilt.
     let city_name = views.lock().ok().and_then(|views| views.city());
     // The in-process Command set, not the wire one: the enrolment

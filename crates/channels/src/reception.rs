@@ -37,7 +37,7 @@ use kernel::{Address, AxCode, AxError, B3Hash, Seq};
 
 use crate::auth;
 use crate::command::WireCommand;
-use crate::wire::{ClientFrame, Hello, Lagged, Query, WIRE_V, Welcome, schema_hash};
+use crate::wire::{Ask, ClientFrame, Hello, Lagged, WIRE_V, Welcome, schema_hash};
 
 /// Which face the listener presents, and the credential it demands.
 ///
@@ -208,8 +208,8 @@ pub enum SessionStep {
     Welcome(Box<Welcome>),
     /// Hand this command to the sink.
     Deliver(Box<WireCommand>),
-    /// Evaluate this query and answer it.
-    Answer(Box<Query>),
+    /// Evaluate this question and answer it under its own number.
+    Answer(Box<Ask>),
     /// Send this refusal; `close` ends the session afterwards.
     Refuse { error: Box<AxError>, close: bool },
 }
@@ -256,7 +256,7 @@ pub fn decide_frame(
             close: true,
         },
         (SessionState::Live, ClientFrame::Command(command)) => SessionStep::Deliver(command),
-        (SessionState::Live, ClientFrame::Query(query)) => SessionStep::Answer(Box::new(query)),
+        (SessionState::Live, ClientFrame::Ask(ask)) => SessionStep::Answer(Box::new(ask)),
         (SessionState::Live, ClientFrame::Hello(_)) => SessionStep::Refuse {
             error: Box::new(
                 AxError::failure(

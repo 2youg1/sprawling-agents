@@ -88,7 +88,7 @@ fn unreachable_city(at: &str, why: &str) -> AxError {
 fn malformed(what: &str, why: &str) -> AxError {
     AxError::failure(AxCode::WireMismatch, what, why.to_owned()).with_recovery(
         "a frame is one JSON object: {\"command\":{\"dispatch\":{..}}} or \
-         {\"query\":\"city_view\"}; `sprawling call` with no frame lists every name",
+         {\"ask\":{\"ask_id\":1,\"query\":\"city_view\"}}; `sprawling call` with no frame lists every name",
     )
 }
 
@@ -219,9 +219,14 @@ fn report(text: &str, heard: &mut Heard) {
     // Read back through the wire's own type rather than by looking for
     // a word in the text, so a payload that merely mentions refusal is
     // not counted as one.
-    if let Ok(channels::ServerFrame::Refusal(_)) =
-        serde_json::from_str::<channels::ServerFrame>(text)
-    {
+    let refused = match serde_json::from_str::<channels::ServerFrame>(text) {
+        Ok(channels::ServerFrame::Refusal(_)) => true,
+        Ok(channels::ServerFrame::Answered(answered)) => {
+            matches!(answered.outcome, channels::AskOutcome::Refusal(_))
+        }
+        Ok(_) | Err(_) => false,
+    };
+    if refused {
         heard.refusals = heard.refusals.saturating_add(1);
     }
 }
@@ -286,7 +291,7 @@ mod tests {
         let at = format!("127.0.0.1:{}", port.recv().unwrap());
         let heard = super::call(
             &at,
-            "{\"query\":\"city_view\"}",
+            "{\"ask\":{\"ask_id\":1,\"query\":\"city_view\"}}",
             None,
             Duration::from_millis(200),
         )

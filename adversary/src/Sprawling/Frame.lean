@@ -162,6 +162,15 @@ private def parseAnswer (body : Json) : Except String Frame := do
   | [(tag, inner)] => return .answered tag inner
   | fields => .error s!"an answer is one tagged object, not {fields.length}"
 
+/-- An answered frame carries the asking side's id, the ledger position the
+answer was read at, and one outcome: the answer, or the refusal of the question. -/
+private def parseAnswered (body : Json) : Except String Frame := do
+  let pairs ← expectObject "Answered" body
+  match ← expectObject "AskOutcome" (← field "Answered" pairs "outcome") with
+  | [("answer", inner)] => parseAnswer inner
+  | [("refusal", inner)] => return .refused (← parseComplaint inner)
+  | fields => .error s!"an outcome is one answer or one refusal, not {fields.length} fields"
+
 private def parseDelta (body : Json) : Except String Frame := do
   let pairs ← expectObject "Delta" body
   return .streamed (← stringField "Delta" pairs "run") (← stringField "Delta" pairs "text")
@@ -176,7 +185,7 @@ private def parseFrame (value : Json) : Except String Frame := do
     match tag with
     | "welcome" => return .welcomed (← parseWelcome body)
     | "event" => return .happened (← parseRecord body)
-    | "answer" => parseAnswer body
+    | "answered" => parseAnswered body
     | "refusal" => return .refused (← parseComplaint body)
     | "delta" => parseDelta body
     | "log" => parseLog body

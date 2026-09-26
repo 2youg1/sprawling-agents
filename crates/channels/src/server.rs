@@ -19,6 +19,6 @@ mod config;
 mod reply;
 mod socket;
 
-pub use config::{AcpProgress, AcpSink, ServeConfig, TranscribeSink, router};
+pub use config::{AcpProgress, AcpSink, Answering, ServeConfig, TranscribeSink, router};
 pub use reply::{Delivered, Reply};
 pub use socket::serve;

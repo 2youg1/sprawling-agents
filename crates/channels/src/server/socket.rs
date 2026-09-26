@@ -32,7 +32,7 @@ use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, Seq};
 use tokio::sync::broadcast;
 
 use crate::assets::AssetReply;
@@ -41,7 +41,7 @@ use crate::reception::{
     Admission, BindVerdict, Door, SessionState, SessionStep, Stream, decide_admission, decide_bind,
     decide_frame,
 };
-use crate::wire::ServerFrame;
+use crate::wire::{Answered, Ask, AskOutcome, ServerFrame};
 
 use super::config::{ServeConfig, ShellState, router};
 
@@ -95,7 +95,7 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                             return;
                         }
                     }
-                    SessionStep::Answer(query) => {
+                    SessionStep::Answer(ask) => {
                         // Answering reads the disk and takes a lock, and
                         // it ran here, inside the task that owns this
                         // socket. One `RunHistory` therefore held a
@@ -107,25 +107,34 @@ pub(crate) async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         // read belongs, and this stays true however fast
                         // the read becomes.
                         let answering = Arc::clone(&state.queries);
-                        let asked = *query;
+                        let Ask { ask_id, query } = *ask;
                         let outcome =
-                            tokio::task::spawn_blocking(move || answering(asked)).await;
-                        let frame = match outcome {
-                            Ok(Ok(answer)) => ServerFrame::Answer(Box::new(answer)),
-                            Ok(Err(error)) => ServerFrame::Refusal(Box::new(error)),
+                            tokio::task::spawn_blocking(move || answering(query)).await;
+                        let (as_of, outcome) = match outcome {
+                            Ok((as_of, Ok(answer))) => (as_of, AskOutcome::Answer(answer)),
+                            Ok((as_of, Err(error))) => (as_of, AskOutcome::Refusal(error)),
                             // The pool dropped the work, which means the
                             // runtime is going down; say so rather than
                             // leave the page waiting on a frame that
-                            // will never come.
-                            Err(_) => ServerFrame::Refusal(Box::new(
-                                AxError::failure(
-                                    AxCode::StorageFatal,
-                                    "answer a query",
-                                    "the answering task did not finish",
-                                )
-                                .with_recovery("ask again; if it repeats, restart the server"),
-                            )),
+                            // will never come. Nothing was read, so the
+                            // answer is dated at the start of history.
+                            Err(_) => (
+                                Seq::FIRST,
+                                AskOutcome::Refusal(
+                                    AxError::failure(
+                                        AxCode::StorageFatal,
+                                        "answer a query",
+                                        "the answering task did not finish",
+                                    )
+                                    .with_recovery("ask again; if it repeats, restart the server"),
+                                ),
+                            ),
                         };
+                        let frame = ServerFrame::Answered(Box::new(Answered {
+                            ask_id,
+                            as_of,
+                            outcome,
+                        }));
                         if send(&mut socket, &frame).await.is_err() {
                             return;
                         }

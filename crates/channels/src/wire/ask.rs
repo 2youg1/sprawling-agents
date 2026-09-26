@@ -1,0 +1,55 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! A question and its answer, paired by the number the asking side
+//! minted rather than by what the answer happens to contain.
+//!
+//! The server echoes an [`AskId`] and never judges it: pairing is the
+//! page's concern, and a server that checked uniqueness would be a second
+//! place deciding which answer belongs to which question.
+
+use kernel::{AxError, Seq};
+use serde::{Deserialize, Serialize};
+
+use super::{Answer, Query};
+
+/// The asking side's own number for one question, minted monotonically
+/// per connection and echoed on the answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct AskId(pub u32);
+
+/// One question, carrying the number its answer will come back under.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Ask {
+    pub ask_id: AskId,
+    pub query: Query,
+}
+
+/// The reply to one [`Ask`].
+///
+/// `as_of` is the ledger position sampled before the read, so the answer
+/// reflects at least every record up to it: a record folded during the
+/// read can only make a page ask once more, never keep a stale answer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Answered {
+    pub ask_id: AskId,
+    pub as_of: Seq,
+    pub outcome: AskOutcome,
+}
+
+/// Whether the question was answered or refused. A refusal of a question
+/// travels here rather than as a bare `Refusal` frame, so the page knows
+/// which question fell through.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum AskOutcome {
+    Answer(Answer),
+    Refusal(AxError),
+}

@@ -21,7 +21,7 @@
 
 - **wire**：Command 恰 28 个 variant、Query 恰 34 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`ec0edce8d6c76a2f93d3a8957bf92bb7fe9277d466d45dacbce9dd7c438cf510`；**WIRE_V ＝ 38**（回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 39**（问与答按 `ask_id` 配对、答带 `as_of` → §8-46；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -1299,22 +1299,21 @@ pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String
 - **线的背面是同一件事**：写入经 `city::write_second_threshold` 落到那一级的 `CONFIG.toml` 的 `[context] second_threshold`，与 `write_effort` 同一扇门（读—改—写整份文件，别人的键原样保留）；`building_configured` 的载荷因此从三面到四面（`Written::context`）。
 - **`WIRE_V` 的路不单独走**：36→37 记的是这一次面变——给既有命名帧加字段是「语法换形而名字没换」那一类（字段名不进 `COMMAND_NAMES`），与 §8-44 的 35→36 无关；两次都在 §8-1 的 golden 里看得见。
 
-### 8-46 问与答按 `ask_id` 配对，答带 `as_of`（未实现，设计已定；`WIRE_V` 的下一笔）
+### 8-46 问与答按 `ask_id` 配对，答带 `as_of`
 
 ```rust
-pub struct AskId(u32);                          // 形状 2；页面按连接单调铸造，服务端只回显、不判定
+pub struct AskId(pub u32);                      // 形状 2；页面按连接铸造，服务端只回显、不判定
 pub struct Ask { pub ask_id: AskId, pub query: Query }
-ClientFrame::Ask(Ask)                           // 取代 ClientFrame::Query(Query)
+ClientFrame::Ask(Ask)
 pub struct Answered { pub ask_id: AskId, pub as_of: Seq, pub outcome: AskOutcome }
 pub enum AskOutcome { Answer(Answer), Refusal(AxError) }
-ServerFrame::Answered(Box<Answered>)            // 取代 ServerFrame::Answer；对一问的拒绝也走这里
+ServerFrame::Answered(Box<Answered>)            // 对一问的拒绝也走这里
 ```
 
-**今天一个答复回到哪一问，是页面猜出来的。** `client/src/core/asking.ts` 用 `keyOfAnswer` 从答复的内容反推问题的键，推不出时用 `kindsOf` 按种类取最早的那一问；两个同种、参数不同的问题同时在途（两个 run 的 `RunView`），就只能按到达顺序配。这张反推表是「问什么」的第二个权威：`Query` 每加一条，表就得跟着加一行，漏一行的后果是一个永远不落地的答（`E_WIRE_MISMATCH`）。
+**一个答复回到哪一问，由问的一方铸造的编号决定，而不是从答复的内容反推。** 从内容反推需要一张「答复字段 → 问题键」的表，那是「问什么」的第二个权威：`Query` 每加一条，表就得跟着加一行，漏一行的后果是一个永远不落地的答；两个同种、参数不同的问题同时在途时，内容也分不出它们。
 
-- **配对的键由问的一方铸造**：`AskId` 在页面上按连接单调递增，服务端原样回显，不检查唯一——配对是页面的事，服务端判一次就是第二个家。重连后页面清空在途表，旧连接的 id 不会再来。
-- **拒绝也带 `ask_id`**：对一问的拒绝今天走不带编号的 `ServerFrame::Refusal`，页面无法知道哪一问落空；`AskOutcome::Refusal` 让它落到那一问上。命令的拒绝仍走 `Refusal`，那条路不变。
-- **`as_of` 是下界**：答复一方在读之前取账本头，与答复一同返回；答复至少反映到 `as_of` 为止的事。页面据此判陈旧：一条 `seq > as_of` 且够得着这一问的事件把它标陈旧，而 `seq <= as_of` 的事件不再触发重问。取在读之前而不是之后，是因为读的过程中落账的事件只会让页面多问一次，永远不会让它留着一个旧答。
-- **`WIRE_V` 加一**，`client/src/wire.ts` 随之重新生成；帧名换了（`query`→`ask`，`answer`→`answered`），旧页面在握手处被拒，而不是发出服务端读不懂的帧。
-- **页面一侧**：`asking.ts` 的在途表以 `AskId` 为键，`keyOfAnswer`、`kindsOf` 与按到达顺序的配对一并删除；`ask` 的返回类型按问题名收窄到对应的答复字段。
-- **红测在 Rust 侧先写**：`{"ask":{"ask_id":7,"query":"city_view"}}` 经 `reception` 解出 `Ask`，socket 回出的 `answered` 帧 `ask_id` 为 7。
+- **配对的键由问的一方铸造**：`AskId` 在页面上按连接递增（到 `u32` 上限回到 1），服务端原样回显，不检查唯一——配对是页面的事，服务端再判一次就是第二个家。重连后页面清空在途表，旧连接的 id 不会再来。区间补拉（§8-41）与视图的问共用这一个计数器，两者的 id 不会相撞。
+- **拒绝也带 `ask_id`**：`AskOutcome::Refusal` 让对一问的拒绝落到那一问上，那一问回到陈旧状态，由下一个观看者再问；拒绝本身仍交给页面的拒绝角落。拒绝码是 `E_WIRE_MISMATCH` 时整条连接停下，与 `ServerFrame::Refusal` 同一规则。命令的拒绝仍走 `ServerFrame::Refusal`。
+- **`as_of` 是答复读自的账本位置**：`sprawling` 在视图锁内先取视图折叠到的最后一条记录的 `seq`，再读答复，二者在同一把锁下，所以 `as_of` 恰是答复反映到的最后一条事。视图锁中毒时 `as_of` 为 `Seq::FIRST`，结果是拒绝。页面据此判陈旧：`seq <= as_of` 的事件已在答复里，不再触发重问；问在途时到达的事件记下它的 `seq`，答复的 `as_of` 不小于它时，这次陈旧随答复一起消掉。
+- **帧名随之换了**（`query`→`ask`，`answer`→`answered`），`WIRE_V` 加一；旧页面在握手处被拒，而不是发出服务端读不懂的帧。
+- **`sprawling console` 只有一问在途**，所以它的问一律用 `AskId(0)`，并且不读回 id。
