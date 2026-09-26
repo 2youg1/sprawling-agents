@@ -11,9 +11,10 @@ use memory::Cas;
 use serde_json::{Value, json};
 
 fn answer(content: Value) -> ToolOutcome {
-    let Value::Object(map) = json!({ "content": content, "isError": false }) else {
-        unreachable!("a literal object")
-    };
+    let map = json!({ "content": content, "isError": false })
+        .as_object()
+        .cloned()
+        .unwrap();
     ToolOutcome {
         result: Payload::new(map).unwrap(),
         attachments: Vec::new(),

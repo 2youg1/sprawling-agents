@@ -153,8 +153,7 @@ fn a_mother_run_holding_a_line_of_a_newer_kind_rebuilds_without_it() {
     let mut written = std::fs::read(&segment).unwrap();
     let last = written
         .split(|byte| *byte == b'\n')
-        .filter(|line| !line.is_empty())
-        .next_back()
+        .rfind(|line| !line.is_empty())
         .unwrap()
         .to_vec();
     let future = format!(
