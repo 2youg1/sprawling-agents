@@ -18,6 +18,7 @@
 mod apisync;
 mod architecture;
 mod artifact;
+mod attestation;
 mod badge;
 mod boundary;
 mod budget;

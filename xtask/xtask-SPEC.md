@@ -78,7 +78,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 ## 7 模块边界
 
-判定面一门一文件。门表与门序只住 `gates::GATES` 那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。此处只说明每道门判什么：不抄一份名册，也不写它们有几道，因为手写的名册与数组相隔一次代码改动而不是一个 token（产品文档写过「ten gates」而树上跑十二道）。要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates --list`；要知道有几道门，读 §12 那对受管标记。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字，与按 `## N 标题` 切节这一个读法：`section` 只被 `depmap` 调用（模块图迁入 `architecture.toml` 后 `modmap` 不再按节定位）；`specalign` 经 `modmap::anchors` 吃 TOML 那侧的产物，`proof` 只取 `PATH`、自己逐行读它与 `kani harness` 相邻的那个数，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 用它让退役词指向被定义的词；`proof` 用它的数词表读 `kani harness` 前的数）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
+判定面一门一文件。门表与门序只住 `gates::GATES` 那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。此处只说明每道门判什么：不抄一份名册，也不写它们有几道，因为手写的名册与数组相隔一次代码改动而不是一个 token（产品文档写过「ten gates」而树上跑十二道）。要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates --list`；要知道有几道门，读 §12 那对受管标记。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字，与按 `## N 标题` 切节这一个读法：`section` 只被 `depmap` 调用（模块图迁入 `architecture.toml` 后 `modmap` 不再按节定位）；`specalign` 经 `modmap::anchors` 吃 TOML 那侧的产物，`proof` 只取 `PATH`、自己逐行读它与 `kani harness` 相邻的那个数，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 用它让退役词指向被定义的词；`proof` 用它的数词表读 `kani harness` 前的数）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）｜`attestation`（挂到 tag 上的归档先有构件证明，被 `artifact` 调用，§8-34）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
@@ -840,3 +840,22 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **决定**：模块方向写在 ARCHITECTURE.md 与 crate 边同一节，由同一道门读。**败给的方案**：一个在 sprawling 里扫自己源码的测试——它判的是树的形状而不是行为，放在被判的 crate 里会让产品 crate 知道自己的源码路径；也败给新开一道门，因为方向就是依赖图的一部分，门名册不必为它多一行。**重议条件**：某个 crate 的模块要按图而不是按禁止表来判（例如要求整个 crate 无环），那时改为从 `use` 解析出模块图。
 
+
+### 8-34 `xtask::attestation`：挂到 tag 上的每份归档都先有构件证明（形状 1 判定）
+
+**要判的事实**：发布页上的每份归档都能用 `gh attestation verify <归档> --repo 2youg1/sprawling` 验出它出自本仓库的 `release.yml`。证明由 `actions/attest-build-provenance` 在发布 job 里生成，签名走 Sigstore 的无私钥流程（OIDC 令牌换短期证书），仓库里不存任何私钥。安装器照旧只比 sha256：`curl | sh` 不验签，文档也不这样宣称。
+
+**权威**：`.github/workflows/release.yml` 里执行 `gh release create` 的那个 job。本模块只读它，不生成它；路径取 `platform::WORKFLOW`，不另写一份。
+
+**接口**：`pub(crate) fn unattested(root: &Path) -> Result<Vec<Violation>, XtaskError>`，挂在 `artifact` 门下（与 §8-19 同理：发布档的形状本来就是 `artifact` 那一行的责任）。纯函数 `fn findings(workflow: &str) -> Vec<String>` 按形状逐行读，不引 YAML 解析器；每条发现是一句违规文字。失败：工作流读不到时返回 `XtaskError::Io`。
+
+**四条断言**，都只在那个 job 的行范围内判（job 以两格缩进的 `名字:` 开头）：
+
+1. 该 job 的 `permissions` 写着 `id-token: write` 与 `attestations: write`。一个 job 声明了权限就得声明全部，缺哪一条证明步骤都会在服务端被拒，而那时归档已经构建完。
+2. 该 job 有一步 `uses: actions/attest-build-provenance@…`。
+3. 这一步的 `subject-path:` 与 `gh release create` 那一行挂上去的 glob 逐字相同。两者分叉时，挂上去的归档里会有一份没有证明。
+4. 证明那一步写在 `gh release create` 之前，所以一次发布挂出来的每份归档都已经有证明；反过来排，证明步骤失败时发布页上会留下没有证明的归档。
+
+找不到执行 `gh release create` 的 job，本身就是一条发现，而不是「没什么可判」：静默通过会让整条规则随一次改名消失。
+
+**不判的**：证明是否真的上传成功、`gh attestation verify` 能否通过——那要一次真实的 tag 推送，由发布流水线自己在服务端失败。
