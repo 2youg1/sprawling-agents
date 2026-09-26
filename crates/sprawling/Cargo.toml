@@ -29,6 +29,9 @@ toml = { workspace = true }
 # crate's surface is safe, so no foreign call lives in this crate
 # (sprawling-SPEC.md 8-93).
 thread-priority = "3.1"
+# This machine's memory, read where the monitor's counters come from
+# (sprawling-SPEC.md 8-94); only the system part, which reads the RAM.
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
 zeroize = { workspace = true }
 
 [features]
