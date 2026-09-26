@@ -71,9 +71,9 @@ fn findings(workflow: &str) -> Vec<String> {
         .skip(attest)
         .find_map(|line| line.trim().strip_prefix("subject-path:"))
         .map(str::trim);
-    let attached = attach.and_then(|index| job.get(index));
+    let attached = attach.map(|index| attached_words(&job, index));
     match (subject, attached) {
-        (Some(glob), Some(line)) if line.split_whitespace().any(|word| word == glob) => {}
+        (Some(glob), Some(words)) if words.contains(&glob) => {}
         (Some(glob), _) => {
             out.push(format!(
                 "the attestation covers `{glob}`, which `{ATTACH}` does not attach"
@@ -94,6 +94,21 @@ fn runs_attach(line: &str) -> bool {
     line.trim_start().starts_with(ATTACH)
 }
 
+/// The words of the command that starts on line `from`, read through every
+/// line it continues onto with a trailing `\`.
+fn attached_words<'a>(job: &[&'a str], from: usize) -> Vec<&'a str> {
+    let mut words = Vec::new();
+    for line in job.iter().skip(from) {
+        let line = line.trim_end();
+        let text = line.strip_suffix('\\');
+        words.extend(text.unwrap_or(line).split_whitespace());
+        if text.is_none() {
+            break;
+        }
+    }
+    words
+}
+
 /// The lines of the job whose steps run `gh release create`.
 fn attaching_job<'a>(lines: &[&'a str]) -> Option<Vec<&'a str>> {
     let opens = |line: &&str| {
@@ -110,7 +125,7 @@ fn attaching_job<'a>(lines: &[&'a str]) -> Option<Vec<&'a str>> {
     starts.windows(2).find_map(|pair| {
         let job = lines.get(*pair.first()?..*pair.get(1)?)?;
         job.iter()
-            .any(|line| line.contains(ATTACH))
+            .any(|line| runs_attach(line))
             .then(|| job.to_vec())
     })
 }

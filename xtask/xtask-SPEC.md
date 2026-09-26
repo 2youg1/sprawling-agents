@@ -709,11 +709,11 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **接口**：`pub(crate) fn unattested(root: &Path) -> Result<Vec<Violation>, XtaskError>`，挂在 `artifact` 门下（与 §8-19 同理：发布档的形状本来就是 `artifact` 那一行的责任）。纯函数 `fn findings(workflow: &str) -> Vec<String>` 按形状逐行读，不引 YAML 解析器；每条发现是一句违规文字。失败：工作流读不到时返回 `XtaskError::Io`。
 
-**四条断言**，都只在那个 job 的行范围内判（job 以两格缩进的 `名字:` 开头）：
+**四条断言**，都只在那个 job 的行范围内判（job 以两格缩进的 `名字:` 开头）。「执行 `gh release create` 的 job」指某一行去掉缩进后以这条命令开头的 job；注释里提到这条命令的行不算，否则前面某个 job 的一句注释就会把判定引到错的 job 上。「那一行挂上去的 glob」指这条命令连同它用行尾 `\` 续上的各行：发布命令本来就常折成多行，只读第一行会把写在续行上的 glob 当成没挂。
 
 1. 该 job 的 `permissions` 写着 `id-token: write` 与 `attestations: write`。一个 job 声明了权限就得声明全部，缺哪一条证明步骤都会在服务端被拒，而那时归档已经构建完。
 2. 该 job 有一步 `uses: actions/attest-build-provenance@…`。
-3. 这一步的 `subject-path:` 与 `gh release create` 那一行挂上去的 glob 逐字相同。两者分叉时，挂上去的归档里会有一份没有证明。
+3. 这一步的 `subject-path:` 与 `gh release create` 挂上去的 glob 逐字相同。两者分叉时，挂上去的归档里会有一份没有证明。
 4. 证明那一步写在 `gh release create` 之前，所以一次发布挂出来的每份归档都已经有证明；反过来排，证明步骤失败时发布页上会留下没有证明的归档。
 
 找不到执行 `gh release create` 的 job，本身就是一条发现，而不是「没什么可判」：静默通过会让整条规则随一次改名消失。
