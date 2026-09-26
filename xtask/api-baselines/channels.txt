@@ -545,9 +545,10 @@ pub channels::ModelFactsSummary::input_price: core::option::Option<alloc::string
 pub channels::ModelFactsSummary::max_output_tokens: core::option::Option<kernel::model::wire::Ceiling>
 pub channels::ModelFactsSummary::output_price: core::option::Option<alloc::string::String>
 pub channels::MonitorFeed::samples: tokio::sync::broadcast::Sender<channels::Sample>
-pub channels::MonitorFeed::watch: alloc::sync::Arc<(dyn core::ops::function::Fn() -> alloc::boxed::Box<dyn core::marker::Send> + core::marker::Send + core::marker::Sync)>
+pub channels::MonitorFeed::watch: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Watched) -> alloc::boxed::Box<dyn core::marker::Send> + core::marker::Send + core::marker::Sync)>
 pub channels::Monitoring::Release
 pub channels::Monitoring::Watch
+pub channels::Monitoring::WatchSummary
 pub channels::Motion::Off
 pub channels::Motion::On
 pub channels::Motion::System
@@ -761,7 +762,7 @@ pub channels::SessionStep::Refuse
 pub channels::SessionStep::Refuse::close: bool
 pub channels::SessionStep::Refuse::error: alloc::boxed::Box<kernel::error::shape::AxError>
 pub channels::SessionStep::Release
-pub channels::SessionStep::Watch
+pub channels::SessionStep::Watch(channels::Watched)
 pub channels::SessionStep::Welcome(alloc::boxed::Box<channels::Welcome>)
 pub channels::SettledEffort::effort: kernel::model::wire::Effort
 pub channels::SettledEffort::from: channels::ConfigLayer
@@ -830,6 +831,8 @@ pub channels::Upstream::token_digest: core::option::Option<kernel::locator::B3Ha
 pub channels::Used::cached: kernel::budget::Tokens
 pub channels::Used::input: kernel::budget::Tokens
 pub channels::Used::output: kernel::budget::Tokens
+pub channels::Watched::Everything
+pub channels::Watched::Summary
 pub channels::Welcome::city: core::option::Option<kernel::address::Address>
 pub channels::Welcome::resume_from: core::option::Option<kernel::event::identity::Seq>
 pub channels::Welcome::schema: kernel::locator::B3Hash
@@ -902,6 +905,7 @@ pub enum channels::SkillShelf
 pub enum channels::SpineDocument
 pub enum channels::Standing
 pub enum channels::ToolkitsAnswer
+pub enum channels::Watched
 pub fn channels::Aggregate::ask(&self, &channels::CityLabel, channels::Query) -> core::result::Result<channels::Forwarded, kernel::error::shape::AxError>
 pub fn channels::Aggregate::attach(&mut self, channels::Upstream)
 pub fn channels::Aggregate::cities(&self) -> impl core::iter::traits::iterator::Iterator<Item = &channels::Upstream>

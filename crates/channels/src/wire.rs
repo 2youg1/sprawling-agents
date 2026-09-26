@@ -141,7 +141,10 @@ use serde::{Deserialize, Serialize};
 /// 39: the performance monitor travels. A session says it is watching
 ///    with `ClientFrame::Monitor` and receives one `ServerFrame::Monitor`
 ///    reading a second until it releases or closes.
-pub const WIRE_V: u32 = 39;
+/// 40: a session may watch only the fact bar's summary.
+///    `Monitoring::WatchSummary` makes the city read this process alone
+///    for it, and an older city would refuse the spelling.
+pub const WIRE_V: u32 = 40;
 mod monitor;
 mod query;
 
