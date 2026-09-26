@@ -36,6 +36,7 @@ mod output_ring;
 pub(crate) mod pool;
 pub(crate) mod relay;
 pub(super) mod serve;
+pub(crate) mod standing;
 #[cfg(test)]
 mod tests;
 pub(super) mod worker;
@@ -45,4 +46,5 @@ pub(crate) use door::random_token;
 pub use door::{Keyed, key_for, open_vault};
 pub use journal::Journal;
 pub use serve::Serving;
+pub use standing::{CorePriority, serving_runtime, setting_telling_a_refusal};
 pub use worker::{Listening, listen};

@@ -34,6 +34,7 @@ use super::folding::{Broadcast, Folding, spawn_folding};
 use super::output_ring::OutputRing;
 use super::relay::Patience;
 use super::serve::Opening;
+use super::standing::setting_telling_a_refusal;
 use crate::assembly::{RunWorker, Serving, now_ms};
 use crate::views::Views;
 
@@ -85,6 +86,9 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         to_readers,
         kept,
     } = outward;
+    // The views thread stands above the commands the city dispatches
+    // (sprawling-SPEC.md 8-93).
+    let setting = setting_telling_a_refusal();
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
     // (sprawling-SPEC.md 8-89).
@@ -92,7 +96,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         observer,
         machine,
         thread: fold_thread,
-    } = spawn_folding(views, Broadcast { to_clients, head })?;
+    } = spawn_folding(views, Broadcast { to_clients, head }, setting)?;
     // The one sanctioned thread besides the runtime's own. The ledger was
     // opened, its writer lock taken, before the history was folded; it
     // moves into this thread and never leaves: a city has one writer.
