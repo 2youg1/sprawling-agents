@@ -71,6 +71,12 @@ pub use queue::EventQueue;
 pub use queue::QueueItem;
 pub use queue::QueueLane;
 
+mod chain_audit;
+
+pub use chain_audit::ChainAudit;
+pub use chain_audit::ChainHalt;
+pub use chain_audit::audit_chain;
+
 mod snapshot;
 
 pub use snapshot::ChainSnapshot;

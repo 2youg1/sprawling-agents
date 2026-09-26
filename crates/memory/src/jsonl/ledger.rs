@@ -48,6 +48,8 @@ pub struct JsonlLedger {
     /// directory that is not a city's ledger, and on the fault model,
     /// whose disk no other process can reach.
     pub(crate) lock: Option<WriterLock>,
+    /// The stop a failed whole-chain audit trips (memory-SPEC 8-27).
+    pub(crate) halt: crate::chain_audit::ChainHalt,
 }
 
 /// This process's exclusive hold on a city's Ledger, released when the

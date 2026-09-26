@@ -45,6 +45,7 @@ impl JsonlLedger {
     /// (memory-SPEC 3-1: the batch is what the wave delivered).
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, MemoryError> {
         self.barrier.admit(&self.dir, self.next_seq)?;
+        self.halt.admit()?;
         if drafts.is_empty() {
             return Ok(Vec::new());
         }

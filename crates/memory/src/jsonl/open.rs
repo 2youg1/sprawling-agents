@@ -91,6 +91,7 @@ impl JsonlLedger {
             sessions: crate::sessions::Sessions::for_ledger(dir),
             observer: None,
             lock: None,
+            halt: crate::chain_audit::ChainHalt::default(),
         };
 
         let Some(last) = segments.last().cloned() else {
