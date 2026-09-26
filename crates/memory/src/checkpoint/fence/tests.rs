@@ -336,6 +336,37 @@ fn a_file_scope_is_a_literal_path_and_not_a_glob() {
     assert_eq!(files_of(&fence), ["hall/notes[1].md"]);
 }
 
+/// The address grammar admits a leading `!`, which a git pathspec reads
+/// as a negation: the scope `!notes.md` has to stage that file, and
+/// removing it has to stage the removal, and neither may stage any
+/// other file the tree changed.
+#[test]
+fn a_file_scope_with_a_leading_bang_is_that_file_and_not_a_negation() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "notes.md", "decoy");
+    write(tmp.path(), "other.md", "decoy");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    checkpoint
+        .wave_pre(&[], TimeMs::new(1_000), &resident())
+        .unwrap();
+
+    write(tmp.path(), "!notes.md", "written");
+    write(tmp.path(), "notes.md", "decoy changed");
+    write(tmp.path(), "other.md", "decoy changed");
+    let scope = ["!notes.md".to_owned()];
+    let added = checkpoint
+        .wave_pre(&scope, TimeMs::new(2_000), &resident())
+        .unwrap();
+    std::fs::remove_file(tmp.path().join("!notes.md")).unwrap();
+    let removed = checkpoint
+        .wave_pre(&scope, TimeMs::new(3_000), &resident())
+        .unwrap();
+    assert_eq!(
+        [files_of(&added), files_of(&removed)],
+        [["!notes.md"], ["!notes.md"]]
+    );
+}
+
 #[test]
 fn a_fence_lists_only_the_paths_it_changed() {
     let tmp = tempfile::tempdir().unwrap();

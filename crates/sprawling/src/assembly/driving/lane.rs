@@ -274,7 +274,14 @@ pub(crate) fn drive_run<L: Ledger>(
             // and both run; the same position replayed is one key, which
             // is what deduplication is for.
             let key = kernel::IdemKey::derive(&run_id, kernel::Seq::new(at), &call.action()?);
-            match bench.invoke(call, &key, t)? {
+            // A call that failed may have failed partway through its
+            // writes, and its own account of them no longer holds, so the
+            // next fence walks the whole domain (runtime-SPEC 8-45).
+            let answered = bench.invoke(call, &key, t).inspect_err(|_| {
+                let so_far = wrote.replace(kernel::Writes::Nothing);
+                wrote.replace(so_far.and(kernel::Writes::Domain));
+            })?;
+            match answered {
                 BenchOutcome::Ran {
                     outcome,
                     fenced: at,
