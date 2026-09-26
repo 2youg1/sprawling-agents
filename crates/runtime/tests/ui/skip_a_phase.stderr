@@ -4,4 +4,4 @@ error[E0599]: no method named `call` found for struct `Turn<Assembling>` in the 
 15 |     let _ = turn.call();
    |                  ^^^^ method not found in `Turn<Assembling>`
    |
-   = note: the method was found for `Turn<Calling>`
+   = note: the method was found for `Turn<Calling<'_>>`
