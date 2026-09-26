@@ -2791,58 +2791,6 @@
     "en": "waiting on you",
     "zh": "等你的事"
   },
-  "welcome_back": {
-    "en": "back",
-    "zh": "上一步"
-  },
-  "welcome_done": {
-    "en": "the Mayor's office",
-    "zh": "进入市长室"
-  },
-  "welcome_later": {
-    "en": "later",
-    "zh": "以后再说"
-  },
-  "welcome_machine_body": {
-    "en": "run once in a terminal",
-    "zh": "在终端里跑一次"
-  },
-  "welcome_next": {
-    "en": "next",
-    "zh": "下一步"
-  },
-  "welcome_no_main": {
-    "en": "no main model",
-    "zh": "main 没有模型"
-  },
-  "welcome_skip": {
-    "en": "skip",
-    "zh": "跳过"
-  },
-  "welcome_step_go": {
-    "en": "begin",
-    "zh": "开始"
-  },
-  "welcome_step_machine": {
-    "en": "dependencies",
-    "zh": "依赖项安装"
-  },
-  "welcome_step_model": {
-    "en": "the model",
-    "zh": "模型"
-  },
-  "welcome_step_optional": {
-    "en": "optional",
-    "zh": "可选"
-  },
-  "welcome_step_provider": {
-    "en": "a provider",
-    "zh": "一个 provider"
-  },
-  "welcome_steps": {
-    "en": "the steps",
-    "zh": "步骤"
-  },
   "welcome_title": {
     "en": "welcome",
     "zh": "欢迎"
