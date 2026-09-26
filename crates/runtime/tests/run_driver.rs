@@ -825,3 +825,60 @@ fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
     assert_eq!(*attempts.borrow(), 3, "no call goes out after the halt");
     assert!(matches!(frozen.completion(), Completion::Cancelled));
 }
+
+/// A steer that arrives between two calls of a wave is written down
+/// before the model reads it, the same as a steer at any other safe
+/// point: the window that carries it is the model's, and a window
+/// holding text the ledger never saw is a request nobody can account
+/// for.
+#[test]
+fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
+    let mut ledger = RecordingLedger::new();
+    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::clone(&seen),
+        waves: vec![vec![call("t-1"), call("t-2")]],
+    };
+    let mut now = counter();
+    let mut interrupt = |point: SafePoint| match point {
+        SafePoint::BeforeToolCall { turn: 0, call: 1 } => Interrupt::Steer {
+            source: "user".to_owned(),
+            text: "measure it in metres".to_owned(),
+        },
+        _ => Interrupt::None,
+    };
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+
+    let kinds = ledger.kinds();
+    let steered = kinds
+        .iter()
+        .position(|kind| kind == "steer_received")
+        .unwrap_or_else(|| panic!("the steer inside the wave is recorded: {kinds:?}"));
+    let called_again = kinds
+        .iter()
+        .rposition(|kind| kind == "model_called")
+        .unwrap();
+    assert!(
+        steered < called_again,
+        "recorded before the call that carries it: {kinds:?}"
+    );
+    assert!(
+        seen.borrow()[1].contains("measure it in metres"),
+        "and the next assembly carries it"
+    );
+}

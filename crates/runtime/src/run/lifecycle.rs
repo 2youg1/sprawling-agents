@@ -16,7 +16,7 @@ use kernel::{
 use crate::handoff::Handoff;
 use crate::prefix::shape::PromptShape;
 use crate::reminder::ContextGauge;
-use crate::turn::{Interrupt, NextCall, PhaseOutcome, Turn, TurnReport};
+use crate::turn::{Interrupt, PhaseOutcome, Turn, TurnReport};
 use crate::window::Window;
 
 use super::fence::{Fence, FencePolicy};
@@ -214,19 +214,16 @@ impl Run<Active> {
         let mut stamped = |call: &ToolCall| invoke(call, t);
         // The same question the three phase boundaries ask, asked again
         // before each call of the wave. A cancel ends the wave there; a
-        // steer is folded into the window and the call goes ahead,
-        // because text that redirects the work takes effect at the next
-        // assembly and stopping is the only instruction that can be
-        // carried out between two calls.
+        // steer is recorded by the turn and folded into the window, and
+        // the call goes ahead, because text that redirects the work takes
+        // effect at the next assembly and stopping is the only
+        // instruction that can be carried out between two calls.
         let asking = &mut hooks.interrupt;
         let window = &mut self.state.window;
         let mut still_going = |call: u32| {
             let arrived = asking(SafePoint::BeforeToolCall { turn: index, call });
             fold_steer(window, &arrived);
-            match arrived {
-                Interrupt::Cancel => NextCall::Halted,
-                Interrupt::None | Interrupt::Steer { .. } => NextCall::Allowed,
-            }
+            arrived
         };
         let turn = match turn.execute(wave, ledger, &mut stamped, &mut still_going)? {
             PhaseOutcome::Advanced(next) => next,
