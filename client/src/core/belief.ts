@@ -15,6 +15,7 @@
 // the position - that, the author and the time are readable - and the
 // field it could not read comes back to the caller to report.
 
+import { Effect } from "effect";
 import { writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
@@ -204,12 +205,21 @@ export function createBelief(now: () => number): BeliefStore {
     if (depth === 0) store.set(next);
   }
 
+  // A fold that fails still closes its batch: a depth left above zero
+  // would stop every later write from reaching a subscriber.
   function batch(folds: () => void): void {
     const before = current;
     depth += 1;
-    folds();
-    depth -= 1;
-    if (depth === 0 && current !== before) store.set(current);
+    Effect.runSync(
+      Effect.sync(folds).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            depth -= 1;
+            if (depth === 0 && current !== before) store.set(current);
+          }),
+        ),
+      ),
+    );
   }
 
   // What a `city_view` answer says about runs this page never saw. A run

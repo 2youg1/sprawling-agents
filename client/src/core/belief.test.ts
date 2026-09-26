@@ -370,3 +370,20 @@ describe("one refusal, however often it arrived", () => {
     expect(notices[1]?.about).toBeNull();
   });
 });
+
+describe("batch", () => {
+  // The defect: a fold that failed inside a batch left the nesting depth
+  // above zero, and from then on no write reached a subscriber - the page
+  // froze on the belief it held when the fold failed.
+  test("a fold that fails inside a batch leaves later writes published", () => {
+    const store = createBelief(() => 0);
+    expect(() => {
+      store.batch(() => {
+        JSON.parse("{");
+      });
+    }).toThrow();
+    store.named("city");
+
+    expect(get(store.belief).city).toBe("city");
+  });
+});
