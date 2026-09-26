@@ -286,8 +286,8 @@ pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const fn kernel::retries::Retries::without_a_brake(self) -> u32
 pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
 pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
-pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::DOORS: [kernel::gate::DoorId; 9]
+pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
 pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
