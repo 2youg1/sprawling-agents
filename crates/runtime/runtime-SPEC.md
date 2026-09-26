@@ -105,7 +105,7 @@ pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError>;
 
 流程：逐行①envelope 探查（serde_json::Value：v/seq/prev/kind/ig 键）；②v 判向（>EVENT_LOG_V 即 `E_LOG_VERSION_UNSUPPORTED`）；③链续（`chain_hash` 复算对拍 prev，首行对 GENESIS_PREV）；④seq 连续（自 FIRST 起）；⑤kind 已知→`parse_line` 全解＋规范复验＋`to_ref`；未知＋`ig:true`→记 IgnoredUnknown；未知无 ig→`E_LOG_VERSION_UNSUPPORTED`（subject=kind＋行号）。链与 seq 对一切行（含 ignored）成立。
 
-**「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 的四个生产调用方（`fold`、`rebuild_views`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
+**「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 的四个生产调用方（`fold`、`Views::rebuild`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
 
 故依据归给**拿到人输入路径的那一层**：`sprawling replay <ledger-dir>` 先问 `memory::ledger_segments_at`，一段都没有就报 `E_PATH_NOT_FOUND`（sprawling-SPEC §12）。先例取自本仓库：`xtask guard` 在无提交时说 `no commits yet, nothing to judge`，而不说通过。**空账本本身仍然合法**：`verify_lines(vec![])` 照旧返回空 `VerifiedLedger`。
 
@@ -408,12 +408,7 @@ pub struct Watchdog { /* corrections: u32、provider_failures: u32、retries: Re
 pub enum Disposal { Proceed, CorrectiveSteer { text: String },
                                      BackOff { until: TimeMs, code: AxCode, subject: String },
                                      Freeze { reason: FreezeReason } }
-pub struct WatchdogFired { #[serde(flatten)] pub action: FiredAction,
-                           pub corrections: u32, pub provider_failures: u32 }
-#[serde(tag = "action", rename_all = "snake_case")]
-pub enum FiredAction { Steer { text: String },
-                       BackOff { until_ms: u64, code: String, subject: String },
-                       Freeze { reason: String } }
+// fired_payload 写的是 kernel::event::record::WatchdogFired（kernel-SPEC §8-4），本 crate 不另声明其形状
 pub enum FreezeReason { Stall, ProviderRefused }
 impl Watchdog {
     pub fn new(retries: Retries) -> Watchdog;
@@ -431,7 +426,7 @@ impl Watchdog {
 - **`runtime::run::drive` 是那个调用方**：一次可重试的失败写一条 `watchdog_fired` 再重来，于是历史里第二条 `model_called` 就是人读到的那次重试，而不是一次无声的重复。节奏归 `Watchdog` 的退避表：`drive` 先把 `Watchdog` 给的 `until` 写进 `watchdog_fired`，再交给 `RunHooks::wait` 等到那一刻，于是历史许诺的「不早于 `until_ms`」与下一条 `model_called` 一致。**等待是 `Halt` 够得着一个没有回合在飞的 run 的地方**：`wait` 答 `Halted` 时 run 以 `Cancelled` 冻住，不再发下一次调用。落选的是「等完再问 `interrupt`」：退避长到一分钟，一个晚一分钟才生效的刹车不是刹车。装配层的 `wait` 以 50 ms 为片睡到 `until`，每片问一次是否停下；等待中到达的 steer 留到下一个安全点，不在等待里被吞掉。计数时钟（citysim、离线重放）答 `Allowed` 且不等，因为它重放的东西不在真实时间里等待。
 - **为什么删掉 `WATCHDOG_PROVIDER_RETRIES=2`。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。`retriable` 是产错处已经知道的事实（默认 false，fail-closed），拿它分类比在这里重新猜一遍强。
 - **`ProviderExhausted` 改名 `ProviderRefused`。** 既然没有重试预算了，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。载荷里的 `reason` 字串同改为 `provider_refused`。
-- fired_payload 的形状由 `WatchdogFired` 独家拼出：`drive` 此前对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，于是一份历史里有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
+- fired_payload 的形状由 `kernel::event::record::WatchdogFired`（kernel-SPEC §8-4）独家拼出：`drive` 此前对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，于是一份历史里有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不再是一个阀值。
 
 ### 8-10 runtime::clock（形状 1；纯格式化不采样）
 

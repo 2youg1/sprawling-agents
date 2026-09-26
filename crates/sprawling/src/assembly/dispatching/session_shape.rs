@@ -97,6 +97,7 @@ impl RunWorker {
     /// would be a fact this city does not have.
     fn frozen_shape(&self, model: &str, effort: Option<Effort>) -> CallShape {
         let held = self
+            .credentials
             .book
             .choices()
             .find(|(_, _, entry)| entry.id == model)

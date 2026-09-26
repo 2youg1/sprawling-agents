@@ -15,7 +15,7 @@ use memory::JsonlLedger;
 use crate::serving::open_vault;
 
 use super::freezing::Assembled;
-use super::{RunWorker, ScanReport, ledger_dir, now_ms};
+use super::{RunWorker, ScanReport, now_ms};
 
 /// The city segment of every prefix, and a file the person is meant to
 /// edit: `init` writes it into the city, and every later run reads that
@@ -87,7 +87,7 @@ pub enum History {
 /// listed: calling that `Absent` would let `init` write a second genesis
 /// over a city it merely failed to read.
 pub fn has_history(city_root: &Path) -> Result<History, AxError> {
-    let dir = ledger_dir(city_root);
+    let dir = kernel::layout::CityLayout::new(city_root).ledger();
     match std::fs::read_dir(&dir) {
         Ok(mut entries) => Ok(match entries.next() {
             Some(_) => History::Present,
@@ -129,7 +129,7 @@ pub fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
 pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> {
     let history = has_history(city_root)?;
     let standing = standing_of(city_root, history);
-    let dir = ledger_dir(city_root);
+    let dir = kernel::layout::CityLayout::new(city_root).ledger();
     if history == History::Present {
         return Err(AxError::failure(
             AxCode::ConfigInvalid,
@@ -162,7 +162,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
         // city that had been running for a month.
         addr: kernel::layout::CityLayout::new(city_root).city_address(),
         kind: EventKind::CityInitialized,
-        data: Payload::empty(),
+        data: Payload::of(&kernel::event::record::CityInitialized {})?,
         ig: false,
     })?;
     let city_md = city_root.join(city::CITY_FILE);
@@ -321,7 +321,9 @@ impl RunWorker {
     /// Propagates whatever the chain says about itself: a history that
     /// does not verify is not a history to append closing drafts to.
     pub fn startup_scan(&mut self) -> Result<ScanReport, AxError> {
-        let verified = runtime::replay::verify_ledger_dir(&ledger_dir(&self.city_root))?;
+        let verified = runtime::replay::verify_ledger_dir(
+            &kernel::layout::CityLayout::new(&self.city_root).ledger(),
+        )?;
         let dangling = runtime::replay::dangling_tool_calls(&verified);
         let mut closed = 0usize;
         for (run, seq) in dangling {

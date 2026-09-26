@@ -24,29 +24,8 @@
 //! is worse than the string the provider printed.
 
 use kernel::Ceiling;
-use serde::{Deserialize, Serialize};
+use kernel::event::record::ModelFacts;
 use serde_json::Value;
-
-/// What a model list said about one model.
-///
-/// Everything but the id is optional, because for most providers
-/// everything but the id is missing.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct ModelFacts {
-    pub id: String,
-    /// How many tokens the model reads in one call.
-    pub context_tokens: Option<u64>,
-    /// How many tokens it may write back.
-    pub max_output_tokens: Option<Ceiling>,
-    /// What it accepts, in the provider's own words (`text`, `image`,
-    /// `audio`). Empty means the row said nothing, never "text only".
-    pub input_modalities: Vec<String>,
-    /// The provider's own input price, verbatim, unit included when the
-    /// provider stated one.
-    pub input_price: Option<String>,
-    /// The provider's own output price, verbatim.
-    pub output_price: Option<String>,
-}
 
 /// The keys a context window arrives under, first one wins.
 const CONTEXT_KEYS: [&str; 5] = [
@@ -146,27 +125,25 @@ fn price(row: &Value, keys: [&str; 2]) -> Option<String> {
     None
 }
 
-impl ModelFacts {
-    /// One row read for everything it states.
-    ///
-    /// `None` when the row carries no id: a model this city cannot name
-    /// is a model it cannot call, and inventing a name for it would put
-    /// an uncallable row in front of a person choosing one.
-    #[must_use]
-    pub fn read(row: &Value) -> Option<ModelFacts> {
-        let id = row
-            .get("id")
-            .and_then(Value::as_str)
-            .or_else(|| row.get("name").and_then(Value::as_str))?;
-        Some(ModelFacts {
-            id: id.to_owned(),
-            context_tokens: count(row, &CONTEXT_KEYS),
-            max_output_tokens: count(row, &OUTPUT_KEYS).and_then(Ceiling::new),
-            input_modalities: modalities(row),
-            input_price: price(row, ["input_price", "prompt"]),
-            output_price: price(row, ["output_price", "completion"]),
-        })
-    }
+/// One row read for everything it states.
+///
+/// `None` when the row carries no id: a model this city cannot name
+/// is a model it cannot call, and inventing a name for it would put
+/// an uncallable row in front of a person choosing one.
+#[must_use]
+pub(crate) fn facts_of(row: &Value) -> Option<ModelFacts> {
+    let id = row
+        .get("id")
+        .and_then(Value::as_str)
+        .or_else(|| row.get("name").and_then(Value::as_str))?;
+    Some(ModelFacts {
+        id: id.to_owned(),
+        context_tokens: count(row, &CONTEXT_KEYS),
+        max_output_tokens: count(row, &OUTPUT_KEYS).and_then(Ceiling::new),
+        input_modalities: modalities(row),
+        input_price: price(row, ["input_price", "prompt"]),
+        output_price: price(row, ["output_price", "completion"]),
+    })
 }
 
 #[cfg(test)]
@@ -182,7 +159,7 @@ mod tests {
 
     #[test]
     fn a_row_that_states_nothing_but_an_id_states_nothing_but_an_id() {
-        let facts = ModelFacts::read(&serde_json::json!({ "id": "m-1", "object": "model" }));
+        let facts = facts_of(&serde_json::json!({ "id": "m-1", "object": "model" }));
         assert_eq!(
             facts,
             Some(ModelFacts {
@@ -196,7 +173,7 @@ mod tests {
     /// under their own names, modalities beside them, prices quoted.
     #[test]
     fn a_row_is_read_for_every_fact_it_carries() {
-        let facts = ModelFacts::read(&serde_json::json!({
+        let facts = facts_of(&serde_json::json!({
             "id": "vendor/m-2",
             "context_length": 200_000,
             "max_completion_tokens": "64000",
@@ -219,7 +196,7 @@ mod tests {
     /// The other shape: the same two figures one object further down.
     #[test]
     fn a_nested_row_is_read_as_deeply_as_it_states_its_facts() {
-        let facts = ModelFacts::read(&serde_json::json!({
+        let facts = facts_of(&serde_json::json!({
             "id": "m-3",
             "top_provider": { "context_length": 128_000, "max_completion_tokens": 8_192 },
             "architecture": { "input_modalities": ["text"] },
@@ -235,16 +212,12 @@ mod tests {
     /// `max_tokens: 0`, which answers with no content at all.
     #[test]
     fn a_zero_ceiling_is_an_absent_ceiling() {
-        let facts =
-            ModelFacts::read(&serde_json::json!({ "id": "m-4", "max_output_tokens": 0 })).unwrap();
+        let facts = facts_of(&serde_json::json!({ "id": "m-4", "max_output_tokens": 0 })).unwrap();
         assert_eq!(facts.max_output_tokens, None);
     }
 
     #[test]
     fn a_row_without_a_name_is_no_row() {
-        assert_eq!(
-            ModelFacts::read(&serde_json::json!({ "object": "model" })),
-            None
-        );
+        assert_eq!(facts_of(&serde_json::json!({ "object": "model" })), None);
     }
 }

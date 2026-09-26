@@ -30,9 +30,11 @@
 //! which the dispatching modules read where the credentials module keeps it.
 
 mod building_page;
+mod collaborating;
 mod commanding;
 mod credentials;
 mod dispatching;
+mod doorstep;
 mod driving;
 mod folds;
 mod freezing;
@@ -51,43 +53,49 @@ mod waking;
 mod workbench;
 
 pub(crate) use building_page::{DOC_BYTES_MAX, read_building};
+use collaborating::Collaborating;
 use commanding::entrance::Entrance;
+use credentials::held::Credentials;
 pub(crate) use credentials::signing::resolving;
 use credentials::subscription::Expiries;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
+use doorstep::Doorstep;
 use driving::flight::{Flight, Landed};
 pub(crate) use driving::lane::{DriveContext, drive_run};
 use driving::owing::{Owed, Owing, Unasked};
 pub(crate) use driving::{Driven, Driving};
+pub(crate) use folds::Standing;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
-pub(crate) use folds::{Standing, rebuild_views};
 use genesis::city_segment;
 pub use genesis::{Adopt, History, InitReport, form_city, has_history, init_city};
 use lifetime::LedgerOpening;
 pub(crate) use mcp::McpLink;
 use mcp::{connect_mcp, mounts_under, transport_site};
-use naming::{building_of, governed_of, name_of, not_built, plan_node_of, scope_of};
+use naming::{building_of, governed_of, name_of, not_built, scope_of};
 use plans::Reporter;
+use plans::held::{PlanHolders, Planning};
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
 pub(crate) use toolkits::broker_for;
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use kernel::{Address, AxCode, AxError, EventRecord, RunId, TimeMs};
+use kernel::{AxCode, AxError, EventRecord, RunId, TimeMs};
 // What the test fixtures below reach through `super::*`, now that the
 // lines this worker appends live in `recording`.
 #[cfg(test)]
 use crate::effect;
 #[cfg(test)]
-use kernel::{EventDraft, EventKind, Payload};
+use kernel::{Address, EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};
 use runtime::Interrupt;
+#[cfg(test)]
+use std::path::Path;
 
 /// The single sanctioned sampling point (clippy.toml disallowed-methods). Everything below this call takes `TimeMs` as a
 /// parameter.
@@ -114,12 +122,6 @@ pub(crate) fn now_ms() -> Result<TimeMs, AxError> {
         )
     })?;
     Ok(TimeMs::new(millis))
-}
-
-/// Where a city keeps its ledger: under the reserved prefix, outside
-/// every WriteDomain (C17).
-pub(crate) fn ledger_dir(city_root: &Path) -> PathBuf {
-    kernel::layout::CityLayout::new(city_root).ledger()
 }
 
 /// What the startup scan found and repaired.
@@ -188,14 +190,9 @@ pub struct RunWorker {
     /// What opening `ledger` repaired, kept until a person is told.
     opening: LedgerOpening,
     cas: Cas,
-    /// Every endpoint the person attached and every model they chose,
-    /// folded from the ledger. The worker keeps its own copy because a
-    /// dispatch needs it synchronously, before the record it just wrote
-    /// has reached any observer.
-    book: gateway::EndpointBook,
-    /// The vault. Shared because a redemption closure outlives the call
-    /// that builds it; the lock is held for one resolve at a time.
-    vault: Arc<std::sync::Mutex<gateway::Custodian>>,
+    /// Whose identity this city can call which model under
+    /// (`credentials::held`).
+    credentials: Credentials,
     /// The three places a live control surface listens, or `None` in a
     /// worker driven one command at a time.
     ///
@@ -211,70 +208,28 @@ pub struct RunWorker {
     /// keeps the endpoint book: an answer is decided synchronously,
     /// before the record it just wrote has reached any observer.
     governance: Governance,
-    /// What is waiting for each room, folded from the signal records,
-    /// and which run is reading it. A dispatch lends its room's queue
-    /// to the signal tool and takes it back when the drive ends, and
-    /// `rooms` is what holds that to one queue per room.
-    pub(in crate::assembly) rooms: RoomQueues,
-    /// What each room already got back from work it handed down. Kept
-    /// beside the inboxes because it is folded from the same lines and
-    /// belongs to the same room.
-    pub(super) joins: std::collections::BTreeMap<Address, collab::FanIn>,
-    /// The requests waiting for someone to check them, folded from the
-    /// pull request records.
-    pub(super) requests: Vec<collab::OpenRequest>,
-    /// The ground residents have claimed, folded from `goal_registered`
-    /// in the order the claims were made — which is the order the
-    /// conflict check reads them in.
-    pub(super) goals: Vec<kernel::GoalEntry>,
-    /// What each building is working towards, and the depth-zero
-    /// position that lets one be declared. Held by the worker because
-    /// the worker is what acts on it; rebuilt from the records on open,
-    /// like the endpoint book and the goal register beside it.
-    pursuits: std::collections::BTreeMap<Address, kernel::Pursuit>,
-    delegator: kernel::Delegator,
-    /// Which room holds each node of each building's plan, folded from
-    /// the claim records and kept up to date as this worker writes them.
-    plan_holders:
-        std::collections::BTreeMap<Address, std::collections::BTreeMap<kernel::NodeId, String>>,
+    /// What residents are handing one another (`collaborating`).
+    collaborating: Collaborating,
+    /// What each building is working towards and who holds which part
+    /// of its plan (`plans::held`).
+    planning: Planning,
     /// The instant the schedule was last read against. Set when the
     /// worker opens, so a city that was off owes nothing for the time it
     /// was off.
     last_tick: TimeMs,
-    /// When each subscription credential stops working, by provider.
-    /// Folded from the capture records, so a restarted city renews on
-    /// the same schedule rather than discovering expiry through a 401.
-    expiries: Expiries,
-    /// Logins begun and not yet redeemed, by provider. Held in memory
-    /// on purpose: a PKCE verifier proves that the process which asked
-    /// is the process which redeems, so a verifier that outlived the
-    /// process would be proving nothing. A restart means starting the
-    /// login again, which is one browser visit.
-    logins: std::collections::BTreeMap<String, gateway::OauthPending>,
     /// The diagnostic log. Write-only, and nothing here reads it back:
     /// turning it off must leave the ledger byte-identical.
     log: runtime::diagnostics::Diagnostics,
-    /// Residents who were spoken to while nobody was home. Held between
-    /// the run that spoke and the runs that answer, because delivery
-    /// happens after the speaker has frozen.
-    knocks: Vec<Knock>,
-    /// Every command key this city has answered, and what it answered.
-    /// Folded from the history like the endpoint book beside it, so a
-    /// client retrying across a restart is still asking for one thing.
-    entrance: Entrance,
-    /// What is still running while the runs go on. One table per city,
-    /// and every `exec` gets a handle onto it, so `halt` reaches a
-    /// command without knowing which tool started it.
-    backlog: runtime::Backlog,
+    /// What reached the city's door and has not yet become a run
+    /// (`doorstep`).
+    doorstep: Doorstep,
     /// What each room's current session branched from, until the run
     /// that begins it is written (`assembly::folds::session`).
     pub(in crate::assembly) origins: SessionOrigins,
-    /// One fence at a time per city: a repository has one index, and
-    /// every lane of this worker stages and commits it (`driving::lane`).
-    pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// Every run in a lane right now, the crossing those lanes write
-    /// history through, and what the city owes each one when it comes
-    /// home. One per city, so the number of runs a city drives at once
+    /// history through, what the city owes each one when it comes home,
+    /// the one fence they take turns at, and the commands they left
+    /// running. One per city, so the number of runs a city drives at once
     /// has one answer (sprawling-SPEC.md 8-46-2).
     flight: Flight,
 }
@@ -297,8 +252,9 @@ impl RunWorker {
         if let Some(known) = self.city.get() {
             return Ok(*known);
         }
-        let read = memory::Provenance::city_of(&ledger_dir(&self.city_root))
-            .map_err(memory::MemoryError::into_ax)?;
+        let read =
+            memory::Provenance::city_of(&kernel::layout::CityLayout::new(&self.city_root).ledger())
+                .map_err(memory::MemoryError::into_ax)?;
         Ok(*self.city.get_or_init(|| read))
     }
 

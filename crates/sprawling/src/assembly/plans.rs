@@ -5,6 +5,7 @@
 
 //! One building's plan: who holds what, and how far red reaches.
 
+use kernel::event::record::{PursuitChanged, PursuitMove};
 use kernel::{Address, AxCode, AxError, EventKind};
 use kernel::{Payload, RunId};
 
@@ -115,7 +116,7 @@ impl RunWorker {
     /// which room. A node marked `In progress` that no record claims is
     /// left out rather than guessed at.
     fn holders_in(&self, building: &Address) -> std::collections::BTreeMap<kernel::NodeId, String> {
-        self.plan_holders.get(building).cloned().unwrap_or_default()
+        self.planning.holders.in_building(building)
     }
 
     /// What could be started in one building right now.
@@ -170,13 +171,13 @@ impl RunWorker {
             )
             .with_recovery("set a goal first; there is nothing here to change")
         };
-        let name = match step {
+        let step = match step {
             channels::PursuitStep::Set { goal } => {
                 // Declared through the depth-zero position this worker
                 // holds. That is the runtime half of the guard the type
                 // already carries: a sub-agent has no `Delegator`, and
                 // no path from a tool reaches this function either.
-                let declared = kernel::Pursuit::declare(&self.delegator, goal)?;
+                let declared = kernel::Pursuit::declare(&self.planning.delegator, goal)?;
                 self.note(
                     runtime::diagnostics::Level::Effect,
                     "kernel::pursuit",
@@ -186,46 +187,51 @@ impl RunWorker {
                         declared.goal()
                     ),
                 );
-                self.pursuits.insert(addr.clone(), declared);
-                "set"
+                self.planning.pursuits.insert(addr.clone(), declared);
+                PursuitMove::Set
             }
             channels::PursuitStep::Pause => {
-                self.pursuits
+                self.planning
+                    .pursuits
                     .get_mut(addr)
                     .ok_or_else(|| missing("pause a pursuit"))?
                     .pause();
-                "pause"
+                PursuitMove::Pause
             }
             channels::PursuitStep::Resume => {
-                self.pursuits
+                self.planning
+                    .pursuits
                     .get_mut(addr)
                     .ok_or_else(|| missing("resume a pursuit"))?
                     .resume();
-                "resume"
+                PursuitMove::Resume
             }
             channels::PursuitStep::Clear => {
-                self.pursuits
+                self.planning
+                    .pursuits
                     .remove(addr)
                     .ok_or_else(|| missing("clear a pursuit"))?;
-                "clear"
+                PursuitMove::Clear
             }
         };
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "step".to_owned(),
-            serde_json::Value::String(name.to_owned()),
-        );
-        if let Some(held) = self.pursuits.get(addr) {
-            map.insert(
-                "goal".to_owned(),
-                serde_json::Value::String(held.goal().to_owned()),
-            );
-        }
-        self.record_at(EventKind::PursuitChanged, addr.clone(), Payload::new(map)?)?;
+        let changed = PursuitChanged {
+            step,
+            goal: self
+                .planning
+                .pursuits
+                .get(addr)
+                .map(|held| held.goal().to_owned()),
+        };
+        self.record_at(
+            EventKind::PursuitChanged,
+            addr.clone(),
+            Payload::of(&changed)?,
+        )?;
         self.pursue(addr)
     }
 }
 
+pub(super) mod held;
 mod pursuing;
 
 #[cfg(test)]

@@ -10,8 +10,8 @@ use super::codec::{base64url_nopad, percent_encode};
 use super::exchange;
 use super::types::{OauthTokens, RedirectPending, TokenRequest};
 
+use kernel::event::record::{ProviderDegraded, VaultFellBack};
 use kernel::{AxCode, AxError, Payload, Sealed};
-use serde_json::{Map, Value};
 use zeroize::Zeroizing;
 
 pub fn oauth_begin(
@@ -224,18 +224,13 @@ fn redirect_of(profile: &crate::oauth_profiles::OauthProfile) -> Result<&'static
 }
 
 pub(crate) fn degraded_payload(reason: &str) -> Option<Payload> {
-    let mut map = Map::new();
-    map.insert("component".to_owned(), Value::String("vault".to_owned()));
-    map.insert(
-        "fallback".to_owned(),
-        Value::String("session-memory".to_owned()),
-    );
-    map.insert(
-        "persistence".to_owned(),
-        Value::String(Persistence::ThisProcess.as_str().to_owned()),
-    );
-    map.insert("reason".to_owned(), Value::String(reason.to_owned()));
-    Payload::new(map).ok()
+    Payload::of(&ProviderDegraded::VaultFellBack(VaultFellBack {
+        component: "vault".to_owned(),
+        fallback: "session-memory".to_owned(),
+        persistence: Persistence::ThisProcess.as_str().to_owned(),
+        reason: reason.to_owned(),
+    }))
+    .ok()
 }
 
 #[cfg(test)]

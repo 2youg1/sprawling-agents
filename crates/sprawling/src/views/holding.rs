@@ -8,7 +8,7 @@
 //!
 //! **Why it is a projection and not part of the assembly point.** Nothing
 //! here decides anything or reaches a provider: it folds records into the
-//! answers a client asks for, and `rebuild_views` throws the whole thing
+//! answers a client asks for, and `Views::rebuild` throws the whole thing
 //! away and folds the ledger again to get the same bytes. That is
 //! ARCHITECTURE.md section 9 shape 7, while `bin::assembly` is an
 //! adapter - and a file holding two shapes is what section 9 says a split
@@ -24,14 +24,13 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-// Where a city keeps its ledger and how a building reads off disk are
-// `bin::assembly`'s: it forms the city that laid them out. Borrowed
-// rather than copied, so "where the ledger lives" keeps one answer.
 use super::lines::verdict_line;
-use super::lines::{buildings_of, discard_lines, pursuit_from, registry_line, signal_line};
-use crate::assembly::{ledger_dir, rebuild_views};
+use super::lines::{
+    buildings_of, discard_lines, pursued, registry_line, restored_paths, signal_line,
+};
 
 /// Answers one query out of a city's own history, without serving it.
 ///
@@ -47,7 +46,7 @@ use crate::assembly::{ledger_dir, rebuild_views};
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &channels::Query) -> Result<channels::Answer, AxError> {
-    Ok(rebuild_views(&ledger_dir(city_root))?.answer(query))
+    Ok(Views::rebuild(&kernel::layout::CityLayout::new(city_root).ledger())?.answer(query))
 }
 
 /// The derived views a query reads. They are rebuilt from the ledger at
@@ -147,6 +146,27 @@ pub(crate) struct Views {
 }
 
 impl Views {
+    /// Rebuilds the views from the ledger on disk. This is the
+    /// disposability of a projection exercised on every start: nothing
+    /// is persisted, and the answer is the same as if the process had
+    /// been running all along.
+    ///
+    /// # Errors
+    /// Propagates chain verification failures; a city whose history does
+    /// not verify is not one whose views should be served.
+    pub(crate) fn rebuild(ledger_dir: &Path) -> Result<Views, AxError> {
+        let verified = runtime::replay::verify_ledger_dir(ledger_dir)?;
+        let city_root = ledger_dir
+            .parent()
+            .and_then(Path::parent)
+            .unwrap_or(ledger_dir);
+        let mut views = Views::new(city_root);
+        for record in known_records(&verified) {
+            views.apply(record)?;
+        }
+        Ok(views)
+    }
+
     pub(crate) fn new(city_root: &Path) -> Views {
         Views {
             city_root: city_root.to_path_buf(),
@@ -166,8 +186,10 @@ impl Views {
             // An unreadable ledger directory is not a reason to refuse to
             // start: the index is disposable, every refresh tries again,
             // and a city with no ledger yet is the ordinary first run.
-            index: memory::LedgerIndex::rebuild(&ledger_dir(city_root))
-                .unwrap_or_else(|_| memory::LedgerIndex::empty()),
+            index: memory::LedgerIndex::rebuild(
+                &kernel::layout::CityLayout::new(city_root).ledger(),
+            )
+            .unwrap_or_else(|_| memory::LedgerIndex::empty()),
             plans: crate::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
@@ -204,26 +226,23 @@ impl Views {
                 self.city = record.addr().cloned();
             }
             EventKind::SignalEnqueued => {
-                if let Some((room, line)) = signal_line(record) {
-                    self.waiting.entry(room).or_default().push(line);
-                }
+                let (room, line) = signal_line(record)?;
+                self.waiting.entry(room).or_default().push(line);
             }
             EventKind::SignalConsumed => {
-                if let Some((room, line)) = signal_line(record)
-                    && let Some(queue) = self.waiting.get_mut(&room)
-                {
-                    queue.retain(|held| held.id != line.id);
+                let taken = collab::SignalConsumed::from_payload(record.data())?;
+                if let Some(queue) = record.addr().and_then(|room| self.waiting.get_mut(room)) {
+                    queue.retain(|held| held.id != taken.id.as_str());
                 }
             }
             EventKind::PursuitChanged => {
-                if let Some((addr, held)) = pursuit_from(record) {
-                    match held {
-                        Some(entry) => {
-                            self.pursuits.insert(addr, entry);
-                        }
-                        None => {
-                            self.pursuits.remove(&addr);
-                        }
+                let addr = pursued(record)?;
+                match record.data().read::<PursuitChanged>()?.held()? {
+                    Some(entry) => {
+                        self.pursuits.insert(addr, entry);
+                    }
+                    None => {
+                        self.pursuits.remove(&addr);
                     }
                 }
             }
@@ -233,8 +252,8 @@ impl Views {
                 }
             }
             EventKind::DiscardRestored => {
-                for line in discard_lines(record) {
-                    if let Some(held) = self.discards.get_mut(&line.path) {
+                for path in restored_paths(record) {
+                    if let Some(held) = self.discards.get_mut(&path) {
                         held.restored = true;
                     }
                 }
@@ -323,4 +342,19 @@ impl Views {
             .clone()
             .or_else(|| kernel::layout::CityLayout::new(&self.city_root).city_address())
     }
+}
+
+/// The records the per-line check already parsed, in ledger order.
+///
+/// A line the check let through as ignorable carries a kind this build
+/// has no record for, so no fold is shown it; parsing the raw bytes a
+/// second time would refuse exactly that line and turn a history that
+/// verifies into a city that cannot start.
+pub(crate) fn known_records(
+    verified: &runtime::replay::VerifiedLedger,
+) -> impl Iterator<Item = &EventRecord> {
+    verified.lines().iter().filter_map(|line| match line {
+        runtime::replay::VerifiedLine::Known { record, .. } => Some(record),
+        runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
+    })
 }

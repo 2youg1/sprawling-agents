@@ -11,8 +11,8 @@
 //! Terminal-only watchdogs kill recoverable sessions; that lesson is the
 //! reason this type exists.
 
+use kernel::event::record::{FiredAction, WatchdogFired};
 use kernel::{AxCode, AxError, Payload, Retries, StallVerdict, TimeMs};
-use serde::{Deserialize, Serialize};
 
 /// One watchdog per run: it holds the correction history and the ceiling
 /// the person set on retries, nothing else.
@@ -203,39 +203,6 @@ impl Watchdog {
             provider_failures: self.provider_failures,
         })
     }
-}
-
-/// `watchdog_fired`: what the watchdog did, and how often it has had to.
-///
-/// The one authority for this line's keys. The run loop used to write a
-/// second, narrower shape for the same kind and the same `back_off`
-/// word, so one history held two answers to "what does a watchdog line
-/// look like".
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WatchdogFired {
-    #[serde(flatten)]
-    pub action: FiredAction,
-    /// How many corrective steers this run has been given.
-    pub corrections: u32,
-    /// How many provider failures this run has met.
-    pub provider_failures: u32,
-}
-
-/// What the watchdog did, in the word the line carries.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "action", rename_all = "snake_case")]
-pub enum FiredAction {
-    /// The model was told it is repeating itself.
-    Steer { text: String },
-    /// The same call will be made again, no earlier than `until_ms`,
-    /// because of the failure named here.
-    BackOff {
-        until_ms: u64,
-        code: String,
-        subject: String,
-    },
-    /// The run was frozen.
-    Freeze { reason: String },
 }
 
 #[cfg(test)]

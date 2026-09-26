@@ -11,21 +11,8 @@
 use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, Ceiling, UsdMicros};
-use serde::{Deserialize, Serialize};
 
-/// What a model accepts as input.
-///
-/// A closed judgement rather than a set of flags: every row answers it,
-/// and the answer decides whether a picture may be sent at all. The
-/// default is the narrow one, because guessing narrow costs a refusal a
-/// person can act on and guessing wide costs a 400 from the provider.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum InputKinds {
-    #[default]
-    Text,
-    TextImage,
-}
+pub use kernel::event::record::InputKinds;
 
 /// One catalog row. Prices are USD micros per one million tokens —
 /// integers end to end (decision paths ban floats).

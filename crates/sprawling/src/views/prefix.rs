@@ -79,7 +79,7 @@ impl Views {
     /// hashes, so any of them says the same thing and the first is the
     /// one a run that never got past turn one still has.
     fn first_prompt(&mut self, run: RunId) -> Option<EventRecord> {
-        let dir = crate::assembly::ledger_dir(&self.city_root);
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index.refresh(&dir).ok()?;
         let seqs: Vec<Seq> = self.index.run_seqs_before(run, None).collect();
         let mut reader = self.index.reader(&dir);
