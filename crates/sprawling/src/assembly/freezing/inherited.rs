@@ -9,7 +9,8 @@
 //! Two facts and one act. The origin is the session's, folded from the
 //! ledger when it opened (`assembly::folds::session`); the conversation
 //! is the mother's, rebuilt from her own records
-//! (`runtime::fork::inherited`); and what this writes is the lineage of
+//! (`runtime::fork::inherited_indexed`, through the worker's resident
+//! index); and what this writes is the lineage of
 //! the run that inherits, which is also what marks the origin spent.
 //!
 //! **The cut that was actually used is the one written down.** A branch
@@ -38,8 +39,11 @@ impl RunWorker {
         let Some(origin) = at.origin else {
             return Ok(Vec::new());
         };
-        let mother = runtime::replay::verify_ledger_dir(&ledger_dir(&self.city_root))?;
-        let rebuilt = runtime::fork::inherited(&mother, origin.at_seq)?;
+        let dir = ledger_dir(&self.city_root);
+        self.index
+            .refresh(&dir)
+            .map_err(memory::MemoryError::into_ax)?;
+        let rebuilt = runtime::fork::inherited_indexed(&self.index, &dir, origin.at_seq)?;
         self.note_lineage(
             &at.addr,
             run,

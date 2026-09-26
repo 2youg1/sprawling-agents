@@ -8,8 +8,8 @@
 //! resurrection: the mother's frozen state never changes, and the new
 //! RunId arrives from the caller — this module is pure.
 //!
-//! Consumes [`VerifiedLedger`] only: replay and fork share one rebuilder,
-//! so fork correctness and replay correctness are the same assertion.
+//! Consumes [`VerifiedLedger`], so replay and fork share one rebuilder;
+//! the ledger's own writer rebuilds a branch through `indexed` instead.
 
 use kernel::event::record::{
     ModelReturned, RunForked, RunStarted, SteerReceived, ToolAnswer, ToolResult,
@@ -115,29 +115,37 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
         )
     });
     let Some(start) = start else {
-        return Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "fork",
-            format!("{owner} has no run_started in this ledger"),
-        )
-        .with_recovery("name a run this history holds, or start a session instead"));
+        return Err(no_start(owner));
     };
+    fold_run(
+        mother
+            .lines()
+            .iter()
+            .take(index.saturating_add(1))
+            .skip(start)
+            .filter_map(known)
+            .filter(|record| record.run() == owner),
+    )
+}
 
+/// The refusal for a run whose opening line this history does not hold.
+fn no_start(owner: RunId) -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "fork",
+        format!("{owner} has no run_started in this ledger"),
+    )
+    .with_recovery("name a run this history holds, or start a session instead")
+}
+
+/// Folds one run's own records, from its `run_started` through the cut,
+/// into the conversation it sent. The one fold both doors share, so the
+/// verified door and the indexed one cut at the same line.
+fn fold_run<'a>(records: impl Iterator<Item = &'a EventRecord>) -> Result<Inherited, AxError> {
     let mut conversation = Conversation::new();
     let mut at = Seq::FIRST;
     let mut open: Option<Wave> = None;
-    for line in mother
-        .lines()
-        .iter()
-        .take(index.saturating_add(1))
-        .skip(start)
-    {
-        let Some(record) = known(line) else {
-            continue;
-        };
-        if record.run() != owner {
-            continue;
-        }
+    for record in records {
         match record.kind() {
             EventKind::RunStarted => {
                 let started = record.data().read::<RunStarted>()?;
@@ -384,6 +392,9 @@ pub fn fork_draft(
         ig: false,
     })
 }
+
+mod indexed;
+pub use indexed::inherited_indexed;
 
 #[cfg(test)]
 mod tests;
