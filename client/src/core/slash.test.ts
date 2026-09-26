@@ -216,6 +216,13 @@ describe("new and fork", () => {
     expect(find("/halt")?.grammar).toBe(find("/release")?.grammar);
   });
 
+  test("/halt with a word that is not an address sends nothing and keeps the line", () => {
+    const held = hands(Address.make("hall/mayor"), () => null);
+    verb("/halt").run(held.filled, called("/halt lab:"));
+    verb("/release").run(held.filled, called("/release --al"));
+    expect({ sent: held.sent, written: held.written }).toEqual({ sent: [], written: [] });
+  });
+
   test("/clear drops the conversation the way /new does", () => {
     const room = Address.make("hall/mayor");
     const held = hands(room, () => null);

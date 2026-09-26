@@ -143,10 +143,19 @@ function paged(name: string | undefined): View | null {
 
 // `/halt` and `/release` take the same three shapes, and the pair would
 // otherwise be one body copied twice with a frame swapped. A bare verb
-// reaches the city: the only scope a person who named none can mean.
+// or `--all` reaches the city; a word that is not an address sends
+// nothing and leaves the line to edit, because widening a typo to the
+// whole city is the one reading the person cannot have meant.
 function scoped(hands: SlashHands, call: SlashCall, frame: typeof halt): void {
-  const named = call.words.includes(ALL) ? null : addressed(call.words.at(0));
-  hands.command(frame(named === null ? CITY : { building: named }));
+  const first = call.words.at(0);
+  if (first === undefined || call.words.includes(ALL)) {
+    hands.command(frame(CITY));
+    hands.write("");
+    return;
+  }
+  const named = addressed(first);
+  if (named === null) return;
+  hands.command(frame({ building: named }));
   hands.write("");
 }
 

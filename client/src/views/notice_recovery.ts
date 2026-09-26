@@ -13,7 +13,7 @@
 // **A command recovery is labelled in the person's own words and does
 // the command's deed directly.** The phrase travels as a `lang.json`
 // key (`act_*`), and the deed is the command frame behind the spelling
-// (`/new` is `open_session`, `/stop` is `cancel` or `halt`), so a
+// (`/new` is `open_session`, `/stop` is `cancel`), so a
 // notice reaches the city without a line passing through a text box.
 // `/fork` is the one exception: a branch is chosen at a point, and the
 // picker that chooses it lives on the talk screen (ux A6), so its deed
@@ -23,7 +23,7 @@
 import { Option, Schema } from "effect";
 import { get } from "svelte/store";
 
-import { cancel, halt, openSession } from "../core/commands";
+import { cancel, openSession } from "../core/commands";
 import type { Belief } from "../core/belief";
 import type { Key, Lang } from "../core/lang";
 import { say } from "../core/lang";
@@ -99,15 +99,15 @@ export function recoveryWhy(u: Ui, recovery: Recovery, about: About): Key | unde
   }
   const target = targetFor(u, about);
   if (recovery.spelled === "/stop") {
-    return target.run === null && target.room === null ? NO_TARGET : undefined;
+    return target.run === null ? NO_TARGET : undefined;
   }
   return target.room === null ? NO_TARGET : undefined;
 }
 
 // What one recovery does. `/new` opens the session itself - `open_session`
 // is the command behind `/new`, sent without a line through a box - and
-// `/stop` stops what the refusal names: its run, or everything in the
-// room it names.
+// `/stop` cancels the run the refusal names and nothing wider: halting a
+// room is `/halt`, a separate verb (client-SPEC 4-39).
 export function recover(u: Ui, recovery: Recovery, about: About): void {
   if (recovery.kind === "reconnect") {
     u.conn.retry();
@@ -128,10 +128,6 @@ export function recover(u: Ui, recovery: Recovery, about: About): void {
     case "/stop":
       if (target.run !== null) {
         u.send(cancel(target.run));
-        return;
-      }
-      if (target.room !== null) {
-        u.send(halt({ building: target.room }));
       }
       return;
     default:
