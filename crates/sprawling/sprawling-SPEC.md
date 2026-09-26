@@ -3179,9 +3179,11 @@ impl RunWorker {
     pub(in crate::assembly) fn doctor_install(&mut self, item: &str) -> Result<(), AxError>;
     pub(in crate::assembly) fn look_at_this_machine(&mut self);
 }
+// bin::doctor::table：一个名字在这个平台上的配方；RunWorker.recipe_for 在打开时装上它
+pub(crate) fn recipe_for(item: &str) -> Result<&'static accounting::Recipe, AxError>; // InvalidArgs：表里没有；ToolUnavailable：这个平台没有配方
 ```
 
-- **查表、取平台、写进度行三件事都在 `doctor_install` 里**（H-12）：`bin::doctor::installing` 曾把前两件搬到一个只有一个调用方的模块里，而三件事的权威分别在 `REQUIREMENTS`、`Platform::current` 与 `Recipe::command`，那一层因此只是穿透。模块连同它的 `named()` 一并删除，进度行仍由这里写，写的时刻因此就是安装到达的时刻，不再先收集后补报。
+- **查表与取平台在表旁边的 `doctor::recipe_for`，写进度行在 `doctor_install`**：worker 搬进 `accounting` 时需求表留在 `sprawling`（accounting-SPEC.md §7），所以 worker 经打开时交给它的 `RunWorker.recipe_for` 这个 `fn` 指针拿配方，而不是自己读 `REQUIREMENTS`。它不是一层穿透：它是表的查法，与表同住 `doctor::table`，一个名字要不要被拒只在那里回答。进度行仍由 `doctor_install` 写，写的时刻因此就是安装到达的时刻。钉住这条的测试是 `an_install_takes_its_recipe_from_the_table_the_worker_was_handed`。
 - **只跑 `Recipe::Command`，走的是终端那条 `Machine::install`**，不是第二个安装器。`Print` 与 `Manual` 各自带着「人自己去做什么」被拒：管道进 shell 的脚本是没人读过的代码，这条纪律不因请求来自页面而松一格。需求表里没有的名字在起任何进程之前就被拒，因为页面问的是这份构建不认识的东西。
 - **「这条配方这座城可不可以跑」只有 `Recipe::command` 一个家**（H-12）。它要么给出 `Runnable`，要么给出那句带恢复语的拒绝；终端（`screen`）、页面（`commanding::machine`）与机器适配器（`probe`）三处都问它，所以同一条打印配方在三扇门后读到的是同一句话。`Machine::install` 收的是 `Runnable` 而不是 `Recipe`，于是「不可跑的配方」在这一层已经不可表达，`runnable()` 与 `probe` 里那第二段措辞随之删除。
 - **`bin::doctor::running` 是本二进制起安装程序的唯一一处，等待有上限**（B-25／F-10）。三件事一起成立：`stdin`／`stdout`／`stderr` 一律 `Stdio::null()`，于是要人同意源协议、要人输密码的包管理器立刻读到输入结束而不是坐在一台没有人的终端前；等待是 `try_wait` 的**计数敲门**，而不是 `Command::status()` 那种没有尽头的阻塞；敲完即杀掉子进程并带着 `E_TIMEOUT` 返回，恢复语是「自己在终端里跑这一行」。**上限用敲门次数而不是墙钟，因为本二进制读时钟的地方只有 `bin::assembly` 一处**（ARCHITECTURE §10 第 4 条）；这同时让上限可断言——测试要三次敲门就得到三次，而对着墙钟的断言问的是它跑在哪台机器上。`PATIENCE = 3_600` 次 × `TICK = 50ms` = 180 秒，只有这一个家。杀不掉或收不了尸都写进那条错误的主题——本城起的一个停不掉的进程是人必须知道的事实。

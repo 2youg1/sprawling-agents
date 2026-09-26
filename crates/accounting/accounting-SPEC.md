@@ -41,7 +41,7 @@ worker 的两个读写面 `effect` 与 `plan_view`、以及 worker 与 `views` �
 ## 3 假设与歧义
 
 - `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，`views` 还在 `crates/sprawling/src/views`，所以 citysim（不依赖 `sprawling`）仍驱动不了一次 dispatch。归属由 §7 的表和 §12-9 至 §12-12 定下；还没做的按这个次序：
-  1. 还缺的端口。`revealing`（`RunWorker.reveal`）、`monitor::memory`（`DrivingPool` 的 `read_memory`）、`monitor::volume`（`RunWorker.read_volume`）、`release`（`Views.registry`）与 `browser_tool`（`RunWorker.browsers`）已经是交进来的 `fn` 指针；还直接碰 `bin` 的是 `workbench::engine` 读的 `doctor::host` 与 `Presence`，以及 `commanding::machine` 查的 `doctor::REQUIREMENTS` 与 `Platform`。
+  1. 还缺的端口。`revealing`（`RunWorker.reveal`）、`monitor::memory`（`DrivingPool` 的 `read_memory`）、`monitor::volume`（`RunWorker.read_volume`）、`release`（`Views.registry`）、`browser_tool`（`RunWorker.browsers`）与需求表的查法（`RunWorker.recipe_for`）已经是交进来的 `fn` 指针；还直接碰 `bin` 的只剩 `workbench::engine` 读的 `doctor::host` 与 `Presence`。
   2. `views` 搬进本 crate。它的测试里有一部分造一个 worker（`views/tests.rs` 经 `crate::assembly` 的 fixture，`document`、`listing`、`skills` 的测试调 `init_city`），它们要么随 worker 搬、要么先留在 `sprawling` 经 `views` 的公开面测。
   3. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）；`genesis`、`listening`、`attending`、`chain_watch` 与生产适配器留在装配根（§12-12）。
   4. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。
@@ -79,7 +79,7 @@ ModelFactory｜Connectors｜Clock｜Machine｜Recipe｜Runnable｜accounting thr
 | `serving::standing::CorePriority` | 随 `person` 搬进本 crate | 偏好里核心线程抬不抬高的那个值 | 它是 `person` 读出来的值；真去抬高线程的 `raise_this_thread` 留在 `serving` |
 | `held_vault` | 搬进本 crate | 把一个锁着的 vault 变成解析器，锁中毒时的拒绝 | 纯函数，只碰已经打开的 vault |
 | `toolkit_broker` | 搬进本 crate | 一个外部应用的 broker 钥匙登记在哪 | 纯函数，`views::toolkits` 与连接动作读同一组事实 |
-| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经 `Machine` 端口 | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文） |
+| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经端口：看与装经 `Machine`，需求表的查法经 `RunWorker.recipe_for`（sprawling-SPEC.md 中 `doctor_install` 那一节） | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文） |
 | `monitor::memory::read`、`monitor::volume::read` | 经端口：`DrivingPool` 的 `read_memory` 与 `RunWorker` 的 `read_volume`，都是 `fn` 指针（sprawling-SPEC.md 8-46-3、8-94） | 新工作进门时读内存与卷的余量 | 读主机的计数器；`read_volume` 已经这样交进来 |
 | `serving::door::random_token` | 随 `credentials` 搬进本 crate | OAuth 登录的 verifier 与 state | 它的熵必须不可预测：一个第三方能预测的 verifier 就是一个第三方能完成的登录，所以没有哪个脚本场景可以换掉它，端口在这里只会开一个让它变得可预测的门；它经 `getrandom` 这个安全接口取熵，不启动任何东西 |
 | `revealing` | 经端口：`RunWorker` 的 `reveal` 字段，一个 `fn` 指针（sprawling-SPEC.md 8-60） | `Reveal` 在主机的文件管理器里打开一个地址 | 启动主机的一个程序 |
@@ -227,7 +227,7 @@ impl RunWorker {
 
 - **只有 `Recipe::command` 造得出 `Runnable`，它证明的是配方的种类，不是许可。** `Runnable` 的构造函数在本 crate 之外不可见，所以持有一个 `Runnable` 只证明它来自一个 `Command` 配方：打印的配方与手动的配方在 `Recipe::command` 被拒。`Recipe::Command` 的字段是 `pub`，任何 crate 都能拼出一个装任意程序的配方，所以挡住表外程序的是 `doctor_install`（`crates/sprawling/src/assembly/commanding/machine.rs`）先在 requirement 表里查这个名字：表里没有的名字以 `InvalidArgs` 被拒，端口根本不会被调用。
 - **失败**：`install` 原样传 `bin::doctor::running` 的 `AxError`；`Recipe::command` 的拒绝是 `E_TOOL_UNAVAILABLE`，恢复说明人该做什么。端口不另造错误码。
-- **worker 读的两处都经 `RunWorker.machine`**：`doctor_install` 的安装与它之后的重看，以及 `DoctorRefresh` 的 `look_at_this_machine`。worker 仍自己拒绝需求表里没有的名字与没有配方的平台，这一步在端口被问到之前。
+- **worker 读的两处都经 `RunWorker.machine`**：`doctor_install` 的安装与它之后的重看，以及 `DoctorRefresh` 的 `look_at_this_machine`。需求表里没有的名字与没有配方的平台由 worker 交到的 `recipe_for`（生产是 `bin::doctor::recipe_for`）拒绝，这一步在端口被问到之前。
 - **一扇安装的门**：终端的 `sprawling doctor --install` 与 worker 的 `doctor_install` 都经 `accounting::Machine::install` 启动安装程序。`bin::doctor::Machine` 是它的子 trait，只多一个逐项的 `look`，自己不声明 `install`，所以一个装东西的实现只有一处要写，也只有一处能被脚本换掉。
 - **固定值**：`RunWorker::new` 与 `over` 装上 `ThisMachine`；`with_machine` 是唯一换掉它的门。
 - **依赖**：`report` 交回线上的 `channels::DoctorAnswer`，所以本 crate 依赖 `channels`（ARCHITECTURE.md §3 的 `depmap`）。
