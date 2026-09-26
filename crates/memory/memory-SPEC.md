@@ -544,7 +544,7 @@ pub struct WorktreeLease { /* name、path、disk —— 私有 */ }
 impl Worktrees {
     pub fn open(city_root: &Path) -> Result<Worktrees, MemoryError>;
     pub fn claim(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError>;
-    pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError>;
+    pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError>;   // 解锁，不删树
     pub fn live(&self) -> Result<Vec<WorktreeName>, MemoryError>;
     /// 把一个节点已提交的活带进城的 trunk，返回落地的 commit。
     pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, MemoryError>;
@@ -575,10 +575,12 @@ impl WorktreeLease {
   并用一句「城的工作树有 N 字节」说这件事。断言：账本 4 KB、产品文件不到 1 KB 的城仍可领树。
 - **问不出祖先关系不是「不是祖先」（B-68）**：`graph_descendant_of` 的失败按 `Worktree{op:"judge a fast-forward"}` 上报，
   不再顶替成 `MergeStale`——把一次 git 失败说成「trunk 动过了」，会让一个 trunk 没动的人回去重做不需要重做的活。
-- **释放先注销后删文件（B-69）**：`release` 先 prune（`valid` ＋ `working_tree`），再删残留目录；
-  仓库已经忘掉这棵树时 prune 不是失败，那正是调用方要的末态。
-  倒过来的顺序在中途失败时会留下「git 仍列着、目录已没有」的名字，而它唯一的出口是 `WorktreeBusy`，于是这个名字被永久锁住。
-  `claim` 同时自愈：登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射；`E_WORKTREE_BUSY` 因此恒表示「有人正在用」。
+- **租约是 git 的 worktree 锁，树留在盘上（B-69）**：`claim` 以加锁的方式建树（`WorktreeAddOptions::lock`），`release` 只解锁，登记与目录都留下。
+  同名再领时树已在：不量城的工作树、不重新检出整棵树，只把它强制检出到该节点分支的头并删掉未跟踪文件，再加锁——
+  一个节点在两次 run 之间付一次全量检出，而不是每次 run 付一次、再付一次整目录删除。
+  未提交的改动与未跟踪文件在再领时消失：没提交的从来不是这个节点的活。
+  `E_WORKTREE_BUSY` 因此恒表示「锁着」，也就是有人正在用；登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射。
+  否决「释放即 prune 并删目录」：它让同一节点的下一次 run 重新量整个城并全量检出，代价随城的大小涨，而节点的分支本来就留着。
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是一台机器自己的事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
 - **merge 只走 fast-forward**：trunk 在节点分枝之后动过即 `MergeStale`（→`E_VERSION_CONFLICT`），不由机器把一份活重放到别人的活上面——能说出「这份活是否仍然适用」的是做它的人。拒后城内文件逐字节不变（一条断言）。
@@ -723,7 +725,7 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
   - `index::reader::OpenSegment`——按 seq 取单行时持住段句柄。`Vfs::read_at` 每次调用开一次文件，
     那正是这个类型消掉的 734 µs／行（对 0.89 µs 顺走、5.82 µs 逆走，windows-x86_64 NVMe，五万条账本，2026-09-02）。
     它只读不写，而缝要建模的是崩溃语义，对一次定位读无话可说。
-  - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 删残留目录同走 `std::fs`。
+  - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 只解 git 的锁，不删目录。
     缝拦不住 git2，声称拦得住才是第二个权威。释放顺序与自愈见 §8-9。
   - `checkpoint`——同样经 git2 提交与检出。
   - `jsonl::ledger::WriterLock`——文件锁是操作系统对打开句柄的事实，Vfs 的崩溃语义模型对它无话可说（§8-1）。

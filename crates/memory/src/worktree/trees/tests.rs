@@ -71,10 +71,6 @@ fn one_node_holds_one_tree_and_the_second_claim_is_refused_by_name() {
     assert!(ax.recovery().contains("release"));
 
     trees.release(held).unwrap();
-    assert!(
-        trees.live().unwrap().is_empty(),
-        "a released tree is gone from the repository, not just from disk"
-    );
     trees.claim(&name("node-1")).unwrap();
 }
 
@@ -117,16 +113,29 @@ fn a_registered_tree_with_no_directory_is_taken_back_rather_than_locked_away() {
     assert!(again.path().join("lab").join("notes.md").exists());
 }
 
+/// A node's next run finds its tree where it left it: releasing gives
+/// the lease back and keeps the files, so the next claim neither
+/// measures the city nor checks the whole tree out again.
 #[test]
-fn a_released_tree_takes_its_files_with_it() {
+fn a_released_tree_stays_on_disk_for_the_nodes_next_run() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
     let lease = trees.claim(&name("node-1")).unwrap();
     let path = lease.path().to_path_buf();
-    assert!(path.join("lab").join("notes.md").exists());
+    let notes = path.join("lab").join("notes.md");
+    let written = std::fs::metadata(&notes).unwrap().modified().unwrap();
 
     trees.release(lease).unwrap();
-    assert!(!path.exists());
+    assert!(notes.exists(), "a released tree keeps its files");
+    assert_eq!(trees.live().unwrap(), vec![name("node-1")]);
+
+    let again = trees.claim(&name("node-1")).unwrap();
+    assert_eq!(again.path(), path.as_path());
+    assert_eq!(
+        std::fs::metadata(&notes).unwrap().modified().unwrap(),
+        written,
+        "a file the node's branch already holds is not written again"
+    );
     assert!(dir.path().join("lab").join("notes.md").exists());
 }
 
