@@ -4,34 +4,61 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! When `sprawling call` stops listening (sprawling-SPEC.md section
-//! 8-10): a query ends on its one reply, a command on the city's quiet.
+//! 8-10): a query ends on its one reply, a command on the city's quiet
+//! or on the event its caller named.
 
-/// When a call stops listening, decided once by the kind of frame sent.
+use super::{Awaited, Until};
+use kernel::EventKind;
+
+/// When a call stops listening, decided once by the kind of frame sent
+/// and what its caller waits for.
 ///
 /// A frame that has exactly one reply ends on that reply; a command's
 /// consequences are the city's business, so a command ends when the
-/// city has been quiet for the window. The window still bounds a reply
-/// that never comes.
+/// city has been quiet for the window, unless its caller named the
+/// event that finishes the work. The window still bounds a reply or an
+/// event that never comes.
 pub(super) enum Ending {
     OnReply,
     OnQuiet,
+    OnEvent(EventKind),
 }
 
 impl Ending {
     /// A query is answered once, and a greeting on a live session is
     /// refused once (`channels::reception`), so both have one reply.
-    pub(super) fn of(sent: &channels::ClientFrame) -> Self {
-        match sent {
-            channels::ClientFrame::Ask(_) | channels::ClientFrame::Hello(_) => Self::OnReply,
-            channels::ClientFrame::Command(_) => Self::OnQuiet,
+    pub(super) fn of(sent: &channels::ClientFrame, until: Until) -> Self {
+        match (sent, until) {
+            (
+                channels::ClientFrame::Ask(_) | channels::ClientFrame::Hello(_),
+                Until::Quiet | Until::Event(_),
+            ) => Self::OnReply,
+            (channels::ClientFrame::Command(_), Until::Quiet) => Self::OnQuiet,
+            (channels::ClientFrame::Command(_), Until::Event(kind)) => Self::OnEvent(kind),
         }
     }
 
+    /// A refused command causes no event, so a refusal ends a call that
+    /// waits for one.
     pub(super) fn ends_on(&self, frame: &Reply) -> bool {
         match (self, frame) {
-            (Self::OnReply, Reply::Answer | Reply::Refusal) => true,
-            (Self::OnReply, Reply::Other)
-            | (Self::OnQuiet, Reply::Answer | Reply::Refusal | Reply::Other) => false,
+            (Self::OnReply, Reply::Answer | Reply::Refusal)
+            | (Self::OnEvent(_), Reply::Refusal) => true,
+            (Self::OnEvent(awaited), Reply::Event(kind)) => awaited == kind,
+            (Self::OnReply, Reply::Event(_) | Reply::Other)
+            | (Self::OnEvent(_), Reply::Answer | Reply::Other)
+            | (Self::OnQuiet, Reply::Answer | Reply::Refusal | Reply::Event(_) | Reply::Other) => {
+                false
+            }
+        }
+    }
+
+    /// What was heard of the awaited frame while it has not come: a
+    /// call that awaits nothing but the quiet has nothing to miss.
+    pub(super) fn not_yet(&self) -> Awaited {
+        match self {
+            Self::OnQuiet => Awaited::Nothing,
+            Self::OnReply | Self::OnEvent(_) => Awaited::Missing,
         }
     }
 }
@@ -44,6 +71,7 @@ impl Ending {
 pub(super) enum Reply {
     Answer,
     Refusal,
+    Event(EventKind),
     Other,
 }
 
@@ -55,9 +83,9 @@ impl Reply {
                 channels::AskOutcome::Refusal(_) => Self::Refusal,
             },
             Ok(channels::ServerFrame::Refusal(_)) => Self::Refusal,
+            Ok(channels::ServerFrame::Event(record)) => Self::Event(record.kind()),
             Ok(
                 channels::ServerFrame::Welcome(_)
-                | channels::ServerFrame::Event(_)
                 | channels::ServerFrame::Delta(_)
                 | channels::ServerFrame::Log(_)
                 | channels::ServerFrame::Lagged(_),

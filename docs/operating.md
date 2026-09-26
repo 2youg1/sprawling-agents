@@ -67,14 +67,14 @@ The cost page shows shares against the authoritative total rather than normalisi
 
 ## Driving a city from a script
 
-`sprawling call` sends one wire frame and prints every frame that comes back, one JSON object per line, until the city has been quiet for `--quiet-ms` (2000 by default). **The exit code is the answer**, so a script branches on it instead of parsing the JSON.
+`sprawling call` sends one wire frame and prints every frame that comes back, one JSON object per line. A query stops on its answer. A command stops when the city has been quiet for `--quiet-ms` (2000 by default), or, with `--until <event-kind>`, on the first event of that kind, such as `--until run_frozen`; the window then bounds the silence between two frames. **The exit code is the answer**, so a script branches on it instead of parsing the JSON.
 
 | Exit | What it says | What to do about it |
 |---|---|---|
 | 0 | the city answered inside the window, and refused nothing | go on |
 | 1 | the city refused; the refusal is the last frame printed, with its recovery line | read the refusal and act on it |
-| 2 | this command line was not readable - a missing frame, a frame the wire cannot carry, a bad `--quiet-ms`, an unknown subcommand | fix the command; the city was never asked |
-| 3 | the frame went out and **nothing came back** before the window closed | the city may still be working: ask again with a longer `--quiet-ms`, or read the city's own log |
+| 2 | this command line was not readable - a missing frame, a frame the wire cannot carry, a bad `--quiet-ms`, an `--until` that names no event kind, an unknown subcommand | fix the command; the city was never asked |
+| 3 | the frame went out and **nothing came back** before the window closed, or the answer or the `--until` event did not | the city may still be working: ask again with a longer `--quiet-ms`, or read the city's own log |
 | 4 | nothing at `--at` answered as a city | start the city, or point `--at` at the one that is running |
 
 With `--json`, a refusal this binary writes itself, rather than a frame the city sent, is written to stderr as one JSON line with the same fields as the refusal frame, so a script reads both with one parser.

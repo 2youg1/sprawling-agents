@@ -9,7 +9,7 @@
 use super::exit::Exit;
 use super::refusal::{Form, written};
 use super::router::flag_value;
-use super::wire_client::{self, Unheard};
+use super::wire_client::{self, Listen, Unheard, Until};
 use kernel::consts_policy::DEFAULT_AT;
 
 /// Sends one frame over the wire and prints everything that comes back.
@@ -25,7 +25,7 @@ use kernel::consts_policy::DEFAULT_AT;
 pub(super) fn call(args: &[String]) -> Exit {
     let Some(frame) = args.get(1).filter(|a| !a.starts_with("--")) else {
         eprintln!(
-            "usage: sprawling call <frame-json|-> [--at host:port] [--token T] [--quiet-ms N] [--json]"
+            "usage: sprawling call <frame-json|-> [--at host:port] [--token T] [--quiet-ms N] [--until <event-kind>] [--json]"
         );
         eprintln!(
             "exit: 0 answered, 1 refused, 2 this command line, 3 nothing came back, 4 no city at --at"
@@ -59,12 +59,23 @@ pub(super) fn call(args: &[String]) -> Exit {
             }
         },
     };
-    match wire_client::call(
-        &at,
-        &frame,
-        token.as_deref(),
-        std::time::Duration::from_millis(quiet),
-    ) {
+    // The kind is read through `EventKind`'s own serde spelling, so the
+    // names this flag accepts are the names the wire prints.
+    let until = match flag_value(args, "--until") {
+        None => Until::Quiet,
+        Some(raw) => match serde_json::from_value(serde_json::Value::String(raw.clone())) {
+            Ok(kind) => Until::Event(kind),
+            Err(_) => {
+                eprintln!("not an event kind: {raw}");
+                return Exit::Line;
+            }
+        },
+    };
+    let listen = Listen {
+        quiet: std::time::Duration::from_millis(quiet),
+        until,
+    };
+    match wire_client::call(&at, &frame, token.as_deref(), listen) {
         Ok(heard) => {
             eprintln!("{} frame(s), {} refusal(s)", heard.frames, heard.refusals);
             match heard.spoken() {
@@ -72,7 +83,7 @@ pub(super) fn call(args: &[String]) -> Exit {
                 wire_client::Spoken::Answered => Exit::Done,
                 wire_client::Spoken::Quiet => {
                     eprintln!(
-                        "nothing came back inside {quiet}ms: the city may still be working on it"
+                        "what this call waits for did not come inside {quiet}ms: the city may still be working on it"
                     );
                     eprintln!(
                         "recovery: ask again with a longer --quiet-ms, or read the city's own log"

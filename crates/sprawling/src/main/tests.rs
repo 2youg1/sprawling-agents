@@ -140,6 +140,15 @@ fn each_way_a_call_ends_has_its_own_exit_code() {
             Exit::Line,
         ),
         (
+            words(&[
+                "call",
+                "{\"query\":\"city_view\"}",
+                "--until",
+                "no_such_kind",
+            ]),
+            Exit::Line,
+        ),
+        (
             words(&["call", "{\"query\":\"city_view\"}", "--at", &vacant]),
             Exit::NoCity,
         ),
