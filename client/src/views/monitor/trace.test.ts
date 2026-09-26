@@ -24,6 +24,7 @@ const at = (n: number): Seq => Seq.make(n);
 const exec = turn(1, [
   {
     at: 11,
+    called: 1010,
     tool: "exec",
     outcome: "answered",
     arguments: { cut: 0, head: JSON.stringify({ arm: { shell: { text: "cargo test" } } }, null, 2) },
@@ -34,6 +35,7 @@ const exec = turn(1, [
   },
   {
     at: 12,
+    called: 1020,
     tool: "exec",
     outcome: "waiting",
     arguments: { cut: 0, head: JSON.stringify({ arm: { program: { path: "git", args: ["status"] } } }) },
@@ -43,6 +45,7 @@ const exec = turn(1, [
 const edit = turn(2, [
   {
     at: 21,
+    called: 2010,
     tool: "edit",
     subject: "src/lib.rs",
     outcome: "answered",
@@ -57,7 +60,7 @@ const edit = turn(2, [
       }),
     },
   },
-  { at: 22, tool: "read", subject: "src/main.rs", outcome: "answered", arguments: { cut: 0, head: '{"path":"src/main.rs"}' } },
+  { at: 22, called: 2020, tool: "read", subject: "src/main.rs", outcome: "answered", arguments: { cut: 0, head: '{"path":"src/main.rs"}' } },
 ]);
 
 describe("a run's turns read as a terminal record and a code column", () => {
