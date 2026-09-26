@@ -22,8 +22,9 @@ pub(super) enum Exit {
     /// 2: this command line was not readable, including a `call` frame
     /// the wire cannot carry.
     Line,
-    /// 3: `call` sent its frame and nothing came back inside the quiet
-    /// window.
+    /// 3: `call` or `dispatch` sent its frame and nothing came back
+    /// inside the quiet window, or the city spoke and the frame the verb
+    /// waited for did not come (`Spoken::Quiet`, `Spoken::Unfinished`).
     Quiet,
     /// 4: nothing at the address answered as a city.
     NoCity,
