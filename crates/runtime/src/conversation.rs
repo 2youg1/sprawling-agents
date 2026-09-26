@@ -19,7 +19,9 @@
 //! **A message already sent is never rewritten.** Text that arrives after
 //! the last assembly, while the open user message is on the wire, is held
 //! and lands after the next tool results, so the next request extends the
-//! last one instead of editing it (runtime-SPEC §8-47).
+//! last one instead of editing it. The one exception is tool results after
+//! an empty reply, which extend the sent message rather than open a second
+//! adjacent user message, and leave it open again (runtime-SPEC §8-47).
 
 use kernel::{ChatMessage, ContentBlock, Role};
 
@@ -116,14 +118,20 @@ impl Conversation {
     ///
     /// Results never wait in `held`: a reply with no content pushes no
     /// assistant message, so the last user message may already be sent,
-    /// and holding the results there would hold them at every turn.
+    /// and holding the results there would hold them at every turn. The
+    /// message they extend is open again, so a steer before the next
+    /// assembly joins it after them.
     pub fn push_tool_results(&mut self, mut results: Vec<ContentBlock>) {
         results.append(&mut self.held);
         if results.is_empty() {
             return;
         }
+        let reopened = self.messages.len().saturating_sub(1);
         match self.messages.last_mut() {
-            Some(last) if last.role == Role::User => last.content.extend(results),
+            Some(last) if last.role == Role::User => {
+                last.content.extend(results);
+                self.sent = self.sent.min(reopened);
+            }
             _ => self.messages.push(ChatMessage {
                 cache: false,
                 role: Role::User,
