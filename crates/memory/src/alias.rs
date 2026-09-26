@@ -145,6 +145,12 @@ impl WriteTarget {
     /// `root` is examined up to the filesystem root, as [`WriteTarget::at`]
     /// does.
     ///
+    /// The bound is found by comparing path components as spelled, so the
+    /// caller builds `path` by joining onto the same `root` it passes; a
+    /// `root` in another spelling (a trailing separator, a `.` component,
+    /// other case on Windows) is not found, and the walk falls back to the
+    /// filesystem root, which is safe but loses the bound.
+    ///
     /// # Errors
     /// As [`WriteTarget::at`], for an alias at or below the bound.
     pub(crate) fn within(
