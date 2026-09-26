@@ -396,12 +396,15 @@ impl ClaimEffect {
 }
 pub struct ClaimDesk { /* who、room、roadmap 文本、本次 drive 持有的 Held、effects —— 私有 */ }
 impl ClaimDesk {
-    pub fn new(who: String, room: Address, roadmap: String) -> ClaimDesk;
+    pub fn new(who: String, room: Address, roadmap: String, booking: Booking) -> ClaimDesk;
     pub fn take_effects(&mut self) -> Vec<ClaimEffect>;
     pub fn roadmap(&self) -> Option<&str>;    // Some 仅当本次 drive 改过；工人据此写盘一次
     pub fn holding(&self) -> Option<&NodeId>;
     pub fn abandon(&mut self) -> Result<(), AxError>;   // 冻结路径花掉仍被持有的 Held
 }
+/// 调用时判定认领的那个权威；城里是记账线程（sprawling-SPEC 8-42-8）。
+pub struct Booking(Box<dyn FnMut(&NodeId) -> Result<(), AxError> + Send>);
+impl Booking { pub fn new(ask: impl FnMut(&NodeId) -> Result<(), AxError> + Send + 'static) -> Booking; }
 pub fn evidence_of(text: &str, id: &NodeId) -> Option<Locator>;
 pub fn still_true(text: &str, effect: &ClaimEffect) -> bool;
 pub struct ClaimTool { /* meta、Rc<RefCell<ClaimDesk>> —— 私有 */ }
@@ -414,6 +417,10 @@ impl ClaimTool { pub fn new(desk: Rc<RefCell<ClaimDesk>>) -> Result<ClaimTool, A
 - **六个动作长在同一条 catalog 行上，不新开工具**。模型每一轮读的**行数**是成本，一行背后的**动词数**不是。
 - **收口是字节数，量出来的**：四个动作的 `plan` 条目是 **548 B**（disclosure ＋ schema 的紧凑 JSON），六个动作是 **546 B**，一条断言钉住它不超过 548。disclosure 里那句 *Must this be expanded?* 是 LLM First（`ARCHITECTURE.md` §9）的提醒：它在缓存前缀里，零延迟、零花费；不追问、不设深度上限、不设审批。省下的字节来自把 Locator 文法从 schema 移进拒词——**一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节**。schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
 - **状态迁移由 `kernel::PlanTree` 从计划自身判，不由调用者声明**：`claim` 只从就绪集里取（叶子、无人认领、依赖全绿），`finish`／`block`／`release` 只能作用于**本次 drive 认领的那个节点**。拒词报出此刻的状态并指向一个真能拿的节点——「不行」会教模型改写参数再试，「2.3 在做，2.4 就绪」不会。
+- **认领在调用时由 `Booking` 判定，桌子的副本先答**：桌子持有派活那一刻的文件，并排派出的另一轮活读的是同一份，
+  所以 `claim` 先让 `PlanTree::claim` 在副本上判（它的拒词能指向一个就绪节点），再问 `Booking`；`Booking` 拒绝时，
+  桌子不持有节点、不排效应、不改文本，拒词原样交给模型。`Booking` 记的是「哪轮在飞的活持有哪个节点」，
+  只活到那轮活落地为止，落地之后回答这个问题的仍是文件——所以它不是第二份认领登记表。
 - **一次 drive 只持有一个节点**，理由与旧版同：一个 Run 同时占两个节点，两个节点的进度都读不出来。
 - **计划门禁就是那个 `Held` 值**：它由 `PlanTree::claim` 铸出，只能花在 `finish`（绿）或 `stop`（红／交回）上。**没有第三个出口**——一个只是结束了的 run 由 `abandon` 把它花在 `FrozeWithoutEvidence` 上，于是「认领了却没交代」这一态在冻结之后不可达。这正是 `blockage` 里红色的来处。
 - **`split` 之后本次 drive 不再持有那根枝**：它拿到的那件活现在是几片，它接下来该拿其中一片。写盘前先把新文本重新解析并 `PlanTree::build` 一次，**拆不出合法树就一个字节都不写**。拆分结果除 `node` 与 `children` 外带 `unfinished`：该节点下尚未 `Done` 的子节点数，由拆完的树数出，不由调用者声明。

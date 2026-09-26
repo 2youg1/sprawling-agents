@@ -1975,6 +1975,34 @@ Approval Inbox，人的待答队列。
 `Driving` 于是拥有自己的 signals 句柄、一份 `Cas` 第二句柄（§8-43）与 backlog 成员号（runtime-SPEC §8-28-2）。
 `driving/tests/turns::a_drive_can_be_handed_to_another_thread` 钉住这条性质：`Driving: Send` 是编译期事实。
 
+### 8-42-8 `bin::serving::booking`——计划认领在调用时由记账线程判定（形状 4 适配器）
+
+每条车道的 `ClaimDesk` 持有派活那一刻的 `Roadmap.md`，并排派出的两轮活读的是同一份文件，所以只凭桌子自己的副本，
+两轮活都会认领同一个节点、都把活做完，第二个到落地时才被 `still_true` 丢掉。认领因此在模型调用 `plan claim` 的那一刻
+交给记账线程判定：它按队列次序看见每一个认领，先问的拿到节点，后问的当场被拒，一次模型调用都不白花。
+
+```rust
+pub(crate) struct ClaimAsk { /* building、node、run、回信的 SyncSender —— 私有 */ }
+#[derive(Default)]
+pub(crate) struct ClaimBook { /* (building, node) → 在飞的 RunId —— 私有 */ }
+impl ClaimBook {
+    pub(crate) fn answer(&mut self, ask: ClaimAsk);      // 记下或拒绝，并回信
+    pub(crate) fn release(&mut self, run: RunId);        // 这轮活回家时放开它持有的节点
+}
+pub(crate) fn booking(bell: mpsc::Sender<Wake>, building: Address, run: RunId) -> collab::Booking;
+```
+
+- **走同一条队列**：认领是 `Wake::Claim`，与 relay 的 append 同在记账线程那一条队列上（8-42-4），而不是第二条通道；
+  `RelayGate` 持有 `ClaimBook`，`serve` 在排空队列时逐个答复。车道阻塞在一个 rendezvous 通道上等回信，与 append 一样。
+- **拒词**：`InvalidArgs`，动作 `claim a plan node`，说出节点与持有它的 run，恢复是「list the plan and claim a node that is ready」。
+  记账线程已经不在时是 `StorageFatal`，与 relay 的 `gone` 同一形状。
+- **登记持续到那轮活回家**：`Flight::arrived` 放开它，而它的落地在同一线程上、在下一次 `serve` 之前跑完，
+  所以没有任何认领会在「放开」与「盘上的计划写明节点结局」之间被答复。
+- **落地时的 `still_true` 比对保留为兜底**（`effect::Claims::of`）：一条车道在别人落地之后才用旧副本认领一个已经做完的节点，
+  这里不拦它，落地时仍被丢弃并告诉人。
+- 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node/)'`；
+  `cargo nextest run -p collab -E 'test(/two_runs_read_as_ready/)'` 在桌子一侧钉住「第二个认领当场被拒、什么都不留」。
+
 ## 8-41 一次提交出自哪次运行，从账本回答（`bin::views::commits`、`sprawling whose`）
 
 这座城作出的每一个提交都带上五条 git trailers 与一个

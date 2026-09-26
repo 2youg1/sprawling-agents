@@ -28,6 +28,7 @@
 /// third party can predict is a login a third party can finish. This is
 /// the one place in the binary where reproducibility would be a defect.
 pub(crate) mod attending;
+pub(crate) mod booking;
 pub(crate) mod desk;
 pub(super) mod door;
 pub(crate) mod journal;

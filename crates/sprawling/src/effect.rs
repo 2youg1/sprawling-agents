@@ -251,9 +251,11 @@ pub(crate) enum Claims {
 
 impl Claims {
     /// Checks each effect against the file as it stands now rather than
-    /// as it stood when the run was dispatched. Today one run is driven
-    /// at a time, so the two agree; when they stop agreeing the losing
-    /// claim is dropped rather than written over somebody's row.
+    /// as it stood when the run was dispatched. The accounting thread
+    /// already refused a node another run in flight held when the model
+    /// claimed it (`serving::booking`); this is the backstop for a run
+    /// that claimed from its old copy a node somebody had since landed,
+    /// whose claim is dropped rather than written over that row.
     ///
     /// # Errors
     /// Propagates a claim whose payload cannot be built.

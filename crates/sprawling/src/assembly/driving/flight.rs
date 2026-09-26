@@ -140,6 +140,10 @@ impl Flight {
             Ok(arrival) => arrival,
             Err(err) => return Some(Err(err)),
         };
+        // Its landing runs on this thread before the queue is served
+        // again, so no claim is answered between the release and the
+        // plan on disk saying how the run's nodes ended.
+        self.gate.booked.release(run);
         let Some(InLane {
             continuation,
             owing,

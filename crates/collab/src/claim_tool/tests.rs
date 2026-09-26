@@ -28,6 +28,7 @@ fn desk() -> Arc<Mutex<ClaimDesk>> {
         "potter@lab.1".to_owned(),
         Address::parse("lab/room1").unwrap(),
         PLAN.to_owned(),
+        Booking::new(|_| Ok(())),
     )))
 }
 
@@ -338,6 +339,7 @@ fn a_plan_that_does_not_parse_refuses_with_the_repair() {
         "potter@lab.1".to_owned(),
         Address::parse("lab/room1").unwrap(),
         "no table here".to_owned(),
+        Booking::new(|_| Ok(())),
     )));
     let mut tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     let refusal = tool

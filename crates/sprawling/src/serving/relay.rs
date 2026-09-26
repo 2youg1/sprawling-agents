@@ -6,11 +6,10 @@
 //! The third adapter of `kernel::Ledger`: a write from a driving thread,
 //! carried to the accounting thread and waited for.
 //!
-//! The first two adapters own a medium — `memory::jsonl` owns segments on
-//! disk, citysim's owns a `Vec`. This one owns neither. It owns a
-//! crossing: the driving pool holds `Relay` and nothing else that can
-//! write, so "a city has one writer" is held by the types rather than by
-//! discipline (ARCHITECTURE section 10, sprawling-SPEC.md 8-42).
+//! The first two adapters own a medium — `memory::jsonl` owns segments on disk, citysim's
+//! owns a `Vec`. This one owns neither. It owns a crossing: the driving pool holds `Relay`
+//! and nothing else that can write, so "a city has one writer" is held by the types rather
+//! than by discipline (ARCHITECTURE section 10, sprawling-SPEC.md 8-42).
 
 use std::collections::VecDeque;
 use std::sync::mpsc;
@@ -18,6 +17,7 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError, EventDraft, EventRef, Ledger};
 
+use super::booking::{ClaimAsk, ClaimBook};
 use super::pool::Arrival;
 
 /// One append, and the address its answer goes back to.
@@ -41,6 +41,8 @@ pub(crate) struct RelayRequest {
 pub(crate) enum Wake {
     /// A lane's append, waiting for its answer.
     Relay(RelayRequest),
+    /// A lane's claim on a plan node, decided in queue order.
+    Claim(ClaimAsk),
     /// A run home from its lane, boxed because it carries a whole
     /// drive's outcome.
     Home(Box<Arrival>),
@@ -103,12 +105,17 @@ impl Ledger for Relay {
 pub(crate) struct RelayGate {
     wakes: mpsc::Receiver<Wake>,
     issuing: mpsc::Sender<Wake>,
+    pub(crate) booked: ClaimBook,
 }
 
 impl RelayGate {
     pub(crate) fn open() -> RelayGate {
         let (issuing, wakes) = mpsc::channel();
-        RelayGate { wakes, issuing }
+        RelayGate {
+            wakes,
+            issuing,
+            booked: ClaimBook::default(),
+        }
     }
 
     /// One handle for one driving thread.
@@ -133,7 +140,7 @@ impl RelayGate {
     /// only after the write is durable, because that is what makes an
     /// `EventRef` a reference to a history that exists.
     pub(crate) fn serve(
-        &self,
+        &mut self,
         patience: Patience,
         ledger: &mut impl Ledger,
         homes: &mut VecDeque<Arrival>,
@@ -153,6 +160,7 @@ impl RelayGate {
                     drafts.push(draft);
                     senders.push(back);
                 }
+                Wake::Claim(ask) => self.booked.answer(ask),
                 Wake::Home(arrival) => homes.push_back(*arrival),
                 Wake::Command | Wake::Close => {}
             }
@@ -165,10 +173,8 @@ impl RelayGate {
                 // Positional, the port's own promise: a sender with no echo
                 // would be a caller left waiting, never one told a lie.
                 for (back, echo) in senders.into_iter().zip(echoes) {
-                    // A driving thread that stopped listening does not
-                    // undo the line: the history is what the city
-                    // believes, and it was written before this send was
-                    // tried.
+                    // A driving thread that stopped listening does not undo the line: the
+                    // history is what the city believes, and it was written before this send.
                     drop(back.send(Ok(echo)));
                 }
             }
@@ -205,11 +211,9 @@ mod tests {
 
     /// The relay, with the accounting thread it writes through.
     ///
-    /// `LedgerInspect` is the suite's verification-only read-back, and
-    /// `kernel::ledger` says production never reads through a Ledger
-    /// handle — so the read-back is answered here, off the segments the
-    /// accounting thread wrote, rather than by opening a hole in the
-    /// relay's own face.
+    /// `LedgerInspect` is the suite's verification-only read-back, and `kernel::ledger` says
+    /// production never reads through a Ledger handle — so the read-back is answered here, off
+    /// the segments the accounting thread wrote, rather than by opening a hole in the relay.
     struct Relayed {
         relay: Relay,
         dir: tempfile::TempDir,
@@ -222,7 +226,7 @@ mod tests {
         fn open() -> Relayed {
             let dir = tempfile::tempdir().expect("a temporary directory");
             let root = dir.path().to_path_buf();
-            let gate = RelayGate::open();
+            let mut gate = RelayGate::open();
             let relay = gate.issue();
             let bell = gate.bell();
             let (closing, closed) = mpsc::channel::<()>();
@@ -343,17 +347,14 @@ mod tests {
             }
         }
 
-        // **"Already waiting" is arranged, not waited for.** Four
-        // driving threads racing to queue before a wave begins makes the
-        // scheduler decide what is being measured: on a busy machine the
-        // server answers the first before the fourth has sent, four
-        // waves of one is then correct behaviour, and a test that
-        // retried the arrangement until it saw batching failed on CI for
-        // being unlucky rather than for being wrong. The requests are
-        // therefore put on the channel directly, which is the state the
-        // property is about - `serve` drains what it finds, and
-        // what it finds here is four.
-        let gate = RelayGate::open();
+        // **"Already waiting" is arranged, not waited for.** Four driving threads racing to
+        // queue before a wave begins makes the scheduler decide what is being measured: on a
+        // busy machine the server answers the first before the fourth has sent, four waves of
+        // one is then correct behaviour, and a test that retried the arrangement until it saw
+        // batching failed on CI for being unlucky rather than for being wrong. The requests are
+        // therefore put on the channel directly, which is the state the property is about -
+        // `serve` drains what it finds, and what it finds here is four.
+        let mut gate = RelayGate::open();
         let mut answers = Vec::new();
         for stamp in 1..=4 {
             let (back, answer) = mpsc::sync_channel(1);

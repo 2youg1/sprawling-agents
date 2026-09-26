@@ -50,11 +50,39 @@ pub struct ClaimDesk {
     /// work down without saying how it went.
     held: Option<Held>,
     effects: Vec<ClaimEffect>,
+    booking: Booking,
+}
+
+/// Where a claim is decided at the moment a model makes it.
+///
+/// The desk's own copy of the plan is the file as it stood when this run
+/// was dispatched, and a second run dispatched beside it read the same
+/// file; only an authority every run asks can refuse the second claim
+/// before either run spends a call on the node. In the city that
+/// authority is the accounting thread, reached through the relay.
+pub struct Booking(Box<Ask>);
+
+/// Books one node for the run the booking belongs to.
+type Ask = dyn FnMut(&NodeId) -> Result<(), AxError> + Send;
+
+impl Booking {
+    /// `ask` books the node for this run, or refuses because another run
+    /// holds it; its refusal reaches the model unchanged.
+    #[must_use]
+    pub fn new(ask: impl FnMut(&NodeId) -> Result<(), AxError> + Send + 'static) -> Booking {
+        Booking(Box::new(ask))
+    }
+}
+
+impl std::fmt::Debug for Booking {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Booking")
+    }
 }
 
 impl ClaimDesk {
     #[must_use]
-    pub fn new(who: String, room: Address, roadmap: String) -> ClaimDesk {
+    pub fn new(who: String, room: Address, roadmap: String, booking: Booking) -> ClaimDesk {
         ClaimDesk {
             who,
             room,
@@ -62,6 +90,7 @@ impl ClaimDesk {
             changed: false,
             held: None,
             effects: Vec::new(),
+            booking,
         }
     }
 
@@ -334,3 +363,7 @@ pub use tool::ClaimTool;
     reason = "test code"
 )]
 mod tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod booking_tests;
