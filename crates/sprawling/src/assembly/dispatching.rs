@@ -51,14 +51,16 @@ pub(super) struct Assignment {
     /// therefore its depth, which is what makes succession a different
     /// verb from delegation.
     pub(super) succession: Option<Handover>,
-    /// Whether this run began with somebody else's text, which decides
-    /// whether the approvals it raises can be waived by a policy (C15).
+    /// The outside sources this run began with, empty for work that
+    /// began inside the city. Every door the run's bench asks reads it,
+    /// and a non-empty set keeps its approvals from being waived by a
+    /// policy (C15).
     ///
     /// Carried by the dispatch rather than held by the worker: a run is
     /// settled long after the entrance that started it returned, so a
     /// flag the worker set and cleared around one call described
     /// whichever run happened to be landing.
-    pub(super) tainted: bool,
+    pub(super) taint: kernel::TaintSet,
     /// What this session branched off, when it did. Set by the dispatch
     /// from the worker's own fold of `session_opened`, spent by the first
     /// run of that session and by no later one: a branch is a beginning,

@@ -93,7 +93,7 @@ impl RunWorker {
                     mode: mode_of(mode),
                     parent: None,
                     succession: None,
-                    tainted: false,
+                    taint: kernel::TaintSet::empty(),
                 },
                 Asked { task, goal },
                 reply,

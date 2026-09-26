@@ -26,7 +26,7 @@ fn asked(addr: &str) -> Assignment {
         mode: runtime::Mode::PlanGoal,
         parent: None,
         succession: None,
-        tainted: false,
+        taint: kernel::TaintSet::empty(),
         origin: None,
     }
 }
