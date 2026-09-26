@@ -76,6 +76,7 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
         Verb::Doctor => sprawling::doctor::verb(args),
         Verb::Call => call(args).into(),
         Verb::Dispatch => super::dispatch::verb(read),
+        Verb::Top => top(args),
         Verb::Enrol => enrol(read),
         Verb::Serve => serve(nth(1), nth(2), args),
         Verb::Export => export(nth(1), nth(2)),
@@ -139,6 +140,21 @@ pub(super) fn default_city_location() -> std::path::PathBuf {
             home.as_ref(),
             firstrun::BesideBinary::Writable,
         ),
+    }
+}
+
+/// Watches the city at `--at` until it stops (sprawling-SPEC.md 8-93).
+fn top(args: &[String]) -> ExitCode {
+    use std::io::IsTerminal;
+    let at = flag_value(args, "--at").unwrap_or_else(|| DEFAULT_AT.to_owned());
+    let output = if std::io::stdout().is_terminal() {
+        super::wire_client::Output::Screen
+    } else {
+        super::wire_client::Output::Lines
+    };
+    match super::wire_client::top(&at, flag_value(args, "--token").as_deref(), output) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => super::city::report(err),
     }
 }
 

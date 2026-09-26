@@ -27,6 +27,7 @@
   **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 39**（缺省也是一层 `ConfigLayer::Default` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   **当前 golden**：`1efcbe95ee51b1c9efaee07d21d95824d714604c1974e8b41b2ec3dfdbbe725a`；**WIRE_V ＝ 39**（`Dispatch` 可点名这一次的模型 → §8-48；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::NewestRelease` → §8-36、§8-47；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   **当前 golden**：`05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7`；**WIRE_V ＝ 40**（一行 run 带上结局、PR 分支与所等之事 `RunSummary.completion`／`pr`／`ask` → §8-48；一次工具调用的起止时刻 `Call.called`／`Call.answered` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 38**（回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43；性能监视器的一对帧 `ClientFrame::Monitor`／`ServerFrame::Monitor` → §8-47）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -1449,3 +1450,18 @@ pub struct LiveOutput { pub run: RunId, pub stream: OutputStream, pub text: Stri
 - **`text` 是 UTF-8 有损解码**，因为一块在字节上界处切开，可能切在一个多字节字符中间；切口处画成替换字符只影响预览，结果以账本为准。**被否**：线上带字节数组——JSON 里一个字节要三四个字符，而页面最终画的是文本。
 - **`ServeConfig::outputs_so_far: Arc<dyn Fn() -> Vec<LiveOutput> + Send + Sync>`**：一个会话在送出 `Welcome` 之后、接实时帧之前调它一次，把还在跑的命令已经写出的字节按原来的次序作为 `Output` 帧送出，所以在命令跑到一半时打开页面的人先看到已经写出的部分。会话先订阅第四条通道再调它，所以一块可能送两遍而不会漏；预览里重复一块无害，漏一块则要等调用落账才补上。缓冲住在装配层（sprawling-SPEC §8-90），因为清空它要看账本里的 `tool_result`，而本 crate 不折叠账本。
 - **`OutputStream` 是 `runtime::Stream` 的第二处拼写而不是第二处权威**：本 crate 的依赖图够不到 `runtime`，映射住在装配层（`sprawling::assembly` 的 `serve`），与 `LogLevel`（§8-32）同一个安排。
+### 8-47 `WIRE_V` 39：性能监视器的一对帧（`channels::wire::monitor`，形状：值类型）
+
+监视页和 `sprawling top` 读同一份历史（sprawling-SPEC.md 8-90），它们从线上拿到它。线协议为此加一种帧，两个方向各一个变体：
+
+- `ClientFrame::Monitor(Monitoring)`：`Monitoring` 是 `Watch`、`WatchSummary` 或 `Release`。`Watch` 让这个会话算作一个看整页的人，`WatchSummary` 让它算作一个只看事实条摘要的人，`Release` 让它不再算；会话结束等于 `Release`。
+- `ServerFrame::Monitor(Sample)`：一次读数，只发给正在看的会话。`Sample` 的字段即 8-90 列出的 13 个 `u64`；它定义在 `channels::wire::monitor`，`bin::monitor` 用的就是这一个类型，不再另写一份。
+- `Watched`：看的人看什么，`Everything`（整页）或 `Summary`（事实条上的摘要）。它不上线，是 `MonitorFeed::watch` 的参数，`bin::monitor::Monitor` 按它分两类计数。
+- `decide_frame` 把一个已打开会话的 `Monitor(Watch)` 答成 `SessionStep::Watch(Watched::Everything)`，`Monitor(WatchSummary)` 答成 `SessionStep::Watch(Watched::Summary)`，`Monitor(Release)` 答成 `SessionStep::Release`；未打开的会话照旧拒绝并关闭。外壳收到 `Watch(watched)` 时调用 `ServeConfig::monitor` 的 `watch(watched)` 拿一个看的凭据，已有凭据时换掉它、保留已有的 `samples` 订阅，没有时订阅 `samples`；收到 `Release` 时把两者都丢掉。重复的 `Watch` 不叠加计数：一个会话至多持有一个凭据。
+
+**决定。**
+
+1. 看与不看是会话里的两个帧，而不是一个 `Query`。`Query` 问一次答一次，而监视是一段持续的订阅：它的结束（`Release` 或断开）必须让城停止采样，这件事只有持有会话的外壳能保证。另一种做法是每秒一个 `Query`，它让每个看的人每秒多一次往返，且城无法知道人已经走了。
+2. `watch` 是一个返回不透明凭据的函数，而不是把计数器交给本 crate。有没有人在看由 `bin::monitor::Monitor` 一处决定；外壳只持有凭据，丢掉它就是不看。
+3. 读数经 `broadcast` 发出，与 `deltas`、`logs` 同形：错过的一次读数不必补，下一秒还有一个。
+4. 摘要是第三个变体，而不是 `Watch` 带一个参数。事实条在每个页面上，所以它的看法必须比整页便宜得多：只看摘要时城只读本进程（sprawling-SPEC.md 8-92 的 `OwnProcess`，约 1 µs），不打开整机与卷的计数器。已有的 `"watch"` 拼写保持原义，新的 `"watch_summary"` 让 `WIRE_V` 加一。另一种做法是让 `Watch` 带上 `Watched`，它改掉已有帧的拼写，而得到的东西相同。

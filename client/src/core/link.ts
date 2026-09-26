@@ -16,6 +16,7 @@ import type {
   EventRecord,
   LiveOutput,
   LogLine,
+  Sample,
   Seq,
   ServerFrame,
   Welcome,
@@ -70,6 +71,8 @@ export type LinkAction =
   // rather than a report: the page can do something about it, and what
   // it does is ask the Ledger for the range.
   | { readonly kind: "lagged"; readonly from: Seq; readonly to: Seq }
+  // One monitor reading, sent only while this page watches.
+  | { readonly kind: "sampled"; readonly sample: Sample }
   | { readonly kind: "wait"; readonly ms: number }
   | { readonly kind: "report"; readonly error: AxError }
   | { readonly kind: "close" };
@@ -269,6 +272,9 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   }
   if ("output" in frame) {
     return [link, { kind: "writing", piece: frame.output }];
+  }
+  if ("monitor" in frame) {
+    return [link, { kind: "sampled", sample: frame.monitor }];
   }
   return unhandled(link, frame);
 }

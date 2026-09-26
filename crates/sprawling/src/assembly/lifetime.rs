@@ -186,6 +186,7 @@ impl RunWorker {
             backlog: runtime::Backlog::new(),
             flight: Flight::open(),
             index: memory::LedgerIndex::empty(),
+            read_volume: crate::monitor::volume::read,
         };
         worker.sweep_abandoned_trees();
         Ok(worker)

@@ -46,6 +46,10 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
         logs: tokio::sync::broadcast::channel(16).0,
         outputs: tokio::sync::broadcast::channel(16).0,
         outputs_so_far: Arc::new(Vec::new),
+        monitor: channels::MonitorFeed {
+            watch: Arc::new(|_| -> Box<dyn Send> { Box::new(()) }),
+            samples: tokio::sync::broadcast::channel(1).0,
+        },
         client: Arc::new(channels::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
         transcribe_sink: Arc::new(move |body: Vec<u8>, kind: String| match hearing {

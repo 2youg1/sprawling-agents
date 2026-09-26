@@ -53,6 +53,7 @@ impl RunWorker {
         asked: Asked,
         reply: channels::Reply,
     ) -> Result<(), AxError> {
+        self.room_for_new_work()?;
         self.dispatch_into_lane(at, asked.task, asked.goal, Owing::asked(reply))
             .map(drop)
     }

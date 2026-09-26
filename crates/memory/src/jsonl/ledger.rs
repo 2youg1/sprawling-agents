@@ -50,6 +50,9 @@ pub struct JsonlLedger {
     pub(crate) lock: Option<WriterLock>,
     /// The stop a failed whole-chain audit trips (memory-SPEC 8-27).
     pub(crate) halt: crate::chain_audit::ChainHalt,
+    /// The segments a failed wave created, while restoring the disk to
+    /// its length before that wave is still owed (`jsonl::unwind`).
+    pub(crate) pending_unwind: Option<Vec<PathBuf>>,
 }
 
 /// This process's exclusive hold on a city's Ledger, released when the

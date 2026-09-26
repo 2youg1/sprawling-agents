@@ -23,7 +23,7 @@ mod socket;
 
 pub use committed::Committed;
 pub use config::{
-    AcpProgress, AcpSink, Answering, LedgerHead, ServeConfig, TranscribeSink, router,
+    AcpProgress, AcpSink, Answering, LedgerHead, MonitorFeed, ServeConfig, TranscribeSink, router,
 };
 pub use listener::{Bound, bind, serve};
 pub use reply::{Delivered, Reply};

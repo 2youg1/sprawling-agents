@@ -231,6 +231,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         logs,
         outputs,
         outputs_so_far: Arc::new(move || kept_reader.so_far()),
+        monitor: watched(city_root)?,
         city: city_name,
         head,
         epoch,
@@ -320,4 +321,32 @@ impl Listening {
         }
         served
     }
+}
+
+/// The monitor a session watches over the socket, and the thread that
+/// samples it once a second (sprawling-SPEC.md 8-90, 8-92). Whether
+/// anybody watches is the monitor's count; a session holds its
+/// [`crate::monitor::Watch`] for as long as it watches.
+///
+/// # Errors
+/// `StorageFatal` when the sampler's thread cannot be started.
+fn watched(city_root: &std::path::Path) -> Result<channels::MonitorFeed, AxError> {
+    let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
+    let samples = tokio::sync::broadcast::channel(1).0;
+    crate::monitor::sampler::spawn_sampler(
+        Arc::downgrade(&monitor),
+        samples.clone(),
+        city_root.to_path_buf(),
+    )?;
+    Ok(channels::MonitorFeed {
+        watch: Arc::new(move |watched| -> Box<dyn Send> {
+            // The count is an atomic, so a poisoned lock guards no
+            // half-written state and the watcher still counts.
+            let held = monitor
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            Box::new(held.watch(watched))
+        }),
+        samples,
+    })
 }

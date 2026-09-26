@@ -31,6 +31,8 @@ import type { Lang } from "./lang";
 import { createAsking } from "./asking";
 import type { Asking } from "./asking";
 import { createBelief } from "./belief";
+import { createWatching } from "./watching";
+import type { Watching } from "./watching";
 import type { Belief } from "./belief";
 import { NO_TAIL, appended } from "./live_output";
 import type { Tail } from "./live_output";
@@ -59,6 +61,7 @@ export interface Connection {
   readonly dismissRefusal: () => void;
   // Everything in the bell has now been looked at.
   readonly markNoticesSeen: () => void;
+  readonly monitor: Pick<Watching, "samples" | "watch">;
 }
 
 // The pairing code the host put on the URL that opened this page. An
@@ -176,6 +179,7 @@ export function openConnection(
     socket.send(text);
     return true;
   }
+  const watching = createWatching(sendText);
 
   // Asks for one page of the oldest range still owed, and only when none
   // is in flight: the next page starts at the cursor the last one returned.
@@ -299,6 +303,7 @@ export function openConnection(
         resume(action.welcome.resume_from ?? null);
         askGap();
         unsent.release((command) => sendText(encodeFrame({ command })));
+        watching.reconnected();
         return;
       case "deliver": {
         // The field this build could not read, if any, is reported here
@@ -344,6 +349,9 @@ export function openConnection(
       case "lagged":
         gaps.push({ at: action.from, to: action.to, records: "folded" });
         askGap();
+        return;
+      case "sampled":
+        watching.sampled(action.sample);
         return;
       case "wait":
         reconnect = setTimeout(() => {
@@ -483,5 +491,6 @@ export function openConnection(
     markNoticesSeen() {
       store.noticesSeen();
     },
+    monitor: watching,
   };
 }

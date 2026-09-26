@@ -41,6 +41,7 @@
   import LinkBanner from "./views/link_banner.svelte";
   import Mcp from "./views/mcp.svelte";
   import Notifier from "./views/notifier.svelte";
+  import Monitor from "./views/monitor.svelte";
   import Palette from "./views/palette.svelte";
   import Rail from "./views/rail.svelte";
   import RecordView from "./views/record.svelte";
@@ -64,6 +65,7 @@
   const approvals = u.approvals;
   const belief = u.conn.belief;
   const linkState = u.conn.state;
+  const samples = u.conn.monitor.samples;
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const bindings = keymap();
 
@@ -352,6 +354,8 @@
         <Registry />
       {:else if view.kind === "welcome"}
         <Welcome />
+      {:else if view.kind === "monitor"}
+        <Monitor samples={$samples} watch={u.conn.monitor.watch} />
       {:else if view.kind === "gallery"}
         <!-- The storybook and its fixture tables are a chunk of their
              own, fetched only when a person opens `#/gallery`, so the

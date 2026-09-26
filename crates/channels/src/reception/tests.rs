@@ -328,3 +328,49 @@ fn the_welcome_names_the_ledger_head_so_a_reconnect_fetches_only_what_it_missed(
     };
     assert_eq!(welcome.resume_from, Some(kernel::Seq::new(60)));
 }
+
+#[test]
+fn a_live_session_watches_and_releases_the_monitor() {
+    use crate::wire::{Monitoring, Watched};
+    let watch = ClientFrame::Monitor(Monitoring::Watch);
+    let summary = ClientFrame::Monitor(Monitoring::WatchSummary);
+    let release = ClientFrame::Monitor(Monitoring::Release);
+    let steps = (
+        decide_frame(
+            SessionState::Live,
+            watch.clone(),
+            &unpaired(),
+            WelcomeFacts::default(),
+        ),
+        decide_frame(
+            SessionState::Live,
+            summary,
+            &unpaired(),
+            WelcomeFacts::default(),
+        ),
+        decide_frame(
+            SessionState::Live,
+            release,
+            &unpaired(),
+            WelcomeFacts::default(),
+        ),
+        decide_frame(
+            SessionState::AwaitingHello,
+            watch,
+            &unpaired(),
+            WelcomeFacts::default(),
+        ),
+    );
+    assert!(
+        matches!(
+            steps,
+            (
+                SessionStep::Watch(Watched::Everything),
+                SessionStep::Watch(Watched::Summary),
+                SessionStep::Release,
+                SessionStep::Refuse { close: true, .. }
+            )
+        ),
+        "{steps:?}"
+    );
+}

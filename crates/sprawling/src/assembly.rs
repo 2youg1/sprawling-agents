@@ -298,6 +298,9 @@ pub struct RunWorker {
     /// with what was appended since, so a question about one line reads
     /// that line rather than the whole history (sprawling-SPEC.md 8-82).
     pub(in crate::assembly) index: memory::LedgerIndex,
+    /// Reads the city's volume at the door new work enters by
+    /// (sprawling-SPEC.md 8-94).
+    read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
 }
 
 impl RunWorker {

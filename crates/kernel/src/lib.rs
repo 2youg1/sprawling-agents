@@ -26,6 +26,7 @@ pub mod completion;
 pub mod config;
 pub mod consts_external;
 pub mod consts_policy;
+pub mod degradation;
 pub mod delegation;
 pub mod discard;
 pub mod error;

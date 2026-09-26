@@ -3021,6 +3021,16 @@ export const Hello = Schema.Struct({
 export type Hello = typeof Hello.Type;
 
 /**
+ * Whether this session counts as somebody watching the monitor.
+ */
+export const Monitoring = Schema.Union(
+  Schema.Literal("release"),
+  Schema.Literal("watch"),
+  Schema.Literal("watch_summary"),
+).annotations({ identifier: "Monitoring" });
+export type Monitoring = typeof Monitoring.Type;
+
+/**
  * Everything a client may send.
  */
 export const ClientFrame = Schema.Union(
@@ -3032,6 +3042,9 @@ export const ClientFrame = Schema.Union(
   }),
   Schema.Struct({
     ask: Ask,
+  }),
+  Schema.Struct({
+    monitor: Monitoring,
   }),
 ).annotations({ identifier: "ClientFrame" });
 export type ClientFrame = typeof ClientFrame.Type;
@@ -3131,6 +3144,27 @@ export const LogLine = Schema.Struct({
 export type LogLine = typeof LogLine.Type;
 
 /**
+ * One reading of every counter the monitor shows, in integers because
+ * it travels on the wire (sprawling-SPEC.md 8-90).
+ */
+export const Sample = Schema.Struct({
+  core_cpu_permille: Schema.Int,
+  core_private_bytes: Schema.Int,
+  core_read_bytes: Schema.Int,
+  core_working_set_bytes: Schema.Int,
+  core_written_bytes: Schema.Int,
+  durable_lag: Schema.Int,
+  event_to_screen_p50_nanos: Schema.Int,
+  ledger_queue_depth: Schema.Int,
+  machine_available_bytes: Schema.Int,
+  machine_cpu_permille: Schema.Int,
+  queued_runs: Schema.Int,
+  relay_p50_nanos: Schema.Int,
+  volume_free_bytes: Schema.Int,
+}).annotations({ identifier: "Sample" });
+export type Sample = typeof Sample.Type;
+
+/**
  * The server's answer to a `Hello` it accepted.
  */
 export const Welcome = Schema.Struct({
@@ -3177,6 +3211,9 @@ export const ServerFrame = Schema.Union(
   }),
   Schema.Struct({
     output: LiveOutput,
+  }),
+  Schema.Struct({
+    monitor: Sample,
   }),
 ).annotations({ identifier: "ServerFrame" });
 export type ServerFrame = typeof ServerFrame.Type;

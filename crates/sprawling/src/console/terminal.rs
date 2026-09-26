@@ -294,7 +294,7 @@ fn post<W: Write>(
         // so a person inside a city stops being told to open a second
         // terminal and ask it from outside.
         channels::ClientFrame::Ask(ask) => answer(answering, ask.query, out),
-        channels::ClientFrame::Hello(_) => {
+        channels::ClientFrame::Hello(_) | channels::ClientFrame::Monitor(_) => {
             say(out, "  this console is already inside the city");
         }
     }
