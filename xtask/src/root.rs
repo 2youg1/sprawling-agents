@@ -9,15 +9,33 @@ use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 
-/// The checkout this run judges, given the xtask manifest directory the
-/// binary was built from and the directory it was started in.
-pub(crate) fn judged(built: &Path, _cwd: &Path) -> Result<PathBuf, XtaskError> {
-    match built.parent() {
-        Some(parent) => Ok(parent.to_path_buf()),
-        None => Err(XtaskError::Doc {
-            file: "CARGO_MANIFEST_DIR".to_owned(),
-            msg: "xtask manifest directory has no parent".to_owned(),
-        }),
+/// The checkout this run judges: the first directory from `cwd` upward
+/// that holds `xtask/Cargo.toml`, the rule cargo itself follows to find
+/// the workspace. `built` is the xtask manifest directory compiled into
+/// the binary; when its checkout is not the one found here, the binary
+/// is another checkout's build (a copied target directory that cargo
+/// took for fresh), so its gates are not this tree's gates and the run
+/// refuses with `StaleBuild` rather than judge either tree silently.
+/// The path returned is the one found from `cwd`, not its canonical
+/// form, because a verbatim `\\?\` path breaks the tools gates spawn.
+pub(crate) fn judged(built: &Path, cwd: &Path) -> Result<PathBuf, XtaskError> {
+    let here = cwd
+        .ancestors()
+        .find(|dir| dir.join("xtask").join("Cargo.toml").is_file())
+        .ok_or_else(|| XtaskError::NoCheckout {
+            cwd: cwd.display().to_string(),
+        })?;
+    let stale = || XtaskError::StaleBuild {
+        built: built.display().to_string(),
+        here: here.display().to_string(),
+    };
+    let built_root = built.parent().ok_or_else(stale)?;
+    match (
+        std::fs::canonicalize(built_root),
+        std::fs::canonicalize(here),
+    ) {
+        (Ok(a), Ok(b)) if a == b => Ok(here.to_path_buf()),
+        (Ok(_) | Err(_), Ok(_) | Err(_)) => Err(stale()),
     }
 }
 
