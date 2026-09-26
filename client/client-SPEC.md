@@ -386,7 +386,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 **未验的**：`Changes`／`Hunks` 有内容时的样子、Firefox 与 Zen 的无头截图（`-screenshot` 不出图，须走 BiDi）、`Tip` 两条定位分支各自的 `#/gallery` 夹具（`xtask render` 只读 `#/gallery`，所以这两条分支在真引擎里的落点尚无机器读者）、**§7 的键表**（`xtask render` 今天只量盒子，没有一次按键进过真引擎，所以每一行键表今天的读者只有人）。
 
-## 12 Decisions（决策）
+## 12 Decisions
 
 ### 12-1 删除动作的形态是 dialog 确认，不是撤销 toast
 
