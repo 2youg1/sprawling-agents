@@ -88,9 +88,13 @@ impl Endpoint {
     /// blocking one given the same answer return the same value.
     pub(super) fn returned(&self, settled: &Value) -> Result<ModelReturn, AxError> {
         let resp = response_from_wire(self.config.dialect, settled)?;
+        // A row with no figure is nobody's price: settling it would
+        // record a measured zero where no measurement exists.
         let billed: Option<UsdMicros> = match &self.config.pricing {
-            Some(entry) => Some(cost::settle(&resp.usage, None, entry)?.billed),
-            None => None,
+            Some(entry) if entry.states_a_price() => {
+                Some(cost::settle(&resp.usage, None, entry)?.billed)
+            }
+            Some(_) | None => None,
         };
         ModelReturn::from_response(resp, billed)
     }
