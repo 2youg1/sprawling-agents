@@ -201,7 +201,7 @@ struct Answering(String);
 
 impl accounting::Connectors for Answering {
     fn connect(
-        &mut self,
+        &self,
         server: &kernel::McpServer,
         _write_root: &std::path::Path,
         confidential: bool,

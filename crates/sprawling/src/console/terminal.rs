@@ -155,8 +155,15 @@ pub(crate) fn start(
     // would be a second description of every event kind.
     std::thread::spawn(move || {
         while let Ok(committed) = watching.blocking_recv() {
-            if let Ok(text) = serde_json::to_string(committed.record()) {
-                println!("{text}");
+            match serde_json::to_string(committed.record()) {
+                Ok(text) => println!("{text}"),
+                // The record is on the ledger and reached every socket as
+                // its frame; only this printout lacks it, so the gap is
+                // named rather than left silent.
+                Err(error) => eprintln!(
+                    "  seq {} is in the history but could not be printed here: {error}",
+                    committed.record().seq().value()
+                ),
             }
         }
     });

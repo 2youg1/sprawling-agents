@@ -81,15 +81,11 @@ impl PrefixAsk {
     /// The oldest one, not the newest: the prefix is frozen once for
     /// the life of a run and every later turn records the same four
     /// hashes, so any of them says the same thing and the first is the
-    /// one a run that never got past turn one still has. A poisoned
-    /// index is read as one that will not refresh, because a refresh
-    /// cut short can leave an offset pointing at another line.
+    /// one a run that never got past turn one still has.
     fn first_prompt(&self) -> Option<EventRecord> {
         let seq = self.first?;
-        let dir = kernel::layout::CityLayout::new(&self.ledger.city_root).ledger();
         let line = {
-            let mut index = self.ledger.index.lock().ok()?;
-            index.refresh(&dir).ok()?;
+            let (index, dir) = self.ledger.indexed()?;
             index.reader(&dir).line_at(seq).ok()?
         };
         EventRecord::parse_line(&line)

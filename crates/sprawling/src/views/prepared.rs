@@ -13,7 +13,7 @@
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use kernel::{Address, GitOid, Locator, RunId, Seq};
 
@@ -157,6 +157,28 @@ pub(crate) struct LedgerAsk {
     pub(super) index: Arc<Mutex<memory::LedgerIndex>>,
 }
 
+impl LedgerAsk {
+    /// The ledger's directory, and its index brought up to the segments
+    /// on disk and held for one read; `None` when the refresh fails.
+    ///
+    /// A poisoned lock means a refresh was cut short and may have left an
+    /// offset pointing at another line, so the index is replaced by an
+    /// empty one and the poison cleared: the refresh that follows scans
+    /// the whole ledger once, and later reads refresh incrementally again
+    /// (sprawling-SPEC.md 8-92).
+    pub(super) fn indexed(&self) -> Option<(MutexGuard<'_, memory::LedgerIndex>, PathBuf)> {
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
+        let mut index = self.index.lock().unwrap_or_else(|poisoned| {
+            let mut index = poisoned.into_inner();
+            *index = memory::LedgerIndex::empty();
+            self.index.clear_poison();
+            index
+        });
+        index.refresh(&dir).ok()?;
+        Some((index, dir))
+    }
+}
+
 impl Prepared {
     /// Does the read the views left for after the snapshot, and answers.
     pub(crate) fn finish(self) -> channels::Answer {
@@ -274,13 +296,13 @@ impl Prepared {
                 Some(answer) => channels::Answer::Skills(Box::new(answer)),
                 None => unavailable(format!("Skills({})", building.as_str())),
             },
-            // A count that cannot be expressed is reported as the largest
-            // count this wire can carry, for the reason every figure of
-            // `Views::metrics` is.
             Self::McpHealth { live, addr } => {
                 channels::Answer::McpHealth(Box::new(live.mcp_health_answer(&addr)))
             }
             Self::Toolkits(live) => channels::Answer::Toolkits(Box::new(live.toolkits_answer())),
+            // A count that cannot be expressed is reported as the largest
+            // count this wire can carry, for the reason every figure of
+            // `Views::metrics` is.
             Self::Metrics { city_root, held } => {
                 channels::Answer::Metrics(Box::new(channels::MetricsAnswer {
                     buildings: u64::try_from(buildings_of(&city_root).len()).unwrap_or(u64::MAX),
