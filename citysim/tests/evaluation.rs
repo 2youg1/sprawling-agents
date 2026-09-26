@@ -6,7 +6,7 @@
 //! The instrument, run twice.
 //!
 //! A suite is only useful if it says the same thing about the same work
-//! on two different days. These scenarios drive `eval` the way the city
+//! on two different days. These scenarios drive `citysim`'s suite the way the city
 //! will: build a corpus, run it, compare, and check that the two halves
 //! stay apart — because a held-out half that leaked is a measurement
 //! that flatters itself and cannot be caught by looking at the number.
@@ -20,7 +20,7 @@
     reason = "test code"
 )]
 
-use eval::{Half, Outcome, Suite, Task};
+use citysim::{Half, Outcome, Suite, Task};
 use kernel::Locator;
 
 fn locator(seed: u8) -> Locator {
