@@ -77,29 +77,31 @@ impl CoreThread {
     /// the thread stands raised, lowers the thread and tells the person.
     pub(crate) fn record_turn_lowering_when_busy(&mut self, woke: Instant, slept: Instant) {
         self.valve.record(woke, slept);
-        match (&self.standing, self.valve.verdict()) {
-            (Standing::Raised, Verdict::Lower) => {
-                self.standing = match lower_this_thread() {
-                    Ok(standing) => {
-                        eprintln!(
-                            "thread {} kept a core busy for {} s and is back at normal priority",
-                            self.name,
-                            BUSY_LIMIT.as_secs()
-                        );
-                        standing
-                    }
-                    Err(err) => {
-                        eprintln!(
-                            "thread {} kept a core busy for {} s and could not be lowered: {err}",
-                            self.name,
-                            BUSY_LIMIT.as_secs()
-                        );
-                        Standing::Raised
-                    }
-                };
+        if self.standing == Standing::Raised && self.valve.verdict() == Verdict::Lower {
+            self.standing = self.lowered_telling_the_person();
+        }
+    }
+
+    /// Lowers the calling thread and says so on stderr; a refusal leaves
+    /// it raised, and the next turn tries again.
+    fn lowered_telling_the_person(&self) -> Standing {
+        match lower_this_thread() {
+            Ok(standing) => {
+                eprintln!(
+                    "thread {} kept a core busy for {} s and is back at normal priority",
+                    self.name,
+                    BUSY_LIMIT.as_secs()
+                );
+                standing
             }
-            (Standing::Raised | Standing::Normal(_), Verdict::Keep)
-            | (Standing::Normal(_), Verdict::Lower) => {}
+            Err(err) => {
+                eprintln!(
+                    "thread {} kept a core busy for {} s and could not be lowered: {err}",
+                    self.name,
+                    BUSY_LIMIT.as_secs()
+                );
+                Standing::Raised
+            }
         }
     }
 }
