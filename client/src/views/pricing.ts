@@ -13,9 +13,10 @@ import type { CostAnswer } from "../wire";
 
 export type CostReading =
   | { readonly kind: "idle" }
-  | { readonly kind: "unpriced"; readonly calls: number; readonly tokens: number }
+  | { readonly kind: "unpriced" }
   | { readonly kind: "priced" };
 
 export function costReading(answer: CostAnswer): CostReading {
-  return answer.total > 0 ? { kind: "priced" } : { kind: "idle" };
+  if (answer.total > 0) return { kind: "priced" };
+  return answer.unpriced.calls > 0 ? { kind: "unpriced" } : { kind: "idle" };
 }

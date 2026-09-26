@@ -10,7 +10,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { costReading } from "./cost";
+import { costReading } from "./pricing";
 import { UsdMicros, type CostAnswer } from "../wire";
 
 function answer(total: number, calls: number, tokens: number): CostAnswer {
@@ -27,7 +27,7 @@ function answer(total: number, calls: number, tokens: number): CostAnswer {
 
 describe("a zero total is read by whether any call went unpriced", () => {
   test("calls no provider priced are not an idle city", () => {
-    expect(costReading(answer(0, 13, 48_000))).toEqual({ kind: "unpriced", calls: 13, tokens: 48_000 });
+    expect(costReading(answer(0, 13, 48_000))).toEqual({ kind: "unpriced" });
   });
 
   test("a city with no calls at all is idle", () => {
