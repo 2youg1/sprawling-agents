@@ -211,24 +211,15 @@ impl Landing {
                 at,
                 &text,
             )?;
-            let mut data = serde_json::Map::new();
-            data.insert(
-                "kind".to_owned(),
-                serde_json::Value::String(entry.kind.as_str().to_owned()),
-            );
-            data.insert(
-                "day".to_owned(),
-                serde_json::Value::Number(entry.day.into()),
-            );
-            data.insert(
-                "subject".to_owned(),
-                serde_json::Value::String(entry.subject.clone()),
-            );
             lines.push(Line {
                 who: who.to_owned(),
                 addr: room.clone(),
                 kind: EventKind::AssetArchived,
-                data: Payload::new(data)?,
+                data: Payload::of(&kernel::event::record::AssetArchived {
+                    kind: entry.kind.as_str().to_owned(),
+                    day: entry.day,
+                    subject: entry.subject.clone(),
+                })?,
             });
             filings.push(Filing { entry, body: text });
         }
