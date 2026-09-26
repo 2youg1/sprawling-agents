@@ -141,9 +141,16 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
     // Beside the bundle, so that `./assets/…` still resolves: the copy is
     // named for the gate, and `just dist` writes the directory fresh.
     let instrumented = bundle.join("sprawling-render.html");
-    std::fs::write(&instrumented, instrument(&body, pass)).map_err(|source| XtaskError::Io {
-        path: walk::rel(root, &instrumented),
-        source,
+    let chunks = walk::files_with_ext(&bundle.join("assets"), &["js"])?;
+    let names = chunks
+        .iter()
+        .filter_map(|chunk| chunk.file_name().and_then(|name| name.to_str()));
+    let preloaded = preloads(&body, names);
+    std::fs::write(&instrumented, instrument(&body, &preloaded, pass)).map_err(|source| {
+        XtaskError::Io {
+            path: walk::rel(root, &instrumented),
+            source,
+        }
     })?;
     let profile = work.join("profile");
     let mut command = Command::new(browser);
@@ -238,8 +245,38 @@ fn sink<'a>(dom: &'a str, id: &str) -> Option<&'a str> {
     rest.get(..end)
 }
 
-/// Append the probe to a copy of the page.
-fn instrument(body: &str, pass: &Pass) -> String {
+/// A `modulepreload` link for every script chunk in the bundle that the
+/// page does not name itself, which is every chunk a view fetches through
+/// a dynamic `import()`.
+///
+/// A module fetched from `file://` after the document has loaded does not
+/// hold the engine's virtual time, so a lazily loaded view never lands
+/// inside the budget however long the probe waits. A preload is part of
+/// the document load, which does hold virtual time; the later `import()`
+/// then finds the module already fetched. Only the gate's copy carries
+/// these links, so the shipped page stays lazy.
+fn preloads<'a>(body: &str, chunks: impl IntoIterator<Item = &'a str>) -> String {
+    chunks
+        .into_iter()
+        .filter(|chunk| !body.contains(&format!("./assets/{chunk}")))
+        .map(|chunk| {
+            format!(
+                "<link rel=\"modulepreload\" crossorigin href=\"./assets/{chunk}\">
+"
+            )
+        })
+        .collect()
+}
+
+/// Add the preloads to the head and append the probe to a copy of the page.
+fn instrument(body: &str, preloaded: &str, pass: &Pass) -> String {
+    let body = match body.find("</head>") {
+        Some(at) => {
+            let (head, tail) = body.split_at(at);
+            format!("{head}{preloaded}{tail}")
+        }
+        None => format!("{preloaded}{body}"),
+    };
     match body.rfind("</body>") {
         Some(at) => {
             let (head, tail) = body.split_at(at);
@@ -261,5 +298,20 @@ fn url_of(path: &Path) -> String {
         format!("file://{cleaned}")
     } else {
         format!("file:///{cleaned}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::preloads;
+
+    #[test]
+    fn a_chunk_the_page_does_not_load_is_preloaded() {
+        let body = r#"<script type="module" crossorigin src="./assets/index-A.js"></script>"#;
+        assert_eq!(
+            preloads(body, ["gallery-B.js", "index-A.js"]),
+            "<link rel=\"modulepreload\" crossorigin href=\"./assets/gallery-B.js\">
+"
+        );
     }
 }
