@@ -32,7 +32,7 @@
   import type { Lang } from "../core/lang";
   import { fill, say } from "../core/lang";
   import type { Rail } from "../core/prefs";
-  import { recoveryFor } from "../core/recovering";
+  import { linkRecovery, recoveryFor } from "../core/recovering";
   import { ago, clock } from "../core/time";
   import { ui } from "../ui";
   import { recover, recoveryLabel, recoveryWhy } from "./notice_recovery";
@@ -205,11 +205,12 @@ second mark next to it. -->
     {@render dot()}
     <span class="text-text">{linkWord}</span>
     {#if $link.kind === "refused"}
+      {@const lever = linkRecovery($link.error.code)}
       <Button
         tone="quiet"
-        label={say($lang, "link_retry")}
+        label={recoveryLabel(lever, $lang)}
         onPress={() => {
-          u.conn.retry();
+          recover(u, lever, null);
         }}
       />
     {/if}

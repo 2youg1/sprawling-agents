@@ -24,7 +24,12 @@ import type { AxCode } from "../wire";
 
 export type Recovery =
   | { readonly kind: "command"; readonly spelled: string }
-  | { readonly kind: "reconnect"; readonly verb: Key };
+  | { readonly kind: "reconnect"; readonly verb: Key }
+  // Fetches the client this city was built with. The one lever for a
+  // page and a city that disagree about the wire: a reconnect meets the
+  // same disagreement again. A draft survives it, because drafts are
+  // kept in browser storage rather than in the page.
+  | { readonly kind: "reload"; readonly verb: Key };
 
 const NEW: Recovery = { kind: "command", spelled: "/new" };
 const FORK: Recovery = { kind: "command", spelled: "/fork" };
@@ -32,6 +37,7 @@ const STOP: Recovery = { kind: "command", spelled: "/stop" };
 // The word for asking the link to try again lives here rather than at
 // two notice surfaces (`link_retry` in `lang.json`).
 const AGAIN: Recovery = { kind: "reconnect", verb: "link_retry" };
+const RELOAD: Recovery = { kind: "reload", verb: "link_reload" };
 
 const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
   // The room's model is frozen against this session: leave the room, or
@@ -46,11 +52,13 @@ const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
   // The watchdog suspects a loop. Stopping the run is the intervention
   // a person has; the sentence says what was suspected.
   E_LOOP_SUSPECTED: [STOP],
-  // Silence, a stopped link, and a shed load share one lever: asking
-  // the link to try. This is the same door the refusal corner opens.
+  // Silence and a shed load share one lever: asking the link to try.
+  // This is the same door the refusal corner opens.
   E_TIMEOUT: [AGAIN],
-  E_WIRE_MISMATCH: [AGAIN],
   E_BACKPRESSURE_SHED: [AGAIN],
+  // Two ends that disagree about the wire disagree again on every
+  // reconnect; only the client this city was built with settles it.
+  E_WIRE_MISMATCH: [RELOAD],
   // Everything else: the refusal's own sentence is the guidance, and
   // no command helps from the notice.
   E_PATH_NOT_FOUND: [],
@@ -89,4 +97,11 @@ const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
 // notice offers them.
 export function recoveryFor(code: AxCode): readonly Recovery[] {
   return RECOVERIES[code];
+}
+
+// The one lever a refused link offers beside its state word: the table's
+// reload where a reconnect would meet the same refusal again, and asking
+// the link to try for every other refusal a server can end a link with.
+export function linkRecovery(code: AxCode): Recovery {
+  return RECOVERIES[code].find((recovery) => recovery.kind === "reload") ?? AGAIN;
 }
