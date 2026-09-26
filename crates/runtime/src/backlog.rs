@@ -330,9 +330,11 @@ impl Backlog {
                 && *claim == Claim::Run(owner)
             {
                 *claim = Claim::Nobody;
-                // A process that already exited cannot be killed, and
-                // one that cannot be killed is reaped by the next harvest
-                // like any member that stops on its own.
+                // `Child::kill` answers `Ok` for a child that already
+                // exited, so an error here is a kill the system refused.
+                // The member is still owed to nobody and the next harvest
+                // reaps it once it stops; the caller is a drop with
+                // nobody to hand the refusal to.
                 drop(child.kill());
                 released = released.saturating_add(1);
             }
