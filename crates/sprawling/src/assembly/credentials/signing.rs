@@ -17,6 +17,26 @@ use crate::serving::random_token;
 use super::super::{RunWorker, now_ms};
 use super::{Credential, Entered, PROBE_TIMEOUT_MS, poisoned_vault, subscription};
 
+/// How a credential reached the vault, as its `secret_captured` record
+/// states it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::assembly) enum Arrival {
+    /// A person enrolled it on the host, under a name they chose.
+    Enrolment,
+    /// It was pasted into a dispatch and taken into custody there
+    /// (sprawling-SPEC.md 8-85).
+    Pasted,
+}
+
+impl Arrival {
+    fn spelling(self) -> &'static str {
+        match self {
+            Arrival::Enrolment => "enrolment",
+            Arrival::Pasted => "pasted",
+        }
+    }
+}
+
 impl RunWorker {
     /// Renews a subscription credential that is about to stop working.
     ///
@@ -269,21 +289,20 @@ impl RunWorker {
     }
 
     /// Puts one credential in the vault. Nothing about it reaches the
-    /// ledger but the fact that it happened.
+    /// ledger but the fact that it happened, and how it arrived.
     ///
     /// The vault key and the `ref` the record states are one value built
     /// once here: a route that announced a reference it spelled itself
     /// would answer with a place the vault may never have been told.
     pub(in crate::assembly) fn put_secret(
         &mut self,
-        realm: String,
-        name: String,
+        reference: &kernel::SecretRef,
         value: kernel::Sealed<String>,
+        arrival: Arrival,
     ) -> Result<(), AxError> {
-        let reference = kernel::SecretRef::new(&realm, &name)?;
         {
             let mut vault = self.vault.lock().map_err(|_| poisoned_vault())?;
-            vault.set(&reference, value.into_vault_value())?;
+            vault.set(reference, value.into_vault_value())?;
         }
         let mut map = serde_json::Map::new();
         map.insert(
@@ -292,7 +311,7 @@ impl RunWorker {
         );
         map.insert(
             "origin".to_owned(),
-            serde_json::Value::String("enrolment".to_owned()),
+            serde_json::Value::String(arrival.spelling().to_owned()),
         );
         self.record(EventKind::SecretCaptured, Payload::new(map)?)
     }

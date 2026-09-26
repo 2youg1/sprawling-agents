@@ -61,6 +61,10 @@ impl RunWorker {
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
         let agreed = self.agree_to_work(&at.addr)?;
+        // A key pasted into the work goes to the vault before the text
+        // is sent to be named, written to a room or recorded.
+        let task = self.take_custody(task)?;
+        let goal = self.take_custody(goal)?;
         // Naming the work costs one call to the digest model, so it is
         // asked after the city has agreed rather than before: a person
         // does not pay a provider to name work this city was never going

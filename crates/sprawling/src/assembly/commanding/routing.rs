@@ -173,9 +173,11 @@ impl RunWorker {
                     max_output_tokens,
                 },
             ),
-            channels::Command::PutSecret { realm, name, value } => {
-                self.put_secret(realm, name, value)
-            }
+            channels::Command::PutSecret { realm, name, value } => self.put_secret(
+                &kernel::SecretRef::new(&realm, &name)?,
+                value,
+                crate::assembly::credentials::signing::Arrival::Enrolment,
+            ),
             channels::Command::Login { provider, step, .. } => self.login(provider.as_str(), step),
             channels::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())

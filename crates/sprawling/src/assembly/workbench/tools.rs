@@ -15,6 +15,7 @@ use super::super::{Assignment, RunWorker, mounts_under};
 use super::engine::machine_half;
 use super::{Desks, Reach, Site, Situation, Workbench, held, status_snapshot};
 
+mod kept;
 mod reading_room;
 
 impl RunWorker {
@@ -55,7 +56,11 @@ impl RunWorker {
         // what this run admits, and until it was set here the mode's own
         // catalog entry reached no model.
         held(&catalog, "lay out the catalog")?.set_mode(mode);
-        let edit = EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?;
+        let edit = kept::KeptEdit::new(
+            EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?,
+            self.vault_handle(),
+            self.ledger.position().value(),
+        );
         // Who this run can reach, read once at dispatch and frozen with
         // it. Nothing here can move under the run: the assembly is
         // single-threaded, so no second run executes while this one

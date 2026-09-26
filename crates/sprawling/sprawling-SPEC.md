@@ -3347,6 +3347,42 @@ pub(super) struct NamingCall;                               // 适配器、模�
 
 **还没移走的**：计划节点（`plans::pursuing`）与城自己发起的派活（`start_unasked`）仍经 `prepare_dispatch` 里的 `session_for` 在记账线程上取名；`renew_if_stale` 与 `DoctorRefresh`/`DoctorInstall` 仍在记账线程上阻塞。
 
+### 8-85 粘进派活里的 key 进 vault，文字里只留引用（`bin::assembly::dispatching::custody`）
+
+**原因**：人在页面上把一把 provider key 粘进任务或目标时，这段文字原样进了三处：发给模型的请求、账本里的派活记录、房间里的 `JOB.md`。三处都能被城里的居民 `grep` 到，账本还会随城搬走；而 `kernel::secret::scan` 早已能认出这些形状，只是派活这道门从不问它。
+
+```rust
+// bin::assembly::dispatching::custody（形状 4 适配器）
+impl RunWorker {
+    /// 把文字里每一段 provider 形状的 key 存进 vault，原处换成它的 `secret:` 引用。
+    pub(in crate::assembly) fn take_custody(&mut self, text: String) -> Result<String, AxError>;
+}
+```
+
+- **一道门，一处权威**：调用点是 `prepare_dispatch` 里 `agree_to_work` 之后、`session_for` 之前。人打的派活、外面敲门的唤醒、计划推进起的活都经过这里，所以三种入口不会各有一套规矩；放在同意之后，是因为存 key 是一次写入，而城不肯接的活什么都不写；放在命名之前，是因为命名要把任务文字发给摘要模型。
+- **认什么由 `kernel::secret::scan` 定**：只换形状表命中的段（`SecretSpan::provider` 为 `Some`）。熵命中不换：提示里的提交哈希、校验和也是高熵串，换掉它们，居民就读不到它要处理的那个值，而形状表列出的前缀不会出现在这类值里。
+- **存进现有的 `gateway::Custodian`**：它按机器选后端——系统的凭据服务，或用口令派生密钥、逐条 ChaCha20-Poly1305 加密的 `encrypted-file`（gateway-SPEC 8-21）。另起一把 AES-GCM 密钥就是同一件事的第二个家，也会多出一处密钥要保管。
+- **引用是 `secret:pasted/<provider>-<seq>`**，`<seq>` 是存这把 key 时账本的下一个序号。每存一把 key 都追加一条 `secret_captured`（`origin: "pasted"`），所以序号不会重复：同一毫秒的两次派活也不会让后一把覆盖前一把。名字里不放时间，也不放随机数，citysim 回放时仍逐字节一致；也不放 key 的哈希或尾巴，`secret_captured` 的规矩是记录行里不带明文，也不带哈希前缀。
+- **失败**：vault 拒绝写入时整个派活失败，错误原样返回（`E_CONFIG_INVALID`，恢复语由 vault 给出）。此时房间和 `JOB.md` 都还没写；如果照原文继续派活，正是这一节要堵的泄露。
+- **被否决的备选**：① 在页面上拦下粘贴，让人先去设置页登记——人粘 key 的时候，多半就是要居民用它，拦下来只会让人换个地方再粘一次；② 在请求出门时替换——账本和 `JOB.md` 在出门之前就已写下原文。
+
+**居民写的文件**：居民往城里写文字只有一道门，`edit` 工具（`runtime::EditTool`）。装配台登记它时包上一层 `bin::assembly::workbench::tools::kept`：
+
+```rust
+// bin::assembly::workbench::tools::kept（形状 4 适配器）
+pub(in crate::assembly) struct KeptEdit { /* runtime::EditTool, vault, 名字前缀, 计数 */ }
+impl kernel::Tool for KeptEdit { /* invoke: 先把 `new` 交给 custody，再交给 EditTool */ }
+```
+
+- 同一段替换逻辑：派活文字和 `new` 参数都经过 `custody::kept_text`，所以认什么、怎么切、切歪了怎么报错只有一处。
+- **引用是 `secret:written/<provider>-<pos>-<n>`**：`<pos>` 是装配台摆出时账本的位置，每次派活在摆台之前都写过记录，所以两次派活的 `<pos>` 不同；`<n>` 是这次派活里第几把。工具运行在 drive 里，拿不到 `&mut RunWorker`，写不了账本，所以不能像派活那样用存 key 时的下一个序号。
+- 写进文件、回给模型的 diff 里只有引用；vault 拒绝写入时这次 `edit` 失败，文件不动。
+- **被否决的备选**：在 `runtime::EditTool` 里扫描——那要让 `runtime` 认得 vault，而 vault 属于装配层；包一层就不必改 `runtime` 的公开面。
+
+**尚未覆盖**：① 居民写的 key 没有 `secret_captured` 记录，因为工具拿不到账本；要补就得把引用放进一张 desk，drive 结束后由装配层补记。② 工具输出（`runtime::tools` 的结果）还没经过 custody，它的入口是外部内容的那一道门。③ 模型回复里的工具参数原样进账本；`exec` 写的文件不经过 `edit`。
+
+**本章测试**：`assembly::dispatching::custody::tests::a_pasted_key_reaches_the_vault_and_nothing_else`——任务文字里夹一把 `sk-ant-` 形状的 key 派活，断言：模型收到的每个请求、城目录下的每个文件（账本和 `JOB.md` 都在其中）都不含原文；请求里带着 `secret:pasted/anthropic-…` 引用；vault 按这个引用解出的正是原文。`assembly::workbench::tools::kept::tests::a_written_key_reaches_the_vault_and_not_the_file`——模型用 `edit` 新建一个含 key 的文件，断言：文件里没有原文，只有 `secret:written/anthropic-…` 引用，vault 按这个引用解出原文。
+
 ## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
 
 **依据是成本的形状，不是篇幅的偏好。** 四段前缀与工具 schema 在 `runtime::turn` 的**每一趟请求**里全文重发（`turn.rs:108-117`），于是同一批字节有两种代价：**窗口**是进上下文的一次性入场费（请求累积，前缀不随 turn 增长），**钱**是每 turn 重付（`prompt_cache_breakpoint` 命中后按 `cache_read_price` 折价）。两种读法下窗口占用完全相同，所以「多写一句」永远是全城每次请求少一份工作空间。
