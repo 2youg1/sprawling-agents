@@ -212,12 +212,11 @@ pub struct Line { who: String, addr: Address, kind: EventKind, data: Payload }
 /// 一张桌子留下的全部效应：它们成为的行，以及行之后才允许发生的变化。
 pub struct Landing { lines: Vec<Line>, then: Then }   // 两个字段都是私有的
 
-pub enum Then { Nothing, Deliver(Vec<collab::Signal>), Hold(Vec<GoalEntry>),
+pub enum Then { Nothing, Deliver(Vec<collab::Signal>),
                        Roadmap { path: PathBuf, text: String }, Shelf(Vec<Filing>) }
 
 impl Landing {
     pub fn signals(Vec<SignalEffect>, room: &Address, who: &str) -> Result<Landing, AxError>;
-    pub fn goals(Vec<GoalEffect>, room: &Address, who: &str) -> Result<Landing, AxError>;
     pub fn discards(Vec<Payload>, room: &Address, who: &str) -> Landing;
     pub fn shelf(Vec<ArchiveEffect>, write_root, building, at, room, who) -> Result<Landing, AxError>;
     /// 先走完每一行，再把变化交出去。这是 `Then` 唯一的出口。
