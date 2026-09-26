@@ -15,6 +15,7 @@ use runtime::{SieveSite, package_exec};
 
 use super::{RunWorker, Site};
 
+mod entering;
 pub(crate) mod flight;
 pub(crate) mod lane;
 pub(in crate::assembly) mod owing;
