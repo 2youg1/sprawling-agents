@@ -67,7 +67,7 @@ pub trait ModelFactory {
 
 ```rust
 // bin::assembly::models（形状 4 适配器）
-pub struct GatewayModels;          // 生产：dialect 头 + gateway::adapter_for
+pub(crate) struct GatewayModels;          // 生产：dialect 头 + gateway::adapter_for
 impl RunWorker {
     pub fn with_models(self, models: Box<dyn accounting::ModelFactory + Send>) -> RunWorker;
 }
