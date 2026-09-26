@@ -201,6 +201,7 @@ fn a_closing_city_lands_the_runs_still_driving() {
 fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     use std::sync::{Arc, Mutex, mpsc};
     const WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
+    const LOOK: std::time::Duration = std::time::Duration::from_millis(5);
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
@@ -280,10 +281,14 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
         },
         heard(&for_nobody),
     );
-    let started = std::time::Instant::now();
+    // Counted looks rather than a clock, which test code may not read:
+    // each look sleeps `LOOK`, so the count bounds the wait at `WITHIN`.
+    let looks = WITHIN.as_millis() / LOOK.as_millis();
+    let mut looked = 0;
     while for_nobody.lock().unwrap().is_empty() {
-        assert!(started.elapsed() < WITHIN, "the desk was never read");
-        std::thread::sleep(std::time::Duration::from_millis(2));
+        looked += 1;
+        assert!(looked < looks, "the desk was never read");
+        std::thread::sleep(LOOK);
     }
     assert_eq!(
         *for_the_run.lock().unwrap(),
@@ -292,13 +297,14 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     );
 
     release.send(()).unwrap();
-    let started = std::time::Instant::now();
+    let mut looked = 0;
     while !history(&report.ledger_dir)
         .iter()
         .any(|line| line["kind"] == "run_frozen")
     {
-        assert!(started.elapsed() < WITHIN, "the run never froze");
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        looked += 1;
+        assert!(looked < looks, "the run never froze");
+        std::thread::sleep(LOOK);
     }
     desk.close();
     attending.join().unwrap();
