@@ -27,6 +27,7 @@ pub mod lineage;
 pub mod release;
 mod revealing;
 pub mod serving;
+pub mod supervising;
 
 mod browser_bidi;
 mod browser_tool;

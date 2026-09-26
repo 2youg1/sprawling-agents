@@ -169,6 +169,23 @@ pub(super) fn serve(dir: Option<&String>, addr: Option<&String>, args: &[String]
     serve_city(std::path::Path::new(dir), raw, args, open)
 }
 
+/// The child `serve` of a supervised run, from the decisions made above.
+fn child(args: &[String], open: Open, wanted: bool) -> sprawling::supervising::Child {
+    use sprawling::supervising::{Child, Console, Window};
+    Child {
+        forwarded: super::verbs::forwarded(args),
+        first: match open {
+            Open::Browser => Window::Open,
+            Open::Nothing => Window::Leave,
+        },
+        console: if wanted {
+            Console::Enter
+        } else {
+            Console::Skip
+        },
+    }
+}
+
 pub(super) fn serve_city(
     city: &std::path::Path,
     raw: &str,
@@ -199,6 +216,21 @@ pub(super) fn serve_city(
         eprintln!("recovery: give host:port, for example {DEFAULT_AT}");
         return ExitCode::from(2);
     };
+    // After the refusals a restart could not cure, so a mistyped line
+    // is refused once here rather than spending the crash budget
+    // (sprawling-SPEC.md 8-90).
+    // The terminal this city runs in becomes its console when `up`
+    // started it, or when `serve` was asked. `--no-console` is the way
+    // out for a supervisor that wants the old blocking shape.
+    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
+        && !args.iter().any(|a| a == "--no-console");
+    if args.iter().any(|a| a == "--supervise") {
+        return match sprawling::supervising::supervise(city, raw, &child(args, open, wanted)) {
+            Ok(sprawling::supervising::Ended::Chosen) => ExitCode::SUCCESS,
+            Ok(sprawling::supervising::Ended::Degraded) => ExitCode::FAILURE,
+            Err(err) => report(err),
+        };
+    }
     // The client source: embedded by default; a directory for the
     // development loop, read per request so an edit shows on refresh.
     let client = match flag_value(args, "--web-dir") {
@@ -251,11 +283,6 @@ pub(super) fn serve_city(
         Some(level) => runtime::diagnostics::Diagnostics::new(level, journal.sink()),
         None => runtime::diagnostics::Diagnostics::off(),
     };
-    // The terminal this city runs in becomes its console when `up`
-    // started it, or when `serve` was asked. `--no-console` is the way
-    // out for a supervisor that wants the old blocking shape.
-    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
-        && !args.iter().any(|a| a == "--no-console");
     let console = wanted.then(|| console::Terminal {
         url: firstrun::local_url(bind),
         token: token.clone(),

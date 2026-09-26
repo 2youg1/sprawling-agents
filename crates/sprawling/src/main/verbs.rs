@@ -102,6 +102,11 @@ const SERVED: &[Flag] = &[
     NO_OPEN,
     flag("--console", Nothing, "enter the city's console"),
     flag("--no-console", Nothing, "do not enter the console"),
+    flag(
+        "--supervise",
+        Nothing,
+        "serve in a child process, resume and serve again after a crash",
+    ),
     LOG,
     flag(
         "--web-dir",
@@ -109,6 +114,34 @@ const SERVED: &[Flag] = &[
         "read the client from <dir> on every request",
     ),
 ];
+
+/// The flags of a served line a supervised child receives as given, each
+/// with the value `SERVED` says it takes; the four the supervisor decides
+/// again for every child, and `--supervise` itself, are left out.
+pub(super) fn forwarded(args: &[String]) -> Vec<String> {
+    let decided = [
+        "--supervise",
+        "--open",
+        "--no-open",
+        "--console",
+        "--no-console",
+    ];
+    let mut kept = Vec::new();
+    let mut words = args.iter();
+    while let Some(word) = words.next() {
+        let Some(flag) = SERVED.iter().find(|flag| flag.name == word) else {
+            continue;
+        };
+        if decided.contains(&flag.name) {
+            continue;
+        }
+        kept.push(word.clone());
+        if let Takes::Value(_) = flag.takes {
+            kept.extend(words.next().cloned());
+        }
+    }
+    kept
+}
 
 /// The table. Its order is the order the overview prints.
 pub(super) const VERBS: &[Row] = &[
