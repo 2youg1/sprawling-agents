@@ -66,7 +66,10 @@ pub fn dev_entry() -> CatalogEntry {
 #[must_use]
 pub fn catalog_entry(mode: Mode) -> CatalogEntry {
     let (disclosure, expansion) = match mode {
-        Mode::Chat => ("", ""),
+        Mode::Chat => (
+            "chat mode: focus on conversing with the person; answer what they said, in their language",
+            "Reply in the conversation. Start work, plans or dispatches only when the person asks for them.",
+        ),
         Mode::PlanGoal => (
             "plan first, then execute toward the stated goal; report when the goal is met",
             "Write the plan into Roadmap.md before edits. Exit plan_goal and work \
