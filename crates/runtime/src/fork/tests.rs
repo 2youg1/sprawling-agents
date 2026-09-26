@@ -112,11 +112,11 @@ fn a_branch_inherits_the_mother_window_message_for_message() {
     let inherited = crate::fork::inherited(&verified, Seq::new(3)).unwrap();
     assert_eq!(inherited.at, Seq::new(3));
 
-    let mut expected = crate::window::Window::new();
+    let mut expected = crate::conversation::Conversation::new();
     expected.push_task_lines(
         "measure the meter",
         "a number is written down",
-        crate::window::Opening::WithPerson,
+        crate::conversation::Opening::WithPerson,
     );
     expected.push_assistant(vec![ContentBlock::Text {
         text: "reading it now".to_owned(),

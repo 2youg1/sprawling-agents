@@ -96,11 +96,11 @@ fn the_snapshot_is_replaced_at_the_closing_boundary_and_not_before() {
         text: reply.clone(),
         calls: vec![probe_call()],
     };
-    let mut window = Window::new();
-    window.push_task_lines(
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines(
         "say a lot",
         "one long reply",
-        crate::window::Opening::FromJob,
+        crate::conversation::Opening::FromJob,
     );
     let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
     let turn = advance(
@@ -108,7 +108,7 @@ fn the_snapshot_is_replaced_at_the_closing_boundary_and_not_before() {
             Interrupt::None,
             &mut ledger,
             &prefix(),
-            &window,
+            &conversation,
             &[],
             &shape(),
         )
@@ -190,11 +190,11 @@ fn a_threshold_crossed_mid_wave_compacts_once_over_the_whole_exchange() {
         ],
     };
     let answers = [first.clone(), second.clone()];
-    let mut window = Window::new();
-    window.push_task_lines(
+    let mut conversation = Conversation::new();
+    conversation.push_task_lines(
         "cross mid-wave",
         "one over-budget wave",
-        crate::window::Opening::FromJob,
+        crate::conversation::Opening::FromJob,
     );
     let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
     let turn = advance(
@@ -202,7 +202,7 @@ fn a_threshold_crossed_mid_wave_compacts_once_over_the_whole_exchange() {
             Interrupt::None,
             &mut ledger,
             &prefix(),
-            &window,
+            &conversation,
             &[],
             &shape(),
         )

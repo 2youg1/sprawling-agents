@@ -21,8 +21,8 @@ use kernel::{
 };
 
 use crate::compaction::Exchange;
+use crate::conversation::{Conversation, Opening};
 use crate::replay::{VerifiedLedger, VerifiedLine};
-use crate::window::{Opening, Window};
 
 /// The fork prefix: raw lines `0..=at_seq`, byte-exact. Past the tail is
 /// `E_INVALID_ARGS`, never a silent clamp.
@@ -76,7 +76,7 @@ pub struct Inherited {
 /// own records - the opening from `run_started`, the assistant messages
 /// from `model_returned`, the tool results from `tool_result`, and what
 /// the person typed mid-flight from `steer_received` - and folds them
-/// through the same [`Window`] the live loop folds through, so the
+/// through the same [`Conversation`] the live loop folds through, so the
 /// sequence a fork starts from is the sequence the mother sent rather
 /// than a second reading of the same records.
 ///
@@ -123,7 +123,7 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
         .with_recovery("name a run this history holds, or start a session instead"));
     };
 
-    let mut window = Window::new();
+    let mut conversation = Conversation::new();
     let mut at = Seq::FIRST;
     let mut open: Option<Wave> = None;
     for line in mother
@@ -141,7 +141,7 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
         match record.kind() {
             EventKind::RunStarted => {
                 let started = record.data().read::<RunStarted>()?;
-                window.push_task_lines(
+                conversation.push_task_lines(
                     &started.task,
                     &started.goal,
                     if started.job.is_some() {
@@ -158,7 +158,7 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
                 // answered, which a run cannot produce. Reading it as
                 // the start of a new turn is what keeps a damaged
                 // history from being silently rewound.
-                commit(&mut window, open.take())?;
+                commit(&mut conversation, open.take())?;
                 let returned = record.data().read::<ModelReturned>()?;
                 let assistant = content_from_message(&returned.message)?;
                 let mut exchange = Exchange::new();
@@ -168,7 +168,7 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
                     expect: usize::try_from(returned.calls).unwrap_or(usize::MAX),
                 });
                 if returned.calls == 0 {
-                    commit(&mut window, open.take())?;
+                    commit(&mut conversation, open.take())?;
                     at = record.seq();
                 }
             }
@@ -177,14 +177,14 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
                 if let Some(wave) = open.as_mut() {
                     wave.exchange.push_result(result_block(&result)?);
                     if wave.exchange.results().len() >= wave.expect {
-                        commit(&mut window, open.take())?;
+                        commit(&mut conversation, open.take())?;
                         at = record.seq();
                     }
                 }
             }
             EventKind::SteerReceived => {
                 let steer = record.data().read::<SteerReceived>()?;
-                window.push_steer(&steer.source, &steer.text);
+                conversation.push_steer(&steer.source, &steer.text);
             }
             // Everything else is not the conversation: the segment
             // hashes a call was assembled from, the accounting, the
@@ -270,7 +270,7 @@ pub fn inherited(mother: &VerifiedLedger, at_seq: Seq) -> Result<Inherited, AxEr
     // one exchange, and half of one is a shape no provider accepts.
     open.take();
     Ok(Inherited {
-        messages: window.messages().to_vec(),
+        messages: conversation.messages().to_vec(),
         at,
     })
 }
@@ -288,13 +288,13 @@ struct Wave {
 /// turn compacts at: the wave is complete here or it is dropped whole,
 /// so the compaction meets what the turn boundary met and answers the
 /// same bytes.
-fn commit(window: &mut Window, wave: Option<Wave>) -> Result<(), AxError> {
+fn commit(conversation: &mut Conversation, wave: Option<Wave>) -> Result<(), AxError> {
     let Some(mut wave) = wave else {
         return Ok(());
     };
     wave.exchange.compact()?;
-    window.push_assistant(wave.exchange.assistant().to_vec());
-    window.push_tool_results(wave.exchange.results().to_vec());
+    conversation.push_assistant(wave.exchange.assistant().to_vec());
+    conversation.push_tool_results(wave.exchange.results().to_vec());
     Ok(())
 }
 

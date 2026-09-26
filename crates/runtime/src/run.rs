@@ -20,11 +20,11 @@ use kernel::{
 use kernel::ChatMessage;
 
 use crate::catalog::SkillPin;
+use crate::conversation::{Conversation, Opening};
 use crate::handoff::Handoff;
 use crate::prefix::FrozenPrefix;
 use crate::reminder::ContextGauge;
 use crate::turn::{CallShape, Interrupt};
-use crate::window::{Opening, Window};
 
 mod fence;
 mod lifecycle;
@@ -165,7 +165,7 @@ pub struct RunHooks<'a> {
 
 /// An active run: turns may still be taken.
 pub struct Active {
-    window: Window,
+    conversation: Conversation,
     turns: u32,
     last_turn_t: Option<TimeMs>,
     /// How full the window is, read off each call's reported usage.
@@ -186,7 +186,7 @@ pub struct Frozen {
     turns: u32,
     /// Kept past the freeze for one reader: the transcript written
     /// beside the room, which is what this run's model actually saw.
-    window: Window,
+    conversation: Conversation,
 }
 
 pub struct Run<S> {
@@ -210,7 +210,7 @@ impl Run<Frozen> {
     /// # Errors
     /// Propagates a message that will not serialise.
     pub fn transcript(&self) -> Result<crate::transcript::Transcript, AxError> {
-        crate::transcript::Transcript::of(self.plan.run, &self.state.window)
+        crate::transcript::Transcript::of(self.plan.run, &self.state.conversation)
     }
 
     pub fn turns(&self) -> u32 {

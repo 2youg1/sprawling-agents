@@ -30,8 +30,8 @@ use kernel::{Address, AxCode, AxError, Locator, RunId};
 use memory::Cas;
 use serde_json::Value;
 
+use crate::conversation::Conversation;
 use crate::redact;
-use crate::window::Window;
 
 /// The file a transcript is written to, beside the room's own documents.
 const TRANSCRIPT_EXT: &str = "jsonl";
@@ -60,10 +60,10 @@ impl Transcript {
     /// # Errors
     /// Refuses a message that will not serialise, which is a defect in
     /// the wire types rather than in the conversation.
-    pub fn of(run: RunId, window: &Window) -> Result<Transcript, AxError> {
-        let mut lines = Vec::with_capacity(window.messages().len());
+    pub fn of(run: RunId, conversation: &Conversation) -> Result<Transcript, AxError> {
+        let mut lines = Vec::with_capacity(conversation.messages().len());
         let mut redacted: u32 = 0;
-        for message in window.messages() {
+        for message in conversation.messages() {
             let value = serde_json::to_value(message).map_err(|err| {
                 AxError::failure(
                     AxCode::InvalidArgs,
@@ -71,7 +71,7 @@ impl Transcript {
                     err.to_string(),
                 )
                 .with_recovery(
-                    "report this against runtime::transcript: a window message is text \
+                    "report this against runtime::transcript: a conversation message is text \
                      and content blocks, and JSON refuses neither",
                 )
             })?;
@@ -82,7 +82,7 @@ impl Transcript {
                     "a message is an object",
                 )
                 .with_recovery(
-                    "report this against runtime::transcript: a window message encodes \
+                    "report this against runtime::transcript: a conversation message encodes \
                      as a JSON object and this one encoded as something else",
                 ));
             };
@@ -199,21 +199,21 @@ mod tests {
         RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000009").unwrap()
     }
 
-    fn window_with_a_call() -> Window {
-        let mut window = Window::new();
-        window.push_task_lines("look", "one call", crate::window::Opening::FromJob);
-        window.push_assistant(vec![ContentBlock::ToolUse {
+    fn window_with_a_call() -> Conversation {
+        let mut conversation = Conversation::new();
+        conversation.push_task_lines("look", "one call", crate::conversation::Opening::FromJob);
+        conversation.push_assistant(vec![ContentBlock::ToolUse {
             id: "tu_1".to_owned(),
             name: kernel::ToolName::parse("status").unwrap(),
             input: kernel::Payload::empty(),
         }]);
-        window.push_tool_results(vec![ContentBlock::ToolResult {
+        conversation.push_tool_results(vec![ContentBlock::ToolResult {
             tool_use_id: "tu_1".to_owned(),
             content: "{\"ok\":true}".to_owned(),
             is_error: false,
             attachments: Vec::new(),
         }]);
-        window
+        conversation
     }
 
     #[test]
@@ -230,14 +230,14 @@ mod tests {
     #[test]
     fn a_key_the_model_saw_does_not_reach_the_file() {
         let key = format!("sk-ant-api03-{}", "A".repeat(80));
-        let mut window = Window::new();
-        window.push_tool_results(vec![ContentBlock::ToolResult {
+        let mut conversation = Conversation::new();
+        conversation.push_tool_results(vec![ContentBlock::ToolResult {
             tool_use_id: "tu_1".to_owned(),
             content: format!("token={key}"),
             is_error: false,
             attachments: Vec::new(),
         }]);
-        let transcript = Transcript::of(run(), &window).unwrap();
+        let transcript = Transcript::of(run(), &conversation).unwrap();
         assert!(
             !transcript.lines()[0].contains(&key),
             "{:?}",

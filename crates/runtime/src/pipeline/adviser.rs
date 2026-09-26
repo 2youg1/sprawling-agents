@@ -7,7 +7,7 @@
 //! the deterministic strategy that answers when no adviser does.
 //!
 //! **The adviser is the window's, never the prefix's.** The port below
-//! takes a [`Window`] and nothing else — no `FrozenConfig`, no frozen
+//! takes a [`Conversation`] and nothing else — no `FrozenConfig`, no frozen
 //! prefix, no call shape — so a question that would move the cached half
 //! of a request cannot be spelled. Freezing the model and the effort is
 //! the session's business: a consultant asked to re-decide either would
@@ -41,7 +41,7 @@ use kernel::event::record::{
 };
 use kernel::{AxError, Payload};
 
-use crate::window::Window;
+use crate::conversation::Conversation;
 
 /// Which of the three questions is being asked. Re-exported from
 /// `kernel::event::record`, whose payload vocabulary is the question's
@@ -168,8 +168,10 @@ impl Consultation {
 /// A consultant that can fail. [`Consultation::Answered`] is only
 /// reachable through [`Adviser::consult`], which checks the answer
 /// against the question before anything believes it.
-type Answer =
-    Box<dyn for<'a, 'b> FnMut(&'a Ask, &'b Window) -> Result<AdviserAnswer, AdviserFailure> + Send>;
+type Answer = Box<
+    dyn for<'a, 'b> FnMut(&'a Ask, &'b Conversation) -> Result<AdviserAnswer, AdviserFailure>
+        + Send,
+>;
 
 /// The window's adviser, as a city holds it: an answer function, or
 /// nothing at all.
@@ -194,7 +196,10 @@ impl Adviser {
     /// argument is the window: a closure cannot reach `FrozenConfig`
     /// through it, which is the whole type-level promise of this port.
     pub fn with(
-        answer: impl for<'a, 'b> FnMut(&'a Ask, &'b Window) -> Result<AdviserAnswer, AdviserFailure>
+        answer: impl for<'a, 'b> FnMut(
+            &'a Ask,
+            &'b Conversation,
+        ) -> Result<AdviserAnswer, AdviserFailure>
         + Send
         + 'static,
     ) -> Adviser {
@@ -208,7 +213,12 @@ impl Adviser {
     /// `elapsed_ms` is the caller's, like every other measurement that
     /// reaches the ledger: a second opinion on the critical path is a
     /// cost, and the caller is the one who paid it.
-    pub fn consult(&mut self, ask: Ask, window: &Window, elapsed_ms: u64) -> Consultation {
+    pub fn consult(
+        &mut self,
+        ask: Ask,
+        conversation: &Conversation,
+        elapsed_ms: u64,
+    ) -> Consultation {
         let kind = ask.kind;
         let Some(answer) = self.answer.as_mut() else {
             return Consultation::FellBack {
@@ -217,7 +227,7 @@ impl Adviser {
                 reason: AdviserFailure::Unavailable,
             };
         };
-        match answer(&ask, window) {
+        match answer(&ask, conversation) {
             Ok(answer) if accepts(kind, &answer, &ask.options) => Consultation::Answered {
                 ask: kind,
                 subject: ask.subject,
