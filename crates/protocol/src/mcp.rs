@@ -25,13 +25,23 @@
 //! same tool seam as the local tools, so it enters the taint ring the
 //! same way, and there is no unwrapping face here.
 
+mod broker;
 mod handshake;
+mod http;
+mod link;
 mod outbound;
 mod reading;
+mod redeeming;
+mod sse;
+mod stdio;
 mod tools;
 
+pub use broker::{Broker, Connection, Toolkit};
 pub use handshake::PROTOCOL_VERSION;
 pub use handshake::{Handshake, Rpc, handshake};
+pub use link::McpLink;
 pub use outbound::{EXTERNAL_CALL_PATIENCE, Outbound, ScriptedOutbound, digits_for_floats};
 pub use reading::{MESSAGE_CEILING, Received, read_one_message};
+#[cfg(feature = "conformance")]
+pub use stdio::echoing;
 pub use tools::{Listed, McpTool, tools_from};

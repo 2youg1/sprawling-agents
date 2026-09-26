@@ -6,7 +6,7 @@
 //! The external tools a building's configuration names, each already
 //! connected to its server or left out and named in the diagnostics.
 
-use super::super::{RunWorker, connect_mcp, now_ms, transport_site};
+use super::super::{RunWorker, connect_mcp, now_ms};
 
 impl RunWorker {
     /// The external tools this run may reach, each already connected to
@@ -49,10 +49,8 @@ impl RunWorker {
         let resolve = self.resolver();
         for server in &config.mcp {
             // The module a reader is sent to is the transport that
-            // failed, not whichever one was written first: every MCP
-            // failure used to be filed under `bin::mcp_stdio`, which
-            // sent the last reader who followed it to the wrong file.
-            let site = transport_site(&server.transport);
+            // failed, not whichever one was written first.
+            let site = protocol::McpLink::site(&server.transport);
             match connect_mcp(server, write_root, confidential, &resolve) {
                 Ok((tools, opened)) => {
                     self.note(

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use protocol::Outbound as _;
+use crate::Outbound as _;
 use std::io::{Read as _, Write as _};
 
 fn vault() -> gateway::SecretResolver {

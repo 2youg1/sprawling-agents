@@ -34,14 +34,14 @@ const KEY_REFERENCE: &str = "secret:mcp/composio";
 pub(crate) fn broker_for(
     vault: Option<&Arc<Mutex<gateway::Custodian>>>,
     city: Option<&Address>,
-) -> Result<Option<(gateway::Broker, String)>, AxError> {
+) -> Result<Option<(protocol::Broker, String)>, AxError> {
     let Some(key) = enrolled_key(vault)? else {
         return Ok(None);
     };
     // The machine's proxy rule, unmodified. The broker is not an
     // endpoint and carries no tuning of its own, and `ExceptLocal` is
     // what somebody who has not thought about proxies wants.
-    let broker = gateway::Broker::new(key, Proxying::ExceptLocal)?;
+    let broker = protocol::Broker::new(key, Proxying::ExceptLocal)?;
     Ok(Some((broker, broker_user(city))))
 }
 

@@ -86,32 +86,18 @@ fn read_spine(city_root: &Path) -> Vec<BuildingProgress>;                    // 
 
 ## 8-4 MCP 接线
 
+三种传输、兑付与 `McpLink` 住 `protocol::mcp`（签名见 `protocol-SPEC.md` §8-17）；本 crate 只把一栋楼的 `[[mcp]]` 表接成工具表。
+
 ```rust
-// bin::mcp_stdio（形状 4 适配器；实现 protocol::Outbound）
-pub(crate) struct StdioServer { /* 私有：Rc<RefCell<Inner>>，克隆即同一个子进程的第二个句柄 */ }
-impl StdioServer {
-    pub(crate) fn start(command: &str, args: &[String], env: &[Redeemed], cwd: &Path)
-        -> Result<StdioServer, AxError>;
-}
-
-// bin::mcp_redeeming（形状 2 值类型）：一栋楼写在 server 旁边的成对表，引用已兑付
-pub(crate) struct Redeemed { /* 私有：name，以及 Plain | Sealed 两支 */ }
-impl Redeemed { pub(crate) fn name(&self) -> &str; pub(crate) fn expose(&self) -> &str; }
-pub(crate) fn redeem(pairs: &[(String, String)], resolve: &gateway::SecretResolver,
-                     action: &'static str) -> Result<Vec<Redeemed>, AxError>;
-impl protocol::Outbound for StdioServer {
-    fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError>;
-}
-
 // bin::assembly
 fn mcp_tools(&mut self, config: &FrozenConfig, addr: &Address, confidential: bool)
     -> Vec<protocol::McpTool>;   // 起不来的 server 缺席并留下诊断，恒不拒整次 dispatch
 ```
 
-- **兑付只有一处，三种 transport 共用**（`bin::mcp_redeeming`）：一个子进程要的环境变量与一台主机要的请求头是同一件事——一个名、一个值、以及一个可能是凭证的值。兑付发生在读配置的那一刻而不是第一次调用时：金库里没有的引用是一个配置错误，而能处理它的人正在编辑那份文件，不是一小时后工具不应答的那个模型。`Redeemed` 的 `Debug` 只报名字，明文的唯一出口是 `expose`。
+- **兑付只有一处，三种 transport 共用**（`protocol::mcp::redeeming`）：一个子进程要的环境变量与一台主机要的请求头是同一件事——一个名、一个值、以及一个可能是凭证的值。兑付发生在读配置的那一刻而不是第一次调用时：金库里没有的引用是一个配置错误，而能处理它的人正在编辑那份文件，不是一小时后工具不应答的那个模型。`Redeemed` 的 `Debug` 只报名字，明文的唯一出口是 `expose`。
 - **交给子进程的名字收不回来**，故 `start` 收到的 `env` 已经是兑付好的值，明文只在这一次调用里存在；`env` 是**添加**到本进程已有的环境上，否则一台 server 会找不到 PATH 与 HOME。
 - **一台 server 一个子进程，一次 dispatch 一条命**：工具表随 Run 冻结，子进程的寿命因此就是 Run 的寿命。最后一个 `McpTool` 落地时 `Drop` 杀子进程，于是「谁来回收」不需要第二份名单。
-- **读取线程是句柄的一部分，spawn 点仍在 bin**（确定性七条③的口径：并发归装配层）。同步读一根管道没有期限，而一个不回答的 server 会把整个 Run 挂死。故 `start` 起一条只读 stdout 的线程，`call` 用 `recv_timeout` 等它；超时即杀子进程并三段式拒。**线程恒不泄漏**：杀子进程关掉管道，读到 EOF 即结束。
+- **读取线程是句柄的一部分**（ARCHITECTURE 确定性规则 3 为 `protocol::mcp::stdio` 与 `protocol::mcp::sse` 各留一个每连接一条的 reader）。同步读一根管道没有期限，而一个不回答的 server 会把整个 Run 挂死。故 `start` 起一条只读 stdout 的线程，`call` 用 `recv_timeout` 等它；超时即杀子进程并三段式拒。**线程恒不泄漏**：杀子进程关掉管道，读到 EOF 即结束。
 - **期限从声明里来，不在适配器里另写一个数**：`ToolMeta.timeout`（`tools_from` 写的 `TimeoutMs(60_000)`）既是对模型的承诺，就应当是真正被执行的那一个；否则该字段只是装饰。故期限随 `Outbound::call` 入参。
 - **起不来的 server 缺席而不拒 dispatch**：与 `city::library` 对「楼里点名却不在架上的 SKILL」同形——模型看到的名录恒等于真能跑的工具表，缺席的那一件在诊断里留名。一个外部服务今天起不来，不是这栋楼今天不能干活。
 - **confidential 楼：一条规则两层后果，不是两份判定**。工具能不能存在归 `protocol::McpTool::new`（构造点拒，恒是权威）；**进程该不该被拉起归装配层**，因为进程寿命本来就是这一层的职责，而一台 MCP server 可能在启动那一刻就出网。故 confidential 楼在拉起任何子进程之前就跳过整张 `[[mcp]]` 表并留一条诊断；工具层的拒仍在，它是那一层失守时的兵底。两层同向，因此不会出现「只改一处」的漂移。
@@ -121,7 +107,7 @@ fn mcp_tools(&mut self, config: &FrozenConfig, addr: &Address, confidential: boo
 
 ## 8-4b MCP 的第二条传输
 
-`bin::mcp_http` 是 `Outbound` 缝的第三个适配器（stdio 子进程、ScriptedOutbound、HTTP），也是这条缝第一次真正被两条生产路径共用。`McpServer.transport` 从两个裸字段改成穷尽枚举 `McpTransport { Stdio{command,args}, Http{url,header} }`：**一行既写 command 又写 url 就是一行要读者去猜的配置**，故配置层当场三段式拒。装配层把差异全部花在 `McpLink` 这一个枚举里，其上的接线仍是一条路。
+`protocol::mcp::http` 是 `Outbound` 缝的第三个适配器（stdio 子进程、ScriptedOutbound、HTTP），也是这条缝第一次真正被两条生产路径共用。`McpServer.transport` 从两个裸字段改成穷尽枚举 `McpTransport { Stdio{command,args}, Http{url,header} }`：**一行既写 command 又写 url 就是一行要读者去猜的配置**，故配置层当场三段式拒。差异全部花在 `protocol::McpLink` 这一个枚举里，其上的接线仍是一条路。
 
 两条口径：①**事件流只取第一条 `data:`**，读不出就拒，恒不把两条答案拼成一条工具结果；②**拒词不引用对侧正文**（服务端的错误页是别人写的字），只说状态码与该查什么。
 
@@ -129,7 +115,7 @@ fn mcp_tools(&mut self, config: &FrozenConfig, addr: &Address, confidential: boo
 
 - **`HttpServer` 持会话，且克隆共享它**（规范详 `protocol-SPEC.md` §8-3）。一台 server 就是一个会话，不论一次 Run 拿了它几件工具；两个克隆各发一个 session id 就是与同一台 server 开两场对话，而它只开过一场。协商版本从**携 `result.protocolVersion` 的那一条答案**学得——按生命周期，那就是 `initialize` 的答案，因为它是一条连接的第一句话，没有更早的答案能持有该字段。
 - **`header` 兑付 `secret:` 引用**。`redeem_header` 把 `Name: secret:realm/name` 在最后一刻换成真值，与 endpoint 凭据同一条路。不这么做，一把付费档的 key 会明文躺在楼里的 `CONFIG.toml`，而 `xtask secret` 看不见它（城市配置不在仓库内）。不是引用的值原样通过：头里是个账号名或固定标记的 server 无物可兑。
-- **报错地址指向真正出事的传输**。`transport_site()` 按 `McpTransport` 分派；把所有 MCP 失败都挂在 `bin::mcp_stdio` 名下，会把跟着它去查的人引到错的文件。成功时同样留一行：对侧叫什么、说哪个版本、给了几件工具。
+- **报错地址指向真正出事的传输**。`protocol::McpLink::site()` 按 `McpTransport` 分派；把所有 MCP 失败都挂在一个传输名下，会把跟着它去查的人引到错的文件。成功时同样留一行：对侧叫什么、说哪个版本、给了几件工具。
 
 **真机验收**：一座真城接一台托管 server，诊断行为 `exa is exa-search-server speaking 2025-06-18, offering 2 tool(s)`；模型自主调用其搜索工具、读回真实结果、一个回合内给出答案并 `run_frozen{completion: done}`。
 
@@ -383,8 +369,6 @@ impl RunWorker {
 pub mod assembly;
 pub mod console;
 pub mod firstrun;
-mod mcp_http;      // 只经 assembly 到达
-mod mcp_stdio;     // 同上
 
 // assembly：跨出 crate 的项，逐个放行
 pub struct InitReport { pub ledger_dir, pub genesis, pub standing, pub adopted }
@@ -422,7 +406,6 @@ pub fn open_when_ready(SocketAddr, String);
 
 - **为什么需要一个 lib target**：`crates/sprawling` 至今只有 `src/main.rs`，`mod assembly` 是私有模块，于是工作区里**没有任何东西能依赖它**——4377 行生产代码（含 1058 行的 `dispatch_in`）只由同文件内的 66 个测试看守，citysim 与任何 `tests/` 都够不到。同一个事实还有第二个后果：它是唯一带 SPEC 却逃过 `apisync` 的 crate，因为 `spec_crates` 以 `src/lib.rs` 是否存在为依据。加一个 lib target 一并了结两件。
 - **`pub mod` 而非扁平 facade**：§12 模块表以 `bin::assembly`／`bin::console`／`bin::firstrun` 命名模块，模块名本身是已记录的架构事实；折成 `sprawling::init_city` 会抹掉这层限定，而本 crate `publish = false`，C-REEXPORT 要替第三方省的那段路径没有受益人。**取窄的地方在项，不在模块**：只有跨出 crate 的项改 `pub`，其余留 `pub(crate)`——公开面因此是逐项决定的，不是逐模块授予的。
-- **`mcp_http` 与 `mcp_stdio` 保持私有**：只经 `assembly` 到达（`assembly.rs` 的 `McpLink`），没有第二个调用方。
 - **`install` 与 `wire_client` 留在 bin**：前者把二进制放上 PATH，后者从终端连一座已服务的城并从 stdin 读 enrolment——两者都是关于命令行的，不是关于城的，且除 `main` 外零引用。留在 bin 让公开面少六项。
 - **`handle` 进公开面不是为测试拓宽**：AGENTS.md 写着「Tests use the same doors as production code」。`handle` 正是服务中的 worker 循环走的那扇门，把它命名出来是承认已有的门。反过来，那 66 个内部测试**不搬去 `tests/`**：它们触及 `rebuild_views`／`read_building`／`run_id_for` 这类内部项，搬迁会为测试拓宽公开面，正是同一条规矩禁止的事。本 crate 的文件长度因此不变——它变短要等拆 `dispatch_in` 时把生产代码连同其测试一起搬走。
 - **`ScanReport` 只放行一个字段**：`main` 读 `waiting_approvals` 决定是否多印一行，`lines` 与 `closed_calls` 只进 `summary()`。按需放行而非按结构对齐——`InitReport` 四个字段全跨出，是因为 `report_standing` 四个全读。
@@ -1656,7 +1639,6 @@ UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相
     迁出后测试文件本身 403 行仍越线，故按「测试扁平化」再切一次，缝落在**通过的评审**与**被历史拒绝的合并**之间：`tests/landing.rs` 收 `a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked` 与 `work_in_a_review_building_reaches_it_only_after_someone_else_checks_it`，二者共用的夹具 `branch_opened`（从账本读回请求所在分支）随它们同住，不复制；`tests/refusal.rs` 收 `a_merge_the_history_refused_leaves_the_building_where_it_was`（§8-30 那条红），它走 `open_faulty` + `cut_on_write: Some("pr_merged")`，与前两条一份夹具也不共享。`tests.rs` 只剩抬头与 `mod landing; mod refusal;`。两个子文件的导入沿用 `console/tests/*.rs` 的先例，把原来的 `use super::*` 写成 `use super::super::*`，另两行 `use crate::assembly::fixture::*` 与 `use crate::assembly::*` 原样保留。
     **无字段开放**，无可见性变更，测试计数 3→3 不变，`sprawling` 158 条全绿；apisync 基线零漂移（未重写），钉行 `crates/sprawling/src/assembly/reviewing.rs = 567` 删除。
 - **`install.rs`**：`install.rs` 556→268：值与判断留父文件（`INSTALLED_STEM`／`SEPARATOR`／`PathEdit`／`PathRemoval`／`Report`／`PathOutcome`＋`program_dir`／`installed_name`／`same_directory`／`plan_append`／`plan_remove`／`on_search_path`／`place`／`displace`／`no_home`／`dirs`／`install`），两条按平台分岔的落地路径各成一个文件：`install/search_path_windows.rs`（`HKCU\Environment\Path` 的原样读写与 `WM_SETTINGCHANGE` 广播，两段 PowerShell 常量、`Raw`／`carrier_path`／`powershell`／`read`／`write` 与 `extend`／`retract`）与 `install/search_path_elsewhere.rs`（不写任何 shell 启动文件，把 `export PATH=…` 那一行随 outcome 交还本人）。原来一个名字 `mod search_path` 带 `#[cfg]` 双身，现在是两个各自 `#[cfg]` 的文件名，`use search_path_windows::{extend, retract}` 与 `use search_path_elsewhere::{extend, retract}` 同样带 cfg；两个子模块仍以 `pub(super)` 向父文件交出 `extend`／`retract`，可见范围逐字节不变，crate 内其它文件的 `use` 一行未改。测试搬 `install/tests.rs`，`#[cfg(target_os = "windows")] mod plan` 原样保留其 `use crate::install::{…}` 绝对路径，故 `mod tests` 内联时的导入一字未动（原来就不是 `use super::*`，保持 `use super::program_dir`）。**无字段开放**；apisync 未重写基线，公共面未动。
-- **`mcp_http.rs`**：`mcp_http.rs` 543→322：一次即够，只迁测试。内联 `#[cfg(test)] mod tests`（含 `vault`／`fake_server`／`sessioned_server` 三个夹具与八个 `#[test]`）整块搬 `mcp_http/tests.rs`，父文件尾部只留带原 `#[allow(unwrap_used, expect_used, panic, indexing_slicing)]` 属性的 `mod tests;` 声明。传输层的值与方法（`HeaderValue`／`Session`／`HttpServer`／`Exchange`／`one_message`＋`Outbound` 实现）全部留在父文件，因为 `HttpServer` 是「主类型＋核心 impl」的形状，把 `post`／`learn`／`forget`／`refused` 拆到兄弟文件只会让读者多跳一次而不减一分复杂度。`tests.rs` 直读 `held.session` 与 `Session.id` 两个私有字段走「子模块读父模块私有项」的 Rust 规则，**无字段开放**；`use super::*` 与 `use protocol::Outbound as _` 原样保留，八个测试的名字与断言一字未动。`sprawling` 158 测试全绿，公开面不变，故 apisync 基线未重写。
 - **`plan_view.rs`**：`plan_view.rs` 413→241：只用了第一次拆分就够——`#[cfg(test)] mod tests`（174 行）整体搬 `plan_view/tests.rs`，父文件尾部只留带原样 `#[allow(unwrap_used／expect_used／panic／indexing_slicing, reason = "test code")]` 的 `mod tests;` 声明。投影本身不切：`PlanView`／`PlanReading`／`Reading` 三个值、折账的 `apply`、读文件的 `of`、成表的 `describe`／`blockages` 与四个自由函数（`unplanned`／`building_of`／`node_of`／`cause_of`）回答的是同一个问题——「计划上一次读到的样子，以及什么记录能让它作废」——按缝再切只会把一条折叠链拆成两处权威。父文件是 `plan_view.rs`，故 `tests.rs` 里的 `use super::*;` 仍指 `plan_view`，六条测试的断言与名字逐字未改，`crate::plan_view::PlanView`／`PlanReading` 的三处外部引用（`assembly::building_page`、`views::holding`）一行未动。**无字段开放**，可见性一处未变（`PlanView`／`PlanReading` 原本就是 `pub(crate)`，`Reading` 与四个自由函数留在父文件里保持私有）。apisync 基线未重写：公共面逐字节不变。`sprawling` 158 条全绿，`modmap`／`length`／`header`／`apisync` 四门绿。
 
 ## 8-40 运行中的机器有什么，这座城要什么（`bin::doctor`）
@@ -1699,7 +1681,7 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 - **逐项征求同意，而不是一次总同意**：`--install` 对每一个缺项先印出**运行中的机器上要跑的那条命令**，再在 stdin 上问 `y/N`，默认是 N。一次总同意会让人对一串他没读过的命令点头，而这些命令改的是他自己的机器。**没被问到的东西恒不安装**。
 - **恒不提权**：这里的每条命令都是用户级的（`winget`／`brew`／`cargo install`／`rustup`），`sudo`／`apt` 那一支落在 `Recipe::Print`，人自己贴。一个默认会请求管理员权限的 doctor，是把「检查」变成了「让我动你的系统」，与 §8-9 的 install 同一条理由：**只碰这个人 profile 里的东西**。
 - **curl 脚本只印不跑（被否决的备选：`curl | sh` 自动安装）**：bun 在没有包管理器的平台上的官方装法是把一段脚本管进 shell。跑它意味着这座城代替人接受了一份它没读过、也无法在此刻校验的远端代码——**被否决**。那一支是 `Recipe::Print`：命令印在屏幕上，人自己决定。
-- **探测是「在不在 PATH 上」加「`--version` 说什么」，且带时限**：一个装坏了的工具会挂在启动上，而 doctor 挂住等于比不装还糟。子进程的读法沿用 `bin::mcp_stdio` 的形状——读在一个线程里，等在一个带 deadline 的 channel 上，超时就杀掉子进程；`patience` 是参数，**不在这里采时钟**。浏览器另加平台标准安装路径与 Windows 的两个注册表键，因为 Windows 与 macOS 上它常常不在 PATH 上（§8-57）；**浏览器的版本不问它本人**，读它旁边的文件（§8-80），于是这条带时限的子进程路径只剩驱动与命令行工具在走。
+- **探测是「在不在 PATH 上」加「`--version` 说什么」，且带时限**：一个装坏了的工具会挂在启动上，而 doctor 挂住等于比不装还糟。子进程的读法沿用 `protocol::mcp::stdio` 的形状——读在一个线程里，等在一个带 deadline 的 channel 上，超时就杀掉子进程；`patience` 是参数，**不在这里采时钟**。浏览器另加平台标准安装路径与 Windows 的两个注册表键，因为 Windows 与 macOS 上它常常不在 PATH 上（§8-57）；**浏览器的版本不问它本人**，读它旁边的文件（§8-80），于是这条带时限的子进程路径只剩驱动与命令行工具在走。
 - **四个文件而不是两个，理由是尺寸与形状**：`doctor.rs` 只留判定（表的形状、`finding_line`、`verdict`），表落 `table.rs`，屏幕与那一问落 `screen.rs`，跑子进程的落 `probe.rs`。判定与驱动同住一个文件时 `doctor.rs` 是 399 行——`xtask length` 的 400 之下一行，即下一次编辑必红。**这不是把文件切碎，是把「判断」与「跟人说话」分开**，两者本就不是一件事。
 - **Windows 上先找带扩展名的那个文件**：`bun` 若由 npm 装出来，同一目录下既有无扩展名的 shell 脚本 `bun`（Windows 起不动）又有 `bun.cmd`。先取无扩展名的那个，报出来的是「装了但不说版本」——一个装好的工具被报成半坏的。故 `names_of` 在 Windows 上按 `.exe`／`.cmd`／`.bat`／无扩展名的次序找，这条次序有它自己的测试。
 - **一项是环境变量而不是程序**：exec 工具 python 臂要的 CPython-WASI 组件由 `PYTHON_WASM_ENV` 指路（`bin::assembly::workbench::tools`），故它的探测是「那个变量指的文件在不在」，安装那一栏是 `Manual`——没有包管理器发它。它是 `Optional`，行尾说明它开启的是什么。
@@ -2159,7 +2141,7 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 | collab 七张桌子的句柄 | `Rc<RefCell<Desk>>` | `Arc<Mutex<Desk>>` | 桌子本身没有 `Rc`，换句柄不换桌子 |
 | `runtime::ReadTool.catalog` | `Rc<RefCell<Catalog>>` | `Arc<Mutex<Catalog>>` | 同上 |
 | `runtime::StatusTool.children` | `Box<dyn Fn() -> Vec<ChildStatus>>` | `+ Send` | 闭包持派生台句柄 |
-| `bin::mcp_stdio` 连接 | `Rc<RefCell<Connection>>` | `Arc<Mutex<Connection>>` | 同上 |
+| `protocol::mcp::stdio` 连接 | `Rc<RefCell<Connection>>` | `Arc<Mutex<Connection>>` | 同上 |
 | `bin::assembly::workbench::{Desks, Workbench, Reach}` | `Rc<RefCell<_>>` | `Arc<Mutex<_>>` | 出借与收回的地方 |
 | `Driving.signals` | `&Rc<RefCell<SignalDesk>>` | `Arc<Mutex<SignalDesk>>`（拥有） | 池线程不借工人的东西 |
 | `memory::vfs::Vfs`（内缝） | 无上界 | `: Send` | 红测试量出的第七处：`Cas` 持 `Box<dyn Vfs>`，而 §8-43 让 `Driving` 带一份 `Cas`；`RealFs` 本来就是 `Send`，`FaultFs` 的 `Rc<RefCell<State>>` 换 `Arc<Mutex<State>>` |
@@ -3006,7 +2988,7 @@ impl RunWorker {
 - **答案不入账本**：机器有什么不是这座城里发生的事——它在本进程之外被改变，写进历史就是写进一份会错的历史。它沿 `RunWorker::examine` 这个 sink 交给服务层的 views，与开城那一次写进去的是同一处。没有 sink 的 worker（命令行逐条驱动的那种）照样探、照样写那一行日志：一个行为取决于有没有人在看的动词，是两个动词。
 - **跑在写线程上，代价有上限**：探测是十几个程序各被起一次的几秒钟，安装是一个包管理器，两者都占住其他命令排的那条队。但另一条路更糟——让读去起进程，会拿着 views 的锁把其他每一次读都堵住，而且没人要求它这么做。**此条先前接受的是「占住写线程」本身，那在无期限时等于永远**：一个等在输入上的安装程序会让 `Halt` 与 `Cancel` 都进不来，而那正是人最需要它们的一刻。故代价此后由 `PATIENCE × TICK` 封顶（上一条），写线程最多被一次安装占住 180 秒。
 
-### 8-65 `bin::mcp_sse`：一台在流上应答的 server（形状 4 适配器；实现 `protocol::Outbound`）
+### 8-65 `protocol::mcp::sse`：一台在流上应答的 server（形状 4 适配器；实现 `protocol::Outbound`）
 
 第三种 transport，也是唯一一种「请求与它的答不是同一次交换」的。
 
@@ -3021,10 +3003,10 @@ impl protocol::Outbound for SseServer { /* call：先 POST 再等流；notify：
 
 - **先开流，再说话**：规范让 server 把消息端点作为第一个事件播出来，故在流开口之前无处可投。开流因此自带期限（15 s），一台始终不播端点的 server 被拒，而不是被投到一个猜出来的路径上。
 - **15 s 只管「开口并播出端点」，不管流本身**：reqwest 的请求级 `timeout` 从连接一直算到响应体读完，而这条流的响应体就是整段对话，挂在 GET 上它会在 15 s 后把一条好好的流掐断，此后每次调用都读到「流已结束」。故 GET 不带请求级期限，连同发送一起放进读取线程；读取线程送出的第一条要么是开流失败（`Err`，原样是 `unreachable`／`refused` 的那条错误），要么是播出的端点，这一侧对这第一条带 15 s 期限等——连不上、不答头、不播端点三种挂法都落在同一个期限里，而流一旦开口就只由每次调用自己的 `patience` 约束。阻塞 client 自带 30 s 的整请求默认期限，同理对这条流致命，故 client 以 `timeout(None)` 建成，每次 POST 各带自己的 `patience`。播出的多半是一条路径而不是整条地址，故按流自己的地址解析——一台在反向代理后面的 server 只知道它自己那条路径。
-- **读取线程与 `bin::mcp_stdio` 同形、同理由**：读流没有自己的期限，故一条线程把阻塞读变成这一侧可以带期限等的通道；丢掉最后一个句柄即丢掉接收端，下一次发送结束读取线程。
+- **读取线程与 `protocol::mcp::stdio` 同形、同理由**：读流没有自己的期限，故一条线程把阻塞读变成这一侧可以带期限等的通道；丢掉最后一个句柄即丢掉接收端，下一次发送结束读取线程。
 - **一次 POST 不是一个答**：对侧用 202 收下并一言不发，答随后作为事件到达。故 `call` 先投再等流，`notify` 投完即止。
 - **克隆共用同一条流**：一台 server 是一次对话，无论一次 Run 握着它几件工具；两条流会让一次调用的答落在调用方没有在读的那一条上。
-- **401／403 抬 `E_CREDENTIAL_MISSING`**，与 `bin::mcp_http` 同一条口径：server 在、也听懂了，缺的是一个账号，而人接下来要做的是登录而不是检查地址。健康视图（§8-66）据此把它画成「认证中」而不是「失败」。
+- **401／403 抬 `E_CREDENTIAL_MISSING`**，与 `protocol::mcp::http` 同一条口径：server 在、也听懂了，缺的是一个账号，而人接下来要做的是登录而不是检查地址。健康视图（§8-66）据此把它画成「认证中」而不是「失败」。
 
 ### 8-66 `bin::views::mcp_health`：一个地址够得到的每台 server 此刻站在哪（形状 7 投影）
 

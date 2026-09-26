@@ -15,7 +15,10 @@ mod acp;
 mod mcp;
 
 pub use acp::{Admitted, Incoming, Progress, admit};
-pub use mcp::{EXTERNAL_CALL_PATIENCE, Handshake, Listed, McpTool, Outbound};
+#[cfg(feature = "conformance")]
+pub use mcp::echoing;
+pub use mcp::{Broker, Connection, Toolkit};
+pub use mcp::{EXTERNAL_CALL_PATIENCE, Handshake, Listed, McpLink, McpTool, Outbound};
 pub use mcp::{MESSAGE_CEILING, Received, read_one_message};
 pub use mcp::{PROTOCOL_VERSION, digits_for_floats, handshake};
 pub use mcp::{Rpc, ScriptedOutbound, tools_from};

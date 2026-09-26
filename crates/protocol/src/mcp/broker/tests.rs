@@ -21,20 +21,62 @@
     reason = "test code"
 )]
 
+use std::io::{Read as _, Write as _};
+
 use kernel::Sealed;
 
 use super::{Broker, Connection};
-#[cfg(test)]
-use crate::endpoint::fakes::fake_provider;
 
-/// The fake's origin, without the path it was built for.
-fn origin(url: &str) -> String {
-    let parsed = reqwest::Url::parse(url).unwrap();
-    format!(
-        "http://{}:{}/",
-        parsed.host_str().unwrap(),
-        parsed.port().unwrap()
-    )
+/// A broker this crate controls: answers each accepted connection with
+/// the next `(status, body)` in turn, and hands back every request it
+/// read once the list is spent.
+fn fake_broker(answers: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<Vec<String>>) {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let origin = format!("http://{}/", listener.local_addr().unwrap());
+    let handle = std::thread::spawn(move || {
+        answers
+            .into_iter()
+            .map(|(status, body)| {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = request_from(&mut stream);
+                let answer = format!(
+                    "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\n\
+                     content-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                stream.write_all(answer.as_bytes()).unwrap();
+                request
+            })
+            .collect()
+    });
+    (origin, handle)
+}
+
+/// One whole request: the head, then as many body bytes as it declared.
+fn request_from(stream: &mut std::net::TcpStream) -> String {
+    let mut request = String::new();
+    let mut chunk = [0u8; 8192];
+    loop {
+        let read = stream.read(&mut chunk).unwrap();
+        if read == 0 {
+            return request;
+        }
+        request.push_str(&String::from_utf8_lossy(&chunk[..read]));
+        let Some(head_end) = request.find("\r\n\r\n") else {
+            continue;
+        };
+        let declared = request[..head_end]
+            .lines()
+            .find_map(|line| {
+                line.to_ascii_lowercase()
+                    .strip_prefix("content-length: ")
+                    .map(|length| length.trim().parse::<usize>().unwrap())
+            })
+            .unwrap_or(0);
+        if request.len() >= head_end + 4 + declared {
+            return request;
+        }
+    }
 }
 
 fn key() -> Sealed<String> {
@@ -54,8 +96,8 @@ fn a_shelf_joins_the_directory_with_this_person_s_standings() {
         "items": [{ "toolkit_slug": "github", "status": "ACTIVE", "alias": "octocat" }]
     })
     .to_string();
-    let (url, handle) = fake_provider(vec![(200, directory), (200, standings)], false);
-    let broker = Broker::at(&origin(&url), key()).unwrap();
+    let (url, handle) = fake_broker(vec![(200, directory), (200, standings)]);
+    let broker = Broker::at(&url, key()).unwrap();
 
     let shelf = broker.shelf("acme").unwrap();
 
@@ -88,8 +130,8 @@ fn a_shelf_joins_the_directory_with_this_person_s_standings() {
 fn connecting_reuses_an_auth_config_rather_than_making_a_second() {
     let held = serde_json::json!({ "items": [{ "id": "ac_kept" }] }).to_string();
     let opened = serde_json::json!({ "redirect_url": "https://consent.example/abc" }).to_string();
-    let (url, handle) = fake_provider(vec![(200, held), (200, opened)], false);
-    let broker = Broker::at(&origin(&url), key()).unwrap();
+    let (url, handle) = fake_broker(vec![(200, held), (200, opened)]);
+    let broker = Broker::at(&url, key()).unwrap();
 
     let page = broker.connect("github", "acme").unwrap();
 
@@ -112,8 +154,8 @@ fn connecting_creates_a_managed_config_when_the_project_has_none() {
     let none = serde_json::json!({ "items": [] }).to_string();
     let made = serde_json::json!({ "id": "ac_new" }).to_string();
     let opened = serde_json::json!({ "redirect_url": "https://consent.example/x" }).to_string();
-    let (url, handle) = fake_provider(vec![(200, none), (200, made), (200, opened)], false);
-    let broker = Broker::at(&origin(&url), key()).unwrap();
+    let (url, handle) = fake_broker(vec![(200, none), (200, made), (200, opened)]);
+    let broker = Broker::at(&url, key()).unwrap();
 
     assert!(broker.connect("github", "acme").is_ok());
 
@@ -131,8 +173,8 @@ fn a_slug_reaches_the_query_string_percent_encoded() {
     let none = serde_json::json!({ "items": [] }).to_string();
     let made = serde_json::json!({ "id": "ac_new" }).to_string();
     let opened = serde_json::json!({ "redirect_url": "https://consent.example/x" }).to_string();
-    let (url, handle) = fake_provider(vec![(200, none), (200, made), (200, opened)], false);
-    let broker = Broker::at(&origin(&url), key()).unwrap();
+    let (url, handle) = fake_broker(vec![(200, none), (200, made), (200, opened)]);
+    let broker = Broker::at(&url, key()).unwrap();
 
     let _ = broker.connect("git hub/../admin", "acme");
 
@@ -146,8 +188,8 @@ fn a_slug_reaches_the_query_string_percent_encoded() {
 
 #[test]
 fn a_refused_key_reads_as_a_missing_credential_rather_than_a_provider_fault() {
-    let (url, handle) = fake_provider(vec![(401, "{}".to_owned())], false);
-    let broker = Broker::at(&origin(&url), key()).unwrap();
+    let (url, handle) = fake_broker(vec![(401, "{}".to_owned())]);
+    let broker = Broker::at(&url, key()).unwrap();
 
     let refusal = broker.shelf("acme").unwrap_err();
 
@@ -171,8 +213,8 @@ fn a_failed_connection_keeps_the_reason_the_broker_gave() {
         }]
     })
     .to_string();
-    let (url, handle) = fake_provider(vec![(200, directory), (200, standings)], false);
-    let broker = Broker::at(&origin(&url), key()).unwrap();
+    let (url, handle) = fake_broker(vec![(200, directory), (200, standings)]);
+    let broker = Broker::at(&url, key()).unwrap();
 
     let shelf = broker.shelf("acme").unwrap();
 
@@ -193,8 +235,8 @@ fn a_status_this_build_has_not_heard_of_offers_the_button_again() {
         "items": [{ "toolkit_slug": "github", "status": "SOMETHING_NEW" }]
     })
     .to_string();
-    let (url, handle) = fake_provider(vec![(200, directory), (200, standings)], false);
-    let broker = Broker::at(&origin(&url), key()).unwrap();
+    let (url, handle) = fake_broker(vec![(200, directory), (200, standings)]);
+    let broker = Broker::at(&url, key()).unwrap();
 
     let shelf = broker.shelf("acme").unwrap();
 
@@ -203,4 +245,17 @@ fn a_status_this_build_has_not_heard_of_offers_the_button_again() {
     // state this build simply does not know.
     assert_eq!(shelf[0].standing, Connection::Absent);
     drop(handle.join());
+}
+
+#[test]
+fn a_path_that_cannot_be_addressed_is_filed_under_the_module_that_builds_it() {
+    let broker = Broker::at("mailto:nobody", key()).unwrap();
+
+    let refused = broker.shelf("acme").unwrap_err();
+
+    assert!(
+        refused.recovery().contains("protocol::mcp::broker"),
+        "the recovery names the module a reader should open: {}",
+        refused.recovery()
+    );
 }

@@ -580,7 +580,7 @@ pub fn is_local(base_url: &str) -> bool;                                        
 - **`socks` 不花钱**：reqwest 0.13 的 `socks = []` 是空 feature，实现就在它自己的 `connect.rs` 里，锁文件不多一个包。`system-proxy` 只在 Windows 与 macOS 各拉一个读系统设置的包。
 - **全城的 HTTP 客户端都在 `reach::proxy` 里造**（`client_for`）。同一条规则写在五处就是五条规则，它们一直一致到其中一处被改为止；更要紧的是，分段读数若自己再判一次，它报出的就是一条请求不会走的路——而那正是看报告的人唯一无法自己核实的东西。**这个缺陷真实存在过**：客户端已经 `no_proxy` 了，而读数还在按环境变量报 `Environment` 并把解名与套接字两段记成 `ProxiedAway`／`Skipped`。
 - **默认把打到这台电脑的调用摘出代理，但那是默认而不是定理**（`Proxying::ExceptLocal`）：跑起来才现形——开了 system-proxy 之后，一台配了代理的机器把回环也送进代理，本地推理服务器由别人的网关代答 502。但把它写死就是替所有人做了一个只对大多数人成立的决定，而这一类决定失效时没有任何一屏能告诉人到底发生了什么。现在它是 `EndpointTuning.proxying` 的默认值，另两个值各自对应一类真实的机器（kernel-SPEC.md 8-50），而无论哪一个，读数都会把结论写在 `through` 那一格里。
-- **工具服务器与订阅登录用默认值，且是显式地用**（`bin::mcp_http`、`bin::mcp_sse`、`credential::oauth::flow`）：两者都没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
+- **工具服务器与订阅登录用默认值，且是显式地用**（`protocol::mcp::http`、`protocol::mcp::sse`、`credential::oauth::flow`）：两者都没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
 - **`is_local` 是全城唯一的那一条判断**：`client_for` 的代理豁免（`Through::LocalAddress`）、地址规整时缺省的 scheme 与兼容格式提示、设置页上那个 `local` 标记，读的是同一个函数。回环按 `IpAddr::is_loopback` 判，外加 `localhost` 与 `*.localhost`，所以 `127.0.0.2` 在每一处都算这台电脑；两份判断只会在某一处先被改掉时各说各的。
 - **5 秒一段**：设置页上有人在等，一个在这个时间里答不出来的主机，人要的是知道，而不是继续等。
 
