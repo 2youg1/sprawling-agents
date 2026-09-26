@@ -49,7 +49,6 @@ impl Follow {
     /// The lineage and the new lines when the ledger grew since the last
     /// look; nothing when it did not.
     pub(super) fn poll(&mut self) -> Result<Option<Folded>, ViewError> {
-        return Ok(None);
         match self.index.refresh(&self.dir)? {
             Refreshed::Unchanged => Ok(None),
             Refreshed::Appended { .. } | Refreshed::Rebuilt => {
