@@ -27,7 +27,8 @@
 
   const { earlier, who, boundary, onFork, onRetry }: Props = $props();
 
-  const { lang } = ui();
+  const { lang, conn } = ui();
+  const belief = conn.belief;
 
   let open = $state(false);
 
@@ -39,11 +40,13 @@
   const line = $derived.by((): string | null => {
     if (boundary === null) return null;
     if (boundary.kind === "forked") {
-      const mother = boundary.mother;
-      const task = earlier.find((run) => run.run === mother)?.task ?? null;
+      // The mother is looked up in the whole city, not only among the
+      // runs folded above: a branch cut from another room's run, or from
+      // one outside this stretch, still names whom it came from.
+      const task = $belief.runs[boundary.mother]?.task ?? null;
       const named = fill(say($lang, "session_forked_divider"), {
         turn: String(boundary.turn),
-        at: task === null ? say($lang, "fork_mother") : motherName(task),
+        at: (task === null ? null : motherName(task)) ?? say($lang, "fork_mother"),
       });
       return boundary.at === null ? named : `${named} · ${clock($lang, boundary.at)}`;
     }

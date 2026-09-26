@@ -108,8 +108,10 @@ const SENTENCE = /^.*?(?:[.!?](?=\s|$)|[。！？])/u;
 
 // The mother run as the divider names it: the first sentence of its task,
 // because a run id is thirty-six characters nobody recognises and the
-// task is what the person remembers asking.
-export function motherName(task: string): string {
+// task is what the person remembers asking. A blank task names nothing,
+// and answers `null` so the divider says "the mother run" instead.
+export function motherName(task: string): string | null {
   const line = task.trim().split("\n")[0] ?? "";
-  return SENTENCE.exec(line)?.[0] ?? line;
+  const named = SENTENCE.exec(line)?.[0] ?? line;
+  return named === "" ? null : named;
 }

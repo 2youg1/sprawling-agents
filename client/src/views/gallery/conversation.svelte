@@ -317,7 +317,7 @@ came from. -->
   <div class="my-wide flex items-center gap-base text-note text-text-faint">
     <span class="h-px flex-1 bg-raised"></span>
     <a href={toFragment({ kind: "run", run: MOTHER })} class="hover:text-text-quiet">
-      {fill(say($lang, "session_forked_divider"), { turn: "3", at: motherName(MOTHER_TASK) })} · 11:47
+      {fill(say($lang, "session_forked_divider"), { turn: "3", at: motherName(MOTHER_TASK) ?? say($lang, "fork_mother") })} · 11:47
     </a>
     <span class="h-px flex-1 bg-raised"></span>
   </div>

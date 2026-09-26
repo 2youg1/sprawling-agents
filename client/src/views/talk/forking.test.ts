@@ -17,4 +17,8 @@ describe("how the divider names the mother run", () => {
   test("a task with no sentence end is named whole", () => {
     expect(motherName("fix the parser")).toBe("fix the parser");
   });
+
+  test("a blank task names nothing, so the divider falls back to its generic label", () => {
+    expect([motherName(""), motherName("  \n  ")]).toEqual([null, null]);
+  });
 });
