@@ -87,3 +87,70 @@ fn the_screen_keeps_the_listener_half_when_the_city_does_not_answer() {
     assert!(screen.contains("127.0.0.1:8787"), "{screen}");
     assert!(screen.contains("views may be rebuilding"), "{screen}");
 }
+
+/// Runs the console loop and returns every Command it posted.
+fn posted(script: &str) -> Vec<channels::Command> {
+    let desk = crate::serving::CommandDesk::new();
+    let mut out: Vec<u8> = Vec::new();
+    super::super::terminal::drive(
+        &terminal("127.0.0.1:8787", None),
+        &desk,
+        &answering(),
+        &mut std::io::Cursor::new(script.as_bytes().to_vec()),
+        &mut out,
+    );
+    std::iter::from_fn(|| desk.take()).collect()
+}
+
+/// The city answers a key it has seen with its first answer, across
+/// restarts. A line typed twice is two requests, and a line typed again
+/// after its refusal was fixed must reach the city a second time.
+#[test]
+fn the_same_line_typed_twice_is_two_dispatches() {
+    let keys: Vec<kernel::IdemKey> = posted("/at lab/room1\nhello there\nhello there\n")
+        .iter()
+        .filter_map(|command| command.idem().copied())
+        .collect();
+    assert_eq!(keys.len(), 2, "both lines reach the desk: {keys:?}");
+    assert_ne!(keys[0], keys[1], "each line carries its own key");
+}
+
+/// Braking the whole city from a machine with no browser is one short
+/// line: the console supplies the key the wire requires.
+#[test]
+fn a_wire_verb_without_a_key_gets_the_line_key() {
+    let commands = posted("/halt {\"scope\":\"city\"}\n");
+    assert!(
+        matches!(commands.as_slice(), [channels::Command::Halt { .. }]),
+        "the halt reaches the desk: {} command(s)",
+        commands.len()
+    );
+}
+
+/// A known verb whose body cannot be read says which field is wrong,
+/// not that the verb does not exist.
+#[test]
+fn a_body_missing_a_field_names_the_field() {
+    let seen = typed("/halt {}\n", &terminal("127.0.0.1:8787", None));
+    assert!(
+        seen.contains("`scope`"),
+        "the missing field is named: {seen}"
+    );
+    assert!(!seen.contains("no verb"), "halt is a verb: {seen}");
+}
+
+/// The help lists what a socket can carry and says what `/quit` does.
+#[test]
+fn help_offers_only_what_the_console_can_carry() {
+    let seen = typed(
+        "/help\n/auth {\"token\":\"x\"}\n",
+        &terminal("127.0.0.1:8787", None),
+    );
+    assert!(!seen.contains("put_secret"), "{seen}");
+    assert!(!seen.contains(", auth"), "{seen}");
+    assert!(
+        seen.contains("no verb `auth"),
+        "auth is refused as a verb: {seen}"
+    );
+    assert!(seen.contains("the city keeps serving"), "{seen}");
+}

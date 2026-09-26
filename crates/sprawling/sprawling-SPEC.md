@@ -282,8 +282,11 @@ pub(crate) enum Line {
     Frame(Box<channels::ClientFrame>),   // 一个 wire 动词
     Work(String),                        // 普通一行：派给当前选中的 room
     Unknown { verb: String, nearest: Vec<String> },
+    Malformed { verb: String, reason: String },  // 动词认得，JSON 体读不出：reason 是 serde 的原话，写出缺的字段名
 }
-pub(crate) fn parse(line: &str, selected: Option<&Address>) -> Line;
+pub(crate) fn parse(line: &str, selected: Option<&Address>, idem: IdemKey) -> Line;
+struct LineKeys { origin: [u8; 16], lines: Seq }   // 每行一把键
+impl LineKeys { fn drawn() -> Result<LineKeys, AxError>; fn next(&mut self) -> IdemKey; }
 pub(crate) fn verbs() -> Vec<String>;      // 控制动词 ⊕ wire 动词
 pub(crate) fn snake(camel: &str) -> String;
 ```
@@ -291,6 +294,10 @@ pub(crate) fn snake(camel: &str) -> String;
 - **wire 动词表是投影，不是第二份手写清单**。`verbs()` 从 `channels::COMMAND_NAMES` 与 `QUERY_NAMES` 逐个转 snake_case 得来；一份手写清单就是第二套词汇，而它漂开时没有任何东西会发出声音。一条断言钉住这件事：每个 wire 名字都在动词表里。
 - **控制动词另成一个穷尽枚举**（`/help`、`/web`、`/at`、`/quit`）。它们是**控制台自己的**动词，不在 wire 上，故不属于那张投影。两张表合并后仍不得重名，一条断言钉住。
 - **控制台不做任何判定**。一行变成 `Command` 之后，走的是人在页面上点按钮走的**同一张桌子**（`CommandDesk`）与同一个 `Reply`。拒绝因此自动回到控制台，不需要为它另写一条回程——这正是那条回信地址的第二个消费者。
+- **每一行一把幂等键，由控制台铸**。`LineKeys::drawn` 在控制台启动时取 16 字节 OS 熵作 `origin`，`next` 按行计数：键 = `IdemKey::derive(RunId::CITY, 行号, origin)`。城把见过的键连同第一次的答复一起记住，且跨重启记住；故键只由 `地址+任务` 派生时，同一房间同一句话第二次被吞，先被拒（例如还没配模型）、配好模型后再打同一行仍拿到那次拒绝。行号使同一进程内的两行不同，`origin` 使两次启动的同一行号不同。熵取不到时控制台说出原因并关闭，城照跑——一把可预测的键会被上一个进程的答复吞掉。**被否掉的做法**：把时间放进键——时间只在 `bin::assembly` 取样，且同一毫秒内两行仍撞。
+- **wire 动词的 JSON 体缺 `idem` 时由控制台补上这一行的键**；人在没有浏览器的机器上刹住整座城只需 `/halt {"scope":"city"}`。体读不出时返回 `Malformed`，打印 serde 说出的原因（含缺的字段名），而不是「没有这个动词」。
+- **投影只取 socket 能带的 Command**：`put_secret`（`WireCommand` 里没有这个值）与 `auth`（配对令牌在握手里证明，不在命令里）是 `Command::idem()` 返回 `None` 的恰好那两个，控制台既不列它们也不认它们。
+- **`/quit` 只关控制台，城继续服务**；帮助说的是同一句话。停城是 Ctrl-C，那是只有起城的进程按得动的收口（下文）。
 - **普通一行就是派活**。要人为一件活敲 `/dispatch {"addr":…}` 是把 JSON 当人机界面；选中一个 room（`/at`）后直接写任务，才是终端本来的手势。未选中任何 room 时拒，并说该敲什么。
 - **不是 TTY 就不进控制台**。stdin 读到 EOF（管道、服务、CI）即退出控制台循环而**城照跑**：一座因为没人敲键盘而停止服务的城是一个以交互换服务的回归。
 - **拒长表与图**。查询的答案在控制台以 JSONL 逐行输出，与 `sprawling call` 同形；表格与图归浏览器。一个同时伺候两个主人的 CLI 是 CLI 文献里的反面教材。
