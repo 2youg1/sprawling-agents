@@ -148,7 +148,10 @@ impl Entries {
 
     #[cfg(test)]
     pub(super) fn resident_bytes(&self) -> usize {
-        self.column.len() * size_of::<u64>() + self.outliers.len() * size_of::<(Seq, usize, u64)>()
+        self.column
+            .len()
+            .saturating_mul(size_of::<u64>())
+            .saturating_add(self.outliers.len().saturating_mul(size_of::<(Seq, usize, u64)>()))
     }
 }
 

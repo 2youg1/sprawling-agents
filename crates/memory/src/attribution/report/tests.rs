@@ -11,6 +11,7 @@
     clippy::indexing_slicing,
     clippy::string_slice,
     clippy::arithmetic_side_effects,
+    clippy::as_conversions,
     reason = "test code"
 )]
 

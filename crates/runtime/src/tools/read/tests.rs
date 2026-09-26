@@ -305,7 +305,7 @@ fn an_interval_that_cannot_be_counted_is_refused_rather_than_guessed() {
 #[test]
 fn the_tool_refuses_another_tools_call_and_still_answers() {
     let dir = tempfile::tempdir().unwrap();
-    let (tool, _catalog) = tool(dir.path());
+    let (mut tool, _catalog) = tool(dir.path());
     kernel::tool::conformance::assert_tool_conformance(&mut tool);
 }
 

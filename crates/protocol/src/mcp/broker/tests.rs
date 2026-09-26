@@ -18,6 +18,8 @@
     clippy::wildcard_enum_match_arm,
     clippy::let_underscore_must_use,
     clippy::let_underscore_untyped,
+    clippy::string_slice,
+    clippy::arithmetic_side_effects,
     reason = "test code"
 )]
 
