@@ -33,7 +33,7 @@ cleanup() {
     rm -rf "$root"
 }
 trap cleanup EXIT INT TERM
-mkdir "$root/www" "$root/home" "$root/unpacked"
+mkdir "$root/www" "$root/sandbox" "$root/unpacked"
 cp "$archive" "$root/www/"
 name=$(basename "$archive")
 
@@ -74,12 +74,12 @@ PY
 # Every request that would leave this machine goes to a port nothing
 # listens on, so an installer that ignored SPRAWLING_API fails here
 # instead of quietly installing the published release.
-HOME="$root/home" SPRAWLING_API="${origin}/releases" \
+HOME="$root/sandbox" SPRAWLING_API="${origin}/releases" \
     https_proxy=http://127.0.0.1:9 http_proxy=http://127.0.0.1:9 \
     no_proxy=127.0.0.1 NO_PROXY=127.0.0.1 \
     sh "$installer" || die "install.sh failed against ${origin}"
 
-installed="$root/home/.local/bin/sprawling"
+installed="$root/sandbox/.local/bin/sprawling"
 [ -f "$installed" ] || die "install.sh placed nothing at ${installed}"
 unzip -q "$archive" -d "$root/unpacked"
 built=$(find "$root/unpacked" -type f -name sprawling | head -n 1)
