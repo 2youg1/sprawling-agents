@@ -3019,5 +3019,9 @@
   "run_doing_frozen": {
     "en": "wrapped up",
     "zh": "已收尾"
+  },
+  "cost_unpriced": {
+    "en": "{n} runs so far, and no provider reported a price for them, so there is no amount to show",
+    "zh": "已经派了 {n} 次活，provider 没有给它们报价，所以这里没有金额"
   }
 }

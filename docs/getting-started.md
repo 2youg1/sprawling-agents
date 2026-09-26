@@ -116,7 +116,7 @@ That building page is also reached from the city drawing. It shows **the plan**,
 
 **waiting on you** is every design question a resident asked that nothing can move without. A new city is raised with those questions delegated to the clerk, so most are answered there and their reasons land in the Ledger; a question that began with content from outside the city is flagged tainted, so whoever answers it reads it knowing where it came from.
 
-**the record** is the one history in three lenses — **the ledger**, **the archive**, **the recycle bin** — and **cost** is what was spent, in five cuts that each sum to the same total. Where a provider reported no price, the page reports tokens and says why there is no amount, instead of printing `$0.00`.
+**the record** is the one history in three lenses — **the ledger**, **the archive**, **the recycle bin** — and **cost** is what was spent, in five cuts that each sum to the same total. Where a provider reported no price, the page says how many runs there were and why there is no amount, instead of printing `$0.00`.
 
 ## 6 Read the diff, and the merge that landed
 
