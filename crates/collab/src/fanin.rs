@@ -334,6 +334,30 @@ mod tests {
         assert_eq!(joined.nodes().len(), 1);
     }
 
+    /// The question names where the artifact is, and the locator spells
+    /// its digest, so an answer read off the digest needs no opening.
+    #[test]
+    fn a_judge_that_copies_the_question_does_not_get_to_judge() {
+        let mut join = FanIn::new();
+        join.accept(
+            claim("a", "lab/room1", b"result")
+                .verified(true, "lab/tests")
+                .unwrap(),
+        );
+        let prompt = join.question().unwrap().prompt().to_owned();
+        let copied: String = prompt
+            .split("cas:b3-")
+            .nth(1)
+            .unwrap()
+            .chars()
+            .take(8)
+            .collect();
+        assert!(
+            join.decide(&copied).is_err(),
+            "the question carries its own answer: {prompt}"
+        );
+    }
+
     #[test]
     fn the_question_follows_what_actually_joined() {
         let mut join = FanIn::new();
