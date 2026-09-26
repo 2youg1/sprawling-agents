@@ -46,6 +46,10 @@ impl Sink {
     pub fn new(deliver: impl Fn(Chunk) + Send + Sync + 'static) -> Sink {
         Sink(Arc::new(deliver))
     }
+
+    pub(super) fn deliver(&self, chunks: Vec<Chunk>) {
+        chunks.into_iter().for_each(|chunk| (self.0)(chunk));
+    }
 }
 
 /// How far one member's two files have been read.
@@ -56,18 +60,19 @@ pub(super) struct Tail {
 }
 
 impl Tail {
-    /// Hands `sink` what each file grew by, at most half of `per_poll`
-    /// bytes from each, so a flood on stdout never starves stderr and
-    /// a command that writes faster than a page reads leaves the page
-    /// behind rather than the poll slower.
-    pub(super) fn follow(
+    /// Takes what each file grew by since the last take, at most half
+    /// of `per_poll` bytes from each, so a flood on stdout never starves
+    /// stderr and a command that writes faster than a page reads leaves
+    /// the page behind rather than the poll slower. The caller delivers
+    /// them, which lets it release the table first.
+    pub(super) fn take(
         &mut self,
         dir: &std::path::Path,
         from: (RunId, BacklogId),
         per_poll: usize,
-        sink: &Sink,
-    ) {
+    ) -> Vec<Chunk> {
         let half = per_poll.div_ceil(2);
+        let mut chunks = Vec::new();
         for (stream, name, offset) in [
             (Stream::Out, "out", &mut self.out),
             (Stream::Err, "err", &mut self.err),
@@ -77,13 +82,14 @@ impl Tail {
                 continue;
             }
             *offset = offset.saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
-            (sink.0)(Chunk {
+            chunks.push(Chunk {
                 run: from.0,
                 member: from.1,
                 stream,
                 bytes,
             });
         }
+        chunks
     }
 }
 

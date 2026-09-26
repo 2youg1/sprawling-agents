@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use kernel::AxError;
 
+use super::tail::Tail;
 use super::{BacklogId, Body, Claim, Member};
 
 /// The rate a watched command's output is read at, 64 KiB a second:
@@ -177,15 +178,18 @@ impl super::Backlog {
         Ok(stopped)
     }
 
-    pub(super) fn hand_over(&self, id: BacklogId) -> Result<(), AxError> {
+    /// Past the window: the command is owed to its run's harvest, which
+    /// reads its output on from where the window's `read` stopped.
+    pub(super) fn hand_over(&self, id: BacklogId, read: Tail) -> Result<(), AxError> {
         let mut table = self.hold()?;
         if let Some(Member {
-            body: Body::Command { claim, .. },
+            body: Body::Command { claim, tail, .. },
             ..
         }) = table.members.get_mut(&id)
             && let Claim::Window(owner) = *claim
         {
             *claim = Claim::Run(owner);
+            *tail = read;
         }
         Ok(())
     }
