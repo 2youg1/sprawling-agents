@@ -241,4 +241,5 @@ pub(super) fn read_dir(path: &Path) -> Result<Vec<PathBuf>, AxError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
 mod tests;
