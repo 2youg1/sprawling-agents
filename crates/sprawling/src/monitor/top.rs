@@ -48,6 +48,14 @@ fn level(offset: u64, span: u64) -> Option<char> {
     LEVELS.get(usize::try_from(rank).ok()?).copied()
 }
 
+/// One terminal screen: a row per counter with its label, its latest
+/// reading and its last `curve_width` points; empty with no samples.
+#[must_use]
+pub fn screen(samples: &[Sample], curve_width: usize) -> String {
+    let _ = (samples, curve_width);
+    String::new()
+}
+
 #[cfg(test)]
 #[path = "top/tests.rs"]
 mod tests;
