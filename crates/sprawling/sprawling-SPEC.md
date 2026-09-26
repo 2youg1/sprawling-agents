@@ -3547,7 +3547,7 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 
 ## 8-91 `sprawling view`：给人的一面（`bin::main::view::keys`、`bin::main::view::arrange`、`bin::main::view::frame`、`bin::main::view::detail`、`bin::main::view::terminal`）
 
-**形状。** 四个纯模块，不碰终端也不碰盘。`keys` 是 decision（ARCHITECTURE §9 形状 3）：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。`terminal` 是 adapter：stdout 是终端且没有任何过滤参数时，`view` 一遍读完账本（折 lineage、收 `records` 行），进 raw 模式与备用屏，读键、调 `apply`、画 `frame()`，退出时无论成败都把终端还原。它不做任何决定。尚未做的：跟随服务中的城、从尾部倒读首屏、回合与调用两层、「等人」优先的光标、T8–T12 的 `ttyprobe` 验收。
+**形状。** 四个纯模块，不碰终端也不碰盘。`keys` 是 decision：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。`terminal` 是 adapter：stdout 是终端且没有任何过滤参数时，`view` 一遍读完账本（折 lineage、收 `records` 行），进 raw 模式与备用屏，读键、调 `apply`、画 `frame()`，退出时无论成败都把终端还原。它不做任何决定。尚未做的：跟随服务中的城、从尾部倒读首屏、回合与调用两层、「等人」优先的光标、T8–T12 的 `ttyprobe` 验收。
 
 ```rust
 // bin::main::view::keys
