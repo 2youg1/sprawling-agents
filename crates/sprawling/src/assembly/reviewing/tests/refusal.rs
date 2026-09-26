@@ -105,7 +105,7 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
     let (ledger, _report) = memory::JsonlLedger::open_faulty(
         fs,
         &kernel::layout::CityLayout::new(dir.path()).ledger(),
-        now_ms().unwrap(),
+        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
     )
     .unwrap();
     let mut checker = RunWorker::over(

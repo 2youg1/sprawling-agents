@@ -21,8 +21,6 @@
 use kernel::event::record::{EndpointProbed, ProbeFailure};
 use kernel::{AxCode, AxError, Payload, Proxying, Reach};
 
-use crate::assembly::now_ms;
-
 /// What one probe learned about one endpoint.
 pub(super) struct Probing {
     /// Where a plain request to the base URL stopped.
@@ -41,7 +39,11 @@ pub(super) struct Probing {
 /// # Errors
 /// A transport this machine will not construct, or a clock that reads
 /// before the unix epoch.
-pub(super) fn reach_of(base_url: &str, proxying: Proxying) -> Result<Reach, AxError> {
+pub(super) fn reach_of(
+    base_url: &str,
+    proxying: Proxying,
+    clock: &dyn accounting::Clock,
+) -> Result<Reach, AxError> {
     let client = gateway::client_for(proxying, base_url)
         .build()
         .map_err(|err| {
@@ -52,9 +54,9 @@ pub(super) fn reach_of(base_url: &str, proxying: Proxying) -> Result<Reach, AxEr
             )
             .with_recovery("restart the server; this machine refused to build an HTTP client")
         })?;
-    let before = now_ms()?;
+    let before = clock.now()?;
     let reading = gateway::reach(&client, proxying, base_url, 0);
-    let after = now_ms()?;
+    let after = clock.now()?;
     Ok(Reach {
         elapsed_ms: after.value().saturating_sub(before.value()),
         ..reading

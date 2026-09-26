@@ -14,7 +14,7 @@
 
 use super::{
     Collaborating, Credentials, Doorstep, Flight, GatewayModels, McpServers, Planning, RoomQueues,
-    RunWorker, Standing, city_segment, now_ms,
+    RunWorker, Standing, SystemClock, city_segment,
 };
 use std::path::Path;
 
@@ -32,8 +32,8 @@ impl RunWorker {
         log: runtime::diagnostics::Diagnostics,
     ) -> Result<Self, AxError> {
         let dir = kernel::layout::CityLayout::new(city_root).ledger();
-        let (ledger, _report) =
-            JsonlLedger::open(&dir, now_ms()?).map_err(memory::MemoryError::into_ax)?;
+        let (ledger, _report) = JsonlLedger::open(&dir, accounting::Clock::now(&SystemClock)?)
+            .map_err(memory::MemoryError::into_ax)?;
         RunWorker::over(city_root, vault, log, ledger)
     }
 
@@ -57,7 +57,7 @@ impl RunWorker {
         log: runtime::diagnostics::Diagnostics,
         ledger: JsonlLedger,
     ) -> Result<Self, AxError> {
-        let now = now_ms()?;
+        let now = accounting::Clock::now(&SystemClock)?;
         let dir = kernel::layout::CityLayout::new(city_root).ledger();
         let Standing {
             book,
@@ -100,6 +100,7 @@ impl RunWorker {
             flight: Flight::open(),
             models: Box::new(GatewayModels),
             connectors: Box::new(McpServers),
+            clock: std::sync::Arc::new(SystemClock),
         })
     }
 
@@ -141,5 +142,20 @@ impl RunWorker {
             "the city is closing; its handoff is on the ledger",
         );
         self.record(EventKind::HandoffWritten, handoff.payload()?)
+    }
+
+    /// The same worker, reading every time through `clock` instead of
+    /// the wall clock (accounting-SPEC.md 8-3).
+    ///
+    /// The door citysim and the tests drive a worker through: when
+    /// things happen is theirs to script, while what the worker writes
+    /// at those times stays its own. The ledger was opened before this
+    /// door, at the wall clock's time.
+    #[must_use]
+    pub fn with_clock(
+        self,
+        clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
+    ) -> RunWorker {
+        RunWorker { clock, ..self }
     }
 }

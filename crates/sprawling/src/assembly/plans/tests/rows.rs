@@ -91,7 +91,7 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
     let (ledger, _report) = memory::JsonlLedger::open_faulty(
         fs,
         &kernel::layout::CityLayout::new(dir.path()).ledger(),
-        now_ms().unwrap(),
+        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
     )
     .unwrap();
     let mut worker = RunWorker::over(

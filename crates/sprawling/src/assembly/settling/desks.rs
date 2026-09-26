@@ -9,7 +9,7 @@ use kernel::{AxCode, AxError};
 
 use crate::effect;
 
-use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held, now_ms};
+use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held};
 
 /// Writes the plan back, creating nothing that was not there: a
 /// building without a plan is a building whose residents have nothing
@@ -101,7 +101,7 @@ impl RunWorker {
                         class: kernel::ApprovalClass::Question,
                         detail: addr.as_str().to_owned(),
                     },
-                    created: now_ms()?,
+                    created: self.clock.now()?,
                     tainted: false,
                 };
                 sweep.raised.push(item);
@@ -167,7 +167,7 @@ impl RunWorker {
             held(&desks.shelf, "settle the shelf")?.take_effects(),
             write_root,
             building.addr(),
-            now_ms()?,
+            self.clock.now()?,
             addr,
             who,
         )?;

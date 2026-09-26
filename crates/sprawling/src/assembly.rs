@@ -99,31 +99,37 @@ use runtime::Interrupt;
 #[cfg(test)]
 use std::path::Path;
 
-/// The single sanctioned sampling point (clippy.toml disallowed-methods). Everything below this call takes `TimeMs` as a
-/// parameter.
-pub(crate) fn now_ms() -> Result<TimeMs, AxError> {
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "the one sampling point: Main injects time"
-    )]
-    let elapsed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|err| {
-            AxError::failure(AxCode::ConfigInvalid, "sample wall clock", err.to_string())
-                .with_recovery("fix the system clock; it reads before the unix epoch")
+/// The wall clock: the single sanctioned sampling point (clippy.toml
+/// disallowed-methods), and the production `accounting::Clock`
+/// (accounting-SPEC.md 8-3). Everything below it takes `TimeMs` as a
+/// parameter or reads the clock it was handed.
+pub(crate) struct SystemClock;
+
+impl accounting::Clock for SystemClock {
+    fn now(&self) -> Result<TimeMs, AxError> {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the one sampling point: Main injects time"
+        )]
+        let elapsed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|err| {
+                AxError::failure(AxCode::ConfigInvalid, "sample wall clock", err.to_string())
+                    .with_recovery("fix the system clock; it reads before the unix epoch")
+            })?;
+        let millis = u64::try_from(elapsed.as_millis()).map_err(|_| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "sample wall clock",
+                "beyond u64 millis",
+            )
+            .with_recovery(
+                "set this machine's clock to the present day; it reads more than half a \
+                 billion years after the unix epoch",
+            )
         })?;
-    let millis = u64::try_from(elapsed.as_millis()).map_err(|_| {
-        AxError::failure(
-            AxCode::ConfigInvalid,
-            "sample wall clock",
-            "beyond u64 millis",
-        )
-        .with_recovery(
-            "set this machine's clock to the present day; it reads more than half a \
-             billion years after the unix epoch",
-        )
-    })?;
-    Ok(TimeMs::new(millis))
+        Ok(TimeMs::new(millis))
+    }
 }
 
 /// What the startup scan found and repaired.
@@ -232,6 +238,10 @@ pub struct RunWorker {
     /// Connects the MCP servers a building's configuration names
     /// (`mcp`). Received for the same reason `models` is.
     connectors: Box<dyn accounting::Connectors + Send>,
+    /// What time it is, for this worker and every lane it drives
+    /// (`SystemClock`). Shared, because a lane reads it while the
+    /// worker does.
+    pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
 }
 
 impl RunWorker {

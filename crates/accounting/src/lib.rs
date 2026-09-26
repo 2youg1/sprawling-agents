@@ -11,8 +11,10 @@
 //! and not a dispatch (ARCHITECTURE.md section 11). Each port here has a
 //! production adapter in `bin::assembly` and a second one outside it.
 
+mod clock;
 mod connectors;
 mod models;
 
+pub use clock::Clock;
 pub use connectors::Connectors;
 pub use models::ModelFactory;

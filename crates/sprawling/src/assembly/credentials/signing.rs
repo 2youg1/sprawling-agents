@@ -15,7 +15,7 @@ use kernel::{AxCode, AxError, EventKind};
 
 use crate::serving::random_token;
 
-use super::super::{RunWorker, now_ms};
+use super::super::RunWorker;
 use super::{Credential, Entered, PROBE_TIMEOUT_MS, poisoned_vault, subscription};
 
 /// How a credential reached the vault, as its `secret_captured` record
@@ -45,16 +45,13 @@ impl Arrival {
 /// # Errors
 /// Propagates a clock that cannot be read.
 fn captured_until(
+    now: kernel::TimeMs,
     reference: kernel::SecretRef,
     origin: String,
     expires_in_s: Option<u64>,
 ) -> Result<SecretCaptured, AxError> {
     let expires_at = match expires_in_s {
-        Some(seconds) => Some(
-            now_ms()?
-                .value()
-                .saturating_add(seconds.saturating_mul(1_000)),
-        ),
+        Some(seconds) => Some(now.value().saturating_add(seconds.saturating_mul(1_000))),
         None => None,
     };
     Ok(SecretCaptured {
@@ -83,7 +80,7 @@ impl RunWorker {
         };
         // A minute of margin: a call started now must still be holding a
         // working credential when it reaches the far end.
-        if now_ms()?.value().saturating_add(60_000) < expires_at {
+        if self.clock.now()?.value().saturating_add(60_000) < expires_at {
             return Ok(());
         }
         let Some(profile) = gateway::profile(provider) else {
@@ -111,7 +108,12 @@ impl RunWorker {
                 vault.set(&stored, next)?;
             }
         }
-        let captured = captured_until(access, format!("{provider}-renewal"), tokens.expires_in_s)?;
+        let captured = captured_until(
+            self.clock.now()?,
+            access,
+            format!("{provider}-renewal"),
+            tokens.expires_in_s,
+        )?;
         self.record(EventKind::SecretCaptured, Payload::of(&captured)?)
     }
 
@@ -182,9 +184,11 @@ impl RunWorker {
                     gateway::Grant::AuthorizationCode { .. } => gateway::OauthPending::Redirect(
                         gateway::oauth_begin(profile, random_token(48)?, random_token(24)?)?,
                     ),
-                    gateway::Grant::DeviceCode { .. } => {
-                        gateway::device_login_begin(profile, now_ms()?.value(), PROBE_TIMEOUT_MS)?
-                    }
+                    gateway::Grant::DeviceCode { .. } => gateway::device_login_begin(
+                        profile,
+                        self.clock.now()?.value(),
+                        PROBE_TIMEOUT_MS,
+                    )?,
                 };
                 // The URL carries a PKCE challenge and a state, both of
                 // which are public by design; no credential exists yet.
@@ -199,7 +203,7 @@ impl RunWorker {
                 self.record(EventKind::LoginStarted, Payload::of(&started)?)
             }
             channels::LoginStep::Code { code } => {
-                let asked_at = now_ms()?.value();
+                let asked_at = self.clock.now()?.value();
                 let pending = self.credentials.logins.get_mut(provider).ok_or_else(|| {
                     AxError::failure(
                         AxCode::CredentialMissing,
@@ -243,6 +247,7 @@ impl RunWorker {
                 // secret, and the one fact that decides whether the next
                 // call must renew first.
                 let captured = captured_until(
+                    self.clock.now()?,
                     access.clone(),
                     format!("{provider}-subscription"),
                     tokens.expires_in_s,

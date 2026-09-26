@@ -33,7 +33,7 @@ use super::desk::{CommandDesk, DeskWait, SCHEDULE_TICK_MS};
 use super::folding::{Folding, spawn_folding};
 use super::relay::Patience;
 use super::serve::Opening;
-use crate::assembly::{RunWorker, Serving, now_ms};
+use crate::assembly::{RunWorker, Serving};
 use crate::views::Views;
 
 /// Where a worker's work goes, and where it comes from.
@@ -202,7 +202,7 @@ pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
             // cannot be read must not stop the city from answering the
             // person.
             DeskWait::Idle => {
-                let since = match now_ms() {
+                let since = match worker.clock.now() {
                     Ok(now) => {
                         let since = now.value().saturating_sub(read_schedule_at.value());
                         if since >= SCHEDULE_TICK_MS {

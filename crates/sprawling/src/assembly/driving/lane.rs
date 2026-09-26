@@ -9,7 +9,7 @@
 //!
 //! It is a free function rather than a method because a lane is a
 //! thread that holds no worker (sprawling-SPEC.md 8-46-1): everything a
-//! drive needs from the city arrives in [`DriveContext`], which is four
+//! drive needs from the city arrives in [`DriveContext`], which is five
 //! handles that clone, and the ledger arrives as a parameter — the
 //! accounting thread hands its own, and a lane hands a
 //! [`Relay`](crate::serving::Relay).
@@ -21,7 +21,6 @@ use runtime::run::{RunHooks, SafePoint, drive};
 use runtime::{Interrupt, NextCall};
 
 use super::{Driven, Driving};
-use crate::assembly::now_ms;
 
 /// What one drive takes from the city, in handles rather than in loans.
 ///
@@ -58,6 +57,9 @@ pub(crate) struct DriveContext {
     /// and that is a different contender: another sprawling process on
     /// the same city, which no mutex here can see.
     pub(crate) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    /// The worker's own clock, so a run's lines and the worker's are
+    /// read from one time (accounting-SPEC.md 8-3).
+    pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
 }
 
 /// Who may interrupt one drive, in rank order: the halt that reached
@@ -209,8 +211,9 @@ pub(crate) fn drive_run<L: Ledger>(
         person,
         backlog,
         fence_gate,
+        clock,
     } = context;
-    let mut now = || now_ms();
+    let mut now = || clock.now();
     let mut fence_point =
         memory::Checkpoint::open(&write_root).map_err(memory::MemoryError::into_ax)?;
     // What the bench fenced, so the sweep afterwards knows which commit
@@ -245,7 +248,7 @@ pub(crate) fn drive_run<L: Ledger>(
             }
             // A clock that cannot be read sends at once: the turn that
             // follows samples the same clock and reports its failure.
-            let Ok(at) = now_ms() else {
+            let Ok(at) = clock.now() else {
                 return NextCall::Allowed;
             };
             let left = until.value().saturating_sub(at.value());

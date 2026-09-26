@@ -15,7 +15,7 @@ use kernel::{Address, EventKind, Locator};
 
 use crate::effect;
 
-use super::super::{CITY_VERIFIER, RunWorker, now_ms};
+use super::super::{CITY_VERIFIER, RunWorker};
 use super::Dispatched;
 
 impl RunWorker {
@@ -59,7 +59,7 @@ impl RunWorker {
         let signal = back.signal(
             collab::SignalId::parse(&format!("handback-{}", child.run))?,
             parent.clone(),
-            now_ms()?,
+            self.clock.now()?,
         )?;
         // Recorded, then delivered - the same order every other signal
         // takes, so the queue only ever changes as a consequence of a

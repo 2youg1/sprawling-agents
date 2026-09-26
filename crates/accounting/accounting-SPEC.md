@@ -11,12 +11,12 @@
 |---|---|---|
 | `models` | 一次 run 或一次命名调用，拿什么模型适配器去说话 | 8-1 |
 | `connectors` | 一栋楼配置里写的 MCP server，怎样连上并变成工具 | 8-2 |
+| `clock` | 现在几点 | 8-3 |
 
-目标形状里还有两个端口与一批搬迁，现在都还不在本 crate：
+目标形状里还有一个端口与一批搬迁，现在都还不在本 crate：
 
 | 端口 | 它回答的问题 | 现在的住处 |
 |---|---|---|
-| `Clock` | 现在几点 | `bin::assembly::now_ms`，唯一采样点 |
 | `Machine` | city 所在的主机上有哪些工具，以及装上一个 | `bin::doctor::probe::Machine`，`pub(crate)` |
 
 `RunWorker` 的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例与 `views` 仍在 `crates/sprawling/src/assembly` 与 `crates/sprawling/src/views`。
@@ -33,14 +33,15 @@
 
 第四条在 `crates/sprawling/tests/connectors.rs`：`a_run_is_offered_the_tools_the_worker_was_handed`。楼的配置写了一个 MCP server，它的命令在任何主机上都不存在；worker 接收了一个脚本 `Connectors`，它给出一个工具。只要 worker 还自己启动 server，这个 server 就起不来，模型收到的工具表里也就没有那个工具。
 
+第五条在 `crates/sprawling/tests/clock.rs`：`a_worker_stamps_its_lines_with_the_clock_it_was_handed`。worker 接收一个停在固定时刻的脚本 `Clock` 之后写下的每一行，`t` 都是那个时刻；只要还有一个写点自己读墙钟，这一行的 `t` 就是现在的时间。
+
 ## 3 假设与歧义
 
-- `Clock` 端口要不要连带 `last_tick` 与调度器一起搬：`last_tick` 是 `RunWorker` 字段，它的读法随六个对象一起定。能定下它的证据是：计划组搬进本 crate 之后，调度器还剩几个调用 `now_ms` 的地方。
 - `views` 在读侧与写侧各有一份 `Governance`，搬进本 crate 时哪一侧拥有这个类型，取决于 `bin::views` 与 `bin::assembly` 之间的环断在哪里（sprawling-SPEC.md 8-92 的表）。
 
 ## 4 现状分析
 
-本 crate 现有两个端口。`ModelFactory` 的生产适配器在装配根（`bin::assembly::models`），第二实现在 `crates/sprawling/tests/model_factory.rs`；`Connectors` 的生产适配器是 `bin::assembly::mcp::McpServers`，第二实现在 `crates/sprawling/tests/connectors.rs`。
+本 crate 现有三个端口。`ModelFactory` 的生产适配器在装配根（`bin::assembly::models`），第二实现在 `crates/sprawling/tests/model_factory.rs`；`Connectors` 的生产适配器是 `bin::assembly::mcp::McpServers`，第二实现在 `crates/sprawling/tests/connectors.rs`；`Clock` 的生产适配器是 `bin::assembly::SystemClock`，第二实现在 `crates/sprawling/tests/clock.rs`。
 
 ## 5 权威信源
 
@@ -48,7 +49,7 @@ ARCHITECTURE.md §3（依赖律与 `depmap`）、§4（端口表）、§11（V6 
 
 ## 6 命名统一
 
-ModelFactory｜Connectors｜accounting thread｜Chosen｜Redemption。「适配器」专指 `kernel::Model` 的一个实现；「端口」专指本 crate 声明、外层实现的 trait。
+ModelFactory｜Connectors｜Clock｜accounting thread｜Chosen｜Redemption。「适配器」专指 `kernel::Model` 的一个实现；「端口」专指本 crate 声明、外层实现的 trait。
 
 ## 7 模块边界
 
@@ -119,6 +120,29 @@ impl RunWorker {
 - **`confidential` 原样传给 `McpTool::new`**：那是工具层的权威。worker 在机密楼里一个 server 都不启动，所以生产路径上它总是 `false`；它仍在签名里，是为了任何实现都不能造出一个绕过工具层拒绝的工具。
 - **固定值**：`RunWorker::new` 与 `over` 装上 `McpServers`；`with_connectors` 是唯一换掉它的门。
 - **依赖**：本 crate 因此依赖 `protocol`（ARCHITECTURE.md §3 的 `depmap`）。
+
+### 8-3 accounting::clock（形状 3 端口）
+
+```rust
+pub trait Clock {
+    /// # Errors
+    /// A clock that cannot be read, such as a wall clock set before the
+    /// unix epoch.
+    fn now(&self) -> Result<kernel::TimeMs, AxError>;
+}
+```
+
+```rust
+// bin::assembly（形状 4 适配器）
+pub(crate) struct SystemClock;            // 生产：墙钟，唯一被许可的采样点（clippy.toml disallowed-methods）
+impl RunWorker {
+    pub fn with_clock(self, clock: Arc<dyn accounting::Clock + Send + Sync>) -> RunWorker;
+}
+```
+
+- **worker 读的每一个时刻都经 `RunWorker.clock`**：它写的行、它量的耗时、它排的期限。lane 线程从 `DriveContext` 拿到同一个时钟的克隆，所以一个 run 的行与 worker 自己的行读的是同一个钟。worker 调用的自由函数（`captured_until`、`reach_of`）把时刻或时钟当参数收下，不自己采样。
+- **worker 之外的两个读点用 `SystemClock`**：`form_city`（city 在任何 worker 存在之前诞生）与 `serving::journal`（诊断日志行的时间，不是城的记录）。`RunWorker::new` 打开 ledger 时 worker 还不存在，也用 `SystemClock`。
+- **固定值**：`RunWorker::new` 与 `over` 装上 `SystemClock`；`with_clock` 是唯一换掉它的门。`Send + Sync` 与 `Arc`，是因为 lane 线程与 worker 同时读它。
 
 ## 12 决策
 

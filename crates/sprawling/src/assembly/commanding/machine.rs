@@ -121,14 +121,14 @@ impl RunWorker {
     reason = "test code"
 )]
 mod tests {
-    use crate::assembly::{RunWorker, now_ms};
+    use crate::assembly::RunWorker;
 
     /// A worker over an empty city, which is all this verb needs: it
     /// refuses before it touches the machine.
     fn worker(city_root: &std::path::Path) -> RunWorker {
         let (ledger, _opened) = memory::JsonlLedger::open(
             &kernel::layout::CityLayout::new(city_root).ledger(),
-            now_ms().unwrap(),
+            accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
         )
         .unwrap();
         RunWorker::over(

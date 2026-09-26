@@ -202,8 +202,9 @@ moves up into the assembly layer.
 **citysim drives the turn loop a second time**: `runtime::run::drive` with
 simulated adapters — a scripted model, scripted tools, an in-memory Ledger
 — which is how a script reproduces a run. It stops below `bin::assembly`:
-`RunWorker` receives its model adapters through `accounting::ModelFactory`
-and its MCP servers through `accounting::Connectors`, and integration tests
+`RunWorker` receives its model adapters through `accounting::ModelFactory`,
+its MCP servers through `accounting::Connectors` and its time through
+`accounting::Clock`, and integration tests
 drive a dispatch against scripted ones by the same door `channels::server`
 uses, but the worker itself still lives in
 `sprawling`, which citysim does not depend on. Moving the worker into
@@ -227,6 +228,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `protocol::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
 | `accounting::models` | crates/accounting/src/models.rs | `bin::assembly::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
+| `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::SystemClock`: the wall clock, the one sampling point | the stopped clock in `crates/sprawling/tests/clock.rs` |
 | `accounting::connectors` | crates/accounting/src/connectors.rs | `bin::assembly::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
 
 The *second adapter* column has no checker: a seam whose double was
