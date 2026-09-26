@@ -16,14 +16,14 @@
 | 端口 | 它回答的问题 | 现在的住处 |
 |---|---|---|
 | `Clock` | 现在几点 | `bin::assembly::now_ms`，唯一采样点 |
-| `Machine` | 这台机器上有什么 | `bin::doctor::probe::Machine`，`pub(crate)` |
+| `Machine` | city 所在的主机上有哪些工具，以及装上一个 | `bin::doctor::probe::Machine`，`pub(crate)` |
 | `Connectors` | 一栋楼连哪些 MCP server | `bin::assembly::mcp` |
 
 `RunWorker` 的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例与 `views` 仍在 `crates/sprawling/src/assembly` 与 `crates/sprawling/src/views`。
 
 ## 2 验收标准
 
-一个接收了脚本 `ModelFactory` 的 `RunWorker`，其 dispatch 走到脚本模型，而不是走到端点簿里登记的那个端点：`a_dispatch_reaches_the_model_the_worker_was_handed`（`crates/sprawling/tests/model_factory.rs`）。端点指向一个拒绝连接的本机端口，所以只要 worker 还自己造适配器，这次 run 就碰不到脚本模型，历史里也就没有脚本写下的那句回答。
+一个接收了脚本 `ModelFactory` 的 `RunWorker`，其 dispatch 走到脚本模型，而不是走到端点簿里登记的那个端点：`a_dispatch_reaches_the_model_the_worker_was_handed`（`crates/sprawling/tests/model_factory.rs`）。端点指向一个拒绝连接的 loopback 端口，所以只要 worker 还自己造适配器，这次 run 就碰不到脚本模型，历史里也就没有脚本写下的那句回答。
 
 ## 3 假设与歧义
 
