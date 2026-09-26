@@ -831,8 +831,8 @@ pub fn free_space_floor(volume_bytes: u64) -> u64;
 - 内存紧：`queued_runs > 0`。排队本身就是 S5.9L 的内存闸门给出的，这里只把它说出来。
 - CPU 被占满：`schedule_delay > CPU_SATURATED_DELAY`，即一帧（60 Hz）——人开始看得见的延迟；它是感知常数，不随机器类别调。
 - 只有盘快满停止接新活：盘慢与 CPU 满时接活只会变慢，不会丢；内存紧已由排队处理。停止接新活用 `backpressure::Admission`，不另立一套准入。
-- 写盘失败时账本不坏、重启可恢复，由 memory 的 `fault_fs` 注入测试与 jsonl 的撕裂尾恢复承担（torn tail 截到最长有效前缀）；本模块不复述。
-- 未落地：事实条与 doctor 的显示，读数接入 S5.9N 的采样点，停止接新活接到受理新 run 的入口。
+- 写盘失败时账本不坏、重启可恢复，由 memory 承担（memory-SPEC 8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
+- 未落地：事实条与 doctor 的显示；停止接新活接到受理新 run 的入口；读数的来源。`bin::monitor::Sample` 还没有卷容量、fsync 中位数与调度延迟三项，它的 `durable_lag` 是条数而本模块要的是等待时长，生产的计数器读取也尚未选定来源（sprawling-SPEC 8-90），所以 `ResourceReadings` 暂无生产的填写者。
 
 ### 8-14 kernel::stall
 
