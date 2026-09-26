@@ -76,6 +76,7 @@ Stage 2 追加：
 6. **浮点拒绝在构造点**：Ledger 载荷禁浮点（确定性七条之 6）由 `Payload::new` 与其 `Deserialize` 双侧执行，serde_json 数字非 i64/u64 可表示即拒。
 7. **存储写失败码**（S2 期初定）：增装载期第 5 码 `E_STORAGE_FATAL`（AxCode 36）承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
 8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。
+9. **没有写方的 kind 不定型**：`credential_lent`、`backpressure_shed`、`digest_invalidated` 在 `EventKind` 里有名字，但本树没有任何写方。结构体要以写方的字节为准（record 模块规则 1），没有写方就没有可对齐的字节，故它们留在 `record` 之外，与 F1 家族的无写方 kind 同理；哪天出现写方，它的第一版就经 `Payload::of` 写，结构体随之落在 `record` 下。
 
 ## 4 现状分析
 
@@ -393,6 +394,9 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub skills: Vec<SkillPin>,          // 空亦写出
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
+pub struct EvalRun { pub probe: String, pub version: u32, pub predecessor: RunId,  // eval_run：交接探针的一次读数
+                    pub kept: u32, pub lost: Vec<u32>,       // lost 是答案不同的题号
+                    pub before: Vec<String>, pub after: Vec<String> }   // 全部必填，空亦写出
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
@@ -441,6 +445,64 @@ pub struct AdviserAnswered { pub subject: String, #[serde(flatten)] pub answer: 
 #[serde(rename_all = "snake_case")]
 pub enum AdviserFailure { Unavailable, Timeout, Unreadable }
 pub struct AdviserFellBack { pub subject: String, pub reason: AdviserFailure }
+
+// record::credential：F3 家族里凭据进出的三行。`ref` 是 SecretRef 而不是 String，
+// 语法之外的引用读不成这一行（Payload::read 报 E_WIRE_MISMATCH），不再被读者各自静默跳过。
+pub struct SecretCaptured { #[serde(rename = "ref")] pub reference: SecretRef,
+                            #[serde(default)] pub origin: String,   // enrolment | pasted | <provider>-subscription | <provider>-renewal
+                            pub expires_at: Option<u64> }           // 缺席即省略，不写 null
+pub struct LoginStarted { pub provider: String, pub auth_url: String,
+                          pub user_code: Option<String> }           // 只有设备码登录才有；缺席即省略
+pub struct ToolkitLinkOpened { pub toolkit: String }
+
+// record::endpoint：F3 家族里「哪个 model 替哪个 tag 作答」的两行。gateway 的 EndpointBook
+// 只经 Payload::read 读它们；InputKinds 随之归 kernel（gateway::InputKinds 是它的再导出），
+// 因为账本行的值要用 kernel 自己的类型。
+#[serde(rename_all = "snake_case")] #[derive(Default)]
+pub enum InputKinds { #[default] Text, TextImage }
+pub struct ModelSelected { pub tag: ModelTag, pub endpoint: String, pub model: String,
+                           pub context_tokens: u64,
+                           #[serde(default)] pub max_output_tokens: Option<u64>, // 总是写出，缺席写 null
+                           pub ceiling_from: Option<String>,   // person|upstream|preset|policy；缺席即省略
+                           #[serde(default)] pub input: InputKinds, // 旧行没有这个键，读作 Text
+                           pub input_price: UsdMicros, pub output_price: UsdMicros,
+                           pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
+impl ModelSelected { pub fn ceiling(&self) -> Option<Ceiling>; }   // 0 与 null 同读作「未声明」
+pub struct EndpointLost { pub name: String }
+pub struct EndpointAttached { pub name: String, pub base_url: String, pub dialect: DialectKind,
+                              pub auth: Option<SecretRef>,          // 引用，从不是密钥；缺席即省略
+                              pub auth_header: Option<String>,      // 非 bearer 时凭据所在的 header
+                              pub models: Vec<String>,              // 空亦写出
+                              pub connection_kind: Option<String>,  // 旧行没有，读者按 dialect 回推
+                              #[serde(default = true)] pub probed: bool,
+                              pub tuning: Option<AttachedTuning> }  // 什么都没设就省略；不是对象读作未设
+pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u64>,
+                            pub stream_idle_timeout_ms: Option<u64>, pub request_max_retries: Option<u32>,
+                            pub proxying: Option<Proxying>,        // 默认值省略
+                            pub extra_headers: Vec<(String, String)>, pub overrides: Vec<(String, String)> }
+// AttachedTuning 的每个键缺席读作未设、在而读不懂也读作未设（行不被拒）：编造一个期限比没有期限更难解释。
+// EndpointAttached 顶层的键则不然：probed、auth、connection_kind 在而读不懂，整行读不成（E_WIRE_MISMATCH），
+// 因为把一个没探到的端点读成探到过，是在书里放进一个没人够得着的端点。
+
+// record::probe：endpoint_probed，一次探测在挂上任何东西之前看到的。ModelFacts 随之归 kernel
+// （gateway::ModelFacts 是它的再导出，读一行 /models 的 gateway::endpoint::models::facts_of 仍归 gateway），
+// 因为账本行的值要用 kernel 自己的类型。
+pub struct ModelFacts { pub id: String, pub context_tokens: Option<u64>, pub max_output_tokens: Option<Ceiling>,
+                        pub input_modalities: Vec<String>, pub input_price: Option<String>,
+                        pub output_price: Option<String> }        // 缺席写 null，行没说就是没说
+pub struct EndpointProbed { pub name: String, pub base_url: String, pub reach: Reach,
+                            pub models: Vec<String>, pub facts: Vec<ModelFacts>,   // 读不到列表时两者都写空
+                            pub failed: Option<ProbeFailure> }                   // 缺席即省略
+pub struct ProbeFailure { pub code: String, pub subject: String }
+// record::provider：provider_degraded 有两个写方、两种形状，一个 untagged enum 让读者靠读来分，
+// 不靠猜键：E_PROVIDER 经 kernel::error 的 carrier 表平铺写成 AxError 本身；vault 启动探针退到
+// session memory 时写 VaultFellBack。两者都不是的行读不成（E_WIRE_MISMATCH）。
+#[serde(untagged)] pub enum ProviderDegraded { Refused(AxError), VaultFellBack(VaultFellBack) }
+pub struct VaultFellBack { pub component: String,     // 探针写 vault
+                           pub fallback: String,      // 探针写 session-memory
+                           pub persistence: String,   // gateway::Persistence 的自有拼法
+                           pub reason: String }
+// channels::note_of 只把 Refused 记成回合上的 Note::Refused；VaultFellBack 没改变任何回合，不出 note。
 
 pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
                         pub subject: Option<String> }   // 键缺席读作 None

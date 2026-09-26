@@ -17,7 +17,7 @@
 //! rather than an error, because a view that hid a record it could not
 //! parse would be a view that lies about what happened.
 
-use kernel::event::record::{CheckpointCommitted, FileDiscarded};
+use kernel::event::record::{CheckpointCommitted, FileDiscarded, ProviderDegraded};
 use kernel::{EventKind, EventRecord, Seq};
 
 use crate::answer::{Note, Output, Used};
@@ -160,16 +160,20 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
         // into the payload. A payload that will not read back as one is
         // kept as the failure to read it rather than rendered as a
         // refusal this build invented, or dropped as if nothing refused.
-        EventKind::GateDenied
-        | EventKind::BudgetLimit
-        | EventKind::WatchdogFired
-        | EventKind::ProviderDegraded => {
+        EventKind::GateDenied | EventKind::BudgetLimit | EventKind::WatchdogFired => {
             let value = serde_json::Value::Object(map.clone());
             Some(match serde_json::from_value(value) {
                 Ok(error) => Note::Refused { error, at },
                 Err(err) => unreadable(kind, &err, at),
             })
         }
+        // The vault's fallback to session memory shares this kind and
+        // changed nothing a turn did.
+        EventKind::ProviderDegraded => match record.data().read() {
+            Ok(ProviderDegraded::Refused(error)) => Some(Note::Refused { error, at }),
+            Ok(ProviderDegraded::VaultFellBack(_)) => None,
+            Err(err) => Some(unreadable(kind, &err, at)),
+        },
         EventKind::ApprovalRequested => Some(Note::Waiting { at }),
         // The job pin that opens a dispatch is a `checkpoint_committed`
         // naming no commit, and the record type says so rather than

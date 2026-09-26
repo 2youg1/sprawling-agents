@@ -23,7 +23,8 @@ use crate::dialect::{ImageBytes, request_wire};
 
 use super::config::{AuthSpec, Endpoint, ProviderFailure, apply_override, provider_err};
 use super::header::HeaderValue;
-use super::models::ModelFacts;
+use super::models::facts_of;
+use kernel::event::record::ModelFacts;
 
 /// Every picture one conversation refers to, in the order the blocks
 /// name them: the blocks a person attached and the ones a tool produced
@@ -50,7 +51,7 @@ impl Endpoint {
     ///
     /// Both dialects answer `GET .../models` with `{"data":[{"id":..}]}`.
     /// What else a row carries is the vendor's own business, so each row
-    /// is read by [`ModelFacts::read`] for everything it states and for
+    /// is read by [`facts_of`] for everything it states and for
     /// nothing it does not; a row this city cannot name is left out
     /// rather than given an invented one.
     ///
@@ -83,7 +84,7 @@ impl Endpoint {
         })?;
         let mut facts = Vec::new();
         for row in rows {
-            facts.push(ModelFacts::read(row).ok_or_else(|| {
+            facts.push(facts_of(row).ok_or_else(|| {
                 provider_err(
                     "read the model list",
                     &ProviderFailure::Unreadable("a row has no id".to_owned()),

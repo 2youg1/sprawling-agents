@@ -41,10 +41,14 @@
 mod adviser;
 mod checkpoint;
 mod collaboration;
+mod credential;
 mod discard;
+mod endpoint;
 mod governance;
 mod log;
 mod modality;
+mod probe;
+mod provider;
 mod run;
 mod tool;
 mod turn;
@@ -54,14 +58,18 @@ pub use adviser::{
 };
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
 pub use collaboration::{ConflictLevel, GoalConflict, PursuitChanged, PursuitMove};
+pub use credential::{LoginStarted, SecretCaptured, ToolkitLinkOpened};
 pub use discard::{AssetArchived, DiscardRestored, FileDiscarded};
+pub use endpoint::{AttachedTuning, EndpointAttached, EndpointLost, InputKinds, ModelSelected};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     SpineDocumentWritten, autonomy_word,
 };
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
-pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
+pub use probe::{EndpointProbed, ModelFacts, ProbeFailure};
+pub use provider::{ProviderDegraded, VaultFellBack};
+pub use run::{EvalRun, EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,
