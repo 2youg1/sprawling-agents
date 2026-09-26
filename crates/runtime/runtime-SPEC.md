@@ -967,7 +967,7 @@ pub struct RunHooks<'a> {
 |---|---|
 | `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`grant`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_memory` |
 | `bench/admit.rs` | 门：`admit` 按 `Effect` 分派到 Write／Connector／Egress／Spawn／Govern 各门，`settled`／`crossed` 把一次判定翻译成 `BenchOutcome`，`scanned` 为两扇朝外的门备好密钥扫描的字节 |
-| `bench/tests.rs` | 去重、门、fence 与注册冲突的夹具（7 个 `#[test]`） |
+| `bench/tests.rs` | 去重、门、taint、fence 与注册冲突的夹具（8 个 `#[test]`） |
 
 **无字段开放。** 子模块本就能看见父模块的私有项，故 `ToolBench` 的字段一个都没动；唯一的可见性改动是 `fn admit` → `pub(super) fn admit`，因为它现在由父文件的 `invoke` 调用。
 
