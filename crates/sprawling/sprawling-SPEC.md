@@ -14,7 +14,7 @@ S0 三件：①CLI 壳（`status` 可用；未到期的子命令给出诚实拒�
 
 「验证这条链先于验证页面内容」——S0 不起 HTTP 服务，HTTP 属 channels::server（S4）；嵌入的取证面是测试与 `status` 输出。
 
-评审楼的 worktree 按房间保留：`stand_up` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（memory-SPEC 8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。树按楼的 scope 领、按同一个 scope 围栏和献出（`workbench::tree_scope` 是这一个 scope 的唯一定义）：再领一棵留着的树只检出 scope（memory-SPEC 8-9），献出的 `Checkpoint::land` 只按 scope 暂存，于是合并进干线的提交只动 scope。第一次放置仍是全量检出：`Worktree::add` 总做一次全量检出，git2 0.21 没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `memory` 禁 `unsafe`。上限只称一次检出、不称留着的树之和，定在 memory-SPEC 8-9。树的放置与 MCP 缺表时的那次连接今天仍在记账线程上；把它们连同 `lay_out_workbench`、`freeze_plan` 一起移进 lane 的形状定在 8-93，那一节也写着还没落地的三个阶段。
+评审楼的 worktree 按房间保留：`stand_up` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（memory-SPEC 8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。树按楼的 scope 领、按同一个 scope 围栏和献出（`workbench::tree_scope` 是这一个 scope 的唯一定义）：再领一棵留着的树只检出 scope（memory-SPEC 8-9），献出的 `Checkpoint::land` 只按 scope 暂存，于是合并进干线的提交只动 scope。第一次放置仍是全量检出：`Worktree::add` 总做一次全量检出，git2 0.21 没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `memory` 禁 `unsafe`。上限只称一次检出、不称留着的树之和，定在 memory-SPEC 8-9。树的放置与 MCP 缺表时的那次连接今天仍在记账线程上；把它们连同 `lay_out_workbench`、`freeze_plan` 一起移进 lane 的形状定在 8-93，那一节也写着还没落地的两个阶段。
 
 ## 4 现状分析
 
@@ -109,10 +109,10 @@ impl protocol::Outbound for StdioServer {
 fn mcp_tools(&mut self, config: &FrozenConfig, addr: &Address, confidential: bool)
     -> Vec<protocol::McpTool>;   // 起不来的 server 缺席并留下诊断，恒不拒整次 dispatch
 
-// bin::assembly::mcp（形状 3 常驻表）：worker 持有，一台 server 一项
-pub(crate) struct Residents { /* 私有：Vec<Resident>，键 (McpServer, write_root) */ }
+// bin::assembly::mcp（形状 3 常驻表）：worker 持有，一台 server 一项，每项一把锁
+pub(crate) struct Residents { /* 私有：Mutex<Vec<Arc<Keyed>>>，键 (McpServer, write_root)，每个 Keyed 自带 Mutex<Option<Resident>> */ }
 impl Residents {
-    pub(crate) fn tools(&mut self, server: &kernel::McpServer, write_root: &Path, confidential: bool,
+    pub(crate) fn tools(&self, server: &kernel::McpServer, write_root: &Path, confidential: bool,
                         resolve: &gateway::SecretResolver)
         -> Result<(Vec<protocol::McpTool>, Reached), AxError>;   // Reached::{Connected(Handshake), Resident}
 }
@@ -120,7 +120,7 @@ impl Residents {
 
 - **兑付只有一处，三种 transport 共用**（`bin::mcp_redeeming`）：一个子进程要的环境变量与一台主机要的请求头是同一件事——一个名、一个值、以及一个可能是凭证的值。兑付发生在读配置的那一刻而不是第一次调用时：金库里没有的引用是一个配置错误，而能处理它的人正在编辑那份文件，不是一小时后工具不应答的那个模型。`Redeemed` 的 `Debug` 只报名字，明文的唯一出口是 `expose`。
 - **交给子进程的名字收不回来**，故 `start` 收到的 `env` 已经是兑付好的值，明文只在这一次调用里存在；`env` 是**添加**到本进程已有的环境上，否则一台 server 会找不到 PATH 与 HOME。
-- **一台 server 一个子进程，寿命是 worker 的寿命**（`assembly::mcp::Residents`，常驻连接表）。每次 dispatch 都起子进程、握手、list，是 `[prepare_dispatch_ms]` 里 servers 那一半的全部开销；表把它降到一次。键是整条 `McpServer` 声明加上运行根 `write_root`：声明任一字段变了就是另一台 server，起在另一个目录里的子进程也不是同一台，因为子进程的工作目录在启动时定下、之后改不了。命中且子进程仍在运行时，这次 dispatch 用表里记下的清单（`ToolMeta` 与远端名成对）和同一条连接构造 `McpTool`，不握手也不 list；子进程已退出或问不出状态，就丢掉这一项并重连，这就是 server 死后的重连。HTTP 与 SSE 的表项恒视为可用：连接逐次请求，一台死掉的主机在那次调用里失败并留名。几条 lane 同时用一条 stdio 连接时由连接自己的锁排队。代价有两件：清单在连接那一刻读定，server 在两次 run 之间改了清单，要等子进程重启才看得见；配置里删掉的 server 的子进程活到 worker 落地。worker 落地时表落地，最后一个句柄落地时 `Drop` 杀子进程，于是「谁来回收」仍不需要第二份名单。连接今天仍在记账线程上建立（缺表的那一次仍付握手）；表怎样变成 lane 可借的句柄、连接怎样搬进 lane，定在 8-93。
+- **一台 server 一个子进程，寿命是 worker 的寿命**（`assembly::mcp::Residents`，常驻连接表）。每次 dispatch 都起子进程、握手、list，是 `[prepare_dispatch_ms]` 里 servers 那一半的全部开销；表把它降到一次。键是整条 `McpServer` 声明加上运行根 `write_root`：声明任一字段变了就是另一台 server，起在另一个目录里的子进程也不是同一台，因为子进程的工作目录在启动时定下、之后改不了。命中且子进程仍在运行时，这次 dispatch 用表里记下的清单（`ToolMeta` 与远端名成对）和同一条连接构造 `McpTool`，不握手也不 list；子进程已退出或问不出状态，就丢掉这一项并重连，这就是 server 死后的重连。HTTP 与 SSE 的表项恒视为可用：连接逐次请求，一台死掉的主机在那次调用里失败并留名。表按键上锁：表自己的锁只在找键、添键的那一刻持有，连接、握手与 list 在这一键自己的锁里做，于是同一台 server 的两次查询排在同一把键锁上，先到的连接、后到的命中，不同 server 的连接互不等待；`tools` 取 `&self`，表是 `Sync`，可以被几条线程同时问。几条 lane 同时用一条 stdio 连接时由连接自己的锁排队。代价有两件：清单在连接那一刻读定，server 在两次 run 之间改了清单，要等子进程重启才看得见；配置里删掉的 server 的子进程活到 worker 落地。worker 落地时表落地，最后一个句柄落地时 `Drop` 杀子进程，于是「谁来回收」仍不需要第二份名单。连接今天仍在记账线程上建立（缺表的那一次仍付握手）；表怎样成为 lane 借的 `Arc`、连接怎样搬进 lane，定在 8-93。
 - **读取线程是句柄的一部分，spawn 点仍在 bin**（确定性七条③的口径：并发归装配层）。同步读一根管道没有期限，而一个不回答的 server 会把整个 Run 挂死。故 `start` 起一条只读 stdout 的线程，`call` 用 `recv_timeout` 等它；超时即杀子进程并三段式拒。**线程恒不泄漏**：杀子进程关掉管道，读到 EOF 即结束。
 - **期限从声明里来，不在适配器里另写一个数**：`ToolMeta.timeout`（`tools_from` 写的 `TimeoutMs(60_000)`）既是对模型的承诺，就应当是真正被执行的那一个；否则该字段只是装饰。故期限随 `Outbound::call` 入参。
 - **起不来的 server 缺席而不拒 dispatch**：与 `city::library` 对「楼里点名却不在架上的 SKILL」同形——模型看到的名录恒等于真能跑的工具表，缺席的那一件在诊断里留名。一个外部服务今天起不来，不是这栋楼今天不能干活。
@@ -3697,7 +3697,7 @@ pub(in crate::assembly) struct Flight {
 - **记账线程：`stage_dispatch(&mut self, at, task, goal) -> Result<Staged, AxError>`。** 同意、托管、规则、房间、定形、brief、job，配置与身份的读取，run id（连同它那一次时钟采样），`governance.sent`，滤表，`open_desks`，`inherited`，以及 lane 要读的状态快照：`collaborating.rooms` 里挂着信的房间集合、`ledger.position`、治理的自治级别、`city_hash`；最后 `enrol_run`。这些要么写账本，要么改记账线程持有的折叠，要么是一次时钟采样。留在这里，run 与 run 之间的决定次序就与今天相同。`inherited` 留下，是因为它读账本索引、写 lineage 一行，账本与 `LedgerIndex` 只属于记账线程。`Staged` 拥有它的全部字段，是 `Send`。
 - **lane：`prepare_in_lane(staged, ledger: &mut L, context: &DriveContext) -> Result<(Driving, Prepared), AxError>`**，在同一条 lane 上、`drive_run` 之前。评审树的 `ensure_base` 与 `claim`；`worktree_opened` 经这条 lane 的 relay 写；`lay_out_workbench`，MCP 缺表时的连接在这里；`freeze_plan` 去掉 `inherited` 之后的部分；`probe_after`、`sieving_for`、`fence_scope`。`ensure_base` 在 `fence_gate` 里做：城还没有提交时它提交一次城的 index，与围栏争同一把 `.git/index.lock`，8-46-13 的理由原样适用。`claim` 只动本房间的树与分支，不进这道闸。`Prepared` 里的 `site` 与 `workbench` 随 `Driven` 回家，交给 `land`；`Continuation` 在起飞时只剩记账线程那一半。
 
-**lane 借什么。** 8-90、8-91 拆出的对象里，lane 只借本来就是共享句柄的那几样，每样是一个 `Arc` 的克隆或一个值：`Flight.backlog` 与 `Flight.fence_gate`（已在 `DriveContext` 里）、`Credentials.vault`（工具解析密钥用）、`city_root`、CAS 的第二个句柄、MCP 常驻表。CAS 可以有第二个写者，因为它按内容寻址：两个写者放同一个对象，结果是同一个文件。常驻表由 `RunWorker.mcp` 独占的 `Residents` 改成 `Arc<Residents>`，内部按键上锁：同一台 server 的两条 lane 排在同一把键锁上，先到的连接，后到的命中；不同 server 的连接互不等待；表的寿命仍是 worker 的寿命，最后一个 `Arc` 落地时 `Drop` 杀子进程（8-4）。`Collaborating`、`Planning`、`Doorstep`、`Governance`、账本与 `LedgerIndex` 不借：记账线程的折叠改写它们，lane 读到的只能是 `Staged` 里的快照。快照在 `stage_dispatch` 里取，和今天 `lay_out_workbench` 读它们时处在同一个时点，所以读到的值相同。
+**lane 借什么。** 8-90、8-91 拆出的对象里，lane 只借本来就是共享句柄的那几样，每样是一个 `Arc` 的克隆或一个值：`Flight.backlog` 与 `Flight.fence_gate`（已在 `DriveContext` 里）、`Credentials.vault`（工具解析密钥用）、`city_root`、CAS 的第二个句柄、MCP 常驻表。CAS 可以有第二个写者，因为它按内容寻址：两个写者放同一个对象，结果是同一个文件。常驻表已按键上锁、可被几条线程同时问（8-4），`RunWorker.mcp` 由 `Residents` 改成 `Arc<Residents>`，lane 借一个克隆；表的寿命仍是 worker 的寿命，最后一个 `Arc` 落地时 `Drop` 杀子进程（8-4）。`Collaborating`、`Planning`、`Doorstep`、`Governance`、账本与 `LedgerIndex` 不借：记账线程的折叠改写它们，lane 读到的只能是 `Staged` 里的快照。快照在 `stage_dispatch` 里取，和今天 `lay_out_workbench` 读它们时处在同一个时点，所以读到的值相同。
 
 **冻结前缀为什么逐字节不变。** 前缀由三段文件、一个 run slot 与工具表拼成，每个输入在搬前搬后是同一个值。三段读的是城根下的文件，从 `stage_dispatch` 到 `prepare_in_lane` 之间记账线程不写它们：它写的是账本、brief 与 job。run slot 由 `Given`、模型注记与继承的对话拼成，三者都在 `Staged` 里。树的路径是 `city_root` 与 `tree_of(addr)` 的纯函数，与哪条线程去认领无关。工具表的顺序由 `lay_out_workbench` 的准入顺序定；其中 MCP 那部分，命中时是表项记下的 `listed`，缺表时是这一次 list 的结果，与握手在哪条线程上无关。run id 仍在记账线程上铸，从它铸 id 的三件工具拿到的还是同一个 id。唯一换了线程的时钟读数是计时用的 `[prepare_dispatch_ms]`，它不进任何记录；铸 run id 的那一次采样不搬（`stand_up` 的文档：结构改动不得移动时钟采样）。
 
@@ -3705,7 +3705,6 @@ pub(in crate::assembly) struct Flight {
 
 **验收的两条测试。** 其一是红：记账线程在一次派活里不做 worktree 与 MCP 的 I/O。测试用一台握手要等测试放行的 stdio MCP 夹具，把一轮活派进评审楼；握手没放行时，记账线程要在限定时间内答出另一条命令。今天握手在记账线程上，那条命令答不出，断言失败。树的一半同形：测试在一座还没有提交的城里先放一把 `.git/index.lock`，`ensure_base` 等锁时记账线程仍要答。其二是守护：同一个夹具城、同一条 job、同一个钉住的时钟，经 lane 派出的 run 在 `run_started` 里记下的前缀各段哈希，等于搬之前的路径记下的那一组；那组哈希在搬之前从今天的路径取出，写进测试作为期望值。它在搬前搬后都绿，作用是让搬动改不了前缀。
 
-**三个阶段，各自独立成立。**
-1. `Residents` 改成按键上锁、可共享的表，仍在记账线程上调用；行为不变，既有的常驻表测试原样通过。
-2. 切出 `Staged`、`stage_dispatch` 与 `prepare_in_lane`；`prepare_dispatch` 暂时是二者在同一线程上的组合，直接调它的测试（`settling/tests/landing.rs`、`driving/tests/rules_account.rs`）不改。守护测试在这一阶段落下。
-3. `Flight` 把 `prepare_in_lane` 放进 lane 的闭包、排在 `drive_run` 之前，`prepare_dispatch` 这个组合随之删除，调用它的两个入口（`driving::flight`、`plans::pursuing`）改为 `stage_dispatch` 加起飞。红测在这一阶段落下并转绿，`[prepare_dispatch_ms]` 的读数只剩记账线程那一半。
+**还没落地的两个阶段，各自独立成立。** 常驻表按键上锁（8-4）是它们的前提，已经成立：它仍只在记账线程上被调用，`a_server_still_shaking_hands_keeps_no_other_server_waiting` 用两条线程守着「一台握手未答的 server 不挡另一台」。
+1. 切出 `Staged`、`stage_dispatch` 与 `prepare_in_lane`；`prepare_dispatch` 暂时是二者在同一线程上的组合，直接调它的测试（`settling/tests/landing.rs`、`driving/tests/rules_account.rs`）不改。守护测试在这一阶段落下。
+2. `Flight` 把 `prepare_in_lane` 放进 lane 的闭包、排在 `drive_run` 之前，`prepare_dispatch` 这个组合随之删除，调用它的两个入口（`driving::flight`、`plans::pursuing`）改为 `stage_dispatch` 加起飞。红测在这一阶段落下并转绿，`[prepare_dispatch_ms]` 的读数只剩记账线程那一半。
