@@ -9,6 +9,7 @@ import { get } from "svelte/store";
 import table from "../lang.json";
 import { Address, RunId, Seq } from "../wire";
 import type { Command, Origin } from "../wire";
+import type { View } from "./route";
 import { SLASH, find, offered, parse } from "./slash";
 import type { Slash, SlashCall, SlashHands } from "./slash";
 import { completed } from "./completion";
@@ -20,6 +21,9 @@ describe("slash", () => {
     for (const known of SLASH) {
       expect(known.spelling, "a verb begins with a slash").toMatch(/^\/[a-z]+$/);
       expect(seen.has(known.spelling), `${known.spelling} is spelled twice`).toBe(false);
+      expect(["actions", "navigation", "sessions"], `${known.spelling} names its palette section`).toContain(
+        known.section,
+      );
       seen.add(known.spelling);
     }
   });
@@ -90,6 +94,7 @@ describe("new and fork", () => {
         spelling,
         grammar: "",
         about: "slash_help",
+        section: "actions",
         run: () => undefined,
       }
     );
@@ -100,20 +105,23 @@ describe("new and fork", () => {
   function hands(
     here: Address | null,
     newest: (room: string) => { run: RunId; at: Seq } | null,
-  ): { filled: SlashHands; sent: Command[]; written: string[] } {
+    live: { run: RunId; at: Seq } | null = null,
+  ): { filled: SlashHands; sent: Command[]; written: string[]; went: View[] } {
     const sent: Command[] = [];
     const written: string[] = [];
+    const went: View[] = [];
     return {
       sent,
       written,
+      went,
       filled: {
         command: (command) => {
           sent.push(command);
           return true;
         },
-        go: () => undefined,
+        go: (view) => went.push(view),
         here,
-        live: null,
+        live,
         newest,
         models: [],
         effort: null,
@@ -189,5 +197,40 @@ describe("new and fork", () => {
     verb("/fork").run(held.filled, called("/fork lab/room1"));
     expect(held.sent).toHaveLength(0);
     expect(held.written, "the line stays for editing").toHaveLength(0);
+  });
+  // Halt and Cancel are two verbs in the glossary, so they are two
+  // spellings here: `/stop` ends the run in front of the person and
+  // nothing wider, and `/halt` is the brake `/release` lifts.
+  test("/stop cancels the run in front of the person and never halts", () => {
+    const held = hands(Address.make("hall/mayor"), () => null, { run: MOTHER, at: Seq.make(3) });
+    verb("/stop").run(held.filled, called("/stop --all"));
+    expect(held.sent.map((frame) => ("cancel" in frame ? frame.cancel.run : null))).toEqual([MOTHER]);
+  });
+
+  test("/halt pairs with /release over a building and the city", () => {
+    const held = hands(Address.make("hall/mayor"), () => null);
+    verb("/halt").run(held.filled, called("/halt lab"));
+    verb("/halt").run(held.filled, called("/halt --all"));
+    verb("/release").run(held.filled, called("/release lab"));
+    expect(held.sent.map((frame) => Object.keys(frame).at(0))).toEqual(["halt", "halt", "release"]);
+    expect(find("/halt")?.grammar).toBe(find("/release")?.grammar);
+  });
+
+  test("/clear drops the conversation the way /new does", () => {
+    const room = Address.make("hall/mayor");
+    const held = hands(room, () => null);
+    verb("/clear").run(held.filled, called("/clear"));
+    expect(opened(held.sent)).toEqual({ addr: room, carry: "nothing", from: null });
+  });
+
+  test("/steer takes only the sentence", () => {
+    expect(find("/steer")?.grammar).toBe("<text>");
+  });
+
+  test("/diff opens the run page that holds the changes lens", () => {
+    const room = Address.make("lab/room1");
+    const held = hands(room, (asked) => (asked === room ? { run: MOTHER, at: Seq.make(7) } : null));
+    verb("/diff").run(held.filled, called("/diff"));
+    expect(held.went).toEqual([{ kind: "run", run: MOTHER }]);
   });
 });

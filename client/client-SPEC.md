@@ -81,7 +81,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **4-10 页面上没有句子，但零数据的屏必须说下一步。** `lang.json` 全是标签，说明段不写。**动词一律拼成命令**：`city_stop` ＝ `/stop --all`、`bld_halt` ＝ `/stop {addr}`、`talk_stop`／`run_cancel` ＝ `/stop`，`release` 同形；两语同一拼写。理由：人会从别的软件迁移用法，一条命令的拼写自己说明自己。**原条禁「图例」与「空态提示」，这一句在 2026-09 被两次实测推翻，故在此改写而不是在代码里绕过**：`city/bar.svelte` 的图例是五个字形唯一的名字，去掉它城就是一张没人读得懂的画；一个零数据的屏只画一个灰词时，人分不清这屏是空的还是坏的。因此**空态一律走 `parts/empty.svelte`**——一个形状、一句说缺什么的话、一个离开这个状态的动作，动作能省而那句话不能。这不放宽「不写说明段」：空态那句话说的是这一屏此刻没有什么，不是这一屏是干什么的。
 - **4-11 性能纪律。** 帧按动画帧合并（`socket.ts` 的 `queue` ＋ `requestAnimationFrame`），事件折叠 O(1)，同一查询 250 ms 内合并（`asking.ts` 的 `PACE_MS`），stale-while-revalidate，动画只用 `transform`／`opacity`。
 - **4-12 SVG 的规则：id 只有一个家。** JSX 时代「`<a>` 被建成 HTML 元素、SVG 子树不渲染」的陷阱在 Svelte 不存在——模板解析器按命名空间处理 svg 子树。留下来的是原规则后半句的加强：`<defs>` 只在最外层绘图组件里写，渐变／滤镜／裁剪的 id 在那里声明一次，引用者拿 id、不自己拼第二遍。城市插画（skyline／marks）是画不是图标，导航与动作类图标一律 `parts/glyph.svelte`（4-34）。
-- **4-13 composer 说出消息落点。** `core/belief.ts` 的 `Sending = "dispatch" | "steer" | "queued"` 与纯函数 `sendingInto(doing)`：`frozen` 与无 run → `dispatch`，`thinking` → `steer`，`calling`／`waiting` → `queued`；拼写 `/dispatch`／`/steer`／`/steer --queued`。理由：steer 在相位边界被消费，工具调用期间 run 在系统调用里，「发出去了」与「被听见了」不是一个时刻。**零 wire 变更**：信息全在 belief 里。**抖动缓冲不做**：抖动多大是一个未测量的量，为一个未测量的量先建队列是这座城禁的那条。
+- **4-13 composer 说出消息落点。** `core/belief.ts` 的 `Sending = "dispatch" | "steer" | "queued"` 与纯函数 `sendingInto(doing)`：`frozen` 与无 run → `dispatch`，`thinking` → `steer`，`calling`／`waiting` → `queued`；标签 `/dispatch`／`/steer`／`/steer, after the tool call`；三者发的都是 `/dispatch` 或 `/steer <text>`，`queued` 只是标签说出的落点，不是另一种送法（真正的排队送达——等 run 冻结后再送——要改 wire，不在本客户端的语法里）。理由：steer 在相位边界被消费，工具调用期间 run 在系统调用里，「发出去了」与「被听见了」不是一个时刻。**零 wire 变更**：信息全在 belief 里。**抖动缓冲不做**：抖动多大是一个未测量的量，为一个未测量的量先建队列是这座城禁的那条。
 - **4-14 从 diff 到 session 是一次路由跳转**，不新增命令帧、不加「继续」按钮。`dispatch{addr: room, session: null}` 与在该房间对话页按 Enter 是同一个动作，加按钮就是给一个已有机制起第二个名字。
 - **4-15 提交列表按页问、按页存。** `core/asking.ts` 的 `COMMITS_PAGE = 40` 与 `commitsQuery(building, before)`——问题只有一种拼写，因为 `CommitsAnswer` 回带 `building` 与 `before` 而不带 `limit`，键若拼法不一，答案永远落不回槽里。每页是一个独立的问题：只有 `before: null` 的首页会因 `checkpoint_committed`／`pr_merged` 失效重问；旧页上界是已写下的 seq，且 `lineage` 从写提交的 run 向前走，后来的接替者改不了它。
 - **4-16 转写结果落进输入框，不直接发出去。** 机器听错的那一句必须能改，否则它会花掉一次 run。没有为 `transcribe` 选过模型的城不画那个按钮：一个只可能答拒绝的控件，是一个没人该遇见的控件。
@@ -120,6 +120,8 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 **宽度按内容种类分档，不按页面封顶。** `setup.svelte` 的 `WIDTH` 是这张表的唯一权威：`accounts`、`tools`、`skills` 是 `page`（表与卡片网格），其余七组是 `measure`（段落与分段控件）。**账户组有两个例外，两个都是内容种类给的**：供应商表单占 `talk`（760）而不是 `measure`，因为那里贴的是 base URL 与密钥、常常六十多字符，520 会把它们截断；`等价的 config.toml` 在 `@wide/page:`（≥1120）下挪到表单右侧的 `w-tree` 列，因为校对材料该在被校对的东西旁边，窄容器下它回到正文之后。**一个名字隔阱记在 `theme.css` 里**：`max-w-wide` 取的是间距档 `--spacing-wide`（24 px）而不是 `--container-wide`（1120），页面上任何 `max-w-wide` 都会把整列压成 24 px；能安全指名的只有 `page`、`measure`、`talk`。
 - **4-37 字栈不指名任何 CJK 面，也不随包发一个。** 汉字落到这台设备自己有的面上，因为那正是引擎对一个指名面都没有的字形会做的事，而平台自己的选择是唯一按本项目能接受的条件拿得到的一个。**两条条件各自单独就足以定下来**：许可上，这条字栈只能指名客户端可以再分发的面（`fonts/OFL.txt`、`docs/third-party.md` 第 4 节），而 Windows 与 macOS 上人真正有的中文面是它们厂商的；尺寸上，一个值得指名的面按厂商原样是 17,773,244 B、过 `gzip -9` 是 11,266,972 B（windows-x86_64，2026-09），而 `xtask/budgets.toml` 给整个前端产物的档位是 2,097,152 B，今天的实数是 322,687 B。**代价很小**：回退面的基线与 x-height 与随包面不同，而这只在一行里同时出现拉丁字与汉字时看得出来；指名一个 CJK 面并不能取消这件事——它只会让结果取决于那台机器恰好装了哪些字体。**中文的尺寸与行高照旧另计**（`theme.css` 的 `:root:lang(zh)`）：注释步不再减 1 px、行高 1.6、字距归零——那三条说的是同一个字号下汉字比拉丁字密得多，与用哪个面无关。
 - **4-38 视图栈是 Svelte 5，Vite 保留（换栈由人选定；Svelte 5 与 Vue 5 之间取前者，参数如下）。** 参数是构建物的性能与内存：响应式被编译进产物，没有虚拟 DOM 与运行时 diff，一个对话客户端的框架负担从 Vue 的三十几 KB 降到十几 KB，流式更新也从整树重求值降到碰过的信号重求值。**组件生态不是参数**：`parts/` 的控件全部自绘（§7 判定），平台已给 `<dialog>`、Popover 与提示语义，Vue 的生态优势在这里无处兑现。Vite 保留的理由是产物而不是习惯：`@sveltejs/vite-plugin-svelte` 官方支持 Vite 8，换 bundler 不改变一个产物字节，却要动 `crates/sprawling/build.rs` 读取的输出契约。重开参数：出现第一个真正需要组件库的需求时（届时先过 §7 的 `RUNTIME` 判定与 7-9）。
+
+- **4-39 斜杠动词是一张表，每条自带分组。** `core/slash.ts` 的 `SLASH` 是页面动词的唯一权威，`/` 菜单与 Ctrl-K palette 都读它；`Slash` 记录有五个字段：`spelling`、`grammar`、`about`、`section`（`actions`／`navigation`／`sessions`，类型 `Section`，类型检查强制每条填写）、`run`。palette 按 `section` 分组，不另立以拼写为键的表——另一张表会让改名的动词静默落进 actions。glossary 的 Halt 与 Cancel 是两个动词，页面随之分开拼写：`/stop` 无参，只对眼前的 run 发 `cancel`；`/halt [addr|--all]` 与 `/release [addr|--all]` 成对，带地址的作用于那栋楼，`--all` 与无参作用于整座城（`halt`／`release` 帧）。`/clear` 等于 `/new`：丢掉对话、在此地址开一个什么都不带的新 session，与各家 harness 的 `/clear` 同义，不再只清空输入框。`/steer <text>` 的语法里没有 `--queued`。`/diff` 打开眼前 run（没有时取此房间最新的 run）的 run 页，changes 视图是那一页的一个 lens。
 
 ## 5 `src/core/`（形状按 ARCHITECTURE §9）
 
@@ -401,3 +403,10 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：两者给同样的逐键粒度——读 `runs[id].saying` 的 effect 只因这个 run 这个字段重跑，遍历表的读者只因 run 的增删重跑（`belief/grain.svelte.test.ts` 判定）。记录的写法让十余个按 `runs[id]`、`Object.values(runs)` 读表的视图一行不改。在 R = 1e4、一帧 50 个 delta、一个读全表的订阅者下，每帧折叠从约 470–540 µs 降到约 30–40 µs（`belief/fold_cost.test.ts`，同一仪表前后交错测），因为 delta 不再让订阅者走一遍表。
 - **被击败的备选**：`SvelteMap<RunId, RunBelief>`。粒度相同，但每个读者都得改成 `get`／`values()`，且对已有键 `set` 新值时，有遍历读者就会连带推进迭代版本。
 - **重开参数**：视图改由 belief 暴露的派生索引读表（不再直接下标）时，表的容器可以换，读者迁移的成本就不再存在。
+
+### 12-3 对话里没有 `/goal`
+
+- **决策**（人的裁决）：页面的斜杠表不设 `/goal`。
+- **理由**：目标已经有两处权威——楼的常设目标（`set_pursuit`／`pursue`，sprawling-SPEC §8-35）与每次派活的 `run_started.goal`。对话里再开一个入口，就是同一事实的第三处定义，三处之间没有东西把它们绑在一起。
+- **被击败的备选**：`/goal <text>|pause|resume|clear`，把 `/goal x` 翻成 `pursue{step:{set:{goal:"x"}}}`。
+- **重开参数**：常设目标与派活目标合并成一处权威时，对话入口可以指向那一处而不增加定义。
