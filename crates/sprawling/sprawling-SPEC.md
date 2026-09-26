@@ -3596,3 +3596,13 @@ impl RunWorker {
 - **写回的是城根，不是 lease 的 worktree**：栅栏的对象在城的对象库里，一个评审运行的 worktree 与城共用它；人要回的是自己丢的文件，放回主干的那个位置。
 - **拒绝**：`Interred` 与带 `range` 的定位符答 `E_INVALID_ARGS`（前者从内容仓库取回尚未接线，后者不是整个文件）；`Rebuildable` 答 `E_INVALID_ARGS`，recovery 就是那条重建的理由；提交找不到或路径不在提交里，是 memory 的 `E_WORKTREE_BUSY`，原样上抛。
 - **被否：按路径在写线程上查回收站**。写线程不持有 `DiscardView`；为一次还原把整份历史再折一遍，是在人按下按钮的那一刻付一整次重放。页面手里的那一行已经带着路（channels-SPEC §8-47）。
+
+## 8-93 开城时收走崩溃留下的树（`bin::assembly::lifetime`；memory-SPEC §8-9）
+
+**原因**：评审 run 的树以 run id 为名，只在 `release_lease` 里归还；进程死在一轮中间时，登记、目录与分支永远留着（F10），一棵最多 `WORKTREE_MAX_BYTES`。
+
+- **在哪里做**：`RunWorker::over` 在开账之后调 `memory::Worktrees::sweep_abandoned(city_root, &[])`。`held` 为空，因为账本的独占锁保证此刻没有别的进程在用这座城，而这个 worker 还没有派出任何一轮；`over` 是 `serve`、`resume` 与 `form_city` 共同的构造点，所以每条开城路径都清扫。
+- **失败不挡开城**：清扫失败（例如 Windows 上一个文件还被别的程序打开）写进 `Diagnostics` 的一条 warn，城照常打开；留下的树下一次开城再收。一棵收不走的树不该让人进不了自己的城。
+- **不碰的东西**：人加的 worktree、人的分支、带着未进 HEAD 的提交的租约分支、`refs/sprawling/runs/` 下的栅栏引用（memory-SPEC §8-9）。
+
+**本节测试**：`memory::worktree::sweep::tests` 的三条：崩溃留下的租约被收走；栅栏引用留下；活着的 run 的树留下。

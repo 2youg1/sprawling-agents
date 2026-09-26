@@ -554,6 +554,9 @@ impl Worktrees {
     pub fn claim(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError>;
     pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError>;
     pub fn live(&self) -> Result<Vec<WorktreeName>, MemoryError>;
+    /// 开城时收走崩溃留下的树：`held` 之外、住在 `<city>/.sprawling/worktrees/` 下的登记、目录与租约分支。
+    /// 城没有仓库时答空。返回收走的名字，排序。
+    pub fn sweep_abandoned(city_root: &Path, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, MemoryError>;
     /// 把一个节点已提交的活带进城的 trunk，返回落地的 commit。
     pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, MemoryError>;
 }
@@ -587,6 +590,13 @@ impl WorktreeLease {
   仓库已经忘掉这棵树时 prune 不是失败，那正是调用方要的末态。
   倒过来的顺序在中途失败时会留下「git 仍列着、目录已没有」的名字，而它唯一的出口是 `WorktreeBusy`，于是这个名字被永久锁住。
   `claim` 同时自愈：登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射；`E_WORKTREE_BUSY` 因此恒表示「有人正在用」。
+- **开城清扫崩溃留下的树（`memory::worktree::sweep`，F10）**：树只在正常路径上由 `release` 归还，名字是 run id、永不复用，
+  所以进程死在一轮中间时，`.git/worktrees/<name>` 的登记、`.sprawling/worktrees/<name>` 目录（最多 `WORKTREE_MAX_BYTES`）与分支 `<name>` 永远留着。
+  `sweep_abandoned` 收三样，每样只收城自己造的：登记的路径以 `.sprawling/worktrees/<name>` 结尾（人用 `git worktree add` 加的树在别处，不碰）；
+  `.sprawling/worktrees/` 下没有登记的目录（整个子树是城的机器）；与被收登记同名、且尖端已被 HEAD 包含的分支——尖端带着 HEAD 没有的提交时，
+  那是一轮已经 land 的活（PR 的 commit 就在它上面），分支留下。`held` 里的名字一概不动，那是活着的 run 手里的树。
+  `refs/sprawling/runs/` 下的栅栏引用不在清扫范围里：回收站靠它们让被删文件的提交躲过 `git gc`（§8-8）。
+  清扫在开城时做，因为账本的独占锁（§8-1）保证那一刻没有别的进程在用这座城；被否：在 `claim` 里顺手清，名字不复用，所以 `claim` 永远遇不到崩溃留下的那个名字。
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是一台机器自己的事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
 - **merge 只走 fast-forward**：trunk 在节点分枝之后动过即 `MergeStale`（→`E_VERSION_CONFLICT`），不由机器把一份活重放到别人的活上面——能说出「这份活是否仍然适用」的是做它的人。拒后城内文件逐字节不变（一条断言）。
