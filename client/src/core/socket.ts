@@ -269,12 +269,11 @@ export function openConnection(
     (query: Query) => (isLive(link) ? sendAsk(query) : null),
     now,
     // A question that never came back lands where every other refusal
-    // lands: the corner
-    // once, and the bell until the person has read it. The recovery
-    // is the one part written for a person, so it is said here, in
-    // the language `<html lang>` states - which `app.tsx` keeps equal
-    // to the person's choice, and which a screen reader reads the
-    // page by.
+    // lands: the corner once, and the bell until the person has read
+    // it. The recovery is the one part written for a person, so it is
+    // said here, in the language `<html lang>` states - which `app.tsx`
+    // keeps equal to the person's choice, and which a screen reader
+    // reads the page by.
     (phrase, error) => {
       const lang = langOf(document.documentElement.lang);
       store.refused({ ...error, recovery: say(lang, phrase) });

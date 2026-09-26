@@ -33,7 +33,9 @@
   // What a person can do about a refusal, by the code it carries. The
   // city's own `recovery` speaks to the runtime that must retry or fail
   // over, so it is copied rather than shown; this table is the half
-  // written for the person filling in the form.
+  // written for the person filling in the form. `E_MODEL_UNCHOSEN` has
+  // no row: the router's model choice refuses with it, and a reach
+  // probe talks to the endpoint without asking the router.
   const NEXT_STEP: readonly (readonly [AxCode, Key])[] = [
     ["E_PROVIDER", "setup_next_provider"],
     ["E_TIMEOUT", "setup_next_timeout"],

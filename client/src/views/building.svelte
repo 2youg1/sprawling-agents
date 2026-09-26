@@ -82,6 +82,7 @@
   let shown = $state.raw<Shown>(PLAN);
   let treeOpen = $state(false);
   let goal = $state("");
+  let goalField = $state<HTMLInputElement | undefined>(undefined);
 
   const question = $derived<Query>({ building_view: { addr: address } });
   const asked = $derived(u.conn.asking.ask(question));
@@ -118,9 +119,13 @@
     treeOpen = false;
   }
 
+  // An empty goal sends nothing; the press moves the caret to the field,
+  // so the person sees where the goal is missing.
   function setGoalNow(): void {
     const words = goal.trim();
-    if (words !== "" && u.send(pursue(address, { set: { goal: words } }))) {
+    if (words === "") {
+      goalField?.focus();
+    } else if (u.send(pursue(address, { set: { goal: words } }))) {
       goal = "";
     }
   }
@@ -194,6 +199,7 @@
         class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-faint"
         placeholder={fill(say($lang, "bld_goal_placeholder"), { addr: address })}
         bind:value={goal}
+        bind:this={goalField}
         onkeydown={(event) => {
           if (event.key === "Enter") setGoalNow();
         }}
