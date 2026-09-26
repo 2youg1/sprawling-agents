@@ -10,34 +10,33 @@
 //! index kept beside them would be a second copy of what the disk says,
 //! and the one that drifted would be the one nobody was looking at.
 
-use super::holding::Views;
+use std::path::Path;
+
 use super::lines::buildings_of;
 
-impl Views {
-    /// Every archive entry whose subject contains `needle`, across every
-    /// building, read from the shelves at the moment of asking.
-    pub(super) fn search_archives(&self, needle: &str) -> channels::ArchiveAnswer {
-        let mut hits = Vec::new();
-        let wanted = needle.to_lowercase();
-        for building in buildings_of(&self.city_root) {
-            let Ok(entries) = city::archive_index(&self.city_root, &building) else {
+/// Every archive entry whose subject contains `needle`, across every
+/// building, read from the shelves at the moment of asking.
+pub(super) fn search_archives(city_root: &Path, needle: &str) -> channels::ArchiveAnswer {
+    let mut hits = Vec::new();
+    let wanted = needle.to_lowercase();
+    for building in buildings_of(city_root) {
+        let Ok(entries) = city::archive_index(city_root, &building) else {
+            continue;
+        };
+        for entry in entries {
+            if !entry.subject.to_lowercase().contains(&wanted) {
                 continue;
-            };
-            for entry in entries {
-                if !entry.subject.to_lowercase().contains(&wanted) {
-                    continue;
-                }
-                hits.push(channels::ArchiveHit {
-                    building: building.clone(),
-                    kind: entry.kind.as_str().to_owned(),
-                    day: entry.day,
-                    subject: entry.subject,
-                });
             }
+            hits.push(channels::ArchiveHit {
+                building: building.clone(),
+                kind: entry.kind.as_str().to_owned(),
+                day: entry.day,
+                subject: entry.subject,
+            });
         }
-        channels::ArchiveAnswer {
-            needle: needle.to_owned(),
-            hits,
-        }
+    }
+    channels::ArchiveAnswer {
+        needle: needle.to_owned(),
+        hits,
     }
 }

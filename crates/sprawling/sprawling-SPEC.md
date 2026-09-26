@@ -3492,10 +3492,10 @@ pub(super) fn spawn_folding(
 
 **尚未做到的（本节接口的当前状态）**：不做 I/O 的查询仍在锁内作答，所以读者之间、以及读者与折叠线程之间仍会为这段纯内存的时间互等；发布 `Arc<ViewsSnapshot>` 供查询无锁读取，是这一接口余下的一步。做 I/O 的查询怎样离开锁，见 8-92。
 
-### 8-92 做 I/O 的查询只在锁内取小数据，I/O 在锁外做（`bin::views::answering`）
+### 8-92 做 I/O 的查询只在锁内取小数据，I/O 在锁外做（`bin::views::answering`、`bin::views::prepared`）
 
 ```rust
-// bin::views::answering —— shape: projection
+// bin::views::prepared —— shape: projection
 pub(crate) enum Prepared {
     Held(channels::Answer),          // 视图自己答完了
     GitStatus(GitStatusAsk),         // 锁内取了楼的地址与最近一次围栏，锁外读工作树
@@ -3504,10 +3504,15 @@ pub(crate) enum Prepared {
     Listing { city_root: PathBuf, at: Option<Address> }, // 锁外列一层目录
     Document { city_root: PathBuf, at: Address },       // 锁外读一个文件的开头
     Building { city_root: PathBuf, addr: Address, plan: PlanReading }, // 锁内取折叠好的计划，锁外读楼的目录
+    Changes { city_root: PathBuf, base: GitOid, head: Option<GitOid> }, // 锁外让 git 比较两个检查点
+    Hunks { city_root: PathBuf, oid_a: GitOid, oid_b: GitOid, path: String }, // 锁外读一个文件的补丁
+    Content { city_root: PathBuf, locator: Locator }, // 锁外读内容仓库里的一个对象
+    Archives { city_root: PathBuf, needle: String }, // 锁外逐楼读档案架
     Release,                         // 锁外经网络问发布页
 }
+// bin::views::answering
 impl Views { pub(crate) fn prepare(&mut self, query: &channels::Query) -> Prepared; }
-impl Prepared { pub(crate) fn finish(self) -> channels::Answer; }
+impl Prepared { pub(crate) fn finish(self) -> channels::Answer; } // bin::views::prepared
 pub(crate) fn answer_outside_the_lock(
     views: &Mutex<Views>,
     query: &channels::Query,
@@ -3518,7 +3523,9 @@ pub(crate) fn answer_outside_the_lock(
 
 **变体是穷尽的枚举，而不是一个 `Box<dyn FnOnce>`。** 每种锁外的 I/O 有名字，`match` 列全，新加一种要在这里写出它锁内拿什么；闭包会把这件事藏进调用点。
 
-**`Content`、`Skills`、`Hunks`、档案检索仍在锁内读盘，`BuildingView` 的计划第一次被问时也在锁内读盘**（本节接口的当前状态）：它们要的小数据还没有拆出来，拆法与 `GitStatus` 相同。
+**`Prepared` 与它的 `finish` 自成一个模块。** `answering` 管「一个查询在锁内拿什么」，`prepared` 管「锁外怎样把它读完」；两者分开，锁外新添一种读法时不必动锁内那张表。
+
+**`Skills`、`Prefix`、`Metrics` 的楼数仍在锁内读盘，`BuildingView` 的计划第一次被问时也在锁内读盘**（本节接口的当前状态）：`Skills` 还要锁内拷出折叠好的钉住表，`Prefix` 还要锁内拷出那条 `prompt_assembled` 记录，拆法与 `GitStatus` 相同。`Commit`、`Commits` 只读折叠，不在此列。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 

@@ -462,3 +462,89 @@ fn the_building_page_reads_its_directory_after_the_views_are_released() {
     );
     assert_eq!(answer, views.answer(&query));
 }
+
+/// A change list, a patch, a stored object and an archive search read the
+/// disk after the views are released: a city that appears between
+/// `prepare` and `finish` is the one each of them reports.
+#[test]
+fn git_store_and_archive_readers_read_after_the_views_are_released() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (staged, root) = (tmp.path().join("staged"), tmp.path().join("city"));
+    let lab = Address::parse("lab").unwrap();
+    std::fs::create_dir_all(staged.join("lab")).unwrap();
+    let repo = git2::Repository::init(&staged).unwrap();
+    let signature = git2::Signature::now("city", "city@localhost").unwrap();
+    let commit = |text: &str| {
+        std::fs::write(staged.join("lab/lex.rs"), text).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(std::path::Path::new("lab/lex.rs")).unwrap();
+        index.write().unwrap();
+        let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+        let parents: Vec<git2::Commit> = repo
+            .head()
+            .ok()
+            .and_then(|head| head.peel_to_commit().ok())
+            .into_iter()
+            .collect();
+        let parents: Vec<&git2::Commit> = parents.iter().collect();
+        let oid = repo
+            .commit(Some("HEAD"), &signature, &signature, "c", &tree, &parents)
+            .unwrap();
+        kernel::GitOid::from_bytes(oid.as_bytes().try_into().unwrap())
+    };
+    let (oid_a, oid_b) = (commit("a\n"), commit("a\nb\n"));
+    std::fs::write(staged.join("lab/lex.rs"), "a\nb\nc\n").unwrap();
+    let hash = memory::Cas::open(&kernel::layout::CityLayout::new(&staged).cas())
+        .unwrap()
+        .put(b"held in the store")
+        .unwrap();
+    let entry = city::archive_entry(
+        &staged,
+        &lab,
+        city::ArchiveKind::parse("decision").unwrap(),
+        kernel::TimeMs::new(0),
+        "chose git over a second index",
+    )
+    .unwrap();
+    city::file_archive(&entry, "because").unwrap();
+
+    let queries = [
+        channels::Query::Changes {
+            base: oid_b,
+            head: None,
+        },
+        channels::Query::Hunks {
+            oid_a,
+            oid_b,
+            path: "lab/lex.rs".to_owned(),
+        },
+        channels::Query::Content {
+            locator: kernel::Locator::Cas { hash, range: None },
+        },
+        channels::Query::ArchiveSearch {
+            needle: "git".to_owned(),
+        },
+    ];
+    let mut views = Views::new(&root);
+    let prepared: Vec<_> = queries.iter().map(|query| views.prepare(query)).collect();
+    // Opening the store makes its directory, so a read done under the
+    // lock leaves a directory behind for the city to replace.
+    if root.exists() {
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+    std::fs::rename(&staged, &root).unwrap();
+
+    let read: Vec<_> = prepared
+        .into_iter()
+        .map(|prepared| prepared.finish())
+        .collect();
+    let fresh: Vec<_> = queries.iter().map(|query| views.answer(query)).collect();
+    assert_eq!(read, fresh);
+    assert!(
+        read.iter().all(
+            |answer| !matches!(answer, channels::Answer::Unavailable { .. })
+                && !matches!(answer, channels::Answer::Archive(found) if found.hits.is_empty())
+        ),
+        "{read:?}"
+    );
+}

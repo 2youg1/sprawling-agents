@@ -16,6 +16,8 @@
 //! the two a reader is looking at, because the first is a store that
 //! was pruned and the second is a slot the city had nothing to put in.
 
+use std::path::Path;
+
 use kernel::{Address, B3Hash, EventKind, EventRecord, Locator, RunId, Seq};
 
 use super::document::read_bytes;
@@ -30,7 +32,7 @@ impl Views {
     /// an empty answer would read as a run that was told nothing.
     pub(super) fn prefix_answer(&mut self, run: RunId) -> Option<channels::PrefixAnswer> {
         let record = self.first_prompt(run)?;
-        let store = self.store()?;
+        let store = store(&self.city_root)?;
         let segments = record
             .data()
             .as_map()
@@ -40,36 +42,6 @@ impl Views {
             .filter_map(|row| segment_of(row, &store))
             .collect();
         Some(channels::PrefixAnswer { run, segments })
-    }
-
-    /// One object of the store, cut to what travels.
-    ///
-    /// `None` for a locator naming a path rather than an object, and
-    /// for an object this city no longer holds. Both are the same
-    /// answer to the caller - there is nothing here to read - and the
-    /// query handed back with the refusal says which was asked.
-    pub(super) fn content_answer(&self, locator: &Locator) -> Option<channels::ContentAnswer> {
-        let Locator::Cas { hash, range: _ } = locator else {
-            return None;
-        };
-        let read = read_bytes(&self.store()?.get(hash).ok()?);
-        Some(channels::ContentAnswer {
-            locator: locator.clone(),
-            text: read.text,
-            bytes: read.bytes,
-            truncated: read.truncated,
-            binary: read.binary,
-        })
-    }
-
-    /// The store this city keeps, opened for reading.
-    ///
-    /// Opened per question rather than held: this is the one read here
-    /// that reaches a directory the fold does not own, and a handle
-    /// kept across a rebuild would outlive the city it was opened
-    /// under.
-    fn store(&self) -> Option<memory::Cas> {
-        memory::Cas::open(&kernel::layout::CityLayout::new(&self.city_root).cas()).ok()
     }
 
     /// The `prompt_assembled` record that opened this run.
@@ -96,6 +68,39 @@ impl Views {
         }
         None
     }
+}
+
+/// One object of the store, cut to what travels.
+///
+/// `None` for a locator naming a path rather than an object, and
+/// for an object this city no longer holds. Both are the same
+/// answer to the caller - there is nothing here to read - and the
+/// query handed back with the refusal says which was asked.
+pub(super) fn content_answer(
+    city_root: &Path,
+    locator: &Locator,
+) -> Option<channels::ContentAnswer> {
+    let Locator::Cas { hash, range: _ } = locator else {
+        return None;
+    };
+    let read = read_bytes(&store(city_root)?.get(hash).ok()?);
+    Some(channels::ContentAnswer {
+        locator: locator.clone(),
+        text: read.text,
+        bytes: read.bytes,
+        truncated: read.truncated,
+        binary: read.binary,
+    })
+}
+
+/// The store this city keeps, opened for reading.
+///
+/// Opened per question rather than held: this is the one read here
+/// that reaches a directory the fold does not own, and a handle
+/// kept across a rebuild would outlive the city it was opened
+/// under.
+fn store(city_root: &Path) -> Option<memory::Cas> {
+    memory::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).ok()
 }
 
 /// One recorded segment row, joined to the bytes the store holds for it.

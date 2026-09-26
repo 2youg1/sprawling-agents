@@ -40,6 +40,7 @@ pub(super) mod lines;
 pub(super) mod listing;
 pub(super) mod mcp_health;
 pub(super) mod prefix;
+pub(super) mod prepared;
 pub(super) mod rounds;
 pub(super) mod served;
 pub(super) mod skills;
