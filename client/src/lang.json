@@ -2384,6 +2384,14 @@
     "zh": "听写中…"
   },
 
+  "talk_model_kept": {
+    "en": "this session",
+    "zh": "本会话"
+  },
+  "talk_model_locked": {
+    "en": "model, kept by this session: another model opens a new session",
+    "zh": "模型，本会话固定：换模型会开一个新会话"
+  },
   "talk_no_model": {
     "en": "no model chosen",
     "zh": "还没有选模型"

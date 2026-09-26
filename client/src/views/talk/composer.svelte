@@ -30,7 +30,7 @@
   import { get } from "svelte/store";
 
   import { QUERIES } from "../../core/asking";
-  import { selectModel } from "../../core/commands";
+  import { openSession, selectModel } from "../../core/commands";
   import type { Sending } from "../../core/doing";
   import { fill, say } from "../../core/lang";
   import { current } from "../../core/route";
@@ -50,12 +50,13 @@
     draftAt,
     effortLevel,
     menuColumns,
+    modelMove,
     newestRun,
     pickSlash,
     pills,
     roomsKnown,
+    sessionModel,
     slashHands,
-    splitModel,
   } from "./composer";
   import type { Picks } from "./composer";
 
@@ -175,12 +176,29 @@
   const live = $derived(newestRun(Object.values($belief.runs), here, "moving"));
 
   const picks: Picks = { model: pickModel, workspace: pickRoom, effort: pickEffort };
-  const specs = $derived(pills($lang, { served: models, chosen: main, rooms, here, effort: $effort }, picks));
+  const session = $derived(
+    sessionModel(Object.values($belief.runs), here, here === null ? null : ($belief.sessions[here] ?? null)),
+  );
+  const specs = $derived(
+    pills($lang, { served: models, chosen: main, session, rooms, here, effort: $effort }, picks),
+  );
 
+  // A new session takes the model `main` names when it opens, so the
+  // select goes first.
   function pickModel(value: string): void {
-    const model = splitModel(value);
-    if (model === null) return;
-    u.send(selectModel(model.endpoint, model.model, "main"));
+    const move = modelMove(value, session);
+    switch (move.kind) {
+      case "stay":
+        return;
+      case "select":
+        u.send(selectModel(move.names.endpoint, move.names.model, "main"));
+        return;
+      case "reopen":
+        if (here === null) return;
+        u.send(selectModel(move.names.endpoint, move.names.model, "main"));
+        u.send(openSession(here, "nothing", null));
+        return;
+    }
   }
 
   function pickRoom(value: string): void {
