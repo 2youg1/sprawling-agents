@@ -54,19 +54,34 @@ impl RunWorker {
         task: &str,
         policy: &kernel::BuildingPolicy,
     ) -> Result<Option<kernel::SessionName>, AxError> {
-        if session.is_some() {
-            return Ok(session);
-        }
         // An address with a room in it is already a session: this is the
         // shape a second dispatch into an open session takes, and naming
         // it again would open a room inside a room.
-        if addr.as_str().contains('/') {
-            return Ok(None);
+        if !needs_a_name(addr, session.as_ref()) {
+            return Ok(session);
         }
-        // The choice is made under the building's policy and refused
-        // here rather than swallowed: a confidential building that has
-        // no digest model on this machine is a decision for the person,
-        // and the two ways out are both named.
+        self.naming_call(policy)?
+            .name(task)?
+            .map(Some)
+            .ok_or_else(|| unnamed(addr))
+    }
+
+    /// The digest model's call, built here and made wherever the caller
+    /// can afford to wait for it.
+    ///
+    /// The choice is made under the building's policy and refused here
+    /// rather than swallowed: a confidential building that has no digest
+    /// model on this machine is a decision for the person, and the two
+    /// ways out are both named.
+    ///
+    /// # Errors
+    /// Propagates the book's refusal to route a confidential building's
+    /// text off this machine, the vault's refusal to redeem, and the
+    /// adapter's refusal to be built.
+    pub(super) fn naming_call(
+        &self,
+        policy: &kernel::BuildingPolicy,
+    ) -> Result<NamingCall, AxError> {
         let chosen = self
             .book
             .select(kernel::ModelTag::Digest, policy)
@@ -76,64 +91,98 @@ impl RunWorker {
                      digest model that runs on this machine",
                 )
             })?;
-        let Some(named) = self.name_the_work(&chosen, task, policy)? else {
-            return Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "work out what to call this work",
-                addr.as_str().to_owned(),
-            )
-            .with_recovery(
-                "name the room yourself: send the work to `building/name` rather than to \
-                 `building`",
-            ));
-        };
-        Ok(Some(named))
-    }
-
-    /// One cheap model call, turning a task into a short room name.
-    ///
-    /// The digest tag, which is this city's word for the small model
-    /// that reads so the main one does not have to. Naming a piece of
-    /// work is exactly that shape of job, and putting it on the main
-    /// model would charge a person reasoning tokens for a filename.
-    ///
-    /// `Ok(None)` is reserved for one outcome: **the model answered, and
-    /// what it answered is not a legal session name.** A credential that
-    /// cannot be redeemed, an endpoint that cannot be built, a call that
-    /// did not come back and a reply whose content cannot be read are
-    /// each returned as the error they are, because a person told only
-    /// "name the room yourself" would never learn that their provider
-    /// was unreachable (sprawling-SPEC.md 8-75).
-    ///
-    /// The endpoint is chosen by the caller under the building's policy,
-    /// and that same policy rides along on the request: the task text
-    /// travels under the rules of the building it was sent to, not under
-    /// a laxer set written here.
-    ///
-    /// # Errors
-    /// Propagates the vault's refusal to redeem, the adapter's refusal
-    /// to be built, the provider's own failure, and a reply this build
-    /// cannot read.
-    fn name_the_work(
-        &self,
-        chosen: &gateway::Chosen<'_>,
-        task: &str,
-        policy: &kernel::BuildingPolicy,
-    ) -> Result<Option<kernel::SessionName>, AxError> {
-        let model_id = chosen.entry.id.clone();
-        let mut adapter = gateway::adapter_for(
-            chosen,
+        let adapter = gateway::adapter_for(
+            &chosen,
             self.redemption()?,
             dialect_headers(chosen.endpoint.dialect)
                 .into_iter()
                 .map(|(name, value)| (name, value.spelled()))
                 .collect(),
         )?;
-        let answer = adapter.call(&kernel::ModelRequest {
+        Ok(NamingCall {
+            adapter,
+            model: chosen.entry.id.clone(),
             policy: policy.clone(),
+        })
+    }
+
+    pub(super) fn room_for(
+        &self,
+        addr: Address,
+        session: Option<&kernel::SessionName>,
+    ) -> Result<Address, AxError> {
+        match session {
+            None => Ok(addr),
+            Some(name) => {
+                let building = city::Building::of(&addr)?;
+                city::open_room(&self.city_root, building.addr(), name)
+            }
+        }
+    }
+}
+
+/// Whether a dispatch waits on the digest model before it has a room.
+///
+/// An address with a room in it is already a session, so only a bare
+/// building with no session beside it is named.
+pub(in crate::assembly) fn needs_a_name(
+    addr: &Address,
+    session: Option<&kernel::SessionName>,
+) -> bool {
+    session.is_none() && !addr.as_str().contains('/')
+}
+
+/// The refusal owed when the digest model answered with something that
+/// is not a legal session name. It names the field the person has to
+/// fill, and the composer opens that one control.
+pub(super) fn unnamed(addr: &Address) -> AxError {
+    AxError::failure(
+        AxCode::InvalidArgs,
+        "work out what to call this work",
+        addr.as_str().to_owned(),
+    )
+    .with_recovery(
+        "name the room yourself: send the work to `building/name` rather than to `building`",
+    )
+}
+
+/// One cheap model call, turning a task into a short room name.
+///
+/// The digest tag, which is this city's word for the small model that
+/// reads so the main one does not have to. Naming a piece of work is
+/// exactly that shape of job, and putting it on the main model would
+/// charge a person reasoning tokens for a filename.
+///
+/// Built on the accounting thread, because choosing the model reads the
+/// book and the vault; made anywhere, because it owns everything it
+/// needs and the call is the part that waits on a provider. The policy
+/// it carries is the building's own, so the task text travels under the
+/// rules of the building it was sent to.
+pub(super) struct NamingCall {
+    adapter: Box<dyn kernel::Model + Send>,
+    model: String,
+    policy: kernel::BuildingPolicy,
+}
+
+impl NamingCall {
+    /// Asks the model, and reads a session name out of what it says.
+    ///
+    /// `Ok(None)` is reserved for one outcome: **the model answered, and
+    /// what it answered is not a legal session name.** A call that did
+    /// not come back and a reply whose content cannot be read are each
+    /// returned as the error they are, because a person told only "name
+    /// the room yourself" would never learn that their provider was
+    /// unreachable (sprawling-SPEC.md 8-75).
+    ///
+    /// # Errors
+    /// Propagates the provider's own failure and a reply this build
+    /// cannot read.
+    pub(super) fn name(mut self, task: &str) -> Result<Option<kernel::SessionName>, AxError> {
+        let answer = self.adapter.call(&kernel::ModelRequest {
+            policy: self.policy,
             segments: [kernel::B3Hash::digest(b""); 4],
             chat: kernel::ChatRequest {
-                model: model_id,
+                model: self.model,
                 max_tokens: NAME_TOKENS,
                 system: vec![kernel::SystemBlock {
                     text: NAME_THE_WORK.to_owned(),
@@ -177,19 +226,5 @@ impl RunWorker {
             .trim()
             .trim_matches(|glyph: char| glyph == '`' || glyph == '"' || glyph == '.');
         Ok(kernel::SessionName::parse(candidate).ok())
-    }
-
-    pub(super) fn room_for(
-        &self,
-        addr: Address,
-        session: Option<&kernel::SessionName>,
-    ) -> Result<Address, AxError> {
-        match session {
-            None => Ok(addr),
-            Some(name) => {
-                let building = city::Building::of(&addr)?;
-                city::open_room(&self.city_root, building.addr(), name)
-            }
-        }
     }
 }

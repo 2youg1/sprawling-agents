@@ -193,6 +193,7 @@ impl RunWorker {
         self.flight
             .gate
             .serve(patience, &mut self.ledger, &mut self.flight.homes);
+        self.dispatch_the_named();
         let Some(arrival) = self.flight.arrived() else {
             return Ok(Landed::Nothing);
         };
@@ -230,7 +231,7 @@ impl RunWorker {
 
     /// Whether any run is driving right now.
     pub(crate) fn driving(&self) -> bool {
-        self.flight.in_flight() > 0
+        self.flight.in_flight() > 0 || self.namings.pending()
     }
 
     /// Serves the crossing and lands runs until no lane is left.
