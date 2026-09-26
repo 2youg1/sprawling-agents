@@ -30,10 +30,8 @@ use kernel::{
     Address, AxCode, AxError, DiscardForecast, Effect, EgressOutcome, EgressTarget, GateOutcome,
     GateSubject, IdemKey, Locator, TaintSet, Tool, ToolCall, ToolName, ToolOutcome, WriteDomain,
 };
-
-use serde_json::Value;
-
 use memory::{Checkpoint, Provenance};
+use serde_json::Value;
 
 mod admit;
 mod outside;
@@ -56,16 +54,8 @@ pub struct CheckpointNet {
 }
 
 /// The tool bench: the turn layer's routing of a call through the gate
-/// its own declared Effect names (Handoff verdict 10 — gate routing is
-/// turn-layer work, so the executor stays thin).
-///
-/// Three orderings are load-bearing. Dedup runs before any side effect,
-/// so a replayed call cannot bill or write twice. `exec` is forecast for
-/// discards before the Write door, because "this command deletes things"
-/// is a stronger claim than "this command writes somewhere" and deserves
-/// the stricter door. And a Deny comes back as a `tool_result` carrying
-/// the refusal rather than ending the turn: the model that asked for
-/// something it may not have should learn that, and continue.
+/// its own declared Effect names, in the three orderings the module
+/// documentation states.
 pub struct ToolBench {
     tools: BTreeMap<ToolName, Box<dyn Tool>>,
     domain: WriteDomain,

@@ -21,9 +21,8 @@
 //! A missing component is `E_TOOL_UNAVAILABLE` carrying the alternative
 //! that would work, so the caller redirects instead of guessing.
 
-use std::path::PathBuf;
-
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
 use kernel::{
@@ -166,14 +165,11 @@ impl ExecTool {
     }
 
     /// Every host command goes through the table, whichever arm asked
-    /// for it.
-    ///
-    /// There is no `background` argument, because two paths would be two
-    /// authorities and the one with the hole in it would always be the
-    /// one nobody remembered.
-    ///
-    /// The command is lowered before its environment is cleared, so that
-    /// the clearing lands on whatever process is actually spawned.
+    /// for it: there is no `background` argument, because two paths would
+    /// be two authorities and the one with the hole in it would always be
+    /// the one nobody remembered. The command is lowered before its
+    /// environment is cleared, so the clearing lands on whatever process
+    /// is actually spawned.
     fn through_the_backlog(
         &self,
         command: std::process::Command,

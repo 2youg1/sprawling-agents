@@ -77,11 +77,9 @@ pub enum Command<Secret = Sealed<String>> {
     },
     /// Asks a base URL what it serves, and attaches nothing.
     ///
-    /// A person cannot choose from a list they have not seen, and a list
-    /// that arrived only as a side effect of attaching would mean
-    /// registering a key before looking at what it buys. The answer
-    /// lands as `endpoint_probed`, which the page folds like any other
-    /// fact about this city.
+    /// A person cannot choose from a list they have not seen, so the
+    /// list is asked for apart from attaching; the answer lands as
+    /// `endpoint_probed`, which the page folds like any other fact.
     ///
     /// It carries the same `tuning` the attachment will, because a
     /// probe that reached a gateway without the header that gateway
@@ -99,17 +97,14 @@ pub enum Command<Secret = Sealed<String>> {
     /// external servers its tools come from, and the windows on this
     /// person's own machine its desktop connector may touch.
     ///
-    /// None of the three had a surface, so a person could read what they
-    /// were governed by and not change it. Each field is optional and an
-    /// absent one leaves that section alone; an empty `mcp` list is a
-    /// building that reaches no server, which is a different statement
-    /// from not saying.
+    /// Each field is optional and an absent one leaves that section
+    /// alone; an empty `mcp` list is a building that reaches no server,
+    /// which is a different statement from not saying.
     ///
-    /// `desktop` is the allowlist's text and not a parsed value, and
-    /// that is deliberate: the authority on that file's syntax is the
-    /// connector that reads it at start-up, and that connector fails
-    /// closed. A second parser on this side would be a second authority
-    /// (city-SPEC.md 8-26).
+    /// `desktop` is the allowlist's text and not a parsed value: the
+    /// connector that reads that file at start-up is the authority on
+    /// its syntax and fails closed, and a second parser here would be a
+    /// second authority (city-SPEC.md 8-26).
     ConfigureBuilding {
         addr: Address,
         sandbox: Option<SandboxLimits>,
@@ -139,9 +134,8 @@ pub enum Command<Secret = Sealed<String>> {
         /// person who did not look at the list meant.
         admit: Vec<String>,
         /// What this endpoint is called, how long it may take, and what
-        /// every request to it carries. The city keeps it beside the
-        /// registration, so a call made a week later is made the way
-        /// the person set it up.
+        /// every request to it carries, kept beside the registration so a
+        /// call made a week later is made the way the person set it up.
         tuning: EndpointTuning,
         idem: IdemKey,
     },
@@ -169,12 +163,10 @@ pub enum Command<Secret = Sealed<String>> {
     /// first run writes down the model it calls and how hard it thinks,
     /// and every later run there refuses to move either, because a
     /// provider caches a conversation's prefix only while the shape of
-    /// the calls behind it holds still. That rule is right, and without
-    /// this verb it was also a dead end: a person who changed the model
-    /// could no longer dispatch into the room at all. What this frame
-    /// does is let the room start a new stretch, which is a thing a
-    /// person asks for on purpose rather than a change made behind
-    /// their back (sprawling-SPEC.md 8-82).
+    /// the calls behind it holds still. This frame lets a person who
+    /// changed the model start a new stretch of the room on purpose,
+    /// rather than have it changed behind their back (sprawling-SPEC.md
+    /// 8-82).
     ///
     /// It carries [`Carry`] rather than a flag: what a new session
     /// keeps from the one before it has two named answers, and the
@@ -184,13 +176,10 @@ pub enum Command<Secret = Sealed<String>> {
     OpenSession {
         addr: Address,
         carry: Carry,
-        /// What this session continues, when it continues something.
-        ///
-        /// A branch is a session and not a second verb: forking is
-        /// starting a session whose first run begins from a line of
-        /// another conversation, and everything else about it - the
-        /// model it may choose, the effort, the handoff it carries -
-        /// is what [`Carry`] and the room already say
+        /// What this session continues, when it continues something: a
+        /// branch is a session whose first run begins from a line of
+        /// another conversation, and everything else about it - model,
+        /// effort, handoff - is what [`Carry`] and the room already say
         /// (sprawling-SPEC.md 8-82).
         from: Option<Origin>,
         idem: IdemKey,
@@ -236,10 +225,9 @@ pub enum Command<Secret = Sealed<String>> {
         at: Address,
         idem: IdemKey,
     },
-    /// Put one recycle-bin row back by the way back it carries. The
-    /// frame carries the row's own restoration rather than a path: a
-    /// path can be discarded twice, and the row already knows which
-    /// commit holds the bytes.
+    /// Put one recycle-bin row back. The frame carries the row's own
+    /// restoration rather than a path, because a path can be discarded
+    /// twice and the row already knows which commit holds the bytes.
     RestoreDiscard {
         restoration: Restoration,
         idem: IdemKey,
@@ -260,10 +248,9 @@ pub enum Command<Secret = Sealed<String>> {
     /// the city was served.
     ///
     /// [`Query::Doctor`](crate::Query::Doctor) answers that snapshot,
-    /// which is what a page must not be given after it has just
-    /// installed something. Probing is seconds of starting programs, so
-    /// it happens here, where the city already serialises work, rather
-    /// than inside a read.
+    /// which a page that has just installed something must not be given.
+    /// Probing starts programs for seconds, so it runs here, where the
+    /// city already serialises work, rather than inside a read.
     DoctorRefresh {
         idem: IdemKey,
     },
@@ -282,13 +269,11 @@ pub enum Command<Secret = Sealed<String>> {
     },
     /// Give one waiting question to a resident to answer.
     ///
-    /// The inbox holds design questions, and a person who does not
-    /// want to answer one has exactly two ways out: answer it anyway,
-    /// or name somebody who will. This is the second. It moves one
-    /// item and leaves [`Command::SetAutonomy`] to say who answers
-    /// everything, because handing over a single question and
-    /// appointing a standing delegate are different decisions with
-    /// different reach.
+    /// A person who does not want to answer a question may name
+    /// somebody who will. This moves one item and leaves
+    /// [`Command::SetAutonomy`] to say who answers everything, because
+    /// handing over one question and appointing a standing delegate are
+    /// different decisions with different reach.
     ///
     /// Writes `question_handed`, after which the named resident may
     /// answer this item even though it is not the standing delegate.
@@ -353,10 +338,6 @@ pub enum Command<Secret = Sealed<String>> {
         body: String,
         idem: IdemKey,
     },
-    /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token
-    /// is plain here because a token that must cross a wire has, by
-    /// definition, no secrecy left to protect in transit - it is sealed the
-    /// moment it lands (see `server::decide_handshake`).
     /// Connects one outside application through the broker that holds
     /// its OAuth.
     ///
@@ -366,12 +347,10 @@ pub enum Command<Secret = Sealed<String>> {
     /// broker was asked, so the reading is fresh for all of them, and a
     /// half-refreshed list is a list that disagrees with itself.
     ///
-    /// **The consent page is opened by the client, never by the city.**
-    /// The person is sitting at the client; the city may be running on
-    /// a machine in another room, and a browser opened there is a
-    /// browser nobody is looking at. This is also why the url keeps
-    /// travelling in the answer instead of being spent once - a blocked
-    /// popup leaves a person who still needs the link.
+    /// **The consent page is opened by the client, never by the city**,
+    /// which may run on a machine nobody is looking at; the url keeps
+    /// travelling in the answer because a blocked popup leaves a person
+    /// who still needs the link.
     ///
     /// It carries an `IdemKey` like every other state change, and here
     /// that key is what stops a second press from opening a second
@@ -405,6 +384,10 @@ pub enum Command<Secret = Sealed<String>> {
         text: String,
         idem: IdemKey,
     },
+    /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token
+    /// is plain here because a token that must cross a wire has, by
+    /// definition, no secrecy left to protect in transit - it is sealed the
+    /// moment it lands (see `server::decide_handshake`).
     Auth {
         token: String,
     },
