@@ -201,7 +201,6 @@ fn main() -> ExitCode {
         Some("depmap") => report::finish("depmap", depmap::check(&root)),
         Some("guard") => report::finish("guard", guard::check(&root, range.as_deref())),
         Some("release") => report::finish("release", release::check(&root)),
-        Some("features") => report::finish("features", gates::default_features(&root)),
         Some("spec") => match spec::run(&root, args.get(1).map(String::as_str)) {
             Ok(message) => {
                 println!("{message}");

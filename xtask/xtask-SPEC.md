@@ -32,7 +32,6 @@
 | proof | kani harness 名册只住 `#[kani::proof]` 属性；CI 不得点名 harness，文档不得手写总数 |
 | docnum | 文档里的数字由 `docnum::FACTS` 生成并由 `--write` 回写；区段陈旧、事实未知、标记不闭合各自即红（§8-16） |
 | gates | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；聚合报告，任一违规即退出码 1 |
-| features | 工作区在默认 feature 集上（含测试目标）能否编译：`clippy` 与 `nextest` 都取 `--all-features`，`dist` 只构建一个 package；这道门跑编译器而不读源码，判定是那条命令的退出码，故与 `gates` 同住 `gates.rs` |
 | wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH` 与 `CITY_RUN`（§8-20）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
 
 ### 门禁针对的 LLM 失效模式（本 crate 存在的理由）
@@ -84,7 +83,7 @@ gate／Violation／rule／violation／alternative（three-part refusal 的施工
 
 ## 7 模块边界
 
-判定面一门一文件，`features` 是唯一的例外：它跑编译器而不读源码，判定就是那条命令的退出码，故它没有自己的模块，与它所附属的 `gates` 同住 `gates.rs`（`default_features`）。门表与门序只住 `gates::GATES` 那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。此处只说明每道门判什么：不抄一份名册，也不写它们有几道，因为手写的名册与数组相隔一次代码改动而不是一个 token（产品文档写过「ten gates」而树上跑十二道）。要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates --list`；要知道有几道门，读 §12 那对受管标记。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字，与按 `## N 标题` 切节这一个读法：`section` 只被 `depmap` 调用（模块图迁入 `architecture.toml` 后 `modmap` 不再按节定位）；`specalign` 经 `modmap::anchors` 吃 TOML 那侧的产物，`proof` 只取 `PATH`、自己逐行读它与 `kani harness` 相邻的那个数，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `proof` 共用的词形与计数读法，`lexicon` 另用它把文档里的门数与 `COUNT` 对账）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
+判定面一门一文件。门表与门序只住 `gates::GATES` 那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。此处只说明每道门判什么：不抄一份名册，也不写它们有几道，因为手写的名册与数组相隔一次代码改动而不是一个 token（产品文档写过「ten gates」而树上跑十二道）。要知道今天跑哪几道，读那张数组或跑 `cargo xtask gates --list`；要知道有几道门，读 §12 那对受管标记。三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字，与按 `## N 标题` 切节这一个读法：`section` 只被 `depmap` 调用（模块图迁入 `architecture.toml` 后 `modmap` 不再按节定位）；`specalign` 经 `modmap::anchors` 吃 TOML 那侧的产物，`proof` 只取 `PATH`、自己逐行读它与 `kani harness` 相邻的那个数，§8-22）｜`badge`（渲染与陈旧判定，被 `budget` 调用）｜`vocabulary`（`lexicon` 与 `proof` 共用的词形与计数读法，`lexicon` 另用它把文档里的门数与 `COUNT` 对账）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——列格式一变，只有一处要改。
 
@@ -172,7 +171,7 @@ pub(crate) struct Violation {
 
 `XtaskError`（thiserror）：`Io{path}`｜`Doc{file,msg}`（数据面不可解析）｜`Cmd{cmd,msg}`（git/cargo 调用失败）｜`Usage`。数据面坏＝退出码 2（门自身故障），不伪装成 0 或 1——门坏了必须显性，静默通过是门的最坏失效。
 
-**一门判不动，不得连累其余各门的结论**（issue #5）。`gates` 的那张数组是急切求值的，<!-- xtask:begin gate_count -->22<!-- xtask:end --> 道门在第一行输出之前就已全部跑完；此前的循环一遇 `Err` 即 `return`，于是排在它后面的 `release` 与 `guard` 结论已在手里却从未被打印。缺 `cargo-public-api` 是 `docs/CONTRIBUTING.md` §7 明列的预期状态，而在那种机器上，一次带违规的运行与一次干净的运行输出逐字相同，作为必要前提的 `guard` 恰在被吞掉的那两道里。故聚合运行遍历到底，逐门报出 `ok`／`N violation(s)`／`could not judge` 三态之一，再统一渲染全部违规。**退出码取最重的一态**：任一门判不动＝2，否则有违规＝1，否则 0——判不动压过判有罪，因为「没判」与「判过且干净」同形正是本条要拆开的东西。
+**一门判不动，不得连累其余各门的结论**（issue #5）。`gates` 的那张数组是急切求值的，<!-- xtask:begin gate_count -->21<!-- xtask:end --> 道门在第一行输出之前就已全部跑完；此前的循环一遇 `Err` 即 `return`，于是排在它后面的 `release` 与 `guard` 结论已在手里却从未被打印。缺 `cargo-public-api` 是 `docs/CONTRIBUTING.md` §7 明列的预期状态，而在那种机器上，一次带违规的运行与一次干净的运行输出逐字相同，作为必要前提的 `guard` 恰在被吞掉的那两道里。故聚合运行遍历到底，逐门报出 `ok`／`N violation(s)`／`could not judge` 三态之一，再统一渲染全部违规。**退出码取最重的一态**：任一门判不动＝2，否则有违规＝1，否则 0——判不动压过判有罪，因为「没判」与「判过且干净」同形正是本条要拆开的东西。
 
 ## 13 依赖选型
 
@@ -551,7 +550,7 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 **机制＝受管区段。** 文档用一对 HTML 注释圈住一段文字，开标记里写它由哪个事实生成：
 
 <!-- xtask:begin gate_count -->
-22
+21
 <!-- xtask:end -->
 
 上面这一段本身就是一个受管区段，圈的是 `gate_count`：它由 `cargo xtask docnum --write` 写出，读者据此知道这道门长什么样，而它同时受这道门看守，故这份 SPEC 里的示例不可能与机制分叉。
@@ -751,7 +750,7 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 
 **败给的方案**：在 `ci.yml` 里照抄那两条命令，附一句「与 `justfile` 保持一致」。那正是分叉发生时的写法，而没有任何东西会注意到它们不再一致。
 
-**第二份仍在**：`gates::default_features` 在进程内跑同一条工作区检查（门要在进程里拿退出码），两份今天逐字节相同。收口的条件是那条门改调这条 recipe，而它住在 `gates.rs`。
+**只有一份**：`features` 不是门。它曾在 `gates` 里跑同一条工作区检查，而 `just check` 已经调这条 recipe，同一次编译每轮跑两遍；删掉门、留 recipe 是人的裁决。
 
 ### 8-29 发行件签名：Minisign 分离签名，验签先于落位（验签公钥侧与格式设计；不接签名动作）
 
@@ -815,7 +814,7 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **败给的方案**：线程池或 `rayon`。门只有二十来道、每道各跑一次，一门一线程已经是最短墙钟；池只增一个依赖。
 
-**限制**：`features` 起一次 cargo，在 cargo 的构建锁上排队，并行只省下它与纯读门之间的重叠。
+**限制**：没有门起 cargo 编译，并行的上限是最慢那道纯读门。
 
 ### 8-32 `apisync` 不在门名册里，只判 kernel 与 channels（裁决）
 
