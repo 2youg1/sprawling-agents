@@ -44,13 +44,14 @@
 </script>
 
 <script lang="ts">
+  import { Option } from "effect";
   import { readAnswer } from "../core/answered";
   import { QUERIES } from "../core/asking";
   import { halt, pursue, release, removeBuilding } from "../core/commands";
   import { fill, say } from "../core/lang";
   import { pursuitClause } from "../core/pursuit";
   import { removalOf } from "../core/removal";
-  import { roomOf, toFragment } from "../core/route";
+  import { go, roomIn, roomOf, toFragment } from "../core/route";
   import { within } from "../core/belief/live";
   import { buildingIsShut } from "../core/scope";
   import { ui } from "../ui";
@@ -82,6 +83,8 @@
   let shown = $state.raw<Shown>(PLAN);
   let treeOpen = $state(false);
   let goal = $state("");
+  let roomName = $state("");
+  const named = $derived(roomIn(address, roomName));
 
   const question = $derived<Query>({ building_view: { addr: address } });
   const asked = $derived(u.conn.asking.ask(question));
@@ -125,6 +128,14 @@
     }
   }
 
+  // A room is opened by talking in it: the talk page's first dispatch
+  // to `<building>/<name>` opens that room, so no model has to name it.
+  function talkIn(): void {
+    if (Option.isNone(named)) return;
+    go(u.bar, { kind: "talk", address: named.value });
+    roomName = "";
+  }
+
   // How many runs are working at or below a room, which is what the
   // rooms column lights its dots for.
   function livingIn(room: Address): number {
@@ -162,6 +173,22 @@
     {:else}
       <p class="text-note text-text-faint">{say($lang, "bld_no_rooms")}</p>
     {/if}
+    <div class="mt-base flex items-center gap-snug">
+      <input
+        class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-faint"
+        aria-label={say($lang, "bld_room_name")}
+        placeholder={say($lang, "bld_room_name")}
+        bind:value={roomName}
+        onkeydown={(event) => {
+          if (event.key === "Enter") talkIn();
+        }}
+      />
+      <Button
+        label={say($lang, "bld_room_talk")}
+        tone={Option.isSome(named) ? "primary" : "secondary"}
+        onPress={talkIn}
+      />
+    </div>
   </div>
 {/snippet}
 

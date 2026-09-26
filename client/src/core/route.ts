@@ -10,7 +10,7 @@
 
 import { Option, Schema } from "effect";
 
-import { Address } from "../wire";
+import { Address, SessionName } from "../wire";
 import type { RunId } from "../wire";
 import { readRunId } from "./run_id";
 
@@ -243,6 +243,7 @@ export function roomOf(address: Address): string {
 // The room a person names inside a building: `<building>/<name>`, which
 // a dispatch opens by itself, so naming a room needs no digest model to
 // name it. None when the name is one the city would refuse as a session.
-export function roomIn(_building: Address, _name: string): Option.Option<Address> {
-  return Option.none();
+export function roomIn(building: Address, name: string): Option.Option<Address> {
+  const named = name.trim();
+  return Schema.is(SessionName)(named) ? Option.some(Address.make(`${building}/${named}`)) : Option.none();
 }

@@ -33,14 +33,12 @@ import type {
   PursuitStep,
   Restoration,
   RunId,
-  SessionName,
   ToolkitSlug,
 } from "../wire";
 import {
   Ceiling as CeilingSchema,
   Effort as EffortSchema,
   Window as WindowSchema,
-  SessionName as SessionNameSchema,
   TemplateName as TemplateNameSchema,
 } from "../wire";
 
@@ -58,8 +56,9 @@ export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 const PLAN_MODE: Mode = "plan_goal";
 
 // A dispatch names a room: `addr` is the room itself (`hall/mayor`),
-// and the city opens no second room inside it. Naming a session is the
-// building form's business, which opens `<building>/<session>`.
+// and the city opens no second room inside it. A room a person names on
+// the building page is an address like any other (`lab/first try`,
+// `core/route.ts` `roomIn`), and the first dispatch to it opens it.
 export interface Dispatch {
   readonly addr: Address;
   readonly task: string;
@@ -78,22 +77,6 @@ export function dispatch(d: Dispatch): Command {
       goal: d.goal,
       mode: PLAN_MODE,
       session: null,
-      effort: d.effort,
-      idem: mintIdem(),
-    },
-  };
-}
-
-// A new session in a building: the city opens `<building>/<session>`.
-export function open(building: Address, session: string, d: Omit<Dispatch, "addr">): Command {
-  const named: SessionName = SessionNameSchema.make(session);
-  return {
-    dispatch: {
-      addr: building,
-      task: d.task,
-      goal: d.goal,
-      mode: PLAN_MODE,
-      session: named,
       effort: d.effort,
       idem: mintIdem(),
     },

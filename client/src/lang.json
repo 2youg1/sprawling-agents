@@ -239,6 +239,14 @@
     "en": "resume",
     "zh": "继续"
   },
+  "bld_room_name": {
+    "en": "name a room to talk in",
+    "zh": "给要说话的房间起个名字"
+  },
+  "bld_room_talk": {
+    "en": "talk there",
+    "zh": "去那里说"
+  },
   "bld_rooms": {
     "en": "rooms",
     "zh": "房间"
