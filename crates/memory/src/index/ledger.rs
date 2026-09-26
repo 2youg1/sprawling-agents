@@ -206,6 +206,12 @@ impl LedgerIndex {
         self.folded.run_seqs_before(run, before).into_iter()
     }
 
+    /// Every seq the index holds, ascending: the walk a reader takes
+    /// to read the whole ledger forwards, which is its fast direction.
+    pub fn seqs(&self) -> &[Seq] {
+        self.folded.seqs()
+    }
+
     pub fn tail_seq(&self) -> Option<Seq> {
         self.folded.tail_seq()
     }

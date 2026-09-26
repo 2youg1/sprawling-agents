@@ -96,6 +96,10 @@ impl Folded {
         self.entries.tail_seq()
     }
 
+    pub(crate) fn seqs(&self) -> &[Seq] {
+        &self.entries.seqs
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.entries.len()
     }
