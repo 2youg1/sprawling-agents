@@ -61,6 +61,17 @@ pub struct AttributionReport {
     pub by_segment: Vec<(String, UsdMicros)>,
     pub by_tool: Vec<(String, UsdMicros)>,
     pub by_skill: Vec<(String, UsdMicros)>,
+    pub unpriced: Unpriced,
+}
+
+/// The model calls that came back with no authoritative amount. They
+/// add nothing to `total`, so without this count a city whose provider
+/// never prices a call reads the same as a city that never ran one; the
+/// tokens are the one measure of their use the ledger does hold.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Unpriced {
+    pub calls: u64,
+    pub tokens: u64,
 }
 
 impl Attribution {
@@ -164,6 +175,7 @@ impl Attribution {
             by_segment: quantify(&self.by_segment),
             by_tool: quantify(&self.by_tool),
             by_skill: quantify(&self.by_skill),
+            unpriced: Unpriced::default(),
         }
     }
 }
