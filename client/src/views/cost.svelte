@@ -46,6 +46,7 @@ const TITLES: Record<Cut, Key> = {
   import { ui } from "../ui";
   import type { CostAnswer } from "../wire";
   import EmptyState from "./parts/empty.svelte";
+  import { costReading } from "./cost";
 
   const u = ui();
   const lang = u.lang;
@@ -84,7 +85,7 @@ const TITLES: Record<Cut, Key> = {
   </div>
   {#if answer === undefined}
     <p class="text-text-disabled">…</p>
-  {:else if answer.total <= 0}
+  {:else if costReading(answer).kind === "idle"}
     <!-- Nothing has been spent, which reads exactly like a page that
     failed to load unless the page says which one it is. Spending starts
     with a run, and a run starts in the conversation with the Mayor. -->
