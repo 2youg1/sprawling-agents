@@ -42,6 +42,7 @@
   import SkillsSection from "./setup/skills.svelte";
   import Toml from "./setup/toml.svelte";
   import EffortSection from "./shared/effort.svelte";
+  import GovernedSection from "./setup/governed.svelte";
   import ProviderDoor from "./shared/provider.svelte";
 
   const GROUPS = [
@@ -200,8 +201,18 @@
 
   // The one write behind the autonomy control: a caller that owns the
   // question answers it itself; this page otherwise sends the command.
-  function settle(next: AutonomySetting): void {
+  // "Saved" is said once the answer the page reads holds the choice, not
+  // when the frame leaves: a frame the link could not carry, or one the
+  // city refused, never shows the receipt.
+  let awaited = $state.raw<AutonomySetting | null>(null);
+  $effect(() => {
+    if (awaited === null || chosen === undefined || autonomySetting(chosen) !== awaited) return;
+    awaited = null;
     receipt.landed("autonomy");
+  });
+
+  function settle(next: AutonomySetting): void {
+    awaited = next;
     if (onAutonomy !== undefined) {
       onAutonomy(next);
       return;
@@ -340,6 +351,7 @@
         {:else if shown === "run"}
           <div class="flex flex-col gap-wide">
             <EffortSection />
+            <GovernedSection />
             <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
               <span class="text-label font-label text-text">{say($lang, "setup_autonomy")}</span>
               <p class="text-note text-text-faint">{say($lang, "setup_autonomy_note")}</p>

@@ -33,14 +33,13 @@ import type {
   PursuitStep,
   Restoration,
   RunId,
-  SessionName,
   ToolkitSlug,
 } from "../wire";
 import {
   Ceiling as CeilingSchema,
   Effort as EffortSchema,
+  Mode as ModeSchema,
   Window as WindowSchema,
-  SessionName as SessionNameSchema,
   TemplateName as TemplateNameSchema,
 } from "../wire";
 
@@ -52,14 +51,14 @@ import {
 // is what `Dispatch.effort === null` spells below.
 export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 
-// The one mode a conversation runs in: plan first, then work. The city
-// reads any tag it does not know as this one, so the spelling here is
-// the explicit form of the default.
-const PLAN_MODE: Mode = "plan_goal";
+// The disciplines a run may work under, in the order a control offers
+// them (kernel `Mode::ALL`); the first is the one a page starts with.
+export const MODES: readonly Mode[] = ModeSchema.members.flatMap((member) => member.literals);
 
 // A dispatch names a room: `addr` is the room itself (`hall/mayor`),
-// and the city opens no second room inside it. Naming a session is the
-// building form's business, which opens `<building>/<session>`.
+// and the city opens no second room inside it. A room a person names on
+// the building page is an address like any other (`lab/first try`,
+// `core/route.ts` `roomIn`), and the first dispatch to it opens it.
 export interface Dispatch {
   readonly addr: Address;
   readonly task: string;
@@ -68,6 +67,7 @@ export interface Dispatch {
   // nothing about effort and the provider decides, which is not the
   // same request as `"none"`, an instruction not to think.
   readonly effort: Effort | null;
+  readonly mode: Mode;
 }
 
 export function dispatch(d: Dispatch): Command {
@@ -76,24 +76,8 @@ export function dispatch(d: Dispatch): Command {
       addr: d.addr,
       task: d.task,
       goal: d.goal,
-      mode: PLAN_MODE,
+      mode: d.mode,
       session: null,
-      effort: d.effort,
-      idem: mintIdem(),
-    },
-  };
-}
-
-// A new session in a building: the city opens `<building>/<session>`.
-export function open(building: Address, session: string, d: Omit<Dispatch, "addr">): Command {
-  const named: SessionName = SessionNameSchema.make(session);
-  return {
-    dispatch: {
-      addr: building,
-      task: d.task,
-      goal: d.goal,
-      mode: PLAN_MODE,
-      session: named,
       effort: d.effort,
       idem: mintIdem(),
     },

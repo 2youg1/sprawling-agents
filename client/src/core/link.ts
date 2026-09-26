@@ -177,6 +177,21 @@ export function unreadableRecord(lang: Lang, at: string): AxError {
   );
 }
 
+// A command pressed while the link is down never left the page. It is
+// said where every refusal lands, because most controls drop the `false`
+// the socket returns and would otherwise do nothing where the person can
+// see it. Nothing was sent, so pressing again once connected is safe.
+export function unsentCommand(lang: Lang, verb: string): AxError {
+  return {
+    code: "E_TIMEOUT",
+    action: say(lang, "link_send_action"),
+    subject: verb,
+    recovery: say(lang, "link_send_when_connected"),
+    nearby: [],
+    retry: "yes",
+  };
+}
+
 // Starts, or restarts after a refusal was cleared by the person.
 export function connect(link: Link): [Link, LinkAction] {
   return [{ ...link, state: { kind: "opening" } }, { kind: "open" }];

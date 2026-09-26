@@ -126,6 +126,7 @@ describe("new and fork", () => {
         models: [],
         effort: null,
         setEffort: () => undefined,
+        mode: "plan_goal",
         goal: "a goal",
         write: (line) => written.push(line),
       },
@@ -148,6 +149,13 @@ describe("new and fork", () => {
     }
     return null;
   }
+
+  test("/dispatch runs in the mode the person chose, not a fixed one", () => {
+    const held = hands(Address.make("lab/room1"), () => null);
+    verb("/dispatch").run({ ...held.filled, mode: "up" }, called("/dispatch add the parser"));
+    const frame = held.sent[0];
+    expect(frame !== undefined && "dispatch" in frame ? frame.dispatch.mode : null).toBe("up");
+  });
 
   test("/new opens a session here and carries nothing by default", () => {
     const room = Address.make("hall/mayor");

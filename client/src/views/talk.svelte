@@ -46,6 +46,7 @@
   import { anchorAt, footOf } from "./talk/anchoring";
   import type { Anchoring } from "./talk/anchoring";
   import { NOTHING, artifactsIn } from "./talk/trace";
+  import Inbox from "./talk/inbox.svelte";
   import Waiting from "./talk/waiting.svelte";
 
   interface Props {
@@ -58,6 +59,7 @@
   const { lang } = u;
   const belief = u.conn.belief;
   const effort = u.effort;
+  const mode = u.mode;
   const held = u.prefs.held;
 
   // The runs of this room, oldest first. A run whose room is not yet
@@ -147,7 +149,7 @@
       return u.send(steer(going.run, text));
     }
     const went = u.send(
-      dispatch({ addr: address, task: text, goal: say($lang, "talk_goal"), effort: $effort }),
+      dispatch({ addr: address, task: text, goal: say($lang, "talk_goal"), effort: $effort, mode: $mode }),
     );
     if (went) sent = sentFrom(address, text, $belief.runs);
     return went;
@@ -308,6 +310,11 @@
             </p>
             <div class="w-full">{@render composer()}</div>
           </div>
+          <!-- The queue is drawn in an empty room too: "N waiting" links
+              to the mayor's room, which a person who only worked in a
+              building has never spoken in. -->
+          <Waiting />
+          <Inbox addr={address} />
         {:else}
           <div class="mb-base flex justify-end"><Showing /></div>
           {#if drawsCalls($held.showing)}
@@ -319,6 +326,7 @@
             <Stream {shown} {earlier} boundary={story} />
           {/if}
           <Waiting />
+          <Inbox addr={address} />
         {/if}
       </div>
     </div>

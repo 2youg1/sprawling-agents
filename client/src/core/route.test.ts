@@ -13,6 +13,7 @@ import {
   current,
   fromFragment,
   go,
+  roomIn,
   toFragment,
   unresolved,
   type View,
@@ -154,5 +155,16 @@ describe("route", () => {
     go(bar, { kind: "record", lens: "bin" });
     expect(bar.hash).toBe("#/record/bin");
     expect(current(bar)).toEqual(Option.some({ kind: "record", lens: "bin" }));
+  });
+});
+
+describe("naming a room in a building", () => {
+  test("a name the city takes is the room's address, and one it refuses is none", () => {
+    expect([roomIn(lab, " first try "), roomIn(lab, "a/b"), roomIn(lab, "   "), roomIn(lab, "dots.")]).toEqual([
+      Option.some(Address.make("lab/first try")),
+      Option.none(),
+      Option.none(),
+      Option.none(),
+    ]);
   });
 });

@@ -40,6 +40,8 @@ import { browserRows } from "./rows";
 import { sizingOf } from "./sizing";
 import type { Rows } from "./rows";
 import { Proxying } from "../wire";
+import type { Chord, PreferencePatch } from "../wire";
+import { appearanceOnWire } from "./prefs_city";
 import type { Notifying } from "./notify";
 import { SHOWINGS } from "./results";
 import type { Showing } from "./results";
@@ -195,10 +197,12 @@ export type Keeper =
 // named changes to it, and the two families that are read by name
 // because they have one row each per place and per action.
 //
-// Named changes rather than one `write`, because each of them becomes
-// its own command the day the city keeps these: a caller that handed
-// over a whole record would have to be rewritten then, and a caller
-// that says which fact it is changing would not. `adopt` is the other
+// Named changes rather than one `write`, because each of them is its
+// own `PutPreferences` patch: a caller that handed over a whole record
+// would send the city every field to change one, and a caller that says
+// which fact it is changing sends that fact. The layout of the rail, the
+// bell and how a conversation is shown stay in this browser, since the
+// city's record has no field for them. `adopt` is the other
 // direction and is therefore whole - an answer states every value at
 // once, and a record applied field by field could be half of one
 // answer and half of the last.
@@ -208,8 +212,13 @@ export interface PreferenceDoor {
   // The city's whole record, taken as the one that counts: it becomes
   // what `held` answers, it is mirrored into the cache so the next
   // first paint draws it rather than the shipped postures, and it is
-  // the only thing that makes `keeper` say `city`.
-  readonly adopt: (stated: Preferences) => void;
+  // the only thing that makes `keeper` say `city`. The chords it names
+  // replace this browser's rows for those actions.
+  readonly adopt: (stated: Preferences, chords: readonly Chord[]) => void;
+  // Where each named change is told once it is made: the city's
+  // `PutPreferences`, joined by `core/prefs_city.ts`. Until then a
+  // change stays in this browser alone.
+  readonly tell: (send: (patch: PreferencePatch) => void) => void;
   readonly setLang: (lang: Lang) => void;
   readonly setWelcomed: (done: boolean) => void;
   readonly setPanel: (open: boolean) => void;
@@ -332,30 +341,47 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     writePreferences(rows, next);
     held.set(next);
   };
+  let told: (patch: PreferencePatch) => void = () => undefined;
+  const writeChord = (action: string, spelled: string): void => {
+    if (spelled === "") {
+      rows.removeItem(ROWS.chord + action);
+    } else {
+      rows.setItem(ROWS.chord + action, spelled);
+    }
+  };
   return {
     held,
     keeper,
-    adopt(stated) {
+    adopt(stated, chords) {
       settle(stated);
+      for (const each of chords) writeChord(each.action, each.spelled);
       keeper.set("city");
+    },
+    tell(send) {
+      told = send;
     },
     setLang(lang) {
       settle({ ...get(held), lang });
+      told({ lang });
     },
     setWelcomed(welcomed) {
       settle({ ...get(held), welcomed });
+      told({ welcomed });
     },
     setPanel(panel) {
       settle({ ...get(held), panel });
+      told({ panel });
     },
     setRail(rail) {
       settle({ ...get(held), rail });
     },
     setAppearance(appearance) {
       settle({ ...get(held), appearance });
+      told({ appearance: appearanceOnWire(appearance) });
     },
     setProxying(proxying) {
       settle({ ...get(held), proxying });
+      told({ proxying });
     },
     setNotifying(notifying) {
       settle({ ...get(held), notifying });
@@ -365,11 +391,8 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     },
     chord: (action) => rows.getItem(ROWS.chord + action) ?? "",
     setChord(action, spelled) {
-      if (spelled === "") {
-        rows.removeItem(ROWS.chord + action);
-      } else {
-        rows.setItem(ROWS.chord + action, spelled);
-      }
+      writeChord(action, spelled);
+      told({ chord: { action, spelled } });
     },
     draft: (at) => rows.getItem(ROWS.draft + at) ?? "",
     setDraft(at, text) {

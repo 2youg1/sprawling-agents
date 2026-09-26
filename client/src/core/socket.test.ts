@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
-import { steer } from "./commands";
+import { doctorRefresh, steer } from "./commands";
 import { openConnection } from "./socket";
 import { RunId, WIRE_HASH, WIRE_V } from "../wire";
 
@@ -240,6 +240,28 @@ describe("the browser half", () => {
 
     expect({ state: get(conn.state).kind, accepted, held: get(conn.unsent) })
       .toEqual({ state: "refused", accepted: false, held: 0 });
+  });
+
+  // A press made while the link is down sends nothing, and the page says
+  // so where every refusal lands, instead of a button that does nothing.
+  test("says in the corner that a command made off the link was not sent", () => {
+    install();
+    const conn = openConnection("ws://city.invalid/ws", null, "en");
+    FakeSocket.opened[0]?.onopen?.();
+    FakeSocket.opened[0]?.onclose?.();
+    const sent = conn.command(doctorRefresh());
+
+    expect({ sent, refusal: get(conn.belief).refusal }).toEqual({
+      sent: false,
+      refusal: {
+        code: "E_TIMEOUT",
+        action: "send a command to the city",
+        subject: "doctor_refresh",
+        recovery: "wait until the page says it is connected, then do it again",
+        nearby: [],
+        retry: "yes",
+      },
+    });
   });
 
   // Fifty records written while the page was away are fifty records to

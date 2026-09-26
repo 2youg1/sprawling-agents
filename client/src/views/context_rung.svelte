@@ -27,9 +27,11 @@
   import { configureContext } from "../core/commands";
   import { fill, say } from "../core/lang";
   import { ui } from "../ui";
-  import type { Address, SettledSecond } from "../wire";
+  import { readAnswer } from "../core/answered";
+  import type { Address, Query, SettledSecond } from "../wire";
   import Button from "./parts/button.svelte";
   import Field from "./parts/field.svelte";
+  import Unanswered from "./parts/unanswered.svelte";
 
   interface Props {
     readonly addr: Address;
@@ -43,13 +45,13 @@
   let box = $state("");
   let edited = $state(false);
 
-  const config = $derived(u.conn.asking.ask({ config: { addr } }));
+  const question = $derived<Query>({ config: { addr } });
+  const config = $derived(u.conn.asking.ask(question));
   // What is in force here and which layer said it, once the city has
-  // answered.
-  const settled = $derived.by(() => {
-    const answer = $config;
-    return answer === undefined || !("config" in answer) ? undefined : answer.config.second;
-  });
+  // answered; a city that could not answer is said so, not drawn as a
+  // rung nobody set.
+  const read = $derived(readAnswer($config, (answer) => ("config" in answer ? answer.config.second : undefined)));
+  const settled = $derived(read.kind === "held" ? read.value : undefined);
   // What a file says, or an empty box where no file states the rung -
   // which is the default in force rather than a gap.
   const onDisk = $derived(settled === undefined || settled.from === "default" ? "" : String(settled.percent));
@@ -97,6 +99,9 @@
       edited = true;
     }}
   />
+  {#if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={question} />
+  {/if}
   <div class="flex items-center gap-base">
     <Button
       label={say($lang, "context_second_save")}

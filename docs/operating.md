@@ -55,7 +55,7 @@ The cost page shows shares against the authoritative total rather than normalisi
 
 **A provider is slow or silent.** The right-hand status says `degraded` or `lost`. Calls carry a deadline, so a silent provider ends as a timeout rather than hanging a run forever. If it recurs, check the endpoint on the settings page: a provider that stops listing models is usually a key that expired.
 
-**A file is gone.** The recycle bin has a row for it, with the instruction to bring it back — a checkpoint commit to restore from, a stored copy to retrieve, or a way to rebuild it. There is no restore button: nothing on the wire performs a restoration, and a button that does nothing when pressed is worse than a sentence you can act on. If a row says only that the record names a scheme this build cannot read, the Ledger has the plan.
+**A file is gone.** The recycle bin has a row for it. A file a checkpoint commit holds has a *restore* button, which puts it back and marks the row restored; a row for a copy kept in the content store names where that copy is, and a row for a file that can be rebuilt says so. An approval card that asks about deleted files links here, because *deny* stops the work and puts nothing back. If a row says only that the record names a scheme this build cannot read, the Ledger has the plan.
 
 **The whole city is behaving oddly.** Halt it. Halting is recorded, every run reads as halted, and nothing new starts until you release it. Then read the ledger page from before the trouble.
 

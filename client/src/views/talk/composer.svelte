@@ -32,7 +32,7 @@
   import { QUERIES } from "../../core/asking";
   import { heldIn } from "../../core/belief/rooms";
   import { newestWorking } from "../../core/belief/live";
-  import { openSession, selectModel } from "../../core/commands";
+  import { MODES, openSession, selectModel } from "../../core/commands";
   import type { Sending } from "../../core/doing";
   import { fill, say } from "../../core/lang";
   import { current } from "../../core/route";
@@ -83,6 +83,7 @@
   const u = ui();
   const { lang } = u;
   const effort = u.effort;
+  const mode = u.mode;
   const belief = u.conn.belief;
 
   // The words in the box, and where they are kept while unsent. The
@@ -188,12 +189,12 @@
   // The run this box would steer: what a typed `/stop` reaches too.
   const live = $derived(here === null ? undefined : newestWorking($belief, here));
 
-  const picks: Picks = { model: pickModel, workspace: pickRoom, effort: pickEffort };
+  const picks: Picks = { model: pickModel, workspace: pickRoom, effort: pickEffort, mode: pickMode };
   const session = $derived(
     here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null),
   );
   const specs = $derived(
-    pills($lang, { served: models, chosen: main, session, rooms, here, effort: $effort }, picks),
+    pills($lang, { served: models, chosen: main, session, rooms, here, effort: $effort, mode: $mode }, picks),
   );
 
   // A new session takes the model `main` names when it opens, so the
@@ -224,6 +225,11 @@
     u.chooseEffort(effortLevel(value));
   }
 
+  function pickMode(value: string): void {
+    const chosen = MODES.find((each) => each === value);
+    if (chosen !== undefined) u.chooseMode(chosen);
+  }
+
   // ------------------------------------------------------- the `/` menu
 
   const showing = $derived(open ? menuColumns($lang, text) : []);
@@ -252,6 +258,7 @@
         setEffort: (level) => {
           u.chooseEffort(level);
         },
+        mode: get(mode),
         goal: say(get(lang), "talk_goal"),
         write,
       }),
@@ -353,6 +360,7 @@
       <PillView spec={specs[0]} />
       <PillView spec={specs[1]} />
       <PillView spec={specs[2]} />
+      <PillView spec={specs[3]} />
       {#if hearing === true && canRecord()}
         <button
           type="button"

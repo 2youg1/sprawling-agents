@@ -239,6 +239,14 @@
     "en": "resume",
     "zh": "继续"
   },
+  "bld_room_name": {
+    "en": "name a room to talk in",
+    "zh": "给要说话的房间起个名字"
+  },
+  "bld_room_talk": {
+    "en": "talk there",
+    "zh": "去那里说"
+  },
   "bld_rooms": {
     "en": "rooms",
     "zh": "房间"
@@ -727,6 +735,14 @@
     "en": "the plinth is how much of the plan is done",
     "zh": "基座是计划完成了多少"
   },
+  "inbox_count": {
+    "en": "{n} signals waiting for a run here",
+    "zh": "{n} 条信号在等这里的 run 读"
+  },
+  "inbox_waiting": {
+    "en": "signals waiting here",
+    "zh": "在这里排队的信号"
+  },
   "legend_window": {
     "en": "a lit window is a run",
     "zh": "亮着的窗是一次 run"
@@ -742,6 +758,14 @@
   "link_refused": {
     "en": "refused",
     "zh": "被拒绝"
+  },
+  "link_send_action": {
+    "en": "send a command to the city",
+    "zh": "把一条命令发给城"
+  },
+  "link_send_when_connected": {
+    "en": "wait until the page says it is connected, then do it again",
+    "zh": "等页面显示已连接，再做一次"
   },
   "link_retry": {
     "en": "try again",
@@ -2307,6 +2331,34 @@
     "en": "timeout_ms",
     "zh": "调用超时（毫秒）"
   },
+  "setup_governed": {
+    "en": "documents that govern the city",
+    "zh": "治理这座城的文件"
+  },
+  "setup_governed_note": {
+    "en": "each run reads these when it starts; a run already going keeps what it was given",
+    "zh": "每次 run 开始时读它们；已经在跑的 run 仍用开始时拿到的内容"
+  },
+  "setup_governed_save": {
+    "en": "save the document",
+    "zh": "保存这份文件"
+  },
+  "setup_governed_unchanged": {
+    "en": "nothing changed yet",
+    "zh": "还没有改动"
+  },
+  "governed_clerk": {
+    "en": "who the clerk is",
+    "zh": "clerk 是谁"
+  },
+  "governed_mayor": {
+    "en": "who the mayor is",
+    "zh": "市长是谁"
+  },
+  "governed_preferences": {
+    "en": "how you want the city run",
+    "zh": "你希望城怎么运转"
+  },
   "setup_toml": {
     "en": "the same in config.toml",
     "zh": "等价的 config.toml"
@@ -2316,8 +2368,8 @@
     "zh": "等价的 config.toml"
   },
   "setup_toml_unread": {
-    "en": "nothing here can read the city's config.toml yet",
-    "zh": "这一版还读不到城的 config.toml"
+    "en": "this page does not print config.toml line by line",
+    "zh": "这一页不逐行列出 config.toml"
   },
   "setup_transcribe": {
     "en": "transcribe · hears (needs an ASR model such as whisper; a text model cannot go here)",
@@ -2498,6 +2550,10 @@
   "talk_column_effort": {
     "en": "effort",
     "zh": "强度"
+  },
+  "talk_column_mode": {
+    "en": "mode",
+    "zh": "方式"
   },
   "talk_column_model": {
     "en": "model",
@@ -2707,9 +2763,17 @@
     "en": "allow",
     "zh": "允许"
   },
+  "wait_bin": {
+    "en": "open the recycle bin",
+    "zh": "打开回收站"
+  },
   "wait_deny": {
     "en": "deny",
     "zh": "拒绝"
+  },
+  "wait_deny_keeps": {
+    "en": "deny stops the work and undoes nothing; files a run deleted are kept in the recycle bin.",
+    "zh": "拒绝只停下这件活，不撤销已经发生的事；run 删掉的文件留在回收站里。"
   },
   "wait_from": {
     "en": "{actor} asks",
@@ -3746,6 +3810,26 @@
   "file_missing": {
     "en": "missing",
     "zh": "不存在"
+  },
+  "mode_experiment": {
+    "en": "experiment: try it, nothing promised",
+    "zh": "试验：试一试，不作保证"
+  },
+  "mode_plan_goal": {
+    "en": "plan: write it down, change nothing",
+    "zh": "计划：写下来，不改动"
+  },
+  "mode_sc": {
+    "en": "renovate: keep what it does",
+    "zh": "翻新：外部行为不变"
+  },
+  "mode_ud": {
+    "en": "change: behaviour, with evidence",
+    "zh": "改变：改行为，带证据"
+  },
+  "mode_up": {
+    "en": "build: one piece with its tests",
+    "zh": "建造：一件东西连同它的测试"
   },
   "monitor_title": {
     "en": "performance",
