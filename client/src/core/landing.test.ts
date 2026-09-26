@@ -36,14 +36,17 @@ describe("where a dispatch landed", () => {
     expect(landingOf(sent, before)).toEqual({ kind: "pending" });
   });
 
-  test("a new run in a room under the building is followed there", () => {
-    const after = { ...before, [OURS]: run(OURS, "shop/add-a-test-to-price", TASK, 5) };
-    expect(landingOf(sent, after)).toEqual({
-      kind: "elsewhere",
-      run: OURS,
-      addr: Address.make("shop/add-a-test-to-price"),
-    });
-  });
+  test.each(["shop/add-a-test-to-price", "shop/pricing/add-a-test-to-price"])(
+    "a new run in %s, a room at any depth under the building, is followed there",
+    (addr) => {
+      const after = { ...before, [OURS]: run(OURS, addr, TASK, 5) };
+      expect(landingOf(sent, after)).toEqual({
+        kind: "elsewhere",
+        run: OURS,
+        addr: Address.make(addr),
+      });
+    },
+  );
 
   test("a new run in the room itself stays here", () => {
     const after = { ...before, [OURS]: run(OURS, "shop", TASK, 5) };
