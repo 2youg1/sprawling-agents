@@ -96,7 +96,7 @@ use kernel::{AxCode, AxError, EventRecord, RunId, TimeMs};
 // What the test fixtures below reach through `super::*`, now that the
 // lines this worker appends live in `recording`.
 #[cfg(test)]
-use crate::effect;
+use accounting::effect;
 #[cfg(test)]
 use kernel::{Address, EventDraft, EventKind, Payload};
 use memory::{Cas, JsonlLedger};

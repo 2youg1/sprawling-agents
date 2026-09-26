@@ -10,11 +10,18 @@
 //! one of each, which is why a scripted scenario could reproduce a run
 //! and not a dispatch (ARCHITECTURE.md section 11). Each port here has a
 //! production adapter in `bin::assembly` and a second one outside it.
+//!
+//! Beside the ports live the worker's own values that reach nothing but
+//! the kernel, the city's files and the collaboration vocabulary: what a
+//! desk's effects come to (`effect`) and every building's plan folded
+//! from the records (`plan_view`).
 
 mod clock;
 mod connectors;
+pub mod effect;
 mod machine;
 mod models;
+pub mod plan_view;
 
 pub use clock::Clock;
 pub use connectors::Connectors;

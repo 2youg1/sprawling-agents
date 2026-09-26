@@ -21,7 +21,7 @@ fn a_building_page_still_shows_the_rules_that_govern_it() {
     )
     .unwrap();
     let lab = Address::parse("lab").unwrap();
-    let plan = crate::plan_view::PlanView::default().of(dir.path(), &lab);
+    let plan = accounting::plan_view::PlanView::default().of(dir.path(), &lab);
     let answer = read_building(dir.path(), &lab, plan).expect("a created building has a page");
     let rules = answer
         .docs
@@ -56,7 +56,7 @@ fn a_building_page_says_the_plan_cannot_be_read_rather_than_that_it_is_malformed
     let _ = std::fs::remove_file(&plan);
     std::fs::create_dir_all(&plan).unwrap();
 
-    let plan = crate::plan_view::PlanView::default().of(dir.path(), &lab);
+    let plan = accounting::plan_view::PlanView::default().of(dir.path(), &lab);
     let answer = read_building(dir.path(), &lab, plan).expect("the building is still a building");
     assert!(
         answer
@@ -155,7 +155,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
     // resolved value, so saving twice does not copy the city's
     // settings down into the building.
     let lab = Address::parse("lab").unwrap();
-    let plan = crate::plan_view::PlanView::default().of(dir.path(), &lab);
+    let plan = accounting::plan_view::PlanView::default().of(dir.path(), &lab);
     let shown = read_building(dir.path(), &lab, plan).expect("the building page has an answer");
     assert_eq!(shown.mcp.len(), 1);
     assert!(shown.sandbox.is_some_and(|limits| limits.shell));

@@ -28,11 +28,11 @@ use kernel::{Address, AxError, EventKind, Payload, TimeMs};
 /// The attribution travels with the line rather than with the batch: a
 /// signal is recorded against the room it is going to, and consuming one
 /// is recorded against the resident that read it.
-pub(crate) struct Line {
-    pub(crate) who: String,
-    pub(crate) addr: Address,
-    pub(crate) kind: EventKind,
-    pub(crate) data: Payload,
+pub struct Line {
+    pub who: String,
+    pub addr: Address,
+    pub kind: EventKind,
+    pub data: Payload,
 }
 
 /// What the city does once a desk's lines are on the ledger.
@@ -40,7 +40,7 @@ pub(crate) struct Line {
 /// Every arm is a change somebody can observe without reading the
 /// history: a room's queue, the goal register, the shared plan, the
 /// building's shelf. That is exactly why none of them may happen first.
-pub(crate) enum Then {
+pub enum Then {
     /// The line was the whole of it.
     Nothing,
     /// Put each signal in the room it names, and knock on that door.
@@ -58,16 +58,16 @@ pub(crate) enum Then {
 /// The entry already names its own place: `city::archive_entry` decides
 /// that from the kind, the instant and the subject, none of which needs
 /// a disk. That is what lets the line be written first.
-pub(crate) struct Filing {
-    pub(crate) entry: city::ArchiveEntry,
-    pub(crate) body: String,
+pub struct Filing {
+    pub entry: city::ArchiveEntry,
+    pub body: String,
 }
 
 /// Everything one desk left behind, resolved.
 ///
 /// Both fields are private, and `then` leaves only through
 /// [`Landing::record`].
-pub(crate) struct Landing {
+pub struct Landing {
     lines: Vec<Line>,
     then: Then,
 }
@@ -79,7 +79,7 @@ impl Landing {
     /// Propagates the first line the ledger refuses, and makes no change
     /// at all in that case: the change is the return value, so a caller
     /// that never receives it cannot apply it.
-    pub(crate) fn record(
+    pub fn record(
         self,
         append: &mut impl FnMut(Line) -> Result<(), AxError>,
     ) -> Result<Then, AxError> {
@@ -93,7 +93,7 @@ impl Landing {
     ///
     /// # Errors
     /// Propagates a signal whose payload cannot be built.
-    pub(crate) fn signals(
+    pub fn signals(
         effects: Vec<collab::SignalEffect>,
         room: &Address,
         who: &str,
@@ -132,7 +132,7 @@ impl Landing {
     ///
     /// # Errors
     /// Propagates an entry or a conflict whose payload cannot be built.
-    pub(crate) fn goals(
+    pub fn goals(
         effects: Vec<collab::GoalEffect>,
         room: &Address,
         who: &str,
@@ -169,7 +169,7 @@ impl Landing {
     /// What a wave deleted, as the sweep found it. The payloads carry
     /// their own way back, so there is nothing left for the city to do
     /// once they are on the ledger.
-    pub(crate) fn discards(payloads: Vec<Payload>, room: &Address, who: &str) -> Landing {
+    pub fn discards(payloads: Vec<Payload>, room: &Address, who: &str) -> Landing {
         Landing {
             lines: payloads
                 .into_iter()
@@ -193,7 +193,7 @@ impl Landing {
     /// # Errors
     /// Propagates a kind outside the four, an entry with no subject, and
     /// a payload that cannot be built.
-    pub(crate) fn shelf(
+    pub fn shelf(
         effects: Vec<collab::ArchiveEffect>,
         write_root: &Path,
         building: &Address,
@@ -234,7 +234,7 @@ impl Landing {
 /// third, because the plan is written whole: either every effect still
 /// matches the file as it stands and the lines take the rows, or one of
 /// them does not and nothing at all is written.
-pub(crate) enum Claims {
+pub enum Claims {
     Landed(Box<Landing>),
     /// The nodes that moved, so a person can be told which.
     Stale(Vec<String>),
@@ -248,7 +248,7 @@ impl Claims {
     ///
     /// # Errors
     /// Propagates a claim whose payload cannot be built.
-    pub(crate) fn of(
+    pub fn of(
         effects: &[collab::ClaimEffect],
         on_disk: &str,
         text: String,

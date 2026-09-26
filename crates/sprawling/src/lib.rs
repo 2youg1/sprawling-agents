@@ -29,7 +29,6 @@ pub mod serving;
 
 mod browser_bidi;
 mod browser_tool;
-mod effect;
 mod held_vault;
 mod keying;
 mod mcp_http;
@@ -38,7 +37,6 @@ mod mcp_redeeming;
 mod mcp_sse;
 mod mcp_stdio;
 mod person;
-mod plan_view;
 mod toolkit_broker;
 mod views;
 

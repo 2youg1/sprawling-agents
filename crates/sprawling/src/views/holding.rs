@@ -15,7 +15,7 @@
 //! looks like.
 //!
 //! **What it deliberately does not hold.** The plans are
-//! `crate::plan_view`'s and are read through it; a second parse here
+//! `accounting::plan_view`'s and are read through it; a second parse here
 //! would be a second answer to "what is stuck and why", and only one of
 //! them would be folding the records that say why. What waits in a room
 //! is folded from signal records rather than read off a queue, because a
@@ -111,7 +111,7 @@ pub(crate) struct Views {
     pub(super) index: memory::LedgerIndex,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
-    pub(super) plans: crate::plan_view::PlanView,
+    pub(super) plans: accounting::plan_view::PlanView,
     /// What each building is working towards, folded from the records
     /// that said so. The goal text and its state, not the value itself:
     /// declaring a pursuit takes the depth-zero position, and a view
@@ -190,7 +190,7 @@ impl Views {
                 &kernel::layout::CityLayout::new(city_root).ledger(),
             )
             .unwrap_or_else(|_| memory::LedgerIndex::empty()),
-            plans: crate::plan_view::PlanView::default(),
+            plans: accounting::plan_view::PlanView::default(),
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
             claims: std::collections::BTreeMap::new(),
