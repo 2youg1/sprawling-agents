@@ -66,6 +66,18 @@ fn a_goal_line_the_build_cannot_read_is_a_wire_mismatch() {
     assert_eq!(refused, Err(kernel::AxCode::WireMismatch));
 }
 
+/// A request line that names no branch stops the fold. Skipping it
+/// left the request in the register, so a rebuild offered a rejected
+/// branch for review a second time.
+#[test]
+fn a_request_line_that_names_no_branch_stops_the_fold() {
+    let line = unreadable(
+        kernel::EventKind::PrRejected,
+        serde_json::json!({ "node": "lab-a", "by": "lab/b", "why": "no tests" }),
+    );
+    assert!(CollaborationFold::default().absorb(&line).is_err());
+}
+
 fn unreadable(kind: kernel::EventKind, data: serde_json::Value) -> EventRecord {
     let draft = kernel::EventDraft {
         run: RunId::CITY,

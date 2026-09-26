@@ -134,15 +134,17 @@ impl CollaborationFold {
             // merged one is done, and a rejected one goes back to the
             // resident who wrote it rather than sitting in a queue
             // nobody owns.
-            EventKind::PrMerged | EventKind::PrRejected => {
-                if let Some(branch) = record
+            EventKind::PrMerged => {
+                let branch = record.data().read::<collab::MergedRequest>()?.branch;
+                self.requests.retain(|held| held.branch != branch);
+            }
+            EventKind::PrRejected => {
+                let branch = record
                     .data()
-                    .as_map()
-                    .get("branch")
-                    .and_then(serde_json::Value::as_str)
-                {
-                    self.requests.retain(|held| held.branch != branch);
-                }
+                    .read::<collab::RejectedRequest>()?
+                    .request
+                    .branch;
+                self.requests.retain(|held| held.branch != branch);
             }
             _ => {}
         }
