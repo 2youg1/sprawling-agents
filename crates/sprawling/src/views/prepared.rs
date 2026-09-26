@@ -274,13 +274,13 @@ impl Prepared {
                 Some(answer) => channels::Answer::Skills(Box::new(answer)),
                 None => unavailable(format!("Skills({})", building.as_str())),
             },
-            // A count that cannot be expressed is reported as the largest
-            // count this wire can carry, for the reason every figure of
-            // `Views::metrics` is.
             Self::McpHealth { live, addr } => {
                 channels::Answer::McpHealth(Box::new(live.mcp_health_answer(&addr)))
             }
             Self::Toolkits(live) => channels::Answer::Toolkits(Box::new(live.toolkits_answer())),
+            // A count that cannot be expressed is reported as the largest
+            // count this wire can carry, for the reason every figure of
+            // `Views::metrics` is.
             Self::Metrics { city_root, held } => {
                 channels::Answer::Metrics(Box::new(channels::MetricsAnswer {
                     buildings: u64::try_from(buildings_of(&city_root).len()).unwrap_or(u64::MAX),
