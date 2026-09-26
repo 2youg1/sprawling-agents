@@ -5,13 +5,11 @@
 
 //! What rides in a release archive, and where each part is read from.
 //!
-//! **The list is closed, and every part of it is required.** Whether the
-//! archive carried the bill of materials used to depend on whether
-//! `target/` happened to hold one: an archive assembled in a tree where
-//! `just sbom` had not run was one entry short and said nothing about
-//! it, so two people packaging one tag could ship archives that disagree
-//! about what is inside them. A part that cannot be found is now a
-//! refusal naming the recipe that produces it.
+//! **The list is closed, and every part of it is required.** A part that
+//! cannot be found is a refusal naming the recipe that produces it,
+//! because an archive that quietly left out, say, the bill of materials
+//! whenever `target/` held none would let two people packaging one tag
+//! ship archives that disagree about what is inside them.
 
 use std::path::{Path, PathBuf};
 
@@ -28,10 +26,10 @@ pub(super) enum Packaged {
     /// The executable, under the name its target gives it.
     Binary,
     /// A document a person reads beside the binary, and where the tree
-    /// keeps it. `QUICKSTART.md` moved into `docs/` once while this, its
-    /// only reader, kept asking for the old path — so every archive
-    /// after that move failed to assemble, on a release runner, which is
-    /// the one place nobody watches until a tag is already cut.
+    /// keeps it. This path is the document's only reader on the release
+    /// path, so moving the document means changing this row in the same
+    /// change; otherwise the archive fails to assemble on a release
+    /// runner, the one place nobody watches until a tag is already cut.
     Document {
         name: &'static str,
         source: &'static str,

@@ -45,7 +45,8 @@ pub(super) const ATTRIBUTE: &str = "#[kani::proof]";
 /// `predating` table has. Deleting the marker is how one comes back.
 pub(super) const EXCUSED: &str = "// not-proved:";
 
-/// The workflow that used to hold a second copy of the roster.
+/// The workflow that must not name a harness, because a second copy of
+/// the roster there would drift from the source.
 const CI: &str = ".github/workflows/ci.yml";
 
 /// The document whose §11 states how many harnesses exist.

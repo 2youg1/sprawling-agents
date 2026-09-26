@@ -170,7 +170,7 @@ fn a_block_comment_spans_lines() {
 /// the tree, so this test is the one that notices when the tree changes
 /// shape rather than when the reader breaks.
 #[test]
-fn the_tree_holds_the_harnesses_the_workflow_no_longer_names() {
+fn the_tree_holds_the_harnesses_the_workflow_does_not_name() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -185,7 +185,7 @@ fn the_tree_holds_the_harnesses_the_workflow_no_longer_names() {
         found
             .iter()
             .any(|h| h.name == "backpressure::verification::admit_is_total_and_monotone_in_depth"),
-        "the harness CI used to name by hand is no longer found by the reader that replaced it"
+        "a harness the source declares is missing from the roster the attribute reader built"
     );
     assert!(
         found

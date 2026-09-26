@@ -16,10 +16,9 @@
 //! with a `## <number> <title>` heading and closes at the next one;
 //! `###` subheadings belong to the section above them.
 //!
-//! **Lines no longer carry their number**, because nothing reports one.
-//! The module map used to live here and was found by line; it is
-//! `architecture.toml` now, where an entry is found by name, and a name
-//! survives a reordering that a line number does not.
+//! **Lines carry no number**, because nothing reports one. The module
+//! map is `architecture.toml`, where an entry is found by name, and a
+//! name survives a reordering that a line number does not.
 
 /// The document every gate in this module's field of view judges.
 pub(crate) const PATH: &str = "ARCHITECTURE.md";

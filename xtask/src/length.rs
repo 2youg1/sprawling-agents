@@ -102,8 +102,8 @@ const SOURCE_DIRS: [&str; 4] = ["crates", "xtask/src", "citysim/src", "desktop/s
 
 /// Where the client's own sources live. Only the file rule reaches
 /// them; the module documentation says why. The directory itself is
-/// `walk`'s to state - five gates used to hold their own spelling of
-/// it, and nothing compared them.
+/// `walk`'s to state, so no gate holds a spelling of it that nothing
+/// compares.
 use crate::walk::CLIENT_SRC as CLIENT_DIR;
 
 /// What the client is written in.
@@ -195,10 +195,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 
 /// The signatures the register still excuses and no longer needs to.
 ///
-/// The parameter register used to be consulted and never audited, so a
-/// name stayed on it after the clump had been given a name, and it
-/// silently re-excused any function later born with that name in that
-/// file. Both other registers in this repository - the file register
+/// A register that is consulted and never audited keeps a name after
+/// the clump has been given a name, and silently re-excuses any
+/// function later born with that name in that file. Both other registers in this repository - the file register
 /// above and `boundary`'s - already report their own spent rows, and
 /// this is the same rule in the same words.
 fn spent_signatures(

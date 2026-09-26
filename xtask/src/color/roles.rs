@@ -7,11 +7,11 @@
 //! vocabulary (xtask-SPEC.md section 8-8).
 //!
 //! The rungs are the authority on values and the six assertions beside
-//! this file judge them. They never answered the question a view asks -
-//! *what fills a control that has lifted off the page* - so before this
-//! gate existed every view answered it where it stood: two hundred and
-//! thirty-six hand-typed `bg-g2` and `border-g3` spellings, no two of
-//! which could be compared and none of which was the authority.
+//! this file judge them. They do not answer the question a view asks -
+//! *what fills a control that has lifted off the page* - and without a
+//! role every view answers it where it stands, in hand-typed `bg-g2`
+//! and `border-g3` spellings that cannot be compared and none of which
+//! is the authority.
 //!
 //! **A role is a single hop and nothing else.** `--color-raised:
 //! var(--color-g2)`. Not an `oklch()` beside the rung it copies, which

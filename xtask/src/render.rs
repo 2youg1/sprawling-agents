@@ -13,18 +13,15 @@
 //! green through all of it: fourteen gates, 1,338 tests, and a home page
 //! whose task box had floated into the top right corner.
 //!
-//! **The accessibility half used to be its own gate and is now these
-//! three properties.** `ax` compared the affordances both sides *wrote
-//! down*, and said in its own header why: a computed tree needs a
-//! browser, and a gate that cannot run offline stops running. That
-//! trade expired when the gate learnt to open a browser. Roles,
-//! accessible names and landmarks are read off the page as drawn, which
-//! is what a person using a screen reader actually meets.
+//! **Accessibility is read off the page as drawn.** Roles, accessible
+//! names and landmarks come from the rendered page rather than from
+//! what either side wrote down, because the rendered page is what a
+//! person using a screen reader actually meets, and this gate already
+//! opens a browser.
 //!
-//! **The geometry is no longer here.** The left edge of the regions in
-//! the main column, the first mark of the rows of a navigation column
-//! and containment were three population judgements written beside this
-//! gate; they are now three of the readings `xtask::survey` takes, and
+//! **The geometry is measured elsewhere.** The left edge of the regions
+//! in the main column, the first mark of the rows of a navigation column
+//! and containment are three of the readings `xtask::survey` takes, and
 //! this gate refuses the ones that reading marks as refusable
 //! (section 8-26). A page's geometry with two homes is the defect that
 //! instrument exists to prevent, and a gate is a consumer of a
