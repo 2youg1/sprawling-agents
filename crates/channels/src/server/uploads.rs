@@ -68,9 +68,15 @@ pub(crate) async fn accept_recording(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let Some(media) = headers
+    // The parameters a browser appends (`; codecs=opus`) name the codec
+    // inside the container, and what the audio wire routes on is the
+    // container, so a value of parameters alone declares none.
+    let Some(container) = headers
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .map(str::trim)
+        .filter(|container| !container.is_empty())
     else {
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -78,11 +84,7 @@ pub(crate) async fn accept_recording(
         )
             .into_response();
     };
-    // The parameters a browser appends (`; codecs=opus`) name the codec
-    // inside the container, and what the audio wire routes on is the
-    // container.
-    let media = media.split(';').next().unwrap_or(media).trim().to_owned();
-    match (state.transcribe_sink)(body.to_vec(), media) {
+    match (state.transcribe_sink)(body.to_vec(), container.to_owned()) {
         Ok(text) => (StatusCode::OK, text).into_response(),
         Err(err) => (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response(),
     }

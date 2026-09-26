@@ -818,7 +818,7 @@ pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError>
 ```
 
 - **是一条路由，不是一条 Command，也不是一条 Query**。Command 被接下之后经事件流作答，而「我刚说的那句话是什么」必须回到录它的那个标签页；Query 是另一种会作答的形状，而一条在供应方那里花掉数秒的查询就是一条装成读的命令。`/enroll` 与 `/upload` 早已是同一类旁门：帧的文法装不下的那几件事各有一扇 HTTP 门。
-- **容器从请求头读，不从字节猜**：浏览器录进它手上有的容器，而只有它知道是哪一个。没有 content-type 即按名拒绝——一个没人声明的容器发不出去。`; codecs=opus` 这类参数说的是容器里的编解码器，而音频线路由的是容器，故取分号前那一段。
+- **容器从请求头读，不从字节猜**：浏览器录进它手上有的容器，而只有它知道是哪一个。没有 content-type 即按名拒绝——一个没人声明的容器发不出去。`; codecs=opus` 这类参数说的是容器里的编解码器，而音频线路由的是容器，故取分号前那一段；那一段修剪后为空（头里只有参数）同样是没声明容器，与缺头同一句拒绝。
 - **`ModelTag` 增第三个 `Transcribe`**（kernel-SPEC 的枚举表同步）：**「哪个 endpoint、哪个 model 答这一类活」本来就有机制**——人登记一个 endpoint，再为一个 tag 选一个 model。第二张表单加第二份存储会是同一个问题的第二个答案，而那把 key 还要有第二条进金库的路。人填 URL 与 key 因而走的是既有的 attach 表单。
 - **服务端**：`gateway::transcriber_for(chosen, secrets)` 与 `adapter_for` 同形——把一个选择变成一件可调用的东西这件事只在一处发生。`Views::transcriber` 在锁内读出选择、锁外发请求。
 
