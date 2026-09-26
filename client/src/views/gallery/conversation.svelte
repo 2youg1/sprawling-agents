@@ -33,7 +33,7 @@
   import { RunId } from "../../wire";
   import { motherName } from "../talk/forking";
   import type { Utterance } from "./served";
-  import { CALLS, EARLIER_SEGMENT, ROUND, TURNS, WAITING } from "./served";
+  import { CALLS, EARLIER_SEGMENT, ONE_QUESTION, ROUND, TURNS, WAITING } from "./served";
 
   // The question the rail's dot counts stays reachable under the name
   // it always had, for the presences fixture that reads it.
@@ -72,6 +72,7 @@
   import Popover from "../parts/popover.svelte";
   import Composer from "../talk/composer.svelte";
   import { WaitingCards } from "../talk/waiting.svelte";
+  import Asked from "../talk/asked.svelte";
   import Case from "./case.svelte";
   import { CHOSEN, MODELS } from "./served";
 
@@ -138,6 +139,13 @@
 
 <Case label="waiting">
   <WaitingCards items={WAITING} />
+</Case>
+
+<Case label="waiting · what the question is about, on the card">
+  <Asked
+    locator={ONE_QUESTION.artifact}
+    content={{ binary: false, bytes: 96, locator: ONE_QUESTION.artifact, text: "rm -rf target\n# frees 4.2 GiB; the next build starts cold", truncated: false }}
+  />
 </Case>
 
 <!-- The empty room lifts the box into the upper third rather than

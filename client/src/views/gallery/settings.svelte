@@ -102,10 +102,23 @@
 <script lang="ts">
   import { MachineReport, MachineUnchecked } from "../machine.svelte";
   import Setup from "../setup.svelte";
+  import Decided from "../setup/decided.svelte";
+  import { TimeMs, type Decision } from "../../wire";
   import { ENDPOINTS } from "./served";
   import Case from "./case.svelte";
   import { answered } from "./shelved.svelte";
   import Stand from "./stand.svelte";
+
+  // Three questions the clerk answered while the person was away: two
+  // allowed, one denied, so both verdicts are drawn.
+  function ruled(item: string, detail: string, at: number, verdict: Decision["verdict"]): Decision {
+    return { at: TimeMs.make(at), cluster: { class: "question", detail }, item, verdict };
+  }
+  const CLERK: readonly Decision[] = [
+    ruled("ap-1", "keep the ledger schema at v3 for this release", 1_767_225_600_000, "allow"),
+    ruled("ap-2", "split the gate module before adding the dedup rule", 1_767_229_200_000, "allow"),
+    ruled("ap-3", "drop the legacy wire frame in this change", 1_767_232_800_000, "deny"),
+  ];
 </script>
 
 <!-- What the dependency group's body is, per case. The real one asks
@@ -249,5 +262,17 @@ turns into a row across the top and every grid is down to one column. -->
       onAutonomy={() => undefined}
       dependency={unchecked}
     />
+  </Stand>
+</Case>
+
+<Case label="setup · answered for you, nothing yet" width={820}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answered}>
+    <Decided decided={[]} />
+  </Stand>
+</Case>
+
+<Case label="setup · answered for you, three by the clerk" width={820}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answered}>
+    <Decided decided={CLERK} />
   </Stand>
 </Case>

@@ -8,7 +8,7 @@
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { count } from "../../core/time";
-  import type { Call, RunId, Turn } from "../../wire";
+  import type { Call, Output, RunId, Turn } from "../../wire";
   import { ui } from "../../ui";
   import { callWord } from "./calls";
   import type { ForkEntry } from "./forking";
@@ -43,6 +43,20 @@
   });
 </script>
 
+<!-- What a call was given and what it said, cut the same way: the
+     arguments of a write can be as long as its output, and the cut is
+     counted either way. -->
+{#snippet bounded(output: Output)}
+  <pre
+    class="mt-tight max-h-output overflow-auto rounded-card border border-edge bg-page p-snug font-mono text-note text-text-quiet"
+  >{output.cut > 0 ? `${output.head}\n` : output.head}{#if output.cut > 0}<span class="text-text-disabled">{fill(say($lang, "run_cut"), { n: String(output.cut) })}</span>{/if}</pre>
+  {#if output.cut > 0}
+    <a class="text-note text-text-faint hover:text-text-quiet" href={toFragment({ kind: "run", run })}>
+      {say($lang, "talk_call_open")}
+    </a>
+  {/if}
+{/snippet}
+
 <!-- What a turn did, folded to one line.
 
      A wave of tool calls is the bulk of what a run produces and almost
@@ -60,6 +74,7 @@
      Each call carries the branch action the thread gives every entry:
      a call is a place the conversation could have gone another way
      (roadmap S2). -->
+
 <details class="my-tight text-note text-text-faint">
   <summary
     class="cursor-pointer rounded-control px-tight marker:text-text-disabled hover:bg-chrome hover:text-text-quiet"
@@ -92,19 +107,14 @@
         >
           {callWord(call.tool, call.subject)}
         </span>
+        {#if call.arguments}
+          <span class="mt-tight block text-text-disabled">{say($lang, "talk_call_arguments")}</span>
+          <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself) -->
+          {@render bounded(call.arguments)}
+        {/if}
         {#if call.output}
-          {@const output = call.output}
-          <pre
-            class="mt-tight max-h-output overflow-auto rounded-card border border-edge bg-page p-snug font-mono text-note text-text-quiet"
-          >{output.cut > 0 ? `${output.head}\n` : output.head}{#if output.cut > 0}<span class="text-text-disabled">{fill(say($lang, "run_cut"), { n: String(output.cut) })}</span>{/if}</pre>
-          {#if output.cut > 0}
-            <a
-              class="text-note text-text-faint hover:text-text-quiet"
-              href={toFragment({ kind: "run", run })}
-            >
-              {say($lang, "talk_call_open")}
-            </a>
-          {/if}
+          <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself) -->
+          {@render bounded(call.output)}
         {/if}
       </li>
     {/each}

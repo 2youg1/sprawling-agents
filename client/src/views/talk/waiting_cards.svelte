@@ -61,6 +61,7 @@
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
   import Glyph from "../parts/glyph.svelte";
+  import Asked from "./asked.svelte";
 
   interface Props {
     readonly items: readonly ApprovalItem[];
@@ -94,6 +95,7 @@
       <span class="shrink-0 text-text-faint">{ago($lang, group.first.created, u.now())}</span>
     </div>
     <p class="my-snug text-body leading-relaxed">{group.first.action_desc}</p>
+    <Asked locator={group.first.artifact} />
     <div class="flex flex-wrap items-center gap-snug text-note">
       {#if group.items.length > 1}
         <span class="text-text-faint">

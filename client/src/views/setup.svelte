@@ -18,13 +18,11 @@
   // control, and a foot with the constraint or state on the left and the
   // save receipt on the right (client-SPEC 4-36, ux-upgrades A2).
 
-  import { tick } from "svelte";
-  import type { Snippet } from "svelte";
+  import { tick, type Snippet } from "svelte";
 
   import { QUERIES } from "../core/asking";
   import { setAutonomy } from "../core/commands";
-  import { LANGS, endonym, say } from "../core/lang";
-  import type { Lang, Key } from "../core/lang";
+  import { LANGS, endonym, say, type Key, type Lang } from "../core/lang";
   import { toFragment } from "../core/route";
   import { ui } from "../ui";
   import type { Autonomy, EndpointsAnswer, Proxying } from "../wire";
@@ -36,6 +34,7 @@
   import AdvancedSection from "./setup/advanced.svelte";
   import { saveReceipt } from "./setup/appearance";
   import AppearanceSection from "./setup/appearance.svelte";
+  import Decided from "./setup/decided.svelte";
   import Kept from "./setup/kept.svelte";
   import KeysSection from "./setup/keys.svelte";
   import ModelChoice from "./setup/models.svelte";
@@ -345,6 +344,7 @@
               {@render autonomyControl()}
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
               {@render foot(undefined, "autonomy")}
+              <Decided />
             </div>
           </div>
         {:else if shown === "network"}

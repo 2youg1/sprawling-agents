@@ -3123,5 +3123,37 @@
   "setup_editor_folder_help": {
     "en": "An absolute path. Only a file inside it gets a link.",
     "zh": "填绝对路径。只有这个文件夹里的文件会有链接。"
+  },
+  "change_folded": {
+    "en": "{n} unchanged lines",
+    "zh": "{n} 行未改动"
+  },
+  "change_line_quote": {
+    "en": "quote line {n} in the conversation",
+    "zh": "在对话里引用第 {n} 行"
+  },
+  "talk_call_arguments": {
+    "en": "called with",
+    "zh": "调用参数"
+  },
+  "decided_title": {
+    "en": "answered for you",
+    "zh": "代为答复的记录"
+  },
+  "decided_none": {
+    "en": "nothing has been answered for you",
+    "zh": "还没有代为答复过任何事"
+  },
+  "decided_allow": {
+    "en": "allowed",
+    "zh": "已允许"
+  },
+  "decided_deny": {
+    "en": "denied",
+    "zh": "已拒绝"
+  },
+  "wait_asks": {
+    "en": "what it asks about",
+    "zh": "它问的内容"
   }
 }
