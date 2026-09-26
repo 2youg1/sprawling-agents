@@ -161,6 +161,19 @@ impl Checkpoint {
     /// and the index it wrote, which is what the fence touched and not
     /// what the city holds.
     pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, MemoryError> {
+        let files = self.stage_scopes_held(scopes)?;
+        write_index(&mut self.repo.index().map_err(git_err("read index"))?)?;
+        Ok(files)
+    }
+
+    /// Stages `scopes` into the repository's index in memory and leaves
+    /// the file on disk as it was, for a caller whose objects are not on
+    /// disk yet: an index written before them names blobs a failure
+    /// would drop, and later fences skip those entries by their stat data.
+    pub(crate) fn stage_scopes_held(
+        &mut self,
+        scopes: &[String],
+    ) -> Result<Vec<String>, MemoryError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
         let found: BTreeMap<Vec<u8>, git2::Oid> =
             index.iter().map(|entry| (entry.path, entry.id)).collect();
@@ -185,7 +198,6 @@ impl Checkpoint {
                 .map_err(git_err("stage scope"))?;
         }
         filter.refused()?;
-        write_index(&mut index)?;
         let mut changed: BTreeSet<Vec<u8>> = BTreeSet::new();
         let mut present = 0usize;
         for entry in index.iter() {
@@ -352,7 +364,7 @@ impl Checkpoint {
 /// Retrying is safe because the index being written is the in-memory one
 /// this call built, unchanged by a failed write: the second attempt
 /// states the same thing as the first.
-fn write_index(index: &mut git2::Index) -> Result<(), MemoryError> {
+pub(super) fn write_index(index: &mut git2::Index) -> Result<(), MemoryError> {
     const ATTEMPTS: u32 = 20;
     const WAIT: std::time::Duration = std::time::Duration::from_millis(25);
     let mut attempt: u32 = 0;

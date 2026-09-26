@@ -63,7 +63,7 @@ impl Checkpoint {
             .set_odb(&odb)
             .map_err(git_err("hold the base fence in memory"))?;
 
-        let files = self.stage_scopes(scopes)?;
+        let files = self.stage_scopes_held(scopes)?;
         progress(BaseProgress::Staged { files: files.len() });
         self.scan_staged()?;
         // The same question `ensure_base` asks: a city with no HEAD has
@@ -73,7 +73,7 @@ impl Checkpoint {
             t,
             of,
             subject: &subject_of(scopes),
-            onto_head,
+            onto_head: false,
         })?;
 
         let mut pack = git2::Buf::new();
@@ -96,11 +96,29 @@ impl Checkpoint {
             .map_err(git_err("write the base fence pack"))?;
         progress(BaseProgress::Packed { bytes: pack.len() });
 
-        if !onto_head {
+        // Only now are the objects on disk, so only now may the index and
+        // a reference name them: a failure above leaves both as they were.
+        super::scan::write_index(&mut self.repo.index().map_err(git_err("read index"))?)?;
+        let name = if onto_head {
             self.repo
-                .reference(&fence_ref(of, oid), oid, true, "sprawling: a base fence")
-                .map_err(git_err("file a base fence"))?;
-        }
+                .find_reference("HEAD")
+                .map_err(git_err("read HEAD"))?
+                .symbolic_target()
+                .map_err(|err| MemoryError::Checkpoint {
+                    op: "read HEAD",
+                    detail: err.to_string(),
+                })?
+                .map(str::to_owned)
+                .ok_or_else(|| MemoryError::Checkpoint {
+                    op: "move HEAD to the base fence",
+                    detail: "HEAD names no branch".to_owned(),
+                })?
+        } else {
+            fence_ref(of, oid)
+        };
+        self.repo
+            .reference(&name, oid, true, "sprawling: a base fence")
+            .map_err(git_err("file a base fence"))?;
         held.reset().map_err(git_err("release the base fence"))?;
         committed(oid, of, scopes, files)
     }
