@@ -25,13 +25,15 @@ function gist(data: Payload): string {
 </script>
 
 <script lang="ts">
+  import { readAnswer } from "../../core/answered";
   import { say } from "../../core/lang";
   import { clock, hhmmss } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Seq } from "../../wire";
+  import type { Query, Seq } from "../../wire";
   import Button from "../parts/button.svelte";
   import Row, { RowList } from "../parts/row.svelte";
   import Tip from "../parts/tip.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
 
   const u = ui();
   const lang = u.lang;
@@ -39,14 +41,15 @@ function gist(data: Payload): string {
   let before = $state<Seq | null>(null);
   let open = $state<Seq | null>(null);
 
-  const history = $derived(u.conn.asking.ask({ history: { before, limit: 100 } }));
-  const answer = $derived.by(() => {
-    const held = $history;
-    return held !== undefined && "history" in held ? held.history : undefined;
-  });
+  const question = $derived<Query>({ history: { before, limit: 100 } });
+  const history = $derived(u.conn.asking.ask(question));
+  const read = $derived(readAnswer($history, (held) => ("history" in held ? held.history : undefined)));
+  const answer = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 
-{#if answer === undefined}
+{#if read.kind === "unavailable"}
+  <Unanswered query={read.query} asked={question} />
+{:else if answer === undefined}
   <p class="text-text-disabled">…</p>
 {:else}
   {#snippet ledgerRows()}

@@ -10,19 +10,21 @@
 
 <script lang="ts">
   import { toFragment } from "../../core/route";
+  import { readAnswer } from "../../core/answered";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
+  import type { Query } from "../../wire";
+  import Unanswered from "../parts/unanswered.svelte";
 
   const u = ui();
   const lang = u.lang;
 
   let needle = $state("");
 
-  const search = $derived(u.conn.asking.ask({ archive_search: { needle } }));
-  const hits = $derived.by(() => {
-    const held = $search;
-    return held !== undefined && "archive" in held ? held.archive.hits : undefined;
-  });
+  const question = $derived<Query>({ archive_search: { needle } });
+  const search = $derived(u.conn.asking.ask(question));
+  const read = $derived(readAnswer($search, (held) => ("archive" in held ? held.archive.hits : undefined)));
+  const hits = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 
 <div>
@@ -31,7 +33,9 @@
     placeholder={say($lang, "rec_search")}
     bind:value={needle}
   />
-  {#if hits === undefined}
+  {#if read.kind === "unavailable"}
+    <Unanswered query={read.query} asked={question} />
+  {:else if hits === undefined}
     <p class="text-text-disabled">…</p>
   {:else if hits.length === 0}
     <p class="text-text-faint">{say($lang, "rec_nothing")}</p>

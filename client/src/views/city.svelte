@@ -17,15 +17,17 @@
   // own art rather than icons, so they stay hand-drawn here (4-12).
 
   import { QUERIES } from "../core/asking";
+  import { readAnswer } from "../core/answered";
   import { fill, say } from "../core/lang";
   import { MAYOR, toFragment } from "../core/route";
   import { percent } from "../core/share";
-  import type { Address, BuildingProgress, CityAnswer } from "../wire";
+  import type { Address, BuildingProgress } from "../wire";
   import { ui } from "../ui";
   import Bar from "./city/bar.svelte";
   import Panel from "./city/panel.svelte";
   import Skyline from "./city/skyline.svelte";
   import EmptyState from "./parts/empty.svelte";
+  import Unanswered from "./parts/unanswered.svelte";
 
   // The five marks the drawing carries, and the order a reader meets
   // them in.
@@ -44,10 +46,8 @@
 
   let picked = $state.raw<Address | null>(null);
 
-  const city = $derived.by((): CityAnswer | undefined => {
-    const held = $answer;
-    return held !== undefined && "city" in held ? held.city : undefined;
-  });
+  const read = $derived(readAnswer($answer, (held) => ("city" in held ? held.city : undefined)));
+  const city = $derived(read.kind === "held" ? read.value : undefined);
 
   const rows = $derived.by((): Row[] =>
     [...(city?.buildings ?? [])]
@@ -93,7 +93,9 @@
       {/each}
     </nav>
     <section class="flex min-h-0 min-w-0 flex-1 flex-col justify-center overflow-auto px-pane py-base">
-      {#if city === undefined}
+      {#if read.kind === "unavailable"}
+        <Unanswered query={read.query} asked={QUERIES.city} />
+      {:else if city === undefined}
         <p class="text-center text-text-disabled">…</p>
       {:else if city.buildings.length > 0}
         <Skyline
