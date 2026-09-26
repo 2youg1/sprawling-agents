@@ -115,5 +115,5 @@ fn a_line_that_does_not_link_to_the_newer_one_ends_the_walk_with_its_line() {
     let Some(Err(MemoryError::Envelope { line, .. })) = walked.last() else {
         panic!("the third line back must be refused");
     };
-    assert_eq!(*line, lines.len() as u64 - 3);
+    assert_eq!(*line, lines.len() as u64 - 2);
 }

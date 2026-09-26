@@ -139,7 +139,7 @@ impl SegmentBytes { pub(crate) fn lines(&self) -> impl Iterator<Item = &[u8]>; }
 /// 每行过的检查与正向读者相同：信封、版本方向、kind 的有类型／可忽略之分、写者规范回显，
 /// 这些住 `LineCheck::judge` 一处；链改成倒着接：这一行的 `chain_hash` 必须等于较新那行的 `prev`，
 /// 它的 `seq.next()` 必须等于较新那行的 `seq`，seq 为 `FIRST` 的行的 `prev` 必须是 `GENESIS_PREV`。
-/// 不合格的行以 `LineFault::into_ax(seq + 1)` 报出，之后迭代结束。撕裂尾（最后一个 `\n` 之后的字节）
+/// 不合格的行以 `MemoryError::Envelope` 报出，行号是链给它的位置（较新那行的 seq 值，即 1 起的行号；最新一行没有较新者，记作第 0 行），之后迭代结束。撕裂尾（最后一个 `\n` 之后的字节）
 /// 不是行，跳过，与 `lines()` 同一规则。住 `jsonl::tail`。
 /// 被否掉的：先 `read_raw_lines_at` 再取末尾——首屏要付整本账本的读取，正是这个读者要去掉的。
 pub struct TailLines { /* 段路径（倒序）、当前段的未读偏移与缓冲、较新一行的 seq 与 prev */ }
