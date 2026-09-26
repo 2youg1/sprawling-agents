@@ -48,6 +48,18 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
+/// The ```depmap block of `text` drawn as a mermaid flowchart, fences
+/// included: one line per crate that allows no edge, one arrow per
+/// allowed edge, dependent to dependency. No edge is reduced away, since
+/// the one a reader looks up may be exactly the transitive one.
+///
+/// # Errors
+/// When `text` holds no closed depmap block, as [`check`] refuses it.
+pub(crate) fn graph(text: &str) -> Result<String, XtaskError> {
+    let _allowed = parse_block(text)?;
+    Ok(String::new())
+}
+
 /// Parse the ```depmap fenced block: `name:` or `name: dep, dep`.
 fn parse_block(text: &str) -> Result<BTreeMap<String, BTreeSet<String>>, XtaskError> {
     let mut map = BTreeMap::new();
@@ -251,6 +263,27 @@ mod tests {
         let map = parse_block(text).unwrap();
         assert!(map.get("kernel").unwrap().is_empty());
         assert_eq!(map.get("runtime").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn the_crate_graph_draws_every_allowed_edge_from_dependent_to_dependency() {
+        let text = "x
+```depmap
+kernel:
+memory: kernel
+runtime: kernel, memory
+```
+";
+        assert_eq!(
+            graph(text).unwrap(),
+            "```mermaid
+flowchart TD
+    kernel
+    memory --> kernel
+                 runtime --> kernel
+    runtime --> memory
+```"
+        );
     }
 
     #[test]

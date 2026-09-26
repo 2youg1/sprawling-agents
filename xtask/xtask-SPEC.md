@@ -558,6 +558,8 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 
 **权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`channels::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `channels::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `channels` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
 
+**一张图也是一个事实。** `crate_graph` 把 `ARCHITECTURE.md` §3 的 `depmap` 块画成一段 mermaid `flowchart TD`：块里每个 crate 一行，每条允许的边一个箭头（依赖方指向被依赖方），不做传递约简，因为约简掉的边正是 `depmap` 允许、读者要查的那一条。生成函数 `depmap::graph` 与门用同一个 `parse_block` 读块，故图与门不会读出两张依赖表；手画一张依赖图，就是依赖表的第二个权威。值自带 ```` ```mermaid ```` 围栏，标记放在围栏之外，因为 mermaid 不认 HTML 注释。
+
 **带参数的四族，键写成 `<事实>:<参数>`**：`dep_version:<crate>`（读工作区与各成员清单钉的版本；同一个 crate 在两处钉成两个版本时，这个读数本身就是拒绝）、`budget_bytes:<行>` 与 `budget_reading:<行>`（`xtask/budgets.toml` 那一行的预算与读数，按文档的写法分三位一组）、`budget_headroom:<行>`（两者之比，四舍五入到一位小数）、`budget_figure:<行>.<字段>`（那一行任一整数字段，分三位一组、不带单位，单位由字段名给出；缺 `.字段` 即拒绝）。同一个读数只住在 `budgets.toml` 的一行里，文档里每处引用它的地方都是这一族的标记，不是第二份手写的数。一个生成器服务一族事实，于是加一个被引用的版本号或预算行不需要加一行代码。
 
 **尺寸读数改由本门持有，推翻了本节早先的分派。** 早先写的是「尺寸读数（M-04）属 `budget` 与 `badge`」，而那句话把两件事混成一件：`budget` 称重并守住预算，`badge` 把读数画成 SVG，**没有一个把读数搬进散文与表格**。于是 `ARCHITECTURE.md` §11 的三行尺寸各自手写，`558,419 B — 3.8×` 与登记表的 `288,972 B — 7.3×` 分叉了两个版本。现在的分工是：**称重仍只属 `budget`，引用属 `docnum`**，两者读同一行 `budgets.toml`，故读数仍只有一个家。同理 `dep_version` 并不与 `depmap` 争权——`depmap` 判依赖边，版本号住清单，本门只负责把清单里的那个字符串搬进文档。
