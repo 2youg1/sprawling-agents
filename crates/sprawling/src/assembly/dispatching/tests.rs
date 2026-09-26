@@ -171,6 +171,45 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
     );
 }
 
+/// Work sent to a bare building is named by rule from the task, so the
+/// first call the provider sees is the run itself and a model's reply
+/// never becomes a room (sprawling-SPEC.md 8-86).
+#[test]
+fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![completion("收到。", None), completion("done", None)],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("shop").unwrap(),
+            task: "[short] 给 price 加一个测试".to_owned(),
+            goal: "a test exists".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+        })
+        .unwrap();
+
+    let first = provider.bodies().into_iter().find(|body| body.contains("messages"));
+    assert!(
+        first.as_deref().is_some_and(|body| body.contains("Task: [short]")),
+        "the first chat call is the run itself: {first:?}"
+    );
+    assert!(
+        dir.path().join("shop").join("short-price").is_dir(),
+        "the room is named from the task by rule"
+    );
+    assert!(
+        !dir.path().join("shop").join("收到。").exists(),
+        "a model's reply never becomes a room"
+    );
+}
+
 /// A confidential building's task text is not sent off this machine to
 /// be given a room name.
 ///
