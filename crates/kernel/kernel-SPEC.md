@@ -338,6 +338,8 @@ impl fmt::Display for Locator { /* 规范拼写往返：parse(x).to_string() == 
 pub struct RunId(Uuid);                 // uuid v7 仅人读标识；kernel 不生成
 impl RunId { pub const CITY: RunId;     // nil UUID：city 级事件哨兵
              pub fn from_bytes([u8;16]) -> Self;  pub fn parse(&str) -> Result<Self, AxError>; }
+// 反序列化：人读格式（JSON 行、帧）只收 parse 认的那一种拼写；二进制格式（views 快照的 postcard）
+// 按 uuid 的 16 字节读回，与序列化对称——否则存着 RunId 的 views 快照与 twin 都解不回来。
 pub struct Seq(u64);
 impl Seq { pub const FIRST: Seq;        // 0；创世行
            pub fn next(self) -> Result<Seq, AxError>; }   // checked_add

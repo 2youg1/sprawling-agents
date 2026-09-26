@@ -54,7 +54,14 @@ impl RunId {
 /// in a frame or a ledger line cannot be read in a spelling the
 /// constructor refuses. The derived `Deserialize` would otherwise ask
 /// `uuid::Uuid` directly, which takes four spellings to this type's one.
+///
+/// A binary format has no spelling: `uuid::Uuid` writes its sixteen bytes
+/// there, and a snapshot of the views is read back through the same
+/// format it was written in, so only a human-readable format is parsed.
 fn read_run_id<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<uuid::Uuid, D::Error> {
+    if !deserializer.is_human_readable() {
+        return uuid::Uuid::deserialize(deserializer);
+    }
     let raw = String::deserialize(deserializer)?;
     RunId::parse(&raw)
         .map(|run| run.0)
