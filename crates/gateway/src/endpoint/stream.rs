@@ -40,6 +40,7 @@ impl Endpoint {
         &mut self,
         req: &ModelRequest,
         onto: kernel::Increments<'_>,
+        early: kernel::EarlyCalls<'_>,
     ) -> Result<ModelReturn, AxError> {
         let mut wire = self.wire_request(req)?;
         if let Some(map) = wire.as_object_mut() {
@@ -95,6 +96,7 @@ impl Endpoint {
             self.lines_of(response, |line| {
                 body.push_str(&line);
                 body.push('\n');
+                Ok(())
             })?;
             serde_json::from_str(&body).map_err(|err| {
                 provider_err(
@@ -110,7 +112,11 @@ impl Endpoint {
                         onto(&held);
                     }
                     frames.push(frame);
+                    if let Some(call) = dialect::call_completed_by(self.config.dialect, &frames)? {
+                        early(&call);
+                    }
                 }
+                Ok(())
             })?;
             // A cut stream is a provider failure, never a shortened
             // reply: a return is built from the settled frame, and a
@@ -138,7 +144,7 @@ impl Endpoint {
     fn lines_of(
         &self,
         response: reqwest::blocking::Response,
-        mut each: impl FnMut(String),
+        mut each: impl FnMut(String) -> Result<(), AxError>,
     ) -> Result<(), AxError> {
         // The stream's own bound when it has one, and the settled
         // call's when it does not: a stream nobody bounded separately
@@ -176,7 +182,7 @@ impl Endpoint {
                     ));
                 }
             };
-            each(line);
+            each(line)?;
         }
     }
 }
@@ -290,7 +296,7 @@ mod tests {
                 said.borrow_mut().push_str(text);
             }
         };
-        let ret = endpoint.stream(&request(), &mut onto).unwrap();
+        let ret = endpoint.stream(&request(), &mut onto, &mut |_| {}).unwrap();
         assert_eq!(said.borrow().as_str(), "still writing");
         assert_eq!(ret.stop, Some(kernel::StopReason::EndTurn));
         server.join().unwrap();
@@ -315,7 +321,9 @@ mod tests {
         )
         .unwrap();
         let mut onto = |_held: &kernel::Increment| {};
-        let err = endpoint.stream(&request(), &mut onto).unwrap_err();
+        let err = endpoint
+            .stream(&request(), &mut onto, &mut |_| {})
+            .unwrap_err();
         assert_eq!(*err.code(), kernel::AxCode::Provider);
         assert!(
             err.subject().contains("no byte arrived for 400 ms"),
@@ -386,7 +394,7 @@ mod tests {
             // a failure of the thing under test.
             let _ = saw_opening.send(());
         };
-        let ret = endpoint.stream(&request(), &mut onto).unwrap();
+        let ret = endpoint.stream(&request(), &mut onto, &mut |_| {}).unwrap();
 
         assert!(
             server.join().unwrap(),
