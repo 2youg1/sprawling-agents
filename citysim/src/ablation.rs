@@ -18,7 +18,7 @@
 //! next editor to edit the corpus. The run lives behind `#[ignore]` in
 //! this module's own tests and answers when somebody asks it.
 //!
-//! **It does not call a model**, for the reason [`crate::Shape`]'s suite
+//! **It does not call a model**, for the reason [`crate::nesting::Shape`]'s suite
 //! does not: a suite owning a provider cannot run offline, cannot be
 //! replayed, and measures the network as much as the model. The
 //! measurable stand-in is a cue — the phrase the document uses to grant

@@ -33,8 +33,10 @@ impl Payload {
     /// Sole constructor.
     pub fn new(map: serde_json::Map<String, serde_json::Value>) -> Result<Self, AxError> {
         for value in map.values() {
-            reject_floats(value)?;
+            // Depth first: it is iterative, and it bounds the recursion
+            // `reject_floats` spends on the levels that remain.
             reject_depth(value, PAYLOAD_DEPTH_MAX.saturating_sub(1))?;
+            reject_floats(value)?;
         }
         Ok(Payload(map))
     }

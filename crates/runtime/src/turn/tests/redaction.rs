@@ -84,7 +84,7 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
                     attachments: Vec::new(),
                 })
             },
-            &mut |_| NextCall::Allowed,
+            &mut |_| Interrupt::None,
         )
         .unwrap(),
     );
@@ -168,7 +168,7 @@ fn the_wave_result_block_keeps_what_the_ledger_drops() {
                     attachments: Vec::new(),
                 })
             },
-            &mut |_| NextCall::Allowed,
+            &mut |_| Interrupt::None,
         )
         .unwrap(),
     );

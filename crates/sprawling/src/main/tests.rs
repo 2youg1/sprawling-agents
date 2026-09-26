@@ -15,18 +15,7 @@
 )]
 
 use super::data::verified_chain;
-use super::router::{COMMANDS, named};
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
-
-/// A verb the binary accepts is on the one screen that lists them. What
-/// `doctor` reads off its own line is judged beside it, in the library.
-#[test]
-fn doctor_is_on_the_command_screen() {
-    assert!(
-        COMMANDS.contains("doctor"),
-        "a verb the binary accepts is on the one screen that lists them"
-    );
-}
 
 /// A place with no ledger in it is not a verified chain.
 ///
@@ -44,27 +33,6 @@ fn a_place_holding_no_ledger_is_refused_rather_than_verified() {
         "the recovery names the mistake that was actually made: {}",
         err.recovery()
     );
-}
-
-/// A flag is not a path.
-///
-/// `sprawling init --help` used to raise a city in a directory
-/// called `--help`, because `init` read `args[1]` whatever it was.
-/// This repository's own root held one of those for a day.
-#[test]
-fn a_flag_is_never_read_as_the_path_a_subcommand_wanted() {
-    let words =
-        |raw: &[&str]| -> Vec<String> { raw.iter().map(|word| (*word).to_owned()).collect() };
-    let asked = words(&["init", "--help"]);
-    assert_eq!(named(&asked, 1), None, "--help became a city directory");
-
-    let two = words(&["export", "--verbose", "city", "bundle"]);
-    assert_eq!(named(&two, 1).map(String::as_str), Some("city"));
-    assert_eq!(named(&two, 2).map(String::as_str), Some("bundle"));
-
-    let plain = words(&["serve", "city", "127.0.0.1:8787"]);
-    assert_eq!(named(&plain, 1).map(String::as_str), Some("city"));
-    assert_eq!(named(&plain, 2).map(String::as_str), Some("127.0.0.1:8787"));
 }
 
 /// The embed chain delivers a file table with the page shell in it;

@@ -402,6 +402,16 @@ what = "bytes read by one LedgerIndex::refresh that folds a single appended reco
 measured_by = "cargo test -p memory --lib -- --nocapture a_refresh_reads_the_appended_tail_rather_than_the_segment (the test prints the Refreshed::Appended reading beside the segment length)"
 status = "measured, not gated: 191 B read out of a 76,180 B segment, which is the one appended record and nothing else (2026-09, 401-record fixture). The test asserts the equality rather than a threshold, so a gate here would be a second authority over the same claim"
 
+# One rules lookup the read bound makes when a model-chosen path lands in
+# another building. `city::RulesCache` keeps what a run read while the
+# file's modification time and length hold, so a repeat costs one stat
+# instead of a read and a TOML evaluation. On Windows the stat opens a
+# handle, which is the floor of this design.
+[rules_lookup]
+what = "ns per rules lookup for another building, a fresh city::load against city::RulesCache::load, alternating rounds"
+measured_by = "cargo test --release -p city --lib rules_lookup_reading -- --ignored --nocapture"
+status = "measured, not gated: median of 15 rounds of 2000, three runs, load 186,793-212,885 ns against cache 76,112-91,730 ns (release test profile, Windows NTFS, sixteen cores shared by eight build lanes)"
+
 # Read amplification on a range retrieval: the bytes a `Vfs` hands back
 # while `Cas::get_range` answers, over the bytes in the answer.
 #
@@ -607,8 +617,9 @@ status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized b
 # What the client pays to fold one animation frame of stream into the
 # belief, with one subscriber reading the run table the way the views do.
 # A fold that told subscribers once per record paid the table's length
-# once per record; `belief.batch` tells them once per frame.
+# once per record; `belief.batch` tells them once per frame, and a token
+# into a run the `$state` table holds tells them nothing at all.
 [client_fold]
 what = "one animation frame of 50 token deltas folded into a belief of R runs, one subscriber reading the run table"
 measured_by = "bun test --conditions=browser client/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds R=1e4 to 4000 us)"
-status = "measured, not gated here: per frame 99-102 us at R=1e2, 54-107 us at R=1e3, 1031-1145 us at R=1e4 with belief.batch, against 224-233 us, 5245-7845 us and 55452-63622 us with one publish per delta (bun 1.4, x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"
+status = "measured, not gated here: per frame with the `$state` run table 30-37 us at R=1e3 and 30-54 us at R=1e4, and 30 us at R=1e2 once warm (the first size measured pays the runes runtime warm-up, 94-330 us), against 29-34 us, 58-73 us and 471-539 us with belief.batch alone, interleaved on the same instrument (bun 1.4, x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test's own budget is the guard"

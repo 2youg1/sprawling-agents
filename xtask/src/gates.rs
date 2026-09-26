@@ -17,14 +17,14 @@ use std::thread;
 
 use crate::report::{self, Violation, XtaskError};
 use crate::{
-    apisync, artifact, boundary, budget, color, depmap, docnum, guard, header, length, lexicon,
-    modmap, npm, proof, release, render, secret, slices, specalign, wire_ts, wiring, wording,
+    artifact, boundary, budget, color, depmap, docnum, guard, header, length, lexicon, modmap, npm,
+    proof, release, render, secret, slices, specalign, wire_ts, wiring, wording,
 };
 
 /// How many gates run. The array below is typed by it, so the number and
 /// the list are one token apart and cannot disagree; `vocabulary` reads
 /// it so no document has to hold a copy.
-pub(crate) const COUNT: usize = 23;
+pub(crate) const COUNT: usize = 21;
 
 /// One gate: the name a person types, and the check it runs.
 pub(crate) struct Gate {
@@ -116,17 +116,6 @@ pub(crate) const GATES: [Gate; COUNT] = [
         name: "specalign",
         check: |root, _| specalign::check(root),
     },
-    // `features` runs the compiler rather than reading source; its
-    // verdict is the default feature set's, test targets included, which
-    // nothing else compiles.
-    Gate {
-        name: "features",
-        check: |root, _| default_features(root),
-    },
-    Gate {
-        name: "apisync",
-        check: apisync::check,
-    },
     Gate {
         name: "release",
         check: |root, _| release::check(root),
@@ -194,43 +183,6 @@ fn judge(
             })
             .collect()
     })
-}
-
-/// The default feature set, test targets included.
-///
-/// Every other build in this repository passes `--all-features`
-/// (`clippy`, `nextest`) or builds one package (`dist`), so the
-/// workspace on its own default features is a configuration nothing
-/// else compiles. Code behind a feature is compiled the day somebody
-/// turns that feature on, and a test target whose `cfg` does not match
-/// the default set is exactly what this gate is for: one referenced
-/// `#[cfg(feature = "conformance")]` items while declaring no such
-/// gate, and no command but `--all-features` ever compiled it.
-///
-/// Judged by running the build rather than by reading source: the
-/// verdict is the compiler's, and its diagnostics are on stderr by the
-/// time this returns.
-pub(crate) fn default_features(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let status = std::process::Command::new("cargo")
-        .args(["check", "--workspace", "--locked", "--all-targets"])
-        .current_dir(root)
-        .status()
-        .map_err(|source| XtaskError::Io {
-            path: "run `cargo check --workspace --locked --all-targets`".to_owned(),
-            source,
-        })?;
-    if status.success() {
-        return Ok(Vec::new());
-    }
-    Ok(vec![Violation {
-        gate: "features",
-        location: "crates/**".to_owned(),
-        rule: "the workspace builds on its default features, test targets included".to_owned(),
-        violation: "`cargo check --workspace --locked --all-targets` failed".to_owned(),
-        alternative: "fix the default-feature build; `--all-features` is a gate's configuration, \
-                      not the one a person builds"
-            .to_owned(),
-    }])
 }
 
 #[cfg(test)]

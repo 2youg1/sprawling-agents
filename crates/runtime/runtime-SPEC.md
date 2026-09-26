@@ -94,6 +94,8 @@ impl VerifiedLedger {
 /// Offline chain verification (A2). Errors carry the failing line number in
 /// `subject`. Refuses: v > EVENT_LOG_V (direction-aware), broken prev chain,
 /// seq gaps, non-canonical bytes, unknown kind without `ig:true`.
+/// 逐行判定不住在这里：每一行经 `memory::LineCheck::advance`，拒词经 `LineFault::into_ax`
+/// ——与 `JsonlLedger::open` 的尾段扫描同一份检查（memory-SPEC §8-1）。
 pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError>;
 /// Convenience over a jsonl directory: memory::jsonl::read_raw_lines + verify.
 /// 无段目录与空账本在此同形（均得空 VerifiedLedger）——本函数的调用方均自持城根算出路径；
@@ -171,7 +173,7 @@ impl Turn<ToolWave> {
     /// still_going 在每条 call 之前被问一次（B-70，见 §8-28-2）。
     pub fn execute(self, interrupt: Interrupt, ledger: &mut dyn Ledger,
                    invoke: &mut dyn FnMut(&ToolCall) -> Result<ToolOutcome, AxError>,
-                   still_going: &mut dyn FnMut(u32) -> NextCall)
+                   still_going: &mut dyn FnMut(u32) -> Interrupt)
         -> Result<PhaseOutcome<Turn<Recording>>, AxError>;
 }
 pub enum NextCall { Allowed, Halted }   // 比 Interrupt 窄：波内只有「停」可以立刻执行
@@ -181,7 +183,7 @@ impl Turn<Recording> {
 ```
 
 - **相变函数携 `&mut dyn Ledger`，相内字段私有**；无返回既往相的方法；跳相／相内取消／字面量构造中间相，三者编译不过（trybuild）。
-- **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。**工具波内的每条 call 同样是一道边界**（B-70）：一波是 N 件副作用而不是一件，于是 `execute` 在每条 call 之前问 `still_going`，并经同一个 `cancel_here` 写下同一条 `cancel_received`——消费中断的地方仍然只有一处。
+- **取消只在边界**：每相变函数首参即边界快照；命中 Cancel → 追加 cancel_received → 返回 Cancelled（回合终止，后续 handoff_written＋run_frozen 归执行器）。相内无任何中断入口＝A9 的结构化一半；另一半（事件序断言）在 citysim。**工具波内的每条 call 同样是一道边界**（B-70）：一波是 N 件副作用而不是一件，于是 `execute` 在每条 call 之前问 `still_going`，答案交给同一个 `consume_boundary`：Cancel 写下同一条 `cancel_received`，Steer 写下同一条 `steer_received`——消费中断的地方仍然只有一处。
 - **四取消点**：组装前／provider 调用前／工具执行前／派生前，四点全住本模块。第四点由 `Turn<Recording>::record` 收边界快照，故 `record` 与前三相同形——收 `Interrupt`、答 `PhaseOutcome`。它买到的是别处买不到的一件事：**一个回合把活派下去之后、子 Run 起来之前，仍停得住**；`calls_made == 0` 的收尾回合尤其如此，那一刻在第四点之前根本没有下一个边界。
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。S3 接真 dialect 时只加字段。
 - **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名那条今天走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
@@ -967,7 +969,7 @@ pub struct RunHooks<'a> {
 |---|---|
 | `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`grant`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_memory` |
 | `bench/admit.rs` | 门：`admit` 按 `Effect` 分派到 Write／Connector／Egress／Spawn／Govern 各门，`settled`／`crossed` 把一次判定翻译成 `BenchOutcome`，`scanned` 为两扇朝外的门备好密钥扫描的字节 |
-| `bench/tests.rs` | 去重、门、fence 与注册冲突的夹具（7 个 `#[test]`） |
+| `bench/tests.rs` | 去重、门、taint、fence 与注册冲突的夹具（8 个 `#[test]`） |
 
 **无字段开放。** 子模块本就能看见父模块的私有项，故 `ToolBench` 的字段一个都没动；唯一的可见性改动是 `fn admit` → `pub(super) fn admit`，因为它现在由父文件的 `invoke` 调用。
 
@@ -1299,7 +1301,7 @@ impl Backlog {
     pub fn run(&self, owner: RunId, scope: &Address, what: String, command: Command) -> Result<Started, AxError>;
     pub fn halt(&self, scope: Option<&Address>) -> Result<usize, AxError>;   // None＝整城
     pub fn harvest(&self, owner: RunId) -> Result<Vec<Finished>, AxError>;   // 只收 owner 起的
-    pub fn release(&self, owner: RunId) -> Result<usize, AxError>;           // owner 结束：它的命令不再欠任何人
+    pub fn release(&self, owner: RunId) -> usize;                            // owner 结束：终止它留下的命令，它们不再欠任何人
     pub fn standing(&self, scope: &Address) -> Result<Vec<Standing>, AxError>;
 }
 ```
@@ -1311,7 +1313,7 @@ impl Backlog {
 1b. **退出码是穷尽枚举，不是一个整数（B-47）。** `Exit::Ended { code }`／`Signalled`／`Unknown { why }` 三臂：`-1` 过去同时是「程序返回了负一」「被信号杀死」「本城没问出来」，而读结果的模型分不出是哪一件。`exec` 结果里 `exit_code` 键**只在 `Ended` 时出现**，另两臂写 `outcome`（`signalled`／`unknown`）与一句 `detail`；键名仍只由 `tools/exec/outcome.rs` 拼（§8-26）。
 2. **子进程的输出写文件，不走管道。** 管道缓冲区填满会让后台子进程停在写系统调用上，于是「后台」变成「挂死」——那正是本节要修的那个洞的另一种写法。文件住 `std::env::temp_dir()` 下按 `BacklogId` 命名的一层目录，收割时读完即删。
 3. **表是一份共享句柄（`Clone` 的 `Arc<Mutex<_>>`）。** 装配层持一份，每个 `ExecTool` 持一份克隆，于是 `halt` 够得着 `exec` 起的东西而不必让 `halt` 认识 `exec`。表内是 `BTreeMap`，遍历序恒定。
-4. **后台命令的结局只欠起它的那个 run（`owner: RunId`）。** 表是全城一张（第 3 条），所以「谁收割」必须由表按成员记下的 owner 判，而不是由「谁先调 `exec`」判：不带 owner 的 `harvest` 会把一栋楼（包括 confidential 楼）里一条命令的 stdout／stderr 原文交给城里任何一个随后调 `exec` 的 run，进它的模型与账本，而起它的 run 反倒收不到。一条命令的归属是穷尽枚举 `Claim` 而不是 `bool`：`Window(RunId)`（短窗口里，归正在轮询它的那次调用）、`Run(RunId)`（已转后台，只交给这个 run 的 `harvest`）、`Nobody`（它的 run 已结束，结局不交给任何人）。`ExecTool` 在 drop 时调 `release(run)`：每个 run 的工具台在它冻结后被丢弃，于是 drop 就是「这个 run 再也收不到」的那一刻；此后任何一次 `harvest` 都会把已结束的 `Nobody` 成员不读即删（进程句柄与临时目录因此有界），输出不交给调用者。**被否决的做法**：按 `scope`（楼或房间地址）收割——同一房间里前后两个 run 地址相同，于是后一个 run 仍会收到前一个的输出，而 confidential 的界是按 run 的模型与账本行划的，不是按地址。**尚未做的一半**：一个已结束的 run 的后台结局今天被丢弃；把它写成该 run 名下的一条账本事件，需要 kernel 事件表多一种，归 kernel-SPEC 的事件表。
+4. **后台命令的结局只欠起它的那个 run（`owner: RunId`）。** 表是全城一张（第 3 条），所以「谁收割」必须由表按成员记下的 owner 判，而不是由「谁先调 `exec`」判：不带 owner 的 `harvest` 会把一栋楼（包括 confidential 楼）里一条命令的 stdout／stderr 原文交给城里任何一个随后调 `exec` 的 run，进它的模型与账本，而起它的 run 反倒收不到。一条命令的归属是穷尽枚举 `Claim` 而不是 `bool`：`Window(RunId)`（短窗口里，归正在轮询它的那次调用）、`Run(RunId)`（已转后台，只交给这个 run 的 `harvest`）、`Nobody`（它的 run 已结束，结局不交给任何人）。`ExecTool` 在 drop 时调 `release(run)`：每个 run 的工具台在它冻结后被丢弃，于是 drop 就是「这个 run 再也收不到」的那一刻。`release` 把这个 run 的命令改记为 `Nobody` **并终止它们**（与 `halt` 同一个 `kill`）；此后任何一次 `harvest` 都会把已结束的 `Nobody` 成员不读即删（进程句柄与临时目录因此有界），输出不交给调用者。`release` 不会失败：它只把认领降为 `Nobody`、只终止进程，这两件事在表的任何状态下都成立，所以一张被死线程锁住的表它也照做（取 `PoisonError::into_inner`）；表的其余调用照旧答 `E_STORAGE_FATAL`。它的调用方是 drop，没有人可以转交失败，一个会失败的 `release` 只能被丢弃，而被丢弃的那一次正是命令被留着为一个不存在的 run 跑下去的那一次。**被否决的做法**：按 `scope`（楼或房间地址）收割——同一房间里前后两个 run 地址相同，于是后一个 run 仍会收到前一个的输出，而 confidential 的界是按 run 的模型与账本行划的，不是按地址。**run 结束即终止它留下的后台命令，而不是让它们跑完。** 理由：结束之后没有任何一次工具结果能把结局交给它；`Sandbox` 放置的命令跑在 `Confined` 的副本里，而那份副本在同一次 drop 里被删，让它跑下去等于让它对着一棵已删的树跑；一条无主命令留着的进程、句柄与临时目录是每个会话的边际内存。**被否决的做法**：让无主命令跑到自然结束、再把结局写成该 run 名下的一条账本事件——结局到达时已经没有读者，而事件表要为一件被选定不再发生的事多一种事件。**重开的参数**：`Host` 放置成为后台命令的常态、且其对宿主树的副作用本身就是人要的产物时，run 的结束不再是「没人要」的证据，这条规则应重新论证。今天被终止的命令不在账本里留下一行：把「结束时终止了 N 条后台命令」写进账本需要 kernel 事件表多一种，归 kernel-SPEC 的事件表。
 
 **已落地范围（诚实记账）**：成员目前只有后台 `exec` 子进程。`delegate` 子 run 入表是同一张表的第二类成员，接口已按此形状留好（`Standing`／`Finished` 不提进程），但尚未接线；`status` 报告本 run 那部分同理待接。**→ 第二类成员与 `status` 那一半由 §8-28-2 接上。**
 
@@ -1335,7 +1337,7 @@ impl Backlog {
 ```
 
 - **一个 run 成员没有进程可杀**：`halt` 对它做的是把身体记成 `Stopping`，而 run 在下一个安全点问 `stopping` 并以 `Interrupt::Cancel` 走 `runtime::turn` 既有的取消路——取消因此仍只在相位边界被消费，§8-28 首段那条法则不动。
-- **每个 call 之前问一次（B-70）**：一次工具波是模型一条回复里要的 N 件副作用，不是一件。`SafePoint::BeforeToolCall { turn, call }` 是第五个安全点，`Turn::<ToolWave>::execute` 在每条 call **入账之前**问 `still_going(call) -> NextCall`；`Halted` 走 `cancel_here` 写下与相位边界同一条 `cancel_received` 并终止回合，于是停城不必等整波跑完，也不会为没做的活留下 `tool_called`。答案窄于 `Interrupt` 是刻意的：两条 call 之间能立刻执行的指令只有「停」，改道的文字属于执行器的 `Window`，由执行器在回答之前折进去。
+- **每个 call 之前问一次（B-70）**：一次工具波是模型一条回复里要的 N 件副作用，不是一件。`SafePoint::BeforeToolCall { turn, call }` 是第五个安全点，`Turn::<ToolWave>::execute` 在每条 call **入账之前**问 `still_going(call) -> Interrupt`，答案走相位边界那一个 `consume_boundary`：Cancel 写下同一条 `cancel_received` 并终止回合，于是停城不必等整波跑完，也不会为没做的活留下 `tool_called`；Steer 写下 `steer_received`，这条 call 照做。两条 call 之间能立刻执行的指令仍只有「停」，改道的文字属于执行器的 `Window`，由执行器在回答之前折进去、在下一次组装时交给模型。答案取整个 `Interrupt` 而不是只说停不停的 `NextCall`，是因为窄答案让波内到达的 steer 只进了窗口、没进账本：模型读到了一段账本上没有来历的文字。
 - **只有委派下去的 run 入表**。根 run 由 `Cancel` 结束，那是另一个动词（glossary「Halt」行）；把根 run 也入表会让 `halt` 与 `Cancel` 变成同一件事。
 - **`harvest` 与短窗口都跳过 run 成员**：它们收的是进程的退出码，run 的结局在账本上。
 - **`status` 的那一半**：第十四行 `backlog:` 追加在冻结序末尾（追加规则同 `neighbours`），报 `standing(addr)` 里属于本 run 地址的成员——`bg-3 cargo build (command)` 逐条分号相连，没有则 `none`。**不报跑了多久**：本表不采样时钟（§8-28-1 第 1 条），一个为了报时长而采样的 status 会是第二个采样点。
@@ -1432,8 +1434,10 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 | 读界关上的楼 | 机密楼对楼外全关；规则读不出的楼同样关 | `kernel::address::may_read`（city-SPEC §8-2） |
 | `.git` 目录 | 它是对象库不是文本，扫它只产出乱码命中 | 本节 |
 | 非 UTF-8 文件 | 二进制里没有可读的行 | 本节 |
-| `land` 拒绝的链接 | 链接的目标落在城外、保留区或关上的楼 | `chosen_path::land` |
+| `land` 以 `E_GATE_DENIED` 拒绝的链接 | 链接的目标落在城外、保留区或关上的楼 | `chosen_path::land` |
 | 指向目录的链接 | 顺着链接走可能绕回自己走过的地方；要搜目标目录，按它真实的地址去搜 | 本节 |
+
+`land` 以别的码拒绝的链接不在这张表里：真实位置解析不出（`E_STORAGE_FATAL`，比如一个指回自己的链接）是盘没有作答，不是一栋关上的楼，所以它计入 `unreadable`，`unread` 里带上那个错误；`chosen_path::walked` 只把 `E_GATE_DENIED` 当作跳过，其余的错误交给遍历者。
 
 大于 1 MiB 的文件不读——把一个大对象读进内存找子串是一次停顿——但它不在这张表里：它是「没看」，计入 `unreadable` 并在 `unread` 里说出来。
 
@@ -1513,7 +1517,7 @@ impl Run<Frozen> { pub fn transcript(&self) -> Result<Transcript, AxError>; pub 
 
 **Handoff 从楼搬到房间**：`city::handoff(city_root, room)`／`handoff_path(city_root, room)` 读写 `<city>/<room>/Handoff.md`；模板在 `city::open_room` 打开房间时铺下，楼级 `lay_out` 不再铺它。理由是同楼并发：一栋楼一份 Handoff，两个房间同时冻结就是两份内容抢一个文件。
 
-**质量防线（不可选）**：`eval::probe` 的 handoff 探针在每次 succession 真的跑。`eval::handoff_probe()` 给出固定四问（版本 1）；装配层 `bin::assembly::probing` 在 `conclude` 读到接替请求时，用前任的 adapter 对前任的 transcript 问一遍（before），在继任者 `freeze_plan` 之后、第一回合之前，用继任者的 prefix 问一遍（after），`eval::compare` 后记一条 `eval_run`（`probe`／`version`／`kept`／`lost`／两份答案）。探针答案不是判定，`lost` 报的是位置，人自己去读两份答案——这正是 eval-SPEC §8-2 定的口径。每次 succession 两次模型调用，这是这道防线的价钱，写在明处。
+**质量防线（不可选）**：`bin::assembly::probing::probe` 的 handoff 探针在每次 succession 真的跑。`handoff_probe()` 给出固定四问（版本 1）；装配层 `bin::assembly::probing` 在 `conclude` 读到接替请求时，用前任的 adapter 对前任的 transcript 问一遍（before），在继任者 `freeze_plan` 之后、第一回合之前，用继任者的 prefix 问一遍（after），`compare` 后记一条 `eval_run`（`probe`／`version`／`kept`／`lost`／两份答案）。探针答案不是判定，`lost` 报的是位置，人自己去读两份答案——这正是 sprawling-SPEC §8-39 交接探针一节定的口径。每次 succession 两次模型调用，这是这道防线的价钱，写在明处。
 
 ### 8-34 runtime::reminder（形状 1 判定）
 
@@ -1781,3 +1785,16 @@ impl FencePolicy {
 - **未定**：今天每个调用都按「可能写」算，因为 run 驱动还不知道每个调用声明的 `Effect`——`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里。一旦 `RunPlan` 或 `RunHooks` 带上名字到 `Effect` 的表，「这一波有调用」换成「这一波有可能写的调用」，只读波就落到 `Fenced`/`Unfenced` 的 `Skip`；`Stage` 也应只带这一波写过的路径（写工具自报；exec 这类说不清的才扫写域）。定下它的证据是：5,000 文件的楼首次派活 ≤ 200 ms。
 - **否决「空波一律跳过」**：结束回合的空波前那次 fence，是把上一波的写带进提交的唯一时机；跳过它，run 写下的文件就没有任何提交持有。
 - **否决「每波都 fence」**：一个没跑过任何调用的 run，提交的是一棵没变的树，却多付一次 stage 与 commit。
+
+### 8-46 runtime::bench::outside（形状 1 判定；**外来内容进 run 的唯一入口**）
+
+```rust
+// crates/runtime/src/bench/outside.rs
+pub(super) fn entered(effect: &Effect, taint: &TaintSet) -> Result<TaintSet, AxError>;  // 一次答案进门后 run 的 taint
+```
+
+- **判定表**（对 `Effect` 穷尽，无通配臂）：`Connector { label }` → 并入 `mcp:<label>`；`Egress` → 并入 `web`；`AttachUserBrowser` → 并入 `web:browser`；`Read`／`Write`／`Spawn`／`Govern`／`Spend` → 原样返回。新增一种 `Effect` 不回答这张表就不编译。
+- **调用点只有一个**：`ToolBench::invoke` 在工具答出 `Ok` 之后、把答案交还模型之前，用 `entered` 的返回值替换 bench 的 taint。之后同一 run 的每扇门（`command`／`reach`／`undoable`）读到的都是长大后的集合，所以读过一段 MCP 回答或网页的 run 再调 exec，由 `kernel::gate::command` 答 `E_TAINTED_ACTION`。失败的调用不并入：没有内容进门。来源标签为空时答 `E_CONFIG_INVALID`，这个错误就是这次调用被记下的答案，模型读不到那段内容。
+- **为什么按 `Effect` 判，而不是让每个工具自报**：`Effect` 已经是工具注册时声明的「这次调用伸向哪里」，门按它分派；来源再让工具另报一次，就是同一事实的第二份定义，漏报的工具会把外来内容当成内生数据放进来。
+- **为什么是一个函数**：外来内容在 run 里要过的每一道手续（今天是标 taint，之后是密钥托管的入站扫描）都挂在这同一处，第二个消费者改这一个函数，不另开入口。
+- **未定**：他楼文件（`read` 经 read bound 落进另一栋楼的路径）今天的 `Effect` 是 `Read`，这张表因此不标它；要标它，需要 `GateSubject::Path` 在 bench 里能判出「不在本楼」，证据是一条读他楼文件后 exec 被拒的 bench 测试。run 起点的 taint 仍由 sprawling 的 `Assignment.tainted: bool` 在 `workbench::tools::run_taint` 里翻成单一来源 `outside`；换成携带来源的 `TaintSet` 是下一阶段。

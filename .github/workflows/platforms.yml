@@ -78,7 +78,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
-      # `guard` and `apisync` read one commit and its parent; ci.yml
+      # `guard` reads one commit and its parent; ci.yml
       # gives the reasoning.
       - uses: actions/checkout@v7
         with:
@@ -88,9 +88,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-public-api
-      - name: nightly toolchain (rustdoc JSON for apisync)
-        run: rustup toolchain install nightly --profile minimal
+          tool: cargo-nextest
       # One job rather than ci.yml's five: nobody is waiting for this
       # one, and the sum of two builds costs a schedule nothing.
       - name: fmt

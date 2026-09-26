@@ -288,3 +288,29 @@ fn a_walk_does_not_follow_a_link_into_a_closed_building() {
         );
     }
 }
+
+/// A link whose real location does not resolve is not a closed
+/// building: the disk failed to answer, so the walk counts it as a place
+/// it could not look and names the storage failure, instead of passing
+/// over it the way it passes over a link the read bound refuses.
+#[test]
+fn a_link_that_does_not_resolve_is_counted_as_unread() {
+    let dir = city();
+    let knot = dir.path().join("lab").join("knot");
+    super::super::chosen_path::make_link(&knot, &knot);
+    let mut tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+
+    let outcome = tool.invoke(&text("the ledger")).unwrap();
+    let map = outcome.result.as_map();
+    assert_eq!(map["unreadable"], 1, "{map:?}");
+    let unread = map["unread"].as_array().unwrap();
+    assert_eq!(unread[0]["path"], "lab/knot");
+    assert!(
+        unread[0]["why"]
+            .as_str()
+            .unwrap()
+            .contains("E_STORAGE_FATAL"),
+        "{}",
+        unread[0]["why"]
+    );
+}

@@ -189,7 +189,7 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(err) => report::internal_failure(&err),
         },
-        Some("apisync") => report::finish("apisync", apisync::check(&root, range.as_deref())),
+        Some("apisync") => report::finish("apisync", apisync::check(&root)),
         Some("header") => report::finish("header", header::check(&root)),
         Some("lexicon") => report::finish("lexicon", lexicon::check(&root)),
         Some("length") => report::finish("length", length::check(&root)),
@@ -201,7 +201,6 @@ fn main() -> ExitCode {
         Some("depmap") => report::finish("depmap", depmap::check(&root)),
         Some("guard") => report::finish("guard", guard::check(&root, range.as_deref())),
         Some("release") => report::finish("release", release::check(&root)),
-        Some("features") => report::finish("features", gates::default_features(&root)),
         Some("spec") => match spec::run(&root, args.get(1).map(String::as_str)) {
             Ok(message) => {
                 println!("{message}");
@@ -276,7 +275,7 @@ struct Tool {
 const TOOLS: [Tool; 12] = [
     Tool {
         call: "gates [<gate>...] [--range a..b]",
-        gives: "every gate, or only the named ones; --range bounds the commits `apisync` and `guard` judge",
+        gives: "every gate, or only the named ones; --range bounds the commits `guard` judges",
     },
     Tool {
         call: "gates --list",

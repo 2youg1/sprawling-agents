@@ -11,7 +11,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 
 | 模块 | 形状（ARCHITECTURE §7） | 一句话 |
 |---|---|---|
-| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 37（S2 期初增 `E_STORAGE_FATAL`，删 `E_SIGNAL_UNKNOWN`，S1 增 `E_BUSY`）；carrier 声明位 |
+| `error` | 2 值类型＋6 数据面 | AxError 七字段，经 ErrorDraft 构造，恢复语必填；AxCode 38（其中装载期六码）；carrier 声明位 |
 | `address` | 2 值类型 | 相对 city root 路径 newtype；WriteDomain 原语；reserved prefix 判定 |
 | `locator` | 2 值类型 | `cas:`／`file:` 文法解析与呈现；fail-closed |
 | `event` | 2 值类型 | EventKind 72（二分共 9 条入窗）；in-window／record-only 二分；EventRecord 规范字节；EventRef 私有铸造 |
@@ -155,7 +155,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 
 ```rust
                       // C8：对扩展开放
-pub enum AxCode { PathNotFound, /* …37 variant，serde 呈现名见下表 */ }
+pub enum AxCode { PathNotFound, /* …38 variant，serde 呈现名见下表 */ }
 
 pub struct GateRefusal {                // three-part refusal；三段必填
     rule: String, violation: String, alternative: String,
@@ -200,7 +200,7 @@ impl ErrorDraft {
 
 「gate 码走 `refusal`」由构造纪律＋单测保证；S2 `kernel::gate` 是全库唯一 gate 码生产者，citysim 不变量 8 号在系统层复验。derive `Serialize/Deserialize`（Ledger 载荷需要）、`Clone/Debug/PartialEq`；`thiserror::Error` 提供 Display（`{code}: {action} on {subject}`）。
 
-**AxCode 37 全集与 carrier 对应（specalign 数据面）**
+**AxCode 38 全集与 carrier 对应（specalign 数据面）**
 
 > 协作组由六降为五——`E_SIGNAL_UNKNOWN` 已定义掉（三码之一；理由与实测见 `collab-SPEC.md` §8-1）。删除时全仓只有本文件提到它，零生产者。剩下两码（`E_WORKTREE_BUSY`／`E_DIGEST_SUSPECT`）已在各自 SPEC 里答过「能否定义掉」，答案是能保留——它们各自有一个真实的运行期情境。
 
@@ -240,12 +240,13 @@ impl ErrorDraft {
 | 治理与设施 | `E_ENDPOINT_DIALECT_UNSUPPORTED` | `endpoint_lost` |
 | 治理与设施 | `E_WIRE_MISMATCH` | 装载期（无 carrier） |
 | 治理与设施 | `E_LOG_VERSION_UNSUPPORTED` | 装载期（无 carrier） |
+| 治理与设施 | `E_LEDGER_HELD` | 装载期（无 carrier） |
 | 隐私与 Discard | `E_SECRET_EGRESS` | `gate_denied` |
 | 隐私与 Discard | `E_DISCARD_IRREVERSIBLE` | `gate_denied` |
 | 背压 | `E_BACKPRESSURE_SHED` | `tool_result` |
 | 运行未知 | `E_TOOL_OUTCOME_UNKNOWN` | `tool_result` |
 
-装载期五码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED`）＝C9 唯一例外白名单，封闭且不得增长（第 5 码于 S2 期初增补）；`Carrier::Loadtime` 即其类型面。
+装载期六码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的条件只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 §12。
 `E_BUSY` 的 carrier 与 `E_WORKTREE_BUSY` 一样是 `tool_result`，而两者的区别在名字里：那一个说的是工作树这个机制，这一个说的是**同一个地址上有 run 正在工作**，拒绝里点名那条 run，调用方据此先停它再动手。
 两条呈现约束：`E_SECRET_EGRESS` 的 subject 只写 SecretRef 与位置、恒不回显命中字节；`E_DISCARD_IRREVERSIBLE` 的 alternative 必须可执行。执行点在各生产模块（S2），此处记为 carrier 表随附契约。
 
@@ -1498,7 +1499,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 1. 全模块零 I/O、零时钟、零随机；BTreeMap/BTreeSet only（Payload 经 serde_json::Map 默认 BTreeMap 间接满足）。
 2. hex 编解码手写（16 行内，查表小写），不引 hex crate——C12 精神：依赖面只进钉版清单所列。
 3. `EventKind`/`AxCode` 的 serde 呈现名逐 variant `#[serde(rename = …)]`（AxCode）与 `#[serde(rename_all = "snake_case")]`（EventKind）；`as_str` 与 serde 用同一份拼写（单测对拍）。
-4. `Payload` 校验递归下降 serde_json::Value：`Number::is_i64 || is_u64` 之外即拒；数组与对象深入。递归深度由输入方（我们自己的写方）有界，读侧 parse_line 对深度不设限但对浮点恒拒。
+4. `Payload` 校验先判深度、再拒浮点：深度检查逐层迭代，不占调用栈；浮点检查递归下降 serde_json::Value，`Number::is_i64 || is_u64` 之外即拒，数组与对象深入。次序是这条递归的界：它只走深度检查已放行的至多 `PAYLOAD_DEPTH_MAX` 层，一个程序拼出的深嵌套值因此在深度处被拒，不会先把写方的栈耗尽。读侧 parse_line 的深度由 serde_json 的递归上限封住，对浮点恒拒。
 5. `canonical_line` 用 `serde_json::to_vec`；`addr`/`ig` 的省略由 `skip_serializing_if` 表达；无 pretty、无空格。
 
 ## 11 边界枚举
@@ -1530,6 +1531,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 - `E_VERSION_CONFLICT`（verdict 映射在 S3）：不可定义掉——乐观并发的存在理由就是冲突可发生。
 - `E_LOG_VERSION_UNSUPPORTED`／`E_CAS_CORRUPT`：住装载期白名单，产生地在 memory/runtime（见各自 SPEC）。
 - `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；memory 的 Io 映射已改正（memory-SPEC §12）。
+- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 memory 的写者锁先于一切读写定义掉（memory-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
 
 S2 激活的码（逐码答「能否定义掉」）：
 

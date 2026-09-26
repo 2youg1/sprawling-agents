@@ -72,7 +72,7 @@ pub(super) struct Assignment {
 /// without its first.
 pub(super) struct Handover {
     pub(super) predecessor: RunId,
-    pub(super) before: eval::Answers,
+    pub(super) before: super::probing::probe::Answers,
 }
 
 impl Assignment {
@@ -118,6 +118,9 @@ pub(super) struct Agreed {
     pub(super) building: city::Building,
     pub(super) rules: city::BuildingRules,
     pub(super) model: gateway::ModelEntry,
+    /// The name of the endpoint the model is reached through, which is
+    /// the provider a model's note is filed under (sprawling-SPEC 8-85).
+    pub(super) provider: String,
     pub(super) adapter: Box<dyn Model + Send>,
     /// How many times this run may make a failed call again, as the
     /// person set it on the endpoint that was chosen. Read here, where
@@ -165,6 +168,8 @@ pub(super) const NAME_THE_WORK: &str = "Name this piece of work in two to four w
 pub(super) const NAME_TOKENS: Option<kernel::Ceiling> = kernel::Ceiling::new(32);
 
 pub(super) mod agreeing;
+pub(super) mod asking_name;
+pub(super) mod custody;
 pub(super) mod handback;
 pub(super) mod running;
 pub(super) mod session;
