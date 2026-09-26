@@ -192,7 +192,10 @@ fn arguments(row: &Row, words: &[String]) -> Result<Arguments, LineError> {
 /// The known names sharing the longest prefix (up to four characters)
 /// with what was typed: a short list a person can read, not one winner
 /// they then have to doubt.
-fn nearest(typed: &str, known: impl Iterator<Item = &'static str> + Clone) -> Vec<&'static str> {
+pub(super) fn nearest<'name>(
+    typed: &str,
+    known: impl Iterator<Item = &'name str> + Clone,
+) -> Vec<&'name str> {
     let typed = typed.trim_start_matches('-');
     (1..=typed.chars().count().min(4))
         .rev()

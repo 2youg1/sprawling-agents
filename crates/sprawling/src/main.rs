@@ -42,6 +42,8 @@ mod tests;
 mod verbs;
 #[path = "main/version.rs"]
 mod version;
+#[path = "main/view.rs"]
+mod view;
 #[path = "main/whose.rs"]
 mod whose;
 
