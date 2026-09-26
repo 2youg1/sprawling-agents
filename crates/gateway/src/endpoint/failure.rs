@@ -52,6 +52,13 @@ pub(crate) enum ProviderFailure<'e> {
         url: &'e str,
         status: reqwest::StatusCode,
     },
+    /// The provider refused the request because it no longer fits the
+    /// model's context window. Sent again it would not fit again; what
+    /// fits it is a shorter conversation or a wider model.
+    Overflow {
+        url: &'e str,
+        status: reqwest::StatusCode,
+    },
     /// The provider answered 2xx and the body is not a shape this city
     /// can read.
     Unreadable(String),
@@ -62,6 +69,37 @@ pub(crate) enum ProviderFailure<'e> {
     Unbuilt(&'e reqwest::Error),
 }
 
+/// What a provider's refusal says when the request outgrew the model's
+/// window, lowercased: the OpenAI and Anthropic dialects both refuse
+/// with 400 and name the window only in the body.
+const WINDOW_MARKERS: [&str; 4] = [
+    "context_length_exceeded",
+    "prompt is too long",
+    "maximum context length",
+    "context window",
+];
+
+impl<'e> ProviderFailure<'e> {
+    /// A non-2xx answer, classed by its status and by what its body says.
+    ///
+    /// The body is read to classify and never quoted back; a body that
+    /// could not be read classes the refusal by its status alone.
+    pub(crate) fn refusal(
+        url: &'e str,
+        status: reqwest::StatusCode,
+        body: &reqwest::Result<String>,
+    ) -> ProviderFailure<'e> {
+        let outgrew = |said: &String| {
+            let lowered = said.to_ascii_lowercase();
+            WINDOW_MARKERS.iter().any(|marker| lowered.contains(marker))
+        };
+        match (status.as_u16(), body) {
+            (400 | 413, Ok(said)) if outgrew(said) => ProviderFailure::Overflow { url, status },
+            _ => ProviderFailure::Refused { url, status },
+        }
+    }
+}
+
 impl ProviderFailure<'_> {
     fn subject(&self) -> String {
         match self {
@@ -70,7 +108,8 @@ impl ProviderFailure<'_> {
             ProviderFailure::Silence { quiet_ms } => {
                 format!("no byte arrived for {quiet_ms} ms")
             }
-            ProviderFailure::Refused { url, status } => {
+            ProviderFailure::Refused { url, status }
+            | ProviderFailure::Overflow { url, status } => {
                 format!("{url} answered {}", status.as_u16())
             }
             ProviderFailure::Unreadable(detail) => detail.clone(),
@@ -83,6 +122,7 @@ impl ProviderFailure<'_> {
             | ProviderFailure::Cut(_)
             | ProviderFailure::Silence { .. } => true,
             ProviderFailure::Refused { .. }
+            | ProviderFailure::Overflow { .. }
             | ProviderFailure::Unreadable(_)
             | ProviderFailure::Unbuilt(_) => false,
         }
@@ -98,6 +138,11 @@ impl ProviderFailure<'_> {
             ProviderFailure::Refused { .. } | ProviderFailure::Unreadable(_) => {
                 "the provider answered, and it would answer the same way again: check this \
                  endpoint's model name, credential and dialect, then dispatch again"
+            }
+            ProviderFailure::Overflow { .. } => {
+                "the conversation no longer fits this model's context window, and it would not \
+                 fit on a second try: start a new session that keeps the summary (`/new --carry`), \
+                 or give this duty a model with a larger window"
             }
             ProviderFailure::Unbuilt(_) => {
                 "check this endpoint's `base_url` and its extra headers: the request was \

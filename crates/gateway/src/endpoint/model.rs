@@ -58,10 +58,7 @@ impl Model for Endpoint {
         if !status.is_success() {
             return Err(provider_err(
                 "call provider",
-                &ProviderFailure::Refused {
-                    url: &self.config.base_url,
-                    status,
-                },
+                &ProviderFailure::refusal(&self.config.base_url, status, &response.text()),
             ));
         }
         // A cut stream surfaces here as a body read error — no partial
