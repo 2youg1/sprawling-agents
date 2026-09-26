@@ -200,7 +200,7 @@ pub(crate) fn local_url(bind: SocketAddr) -> String;
 - **「同级目录可不可写」是二元枚举而不是 bool**（Roadmap G-25）：`writability` 产出 `BesideBinary`，`default_city` 只收它，于是这一个事实在探测端与决定端是同一个拼写，调用点读起来是 `BesideBinary::ReadOnly` 而不是一个无名的 `false`。
 - **回退路径只有 `bin::home` 一处权威**：`~/sprawling/city` 由 `Home::default_city()` 给出，`firstrun` 不再自己拼 `join("sprawling").join("city")`（Roadmap G-10 的第四处）；目录名 `city` 由 `home::CITY_DIR` 一处定义，exe 同级与家目录两种落点共用它。
 - **开浏览器恒非致命**：`open_in_browser` 失败只记一行，`serve` 照跑——URL 在这之前已经打印。命名不取 `browser`：`crates/browser` 已占住「Agent 驱动真实浏览器」这个概念，一名一义。
-- **横幅给人读**：city 目录、WebUI 的完整 URL、客户端完整与否、`Ctrl-C` 停城，四行。bind 是未指定地址（`0.0.0.0`）时 URL 仍给回环形，因为那才是运行中的机器打得开的那一个。横幅在端口已经绑定、写者已经持锁之后才印（§8-83）。
+- **横幅给人读**：city 目录、WebUI 的完整 URL、客户端完整与否、`Ctrl-C` 停城，四行。bind 是未指定地址（`0.0.0.0`）时 URL 仍给回环形，因为那才是运行中的机器打得开的那一个。横幅在端口已经绑定、写者已经持锁之后才印（§8-88）。
 
 **交付形态**：`just package` 产 `sprawling-<version>-<target>.zip`＝二进制＋`start.cmd`／`start.sh`＋`QUICKSTART.md`；裸 exe 不再单独作附件，双击的目标因此永远是启动器。`release.yml` 由 tag 触发，三平台各跑 `just dist`，`xtask budget` 在打包前拦下页壳客户端（`CLIENT_COMPLETE=false` 的二进制），通过后才附件。手工上传的产物来历不明，是本次全部症状的链头，这条把它关掉。
 
@@ -394,7 +394,7 @@ pub fn init_city(&Path) -> Result<InitReport, AxError>;
 pub fn form_city(&Path, Adopt) -> Result<InitReport, AxError>;
 pub fn open_vault() -> (gateway::Custodian, Option<Payload>);
 pub struct Serving { /* 八个字段全 pub：调用方构造它 */ }
-pub async fn listen(Serving) -> Result<Listening, AxError>;   // §8-83
+pub async fn listen(Serving) -> Result<Listening, AxError>;   // §8-88
 impl Listening { pub async fn serve(self) -> Result<(), AxError>; }
 pub struct ScanReport { pub waiting_approvals: usize /* lines、closed_calls 不跨出 */ }
 impl ScanReport { pub fn summary(&self) -> String; }
@@ -3301,7 +3301,7 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 
 **重开参数**：两件仪表只经过 desk、relay 与 provider 三个面；`attend` 的等法再怎么改，只要这三个面不变，仪表就不用改。
 
-### 8-84 每个模型一段追加提示词（`bin::assembly::freezing::model_note`，形状 4 适配器）
+### 8-85 每个模型一段追加提示词（`bin::assembly::freezing::model_note`，形状 4 适配器）
 
 同一套城规、楼规与身份，交给不同的模型时常常要补一两句只对那个模型说的话（例如某个模型爱省略测试输出，某个模型需要被提醒先读再改）。这段话放在城里一处、按 provider 与模型分文件：
 
@@ -3321,7 +3321,7 @@ pub(super) fn model_note(city_root: &Path, provider: &str, model: &str) -> Resul
 
 **本章测试**：`freezing::tests::model_note::a_note_for_the_chosen_model_ends_the_system_prompt`——为 `house/m-local` 放一个文件，派活发出的请求里最后一条 system 消息以这段文字结尾；`freezing::tests::model_note::a_note_for_another_model_is_not_sent`——别的模型的那段话不出现。
 
-### 8-85 取名的那次模型调用不在记账线程上（`bin::assembly::dispatching::asking_name`）
+### 8-86 取名的那次模型调用不在记账线程上（`bin::assembly::dispatching::asking_name`）
 
 ```rust
 // bin::assembly::dispatching::asking_name —— shape: adapter
@@ -3347,7 +3347,7 @@ pub(super) struct NamingCall;                               // 适配器、模�
 
 **还没移走的**：计划节点（`plans::pursuing`）与城自己发起的派活（`start_unasked`）仍经 `prepare_dispatch` 里的 `session_for` 在记账线程上取名；`renew_if_stale` 与 `DoctorRefresh`/`DoctorInstall` 仍在记账线程上阻塞。
 
-### 8-85 粘进派活里的 key 进 vault，文字里只留引用（`bin::assembly::dispatching::custody`）
+### 8-87 粘进派活里的 key 进 vault，文字里只留引用（`bin::assembly::dispatching::custody`）
 
 **原因**：人在页面上把一把 provider key 粘进任务或目标时，这段文字原样进了三处：发给模型的请求、账本里的派活记录、房间里的 `JOB.md`。三处都能被城里的居民 `grep` 到，账本还会随城搬走；而 `kernel::secret::scan` 早已能认出这些形状，只是派活这道门从不问它。
 
@@ -3405,7 +3405,7 @@ impl kernel::Tool for KeptEdit { /* invoke: 先把 `new` 交给 custody，再交
 
 **`crates/eval::ablation` 是这一章的尺**：它按段落切除文档、报出每段独占哪些能力。当前读数是 12 段、32 项能力、**全部独占**（无一 `Restated`），即每项能力恰好一个家。
 
-## 8-83 开城的次序：先占端口，再写第一行，最后才说 running（`bin::serving::worker`、`main::city`）
+## 8-88 开城的次序：先占端口，再写第一行，最后才说 running（`bin::serving::worker`、`main::city`）
 
 **原因**：一座城曾经可以同时有两个写者。第二个进程对同一座城执行 `serve` 时，写者线程在 bind 之前就已经打开；bind 失败后它照常收口，往账本里写了一行「人主动关城」的 handoff。那是没有人做过的事，而且是一次分叉：两个进程各自用同一个 `prev` 写了同一个 seq。`sprawling is running.` 这行横幅则在这一切之前就印了出来。
 
@@ -3436,7 +3436,7 @@ impl Listening {
 
 **本章测试**：`serving::tests::a_serve_refused_at_the_socket_writes_no_line`：测试自己先占住端口，`listen` 返回错误，账本的每一行与之前逐字节相同。锁的那一半由 memory 的 `a_second_writer_of_a_city_is_refused_until_the_first_lets_go` 守住。
 
-### 8-85 视图在自己的线程上折叠，写线程不等读者（`bin::serving::folding`）
+### 8-89 视图在自己的线程上折叠，写线程不等读者（`bin::serving::folding`）
 
 ```rust
 // bin::serving::folding —— shape: adapter

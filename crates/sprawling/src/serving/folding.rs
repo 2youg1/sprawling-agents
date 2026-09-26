@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The thread the views are folded on, so the writer never waits for a
-//! reader (sprawling-SPEC.md 8-85).
+//! reader (sprawling-SPEC.md 8-89).
 
 use std::sync::{Arc, Mutex, mpsc};
 

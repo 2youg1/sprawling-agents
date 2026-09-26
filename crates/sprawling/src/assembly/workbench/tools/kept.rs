@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A key a resident writes into a file goes to the vault, and the file
-//! holds its `secret:` reference instead (sprawling-SPEC.md 8-85).
+//! holds its `secret:` reference instead (sprawling-SPEC.md 8-87).
 
 use std::sync::{Arc, Mutex};
 

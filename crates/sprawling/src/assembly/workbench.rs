@@ -47,7 +47,7 @@ pub(super) struct Site {
     /// the whole run.
     pub(super) config: kernel::FrozenConfig,
     pub(super) model: gateway::ModelEntry,
-    /// The endpoint the model is reached through (sprawling-SPEC 8-84).
+    /// The endpoint the model is reached through (sprawling-SPEC 8-85).
     pub(super) provider: String,
     pub(super) adapter: Option<Box<dyn Model + Send>>,
     pub(super) identity: city::Identity,

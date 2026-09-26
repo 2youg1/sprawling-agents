@@ -220,7 +220,7 @@ impl RunWorker {
 
     /// The run slot: the task, and after it the note the person keeps
     /// for the model this run is sent to, which therefore ends the
-    /// system prompt (sprawling-SPEC 8-84).
+    /// system prompt (sprawling-SPEC 8-85).
     ///
     /// # Errors
     /// Propagates a run segment that will not read and a note that is

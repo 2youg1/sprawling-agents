@@ -9,7 +9,7 @@
 //! The naming call waits on a provider for seconds; the accounting
 //! thread serves every run's appends. A name asked for on that thread
 //! stalled every run already going for as long as the provider took
-//! (sprawling-SPEC.md 8-85). So the call is built on the accounting
+//! (sprawling-SPEC.md 8-86). So the call is built on the accounting
 //! thread, made on a thread of its own, and the name comes back through
 //! the same queue that wakes the accounting thread for everything else.
 //! Nothing is written for the dispatch until the name is home, so

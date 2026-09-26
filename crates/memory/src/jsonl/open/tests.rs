@@ -282,10 +282,9 @@ fn a_second_writer_of_a_ledger_outside_any_city_is_refused() {
     );
 }
 
-/// Two writers that each continued the same `prev` leave a fork: every
-/// line after the fork point is a complete, lawful record. Reopening
-/// must refuse and leave all of them on disk, because truncating would
-/// delete the other writer's history.
+/// Two writers that each continued the same `prev` leave a fork: every line after the
+/// fork point is a complete, lawful record. Reopening must refuse and leave all of them
+/// on disk, because truncating would delete the other writer's history.
 #[test]
 fn a_fork_after_the_first_line_is_refused_and_keeps_every_line() {
     let dir = tempfile::tempdir().unwrap();

@@ -268,7 +268,7 @@ pub struct RunWorker {
     /// has one answer (sprawling-SPEC.md 8-46-2).
     flight: Flight,
     /// Dispatches waiting on the digest model for a room name, off this
-    /// thread (sprawling-SPEC.md 8-85).
+    /// thread (sprawling-SPEC.md 8-86).
     namings: Namings,
 }
 

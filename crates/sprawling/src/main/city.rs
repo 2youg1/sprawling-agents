@@ -287,7 +287,7 @@ pub(super) fn serve_city(
     let (vault, vault_notice) = serving::open_vault();
     // The port and the writer are both taken before a word is printed:
     // a banner saying "running" over a port another process holds was a
-    // claim the city could not keep (sprawling-SPEC.md 8-83).
+    // claim the city could not keep (sprawling-SPEC.md 8-88).
     let listening = match runtime.block_on(serving::listen(serving::Serving {
         city_root: city.to_path_buf(),
         addr: bind,

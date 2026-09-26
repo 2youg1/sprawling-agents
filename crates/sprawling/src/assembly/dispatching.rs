@@ -119,7 +119,7 @@ pub(super) struct Agreed {
     pub(super) rules: city::BuildingRules,
     pub(super) model: gateway::ModelEntry,
     /// The name of the endpoint the model is reached through, which is
-    /// the provider a model's note is filed under (sprawling-SPEC 8-84).
+    /// the provider a model's note is filed under (sprawling-SPEC 8-85).
     pub(super) provider: String,
     pub(super) adapter: Box<dyn Model + Send>,
     /// How many times this run may make a failed call again, as the

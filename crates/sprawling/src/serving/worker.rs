@@ -12,7 +12,7 @@
 //! handed the sinks it may reach the city through; and the whole of it
 //! is stopped when the person stops it ([`Listening::serve`]).
 //!
-//! The order is sprawling-SPEC.md 8-83, and this file is its one
+//! The order is sprawling-SPEC.md 8-88, and this file is its one
 //! definition: a port another process holds is refused before a writer
 //! exists, so a refused serve leaves the Ledger exactly as it found it.
 
