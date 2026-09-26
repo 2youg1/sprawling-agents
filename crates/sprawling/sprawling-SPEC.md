@@ -3249,9 +3249,22 @@ impl RunWorker {
 - **失败**：vault 拒绝写入时整个派活失败，错误原样返回（`E_CONFIG_INVALID`，恢复语由 vault 给出）。此时房间和 `JOB.md` 都还没写；如果照原文继续派活，正是这一节要堵的泄露。
 - **被否决的备选**：① 在页面上拦下粘贴，让人先去设置页登记——人粘 key 的时候，多半就是要居民用它，拦下来只会让人换个地方再粘一次；② 在请求出门时替换——账本和 `JOB.md` 在出门之前就已写下原文。
 
-**尚未覆盖**：工具输出和居民写进城里的文件还没有经过这道门。它们的入口是 `runtime::tools` 的结果和 `city` 的写文件路径，两处都要调用同一个 `take_custody`（或者把它下沉到两者都能依赖的一层）。
+**居民写的文件**：居民往城里写文字只有一道门，`edit` 工具（`runtime::EditTool`）。装配台登记它时包上一层 `bin::assembly::workbench::tools::kept`：
 
-**本章测试**：`assembly::dispatching::custody::tests::a_pasted_key_reaches_the_vault_and_nothing_else`——任务文字里夹一把 `sk-ant-` 形状的 key 派活，断言：模型收到的每个请求、城目录下的每个文件（账本和 `JOB.md` 都在其中）都不含原文；请求里带着 `secret:pasted/anthropic-…` 引用；vault 按这个引用解出的正是原文。
+```rust
+// bin::assembly::workbench::tools::kept（形状 4 适配器）
+pub(in crate::assembly) struct KeptEdit { /* runtime::EditTool, vault, 名字前缀, 计数 */ }
+impl kernel::Tool for KeptEdit { /* invoke: 先把 `new` 交给 custody，再交给 EditTool */ }
+```
+
+- 同一段替换逻辑：派活文字和 `new` 参数都经过 `custody::kept_text`，所以认什么、怎么切、切歪了怎么报错只有一处。
+- **引用是 `secret:written/<provider>-<pos>-<n>`**：`<pos>` 是装配台摆出时账本的位置，每次派活在摆台之前都写过记录，所以两次派活的 `<pos>` 不同；`<n>` 是这次派活里第几把。工具运行在 drive 里，拿不到 `&mut RunWorker`，写不了账本，所以不能像派活那样用存 key 时的下一个序号。
+- 写进文件、回给模型的 diff 里只有引用；vault 拒绝写入时这次 `edit` 失败，文件不动。
+- **被否决的备选**：在 `runtime::EditTool` 里扫描——那要让 `runtime` 认得 vault，而 vault 属于装配层；包一层就不必改 `runtime` 的公开面。
+
+**尚未覆盖**：① 居民写的 key 没有 `secret_captured` 记录，因为工具拿不到账本；要补就得把引用放进一张 desk，drive 结束后由装配层补记。② 工具输出（`runtime::tools` 的结果）还没经过 custody，它的入口是外部内容的那一道门。③ 模型回复里的工具参数原样进账本；`exec` 写的文件不经过 `edit`。
+
+**本章测试**：`assembly::dispatching::custody::tests::a_pasted_key_reaches_the_vault_and_nothing_else`——任务文字里夹一把 `sk-ant-` 形状的 key 派活，断言：模型收到的每个请求、城目录下的每个文件（账本和 `JOB.md` 都在其中）都不含原文；请求里带着 `secret:pasted/anthropic-…` 引用；vault 按这个引用解出的正是原文。`assembly::workbench::tools::kept::tests::a_written_key_reaches_the_vault_and_not_the_file`——模型用 `edit` 新建一个含 key 的文件，断言：文件里没有原文，只有 `secret:written/anthropic-…` 引用，vault 按这个引用解出原文。
 
 ## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
 

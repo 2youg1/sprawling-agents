@@ -15,6 +15,7 @@ use super::super::{Assignment, RunWorker, mounts_under};
 use super::engine::machine_half;
 use super::{Desks, Reach, Site, Situation, Workbench, held, status_snapshot};
 
+mod kept;
 mod reading_room;
 
 impl RunWorker {
