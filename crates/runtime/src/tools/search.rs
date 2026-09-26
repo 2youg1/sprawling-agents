@@ -172,15 +172,15 @@ impl SearchTool {
             None => Ok((self.city_root.clone(), String::new())),
             Some(asked) => {
                 let addr = chosen_path::admit(asked, "search", &*self.bound)?;
-                let path = chosen_path::land(&self.city_root, &addr, "search", &*self.bound)?;
-                if !path.exists() {
+                let located = chosen_path::land(&self.city_root, &addr, "search", &*self.bound)?;
+                let chosen_path::Located::Present(path) = located else {
                     return Err(AxError::failure(
                         AxCode::InvalidArgs,
                         "search",
                         format!("{asked} is not a place in this city"),
                     )
                     .with_recovery("name a path that exists, or leave `path` out to search all"));
-                }
+                };
                 Ok((path, addr.as_str().to_owned()))
             }
         }

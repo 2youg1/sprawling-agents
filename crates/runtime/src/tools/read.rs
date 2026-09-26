@@ -42,8 +42,9 @@ use serde_json::{Map, Value};
 mod miss;
 mod package;
 
-use super::chosen_path::ReadBound;
+use super::chosen_path::{Located, ReadBound};
 use crate::catalog::{Catalog, Expansion};
+use miss::Floor;
 
 /// The most lines one call may bring back, and the default when the
 /// caller says nothing. One number for both: a default below the cap
@@ -54,7 +55,11 @@ const LINE_CAP: u16 = 512;
 
 /// Where the answer to one call comes from.
 enum Found {
-    File(PathBuf),
+    /// A place on disk, and the highest directory a miss there may list.
+    File {
+        at: Located,
+        floor: Floor,
+    },
     Text(String),
 }
 
@@ -264,9 +269,17 @@ impl ReadTool {
     /// called `review` has said what that word means here, and a file
     /// that happens to share the name must not be able to shadow it.
     fn resolve(&self, asked: &str) -> Result<Found, AxError> {
-        if let Ok(catalog) = self.catalog.lock()
-            && let Some(expansion) = catalog.expand(asked)
-        {
+        let catalog = self.catalog.lock().map_err(|_| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "read",
+                "the catalog was left locked by a thread that died",
+            )
+            .with_recovery(
+                "end this run and resume it: the catalog cannot be trusted again inside a                  process where a thread died holding it",
+            )
+        })?;
+        if let Some(expansion) = catalog.expand(asked) {
             return match expansion {
                 Expansion::Skill { addr } => {
                     let addr = kernel::Address::parse(&addr).map_err(|err| {
@@ -280,7 +293,10 @@ impl ReadTool {
                              a person has to fix the shelf",
                         )
                     })?;
-                    Ok(Found::File(self.under_city(&addr)))
+                    Ok(Found::File {
+                        at: Located::Present(self.under_city(&addr)),
+                        floor: Floor::Document,
+                    })
                 }
                 // The catalog's own second level. The prompt carries one
                 // line per entry, and this is what that line stood for,
@@ -288,22 +304,19 @@ impl ReadTool {
                 Expansion::Said { text } => Ok(Found::Text(text)),
             };
         }
-        if let Ok(catalog) = self.catalog.lock()
-            && let Some(inside) = package::open_in_package(&catalog, &self.city_root, asked)
-        {
-            return inside.map(Found::File);
+        if let Some(inside) = package::open_in_package(&catalog, &self.city_root, asked) {
+            return inside;
         }
+        drop(catalog);
         // The judgement every model-chosen path gets, in the one place
         // it is written. `search` asks the same function the same
         // question, so what is reserved and what is closed have one
         // answer each.
         let addr = super::chosen_path::admit(asked, "read", &*self.bound)?;
-        Ok(Found::File(super::chosen_path::land(
-            &self.city_root,
-            &addr,
-            "read",
-            &*self.bound,
-        )?))
+        Ok(Found::File {
+            at: super::chosen_path::land(&self.city_root, &addr, "read", &*self.bound)?,
+            floor: Floor::of_address(&self.city_root, &addr),
+        })
     }
 
     fn under_city(&self, addr: &kernel::Address) -> PathBuf {
@@ -347,8 +360,7 @@ impl Tool for ReadTool {
             })?;
         let text = match self.resolve(asked)? {
             Found::Text(text) => text,
-            Found::File(path) => std::fs::read_to_string(&path)
-                .map_err(|err| miss::unread(&self.city_root, asked, &path, &err))?,
+            Found::File { at, floor } => miss::text_at(asked, at, &floor)?,
         };
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));

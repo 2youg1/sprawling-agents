@@ -6,6 +6,8 @@
 use super::*;
 use crate::catalog::CatalogEntry;
 
+mod doors;
+
 fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
     let catalog = Arc::new(Mutex::new(Catalog::new()));
     let everywhere: ReadBound = Arc::new(|_: &kernel::Address| kernel::ReadVerdict::Open);
@@ -302,88 +304,26 @@ fn the_tool_refuses_another_tools_call_and_still_answers() {
     kernel::tool::conformance::assert_tool_conformance(&mut tool);
 }
 
-/// A link is judged where it lands, not where it was written: a door in
-/// an open building leading into a confidential one, into a reserved
-/// subtree, or out of the city opens nothing, and each refusal is the
-/// gate's.
+/// A catalog whose lock a dying thread left behind is not trusted, and
+/// its names do not fall through to a file that happens to share one.
 #[test]
-fn a_link_is_judged_by_where_it_lands() {
+fn a_poisoned_catalog_refuses_rather_than_falls_through() {
     let dir = tempfile::tempdir().unwrap();
-    let outside = tempfile::tempdir().unwrap();
-    for room in ["lab", "vault/room1", ".sprawling"] {
-        std::fs::create_dir_all(dir.path().join(room)).unwrap();
-    }
-    std::fs::write(dir.path().join("vault/room1/secret.md"), "the vault\n").unwrap();
-    std::fs::write(dir.path().join(".sprawling/secret.md"), "governance\n").unwrap();
-    std::fs::write(outside.path().join("secret.md"), "elsewhere\n").unwrap();
-    let lab = dir.path().join("lab");
-    super::super::chosen_path::make_link(
-        &lab.join("to-vault"),
-        &dir.path().join("vault").join("room1"),
-    );
-    super::super::chosen_path::make_link(&lab.join("to-reserved"), &dir.path().join(".sprawling"));
-    super::super::chosen_path::make_link(&lab.join("to-outside"), outside.path());
-    let only_lab: ReadBound = Arc::new(|addr: &kernel::Address| {
-        if addr.as_str().starts_with("vault") {
-            kernel::ReadVerdict::Confidential
-        } else {
-            kernel::ReadVerdict::Open
-        }
-    });
-    let catalog = Arc::new(Mutex::new(Catalog::new()));
-    let mut tool = ReadTool::new(dir.path(), catalog, only_lab).unwrap();
-
-    for asked in [
-        "lab/to-vault/secret.md",
-        "lab/to-reserved/secret.md",
-        "lab/to-outside/secret.md",
-        "lab/to-vault/absent.md",
-        "lab/to-outside/absent.md",
-    ] {
-        let refused = tool.invoke(&call(asked));
-        assert!(
-            matches!(&refused, Err(err) if err.code() == &AxCode::GateDenied),
-            "{asked} was read through a link: {refused:?}"
-        );
-    }
-}
-
-/// The reading room admits a package whole: `<name>/<path>` opens a file
-/// beside the package's `SKILL.md`, and a path that climbs out of the
-/// package, by its segments or through a link, is refused.
-#[test]
-fn a_package_the_reading_room_admits_opens_by_name_and_path() {
-    let dir = tempfile::tempdir().unwrap();
-    let package = dir.path().join(".sprawling").join("library").join("review");
-    std::fs::create_dir_all(package.join("scripts")).unwrap();
-    std::fs::write(package.join("SKILL.md"), "check the diff first\n").unwrap();
-    std::fs::write(package.join("scripts").join("check.sh"), "git diff\n").unwrap();
-    std::fs::write(dir.path().join(".sprawling").join("CONFIG.toml"), "x\n").unwrap();
+    std::fs::write(dir.path().join("review"), "a file named like the skill\n").unwrap();
     let (mut tool, catalog) = tool(dir.path());
-    catalog
-        .lock()
-        .unwrap()
-        .admit_skill(CatalogEntry {
-            name: "review".to_owned(),
-            disclosure: "how this building reviews".to_owned(),
-            expansion: ".sprawling/library/review/SKILL.md".to_owned(),
-            hash: None,
-        })
-        .unwrap();
+    let poisoner = Arc::clone(&catalog);
+    let died = std::thread::spawn(move || {
+        let _held = poisoner.lock().unwrap();
+        panic!("the thread dies holding the catalog");
+    })
+    .join();
+    assert!(died.is_err());
 
-    super::super::chosen_path::make_link(&package.join("out"), &dir.path().join(".sprawling"));
-    let outcome = tool.invoke(&call("review/scripts/check.sh")).unwrap();
-    assert_eq!(outcome.result.as_map()["text"], "git diff\n");
-    for (leaving, code) in [
-        ("review/out/CONFIG.toml", AxCode::GateDenied),
-        ("review/out/absent.md", AxCode::GateDenied),
-        ("review/../../CONFIG.toml", AxCode::InvalidArgs),
-        ("review/./SKILL.md", AxCode::InvalidArgs),
-        ("review/", AxCode::InvalidArgs),
-    ] {
-        let err = tool.invoke(&call(leaving)).unwrap_err();
-        assert_eq!(err.code(), &code, "{leaving} was opened");
-    }
+    let refused = tool.invoke(&call("review"));
+    assert!(
+        matches!(&refused, Err(err) if err.code() == &AxCode::StorageFatal),
+        "a poisoned catalog fell through to the path: {refused:?}"
+    );
 }
 
 /// A miss names what is there instead, and points at a tool every
@@ -396,5 +336,11 @@ fn a_miss_offers_the_nearest_directorys_entries() {
     let (mut tool, _catalog) = tool(dir.path());
     let err = tool.invoke(&call("lab/notes/Memo.mb")).unwrap_err();
     assert_eq!(err.nearby(), ["lab/Memo.md"]);
+    let above = tool.invoke(&call("ghost/Memo.md")).unwrap_err();
+    assert!(
+        above.nearby().is_empty(),
+        "a miss listed above the path it was admitted to: {:?}",
+        above.nearby()
+    );
     assert!(!err.recovery().contains("exec"), "{}", err.recovery());
 }

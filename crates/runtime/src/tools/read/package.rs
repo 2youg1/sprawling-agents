@@ -16,6 +16,8 @@ use std::path::{Path, PathBuf};
 use kernel::layout::SKILL_FILE;
 use kernel::{Address, AxCode, AxError};
 
+use super::Found;
+use super::miss::Floor;
 use crate::catalog::{Catalog, Expansion};
 use crate::tools::chosen_path::real_location;
 
@@ -36,30 +38,34 @@ pub(super) fn open_in_package(
     catalog: &Catalog,
     city_root: &Path,
     asked: &str,
-) -> Option<Result<PathBuf, AxError>> {
+) -> Option<Result<Found, AxError>> {
     let (name, inside) = asked.split_once('/')?;
     let Some(Expansion::Skill { addr }) = catalog.expand(name) else {
         return None;
     };
     let package = addr.strip_suffix(SKILL_FILE)?.strip_suffix('/')?;
-    Some(
-        within(package, inside, asked)
-            .and_then(|target| stays_inside(city_root, package, &target, asked)),
-    )
+    Some(within(package, inside, asked).and_then(|target| {
+        let shelf = under(
+            &real_location(city_root, "read", asked)?.into_path(),
+            package,
+        );
+        let at = real_location(&under(city_root, target.as_str()), "read", asked)?;
+        stays_inside(&at, &shelf, asked)?;
+        Ok(Found::File {
+            at,
+            floor: Floor::Directory {
+                dir: shelf,
+                named: name.to_owned(),
+            },
+        })
+    }))
 }
 
-/// The file's real location, present or absent, provided that lies in
-/// the package.
-fn stays_inside(
-    city_root: &Path,
-    package: &str,
-    target: &Address,
-    asked: &str,
-) -> Result<PathBuf, AxError> {
-    let real = real_location(&under(city_root, target.as_str()), "read", asked)?;
-    let shelf = under(&real_location(city_root, "read", asked)?, package);
-    if real.starts_with(&shelf) {
-        return Ok(real);
+/// Refuses a file whose real location, present or absent, is not in
+/// the package directory as the shelf spells it.
+fn stays_inside(at: &super::Located, shelf: &Path, asked: &str) -> Result<(), AxError> {
+    if at.path().starts_with(shelf) {
+        return Ok(());
     }
     Err(AxError::failure(
         AxCode::GateDenied,

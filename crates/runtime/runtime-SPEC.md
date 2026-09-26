@@ -1389,24 +1389,26 @@ const LINE_CAP: u16 = 512;
 
 ```rust
 // read::package
-pub(super) fn open_in_package(catalog: &Catalog, city_root: &Path, asked: &str) -> Option<Result<PathBuf, AxError>>;
+pub(super) fn open_in_package(catalog: &Catalog, city_root: &Path, asked: &str) -> Option<Result<Found, AxError>>;
 ```
 
 - **阅览室准入的是整个包**：catalog 条目的落点以 `/SKILL.md` 收尾时，它是一个包（city-SPEC §8-8），`<名>/<相对路径>` 打开包目录下的那个文件。准入是人写阅览室时做的，所以包内文件与 `SKILL.md` 一样不经读界与保留区判定——它们住在同一个被准入的目录里。
 - **名字在前、路径在后，名字先查 catalog**：与整名命中同一条理由（§8-29 起首），一个恰好同名的城内目录遮不住它。首段不是 catalog 里的包（没有这个名字，或它是单份文档）即返回 `None`，交回普通路径那条路。
 - **相对路径逐段判形，不做规范化**：空段、`.`、`..`、带反斜杠或冒号的段一律 `E_INVALID_ARGS`，恢复语说出「包内相对路径，只用普通段」。规范化会把一条爬出包的路径「修」成另一条，而拒绝让写错的那一方看见自己写了什么。
 - **链接按落点判，不出包目录**：拼出的路径解开链接后的真实位置，必须落在「规范化的城根 + 书架上写的包路径」之下，否则 `E_GATE_DENIED`，恢复语说出「指包里的文件本身，而不是包里链接背后的东西」。以书架上的写法而非包目录的真实位置为准，所以包目录本身是链接时同样拒绝。免于读界的理由只覆盖被准入的那个目录；链接背后的文件没有被准入，而书架上的文件可以由人手或 `exec` 写进来，安装时的预检挡不住它们。文件不存在时同样按落点判：真实位置由 `chosen_path::real_location`（§8-30-1）求出，不存在的尾段不可能是链接，所以包里一条链接背后的缺失文件落在链接目标之下，出包即 `E_GATE_DENIED`，不交给读取去列链接背后的目录。
-- **没有 catalog 锁就没有包**：锁中毒时整名命中一样落空，两条路同一个口径。
+- **catalog 锁中毒＝`E_STORAGE_FATAL`，不落空到普通路径**：整名与包名同一个口径。落空会让一个与 skill 同名的城内文件或目录顶替它——正是「名字先查 catalog」要挡的那件事；恢复语说出「结束本 run 再续」，因为同一进程里这把锁再也拿不回来。
 
 #### 8-29-4 没命中时给出 `nearby`（`runtime::tools::read::miss`）
 
 ```rust
 // read::miss
-pub(super) fn unread(city_root: &Path, asked: &str, path: &Path, err: &std::io::Error) -> AxError;
+pub(super) enum Floor { Document, Directory { dir: PathBuf, named: String } }
+// 打开 read 落到的地方；Located::Absent 不打开，直接答没命中（§8-30-1）。
+pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String, AxError>;
 const NEARBY_CAP: usize = 16;
 ```
 
-- **文件不在＝`E_INVALID_ARGS`，`nearby` 携最近一层存在的目录里的条目**：从被问路径的真实位置（`chosen_path::real_location`）往上找第一个存在的目录（不出规范化的城根），逐项拼成城内相对路径，保留区里的项不列——模型本来就读不到它们。按与缺失文件名的共同前缀长度（不分大小写）降序、再按路径排，截到 `NEARBY_CAP`。上限界定的是一次拒绝花掉多少窗口，不是目录多大；被截掉的是最不像的那些。
+- **文件不在＝`E_INVALID_ARGS`，`nearby` 携最近一层存在的目录里的条目**：从被问路径的真实位置往上找第一个存在的目录，**不高于这次调用被准入的那一层（`Floor`）**：普通路径是它首段的真实位置，包是书架上写的包目录，catalog 里的单份文档没有目录可列（`Floor::Document`）。城根与书架上别的藏品因此不会出现在候选里——它们不是这次调用被准入的东西。条目按调用方够得着的写法拼出：普通路径是城内相对路径，包是 `<名>/<相对路径>`；保留区里的项不列，模型本来就读不到它们。按与缺失文件名的共同前缀长度（不分大小写）降序、再按路径排，截到 `NEARBY_CAP`。上限界定的是一次拒绝花掉多少窗口，不是目录多大；被截掉的是最不像的那些。
 - **文件在而打不开＝`E_STORAGE_FATAL`，不给 `nearby`**：名字是对的，候选只会误导。
 - **列目录是尽力而为**：目录列不出或名字不是 Unicode 时 `nearby` 为空，调用方要的拒因是「没命中」本身。
 - **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（city-SPEC §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
@@ -1427,16 +1429,19 @@ pub(crate) fn admit(asked: &str, action: &'static str, bound: &dyn Fn(&Address) 
 // 读界答 Confidential 或 RulesUnreadable＝E_GATE_DENIED，后者的 subject 带上规则读不出的原因。
 // 已准入的地址在盘上真正落到哪里：解析真实路径（沿途每一个 symlink 或 junction），把它在城里的地址
 // 再交给 admit 判一次，返回真实路径。落在城外＝E_GATE_DENIED；落到保留区或关上的楼＝admit 的那条拒绝；
-// 文件不存在也同样判，真实位置由 real_location 求出，由随后的打开报缺；解析失败于别的原因＝E_STORAGE_FATAL。
+// 文件不存在也同样判，真实位置由 real_location 求出，答 Located::Absent；解析失败于别的原因＝E_STORAGE_FATAL。
 pub(crate) fn land(city_root: &Path, addr: &Address, action: &'static str,
-    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<PathBuf, AxError>;
+    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Located, AxError>;
+pub(crate) enum Located { Present(PathBuf), Absent(PathBuf) }
 // 一条路径在盘上的真实位置，末尾几段不存在也算：盘解析最深的那个存在的祖先（沿途链接全解开），
 // 其下不存在的段原样接上——不存在的段不可能是链接。接上的段不是普通名字（`..` 在内）＝E_GATE_DENIED；
 // 路上某个存在的条目解析不了（目标已不在的链接在内）＝E_STORAGE_FATAL。
-pub(crate) fn real_location(written: &Path, action: &'static str, subject: &str) -> Result<PathBuf, AxError>;
+pub(crate) fn real_location(written: &Path, action: &'static str, subject: &str) -> Result<Located, AxError>;
 ```
 
 **缺失的文件按它会落在哪里判，与存在的文件同一个函数。** 若文件不存在就交回字面路径，链接背后的缺失文件就绕过了判定：随后的「没命中」会列出链接目标那个目录的条目——城外的、机密楼的、包外的。`land`、`read::package` 与 `read::miss` 都经 `real_location` 求真实位置，各自只判「落点在不在我的范围里」；`..` 若接在已解析的祖先之后，会在盘从未看过的地方退出那个目录，所以拒绝而不接。
+
+**判定时不在的文件，之后也不打开。** 接上的尾段是盘在判定那一刻没有的东西；若随后照这条路径打开，判定与打开之间在那里放下的一条链接会把打开带到它指向的任何地方——判过的是一处，读到的是另一处。所以 `real_location` 把「全都在」与「尾段不在」分成 `Located` 的两臂，调用方对 `Absent` 只报缺、不打开：`read` 直接答没命中，`search` 的起点答「不是城里的地方」，遍历里的链接略过。
 
 **判的是盘打开的那个地址，不只是模型写下的那个。** 文法准入的地址仍可能穿过一个链接：开放楼里一条指向机密楼、保留区或城外的链接，打开的是链接的目标，只判字面地址就等于把 admit 拒掉的东西从侧门交出去。所以 `read` 与 `search` 的起点都走 `land`，`search` 遍历中遇到的每一个链接也走 `land`——链接的判定只有这一处。
 

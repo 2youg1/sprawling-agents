@@ -3,37 +3,84 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What `read` answers when the file it was asked for will not open.
+//! Opening the place a read landed on, and what `read` answers when
+//! the file it was asked for will not open.
 //!
 //! A miss names what is there instead: the entries of the nearest
 //! directory that does exist, closest name first, so the next call can
-//! be a correct one rather than a guess. The recovery points at
+//! be a correct one rather than a guess. It never lists above the
+//! directory the call was admitted to, because what lies above it is
+//! not something this call was allowed to see. The recovery points at
 //! `search`, which every building's tool set carries; `exec` is not in
 //! City Hall's.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError};
 
-use crate::tools::chosen_path::real_location;
+use crate::tools::chosen_path::{Located, real_location};
+
+/// The highest directory a miss may list.
+pub(super) enum Floor {
+    /// A catalog entry that names one document: there is no directory
+    /// the entry admitted, so a miss offers nothing.
+    Document,
+    /// The directory the call was admitted to, as it really lies, and
+    /// the name the caller reaches it by: the first segment of a city
+    /// path, or a package's catalog name.
+    Directory { dir: PathBuf, named: String },
+}
+
+impl Floor {
+    /// The floor of a path the model chose: its first segment, so a miss
+    /// never climbs to the city root and lists the buildings there.
+    pub(super) fn of_address(city_root: &Path, addr: &Address) -> Floor {
+        let Some(first) = addr.as_str().split('/').next() else {
+            return Floor::Document;
+        };
+        real_location(&city_root.join(first), "read", first).map_or(Floor::Document, |dir| {
+            Floor::Directory {
+                dir: dir.into_path(),
+                named: first.to_owned(),
+            }
+        })
+    }
+}
 
 /// How many entries a miss offers. A bound on what one refusal costs the
 /// context window, not on the directory: the closest names come first,
 /// so the ones cut are the least likely to be meant.
 const NEARBY_CAP: usize = 16;
 
+/// The text at `at`, or the miss. A location that was absent when it
+/// was judged is reported missing without being opened, so a link
+/// placed there since cannot lead the open past the judgement.
+pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String, AxError> {
+    match at {
+        Located::Present(path) => {
+            std::fs::read_to_string(&path).map_err(|err| unread(asked, &path, floor, &err))
+        }
+        Located::Absent(path) => Err(unread(
+            asked,
+            &path,
+            floor,
+            &std::io::ErrorKind::NotFound.into(),
+        )),
+    }
+}
+
 /// The refusal for a file that did not open, with the entries of the
 /// nearest existing directory in `nearby` when the file is not there.
 ///
 /// A file that exists and will not open is storage, and offers nothing:
 /// the caller asked for the right name.
-pub(super) fn unread(city_root: &Path, asked: &str, path: &Path, err: &std::io::Error) -> AxError {
+fn unread(asked: &str, path: &Path, floor: &Floor, err: &std::io::Error) -> AxError {
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "std::io::ErrorKind is an upstream open enum; a file that exists and will not open is storage"
     )]
     let (code, nearby) = match err.kind() {
-        std::io::ErrorKind::NotFound => (AxCode::InvalidArgs, nearby(city_root, path)),
+        std::io::ErrorKind::NotFound => (AxCode::InvalidArgs, nearby(path, floor)),
         _ => (AxCode::StorageFatal, Vec::new()),
     };
     AxError::failure(code, "read", format!("{asked}: {err}"))
@@ -44,39 +91,26 @@ pub(super) fn unread(city_root: &Path, asked: &str, path: &Path, err: &std::io::
         )
 }
 
-/// The entries of the deepest directory above where `missing` really
-/// lands that exists, inside the city, as city-relative paths a model
-/// may read.
+/// The entries of the deepest existing directory above `missing`, a
+/// real location, and no higher than `floor`, spelled the way the
+/// caller reaches them.
 ///
-/// Listing is best effort: a path whose real location will not resolve,
-/// or a directory that will not list, offers no candidates, because the
-/// refusal the caller needs is the miss itself.
-fn nearby(city_root: &Path, missing: &Path) -> Vec<String> {
-    let (Ok(city_root), Ok(missing)) = (
-        real_location(city_root, "read", "the city root"),
-        real_location(missing, "read", "the missing file"),
-    ) else {
+/// Listing is best effort: a directory that will not list offers no
+/// candidates, because the refusal the caller needs is the miss itself.
+fn nearby(missing: &Path, floor: &Floor) -> Vec<String> {
+    let Floor::Directory { dir: top, named } = floor else {
         return Vec::new();
     };
-    let city_root = city_root.as_path();
     let Some(dir) = missing
         .ancestors()
         .skip(1)
-        .take_while(|dir| dir.starts_with(city_root))
+        .take_while(|dir| dir.starts_with(top))
         .find(|dir| dir.is_dir())
     else {
         return Vec::new();
     };
-    let Ok(listing) = std::fs::read_dir(dir) else {
+    let (Ok(listing), Some(prefix)) = (std::fs::read_dir(dir), spelled(top, named, dir)) else {
         return Vec::new();
-    };
-    let prefix = if dir == city_root {
-        None
-    } else {
-        let Some(spelled) = spelled(city_root, dir) else {
-            return Vec::new();
-        };
-        Some(spelled)
     };
     let wanted = missing
         .file_name()
@@ -86,9 +120,7 @@ fn nearby(city_root: &Path, missing: &Path) -> Vec<String> {
         .flatten()
         .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
         .filter_map(|name| {
-            let path = prefix
-                .as_ref()
-                .map_or_else(|| name.clone(), |dir| format!("{dir}/{name}"));
+            let path = format!("{prefix}/{name}");
             Address::parse(&path)
                 .is_ok_and(|addr| !addr.is_reserved())
                 .then(|| (shared_prefix(wanted, &name), path))
@@ -102,14 +134,16 @@ fn nearby(city_root: &Path, missing: &Path) -> Vec<String> {
         .collect()
 }
 
-/// `dir` relative to the city root, spelled with `/`; `None` for a
-/// directory named outside Unicode.
-fn spelled(city_root: &Path, dir: &Path) -> Option<String> {
-    let segments: Option<Vec<&str>> = dir
-        .strip_prefix(city_root)
-        .ok()?
-        .components()
-        .map(|component| component.as_os_str().to_str())
+/// `dir` as the caller names it: `named`, then the segments from `top`
+/// down to `dir`; `None` for a directory named outside Unicode.
+fn spelled(top: &Path, named: &str, dir: &Path) -> Option<String> {
+    let segments: Option<Vec<&str>> = std::iter::once(Some(named))
+        .chain(
+            dir.strip_prefix(top)
+                .ok()?
+                .components()
+                .map(|component| component.as_os_str().to_str()),
+        )
         .collect();
     segments.map(|segments| segments.join("/"))
 }

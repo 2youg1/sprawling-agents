@@ -107,8 +107,8 @@ pub(crate) fn admit(
 /// the city. So the real path is resolved and the address it names in
 /// this city goes through [`admit`] a second time; the one judgement
 /// stays the only one. A path that does not exist is judged at the
-/// place [`real_location`] puts it, and the open that follows reports
-/// it missing.
+/// place [`real_location`] puts it and comes back [`Located::Absent`],
+/// which no caller opens.
 ///
 /// # Errors
 /// `E_GATE_DENIED` when the real path is outside the city or [`admit`]
@@ -119,13 +119,13 @@ pub(crate) fn land(
     addr: &Address,
     action: &'static str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<PathBuf, AxError> {
+) -> Result<Located, AxError> {
     let written = addr
         .as_str()
         .split('/')
         .fold(city_root.to_path_buf(), |path, segment| path.join(segment));
-    let real = real_location(&written, action, addr.as_str())?;
-    let root = real_location(city_root, action, addr.as_str())?;
+    let located = real_location(&written, action, addr.as_str())?;
+    let root = real_location(city_root, action, addr.as_str())?.into_path();
     let outside = || {
         AxError::failure(
             AxCode::GateDenied,
@@ -134,7 +134,8 @@ pub(crate) fn land(
         )
         .with_recovery("name a path whose every link stays inside the city")
     };
-    let inside = real
+    let inside = located
+        .path()
         .strip_prefix(&root)
         .map_err(|_| outside())?
         .iter()
@@ -147,7 +148,33 @@ pub(crate) fn land(
     if inside != addr.as_str() {
         admit(&inside, action, bound)?;
     }
-    Ok(real)
+    Ok(located)
+}
+
+/// Where a path really lands, and whether the disk had anything there
+/// when it was asked.
+pub(crate) enum Located {
+    /// Every segment exists: the path with every link on it resolved.
+    Present(PathBuf),
+    /// The deepest existing ancestor resolved, the segments below it
+    /// appended as written. Nothing was there to judge, so a caller
+    /// reports the miss and never opens it: a link placed at an absent
+    /// segment after this answer would lead the open wherever it points.
+    Absent(PathBuf),
+}
+
+impl Located {
+    pub(crate) fn path(&self) -> &Path {
+        match self {
+            Located::Present(path) | Located::Absent(path) => path,
+        }
+    }
+
+    pub(crate) fn into_path(self) -> PathBuf {
+        match self {
+            Located::Present(path) | Located::Absent(path) => path,
+        }
+    }
 }
 
 /// Where `written` really lands, every link on it resolved, whether or
@@ -155,10 +182,11 @@ pub(crate) fn land(
 ///
 /// The disk resolves the deepest ancestor that exists; the segments
 /// below it exist nowhere, so no link hides in them, and they are
-/// appended as written. An absent file behind a link is therefore judged
-/// under the link's target, as a present one is, and never at the
-/// spelling the link stood on. Every caller that judges where a path
-/// lands asks this function, so an absent file has one answer.
+/// appended as written, and the answer says so: [`Located::Absent`]. An
+/// absent file behind a link is therefore judged under the link's
+/// target, as a present one is, and never at the spelling the link
+/// stood on. Every caller that judges where a path lands asks this
+/// function, so an absent file has one answer.
 ///
 /// # Errors
 /// `E_GATE_DENIED` when a segment below that ancestor is not a plain
@@ -170,7 +198,7 @@ pub(crate) fn real_location(
     written: &Path,
     action: &'static str,
     subject: &str,
-) -> Result<PathBuf, AxError> {
+) -> Result<Located, AxError> {
     let unresolved = |err: std::io::Error| {
         AxError::failure(
             AxCode::StorageFatal,
@@ -181,6 +209,7 @@ pub(crate) fn real_location(
     };
     for existing in written.ancestors() {
         match std::fs::canonicalize(existing) {
+            Ok(real) if existing == written => return Ok(Located::Present(real)),
             Ok(real) => {
                 return written
                     .components()
@@ -196,7 +225,8 @@ pub(crate) fn real_location(
                             format!("{subject} climbs out of the directory it names"),
                         )
                         .with_recovery("name a path made of plain segments")),
-                    });
+                    })
+                    .map(Located::Absent);
             }
             Err(err) if err.kind() == ErrorKind::NotFound && no_entry(existing) => {}
             Err(err) => return Err(unresolved(err)),
@@ -248,8 +278,8 @@ pub(crate) fn walked(
         return Ok(Walked::File(path));
     }
     match Address::parse(rel).and_then(|addr| land(city_root, &addr, "search", bound)) {
-        Ok(real) if real.is_file() => Ok(Walked::File(real)),
-        Ok(_) => Ok(Walked::Passed),
+        Ok(Located::Present(real)) if real.is_file() => Ok(Walked::File(real)),
+        Ok(Located::Present(_) | Located::Absent(_)) => Ok(Walked::Passed),
         Err(refused) if refused.code() == &AxCode::GateDenied => Ok(Walked::Passed),
         Err(unresolved) => Err(unresolved),
     }
