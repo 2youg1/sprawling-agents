@@ -49,7 +49,13 @@ fn line(kind: EventKind, data: Payload) -> EventDraft {
 fn mother() -> VerifiedLedger {
     let dir = tempfile::tempdir().unwrap();
     let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
-    let drafts = [
+    ledger.append_all(mother_drafts()).unwrap();
+    replay::verify_ledger_dir(dir.path()).unwrap()
+}
+
+/// The mother's four lines, as drafts.
+fn mother_drafts() -> Vec<EventDraft> {
+    vec![
         line(
             EventKind::RunStarted,
             Payload::of(&RunStarted {
@@ -99,9 +105,51 @@ fn mother() -> VerifiedLedger {
             })
             .unwrap(),
         ),
-    ];
-    ledger.append_all(drafts.to_vec()).unwrap();
-    replay::verify_ledger_dir(dir.path()).unwrap()
+    ]
+}
+
+/// A mother run with a line of a newer kind inside it: the verified door
+/// skips the line, and the indexed door production calls reaches the same
+/// rebuild rather than refusing it.
+#[test]
+fn both_doors_rebuild_a_mother_run_holding_a_line_of_a_newer_kind() {
+    let dir = tempfile::tempdir().unwrap();
+    let drafts = mother_drafts();
+    let (head, tail) = drafts.split_at(2);
+    {
+        let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        ledger.append_all(head.to_vec()).unwrap();
+    }
+    let segment = memory::ledger_segments_at(dir.path())
+        .unwrap()
+        .pop()
+        .unwrap();
+    let mut written = std::fs::read(&segment).unwrap();
+    let last = written
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+        .last()
+        .unwrap()
+        .to_vec();
+    let future = format!(
+        "{{\"v\":1,\"run\":{},\"seq\":2,\"prev\":\"{}\",\"t\":0,\"who\":\"city\",\"kind\":\"kind_from_the_future\",\"data\":{{}},\"ig\":true}}\n",
+        serde_json::to_string(&RunId::CITY).unwrap(),
+        kernel::ledger::chain_hash(&last)
+    );
+    written.extend_from_slice(future.as_bytes());
+    std::fs::write(&segment, written).unwrap();
+    {
+        let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        ledger.append_all(tail.to_vec()).unwrap();
+    }
+    let verified = replay::verify_ledger_dir(dir.path()).unwrap();
+    let at = verified.tail_seq().unwrap();
+    let mut index = memory::LedgerIndex::empty();
+    index.refresh(dir.path()).unwrap();
+    assert_eq!(
+        super::inherited_indexed(&index, dir.path(), at).unwrap(),
+        super::inherited(&verified, at).unwrap()
+    );
 }
 
 /// The rebuild is the mother's own window, folded through the same type
