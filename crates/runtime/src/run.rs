@@ -69,6 +69,10 @@ pub struct RunPlan {
     /// setting here, so "each rung sounds once per run" cannot depend on
     /// when somebody edited a file.
     pub second_threshold: Option<kernel::SecondThreshold>,
+    /// Where this run records the provider's count after each call. The
+    /// caller keeps a clone for whatever reports the reading, which is
+    /// `status`: the run writes it and nothing else does.
+    pub context: crate::ContextReading,
     pub prefix: FrozenPrefix,
     pub policy: BuildingPolicy,
     pub tools: Vec<ToolDef>,

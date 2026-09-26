@@ -613,7 +613,7 @@ impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render
 // 创建住 edit 而非新工具，因为「文件变更＋乐观并发」已是本工具拥有的唯一权威，“absent”只是版本的一个取值。
 
 // tools/status.rs —— 十三字段
-pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode, pub ctx_used: Tokens,
+pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode,
     pub ctx_limit: Tokens, pub budget_usd: UsdMicros, pub budget_tokens: Tokens, pub trust: String,
     pub write_domain: String, pub locks: Vec<String>, pub worktree_path: String, pub worktree_disk: ByteLen,
     pub signals_pending: u32, pub children: Vec<ChildStatus>, pub now: Option<ClockStamp>,
@@ -624,12 +624,14 @@ pub struct StatusTool { /* snapshot＋ children: Box<dyn Fn() -> Vec<ChildStatus
 impl StatusTool {
     pub fn watching(snapshot: StatusSnapshot, children: Box<dyn Fn() -> Vec<ChildStatus> + Send>) -> Result<StatusTool, AxError>;
     pub fn reporting(self, backlog: Backlog) -> StatusTool;   // §8-28-2：末行 `backlog:` 从表里现读，与 children 同一理由
+    pub fn metering(self, context: ContextReading) -> StatusTool;   // `ctx:` 行的用量从运行的读数现读
 }
 impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timestamped、render=Generic；渲染序末尾追加 backlog 一行 */ }
 
 // ToolBench 住 turn.rs：按 Effect 过门是回合层职责，不另立 bench 模块。
 
 - **`children` 为何重塑**：旧形状 `{run, phase, ctx_used, ctx_lock}` 预设子已在跑。真实情形是子 Run 在父嚽结之后才开，故父自己那一跑里 **子既无 run id 也无上下文读数**——四个字段里三个只能填零，而零与未知是两件事。现形状只携得出口的两件：派到哪个房间、哪一类代理。
+- **`ctx` 的用量为何现读**：快照在派发时冻结，那时还没有任何一次调用，冻结的用量只能是零，而且整跑都是零——一个照 City.md 去问 `status` 的模型会被告知窗口是空的。用量住 `ContextReading`：Run 每回合把 provider 报的 `input_tokens` 写进去，`status` 被调用时读出，所以报的是本跑最近一次已完成调用的计数。上限 `ctx_limit` 仍在快照里，因为它整跑不变。
 - **`neighbours` 追加在末尾而不插入到 `signals_pending` 旁边**：冻结序存在的理由是字段表增长时居民的习惯仍可迁移，而一次插入会把前十二行里的一半挪位。它只报**人数**不报名单：名单长度随人口增长，而 `status` 是一份定长文本（`render_children` 已为同一条理由被压成一行）；详情归 `neighbours` 工具，city-SPEC §8-15b。
 - **数的是人，不是地址**：一间没人站着的房间没有读者，把它计入会让 `neighbours: 3` 读起来像「有三个人可以说话」而实际上一个都没有。空房间仍然在工具的答案里，因为它对 delegate 与搬入是真信息。
 - **`children` 是闭包而不是快照字段**：派活发生在 `status` 工具造好之后，一份开跑前拍的快照永远是空的。派生台住 `collab`，而 depmap 不允许 runtime 依赖 collab，故本模块只收一个答「现在派了哪些」的闭包，装配层把台接上去——与 `RunHooks` 四个闭包同一纪律：第二实现不存在时不引 trait。
@@ -1524,6 +1526,8 @@ impl Run<Frozen> { pub fn transcript(&self) -> Result<Transcript, AxError>; pub 
 
 ```rust
 pub struct ContextGauge { window: Tokens, second_at: u64, sounded: Sounded }
+pub struct ContextReading(Arc<AtomicU64>);   // Clone＋Default；Run 写、status 读的同一格
+impl ContextReading { pub fn tokens(&self) -> Tokens; pub(crate) fn record(&self, used: Tokens); }
 impl ContextGauge { pub fn new(window: Tokens, second: Option<SecondThreshold>) -> ContextGauge; pub fn observe(&mut self, used: Tokens) -> Option<ContextReminder>; }
 pub enum ContextReminder { Usage { used: Tokens, window: Tokens }, HandoverWindow { used: Tokens, window: Tokens } }
 impl ContextReminder { pub fn render(&self) -> String; }
@@ -1531,7 +1535,7 @@ impl ContextReminder { pub fn render(&self) -> String; }
 
 `second` 来自 `RunPlan.second_threshold`：配置梯子冻结的值，`None`＝没有一层说话，取 `CTX_REMINDER_SECOND_DEFAULT`，「缺席取默认」只在这一个构造点判定。`window == 0`（簿上没写）恒不响：没有分母就没有百分比，与 `UnplannedProgress` 同一条理。整数算术：`used * 100 / window` 用 checked 乘法。
 
-**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Window::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
+**接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`RunPlan` 增 `context: ContextReading`，Run 在每回合观察之前把同一个 `input_tokens` 记进去，装配层把同一格交给 `StatusTool::metering`——只有一处写，窗口提醒与 `status` 读的是同一个数；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Window::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
 
 **改这一格的入口**：`channels::Command::ConfigureBuilding` 的 `context_second_threshold`（channels-SPEC §8-45）写的就是 `RunPlan.second_threshold` 读的那一格——写入落那一级的 `[context] second_threshold`，下一个 Run 起点冻结时读到；正在跑的那个 Run 不受影响（冻结的理由见 kernel-SPEC §8-22）。
 

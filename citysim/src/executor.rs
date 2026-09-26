@@ -222,6 +222,7 @@ pub fn run_scenario_on(
             context_tokens: 0,
         },
         second_threshold: None,
+        context: runtime::ContextReading::default(),
         prefix,
         policy: BuildingPolicy::default(),
         tools: Vec::new(),

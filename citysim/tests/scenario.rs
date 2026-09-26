@@ -371,7 +371,6 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
                 who: "worker@sim.1".to_owned(),
                 addr: Address::parse("sim/lobby/room1").unwrap(),
                 mode: kernel::Mode::Up,
-                ctx_used: kernel::Tokens::new(900),
                 ctx_limit: kernel::Tokens::new(8000),
                 trust: "trusted".to_owned(),
                 write_domain: "sim/lobby/room1".to_owned(),

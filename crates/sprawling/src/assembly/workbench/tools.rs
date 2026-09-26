@@ -78,6 +78,7 @@ impl RunWorker {
             at.depth(),
             site.building.addr().clone(),
         )));
+        let context = runtime::ContextReading::default();
         let status = self.status_tool(
             site,
             desks,
@@ -85,6 +86,7 @@ impl RunWorker {
             Reach {
                 seen: &seen,
                 delegates: &delegates,
+                context: &context,
             },
         )?;
         let signal_tool = collab::SignalTool::new(std::sync::Arc::clone(&desks.signals))?;
@@ -232,6 +234,7 @@ impl RunWorker {
             bench: Some(bench),
             delegates,
             succession,
+            context,
         })
     }
 }
@@ -337,12 +340,11 @@ impl RunWorker {
 
     /// Builds the one tool that answers what this run is, to itself.
     ///
-    /// Everything a `status` answer holds is read here, at dispatch, and
-    /// frozen with the tool - except the children, which a closure reads
-    /// live from the delegate desk because a run hands work down while
-    /// it is going. A borrowed desk answers nothing rather than
-    /// refusing: `status` reporting its own plumbing to a model would
-    /// teach it about a lock it can do nothing about.
+    /// Everything a `status` answer holds is read here and frozen, except
+    /// what moves while the run goes on: the children from the delegate
+    /// desk, the backlog from its table, the context used from the run's
+    /// reading. A borrowed desk answers nothing rather than refusing: a
+    /// model told about `status`'s own lock could do nothing about it.
     ///
     /// # Errors
     /// Propagates a write domain that will not resolve and whatever the
@@ -354,8 +356,6 @@ impl RunWorker {
         at: &Assignment,
         reach: Reach<'_>,
     ) -> Result<StatusTool, AxError> {
-        // What `status.children` reads, and the only part of the answer
-        // that is not frozen here.
         let watched = std::sync::Arc::clone(reach.delegates);
         let tool = StatusTool::watching(
             status_snapshot(Situation {
@@ -393,7 +393,8 @@ impl RunWorker {
                 )
             }),
         )?;
-        // The thirteenth line: what this run started and left running.
-        Ok(tool.reporting(self.backlog.clone()))
+        Ok(tool
+            .reporting(self.backlog.clone())
+            .metering(reach.context.clone()))
     }
 }

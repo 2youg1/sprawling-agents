@@ -321,6 +321,7 @@ impl RunWorker {
                 context_tokens: site.model.context_tokens,
             },
             second_threshold: site.config.second_threshold,
+            context: workbench.context.clone(),
             prefix,
             policy: site.rules.policy().clone(),
             tools,

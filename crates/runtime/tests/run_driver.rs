@@ -191,6 +191,7 @@ fn plan() -> RunPlan {
             context_tokens: 0,
         },
         second_threshold: None,
+        context: runtime::ContextReading::default(),
         prefix: FrozenPrefix::assemble(
             FrozenSegment::new(SegmentSlot::City, b"city".to_vec()),
             FrozenSegment::new(SegmentSlot::Building, b"building".to_vec()),
