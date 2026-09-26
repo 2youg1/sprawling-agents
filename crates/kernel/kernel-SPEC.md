@@ -414,6 +414,10 @@ pub mod autonomy_word {                          // owner | delegate:<resident>
     pub fn read(word: &str) -> Result<Autonomy, AxError>;
 }
 pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
+pub struct PursuitChanged { pub step: PursuitMove,       // goal 只在 clear 之后缺席
+                            pub goal: Option<String> }
+#[serde(rename_all = "snake_case")] pub enum PursuitMove { Set, Pause, Resume, Clear }
+impl PursuitChanged { pub fn held(self) -> Result<Option<(String, PursuitState)>, AxError>; }
 pub struct EmbeddingCalled { pub model: String, pub inputs: u64, pub vectors: u64,
                              pub dimensions: Option<u64>, pub prompt_tokens: Option<Tokens> }
 pub struct RerankCalled { pub model: String, pub passages: u64, pub ranks: u64,

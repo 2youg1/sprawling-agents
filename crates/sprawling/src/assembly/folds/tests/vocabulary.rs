@@ -38,3 +38,27 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     let standing = Standing::fold(&report.ledger_dir).map(|_| ());
     assert_eq!((views, standing), (Ok(()), Ok(())));
 }
+
+/// A pursuit line this build cannot read stops the fold. Skipping it
+/// would leave standing whatever goal the line changed, so a building a
+/// person cleared would go on pursuing after a restart.
+#[test]
+fn a_pursuit_line_the_build_cannot_read_stops_the_fold() {
+    let draft = kernel::EventDraft {
+        run: RunId::CITY,
+        t: kernel::TimeMs::new(0),
+        who: "person".into(),
+        addr: Some(Address::parse("lab").unwrap()),
+        kind: kernel::EventKind::PursuitChanged,
+        data: kernel::Payload::new(
+            serde_json::json!({ "step": "abandon", "goal": "read the meter" })
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .unwrap(),
+        ig: false,
+    };
+    let line = EventRecord::from_draft(draft, kernel::Seq::FIRST, kernel::ledger::GENESIS_PREV);
+    assert!(CollaborationFold::default().absorb(&line).is_err());
+}
