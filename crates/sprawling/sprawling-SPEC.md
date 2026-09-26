@@ -2354,8 +2354,10 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 **污点随派活走，不随工人走**：`wake` 从前置 `RunWorker.tainted_arrival`、派完再清；
 活进车道之后清旗标的那一刻远在落地之前，被清掉的正是那轮外来活自己的 C15 标记。
 污点因此成为 `Assignment` 的字段 `taint: kernel::TaintSet`，子活与继任者继承它。
-写点给出真实来路：`waking` 把到达的来路标签交给 `driving::flight::start_unasked`（`Unasked::Arrival`），
-其余派活写 `TaintSet::empty()`。
+写点给出真实来路：`waking` 把到达的来路记成标签 `arrival:<source>`，装进 `Unasked::Arrival(TaintSource)` 交给
+`driving::flight::start_unasked`，由 `Unasked::taint` 一处换成 `TaintSet`；其余派活写 `TaintSet::empty()`。
+标签与 `runtime::bench::outside` 的 `mcp:<server>`、`web` 同一种写法，拒绝文案逐个念出来路，
+模型与人都看得见是哪一处外来内容挡住了命令。
 `lay_out_workbench` 把 `Assignment.taint` 原样放进这张桌子的 `TaintSet`，不再另造标签，
 于是桌子问的每一道门都看得见它，`gate::command` 据此拒掉 `exec`（`E_TAINTED_ACTION`）。
 读点 `settling::landing` 转交 `at.taint`，待批项的 C15 标记取 `!taint.is_empty()`，一个事实一个家。
