@@ -401,3 +401,32 @@ fn restore_refuses_a_link_on_the_path_and_writes_nothing_outside_the_city() {
         (true, false)
     );
 }
+
+#[test]
+fn restore_refuses_a_reserved_address_and_writes_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), ".sprawling/doc.txt", "from history");
+    let repo = git2::Repository::init(tmp.path()).unwrap();
+    let mut index = repo.index().unwrap();
+    index.add_path(Path::new(".sprawling/doc.txt")).unwrap();
+    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+    let sig = git2::Signature::now("t", "t@t").unwrap();
+    let held = repo
+        .commit(None, &sig, &sig, "holds a reserved file", &tree, &[])
+        .unwrap();
+    let checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    std::fs::remove_file(tmp.path().join(".sprawling/doc.txt")).unwrap();
+
+    let restored = checkpoint.restore(
+        &Address::parse(".sprawling/doc.txt").unwrap(),
+        &GitOid::parse(&held.to_string()).unwrap(),
+    );
+
+    assert_eq!(
+        (
+            restored.is_err(),
+            tmp.path().join(".sprawling/doc.txt").exists()
+        ),
+        (true, false)
+    );
+}
