@@ -139,6 +139,12 @@ impl Journal {
         self.append(ledger, event.kind(), Payload::new(scanned)?)
     }
 
+    /// The turn's stamp: the time every line of this turn carries, and
+    /// the time a wave's tools are admitted at.
+    pub(super) fn stamp(&self) -> TimeMs {
+        self.t
+    }
+
     /// The turn module's single `Ledger::append` call, and the single
     /// place an [`EventDraft`] of this turn is built: the stamp, the
     /// author and the ref bookkeeping cannot drift between phases.

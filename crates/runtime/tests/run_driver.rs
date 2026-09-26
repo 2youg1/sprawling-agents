@@ -882,3 +882,176 @@ fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
         "and the next assembly carries it"
     );
 }
+
+const READS: u32 = 3;
+
+/// Long enough that a thread the scheduler delays under a loaded build
+/// still arrives; a serial wave waits it out on every read and fails.
+const ARRIVAL_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Where the reads of one wave meet: each read waits until every read of
+/// the wave has started, then notes how many had started while it was
+/// still running. A read that saw them all overlapped every other read.
+struct Meeting {
+    started: std::sync::Mutex<u32>,
+    arrived: std::sync::Condvar,
+    fewest_seen: std::sync::Mutex<u32>,
+}
+
+/// A read-only tool; with a meeting, each call waits at it.
+struct MeetingRead {
+    meta: kernel::ToolMeta,
+    meeting: Option<std::sync::Arc<Meeting>>,
+}
+
+impl kernel::Tool for MeetingRead {
+    fn meta(&self) -> &kernel::ToolMeta {
+        &self.meta
+    }
+
+    fn invoke(&self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
+        if let Some(meeting) = &self.meeting {
+            let mut started = meeting.started.lock().unwrap();
+            *started += 1;
+            meeting.arrived.notify_all();
+            let (started, _) = meeting
+                .arrived
+                .wait_timeout_while(started, ARRIVAL_WAIT, |seen| *seen < READS)
+                .unwrap();
+            let mut fewest = meeting.fewest_seen.lock().unwrap();
+            *fewest = (*fewest).min(*started);
+        }
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    }
+}
+
+/// The bench's three stages, with each call's key placed by its
+/// position in the run, as the lane places it.
+struct Placed {
+    bench: runtime::bench::ToolBench,
+    next: u64,
+}
+
+impl Placed {
+    fn with(meeting: Option<std::sync::Arc<Meeting>>) -> Placed {
+        let domain = kernel::WriteDomain::new(vec![Address::parse("lab").unwrap()]).unwrap();
+        let mut bench = runtime::bench::ToolBench::new(domain);
+        bench
+            .register(Box::new(MeetingRead {
+                meta: kernel::ToolMeta {
+                    name: ToolName::parse("read").unwrap(),
+                    disclosure: "reads a file".to_owned(),
+                    params: Payload::empty(),
+                    effect: kernel::Effect::Read,
+                    cost_tier: kernel::CostTier::Free,
+                    timeout: None,
+                    render: kernel::RenderIntent::Generic,
+                    temporal: kernel::Temporal::Timeless,
+                },
+                meeting,
+            }))
+            .unwrap();
+        Placed { bench, next: 0 }
+    }
+
+    fn key(&mut self, call: &ToolCall) -> kernel::IdemKey {
+        let at = self.next;
+        self.next += 1;
+        kernel::IdemKey::derive(
+            &RunId::from_bytes([7; 16]),
+            kernel::Seq::new(at),
+            call.id.as_bytes(),
+        )
+    }
+}
+
+fn answer(outcome: runtime::bench::BenchOutcome) -> Result<ToolOutcome, AxError> {
+    match outcome {
+        runtime::bench::BenchOutcome::Ran { outcome, .. }
+        | runtime::bench::BenchOutcome::Duplicate { outcome } => Ok(outcome),
+        runtime::bench::BenchOutcome::Refused { refusal } => Err(*refusal),
+    }
+}
+
+impl runtime::ConcurrentInvoke for Placed {
+    fn effect_of(&self, call: &ToolCall) -> Option<kernel::Effect> {
+        self.bench
+            .meta_of(call.name.as_str())
+            .map(|meta| meta.effect.clone())
+    }
+
+    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> runtime::Admitted {
+        let key = self.key(call);
+        match self.bench.clear(call, &key, t) {
+            Ok(runtime::bench::Clearance::Cleared(ticket)) => runtime::Admitted::Cleared(ticket),
+            Ok(runtime::bench::Clearance::Answered(outcome)) => {
+                runtime::Admitted::Answered(answer(outcome))
+            }
+            Err(refused) => runtime::Admitted::Answered(Err(refused)),
+        }
+    }
+
+    fn tool(&self, ticket: &runtime::bench::Ticket) -> Result<&dyn kernel::Tool, AxError> {
+        self.bench.tool_for(ticket)
+    }
+
+    fn account(
+        &mut self,
+        _call: &ToolCall,
+        ticket: runtime::bench::Ticket,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<ToolOutcome, AxError> {
+        self.bench.account(ticket, answered).and_then(answer)
+    }
+}
+
+fn three_reads_driven(invoke: &mut dyn runtime::ConcurrentInvoke) -> RecordingLedger {
+    let read = |id: &str| ToolCall {
+        id: id.to_owned(),
+        name: ToolName::parse("read").unwrap(),
+        args: Payload::empty(),
+    };
+    let mut ledger = RecordingLedger::new();
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+        waves: vec![vec![read("r1"), read("r2"), read("r3")]],
+    };
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut hooks = RunHooks {
+        now: &mut now,
+        interrupt: &mut interrupt,
+        fence: None,
+        invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    ledger
+}
+
+/// The production driver runs a wave's leading reads at once, and the
+/// ledger it leaves is the one the same calls leave one after another.
+#[test]
+fn three_reads_a_run_makes_in_one_wave_are_in_flight_together_and_leave_the_serial_ledger() {
+    let mut one_by_one = Placed::with(None);
+    let mut invoke = |call: &ToolCall, t: TimeMs| {
+        let key = one_by_one.key(call);
+        one_by_one.bench.invoke(call, &key, t).and_then(answer)
+    };
+    let serial = three_reads_driven(&mut invoke);
+
+    let meeting = std::sync::Arc::new(Meeting {
+        started: std::sync::Mutex::new(0),
+        arrived: std::sync::Condvar::new(),
+        fewest_seen: std::sync::Mutex::new(u32::MAX),
+    });
+    let concurrent = three_reads_driven(&mut Placed::with(Some(meeting.clone())));
+
+    assert_eq!(concurrent.lines, serial.lines);
+    // In a serial wave the first read finishes before the second starts.
+    assert_eq!(*meeting.fewest_seen.lock().unwrap(), READS);
+}

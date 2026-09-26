@@ -125,10 +125,10 @@ fn the_snapshot_is_replaced_at_the_closing_boundary_and_not_before() {
         .unwrap(),
     );
     let turn = advance(
-        turn.execute(
+        turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut |_| Ok(outcome(&prose(20))),
+            &mut |_: &ToolCall, _: TimeMs| Ok(outcome(&prose(20))),
             &mut |_| Interrupt::None,
         )
         .unwrap(),
@@ -220,10 +220,10 @@ fn a_threshold_crossed_mid_wave_compacts_once_over_the_whole_exchange() {
     );
     let mut seen = 0usize;
     let turn = advance(
-        turn.execute(
+        turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut |_call| {
+            &mut |_call: &ToolCall, _: TimeMs| {
                 seen += 1;
                 Ok(outcome(&prose(20_000)))
             },

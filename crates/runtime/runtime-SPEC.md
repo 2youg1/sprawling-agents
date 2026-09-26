@@ -167,23 +167,24 @@ impl Turn<Calling> {
                                                                   // 产 model_called＋model_returned
 }
 impl Turn<ToolWave> {
-    /// Boundary 3 (工具执行前)，串行；per call tool_called + tool_result。
-    /// still_going 在每条 call 之前被问一次（B-70，见 §8-28-2）。
-    pub fn execute(self, interrupt: Interrupt, ledger: &mut dyn Ledger,
-                   invoke: &mut dyn FnMut(&ToolCall) -> Result<ToolOutcome, AxError>,
-                   still_going: &mut dyn FnMut(u32) -> Interrupt)
-        -> Result<PhaseOutcome<Turn<Recording>>, AxError>;
-    /// 同一边界：开头连续的 Effect::Read 调用同时执行，结果进重排缓冲、按调用序入账；
+    /// Boundary 3 (工具执行前)；per call tool_called + tool_result，按调用序入账。
+    /// 开头连续的 Effect::Read 调用同时执行，结果进重排缓冲；
     /// 第一条非只读调用等它们全部收齐后再开始，此后串行。
+    /// still_going 在每条 call 之前被问一次（B-70，见 §8-28-2）。
     pub fn execute_concurrent(self, interrupt: Interrupt, ledger: &mut dyn Ledger,
-                              tools: &ConcurrentInvoke<'_>,
+                              tools: &mut dyn ConcurrentInvoke,
                               still_going: &mut dyn FnMut(u32) -> Interrupt)
         -> Result<PhaseOutcome<Turn<Recording>>, AxError>;
 }
-pub struct ConcurrentInvoke<'a> {   // 在 crate 根重导出：runtime::ConcurrentInvoke
-    pub invoke: &'a (dyn Fn(&ToolCall) -> Result<ToolOutcome, AxError> + Sync),
-    pub effect_of: &'a dyn Fn(&ToolCall) -> Option<Effect>,   // None＝目录不认识的工具，按非只读处理
+pub trait ConcurrentInvoke {          // 在 crate 根重导出：runtime::ConcurrentInvoke／runtime::Admitted
+    fn effect_of(&self, call: &ToolCall) -> Option<Effect>;   // None＝目录不认识的工具，按非只读处理
+    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted;          // 一段：按调用序串行放行
+    fn tool(&self, ticket: &bench::Ticket) -> Result<&dyn Tool, AxError>; // 二段：借出工具，多线程调
+    fn account(&mut self, call: &ToolCall, ticket: bench::Ticket,
+               answered: Result<ToolOutcome, AxError>) -> Result<ToolOutcome, AxError>;  // 三段：按调用序串行记账
 }
+pub enum Admitted { Answered(Result<ToolOutcome, AxError>), Cleared(bench::Ticket) }
+impl<F: FnMut(&ToolCall, TimeMs) -> Result<ToolOutcome, AxError>> ConcurrentInvoke for F { /* 放行即作答；不报效果，故整波串行 */ }
 pub enum NextCall { Allowed, Halted }   // RunHooks::wait 的答案：等待中只有「停」可以立刻执行
 impl Turn<Recording> {
     pub fn record(self, interrupt: Interrupt, ledger: &mut dyn Ledger) -> Result<PhaseOutcome<TurnReport>, AxError>;
@@ -196,8 +197,8 @@ impl Turn<Recording> {
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。S3 接真 dialect 时只加字段。
 - **前缀冻结是运行时不变量，不只是测试（E-2）。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名那条今天走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
 - **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
-- **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行与并行两个入口共用，所以账本字节与串行执行完全一致（`turn/tests/concurrent.rs` 对拍）。第一条非只读调用就是 fence：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
-- **生产驱动仍走串行 `execute`，因为生产的 invoke 还不是 `Sync`。** 最里一层已经是：`kernel::Tool::invoke` 取 `&self`，trait 要求 `Send + Sync`（kernel-SPEC 的工具面），`ExecTool` 把沙盒与 confinement、`BrowserTool` 把整张 tab、`McpTool` 把请求编号与连接各自放进自己的 `Mutex`，`KeptEdit` 的计数是一个原子数。`ToolBench` 已拆成串行的 `clear`、交出工具供并行调用的 `tool_for`（`&self`）与串行的 `account`。仍挡着的一层是 `bin::assembly::driving::lane` 的 invoke 持有 `Cell`／`RefCell`（按位置派生 `IdemKey` 的计数、fence 记录、exec 计数）。换成 `execute_concurrent` 依次要：(1) lane 在起跑前按调用序预分配 `IdemKey` 的位置，fence 记录与 exec 计数随答案按调用序累加，一波开头的只读调用先逐条 `clear`、再经 `tool_for` 并行调工具、再按调用序 `account`——只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；(2) `RunHooks::invoke` 换成 `ConcurrentInvoke`，`lifecycle` 改调 `execute_concurrent`，删掉串行入口。
+- **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行段与并行段共用，所以账本字节与串行执行完全一致（`tests/run_driver.rs` 与 `turn/tests/concurrent.rs` 对拍）。第一条非只读调用就是 fence：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
+- **`ConcurrentInvoke` 是三段，不是一个闭包。** 放行（`admit`，`&mut`，按调用序）、执行（`tool` 借出 `&dyn Tool`，`&self`，各条在 scope 线程上调它的 `invoke`）、记账（`account`，`&mut`，按调用序）。一个包着 bench 的闭包表达不了这个次序：放行与记账写同一张去重表与同一份 taint，而 bench 不是 `Sync`（checkpoint 持有 git 仓库句柄），工具是（`kernel::Tool: Send + Sync`，`invoke(&self)`；有内部状态的工具把状态放在自己的锁后）。三个闭包也不行：三者要借同一个 bench，一个要 `&`、两个要 `&mut`。所以它是 trait——第二实现在缝上已经存在：闭包的全覆盖实现（放行即作答，不报效果，于是 citysim 与脚本化工具的测试走串行、字节不动），与装配层 `bin::assembly::driving::lane` 的 bench 实现。只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；`IdemKey` 的位置在放行时按调用序定下，exec 计数与 fence 记录在记账时按调用序累加，所以它们与串行波逐字相同。落选的是「lane 把整个 bench 放进锁、闭包取 `Sync`」：锁把三条读排成一条队，并行只剩名字。生产路径由 `tests/run_driver.rs` 的三读测试守着：`drive` 走 `lifecycle` 到 `execute_concurrent`，三条读彼此重叠，账本与串行逐行相同。
 
 #### 8-4-1 一句恢复语只许指向线上真有的动词（`prefix::segment::ANOTHER_ADDRESS`）
 
@@ -784,7 +785,7 @@ pub struct RunHooks<'a> {            // 四个闭包，不是四个 trait：本�
     pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,        // 时间入参，本模块恒不采样
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,       // 安全点由我定，信号由你答
     pub fence: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,  // 波前 checkpoint
-    pub invoke: &'a mut dyn FnMut(&ToolCall, TimeMs) -> Result<ToolOutcome, AxError>,  // 回合时间戳随行
+    pub invoke: &'a mut dyn ConcurrentInvoke,   // 一波的工具，三段（§8-3）；回合时间戳随 admit 行
     pub wait: &'a mut dyn FnMut(TimeMs) -> NextCall,               // 等到 Watchdog 给的 until；途中来了 Halt 就立刻答 Halted
 }
 
@@ -806,7 +807,7 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
 - **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
 - **第四种结束：回合中途的失败。** 上一段那句「无第二条退路」先前在代码里不成立：`drive` 的错误臂只对带 `Carrier::Event` 的码写载体事件并冻结，对 `Carrier::Loadtime` 的五个码直接 `return Err`，**那次 run 被丢掉、账本上只剩 `run_started`**。实测：ModelScope 的流式 tool_call 拼接缺陷令每次派活死于 `E_WIRE_MISMATCH`，重启后 `city_view` 仍报那次 run `frozen: false`，页面于是把每条消息都当 `steer` 发而被拒。**两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件。** 理由：`Loadtime` 原先的理由是「账本自身就是受害者时，没有什么真实的东西可写」——这对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立：供应方把兑换格式写错与账本健否无关。而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抩——这比预先判定「写不进去」更诚实。冻结后**原错误仍然向上抩**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
 - **Window 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
-- **四个闭包而非四个 trait**：第二实现尚不存在，而本库的纪律是 trait 只在已有第二实现的缝上引入（同 8-3 的 invoke 闭包）。`RunHooks` 自身只是四个引用的容器，不持策略。
+- **闭包而非 trait，`invoke` 除外**：`now`／`interrupt`／`fence`／`wait` 的第二实现尚不存在，而本库的纪律是 trait 只在已有第二实现的缝上引入；`invoke` 是 §8-3 的 `ConcurrentInvoke`，它的第二实现已在缝上。`RunHooks` 自身只是引用的容器，不持策略。
 - **字节不变是验收标准**：同一堆剧本、同一份 `fixtures/golden-p0`，换了驱动实现而字节不动——这才能证明“提取”是提取而不是重写。
 
 ### 8-16 runtime::digest（形状 1 判定＋形状 2 值类型）
@@ -971,7 +972,7 @@ pub struct RunHooks<'a> {
 | `turn/tests.rs` | 纯索引 |
 | `turn/tests/helpers.rs` | 三处共用的夹具：`TestLedger`、`OneShotModel`、`prefix`／`run_id`／`shape`／`advance`／`probe_call` |
 | `turn/tests/phases.rs` | 四个边界跑在真账本链上（5 个 `#[test]`） |
-| `turn/tests/concurrent.rs` | 只读前缀并行：墙钟是一条的时间，账本字节与串行一致，波内停下只起跑停点之前的调用（2 个 `#[test]`） |
+| `turn/tests/concurrent.rs` | 只读前缀并行：波内停下只起跑停点之前的调用，steer 落在串行波写它的位置，两者账本字节与串行一致（2 个 `#[test]`） |
 | `turn/tests/window.rs` | 开场白与 steer 在窗口里留下什么（3 个 `#[test]`） |
 | `turn/tests/redaction.rs` | 工具参数与工具结果里的密钥进不了账本，其余字段完好（2 个 `#[test]`） |
 

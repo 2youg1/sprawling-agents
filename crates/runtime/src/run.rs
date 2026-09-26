@@ -14,7 +14,7 @@
 
 use kernel::{
     Address, AxError, BuildingPolicy, Carrier, Completion, EventDraft, Ledger, Locator, Model,
-    Payload, RunId, TimeMs, ToolCall, ToolDef, ToolOutcome,
+    Payload, RunId, TimeMs, ToolDef,
 };
 
 use kernel::ChatMessage;
@@ -137,11 +137,11 @@ pub struct RunHooks<'a> {
     /// The pre-wave checkpoint fence. `None` runs without a net, which
     /// the tool layer refuses for anything that can delete.
     pub fence: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,
-    /// Runs one tool call. The turn's stamp rides along because the tool
-    /// layer stamps results and derives idempotency keys from it, and a
-    /// caller that sampled its own clock there would be a second time
-    /// source inside one turn.
-    pub invoke: &'a mut dyn FnMut(&ToolCall, TimeMs) -> Result<ToolOutcome, AxError>,
+    /// Runs a wave's tool calls in three stages (see
+    /// [`crate::ConcurrentInvoke`]). The turn's stamp rides along because
+    /// the tool layer stamps results from it, and a caller that sampled
+    /// its own clock there would be a second time source inside one turn.
+    pub invoke: &'a mut dyn crate::ConcurrentInvoke,
     /// Holds the run until the moment the watchdog set for the next call
     /// to a provider that failed, and answers whether that call may go.
     ///

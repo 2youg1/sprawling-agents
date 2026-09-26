@@ -10,7 +10,7 @@ use kernel::event::Who;
 use kernel::event::record::{CheckpointCommitted, RunFrozen, RunStarted};
 use kernel::{
     AxCode, AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, Payload, RunId,
-    StopReason, TimeMs, ToolCall,
+    StopReason, TimeMs,
 };
 
 use crate::conversation::Conversation;
@@ -210,8 +210,6 @@ impl Run<Active> {
 
         let wave = (hooks.interrupt)(SafePoint::BeforeWave { turn: index });
         fold_steer(&mut self.state.conversation, &wave);
-        let invoke = &mut hooks.invoke;
-        let mut stamped = |call: &ToolCall| invoke(call, t);
         // The same question the three phase boundaries ask, asked again
         // before each call of the wave. A cancel ends the wave there; a
         // steer is recorded by the turn and folded into the window, and
@@ -225,7 +223,7 @@ impl Run<Active> {
             fold_steer(conversation, &arrived);
             arrived
         };
-        let turn = match turn.execute(wave, ledger, &mut stamped, &mut still_going)? {
+        let turn = match turn.execute(wave, ledger, &mut *hooks.invoke, &mut still_going)? {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };

@@ -6,7 +6,11 @@
 //! Boundary 3: the tool wave, accounted in call order.
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
-use kernel::{AxCode, AxError, ContentBlock, Effect, Ledger, Payload, ToolCall, ToolOutcome};
+use kernel::{
+    AxCode, AxError, ContentBlock, Effect, Ledger, Payload, TimeMs, Tool, ToolCall, ToolOutcome,
+};
+
+use crate::bench::Ticket;
 
 use crate::compaction::Exchange;
 
@@ -23,18 +27,88 @@ fn printed(payload: &Payload, action: &'static str) -> Result<String, AxError> {
     })
 }
 
-/// A wave's invoker that may be called from several threads at once,
-/// with the lookup that says which calls only read.
+/// A wave's tools in three stages, so the calls that only read can run
+/// at once while everything they decide stays in call order.
 ///
-/// The leading run of calls whose tool declares `Effect::Read` runs at
-/// once; the first call with any other effect waits until every one of
-/// them has answered, and from there the wave is serial. The Ledger sees
-/// the same lines in the same order either way: results wait in a
-/// reorder buffer and are written in call order.
-pub struct ConcurrentInvoke<'a> {
-    pub invoke: &'a (dyn Fn(&ToolCall) -> Result<ToolOutcome, AxError> + Sync),
-    /// `None` is a tool the catalog does not know, which is not read-only.
-    pub effect_of: &'a dyn Fn(&ToolCall) -> Option<Effect>,
+/// The leading run of calls whose tool declares `Effect::Read` is
+/// admitted one call at a time, in call order; the tools of the calls it
+/// clears then run at once, each on its own scoped thread; and every
+/// answer is accounted one call at a time, in call order. The first
+/// call with any other effect waits until every one of them has
+/// answered, and from there the wave is serial. The Ledger sees the same
+/// lines in the same order either way: results wait in a reorder buffer
+/// and are written in call order.
+///
+/// A trait rather than three closures: admitting and accounting write
+/// the same dedup table and taint that `tool` lends out, and three
+/// closures cannot each borrow one bench.
+pub trait ConcurrentInvoke {
+    /// The effect the call's tool declares. `None` is a tool the
+    /// catalog does not know, which is not read-only.
+    fn effect_of(&self, call: &ToolCall) -> Option<Effect>;
+    /// Stage one, serial in call order: whether the call may run, at the
+    /// turn's stamp. An answer that needs no tool (a replay, a door's
+    /// refusal) comes back here.
+    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted;
+    /// Stage two: the tool a cleared call runs on. It takes `&self`, so
+    /// every cleared call's tool is lent out at once and invoked from
+    /// several threads; a tool is `Sync` where the implementor need not be.
+    fn tool(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError>;
+    /// Stage three, serial in call order: records what the tool answered
+    /// and returns what the model reads back.
+    fn account(
+        &mut self,
+        call: &ToolCall,
+        ticket: Ticket,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<ToolOutcome, AxError>;
+}
+
+/// What admitting one call decided.
+#[derive(Debug)]
+pub enum Admitted {
+    /// Answered without running a tool; the answer goes to the model.
+    Answered(Result<ToolOutcome, AxError>),
+    /// The call may run: `tool` and then `account` take the ticket.
+    Cleared(Ticket),
+}
+
+/// A closure is a tool face that answers every call as it admits it:
+/// it declares no effect, so its waves are serial. citysim and the tests
+/// that script a tool's answer drive a run through this one.
+impl<F> ConcurrentInvoke for F
+where
+    F: FnMut(&ToolCall, TimeMs) -> Result<ToolOutcome, AxError>,
+{
+    fn effect_of(&self, _call: &ToolCall) -> Option<Effect> {
+        None
+    }
+
+    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {
+        Admitted::Answered(self(call, t))
+    }
+
+    fn tool(&self, _ticket: &Ticket) -> Result<&dyn Tool, AxError> {
+        Err(unheld_ticket())
+    }
+
+    fn account(
+        &mut self,
+        _call: &ToolCall,
+        _ticket: Ticket,
+        _answered: Result<ToolOutcome, AxError>,
+    ) -> Result<ToolOutcome, AxError> {
+        Err(unheld_ticket())
+    }
+}
+
+fn unheld_ticket() -> AxError {
+    AxError::failure(
+        AxCode::ToolUnavailable,
+        "run a cleared tool call",
+        "a tool face that answers every call as it admits it was handed a ticket",
+    )
+    .with_recovery("report this against runtime::turn::wave: only a bench issues tickets")
 }
 
 impl Turn<ToolWave> {
@@ -43,10 +117,10 @@ impl Turn<ToolWave> {
         &self.state.calls
     }
 
-    /// Boundary 3 (before tool execution), serial: accounting order is
-    /// the call order. A tool Err is not a turn Err — it lands in
-    /// `tool_result` and goes back to the model (the model is the
-    /// recovery subject).
+    /// Boundary 3 (before tool execution), accounted in call order, with
+    /// the leading read-only calls run at once (see [`ConcurrentInvoke`]).
+    /// A tool Err is not a turn Err — it lands in `tool_result` and goes
+    /// back to the model (the model is the recovery subject).
     ///
     /// Both tool events reach the ledger through `append_redacted`: a
     /// tool's arguments and its result are the two payloads most likely
@@ -58,56 +132,28 @@ impl Turn<ToolWave> {
     /// the person who stopped the city waited for all of them. What it
     /// answers is consumed through the one boundary consumer, so a steer
     /// between two calls is recorded here, before the next assembly
-    /// hands it to the model.
-    pub fn execute(
-        mut self,
-        interrupt: Interrupt,
-        ledger: &mut dyn Ledger,
-        invoke: &mut dyn FnMut(&ToolCall) -> Result<ToolOutcome, AxError>,
-        still_going: &mut dyn FnMut(u32) -> Interrupt,
-    ) -> Result<PhaseOutcome<Turn<Recording>>, AxError> {
-        if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
-            return Ok(PhaseOutcome::Cancelled(cancelled));
-        }
-        let calls = std::mem::take(&mut self.state.calls);
-        let mut exchange = self.open_exchange();
-        for (index, call) in (0..=u32::MAX).zip(&calls) {
-            // Asked before the call is written down, so a wave that was
-            // stopped leaves no `tool_called` line for work nothing ever
-            // did. Through the same door a phase boundary takes, so a
-            // wave that stops leaves the one `cancel_received` line every
-            // other ending leaves, and a steer its `steer_received`.
-            if let Some(cancelled) = self.consume_boundary(still_going(index), ledger)? {
-                return Ok(PhaseOutcome::Cancelled(cancelled));
-            }
-            let answered = invoke(call);
-            self.account(ledger, &mut exchange, call, answered)?;
-        }
-        Ok(self.recorded(calls, exchange))
-    }
-
-    /// Boundary 3 with the leading read-only calls run at once (see
-    /// [`ConcurrentInvoke`]). `still_going` is asked for every call of
-    /// that leading run before any of them starts, in call order, and a
-    /// cancel starts only the calls before it: the calls a serial wave
-    /// would have made before the same cancel. Each answer is consumed
-    /// just before its call is accounted, so a steer lands on the ledger
-    /// where the serial wave writes it.
+    /// hands it to the model. For the leading reads it is asked for every
+    /// call before any of them starts, in call order, and a cancel starts
+    /// only the calls before it: the calls a serial wave would have made
+    /// before the same cancel. Each answer is consumed just before its
+    /// call is accounted, so a steer lands on the ledger where a serial
+    /// wave writes it.
     pub fn execute_concurrent(
         mut self,
         interrupt: Interrupt,
         ledger: &mut dyn Ledger,
-        tools: &ConcurrentInvoke<'_>,
+        tools: &mut dyn ConcurrentInvoke,
         still_going: &mut dyn FnMut(u32) -> Interrupt,
     ) -> Result<PhaseOutcome<Turn<Recording>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
         let calls = std::mem::take(&mut self.state.calls);
+        let t = self.journal.stamp();
         let mut exchange = self.open_exchange();
         let reads = calls
             .iter()
-            .take_while(|call| (tools.effect_of)(call) == Some(Effect::Read))
+            .take_while(|call| tools.effect_of(call) == Some(Effect::Read))
             .count();
         let mut going = Vec::with_capacity(reads);
         let mut halt = Interrupt::None;
@@ -120,12 +166,20 @@ impl Turn<ToolWave> {
                 standing @ (Interrupt::None | Interrupt::Steer { .. }) => going.push(standing),
             }
         }
-        let leading: Vec<&ToolCall> = calls.iter().take(going.len()).collect();
-        let answers = all_at_once(&leading, tools.invoke);
-        for ((call, standing), answered) in leading.iter().zip(going).zip(answers) {
+        let leading = calls.get(..going.len()).unwrap_or_default();
+        let admitted: Vec<Admitted> = leading.iter().map(|call| tools.admit(call, t)).collect();
+        let mut answers = all_at_once(&*tools, leading, &admitted).into_iter();
+        for ((call, standing), admission) in leading.iter().zip(going).zip(admitted) {
             if let Some(cancelled) = self.consume_boundary(standing, ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
             }
+            let answered = match admission {
+                Admitted::Answered(answered) => answered,
+                Admitted::Cleared(ticket) => {
+                    let ran = answers.next().unwrap_or_else(|| Err(lost_answer()));
+                    tools.account(call, ticket, ran)
+                }
+            };
             self.account(ledger, &mut exchange, call, answered)?;
         }
         if let Some(cancelled) = self.consume_boundary(halt, ledger)? {
@@ -135,7 +189,31 @@ impl Turn<ToolWave> {
             if let Some(cancelled) = self.consume_boundary(still_going(index), ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
             }
-            let answered = (tools.invoke)(call);
+            let answered = alone(tools, call, t);
+            self.account(ledger, &mut exchange, call, answered)?;
+        }
+        Ok(self.recorded(calls, exchange))
+    }
+
+    /// Boundary 3 with every call serial.
+    pub fn execute(
+        mut self,
+        interrupt: Interrupt,
+        ledger: &mut dyn Ledger,
+        tools: &mut dyn ConcurrentInvoke,
+        still_going: &mut dyn FnMut(u32) -> Interrupt,
+    ) -> Result<PhaseOutcome<Turn<Recording>>, AxError> {
+        if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
+            return Ok(PhaseOutcome::Cancelled(cancelled));
+        }
+        let calls = std::mem::take(&mut self.state.calls);
+        let t = self.journal.stamp();
+        let mut exchange = self.open_exchange();
+        for (index, call) in (0..=u32::MAX).zip(&calls) {
+            if let Some(cancelled) = self.consume_boundary(still_going(index), ledger)? {
+                return Ok(PhaseOutcome::Cancelled(cancelled));
+            }
+            let answered = alone(tools, call, t);
             self.account(ledger, &mut exchange, call, answered)?;
         }
         Ok(self.recorded(calls, exchange))
@@ -224,34 +302,68 @@ impl Turn<ToolWave> {
     }
 }
 
-/// Runs every call at once and answers in call order: the reorder
-/// buffer. The first call runs on this thread, so a wave of one read
-/// starts no thread at all. The scope is this module's exception to the
-/// one spawn point (ARCHITECTURE §10 rule 3): every thread it starts is
-/// joined before it returns.
+/// One call through all three stages on this thread: how every call
+/// after the leading reads runs.
+fn alone(
+    tools: &mut dyn ConcurrentInvoke,
+    call: &ToolCall,
+    t: TimeMs,
+) -> Result<ToolOutcome, AxError> {
+    match tools.admit(call, t) {
+        Admitted::Answered(answered) => answered,
+        Admitted::Cleared(ticket) => {
+            let ran = tools.tool(&ticket).and_then(|tool| tool.invoke(call));
+            tools.account(call, ticket, ran)
+        }
+    }
+}
+
+/// Runs the tool of every cleared call at once and answers in call
+/// order, one answer per cleared call: the reorder buffer. The first
+/// runs on this thread, so a wave of one read starts no thread at all.
+/// The scope is this module's exception to the one spawn point
+/// (ARCHITECTURE §10 rule 3): every thread it starts is joined before it
+/// returns.
 fn all_at_once(
-    calls: &[&ToolCall],
-    invoke: &(dyn Fn(&ToolCall) -> Result<ToolOutcome, AxError> + Sync),
+    tools: &dyn ConcurrentInvoke,
+    calls: &[ToolCall],
+    admitted: &[Admitted],
 ) -> Vec<Result<ToolOutcome, AxError>> {
-    let Some((first, rest)) = calls.split_first() else {
+    let running: Vec<(&ToolCall, Result<&dyn Tool, AxError>)> = calls
+        .iter()
+        .zip(admitted)
+        .filter_map(|(call, admission)| match admission {
+            Admitted::Answered(_) => None,
+            Admitted::Cleared(ticket) => Some((call, tools.tool(ticket))),
+        })
+        .collect();
+    let run = |(call, tool): &(&ToolCall, Result<&dyn Tool, AxError>)| match tool {
+        Ok(tool) => tool.invoke(call),
+        Err(unheld) => Err(unheld.clone()),
+    };
+    let Some((first, rest)) = running.split_first() else {
         return Vec::new();
     };
     std::thread::scope(|scope| {
         let others: Vec<_> = rest
             .iter()
-            .map(|call| scope.spawn(move || invoke(call)))
+            .map(|job| scope.spawn(move || run(job)))
             .collect();
-        std::iter::once(invoke(first))
-            .chain(others.into_iter().map(|worker| {
-                worker.join().unwrap_or_else(|_| {
-                    Err(AxError::failure(
-                        AxCode::ToolUnavailable,
-                        "run a read-only tool call",
-                        "the tool stopped its thread without an answer",
-                    )
-                    .with_recovery("call the tool again; report it when it stops a second time"))
-                })
-            }))
+        std::iter::once(run(first))
+            .chain(
+                others
+                    .into_iter()
+                    .map(|worker| worker.join().unwrap_or_else(|_| Err(lost_answer()))),
+            )
             .collect()
     })
+}
+
+fn lost_answer() -> AxError {
+    AxError::failure(
+        AxCode::ToolUnavailable,
+        "run a read-only tool call",
+        "the tool stopped its thread without an answer",
+    )
+    .with_recovery("call the tool again; report it when it stops a second time")
 }

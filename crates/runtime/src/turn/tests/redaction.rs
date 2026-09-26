@@ -70,10 +70,10 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
     );
     let echoed = key.clone();
     let turn = advance(
-        turn.execute(
+        turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut move |_call| {
+            &mut move |_call: &ToolCall, _: TimeMs| {
                 let mut result = serde_json::Map::new();
                 result.insert(
                     "stdout".to_owned(),
@@ -157,10 +157,10 @@ fn the_wave_result_block_keeps_what_the_ledger_drops() {
     );
     let echoed = key.clone();
     let turn = advance(
-        turn.execute(
+        turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
-            &mut move |_call| {
+            &mut move |_call: &ToolCall, _: TimeMs| {
                 let mut result = serde_json::Map::new();
                 result.insert("stdout".to_owned(), Value::String(echoed.clone()));
                 Ok(ToolOutcome {
