@@ -221,7 +221,9 @@ pub(crate) struct Requirement {
     pub(crate) name: &'static str,
     pub(crate) tier: Tier,
     pub(crate) need: Need,
-    /// What having it lets a person do, in one clause.
+    /// What having it lets a person do, in one clause of the terminal
+    /// report's English. The page words it itself, under
+    /// `machine_enables_<name>` in `client/src/lang.json`.
     pub(crate) enables: &'static str,
     pub(crate) detect: Detection,
     /// The item's own site, for a reader who wants to know what it is

@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 40 as const;
+export const WIRE_V = 41 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "6b3b2d3069b8a6dc29e042d0df7924969eaa47728565d48518d1e442ce23c8d9" as const;
+export const WIRE_HASH = "676cc8466f916e04bfcc460a007c0e8f26fef303cbd8d19f10fe55759c2343ee" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -1033,7 +1033,6 @@ export type DoctorTier = typeof DoctorTier.Type;
  * One item, and this machine's answer about it.
  */
 export const DoctorItem = Schema.Struct({
-  enables: Schema.String,
   homepage: Schema.optional(Schema.NullOr(Schema.String)),
   install: DoctorInstall,
   name: Schema.String,

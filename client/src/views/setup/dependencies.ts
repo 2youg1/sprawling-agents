@@ -13,7 +13,7 @@
 // arrives. The view above them decides only how loud each answer is
 // drawn.
 
-import type { Key } from "../../core/lang";
+import { isKey, type Key } from "../../core/lang";
 import type {
   DoctorAnswer,
   DoctorInstall,
@@ -21,6 +21,15 @@ import type {
   DoctorState,
   DoctorTier,
 } from "../../wire";
+
+// What the item is for, in the page's words: the wire carries the item's
+// name as its id, and the clause lives in `lang.json` under
+// `machine_enables_<name>` (sprawling-SPEC §12). An item this client has
+// no clause for is shown by its name alone.
+export function enablesKey(name: string): Key | null {
+  const key = `machine_enables_${name}`;
+  return isKey(key) ? key : null;
+}
 
 // The one word a card is labelled by. The state is a value the city
 // sent; every word around it comes from the phrase table.

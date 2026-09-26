@@ -8,11 +8,9 @@
 //! Every state here is an enum rather than a sentence. The terminal
 //! report is one machine's prose and a browser is two languages, so a
 //! wire that carried the wording would make the page's words the
-//! server's to choose. The one exception is `enables`, which is the
-//! requirement table's own clause about what an item is for: no reader
-//! can derive it, and nothing else on this answer can carry it. The
-//! `said` fields carry what a platform or a program said, which no
-//! reader can derive either.
+//! server's to choose. What an item is for travels as its `name`, the
+//! id the page looks its own clause up by. The `said` fields carry what
+//! a platform or a program said, which no reader can derive.
 
 use serde::{Deserialize, Serialize};
 
@@ -73,8 +71,7 @@ pub enum DoctorTier {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorNeed {
     Required,
-    /// Absent is a fact rather than a fault; `enables` says what having
-    /// it would add.
+    /// Absent is a fact rather than a fault.
     Optional,
 }
 
@@ -82,12 +79,12 @@ pub enum DoctorNeed {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DoctorItem {
+    /// The requirement table's name for the item, which is also its id:
+    /// a page says what the item is for in its own words, looked up by
+    /// this name.
     pub name: String,
     pub tier: DoctorTier,
     pub need: DoctorNeed,
-    /// What having it lets a person do, in one clause, in the
-    /// requirement table's own words.
-    pub enables: String,
     /// The item's own site, so a page can link a name to the people who
     /// publish it. `None` where there is no one site: a platform's
     /// shell, and this project's own connector.

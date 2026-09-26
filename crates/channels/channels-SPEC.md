@@ -843,7 +843,8 @@ pub struct DoctorAnswer { pub items: Vec<DoctorItem>, pub tiers: Vec<DoctorVerdi
                           pub sandbox: DoctorSandbox, pub custody: DoctorCustody,
                           pub core: DoctorCore }
 pub struct DoctorItem { pub name: String, pub tier: DoctorTier, pub need: DoctorNeed,
-                        pub enables: String, pub state: DoctorState, pub install: DoctorInstall }
+                        pub homepage: Option<String>, pub state: DoctorState,
+                        pub install: DoctorInstall }
 pub enum DoctorTier { Use, Develop }
 pub enum DoctorNeed { Required, Optional }
 pub enum DoctorState { Present { at, version }, Broken { at, fault }, Absent { absence } }
@@ -869,7 +870,7 @@ pub enum DoctorCustodyLifetime { AcrossReboots, WithPassphrase, UntilReboot, Thi
 pub enum DoctorCore { Raised, HeldBySetting, Refused { said }, LoweredByValve, Unasked { said } }
 ```
 
-- **每一种状态都是枚举，不是句子**。终端那份报告是一台机器的散文，而浏览器说两种语言；线上若携措辞，页面的用词就成了服务端的选择。唯一的例外是 `enables`——那是需求表自己关于「有了它能做什么」的一句话，读者推不出来，这条答案里也没有别的字段装得下它。
+- **每一种状态都是枚举，不是句子**。终端那份报告是一台机器的散文，而浏览器说两种语言；线上若携措辞，页面的用词就成了服务端的选择。「有了它能做什么」那一句也不上线：`name` 就是这一项的 id（需求表里的名字，如 `cargo-nextest`），页面按它从 `lang.json` 的 `machine_enables_<name>` 取两种语言的那一句，终端的英文留在需求表（sprawling-SPEC §12「doctor 的「能做什么」各面自持」）。线上仍携的句子只有 `said`：平台或程序自己说的话，读者推不出来。
 - **答的是城启动时看到的那一眼，不是现问现看**。每一项都是起一个进程问版本；一次查询若这么做，会把答一切读的那条线程按住数秒。城若没看过（一次一条命令驱动的工人就是），答 `Unavailable`——与「一栋没人盖过的楼」同口径：**「我没看」是它自己的答案**，而一台空机器会让页面告诉人他手上每件工具都缺。
 - **`install` 把平台不明单列一支**。三个平台之外的机器上，本项目没有任何配方；此时拼一条别的平台的命令是错的，沉默也是错的。
 - **沙箱的保证逐轴作答，不是一句「已隔离」**：`coverage` 逐轴一行，`Kept`／`NotKept` 两个字而不是布尔——页面两态都要有词，布尔会让每个读者自己给 `false` 选一个。它存在的理由，是 agent 在动手前要读得到哪几条保证没成立。臂与轴的定义住 `runtime-SPEC §8-13-2`（`Confinement` 与 `Guarantee`），线上重拼一份，逐臂对应只住 `sprawling::doctor::report` 的穷尽匹配——上游加一臂即编译红。

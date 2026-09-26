@@ -152,7 +152,6 @@
         name: "firefox",
         tier: "use",
         need: "required",
-        enables: "the browser a city serves its pages to",
         state: { absent: { absence: "not_on_search_path" } },
         install: { command: { spelled: "winget install --id Mozilla.Firefox" } },
       },
@@ -160,7 +159,6 @@
         name: "git",
         tier: "use",
         need: "required",
-        enables: "the history every run is fenced against",
         state: {
           present: {
             at: "/usr/bin/git",
@@ -173,7 +171,6 @@
         name: "chromedriver",
         tier: "use",
         need: "optional",
-        enables: "the browser tool against Chromium",
         state: { absent: { absence: "not_on_search_path" } },
         install: "unknown_platform",
       },

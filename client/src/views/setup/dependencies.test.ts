@@ -9,7 +9,6 @@ import { absenceOf } from "./dependencies";
 
 const card = (name: string, here: boolean): DoctorItem => ({
   name,
-  enables: "",
   install: "unknown_platform",
   need: "required",
   tier: "use",
