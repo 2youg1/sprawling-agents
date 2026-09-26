@@ -83,8 +83,9 @@ market／cost：纯判定与数据面，被 endpoint 与 S3 回合层消费
 pub enum DialectKind { Anthropic, OpenAi }
 pub fn request_wire(kind: DialectKind, req: &ChatRequest) -> Result<serde_json::Value, AxError>;
 pub fn response_from_wire(kind: DialectKind, wire: &serde_json::Value) -> Result<ChatResponse, AxError>;
-pub fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<serde_json::Value, AxError>;
-                                    // 响应侧双向：往返性质可测（wire→canonical→wire 等值）；重放剧本也要它造假响应
+#[cfg(test)]
+pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<serde_json::Value, AxError>;
+                                    // 响应侧的反方向只供测试：造 provider 回复、证往返（wire→canonical→wire 等值）；生产里没有调用者，所以不编进发行的二进制
 ```
 
 - **保三样**：①断点位——canonical 的 `cache: true` 标记翻到 Anthropic 侧＝`cache_control{type:"ephemeral"}`，system 块逐块原位，被标记的消息落在它的最后一块上（缓存区到这一块结束为止）；断点放在哪由 `runtime::prefix::BreakpointPlan` 决定，兼容格式只拼写；OpenAI 侧无显式断点（供应商缓存是隐式前缀匹配），翻译**记录性丢弃**（文档声明，不静默）；②工具形状——`ToolDef{name, description, input_schema}`↔Anthropic `tools[]`／OpenAI `tools[{type:"function",function:{…}}]`，逐字段；tool_use↔tool_calls（id/name/args 无失）；③usage——Anthropic `usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`／OpenAI `usage{prompt_tokens,completion_tokens,prompt_tokens_details.cached_tokens}`→`ModelUsage` 四整数字段，缺失字段取 0。
@@ -255,7 +256,7 @@ pub struct OauthProfile {
 }
 pub const OAUTH_PROFILES: [OauthProfile; 4] = [ /* 一家一行；只有数据零分支 */ ];
 pub fn profile(provider: &str) -> Option<&'static OauthProfile>;   // 按 realm 词
-pub fn profile_for(family: Family) -> Option<&'static OauthProfile>;
+#[cfg(test)] pub(crate) fn profile_for(family: Family) -> Option<&'static OauthProfile>;   // 按 family，只有测试按 family 找行
 ```
 
 - 内容自 `docs/third-party.md` §1 逐行指名并每日监视的上游路径（跟情报不跟代码）；上游变更检测是周任务不是 CI 门。缺项留空串——宁缺毋错，在 `oauth_begin` 处 fail-closed。
@@ -381,7 +382,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<String>, AxEr
 // gateway::transcribe（索引，无逻辑）
 pub use chosen::transcriber_for;
 pub use recording::{AudioType, Recording};
-pub use transcriber::{Transcriber, TranscriberConfig};
+pub use transcriber::Transcriber;               // TranscriberConfig 在 crate 内用，不出 crate
 
 // transcribe/chosen.rs（形状 1 装配，`adapter_for` 的孪生）
 pub fn transcriber_for(chosen: &Chosen<'_>, secrets: SecretResolver)
@@ -465,6 +466,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 - `E_ENDPOINT_DIALECT_UNSUPPORTED`：不可定义掉——用户可配任意 external provider，兼容格式探查失败必须可报。
 - `E_CREDENTIAL_MISSING`／`E_CONFIG_INVALID`：kernel 已有码，语义照 Custody 一节；不新增码。
 - `E_SECRET_EGRESS`：本 crate 不产（出口扫描住 gate::egress 与 checkpoint 面）；endpoint 组请求不做二次扫描（Custody 在入口已换引用，纵深由门守）。
+- **crate 根只再导出有别的 crate 叫得出名字的项。** 一个只在 gateway 内部用、或只在测试里用的项，挂在 crate 根上就是一个没人读的公开面：编译器不再为它报 dead code，于是它在生产里还有没有调用者就没有东西在看。只供测试的项（`response_wire` 一族、`profile_for`、`oauth_redeem_request` 的再导出）放在 `#[cfg(test)]` 后面，不编进发行的二进制。另一种做法是保留再导出、靠审查记住它们没有调用者——那正是让这些项积下来的原因。
 
 ## 13 依赖选型
 

@@ -182,8 +182,8 @@ pub fn profile(provider: &str) -> Option<&'static OauthProfile> {
 }
 
 /// The row for one harness family.
-#[must_use]
-pub fn profile_for(family: Family) -> Option<&'static OauthProfile> {
+#[cfg(test)]
+pub(crate) fn profile_for(family: Family) -> Option<&'static OauthProfile> {
     OAUTH_PROFILES.iter().find(|row| row.family == family)
 }
 

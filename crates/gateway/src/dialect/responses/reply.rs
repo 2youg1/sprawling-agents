@@ -9,7 +9,9 @@ use kernel::{
     AxCode, AxError, ChatResponse, ContentBlock, DialectKind, ModelUsage, StopReason, Tokens,
     ToolName,
 };
-use serde_json::{Value, json};
+use serde_json::Value;
+#[cfg(test)]
+use serde_json::json;
 
 use crate::mismatch::{as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero};
 
@@ -221,6 +223,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
     })
 }
 
+#[cfg(test)]
 pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
     let mut output = Vec::new();
     let mut parts = Vec::new();
