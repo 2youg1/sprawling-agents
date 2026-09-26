@@ -61,6 +61,13 @@ pub(in crate::assembly) struct Flight {
     /// arrival order. Kept rather than re-queued, so arrival order is
     /// landing order.
     homes: VecDeque<Arrival>,
+    /// One fence at a time per city: a repository has one index, and
+    /// every lane stages and commits it (`driving::lane`).
+    pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    /// What is still running while the runs go on. One table per city,
+    /// and every `exec` gets a handle onto it, so `halt` reaches a
+    /// command without knowing which tool started it.
+    pub(in crate::assembly) backlog: runtime::Backlog,
 }
 
 impl Flight {
@@ -71,6 +78,8 @@ impl Flight {
             gate,
             driving: BTreeMap::new(),
             homes: VecDeque::new(),
+            fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
+            backlog: runtime::Backlog::new(),
         }
     }
 
@@ -231,7 +240,7 @@ impl RunWorker {
 
     /// Whether any run is driving right now.
     pub(crate) fn driving(&self) -> bool {
-        self.flight.in_flight() > 0 || self.namings.pending()
+        self.flight.in_flight() > 0 || self.doorstep.namings.pending()
     }
 
     /// Whether `run` is in a lane right now, and so reads its own Cancel

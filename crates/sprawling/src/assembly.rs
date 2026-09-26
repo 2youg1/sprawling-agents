@@ -34,6 +34,7 @@ mod collaborating;
 mod commanding;
 mod credentials;
 mod dispatching;
+mod doorstep;
 mod driving;
 mod folds;
 mod freezing;
@@ -62,6 +63,7 @@ use dispatching::asking_name::Namings;
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 pub(crate) use dispatching::{Dispatched, acp_dispatch};
+use doorstep::Doorstep;
 use driving::flight::{Flight, Landed};
 pub(crate) use driving::lane::{DriveContext, drive_run};
 use driving::owing::{Owed, Owing, Unasked};
@@ -209,32 +211,18 @@ pub struct RunWorker {
     /// The diagnostic log. Write-only, and nothing here reads it back:
     /// turning it off must leave the ledger byte-identical.
     log: runtime::diagnostics::Diagnostics,
-    /// Residents who were spoken to while nobody was home. Held between
-    /// the run that spoke and the runs that answer, because delivery
-    /// happens after the speaker has frozen.
-    knocks: Vec<Knock>,
-    /// Every command key this city has answered, and what it answered.
-    /// Folded from the history like the endpoint book beside it, so a
-    /// client retrying across a restart is still asking for one thing.
-    entrance: Entrance,
-    /// What is still running while the runs go on. One table per city,
-    /// and every `exec` gets a handle onto it, so `halt` reaches a
-    /// command without knowing which tool started it.
-    backlog: runtime::Backlog,
+    /// What reached the city's door and has not yet become a run
+    /// (`doorstep`).
+    doorstep: Doorstep,
     /// What each room's current session branched from, until the run
     /// that begins it is written (`assembly::folds::session`).
     pub(in crate::assembly) origins: SessionOrigins,
-    /// One fence at a time per city: a repository has one index, and
-    /// every lane of this worker stages and commits it (`driving::lane`).
-    pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// Every run in a lane right now, the crossing those lanes write
-    /// history through, and what the city owes each one when it comes
-    /// home. One per city, so the number of runs a city drives at once
+    /// history through, what the city owes each one when it comes home,
+    /// the one fence they take turns at, and the commands they left
+    /// running. One per city, so the number of runs a city drives at once
     /// has one answer (sprawling-SPEC.md 8-46-2).
     flight: Flight,
-    /// Dispatches waiting on the digest model for a room name, off this
-    /// thread (sprawling-SPEC.md 8-86).
-    namings: Namings,
 }
 
 impl RunWorker {

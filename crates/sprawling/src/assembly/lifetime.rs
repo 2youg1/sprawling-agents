@@ -13,7 +13,7 @@
 //! leave" is asking one question from two ends.
 
 use super::{
-    Collaborating, Credentials, Flight, Namings, Planning, RoomQueues, RunWorker, Standing,
+    Collaborating, Credentials, Doorstep, Flight, Planning, RoomQueues, RunWorker, Standing,
     city_segment, now_ms,
 };
 use std::path::Path;
@@ -95,13 +95,9 @@ impl RunWorker {
             },
             last_tick: now,
             log,
-            knocks: Vec::new(),
-            entrance,
+            doorstep: Doorstep::opened(entrance),
             origins,
-            fence_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
-            backlog: runtime::Backlog::new(),
             flight: Flight::open(),
-            namings: Namings::open(),
         })
     }
 

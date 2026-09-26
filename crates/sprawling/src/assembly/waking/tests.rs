@@ -125,7 +125,7 @@ fn a_knock_past_the_conversation_ceiling_starts_no_run() {
     let report = init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("unused", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    worker.knocks.push(Knock {
+    worker.doorstep.knocks.push(Knock {
         addr: Address::parse("market/hana").unwrap(),
         from: "market/ito".to_owned(),
         mode: kernel::Mode::PlanGoal,

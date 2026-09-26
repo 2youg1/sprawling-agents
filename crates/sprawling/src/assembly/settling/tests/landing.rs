@@ -65,7 +65,7 @@ Trades in the market as {who}.
     worker.collaborating.rooms = crate::assembly::RoomQueues::folded(
         std::collections::BTreeMap::from([(room.clone(), collab::Inbox::new(1, 1))]),
     );
-    let knocks_mark = worker.knocks.len();
+    let knocks_mark = worker.doorstep.knocks.len();
     let at = Assignment {
         addr: Address::parse("market/ito").unwrap(),
         parent: None,
@@ -86,7 +86,7 @@ Trades in the market as {who}.
     let err = worker.settle(&at, RunId::CITY, landing, 0).unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::BackpressureShed);
     assert_eq!(
-        worker.knocks.len(),
+        worker.doorstep.knocks.len(),
         knocks_mark,
         "knocks pushed by landed signals are cut back on failure"
     );

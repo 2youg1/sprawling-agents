@@ -303,7 +303,7 @@ impl RunWorker {
                 run: site.run_id,
             },
             machine.engine,
-            self.backlog.clone(),
+            self.flight.backlog.clone(),
         )
     }
 
@@ -396,6 +396,6 @@ impl RunWorker {
             }),
         )?;
         // The thirteenth line: what this run started and left running.
-        Ok(tool.reporting(self.backlog.clone()))
+        Ok(tool.reporting(self.flight.backlog.clone()))
     }
 }
