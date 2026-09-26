@@ -406,6 +406,11 @@
   /* The one easing: everything that moves leaves fast and arrives
    * slow, so a thing entering the page is read before it stops. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* A count pinned to a glyph's corner. It has to be smaller than the
+   * 16px glyph it marks, or it covers the glyph instead of marking it;
+   * tied to the body so it moves with the rest of the ladder. */
+  --text-tally: calc(var(--text-body) - 5px);
 }
 
 /* What `cargo xtask color` proves, stated where the values it judges are.

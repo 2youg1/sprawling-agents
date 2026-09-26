@@ -178,8 +178,8 @@
                    the row below does spend a coloured token, because
                    that one counts people waiting on an answer. -->
               {#if (item.badge ?? 0) > 0}
-                <span class="absolute -top-tight -right-tight">
-                  <Badge text={String(item.badge ?? 0)} weight="quiet" />
+                <span class="absolute -top-snug -right-snug">
+                  <Badge text={String(item.badge ?? 0)} weight="quiet" seat="corner" />
                 </span>
               {/if}
             </span>
@@ -202,8 +202,8 @@
           >
             <span class="relative shrink-0">
               <Glyph name="hand" />
-              <span class="absolute -top-tight -right-tight">
-                <Badge text={String(waiting)} weight="alert" />
+              <span class="absolute -top-snug -right-snug">
+                <Badge text={String(waiting)} weight="alert" seat="corner" />
               </span>
             </span>
             <span class="{label} flex-1">{fill(say($lang, "nav_waiting"), { n: String(waiting) })}</span>
