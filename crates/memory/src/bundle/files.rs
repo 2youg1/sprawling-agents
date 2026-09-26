@@ -312,6 +312,33 @@ mod tests {
     use super::super::manifest::CITY;
     use super::*;
 
+    /// The permission a city file carries is part of the file: a
+    /// read-only note (or, on Unix, an executable script) comes back
+    /// the way it left.
+    #[test]
+    fn a_read_only_city_file_comes_back_read_only() {
+        let home = tempfile::tempdir().unwrap();
+        city_with(1, home.path());
+        let kept = home.path().join("kept.md");
+        std::fs::write(&kept, b"do not touch").unwrap();
+        let mut bits = std::fs::metadata(&kept).unwrap().permissions();
+        bits.set_readonly(true);
+        std::fs::set_permissions(&kept, bits).unwrap();
+
+        let carried = tempfile::tempdir().unwrap();
+        Bundle::export(home.path(), carried.path()).unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        Bundle::restore(carried.path(), elsewhere.path()).unwrap();
+        let read_only = |at: &Path| std::fs::metadata(at).unwrap().permissions().readonly();
+        assert_eq!(
+            (
+                read_only(&carried.path().join(CITY).join("kept.md")),
+                read_only(&elsewhere.path().join("kept.md")),
+            ),
+            (true, true)
+        );
+    }
+
     #[test]
     fn nothing_under_the_reserved_prefix_travels_as_a_city_file() {
         let home = tempfile::tempdir().unwrap();
