@@ -295,9 +295,11 @@
 </script>
 
 <!-- Escape, answered by the shell's key handler, closes this box; the
-click on the scrim is the pointer's extra way out, not the only one. -->
+click on the scrim is the pointer's extra way out, not the only one.
+It stands above the rail, whose drawer is `z-10`: on a narrow window the
+rail would otherwise cover the left half of the box. -->
 <div
-  class="fixed inset-0 flex items-start justify-center bg-page/70 pt-section"
+  class="fixed inset-0 z-20 flex items-start justify-center bg-page/70 px-snug pt-section"
   role="presentation"
   onclick={(event) => {
     if (event.target === event.currentTarget) onClose();

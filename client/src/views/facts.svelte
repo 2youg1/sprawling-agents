@@ -207,9 +207,11 @@
 
 <!-- `role="status"` rather than a landmark: a screen reader is told
 when one of these changes, and is not offered a region with seven
-unlabelled numbers in it to navigate into. -->
+unlabelled numbers in it to navigate into. The cells wrap onto a second
+line rather than scroll: a narrow window would otherwise push the gate
+and the sandbox, two of the risk readings, out of sight. -->
 <footer
-  class="flex h-facts shrink-0 items-center gap-wide overflow-x-auto border-t border-edge bg-chrome px-pane text-note whitespace-nowrap"
+  class="flex min-h-facts shrink-0 flex-wrap items-center gap-x-wide gap-y-tight border-t border-edge bg-chrome px-pane py-tight text-note whitespace-nowrap"
   aria-label={say($lang, "facts_region")}
   role="status"
 >
