@@ -67,9 +67,9 @@ impl Health {
 /// an instant, and a reading of 0 is truer than one near `u64::MAX`.
 fn lower(count: &AtomicU64, n: u64) {
     // The closure always returns `Some`, so the update always lands.
-    drop(
-        count.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |now| {
-            Some(now.saturating_sub(n))
-        }),
-    );
+    match count.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |now| {
+        Some(now.saturating_sub(n))
+    }) {
+        Ok(_) | Err(_) => {}
+    }
 }

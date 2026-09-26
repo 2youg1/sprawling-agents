@@ -90,9 +90,13 @@ impl Ledger for Relay {
     /// freeze its run rather than wait for a writer that ended.
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         let (back, answer) = mpsc::sync_channel(0);
+        self.health.asked();
         self.asking
             .send(Wake::Relay(RelayRequest { draft, back }))
-            .map_err(|_| gone("the accounting thread is no longer taking writes"))?;
+            .map_err(|_| {
+                self.health.withdrawn();
+                gone("the accounting thread is no longer taking writes")
+            })?;
         answer
             .recv()
             .map_err(|_| gone("the accounting thread ended before answering"))?
@@ -180,6 +184,8 @@ impl RelayGate {
         if senders.is_empty() {
             return;
         }
+        let batch = u64::try_from(senders.len()).unwrap_or(u64::MAX);
+        self.health.taken(batch);
         match ledger.append_all(drafts) {
             Ok(echoes) => {
                 // Positional, the port's own promise: a sender with no echo
@@ -196,6 +202,7 @@ impl RelayGate {
                 }
             }
         }
+        self.health.answered(batch);
     }
 }
 
