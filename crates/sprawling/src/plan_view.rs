@@ -303,6 +303,8 @@ fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::FileDiscarded
         | EventKind::DiscardRestored
         | EventKind::AutonomyChanged
+        | EventKind::WentBack
+        | EventKind::FileRestored
         | EventKind::GovernedDocumentWritten
         | EventKind::ToolkitLinkOpened
         // A call to an embeddings or rerank face, and every line an

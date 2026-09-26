@@ -6,6 +6,7 @@
 use super::super::*;
 use crate::error::MemoryError;
 use kernel::GitOid;
+use kernel::event::record::FileRestored;
 use std::path::Path;
 
 /// Commits `body` as `notes.md` on the trunk and returns the point.
@@ -112,6 +113,26 @@ fn restoring_a_file_takes_it_back_from_the_point_into_that_tree_alone() {
             "second\n".to_owned(),
             "second\n".to_owned()
         )
+    );
+}
+
+#[test]
+fn a_restore_records_its_tree_its_point_and_the_path_as_git_spells_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (trees, first, _) = city(dir.path());
+    let mine = trees.claim(&name("node-1")).unwrap();
+
+    let restored = trees
+        .restore_file(&mine, &first, &Path::new("docs").join("later.md"))
+        .unwrap();
+
+    assert_eq!(
+        restored,
+        FileRestored {
+            name: "node-1".to_owned(),
+            path: "docs/later.md".to_owned(),
+            point: first
+        }
     );
 }
 

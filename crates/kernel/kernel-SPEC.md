@@ -389,6 +389,8 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub skills: Vec<SkillPin>,          // 空亦写出
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
+pub struct WentBack { pub name: String, pub point: GitOid }            // 回到过去：一棵新树起于 point
+pub struct FileRestored { pub name: String, pub path: String, pub point: GitOid } // path 取 git 树的写法
 pub struct CommitAttribution {          // flatten 进每一条指名提交的记录
     pub model: String, pub effort: Option<Effort>, pub predecessor: Option<RunId>,
 }
@@ -434,7 +436,7 @@ pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
 pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 ```
 
-已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`tool_called`／`tool_result`、
+已迁移的 kind 与其结构：`session_opened`、`run_started`、`run_forked`、`went_back`／`file_restored`、`tool_called`／`tool_result`、
 `checkpoint_committed`、`approval_resolved`、`autonomy_changed`、`city_halted`、
 `governed_document_written`、`embedding_called`／`rerank_called`、
 `adviser_asked`／`adviser_answered`／`adviser_fell_back`；
@@ -549,6 +551,8 @@ pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 | 隐私与 Discard | `file_discarded` | record-only |
 | 隐私与 Discard | `discard_restored` | record-only |
 | 隐私与 Discard | `autonomy_changed` | record-only |
+| 统一历史 | `went_back` | record-only（回到过去：名为 name 的新树起于提交 point；干线不动。与 `worktree_opened` 分开，因为只有这条说出这棵树停在历史的哪一点） |
+| 统一历史 | `file_restored` | record-only（从 point 取回 path 到名为 name 的树；point 上没有这个文件即删掉它。撤销就是追加这一条，账本不删任何行。path 取 git 树的写法（`/` 分隔、相对），不随写下它的机器变） |
 | 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 | 治理与设施 | `spine_document_written` | record-only（人写下某楼自己的 spine 文档之一，载荷携 building、which 与字节数，恒不携正文。与上一行分开是因为这几份有第二个写者，写入携起手正文并可能被拒） |
 | 治理与设施 | `toolkit_link_opened` | record-only（人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（channels-SPEC §8-31）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人） |

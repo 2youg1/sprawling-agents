@@ -41,6 +41,7 @@
 mod adviser;
 mod checkpoint;
 mod governance;
+mod history;
 mod log;
 mod modality;
 mod run;
@@ -55,6 +56,7 @@ pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     SpineDocumentWritten, autonomy_word,
 };
+pub use history::{FileRestored, WentBack};
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
 pub use run::{EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};

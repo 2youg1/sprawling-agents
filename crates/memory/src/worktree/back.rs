@@ -11,9 +11,10 @@
 //! rather than replaced, and neither step touches the trunk or another
 //! run's tree.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 
 use kernel::GitOid;
+use kernel::event::record::FileRestored;
 
 use crate::alias::WriteTarget;
 use crate::bundle::landing::{Bits, land};
@@ -79,7 +80,8 @@ impl Worktrees {
 
     /// Takes `path` back from `point` into the tree `lease` holds: the
     /// point's bytes when it holds the file, and no file when it does
-    /// not. No other tree and not the trunk are touched.
+    /// not. No other tree and not the trunk are touched. Returns the
+    /// `file_restored` record of this step for the caller to append.
     ///
     /// # Errors
     /// Refuses a path that is empty, absolute, climbs, or names the
@@ -90,7 +92,7 @@ impl Worktrees {
         lease: &WorktreeLease,
         point: &GitOid,
         path: &Path,
-    ) -> Result<(), MemoryError> {
+    ) -> Result<FileRestored, MemoryError> {
         let refuse = |detail: String| MemoryError::Worktree {
             op: "restore a file from a point",
             detail,
@@ -111,12 +113,17 @@ impl Worktrees {
             path: target.as_path().to_path_buf(),
             source,
         };
-        let entry = match tree.get_path(&inside) {
+        let restored = FileRestored {
+            name: lease.name().as_str().to_owned(),
+            path: inside,
+            point: *point,
+        };
+        let entry = match tree.get_path(Path::new(&restored.path)) {
             Ok(entry) => entry,
             Err(err) if err.code() == git2::ErrorCode::NotFound => {
                 return match std::fs::remove_file(target.as_path()) {
-                    Ok(()) => Ok(()),
-                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                    Ok(()) => Ok(restored),
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(restored),
                     Err(err) => Err(io(err)),
                 };
             }
@@ -131,7 +138,8 @@ impl Worktrees {
         if let Some(parent) = target.as_path().parent() {
             std::fs::create_dir_all(parent).map_err(io)?;
         }
-        land(&mut RealFs::new(), target, blob.content(), Bits::OfReplaced)
+        land(&mut RealFs::new(), target, blob.content(), Bits::OfReplaced)?;
+        Ok(restored)
     }
 
     fn commit_at(&self, point: &GitOid) -> Result<git2::Commit<'_>, MemoryError> {
@@ -146,7 +154,7 @@ impl Worktrees {
 
 /// `path` in the spelling a git tree uses, or `None` when it is empty,
 /// leaves the tree, or names the reserved subtree.
-fn in_tree(path: &Path) -> Option<PathBuf> {
+fn in_tree(path: &Path) -> Option<String> {
     let segments = path
         .components()
         .map(|component| match component {
@@ -157,8 +165,7 @@ fn in_tree(path: &Path) -> Option<PathBuf> {
             | Component::ParentDir => None,
         })
         .collect::<Option<Vec<_>>>()?;
-    (!segments.is_empty() && crate::reserved::outside_reserved(path))
-        .then(|| PathBuf::from(segments.join("/")))
+    (!segments.is_empty() && crate::reserved::outside_reserved(path)).then(|| segments.join("/"))
 }
 
 #[cfg(test)]

@@ -957,13 +957,14 @@ impl Worktrees {
     /// 从 point 分叉：一棵新树，分支 `name` 起于 point；城的 HEAD 与干线不动。
     pub fn claim_at(&self, name: &WorktreeName, point: &GitOid) -> Result<WorktreeLease, MemoryError>;
     /// 把 point 上的 path 取回 lease 这棵树；point 上没有这个文件即删掉它。
-    pub fn restore_file(&self, lease: &WorktreeLease, point: &GitOid, path: &Path) -> Result<(), MemoryError>;
+    /// 返回调用者要追加进账本的 `file_restored` 记录。
+    pub fn restore_file(&self, lease: &WorktreeLease, point: &GitOid, path: &Path) -> Result<FileRestored, MemoryError>;
 }
 ```
 
 **统一历史不另建存储。** 城的历史只有两份已有的东西：只追加的账本，与城仓库里写下就不再变的 git 对象。log 是血缘树，diff 是两点之间对话与文件一起的差别，blame 是 `whose`，合并走已有的 PR 流（8-9）；本节只管其中两个会写盘的动作。
 
-**性质由 Lean 模型定。** `adversary/design/GoingBack.lean`（`lake build Design`）规定的性质分两处守。本模块守树的四条：回到过去得到的树恰是那一点的文件（`goBack_opens_at_the_point`）；名字已被一棵活树占着即拒，调用者自己的树也不被替换（`goBack_refuses_a_live_tree`）；回到过去、写、取回都只动发起它的那个 run 的树，从不动干线，于是一个 run 写下的内容在任何只含别的 run 的步骤序列之后原样还在（`others_never_touch_a_tree`、`a_write_survives_other_runs`）。账本的两条——每一步给账本追加恰好一条记录，撤销即取回、也是追加（`the_ledger_only_grows`、`undo_is_an_appended_restore`）——归将把分叉与取回记成 kernel 事件的调用者；`claim_at` 与 `restore_file` 不写账本，今天没有代码守这两条。
+**性质由 Lean 模型定。** `adversary/design/GoingBack.lean`（`lake build Design`）规定的性质分两处守。本模块守树的四条：回到过去得到的树恰是那一点的文件（`goBack_opens_at_the_point`）；名字已被一棵活树占着即拒，调用者自己的树也不被替换（`goBack_refuses_a_live_tree`）；回到过去、写、取回都只动发起它的那个 run 的树，从不动干线，于是一个 run 写下的内容在任何只含别的 run 的步骤序列之后原样还在（`others_never_touch_a_tree`、`a_write_survives_other_runs`）。账本的两条——每一步给账本追加恰好一条记录，撤销即取回、也是追加（`the_ledger_only_grows`、`undo_is_an_appended_restore`）——归调用者：本模块不写账本，但 `restore_file` 把它那一步的记录作为返回值交出（kernel 的 `FileRestored`，path 取 git 树的写法，所以同一次取回在任何机器上记成同样的字节），调用者追加它即是 `restored` 那一条；`claim_at` 那一步的记录是 kernel 的 `WentBack`（名字加 point）。
 
 **回到过去不移动 HEAD。** 选「新 session ＋ 一棵停在那一点提交上的独立工作区」，否决「把城的 HEAD 检出到那一点」：后者会在别的 run 正写着的时候改掉它们落地的基线，而 Lean 模型里干线恒不被任何一步改动，正是这条的形式化。分支在那一点上新建，名字就是 `WorktreeName`，与 `claim` 同一套名字。
 
@@ -971,4 +972,4 @@ impl Worktrees {
 
 **取回只写自己的树。** `restore_file` 只接受相对路径且不含 `..`，不接受 `RESERVED_PREFIX` 之下的路径；写入目标是 `lease.path()` 下的那个文件，经 `alias::WriteTarget` 判定（8-25）。point 上是 blob 即按原字节经 `bundle::landing::land` 落盘（同目录暂存、`sync_data`、抄原权限、`rename` 覆盖、`sync_dir`，8-25），所以经硬链接指向别的树或干线的名字只被换掉目录项，那一头的字节不动，崩溃也不留半个文件；point 上没有即删除，这就是「恢复到那一点」的含义；目录与子模块不是一个文件，拒。
 
-**现状。** 本模块是统一历史的第一段。其余几段尚不存在：把「分叉」与「取回」写成账本记录的事件种类（kernel 事件表），服务端把账本加 git 投影成一棵血缘树的读者面，以及网页上把楼页的提交、改动、回收站与对话页的分叉合成一页的「历史」页。它们到来之前，`claim_at` 与 `restore_file` 没有生产调用者。
+**现状。** 本模块是统一历史的第一段。「分叉」与「取回」的事件种类（`went_back`、`file_restored`）已在 kernel 事件表里。其余几段尚不存在：服务端把账本加 git 投影成一棵血缘树的读者面，以及网页上把楼页的提交、改动、回收站与对话页的分叉合成一页的「历史」页。它们到来之前，`claim_at` 与 `restore_file` 没有生产调用者。

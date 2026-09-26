@@ -289,8 +289,8 @@ pub const kernel::AxCode::ALL: [kernel::AxCode; 38]
 pub const kernel::DOORS: [kernel::gate::DoorId; 9]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
 pub const kernel::Effort::ALL: [kernel::Effort; 6]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
-pub const kernel::EventKind::ALL: [kernel::EventKind; 73]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 75]
+pub const kernel::EventKind::ALL: [kernel::EventKind; 75]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::GIT_METADATA: &str
 pub const kernel::IDEM_DERIVE_V: u8
@@ -1348,6 +1348,7 @@ pub kernel::EventKind::EndpointLost
 pub kernel::EventKind::EndpointProbed
 pub kernel::EventKind::EvalRun
 pub kernel::EventKind::FileDiscarded
+pub kernel::EventKind::FileRestored
 pub kernel::EventKind::GateChecked
 pub kernel::EventKind::GateDenied
 pub kernel::EventKind::GoalConflict
@@ -1392,6 +1393,7 @@ pub kernel::EventKind::ToolCalled
 pub kernel::EventKind::ToolResult
 pub kernel::EventKind::ToolkitLinkOpened
 pub kernel::EventKind::WatchdogFired
+pub kernel::EventKind::WentBack
 pub kernel::EventKind::WorktreeOpened
 pub kernel::EvidenceCell::Empty
 pub kernel::EvidenceCell::Invalid
@@ -1872,6 +1874,7 @@ pub kernel::event::EventKind::EndpointLost
 pub kernel::event::EventKind::EndpointProbed
 pub kernel::event::EventKind::EvalRun
 pub kernel::event::EventKind::FileDiscarded
+pub kernel::event::EventKind::FileRestored
 pub kernel::event::EventKind::GateChecked
 pub kernel::event::EventKind::GateDenied
 pub kernel::event::EventKind::GoalConflict
@@ -1916,6 +1919,7 @@ pub kernel::event::EventKind::ToolCalled
 pub kernel::event::EventKind::ToolResult
 pub kernel::event::EventKind::ToolkitLinkOpened
 pub kernel::event::EventKind::WatchdogFired
+pub kernel::event::EventKind::WentBack
 pub kernel::event::EventKind::WorktreeOpened
 pub kernel::event::Scope::Building(kernel::address::Address)
 pub kernel::event::Scope::City
@@ -1971,6 +1975,9 @@ pub kernel::event::record::EmbeddingCalled::prompt_tokens: core::option::Option<
 pub kernel::event::record::EmbeddingCalled::vectors: u64
 pub kernel::event::record::EvidenceCite::kind: kernel::EventKind
 pub kernel::event::record::EvidenceCite::seq: kernel::Seq
+pub kernel::event::record::FileRestored::name: alloc::string::String
+pub kernel::event::record::FileRestored::path: alloc::string::String
+pub kernel::event::record::FileRestored::point: kernel::locator::GitOid
 pub kernel::event::record::GovernedDocumentWritten::bytes: usize
 pub kernel::event::record::GovernedDocumentWritten::which: alloc::string::String
 pub kernel::event::record::LogTruncated::dropped_bytes: u64
@@ -2049,6 +2056,8 @@ pub kernel::event::record::ToolCalled::subject: core::option::Option<alloc::stri
 pub kernel::event::record::ToolResult::answer: kernel::event::record::ToolAnswer
 pub kernel::event::record::ToolResult::name: kernel::tool::ToolName
 pub kernel::event::record::ToolResult::tool_use_id: alloc::string::String
+pub kernel::event::record::WentBack::name: alloc::string::String
+pub kernel::event::record::WentBack::point: kernel::locator::GitOid
 pub kernel::gate::ConnectorCall::label: &'a kernel::tool::ServerLabel
 pub kernel::gate::ConnectorCall::tool: &'a kernel::tool::ToolName
 pub kernel::gate::DoorId::Attach
@@ -2534,6 +2543,7 @@ pub struct kernel::event::record::Commit
 pub struct kernel::event::record::CommitAttribution
 pub struct kernel::event::record::EmbeddingCalled
 pub struct kernel::event::record::EvidenceCite
+pub struct kernel::event::record::FileRestored
 pub struct kernel::event::record::GovernedDocumentWritten
 pub struct kernel::event::record::LogTruncated
 pub struct kernel::event::record::ModelCalled
@@ -2554,6 +2564,7 @@ pub struct kernel::event::record::SpineDocumentWritten
 pub struct kernel::event::record::SteerReceived
 pub struct kernel::event::record::ToolCalled
 pub struct kernel::event::record::ToolResult
+pub struct kernel::event::record::WentBack
 pub struct kernel::gate::ConnectorCall<'a>
 pub struct kernel::gate::EgressAllowlist
 pub struct kernel::goal::GoalEntry
