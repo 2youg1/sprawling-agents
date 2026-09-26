@@ -545,6 +545,8 @@ impl Worktrees {
     pub fn open(city_root: &Path) -> Result<Worktrees, MemoryError>;
     pub fn claim(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError>;
     pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError>;   // 解锁，不删树
+    /// 城的唯一写者（借出的 `JsonlLedger` 即凭证）打开时调用：之前的写者没还的锁全部解开。无仓库即无事可做。
+    pub fn lift_abandoned_leases(city_root: &Path, writer: &JsonlLedger) -> Result<(), MemoryError>;
     pub fn live(&self) -> Result<Vec<WorktreeName>, MemoryError>;
     /// 把一个节点已提交的活带进城的 trunk，返回落地的 commit。
     pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, MemoryError>;
@@ -580,6 +582,7 @@ impl WorktreeLease {
   再把树强制检出到分支头并删掉未跟踪文件，最后加锁——
   一个节点在两次 run 之间付一次全量检出，而不是每次 run 付一次、再付一次整目录删除。
   未提交的改动与未跟踪文件在再领时消失：没提交的从来不是这个节点的活。
+  进程在 run 中途死掉会留下锁：一个城只有一个写者，所以新写者一拿到 `JsonlLedger` 就由 `lift_abandoned_leases` 解开全部锁——此时任何锁都不可能属于活着的 run。
   `E_WORKTREE_BUSY` 因此恒表示「锁着」，也就是有人正在用；登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射。
   否决「释放即 prune 并删目录」：它让同一节点的下一次 run 重新量整个城并全量检出，代价随城的大小涨，而节点的分支本来就留着。
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。

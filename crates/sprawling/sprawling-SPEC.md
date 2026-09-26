@@ -14,7 +14,7 @@ S0 三件：①CLI 壳（`status` 可用；未到期的子命令给出诚实拒�
 
 「验证这条链先于验证页面内容」——S0 不起 HTTP 服务，HTTP 属 channels::server（S4）；嵌入的取证面是测试与 `status` 输出。
 
-评审楼的 worktree 按房间保留：`stand_up` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（memory-SPEC 8-9），不再每轮全量检出、再整目录删除。四件事未定。其一，只检出本楼的 scope：libgit2 没有 sparse-checkout，git2 0.21 也没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `memory` 禁 `unsafe`；只检出 scope 而不给其余路径的索引项置 skip-worktree 位，栅栏的暂存会把 scope 之外的文件记成删除；能定下它的证据是在这样一份索引上跑一次栅栏与 `decide_merge` 的测试，看提交的树是否只动了 scope。其二，保留的树由谁计入 `WORKTREE_MAX_BYTES`：今天上限只在新建一棵时量城的工作树，留着的树不计。其三，进程在 run 中途死掉会留下 git 的 worktree 锁，这个房间此后领树即 `E_WORKTREE_BUSY`；一个城只有一个进程写，所以启动时解开全部锁是一个候选，证据是一次杀进程后再派活的测试。其四，放置移进 lane，与 MCP 缺表时的那次连接一样，要等 `RunWorker` 拆分定下 lane 能借到的句柄。
+评审楼的 worktree 按房间保留：`stand_up` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（memory-SPEC 8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。三件事未定。其一，只检出本楼的 scope：libgit2 没有 sparse-checkout，git2 0.21 也没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `memory` 禁 `unsafe`；只检出 scope 而不给其余路径的索引项置 skip-worktree 位，栅栏的暂存会把 scope 之外的文件记成删除；能定下它的证据是在这样一份索引上跑一次栅栏与 `decide_merge` 的测试，看提交的树是否只动了 scope。其二，保留的树由谁计入 `WORKTREE_MAX_BYTES`：今天上限只在新建一棵时量城的工作树，留着的树不计。其三，放置移进 lane，与 MCP 缺表时的那次连接一样，要等 `RunWorker` 拆分定下 lane 能借到的句柄。
 
 ## 4 现状分析
 
