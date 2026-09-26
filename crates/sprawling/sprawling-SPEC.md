@@ -1607,56 +1607,6 @@ UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相
 `commanding::governing` 职责减一句）；`gateway-SPEC` 的 endpoint 节记
 `adapter_for` 的归属理由（装配线住适配器簇，凭据只出 `resolver`）。
 
-## 8-30 余部拆净：views／serving／console／main 按缝归位
-
-`assembly.rs` 经前三步已成树（这里零动），余下四文件：
-
-- `views.rs` 995→`holding`（持有＋`apply`）／`answering`（`answer` 面）／
-  `lines`（记录→行纯函数）＋`tests.rs`。`Views` 字段改 `pub(super)`
-  （两兄弟读），`lines` 八函数改 `pub(crate)`（`folds.rs` 经
-  `views::pursuit_from` 仍直达）。
-- `serving.rs` 830→`door`（钥匙＋vault）／`desk`（命令台）／`serve`
-  （`Serving`＋`Opening` 值）／`worker`（单写者线程＋`serve`）＋`tests.rs`。
-  `serve` 与 `Serving` 保持 `pub`（binary 经 `sprawling::serving` 直达，
-  公开面零变）；`DeskWait` 改经 `assembly::desk::DeskWait` 全路径
-  （`pub(crate) use` 转给只在测试出现的名会被门禁记未用——量过，
-  全路径是诚实的写法）。
-- `console.rs` 781→`language`（`Line`＋`CONTROL`＋解析）／`terminal`
-  （`Terminal`＋`Answering`＋`drive` 循环）＋`tests/helpers|parsing|terminal`。
-  `drive` 提 `pub(super)`（helpers 直达），`Terminal` 保持 `pub`
-  （`Serving.console` 字段,*公开面零变）。
-- `main.rs`（bin 根）900→`router`（分派＋flags）／`city`（起服 verbs）／
-  `data`（搬运＋查询 verbs）＋`tests.rs`。bin 根的子模块需 `#[path]`
-  声明（`mod city` 在 `main.rs` 里指 `src/city.rs`，这是 Rust 的规则不是
-  这里的发明）。`COMMANDS`／`DEFAULT_AT`／`DEPENDENCIES` 各留一处定义，
-  跨文件用 `super::` 直达。
-
-钉行 4 删（views/serving/console/main），`drive` 豁免键随文件搬家
-（`console.rs::drive`→`console/terminal.rs::drive`），`view_record`
-标 `#[cfg(test)]` 豁免（门禁认属性不认文件）。
-`sprawling` 158 全绿，18 门绿，`sprawling` 基线零漂移（`pub` 项未动）。
-
-## 8-31 装配簇归零：在册的最后十一文件
-
-切法：先迁测试，再按缝切，字段不为跨文件而开；带参数豁免的函数不搬家。逐文件：
-
-- `assembly.rs` 772→365：`fixture`（302 行的 `pub(super) mod fixture`）搬 `assembly/fixture.rs`，路径 `assembly::fixture` 不变，故十六个子模块的测试 `use` 一行未改；`new`／`over`／`close_city` 搬 `assembly/lifetime.rs`（LOADING 与 UNLOADING 是一个生命周期的两端，`over` 的 rustdoc 本就这样写）。子模块读父模块私有字段是 Rust 的规则，`RunWorker` 二十二个字段**无一开放**。`Locator` 的引入随 `close_city` 走，`commanding/tests/answering.rs` 原经 `assembly::*` 借到它，现自引 `kernel::Locator`。
-- `workbench.rs` 1000→188：值留父文件（`Site`／`Workbench`／`Reach`／`Desks`／`Situation`＋`status_snapshot`＋`fence_scope`），方法按阶段归子文件：`standing`（`stand_up`）／`desks`（`open_desks`）／`tools`（`lay_out_workbench`＋`status_tool`＋`admit_reading_room`）／`servers`（`mcp_tools`）／`engine`（`execution_engine` 两臂＋`host_shell`）＋`tests.rs`。四个跨 `assembly` 调用的方法由 `pub(super)` 改 `pub(in crate::assembly)`——同一可见范围的精确拼写，不是放宽；子模块读 `Site.branch`／`Desks.waiting`／`Situation` 私有字段走"子读父"规则，**无字段开放**。`engine` 两函数只有 `tools` 与 `tests` 用，不再经父文件转出口。
-- `credentials.rs` 930→130：值与读法留父文件（`Entered`／`Chosen`／`Ceilings`＋四常量＋`dialect_headers`／`poisoned_vault`／`local_model_facts`），方法按"签入"与"可调用"归 `signing`（`renew_if_stale`／`login`／`login_with`／`put_secret`／`resolver`）与 `endpoints`（`probe_endpoint`／`endpoint_of`／`attach_endpoint`／`probe`／`select_model`／`seed_from_environment`／`open_for_service`）＋`tests.rs`。八个跨 `assembly` 调用的方法改 `pub(in crate::assembly)`；**无字段开放**。
-- **`attach_endpoint` 不再以探测为准入条件（gateway-SPEC §8-10 是权威，这里只记装配侧的落地）**：`endpoint_of` 的鉴权头改由 `gateway::AuthSpec::for_dialect` 产出（`Entered.auth_header` 仍恒优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`；`attach_endpoint` 在探测失败时，若 `admit` 非空则按人报的型号登记（`probed=false`，另写一条 `effect` 级诊断点名探测的错），若 `admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
-- **`Entered.secret`＋`Entered.auth_header` 合并为 `Credential` 枚举**：`Absent`／`Key{reference, header}`／`Subscription{reference}`。因为「按兼容格式选头」只对 **API key** 成立：登录挣来的订阅令牌在 Anthropic 那里恒走 `Authorization: Bearer`，若也拿 `x-api-key` 发就是 401。两个 `Option` 拼不出这个区别，于是把它写成穷举枚举：**「订阅令牌装在 key 的头里」现在拼不出来**。`Credential::entered` 是线上命令的唯一入口（线上从不携订阅令牌），`signing` 自己造 `Subscription`。改动面：`credentials.rs` 加类型、`commanding/routing.rs` 两个构造点、`credentials/signing.rs` 一个、`assembly.rs` 一行 `use`。
-- **`assembly/folds.rs`**：`folds.rs` 957→286。切法沿 §8-31：先迁测试，再按缝切一簇，字段不为跨文件而开。六条测试按「问的是哪一次折叠」分两份：`folds/tests/standing.rs` 收 `Standing::fold` 的三条（活城与重启折出同一份 governance／collaboration、探针填出的 endpoint book、停摆与放行经账本活过重启），`folds/tests/history.rs` 收 `rebuild_views` 的三条（整城回翻、单会话自取、停在上限的那一页说从哪续）；两份不共用夹具，故无 `helpers.rs`，`folds/tests.rs` 只留 `mod history; mod standing;`。`history.rs` 不再 `use crate::assembly::fixture::*`——那三条测试从未用过夹具，内联 `mod tests` 时它被另外三条借着。迁测后仍 495 行，再切一簇：`Collaboration`／`CollaborationFold`／`artifact_of`／`new_inbox`／`INBOX_CAPACITY`／`SIGNAL_BANDWIDTH` 归 `folds/collaboration.rs`（房间里等着什么、哪块地已被认领），`BlockedJob`／`Sent`／`Governance`／`HALTED`／`RELEASED`／`Standing`／`rebuild_views` 留父文件。原先误挂在 `BlockedJob` 上的两段文档（讲「两个投影」与「筛法重建信号」）随它们描述的类型迁为 `collaboration` 的模块文档，`BlockedJob` 自己那段逐字未动。可见性：`assembly::lifetime` 读 `Collaboration` 的 `inboxes`／`joins`／`goals`／`requests`／`plan_holders` 并调 `pursuits`，`assembly.rs`／`dispatching::running`／`settling::landing`／`workbench::desks` 用 `artifact_of`／`new_inbox`，这七项由 `pub(super)` 改 `pub(in crate::assembly)`——同一可见范围的精确拼写，不是放宽；`CollaborationFold` 与其 `absorb`／`settle` 只有父文件用，`pub(super)` 现指 `folds`。`Collaboration.pursuits`（私有字段）与 `CollaborationFold` 的五个私有字段随 `settle` 同迁，**无字段开放**。父文件因此卸下 `Locator`／`effect`／`pursuit_from`／`building_of`／`plan_node_of` 五个 import，`standing.rs` 自引 `kernel::Locator`。`sprawling` 158 全绿（切前切后同为 6 条 `#[test]`），apisync 基线零漂移，未重写。
-- **`assembly/freezing.rs`**：`freezing.rs` 778→214：非测试部分（`NEWLINE`／`building_segment`／`run_segment`／`task_line`＋`RunWorker::freeze_plan`）一行未动地留在原文件，573 行的内联 `mod tests` 整体迁到 `freezing/tests.rs`，父文件尾部只余原样保留的 `#[cfg(test)] #[allow(unwrap_used, expect_used, panic, indexing_slicing, reason = "test code")] mod tests;`。测试自身超 400，故 `tests.rs` 退为纯路由（`mod ceilings; mod dispatches;`），八条测试按"问的是什么"分两处：`tests/dispatches.rs` 收一次 dispatch 冻下什么、留下什么——读不动的 handoff 必须点名拒绝、up 模式无自测的改动不落地、job 字节与 must-read 三项进历史、prefix 直接携带楼规与任务而非指路、fork 记血缘并拒非母亲的节点；`tests/ceilings.rs` 收一次 run 在什么之下跑——转派下去的活沿用发它的 ceiling、审批答复续上的活沿用同一 ceiling、config 层解析出的 effort 就是上线的那个，二者共用的夹具 `ceiling_read_by` 只被 `ceilings` 里两条用，随它们同住一文件，故**不设 `helpers.rs`**。两个主题文件按仓内先例用 `use super::super::*;` 回到 `freezing`，再补 `use crate::assembly::fixture::*;` 与 `use crate::assembly::*;`。**无字段开放**，无可见性改动（迁出的只有测试，`freeze_plan` 等仍是 `pub(super)`），函数签名与公共面逐字节不变，apisync 未重写基线。`sprawling` 158 条测试全绿，测试计数切前切后同为 8。
-- **`assembly/plans.rs`**：`plans.rs` 740→297：一次即够，只迁测试，生产代码一行未动。`Reporter`／`tell_whoever_is_behind`／`holders_in`／`ready_in`／`plan_item`／`plan_of`／`set_pursuit`／`pursue` 全部留在父文件——它们回答的是同一个问题（一栋楼的计划树：谁占着哪个节点、什么现在可开工、红色能传到哪个房间），拆开只会把「读计划」与「按计划派活」隔到两个文件里，而后者每一步都要问前者。452 行的 `mod tests` 迁至 `plans/tests.rs`，因其自身逾 400 而按主题扁平化为两份：`plans/tests/rows.rs`（计划的行：读不出来的计划按名字拒绝而不赖给邻居、账本拒了那一行则磁盘上的计划分毫不动、一行只能被一次 run 占住、Done 带得回证据）与 `plans/tests/goals.rs`（撞上已占路径的常驻目标按判定它的层级被拒、workshop 图按依赖次序逐房间跑完且结果回汇）。`tests.rs` 只剩 `mod goals; mod rows;`，沿用 `console/tests.rs` 的先例；两份测试各自写 `use super::super::*;` 直取父模块，夹具仍走 `crate::assembly::fixture::*`，**无夹具复制，故无 `helpers.rs`**。原 `mod tests` 上的四条 `#[allow]` 原样搬到父文件的 `mod tests;` 声明上，lint 沿模块树下传覆盖两份子文件。**无字段开放**，无可见性变更（父文件里 `pub(super)` 的两项本就只被 `assembly` 内同级调用，位置未动）；6 条测试切前切后相等，`sprawling` 158 全绿，基线零漂移，apisync 未重写。钉行 1 删（`crates/sprawling/src/assembly/plans.rs`）。
-- **`assembly/genesis.rs`**：`genesis.rs` 677→329：切法止于第一次。文件里只有一簇——「一个目录如何成为城，以及重启看见了什么」：`InitReport`／`Adopt`／`CITY_MD`、读盘的 `standing_of`／`has_history`／`city_address`／`city_segment`，以及 `RunWorker` 上的 `configure_building`／`create_building`／`adopt_building`／`startup_scan`。这四个方法是 §8-31 之前就从动词表挪进来的（本 SPEC 第 1175 行），它们与 `form_city` 共读 `self.city_root` 与 `self.ledger`，拆开只会把一次开城分给两个文件叙述；347 行的 `#[cfg(test)] mod tests` 迁出后父文件 329 行，已在 400 之内，再切一次就是为切而切。
-    `genesis/tests.rs` 352 行，八条测试逐字未动，`use super::*` 与 `use crate::assembly::fixture::*`／`use crate::assembly::*` 原样保留——父文件是 `genesis.rs`，`super` 仍指 `genesis`。父文件尾部留 `mod tests;`，原 `mod tests` 上的四个 `#[allow]` 与 `reason = "test code"` 整份搬到声明上。
-    **无字段开放**，可见性一处未改：`pub(super)` 的 `CITY_MD`／`standing_of`／`city_segment` 只被 `assembly` 内同层兄弟读，方法上的 `pub`／`pub(super)` 是 `RunWorker` 的 inherent impl 面，位置不动即路径不动。`apisync` 未重写基线（公开项定义位置未移），`sprawling` 158 条测试全绿。钉行删 1（`crates/sprawling/src/assembly/genesis.rs` = 677）。
-- **`assembly/reviewing.rs`**：`reviewing.rs` 567→168：`settle_requests` 这一个方法（连同它对 `PrEffect::Opened`／`Merged`／`Rejected` 三臂的处理）整体留在父文件，可见性与签名逐字节不变（`pub(super) fn settle_requests`，仍只被 `assembly` 同层调用，故无须改写为 `pub(in crate::assembly)`）。399 行内联测试迁出为 `reviewing/tests.rs`，原 `#[allow(unwrap_used, expect_used, panic, indexing_slicing)]` 属性列表原样搬到父文件的 `mod tests;` 声明上。
-    迁出后测试文件本身 403 行仍越线，故按「测试扁平化」再切一次，缝落在**通过的评审**与**被历史拒绝的合并**之间：`tests/landing.rs` 收 `a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked` 与 `work_in_a_review_building_reaches_it_only_after_someone_else_checks_it`，二者共用的夹具 `branch_opened`（从账本读回请求所在分支）随它们同住，不复制；`tests/refusal.rs` 收 `a_merge_the_history_refused_leaves_the_building_where_it_was`（§8-30 那条红），它走 `open_faulty` + `cut_on_write: Some("pr_merged")`，与前两条一份夹具也不共享。`tests.rs` 只剩抬头与 `mod landing; mod refusal;`。两个子文件的导入沿用 `console/tests/*.rs` 的先例，把原来的 `use super::*` 写成 `use super::super::*`，另两行 `use crate::assembly::fixture::*` 与 `use crate::assembly::*` 原样保留。
-    **无字段开放**，无可见性变更，测试计数 3→3 不变，`sprawling` 158 条全绿；apisync 基线零漂移（未重写），钉行 `crates/sprawling/src/assembly/reviewing.rs = 567` 删除。
-- **`install.rs`**：`install.rs` 556→268：值与判断留父文件（`INSTALLED_STEM`／`SEPARATOR`／`PathEdit`／`PathRemoval`／`Report`／`PathOutcome`＋`program_dir`／`installed_name`／`same_directory`／`plan_append`／`plan_remove`／`on_search_path`／`place`／`displace`／`no_home`／`dirs`／`install`），两条按平台分岔的落地路径各成一个文件：`install/search_path_windows.rs`（`HKCU\Environment\Path` 的原样读写与 `WM_SETTINGCHANGE` 广播，两段 PowerShell 常量、`Raw`／`carrier_path`／`powershell`／`read`／`write` 与 `extend`／`retract`）与 `install/search_path_elsewhere.rs`（不写任何 shell 启动文件，把 `export PATH=…` 那一行随 outcome 交还本人）。原来一个名字 `mod search_path` 带 `#[cfg]` 双身，现在是两个各自 `#[cfg]` 的文件名，`use search_path_windows::{extend, retract}` 与 `use search_path_elsewhere::{extend, retract}` 同样带 cfg；两个子模块仍以 `pub(super)` 向父文件交出 `extend`／`retract`，可见范围逐字节不变，crate 内其它文件的 `use` 一行未改。测试搬 `install/tests.rs`，`#[cfg(target_os = "windows")] mod plan` 原样保留其 `use crate::install::{…}` 绝对路径，故 `mod tests` 内联时的导入一字未动（原来就不是 `use super::*`，保持 `use super::program_dir`）。**无字段开放**；apisync 未重写基线，公共面未动。
-- **`plan_view.rs`**：`plan_view.rs` 413→241：只用了第一次拆分就够——`#[cfg(test)] mod tests`（174 行）整体搬 `plan_view/tests.rs`，父文件尾部只留带原样 `#[allow(unwrap_used／expect_used／panic／indexing_slicing, reason = "test code")]` 的 `mod tests;` 声明。投影本身不切：`PlanView`／`PlanReading`／`Reading` 三个值、折账的 `apply`、读文件的 `of`、成表的 `describe`／`blockages` 与四个自由函数（`unplanned`／`building_of`／`node_of`／`cause_of`）回答的是同一个问题——「计划上一次读到的样子，以及什么记录能让它作废」——按缝再切只会把一条折叠链拆成两处权威。父文件是 `plan_view.rs`，故 `tests.rs` 里的 `use super::*;` 仍指 `plan_view`，六条测试的断言与名字逐字未改，`crate::plan_view::PlanView`／`PlanReading` 的三处外部引用（`assembly::building_page`、`views::holding`）一行未动。**无字段开放**，可见性一处未变（`PlanView`／`PlanReading` 原本就是 `pub(crate)`，`Reading` 与四个自由函数留在父文件里保持私有）。apisync 基线未重写：公共面逐字节不变。`sprawling` 158 条全绿，`modmap`／`length`／`header`／`apisync` 四门绿。
-
 ## 8-40 运行中的机器有什么，这座城要什么（`bin::doctor`）
 
 **原因**：README 说「别 `cargo install` 这个东西」，`just check` 要 `just` 与 `cargo-nextest`，客户端要一个版本与 crate 版本相等的 `wasm-bindgen` CLI，exec 工具的 python 臂要一个 CPython-WASI 组件，而这些要求今天散在四份文档里。一个人装不全的时候，得到的是某一条命令的失败信息，而不是一句「运行中的机器缺什么」。
@@ -3383,6 +3333,9 @@ fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<Strin
 - **被否决的备选**：① 把 `secret:realm/name` 放进 `EndpointSummary` 让表单送回来——凭据引用是城的内政，上线只为让页面把它原样送回，等于给同一个事实开第二个家，还多一条泄露面；② 让表单按约定重新拼出引用（`referenceOf(id)`）——那只对这张表单自己登记过的 key 成立，`import` 与环境变量来的端点引用不同名，会把别人的引用送进这一个端点。
 
 **本章测试**：`credentials::tests::kept::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用；`credentials::tests::kept::a_subscription_token_keeps_its_bearer_header_when_the_settings_are_saved_again`——messages 面上以订阅引用接上、再空框重存，模型表请求都带 `authorization: Bearer`，端点的 `auth` 仍是 `Bearer`。
+
+- **`attach_endpoint` 不以探测为准入条件（gateway-SPEC §8-10 是权威，这里只记装配侧）**：鉴权头由 `gateway::AuthSpec::for_dialect` 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。探测失败时，若 `admit` 非空则按人报的型号登记（`probed: false`，另写一条 `effect` 级诊断点名探测的错），`admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
+- **`Credential` 是穷举枚举**：`Absent { header }`／`Key { reference, header }`／`Subscription { reference }`。按兼容格式选头只对 API key 成立：登录挣来的订阅令牌在 Anthropic 那里恒走 `Authorization: Bearer`，拿 `x-api-key` 发就是 401。两个 `Option` 拼不出这个区别，枚举让「订阅令牌装在 key 的头里」拼不出来。`Credential::entered` 是线上命令的唯一入口（线上从不携订阅令牌），`signing` 自己造 `Subscription`。
 
 ### 8-82 同一个地址上的新一段：`/new`（`bin::assembly::commanding::sessions`、`Command::OpenSession`、`EventKind::SessionOpened`）
 
