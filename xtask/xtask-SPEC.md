@@ -511,7 +511,7 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 
 **skip 的理由仍须各自点名**：没有画廊路由、没有构建产物（`target/web-dist/`）、测试机上没有引擎——三种各说各的。一道找不到东西就悄悄变绿的门，仍然是这里要避的失效。
 
-**探针等页面不再标 `aria-busy="true"` 才量。** 客户端把单独成块、按需取来的视图（今天是 `#/gallery`）在块落地之前标成 `aria-busy="true"`，块到了就去掉。以 `file://` 取来的块不占住引擎的虚拟时间，所以只在 `SETTLE_MS` 那一刻量一次，量到的是一页没有首标题的半成品。探针在 `SETTLE_MS` 之后每 `POLL_MS` 问一次，直到页上没有忙碌的区域；到 `BUDGET_MS` 前两次轮询还忙，就把「还忙」写进 `FAILED`，门报「页面没有在量之前稳下来」，不去判那半页。用 ARIA 已有的 `aria-busy` 而不另立一个 `data-*` 标记，理由是这个标记同时告诉读屏软件「这里还在加载」，一个事实只有一个拼法，读者也不止探针一个。
+**探针等懒加载的视图落地才量。** 客户端把单独成块、按需取来的视图（今天是 `#/gallery`）在块落地之前标一个 `data-pending` 属性，块到了这个标记随占位一起消失。以 `file://` 取来的块不占住引擎的虚拟时间，所以只在 `SETTLE_MS` 那一刻量一次，量到的是一页没有首标题的半成品。探针在 `SETTLE_MS` 之后每 `POLL_MS` 问一次，直到页上没有 `PENDING`；到 `BUDGET_MS` 前两次轮询还在等，就把「还在等」写进 `FAILED`，门报「页面没有在量之前稳下来」，不去判那半页。不用 ARIA 的 `aria-busy`，理由是画廊把骨架屏和加载中的按钮当夹具来画，它们在页面开着的整段时间里都读作忙碌，拿它当信号探针永远等不到。
 
 **本节属门禁机具，与产品代码分开提交。**
 
@@ -595,7 +595,7 @@ composer 的 `<textarea>` 在每一个画它的夹具上都没有可及名。它
 |---|---|
 | `xtask/src/render/pass.rs` | 一次开页是什么：三个宽度与高度（`NARROW`、`READING`、`WIDE`、`WIDTHS`、`PAINTED_AT`、`HEIGHT`）、亮度与强制色两个枚举（`Lighting`、`Colours`）、五次开页的名单与它们的自称（`Pass`、`PASSES`、`called`）、页面回报的条件与对账（`Reported`、`disagrees`）、`--width` 的读法（`wanted`、`asked_for`） |
 | `xtask/src/render/pass/tests.rs` | 五次开页的名单、自称，以及两条对账各自的正反例 |
-| `xtask/src/render/probe.rs` | 那段量页面的脚本与它写读数的两个元素（`SINK`、`CONDITIONS`、`SETTLE_MS`、`BUSY`、`script`）；`engine.rs` 因此只管找引擎、开进程、把读数读回来 |
+| `xtask/src/render/probe.rs` | 那段量页面的脚本与它写读数的两个元素（`SINK`、`CONDITIONS`、`SETTLE_MS`、`PENDING`、`script`）；`engine.rs` 因此只管找引擎、开进程、把读数读回来 |
 | `xtask/src/render/announced.rs` | 屏幕阅读器遇到的那三条（原 `ax` 的三条）：`every_control_is_announceable`、`every_landmark_is_named`、`one_first_heading` |
 
 **关门判据**（两条都实跑过，2026-09-21）：`cargo run -q -p xtask -- render` 五次开页全绿；**把探针写的那个属性名从 `data-theme` 改成别的而不动样式表**，亮色那一次必须红在「页面画的不是这一次要的条件」上（实测拒词：`the pass asked for the light page and the page drew itself dark`）；**把 `--force-high-contrast` 换成任何不开强制色的开关**，强制色那一次同样必须红（实测拒词：`the pass asked for forced colours and the engine drew the colours it authored`）。**改 `PASSES` 里那一行的 `Lighting` 不是这条控制**：它同时改掉了请求与期待，两边仍然一致，故照旧为绿。
