@@ -14,6 +14,8 @@ S0 三件：①CLI 壳（`status` 可用；未到期的子命令给出诚实拒�
 
 「验证这条链先于验证页面内容」——S0 不起 HTTP 服务，HTTP 属 channels::server（S4）；嵌入的取证面是测试与 `status` 输出。
 
+评审楼的 worktree 仍在记账线程上放置：`stand_up` 按 run id 起名，`memory::Worktrees::claim` 每次先量一遍整个城的工作树、再全量检出，run 结束时 `release` 连目录一起删。三件事未定。其一，只检出本楼的 scope：libgit2 没有 sparse-checkout，只检出 scope 而不给其余路径的索引项置 skip-worktree 位，栅栏的暂存会把 scope 之外的文件记成删除；能定下它的证据是在这样一份索引上跑一次栅栏与 `decide_merge` 的测试，看提交的树是否只动了 scope。其二，同一节点两次 run 之间保留它的树：名字要从 run id 换成节点 id，`release` 改为解除租约而不删目录，下一次 `claim` 把树重置到分支头；未定的是保留的树由谁计入 `WORKTREE_MAX_BYTES`。其三，放置移进 lane，与 MCP 缺表时的那次连接一样，要等 `RunWorker` 拆分定下 lane 能借到的句柄。
+
 ## 4 现状分析
 
 空壳。无。
