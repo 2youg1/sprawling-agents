@@ -410,3 +410,35 @@ fn a_git_status_reader_does_not_hold_the_views_while_git_reads_the_disk() {
         "the fold waited {longest:?} for the views while one git status takes {solo:?}"
     );
 }
+
+/// A page that opens a file or lists a directory reads the tree after
+/// the views are released, so it shows the tree as it is at `finish`.
+#[test]
+fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let at = Address::parse("notes").unwrap();
+    let document = views.prepare(&channels::Query::Document { at: at.clone() });
+    let listing = views.prepare(&channels::Query::Listing { at: None });
+    std::fs::write(dir.path().join("notes"), "written after the lock").unwrap();
+
+    assert_eq!(
+        (document.finish(), listing.finish()),
+        (
+            channels::Answer::Document(Box::new(channels::DocumentAnswer {
+                at,
+                text: "written after the lock".to_owned(),
+                bytes: 22,
+                truncated: false,
+                binary: false,
+            })),
+            channels::Answer::Listing(channels::ListingAnswer {
+                at: None,
+                entries: vec![channels::Entry {
+                    name: "notes".to_owned(),
+                    kind: channels::EntryKind::File { bytes: 22 },
+                }],
+            }),
+        )
+    );
+}

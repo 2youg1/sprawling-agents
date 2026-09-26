@@ -3500,6 +3500,8 @@ pub(crate) enum Prepared {
     GitStatus(GitStatusAsk),         // 锁内取了楼的地址与最近一次围栏，锁外读工作树
     Preferences,                     // 锁外读这个人的设置文件
     Config { city_root: PathBuf, addr: Address }, // 锁外读配置阶梯
+    Listing { city_root: PathBuf, at: Option<Address> }, // 锁外列一层目录
+    Document { city_root: PathBuf, at: Address },       // 锁外读一个文件的开头
     Release,                         // 锁外经网络问发布页
 }
 impl Views { pub(crate) fn prepare(&mut self, query: &channels::Query) -> Prepared; }
@@ -3514,7 +3516,7 @@ pub(crate) fn answer_outside_the_lock(
 
 **变体是穷尽的枚举，而不是一个 `Box<dyn FnOnce>`。** 每种锁外的 I/O 有名字，`match` 列全，新加一种要在这里写出它锁内拿什么；闭包会把这件事藏进调用点。
 
-**`Content`、`Skills`、`Document`、`Hunks`、档案检索仍在锁内读盘**（本节接口的当前状态）：它们要的小数据还没有拆出来，拆法与 `GitStatus` 相同。
+**`Content`、`Skills`、`Hunks`、`BuildingView`、档案检索仍在锁内读盘**（本节接口的当前状态）：它们要的小数据还没有拆出来，拆法与 `GitStatus` 相同。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 

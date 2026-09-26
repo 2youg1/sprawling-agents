@@ -28,8 +28,10 @@ use std::sync::Mutex;
 
 use kernel::{Address, AxCode, AxError};
 
+use super::document::document_answer;
 use super::git_status::GitStatusAsk;
 use super::holding::Views;
+use super::listing::listing_answer;
 
 mod history;
 use super::lines::{buildings_of, config_answer, endpoints_answer, summarize};
@@ -85,6 +87,13 @@ pub(crate) enum Prepared {
     Config { city_root: PathBuf, addr: Address },
     /// The release page, which leaves this machine.
     Release,
+    /// One level of the tree.
+    Listing {
+        city_root: PathBuf,
+        at: Option<Address>,
+    },
+    /// The head of one file.
+    Document { city_root: PathBuf, at: Address },
 }
 
 impl Prepared {
@@ -108,6 +117,18 @@ impl Prepared {
             },
             // Leaves this machine, and only on a press (channels-SPEC 8-36).
             Self::Release => channels::Answer::Release(Box::new(crate::release::answer())),
+            Self::Listing { city_root, at } => {
+                channels::Answer::Listing(listing_answer(&city_root, at))
+            }
+            // A file this city does not hold, for the reason a building
+            // nobody raised is: "I could not look" is its own answer.
+            Self::Document { city_root, at } => {
+                let query = format!("Document({})", at.as_str());
+                match document_answer(&city_root, at) {
+                    Some(answer) => channels::Answer::Document(Box::new(answer)),
+                    None => unavailable(query),
+                }
+            }
         }
     }
 }
@@ -256,16 +277,17 @@ impl Views {
             channels::Query::CostOf { node } => channels::Answer::CostOf(self.cost_of_answer(node)),
             // The tree itself, one level and one file at a time.
             channels::Query::Listing { at } => {
-                channels::Answer::Listing(self.listing_answer(at.as_ref()))
+                return Prepared::Listing {
+                    city_root: self.city_root.clone(),
+                    at: at.clone(),
+                };
             }
-            channels::Query::Document { at } => match self.document_answer(at) {
-                Some(answer) => channels::Answer::Document(Box::new(answer)),
-                // A file this city does not hold, for the reason a building
-                // nobody raised is: "I could not look" is its own answer.
-                None => channels::Answer::Unavailable {
-                    query: format!("Document({})", at.as_str()),
-                },
-            },
+            channels::Query::Document { at } => {
+                return Prepared::Document {
+                    city_root: self.city_root.clone(),
+                    at: at.clone(),
+                };
+            }
             // What an agent was told, and the store read that recovers
             // it. A run with no prompt yet and an object this city no
             // longer holds are both "I could not look".
