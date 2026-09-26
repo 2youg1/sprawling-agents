@@ -237,7 +237,7 @@ fn run_history(scratch: &std::path::Path) -> Result<(), String> {
     // Eight sessions interleaved across fifty thousand records: a city
     // that has been working, which is the only city where this question
     // is expensive. The session asked about is the *oldest* one, because
-    // the answer used to cost a walk back from the tail.
+    // that is the one a walk back from the tail would reach last.
     const RECORDS: u64 = 50_000;
     const SESSIONS: u64 = 8;
     let session = |n: u64| {

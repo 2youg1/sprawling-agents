@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The four actions T14 prices, driven over the product's public faces
+//! The four actions this binary prices, driven over the product's public faces
 //! (citysim-SPEC.md section 8-5).
 //!
 //! Shape: adapter. Each driver is the timing boundary of its action and
@@ -87,7 +87,7 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str> {
 /// Boundary (citysim-SPEC.md 3-3): the digest check `install.sh` and
 /// `install.ps1` perform, the unpack, and the launch that confirms the
 /// unpacked binary answers. The archive is prepared by the caller before
-/// any of this runs: T14's start line is "the archive is in place".
+/// any of this runs: the reading starts at "the archive is in place".
 pub fn install(scratch: &Path, archive_path: &Path) -> Result<Action, AxError> {
     let published = digest_of(archive_path)?;
     let mut totals = Vec::with_capacity(SAMPLES);

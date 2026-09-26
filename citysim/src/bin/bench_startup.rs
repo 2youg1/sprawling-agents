@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The four-action pressure reading T14 asks for (citysim-SPEC.md
+//! The four-action pressure reading (citysim-SPEC.md
 //! section 8-5): install, startup, raise a city, open a session - and
 //! the first byte a served city answers with, over three lengths of
 //! history (section 8-5-1). `bench_startup first-byte` takes that last
@@ -58,7 +58,7 @@ fn main() -> ExitCode {
     );
     println!("bench_startup on {machine}");
     println!(
-        "machine class: T14's reference class - one ordinary machine rather than a benchmark \
+        "machine class: the reference class - one ordinary machine rather than a benchmark \
          host. This harness can see neither the disk nor the memory, so the register row that \
          records these readings states them."
     );
@@ -255,8 +255,8 @@ fn report(rows: &[(&str, &Action)], archive_bytes: u64) {
          `digest` sub-step of the three-piece line above"
     );
     println!(
-        "  verify hashing   0 ms: T1 signature verification is a stub. Recorded as zero and \
-         named here; T14's red line is that it is not deleted when T1 lands"
+        "  verify hashing   0 ms: release signing is not wired, so no signature is verified. Recorded as zero and \
+         named here; the sub-step stays when signing lands"
     );
     let marks: Vec<String> = rows
         .iter()
