@@ -358,7 +358,6 @@ pub const kernel::layout::FILTERS_FILE: &str
 pub const kernel::layout::HANDOFF_FILE: &str
 pub const kernel::layout::JOB_FILE: &str
 pub const kernel::layout::LEDGER_DIR: &str
-pub const kernel::layout::LEDGER_LOCK_FILE: &str
 pub const kernel::layout::LIBRARY_DIR: &str
 pub const kernel::layout::SESSIONS_DIR: &str
 pub const kernel::layout::URBANITE_FILE: &str
@@ -889,7 +888,6 @@ pub fn kernel::layout::CityLayout::handoff(&self, &kernel::address::Address) -> 
 pub fn kernel::layout::CityLayout::is_session_projection(&std::path::Path) -> bool
 pub fn kernel::layout::CityLayout::job(&self, &kernel::address::Address) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::ledger(&self) -> std::path::PathBuf
-pub fn kernel::layout::CityLayout::ledger_lock(&self) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::library(&self) -> std::path::PathBuf
 pub fn kernel::layout::CityLayout::new(&std::path::Path) -> Self
 pub fn kernel::layout::CityLayout::of_ledger(&std::path::Path) -> core::option::Option<kernel::layout::CityLayout>

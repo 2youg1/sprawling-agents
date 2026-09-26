@@ -7,7 +7,6 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::layout::CityLayout;
 use kernel::{B3Hash, EventRecord, Seq};
 
 use crate::error::{MemoryError, io_err};
@@ -63,20 +62,28 @@ pub(crate) struct WriterLock {
 }
 
 impl WriterLock {
-    /// Takes the writer lock of the city whose ledger is `dir`, or
-    /// answers `None` when `dir` is not a city's ledger.
+    /// Takes the writer lock of the ledger directory `dir`: the file
+    /// `<name>.lock` beside it, named from `dir` alone so that this
+    /// module, not the city layout, owns where the lock lies
+    /// (memory-SPEC 12).
     ///
     /// # Errors
-    /// `LedgerHeld` when another handle holds the lock; `Io` when the
-    /// lock file cannot be made or the lock cannot be asked for.
-    pub(crate) fn take(dir: &Path) -> Result<Option<WriterLock>, MemoryError> {
-        let Some(city) = CityLayout::of_ledger(dir) else {
-            return Ok(None);
-        };
-        let path = city.ledger_lock();
-        if let Some(reserved) = path.parent() {
-            std::fs::create_dir_all(reserved)
-                .map_err(io_err("create the reserved subtree", reserved))?;
+    /// `LedgerHeld` when another handle holds the lock; `Io` when `dir`
+    /// has no name to put a sibling beside (a root, `..`), or the lock
+    /// file cannot be made, or the lock cannot be asked for.
+    pub(crate) fn take(dir: &Path) -> Result<WriterLock, MemoryError> {
+        let name = dir.file_name().ok_or_else(|| {
+            io_err("name the ledger lock", dir)(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "a ledger directory needs a name for its lock to sit beside it",
+            ))
+        })?;
+        let mut lock_name = name.to_os_string();
+        lock_name.push(".lock");
+        let path = dir.with_file_name(lock_name);
+        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            std::fs::create_dir_all(parent)
+                .map_err(io_err("create the ledger's parent directory", parent))?;
         }
         let file = std::fs::OpenOptions::new()
             .create(true)
@@ -85,7 +92,7 @@ impl WriterLock {
             .open(&path)
             .map_err(io_err("open the ledger lock", &path))?;
         match file.try_lock() {
-            Ok(()) => Ok(Some(WriterLock { _held: file })),
+            Ok(()) => Ok(WriterLock { _held: file }),
             Err(std::fs::TryLockError::WouldBlock) => Err(MemoryError::LedgerHeld {
                 dir: dir.to_path_buf(),
             }),

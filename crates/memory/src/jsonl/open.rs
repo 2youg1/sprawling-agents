@@ -21,18 +21,18 @@ use super::ledger::{
 };
 
 impl JsonlLedger {
-    /// Production entrance: std filesystem underneath, and for a city's
-    /// ledger the city's writer lock, taken before anything is read or
+    /// Production entrance: std filesystem underneath, and the ledger
+    /// directory's writer lock, taken before anything is read or
     /// repaired and held for as long as the returned ledger lives.
     ///
     /// # Errors
-    /// `LedgerHeld` when another writer holds this city's ledger, in this
+    /// `LedgerHeld` when another writer holds this ledger, in this
     /// process or another; otherwise whatever reading and repairing the
     /// segments reports.
     pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), MemoryError> {
         let lock = WriterLock::take(dir)?;
         let (mut ledger, report) = JsonlLedger::open_with(Box::new(RealFs::new()), dir, now)?;
-        ledger.lock = lock;
+        ledger.lock = Some(lock);
         Ok((ledger, report))
     }
 

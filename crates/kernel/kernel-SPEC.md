@@ -245,7 +245,7 @@ impl ErrorDraft {
 | 背压 | `E_BACKPRESSURE_SHED` | `tool_result` |
 | 运行未知 | `E_TOOL_OUTCOME_UNKNOWN` | `tool_result` |
 
-装载期六码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的判据只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 §12。
+装载期六码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的条件只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 §12。
 `E_BUSY` 的 carrier 与 `E_WORKTREE_BUSY` 一样是 `tool_result`，而两者的区别在名字里：那一个说的是工作树这个机制，这一个说的是**同一个地址上有 run 正在工作**，拒绝里点名那条 run，调用方据此先停它再动手。
 两条呈现约束：`E_SECRET_EGRESS` 的 subject 只写 SecretRef 与位置、恒不回显命中字节；`E_DISCARD_IRREVERSIBLE` 的 alternative 必须可执行。执行点在各生产模块（S2），此处记为 carrier 表随附契约。
 
@@ -1974,7 +1974,6 @@ pub fn is_reserved(&self) -> bool;                  // 改：eq_ignore_ascii_cas
 
 ```rust
 pub const LEDGER_DIR: &str = "ledger";
-pub const LEDGER_LOCK_FILE: &str = "ledger.lock";
 pub const CAS_DIR: &str = "cas";
 pub const LIBRARY_DIR: &str = "library";
 pub const SESSIONS_DIR: &str = "sessions";
@@ -1992,7 +1991,6 @@ impl CityLayout {
     pub fn root(&self) -> &Path;
     pub fn scope(&self, addr: &Address) -> PathBuf;             // root + 逐段
     pub fn ledger(&self) -> PathBuf;                            // root/.sprawling/ledger
-    pub fn ledger_lock(&self) -> PathBuf;                       // root/.sprawling/ledger.lock
     pub fn cas(&self) -> PathBuf;                               // root/.sprawling/cas
     pub fn library(&self) -> PathBuf;                           // root/.sprawling/library
     pub fn config(&self, addr: &Address) -> PathBuf;            // <scope>/.sprawling/CONFIG.toml
@@ -2018,7 +2016,6 @@ impl CityLayout {
 5. **一个落点一个方法，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威（Roadmap §19.3 第 5 条）。后续新增一类文件时，先在此加方法与常量，再写调用点。
 6. **`session_slice` 是唯一一个按「首段是楼」读地址的方法。** Room 的地址就是 session 的身份，而 Building 是地址的第一段：地址里楼以下的部分就落成楼自己 sessions 下的目录嵌套，一个 run 不点名 session 时就在楼自己的地址上工作，文件于是叫楼的名字。这条路只被 `memory::sessions` 这一个写者引用，`xtask` 的 `slices` 门钉住这句话。
 7. **`of_ledger` 是 `ledger` 的逆，为「只拿到账本目录」的写者而存在。** 账本的写者手里只有它打开的那一个目录，而切片落在城根之下，故城根必须能从这一个输入反推回来；逆运算住在具名常量所在的同一模块里，任何调用点都不许用 `parent().parent()` 重新拼一遍。不是 `ledger()` 形状的目录不是城（夹具、bundle 的校验台、直接打开的存储），回答 `None`。
-8. **`ledger_lock` 在账本目录旁边，不在里面。** 它是写者锁的那个文件（memory-SPEC §8-1）。账本目录的读者把其中每一项都当作历史，而保留子树的根不随 bundle 走，所以锁文件落在 `.sprawling/` 下、与 `ledger/` 并列。
 
 ### 8-72 `kernel::retries`：失败的调用再试几次（形状 2 值类型）
 

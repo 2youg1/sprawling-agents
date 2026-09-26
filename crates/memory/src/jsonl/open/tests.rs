@@ -252,3 +252,21 @@ fn a_second_writer_of_a_city_is_refused_until_the_first_lets_go() {
         "the refusal wrote nothing"
     );
 }
+
+/// The lock is named from the ledger directory alone, so a directory
+/// that sits in no city is held by one writer just as a city's is.
+#[test]
+fn a_second_writer_of_a_ledger_outside_any_city_is_refused() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("history");
+    let (_first, _) = JsonlLedger::open(&dir, TimeMs::new(0)).unwrap();
+
+    let second = JsonlLedger::open(&dir, TimeMs::new(1))
+        .err()
+        .map(|refused| refused.into_ax().code().as_str());
+    assert_eq!(
+        second,
+        Some("E_LEDGER_HELD"),
+        "a second writer opened a ledger another writer holds"
+    );
+}
