@@ -362,4 +362,29 @@ mod tests {
             "a line saying it backed off says what it backed off from"
         );
     }
+
+    #[test]
+    fn a_provider_that_names_its_wait_is_not_asked_sooner() {
+        let mut dog = Watchdog::new(Retries::UntilHalted);
+        let told = |wait_ms: u64| {
+            AxError::failure(AxCode::Provider, "call the model", "answered 429")
+                .retriable_after(wait_ms)
+                .with_recovery("wait, then ask again")
+        };
+        let waits: Vec<u64> = [30_000, 10]
+            .map(
+                |wait_ms| match dog.on_provider_failure(&told(wait_ms), TimeMs::new(1_000)) {
+                    Disposal::BackOff { until, .. } => until.value().saturating_sub(1_000),
+                    other => {
+                        panic!("a provider that says when to come back is asked again: {other:?}")
+                    }
+                },
+            )
+            .to_vec();
+        assert_eq!(
+            waits,
+            [30_000, 1_000],
+            "the longer of the provider's word and the schedule's own wait"
+        );
+    }
 }

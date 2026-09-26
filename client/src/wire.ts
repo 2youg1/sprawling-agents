@@ -1495,6 +1495,7 @@ export const AxError = Schema.Struct({
   nearby: Schema.Array(Schema.String),
   recovery: Schema.String,
   retriable: Schema.Boolean,
+  retry_after_ms: Schema.optional(Schema.NullOr(Schema.Int)),
   subject: Schema.String,
 }).annotations({ identifier: "AxError" });
 export type AxError = typeof AxError.Type;

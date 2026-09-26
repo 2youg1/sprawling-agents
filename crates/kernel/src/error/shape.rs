@@ -11,9 +11,10 @@ use serde::{Deserialize, Serialize};
 use super::code::AxCode;
 use super::refusal::GateRefusal;
 
-/// The unified error shape: seven wire fields, serialized in declaration
-/// order (determinism rule 6). The model is the recovery subject: `nearby`
-/// and `recovery` must hold directly executable information, not apologies.
+/// The unified error shape: seven wire fields and one that is left out
+/// when absent, serialized in declaration order (determinism rule 6).
+/// The model is the recovery subject: `nearby` and `recovery` must hold
+/// directly executable information, not apologies.
 ///
 /// Everything but `code` sits behind one Box so the type stays cheap in
 /// every seam's return slot (`result_large_err`); serde flatten keeps the
@@ -35,6 +36,8 @@ struct ErrorDetail {
     nearby: Vec<String>,
     recovery: String,
     retriable: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    retry_after_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     gate: Option<GateRefusal>,
 }
@@ -68,6 +71,7 @@ impl AxError {
                     nearby: Vec::new(),
                     recovery: String::new(),
                     retriable: false,
+                    retry_after_ms: None,
                     gate: None,
                 }),
             },
@@ -112,6 +116,12 @@ impl AxError {
         self.detail.retriable
     }
 
+    /// The least the raiser says to wait before asking again, when it
+    /// said one; present only on a retriable error.
+    pub fn retry_after_ms(&self) -> Option<u64> {
+        self.detail.retry_after_ms
+    }
+
     pub fn gate(&self) -> Option<&GateRefusal> {
         self.detail.gate.as_ref()
     }
@@ -139,6 +149,13 @@ impl ErrorDraft {
     pub fn retriable(mut self) -> Self {
         self.pending.detail.retriable = true;
         self
+    }
+
+    /// Declares the action safe to retry, and no sooner than `wait_ms`
+    /// from now: the other side's own word on when it recovers.
+    pub fn retriable_after(mut self, wait_ms: u64) -> Self {
+        self.pending.detail.retry_after_ms = Some(wait_ms);
+        self.retriable()
     }
 
     /// Writes the one sentence that tells the reader what to do next, and

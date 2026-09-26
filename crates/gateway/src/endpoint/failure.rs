@@ -42,10 +42,12 @@ pub(crate) enum ProviderFailure<'e> {
     /// A stream stayed open and silent past the bound set for silence.
     Silence { quiet_ms: u64 },
     /// The provider answered with a status that is not 2xx. The
-    /// provider's own body is never quoted back.
+    /// provider's own body is never quoted back; its headers are read
+    /// for the one hint they may carry, how long to wait.
     Refused {
         url: &'e str,
         status: reqwest::StatusCode,
+        headers: &'e reqwest::header::HeaderMap,
     },
     /// The provider answered 2xx and the body is not a shape this city
     /// can read.
@@ -65,7 +67,7 @@ impl ProviderFailure<'_> {
             ProviderFailure::Silence { quiet_ms } => {
                 format!("no byte arrived for {quiet_ms} ms")
             }
-            ProviderFailure::Refused { url, status } => {
+            ProviderFailure::Refused { url, status, .. } => {
                 format!("{url} answered {}", status.as_u16())
             }
             ProviderFailure::Unreadable(detail) => detail.clone(),
@@ -90,6 +92,19 @@ impl ProviderFailure<'_> {
         }
     }
 
+    /// The provider's own word on how long to wait: `retry-after-ms`
+    /// first, then `retry-after` in whole seconds. The HTTP-date form is
+    /// not read, because turning a date into a wait needs a clock this
+    /// crate does not sample; the watchdog's schedule covers it.
+    fn retry_after_ms(&self) -> Option<u64> {
+        let ProviderFailure::Refused { headers, .. } = self else {
+            return None;
+        };
+        let number = |name: &str| headers.get(name)?.to_str().ok()?.trim().parse::<u64>().ok();
+        number("retry-after-ms")
+            .or_else(|| number("retry-after").and_then(|secs| secs.checked_mul(1_000)))
+    }
+
     fn recovery(&self) -> &'static str {
         if let ProviderFailure::Unbuilt(_) = self {
             "check this endpoint's `base_url` and its extra headers: the request was \
@@ -108,10 +123,10 @@ impl ProviderFailure<'_> {
 /// its way out taken from [`ProviderFailure`], never decided here.
 pub(crate) fn provider_err(action: &str, failure: &ProviderFailure<'_>) -> AxError {
     let draft = AxError::failure(AxCode::Provider, action, failure.subject());
-    let draft = if failure.retriable() {
-        draft.retriable()
-    } else {
-        draft
+    let draft = match (failure.retriable(), failure.retry_after_ms()) {
+        (true, Some(wait_ms)) => draft.retriable_after(wait_ms),
+        (true, None) => draft.retriable(),
+        (false, _) => draft,
     };
     draft.with_recovery(failure.recovery())
 }
@@ -140,6 +155,7 @@ mod tests {
             &ProviderFailure::Refused {
                 url: "http://house/v1",
                 status: reqwest::StatusCode::BAD_REQUEST,
+                headers: &reqwest::header::HeaderMap::new(),
             },
         );
         assert!(!refused.is_retriable(), "it would answer the same way");
@@ -156,6 +172,7 @@ mod tests {
                 &ProviderFailure::Refused {
                     url: "http://house/v1",
                     status,
+                    headers: &reqwest::header::HeaderMap::new(),
                 },
             )
             .is_retriable()
@@ -172,6 +189,7 @@ mod tests {
             ProviderFailure::Refused {
                 url: "http://house/v1",
                 status: reqwest::StatusCode::BAD_REQUEST,
+                headers: &reqwest::header::HeaderMap::new(),
             },
         ];
         for failure in failures {
@@ -181,6 +199,32 @@ mod tests {
         assert_eq!(
             ProviderFailure::Cut(&cut).recovery(),
             "the watchdog backs off and sends the same request again, until the run's retry limit or a Halt"
+        );
+    }
+
+    #[test]
+    fn a_wait_the_provider_names_travels_with_the_failure() {
+        let told = |code: u16, header: [&'static str; 2]| {
+            let mut headers = reqwest::header::HeaderMap::new();
+            headers.insert(header[0], header[1].parse().unwrap());
+            provider_err(
+                "call provider",
+                &ProviderFailure::Refused {
+                    url: "http://house/v1",
+                    status: reqwest::StatusCode::from_u16(code).unwrap(),
+                    headers: &headers,
+                },
+            )
+            .retry_after_ms()
+        };
+        assert_eq!(
+            [
+                told(429, ["retry-after", "7"]),
+                told(503, ["retry-after-ms", "250"]),
+                told(429, ["retry-after", "Wed, 21 Oct 2015 07:28:00 GMT"]),
+                told(400, ["retry-after", "7"]),
+            ],
+            [Some(7_000), Some(250), None, None]
         );
     }
 }
