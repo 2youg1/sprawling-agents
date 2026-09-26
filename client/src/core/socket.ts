@@ -164,10 +164,12 @@ export function openConnection(
   }
 
   // The records of one page of a gap, folded like any other record: what
-  // the page lost is what happened, and the fold is what draws it. They
-  // invalidate nothing - they are old records rather than news, and
-  // marking every answer stale for them would ask the city for
-  // everything again.
+  // the page lost is what happened, and the fold is what draws it. A
+  // `folded` gap (the stream lagged while the socket stayed open)
+  // invalidates nothing: its answers were already asked after those
+  // records. An `invalidating` gap (written while the socket was down)
+  // marks stale each answer a record touches, since no answer since
+  // the disconnect has seen it.
   function filled(range: HistoryRangeAnswer): void {
     // One report per page, naming the first field this build could not
     // read: a page of two hundred records is one question's answer, and

@@ -205,7 +205,10 @@ pub struct Hello {
 pub struct Welcome {
     pub wire_v: u32,
     pub schema: B3Hash,
-    /// Where the Event stream resumes, so a reconnect leaves no gap.
+    /// The seq of the last record in the Ledger when this welcome is sent.
+    /// The live stream that follows carries only records after it, so a
+    /// client that reconnects fetches the records after its own mark up to
+    /// and including this seq, and no record arrives twice or not at all.
     pub resume_from: Option<Seq>,
     /// Which city answered. The handshake is where a connection learns
     /// whose city it is: the name is in the Ledger's first record, and a
