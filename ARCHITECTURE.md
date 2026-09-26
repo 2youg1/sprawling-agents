@@ -15,9 +15,7 @@
 > governs one module lives in that module's SPEC and its rustdoc; the history
 > of a decision — what was tried, what was rejected, what a gate once caught —
 > lives beside the thing it constrains, so that removing the thing removes the
-> record. This document is therefore as long as the system is complicated, not
-> as long as the project is old, which is what makes *read this before you
-> start* an instruction rather than a wish.
+> record (§12).
 >
 > **Three kinds of statement, and you can tell them apart.** A figure between
 > `xtask:begin` and `xtask:end` markers is written from the code by
@@ -31,7 +29,8 @@
 One process serves one page, and the page is inside the binary rather than
 beside it: `crates/sprawling/build.rs` compresses `target/web-dist` and emits
 an `include_bytes!` entry per file, so a server that started has no asset
-directory left to lose. The page is `client/`, TypeScript bundled by bun.
+directory left to lose. The page is `client/`: Svelte and Effect, bundled by
+Vite and driven by bun (§2).
 
 **The wire is the seam, not the language.** A second client written against
 `channels::wire` in any language is a supported thing to build; what the
@@ -43,8 +42,8 @@ shipped one happens to be written in is a replaceable fact.
 │  sprawling (one binary)                                      │
 │                                                              │
 │   bin::assembly ── the only omniscient point: it holds every │
-│        │           concrete type, samples the clock, hands   │
-│        │           out seeds, and starts every task          │
+│        │           concrete type, samples the clock, and     │
+│        │           starts every task                         │
 │        │                                                     │
 │        ├── accounting ─ the ports the one writer reaches     │
 │        │              outside itself through                 │
@@ -89,21 +88,21 @@ every week.
 
 | Concern | Choice | Why it, and what it costs |
 |---|---|---|
-| Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, MSRV 1.97 | The invariants this design cares about are expressible as types, and `#![forbid(unsafe_code)]` holds workspace-wide. Cost: compile times, and a client that has to be built before the binary that embeds it. |
+| Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, the oldest supported compiler in `Cargo.toml`'s `rust-version` | The invariants this design cares about are expressible as types, and `#![forbid(unsafe_code)]` holds workspace-wide. Cost: compile times, and a client that has to be built before the binary that embeds it. |
 | Async runtime | `tokio`, only in `channels` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
 | Inbound WebSocket | `axum` with its `ws` feature (`crates/channels/Cargo.toml`) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (channels-SPEC section 8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
-| Client | Svelte and Effect, bundled by Vite, driven by bun | Two runtime dependencies and no framework runtime beyond them: Svelte compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
+| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `xtask/src/npm.rs`: Svelte, Effect and the `@lezer` highlighters, and no framework runtime beyond them. Svelte compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
 | Sandbox | `wasmtime` + `wasmtime-wasi`, wasip1 only | Fuel-metered execution with **no socket host implementation** — the Python arm's mechanical proof that it cannot reach the network. Cost: an optional feature; a build without it refuses tool execution in three parts rather than pretending. |
 | Credentials | `keyring` (platform credential service), `secrecy`, `zeroize` | Plaintext lives in the operating system's own vault, never in a file we wrote. `sha2` is present for one external protocol fact: PKCE mandates SHA-256. |
-| Entropy | `getrandom` | OS entropy for the PKCE verifier and the login state. It is *not* the seeded RNG the simulator uses, and must never become it. |
+| Entropy | `getrandom` | OS entropy for values a stranger must not guess: the PKCE verifier, the login state, the door's token. No decision path reads it, so replay never needs it (§10 rule 4). |
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
-| Release profile | `opt-level = "z"`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `"z"` rather than `3` on a measurement whose criterion was written before the readings existed — the manifest records both arms. |
+| Release profile | `opt-level = "z"`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `"z"` rather than `3` because it is much smaller and no slower to start; the criterion and both arms' readings sit beside the setting in `Cargo.toml`. |
 | Dependency count | <!-- xtask:begin dependency_count -->442<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
@@ -138,10 +137,10 @@ hold at once:
    equivalence suite against a Rust reference.
 
 The parameter that made this rule right is a measurement: on byte
-scanning of ledger envelopes, safe Rust ran level with or faster than Zig
-`ReleaseFast`, so the one Zig leaf the tree carried cost a toolchain in
-every workflow and bought nothing. When a leaf measures the other way,
-re-argue the rule.
+scanning of ledger envelopes, safe Rust runs level with or faster than Zig
+`ReleaseFast`, so a Zig leaf there would cost a toolchain in every
+workflow and buy nothing. When a leaf measures the other way, re-argue the
+rule.
 
 ## 3 The units and the dependency law
 
@@ -183,9 +182,9 @@ crates/sprawling/src/serving: crate::assembly
 crates/sprawling/src/views: crate::assembly
 ```
 
-What each unit owns is stated once, in §1's figure. It is not repeated
-here: the two lists drifted apart while both were maintained by hand, and
-`collab` was carrying a duty in one that its source had never had.
+What each unit owns is stated once, in §1's figure, and not repeated here,
+because two hand-kept lists of duties drift apart. §13 draws this block as a
+graph, generated from it.
 
 **Three rules.** Dependencies point inward, and never back. A seam declares
 its trait in the inner layer and implements it in the outer one, so
@@ -202,12 +201,14 @@ repository readable:
 | Assembly | run time, only in `bin::assembly` | the upload sink in `channels::server` receiving `memory::cas` |
 | Event | anywhere a `kernel::Ledger` handle is held | writing `tool_result` after a tool runs |
 
-Below the binary no crate depends on more than two others: `runtime` and
-`collab` each use `kernel` and `memory`, `protocol` uses `kernel` and
-`gateway` (an MCP server reached over HTTP gets its client from
-`gateway::client_for`, the one place a client is built), and `sprawling` is the only crate
-that depends on most of the workspace. The `depmap` block above also lets `runtime` use
-`gateway`, and the code does not take that edge yet. A crate may **use**
+Below the binary each crate that holds a domain uses at most two others:
+`runtime` and `collab` each use `kernel` and `memory`, and `protocol` uses
+`kernel` and `gateway` (an MCP server reached over HTTP gets its client
+from `gateway::client_for`, the one place a client is built). The `depmap`
+block also lets `runtime` use `gateway`, and the code does not take that
+edge. `accounting` uses six, because it declares the ports the one writer
+reaches outside itself through, and those ports carry the other crates'
+types; `sprawling` uses every crate. A crate may **use**
 the interfaces of what it depends on and nothing more; the moment a
 module starts passing concrete types between two of them, that edge
 moves up into the assembly layer.
@@ -222,8 +223,8 @@ its MCP servers through `accounting::Connectors`, its time through
 `accounting::Machine`, and integration tests
 drive a dispatch against scripted ones by the same door `channels::server`
 uses, but the worker itself still lives in
-`sprawling`, which citysim does not depend on. Moving the worker into
-`accounting` is what a seeded scenario still needs.
+`sprawling`, which citysim does not depend on. A scripted scenario that
+reproduces a whole dispatch needs the worker moved into `accounting`.
 
 ## 4 Seams
 
@@ -280,7 +281,9 @@ than any diagram of boxes.
    A worker takes the dispatch and answers every refusal it can owe before
    it writes anything: the reserved subtree, a halted scope, rules that
    will not load, and a tag with no model behind it are all decided by
-   `agree_to_work`, which reads and writes nothing. **Opening the room is
+   `agree_to_work`. It writes nothing but a login renewal: when the chosen
+endpoint's subscription login is about to expire, `renew_if_stale` stores
+the new tokens in the vault and records `secret_captured`. **Opening the room is
    the first thing this city puts on disk for a dispatch**, so work nobody
    could take leaves no room behind for a person to find.
 4. **The city writes `run_started` before anything happens.** Every effect
@@ -290,40 +293,45 @@ than any diagram of boxes.
    city, building, resident, run — from `city::spine_files`, `city::policy`
    and `city::resident`. Assembling it is itself an event, and the result
    is frozen for the whole run.
-6. **`runtime::catalog` decides what the model may see**: the three
-   built-in tools, the collaboration tools this building admits, the skills
+6. **`runtime::catalog` decides what the model may see**: the built-in
+   tools, the collaboration tools this building admits, the skills
    its reading room allows, and any MCP tools discovered from the
    building's `CONFIG.toml`. `city::neighbourhood` is scanned in the same
    breath, so the run also knows which addresses it can reach and who
    stands at them — without it, `signal` takes an address the model has to
    have been told.
 7. **`runtime::turn` enters its typestate**: Assembling → Calling →
-   Applying → Settling, with four cancellation-safe points. An interruption
-   inside a phase cannot be spelled.
+   ToolWave → Recording. `runtime::run::SafePoint` names where a cancel is
+   heard: before each of those four boundaries, and before every call of a
+   tool wave. An interruption inside a phase cannot be spelled.
 8. **`gateway` makes the call.** `gateway::router` picks the endpoint
    attached to this tag; `gateway::dialect` translates the canonical
    Anthropic-shaped conversation into the provider's dialect;
    `gateway::credential` redeems a `secret:realm/name` reference into a
-   header at the last moment. Nothing here holds a concurrency limit: the
-   module that did was deleted for having no caller, and what it would
-   take to grow one back is recorded where it was removed
-   (gateway-SPEC.md section 8-6).
+   header at the last moment. Nothing here holds a concurrency limit; how
+   many runs call at once is the width of the driving pool (§11), and what
+   a limit here would need is in gateway-SPEC.md section 8-6.
 9. **The reply is scanned before it is recorded.** `runtime::redact` puts
    model output through the same secret scan as everything else, so a key a
    model repeated does not become permanent.
 10. **Tools run behind gates.** `kernel::gate` answers with an exhaustive
     verdict — allowed, refused in three parts, or escalated to a person.
-    `memory::checkpoint` puts a git fence before the wave and scans the
-    worktree after it, so anything that disappeared becomes a
-    `file_discarded` event carrying the way back.
+    `runtime::run::fence` decides whether a wave needs a git fence first,
+    `memory::checkpoint` commits the fence and scans the worktree after the
+    wave, and anything that disappeared becomes a `file_discarded` event
+    carrying the way back.
 11. **The result comes back shaped.** `runtime::pipeline` builds the result
     envelope — clock stamp, network reminder, any steer a person sent — and
     `runtime::compaction` shortens what is too long, always reporting how
     much it dropped.
 12. **Everything lands in the Ledger, and the views follow.**
     `memory::hot` and `memory::attribution` fold the same event stream into
-    what the pages ask for. The server pushes each event; the client folds
-    it into what it believes. The same fold, on both sides of the wire.
+    what the pages ask for. The views fold each record on their own thread
+    (`bin::serving::folding`), and only then is it broadcast to every socket
+    as one `Committed` frame, so a page that asks right after an event
+    arrives is answered from views that already hold it. The client folds
+    the event into what it believes. The same fold, on both sides of the
+    wire.
 13. **A signal reaches whoever it names, working or not.** After the run
     freezes, each signal it sent is recorded and then delivered. A
     steer-kind signal slips under the door of a run that is already going,
@@ -390,6 +398,7 @@ stale.
 │  ├─ cas/                     content-addressed store, BLAKE3, one copy per content
 │  ├─ worktrees/               one git worktree per reviewing run, objects shared
 │  ├─ library/                 skills more than one building admits
+│  ├─ snapshot/                what an open resumes the views from, so it folds only the tail
 │  ├─ CONFIG.toml              city layer of the three-layer configuration
 │  └─ FILTERS.toml             what this scope keeps out of a transcript
 └─ <building>/                 one building, one line of business
@@ -409,9 +418,10 @@ stale.
 
 **One rule, applied at every scope: what governs a scope lives in that
 scope's `.sprawling/`, and no write domain reaches it.** `is_reserved`
-answers true for an address with `.sprawling` in any segment, so the check
-is one predicate in `kernel::address` rather than a list of protected file
-names. An agent therefore cannot edit its own accounting, its own
+answers true for an address with `.sprawling` or `.git` in any segment,
+compared without ASCII case (`kernel::address::PROTECTED_METADATA`), so the
+check is one predicate in `kernel::address` rather than a list of protected
+file names. An agent therefore cannot edit its own accounting, its own
 configuration, its own building's rules, or the history of what it did.
 
 A run's write domain is what its building's `RULES.toml` declares, and
@@ -549,11 +559,8 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader, and `runtime::turn::wave`, whose scoped threads run the read-only prefix of a tool wave and are all joined before the wave accounts a single result. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
-| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader, and `protocol::mcp::stdio` and `protocol::mcp::sse`, which give each MCP connection one reader that ends when the connection closes. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the console, first run, and the doctor's probe reader |
-| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader, `runtime::turn::wave`, whose scoped threads run the read-only prefix of a tool wave and are all joined before the wave accounts a single result, and `runtime::turn::speculation`, whose scoped threads run the reads a model hands over while it is still generating and are all joined before the model call returns. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::serving::pool`, the fold and attending workers under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
-| 3 | One spawn point | review; no library crate starts a thread except `gateway::endpoint::stream`, which gives each streamed call one detached reader. Every other thread starts in the `sprawling` crate, and each lives exactly as long as the run, connection, transport or probe it serves: the driving lanes in `bin::assembly::pool`, the attending worker under `bin::assembly` and the fold under `bin::serving`, the MCP transports, the console, first run, and the doctor's probe reader |
-| 4 | Seeded RNG handed out from one place | assembly derives per session |
+| 3 | One spawn point | review. A library crate starts a thread in four places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; and `protocol::mcp::stdio` and `protocol::mcp::sse` give each MCP connection one reader that ends when the connection closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the driving lanes in `bin::assembly::pool`, the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, the console, first run, and the doctor's probes |
+| 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
 | 7 | `IdemKey` derives from `(run, seq, normalised action)` — never from a clock or a random number | property tests |
@@ -588,8 +595,8 @@ do not overlap: overlapping verification reads as more coverage than it is.
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
 | V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2540<!-- xtask:end --> test functions, properties before examples |
-| V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md#8-6) |
-| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets: address, locator, truncated ledger tail |
+| V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md section 8.6) |
+| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
 | V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->8<!-- xtask:end --> scenario files, failures replayed from their script |
 | V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |
@@ -597,7 +604,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |
 | V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
 
-**V10 is not a gate, and the difference is load-bearing.** §8 says the wire
+**V10 is not a gate, and the difference is load-bearing.** §1 says the wire
 is the whole API and that a second client writes against it; `adversary/`
 exercises that permission by writing a third one outside the workspace, in
 another language, to attack rather than to use. It is reached by
@@ -611,8 +618,9 @@ what each finding cost to fix, is recorded in
 `adversary/adversary-SPEC.md` section 4 — beside the mechanism rather than
 here, so that retiring the mechanism retires its record.
 
-**Four gaps, named rather than hidden.** CI has no browser driver, so V9 is
-a command a developer runs rather than a gate. The isometric city compares
+**Four gaps, named rather than hidden.** V9 needs a real city served by a
+real server, and no CI job starts one, so V9 is a command a developer runs
+rather than a gate. The isometric city compares
 display lists rather than bitmaps: the preconditions for bitmap comparison
 are paid for — placement is a pure function of the id, painter order is
 total, projection and its inverse are exact — but there is no rasteriser.
@@ -644,10 +652,10 @@ than typed.
 | Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->547,848 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->3.8×<!-- xtask:end --> headroom | yes |
 | The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->11,523,584 B<!-- xtask:end -->, client included | yes |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:resident_empty_idle -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:resident_empty_idle -->2,469,888 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
-| Ledger append plus fsync | p50 ≤5 ms, p99 ≤20 ms | 0.97 ms / 1.61 ms on one NVMe machine | no |
+| Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_ms -->5<!-- xtask:end --> ms, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_ms -->20<!-- xtask:end --> ms | `[ledger_append]`, with its machine class | no |
 | Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->2,759<!-- xtask:end --> ms for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
-| Prefix assembly | ≤1 ms | 0.022 ms for 16.5 KB over four slots | no |
-| Runs driving at once | 4 lanes | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
+| Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_ms -->1<!-- xtask:end --> ms | `[prefix_assembly]`, with its machine class | no |
+| Runs driving at once | `DRIVING_LANES` in `bin::assembly::pool` | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
 | Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
 | Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
 
@@ -658,7 +666,10 @@ carrying its machine class. Multi-run parallel is read by
 `instrument_relay_round_trip`, which drives the accounting loop the city runs
 (sprawling-SPEC.md 8-84); its readings and their machine class sit in
 `xtask/budgets.toml` `[relay_round_trip]`. The other three are
-citysim's bench scenarios, and their baselines sit in the table below. The two
+citysim's bench scenarios. The large-ledger fold has a register row, quoted
+below; the large-worktree placement and long-session forwarding readings are
+printed by `just bench` and have no register row, so no figure for them is
+quoted here. The two
 latency tiers and the ratchet that governs these readings live in
 `xtask/budgets.toml` `[local_latency]`; a reading under the registered load
 only goes down.
@@ -666,8 +677,6 @@ only goes down.
 | Load scenario, sub-metric | Baseline (p50 / p95 / p99) | Machine class |
 |---|---|---|
 | large-ledger fold, `harness` | <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->2,759<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p95_ms -->3,765<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p99_ms -->3,765<!-- xtask:end --> ms per rebuild, from `[views_rebuild_per_mb]` | general: windows-x86_64, 16 cores, NVMe |
-| large-worktree placement, `whole` | 10,503 / 11,052 / 11,052 ms per claim | general: windows-x86_64, 16 cores, NVMe |
-| long-session forwarding, `harness` | 4 / 4 / 4 µs per event | general: windows-x86_64, 16 cores, NVMe |
 
 Taken under the registered fixture (`bench::scenarios::REGISTERED`), release
 build. A reading from another machine class does not enter this table.
@@ -679,9 +688,9 @@ Nobody types a size into a document.
 **One honest trade.** With network and model time removed, the throughput
 ceiling of a city is the throughput ceiling of its Ledger. That is the
 price of "the Ledger is the only history", stated in the open. The first
-wall is one this city sets itself: a building working towards a goal drives
-four runs at a time, because a lane past the provider's own admission
-ceiling would only park a thread there. Then come the walls outside:
+wall is one this city sets itself: it drives `DRIVING_LANES` runs at a time
+(`bin::assembly::pool`), and past it a prepared drive waits in the pool for
+a lane. Then come the walls outside:
 provider-side rate limits, Ledger fsync, worktree disk, file-descriptor
 limits, then the blocking pool. RAM is not among them. **Runs are driven in
 parallel and accounted for in series** — every line a lane writes crosses to
@@ -700,23 +709,276 @@ model time back and buys nothing from the Ledger.
   what keeps *read this before you start* a reasonable instruction.
 - **A rejected alternative is recorded where the decision lives**, in the
   crate's SPEC, rather than in a separate register of regrets.
-- **Three kinds of statement, and a reader may tell them apart.** A figure
-  between `xtask:begin` markers is written from the code by
-  `cargo xtask docnum` and cannot drift. A table marked **machine
-  authority** is parsed by a gate, so a disagreement with the code is a red
-  build. Everything else is prose a person maintains — and where it
-  contradicts the code, the code is right and this document is the defect.
+- **The three kinds of statement are the ones the opening names**, and a
+  change keeps each in its kind: a figure the code decides goes between
+  `xtask:begin` markers, and prose that contradicts the code is the defect.
 - **Structure is add-only.** The topology in §3, the seam list in §4, the
   shape set in §9 and the fields of `architecture.toml` change only with an
   explicit ruling, recorded in the commit that changes them.
 - **The module map is `architecture.toml`**, not a section here. It is the
   machine's data face: one entry per module file, read only by
   `cargo xtask modmap`, and asked for one module at a time rather than read
-  through. Keeping it here cost this document seven hundred lines and gave
-  every entry a position that a person maintained.
+  through, so no entry has a position a person maintains.
 - **Adding an entry is the registration step**: it lands in the same change
   as the file, before the file is written.
 - **Removing an entry requires a ruling**, recorded as a `Verdict:` trailer
   and held by review, because an entry that quietly disappears is a rule that
   quietly stops being enforced.
 
+
+## 13 Diagrams
+
+Each diagram is Mermaid, so it is text that diffs and reviews like the
+rest of this file and GitHub renders it in place. Nodes use the names in
+[`docs/glossary.md`](docs/glossary.md), or a module path where the
+glossary has no name for the thing; the line under each diagram names the
+code it describes, and where the two disagree the code is right.
+
+### 13.1 The crates
+
+Drawn by `cargo xtask docnum` from the `depmap` block in §3, never by
+hand, because a hand-drawn copy would be a second dependency table. An
+arrow runs from a crate to one it may use.
+
+<!-- xtask:begin crate_graph -->
+```mermaid
+flowchart TD
+    accounting --> channels
+    accounting --> city
+    accounting --> collab
+    accounting --> gateway
+    accounting --> kernel
+    accounting --> protocol
+    browser --> kernel
+    channels --> kernel
+    city --> kernel
+    collab --> kernel
+    collab --> memory
+    gateway --> kernel
+    kernel
+    memory --> kernel
+    protocol --> gateway
+    protocol --> kernel
+    runtime --> gateway
+    runtime --> kernel
+    runtime --> memory
+    sprawling --> accounting
+    sprawling --> browser
+    sprawling --> channels
+    sprawling --> city
+    sprawling --> collab
+    sprawling --> gateway
+    sprawling --> kernel
+    sprawling --> memory
+    sprawling --> protocol
+    sprawling --> runtime
+```
+<!-- xtask:end -->
+
+### 13.2 One dispatch, end to end
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant W as WebUI
+    participant S as channels::server
+    participant D as bin::assembly::desk
+    participant A as accounting thread
+    participant L as lane
+    participant E as Endpoint
+    participant G as Gate
+    participant R as Ledger
+    participant P as projection
+    W->>S: Command::Dispatch
+    S->>S: admission, pure decisions only
+    S->>D: post
+    D-->>A: Wake::Command
+    A->>A: agree_to_work: every refusal before anything is written
+    A->>R: open the room, write the brief
+    A->>L: start the run in the driving pool
+    loop each turn until the turn concludes
+        L->>A: relay each EventDraft, wait for its EventRef
+        A->>R: append_all
+        L->>E: request in its dialect
+        E-->>L: reply, secrets redacted
+        L->>G: tool wave, each call through the Gate
+    end
+    L-->>A: Wake::Home, the run froze
+    A->>R: settle what the run left behind
+    R-->>P: the view fold takes each EventRecord
+    P-->>S: one Committed frame, after the fold
+    S-->>W: the event, folded into the Snapshot
+```
+
+`crates/channels/src/server/socket.rs` (`session`),
+`crates/channels/src/reception/admission.rs` (`decide_admission`),
+`crates/sprawling/src/assembly/desk.rs` (`post`),
+`crates/sprawling/src/assembly/relay.rs` (`Wake`),
+`crates/sprawling/src/assembly/attending.rs` (`attend`),
+`crates/sprawling/src/assembly/dispatching/agreeing.rs` (`agree_to_work`),
+`crates/sprawling/src/assembly/pool.rs`,
+`crates/runtime/src/run/lifecycle.rs`,
+`crates/memory/src/jsonl/append.rs` (`append_all`),
+`crates/sprawling/src/serving/folding.rs`, `client/src/core/socket.ts`.
+
+### 13.3 A turn, and where a cancel is heard
+
+```mermaid
+stateDiagram-v2
+    [*] --> Assembling: BeforeAssemble
+    Assembling --> Calling: BeforeCall
+    Calling --> ToolWave: BeforeWave
+    ToolWave --> ToolWave: BeforeToolCall, before every call
+    ToolWave --> Recording: BeforeSpawn, passed even when the turn concluded
+    Recording --> Assembling: the next turn
+    Recording --> Frozen: the turn concluded
+    Assembling --> Frozen: Cancel at a safe point
+    Calling --> Frozen: Cancel at a safe point
+    ToolWave --> Frozen: Cancel at a safe point
+    Recording --> Frozen: Cancel at a safe point
+    Frozen --> [*]: run_frozen with its Completion
+```
+
+`crates/runtime/src/turn.rs` (the four phase types),
+`crates/runtime/src/run.rs` (`SafePoint`),
+`crates/runtime/src/run/lifecycle.rs` (`dispatch`, `advance`, `freeze`),
+`crates/kernel/src/completion.rs` (`Completion`: `Done`, `Limit`,
+`Cancelled`).
+
+### 13.4 The accounting thread
+
+```mermaid
+flowchart TD
+    lane[lane] -- "Wake::Relay: an EventDraft" --> wake[the one queue]
+    claim[lane] -- "Wake::Claim, Wake::Goal" --> wake
+    home[lane whose run ended] -- "Wake::Home" --> wake
+    desk[bin::assembly::desk] -- "Wake::Command" --> wake
+    close[the person stops the city] -- "Wake::Close" --> wake
+    wake --> acc[accounting thread]
+    acc -->|"1: every relay request queued"| ledger[Ledger]
+    acc -->|"2: then at most one run home"| ledger
+    acc -->|"3: then the desk"| ledger
+    acc -->|"idle: sleeps until the schedule's deadline"| wake
+    ledger -->|"EventRef: durable"| lane
+    ledger -->|"each EventRecord"| fold[bin::serving::folding]
+    fold --> proj[projection]
+    fold -->|"after the fold"| committed[one Committed frame]
+    committed --> s1[socket 1]
+    committed --> sn[socket n]
+```
+
+`crates/sprawling/src/assembly/relay.rs` (`Wake`),
+`crates/sprawling/src/assembly/attending.rs` (`attend`),
+`crates/memory/src/jsonl/append.rs`,
+`crates/sprawling/src/serving/folding.rs` (`spawn_folding`),
+`crates/channels/src/server/socket.rs`.
+
+### 13.5 Opening a city
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant M as sprawling serve
+    participant S as channels::server
+    participant P as projection
+    participant A as accounting thread
+    participant R as Ledger
+    participant C as bin::assembly::chain_watch
+    M->>S: bind; a port another process holds is refused before any write
+    M->>P: start from the snapshot, fold only the tail after it
+    M->>A: start the writer thread
+    A->>R: open: take the writer lock, then recover a torn tail
+    A->>C: start the chain audit in the background
+    C-->>A: a broken chain halts the writer through ChainHalt
+    A-->>M: Listening
+    M->>M: banner, then serve
+```
+
+`crates/sprawling/src/assembly/listening.rs` (`listen`, the one
+definition of this order, sprawling-SPEC.md 8-88),
+`crates/sprawling/src/views/snapshot/start.rs`,
+`crates/sprawling/src/assembly/attending.rs` (`spawn_worker`),
+`crates/memory/src/jsonl.rs` (`open`),
+`crates/sprawling/src/assembly/chain_watch.rs`,
+`crates/memory/src/chain_audit.rs` (`ChainHalt`).
+
+### 13.6 A streaming turn
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant L as lane
+    participant E as Endpoint
+    participant X as dialect
+    participant K as runtime::turn::speculation
+    participant G as Gate
+    participant R as Ledger
+    participant W as WebUI
+    L->>E: request, streaming
+    E->>X: the body, read as it arrives
+    X-->>W: increments of text, never written down
+    X-->>K: each tool call, the moment its block is complete
+    K->>K: reads before the first writing call start at once
+    X-->>L: the answer settles
+    L->>R: model_returned
+    alt the answer failed
+        K-->>L: every early result discarded
+    end
+    L->>R: a fence first, when runtime::run::fence asks for one
+    L->>G: tool wave: each call admitted in call order
+    K-->>L: an early result answers the call equal to it
+    L->>L: the remaining leading reads run at once
+    L->>R: tool_called and tool_result in call order
+```
+
+`crates/gateway/src/endpoint/stream.rs`,
+`crates/runtime/src/turn/speculation.rs` (`Generating`),
+`crates/runtime/src/turn/wave.rs` (`ConcurrentInvoke`),
+`crates/runtime/src/run/fence.rs`, `crates/memory/src/checkpoint.rs`;
+what may start early and in which order results reach the Ledger is
+`adversary/design/Speculating.lean`.
+
+### 13.7 A run's life
+
+```mermaid
+stateDiagram-v2
+    [*] --> Refused: agree_to_work says no; nothing written
+    [*] --> Prepared: room opened, brief written
+    Prepared --> Driving: a lane is free
+    Driving --> Driving: a Steer lands at a safe point
+    Driving --> Frozen: Completion done or limit
+    Driving --> Frozen: Cancel, Completion cancelled
+    Driving --> Lost: the process died
+    Lost --> Frozen: resume closes lost tool calls as unknown
+    Frozen --> [*]
+```
+
+A frozen run is history and is never woken: a succession or a knock
+starts a new run. `crates/sprawling/src/assembly/dispatching/agreeing.rs`,
+`crates/sprawling/src/assembly/pool.rs`, `crates/runtime/src/run.rs`
+(`drive`), `crates/kernel/src/completion.rs`,
+`crates/sprawling/src/assembly/freezing.rs`,
+`crates/sprawling/src/assembly/genesis.rs`.
+
+### 13.8 The client's fold
+
+```mermaid
+flowchart TD
+    ws[socket message] --> dec[decodeFrame]
+    dec -->|"welcome or refusal"| now[folded at once]
+    dec -->|"anything else"| q[queue]
+    q -->|"next animation frame, or a timer while the tab is hidden"| batch[one batch, one store update]
+    batch --> link[link: advance]
+    now --> link
+    link -->|"deliver"| walk[gap walk: fold]
+    walk --> snap[Snapshot]
+    link -->|"deliver"| inv[asking: invalidate]
+    link -->|"lagged"| walk
+    link -->|"answered"| ans[asking: answered]
+    link -->|"saying"| say[the text of one run, in place]
+```
+
+`client/src/core/socket.ts` (`drain`, `deliver`, `lagged`),
+`client/src/core/frames.ts`, `client/src/core/link.ts` (`advance`),
+`client/src/core/gap_walk.ts`, `client/src/core/belief.ts`,
+`client/src/core/asking.ts` (`invalidate`).
