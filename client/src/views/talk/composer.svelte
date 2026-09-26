@@ -6,10 +6,11 @@
 -->
 <script lang="ts" module>
   // The box a person writes in: one textarea where Enter sends, the
-  // three pills that say which model answers, which room hears it and
-  // how hard the model thinks, and the way to stop a run while it is
-  // going. Nothing here decides where a message goes; the page does.
-  // `composer.ts` owns what the pills offer and what a pick means.
+  // four pills that say which model answers, which room hears it, how
+  // hard the model thinks and which mode the run works in, and the way
+  // to stop a run while it is going. Nothing here decides where a
+  // message goes; the page does. `composer.ts` owns what the pills offer
+  // and what a pick means, `dropping.ts` what a dropped file becomes.
   //
   // A line that begins with `/` is a command rather than a message, and
   // the menu over the box is the same list the Ctrl-K palette reads.
@@ -26,9 +27,8 @@
   import { QUERIES } from "../../core/asking";
   import { heldIn } from "../../core/belief/rooms";
   import { newestWorking } from "../../core/belief/live";
-  import { MODES, openSession, selectModel } from "../../core/commands";
   import type { Sending } from "../../core/doing";
-  import { say } from "../../core/lang";
+  import { fill, say } from "../../core/lang";
   import { current } from "../../core/route";
   import { completed } from "../../core/completion";
   import { find } from "../../core/slash";
@@ -36,26 +36,23 @@
   import { canRecord } from "../../core/speaking";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
-  import Button from "../parts/button.svelte";
   import PillView from "./pill.svelte";
-  import Record from "./record.svelte";
-  import Send from "./send.svelte";
+  import Actions from "./actions.svelte";
   import Popover from "../parts/popover.svelte";
   import {
-    decodeRoom,
     draftAt,
-    effortLevel,
     menuColumns,
-    modelMove,
     pickSlash,
+    picksFor,
     pills,
     roomsKnown,
     sessionModel,
     slashHands,
   } from "./composer";
-  import type { Picks } from "./composer";
   import { IDLE, hand, settle } from "./handing";
   import type { Handing } from "./handing";
+  import { dropped, insertAt } from "./dropping";
+  import type { Kept } from "./dropping";
 
   interface ComposerProps {
     readonly placeholder: string;
@@ -183,46 +180,16 @@
   // The run this box would steer: what a typed `/stop` reaches too.
   const live = $derived(here === null ? undefined : newestWorking($belief, here));
 
-  const picks: Picks = { model: pickModel, workspace: pickRoom, effort: pickEffort, mode: pickMode };
   const session = $derived(
     here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null),
   );
   const specs = $derived(
-    pills($lang, { served: models, chosen: main, session, rooms, here, effort: $effort, mode: $mode }, picks),
+    pills(
+      $lang,
+      { served: models, chosen: main, session, rooms, here, effort: $effort, mode: $mode },
+      picksFor(u, here, session),
+    ),
   );
-
-  // A new session takes the model `main` names when it opens, so the
-  // select goes first.
-  function pickModel(value: string): void {
-    const move = modelMove(value, session);
-    switch (move.kind) {
-      case "stay":
-        return;
-      case "select":
-        u.send(selectModel(move.names.endpoint, move.names.model, "main"));
-        return;
-      case "reopen":
-        if (here === null) return;
-        u.send(selectModel(move.names.endpoint, move.names.model, "main"));
-        u.send(openSession(here, "nothing", null));
-        return;
-    }
-  }
-
-  function pickRoom(value: string): void {
-    const address = decodeRoom(value);
-    if (address === null) return;
-    u.go({ kind: "talk", address });
-  }
-
-  function pickEffort(value: string): void {
-    u.chooseEffort(effortLevel(value));
-  }
-
-  function pickMode(value: string): void {
-    const chosen = MODES.find((each) => each === value);
-    if (chosen !== undefined) u.chooseMode(chosen);
-  }
 
   // ------------------------------------------------------- the `/` menu
 
@@ -289,6 +256,32 @@
     open = text.startsWith("/");
   }
 
+  // ----------------------------------------------------------- dropping
+
+  // Whether a drag is over the box, and what the last drop could not keep.
+  let over = $state(false);
+  let unkept = $state<readonly Kept[]>([]);
+
+  function onDrop(event: DragEvent): void {
+    over = false;
+    const drop = dropped(event.dataTransfer, u.origin, u.pairing);
+    if (drop.kind === "nothing") return;
+    event.preventDefault();
+    unkept = [];
+    const place = (paths: readonly string[]): void => {
+      write(insertAt(text, box?.selectionStart ?? text.length, paths));
+      box?.focus();
+    };
+    if (drop.kind === "named") {
+      place(drop.paths);
+      return;
+    }
+    void drop.kept.then((kept) => {
+      place(kept.flatMap((each) => (each.kind === "path" ? [each.path] : [])));
+      unkept = kept.filter((each) => each.kind === "refused");
+    });
+  }
+
   // ---------------------------------------------------------- speaking
 
   function heardWords(words: string): void {
@@ -306,17 +299,31 @@
   });
 </script>
 
-<!-- Focus is said by the edge going from dashed to solid, and by
-     nothing else: a full-strength accent here made this box the
-     brightest rectangle on any page - brighter than the stop button.
-     The accent is a budget with two lines in it (client-SPEC 7B). -->
+<!-- Focus is said by the edge going from quiet to firm, and by nothing
+     else: a full-strength accent here made this box the brightest
+     rectangle on any page - brighter than the stop button. The accent
+     is a budget with two lines in it (client-SPEC 7B). A drag over the
+     box is said the same way, with the raised fill, so a person sees
+     where to let go. -->
 <form
-  class="relative rounded-panel border border-dashed border-edge-input bg-raised p-base shadow-float focus-within:border-solid"
+  class={[
+    "relative rounded-panel border bg-raised px-base pt-base pb-snug shadow-float focus-within:border-edge-input",
+    over ? "border-edge-input bg-raised-hover" : "border-edge-panel",
+  ]}
   aria-label={say($lang, "region_composer")}
   onsubmit={(event) => {
     event.preventDefault();
     submit();
   }}
+  ondragover={(event) => {
+    event.preventDefault();
+    over = true;
+  }}
+  ondragleave={(event) => {
+    const next = event.relatedTarget;
+    if (!(next instanceof Node && event.currentTarget.contains(next))) over = false;
+  }}
+  ondrop={onDrop}
 >
   {#if open && showing.length > 0}
     <Popover
@@ -337,7 +344,7 @@
   <textarea
     bind:this={box}
     bind:value={text}
-    class="block max-h-output w-full resize-none overflow-y-auto bg-transparent text-body leading-relaxed text-text field-sizing-content placeholder:text-text-faint"
+    class="block max-h-output min-h-control w-full resize-none overflow-y-auto bg-transparent px-tight text-body leading-relaxed text-text outline-none field-sizing-content placeholder:text-text-faint focus-visible:outline-none"
     rows={1}
     {placeholder}
     aria-label={placeholder}
@@ -346,34 +353,31 @@
     onkeydown={onKeydown}
     oninput={onInput}
   ></textarea>
-  <div class="mt-snug flex flex-wrap items-center gap-base text-note text-text-faint">
-    <div class="flex min-w-[min(100%,20rem)] grow flex-wrap items-center gap-tight">
+  {#each unkept as each (each.kind === "refused" ? each.name : "")}
+    {#if each.kind === "refused"}
+      <p class="px-tight text-note text-alert" role="alert">
+        {fill(say($lang, "talk_drop_refused"), { name: each.name, why: each.said === "" ? say($lang, "talk_not_live") : each.said })}
+      </p>
+    {/if}
+  {/each}
+  <div class="mt-snug flex items-center gap-tight text-note text-text-faint">
+    <div class="flex min-w-0 grow flex-wrap items-center gap-tight">
       <PillView spec={specs[0]} />
       <PillView spec={specs[1]} />
       <PillView spec={specs[2]} />
       <PillView spec={specs[3]} />
-      {#if hearing === true && canRecord()}
-        <Record onWords={heardWords} />
-      {/if}
       {#if kept}
         <span class="text-alert">{say($lang, "talk_not_live")}</span>
       {/if}
     </div>
-    <div class="ml-auto flex shrink-0 items-center gap-base">
-      {#if sending !== "dispatch"}
-        <Button
-          label={say($lang, "talk_stop")}
-          tone="destructive"
-          onPress={() => {
-            onStop();
-          }}
-        />
-      {/if}
-      <Send {sending} {handed} {here} empty={text.trim() === ""} />
-    </div>
+    <Actions
+      {sending}
+      {handed}
+      {here}
+      empty={text.trim() === ""}
+      hearing={hearing === true && canRecord()}
+      onWords={heardWords}
+      {onStop}
+    />
   </div>
-  {#if text !== ""}
-    <!-- What two keys do, drawn only while there is something to send (ux A3). -->
-    <p class="mt-tight text-note text-text-faint">{say($lang, "talk_enter_hint")}</p>
-  {/if}
 </form>

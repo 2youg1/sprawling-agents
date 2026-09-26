@@ -26,7 +26,7 @@
   import type { Snippet } from "svelte";
   import type { Query, RunId, Turn } from "../../wire";
   import { ui } from "../../ui";
-  import Button from "../parts/button.svelte";
+  import Failed from "./failed.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import Prose from "../prose.svelte";
   import Calls from "./calls.svelte";
@@ -295,28 +295,25 @@ said, and what that cost. -->
     <Saying text={run.saying} {who} />
   {/if}
   {#if emptyRun}
-    <!-- The zero-output run: the reason it stopped and one way out, the
-         verb spelled as the command it sends (client-SPEC 4-10). -->
-    <div class="my-snug rounded-card border border-alert/40 px-base py-snug text-note text-alert">
-      <div>
-        {ceiling === null
+    <!-- The zero-output run: what happened where the reply would have
+         been, and one way out, the verb spelled as the command it sends
+         (client-SPEC 4-10). A run the person stopped says so rather
+         than blaming the model. -->
+    {@const stopped = (answer?.closing?.completion ?? (run.doing.kind === "frozen" ? run.doing.completion : null)) === "cancelled"}
+    <Failed
+      what={stopped
+        ? say($lang, "talk_failed_cancelled")
+        : ceiling === null
           ? say($lang, "talk_said_nothing")
           : fill(say($lang, "talk_said_nothing_capped"), { n: count(ceiling) })}
-      </div>
-      {#if why !== null}
-        <div class="mt-tight">{fill(say($lang, "talk_cut_off"), { why })}</div>
-      {/if}
-      {#if onRetry !== undefined}
-        <div class="mt-tight">
-          <Button
-            label={say($lang, "talk_send")}
-            onPress={() => {
-              onRetry(task);
-            }}
-          />
-        </div>
-      {/if}
-    </div>
+      settings={stopped ? "absent" : "offered"}
+      onRetry={onRetry === undefined ? undefined : () => {
+        onRetry(task);
+      }}
+    />
+    {#if why !== null}
+      <div class="text-note text-text-faint">{fill(say($lang, "talk_cut_off"), { why })}</div>
+    {/if}
   {/if}
   {#if !frozen && !streaming}
     <div class="my-snug flex items-center gap-snug text-note text-text-faint">

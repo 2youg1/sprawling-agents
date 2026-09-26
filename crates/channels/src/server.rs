@@ -25,7 +25,8 @@ mod uploads;
 
 pub use committed::Committed;
 pub use config::{
-    AcpProgress, AcpSink, Answering, LedgerHead, MonitorFeed, ServeConfig, TranscribeSink, router,
+    AcpProgress, AcpSink, Answering, DROP_BYTES_MAX, DropSink, LedgerHead, MonitorFeed,
+    ServeConfig, TranscribeSink, router,
 };
 pub use listener::{Bound, bind, serve};
 pub use reply::{Delivered, Reply};

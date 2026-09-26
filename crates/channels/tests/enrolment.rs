@@ -96,6 +96,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         },
         client: Arc::new(channels::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
+        drop_sink: Arc::new(|_, _| Ok(String::new())),
         transcribe_sink: Arc::new(|_, _| {
             Err(AxError::failure(
                 AxCode::ToolUnavailable,

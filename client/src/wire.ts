@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 41 as const;
+export const WIRE_V = 42 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "676cc8466f916e04bfcc460a007c0e8f26fef303cbd8d19f10fe55759c2343ee" as const;
+export const WIRE_HASH = "b9ab170a03bb161ccd28562314a4607d7d0f5aa7f8e90afe2492596f5c78f776" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `channels::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -2662,6 +2662,7 @@ export type LoginStep = typeof LoginStep.Type;
  * which ones exist.
  */
 export const Mode = Schema.Union(
+  Schema.Literal("chat"),
   Schema.Literal("plan_goal"),
   Schema.Literal("up"),
   Schema.Literal("sc"),

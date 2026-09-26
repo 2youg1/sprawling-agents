@@ -11,6 +11,8 @@
   // Any other refusal has only the city's sentence, shown as it is.
   import { say } from "../../core/lang";
   import { providerClause } from "../../core/provider_failure";
+  import { toFragment } from "../../core/route";
+  import { settledBySettings } from "./refused";
   import { ui } from "../../ui";
   import type { AxError } from "../../wire";
 
@@ -30,5 +32,11 @@
     {/if}
   {:else if error.recovery !== ""}
     <div class="mt-tight text-text-faint">{error.recovery}</div>
+  {/if}
+  {#if settledBySettings(error)}
+    <!-- The next step, where the model or its provider stood in the way. -->
+    <a href={toFragment({ kind: "setup" })} class="mt-snug inline-block text-text-quiet underline hover:text-text">
+      {say($lang, "talk_open_settings")}
+    </a>
   {/if}
 </div>

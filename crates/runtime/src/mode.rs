@@ -60,10 +60,16 @@ pub fn dev_entry() -> CatalogEntry {
 }
 
 /// The catalog row for this mode: disclosure one-liner plus the
-/// expansion text (plan_goal carries its four exit conditions).
+/// expansion text (plan_goal carries its four exit conditions). The
+/// chat row is the whole of what chat mode does: one line telling the
+/// resident that the person is talking with it.
 #[must_use]
 pub fn catalog_entry(mode: Mode) -> CatalogEntry {
     let (disclosure, expansion) = match mode {
+        Mode::Chat => (
+            "chat mode: focus on conversing with the person; answer what they said, in their language",
+            "Reply in the conversation. Start work, plans or dispatches only when the person asks for them.",
+        ),
         Mode::PlanGoal => (
             "plan first, then execute toward the stated goal; report when the goal is met",
             "Write the plan into Roadmap.md before edits. Exit plan_goal and work \
@@ -135,6 +141,7 @@ pub enum Admission {
 #[must_use]
 pub fn admits(mode: Mode, produced: &Produced) -> Admission {
     match mode {
+        Mode::Chat => Admission::Lands,
         Mode::PlanGoal => Admission::Lands,
         Mode::Up => match produced.tests_passed {
             Some(true) => Admission::Lands,
@@ -191,6 +198,21 @@ pub fn admits(mode: Mode, produced: &Produced) -> Admission {
 )]
 mod tests {
     use super::*;
+
+    /// A chat run is told one thing, to talk with the person, and is
+    /// held to nothing else: whatever it produced lands.
+    #[test]
+    fn chat_is_one_line_about_the_conversation_and_holds_nothing_back() {
+        let entry = catalog_entry(Mode::Chat);
+        assert_eq!(entry.name, "mode:chat");
+        assert!(entry.disclosure.contains("convers"), "{}", entry.disclosure);
+        assert!(!entry.disclosure.contains('\n'), "one line");
+        assert!(
+            !entry.expansion.is_empty(),
+            "a read of the entry says something"
+        );
+        assert_eq!(admits(Mode::Chat, &Produced::default()), Admission::Lands);
+    }
 
     #[test]
     fn up_wants_the_asset_proven_and_says_which_way_it_failed() {

@@ -54,10 +54,14 @@ export type GlyphName =
   | "check"
   // A wrench: a tool is at work.
   | "tool"
-  // A square, the stop key of every player: somebody stopped it.
-  | "stopped"
+  // A square, the stop key of every player: stop what is going, and the
+  // mark of a run somebody stopped, so the control and its outcome read
+  // as one shape.
+  | "stop"
   // A line that runs into a wall: it ran out of what it was allowed.
-  | "capped";
+  | "capped"
+  // An arrow rising from the box: send what is written.
+  | "send";
 
 export const GLYPHS: Record<GlyphName, string> = {
   talk: "M3 5.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2z",
@@ -75,8 +79,9 @@ export const GLYPHS: Record<GlyphName, string> = {
   cross: "M5.5 5.5l9 9M14.5 5.5l-9 9",
   check: "M4 10.5l4 4 8-9",
   tool: "M13.5 3a3.5 3.5 0 0 0-3.3 4.7L3.5 14.4l2.1 2.1 6.7-6.7A3.5 3.5 0 0 0 17 6.5l-2.2.7-2-2 .7-2.2z",
-  stopped: "M6 6h8v8H6z",
+  stop: "M6 6h8v8H6z",
   capped: "M3 10h10M10 7l3 3-3 3M16 4v12",
+  send: "M10 16V4M5 9l5-5 5 5",
 };
 
 // The three paint tiers a mark may take (client-SPEC 4-32). They are

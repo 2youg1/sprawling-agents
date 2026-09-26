@@ -30,6 +30,8 @@ pub enum Door {
     Enroll,
     /// `POST /acp`: an outside editor driving the city.
     Acp,
+    /// `POST /drop`: a file written onto the city's disk.
+    Drop,
 }
 
 /// What a door does with one request, before any of its bytes are read.
@@ -66,7 +68,7 @@ pub enum Pairing {
 ///
 /// [`Door::Acp`] is admitted unpaired on purpose: what an
 /// unauthenticated editor may learn is `protocol::admit`'s to word, and
-/// it words it so that a stranger learns exactly one bit. The other two
+/// it words it so that a stranger learns exactly one bit. The other three
 /// doors act, so they refuse here.
 ///
 /// [`decide_bind`]: super::decide_bind
@@ -81,6 +83,7 @@ pub fn decide_admission(door: Door, offered: Option<&str>, face: &BindFace) -> A
     let action = match door {
         Door::Transcribe => "transcribe a recording",
         Door::Enroll => "enrol a credential",
+        Door::Drop => "keep a dropped file",
         Door::Acp => return Admission::Admit(Pairing::Absent),
     };
     Admission::Refuse(
@@ -135,8 +138,8 @@ mod tests {
     }
 
     #[test]
-    fn the_two_acting_doors_refuse_a_stranger_and_the_editor_door_carries_the_bit() {
-        for door in [Door::Transcribe, Door::Enroll] {
+    fn the_acting_doors_refuse_a_stranger_and_the_editor_door_carries_the_bit() {
+        for door in [Door::Transcribe, Door::Enroll, Door::Drop] {
             let Admission::Refuse(err) = decide_admission(door, None, &exposed()) else {
                 panic!("{door:?} acts on a request, so it refuses an unpaired one");
             };
@@ -154,7 +157,7 @@ mod tests {
 
     #[test]
     fn a_city_with_no_token_configured_admits_every_door() {
-        for door in [Door::Transcribe, Door::Enroll, Door::Acp] {
+        for door in [Door::Transcribe, Door::Enroll, Door::Acp, Door::Drop] {
             assert!(
                 matches!(
                     decide_admission(door, None, &unpaired()),

@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 
 /// Wire format version. Bumped whenever the frame grammar changes shape in a
 /// way the schema hash alone would not explain to a human reading a log.
-pub const WIRE_V: u32 = 41;
+pub const WIRE_V: u32 = 42;
 mod ask;
 mod monitor;
 mod query;

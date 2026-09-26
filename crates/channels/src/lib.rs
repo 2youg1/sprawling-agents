@@ -87,6 +87,8 @@ pub use server::{AcpProgress, AcpSink, Answering, MonitorFeed, TranscribeSink};
 #[cfg(feature = "server")]
 pub use server::{Bound, Committed, Delivered, LedgerHead, Reply, ServeConfig};
 #[cfg(feature = "server")]
+pub use server::{DROP_BYTES_MAX, DropSink};
+#[cfg(feature = "server")]
 pub use server::{bind, router, serve};
 #[cfg(feature = "schema")]
 pub use wire::wire_schema;

@@ -249,6 +249,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         // everything after that is the city's usual path.
         acp: Arc::new(move |body, pairing| acp_dispatch(&acp_desk, body, pairing)),
         transcribe_sink: hearing(audio_views, audio_vault),
+        drop_sink: super::dropping::dropping(city_root.to_path_buf()),
     };
     Ok(Listening {
         bound,

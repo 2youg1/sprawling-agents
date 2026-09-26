@@ -21,7 +21,7 @@ export const PHASE_MARK: Record<Phase, { readonly glyph: GlyphName; readonly wei
   person: { glyph: "hand", weight: "alert" },
   idle: { glyph: "ring", weight: "quiet" },
   done: { glyph: "check", weight: "quiet" },
-  stopped: { glyph: "stopped", weight: "quiet" },
+  stopped: { glyph: "stop", weight: "quiet" },
   capped: { glyph: "capped", weight: "alert" },
 };
 

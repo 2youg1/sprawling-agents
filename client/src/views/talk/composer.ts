@@ -13,10 +13,10 @@ import { Option, Schema } from "effect";
 
 import type { Belief, RunBelief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
-import { EFFORTS, MODES } from "../../core/commands";
+import { EFFORTS, MODES, openSession, selectModel } from "../../core/commands";
 import type { PreferenceDoor } from "../../core/prefs";
 import type { Key, Lang } from "../../core/lang";
-import { say } from "../../core/lang";
+import { fill, say } from "../../core/lang";
 import { MAYOR } from "../../core/route";
 import { UNSTATED, offered, parse } from "../../core/slash";
 import { reached } from "../../core/slash_hands";
@@ -25,7 +25,6 @@ import type { Sending } from "../../core/doing";
 import { Address } from "../../wire";
 import type { Command, Effort, Mode, Seq } from "../../wire";
 import type { View } from "../../core/route";
-import type { Choice } from "../parts/combobox.svelte";
 import type { PopoverColumn } from "../parts/popover";
 
 // What the send control is spelled, for each of the three places a
@@ -181,6 +180,17 @@ export function effortLevel(value: string): Effort | null {
   return EFFORTS.find((known) => known === value) ?? null;
 }
 
+// What sending to a room means, in one line: the Mayor's own room, a
+// bare building (a dispatch there opens a room of its own, client-SPEC
+// 12-6), or a room that carries on a conversation.
+function roomNote(lang: Lang, room: string): string {
+  if (room === MAYOR) return say(lang, "talk_room_note_mayor");
+  const slash = room.indexOf("/");
+  return slash < 0
+    ? say(lang, "talk_room_note_building")
+    : fill(say(lang, "talk_room_note_room"), { building: room.slice(0, slash) });
+}
+
 // The room a pill names, in the address spelling the wire brands.
 export function decodeRoom(value: string): Address | null {
   return Option.getOrNull(Schema.decodeOption(Address)(value));
@@ -195,9 +205,20 @@ export function roomsKnown(buildings: Iterable<{ readonly addr: string }>, opene
   return [...named].sort((a, b) => a.localeCompare(b));
 }
 
-// One pill of the row under the box.
+// One row of a pill's menu: the value a pick sends, the short name a
+// person reads, and one line saying what choosing it changes.
+export interface Choice {
+  readonly value: string;
+  readonly label: string;
+  readonly note?: string;
+}
+
+// One pill of the row under the box. `label` is the short name the
+// trigger and a screen reader say; `about`, when there is more to say,
+// heads the menu instead.
 export interface Pill {
   readonly label: string;
+  readonly about?: string;
   readonly placeholder: string;
   readonly choices: readonly Choice[];
   readonly value: string | null;
@@ -211,6 +232,38 @@ export interface Picks {
   readonly workspace: (value: string) => void;
   readonly effort: (value: string) => void;
   readonly mode: (value: string) => void;
+}
+
+// The page's hands a pick reaches for.
+export interface PickHands {
+  readonly send: (command: Command) => boolean;
+  readonly go: (view: View) => void;
+  readonly chooseEffort: (effort: Effort | null) => void;
+  readonly chooseMode: (mode: Mode) => void;
+}
+
+// What a pick of each pill does. A new session takes the model `main`
+// names when it opens, so the select goes before the open.
+export function picksFor(hands: PickHands, here: Address | null, session: string | null): Picks {
+  return {
+    model: (value) => {
+      const move = modelMove(value, session);
+      if (move.kind === "stay" || (move.kind === "reopen" && here === null)) return;
+      hands.send(selectModel(move.names.endpoint, move.names.model, "main"));
+      if (move.kind === "reopen" && here !== null) hands.send(openSession(here, "nothing", null));
+    },
+    workspace: (value) => {
+      const address = decodeRoom(value);
+      if (address !== null) hands.go({ kind: "talk", address });
+    },
+    effort: (value) => {
+      hands.chooseEffort(effortLevel(value));
+    },
+    mode: (value) => {
+      const chosen = MODES.find((each) => each === value);
+      if (chosen !== undefined) hands.chooseMode(chosen);
+    },
+  };
 }
 
 // Everything the pills read off the page and the city, gathered so the
@@ -233,7 +286,8 @@ export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill,
   const levels: readonly (typeof UNSTATED | Effort)[] = [UNSTATED, ...EFFORTS];
   return [
     {
-      label: say(lang, around.session === null ? "talk_column_model" : "talk_model_locked"),
+      label: say(lang, "talk_column_model"),
+      ...(around.session === null ? {} : { about: say(lang, "talk_model_locked") }),
       placeholder: say(lang, "talk_no_model"),
       ...modelRows(lang, around),
       pick: picks.model,
@@ -241,7 +295,7 @@ export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill,
     {
       label: say(lang, "talk_column_workspace"),
       placeholder: say(lang, "talk_column_workspace"),
-      choices: around.rooms.map((room) => ({ value: room, label: room })),
+      choices: around.rooms.map((room) => ({ value: room, label: room, note: roomNote(lang, room) })),
       value: around.here,
       pick: picks.workspace,
     },
@@ -259,7 +313,7 @@ export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill,
     {
       label: say(lang, "talk_column_mode"),
       placeholder: say(lang, "talk_column_mode"),
-      choices: MODES.map((each) => ({ value: each, label: say(lang, `mode_${each}`) })),
+      choices: MODES.map((each) => ({ value: each, label: say(lang, `mode_${each}`), note: say(lang, `mode_note_${each}`) })),
       value: around.mode,
       pick: picks.mode,
     },

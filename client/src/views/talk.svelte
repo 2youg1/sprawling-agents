@@ -6,21 +6,17 @@
 
 <script lang="ts">
   // The first page: one conversation with one room, the Mayor's unless
-  // the address says otherwise. Every run in the room is a stretch of
-  // the same thread; what waits for the person is a card in the same
-  // thread; and the box at the bottom either steers the run that is
-  // going or opens the next one.
+  // the address says otherwise, laid out as a chat page is - one centred
+  // column the height of the window, words flowing down it, the box
+  // pinned at the foot. Every run in the room is a stretch of the same
+  // thread; what waits for the person is a card in it; and the box
+  // either steers the run that is going or opens the next one.
   //
-  // A session is a stretch of the room, not the room (roadmap S1): the
-  // runs this session opened are the thread, everything before them
-  // folds behind one line, and how the stretch began - freshly or by a
-  // branch - is drawn where the two meet.
-  //
-  // Beside the conversation, once the room is wide enough to hold two
-  // columns, stands what the run produced. The width that decides it is
-  // the main region's, asked with a container query: an open rail takes
-  // 232px of the window, so a layout that asked the window would put two
-  // columns into a space that holds one.
+  // A session is a stretch of the room, not the room (roadmap S1): runs
+  // before it fold behind one line, and how it began is drawn where the
+  // two meet. Beside the conversation, once the main region is wide
+  // enough (a container query, because an open rail takes 232px of the
+  // window), stands what the run produced.
   import { cancel, dispatch, openSession, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
   import { newestWorking } from "../core/belief/live";
@@ -48,6 +44,11 @@
   import { NOTHING, artifactsIn } from "./talk/trace";
   import Inbox from "./talk/inbox.svelte";
   import Waiting from "./talk/waiting.svelte";
+  import ContextStrip from "./talk/context_strip.svelte";
+  import Failed from "./talk/failed.svelte";
+  import { IDLE, hand, settle } from "./talk/handing";
+  import type { Handing } from "./talk/handing";
+  import type { AxError } from "../wire";
 
   interface Props {
     readonly address: Address;
@@ -157,9 +158,29 @@
     const went = u.send(
       dispatch({ addr: address, task: text, goal: say($lang, "talk_goal"), effort: $effort, mode: $mode }),
     );
-    if (went) sent = sentFrom(address, text, $belief.runs);
+    if (went) {
+      sent = sentFrom(address, text, $belief.runs);
+      refused = null;
+      handing = hand(text, $belief);
+    }
     return went;
   }
+
+  // A dispatch the city refused never becomes a run, so the thread has
+  // no place to say so; the refusal is drawn where the reply would have
+  // been, above the box that got the words back (`handing.ts` reads
+  // which refusal answers which send).
+  let handing: Handing = IDLE;
+  let refused = $state<{ readonly words: string; readonly error: AxError } | null>(null);
+  $effect(() => {
+    const now = $belief;
+    const held = handing;
+    const next = settle(held, now, "");
+    handing = next.handing;
+    if (next.box !== null && held.kind === "handed" && now.refusal !== null) {
+      refused = { words: held.words, error: now.refusal };
+    }
+  });
 
   // One branch, from wherever a person pointed: the words a message
   // carries go back to the box through the draft door - the composer
@@ -237,6 +258,17 @@
 
 {#snippet drawComposer()}
   <Landed {landing} />
+  {#if refused !== null}
+    <Failed
+      what={refused.error.code === "E_MODEL_UNCHOSEN" ? say($lang, "talk_failed_model") : say($lang, "talk_failed_refused")}
+      error={refused.error}
+      onRetry={() => {
+        const words = refused?.words;
+        refused = null;
+        if (words !== undefined) send(words);
+      }}
+    />
+  {/if}
   <Composer
     {placeholder}
     sending={sendingInto(live?.doing)}
@@ -248,6 +280,7 @@
       return going === undefined ? false : u.send(cancel(going.run));
     }}
   />
+  <ContextStrip {address} run={current?.run} />
 {/snippet}
 
 <div class="flex min-h-0 flex-1 flex-col @lg/page:flex-row">
@@ -272,21 +305,21 @@
     {/if}
     <div
       bind:this={scroller}
-      class="min-h-0 flex-1 overflow-y-auto"
+      class="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]"
       onscroll={(event) => {
         anchoring = anchorAt({ kind: "scrolled", foot: footOf(event.currentTarget) });
       }}
     >
-      <!-- An empty room opens with the box about a third of the way down
-           the page, because the first thing asked of a person here is to
-           say something and a composer pinned to the foot of two
-           thousand pixels of nothing reads as broken (ux A4). It rides
-           down to the bar on the first send. -->
+      <!-- An empty room holds the greeting and the box in the middle of
+           the window, the way a chat page opens, because the first thing
+           asked of a person here is to say something and a composer
+           pinned to the foot of two thousand pixels of nothing reads as
+           broken (ux A4). It rides down to the bar on the first send. -->
       <div
         bind:this={column}
         class={[
-          "mx-auto flex min-h-full w-full max-w-talk flex-col px-pane pb-wide",
-          runs.length === 0 ? "justify-start pt-[18vh]" : "justify-end pt-wide",
+          "mx-auto flex min-h-full w-full max-w-talk flex-col px-pane",
+          runs.length === 0 ? "justify-center pb-section" : "justify-end pt-wide pb-wide",
         ]}
       >
         <!-- The page's own name, and it is always here: a reader
@@ -302,21 +335,21 @@
           {isMayor ? say($lang, "talk_empty_mayor") : who}
         </h1>
         {#if !isMayor && runs.length === 0}
-          <p class="mb-wide text-note text-text-faint">{address}</p>
+          <p class="mb-wide text-center text-note text-text-faint">{address}</p>
         {/if}
         {#if runs.length === 0}
-          <div class="flex flex-col items-center gap-base py-section text-center">
-            <p class="text-heading font-heading text-text-faint">
+          <div class="flex flex-col items-center gap-base text-center">
+            <p class="text-heading font-heading text-text">
               {isMayor
                 ? say($lang, "talk_empty_mayor")
                 : fill(say($lang, "talk_empty_room"), { room: who })}
             </p>
-            <p class="text-note text-text-faint">
+            <p class="mb-base text-note text-text-quiet">
               {isMayor
                 ? say($lang, "talk_opening_mayor")
                 : fill(say($lang, "talk_opening_room"), { room: who })}
             </p>
-            <div class="w-full">{@render composer()}</div>
+            <div class="w-full text-left">{@render composer()}</div>
           </div>
           <!-- The queue is drawn in an empty room too: "N waiting" links
               to the mayor's room, which a person who only worked in a

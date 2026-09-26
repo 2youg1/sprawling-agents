@@ -80,7 +80,7 @@ The ones whose arguments need saying:
 
 | Command | What it does |
 |---|---|
-| `dispatch {addr, task, goal, mode, idem, session, effort, model}` | put a room to work. `session: "name"` opens a room of that name under a building; `session: null` continues the room `addr` already names. `mode` is one of `plan_goal`, `up`, `sc`, `ud`, `experiment`. `model: null` continues on the room's model, or takes `main`'s for a new room; an id names one registered model, and an id the city never registered is refused before anything is written. A dispatch carries no spending limit |
+| `dispatch {addr, task, goal, mode, idem, session, effort, model}` | put a room to work. `session: "name"` opens a room of that name under a building; `session: null` continues the room `addr` already names. `mode` is one of `chat`, `plan_goal`, `up`, `sc`, `ud`, `experiment`; `chat` tells the resident to converse with the person and changes nothing else. `model: null` continues on the room's model, or takes `main`'s for a new room; an id names one registered model, and an id the city never registered is refused before anything is written. A dispatch carries no spending limit |
 | `pursue {addr, step, idem}` | `step` is `{"set": {"goal": "…"}}`, `"pause"`, `"resume"` or `"clear"`: a goal the building keeps working towards until the work runs out |
 | `steer {run, text, idem}` | add an instruction to a run without stopping it; it lands after the next tool result |
 | `cancel {run, idem}` | stop one run |
