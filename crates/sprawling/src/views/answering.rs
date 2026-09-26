@@ -272,12 +272,10 @@ impl Views {
                     pins: self.skill_pins.clone(),
                 };
             }
-            channels::Query::GitStatus { building } => {
-                match self.git_status_ask(building) {
-                    Some(ask) => return Prepared::GitStatus(ask),
-                    None => unavailable(format!("GitStatus({})", building.as_str())),
-                }
-            }
+            channels::Query::GitStatus { building } => match self.git_status_ask(building) {
+                Some(ask) => return Prepared::GitStatus(ask),
+                None => unavailable(format!("GitStatus({})", building.as_str())),
+            },
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }
@@ -288,7 +286,7 @@ impl Views {
             channels::Query::Toolkits => {
                 channels::Answer::Toolkits(Box::new(self.toolkits_answer()))
             }
-            channels::Query::Release => return Prepared::Release,
+            channels::Query::NewestRelease => return Prepared::Release,
             channels::Query::BuildingView { addr } => {
                 let city_root = self.city_root.clone();
                 let plan = self.plans.of(&city_root, addr);

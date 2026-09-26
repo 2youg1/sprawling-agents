@@ -15,7 +15,7 @@ use kernel::{Locator, RunId, TimeMs};
 use crate::serving::CommandDesk;
 
 use super::super::RunWorker;
-use super::Agreed;
+use super::{Agreed, Assignment};
 use crate::assembly::credentials::dialect_headers;
 
 /// A run's identity, derived rather than drawn: the same job dispatched
@@ -87,6 +87,7 @@ pub(crate) fn acp_dispatch(
             // ...and says nothing about how hard to think, so the
             // layers above answer.
             effort: None,
+            model: None,
         },
         channels::Reply::nowhere(),
     );
@@ -116,7 +117,8 @@ impl RunWorker {
     /// load, a tag with no model behind it, an endpoint that is no
     /// longer attached, a confidential building whose model would leave
     /// this machine, and a subscription credential that will not renew.
-    pub(super) fn agree_to_work(&mut self, addr: &Address) -> Result<Agreed, AxError> {
+    pub(super) fn agree_to_work(&mut self, at: &Assignment) -> Result<Agreed, AxError> {
+        let addr = &at.addr;
         if let Some(scope) = self.halted_by(addr) {
             return Err(AxError::failure(
                 AxCode::GateDenied,
@@ -132,13 +134,17 @@ impl RunWorker {
         // reach, so they are read before one is chosen.
         let building = city::Building::of(addr)?;
         let rules = city::load(&self.city_root, building.addr())?;
-        let chosen = self.book.select(kernel::ModelTag::Main, rules.policy())?;
+        // A run that names no model - a successor, a wake knock, a
+        // follow-up without `-m` - continues on what the room froze.
+        let own = city::own_layer(&self.city_root, addr)?;
+        let tag = self.tag_for(at.model.as_deref().or(own.model()))?;
+        let chosen = self.book.select(tag, rules.policy())?;
         // A subscription credential that expires mid-run is a run that
         // dies on its second turn, so it is renewed before the run
         // starts rather than after a call comes back refused. The
         // endpoint a login attached carries the provider's own name.
         self.renew_if_stale(&chosen.endpoint.name.clone())?;
-        let chosen = self.book.select(kernel::ModelTag::Main, rules.policy())?;
+        let chosen = self.book.select(tag, rules.policy())?;
         let model = chosen.entry.clone();
         let provider = chosen.endpoint.name.clone();
         let adapter = gateway::adapter_for(
@@ -216,6 +222,29 @@ impl RunWorker {
             }
         }
         Ok(())
+    }
+
+    /// The tag whose registration a dispatch runs on: `main` when
+    /// neither it nor its room named a model, else the tag the named id was registered under,
+    /// so the endpoint, the window and the policy check come with it.
+    ///
+    /// # Errors
+    /// Refuses an id no tag registered, before anything is written.
+    fn tag_for(&self, model: Option<&str>) -> Result<kernel::ModelTag, AxError> {
+        let Some(id) = model else {
+            return Ok(kernel::ModelTag::Main);
+        };
+        self.book
+            .choices()
+            .find_map(|(tag, _, entry)| (entry.id == id).then_some(tag))
+            .ok_or_else(|| {
+                AxError::failure(
+                    AxCode::ConfigInvalid,
+                    "dispatch work",
+                    format!("no tag registers the model {id}"),
+                )
+                .with_recovery("register it under a tag on the settings page, then dispatch again")
+            })
     }
 }
 

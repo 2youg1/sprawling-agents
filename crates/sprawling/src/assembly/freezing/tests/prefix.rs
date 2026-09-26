@@ -49,6 +49,7 @@ fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -88,6 +89,7 @@ fn a_building_without_the_file_gets_no_heading_for_it() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -132,6 +134,7 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -174,6 +177,7 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     // Find the mother's run_started node in the verified chain.
@@ -230,6 +234,7 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"carry-on"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let after = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
@@ -291,6 +296,7 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

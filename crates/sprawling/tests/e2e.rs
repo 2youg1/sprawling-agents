@@ -182,6 +182,7 @@ fn dispatch(worker: &mut RunWorker) -> Result<(), AxError> {
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-dispatch"),
         session: Some(kernel::SessionName::parse(SESSION)?),
         effort: None,
+        model: None,
     })?;
     Ok(())
 }

@@ -75,6 +75,7 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
         Verb::Install => install(args),
         Verb::Doctor => sprawling::doctor::verb(args),
         Verb::Call => call(args).into(),
+        Verb::Dispatch => super::dispatch::verb(read),
         Verb::Enrol => enrol(read),
         Verb::Serve => serve(nth(1), nth(2), args),
         Verb::Export => export(nth(1), nth(2)),

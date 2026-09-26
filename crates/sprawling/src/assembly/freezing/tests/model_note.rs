@@ -43,6 +43,7 @@ fn system_prompt_with_a_note_for(noted: &str) -> String {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     // The first chat request: the endpoint also answers a model listing,

@@ -23,6 +23,7 @@ pub(super) fn asked(addr: &str) -> Assignment {
         addr: Address::parse(addr).unwrap(),
         session: None,
         effort: None,
+        model: None,
         mode: kernel::Mode::PlanGoal,
         parent: None,
         succession: None,
@@ -246,6 +247,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
             idem: key(b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         },
         channels::Reply::nowhere(),
     );

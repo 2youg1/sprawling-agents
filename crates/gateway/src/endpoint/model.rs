@@ -70,7 +70,12 @@ impl Model for Endpoint {
             let headers = response.headers().clone();
             return Err(provider_err(
                 "call provider",
-                &ProviderFailure::refusal(&self.config.base_url, status, &headers, &response.text()),
+                &ProviderFailure::refusal(
+                    &self.config.base_url,
+                    status,
+                    &headers,
+                    &response.text(),
+                ),
             ));
         }
         // A cut stream surfaces here as a body read error — no partial

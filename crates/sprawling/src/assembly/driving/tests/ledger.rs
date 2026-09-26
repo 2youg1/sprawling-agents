@@ -87,6 +87,7 @@ fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"order"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     drop(provider);
@@ -165,6 +166,7 @@ fn a_resident_crosses_two_runs_with_the_same_identity_segment() {
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, task.as_bytes()),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
     }
@@ -213,6 +215,7 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -268,6 +271,7 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"whose"),
             session: None,
             effort: Some(kernel::Effort::High),
+            model: None,
         })
         .unwrap();
 

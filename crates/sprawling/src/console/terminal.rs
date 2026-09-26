@@ -193,6 +193,14 @@ pub(super) fn drive<R: BufRead, W: Write>(
     input: &mut R,
     out: &mut W,
 ) {
+    let mut keys = match LineKeys::drawn() {
+        Ok(keys) => keys,
+        Err(err) => {
+            say(out, &format!("  {err}"));
+            say(out, &format!("  {}", err.recovery()));
+            return;
+        }
+    };
     let mut selected: Option<Address> = None;
     let mut typed = String::new();
     loop {
@@ -206,7 +214,8 @@ pub(super) fn drive<R: BufRead, W: Write>(
             Ok(0) | Err(_) => return,
             Ok(_) => {}
         }
-        match parse(&typed, selected.as_ref()) {
+        let idem = keys.next();
+        match parse(&typed, selected.as_ref(), idem) {
             Line::Nothing => {}
             Line::Help => {
                 say(out, &help(selected.as_ref()));
@@ -241,17 +250,19 @@ pub(super) fn drive<R: BufRead, W: Write>(
                     say(out, &format!("  did you mean: {}", nearest.join(", ")));
                 }
             }
+            Line::Malformed { verb, reason } => {
+                say(out, &format!("  `/{verb}` cannot be read: {reason}"));
+                say(
+                    out,
+                    "  the body is the wire's own JSON; `idem` may be left out",
+                );
+            }
             Line::Frame(frame) => post(desk, answering, *frame, out),
             Line::Work(task) => {
                 let Some(addr) = selected.clone() else {
                     continue;
                 };
-                match dispatch(&addr, &task) {
-                    Ok(frame) => post(desk, answering, frame, out),
-                    Err(err) => {
-                        say(out, &format!("  {err}"));
-                    }
-                }
+                post(desk, answering, dispatch(&addr, &task, idem), out);
             }
         }
     }
@@ -319,27 +330,59 @@ fn answer<W: Write>(answering: &Answering, query: channels::Query, out: &mut W) 
 }
 
 /// A line of work, as the Command a browser would have sent for it.
+fn dispatch(addr: &Address, task: &str, idem: kernel::IdemKey) -> channels::ClientFrame {
+    channels::ClientFrame::Command(Box::new(channels::WireCommand::Dispatch {
+        addr: addr.clone(),
+        task: task.to_owned(),
+        goal: String::new(),
+        mode: channels::Mode::PlanGoal,
+        idem,
+        // `/at` already chose the room; a line typed after it
+        // continues what is working there.
+        session: None,
+        effort: None,
+        model: None,
+    }))
+}
+
+/// One idempotency key per typed line.
 ///
-/// # Errors
-/// Refuses only when the mode tag this console names stops being a mode
-/// tag, which would be a change in `channels::wire` this file has not
-/// followed - so it is reported rather than assumed away.
-fn dispatch(addr: &Address, task: &str) -> Result<channels::ClientFrame, kernel::AxError> {
-    Ok(channels::ClientFrame::Command(Box::new(
-        channels::WireCommand::Dispatch {
-            addr: addr.clone(),
-            task: task.to_owned(),
-            goal: String::new(),
-            mode: channels::Mode::PlanGoal,
-            idem: kernel::IdemKey::derive(
-                &kernel::RunId::CITY,
-                kernel::Seq::FIRST,
-                format!("console:{}:{task}", addr.as_str()).as_bytes(),
-            ),
-            // `/at` already chose the room; a line typed after it
-            // continues what is working there.
-            session: None,
-            effort: None,
-        },
-    )))
+/// The city answers a key it has seen with its first answer, and keeps
+/// every key across restarts, so a key derived from the words alone
+/// swallowed a line typed twice and replayed a refusal after its cause
+/// was fixed. The line count separates two lines of one console; the
+/// origin, drawn from OS entropy, separates two consoles that reach the
+/// same count.
+struct LineKeys {
+    origin: [u8; 16],
+    lines: kernel::Seq,
+}
+
+impl LineKeys {
+    fn drawn() -> Result<LineKeys, kernel::AxError> {
+        let mut origin = [0u8; 16];
+        getrandom::fill(&mut origin).map_err(|err| {
+            kernel::AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "draw an origin for this console's keys",
+                err.to_string(),
+            )
+            .with_recovery(
+                "this machine's entropy source refused; the city keeps serving, drive it from the WebUI or `sprawling call`",
+            )
+        })?;
+        Ok(LineKeys {
+            origin,
+            lines: kernel::Seq::FIRST,
+        })
+    }
+
+    /// The key for the line just read, advancing to the next line.
+    fn next(&mut self) -> kernel::IdemKey {
+        let key = kernel::IdemKey::derive(&kernel::RunId::CITY, self.lines, &self.origin);
+        // A console that has read 2^64 lines reuses its last key; no
+        // person reaches it, and wrapping would reuse the first one.
+        self.lines = self.lines.next().unwrap_or(self.lines);
+        key
+    }
 }

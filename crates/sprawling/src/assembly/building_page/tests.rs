@@ -257,6 +257,7 @@ fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     assert!(

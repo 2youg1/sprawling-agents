@@ -55,6 +55,7 @@ fn a_written_key_reaches_the_vault_and_not_the_file() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"write"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -108,6 +109,7 @@ fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
             addr: Address::parse("lab/room1").unwrap(),
             task: "read the token".to_owned(),
             goal: "the token is known".to_owned(),
+            model: None,
             mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"read"),
             session: None,

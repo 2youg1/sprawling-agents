@@ -57,6 +57,14 @@ pub enum Command<Secret = Sealed<String>> {
         /// its room is opened, so it is chosen once and holds for every
         /// run in that room (city-SPEC.md section 8-14).
         effort: Option<Effort>,
+        /// Which registered model this one dispatch calls, by its id.
+        ///
+        /// `None` takes the model behind the `main` tag. A value names a
+        /// model the city registered under some tag, so it arrives with
+        /// the endpoint and the window it was registered with; an id the
+        /// city never registered is refused before anything is written
+        /// (channels-SPEC.md section 8-48).
+        model: Option<String>,
     },
     /// One step of a subscription login. Which step is named rather
     /// than inferred: beginning and redeeming are different actions

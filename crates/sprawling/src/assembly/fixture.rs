@@ -203,6 +203,7 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let joined = worker.joins.get(&room).map_or(0, |j| j.artifacts().count());

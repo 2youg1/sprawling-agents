@@ -42,6 +42,10 @@ pub(super) struct Assignment {
     /// caller said. It is written into the room's own configuration
     /// layer, so it cannot be answered before the room exists.
     pub(super) effort: Option<kernel::Effort>,
+    /// The registered model this dispatch named by id, when it named
+    /// one; `None` runs on the `main` tag's model. Spent by agreeing,
+    /// which finds the tag that registered it (sprawling-SPEC.md 8-10).
+    pub(super) model: Option<String>,
     pub(super) mode: kernel::Mode,
     /// The run that handed this work down, when somebody did.
     pub(super) parent: Option<RunId>,

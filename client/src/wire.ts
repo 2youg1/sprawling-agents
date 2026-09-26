@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 40 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "1dbef54ae8af494c7f0ff3cff7c8753f9d797960f4876a3ea5a129c6ce6f90de" as const;
+export const WIRE_HASH = "d6a99c1be4efa307d998a6b9a43daf67cf18f227d10afecf2edf8f593872742f" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 
@@ -755,6 +755,18 @@ export const ContentAnswer = Schema.Struct({
 export type ContentAnswer = typeof ContentAnswer.Type;
 
 /**
+ * The model calls that came back with no authoritative amount, and the
+ * tokens they used. A city whose provider never prices a call has a
+ * zero `total` after any number of runs; this is what tells that city
+ * apart from one where nothing ran.
+ */
+export const UnpricedCalls = Schema.Struct({
+  calls: Schema.Int,
+  tokens: Schema.Int,
+}).annotations({ identifier: "UnpricedCalls" });
+export type UnpricedCalls = typeof UnpricedCalls.Type;
+
+/**
  * The five cuts of one authoritative total. Four cuts sum to `total`;
  * `by_run` names the active runs and the few billed most, so it may sum
  * to less. Shares render against `total`, so a remainder stays visible.
@@ -766,6 +778,7 @@ export const CostAnswer = Schema.Struct({
   by_skill: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
   by_tool: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
   total: UsdMicros,
+  unpriced: UnpricedCalls,
 }).annotations({ identifier: "CostAnswer" });
 export type CostAnswer = typeof CostAnswer.Type;
 
@@ -2421,7 +2434,7 @@ export const Query = Schema.Union(
     }),
   }),
   Schema.Literal("toolkits"),
-  Schema.Literal("release"),
+  Schema.Literal("newest_release"),
   Schema.Literal("preferences"),
   Schema.Struct({
     config: Schema.Struct({
@@ -2712,6 +2725,7 @@ export const Command = Schema.Union(
       goal: Schema.String,
       idem: IdemKey,
       mode: Mode,
+      model: Schema.optional(Schema.NullOr(Schema.String)),
       session: Schema.optional(Schema.NullOr(SessionName)),
       task: Schema.String,
     }),

@@ -93,6 +93,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"succession"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let bodies = provider.bodies();
@@ -198,6 +199,7 @@ fn the_handoff_in_the_room_reaches_the_successor() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"room-handoff"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let bodies = provider.bodies();

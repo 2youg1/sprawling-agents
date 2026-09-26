@@ -38,6 +38,7 @@ fn the_effort_a_config_layer_states_is_what_goes_out_on_the_wire() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

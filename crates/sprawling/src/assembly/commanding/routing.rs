@@ -77,6 +77,7 @@ impl RunWorker {
                 mode,
                 session,
                 effort,
+                model,
                 ..
             } => self.dispatch_asked(
                 Assignment {
@@ -87,6 +88,7 @@ impl RunWorker {
                     addr,
                     session,
                     effort,
+                    model,
                     mode,
                     parent: None,
                     succession: None,

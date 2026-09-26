@@ -28,65 +28,16 @@ mod ending;
 /// frame spoken on the socket, so it has its own file.
 mod enrolment;
 
-use ending::{Ending, Reply};
+use ending::{Awaited, Echo, Ending, Heard, Reply};
+pub(crate) use ending::{Milestone, Spoken, Until};
 pub(crate) use enrolment::{enrol, split_reference};
 
-/// How long a call listens: the silence that ends it, and what a
-/// command waits for before then. They are read together at every
-/// frame, so they travel as one value.
+/// How long a call listens: the silence that ends it, and what it waits
+/// for before then. They are read together at every frame, so they
+/// travel as one value.
 pub(crate) struct Listen {
     pub(crate) quiet: Duration,
     pub(crate) until: Until,
-}
-
-/// What a command's call waits for. A query ends on its one reply
-/// whatever this says, because nothing follows that reply.
-pub(crate) enum Until {
-    /// The city going quiet for the window: the caller does not know
-    /// which event finishes the work.
-    Quiet,
-    /// The first event of this kind, or a refusal, since a refused
-    /// command causes no event at all.
-    Event(kernel::EventKind),
-}
-
-/// What came back before the city went quiet.
-pub(crate) struct Heard {
-    pub(crate) frames: u32,
-    pub(crate) refusals: u32,
-    /// Frames that arrived *after* the frame was sent.
-    ///
-    /// Counted apart from `frames` because the handshake's `Welcome` is
-    /// a frame too, so `frames` is never zero and cannot tell silence
-    /// from an answer. Subtracting one at the caller would copy the
-    /// shape of the handshake into a second place.
-    pub(crate) answers: u32,
-    pub(crate) awaited: Awaited,
-}
-
-/// What became of the frame a call was waiting for.
-#[derive(Clone, Copy)]
-pub(crate) enum Awaited {
-    /// The call waits only for the city's quiet.
-    Nothing,
-    /// The reply or the named event arrived and ended the call.
-    Arrived,
-    /// The window closed first: the city may still be working.
-    Missing,
-}
-
-/// What the city did about the frame it was sent. Exhaustive: these
-/// three are what a caller can learn inside one quiet window, and the
-/// exit code `sprawling call` returns is one per arm.
-pub(crate) enum Spoken {
-    /// The city refused, inside the window.
-    Refused,
-    /// The city answered, inside the window, and refused nothing.
-    Answered,
-    /// The frame went out and nothing came back before the window
-    /// closed, or what the call waited for did not. Whether the city took the work is not knowable here, so
-    /// this is neither of the other two.
-    Quiet,
 }
 
 /// Why nothing was heard: the three failures `call` tells apart,
@@ -101,20 +52,6 @@ pub(crate) enum Unheard {
     /// The conversation started and then broke, or this process could
     /// not start one.
     Broken(AxError),
-}
-
-impl Heard {
-    /// Refusal first, because a refusal that also carried events is
-    /// still a refusal; then silence, which is nothing at all arriving
-    /// or the awaited frame missing, since events that are not the one
-    /// asked for do not say the work is done.
-    pub(crate) fn spoken(&self) -> Spoken {
-        match (self.refusals, self.awaited, self.answers) {
-            (0, Awaited::Missing, _) | (0, Awaited::Nothing, 0) => Spoken::Quiet,
-            (0, Awaited::Arrived | Awaited::Nothing, _) => Spoken::Answered,
-            _ => Spoken::Refused,
-        }
-    }
 }
 
 /// The greeting this build sends, computed rather than transcribed.
@@ -144,8 +81,8 @@ fn malformed(what: &str, why: &str) -> AxError {
 
 /// Sends one frame and prints every frame that comes back, as one JSON
 /// object per line, until the frame's [`Ending`]: a query stops on its
-/// answer or refusal, a command on the event `listen.until` names or
-/// once nothing has arrived for `listen.quiet`.
+/// answer or refusal, a command on what `listen.until` names or once
+/// nothing has arrived for `listen.quiet`.
 ///
 /// Quiet is a duration rather than a frame count because how many events
 /// one dispatch produces is the city's business, not this client's; for
@@ -169,7 +106,22 @@ pub(crate) fn call(
     let outgoing: channels::ClientFrame = serde_json::from_str(frame).map_err(|err| {
         Unheard::Unreadable(malformed("read the frame to send", &err.to_string()))
     })?;
-    let body = serde_json::to_string(&outgoing).map_err(|err| {
+    send(at, &outgoing, token, listen)
+}
+
+/// Sends a frame this process built and prints what comes back until
+/// the [`Ending`] the frame's kind and `listen.until` decide; [`call`]
+/// is this for a frame a person wrote.
+///
+/// # Errors
+/// As [`call`], less the frame this process could not read.
+pub(crate) fn send(
+    at: &str,
+    outgoing: &channels::ClientFrame,
+    token: Option<&str>,
+    listen: Listen,
+) -> Result<Heard, Unheard> {
+    let body = serde_json::to_string(outgoing).map_err(|err| {
         Unheard::Unreadable(malformed("encode the frame to send", &err.to_string()))
     })?;
     let greeting = serde_json::to_string(&hello(token))
@@ -191,11 +143,11 @@ pub(crate) fn call(
                 ),
             )
         })?;
-    let sending = Sending {
+    let mut sending = Sending {
         body,
-        ending: Ending::of(&outgoing, listen.until),
+        ending: Ending::of(outgoing, listen.until),
     };
-    runtime.block_on(converse(at, &greeting, &sending, listen.quiet))
+    runtime.block_on(converse(at, &greeting, &mut sending, listen.quiet))
 }
 
 /// The frame on its way out, and when to stop listening for what it
@@ -208,7 +160,7 @@ struct Sending {
 async fn converse(
     at: &str,
     greeting: &str,
-    sending: &Sending,
+    sending: &mut Sending,
     quiet: Duration,
 ) -> Result<Heard, Unheard> {
     let url = format!("ws://{at}/ws");
@@ -226,6 +178,7 @@ async fn converse(
         refusals: 0,
         answers: 0,
         awaited: sending.ending.not_yet(),
+        run: None,
     };
     // The greeting is answered before anything else is sent: a client
     // that shouted its command at a server which then refused the
@@ -235,7 +188,7 @@ async fn converse(
         .map_err(Unheard::NoCity)?;
     match welcome {
         Some(text) => {
-            report(&text, &Reply::of(&text), &mut heard);
+            report(&text, &Reply::of(&text), &sending.ending.echo(), &mut heard);
             if heard.refusals > 0 {
                 return Ok(heard);
             }
@@ -252,13 +205,14 @@ async fn converse(
         .map_err(Unheard::Broken)?
     {
         let reply = Reply::of(&text);
-        report(&text, &reply, &mut heard);
+        report(&text, &reply, &sending.ending.echo(), &mut heard);
         heard.answers = heard.answers.saturating_add(1);
         if sending.ending.ends_on(&reply) {
             heard.awaited = Awaited::Arrived;
             break;
         }
     }
+    heard.run = sending.ending.run();
     // Closing rather than dropping: a city that is told the peer has
     // gone stops holding a session open for it.
     let _closed = socket.close(None).await;
@@ -298,12 +252,15 @@ where
 /// Printed as it arrived rather than reformatted: inventing a display
 /// form here would be a second, drifting description of every type on
 /// the wire.
-fn report(text: &str, reply: &Reply, heard: &mut Heard) {
-    println!("{text}");
+fn report(text: &str, reply: &Reply, echo: &Echo, heard: &mut Heard) {
+    match echo {
+        Echo::Stdout => println!("{text}"),
+        Echo::Stderr => eprintln!("{text}"),
+    }
     heard.frames = heard.frames.saturating_add(1);
     match reply {
         Reply::Refusal => heard.refusals = heard.refusals.saturating_add(1),
-        Reply::Answer | Reply::Event(_) | Reply::Other => {}
+        Reply::Answer | Reply::Event { .. } | Reply::Other => {}
     }
 }
 
@@ -406,7 +363,13 @@ mod tests {
             quiet: Duration::from_millis(200),
             until: Until::Quiet,
         };
-        let heard = super::call(&at, "{\"ask\":{\"ask_id\":1,\"query\":\"city_view\"}}", None, listen).unwrap();
+        let heard = super::call(
+            &at,
+            "{\"ask\":{\"ask_id\":1,\"query\":\"city_view\"}}",
+            None,
+            listen,
+        )
+        .unwrap();
         assert_eq!(heard.answers, 0, "nothing came back after the frame");
         assert_eq!(heard.refusals, 0, "and nothing was refused either");
         assert!(
@@ -434,7 +397,13 @@ mod tests {
             quiet,
             until: Until::Quiet,
         };
-        let heard = super::call(&at, "{\"ask\":{\"ask_id\":1,\"query\":\"city_view\"}}", None, listen).unwrap();
+        let heard = super::call(
+            &at,
+            "{\"ask\":{\"ask_id\":1,\"query\":\"city_view\"}}",
+            None,
+            listen,
+        )
+        .unwrap();
         let waited = began.elapsed();
         assert!(matches!(heard.spoken(), Spoken::Answered));
         assert!(
@@ -468,10 +437,10 @@ mod tests {
     }
 
     /// Events that arrive while the awaited one never does are not the
-    /// answer the caller asked for, so the call reads as quiet: the
+    /// answer the caller asked for, so the call reads as unfinished: the
     /// work may still be running, and exit 0 would call it done.
     #[test]
-    fn a_command_whose_awaited_event_never_comes_is_quiet_not_answered() {
+    fn a_command_whose_awaited_event_never_comes_is_unfinished_not_answered() {
         let said = vec![event(EventKind::RunStarted)];
         let (at, scripted) = city_saying(said, Duration::from_millis(800));
         let listen = Listen {
@@ -481,7 +450,7 @@ mod tests {
         let heard = super::call(&at, &cancelling(), None, listen).unwrap();
         assert_eq!(heard.answers, 1);
         assert!(
-            matches!(heard.spoken(), Spoken::Quiet),
+            matches!(heard.spoken(), Spoken::Unfinished),
             "the awaited event did not come, so the call is not a success"
         );
         let _joined = scripted.join();

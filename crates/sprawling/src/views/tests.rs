@@ -369,7 +369,9 @@ fn a_git_status_reader_does_not_hold_the_views_while_git_reads_the_disk() {
     let solo = (0..3)
         .map(|_| {
             let asked = Instant::now();
-            let answer = crate::views::answer_outside_the_lock(&views, &query).1.unwrap();
+            let answer = crate::views::answer_outside_the_lock(&views, &query)
+                .1
+                .unwrap();
             assert!(
                 matches!(answer, channels::Answer::GitStatus(_)),
                 "{answer:?}"
@@ -384,7 +386,9 @@ fn a_git_status_reader_does_not_hold_the_views_while_git_reads_the_disk() {
         let (views, query, done) = (Arc::clone(&views), query.clone(), Arc::clone(&done));
         std::thread::spawn(move || {
             for _ in 0..8 {
-                crate::views::answer_outside_the_lock(&views, &query).1.unwrap();
+                crate::views::answer_outside_the_lock(&views, &query)
+                    .1
+                    .unwrap();
             }
             done.store(true, Ordering::SeqCst);
         })

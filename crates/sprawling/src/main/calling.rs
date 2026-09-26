@@ -9,7 +9,7 @@
 use super::exit::Exit;
 use super::refusal::{Form, written};
 use super::router::flag_value;
-use super::wire_client::{self, Listen, Unheard, Until};
+use super::wire_client::{self, Listen, Spoken, Unheard, Until};
 use kernel::consts_policy::DEFAULT_AT;
 
 /// Sends one frame over the wire and prints everything that comes back.
@@ -78,28 +78,43 @@ pub(super) fn call(args: &[String]) -> Exit {
     match wire_client::call(&at, &frame, token.as_deref(), listen) {
         Ok(heard) => {
             eprintln!("{} frame(s), {} refusal(s)", heard.frames, heard.refusals);
-            match heard.spoken() {
-                wire_client::Spoken::Refused => Exit::Refused,
-                wire_client::Spoken::Answered => Exit::Done,
-                wire_client::Spoken::Quiet => {
+            let spoken = heard.spoken();
+            match spoken {
+                Spoken::Refused | Spoken::Answered => {}
+                Spoken::Quiet | Spoken::Unfinished => {
                     eprintln!(
                         "what this call waits for did not come inside {quiet}ms: the city may still be working on it"
                     );
                     eprintln!(
                         "recovery: ask again with a longer --quiet-ms, or read the city's own log"
                     );
-                    Exit::Quiet
                 }
             }
+            exit_of(&spoken)
         }
-        Err(unheard) => {
-            let (exit, err) = match &unheard {
-                Unheard::Unreadable(err) => (Exit::Line, err),
-                Unheard::NoCity(err) => (Exit::NoCity, err),
-                Unheard::Broken(err) => (Exit::Refused, err),
-            };
-            eprint!("{}", written(err, Form::of(args)));
-            exit
-        }
+        Err(unheard) => tell_unheard(&unheard, Form::of(args)),
     }
+}
+
+/// The exit code a finished wait says, in the one table `call` and
+/// `dispatch` share. Silence and an unfinished wait are both 3: neither
+/// says the work is done or refused, since the city may still be on it.
+pub(super) fn exit_of(spoken: &Spoken) -> Exit {
+    match spoken {
+        Spoken::Refused => Exit::Refused,
+        Spoken::Answered => Exit::Done,
+        Spoken::Quiet | Spoken::Unfinished => Exit::Quiet,
+    }
+}
+
+/// Writes why nothing was heard to stderr and returns the exit code that
+/// tells the three failures apart, for `call` and `dispatch` alike.
+pub(super) fn tell_unheard(unheard: &Unheard, form: Form) -> Exit {
+    let (exit, err) = match unheard {
+        Unheard::Unreadable(err) => (Exit::Line, err),
+        Unheard::NoCity(err) => (Exit::NoCity, err),
+        Unheard::Broken(err) => (Exit::Refused, err),
+    };
+    eprint!("{}", written(err, form));
+    exit
 }

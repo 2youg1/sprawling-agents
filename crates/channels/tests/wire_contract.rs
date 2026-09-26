@@ -346,6 +346,7 @@ fn sample_of_every_command() -> Vec<Command> {
             idem,
             session: Some(kernel::SessionName::parse("ship it").unwrap()),
             effort: Some(kernel::Effort::High),
+            model: None,
         },
         Command::Login {
             provider: ProviderName::parse("anthropic").unwrap(),
@@ -656,6 +657,7 @@ fn a_dispatch_frame_carries_no_spend_ceiling() {
         idem: kernel::IdemKey::derive(&run, Seq::new(1), b"sample"),
         session: None,
         effort: None,
+        model: None,
     };
     let text = serde_json::to_string(&dispatch).unwrap();
     assert!(

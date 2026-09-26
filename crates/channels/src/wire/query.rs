@@ -335,7 +335,7 @@ pub enum Query {
     ///
     /// Nothing it answers updates anything. Where a binary lives belongs
     /// to whoever installed it, so this reports and stops.
-    Release,
+    NewestRelease,
     /// Everything this person settled about their own reading of the
     /// city: the language, the appearance, the chords they rebound.
     ///

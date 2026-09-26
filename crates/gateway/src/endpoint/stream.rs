@@ -85,7 +85,12 @@ impl Endpoint {
             let headers = response.headers().clone();
             return Err(provider_err(
                 "call provider",
-                &ProviderFailure::refusal(&self.config.base_url, status, &headers, &response.text()),
+                &ProviderFailure::refusal(
+                    &self.config.base_url,
+                    status,
+                    &headers,
+                    &response.text(),
+                ),
             ));
         }
         // A provider that ignores `stream: true` answers with the

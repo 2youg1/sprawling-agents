@@ -8,13 +8,13 @@
 //!
 //! This module owns the console's own verbs — `CONTROL`, the five that
 //! never reach the wire — and owns nothing else about any verb. Every
-//! other verb is a projection of `channels::COMMAND_NAMES` and
-//! `channels::QUERY_NAMES` spelled by [`snake`], so a command renamed on
+//! other verb is a projection of the Commands a socket can carry and of
+//! `channels::QUERY_NAMES`, spelled by [`snake`], so a command renamed on
 //! the wire is renamed here in the same build and a hand-written table
 //! never becomes a second vocabulary.
 //!
 //! The judgement is pure and total: no clock, no socket, no ledger, and
-//! no error type. A line nobody can classify comes back as
+//! no error type; the line's idempotency key arrives as a parameter. A line nobody can classify comes back as
 //! [`Line::Unknown`] carrying the nearest verbs, because a console that
 //! refused to classify a line would have nothing to print.
 //!
@@ -23,9 +23,23 @@
 //! and the argument of a wire verb is the wire's own JSON — inventing a
 //! second argument grammar here would describe every wire type twice.
 
-use kernel::Address;
+use kernel::{Address, IdemKey};
 
 pub(super) const CONTROL: [&str; 5] = ["help", "web", "at", "quit", "serving"];
+
+/// The two Commands whose `Command::idem()` is `None`, which a socket
+/// cannot carry: `PutSecret` has no wire form at all, and `Auth` is
+/// proved in the handshake rather than sent as a command. Offering them
+/// would list verbs that can only ever be refused.
+const OFF_THE_SOCKET: [&str; 2] = ["PutSecret", "Auth"];
+
+/// The Commands a console line can become, in wire order.
+pub(super) fn carried_commands() -> impl Iterator<Item = &'static str> {
+    channels::COMMAND_NAMES
+        .iter()
+        .copied()
+        .filter(|name| !OFF_THE_SOCKET.contains(name))
+}
 
 /// What one line asked for.
 #[derive(Debug, PartialEq)]
@@ -49,6 +63,12 @@ pub(crate) enum Line {
         verb: String,
         nearest: Vec<String>,
     },
+    /// A verb this console has, with a body the wire cannot read; the
+    /// reason is the reader's own, which names the field at fault.
+    Malformed {
+        verb: String,
+        reason: String,
+    },
 }
 
 pub(crate) fn snake(camel: &str) -> String {
@@ -65,13 +85,13 @@ pub(crate) fn snake(camel: &str) -> String {
 /// Every verb this console answers to.
 ///
 /// **A projection, never a second list.** The wire half is derived from
-/// `channels::COMMAND_NAMES` and `channels::QUERY_NAMES`, so a command
+/// [`carried_commands`] and `channels::QUERY_NAMES`, so a command
 /// renamed there is renamed here in the same commit or not at all. A
 /// hand-written table would be a second vocabulary, and the moment it
 /// drifted nothing would say so.
 pub(crate) fn verbs() -> Vec<String> {
     let mut out: Vec<String> = CONTROL.iter().map(|name| (*name).to_owned()).collect();
-    out.extend(channels::COMMAND_NAMES.iter().map(|name| snake(name)));
+    out.extend(carried_commands().map(snake));
     out.extend(channels::QUERY_NAMES.iter().map(|name| snake(name)));
     out
 }
@@ -100,12 +120,13 @@ fn nearest(verb: &str) -> Vec<String> {
     Vec::new()
 }
 
-/// Reads one line.
+/// Reads one line; a wire Command whose body carries no `idem` gets
+/// `idem`, the key this console minted for the line.
 ///
 /// # Errors
 /// None: an unreadable line is an answer (`Unknown`), because a console
 /// that refused to classify a line would have nothing to say about it.
-pub(crate) fn parse(line: &str, selected: Option<&Address>) -> Line {
+pub(crate) fn parse(line: &str, selected: Option<&Address>, idem: IdemKey) -> Line {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return Line::Nothing;
@@ -135,7 +156,7 @@ pub(crate) fn parse(line: &str, selected: Option<&Address>) -> Line {
                 nearest: vec!["at <building>/<room>".to_owned()],
             },
         },
-        other => wire_frame(other, tail),
+        other => wire_frame(other, tail, idem),
     }
 }
 
@@ -144,47 +165,53 @@ pub(crate) fn parse(line: &str, selected: Option<&Address>) -> Line {
 /// The body is JSON because the wire is JSON: inventing a second
 /// argument grammar here would be a second description of every type on
 /// the wire, and the two would disagree the first time either moved.
-fn wire_frame(verb: &str, tail: &str) -> Line {
-    let body = if tail.is_empty() { "null" } else { tail };
-    let known_command = channels::COMMAND_NAMES
-        .iter()
-        .find(|name| snake(name) == verb);
+fn wire_frame(verb: &str, tail: &str, idem: IdemKey) -> Line {
+    let body = if tail.is_empty() {
+        Ok(serde_json::Value::Null)
+    } else {
+        serde_json::from_str::<serde_json::Value>(tail)
+    };
+    let known_command = carried_commands().find(|name| snake(name) == verb);
     let known_query = channels::QUERY_NAMES
         .iter()
         .find(|name| snake(name) == verb);
-    let framed = match (known_command, known_query) {
-        (Some(name), _) => format!("{{\"command\":{{{}:{body}}}}}", quoted(name)),
-        (None, Some(name)) => {
-            // The console answers in place, so every question it asks
-            // carries the same number: nothing waits to be paired.
-            if tail.is_empty() {
-                format!("{{\"ask\":{{\"ask_id\":0,\"query\":{}}}}}", quoted(name))
-            } else {
-                format!(
-                    "{{\"ask\":{{\"ask_id\":0,\"query\":{{{}:{body}}}}}}}",
-                    quoted(name)
-                )
-            }
-        }
-        (None, None) => {
+    let framed = match (known_command, known_query, body) {
+        (None, None, _) => {
             return Line::Unknown {
                 verb: verb.to_owned(),
                 nearest: nearest(verb),
             };
         }
+        (_, _, Err(err)) => return malformed(verb, &err),
+        (Some(name), _, Ok(mut body)) => {
+            if let serde_json::Value::Object(fields) = &mut body {
+                fields
+                    .entry("idem")
+                    .or_insert_with(|| serde_json::Value::String(idem.to_string()));
+            }
+            keyed("command", keyed(&snake(name), body))
+        }
+        (None, Some(name), Ok(serde_json::Value::Null)) => {
+            asked(serde_json::Value::String(snake(name)))
+        }
+        (None, Some(name), Ok(body)) => asked(keyed(&snake(name), body)),
     };
-    match serde_json::from_str::<channels::ClientFrame>(&framed) {
+    match serde_json::from_value::<channels::ClientFrame>(framed) {
         Ok(frame) => Line::Frame(Box::new(frame)),
-        Err(_) => Line::Unknown {
-            verb: format!("{verb} {tail}"),
-            nearest: vec![format!("{verb} takes a JSON body; see `sprawling call`")],
-        },
+        Err(err) => malformed(verb, &err),
     }
 }
 
-/// A wire name in its snake_case spelling, as a JSON key.
-fn quoted(camel: &str) -> String {
-    serde_json::Value::String(snake(camel)).to_string()
+/// `{"<key>": value}`, the shape every level of a wire frame takes.
+fn keyed(key: &str, value: serde_json::Value) -> serde_json::Value {
+    serde_json::Value::Object(serde_json::Map::from_iter([(key.to_owned(), value)]))
+}
+
+fn malformed(verb: &str, err: &serde_json::Error) -> Line {
+    Line::Malformed {
+        verb: verb.to_owned(),
+        reason: err.to_string(),
+    }
 }
 
 /// What the console prints when asked what it knows.
@@ -192,7 +219,7 @@ fn quoted(camel: &str) -> String {
 /// Grouped the way the wire groups itself, and generated from the same
 /// two constants the parser reads.
 pub(crate) fn help(selected: Option<&Address>) -> String {
-    let commands: Vec<String> = channels::COMMAND_NAMES.iter().map(|n| snake(n)).collect();
+    let commands: Vec<String> = carried_commands().map(snake).collect();
     let queries: Vec<String> = channels::QUERY_NAMES.iter().map(|n| snake(n)).collect();
     let room = selected.map_or_else(
         || "no room selected - `/at <building>/<room>` first".to_owned(),
@@ -204,11 +231,18 @@ pub(crate) fn help(selected: Option<&Address>) -> String {
          /at <building>/<room>     choose where plain lines go\n  \
          /serving                  where this city listens, and what is running in it\n  \
          /web                      open the WebUI, token included\n  \
-         /quit                     close this console; the city stops\n\n  \
+         /quit                     close this console; the city keeps serving\n\n  \
          anything else             work, dispatched to the chosen room\n\n  \
          /<query>                  {}\n  \
          /<command> <json>         {}\n",
         queries.join(", "),
         commands.join(", ")
     )
+}
+
+/// The ask frame for one question. The console answers in place, so
+/// every question it asks carries the same number: nothing waits to be
+/// paired.
+fn asked(query: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({ "ask": { "ask_id": 0, "query": query } })
 }

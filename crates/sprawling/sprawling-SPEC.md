@@ -245,24 +245,31 @@ pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
 
 ```rust
 // bin::wire_client（形状 4 adapter）
-pub(crate) struct Heard { pub frames: u32, pub refusals: u32, pub answers: u32, pub awaited: Awaited }
-pub(crate) enum Until { Quiet, Event(kernel::EventKind) }      // 一条命令等到什么为止
 pub(crate) struct Listen { pub quiet: Duration, pub until: Until }  // 何时停止收听，两者同行
+pub(crate) enum Until { Quiet, Event(kernel::EventKind), Run { under: Address, milestone: Milestone } }  // 调用方在等什么
+pub(crate) enum Milestone { Started, Frozen }                         // 由 run_started / run_frozen 标记
+pub(crate) struct Heard { pub frames: u32, pub refusals: u32, pub answers: u32, pub awaited: Awaited, pub run: Option<RunId> }
+pub(crate) enum Awaited { Nothing, Arrived, Missing }
+pub(crate) enum Spoken { Refused, Answered, Quiet, Unfinished }
 pub(crate) fn call(at: &str, frame: &str, token: Option<&str>, listen: Listen) -> Result<Heard, Unheard>;
+pub(crate) fn send(at: &str, outgoing: &channels::ClientFrame, token: Option<&str>, listen: Listen) -> Result<Heard, Unheard>;
 pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<String, AxError>;
 pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/name"
 ```
 
 - **握手在进程内算，不手抄**。`WIRE_V` 与 `schema_hash()` 直接取自 `channels`，故改一条命令名字时本客户端**不可能**落后。因此删掉了那个一次性的 Python 探针——它在工作区外复刻了 `schema_hash()` 与 `IdemKey::derive()`，那本身就是第二个权威。
-- **一个查询恰好一个答复，收到就走**。发出的是 `Query` 时，`call` 在收到第一帧 `Answer` 或 `Refusal` 时打印它并退出，之前推来的 `Event`／`Log`／`Delta` 照样逐行打印；城的答复在十几毫秒内到达，再等一整段安静窗口只是让进程白占两秒。安静窗口在这里只剩上限的作用：答复迟迟不来时，`call` 仍按「安静」退出（退出码 3）。
-- **一条命令收到城安静为止，或收到调用方点名的那种事件为止**。发出的是 `Command` 时，“安静”是一段无帧的时长（`--quiet-ms`，默认 2000），而不是帧数：一条 Dispatch 会产生多少事件是城的事，客户端猜不到。调用方知道自己在等哪件事时，写 `--until <kind>`（`kind` 取 `EventKind` 的 snake_case 拼写，由 serde 读，不另立名表）：`call` 在打印第一条该种类的 `Event` 或一条 `Refusal`（被拒的命令不会再产生事件）后退出，不再白等一整段安静窗口。窗口此时仍是两帧之间的上限；窗口先到而点名的事件没来，`Heard.awaited` 为 `Missing`，退出码是 3（安静）而不是 0——在等的事没发生，读成成功就是把失败读成成功。查询的等待同理：窗口先到而答复没来也是 `Missing`。查询只有一个答复，`--until` 对查询不起作用。何时结束由 `wire_client::Ending` 一处决定，按发出帧的种类与 `Until` 穷尽匹配（被否决的备选：把「收到答复就走」做成一个布尔参数——它会让 `call(…, false)` 这样的调用点说不出自己在等什么）。
+- **一个查询恰好一个答复，收到就走**。发出的是 `Ask` 时，`call` 在收到第一帧 `Answered`（其 `AskOutcome` 是答复或拒绝）或 `Refusal` 时打印它并退出，之前推来的 `Event`／`Log`／`Delta` 照样逐行打印；城的答复在十几毫秒内到达，再等一整段安静窗口只是让进程白占两秒。安静窗口在这里只剩上限的作用：答复迟迟不来时，`call` 退 3——什么都没回来是 `Quiet`，只回来了别的帧是 `Unfinished`。
+- **一条命令收到城安静为止，或收到调用方点名的那种事件为止**。发出的是 `Command` 时，“安静”是一段无帧的时长（`--quiet-ms`，默认 2000），而不是帧数：一条 Dispatch 会产生多少事件是城的事，客户端猜不到。调用方知道自己在等哪件事时，写 `--until <kind>`（`kind` 取 `EventKind` 的 snake_case 拼写，由 serde 读，不另立名表）：`call` 在打印第一条该种类的 `Event` 或一条 `Refusal`（被拒的命令不会再产生事件）后退出，不再白等一整段安静窗口。窗口此时仍是两帧之间的上限；窗口先到而点名的事件没来，`Heard.awaited` 为 `Missing`，`spoken()` 给 `Unfinished`，退出码是 3 而不是 0——在等的事没发生，读成成功就是把失败读成成功。查询只有一个答复，`--until` 对查询不起作用。
+- **何时结束由 `wire_client::Ending` 一处决定**。`Ending::of` 按发出帧的种类与 `Until` 穷尽匹配，得 `Reply`（查询与握手）、`Quiet`、`Event(kind)`、`Run { under, milestone, run }` 四者之一；每一帧由 `Reply::of` 经 `channels::ServerFrame` 读一次，`Reply::Event { kind, run, addr }` 同时供 `--until` 比种类、供 dispatch 认出自己的 run。在等的帧到没到只记在 `Heard.awaited` 一处，`call` 与 `dispatch` 读的是同一个 `spoken()`。被否决的备选：把「收到答复就走」做成一个布尔参数——它会让 `call(…, false)` 这样的调用点说不出自己在等什么；以及让 dispatch 另记一份「里程碑到没到」——它与 `Awaited` 答的是同一个问题，两份记录迟早说两样话。
+- **`sprawling dispatch <addr> <task> [--detach] [-m/--model <id>] [--at] [--token]`（`bin::main::dispatch`，形状 adapter）是一次派活的整条路**：进程内铸幂等键（`IdemKey::derive(RunId::CITY, Seq::FIRST, 16 字节 OS 熵)`，与控制台每行一把键同一个构造；键从命令行拿进来就等于让人或 agent 再抄一遍 wire 的键格式），模式取 `Mode::PlanGoal`、强度与目标留空、`session` 为 `None`（地址是楼时城向模型要房间名，是房间时续写那个会话）。它等的是 `Until::Run { under, milestone }`，`Ending::of` 把它变成 `Ending::Run { under, milestone, run }`：`under` 是派去的地址，第一条 `addr` 等于它或在它之下的 `run_started` 认定这次的 run，`milestone = Milestone::Frozen` 时等到**那个** run 的 `run_frozen`（别的 run 冻结不算），`milestone = Milestone::Started`（`--detach`）时收到 `run_started` 就走；两者收到 `Refusal` 都立即结束，安静窗口（默认 120000 ms：一次模型调用返回前不出帧，派到楼时城先调一次模型给房间起名，run 才开始；每来一帧都重新计时）只作上限，窗口在里程碑之前关上时 `Heard.awaited` 为 `Missing`，城说过话则 `spoken()` 给 `Spoken::Unfinished`，一帧没回则给 `Quiet`，都退 3 而不是 0。`--detach` 的 stdout 只有 run id 一行，逐帧 JSONL 改走 stderr，于是 `id=$(sprawling dispatch --detach …)` 可直接用；不带 `--detach` 时逐帧 JSONL 走 stdout，与 `call` 一致。退出码表与 `call` 同一张，映射只写在 `main::calling` 的 `exit_of`（`Spoken` → `Exit`）与 `tell_unheard`（`Unheard` → `Exit`）两处，两个动词都调它们：0 答复（里程碑已到）、1 拒绝、2 命令行、3 安静或未到里程碑、4 `--at` 没有城。被否决的备选：让 `dispatch` 拼一段 JSON 再交给 `call`——`call --until run_frozen` 等的是任何一个 run 的冻结，认不出这一次派出的那个 run，而不带 `--until` 只能等安静；一次 run 的长短是模型的事，安静窗口要么截断它要么让每次派活白等。
+- **`-m/--model <id>` 点名这一次的模型**：它原样进 `WireCommand::Dispatch.model`（channels-SPEC §8-48），不带时为 `None`：房间自己那层已冻结了模型时取那个模型，否则取 `main` tag 的模型。继任交接、唤醒敲门和不带 `-m` 的后续派活都带 `None`，若 `None` 一律取 `main`，在用 `-m` 开的房间里它们会被 `choose_shape` 以换模型拒掉，接力就断在半路。装配在 `agree_to_work` 里按这个 id 在 `ModelBook::choices()` 找到登记它的 tag，再经 `ModelBook::select` 取端点与登记行，所以保密楼只用回环端点的检查、端点是否仍挂着、订阅凭证续期都与 `main` 同一条路；找不到时以 `E_CONFIG_INVALID` 拒，恢复语是「在设置页把它登记到一个 tag 下再派」，拒在写任何东西之前。选中的 id 由 `choose_shape` 冻进房间自己那层 `CONFIG.toml`，与 tag 解析出的模型同一扇门，所以一个已冻结的会话照旧拒绝换模型。被否决的备选：用 `SelectModel` 先改 tag 再派——那是整座城的配置，会在同时跑着的别人的 run 底下换模型。
 - **输出是 JSONL，一行一帧**。发明一种人看的排版就是为 wire 里的每一个类型再写一遍它长什么样，而那份渲染一定会漂。
-- **退出码带信息**：收到过 `Refusal` 退 1；在等的帧没来（`Missing`），或命令之后什么都没来，退 3；否则退 0。一个驱动它的 agent 不应当为了知道「成不成」去解析 JSON。
+- **退出码带信息**：收到过 `Refusal` 退 1；命令之后一帧都没回来（`Quiet`），或回来了帧而在等的那一帧没来（`Unfinished`），退 3；否则退 0。`Quiet` 与 `Unfinished` 分成两支，是因为前者连城是否收到这一帧都无从断言，后者城在说话、只是事情还没做到。一个驱动它的 agent 不应当为了知道「成不成」去解析 JSON。
 - **`enrol` 只从 stdin 读，恒不从 argv 读**。argv 进进程表、进 shell 历史、进父进程的日志；这比浏览器路径更好的地方就在这里，因为页面那条路要先把明文拿进一个标签页的内存。**输出只有引用**，恒不回显值。
 - **依赖不新增包**：`tokio-tungstenite` 正是 axum 的 `ws` 特性已经携带的那一份，直接依赖它在 `Cargo.lock` 里**增加零个包**（实测 496 → 496）；换一个别的 WebSocket 库就是把同一个协议的两份实现放进同一个二进制。不开 TLS：控制面走 `ws://`，而一座要经 TLS 到达的城是一座前面站着终结器的城。
 - **未做且已知**：`/enroll` 仍在工人取走凭据之前就答 201（详 `channels-SPEC.md` §8）。`enrol` 因此报的是「已受理」而不是「已入库」，这句话写在输出里而不是留给人去撞。
 
-**本章测试**：`split_reference` 对 `realm/name`、缺斜杠、空段、多斜杠四类输入给出正确答案；握手帧的 `wire_v` 与 `schema` 逐字节等于 `channels` 自己的值（这条断言就是「不存在第二份握手权威」的可执行形式）。`wire_client::tests` 用一个替身城证明：查询在窗口到期之前随答复返回；带 `--until` 的命令在窗口到期之前随点名的事件返回，之前的事件照样打印；点名的事件没来而别的事件来了，结果是安静而不是已答复。真城验收：`call` 一条必被拒的命令，收到 `refusal` 且退 1。
+**本章测试**：`split_reference` 对 `realm/name`、缺斜杠、空段、多斜杠四类输入给出正确答案；握手帧的 `wire_v` 与 `schema` 逐字节等于 `channels` 自己的值（这条断言就是「不存在第二份握手权威」的可执行形式）。`wire_client::tests` 用一个替身城证明：查询在窗口到期之前随答复返回；带 `--until` 的命令在窗口到期之前随点名的事件返回，之前的事件照样打印；点名的事件没来而别的事件来了，结果是 `Unfinished` 而不是已答复。`wire_client::ending::tests` 证明：派到楼的等待认出在它房间里开始的 run，别的 run 冻结不结束它；`--detach` 在 run 开始时结束并带回 run id；窗口在里程碑之前关上是 `Unfinished`。真城验收：`call` 一条必被拒的命令，收到 `refusal` 且退 1。
 
 ## 8-11 控制台：服务中的那个终端不再是死胡同
 
@@ -283,8 +290,11 @@ pub(crate) enum Line {
     Frame(Box<channels::ClientFrame>),   // 一个 wire 动词
     Work(String),                        // 普通一行：派给当前选中的 room
     Unknown { verb: String, nearest: Vec<String> },
+    Malformed { verb: String, reason: String },  // 动词认得，JSON 体读不出：reason 是 serde 的原话，写出缺的字段名
 }
-pub(crate) fn parse(line: &str, selected: Option<&Address>) -> Line;
+pub(crate) fn parse(line: &str, selected: Option<&Address>, idem: IdemKey) -> Line;
+struct LineKeys { origin: [u8; 16], lines: Seq }   // 每行一把键
+impl LineKeys { fn drawn() -> Result<LineKeys, AxError>; fn next(&mut self) -> IdemKey; }
 pub(crate) fn verbs() -> Vec<String>;      // 控制动词 ⊕ wire 动词
 pub(crate) fn snake(camel: &str) -> String;
 ```
@@ -292,6 +302,10 @@ pub(crate) fn snake(camel: &str) -> String;
 - **wire 动词表是投影，不是第二份手写清单**。`verbs()` 从 `channels::COMMAND_NAMES` 与 `QUERY_NAMES` 逐个转 snake_case 得来；一份手写清单就是第二套词汇，而它漂开时没有任何东西会发出声音。一条断言钉住这件事：每个 wire 名字都在动词表里。
 - **控制动词另成一个穷尽枚举**（`/help`、`/web`、`/at`、`/quit`）。它们是**控制台自己的**动词，不在 wire 上，故不属于那张投影。两张表合并后仍不得重名，一条断言钉住。
 - **控制台不做任何判定**。一行变成 `Command` 之后，走的是人在页面上点按钮走的**同一张桌子**（`CommandDesk`）与同一个 `Reply`。拒绝因此自动回到控制台，不需要为它另写一条回程——这正是那条回信地址的第二个消费者。
+- **每一行一把幂等键，由控制台铸**。`LineKeys::drawn` 在控制台启动时取 16 字节 OS 熵作 `origin`，`next` 按行计数：键 = `IdemKey::derive(RunId::CITY, 行号, origin)`。城把见过的键连同第一次的答复一起记住，且跨重启记住；故键只由 `地址+任务` 派生时，同一房间同一句话第二次被吞，先被拒（例如还没配模型）、配好模型后再打同一行仍拿到那次拒绝。行号使同一进程内的两行不同，`origin` 使两次启动的同一行号不同。熵取不到时控制台说出原因并关闭，城照跑——一把可预测的键会被上一个进程的答复吞掉。**被否掉的做法**：把时间放进键——时间只在 `bin::assembly` 取样，且同一毫秒内两行仍撞。
+- **wire 动词的 JSON 体缺 `idem` 时由控制台补上这一行的键**；人在没有浏览器的机器上刹住整座城只需 `/halt {"scope":"city"}`。体读不出时返回 `Malformed`，打印 serde 说出的原因（含缺的字段名），而不是「没有这个动词」。
+- **投影只取 socket 能带的 Command**：`put_secret`（`WireCommand` 里没有这个值）与 `auth`（配对令牌在握手里证明，不在命令里）是 `Command::idem()` 返回 `None` 的恰好那两个，控制台既不列它们也不认它们。
+- **`/quit` 只关控制台，城继续服务**；帮助说的是同一句话。停城是 Ctrl-C，那是只有起城的进程按得动的收口（下文）。
 - **普通一行就是派活**。要人为一件活敲 `/dispatch {"addr":…}` 是把 JSON 当人机界面；选中一个 room（`/at`）后直接写任务，才是终端本来的手势。未选中任何 room 时拒，并说该敲什么。
 - **不是 TTY 就不进控制台**。stdin 读到 EOF（管道、服务、CI）即退出控制台循环而**城照跑**：一座因为没人敲键盘而停止服务的城是一个以交互换服务的回归。
 - **拒长表与图**。查询的答案在控制台以 JSONL 逐行输出，与 `sprawling call` 同形；表格与图归浏览器。一个同时伺候两个主人的 CLI 是 CLI 文献里的反面教材。`sprawling view` 是另一个动词、另一个进程，按 stdout 是不是终端把两个主人分开（§8-93）。

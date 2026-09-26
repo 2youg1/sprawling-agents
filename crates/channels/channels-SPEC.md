@@ -25,6 +25,7 @@
   **当前 golden**：`05a6b0eec8c0dac9fedd76c443cbdc6d028c51b599a470667b739eee45a78cb7`；**WIRE_V ＝ 40**（事件种类 `rules_changed` → kernel-SPEC §8-4；问与答按 `ask_id` 配对、答带 `as_of` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 38**（回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   **当前 golden**：`7c3c4f23c2aa2e597114c59d9e76db2d828a85e9af9ab1a2b9cc7d9bc1488c94`；**WIRE_V ＝ 39**（缺省也是一层 `ConfigLayer::Default` → §8-47；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::Release` → §8-36；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
+  **当前 golden**：`1efcbe95ee51b1c9efaee07d21d95824d714604c1974e8b41b2ec3dfdbbe725a`；**WIRE_V ＝ 39**（`Dispatch` 可点名这一次的模型 → §8-48；回合里读不出的记录 `Note::Unreadable` → §8-21；帧表与查询表的当前内容见本节以下各章；端点带 `EndpointTuning` 见 §8-29；工具服务器的三种 transport 与 `McpHealth` 见 §8-34；日志帧 `ServerFrame::Log` → §8-32；机器上的两个动词 `DoctorInstall`／`DoctorRefresh` → §8-33；外包服务的目录与一键连接 `Query::Toolkits`／`Command::ConnectToolkit` → §8-35；哪一版与 npm 上哪一版 `Query::NewestRelease` → §8-36、§8-47；丢帧帧 `ServerFrame::Lagged` 与区间补拉 `Query::HistoryRange` → §8-41；关停范围在答案里带上类型 → §8-42；在同一个地址上开始新的一段会话 `Command::OpenSession` 与 `Carry` → §8-43）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`，WIRE_V 9→10。**
@@ -1084,10 +1085,10 @@ pub enum Standing {
 
 **被否**：让 `ConnectToolkit` 直接把 consent URL 作为命令的答案回去。`Reply` 只运送拒绝（`server::reply`），把一个成功结果塞进 `AxError` 是为一次往返伪造一条错误路径；URL 由随后的 `Query::Toolkits` 从对方这个「此刻」的权威取回，客户端因而只有一条渲染路径而不是两条需要互相对齐的。
 
-### 8-36 这是哪一版，npm 上是哪一版：`Query::Release`（WIRE_V 30→31）
+### 8-36 这是哪一版，npm 上是哪一版：`Query::NewestRelease`（WIRE_V 30→31）
 
 ```rust
-pub enum Query { /* … */ Release }
+pub enum Query { /* … */ NewestRelease }
 
 pub struct ReleaseLine { pub version: String, pub released: String }
 pub enum ReleaseAnswer {
@@ -1382,3 +1383,24 @@ ServerFrame::Answered(Box<Answered>)            // 对一问的拒绝也走这�
 - **合法域随值一起回答**：`SettledSecond::domain` 是 `SecondThreshold` 构造点读的那两个常量。页面仍不判域（拒因由城带回），但它画给人看的「30 到 90」不再是客户端自己写的第二份。
 - **`effort` 不跟着变**：没有一级说过时生效的是提供方的缺省，城不知道那个值；为它编一个级别就是说一句城说不出的话。重开条件：城自己开始为 effort 定一个缺省值。
 - **被否的方案**：保留 `Option` 并在旁边加一个 `default_percent` 字段——那样一个值有两个字段，读者要自己拼出生效值，拼法又多一个家。
+### 8-47 查询按它回答的东西命名：`Query::NewestRelease`
+
+```rust
+pub enum Query { /* … */ NewestRelease }   // 线上拼作 "newest_release"
+```
+
+- **名字说出答的是什么**：这条查询回答「这座城是哪一版、npm 上最新的是哪一版」（§8-36 的五条口径不变）。它原来叫 `Release`，与释放一个关停范围的 `Command::Release` 同名；控制台把 socket 能带的动词与查询列在一处，一个人看到两个 `release`，分不清哪个放开关停、哪个去问注册表。
+- **只改查询，不改答复**：`Answer::Release` 与 `ReleaseAnswer` 保持原名。答复不出现在人能输入的地方，没有同名的歧义；改它只会多一次无人受益的线上换形。
+- **`WIRE_V` 不动**：变体名进 `QUERY_NAMES`，名字一变 §8-1 的 golden 就变，旧页面在握手时被拒，而不是发出一条城不认识的查询；`WIRE_V` 只为「名字没换而语法换形」而升（§298），改名不属于那一类。新名字登记在 `docs/glossary.md` §6；旧拼法不进 `xtask/lexicon.toml`，因为已发布版本的 `CHANGELOG.md` 如实记着它当时的名字，子串禁令会误伤那段历史。
+- **被否：保留 `release` 作别名**。一条查询两个拼法，就是同一个名字有两个家；握手已经把旧页面挡在门外，别名没有读者。
+
+### 8-48 `WIRE_V` 39：`Dispatch` 可以点名这一次的模型
+
+```rust
+Dispatch { addr, task, goal, mode, idem, session, effort, model: Option<String> }
+```
+
+- **`model` 是城已登记的一个模型 id**，登记在哪个 tag 下都行；`None` 取房间自己那层已冻结的模型，房间尚未冻结时取 `main` tag 的模型。装配按这个 id 在簿子里找到那一条登记，连同它的端点与窗口一起用，保密楼「只用回环端点」的检查照旧由 `ModelBook::select` 做（sprawling-SPEC §8-10）。
+- **被否：借 `SelectModel` 换 tag 再派活**。`SelectModel` 改的是整座城的配置，会在同时跑着的别人的 run 底下换模型；一次派活的选择只该属于这一次派活。
+- **被否：接受任意 id，在 `main` 的端点上直接调用**。窗口与输出上限是登记时说出的，未登记的 id 没有这两个数，上下文提醒只能量一个没人给过的数。
+- **`WIRE_V` 38→39**：给既有命名帧加字段是「语法换形而名字没换」那一类，§8-1 的 golden 随之变；`client/src/wire.ts` 由 `cargo xtask wire-ts --write` 同集重生成。

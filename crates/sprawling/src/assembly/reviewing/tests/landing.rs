@@ -51,6 +51,7 @@ fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"remember"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -89,6 +90,7 @@ fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"check"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -166,6 +168,7 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"one"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -216,6 +219,7 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"two"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -271,6 +275,7 @@ fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"offer"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -309,6 +314,7 @@ fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"check"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

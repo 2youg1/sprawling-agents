@@ -309,6 +309,7 @@ impl RunWorker {
             origin: None,
             session: None,
             effort: None,
+            model: None,
             mode: kernel::Mode::PlanGoal,
             parent: None,
             succession: None,

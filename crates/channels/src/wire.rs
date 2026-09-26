@@ -254,7 +254,15 @@ mod tests {
     fn a_query_names_itself_with_its_entry_in_the_table() {
         assert_eq!(Query::CityView.name(), "CityView");
         assert!(QUERY_NAMES.contains(&Query::CityView.name()));
-        assert!(QUERY_NAMES.contains(&Query::Release.name()));
+        assert!(QUERY_NAMES.contains(&Query::NewestRelease.name()));
+    }
+
+    /// The query that asks npm is named for what it answers, so it
+    /// cannot be read as the verb that releases a halted scope.
+    #[test]
+    fn the_newest_release_query_is_not_spelled_like_the_release_verb() {
+        assert!(QUERY_NAMES.contains(&"NewestRelease"));
+        assert!(!QUERY_NAMES.contains(&"Release"));
     }
 
     /// The document names both roots, every command by its wire name,

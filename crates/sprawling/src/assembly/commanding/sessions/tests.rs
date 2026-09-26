@@ -181,6 +181,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let verified = runtime::replay::verify_ledger_dir(&ledger_dir(dir.path())).unwrap();
@@ -221,6 +222,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"carry-on"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -254,6 +256,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"again"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let next = provider.bodies();
@@ -282,6 +285,7 @@ fn checking_a_branch_origin_does_not_verify_the_history() {
             addr: addr("lab/room2"),
             task: "measure the meter".to_owned(),
             goal: "a number is written down".to_owned(),
+            model: None,
             mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
             session: None,
@@ -337,6 +341,7 @@ fn a_carried_session_names_the_previous_runs_transcript() {
         addr: room.clone(),
         task: task.to_owned(),
         goal: "done".to_owned(),
+        model: None,
         mode: kernel::Mode::PlanGoal,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,

@@ -30,6 +30,7 @@ fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap_err();
     assert!(err.recovery().contains(city::RULES_FILE));
@@ -81,6 +82,7 @@ fn a_run_is_told_who_shares_its_building_and_what_to_bring_them() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -152,6 +154,7 @@ fn a_signal_one_run_sends_is_read_by_the_run_that_pulls_it() {
                 ),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
     }
@@ -249,6 +252,7 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -301,6 +305,7 @@ fn a_fence_carries_what_the_run_may_write_and_not_only_its_room() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

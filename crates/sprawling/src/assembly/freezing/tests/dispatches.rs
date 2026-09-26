@@ -41,6 +41,7 @@ fn a_handoff_that_cannot_be_read_is_refused_by_name() {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"handoff"),
         session: None,
         effort: None,
+        model: None,
     });
 
     let err = outcome.expect_err("an unreadable handoff is not an absent one");
@@ -87,6 +88,7 @@ fn work_offered_in_up_mode_without_a_test_does_not_land() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     drop(provider);
@@ -136,6 +138,7 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -205,6 +208,7 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     drop(provider);
@@ -287,6 +291,7 @@ fn inheriting_a_branch_does_not_verify_the_history() {
                 addr: Address::parse(room).unwrap(),
                 task: task.to_owned(),
                 goal: "a number is written down".to_owned(),
+                model: None,
                 mode: kernel::Mode::PlanGoal,
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, task.as_bytes()),
                 session: None,
@@ -317,6 +322,7 @@ fn inheriting_a_branch_does_not_verify_the_history() {
         addr: Address::parse("lab/room1").unwrap(),
         session: None,
         effort: None,
+        model: None,
         mode: kernel::Mode::PlanGoal,
         parent: None,
         succession: None,
@@ -359,6 +365,7 @@ fn the_frozen_handoff_carries_the_rooms_own_sections_and_pins_its_bytes() {
             addr: room,
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),
+            model: None,
             mode: kernel::Mode::PlanGoal,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,

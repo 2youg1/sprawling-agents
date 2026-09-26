@@ -126,6 +126,7 @@ fn a_dispatch_without_a_provider_fails_saying_what_to_configure() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap_err();
     assert!(
@@ -184,6 +185,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     let chat = provider

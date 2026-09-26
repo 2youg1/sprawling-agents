@@ -34,6 +34,7 @@ fn an_allowed_item_carries_the_work_on_instead_of_asking_for_the_command_again()
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"first"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -174,6 +175,7 @@ fn work_handed_down_becomes_a_run_that_cannot_hand_it_down_again() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
     // The work went down without anybody being asked: one level of
@@ -282,6 +284,7 @@ fn what_came_back_from_a_delegate_waits_in_the_room_that_asked_for_it() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -346,6 +349,7 @@ fn status_tells_a_run_where_the_work_it_handed_down_went() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

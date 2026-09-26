@@ -206,6 +206,7 @@ mod tests {
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
 
@@ -276,6 +277,7 @@ mod tests {
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
                 session: None,
                 effort: None,
+                model: None,
             })
             .unwrap();
 

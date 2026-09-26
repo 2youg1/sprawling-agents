@@ -287,6 +287,7 @@ fn dispatch(addr: &str, task: &str, key: &[u8]) -> channels::Command {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
         effort: None,
+        model: None,
     }
 }
 

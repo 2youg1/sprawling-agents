@@ -72,6 +72,7 @@ fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -120,6 +121,7 @@ fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: Some(kernel::SessionName::parse("one").unwrap()),
             effort: None,
+            model: None,
         })
         .unwrap_err();
 
@@ -153,6 +155,7 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"talk"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -192,6 +195,7 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 
@@ -299,6 +303,7 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
+            model: None,
         })
         .unwrap();
 

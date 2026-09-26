@@ -75,6 +75,7 @@ fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lab|read the plan"),
         session: Some(kernel::SessionName::parse("one").unwrap()),
         effort: None,
+        model: None,
     };
     for _sent in 0..2 {
         worker.serve_one(Posted {

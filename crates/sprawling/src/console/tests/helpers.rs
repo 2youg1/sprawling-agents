@@ -21,6 +21,9 @@ use super::super::terminal::drive;
 use super::super::*;
 use kernel::Address;
 use std::sync::Arc;
+pub(super) fn key() -> kernel::IdemKey {
+    kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"a typed line")
+}
 pub(super) fn room() -> Address {
     Address::parse("lab/room1").unwrap()
 }
