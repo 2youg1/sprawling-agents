@@ -62,3 +62,47 @@ fn an_installed_skill_is_registered_in_the_cas_under_its_hash() {
         "the CAS answers the same bytes under the hash the install reported"
     );
 }
+
+/// A package is registered as one blob, its canonical string, under the
+/// hash the install reported; every item it carried is in that blob and
+/// on the shelf under its own path.
+#[test]
+fn an_installed_package_is_registered_in_the_cas_as_one_blob() {
+    let city_root = tempfile::tempdir().unwrap();
+    let stage = tempfile::tempdir().unwrap();
+    let package = stage.path().join("review");
+    std::fs::create_dir_all(package.join("scripts")).unwrap();
+    std::fs::write(package.join("SKILL.md"), BODY).unwrap();
+    std::fs::write(package.join("scripts").join("run.sh"), "echo review\n").unwrap();
+
+    let layout = kernel::layout::CityLayout::new(city_root.path());
+    let mut cas = memory::Cas::open(&layout.cas()).unwrap();
+    let slot = Slot::library("utilities").unwrap();
+    let mut register = |bytes: &[u8]| cas.put(bytes).map_err(memory::MemoryError::into_ax);
+
+    let installed = install_skill(city_root.path(), &slot, &package, &mut register).unwrap();
+    assert_eq!(installed.placed, Placed::Fresh);
+
+    let shelved = city_root
+        .path()
+        .join(kernel::RESERVED_PREFIX)
+        .join(city::LIBRARY_DIR)
+        .join("utilities")
+        .join("review");
+    assert_eq!(
+        std::fs::read(shelved.join("scripts").join("run.sh")).unwrap(),
+        b"echo review\n",
+        "every item lands under its own path"
+    );
+    let blob = cas.get(&installed.hash).unwrap();
+    assert!(
+        blob.starts_with(b"sprawling-skill-package/1\n"),
+        "the blob is the package's canonical string"
+    );
+    for carried in [BODY.as_bytes(), b"echo review\n".as_slice()] {
+        assert!(
+            blob.windows(carried.len()).any(|window| window == carried),
+            "every file the package carried is in the one blob"
+        );
+    }
+}
