@@ -3089,7 +3089,11 @@ pub(crate) fn asked(args: &[String], no_color: Option<OsString>) -> Asked;   // 
 
 ```rust
 pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError>;
+// bin::assembly::RunWorker 的字段：打开时装上 revealing::reveal
+reveal: fn(&Path, &Address) -> Result<(), AxError>,
 ```
+
+- **worker 经它被交到的 `fn` 指针碰这里**：`RunWorker::new` 与 `over` 装上 `revealing::reveal`，`Command::Reveal` 调的是那个字段，不直接调本函数。本模块启动主机的一个程序，worker 搬进 `accounting` 时它留在 `sprawling`（accounting-SPEC.md §7、§12-10）；脚本场景交一个自己的 `fn`，就不会在宿主上起文件管理器。钉住它的测试是 `a_reveal_reaches_the_file_manager_the_worker_was_handed`。
 
 - **为什么是一条命令而不是一个链接**：浏览器打不开 `file://` 之外的东西，而 `file://` 打开的是一个目录列表而不是人平时用的那个窗口。城代为执行，于是「在文件管理器里指出来」这件事在三个平台上各自用它们自己的办法完成：Windows `explorer /select,<路径>`、macOS `open -R <路径>`、其余 `xdg-open <父目录>`。
 - **文法即闸**：入参是 `Address`，它在语法上爬不出城，所以「请求城外的一个路径」这句话在线上拼不出来。此处不再加第二道路径检查——那会是同一条规则的第二个权威。
