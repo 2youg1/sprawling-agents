@@ -42,7 +42,7 @@ action. -->
     <ForkButton {entry} {run} {onFork} {onHover} />
   {/if}
   <div
-    class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap"
+    class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap wrap-anywhere"
   >
     {text}
   </div>
