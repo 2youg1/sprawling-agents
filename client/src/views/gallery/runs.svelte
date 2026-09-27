@@ -58,6 +58,9 @@
         run: idOf(n + 1),
         addr: `${BUILDINGS[n % BUILDINGS.length] ?? "atlas"}/${ROOMS[(n >> 1) % ROOMS.length] ?? "api"}`,
         task: n % 9 === 4 ? null : TASKS[n % TASKS.length] ?? null,
+        // Half the runs with no task written down carry a goal, which
+        // titles them; the other half fall back to their room.
+        goal: n % 18 === 4 ? "every clippy warning in the gate crate fixed" : null,
         started,
         ended: doing.kind === "frozen" ? started + ((n % 6) + 1) * 90_000 : null,
         doing,

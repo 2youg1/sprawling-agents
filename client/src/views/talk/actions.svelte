@@ -4,11 +4,13 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The right end of the composer's lower row: what two keys do while
-  // there is something to send (ux A3), the microphone where the city
-  // can transcribe, the stop square while a run is going, and the send
-  // arrow. Round icon buttons, named by the verb each one sends, in the
-  // place every chat page puts them.
+  // The right end of the composer's lower row: the microphone where the
+  // city can transcribe, the stop square while a run is going, and the
+  // send arrow. Round icon buttons, named by the verb each one sends, in
+  // the place every chat page puts them. What the two keys do is the
+  // send arrow's tooltip (`send.svelte`): drawn in this row it pushed the
+  // mode pill onto a second line in a conversation column of any width a
+  // desktop gives it.
   import type { Sending } from "../../core/doing";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
@@ -34,9 +36,6 @@
 </script>
 
 <div class="flex shrink-0 items-center gap-snug">
-  {#if !empty}
-    <span class="hidden text-note text-text-faint @lg/page:inline">{say($lang, "talk_enter_hint")}</span>
-  {/if}
   {#if hearing}
     <Record {onWords} />
   {/if}

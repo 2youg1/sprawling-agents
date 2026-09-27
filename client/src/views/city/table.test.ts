@@ -17,7 +17,7 @@ function building(addr: string): BuildingProgress {
 }
 
 function run(id: string, addr: string, started: number, doing: BoardRun["doing"]): BoardRun {
-  return { run: id, addr, task: null, started, ended: null, doing };
+  return { run: id, addr, task: null, goal: null, started, ended: null, doing };
 }
 
 describe("building table", () => {

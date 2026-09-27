@@ -115,6 +115,11 @@ pub struct RunSummary {
     /// What the run waits for the person to allow. Present exactly when
     /// `last_kind` is `approval_requested`.
     pub ask: Option<String>,
+    /// What the person asked for, as the run's `run_started` record says.
+    /// Absent when the view never saw the opening or the task was empty.
+    pub task: Option<String>,
+    /// What finishing looks like, from the same record, read the same way.
+    pub goal: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

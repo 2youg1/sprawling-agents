@@ -24,7 +24,7 @@
 
 - **wire**：Command 恰 30 个 variant、Query 恰 35 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`b9ab170a03bb161ccd28562314a4607d7d0f5aa7f8e90afe2492596f5c78f776`；**WIRE_V ＝ 42**（帧表与查询表的当前内容见 §8 各章）。
+  **当前 golden**：`576c3f9a1aab20e92387f497efc96f3e39799b921a2e150cbd13732c8d06693f`；**WIRE_V ＝ 43**（帧表与查询表的当前内容见 §8 各章）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`**：一个会话的历史按 run 取。`Query::History` 是城全局的最后一页，按它在客户端过滤，一个较早的会话就不在那一页里；`Query::RunView` 回答「这个 run 在不在、走到哪」，不回答「这个会话是什么」。
@@ -1396,6 +1396,21 @@ pub struct LiveOutput { pub run: RunId, pub stream: OutputStream, pub text: Stri
 - **`text` 是 UTF-8 有损解码**，因为一块在字节上界处切开，可能切在一个多字节字符中间；切口处画成替换字符只影响预览，结果以账本为准。**被否**：线上带字节数组——JSON 里一个字节要三四个字符，而页面最终画的是文本。
 - **`ServeConfig::outputs_so_far: Arc<dyn Fn() -> Vec<LiveOutput> + Send + Sync>`**：一个会话在送出 `Welcome` 之后、接实时帧之前调它一次，把还在跑的命令已经写出的字节按原来的次序作为 `Output` 帧送出，所以在命令跑到一半时打开页面的人先看到已经写出的部分。会话先订阅第四条通道再调它，所以一块可能送两遍而不会漏；预览里重复一块无害，漏一块则要等调用落账才补上。缓冲住在装配层（sprawling-SPEC §8-90），因为清空它要看账本里的 `tool_result`，而本 crate 不折叠账本。
 - **`OutputStream` 是 `runtime::Stream` 的第二处拼写而不是第二处权威**：本 crate 的依赖图够不到 `runtime`，映射住在装配层（`sprawling::assembly` 的 `serve`），与 `LogLevel`（§8-32）同一个安排。
+
+### 8-48e 一行 run 带上人交给它的任务与目标
+
+```rust
+pub struct RunSummary {
+    // …既有字段…
+    pub task: Option<String>,       // run_started.task；空串或窗口外为 None
+    pub goal: Option<String>,       // run_started.goal；同上
+}
+```
+
+- **为什么要上线**：run 板以人说的第一句话给一行 run 起名，没有这句话就以目标起名。页面只从事件流里听到 `run_started` 时才知道这两句；重载之后它只有 `city_view` 的答，每一行都只能叫「某房间里的一次 run」，同一个房间里的几次 run 在板上没法分开。
+- **两件都由 `memory::RunHot` 从 `run_started` 折出**（memory-SPEC §8-5），`summarize` 照抄，不读账本。空串记作 `None`：一句空的任务不是一个名字，页面对 `None` 与空串本来就得同样处理，线上只留一种拼法。
+- **被否：让页面逐行问 `Rounds` 拿 `opening`**。与 §8-48b 否掉逐行问 `closing` 同一个理由：一座两百个 run 的城首屏要问两百次，而热视图本来就在折 `run_started`。
+- **`WIRE_V` 42→43**：给既有答面类型加字段是「语法换形而名字没换」那一类，golden 随之变；`client/src/wire.ts` 由 `cargo xtask wire-ts --write` 同集重生成。
 
 ### 8-49 拖进对话框的文件：`/drop`
 

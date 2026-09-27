@@ -177,6 +177,38 @@ fn the_fold_keeps_the_ending_the_pull_request_and_the_ask() {
     );
 }
 
+/// The run board titles a reloaded run by what the person asked, so
+/// the fold keeps the opening's task and goal; an empty one is no name.
+#[test]
+fn the_fold_keeps_the_task_and_the_goal_the_run_was_started_with() {
+    let mut view = HotView::new();
+    let run = RunId::from_bytes([6u8; 16]);
+    let mut data = serde_json::Map::new();
+    data.insert("task".to_owned(), serde_json::json!("draft the plan"));
+    data.insert("goal".to_owned(), serde_json::json!(""));
+    let draft = EventDraft {
+        run,
+        t: TimeMs::new(0),
+        who: "city".to_owned(),
+        addr: None,
+        kind: EventKind::RunStarted,
+        data: Payload::new(data).unwrap(),
+        ig: false,
+    };
+    view.apply(&EventRecord::from_draft(
+        draft,
+        Seq::new(0),
+        B3Hash::digest(b""),
+    ))
+    .unwrap();
+    view.apply(&record(run, 1, EventKind::ToolCalled)).unwrap();
+    let hot = view.get(&run).unwrap();
+    assert_eq!(
+        (hot.task.as_deref(), hot.goal.as_deref()),
+        (Some("draft the plan"), None)
+    );
+}
+
 #[test]
 fn a_city_level_record_is_not_a_run() {
     // `RunId::CITY` is the nil id that marks a record belonging to the

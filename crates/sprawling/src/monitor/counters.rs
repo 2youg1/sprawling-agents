@@ -38,12 +38,13 @@ struct Machine {
 impl Counters {
     /// Opens this process's handle; the machine's wait for the first
     /// reading of [`Watched::Everything`]. The first reading has no
-    /// earlier one to compare with, so both CPU figures read 0.
+    /// earlier one to compare with, so both CPU figures read 0. The
+    /// volume is resolved once, here, the way the entry resolves it.
     pub(crate) fn open(volume: PathBuf) -> Self {
         Self {
             own: OwnProcess::new(),
             machine: None,
-            volume,
+            volume: super::volume::resolved(&volume).unwrap_or(volume),
         }
     }
 

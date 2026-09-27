@@ -185,7 +185,12 @@ export function normalisedFrom(probed: Probed, typed: string): Normalised | null
 // wrong is what the form says: a name that never resolved explains a
 // socket that never opened, and telling somebody about the socket sends
 // them to look at a firewall for a typo.
-export function stoppedAt(reach: Reached): Key {
+//
+// The staged reading asks the base URL without the key, so a 401 or a
+// 403 there says only that the host wants one; whether it takes this
+// key is what the model list, asked with the key, answers. A list that
+// was read means the key was taken, and the sentence says so.
+export function stoppedAt(reach: Reached, listed: Probed["failure"]): Key {
   switch (reach.named.state) {
     case "not_found":
       return "setup_reach_unknown_host";
@@ -212,15 +217,15 @@ export function stoppedAt(reach: Reached): Key {
     case "unreachable":
       return "setup_reach_unreachable";
     case "status":
-      return byStatus(reach.answered.figure);
+      return byStatus(reach.answered.figure, listed);
     default:
       return "setup_reach_unreachable";
   }
 }
 
-function byStatus(status: number | null): Key {
+function byStatus(status: number | null, listed: Probed["failure"]): Key {
   if (status === null) return "setup_reach_unreachable";
-  if (status === 401 || status === 403) return "setup_reach_key";
+  if (status === 401 || status === 403) return listed === null ? "setup_reach_ok" : "setup_reach_key";
   if (status === 404) return "setup_reach_path";
   if (status >= 200 && status < 400) return "setup_reach_ok";
   return "setup_reach_status";

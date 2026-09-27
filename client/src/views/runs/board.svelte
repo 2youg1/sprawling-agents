@@ -124,12 +124,13 @@
     list?.focus();
   }
 
-  // A run is titled by what the person asked of it; one dispatched with
-  // nothing written down, or one this page knows only from an answer
-  // that does not carry its words, is named by where it works instead,
-  // so two such runs in one list are still two different lines.
+  // A run is titled by what the person asked of it, else by what
+  // finishing looks like; one dispatched with neither written down is
+  // named by where it works instead, so two such runs in one list are
+  // still two different lines.
   function titleOf(run: BoardRun): string {
-    if (run.task !== null && run.task.trim() !== "") return run.task;
+    const words = [run.task, run.goal].find((said) => said !== null && said.trim() !== "");
+    if (words !== undefined && words !== null) return words;
     return run.addr === null ? say($lang, "runs_untitled") : fill(say($lang, "runs_untitled_in"), { addr: run.addr });
   }
 

@@ -105,9 +105,10 @@
 <!-- Where the call stopped, stage by stage, as the city measured it.
 Four stages, each with the word the city wrote for it, and above them
 the one sentence a person can act on. The stages are shown even when
-the call went through: a 401 from a host that resolved and answered in
-90 ms is a key, and somebody sent to look at a proxy instead has been
-sent the wrong way. -->
+the call went through: a host that resolved and answered in 90 ms is
+not a proxy problem, and somebody sent to look at one has been sent the
+wrong way. The stages ask without the key, so their 401 is read beside
+the model list, which was asked with it (`core/probed.ts`). -->
 {#if probed !== null && reach !== null}
   {@const found = reach}
   {@const failed = probed.failure}
@@ -121,7 +122,7 @@ sent the wrong way. -->
     <p class={["font-label", failed === null ? "text-text" : "text-alert"]}>
       {fill(say($lang, "setup_probe_read"), { host: found.host })}
     </p>
-    <p class="mt-tight text-text-quiet">{say($lang, stoppedAt(found))}</p>
+    <p class="mt-tight text-text-quiet">{say($lang, stoppedAt(found, failed))}</p>
     <dl class="mt-snug grid grid-cols-2 gap-x-base gap-y-tight text-text-faint">
       {#each stages as [word, stage] (word)}
         <dt>{say($lang, word)}</dt>

@@ -93,12 +93,19 @@ function first(...fields: readonly Field<unknown>[]): string | null {
   return null;
 }
 
-// `RunStarted::task`. The empty string is a run dispatched with nothing
-// written down, which is what the struct's default reads an absent key
-// as, so the two are one state rather than two.
-export function taskOf(record: EventRecord): [string, string | null] {
-  const held = defaulted(record, "task");
-  return [held.value, first(held)];
+// `RunStarted::task` and `goal`: what the person asked for and what
+// finishing looks like. The empty string is a run dispatched with
+// nothing written down, which is what the struct's default reads an
+// absent key as, so the two are one state rather than two.
+export interface Opening {
+  readonly task: string;
+  readonly goal: string;
+}
+
+export function openingOf(record: EventRecord): [Opening, string | null] {
+  const task = defaulted(record, "task");
+  const goal = defaulted(record, "goal");
+  return [{ task: task.value, goal: goal.value }, first(task, goal)];
 }
 
 // The two fields of `ToolCalled` this page folds: the tool the model

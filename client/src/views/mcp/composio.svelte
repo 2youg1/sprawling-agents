@@ -58,6 +58,7 @@
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";
   import Unanswered from "../parts/unanswered.svelte";
+  import { recoveryWords } from "../parts/notice_title";
   import { EMPTY, WHY, encode } from "./draft";
   import { consentUrl, shelfOf } from "./shelf.svelte";
 
@@ -213,7 +214,9 @@
   {:else if "refused" in answer}
     <div class="flex flex-col gap-tight" role="alert">
       <p class="text-note text-alert">{answer.refused.refusal.subject}</p>
-      <p class="text-note text-text-faint">{answer.refused.refusal.recovery}</p>
+      <p class="text-note text-text-faint">
+        {recoveryWords($lang, answer.refused.refusal.code, answer.refused.refusal.recovery)}
+      </p>
       <Button label={say($lang, "mcp_shelf_again")} tone="quiet" onPress={shelf.recheck} />
     </div>
   {:else if "shelf" in answer}
@@ -305,7 +308,7 @@ has none (ux A11). -->
   {:else if "refused" in line.standing}
     <div class="flex min-w-0 items-center gap-snug">
       <span class="min-w-0 truncate text-note text-alert">
-        {line.standing.refused.refusal.recovery}
+        {recoveryWords($lang, line.standing.refused.refusal.code, line.standing.refused.refusal.recovery)}
       </span>
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render again(say($lang, "mcp_connect_again"), line)}

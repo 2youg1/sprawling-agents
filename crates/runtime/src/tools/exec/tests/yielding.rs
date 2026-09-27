@@ -68,8 +68,7 @@ fn a_dispatched_command_runs_below_the_core() {
             .collect(),
         ..setup(chamber.path(), None, None)
     };
-    let patient = Backlog::with_window(crate::backlog::PollBudget::new(3000, 20));
-    let tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), patient).unwrap();
+    let tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap();
     let outcome = tool
         .invoke(&call(serde_json::json!({
             "program": { "path": path, "args": args }
@@ -91,11 +90,10 @@ fn a_dispatched_command_runs_below_the_core() {
 #[test]
 fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
     let chamber = tempfile::tempdir().unwrap();
-    let patient = Backlog::with_window(crate::backlog::PollBudget::new(3000, 20));
     let mut tool = ExecTool::new(
         setup(chamber.path(), None, None),
         Box::new(EchoSandbox::new()),
-        patient,
+        patient(),
     )
     .unwrap();
     let outcome = tool

@@ -202,13 +202,16 @@ fn a_scheduled_job_that_cannot_start_does_not_take_the_others_with_it() {
     worker.land_the_rest().unwrap();
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
-    let started: Vec<String> = verified
+    // The two lanes drive at once, so which opening lands first is a
+    // race; the promise is that each did once, not their order.
+    let mut started: Vec<String> = verified
         .raw_lines()
         .iter()
         .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
         .filter(|value| value["kind"] == "run_started")
         .filter_map(|value| value["addr"].as_str().map(str::to_owned))
         .collect();
+    started.sort();
     assert_eq!(
         started,
         vec!["ghost/room1".to_owned(), "lab/room1".to_owned()],

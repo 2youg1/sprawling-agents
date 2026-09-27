@@ -74,6 +74,7 @@
       addr: ROOM,
       started: TimeMs.make(now - told.ago * 60_000),
       task: told.task,
+      goal: null,
       lastSeq: Seq.make(100 - index),
       doing: told.doing,
       model: null,

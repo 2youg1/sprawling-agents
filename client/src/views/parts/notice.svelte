@@ -63,7 +63,7 @@
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Badge from "./badge.svelte";
-  import { noticeTitle } from "./notice_title";
+  import { noticeTitle, recoveryWords } from "./notice_title";
 
   interface Props {
     readonly seat: Seat;
@@ -90,6 +90,7 @@
   const { lang } = ui();
 
   const title = $derived(noticeTitle($lang, code, subject));
+  const nextStep = $derived(recoveryWords($lang, code, recovery));
 </script>
 
 <div
@@ -112,8 +113,8 @@
       {/if}
       <span class="ml-auto shrink-0 font-mono text-note text-text-faint">{code}</span>
     </div>
-    {#if recovery !== ""}
-      <p class="min-w-0 wrap-anywhere text-note text-text">{recovery}</p>
+    {#if nextStep !== ""}
+      <p class="min-w-0 wrap-anywhere text-note text-text">{nextStep}</p>
     {/if}
     <details class="min-w-0">
       <summary class="cursor-pointer text-note text-text-faint">{say($lang, "notices_detail")}</summary>
@@ -122,6 +123,9 @@
       >
         <span>{action}</span>
         <span>{subject}</span>
+        {#if recovery !== "" && recovery !== nextStep}
+          <span>{recovery}</span>
+        {/if}
       </div>
     </details>
   </div>

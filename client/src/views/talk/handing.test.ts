@@ -9,7 +9,7 @@ import { get } from "svelte/store";
 import { createBelief } from "../../core/belief";
 import type { AxError, EventRecord } from "../../wire";
 import { B3Hash, RunId, Seq, TimeMs } from "../../wire";
-import { IDLE, hand, settle } from "./handing";
+import { IDLE, NOT_CONVERSING, claims, hand, settle } from "./handing";
 
 const WORDS = "add a test for price";
 
@@ -77,5 +77,35 @@ describe("the words a box handed to the city", () => {
     store.refused(NO_MODEL);
     const handing = hand(WORDS, get(store.belief));
     expect(settle(handing, get(store.belief), "")).toEqual({ handing, box: null });
+  });
+});
+
+describe("which refusal the conversation draws itself", () => {
+  // The defect: a refused dispatch was said twice, by the card in the
+  // conversation and by the toast in the corner. Either may read the
+  // refusal first, so both readings of the claim are held here.
+  test("a conversation still waiting claims the refusal that settles its words", () => {
+    const store = createBelief(() => 0);
+    const handing = hand(WORDS, get(store.belief));
+    store.refused(NO_MODEL);
+    const now = get(store.belief);
+    expect(claims({ kind: "waiting", handing }, now.refusal ?? NO_MODEL, now)).toBe(true);
+  });
+
+  test("a conversation that drew the refusal names it", () => {
+    const store = createBelief(() => 0);
+    store.refused(NO_MODEL);
+    const now = get(store.belief);
+    const drawn = now.refusal ?? NO_MODEL;
+    expect(claims({ kind: "answered", refusal: drawn }, drawn, now)).toBe(true);
+  });
+
+  // A refusal of a command sent from somewhere else - the palette, the
+  // settings - has no card, so the corner is its one place.
+  test("a refusal nobody in the conversation waited on stays the corner's", () => {
+    const store = createBelief(() => 0);
+    store.refused(NO_MODEL);
+    const now = get(store.belief);
+    expect(claims(NOT_CONVERSING, now.refusal ?? NO_MODEL, now)).toBe(false);
   });
 });

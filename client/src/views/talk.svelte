@@ -46,7 +46,7 @@
   import Waiting from "./talk/waiting.svelte";
   import ContextStrip from "./talk/context_strip.svelte";
   import Failed from "./talk/failed.svelte";
-  import { IDLE, hand, settle } from "./talk/handing";
+  import { IDLE, NOT_CONVERSING, hand, settle } from "./talk/handing";
   import type { Handing } from "./talk/handing";
   import type { AxError } from "../wire";
 
@@ -162,14 +162,13 @@
       sent = sentFrom(address, text, $belief.runs);
       refused = null;
       handing = hand(text, $belief);
+      u.conversing.set({ kind: "waiting", handing });
     }
     return went;
   }
 
-  // A dispatch the city refused never becomes a run, so the thread has
-  // no place to say so; the refusal is drawn where the reply would have
-  // been, above the box that got the words back (`handing.ts` reads
-  // which refusal answers which send).
+  // A refused dispatch never becomes a run: its card stands where the reply would have been
+  // (`handing.ts` pairs a refusal with its send), and the corner is told the card is ours.
   let handing: Handing = IDLE;
   let refused = $state<{ readonly words: string; readonly error: AxError } | null>(null);
   $effect(() => {
@@ -177,10 +176,12 @@
     const held = handing;
     const next = settle(held, now, "");
     handing = next.handing;
-    if (next.box !== null && held.kind === "handed" && now.refusal !== null) {
-      refused = { words: held.words, error: now.refusal };
-    }
+    if (held.kind !== "handed" || next.handing.kind !== "idle") return;
+    const error = next.box === null ? null : now.refusal;
+    if (error !== null) refused = { words: held.words, error };
+    u.conversing.set(error === null ? NOT_CONVERSING : { kind: "answered", refusal: error });
   });
+  $effect(() => () => { u.conversing.set(NOT_CONVERSING); });
 
   // One branch, from wherever a person pointed: the words a message
   // carries go back to the box through the draft door - the composer

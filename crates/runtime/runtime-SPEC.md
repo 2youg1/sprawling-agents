@@ -1599,7 +1599,15 @@ pub(crate) enum Located { Present(PathBuf), Absent(PathBuf) }
 // 其下不存在的段原样接上——不存在的段不可能是链接。接上的段不是普通名字（`..` 在内）＝E_GATE_DENIED；
 // 路上某个存在的条目解析不了（目标已不在的链接在内）＝E_STORAGE_FATAL。
 pub(crate) fn real_location(written: &Path, action: &'static str, subject: &str) -> Result<Located, AxError>;
+// 模型写下的路径在城里的拼写。不是绝对路径的原样交回；绝对路径解开真实位置（real_location）后落在
+// 城根的真实位置之下，交回它相对城根的拼写（段以 `/` 相连，城根本身交回空串）；落在城外＝E_GATE_DENIED，
+// 恢复语说出 `read`／`search`／`edit` 只到城内、城外的文件经 `exec` 读。它不判保留区与读界：交回的拼写
+// 照旧过 admit 与 land。
+pub(crate) fn within_city<'a>(city_root: &Path, asked: &'a str, action: &'static str)
+    -> Result<Cow<'a, str>, AxError>;
 ```
+
+**城内的绝对路径换成它的地址，再走同一道判定。** 页面把拖进输入框的文件存到城里（`hall/dropped/…`），插进消息的是文件在盘上的绝对路径；模型照抄它看到的路径，于是 `read` 以文法拒绝一个本就在城里的文件，resident 只能回头让人重打一遍。`read`、`search` 的起点与 `edit` 因此先调 `within_city`，再把交回的拼写交给 `admit`（`edit` 交给 `Address::parse` 与写域门）。换算只做「这是城里的哪个地址」这一件事，保留区、读界与链接仍由原来那一处判，所以没有第二个权威。落选的方案：在页面上把路径改写成城相对地址——页面不知道城根的真实位置（链接、junction、大小写），而且模型从别处（`exec` 的输出、日志）拿到的绝对路径同样会被拒。
 
 **缺失的文件按它会落在哪里判，与存在的文件同一个函数。** 若文件不存在就交回字面路径，链接背后的缺失文件就绕过了判定：随后的「没命中」会列出链接目标那个目录的条目——城外的、机密楼的、包外的。`land`、`read::package` 与 `read::miss` 都经 `real_location` 求真实位置，各自只判「落点在不在我的范围里」；`..` 若接在已解析的祖先之后，会在盘从未看过的地方退出那个目录，所以拒绝而不接。
 

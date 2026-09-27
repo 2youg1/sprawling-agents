@@ -32,6 +32,7 @@ function runAt(index: number): RunBelief {
     addr: null,
     started: TimeMs.make(index),
     task: `task ${String(index)}`,
+    goal: null,
     lastSeq: Seq.make(1),
     doing: POSTURES[index % POSTURES.length] ?? { kind: "unknown" },
     model: null,

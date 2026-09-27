@@ -13,7 +13,7 @@
 // to `lang` below is the whole reason a language change redraws a word.
 
 import { derived, get, readable, writable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import type { Readable, Writable } from "svelte/store";
 
 import { QUERIES } from "./core/asking";
 import { MODES } from "./core/commands";
@@ -27,6 +27,8 @@ import type { AddressBar, View } from "./core/route";
 import { go } from "./core/route";
 import type { Connection } from "./core/socket";
 import type { Answer, ApprovalItem, Command, Effort, Mode } from "./wire";
+import { NOT_CONVERSING } from "./views/talk/handing";
+import type { Conversing } from "./views/talk/handing";
 
 export interface Ui {
   readonly conn: Connection;
@@ -48,6 +50,10 @@ export interface Ui {
   // The discipline the next dispatch runs under, held for this page the
   // way effort is; it starts at the first a control offers.
   readonly mode: Readable<Mode>;
+  // What the open conversation waits on, so the corner leaves the
+  // refusal the conversation draws to the conversation
+  // (`views/talk/handing.ts`). Written by the talk page alone.
+  readonly conversing: Writable<Conversing>;
   // The questions this city is holding for the person, as one reading
   // three views share: the dot on the rail, the rail's badge, and the
   // tab's title. Before this each of them folded the same answer by
@@ -101,6 +107,7 @@ function readied(value: Opening): Ui {
     lang: derived(value.prefs.held, (held) => held.lang),
     effort,
     mode,
+    conversing: writable<Conversing>(NOT_CONVERSING),
     approvals: derived(
       value.conn.asking.ask(QUERIES.approvals),
       (answer) => (answer !== undefined && "approvals" in answer ? answer.approvals.items : undefined),
