@@ -15,6 +15,7 @@
   import type { AxError } from "../../wire";
   import Button from "../parts/button.svelte";
   import { settledBySettings } from "./refused";
+  import { recoveryWords } from "../parts/notice_title";
 
   interface Props {
     // What happened, already in the reader's language.
@@ -41,7 +42,7 @@
   {#if error !== undefined}
     <p class="mt-tight text-text-quiet">{error.code} · {error.subject}</p>
     {#if error.recovery !== ""}
-      <p class="mt-tight text-text-faint">{error.recovery}</p>
+      <p class="mt-tight text-text-faint">{recoveryWords($lang, error.code, error.recovery)}</p>
     {/if}
   {/if}
   {#if toSettings || onRetry !== undefined}

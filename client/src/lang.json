@@ -4398,5 +4398,165 @@
   "gallery_city_table_narrow": {
     "en": "city · the building table at a phone's width",
     "zh": "城 · 手机宽度下的楼表"
+  },
+  "recover_e_path_not_found": {
+    "en": "Check the path against the city's tree; paths are relative to the city root.",
+    "zh": "对照城里的目录树核对这条路径；路径从城的根目录算起。"
+  },
+  "recover_e_tool_unknown": {
+    "en": "Use one of the tools this building lists for its residents.",
+    "zh": "改用这栋楼给居民列出的工具之一。"
+  },
+  "recover_e_tool_unavailable": {
+    "en": "Install what the tool needs on the dependencies page, or use another tool.",
+    "zh": "在依赖项页面装上这件工具要的程序，或者改用别的工具。"
+  },
+  "recover_e_invalid_args": {
+    "en": "Correct the request as the detail below says, then send it again.",
+    "zh": "按下面的详情改正这次请求，再发一次。"
+  },
+  "recover_e_outside_write_domain": {
+    "en": "Write inside the building's own ground, or widen what it may write in its RULES.toml.",
+    "zh": "写在这栋楼自己的范围里，或者在它的 RULES.toml 里放宽它能写的地方。"
+  },
+  "recover_e_version_conflict": {
+    "en": "Read the file again and redo the change against what it says now.",
+    "zh": "重新读一遍这个文件，按它现在的内容再改一次。"
+  },
+  "recover_e_gate_denied": {
+    "en": "The rule in the detail below says what is allowed; ask for that instead, or change the rule.",
+    "zh": "下面详情里的规则说明了什么是允许的；改成那样再做，或者改规则本身。"
+  },
+  "recover_e_budget_exhausted": {
+    "en": "Raise the spending limit on the run page, or start a new run.",
+    "zh": "在 run 页面调高花费上限，或者另起一次 run。"
+  },
+  "recover_e_timeout": {
+    "en": "Try again; if it keeps taking this long, check the network and the provider's status.",
+    "zh": "再试一次；如果总是这么久，检查网络和供应方的状态。"
+  },
+  "recover_e_provider": {
+    "en": "Check the provider's key and status on the model settings page, then send again.",
+    "zh": "在模型设置页面检查供应方的密钥和状态，然后再发一次。"
+  },
+  "recover_e_evidence_missing": {
+    "en": "Let the run show the work first: a test, a diff or a file it wrote.",
+    "zh": "先让 run 拿出做过的证据：一次测试、一份改动或它写下的文件。"
+  },
+  "recover_e_loop_suspected": {
+    "en": "Read the last steps on the run page, then steer the run with a narrower ask.",
+    "zh": "在 run 页面看看最后几步，再用更具体的要求引导它。"
+  },
+  "recover_e_locator_invalid": {
+    "en": "Point at a file by its path in the city, or at a stored block by its full name.",
+    "zh": "用城里的路径指向一个文件，或者用完整的名字指向一个已存的块。"
+  },
+  "recover_e_sandbox_denied": {
+    "en": "Run it on the host instead, or allow it in the building's sandbox rules.",
+    "zh": "改在本机上运行，或者在这栋楼的沙箱规则里允许它。"
+  },
+  "recover_e_busy": {
+    "en": "Wait for the run in this room to finish, or stop it, then send again.",
+    "zh": "等这个房间里的 run 做完，或者先停下它，再发一次。"
+  },
+  "recover_e_draft_stale": {
+    "en": "Read the file again and write the draft against its current text.",
+    "zh": "重新读一遍这个文件，按它现在的文字重写草稿。"
+  },
+  "recover_e_goal_conflict": {
+    "en": "Change the request to fit the building's goal, or change the goal first.",
+    "zh": "把请求改得合乎这栋楼的目标，或者先改目标。"
+  },
+  "recover_e_tainted_action": {
+    "en": "A person has to confirm this step: its input came from outside the city.",
+    "zh": "这一步要由人来确认：它的输入来自城外。"
+  },
+  "recover_e_repair_busy": {
+    "en": "Wait for the running repair to finish, then try again.",
+    "zh": "等正在进行的修复做完，再试一次。"
+  },
+  "recover_e_delegation_depth": {
+    "en": "Do the work in this run, or hand it to a room nearer the top.",
+    "zh": "在这次 run 里自己做完，或者交给离顶层更近的房间。"
+  },
+  "recover_e_approval_pending": {
+    "en": "Allow or refuse the request under approvals; the run waits until you do.",
+    "zh": "到审批里允许或拒绝这项请求；在那之前 run 会一直等。"
+  },
+  "recover_e_approval_denied": {
+    "en": "The request was refused; ask for something else, or ask again with a reason.",
+    "zh": "这项请求被拒绝了；改要别的，或者说明理由再请求一次。"
+  },
+  "recover_e_cross_building_denied": {
+    "en": "Signal a resident of that building with the question instead of reaching in.",
+    "zh": "别直接伸进那栋楼，改给那里的居民发信号去问。"
+  },
+  "recover_e_digest_suspect": {
+    "en": "Fetch the bytes again from their source; the stored copy does not match its name.",
+    "zh": "从来源重新取这些字节；存下的副本和它的名字对不上。"
+  },
+  "recover_e_credential_missing": {
+    "en": "File the key on the model settings page, then attach the provider again.",
+    "zh": "在模型设置页面存入密钥，再重新接上这个供应方。"
+  },
+  "recover_e_model_unchosen": {
+    "en": "Attach a provider on the model settings page and pick a model for it.",
+    "zh": "在模型设置页面接上一个供应方，并为它选一个模型。"
+  },
+  "recover_e_config_invalid": {
+    "en": "Fix the setting named in the detail below, on the settings page or in its file.",
+    "zh": "在设置页面或它所在的文件里，改正下面详情里点名的那项设置。"
+  },
+  "recover_e_cas_corrupt": {
+    "en": "Run sprawling doctor; it names the damaged objects and how to restore them.",
+    "zh": "运行 sprawling doctor；它会点名损坏的对象，并说明怎样恢复。"
+  },
+  "recover_e_storage_fatal": {
+    "en": "Free disk space or fix the folder's permissions, then restart the city.",
+    "zh": "腾出磁盘空间或修好这个目录的权限，然后重启这座城。"
+  },
+  "recover_e_worktree_busy": {
+    "en": "Wait for the other run working in this tree to finish, then try again.",
+    "zh": "等在这棵工作树里干活的另一次 run 做完，再试一次。"
+  },
+  "recover_e_browser_unavailable": {
+    "en": "Install a browser the city can drive; the dependencies page lists them.",
+    "zh": "装一个城能驱动的浏览器；依赖项页面列出了可用的几种。"
+  },
+  "recover_e_endpoint_dialect_unsupported": {
+    "en": "Pick the format this provider speaks on the model settings page.",
+    "zh": "在模型设置页面选这个供应方用的兼容格式。"
+  },
+  "recover_e_wire_mismatch": {
+    "en": "Reload the page to get the client this city was built with.",
+    "zh": "重新加载页面，取回这座城配套的客户端。"
+  },
+  "recover_e_log_version_unsupported": {
+    "en": "Open this city with the newer sprawling that wrote its ledger.",
+    "zh": "用写下这本账的较新版本的 sprawling 打开这座城。"
+  },
+  "recover_e_ledger_held": {
+    "en": "Another sprawling process holds this city's ledger; stop it, then start this one.",
+    "zh": "另一个 sprawling 进程占着这座城的账本；先停下它，再启动这一个。"
+  },
+  "recover_e_secret_egress": {
+    "en": "Keep the key in the vault and pass it as a secret: reference instead of its value.",
+    "zh": "把密钥留在钥匙库里，传 secret: 引用而不是它的值。"
+  },
+  "recover_e_discard_irreversible": {
+    "en": "Keep a copy first if you may need it; this discard cannot be taken back.",
+    "zh": "如果以后还可能要用，先留一份副本；这次丢弃收不回来。"
+  },
+  "recover_e_backpressure_shed": {
+    "en": "Free disk space or wait for queued runs to finish, then send again.",
+    "zh": "腾出磁盘空间或等排队的 run 做完，再发一次。"
+  },
+  "recover_e_tool_outcome_unknown": {
+    "en": "Check whether the step took effect before running it again.",
+    "zh": "先确认这一步有没有生效，再决定要不要重做。"
+  },
+  "recover_e_plan_missing": {
+    "en": "Ask the Mayor to write a plan for this goal in the building's Roadmap.md.",
+    "zh": "请市长在这栋楼的 Roadmap.md 里为这个目标写一份计划。"
   }
 }

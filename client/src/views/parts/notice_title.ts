@@ -3,9 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The heading of one notice (client-SPEC 4-35): the sentence this
-// client can say in the reader's own language, found under `err_` plus
-// the code in lower case. A code whose key `lang.json` does not hold
+// The heading of one notice (client-SPEC 4-35), and the next step under
+// it: the sentences this client can say in the reader's own language,
+// found under `err_` and `recover_` plus the code in lower case.
+//
+// The heading is read under `err_`. A code whose key `lang.json` does not hold
 // has no translation yet, and the title then shows that key name
 // itself: a visible `err_e_foo` is a defect somebody reports, and a
 // silently chosen default sentence is one nobody does (`fill` leaves
@@ -30,4 +32,15 @@ export function noticeTitle(lang: Lang, code: string, subject: string): string {
   if (asked !== null) return fill(say(lang, "ask_late_title"), { query: asked });
   const key = `err_${code.toLowerCase()}`;
   return isKey(key) ? say(lang, key) : key;
+}
+
+// What a person can do next, by the code, in the reader's language. The
+// city writes its recovery in English and for the one case in front of
+// it; the page shows its own sentence for every code it knows, and the
+// city's only for a code this build has no word for, since a sentence in
+// the wrong language still beats none. The city's own sentence stays
+// reachable in the notice's detail.
+export function recoveryWords(lang: Lang, code: string, said: string): string {
+  const key = `recover_${code.toLowerCase()}`;
+  return isKey(key) ? say(lang, key) : said;
 }

@@ -78,6 +78,7 @@
   import Button from "../parts/button.svelte";
   import Dialog from "../parts/dialog.svelte";
   import EmptyState from "../parts/empty.svelte";
+  import { recoveryWords } from "../parts/notice_title";
   import Row, { RowList } from "../parts/row.svelte";
 
   const { servers, health, onCheck, onRemove }: ServersProps = $props();
@@ -178,12 +179,15 @@
   {:else if "authenticating" in state}
     <p class="text-text-faint">{state.authenticating.recovery}</p>
   {:else if "failed" in state}
-    <!-- The three-part refusal, drawn verbatim: what failed, on what,
-    and what a person can do about it. The city composed it; nothing
-    here rewords it, because a second wording would be a second
-    authority on why this server is not answering. -->
+    <!-- The three-part refusal: what failed and on what, as the city
+    wrote them, and what a person can do about it in the reader's own
+    language, by the code (`parts/notice_title.ts`). -->
     <p class="text-text-faint">
-      {state.failed.refusal.action}: {state.failed.refusal.subject} — {state.failed.refusal.recovery}
+      {state.failed.refusal.action}: {state.failed.refusal.subject} — {recoveryWords(
+        $lang,
+        state.failed.refusal.code,
+        state.failed.refusal.recovery,
+      )}
     </p>
   {:else if "connected" in state}
     <ul class="flex flex-col gap-tight">
