@@ -19,7 +19,6 @@
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import Field from "../parts/field.svelte";
-  import Segmented from "../parts/segmented.svelte";
 
   // One word per editor, keyed by the editor: an editor added to
   // `core/editor.ts` leaves this table refusing to compile until it has
@@ -28,6 +27,10 @@
     none: "setup_editor_none",
     vscode: "setup_editor_vscode",
     "vscode-insiders": "setup_editor_vscode_insiders",
+    vscodium: "setup_editor_vscodium",
+    cursor: "setup_editor_cursor",
+    windsurf: "setup_editor_windsurf",
+    zed: "setup_editor_zed",
   };
 
   const { lang, prefs } = ui();
@@ -38,20 +41,32 @@
     prefs.setEditor(next);
     held = next;
   }
+
+  // A native list rather than a segmented track: seven editors are more
+  // than a track of equal cells holds in a settings card, and a list
+  // reads the same to a keyboard and a screen reader at any width.
+  function pick(word: string): void {
+    const editor = EDITORS.find((each) => each === word);
+    if (editor !== undefined) keep({ ...held, editor });
+  }
 </script>
 
 <div class="grid grid-fit items-start gap-base">
   <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
     <span class="text-label font-label text-text">{say($lang, "setup_editor")}</span>
     <p class="text-note text-text-faint">{say($lang, "setup_editor_note")}</p>
-    <Segmented
-      label={say($lang, "setup_editor")}
-      options={EDITORS.map((each) => ({ value: each, label: say($lang, WORDS[each]) }))}
-      held={held.editor}
-      onPick={(editor) => {
-        keep({ ...held, editor });
+    <select
+      class="h-control w-full min-w-0 rounded-control border border-edge-input bg-raised px-base text-body text-text"
+      aria-label={say($lang, "setup_editor")}
+      value={held.editor}
+      onchange={(event) => {
+        pick(event.currentTarget.value);
       }}
-    />
+    >
+      {#each EDITORS as each (each)}
+        <option value={each}>{say($lang, WORDS[each])}</option>
+      {/each}
+    </select>
     <Field
       label={say($lang, "setup_editor_folder")}
       help={say($lang, "setup_editor_folder_help")}

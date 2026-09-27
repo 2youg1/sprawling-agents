@@ -3811,6 +3811,22 @@
     "en": "VS Code Insiders",
     "zh": "VS Code 预览版（Insiders）"
   },
+  "setup_editor_vscodium": {
+    "en": "VSCodium",
+    "zh": "VSCodium"
+  },
+  "setup_editor_cursor": {
+    "en": "Cursor",
+    "zh": "Cursor"
+  },
+  "setup_editor_windsurf": {
+    "en": "Windsurf",
+    "zh": "Windsurf"
+  },
+  "setup_editor_zed": {
+    "en": "Zed",
+    "zh": "Zed"
+  },
   "setup_editor_folder": {
     "en": "The city's folder on this computer",
     "zh": "城在这台电脑上的文件夹"

@@ -7,10 +7,10 @@
 //
 // The page hands the browser a link and the browser hands it to the
 // editor this machine registered for the scheme; the city starts
-// nothing. Only editors whose own documentation states a file-and-line
-// URL are offered (client-SPEC 4-39 cites each one), because a guessed
-// scheme fails silently: the browser asks for an application nobody
-// installed, or opens the file at its first line.
+// nothing. Only editors whose own documentation or source code reads a
+// file-and-line URL are offered (client-SPEC 4-39 cites each one),
+// because a guessed scheme fails silently: the browser asks for an
+// application nobody installed, or opens the file at its first line.
 //
 // **Only a path inside the city gets a link.** The path is judged by
 // the generated `Address` grammar, which is the city's own rule for a
@@ -27,11 +27,19 @@ import { Address } from "../wire";
 
 // `none` is the posture a browser starts in: no link is drawn until the
 // person names the editor this machine has.
-export type Editor = "none" | "vscode" | "vscode-insiders";
+export type Editor = "none" | "vscode" | "vscode-insiders" | "vscodium" | "cursor" | "windsurf" | "zed";
 
 // Every value the settings selector offers, in the order it is drawn,
 // and the list a stored word is read back through.
-export const EDITORS: readonly Editor[] = ["none", "vscode", "vscode-insiders"];
+export const EDITORS: readonly Editor[] = [
+  "none",
+  "vscode",
+  "vscode-insiders",
+  "vscodium",
+  "cursor",
+  "windsurf",
+  "zed",
+];
 
 export interface Opening {
   readonly editor: Editor;
@@ -46,18 +54,38 @@ export interface Opening {
 
 const isAddress = Schema.is(Address);
 
-// `vscode://file/{full path to file}:line:column`, the form VS Code
-// documents; the Insiders build takes the same form under its own
-// scheme. The column is always the first, because a line is what the
-// monitor knows.
+// `{scheme}://file/{full path to file}:line:column`. The column is
+// always the first, because a line is what the monitor knows.
 export function editorLink(at: Opening): string | null {
-  if (at.editor === "none" || !isAddress(at.path) || !Number.isSafeInteger(at.line) || at.line < 1) {
+  const editor = at.editor;
+  if (editor === "none" || !isAddress(at.path) || !Number.isSafeInteger(at.line) || at.line < 1) {
     return null;
   }
   const folder = absoluteFolder(at.folder);
   if (folder === null) return null;
   const segments = [...folder.segments, ...at.path.split("/")].map(encodeURIComponent);
-  return `${at.editor}://file/${folder.drive}${segments.join("/")}:${String(at.line)}:1`;
+  return `${fileUrl(editor, folder.drive)}${segments.join("/")}:${String(at.line)}:1`;
+}
+
+// Where each editor's file handler starts reading the path.
+//
+// VS Code opens `{scheme}://file/{path}` for whatever scheme the build
+// registers, so the Insiders build, VSCodium, Cursor and Windsurf take
+// the same form under their own scheme. Zed strips `zed://file` and
+// opens the rest as a path, which on Windows leaves `/C:/...`, a name
+// Windows refuses; `//?/C:/...` is the device form of the same path and
+// opens, with the `?` escaped so the browser does not read a query.
+function fileUrl(editor: Exclude<Editor, "none">, drive: string): string {
+  switch (editor) {
+    case "vscode":
+    case "vscode-insiders":
+    case "vscodium":
+    case "cursor":
+    case "windsurf":
+      return `${editor}://file/${drive}`;
+    case "zed":
+      return drive === "" ? "zed://file/" : `zed://file//%3F/${drive}`;
+  }
 }
 
 interface Folder {
