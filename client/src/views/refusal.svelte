@@ -29,6 +29,7 @@
   // `notice_recovery.ts`'s**, shared with the drawer (client-SPEC
   // 4-35).
   import { SvelteMap } from "svelte/reactivity";
+  import { get } from "svelte/store";
 
   import { say } from "../core/lang";
   import { recoveryFor } from "../core/recovering";
@@ -36,6 +37,7 @@
   import type { About } from "./notice_recovery";
   import { recover, recoveryLabel, recoveryWhy } from "./notice_recovery";
   import type { AxError } from "../wire";
+  import { claims } from "./talk/handing";
   import Button from "./parts/button.svelte";
   import Notice from "./parts/notice.svelte";
 
@@ -123,14 +125,18 @@
     arm(next);
   }
 
-  // Every refusal the city comes back with is toasted once. The belief
-  // hands out a new value per arrival, so identity is the arrival.
+  // Every refusal the city comes back with is toasted once, except the
+  // one the open conversation draws as a card where its reply would
+  // have been (`talk/handing.ts`): the same refusal in two places is
+  // one refusal said twice. The belief hands out a new value per
+  // arrival, so identity is the arrival.
   $effect(() => {
     const refusal = $belief.refusal;
     if (refusal === null || refusal === heard) {
       return;
     }
     heard = refusal;
+    if (claims(get(u.conversing), refusal, $belief)) return;
     push(refusal);
   });
 </script>
