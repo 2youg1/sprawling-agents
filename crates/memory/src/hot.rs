@@ -49,6 +49,12 @@ pub struct RunHot {
     /// the run's last record is an `approval_requested`, so it cannot say
     /// a run waits when `last_kind` says it moved on.
     pub ask: Option<String>,
+    /// What the person asked for, from the `run_started` record's
+    /// `task`; `None` when that record is unseen or the task is empty.
+    pub task: Option<String>,
+    /// What finishing looks like, from the same record's `goal`, read
+    /// the same way.
+    pub goal: Option<String>,
 }
 
 impl RunHot {
@@ -63,6 +69,8 @@ impl RunHot {
             completion: None,
             pr: None,
             ask: None,
+            task: None,
+            goal: None,
         }
     }
 
