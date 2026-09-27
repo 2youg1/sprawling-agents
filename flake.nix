@@ -159,6 +159,12 @@
         # `tools` turns red. The exception list is checked in the other
         # direction too: an entry that is no longer a required row is a
         # stale excuse and fails, so it cannot outlive the tool.
+        #
+        # The build sandbox has no `/usr/bin/env`, which every shebang
+        # recipe in the `justfile` names, so the check runs a copy of the
+        # justfile whose shebangs point at the sandbox's own bash. The copy
+        # keeps its place beside `prereqs.tsv`, because the recipe finds
+        # that file relative to the justfile.
         checks.devshell-covers-just-check =
           pkgs.runCommand "devshell-covers-just-check"
             {
@@ -168,7 +174,14 @@
             ''
               set -eu
               tab=$(printf '\t')
-              just --justfile ${self}/justfile --working-directory . prereqs list > rows
+              table=crates/sprawling/src/doctor/table
+              mkdir -p tree/$table
+              cp ${self}/justfile tree/justfile
+              chmod u+w tree/justfile
+              cp ${self}/$table/prereqs.tsv tree/$table/prereqs.tsv
+              substituteInPlace tree/justfile \
+                --replace-fail '#!/usr/bin/env bash' '#!${pkgs.runtimeShell}'
+              just --justfile tree/justfile --working-directory . prereqs list > rows
               missing=""
               while IFS="$tab" read -r class name probe; do
                 [ "$class" = required ] || continue
