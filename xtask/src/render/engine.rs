@@ -32,11 +32,17 @@ const FORCED_COLOURS: &str = "--force-high-contrast";
 /// at, in the same virtual time the probe's own wait is counted in.
 pub(super) const BUDGET_MS: u32 = 8000;
 
+/// The Chromium family as the doctor states it: one brand per line,
+/// with the program a shell resolves and where each platform installs
+/// it. Rendered by the doctor's own test from its family table, so the
+/// gate and the doctor look in the same places (section 8-13).
+const CHROMIUM: &str = include_str!("../../../crates/sprawling/src/doctor/family/chromium.tsv");
+
 /// The engine to render with, in the three tiers section 8-13 fixes.
 ///
 /// Each tier is an authority that already exists. The gate does not keep
-/// a fourth list of its own, and it does not probe for what `doctor`
-/// already knows.
+/// a list of its own, and it does not probe for what `doctor` already
+/// knows.
 pub(super) fn browser() -> Option<PathBuf> {
     if let Some(named) = std::env::var_os("SPRAWLING_BROWSER") {
         let path = PathBuf::from(named);
@@ -47,26 +53,33 @@ pub(super) fn browser() -> Option<PathBuf> {
     if let Some(installed) = in_components() {
         return Some(installed);
     }
-    const FIXED: [&str; 6] = [
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-        "/usr/bin/chromium",
-    ];
-    for candidate in FIXED {
-        let path = PathBuf::from(candidate);
-        if path.is_file() {
-            return Some(path);
-        }
-    }
-    on_path(&[
-        "google-chrome",
-        "chromium",
-        "chromium-browser",
-        "microsoft-edge",
-    ])
+    chromium_members().find_map(|(program, places)| {
+        places
+            .map(PathBuf::from)
+            .find(|path| path.is_file())
+            .or_else(|| on_path(program))
+    })
+}
+
+/// Each brand of the doctor's Chromium family, in its order: the
+/// program name, and the places this platform installs it.
+fn chromium_members() -> impl Iterator<Item = (&'static str, std::str::Split<'static, char>)> {
+    let column = if cfg!(windows) {
+        2
+    } else if cfg!(target_os = "macos") {
+        3
+    } else {
+        4
+    };
+    CHROMIUM
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .filter_map(move |line| {
+            let fields: Vec<&'static str> = line.split('\t').collect();
+            let program = fields.get(1)?;
+            let places = fields.get(column)?;
+            Some((*program, places.split('|')))
+        })
 }
 
 /// What `doctor` installed, read as the filesystem convention it is
@@ -87,18 +100,13 @@ fn in_components() -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-/// The first of these names that is executable somewhere on `PATH`.
-fn on_path(names: &[&str]) -> Option<PathBuf> {
+/// Where `program` is on `PATH`, under its own name or, on Windows,
+/// with the `.exe` a shell adds.
+fn on_path(program: &str) -> Option<PathBuf> {
     let paths = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&paths) {
-        for name in names {
-            let candidate = dir.join(name);
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-        }
-    }
-    None
+    std::env::split_paths(&paths)
+        .flat_map(|dir| [dir.join(program), dir.join(format!("{program}.exe"))])
+        .find(|candidate| candidate.is_file())
 }
 
 /// Open one route of the built client and read back every element the
