@@ -2913,7 +2913,7 @@
   },
   "talk_choose": {
     "en": "model, workspace and effort",
-    "zh": "模型、工作区与 effort"
+    "zh": "模型、工作区与强度"
   },
   "talk_column_effort": {
     "en": "effort",
@@ -2961,7 +2961,7 @@
   },
   "talk_effort": {
     "en": "effort",
-    "zh": "effort"
+    "zh": "强度"
   },
   "talk_drop_refused": {
     "en": "{name} was not kept: {why}",
