@@ -40,6 +40,7 @@
     empty && !handed ? "bg-raised-hover aria-disabled:text-text-disabled" : "bg-accent text-on-accent hover:bg-accent-hover",
   ]}
   aria-label={say($lang, SPELLING[sending])}
+  title={say($lang, "talk_enter_hint")}
   aria-disabled={empty}
   onclick={(event) => {
     if (empty) event.preventDefault();
