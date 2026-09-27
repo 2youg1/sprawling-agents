@@ -2826,7 +2826,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **`Views.machine: Option<channels::DoctorAnswer>`**，由 `found_on_this_machine` 从外面放进来，**不由任何记录折出**：这是本文件里唯一一个关于机器而非关于历史的答案，所以重建账本不碰它。`None` 答 `Unavailable`。
 - **`Views.registry: Option<fn() -> channels::ReleaseAnswer>`**，由 `views::served` 的 `ask_the_registry_through` 从外面放进来，与 `machine`、`vault` 同形：serve 一座城时装配根交 `bin::release::answer`，`twin` 把它带到另一份。`NewestRelease` 在快照放开之后调它（它要出网）；`None` 是一份没人 serve 的 views（重建、测试），答 `Unavailable` 而不去问注册表。views 因此不直接碰 `bin::release`，搬进 `accounting` 时 `release` 留在 `sprawling`（accounting-SPEC.md §7）。钉住它的测试是 `a_newest_release_is_asked_of_the_registry_the_views_were_handed`。
 - **探测只由 `DoctorRefresh` 触发，服务一座城时一次也不跑**：表从 12 行长到 32 行，其中大半是起一个进程问它的版本（六件 cargo 子命令各起一次 cargo），windows-x86_64 暖缓存四核一档机器上量得 3.3–4.1 s。先前的决定把它放在开门之前，给出的参数是「12 项约 2 秒」，**两个数都已经移动**：项数翻了一倍有余，而问它的那一屏不再是第一屏（`#/` 是对话，机器那一屏在设置页的「依赖项安装」组里）。它当时否决后台探测的理由是「要多一条『还没答上来』的状态」，而那条状态今天已经存在、有夹具、也有它的动作（`MachineSkeleton` 与 `MachineUnchecked`）——那笔代价早已付过。服务因此不再为一个没人问的答案把套接字关着几秒。
-- **客户端**：`client/src/views/machine.svelte` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏打开时城里没有答案，它就发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有答案时开页不花任何东西。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
+- **客户端**：`client/src/views/machine.svelte` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏每次打开都发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有的答案先画出来，探完的那一份到了再换上（§8-120）。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
 - **验收**：`doctor::report::tests`——没有任何浏览器引擎的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["a browser engine"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。
 
@@ -2903,10 +2903,14 @@ pub(crate) fn prereqs() -> String;            // Develop 档渲染成 prereqs.ts
 ```
 
 - **表是权威，`just prereqs` 读它的渲染**：`crates/sprawling/src/doctor/table/prereqs.tsv` 每行 `class<TAB>name<TAB>program<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`，由 `table::prereqs()` 从 Develop 档渲染；测试 `the_prereqs_file_is_the_develop_tier_rendered` 要求文件逐字等于渲染结果，不等时把应有的全文印出来。`just prereqs` 在编译之前跑，只能读文件而不能问二进制，所以读的是这份渲染而不是另一张清单；`command -v <program>` 是它的探测，`program` 为 `-` 的行（浏览器家族）归 doctor 与 render 门自己去找。被否决的备选：justfile 当权威、doctor 在编译期读它——justfile 不写三平台的装法，doctor 就得再拼一遍。
-- **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、rustup、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、elan、lean、uv、python，以及 cargo-audit、cargo-mutants、cargo-fuzz、cargo-llvm-cov、kani、cargo-public-api）。于是没装 Lean 的机器上 `just check` 仍与没有 `adversary/` 时一样，而页面的「全部安装」照样把 Lean 装上。
+- **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、rustup、rust、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、elan、lean、uv、python，以及 cargo-mutants、cargo-fuzz、cargo-public-api、kani）。于是没装 Lean 的机器上 `just check` 仍与没有 `adversary/` 时一样，而页面的「全部安装」照样把 Lean 装上。
 - **行序就是安装顺序**：后一行的装法用到前一行装出的程序——rustup 之后才有 `rustup component add` 与 `cargo install`，elan 之后才有 `elan toolchain install`，uv 之后才有 `uv python install`。页面的「全部安装」按表序逐项跑，所以顺序写在表里而不是写在页面上。
 - **Lean 的版本只写在 `adversary/lean-toolchain`**：`LEAN_PIN` 是那个文件的 `include_str!`（`str::trim_ascii_end` 在 const 里去掉换行），装法是 `elan toolchain install <pin>`，探测是 `elan toolchain list` 里有以 pin 开头的一行。换 Lean 版本只改那一个文件。
-- **Windows 上能用 winget 的都用 winget**：Git、rustup、just、bun、uv、Chrome；elan 在 winget 上没有包，官方装法是一段 PowerShell 脚本，按 §8-40 只印不跑，这是 Windows 上唯一一条要人自己贴的线。cargo-nextest、cargo-deny 与其余 cargo 工具没有 winget 包，走 `cargo install --locked`。
+- **Windows 上能用 winget 的都用 winget，且按用户装**：Git、just、bun、uv、ffmpeg 的 winget 清单都有用户级安装程序，配方带 `--scope user`，于是装的时候不弹 UAC——§8-40「恒不提权」在 winget 上就是这个参数。rustup 的清单没有 scope 字段，而 rustup-init 本来就只写这个人的 profile，所以不带（带了 winget 答「找不到适用的安装程序」）；Chrome 的清单只有机器级安装程序，而每台 Windows 都有 Edge，Chromium 一族在 Windows 上由 Edge 答上，Chrome 那条配方很少被走到。
+- **elan 在 Windows 上由城跑它的官方安装脚本**：winget 上没有 elan，官方装法是 `elan-init.ps1`。理由：一台新机器应当一次走完，而让人把一行 PowerShell 贴进终端正是走不完的那一步；这一条由人定下，是 §8-40「脚本只印不跑」在 Windows 的 elan 上的例外。配方是 `powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <elan-init.ps1>))) -NoPrompt 1 -DefaultToolchain none"`：`-NoPrompt` 让它不问，`-DefaultToolchain none` 让 Lean 的版本仍只由 `lean` 一行按 `adversary/lean-toolchain` 装。它仍是 `Recipe::Command`，页面仍要人按一下才跑，所以「每一条会改动计算机的命令都先给人看过」这条不变；Linux 上的 `curl … | sh` 仍是 `Print`，例外只到 Windows 的 elan 为止。
+- **cargo 工具是一包，包里有哪些由仓库自己点名的地方决定**：`Requirement.pack == Some(Pack::RustTools)` 的行是 cargo-nextest、cargo-deny、cargo-mutants、cargo-fuzz、cargo-public-api、kani。测试 `the_rust_tools_pack_is_every_cargo_tool_this_repository_calls` 读 `justfile`、`.github/` 下的工作流、`xtask/src/` 与 `docs/`，把其中调用的 cargo 子命令（`cargo <sub>` 里 `<sub>` 不是 cargo 自带的那些）与 install-action 的 `tool:` 行收成一个集合，要求它恰好等于这一包；多一个或少一个都点名。cargo-audit 与 cargo-llvm-cov 因此不在表里：仓库里没有任何 recipe、工作流或文档调用它们。线上每一项仍是自己的一行（`just prereqs` 与判定逐项读），页面把同一包的行画成一行，一个按钮按表序装完缺的那几项，每一项一份日志。
+- **Rust 本身是一行**：`rust` 探 `rustc --version`，配方 `rustup default stable`（rustup 装好后给出一个在 PATH 上的 rustc；进仓库后 rustup 按 `rust-toolchain.toml` 自取钉住的那一版）。它与 `lean` 两行带 `Pin`：页面把钉住的版本与装着的、上游最新的并排画出（§8-120）。
+- **探测与安装子进程看到同一条搜索路径**（`doctor::host::search_path`）：进程的 `PATH` 之后补上这个人的几个用户级 bin 目录——home 下 `.cargo`、`.elan`、`.local`、`.bun` 各自的 `bin`，Windows 上再加 `%LOCALAPPDATA%\Microsoft\WinGet\Links`——已在 `PATH` 上的不重复。安装程序改的是注册表或 shell 启动文件，本进程的 `PATH` 是启动时那一份；不补这几个目录，刚装好的 rustup 让下一行的 `cargo install` 找不到 cargo，刚装好的 elan 让 `elan toolchain install` 找不到 elan，整批装要重启城才能走完。
 - **`same_command` 一处拼写三平台**：三平台装法相同的工具只写一次，三列各抄一遍只会让其中一列悄悄落后。
 
 ## 8-59 CLI 自己的样子：一张表，四个状态词，一句下一步（`bin::doctor::paint`、`bin::doctor::screen`）
@@ -3027,12 +3031,12 @@ pub(crate) fn recipe_for(item: &str) -> Result<&'static accounting::Recipe, AxEr
 - **查表与取平台在表旁边的 `doctor::recipe_for`，写进度行在 `doctor_install`**：worker 搬进 `accounting` 时需求表留在 `sprawling`（accounting-SPEC.md §7），所以 worker 经打开时交给它的 `RunWorker.recipe_for` 这个 `fn` 指针拿配方，而不是自己读 `REQUIREMENTS`。它不是一层穿透：它是表的查法，与表同住 `doctor::table`，一个名字要不要被拒只在那里回答。进度行仍由 `doctor_install` 写，写的时刻因此就是安装到达的时刻。钉住这条的测试是 `an_install_takes_its_recipe_from_the_table_the_worker_was_handed`。
 - **只跑 `Recipe::Command`，走的是终端那条 `Machine::install`**，不是第二个安装器。`Print` 与 `Manual` 各自带着「人自己去做什么」被拒：管道进 shell 的脚本是没人读过的代码，这条纪律不因请求来自页面而松一格。需求表里没有的名字在起任何进程之前就被拒，因为页面问的是这份构建不认识的东西。
 - **「这条配方这座城可不可以跑」只有 `Recipe::command` 一个家**（H-12）。它要么给出 `Runnable`，要么给出那句带恢复语的拒绝；终端（`screen`）、页面（`commanding::machine`）与机器适配器（`probe`）三处都问它，所以同一条打印配方在三扇门后读到的是同一句话。`Machine::install` 收的是 `Runnable` 而不是 `Recipe`，于是「不可跑的配方」在这一层已经不可表达，`runnable()` 与 `probe` 里那第二段措辞随之删除。
-- **`bin::doctor::running` 是本二进制起安装程序的唯一一处，等待有上限**（B-25／F-10）。三件事一起成立：`stdin` 是 `Stdio::null()`，于是要人同意源协议、要人输密码的包管理器立刻读到输入结束而不是坐在一台没有人的终端前；等待是 `try_wait` 的**计数敲门**，而不是 `Command::status()` 那种没有尽头的阻塞；敲完即杀掉子进程并带着 `E_TIMEOUT` 返回，恢复语是「自己在终端里跑这一行」。**上限用敲门次数而不是墙钟，因为本二进制读时钟的地方只有 `bin::assembly` 一处**（ARCHITECTURE §10 第 4 条）；这同时让上限可断言——测试要三次敲门就得到三次，而对着墙钟的断言问的是它跑在哪台机器上。`PATIENCE = 3_600` 次 × `TICK = 50ms` = 180 秒，只有这一个家。杀不掉或收不了尸都写进那条错误的主题——本城起的一个停不掉的进程是人必须知道的事实。
+- **`bin::doctor::running` 是本二进制起安装程序的唯一一处，等待有上限**（B-25／F-10）。三件事一起成立：`stdin` 是 `Stdio::null()`，于是要人同意源协议、要人输密码的包管理器立刻读到输入结束而不是坐在一台没有人的终端前；等待是 `try_wait` 的**计数敲门**，而不是 `Command::status()` 那种没有尽头的阻塞；敲完即杀掉子进程并带着 `E_TIMEOUT` 返回，恢复语是「自己在终端里跑这一行」。**上限用敲门次数而不是墙钟，因为本二进制读时钟的地方只有 `bin::assembly` 一处**（ARCHITECTURE §10 第 4 条）；这同时让上限可断言——测试要三次敲门就得到三次，而对着墙钟的断言问的是它跑在哪台机器上。上限由 `running::patience_for(runnable)` 一处决定：`cargo install` 从源码编译，给 `BUILD_PATIENCE = 24_000` 次 × `TICK = 50ms` = 20 分钟，因为 cargo-mutants、cargo-deny 这一类在四核机器上冷编译要 5–12 分钟，3 分钟的上限让它们每次都被杀在半路；其余的包管理器下载现成的包，仍是 `PATIENCE = 3_600` 次 = 180 秒。杀不掉或收不了尸都写进那条错误的主题——本城起的一个停不掉的进程是人必须知道的事实。
 - **每一项的输出一份文件**：`stdout` 与 `stderr` 写进 `host::install_log(item)`，每次安装从空文件写起。安装失败时，人要的是包管理器自己说了什么；这份文件的路径写进开始那一行日志，也写进失败的恢复语。放在系统临时目录而不是 `~/.sprawling/components/` 下，因为 components 下一个名字对应的目录本身就是 `Detection::Component` 的探测对象。
 - **进度就是日志行**（`bin::doctor` 模块名）。安装是本城起的一个进程并等它，值得报告的两件事——将要跑什么、怎么结束——正好是一行日志的形状；第二条进度通道会是同一件事的第二个权威。
 - **`doctor_install` 装完自己再探一遍，探不到就拒绝**：装完仍答启动快照的城，会告诉人他刚装的东西还是没有。包管理器报成功而这座城仍找不到这一项（最常见的是它装进了本进程启动之后才加进 PATH 的目录），`doctor_install` 在交出新答案之后以 `E_TOOL_UNAVAILABLE` 拒绝，主题以 `<item>:` 开头，恢复语是重启这座城。于是每一次安装恰好以两种方式之一结束——新答案里这一项在，或者一条点名这一项的拒绝——页面的「全部安装」按这两种结局逐项往下走，而不必读日志行的措辞。钉住它的测试是 `an_install_that_leaves_the_item_absent_is_refused_by_name`。
 - **答案不入账本**：机器有什么不是这座城里发生的事——它在本进程之外被改变，写进历史就是写进一份会错的历史。它沿 `RunWorker::examine` 这个 sink 交给服务层的 views，与开城那一次写进去的是同一处。没有 sink 的 worker（命令行逐条驱动的那种）照样探、照样写那一行日志：一个行为取决于有没有人在看的动词，是两个动词。
-- **跑在写线程上，代价有上限**：探测是十几个程序各被起一次的几秒钟，安装是一个包管理器，两者都占住其他命令排的那条队。但另一条路更糟——让读去起进程，会拿着 views 的锁把其他每一次读都堵住，而且没人要求它这么做。**此条先前接受的是「占住写线程」本身，那在无期限时等于永远**：一个等在输入上的安装程序会让 `Halt` 与 `Cancel` 都进不来，而那正是人最需要它们的一刻。故代价此后由 `PATIENCE × TICK` 封顶（上一条），写线程最多被一次安装占住 180 秒。
+- **跑在写线程上，代价有上限**：探测是十几个程序各被起一次的几秒钟，安装是一个包管理器，两者都占住其他命令排的那条队。但另一条路更糟——让读去起进程，会拿着 views 的锁把其他每一次读都堵住，而且没人要求它这么做。**此条先前接受的是「占住写线程」本身，那在无期限时等于永远**：一个等在输入上的安装程序会让 `Halt` 与 `Cancel` 都进不来，而那正是人最需要它们的一刻。故代价此后由 `patience_for` 封顶（上一条）：写线程最多被一次下载占住 180 秒、被一次 `cargo install` 占住 20 分钟。后者是明知的代价：页面在这段时间里把那一项画成「正在装」，人看得见城在等什么；把安装搬出写线程要一条把结局送回页面的新通道（今天结局是命令的回答），那是剩下的一步，不在本节。
 
 ### 8-65 `protocol::mcp::sse`：一台在流上应答的 server（形状 4 适配器；实现 `protocol::Outbound`）
 
@@ -4382,3 +4386,30 @@ pub(super) fn dropping(city_root: PathBuf) -> channels::DropSink;   // listening
 3. **名字交给地址文法判，不另写一份清洗规则。** 一条存得下却不能被读成地址的路径，居民拿到了也打不开；地址文法已经是「城里什么路径合法」的唯一回答。
 
 **测试。** `assembly::dropping::tests`：一个文件存下后答出的路径在 hall 的 `dropped/` 之下、内容与拖进来的字节相同；同样的字节再存一次答出同一条路径；`..` 与带分隔符的名字被拒为 `E_INVALID_ARGS`，城里什么也没有写。
+
+## 8-120 每一项的三个版本：装着的、钉住的、上游最新的（`bin::doctor::upstream`、`bin::doctor::pin`，形状：adapter；channels-SPEC §8-50）
+
+一个人打开依赖页，要知道的不只是「有没有」，还有「是不是旧了」。装着的版本由探测读出（`DoctorVersion::Said`），钉住的版本写在仓库的两份文件里，上游最新的版本只有发布它的人知道。
+
+```rust
+// bin::doctor（Requirement 多三个字段，每一行都写明）
+pub(crate) enum Pack { RustTools }                         // §8-58：同一包的行在页面上是一行
+pub(crate) enum Pin { Unpinned, RustToolchain, LeanToolchain }
+pub(crate) enum Upstream { Crate(&'static str), GitHub(&'static str), RustChannel, PythonOrg,
+                           Unread(channels::DoctorUnread) }
+// bin::doctor::pin：钉子读自仓库里的那一份文件，编译时 include_str!
+pub(crate) fn pinned(pin: Pin) -> Option<String>;
+// bin::doctor::upstream：一项的上游最新版本，出网
+pub(crate) fn newest(item: &str) -> channels::DoctorUpstream;   // 不失败：读不到也是一个答案
+```
+
+- **上游只问官方的来源**：cargo 工具与 just 问 crates.io（`/api/v1/crates/<crate>` 的 `crate.max_stable_version`），Rust 问 static.rust-lang.org 上 stable 发布通道的清单里 `[pkg.rust]` 的 `version`，Python 问 python.org 的 release API（取已发布、非预发布版本里最大的一个），其余问项目自己的 GitHub releases 的 `latest`（git-for-windows、rustup、bun、uv、elan、lean4）。版本号取答案里第一个点分数字，于是 `bun-v1.2.3` 与 `v2.55.0.windows.3` 都读成页面比得了的样子。
+- **读不到的项说它读不到，并说为什么**：rustfmt 与 clippy 随工具链发布（`WithToolchain`），浏览器一族有好几个牌子各自发布（`ManyBrands`），驱动的版本跟着浏览器走（`MatchesBrowser`），sandbox 引擎与 sprawling-desktop 是这份代码自己（`ThisProject`），shell、python-wasi 与 ffmpeg 没有一个官方的机读来源（`NoSource`）。网络上失败的一问答 `Refused { said }`，`said` 是停在哪一步。
+- **经这座城自己的网络设置出去**：请求由 `gateway::client_for(Proxying::ExceptLocal, url)` 造，与发布检查、模型调用同一条代理规则。
+- **页面打开依赖组时才问，每项一问，后台逐个填上**：`Query::UpstreamVersion { item }` 在快照放开之后答（它要出网），所以一项慢不挡其他项，也不挡本地探测。这与 `NewestRelease` 的「只在人按下时问」是同一个原则的两种按法：打开依赖页就是人在问自己的工具旧没旧。一次成功的读数在本进程里记住，下一次打开不再出网；GitHub 对不带凭据的请求每小时只给 60 次，每开一次页都重问会在一个小时里把它用完。失败的读数不记，下次打开再问。记住的读数不按时间过期，因为本二进制读时钟只在 `bin::assembly` 一处（ARCHITECTURE §10）；城重启即重问。
+- **钉子只在一处写**：`Pin::RustToolchain` 读 `rust-toolchain.toml` 的 `channel`，`Pin::LeanToolchain` 读 `adversary/lean-toolchain` 冒号之后的部分。改版本只改那一份文件。
+- **比较在页面**：`installed < newest` 时那一行标「有更新」。比较按点分数字逐段比，读不出数字的一方不比。
+- **打开依赖组即探一次**：页面每次打开这一组发一次 `DoctorRefresh`（§8-54 的同一条命令），不再等人先按「重新检查」；城里已有的答案先画出来，新的一份到了再换上。
+- **sprawling-desktop 一行说清它是什么**：它是一台可选的 MCP server，让 agent 看见并操作这台 Windows 桌面上的窗口；它不是 WebUI，没有它城照样跑、页面照样开。
+
+**测试**：`doctor::pin::tests` 读出的两个钉子与两份文件相等；`doctor::upstream::tests` 从固定的答案文本里读出版本（crates.io、通道清单、python.org、GitHub 各一份），以及每一行的 `Upstream` 与表对得上；`doctor::tests::the_rust_tools_pack_is_every_cargo_tool_this_repository_calls`。
