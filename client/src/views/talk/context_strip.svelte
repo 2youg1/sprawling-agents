@@ -16,6 +16,8 @@
   // `<summary>` drawn as a flex row loses its marker in some engines.
   // Enter and Space reach it the way they reach any button.
   import { fill, say } from "../../core/lang";
+  import { untrack } from "svelte";
+
   import { buildingOf, roomOf } from "../../core/route";
   import { ui } from "../../ui";
   import type { Address, RunId } from "../../wire";
@@ -25,16 +27,19 @@
   interface Props {
     readonly address: Address;
     readonly run: RunId | undefined;
+    // The gallery draws it open so the segments are measured; every
+    // screen starts closed.
+    readonly starts?: "open" | "closed";
   }
 
-  const { address, run }: Props = $props();
+  const { address, run, starts = "closed" }: Props = $props();
 
   const u = ui();
   const { lang } = u;
   const belief = u.conn.belief;
   const uid = $props.id();
 
-  let open = $state(false);
+  let open = $state(untrack(() => starts) === "open");
 
   const cells = $derived([
     { key: "slot_city", value: $belief.city ?? "—" },
