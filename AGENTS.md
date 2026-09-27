@@ -65,7 +65,7 @@ just check                    # the whole check: fmt, source gates, Lean models,
 
 - Return failure through `Result`. Non-test code has no `unwrap`, `expect`, `panic!`, `todo!`, `unreachable!`, bare indexing or bare slicing.
 - Use checked arithmetic and `TryFrom` in place of `as` casts.
-- `unsafe_code` is `deny` across the workspace, and the root of every crate without a foreign-function call carries `#![forbid(unsafe_code)]`, which nothing inside the crate can lift. `desktop` is the only crate without that line: there `unsafe` appears only under `platform/windows/`, lifted at the narrowest scope with `#[expect(unsafe_code, reason = "…")]`, and it wraps the FFI call alone, because reasoning pulled inside the block only makes the next reader audit more lines.
+- `unsafe_code` is `forbid` in the workspace lint table (`[workspace.lints.rust]` in the root `Cargo.toml`), which every workspace crate inherits and nothing inside a crate can lift. `desktop` sits outside the workspace for exactly this reason and sets `unsafe_code = "deny"` in its own manifest: there `unsafe` appears only under `platform/windows/`, lifted at the narrowest scope with `#[expect(unsafe_code, reason = "…")]`, and it wraps the FFI call alone, because reasoning pulled inside the block only makes the next reader audit more lines.
 - A platform call takes the first of these that works, and the crate's SPEC §12 records which one and why: a safe interface from the standard library or from a crate whose public surface is safe (for example `CommandExt::creation_flags` to set a child's priority class); then a Zig leaf behind a `(ptr, len)` boundary, checked for equivalence against a Rust reference, fuzzed on both sides, its boundary properties proved in Lean, and the one `unsafe` its `extern` call costs named in the SPEC. `unsafe` Rust that calls the platform directly is admitted only where a measurement shows it is the best choice overall.
 - Every `unsafe` block carries one `SAFETY:` line that gives the precondition that makes the call sound. Test the line by asking whether what it says could be false: *"we call `EnumWindows`"* cannot be false, so it restates the code; *"the callback is an `extern "system" fn` in this module, and the `Vec` behind `lparam` outlives the call with no second alias"* can be false, so it is a precondition.
 - Carry every failure to a decision: a `Result` is handled or returned. Binding it to `let _ =`, replacing it with `unwrap_or_default`, or turning it into an `Option` with `.ok()` drops the reason a caller needed.
@@ -124,7 +124,7 @@ A violation turns the check red with a message that names the rule, the violatio
 
 | Rule | Held by |
 |---|---|
-| The Rust rules above: no panics, checked arithmetic, `unsafe` only where a crate root does not forbid it. | workspace lints, `-D warnings`, `#![forbid(unsafe_code)]` |
+| The Rust rules above: no panics, checked arithmetic, `unsafe` only in `desktop`. | workspace lints, `-D warnings` |
 | The MPL-2.0 notice, then the copyright line, at the top of every `.rs` file. | `xtask header` |
 | One name per concept, taken from the glossary. | `xtask lexicon` |
 | Module map registered; functions within 200 lines and 4 parameters, files within 400 production lines. | `xtask modmap`, `xtask length` |
