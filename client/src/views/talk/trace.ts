@@ -97,10 +97,12 @@ export const NOTHING: Artifacts = { read: null, wrote: null, terminal: null };
 // Whether this call produced something worth showing: it answered, and
 // it answered in words this build can read. A call still waiting is not
 // an artifact, and neither is one whose result was too large to ride
-// the wire - that one names a locator the run page opens.
+// the wire - that one names a locator the run page opens. A call that
+// failed carries the refusal in its output, which the thread already
+// draws; under the call's subject in this card it read as the file.
 function produced(call: Call): boolean {
   const output = call.output;
-  return output !== null && output !== undefined && output.head !== "";
+  return call.outcome === "answered" && output !== null && output !== undefined && output.head !== "";
 }
 
 // The newest of each half, searched backwards from the last turn. The
