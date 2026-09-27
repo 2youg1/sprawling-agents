@@ -174,7 +174,11 @@ impl SearchTool {
         match call.args.as_map().get("path").and_then(Value::as_str) {
             None => Ok((self.city_root.clone(), String::new())),
             Some(asked) => {
-                let addr = chosen_path::admit(asked, "search", &*self.bound)?;
+                let spelled = chosen_path::within_city(&self.city_root, asked, "search")?;
+                if spelled.is_empty() {
+                    return Ok((self.city_root.clone(), String::new()));
+                }
+                let addr = chosen_path::admit(&spelled, "search", &*self.bound)?;
                 let located = chosen_path::land(&self.city_root, &addr, "search", &*self.bound)?;
                 let chosen_path::Located::Present(path) = located else {
                     return Err(AxError::failure(

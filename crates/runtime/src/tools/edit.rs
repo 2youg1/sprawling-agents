@@ -131,9 +131,12 @@ impl Tool for EditTool {
     /// the answer stays `Domain` so that no reading of it can come out
     /// narrower than the truth.
     fn writes(&self, call: &ToolCall) -> kernel::Writes {
-        match arg(call.args.as_map(), "path").map(kernel::Address::parse) {
-            Ok(Ok(path)) => kernel::Writes::Paths(vec![path]),
-            Ok(Err(_)) | Err(_) => kernel::Writes::Domain,
+        match arg(call.args.as_map(), "path")
+            .and_then(|asked| super::chosen_path::within_city(&self.city_root, asked, "edit file"))
+            .and_then(|spelled| kernel::Address::parse(&spelled))
+        {
+            Ok(path) => kernel::Writes::Paths(vec![path]),
+            Err(_) => kernel::Writes::Domain,
         }
     }
 
@@ -150,7 +153,9 @@ impl Tool for EditTool {
             )));
         }
         let args = call.args.as_map();
-        let rel = arg(args, "path")?;
+        let spelled =
+            super::chosen_path::within_city(&self.city_root, arg(args, "path")?, "edit file")?;
+        let rel: &str = &spelled;
         let base_version = arg(args, "base_version")?;
         let old = arg(args, "old")?;
         let new = arg(args, "new")?;

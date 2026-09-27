@@ -101,16 +101,54 @@ pub(crate) fn admit(
 }
 
 /// The city spelling of a path a model wrote: an absolute path inside
-/// the city becomes the address it names there.
+/// the city becomes the address it names there, and anything else comes
+/// back as written.
+///
+/// The page inserts a dropped file as this machine's path to it, and a
+/// model copies the paths it is shown. The answer is only a spelling:
+/// it still goes through [`admit`] and [`land`], so the reserved
+/// subtree, the read bound and every link keep their one judgement.
 ///
 /// # Errors
-/// Not yet decided.
+/// `E_GATE_DENIED` when the path really lands outside the city;
+/// whatever [`real_location`] refuses the path or the city root with.
 pub(crate) fn within_city<'a>(
-    _city_root: &Path,
+    city_root: &Path,
     asked: &'a str,
-    _action: &'static str,
+    action: &'static str,
 ) -> Result<Cow<'a, str>, AxError> {
-    Ok(Cow::Borrowed(asked))
+    let written = Path::new(asked);
+    if !written.is_absolute() {
+        return Ok(Cow::Borrowed(asked));
+    }
+    let root = real_location(city_root, action, asked)?.into_path();
+    let located = real_location(written, action, asked)?;
+    let outside = || {
+        AxError::failure(
+            AxCode::GateDenied,
+            action,
+            format!("{asked} is outside the city"),
+        )
+        .with_recovery(
+            "`read`, `search` and `edit` reach only files inside the city; to read a file \
+             elsewhere on this machine, run a command with `exec`",
+        )
+    };
+    spelled_under(&root, located.path())
+        .map(Cow::Owned)
+        .ok_or_else(outside)
+}
+
+/// The city spelling of `real` under the city's real root: its segments
+/// joined by `/`. `None` when it is not under the root, or when a
+/// segment is not text and so names no address.
+fn spelled_under(root: &Path, real: &Path) -> Option<String> {
+    real.strip_prefix(root)
+        .ok()?
+        .iter()
+        .map(std::ffi::OsStr::to_str)
+        .collect::<Option<Vec<&str>>>()
+        .map(|segments| segments.join("/"))
 }
 
 /// Where an admitted address really lands on disk, judged again there.
@@ -148,15 +186,7 @@ pub(crate) fn land(
         )
         .with_recovery("name a path whose every link stays inside the city")
     };
-    let inside = located
-        .path()
-        .strip_prefix(&root)
-        .map_err(|_| outside())?
-        .iter()
-        .map(std::ffi::OsStr::to_str)
-        .collect::<Option<Vec<&str>>>()
-        .ok_or_else(outside)?
-        .join("/");
+    let inside = spelled_under(&root, located.path()).ok_or_else(outside)?;
     // A path with no link on it names the address already admitted, and
     // asking the read bound twice would read a building's rules twice.
     if inside != addr.as_str() {
@@ -377,12 +407,19 @@ mod tests {
     fn an_absolute_path_inside_the_city_comes_back_as_its_address() {
         let city = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(city.path().join("hall").join("dropped")).unwrap();
-        std::fs::write(city.path().join("hall").join("dropped").join("plan.md"), "x").unwrap();
+        std::fs::write(
+            city.path().join("hall").join("dropped").join("plan.md"),
+            "x",
+        )
+        .unwrap();
         let native = city.path().join("hall").join("dropped").join("plan.md");
         let native = native.to_str().unwrap();
         let forward = native.replace('\\', "/");
-        let spelled = [native, forward.as_str()]
-            .map(|asked| within_city(city.path(), asked, "read").unwrap().into_owned());
+        let spelled = [native, forward.as_str()].map(|asked| {
+            within_city(city.path(), asked, "read")
+                .unwrap()
+                .into_owned()
+        });
         assert_eq!(spelled, ["hall/dropped/plan.md", "hall/dropped/plan.md"]);
     }
 

@@ -318,7 +318,8 @@ impl ReadTool {
         // it is written. `search` asks the same function the same
         // question, so what is reserved and what is closed have one
         // answer each.
-        let addr = super::chosen_path::admit(asked, "read", &*self.bound)?;
+        let spelled = super::chosen_path::within_city(&self.city_root, asked, "read")?;
+        let addr = super::chosen_path::admit(&spelled, "read", &*self.bound)?;
         Ok(Found::File {
             at: super::chosen_path::land(&self.city_root, &addr, "read", &*self.bound)?,
             floor: Floor::of_address(&self.city_root, &addr),

@@ -357,7 +357,11 @@ fn a_miss_offers_the_nearest_directorys_entries() {
 fn an_absolute_path_inside_the_city_is_read_as_its_address() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("hall").join("dropped")).unwrap();
-    std::fs::write(dir.path().join("hall").join("dropped").join("plan.md"), "the plan\n").unwrap();
+    std::fs::write(
+        dir.path().join("hall").join("dropped").join("plan.md"),
+        "the plan\n",
+    )
+    .unwrap();
     let (tool, _catalog) = tool(dir.path());
     let asked = dir.path().join("hall").join("dropped").join("plan.md");
 
