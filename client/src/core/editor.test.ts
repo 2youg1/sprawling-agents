@@ -35,7 +35,7 @@ describe("editorLink", () => {
   // so a link that parser rewrites is not the link the editor receives.
   test("survives the browser's URL parser unchanged", () => {
     const links = EDITORS.map((editor) =>
-      editorLink({ editor, folder: String.raw`C:\Users\a b`, path: "shop/main.rs", line: 3 }),
+      editorLink({ editor, folder: String.raw`D:\cities\a b`, path: "shop/main.rs", line: 3 }),
     ).filter((link) => link !== null);
     expect(links.map((link) => new URL(link).href)).toEqual(links);
   });
