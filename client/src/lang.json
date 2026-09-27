@@ -4453,7 +4453,7 @@
   },
   "recover_e_sandbox_denied": {
     "en": "Run it on the host instead, or allow it in the building's sandbox rules.",
-    "zh": "改在本机上运行，或者在这栋楼的沙箱规则里允许它。"
+    "zh": "改到沙箱外运行，或者在这栋楼的沙箱规则里允许它。"
   },
   "recover_e_busy": {
     "en": "Wait for the run in this room to finish, or stop it, then send again.",
