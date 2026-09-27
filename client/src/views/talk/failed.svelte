@@ -32,6 +32,8 @@
 
   // A refusal about the model or the provider is fixed in the settings;
   // a caller that knows better says so.
+  const nextStep = $derived(error === undefined ? "" : recoveryWords($lang, error.code, error.recovery));
+
   const toSettings = $derived(
     settings === "offered" || (settings === undefined && error !== undefined && settledBySettings(error)),
   );
@@ -41,8 +43,17 @@
   <p class="text-alert">{what}</p>
   {#if error !== undefined}
     <p class="mt-tight text-text-quiet">{error.code} · {error.subject}</p>
-    {#if error.recovery !== ""}
-      <p class="mt-tight text-text-faint">{recoveryWords($lang, error.code, error.recovery)}</p>
+    {#if nextStep !== ""}
+      <p class="mt-tight text-text-faint">{nextStep}</p>
+    {/if}
+    <!-- The city's own sentence names the case in front of it - which
+    field moved, which of two ways out - where the page's word speaks
+    for the whole code, so it stays one fold away, as in a notice. -->
+    {#if error.recovery !== "" && error.recovery !== nextStep}
+      <details class="mt-tight min-w-0">
+        <summary class="cursor-pointer text-text-faint">{say($lang, "notices_detail")}</summary>
+        <p class="mt-tight wrap-anywhere font-mono text-text-quiet">{error.recovery}</p>
+      </details>
     {/if}
   {/if}
   {#if toSettings || onRetry !== undefined}
