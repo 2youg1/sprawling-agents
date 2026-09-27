@@ -26,3 +26,12 @@ fn a_reading_of_this_process_has_memory_and_free_space() {
         (true, true, true, true, true, true)
     );
 }
+
+/// A city served from a relative path lives on the disk that holds its
+/// absolute spelling; no mount point is a prefix of `.` itself.
+#[test]
+fn a_city_opened_by_a_relative_path_reads_its_free_space() {
+    let mut counters = Counters::open(std::path::PathBuf::from("."));
+    let sample = counters.read(Watched::Everything, std::time::Duration::ZERO);
+    assert!(sample.volume_free_bytes > 0, "{sample:?}");
+}
