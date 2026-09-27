@@ -18,12 +18,12 @@ release notes and their commits.
 
 ---
 
-## <!-- xtask:begin workspace_version -->0.0.7<!-- xtask:end --> citior
+## v<!-- xtask:begin workspace_version -->0.0.7<!-- xtask:end -->-Pre-alpha-260927
 
-Pre-alpha. Nothing in this section has been published yet: it records what
-landed in the repository after `v0.0.6-Pre-alpha-260922`. WIRE_V
-<!-- xtask:begin wire_v -->44<!-- xtask:end -->, recounted from
-`channels::WIRE_V` while this section is unreleased.
+**sprawling 0.0.7 citior (pre-alpha)**
+
+Pre-alpha. It records what landed in the repository after
+`v0.0.6-Pre-alpha-260922`. WIRE_V <!-- xtask:begin wire_v -->44<!-- xtask:end -->.
 
 This section quotes no wall-clock figure. The measurements that would price
 this release's changes are taken after it, so the entries below say what the
@@ -479,7 +479,55 @@ rather than a component tree. The client speaks only the WebSocket protocol in
   download arrived whole and not who built it: `install.sh` and
   `install.ps1` verify no signature and no attestation. (install.sh:152)
 
+### The first pass by hand
+
+The release build was driven through its own page the way a person uses it,
+with a real provider attached, and what failed there was fixed before the tag.
+
+- A city that had committed once could not be served again. The views are
+  copied through their binary snapshot encoding at every start, and a run id
+  read back as text where sixteen bytes had been written, so `serve` stopped
+  with `E_CAS_CORRUPT`. A run id now reads its bytes back from a binary
+  format and keeps its one spelling in text. (crates/kernel/src/event/identity.rs:61)
+- Listing a provider's models filed the key and cleared its box, and the
+  attach that followed registered the endpoint without it, so every call
+  answered 401. The attach now carries the reference the form filed. (client/src/views/setup/providers/form.svelte:194)
+- The Mayor room is a chat page. A new chat mode, first in the list, sends
+  what the person typed as they typed it; the model, workspace, effort and
+  mode menus say in one line what each choice does; the strip under the box
+  opens to show what the prompt carries; a refused or stopped dispatch is
+  answered in the conversation with the way forward; a dropped file is
+  inserted as a path the city can read.
+- In the composer, Tab completes a command (`/ne` becomes `/new`), the arrow
+  keys move through several matches and Enter takes one; a line that spells
+  a known command runs it, and a message that starts with a path is sent as a
+  message.
+- Every other page stands in one desktop frame: the title and the page's
+  controls on one line, the content using the window's width. The ledger
+  reads as sentences with the raw fields behind a fold, and each run state on
+  the board has its own mark. A run the page learns of after a reload is
+  titled by its task or goal.
+- Requests are shaped the way each provider's own documentation says: where
+  effort is written, which field caps the output, how reasoning is handed
+  back, an OpenCode session header, and a `User-Agent`. The reachability
+  check no longer reports a good key as refused.
+- `read` takes an absolute path that lies inside the city, and a directory
+  is answered with its entries.
+- The dependency page checks this computer as soon as it opens, shows the
+  version installed, the version the repository pins and the newest upstream
+  side by side, installs every missing tool of a tier with one press, and
+  gathers the cargo tools the repository calls into one pack.
+- A hung test is terminated by the runner instead of outliving it.
+
 ### Known and unfixed
+
+- The `plan` tool cannot create the first row of an empty Roadmap, so the
+  Mayor cannot plan in a new city; chat mode is unaffected.
+- A skill on a shelf mounted from outside the city is listed but never
+  reaches a run; a skill copied into the city's library does.
+- An install runs on the city's writer thread and can hold it for as long
+  as a `cargo install` takes.
+- The install recipes on the dependency page are English on the Chinese page.
 
 - The page draws nothing for `log_truncated`. (client/src/core/belief/fold.ts:101)
 - A dispatched command has no memory cap: the one safe interface on Windows
