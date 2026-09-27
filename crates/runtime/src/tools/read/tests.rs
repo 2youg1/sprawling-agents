@@ -349,3 +349,18 @@ fn a_miss_offers_the_nearest_directorys_entries() {
     );
     assert!(!err.recovery().contains("exec"), "{}", err.recovery());
 }
+
+/// The page inserts a dropped file as this machine's path to it; the
+/// file lies in the city, so `read` answers with it rather than asking
+/// for the address the person never saw.
+#[test]
+fn an_absolute_path_inside_the_city_is_read_as_its_address() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("hall").join("dropped")).unwrap();
+    std::fs::write(dir.path().join("hall").join("dropped").join("plan.md"), "the plan\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let asked = dir.path().join("hall").join("dropped").join("plan.md");
+
+    let outcome = tool.invoke(&call(asked.to_str().unwrap())).unwrap();
+    assert_eq!(outcome.result.as_map()["text"], "the plan\n");
+}

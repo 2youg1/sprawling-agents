@@ -24,6 +24,7 @@
 //! why a skill inside reserved space is still handed over: `read`
 //! resolves the catalog first and only unresolved names reach this.
 
+use std::borrow::Cow;
 use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -97,6 +98,19 @@ pub(crate) fn admit(
              outside reads there",
         )),
     }
+}
+
+/// The city spelling of a path a model wrote: an absolute path inside
+/// the city becomes the address it names there.
+///
+/// # Errors
+/// Not yet decided.
+pub(crate) fn within_city<'a>(
+    _city_root: &Path,
+    asked: &'a str,
+    _action: &'static str,
+) -> Result<Cow<'a, str>, AxError> {
+    Ok(Cow::Borrowed(asked))
 }
 
 /// Where an admitted address really lands on disk, judged again there.
@@ -354,6 +368,35 @@ mod tests {
             assert_eq!(err.code(), &AxCode::InvalidArgs, "{asked} was allowed");
             assert_eq!(err.action(), "search");
         }
+    }
+
+    /// A dropped file reaches the conversation as this machine's path
+    /// to it, and it lies inside the city: the model that copies it is
+    /// asking for that file's address, in either separator.
+    #[test]
+    fn an_absolute_path_inside_the_city_comes_back_as_its_address() {
+        let city = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(city.path().join("hall").join("dropped")).unwrap();
+        std::fs::write(city.path().join("hall").join("dropped").join("plan.md"), "x").unwrap();
+        let native = city.path().join("hall").join("dropped").join("plan.md");
+        let native = native.to_str().unwrap();
+        let forward = native.replace('\\', "/");
+        let spelled = [native, forward.as_str()]
+            .map(|asked| within_city(city.path(), asked, "read").unwrap().into_owned());
+        assert_eq!(spelled, ["hall/dropped/plan.md", "hall/dropped/plan.md"]);
+    }
+
+    #[test]
+    fn an_absolute_path_outside_the_city_is_refused_toward_exec() {
+        let city = tempfile::tempdir().unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        let asked = elsewhere.path().join("notes.md");
+        let err = within_city(city.path(), asked.to_str().unwrap(), "read").unwrap_err();
+        assert_eq!(
+            (err.code(), err.recovery().contains("`exec`")),
+            (&AxCode::GateDenied, true),
+            "{err:?}"
+        );
     }
 
     #[test]
