@@ -102,6 +102,20 @@ jobs:
       # `moved` job's skip branch since that change landed, which is the
       # only reason this was still theoretical here and not there.
       - uses: ./.github/actions/client-artifacts
+      # The render gate drives a Chromium-family engine with `--dump-dom`.
+      # The full Google Chrome on this runner never exits from that call
+      # (the gate kills it after two minutes and says so), while
+      # chrome-headless-shell - the build Google ships for exactly this
+      # kind of scripted, windowless use - does. SPRAWLING_BROWSER is the
+      # gate's first tier, so naming the shell there is the whole change.
+      - name: an engine the render gate can finish with
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @puppeteer/browsers install chrome-headless-shell@stable --path "$RUNNER_TEMP/engines"
+          shell=$(find "$RUNNER_TEMP/engines" -type f -name chrome-headless-shell -perm -u+x | head -n 1)
+          test -n "$shell"
+          echo "SPRAWLING_BROWSER=$shell" >> "$GITHUB_ENV"
       - name: xtask gates
         run: cargo xtask gates
       - name: tests
