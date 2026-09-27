@@ -107,7 +107,11 @@ impl Worktrees {
             .commit_at(point)?
             .tree()
             .map_err(|err| refuse(format!("{point}: {err}")))?;
-        let target = WriteTarget::at("restore a file from a point", &lease.path().join(path))?;
+        let target = WriteTarget::within(
+            "restore a file from a point",
+            lease.path(),
+            &lease.path().join(path),
+        )?;
         let io = |source: std::io::Error| MemoryError::Io {
             op: "restore a file from a point",
             path: target.as_path().to_path_buf(),

@@ -228,7 +228,8 @@ impl Tool for EditTool {
         // escalation (memory-SPEC 8-25). And the write lands in a fresh
         // entry: the name is removed first and recreated, so a hard
         // link's other names keep their bytes.
-        memory::WriteTarget::at("edit file", &path).map_err(|err| err.into_ax())?;
+        memory::WriteTarget::within("edit file", &self.city_root, &path)
+            .map_err(|err| err.into_ax())?;
         if let Err(err) = std::fs::remove_file(&path) {
             // A name that is not there is what removal asked for; any
             // other refusal is the disk saying no.
@@ -296,7 +297,8 @@ impl EditTool {
         // parent through a link would land a directory inside the
         // protected metadata the link reaches, before the write itself
         // is refused (memory-SPEC 8-25).
-        memory::WriteTarget::at("edit file", path).map_err(|err| err.into_ax())?;
+        memory::WriteTarget::within("edit file", &self.city_root, path)
+            .map_err(|err| err.into_ax())?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|err| {
                 AxError::failure(AxCode::StorageFatal, "edit file", format!("{rel}: {err}"))

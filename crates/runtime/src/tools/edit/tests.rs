@@ -338,3 +338,37 @@ fn an_edit_through_a_hard_link_leaves_the_reserved_file_whole() {
         "the reserved file behind the other name is byte-identical: the write never landed"
     );
 }
+
+/// Where a person keeps a city is their placement, not a write a run
+/// could redirect: a city reached through a link above its root - macOS
+/// puts every temporary directory under `/var`, which is a link to
+/// `/private/var` - is edited like any other (memory-SPEC 8-12).
+#[test]
+fn a_city_placed_below_a_link_is_edited_like_any_other() {
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(tmp.path().join("real")).unwrap();
+    if !place_link(true, &tmp.path().join("real"), &tmp.path().join("placed")) {
+        return;
+    }
+    let city = tmp.path().join("placed");
+    let tool = tool(&city);
+    std::fs::write(city.join("work/a.txt"), "draft\n").unwrap();
+
+    let edited = tool.invoke(&call(
+        "work/a.txt",
+        &version_of(b"draft\n"),
+        "draft",
+        "final",
+    ));
+    let created = tool.invoke(&call("work/b.txt", "new", "", "made\n"));
+
+    assert_eq!(
+        (
+            edited.map(|_| ()),
+            created.map(|_| ()),
+            std::fs::read_to_string(tmp.path().join("real/work/a.txt")).unwrap(),
+            std::fs::read_to_string(tmp.path().join("real/work/b.txt")).unwrap(),
+        ),
+        (Ok(()), Ok(()), "final\n".to_owned(), "made\n".to_owned())
+    );
+}

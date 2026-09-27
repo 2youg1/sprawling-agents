@@ -153,11 +153,7 @@ impl WriteTarget {
     ///
     /// # Errors
     /// As [`WriteTarget::at`], for an alias at or below the bound.
-    pub(crate) fn within(
-        op: &'static str,
-        root: &Path,
-        path: &Path,
-    ) -> Result<WriteTarget, MemoryError> {
+    pub fn within(op: &'static str, root: &Path, path: &Path) -> Result<WriteTarget, MemoryError> {
         for at in path.ancestors().take_while(|at| *at != root) {
             if let Some(kind) = kind_at(at)? {
                 return Err(refused(op, at, kind));
@@ -214,11 +210,14 @@ pub(crate) mod tests {
     #[test]
     fn a_plain_name_clears_and_so_does_one_that_is_not_there_yet() {
         let tmp = tempfile::tempdir().unwrap();
-        let plain = tmp.path().join("work").join("a.txt");
+        // Resolved first: `at` walks to the filesystem root, and on macOS
+        // every temporary directory sits below `/var`, which is a link.
+        let root = tmp.path().canonicalize().unwrap();
+        let plain = root.join("work").join("a.txt");
         std::fs::create_dir_all(plain.parent().unwrap()).unwrap();
         std::fs::write(&plain, b"one").unwrap();
         WriteTarget::at("write a file", &plain).unwrap();
-        WriteTarget::at("write a file", &tmp.path().join("work").join("new.txt")).unwrap();
+        WriteTarget::at("write a file", &root.join("work").join("new.txt")).unwrap();
     }
 
     /// The link arm of the alias family: at the name or above it, a

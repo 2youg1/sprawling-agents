@@ -28,6 +28,8 @@ pub(super) const WORKTREE_DIR: &str = "worktrees";
 pub struct Worktrees {
     pub(super) repo: git2::Repository,
     pub(super) home: PathBuf,
+    /// Where the person placed the city; the alias check stops here.
+    city_root: PathBuf,
     ceiling: ByteLen,
 }
 
@@ -63,6 +65,7 @@ impl Worktrees {
         Worktrees {
             repo,
             home: city_root.join(kernel::RESERVED_PREFIX).join(WORKTREE_DIR),
+            city_root: city_root.to_path_buf(),
             ceiling: ByteLen::new(WORKTREE_MAX_BYTES),
         }
     }
@@ -155,7 +158,7 @@ impl Worktrees {
         let path = self.home.join(name.as_str());
         // The checkout lands at this name, and a name that is an alias
         // would write the whole tree through it (memory-SPEC 8-25).
-        crate::alias::WriteTarget::at("place a worktree", &path)?;
+        crate::alias::WriteTarget::within("place a worktree", &self.city_root, &path)?;
         let mut opts = git2::WorktreeAddOptions::new();
         opts.lock(true);
         opts.reference(reference);
