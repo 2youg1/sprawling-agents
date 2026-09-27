@@ -366,7 +366,10 @@ fn a_directory_is_answered_with_its_entries() {
         (err.code(), err.nearby()),
         (
             &AxCode::InvalidArgs,
-            &["hall/mayor/Handoff.md".to_owned(), "hall/mayor/notes.md".to_owned()][..]
+            &[
+                "hall/mayor/Handoff.md".to_owned(),
+                "hall/mayor/notes.md".to_owned()
+            ][..]
         )
     );
 }
