@@ -23,8 +23,11 @@ runs:
       shell: bash
       run: |
         if [ ! -x "$HOME/.elan/bin/elan" ]; then
-          curl -fsSL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
-          sh elan-init.sh -y --default-toolchain none
+          # Into the runner's temp directory, never the checkout: the source
+          # gates scan the working tree, and the installer carries a
+          # high-entropy checksum the secret gate rightly refuses.
+          curl -fsSL https://elan.lean-lang.org/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
+          sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none
         fi
         echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
     - name: fetch the pinned toolchain, so nothing that needs lake can skip
