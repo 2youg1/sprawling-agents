@@ -42,13 +42,13 @@ python3 -u -m http.server 0 --bind 127.0.0.1 --directory "$root/www" \
     >"$root/server.log" 2>&1 &
 server=$!
 port=""
-for _ in $(seq 1 100); do
+for _ in $(seq 1 600); do
     port=$(sed -n 's/^Serving HTTP on 127\.0\.0\.1 port \([0-9][0-9]*\).*/\1/p' "$root/server.log")
     [ -n "$port" ] && break
     kill -0 "$server" 2>/dev/null || die "the loopback server exited: $(cat "$root/server.log")"
     sleep 0.1
 done
-[ -n "$port" ] || die "the loopback server named no port within 10 s"
+[ -n "$port" ] || die "the loopback server named no port within 60 s"
 origin="http://127.0.0.1:${port}"
 
 # The list in the shape GitHub's API answers with: an array of releases,
