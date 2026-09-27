@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunBelief } from "../../core/belief";
 import { Address, RunId, Seq, TimeMs } from "../../wire";
-import { modelMove, pills, sessionModel } from "./composer";
+import { menuColumns, modelMove, pills, sessionModel } from "./composer";
 import type { Around, Picks } from "./composer";
 
 const ignore = (): void => undefined;
@@ -25,6 +25,16 @@ const around: Around = {
   effort: null,
   mode: "plan_goal",
 };
+
+describe("the `/` menu", () => {
+  test("a line no verb matches opens no menu, so Enter reaches the box", () => {
+    expect(menuColumns("en", "/etc/hosts is broken")).toEqual([]);
+    expect(menuColumns("en", "/st").flatMap((column) => column.rows.map((row) => row.id))).toEqual([
+      "/steer",
+      "/stop",
+    ]);
+  });
+});
 
 describe("the model pill", () => {
   test("a session's model is what the pill shows, not the city's next pick", () => {

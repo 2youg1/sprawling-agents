@@ -41,6 +41,9 @@
     // unfocused list must never carry it, or the change reaches no
     // screen reader at all.
     readonly onCursorChange?: ((rowId: string | null) => void) | undefined;
+    // The row the cursor is on, as data, for a caller whose own keys act
+    // on it: the composer's Tab takes this row's verb into the box.
+    readonly onCursorRow?: ((row: PopoverRow | null) => void) | undefined;
     // Where the data is not enough: renders one row's body in place of
     // the label and the secondary cell.
     readonly row?: Snippet<[PopoverRow]> | undefined;
@@ -53,6 +56,7 @@
     onClose,
     bind,
     onCursorChange,
+    onCursorRow,
     row,
   }: Props = $props();
 
@@ -170,6 +174,9 @@
   });
   $effect(() => {
     onCursorChange?.(activeId);
+  });
+  $effect(() => {
+    onCursorRow?.(rows.at(heldRow) ?? null);
   });
 </script>
 
