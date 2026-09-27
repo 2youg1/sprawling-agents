@@ -64,6 +64,7 @@ pub channels::Answer::Skills(alloc::boxed::Box<channels::SkillsAnswer>)
 pub channels::Answer::Toolkits(alloc::boxed::Box<channels::ToolkitsAnswer>)
 pub channels::Answer::Unavailable
 pub channels::Answer::Unavailable::query: alloc::string::String
+pub channels::Answer::Upstream(alloc::boxed::Box<channels::DoctorUpstream>)
 pub channels::Answered::as_of: kernel::event::identity::Seq
 pub channels::Answered::ask_id: channels::AskId
 pub channels::Answered::outcome: channels::AskOutcome
@@ -405,10 +406,20 @@ pub channels::DoctorItem::homepage: core::option::Option<alloc::string::String>
 pub channels::DoctorItem::install: channels::DoctorInstall
 pub channels::DoctorItem::name: alloc::string::String
 pub channels::DoctorItem::need: channels::DoctorNeed
+pub channels::DoctorItem::pack: core::option::Option<channels::DoctorPack>
+pub channels::DoctorItem::pinned: core::option::Option<alloc::string::String>
 pub channels::DoctorItem::state: channels::DoctorState
 pub channels::DoctorItem::tier: channels::DoctorTier
 pub channels::DoctorNeed::Optional
 pub channels::DoctorNeed::Required
+pub channels::DoctorNewest::Asking
+pub channels::DoctorNewest::Read
+pub channels::DoctorNewest::Read::version: alloc::string::String
+pub channels::DoctorNewest::Refused
+pub channels::DoctorNewest::Refused::said: alloc::string::String
+pub channels::DoctorNewest::Unread
+pub channels::DoctorNewest::Unread::why: channels::DoctorUnread
+pub channels::DoctorPack::RustTools
 pub channels::DoctorSandbox::arm: channels::DoctorSandboxArm
 pub channels::DoctorSandbox::coverage: alloc::vec::Vec<channels::DoctorGuarantee>
 pub channels::DoctorSandboxArm::CopiedTree
@@ -427,6 +438,14 @@ pub channels::DoctorState::Present::at: alloc::string::String
 pub channels::DoctorState::Present::version: channels::DoctorVersion
 pub channels::DoctorTier::Develop
 pub channels::DoctorTier::Use
+pub channels::DoctorUnread::ManyBrands
+pub channels::DoctorUnread::MatchesBrowser
+pub channels::DoctorUnread::NoSource
+pub channels::DoctorUnread::ThisProject
+pub channels::DoctorUnread::UnknownItem
+pub channels::DoctorUnread::WithToolchain
+pub channels::DoctorUpstream::item: alloc::string::String
+pub channels::DoctorUpstream::newest: channels::DoctorNewest
 pub channels::DoctorVerdict::missing: alloc::vec::Vec<alloc::string::String>
 pub channels::DoctorVerdict::tier: channels::DoctorTier
 pub channels::DoctorVersion::Late
@@ -440,6 +459,7 @@ pub channels::DocumentAnswer::bytes: u64
 pub channels::DocumentAnswer::text: alloc::string::String
 pub channels::DocumentAnswer::truncated: bool
 pub channels::Door::Acp
+pub channels::Door::Drop
 pub channels::Door::Enroll
 pub channels::Door::Transcribe
 pub channels::Drift::ahead: u64
@@ -733,6 +753,8 @@ pub channels::Query::RunView::run: kernel::event::identity::RunId
 pub channels::Query::Skills
 pub channels::Query::Skills::building: kernel::address::Address
 pub channels::Query::Toolkits
+pub channels::Query::UpstreamVersion
+pub channels::Query::UpstreamVersion::item: alloc::string::String
 pub channels::RegistryAnswer::assets: alloc::vec::Vec<channels::RegistryLine>
 pub channels::RegistryLine::addr: kernel::address::Address
 pub channels::RegistryLine::at: kernel::event::identity::TimeMs
@@ -759,11 +781,13 @@ pub channels::RunSummary::addr: core::option::Option<kernel::address::Address>
 pub channels::RunSummary::ask: core::option::Option<alloc::string::String>
 pub channels::RunSummary::completion: core::option::Option<alloc::string::String>
 pub channels::RunSummary::frozen: bool
+pub channels::RunSummary::goal: core::option::Option<alloc::string::String>
 pub channels::RunSummary::last_kind: kernel::event::kind::EventKind
 pub channels::RunSummary::last_seq: kernel::event::identity::Seq
 pub channels::RunSummary::pr: core::option::Option<alloc::string::String>
 pub channels::RunSummary::run: kernel::event::identity::RunId
 pub channels::RunSummary::started: core::option::Option<kernel::event::identity::TimeMs>
+pub channels::RunSummary::task: core::option::Option<alloc::string::String>
 pub channels::RunSummary::who: alloc::string::String
 pub channels::Sample::core_cpu_permille: u64
 pub channels::Sample::core_private_bytes: u64
@@ -785,6 +809,7 @@ pub channels::ServeConfig::city: core::option::Option<kernel::address::Address>
 pub channels::ServeConfig::client: alloc::sync::Arc<channels::ClientAssets>
 pub channels::ServeConfig::commands: alloc::sync::Arc<(dyn core::ops::function::Fn(channels::WireCommand, channels::Reply) -> core::result::Result<(), kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub channels::ServeConfig::deltas: tokio::sync::broadcast::Sender<channels::Delta>
+pub channels::ServeConfig::drop_sink: channels::DropSink
 pub channels::ServeConfig::epoch: core::option::Option<kernel::locator::B3Hash>
 pub channels::ServeConfig::events: tokio::sync::broadcast::Sender<channels::Committed>
 pub channels::ServeConfig::head: alloc::sync::Arc<channels::LedgerHead>
@@ -901,9 +926,10 @@ pub channels::Withheld::reason: alloc::string::String
 pub const channels::BODY_PX_MAX: u32
 pub const channels::BODY_PX_MIN: u32
 pub const channels::COMMAND_NAMES: [&str; 30]
+pub const channels::DROP_BYTES_MAX: usize
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 35]
+pub const channels::QUERY_NAMES: [&str; 36]
 pub const channels::RUN_COSTS_MAX: usize
 pub const channels::WIRE_V: u32
 pub enum channels::Admission
@@ -930,10 +956,13 @@ pub enum channels::DoctorFault
 pub enum channels::DoctorGuaranteeAxis
 pub enum channels::DoctorInstall
 pub enum channels::DoctorNeed
+pub enum channels::DoctorNewest
+pub enum channels::DoctorPack
 pub enum channels::DoctorSandboxArm
 pub enum channels::DoctorSandboxMissing
 pub enum channels::DoctorState
 pub enum channels::DoctorTier
+pub enum channels::DoctorUnread
 pub enum channels::DoctorVersion
 pub enum channels::Door
 pub enum channels::EntryKind
@@ -1064,6 +1093,7 @@ pub struct channels::DoctorCustody
 pub struct channels::DoctorGuarantee
 pub struct channels::DoctorItem
 pub struct channels::DoctorSandbox
+pub struct channels::DoctorUpstream
 pub struct channels::DoctorVerdict
 pub struct channels::DocumentAnswer
 pub struct channels::Drift
@@ -1135,6 +1165,7 @@ pub struct channels::WelcomeFacts<'a>
 pub struct channels::Withheld
 pub type channels::AcpSink = alloc::sync::Arc<(dyn core::ops::function::Fn(&serde_json::value::Value, channels::Pairing) -> core::result::Result<channels::AcpProgress, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type channels::Answering = alloc::sync::Arc<(dyn core::ops::function::Fn(channels::Query) -> (kernel::event::identity::Seq, core::result::Result<channels::Answer, kernel::error::shape::AxError>) + core::marker::Send + core::marker::Sync)>
+pub type channels::DropSink = alloc::sync::Arc<(dyn core::ops::function::Fn(&str, &[u8]) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type channels::TranscribeSink = alloc::sync::Arc<(dyn core::ops::function::Fn(alloc::vec::Vec<u8>, alloc::string::String) -> core::result::Result<alloc::string::String, kernel::error::shape::AxError> + core::marker::Send + core::marker::Sync)>
 pub type channels::WireCommand = channels::Command<channels::NoSecret>
 pub use channels::Address

@@ -50,6 +50,8 @@ impl core::fmt::Display for kernel::locator::Range
 impl core::fmt::Display for kernel::locator::Range
 impl core::fmt::Display for kernel::node_id::NodeId
 impl core::fmt::Display for kernel::node_id::NodeId
+impl core::fmt::Display for kernel::taint::TaintSet
+impl core::fmt::Display for kernel::taint::TaintSet
 impl core::fmt::Display for kernel::tool::ServerLabel
 impl core::fmt::Display for kernel::tool::ServerLabel
 impl core::fmt::Display for kernel::tool::ToolName
@@ -62,8 +64,8 @@ impl kernel::BuildingPolicy
 impl kernel::BuildingPolicy
 impl kernel::Ceiling
 impl kernel::Ceiling
-impl kernel::ChatRequest
-impl kernel::ChatRequest
+impl kernel::ChatRequest<'_>
+impl kernel::ChatRequest<'_>
 impl kernel::Discard
 impl kernel::Discard
 impl kernel::Effort
@@ -86,6 +88,8 @@ impl kernel::ImageType
 impl kernel::ImageType
 impl kernel::Mode
 impl kernel::Mode
+impl kernel::ModelRequest<'_>
+impl kernel::ModelRequest<'_>
 impl kernel::ModelReturn
 impl kernel::ModelReturn
 impl kernel::ModelTag
@@ -247,6 +251,7 @@ impl<'de> serde_core::de::Deserialize<'de> for kernel::address::SessionName
 impl<'de> serde_core::de::Deserialize<'de> for kernel::address::SessionName
 impl<'de> serde_core::de::Deserialize<'de> for kernel::event::Scope
 impl<'de> serde_core::de::Deserialize<'de> for kernel::event::Who
+impl<'de> serde_core::de::Deserialize<'de> for kernel::event::record::ProviderDegraded
 impl<'de> serde_core::de::Deserialize<'de> for kernel::idem::IdemKey
 impl<'de> serde_core::de::Deserialize<'de> for kernel::idem::IdemKey
 impl<'de> serde_core::de::Deserialize<'de> for kernel::locator::B3Hash
@@ -309,8 +314,8 @@ pub const kernel::EventKind::ALL: [kernel::EventKind; 78]
 pub const kernel::GENESIS_PREV: kernel::locator::B3Hash
 pub const kernel::GIT_METADATA: &str
 pub const kernel::IDEM_DERIVE_V: u8
-pub const kernel::Mode::ALL: [kernel::Mode; 5]
-pub const kernel::Mode::ALL: [kernel::Mode; 5]
+pub const kernel::Mode::ALL: [kernel::Mode; 6]
+pub const kernel::Mode::ALL: [kernel::Mode; 6]
 pub const kernel::ModelTag::ALL: [kernel::ModelTag; 3]
 pub const kernel::ModelTag::ALL: [kernel::ModelTag; 3]
 pub const kernel::NODE_DEPTH_MAX: usize
@@ -445,6 +450,7 @@ pub enum kernel::KeepWarm
 pub enum kernel::Lines
 pub enum kernel::Locator
 pub enum kernel::McpTransport
+pub enum kernel::MessageBreakpoint
 pub enum kernel::Mode
 pub enum kernel::ModelTag
 pub enum kernel::Named
@@ -546,6 +552,7 @@ pub enum kernel::model::DialectKind
 pub enum kernel::model::Effort
 pub enum kernel::model::ImageType
 pub enum kernel::model::Increment
+pub enum kernel::model::MessageBreakpoint
 pub enum kernel::model::Mode
 pub enum kernel::model::ModelTag
 pub enum kernel::model::Role
@@ -629,8 +636,12 @@ pub fn kernel::BuildingPolicy::new(bool) -> Self
 pub fn kernel::BuildingPolicy::new(bool) -> Self
 pub fn kernel::Ceiling::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::Ceiling::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-pub fn kernel::ChatRequest::empty(&str, kernel::Ceiling) -> kernel::ChatRequest
-pub fn kernel::ChatRequest::empty(&str, kernel::Ceiling) -> kernel::ChatRequest
+pub fn kernel::ChatRequest<'_>::carries_breakpoint(&self, usize) -> bool
+pub fn kernel::ChatRequest<'_>::carries_breakpoint(&self, usize) -> bool
+pub fn kernel::ChatRequest<'_>::empty(&str, kernel::Ceiling) -> kernel::ChatRequest<'static>
+pub fn kernel::ChatRequest<'_>::empty(&str, kernel::Ceiling) -> kernel::ChatRequest<'static>
+pub fn kernel::ChatRequest<'_>::into_owned(self) -> kernel::ChatRequest<'static>
+pub fn kernel::ChatRequest<'_>::into_owned(self) -> kernel::ChatRequest<'static>
 pub fn kernel::Discard::new(alloc::vec::Vec<kernel::address::Address>, kernel::Restoration, kernel::taint::TaintSet, kernel::budget::ByteLen) -> core::result::Result<kernel::Discard, kernel::AxError>
 pub fn kernel::Discard::new(alloc::vec::Vec<kernel::address::Address>, kernel::Restoration, kernel::taint::TaintSet, kernel::budget::ByteLen) -> core::result::Result<kernel::Discard, kernel::AxError>
 pub fn kernel::Discard::paths(&self) -> &[kernel::address::Address]
@@ -715,9 +726,11 @@ pub fn kernel::Ledger::append(&mut self, kernel::EventDraft) -> core::result::Re
 pub fn kernel::Ledger::append_all(&mut self, alloc::vec::Vec<kernel::EventDraft>) -> core::result::Result<alloc::vec::Vec<kernel::EventRef>, kernel::AxError>
 pub fn kernel::Mode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::Mode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-pub fn kernel::Model::call(&mut self, &kernel::ModelRequest) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
-pub fn kernel::Model::call_speculating(&mut self, &kernel::ModelRequest, kernel::model::Increments<'_>, kernel::model::EarlyCalls<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
-pub fn kernel::Model::call_streaming(&mut self, &kernel::ModelRequest, kernel::model::Increments<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
+pub fn kernel::Model::call(&mut self, &kernel::ModelRequest<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
+pub fn kernel::Model::call_speculating(&mut self, &kernel::ModelRequest<'_>, kernel::model::Increments<'_>, kernel::model::EarlyCalls<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
+pub fn kernel::Model::call_streaming(&mut self, &kernel::ModelRequest<'_>, kernel::model::Increments<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
+pub fn kernel::ModelRequest<'_>::into_owned(self) -> kernel::ModelRequest<'static>
+pub fn kernel::ModelRequest<'_>::into_owned(self) -> kernel::ModelRequest<'static>
 pub fn kernel::ModelReturn::bare(kernel::Payload, alloc::vec::Vec<kernel::tool::ToolCall>) -> kernel::ModelReturn
 pub fn kernel::ModelReturn::bare(kernel::Payload, alloc::vec::Vec<kernel::tool::ToolCall>) -> kernel::ModelReturn
 pub fn kernel::ModelReturn::from_response(kernel::ChatResponse, core::option::Option<kernel::budget::UsdMicros>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
@@ -906,6 +919,7 @@ pub fn kernel::event::Who::parse(&str) -> core::result::Result<kernel::event::Wh
 pub fn kernel::event::Who::resident(kernel::address::Address) -> core::result::Result<kernel::event::Who, kernel::AxError>
 pub fn kernel::event::Who::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
 pub fn kernel::event::record::ModelSelected::ceiling(&self) -> core::option::Option<kernel::Ceiling>
+pub fn kernel::event::record::ProviderDegraded::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
 pub fn kernel::event::record::PursuitChanged::held(self) -> core::result::Result<core::option::Option<(alloc::string::String, kernel::pursuit::PursuitState)>, kernel::AxError>
 pub fn kernel::event::record::RunFrozen::of(&kernel::completion::Completion) -> kernel::event::record::RunFrozen
 pub fn kernel::event::record::SignalId::as_str(&self) -> &str
@@ -1007,9 +1021,9 @@ pub fn kernel::locator::Range::fmt(&self, &mut core::fmt::Formatter<'_>) -> core
 pub fn kernel::locator::Range::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::locator::Range::lines(u64, u64) -> core::result::Result<Self, kernel::AxError>
 pub fn kernel::locator::Range::lines(u64, u64) -> core::result::Result<Self, kernel::AxError>
-pub fn kernel::model::Model::call(&mut self, &kernel::ModelRequest) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
-pub fn kernel::model::Model::call_speculating(&mut self, &kernel::ModelRequest, kernel::model::Increments<'_>, kernel::model::EarlyCalls<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
-pub fn kernel::model::Model::call_streaming(&mut self, &kernel::ModelRequest, kernel::model::Increments<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
+pub fn kernel::model::Model::call(&mut self, &kernel::ModelRequest<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
+pub fn kernel::model::Model::call_speculating(&mut self, &kernel::ModelRequest<'_>, kernel::model::Increments<'_>, kernel::model::EarlyCalls<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
+pub fn kernel::model::Model::call_streaming(&mut self, &kernel::ModelRequest<'_>, kernel::model::Increments<'_>) -> core::result::Result<kernel::ModelReturn, kernel::AxError>
 pub fn kernel::model::content_from_message(&kernel::Payload) -> core::result::Result<alloc::vec::Vec<kernel::ContentBlock>, kernel::AxError>
 pub fn kernel::model::message_payload(&[kernel::ContentBlock]) -> core::result::Result<kernel::Payload, kernel::AxError>
 pub fn kernel::node_id::NodeId::ancestors(&self) -> alloc::vec::Vec<kernel::node_id::NodeId>
@@ -1124,6 +1138,8 @@ pub fn kernel::taint::TaintSet::contains(&self, &kernel::taint::TaintSource) -> 
 pub fn kernel::taint::TaintSet::contains(&self, &kernel::taint::TaintSource) -> bool
 pub fn kernel::taint::TaintSet::empty() -> kernel::taint::TaintSet
 pub fn kernel::taint::TaintSet::empty() -> kernel::taint::TaintSet
+pub fn kernel::taint::TaintSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn kernel::taint::TaintSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn kernel::taint::TaintSet::is_empty(&self) -> bool
 pub fn kernel::taint::TaintSet::is_empty(&self) -> bool
 pub fn kernel::taint::TaintSet::len(&self) -> usize
@@ -1270,15 +1286,15 @@ pub kernel::BudgetUse::usd: kernel::budget::UsdMicros
 pub kernel::BuildingPolicy::confidential: bool
 pub kernel::Carrier::Event(kernel::EventKind)
 pub kernel::Carrier::Loadtime
-pub kernel::ChatMessage::cache: bool
 pub kernel::ChatMessage::content: alloc::vec::Vec<kernel::ContentBlock>
 pub kernel::ChatMessage::role: kernel::Role
+pub kernel::ChatRequest::breakpoint: kernel::MessageBreakpoint
 pub kernel::ChatRequest::effort: core::option::Option<kernel::Effort>
 pub kernel::ChatRequest::max_tokens: core::option::Option<kernel::Ceiling>
-pub kernel::ChatRequest::messages: alloc::vec::Vec<kernel::ChatMessage>
+pub kernel::ChatRequest::messages: alloc::borrow::Cow<'a, [kernel::ChatMessage]>
 pub kernel::ChatRequest::model: alloc::string::String
 pub kernel::ChatRequest::system: alloc::vec::Vec<kernel::SystemBlock>
-pub kernel::ChatRequest::tools: alloc::vec::Vec<kernel::ToolDef>
+pub kernel::ChatRequest::tools: alloc::borrow::Cow<'a, [kernel::ToolDef]>
 pub kernel::ChatResponse::content: alloc::vec::Vec<kernel::ContentBlock>
 pub kernel::ChatResponse::stop: kernel::StopReason
 pub kernel::ChatResponse::usage: kernel::ModelUsage
@@ -1561,12 +1577,15 @@ pub kernel::McpTransport::Stdio
 pub kernel::McpTransport::Stdio::args: alloc::vec::Vec<alloc::string::String>
 pub kernel::McpTransport::Stdio::command: alloc::string::String
 pub kernel::McpTransport::Stdio::env: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub kernel::MessageBreakpoint::Tail
+pub kernel::MessageBreakpoint::Unmarked
+pub kernel::Mode::Chat
 pub kernel::Mode::Experiment
 pub kernel::Mode::PlanGoal
 pub kernel::Mode::Sc
 pub kernel::Mode::Ud
 pub kernel::Mode::Up
-pub kernel::ModelRequest::chat: kernel::ChatRequest
+pub kernel::ModelRequest::chat: kernel::ChatRequest<'a>
 pub kernel::ModelRequest::policy: kernel::BuildingPolicy
 pub kernel::ModelRequest::segments: [kernel::locator::B3Hash; 4]
 pub kernel::ModelReturn::billed_usd_micros: core::option::Option<kernel::budget::UsdMicros>
@@ -2389,15 +2408,15 @@ pub kernel::locator::Range::Lines
 pub kernel::locator::Range::Lines::from: u64
 pub kernel::locator::Range::Lines::to: u64
 pub kernel::model::BuildingPolicy::confidential: bool
-pub kernel::model::ChatMessage::cache: bool
 pub kernel::model::ChatMessage::content: alloc::vec::Vec<kernel::ContentBlock>
 pub kernel::model::ChatMessage::role: kernel::Role
+pub kernel::model::ChatRequest::breakpoint: kernel::MessageBreakpoint
 pub kernel::model::ChatRequest::effort: core::option::Option<kernel::Effort>
 pub kernel::model::ChatRequest::max_tokens: core::option::Option<kernel::Ceiling>
-pub kernel::model::ChatRequest::messages: alloc::vec::Vec<kernel::ChatMessage>
+pub kernel::model::ChatRequest::messages: alloc::borrow::Cow<'a, [kernel::ChatMessage]>
 pub kernel::model::ChatRequest::model: alloc::string::String
 pub kernel::model::ChatRequest::system: alloc::vec::Vec<kernel::SystemBlock>
-pub kernel::model::ChatRequest::tools: alloc::vec::Vec<kernel::ToolDef>
+pub kernel::model::ChatRequest::tools: alloc::borrow::Cow<'a, [kernel::ToolDef]>
 pub kernel::model::ChatResponse::content: alloc::vec::Vec<kernel::ContentBlock>
 pub kernel::model::ChatResponse::stop: kernel::StopReason
 pub kernel::model::ChatResponse::usage: kernel::ModelUsage
@@ -2437,12 +2456,15 @@ pub kernel::model::ImageType::Png
 pub kernel::model::ImageType::Webp
 pub kernel::model::Increment::Said(alloc::string::String)
 pub kernel::model::Increment::Thought(alloc::string::String)
+pub kernel::model::MessageBreakpoint::Tail
+pub kernel::model::MessageBreakpoint::Unmarked
+pub kernel::model::Mode::Chat
 pub kernel::model::Mode::Experiment
 pub kernel::model::Mode::PlanGoal
 pub kernel::model::Mode::Sc
 pub kernel::model::Mode::Ud
 pub kernel::model::Mode::Up
-pub kernel::model::ModelRequest::chat: kernel::ChatRequest
+pub kernel::model::ModelRequest::chat: kernel::ChatRequest<'a>
 pub kernel::model::ModelRequest::policy: kernel::BuildingPolicy
 pub kernel::model::ModelRequest::segments: [kernel::locator::B3Hash; 4]
 pub kernel::model::ModelReturn::billed_usd_micros: core::option::Option<kernel::budget::UsdMicros>
@@ -2688,7 +2710,7 @@ pub struct kernel::BuildingPolicy
 pub struct kernel::ByteLen(_)
 pub struct kernel::Ceiling(_)
 pub struct kernel::ChatMessage
-pub struct kernel::ChatRequest
+pub struct kernel::ChatRequest<'a>
 pub struct kernel::ChatResponse
 pub struct kernel::Claim
 pub struct kernel::ClockZone
@@ -2721,7 +2743,7 @@ pub struct kernel::ItemMeta
 pub struct kernel::LayeredValue<T>
 pub struct kernel::LiveConfig
 pub struct kernel::McpServer
-pub struct kernel::ModelRequest
+pub struct kernel::ModelRequest<'a>
 pub struct kernel::ModelReturn
 pub struct kernel::ModelUsage
 pub struct kernel::NewChild
@@ -2886,10 +2908,10 @@ pub struct kernel::locator::GitOid(_)
 pub struct kernel::model::BuildingPolicy
 pub struct kernel::model::Ceiling(_)
 pub struct kernel::model::ChatMessage
-pub struct kernel::model::ChatRequest
+pub struct kernel::model::ChatRequest<'a>
 pub struct kernel::model::ChatResponse
 pub struct kernel::model::ImageRef
-pub struct kernel::model::ModelRequest
+pub struct kernel::model::ModelRequest<'a>
 pub struct kernel::model::ModelReturn
 pub struct kernel::model::ModelUsage
 pub struct kernel::model::SystemBlock
