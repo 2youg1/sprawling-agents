@@ -12,4 +12,7 @@
 //! that owns it, so the module name says which authority answered.
 
 pub mod door;
+pub mod handshake;
+pub mod keys;
 pub mod pairing;
+pub mod seal;

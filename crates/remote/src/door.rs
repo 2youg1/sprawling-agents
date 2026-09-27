@@ -44,6 +44,11 @@ impl DeviceId {
     pub fn from_entropy(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
+
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
 }
 
 /// One session a paired device holds after its handshake.
