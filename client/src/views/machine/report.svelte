@@ -20,6 +20,11 @@
 // copy control, and one line saying where the command gets it from and
 // why the page waits for a press before running it.
 //
+// Under each name, the three versions (`versions.svelte`): installed
+// here, pinned by this repository, newest upstream. The cargo tools this
+// repository calls are one row, the Rust tools pack (`pack.svelte`),
+// with one press for the members it is missing.
+//
 // The develop section carries the one press that installs everything
 // it is missing (`views/setup/installing`); the screen's `machine.svelte`
 // sends the installs, and this file only draws how far they have got.
@@ -68,15 +73,17 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
 
 <script lang="ts">
   import { fill, say } from "../../core/lang";
-  import type { DoctorAnswer, DoctorTier } from "../../wire";
+  import type { DoctorAnswer, DoctorNewest, DoctorTier } from "../../wire";
   import { ui } from "../../ui";
-  import { absenceOf, enablesKey, offerOf, ofTier, outstanding, siteOf, sourceOf, spelledOf, standing, stateKey, versionOf } from "../setup/dependencies";
+  import { absenceOf, enablesKey, offerOf, ofTier, outstanding, siteOf, sourceOf, spelledOf, standing, stateKey } from "../setup/dependencies";
   import { over, type Walk } from "../setup/installing";
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
   import Progress from "../parts/progress.svelte";
   import Tip from "../parts/tip.svelte";
   import Copy from "./copy.svelte";
+  import Pack from "./pack.svelte";
+  import Versions from "./versions.svelte";
 
   interface Props {
     readonly answer: DoctorAnswer;
@@ -86,9 +93,13 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
     readonly onInstallAll?: () => void;
     // How far that press has got, once it was pressed.
     readonly walk?: Walk | null;
+    // The newest release of each item, by name, as the answers arrive.
+    readonly newest?: Readonly<Record<string, DoctorNewest>>;
+    // The pack's one press: its missing members, in table order.
+    readonly onInstallPack?: (names: readonly string[]) => void;
   }
 
-  const { answer, onInstall, planned = [], onInstallAll, walk = null }: Props = $props();
+  const { answer, onInstall, planned = [], onInstallAll, walk = null, newest = {}, onInstallPack }: Props = $props();
 
   const { lang } = ui();
 
@@ -113,7 +124,6 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
 </script>
 
 {#snippet row(item: DoctorItem, absence: Absence)}
-  {@const said = versionOf(item.state)}
   {@const how = spelledOf(item.install)}
   {@const enables = enablesKey(item.name)}
   {@const here = "present" in item.state}
@@ -143,11 +153,8 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
       {:else if absence === "spare"}
         <span class="min-w-0 truncate text-note text-text-faint">{say($lang, "machine_spare")}</span>
       {/if}
-      <span class="min-w-0 flex-1"></span>
-      {#if said !== null}
-        <span class="min-w-0 truncate font-mono text-note text-text-quiet">{said}</span>
-      {/if}
     </div>
+    <Versions {item} newest={newest[item.name]} />
     {#if enables !== null}
       <p class="text-note text-text-faint">{say($lang, enables)}</p>
     {/if}
@@ -205,6 +212,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
 
 {#snippet tier(title: string, which: DoctorTier)}
   {@const items = ofTier(answer, which)}
+  {@const packed = items.filter((each) => each.pack === "rust_tools")}
   {@const missing = outstanding(answer, which)}
   {@const far = standing(items, missing === null ? null : missing.length)}
   <section class="flex min-w-0 flex-col gap-snug" aria-label={title}>
@@ -239,10 +247,13 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
       {@render steps(walk)}
     {/if}
     <ul class="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] items-start gap-snug">
-      {#each items as item (item.name)}
+      {#each items.filter((each) => each.pack === undefined || each.pack === null) as item (item.name)}
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
         {@render row(item, absenceOf(item, missing, items))}
       {/each}
+      {#if packed.length > 0}
+        <Pack members={packed} {newest} {walking} onInstall={onInstallPack} />
+      {/if}
     </ul>
   </section>
 {/snippet}

@@ -14,9 +14,12 @@
 // it has no such answer means nobody has asked this machine since it
 // was served, because serving one no longer spends the seconds it takes
 // to start thirty-two programs and ask each its version. The page that
-// shows the answer is the page that asks for it - once per opening, and
-// through the same command the button sends, so "look at this machine"
-// keeps one authority.
+// shows the answer is the page that asks for it - once per opening,
+// whether or not the city holds an older answer, and through the same
+// command the button sends, so "look at this machine" keeps one
+// authority (sprawling-SPEC §8-120). Once an answer is here, each
+// item's newest release is asked of its publisher, one question per
+// item, and filled in as the answers arrive.
 
 export { default as MachineReport } from "./machine/report.svelte";
 export { default as MachineSkeleton } from "./machine/skeleton.svelte";
@@ -32,7 +35,7 @@ const DOCTOR = "sprawling doctor --install";
   import { doctorInstall, doctorRefresh } from "../core/commands";
   import { say } from "../core/lang";
   import { ui } from "../ui";
-  import type { DoctorAnswer } from "../wire";
+  import type { DoctorAnswer, DoctorNewest } from "../wire";
   import { answered, plan, refused, running, started, type Walk } from "./setup/installing";
   import Button from "./parts/button.svelte";
   import Copy from "./machine/copy.svelte";
@@ -50,10 +53,6 @@ const DOCTOR = "sprawling doctor --install";
     const now = $held;
     return now !== undefined && "doctor" in now ? now.doctor : undefined;
   });
-  const unasked = $derived.by((): boolean => {
-    const now = $held;
-    return now !== undefined && !("doctor" in now);
-  });
 
   let asking = $state(false);
   // A fresh answer ends the wait, whoever asked for it.
@@ -70,8 +69,8 @@ const DOCTOR = "sprawling doctor --install";
   // dozen programs started and asked their version.
   //
   // A city running with its log off writes no such line. `check again`
-  // is then the whole mechanism, which is why it stays a control the
-  // person can press rather than something the page does for them.
+  // then brings the answer in, which is why it stays a control the
+  // person can press beside the check the page makes when it opens.
   const looked = $derived($belief.logs.filter((line) => line.module === "bin::doctor").length);
   let seenAt = -1;
   $effect(() => {
@@ -95,11 +94,31 @@ const DOCTOR = "sprawling doctor --install";
     u.conn.asking.refresh(QUERIES.doctor);
   }
 
+  // Every opening checks this machine at once, once the link can carry
+  // the command; an answer the city already holds is drawn meanwhile.
   let opened = false;
   $effect(() => {
-    if (opened || !unasked) return;
+    const live = $link.kind === "live";
+    if (opened || !live) return;
     opened = true;
     recheck();
+  });
+
+  // Each item's newest release, by name. Keyed on the list of names, so
+  // a fresh answer about the same items asks nothing again.
+  let newest = $state.raw<Readonly<Record<string, DoctorNewest>>>({});
+  const names = $derived(answer === undefined ? "" : answer.items.map((each) => each.name).join(" "));
+  $effect(() => {
+    const asked = names === "" ? [] : names.split(" ");
+    const stops = asked.map((item) =>
+      u.conn.asking.ask({ upstream_version: { item } }).subscribe((now) => {
+        if (now === undefined || !("upstream" in now)) return;
+        newest = { ...untrack(() => newest), [now.upstream.item]: now.upstream.newest };
+      }),
+    );
+    return () => {
+      for (const stop of stops) stop();
+    };
   });
 
   function install(item: string): void {
@@ -116,6 +135,10 @@ const DOCTOR = "sprawling doctor --install";
 
   function installAll(): void {
     walk = started(planned);
+  }
+
+  function installPack(names: readonly string[]): void {
+    walk = started(names);
   }
 
   $effect(() => {
@@ -163,7 +186,7 @@ const DOCTOR = "sprawling doctor --install";
     <Copy text={DOCTOR} />
   </div>
   {#if answer !== undefined}
-    <Report {answer} onInstall={install} {planned} onInstallAll={installAll} {walk} />
+    <Report {answer} onInstall={install} {planned} onInstallAll={installAll} {walk} {newest} onInstallPack={installPack} />
   {:else if reaching}
     <Skeleton />
   {:else}

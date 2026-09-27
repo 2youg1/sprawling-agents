@@ -40,7 +40,7 @@
   // tier verdicts; this one's subject is the width of a card at the
   // front of a grid.
 
-  import type { DoctorAnswer } from "../../wire";
+  import type { DoctorAnswer, DoctorNewest } from "../../wire";
   import type { Walk } from "../setup/installing";
 
   const MACHINE: DoctorAnswer = {
@@ -112,11 +112,36 @@
         install: { command: { spelled: "winget install --id Casey.Just -e" } },
       },
       {
+        name: "rust",
+        tier: "develop",
+        need: "required",
+        pinned: "1.97.1",
+        state: { present: { at: "/usr/bin/rustc", version: { said: { text: "rustc 1.97.1 (8bab26f4f 2026-07-14)" } } } },
+        install: { command: { spelled: "rustup default stable" } },
+      },
+      {
+        name: "cargo-nextest",
+        tier: "develop",
+        need: "required",
+        pack: "rust_tools",
+        state: { present: { at: "/usr/bin/cargo-nextest", version: { said: { text: "cargo-nextest 0.9.143" } } } },
+        install: { command: { spelled: "cargo install cargo-nextest --locked" } },
+      },
+      {
         name: "cargo-deny",
         tier: "develop",
         need: "optional",
+        pack: "rust_tools",
         state: { absent: { absence: "not_on_search_path" } },
         install: { command: { spelled: "cargo install cargo-deny --locked" } },
+      },
+      {
+        name: "kani",
+        tier: "develop",
+        need: "optional",
+        pack: "rust_tools",
+        state: { absent: { absence: "not_on_search_path" } },
+        install: { manual: { how: "kani runs on Linux; a WSL installation is where it goes here" } },
       },
       {
         name: "elan",
@@ -136,9 +161,23 @@
   // one item done, one failed with the city's recovery, one running.
   const WALK: Walk = [
     { name: "just", state: "done", why: null },
-    { name: "cargo-audit", state: "failed", why: "read what it reported in the log, then run the line yourself in a terminal" },
+    { name: "cargo-mutants", state: "failed", why: "read what it reported in the log, then run the line yourself in a terminal" },
     { name: "cargo-deny", state: "running", why: null },
   ];
+
+  // What the publishers answered, one of each kind a row draws: a newer
+  // release, a current one, a reading that cannot exist, a refusal, and
+  // one still out (absent from the record).
+  const NEWEST: Readonly<Record<string, DoctorNewest>> = {
+    git: { read: { version: "2.55.1" } },
+    just: { read: { version: "1.58.0" } },
+    rust: { read: { version: "1.98.0" } },
+    "cargo-nextest": { read: { version: "0.9.143" } },
+    "cargo-deny": { read: { version: "0.19.2" } },
+    kani: { refused: { said: "crates.io answered 503 Service Unavailable" } },
+    geckodriver: { unread: { why: "matches_browser" } },
+    msedgedriver: { unread: { why: "matches_browser" } },
+  };
 </script>
 
 <script lang="ts">
@@ -167,7 +206,7 @@
 the city; these two are the survey above and the state before anyone
 has asked. -->
 {#snippet cards()}
-  <MachineReport answer={MACHINE} onInstall={() => undefined} planned={["cargo-deny"]} onInstallAll={() => undefined} walk={WALK} />
+  <MachineReport answer={MACHINE} onInstall={() => undefined} planned={["cargo-deny"]} onInstallAll={() => undefined} walk={WALK} newest={NEWEST} onInstallPack={() => undefined} />
 {/snippet}
 
 {#snippet unchecked()}
