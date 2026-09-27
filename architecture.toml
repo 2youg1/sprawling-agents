@@ -486,6 +486,9 @@ module = [
   { name = "city::gitignore", file = "crates/city/src/gitignore.rs", owns = "what a building promises is tracked, what one session was thinking is not", shape = "data", since = "V4", status = "built", spec = "city-SPEC.md#8-21" },
   { name = "city::vocation", file = "crates/city/src/vocation.rs", owns = "whether the residents at an address build or plan", shape = "decision", since = "V4", status = "built", spec = "city-SPEC.md#8-22" },
   { name = "city::city_tool", file = "crates/city/src/city_tool.rs", owns = "the face the city itself shows a model: raise, adopt, list", shape = "adapter", since = "V4", status = "built", spec = "city-SPEC.md#8-23" },
+  { name = "remote::door", file = "crates/remote/src/door.rs", owns = "whether the remote door is open and in which epoch, the pairings it waits for, the devices it paired and the sessions they hold", shape = "state machine", since = "V0.0.8", status = "built", spec = "remote-SPEC.md#8-1" },
+  { name = "remote::door::tests", file = "crates/remote/src/door/tests.rs", owns = "the six properties the Lean model of the door proves, one scenario each", shape = "test", since = "V0.0.8", status = "built", spec = "remote-SPEC.md#8-1" },
+  { name = "remote::pairing", file = "crates/remote/src/pairing.rs", owns = "the one-time code that pairs a device: minted from entropy, shown once, read back however it was retyped", shape = "value", since = "V0.0.8", status = "built", spec = "remote-SPEC.md#8-2" },
   { name = "channels::wire", file = "crates/channels/src/wire.rs", owns = "the envelope both sides speak: the frames, the version and its hash", shape = "value", since = "S4", status = "built", spec = "channels-SPEC.md#8-1" },
   { name = "channels::named_frames", file = "crates/channels/src/named_frames.rs", owns = "one declaration of a frame family, from which the enum, each variant's wire name and the schema-hash table are all generated", shape = "grammar", since = "P1", status = "built", spec = "channels-SPEC.md#8-1" },
   { name = "channels::preference", file = "crates/channels/src/preference.rs", owns = "what one person set for themselves, as the wire carries it", shape = "value type", since = "V0.0.6", status = "built", spec = "channels-SPEC.md#8-1" },
@@ -964,6 +967,9 @@ duty = "space, identity, and the documents a building keeps"
 
 [family.channels]
 duty = "the process boundary"
+
+[family.remote]
+duty = "the remote door, and nothing that depends on the route that reaches it"
 
 [family.accounting]
 duty = "the city's one writer, and the ports it reaches outside itself through"
