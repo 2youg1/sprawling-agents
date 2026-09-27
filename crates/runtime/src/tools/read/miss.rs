@@ -55,13 +55,22 @@ impl Floor {
 /// so the ones cut are the least likely to be meant.
 const NEARBY_CAP: usize = 16;
 
-/// The text at `at`, or the miss. A location that was absent when it
-/// was judged is reported missing without being opened, so a link
-/// placed there since cannot lead the open past the judgement. A
-/// present one is read from the handle the open returned, and only
-/// after [`still_judged`] has found that handle is the file judged.
+/// The text at `at`, or the miss. A directory is not opened: it is
+/// answered with its entries, which is what a read of one asks for. A
+/// location that was absent when it was judged is reported missing
+/// without being opened, so a link placed there since cannot lead the
+/// open past the judgement. A present one is read from the handle the
+/// open returned, and only after [`still_judged`] has found that handle
+/// is the file judged.
 pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String, AxError> {
     match at {
+        Located::Present(path) if path.is_dir() => Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "read",
+            format!("{asked} is a directory"),
+        )
+        .with_nearby(entries(&path, floor, ""))
+        .with_recovery("read one of the entries in `nearby`, or find a file with `search`")),
         Located::Present(path) => {
             let mut opened = std::fs::File::open(&path)
                 .and_then(Handle::from_file)
@@ -139,7 +148,7 @@ fn unread(asked: &str, path: &Path, floor: &Floor, err: &std::io::Error) -> AxEr
 /// Listing is best effort: a directory that will not list offers no
 /// candidates, because the refusal the caller needs is the miss itself.
 fn nearby(missing: &Path, floor: &Floor) -> Vec<String> {
-    let Floor::Directory { dir: top, named } = floor else {
+    let Floor::Directory { dir: top, .. } = floor else {
         return Vec::new();
     };
     let Some(dir) = missing
@@ -150,13 +159,26 @@ fn nearby(missing: &Path, floor: &Floor) -> Vec<String> {
     else {
         return Vec::new();
     };
-    let (Ok(listing), Some(prefix)) = (std::fs::read_dir(dir), spelled(top, named, dir)) else {
-        return Vec::new();
-    };
     let wanted = missing
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or_default();
+    entries(dir, floor, wanted)
+}
+
+/// The entries of `dir`, a real location no higher than `floor`, closest
+/// to `wanted` first and spelled the way the caller reaches them; a
+/// directory above the floor offers none.
+fn entries(dir: &Path, floor: &Floor, wanted: &str) -> Vec<String> {
+    let Floor::Directory { dir: top, named } = floor else {
+        return Vec::new();
+    };
+    if !dir.starts_with(top) {
+        return Vec::new();
+    }
+    let (Ok(listing), Some(prefix)) = (std::fs::read_dir(dir), spelled(top, named, dir)) else {
+        return Vec::new();
+    };
     let mut found: Vec<(usize, String)> = listing
         .flatten()
         .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))

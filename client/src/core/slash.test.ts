@@ -71,6 +71,14 @@ describe("slash", () => {
     expect(completed("/zzz")).toBe("/zzz");
     expect(completed("read the city")).toBe("read the city");
   });
+
+  test("tab on a prefix it cannot lengthen takes the row the list points at", () => {
+    expect(completed("/s", "/stop")).toBe("/st");
+    expect(completed("/st", "/stop")).toBe("/stop ");
+    // A row that does not match what is typed is not the person's pick.
+    expect(completed("/st", "/new")).toBe("/st");
+    expect(completed("/zzz", "/stop")).toBe("/zzz");
+  });
 });
 
 // `/new` and `/fork` are one verb with and without an origin: both send

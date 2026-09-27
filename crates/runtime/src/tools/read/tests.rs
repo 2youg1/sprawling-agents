@@ -368,3 +368,27 @@ fn an_absolute_path_inside_the_city_is_read_as_its_address() {
     let outcome = tool.invoke(&call(asked.to_str().unwrap())).unwrap();
     assert_eq!(outcome.result.as_map()["text"], "the plan\n");
 }
+
+/// A directory is a question about what is in it. Opening one failed
+/// as storage - access denied on Windows, EISDIR on Unix - and the
+/// model got `retry: no` and no entries.
+#[test]
+fn a_directory_is_answered_with_its_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    let room = dir.path().join("hall").join("mayor");
+    std::fs::create_dir_all(&room).unwrap();
+    std::fs::write(room.join("notes.md"), "x\n").unwrap();
+    std::fs::write(room.join("Handoff.md"), "y\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let err = tool.invoke(&call("hall/mayor")).unwrap_err();
+    assert_eq!(
+        (err.code(), err.nearby()),
+        (
+            &AxCode::InvalidArgs,
+            &[
+                "hall/mayor/Handoff.md".to_owned(),
+                "hall/mayor/notes.md".to_owned()
+            ][..]
+        )
+    );
+}

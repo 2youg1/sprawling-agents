@@ -325,13 +325,18 @@ export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill,
 const COMMANDS = "commands";
 
 // The menu's one column, built from the same table the Ctrl-K palette
-// reads: a spelling, and beside it the shape its arguments take.
+// reads: a spelling, and beside it the shape its arguments take. A line
+// no verb matches - a message that begins with a path - gets no menu at
+// all, so the box's own Enter sends it rather than an empty list taking
+// the key.
 export function menuColumns(lang: Lang, line: string): readonly PopoverColumn[] {
+  const verbs = offered(line);
+  if (verbs.length === 0) return [];
   return [
     {
       id: COMMANDS,
       label: "talk_commands",
-      rows: offered(line).map((each) => ({
+      rows: verbs.map((each) => ({
         id: each.spelling,
         label: each.spelling,
         secondary:

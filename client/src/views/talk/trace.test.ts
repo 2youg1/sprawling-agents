@@ -101,4 +101,12 @@ describe("what the panel shows", () => {
     const held = artifactsIn([turn(1, [call("exec", "true", "")])]);
     expect(held.terminal).toBeNull();
   });
+
+  // A read of a directory failed, and the card drew the refusal's JSON
+  // as the text of a file called `hall/mayor`.
+  test("a call that failed is not an artifact: its words are a refusal, not the file", () => {
+    const refused: Call = { ...call("read", "hall/mayor", '{"code":"E_INVALID_ARGS"}'), outcome: "failed" };
+    const held = artifactsIn([turn(1, [call("read", "hall/Memo.md", "memo")]), turn(2, [refused])]);
+    expect(held.read?.subject).toBe("hall/Memo.md");
+  });
 });

@@ -31,7 +31,7 @@
   import { fill, say } from "../../core/lang";
   import { current } from "../../core/route";
   import { completed } from "../../core/completion";
-  import { find } from "../../core/slash";
+  import { find, parse } from "../../core/slash";
   import type { Slash } from "../../core/slash_hands";
   import { canRecord } from "../../core/speaking";
   import { ui } from "../../ui";
@@ -91,6 +91,9 @@
   let open = $state(false);
   // The row the menu's cursor is on, as `aria-activedescendant` on the box.
   let activeId = $state<string | null>(null);
+  // The verb that row spells, which a Tab that cannot lengthen the typed
+  // prefix takes into the box.
+  let pointed = $state<string | undefined>(undefined);
   let menuKeys: ((event: KeyboardEvent) => boolean) | null = null;
   let receipt: ReturnType<typeof setTimeout> | undefined = undefined;
 
@@ -107,9 +110,11 @@
   }
 
   // Whatever put words in the box - a transcription, a completion, a
-  // command that empties it - goes through here.
+  // command that empties it - goes through here, and the menu follows
+  // the words as it does for typing: `/help` writes `/` to open it.
   function write(words: string): void {
     text = words;
+    open = words.startsWith("/");
     keptDraft.replace(words);
     requestAnimationFrame(grow);
   }
@@ -117,6 +122,15 @@
   function submit(): void {
     const words = text.trim();
     if (words === "") return;
+    // A line that spells a verb is that verb, whether the menu is open
+    // or the person closed it: sent as a message, `/new` reached the
+    // model as words to answer.
+    const call = parse(words);
+    const chosen = call === null ? undefined : find(call.verb);
+    if (chosen !== undefined) {
+      pick(chosen);
+      return;
+    }
     if (onSend(words)) {
       handing = hand(words, get(belief));
       write("");
@@ -224,19 +238,18 @@
         write,
       }),
     );
-    if (rest === null) {
-      open = false;
-      return;
-    }
+    if (rest === null) return;
     write(rest);
     box?.focus();
   }
 
   function onKeydown(event: KeyboardEvent): void {
-    if (open && showing.length > 0) {
+    // A key that confirms an input method's composition belongs to the
+    // input method, not to the menu.
+    if (open && showing.length > 0 && !event.isComposing) {
       if (event.key === "Tab") {
         event.preventDefault();
-        write(completed(text));
+        write(completed(text, pointed));
         return;
       }
       if (menuKeys?.(event) === true) {
@@ -337,6 +350,9 @@
       bind={holdKeys}
       onCursorChange={(rowId) => {
         activeId = rowId;
+      }}
+      onCursorRow={(row) => {
+        pointed = row?.id;
       }}
     />
   {/if}

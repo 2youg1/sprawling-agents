@@ -25,9 +25,12 @@ function shared(spellings: readonly string[]): string {
 }
 
 // The one match completed, or the longest prefix every match shares.
-// A line Tab cannot improve comes back unchanged, so the caller has
-// nothing to decide.
-export function completed(line: string): string {
+// When several match and their shared prefix is already typed, the
+// verb the list's cursor points at is taken instead: a second Tab on
+// `/st` gives the row the person is looking at, where the prefix alone
+// would leave Tab doing nothing. A line Tab cannot improve comes back
+// unchanged, so the caller has nothing to decide.
+export function completed(line: string, pointed?: string): string {
   const call = parse(line);
   if (call === null) {
     return line;
@@ -38,5 +41,9 @@ export function completed(line: string): string {
     return call.rest === "" ? `${only.spelling} ` : line;
   }
   const prefix = shared(hits.map((known) => known.spelling));
-  return prefix.length > call.verb.length ? prefix : line;
+  if (prefix.length > call.verb.length) {
+    return prefix;
+  }
+  const taken = hits.find((known) => known.spelling === pointed);
+  return taken !== undefined && call.rest === "" ? `${taken.spelling} ` : line;
 }
