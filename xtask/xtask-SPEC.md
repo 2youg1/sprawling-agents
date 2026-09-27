@@ -383,7 +383,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 1. `SPRAWLING_BROWSER` 点名的那一个；
 2. **doctor 装到 `~/.sprawling/components/firefox/` 的那一个**——读的是 `components_dir()` 这条**文件系统约定**（kernel-SPEC.md §8-22 已记），与 `xtask budget` 读 `target/` 同性质，不是对「运行中的机器上 Firefox 在哪」再写一份探测；
-3. 三个桌面自带浏览器的固定路径。
+3. **doctor 的 Chromium 一族**：`crates/sprawling/src/doctor/family/chromium.tsv` 每行一个牌子——程序名与三平台的安装位置——由 doctor 自己的测试 `the_chromium_file_is_the_family_rendered` 从 `family::chromium` 渲染，本门 `include_str!` 它，按表序逐个牌子先看安装位置、再看 `PATH`。门与 doctor 因此在同样的地方找同样的牌子；本门不留自己的路径表，新加一个牌子只改 doctor 的那张表。
 
 **为什么可及面不单独成一道门。** 比两侧**写下的**角色与可及名，是没有浏览器时的替代品；门能进浏览器之后，角色、可及名与地标从画出来的 DOM 上读更准，也少一份要维护的读法。
 

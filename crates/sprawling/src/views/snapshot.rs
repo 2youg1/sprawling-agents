@@ -118,6 +118,7 @@ impl Views {
             machine: self.machine.clone(),
             vault: self.vault.clone(),
             registry: self.registry,
+            upstream: self.upstream,
             ..copy
         })
     }

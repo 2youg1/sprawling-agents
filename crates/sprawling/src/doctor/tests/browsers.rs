@@ -130,3 +130,39 @@ fn a_member_that_needs_confirming_is_never_the_first_answer() {
         "Safari's BiDi support is partial, and the report says so"
     );
 }
+
+/// `cargo xtask render` finds its engine through `chromium.tsv`, which
+/// is this family rendered, so the gate and the doctor look in the same
+/// places for the same brands; when they differ this prints the file
+/// the family wants.
+#[test]
+fn the_chromium_file_is_the_family_rendered() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/doctor/family/chromium.tsv");
+    let rendered = Family::Chromium.members().iter().fold(
+        concat!(
+            "# generated from crates/sprawling/src/doctor/family/chromium.rs by the test ",
+            "`the_chromium_file_is_the_family_rendered`; edit the family, not this file\n",
+            "# brand<TAB>program<TAB>windows<TAB>macos<TAB>linux, places separated by |\n"
+        )
+        .to_owned(),
+        |mut file, member| {
+            let places = |platform| member.places.at(platform).join("|");
+            file.push_str(&format!(
+                "{}\t{}\t{}\t{}\t{}\n",
+                member.name,
+                member.program,
+                places(Platform::Windows),
+                places(Platform::MacOs),
+                places(Platform::Linux)
+            ));
+            file
+        },
+    );
+    let written = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(
+        written == rendered,
+        "{} is not what the family renders; write this into it:\n<<<\n{rendered}>>>",
+        path.display()
+    );
+}

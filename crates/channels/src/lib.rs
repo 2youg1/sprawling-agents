@@ -49,6 +49,7 @@ pub use answer::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorIns
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
+pub use answer::{DoctorNewest, DoctorPack, DoctorUnread, DoctorUpstream};
 pub use answer::{DocumentAnswer, Entry, EntryKind, ListingAnswer};
 pub use answer::{EndpointSummary, EndpointsAnswer, UnpricedCalls};
 pub use answer::{EvidenceItem, EvidenceKind, Picture};

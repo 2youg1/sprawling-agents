@@ -867,10 +867,6 @@
     "en": "just build-web and the client's checks, which the artifact gates judge",
     "zh": "just build-web 与客户端自己的检查，产物门要看它们的结果"
   },
-  "machine_enables_cargo_audit": {
-    "en": "cargo audit, which reads this lockfile against the RustSec advisories",
-    "zh": "cargo audit，按 RustSec 公告检查本仓库的 lockfile"
-  },
   "machine_enables_cargo_deny": {
     "en": "just deny, the supply-chain read just gates ends with; CI runs it on every push",
     "zh": "just deny，just gates 最后那一步供应链检查；CI 每次推送都会跑"
@@ -878,10 +874,6 @@
   "machine_enables_cargo_fuzz": {
     "en": "just fuzz <target>, which needs a nightly toolchain as well",
     "zh": "just fuzz <target>，另外还需要一个 nightly 工具链"
-  },
-  "machine_enables_cargo_llvm_cov": {
-    "en": "a coverage reading of this workspace, which no gate asks for",
-    "zh": "本工作区的覆盖率读数，没有哪道门要求它"
   },
   "machine_enables_cargo_mutants": {
     "en": "just mutants, which asks whether the tests notice a changed kernel",
@@ -952,8 +944,8 @@
     "zh": "exec 工具的 shell 一支，用于 CONFIG.toml 要求它的楼"
   },
   "machine_enables_sprawling_desktop": {
-    "en": "the desktop connector, for a building whose rules declare it",
-    "zh": "桌面连接器，用于规则里声明了它的楼"
+    "en": "optional: an MCP server that lets agents see and operate this Windows desktop; it is not the WebUI, and the city runs without it",
+    "zh": "可选：一个 MCP server，让 agent 看见并操作这台 Windows 的桌面；它不是 WebUI，没有它城照样跑"
   },
   "machine_enables_webkit": {
     "en": "the browser tool against Safari, experimentally: BiDi support is partial and safaridriver --enable has to be run once",
@@ -974,6 +966,78 @@
   "machine_enables_render_browser": {
     "en": "cargo xtask render, which measures the built client in a headless Chromium browser",
     "zh": "cargo xtask render，用无头 Chromium 浏览器量构建好的客户端"
+  },
+  "machine_enables_rust": {
+    "en": "the compiler, at the version rust-toolchain.toml pins, which rustup fetches on first use",
+    "zh": "编译器，版本是 rust-toolchain.toml 钉住的那个，rustup 第一次用到时下载"
+  },
+  "machine_source_powershell": {
+    "en": "the official elan-init.ps1 script, run by this city without a prompt",
+    "zh": "elan 官方的 elan-init.ps1 脚本，由城直接运行，不需要你粘贴"
+  },
+  "machine_pack_rust_tools": {
+    "en": "Rust tools",
+    "zh": "Rust 工具包"
+  },
+  "machine_pack_rust_tools_note": {
+    "en": "the cargo subcommands this repository's recipes and workflows call",
+    "zh": "本仓库的 recipe 与工作流调用的那些 cargo 子命令"
+  },
+  "machine_pack_install": {
+    "en": "install the {count} missing",
+    "zh": "安装缺的 {count} 项"
+  },
+  "machine_pack_install_note": {
+    "en": "one at a time, each compiled from crates.io, each with its own log",
+    "zh": "逐项安装，每一项从 crates.io 编译，各有一份日志"
+  },
+  "machine_version_installed": {
+    "en": "installed",
+    "zh": "已装"
+  },
+  "machine_version_pinned": {
+    "en": "pinned",
+    "zh": "钉住"
+  },
+  "machine_version_newest": {
+    "en": "newest",
+    "zh": "最新"
+  },
+  "machine_version_behind": {
+    "en": "update available",
+    "zh": "有更新"
+  },
+  "machine_version_asking": {
+    "en": "asking upstream",
+    "zh": "正在问上游"
+  },
+  "machine_upstream_refused": {
+    "en": "upstream could not be read",
+    "zh": "读不到上游"
+  },
+  "machine_unread_with_toolchain": {
+    "en": "ships with the Rust toolchain",
+    "zh": "随 Rust 工具链发布"
+  },
+  "machine_unread_many_brands": {
+    "en": "each browser has its own releases",
+    "zh": "每个浏览器各自发布"
+  },
+  "machine_unread_matches_browser": {
+    "en": "follows the browser's version",
+    "zh": "版本跟着浏览器走"
+  },
+  "machine_unread_this_project": {
+    "en": "part of sprawling itself",
+    "zh": "sprawling 自己的一部分"
+  },
+  "machine_unread_no_source": {
+    "en": "no official release feed to read",
+    "zh": "没有可读的官方发布源"
+  },
+  "machine_unread_unknown_item": {
+    "en": "this city does not know the item",
+    "zh": "城不认得这一项"
   },
   "machine_enables_uv": {
     "en": "the Python this repository's probes and maintenance scripts run on",

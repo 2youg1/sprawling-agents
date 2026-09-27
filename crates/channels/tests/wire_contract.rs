@@ -49,7 +49,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     // Thirty commands, thirty-five queries. The count is not a style
     // choice - it is the wire's closed surface.
     assert_eq!(COMMAND_NAMES.len(), 30, "command table");
-    assert_eq!(QUERY_NAMES.len(), 35, "query table");
+    assert_eq!(QUERY_NAMES.len(), 36, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -59,7 +59,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 35, "query names are distinct");
+    assert_eq!(sorted.len(), 36, "query names are distinct");
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 43,
+        WIRE_V, 44,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
@@ -116,7 +116,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "576c3f9a1aab20e92387f497efc96f3e39799b921a2e150cbd13732c8d06693f";
+const WIRE_SCHEMA_GOLDEN: &str = "918112851b94af1a7c46a16160fd89c5b30409f3a57d4cf219737f38eb1ab8c5";
 
 // -------------------------------------------------------------- binding face
 

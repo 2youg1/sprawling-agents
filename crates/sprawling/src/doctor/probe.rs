@@ -75,7 +75,7 @@ impl ThisMachine {
 
 impl Machine for ThisMachine {
     fn look(&self, requirement: &Requirement) -> Presence {
-        let search_path = std::env::var_os("PATH").unwrap_or_default();
+        let search_path = super::host::search_path();
         match &requirement.detect {
             Detection::Program {
                 program,
@@ -165,7 +165,7 @@ impl accounting::Machine for ThisMachine {
         super::running::run(
             item,
             runnable,
-            super::running::PATIENCE,
+            super::running::patience_for(runnable),
             &super::host::install_log(item),
         )
     }

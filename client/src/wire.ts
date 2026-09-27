@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 43 as const;
+export const WIRE_V = 44 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "576c3f9a1aab20e92387f497efc96f3e39799b921a2e150cbd13732c8d06693f" as const;
+export const WIRE_HASH = "918112851b94af1a7c46a16160fd89c5b30409f3a57d4cf219737f38eb1ab8c5" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `channels::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -937,6 +937,15 @@ export const DoctorNeed = Schema.Union(
 export type DoctorNeed = typeof DoctorNeed.Type;
 
 /**
+ * A set of items a page draws as one row: each member is still its own
+ * item here, because each is detected, judged and installed on its own.
+ */
+export const DoctorPack = Schema.Union(
+  Schema.Literal("rust_tools"),
+).annotations({ identifier: "DoctorPack" });
+export type DoctorPack = typeof DoctorPack.Type;
+
+/**
  * Which kind of not being here.
  */
 export const DoctorAbsence = Schema.Union(
@@ -1031,6 +1040,8 @@ export const DoctorItem = Schema.Struct({
   install: DoctorInstall,
   name: Schema.String,
   need: DoctorNeed,
+  pack: Schema.optional(Schema.NullOr(DoctorPack)),
+  pinned: Schema.optional(Schema.NullOr(Schema.String)),
   state: DoctorState,
   tier: DoctorTier,
 }).annotations({ identifier: "DoctorItem" });
@@ -1111,6 +1122,51 @@ export const DoctorAnswer = Schema.Struct({
   tiers: Schema.Array(DoctorVerdict),
 }).annotations({ identifier: "DoctorAnswer" });
 export type DoctorAnswer = typeof DoctorAnswer.Type;
+
+/**
+ * Why an item has no upstream version to compare with.
+ */
+export const DoctorUnread = Schema.Union(
+  Schema.Literal("with_toolchain"),
+  Schema.Literal("many_brands"),
+  Schema.Literal("matches_browser"),
+  Schema.Literal("this_project"),
+  Schema.Literal("no_source"),
+  Schema.Literal("unknown_item"),
+).annotations({ identifier: "DoctorUnread" });
+export type DoctorUnread = typeof DoctorUnread.Type;
+
+/**
+ * What asking the item's publisher came to.
+ */
+export const DoctorNewest = Schema.Union(
+  Schema.Literal("asking"),
+  Schema.Struct({
+    read: Schema.Struct({
+      version: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    unread: Schema.Struct({
+      why: DoctorUnread,
+    }),
+  }),
+  Schema.Struct({
+    refused: Schema.Struct({
+      said: Schema.String,
+    }),
+  }),
+).annotations({ identifier: "DoctorNewest" });
+export type DoctorNewest = typeof DoctorNewest.Type;
+
+/**
+ * The newest release of one item upstream, as its publisher states it.
+ */
+export const DoctorUpstream = Schema.Struct({
+  item: Schema.String,
+  newest: DoctorNewest,
+}).annotations({ identifier: "DoctorUpstream" });
+export type DoctorUpstream = typeof DoctorUpstream.Type;
 
 /**
  * One file's head, and what was left out.
@@ -2324,6 +2380,9 @@ export const Answer = Schema.Union(
     doctor: DoctorAnswer,
   }),
   Schema.Struct({
+    upstream: DoctorUpstream,
+  }),
+  Schema.Struct({
     prefix: PrefixAnswer,
   }),
   Schema.Struct({
@@ -2531,6 +2590,11 @@ export const Query = Schema.Union(
   Schema.Struct({
     run_costs: Schema.Struct({
       runs: Schema.Array(RunId),
+    }),
+  }),
+  Schema.Struct({
+    upstream_version: Schema.Struct({
+      item: Schema.String,
     }),
   }),
 ).annotations({ identifier: "Query" });

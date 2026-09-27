@@ -63,6 +63,11 @@ pub(crate) enum Prepared {
     Config { city_root: PathBuf, addr: Address },
     /// The release page, which leaves this machine.
     Release(Option<fn() -> channels::ReleaseAnswer>),
+    /// One item's publisher, which leaves this machine too.
+    Upstream {
+        ask: Option<fn(&str) -> channels::DoctorUpstream>,
+        item: String,
+    },
     /// What changed between a checkpoint and a later one, or the
     /// working tree.
     Changes {
@@ -233,6 +238,11 @@ impl Prepared {
             // through the registry a served city handed the views.
             Self::Release(Some(newest)) => channels::Answer::Release(Box::new(newest())),
             Self::Release(None) => unavailable("NewestRelease".to_owned()),
+            Self::Upstream {
+                ask: Some(newest),
+                item,
+            } => channels::Answer::Upstream(Box::new(newest(&item))),
+            Self::Upstream { ask: None, item } => unavailable(format!("UpstreamVersion({item})")),
             Self::Listing { city_root, at } => {
                 channels::Answer::Listing(listing_answer(&city_root, at))
             }

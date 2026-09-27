@@ -48,6 +48,14 @@ impl Views {
     pub(crate) fn ask_the_registry_through(&mut self, newest: fn() -> channels::ReleaseAnswer) {
         self.registry = Some(newest);
     }
+
+    /// Takes the one way this city asks an item's publisher for its
+    /// newest release, so an `UpstreamVersion` query leaves this machine
+    /// only through what the served city handed in (sprawling-SPEC.md
+    /// 8-120).
+    pub(crate) fn ask_upstream_through(&mut self, newest: fn(&str) -> channels::DoctorUpstream) {
+        self.upstream = Some(newest);
+    }
 }
 
 #[cfg(test)]

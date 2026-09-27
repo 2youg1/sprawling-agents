@@ -24,7 +24,7 @@
 
 - **wire**：Command 恰 30 个 variant、Query 恰 35 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`576c3f9a1aab20e92387f497efc96f3e39799b921a2e150cbd13732c8d06693f`；**WIRE_V ＝ 43**（帧表与查询表的当前内容见 §8 各章）。
+  **当前 golden**：`918112851b94af1a7c46a16160fd89c5b30409f3a57d4cf219737f38eb1ab8c5`；**WIRE_V ＝ 44**（帧表与查询表的当前内容见 §8 各章）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`**：一个会话的历史按 run 取。`Query::History` 是城全局的最后一页，按它在客户端过滤，一个较早的会话就不在那一页里；`Query::RunView` 回答「这个 run 在不在、走到哪」，不回答「这个会话是什么」。
@@ -1426,6 +1426,25 @@ pub enum Door { Transcribe, Enroll, Acp, Drop }
 - **`Door::Drop` 未配对即拒**：它往城的磁盘上写字节，与另外两扇会动作的门同一个判定（8-40）。
 - **正文上限 `DROP_BYTES_MAX`（64 MiB），只加在这一条路由上**：axum 的缺省上限是 2 MiB，一张截图或一份 PDF 就会超过；更大的正文答 413。上限不放宽到其余路由，因为它们收的是一行文字或一份录音。
 - 城怎么存、存在哪里、答出哪条路径是 sprawling-SPEC 8-119 的事；这里只把名字与字节交进去，把答案或拒绝原样交回来（拒绝是 422 加 `refusal_text`）。
+
+### 8-50 依赖页的三个版本与一包：`DoctorItem.pinned`／`pack`、`Query::UpstreamVersion`
+
+```rust
+pub struct DoctorItem { …, pub pinned: Option<String>, pub pack: Option<DoctorPack> }
+pub enum DoctorPack { RustTools }
+// Query 追加在声明序末尾
+UpstreamVersion { item: String },          // → Answer::Upstream(Box<DoctorUpstream>)
+pub struct DoctorUpstream { pub item: String, pub newest: DoctorNewest }
+pub enum DoctorNewest { Asking, Read { version: String }, Unread { why: DoctorUnread }, Refused { said: String } }
+pub enum DoctorUnread { WithToolchain, ManyBrands, MatchesBrowser, ThisProject, NoSource, UnknownItem }
+```
+
+- **每项一问，而不是一份答案里的一个字段**：上游版本来自六个不同的站点，一个慢的站点不能拖住整页；页面对每一项各问一次，答一个填一个。塞进 `DoctorAnswer` 就得等最慢的那一个，或者要第二条推送通道。
+- **`Asking` 让问题不等网络**：一个会话的问题按到达的次序一个一个答，一个要出网几秒的问题会挡住它后面的每一个；城先答 `Asking`，在后台去读，页面过一会儿再问。
+- **`pack` 是一个枚举而不是一个字符串**：页面要给这一包起名字、写说明，所以它必须是页面认得的封闭集合；新的一包是每个读者处的编译错误。
+- **`DoctorUnread` 是封闭的原因**：「读不到」有几种，每一种页面各有一句话，线上不带句子（§8-25 同一条理由）。`Refused.said` 带的是网络在哪一步停下，那是平台自己的话。
+- **`pinned` 是版本号本身**，已从仓库的文件里读好；没有钉子的项为 `None`。
+- 城那一侧从哪里读、怎么记住读数，见 sprawling-SPEC §8-120。
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 

@@ -91,6 +91,69 @@ pub struct DoctorItem {
     pub homepage: Option<String>,
     pub state: DoctorState,
     pub install: DoctorInstall,
+    /// The version this repository pins the item at, read from the file
+    /// that pins it; `None` for an item nothing pins.
+    pub pinned: Option<String>,
+    /// The pack a page draws this item inside, with one install control
+    /// for the pack's missing members; `None` for an item drawn alone.
+    pub pack: Option<DoctorPack>,
+}
+
+/// A set of items a page draws as one row: each member is still its own
+/// item here, because each is detected, judged and installed on its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorPack {
+    /// The cargo subcommands this repository's recipes and workflows call.
+    RustTools,
+}
+
+/// The newest release of one item upstream, as its publisher states it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DoctorUpstream {
+    /// The requirement table's name for the item, as `DoctorItem.name`.
+    pub item: String,
+    pub newest: DoctorNewest,
+}
+
+/// What asking the item's publisher came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorNewest {
+    /// The city has asked the publisher and has no answer yet; asking
+    /// again later reads what arrived. The question never waits on the
+    /// network, because a session answers its questions one at a time.
+    Asking,
+    /// The newest stable version, as a dotted number.
+    Read { version: String },
+    /// This item has no single upstream version to read, and why.
+    Unread { why: DoctorUnread },
+    /// The source was asked and did not answer; `said` is where the
+    /// call stopped.
+    Refused { said: String },
+}
+
+/// Why an item has no upstream version to compare with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DoctorUnread {
+    /// It ships inside the Rust toolchain, so the toolchain's version is
+    /// the one that moves.
+    WithToolchain,
+    /// A family of browsers, each brand with its own releases.
+    ManyBrands,
+    /// A driver whose version follows the browser beside it.
+    MatchesBrowser,
+    /// A part of this project, released with it.
+    ThisProject,
+    /// Its publisher offers no machine-readable release to ask.
+    NoSource,
+    /// The requirement table carries no item by that name.
+    UnknownItem,
 }
 
 /// Whether the item is here, and in what condition.

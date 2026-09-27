@@ -43,14 +43,31 @@ use std::time::Duration;
 use accounting::Runnable;
 use kernel::{AxCode, AxError};
 
-/// How many times one install program is asked whether it has
-/// finished before this city stops it.
+/// How many times one install program that downloads a finished
+/// package is asked whether it has finished before this city stops it.
 ///
 /// `PATIENCE * TICK` is three minutes: long enough for a package
-/// manager to download a toolchain over a slow link, and the ceiling
-/// this project puts on any single wait, because a writer thread held
-/// longer than that is indistinguishable from a hung city.
+/// manager to download a toolchain over a slow link, and short enough
+/// that a writer thread held that long still reads as a city at work.
 pub(crate) const PATIENCE: u32 = 3_600;
+
+/// The knocks a `cargo install` gets, which compiles from source:
+/// `BUILD_PATIENCE * TICK` is twenty minutes, because cargo-mutants or
+/// cargo-deny compile for five to twelve minutes cold on four cores and
+/// three minutes killed every one of them half way. The writer thread is
+/// held that long; the page draws the item as installing meanwhile, and
+/// moving installs off that thread is the step sprawling-SPEC.md 8-64
+/// names as left.
+const BUILD_PATIENCE: u32 = 24_000;
+
+/// How long this install program may run: a compile from source gets
+/// the build's patience, a download gets the download's.
+pub(crate) fn patience_for(runnable: &Runnable) -> u32 {
+    match runnable.program() {
+        "cargo" => BUILD_PATIENCE,
+        _ => PATIENCE,
+    }
+}
 
 /// How long this city waits between two knocks. Short enough that a
 /// fast install is not padded, long enough that three minutes of
@@ -79,6 +96,7 @@ pub(crate) fn run(
     let (stdout, stderr) = log_streams(item, log)?;
     let mut child = Command::new(runnable.program())
         .args(runnable.args())
+        .env("PATH", super::host::search_path())
         .stdin(Stdio::null())
         .stdout(stdout)
         .stderr(stderr)
@@ -402,12 +420,23 @@ mod tests {
         );
     }
 
+    /// A compile from source gets the patience a real build needs, and
+    /// a download keeps the three-minute ceiling.
     #[test]
-    fn the_wait_this_city_installs_under_stays_inside_the_ceiling() {
-        let bound = TICK.saturating_mul(PATIENCE);
-        assert!(
-            bound <= Duration::from_secs(180),
-            "a single wait may not exceed three minutes: {bound:?}"
+    fn a_build_is_given_twenty_minutes_and_a_download_three() {
+        let cargo = Recipe::Command {
+            program: "cargo",
+            args: &["install", "cargo-deny", "--locked"],
+        };
+        let winget = Recipe::Command {
+            program: "winget",
+            args: &["install", "--id", "Casey.Just"],
+        };
+        let waits = [cargo, winget]
+            .map(|recipe| TICK.saturating_mul(patience_for(&recipe.command("pretend").unwrap())));
+        assert_eq!(
+            waits,
+            [Duration::from_secs(20 * 60), Duration::from_secs(180)]
         );
     }
 }

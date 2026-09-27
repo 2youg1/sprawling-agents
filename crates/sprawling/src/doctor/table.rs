@@ -20,7 +20,8 @@
 mod toolchain;
 
 use super::family::{CHROMIUM_ROW, GECKO_ROW, WEBKIT_ROW};
-use super::{Detection, Need, PerPlatform, Platform, Recipe, Requirement, Tier};
+use super::{Detection, Need, PerPlatform, Pin, Platform, Recipe, Requirement, Tier, Upstream};
+use channels::DoctorUnread;
 use kernel::{AxCode, AxError};
 
 /// The environment variable a person may point at a CPython-WASI
@@ -168,6 +169,9 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             },
             linux: Recipe::Print("sudo apt install chromium-chromedriver"),
         },
+        pin: Pin::Unpinned,
+        upstream: Upstream::Unread(DoctorUnread::MatchesBrowser),
+        pack: None,
     },
     Requirement {
         name: MSEDGEDRIVER,
@@ -194,6 +198,9 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
                  https://developer.microsoft.com/microsoft-edge/tools/webdriver/",
             ),
         },
+        pin: Pin::Unpinned,
+        upstream: Upstream::Unread(DoctorUnread::MatchesBrowser),
+        pack: None,
     },
     Requirement {
         name: SANDBOX_ENGINE,
@@ -209,6 +216,9 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             macos: ENGINE_BY_BUILD,
             linux: ENGINE_BY_BUILD,
         },
+        pin: Pin::Unpinned,
+        upstream: Upstream::Unread(DoctorUnread::ThisProject),
+        pack: None,
     },
     Requirement {
         name: PYTHON_WASI,
@@ -225,6 +235,9 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             macos: PYTHON_WASI_BY_HAND,
             linux: PYTHON_WASI_BY_HAND,
         },
+        pin: Pin::Unpinned,
+        upstream: Upstream::Unread(DoctorUnread::NoSource),
+        pack: None,
     },
     Requirement {
         name: SHELL,
@@ -249,12 +262,15 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             macos: Recipe::Manual("set SHELL to a shell, or restore /bin/sh"),
             linux: Recipe::Manual("set SHELL to a shell, or restore /bin/sh"),
         },
+        pin: Pin::Unpinned,
+        upstream: Upstream::Unread(DoctorUnread::NoSource),
+        pack: None,
     },
     Requirement {
         name: SPRAWLING_DESKTOP,
         tier: Tier::Use,
         need: Need::Optional,
-        enables: "the desktop connector, for a building whose rules declare it",
+        enables: "an optional MCP server that lets agents see and operate this Windows desktop; not the WebUI",
         detect: Detection::Program {
             program: "sprawling-desktop",
             version_arg: "--version",
@@ -266,6 +282,9 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             macos: DESKTOP_BY_HAND,
             linux: DESKTOP_BY_HAND,
         },
+        pin: Pin::Unpinned,
+        upstream: Upstream::Unread(DoctorUnread::ThisProject),
+        pack: None,
     },
     Requirement {
         name: FFMPEG,
@@ -281,7 +300,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         recipe: PerPlatform {
             windows: Recipe::Command {
                 program: "winget",
-                args: &["install", "--id", "Gyan.FFmpeg", "-e"],
+                args: &["install", "--id", "Gyan.FFmpeg", "-e", "--scope", "user"],
             },
             macos: Recipe::Command {
                 program: "brew",
@@ -289,9 +308,13 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             },
             linux: Recipe::Print("sudo apt install ffmpeg"),
         },
+        pin: Pin::Unpinned,
+        upstream: Upstream::Unread(DoctorUnread::NoSource),
+        pack: None,
     },
     toolchain::GIT,
     toolchain::RUSTUP,
+    toolchain::RUST,
     toolchain::RUSTFMT,
     toolchain::CLIPPY,
     toolchain::JUST,
@@ -303,10 +326,8 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
     toolchain::LEAN,
     toolchain::UV,
     toolchain::PYTHON,
-    toolchain::CARGO_AUDIT,
     toolchain::CARGO_MUTANTS,
     toolchain::CARGO_FUZZ,
-    toolchain::CARGO_LLVM_COV,
     toolchain::CARGO_PUBLIC_API,
     toolchain::KANI,
 ];

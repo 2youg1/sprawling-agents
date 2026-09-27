@@ -121,12 +121,20 @@ impl<'a> Runnable<'a> {
 
     /// The command as a person would type it into their own terminal.
     /// Every message about this program quotes this, so what a person
-    /// is told to run is what this city ran.
+    /// is told to run is what this city ran. An argument with a space in
+    /// it is set in double quotes, which every shell a person pastes it
+    /// into reads as one argument, as the program received it.
     #[must_use]
     pub fn spelled(&self) -> String {
-        if self.args.is_empty() {
-            return self.program.to_owned();
-        }
-        format!("{} {}", self.program, self.args.join(" "))
+        std::iter::once(self.program.to_owned())
+            .chain(self.args.iter().map(|arg| {
+                if arg.contains(' ') {
+                    format!("\"{arg}\"")
+                } else {
+                    (*arg).to_owned()
+                }
+            }))
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }

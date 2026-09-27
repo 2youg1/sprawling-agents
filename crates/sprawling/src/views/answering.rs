@@ -51,6 +51,15 @@ impl Views {
         }
     }
 
+    /// One item's newest release, asked once the snapshot is let go
+    /// because it leaves this machine (sprawling-SPEC.md 8-120).
+    fn upstream_of(&self, item: &str) -> Prepared {
+        Prepared::Upstream {
+            ask: self.upstream,
+            item: item.to_owned(),
+        }
+    }
+
     /// How much of everything this city is holding right now, but for
     /// the building count, which `Prepared::finish` reads off the
     /// directory once the lock is released.
@@ -275,6 +284,7 @@ impl Views {
             }
             channels::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
             channels::Query::NewestRelease => return Prepared::Release(self.registry),
+            channels::Query::UpstreamVersion { item } => return self.upstream_of(item),
             channels::Query::BuildingView { addr } => {
                 return Prepared::Building {
                     city_root: self.city_root.clone(),

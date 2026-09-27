@@ -131,6 +131,9 @@ pub(crate) const GECKO_ROW: Requirement = Requirement {
         },
         linux: Recipe::Print("sudo apt install firefox"),
     },
+    pin: super::Pin::Unpinned,
+    upstream: super::Upstream::Unread(channels::DoctorUnread::ManyBrands),
+    pack: None,
 };
 
 /// The Chromium row. Optional, and that is the whole point: a Chromium
@@ -145,6 +148,9 @@ pub(crate) const CHROMIUM_ROW: Requirement = Requirement {
     detect: Detection::Family(Family::Chromium),
     homepage: Some("https://www.chromium.org/"),
     recipe: CHROMIUM_RECIPE,
+    pin: super::Pin::Unpinned,
+    upstream: super::Upstream::Unread(channels::DoctorUnread::ManyBrands),
+    pack: None,
 };
 
 /// How a Chromium browser is installed here; the browser tool's row and
@@ -176,6 +182,9 @@ pub(crate) const WEBKIT_ROW: Requirement = Requirement {
         macos: Recipe::Manual("run `safaridriver --enable` once; Safari itself ships with macOS"),
         linux: Recipe::Manual("Safari runs on macOS only"),
     },
+    pin: super::Pin::Unpinned,
+    upstream: super::Upstream::Unread(channels::DoctorUnread::ManyBrands),
+    pack: None,
 };
 
 /// Which member of this family this machine has, and where.

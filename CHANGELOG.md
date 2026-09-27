@@ -22,7 +22,7 @@ release notes and their commits.
 
 Pre-alpha. Nothing in this section has been published yet: it records what
 landed in the repository after `v0.0.6-Pre-alpha-260922`. WIRE_V
-<!-- xtask:begin wire_v -->43<!-- xtask:end -->, recounted from
+<!-- xtask:begin wire_v -->44<!-- xtask:end -->, recounted from
 `channels::WIRE_V` while this section is unreleased.
 
 This section quotes no wall-clock figure. The measurements that would price
