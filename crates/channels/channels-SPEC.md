@@ -1420,11 +1420,12 @@ pub enum DoctorPack { RustTools }
 // Query 追加在声明序末尾
 UpstreamVersion { item: String },          // → Answer::Upstream(Box<DoctorUpstream>)
 pub struct DoctorUpstream { pub item: String, pub newest: DoctorNewest }
-pub enum DoctorNewest { Read { version: String }, Unread { why: DoctorUnread }, Refused { said: String } }
+pub enum DoctorNewest { Asking, Read { version: String }, Unread { why: DoctorUnread }, Refused { said: String } }
 pub enum DoctorUnread { WithToolchain, ManyBrands, MatchesBrowser, ThisProject, NoSource, UnknownItem }
 ```
 
 - **每项一问，而不是一份答案里的一个字段**：上游版本来自六个不同的站点，一个慢的站点不能拖住整页；页面对每一项各问一次，答一个填一个。塞进 `DoctorAnswer` 就得等最慢的那一个，或者要第二条推送通道。
+- **`Asking` 让问题不等网络**：一个会话的问题按到达的次序一个一个答，一个要出网几秒的问题会挡住它后面的每一个；城先答 `Asking`，在后台去读，页面过一会儿再问。
 - **`pack` 是一个枚举而不是一个字符串**：页面要给这一包起名字、写说明，所以它必须是页面认得的封闭集合；新的一包是每个读者处的编译错误。
 - **`DoctorUnread` 是封闭的原因**：「读不到」有几种，每一种页面各有一句话，线上不带句子（§8-25 同一条理由）。`Refused.said` 带的是网络在哪一步停下，那是平台自己的话。
 - **`pinned` 是版本号本身**，已从仓库的文件里读好；没有钉子的项为 `None`。
