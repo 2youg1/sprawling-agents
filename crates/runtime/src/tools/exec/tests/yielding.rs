@@ -93,7 +93,7 @@ fn a_dispatched_command_runs_below_the_core() {
 #[test]
 fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
     let chamber = tempfile::tempdir().unwrap();
-    let mut tool = ExecTool::new(
+    let tool = ExecTool::new(
         setup(chamber.path(), None, None),
         Box::new(EchoSandbox::new()),
         patient(),
@@ -119,7 +119,7 @@ fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
 #[test]
 fn a_missing_program_still_refuses_under_nice() {
     let chamber = tempfile::tempdir().unwrap();
-    let mut tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
     let err = match tool.invoke(&call(serde_json::json!({
         "program": { "path": "sprawling-no-such-program", "args": [] }
     }))) {

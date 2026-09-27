@@ -14,9 +14,9 @@
 
 use std::time::{Duration, Instant};
 
-use super::{
-    BUSY_LIMIT, CorePriority, Standing, Valve, Verdict, raise_this_thread, serving_runtime,
-};
+use super::{BUSY_LIMIT, Standing, Valve, Verdict};
+#[cfg(windows)]
+use super::{CorePriority, raise_this_thread, serving_runtime};
 
 #[cfg(windows)]
 #[test]

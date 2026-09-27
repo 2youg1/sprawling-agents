@@ -203,8 +203,7 @@ pub(crate) mod tests {
     }
 
     #[cfg(not(windows))]
-    pub(crate) fn place_link(file: bool, from: &Path, to: &Path) -> bool {
-        let _ = file;
+    pub(crate) fn place_link(_file: bool, from: &Path, to: &Path) -> bool {
         std::os::unix::fs::symlink(from, to).is_ok()
     }
 

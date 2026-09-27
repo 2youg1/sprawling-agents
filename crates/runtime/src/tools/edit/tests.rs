@@ -243,8 +243,7 @@ fn place_link(_file: bool, from: &Path, to: &Path) -> bool {
 }
 
 #[cfg(not(windows))]
-fn place_link(file: bool, from: &Path, to: &Path) -> bool {
-    let _ = file;
+fn place_link(_file: bool, from: &Path, to: &Path) -> bool {
     std::os::unix::fs::symlink(from, to).is_ok()
 }
 
