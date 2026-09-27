@@ -23,6 +23,7 @@ export interface BoardRun {
   readonly run: string;
   readonly addr: string | null;
   readonly task: string | null;
+  readonly goal: string | null;
   readonly started: number | null;
   readonly ended: number | null;
   readonly doing: Doing;
@@ -33,7 +34,15 @@ export interface BoardRun {
 // fields are named rather than spread: a streamed token writes the run's
 // `saying`, and a board that read it would be rebuilt for every token.
 export function boardRuns(runs: Readonly<Record<string, RunBelief>>): BoardRun[] {
-  return Object.values(runs).map(({ run, addr, task, started, doing }) => ({ run, addr, task, started, ended: null, doing }));
+  return Object.values(runs).map(({ run, addr, task, goal, started, doing }) => ({
+    run,
+    addr,
+    task,
+    goal,
+    started,
+    ended: null,
+    doing,
+  }));
 }
 
 // The phase a run's bar is coloured by: whose turn it is, and for a

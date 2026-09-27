@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 42 as const;
+export const WIRE_V = 43 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "b9ab170a03bb161ccd28562314a4607d7d0f5aa7f8e90afe2492596f5c78f776" as const;
+export const WIRE_HASH = "576c3f9a1aab20e92387f497efc96f3e39799b921a2e150cbd13732c8d06693f" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `channels::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -567,11 +567,13 @@ export const RunSummary = Schema.Struct({
   ask: Schema.optional(Schema.NullOr(Schema.String)),
   completion: Schema.optional(Schema.NullOr(Schema.String)),
   frozen: Schema.Boolean,
+  goal: Schema.optional(Schema.NullOr(Schema.String)),
   last_kind: EventKind,
   last_seq: Seq,
   pr: Schema.optional(Schema.NullOr(Schema.String)),
   run: RunId,
   started: Schema.optional(Schema.NullOr(TimeMs)),
+  task: Schema.optional(Schema.NullOr(Schema.String)),
   who: Schema.String,
 }).annotations({ identifier: "RunSummary" });
 export type RunSummary = typeof RunSummary.Type;

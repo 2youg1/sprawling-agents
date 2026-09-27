@@ -8,7 +8,7 @@
 // new; this decides what the record does to that run.
 
 import { PHASES } from "../doing";
-import { askOf, branchOf, completionOf, modelOf, taskOf, toolCall } from "../reading";
+import { askOf, branchOf, completionOf, modelOf, openingOf, toolCall } from "../reading";
 
 import type { EventRecord, RunId, Seq } from "../../wire";
 
@@ -21,6 +21,7 @@ export function unseen(run: RunId, at: Seq): RunBelief {
     addr: null,
     started: null,
     task: null,
+    goal: null,
     lastSeq: at,
     doing: { kind: "unknown" },
     model: null,
@@ -39,13 +40,14 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
   const moved: RunBelief = { ...held, lastSeq: record.seq, ask: null };
   switch (record.kind) {
     case "run_started": {
-      const [task, bad] = taskOf(record);
+      const [opening, bad] = openingOf(record);
       return [
         {
           ...moved,
           addr: record.addr ?? null,
           started: record.t,
-          task,
+          task: opening.task,
+          goal: opening.goal,
           doing: PHASES.run_started,
         },
         bad,

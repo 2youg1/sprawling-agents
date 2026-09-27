@@ -20,6 +20,7 @@ function run(id: RunId, addr: string, task: string, at: number): RunBelief {
     addr: Address.make(addr),
     started: TimeMs.make(at),
     task,
+    goal: null,
     lastSeq: Seq.make(at),
     doing: { kind: "thinking" },
     model: null,

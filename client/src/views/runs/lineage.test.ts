@@ -9,7 +9,7 @@ import type { BoardRun } from "./lineage";
 import { rowsOf, windowOf } from "./lineage";
 
 function run(id: string, addr: string, started: number, doing: BoardRun["doing"]): BoardRun {
-  return { run: id, addr, task: null, started, ended: null, doing };
+  return { run: id, addr, task: null, goal: null, started, ended: null, doing };
 }
 
 const THINKING = { kind: "thinking" } as const;

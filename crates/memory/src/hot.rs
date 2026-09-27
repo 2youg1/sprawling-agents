@@ -94,6 +94,11 @@ impl RunHot {
                 .and_then(serde_json::Value::as_str)
                 .map(str::to_owned)
         };
+        if kind == EventKind::RunStarted {
+            let named = |field: &str| stated(field).filter(|said| !said.is_empty());
+            self.task = named("task");
+            self.goal = named("goal");
+        }
         if kind == EventKind::RunFrozen {
             self.completion = stated("completion");
         }

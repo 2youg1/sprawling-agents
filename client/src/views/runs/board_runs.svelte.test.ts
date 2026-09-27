@@ -39,5 +39,5 @@ test("the board reads what it draws from the run table and no token wakes it", (
   store.say({ run, increment: { said: "x" } });
   flushSync();
   stop();
-  expect(built).toEqual([[{ run, addr: "web/api", task: null, started: 5, ended: null, doing: { kind: "thinking" } }]]);
+  expect(built).toEqual([[{ run, addr: "web/api", task: null, goal: null, started: 5, ended: null, doing: { kind: "thinking" } }]]);
 });

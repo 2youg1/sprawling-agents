@@ -110,6 +110,15 @@ describe("the runs a page believes in", () => {
     expect(get(store.belief).runs[ONE]?.lastSeq).toBe(Seq.make(12));
     expect(get(store.belief).runs[ONE]?.task).toBe("write the report");
   });
+
+  // After a reload the answer is all a page has of a run's opening, and
+  // the run board titles the run by it.
+  test("a run met only in an answer keeps the task and goal the answer carries", () => {
+    const store = createBelief(() => 0);
+    store.adoptCity(city([{ ...summary(ONE, 5), task: "draft the plan", goal: "a plan in hall" }]));
+    const held = get(store.belief).runs[ONE];
+    expect([held?.task, held?.goal]).toEqual(["draft the plan", "a plan in hall"]);
+  });
 });
 
 describe("the phase a run is in", () => {

@@ -35,7 +35,11 @@ export interface RunBelief {
   readonly run: RunId;
   readonly addr: Address | null;
   readonly started: TimeMs | null;
+  // What the person asked for and what finishing looks like, as the
+  // run's opening said them: heard from the stream, or read off the
+  // city's answer after a reload.
   readonly task: string | null;
+  readonly goal: string | null;
   readonly lastSeq: Seq;
   readonly doing: Doing;
   // The model the run's last call went to. A session keeps the model it

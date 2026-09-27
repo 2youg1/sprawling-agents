@@ -46,6 +46,7 @@ function run(id: string, lastSeq: number, model: string | null): RunBelief {
     addr: room,
     started: TimeMs.make(lastSeq),
     task: null,
+    goal: null,
     lastSeq: Seq.make(lastSeq),
     doing: { kind: "frozen", completion: null },
     model,

@@ -92,7 +92,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 42,
+        WIRE_V, 43,
         "the version rises when the grammar changes shape without a name changing"
     );
 }
@@ -116,7 +116,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "b9ab170a03bb161ccd28562314a4607d7d0f5aa7f8e90afe2492596f5c78f776";
+const WIRE_SCHEMA_GOLDEN: &str = "576c3f9a1aab20e92387f497efc96f3e39799b921a2e150cbd13732c8d06693f";
 
 // -------------------------------------------------------------- binding face
 

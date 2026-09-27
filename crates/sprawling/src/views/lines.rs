@@ -235,6 +235,8 @@ pub(crate) fn summarize(run: RunId, hot: &memory::RunHot) -> channels::RunSummar
         completion: hot.completion.clone(),
         pr: hot.pr.clone(),
         ask: hot.ask.clone(),
+        task: hot.task.clone(),
+        goal: hot.goal.clone(),
     }
 }
 

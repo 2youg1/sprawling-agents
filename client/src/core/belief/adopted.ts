@@ -27,7 +27,15 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
   if (held !== undefined && held.lastSeq >= summary.last_seq) {
     const at = held.started ?? summary.started ?? null;
     const pr = held.pr ?? summary.pr ?? null;
-    return { ...held, addr: held.addr ?? summary.addr ?? null, started: at, pr, local: false };
+    return {
+      ...held,
+      addr: held.addr ?? summary.addr ?? null,
+      started: at,
+      task: held.task ?? summary.task ?? null,
+      goal: held.goal ?? summary.goal ?? null,
+      pr,
+      local: false,
+    };
   }
   // The answer is the newer reading. Its `last_kind` states the phase
   // where the kind does; a kind that states none leaves what the page
@@ -38,7 +46,8 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
     run: summary.run,
     addr: summary.addr ?? held?.addr ?? null,
     started: summary.started ?? held?.started ?? null,
-    task: held?.task ?? null,
+    task: summary.task ?? held?.task ?? null,
+    goal: summary.goal ?? held?.goal ?? null,
     lastSeq: summary.last_seq,
     doing: summary.frozen ? frozen(summary, held) : (stated ?? held?.doing ?? { kind: "unknown" }),
     model: held?.model ?? null,
