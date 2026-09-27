@@ -388,7 +388,12 @@ mod tests {
         assert_eq!(trees.live().unwrap(), vec![name("node-1")]);
 
         let again = trees.claim(&name("node-1"), &[]).unwrap();
-        assert_eq!(again.path(), path.as_path());
+        // The same directory, spelled two ways: git answers with the long
+        // name, and a Windows runner's temp directory hands out its 8.3 one.
+        assert_eq!(
+            std::fs::canonicalize(again.path()).unwrap(),
+            std::fs::canonicalize(&path).unwrap()
+        );
         assert_eq!(
             std::fs::metadata(&notes).unwrap().modified().unwrap(),
             written,
