@@ -12,16 +12,19 @@ use kernel::degradation::VolumeSpace;
 use sysinfo::Disks;
 
 /// Lists the disks once and reads the one that holds `city`, resolved
-/// first: a link would name the disk that holds the link, and no mount
-/// point is a prefix of a relative or verbatim path.
+/// first.
 pub(crate) fn read(city: &Path) -> Option<VolumeSpace> {
-    let city = std::fs::canonicalize(city)
+    space(&Disks::new_with_refreshed_list(), &resolved(city)?)
+}
+
+/// `city` spelled the way mount points are: a link would name the disk
+/// that holds the link, and no mount point is a prefix of a relative or
+/// verbatim path. `None` when the path resolves neither way.
+pub(crate) fn resolved(city: &Path) -> Option<PathBuf> {
+    std::fs::canonicalize(city)
         .or_else(|_| std::path::absolute(city))
-        .ok()?;
-    space(
-        &Disks::new_with_refreshed_list(),
-        &without_verbatim_disk(&city),
-    )
+        .ok()
+        .map(|city| without_verbatim_disk(&city))
 }
 
 /// `\\?\C:\city` respelled `C:\city`, the spelling mount points carry.
