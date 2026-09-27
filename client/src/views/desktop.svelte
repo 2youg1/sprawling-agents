@@ -27,11 +27,10 @@ export function desktopScopeAt(addr: Address): Address {
 
   import { readAnswer } from "../core/answered";
   import { configureDesktop } from "../core/commands";
-  import { say } from "../core/lang";
+  import { fill, say } from "../core/lang";
   import { ui } from "../ui";
   import type { Query } from "../wire";
   import Button from "./parts/button.svelte";
-  import Unanswered from "./parts/unanswered.svelte";
 
   interface Props {
     readonly addr: Address;
@@ -49,8 +48,10 @@ export function desktopScopeAt(addr: Address): Address {
   const held = $derived(u.conn.asking.ask(question));
   // The city answers `unavailable` both for a building with no allowlist
   // yet and for a file it could not read, so the box starts empty for
-  // either and the page says it could not read one rather than calling
-  // the allowlist empty: a save then writes the file whole either way.
+  // either and the page says what is missing and how a save creates it,
+  // rather than calling the allowlist empty or printing the question the
+  // city could not answer: a save writes the file whole either way, and
+  // the server reads an unreadable file as a closed door.
   const read = $derived(readAnswer($held, (answer) => ("document" in answer ? answer.document.text : undefined)));
   const onDisk = $derived(read.kind === "held" ? read.value : "");
 
@@ -89,7 +90,7 @@ export function desktopScopeAt(addr: Address): Address {
     }}
   ></textarea>
   {#if read.kind === "unavailable"}
-    <Unanswered query={read.query} asked={question} />
+    <p class="text-note text-text-faint">{fill(say($lang, "desktop_missing"), { path: desktopScopeAt(addr) })}</p>
   {/if}
   <div class="flex items-center gap-base">
     <Button

@@ -463,6 +463,10 @@
     "en": "no windows listed",
     "zh": "没有列出窗口"
   },
+  "desktop_missing": {
+    "en": "This building has no desktop allowlist yet, so no run in it may touch a window. Write the windows it may touch in the box above and save: that creates {path}.",
+    "zh": "这栋楼还没有桌面白名单，所以楼里的 run 碰不了任何窗口。在上面的框里写下它能碰的窗口，保存后就会建出 {path}。"
+  },
   "desktop_none": {
     "en": "nothing permitted",
     "zh": "什么都不许"
