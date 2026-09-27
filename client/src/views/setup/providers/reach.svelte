@@ -121,7 +121,7 @@ sent the wrong way. -->
     <p class={["font-label", failed === null ? "text-text" : "text-alert"]}>
       {fill(say($lang, "setup_probe_read"), { host: found.host })}
     </p>
-    <p class="mt-tight text-text-quiet">{say($lang, stoppedAt(found))}</p>
+    <p class="mt-tight text-text-quiet">{say($lang, stoppedAt(found, failed))}</p>
     <dl class="mt-snug grid grid-cols-2 gap-x-base gap-y-tight text-text-faint">
       {#each stages as [word, stage] (word)}
         <dt>{say($lang, word)}</dt>
