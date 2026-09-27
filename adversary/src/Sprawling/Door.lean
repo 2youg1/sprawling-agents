@@ -160,9 +160,6 @@ inductive Verb where
   `ceiling` absent is a person who left the output ceiling box empty, which is
   the case the whole ladder in `gateway::provider::ceiling` exists to answer. -/
   | selectModel (endpoint : String) (model : String) (ceiling : Option Nat) (idem : IdemKey)
-  /-- A frame this adversary writes by hand, for the cases where the point is
-  that the door refuses to encode it at all. -/
-  | verbatim (raw : String)
 
 /-- What the door said.
 
@@ -248,7 +245,7 @@ def Verb.frame : Verb → String
       [ ("addr", .str addr)
       , ("task", .str "say something")
       , ("goal", .str "an answer")
-      , ("mode", .str "build")
+      , ("mode", .str "up")
       , ("idem", .str idem.value)
       , ("session", .str session)
       , ("effort", .null) ]
@@ -268,12 +265,12 @@ def Verb.frame : Verb → String
       [ ("endpoint", .str endpoint)
       , ("model", .str model)
       , ("tag", .str "main")
-      -- Zero is how the wire spells "nobody stated a window", which is what a
-      -- person who picked a model from a list and typed nothing sends.
-      , ("context_tokens", Json.num (JsonNumber.fromNat 0))
+      -- Null is how the wire spells "nobody stated a window", which is what a
+      -- person who picked a model from a list and typed nothing sends; the
+      -- window is a nonzero count whenever it is stated at all.
+      , ("context_tokens", Json.null)
       , ("max_output_tokens", tokensOrNull ceiling)
       , ("idem", .str idem.value) ]
-  | .verbatim raw => raw
 where
   /-- Every question goes out under id 1: this adversary reads an answer by the
   query name it carries, so the id is never read back. -/
@@ -501,17 +498,30 @@ private def interpret (local' : Option Complaint) (frames : List Frame) : Answer
       | [] => .quiet
       | answered => .accepted answered
 
-/-- Asks one question of one city, written out by hand.
+/-- Who wrote the frame, which decides what a refused command line means.
+
+`sprawling call` exits 2 for its command line, and a frame it cannot read is part
+of its command line: the client parses the frame before it opens a socket. A
+frame this adversary encoded from a `Verb` is meant to be readable, so a refusal
+there is this adversary's own mistake and throws. A frame written by hand to be
+refused has earned exactly that refusal, and it is the answer. -/
+private inductive Author where
+  | encoded
+  | byHand
+
+/-- Sends one frame and sorts what came back.
 
 A refusal is an answer. A line that will not parse is not: it means the wire has
 changed shape, so this throws rather than reporting a green test against a
 program it can no longer read. -/
-def Door.askRaw (door : Door) (port : Port) (frame : String) : IO Answer := do
+private def Door.say (door : Door) (port : Port) (frame : String) (author : Author) :
+    IO Answer := do
   let said ← capture door.binary
     #["call", frame, "--at", s!"127.0.0.1:{port}", "--quiet-ms", toString quietMillis]
-  -- Usage errors are this adversary's own mistake, never a fact about the city.
   if said.exitCode == 2 then
-    throw <| IO.userError s!"the door refused the invocation: {said.err}"
+    match author, localRefusal said.err with
+    | .byHand, some complaint => return .denied complaint
+    | _, _ => throw <| IO.userError s!"the door refused the invocation: {said.err}"
   let lines := said.out.splitOn "\n" |>.filter (fun line => !line.trimAscii.toString.isEmpty)
   let frames ← lines.mapM fun line =>
     match decodeFrame line with
@@ -523,9 +533,14 @@ def Door.askRaw (door : Door) (port : Port) (frame : String) : IO Answer := do
         s!"  said:  {line.take 400}"
   return interpret (localRefusal said.err) frames
 
+/-- Sends a frame written out by hand, for the checks whose point is that the
+door refuses to carry it. -/
+def Door.askRaw (door : Door) (port : Port) (frame : String) : IO Answer :=
+  door.say port frame .byHand
+
 /-- Asks one question of one city. -/
 def Door.ask (door : Door) (port : Port) (verb : Verb) : IO Answer :=
-  door.askRaw port verb.frame
+  door.say port verb.frame .encoded
 
 /-- Verifies a chain offline, the way `just replay` does.
 

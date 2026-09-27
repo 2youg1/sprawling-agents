@@ -83,10 +83,11 @@ private def fieldsOf (index : Nat) : Action y → List String
     [ s!"addr: Address::parse({quoted addr}).unwrap(),"
     , "task: \"say something\".to_owned(),"
     , "goal: \"an answer\".to_owned(),"
-    , "mode: channels::ModeTag::parse(\"build\").unwrap(),"
+    , "mode: kernel::Mode::Up,"
     , idemField index
     , s!"session: Some(kernel::SessionName::parse({quoted session}).unwrap()),"
-    , "effort: None," ]
+    , "effort: None,"
+    , "model: None," ]
   | .stop scope => [s!"scope: {scopeOf scope},", idemField index]
   | .resume scope => [s!"scope: {scopeOf scope},", idemField index]
   | .batch addr => [s!"addr: Address::parse({quoted addr}).unwrap(),", idemField index]
@@ -303,7 +304,7 @@ private def ceilingRegistered : List String :=
      , s!"            endpoint: channels::ProviderName::parse({quoted relayName}).unwrap(),"
      , s!"            model: {quoted unlistedModel}.to_owned(),"
      , "            tag: kernel::ModelTag::Main,"
-     , "            context_tokens: 0,"
+     , "            context_tokens: None,"
      , "            max_output_tokens: None,"
      , "            idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b\"select\"),"
      , "        })"
