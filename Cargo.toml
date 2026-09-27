@@ -119,6 +119,11 @@ cap-fs-ext = "4"
 # One HTTP client for the whole workspace: gateway speaks to providers,
 # the bin speaks to MCP servers reached over HTTP, and two version
 # authorities for one client is how two TLS stacks end up in one binary.
+# The remote door's cryptography: ML-KEM-768, ML-DSA-44, X25519, Ed25519,
+# HKDF and AES-GCM from one library that is already in the graph through
+# rustls, with the features rustls turns on, so building `remote` alone
+# needs no assembler either (remote-SPEC.md section 13).
+aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "prebuilt-nasm"] }
 reqwest = { version = "0.13", default-features = false, features = [
     "blocking",
     "rustls",
