@@ -39,9 +39,11 @@
 
 <p class="flex min-w-0 flex-wrap items-baseline gap-x-base gap-y-tight text-note">
   {#if installed !== null}
-    <span class="flex items-baseline gap-tight">
-      <span class="text-text-faint">{say($lang, "machine_version_installed")}</span>
-      <span class="font-mono text-text">{installed}</span>
+    <!-- A banner with no dotted number in it is shown whole, so it is
+    cut at the row's edge rather than pushing its label onto two lines. -->
+    <span class="flex min-w-0 max-w-full items-baseline gap-tight">
+      <span class="shrink-0 text-text-faint">{say($lang, "machine_version_installed")}</span>
+      <span class="min-w-0 truncate font-mono text-text">{installed}</span>
     </span>
   {/if}
   {#if pinned !== null}
@@ -50,14 +52,14 @@
       <span class="font-mono text-text">{pinned}</span>
     </span>
   {/if}
-  <span class="flex min-w-0 items-baseline gap-tight">
-    <span class="shrink-0 text-text-faint">{say($lang, "machine_version_newest")}</span>
-    {#if reading.version !== null}
+  {#if reading.version !== null}
+    <span class="flex items-baseline gap-tight">
+      <span class="text-text-faint">{say($lang, "machine_version_newest")}</span>
       <span class="font-mono text-text">{reading.version}</span>
-    {:else}
-      <span class="min-w-0 truncate text-text-quiet">{reading.phrase}</span>
-    {/if}
-  </span>
+    </span>
+  {:else}
+    <span class="min-w-0 truncate text-text-faint">{reading.phrase}</span>
+  {/if}
   {#if stale}
     <Badge text={say($lang, "machine_version_behind")} weight="live" dot />
   {/if}

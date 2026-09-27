@@ -37,6 +37,7 @@ const DOCTOR = "sprawling doctor --install";
   import { ui } from "../ui";
   import type { DoctorAnswer, DoctorNewest } from "../wire";
   import { answered, plan, refused, running, started, type Walk } from "./setup/installing";
+  import { stillAsking } from "./setup/versions";
   import Button from "./parts/button.svelte";
   import Copy from "./machine/copy.svelte";
   import Report from "./machine/report.svelte";
@@ -118,6 +119,22 @@ const DOCTOR = "sprawling doctor --install";
     );
     return () => {
       for (const stop of stops) stop();
+    };
+  });
+
+  // The city answers `asking` while it reads a publisher, rather than
+  // holding every other question of this page behind the network; the
+  // items it is still reading are asked again after a pause, until each
+  // has its reading (sprawling-SPEC §8-120).
+  const ASK_AGAIN_MS = 1500;
+  const pending = $derived(stillAsking(newest).join(" "));
+  $effect(() => {
+    if (pending === "") return;
+    const again = setTimeout(() => {
+      for (const item of pending.split(" ")) u.conn.asking.refresh({ upstream_version: { item } });
+    }, ASK_AGAIN_MS);
+    return () => {
+      clearTimeout(again);
     };
   });
 

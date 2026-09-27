@@ -123,6 +123,10 @@ pub struct DoctorUpstream {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorNewest {
+    /// The city has asked the publisher and has no answer yet; asking
+    /// again later reads what arrived. The question never waits on the
+    /// network, because a session answers its questions one at a time.
+    Asking,
     /// The newest stable version, as a dotted number.
     Read { version: String },
     /// This item has no single upstream version to read, and why.

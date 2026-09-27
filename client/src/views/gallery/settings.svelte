@@ -166,8 +166,8 @@
   ];
 
   // What the publishers answered, one of each kind a row draws: a newer
-  // release, a current one, a reading that cannot exist, a refusal, and
-  // one still out (absent from the record).
+  // release, a current one, a reading that cannot exist, a refusal, one
+  // the city is still reading, and one not answered yet (absent).
   const NEWEST: Readonly<Record<string, DoctorNewest>> = {
     git: { read: { version: "2.55.1" } },
     just: { read: { version: "1.58.0" } },
@@ -176,6 +176,7 @@
     "cargo-deny": { read: { version: "0.19.2" } },
     kani: { refused: { said: "crates.io answered 503 Service Unavailable" } },
     geckodriver: { unread: { why: "matches_browser" } },
+    elan: "asking",
     msedgedriver: { unread: { why: "matches_browser" } },
   };
 </script>

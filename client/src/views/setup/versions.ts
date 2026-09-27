@@ -48,14 +48,23 @@ const UNREAD: Record<DoctorUnread, Key> = {
 };
 
 // What the newest column says: the version itself, a phrase for a
-// reading the city could not take, or that the question is still out.
+// reading the city could not take, or that the question is still out -
+// not answered yet, or answered `asking` while the city reads it.
 export type Newest =
   | { readonly version: string }
   | { readonly key: Key; readonly said: string | null };
 
 export function newestOf(answer: DoctorNewest | undefined): Newest {
-  if (answer === undefined) return { key: "machine_version_asking", said: null };
+  if (answer === undefined || answer === "asking") return { key: "machine_version_asking", said: null };
   if ("read" in answer) return { version: answer.read.version };
   if ("unread" in answer) return { key: UNREAD[answer.unread.why], said: null };
   return { key: "machine_upstream_refused", said: answer.refused.said };
+}
+
+// The items whose reading the city is still taking, which the page asks
+// about again after a pause.
+export function stillAsking(newest: Readonly<Record<string, DoctorNewest>>): readonly string[] {
+  return Object.entries(newest)
+    .filter(([, answer]) => answer === "asking")
+    .map(([item]) => item);
 }

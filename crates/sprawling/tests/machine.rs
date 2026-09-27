@@ -161,7 +161,9 @@ fn an_install_hands_the_table_command_to_the_machine_it_was_handed() {
     // The table's ffmpeg recipe is a command on Windows and macOS and a
     // printed line on Linux, which the worker refuses before the machine.
     let expected = match sprawling::doctor::Platform::current() {
-        Some(sprawling::doctor::Platform::Windows) => Some("winget install --id Gyan.FFmpeg -e --scope user"),
+        Some(sprawling::doctor::Platform::Windows) => {
+            Some("winget install --id Gyan.FFmpeg -e --scope user")
+        }
         Some(sprawling::doctor::Platform::MacOs) => Some("brew install ffmpeg"),
         Some(sprawling::doctor::Platform::Linux) | None => None,
     };

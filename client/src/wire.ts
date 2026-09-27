@@ -1138,6 +1138,7 @@ export type DoctorUnread = typeof DoctorUnread.Type;
  * What asking the item's publisher came to.
  */
 export const DoctorNewest = Schema.Union(
+  Schema.Literal("asking"),
   Schema.Struct({
     read: Schema.Struct({
       version: Schema.String,

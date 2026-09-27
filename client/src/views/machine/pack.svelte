@@ -36,7 +36,10 @@
   const wanting = $derived(
     members.some((each) => !("present" in each.state) && each.need === "required"),
   );
-  const complete = $derived(members.every((each) => "present" in each.state));
+  // The pack is complete when every member this city can install here
+  // is here; a member only a person can install (kani on Windows) says
+  // so on its own line rather than keeping the whole pack "absent".
+  const complete = $derived(members.every((each) => "present" in each.state || offerOf(each) === "by_hand"));
 </script>
 
 <li class="col-span-full flex min-w-0 flex-col gap-snug rounded-card bg-raised px-base py-snug">

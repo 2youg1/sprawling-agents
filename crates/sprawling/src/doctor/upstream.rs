@@ -12,12 +12,20 @@
 //! `gateway::client_for`, the proxy rule every other outbound call of
 //! this city follows.
 //!
+//! **The question never waits on the network.** A session answers its
+//! questions one at a time, so a page asking thirty publishers in turn
+//! would hold every other question it has for as long as the slowest
+//! took. The first question about an item starts one thread that asks
+//! the publisher and answers `Asking`; a later question reads what the
+//! thread left.
+//!
 //! **A reading that arrived is kept for the life of this process.**
 //! GitHub gives a caller without credentials sixty questions an hour,
 //! and a page that asked again on every opening would spend them in an
-//! afternoon. A refused reading is not kept, so the next opening asks
-//! again. Nothing expires by time, because this binary reads the clock
-//! in `bin::assembly` alone; a restarted city asks afresh.
+//! afternoon. A refusal is handed out once and then forgotten, so the
+//! next opening asks again. Nothing expires by time, because this binary
+//! reads the clock in `bin::assembly` alone; a restarted city asks
+//! afresh.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -54,11 +62,12 @@ const RUSTUP_CHANNEL: &str = "https://static.rust-lang.org/rustup/release-stable
 const PYTHON_RELEASES: &str =
     "https://www.python.org/api/v2/downloads/release/?is_published=true&pre_release=false";
 
-/// The readings already taken in this process, by item.
-static KNOWN: Mutex<BTreeMap<String, String>> = Mutex::new(BTreeMap::new());
+/// What this process knows about each item's publisher, by item.
+static KNOWN: Mutex<BTreeMap<String, DoctorNewest>> = Mutex::new(BTreeMap::new());
 
-/// The newest release of `item`, or why there is none to show. Never
-/// fails: a source that did not answer is an answer a page draws.
+/// The newest release of `item` as far as this process knows it, or
+/// why there is none to show. Never fails and never waits: an item not
+/// asked about yet starts its reading and is answered `Asking`.
 pub(crate) fn newest(item: &str) -> DoctorUpstream {
     let answer = |newest| DoctorUpstream {
         item: item.to_owned(),
@@ -69,16 +78,51 @@ pub(crate) fn newest(item: &str) -> DoctorUpstream {
             why: DoctorUnread::UnknownItem,
         });
     };
-    if let Some(version) = KNOWN.lock().ok().and_then(|known| known.get(item).cloned()) {
-        return answer(DoctorNewest::Read { version });
+    if let Upstream::Unread(why) = row.upstream {
+        return answer(DoctorNewest::Unread { why });
     }
-    let newest = read(row.upstream);
-    if let DoctorNewest::Read { version } = &newest
-        && let Ok(mut known) = KNOWN.lock()
-    {
-        known.insert(item.to_owned(), version.clone());
+    let Ok(mut known) = KNOWN.lock() else {
+        return answer(DoctorNewest::Refused {
+            said: "a reading of this item stopped part way; restart this city to ask again"
+                .to_owned(),
+        });
+    };
+    match known.get(item).cloned() {
+        Some(DoctorNewest::Refused { said }) => {
+            known.remove(item);
+            answer(DoctorNewest::Refused { said })
+        }
+        Some(held) => answer(held),
+        None => {
+            known.insert(item.to_owned(), DoctorNewest::Asking);
+            drop(known);
+            answer(start_reading(row.name, row.upstream))
+        }
     }
-    answer(newest)
+}
+
+/// Starts the one thread that asks `item`'s publisher and leaves the
+/// reading in `KNOWN`; what the caller is told meanwhile.
+fn start_reading(item: &'static str, upstream: Upstream) -> DoctorNewest {
+    let started = std::thread::Builder::new()
+        .name(format!("upstream-{item}"))
+        .spawn(move || {
+            let reading = read(upstream);
+            if let Ok(mut known) = KNOWN.lock() {
+                known.insert(item.to_owned(), reading);
+            }
+        });
+    match started {
+        Ok(_reading) => DoctorNewest::Asking,
+        Err(err) => {
+            if let Ok(mut known) = KNOWN.lock() {
+                known.remove(item);
+            }
+            DoctorNewest::Refused {
+                said: format!("no thread to ask with: {err}"),
+            }
+        }
+    }
 }
 
 /// Asks the source `upstream` names.
@@ -238,13 +282,19 @@ mod tests {
         );
     }
 
+    /// An item with nothing to ask is answered at once, from the table.
     #[test]
-    fn an_item_the_table_does_not_carry_is_named_as_unknown() {
+    fn an_item_with_no_source_is_answered_without_asking_anyone() {
         assert_eq!(
-            newest("no-such-item").newest,
-            DoctorNewest::Unread {
-                why: DoctorUnread::UnknownItem
-            }
+            (newest("no-such-item").newest, newest("rustfmt").newest),
+            (
+                DoctorNewest::Unread {
+                    why: DoctorUnread::UnknownItem
+                },
+                DoctorNewest::Unread {
+                    why: DoctorUnread::WithToolchain
+                }
+            )
         );
     }
 }
