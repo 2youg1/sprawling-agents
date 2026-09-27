@@ -113,9 +113,12 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     let mut result = serde_json::to_value(&outcome.result).unwrap();
     // A slow machine settles the build after the short window, and the
     // verdict of that call stays backgrounded: the exit code arrives at
-    // the table, not in the answered call.
+    // the table, not in the answered call. The harvest ends at the build's
+    // exit; its bound keeps the short window and the harvest together
+    // (160 s) under the suite's three-minute limit, so a build that hangs
+    // fails here with its own message.
     if result.get("exit_code").is_none() {
-        for _ in 0..600 {
+        for _ in 0..1_500 {
             let done = backlog.harvest(run).unwrap();
             if let Some(finished) = done.first() {
                 result["exit_code"] = match finished.exit {

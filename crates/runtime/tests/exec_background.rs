@@ -89,9 +89,13 @@ fn a_background_result_reaches_only_the_run_that_started_it() {
     assert_eq!(started["outcome"], "backgrounded", "{started}");
 
     // The stranger looks first on every round, so the moment the command
-    // ends the first harvest after it is the stranger's.
+    // ends the first harvest after it is the stranger's. The loop ends at
+    // the round that delivers; its bound, two minutes of rounds, is only
+    // there so that a result that never arrives fails inside the suite's
+    // three-minute limit instead of at it. Ten seconds was not enough for
+    // a one-second command on a machine loaded by parallel builds.
     let mut delivered = None;
-    for _ in 0..500 {
+    for _ in 0..6_000 {
         std::thread::sleep(std::time::Duration::from_millis(20));
         let seen = invoke(&mut stranger, quick_look());
         assert!(

@@ -56,7 +56,18 @@ fn a_tool(
     sandbox: Box<dyn Sandbox>,
     shell: Option<PathBuf>,
 ) -> ExecTool {
-    ExecTool::new(setup(workdir, python, shell), sandbox, Backlog::new()).unwrap()
+    ExecTool::new(setup(workdir, python, shell), sandbox, patient()).unwrap()
+}
+
+/// A table whose callers wait for the command to settle rather than for
+/// the ten seconds a person is given. These tests read a settled answer,
+/// and the wait ends at the poll that sees the command exit, so a quick
+/// command costs no more than it did. On a machine loaded by parallel
+/// builds these tests failed at ten seconds and passed alone. Two
+/// minutes stays under the suite's own three-minute limit
+/// (`.config/nextest.toml`), so a command that really hangs still fails.
+fn patient() -> Backlog {
+    Backlog::with_window(crate::backlog::PollBudget::new(6_000, 20))
 }
 
 /// One variable this process really has, which no building declares by
@@ -108,7 +119,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
         env_passthrough: vec![kernel::EnvVarName::parse(&name).unwrap()],
         ..setup(chamber.path(), None, None)
     };
-    let tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), Backlog::new()).unwrap();
+    let tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap();
     let outcome = tool
         .invoke(&call(serde_json::json!({
             "program": { "path": path.clone(), "args": args.clone() }
