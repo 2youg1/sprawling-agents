@@ -175,6 +175,8 @@ fn item(found: &Finding, platform: Option<Platform>) -> channels::DoctorItem {
             None => channels::DoctorInstall::UnknownPlatform,
             Some(platform) => install(found.requirement.recipe.at(platform)),
         },
+        pinned: super::pin::pinned(found.requirement.pin),
+        pack: found.requirement.pack.map(super::Pack::wire),
     }
 }
 

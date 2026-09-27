@@ -17,14 +17,13 @@
 //! `just check` skips it when it is absent, or only a recipe a person
 //! runs on purpose calls it, and the row says which recipe that is.
 
+use channels::DoctorUnread;
+
 use crate::doctor::family::{CHROMIUM_RECIPE, Family};
-use crate::doctor::{Detection, Need, PerPlatform, Recipe, Requirement, Tier};
+use crate::doctor::pin::LEAN_TOOLCHAIN as LEAN_PIN;
+use crate::doctor::{Detection, Need, Pack, PerPlatform, Pin, Recipe, Requirement, Tier, Upstream};
 
 use super::NOWHERE;
-
-/// The Lean toolchain `adversary/` pins, read from the file elan reads,
-/// so changing the Lean version is an edit to that one file.
-const LEAN_PIN: &str = include_str!("../../../../../adversary/lean-toolchain").trim_ascii_end();
 
 /// One command, spelled once and answered on all three platforms.
 /// Every tool below that installs the same way everywhere uses it, so
@@ -63,6 +62,30 @@ const fn row(
         detect,
         homepage: Some(homepage),
         recipe,
+        pin: Pin::Unpinned,
+        upstream: Upstream::Unread(DoctorUnread::NoSource),
+        pack: None,
+    }
+}
+
+/// The three facts a row states beyond its detection and its recipe,
+/// chained onto `row` so that each row says only the ones it has.
+impl Requirement {
+    const fn from(mut self, upstream: Upstream) -> Requirement {
+        self.upstream = upstream;
+        self
+    }
+
+    const fn pinned(mut self, pin: Pin) -> Requirement {
+        self.pin = pin;
+        self
+    }
+
+    /// A cargo tool this repository calls, installed from its crate.
+    const fn packed(mut self, krate: &'static str) -> Requirement {
+        self.pack = Some(Pack::RustTools);
+        self.upstream = Upstream::Crate(krate);
+        self
     }
 }
 
@@ -85,7 +108,7 @@ pub(super) const GIT: Requirement = row(
     PerPlatform {
         windows: Recipe::Command {
             program: "winget",
-            args: &["install", "--id", "Git.Git", "-e"],
+            args: &["install", "--id", "Git.Git", "-e", "--scope", "user"],
         },
         macos: Recipe::Command {
             program: "brew",
@@ -93,7 +116,8 @@ pub(super) const GIT: Requirement = row(
         },
         linux: Recipe::Print("sudo apt install git"),
     },
-);
+)
+.from(Upstream::GitHub("git-for-windows/git"));
 
 pub(super) const RUSTUP: Requirement = row(
     "rustup",
@@ -109,7 +133,22 @@ pub(super) const RUSTUP: Requirement = row(
         macos: Recipe::Print("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"),
         linux: Recipe::Print("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"),
     },
-);
+)
+.from(Upstream::RustupChannel);
+
+/// The compiler itself. `rustup default stable` puts one on the search
+/// path; inside this repository rustup then fetches the version
+/// `rust-toolchain.toml` pins on first use.
+pub(super) const RUST: Requirement = row(
+    "rust",
+    Need::Required,
+    "the compiler, at the version rust-toolchain.toml pins, which rustup fetches on first use",
+    program("rustc"),
+    "https://www.rust-lang.org/",
+    same_command("rustup", &["default", "stable"]),
+)
+.from(Upstream::RustChannel)
+.pinned(Pin::RustToolchain);
 
 pub(super) const RUSTFMT: Requirement = row(
     "rustfmt",
@@ -118,7 +157,8 @@ pub(super) const RUSTFMT: Requirement = row(
     program("rustfmt"),
     "https://github.com/rust-lang/rustfmt",
     same_command("rustup", &["component", "add", "rustfmt"]),
-);
+)
+.from(Upstream::Unread(DoctorUnread::WithToolchain));
 
 pub(super) const CLIPPY: Requirement = row(
     "clippy",
@@ -127,7 +167,8 @@ pub(super) const CLIPPY: Requirement = row(
     program("cargo-clippy"),
     "https://doc.rust-lang.org/clippy/",
     same_command("rustup", &["component", "add", "clippy"]),
-);
+)
+.from(Upstream::Unread(DoctorUnread::WithToolchain));
 
 pub(super) const JUST: Requirement = row(
     "just",
@@ -138,7 +179,7 @@ pub(super) const JUST: Requirement = row(
     PerPlatform {
         windows: Recipe::Command {
             program: "winget",
-            args: &["install", "--id", "Casey.Just", "-e"],
+            args: &["install", "--id", "Casey.Just", "-e", "--scope", "user"],
         },
         macos: Recipe::Command {
             program: "brew",
@@ -149,7 +190,8 @@ pub(super) const JUST: Requirement = row(
             args: &["install", "just", "--locked"],
         },
     },
-);
+)
+.from(Upstream::Crate("just"));
 
 pub(super) const CARGO_NEXTEST: Requirement = row(
     "cargo-nextest",
@@ -158,7 +200,8 @@ pub(super) const CARGO_NEXTEST: Requirement = row(
     program("cargo-nextest"),
     "https://nexte.st/",
     same_command("cargo", &["install", "cargo-nextest", "--locked"]),
-);
+)
+.packed("cargo-nextest");
 
 pub(super) const CARGO_DENY: Requirement = row(
     "cargo-deny",
@@ -167,7 +210,8 @@ pub(super) const CARGO_DENY: Requirement = row(
     program("cargo-deny"),
     "https://embarkstudios.github.io/cargo-deny/",
     same_command("cargo", &["install", "cargo-deny", "--locked"]),
-);
+)
+.packed("cargo-deny");
 
 pub(super) const BUN: Requirement = row(
     "bun",
@@ -178,7 +222,7 @@ pub(super) const BUN: Requirement = row(
     PerPlatform {
         windows: Recipe::Command {
             program: "winget",
-            args: &["install", "--id", "Oven-sh.Bun", "-e"],
+            args: &["install", "--id", "Oven-sh.Bun", "-e", "--scope", "user"],
         },
         macos: Recipe::Command {
             program: "brew",
@@ -186,7 +230,8 @@ pub(super) const BUN: Requirement = row(
         },
         linux: Recipe::Print("curl -fsSL https://bun.sh/install | bash"),
     },
-);
+)
+.from(Upstream::GitHub("oven-sh/bun"));
 
 /// The browser the render gate measures the built client in. The same
 /// family and recipe as the browser tool's Chromium row, under the tier
@@ -198,11 +243,15 @@ pub(super) const RENDER_BROWSER: Requirement = row(
     Detection::Family(Family::Chromium),
     "https://www.chromium.org/",
     CHROMIUM_RECIPE,
-);
+)
+.from(Upstream::Unread(DoctorUnread::ManyBrands));
 
-/// elan has no winget package, and its official Windows and Linux
-/// installers are scripts, which this city prints rather than runs
-/// (sprawling-SPEC.md section 8-40).
+/// elan has no winget package, and its official installers are
+/// scripts. On Windows this city runs `elan-init.ps1` without a prompt
+/// once the person presses install, because a fresh machine has to
+/// finish in one pass; the Linux line stays printed (sprawling-SPEC.md
+/// section 8-58). `-DefaultToolchain none` leaves the Lean version to
+/// the `lean` row, which installs the one `adversary/` pins.
 pub(super) const ELAN: Requirement = row(
     "elan",
     Need::Optional,
@@ -210,10 +259,18 @@ pub(super) const ELAN: Requirement = row(
     program("elan"),
     "https://github.com/leanprover/elan",
     PerPlatform {
-        windows: Recipe::Print(
-            "powershell -ExecutionPolicy Bypass -c \"irm \
-             https://raw.githubusercontent.com/leanprover/elan/master/elan-init.ps1 | iex\"",
-        ),
+        windows: Recipe::Command {
+            program: "powershell",
+            args: &[
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "& ([scriptblock]::Create((irm \
+                 https://raw.githubusercontent.com/leanprover/elan/master/elan-init.ps1))) \
+                 -NoPrompt 1 -DefaultToolchain none",
+            ],
+        },
         macos: Recipe::Command {
             program: "brew",
             args: &["install", "elan-init"],
@@ -222,7 +279,8 @@ pub(super) const ELAN: Requirement = row(
             "curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh",
         ),
     },
-);
+)
+.from(Upstream::GitHub("leanprover/elan"));
 
 pub(super) const LEAN: Requirement = row(
     "lean",
@@ -235,7 +293,9 @@ pub(super) const LEAN: Requirement = row(
     },
     "https://lean-lang.org/",
     same_command("elan", &["toolchain", "install", LEAN_PIN]),
-);
+)
+.from(Upstream::GitHub("leanprover/lean4"))
+.pinned(Pin::LeanToolchain);
 
 pub(super) const UV: Requirement = row(
     "uv",
@@ -246,7 +306,7 @@ pub(super) const UV: Requirement = row(
     PerPlatform {
         windows: Recipe::Command {
             program: "winget",
-            args: &["install", "--id", "astral-sh.uv", "-e"],
+            args: &["install", "--id", "astral-sh.uv", "-e", "--scope", "user"],
         },
         macos: Recipe::Command {
             program: "brew",
@@ -254,7 +314,8 @@ pub(super) const UV: Requirement = row(
         },
         linux: Recipe::Print("curl -LsSf https://astral.sh/uv/install.sh | sh"),
     },
-);
+)
+.from(Upstream::GitHub("astral-sh/uv"));
 
 /// Present when uv can name an interpreter, whichever installed it.
 pub(super) const PYTHON: Requirement = row(
@@ -268,16 +329,8 @@ pub(super) const PYTHON: Requirement = row(
     },
     "https://www.python.org/",
     same_command("uv", &["python", "install"]),
-);
-
-pub(super) const CARGO_AUDIT: Requirement = row(
-    "cargo-audit",
-    Need::Optional,
-    "`cargo audit`, which reads this lockfile against the RustSec advisories",
-    program("cargo-audit"),
-    "https://rustsec.org/",
-    same_command("cargo", &["install", "cargo-audit", "--locked"]),
-);
+)
+.from(Upstream::PythonOrg);
 
 pub(super) const CARGO_MUTANTS: Requirement = row(
     "cargo-mutants",
@@ -286,7 +339,8 @@ pub(super) const CARGO_MUTANTS: Requirement = row(
     program("cargo-mutants"),
     "https://mutants.rs/",
     same_command("cargo", &["install", "cargo-mutants", "--locked"]),
-);
+)
+.packed("cargo-mutants");
 
 pub(super) const CARGO_FUZZ: Requirement = row(
     "cargo-fuzz",
@@ -295,16 +349,8 @@ pub(super) const CARGO_FUZZ: Requirement = row(
     program("cargo-fuzz"),
     "https://rust-fuzz.github.io/book/cargo-fuzz.html",
     same_command("cargo", &["install", "cargo-fuzz", "--locked"]),
-);
-
-pub(super) const CARGO_LLVM_COV: Requirement = row(
-    "cargo-llvm-cov",
-    Need::Optional,
-    "a coverage reading of this workspace, which no gate asks for",
-    program("cargo-llvm-cov"),
-    "https://github.com/taiki-e/cargo-llvm-cov",
-    same_command("cargo", &["install", "cargo-llvm-cov", "--locked"]),
-);
+)
+.packed("cargo-fuzz");
 
 pub(super) const CARGO_PUBLIC_API: Requirement = row(
     "cargo-public-api",
@@ -313,7 +359,8 @@ pub(super) const CARGO_PUBLIC_API: Requirement = row(
     program("cargo-public-api"),
     "https://github.com/cargo-public-api/cargo-public-api",
     same_command("cargo", &["install", "cargo-public-api", "--locked"]),
-);
+)
+.packed("cargo-public-api");
 
 pub(super) const KANI: Requirement = row(
     "kani",
@@ -326,4 +373,5 @@ pub(super) const KANI: Requirement = row(
         macos: Recipe::Manual("kani runs on Linux; this platform has no build today"),
         linux: Recipe::Print("cargo install --locked kani-verifier && cargo kani setup"),
     },
-);
+)
+.packed("kani-verifier");

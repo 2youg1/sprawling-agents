@@ -27,7 +27,9 @@ mod explain;
 mod family;
 pub(crate) mod host;
 mod needs;
+mod pack;
 mod paint;
+mod pin;
 mod presence;
 mod probe;
 mod registry;
@@ -35,15 +37,19 @@ mod report;
 mod running;
 mod screen;
 mod table;
+mod upstream;
 mod version_file;
 mod visit;
 
 pub(crate) use family::Family;
+pub(crate) use pack::Pack;
+pub(crate) use pin::Pin;
 pub(crate) use presence::{Absence, Fault, Presence, Version};
 pub(crate) use probe::{Machine, ThisMachine};
 pub(crate) use report::answer;
 pub use screen::verb;
 pub(crate) use table::{REQUIREMENTS, recipe_for};
+pub(crate) use upstream::{Upstream, newest};
 
 use accounting::Recipe;
 
@@ -240,6 +246,12 @@ pub(crate) struct Requirement {
     /// platform's shell, and this repository's own connector.
     pub(crate) homepage: Option<&'static str>,
     pub(crate) recipe: PerPlatform<Recipe>,
+    /// The file in this repository that pins the item's version, if any.
+    pub(crate) pin: Pin,
+    /// Where the item's newest release is read, or why it cannot be.
+    pub(crate) upstream: Upstream,
+    /// The row a page draws the item inside (sprawling-SPEC.md section 8-58).
+    pub(crate) pack: Option<Pack>,
 }
 
 /// One item, and this machine's answer about it.

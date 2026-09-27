@@ -17,6 +17,7 @@
 //! is, and the caller - which knows what the run may reach - turns it
 //! into a tool argument or a refusal.
 
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use kernel::AxError;
@@ -41,6 +42,47 @@ pub(crate) fn components_dir() -> Option<PathBuf> {
     match accounting::home::Home::detect() {
         Ok(home) => Some(home.components()),
         Err(_) => None,
+    }
+}
+
+/// The directories under a person's home that installers put programs
+/// in without asking for elevation: cargo, elan, pipx and uv, and bun.
+const USER_BINS: [&str; 4] = [".cargo/bin", ".elan/bin", ".local/bin", ".bun/bin"];
+
+/// The search path every probe reads and every install program is
+/// started with (sprawling-SPEC.md section 8-58): this process's `PATH`,
+/// then each per-user bin directory it does not already name, and on
+/// Windows the directory winget links a user-scope package into.
+///
+/// An installer writes the new directory into the registry or a shell
+/// startup file, which this process read once, when it started; without
+/// these the program rustup just installed is not found by the `cargo
+/// install` on the next row, and a fresh machine needs a restarted city
+/// to finish.
+pub(crate) fn search_path() -> OsString {
+    let inherited = std::env::var_os("PATH").unwrap_or_default();
+    let mut dirs: Vec<PathBuf> = std::env::split_paths(&inherited).collect();
+    let home = accounting::home::Home::detect()
+        .map(|home| home.path().to_path_buf())
+        .into_iter()
+        .flat_map(|home| USER_BINS.map(|bin| home.join(bin)));
+    let links = std::env::var_os("LOCALAPPDATA").map(|local| {
+        PathBuf::from(local)
+            .join("Microsoft")
+            .join("WinGet")
+            .join("Links")
+    });
+    for dir in home.chain(links) {
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
+    // A directory whose name holds the separator cannot be joined; the
+    // inherited path is then the whole answer, as it was before any
+    // directory was added.
+    match std::env::join_paths(dirs) {
+        Ok(joined) => joined,
+        Err(_unjoinable) => inherited,
     }
 }
 

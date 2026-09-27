@@ -364,6 +364,18 @@ pub enum Query {
     RunCosts {
         runs: Vec<RunId>,
     },
+    /// The newest release of one requirement-table item, asked of its
+    /// publisher (sprawling-SPEC 8-120).
+    ///
+    /// Asked by the dependency page for each item once the page is open,
+    /// which is the person asking whether their tools are behind; the
+    /// city asks nothing on its own schedule. One item per question, so
+    /// a slow publisher holds up its own row and no other. A source that
+    /// cannot be reached is [`DoctorNewest::Refused`](crate::DoctorNewest::Refused)
+    /// rather than [`Answer::Unavailable`](crate::Answer::Unavailable).
+    UpstreamVersion {
+        item: String,
+    },
 }
 
 /// The Query surface, in declaration order — the order the handshake

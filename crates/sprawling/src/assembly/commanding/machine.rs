@@ -219,6 +219,8 @@ mod tests {
                             version: channels::DoctorVersion::Silent,
                         },
                         install: channels::DoctorInstall::UnknownPlatform,
+                        pinned: None,
+                        pack: None,
                     })
                     .collect(),
             };

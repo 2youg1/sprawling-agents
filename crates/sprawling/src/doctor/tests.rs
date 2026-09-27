@@ -167,15 +167,14 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         "chromium",
         "webkit",
         "rustup",
+        "rust",
         "rustfmt",
         "clippy",
         "just",
         "cargo-nextest",
         "cargo-deny",
-        "cargo-audit",
         "cargo-mutants",
         "cargo-fuzz",
-        "cargo-llvm-cov",
         "kani",
         "bun",
         "chromedriver",
@@ -299,7 +298,7 @@ fn a_verdict_counts_the_required_items_of_its_own_tier_only() {
         "Edge with its own driver is a way in, and Windows ships both"
     );
 
-    let no_coverage = examine(&ScriptedMachine::missing(&["cargo-llvm-cov"]));
+    let no_coverage = examine(&ScriptedMachine::missing(&["cargo-mutants"]));
     assert_eq!(
         verdict(&no_coverage, Tier::Develop),
         Verdict::Ready,

@@ -1,0 +1,7 @@
+# generated from crates/sprawling/src/doctor/family/chromium.rs by the test `the_chromium_file_is_the_family_rendered`; edit the family, not this file
+# brand<TAB>program<TAB>windows<TAB>macos<TAB>linux, places separated by |
+chrome	google-chrome	C:\Program Files\Google\Chrome\Application\chrome.exe|C:\Program Files (x86)\Google\Chrome\Application\chrome.exe	/Applications/Google Chrome.app/Contents/MacOS/Google Chrome	/usr/bin/google-chrome|/opt/google/chrome/chrome
+edge	msedge	C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe|C:\Program Files\Microsoft\Edge\Application\msedge.exe	/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge	/usr/bin/microsoft-edge|/opt/microsoft/msedge/msedge
+brave	brave-browser	C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe	/Applications/Brave Browser.app/Contents/MacOS/Brave Browser	/usr/bin/brave-browser|/opt/brave.com/brave/brave
+chromium	chromium	C:\Program Files\Chromium\Application\chrome.exe	/Applications/Chromium.app/Contents/MacOS/Chromium	/usr/bin/chromium|/usr/bin/chromium-browser|/snap/bin/chromium
+vivaldi	vivaldi	C:\Program Files\Vivaldi\Application\vivaldi.exe	/Applications/Vivaldi.app/Contents/MacOS/Vivaldi	/usr/bin/vivaldi|/opt/vivaldi/vivaldi

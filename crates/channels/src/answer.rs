@@ -54,6 +54,7 @@ pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorIns
 pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
+pub use doctor::{DoctorNewest, DoctorPack, DoctorUnread, DoctorUpstream};
 pub use document::DocumentAnswer;
 pub use endpoints::{ChosenSummary, EndpointSummary, EndpointsAnswer};
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
@@ -218,6 +219,7 @@ pub enum Answer {
     Document(Box<DocumentAnswer>),
     Commits(CommitsAnswer),
     Doctor(Box<DoctorAnswer>),
+    Upstream(Box<DoctorUpstream>),
     Prefix(Box<PrefixAnswer>),
     Content(Box<ContentAnswer>),
     Skills(Box<SkillsAnswer>),

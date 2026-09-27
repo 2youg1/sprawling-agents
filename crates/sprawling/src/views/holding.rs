@@ -165,6 +165,10 @@ pub(crate) struct Views {
     /// answers `Unavailable` rather than leaving this machine.
     #[serde(skip)]
     pub(super) registry: Option<fn() -> channels::ReleaseAnswer>,
+    /// How an item's newest release is asked of its publisher; `None`
+    /// for views nobody serves, which answer `Unavailable` instead.
+    #[serde(skip)]
+    pub(super) upstream: Option<fn(&str) -> channels::DoctorUpstream>,
 }
 
 impl Views {
@@ -230,6 +234,7 @@ impl Views {
             machine: None,
             vault: None,
             registry: None,
+            upstream: None,
         }
     }
 
