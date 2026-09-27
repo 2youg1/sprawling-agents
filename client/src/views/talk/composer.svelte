@@ -110,9 +110,11 @@
   }
 
   // Whatever put words in the box - a transcription, a completion, a
-  // command that empties it - goes through here.
+  // command that empties it - goes through here, and the menu follows
+  // the words as it does for typing: `/help` writes `/` to open it.
   function write(words: string): void {
     text = words;
+    open = words.startsWith("/");
     keptDraft.replace(words);
     requestAnimationFrame(grow);
   }
@@ -236,10 +238,7 @@
         write,
       }),
     );
-    if (rest === null) {
-      open = false;
-      return;
-    }
+    if (rest === null) return;
     write(rest);
     box?.focus();
   }
