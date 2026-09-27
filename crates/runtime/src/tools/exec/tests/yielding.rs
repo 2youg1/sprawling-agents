@@ -77,8 +77,11 @@ fn a_dispatched_command_runs_below_the_core() {
     let result = serde_json::to_value(&outcome.result).unwrap();
     let dispatched = result["stdout"].as_str().unwrap();
 
+    // Windows sets an absolute class, so a core that a CI runner already
+    // starts at BelowNormal leaves its commands beside it, not beneath it.
+    let floor = rank("BelowNormal");
     assert!(
-        rank(dispatched) < rank(&core),
+        rank(dispatched) < rank(&core) || (rank(dispatched) == rank(&core) && rank(&core) <= floor),
         "a dispatched command runs below the core: it ran at {dispatched:?}, the core at \
          {core:?}; {result}"
     );
