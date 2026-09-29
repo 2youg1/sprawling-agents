@@ -93,7 +93,7 @@ fn the_real_shape_passes() {
 }
 
 /// The names the rest of the repository uses, which are not the names CSS
-/// spells. `badge` asks the ramp for `G1`; the stylesheet declares
+/// spells. A finding names the rung `G1`; the stylesheet declares
 /// `--color-g1`, and the reader who goes looking for either finds one
 /// thing.
 #[test]

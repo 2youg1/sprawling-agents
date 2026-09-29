@@ -154,7 +154,7 @@ fn nameable(suffix: &str) -> bool {
     !suffix.is_empty() && !suffix.contains('*')
 }
 
-/// The name every table, badge and document in this repository uses:
+/// The name every table and document in this repository uses:
 /// `accent-hover` is `ACCENT_HOVER`. Custom properties are lowercase by
 /// convention; the colour library is not, and the gate reports the name a
 /// reader will go looking for.

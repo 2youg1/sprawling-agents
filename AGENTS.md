@@ -46,7 +46,7 @@ just check                    # the whole check: fmt, source gates, Lean models,
 | `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `channels` without `server` |
 | `just check-client` | the client's lint, typecheck and tests |
 | `just build-web` | the client bundle, built into `target/web-dist` |
-| `just dist` | the whole deliverable: client, binary, bill of materials, size badges |
+| `just dist` | the whole deliverable: client, binary, bill of materials |
 | `just sim` | the citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
 | `cargo xtask docnum [--write]` | every number and generated section a document carries, checked against the code that decides it; `--write` rewrites them |
 | `cargo xtask apisync [--write]` | the public API of `kernel` and `channels` against its baseline in `xtask/api-baselines/`; a nightly job reads it, and a change to either surface rewrites the baseline in the same change-set |
@@ -141,7 +141,7 @@ A violation turns the check red with a message that names the rule, the violatio
 | `client/src/wire.ts` regenerated whenever `WIRE_V` moves. | `xtask wire-ts` |
 | Every number a document quotes, and every kernel enum table a SPEC carries, equal to the code that decides it. | `xtask docnum` |
 | The kani harness roster read out of the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, and a harness left unproved cites where that was decided. | `xtask proof` |
-| Sizes inside their budget, badges in step with the artifacts. | `xtask budget` |
+| Sizes inside their budget. | `xtask budget` |
 | Kernel enums and the kernel-SPEC tables agree variant by variant, and every module's SPEC anchor resolves. | `xtask specalign` |
 | Nothing published that names one machine's home directory, its working notes, or a document this tree does not contain. | `xtask release` |
 | `desktop/`'s copy of the workspace lint table, package metadata and dependency versions equal to the workspace's own. | `xtask guard` |

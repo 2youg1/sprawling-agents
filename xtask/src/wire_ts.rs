@@ -10,8 +10,8 @@
 //! Without `--write` this is a comparison: the file on disk against the
 //! text the wire produces now, refused at the first line that differs.
 //! With `--write` it is the only file this command ever writes. Same
-//! shape as `apisync` and `badge`: a gate that generates its own record
-//! and then holds the tree to it.
+//! shape as `apisync`: a gate that generates its own record and then
+//! holds the tree to it.
 
 use std::path::Path;
 

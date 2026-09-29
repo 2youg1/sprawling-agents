@@ -39,7 +39,7 @@ mod roles;
 mod scan;
 mod tables;
 
-pub(crate) use tables::grey_ramp;
+use tables::grey_ramp;
 
 use contrast::{apca_lc, bronze_tier};
 use scan::scan_for_literals;
@@ -48,10 +48,10 @@ use tables::{
     parse_type_scale, text_surface_ceiling,
 };
 
-pub(crate) const THEME: &str = concat!(crate::walk::client_src!(), "/theme.css");
-pub(crate) const HUE_AXIS: u16 = 264;
+const THEME: &str = concat!(crate::walk::client_src!(), "/theme.css");
+const HUE_AXIS: u16 = 264;
 const HUE_ALERT: u16 = 84;
-pub(crate) const GRAY_CHROMA: u16 = 18;
+const GRAY_CHROMA: u16 = 18;
 
 /// Where the light block begins, and what closes it. The gate reads one
 /// stylesheet as two palettes, so it has to know which lines belong to
@@ -67,7 +67,7 @@ const BLOCK_END: &str = "\n}";
 /// at, which is why each carries its own pair of ends and why a ramp is
 /// judged for moving away from its page rather than for climbing.
 #[derive(Clone, Copy)]
-pub(crate) enum Mode {
+enum Mode {
     Dark,
     Light,
 }
@@ -112,7 +112,7 @@ impl Mode {
 /// Built as text rather than as a parsed table because every reader
 /// below already parses text, and a second representation of the same
 /// stylesheet is the second authority this gate exists to prevent.
-pub(crate) fn reading(source: &str, mode: Mode) -> String {
+fn reading(source: &str, mode: Mode) -> String {
     let Some((before, rest)) = source.split_once(LIGHT_SELECTOR) else {
         return source.to_owned();
     };

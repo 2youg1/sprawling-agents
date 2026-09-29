@@ -187,9 +187,7 @@ jobs:
       # matrix names and passes it down to `cargo xtask package`, which
       # reads `target/<triple>/release` and puts the triple in the archive
       # name (xtask-SPEC.md section 8-11). An empty triple is the host
-      # build, whose two archive names are what they always were. The
-      # recipe leaves the README badges alone for a cross build, so two
-      # builds of one tag cannot disagree about one number.
+      # build, whose two archive names are what they always were.
       - name: build the client, the binary, and the archive
         shell: bash
         run: just package "${{ matrix.target }}"

@@ -19,7 +19,6 @@ mod apisync;
 mod architecture;
 mod artifact;
 mod attestation;
-mod badge;
 mod boundary;
 mod budget;
 mod bundle;
@@ -92,14 +91,6 @@ fn main() -> ExitCode {
             }
             Err(err) => report::internal_failure(&err),
         },
-        Some("badge") if args.iter().any(|a| a == "--write") => match badge::write(&root) {
-            Ok(message) => {
-                print!("{message}");
-                ExitCode::SUCCESS
-            }
-            Err(err) => report::internal_failure(&err),
-        },
-        Some("badge") => report::finish("badge", badge::check(&root)),
         Some("mem") => match mem::run(&root, args.get(1..).unwrap_or(&[])) {
             Ok(text) => {
                 println!("{text}");
@@ -284,7 +275,7 @@ const TOOLS: [Tool; 13] = [
     },
     Tool {
         call: "<gate> --write",
-        gives: "the recovery that gate names, applied: apisync, docnum, wire-ts, badge",
+        gives: "the recovery that gate names, applied: apisync, docnum, wire-ts",
     },
     Tool {
         call: "proof --list",

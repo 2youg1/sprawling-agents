@@ -455,13 +455,9 @@ repro:
     cargo xtask repro
 
 # The whole deliverable: client bundle first, then the binary that embeds
-# it, then the size badges README shows. The badges are rendered from the
-# artifacts this recipe just produced, so a release cannot ship a size
-# somebody typed.
+# it, then its bill of materials.
 # An optional target triple builds for a platform other than this
-# machine's default; the badges are then left alone, because README's
-# sizes describe the artifact a person downloads first and two builds of
-# one tag must not disagree about one number.
+# machine's default.
 # **The engine is part of what ships.** `runtime/wasm` is off by default,
 # so a plain release build carries no execution engine and every `python`
 # call an archive's city makes would be refused; `cargo xtask package`
@@ -471,7 +467,6 @@ repro:
 dist target="": build-web
     cargo build --release -p sprawling --features sandbox --locked {{ if target == "" { "" } else { "--target " + target } }}
     cargo xtask sbom
-    {{ if target == "" { "cargo xtask badge --write" } else { "echo the badges belong to the host build" } }}
 
 # The release archive: the one file a person downloads, unpacks and runs.
 # `dist` first, because the archive is assembled out of its artifacts and

@@ -82,8 +82,8 @@ struct Row {
     slack: u64,
 }
 
-/// The register, parsed. Shared with `badge`, which renders the same
-/// readings: two parsers would be two answers to "how big is it".
+/// The register, parsed. Shared with every gate that reads a row of it:
+/// two parsers would be two answers to "how big is it".
 pub(crate) fn register(root: &Path) -> Result<toml::Value, XtaskError> {
     let path = root.join("xtask").join("budgets.toml");
     let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
@@ -99,8 +99,7 @@ pub(crate) fn register(root: &Path) -> Result<toml::Value, XtaskError> {
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let parsed = register(root)?;
 
-    let mut violations = crate::badge::check(root)?;
-    violations.extend(release_profile(root)?);
+    let mut violations = release_profile(root)?;
     // The single-binary promise, checked as bytes: a release binary that
     // exists must carry the client bundle's file table. The placeholder
     // build (no `just build-web` beforehand) lacks the assets entry, and
@@ -220,11 +219,11 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
 ///
 /// **A size is a fact about the linker that produced it**, so a reading
 /// taken at one `opt-level` describes a binary nobody ships the moment
-/// the profile says another. This is the rule the register already
-/// states for its badge - one platform, and only that platform may
-/// refresh the number - applied to the other half of what a size depends
-/// on. It is a check rather than a comment because the setting is one
-/// word in a manifest and the reading it invalidates is seven megabytes,
+/// the profile says another. The register names the platform its
+/// reading was linked on; this check holds the other half of what a
+/// size depends on. It is a check rather than a comment because the
+/// setting is one word in a manifest and the reading it invalidates is
+/// seven megabytes,
 /// and it costs a read: the binary itself is weighed only when somebody
 /// has built one.
 ///

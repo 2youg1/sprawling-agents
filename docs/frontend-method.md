@@ -38,7 +38,7 @@ just check-client            # lint, typecheck, the client's own tests
 
 **Every colour comes from `client/src/theme.css`.** `cargo xtask color` scans every other file for `oklch(`, `rgb(`, `#rrggbb` and their relatives, and holds the tokens themselves to a set of properties in both lightings: an eleven-rung grey ramp that climbs, no pure black or white, one hue axis and its single complement, exactly two chroma ratios, and text that reaches the APCA tier it claims on the brightest surface text may sit on.
 
-**The bundle stays inside its budget.** `cargo xtask budget` weighs the built client against `xtask/budgets.toml` and refuses a size badge in `docs/badges/` that no longer states the reading; `cargo xtask badge --write` rewrites the badge after a change that moved the size.
+**The bundle stays inside its budget.** `cargo xtask budget` weighs the built client against `xtask/budgets.toml` and refuses a reading above the budget, or more than the slack above the best recorded reading.
 
 **The client's own lint rules hold.** eslint refuses `any`, `as`, `throw`, `try` and a `switch` that is not exhaustive. A value read from outside the page — a stored preference, a frame from the socket, the value of a `<select>` — is narrowed by looking it up in the list of values the code knows (`EDITORS.find((each) => each === word)`), never cast.
 
@@ -76,4 +76,4 @@ A missing bundle, a missing engine and a gallery that drew nothing are each a vi
 
 ## What goes into the commit
 
-The screen, its words in `lang.json`, its fixtures, and the badge when the size moved. When the change alters what a part owes a keyboard or a screen reader, the interaction contract in `client/client-SPEC.md` section 7 changes in the same commit, because that half is held to SPEC-first. When a screen offers a choice whose list rests on outside facts — which editors read a file-and-line link, which fonts are installed — the SPEC entry that cites where each fact came from changes with it.
+The screen, its words in `lang.json`, its fixtures, and a new reading in `xtask/budgets.toml`, with its reason, when the size moved past its slack. When the change alters what a part owes a keyboard or a screen reader, the interaction contract in `client/client-SPEC.md` section 7 changes in the same commit, because that half is held to SPEC-first. When a screen offers a choice whose list rests on outside facts — which editors read a file-and-line link, which fonts are installed — the SPEC entry that cites where each fact came from changes with it.

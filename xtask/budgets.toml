@@ -71,11 +71,6 @@ best_bytes = 578422
 slack_bytes = 20480
 measured_by = "just build-web, then just gates (the whole dist directory, recursive)"
 status = "gated"
-# The badge in README.md. Rendered from the reading above by
-# `cargo xtask badge --write`, which `just dist` ends with, so nobody
-# edits a size by hand. No platform row: the bundle is the same bytes
-# wherever bun builds it.
-badge_label = "client"
 
 # The remediation pass found the single-binary promise was hollow: build.rs
 # embedded a 1,306-byte placeholder and the real client never shipped. The
@@ -106,7 +101,7 @@ badge_label = "client"
 # configuration rather than in the repository. Which of the two moved
 # the figure is not separated here, and it does not need to be: a size
 # is a fact about the linker that produced it, which is why this row
-# names one platform and only that platform may refresh its badge. The
+# names the platform its reading was linked on. The
 # `opt-level = "z"` decision was weighed against this row and taken on
 # 2026-09-21; the row records a binary linked the way that decision
 # chose.
@@ -118,14 +113,8 @@ budget_bytes = 134217728
 # and memory-stats, with about 28,000 lines of Rust around them.
 best_bytes = 12857344
 slack_bytes = 1048576
-measured_by = "just build-web, cargo build --release, then just gates"
+measured_by = "just build-web, cargo build --release, then just gates, on windows-x86_64"
 status = "gated"
-# A binary's size is a fact about the platform that linked it, so the
-# badge names one machine and only that machine may refresh it. Three
-# platforms writing one file would make the badge churn rather than
-# report. Change this row when a release workflow takes the job over.
-badge_label = "binary · windows-x86_64"
-badge_platform = "windows-x86_64"
 
 # The unit is a production function because the alternative was measured:
 # any honest file threshold lights up eight files across four crates at

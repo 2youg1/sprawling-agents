@@ -77,7 +77,7 @@ A gate's violation turns the check red with a message naming the rule, the viola
 | Quote a number in a document only inside a managed span, so the figure is recounted from the code that decides it. | `xtask docnum` |
 | Describe every kernel enum in its SPEC table, variant for variant. | `xtask specalign` |
 | Let the kani harness roster come from the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, and a harness left unproved cites where that was decided. | `xtask proof` |
-| Keep sizes inside their budget, and the badges in `README.md` in step with the artifacts they measure. `just dist` rewrites them; nobody types a size into a document. | `xtask budget` |
+| Keep sizes inside their budget. | `xtask budget` |
 | Publish nothing that names one machine's home directory, its working notes, or a document this tree does not contain. | `xtask release` |
 | Keep `desktop/`'s copies of the workspace lint table, package metadata and dependency versions equal to the originals. | `xtask guard` |
 | Take the time as a parameter. The single sampling point is `bin::assembly`. | `clippy.toml` disallowed methods |
@@ -159,7 +159,7 @@ Let a Rust command finish, and never kill it by PID; waiting on the build lock i
 | `just features` | the workspace on its default features, and `channels` without `server` |
 | `just check-client` | the client's lint, typecheck and tests, after `build-web` |
 | `just build-web` | build the client bundle into `target/web-dist` |
-| `just dist` | the whole deliverable: client, binary, bill of materials, and the size badges |
+| `just dist` | the whole deliverable: client, binary, and bill of materials |
 | `just budget` / `just bench` | every budget with what it costs today; the wall-clock readings, never gated |
 | `just sim` | citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
 | `just spec <crate>` | generate a SPEC skeleton |
