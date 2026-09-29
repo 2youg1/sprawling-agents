@@ -64,6 +64,64 @@ fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
     );
 }
 
+/// A city formed around a project's own folder finds the project's
+/// `AGENTS.md` at the city root, and its buildings are that project's
+/// subfolders. Both files reach the prompt, the workspace's first and
+/// the building's after it, so the one nearest the work is read last.
+#[test]
+fn the_workspaces_conventions_come_before_the_buildings_own() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(channels::Command::CreateBuilding {
+            addr: Address::parse("lab").unwrap(),
+            template: channels::TemplateName::parse("minimal").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
+        })
+        .unwrap();
+    std::fs::write(
+        dir.path().join("AGENTS.md"),
+        "# AGENTS.md
+
+Every commit message is in English.
+",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("lab").join("AGENTS.md"),
+        "# AGENTS.md
+
+Every measurement is recorded in millivolts.
+",
+    )
+    .unwrap();
+    worker
+        .handle(channels::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "measure the thing".to_owned(),
+            goal: "a number with a unit, then stop".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    let asked = provider.bodies().join(
+        "
+",
+    );
+    let workspace = asked.find("Every commit message is in English.");
+    let building = asked.find("Every measurement is recorded in millivolts.");
+    assert!(
+        workspace.is_some() && building.is_some() && workspace < building,
+        "the workspace's conventions and then the building's, in that order: {asked}"
+    );
+}
+
 /// A building with no `AGENTS.md` says nothing about one. The heading is
 /// written only when there is a file under it, so a resident is never
 /// told to follow conventions that do not exist.

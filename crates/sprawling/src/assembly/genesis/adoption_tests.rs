@@ -42,3 +42,28 @@ fn adopting_a_folder_fences_it_as_one_pack_before_any_dispatch() {
         .unwrap_or(0);
     assert_eq!((carried, loose, packs), (true, 0, 1));
 }
+
+/// A city formed around a project's own folder keeps its records beside
+/// the project's files, and the project's git would list the ledger and
+/// the object store as untracked work. Genesis adds one anchored line
+/// for the city's reserved subtree to the root's `.gitignore`, keeping
+/// every line the project already had (city-SPEC.md 8-21).
+#[test]
+fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join(".gitignore"), "target/\n").unwrap();
+    form_city(dir.path(), Adopt::EveryFolder).unwrap();
+
+    let ignored = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap_or_default();
+    assert!(
+        ignored.starts_with("target/\n"),
+        "the project's own lines moved: {ignored}"
+    );
+    assert!(
+        ignored.lines().any(|line| line.trim() == "/.sprawling/"),
+        "the city's own subtree is not ignored at the root: {ignored}"
+    );
+    // Once, however often a city is formed or opened here.
+    assert_eq!(ignored.matches("/.sprawling/\n").count(), 1);
+}
