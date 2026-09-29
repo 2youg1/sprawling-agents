@@ -1,6 +1,6 @@
 # sprawling-desktop
 
-An MCP server that gives an agent eyes and hands on this Windows desktop: it lists windows, reads their accessibility tree, clicks and types, captures images, records, and reads the clipboard. A city attaches it the way it attaches any other server, and it does only what one file on this machine says it may do.
+An MCP server that gives an agent eyes and hands on this Windows desktop: it lists windows, reads their accessibility tree, clicks and types, captures images, records, and reads the clipboard. It is compiled into the `sprawling` binary, and a city starts it for a building whose `RULES.toml` says `desktop = true`. It does only what one file on this machine says it may do.
 
 **On Windows this build carries all six out.** Elsewhere every call is refused with `E_TOOL_UNAVAILABLE` naming the platform, because a refusal is the honest answer and a fabricated success would be the expensive one: a model reasons onward from whatever it is told.
 
@@ -12,11 +12,11 @@ The workspace forbids `unsafe` outright, workspace-wide, and that rule holds bec
 
 **`deny` is only worth what is paid for it, so the price is paid in the open.** Every relaxation is an `#[expect(unsafe_code, reason = "…")]` on one function, and every `unsafe` block inside carries a `SAFETY:` comment stating the precondition that makes the call sound — the thing a reader could in principle find false, never a restatement of the call. "We call `EnumWindows`" is not a precondition; "the callback is the `extern "system"` function below, and the vector its address points at is live and unaliased for the whole synchronous call" is. The way to review this package is to ask each `SAFETY:` line whether what it claims *could be wrong*. If it could not, it is a paraphrase and not a precondition.
 
-The seam that makes this possible is MCP itself (`ARCHITECTURE.md` section 8): outside applications are reached over a protocol, not linked in, so a separate binary is the ordinary shape here rather than an exception. It has its own `Cargo.lock` and uses the repository's `rust-toolchain.toml` by location.
+`sprawling` links this package as a library, and still reaches it over MCP in a process of its own: the city starts its own executable as `sprawling desktop <DESKTOP.toml>` and talks to it over that child's pipes. The COM state, `SendInput` and every `unsafe` block therefore run in the child, never in the process that writes the city's Ledger. The package keeps its own `Cargo.lock` for `just check-desktop` and uses the repository's `rust-toolchain.toml` by location.
 
 ## The scope file
 
-The server reads a `DESKTOP.toml` named by its first argument, or by `SPRAWLING_DESKTOP_SCOPE`. **No file means nothing is permitted**, and so does a file this version cannot read.
+The server reads the `DESKTOP.toml` named by the argument after `sprawling desktop`. A city passes the building's own file, `<building>/.sprawling/DESKTOP.toml`, which the settings page writes. **No file means nothing is permitted**, and so does a file this version cannot read.
 
 ```toml
 # Window titles this server may touch. `*` stands for any run of
@@ -36,19 +36,15 @@ Four rules follow from it, and each one is a refusal a caller can act on:
 - `desktop.record` needs `record = true`; `desktop.clipboard` needs `clipboard = true`.
 - `desktop.windows` reports only the windows the file lists, so it is how a caller learns what it may name.
 
-## How a city attaches it
+## How a city starts it
 
-One entry in a building's `.sprawling/CONFIG.toml`, and nothing else anywhere:
+One line in a building's `.sprawling/RULES.toml`, and no `[[mcp]]` entry:
 
 ```toml
-[[mcp]]
-label = "desk"
-transport = "stdio"
-command = "sprawling-desktop"
-args = ["C:/where/you/keep/DESKTOP.toml"]
+desktop = true
 ```
 
-The city starts it as a child process, opens with `initialize`, sends `notifications/initialized`, reads `tools/list`, and freezes the six tools into the run's tool table under the names `desk_desktop_windows`, `desk_desktop_snapshot`, `desk_desktop_act`, `desk_desktop_screenshot`, `desk_desktop_record` and `desk_desktop_clipboard`. The assembly layer needs no change for this server: `tests/smoke.rs` starts the real binary and drives that exchange through its own pipes, which is what makes the claim checkable rather than asserted.
+The city starts its own executable as `sprawling desktop <building>/.sprawling/DESKTOP.toml`, opens with `initialize`, sends `notifications/initialized`, reads `tools/list`, and freezes the six tools into the run's tool table under the names `desktop_desktop_windows`, `desktop_desktop_snapshot`, `desktop_desktop_act`, `desktop_desktop_screenshot`, `desktop_desktop_record` and `desktop_desktop_clipboard`. `crates/sprawling/tests/desktop.rs` starts the real binary that way and checks the six names the model is offered. A building that already names a server `desktop` in its own `[[mcp]]` keeps that server, and the city starts none of its own.
 
 The transport is JSON-RPC 2.0 over stdin and stdout, one message per line, with no async runtime: a blocking read loop, one reply per request. A notification is never answered. `ping` is answered at any time; `tools/list` and `tools/call` are refused until the handshake has finished.
 
@@ -65,6 +61,6 @@ cargo clippy --all-targets -- -D warnings
 cargo nextest run
 ```
 
-`just check` at the repository root does not reach this package, because it is not a workspace member. Run the three commands above from this directory.
+No workspace command reaches this package, because it is not a workspace member; `just check-desktop` at the repository root runs the three commands above and the licence check, and `just check` runs it.
 
 Read `desktop-SPEC.md` for the interfaces, the decisions and the alternatives that were rejected.

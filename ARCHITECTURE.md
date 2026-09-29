@@ -166,8 +166,14 @@ protocol: kernel, gateway
 channels: kernel
 remote: kernel
 accounting: kernel, gateway, protocol, channels, city, collab
-sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels, accounting
+sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels, accounting, desktop
+desktop:
 ```
+
+The `desktop` row is the one package outside the workspace (`desktop/`, package
+`sprawling-desktop`). `cargo xtask depmap` reads workspace members only, so
+this row states the edge rather than guarding it; the package's own manifest
+names no workspace crate (desktop-SPEC.md section 7).
 
 Inside one crate the compiler sees no layering: `sprawling` builds as one
 unit whichever way its modules name each other. The block below is the
@@ -749,6 +755,7 @@ flowchart TD
     city --> kernel
     collab --> kernel
     collab --> memory
+    desktop
     gateway --> kernel
     kernel
     memory --> kernel
@@ -763,6 +770,7 @@ flowchart TD
     sprawling --> channels
     sprawling --> city
     sprawling --> collab
+    sprawling --> desktop
     sprawling --> gateway
     sprawling --> kernel
     sprawling --> memory

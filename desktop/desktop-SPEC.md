@@ -1,6 +1,6 @@
 # desktop-SPEC.md
 
-> package：`sprawling-desktop`（out-of-tree，**不是** workspace member）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
+> package：`sprawling-desktop`（out-of-tree，**不是** workspace member；作为库链进 `sprawling`，由 `sprawling desktop` 这个动词起成子进程）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。
 
 ## 1 需求分解
@@ -9,7 +9,7 @@
 
 拆成三件可独立验收的事：
 
-- **协议壳（`rpc` ＋ `session`）**：一台按行说话的 MCP server，握手与 `tools/call` 的形状与 `crates/protocol/src/mcp/*` 所写的客户端逐字对齐，于是城里一栋楼的 `CONFIG.toml` 用一条普通 `command` 就能接上它，装配层无需为它开任何特例。
+- **协议壳（`rpc` ＋ `session`）**：一台按行说话的 MCP server，握手与 `tools/call` 的形状与 `crates/protocol/src/mcp/*` 所写的客户端逐字对齐，于是城把它当一台普通的 stdio MCP server 连：一栋楼的 `RULES.toml` 写 `desktop = true`，城就以 `sprawling desktop <DESKTOP.toml>` 起自己这个二进制（sprawling-SPEC §8-4d），之后走的是与任何 `[[mcp]]` 相同的那条路。
 - **工具表（`tools`）**：六件工具的名字、说明与入参 schema **定死**。每条说明都写明这件工具**不做**什么。
 - **拒绝故事（`scope` ＋ `platform`）**：越界与未实现都回一个带稳定错误码与恢复句的 JSON-RPC error。没有 scope 文件＝全拒。
 
@@ -50,7 +50,7 @@
 | `tools/list`／`tools/call` 的 `name`／`description`／`inputSchema` 三字段 | <https://modelcontextprotocol.io/specification/2025-06-18/server/tools> |
 | JSON-RPC 2.0 的保留错误码区间与 `-32000` 起的实现自定义区 | <https://www.jsonrpc.org/specification#error_object> |
 | 城里客户端实际发出的行 | `crates/protocol/src/mcp/handshake.rs`、`crates/protocol/src/mcp/tools.rs` |
-| 城里字节怎么走、超时怎么算 | `crates/sprawling/src/mcp_stdio.rs` |
+| 城里字节怎么走、超时怎么算 | `crates/protocol/src/mcp/stdio.rs` |
 | `CONFIG.toml` 的 `[[mcp]]` 与 `McpTransport::Stdio { command, args }` | `crates/kernel/src/config.rs` |
 
 ## 6 命名统一
@@ -63,7 +63,7 @@
 
 ## 7 模块边界
 
-- **字节怎么走**归 `main`：argv、环境变量、stdin／stdout 的锁与刷新住那里；`session` 只收一行、出一行。
+- **字节从哪里来**归 `serve_stdio` 的调用方，城里的 `bin::main::desktop`：一个位置参数（`DESKTOP.toml` 的路径）与一对管道。stdin／stdout 的锁与刷新住 `serve_stdio`；`session` 只收一行、出一行。
 - **准不准做**归 `scope`：一次 `tools/call` 在碰到平台之前先过它，于是「越界」这件事在任何 Win32 调用之前就已判完。
 - **做得成做不成**归 `platform`：`cfg(windows)` 两个文件各自完整，**无 trait**——一个只有一个实现的接口是装饰（ARCHITECTURE §4）。
 - **一行 allowlist 匹配什么**归 `scope::pattern`：glob 语义与文件解析是两件会各自变的事，且前者要被单独证明会终止（§10 第 6 条）。
@@ -209,12 +209,12 @@ impl Desk {
 
 `unsafe` 恒只出现在 `platform/windows/` 之下，且恒只包住 FFI 调用本身——不包住随后的判断，因为把安全代码收进 `unsafe` 块只会让下一个读者多审几行。
 
-### 8-10 `main` 与 `smoke`：进程的两端
+### 8-10 进程的两端住城里
 
-模块表的 `Spec` 列要求每个在册模块指向定义它的那一节。
+本 package 没有自己的可执行文件，公开面只有 `serve_stdio` 一个函数。
 
-- **`desktop::main`（形状 4 适配器）**：这个服务器从哪里被启动——一个参数（`DESKTOP.toml` 的路径）、一个环境变量、一对管道。它不判定任何事：作用域归 `scope`，应答归 `session`。
-- **`desktop::smoke`（形状 4 适配器；`desktop/tests/smoke.rs`）**：唯一一处真的把二进制拉起来的测试（§16 已记其理由）——从管道灌一次 `initialize` 加一次 `tools/list`，断言六个名字。其余测试只证明库里的判断。
+- **进程从哪里起**：`sprawling desktop [scope]`（`crates/sprawling/src/main/desktop.rs`，sprawling-SPEC §8-4d）。一个位置参数是 `DESKTOP.toml` 的路径，缺席即 `Scope::Closed`。它不判定任何事：作用域归 `scope`，应答归 `session`。
+- **唯一真的把进程拉起来的测试**也住城里（`crates/sprawling/tests/desktop.rs`）：城按一栋楼的规则起 `sprawling desktop`，握手、list，模型收到六件工具。其余测试只证明库里的判断。
 
 ## 8.5 四个设计
 
@@ -242,7 +242,7 @@ impl Desk {
 
 ## 9 工作流程
 
-进程起来 → `main` 取 scope 路径（argv[1]，否则 `SPRAWLING_DESKTOP_SCOPE`，否则无）→ `Scope::read`（缺文件即 `Closed`）→ `Server::serve` 阻塞读 stdin。
+进程起来 → `sprawling desktop` 取 scope 路径（第一个位置参数，否则无）→ `serve_stdio` → `Scope::read`（缺文件即 `Closed`）→ `Server::serve` 阻塞读 stdin。
 
 每收到一行：`rpc::read` → 按 method 分派 → `initialize` 答能力与自我介绍并进 `Initializing` → `notifications/initialized` 无答案并进 `Ready` → `ping` 答 `{}` → `tools/list` 答六张卡片 → `tools/call` 先 `Scope::admits`（过了交出一个 `Admitted`），再把它随参数一起交给 `platform::perform` → 出一行 → flush。
 
@@ -310,32 +310,35 @@ impl Desk {
 
 ## 15 影响面
 
-新增 out-of-tree package，无既有调用方。波及两处：根 `Cargo.toml` 的 `[workspace]` 增一行 `exclude = ["desktop"]`（属 gate machinery，单独提交）；`ARCHITECTURE.md` §12 增一节十一行。城里接上它时只需一栋楼的 `CONFIG.toml` 写一条 `[[mcp]]` ＋ `command`，装配层**零改动**——这正是要验的那一条。
+out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `[workspace]` 有一行 `exclude = ["desktop"]`，`crates/sprawling/Cargo.toml` 按路径依赖它，`ARCHITECTURE.md` §3 的 depmap 块有它一行。改 `serve_stdio` 的签名波及 `bin::main::desktop`；改工具名或 `tools/list` 的形状波及 `kernel::gate::undoable`（按远端名前缀 `desktop.` 判）与 `crates/sprawling/tests/desktop.rs`。
 
-## 15.2 城里那一侧欠的东西
+## 15.2 城里那一侧
 
-城里要认这台 server，三件事的落点写在这里：
+城里认这台 server 的四件事与各自的落点：
 
 1. **`RULES.toml` 增一键 `desktop`**：住在 `city::policy`，与 `confidential`／`write`／`review` 同一处解析。缺省是**关**——一栋楼默认不把桌面交出去，理由与 `record`／`clipboard` 默认关是同一条。
 2. **`desktop.` 前缀的 MCP 工具归到「撤不回」那道门**：一次点击没有 restoration，`kernel::discard` 那套「拿得回来才准删」在这里无从谈起，故它该走的是**升给人**（Escalate），不是 Deny。落点是 `runtime::bench::admit` 里 `Effect::Connector` 那一支。
 3. **设置页写 `DESKTOP.toml`**：它是**治理文件**，不是产物——它说的是这栋楼的 runs 能碰什么。故它落在这栋楼的 reserved subtree（`<building>/.sprawling/DESKTOP.toml`），与 `RULES.toml`／`CONFIG.toml` 同处，**任何 write domain 都够不着**；写它的那一点照 `city::governed` 的形状办（一道门、整份写、不拼路径），而不是让设置页自己拼一个路径出来。这就是 `DomainReach` 立下的那条读法：一份决定「residents 能写什么」的文件，恒不由 resident 写。
 
+4. **城自己起这台 server**：`RULES.toml` 写 `desktop = true` 的楼，城以 `sprawling desktop <DESKTOP.toml>` 起它，不要人手写 `[[mcp]]`（sprawling-SPEC §8-4d）。
+
 #### 落到哪一步，还欠什么
 
-前两件已落地并各自有测试：`city::policy` 读 `desktop:`（缺省关、机密楼即拒、打字错误即拒），`kernel::gate::undoable` 判「远端名前缀 `desktop.`」并升给人，`runtime::bench::admit` 在出网门之后叫它。
+四件都已落地并各自有测试：`city::policy` 读 `desktop:`（缺省关、机密楼即拒、打字错误即拒）；`kernel::gate::undoable` 判「远端名前缀 `desktop.`」并升给人，`runtime::bench::admit` 在出网门之后叫它；设置页的框经 `ConfigureBuilding` 的 `desktop` 字段整份写 `DESKTOP.toml`，写之前先落账本一行（sprawling-SPEC 里桌面 allowlist 那一节）；城按规则起 `sprawling desktop`。
 
-第三件**只落了服务端那一半**：`city::write_desktop_scope` 与 `city::desktop_scope_path` 已经在，落点与理由如上，并有测试断言它落在 reserved subtree 之内。**还欠三样，且都在这条线之外的地方**：
+**不内置任何模型（定规）**：本二进制不带 OCR、ASR 或任何视觉模型的权重，这些都经人接入的端点。模型拿到的桌面文字先是 accessibility tree；OCR 端点与本地 ASR 端点都是人接进来的。
 
-1. `channels` 上一条命令帧，携「哪一栋楼」与「整份文本」——形状与 `Govern` 那一类同，因为它改的是治理文件。
-2. `bin::assembly` 上接这条帧的一格，写之前先上账本一行（每一次效果先成为事件）。
-3. 设置页上的那个框。
+**还欠的**，都是这条接口的当前状态：
 
-**它们尚未做**：加一条命令帧会同时动 `channels::command`、`WIRE_V` 的 schema hash 与 `xtask wiring` 认的那张表，而前端此刻是冻结的。第 3 条欠客户端一个整份文本的编辑框加一次保存——没有分段编辑，理由与 `city::governed` 同：写一半会让这台 server 被半行 allowlist 约束。
+1. **给模型的文字反馈**：`desktop.snapshot` 回的是 role／name／ref／bounds 的树，还没有像 `browser::snapshot` 那样把一扇窗口折成模型读得快的纯文本。
+2. **OCR**：一张截图经人接入的 OCR 端点变成文字，给 accessibility tree 读不到字的窗口（画在画布上的界面、远程桌面）。端点的形状与 `gateway` 里的哪一面还没有定。
+3. **ASR**：`gateway` 的 `transcribe`（OpenAI 兼容的 `audio/transcriptions`）已经在；桌面这一侧还没有把录下的声音交给它，`desktop.record` 的 `audio: true` 仍被拒。
+4. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
 
 
 ## 16 测试与约束
 
-逐模块 `#[cfg(test)]`，外加 `tests/smoke.rs`：**真的把二进制拉起来**，从管道里灌一次 `initialize` ＋ 一次 `tools/list`，断言六个名字。它是唯一一处证明「城里那条 `command` 真的能接上」的测试，其余测试都只证明库里的判断。
+逐模块 `#[cfg(test)]`。真的把进程拉起来的那一条住城里（`crates/sprawling/tests/desktop.rs`，§8-10）：它是唯一一处证明「城起的 `sprawling desktop` 真的接得上」的测试，其余测试都只证明库里的判断。
 
 **约束**：`unsafe` 只在 `platform/windows/` 之下且每块携一行 `SAFETY:`（§8-9）；其余处恒不出现 `unsafe`、`unwrap`、`expect`、`panic!`、`todo!`、裸下标、`as`；算术走 `checked_*`／`saturating_*`；每个文件 ≤400 行、每个函数 ≤200 行且 ≤4 参数。`scope.rs` 因这条尺子而在 446 行处切出 `scope/pattern.rs`——切口落在「一行 allowlist 匹配什么」与「这份文件许可什么」之间，是语义的，不是为了凑行数；`Admitted` 落地时它再次抵线，这一次切出的是 `scope/tests.rs`（形状同 `session/tests.rs`），判定与对判定的断言各占一个文件。
 
@@ -356,5 +359,5 @@ impl Desk {
 
 ## 18 文档同步
 
-`ARCHITECTURE.md` §12 新增 desktop 一节｜`desktop/README.md`（英文，讲清它为什么住在 workspace 外）｜同步本 SPEC §13 与 §8-7 的实现状态。
+`ARCHITECTURE.md` §3 depmap 块的 `desktop` 一行｜`desktop/README.md`（英文，讲清它为什么住在 workspace 外、城怎么起它）｜sprawling-SPEC §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态。
 
