@@ -135,6 +135,37 @@ pub fn open(city_root: &Path, building: &Address, name: &SessionName) -> Result<
     ))
 }
 
+/// Makes the room a dispatch is about to write in when nothing is there
+/// yet, sealed like one [`open`] made (city-SPEC.md 8-21).
+///
+/// A directory that is already there is left as it is: either the city
+/// opened it and sealed it then, or it is one of the project's own, where
+/// a `*` would hide every new file from the project's history. The city's
+/// files in such a directory are kept out of git by name instead. A
+/// building's own address is not a room and is never sealed.
+///
+/// # Errors
+/// Propagates an address outside every building and a directory that
+/// cannot be created or sealed.
+pub fn claim(city_root: &Path, room: &Address) -> Result<(), AxError> {
+    if crate::building::Building::of(room)?.addr() == room {
+        return Ok(());
+    }
+    let dir = CityLayout::new(city_root).scope(room);
+    match std::fs::create_dir_all(dir.parent().unwrap_or(city_root))
+        .and_then(|()| std::fs::create_dir(&dir))
+    {
+        Ok(()) => crate::gitignore::seal_room(&dir),
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(err) => Err(AxError::failure(
+            AxCode::StorageFatal,
+            "make the room a dispatch works in",
+            format!("{}: {err}", dir.display()),
+        )
+        .with_recovery("check the city directory is writable")),
+    }
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

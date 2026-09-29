@@ -73,6 +73,7 @@ pub use policy::{UserBrowser, UserBrowserEndpoint};
 pub use policy::{agents_path, city_agents_path, evaluate, load, rules_path};
 pub use resident::{Dossier, Identity, Resident, urbanite_path};
 pub use room::all as rooms;
+pub use room::claim as claim_room;
 pub use room::open as open_room;
 pub use rules_tool::RulesTool;
 pub use schedule::{Cadence, Entry, SCHEDULE_FILE, Schedule, schedule_path};

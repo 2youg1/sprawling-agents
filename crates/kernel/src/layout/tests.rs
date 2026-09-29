@@ -109,3 +109,18 @@ fn a_ledger_directory_alone_yields_the_city_it_belongs_to() {
         assert_eq!(CityLayout::of_ledger(not_a_city), None, "{not_a_city:?}");
     }
 }
+
+/// The ignore pattern and the display of a run id are two spellings of
+/// one shape, and a building keeps transcripts out of git only while
+/// they agree character for character.
+#[test]
+fn the_run_id_pattern_matches_every_run_id_the_city_displays() {
+    for bytes in [[0u8; 16], [0xffu8; 16]] {
+        let shown = crate::RunId::from_bytes(bytes).to_string();
+        assert_eq!(shown.len(), RUN_ID_PATTERN.len(), "{shown}");
+        for (glyph, wanted) in shown.chars().zip(RUN_ID_PATTERN.chars()) {
+            assert!(wanted == '?' || glyph == wanted, "{shown}");
+            assert_eq!(glyph == '-', wanted == '-', "{shown}");
+        }
+    }
+}

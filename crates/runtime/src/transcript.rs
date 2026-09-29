@@ -26,15 +26,13 @@
 
 use std::path::Path;
 
+use kernel::layout::TRANSCRIPT_EXT;
 use kernel::{Address, AxCode, AxError, Locator, RunId};
 use memory::Cas;
 use serde_json::Value;
 
 use crate::conversation::Conversation;
 use crate::redact;
-
-/// The file a transcript is written to, beside the room's own documents.
-const TRANSCRIPT_EXT: &str = "jsonl";
 
 /// The messages one run's model saw, one JSON line each, already
 /// scanned. Private fields: a transcript that skipped the scan cannot

@@ -30,7 +30,13 @@ impl RunWorker {
         session: Option<&SessionName>,
     ) -> Result<Address, AxError> {
         match session {
-            None => Ok(addr),
+            // A room address nobody opened: the city makes it here, the
+            // first thing it writes for the dispatch, and seals it, so
+            // nothing the run writes in it reaches the project's git.
+            None => {
+                city::claim_room(&self.city_root, &addr)?;
+                Ok(addr)
+            }
             Some(name) => {
                 let building = city::Building::of(&addr)?;
                 city::open_room(&self.city_root, building.addr(), name)

@@ -58,6 +58,13 @@ pub const JOB_FILE: &str = "JOB.md";
 pub const HANDOFF_FILE: &str = "Handoff.md";
 /// Who a standing resident is, in that resident's own directory.
 pub const URBANITE_FILE: &str = "URBANITE.md";
+/// The extension of what one run saw, written in its room as
+/// `<run>.jsonl`.
+pub const TRANSCRIPT_EXT: &str = "jsonl";
+/// A run id as a git ignore pattern: one `?` for each character of the
+/// hyphenated form a [`crate::RunId`] displays, so a building can keep
+/// every run's transcript out of its history by name.
+pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";
 
 /// The disk layout of one city, derived from its root.
 ///

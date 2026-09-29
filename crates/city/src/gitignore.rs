@@ -3,15 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a building promises is tracked; what one session was thinking
-//! is not (city-SPEC.md section 8-21).
+//! What a building promises is tracked; no working document and no
+//! conversation record ever is (city-SPEC.md sections 8-21 and 12.5).
 //!
 //! `SPEC.md` and the building's own reserved subtree go into history,
 //! because a reader who clones this repository a year from now needs
-//! the promises and the rules they were made under. `Roadmap.md`,
-//! `Memo.md` and `Handoff.md` do not: they are where one session keeps
-//! what it is currently thinking, and a plan that is rewritten every
-//! hour turns a history into a diff of nobody's decisions.
+//! the promises and the rules they were made under. Plans, memos,
+//! handoffs, task briefs, resident identities, run transcripts and the
+//! archive of the person's preferences and decisions do not: they record
+//! what was said between a person and the residents, and a history is
+//! pushed, cloned and shared. They are ignored by name at any depth,
+//! because a dispatch may land in a directory the project already had,
+//! and there the city may not seal anything.
 //!
 //! The `!` lines are written out rather than left to the default. An
 //! adopted repository may already ignore `*.md` or every dot
@@ -36,7 +39,10 @@
 
 use std::path::Path;
 
-use kernel::layout::{BUILDING_SHELF, CONFIG_FILE, FILTERS_FILE};
+use kernel::layout::{
+    ARCHIVE_DIR, BUILDING_SHELF, CONFIG_FILE, FILTERS_FILE, JOB_FILE, RUN_ID_PATTERN,
+    TRANSCRIPT_EXT, URBANITE_FILE,
+};
 use kernel::{AxCode, AxError, RESERVED_PREFIX};
 
 use crate::policy::{DESKTOP_SCOPE_FILE, RULES_FILE};
@@ -61,6 +67,10 @@ fn block() -> Vec<String> {
         ROADMAP_FILE.to_owned(),
         MEMO_FILE.to_owned(),
         HANDOFF_FILE.to_owned(),
+        JOB_FILE.to_owned(),
+        URBANITE_FILE.to_owned(),
+        format!("{RUN_ID_PATTERN}.{TRANSCRIPT_EXT}"),
+        format!("/{ARCHIVE_DIR}/"),
         format!("!{SPEC_FILE}"),
         format!("{RESERVED_PREFIX}/"),
         format!("!/{RESERVED_PREFIX}/"),
