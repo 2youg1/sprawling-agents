@@ -91,11 +91,11 @@ pub(crate) fn auth_reference(auth: &AuthSpec) -> Option<&SecretRef> {
 
 /// The one place a `model_selected` payload is formed.
 ///
-/// `ceiling_from` names which rung of the ladder supplied the output
-/// ceiling, when one did: `anthropic.rs` once carried the note that a
-/// ceiling invented at the call site truncates runs for a reason that
-/// appears nowhere in the account, and this is where that reason
-/// appears, in the spelling [`crate::CeilingSource::as_str`] owns.
+/// `ceiling` says which rung of the ladder supplied the output ceiling,
+/// or that the provider picks it: `anthropic.rs` once carried the note
+/// that a ceiling invented at the call site truncates runs for a reason
+/// that appears nowhere in the account, and this is where that reason
+/// appears, in the spelling [`crate::OutputCeiling::word`] owns.
 ///
 /// # Errors
 /// Propagates payload construction failure.
@@ -103,7 +103,7 @@ pub fn selected_payload(
     tag: ModelTag,
     endpoint: &str,
     entry: &ModelEntry,
-    ceiling_from: Option<crate::CeilingSource>,
+    ceiling: Option<crate::OutputCeiling>,
 ) -> Result<Payload, AxError> {
     Payload::of(&ModelSelected {
         tag,
@@ -111,7 +111,7 @@ pub fn selected_payload(
         model: entry.id.clone(),
         context_tokens: entry.context_tokens,
         max_output_tokens: entry.max_output_tokens.map(kernel::Ceiling::get),
-        ceiling_from: ceiling_from.map(|rung| rung.as_str().to_owned()),
+        ceiling_from: ceiling.map(|rung| rung.word().to_owned()),
         input: entry.input,
         input_price: entry.input_price,
         output_price: entry.output_price,

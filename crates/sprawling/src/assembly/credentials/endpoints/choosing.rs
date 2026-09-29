@@ -102,11 +102,13 @@ impl RunWorker {
                 upstream: registered.as_ref().and_then(|row| row.max_output_tokens),
             },
             priced.as_ref().and_then(|row| row.max_output_tokens),
-            &known.base_url,
-            &model,
+            gateway::Target {
+                base_url: &known.base_url,
+                id: &model,
+                wire: known.dialect,
+            },
         );
-        let max_output_tokens = resolved.map(gateway::OutputCeiling::tokens);
-        let ceiling_from = resolved.map(gateway::OutputCeiling::source);
+        let max_output_tokens = resolved.and_then(gateway::OutputCeiling::tokens);
         let entry = gateway::ModelEntry {
             id: model,
             // The catalogue row carries a plain figure; a window nobody
@@ -134,7 +136,7 @@ impl RunWorker {
                 .unwrap_or_default(),
             cache_write_price: priced.map(|row| row.cache_write_price).unwrap_or_default(),
         };
-        let payload = gateway::selected_payload(tag, &endpoint, &entry, ceiling_from)?;
+        let payload = gateway::selected_payload(tag, &endpoint, &entry, resolved)?;
         self.record(EventKind::ModelSelected, payload)
     }
 }

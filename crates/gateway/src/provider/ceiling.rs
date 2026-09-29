@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which statement about one model's output ceiling wins, and who made
-//! it (shape 1 decision).
+//! it (shape 1 decision; gateway-SPEC.md section 8-17).
 //!
 //! **A model with no registered ceiling could not be called at all.**
 //! The Anthropic wire requires `max_tokens` in every request and refuses
@@ -14,14 +14,23 @@
 //! missing figure.
 //!
 //! The ladder below always answers, and it records which rung answered.
+//!
+//! **Where the face does not need a figure, the city states none.** The
+//! chat and responses faces take the ceiling as an optional field, and
+//! each vendor's default for it follows the model: a thinking model is
+//! left tens of thousands of tokens, and a vendor that refuses a request
+//! whose input and ceiling together pass the window never refuses its
+//! own default. A number of this city's on those faces was either lower
+//! than the vendor's or a refusal once the conversation grew, so there
+//! the pinned and policy rungs stay silent and the field is left out.
 //! A truncated run is then read off the account rather than guessed at:
 //! `model_selected` carries `ceiling_from`, which is the reply to the
 //! objection this city wrote against itself in `anthropic.rs` — that a
 //! ceiling invented at the call site truncates runs for a reason that
 //! appears nowhere in the account.
 
-use kernel::Ceiling;
 use kernel::consts_policy::OUTPUT_CEILING_DEFAULT;
+use kernel::{Ceiling, DialectKind};
 
 use super::preset;
 
@@ -60,57 +69,80 @@ impl CeilingSource {
     }
 }
 
-/// A ceiling and the rung it came from, which travel together because
-/// a caller holding only the number cannot say why a run stopped where
-/// it did.
+/// The ceiling one call is made with.
+///
+/// A figure and the rung it came from travel together, because a caller
+/// holding only the number cannot say why a run stopped where it did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct OutputCeiling {
-    tokens: Ceiling,
-    from: CeilingSource,
+pub enum OutputCeiling {
+    /// A figure every request states, and who stated it.
+    Sent {
+        tokens: Ceiling,
+        from: CeilingSource,
+    },
+    /// Nobody stated one and the face takes none: the request leaves the
+    /// field out and the provider applies its own default for the model.
+    ProviderDefault,
+}
+
+/// The model a call is made to, as the ladder asks about it: where it
+/// is served, its id, and the face its requests are written on.
+#[derive(Debug, Clone, Copy)]
+pub struct Target<'a> {
+    pub base_url: &'a str,
+    pub id: &'a str,
+    pub wire: DialectKind,
 }
 
 impl OutputCeiling {
     /// The ceiling one call is made with, and who supplied it.
     ///
-    /// `pinned` is the pinned catalogue's row for this exact id, and
-    /// `at` with `id` is what the preset table is asked; both are the
-    /// same rung reached through two indexes, and a test keeps the two
-    /// indexes from answering for one id.
+    /// `pinned` is the pinned catalogue's row for this exact id, and the
+    /// preset table is asked with the target's base URL and id; both are
+    /// the same rung reached through two indexes, and a test keeps the
+    /// two indexes from answering for one id.
     ///
-    /// `None` says every rung stayed silent, which requires
-    /// [`OUTPUT_CEILING_DEFAULT`] itself to be zero — a state the policy
-    /// module's own test forbids. Returning it rather than substituting
-    /// a number keeps this decision free of a figure it invented.
+    /// `None` says every rung stayed silent on a face that needs a
+    /// figure, which requires [`OUTPUT_CEILING_DEFAULT`] itself to be
+    /// zero — a state the policy module's own test forbids. Returning it
+    /// rather than substituting a number keeps this decision free of a
+    /// figure it invented.
     #[must_use]
     pub fn resolve(
         stated: Stated,
         pinned: Option<Ceiling>,
-        at: &str,
-        id: &str,
+        target: Target<'_>,
     ) -> Option<OutputCeiling> {
-        let sourced = |tokens, from| Some(OutputCeiling { tokens, from });
+        let sent = |tokens, from| Some(OutputCeiling::Sent { tokens, from });
         if let Some(tokens) = stated.person {
-            return sourced(tokens, CeilingSource::Person);
+            return sent(tokens, CeilingSource::Person);
         }
         if let Some(tokens) = stated.upstream {
-            return sourced(tokens, CeilingSource::Upstream);
+            return sent(tokens, CeilingSource::Upstream);
         }
-        if let Some(tokens) = pinned.or_else(|| preset::ceiling_for(at, id)) {
-            return sourced(tokens, CeilingSource::Preset);
+        if let Some(tokens) = pinned.or_else(|| preset::ceiling_for(target.base_url, target.id)) {
+            return sent(tokens, CeilingSource::Preset);
         }
-        sourced(Ceiling::new(OUTPUT_CEILING_DEFAULT)?, CeilingSource::Policy)
+        sent(Ceiling::new(OUTPUT_CEILING_DEFAULT)?, CeilingSource::Policy)
     }
 
+    /// The figure a request states, or `None` when it states none.
     #[must_use]
-    pub const fn tokens(self) -> Ceiling {
-        self.tokens
+    pub const fn tokens(self) -> Option<Ceiling> {
+        match self {
+            OutputCeiling::Sent { tokens, .. } => Some(tokens),
+            OutputCeiling::ProviderDefault => None,
+        }
     }
 
-    /// Which rung answered. Named `source` rather than `from` because
-    /// `from` is the conversion vocabulary of the standard library.
+    /// The word `model_selected.ceiling_from` records: the rung that
+    /// stated the figure, or `provider` when no figure is sent.
     #[must_use]
-    pub const fn source(self) -> CeilingSource {
-        self.from
+    pub const fn word(self) -> &'static str {
+        match self {
+            OutputCeiling::Sent { from, .. } => from.as_str(),
+            OutputCeiling::ProviderDefault => "provider",
+        }
     }
 }
 
@@ -140,15 +172,32 @@ mod tests {
 
     const ANTHROPIC: &str = "https://api.anthropic.com/v1";
     const RELAY: &str = "https://relay.example.test/v1";
+    const LOCAL: &str = "http://127.0.0.1:8000/v1";
     const SONNET: &str = "claude-sonnet-4-5";
+
+    fn messages(base_url: &'static str, id: &'static str) -> Target<'static> {
+        Target {
+            base_url,
+            id,
+            wire: DialectKind::Anthropic,
+        }
+    }
+
+    fn sent(tokens: u64, from: CeilingSource) -> OutputCeiling {
+        OutputCeiling::Sent {
+            tokens: Ceiling::new(tokens).unwrap(),
+            from,
+        }
+    }
 
     fn tokens(count: u64) -> Option<Ceiling> {
         Ceiling::new(count)
     }
 
-    /// The priority table, one row per pair of rungs that can both
-    /// answer. Read it downward: whatever is stated higher wins, and
-    /// the rung that won is named in the record.
+    /// The priority table on the messages face, which needs a figure in
+    /// every request, one row per pair of rungs that can both answer.
+    /// Read it downward: whatever is stated higher wins, and the rung
+    /// that won is named in the record.
     #[test]
     fn the_higher_rung_wins_and_says_that_it_did() {
         let table = [
@@ -191,30 +240,62 @@ mod tests {
                 CeilingSource::Preset,
             ),
             (
-                "policy answers last, for a host nobody documented",
+                "policy answers last, for a server on this machine",
                 Stated::default(),
                 None,
-                RELAY,
+                LOCAL,
                 OUTPUT_CEILING_DEFAULT,
                 CeilingSource::Policy,
             ),
         ];
         for (why, stated, pinned, at, expected, from) in table {
-            let got = OutputCeiling::resolve(stated, pinned, at, SONNET)
-                .expect("the ladder always answers");
-            assert_eq!(got.tokens().get(), expected, "{why}");
-            assert_eq!(got.source(), from, "{why}");
+            let got = OutputCeiling::resolve(stated, pinned, messages(at, SONNET));
+            assert_eq!(got, Some(sent(expected, from)), "{why}");
         }
+    }
+
+    /// The chat and responses faces take the ceiling as optional, and
+    /// a vendor's own default for it follows the model: nobody's
+    /// statement means no figure on the wire, whatever this city pinned.
+    #[test]
+    fn on_a_face_that_takes_no_figure_the_provider_picks_when_nobody_stated_one() {
+        for wire in [DialectKind::OpenAi, DialectKind::OpenAiResponses] {
+            let target = Target {
+                base_url: ANTHROPIC,
+                id: SONNET,
+                wire,
+            };
+            let got = OutputCeiling::resolve(Stated::default(), tokens(3_000), target);
+            assert_eq!(got, Some(OutputCeiling::ProviderDefault), "{wire:?}");
+            let stated = Stated {
+                person: None,
+                upstream: tokens(2_000),
+            };
+            let got = OutputCeiling::resolve(stated, None, target);
+            assert_eq!(got, Some(sent(2_000, CeilingSource::Upstream)), "{wire:?}");
+        }
+    }
+
+    /// A relay forwarding a vendor's id gets the vendor's documented
+    /// ceiling on the messages face rather than the policy figure, which
+    /// has nothing to do with either of them.
+    #[test]
+    fn a_relay_forwarding_a_vendors_id_is_called_at_the_vendors_ceiling() {
+        let got = OutputCeiling::resolve(Stated::default(), None, messages(RELAY, SONNET));
+        assert_eq!(got, Some(sent(64_000, CeilingSource::Preset)));
     }
 
     /// The whole point of the ladder: an id no table knows, on the wire
     /// that requires the field, now has a figure to send.
     #[test]
     fn an_unknown_model_at_an_unknown_host_is_still_callable() {
-        let got = OutputCeiling::resolve(Stated::default(), None, RELAY, "some-relay-model")
-            .expect("the ladder always answers");
-        assert_eq!(got.tokens().get(), OUTPUT_CEILING_DEFAULT);
-        assert_eq!(got.source().as_str(), "policy");
+        let got =
+            OutputCeiling::resolve(Stated::default(), None, messages(RELAY, "some-relay-model"));
+        assert_eq!(
+            got,
+            Some(sent(OUTPUT_CEILING_DEFAULT, CeilingSource::Policy))
+        );
+        assert_eq!(got.map(OutputCeiling::word), Some("policy"));
     }
 
     #[test]
@@ -227,5 +308,6 @@ mod tests {
         ]
         .map(CeilingSource::as_str);
         assert_eq!(words, ["person", "upstream", "preset", "policy"]);
+        assert_eq!(OutputCeiling::ProviderDefault.word(), "provider");
     }
 }

@@ -353,4 +353,32 @@ mod tests {
         );
         assert_eq!(entry.context_tokens, 32_768);
     }
+
+    /// On the chat face a model nobody stated a ceiling for is called
+    /// with none, so the provider's own default for that model applies
+    /// (gateway-SPEC.md 8-17), and the account says who picked it.
+    #[test]
+    fn a_chat_face_model_nobody_stated_a_ceiling_for_is_left_to_the_provider() {
+        let dir = tempfile::tempdir().unwrap();
+        init_city(dir.path()).unwrap();
+        let (base_url, _provider) = fake_openai(&["m-1", "m-2"], Vec::new());
+        let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
+        worker
+            .handle(channels::Command::SelectModel {
+                endpoint: channels::ProviderName::parse("house").unwrap(),
+                model: "m-2".to_owned(),
+                tag: kernel::ModelTag::Main,
+                context_tokens: None,
+                max_output_tokens: None,
+                idem: kernel::IdemKey::derive(
+                    &kernel::RunId::CITY,
+                    kernel::Seq::FIRST,
+                    b"picked with nothing stated",
+                ),
+            })
+            .unwrap();
+        let (_, _, entry) = worker.credentials.book.choices().next().unwrap();
+        assert_eq!(entry.id, "m-2");
+        assert_eq!(entry.max_output_tokens, None);
+    }
 }

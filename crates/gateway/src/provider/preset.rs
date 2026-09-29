@@ -262,6 +262,13 @@ pub fn ceiling_for(base_url: &str, id: &str) -> Option<Ceiling> {
     Ceiling::new(model_for(base_url, id)?.max_output_tokens)
 }
 
+/// The context window this table states for one model, as a window
+/// rather than as a count.
+#[must_use]
+pub fn window_for(base_url: &str, id: &str) -> Option<kernel::Window> {
+    kernel::Window::new(model_for(base_url, id)?.context_tokens)
+}
+
 /// The preset table as the host authority the normaliser reads.
 ///
 /// A zero-sized handle rather than a free function, because
@@ -406,13 +413,49 @@ mod tests {
         assert!(row.source.starts_with("https://"), "every row cites a page");
     }
 
-    /// A vendor's figures belong to that vendor's host. A relay that
-    /// serves the same id truncates where the relay says it does, and
-    /// its model list is the place that says so.
+    /// A relay's model list rarely states a ceiling, so the vendor that
+    /// published the id it forwards answers for it; a server on this
+    /// machine does not borrow the vendor's figures, because its window
+    /// is its own configuration.
     #[test]
-    fn a_relay_serving_the_same_id_is_not_handed_the_vendors_figures() {
-        assert!(model_for("https://relay.example.test/v1", "claude-sonnet-4-5").is_none());
-        assert!(ceiling_for("https://relay.example.test/v1", "claude-sonnet-4-5").is_none());
+    fn a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not() {
+        assert_eq!(
+            model_for("https://relay.example.test/v1", "claude-sonnet-4-5")
+                .map(|row| row.id_prefix),
+            Some("claude-sonnet-4")
+        );
+        assert_eq!(
+            window_for("https://relay.example.test/v1", "claude-sonnet-4-5"),
+            kernel::Window::new(200_000)
+        );
+        assert!(model_for("http://127.0.0.1:8000/v1", "claude-sonnet-4-5").is_none());
+        assert!(window_for("http://127.0.0.1:8000/v1", "claude-sonnet-4-5").is_none());
+    }
+
+    /// The current lineup on the vendor's own page, and DeepSeek's two
+    /// families, whose ceiling the API reference states exactly.
+    #[test]
+    fn the_documented_lineup_is_read_as_the_vendors_page_states_it() {
+        let at = |base: &str, id: &str| {
+            model_for(base, id).map(|row| (row.context_tokens, row.max_output_tokens))
+        };
+        let anthropic = "https://api.anthropic.com/v1";
+        assert_eq!(at(anthropic, "claude-opus-5-5"), Some((1_000_000, 128_000)));
+        assert_eq!(
+            at(anthropic, "claude-sonnet-5-5"),
+            Some((1_000_000, 128_000))
+        );
+        assert_eq!(
+            at(anthropic, "claude-fable-5-1"),
+            Some((1_000_000, 128_000))
+        );
+        assert_eq!(
+            at(anthropic, "claude-haiku-4-5-20251001"),
+            Some((200_000, 64_000))
+        );
+        let deepseek = "https://api.deepseek.com/anthropic";
+        assert_eq!(at(deepseek, "deepseek-flash"), Some((1_000_000, 393_216)));
+        assert_eq!(at(deepseek, "deepseek-v4-pro"), Some((1_000_000, 393_216)));
     }
 
     #[test]

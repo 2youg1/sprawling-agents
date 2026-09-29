@@ -29,7 +29,7 @@ pub use endpoint::adapter_for;
 pub use endpoint::{AuthSpec, Endpoint, EndpointConfig, HeaderValue, SecretResolver};
 pub use endpoint::{ModelFacts, Redemption};
 pub use market::{InputKinds, MarketSnapshot, ModelEntry};
-pub use provider::ceiling::{CeilingSource, OutputCeiling, Stated};
+pub use provider::ceiling::{CeilingSource, OutputCeiling, Stated, Target};
 pub use provider::modality::call::{Ranks, Vectors};
 pub use provider::modality::embedding::{EmbeddingRequest, Embeddings};
 pub use provider::modality::rerank::{Rank, Ranking, RerankRequest};
