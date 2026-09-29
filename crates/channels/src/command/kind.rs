@@ -14,9 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
-use crate::command::step::{
-    Carry, GovernedDocument, HaltScope, LoginStep, PursuitStep, SpineDocument,
-};
+use crate::command::step::{Carry, GovernedDocument, HaltScope, PursuitStep, SpineDocument};
 use crate::command::tuning::EndpointTuning;
 use crate::named_frames::named_frames;
 use crate::preference::PreferencePatch;
@@ -65,15 +63,6 @@ pub enum Command<Secret = Sealed<String>> {
         /// city never registered is refused before anything is written
         /// (channels-SPEC.md section 8-48c).
         model: Option<String>,
-    },
-    /// One step of a subscription login. Which step is named rather
-    /// than inferred: beginning and redeeming are different actions
-    /// with different failure modes, and a page that means one must not
-    /// be readable as the other.
-    Login {
-        provider: ProviderName,
-        step: LoginStep,
-        idem: IdemKey,
     },
     /// Asks a base URL what it serves, and attaches nothing.
     ///

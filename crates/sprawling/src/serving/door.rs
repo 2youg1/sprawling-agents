@@ -15,9 +15,9 @@
 //! because its three cases carry different obligations, and only a key
 //! minted for this serve may be shown to a person. Which case applies is
 //! decided by `crate::keying`, which stays pure; this module is where
-//! the entropy behind a minted key and behind [`random_token`] is drawn,
-//! so the binary samples randomness in one place and a key a third party
-//! can predict is a door a third party can open.
+//! the entropy behind a minted key is drawn, so the binary samples
+//! randomness in one place and a key a third party can predict is a door
+//! a third party can open.
 //!
 //! The point a reader most often gets wrong: [`open_vault`] reports what
 //! a probe of write, read and delete found, not what configuration
@@ -26,28 +26,6 @@
 //! an egress failure.
 
 use kernel::{AxCode, AxError, Payload};
-
-/// A URL-safe random string of `bytes` bytes of OS entropy.
-///
-/// Deliberately not the simulator's seeded randomness: a verifier a
-/// third party can predict is a login a third party can finish. This is
-/// the one place in the binary where reproducibility would be a defect.
-pub(crate) fn random_token(bytes: usize) -> Result<String, AxError> {
-    let mut raw = vec![0u8; bytes];
-    getrandom::fill(&mut raw).map_err(|err| {
-        AxError::failure(
-            AxCode::ConfigInvalid,
-            "draw randomness for a login",
-            err.to_string(),
-        )
-        .with_recovery("this machine's entropy source refused; no login can be started safely")
-    })?;
-    // The alphabet belongs to the flow that consumes it, and a copy of
-    // it here would be both a second authority and - being sixty-four
-    // mixed characters at rest - exactly the shape the secret scanner
-    // hunts for.
-    Ok(gateway::oauth_random(&raw))
-}
 
 /// What this serve will present at its door, and whether a person has
 /// to be shown it.

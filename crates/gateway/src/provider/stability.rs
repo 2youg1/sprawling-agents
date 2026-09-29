@@ -40,18 +40,14 @@ use kernel::{ChatMessage, ChatRequest, ContentBlock, DialectKind, Role, SystemBl
 
 use crate::dialect::{ImageBytes, request_wire};
 use crate::provider::preset::ChatSpelling;
-use crate::provider::registry::{ConnectionKind, Family};
+use crate::provider::registry::ConnectionKind;
 
 /// Every way this city connects, so a connection added without a
 /// thought for caching fails here rather than on somebody's bill.
-const EVERY_CONNECTION: [ConnectionKind; 7] = [
+const EVERY_CONNECTION: [ConnectionKind; 3] = [
     ConnectionKind::OpenAiCompat,
     ConnectionKind::Responses,
     ConnectionKind::AnthropicNative,
-    ConnectionKind::Harness(Family::Codex),
-    ConnectionKind::Harness(Family::ClaudeCode),
-    ConnectionKind::Harness(Family::GrokBuild),
-    ConnectionKind::Harness(Family::KimiCli),
 ];
 
 /// One conversation with a system prefix a person would recognise,

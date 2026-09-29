@@ -98,8 +98,8 @@ every week.
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
 | Sandbox | `wasmtime` + `wasmtime-wasi`, wasip1 only | Fuel-metered execution with **no socket host implementation** — the Python arm's mechanical proof that it cannot reach the network. Cost: an optional feature; a build without it refuses tool execution in three parts rather than pretending. |
-| Credentials | `keyring` (platform credential service), `secrecy`, `zeroize` | Plaintext lives in the operating system's own vault, never in a file we wrote. `sha2` is present for one external protocol fact: PKCE mandates SHA-256. |
-| Entropy | `getrandom` | OS entropy for values a stranger must not guess: the PKCE verifier, the login state, the door's token. No decision path reads it, so replay never needs it (§10 rule 4). |
+| Credentials | `keyring` (platform credential service), `secrecy`, `zeroize` | Plaintext lives in the operating system's own vault, never in a file we wrote. The only credential the city takes is a key a person hands it: it signs in to no subscription. |
+| Entropy | `getrandom` | OS entropy for values a stranger must not guess: the door's pairing key, and the salt and nonce of the encrypted vault file. No decision path reads it, so replay never needs it (§10 rule 4). |
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = "z"`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `"z"` rather than `3` because it is much smaller and no slower to start; the criterion and both arms' readings sit beside the setting in `Cargo.toml`. |
@@ -282,9 +282,7 @@ than any diagram of boxes.
    A worker takes the dispatch and answers every refusal it can owe before
    it writes anything: the reserved subtree, a halted scope, rules that
    will not load, and a tag with no model behind it are all decided by
-   `agree_to_work`. It writes nothing but a login renewal: when the chosen
-endpoint's subscription login is about to expire, `renew_if_stale` stores
-the new tokens in the vault and records `secret_captured`. **Opening the room is
+   `agree_to_work`, which writes nothing. **Opening the room is
    the first thing this city puts on disk for a dispatch**, so work nobody
    could take leaves no room behind for a person to find.
 4. **The city writes `run_started` before anything happens.** Every effect
@@ -448,7 +446,7 @@ on connect: a page from a different build refuses rather than misreads.
 
 | Frame | Count | What it is |
 |---|---|---|
-| `Command` | <!-- xtask:begin command_frames -->30<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
+| `Command` | <!-- xtask:begin command_frames -->29<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
 | `Query` | <!-- xtask:begin query_frames -->36<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
@@ -476,7 +474,7 @@ the part worth knowing before starting, not after.
 | a new `Command` or `Query` frame | `channels::wire` + channels-SPEC | `WIRE_V` must rise, and every `Query` must be answered or it does not compile |
 | what a model may call | `runtime::catalog`, tools in `runtime` or `collab` | `kernel::tool` is the seam; a tool with no conformance suite is not a seam |
 | how a provider is spoken to | `gateway::dialect` + gateway-SPEC | a pure two-way translation with the canonical shape in the middle |
-| how a login begins, finishes, renews | `gateway::credential`, `gateway::oauth_profiles` | plaintext may reach only the platform vault; `secret` gate reads every boundary |
+| how a key is kept and redeemed | `gateway::credential` | plaintext may reach only the platform vault; `secret` gate reads every boundary |
 | where a city keeps a file | `kernel::layout` | the reserved subtree is out of every write domain, by one predicate in `kernel::address` |
 | what a building may do | `city::policy` (`RULES.toml`) + city-SPEC | a run's write domain is what its building declares |
 | a crate depending on another | the `depmap` block in §3 | actual edges must be a subset; a hidden edge is a red build |
@@ -595,7 +593,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2592<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2559<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md section 8.6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |

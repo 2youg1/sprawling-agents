@@ -156,7 +156,8 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://opencode.ai/docs/go/",
     },
     HostPreset {
-        // The Kimi Code subscription, whose API does not hang under
+        // The Kimi Code membership API, which a member calls with a key
+        // from the Kimi Code console and which does not hang under
         // `/v1` at all. Appending `/v1` to this host answers 404,
         // which is the same defect `openrouter.ai` is listed for.
         host: "api.kimi.com",
@@ -167,9 +168,9 @@ pub const PRESETS: [HostPreset; 13] = [
         // the OpenAI-compatible one.
         dialect: Some(DialectKind::OpenAi),
         // Pending: the ceilings of the Kimi models are stated by this
-        // endpoint's own model list, which needs a subscription token
-        // to read, and no vendor page reachable from this machine
-        // states them.
+        // endpoint's own model list, which needs a member's key to
+        // read, and no vendor page reachable from this machine states
+        // them.
         models: &[],
         chat: MOONSHOT_CHAT,
         session_header: None,
@@ -215,7 +216,7 @@ pub const PRESETS: [HostPreset; 13] = [
 /// `max_completion_tokens`, and every earlier assistant message keeps
 /// its `reasoning_content`, read at
 /// <https://platform.moonshot.ai/docs/api/chat>. The Kimi Code
-/// subscription serves the same models, and `kimi-k2.7-code` keeps
+/// membership API serves the same models, and `kimi-k2.7-code` keeps
 /// every earlier `reasoning_content` whatever the request says.
 const MOONSHOT_CHAT: ChatSpelling = ChatSpelling {
     ceiling: CeilingField::MaxCompletionTokens,

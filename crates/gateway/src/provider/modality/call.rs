@@ -218,8 +218,7 @@ impl<'a> Face<'a> {
 ///
 /// Stated in terms of the connection rather than of a path, because
 /// that is the fact the person can change: this connection is a
-/// subscription login, or a conversation face, and neither sells a
-/// vector.
+/// conversation face that sells no vector.
 fn unserved(endpoint: &AttachedEndpoint, modality: Modality) -> AxError {
     AxError::failure(
         AxCode::ConfigInvalid,

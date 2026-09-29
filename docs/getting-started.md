@@ -24,7 +24,7 @@ A **model** is the thing that thinks — `claude-sonnet-…`, `gpt-…`, `qwen�
 
 The format decides the shape of each request. sprawling speaks two: the OpenAI chat format (`chat` on the settings page), which most providers, relays and local servers accept, and the Anthropic messages format (`messages`). A third shape, OpenAI's `responses`, is listed and refused, because the city does not call it.
 
-There are three ways to pay for a model, and the city takes all three: an **API key**, billed per token; a **subscription** you sign in to, which has no price per call; and a **local model**, served on this machine with no key at all.
+There are two ways to pay for a model, and the city takes both: an **API key**, billed per token, and a **local model**, served on this machine with no key at all. The city signs in to no subscription.
 
 The city gives models **roles**, so that the expensive model is not used for cheap work:
 
@@ -123,7 +123,7 @@ The largest difference is that nothing here is one conversation. The Mayor plans
 
 ## What you need
 
-A desktop browser, and one model to call: an API key for a provider that speaks the OpenAI or the Anthropic format, an Anthropic subscription you can sign in to, or a local server that speaks the OpenAI format. Nothing else: no npm, no node, no language runtime, no database.
+A desktop browser, and one model to call: an API key for a provider that speaks the OpenAI or the Anthropic format, or a local server that speaks the OpenAI format. Nothing else: no npm, no node, no language runtime, no database.
 
 ## 1 Install
 
@@ -179,8 +179,6 @@ A city with no model to call opens on **welcome**, whose first card, **connect a
 
 **list models** asks the endpoint what it serves and shows each model it found; **attach** registers the endpoint with the models you ticked. Beside the form the page shows the `config.toml` this would write and the request it would send. The key never becomes part of a command or a frame: it goes to your operating system's credential service, and from then on configuration, events and logs hold only a reference of the form `secret:realm/name`.
 
-With an Anthropic subscription instead, choose **with a subscription**: **start the login** gives you an approval page to open, you approve in your browser and paste back the code the provider shows, and **finish the login** stores the token. It is renewed before it expires.
-
 Then give models their roles. The model table has a role column, so a model can take its role as it is attached, and **which model thinks** holds one box per role afterwards. A dispatch with no model chosen for `main` is refused with `E_MODEL_UNCHOSEN`. The context window and output ceiling columns may stay empty: an empty ceiling is filled from what the provider stated, then from the city's table of known models, then from its default.
 
 A local server can also be named before the city starts: with `SPRAWLING_MODEL_URL` and `SPRAWLING_MODEL` set in the environment of `sprawling serve`, a city with nothing registered attaches that server with no key and chooses the named model for `main`.
@@ -233,7 +231,7 @@ No page merges for you, and none rejects work already merged. Your recourse is g
 
 ## 8 Read what it cost, and what happened
 
-**cost** is money and tokens cut by run, by resident, by prefix segment, by skill and by tool, each cut summing to the same total. Where a provider reported no price, as with a subscription, the page counts the calls and tokens instead of printing `$0.00`.
+**cost** is money and tokens cut by run, by resident, by prefix segment, by skill and by tool, each cut summing to the same total. Where a provider reported no price, as with a local model, the page counts the calls and tokens instead of printing `$0.00`.
 
 **the record** is the one history read through four lenses: **the ledger** (every event, with filters that say how many rows they hid), **the archive** (a search across what every building keeps, at the moment you ask), **the recycle bin** and **the log** (this process's diagnostic log). From a terminal, `sprawling view ~/cities/first` reads the same Ledger without a served city, and `--runs` prints the run tree.
 

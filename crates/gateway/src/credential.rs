@@ -16,11 +16,7 @@
 //! between.
 
 mod custodian;
-mod oauth;
 mod vault;
 
 pub use custodian::{Custodian, Custody, Store};
-pub use oauth::{DeviceStep, FormPost, device_login_begin};
-pub use oauth::{OauthPending, oauth_begin};
-pub use oauth::{oauth_random, oauth_redeem, oauth_refresh};
 pub use vault::Persistence;

@@ -10,18 +10,11 @@ Two kinds of outside thing appear here, and the boundary differs, so they get a 
 
 ## 1 Where the intelligence comes from
 
-Signing in to a provider requires knowing four things: the authorization endpoint, the token endpoint, the client id, and the scopes. Calling a face this city did not invent requires one more: the shape of the request and of the answer. Those are **facts** rather than works, and citing them creates no licence obligation. The source still has to be written down, or "check periodically whether upstream changed" is a discipline with no address to go to.
+Calling a face this city did not invent requires knowing the shape of the request and of the answer, and reaching a host by name requires knowing the path its API hangs under. Those are **facts** rather than works, and citing them creates no licence obligation. The source still has to be written down, or "check periodically whether upstream changed" is a discipline with no address to go to.
 
 | Project | Licence | What is followed | Where to look | Tracked to |
 |---|---|---|---|---|
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | OpenAI's subscription login: authorization endpoint, token endpoint, client id, scopes, device-code flow | `codex-rs/login/` | `c9e25207073a` |
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | where OpenAI states the contract for driving codex non-interactively, which is the shape the `Codex` family answers in | `docs/exec.md` | `ab753387ccf5` |
-| [openai/codex](https://github.com/openai/codex) | Apache-2.0 | which base URL a ChatGPT subscription is served under, as against the key-billed platform | `codex-rs/model-provider-info/` | `c9e25207073a` |
-| [anthropics/claude-agent-sdk-typescript](https://github.com/anthropics/claude-agent-sdk-typescript) | proprietary, under Anthropic's Commercial Terms of Service | the protocol types the Claude agent wire is spelled in, and which release changed one | `CHANGELOG.md` | `9e1902d8c304` |
-| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's browser login: that the endpoints come from OIDC discovery at `{issuer}/.well-known/openid-configuration`, and how a refresh is spelled | `crates/codegen/xai-grok-login/src/oidc/` | `f0e3be1100ef` |
-| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's issuer `https://auth.x.ai`, the public client id, and the scopes a subscription asks for | `crates/codegen/xai-grok-login/src/config.rs` | `75810042ca27` |
-| [xai-org/grok-build](https://github.com/xai-org/grok-build) | Apache-2.0 | xAI's device-code login: the two endpoint paths under the issuer, and the grant type | `crates/codegen/xai-grok-login/src/device_code.rs` | `f0e3be1100ef` |
-| [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) | Apache-2.0 | Moonshot's subscription login: the platform table, the OAuth endpoints, and the refresh | `src/kimi_cli/auth/` | `b5f48ef2aaf1` |
+| [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) | Apache-2.0 | the platform table the three Kimi hosts in `gateway::provider::preset` are read from: each host's base path and that it answers on the OpenAI-compatible face | `src/kimi_cli/auth/` | `b5f48ef2aaf1` |
 | [openai/openai-openapi](https://github.com/openai/openai-openapi) | MIT | the request and answer of the embeddings face, which every compatible server copied | `openapi.yaml` | `d983890f7777` |
 | [huggingface/text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) | Apache-2.0 | the request and answer of the rerank face, which has no OpenAI shape to copy | `docs/openapi.json` | `d246fbf17cc7` |
 
@@ -33,15 +26,7 @@ Signing in to a provider requires knowing four things: the authorization endpoin
 
 **One row is one watched path.** The workflow sends the fourth cell to the commits API as a single path, so a cell naming two paths would ask GitHub for a path that does not exist, and a run that asks for nothing gets nothing rather than saying so. Two paths therefore mean two rows with two watermarks. The workflow opens no second issue for a repository that already has one open, so when two paths of one repository move at once, the second is reported only after the first issue is closed. That cost grows with each row a repository gains, and it is paid deliberately: a path nobody watches is a constant that goes stale without a signal.
 
-**The split is by family**, and the families are the four this city signs in to directly: `Codex`, `ClaudeCode`, `GrokBuild` and `KimiCli`, the enum in `gateway::provider::registry`, which cites this section as where its facts come from. A fifth source would buy one cross-check and cost an extra place to read on every review, plus a round of judgement whenever two sources disagree.
-
-**Anthropic's subscription login is implemented here**, in `gateway::credential::oauth`, so no third party's reading of that login is followed. What still moves without warning on the Anthropic side is the protocol the wire is spelled in, which is why the agent SDK's changelog is the watched path. If an Anthropic endpoint moves and no watched path says so, an addressable source for that side is restored.
-
-**Anthropic's SDK repository is not open source, and that changes nothing about what may be followed.** Its `LICENSE.md` places use under Anthropic's Commercial Terms of Service, so no file of it may be copied into this tree under any reading. Facts are still facts: a type name, a field, and the release that changed them carry no copyright, and this city writes its own request. The repository also answers to the shorter name `anthropics/claude-agent-sdk`, which redirects; the row spells the name GitHub canonicalises to, so the watch compares the same repository a person visiting the link lands on.
-
-**codex's `docs/exec.md` is a short pointer to `developers.openai.com`.** The contract it names is published as a web page with no commit history, so the page cannot be watched and the pointer can. A change to the pointer is the one machine-visible signal that the contract moved, which is what this row buys; the contract's own text is read at the destination.
-
-**xAI's login constants are literals in the login crate**: the issuer, the public client id and the scopes sit in its configuration module, and the device-code login posts to `{issuer}/oauth2/device/code` and `{issuer}/oauth2/token` without consulting the discovery document. `gateway::oauth_profiles` states that grant.
+**No vendor's login is followed.** The city signs in to no subscription: a key is the only credential it takes, and subscription quota enters through the vendor's own harness, where the person signs in (`crates/gateway/gateway-SPEC.md` section 8-5). Anthropic's Claude Code compliance page forbids a third-party application to offer Claude login or to store its tokens, Kimi Code keeps OAuth for its official clients, and OpenAI publishes no contract for a third party to call the subscription backend, so following their login constants would only serve a flow this city must not run.
 
 **The ceiling, modality and price cells of `gateway::provider::preset` are re-checked against the vendor's own page or left alone.** A figure re-stated on the strength of a page nobody opened is a figure with no source, which is the defect this whole section exists to prevent.
 
@@ -53,9 +38,8 @@ Signing in to a provider requires knowing four things: the authorization endpoin
 
 **Why follow intelligence and not code**:
 
-1. "Has this endpoint expired?" is not machine-decidable. It is a periodic human task, so the thinner the dependency the better.
+1. "Has this path moved?" is not machine-decidable. It is a periodic human task, so the thinner the dependency the better.
 2. Facts carry no copyright and code does. Following intelligence makes this file a courtesy; following code would make it an obligation.
-3. **Upstream flow code can be wrong while the constants in the same files are right.** An upstream login flow once set the OAuth `state` parameter to the same value as the PKCE `verifier`, and Anthropic's endpoint refuses such a request with `400 invalid_grant`, while every endpoint constant in the same files was correct. **So `oauth_begin`, in `gateway::credential::oauth`, refuses `state == code_verifier`**: somebody copying an upstream shape while wiring it is the one path by which that defect could arrive here.
 
 **What is followed is never a vendor's billing side-channel.** An upstream client may send a field that only its own vendor's server understands, and copying it makes this city send a token it cannot read to endpoints that cannot read it either. The reported case is a per-request line carrying a `cch=` parameter, prepended to the system prompt on the messages face: recognised by that vendor's server, and cache-defeating at every third-party endpoint, because a compatible relay keys its prompt cache on the whole prompt text. So the rule has a check rather than a paragraph: `gateway::provider::stability` asserts that, under one configuration, two dispatches send the same system prefix byte for byte, with nothing in front of it.
 
@@ -200,23 +184,10 @@ What is followed instead is the same kind of thing section 1 follows for provide
 
 > **A table row in this file must not begin with `| [` while also carrying a `github.com` link, unless it is an upstream-watch row.** `.github/workflows/upstream-watch.yml` greps the whole file for rows that open with `| [` and reads a repository out of any `github.com` URL on the line. The three rows above therefore open with plain text and point at each project's documentation site.
 
-## 7 A future bolt-on crate
-
-The provider intelligence table is planned to move out into a crate of its own under its own licence (MIT or Apache-2.0), outside this repository's MPL notice, because it is not part of this work. It covers the four families of section 1, and each family's watch travels with it as its own row.
-
-The cost has to be stated plainly: it would be a **build-time dependency**, so its code enters the shipped binary. The licence obligations therefore **travel with the binary rather than with the repository**:
-
-- Apache-2.0 §4 requires keeping the NOTICE on distribution and marking modified files, so a release artifact must carry a NOTICE.
-- MIT requires keeping the copyright and licence notice, so the same.
-
-The acknowledgement in `README.md` does not discharge either. **An acknowledgement is a courtesy and a NOTICE is an obligation; both are required and neither substitutes for the other.**
-
-The same measure governs **upstream synchronisation**. When an upstream publishes a new version, usually because a new model appeared, realigning the bolt-on crate should be **one run opening one pull request**, rather than a person periodically reading several repositories' diffs. It is work the city can do itself, so no separate mechanism is built for it: a schedule entry and a building that owns the bolt-on are enough.
-
-## 8 What will not be done
+## 7 What will not be done
 
 **Upstream code is not vendored in.** Every `.rs` file here carries the MPL-2.0 notice, and a file pasted from an MIT or Apache-2.0 project cannot wear one. The machine checks only whether a notice is present, not whether it is the right one, **so this rule is held by people, not by a gate.**
 
-**Credential custody is not delegated.** Plaintext reaches only the credential service on the machine the city runs on. Which facts a bolt-on may hold (endpoints, client ids, scopes) and which never leave (custody, redemption, renewal) is part of what the product promises rather than an organisational convenience.
+**Credential custody is not delegated.** Plaintext reaches only the credential service on the machine the city runs on, and redemption happens in the last slot before the wire. That is part of what the product promises rather than an organisational convenience.
 
 **No outside service's key is bundled, nothing is paid, nothing is proxied.** Which service to connect and whose account to use is the user's decision.

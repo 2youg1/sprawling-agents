@@ -14,7 +14,7 @@
 
 如果你只用过聊天窗口，区别在于 agent 是干活，不是回答。你说清要什么结果、怎样算做完；模型接着读文件、跑命令、写代码和文档，只有遇到你写下的规则替它定不了的决定时才来问你。它做过的每件事都有记录，它删掉的每个文件都能放回去。
 
-sprawling 自己不思考，它要一个能调用的模型：一个说 OpenAI 或 Anthropic 兼容格式的 provider 的 API key，一个能登录的 Anthropic 订阅，或者一个本地模型服务。它负责给 agent 排活、发工具、记历史，并把这一切摆给你看。
+sprawling 自己不思考，它要一个能调用的模型：一个说 OpenAI 或 Anthropic 兼容格式的 provider 的 API key，或者一个本地模型服务。它负责给 agent 排活、发工具、记历史，并把这一切摆给你看。
 
 **给谁用。** 想让一组 agent 替自己长期跑固定工作的小团队；想观察 agent 如何分工、如何互相说话的研究者，不论计算机还是人文社科。它面向配置一般的机器设计，一台旧笔记本或一台便宜的云主机就放得下一座城。
 
@@ -149,7 +149,6 @@ trailer 是给城外读者的 projection；trailer 与 Ledger 不一致时，错
 
 | 部件 | 住在哪里 | 怎么换 |
 |---|---|---|
-| 订阅登录用到的事实（跟随 [`docs/third-party.md`](docs/third-party.md) §1 列出的四个 harness 家族） | `gateway::oauth_profiles`（只有数据）、`gateway::credential`（流程与续期） | 加一行配置。凭据托管从不外包：明文只到你电脑上的凭据库。 |
 | 模型端点与兼容格式 | `gateway::endpoint`、`gateway::dialect` | 在设置页填 base URL 与兼容格式。跑在同一台电脑上的模型默认直连、不走系统代理，有一个设置可以改。 |
 | SaaS 与外部工具（[Composio](https://composio.dev) 是众多 MCP server 之一） | `protocol::mcp` 的 `Outbound` 缝及其 stdio、HTTP、SSE 适配器；楼的 `CONFIG.toml` | 改一个 URL 或一条命令就换一个 server；保密楼一个也不起。 |
 | 沙箱 | `runtime::sandbox` 缝（今天是带燃料预算的 wasmtime）；宿主命令由 `runtime::tools` 约束 | 实现这条缝并通过它的一致性测试。 |
@@ -201,7 +200,7 @@ PR 描述、issue、评审意见都可以用你自己的语言写。能的话附
 
 ## 站在别人的肩膀上
 
-登录一家 provider 需要一小组端点与参数。我不自己去读那些 API 文档，而是跟随厂商自己积极维护的 Harness——OpenAI 的 `codex`、Anthropic 的 agent SDK、xAI 的 `grok-build`、Moonshot 的 `kimi-cli`——这座城直接登录的四个家族，一家一个。读的是哪个仓库、仓库里哪条路径、哪个提交，只写在一个地方：[`docs/third-party.md`](docs/third-party.md) §1，每天有一个工作流解析它，去问每个上游有没有变。跟随的是情报，不是代码：端点与参数是事实，流程与凭据托管在这里实现。上游是专有许可还是 Apache-2.0，这一点都一样，而四个里有一个是专有的。
+按主机名接上一家厂商，要知道它的 API 挂在哪条路径下、说哪种兼容格式。这些是事实；厂商自己的客户端写得比文档更准时，跟随的是那个客户端，而不是抄它的代码：读的是哪个仓库、仓库里哪条路径、哪个提交，只写在一个地方：[`docs/third-party.md`](docs/third-party.md) §1，每天有一个工作流解析它，去问每个上游有没有变。不跟随任何厂商的登录。这座城不登录任何订阅，只收 API key，凭据托管在这里实现。
 
 浏览器页面站在同一类东西上。它的运行时依赖是 `svelte`、`effect`，以及 `@lezer` 语法高亮器和它的语法（MIT），页面第一次显示代码时才下载后者；其中没有组件库，`client/src/views/parts/` 里的每一个控件都是本仓库自己的。从 W3C 的 ARIA Authoring Practices 以及 Kobalte 与 Ark UI 的文档里取来的，是以文字发表的行为：一个控件实现哪种模式、每个键做什么、关闭时焦点回到哪里。它们的代码一行都不在这棵树里，所以不欠什么；读它们得出的键盘表写在 [`client/client-SPEC.md`](client/client-SPEC.md)。
 

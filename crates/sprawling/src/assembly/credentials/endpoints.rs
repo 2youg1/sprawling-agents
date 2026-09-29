@@ -10,7 +10,6 @@ use kernel::{AxCode, AxError, EventKind};
 
 use super::super::RunWorker;
 use super::probing::{Probing, probed_payload, reach_of};
-use super::subscription::auth_for;
 use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_headers, hint_of};
 
 mod choosing;
@@ -60,18 +59,17 @@ impl RunWorker {
         } = entered;
         let auth = match credential {
             Credential::Absent { header } => self.kept_credential(&name, dialect, header),
-            Credential::Key { reference, header } => {
-                auth_for(dialect, kernel::SecretRef::parse(&reference)?, header)
-            }
-            Credential::Subscription { reference } => {
-                auth_for(dialect, kernel::SecretRef::parse(&reference)?, None)
-            }
+            Credential::Key { reference, header } => gateway::AuthSpec::for_dialect(
+                dialect,
+                kernel::SecretRef::parse(&reference)?,
+                header,
+            ),
         };
         // Resolved here and nowhere later: what a person set up is
         // settled at the moment they set it up, and a reader that
         // worked it out again from the writer would be answering a
         // narrower question than the one it was asked.
-        let connection_kind = gateway::resolve_connection(hint_of(dialect), None)?;
+        let connection_kind = gateway::resolve_connection(hint_of(dialect))?;
         Ok(gateway::AttachedEndpoint {
             name,
             base_url,
@@ -96,7 +94,7 @@ impl RunWorker {
     /// own, which the wire does not carry yet.
     ///
     /// The reference is kept and the header is worked out again by
-    /// [`auth_for`], because the same key moves between faces: one archived as
+    /// [`gateway::AuthSpec::for_dialect`], because the same key moves between faces: one archived as
     /// `Authorization: Bearer` under the chat face travels as
     /// `x-api-key` under the messages face, and carrying the old
     /// spelling over answers 401 for a key that is good.
@@ -117,7 +115,7 @@ impl RunWorker {
             Some(gateway::AuthSpec::Header { value, .. }) => value.clone(),
             Some(gateway::AuthSpec::None) | None => return gateway::AuthSpec::None,
         };
-        auth_for(dialect, reference, header)
+        gateway::AuthSpec::for_dialect(dialect, reference, header)
     }
 
     /// Registers what the person entered, asking the endpoint what it

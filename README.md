@@ -14,7 +14,7 @@ If you have used Claude Code, Codex CLI or a similar terminal agent, you know th
 
 If you have only used a chat window, the difference is that an agent does work rather than answering. You describe a result and what counts as done; the model then reads files, runs commands, writes code and documents, and asks you only when it reaches a decision it cannot make from the rules you wrote down. Everything it did is recorded, and every file it deleted can be put back.
 
-sprawling does not think by itself. It needs a model to call: an API key for a provider that speaks the OpenAI or the Anthropic format, an Anthropic subscription you can sign in to, or a local model server. It schedules the agents, gives them tools, keeps the history, and shows you all of it.
+sprawling does not think by itself. It needs a model to call: an API key for a provider that speaks the OpenAI or the Anthropic format, or a local model server. It schedules the agents, gives them tools, keeps the history, and shows you all of it.
 
 **Who it is for.** Small teams who want a set of agents to keep running fixed work for them, and researchers — in computer science or in the humanities and social sciences — who want to watch how agents divide work and talk to each other. It is designed for modest hardware, so an old laptop or a cheap cloud machine can hold a city.
 
@@ -149,7 +149,6 @@ Everything external sits on a seam and can be replaced without touching the rest
 
 | Piece | Lives in | How to replace |
 |---|---|---|
-| Subscription-login facts (followed from the four harness families listed in [`docs/third-party.md`](docs/third-party.md) §1) | `gateway::oauth_profiles` (data only), `gateway::credential` (flow and renewal) | Add one profile line. Credential custody is never outsourced: plaintext reaches only the local credential store. |
 | Model endpoint and format | `gateway::endpoint`, `gateway::dialect` | Enter a base URL and a format on the settings page. A model served on this machine is called directly rather than through the machine's proxy, and a setting changes that. |
 | SaaS and external tools ([Composio](https://composio.dev) is one MCP server among others) | the `protocol::mcp` `Outbound` seam and its stdio, HTTP and SSE adapters; a building's `CONFIG.toml` | Change one URL or one command to switch servers; confidential buildings start none. |
 | Sandbox | the `runtime::sandbox` seam (wasmtime with a fuel budget today); `runtime::tools` confinement for host commands | Implement the seam and pass its conformance suite. |
@@ -201,7 +200,7 @@ Pull request descriptions, issues and review comments may be written in your own
 
 ## Standing on the shoulders of others
 
-Logging into a provider requires a small set of endpoints and parameters. Rather than read those API docs myself, I follow the vendors' own actively maintained harnesses — OpenAI's `codex`, Anthropic's agent SDK, xAI's `grok-build`, Moonshot's `kimi-cli` — one for each of the four families this city signs in to directly. Which repository, which path inside it, and which commit has been read live in one place, [`docs/third-party.md`](docs/third-party.md) §1, which a daily workflow parses to ask each upstream whether it moved. What is followed is intelligence, not code: endpoints and parameters are facts, and the flow and credential custody are implemented here. That holds for an upstream under a proprietary licence exactly as for one under Apache-2.0, and one of the four is proprietary.
+Reaching a vendor by host name requires knowing the path its API hangs under and which format it answers in. Those are facts, and where a vendor's own client states them more precisely than its documentation, the client is followed rather than copied: which repository, which path inside it, and which commit has been read live in one place, [`docs/third-party.md`](docs/third-party.md) §1, which a daily workflow parses to ask each upstream whether it moved. No vendor's login is followed. The city signs in to no subscription; a key is the only credential it takes, and its custody is implemented here.
 
 The browser page stands on the same kind of thing. Its runtime dependencies are `svelte`, `effect`, and the `@lezer` syntax highlighter with its grammars (MIT), which the page downloads only when it first shows code; no component library is among them, and every control in `client/src/views/parts/` is this repository's own. What is taken from the W3C's ARIA Authoring Practices and from the Kobalte and Ark UI documentation is behaviour published as prose: which pattern a control implements, what each key does, where the focus returns when it closes. Not one line of their code is in this tree, so nothing is owed for it, and the keyboard table that reading produced is specified in [`client/client-SPEC.md`](client/client-SPEC.md).
 

@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The closed sets a Command carries: which step of a login, which
-//! scope a halt applies to, which governed document is being written,
+//! The closed sets a Command carries: which scope a halt applies to, which governed document is being written,
 //! what is being done to a pursuit, and what a new session keeps from
 //! the one before it.
 //!
@@ -37,22 +36,6 @@ pub enum Carry {
     /// who carries the summary changed the model, and a room that kept
     /// its frozen shape could not dispatch at all.
     Handoff,
-}
-
-/// Which step of a subscription login a `Login` frame carries.
-///
-/// The authorization code arrives by hand: the provider shows it to the
-/// person after they approve, and the person brings it back. That is
-/// the flow the profile table describes, and it needs no listening port
-/// of its own.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum LoginStep {
-    /// Mint the authorization URL for a person to open.
-    Begin,
-    /// Redeem the code that person brought back.
-    Code { code: String },
 }
 
 /// What a Halt, Release or Autonomy change applies to. Unlike modes and

@@ -12,9 +12,9 @@
 //! deliberately handed the city, kept under the name the caller asked
 //! for and never handed back except to the wire.
 
-use super::oauth::degraded_payload;
 use super::vault::{Described, EnvReader, KeyringVault, MemoryVault, Persistence, Vault, env_key};
 
+use kernel::event::record::{ProviderDegraded, VaultFellBack};
 use kernel::{AxCode, AxError, Payload, Sealed, SecretRef};
 use zeroize::Zeroizing;
 
@@ -275,6 +275,18 @@ impl Custodian {
 /// PKCE begin (RFC 7636, S256): pure construction — the browser visit
 /// and the token POST are the caller's I/O. The verifier arrives from
 /// the assembly's seeded randomness (kernel never samples).
+/// The `provider_degraded` line the probe hands back when it fell to
+/// session memory, naming what the platform service said.
+fn degraded_payload(reason: &str) -> Option<Payload> {
+    Payload::of(&ProviderDegraded::VaultFellBack(VaultFellBack {
+        component: "vault".to_owned(),
+        fallback: "session-memory".to_owned(),
+        persistence: Persistence::ThisProcess.as_str().to_owned(),
+        reason: reason.to_owned(),
+    }))
+    .ok()
+}
+
 #[cfg(test)]
 #[allow(
     clippy::float_arithmetic,

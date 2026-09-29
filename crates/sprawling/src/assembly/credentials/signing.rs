@@ -3,21 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Signing in, and the vault: a subscription login in two steps, the
-//! renewal that runs before a credential is used, the one way a
-//! credential enters, and the closure that redeems a reference.
+//! The vault: the one way a credential enters, and the closure that
+//! redeems a reference.
+//!
+//! No login lives here. Subscription quota enters the city through the
+//! vendor's own harness, where the person signs in (gateway-SPEC.md
+//! 8-5), so the only credential this city takes is a key a person
+//! hands it.
 
 use std::sync::Arc;
 
-use kernel::Payload;
-use kernel::event::record::{LoginStarted, SecretCaptured};
-use kernel::{AxCode, AxError, EventKind};
+use kernel::event::record::SecretCaptured;
+use kernel::{AxError, EventKind, Payload};
 
-use crate::serving::random_token;
 use accounting::held_vault::{poisoned_vault, resolving};
 
 use super::super::RunWorker;
-use super::{Credential, Entered, PROBE_TIMEOUT_MS, subscription};
 
 /// How a credential reached the vault, as its `secret_captured` record
 /// states it.
@@ -39,254 +40,7 @@ impl Arrival {
     }
 }
 
-/// A subscription credential's capture line: the provider's
-/// `expires_in` turned into the instant it stops working, in the city's
-/// own clock, because renewal compares that instant with the next call.
-///
-/// # Errors
-/// Propagates a clock that cannot be read.
-fn captured_until(
-    now: kernel::TimeMs,
-    reference: kernel::SecretRef,
-    origin: String,
-    expires_in_s: Option<u64>,
-) -> Result<SecretCaptured, AxError> {
-    let expires_at =
-        expires_in_s.map(|seconds| now.value().saturating_add(seconds.saturating_mul(1_000)));
-    Ok(SecretCaptured {
-        reference,
-        origin,
-        expires_at,
-    })
-}
-
 impl RunWorker {
-    /// Renews a subscription credential that is about to stop working.
-    ///
-    /// Called before the credential is used rather than after a call
-    /// fails: a 401 costs a whole turn to discover, and the expiry the
-    /// provider stated is a fact this city already wrote down. A
-    /// provider with no recorded expiry is left alone - not knowing when
-    /// something expires is not a reason to renew it every time.
-    ///
-    /// # Errors
-    /// Propagates the token endpoint's refusal. A refused refresh means
-    /// the login is over, and saying so beats retrying what will fail
-    /// again.
-    pub(in crate::assembly) fn renew_if_stale(&mut self, provider: &str) -> Result<(), AxError> {
-        let Some(expires_at) = self.credentials.expiries.of(provider) else {
-            return Ok(());
-        };
-        // A minute of margin: a call started now must still be holding a
-        // working credential when it reaches the far end.
-        if self.clock.now()?.value().saturating_add(60_000) < expires_at {
-            return Ok(());
-        }
-        let Some(profile) = gateway::profile(provider) else {
-            return Ok(());
-        };
-        let stored = subscription::oauth_refresh_ref(provider)?;
-        let refresh = {
-            let vault = self
-                .credentials
-                .vault
-                .lock()
-                .map_err(|_| poisoned_vault())?;
-            vault.resolve(&stored)?
-        };
-        let tokens = gateway::oauth_refresh(profile, &refresh, PROBE_TIMEOUT_MS)?;
-        let access = subscription::oauth_ref(provider)?;
-        {
-            let mut vault = self
-                .credentials
-                .vault
-                .lock()
-                .map_err(|_| poisoned_vault())?;
-            vault.set(&access, tokens.access)?;
-            if let Some(next) = tokens.refresh {
-                vault.set(&stored, next)?;
-            }
-        }
-        let captured = captured_until(
-            self.clock.now()?,
-            access,
-            format!("{provider}-renewal"),
-            tokens.expires_in_s,
-        )?;
-        self.record(EventKind::SecretCaptured, Payload::of(&captured)?)
-    }
-
-    /// One step of a subscription login.
-    ///
-    /// Two steps rather than one because a person stands between them:
-    /// the provider shows them a code after they approve, and they bring
-    /// it back. Nothing listens on a port for it — the profile's own
-    /// redirect is the provider's page, so a listener would be a second
-    /// way in that nobody uses.
-    ///
-    /// The two grants share those two steps. A vendor that signs in by
-    /// device code shows the person a short code instead of a
-    /// redirect, and the second step carries that code back: the
-    /// person approving on another device is the only thing this city
-    /// can wait for, and waiting for it inside the worker would park
-    /// the whole city for as long as they take.
-    pub(in crate::assembly) fn login(
-        &mut self,
-        provider: &str,
-        step: channels::LoginStep,
-    ) -> Result<(), AxError> {
-        let profile = *gateway::profile(provider).ok_or_else(|| {
-            // The list is read out of the table rather than written
-            // here: a fifth row would otherwise reach a person as a
-            // sentence naming four.
-            let known: Vec<&str> = gateway::OAUTH_PROFILES
-                .iter()
-                .map(|row| row.provider)
-                .collect();
-            AxError::failure(
-                AxCode::ConfigInvalid,
-                "begin a subscription login",
-                provider.to_owned(),
-            )
-            .with_recovery(format!(
-                "this build knows the subscription flow of: {}; \
-                 other providers attach with an API key",
-                known.join(", ")
-            ))
-        })?;
-        self.login_with(&profile, provider, step)
-    }
-
-    /// The same login against a profile the caller supplies. The lookup
-    /// is the only thing this does not do, which is what lets a test
-    /// point the flow at a server it controls without the production
-    /// path growing an override nobody in production would set.
-    pub(in crate::assembly) fn login_with(
-        &mut self,
-        profile: &gateway::OauthProfile,
-        provider: &str,
-        step: channels::LoginStep,
-    ) -> Result<(), AxError> {
-        match step {
-            channels::LoginStep::Begin => {
-                // Which grant a vendor answers is the profile's
-                // statement, and the branch is here because the two
-                // flows need different things this crate owns: the
-                // redirect draws entropy, and the device code reads
-                // the clock. Gateway samples neither.
-                let pending = match profile.grant {
-                    // Two independent draws. The verifier proves the
-                    // client that redeems is the client that asked;
-                    // the state proves the redirect answers this
-                    // request. One value doing both jobs proves
-                    // neither, and `oauth_begin` refuses it.
-                    gateway::Grant::AuthorizationCode { .. } => gateway::OauthPending::Redirect(
-                        gateway::oauth_begin(profile, random_token(48)?, random_token(24)?)?,
-                    ),
-                    gateway::Grant::DeviceCode { .. } => gateway::device_login_begin(
-                        profile,
-                        self.clock.now()?.value(),
-                        PROBE_TIMEOUT_MS,
-                    )?,
-                };
-                // The URL carries a PKCE challenge and a state, both of
-                // which are public by design; no credential exists yet.
-                // A device login's page is public for the same reason:
-                // the code that pairs with it stays in this process.
-                let started = LoginStarted {
-                    provider: provider.to_owned(),
-                    auth_url: pending.open_url().to_owned(),
-                    user_code: pending.user_code().map(str::to_owned),
-                };
-                self.credentials.logins.insert(provider.to_owned(), pending);
-                self.record(EventKind::LoginStarted, Payload::of(&started)?)
-            }
-            channels::LoginStep::Code { code } => {
-                let asked_at = self.clock.now()?.value();
-                let pending = self.credentials.logins.get_mut(provider).ok_or_else(|| {
-                    AxError::failure(
-                        AxCode::CredentialMissing,
-                        "redeem an authorization code",
-                        provider.to_owned(),
-                    )
-                    .with_recovery(
-                        "start the login first; the code answers a request this process made",
-                    )
-                })?;
-                let tokens = match pending {
-                    gateway::OauthPending::Redirect(redirect) => {
-                        gateway::oauth_redeem(profile, redirect, &code, PROBE_TIMEOUT_MS)?
-                    }
-                    gateway::OauthPending::Device(device) => {
-                        match device.ask(profile, &code, asked_at)? {
-                            gateway::DeviceStep::Signed(tokens) => tokens,
-                            gateway::DeviceStep::NotYet { seconds } => {
-                                return Err(not_approved_yet(provider, seconds));
-                            }
-                        }
-                    }
-                };
-                // Spent, and only now: a person who mistyped keeps the
-                // login they began rather than starting a new one.
-                self.credentials.logins.remove(provider);
-                let access = subscription::oauth_ref(provider)?;
-                {
-                    let mut vault = self
-                        .credentials
-                        .vault
-                        .lock()
-                        .map_err(|_| poisoned_vault())?;
-                    vault.set(&access, tokens.access)?;
-                    if let Some(refresh) = tokens.refresh {
-                        let reference = subscription::oauth_refresh_ref(provider)?;
-                        vault.set(&reference, refresh)?;
-                    }
-                }
-                // When it stops working, in the city's own clock. Not a
-                // secret, and the one fact that decides whether the next
-                // call must renew first.
-                let captured = captured_until(
-                    self.clock.now()?,
-                    access.clone(),
-                    format!("{provider}-subscription"),
-                    tokens.expires_in_s,
-                )?;
-                self.record(EventKind::SecretCaptured, Payload::of(&captured)?)?;
-                if profile.api_base.is_empty() {
-                    return Err(AxError::failure(
-                        AxCode::ConfigInvalid,
-                        "attach the endpoint this login is for",
-                        provider.to_owned(),
-                    )
-                    .with_recovery(
-                        "the token is in the vault; attach the endpoint by hand until this \
-                         provider's api base is known",
-                    ));
-                }
-                // The person logged in to use it, so the endpoint they
-                // logged into is attached here rather than left as a
-                // second thing to remember.
-                self.attach_endpoint(
-                    Entered {
-                        name: provider.to_owned(),
-                        base_url: profile.api_base.to_owned(),
-                        // Which face a subscription answers on is the
-                        // family's statement, read through the
-                        // connection this registration is: a second
-                        // mapping from a provider word to a dialect
-                        // sent Codex's subscription to the chat face.
-                        dialect: gateway::ConnectionKind::Harness(profile.family).wire(),
-                        credential: Credential::Subscription {
-                            reference: access.to_string(),
-                        },
-                        tuning: gateway::EndpointTuning::default(),
-                    },
-                    &[],
-                )
-            }
-        }
-    }
-
     /// Puts one credential in the vault. Nothing about it reaches the
     /// ledger but the fact that it happened, and how it arrived.
     ///
@@ -310,7 +64,6 @@ impl RunWorker {
         let captured = SecretCaptured {
             reference: reference.clone(),
             origin: arrival.spelling().to_owned(),
-            expires_at: None,
         };
         self.record(EventKind::SecretCaptured, Payload::of(&captured)?)
     }
@@ -331,22 +84,4 @@ impl RunWorker {
     pub(crate) fn vault_handle(&self) -> Arc<std::sync::Mutex<gateway::Custodian>> {
         Arc::clone(&self.credentials.vault)
     }
-}
-
-/// The person has not finished approving a device-code login, and the
-/// vendor states how long to leave it before asking again.
-///
-/// A refusal rather than a quiet success: nothing was signed in, and
-/// the login is still in flight, so the one thing the person can do is
-/// finish on the vendor's page and say so again.
-fn not_approved_yet(provider: &str, seconds: u64) -> AxError {
-    AxError::failure(
-        AxCode::CredentialMissing,
-        "finish a device-code login",
-        provider.to_owned(),
-    )
-    .with_recovery(format!(
-        "approve the login on the page this city opened, then enter the code again; \
-         the vendor asks for {seconds} seconds between tries"
-    ))
 }

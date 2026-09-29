@@ -40,7 +40,6 @@ impl<Secret> Command<Secret> {
         match *self {
             Self::Dispatch { ref idem, .. }
             | Self::Wake { ref idem, .. }
-            | Self::Login { ref idem, .. }
             | Self::OpenSession { ref idem, .. }
             | Self::ProbeEndpoint { ref idem, .. }
             | Self::ConfigureBuilding { ref idem, .. }
@@ -105,15 +104,6 @@ impl From<WireCommand> for Command {
                 session,
                 effort,
                 model,
-            },
-            Command::Login {
-                provider,
-                step,
-                idem,
-            } => Self::Login {
-                provider,
-                step,
-                idem,
             },
             Command::ConfigureBuilding {
                 addr,

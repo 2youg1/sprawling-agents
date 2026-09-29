@@ -6,12 +6,10 @@
 -->
 
 <script lang="ts" module>
-  // What is attached, one row each - the list that stands over both
-  // doors a provider is reached through. The subscription door and the
-  // door picker are `shared/provider.svelte`'s own now, and the key
-  // door is `providers/form.svelte`; this file is what came in
-  // through them, and `providers.ts` is the one specifier a caller
-  // reaches the pair through.
+  // What is attached, one row each - the list that stands over the form
+  // a key is entered through. The form is `providers/form.svelte`;
+  // this file is what came in through it, and `providers.ts` is the
+  // one specifier a caller reaches the pair through.
   //
   // **The row is headed by the name the person gave it.** `label` is
   // the display name, and the city answers with the id when nobody

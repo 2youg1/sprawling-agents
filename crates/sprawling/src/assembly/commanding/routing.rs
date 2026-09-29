@@ -179,7 +179,6 @@ impl RunWorker {
                 value,
                 crate::assembly::credentials::signing::Arrival::Enrolment,
             ),
-            channels::Command::Login { provider, step, .. } => self.login(provider.as_str(), step),
             channels::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
             }

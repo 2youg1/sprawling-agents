@@ -66,10 +66,10 @@ sending the same key twice does the thing once and answers twice. An ask
 changes nothing.
 
 Commands, every one the city accepts, generated from the wire schema by
-`cargo xtask docnum` (<!-- xtask:begin command_frames -->30<!-- xtask:end --> in all):
+`cargo xtask docnum` (<!-- xtask:begin command_frames -->29<!-- xtask:end --> in all):
 
 <!-- xtask:begin command_names -->
-`dispatch`, `login`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `remove_building`, `put_secret`, `steer`, `cancel`, `halt`, `reveal`, `restore_discard`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `put_spine`, `connect_toolkit`, `put_preferences`, `put_shelved`, `auth`
+`dispatch`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `remove_building`, `put_secret`, `steer`, `cancel`, `halt`, `reveal`, `restore_discard`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `put_spine`, `connect_toolkit`, `put_preferences`, `put_shelved`, `auth`
 <!-- xtask:end -->
 
 `put_secret` is listed because the schema names it, and no socket can send

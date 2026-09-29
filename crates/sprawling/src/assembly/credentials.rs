@@ -3,12 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What this city can sign in as, and what it may call.
+//! Which keys this city holds, and what it may call.
 //!
 //! The values and the readings live here; `held` is what the worker
-//! keeps (the book, the vault, the expiries, the logins begun),
-//! `signing` the login and the vault's use, `endpoints` what may be
-//! called.
+//! keeps (the book and the vault), `signing` the vault's use,
+//! `endpoints` what may be called.
 
 use kernel::{AxCode, AxError};
 
@@ -17,7 +16,6 @@ mod environment;
 pub(super) mod held;
 mod probing;
 pub(super) mod signing;
-pub(super) mod subscription;
 
 /// The name the environment-configured endpoint is attached under, so a
 /// person reading the settings page can see where it came from.
@@ -133,10 +131,9 @@ pub(super) fn tuning_of(
 
 /// How a credential proves itself to a provider.
 ///
-/// Exhaustive rather than a reference beside a header name: a key and
-/// a subscription token do not travel in the same header, and "a
-/// subscription token in the header a key uses" is a 401 nobody can
-/// read off a form.
+/// Exhaustive rather than an optional reference: "nothing entered this
+/// time" keeps the key the city already holds, which an absent
+/// reference beside a header name cannot say.
 pub(super) enum Credential {
     /// No key was entered this time, which is not the same as no key:
     /// the city keeps what it has for this endpoint, and an empty box
@@ -151,15 +148,10 @@ pub(super) enum Credential {
         reference: String,
         header: Option<String>,
     },
-    /// What a login earned. Always `Authorization: Bearer`, whatever
-    /// the compatible format does with keys: both first parties issue
-    /// their subscription tokens that way.
-    Subscription { reference: String },
 }
 
 impl Credential {
-    /// What a wire command carries. A subscription token is never among
-    /// it: that one is earned by a login inside this process.
+    /// What a wire command carries.
     pub(super) fn entered(reference: Option<String>, header: Option<String>) -> Credential {
         match reference {
             None => Credential::Absent { header },

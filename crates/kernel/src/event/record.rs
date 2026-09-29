@@ -69,7 +69,7 @@ pub use control::{
     BuildingConfigured, BuildingCreated, CancelReceived, CityInitialized, FiredAction, GateChecked,
     HandoffWritten, PolicyChanged, WatchdogFired,
 };
-pub use credential::{LoginStarted, SecretCaptured, ToolkitLinkOpened};
+pub use credential::{SecretCaptured, ToolkitLinkOpened};
 pub use discard::{AssetArchived, DiscardRestored, FileDiscarded};
 pub use endpoint::{AttachedTuning, EndpointAttached, EndpointLost, InputKinds, ModelSelected};
 pub use governance::{

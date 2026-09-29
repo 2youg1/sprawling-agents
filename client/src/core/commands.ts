@@ -284,16 +284,6 @@ export function selectModel(
   };
 }
 
-export function loginBegin(provider: string): Command {
-  return { login: { provider: providerName(provider), step: "begin", idem: mintIdem() } };
-}
-
-export function loginCode(provider: string, code: string): Command {
-  return {
-    login: { provider: providerName(provider), step: { code: { code } }, idem: mintIdem() },
-  };
-}
-
 // Connecting one outside application through the broker that holds its
 // OAuth. It names the application and nothing else: who this city is to
 // the broker is the city's own name, which it already knows, and an id

@@ -8,11 +8,11 @@
 //!
 //! Three modules each hold a piece of this answer and none of them can
 //! state it: the dialect says which request writer runs, the credential
-//! says whether a key or a subscription login pays, and the ceiling
-//! ladder says what the call may write. Three partial answers agree
-//! only until one of them is changed, and a registration that folded a
-//! responses URL into the chat dialect would leave every later reader
-//! guessing what the person pasted.
+//! says which key pays, and the ceiling ladder says what the call may
+//! write. Three partial answers agree only until one of them is
+//! changed, and a registration that folded a responses URL into the
+//! chat dialect would leave every later reader guessing what the person
+//! pasted.
 //!
 //! [`ConnectionKind`] is that one answer. It is resolved once, at
 //! attach, after normalisation has folded the pasted URL, the person's
@@ -21,85 +21,21 @@
 //! re-derives it**, which is the whole point: a fact derived twice is a
 //! fact that can differ twice.
 //!
-//! A responses URL is called on the responses face:
-//! [`ConnectionKind::wire`] answers `OpenAiResponses` for it.
-//!
-//! What this module does not hold: the request bytes (`dialect`), the
-//! header a key travels in (`endpoint::auth`), and the login flow of a
-//! harness family (`credential::oauth`). It names the connection; the
-//! modules that already own those facts keep them.
+//! What this module does not hold: the request bytes (`dialect`) and
+//! the header a key travels in (`endpoint::auth`). It names the
+//! connection; the modules that already own those facts keep them.
 
 use kernel::{AxCode, AxError, DialectKind};
 
 use crate::router::DialectHint;
 
-/// A first-party client whose subscription this city signs in to
-/// directly.
-///
-/// A family is not a URL and not a dialect: it is a vendor's own
-/// harness, whose login this city implements itself and whose wire this
-/// city writes itself. The city installs none of these clients, spawns
-/// none of them, and carries none of their source — it follows their
-/// published facts, which is what `docs/third-party.md` §1 records.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum Family {
-    /// OpenAI's own client; signs in by device flow, answers on the
-    /// responses face.
-    Codex,
-    /// Anthropic's own client; the subscription OAuth this city already
-    /// implements in `credential::oauth`.
-    ClaudeCode,
-    /// xAI's own client; OpenAI-compatible chat under `api.x.ai`.
-    GrokBuild,
-    /// Moonshot's own client; OpenAI-compatible chat under the Kimi
-    /// hosts.
-    KimiCli,
-}
-
-impl Family {
-    /// The request shape this family's subscription answers in.
-    ///
-    /// Stated here rather than beside each login flow, so that a
-    /// registration made from a subscription and one made from a pasted
-    /// URL are checked against the same statement.
-    #[must_use]
-    pub const fn shape(self) -> DialectHint {
-        match self {
-            Family::Codex => DialectHint::Responses,
-            Family::ClaudeCode => DialectHint::Messages,
-            Family::GrokBuild | Family::KimiCli => DialectHint::Chat,
-        }
-    }
-
-    /// The word this family travels under in the ledger, on the wire,
-    /// and in a person's configuration file. One spelling, written
-    /// here.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Family::Codex => "codex",
-            Family::ClaudeCode => "claude_code",
-            Family::GrokBuild => "grok_build",
-            Family::KimiCli => "kimi_cli",
-        }
-    }
-
-    /// Every family, in the order this module declares them. The data
-    /// face a credential form is generated from, so that adding a
-    /// family adds a form rather than a form and a list.
-    pub const ALL: [Family; 4] = [
-        Family::Codex,
-        Family::ClaudeCode,
-        Family::GrokBuild,
-        Family::KimiCli,
-    ];
-}
-
 /// How this city talks to one attached endpoint.
 ///
-/// Exhaustive and closed: a fifth way to connect is a compile error at
+/// Exhaustive and closed: a fourth way to connect is a compile error at
 /// every reader, which is how a new one is kept from being approximated
-/// with the nearest of the four already written.
+/// with the nearest of the three already written. Subscription quota is
+/// not a way to connect: it enters the city through the vendor's own
+/// harness (gateway-SPEC.md 8-5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ConnectionKind {
     /// The OpenAI-compatible chat face — what most relays, most local
@@ -111,63 +47,47 @@ pub enum ConnectionKind {
     Responses,
     /// Anthropic's messages face.
     AnthropicNative,
-    /// A first-party harness this city signs in to as that vendor's own
-    /// client.
-    Harness(Family),
 }
 
 impl ConnectionKind {
     /// Which request writer serves this connection.
-    ///
-    /// Three writers for four connections: the two OpenAI-compatible
-    /// harnesses are called on the chat face their vendors serve, and
-    /// Codex is called on the responses face its subscription answers
-    /// on — which is what [`Family::shape`] already states, read here
-    /// rather than restated.
     #[must_use]
     pub const fn wire(self) -> DialectKind {
         match self {
             ConnectionKind::AnthropicNative => DialectKind::Anthropic,
             ConnectionKind::OpenAiCompat => DialectKind::OpenAi,
             ConnectionKind::Responses => DialectKind::OpenAiResponses,
-            ConnectionKind::Harness(family) => match family {
-                Family::ClaudeCode => DialectKind::Anthropic,
-                Family::Codex => DialectKind::OpenAiResponses,
-                Family::GrokBuild | Family::KimiCli => DialectKind::OpenAi,
-            },
         }
     }
 
     /// The word this connection travels under, everywhere it travels.
-    ///
-    /// Flat rather than compound: a harness is spelled by its family
-    /// alone, so a reader splits nothing and a payload key holds one
-    /// token. [`ConnectionKind::parse`] is the inverse.
+    /// [`ConnectionKind::parse`] is the inverse.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             ConnectionKind::OpenAiCompat => "openai_compat",
             ConnectionKind::Responses => "responses",
             ConnectionKind::AnthropicNative => "anthropic_native",
-            ConnectionKind::Harness(family) => family.as_str(),
         }
     }
 
     /// The connection one recorded word names.
     ///
+    /// Besides the three words this build writes, it reads the four an
+    /// older build wrote for an endpoint a subscription login attached,
+    /// each as the face that vendor answered on. The credential such an
+    /// endpoint holds is no longer renewed, so its first call after the
+    /// token expires is refused by the vendor, and the person attaches
+    /// a key in its place (gateway-SPEC.md 8-5).
+    ///
     /// # Errors
     /// A word no build of this city ever wrote, which a ledger written
     /// by a newer binary is the only way to reach.
     pub fn parse(word: &str) -> Result<ConnectionKind, AxError> {
-        for family in Family::ALL {
-            if family.as_str() == word {
-                return Ok(ConnectionKind::Harness(family));
-            }
-        }
         match word {
-            "openai_compat" => Ok(ConnectionKind::OpenAiCompat),
-            "responses" => Ok(ConnectionKind::Responses),
-            "anthropic_native" => Ok(ConnectionKind::AnthropicNative),
+            "openai_compat" | "grok_build" | "kimi_cli" => Ok(ConnectionKind::OpenAiCompat),
+            "responses" | "codex" => Ok(ConnectionKind::Responses),
+            "anthropic_native" | "claude_code" => Ok(ConnectionKind::AnthropicNative),
             other => Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "read how an endpoint is connected",
@@ -185,49 +105,11 @@ impl ConnectionKind {
 /// Resolve how an endpoint is connected, once, at attach.
 ///
 /// `shape` is what normalisation settled — the pasted URL first, then
-/// the person's choice, then the host table. `subscription` is the
-/// family whose login this registration pays with, and `None` is a key
-/// the person entered.
-///
-/// A subscription decides the connection, because the harness wire
-/// belongs to the vendor rather than to the form. A contradiction is
-/// refused rather than resolved silently: somebody who signed in to one
-/// vendor and pasted another vendor's URL has made a mistake that costs
-/// a 404 at the first call and is free to fix here.
+/// the person's choice, then the host table.
 ///
 /// # Errors
-/// When nothing said what shape the endpoint answers in, and when a
-/// subscription and a pasted URL name different shapes.
-pub fn resolve(
-    shape: DialectHint,
-    subscription: Option<Family>,
-) -> Result<ConnectionKind, AxError> {
-    match subscription {
-        None => by_shape(shape),
-        Some(family) => {
-            if shape == DialectHint::Unset || shape == family.shape() {
-                Ok(ConnectionKind::Harness(family))
-            } else {
-                Err(AxError::failure(
-                    AxCode::ConfigInvalid,
-                    "resolve how an endpoint is connected",
-                    format!(
-                        "signed in to {}, which answers on {}, but this URL names another face",
-                        family.as_str(),
-                        shape_word(family.shape())
-                    ),
-                )
-                .with_recovery(
-                    "attach the vendor's own base URL under this subscription, or attach \
-                     the pasted URL with an API key instead",
-                ))
-            }
-        }
-    }
-}
-
-/// The connection a pasted URL names on its own.
-fn by_shape(shape: DialectHint) -> Result<ConnectionKind, AxError> {
+/// When nothing said what shape the endpoint answers in.
+pub fn resolve(shape: DialectHint) -> Result<ConnectionKind, AxError> {
     match shape {
         DialectHint::Chat => Ok(ConnectionKind::OpenAiCompat),
         DialectHint::Responses => Ok(ConnectionKind::Responses),
@@ -245,16 +127,6 @@ fn by_shape(shape: DialectHint) -> Result<ConnectionKind, AxError> {
     }
 }
 
-/// One shape as a person reads it in a refusal.
-fn shape_word(shape: DialectHint) -> &'static str {
-    match shape {
-        DialectHint::Unset => "no face",
-        DialectHint::Chat => "chat completions",
-        DialectHint::Responses => "responses",
-        DialectHint::Messages => "messages",
-    }
-}
-
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -269,11 +141,11 @@ mod tests {
     #[test]
     fn a_pasted_face_decides_the_connection() {
         assert_eq!(
-            resolve(DialectHint::Chat, None).unwrap(),
+            resolve(DialectHint::Chat).unwrap(),
             ConnectionKind::OpenAiCompat
         );
         assert_eq!(
-            resolve(DialectHint::Messages, None).unwrap(),
+            resolve(DialectHint::Messages).unwrap(),
             ConnectionKind::AnthropicNative
         );
     }
@@ -283,62 +155,17 @@ mod tests {
     /// path.
     #[test]
     fn a_responses_url_is_registered_and_called_on_the_responses_face() {
-        let kind = resolve(DialectHint::Responses, None).unwrap();
+        let kind = resolve(DialectHint::Responses).unwrap();
         assert_eq!(kind, ConnectionKind::Responses);
         assert_ne!(kind, ConnectionKind::OpenAiCompat);
         assert_eq!(kind.wire(), DialectKind::OpenAiResponses);
     }
 
-    /// One authority for which face a family answers on: the writer
-    /// this build picks agrees with the shape the family states, for
-    /// every family, so a subscription cannot be registered against
-    /// one face and called on another.
-    #[test]
-    fn every_family_is_called_on_the_face_it_says_it_answers_on() {
-        for family in Family::ALL {
-            let by_shape = by_shape(family.shape()).unwrap();
-            assert_eq!(
-                ConnectionKind::Harness(family).wire(),
-                by_shape.wire(),
-                "{} is called on a face it did not claim",
-                family.as_str()
-            );
-        }
-    }
-
     #[test]
     fn an_endpoint_nobody_named_a_shape_for_is_refused_with_a_way_out() {
-        let refusal = resolve(DialectHint::Unset, None).unwrap_err();
+        let refusal = resolve(DialectHint::Unset).unwrap_err();
         assert_eq!(*refusal.code(), AxCode::ConfigInvalid);
         assert!(refusal.recovery().contains("chat/completions"));
-    }
-
-    #[test]
-    fn a_subscription_names_the_connection_and_its_wire() {
-        for family in Family::ALL {
-            let kind = resolve(family.shape(), Some(family)).unwrap();
-            assert_eq!(kind, ConnectionKind::Harness(family));
-            assert_eq!(resolve(DialectHint::Unset, Some(family)).unwrap(), kind);
-        }
-        assert_eq!(
-            ConnectionKind::Harness(Family::ClaudeCode).wire(),
-            DialectKind::Anthropic
-        );
-        assert_eq!(
-            ConnectionKind::Harness(Family::GrokBuild).wire(),
-            DialectKind::OpenAi
-        );
-        assert_eq!(
-            ConnectionKind::Harness(Family::Codex).wire(),
-            DialectKind::OpenAiResponses
-        );
-    }
-
-    #[test]
-    fn a_subscription_and_a_url_that_disagree_are_refused_at_attach() {
-        let refusal = resolve(DialectHint::Messages, Some(Family::GrokBuild)).unwrap_err();
-        assert_eq!(*refusal.code(), AxCode::ConfigInvalid);
-        assert!(refusal.subject().contains("grok_build"));
     }
 
     #[test]
@@ -348,10 +175,6 @@ mod tests {
             ConnectionKind::OpenAiCompat,
             ConnectionKind::Responses,
             ConnectionKind::AnthropicNative,
-            ConnectionKind::Harness(Family::Codex),
-            ConnectionKind::Harness(Family::ClaudeCode),
-            ConnectionKind::Harness(Family::GrokBuild),
-            ConnectionKind::Harness(Family::KimiCli),
         ];
         for kind in kinds {
             assert_eq!(ConnectionKind::parse(kind.as_str()).unwrap(), kind);

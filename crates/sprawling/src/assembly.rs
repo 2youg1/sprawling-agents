@@ -68,7 +68,6 @@ mod workbench;
 use collaborating::Collaborating;
 use commanding::entrance::Entrance;
 use credentials::held::Credentials;
-use credentials::subscription::Expiries;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
 pub(crate) use desk::CommandDesk;
 use desk::Posted;

@@ -67,7 +67,7 @@ pub use carried_name::{ProviderName, TemplateName, ToolkitSlug};
 pub use command::COMMAND_NAMES;
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Carry, Command, WireCommand};
-pub use command::{GovernedDocument, HaltScope, LoginStep, NoSecret};
+pub use command::{GovernedDocument, HaltScope, NoSecret};
 pub use command::{PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
 pub use kernel::{FileChange, How, Lines};

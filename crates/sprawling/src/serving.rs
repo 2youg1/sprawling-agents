@@ -29,7 +29,6 @@ pub(crate) mod standing;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use door::random_token;
 pub use door::{Keyed, key_for, open_vault};
 pub use journal::{Clock, Journal};
 pub use serve::Serving;

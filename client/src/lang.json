@@ -2259,10 +2259,6 @@
     "en": "welcome",
     "zh": "引导"
   },
-  "setup_attach": {
-    "en": "with a key",
-    "zh": "用 key"
-  },
   "setup_attach_btn": {
     "en": "attach",
     "zh": "添加"
@@ -2439,26 +2435,6 @@
     "en": "on this computer",
     "zh": "就在这台电脑上"
   },
-  "setup_login": {
-    "en": "with a subscription",
-    "zh": "用订阅"
-  },
-  "setup_login_begin": {
-    "en": "start the login",
-    "zh": "开始登录"
-  },
-  "setup_login_code": {
-    "en": "code",
-    "zh": "码"
-  },
-  "setup_login_finish": {
-    "en": "finish the login",
-    "zh": "完成登录"
-  },
-  "setup_login_open": {
-    "en": "open the approval page",
-    "zh": "打开批准页"
-  },
   "setup_look": {
     "en": "list models",
     "zh": "获取模型列表"
@@ -2598,10 +2574,6 @@
   "setup_probe_read": {
     "en": "what the city found at {host}",
     "zh": "城在 {host} 上读到的"
-  },
-  "setup_providers": {
-    "en": "providers",
-    "zh": "模型供应方"
   },
   "setup_proxying": {
     "en": "proxy",

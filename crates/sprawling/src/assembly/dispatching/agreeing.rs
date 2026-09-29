@@ -114,8 +114,8 @@ impl RunWorker {
     /// # Errors
     /// Refuses a halted scope, the reserved subtree, rules that will not
     /// load, a tag with no model behind it, an endpoint that is no
-    /// longer attached, a confidential building whose model would leave
-    /// this machine, and a subscription credential that will not renew.
+    /// longer attached, and a confidential building whose model would
+    /// leave this machine.
     pub(super) fn agree_to_work(&mut self, at: &Assignment) -> Result<Agreed, AxError> {
         let addr = &at.addr;
         if let Some(scope) = self.halted_by(addr) {
@@ -135,12 +135,6 @@ impl RunWorker {
         let rules = city::load(&self.city_root, building.addr())?;
         let own = city::own_layer(&self.city_root, addr)?;
         let tag = self.tag_for(at.model.as_deref(), own.model())?;
-        let chosen = self.credentials.book.select(tag, rules.policy())?;
-        // A subscription credential that expires mid-run is a run that
-        // dies on its second turn, so it is renewed before the run
-        // starts rather than after a call comes back refused. The
-        // endpoint a login attached carries the provider's own name.
-        self.renew_if_stale(&chosen.endpoint.name.clone())?;
         let chosen = self.credentials.book.select(tag, rules.policy())?;
         let model = chosen.entry.clone();
         let provider = chosen.endpoint.name.clone();

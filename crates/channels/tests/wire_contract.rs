@@ -48,13 +48,13 @@ fn exposed() -> SocketAddr {
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // Thirty commands, thirty-five queries. The count is not a style
     // choice - it is the wire's closed surface.
-    assert_eq!(COMMAND_NAMES.len(), 30, "command table");
+    assert_eq!(COMMAND_NAMES.len(), 29, "command table");
     assert_eq!(QUERY_NAMES.len(), 36, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 30, "command names are distinct");
+    assert_eq!(sorted.len(), 29, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
@@ -116,7 +116,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "918112851b94af1a7c46a16160fd89c5b30409f3a57d4cf219737f38eb1ab8c5";
+const WIRE_SCHEMA_GOLDEN: &str = "1177945fe95db38c364edb312de147e060055e3f729bff9a3a222d5af397b733";
 
 // -------------------------------------------------------------- binding face
 
@@ -347,11 +347,6 @@ fn sample_of_every_command() -> Vec<Command> {
             session: Some(kernel::SessionName::parse("ship it").unwrap()),
             effort: Some(kernel::Effort::High),
             model: None,
-        },
-        Command::Login {
-            provider: ProviderName::parse("anthropic").unwrap(),
-            step: channels::LoginStep::Begin,
-            idem,
         },
         Command::PutDocument {
             which: channels::GovernedDocument::Mayor,
@@ -672,37 +667,6 @@ fn a_dispatch_frame_carries_no_spend_ceiling() {
     assert!(
         !text.contains("budget"),
         "a dispatch frame states no ceiling: {text}"
-    );
-}
-
-/// The second step of a login has its own byte form: a page that means
-/// "redeem this code" must not be readable as "start a login".
-#[test]
-fn both_login_steps_survive_the_round_trip_and_stay_distinct() {
-    let idem = kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"login");
-    let begin = Command::Login {
-        provider: ProviderName::parse("anthropic").unwrap(),
-        step: channels::LoginStep::Begin,
-        idem,
-    };
-    let code = Command::Login {
-        provider: ProviderName::parse("anthropic").unwrap(),
-        step: channels::LoginStep::Code {
-            code: "the-code".to_owned(),
-        },
-        idem,
-    };
-    let begin_text = serde_json::to_string(&begin).unwrap();
-    let code_text = serde_json::to_string(&code).unwrap();
-    assert_ne!(begin_text, code_text, "one step must not read as the other");
-    assert!(code_text.contains("the-code"));
-    assert_eq!(
-        serde_json::from_str::<channels::WireCommand>(&begin_text).unwrap(),
-        begin
-    );
-    assert_eq!(
-        serde_json::from_str::<channels::WireCommand>(&code_text).unwrap(),
-        code
     );
 }
 

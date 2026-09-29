@@ -289,12 +289,13 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
     assert!(restarted.halted.is_empty());
 }
 
-/// The expiry table is folded from the capture records like every other
-/// book the worker keeps. Written only by the process that logged in, it
-/// would leave a restart with an empty table that renews nothing and
-/// meets each expiry as a 401 in the middle of a run.
+/// A ledger an older build wrote while it still signed in to
+/// subscriptions still folds: its capture with an expiry, its
+/// `login_started` and its endpoint attached under a harness word all
+/// read, and the endpoint comes back on the face its vendor answered
+/// on (gateway-SPEC.md 8-5).
 #[test]
-fn when_a_subscription_credential_expires_survives_a_restart() {
+fn a_ledger_an_older_build_wrote_with_a_subscription_login_still_folds() {
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
@@ -303,45 +304,31 @@ fn when_a_subscription_credential_expires_survives_a_restart() {
         runtime::diagnostics::Diagnostics::off(),
     )
     .unwrap();
-
-    // The shape `login` and `renew_if_stale` write: the reference
-    // names the provider, and the expiry is a time rather than a
-    // secret.
-    let mut captured = serde_json::Map::new();
-    captured.insert(
-        "ref".to_owned(),
-        serde_json::Value::String("secret:anthropic/oauth".to_owned()),
-    );
-    captured.insert(
-        "origin".to_owned(),
-        serde_json::Value::String("anthropic-subscription".to_owned()),
-    );
-    captured.insert(
-        "expires_at".to_owned(),
-        serde_json::Value::Number(1_700_000_000_000_u64.into()),
-    );
-    worker
-        .record(
+    let line = |text: &str| kernel::Payload::new(serde_json::from_str(text).unwrap()).unwrap();
+    for (kind, text) in [
+        (
+            kernel::EventKind::LoginStarted,
+            r#"{"auth_url":"https://claude.ai/oauth/authorize","provider":"anthropic"}"#,
+        ),
+        (
             kernel::EventKind::SecretCaptured,
-            kernel::Payload::new(captured).unwrap(),
-        )
-        .unwrap();
+            r#"{"expires_at":1700000000000,"origin":"anthropic-subscription","ref":"secret:anthropic/oauth"}"#,
+        ),
+        (
+            kernel::EventKind::EndpointAttached,
+            r#"{"auth":"secret:anthropic/oauth","base_url":"https://api.anthropic.com","connection_kind":"claude_code","dialect":"anthropic","models":[],"name":"anthropic"}"#,
+        ),
+    ] {
+        worker.record(kind, line(text)).unwrap();
+    }
+    let rebuilt = Standing::fold(&report.ledger_dir).unwrap().book;
+    let endpoint = rebuilt
+        .endpoints()
+        .find(|endpoint| endpoint.name == "anthropic")
+        .expect("the endpoint the old login attached is still in the book");
     assert_eq!(
-        worker.credentials.expiries.of("anthropic"),
-        Some(1_700_000_000_000),
-        "the worker that wrote the line reads its own book"
-    );
-
-    let rebuilt = Standing::fold(&report.ledger_dir).unwrap().expiries;
-    assert_eq!(
-        rebuilt.of("anthropic"),
-        worker.credentials.expiries.of("anthropic"),
-        "a restarted city renews on the schedule the provider stated"
-    );
-    assert_eq!(
-        rebuilt.of("openai"),
-        None,
-        "a provider that never stated an expiry stays unstated"
+        endpoint.connection_kind,
+        gateway::ConnectionKind::AnthropicNative
     );
 }
 

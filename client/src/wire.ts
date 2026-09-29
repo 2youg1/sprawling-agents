@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 44 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "918112851b94af1a7c46a16160fd89c5b30409f3a57d4cf219737f38eb1ab8c5" as const;
+export const WIRE_HASH = "1177945fe95db38c364edb312de147e060055e3f729bff9a3a222d5af397b733" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `channels::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -523,7 +523,7 @@ export type PursuitLine = typeof PursuitLine.Type;
  * The closed event vocabulary.
  */
 export const EventKind = Schema.Union(
-  Schema.Literal("city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "login_started", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed", "went_back", "file_restored"),
+  Schema.Literal("city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed", "went_back", "file_restored"),
   Schema.Literal("building_configured"),
   Schema.Literal("building_removed"),
   Schema.Literal("session_opened"),
@@ -532,6 +532,7 @@ export const EventKind = Schema.Union(
   Schema.Literal("roadmap_blocked"),
   Schema.Literal("pursuit_changed"),
   Schema.Literal("endpoint_probed"),
+  Schema.Literal("login_started"),
   Schema.Literal("governed_document_written"),
   Schema.Literal("spine_document_written"),
   Schema.Literal("rules_changed"),
@@ -2696,24 +2697,6 @@ export const IdemKey = Schema.String.pipe(Schema.pattern(new RegExp("^idem1-[0-9
 export type IdemKey = typeof IdemKey.Type;
 
 /**
- * Which step of a subscription login a `Login` frame carries.
- * 
- * The authorization code arrives by hand: the provider shows it to the
- * person after they approve, and the person brings it back. That is
- * the flow the profile table describes, and it needs no listening port
- * of its own.
- */
-export const LoginStep = Schema.Union(
-  Schema.Literal("begin"),
-  Schema.Struct({
-    code: Schema.Struct({
-      code: Schema.String,
-    }),
-  }),
-).annotations({ identifier: "LoginStep" });
-export type LoginStep = typeof LoginStep.Type;
-
-/**
  * Which discipline a run works under. A run sits in exactly one.
  * 
  * Closed, and carried on the wire in this spelling. A word outside this
@@ -2877,13 +2860,6 @@ export const Command = Schema.Union(
       model: Schema.optional(Schema.NullOr(Schema.String)),
       session: Schema.optional(Schema.NullOr(SessionName)),
       task: Schema.String,
-    }),
-  }),
-  Schema.Struct({
-    login: Schema.Struct({
-      idem: IdemKey,
-      provider: ProviderName,
-      step: LoginStep,
     }),
   }),
   Schema.Struct({

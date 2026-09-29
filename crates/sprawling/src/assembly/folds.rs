@@ -20,7 +20,7 @@ use crate::views::snapshot::start::{
     SnapshotFold, city_root_of, cut, cut_at, last_line, start_audited,
 };
 
-use super::{Entrance, Expiries};
+use super::Entrance;
 
 mod collaboration;
 mod session;
@@ -46,11 +46,6 @@ pub(crate) struct Standing {
     /// the same pass as the other three: recognising a repeat across a
     /// restart must not cost a second read of the whole history.
     pub(super) entrance: Entrance,
-    /// When each subscription credential stops working. On the same
-    /// pass for the same reason, and folded at all because a worker
-    /// that read it only from its own process renewed nothing after a
-    /// restart and met each expiry as a 401 mid-run.
-    pub(super) expiries: Expiries,
     /// What each room's current session branched from, until the run
     /// that begins it is written.
     pub(super) origins: SessionOrigins,

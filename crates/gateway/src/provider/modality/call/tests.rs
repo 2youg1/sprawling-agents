@@ -10,7 +10,7 @@ use super::*;
 use crate::endpoint::AuthSpec;
 use crate::endpoint::fakes;
 use crate::endpoint::redemption::redemption;
-use crate::provider::registry::{ConnectionKind, Family};
+use crate::provider::registry::ConnectionKind;
 use crate::router::EndpointTuning;
 use kernel::event::Payload;
 
@@ -150,27 +150,21 @@ fn a_rerank_call_reads_the_answer_and_records_the_line() {
 /// A connection that serves no such face is refused before a byte
 /// leaves, and the refusal says which connection it was.
 #[test]
-fn a_subscription_is_refused_before_anything_is_sent() {
-    for family in Family::ALL {
-        let endpoint = attached("http://127.0.0.1:1", ConnectionKind::Harness(family));
-        for refusal in [
-            Vectors::of(&endpoint, "bge-m3".to_owned()).err(),
-            Ranks::of(&endpoint, "bge-reranker".to_owned()).err(),
-        ] {
-            let refused = refusal.expect("a subscription sells a conversation, not a vector");
-            assert_eq!(*refused.code(), AxCode::ConfigInvalid);
-            assert!(
-                refused.subject().contains(family.as_str()),
-                "{}",
-                refused.subject()
-            );
-            assert!(
-                refused.recovery().contains("embedding") || refused.recovery().contains("rerank")
-            );
-        }
+fn a_messages_endpoint_is_refused_before_anything_is_sent() {
+    let endpoint = attached("http://127.0.0.1:1", ConnectionKind::AnthropicNative);
+    for refusal in [
+        Vectors::of(&endpoint, "bge-m3".to_owned()).err(),
+        Ranks::of(&endpoint, "bge-reranker".to_owned()).err(),
+    ] {
+        let refused = refusal.expect("the messages face sells a conversation, not a vector");
+        assert_eq!(*refused.code(), AxCode::ConfigInvalid);
+        assert!(
+            refused.subject().contains("anthropic_native"),
+            "{}",
+            refused.subject()
+        );
+        assert!(refused.recovery().contains("embedding") || refused.recovery().contains("rerank"));
     }
-    let messages = attached("http://127.0.0.1:1", ConnectionKind::AnthropicNative);
-    assert!(Ranks::of(&messages, "x".to_owned()).is_err());
 }
 
 /// The responses face serves embeddings and no rerank, which is the

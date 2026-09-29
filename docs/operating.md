@@ -53,7 +53,7 @@ An item marked **outside content** began with text from outside the city — a w
 
 ## Reading cost honestly
 
-The cost page shows shares against the billed total rather than normalising its own rows, so an unattributed remainder stays visible instead of being divided away. Where calls came back with tokens and no amount, the page says how many calls that was and how many tokens they used. A subscription reports no price at all, and a page that rendered that as `$0.00` would be inventing a fact.
+The cost page shows shares against the billed total rather than normalising its own rows, so an unattributed remainder stays visible instead of being divided away. Where calls came back with tokens and no amount, the page says how many calls that was and how many tokens they used. A local model reports no price at all, and a page that rendered that as `$0.00` would be inventing a fact.
 
 **by skill** is one bucket. A tool call does not happen "under" a skill — a skill is a line of disclosure in the prefix, not a calling context — so nothing in the Ledger names the skill a call was made under, and every call lands in `no_skill`. The cut stays, reporting what it can defend.
 
@@ -160,13 +160,12 @@ This repository bundles nobody's key, pays for nothing, and proxies nothing. Eve
 
 ### Provider intelligence — followed from upstreams
 
-Signing in to a provider means knowing four things: authorization endpoint, token endpoint, client id, scopes. Those are facts, and they change without warning, so they are followed from actively maintained projects rather than watched by hand: [`openai/codex`](https://github.com/openai/codex) for OpenAI, [`anthropics/claude-agent-sdk-typescript`](https://github.com/anthropics/claude-agent-sdk-typescript) for the Claude agent protocol types, [`xai-org/grok-build`](https://github.com/xai-org/grok-build) for xAI, and [`MoonshotAI/kimi-cli`](https://github.com/MoonshotAI/kimi-cli) for Moonshot. **What is followed is intelligence, not code**: [`third-party.md`](third-party.md) gives each upstream's licence, the path watched, the commit it is tracked to, and how to re-check.
+The city calls a provider with an API key, on the OpenAI-compatible face or the Anthropic-compatible face, and signs in to no subscription (`crates/gateway/gateway-SPEC.md` section 8-5). Which path a known host's API hangs under, and which face it answers on, is a fact the host table in `gateway::provider::preset` holds, each row citing its source. Where a vendor's own client states such a fact, it is followed from that client rather than copied: [`third-party.md`](third-party.md) gives each upstream's licence, the path watched, the commit it is tracked to, and how to re-check.
 
 | To do this | Change this |
 |---|---|
-| add or correct a subscription provider | `gateway::oauth_profiles`, a table with data and no branches |
-| change how a login is begun, finished or renewed | `gateway::credential` |
-| use an API key instead | the settings page: base URL, wire API, key |
+| add or correct a known host | `gateway::provider::preset`, a table with data and no branches |
+| attach a provider | the settings page: base URL, wire API, key |
 | speak a third dialect | `gateway::dialect`, a pure two-way translation with the canonical shape in the middle |
 | run a local model | the settings page: a loopback base URL and the chat face; `gateway::endpoint` takes a loopback address off the proxy and streams it like any other |
 

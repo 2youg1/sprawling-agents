@@ -1067,7 +1067,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "sha2 0.11.0",
  "zeroize",
 ]
 

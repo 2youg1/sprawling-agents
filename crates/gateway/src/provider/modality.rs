@@ -27,7 +27,7 @@ pub mod call;
 pub mod embedding;
 pub mod rerank;
 
-use super::registry::{ConnectionKind, Family};
+use super::registry::ConnectionKind;
 
 /// What an endpoint is asked to do beyond holding a conversation.
 ///
@@ -75,9 +75,6 @@ impl ConnectionKind {
     ///   the shape the two local rerank servers answer in.
     /// - The responses face is OpenAI's own, whose base also serves
     ///   embeddings; rerank it does not serve.
-    /// - A subscription harness sells a conversation. None of the four
-    ///   documents a vector face, and calling one with a subscription
-    ///   token would be a use its terms do not describe.
     #[must_use]
     pub const fn path_for(self, modality: Modality) -> Option<&'static str> {
         match self {
@@ -90,9 +87,6 @@ impl ConnectionKind {
                 Modality::Rerank => None,
             },
             ConnectionKind::AnthropicNative => None,
-            ConnectionKind::Harness(family) => match family {
-                Family::Codex | Family::ClaudeCode | Family::GrokBuild | Family::KimiCli => None,
-            },
         }
     }
 
@@ -147,12 +141,9 @@ mod tests {
     /// A face the vendor does not publish has no path, so a caller
     /// cannot build a URL for it at all.
     #[test]
-    fn a_messages_endpoint_and_a_subscription_serve_no_vector_face() {
+    fn a_messages_endpoint_serves_no_vector_face() {
         for modality in Modality::ALL {
             assert_eq!(ConnectionKind::AnthropicNative.path_for(modality), None);
-            for family in Family::ALL {
-                assert_eq!(ConnectionKind::Harness(family).path_for(modality), None);
-            }
         }
         assert_eq!(
             ConnectionKind::AnthropicNative

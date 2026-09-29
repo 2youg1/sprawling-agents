@@ -4,14 +4,18 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How a credential reached this city: the line a vault write leaves,
-//! the page a subscription login sends the person to, and the app a
-//! toolkit link was asked for.
+//! and the app a toolkit link was asked for.
 //!
 //! **No line here carries a credential.** A capture names the vault
-//! place and never the value; a login's URL carries a PKCE challenge and
-//! a state, both public by design; a toolkit link records which app was
+//! place and never the value; a toolkit link records which app was
 //! asked for and not the consent URL, which is a capability and would be
 //! handed to every reader of a replayable ledger.
+//!
+//! Older builds also wrote `login_started` for a subscription login and
+//! an `expires_at` key on a capture. This build signs in to no
+//! subscription (gateway-SPEC.md 8-5): the kind stays in the vocabulary
+//! so such a ledger still reads, nothing reads its payload, and a
+//! capture's `expires_at` is ignored on the way in.
 
 use serde::{Deserialize, Serialize};
 
@@ -30,31 +34,12 @@ pub struct SecretCaptured {
     #[serde(rename = "ref")]
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub reference: SecretRef,
-    /// How it arrived, in the writer's words: `enrolment`, `pasted`,
-    /// `<provider>-subscription` or `<provider>-renewal`. Free text,
-    /// because the provider is part of the spelling.
+    /// How it arrived, in the writer's words: `enrolment` or `pasted`.
+    /// An older build also wrote `<provider>-subscription` and
+    /// `<provider>-renewal`. Free text, because those spellings carry a
+    /// provider name.
     #[serde(default)]
     pub origin: String,
-    /// When the provider said the credential stops working, in the
-    /// city's clock (ms). Absent when the provider said nothing: not
-    /// knowing is not an expiry.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expires_at: Option<u64>,
-}
-
-/// `login_started`: a subscription login is waiting for the person.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct LoginStarted {
-    /// The provider being signed in to.
-    pub provider: String,
-    /// The page the person opens.
-    pub auth_url: String,
-    /// The short code the person types on that page, for a device
-    /// login. Absent rather than empty: a redirect login has no code,
-    /// and a blank one would read as a code that failed to arrive.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub user_code: Option<String>,
 }
 
 /// `toolkit_link_opened`: the person asked to connect this app.
@@ -76,43 +61,15 @@ mod tests {
     /// reads back and a new line is byte-identical to an old one.
     #[test]
     fn each_credential_line_keeps_the_bytes_its_ledger_already_holds() {
-        let place = SecretRef::parse("secret:anthropic/oauth").unwrap();
-        let cases: [(Payload, &str); 5] = [
-            (
-                Payload::of(&SecretCaptured {
-                    reference: place.clone(),
-                    origin: "anthropic-subscription".to_owned(),
-                    expires_at: Some(1_700_000_000_000),
-                })
-                .unwrap(),
-                "{\"expires_at\":1700000000000,\"origin\":\"anthropic-subscription\",\"ref\":\"secret:anthropic/oauth\"}",
-            ),
+        let place = SecretRef::parse("secret:anthropic/api-key").unwrap();
+        let cases: [(Payload, &str); 2] = [
             (
                 Payload::of(&SecretCaptured {
                     reference: place,
                     origin: "enrolment".to_owned(),
-                    expires_at: None,
                 })
                 .unwrap(),
-                "{\"origin\":\"enrolment\",\"ref\":\"secret:anthropic/oauth\"}",
-            ),
-            (
-                Payload::of(&LoginStarted {
-                    provider: "openai".to_owned(),
-                    auth_url: "https://auth.example.test/device".to_owned(),
-                    user_code: Some("ABCD-1234".to_owned()),
-                })
-                .unwrap(),
-                "{\"auth_url\":\"https://auth.example.test/device\",\"provider\":\"openai\",\"user_code\":\"ABCD-1234\"}",
-            ),
-            (
-                Payload::of(&LoginStarted {
-                    provider: "anthropic".to_owned(),
-                    auth_url: "https://auth.example.test/authorize".to_owned(),
-                    user_code: None,
-                })
-                .unwrap(),
-                "{\"auth_url\":\"https://auth.example.test/authorize\",\"provider\":\"anthropic\"}",
+                "{\"origin\":\"enrolment\",\"ref\":\"secret:anthropic/api-key\"}",
             ),
             (
                 Payload::of(&ToolkitLinkOpened {
@@ -127,6 +84,24 @@ mod tests {
             let back: Payload = serde_json::from_str(wire).unwrap();
             assert_eq!(back, payload);
         }
+    }
+
+    /// A capture an older build wrote for a subscription token, with its
+    /// `expires_at`, still reads: the key is ignored rather than refused,
+    /// so a ledger that holds one replays (gateway-SPEC.md 8-5).
+    #[test]
+    fn a_capture_with_an_expiry_an_older_build_wrote_still_reads() {
+        let payload: Payload = serde_json::from_str(
+            "{\"expires_at\":1700000000000,\"origin\":\"anthropic-subscription\",\"ref\":\"secret:anthropic/oauth\"}",
+        )
+        .unwrap();
+        assert_eq!(
+            payload.read::<SecretCaptured>().unwrap(),
+            SecretCaptured {
+                reference: SecretRef::parse("secret:anthropic/oauth").unwrap(),
+                origin: "anthropic-subscription".to_owned(),
+            }
+        );
     }
 
     /// A reference outside the grammar is not a capture, so no reader

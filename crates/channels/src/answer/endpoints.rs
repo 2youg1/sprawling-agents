@@ -33,8 +33,7 @@ pub struct EndpointSummary {
     pub base_url: String,
     pub dialect: DialectKind,
     /// How this endpoint is connected, as one flat word:
-    /// `openai_compat`, `responses`, `anthropic_native`, or the name of
-    /// the first-party harness whose subscription pays for it.
+    /// `openai_compat`, `responses` or `anthropic_native`.
     ///
     /// Resolved once when the endpoint was attached and read back
     /// here. `dialect` beside it answers a narrower question - which

@@ -12,16 +12,16 @@ use kernel::{AxCode, AxError, B3Hash, EventRecord};
 use memory::LedgerIndex;
 
 use super::collaboration::CollaborationFold;
-use super::{Entrance, Expiries, Governance, SessionOrigins, Standing};
+use super::{Entrance, Governance, SessionOrigins, Standing};
 use crate::views::snapshot::start::SnapshotFold;
 
 /// Changed whenever a standing fold rule or the encoding of
 /// [`StandingFolds`] changes within one version of this binary. The
 /// suffix is the digest of a fixed fixture's encoding, which the tests
 /// beside this file hold, so the encoding cannot move alone.
-const STANDING_FOLD_RULES: &str = "standing-fold-683928ce40929932";
+const STANDING_FOLD_RULES: &str = "standing-fold-066ecd956d87a960";
 
-/// The six folds of [`Standing`] after the last line they read, before
+/// The five folds of [`Standing`] after the last line they read, before
 /// the collaboration fold settles: a tail folded on after a snapshot
 /// needs the signals still held aside.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -30,7 +30,6 @@ pub(super) struct StandingFolds {
     governance: Governance,
     collaboration: CollaborationFold,
     entrance: Entrance,
-    expiries: Expiries,
     origins: SessionOrigins,
 }
 
@@ -46,7 +45,6 @@ impl StandingFolds {
             governance: self.governance,
             collaboration: self.collaboration.settle()?,
             entrance: self.entrance,
-            expiries: self.expiries,
             origins: self.origins,
             cut,
         })
@@ -68,7 +66,6 @@ impl SnapshotFold for StandingFolds {
             governance: Governance::empty(),
             collaboration: CollaborationFold::default(),
             entrance: Entrance::default(),
-            expiries: Expiries::default(),
             origins: SessionOrigins::default(),
         }
     }
@@ -101,7 +98,6 @@ impl SnapshotFold for StandingFolds {
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
         self.collaboration.absorb(record)?;
         self.entrance.absorb(record.data());
-        self.expiries.absorb(record.kind(), record.data())?;
         self.origins
             .absorb(record.kind(), record.run(), record.addr(), record.data())
     }
