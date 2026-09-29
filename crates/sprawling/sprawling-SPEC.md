@@ -3127,9 +3127,9 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 
 - **缺陷**：设置页每次选模型都把整行发上来，于是一个人重选自己已经登记过的模型，就把当初填的上限用一个空框覆盖掉了；下一次 messages 兼容格式的调用因为写不出 `max_tokens` 被拒（A 章 B-01 的第二段）。`None` 从此表示「这次没说」，而不是「这次要清空」。
 - **权威从高到低**：人这次填的 → 这个 endpoint 与这个 model id 上一次登记的 → 钉版目录行。**按 endpoint 与 model id 读上一次，而不是只按 tag**：把一个 tag 指向另一个模型时，旧模型的上限不得跟过去。上一次登记从 `book.choices()` 读回——书是「这座城登记了什么」的唯一陈述，在它旁边另存一份就是第二个权威。
-- **`context_tokens` 同理**，`0` 是「这次没说」；两个数字读法一致，因为它们来自同一个空表单。
-- **再往上与再往下的两档住 gateway**（`provider::ceiling`，gateway-SPEC §8-17）：上游 `/v1/models` 的陈述与策略缺省 `OUTPUT_CEILING_DEFAULT`。装配层不复写那条规则，只把人层与书里的值交给它——一条规则两个家，漂开的总是没人看的那个。
-- **来源入账（未落，随共享文件同集落）**：`model_selected` 要带 `ceiling_from: person | upstream | preset | policy`，`model_called` 回显这次调用实际用的那一档；载荷由 `gateway::router::payload` 一处写，拼写取 `CeilingSource::as_str`。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的；`tests/e2e.rs` 里那条桩测试（sprawling-SPEC §2795 第 5 条）就是它的关门条件。
+- **`context_tokens` 同理**，`0` 是「这次没说」；两个数字读法一致，因为它们来自同一个空表单。窗口梯是人这次填的 → 上一次登记的 → 钉版目录行 → `gateway::provider::preset::window_for`（gateway-SPEC §8-17）；四档都沉默时窗口为 `0`，上下文提醒随之不响。
+- **输出上限的其余几档住 gateway**（`provider::ceiling`，gateway-SPEC §8-17）：上游 `/v1/models` 的陈述、预设表与策略缺省 `OUTPUT_CEILING_DEFAULT`，以及 chat 与 responses 两面在人与上游都沉默时的 `ProviderDefault`。装配层不复写那条规则，只把人层、书里的值与这个端点的兼容格式交给它——一条规则两个家，漂开的总是没人看的那个。
+- **来源入账**：`model_selected` 带 `ceiling_from: person | upstream | preset | policy | provider`，拼写取 `OutputCeiling::word`，载荷由 `gateway::router::payload` 一处写。`provider` 行的 `max_output_tokens` 缺席：请求里没有这个字段。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的。
 
 ### 8-72 从别的工具的配置里读一张 provider 表（`bin::import`，形状 4 适配器）
 
