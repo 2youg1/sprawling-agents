@@ -363,6 +363,21 @@ mod tests {
         assert_eq!(words.len(), written, "two connections under one word");
     }
 
+    /// An endpoint an older build attached through a subscription login
+    /// replays on the face its vendor answered on, so an old ledger
+    /// still folds (gateway-SPEC.md 8-5).
+    #[test]
+    fn a_harness_word_an_older_build_wrote_reads_as_the_face_it_answered_on() {
+        for (word, face) in [
+            ("codex", ConnectionKind::Responses),
+            ("claude_code", ConnectionKind::AnthropicNative),
+            ("grok_build", ConnectionKind::OpenAiCompat),
+            ("kimi_cli", ConnectionKind::OpenAiCompat),
+        ] {
+            assert_eq!(ConnectionKind::parse(word).unwrap(), face, "{word}");
+        }
+    }
+
     #[test]
     fn a_word_this_build_never_wrote_is_refused_rather_than_guessed() {
         let refusal = ConnectionKind::parse("gemini_native").unwrap_err();
