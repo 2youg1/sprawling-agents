@@ -141,3 +141,27 @@ fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
         "the project's own new file is hidden from git: {visible:?}"
     );
 }
+
+/// A building raised before a rule existed gets that rule the next time
+/// the city opens, so the ruling holds for a city already running.
+#[test]
+fn opening_a_city_gives_an_older_building_the_rules_it_lacks() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("proj")).unwrap();
+    form_city(dir.path(), Adopt::EveryFolder).unwrap();
+    let ignore = dir.path().join("proj").join(".gitignore");
+    std::fs::write(&ignore, "Roadmap.md\nMemo.md\n").unwrap();
+
+    RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+
+    let rules = std::fs::read_to_string(&ignore).unwrap();
+    assert!(
+        rules.starts_with("Roadmap.md\nMemo.md\n") && rules.lines().any(|line| line == "JOB.md"),
+        "{rules}"
+    );
+}
