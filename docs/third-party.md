@@ -17,6 +17,11 @@ Calling a face this city did not invent requires knowing the shape of the reques
 | [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) | Apache-2.0 | the platform table the three Kimi hosts in `gateway::provider::preset` are read from: each host's base path and that it answers on the OpenAI-compatible face | `src/kimi_cli/auth/` | `b5f48ef2aaf1` |
 | [openai/openai-openapi](https://github.com/openai/openai-openapi) | MIT | the request and answer of the embeddings face, which every compatible server copied | `openapi.yaml` | `d983890f7777` |
 | [huggingface/text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) | Apache-2.0 | the request and answer of the rerank face, which has no OpenAI shape to copy | `docs/openapi.json` | `d246fbf17cc7` |
+| [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Claude Code is started as an ACP agent: the adapter package and its version | `claude-acp/` | `4b785db2d336` |
+| [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Codex is started as an ACP agent: the adapter package and its version | `codex-acp/` | `9bd56ff1ce3a` |
+| [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Grok Build is started as an ACP agent: its package, version and arguments | `grok-build/` | `e20536b4ffaf` |
+| [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Kimi Code is started as an ACP agent: its binary and arguments | `kimi/` | `a3f02fa2243b` |
+| [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Pi is started as an ACP agent: the adapter package and its version | `pi-acp/` | `6a8a2f424c47` |
 
 > **Machine authority**: `.github/workflows/upstream-watch.yml` reads every
 > row above that opens with `| [` and carries a `github.com` link — the
@@ -25,6 +30,8 @@ Calling a face this city did not invent requires knowing the shape of the reques
 > prose around it is not.
 
 **One row is one watched path.** The workflow sends the fourth cell to the commits API as a single path, so a cell naming two paths would ask GitHub for a path that does not exist, and a run that asks for nothing gets nothing rather than saying so. Two paths therefore mean two rows with two watermarks. The workflow opens no second issue for a repository that already has one open, so when two paths of one repository move at once, the second is reported only after the first issue is closed. That cost grows with each row a repository gains, and it is paid deliberately: a path nobody watches is a constant that goes stale without a signal.
+
+**The five official harnesses are started the way the ACP registry says**, one watched registry directory each, holding its `agent.json`, with the version pinned in `protocol::harness`. Which harnesses are on the list is the person's ruling, not the registry's: Claude Code, Codex, Grok Build, Kimi Code and Pi. The adapters for Claude Code and Codex are published under the registry's own organisation with the vendor among the authors, Grok Build and Kimi Code speak ACP themselves, and Pi's adapter is a third party's; none of their code is in this tree, and each runs as a separate process that the person installs through `npx` or, for Kimi Code, themselves.
 
 **No vendor's login is followed.** The city signs in to no subscription: a key is the only credential it takes, and subscription quota enters through the vendor's own harness, where the person signs in (`crates/gateway/gateway-SPEC.md` section 8-5). Anthropic's Claude Code compliance page forbids a third-party application to offer Claude login or to store its tokens, Kimi Code keeps OAuth for its official clients, and OpenAI publishes no contract for a third party to call the subscription backend, so following their login constants would only serve a flow this city must not run.
 

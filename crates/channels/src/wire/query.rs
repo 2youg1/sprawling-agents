@@ -150,6 +150,9 @@ pub enum Query {
     /// face they document, so a person picks a vendor rather than
     /// pasting its address.
     KnownHosts,
+    /// The official harnesses, the command that starts each as an ACP
+    /// agent, and whether this machine can run it: the harness page.
+    Harnesses,
     /// One building's own files and its archive - the pages an agent
     /// writes for the next agent, which are also the pages a person
     /// reads to know what happened in there.

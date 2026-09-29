@@ -159,6 +159,32 @@ pub(crate) fn known_hosts_answer() -> channels::Answer {
     })
 }
 
+/// The harness page: every official harness in the roster, the command
+/// that starts it, and whether this machine finds that command's
+/// program on the same search path the doctor reads
+/// (channels-SPEC.md 8-52).
+pub(crate) fn harnesses_answer() -> channels::Answer {
+    let search_path = crate::doctor::host::search_path();
+    channels::Answer::Harnesses(channels::HarnessesAnswer {
+        harnesses: protocol::Harness::ALL
+            .iter()
+            .map(|harness| {
+                let launch = harness.launch();
+                channels::HarnessLine {
+                    name: harness.as_str().to_owned(),
+                    launch: std::iter::once(launch.program.name())
+                        .chain(launch.args.iter().copied())
+                        .map(str::to_owned)
+                        .collect(),
+                    found: crate::doctor::on_search_path(&search_path, launch.program.name())
+                        .is_some(),
+                    docs: harness.docs().to_owned(),
+                }
+            })
+            .collect(),
+    })
+}
+
 /// The building a `pursuit_changed` record is about.
 ///
 /// # Errors

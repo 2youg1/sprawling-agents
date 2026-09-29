@@ -169,6 +169,8 @@ To work on projects you already have, raise the city in the folder that holds th
 
 A city with no model to call opens on **welcome**, whose first card, **connect a provider**, leads to **settings** → **accounts and providers**.
 
+**official harnesses**, the next group, is where a subscription comes in: the city never signs in to one itself. The page lists Claude Code, Codex, Grok Build, Kimi Code and Pi, whether this computer can run the command that starts each, that command, and a link to the vendor's own sign-in instructions; you sign in inside the harness.
+
 The form above the list of what is attached takes a key. Its first control lists the providers the city knows by host: pick one and the base URL and the format are filled in for you. The three boxes below it are:
 
 | Field | What it wants |

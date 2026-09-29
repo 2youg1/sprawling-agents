@@ -255,7 +255,7 @@ pub enum Connection { Absent, Awaiting { consent_url: String }, Connected { alia
 订阅额度由厂商自己的 harness 带进城（gateway-SPEC §8-5）。本节是这条路的传输半：认得哪几家、怎么把一家起成一个说 ACP 的子进程、怎么跟它开一场会话并把它说的话读回来。**本城是 ACP 的 client**，与 §8-2 的入站方向相反。
 
 ```rust
-// harness::roster —— 数据面，人的裁定：只有这五家
+// harness::roster —— 数据面，定规：只有这五家
 pub enum Harness { Codex, ClaudeCode, GrokBuild, KimiCode, Pi }   // as_str(): codex|claude_code|grok_build|kimi_code|pi
 impl Harness {
     pub const ALL: [Harness; 5];
@@ -283,7 +283,7 @@ pub enum Permit { Chosen(String), Cancelled }
 pub enum StopReason { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
 ```
 
-- **名单是人的裁定**：Codex、Claude Code、Grok Build、Kimi Code、Pi 五家是人唯一认可的 harness。增一家要人的裁定，不因为 ACP registry 里多了一行就跟着加。
+- **名单是定规**：Codex、Claude Code、Grok Build、Kimi Code、Pi 五家是人认可的全部 harness。增一家要人另定，不因为 ACP registry 里多了一行就跟着加。
 - **怎么起一家，读 ACP registry**（<https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json>，逐家的 `agent.json` 在 `agentclientprotocol/registry`，被看路径见 docs/third-party.md §1）：Claude Code 与 Codex 各经官方适配器（`npx -y @agentclientprotocol/claude-agent-acp@0.84.0`、`npx -y @agentclientprotocol/codex-acp@2.0.0`），Grok Build 经它自己的包（`npx -y @xai-official/grok@1.0.45 agent stdio`），Kimi Code 是人装好的 `kimi acp`，Pi 经 `npx -y pi-acp@0.0.34`。**版本钉死**：`npx` 不带版本会在每次起进程时向 npm 取最新的包，一个没人看过的版本就进了城。
 - **登录是人在 harness 里做的**：本城不起登录流程、不读 harness 的凭据文件。`docs` 是每家自己写的登录说明，页面只把它交给人。
 - **本城不向 harness 提供文件与终端**：`initialize` 声明 `fs.readTextFile`、`fs.writeTextFile`、`terminal` 全为 `false`，harness 用它自己的工具。ACP 规格里工具由 agent 自己执行，`session/request_permission` 是 agent 可以不发的请求，工具名 "do not advertise a capability or grant authorization"（<https://agentclientprotocol.com/protocol/tool-calls>）；本城因此只能**记录**一家 harness 做了什么，不能**管辖**它。harness 发来的其余请求（`fs/*`、`terminal/*`）以 JSON-RPC `-32601` 回答，不静默。

@@ -193,7 +193,7 @@ pub(super) fn names_of(program: &str) -> Vec<String> {
 }
 
 /// The first directory on the search path holding this program.
-pub(super) fn on_search_path(search_path: &OsString, program: &str) -> Option<PathBuf> {
+pub(crate) fn on_search_path(search_path: &OsString, program: &str) -> Option<PathBuf> {
     let separator = match super::Platform::current() {
         Some(platform) => platform.search_path_separator(),
         // A fourth platform is read the POSIX way: it is the spelling

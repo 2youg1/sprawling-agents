@@ -44,6 +44,7 @@
   import EffortSection from "./shared/effort.svelte";
   import GovernedSection from "./setup/governed.svelte";
   import ProviderDoor from "./shared/provider.svelte";
+  import HarnessList from "./setup/harnesses.svelte";
   import { HEADING, HINT, NAV, NAV_HERE, NAV_THERE, NAV_WEAR, PREFERRED, WIDTH } from "./setup/groups";
   import type { Group } from "./setup/groups";
 
@@ -282,6 +283,8 @@
                 {/if}
               </div>
             </div>
+          {:else if shown === "harnesses"}
+            <HarnessList />
           {:else if shown === "run"}
             <div class="grid grid-fit items-start gap-base">
               <div class="min-w-0 rounded-card bg-raised px-base py-snug">

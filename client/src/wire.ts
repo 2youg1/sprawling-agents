@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 44 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "8ed10b640a9e6f62493533019e799cd6f8610152c4cc2523d0222d72c66ac5df" as const;
+export const WIRE_HASH = "95e42860107174f073491d7a2995233ff7351a6659e34497be815c351a3c8276" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `channels::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -1433,6 +1433,25 @@ export const GovernanceAnswer = Schema.Struct({
 export type GovernanceAnswer = typeof GovernanceAnswer.Type;
 
 /**
+ * One harness as the page draws it.
+ */
+export const HarnessLine = Schema.Struct({
+  docs: Schema.String,
+  found: Schema.Boolean,
+  launch: Schema.Array(Schema.String),
+  name: Schema.String,
+}).annotations({ identifier: "HarnessLine" });
+export type HarnessLine = typeof HarnessLine.Type;
+
+/**
+ * Every official harness, in the roster's order.
+ */
+export const HarnessesAnswer = Schema.Struct({
+  harnesses: Schema.Array(HarnessLine),
+}).annotations({ identifier: "HarnessesAnswer" });
+export type HarnessesAnswer = typeof HarnessesAnswer.Type;
+
+/**
  * A BLAKE3 digest: exactly 64 lowercase hex digits.
  */
 export const B3Hash = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
@@ -2364,6 +2383,9 @@ export const Answer = Schema.Union(
     known_hosts: KnownHostsAnswer,
   }),
   Schema.Struct({
+    harnesses: HarnessesAnswer,
+  }),
+  Schema.Struct({
     building: BuildingAnswer,
   }),
   Schema.Struct({
@@ -2548,6 +2570,7 @@ export const Query = Schema.Union(
   }),
   Schema.Literal("endpoint_view"),
   Schema.Literal("known_hosts"),
+  Schema.Literal("harnesses"),
   Schema.Struct({
     building_view: Schema.Struct({
       addr: Address,

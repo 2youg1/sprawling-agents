@@ -11,7 +11,7 @@
 import type { Key } from "../../core/lang";
 
 const GROUPS = [
-  "accounts", "run", "network", "tools", "skills", "appearance", "keys", "advanced", "about",
+  "accounts", "harnesses", "run", "network", "tools", "skills", "appearance", "keys", "advanced", "about",
 ] as const;
 
 export type Group = (typeof GROUPS)[number];
@@ -20,6 +20,7 @@ export type Group = (typeof GROUPS)[number];
 // (client-SPEC 4-33, 4-36), one table per fact.
 export const HEADING: Record<Group, Key> = {
   accounts: "setup_group_accounts",
+  harnesses: "setup_group_harnesses",
   run: "setup_group_run",
   network: "setup_group_network",
   tools: "setup_group_tools",
@@ -34,6 +35,7 @@ export const HEADING: Record<Group, Key> = {
 // kind of sentence this page is allowed (client-SPEC 4-10).
 export const HINT: Record<Group, Key | null> = {
   accounts: "setup_group_hint_accounts",
+  harnesses: "setup_group_hint_harnesses",
   run: "setup_group_hint_run",
   network: "setup_group_hint_network",
   tools: "setup_group_hint_tools",
@@ -51,6 +53,7 @@ export const HINT: Record<Group, Key | null> = {
 // reads badly stretched and stops at the conversation's width.
 export const WIDTH: Record<Group, string> = {
   accounts: "",
+  harnesses: "max-w-talk",
   run: "",
   network: "max-w-talk",
   tools: "",

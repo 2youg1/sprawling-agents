@@ -2311,6 +2311,10 @@
     "en": "accounts and providers",
     "zh": "账户与供应方"
   },
+  "setup_group_harnesses": {
+    "en": "official harnesses",
+    "zh": "官方 harness"
+  },
   "setup_group_advanced": {
     "en": "advanced",
     "zh": "高级"
@@ -2350,6 +2354,10 @@
   "setup_group_hint_accounts": {
     "en": "who the city may call, and with which key",
     "zh": "城能调用谁，用哪把钥匙"
+  },
+  "setup_group_hint_harnesses": {
+    "en": "a subscription reaches the city through its vendor's own harness, signed in there",
+    "zh": "订阅经厂商自己的 harness 进城，在那里登录"
   },
   "setup_group_keys": {
     "en": "keybindings",
@@ -3606,6 +3614,18 @@
   "setup_known_host_pick": {
     "en": "pick a provider",
     "zh": "选一家供应方"
+  },
+  "harness_found": {
+    "en": "on this computer",
+    "zh": "这台电脑上有"
+  },
+  "harness_missing": {
+    "en": "not found on this computer",
+    "zh": "这台电脑上没找到"
+  },
+  "harness_sign_in": {
+    "en": "how to sign in",
+    "zh": "怎么登录"
   },
   "setup_form_incomplete": {
     "en": "finish the fields first",

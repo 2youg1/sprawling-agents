@@ -53,6 +53,7 @@ export const QUERIES = {
   discards: "discard_view",
   endpoints: "endpoint_view",
   knownHosts: "known_hosts",
+  harnesses: "harnesses",
   governance: "governance",
   doctor: "doctor",
   toolkits: "toolkits",

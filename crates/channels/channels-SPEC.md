@@ -24,7 +24,7 @@
 
 - **wire**：Command 恰 29 个 variant、Query 恰 38 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
-  **当前 golden**：`8ed10b640a9e6f62493533019e799cd6f8610152c4cc2523d0222d72c66ac5df`；**WIRE_V ＝ 44**（帧表与查询表的当前内容见 §8 各章）。
+  **当前 golden**：`95e42860107174f073491d7a2995233ff7351a6659e34497be815c351a3c8276`；**WIRE_V ＝ 44**（帧表与查询表的当前内容见 §8 各章）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`**：一个会话的历史按 run 取。`Query::History` 是城全局的最后一页，按它在客户端过滤，一个较早的会话就不在那一页里；`Query::RunView` 回答「这个 run 在不在、走到哪」，不回答「这个会话是什么」。
@@ -1468,7 +1468,7 @@ pub struct HarnessesAnswer { pub harnesses: Vec<HarnessLine> }
 pub struct HarnessLine { pub name: String, pub launch: Vec<String>, pub found: bool, pub docs: String }
 ```
 
-- **provider 页与 harness 页分开**（人的裁定）：provider 页收 API key，harness 页说明五家官方 harness（protocol-SPEC §8-19）。
+- **provider 页与 harness 页分开**（定规）：provider 页收 API key，harness 页说明五家官方 harness（protocol-SPEC §8-19）。
 - `name` 是 `protocol::Harness::as_str` 的词；`launch` 是起它说 ACP 的那条命令，逐词；`found` 是那条命令的程序在这台电脑的搜索路径上找不找得到；`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
 - 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
 

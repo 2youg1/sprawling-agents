@@ -31,6 +31,7 @@ mod document;
 mod endpoints;
 mod evidence;
 mod git_status;
+mod harnesses;
 mod history;
 mod hunks;
 mod known_hosts;
@@ -60,6 +61,7 @@ pub use document::DocumentAnswer;
 pub use endpoints::{ChosenSummary, EndpointSummary, EndpointsAnswer};
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use git_status::{Drift, GitStatusAnswer};
+pub use harnesses::{HarnessLine, HarnessesAnswer};
 pub use history::{HistoryAnswer, HistoryRangeAnswer};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
 pub use known_hosts::{KnownFace, KnownHost, KnownHostsAnswer};
@@ -211,6 +213,7 @@ pub enum Answer {
     Cost(Box<CostAnswer>),
     Endpoints(EndpointsAnswer),
     KnownHosts(KnownHostsAnswer),
+    Harnesses(HarnessesAnswer),
     Building(Box<BuildingAnswer>),
     Inbox(InboxAnswer),
     Discards(DiscardAnswer),
