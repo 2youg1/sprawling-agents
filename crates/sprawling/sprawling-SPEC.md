@@ -128,20 +128,12 @@ impl Residents {
 
 **真机验收**：一座真城接一台托管 server，诊断行为 `exa is exa-search-server speaking 2025-06-18, offering 2 tool(s)`；模型自主调用其搜索工具、读回真实结果、一个回合内给出答案并 `run_frozen{completion: done}`。
 
-## 8-5 订阅登录接线
+## 8-5 订阅额度走 harness，不走登录
 
-```rust
-fn login(&mut self, provider: &str, step: channels::LoginStep) -> Result<(), AxError>;
-fn login_with(&mut self, profile: &gateway::OauthProfile, provider: &str,
-              step: channels::LoginStep) -> Result<(), AxError>;   // 查表之外的全部
-fn random_token(bytes: usize) -> Result<String, AxError>;          // OS 熵，非种子 RNG
-```
+本城没有登录命令，也不持订阅令牌（gateway-SPEC §8-5）。一个人要用自己的 Codex、Claude Code、Grok Build、Kimi Code 或 Pi 订阅，是在那个 harness 里自己登录，再把它作为 harness 居民接进城；provider 页只收 API key。
 
-- **熵不走种子**：`random_token` 用 `getrandom`（OS 熵），**恒不**用装配持有的仿真种子——一个第三方能预测的 verifier 就是一个第三方能完成的登录。这是全二进制里唯一一处「可复现即缺陷」的地方，故写在这里而不是留给读者推断。
-- **pending 只活在进程里**：PKCE 的 verifier 证明「来兑的就是当初请求的那个进程」，一个活过进程的 verifier 什么也不证明。重启＝重新开始登录，代价是一次浏览器访问。
-- **`login_with` 是查表之外的全部**：生产路径先查 `oauth_profiles` 再进它；测试把一台自己控制的 server 当 profile 传进去。**恒不为测试在生产路径上加环境变量开关**——那个开关在生产里没有人会设，却永远在那里可被设。
-- **登录完即 attach**：人是为了用它才登录的，故 `api_base` 一到手就接上端点，而不是留下第二件要记得做的事。`api_base` 为空的 provider 在这里三段式拒，且拒词说明令牌已在保管库里——已经发生的事恒要说出来。
-- **未做且已知**：令牌续期。`expires_in` 与 refresh token 都已入库，但到期前自动换新还没有接线；在它到来之前，过期就是重新登录一次。写成明账而不是留给用户去撞。
+- **旧账本照样折得回**：旧版本写过的 `login_started` 仍是一个事件种类，没有读者；`secret_captured` 行里的 `expires_at` 与 `<provider>-subscription`／`<provider>-renewal` 来源读入时照收，本城不再据此续期。
+- **旧快照不接**：`StandingFolds` 少了到期表，`STANDING_FOLD_RULES` 随之换值，旧快照按版本不符从创世重折（8-101）。
 
 ## 8-6 五个视图不再答 unavailable
 
@@ -155,19 +147,15 @@ fn random_token(bytes: usize) -> Result<String, AxError>;          // OS 熵，�
 | `ArchiveSearch` | 被问的那一刻读盘（同 `BuildingView`） | 文件是权威，另存索引就是第二个权威 |
 | `Metrics` | 上面几份＋`hot`＋`read_spine` | **恒不携钱**：钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。这里每个数都已被别的视图证明过，它存在只为让画一条读数花一次问答；唯一自有的数是 `events`（本视图折过多少条），因为没有别的答案能推出它 |
 
-## 8-7 ACP 入站与令牌续期
+## 8-7 ACP 入站
 
 ```rust
 fn acp_dispatch(desk: &CommandDesk, body: channels::AcpBody, authentic: bool)
     -> Result<channels::AcpProgress, AxError>;          // 外来请求 → 普通 Dispatch
-fn renew_if_stale(&mut self, provider: &str) -> Result<(), AxError>;   // 用之前先换，不等 401
 ```
 
 - **令牌在门那侧判，判定在协议那侧措辞**：`channels` 持配对令牌，故常数时间比对住 `/acp` 路由；`authentic` 这一位传进来，由 `protocol::admit` 说拒词——未配对者只学到一位，这句话的权威只有一个。
 - **入站不是第二个 control surface**：admit 之后就是人按派活条时走的同一条路（同一个 `CommandDesk`、同一个 `Command::Dispatch`）。回给编辑器的只有 progress 三字段，且 run id 是工人接单时才铸的，故此刻诚实的答案是「已受理、尚未完成」。
-- **续期在用之前做，不在 401 之后做**：一次 401 要花掉一整个回合才发现，而 provider 说过的到期时刻这座城已经写下来了（`secret_captured` 携 `expires_at`，非密文）。留一分钟余量；**没有记过到期时刻的 provider 不碰**——不知道什么时候过期，不是每次都换一遍的理由。
-- **到期表是折出来的，不是进程内的记忆**：`Expiries` 吸收 `secret_captured` 的 `expires_at`，键由 `ref` 的 `secret:<provider>/oauth` 解出，写这个拼法与读它的是同一个模块（`assembly::credentials::subscription`）。从前只有登录的那个进程知道到期时刻，重启后表是空的、什么都不续，于是人在运行中撞 401 丢掉一整轮（B-30）。
-- **换新与兑付共用一次发送**：`send_token_request` 是两种 grant 的同一条路，故「不引用对侧正文」这条只写一次、也只可能对一次。
 
 ## 8-8 首次运行与交付形态
 
@@ -886,7 +874,7 @@ impl RunWorker {
 }
 ```
 
-**一个值而不是三个，理由是时钟而不是口味**。这一相位读上去是三件事（规则与选型、身份与登记、围栏与租约），而它们在代码里互相咀合：租约要 `run_id` 与 `who`，而 `run_id` 在 `renew_if_stale`（一次可能走网的凭证续期）**之后**采钟。拆成三个方法就得把身份块提到选型之前，那会把 `run_id` 的时间戳提前一次网络往返——而这是纯结构改动，行为需逐字不变。**一个采钟点的先后不是重构可以顺手改的东西**（ARCH §10：全库只有一个采样点，它采到的值进了账本）。于是相位按原序整体搬迁，归位值一个。
+**一个值而不是三个，理由是时钟而不是口味**。这一相位读上去是三件事（规则与选型、身份与登记、围栏与租约），而它们在代码里互相咀合：租约要 `run_id` 与 `who`，而 `run_id` 在选型**之后**采钟。拆成三个方法就得把身份块提到选型之前，那会改变 `run_id` 的时间戳落在哪一步之后——而这是纯结构改动，行为需逐字不变。**一个采钟点的先后不是重构可以顺手改的东西**（ARCH §10：全库只有一个采样点，它采到的值进了账本）。于是相位按原序整体搬迁，归位值一个。
 
 **`Site` 不收 `addr`**：`Address` 是 `dispatch_in` 的形参，它在相位之前就在，放进去就是同一个值的第二份，故它不在字段里。
 
@@ -1048,7 +1036,7 @@ workspace lints 全量适用（含 build.rs）；各节写出钉住它的测试�
 
 | 簇 | 碰它的方法 | 落到 |
 |---|---|---|
-| `vault`／`expiries`／`logins` | `renew_if_stale`／`login_with`／`put_secret`／`resolver` | `assembly::credentials` |
+| `vault` | `put_secret`／`resolver` | `assembly::credentials` |
 | `inboxes`／`joins`／`requests`／`goals` | `lay_out_workbench`／`open_desks`／`settle_desks`／`settle`／`deliver_handback` | `assembly::workbench`＋`assembly::settling` |
 | `pursuits`／`delegator` | `set_pursuit`／`pursue` | `assembly::commanding` |
 | `interrupts`／`watching` | `attach_interrupts`／`watch`／`drive_dispatch` | `assembly.rs`（装的两个钩子）＋`assembly::driving` |
@@ -1149,7 +1137,7 @@ the work: a halted city that laid a job file down would leave a task in a room n
 | 4 | `dispatching::stage_dispatch` | `halted_by` | `E_GATE_DENIED` | 否 |
 | 5 | 同上 | `city::write_brief` | 存储错 | **写：`JOB.md`** |
 | 6 | 同上 | `cas.put` | 存储错 | 写：CAS 对象（`.sprawling/` 内，内容寻址） |
-| 7 | `workbench::stand_up` | `Building::of`／`city::load`／`load_config`／`Router::select`／`renew_if_stale`／`adapter_for`／`Identity::load` | `E_INVALID_ARGS`／`E_CONFIG_INVALID`／`E_MODEL_UNCHOSEN`／`E_GATE_DENIED` | 否 |
+| 7 | `workbench::stand_up` | `Building::of`／`city::load`／`load_config`／`Router::select`／`adapter_for`／`Identity::load` | `E_INVALID_ARGS`／`E_CONFIG_INVALID`／`E_MODEL_UNCHOSEN`／`E_GATE_DENIED` | 否 |
 | 8 | 同上 | `run_id_for`／`governance.sent`／worktree 租约 | 存储错 | 写 |
 
 实测（`sprawling call` 打到一座刚 init 的城）：派活到从没立过的楼 `gamma`，得到
@@ -1164,7 +1152,7 @@ the work: a halted city that laid a job file down would leave a task in a room n
 
 「城答应」由一处回答，穷尽如下，且每一条都只读不写：保留子树（`Building::of`）、停摆
 （`halted_by`）、楼的规矩读得出（`city::load`）、tag 后面有模型且端点还在且不违反 confidential
-（`Router::select`）、订阅凭证续得上（`renew_if_stale`）、适配器造得出（`adapter_for`）。
+（`Router::select`）、适配器造得出（`adapter_for`）。
 
 **留在答应之后的两条拒绝，各有其理由，写在这里而不是被含糊过去**：
 
@@ -1206,7 +1194,7 @@ impl RunWorker {
 `session_for`／`room_for`／`write_effort` 必须搬进 `stage_dispatch`，**否则这条规矩就有两个家**：
 `stage_dispatch` 是唯一被七个派活入口共用的地方（人发的动词、批准后续跑的活、`wake`／`tick`／`knock`／
 委派子活、继任），而房间是在人发的那条臂上开的。把答应放进 `stage_dispatch` 而把开房间留在臂上，
-等于让敲门那条路照旧先写后判；把答应也放到臂上，就要在三个调用点各算一次，`renew_if_stale` 会走两趟网。
+等于让敲门那条路照旧先写后判；把答应也放到臂上，就要在三个调用点各算一次。
 
 于是 `Assignment` 从四个字段变六个：
 
@@ -1280,7 +1268,7 @@ before、after 与字节数，恒不携正文；`before` 缺席即开账行，�
 **`halted_by` 并入 `agree_to_work`**：它本来就是唯一守住的那道门，
 现在与其余五道站在一起，于是「城答应什么」读一处就够。
 
-**采钟点不动**（ARCH §10）：`run_id_for` 读的 `clock.now()` 仍在 `renew_if_stale` 之后，
+**采钟点不动**（ARCH §10）：`run_id_for` 读的 `clock.now()` 仍在选型之后，
 采样次数与相对先后逐字不变；变的只是两者之间多了几次文件写，而那不是任何账本值的输入。
 
 ### 谁答哪一个错误码，逐字不变
@@ -2788,7 +2776,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 
 **签名随之带上失败**：`redemption(&self) -> Result<gateway::Redemption, AxError>`，因为开库会失败，而失败的时刻从「第一张图到达时」提前到「装配适配器时」——这正是想要的：一个读不了自己内容库的城，应当在造适配器时说出来，而不是在模型已经开口之后。两个调用点各改一处（`dispatching::agreeing` 用 `?`，`dispatching::session::name_the_work` 在 Option 语境里用 `.ok()?`）。
 
-**本节的断言把 `credentials/tests.rs` 顶过 400 行，故它按责任一分为二**（`length` 门报的红，修的是因而不是门）：`credentials/tests/endpoints.rs`（一座城够得着哪些模型，以及适配器在线上兑现什么）与 `credentials/tests/signing.rs`（凭证怎么进城：录入与订阅登录），`tests.rs` 只剩两行 `mod`。切分对着源文件的两半（`endpoints.rs`／`signing.rs`）而不是对着行数切。
+**本节的断言把 `credentials/tests.rs` 顶过 400 行，故它按责任一分为二**（`length` 门报的红，修的是因而不是门）：`credentials/tests/endpoints.rs`（一座城够得着哪些模型，以及适配器在线上兑现什么）与 `credentials/tests/signing.rs`（凭证怎么进城：录入），`tests.rs` 只剩两行 `mod`。切分对着源文件的两半（`endpoints.rs`／`signing.rs`）而不是对着行数切。
 
 **未由机器作证的那一半，写在明处**：「只开一次」本身没有断言，因为 `memory::Cas` 不数自己被开过几次；加一个计数缝只为这一条断言，代价大于它买到的东西。作证的是行为面——一次 `redemption` 解得开对话里的每一张图。
 
@@ -3249,7 +3237,7 @@ pub(super) fn look(family, platform, search_path) -> Presence;
 
 ```rust
 // bin::assembly::credentials（形状 2 value）
-pub(super) enum Credential { Absent { header: Option<String> }, Key { .. }, Subscription { .. } }
+pub(super) enum Credential { Absent { header: Option<String> }, Key { .. } }
 
 // bin::assembly::credentials::endpoints（形状 1 decision）
 fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<String>) -> gateway::AuthSpec;
@@ -3258,14 +3246,14 @@ fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<Strin
 - **一条规则一个家**：`endpoint_of` 是 probe 与 attach 共用的那道门，空引用的读法因此只有它一处，`ProbeEndpoint` 与 `AttachEndpoint` 不可能对同一个空框给出两种答案。
 - **空不是删，删是另一个动词**：拿掉一个端点的凭据要一个自己的命令，现在还没有（见 8-46-11 撤销 attach 那一格）；空着的框永远不承担这个意思。一个既能表示「不改」又能表示「删掉」的字段，会让每一次不相干的编辑都带着删除凭据的风险。
 - **留引用、重算头**：归档的是 `AuthSpec`（头 + 引用），沿用的只是引用，头按这次进来的接口形态重算——同一把 key 从 chat 面挪到 messages 面要从 `Authorization: Bearer` 变成 `x-api-key`，照抄旧头会对一把好 key 答 401。人自己命名的头仍然压过推导，`Credential::Absent` 因此带着 `header`。
-- **订阅令牌只走 `Authorization: Bearer`**：头由引用的种类与接口形态一处推出（`bin::assembly::credentials::subscription::auth_for`），`Absent`、`Key`、`Subscription` 三条路都经过它。引用名为 `oauth` 的是某家订阅的 access token，厂商只认 Bearer，所以它不随 messages 面改成 `x-api-key`；否则只改了超时的一次重存就会让 Claude 订阅开始答 401，手工填 `secret:anthropic/oauth` 接上也会落到同一个错头。`oauth` 这个引用名因此在任何 realm 下都保留给订阅的 access token：一把普通 API key 存成 `secret:foo/oauth`，在 messages 面上也会以 Bearer 送出。人自己命名的头照旧压过推导。被否决的备选：按归档的头原样沿用——那会让 API key 在换面时带着旧头 401。
+- **头由接口形态一处推出**：`Absent` 与 `Key` 两条路都经 `gateway::AuthSpec::for_dialect`，人自己命名的头压过推导。被否决的备选：按归档的头原样沿用——那会让 API key 在换面时带着旧头 401。
 - **前端说的话此后是真话**：`lang.json` 的 `setup_key_stored`（「此名下已有密钥，留空则沿用」）先前只在表单自己还记得引用时出现，而城当时并不沿用。现在城沿用，那句话改为在**城说这个 id 有凭据**时出现——一句话一个家，不新增第二个键。
 - **被否决的备选**：① 把 `secret:realm/name` 放进 `EndpointSummary` 让表单送回来——凭据引用是城的内政，上线只为让页面把它原样送回，等于给同一个事实开第二个家，还多一条泄露面；② 让表单按约定重新拼出引用（`referenceOf(id)`）——那只对这张表单自己登记过的 key 成立，`import` 与环境变量来的端点引用不同名，会把别人的引用送进这一个端点。
 
-**本章测试**：`credentials::tests::kept::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用；`credentials::tests::kept::a_subscription_token_keeps_its_bearer_header_when_the_settings_are_saved_again`——messages 面上以订阅引用接上、再空框重存，模型表请求都带 `authorization: Bearer`，端点的 `auth` 仍是 `Bearer`。
+**本章测试**：`credentials::tests::kept::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用。
 
 - **`attach_endpoint` 不以探测为准入条件（gateway-SPEC §8-10 是权威，这里只记装配侧）**：鉴权头由 `gateway::AuthSpec::for_dialect` 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。探测失败时，若 `admit` 非空则按人报的型号登记（`probed: false`，另写一条 `effect` 级诊断点名探测的错），`admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
-- **`Credential` 是穷举枚举**：`Absent { header }`／`Key { reference, header }`／`Subscription { reference }`。按兼容格式选头只对 API key 成立：登录挣来的订阅令牌在 Anthropic 那里恒走 `Authorization: Bearer`，拿 `x-api-key` 发就是 401。两个 `Option` 拼不出这个区别，枚举让「订阅令牌装在 key 的头里」拼不出来。`Credential::entered` 是线上命令的唯一入口（线上从不携订阅令牌），`signing` 自己造 `Subscription`。
+- **`Credential` 是穷举枚举**：`Absent { header }`／`Key { reference, header }`。「这次没填」与「填了一把 key」是两件事，前者保留城已有的凭证，两个 `Option` 拼不出这个区别。`Credential::entered` 是线上命令的唯一入口。
 
 ### 8-82 同一个地址上的新一段：`/new`（`bin::assembly::commanding::sessions`、`Command::OpenSession`、`EventKind::SessionOpened`）
 
@@ -3671,14 +3659,14 @@ pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics)
 ```rust
 // bin::assembly::folds::standing_start —— shape: projection
 #[derive(serde::Serialize, serde::Deserialize)]
-pub(super) struct StandingFolds { book, governance, collaboration: CollaborationFold, entrance, expiries, origins }
+pub(super) struct StandingFolds { book, governance, collaboration: CollaborationFold, entrance, origins }
 impl SnapshotFold for StandingFolds { const DIR: &'static str = "standing"; /* … */ }
 impl StandingFolds { pub(super) fn settle(self, cut: Result<(), AxError>) -> Result<Standing, AxError>; }
 pub(in crate::assembly) fn as_json_text<T: Serialize, S: Serializer>(value: &T, serializer: S) -> Result<S::Ok, S::Error>;
 pub(in crate::assembly) fn from_json_text<'de, T: DeserializeOwned, D: Deserializer<'de>>(deserializer: D) -> Result<T, D::Error>;
 ```
 
-**快照存的是还没 settle 的折叠。** `Standing` 里的 `Collaboration` 是 `CollaborationFold::settle` 的结果：信号的入队与消费按工作发生的顺序到达，队列要到最后一行之后才能算出；尾部再折进来时还要那些被搁置的信号，所以快照存 `CollaborationFold`，不存 `Collaboration`。六个折叠对一条记录的处理只写在 `StandingFolds::absorb` 一处，从创世与从快照起步都走它。
+**快照存的是还没 settle 的折叠。** `Standing` 里的 `Collaboration` 是 `CollaborationFold::settle` 的结果：信号的入队与消费按工作发生的顺序到达，队列要到最后一行之后才能算出；尾部再折进来时还要那些被搁置的信号，所以快照存 `CollaborationFold`，不存 `Collaboration`。五个折叠对一条记录的处理只写在 `StandingFolds::absorb` 一处，从创世与从快照起步都走它。
 
 **postcard 装不下的字段写成 JSON 文本。** `Entrance.refused` 里的 `AxError` 用 `#[serde(flatten)]`，postcard 不支持；`CollaborationFold.enqueued` 里的信号带 `Payload`（JSON 值），postcard 读不回来。前者整张表经 `as_json_text` 写成一段 JSON 文本；后者先经写者自己的 `Signal::enqueued_payload` 变回入队记录的载荷，读回时经它的逆 `Signal::from_payload`，所以信号的形状只有一处定义。`Entrance.carrying` 是本进程正在执行的命令，不是从历史折出来的，不进快照。**被否：给 `AxError` 另写一份不带 flatten 的编码。** 那是这个类型的第二份拼写，线上的 JSON 形状与快照的形状会各自漂移。
 
@@ -3688,7 +3676,7 @@ pub(in crate::assembly) fn from_json_text<'de, T: DeserializeOwned, D: Deseriali
 
 **`fold_version`**：blake3(`CARGO_PKG_VERSION` ‖ `STANDING_FOLD_RULES`) 的前四字节（LE）；同一版本内改了折叠规则或 `StandingFolds` 的字段，改 `STANDING_FOLD_RULES`。这条规则由 `assembly::folds::standing_start::tests` 机器核对：常量写成 `standing-fold-<16 位十六进制>`，后缀是一份固定夹具（两条手写记录，一条信号入队、一条认领，填进协作折叠的信号队列与计划持有表；时间与序号都是常数）折出的 `StandingFolds` 的 postcard 编码的 blake3 摘要前 16 位，编码一变测试就给出新值。
 
-**本节接口的当前状态**：夹具只填了协作折叠；另外五个折叠（`EndpointBook`、`Governance`、`Entrance`、`Expiries`、`SessionOrigins`）在夹具里是空的，摘要只钉住它们空时的编码。其中一个在非空时改了编码（字段顺序不变、含义变了）而忘了改常量，同一版本的二进制仍会接受旧快照；给夹具补上这五个折叠各自的一条记录即可合上。
+**本节接口的当前状态**：夹具只填了协作折叠；另外四个折叠（`EndpointBook`、`Governance`、`Entrance`、`SessionOrigins`）在夹具里是空的，摘要只钉住它们空时的编码。其中一个在非空时改了编码（字段顺序不变、含义变了）而忘了改常量，同一版本的二进制仍会接受旧快照；给夹具补上这四个折叠各自的一条记录即可合上。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 
@@ -3903,11 +3891,9 @@ impl RunWorker {
 pub(in crate::assembly) struct Credentials {
     pub(in crate::assembly) book: gateway::EndpointBook,        // 接了哪些端点、每个 tag 选了哪个模型
     pub(in crate::assembly) vault: Arc<Mutex<gateway::Custodian>>,
-    pub(in crate::assembly) expiries: Expiries,                 // 每个 provider 的订阅凭据何时失效
-    pub(in crate::assembly) logins: BTreeMap<String, gateway::OauthPending>, // 只在内存：PKCE verifier 证明的是同一进程
 }
 impl Credentials {
-    pub(in crate::assembly) fn opened(book, expiries, vault: gateway::Custodian) -> Credentials;
+    pub(in crate::assembly) fn opened(book, vault: gateway::Custodian) -> Credentials;
     pub(in crate::assembly) fn absorb(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
 }
 // bin::assembly::collaborating —— shape: data
@@ -3924,7 +3910,7 @@ impl RunWorker {
 }
 ```
 
-`RunWorker` 拆成六个对象：凭据、治理、协作、计划、入口、飞行中的 run。每个对象带走自己的字段、方法与测试，`RunWorker` 只持有这六个对象和账本、CAS、日志这些整城共用的东西。凭据一组是 `book`、`vault`、`expiries`、`logins` 四个字段：它们回答同一个问题——这座城能以谁的身份去叫哪个模型——而且改动它们的是同一族记录（`endpoint_attached`、`model_selected`、`endpoint_lost`、`secret_captured`）。协作一组是 `rooms`、`joins`、`requests`、`goals` 四个字段：它们都从信号、handback、pull request 与 `goal_registered` 这几族记录折出，回答的是「居民之间正在交接什么」。`pursuits`、`plan_holders` 与 `delegator` 虽然也由协作折叠（`folds::Collaboration`）折出，却回答「每栋楼在朝什么推进」，属于计划一组，不归这里。治理早已是一个对象（`views::Governance`），判定面与读面共用那一个定义，这一步不动它。计划、入口、飞行中的 run 三组见 8-111。
+`RunWorker` 拆成六个对象：凭据、治理、协作、计划、入口、飞行中的 run。每个对象带走自己的字段、方法与测试，`RunWorker` 只持有这六个对象和账本、CAS、日志这些整城共用的东西。凭据一组是 `book`、`vault` 两个字段：它们回答同一个问题——这座城能以谁的身份去叫哪个模型——而且改动它们的是同一族记录（`endpoint_attached`、`model_selected`、`endpoint_lost`、`secret_captured`）。协作一组是 `rooms`、`joins`、`requests`、`goals` 四个字段：它们都从信号、handback、pull request 与 `goal_registered` 这几族记录折出，回答的是「居民之间正在交接什么」。`pursuits`、`plan_holders` 与 `delegator` 虽然也由协作折叠（`folds::Collaboration`）折出，却回答「每栋楼在朝什么推进」，属于计划一组，不归这里。治理早已是一个对象（`views::Governance`），判定面与读面共用那一个定义，这一步不动它。计划、入口、飞行中的 run 三组见 8-111。
 
 **worker 写下的每一行，会话起点、治理、计划、凭据四份折叠都要看到，不论这行以城的名义还是以某个 run 的名义写。** 重启走 `Standing::fold`，那条路把账本上每一行都交给每一份折叠，不问是谁写的；活着的 worker 若只在以城的名义写时才折凭据与会话起点，一行由 run 写下的 `endpoint_attached` 就在账本上、却不在 worker 的 `book` 里，直到进程重启——这正是 8-17 已经排除的那类「活城与重启折出两份」。所以 `record_where` 与 `record_for` 都经过同一个 `RunWorker::absorb`，它把这一行交给会话起点、治理、计划、凭据四份折叠，每份都看过之后才交出第一份的错误：行已经在账本上，一份折叠出错不该让排在它后面的折叠漏看这一行、在重启之前与重启折出两份。哪份折叠看哪几种记录由各自的 `absorb` 决定，这里不再筛。协作一组与入口不经过 `absorb`：协作由写下那一行的效果处理器当场改，入口由 `entrance.stamp` 改；重启时 `Standing::fold` 把每一行也交给这两份折叠。
 

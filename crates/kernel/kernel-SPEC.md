@@ -476,13 +476,11 @@ pub struct AdviserAnswered { pub subject: String, #[serde(flatten)] pub answer: 
 pub enum AdviserFailure { Unavailable, Timeout, Unreadable }
 pub struct AdviserFellBack { pub subject: String, pub reason: AdviserFailure }
 
-// record::credential：F3 家族里凭据进出的三行。`ref` 是 SecretRef 而不是 String，
+// record::credential：F3 家族里凭据进出的两行。`ref` 是 SecretRef 而不是 String，
 // 语法之外的引用读不成这一行（Payload::read 报 E_WIRE_MISMATCH），不再被读者各自静默跳过。
+// 旧版本在订阅登录时另写过 `expires_at` 键；读入时忽略它，本版本不写。
 pub struct SecretCaptured { #[serde(rename = "ref")] pub reference: SecretRef,
-                            #[serde(default)] pub origin: String,   // enrolment | pasted | <provider>-subscription | <provider>-renewal
-                            pub expires_at: Option<u64> }           // 缺席即省略，不写 null
-pub struct LoginStarted { pub provider: String, pub auth_url: String,
-                          pub user_code: Option<String> }           // 只有设备码登录才有；缺席即省略
+                            #[serde(default)] pub origin: String }  // enrolment | pasted；旧行另有 <provider>-subscription | <provider>-renewal
 pub struct ToolkitLinkOpened { pub toolkit: String }
 
 // record::endpoint：F3 家族里「哪个 model 替哪个 tag 作答」的两行。gateway 的 EndpointBook
@@ -671,7 +669,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 治理与设施 | `endpoint_lost` | record-only |
 | 治理与设施 | `model_selected` | record-only |
 | 治理与设施 | `provider_degraded` | record-only |
-| 治理与设施 | `login_started` | record-only（订阅登录开始，载荷携 provider 与授权 URL——URL 里只有 PKCE challenge 与 state，恒无凭证） |
+| 治理与设施 | `login_started` | record-only（旧版本的订阅登录写过它；本版本不写，保留这一种只为旧账本读得回，载荷不再有读者） |
 | 治理与设施 | `eval_run` | record-only |
 | 治理与设施 | `asset_archived` | record-only |
 | 治理与设施 | `credential_lent` | record-only |

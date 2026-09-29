@@ -22,7 +22,7 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 30 个 variant、Query 恰 35 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 29 个 variant、Query 恰 35 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
   **当前 golden**：`918112851b94af1a7c46a16160fd89c5b30409f3a57d4cf219737f38eb1ab8c5`；**WIRE_V ＝ 44**（帧表与查询表的当前内容见 §8 各章）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
@@ -88,7 +88,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 ### 8-0 跨层名字的携带法（先于一切接口的决定）
 
 `PlanRow.status` 携 `kernel::RoadmapStatus`（经 `kernel` 重导出，住 `spine::row`，公共拼写不变）。
-`Dispatch` 携 `mode`，值集住 kernel（`kernel::model::Mode`），channels 依赖 kernel，所以 wire 直接携它。`Login` 携 `provider`、`CreateBuilding` 携 `template`、`ConnectToolkit` 携 toolkit 的 slug——**这三个集合的权威分别住 `gateway`、`city` 与 broker 的目录，而 channels 只依赖 kernel**（ARCHITECTURE §2 depmap）。
+`Dispatch` 携 `mode`，值集住 kernel（`kernel::model::Mode`），channels 依赖 kernel，所以 wire 直接携它。`CreateBuilding` 携 `template`、`ConnectToolkit` 携 toolkit 的 slug——**这两个集合的权威分别住 `city` 与 broker 的目录，而 channels 只依赖 kernel**（ARCHITECTURE §2 depmap）。
 
 取法：wire 携**无封闭列表的 newtype**（`ProviderName`、`TemplateName`、`ToolkitSlug`），只断言「非空且无控制字符」，**不断言合法值集**。合法值集恒由上游单一权威回答，映射点在装配层（`bin::assembly`），未知值即报错不猜。
 
@@ -98,7 +98,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 **四样东西，四个文件**，切法取自依赖方向而不是行数，**因为方向是无环的**：`wire`（信封：`Query`、五种帧、`WIRE_V`、`schema_hash`）→ `command`／`answer` → `carried_name`。
 谁都不回头指，所以加一个 Command 不碰答面，加一个答面不碰命令，而 `carried_name` 的四个新类型谁也不依赖。
-- `command`：`Command`／`WireCommand`／`NoSecret`／`COMMAND_NAMES` 与三个只服务于命令的步骤枚举（`LoginStep`／`HaltScope`／`PursuitStep`）。两条不可拼写的性质随类型走，反例仍在 `tests/trybuild.rs`。
+- `command`：`Command`／`WireCommand`／`NoSecret`／`COMMAND_NAMES` 与两个只服务于命令的步骤枚举（`HaltScope`／`PursuitStep`）。两条不可拼写的性质随类型走，反例仍在 `tests/trybuild.rs`。
 - `answer`：二十余个答面结构与 `Answer` 枚举、`HISTORY_MAX`。它们是读形状，一处判定也不做。
 - `carried_name`：`carried_name!` 宏与 `ProviderName`／`TemplateName`／`ToolkitSlug`——**本 crate 不拥有的名字**，只在唯一构造点拒空与控制字符，合法值集恒属上游。
 公开名经 `lib.rs` 重导出，定义住哪个文件是本 crate 的内政。
@@ -299,9 +299,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - 壳里零策略：判定在 `decide_enroll`，壳只搬字节——同 `decide_bind`／`decide_frame` 的切法，故无需跑服务即可穷尽测。
 - 应答返回那条 `secret_captured` 记录写下的 `ref`——金库键的那句文本，不是路由再拼一次的一句；值不回声、不入事件载荷。入金库由 `Sealed::into_vault_value`（住 kernel::secret，即 expose 白名单三文件之一）完成，开封因此**不发生在装配层**。
 
-**`Login` 携 `LoginStep { Begin, Code { code } }`，WIRE_V 1→2**。两步之间站着一个人：provider 在它自己的页面上把 code 显示给他，他再带回来。**用穷尽枚举而不是 `Option<String>`**——「开始登录」与「兑付这个 code」是两个动作、两种失败，一个页面表达其一时恒不该被读作另一个。`COMMAND_NAMES` 不变，故 schema 哈希单靠名字表不会动；这正是 `WIRE_V` 存在的那种情形（语法换形而名字没换），于是版本进位、旧页面在握手期被明确拒绝。**恒不开回环监听端口**：该 provider 的 redirect 就是它自己的页面，多一个监听口就是多一条没人走的入口。
-
-**`Login` 携穷尽枚举 `LoginStep { Begin, Code { code } }`，WIRE_V 1→2**。两步之间站着一个人：provider 在它自己的页面上把 code 显示给他，他再带回来。用枚举而不是 `Option<String>`——「开始登录」与「兑付这个 code」是两个动作、两种失败。`COMMAND_NAMES` 未变故 schema 哈希单靠名字表不会动，这正是 `WIRE_V` 存在的那种情形。**恒不开回环监听端口**：该 provider 的 redirect 就是它自己的页面。
+**线上没有登录命令**：订阅额度由厂商自己的 harness 带进城，人在 harness 里自己登录，本城不以任何厂商客户端的身份登录（gateway-SPEC §8-5）。旧版本的 `Login` 命令与 `LoginStep` 随之删去；`COMMAND_NAMES` 少一项，schema 哈希因名字表而变，旧页面在握手期被明确拒绝，所以 `WIRE_V` 不为此进位。
 
 **五个查询各有自己的答**（`InboxView`／`DiscardView`／`RegistryView`／`ArchiveSearch`／`Metrics`）。三条口径：①**队列折叠着看不消费着看**（`Inbox::pull` 要拿走才给内容，看一眼就取走的视图会改变它所报告的对象）；②归档在被问的那一刻读盘（同 `BuildingView`，文件是权威）；③**`Metrics` 恒不携钱**——钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。
 
@@ -1471,7 +1469,6 @@ pub enum DoctorUnread { WithToolchain, ManyBrands, MatchesBrowser, ThisProject, 
 | Command | reach | 说明 |
 |---|---|---|
 | `Dispatch` | client | 派活，产品的正面 |
-| `Login` | client | 登录一个 provider |
 | `ProbeEndpoint` | client | 问一个端点它供应什么 |
 | `ConfigureBuilding` | client | 改一栋楼的规矩 |
 | `AttachEndpoint` | client | 把一个端点挂上 |
