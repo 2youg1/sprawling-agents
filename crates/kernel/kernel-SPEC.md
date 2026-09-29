@@ -2104,6 +2104,8 @@ pub const ARCHIVE_DIR: &str = "Archive";
 pub const JOB_FILE: &str = "JOB.md";
 pub const HANDOFF_FILE: &str = "Handoff.md";
 pub const URBANITE_FILE: &str = "URBANITE.md";
+pub const TRANSCRIPT_EXT: &str = "jsonl";                            // 一次 run 的对话记录：房间里的 `<run>.jsonl`
+pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";   // `RunId` 显示形的 git 忽略模式，一个字符一个 `?`
 
 pub struct CityLayout { /* root —— 私有 */ }
 impl CityLayout {
