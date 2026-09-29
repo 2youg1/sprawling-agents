@@ -22,7 +22,7 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 29 个 variant、Query 恰 37 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 29 个 variant、Query 恰 38 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
   **当前 golden**：`8ed10b640a9e6f62493533019e799cd6f8610152c4cc2523d0222d72c66ac5df`；**WIRE_V ＝ 44**（帧表与查询表的当前内容见 §8 各章）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
@@ -1457,6 +1457,19 @@ pub struct KnownFace { pub dialect: DialectKind, pub base_url: String }
 - **一个人挑厂商，而不是去厂商文档里复制一个地址。** 本城认得的 host 住 `gateway::provider::preset`（gateway-SPEC §8-17），设置页经这一问读它：每个 host 说几面、每面的 base URL 是什么。`base_url` 是这座城登记时自己会算出的那个地址（`normalise_entered`），所以页上填进框里的与登记下来的是同一串。
 - **客户端据同一答案决定哪几面可选**：一个 host 不说的那一面在控件上拒点，理由写出它说的几面。客户端不再持自己的 host 表。
 - **一问而不是塞进 `EndpointsAnswer`**：那个答案说的是这座城登记了什么，随账本变；这一问说的是本城认得哪些厂商，只随二进制变。合成一个答案，会让每一次登记都重发一份不变的表。
+- 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
+
+### 8-52 设置页的 harness 页：`Query::Harnesses`
+
+```rust
+Query::Harnesses
+Answer::Harnesses(HarnessesAnswer)
+pub struct HarnessesAnswer { pub harnesses: Vec<HarnessLine> }
+pub struct HarnessLine { pub name: String, pub launch: Vec<String>, pub found: bool, pub docs: String }
+```
+
+- **provider 页与 harness 页分开**（人的裁定）：provider 页收 API key，harness 页说明五家官方 harness（protocol-SPEC §8-19）。
+- `name` 是 `protocol::Harness::as_str` 的词；`launch` 是起它说 ACP 的那条命令，逐词；`found` 是那条命令的程序在这台电脑的搜索路径上找不找得到；`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
 - 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）

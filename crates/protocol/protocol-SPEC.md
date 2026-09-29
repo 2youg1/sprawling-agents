@@ -249,3 +249,46 @@ pub enum Connection { Absent, Awaiting { consent_url: String }, Connected { alia
 - **只有一家 broker，所以没有 trait**：第二家外包服务才是这条缝的第二个实现。
 - 失败码：401／403 抬 `E_CREDENTIAL_MISSING`；408／429／5xx 抬可重试的 `E_PROVIDER`；连接阶段超时抬可重试的 `E_PROVIDER`（请求还没离开这台电脑）；请求发出之后等答超时抬 `effect_unknown` 的 `E_PROVIDER`，因为 `connect` 会在 broker 那边建一份 auth config，重发可能建出第二份；2xx 之后 body 读不完（连接在答案中途断开）同样抬 `effect_unknown` 的 `E_PROVIDER`，subject 带读不出的原因——broker 已经照做了，丢的只是答案；非 2xx 的 body 读不出时，读不出的原因代替 body 作附近文字；其余状态、读不出的答案与接不上 base 的路径抬 `E_PROVIDER`。接不上的路径在 recovery 里报出本模块的路径（`module_path!()`），模块再搬家也不漂。
 - 字段按防御方式读：缺一个字段少一行，不毁整张答案；测试里的假 server 是本 crate 对 broker 所发内容的陈述。
+
+### 8-19 官方 harness 出站：五家与一场 ACP 会话（`protocol::harness`；`roster` 形状 6 数据面，`session` 形状 4 适配器）
+
+订阅额度由厂商自己的 harness 带进城（gateway-SPEC §8-5）。本节是这条路的传输半：认得哪几家、怎么把一家起成一个说 ACP 的子进程、怎么跟它开一场会话并把它说的话读回来。**本城是 ACP 的 client**，与 §8-2 的入站方向相反。
+
+```rust
+// harness::roster —— 数据面，人的裁定：只有这五家
+pub enum Harness { Codex, ClaudeCode, GrokBuild, KimiCode, Pi }   // as_str(): codex|claude_code|grok_build|kimi_code|pi
+impl Harness {
+    pub const ALL: [Harness; 5];
+    pub const fn launch(self) -> Launch;          // 起一个说 ACP 的进程：程序与参数
+    pub const fn registry_id(self) -> &'static str;   // ACP registry 里的 id
+    pub const fn docs(self) -> &'static str;      // 这家自己写的登录说明
+}
+pub struct Launch { pub program: Program, pub args: &'static [&'static str] }
+pub enum Program { Npx, Kimi }
+impl Program { pub const fn name(self) -> &'static str; }   // Windows 上 npx 是 npx.cmd，kimi 是 kimi.exe 由搜索路径补
+
+// harness::session —— 一场 ACP 会话，JSON-RPC 2.0，按行分帧
+pub struct AcpSession<R: BufRead, W: Write> { /* 私有：reader、writer、下一个请求 id、session id、harness 名 */ }
+impl<R: BufRead, W: Write> AcpSession<R, W> {
+    pub fn open(reader: R, writer: W, name: &str, cwd: &Path) -> Result<Self, AxError>;   // initialize ＋ session/new
+    pub fn prompt(&mut self, text: &str, updates: &mut dyn FnMut(Update),
+                  permit: &mut dyn FnMut(&PermissionAsk) -> Permit) -> Result<StopReason, AxError>;
+}
+pub enum Update { Text(String), Thought(String), ToolCall { id: String, title: String, kind: String },
+                  ToolCallStatus { id: String, status: String }, Other { variant: String } }
+pub struct PermissionAsk { pub title: String, pub options: Vec<PermitOption> }
+pub struct PermitOption { pub id: String, pub name: String, pub kind: PermitKind }
+pub enum PermitKind { AllowOnce, AllowAlways, RejectOnce, RejectAlways }
+pub enum Permit { Chosen(String), Cancelled }
+pub enum StopReason { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
+```
+
+- **名单是人的裁定**：Codex、Claude Code、Grok Build、Kimi Code、Pi 五家是人唯一认可的 harness。增一家要人的裁定，不因为 ACP registry 里多了一行就跟着加。
+- **怎么起一家，读 ACP registry**（<https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json>，逐家的 `agent.json` 在 `agentclientprotocol/registry`，被看路径见 docs/third-party.md §1）：Claude Code 与 Codex 各经官方适配器（`npx -y @agentclientprotocol/claude-agent-acp@0.84.0`、`npx -y @agentclientprotocol/codex-acp@2.0.0`），Grok Build 经它自己的包（`npx -y @xai-official/grok@1.0.45 agent stdio`），Kimi Code 是人装好的 `kimi acp`，Pi 经 `npx -y pi-acp@0.0.34`。**版本钉死**：`npx` 不带版本会在每次起进程时向 npm 取最新的包，一个没人看过的版本就进了城。
+- **登录是人在 harness 里做的**：本城不起登录流程、不读 harness 的凭据文件。`docs` 是每家自己写的登录说明，页面只把它交给人。
+- **本城不向 harness 提供文件与终端**：`initialize` 声明 `fs.readTextFile`、`fs.writeTextFile`、`terminal` 全为 `false`，harness 用它自己的工具。ACP 规格里工具由 agent 自己执行，`session/request_permission` 是 agent 可以不发的请求，工具名 "do not advertise a capability or grant authorization"（<https://agentclientprotocol.com/protocol/tool-calls>）；本城因此只能**记录**一家 harness 做了什么，不能**管辖**它。harness 发来的其余请求（`fs/*`、`terminal/*`）以 JSON-RPC `-32601` 回答，不静默。
+- **一条消息的上限与 MCP 同一个**：`read_one_message` 与 `MESSAGE_CEILING`（§8-15）。ACP 与 MCP 同是按行分帧的 JSON-RPC，一个图片加信封的上限对两者是同一个事实。
+- **`prompt` 在对方答出 `StopReason` 时返回**；读到输入结束而没有答，是 `E_PROVIDER` 并标 `Retry::Unknown`：对方也许已经做了事。`StopReason` 未知的词拒而不猜。
+- **测试走同一扇门**：`AcpSession` 对任何 `BufRead + Write` 成立，测试用一条线程在内存管道另一头扮演 agent，不另立 trait。
+
+**尚未做到的（本节接口的当前状态）**：一个 harness 居民的 run——派活到这样的居民时起它的进程、在房间的 worktree 里开会话、把 `Update` 写进账本、把 `Halt` 译成 `session/cancel`、confidential 楼拒绝构造它、经 `session/new` 的 `mcpServers` 把城的工具交给它——还没有接线。它先在 `adversary/design/` 用 Lean 建模「汇报过的效果不进准入历史」，再写 sprawling-SPEC 的一节，再接线；在那之前，设置页的 harness 页只说明五家在这台电脑上够不够得着、怎么起、去哪里登录。
