@@ -34,16 +34,9 @@ use crate::walk;
 
 /// The only files allowed to say `.expose(` under crates/*/src: the
 /// defining module and the redemption point in gateway's endpoint call.
-const EXPOSE_WHITELIST: [&str; 5] = [
+const EXPOSE_WHITELIST: [&str; 4] = [
     "crates/kernel/src/secret/sealed.rs",
     "crates/gateway/src/endpoint/call.rs",
-    // Renewing a subscription credential sends the refresh token
-    // to the provider's token endpoint, which is a redemption point of
-    // exactly the same kind as the endpoint call above - the last slot before the
-    // wire. Widened here rather than worked around at the call site,
-    // because the alternative was the assembly holding plaintext, and
-    // that is the thing this list exists to prevent.
-    "crates/gateway/src/credential/oauth/flow.rs",
     // An MCP server's configured header or environment variable may
     // name a credential instead of carrying one. This is the one place
     // the reference is redeemed for all three transports; what travels
@@ -93,12 +86,7 @@ const EXPOSE_WHITELIST: [&str; 5] = [
 ///   `Win32` beside the underscores are what trip the mixed-alphabet
 ///   rule. Only the six names of twenty bytes or more are listed, since
 ///   a shorter one never reaches the entropy detector.
-/// - `app_EMoamEEZ73f0CkXaXp7hrann` — OpenAI's public OAuth client id,
-///   published by the upstream `docs/third-party.md` section 1 follows.
-///   A client id authorises nothing on its own: the flow it belongs to
-///   proves possession with a PKCE verifier nobody writes down.
-const NOT_CREDENTIALS: [&str; 8] = [
-    "app_EMoamEEZ73f0CkXaXp7hrann",
+const NOT_CREDENTIALS: [&str; 7] = [
     "CC_x86_64_unknown_linux_musl",
     "Win32_System_DataExchange",
     "Win32_System_Threading",

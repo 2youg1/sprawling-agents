@@ -2202,9 +2202,6 @@ pub kernel::event::record::InputKinds::TextImage
 pub kernel::event::record::Lane::Ordinary
 pub kernel::event::record::Lane::Urgent
 pub kernel::event::record::LogTruncated::dropped_bytes: u64
-pub kernel::event::record::LoginStarted::auth_url: alloc::string::String
-pub kernel::event::record::LoginStarted::provider: alloc::string::String
-pub kernel::event::record::LoginStarted::user_code: core::option::Option<alloc::string::String>
 pub kernel::event::record::ModelCalled::model: alloc::string::String
 pub kernel::event::record::ModelCalled::segments: alloc::vec::Vec<kernel::locator::B3Hash>
 pub kernel::event::record::ModelFacts::context_tokens: core::option::Option<u64>
@@ -2296,7 +2293,6 @@ pub kernel::event::record::RunStarted::parent: core::option::Option<kernel::RunI
 pub kernel::event::record::RunStarted::predecessor: core::option::Option<kernel::RunId>
 pub kernel::event::record::RunStarted::skills: alloc::vec::Vec<kernel::event::record::SkillPin>
 pub kernel::event::record::RunStarted::task: alloc::string::String
-pub kernel::event::record::SecretCaptured::expires_at: core::option::Option<u64>
 pub kernel::event::record::SecretCaptured::origin: alloc::string::String
 pub kernel::event::record::SecretCaptured::reference: kernel::SecretRef
 pub kernel::event::record::SessionOpened::carried: bool
@@ -2859,7 +2855,6 @@ pub struct kernel::event::record::GoalConflict
 pub struct kernel::event::record::GovernedDocumentWritten
 pub struct kernel::event::record::HandoffWritten
 pub struct kernel::event::record::LogTruncated
-pub struct kernel::event::record::LoginStarted
 pub struct kernel::event::record::ModelCalled
 pub struct kernel::event::record::ModelFacts
 pub struct kernel::event::record::ModelReturned

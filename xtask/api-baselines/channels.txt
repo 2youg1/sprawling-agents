@@ -217,10 +217,6 @@ pub channels::Command::HandOff
 pub channels::Command::HandOff::idem: kernel::idem::IdemKey
 pub channels::Command::HandOff::item: kernel::approval::ApprovalId
 pub channels::Command::HandOff::to: kernel::registry::ResidentId
-pub channels::Command::Login
-pub channels::Command::Login::idem: kernel::idem::IdemKey
-pub channels::Command::Login::provider: channels::ProviderName
-pub channels::Command::Login::step: channels::LoginStep
 pub channels::Command::OpenSession
 pub channels::Command::OpenSession::addr: kernel::address::Address
 pub channels::Command::OpenSession::carry: channels::Carry
@@ -561,9 +557,6 @@ pub channels::LogLine::module: alloc::string::String
 pub channels::LogLine::run: core::option::Option<kernel::event::identity::RunId>
 pub channels::LogLine::seq: kernel::event::identity::Seq
 pub channels::LogLine::t: core::option::Option<kernel::event::identity::TimeMs>
-pub channels::LoginStep::Begin
-pub channels::LoginStep::Code
-pub channels::LoginStep::Code::code: alloc::string::String
 pub channels::McpHealthAnswer::addr: kernel::address::Address
 pub channels::McpHealthAnswer::servers: alloc::vec::Vec<channels::McpServerHealth>
 pub channels::McpServerHealth::label: kernel::tool::ServerLabel
@@ -925,7 +918,7 @@ pub channels::Withheld::number: u32
 pub channels::Withheld::reason: alloc::string::String
 pub const channels::BODY_PX_MAX: u32
 pub const channels::BODY_PX_MIN: u32
-pub const channels::COMMAND_NAMES: [&str; 30]
+pub const channels::COMMAND_NAMES: [&str; 29]
 pub const channels::DROP_BYTES_MAX: usize
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
@@ -975,7 +968,6 @@ pub enum channels::Intervention
 pub enum channels::Lang
 pub enum channels::Lighting
 pub enum channels::LogLevel
-pub enum channels::LoginStep
 pub enum channels::McpState
 pub enum channels::Monitoring
 pub enum channels::Motion
