@@ -172,7 +172,7 @@ Seven skills under `skills/` travel with this tree. The directory is a skill she
 
 | Skill | What it is for | Licence | Origin |
 |---|---|---|---|
-| `skills/sdd/SKILL.md` | spec-first programming work: a SPEC.md before the code, the code kept in step with it | MPL-2.0 | the author's own Chinese-language skill, translated here |
+| `skills/sdd/SKILL.md` | specification-first development with formally verified Lean contracts; see the skill for its migration, delegation, and maintenance rules | MPL-2.0 | the author's own Chinese-language skill, translated here |
 | `skills/tutor/SKILL.md` | discovery teaching: one person, dialogue and verifiable outcomes, no courseware | MPL-2.0 | the same |
 | `skills/translation/SKILL.md` | low-variance translation of form-as-content text into Chinese | MPL-2.0 | the same |
 | `skills/why/SKILL.md` | design rationale read off evidence, with citations | MIT | modified adaptation of pstack's `why` |
