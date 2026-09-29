@@ -1,10 +1,11 @@
-# Ask the two provider-intelligence upstreams whether they moved, every
-# day, and open one issue when one did.
+# Ask every upstream path `docs/third-party.md` section 1 follows whether
+# it moved, every day, and open one issue for each path that did.
 #
-# What is watched and what commit it is tracked to are facts of
-# `docs/third-party.md` section 1, not of this file: the workflow parses
-# the two table rows (project, path, tracked commit), so the doc stays the
-# single authority for both the list and the watermark. An endpoint
+# What is watched, what it is followed for, and what commit it is tracked
+# to are facts of `docs/third-party.md` section 1, not of this file: the
+# workflow parses each table row (project, what is followed, path,
+# tracked commit), so the doc stays the single authority for the list,
+# the reason and the watermark. An endpoint
 # migration arrives in a patch version, so commits are compared rather
 # than releases; releases are exactly what this must not watch.
 #
@@ -39,21 +40,26 @@ jobs:
             [ -z "$repo" ] && continue
             # Octal 140 is the backtick: a literal one has been eaten out
             # of this file once already, and the column is not worth it.
+            followed=$(printf '%s\n' "$line" | cut -d'|' -f4 | sed 's/^ *//; s/ *$//')
             path=$(printf '%s\n' "$line" | cut -d'|' -f5 | tr -d '\140 ')
             tracked=$(printf '%s\n' "$line" | cut -d'|' -f6 | tr -d '\140 ')
             head=$(curl -fsSL "https://api.github.com/repos/$repo/commits?path=$path&per_page=1" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['sha'])")
             if [[ "$head" == "$tracked"* ]]; then
-              echo "$repo: unchanged ($tracked)"
+              echo "$repo $path: unchanged ($tracked)"
               continue
             fi
-            if gh issue list --state open --label upstream-watch --json title --limit 50 | grep -q "$repo"; then
-              echo "$repo: moved ($head), issue already open"
+            # One issue per watched path rather than per repository: one
+            # registry holds five harnesses, and a move in one directory
+            # must not stay unreported until somebody closes another.
+            title="upstream watch: $repo $path moved"
+            if gh issue list --state open --label upstream-watch --json title --jq '.[].title' --limit 100 | grep -qxF "$title"; then
+              echo "$repo $path: moved ($head), issue already open"
               continue
             fi
-            body=$(printf '## What moved\n\n\140%s\140 in [%s](https://github.com/%s) has a newer commit than \140%s\140, which is what this repository\047s constants have read so far.\n\n- new commit: [\140%s\140](https://github.com/%s/commit/%s)\n- compare: <https://github.com/%s/compare/%s...%s>\n\n## What to do\n\nThe provider intelligence followed here (docs/third-party.md section 1) needs re-checking against that diff: endpoints, client id, scopes, device-code flow. Realigning the constants and setting the new commit in the \140Tracked to\140 column belong to the same change-set, so the watermark never runs ahead of what the code knows. Where two sources disagree, the provider\047s own documentation decides, not the majority.' \
-              "$path" "$repo" "$repo" "$tracked" "${head:0:12}" "$repo" "$head" "$repo" "$tracked" "$head")
+            body=$(printf '## What moved\n\n\140%s\140 in [%s](https://github.com/%s) has a newer commit than \140%s\140, which is what this repository\047s constants have read so far.\n\n- new commit: [\140%s\140](https://github.com/%s/commit/%s)\n- compare: <https://github.com/%s/compare/%s...%s>\n\n## What is followed there\n\n%s\n\n## What to do\n\nRe-check that fact against the diff (docs/third-party.md section 1). Realigning the code and setting the new commit in the \140Tracked to\140 column belong to the same change-set, so the watermark never runs ahead of what the code knows; when the diff leaves the fact alone, that change-set advances the watermark and nothing else. Where two sources disagree, the vendor\047s own documentation decides, not the majority.' \
+              "$path" "$repo" "$repo" "$tracked" "${head:0:12}" "$repo" "$head" "$repo" "$tracked" "$head" "$followed")
             gh issue create \
-              --title "upstream watch: $repo moved" \
+              --title "$title" \
               --label upstream-watch \
               --body "$body"
           done <<< "$rows"

@@ -29,7 +29,7 @@ Calling a face this city did not invent requires knowing the shape of the reques
 > commit out of the last two cells. The column shape is fixed and the
 > prose around it is not.
 
-**One row is one watched path.** The workflow sends the fourth cell to the commits API as a single path, so a cell naming two paths would ask GitHub for a path that does not exist, and a run that asks for nothing gets nothing rather than saying so. Two paths therefore mean two rows with two watermarks. The workflow opens no second issue for a repository that already has one open, so when two paths of one repository move at once, the second is reported only after the first issue is closed. That cost grows with each row a repository gains, and it is paid deliberately: a path nobody watches is a constant that goes stale without a signal.
+**One row is one watched path.** The workflow sends the fourth cell to the commits API as a single path, so a cell naming two paths would ask GitHub for a path that does not exist, and a run that asks for nothing gets nothing rather than saying so. Two paths therefore mean two rows with two watermarks. The workflow keeps one open issue per path, titled with the repository and the path, so the five registry directories below report their moves side by side rather than one after another, and a path that moves again while its issue is open adds nothing to it.
 
 **The five official harnesses are started the way the ACP registry says**, one watched registry directory each, holding its `agent.json`, with the version pinned in `protocol::harness`. Which harnesses are on the list is the person's ruling, not the registry's: Claude Code, Codex, Grok Build, Kimi Code and Pi. The adapters for Claude Code and Codex are published under the registry's own organisation with the vendor among the authors, Grok Build and Kimi Code speak ACP themselves, and Pi's adapter is a third party's; none of their code is in this tree, and each runs as a separate process that the person installs through `npx` or, for Kimi Code, themselves.
 
@@ -41,7 +41,7 @@ Calling a face this city did not invent requires knowing the shape of the reques
 
 **How to re-check**: watch the paths above for changes rather than watching releases, because an endpoint migration often arrives in a patch version with no mention in the changelog. Where two sources disagree, the provider's own documentation decides, not the majority. Every row above was read at the commit its `Tracked to` cell names.
 
-**The watch is automated.** Every day `upstream-watch` asks each path for its newest commit and compares it with `Tracked to`; a difference opens one issue naming the commit, a compare view, and what to re-check. `Tracked to` advances only in the pull request that realigns the constants, the same change-set that carries the new facts, so the watermark never runs ahead of what the code knows.
+**The watch is automated.** Every day `upstream-watch` asks each path for its newest commit and compares it with `Tracked to`; a difference opens one issue naming the commit, a compare view, and the row's *What is followed* cell as the fact to re-check. `Tracked to` advances only in the pull request that realigns the constants, the same change-set that carries the new facts, so the watermark never runs ahead of what the code knows.
 
 **Why follow intelligence and not code**:
 
