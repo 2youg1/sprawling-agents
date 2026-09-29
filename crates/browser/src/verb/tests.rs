@@ -285,7 +285,7 @@ fn a_fetch_is_one_frame_from_the_page_and_names_its_host() {
     for relative in ["/v1/items", "file:///etc/hosts", "data:text/plain,hi"] {
         let refused = Verb::read(&args(json!({ "action": "fetch", "url": relative })));
         assert_eq!(
-            refused.err().map(|err| err.code().clone()),
+            refused.err().map(|err| *err.code()),
             Some(AxCode::InvalidArgs),
             "{relative}"
         );

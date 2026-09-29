@@ -16,7 +16,10 @@ use super::person::for_user_browser;
 
 /// What the model is told about the building's own browser.
 pub(super) const BUILDING_DISCLOSURE: &str = "drive this machine's browser: open a page, look at it, act on it, \
-     take a screenshot, measure boxes, read the console, resize, close. The accessibility tree \
+     take a screenshot, measure boxes, fetch an address as text, read the console, resize, \
+     close. `fetch` runs in the open page, so it carries that page's cookies and keeps its \
+     same-origin rules; HTML comes back as readable text, and a redirect is reported rather \
+     than followed. The accessibility tree \
      answers most questions; reach for a screenshot when the question is what a person would \
      see. A screenshot covers the whole page, a `ref` from the snapshot, or a `clip` rectangle \
      in CSS pixels, and comes back at most 1920 pixels on its longest side; coordinates this \

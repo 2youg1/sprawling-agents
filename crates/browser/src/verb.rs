@@ -23,8 +23,8 @@ use crate::port::Frame;
 use crate::session::{ContextId, Session};
 use crate::shot::ShotRequest;
 use crate::snapshot::PageSnapshot;
-use read::{number_of, read_action, side_of, text_of};
-use script::{measure_script, read_references};
+use read::{fetched_url, number_of, read_action, side_of, text_of};
+use script::{fetch_script, measure_script, read_references};
 
 pub use script::{complained, read_json};
 
@@ -83,14 +83,29 @@ fn tree_script() -> String {
 /// page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verb {
-    Open { url: String },
+    Open {
+        url: String,
+    },
     Snapshot,
-    Act { generation: u64, action: Action },
+    Act {
+        generation: u64,
+        action: Action,
+    },
     Screenshot(ShotRequest),
-    Measure { references: Vec<String> },
+    Measure {
+        references: Vec<String>,
+    },
     Survey,
+    /// One address fetched by the open page's own Fetch API and read
+    /// back as text (browser-SPEC.md 19-2).
+    Fetch {
+        url: String,
+    },
     Console,
-    Viewport { width: u32, height: u32 },
+    Viewport {
+        width: u32,
+        height: u32,
+    },
     Close,
 }
 
@@ -107,7 +122,7 @@ impl Verb {
     /// egress unjudged.
     pub fn destination(&self) -> Result<Option<String>, AxError> {
         match self {
-            Verb::Open { url } => kernel::gate::host_of(url),
+            Verb::Open { url } | Verb::Fetch { url } => kernel::gate::host_of(url),
             Verb::Snapshot
             | Verb::Act { .. }
             | Verb::Screenshot(_)
@@ -171,6 +186,7 @@ impl Verb {
             | Verb::Screenshot(_)
             | Verb::Measure { .. }
             | Verb::Survey
+            | Verb::Fetch { .. }
             | Verb::Console
             | Verb::Viewport { .. }
             | Verb::Close => Err(AxError::failure(
@@ -207,6 +223,9 @@ impl Verb {
                 references: read_references(args)?,
             }),
             "survey" => Ok(Verb::Survey),
+            "fetch" => Ok(Verb::Fetch {
+                url: fetched_url(args)?,
+            }),
             "console" => Ok(Verb::Console),
             "viewport" => Ok(Verb::Viewport {
                 width: side_of(args, "width")?,
@@ -219,7 +238,7 @@ impl Verb {
                 other.to_owned(),
             )
             .with_recovery(
-                "one of open, snapshot, act, screenshot, measure, console, viewport, close",
+                "one of open, snapshot, act, screenshot, measure, survey, fetch, console,                  viewport, close",
             )),
         }
     }
@@ -280,6 +299,7 @@ impl Verb {
                     &crate::survey::probe::evaluated(None),
                 )?])
             }
+            Verb::Fetch { url } => Ok(vec![session.evaluate(context, &fetch_script(url))?]),
             Verb::Console => Ok(vec![session.evaluate(context, CONSOLE_SCRIPT)?]),
             Verb::Viewport { width, height } => Ok(vec![session.frame(
                 "browsingContext.setViewport",

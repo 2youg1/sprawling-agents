@@ -25,7 +25,7 @@
 - **假设**：起进程归 `bin::browser_bidi`；本库恒不拉起浏览器进程、恒不持套接字、恒不下载驱动。
 - **假设（附着）**：连一个已经开着的浏览器也归装配层——本库只把帧交给缝。装配层的 `AttachedBrowser` 与 `LazyEngine` 是同一缝上的第二个实现：前者只连、不启动、不结束进程；后者的 `running`／`Drop` 假定进程归自己，两者因此不能合成一个类型。
 - **协议形状**：`input.performActions` 的 `pointer`／`wheel` 源动作字段与元素 origin 的 `SharedReference` 据 W3C 草案写成；`script.evaluate` 回复里 `sharedId` 的位置、空能力集、`image/png` 拼写已对 Gecko 真会话核过（§19-7）。`input::shared_id_of` 在回复里按有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`。
-- **未定**：`-headless` 这一位由哪一面提供（楼的 `CONFIG.toml` 还是派活帧的一个字段）；某个具体 Firefox fork 是否接受本 crate 的启动参数与会话形态；行容器的交叉轴怎么扫（§19-10）；画出来的一对颜色是否可读：接进 `xtask::color` 的对比度模型要把它开放给本 crate，另写一条对比度公式就是第二个权威（`survey::legibility`）。
+- **未定**：`-headless` 这一位由哪一面提供（楼的 `CONFIG.toml` 还是派活帧的一个字段）；某个具体 Firefox fork 是否接受本 crate 的启动参数与会话形态；行容器的交叉轴怎么扫（§19-10）；`fetch` 的脚本在 Gecko 上是否读出与 Chromium 相同的文字（§19-7 记的是 Chromium 那一次）；画出来的一对颜色是否可读：接进 `xtask::color` 的对比度模型要把它开放给本 crate，另写一条对比度公式就是第二个权威（`survey::legibility`）。
 - **歧义已定**：BiDi 的 `session.new` 能力集合本版本只请求空能力＋按需 `network` 事件；更多能力等到有消费者再加，因为每一项能力都是远端因此获得的一项许可。
 
 ## 4 现状分析
@@ -306,6 +306,8 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 **对 Gecko 的一次真会话核过了 §3 的协议形状**：`session.new` 接受空能力集；`script.evaluate` 的回复是 `result.result = { type, handle, sharedId, value }`，`sharedId` 就在这一层，`shared_id_of` 的有界查找找到它；`browsingContext.captureScreenshot` 的 `format.type` 收 `image/png` 这一拼写。元素裁剪也随之落地：`clip.type = "element"` 收由 `script.evaluate` 回复里取出的 `sharedId`，回来的图正好是该元素的框。
 
 同一次会话量到驱动**原样忽略** `imageSize`，所以上界靠 §19-3 的重拍生效：超界时按实测长边算比例重拍一次，仍超界才拒。
+
+**`fetch` 的脚本对 Chromium 引擎核过**：headless Chromium 打开一个回环地址上的页面，页面里跑 `fetch_script` 取同源的一份 HTML，读回 `status` 200、`content-type`、最终地址，正文是「标题、空行、各块一行」的文字，`script`、`style`、`noscript` 的内容不在其中，段落里的源码换行收成空格，`pre` 里的换行与缩进原样保留。同一段脚本在 Bun 的 `fetch` 下读 JSON、纯文本（超上限时 `cut` 为真并报原长）、图片（只报 `binary` 与字节数）、302（停在跳转本身）与连不上的地址（`error` 带页面的原话）。
 
 - **`-headless` 有开关没有问的人**：`LaunchPlan` 带这一位并逐字断言，但 `for_building` 恒传 `false`；由哪一面提供见 §3。
 - **引擎的名字不止一个，而且已经是查表**：`host::firefox` 走的是 `doctor` 的 `gecko` 条目（`Need::OneOf(Group::BrowserEngine)`），家族表里有 firefox、zen、librewolf、waterfox、floorp、firefox-developer、firefox-nightly、tor-browser 八行，`SPRAWLING_BROWSER` 可压过其一；`Engine::choose` 的参数只是叫 `firefox`，取的是这条答案的路径——所以一个只有 fork、没有 Firefox 的机器是可起的。**仍未定的只是：某个具体 fork 是否接受本 crate 的启动参数与会话形态**，而那要在那个 fork 上真的起一次会话才算数。

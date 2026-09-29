@@ -55,6 +55,25 @@ impl Browser {
                 result: payload(vec![("survey", Value::String(surveyed(result)?))])?,
                 attachments: Vec::new(),
             }),
+            // The page's own reading of the response, field for field:
+            // status, type, url, text, cut and chars, or `binary` with a
+            // byte count, or the page's `error` when fetch itself threw.
+            Verb::Fetch { .. } => {
+                let Value::Object(fields) = browser::read_json(result)? else {
+                    return Err(AxError::failure(
+                        kernel::AxCode::WireMismatch,
+                        "read what the page fetched",
+                        "the page answered with something other than an object",
+                    )
+                    .with_recovery(
+                        "report this against browser::verb: the fetch script returns one object",
+                    ));
+                };
+                Ok(ToolOutcome {
+                    result: Payload::new(fields)?,
+                    attachments: Vec::new(),
+                })
+            }
             Verb::Console => {
                 let entries = browser::read_json(result)?;
                 self.complained = browser::complained(&entries);

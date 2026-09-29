@@ -33,6 +33,29 @@ pub(super) fn text_of(args: &Payload, field: &str) -> Result<String, AxError> {
         .ok_or_else(|| missing(field))
 }
 
+/// The address a `fetch` names: absolute, over http or https, with a
+/// host the egress door can judge. A relative address resolves against
+/// the page's `<base>`, which may name any host, and `file:` or `data:`
+/// names none, so both are refused before anything is sent.
+pub(super) fn fetched_url(args: &Payload) -> Result<String, AxError> {
+    let url = text_of(args, "url")?;
+    let web = ["http://", "https://"].iter().any(|scheme| {
+        url.get(..scheme.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(scheme))
+    });
+    if web && kernel::gate::host_of(&url)?.is_some() {
+        return Ok(url);
+    }
+    Err(AxError::failure(
+        AxCode::InvalidArgs,
+        "fetch an address from the page",
+        url,
+    )
+    .with_recovery(
+        "give the whole address, with http:// or https:// and the host; a relative one          would resolve against a base the egress door never sees",
+    ))
+}
+
 pub(super) fn number_of(args: &Payload, field: &str) -> Result<u64, AxError> {
     args.as_map()
         .get(field)
