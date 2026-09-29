@@ -22,7 +22,7 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 29 个 variant、Query 恰 35 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 29 个 variant、Query 恰 36 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
   **当前 golden**：`1177945fe95db38c364edb312de147e060055e3f729bff9a3a222d5af397b733`；**WIRE_V ＝ 44**（帧表与查询表的当前内容见 §8 各章）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
@@ -1443,6 +1443,21 @@ pub enum DoctorUnread { WithToolchain, ManyBrands, MatchesBrowser, ThisProject, 
 - **`DoctorUnread` 是封闭的原因**：「读不到」有几种，每一种页面各有一句话，线上不带句子（§8-25 同一条理由）。`Refused.said` 带的是网络在哪一步停下，那是平台自己的话。
 - **`pinned` 是版本号本身**，已从仓库的文件里读好；没有钉子的项为 `None`。
 - 城那一侧从哪里读、怎么记住读数，见 sprawling-SPEC §8-120。
+
+### 8-51 设置页的厂商表：`Query::KnownHosts`
+
+```rust
+Query::KnownHosts                                   // 无参数；答案不随城变
+Answer::KnownHosts(KnownHostsAnswer)
+pub struct KnownHostsAnswer { pub hosts: Vec<KnownHost> }
+pub struct KnownHost { pub host: String, pub faces: Vec<KnownFace> }
+pub struct KnownFace { pub dialect: DialectKind, pub base_url: String }
+```
+
+- **一个人挑厂商，而不是去厂商文档里复制一个地址。** 本城认得的 host 住 `gateway::provider::preset`（gateway-SPEC §8-17），设置页经这一问读它：每个 host 说几面、每面的 base URL 是什么。`base_url` 是这座城登记时自己会算出的那个地址（`normalise_entered`），所以页上填进框里的与登记下来的是同一串。
+- **客户端据同一答案决定哪几面可选**：一个 host 不说的那一面在控件上拒点，理由写出它说的几面。客户端不再持自己的 host 表。
+- **一问而不是塞进 `EndpointsAnswer`**：那个答案说的是这座城登记了什么，随账本变；这一问说的是本城认得哪些厂商，只随二进制变。合成一个答案，会让每一次登记都重发一份不变的表。
+- 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 

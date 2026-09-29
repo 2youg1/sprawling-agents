@@ -555,9 +555,15 @@ pub fn is_local(base_url: &str) -> bool;                                        
 
 ```rust
 // provider::preset —— 数据面，逐行注出处
-pub struct HostPreset { pub host: &'static str, pub base_path: &'static str,
-                        pub dialect: Option<DialectKind>, pub models: &'static [ModelPreset],
-                        pub source: &'static str }
+pub struct HostPreset { pub host: &'static str, pub faces: &'static [Face],
+                        pub models: &'static [ModelPreset], pub source: &'static str }
+pub struct Face { pub dialect: DialectKind, pub path: &'static str }   // 厂商文档写的一面，与它挂在哪条路径下
+impl HostPreset {
+    pub fn default_dialect(&self) -> Option<DialectKind>;   // 恰一面时是那一面，否则 None
+    pub fn path_for(&self, dialect: Option<DialectKind>) -> &'static str;   // 那一面的路径；未定面时取第一面
+}
+pub fn known_hosts() -> impl Iterator<Item = KnownHost>;    // 设置页的厂商表（§8-17 末条）
+pub struct KnownHost { pub host: &'static str, pub faces: Vec<(DialectKind, String)> }   // 每面一个 base URL，经 normalise_entered 算出
 pub struct ModelPreset { pub id_prefix: &'static str, pub context_tokens: u64,
                          pub max_output_tokens: u64, pub input: InputKinds,
                          pub source: &'static str }
@@ -590,6 +596,8 @@ impl OutputCeiling {
 - **预设表逐行注出处**，每行带厂商文档地址；查不到的行不发明数字，而是让梯子落到下一档——这就是「不补零、不补默认、不补猜测」在登记面上的样子。价目列不在本表：厂商价目随时在动，一个没有复核日期的价目行就是第二个会漂的权威，价目继续住钉版目录（§8-7）。
 - **chat 面的三处拼法随主机走，住本表的 `chat` 列**：输出上限写进 `max_tokens` 还是 `max_completion_tokens`、强度写成 `reasoning_effort` 还是 `reasoning:{effort}`、上一轮的推理是否作为 `reasoning_content` 放回 assistant 消息。三件事都是「同一个 OpenAI 兼容格式，各家文档各写各的」，dialect 本身不带主机名，所以由 `Endpoint::wire_request` 按 base URL 查一次本表、把拼法作为参数交给纯函数。**未登记的主机取 `ChatSpelling::DOCUMENTED`**：`max_tokens`（OpenAI 规格已标 deprecated，但本地推理服务与多数兼容服务只认它，而 `max_completion_tokens` 落在一个不认它的服务上是被静默忽略的上限）、`reasoning_effort`（OpenAI 规格的拼法）、丢弃思考块（OpenAI 规格的 assistant 消息没有这个字段）。`api.openai.com` 必须是 `max_completion_tokens`：规格写明 `max_tokens`「is not compatible with o-series models」，推理模型对它答 400。落选的是「一律 `max_completion_tokens`」：DeepSeek、通义与智谱的文档只写 `max_tokens`，对它们换名就是把人定的上限丢掉。**重开参数**：当本地推理服务普遍改收 `max_completion_tokens` 时，`DOCUMENTED` 的上限列随之改。
 - **会话标识头**：`opencode.ai`（OpenCode Zen 与 Go 共用这个 host）的文档要求每个会话带一个稳定的 `x-opencode-session`，用于路由与前缀缓存。值由 `endpoint` 从请求本身推出：冻结前缀的四段 hash 加第一条消息的字节，经 `kernel::B3Hash::digest` 取十六进制。同一会话的每一轮前缀与首条消息都不变，所以值不变；不同会话首条不同，值就不同；推出来的值不含任何原文，也不需要本城另存一份状态。人在 `extra_headers` 里自己写了同名头时让位于人。本城不冒充 OpenCode 客户端：只收 OpenCode 客户端的免费模型不在本城要走的路上。所有经 `client_for` 出去的请求都带 `sprawling/<版本>` 的 User-Agent——OpenCode Go 的文档要求客户端以自己的名字自报，而不是 HTTP 库的名字。
+- **一个 host 说几面，各挂在哪，是本表的一列（`faces`）**。它取代原来的 `base_path` 与 `dialect` 两列：一列只能说一条路径与一个默认面，而厂商文档常把两种兼容格式挂在同一 host 的两条路径下（DeepSeek 的 OpenAI 兼容面在 `/`、Anthropic 兼容面在 `/anthropic`；Kimi Code 的 OpenAI 兼容面在 `/coding/v1`、Anthropic 兼容面在 `/coding/`）。**默认面只在恰一面时存在**：两面以上时替人挑一面就是替人猜，归一化照旧让人选。人粘了裸 host 时，路径取他所选那一面的路径；他还没选时取第一面的路径，第一面因此按厂商文档的主推面排。
+- **设置页的厂商表读本表，客户端不另持一份**（`known_hosts`）。每一面的 base URL 由 `normalise_entered(host, 那一面)` 算出，所以页上填进框里的地址，就是登记时这座城会算出的同一个地址；客户端据同一答案决定哪几面可选。落选的是保留客户端的 `presets.ts`：它与本表已经分歧（它说 DeepSeek 只有 chat 面，本表与厂商文档都说 chat 与 responses 两面都在），第二份表只会继续分歧。
 - **本表登记的 host**（逐行注出处）：`api.anthropic.com`、`api.openai.com`、`api.deepseek.com`（`/`：文档印的 base URL 不带路径，补 `/v1` 就离开了文档）、`api.x.ai`、`openrouter.ai`、`generativelanguage.googleapis.com`（`/v1beta/openai`：OpenAI 兼容面挂在这里，`/v1beta` 之下是 Gemini 自己的形状，本城没有那支笔）、`open.bigmodel.cn` 与 `api.z.ai`（`/api/paas/v4`，智谱国内与海外两站）、`opencode.ai`（`/zen/v1`；OpenCode Go 挂在同一 host 的 `/zen/go/v1`，人粘的路径恒不被改写，所以 Go 的人粘带路径的 URL），加 `api.kimi.com`（`/coding/v1`）、`api.moonshot.cn`（`/v1`）、`api.moonshot.ai`（`/v1`），后三行读自 `MoonshotAI/kimi-cli` 的 `src/kimi_cli/auth/platforms.py`（docs/third-party.md §1 已列为被看路径），兼容格式为 OpenAI 兼容——同仓 `kosong/chat_provider/openai_common.py` 以这三个 base URL 构造 OpenAI 客户端。**`api.kimi.com` 与 `openrouter.ai` 是同一类缺陷的两个实例**：一律补 `/v1` 会把 Kimi Code 会员端点指到不存在的路径。
 - **`label` 与「价格」两列不进本表——这是一条决定**。`label`：一个端点在人眼前叫什么，已有唯一的家，即人自己填的 `EndpointTuning.label`（§8-16）；人没填时该显示什么，从 summary 已经携带的 base URL 里按 `reach::split` 读一次 host 即得。厂商展示名再落一列，就是把 URL 已经携带的事实重拼一遍，而两处一旦不一致，界面上那个名字与实际调用的主机会指向两家厂商。「价格」：一次调用按什么价结算，也已有唯一的家，且是一架有序的梯——厂商在 `/v1/models` 里陈述的原文（`ModelFacts.input_price`／`output_price`，§8-16）在上，钉版目录按精确 id（§8-7）在下，而 `CostSource::Authoritative` 在两者之上；按 host ＋ id 前缀再加一个索引，就是同一批厂商数字的第三个家。**结算读的是登记那一刻写进 `model_selected` 的那份价目**，故表里改一个数也追不回已登记的模型，第三个家只会静默地与前两个分叉。**重开参数**：当一次真实调用在钉版目录无行、上游又不陈述价目而必须结算出非零金额时，价目以**迁移**而非新增索引的方式进本表——把价目事实从 `MarketSnapshot` 整体搬到 host ＋ id 前缀索引下，钉版目录同期删去价目列，每格带复核日期。`label` 的重开参数同理：`channels::EndpointSummary` 决定展示名不再由人填时，那一列进表且 `EndpointTuning.label` 同期降为覆盖值。
 - **厂商的 id 属于厂商的 host**：中转站以同名 id 转发时不套用厂商图表，它截在哪里是它自己的事实，而它的模型列表就是它陈述这件事的地方。
