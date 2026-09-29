@@ -85,6 +85,21 @@ pub enum OutputCeiling {
     ProviderDefault,
 }
 
+/// Whether every request on a face must state a ceiling.
+enum Field {
+    Required,
+    Optional,
+}
+
+/// The messages face refuses a request without `max_tokens`; the chat
+/// and responses faces take their ceiling field as optional.
+const fn field_on(wire: DialectKind) -> Field {
+    match wire {
+        DialectKind::Anthropic => Field::Required,
+        DialectKind::OpenAi | DialectKind::OpenAiResponses => Field::Optional,
+    }
+}
+
 /// The model a call is made to, as the ladder asks about it: where it
 /// is served, its id, and the face its requests are written on.
 #[derive(Debug, Clone, Copy)]
@@ -120,10 +135,15 @@ impl OutputCeiling {
         if let Some(tokens) = stated.upstream {
             return sent(tokens, CeilingSource::Upstream);
         }
-        if let Some(tokens) = pinned.or_else(|| preset::ceiling_for(target.base_url, target.id)) {
-            return sent(tokens, CeilingSource::Preset);
+        match field_on(target.wire) {
+            Field::Optional => Some(OutputCeiling::ProviderDefault),
+            Field::Required => {
+                match pinned.or_else(|| preset::ceiling_for(target.base_url, target.id)) {
+                    Some(tokens) => sent(tokens, CeilingSource::Preset),
+                    None => sent(Ceiling::new(OUTPUT_CEILING_DEFAULT)?, CeilingSource::Policy),
+                }
+            }
         }
-        sent(Ceiling::new(OUTPUT_CEILING_DEFAULT)?, CeilingSource::Policy)
     }
 
     /// The figure a request states, or `None` when it states none.

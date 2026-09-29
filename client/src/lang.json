@@ -2488,8 +2488,8 @@
     "zh": "输入模态"
   },
   "setup_model_needed": {
-    "en": "An empty ceiling is filled by the city: the figure the provider stated, then this city's table of known models, then its policy default. To outrank all three, type a number in this column.",
-    "zh": "上限留空，就由城来填：先用供应方陈述的数字，再查本城的已知模型表，最后落到策略缺省。要压过这三者，就在这一列填上数字。"
+    "en": "An empty ceiling is safe to leave empty. Where the provider's model list states one, the city uses it. Otherwise, on the OpenAI-compatible formats the request carries no ceiling and the provider applies its own default for that model, usually the largest it allows; on the Anthropic-compatible format, which needs a number, the city takes the vendor's documented figure, then its policy default. Type a number here only to set your own.",
+    "zh": "上限可以留空。供应方的模型列表写了上限，城就用它；没写时，OpenAI 兼容格式的请求不带上限，由供应方按这个模型取它自己的缺省，通常就是它允许的最大值；Anthropic 兼容格式必须带一个数，城先取厂商文档写的上限，再落到策略缺省。只有想自己定时才在这里填数。"
   },
   "setup_model_output": {
     "en": "output ceiling",

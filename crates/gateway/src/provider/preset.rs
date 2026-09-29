@@ -238,19 +238,29 @@ fn host_row(base_url: &str) -> Option<&'static HostPreset> {
 
 /// The row for one model at one base URL.
 ///
-/// The host decides which vendor's rows are consulted, so a proxy that
-/// serves `claude-sonnet-4-5` under its own name is not handed
-/// Anthropic's figures: what that proxy truncates at is that proxy's
-/// fact, and its model list is where it states it.
+/// The host's own rows answer first. A host with no model rows of its
+/// own that is not on this machine - a relay forwarding a vendor's id -
+/// is answered from the rows of the vendor that published the id:
+/// relays rarely state a ceiling in their model list, and the vendor's
+/// documented figure is closer to the relay's fact than a policy figure
+/// that belongs to neither (gateway-SPEC.md 8-17). A server on this
+/// machine borrows nothing, because the window of a model it serves is
+/// its own configuration.
 ///
 /// The longest matching prefix wins, so a row for a family and a row
 /// for one member of it can both stand and the more specific one
 /// answers.
 #[must_use]
 pub fn model_for(base_url: &str, id: &str) -> Option<&'static ModelPreset> {
-    host_row(base_url)?
-        .models
-        .iter()
+    let own = host_row(base_url).map_or(&[][..], |row| row.models);
+    let relayed = own.is_empty() && !crate::reach::is_local(base_url);
+    own.iter()
+        .chain(
+            PRESETS
+                .iter()
+                .filter(|_| relayed)
+                .flat_map(|row| row.models.iter()),
+        )
         .filter(|row| id.starts_with(row.id_prefix))
         .max_by_key(|row| row.id_prefix.len())
 }

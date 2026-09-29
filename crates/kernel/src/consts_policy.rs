@@ -178,13 +178,16 @@ pub const IMAGES_PER_TURN: crate::policy_limit::ImagesPerTurn =
 pub const IMAGE_QUALITY: crate::policy_limit::ImageQuality =
     crate::policy_limit::ImageQuality::new(100);
 
-/// How long one answer may be when nobody has said: 8_192 tokens.
+/// How long one answer may be on the messages face when nobody has said:
+/// 8_192 tokens.
 ///
-/// The last rung of the output-ceiling ladder, reached only when the
-/// person stated no ceiling, the provider's model list stated none, and
-/// the preset table has no row for the model. The three rungs above it
-/// carry real statements, so this number is never a figure that outranks
-/// one somebody made.
+/// The last rung of the output-ceiling ladder on the one face that needs
+/// a figure in every request, reached only when the person stated no
+/// ceiling, the provider's model list stated none, and the preset table
+/// has no row for the model. The three rungs above it carry real
+/// statements, so this number is never a figure that outranks one
+/// somebody made. The chat and responses faces never reach it: there a
+/// ceiling nobody stated is left to the provider (gateway-SPEC.md 8-17).
 ///
 /// Chosen at the width every provider this city calls accepts for every
 /// model it serves, which is what a number used in place of knowledge

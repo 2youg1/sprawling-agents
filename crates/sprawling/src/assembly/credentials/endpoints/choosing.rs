@@ -73,12 +73,11 @@ impl RunWorker {
         let priced = gateway::MarketSnapshot::builtin()?.lookup(&model).cloned();
         let registered = registered_as(&self.credentials.book, tag, &endpoint, &model);
         // What the person stated outranks what they stated before, which
-        // outranks the catalogue, and what none of the three states
-        // stays unstated. **An unknown model's ceiling is not zero**: the
-        // OpenAI wire would write zero out as `max_tokens: 0`, a provider
-        // would answer with no content at all, and the run would freeze
-        // as work that finished. A ceiling this city cannot name is
-        // carried as one it cannot name.
+        // outranks the catalogue, which outranks the vendor's documented
+        // window, and what none of the four states stays unstated. **An
+        // unknown window is not zero**: a window this city cannot name
+        // is carried as one it cannot name, and the context reminder
+        // stays quiet rather than counting against a guess.
         let context_tokens = context_tokens.or_else(|| {
             registered
                 .as_ref()
@@ -88,14 +87,14 @@ impl RunWorker {
                         .as_ref()
                         .and_then(|row| kernel::Window::new(row.context_tokens))
                 })
+                .or_else(|| gateway::window_for(&known.base_url, &model))
         });
         // The ladder answers, and says which rung answered. The person's
-        // figure outranks the one they entered before, which outranks
-        // the pinned catalogue and the preset table, and the policy
-        // default is the last rung rather than a number invented at the
-        // call site (gateway-SPEC.md 8-17). Because the ladder always
-        // answers, a model no catalogue knows can still be called on the
-        // Anthropic wire.
+        // figure outranks the one they entered before; on the messages
+        // face, which needs a figure in every request, the pinned
+        // catalogue, the preset table and the policy default follow, and
+        // on the chat and responses faces nobody's statement leaves the
+        // figure to the provider (gateway-SPEC.md 8-17).
         let resolved = gateway::OutputCeiling::resolve(
             gateway::Stated {
                 person: max_output_tokens,

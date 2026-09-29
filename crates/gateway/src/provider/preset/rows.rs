@@ -83,7 +83,7 @@ pub const PRESETS: [HostPreset; 13] = [
                 path: "/anthropic/v1",
             },
         ],
-        models: &[],
+        models: DEEPSEEK_MODELS,
         // Thinking is on by default, and a request with tools whose
         // history lacks the earlier `reasoning_content` answers 400.
         chat: ChatSpelling {
@@ -300,7 +300,41 @@ const MOONSHOT_CHAT: ChatSpelling = ChatSpelling {
 /// Anthropic's documented ceilings. The Messages API requires
 /// `max_tokens` in every request, so a missing row here is a call that
 /// cannot be written at all.
+///
+/// The first four rows are the lineup the overview page lists as
+/// current, whose windows it prints as `1M` and `200K` and whose
+/// ceilings as `128K` and `64K`; each is read at a thousand to the
+/// `K`, which is never above the figure the vendor meant. The rows
+/// after them are earlier families the same page listed before.
 const ANTHROPIC_MODELS: &[ModelPreset] = &[
+    ModelPreset {
+        id_prefix: "claude-fable-5-1",
+        context_tokens: 1_000_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-opus-5-5",
+        context_tokens: 1_000_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-sonnet-5-5",
+        context_tokens: 1_000_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
+    ModelPreset {
+        id_prefix: "claude-haiku-4-5",
+        context_tokens: 200_000,
+        max_output_tokens: 64_000,
+        input: InputKinds::TextImage,
+        source: "https://platform.claude.com/docs/en/about-claude/models/overview",
+    },
     ModelPreset {
         id_prefix: "claude-opus-4",
         context_tokens: 200_000,
@@ -360,5 +394,28 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         max_output_tokens: 100_000,
         input: InputKinds::TextImage,
         source: "https://platform.openai.com/docs/models/o4-mini",
+    },
+];
+
+/// DeepSeek's two families. The API reference states the ceiling
+/// exactly - "between 1 and 384K (393216)" - and the models page states
+/// a `1M` window for both, read at a thousand to the `K`
+/// (<https://api-docs.deepseek.com/quick_start/pricing>). The retired
+/// `deepseek-v4-flash` name is still accepted and served by the flash
+/// model, so the `deepseek-v4` prefix answers for it too.
+const DEEPSEEK_MODELS: &[ModelPreset] = &[
+    ModelPreset {
+        id_prefix: "deepseek-flash",
+        context_tokens: 1_000_000,
+        max_output_tokens: 393_216,
+        input: InputKinds::TextImage,
+        source: "https://api-docs.deepseek.com/api/create-chat-completion",
+    },
+    ModelPreset {
+        id_prefix: "deepseek-v4",
+        context_tokens: 1_000_000,
+        max_output_tokens: 393_216,
+        input: InputKinds::Text,
+        source: "https://api-docs.deepseek.com/api/create-chat-completion",
     },
 ];
