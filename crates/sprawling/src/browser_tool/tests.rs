@@ -343,3 +343,48 @@ fn a_declared_address_is_the_effect_the_attach_door_judges() {
         .expect("the call reads");
     assert_eq!(snapshot, GateSubject::None);
 }
+
+/// What the page's own fetch answered reaches the model as fields, not as
+/// the driver's remote-value envelope, and a refusal the page raised -
+/// CORS, a network failure - comes back as the page worded it.
+#[test]
+fn a_fetch_answers_with_the_pages_own_reading_of_the_response() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let cas = Cas::open(&dir.path().join("cas")).expect("a cas opens in a fresh directory");
+    let port = Sequence {
+        answers: vec![
+            string_result(
+                r#"{"status":200,"type":"text/html","url":"https://example.test/a","text":"Title\n\nBody","cut":false,"chars":11}"#,
+            ),
+            string_result(
+                r#"{"error":"TypeError: NetworkError when attempting to fetch resource."}"#,
+            ),
+        ],
+    };
+    let tool =
+        BrowserTool::new(Role::Building, Box::new(port), cas, origin()).expect("the tool builds");
+    let fetched = tool
+        .invoke(&call(
+            json!({ "action": "fetch", "url": "https://example.test/a" }),
+        ))
+        .map(|outcome| outcome.result.as_map().clone());
+    let expected: Map<String, Value> = json!({
+        "status": 200, "type": "text/html", "url": "https://example.test/a",
+        "text": "Title\n\nBody", "cut": false, "chars": 11,
+    })
+    .as_object()
+    .cloned()
+    .unwrap_or_default();
+    assert_eq!(fetched.ok(), Some(expected));
+    let refused = tool
+        .invoke(&call(
+            json!({ "action": "fetch", "url": "https://elsewhere.test/b" }),
+        ))
+        .map(|outcome| outcome.result.as_map().get("error").cloned());
+    assert_eq!(
+        refused.ok().flatten(),
+        Some(Value::String(
+            "TypeError: NetworkError when attempting to fetch resource.".to_owned()
+        ))
+    );
+}

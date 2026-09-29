@@ -239,3 +239,55 @@ fn an_open_names_the_host_the_door_will_judge() {
     let snapshot = Verb::read(&args(json!({ "action": "snapshot" }))).expect("a snapshot reads");
     assert_eq!(snapshot.destination().unwrap(), None);
 }
+
+/// `fetch` asks the open page to fetch one absolute address with its own
+/// credentials, in one frame, and names that address's host to the
+/// egress door. A relative address is refused before anything is sent:
+/// it resolves against a `<base>` the door cannot see.
+#[test]
+fn a_fetch_is_one_frame_from_the_page_and_names_its_host() {
+    let read = Verb::read(&args(
+        json!({ "action": "fetch", "url": "https://api.example.test/v1/items?x=1" }),
+    ));
+    assert_eq!(
+        read.as_ref()
+            .ok()
+            .map(Verb::destination)
+            .and_then(Result::ok),
+        Some(Some("api.example.test".to_owned()))
+    );
+    let mut session = Session::new();
+    let frames = read
+        .and_then(|verb| verb.frames(&mut session, &context(), None))
+        .map(|frames| {
+            frames
+                .iter()
+                .map(|frame| {
+                    let expression = frame.params()["expression"].as_str().unwrap_or_default();
+                    (frame.method().to_owned(), expression.to_owned())
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    assert_eq!(frames.len(), 1, "{frames:?}");
+    let (method, text) = &frames[0];
+    assert_eq!(method, "script.evaluate");
+    for part in [
+        "fetch(",
+        "https://api.example.test/v1/items?x=1",
+        "include",
+        "manual",
+        "DOMParser",
+    ] {
+        assert!(text.contains(part), "{part} is not in {text}");
+    }
+
+    for relative in ["/v1/items", "file:///etc/hosts", "data:text/plain,hi"] {
+        let refused = Verb::read(&args(json!({ "action": "fetch", "url": relative })));
+        assert_eq!(
+            refused.err().map(|err| err.code().clone()),
+            Some(AxCode::InvalidArgs),
+            "{relative}"
+        );
+    }
+}
