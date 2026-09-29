@@ -35,8 +35,9 @@ const PROBE_INTERVAL: Duration = Duration::from_millis(200);
 pub enum FirstScreen {
     Start(PathBuf),
     /// A folder the person already works in. The city forms around it
-    /// and every folder inside becomes a building; nothing already there
-    /// is read, moved or rewritten.
+    /// and every folder inside becomes a building; no file already there
+    /// is moved or rewritten, and a `.gitignore` only gains the lines
+    /// that keep the city's own records out of git.
     Use(PathBuf),
     Quit,
 }
@@ -132,7 +133,14 @@ pub fn ask<R: BufRead, W: Write>(
         out,
         "               around it, every folder inside becomes a building,"
     )?;
-    writeln!(out, "               and nothing already there is touched")?;
+    writeln!(
+        out,
+        "               and your files stay as they are: a .gitignore"
+    )?;
+    writeln!(
+        out,
+        "               only gains the lines that keep the city out of git"
+    )?;
     writeln!(out, "      [q]      quit, and print the command list\n")?;
     write!(out, "  > ")?;
     out.flush()?;
@@ -342,7 +350,7 @@ mod tests {
             _ => panic!("a path is a folder to use"),
         }
         assert!(
-            drawn.contains("nothing already there is touched"),
+            drawn.contains("your files stay as they are"),
             "the screen has to say what will happen to their work: {drawn}"
         );
     }

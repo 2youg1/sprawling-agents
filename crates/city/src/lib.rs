@@ -58,6 +58,7 @@ pub use history::{History, has_history};
 // Where each of these files sits is `kernel::layout`'s answer, and the
 // names are re-exported rather than restated so that a caller reading
 // `city::CONFIG_TOML` and the layout that places it cannot disagree.
+pub use gitignore::place_city as ignore_city_records;
 pub use handoff_form::{HandoffSections, handoff_sections};
 pub use kernel::layout::{ARCHIVE_DIR, BUILDING_SHELF, CONFIG_FILE, LIBRARY_DIR, URBANITE_FILE};
 pub use library::{Holding, Library, Shelf};
@@ -69,7 +70,7 @@ pub use policy::write_rules;
 pub use policy::{BuildingRules, DomainReach, ModelPool, RULES_FILE, RulesCache};
 pub use policy::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 pub use policy::{UserBrowser, UserBrowserEndpoint};
-pub use policy::{agents_path, evaluate, load, rules_path};
+pub use policy::{agents_path, city_agents_path, evaluate, load, rules_path};
 pub use resident::{Dossier, Identity, Resident, urbanite_path};
 pub use room::all as rooms;
 pub use room::open as open_room;

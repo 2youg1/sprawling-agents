@@ -115,19 +115,32 @@ pub(super) fn building_segment(
         out.extend(addressed(city_root, &rules_at)?, &rules);
     }
     // Written only when the file is: a heading over nothing would tell a
-    // resident to follow conventions that do not exist.
-    let conventions_at = city::agents_path(city_root, building);
-    if let Ok(conventions) = std::fs::read(&conventions_at) {
-        let mut block = format!(
-            "## {}/{}\n\nHow work is done in this project, from the project itself. Where \
-             this and the building's rules above disagree, the rules decide: they are what \
-             the city enforces.\n\n",
-            building.as_str(),
-            city::AGENTS_FILE,
-        )
-        .into_bytes();
-        block.extend_from_slice(&conventions);
-        out.extend(addressed(city_root, &conventions_at)?, &block);
+    // resident to follow conventions that do not exist. The workspace's
+    // copy first and the building's after it, so the one nearest the
+    // work is read last.
+    let conventions = [
+        (
+            city::city_agents_path(city_root),
+            city::AGENTS_FILE.to_owned(),
+            "How work is done across the workspace this city formed around, from the \
+             workspace itself.",
+        ),
+        (
+            city::agents_path(city_root, building),
+            format!("{}/{}", building.as_str(), city::AGENTS_FILE),
+            "How work is done in this project, from the project itself.",
+        ),
+    ];
+    for (at, heading, whose) in conventions {
+        if let Ok(text) = std::fs::read(&at) {
+            let mut block = format!(
+                "## {heading}\n\n{whose} Where this and the building's rules above disagree, \
+                 the rules decide: they are what the city enforces.\n\n"
+            )
+            .into_bytes();
+            block.extend_from_slice(&text);
+            out.extend(addressed(city_root, &at)?, &block);
+        }
     }
     Ok(out)
 }

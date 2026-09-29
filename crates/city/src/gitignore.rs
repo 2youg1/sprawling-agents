@@ -25,6 +25,11 @@
 //! vault: a rule written to carry five promises into history carried
 //! the machine's own records with them.
 //!
+//! The city root gets a block of its own, one anchored line for the
+//! city's reserved subtree: a city formed around a project's own folder
+//! keeps its ledger, object store and worktrees beside the project's
+//! files, and the project's git would list them as untracked work.
+//!
 //! Nothing here removes a line. A directory being adopted usually
 //! carries its own rules, and those bytes are exactly what adoption
 //! promises not to touch.
@@ -68,45 +73,69 @@ fn block() -> Vec<String> {
     ]
 }
 
+/// The city root's block: the city's own reserved subtree, anchored to
+/// the root so that each building's block still decides what of its own
+/// subtree goes into history.
+fn city_block() -> Vec<String> {
+    vec![
+        "# sprawling: this city's own records stay out of the workspace's history.".to_owned(),
+        format!("/{RESERVED_PREFIX}/"),
+    ]
+}
+
 /// Adds this city's rules to a building's `.gitignore`, keeping every
 /// line that is already there.
 ///
+/// # Errors
+/// As [`append_missing`].
+pub(crate) fn place(building_root: &Path) -> Result<(), AxError> {
+    append_missing(&building_root.join(GITIGNORE_FILE), &block())
+}
+
+/// Adds the city's reserved subtree to the city root's `.gitignore`,
+/// keeping every line that is already there (city-SPEC.md 8-21).
+///
+/// # Errors
+/// As [`append_missing`].
+pub fn place_city(city_root: &Path) -> Result<(), AxError> {
+    append_missing(&city_root.join(GITIGNORE_FILE), &city_block())
+}
+
+/// Appends each rule the file does not already hold.
+///
 /// Idempotent by line: a rule already present in the file is not added
-/// again, so raising a building twice, or adopting a directory the city
-/// once raised, appends nothing. The comparison is on the trimmed line,
-/// which is how a person reading the file compares them.
+/// again, so raising a building twice, forming a city where one once
+/// stood, or adopting a directory the city once raised appends nothing.
+/// The comparison is on the trimmed line, which is how a person reading
+/// the file compares them.
 ///
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path when the file cannot be read or
 /// written. A file that is not there is not a failure — it is the
 /// ordinary case for a building the city just raised.
-pub(crate) fn place(building_root: &Path) -> Result<(), AxError> {
-    let path = building_root.join(GITIGNORE_FILE);
+fn append_missing(path: &Path, rules: &[String]) -> Result<(), AxError> {
     // Read and write under one hold: the file belongs to the project
     // and a person may be adding a line to it at the same moment.
-    crate::document::edit(&path, |held| {
-        let existing = match std::fs::read_to_string(&path) {
+    crate::document::edit(path, |held| {
+        let existing = match std::fs::read_to_string(path) {
             Ok(text) => text,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
-            Err(err) => return Err(storage(&path, &err)),
+            Err(err) => return Err(storage(path, &err)),
         };
-        let mut out = existing.clone();
-        let mut added = false;
-        for rule in block() {
-            if existing.lines().any(|line| line.trim() == rule) {
-                continue;
-            }
-            if !out.is_empty() && !out.ends_with('\n') {
-                out.push('\n');
-            }
-            // The block is announced once, and only when something from
-            // it is actually being added below.
-            out.push_str(&rule);
-            out.push('\n');
-            added = true;
-        }
-        if !added {
+        let missing: Vec<&String> = rules
+            .iter()
+            .filter(|rule| !existing.lines().any(|line| line.trim() == rule.as_str()))
+            .collect();
+        if missing.is_empty() {
             return Ok(());
+        }
+        let mut out = existing.clone();
+        if !out.is_empty() && !out.ends_with('\n') {
+            out.push('\n');
+        }
+        for rule in missing {
+            out.push_str(rule);
+            out.push('\n');
         }
         held.replace(out.as_bytes())
     })
@@ -140,7 +169,7 @@ pub(crate) fn seal_room(room: &Path) -> Result<(), AxError> {
 fn storage(path: &Path, err: &std::io::Error) -> AxError {
     AxError::failure(
         AxCode::StorageFatal,
-        "write a building's ignore rules",
+        "write the city's ignore rules",
         format!("{}: {err}", path.display()),
     )
     .with_recovery("fix the path's permissions, then run this again")

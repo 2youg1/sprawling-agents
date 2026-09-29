@@ -99,9 +99,10 @@ mod tests {
         let listed = names(&answer.entries);
         assert!(listed.contains(&".sprawling"), "{listed:?}");
         assert!(listed.contains(&"hall"), "{listed:?}");
-        // The reserved subtree, City Hall, and the one file a city keeps
-        // at its root - in that order, because directories come first.
-        assert_eq!(listed, vec![".sprawling", "hall", "City.md"]);
+        // The reserved subtree, City Hall, the ignore file that keeps the
+        // reserved subtree out of the workspace's git, and the city's
+        // norms - directories first.
+        assert_eq!(listed, vec![".sprawling", "hall", ".gitignore", "City.md"]);
     }
 
     /// Directories come before files, so a tree reads the same way at

@@ -93,7 +93,7 @@ pub(super) fn report_standing(report: &assembly::InitReport) {
         city::Standing::AlreadyACity => println!("the folder was already a city"),
         city::Standing::Work { adoptable, loose } => {
             println!(
-                "found {} folder(s) and {loose} other item(s); nothing in them was read, moved or rewritten",
+                "found {} folder(s) and {loose} other item(s); no file in them was moved or rewritten",
                 adoptable.len()
             );
         }

@@ -257,6 +257,14 @@ pub fn agents_path(city_root: &Path, addr: &Address) -> PathBuf {
         .join(crate::spine_files::AGENTS_FILE)
 }
 
+/// Where the workspace this city formed around keeps its conventions:
+/// the city root, which is either the project itself or the folder that
+/// holds the projects its buildings are.
+#[must_use]
+pub fn city_agents_path(city_root: &Path) -> PathBuf {
+    city_root.join(crate::spine_files::AGENTS_FILE)
+}
+
 /// more, if one is on this disk.
 ///
 /// Two of them can be: the rules were Markdown before they were TOML,

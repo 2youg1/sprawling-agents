@@ -745,6 +745,7 @@ pub const GITIGNORE_FILE: &str = ".gitignore";
 /// 缺哪行补哪行；文件不存在则整份写出。
 pub(crate) fn place(building_root: &Path) -> Result<(), AxError>;
 /// 把城自己的保留子树补进城根的 .gitignore，同一条只追加的路。
+/// 门面上叫 `city::ignore_city_records`：裸的 `place_city` 在装配层里说不出放下的是什么。
 pub fn place_city(city_root: &Path) -> Result<(), AxError>;
 
 // city::spine_files

@@ -129,6 +129,9 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
         data: Payload::of(&kernel::event::record::CityInitialized {})?,
         ig: false,
     })?;
+    // The city's own records stay out of the workspace's git before
+    // anything else is laid beside the project's files.
+    city::ignore_city_records(city_root)?;
     let city_md = city_root.join(city::CITY_FILE);
     if !city_md.exists() {
         std::fs::write(&city_md, CITY_MD).map_err(|source| {
