@@ -2148,11 +2148,11 @@ impl Engine {
 
 `plan` 是纯函数，端口由调用方给，于是「参数长什么样」这件事在没有浏览器的机器上也逐字可断言；`launch` 只是 `Command::spawn` 加一个「进程死了就报出来」。**时间与随机都不在这里取**（ARCHITECTURE §10 第 2、4 条）：端口由 `port_for(city_root)` 从城目录的 BLAKE3 摘要推出，落在 40000–59999。这既不采时钟也不取熵，而同一台机器上的两座城本来就在不同目录里——用已经把它们区分开的那件事去区分端口，比再引入一个随机源更少一处不确定性。等待浏览器起来靠**敲门次数**而不是截止时刻，因为读时钟的地方只有 `bin::assembly` 一处。
 
-### 8-45-2 `bin::browser_tool`——八个动作，一个会话
+### 8-45-2 `bin::browser_tool`——一张动作表，一个会话
 
 工具住这里而不是 `browser` crate，理由是截图要落 `memory::cas`，而 `browser` 依赖图里没有 `memory`，也不该有。把 CAS 塞进 browser 会多一条本可不存在的依赖边；把工具放在装配层，`browser::verb` 的判定与 `memory::cas` 的字节各自留在自己那侧，中间只有一个 `Shot` 值。
 
-工具持有：一个 `Box<dyn BrowserPort>`、一个 `Session`、当前 `ContextId`、上一次 `PageSnapshot`（快照的 generation 由它递增）、一个 CAS 句柄。八个动作即 `browser::verb::Verb` 的八个变体，一个不多一个不少。
+工具持有：一个 `Box<dyn BrowserPort>`、一个 `Session`、当前 `ContextId`、上一次 `PageSnapshot`（快照的 generation 由它递增）、一个 CAS 句柄。动作即 `browser::verb::Verb` 的变体（browser-SPEC §19-2），一个不多一个不少；`fetch` 的回复在这里变成 `status`、`type`、`url`、`text`、`cut`、`chars` 六个字段的结果，非文本的回复变成 `binary` 与 `bytes`，页面自己的拒绝变成 `error`。
 
 `effect` 是 `Effect::Egress`：浏览器打开的每个 URL 都离开运行中的机器，所以它过出网门，confidential 楼因此天然拿不到它。
 

@@ -214,6 +214,8 @@ pub enum Verb {
     Act { generation: u64, action: Action },
     Screenshot(ShotRequest),
     Measure { references: Vec<String> },
+    Survey,
+    Fetch { url: String },
     Console,
     Viewport { width: u32, height: u32 },
     Close,
@@ -222,13 +224,21 @@ impl Verb {
     pub fn read(args: &Payload) -> Result<Verb, AxError>;
     pub fn frames(&self, session: &mut Session, context: &ContextId,
                   snapshot: Option<&PageSnapshot>) -> Result<Vec<Frame>, AxError>;
-    pub fn destination(&self) -> Result<Option<String>, AxError>;   // Open 的主机，门据此判出网
+    pub fn destination(&self) -> Result<Option<String>, AxError>;   // Open 与 Fetch 的主机，门据此判出网
     pub fn input_frame(&self, session: &mut Session, context: &ContextId,
                        origin: Option<ResolvedOrigin>) -> Result<Frame, AxError>;
 }
 ```
 
 三条判定写在这里而不是调用方：`act` 没有快照即拒（对没看过的页面动手不可拼写，§8.5 第二对的直接后果）；`measure` 的每个 ref 都过 `PageSnapshot::resolve`，因此「我编了一个 ref」在出网前就被报出；`console` 读的是 `open` 时装上的录音数组，因为本 crate 的缝只运请求-应答，而 BiDi 的 `log.entryAdded` 是无 id 的事件，归装配层路由——用一个页面内数组换一条事件订阅，是拿已有机制复用而非新开一条通路。
+
+**`fetch`：用页面自己的 Fetch API 取一份文字**。`Verb::Fetch { url }` 是一帧 `script.evaluate`（`awaitPromise`），在已打开的页面里跑 `fetch(url, { credentials: "include", redirect: "manual" })`：请求从这个页面发出，带着它的 cookie，守它的同源与 CORS 规则——跨源而对方不许带凭据时，页面自己的 `TypeError` 原样回来，本城不另开一条绕过 CORS 的路。回来的是一个 JSON 串：`status`、`type`（`content-type` 头）、`url`（最终地址）、`text`、`cut`（正文被截过）与 `chars`（截之前的长度）。
+
+- **HTML 在页面里变成可读文字**：`DOMParser` 解析，不挂进活文档（挂进去就会去取图、跑脚本），删掉 `script`、`style`、`noscript`、`template`，按块级元素换行走一遍文本节点，再把空白收拢；`<title>` 放在第一行。JSON、XML 与 `text/*` 原样；其余类型（图片、PDF）不读正文，只报 `binary` 与字节数——一段乱码不是模型能用的反馈。
+- **每个收到请求的主机都被门判过**：`destination()` 答 `url` 的主机，egress 门据此判；`redirect: "manual"` 让跨主机的跳转停在跳转本身（`type` 为 `opaqueredirect`，状态 0），模型要跟就用新地址再 `fetch` 一次，那一次同样过门。`follow` 落选：跳转目标是门从没见过的主机。
+- **只收带主机的 http(s) 地址**：相对地址、`file:` 与 `data:` 在 `Verb::read` 即拒，拒词让模型给出绝对地址。相对地址会按页面的 `<base>` 解析，而 `<base>` 可以指向任何主机，门看不见。
+- **正文在页面里截**：`FETCH_TEXT_MAX_CHARS`（65 536 个 UTF-16 单位）是过套接字的上限，截的时候报出原长；工具结果再往下怎么缩，是 `runtime::pipeline` 的事。
+- 它与 `snapshot` 不重复：`snapshot` 读的是渲染后的无障碍树（哪里能点、叫什么），`fetch` 读的是一个地址的正文，不渲染、不执行、不改页面。
 
 ### 19-3 `browser::shot`（形状 2 值类型）
 
@@ -284,7 +294,7 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 
 | 单元 | 完成的定义 |
 |---|---|
-| verb | 每个动作各自的帧可在无浏览器下逐帧断言；`act` 无快照即拒；`measure` 的假 ref 在出网前被拒 |
+| verb | 每个动作各自的帧可在无浏览器下逐帧断言；`act` 无快照即拒；`measure` 的假 ref 在出网前被拒；`fetch` 是一帧、带凭据、跳转不跟，只收带主机的 http(s) 地址，`destination()` 答它的主机 |
 | shot | 同一段 PNG 字节两次读出同一尺寸；非 PNG 不猜尺寸；quality 不引入浮点变量；`clip` 与 `ref` 同时给出即拒，`ref` 没有世代即拒；两张捕获帧都带上界，且上界按字节读出的两侧判；矩形臂传入句柄即拒 |
 | diff | 尺寸不同即拒；全同两图为 0；一个像素变化的框恰好含那个像素；解码字节短于头部时拒绝语点名是哪一张 |
 | input | 指针拖拽恒是 pointerMove→pointerDown→pointerMove×n→pointerUp；元素 origin 有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`；滚轮增量可为负 |
