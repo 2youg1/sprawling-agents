@@ -560,9 +560,9 @@ pub struct HostPreset { pub host: &'static str, pub faces: &'static [Face],
 pub struct Face { pub dialect: DialectKind, pub path: &'static str }   // 厂商文档写的一面，与它挂在哪条路径下
 impl HostPreset {
     pub fn default_dialect(&self) -> Option<DialectKind>;   // 恰一面时是那一面，否则 None
-    pub fn path_for(&self, dialect: Option<DialectKind>) -> &'static str;   // 那一面的路径；未定面时取第一面
+    pub fn path_for(&self, dialect: Option<DialectKind>) -> Option<&'static str>;   // 那一面的路径；未定面或本表不列的面取第一面
 }
-pub fn known_hosts() -> impl Iterator<Item = KnownHost>;    // 设置页的厂商表（§8-17 末条）
+pub fn known_hosts() -> Result<Vec<KnownHost>, AxError>;    // 设置页的厂商表；归一化拒掉某一行即是本表的缺陷
 pub struct KnownHost { pub host: &'static str, pub faces: Vec<(DialectKind, String)> }   // 每面一个 base URL，经 normalise_entered 算出
 pub struct ModelPreset { pub id_prefix: &'static str, pub context_tokens: u64,
                          pub max_output_tokens: u64, pub input: InputKinds,

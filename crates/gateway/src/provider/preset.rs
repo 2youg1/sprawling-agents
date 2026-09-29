@@ -38,24 +38,17 @@ use crate::market::InputKinds;
 /// a port — the spelling `reach::split` produces and `normalise` asks
 /// with.
 ///
-/// The path and shape columns are read by the `HostDefaults` answer
-/// that `router::normalise` takes, which lands with the attach caller
-/// in `bin::assembly`; until then only the ceiling ladder reads this
-/// table, and the expectation below fails the build on the day that
-/// changes — which is when the attribute goes.
+/// The faces column is read by the `HostDefaults` answer that
+/// `router::normalise` takes, and by [`known_hosts`], which is what the
+/// settings page offers a person to pick from.
 pub struct HostPreset {
     pub host: &'static str,
-    /// The path the API hangs under, leading slash included. Filled in
-    /// only when the person entered a host with no path at all.
-    pub base_path: &'static str,
-    /// The shape this host answers in, when neither the pasted URL nor
-    /// the person said. `None` where a host serves several shapes and
-    /// choosing one for the person would be a guess with a 404 in it.
-    ///
-    /// Spelled in the enum a registration is stored under, so that the
-    /// table states what it would register rather than a second
-    /// vocabulary for the same two shapes.
-    pub dialect: Option<DialectKind>,
+    /// The faces this host's documentation says it answers on, and the
+    /// path each hangs under, the vendor's main face first. Spelled in
+    /// the enum a registration is stored under, so that the table
+    /// states what it would register rather than a second vocabulary
+    /// for the same shapes.
+    pub faces: &'static [Face],
     /// The models this vendor documents, longest matching id prefix
     /// first at lookup time. Empty where the endpoint states its own
     /// facts in its model list, which outranks this table anyway.
@@ -65,9 +58,79 @@ pub struct HostPreset {
     /// The header this vendor asks to carry one conversation's id, so
     /// that its routing and prompt cache see a conversation as one.
     pub session_header: Option<&'static str>,
-    /// Where `base_path`, `dialect`, `chat` and `session_header` were
-    /// read.
+    /// Where `faces`, `chat` and `session_header` were read.
     pub source: &'static str,
+}
+
+/// One face a host answers on, and the path it hangs under, leading
+/// slash included. The path is filled in only when the person entered
+/// a host with no path at all.
+pub struct Face {
+    pub dialect: DialectKind,
+    pub path: &'static str,
+}
+
+impl HostPreset {
+    /// The shape this host answers in when neither the pasted URL nor
+    /// the person said: its one face, or `None` where it serves several
+    /// and choosing one for the person would be a guess with a 404 in
+    /// it.
+    #[must_use]
+    pub fn default_dialect(&self) -> Option<DialectKind> {
+        match self.faces {
+            [only] => Some(only.dialect),
+            _ => None,
+        }
+    }
+
+    /// The path the face the person chose hangs under. A face this host
+    /// does not list, or no face chosen yet, takes the main face's
+    /// path: the vendor put that face first.
+    #[must_use]
+    pub fn path_for(&self, dialect: Option<DialectKind>) -> Option<&'static str> {
+        dialect
+            .and_then(|chosen| self.faces.iter().find(|face| face.dialect == chosen))
+            .or_else(|| self.faces.first())
+            .map(|face| face.path)
+    }
+}
+
+/// One host the settings page offers, with the base URL each of its
+/// faces is called at.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnownHost {
+    pub host: &'static str,
+    pub faces: Vec<(DialectKind, String)>,
+}
+
+/// Every host this table lists, each face's base URL computed by the
+/// same normalisation an attach runs, so the address a form fills is
+/// the address the city would store.
+///
+/// # Errors
+/// A row whose host the normaliser refuses, which is a defect of this
+/// table that a test holds shut.
+pub fn known_hosts() -> Result<Vec<KnownHost>, kernel::AxError> {
+    PRESETS
+        .iter()
+        .map(|row| {
+            let faces = row
+                .faces
+                .iter()
+                .map(|face| {
+                    let stored = crate::router::normalise_entered(
+                        row.host,
+                        crate::router::DialectHint::of(face.dialect),
+                    )?;
+                    Ok((face.dialect, stored.base_url))
+                })
+                .collect::<Result<Vec<_>, kernel::AxError>>()?;
+            Ok(KnownHost {
+                host: row.host,
+                faces,
+            })
+        })
+        .collect()
 }
 
 /// The three fields of the OpenAI-compatible chat face whose spelling
@@ -209,16 +272,14 @@ pub fn ceiling_for(base_url: &str, id: &str) -> Option<Ceiling> {
 pub struct Presets;
 
 impl crate::router::HostDefaults for Presets {
-    fn default_path(&self, host: &str) -> Option<&str> {
-        for_host(host).map(|row| row.base_path)
+    fn default_path(&self, host: &str, face: crate::router::DialectHint) -> Option<&str> {
+        for_host(host)?.path_for(face.dialect())
     }
 
     fn default_dialect(&self, host: &str) -> Option<crate::router::DialectHint> {
-        match for_host(host)?.dialect? {
-            kernel::DialectKind::Anthropic => Some(crate::router::DialectHint::Messages),
-            kernel::DialectKind::OpenAi => Some(crate::router::DialectHint::Chat),
-            kernel::DialectKind::OpenAiResponses => Some(crate::router::DialectHint::Responses),
-        }
+        Some(crate::router::DialectHint::of(
+            for_host(host)?.default_dialect()?,
+        ))
     }
 }
 
@@ -234,7 +295,7 @@ mod tests {
     use super::*;
 
     fn path_of(host: &str) -> Option<&'static str> {
-        Some(for_host(host)?.base_path)
+        for_host(host)?.path_for(None)
     }
 
     #[test]
@@ -285,9 +346,8 @@ mod tests {
     #[test]
     fn a_bare_host_reaches_the_path_of_the_face_the_person_chose() {
         use crate::router::{DialectHint, normalise_entered};
-        let base = |entered: &str, face: DialectHint| {
-            normalise_entered(entered, face).unwrap().base_url
-        };
+        let base =
+            |entered: &str, face: DialectHint| normalise_entered(entered, face).unwrap().base_url;
         assert_eq!(
             base("api.deepseek.com", DialectHint::Messages),
             "https://api.deepseek.com/anthropic/v1"
@@ -326,10 +386,13 @@ mod tests {
     #[test]
     fn a_host_that_serves_one_shape_says_so_and_one_that_serves_two_does_not() {
         assert_eq!(
-            for_host("api.anthropic.com").and_then(|row| row.dialect),
+            for_host("api.anthropic.com").and_then(HostPreset::default_dialect),
             Some(DialectKind::Anthropic)
         );
-        assert_eq!(for_host("api.openai.com").and_then(|row| row.dialect), None);
+        assert_eq!(
+            for_host("api.openai.com").and_then(HostPreset::default_dialect),
+            None
+        );
         assert!(for_host("llm.example.test").is_none());
     }
 
@@ -369,7 +432,7 @@ mod tests {
         let catalogue = crate::market::MarketSnapshot::builtin().unwrap();
         for row in PRESETS {
             for model in row.models {
-                let base_url = format!("https://{}{}", row.host, row.base_path);
+                let base_url = format!("https://{}{}", row.host, row.path_for(None).unwrap());
                 assert!(
                     catalogue.lookup(model.id_prefix).is_none(),
                     "{} is pinned in the catalogue and matched here",
@@ -405,7 +468,47 @@ mod tests {
     fn every_host_row_cites_the_page_it_was_read_from() {
         for row in PRESETS {
             assert!(row.source.starts_with("https://"), "{}", row.host);
-            assert!(row.base_path.starts_with('/'), "{}", row.host);
+            assert!(!row.faces.is_empty(), "{} names no face", row.host);
+            for face in row.faces {
+                assert!(face.path.starts_with('/'), "{}", row.host);
+            }
+        }
+    }
+
+    /// The page is offered one base URL per face, and it is the one
+    /// attaching would store, so a vendor picked on the page is the
+    /// vendor the city calls.
+    #[test]
+    fn every_known_host_offers_each_face_at_the_address_attaching_stores() {
+        let hosts = known_hosts().unwrap();
+        assert_eq!(hosts.len(), PRESETS.len());
+        let deepseek = hosts
+            .iter()
+            .find(|row| row.host == "api.deepseek.com")
+            .unwrap();
+        assert_eq!(
+            deepseek.faces,
+            vec![
+                (DialectKind::OpenAi, "https://api.deepseek.com".to_owned()),
+                (
+                    DialectKind::OpenAiResponses,
+                    "https://api.deepseek.com".to_owned()
+                ),
+                (
+                    DialectKind::Anthropic,
+                    "https://api.deepseek.com/anthropic/v1".to_owned()
+                ),
+            ]
+        );
+        for row in &hosts {
+            for (dialect, base_url) in &row.faces {
+                let again = crate::router::normalise_entered(
+                    base_url,
+                    crate::router::DialectHint::of(*dialect),
+                )
+                .unwrap();
+                assert_eq!(&again.base_url, base_url, "{}", row.host);
+            }
         }
     }
 

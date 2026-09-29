@@ -24,7 +24,7 @@
 //! best. Normalisation and the preset table are two halves of one
 //! thing, which is why this module has no host names in it.
 
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, DialectKind};
 
 /// The path appended to a host the preset table does not list, and only
 /// when the person entered no path at all.
@@ -47,6 +47,32 @@ pub enum DialectHint {
     Responses,
     /// Anthropic messages.
     Messages,
+}
+
+impl DialectHint {
+    /// The hint that names one stored shape. The one mapping between
+    /// the two spellings: a registration speaks in formats, a form that
+    /// may not have chosen yet speaks in hints.
+    #[must_use]
+    pub const fn of(dialect: DialectKind) -> DialectHint {
+        match dialect {
+            DialectKind::Anthropic => DialectHint::Messages,
+            DialectKind::OpenAi => DialectHint::Chat,
+            DialectKind::OpenAiResponses => DialectHint::Responses,
+        }
+    }
+
+    /// The stored shape this hint names, or `None` while nobody has
+    /// said.
+    #[must_use]
+    pub const fn dialect(self) -> Option<DialectKind> {
+        match self {
+            DialectHint::Unset => None,
+            DialectHint::Chat => Some(DialectKind::OpenAi),
+            DialectHint::Responses => Some(DialectKind::OpenAiResponses),
+            DialectHint::Messages => Some(DialectKind::Anthropic),
+        }
+    }
 }
 
 /// One entered URL, resolved.
@@ -73,10 +99,11 @@ pub struct Normalised {
 /// reach the algorithm through [`crate::normalise_entered`], which
 /// hands it the table this build ships.
 pub(crate) trait HostDefaults {
-    /// The path this host serves its API under, without the host —
-    /// `/api/v1` for `openrouter.ai`, `/v1beta` for a Gemini-shaped
-    /// host. `None` when the table does not list the host.
-    fn default_path(&self, host: &str) -> Option<&str>;
+    /// The path this host serves one face under, without the host —
+    /// `/api/v1` for `openrouter.ai`, `/anthropic/v1` for DeepSeek's
+    /// messages face. `Unset` asks for the host's main face. `None`
+    /// when the table does not list the host.
+    fn default_path(&self, host: &str, face: DialectHint) -> Option<&str>;
 
     /// The shape this host answers in when the person has not chosen
     /// and the URL does not say. `None` when the table does not list
@@ -108,9 +135,10 @@ pub fn normalise_entered(entered: &str, hint: DialectHint) -> Result<Normalised,
 ///    shape — `/chat/completions`, `/responses`, `/messages`. The URL
 ///    outranks the person's choice here, because a pasted URL is
 ///    evidence and a toggle left on its default is not.
-/// 2. An empty path is filled from the preset table, and from
-///    [`UNLISTED_HOST_PATH`] only when the table does not list the
-///    host. A path the person entered is never rewritten.
+/// 2. An empty path is filled from the preset table with the path of
+///    the face the shape settled on, and from [`UNLISTED_HOST_PATH`]
+///    only when the table does not list the host. A path the person
+///    entered is never rewritten.
 /// 3. A missing scheme becomes `https://`, or `http://` for an address
 ///    on this machine, judged by the city's one locality test.
 ///
@@ -167,7 +195,6 @@ pub fn normalise(
     };
     let segments: Vec<&str> = entered_path.split('/').filter(|s| !s.is_empty()).collect();
     let (kept, from_url) = strip_face(&segments);
-    let path = resolve_path(&kept, &suffix, &host, presets);
     let dialect = match resolve_dialect(from_url, hint, &host, presets) {
         // A server on this machine is an OpenAI-compatible one until it
         // says otherwise: that is what every local inference runtime
@@ -179,6 +206,7 @@ pub fn normalise(
         | DialectHint::Responses
         | DialectHint::Messages) => settled,
     };
+    let path = resolve_path(&kept, &suffix, presets.default_path(&host, dialect));
     Ok(Normalised {
         base_url: format!(
             "{scheme}://{}{path}{suffix}",
@@ -301,7 +329,7 @@ fn strip_one_face<'s, 'p>(segments: &'s [&'p str]) -> (&'s [&'p str], DialectHin
 /// from the preset table, because the hosts the city knows do not all
 /// serve at `/v1`. A URL that carries a query but no path is left
 /// path-less: the query already says which endpoint it means.
-fn resolve_path(kept: &[&str], suffix: &str, host: &str, presets: &dyn HostDefaults) -> String {
+fn resolve_path(kept: &[&str], suffix: &str, preset: Option<&str>) -> String {
     let entered = kept.join("/");
     if !entered.is_empty() {
         return format!("/{entered}");
@@ -312,10 +340,7 @@ fn resolve_path(kept: &[&str], suffix: &str, host: &str, presets: &dyn HostDefau
     // A vendor whose API hangs straight under the host states `/`,
     // which stores as no path at all: a stored base URL carries no
     // trailing slash.
-    match presets
-        .default_path(host)
-        .map(|preset| preset.trim_matches('/'))
-    {
+    match preset.map(|preset| preset.trim_matches('/')) {
         Some("") => String::new(),
         Some(preset) => format!("/{preset}"),
         None => UNLISTED_HOST_PATH.to_owned(),

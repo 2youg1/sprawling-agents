@@ -131,6 +131,34 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::Endpoi
     channels::EndpointsAnswer { endpoints, chosen }
 }
 
+/// The vendors this city knows by host, copied row for row from the
+/// preset table (channels-SPEC.md 8-51). A row the normaliser refuses
+/// is a defect of the table, and the answer names itself unavailable
+/// with the row's refusal rather than listing the rest as if whole.
+pub(crate) fn known_hosts_answer() -> channels::Answer {
+    let hosts = match gateway::known_hosts() {
+        Ok(hosts) => hosts,
+        Err(fault) => {
+            return channels::Answer::Unavailable {
+                query: format!("KnownHosts({})", fault.subject()),
+            };
+        }
+    };
+    channels::Answer::KnownHosts(channels::KnownHostsAnswer {
+        hosts: hosts
+            .into_iter()
+            .map(|row| channels::KnownHost {
+                host: row.host.to_owned(),
+                faces: row
+                    .faces
+                    .into_iter()
+                    .map(|(dialect, base_url)| channels::KnownFace { dialect, base_url })
+                    .collect(),
+            })
+            .collect(),
+    })
+}
+
 /// The building a `pursuit_changed` record is about.
 ///
 /// # Errors

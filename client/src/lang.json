@@ -3599,6 +3599,14 @@
     "en": "this host speaks {faces}",
     "zh": "这个主机说的是 {faces}"
   },
+  "setup_known_host": {
+    "en": "a provider the city knows",
+    "zh": "城认得的供应方"
+  },
+  "setup_known_host_pick": {
+    "en": "pick a provider",
+    "zh": "选一家供应方"
+  },
   "setup_form_incomplete": {
     "en": "finish the fields first",
     "zh": "先把字段填好"

@@ -31,7 +31,7 @@ use super::holding::Views;
 use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
 
 mod history;
-use super::lines::{endpoints_answer, summarize};
+use super::lines::{endpoints_answer, known_hosts_answer, summarize};
 
 /// How many runs a cost view names besides every active one: a bound
 /// on the size of an answer on the wire, not a machine reading, so it is
@@ -275,6 +275,7 @@ impl Views {
             channels::Query::EndpointView => {
                 channels::Answer::Endpoints(endpoints_answer(&self.book))
             }
+            channels::Query::KnownHosts => known_hosts_answer(),
             channels::Query::Doctor => self.doctor_or_unavailable(),
             channels::Query::McpHealth { addr } => {
                 return Prepared::McpHealth {

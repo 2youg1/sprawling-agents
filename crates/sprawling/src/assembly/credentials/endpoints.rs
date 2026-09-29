@@ -10,7 +10,7 @@ use kernel::{AxCode, AxError, EventKind};
 
 use super::super::RunWorker;
 use super::probing::{Probing, probed_payload, reach_of};
-use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_headers, hint_of};
+use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_headers};
 
 mod choosing;
 
@@ -69,7 +69,7 @@ impl RunWorker {
         // settled at the moment they set it up, and a reader that
         // worked it out again from the writer would be answering a
         // narrower question than the one it was asked.
-        let connection_kind = gateway::resolve_connection(hint_of(dialect))?;
+        let connection_kind = gateway::resolve_connection(gateway::DialectHint::of(dialect))?;
         Ok(gateway::AttachedEndpoint {
             name,
             base_url,

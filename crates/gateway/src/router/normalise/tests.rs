@@ -27,7 +27,7 @@ use super::{DialectHint, HostDefaults, Normalised, normalise};
 struct Presets;
 
 impl HostDefaults for Presets {
-    fn default_path(&self, host: &str) -> Option<&str> {
+    fn default_path(&self, host: &str, _face: DialectHint) -> Option<&str> {
         match host {
             "openrouter.ai" => Some("/api/v1"),
             "generativelanguage.googleapis.com" => Some("/v1beta"),

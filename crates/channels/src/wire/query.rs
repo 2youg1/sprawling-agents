@@ -146,6 +146,10 @@ pub enum Query {
     DiscardView,
     /// What is attached and what is chosen: the settings page's read.
     EndpointView,
+    /// The vendors this city knows by host, and the base URL of each
+    /// face they document, so a person picks a vendor rather than
+    /// pasting its address.
+    KnownHosts,
     /// One building's own files and its archive - the pages an agent
     /// writes for the next agent, which are also the pages a person
     /// reads to know what happened in there.

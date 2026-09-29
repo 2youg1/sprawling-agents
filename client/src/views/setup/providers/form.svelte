@@ -9,7 +9,10 @@
   // Turning a URL and a key into models a run can be given.
   //
   // **Three boxes and two controls are all the form asks for.** A URL,
-  // which face the endpoint answers in, a key, and then look or attach;
+  // which face the endpoint answers in, a key, and then look or attach.
+  // Above the URL stands the city's list of the vendors it knows by
+  // host (`./known`): picking one fills the URL and the face, so a
+  // person copies no address out of a vendor's documentation;
   // the id and the display name are derived from the URL and folded
   // into `advanced`, because they are the city's bookkeeping rather
   // than anything the person came holding. What each field means is
@@ -37,11 +40,13 @@
   import type { Endpoint, WireApi } from "../../../core/commands";
   import { enrol, keyField, referenceFor, secretFor } from "../../../core/enrol";
   import type { Enrolment, StoredKey } from "../../../core/enrol";
+  import { readAnswer } from "../../../core/answered";
   import { fill, say } from "../../../core/lang";
   import { normalisedFrom } from "../../../core/probed";
   import type { AxError } from "../../../wire";
   import { ui } from "../../../ui";
   import Button from "../../parts/button.svelte";
+  import Combobox from "../../parts/combobox.svelte";
   import Field from "../../parts/field.svelte";
   import Segmented from "../../parts/segmented.svelte";
   import type { Choice } from "../../parts/segmented";
@@ -49,7 +54,7 @@
   import Advanced from "./advanced.svelte";
   import { BASE_URL, ID_SHAPE, endpointOf, freshDraft, hostOf, idOf, referenceOf, wireChoices } from "./draft";
   import type { Draft } from "./draft";
-  import { facesOf } from "./presets";
+  import { facesOf, followed, hostChoices, picked, rowFor } from "./known";
   import Previews from "./preview.svelte";
   import Reach from "./reach.svelte";
 
@@ -99,13 +104,22 @@
   const facts = $derived(answered?.facts ?? []);
   const complete = $derived(ID_SHAPE.test(id) && hostOf(draft.baseUrl) !== null);
 
-  // The face control, with the cells a chosen host does not answer in
-  // refused under the pointer and saying which shapes it does speak
-  // (`presets.ts` is that fact's one home). A host this table has no
-  // row for keeps every cell open: the form makes the widest judgement
-  // and never a narrower one (client-SPEC 4-25).
+  // The vendors the city knows by host. The answer is the city's own
+  // table, so the picker offers no address and no face the city would
+  // not store.
+  const knownAnswer = u.conn.asking.ask(QUERIES.knownHosts);
+  const known = $derived(
+    readAnswer($knownAnswer, (held) => ("known_hosts" in held ? held.known_hosts.hosts : undefined)),
+  );
+  const hosts = $derived(known.kind === "held" ? known.value : []);
+  const row = $derived(rowFor(hosts, draft.baseUrl));
+
+  // The face control, with the cells a known host does not answer in
+  // refused under the pointer and saying which shapes it does speak. A
+  // host the city does not know keeps every cell open: the form makes
+  // the widest judgement and never a narrower one (client-SPEC 4-25).
   const faces = $derived.by((): readonly Choice<WireApi>[] => {
-    const offered = facesOf(hostOf(draft.baseUrl));
+    const offered = row === null ? null : facesOf(row);
     return wireChoices().map((choice) =>
       offered !== null && !offered.includes(choice.value)
         ? { ...choice, why: fill(say($lang, "setup_face_off"), { faces: offered.join(" / ") }) }
@@ -246,6 +260,21 @@
     event.preventDefault();
   }}
 >
+  <Combobox
+    label={say($lang, "setup_known_host")}
+    placeholder={say($lang, "setup_known_host_pick")}
+    empty={say($lang, "part_no_match")}
+    choices={hostChoices(hosts)}
+    value={row?.host ?? null}
+    onPick={(host: string) => {
+      const chosenRow = hosts.find((each) => each.host === host);
+      const filled = chosenRow === undefined ? null : picked(chosenRow, draft.wireApi);
+      if (filled === null) return;
+      draft.wireApi = filled.wireApi;
+      edit("baseUrl", filled.baseUrl);
+    }}
+  />
+
   <div class="flex flex-col gap-tight">
     <!-- wording-ok: the placeholder is the provider's documented base URL - an address, which no language translates. -->
     <Field placeholder="https://api.openai.com/v1"
@@ -271,8 +300,10 @@
       label={say($lang, "setup_wire_api")}
       options={faces}
       held={draft.wireApi}
-      onPick={(api) => {
+      onPick={(api: WireApi) => {
         draft.wireApi = api;
+        const moved = row === null ? null : followed(row, draft.baseUrl, api);
+        if (moved !== null) edit("baseUrl", moved);
       }}
     />
   </div>

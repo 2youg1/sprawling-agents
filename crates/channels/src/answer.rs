@@ -33,6 +33,7 @@ mod evidence;
 mod git_status;
 mod history;
 mod hunks;
+mod known_hosts;
 mod listing;
 mod mcp_health;
 mod model_facts;
@@ -61,6 +62,7 @@ pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use git_status::{Drift, GitStatusAnswer};
 pub use history::{HistoryAnswer, HistoryRangeAnswer};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
+pub use known_hosts::{KnownFace, KnownHost, KnownHostsAnswer};
 pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use model_facts::ModelFactsSummary;
@@ -208,6 +210,7 @@ pub enum Answer {
     Approvals(ApprovalsAnswer),
     Cost(Box<CostAnswer>),
     Endpoints(EndpointsAnswer),
+    KnownHosts(KnownHostsAnswer),
     Building(Box<BuildingAnswer>),
     Inbox(InboxAnswer),
     Discards(DiscardAnswer),

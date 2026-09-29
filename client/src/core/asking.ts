@@ -52,6 +52,7 @@ export const QUERIES = {
   registry: "registry_view",
   discards: "discard_view",
   endpoints: "endpoint_view",
+  knownHosts: "known_hosts",
   governance: "governance",
   doctor: "doctor",
   toolkits: "toolkits",

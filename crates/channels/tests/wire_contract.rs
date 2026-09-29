@@ -49,7 +49,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     // Thirty commands, thirty-five queries. The count is not a style
     // choice - it is the wire's closed surface.
     assert_eq!(COMMAND_NAMES.len(), 29, "command table");
-    assert_eq!(QUERY_NAMES.len(), 36, "query table");
+    assert_eq!(QUERY_NAMES.len(), 37, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -59,7 +59,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 36, "query names are distinct");
+    assert_eq!(sorted.len(), 37, "query names are distinct");
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "1177945fe95db38c364edb312de147e060055e3f729bff9a3a222d5af397b733";
+const WIRE_SCHEMA_GOLDEN: &str = "8ed10b640a9e6f62493533019e799cd6f8610152c4cc2523d0222d72c66ac5df";
 
 // -------------------------------------------------------------- binding face
 

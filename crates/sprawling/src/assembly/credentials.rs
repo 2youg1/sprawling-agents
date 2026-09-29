@@ -52,27 +52,16 @@ impl Entered {
     /// When the text carries a scheme this city cannot call, or no host
     /// to call at all.
     pub(super) fn resolved(mut self) -> Result<Entered, kernel::AxError> {
-        let settled = gateway::normalise_entered(&self.base_url, hint_of(self.dialect))?;
-        self.dialect = match settled.dialect {
-            gateway::DialectHint::Messages => kernel::DialectKind::Anthropic,
-            gateway::DialectHint::Responses => kernel::DialectKind::OpenAiResponses,
-            gateway::DialectHint::Chat | gateway::DialectHint::Unset => kernel::DialectKind::OpenAi,
-        };
+        let settled =
+            gateway::normalise_entered(&self.base_url, gateway::DialectHint::of(self.dialect))?;
+        // A shape nobody settled is the chat face, the one every
+        // compatible server answers.
+        self.dialect = settled
+            .dialect
+            .dialect()
+            .unwrap_or(kernel::DialectKind::OpenAi);
         self.base_url = settled.base_url;
         Ok(self)
-    }
-}
-
-/// Which shape a compatible format asks the URL reader to expect.
-///
-/// The one translation between the two spellings. The reader speaks in
-/// hints because a person may not have chosen yet; a registration
-/// speaks in formats because by then they have.
-pub(super) fn hint_of(dialect: kernel::DialectKind) -> gateway::DialectHint {
-    match dialect {
-        kernel::DialectKind::Anthropic => gateway::DialectHint::Messages,
-        kernel::DialectKind::OpenAi => gateway::DialectHint::Chat,
-        kernel::DialectKind::OpenAiResponses => gateway::DialectHint::Responses,
     }
 }
 

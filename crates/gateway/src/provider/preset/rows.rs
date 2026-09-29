@@ -15,7 +15,9 @@ use kernel::DialectKind;
 
 use crate::market::InputKinds;
 
-use super::{CeilingField, ChatSpelling, EffortField, HostPreset, ModelPreset, ReasoningReturn};
+use super::{
+    CeilingField, ChatSpelling, EffortField, Face, HostPreset, ModelPreset, ReasoningReturn,
+};
 
 /// The hosts this city knows without asking.
 ///
@@ -25,8 +27,10 @@ use super::{CeilingField, ChatSpelling, EffortField, HostPreset, ModelPreset, Re
 pub const PRESETS: [HostPreset; 13] = [
     HostPreset {
         host: "api.anthropic.com",
-        base_path: "/v1",
-        dialect: Some(DialectKind::Anthropic),
+        faces: &[Face {
+            dialect: DialectKind::Anthropic,
+            path: "/v1",
+        }],
         models: ANTHROPIC_MODELS,
         chat: ChatSpelling::DOCUMENTED,
         session_header: None,
@@ -34,10 +38,18 @@ pub const PRESETS: [HostPreset; 13] = [
     },
     HostPreset {
         host: "api.openai.com",
-        base_path: "/v1",
         // Chat completions and responses are both served here, and the
         // person's own toggle says which one this registration means.
-        dialect: None,
+        faces: &[
+            Face {
+                dialect: DialectKind::OpenAiResponses,
+                path: "/v1",
+            },
+            Face {
+                dialect: DialectKind::OpenAi,
+                path: "/v1",
+            },
+        ],
         models: OPENAI_MODELS,
         // `max_tokens` "is not compatible with o-series models"
         // (`CreateChatCompletionRequest` in `openai/openai-openapi`).
@@ -52,10 +64,25 @@ pub const PRESETS: [HostPreset; 13] = [
         // The documented base URL carries no path: the chat face is
         // `/chat/completions` straight under the host.
         host: "api.deepseek.com",
-        base_path: "/",
-        // Chat and responses both answer here, messages under
-        // `/anthropic`.
-        dialect: None,
+        // Chat and responses both answer straight under the host, and
+        // the Anthropic-compatible face under `/anthropic`, to which
+        // the Anthropic client appends `/v1/messages`
+        // (<https://api-docs.deepseek.com/>,
+        // <https://api-docs.deepseek.com/guides/responses_api>).
+        faces: &[
+            Face {
+                dialect: DialectKind::OpenAi,
+                path: "/",
+            },
+            Face {
+                dialect: DialectKind::OpenAiResponses,
+                path: "/",
+            },
+            Face {
+                dialect: DialectKind::Anthropic,
+                path: "/anthropic/v1",
+            },
+        ],
         models: &[],
         // Thinking is on by default, and a request with tools whose
         // history lacks the earlier `reasoning_content` answers 400.
@@ -68,9 +95,18 @@ pub const PRESETS: [HostPreset; 13] = [
     },
     HostPreset {
         host: "api.x.ai",
-        base_path: "/v1",
-        // Chat completions and responses are both served here.
-        dialect: None,
+        // Responses is the face the vendor recommends; chat completions
+        // is still served as its legacy face.
+        faces: &[
+            Face {
+                dialect: DialectKind::OpenAiResponses,
+                path: "/v1",
+            },
+            Face {
+                dialect: DialectKind::OpenAi,
+                path: "/v1",
+            },
+        ],
         models: &[],
         // `max_tokens` is deprecated in favour of
         // `max_completion_tokens`.
@@ -86,8 +122,10 @@ pub const PRESETS: [HostPreset; 13] = [
         // Not `/v1`: this aggregator serves under `/api/v1`, and the
         // rule that appends `/v1` to every path-less URL answers 404
         // here.
-        base_path: "/api/v1",
-        dialect: Some(DialectKind::OpenAi),
+        faces: &[Face {
+            dialect: DialectKind::OpenAi,
+            path: "/api/v1",
+        }],
         // This gateway states window, ceiling, modalities and prices in
         // its own model list, so a row here would be a second home for
         // a fact the endpoint already publishes.
@@ -107,8 +145,10 @@ pub const PRESETS: [HostPreset; 13] = [
         host: "generativelanguage.googleapis.com",
         // The OpenAI-compatible face. `/v1beta` alone is Gemini's own
         // shape, which this city does not write.
-        base_path: "/v1beta/openai",
-        dialect: Some(DialectKind::OpenAi),
+        faces: &[Face {
+            dialect: DialectKind::OpenAi,
+            path: "/v1beta/openai",
+        }],
         models: &[],
         chat: ChatSpelling::DOCUMENTED,
         session_header: None,
@@ -118,8 +158,10 @@ pub const PRESETS: [HostPreset; 13] = [
         // Zhipu's mainland platform; `api.z.ai` below is the same API
         // served outside mainland China.
         host: "open.bigmodel.cn",
-        base_path: "/api/paas/v4",
-        dialect: Some(DialectKind::OpenAi),
+        faces: &[Face {
+            dialect: DialectKind::OpenAi,
+            path: "/api/paas/v4",
+        }],
         models: &[],
         // The assistant message takes `reasoning_content`, which
         // `clear_thinking: false` keeps in context.
@@ -132,8 +174,10 @@ pub const PRESETS: [HostPreset; 13] = [
     },
     HostPreset {
         host: "api.z.ai",
-        base_path: "/api/paas/v4",
-        dialect: Some(DialectKind::OpenAi),
+        faces: &[Face {
+            dialect: DialectKind::OpenAi,
+            path: "/api/paas/v4",
+        }],
         models: &[],
         chat: ChatSpelling {
             reasoning: ReasoningReturn::AsReasoningContent,
@@ -146,10 +190,22 @@ pub const PRESETS: [HostPreset; 13] = [
         // OpenCode Zen. OpenCode Go hangs under `/zen/go/v1` on the
         // same host, so a Go registration is entered with its path.
         host: "opencode.ai",
-        base_path: "/zen/v1",
         // Each model answers on the face its row names: chat,
         // responses or messages.
-        dialect: None,
+        faces: &[
+            Face {
+                dialect: DialectKind::OpenAi,
+                path: "/zen/v1",
+            },
+            Face {
+                dialect: DialectKind::OpenAiResponses,
+                path: "/zen/v1",
+            },
+            Face {
+                dialect: DialectKind::Anthropic,
+                path: "/zen/v1",
+            },
+        ],
         models: &[],
         chat: ChatSpelling::DOCUMENTED,
         session_header: Some("x-opencode-session"),
@@ -161,12 +217,23 @@ pub const PRESETS: [HostPreset; 13] = [
         // `/v1` at all. Appending `/v1` to this host answers 404,
         // which is the same defect `openrouter.ai` is listed for.
         host: "api.kimi.com",
-        base_path: "/coding/v1",
         // Called through the OpenAI client library with this base URL
         // (`packages/kosong/src/kosong/chat_provider/openai_common.py`
-        // constructs `AsyncOpenAI(base_url=...)`), so the chat face is
-        // the OpenAI-compatible one.
-        dialect: Some(DialectKind::OpenAi),
+        // constructs `AsyncOpenAI(base_url=...)`). The membership guide
+        // prints the Anthropic-compatible base as `/coding/`, to which
+        // the Anthropic client appends `/v1/messages`, so both faces
+        // hang under `/coding/v1`
+        // (<https://www.kimi.com/en/help/kimi-code/membership-guide>).
+        faces: &[
+            Face {
+                dialect: DialectKind::OpenAi,
+                path: "/coding/v1",
+            },
+            Face {
+                dialect: DialectKind::Anthropic,
+                path: "/coding/v1",
+            },
+        ],
         // Pending: the ceilings of the Kimi models are stated by this
         // endpoint's own model list, which needs a member's key to
         // read, and no vendor page reachable from this machine states
@@ -178,8 +245,10 @@ pub const PRESETS: [HostPreset; 13] = [
     },
     HostPreset {
         host: "api.moonshot.cn",
-        base_path: "/v1",
-        dialect: Some(DialectKind::OpenAi),
+        faces: &[Face {
+            dialect: DialectKind::OpenAi,
+            path: "/v1",
+        }],
         // Pending: as above, the model list is the statement and it
         // needs a key.
         models: &[],
@@ -191,8 +260,10 @@ pub const PRESETS: [HostPreset; 13] = [
         // The same platform served outside mainland China; one row per
         // host because a host is what a person pastes.
         host: "api.moonshot.ai",
-        base_path: "/v1",
-        dialect: Some(DialectKind::OpenAi),
+        faces: &[Face {
+            dialect: DialectKind::OpenAi,
+            path: "/v1",
+        }],
         models: &[],
         chat: MOONSHOT_CHAT,
         session_header: None,
@@ -203,8 +274,10 @@ pub const PRESETS: [HostPreset; 13] = [
         // regions give each workspace a host of its own, entered with
         // its path.
         host: "dashscope-us.aliyuncs.com",
-        base_path: "/compatible-mode/v1",
-        dialect: Some(DialectKind::OpenAi),
+        faces: &[Face {
+            dialect: DialectKind::OpenAi,
+            path: "/compatible-mode/v1",
+        }],
         models: &[],
         chat: ChatSpelling::DOCUMENTED,
         session_header: None,

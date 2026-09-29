@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 44 as const;
 /** The schema hash the server checks: `channels::schema_hash()`. */
-export const WIRE_HASH = "1177945fe95db38c364edb312de147e060055e3f729bff9a3a222d5af397b733" as const;
+export const WIRE_HASH = "8ed10b640a9e6f62493533019e799cd6f8610152c4cc2523d0222d72c66ac5df" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `channels::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -1556,6 +1556,34 @@ export const InboxAnswer = Schema.Struct({
 export type InboxAnswer = typeof InboxAnswer.Type;
 
 /**
+ * One face and the base URL it is called at: the URL attaching this
+ * face would store, so a form that fills it in changes nothing when
+ * the city normalises it.
+ */
+export const KnownFace = Schema.Struct({
+  base_url: Schema.String,
+  dialect: DialectKind,
+}).annotations({ identifier: "KnownFace" });
+export type KnownFace = typeof KnownFace.Type;
+
+/**
+ * One vendor's host, and the faces it documents, main face first.
+ */
+export const KnownHost = Schema.Struct({
+  faces: Schema.Array(KnownFace),
+  host: Schema.String,
+}).annotations({ identifier: "KnownHost" });
+export type KnownHost = typeof KnownHost.Type;
+
+/**
+ * Every host the city knows, in the table's own order.
+ */
+export const KnownHostsAnswer = Schema.Struct({
+  hosts: Schema.Array(KnownHost),
+}).annotations({ identifier: "KnownHostsAnswer" });
+export type KnownHostsAnswer = typeof KnownHostsAnswer.Type;
+
+/**
  * What one entry is. A directory has no size worth stating: the size
  * of a directory is a question about everything under it, and this
  * answer deliberately does not walk that far.
@@ -2333,6 +2361,9 @@ export const Answer = Schema.Union(
     endpoints: EndpointsAnswer,
   }),
   Schema.Struct({
+    known_hosts: KnownHostsAnswer,
+  }),
+  Schema.Struct({
     building: BuildingAnswer,
   }),
   Schema.Struct({
@@ -2516,6 +2547,7 @@ export const Query = Schema.Union(
     }),
   }),
   Schema.Literal("endpoint_view"),
+  Schema.Literal("known_hosts"),
   Schema.Struct({
     building_view: Schema.Struct({
       addr: Address,

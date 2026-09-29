@@ -55,6 +55,7 @@ pub use answer::{EndpointSummary, EndpointsAnswer, UnpricedCalls};
 pub use answer::{EvidenceItem, EvidenceKind, Picture};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
+pub use answer::{KnownFace, KnownHost, KnownHostsAnswer};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
 pub use answer::{ReleaseAnswer, ReleaseLine};

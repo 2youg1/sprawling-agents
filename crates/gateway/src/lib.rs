@@ -33,7 +33,7 @@ pub use provider::ceiling::{CeilingSource, OutputCeiling, Stated};
 pub use provider::modality::call::{Ranks, Vectors};
 pub use provider::modality::embedding::{EmbeddingRequest, Embeddings};
 pub use provider::modality::rerank::{Rank, Ranking, RerankRequest};
-pub use provider::preset::{HostPreset, ModelPreset};
+pub use provider::preset::{HostPreset, KnownHost, ModelPreset, known_hosts};
 pub use provider::registry::{ConnectionKind, resolve as resolve_connection};
 pub use reach::{client_for, is_local, reach, through};
 pub use router::{AttachedEndpoint, Chosen, EndpointBook, EndpointTuning};

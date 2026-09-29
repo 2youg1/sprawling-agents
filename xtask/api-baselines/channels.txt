@@ -50,6 +50,7 @@ pub channels::Answer::History(alloc::boxed::Box<channels::HistoryAnswer>)
 pub channels::Answer::HistoryRange(alloc::boxed::Box<channels::HistoryRangeAnswer>)
 pub channels::Answer::Hunks(alloc::boxed::Box<channels::HunksAnswer>)
 pub channels::Answer::Inbox(channels::InboxAnswer)
+pub channels::Answer::KnownHosts(channels::KnownHostsAnswer)
 pub channels::Answer::Listing(channels::ListingAnswer)
 pub channels::Answer::McpHealth(alloc::boxed::Box<channels::McpHealthAnswer>)
 pub channels::Answer::Metrics(alloc::boxed::Box<channels::MetricsAnswer>)
@@ -534,6 +535,11 @@ pub channels::Intervention::Cancel
 pub channels::Intervention::Halt
 pub channels::Intervention::Release
 pub channels::Intervention::Steer
+pub channels::KnownFace::base_url: alloc::string::String
+pub channels::KnownFace::dialect: kernel::model::wire::DialectKind
+pub channels::KnownHost::faces: alloc::vec::Vec<channels::KnownFace>
+pub channels::KnownHost::host: alloc::string::String
+pub channels::KnownHostsAnswer::hosts: alloc::vec::Vec<channels::KnownHost>
 pub channels::Lagged::from: kernel::event::identity::Seq
 pub channels::Lagged::to: kernel::event::identity::Seq
 pub channels::Lang::En
@@ -723,6 +729,7 @@ pub channels::Query::Hunks::oid_b: kernel::locator::GitOid
 pub channels::Query::Hunks::path: alloc::string::String
 pub channels::Query::InboxView
 pub channels::Query::InboxView::addr: kernel::address::Address
+pub channels::Query::KnownHosts
 pub channels::Query::Listing
 pub channels::Query::Listing::at: core::option::Option<kernel::address::Address>
 pub channels::Query::McpHealth
@@ -922,7 +929,7 @@ pub const channels::COMMAND_NAMES: [&str; 29]
 pub const channels::DROP_BYTES_MAX: usize
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 36]
+pub const channels::QUERY_NAMES: [&str; 37]
 pub const channels::RUN_COSTS_MAX: usize
 pub const channels::WIRE_V: u32
 pub enum channels::Admission
@@ -1105,6 +1112,9 @@ pub struct channels::HistoryAnswer
 pub struct channels::HistoryRangeAnswer
 pub struct channels::HunksAnswer
 pub struct channels::InboxAnswer
+pub struct channels::KnownFace
+pub struct channels::KnownHost
+pub struct channels::KnownHostsAnswer
 pub struct channels::Lagged
 pub struct channels::LedgerHead(_)
 pub struct channels::ListingAnswer

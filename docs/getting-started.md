@@ -169,7 +169,7 @@ To work on projects you already have, raise the city in the folder that holds th
 
 A city with no model to call opens on **welcome**, whose first card, **connect a provider**, leads to **settings** → **accounts and providers**.
 
-**with a key** is a form of three boxes:
+The form above the list of what is attached takes a key. Its first control lists the providers the city knows by host: pick one and the base URL and the format are filled in for you. The three boxes below it are:
 
 | Field | What it wants |
 |---|---|

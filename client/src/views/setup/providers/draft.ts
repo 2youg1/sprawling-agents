@@ -21,9 +21,9 @@
 // `api.anthropic.com` and `openrouter` for `openrouter.ai`, so a table
 // of known hosts on this side would be a second home for what
 // `gateway::provider::preset` already holds, and the two would
-// disagree the first time a provider moved. `presets.ts` is a
-// different fact - which request shapes a known host answers - and it
-// only gates a control before the click; it never derives a name.
+// disagree the first time a provider moved. `known.ts` reads the
+// city's own answer for a different fact - which request shapes a known
+// host answers, and at which base URL - and it never derives a name.
 
 import { WIRE_APIS, dialectOf } from "../../../core/commands";
 import type { Endpoint, Pair, Tuning, WireApi } from "../../../core/commands";
@@ -188,8 +188,8 @@ const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
 
 // The three `wire_api` values as cells of one control, grouped by the
 // laboratory that defined each shape. Which cells a particular host
-// offers is `presets.ts`'s fact, applied by the form as a `why` on the
-// cells it does not answer in.
+// offers is the city's `Query::KnownHosts` answer (`known.ts`), applied
+// by the form as a `why` on the cells it does not answer in.
 //
 // A cell is worded with the wire value itself, not out of the phrase
 // table: each of the three is one token that reads the same in both
