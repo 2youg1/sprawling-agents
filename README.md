@@ -2,7 +2,7 @@
 
 **Run many agents on your own machine as a city. One Rust binary; the interface is a page in your browser.**
 
-[![npm](https://img.shields.io/npm/v/sprawling?logo=npm&labelColor=171717&color=CB3837)](https://www.npmjs.com/package/sprawling) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/2youg1/sprawling-agents) [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/2youg1/sprawling-agents?labelColor=171717&color=FF570A&label=CodeRabbit+Reviews)](https://coderabbit.ai)
+[![npm](https://img.shields.io/npm/v/sprawling?logo=npm&labelColor=171717&color=CB3837)](https://www.npmjs.com/package/sprawling) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/2youg1/sprawling-agents) [![License](https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&color=4C8BF5)](LICENSE)
 
 > **Status: pre-alpha, research and development.** The main loop works: register a provider in the browser, raise a building, dispatch a job, and the model calls tools and writes files into that building. Several agents work in one city, each in its own room, and several runs of one building drive at the same time, while one accounting thread writes all of them into the Ledger. What is still missing is listed under [What works, and what does not](#what-works-and-what-does-not); read that section before you hand it real work.
 >
