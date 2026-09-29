@@ -17,7 +17,8 @@
 //! second authority on which passage answers a question, and this city
 //! would then disagree with the model it paid to ask.
 //!
-//! Source, read on 2026-09-21:
+//! Source, read at the commit `docs/third-party.md` section 1 tracks it
+//! to:
 //! `huggingface/text-embeddings-inference` `docs/openapi.json`, the
 //! `/rerank` path with schemas `RerankRequest`, `RerankResponse` and
 //! `Rank`.

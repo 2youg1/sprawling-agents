@@ -18,7 +18,8 @@
 //! default the server could change is not a thing to read an answer
 //! against.
 //!
-//! Sources, both read on 2026-09-21:
+//! Sources, each read at the commit `docs/third-party.md` section 1
+//! tracks it to:
 //! `openai/openai-openapi` `openapi.yaml`, schemas `CreateEmbeddingRequest`,
 //! `CreateEmbeddingResponse` and `Embedding`;
 //! `huggingface/text-embeddings-inference` `docs/openapi.json`, schemas
@@ -37,8 +38,9 @@ pub struct EmbeddingRequest {
 }
 
 /// The encoding this city asks for and the only one it reads. OpenAI
-/// also serves `base64`, which halves the bytes on the wire and would
-/// need a decoder here before it may be asked for.
+/// also serves `base64`, answering each `embedding` as a string rather
+/// than a list; it halves the bytes on the wire and would need a
+/// decoder here before it may be asked for.
 const ENCODING_FORMAT: &str = "float";
 
 impl EmbeddingRequest {
