@@ -279,6 +279,29 @@ mod tests {
         );
     }
 
+    /// A host that hangs its Anthropic-compatible face under another
+    /// path than its OpenAI one is reached on the path of the face the
+    /// person chose (gateway-SPEC.md 8-17).
+    #[test]
+    fn a_bare_host_reaches_the_path_of_the_face_the_person_chose() {
+        use crate::router::{DialectHint, normalise_entered};
+        let base = |entered: &str, face: DialectHint| {
+            normalise_entered(entered, face).unwrap().base_url
+        };
+        assert_eq!(
+            base("api.deepseek.com", DialectHint::Messages),
+            "https://api.deepseek.com/anthropic/v1"
+        );
+        assert_eq!(
+            base("api.deepseek.com", DialectHint::Chat),
+            "https://api.deepseek.com"
+        );
+        assert_eq!(
+            base("api.kimi.com", DialectHint::Messages),
+            "https://api.kimi.com/coding/v1"
+        );
+    }
+
     #[test]
     fn the_chat_spelling_and_the_session_header_are_the_hosts() {
         assert_eq!(
