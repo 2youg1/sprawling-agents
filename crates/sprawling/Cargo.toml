@@ -28,7 +28,7 @@ tokio = { workspace = true }
 # memory and the volume only, not the default component, network and user
 # tables; this process is read through its own handle below, not through
 # the whole process table.
-sysinfo = { version = "0.37", default-features = false, features = ["system", "disk"] }
+sysinfo = { version = "0.39", default-features = false, features = ["system", "disk"] }
 cpu-time = "1"
 memory-stats = "1.2"
 tokio-tungstenite = { workspace = true }
