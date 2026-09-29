@@ -18,10 +18,8 @@ mod harness;
 mod mcp;
 
 pub use acp::{Admitted, Incoming, Progress, admit};
-pub use harness::{
-    AcpSession, PermissionAsk, Permit, PermitKind, PermitOption, StopReason, Update,
-};
-pub use harness::{Harness, Launch, Program};
+pub use harness::{AcpSession, PermissionAsk, Permit, PermitKind, PermitOption};
+pub use harness::{Harness, Launch, Program, StopReason, Update};
 pub use mcp::{Broker, Connection, Toolkit};
 pub use mcp::{EXTERNAL_CALL_PATIENCE, Handshake, Listed, McpLink, McpTool, Outbound};
 pub use mcp::{MESSAGE_CEILING, Received, read_one_message};

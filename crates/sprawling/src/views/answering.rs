@@ -206,8 +206,7 @@ impl Views {
                 Some(page) => channels::Answer::Commits(page),
                 None => unavailable(format!("Commits({before:?})")),
             },
-            // Three readings answered here so a second client draws a
-            // session without folding the ledger itself.
+            // Three readings answered here, so a second client folds no ledger itself.
             channels::Query::Rounds { run } => {
                 return Prepared::Rounds {
                     ledger: self.ledger_ask(),
