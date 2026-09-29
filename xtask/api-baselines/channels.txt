@@ -46,6 +46,7 @@ pub channels::Answer::Endpoints(channels::EndpointsAnswer)
 pub channels::Answer::Evidence(channels::EvidenceAnswer)
 pub channels::Answer::GitStatus(alloc::boxed::Box<channels::GitStatusAnswer>)
 pub channels::Answer::Governance(channels::GovernanceAnswer)
+pub channels::Answer::Harnesses(channels::HarnessesAnswer)
 pub channels::Answer::History(alloc::boxed::Box<channels::HistoryAnswer>)
 pub channels::Answer::HistoryRange(alloc::boxed::Box<channels::HistoryRangeAnswer>)
 pub channels::Answer::Hunks(alloc::boxed::Box<channels::HunksAnswer>)
@@ -513,6 +514,11 @@ pub channels::HaltScope::City
 pub channels::HaltScope::Workshop(kernel::address::Address)
 pub channels::HandshakeVerdict::Accept
 pub channels::HandshakeVerdict::Reject(kernel::error::shape::AxError)
+pub channels::HarnessLine::docs: alloc::string::String
+pub channels::HarnessLine::found: bool
+pub channels::HarnessLine::launch: alloc::vec::Vec<alloc::string::String>
+pub channels::HarnessLine::name: alloc::string::String
+pub channels::HarnessesAnswer::harnesses: alloc::vec::Vec<channels::HarnessLine>
 pub channels::HeaderPair::name: alloc::string::String
 pub channels::HeaderPair::value: alloc::string::String
 pub channels::Hello::schema: kernel::locator::B3Hash
@@ -716,6 +722,7 @@ pub channels::Query::Evidence::run: kernel::event::identity::RunId
 pub channels::Query::GitStatus
 pub channels::Query::GitStatus::building: kernel::address::Address
 pub channels::Query::Governance
+pub channels::Query::Harnesses
 pub channels::Query::History
 pub channels::Query::History::before: core::option::Option<kernel::event::identity::Seq>
 pub channels::Query::History::limit: u32
@@ -929,7 +936,7 @@ pub const channels::COMMAND_NAMES: [&str; 29]
 pub const channels::DROP_BYTES_MAX: usize
 pub const channels::HISTORY_MAX: u32
 pub const channels::OUTPUT_LINES: usize
-pub const channels::QUERY_NAMES: [&str; 37]
+pub const channels::QUERY_NAMES: [&str; 38]
 pub const channels::RUN_COSTS_MAX: usize
 pub const channels::WIRE_V: u32
 pub enum channels::Admission
@@ -1106,6 +1113,8 @@ pub struct channels::EvidenceItem
 pub struct channels::Forwarded
 pub struct channels::GitStatusAnswer
 pub struct channels::GovernanceAnswer
+pub struct channels::HarnessLine
+pub struct channels::HarnessesAnswer
 pub struct channels::HeaderPair
 pub struct channels::Hello
 pub struct channels::HistoryAnswer
