@@ -67,3 +67,77 @@ fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
     // Once, however often a city is formed or opened here.
     assert_eq!(ignored.matches("/.sprawling/\n").count(), 1);
 }
+
+/// No working document and no conversation record the city writes in a
+/// project folder is visible to that project's git (city-SPEC.md 12.5).
+/// A dispatch sent straight to a room address nobody opened writes its
+/// task and its transcript in a room the city made; one sent to a
+/// directory the project already had writes them among the project's
+/// files, which the city must not seal, so a new source file there is
+/// still work git sees.
+#[test]
+fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
+    use crate::assembly::fixture::{completion, fake_openai, worker_with_provider};
+    let dir = tempfile::tempdir().unwrap();
+    git2::Repository::init(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("proj").join("src")).unwrap();
+    std::fs::write(dir.path().join("proj").join("src").join("lib.rs"), "\n").unwrap();
+    form_city(dir.path(), Adopt::EveryFolder).unwrap();
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![completion("done", None), completion("done", None)],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    for (room, idem) in [("proj/room1", b"first"), ("proj/src", b"other")] {
+        worker
+            .handle(channels::Command::Dispatch {
+                addr: kernel::Address::parse(room).unwrap(),
+                task: "measure the thing".to_owned(),
+                goal: "a number, then stop".to_owned(),
+                mode: kernel::Mode::PlanGoal,
+                idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, idem),
+                session: None,
+                effort: None,
+                model: None,
+            })
+            .unwrap();
+    }
+    assert!(dir.path().join("proj").join("src").join("JOB.md").is_file());
+    std::fs::write(dir.path().join("proj").join("src").join("new.rs"), "\n").unwrap();
+
+    let repo = git2::Repository::open(dir.path()).unwrap();
+    let mut options = git2::StatusOptions::new();
+    options.include_untracked(true).recurse_untracked_dirs(true);
+    let visible: Vec<String> = repo
+        .statuses(Some(&mut options))
+        .unwrap()
+        .iter()
+        .map(|entry| entry.path().unwrap().to_owned())
+        .collect();
+    let records: Vec<&String> = visible
+        .iter()
+        .filter(|path| {
+            path.starts_with(".sprawling/")
+                || path.starts_with("proj/room1/")
+                || path.ends_with(".jsonl")
+                || [
+                    "JOB.md",
+                    "URBANITE.md",
+                    "Handoff.md",
+                    "Roadmap.md",
+                    "Memo.md",
+                ]
+                .iter()
+                .any(|name| path.ends_with(name))
+                || path.contains("/Archive/")
+        })
+        .collect();
+    assert!(
+        records.is_empty(),
+        "git sees the city's working records: {records:?}"
+    );
+    assert!(
+        visible.iter().any(|path| path == "proj/src/new.rs"),
+        "the project's own new file is hidden from git: {visible:?}"
+    );
+}
