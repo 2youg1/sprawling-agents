@@ -531,7 +531,7 @@ pub fn forget_shape(city_root: &Path, addr: &Address) -> Result<(), AxError>;
 
 ```rust
 pub fn open(city_root: &Path, building: &Address, name: &SessionName) -> Result<Address, AxError>;
-pub(crate) fn claim(city_root: &Path, room: &Address) -> Result<(), AxError>;   // 城替派活新建的房间：建出并封上；已存在的目录不动（§8-21）
+pub fn claim(city_root: &Path, room: &Address) -> Result<(), AxError>;   // 门面上叫 `city::claim_room`；城替派活新建的房间：建出并封上；已存在的目录不动（§8-21）
 // crate 面：`pub use room::open as open_room;`——调用方读到的是 `city::open_room`，
 // 因为裸的 `city::open` 在装配层里说不出开的是什么。
 ```
@@ -772,7 +772,7 @@ pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 docs/templates/SPEC.md�
 - **顺序就是文法**：git 认最后一条命中的规则，所以「忽略—放回目录—清空—逐行放行」这四步不能重排。这一条由 git 自己验过：外层再写 `.*` 与 `*.md`，`SPEC.md` 与 `.sprawling/CONFIG.toml` 仍然进历史，`.sprawling/ledger/` 仍然不进，一个嵌套目录自己的 `.sprawling/CONFIG.toml` 也不进。
 - **城根也有一块，只有一行 `/.sprawling/`**：城根的保留子树装着账本、对象库、工作树与金库引用，全是城运行时留下的记录，不是项目的内容。人让城围着一个工作区立起来时，那个工作区常常就是一个 git 仓库（项目本身），而楼这一层的块只管楼自己的保留子树，城根的那一棵就会以几百兆的未跟踪目录出现在项目的 `git status` 里。`place_city` 在立城时（`form_city`，`init`、`up` 与「用一个已有的文件夹」三条路都经过它）把这一行补进城根的 `.gitignore`，与 `place` 同一个只追加、逐行比对的规矩；锚在根上（带前导斜杠），因此楼与房间自己的保留子树仍由楼那一块逐文件放行。城根的 `City.md` 与 `hall/` 不在这一行里：前者是人要改的城规，后者是一栋楼，它自己的块已经说了它哪些进历史。
 - **工作文档按名忽略，不靠房间封条**：块里 `JOB.md`、`URBANITE.md`、`Handoff.md`、`Roadmap.md`、`Memo.md` 与一次 run 的对话记录（`runtime::transcript` 写在房间里的 `<run>.jsonl`，按 `kernel::layout::RUN_ID_PATTERN` 与 `TRANSCRIPT_EXT` 拼成 `????????-????-????-????-????????????.jsonl`）不带斜杠，在楼下任意深度都不进历史；`/Archive/` 锚在楼根，那里存的是人说过的偏好、做过的决定与纠正。按名忽略是必要的，因为房间封条只盖在城自己建的目录上：人把活派到一个项目里本来就有的子目录（`proj/src`），城不能往那里放一个 `*`——那会让这个源码目录里此后的每一个新文件都悄悄进不了历史。
-- **城替派活新建的房间都封上**：`city::write_job` 在往一个还不存在的房间写 `JOB.md` 之前，先经 `room::claim` 建出它并封上，与 `room::open` 同一个 `seal_room`。一个直接派到 `building/room` 地址、没经过 `open` 的派活因此不再留下一个没封的房间。已存在的目录不封（理由同上一条），它里面的城文件由按名的规则挡住。
+- **城替派活新建的房间都封上**：派活开房间的那一步（sprawling-SPEC §8-40 的 `room_for`，城为一次派活写下的第一件东西）遇到一个没经过 `open` 的房间地址时调 `city::claim_room`：房间还不存在就建出它并封上，与 `room::open` 同一个 `seal_room`。放在这一步而不是写 `JOB.md` 时，是因为会话冻下的形状（`write_session`）在任务单之前就写进房间自己的 `.sprawling/CONFIG.toml`，那一写会先把目录建出来。一个直接派到 `building/room` 地址、没经过 `open` 的派活因此不再留下一个没封的房间。已存在的目录不封（理由同上一条），它里面的城文件由按名的规则挡住。
 - **房间由房间自己忽略**：`room::open` 在新开的房间里放一份只有 `*` 一行的 `.gitignore`。楼这一层的 `.gitignore` 写不出「房间」——房间是人当场命名的普通子目录，立楼时它们还不存在，而在被收编的仓库里按通配符去猜哪个子目录是房间会误伤源码目录。
 - 被否：在楼的 `.gitignore` 里写 `*/JOB.md`、`*/URBANITE.md` 一类通配。它只忽略房间里的某几个文件名，会让一次会话的其余产物照样进历史，等于把这条规则写成一半。
 
