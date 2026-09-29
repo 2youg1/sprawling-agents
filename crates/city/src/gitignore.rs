@@ -111,6 +111,21 @@ pub fn place_city(city_root: &Path) -> Result<(), AxError> {
     append_missing(&city_root.join(GITIGNORE_FILE), &city_block())
 }
 
+/// Every block this city keeps, placed again: the root's, then each
+/// building's. Called when the city's writer opens, so a rule added to
+/// the table reaches buildings raised before it (city-SPEC.md 8-21).
+///
+/// # Errors
+/// As [`append_missing`], and a city whose buildings cannot be listed.
+pub fn place_everywhere(city_root: &Path) -> Result<(), AxError> {
+    place_city(city_root)?;
+    for addr in crate::building::all(city_root)? {
+        let building = crate::building::Building::of(&addr)?;
+        place(&building.root(city_root))?;
+    }
+    Ok(())
+}
+
 /// Appends each rule the file does not already hold.
 ///
 /// Idempotent by line: a rule already present in the file is not added

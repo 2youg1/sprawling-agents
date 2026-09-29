@@ -59,6 +59,7 @@ pub use history::{History, has_history};
 // names are re-exported rather than restated so that a caller reading
 // `city::CONFIG_TOML` and the layout that places it cannot disagree.
 pub use gitignore::place_city as ignore_city_records;
+pub use gitignore::place_everywhere as keep_records_out_of_git;
 pub use handoff_form::{HandoffSections, handoff_sections};
 pub use kernel::layout::{ARCHIVE_DIR, BUILDING_SHELF, CONFIG_FILE, LIBRARY_DIR, URBANITE_FILE};
 pub use library::{Holding, Library, Shelf};

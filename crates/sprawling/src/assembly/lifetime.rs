@@ -147,6 +147,10 @@ impl RunWorker {
         // lock nobody alive holds (memory-SPEC 8-9).
         memory::Worktrees::lift_abandoned_leases(city_root, &ledger)
             .map_err(memory::MemoryError::into_ax)?;
+        // A rule the ignore table gained since a building was raised
+        // reaches it now: no working record of this city enters git,
+        // however old the building (city-SPEC.md 12.5).
+        city::keep_records_out_of_git(city_root)?;
         let Standing {
             book,
             governance,
