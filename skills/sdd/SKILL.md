@@ -1,6 +1,6 @@
 ---
 name: sdd
-description: "Spec-first programming workflow: write the component's SPEC.md before its code, then implement exactly what the SPEC states and keep the two in step. Load before starting programming work that will be merged."
+description: "Specification-first development with formally verified Lean contracts. Use before designing, implementing, changing, or delegating production code, and when migrating an existing Markdown specification to Spec.lean."
 license: MPL-2.0
 ---
 
@@ -10,52 +10,161 @@ license: MPL-2.0
 
 <principle>
 
-This skill builds on `apostle-artifacts-loops`: it inherits that skill's "documentation first" principle and follows Spec-Driven Development. Before writing code for a component, think divergently first, then write a standalone SPEC.md for that component as specified below, so the user can understand it and later maintainers can keep it in step.
+Translate the requirements and decisions already agreed upon by the user and the primary agent into a module specification whose substantive content is formally verified Lean code, so that subsequent implementers can distinguish binding decisions from implementation details left to their discretion.
 
-Zero references: this SKILL.md is the whole skill — it ships no reference files, scripts, or templates. A SPEC.md belongs to the project workspace; lay the documents out along the code's structure.
+The specification precedes the production implementation. Constructing, executing, and proving Lean models are activities within specification design; a model that serves as a specification is a maintained project artifact.
 
-Before writing anything, put the project's authorities in your context: `AGENTS.md`, the authority documents (such as `CONTEXT.md`, `ARCHITECTURE.md`), ADRs, and the neighboring modules' documentation and code. Inherit their vocabulary and conventions.
+Within a specification, natural language occurs only in Lean comments, where it records sources, rationale, assumptions, open questions, verification boundaries, and relationships to other documents; express behavioral requirements that admit formalization as definitions, types, contracts, and proofs, rather than substituting comments for these declarations.
 
-Name each document `component-name + SPEC.md`, so one directory does not fill with indistinguishable SPEC.md files. Write a SPEC.md only for code that will be merged in this project — not for tests, prototypes, or demos — and when implementing code that has a SPEC.md, write only the comments that are strictly necessary.
+Follow the project's Lean module organization and maintain a `Spec.lean` entry point for the module; where decomposition is necessary, organize definitions and proofs through imports, retaining one authoritative definition of each rule.
 
-When the code you are working on already has a SPEC.md, read it in full first. For improvements, additions, removals, and bug fixes alike, change the SPEC.md first, then write the code.
+Preserve the seventeen responsibilities below in their stated order, organizing them through numbered section comments in `Spec.lean`, with references to declarations in imported modules where the material is substantial. If a responsibility does not apply, explain why in its section comment rather than introducing vacuous declarations merely to complete the structure.
 
 </principle>
 
-<discipline>
+<context>
 
-## Execution discipline
+Before designing or modifying a specification, read `AGENTS.md`, the architecture documents, the glossary, relevant decision records, existing specifications, Lean models, and neighboring modules, and adopt their established concepts and conventions.
 
-- The SPEC.md is written before any code, and the implementation follows the SPEC.md exactly — no more, no less. On a deviation, either fix the code, or update the SPEC.md first and state the reason.
-- When the code is complete, check it against the SPEC.md: every step's implementation should match the decision and its reason in the document. Finding a better way? Update the document with the user first.
-- When the code is complete, verify against the document's testing section and record the results briefly.
-- On completion, walk the "Documentation sync" section and remind the user to update every document it lists, writing the actual verification results down clearly.
-- When you reach a point that must be reviewed or clarified by the user, deliver the SPEC.md or the code, then stop and align with the user in the form they prefer.
+Distinguish user decisions, established project constraints, and agent inferences, recording their sources in the comments accompanying the relevant declarations; retain inferences as explicit assumptions rather than presenting them as matters already agreed upon.
 
-</discipline>
+Reuse existing definitions and verification mechanisms. When a design conflicts with an established decision, revise that decision and its rationale before changing the specifications and implementations that depend on it.
+
+</context>
+
+<alignment>
+
+Before delegation, examine every decision that affects acceptance, including normal results, rejection conditions, the state after failure, operation ordering, observable effects, and architectural constraints already selected.
+
+Identify reasonable alternative interpretations that still satisfy the current specification but produce different results, and classify each as permitted, excluded, or unresolved by reference to the existing record of agreement.
+
+If two approaches both satisfy the specification but the existing record of agreement explicitly excludes one, first add the constraints that distinguish them, and only then delegate implementation work that depends on that decision.
+
+Record permitted differences as implementation discretion; express excluded differences as formal constraints or explicit engineering checks, preserving the reasons for their exclusion.
+
+An unresolved question blocks the relevant work only if it affects the contract or the task's outcome; present concrete alternatives and their consequences, and continue work that does not depend on that decision.
+
+</alignment>
 
 <sections>
 
-## Section order of the SPEC.md
+1. **Requirements breakdown**
+   Decompose requirements into independently acceptable units and associate them with domain objects, operations, and properties; record each requirement's source and scope in comments.
 
-The SPEC.md uses a numbered list in the order below, written in a precise, clear, readable style with multi-level headings and other structure:
+2. **Acceptance criteria**
+   Express completion conditions through observable behavior, preconditions, postconditions, and theorems, covering both required normal behavior and behavior that must be rejected; state how the production implementation will be checked for conformance.
 
-1. **Requirements breakdown** — pin the requirement down and split it into the smallest units that can each be completed and accepted independently.
-2. **Acceptance criteria** — for each smallest unit, an observable, testable definition of done.
-3. **Assumptions and ambiguity** — list the ambiguities in the requirement and the assumption chosen for each; where the "Authoritative sources" section can settle one, verify there first.
-4. **Current-state analysis** — where existing code is involved, analyze it first: one hand on the code's logic, one on its measured behavior in time, memory, and the like.
-5. **Authoritative sources** — cite official documentation or project documents wherever possible; confirm the design intent, follow the same concepts and style, and settle the exact variable names and what is to be quoted.
-6. **Naming** — module, type, and variable names follow the project's vocabulary and domain documents; never coin a synonym.
-7. **Module boundaries** — draw the module boundaries, dependencies, and data flow clearly.
-8. **Interfaces first** — design the public interfaces and type signatures first, and make invalid states unrepresentable in the types rather than backing into runtime checks.
-9. **Workflow** — analyze the module's complete workflow from entry to exit, top down.
-10. **Implementation logic** — split the implementation into steps along the development workflow, and for each step state what to do and why: the key decisions and their trade-offs, complexity and performance considerations, and why it beats the alternatives — enough for a reader to judge the code's quality from the document.
-11. **Boundary enumeration** — enumerate extreme inputs, exceptional paths, and concurrency conflicts.
-12. **Error handling** — for each error class define the strategy: who catches it, how it propagates, and what form the caller or user sees.
-13. **Dependency choices** — for every new external dependency, state the reason for the choice, its alternatives, and its maintenance cost.
-14. **Hard-coding declarations** — where anything is hard-coded, explain the intent and the consequences.
-15. **Impact surface** — list the callers, data, and configuration this change touches, and mark the paths that need regression verification.
-16. **Tests and constraints** — list the tests the module needs to run correctly and the constraints that must hold.
-17. **Documentation sync** — list the documents that must change on completion, so later maintainers can understand the change and nothing that needs changing is missed.
+3. **Assumptions and ambiguity**
+   Make assumptions relevant to proofs explicit as model parameters or theorem hypotheses, explaining their justification in comments; record unresolved questions and the consequences of alternative answers, without replacing an unresolved requirements decision with an axiom.
+
+4. **Current-state analysis**
+   For an existing implementation, identify how its actual behavior corresponds to the target contract, constructing a model of the current behavior where necessary; record source locations, performance measurements, known discrepancies, and supporting evidence in comments.
+
+5. **Authoritative sources**
+   Cite precise locations in requirements, standards, project documents, and upstream definitions in comments, identifying the declarations they constrain; obtain established facts from their authoritative locations rather than transcribing a second definition.
+
+6. **Naming**
+   Use the project's vocabulary in Lean declarations; where names differ across languages, record an explicit correspondence and preserve the meaning of each concept.
+
+7. **Module boundaries**
+   Express the module's responsibilities through types, interfaces, and dependency relationships; separate external effects from the environment model explicitly, and verify production-layer restrictions through the corresponding structural checks.
+
+8. **Interfaces first**
+   Define inputs, outputs, errors, and invocation conditions before defining behavior; exclude invalid states through types wherever possible, and express the remaining requirements as explicit contracts.
+
+9. **Workflow**
+   Describe the flow from entry to exit through transition functions or behavioral relations; preserve permitted choices in concurrent or otherwise nondeterministic behavior, rather than imposing an ordering chosen incidentally by the reference model.
+
+10. **Implementation logic**
+    Provide reference definitions and proofs sufficient to explain and verify the behavior; record substantive trade-offs, alternatives, and implementation discretion in comments. State the computational model underlying complexity claims, and cite measurement evidence for claims about actual performance.
+
+11. **Boundary enumeration**
+    Represent extreme inputs, invalid operations, faults, and concurrent interleavings, and examine these boundaries through properties and scenarios that distinguish relevant cases; passing a finite set of scenarios does not establish a universal property.
+
+12. **Error handling**
+    Define failure, propagation, recovery, and caller-observable results through error types and state transitions; which state is preserved or changed after failure is part of the contract.
+
+13. **Dependency choices**
+    Record each dependency's role, the rationale for its selection, alternatives, and maintenance costs in comments; refer to the project manifests for concrete versions, and incorporate behavioral assumptions into the model.
+
+14. **Hard-coding declarations**
+    Explain the basis, scope, and consequences of changing each fixed value; retain one authoritative definition of each value, and maintain correspondence between model and implementation through established generation or consistency checks.
+
+15. **Impact surface**
+    Record which callers, data, configuration, and properties are affected by changes to the public contract, referring to the relevant declarations and verification entry points; determine impact from actual dependencies rather than maintaining a task list for a single implementation effort.
+
+16. **Tests and constraints**
+    Discharge formal obligations through proofs, list implementation-conformance checks, integration checks, and other acceptance commands, and distinguish proved properties, test coverage, and environmental assumptions.
+
+17. **Documentation relationships**
+    Maintain relationships to architecture documents, the glossary, decision records, neighboring specifications, and operational documentation in comments, identifying the referenced locations, the content connected by each relationship, its authoritative source, and the changes that require the relationship to be re-examined.
+    These records describe persistent dependencies, rather than a checklist of documents to update after completing the current task.
 
 </sections>
+
+<migration>
+
+Migrate by module or by a specification scope that can be switched independently, allowing different modules to occupy different migration stages; each scope has exactly one effective behavioral specification at any given time.
+
+1. **Inventory the existing Markdown specification and its consumers.**
+   Cover all seventeen responsibilities, identifying behavioral requirements, design decisions, assumptions, examples, acceptance checks, and the documents, scripts, and agent instructions that consume the existing specification.
+
+2. **Establish a migration correspondence.**
+   Map each existing requirement to a Lean declaration, an accompanying comment, or a referenced existing authority.
+   Resolve omissions, contradictions, and matters that cannot be confirmed explicitly; record semantic changes as separate decisions rather than incorporating them into a format conversion without acknowledgment.
+
+3. **Construct and verify the candidate specification.**
+   Reuse existing models where possible, translate behavioral requirements into checkable definitions and contracts, move rationale and documentation relationships into comments, and complete the required proofs and implementation-conformance checks.
+
+4. **Identify the authority during the transition.**
+   Before the switch, the still-applicable content of the existing specification and its existing authority relationships remain in force, and the candidate Lean specification is marked as undergoing migration.
+   Incorporate relevant changes made during the transition into the migration work; implementers must not be left to choose between two specifications.
+
+5. **Complete the switch within one change-set.**
+   Verify the correspondence, update project conventions and all active references, designate the Lean specification as the authority for that scope, and remove the previous Markdown specification.
+   Preserve historical versions through version control; before removal, place rationale that remains relevant in Lean comments or existing documents explicitly referenced by those comments.
+
+6. **Check the migration completion criteria.**
+   Every previous requirement has been carried forward or has an explicit decision authorizing its revision; the Lean specification and its dependencies are included in the build and pass verification; implementation-conformance checks pass; all active references have been switched; and the repository retains neither the previous Markdown specification for that scope nor a second definition of its behavior.
+
+If these completion criteria are not met, report the specific outstanding items and retain the migration status rather than declaring the transition to `Spec.lean` complete.
+
+</migration>
+
+<delegation>
+
+When delegating, provide the specification's path and version, the task scope, required related material, permitted modification locations, and acceptance commands, so that the subagent can obtain the complete context independently.
+
+The subagent selects an implementation within the contract's permitted scope; when an unresolved question affects the contract, it submits concrete alternatives and their consequences.
+
+Unless the task explicitly includes specification design, the subagent implements the existing contract; when it finds a contradiction or an unsatisfiable requirement, it submits evidence and proposed revisions for the primary agent, which retains the context of the agreement, to resolve.
+
+The primary agent handles revisions under the authorization already given, consulting the user only on matters that remain undecided or exceed that authorization.
+
+</delegation>
+
+<verification>
+
+Check separately whether the specification faithfully captures the agreed requirements, whether the model satisfies the contract, and whether the production implementation conforms to the model, recording the evidence for each.
+
+Acceptance requires the core behavior to be formalized and the corresponding proofs completed; a file containing only type declarations, natural-language comments, string descriptions, or executable examples does not constitute a verified specification.
+
+Check that initial states and required normal behavior are realizable, preventing vacuous guarantees obtained through unsatisfiable preconditions, unreachable states, or rejection of every operation.
+
+Include all effective specifications and their dependencies in the project build, with proofs that do not depend on `sorry`, `admit`, or unreviewed axioms; report the remaining environmental assumptions and behavior outside the model's coverage explicitly.
+
+Perform conformance checks appropriate to the production implementation's language and risks, distinguishing behavioral comparison tests from implementation-refinement proofs; a proof of a Lean model must not be represented as a proof of the Rust implementation.
+
+Review contract changes at acceptance, verifying that changes to guarantees, preconditions, and scope are justified and that requirements have not been altered to conceal implementation deviations.
+
+</verification>
+
+<maintenance>
+
+For each modification, first determine whether it changes the contract; for a behavioral change, update the specification and its rationale before modifying the production implementation, updating affected proofs and conformance checks in the same change-set.
+
+Treat proof reorganization and internal refactoring that preserve the contract as ordinary maintenance, without manufacturing specification changes that serve no purpose.
+
+Use the relationships in section 17 to identify affected documents and maintain the content actually affected within the same change-set; the specification describes the currently effective contract rather than accumulating records of individual implementation efforts.
+
+</maintenance>
