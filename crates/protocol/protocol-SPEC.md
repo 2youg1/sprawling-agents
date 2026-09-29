@@ -35,6 +35,7 @@
 | `tools/list` 恒不因连接而异 | <https://modelcontextprotocol.io/specification/2026-07-28/server/tools> |
 | stdio 传输：子进程、按行、消息内无换行 | <https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio> |
 | 删除协议级 session、新增 `server/discover` | <https://modelcontextprotocol.io/specification/2026-07-28/changelog> |
+| ACP 第 1 版的线：请求、`session/update` 的变体、许可的四种选项、停止原因（§8-19） | `agentclientprotocol/agent-client-protocol` 的 `schema/v1/` 目录里稳定的那份 `schema.json`（不是旁边的 unstable 那份），读到的提交记在 docs/third-party.md §1 |
 
 ## 6 命名统一
 
