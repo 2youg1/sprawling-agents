@@ -569,6 +569,7 @@ pub struct Holding { …, pub hash: B3Hash }   // 整份文档的 BLAKE3，扫�
 ```rust
 pub fn rules_path(city_root, addr) -> PathBuf;      // <building>/.sprawling/RULES.toml
 pub fn agents_path(city_root, addr) -> PathBuf;     // <building>/AGENTS.md（项目的，故在保留区之外）
+pub fn city_agents_path(city_root) -> PathBuf;      // <city>/AGENTS.md：城围起来的工作区自己的那份
 pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 // 三层统一为 <scope>/.sprawling/CONFIG.toml；city 层因此不再是特例
 ```
@@ -743,6 +744,8 @@ pub const GITIGNORE_FILE: &str = ".gitignore";
 /// 把本城的忽略规则补进这栋楼的 .gitignore。已有的字节一行不删，
 /// 缺哪行补哪行；文件不存在则整份写出。
 pub(crate) fn place(building_root: &Path) -> Result<(), AxError>;
+/// 把城自己的保留子树补进城根的 .gitignore，同一条只追加的路。
+pub fn place_city(city_root: &Path) -> Result<(), AxError>;
 
 // city::spine_files
 pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 docs/templates/SPEC.md（include_str!）
@@ -755,6 +758,7 @@ pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 docs/templates/SPEC.md�
 - **保留子树逐文件放行，不整棵放行**：块里先 `.sprawling/` 忽略任意深度的保留子树，再 `!/.sprawling/` 只把这栋楼自己的那一棵放回来，`/.sprawling/*` 把它清空，最后逐行放行五份承诺——`RULES.toml`、`CONFIG.toml`、`FILTERS.toml`、`DESKTOP.toml` 与 `skills/`。三个理由：①城自己的保留子树同名，账本、对象库与金库引用住在那里，一行 `!.sprawling/` 把它们一并放回版本控制的可见面；②那一行不带斜杠，因此对楼下每一个居民、每一个房间的保留子树同样生效，而那些是机器上的东西，不是这栋楼的承诺；③`CONFIG.toml` 正是 MCP 凭据的落点，它进历史的前提是 §8-4b 的逐值判定同时成立——两件事是同一次改动。
 - **五个名字都从写它的模块取**：`kernel::layout` 的 `CONFIG_FILE`／`FILTERS_FILE`／`BUILDING_SHELF`、`policy` 的 `RULES_FILE`／`DESKTOP_SCOPE_FILE`、`spine_files` 的四份脊柱文档名。因此 `BLOCK` 由 `&[&str]` 常量改为 `block() -> Vec<String>`：一个改了名的文档不会在这里留下一条谁都不写的规则。
 - **顺序就是文法**：git 认最后一条命中的规则，所以「忽略—放回目录—清空—逐行放行」这四步不能重排。这一条由 git 自己验过：外层再写 `.*` 与 `*.md`，`SPEC.md` 与 `.sprawling/CONFIG.toml` 仍然进历史，`.sprawling/ledger/` 仍然不进，一个嵌套目录自己的 `.sprawling/CONFIG.toml` 也不进。
+- **城根也有一块，只有一行 `/.sprawling/`**：城根的保留子树装着账本、对象库、工作树与金库引用，全是城运行时留下的记录，不是项目的内容。人让城围着一个工作区立起来时，那个工作区常常就是一个 git 仓库（项目本身），而楼这一层的块只管楼自己的保留子树，城根的那一棵就会以几百兆的未跟踪目录出现在项目的 `git status` 里。`place_city` 在立城时（`form_city`，`init`、`up` 与「用一个已有的文件夹」三条路都经过它）把这一行补进城根的 `.gitignore`，与 `place` 同一个只追加、逐行比对的规矩；锚在根上（带前导斜杠），因此楼与房间自己的保留子树仍由楼那一块逐文件放行。城根的 `City.md` 与 `hall/` 不在这一行里：前者是人要改的城规，后者是一栋楼，它自己的块已经说了它哪些进历史。
 - **房间由房间自己忽略**：`room::open` 在新开的房间里放一份只有 `*` 一行的 `.gitignore`。楼这一层的 `.gitignore` 写不出「房间」——房间是人当场命名的普通子目录，立楼时它们还不存在，而在被收编的仓库里按通配符去猜哪个子目录是房间会误伤源码目录。
 - 被否：在楼的 `.gitignore` 里写 `*/JOB.md`、`*/URBANITE.md` 一类通配。它只忽略房间里的某几个文件名，会让一次会话的其余产物照样进历史，等于把这条规则写成一半。
 
