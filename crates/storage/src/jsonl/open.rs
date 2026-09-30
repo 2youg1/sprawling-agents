@@ -3,13 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Ledger opening: version probes, tail recovery, segment boundaries.
+//! Ledger opening: version probes and tail recovery.
 
 use std::path::{Path, PathBuf};
 
 use kernel::consts_external::{LogVersion, readable_log_v};
-use kernel::ledger::chain_hash;
-use kernel::{AxCode, AxError, EventRecord, GENESIS_PREV, Seq, TimeMs};
+use kernel::{AxCode, AxError, GENESIS_PREV, Seq, TimeMs};
 
 use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
@@ -17,8 +16,8 @@ use crate::vfs::Vfs;
 
 use super::first_line::first_line;
 use super::ledger::{
-    JsonlLedger, OpenReport, PriorSegment, SEGMENT_ROLL_BYTES, TailBoundary, TailTruncation,
-    WriterLock, complete_lines, is_segment, segment_file_name,
+    JsonlLedger, OpenReport, SEGMENT_ROLL_BYTES, TailTruncation, WriterLock, complete_lines,
+    is_segment, segment_file_name,
 };
 use super::verify::{LineCheck, LineFault};
 
@@ -169,69 +168,6 @@ impl JsonlLedger {
                 source: unversioned(v),
             }),
         }
-    }
-
-    /// Boundary state entering the last segment: chain root, or the
-    /// previous segment's verified last line.
-    fn boundary(
-        &mut self,
-        segments: &[PathBuf],
-        last: &Path,
-    ) -> Result<TailBoundary, StorageError> {
-        let mut prior: Option<&PathBuf> = None;
-        for seg in segments {
-            if seg.as_path() == last {
-                break;
-            }
-            prior = Some(seg);
-        }
-        let Some(prior) = prior else {
-            return Ok(TailBoundary {
-                prev: GENESIS_PREV,
-                next_seq: Seq::FIRST,
-                prior: None,
-            });
-        };
-        let bytes = self
-            .vfs
-            .read(prior)
-            .map_err(io_err("read segment", prior))?;
-        let (lines, _) = complete_lines(&bytes);
-        let count = u64::try_from(lines.len()).unwrap_or(u64::MAX);
-        let Some(last_line) = lines.last() else {
-            return Err(StorageError::Envelope {
-                path: prior.clone(),
-                line: 0,
-                source: AxError::failure(
-                    AxCode::InvalidArgs,
-                    "read prior segment",
-                    "segment holds no complete line",
-                )
-                .with_recovery(
-                    "restore this segment from its checkpoint commit, or move it aside if \
-                     it was never written: a segment that exists holds at least one line",
-                ),
-            });
-        };
-        let record =
-            EventRecord::parse_line(last_line).map_err(|source| StorageError::Envelope {
-                path: prior.clone(),
-                line: count,
-                source,
-            })?;
-        let next = record
-            .seq()
-            .next()
-            .map_err(|source| StorageError::Draft { source })?;
-        let len = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
-        Ok(TailBoundary {
-            prev: chain_hash(last_line),
-            next_seq: next,
-            prior: Some(PriorSegment {
-                path: prior.clone(),
-                len,
-            }),
-        })
     }
 
     /// Tail-truncation recovery over the last segment. Returns dropped

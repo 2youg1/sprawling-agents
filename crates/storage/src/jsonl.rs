@@ -27,6 +27,7 @@
 
 mod append;
 mod barrier;
+mod boundary;
 mod first_line;
 mod ledger;
 mod open;

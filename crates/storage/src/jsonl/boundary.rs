@@ -1,0 +1,80 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! The chain state entering the last segment, read off the segment before it.
+
+use std::path::{Path, PathBuf};
+
+use kernel::ledger::chain_hash;
+use kernel::{AxCode, AxError, EventRecord, GENESIS_PREV, Seq};
+
+use crate::error::{StorageError, io_err};
+
+use super::ledger::{JsonlLedger, PriorSegment, TailBoundary, complete_lines};
+
+impl JsonlLedger {
+    /// Boundary state entering the last segment: chain root, or the
+    /// previous segment's verified last line.
+    pub(super) fn boundary(
+        &mut self,
+        segments: &[PathBuf],
+        last: &Path,
+    ) -> Result<TailBoundary, StorageError> {
+        let mut prior: Option<&PathBuf> = None;
+        for seg in segments {
+            if seg.as_path() == last {
+                break;
+            }
+            prior = Some(seg);
+        }
+        let Some(prior) = prior else {
+            return Ok(TailBoundary {
+                prev: GENESIS_PREV,
+                next_seq: Seq::FIRST,
+                prior: None,
+            });
+        };
+        let bytes = self
+            .vfs
+            .read(prior)
+            .map_err(io_err("read segment", prior))?;
+        let (lines, _) = complete_lines(&bytes);
+        let count = u64::try_from(lines.len()).unwrap_or(u64::MAX);
+        let Some(last_line) = lines.last() else {
+            return Err(StorageError::Envelope {
+                path: prior.clone(),
+                line: 0,
+                source: AxError::failure(
+                    AxCode::InvalidArgs,
+                    "read prior segment",
+                    "segment holds no complete line",
+                )
+                .with_recovery(
+                    "restore this segment from its checkpoint commit, or move it aside if \
+                     it was never written: a segment that exists holds at least one line",
+                ),
+            });
+        };
+        let record =
+            EventRecord::parse_line(last_line).map_err(|source| StorageError::Envelope {
+                path: prior.clone(),
+                line: count,
+                source,
+            })?;
+        let next = record
+            .seq()
+            .next()
+            .map_err(|source| StorageError::Draft { source })?;
+        let len = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        Ok(TailBoundary {
+            prev: chain_hash(last_line),
+            next_seq: next,
+            prior: Some(PriorSegment {
+                path: prior.clone(),
+                len,
+            }),
+        })
+    }
+}
