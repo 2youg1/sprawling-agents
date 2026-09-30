@@ -10,4 +10,16 @@ max-fn-params-bools = 1
 disallowed-methods = [
     { path = "std::time::Instant::now", reason = "inject time from assembly" },
     { path = "std::time::SystemTime::now", reason = "inject time from assembly" },
+    # Every HTTP client is built by `gateway::client_for`, which installs the
+    # process's one TLS backend first (gateway-SPEC 8-15); a client built
+    # anywhere else panics at `build()` under `rustls-no-provider`.
+    # `allow-invalid`, because a crate that depends on neither reqwest nor
+    # rustls cannot resolve these paths, and that is not a finding.
+    { path = "reqwest::blocking::Client::new", reason = "build clients through gateway::client_for", allow-invalid = true },
+    { path = "reqwest::blocking::Client::builder", reason = "build clients through gateway::client_for", allow-invalid = true },
+    { path = "reqwest::blocking::ClientBuilder::new", reason = "build clients through gateway::client_for", allow-invalid = true },
+    { path = "reqwest::Client::new", reason = "build clients through gateway::client_for", allow-invalid = true },
+    { path = "reqwest::Client::builder", reason = "build clients through gateway::client_for", allow-invalid = true },
+    { path = "reqwest::ClientBuilder::new", reason = "build clients through gateway::client_for", allow-invalid = true },
+    { path = "rustls::crypto::CryptoProvider::install_default", reason = "the one provider is installed by gateway::reach::tls", allow-invalid = true },
 ]

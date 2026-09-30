@@ -129,6 +129,11 @@ cap-fs-ext = "4"
 # rustls, with the features rustls turns on, so building `remote_access` alone
 # needs no assembler either (remote_access-SPEC.md section 13).
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "prebuilt-nasm"] }
+# The TLS stack's crypto backend is aws-lc-rs, installed once by
+# `gateway::reach::tls` (gateway-SPEC section 8-15) rather than chosen by a
+# reqwest feature name. The same aws-lc-rs line above serves the remote
+# door's primitives, so the binary links one AWS-LC.
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 reqwest = { version = "0.13", default-features = false, features = [
     "blocking",
     "rustls",
