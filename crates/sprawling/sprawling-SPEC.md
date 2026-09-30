@@ -1040,6 +1040,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id**（wire-SPEC §8-25）。`Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `client/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `client/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
 
+**不从别的工具的配置里读 provider 表（裁决）**。`bin::import` 的五个文件读 Codex 的 `~/.codex/config.toml` 与 pi 的 `models.json`，把其中的 provider 折成本城的词汇；但没有任何 `mod` 声明过它们，所以它们从没被编译，clippy 与测试也从没看过它们，模块图却把它们记为 built。本城删去这五个文件，首次上手的第 1 步由人手填端点，或选一个已知主机。理由：没有调用点的代码是一份没人维护的第二文法，它记下的 Codex 与 pi 键名会随上游改版静默过时。**被否**：接上它，作为首次上手第 1 步「从这台机器上已有的配置读入」的候选来源——那要在 wire 上加一条 Query、在设置页加一行，属于线协议与页面的改动，本版不做。**重开参数**：首次上手要给出「别的工具已配置的 provider」这一步时，从 git 历史取回这两种文法，先在 `lib.rs` 声明模块，让测试与 clippy 看见它们，再接 Query。
+
 ## 13 依赖选型
 
 依赖以 `crates/sprawling/Cargo.toml` 为准；每个依赖旁的注释写它为哪一节而在。
@@ -3193,14 +3195,6 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 - **`context_tokens` 同理**，`0` 是「这次没说」；两个数字读法一致，因为它们来自同一个空表单。窗口梯是人这次填的 → 上一次登记的 → 钉版目录行 → `gateway::provider::preset::window_for`（gateway-SPEC §8-17）；四档都沉默时窗口为 `0`，上下文提醒随之不响。
 - **输出上限的其余几档住 gateway**（`provider::ceiling`，gateway-SPEC §8-17）：上游 `/v1/models` 的陈述、预设表与策略缺省 `OUTPUT_CEILING_DEFAULT`，以及 chat 与 responses 两面在人与上游都沉默时的 `ProviderDefault`。装配层不复写那条规则，只把人层、书里的值与这个端点的兼容格式交给它——一条规则两个家，漂开的总是没人看的那个。
 - **来源入账**：`model_selected` 带 `ceiling_from: person | upstream | preset | policy | provider`，拼写取 `OutputCeiling::word`，载荷由 `gateway::router::payload` 一处写。`provider` 行的 `max_output_tokens` 缺席：请求里没有这个字段。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的。
-
-### 8-72 从别的工具的配置里读一张 provider 表（`bin::import`，形状 4 适配器）
-
-**单向，一次性。** 这个人机器上已经有 Codex 或 pi 的配置，里面写着他早就填好的 provider：主机、兼容格式、默认路径、模型 id。本城把它读进来，变成一串 `Command`，然后就结束——不订阅那个文件，不回写，不做持续同步。理由是权威：那些文件的权威是它们自己的工具，本城若持续跟随，同一个事实就有了两个家。
-
-**四个模块，各答一个问题。** `import::machine` 只答「那份配置在运行这座城的机器上的哪里」，`~` 经 `accounting::home::Home` 解析而不是自己拼；`import::codex` 与 `import::pi` 各拥有一种文法，读不懂的键是错误而不是被跳过；`import::provider` 是读出来的东西在本城词汇里的样子，两种文法都折到它上面，于是「一个 provider 是什么」只有一处定义。
-
-**没查证的字段不写。** 上游文法里本城不确定的键一律登记为待查并留空，而不是猜一个默认值填进去——一个猜出来的 base URL 会在 404 之后让人去查一件本城自己编的事实。
 
 ### 8-73 run 标识直接取自摘要，而停不下来的疑问算「停」（`assembly::dispatching::agreeing::run_id_for`、`assembly::driving::lane`）
 
