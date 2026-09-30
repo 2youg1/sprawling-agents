@@ -105,14 +105,16 @@ impl VerifiedLedger {
 /// ——与 `JsonlLedger::open` 的尾段扫描同一份检查（storage-SPEC §8-1）。
 pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError>;
 /// Convenience over a jsonl directory: storage::jsonl::read_raw_lines + verify.
+/// 给要原始行的读者：分叉（`fork::prefix` 吃 `VerifiedLedger`）、citysim 检查器与测试。只要结论的 `sprawling replay`
+/// 走 `storage::audit_chain`，要折叠的走 `fold_ledger_dir`：两者都一次只持一段字节。
 /// 无段目录与空账本在此同形（均得空 VerifiedLedger）——本函数的调用方均自持城根算出路径；
 /// 区分二者是「从人那里拿到路径」的一层的事（§11；sprawling-SPEC §12）。
 pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError>;
 /// 流式折叠：经 `storage::LedgerIndex::folding` 一次一段地读，每行过同一个 `LineCheck`，已知记录借给 `each`
 /// 后即丢；ignorable 行只入链不入折。每行只读一次、只解析一次，顺序即账本序，结果确定。
 /// 常驻的是一段字节与一条记录，而不是 `VerifiedLedger` 的全部原始行与全部记录——
-/// 启动折叠（`fold_city`、`Standing::fold`、`rebuild_views`）只要折的结果，不要行本身，走这一面；
-/// 分叉与重演要原始行，仍走 `verify_ledger_dir`。
+/// 启动折叠（`fold_city`、`Standing::fold`、`Views::rebuild`）与 `resume` 的启动扫描只要折的结果，不要行本身，走这一面；
+/// 分叉要原始行，走 `verify_ledger_dir`。
 /// 失败即停：第 k 行验不过时，前 k-1 条已经给过 `each`，此时返回的 Err 说明整份折叠作废，
 /// 调用方丢弃它折出的一切（与 `verify_ledger_dir` 同一拒词、同一行号）。无段目录同上，折叠为空。
 /// 读史走 `storage::LedgerIndex::folding`，返回的索引与折叠出自同一遍字节：索引覆盖的恰是 `each` 见过的那段历史，
@@ -122,8 +124,7 @@ pub fn fold_ledger_dir(dir: &Path, each: impl FnMut(&EventRecord) -> Result<(), 
 
 流程：逐行①envelope 探查（serde_json::Value：v/seq/prev/kind/ig 键）；②v 判向（>EVENT_LOG_V 即 `E_LOG_VERSION_UNSUPPORTED`）；③链续（`chain_hash` 复算对拍 prev，首行对 GENESIS_PREV）；④seq 连续（自 FIRST 起）；⑤kind 已知→`parse_line` 全解＋规范复验＋`to_ref`；未知＋`ig:true`→记 IgnoredUnknown；未知无 ig→`E_LOG_VERSION_UNSUPPORTED`（subject=kind＋行号）。链与 seq 对一切行（含 ignored）成立。
 
-**「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 与 `fold_ledger_dir` 的生产调用方（`fold`、`rebuild_views`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
-**「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 的四个生产调用方（`fold`、`Views::rebuild`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
+**「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`fold_ledger_dir` 的四个生产调用方（`fold_city`，经 `snapshot::start` 起步的 `Standing::fold` 与 `Views::rebuild`，`startup_scan`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`Standing::fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
 
 故依据归给**拿到人输入路径的那一层**：`sprawling replay <ledger-dir>` 先问 `storage::ledger_segments_at`，一段都没有就报 `E_PATH_NOT_FOUND`（sprawling-SPEC §12）。先例取自本仓库：`xtask guard` 在无提交时说 `no commits yet, nothing to judge`，而不说通过。**空账本本身仍然合法**：`verify_lines(vec![])` 照旧返回空 `VerifiedLedger`。
 
@@ -428,7 +429,18 @@ impl BreakpointPlan {
 }
 ```
 - A15 重建器：`replay::rebuild_prefix(data: &serde_json::Value, resolver: &dyn Fn(&Address) -> Option<Vec<u8>>) -> Result<[B3Hash; 4], AxError>`——从 prompt_assembled 载荷（逐源的键以 `kernel::event::record::PromptSource` 为准：`{addr, kept, marker, dropped, producer}`，其中 `producer` 不参与对拍，因为哈希只盖段字节、指纹不是字节的一部分）与同源文档重算逐段哈希对拍；resolver 以 Address 取文（钉版 oid 级解析随 checkpoint 接入升级，接口不变）。拼接分隔符的唯一权威住 prefix.rs（`DOC_JOIN`），截断标记的唯一权威住 `runtime::elision`（§8-42），replay 同 crate 复用不另拷。
-- E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::dangling_tool_calls(&VerifiedLedger) -> Vec<(RunId, Seq)>`（tool_called 后邈无同 run 的 tool_result 即 dangling）＋`replay::outcome_unknown_draft(...) -> EventDraft`（补写的 tool_result，携 E_TOOL_OUTCOME_UNKNOWN 错误体）；消费者＝resume 路径。补写方经 `ToolCalled`／`ToolResult` 两个结构读写，读不懂即拒绝：若手挑 `id` 与 `name` 两个键、读不出就写下 `"unknown"`，一条这个 build 读不懂的调用就会被关在一个谁也答不上的 id 上。
+- E_TOOL_OUTCOME_UNKNOWN 补写面：`replay::DanglingCalls` 逐条看已验证的记录，`observe(&EventRecord)`；看完 `into_calls() -> Vec<EventRecord>` 交出没有结果的那些 `tool_called`，按 seq 升序（`tool_called` 之后同一 run 里没有 `tool_result` 即悬空；同一 run 前一个未合上又来一个，前一个同样悬空）。`replay::outcome_unknown_draft(call, t) -> EventDraft` 写补记的 `tool_result`，携 E_TOOL_OUTCOME_UNKNOWN 错误体。消费者＝`resume` 的启动扫描：它把 `fold_ledger_dir` 验过的每条记录交给 `observe`，验链与检出是同一遍流式读，常驻的是一段字节，外加尚未合上的那几条调用。补写方经 `ToolCalled`／`ToolResult` 两个结构读写，读不懂即拒绝：若手挑 `id` 与 `name` 两个键、读不出就写下 `"unknown"`，一条这个 build 读不懂的调用就会被关在一个谁也答不上的 id 上。**被否：先得到 `VerifiedLedger` 再检出**——整本原始行与整本记录同时常驻，只为找几条没有结果的调用；检出只交回 `(RunId, Seq)`，调用方还要回到整本记录里逐条找那一行。
+
+```rust
+#[derive(Debug, Default)]
+pub struct DanglingCalls { /* 私有：未合上的调用（按 run）、已判悬空的调用 */ }
+impl DanglingCalls {
+    pub fn observe(&mut self, record: &EventRecord);
+    pub fn into_calls(self) -> Vec<EventRecord>;
+}
+pub fn outcome_unknown_draft(call: &EventRecord, t: TimeMs) -> Result<EventDraft, AxError>;
+```
+
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读不再自定。
 - 断点：`FrozenPrefix::system_blocks()` 产四块、逐块 cache=true＝断点恒 4＝`CACHE_BREAKPOINTS_MAX`，断点只落段界。
 - handoff：五段＋构造点＋resume 消费；「下一步段首列用户指定动作」属生产者纪律（回合层与 spine 文件），类型不另加钩。
@@ -997,7 +1009,7 @@ impl Diagnostics {
 
 ## 9 工作流程
 
-`just replay <log>` → `verify_ledger_dir` → 全绿报 tail_seq／行数，违规报 three-part。citysim 检查器与 A19 测试直接调 `verify_lines`／`prefix`。
+`just replay <log>` → `sprawling replay` → `storage::audit_chain` → 全绿报行数与 tail seq，违规报 three-part。citysim 检查器与 A19 测试直接调 `verify_lines`／`prefix`。
 
 ## 10 实现逻辑
 

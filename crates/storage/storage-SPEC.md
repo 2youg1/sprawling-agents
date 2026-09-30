@@ -132,7 +132,8 @@ impl JsonlLedger {
     pub fn observe(&mut self, sink: WriteObserver);   // WriteObserver = Box<dyn FnMut(&EventRecord) + Send>
     pub fn position(&self) -> Seq;    // 现在写一条会落在哪；只给位置不给内容
 }
-/// 只读读面（replay/夹具）：不走 open、不触发断尾与任何写——重演恒不修盘（runtime-SPEC §8-1）。
+/// 只读读面，给要原始行的读者（分叉、夹具与测试）：不走 open、不触发断尾与任何写——验证恒不修盘（runtime-SPEC §8-1）。
+/// 只要结论的读者不经它：`sprawling replay` 走 `audit_chain`（8-27），折叠走 `LedgerIndex::folding`（8-4）；两者都一次只持一段字节。
 pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, StorageError>;
 /// 目录里的账本段，按应读顺序（`list` 已排序，段名零填充故字典序即时序）。
 /// 空结果的意思是「这里没有账本」，与「账本里没有事件」不是同一件事；
@@ -341,13 +342,13 @@ impl LineReader<'_> {
 - **seq 是隐式的，每行只存一个 `u64`**：内核给行连续编号，所以一行的 seq 就是它在列里的位置加 `base`，列里只存段名字典 id 与偏移拼成的一个字。五万行的账本在索引里占 400 KB，显式 seq 列加 (id, 偏移) 对的布局要 1.2 MB（每行 24 B，`a_contiguous_ledger_costs_eight_bytes_per_record` 钉住 8 B）。损坏的账本仍要能索引，因为修复路径靠它：低于 `base` 的 seq、远到要让空洞多于行数才够得着的 seq（拉长后列里的空洞数超过 `max(列里的行数, 64)`；界按行数而不按列长算，因为按列长算时每个被接受的 seq 都能让列翻倍）、段 id 超过 16 位或偏移超过 48 位的位置，都进 `outliers`；一个 seq 只在两处之一，重复写保留最后的位置，`seqs()` 把两处按序归并。**被否：只留列、把列外行丢掉**——被丢的行对每个读者都不可见；**被否：空洞无上限地拉长列**——一个被写坏成 2^60 的 seq 会让索引去分配 2^63 字节。`doubling_seqs_leave_the_column_bounded_by_its_lines` 钉住这条界；`fold/tests.rs` 的 map 形 oracle 对全部查询（含 `seqs()` 正反两向与两端交替）判等。
 - **`base` 由第一条插入的行定下，之后不再移动。** 这第一条行的 seq 若已损坏且很大，其后每一条健康的行都低于 `base`，全部落进 `outliers`：答案仍然正确，每行 8 B 的布局却失去了，一行按 `BTreeMap` 的节点计价。接受这笔代价，因为它只出现在首行损坏的账本上，而那样的账本本来走修复路径；列外行多于列内行时重定 `base` 是候选的改法，判定它的证据是一个首行 seq 损坏的真实账本在索引里的常驻字节。
 - **取行走游标，而不是每行一次 open ＋逐字节 read**：一次 `History`／`RunHistory` 查询要取一段连续的 seq，而每一行重开段文件、再一次一个字节 `read` 到换行的读法，系统调用数与行长同阶。句柄因此住进 `LineReader`：段名不变即不重开，读用 `BufReader::read_until(b'\n')`，一次填充服务多行。
-  - **位置自持**：游标记住下一行的偏移，与所求偏移相同即不 seek（顺序读全程零 seek），不同则绝对 seek 并弃缓冲。`run_history` 逆序读每行付一次 seek 与一次缓冲填充，仍是常数次系统调用。
+  - **位置自持**：游标记住下一行的偏移。所求偏移与它相同即不 seek，顺序读全程零 seek；位置已知而不同，就按差值相对移动（`BufReader::seek_relative`），目标落在已读入的缓冲里时缓冲原样保留，落在缓冲外时才去底层 seek 并弃缓冲；位置未知时绝对 seek。差值换不成 `i64` 时按位置未知处理。`run_history` 由旧到新读一个 run 的行，相邻两行之间隔着别的 run 的几行，这段间隔常在同一次缓冲填充之内，于是这样的一行既不付 seek 也不付填充。**被否：位置不同一律绝对 seek**——每读一行都丢掉刚读进来、多半已经含着下一行的那块缓冲。
   - **位置用 `Option<u64>` 表达，算不出来就作废**：seek 前、读前各置 `None`，只在一次成功的读之后写回 `offset + 读长`；长度换 `u64` 失败或相加溢出则继续为 `None`，下一次调用必 seek。一个可能错的位置会让游标把别的行的字节交在调用方要的 seq 名下，而旁挂物宁可重做不可误信（与「存疑即重建」同一条反射）。
   - **读一行只此一条路**（`LineReader::line_at`），不留转发壳：否则「怎样读一行」有两个权威，而慢的那个还在原地招手。
   - **段不因此出门**：`LineReader` 的公开面只有 `line_at(seq)`，段名与偏移仍是内部事务（§7 第三条）。
 - **索引常驻，不每次查询重建**：每一次 `History`／`RunHistory` 都从头 `rebuild` 一遍时，查询代价与账本长度同阶：逐段重读、逐行取一个 `String`。
   - **增量面是 `refresh`，不是“追加时告知索引”**：调用方手里只有 `EventRecord`，段名与偏移是 `jsonl` 的内部事务（§7 第三条）。让观察者携偏移会把分段泄给调用方，而 `refresh` 把那个知识留在本模块。
-  - 索引因此多记一张 `scanned: BTreeMap<段名, 已折入字节数>`。`refresh` 逐段比对：**变大就只读新那一段字节**；**变小或消失就全重建**（断尾修复截过段，旧偏移不再可信）；一字未动就什么也不做。
+  - 索引因此多记一张 `scanned: BTreeMap<段名, 已折入字节数>`。`refresh` 逐段比对：**变大就只读新那一段字节**；**变小或消失就全重建**（断尾修复截过段，旧偏移不再可信）；一字未动就什么也不做。「消失」按计数判：本次列出的段名逐个在 `scanned` 里查，命中的个数少于 `scanned` 的条数，就是有已折入的段不见了。每段一次有序表查找，不按段数的平方比对名字（`index/ledger/tests.rs` 的 `a_segment_that_vanished_rebuilds_the_index`）。
   - **「上次读到哪」只有这一个家，而且它恒落在整行边界上**：`fold_segment` 只把带终止符的行计入，所以 `scanned` 记的永远是某条记录的结尾，下一次 refresh 从一条记录的开头起读，**取不到半条**。
   - **定位读，而不是整读再切尾**：`Vfs::read_at(path, from, size-from)`，读进来的缓冲只装增量。长度以本次 `Vfs::size` 读到的值封顶——stat 与 read 之间落的那条账留给下一次 refresh，而不是折在一个本次没有确认过的偏移上。
   - **`scanned` 不落盘，所以「偏移写坏」不是一个状态**：它是常驻状态，建表时取当下段大小，故「已折入」与「盘上长度」在那一刻是同一个数。进程内若出现 `scanned > 段长`，走的是「变小」那一支，同样整份重建。任何一条可疑路径的答案都是重建，没有一条会读到半条记录。
@@ -357,7 +358,7 @@ impl LineReader<'_> {
   - **为什么不放进一份落盘冷投影**：要让 `run_history` 读一份落盘投影，就得在事件路径上开一个写事务，每条事件多一道磁盘屏障。为一个不需要持久化的答案给每一条落账加一道屏障，方向是反的；本 crate 因此不持有落盘投影。
   - **为什么可以放进 `index`**：这张旁挂物**已经常驻**（`Views` 持有并每查询 `refresh`），**已经逐行解析过每一条新行**（`locate` 一次 `serde_json` 解析读两个字段），**已经带着「存疑即重建」的可弃性**。run 表搭的是同一趟 refresh、同一条重建反射，不新增任何同步义务。
   - **内存代价**：run 表每 run 一段或几段区间，不是每条 seq 一个节点；seq 列不为每条带一个段名 `String`，段名进字典一行一个。计入 `resident_empty_idle` 预算（`tools/xtask/budgets.toml` 该行记录读数与上限）。
-  - **run 表是区间，不是 id 集**：run 是连续突发，写入即尾部并段；真交错的 run 就是几段区间。只有值域首尾相接才并段，而并段时缺口里的值必然都写过（两端点各自由一次写入造出），故区间从不声称没写过的 seq。成员查询＝区间定位后按值下探，答的顺序仍由新到旧。**被否**：`BTreeSet<Seq>` 每条一个 id，长 run 不塌缩。
+  - **run 表是区间，不是 id 集**：run 是连续突发，写入即尾部并段；真交错的 run 就是几段区间。只有值域首尾相接才并段，而并段时缺口里的值必然都写过（两端点各自由一次写入造出），故区间从不声称没写过的 seq。成员查询＝区间定位后按值下探，答的顺序仍由新到旧。它是惰性的：按区间由新到旧逐值产出，调用方 `take(n)` 取多少才走多少，所以代价与取出的条数同阶，不先把整个 run 的 seq 展开成一张表。等价仍由 `index/fold/tests.rs` 的 oracle 判定，oracle 那一侧照旧是展开的表。**被否**：`BTreeSet<Seq>` 每条一个 id，长 run 不塌缩。
   - **等价锁在 `index/fold/tests.rs`**：oracle 是 map 形实现，proptest 喂随机行流（乱序与重复 seq、不可解析的 run 名、非文档行）断言全部公开查询恒同解。
   - **`before` 取开区间**，与线格式 `HistoryAnswer.earlier` 的含义（「从这条之前接着问」）同字同义，调用方不做 `before - 1` 这条减法，也就碰不到它的 `Seq::FIRST` 边界。
   - **答的顺序**：`run_seqs_before` 由新到旧，因为调用方要的是会话的**末尾**；调用方取够条数后翻转成由旧到新再取行，于是 `LineReader` 全程向前走，不付逆序读每行一次的 seek。
@@ -1102,14 +1103,15 @@ impl JsonlLedger { pub fn halt_on(&mut self, halt: ChainHalt); }
 ```rust
 pub enum SnapshotStart {
     Resume { snapshot: ChainSnapshot, tail: Vec<Vec<u8>> },   // 快照合身：它的 views，再折 seq 之后的这些行
-    Whole { lines: Vec<Vec<u8>>, because: WholeFold },         // 从创世折全部完整行，并说明为什么没用快照
+    Whole(WholeFold),                                          // 从创世折，并说明为什么没用快照；行不在这里
 }
 pub enum WholeFold { NoSnapshot, Damaged(String), OtherFoldVersion { found: u32 }, Stale, Missing }
 pub fn start_from_snapshot(ledger_dir: &Path, snapshot_dir: &Path, fold_version: u32) -> Result<SnapshotStart, StorageError>;
 ```
 
-- **一次读既核对又取尾部。** 快照的 `seq` 按段名（`segment_first_seq`）定位到含它的那一段：它之前的段一个字节也不读；从这一段起逐段取完整行，第 `seq - 段首 seq` 行交给 `ChainSnapshot::fit`，它之后的行就是尾部。所以起步的读量是「尾部加一段的前缀」，与账本总长无关；整条链的核对留给后台的 `audit_chain`（8-27）。
-- **不能用快照时一律退回全量折叠，并带上原因。** 没有快照（`NoSnapshot`）、字节不是快照（`Damaged`，原样带出 8-26 的原因）、`fold_version` 不等（`OtherFoldVersion`）、那一行的链哈希不同（`Stale`）、账本里根本没有那一行（`Missing`，账本比快照短）——都是 `Whole`，行取自 `read_raw_lines_at`，与没有快照时的起步完全相同。原因给调用方写诊断用；它们都不是错误，因为快照只是投影。I/O 本身失败才是 `StorageError`。
+- **一次读既核对又取尾部。** 快照的 `seq` 按段名（`segment_first_seq`）定位到含它的那一段：它之前的段一个字节也不读；从这一段起逐段取完整行，第 `seq - 段首 seq` 行交给 `ChainSnapshot::fit`，它之后的行就是尾部。所以起步的读量是「尾部加一段的前缀」，与账本总长无关；整条链的核对留给 `audit_chain`（8-27）。
+- **不能用快照时一律退回全量折叠，并带上原因。** 没有快照（`NoSnapshot`）、字节不是快照（`Damaged`，原样带出 8-26 的原因）、`fold_version` 不等（`OtherFoldVersion`）、那一行的链哈希不同（`Stale`）、账本里根本没有那一行（`Missing`，账本比快照短）——都是 `Whole`。`Whole` 只带原因：从创世折叠的调用方经 `runtime::replay::fold_ledger_dir` 一段一段地读、每行过 `LineCheck`（runtime-SPEC §8-1），常驻的是一段字节与一条记录，与没有快照时的起步完全相同。原因给调用方写诊断用；它们都不是错误，因为快照只是投影。I/O 本身失败才是 `StorageError`。
+- **被否：`Whole` 带回账本的全部行。** 调用方不读它们：它要的是流式折叠，那些行一到手就被丢掉，账本却已经整本进过一次内存，峰值随历史长度增长。
 - **被否：在快照里再存该行的字节偏移，做真正的单次 `pread`。** 偏移指向的是字节，不是链：换过的账本在同一偏移可能正好有一行，核对仍要看链哈希；而尾部本来就要从那一段读，省下的只是一段内的前缀扫描，却让 8-26 的格式多一个会随段滚动失效的字段。
 
 ### 8-27 `storage::worktree::back`：回到过去，与从某一点取回一个文件（形状 4 适配器；git2）
