@@ -12,6 +12,7 @@ use kernel::{AxError, RunId, Seq};
 use runtime::diagnostics::{Diagnostics, Level, Site};
 use storage::{JsonlLedger, OpenReport};
 
+use crate::assembly::opening_cost::{OpeningCost, Phase};
 use crate::views::Views;
 use crate::views::snapshot::start::cut_at;
 
@@ -30,13 +31,17 @@ use super::{Standing, fold_city};
 /// snapshot only shortens a later read, which folds from the older
 /// snapshot or from genesis to the same views.
 ///
+/// The phases of [`fold_city`] and the views cut are lapped on `cost`
+/// (sprawling-SPEC 8-121).
+///
 /// # Errors
 /// Those of [`fold_city`].
 pub(crate) fn start_served_views(
     ledger_dir: &Path,
     log: &mut Diagnostics,
+    cost: &mut OpeningCost,
 ) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
-    let (views, held) = fold_city(ledger_dir)?;
+    let (views, held) = fold_city(ledger_dir, cost)?;
     let last = views.last_folded_line(ledger_dir);
     let site = Site {
         run: RunId::CITY,
@@ -48,6 +53,7 @@ pub(crate) fn start_served_views(
         module: "bin::assembly",
     };
     let cut = last.and_then(|last| cut_at(ledger_dir, &views, last.as_ref()));
+    cost.lap(Phase::CutViews);
     if let Err(fault) = cut {
         log.write(
             Level::Refuse,

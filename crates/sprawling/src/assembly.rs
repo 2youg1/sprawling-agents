@@ -52,6 +52,7 @@ mod listening;
 mod mcp;
 mod models;
 mod naming;
+mod opening_cost;
 mod plans;
 mod pool;
 mod probing;

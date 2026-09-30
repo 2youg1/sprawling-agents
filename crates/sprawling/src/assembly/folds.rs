@@ -21,6 +21,7 @@ use crate::views::snapshot::start::{
 };
 
 use super::Entrance;
+use super::opening_cost::{OpeningCost, Phase};
 
 mod collaboration;
 mod session;
@@ -104,23 +105,32 @@ impl Standing {
 /// later folds only what arrives after it; a cut that fails is in
 /// `Standing.cut`, not here.
 ///
+/// Opening the ledger, the verifying pass with the folding inside it, and
+/// the standing cut are each lapped on `cost` (sprawling-SPEC 8-121).
+///
 /// # Errors
 /// Propagates opening the ledger, chain verification, and whatever a fold
 /// says about a payload it cannot read.
 pub(crate) fn fold_city(
     ledger_dir: &Path,
+    cost: &mut OpeningCost,
 ) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
     let (ledger, report) =
         JsonlLedger::open(ledger_dir, accounting::Clock::now(&super::SystemClock)?)
             .map_err(storage::StorageError::into_ax)?;
+    cost.lap(Phase::OpenLedger);
     let mut views = Views::over(ledger_dir);
     let mut standing = StandingFolds::empty(city_root_of(ledger_dir));
     let index = fold_ledger_dir(ledger_dir, |record| {
-        views.apply(record)?;
-        standing.absorb(record)
+        cost.folding(|| {
+            views.apply(record)?;
+            standing.absorb(record)
+        })
     })?;
+    cost.lap(Phase::VerifyAndFold { lines: index.len() });
     let cut =
         last_line(&index, ledger_dir).and_then(|last| cut_at(ledger_dir, &standing, last.as_ref()));
+    cost.lap(Phase::CutStanding);
     views.hold_index(index, ledger_dir)?;
     Ok((views, (ledger, report, standing.settle(cut)?)))
 }

@@ -23,9 +23,11 @@ use kernel::{AxCode, AxError};
 use super::acp_dispatch;
 use super::attending::{Opening, Outward, Started, spawn_worker};
 use super::desk::CommandDesk;
+use super::opening_cost::{OpeningCost, Phase};
 use super::{Closing, start_served_views};
 use crate::serving::Serving;
 use crate::serving::output_ring::OutputRing;
+use crate::serving::standing::monotonic_now;
 use crate::views::{Published, answer_outside_the_lock};
 
 /// One recording in, one line of text back.
@@ -113,9 +115,13 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         Some(raw) => Some(wire::PairingToken::from_configured(raw)?.digest()),
         None => None,
     };
+    // Each phase of opening is lapped on the monotonic sampling point,
+    // and said in one line once the writer runs (sprawling-SPEC.md 8-121).
+    let mut cost = OpeningCost::begin(monotonic_now);
     // The port first: a serve refused here has opened nothing and
     // written nothing.
     let bound = wire::bind(addr, token_digest).await?;
+    cost.lap(Phase::Bind);
     let cas_root = kernel::layout::CityLayout::new(city_root).cas();
     std::fs::create_dir_all(&cas_root).map_err(|source| {
         AxError::failure(
@@ -153,12 +159,14 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let (mut rebuilt, held) = start_served_views(
         &kernel::layout::CityLayout::new(city_root).ledger(),
         &mut log,
+        &mut cost,
     )?;
     // The fold thread alternates between two copies, so the second is
     // made here from the first (sprawling-SPEC.md 8-99).
     rebuilt.ask_the_registry_through(crate::release::answer);
     rebuilt.ask_upstream_through(crate::doctor::newest);
     let spare = rebuilt.twin()?;
+    cost.lap(Phase::Twin);
     // This machine is not asked here (sprawling-SPEC.md 8-54): the
     // table is thirty-two items, most of them a program started and
     // asked its version, and a serve that waited for all of them holds
@@ -176,7 +184,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let started_from = views.snapshot();
     let city_name = started_from.city();
     let epoch = started_from.epoch();
-    let head = Arc::new(wire::LedgerHead::at(started_from.head()));
+    let started_at = started_from.head();
+    let head = Arc::new(wire::LedgerHead::at(started_at));
     drop(started_from);
     // The in-process Command set, not the wire one: the enrolment
     // route delivers a sealed credential here, and no wire frame can.
@@ -184,6 +193,9 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let commands_desk = Arc::clone(&desk);
     let secrets_desk = Arc::clone(&desk);
     let acp_desk = Arc::clone(&desk);
+    // Taken before `log` moves into the worker: the opening line is said
+    // after the worker runs, at the same floor and through the same sink.
+    let mut opening_log = beside(&log, &journal);
     // The one sanctioned thread besides the runtime's own, running by
     // the time this returns.
     let Started {
@@ -195,11 +207,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             city_root: city_root.to_path_buf(),
             vault,
             notice: vault_notice,
-            audit_log: log
-                .floor()
-                .map_or_else(runtime::diagnostics::Diagnostics::off, |floor| {
-                    runtime::diagnostics::Diagnostics::new(floor, journal.sink())
-                }),
+            audit_log: beside(&log, &journal),
             log,
             held,
             core,
@@ -215,6 +223,16 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             kept,
         },
     )?;
+    cost.lap(Phase::StartWorker);
+    opening_log.write(
+        runtime::diagnostics::Level::Effect,
+        runtime::diagnostics::Site {
+            run: kernel::RunId::CITY,
+            seq: started_at.unwrap_or(kernel::Seq::FIRST),
+            module: "bin::assembly",
+        },
+        &cost.line(),
+    );
 
     let audio_views = Arc::clone(&views);
     let audio_vault = city_vault;
@@ -321,6 +339,18 @@ impl Listening {
         }
         served
     }
+}
+
+/// A second writer at `log`'s floor, into the same journal, for a thread
+/// or a moment `log` itself does not reach; off when `log` is off.
+fn beside(
+    log: &runtime::diagnostics::Diagnostics,
+    journal: &crate::serving::Journal,
+) -> runtime::diagnostics::Diagnostics {
+    log.floor()
+        .map_or_else(runtime::diagnostics::Diagnostics::off, |floor| {
+            runtime::diagnostics::Diagnostics::new(floor, journal.sink())
+        })
 }
 
 /// The monitor a session watches over the socket, and the thread that

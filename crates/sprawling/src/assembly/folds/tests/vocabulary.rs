@@ -70,7 +70,13 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
     let the_worker_judged = judged(&worker.governance);
     drop(worker);
 
-    let (mut views, (_ledger, _report, standing)) = fold_city(&report.ledger_dir).unwrap();
+    let (mut views, (_ledger, _report, standing)) = fold_city(
+        &report.ledger_dir,
+        &mut crate::assembly::opening_cost::OpeningCost::begin(
+            crate::serving::standing::monotonic_now,
+        ),
+    )
+    .unwrap();
     // Answered from what `Views::apply` folded, not from the on-disk index.
     for applied in [
         wire::Query::CityView,

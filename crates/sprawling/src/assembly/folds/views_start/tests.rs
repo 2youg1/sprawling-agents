@@ -169,7 +169,14 @@ fn a_snapshot_that_cannot_be_cut_is_reported_and_the_views_still_serve() {
         }),
     );
 
-    let served = start_served_views(&ledger, &mut log).map(|_| ());
+    let served = start_served_views(
+        &ledger,
+        &mut log,
+        &mut crate::assembly::opening_cost::OpeningCost::begin(
+            crate::serving::standing::monotonic_now,
+        ),
+    )
+    .map(|_| ());
 
     assert_eq!(served, Ok(()));
     let said = said.lock().unwrap();

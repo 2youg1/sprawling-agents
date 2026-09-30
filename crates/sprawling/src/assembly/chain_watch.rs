@@ -12,6 +12,8 @@ use kernel::{AxCode, AxError, RunId, Seq};
 use runtime::diagnostics::{Diagnostics, Level, Site};
 
 use super::RunWorker;
+use super::opening_cost::millis;
+use crate::serving::standing::monotonic_now;
 
 impl RunWorker {
     /// Attaches a fresh halt to this worker's writer, then walks the
@@ -49,12 +51,18 @@ impl RunWorker {
 /// Runs the audit, trips `halt` unless it proved the whole chain, and
 /// says what it found. A ledger that could not be read trips it too: an
 /// audit that did not finish proved nothing whole, and a view resumed
-/// from a snapshot has only this audit reading the lines before it.
+/// from a snapshot has only this audit reading the lines before it. A
+/// whole chain is reported with how long its pass took, read on the
+/// monotonic sampling point (sprawling-SPEC.md 8-90).
 fn report_audit(dir: &Path, halt: &storage::ChainHalt, at: Seq, mut log: Diagnostics) {
+    let began = monotonic_now();
     let (level, message) = match storage::audit_chain(dir) {
         Ok(storage::ChainAudit::Whole { lines }) => (
             Level::Effect,
-            format!("the whole ledger chain verified: {lines} lines"),
+            format!(
+                "the whole ledger chain verified: {lines} lines in {} ms",
+                millis(monotonic_now().saturating_duration_since(began))
+            ),
         ),
         Ok(storage::ChainAudit::Broken(reason)) => {
             let message = format!(
