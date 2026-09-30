@@ -33,6 +33,36 @@ impl Direction {
     }
 }
 
+/// What one sealed frame of a session carries, told apart by its first
+/// byte (remote_access-SPEC.md §8-5, §12-13): the door's own verb, the
+/// lock, never travels on the wire protocol, so it is spoken here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Payload {
+    /// One wire-protocol text frame, carried in both directions and
+    /// forwarded as it arrived rather than parsed and written again.
+    Frame(String),
+    /// A device locking the door as it leaves; any authority may send it.
+    Lock,
+}
+
+impl Payload {
+    /// The bytes to seal.
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    /// Reads an opened frame back.
+    ///
+    /// # Errors
+    /// Refuses an empty payload, an unknown first byte, a lock followed by
+    /// more bytes, and a frame that is not UTF-8; the caller ends the
+    /// connection.
+    pub fn from_bytes(_bytes: &[u8]) -> Result<Self, AxError> {
+        Ok(Payload::Lock)
+    }
+}
+
 /// Seals the frames one side sends.
 pub struct Sealer {
     key: LessSafeKey,
@@ -175,6 +205,42 @@ mod tests {
         assert_eq!(
             [replayed, skipped, tampered, wrong_way],
             [true, true, true, true]
+        );
+    }
+
+    #[test]
+    fn a_payload_reads_back_as_it_was_written() {
+        let frame = Payload::Frame(r#"{"frame":"ask"}"#.to_owned());
+        assert_eq!(
+            [
+                Payload::from_bytes(&frame.to_bytes()),
+                Payload::from_bytes(&Payload::Lock.to_bytes()),
+            ],
+            [Ok(frame.clone()), Ok(Payload::Lock)]
+        );
+    }
+
+    #[test]
+    fn the_first_byte_of_a_payload_says_a_frame_or_the_lock() {
+        assert_eq!(
+            [
+                Payload::Frame("ab".to_owned()).to_bytes(),
+                Payload::Lock.to_bytes()
+            ],
+            [vec![0, b'a', b'b'], vec![1]]
+        );
+    }
+
+    #[test]
+    fn a_payload_that_is_neither_is_refused() {
+        let empty: &[u8] = &[];
+        let unknown: &[u8] = &[2, b'a'];
+        let lock_and_more: &[u8] = &[1, 0];
+        let not_utf8: &[u8] = &[0, 0xff];
+        assert_eq!(
+            [empty, unknown, lock_and_more, not_utf8]
+                .map(|bytes| Payload::from_bytes(bytes).map_err(|refusal| *refusal.code())),
+            [const { Err(AxCode::WireMismatch) }; 4]
         );
     }
 }
