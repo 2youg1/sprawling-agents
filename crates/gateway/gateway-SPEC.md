@@ -365,12 +365,16 @@ pub fn transcriber_for(chosen: &Chosen<'_>, secrets: SecretResolver)
 // transcribe/recording.rs（形状 2 值）
 pub enum AudioType { Webm, Ogg, Mpeg, Mp4, Wav }
 impl AudioType {
+    pub const ALL: [AudioType; 5];                // 这座城发得出去的全部容器，拒词由它列出
     pub fn media_type(self) -> &'static str;   pub fn file_name(self) -> &'static str;
     pub fn of_media_type(raw: &str) -> Result<AudioType, AxError>;  // 认不得的容器＝E_INVALID_ARGS
+    pub fn of_file_name(name: &str) -> Result<AudioType, AxError>;  // §8-33；认不得的扩展名＝E_INVALID_ARGS
 }
 pub struct Recording { /* bytes、kind —— 私有 */ }
 impl Recording {
     pub fn new(bytes: Vec<u8>, kind: AudioType) -> Result<Recording, AxError>;  // 空／越顶＝E_INVALID_ARGS
+    pub fn read_from(reader: impl std::io::Read, kind: AudioType)
+        -> Result<Recording, AxError>;   // §8-33；读到上限多一字节为止，读失败＝E_STORAGE_FATAL
     pub fn kind(&self) -> AudioType;   pub fn len(&self) -> usize;
 }
 
@@ -386,11 +390,11 @@ impl Transcriber {
 }
 ```
 
-**没配就是一句具名的拒绝，不是一个空串。** `Transcriber::absent()` 上的 `transcribe` 恒返回三段式 `E_TOOL_UNAVAILABLE`：action ＝ `transcribe a recording`，subject ＝ `this city has no transcription endpoint attached`，recovery 指出两条人能立刻做的路（登记一个服务 `audio/transcriptions` 的 endpoint，或者改用打字）。**为何复用 `E_TOOL_UNAVAILABLE` 而不新增一码**：基表里这一码的语义正是「这次部署里没有这项设施」，而 `E_CONFIG_INVALID` 会说成人填错了什么——什么都没填错，这项设施本就是可选的；`E_BROWSER_UNAVAILABLE` 那样的专码属于模型会调用的 tool，转写不是 tool 而是界面设施。码表是 kernel 全城权威且按「能否定义掉」逐码守着，为一件已有码能如实表达的事把它撑大，就是给同一个事实立第二个名字。
+**没配就是一句具名的拒绝，不是一个空串。** `Transcriber::absent()` 上的 `transcribe` 恒返回三段式 `E_TOOL_UNAVAILABLE`：action ＝ `transcribe a recording`，subject ＝ `this city has no transcription endpoint attached`，recovery 指出两条人能立刻做的路（登记一个服务 `audio/transcriptions` 的 endpoint，或者改用打字）。**为何复用 `E_TOOL_UNAVAILABLE` 而不新增一码**：基表里这一码的语义正是「这次部署里没有这项设施」，而 `E_CONFIG_INVALID` 会说成人填错了什么——什么都没填错，这项设施本就是可选的。这项设施有两条路用它：界面的 `/transcribe`（composer 的麦克风），与城给 run 的工具 `transcribe`（sprawling-SPEC 8-131）；两条路缺的是同一项设施，故同一个码，`E_BROWSER_UNAVAILABLE` 那样只属于一件工具的专码在这里会给同一个事实第二个名字。码表是 kernel 全城权威且按「能否定义掉」逐码守着，为一件已有码能如实表达的事把它撑大，就是给同一个事实立第二个名字。
 
 **凭据只有一条路，请求也只有一条。** `Transcriber` 内部持一个真的 `Endpoint`（`DialectKind::OpenAi`、`Redemption::without_images`、`pricing: None`），整次 POST 由 `Endpoint::post_bytes` 发（§8-2），认证头由 `Endpoint::authorize` 写——与聊天调用、与 `list_models` 探测是同一格兑付。头名由 `AuthSpec::for_dialect` 定（§8-9），登记面不自己在 Bearer 与具名头之间选。**恒不为转写开第二个持凭据的地方**：两处持凭据就是两处会漏。
 
-**哪个端点答这类活，由账本说了算，装配只有一处。** `transcriber_for` 与 `adapter_for` 是同一句话的两半：`EndpointBook::select` 给出 `Chosen`，这两个自由函数各自把那个选择变成一件可调用的设施。调用方自己拼一个 `TranscriberConfig`，就是给「base URL 与凭据在哪里合流」立第二个地点。**容器从 content-type 读而不从文件名猜**：`AudioType::of_media_type` 是那一步的唯一入口，认不得的容器当场拒。
+**哪个端点答这类活，由账本说了算，装配只有一处。** `transcriber_for` 与 `adapter_for` 是同一句话的两半：`EndpointBook::select` 给出 `Chosen`，这两个自由函数各自把那个选择变成一件可调用的设施。调用方自己拼一个 `TranscriberConfig`，就是给「base URL 与凭据在哪里合流」立第二个地点。**上传的录音，容器从 content-type 读而不从文件名猜**：浏览器录进哪一种容器只有它知道，`AudioType::of_media_type` 是那一步的唯一入口，认不得的容器当场拒。放在文件里的录音没有 content-type，容器从文件名读（§8-33）。
 
 **路径归兼容格式。** 人填 base URL（provider 文档就那么印），`audio/transcriptions` 由 `transcribe::wire` 拼，拼法复用 `router::attached::join`（`pub(crate)`）——「base URL 加上兼容格式自己的路径」在城里只有一个算法。
 
@@ -411,6 +415,13 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 **为何 `Recording` 是值而不是一对参数**：字节与它的格式永远同行，且两条不变量（非空、不超 `RECORDING_MAX_BYTES`）只在 `new` 一处守；无 setter。**为何 `wire` 与 `transcriber` 分家**：「这段多部分请求体长什么样」是纯数据的判定、可逐字节断言，「怎么把它发出去并兑付凭据」要一个 socket——两件事变化的理由不同。
 
 **线上的入口是 `wire` 的 `POST /transcribe`**（`crates/wire/src/reception/admission.rs`），经 `TranscribeSink` 交到这里；它不是 `Command` 的变体。
+
+### 8-33 放在文件里的一段录音（`transcribe::recording` 的 `of_file_name` 与 `read_from`）
+
+城的工具 `transcribe`（sprawling-SPEC 8-131）读的是 run 这座楼里的一个文件，而文件带着的只有名字和字节。本节是它进这个模块的那扇门；判「这条路径能不能读」是调用方的事，gateway 不认识城的地址。
+
+- **容器从文件名的扩展名读，扩展名表不另写。** 磁盘上的文件没有 content-type，扩展名是写下它的人或程序对容器的唯一声明。`of_file_name` 拿扩展名（不分大小写）去比 `ALL` 里每一种的 `file_name()` 的扩展名，所以 `.mp3` 对 `Mpeg`，与请求体里写的 `filename` 是同一个事实。认不得就是 `E_INVALID_ARGS`，拒词列出五个扩展名；`of_media_type` 的拒词同样由 `ALL` 列出，于是「这座城发得出去哪几种」只在枚举里写一次。被否：再写一张扩展名到 `AudioType` 的表——第二张表会在第六种容器进来时少一行。
+- **`read_from` 收一个 `Read`，读到 `RECORDING_MAX_BYTES` 多一字节就停。** 多出的那一字节由 `new` 拒，拒词照旧说出上限；一个几个 GB 的文件因此不会先整个进内存。上限只在本模块：调用方若自己先读全再交 `new`，它要么不设界，要么得知道上限，那就是上限的第二个权威。读失败＝`E_STORAGE_FATAL`，subject 是读者给的错误，恢复语让人换一个可读的文件。被否：`Recording::from_file(path)`——gateway 会开始自己打开路径，而一条路径是否可读（读界、reserved subtree、link）是城的判定，放进 gateway 就多出一处看路径的地方。
 
 ## 8.5 两个设计（crate 级）
 
@@ -441,6 +452,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 - `E_SECRET_EGRESS`：本 crate 不产（出口扫描住 gate::egress 与 checkpoint 面）；endpoint 组请求不做二次扫描（Custody 在入口已换引用，纵深由门守）。
 - **crate 根只再导出有别的 crate 叫得出名字的项。** 一个只在 gateway 内部用、或只在测试里用的项，挂在 crate 根上就是一个没人读的公开面：编译器不再为它报 dead code，于是它在生产里还有没有调用者就没有东西在看。只供测试的项（`response_wire` 一族）放在 `#[cfg(test)]` 后面，不编进发行的二进制。另一种做法是保留再导出、靠审查记住它们没有调用者——那正是让这些项积下来的原因。
 - **TLS 后端的权威是一次调用，不是一个 feature。** 决定：reqwest 取 `rustls-no-provider`，由 `reach::tls::install_provider` 显式安装 aws-lc-rs（§8-15）。理由：reqwest 的 `rustls` feature 顺带打开 `quinn?/rustls-aws-lc-rs`，锁里多出一族从不编译的 quinn；更要紧的是后端藏在一个 feature 名里，远程门与 HTTP 用的是不是同一个 aws-lc-rs，要去读 reqwest 的清单才知道。被否的备选：自建一份 `rustls::ClientConfig`，经 `tls_backend_preconfigured` 交给 reqwest——那要在本 crate 重写 reqwest 已有的平台证书校验与 ALPN 选择，且 reqwest 自己的文档说这条路要求两边 rustls 版本逐一同步，版本一错就是运行期的 unknown TLS backend。
+- **转写是一项设施，两条路用它。** 决定：`transcribe` 既是 composer 麦克风背后的设施，也是城给 run 的一件工具（sprawling-SPEC 8-131）；两条路读端点账本里 `ModelTag::Transcribe` 的同一个选择，经同一个 `transcriber_for` 造设施；工具只在那个选择成立时上 run 的工具表。理由：computer use 要能把声音变成字，而二进制里不内置任何模型（定规），于是模型要转写只能经人接入的这个端点；`Transcriber::absent()` 的码仍是 `E_TOOL_UNAVAILABLE`，语义不变，仍是「这次部署里没有这项设施」。被否的备选：给工具另立一个专码（同一个事实两个名字）；让转写只做界面设施（模型拿不到任何转写能力）。
 - **凭证库经 `keyring-core` 与各平台 store 接入，不经 `keyring`。** 决定见 §8-4。理由：`keyring` 第 4 代的默认 feature 在 Linux 上选 secret service，与静态 musl 发行件矛盾；关掉默认 feature 的 `keyring` 只剩一层转发，上游 README 建议应用直接依赖 `keyring-core` 与所需的 store。被否的备选：停在 `keyring` 3——它是锁里 `security-framework` 2 与 `windows-sys` 0.60 两族的来源之一，也不再是上游维护的那条线。
 
 ## 13 依赖选型
