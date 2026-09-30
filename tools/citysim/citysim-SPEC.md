@@ -81,6 +81,7 @@ fx 的一次修复之前，一个长回合每一步都留着整份恢复重建�
 **RSS 是读数，不是门。** 进程的计数器随机器与分配器变。`just mem long-turn <steps>` 构建 release 的 `long_turn`，它每走完 100 步停一次，打印一行 `step <k> pid <pid>`，等一行输入再走；配方在每次停顿时调 `cargo xtask mem <pid>`——进程计数器的唯一读者（xtask-SPEC §8-30）——再放它走。最后一次停顿的 peak private 就是整个 run 的峰值；相邻两次的 private 之差除以步数，就是每步的增长。模拟器自己的 `MemLedger` 把每一行都留在内存里；跑完的那一行 `done <completion> steps <n> window <bytes> ledger <bytes>` 给出它的字节数与最后一次请求的窗口，每一步的账本行一样长，读者按步数把它从每次停顿的 private 里减掉。峰值的上限由整合者按读数登记进 `tools/xtask/budgets.toml`，写 MiB，照 fx 的做法是 500 步的峰值上限。本配方不带 `product_features`：`long_turn` 直接驱动 `runtime::run::drive`，被量的回合路径与 `sandbox` feature 无关，带上它只会把用不到的执行引擎编进被量的进程。
 
 被否：计数型全局分配器（要 `unsafe impl GlobalAlloc`，workspace 的 `unsafe_code` 是 forbid）；`long_turn` 自己读自己的计数器（Windows 上要么写 FFI，要么像 xtask 那样起一个 PowerShell，于是计数器有了第二个读者）。**重开参数**：出现安全的分配计数接口时，把每步分配的字节也做成门；runtime 给回合窗口一个默认的上界（压缩）时，断言从「增量处处相同」改成「窗口不超过上界」。
+
 ### 3-11 决定：进程外的替身 provider 是 citysim 的一个二进制，脚本就是 `ScriptModel` 的那种线上 JSON
 
 黑盒验收要让发行件去调一个会应答的 provider，而三条已有的规则各挡住一个位置：黑盒检查写在 Lean 里（`xtask boundary`），`tools/adversary/` 不自带 HTTP 服务端（adversary-SPEC §13：一个假 provider 会让那个目录变成第二个 gateway 实现），为测试写的东西不进人下载的二进制（`xtask artifact`）。剩下的位置是这里：`bin/provider` 是测试工具，由 justfile 拉起，URL 经环境变量 `SPRAWLING_PROVIDER` 交给调用它的检查，与对抗器经 `SPRAWLING_BIN` 接收二进制是同一个形状。
@@ -465,6 +466,7 @@ pub fn long_turn(steps: u32, pauses: Pauses) -> Result<TurnReading, AxError>;
 - `Pauses::Every` 在第 `steps` 的每个整数倍次 `read` 之后调 `at(k)`：`bin/long_turn` 在那里打印一行并等一行输入（§3-10），测试传 `Pauses::Never`。
 - `bin/long_turn <steps> [every]`：缺省每 100 步停一次；跑完打印 `done <completion> steps <n> window <bytes> ledger <bytes>`。
 - 测试：`long_turn::tests` 的 `a_long_turn_grows_its_window_by_one_step_at_a_time` 在 40 步与 80 步上断言结局、调用次数与增量处处相同。
+
 ### 8-10 替身 provider：回放一份线上脚本，记下每一次交换（`citysim::wire_script`、`bin/provider`）
 
 形状：`wire_script` 是 decision 加一个 adapter——哪一个请求得到哪一个回答由 `Replay` 判，套接字与记录文件的读写在 `wire_script::exchange`；`bin/provider` 是 adapter。决定见 §3-11。
