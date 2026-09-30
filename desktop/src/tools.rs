@@ -137,7 +137,9 @@ pub(crate) fn table() -> Vec<ToolCard> {
                  key, at a ref from a snapshot or at a point. `generation` is the snapshot the \
                  action was decided against, and an action decided against an older view is \
                  refused. The named window must hold the keyboard when the action is sent, and \
-                 must be the window under the point it lands on; otherwise nothing is sent. It \
+                 must be the window under the point it lands on; otherwise nothing is sent. If \
+                 the desktop takes only part of the action, the answer says how much and \
+                 releases any key or button that part left held; it does not send the rest. It \
                  does not retry, it does not chain several actions, and it does not fall back \
                  to a nearby element when the ref no longer resolves."
                 .to_owned(),

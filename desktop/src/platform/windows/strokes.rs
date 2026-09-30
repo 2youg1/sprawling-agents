@@ -195,22 +195,106 @@ const PART_SENT_RECOVERY: &str = "look at the window with `desktop.screenshot` b
 /// pressed and did not release, in the reverse of the order they were
 /// pressed.
 pub(crate) fn left_held(strokes: &[Stroke], accepted: usize) -> Vec<Stroke> {
-    let _ = (strokes, accepted);
-    Vec::new()
+    let mut held: Vec<Held> = Vec::new();
+    let mut last_at: Option<Point> = None;
+    for stroke in strokes.iter().take(accepted) {
+        let (press, edge) = match *stroke {
+            Stroke::Key { code, edge } => (Held::Key(code), edge),
+            Stroke::Unicode { unit, edge } => (Held::Unicode(unit), edge),
+            Stroke::Pointer { at, motion } => {
+                last_at = Some(at);
+                match motion {
+                    Motion::LeftDown => (Held::Left, Edge::Down),
+                    Motion::LeftUp => (Held::Left, Edge::Up),
+                    Motion::RightDown => (Held::Right, Edge::Down),
+                    Motion::RightUp => (Held::Right, Edge::Up),
+                    Motion::Move | Motion::Wheel { .. } => continue,
+                }
+            }
+        };
+        match edge {
+            Edge::Down => held.push(press),
+            Edge::Up => {
+                if let Some(at) = held.iter().rposition(|was| *was == press) {
+                    held.remove(at);
+                }
+            }
+        }
+    }
+    // A button is held only after a pointer stroke went down with it,
+    // so `last_at` is known for every button this lifts.
+    held.iter()
+        .rev()
+        .filter_map(|was| match *was {
+            Held::Key(code) => Some(Stroke::Key {
+                code,
+                edge: Edge::Up,
+            }),
+            Held::Unicode(unit) => Some(Stroke::Unicode {
+                unit,
+                edge: Edge::Up,
+            }),
+            Held::Left => last_at.map(|at| Stroke::Pointer {
+                at,
+                motion: Motion::LeftUp,
+            }),
+            Held::Right => last_at.map(|at| Stroke::Pointer {
+                at,
+                motion: Motion::RightUp,
+            }),
+        })
+        .collect()
+}
+
+/// One thing a prefix pressed and has not yet released. A button is
+/// one button wherever it went down; it comes up where the pointer last
+/// was, which is where the desktop still has it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Held {
+    Key(u16),
+    Unicode(u16),
+    Left,
+    Right,
 }
 
 /// The refusal for a batch the desktop took `accepted` of `sent` events
 /// of.
+///
+/// Nothing taken is a plain refusal: nothing reached the window. Any
+/// part taken is marked as an effect nobody can see, because that part
+/// may already have clicked or typed (desktop-SPEC.md section 12.4).
 pub(crate) fn cut_short(accepted: usize, sent: usize, released: Released) -> Refusal {
-    let _ = (accepted, sent, released);
+    if accepted == 0 {
+        return Refusal::new(
+            RefusalCode::ToolUnavailable,
+            "act on a window",
+            format!(
+                "the desktop took none of the {sent} input events: a lock screen or an elevated \
+                 window holds the input"
+            ),
+            NOTHING_SENT_RECOVERY,
+        );
+    }
+    let afterwards = match released {
+        Released::NothingWasHeld => String::new(),
+        Released::All { presses } => {
+            format!("; the {presses} presses it left held were released")
+        }
+        Released::Partly { sent, accepted } => format!(
+            "; releasing the {sent} presses it left held also stopped after {accepted}, so a \
+             key or button may still be held down"
+        ),
+    };
     Refusal::new(
         RefusalCode::ToolUnavailable,
         "act on a window",
-        "the desktop is not accepting input",
-        "this desktop is not accepting input right now — a lock screen or an elevated window \
-         blocks it. Nothing was half-done: check the window with `desktop.screenshot` and try \
-         again once it is in the foreground",
+        format!(
+            "the desktop took {accepted} of the {sent} input events of this action and then \
+             stopped accepting input, so the action may have partly happened{afterwards}"
+        ),
+        PART_SENT_RECOVERY,
     )
+    .effect_unknown()
 }
 
 /// How far `notches` turn the wheel, counted in `WHEEL_DELTA`.

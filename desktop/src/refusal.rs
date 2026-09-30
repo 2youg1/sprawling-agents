@@ -114,10 +114,10 @@ impl Refusal {
     /// The same refusal, marked as coming after part of the request was
     /// already handed over, so the caller looks before it acts again.
     #[cfg_attr(
-        not(test),
+        not(any(windows, test)),
         expect(
             dead_code,
-            reason = "the first caller is the partial-input path of platform::windows::act"
+            reason = "the one caller is the partial-input path of platform::windows::act"
         )
     )]
     pub(crate) fn effect_unknown(self) -> Refusal {
