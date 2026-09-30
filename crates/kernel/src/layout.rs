@@ -205,7 +205,7 @@ impl CityLayout {
     /// (kernel-SPEC 8-76).
     #[must_use]
     pub fn devices(&self) -> PathBuf {
-        self.governed_root().join(DEVICES_FILE)
+        self.governed_root().join(REMOTE_DIR).join(DEVICES_FILE)
     }
 
     /// The layout whose ledger is `dir`, when `dir` is a city's.
