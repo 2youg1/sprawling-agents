@@ -10,6 +10,8 @@
 //! that could name itself `.wav` while declaring `audio/webm` is a
 //! shape this module cannot spell.
 
+use std::io::Read as _;
+
 use kernel::{AxCode, AxError};
 
 /// The audio containers the OpenAI audio wire accepts and a browser
@@ -68,9 +70,10 @@ impl AudioType {
                 "read a recording's container",
                 other.to_owned(),
             )
-            .with_recovery(
-                "record into audio/webm, audio/ogg, audio/mpeg, audio/mp4 or audio/wav",
-            )),
+            .with_recovery(format!(
+                "record into one of {}",
+                listed(|kind| kind.media_type().to_owned())
+            ))),
         }
     }
 
@@ -81,12 +84,31 @@ impl AudioType {
     /// `E_INVALID_ARGS` for a name whose extension is none of the
     /// containers this city can send.
     pub fn of_file_name(name: &str) -> Result<AudioType, AxError> {
-        Err(AxError::failure(
-            AxCode::ToolUnavailable,
-            "read a recording's container",
-            name.to_owned(),
-        )
-        .with_recovery("not written yet"))
+        let declared = std::path::Path::new(name)
+            .extension()
+            .and_then(std::ffi::OsStr::to_str);
+        AudioType::ALL
+            .into_iter()
+            .find(|kind| declared.is_some_and(|asked| kind.extension().eq_ignore_ascii_case(asked)))
+            .ok_or_else(|| {
+                AxError::failure(
+                    AxCode::InvalidArgs,
+                    "read a recording's container",
+                    name.to_owned(),
+                )
+                .with_recovery(format!(
+                    "name a recording whose file ends in one of {}",
+                    listed(|kind| format!(".{}", kind.extension()))
+                ))
+            })
+    }
+
+    /// The extension [`AudioType::file_name`] ends in, so the name a
+    /// request body sends and the name a file is read by are one fact.
+    fn extension(self) -> &'static str {
+        self.file_name()
+            .rsplit_once('.')
+            .map_or("", |(_, extension)| extension)
     }
 
     /// The `filename` of the file part. Providers route on the
@@ -102,6 +124,17 @@ impl AudioType {
             AudioType::Wav => "recording.wav",
         }
     }
+}
+
+/// Every container, each spelled the way `spell` spells it, for a
+/// refusal to list: the list is [`AudioType::ALL`], so a sixth container
+/// is named in every refusal the moment it exists.
+fn listed(spell: impl Fn(AudioType) -> String) -> String {
+    AudioType::ALL
+        .into_iter()
+        .map(spell)
+        .collect::<Vec<String>>()
+        .join(", ")
 }
 
 /// The ceiling the OpenAI audio face prints for one upload. A
@@ -152,11 +185,26 @@ impl Recording {
     /// # Errors
     /// `E_STORAGE_FATAL` when the reader fails, and whatever
     /// [`Recording::new`] refuses.
-    pub fn read_from(_reader: impl std::io::Read, _kind: AudioType) -> Result<Recording, AxError> {
-        Err(
-            AxError::failure(AxCode::StorageFatal, "take a recording", "not written yet")
-                .with_recovery("not written yet"),
-        )
+    ///
+    /// The reader is read no further than one byte past
+    /// `RECORDING_MAX_BYTES`, which is enough for [`Recording::new`] to
+    /// refuse a recording over the ceiling: a file of several gigabytes is
+    /// refused without being held in memory, and the ceiling keeps one
+    /// owner rather than a copy in every caller.
+    pub fn read_from(reader: impl std::io::Read, kind: AudioType) -> Result<Recording, AxError> {
+        let unreadable = |why: String| {
+            AxError::failure(AxCode::StorageFatal, "take a recording", why)
+                .with_recovery("name a recording this machine can read, or record it again")
+        };
+        let past_the_ceiling = u64::try_from(RECORDING_MAX_BYTES)
+            .map_err(|err| unreadable(err.to_string()))?
+            .saturating_add(1);
+        let mut bytes = Vec::new();
+        reader
+            .take(past_the_ceiling)
+            .read_to_end(&mut bytes)
+            .map_err(|err| unreadable(err.to_string()))?;
+        Recording::new(bytes, kind)
     }
 
     #[must_use]
