@@ -8,13 +8,7 @@
 
 use sysinfo::{MemoryRefreshKind, System};
 
-/// Physical memory and how much of it the platform could hand out now,
-/// in bytes; both zero where the platform does not say.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Memory {
-    pub(crate) physical: u64,
-    pub(crate) available: u64,
-}
+use crate::assembly::Memory;
 
 thread_local! {
     /// The handle `read` refreshes, kept per thread so a reading pays the

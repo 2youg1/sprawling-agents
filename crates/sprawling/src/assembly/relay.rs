@@ -18,9 +18,9 @@ use std::time::Duration;
 use kernel::{AxCode, AxError, EventDraft, EventRef, Ledger};
 
 use super::booking::{ClaimAsk, ClaimBook};
+use super::health::Health;
 use super::pool::Arrival;
 use super::registering::GoalAsk;
-use crate::monitor::health::Health;
 
 /// One append, and the address its answer goes back to.
 ///
@@ -355,7 +355,7 @@ mod tests {
     /// neither (sprawling-SPEC.md 8-98).
     #[test]
     fn the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable() {
-        use crate::monitor::health::Health;
+        use crate::assembly::health::Health;
         fn standing(health: &Health) -> (u64, u64) {
             let read = health.read(crate::monitor::Sample::default());
             (read.ledger_queue_depth, read.durable_lag)

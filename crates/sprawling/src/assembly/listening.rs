@@ -363,7 +363,7 @@ fn beside(
 /// `StorageFatal` when the sampler's thread cannot be started.
 fn watched(
     city_root: &std::path::Path,
-    health: crate::monitor::health::Health,
+    health: super::health::Health,
 ) -> Result<wire::MonitorFeed, AxError> {
     let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
     let samples = tokio::sync::broadcast::channel(1).0;

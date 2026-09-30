@@ -4332,7 +4332,7 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 **测试。** `wire_client::watching::tests`：一帧读数在 `Lines` 下是一行 JSON 加换行，在 `Screen` 下是清屏序列接一屏；不是读数的帧什么也不输出、不进历史。
 
-## 8-98 核心健康：记账队列与持久水位线跨线程可读（`bin::monitor::health`，形状：数据）
+## 8-98 核心健康：记账队列与持久水位线跨线程可读（`bin::assembly::health`，形状：数据）
 
 `Sample` 里核心健康的两项由记账线程与 lane 在各自的线程上改，由采样线程（8-96）读：`ledger_queue_depth` 是 lane 经 relay 交给记账线程、还在队列里没被取走的 append 条数；`durable_lag` 是记账线程已取进一批、这批的磁盘屏障还没返回、所以还没有答复的条数。两项都以记录条数计。它们的属主是 `assembly::relay`：只有它知道一条 append 何时进队、何时被取、何时变得持久；本模块只给它一处能跨线程读的地方。
 

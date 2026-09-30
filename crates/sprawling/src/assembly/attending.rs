@@ -94,14 +94,14 @@ pub(super) struct Started {
     pub(super) thread: std::thread::JoinHandle<()>,
     pub(super) vault: Arc<std::sync::Mutex<gateway::Custodian>>,
     /// The accounting queue's counts, for the monitor (sprawling-SPEC.md 8-98).
-    pub(super) health: crate::monitor::health::Health,
+    pub(super) health: super::health::Health,
 }
 
 pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started, AxError> {
     type Opened = Result<
         (
             Arc<std::sync::Mutex<gateway::Custodian>>,
-            crate::monitor::health::Health,
+            super::health::Health,
         ),
         AxError,
     >;

@@ -25,7 +25,15 @@ use kernel::{AxCode, AxError, RunId};
 use super::DriveContext;
 use super::dispatching::preparing::{Flown, Staged};
 use super::relay::{Relay, Wake};
-use crate::monitor::memory::Memory;
+
+/// Physical memory and how much of it the platform could hand out now,
+/// in bytes; both zero where the platform does not say. The reading is
+/// `bin::monitor::memory`'s; the pool admits by it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Memory {
+    pub(crate) physical: u64,
+    pub(crate) available: u64,
+}
 
 /// How many runs a city drives at once, whichever entrance started
 /// them: past it, a prepared drive waits in the pool for a lane.
@@ -258,8 +266,8 @@ fn admits(in_flight: u32, lanes: u32, memory: Memory) -> bool {
 #[cfg(test)]
 #[allow(clippy::arithmetic_side_effects)]
 mod tests {
+    use super::Memory;
     use super::{DrivingPool, admits};
-    use crate::monitor::memory::Memory;
     use kernel::RunId;
 
     const GIB: u64 = 1 << 30;

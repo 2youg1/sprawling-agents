@@ -3,18 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The core's health as counts other threads can read
+//! The accounting thread's health as counts other threads can read
 //! (sprawling-SPEC.md 8-98).
 //!
-//! `assembly::relay` owns both counts: only it knows when a lane's
-//! append enters the accounting thread's queue, when the accounting
-//! thread takes it into a batch, and when that batch is durable. This
-//! module is the one place the sampler reads them from.
+//! `relay` owns both counts: only it knows when a lane's append enters
+//! the accounting thread's queue, when the accounting thread takes it
+//! into a batch, and when that batch is durable. The monitor's sampler
+//! reads them from here.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::Sample;
+use wire::Sample;
 
 /// Appends waiting for the accounting thread, and appends it has taken
 /// whose disk barrier has not returned. A clone is another handle onto

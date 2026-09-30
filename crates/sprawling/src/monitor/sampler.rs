@@ -13,8 +13,8 @@ use kernel::{AxCode, AxError};
 use tokio::sync::broadcast;
 
 use super::counters::Counters;
-use super::health::Health;
 use super::{Monitor, Sample};
+use crate::assembly::health::Health;
 
 const BEAT: Duration = Duration::from_secs(1);
 
