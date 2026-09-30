@@ -199,6 +199,7 @@ fn a_reply_line_writes_the_bytes_the_hand_written_map_wrote() {
         usage: Some(usage),
         stop: Some(StopReason::ToolUse),
         billed_usd_micros: Some(UsdMicros::new(3400)),
+        first_at: None,
     };
     let typed = Payload::of(&returned).unwrap();
     assert_eq!(
@@ -224,6 +225,7 @@ fn a_reply_that_reported_nothing_leaves_the_three_keys_absent() {
         usage: None,
         stop: None,
         billed_usd_micros: None,
+        first_at: None,
     };
     let typed = Payload::of(&returned).unwrap();
     assert_eq!(

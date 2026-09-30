@@ -90,11 +90,12 @@
     return [
       {
         calls: [],
-        notes: told.fenced ? [{ fenced: { at: Seq.make(9), oid: FENCED } }] : [],
+        notes: told.fenced ? [{ checkpointed: { at: Seq.make(9), oid: FENCED } }] : [],
         number: 1,
         opened: Seq.make(2),
         said: told.said,
         t: TimeMs.make(0),
+        timing: "measured",
       },
     ];
   }

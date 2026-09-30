@@ -18,6 +18,7 @@ function call(tool: string, subject: string | null, head: string | null): Call {
     output: head === null ? null : { head, cut: 0 },
     called: TimeMs.make(0),
     answered: head === null ? null : TimeMs.make(1),
+    timing: "measured",
   };
 }
 
@@ -28,6 +29,7 @@ function turn(number: number, calls: readonly Call[]): Turn {
     number,
     opened: Seq.make(number),
     t: TimeMs.make(number),
+    timing: "measured",
   };
 }
 

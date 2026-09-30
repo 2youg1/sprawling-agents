@@ -42,7 +42,7 @@
     output: Output | null,
   ): Call {
     const t = TimeMs.make(at);
-    return { at: Seq.make(at), outcome: "answered", output, subject, tool, called: t, answered: t };
+    return { at: Seq.make(at), outcome: "answered", output, subject, tool, called: t, answered: t, timing: "measured" };
   }
 
   // The turn one fixture's calls live in, carrying those same calls:
@@ -50,7 +50,7 @@
   // a turn describing different work would be a second answer to what
   // this run did.
   function turnOf(number: number, calls: readonly Call[]): Turn {
-    return { calls, notes: [], number, opened: Seq.make(number), t: TimeMs.make(number) };
+    return { calls, notes: [], number, opened: Seq.make(number), t: TimeMs.make(number), timing: "measured" };
   }
 
   // One command and nothing else, which is the shortest sentence the

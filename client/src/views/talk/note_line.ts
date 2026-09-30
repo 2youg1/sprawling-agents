@@ -10,7 +10,7 @@ import type { Note } from "../../wire";
 export function noteAt(note: Note): number {
   if ("arrived" in note) return note.arrived.at;
   if ("refused" in note) return note.refused.at;
-  if ("fenced" in note) return note.fenced.at;
+  if ("checkpointed" in note) return note.checkpointed.at;
   if ("waiting" in note) return note.waiting.at;
   if ("unreadable" in note) return note.unreadable.at;
   return note.discarded.at;

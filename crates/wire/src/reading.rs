@@ -187,7 +187,7 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
         // naming no commit, and the record type says so rather than
         // leaving this reader to infer it from a missing key.
         EventKind::CheckpointCommitted => match record.data().read() {
-            Ok(CheckpointCommitted::Committed(commit)) => Some(Note::Fenced {
+            Ok(CheckpointCommitted::Committed(commit)) => Some(Note::Checkpointed {
                 oid: commit.oid,
                 at,
             }),

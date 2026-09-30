@@ -19,10 +19,11 @@ import { traceOf } from "./trace";
 const turn = (number: number, calls: readonly object[]): Turn =>
   Schema.decodeUnknownSync(Turn)({
     number,
-    calls: calls.map((call) => ({ called: number * 1000, ...call })),
+    calls: calls.map((call) => ({ called: number * 1000, timing: "measured", ...call })),
     notes: [],
     opened: number * 10,
     t: number * 1000,
+    timing: "measured",
   });
 
 const at = (n: number): Seq => Seq.make(n);

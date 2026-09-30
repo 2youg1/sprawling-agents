@@ -191,7 +191,11 @@ impl<'h> Turn<'h, Calling<'_>> {
         // before it is made.
         let mut call = recovery::ModelCall::open(&mut self.journal, ledger, model, &request);
         let mut repair = recovery::BlockingResend;
-        let (returned_value, speculated) = call.ask(&mut [&mut repair], generating)?;
+        let recovery::Settled {
+            returned: returned_value,
+            speculated,
+            first_at,
+        } = call.ask(&mut [&mut repair], generating)?;
         let arrived = self.journal.read_clock()?;
         let ModelReturn {
             message,
@@ -214,6 +218,7 @@ impl<'h> Turn<'h, Calling<'_>> {
             usage,
             stop,
             billed_usd_micros,
+            first_at,
         };
         let model_returned = self.journal.append_redacted(
             ledger,

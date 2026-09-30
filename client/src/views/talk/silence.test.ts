@@ -11,7 +11,7 @@ import { silentRun, silentTurn } from "./silence";
 // A turn as the rounds carry it: `stopped` stays null until the model's
 // answer is back, so an open turn is one still being waited on.
 function turn(stopped: string | null, notes: readonly Note[] = []): Turn {
-  return { calls: [], notes, number: 1, opened: Seq.make(1), t: TimeMs.make(1), said: null, stopped };
+  return { calls: [], notes, number: 1, opened: Seq.make(1), t: TimeMs.make(1), timing: "measured", said: null, stopped };
 }
 
 const refusedByProvider: Note = {

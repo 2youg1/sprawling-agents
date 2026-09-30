@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update wire-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 44,
+        WIRE_V, 45,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire-SPEC 12.1)"
     );
 }

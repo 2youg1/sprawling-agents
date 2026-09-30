@@ -202,7 +202,7 @@ fn a_checkpoint_inside_a_turn_names_the_commit_it_made() {
     ];
     assert_eq!(
         turns(&events)[0].notes,
-        vec![Note::Fenced {
+        vec![Note::Checkpointed {
             oid: GitOid::parse(spelled).expect("forty hex digits"),
             at: Seq::new(2)
         }]

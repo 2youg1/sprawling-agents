@@ -23,11 +23,12 @@ function call(n: number, called = 0, answered: number | null = null): Call {
     output: null,
     called: TimeMs.make(called),
     answered: answered === null ? null : TimeMs.make(answered),
+    timing: "measured",
   };
 }
 
 function turn(number: number, t: number, calls: readonly Call[], notes: readonly Note[] = []): Turn {
-  return { calls, notes, number, opened: Seq.make(number), t: TimeMs.make(t) };
+  return { calls, notes, number, opened: Seq.make(number), t: TimeMs.make(t), timing: "measured" };
 }
 
 describe("the time lens", () => {

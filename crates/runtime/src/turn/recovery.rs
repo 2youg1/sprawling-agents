@@ -11,7 +11,9 @@
 //! the failure on rather than swallowing it.
 
 use kernel::event::record::ModelCalled;
-use kernel::{AxCode, AxError, Increment, Ledger, Model, ModelRequest, ModelReturn, Payload};
+use kernel::{
+    AxCode, AxError, Increment, Ledger, Model, ModelRequest, ModelReturn, Payload, TimeMs,
+};
 
 use super::ledger::{Authored, Journal};
 use super::speculation::{Generating, Speculated, call_ahead};
@@ -37,6 +39,16 @@ pub(super) enum SegmentOutcome {
 /// call being recovered, and it answers one of the three above.
 pub(super) trait Segment {
     fn attempt(&mut self, failure: &AxError, call: &mut ModelCall<'_, '_>) -> SegmentOutcome;
+}
+
+/// What one model call settled into: the return the turn records, the
+/// reads started early, and when the attempt that returned it first
+/// reported content (runtime-SPEC 8-50).
+#[derive(Debug)]
+pub(super) struct Settled {
+    pub(super) returned: ModelReturn,
+    pub(super) speculated: Speculated,
+    pub(super) first_at: Option<TimeMs>,
 }
 
 /// One provider call being recovered: what was sent, which door it went
@@ -100,7 +112,7 @@ impl<'a, 'h> ModelCall<'a, 'h> {
         &mut self,
         segments: &mut [&mut dyn Segment],
         generating: Generating<'_, '_>,
-    ) -> Result<(ModelReturn, Speculated), AxError> {
+    ) -> Result<Settled, AxError> {
         self.record()?;
         let settled = |value| (value, Speculated::default());
         let (streamed, first) = match generating {
@@ -119,9 +131,17 @@ impl<'a, 'h> ModelCall<'a, 'h> {
         };
         self.streamed = streamed;
         match first {
-            Ok(value) => Ok(value),
+            Ok((returned, speculated)) => Ok(Settled {
+                returned,
+                speculated,
+                first_at: None,
+            }),
             Err(failure) => match recover(segments, self, failure) {
-                SegmentOutcome::Recovered(value) => Ok(settled(value)),
+                SegmentOutcome::Recovered(returned) => Ok(Settled {
+                    returned,
+                    speculated: Speculated::default(),
+                    first_at: None,
+                }),
                 SegmentOutcome::Failed(err) | SegmentOutcome::Skipped(err) => Err(err),
             },
         }

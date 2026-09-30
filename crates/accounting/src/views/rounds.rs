@@ -14,6 +14,8 @@
 //! reading has to have one authority.
 
 #[cfg(test)]
+mod carried_tests;
+#[cfg(test)]
 mod reading_tests;
 #[cfg(test)]
 mod tests;
@@ -87,7 +89,7 @@ fn opened_at(turns: &[wire::Turn]) -> Option<kernel::GitOid> {
         .iter()
         .flat_map(|turn| turn.notes.iter())
         .find_map(|note| match note {
-            wire::Note::Fenced { oid, .. } => Some(*oid),
+            wire::Note::Checkpointed { oid, .. } => Some(*oid),
             // The other four notes say what happened in the session;
             // none of them names the commit it opened at.
             wire::Note::Refused { .. }
@@ -190,6 +192,8 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     number,
                     opened: record.seq(),
                     t: record.t(),
+                    timing: wire::Timing::Measured,
+                    first_at: None,
                     model: wire::text(record.data().as_map().get("model")),
                     said: None,
                     thought: None,
@@ -217,6 +221,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     output: None,
                     called: record.t(),
                     answered: None,
+                    timing: wire::Timing::Measured,
                 };
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;

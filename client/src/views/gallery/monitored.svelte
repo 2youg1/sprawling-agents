@@ -25,12 +25,14 @@
       number: 1,
       opened: 10,
       t: 1000,
+      timing: "measured",
       notes: [],
       calls: [
         {
           at: 11,
           called: 1010,
           answered: 1040,
+          timing: "measured",
           tool: "edit",
           subject: "src/ledger.rs",
           outcome: "answered",
@@ -46,6 +48,7 @@
           at: 12,
           called: 1050,
           answered: 3200,
+          timing: "measured",
           tool: "exec",
           outcome: "answered",
           arguments: said({ arm: { shell: { text: "cargo test -p ledger" } } }),
@@ -59,6 +62,7 @@
         {
           at: 13,
           called: 3300,
+          timing: "measured",
           tool: "exec",
           outcome: "waiting",
           arguments: said({ arm: { program: { path: "cargo", args: ["clippy", "-p", "ledger"] } } }),

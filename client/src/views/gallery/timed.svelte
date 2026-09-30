@@ -41,6 +41,7 @@
         output: null,
         called: TimeMs.make(at + 1_000 + c * 600),
         answered: TimeMs.make(at + 1_400 + c * 600),
+        timing: "measured",
       }));
       const notes: Note[] = n === 17 ? [{ waiting: { at: Seq.make(n * 100 + 99), t: TimeMs.make(at + 4_000), answered: TimeMs.make(at + 9_000) } }] : [];
       const turn: Turn = {
@@ -49,6 +50,7 @@
         number: n + 1,
         opened: Seq.make(n * 100),
         t: TimeMs.make(at),
+        timing: "measured",
         model: n < 30 ? "large-1" : "small-2",
         used: { input: Tokens.make(12_000 + n * 400), output: Tokens.make(900 + n * 20), cached: Tokens.make(n * 300) },
         spent: UsdMicros.make(40_000 + n * 1_000),

@@ -5,6 +5,7 @@
 
 mod compaction;
 mod concurrent;
+mod first_content;
 mod frozen;
 mod helpers;
 mod phases;

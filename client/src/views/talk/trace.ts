@@ -146,7 +146,7 @@ export function artifactsIn(turns: readonly Turn[]): Artifacts {
 export function lastCheckpointIn(turns: readonly Turn[]): GitOid | null {
   for (let at = turns.length - 1; at >= 0; at -= 1) {
     for (const note of turns[at]?.notes ?? []) {
-      if ("fenced" in note) return note.fenced.oid;
+      if ("checkpointed" in note) return note.checkpointed.oid;
     }
   }
   return null;

@@ -58,6 +58,7 @@ fn a_branch_inherits_the_compacted_exchange_not_the_raw_records() {
                 usage: None,
                 stop: None,
                 billed_usd_micros: None,
+                first_at: None,
             })
             .unwrap(),
         ),

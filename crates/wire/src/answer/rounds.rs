@@ -36,6 +36,25 @@ pub enum Outcome {
     Failed,
 }
 
+/// Whether the span between two times on a row is a measurement.
+///
+/// Two values because a page does one of two things with a row: draw
+/// how long it took, or draw no duration at all. The times themselves
+/// travel either way; they still give the row its order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Timing {
+    /// Every time on the row is the moment its own record measured
+    /// (`kernel::EventRecord::moment`).
+    Measured,
+    /// At least one is not: a line written before each line recorded
+    /// its own moment carries its turn's stamp, which every line of that
+    /// turn shares, and an answer the city wrote itself after a restart
+    /// (`E_TOOL_OUTCOME_UNKNOWN`) carries when the city wrote it.
+    Unmeasured,
+}
+
 /// What a tool said, bounded so a wave of output cannot become the page.
 ///
 /// The cut is counted rather than hinted at: a reader who cannot see how
@@ -69,7 +88,7 @@ pub enum Note {
     Refused { error: AxError, at: Seq },
     /// A checkpoint went up, and this is the commit it made. It is
     /// what a change list is addressed by.
-    Fenced { oid: GitOid, at: Seq },
+    Checkpointed { oid: GitOid, at: Seq },
     /// This turn stopped for a person. What waits and who answers is the
     /// approval queue's; copying it here would be a third authority.
     /// `t` is when the Ledger recorded the request and `answered` when
@@ -101,7 +120,7 @@ impl Note {
     pub fn at(&self) -> Seq {
         match *self {
             Self::Refused { at, .. }
-            | Self::Fenced { at, .. }
+            | Self::Checkpointed { at, .. }
             | Self::Waiting { at, .. }
             | Self::Arrived { at, .. }
             | Self::Discarded { at, .. }
@@ -159,6 +178,11 @@ pub struct Call {
     /// exactly when `outcome` is [`Outcome::Waiting`]: the two are set by
     /// one pairing, and an answer outside the window is not guessed.
     pub answered: Option<TimeMs>,
+    /// Whether `answered - called` is how long the call took. One value
+    /// for both times: two records a build writes are both measured or
+    /// both not, and the one exception - an answer the city supplied
+    /// after a restart - makes the span unmeasured either way.
+    pub timing: Timing,
 }
 
 /// One turn: the model was asked, and this is what came of it.
@@ -177,12 +201,24 @@ pub struct Turn {
     /// reports the times it originally had rather than the times it was
     /// replayed.
     ///
+    /// Whether it is the moment the model was asked, or the stamp a
+    /// ledger written before per-line moments gave every line of the
+    /// turn, is [`Turn::timing`].
+    ///
     /// Not optional, unlike [`crate::LogLine::t`]. A log line is written
     /// beside the Ledger and can find the clock unreadable; a turn is
     /// folded from an `EventRecord`, which carries a reading in every
     /// case. An `Option` here would be a state no fold can produce and
     /// every reader would still have to answer.
     pub t: TimeMs,
+    /// Whether [`Turn::t`] is the moment the model was asked.
+    pub timing: Timing,
+    /// When the reply's first content reached the city, as the turn's
+    /// `model_returned` recorded it; the time to first content is this
+    /// minus [`Turn::t`]. `None` when the reply had no stream, streamed
+    /// only tool calls, or was written before the key existed - the page
+    /// then draws no figure rather than a guessed one.
+    pub first_at: Option<TimeMs>,
     /// The endpoint's model id the `model_called` that opened this turn
     /// recorded. Per turn because a session can change model midway,
     /// and a name for the whole session would be wrong for half of it.

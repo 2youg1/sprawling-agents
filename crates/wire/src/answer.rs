@@ -70,7 +70,7 @@ pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use model_facts::ModelFactsSummary;
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
 pub use release::{ReleaseAnswer, ReleaseLine};
-pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Turn, Used};
+pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
 

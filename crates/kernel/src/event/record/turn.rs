@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::address::Address;
 use crate::budget::UsdMicros;
+use crate::event::identity::TimeMs;
 use crate::event::payload::Payload;
 use crate::locator::B3Hash;
 use crate::model::{ModelUsage, StopReason};
@@ -137,6 +138,15 @@ pub struct ModelReturned {
     /// city's own price list is what fills the gap when it does not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub billed_usd_micros: Option<UsdMicros>,
+    /// When the reply's first non-empty prose or reasoning reached the
+    /// city, read from the turn's clock (kernel-SPEC 8-75). A moment,
+    /// not a duration: the time to first content is this minus the
+    /// `model_called` line's `t`. Absent when the reply came through a
+    /// door that reports nothing before it settles, when it streamed
+    /// only tool calls, and on every line written before the key
+    /// existed - none of which is a zero.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_at: Option<TimeMs>,
 }
 
 /// `steer_received`: text a person added at a phase boundary, and where

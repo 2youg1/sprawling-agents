@@ -5,8 +5,8 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- What else a turn came to beside what it said: words that arrived
 from a person, a refusal, a wait on the person, messages the run let
-go, and a record that did not read back. `fenced` draws nothing: a
-commit the run fenced is a fact for the run page, and the thread's
+go, and a record that did not read back. `checkpointed` draws nothing:
+a commit the run checkpointed is a fact for the run page, and the thread's
 question is what this turn did or waits on. -->
 <script lang="ts">
   import { ui } from "../../ui";

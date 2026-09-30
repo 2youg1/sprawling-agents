@@ -209,9 +209,10 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
         fn call_streaming(
             &mut self,
             _req: &ModelRequest,
-            _onto: kernel::Increments<'_>,
+            onto: kernel::Increments<'_>,
         ) -> Result<ModelReturn, AxError> {
             self.streamed = self.streamed.saturating_add(1);
+            onto(&kernel::Increment::Said("half an answ".to_owned()));
             Err(wire_mismatch())
         }
     }
@@ -267,6 +268,12 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
     assert_eq!(
         model.blocked, 1,
         "the repair asked once through the blocking door"
+    );
+    let returned: serde_json::Value = serde_json::from_slice(&ledger.lines[3]).unwrap();
+    assert_eq!(
+        returned["data"].get("first_at"),
+        None,
+        "the failed stream's first content belongs to another request"
     );
 }
 
