@@ -97,7 +97,7 @@ pub enum Verb {
     },
     Survey,
     /// One address fetched by the open page's own Fetch API and read
-    /// back as text (browser-SPEC.md 19-2).
+    /// back as text (decision D6 of `crates/browser/Spec.lean`).
     Fetch {
         url: String,
     },

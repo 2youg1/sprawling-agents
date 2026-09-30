@@ -73,7 +73,7 @@ pub enum Action {
         by: Point,
     },
     /// One key pressed on whatever the page has focused, with
-    /// `modifiers` held around it (browser-SPEC.md section 19-11).
+    /// `modifiers` held around it (`crates/browser/spec/Keyboard.lean`).
     Press {
         key: Key,
         modifiers: BTreeSet<Modifier>,

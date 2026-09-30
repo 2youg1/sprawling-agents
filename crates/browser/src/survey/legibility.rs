@@ -15,7 +15,7 @@
 //! and writing a second contrast formula here would be the second
 //! authority the whole instrument exists to prevent. So this module
 //! measures the first, and the second is an open question in
-//! browser-SPEC §3 rather than a duplicate.
+//! section 3 of `crates/browser/Spec.lean` rather than a duplicate.
 //!
 //! **A cut a person can see is not a defect.** A box that draws an
 //! ellipsis says that it is holding something back, and a person can

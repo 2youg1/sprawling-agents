@@ -11,7 +11,7 @@ Every Rust package of the product lives in this directory. The packages are sepa
 |---|---|---|---|---|---|
 | `crates/accounting` | `sprawling-accounting` | `accounting` | the city's one writer, and the ports it reaches outside itself through | `agent_protocols`, `city`, `collab`, `gateway`, `kernel`, `runtime`, `storage`, `wire` | `crates/accounting/accounting-SPEC.md` |
 | `crates/agent_protocols` | `sprawling-agent-protocols` | `agent_protocols` | MCP out to a server, ACP in from an editor, and ACP out to a harness | `gateway`, `kernel` | `crates/agent_protocols/agent_protocols-SPEC.md` |
-| `crates/browser` | `sprawling-browser` | `browser` | a browser driven over WebDriver BiDi, and what a model may see of a page and do to it | `kernel` | `crates/browser/browser-SPEC.md` |
+| `crates/browser` | `sprawling-browser` | `browser` | a browser driven over WebDriver BiDi, and what a model may see of a page and do to it | `kernel` | `crates/browser/Spec.lean` |
 | `crates/city` | `sprawling-city` | `city` | space, identity, and the documents a building keeps | `kernel` | `crates/city/city-SPEC.md` |
 | `crates/collab` | `sprawling-collab` | `collab` | several residents in one building, without stepping on each other | `kernel`, `storage` | `crates/collab/Spec.lean` |
 | `crates/gateway` | `sprawling-gateway` | `gateway` | everything between a decision to call a model and the bytes on the wire | `kernel` | `crates/gateway/gateway-SPEC.md` |

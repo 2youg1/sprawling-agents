@@ -5,7 +5,8 @@
 
 //! Pressing a key on a page: the keys a run may press, the modifiers it
 //! may hold, and the BiDi key-source frame that presses one
-//! (browser-SPEC.md section 19-11).
+//! (`crates/browser/spec/Keyboard.lean`, and decision D12 of
+//! `crates/browser/Spec.lean`).
 //!
 //! Every name is spelled once, in the one `spelling` of its variant: the
 //! argument reader and the frame builder both read it, so a key cannot

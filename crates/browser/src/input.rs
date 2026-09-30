@@ -16,8 +16,8 @@
 //! from a reference or a point to a point, and `scroll` moves by a
 //! delta. One action with two homes would drift the day either side was
 //! corrected, so the field names and the meaning of `to` are the same on
-//! both sides (`desktop-SPEC.md` section 8-4 and `browser-SPEC.md`
-//! section 19-5).
+//! both sides (`desktop-SPEC.md` section 8-4 and decision D9 of
+//! `crates/browser/Spec.lean`).
 
 use kernel::{AxCode, AxError};
 use serde_json::{Map, Value, json};

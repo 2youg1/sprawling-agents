@@ -68,7 +68,7 @@ pub(crate) fn measure_script(
 /// How much of a fetched body crosses the socket, in UTF-16 units: a
 /// ceiling on what the page hands back, reported with the length it cut
 /// from. How far a tool result is shortened after that is the pipeline's
-/// decision (browser-SPEC.md 19-2).
+/// decision (decision D6 of `crates/browser/Spec.lean`).
 const FETCH_TEXT_MAX_CHARS: usize = 65_536;
 
 /// The page's own `fetch`, run where the page runs.
