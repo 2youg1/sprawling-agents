@@ -48,11 +48,10 @@ windows = { version = "0.62", features = [
 tempfile = "3"
 
 # The workspace lint table, copied rather than inherited: this package is not a
-# workspace member (root `Cargo.toml`, `exclude`). One line differs, and the
-# difference is the reason this package sits outside — `unsafe_code` is `deny`
-# rather than `forbid`, so the Win32 boundary can relax it at one
-# call site with a written reason instead of everywhere. This card writes no
-# `unsafe` at all.
+# workspace member (root `Cargo.toml`, `exclude`). One line differs:
+# `unsafe_code` is `deny` rather than `forbid`, so the Win32 calls under
+# `src/platform/windows/` can relax it one function at a time, each with a
+# written reason.
 [lints.rust]
 unsafe_code = "deny"
 

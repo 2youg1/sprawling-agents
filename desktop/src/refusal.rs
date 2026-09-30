@@ -7,14 +7,16 @@
 //!
 //! A refusal has three parts — what was refused, why, and what can be
 //! done instead — and all three travel to the caller. The stable code is
-//! spelled exactly as the city spells it in `kernel::error::code`, but it
-//! is defined here rather than imported: this package sits outside the
-//! workspace so that the Win32 boundary may relax
-//! `unsafe_code` at one call site, and importing a workspace crate to
-//! obtain six string constants would give that reason away
-//! (desktop-SPEC.md section 8.5, first pair). The rule that keeps the two
-//! definitions from drifting is that this file only ever *quotes* a code
-//! the city already has; a new one is minted in `kernel` first.
+//! spelled exactly as the city spells it in `kernel::error::code`, and it
+//! is defined here rather than imported. Depending on `kernel` would not
+//! change which lints this package obeys — a manifest inherits the
+//! workspace table only by saying `[lints] workspace = true` — but it
+//! would make this package's own lock file resolve kernel's dependencies
+//! a second time, where nothing compares their versions with the
+//! workspace's (desktop-SPEC.md section 8.5, first pair). The rule that
+//! keeps the two definitions from drifting is that this file only ever
+//! *quotes* a code the city already has, which `xtask guard` checks; a new
+//! one is minted in `kernel` first.
 
 use serde_json::{Value, json};
 
