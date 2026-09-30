@@ -9,13 +9,28 @@
 //! lines' `t` or guessing from the build that exported them.
 
 use super::{EventKind, EventRecord, TimeMs};
+use crate::consts_external::EVENT_LOG_V;
+
+/// The first ledger version whose waited-for lines record their own
+/// moment; a line written before carries its turn's stamp there.
+const MOMENTS_SINCE_V: u32 = 2;
+
+// A build that writes an older version than the one moments start at
+// would answer `None` for every line it writes itself.
+const _: () = assert!(MOMENTS_SINCE_V <= EVENT_LOG_V);
 
 impl EventKind {
     /// Whether a line of this kind records the moment its own event
     /// happened: a model attempt sent, a reply whole, a tool call started,
     /// a call's answer. The roster of those four kinds.
     pub fn records_a_moment(&self) -> bool {
-        false
+        matches!(
+            self,
+            EventKind::ModelCalled
+                | EventKind::ModelReturned
+                | EventKind::ToolCalled
+                | EventKind::ToolResult
+        )
     }
 }
 
@@ -26,7 +41,7 @@ impl EventRecord {
     /// one of those four kinds means the moment was not measured, not
     /// that it took no time.
     pub fn moment(&self) -> Option<TimeMs> {
-        None
+        (self.v() >= MOMENTS_SINCE_V && self.kind().records_a_moment()).then(|| self.t())
     }
 }
 

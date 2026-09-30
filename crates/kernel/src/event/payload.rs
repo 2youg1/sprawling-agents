@@ -239,7 +239,7 @@ impl EventRecord {
     pub fn parse_line(raw: &[u8]) -> Result<Self, AxError> {
         serde_json::from_slice(raw).map_err(|e| {
             AxError::failure(AxCode::InvalidArgs, "parse event line", e.to_string())
-                .with_recovery("the line is not a canonical v1 EventRecord")
+                .with_recovery("the line is not a canonical EventRecord")
         })
     }
 

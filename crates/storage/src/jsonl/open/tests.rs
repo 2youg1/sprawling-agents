@@ -124,22 +124,22 @@ fn higher_version_fixture_is_refused_with_direction_and_path() {
         .join("..")
         .join("..")
         .join("tools/fixtures")
-        .join("ledger-v2");
+        .join("ledger-ahead");
     let segment = "ledger-00000000000000000000.jsonl";
     let before = fs::read(fixture.join(segment)).unwrap();
     // `open` takes a lock beside the directory it opens, so it opens a copy
     // and the source tree stays untouched.
     let scratch = tempfile::tempdir().unwrap();
-    let copy = scratch.path().join("ledger-v2");
+    let copy = scratch.path().join("ledger-ahead");
     fs::create_dir(&copy).unwrap();
     fs::copy(fixture.join(segment), copy.join(segment)).unwrap();
 
     let outcome = JsonlLedger::open(&copy, TimeMs::new(0));
-    let err = outcome.err().expect("v2 fixture must refuse to open");
+    let err = outcome.err().expect("a newer fixture must refuse to open");
     match &err {
         StorageError::VersionAhead { path, v } => {
-            assert_eq!(*v, 2);
-            assert!(path.to_string_lossy().contains("ledger-v2"));
+            assert_eq!(*v, 4294967296);
+            assert!(path.to_string_lossy().contains("ledger-ahead"));
         }
         other => panic!("expected VersionAhead, got {other:?}"),
     }

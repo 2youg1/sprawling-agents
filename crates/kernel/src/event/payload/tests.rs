@@ -55,7 +55,7 @@ fn canonical_line_is_stable_and_omits_empty_optionals() {
     );
     let line = record.canonical_line().unwrap();
     let text = String::from_utf8(line.clone()).unwrap();
-    assert!(text.starts_with("{\"v\":1,\"run\":\""), "{text}");
+    assert!(text.starts_with("{\"v\":2,\"run\":\""), "{text}");
     assert!(
         !text.contains("\"addr\""),
         "None addr must be omitted: {text}"

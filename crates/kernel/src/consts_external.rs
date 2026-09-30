@@ -19,7 +19,9 @@ pub const CACHE_BREAKPOINTS_MAX: u32 = 4;
 pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
 
 /// EventRecord `v`: one monotonic integer, no major/minor split (3.1).
-pub const EVENT_LOG_V: u32 = 1;
+/// 2: the four lines a turn waits for record their own moment
+/// (kernel-SPEC 12.10).
+pub const EVENT_LOG_V: u32 = 2;
 
 /// Where a ledger line's `v` stands against the version this build
 /// writes. The one authority for "which ledgers open"; every reader that
@@ -192,7 +194,7 @@ mod tests {
     fn the_five_facts_hold_their_documented_values() {
         assert_eq!(CACHE_BREAKPOINTS_MAX, 4);
         assert_eq!(PROMPT_CACHE_TTL_SECS, 300);
-        assert_eq!(EVENT_LOG_V, 1);
+        assert_eq!(EVENT_LOG_V, 2);
         assert_eq!(L0_TOOLS, ["exec", "edit", "status"]);
         assert_eq!(SECRET_SHAPES.len(), 11);
     }

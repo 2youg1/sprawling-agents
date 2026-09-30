@@ -288,6 +288,20 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
         ledger.stamps(),
         vec![0, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     );
+    // What the turn wrote and what a reader asks agree: a line reads as
+    // its own moment exactly when it is one of the four the turn waited for.
+    for line in &ledger.lines {
+        let record = kernel::EventRecord::parse_line(line).unwrap();
+        let waited_for = matches!(
+            record.kind(),
+            kernel::EventKind::ModelCalled
+                | kernel::EventKind::ModelReturned
+                | kernel::EventKind::ToolCalled
+                | kernel::EventKind::ToolResult
+        );
+        let expected = waited_for.then(|| record.t());
+        assert_eq!(record.moment(), expected, "{:?}", record.kind());
+    }
 }
 
 /// There is no ceiling to reach, so a run goes on until its
