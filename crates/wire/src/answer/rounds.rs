@@ -13,7 +13,7 @@
 //! They live on the wire because a second client must be able to draw a
 //! session without folding the ledger itself.
 
-use kernel::{AxError, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros};
+use kernel::{AxError, GitOid, Locator, RunId, Seq, TimeMs, Tokens, UsdMicros};
 use serde::{Deserialize, Serialize};
 
 /// What a tool call has come to so far.
@@ -69,6 +69,13 @@ pub struct Output {
     /// How many lines this view cut. The rest is in the Ledger at the
     /// call's own `at`.
     pub cut: usize,
+    /// Where the whole of a call's output was stored when it left the
+    /// window: the bytes the command itself wrote, even when the sieve
+    /// cut them first and the cut was stored again. `None` when nothing
+    /// left the window, on a line written before results carried their
+    /// accounts, and always on a call's arguments, which never leave.
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub pinned: Option<Locator>,
 }
 
 /// What a turn came to besides the calls it made.

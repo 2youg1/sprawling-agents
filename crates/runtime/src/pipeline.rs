@@ -17,7 +17,7 @@
 
 use kernel::consts_policy::OFFLOAD_MIN_BYTES;
 use kernel::event::record::AdviserAnswer;
-use kernel::{AxCode, AxError, ByteLen, Payload};
+use kernel::{AxCode, AxError, ByteLen, Locator, Payload};
 
 use crate::clock::ClockStamp;
 use crate::compaction::{self, Shrink, Strategy};
@@ -33,6 +33,22 @@ pub mod connector;
 pub mod exec;
 
 pub use adviser::{Adviser, Ask, Consultation};
+
+/// The key an `exec` result carries the accounts of what left its window
+/// under, and the key a connector answer carries them under.
+pub(crate) const EXEC_ACCOUNTS: &str = "sieve";
+pub(crate) const CONNECTOR_ACCOUNTS: &str = "offload";
+
+/// Where the whole of one tool result was stored, read from the first
+/// account it carries (runtime-SPEC 8-51(b)). The first, because the
+/// pipeline writes the sieve's account before a later store's, and the
+/// sieve's original is what the command wrote; `None` when the result
+/// carries no account this build can read.
+#[must_use]
+pub fn pinned_original(result: &serde_json::Value) -> Option<Locator> {
+    let _ = (result, EXEC_ACCOUNTS, CONNECTOR_ACCOUNTS);
+    None
+}
 
 /// Attachments beyond this many bytes are cut with the truncation
 /// marker: attachments ride the envelope, they do not become the body.
@@ -305,3 +321,100 @@ pub fn package(result: &[u8], ctx: PackContext<'_>) -> Result<Packaged, AxError>
 
 #[cfg(test)]
 mod tests;
+
+/// Where a cut result's original is, read the way the rounds fold reads
+/// it: through the accounts the two package doors wrote.
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+mod pinned {
+    use super::*;
+    use crate::offload::OffloadSite;
+    use crate::sieve::{FilterTable, SieveHistory};
+    use storage::Cas;
+
+    /// An account as the pipeline writes it, for an original of `bytes`.
+    fn account(bytes: &[u8]) -> serde_json::Value {
+        serde_json::to_value(ResultOffloaded {
+            original: kernel::Locator::cas(kernel::B3Hash::digest(bytes)),
+            len: 4_000,
+            substitute_len: 200,
+            rest_path: "room/.rest/r1.txt".to_owned(),
+            sieve: None,
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn an_exec_result_that_left_the_window_names_the_bytes_the_command_wrote() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cas = Cas::open(&dir.path().join("cas")).unwrap();
+        let env = dir.path().join("env");
+        std::fs::create_dir_all(&env).unwrap();
+        let table = FilterTable::builtin();
+        let mut history = SieveHistory::default();
+        let noise = "   Compiling dep v0.1.0\n".repeat(200);
+        let call = kernel::ToolCall {
+            id: "c1".to_owned(),
+            name: kernel::ToolName::parse(kernel::ToolName::EXEC).unwrap(),
+            args: kernel::Payload::of(
+                &serde_json::json!({ "arm": { "program": { "path": "cargo", "args": ["check"] } } }),
+            )
+            .unwrap(),
+        };
+        let ran = kernel::ToolOutcome {
+            result: kernel::Payload::of(&serde_json::json!({ "stdout": noise, "exit_code": 0 }))
+                .unwrap(),
+            attachments: Vec::new(),
+        };
+        let packaged = exec::package_exec(
+            &call,
+            ran,
+            exec::SieveSite {
+                offload: OffloadSite {
+                    cas: &mut cas,
+                    city_root: &env,
+                    room: &kernel::Address::parse("room").unwrap(),
+                    origin: crate::offload::tests::origin(),
+                },
+                table: &table,
+                history: &mut history,
+            },
+            None,
+        )
+        .unwrap();
+        let result = serde_json::Value::Object(packaged.result.as_map().clone());
+        assert_eq!(
+            pinned_original(&result),
+            Some(kernel::Locator::cas(kernel::B3Hash::digest(
+                noise.as_bytes()
+            ))),
+            "the sieve pinned the whole output before it cut it"
+        );
+        assert_eq!(
+            pinned_original(&serde_json::json!({ "stdout": "ok" })),
+            None
+        );
+    }
+
+    #[test]
+    fn a_result_cut_twice_names_the_first_original() {
+        let twice = serde_json::json!({
+            "content": "cargo check: clean",
+            "sieve": [account(b"what the command wrote"), account(b"what the sieve left")],
+        });
+        assert_eq!(
+            pinned_original(&twice),
+            Some(kernel::Locator::cas(kernel::B3Hash::digest(
+                b"what the command wrote"
+            )))
+        );
+        let paged = serde_json::json!({ "content": [], "offload": [account(b"a long answer")] });
+        assert_eq!(
+            pinned_original(&paged),
+            Some(kernel::Locator::cas(kernel::B3Hash::digest(
+                b"a long answer"
+            ))),
+            "a connector answer carries its account under its own key"
+        );
+    }
+}

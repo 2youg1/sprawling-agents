@@ -136,6 +136,7 @@ fn bounded(whole: &str) -> Option<Output> {
     Some(Output {
         head: head.join("\n"),
         cut,
+        pinned: None,
     })
 }
 

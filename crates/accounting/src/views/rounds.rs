@@ -276,7 +276,10 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     .and_then(|turn| turn.calls.get_mut(call_at))
                 {
                     call.outcome = outcome;
-                    call.output = said.and_then(wire::output_in);
+                    call.output = said.and_then(wire::output_in).map(|shown| wire::Output {
+                        pinned: map.get("result").and_then(runtime::pinned_original),
+                        ..shown
+                    });
                     call.answered = Some(record.t());
                     if supplied_by_the_city(map.get("error")) {
                         call.timing = wire::Timing::Unmeasured;

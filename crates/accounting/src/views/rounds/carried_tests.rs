@@ -153,3 +153,38 @@ fn a_call_says_what_its_tool_was_registered_as() {
         "a line that recorded no registration is drawn as nothing in particular"
     );
 }
+
+#[test]
+fn a_cut_output_points_at_its_original() {
+    let whole = kernel::Locator::cas(B3Hash::digest(b"every line cargo wrote"));
+    let account = serde_json::json!({ "original": whole.to_string(), "len": 4000,
+                                      "substitute_len": 200, "rest_path": "lab/.rest/a.txt" });
+    let cut = record(
+        3,
+        EventKind::ToolResult,
+        serde_json::json!({ "tool_use_id": "a", "name": "exec",
+                            "result": { "content": "cargo check: clean", "sieve": [account] } }),
+    );
+    let folded = turns(&[asked(1), called(2, "a"), cut]);
+    let call = &folded[0].calls[0];
+    assert_eq!(
+        (
+            call.output
+                .as_ref()
+                .and_then(|output| output.pinned.clone()),
+            call.arguments
+                .as_ref()
+                .and_then(|given| given.pinned.clone())
+        ),
+        (Some(whole), None),
+        "the output names where the whole of it is; the arguments never left"
+    );
+    let kept = turns(&[asked(1), called(2, "a"), answered(3, "a")]);
+    assert_eq!(
+        kept[0].calls[0]
+            .output
+            .as_ref()
+            .and_then(|output| output.pinned.clone()),
+        None
+    );
+}
