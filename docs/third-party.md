@@ -84,6 +84,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 | Crate | Licence |
 |---|---|
+| [apple-native-keyring-store](https://crates.io/crates/apple-native-keyring-store) | MIT OR Apache-2.0 |
 | [argon2](https://crates.io/crates/argon2) | MIT OR Apache-2.0 |
 | [axum](https://crates.io/crates/axum) | MIT |
 | [base64](https://crates.io/crates/base64) | MIT OR Apache-2.0 |
@@ -99,7 +100,8 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [git2](https://crates.io/crates/git2) | MIT OR Apache-2.0 |
 | [idna_adapter](https://crates.io/crates/idna_adapter) | Apache-2.0 OR MIT |
 | [insta](https://crates.io/crates/insta) | Apache-2.0 |
-| [keyring](https://crates.io/crates/keyring) | MIT OR Apache-2.0 |
+| [keyring-core](https://crates.io/crates/keyring-core) | MIT OR Apache-2.0 |
+| [linux-keyutils-keyring-store](https://crates.io/crates/linux-keyutils-keyring-store) | MIT OR Apache-2.0 |
 | [memory-stats](https://crates.io/crates/memory-stats) | MIT OR Apache-2.0 |
 | [png](https://crates.io/crates/png) | MIT OR Apache-2.0 |
 | [postcard](https://crates.io/crates/postcard) | MIT OR Apache-2.0 |
@@ -107,6 +109,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [proptest](https://crates.io/crates/proptest) | MIT OR Apache-2.0 |
 | [regex](https://crates.io/crates/regex) | MIT OR Apache-2.0 |
 | [reqwest](https://crates.io/crates/reqwest) | MIT OR Apache-2.0 |
+| [rustls](https://crates.io/crates/rustls) | Apache-2.0 OR ISC OR MIT |
 | [same-file](https://crates.io/crates/same-file) | Unlicense OR MIT |
 | [schemars](https://crates.io/crates/schemars) | MIT |
 | [secrecy](https://crates.io/crates/secrecy) | Apache-2.0 OR MIT |
@@ -127,6 +130,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [wasmtime](https://crates.io/crates/wasmtime) | Apache-2.0 with the LLVM exception |
 | [wasmtime-wasi](https://crates.io/crates/wasmtime-wasi) | Apache-2.0 with the LLVM exception |
 | [wat](https://crates.io/crates/wat) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
+| [windows-native-keyring-store](https://crates.io/crates/windows-native-keyring-store) | MIT OR Apache-2.0 |
 | [zeroize](https://crates.io/crates/zeroize) | Apache-2.0 OR MIT |
 | [zip](https://crates.io/crates/zip) | MIT |
 

@@ -20,10 +20,6 @@ use zeroize::Zeroizing;
     reason = "the passphrase backend awaits its one caller in Custodian::probe (14.5 wiring)"
 )]
 mod file;
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the keyring-core store lands in the next commit")
-)]
 mod platform;
 
 /// The inner seam: store, fetch, delete. Nothing else leaves the crate.
@@ -94,7 +90,8 @@ pub struct Described {
     pub writable: bool,
 }
 
-/// Platform credential service via the keyring crate.
+/// The platform credential service, reached through keyring-core and
+/// this target's store (`platform`).
 pub(crate) struct KeyringVault;
 
 impl KeyringVault {
@@ -123,27 +120,9 @@ impl KeyringVault {
     };
 }
 
-fn keyring_entry(reference: &SecretRef) -> Result<keyring::Entry, AxError> {
-    keyring::Entry::new(
-        &format!("sprawling/{}", reference.realm()),
-        reference.name(),
-    )
-    .map_err(|err| {
-        AxError::failure(
-            AxCode::ConfigInvalid,
-            "open credential entry",
-            err.to_string(),
-        )
-        .with_recovery(
-            "start this machine's credential service (Keychain on macOS, Credential \
-             Manager on Windows, a Secret Service daemon on Linux), then try again",
-        )
-    })
-}
-
 impl Vault for KeyringVault {
     fn put(&mut self, reference: &SecretRef, value: Zeroizing<String>) -> Result<(), AxError> {
-        keyring_entry(reference)?
+        platform::entry(reference)?
             .set_password(&value)
             .map_err(|err| {
                 AxError::failure(AxCode::ConfigInvalid, "store credential", err.to_string())
@@ -155,9 +134,9 @@ impl Vault for KeyringVault {
     }
 
     fn get(&self, reference: &SecretRef) -> Result<Option<Zeroizing<String>>, AxError> {
-        match keyring_entry(reference)?.get_password() {
+        match platform::entry(reference)?.get_password() {
             Ok(value) => Ok(Some(Zeroizing::new(value))),
-            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(keyring_core::Error::NoEntry) => Ok(None),
             Err(err) => Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "fetch credential",
@@ -171,8 +150,8 @@ impl Vault for KeyringVault {
     }
 
     fn delete(&mut self, reference: &SecretRef) -> Result<(), AxError> {
-        match keyring_entry(reference)?.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        match platform::entry(reference)?.delete_credential() {
+            Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
             Err(err) => {
                 Err(
                     AxError::failure(AxCode::ConfigInvalid, "delete credential", err.to_string())
