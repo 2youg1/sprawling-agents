@@ -23,7 +23,7 @@ use kernel::{
     ServerLabel,
 };
 
-use super::{Layer, path};
+use super::{ConfigLayer, Layer, path};
 use crate::document;
 
 /// Writes the sandbox limits into one scope's own configuration.
@@ -273,6 +273,9 @@ pub(super) fn change(
         change.state(&mut document, &file)?;
         let rendered = toml::to_string_pretty(&document)
             .map_err(|err| refuse_file(&file, &err.to_string()))?;
+        // The reader is the file's grammar: bytes it would refuse are not
+        // written, so no write leaves a layer every run then refuses.
+        ConfigLayer::parse(&rendered).map_err(|err| refuse_file(&file, err.subject()))?;
         held.replace(rendered.as_bytes())
     })
 }

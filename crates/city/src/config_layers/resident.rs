@@ -20,6 +20,8 @@ use kernel::{Address, AxError};
 use serde::Deserialize;
 
 use super::ladder::{Ladder, Layer};
+use super::own_layer;
+use super::refuse::{refuse, two_residents};
 
 /// The session record's key, spelled once for every refusal that names
 /// it.
@@ -36,8 +38,34 @@ pub(super) struct ResidentSection {
     pub(super) harness: Option<String>,
 }
 
+/// A name as one key states it. An empty one states nothing and is a
+/// slip of the pen, so it is refused rather than read as absent.
+pub(super) fn stated_name(raw: Option<String>, key: &str) -> Result<Option<String>, AxError> {
+    if raw.as_deref().is_some_and(|name| name.trim().is_empty()) {
+        return Err(refuse(format!(
+            "{key} is empty: leave the key out to state none"
+        )));
+    }
+    Ok(raw)
+}
+
+/// One layer names one resident: the model a session recorded here or
+/// a harness a person chose, never both.
+pub(super) fn one_resident(model: Option<&str>, harness: Option<&str>) -> Result<(), AxError> {
+    match (model, harness) {
+        (Some(model), Some(harness)) => Err(two_residents(model, harness)),
+        (Some(_), None) | (None, Some(_)) | (None, None) => Ok(()),
+    }
+}
+
 /// The harness the next session at `addr` is handed to, and the rung
 /// that named it.
+///
+/// `None` when no rung names one, and when the address's own file holds
+/// a session's `[model] name`: that session opened on a model and keeps
+/// it until `/new` forgets the record (city-SPEC 8-4, 12.6). The ladder
+/// is read first, so a rung that cannot be read is reported before the
+/// record is consulted, as [`super::load`] would report it.
 ///
 /// # Errors
 /// Refuses an address with no building, an unreadable file, and a file
@@ -46,7 +74,14 @@ pub fn settled_harness(
     city_root: &Path,
     addr: &Address,
 ) -> Result<Option<(String, Layer)>, AxError> {
-    Ladder::read(city_root, addr).map(|_ladder| None)
+    let ladder = Ladder::read(city_root, addr)?;
+    if own_layer(city_root, addr)?.model().is_some() {
+        return Ok(None);
+    }
+    Ok(ladder
+        .tagged(|layer| layer.harness.clone())
+        .resolve()
+        .cloned())
 }
 
 #[cfg(test)]

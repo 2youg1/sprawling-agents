@@ -198,13 +198,10 @@ impl ConfigLayer {
                 Some(servers)
             }
         };
-        let model = file.model.name;
-        if model.as_deref().is_some_and(|name| name.trim().is_empty()) {
-            return Err(refuse(
-                "`[model] name` is empty: leave the key out to state no model".to_owned(),
-            ));
-        }
+        let model = resident::stated_name(file.model.name, resident::MODEL_NAME_KEY)?;
         let harness = file.resident.and_then(|section| section.harness);
+        let harness = resident::stated_name(harness, resident::HARNESS_KEY)?;
+        resident::one_resident(model.as_deref(), harness.as_deref())?;
         let second_threshold = file
             .context
             .map(|section| SecondThreshold::parse(section.second_threshold))
