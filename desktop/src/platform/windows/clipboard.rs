@@ -21,15 +21,21 @@
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use windows::Win32::Foundation::{HANDLE, HGLOBAL};
+use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL, HWND};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard,
     SetClipboardData,
 };
-use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+use windows::Win32::System::Memory::{
+    GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CreateWindowExW, DestroyWindow, HWND_MESSAGE, WINDOW_EX_STYLE, WINDOW_STYLE,
+};
+use windows::core::{PCWSTR, w};
 
 use super::fault;
-use crate::refusal::Refusal;
+use crate::refusal::{Refusal, RefusalCode};
 
 /// Unicode text, which is the one format this server speaks.
 const CF_UNICODETEXT: u32 = 13;
@@ -48,21 +54,31 @@ const CF_UNICODETEXT: u32 = 13;
 /// below rely on is real.
 static TURN: Mutex<()> = Mutex::new(());
 
-/// The clipboard, open, and closed again when this value is dropped.
+/// The clipboard, open under a window of this process's own, and closed
+/// again when this value is dropped.
+///
+/// The window is a message-only window made for this one turn and
+/// destroyed at its end (desktop-SPEC.md section 12.8): `EmptyClipboard`
+/// makes the window that opened the clipboard its owner, and a clipboard
+/// opened with no window has no owner, so the `SetClipboardData` after it
+/// fails. Nothing here waits for a message, so the window needs no pump.
 struct Held {
-    /// Released after [`Drop::drop`] below has closed the clipboard,
-    /// because a value's fields are dropped after its own `Drop` runs.
+    owner: HWND,
+    /// Released after [`Drop::drop`] below has closed the clipboard and
+    /// destroyed the owner, because a value's fields are dropped after
+    /// its own `Drop` runs.
     _turn: MutexGuard<'static, ()>,
 }
 
 impl Held {
     /// # Errors
-    /// Refuses when another program holds the clipboard. That is a
-    /// transient fact about this desktop rather than anything wrong with
-    /// the call, and the recovery says so.
+    /// Refuses when this process cannot make the owner window, and when
+    /// another program holds the clipboard. The second is a transient
+    /// fact about this desktop rather than anything wrong with the call,
+    /// and the recovery says so.
     #[expect(
         unsafe_code,
-        reason = "the clipboard is lent to one process at a time, and only through this FFI entry point"
+        reason = "the clipboard is lent to one window at a time, and both the window and the loan are FFI entry points"
     )]
     fn open() -> Result<Held, Refusal> {
         // Waiting here is the point: this thread queues behind the one
@@ -70,20 +86,47 @@ impl Held {
         // A panic in another thread poisons a lock that guards no data,
         // and the turn it was holding is over, so the turn is taken.
         let turn = TURN.lock().unwrap_or_else(PoisonError::into_inner);
-        // SAFETY: `None` asks for the clipboard without associating it
-        // with a window, which is what a program with no window of its
-        // own does. The call either takes the clipboard or fails; there
-        // is no state in between, so the `Held` below stands for a
-        // clipboard that really is open. No other thread of this process
-        // is between an open and a close, because `turn` is held.
-        unsafe { OpenClipboard(None) }.map_err(|err| {
+        // SAFETY: `STATIC` is a class every process has registered, the
+        // name is a null pointer the call accepts for "no title", and
+        // `HWND_MESSAGE` as the parent makes a message-only window; no
+        // menu, instance or creation data is lent to the call.
+        let owner = unsafe {
+            CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                PCWSTR::null(),
+                WINDOW_STYLE::default(),
+                0,
+                0,
+                0,
+                0,
+                Some(HWND_MESSAGE),
+                None,
+                None,
+                None,
+            )
+        }
+        .map_err(|err| {
             fault::win32(
-                "open this machine's clipboard",
-                "another program is holding the clipboard for a moment; try again",
+                "make a window to hold the clipboard with",
+                "try again; this process could not make a window just now",
                 &err,
             )
         })?;
-        Ok(Held { _turn: turn })
+        // SAFETY: `owner` is the message-only window this thread made
+        // just above and has not destroyed, and no other thread of this
+        // process is between an open and a close, because `turn` is held.
+        if let Err(err) = unsafe { OpenClipboard(Some(owner)) } {
+            // SAFETY: `owner` is the window this thread made above, and
+            // nothing else has been handed it.
+            let _destroyed = unsafe { DestroyWindow(owner) };
+            return Err(fault::win32(
+                "open this machine's clipboard",
+                "another program is holding the clipboard for a moment; try again",
+                &err,
+            ));
+        }
+        Ok(Held { owner, _turn: turn })
     }
 }
 
@@ -93,12 +136,16 @@ impl Drop for Held {
         reason = "closing the clipboard is what keeps it from being held against every other program on the desktop"
     )]
     fn drop(&mut self) {
-        // SAFETY: a `Held` exists only where `OpenClipboard` succeeded,
-        // and it is closed exactly once, here, by the thread that opened
-        // it and still holds the turn. Nothing this module hands out
-        // borrows the clipboard past this point: `read` copies the text
-        // out before the `Held` is dropped.
+        // SAFETY: the clipboard is open at this moment by this thread,
+        // under `self.owner`: a `Held` exists only where `OpenClipboard`
+        // succeeded, and it is closed exactly once, here. Nothing this
+        // module hands out borrows the clipboard past this point: `read`
+        // copies the text out before the `Held` is dropped.
         let _closed = unsafe { CloseClipboard() };
+        // SAFETY: `self.owner` is the message-only window this thread
+        // made in `open` and has not destroyed; the clipboard no longer
+        // refers to it, since it was closed above.
+        let _destroyed = unsafe { DestroyWindow(self.owner) };
     }
 }
 
@@ -137,9 +184,13 @@ pub(crate) fn read() -> Result<Option<String>, Refusal> {
 
 /// The text behind a clipboard handle, copied out before the lock is
 /// released.
+///
+/// Another program wrote this block, so its terminator is a claim this
+/// function does not rely on: the text ends at the first zero unit
+/// inside the size `GlobalSize` reports, or at the end of the block.
 #[expect(
     unsafe_code,
-    reason = "a clipboard handle is global memory, and reading it means locking it and walking to its terminator"
+    reason = "a clipboard handle is global memory, and reading it means locking it, measuring it and borrowing it"
 )]
 fn locked(handle: HANDLE) -> Result<Option<String>, Refusal> {
     let memory = HGLOBAL(handle.0);
@@ -150,51 +201,67 @@ fn locked(handle: HANDLE) -> Result<Option<String>, Refusal> {
     // below reads.
     let text = unsafe { GlobalLock(memory) }.cast::<u16>();
     if text.is_null() {
-        return Ok(None);
+        return Err(Refusal::new(
+            RefusalCode::ToolUnavailable,
+            "use the clipboard",
+            "the clipboard's text could not be locked for reading",
+            "try again; another program may be changing the clipboard",
+        ));
     }
-    let mut units: Vec<u16> = Vec::new();
-    let mut at: usize = 0;
-    loop {
-        // SAFETY: `text` is the non-null start of a locked
-        // `CF_UNICODETEXT` block, which the clipboard guarantees is
-        // terminated by a zero unit. `at` only ever advances one unit at
-        // a time and the loop stops at that terminator, so every read is
-        // inside the block. The clipboard is still open and still locked
-        // here, so the block cannot move under this loop.
-        let unit = unsafe { *text.add(at) };
-        if unit == 0 {
-            break;
+    // SAFETY: `memory` is the block locked just above; the call reads
+    // its size and writes nothing.
+    let size = unsafe { GlobalSize(memory) };
+    let copied = match size.checked_div(std::mem::size_of::<u16>()) {
+        Some(units) if units > 0 => {
+            // SAFETY: `text` is the start of the locked block, global
+            // memory is aligned for any `u16`, and `GlobalSize` reported
+            // the true size of that block, so `units` of them lie inside
+            // it. The slice lives only until the unlock below, and the
+            // clipboard stays open meanwhile, so the block cannot move or
+            // be freed under it.
+            let block = unsafe { std::slice::from_raw_parts(text, units) };
+            let end = block
+                .iter()
+                .position(|unit| *unit == 0)
+                .unwrap_or(block.len());
+            Ok(Some(String::from_utf16_lossy(
+                block.get(..end).unwrap_or(block),
+            )))
         }
-        units.push(unit);
-        at = at.saturating_add(1);
-    }
-    // SAFETY: `memory` is the handle locked immediately above, and this
-    // is that lock's one release. Nothing reads `text` after this point.
+        Some(_) | None => Err(Refusal::new(
+            RefusalCode::ToolUnavailable,
+            "use the clipboard",
+            "the clipboard's text reported a size of nothing",
+            "try again; another program may be changing the clipboard",
+        )),
+    };
+    // SAFETY: `memory` is the handle locked above, and this is that
+    // lock's one release. Nothing reads `text` or the slice after it.
     let _unlocked = unsafe { GlobalUnlock(memory) };
-    Ok(Some(String::from_utf16_lossy(&units)))
+    copied
 }
 
 /// Replaces what is on the clipboard.
 ///
+/// The new text is made ready before the clipboard is emptied, so the
+/// only failure that leaves the clipboard empty is the handover itself,
+/// and that refusal says so.
+///
 /// # Errors
-/// Refuses when the clipboard cannot be opened, emptied, or given the
-/// new text.
+/// Refuses when the text cannot be made ready, and when the clipboard
+/// cannot be opened, emptied, or given the new text.
 #[expect(
     unsafe_code,
-    reason = "putting text on the clipboard means allocating global memory and handing its ownership over, which only the FFI entry points do"
+    reason = "emptying the clipboard and handing it a block are FFI entry points only"
 )]
 pub(crate) fn write(text: &str) -> Result<(), Refusal> {
     let mut units: Vec<u16> = text.encode_utf16().collect();
     units.push(0);
-    let bytes = units
-        .len()
-        .checked_mul(std::mem::size_of::<u16>())
-        .ok_or_else(|| fault::last("measure the text", "set a shorter text"))?;
+    let block = OwnedBlock::filled(&units)?;
     let _held = Held::open()?;
-    // SAFETY: the clipboard is open for this process, which is what
-    // makes emptying it this process's right. Emptying also transfers
-    // ownership of what was there to us, which is why the allocation
-    // below may then be given away.
+    // SAFETY: the clipboard is open for this process under its own
+    // window, which is what makes emptying it this process's right and
+    // makes that window the clipboard's owner.
     unsafe { EmptyClipboard() }.map_err(|err| {
         fault::win32(
             "clear the clipboard before writing",
@@ -202,49 +269,121 @@ pub(crate) fn write(text: &str) -> Result<(), Refusal> {
             &err,
         )
     })?;
-    // SAFETY: `GMEM_MOVEABLE` is the allocation kind `SetClipboardData`
-    // requires, and `bytes` is the exact size of `units` including its
-    // terminator. This block is either given to the clipboard below —
-    // after which it is the clipboard's to free, never ours — or freed
-    // by the operating system when this process ends, which is the
-    // documented outcome for a block that was never handed over.
-    let block = unsafe { GlobalAlloc(GMEM_MOVEABLE, bytes) }.map_err(|err| {
-        fault::win32(
-            "make room for the new clipboard text",
-            "set a shorter text; this machine is out of memory",
-            &err,
-        )
-    })?;
-    // SAFETY: `block` is the live allocation from the line above, held
-    // by this function alone.
-    let into = unsafe { GlobalLock(block) }.cast::<u16>();
-    if into.is_null() {
-        return Err(fault::last(
-            "lock the new clipboard text",
-            "try again; this machine is out of memory",
-        ));
+    // SAFETY: the clipboard is open and emptied under this process's
+    // window, and `block.memory` is a moveable block this process
+    // allocated, filled and unlocked. On success the clipboard owns the
+    // block, and `handed_over` stops `block` from freeing it; on failure
+    // `block` still owns it and frees it when dropped.
+    match unsafe { SetClipboardData(CF_UNICODETEXT, Some(HANDLE(block.memory.0))) } {
+        Ok(_handle) => {
+            block.handed_over();
+            Ok(())
+        }
+        Err(err) => Err(Refusal::new(
+            RefusalCode::ToolUnavailable,
+            "use the clipboard",
+            format!(
+                "the clipboard was emptied and the new text could not be put on it: {}",
+                err.message()
+            ),
+            "try again; until then the clipboard is empty",
+        )),
     }
-    // SAFETY: `into` is the start of a block allocated for exactly
-    // `units.len()` `u16`s — `bytes` above is that count times the size
-    // of one — and the two regions cannot overlap, since `block` was
-    // allocated after `units` and is a distinct allocation.
-    unsafe { std::ptr::copy_nonoverlapping(units.as_ptr(), into, units.len()) };
-    // SAFETY: `block` is the handle locked above, and this is that
-    // lock's one release. Nothing reads `into` after this point.
-    let _unlocked = unsafe { GlobalUnlock(block) };
-    // SAFETY: the clipboard is open and has been emptied, so this
-    // process owns the right to set its contents. On success the
-    // clipboard takes ownership of `block`, which is why nothing here
-    // frees it afterwards; on failure the block stays ours and is
-    // released when this process ends.
-    unsafe { SetClipboardData(CF_UNICODETEXT, Some(HANDLE(block.0))) }.map_err(|err| {
-        fault::win32(
-            "put the new text on the clipboard",
-            "try again; another program is contending for the clipboard",
-            &err,
-        )
-    })?;
-    Ok(())
+}
+
+/// A block of global memory holding the new text, freed on every path
+/// that does not hand it to the clipboard.
+struct OwnedBlock {
+    memory: HGLOBAL,
+    owner: BlockOwner,
+}
+
+/// Who frees the block.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BlockOwner {
+    ThisProcess,
+    Clipboard,
+}
+
+impl OwnedBlock {
+    /// A moveable block holding `units`, unlocked and ready to hand over.
+    ///
+    /// # Errors
+    /// Refuses a text too long to measure and a block this machine will
+    /// not allocate or lock.
+    #[expect(
+        unsafe_code,
+        reason = "global memory is allocated, locked and filled only through the FFI entry points"
+    )]
+    fn filled(units: &[u16]) -> Result<OwnedBlock, Refusal> {
+        let bytes = units
+            .len()
+            .checked_mul(std::mem::size_of::<u16>())
+            .ok_or_else(|| {
+                Refusal::new(
+                    RefusalCode::InvalidArgs,
+                    "use the clipboard",
+                    "the text is longer than this machine can measure",
+                    "set a shorter text",
+                )
+            })?;
+        // SAFETY: `GMEM_MOVEABLE` is the allocation kind
+        // `SetClipboardData` requires, and `bytes` is the exact size of
+        // `units`; the block this returns is owned by the value built
+        // from it below, which frees it unless it is handed over.
+        let memory = unsafe { GlobalAlloc(GMEM_MOVEABLE, bytes) }.map_err(|err| {
+            fault::win32(
+                "make room for the new clipboard text",
+                "set a shorter text; this machine is out of memory",
+                &err,
+            )
+        })?;
+        let block = OwnedBlock {
+            memory,
+            owner: BlockOwner::ThisProcess,
+        };
+        // SAFETY: `block.memory` is the live allocation from the line
+        // above, held by this function alone.
+        let into = unsafe { GlobalLock(block.memory) }.cast::<u16>();
+        if into.is_null() {
+            return Err(fault::last(
+                "lock the new clipboard text",
+                "try again; this machine is out of memory",
+            ));
+        }
+        // SAFETY: `into` is the start of a block allocated for exactly
+        // `units.len()` `u16`s — `bytes` above is that count times the
+        // size of one — and the two regions cannot overlap, since the
+        // block is a distinct allocation made after `units`.
+        unsafe { std::ptr::copy_nonoverlapping(units.as_ptr(), into, units.len()) };
+        // SAFETY: `block.memory` is the handle locked above, and this is
+        // that lock's one release. Nothing reads `into` after it.
+        let _unlocked = unsafe { GlobalUnlock(block.memory) };
+        Ok(block)
+    }
+
+    /// The clipboard took the block, so this value no longer frees it.
+    fn handed_over(mut self) {
+        self.owner = BlockOwner::Clipboard;
+    }
+}
+
+impl Drop for OwnedBlock {
+    #[expect(
+        unsafe_code,
+        reason = "global memory is freed only through the FFI entry point"
+    )]
+    fn drop(&mut self) {
+        match self.owner {
+            // SAFETY: the block is this process's: it was allocated in
+            // `filled`, is not locked, and was never taken by the
+            // clipboard, so this is its one release.
+            BlockOwner::ThisProcess => {
+                let _freed = unsafe { GlobalFree(Some(self.memory)) };
+            }
+            BlockOwner::Clipboard => {}
+        }
+    }
 }
 
 #[cfg(test)]
@@ -303,7 +442,6 @@ mod tests {
     /// `GlobalLock` of no block needs no desktop and fails the same way.
     #[test]
     fn a_clipboard_block_that_will_not_lock_is_a_refusal_not_an_empty_clipboard() {
-        use crate::refusal::RefusalCode;
         assert_eq!(
             locked(HANDLE(std::ptr::null_mut())),
             Err(Refusal::new(
