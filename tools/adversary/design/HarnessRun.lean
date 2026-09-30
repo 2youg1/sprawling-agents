@@ -27,7 +27,7 @@ to the prompt carrying a stop reason. It emits four outputs: a report booked,
 the cancel sent to the harness, the answer to the prompt recorded, and the run
 frozen with its stop reason.
 
-Three properties, one theorem group each:
+Four properties, one theorem group each:
 
 * **a report is never admitted history** - the admitted records of a harness
   run are its start, the answer to its prompt and its freeze, whatever and
@@ -36,7 +36,10 @@ Three properties, one theorem group each:
   next thing the run emits is the cancel, so no report is booked between the
   halt and the cancel, and a second halt sends nothing;
 * **a frozen run is history** - after the stop reason nothing is emitted: no
-  report is booked and no cancel is sent to a session that has ended.
+  report is booked and no cancel is sent to a session that has ended;
+* **only admitted history is evidence** - the one record a claim of done may
+  cite is the answer to the city's prompt, and no report is ever admitted, so
+  a report is never evidence.
 -/
 
 namespace HarnessRun
@@ -204,5 +207,43 @@ theorem nothing_follows_the_stop_reason (s : State) (before later : List Input) 
   rw [run_append]
   simp [run, step, live]
   exact a_frozen_run_emits_nothing _ _ rfl
+
+/-! ## Only an admitted record is cited as evidence -/
+
+/-- The records a claim that the run is done may cite (kernel-SPEC.md section
+8-20, `kernel::completion::CITABLE`): the answer to the city's prompt. A report
+is what the harness said, and the city never decided it. -/
+def Record.citable : Record → Bool
+  | .answered _ => true
+  | .started | .reported _ | .cancelSent | .frozen _ => false
+
+/-- No report survives `admitted`, whatever else the records hold. -/
+theorem no_report_is_admitted (said : Nat) :
+    ∀ records : List Record, Record.reported said ∉ admitted records
+  | [] => by simp [admitted]
+  | r :: rest => by
+    have later := no_report_is_admitted said rest
+    cases r <;> simp [admitted, later]
+
+/-- A record that is not a report survives `admitted`. -/
+theorem kept_by_admitted {r : Record} (notReport : ∀ said, r ≠ .reported said) :
+    ∀ {records : List Record}, r ∈ records → r ∈ admitted records
+  | _ :: _, .head _ => by
+    cases r with
+    | reported said => exact absurd rfl (notReport said)
+    | started => simp [admitted]
+    | cancelSent => simp [admitted]
+    | answered _ => simp [admitted]
+    | frozen _ => simp [admitted]
+  | x :: _, .tail _ later => by
+    have kept := kept_by_admitted notReport later
+    cases x <;> simp [admitted, kept]
+
+/-- Whatever a run observed, a record its claim of done may cite is admitted
+history, so a report is never the evidence of done. -/
+theorem a_cited_record_is_admitted (s : State) (inputs : List Input) {r : Record}
+    (cited : r.citable = true) (h : r ∈ ledger s inputs) :
+    r ∈ admitted (ledger s inputs) :=
+  kept_by_admitted (fun said same => by subst same; simp [Record.citable] at cited) h
 
 end HarnessRun
