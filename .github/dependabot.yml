@@ -1,34 +1,47 @@
 # Dependency updates, opened as pull requests so every bump goes through
 # the same gates as any other change.
 #
-# Three entries, split by importance rather than by ecosystem. What the
-# repository pins deliberately is its direct dependencies, and a change to
-# one matters the way an upstream change does - so those are checked daily.
-# A version update still waits out the platform's three-day cooldown, left
-# at its default because being the first machine to compile a fresh release
-# buys one day of freshness and carries the whole risk of a compromised
-# one; security updates ignore the cooldown, so a vulnerability fix is
-# never delayed by it. Dependabot's finest interval is daily and there is
-# no event trigger; a webhook-fired updater would be a second mechanism
-# with a second state, and this repository does not keep two authorities
-# for one thing.
+# One block per ecosystem and directory. GitHub accepts a second block for
+# an ecosystem only when the two directories do not overlap, and a file
+# that breaks the rule is not reported where a pull request shows: the
+# service keeps running the last file it accepted. So `/` has exactly one
+# cargo block.
 #
-# Every entry's commit prefix is `card-S0.DEPS`, a card reserved for
+# Version updates cover direct dependencies only and are checked daily:
+# what the repository pins deliberately is its direct dependencies, and a
+# change to one matters the way an upstream change does. Direct-only is
+# the service's default, which is why no cargo block writes `allow`:
+# `allow` filters security updates as well, and a vulnerable crate deep in
+# the lockfile must still get its pull request. A transitive version moves
+# in a change of its own, by `cargo update`, where the whole lockfile diff
+# is read at once.
+#
+# A version update waits out the platform's three-day cooldown, left at
+# its default because being the first machine to compile a fresh release
+# buys one day of freshness and carries the whole risk of a compromised
+# one. Security updates are switched on in the repository settings rather
+# than here, and they ignore the cooldown, so a vulnerability fix is never
+# delayed by it. Dependabot's finest interval is daily and there is no
+# event trigger; a webhook-fired updater would be a second mechanism with
+# a second state, and this repository does not keep two authorities for
+# one thing.
+#
+# Every block's commit prefix is `card-S0.DEPS`, a card reserved for
 # dependency bumps: Dependabot adds `: ` after a prefix that ends in a
 # letter, so its subjects pass the commit-message check in ci.yml
 # (xtask-SPEC.md section 8-35) under the same rule as any other commit.
 #
-# Transitive dependencies ride the weekly cadence: nobody designed them in,
-# and a weekly grouped PR is cheap to review while a daily transitive bump
-# would be noise.
+# Crates that must move together are one group, and each group is listed
+# before the catch-all `patch-and-minor`, because an update joins the
+# first group it matches.
 #
 # The JavaScript side of the tree is `client/`, whose dependencies bun
 # resolves into `client/bun.lock`. No entry covers it yet: Dependabot's bun
 # updater reads lockfile version 1, while bun writes version 2 from 1.4
 # onward, so an entry would fail on every run instead of opening pull
-# requests. It goes in once the updater reads version 2. Until then the two
-# runtime dependencies are pinned to exact versions and the npm gate
-# refuses a third.
+# requests. It goes in once the updater reads version 2. Until then the
+# runtime dependencies `RUNTIME` in `tools/xtask/src/npm.rs` lists are
+# pinned to exact versions and the npm gate refuses any other.
 version: 2
 
 updates:
@@ -45,34 +58,75 @@ updates:
       actions:
         patterns: ["*"]
 
-  # The direct class: checked daily, patch and minor in one grouped PR per
-  # day, major alone - a major is a decision, and a decision needs its own
-  # PR. Each is reviewed against `just check` like any other change.
+  # The workspace. Patch and minor updates arrive in one grouped PR a day,
+  # a major alone - a major is a decision, and a decision needs its own PR.
+  #
+  # wasmtime and wasmtime-wasi require each other's exact version, and
+  # cap-std and cap-fs-ext share cap-primitives with wasmtime-wasi, so any
+  # one of them moved alone either fails to resolve or puts a second copy
+  # into the lockfile. They are one group. wasmtime stays on its
+  # long-term-support line (every twelfth major, supported for 24 months),
+  # which receives security fixes as patches, so its majors are ignored,
+  # and so are cap-std's, which follow wasmtime-wasi's. Moving to the next
+  # line is a change made by hand.
+  #
+  # idna_adapter chooses idna's Unicode backend by its version line, and
+  # the workspace holds it on the 1.1 line on purpose, so its minors and
+  # majors are ignored. Its patches are not: `ignore` applies to security
+  # updates as well, and a fix on the 1.1 line must still arrive.
   - package-ecosystem: cargo
     directory: /
     schedule:
       interval: daily
-    allow:
-      - dependency-type: direct
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "card-S0.DEPS"
+    ignore:
+      - dependency-name: "wasmtime*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "cap-std"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "cap-fs-ext"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "idna_adapter"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+    groups:
+      wasmtime:
+        patterns: ["wasmtime", "wasmtime-*", "cap-std", "cap-fs-ext"]
+      # axum carries tokio-tungstenite, and the workspace also names
+      # tokio-tungstenite directly; the lockfile holds one copy of the
+      # WebSocket protocol only while the two move together.
+      axum:
+        patterns: ["axum", "axum-*", "tokio-tungstenite", "tungstenite"]
+      # keyring-core defines the credential API that every platform store
+      # implements, so a store built against another keyring-core does not
+      # compile against this one.
+      keyring:
+        patterns: ["keyring-core", "*-keyring-store"]
+      # reqwest's TLS feature sets a lower bound on rustls, so a reqwest
+      # bump often needs the rustls bump beside it.
+      rustls:
+        patterns: ["rustls", "reqwest"]
+      patch-and-minor:
+        update-types: ["patch", "minor"]
+
+  # desktop/ builds outside the workspace with a lockfile of its own, and
+  # it is also a path dependency of the binary: the root lockfile carries
+  # its dependencies too, and `xtask guard` holds the versions it shares
+  # with the workspace equal. A manifest change made from here alone would
+  # be red by construction, so this block updates desktop/Cargo.lock only;
+  # a version requirement moves at the root, with both manifests in one
+  # change. The block goes when desktop joins the workspace.
+  - package-ecosystem: cargo
+    directory: /desktop
+    schedule:
+      interval: daily
+    versioning-strategy: lockfile-only
     open-pull-requests-limit: 5
     commit-message:
       prefix: "card-S0.DEPS"
     groups:
-      patch-and-minor:
-        update-types: ["patch", "minor"]
-
-  # The transitive class: weekly, grouped. A version that only a dependency
-  # of a dependency pins is not a decision this repository made.
-  - package-ecosystem: cargo
-    directory: /
-    schedule:
-      interval: weekly
-      day: monday
-    allow:
-      - dependency-type: indirect
-    open-pull-requests-limit: 10
-    commit-message:
-      prefix: "card-S0.DEPS"
-    groups:
+      windows:
+        patterns: ["windows", "windows-*"]
       patch-and-minor:
         update-types: ["patch", "minor"]
