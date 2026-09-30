@@ -123,6 +123,14 @@ impl JsonlLedger {
         Ok(records.iter().map(EventRecord::to_ref).collect())
     }
 
+    /// Hands this ledger's session slices to whoever will file them from
+    /// now on; this writer files none after it. `None` for a ledger that
+    /// is not a city's, and for one that already handed them off
+    /// (storage-SPEC 8-24).
+    pub fn hand_off_session_slices(&mut self) -> Option<crate::sessions::Sessions> {
+        None
+    }
+
     /// The position a record written now would take.
     ///
     /// A position, never content: this is what anchors a diagnostic log

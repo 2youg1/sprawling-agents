@@ -14,7 +14,9 @@
 //! and nothing else consumes it.
 //!
 //! **One writer, after durability.** [`Sessions::absorb`] is called by
-//! [`crate::JsonlLedger`] on the accounting thread once a wave is synced.
+//! [`crate::JsonlLedger`] on the accounting thread once a wave is synced,
+//! or, once the ledger has handed the slices off, by the thread that
+//! took them - a served city's view thread (storage-SPEC 8-24).
 //! A refusal is reported and skipped: the history already has the record,
 //! and a disposable artifact must never fail history's caller.
 //!
@@ -58,7 +60,7 @@ pub(crate) const SLICE_MAGIC: &str = "slices v1";
 /// adapter holds the segment handle it appends through, and a projection
 /// that took that handle away between every two records would make the
 /// city's hot path pay for a side artifact.
-pub(crate) struct Sessions {
+pub struct Sessions {
     layout: CityLayout,
     ledger: PathBuf,
     vfs: RealFs,
@@ -108,7 +110,7 @@ impl Sessions {
     /// # Errors
     /// Propagates a slice that cannot be read, laid down or appended. The
     /// caller reports it; the Ledger is already durable either way.
-    pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), StorageError> {
+    pub fn absorb(&mut self, record: &EventRecord) -> Result<(), StorageError> {
         let Some(addr) = record.addr() else {
             return Ok(());
         };

@@ -32,6 +32,8 @@ pub use jsonl::{TailLine, TailLines};
 // room, disposable, read by nobody in the product (storage-SPEC 8-24).
 mod sessions;
 
+pub use sessions::Sessions;
+
 #[cfg(any(test, feature = "fault"))]
 mod fault_fs;
 

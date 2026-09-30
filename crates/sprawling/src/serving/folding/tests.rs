@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use kernel::EventRecord;
 
-use super::{Broadcast, Copies, spawn_folding};
+use super::{Broadcast, CUT_WAITS_ABOVE, Cadence, Copies, Folded, spawn_folding};
 use crate::assembly::init_city;
 use crate::serving::standing::monotonic_now;
 use accounting::person::CorePriority;
@@ -60,7 +60,12 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
     );
 
     let folding = writer.join().unwrap();
-    drop((folding.observer, folding.machine, folding.lend));
+    drop((
+        folding.observer,
+        folding.machine,
+        folding.lend,
+        folding.keep_slices,
+    ));
     folding.thread.join().unwrap();
     assert_eq!(head.read(), Some(genesis.seq()));
     let mut folded_here = Views::new(dir.path());
@@ -103,7 +108,12 @@ fn the_fold_thread_cuts_a_snapshot_a_later_read_resumes_from() {
     for record in &records {
         (folding.observer)(record);
     }
-    drop((folding.observer, folding.machine, folding.lend));
+    drop((
+        folding.observer,
+        folding.machine,
+        folding.lend,
+        folding.keep_slices,
+    ));
     folding.thread.join().unwrap();
 
     let resumed = start::<Views>(&report.ledger_dir).unwrap();
@@ -132,4 +142,30 @@ fn heard_within(
         }
         std::thread::sleep(Duration::from_millis(1));
     }
+}
+
+/// A cut that falls due waits while the fold is further behind the writer
+/// than the bound, and is handed out again once it has caught up
+/// (sprawling-SPEC.md 8-123).
+#[test]
+fn a_cut_waits_while_the_fold_is_behind() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let genesis = EventRecord::parse_line(
+        storage::read_raw_lines_at(&report.ledger_dir)
+            .unwrap()
+            .first()
+            .unwrap(),
+    )
+    .unwrap();
+    let mut cadence = Cadence::default();
+    cadence.folded(Duration::from_millis(1), Some(&genesis), Folded::Clean);
+
+    assert_eq!(
+        (
+            cadence.due(CUT_WAITS_ABOVE + 1).map(|record| record.seq()),
+            cadence.due(CUT_WAITS_ABOVE).map(|record| record.seq()),
+        ),
+        (None, Some(genesis.seq()))
+    );
 }

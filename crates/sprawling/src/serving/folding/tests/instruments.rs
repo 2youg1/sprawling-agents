@@ -123,7 +123,7 @@ fn instrument_view_backlog() {
     let (sent_at, observer) = writer.join().unwrap();
     reading.store(false, Ordering::Relaxed);
     let asked = reader.join().unwrap();
-    drop((observer, folding.machine, folding.lend));
+    drop((observer, folding.machine, folding.lend, folding.keep_slices));
     folding.thread.join().unwrap();
 
     let burst = heard_at.last().unwrap().duration_since(sent_at[0]);

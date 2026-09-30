@@ -31,6 +31,14 @@ impl RunWorker {
     pub fn health(&self) -> Health {
         self.flight.gate.health()
     }
+
+    /// Hands this worker's session slices to the thread that will file
+    /// them from now on, so this thread files none (sprawling-SPEC.md
+    /// 8-123). `None` when they were handed off already, or the ledger
+    /// is not a city's.
+    pub fn hand_off_session_slices(&mut self) -> Option<storage::Sessions> {
+        self.ledger.hand_off_session_slices()
+    }
 }
 
 /// The accounting thread's loop: every relay request the one queue

@@ -360,3 +360,38 @@ fn a_new_room_is_filed_without_reading_the_ledger() {
     expected.push(b'\n');
     assert_eq!(slice, expected);
 }
+
+/// A served city hands its slices to the thread that files them, so the
+/// writer that appends a record files nothing, and the slices it handed
+/// off file that record once they are shown it (storage-SPEC 8-24).
+#[test]
+fn a_ledger_that_handed_off_its_slices_files_nothing_itself() {
+    let tmp = tempfile::tempdir().unwrap();
+    let ledger_dir = city(tmp.path());
+    let (mut ledger, _) = JsonlLedger::open(&ledger_dir, TimeMs::new(0)).unwrap();
+    let handed = ledger.hand_off_session_slices();
+    let handed_twice = ledger.hand_off_session_slices();
+    ledger
+        .append_all(vec![draft(
+            Some("webapp/api-rewrite"),
+            EventKind::RunStarted,
+        )])
+        .unwrap();
+    let filed_by_the_writer = slices(tmp.path()).len();
+    if let Some(mut slices_kept) = handed {
+        for line in ledger.read_raw_lines().unwrap() {
+            slices_kept
+                .absorb(&EventRecord::parse_line(&line).unwrap())
+                .unwrap();
+        }
+    }
+
+    assert_eq!(
+        (
+            handed_twice.is_none(),
+            filed_by_the_writer,
+            slices(tmp.path()).into_keys().collect::<Vec<_>>()
+        ),
+        (true, 0, vec!["api-rewrite.jsonl".to_owned()])
+    );
+}

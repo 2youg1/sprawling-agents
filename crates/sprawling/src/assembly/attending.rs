@@ -119,6 +119,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         observer,
         machine,
         lend,
+        keep_slices,
         thread: fold_thread,
     } = spawn_folding(
         Copies {
@@ -186,6 +187,16 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                 machine,
                 interrupts: Arc::new(move |run: RunId| interrupt_desk.interrupt_for(run)),
             });
+            // The session slices go to the view thread before the
+            // observer is attached, so every record from here on is filed
+            // there and none on the accounting thread (sprawling-SPEC.md
+            // 8-123).
+            // The sender is consumed either way: the fold thread ends only
+            // once every sender is gone, and this thread joins it.
+            match worker.hand_off_session_slices() {
+                Some(slices) => keep_slices(slices),
+                None => drop(keep_slices),
+            }
             // The tail is emptied on this thread, right after the result
             // is written, so no piece of that call can arrive after it.
             let mut folding = observer;

@@ -4,8 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The thread the views are folded on and published from, so neither
-//! the writer nor the fold waits for a reader (sprawling-SPEC.md 8-99).
+//! the writer nor the fold waits for a reader (sprawling-SPEC.md 8-99);
+//! it also files the session slices a served writer hands it, and
+//! counts how far it is behind the writer (8-123).
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
@@ -21,14 +24,55 @@ pub(crate) struct Folding {
     pub(crate) observer: Box<dyn FnMut(&EventRecord) + Send>,
     pub(crate) machine: Arc<dyn Fn(wire::DoctorAnswer) + Send + Sync>,
     pub(crate) lend: Box<dyn FnOnce(Arc<Mutex<gateway::Custodian>>) + Send>,
+    /// Where a served writer hands its session slices, so the view thread
+    /// files them instead of the accounting thread (sprawling-SPEC.md 8-123).
+    pub(crate) keep_slices: Box<dyn FnOnce(storage::Sessions) + Send>,
     pub(crate) thread: std::thread::JoinHandle<()>,
 }
+
+/// How many committed records the writer has sent the view thread that
+/// it has not yet folded and broadcast (sprawling-SPEC.md 8-123).
+#[derive(Clone, Default)]
+pub(crate) struct Backlog(Arc<AtomicU64>);
+
+impl Backlog {
+    /// The records sent and not yet broadcast, read now.
+    pub(crate) fn records(&self) -> u64 {
+        self.0.load(Ordering::Relaxed)
+    }
+
+    fn sent(&self) {
+        self.moved(|held| held.saturating_add(1));
+    }
+
+    fn broadcast(&self, records: u64) {
+        self.moved(|held| held.saturating_sub(records));
+    }
+
+    /// One atomic step of the count. The two threads' steps may land in
+    /// either order, so each saturates rather than wraps.
+    fn moved(&self, step: impl Fn(u64) -> u64) {
+        let mut held = self.0.load(Ordering::Relaxed);
+        while let Err(now) =
+            self.0
+                .compare_exchange_weak(held, step(held), Ordering::Relaxed, Ordering::Relaxed)
+        {
+            held = now;
+        }
+    }
+}
+
+/// More records than this sent and not yet broadcast, and a views
+/// snapshot that falls due waits: the thread catches up first
+/// (sprawling-SPEC.md 8-123).
+pub(crate) const CUT_WAITS_ABOVE: u64 = 256;
 
 /// What the writer thread hands the view fold, in the order it wrote it.
 enum Fold {
     Committed(EventRecord),
     Examined(wire::DoctorAnswer),
     Lent(Arc<Mutex<gateway::Custodian>>),
+    Slices(storage::Sessions),
 }
 
 /// The two copies of the views the fold alternates between: the one
@@ -63,9 +107,14 @@ pub(crate) fn spawn_folding(
     let (committed, arriving) = mpsc::channel::<Fold>();
     let examined = committed.clone();
     let lent = committed.clone();
+    let handed = committed.clone();
+    let backlog = Backlog::default();
+    let behind = backlog.clone();
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
-        .spawn(move || fold_until_closed(copies, &arriving, &broadcast, (setting, clock)))
+        .spawn(move || {
+            fold_until_closed(copies, &arriving, (&broadcast, &behind), (setting, clock));
+        })
         .map_err(|source| {
             AxError::failure(
                 AxCode::StorageFatal,
@@ -76,6 +125,7 @@ pub(crate) fn spawn_folding(
         })?;
     Ok(Folding {
         observer: Box::new(move |record: &EventRecord| {
+            backlog.sent();
             if committed.send(Fold::Committed(record.clone())).is_err() {
                 eprintln!(
                     "the view fold has ended; record {} reaches neither the views nor the clients until the server restarts",
@@ -97,6 +147,13 @@ pub(crate) fn spawn_folding(
                 );
             }
         }),
+        keep_slices: Box::new(move |slices: storage::Sessions| {
+            if handed.send(Fold::Slices(slices)).is_err() {
+                eprintln!(
+                    "the view fold has ended; the session slices are not written until the server restarts"
+                );
+            }
+        }),
         thread,
     })
 }
@@ -114,11 +171,12 @@ pub(crate) fn spawn_folding(
 fn fold_until_closed(
     copies: Copies,
     arriving: &mpsc::Receiver<Fold>,
-    broadcast: &Broadcast,
+    (broadcast, backlog): (&Broadcast, &Backlog),
     (setting, clock): (CorePriority, fn() -> Instant),
 ) {
     let mut core = CoreThread::raise("sprawling-views", setting, monotonic_now());
     let mut cadence = Cadence::default();
+    let mut slices: Option<storage::Sessions> = None;
     let Copies {
         published,
         mut spare,
@@ -138,7 +196,8 @@ fn fold_until_closed(
         spare = reclaim(retired);
         fold_batch(&mut spare, &batch);
         cadence.folded(fold_cost, last_committed(&batch), verdict);
-        if let Some(record) = cadence.due() {
+        backlog.broadcast(file_slices(&mut slices, batch));
+        if let Some(record) = cadence.due(backlog.records()) {
             cut_views_snapshot(&spare, &record, clock, &mut cadence);
         }
         core.record_turn_lowering_when_busy(woke, monotonic_now());
@@ -194,8 +253,9 @@ impl Cadence {
         }
     }
 
-    /// The record a snapshot is due at now, when one is.
-    fn due(&self) -> Option<EventRecord> {
+    /// The record a snapshot is due at now, when one is and the fold is
+    /// not more than [`CUT_WAITS_ABOVE`] records behind the writer.
+    fn due(&self, _backlog: u64) -> Option<EventRecord> {
         let spent_enough = self
             .last_cut_cost
             .is_none_or(|cut| self.folded_since_cut >= cut.saturating_mul(CUT_SHARE_INVERSE));
@@ -240,8 +300,29 @@ fn cut_views_snapshot(
 fn last_committed(batch: &[Fold]) -> Option<&EventRecord> {
     batch.iter().rev().find_map(|fold| match fold {
         Fold::Committed(record) => Some(record),
-        Fold::Examined(_) | Fold::Lent(_) => None,
+        Fold::Examined(_) | Fold::Lent(_) | Fold::Slices(_) => None,
     })
+}
+
+/// Files each committed record of `batch` into the session slices once
+/// they have been handed over, in arrival order, and answers how many
+/// committed records the batch carried. A refused slice is reported and
+/// skipped, as the writer did when it filed them (storage-SPEC 8-24).
+fn file_slices(slices: &mut Option<storage::Sessions>, batch: Vec<Fold>) -> u64 {
+    let mut committed: u64 = 0;
+    for fold in batch {
+        match fold {
+            Fold::Committed(record) => {
+                committed = committed.saturating_add(1);
+                if let Some(Err(refused)) = slices.as_mut().map(|kept| kept.absorb(&record)) {
+                    eprintln!("a session slice was refused and skipped: {refused}");
+                }
+            }
+            Fold::Slices(handed) => *slices = Some(handed),
+            Fold::Examined(_) | Fold::Lent(_) => {}
+        }
+    }
+    committed
 }
 
 /// Moves the head past `record` and sends it to every client. The frame
@@ -283,6 +364,7 @@ fn fold_batch(views: &mut Views, batch: &[Fold]) -> Folded {
                 views.lend_the_vault(Arc::clone(vault));
                 verdict
             }
+            Fold::Slices(_) => verdict,
         })
 }
 
