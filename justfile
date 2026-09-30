@@ -403,7 +403,7 @@ proof:
 sim:
     cargo test --package citysim --locked
 
-# Generate or refresh a crate SPEC skeleton.
+# Create a crate's Spec.lean skeleton (tools/xtask/xtask-SPEC.md section 8-41).
 spec crate:
     cargo xtask spec {{crate}}
 

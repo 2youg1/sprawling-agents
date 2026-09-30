@@ -8,7 +8,7 @@
 fn a_relocated_package_gets_its_spec_skeleton_in_its_own_directory() {
     let root = crate::root::fixture::relocated("spec");
     let made = super::run(&root, Some("k"));
-    let landed = root.join("tools/k/k-SPEC.md").is_file();
+    let landed = root.join("tools/k/Spec.lean").is_file();
     std::fs::remove_dir_all(&root).unwrap();
     assert!(made.is_ok() && landed, "{made:?}");
 }

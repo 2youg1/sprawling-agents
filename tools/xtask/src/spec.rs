@@ -3,73 +3,77 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `cargo xtask spec <crate>`: create a `<crate>-SPEC.md` skeleton with
-//! the seventeen sections a SPEC is written in, in the directory of the
-//! package whose lib (or, for a tool without one, whose package) goes by
-//! that name.
-//! Creation only — an existing SPEC is never overwritten (the SPEC is the
-//! construction authority; regenerating it would erase decisions).
+//! `cargo xtask spec <lib>`: create a crate's `Spec.lean` with the MPL
+//! notice and the seventeen numbered section comments `skills/sdd` lists
+//! (xtask-SPEC.md section 8-41), in the directory of the package whose lib
+//! (or, for a tool without one, whose package) goes by that name.
+//! Creation only: an existing `Spec.lean` is never overwritten, because
+//! everything past the skeleton is a specification somebody wrote.
 
 use std::path::Path;
 
+use crate::header::{Leader, notice};
 use crate::members;
 use crate::report::XtaskError;
 
-const SECTIONS: [&str; 19] = [
-    "## 1 需求分解",
-    "## 2 验收标准",
-    "## 3 假设与歧义",
-    "## 4 现状分析",
-    "## 5 权威信源",
-    "## 6 命名统一",
-    "## 7 模块边界\n\n**三件邻居的活，及它们各自的主人**（写「X 归 Y」而非「不做 X」：前者告诉施工者去哪，后者只告诉他别去哪里）：",
-    "## 8 接口先行",
-    "## 8.5 两个设计\n\n（两个实质不同的接口方案，按杠杆率与缝的位置比较；落选方案就地留痕。）",
-    "## 9 工作流程",
-    "## 10 实现逻辑",
-    "## 11 边界枚举",
-    "## 12 Decisions\n\n（编号条目：决定、理由、它胜过的方案；每个错误码也在这里回答「能否让它不可能发生」——设计规则十。）",
-    "## 13 依赖选型",
-    "## 14 硬编码声明",
-    "## 15 影响面",
-    "## 16 测试与约束",
-    "## 17 模型体验\n\n（入窗什么｜token 代价｜对 prefix 缓存的影响；无贡献则写「零字节，因为……」。）",
-    "## 18 文档同步",
+/// The seventeen responsibilities of `skills/sdd`, in its order. What each
+/// section holds is that skill's to say, so the skeleton carries titles only.
+const SECTIONS: [&str; 17] = [
+    "需求分解",
+    "验收标准",
+    "假设与歧义",
+    "现状分析",
+    "权威信源",
+    "命名统一",
+    "模块边界",
+    "接口先行",
+    "工作流程",
+    "实现逻辑",
+    "边界枚举",
+    "错误处理",
+    "依赖选型",
+    "硬编码声明",
+    "影响面",
+    "测试与约束",
+    "文档关系",
 ];
 
-pub(crate) fn run(root: &Path, crate_name: Option<&str>) -> Result<String, XtaskError> {
-    let name = crate_name.ok_or_else(|| XtaskError::Doc {
+pub(crate) fn run(root: &Path, lib: Option<&str>) -> Result<String, XtaskError> {
+    let lib = lib.ok_or_else(|| XtaskError::Doc {
         file: "spec".to_owned(),
-        msg: "usage: cargo xtask spec <crate>".to_owned(),
+        msg: "usage: cargo xtask spec <lib>".to_owned(),
     })?;
     let found = members::members(root)?;
-    let dir = root.join(&members::find(&found, name)?.dir);
-    let path = dir.join(format!("{name}-SPEC.md"));
+    let path = root
+        .join(&members::find(&found, lib)?.dir)
+        .join("Spec.lean");
     if path.exists() {
         return Ok(format!(
             "already exists, left untouched: {}",
             path.to_string_lossy()
         ));
     }
-    std::fs::write(&path, skeleton(name)).map_err(|source| XtaskError::Io {
+    std::fs::write(&path, skeleton(lib)).map_err(|source| XtaskError::Io {
         path: path.to_string_lossy().into_owned(),
         source,
     })?;
     Ok(format!("created {}", path.to_string_lossy()))
 }
 
-fn skeleton(name: &str) -> String {
-    let mut body = format!(
-        "# {name}-SPEC.md\n\n> crate：`{name}`。本 SPEC 先于代码存在；实现不多不少地遵守本文。\n\
-         > 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。\n\
-         > 动手前先读所用工具与依赖的**官方文档或官方 agent 指南**，再写本文的接口节。\n"
-    );
-    for section in SECTIONS {
-        body.push('\n');
-        body.push_str(section);
-        body.push('\n');
-    }
-    body
+fn skeleton(lib: &str) -> String {
+    let head: String = notice(Leader::Lean)
+        .iter()
+        .map(|row| format!("{row}\n"))
+        .collect();
+    let sections: String = SECTIONS
+        .iter()
+        .zip(1_u8..)
+        .map(|(title, number)| format!("\n/-! ## {number} {title}\n-/\n"))
+        .collect();
+    format!(
+        "{head}\n/-! # {lib} 的规格\n\n\
+         `{lib}` 的规格入口；分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。\n-/\n{sections}"
+    )
 }
 
 #[cfg(test)]
