@@ -14,11 +14,10 @@
 //! opens.
 //!
 //! The rule this module owns: **the alias family is refused whole** -
-//! junction, symlink and hard link alike - literally where this crate
-//! reads the link count, and by landing the write in a fresh entry where
-//! it does not yet. The alternative, skipping an alias and counting it, lands
-//! part of a write and breaks the all-or-nothing contract the restore
-//! face is built on.
+//! junction, symlink and hard link alike, literally, on every platform.
+//! The alternative, skipping an alias and counting it, lands part of a
+//! write and breaks the all-or-nothing contract the restore face is
+//! built on.
 
 use std::path::{Path, PathBuf};
 
@@ -28,16 +27,15 @@ use crate::error::StorageError;
 /// link are both reparse points and `file_type().is_symlink()` answers
 /// true for either, which is why they share a variant: refusing the
 /// family is one rule, not one rule per reparse tag. The third member
-/// of the family - the hard link - is classified where this crate reads
-/// a link count (Unix `nlink`) and is answered by the write mechanics
-/// where it does not yet (Windows; storage-SPEC 8-25 and §3).
+/// of the family - the hard link - is a regular file whose link count is
+/// above one (storage-SPEC 8-25 and §3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AliasKind {
     /// A symbolic link or a directory junction: the name leads
     /// somewhere else entirely.
     Link,
     /// A file with more than one name: one write lands in every name at
-    /// once. Produced only where a platform can report it.
+    /// once.
     HardLink,
 }
 
@@ -56,11 +54,8 @@ impl std::fmt::Display for AliasKind {
 /// there yet is the ordinary way a file gets created. The question is
 /// asked with `symlink_metadata`, so a dangling link answers `Link`
 /// rather than disappearing. A hard link is one inode under two names,
-/// and a write at one name changes the other; Unix reports the link
-/// count on the metadata; std reports it on Windows only through the
-/// unstable `windows_by_handle` feature and the safe third-party reader
-/// is not adopted (storage-SPEC §3), so there the write faces answer it
-/// by landing a fresh entry instead (storage-SPEC 8-25, §3).
+/// and a write at one name changes the other, so a regular file with a
+/// link count above one is one.
 pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError> {
     let meta = match std::fs::symlink_metadata(path) {
         Ok(meta) => meta,
@@ -77,16 +72,51 @@ pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError> {
         return Ok(Some(AliasKind::Link));
     }
     // Only a regular file counts: a directory's link count measures its
-    // subdirectories, not aliasing, and Windows is answered by the write
-    // faces instead (storage-SPEC §3).
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        if meta.is_file() && meta.nlink() > 1 {
-            return Ok(Some(AliasKind::HardLink));
-        }
+    // subdirectories, not aliasing.
+    if !meta.is_file() {
+        return Ok(None);
     }
-    Ok(None)
+    Ok(match links_of(path, &meta)? {
+        Some(links) if links > 1 => Some(AliasKind::HardLink),
+        Some(_) | None => None,
+    })
+}
+
+/// How many names the regular file at `path` has; `None` when it is gone
+/// since `meta` was read.
+#[cfg(unix)]
+fn links_of(_path: &Path, meta: &std::fs::Metadata) -> Result<Option<u64>, StorageError> {
+    use std::os::unix::fs::MetadataExt;
+    Ok(Some(meta.nlink()))
+}
+
+/// How many names the regular file at `path` has, read through a handle,
+/// because std reports the count on Windows only on the unstable
+/// `windows_by_handle` feature. The handle asks for no data access, so it
+/// collides with no other handle's share mode - a file another process
+/// holds exclusively is counted like any other - and it does not follow
+/// a reparse point, although a link never reaches here. `None` when the
+/// file is gone since `_meta` was read.
+#[cfg(windows)]
+fn links_of(path: &Path, _meta: &std::fs::Metadata) -> Result<Option<u64>, StorageError> {
+    use std::os::windows::fs::OpenOptionsExt;
+    /// `FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS`, as the
+    /// Win32 headers spell them.
+    const NO_FOLLOW: u32 = 0x0020_0000 | 0x0200_0000;
+    let counted = std::fs::OpenOptions::new()
+        .access_mode(0)
+        .custom_flags(NO_FOLLOW)
+        .open(path)
+        .and_then(|file| winapi_util::file::information(&file));
+    match counted {
+        Ok(info) => Ok(Some(info.number_of_links())),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(source) => Err(StorageError::Io {
+            op: "count the names of a write target",
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
 }
 
 /// The refusal every face greets an alias with.
@@ -362,8 +392,8 @@ pub(crate) mod tests {
                 let mut vfs = RealFs::new();
                 match WriteTarget::at("write a bundle file", &target) {
                     Ok(cleared) => {
-                        // The face lands the write in a fresh entry:
-                        // every other name of the inode keeps its bytes.
+                        // Every alias above is refused; a name that
+                        // cleared lands in a fresh entry all the same.
                         land(&mut vfs, cleared, b"landed", Bits::OfReplaced).unwrap();
                     }
                     Err(StorageError::Alias { .. }) => {}

@@ -18,6 +18,12 @@ thiserror.workspace = true
 # the pre-wave commit oid is what a file_discarded points back at.
 git2.workspace = true
 
+# The link count of a file on Windows: std reads it only on the unstable
+# `windows_by_handle` feature, and this crate writes no unsafe
+# (storage-SPEC 8-25).
+[target.'cfg(windows)'.dependencies]
+winapi-util.workspace = true
+
 [features]
 fault = []
 conformance = ["kernel/conformance"]
