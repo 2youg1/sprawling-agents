@@ -31,7 +31,7 @@ toml.workspace = true
 # Shelling out to gzip would make the reading depend on which gzip is
 # on the path; this lands in workspace tooling only, never in the
 # product binary.
-flate2 = "1"
+flate2.workspace = true
 # Measuring where a function begins and ends is a parsing problem: a
 # brace counter gets `'{'`, a line-continued string and `#[cfg(test)]`
 # wrong, and each mistake produces a wrong list of offenders. Workspace
