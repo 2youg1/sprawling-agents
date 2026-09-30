@@ -176,6 +176,7 @@ pub(crate) struct Violation {
 **12-8 门把 Lean 当文本读，不跑 Lean。** `spec`、`specalign`、`wiring` 读一份 Lean 规格时读的是源文本里几种受限的形状（§8-43）：一行一个构造子的 `inductive`、一行一臂的 `def`、`import` 行、去掉注释与字符串之后剩下的词。Lean 与 Rust 两侧的名字逐字相同，门比的是同一个拼写，不做大小写或下划线的换算——换算规则本身就是第二套文法。理由：门在 `gates` 里并行，每道毫秒到百毫秒；判一张表若要先 `lake build` 再读 Lean 的输出，门就依赖构建的次序，而证明本来已经归 `just models`。Lean 自己守着受限形状背后的那一半：一个 `def` 的 match 漏了构造子，`lake build` 编不过，所以门只需判「两侧的名单与映射相同」。被击败的备选：写一个 Lean 程序在 elaborate 之后把名单导成 JSON 给门读——门从此要先等一次构建，而那个导出程序是名单的第二个读法，要自己的测试与自己的格式。**重开参数**：某张表的形状在一行一臂里写不下（例如一个臂要按参数再分支），那时这张表改由 Lean 侧导出。
 
 **12-9 modmap 判每一个包，门自己所在的包除外。** 范围是 `members` 列出的全部包（§8-39，desktop 在内），减去本门编进去的那个包（`CARGO_PKG_NAME`，与 `boundary` 读同一个事实）。xtask 的模块由本 SPEC §7 按模块描述，给它的文件另开一张表就是同一份描述的第二个家；其余工具包——今天是 citysim——与产品一样受封闭清单约束，因为它们的文件同样会被顺手新建、同样会忘记翻状态。锚点随之扩大：`specalign` 判 citysim 的 `spec` 列，与判产品的一样（§8-43）。失败的方向是故意的：一个新加的工具包默认受判，第一次提交就看得见一片红，而不是静静少判一个包。被击败的备选：在 citysim 的清单里再写一个 `mapped = true`——同一个包的一个性质分写在 `role` 与 `mapped` 两处；在 `modmap` 里写一张 `MAPPED_TOOLS` 常量表——包的一个性质住进了门里，改包名的那次提交不碰 xtask 也能过编译。
+**12-10 截图矩阵是给人看的产物，不是门。** `cargo xtask shots`（§8-44）不进 `gates::GATES`，不断言任何性质，也不比较两张图：它产出每一页在两个宽度、两种光照下的 PNG 与一份索引，给改画面的人与验收的人逐张看。理由与 `render` 断性质、不断图片（本 SPEC 的「`render`」一节）是同一条：截图对比会被字体 hinting 弄红，也放过没人拍过的错版面，所以机器判性质，人判图片，两件事各有一个工具。页面清单不另写一份：路由取 `client/src/core/route.ts` 里 `BARE` 那张表的键，一个页面里的状态取画出来的页面上每个带 `aria-label` 的顶层 `section`（`#/gallery` 的每个夹具就是这样画的），所以前端改了外壳或加了夹具，这个工具不用跟着改。浏览器只经 `render::engine::browser` 找，与 `render` 门在同样的地方找同样的牌子。被击败的备选：①把截图当 `render` 的第六次开页——门就要为一件不判的事多开一次引擎，门名册上也多一个不会变红的步骤；②在 xtask 里写一张页面清单——前端加一条路由而这里没加，那一页就悄悄没有图。
 
 ## 13 依赖选型
 
@@ -961,5 +962,29 @@ pub(crate) fn dotted(dir: &str) -> String;                       // crates/x →
 - **`check-branch`**：分支的 diff 里有 `.lean`，或有 Lean 包的三个文件（`lakefile.toml`、`lean-toolchain`、`lake-manifest.json`）时，多跑一步 `just models`。`members --owning` 早已略过 `.lean`，所以改 Lean 不会选中 Rust 测试。
 
 **测试**：每条都用测试自己造的夹具：kernel 的 Lean 规格少一个构造子、一臂的 carrier 与枚举不符、锚点指向不存在的分部、已迁移的包写 Markdown 锚点、citysim 的一行指向不存在的节、wire 的 reach 臂读成表、`.lean` 进了 `docnum` 与 `lexicon` 的扫描面、Lean 的块注释里点名一份不在树上的文档、`.lean` 作为不证理由。
+### 8-44 `shots`：每一页、每个状态 × 1440／1920 × 暗／亮的 PNG 与索引（形状 4 适配器）
+
+`cargo xtask shots [--origin <url>]`（`just shots`，先跑 `build-web`）把每一页拍成 PNG，写进 `target/shots/`，并写一份 `target/shots/index.md`。决定见 §12-10。
+
+```rust
+// xtask::shots —— 路由：找产物、找引擎、按页拍、写索引、核对每张图都在
+pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
+// xtask::shots::pages —— 形状 1 判定：拍哪些、叫什么、缺哪些
+pub(super) const FRAMES: [Frame; 2];          // 1440×900、1920×1080
+pub(super) enum Lighting { Dark, Light }
+pub(super) struct Shot { /* route, fold, folds, frame, lighting, states */ }
+pub(super) fn routes_in(route_ts: &str) -> Vec<String>;   // BARE 的键，去掉空键，按表序
+pub(super) fn missing(dir: &Path, shots: &[Shot]) -> Vec<String>;   // 没写出或写空的文件
+pub(super) fn index(shots: &[Shot]) -> String;
+// xtask::shots::camera —— 形状 4 适配器：开引擎、量页、拍一张
+```
+
+- **一页是一条路由在一个窗口里画出的样子，一页里的状态按屏往下拍。** 内容在 `<main>` 里滚动，所以先用 `--dump-dom` 开一次，量 `<main>` 的滚动高度与可见高度，得出要几屏（`fold`）；再每屏、每种光照开一次，用 `--screenshot` 拍下 `<main>` 滚到那一屏时的窗口。量的那一次同时记下每个顶层 `section[aria-label]` 的位置，索引里每张图后面列出落在这一屏里的状态名。文件名 `<route>-<fold 两位>-<宽>-<光照>.png`。
+- **光照经引擎的配色偏好给，不改页面。** 每次运行用一个新的引擎资料目录，页面里的光照设置因此是缺省的 `system`，按 `prefers-color-scheme` 画；引擎开关 `--blink-settings=preferredColorScheme=0` 是暗、`=1` 是亮。这台机器自己的明暗设置于是不影响结果：不带这个开关时，无头引擎跟着操作系统走。
+- **两种来源**：缺省开 `just build-web` 产出的包，与 `render` 一样给包旁边写一份插了脚本的副本（`sprawling-shots.html`，带 `render::engine::preloads` 给出的预取行），跑完删掉；给了 `--origin` 时，路由页开 `<origin>/#/<route>`，那是一座正在服务的城，页面上是真数据，页面不能插脚本，所以每页只拍一屏。
+- **拍完核对**：每张计划中的图都要在、都不为空，否则整次运行以 `XtaskError::Cmd` 失败并列出缺的文件名——引擎有时退出了却没写图，一份缺图的索引读起来像是那一页什么都没有。
+- **失败**：没有包时 `XtaskError::Doc`，recovery 是 `just build-web`；没有引擎时 `XtaskError::Doc`，recovery 是装一个 Chromium 一族的浏览器或设 `SPRAWLING_BROWSER`；读不出 `BARE` 时 `XtaskError::Doc` 点名 `route.ts`；引擎失败沿用 `render::engine::dump` 的 `XtaskError::Cmd`。
+
+**测试**：`shots::pages::tests::every_route_gets_four_pictures`：一份夹具 `route.ts` 读出的每条路由，在两个宽度、两种光照下各有一张图，夹具目录里缺一张时 `missing` 恰好点名那一张。真跑要先 `just build-web`，归整合者或前端会话。
 
 **本节属门禁机具，与产品代码分开提交。**
