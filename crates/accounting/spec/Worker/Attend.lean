@@ -6,7 +6,7 @@
 /-!
 # 记账线程与它唯一的收件队列
 
-规定 `crates/sprawling/src/assembly/attending.rs` 里的循环 `attend`：写一座城 Ledger 的唯一线程，以及它服务的三张嘴——一条 lane 的中转请求、一个从 lane 回家的 run、一条来自 desk 的命令——外加 desk 关门。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（sprawling-SPEC.md 8-42-4）。
+规定 `crates/accounting/src/worker/attend.rs` 里的循环 `attend`：写一座城 Ledger 的唯一线程，以及它服务的三张嘴——一条 lane 的中转请求、一个从 lane 回家的 run、一条来自 desk 的命令——外加 desk 关门。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（sprawling-SPEC.md 8-42-4）。
 
 每张嘴都送进同一条队列。线程阻塞在第一条消息上（`recv`），取走已经排在它后面的每一条（`try_recv` 直到取空），按到达次序服务这一批。排程欠下的截止时刻到了，与来一条消息一样唤醒它。
 
@@ -19,7 +19,7 @@
 被服务的消息除了追加之外还做什么（结算一个 run、回答一个人），归 Rust 代码，这里不建模；这里只建模它追加几条记录。
 -/
 
-namespace Sprawling.Assembly.Attending
+namespace Accounting.Worker.Attend
 
 /-- 到达记账线程的东西。每个分支带着服务它要追加几条记录；关门在这里不追加，因为一座正在关的城要写的，由它仍在服务的消息写。 -/
 inductive Message where
@@ -155,4 +155,4 @@ theorem nothing_is_written_before_the_name_is_home :
 theorem the_naming_wait_is_off_the_accounting_thread :
     ∀ step ∈ namedDispatch, step.onAccountingThread = false → step = .askName := by decide
 
-end Sprawling.Assembly.Attending
+end Accounting.Worker.Attend
