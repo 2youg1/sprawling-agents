@@ -189,6 +189,31 @@ mod tests {
         ));
     }
 
+    /// Handing out a builder installs the process's one crypto provider,
+    /// so the client built from it finds a TLS backend rather than
+    /// panicking at `build()` (gateway-SPEC.md section 8-15).
+    #[test]
+    fn a_builder_handed_out_brings_the_one_crypto_provider_with_it() {
+        let _builder = client_for(Proxying::ExceptLocal, "https://example.invalid");
+
+        let installed = rustls::crypto::CryptoProvider::get_default();
+        assert!(
+            installed.is_some(),
+            "client_for handed out a builder with no process-wide crypto provider installed"
+        );
+        let suites = |provider: &rustls::crypto::CryptoProvider| {
+            provider
+                .cipher_suites
+                .iter()
+                .map(|suite| suite.suite())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            suites(installed.unwrap()),
+            suites(&rustls::crypto::aws_lc_rs::default_provider())
+        );
+    }
+
     /// A URL with no scheme has no host to judge, and the report says
     /// nothing about a proxy rather than inventing a reading.
     #[test]

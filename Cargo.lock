@@ -2686,6 +2686,7 @@ dependencies = [
  "keyring",
  "proptest",
  "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "sprawling-kernel",

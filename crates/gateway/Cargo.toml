@@ -16,6 +16,9 @@ serde_json.workspace = true
 # the transport does not (gateway-SPEC 8.5). Blocking: the turn loop is
 # synchronous, and one HTTP call must not asyncify the library.
 reqwest = { workspace = true }
+# Named for one call: `reach::tls` installs aws-lc-rs as the process's
+# rustls provider before any client is built (gateway-SPEC 8-15).
+rustls.workspace = true
 # Chooses the Unicode backend of the `idna` crate reqwest's URL parser
 # uses (gateway-SPEC section 13); no code names it.
 idna_adapter.workspace = true
