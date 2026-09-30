@@ -88,7 +88,7 @@ fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
 const OPENING_PHASES: [&str; 7] = [
     "bind",
     "open the ledger",
-    "verify and fold 3 lines",
+    "fold 3 lines from genesis",
     "cut the standing snapshot",
     "cut the views snapshot",
     "copy the views",

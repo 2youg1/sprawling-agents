@@ -70,12 +70,14 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
     let the_worker_judged = judged(&worker.governance);
     drop(worker);
 
-    let (views, (_ledger, _report, standing)) = fold_city(
+    let (started, (_ledger, _report, standing)) = fold_city(
         &report.ledger_dir,
         crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
         &mut crate::worker::opening_cost::OpeningCost::begin(crate::worker::fixture::monotonic),
+        &mut runtime::diagnostics::Diagnostics::off(),
     )
     .unwrap();
+    let views = started.folded;
     // Answered from what `Views::apply` folded, not from the on-disk index.
     for applied in [
         wire::Query::CityView,

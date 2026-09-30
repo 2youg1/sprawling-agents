@@ -149,12 +149,11 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // the `Diagnostics` was, because the sink is what writes into it.
     let logs = journal.lines();
     // The views the control surface reads, and what the worker inherits,
-    // folded from one verified read of the ledger here; the views are
-    // folded forward by the write observer inside the worker: one fold
-    // rule, two call sites, no second definition of what a view means.
-    // A views snapshot is cut at the last line folded, so a one-shot
-    // read afterwards folds only what arrives after it (sprawling-SPEC
-    // 8-91).
+    // started together from their snapshots on one pass over what they
+    // have not folded (sprawling-SPEC.md 8-122); the views are folded
+    // forward by the write observer inside the worker: one fold rule,
+    // two call sites, no second definition of what a view means. The
+    // history before the snapshots is proved behind the first byte.
     let (mut rebuilt, held) = start_served_views(
         &kernel::layout::CityLayout::new(city_root).ledger(),
         accounting::Clock::now(&super::SystemClock)?,
@@ -209,6 +208,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             vault,
             notice: vault_notice,
             audit_log: beside(&log, &journal),
+            began: cost.began(),
             log,
             held,
             core,

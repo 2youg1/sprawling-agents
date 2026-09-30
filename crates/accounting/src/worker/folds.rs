@@ -7,8 +7,8 @@
 
 use std::path::Path;
 
-use kernel::AxError;
-use runtime::replay::fold_ledger_dir;
+use kernel::{AxError, RunId, Seq};
+use runtime::diagnostics::{Diagnostics, Level, Site};
 use storage::{JsonlLedger, OpenReport};
 
 // The governance fold lives in `views`, where the reading side keeps
@@ -16,9 +16,7 @@ use storage::{JsonlLedger, OpenReport};
 // the same name a page is answered under.
 pub(super) use crate::views::Governance;
 use crate::views::Views;
-use crate::views::snapshot::start::{
-    SnapshotFold, city_root_of, cut, cut_at, last_line, start_audited,
-};
+use crate::views::snapshot::start::{SnapshotFold, Started, cut, start_audited, start_both};
 
 use super::Entrance;
 use super::opening_cost::{OpeningCost, Phase};
@@ -86,13 +84,19 @@ impl Standing {
     }
 }
 
+/// The opened ledger, what opening it repaired, and the standing folded
+/// under its writer lock: what a served worker is handed to hold.
+pub(crate) type Held = (JsonlLedger, OpenReport, Standing);
+
 /// What a served city starts from: its views and the worker's standing,
-/// folded from one verified read of the history.
+/// started on one pass from the earlier of their two snapshots, or from
+/// genesis when either cannot resume (sprawling-SPEC 8-122).
 ///
-/// Each record is shown to the views and then to the standing, so the
-/// first byte a person sees waits on one verified pass rather than two,
-/// and the worker judges from exactly the history the pages answer from:
-/// two reads at two moments could answer for two different histories.
+/// Only the lines the snapshots have not seen are checked before the
+/// first byte; the history before them is proved behind it, and the
+/// writer takes no line until that proof is whole (8-90). The views and
+/// the standing are started from the same pass, so the worker judges
+/// from exactly the history the pages answer from.
 ///
 /// The ledger is opened, and its writer lock taken, before the history is
 /// read: the standing is what the worker decides from, so no line another
@@ -103,39 +107,48 @@ impl Standing {
 /// A standing snapshot is cut at the last line folded, as every worker
 /// open cuts one (sprawling-SPEC 8-101), so a worker opened over this city
 /// later folds only what arrives after it; a cut that fails is in
-/// `Standing.cut`, not here.
+/// `Standing.cut`, not here. Where each fold started, and why, is one
+/// `Effect` line in `log`.
 ///
 /// The ledger is opened at `now`, which the caller sampled: this module
 /// reads no clock of its own (determinism rule 2).
 ///
-/// Opening the ledger, the verifying pass with the folding inside it, and
-/// the standing cut are each lapped on `cost` (sprawling-SPEC 8-121).
+/// Opening the ledger, the pass, and the standing cut are each lapped on
+/// `cost` (sprawling-SPEC 8-121).
 ///
 /// # Errors
-/// Propagates opening the ledger, chain verification, and whatever a fold
-/// says about a payload it cannot read.
+/// Propagates opening the ledger, chain verification of the lines folded,
+/// and whatever a fold says about a payload it cannot read.
 pub(crate) fn fold_city(
     ledger_dir: &Path,
     now: kernel::TimeMs,
     cost: &mut OpeningCost,
-) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
+    log: &mut Diagnostics,
+) -> Result<(Started<Views>, Held), AxError> {
     let (ledger, report) =
         JsonlLedger::open(ledger_dir, now).map_err(storage::StorageError::into_ax)?;
     cost.lap(Phase::OpenLedger);
-    let mut views = Views::over(ledger_dir);
-    let mut standing = StandingFolds::empty(city_root_of(ledger_dir));
-    let index = fold_ledger_dir(ledger_dir, |record| {
-        cost.folding(|| {
-            views.apply(record)?;
-            standing.absorb(record)
-        })
-    })?;
-    cost.lap(Phase::VerifyAndFold { lines: index.len() });
-    let cut =
-        last_line(&index, ledger_dir).and_then(|last| cut_at(ledger_dir, &standing, last.as_ref()));
+    let both = start_both::<Views, StandingFolds>(ledger_dir)?;
+    cost.lap(Phase::FoldTail {
+        lines: both.checked,
+        from: both.from,
+    });
+    log.write(
+        Level::Effect,
+        Site {
+            run: RunId::CITY,
+            seq: both.first.last_seq().unwrap_or(Seq::FIRST),
+            module: "accounting::worker",
+        },
+        &format!(
+            "the views {}; the standing {}",
+            both.first.from, both.second.from
+        ),
+    );
+    let cut = cut(ledger_dir, &both.second);
     cost.lap(Phase::CutStanding);
-    views.hold_index(index, ledger_dir)?;
-    Ok((views, (ledger, report, standing.settle(cut)?)))
+    let standing = both.second.folded.settle(cut)?;
+    Ok((both.first, (ledger, report, standing)))
 }
 
 #[cfg(test)]

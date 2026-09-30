@@ -13,20 +13,16 @@ use runtime::diagnostics::{Diagnostics, Level, Site};
 use storage::{JsonlLedger, OpenReport};
 
 use crate::views::Views;
-use crate::views::snapshot::start::cut_at;
+use crate::views::snapshot::start::cut;
 use crate::worker::opening_cost::{OpeningCost, Phase};
 
 use super::{Standing, fold_city};
 
 /// What `serve` starts from: [`fold_city`] over the ledger opened at
-/// `now`, then a views snapshot cut at
-/// the last line it folded, so a one-shot read afterwards folds only what
-/// arrives after it (sprawling-SPEC 8-91).
-///
-/// `serve` itself folds the whole history rather than resuming: the
-/// worker's standing is folded on the same pass, and the two snapshots
-/// are cut at different moments, so starting the views from their
-/// snapshot would add a second read rather than remove one.
+/// `now`, then a views snapshot cut at the last line the views folded, so
+/// the next start and a one-shot read afterwards fold only what arrives
+/// after it (sprawling-SPEC 8-91); nothing is cut when the views resumed
+/// from their snapshot and folded nothing past it.
 ///
 /// A cut that fails is a `Refuse` line in `log`, not an error: the
 /// snapshot only shortens a later read, which folds from the older
@@ -43,29 +39,23 @@ pub fn start_served_views(
     log: &mut Diagnostics,
     cost: &mut OpeningCost,
 ) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
-    let (views, held) = fold_city(ledger_dir, now, cost)?;
-    let last = views.last_folded_line(ledger_dir);
-    let site = Site {
-        run: RunId::CITY,
-        seq: last
-            .as_ref()
-            .ok()
-            .and_then(|last| last.as_ref().map(|(seq, _)| *seq))
-            .unwrap_or(Seq::FIRST),
-        module: "accounting::worker",
-    };
-    let cut = last.and_then(|last| cut_at(ledger_dir, &views, last.as_ref()));
+    let (views, held) = fold_city(ledger_dir, now, cost, log)?;
+    let cut = cut(ledger_dir, &views);
     cost.lap(Phase::CutViews);
     if let Err(fault) = cut {
         log.write(
             Level::Refuse,
-            site,
+            Site {
+                run: RunId::CITY,
+                seq: views.last_seq().unwrap_or(Seq::FIRST),
+                module: "accounting::worker",
+            },
             &format!(
                 "the views snapshot was not cut: {fault}; serving goes on, and the next read folds from the older snapshot or from genesis"
             ),
         );
     }
-    Ok((views, held))
+    Ok((views.folded, held))
 }
 
 #[cfg(test)]

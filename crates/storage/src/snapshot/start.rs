@@ -79,13 +79,34 @@ pub(crate) fn start_through(
                 found: snapshot.fold_version(),
             }
         }
-        StoredSnapshot::Present(snapshot) => match lines_from_cut(vfs, ledger_dir, snapshot.seq())?
-        {
-            None => WholeFold::Missing,
-            Some(Cut { line_at_seq, tail }) => match snapshot.fit(&line_at_seq) {
-                SnapshotFit::Fits => return Ok(SnapshotStart::Resume { snapshot, tail }),
-                SnapshotFit::Stale => WholeFold::Stale,
-            },
+        StoredSnapshot::Present(snapshot) => return tail_through(vfs, ledger_dir, snapshot),
+    };
+    Ok(SnapshotStart::Whole(because))
+}
+
+/// Where folding goes on after `snapshot`, which the caller has already
+/// read and accepted: the lines after its seq when its line still sits
+/// there, or genesis with the reason it does not.
+///
+/// # Errors
+/// `StorageError::Io` when a segment cannot be read.
+pub fn tail_after(
+    ledger_dir: &Path,
+    snapshot: ChainSnapshot,
+) -> Result<SnapshotStart, StorageError> {
+    tail_through(&RealFs::new(), ledger_dir, snapshot)
+}
+
+fn tail_through(
+    vfs: &dyn Vfs,
+    ledger_dir: &Path,
+    snapshot: ChainSnapshot,
+) -> Result<SnapshotStart, StorageError> {
+    let because = match lines_from_cut(vfs, ledger_dir, snapshot.seq())? {
+        None => WholeFold::Missing,
+        Some(Cut { line_at_seq, tail }) => match snapshot.fit(&line_at_seq) {
+            SnapshotFit::Fits => return Ok(SnapshotStart::Resume { snapshot, tail }),
+            SnapshotFit::Stale => WholeFold::Stale,
         },
     };
     Ok(SnapshotStart::Whole(because))

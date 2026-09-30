@@ -102,8 +102,13 @@ pub struct Views {
     /// until genesis is folded, so "nothing folded" never reads as
     /// "genesis folded".
     pub(super) next_unfolded: kernel::Seq,
-    #[serde(skip, default = "super::snapshot::fresh_index")]
-    /// seq to byte offset, held rather than rebuilt.
+    #[serde(
+        serialize_with = "super::snapshot::encode_index",
+        deserialize_with = "super::snapshot::decode_index"
+    )]
+    /// seq to byte offset, held rather than rebuilt, and carried by the
+    /// views snapshot so a start from it does not rebuild it either
+    /// (storage-SPEC 8-4).
     ///
     /// Rebuilding it read the whole side cache and allocated a `String`
     /// per line, and that was charged to every history question a page

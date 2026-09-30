@@ -14,6 +14,8 @@
 
 use std::time::{Duration, Instant};
 
+use crate::views::snapshot::start::TailFrom;
+
 /// One phase of opening a served city, in the order `listen` does them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
@@ -21,9 +23,10 @@ pub enum Phase {
     Bind,
     /// The writer lock taken, the format probed, the tail recovered.
     OpenLedger,
-    /// Every line verified from genesis while the views and the standing
-    /// fold it and the index is built.
-    VerifyAndFold { lines: usize },
+    /// The one pass that checks and folds the lines the views and the
+    /// standing have not folded yet, from the earlier of their snapshots
+    /// or from genesis (sprawling-SPEC.md 8-122).
+    FoldTail { lines: u64, from: TailFrom },
     /// The standing snapshot cut at the last line folded.
     CutStanding,
     /// The views snapshot cut at the same line.
@@ -35,14 +38,12 @@ pub enum Phase {
     StartWorker,
 }
 
-/// The phases of one opening as they are lapped, and how much of the
-/// verifying pass the folds took.
+/// The phases of one opening as they are lapped.
 pub struct OpeningCost {
     clock: fn() -> Instant,
     began: Instant,
     last: Instant,
     laps: Vec<(Phase, Duration)>,
-    folded: Duration,
 }
 
 impl OpeningCost {
@@ -54,7 +55,6 @@ impl OpeningCost {
             began,
             last: began,
             laps: Vec::with_capacity(7),
-            folded: Duration::ZERO,
         }
     }
 
@@ -67,15 +67,11 @@ impl OpeningCost {
         self.last = now;
     }
 
-    /// Runs `work` and counts how long it took as folding, the part of
-    /// the verifying pass the line names separately.
-    pub fn folding<R>(&mut self, work: impl FnOnce() -> R) -> R {
-        let from = (self.clock)();
-        let done = work();
-        self.folded = self
-            .folded
-            .saturating_add((self.clock)().saturating_duration_since(from));
-        done
+    /// When opening began, the point every readiness moment is measured
+    /// from, including the proof that ends after the first byte
+    /// (sprawling-SPEC.md 8-122).
+    pub fn began(&self) -> Instant {
+        self.began
     }
 
     /// The one rendering: the whole opening, then each phase in the order
@@ -84,7 +80,7 @@ impl OpeningCost {
         let phases: Vec<String> = self
             .laps
             .iter()
-            .map(|&(phase, took)| self.phase_part(phase, took))
+            .map(|&(phase, took)| phase_part(phase, took))
             .collect();
         format!(
             "opened the city in {} ms: {}",
@@ -92,21 +88,23 @@ impl OpeningCost {
             phases.join(", ")
         )
     }
+}
 
-    fn phase_part(&self, phase: Phase, took: Duration) -> String {
-        match phase {
-            Phase::Bind => format!("bind {} ms", millis(took)),
-            Phase::OpenLedger => format!("open the ledger {} ms", millis(took)),
-            Phase::VerifyAndFold { lines } => format!(
-                "verify and fold {lines} lines {} ms (folding {} ms of it)",
-                millis(took),
-                millis(self.folded)
-            ),
-            Phase::CutStanding => format!("cut the standing snapshot {} ms", millis(took)),
-            Phase::CutViews => format!("cut the views snapshot {} ms", millis(took)),
-            Phase::Twin => format!("copy the views {} ms", millis(took)),
-            Phase::StartWorker => format!("start the worker {} ms", millis(took)),
+fn phase_part(phase: Phase, took: Duration) -> String {
+    match phase {
+        Phase::Bind => format!("bind {} ms", millis(took)),
+        Phase::OpenLedger => format!("open the ledger {} ms", millis(took)),
+        Phase::FoldTail { lines, from } => {
+            let from = match from {
+                TailFrom::Snapshots => "the snapshots",
+                TailFrom::Genesis => "genesis",
+            };
+            format!("fold {lines} lines from {from} {} ms", millis(took))
         }
+        Phase::CutStanding => format!("cut the standing snapshot {} ms", millis(took)),
+        Phase::CutViews => format!("cut the views snapshot {} ms", millis(took)),
+        Phase::Twin => format!("copy the views {} ms", millis(took)),
+        Phase::StartWorker => format!("start the worker {} ms", millis(took)),
     }
 }
 

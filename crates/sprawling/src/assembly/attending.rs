@@ -48,6 +48,9 @@ pub(super) struct Opening {
     /// `log`, held apart because the audit thread never touches the
     /// writer (sprawling-SPEC.md 8-90).
     pub(super) audit_log: runtime::diagnostics::Diagnostics,
+    /// When opening the city began, which the proof measures the moment
+    /// commands are taken from (sprawling-SPEC.md 8-122).
+    pub(super) began: std::time::Instant,
     /// The person's `[core] priority`, the reading the socket's workers
     /// already stand on.
     pub(super) core: CorePriority,
@@ -96,6 +99,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         log,
         held,
         audit_log,
+        began,
         core: setting,
     } = opening;
     let Outward {
@@ -142,12 +146,14 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                         eprintln!("{notice}");
                     }
                     worker.open_for_service(vault_notice);
-                    // Detached: the audit holds no part of the writer,
+                    // Detached: the proof holds no part of the writer,
                     // and what it finds reaches the writer through the
-                    // halt it attached (sprawling-SPEC.md 8-90).
+                    // halt it attached; until then the writer takes no
+                    // line (sprawling-SPEC.md 8-90).
                     if let Err(err) = super::chain_watch::audit_in_background(
                         worker.chain_under_audit(),
                         audit_log,
+                        began,
                     ) {
                         drop(ready_tx.send(Err(err)));
                         return;

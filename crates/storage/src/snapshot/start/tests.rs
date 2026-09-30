@@ -163,11 +163,15 @@ impl Vfs for CountingFs {
     }
 }
 
+/// The segments an opening touched, and whether the first segment and
+/// the one before the last were each read inside one window.
+type Reads = (Vec<String>, bool, bool);
+
 /// What opening a ledger of `segments` segments of about 40 KB each, and
 /// resuming from a snapshot cut at its last line, read: the names of the
 /// segments it touched, and whether the reads of the first segment and of
 /// the one before the last each stayed inside one window.
-fn opening_reads(segments: usize) -> ((Vec<String>, bool, bool), (Vec<String>, bool, bool)) {
+fn opening_reads(segments: usize) -> (Reads, Reads) {
     let tmp = tempfile::tempdir().unwrap();
     let (ledger_dir, snapshots) = (tmp.path().join("ledger"), tmp.path().join("snapshot"));
     let (mut ledger, _) = JsonlLedger::open(&ledger_dir, TimeMs::new(0)).unwrap();

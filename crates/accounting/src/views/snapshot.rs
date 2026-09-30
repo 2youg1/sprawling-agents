@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use crate::plan_view::PlanView;
-use kernel::{AxCode, AxError, B3Hash, EventRecord, Seq};
+use kernel::{AxCode, AxError, B3Hash, EventRecord};
 use storage::LedgerIndex;
 
 use super::Views;
@@ -24,7 +24,7 @@ use start::SnapshotFold;
 /// anyway, because `views_fold_version` hashes the version in with this.
 /// The suffix is the digest of a fixed fixture's encoding, which the
 /// tests beside this file hold, so the encoding cannot move alone.
-const VIEWS_FOLD_RULES: &str = "views-fold-9f0492487f4da76f";
+const VIEWS_FOLD_RULES: &str = "views-fold-3c287b8d8e4ea68d";
 
 /// The `fold_version` a views snapshot is cut and accepted under.
 pub(crate) fn views_fold_version() -> u32 {
@@ -33,10 +33,35 @@ pub(crate) fn views_fold_version() -> u32 {
     u32::from_le_bytes([a, b, c, d])
 }
 
-/// The index a new or decoded `Views` starts with: empty, refreshed by
-/// the first question that reads the ledger.
+/// The index a new `Views` starts with: empty, until a fold hands over
+/// the index it built or the first question that reads the ledger
+/// refreshes it.
 pub(super) fn fresh_index() -> std::sync::Arc<std::sync::Mutex<storage::LedgerIndex>> {
     std::sync::Arc::new(std::sync::Mutex::new(storage::LedgerIndex::empty()))
+}
+
+/// The ledger index as a snapshot holds it: the index itself, not the
+/// lock the two copies of the views share it through. A lock a panic
+/// poisoned is taken as it stands: the index is a projection that
+/// `refresh` rebuilds on any doubt (storage-SPEC 8-4).
+pub(super) fn encode_index<S: serde::Serializer>(
+    index: &Arc<Mutex<LedgerIndex>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serde::Serialize::serialize(
+        &*index
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        serializer,
+    )
+}
+
+/// The index `encode_index` wrote, behind a lock of its own.
+pub(super) fn decode_index<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Arc<Mutex<LedgerIndex>>, D::Error> {
+    <LedgerIndex as serde::Deserialize>::deserialize(deserializer)
+        .map(|index| Arc::new(Mutex::new(index)))
 }
 
 /// The plan cache as a snapshot holds it: the cache itself, not the lock
@@ -80,11 +105,23 @@ impl SnapshotFold for Views {
     }
 
     /// The views answer later questions through the index, and name the
-    /// history by the epoch read from its genesis line. After a resume
-    /// the index starts empty and is refreshed by the first question
-    /// that reads the ledger.
+    /// history by the epoch read from its genesis line.
     fn keep_index(&mut self, index: LedgerIndex, ledger_dir: &Path) -> Result<(), AxError> {
         self.hold_index(index, ledger_dir)
+    }
+
+    /// The index the snapshot carried is brought up to the ledger: only
+    /// the bytes appended since the cut are read, and a segment that
+    /// shrank or vanished rebuilds it (storage-SPEC 8-4).
+    fn resumed(&mut self, ledger_dir: &Path) -> Result<(), AxError> {
+        let mut index = self
+            .index
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        index
+            .refresh(ledger_dir)
+            .map(|_| ())
+            .map_err(storage::StorageError::into_ax)
     }
 }
 
@@ -140,35 +177,6 @@ impl Views {
         )
     }
 
-    /// The last line these views folded, read through their index, which
-    /// is where a snapshot of them is cut. `None` before genesis is
-    /// folded.
-    ///
-    /// # Errors
-    /// `StorageFatal` when the index lock is poisoned, and the ledger
-    /// read's own failure.
-    pub(crate) fn last_folded_line(
-        &self,
-        ledger_dir: &Path,
-    ) -> Result<Option<(Seq, Vec<u8>)>, AxError> {
-        let Some(seq) = self.next_unfolded.value().checked_sub(1).map(Seq::new) else {
-            return Ok(None);
-        };
-        let index = self.index.lock().map_err(|_| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "read the last folded line",
-                "the ledger index lock is poisoned",
-            )
-            .with_recovery("restart the server; the index is rebuilt from the ledger")
-        })?;
-        index
-            .reader(ledger_dir)
-            .line_at(seq)
-            .map(|line| Some((seq, line)))
-            .map_err(storage::StorageError::into_ax)
-    }
-
     /// The views `encode` wrote, served from `city_root`.
     ///
     /// # Errors
@@ -182,7 +190,6 @@ impl Views {
         let fresh = Views::new(city_root);
         Ok(Views {
             city_root: fresh.city_root,
-            index: fresh.index,
             machine: fresh.machine,
             vault: fresh.vault,
             ..folded

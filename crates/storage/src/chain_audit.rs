@@ -165,6 +165,16 @@ impl JsonlLedger {
     pub fn await_verdict(&self) {
         self.halt.await_verdict();
     }
+
+    /// Whether this writer takes a line now, asked before a caller does
+    /// anything a refused line would leave behind.
+    ///
+    /// # Errors
+    /// `Unproven` before the verdict of a proof this writer awaits;
+    /// `ChainHalted` after a broken one.
+    pub fn admits(&self) -> Result<(), StorageError> {
+        self.halt.admit()
+    }
 }
 
 /// Walk every complete line of the ledger in `dir` from genesis, each

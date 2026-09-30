@@ -106,6 +106,11 @@ impl SnapshotFold for StandingFolds {
     fn keep_index(&mut self, _index: LedgerIndex, _ledger_dir: &Path) -> Result<(), AxError> {
         Ok(())
     }
+
+    /// Nothing to bring up to the ledger: the standing holds no index.
+    fn resumed(&mut self, _ledger_dir: &Path) -> Result<(), AxError> {
+        Ok(())
+    }
 }
 
 /// A field postcard cannot carry — a JSON value, or a struct serde

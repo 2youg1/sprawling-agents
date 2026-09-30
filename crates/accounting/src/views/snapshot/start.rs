@@ -4,7 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where a fold a snapshot holds starts: after the snapshot, or from
-//! genesis and why, and the snapshot a start cuts (sprawling-SPEC 8-91).
+//! genesis and why, and the snapshot a start cuts (sprawling-SPEC 8-91);
+//! and where two such folds start together, on one pass (8-122).
 //!
 //! Held beside the views rather than in the assembly point, which also
 //! starts the worker's standing from it: a one-shot read starts the views
@@ -16,7 +17,13 @@ use std::path::{Path, PathBuf};
 use kernel::layout::CityLayout;
 use kernel::{AxError, EventRecord, Seq};
 use runtime::replay::fold_ledger_dir;
-use storage::{ChainSnapshot, CheckedLine, LedgerIndex, SnapshotStart, StorageError, WholeFold};
+use storage::{
+    ChainSnapshot, CheckedLine, LedgerIndex, SnapshotStart, StorageError, StoredSnapshot, WholeFold,
+};
+
+mod both;
+
+pub use both::{BothStarted, TailFrom, start_both};
 
 /// The city a ledger directory belongs to, two levels up.
 pub fn city_root_of(ledger_dir: &Path) -> &Path {
@@ -43,11 +50,21 @@ pub trait SnapshotFold: Sized {
     /// a fold that reads the ledger again keeps it, and one that does not
     /// drops it.
     fn keep_index(&mut self, index: LedgerIndex, ledger_dir: &Path) -> Result<(), AxError>;
+    /// A fold resumed from its snapshot and caught up with the tail: one
+    /// that reads the ledger again brings the index its snapshot carried
+    /// up to the ledger as it stands.
+    fn resumed(&mut self, ledger_dir: &Path) -> Result<(), AxError>;
 }
 
 /// Where the snapshot of `F` for the city at `city_root` lives.
 pub fn snapshot_dir<F: SnapshotFold>(city_root: &Path) -> PathBuf {
     CityLayout::new(city_root).snapshot().join(F::DIR)
+}
+
+/// Where the city at `city_root` keeps its verified prefix records
+/// (storage-SPEC 8-30): the one spelling of that path.
+pub fn proof_dir(city_root: &Path) -> PathBuf {
+    CityLayout::new(city_root).snapshot().join("verified")
 }
 
 /// A fold a start built, how it began, and where the next snapshot is
@@ -60,6 +77,13 @@ pub struct Started<F> {
     last: Option<(Seq, Vec<u8>)>,
 }
 
+impl<F> Started<F> {
+    /// The seq of the last line this start folded, when it folded one.
+    pub fn last_seq(&self) -> Option<Seq> {
+        self.last.as_ref().map(|(seq, _)| *seq)
+    }
+}
+
 /// How a start began.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FoldStart {
@@ -67,6 +91,9 @@ pub enum FoldStart {
     Resumed { tail: usize },
     /// From genesis, and why the snapshot was not used.
     Whole(WholeFold),
+    /// From genesis on the pass another fold needed from genesis; this
+    /// fold's own snapshot was not used (sprawling-SPEC 8-122).
+    Alongside,
 }
 
 /// The fold of the ledger in `ledger_dir`, from its snapshot when one
@@ -82,23 +109,29 @@ pub fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> 
         .map_err(StorageError::into_ax)?
     {
         SnapshotStart::Resume { snapshot, tail } => match F::decode(city_root, snapshot.views()) {
-            Ok(folded) => resume(folded, &snapshot, tail),
+            Ok(folded) => resume(folded, &snapshot, tail, ledger_dir),
             Err(undecodable) => whole(ledger_dir, WholeFold::Damaged(undecodable.to_string())),
         },
         SnapshotStart::Whole(because) => whole(ledger_dir, because),
     }
 }
 
-/// [`start`] once an audit of the whole chain returns `Whole`, so a start
+/// [`start`] once a proof of the whole chain returns `Whole`, so a start
 /// from the snapshot never accepts a chain a whole fold would refuse: the
 /// snapshot's fit checks only the line at its seq, and the ledger open
-/// scans only the last segment (sprawling-SPEC 8-101).
+/// scans only the last segment (sprawling-SPEC 8-101). The proof reads
+/// the city's verified prefix records and never writes one: a one-shot
+/// read does not write to the disk.
 ///
 /// # Errors
-/// The audit's reason when the chain is broken or cannot be read, and
+/// The proof's reason when the chain is broken or cannot be read, and
 /// those of [`start`].
 pub fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> {
-    match storage::audit_chain(ledger_dir).map_err(StorageError::into_ax)? {
+    let records = storage::ProofRecords::read_only(&proof_dir(city_root_of(ledger_dir)));
+    match storage::prove_chain(ledger_dir, &records)
+        .map_err(StorageError::into_ax)?
+        .audit
+    {
         storage::ChainAudit::Whole { .. } => start(ledger_dir),
         storage::ChainAudit::Broken(reason) => Err(reason),
     }
@@ -159,6 +192,11 @@ impl std::fmt::Display for FoldStart {
             FoldStart::Resumed { tail } => {
                 return write!(f, "resumed from the snapshot and folded {tail} newer lines");
             }
+            FoldStart::Alongside => {
+                return f.write_str(
+                    "folded from genesis on the pass the other fold needed from genesis",
+                );
+            }
             FoldStart::Whole(WholeFold::NoSnapshot) => "there is no snapshot yet".to_owned(),
             FoldStart::Whole(WholeFold::Damaged(reason)) => {
                 format!("the snapshot was refused: {reason}")
@@ -177,12 +215,45 @@ impl std::fmt::Display for FoldStart {
     }
 }
 
+/// A snapshot of `F` that was read, cut under this build's fold version,
+/// and decoded; or why there is none to resume from.
+enum Candidate<F> {
+    Fits { folded: F, snapshot: ChainSnapshot },
+    Whole(WholeFold),
+}
+
+/// Reads the snapshot of `F` for the city at `city_root` and decodes it,
+/// reading nothing of the ledger.
+///
+/// # Errors
+/// An I/O failure reading the snapshot.
+fn candidate<F: SnapshotFold>(city_root: &Path) -> Result<Candidate<F>, AxError> {
+    Ok(
+        match storage::read_snapshot(&snapshot_dir::<F>(city_root))
+            .map_err(StorageError::into_ax)?
+        {
+            StoredSnapshot::Absent => Candidate::Whole(WholeFold::NoSnapshot),
+            StoredSnapshot::Damaged(reason) => Candidate::Whole(WholeFold::Damaged(reason)),
+            StoredSnapshot::Present(snapshot) if snapshot.fold_version() != F::fold_version() => {
+                Candidate::Whole(WholeFold::OtherFoldVersion {
+                    found: snapshot.fold_version(),
+                })
+            }
+            StoredSnapshot::Present(snapshot) => match F::decode(city_root, snapshot.views()) {
+                Ok(folded) => Candidate::Fits { folded, snapshot },
+                Err(undecodable) => Candidate::Whole(WholeFold::Damaged(undecodable.to_string())),
+            },
+        },
+    )
+}
+
 /// The snapshot's fold with the tail folded on, each tail line through
 /// the same per-line check a whole history passes.
 fn resume<F: SnapshotFold>(
     mut folded: F,
     snapshot: &ChainSnapshot,
     tail: Vec<Vec<u8>>,
+    ledger_dir: &Path,
 ) -> Result<Started<F>, AxError> {
     let mut check = snapshot.resume()?;
     let mut last_seq = None;
@@ -197,6 +268,7 @@ fn resume<F: SnapshotFold>(
         }
         last_seq = Some(seq);
     }
+    folded.resumed(ledger_dir)?;
     let from = FoldStart::Resumed { tail: tail.len() };
     Ok(Started {
         folded,

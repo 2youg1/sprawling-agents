@@ -3,7 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use kernel::Address;
+use std::path::Path;
+
+use kernel::{Address, AxCode, Seq};
 
 use super::*;
 use crate::assembly::{hands, init_city};
@@ -42,10 +44,14 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
         panic!("the tampered ledger still audits whole");
     };
 
-    audit_in_background(worker.chain_under_audit(), Diagnostics::off())
-        .unwrap()
-        .join()
-        .unwrap();
+    audit_in_background(
+        worker.chain_under_audit(),
+        Diagnostics::off(),
+        monotonic_now(),
+    )
+    .unwrap()
+    .join()
+    .unwrap();
     let refused = worker
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
@@ -65,9 +71,53 @@ fn an_audit_that_cannot_read_the_ledger_trips_the_halt() {
     let dir = tempfile::tempdir().unwrap();
     let missing = dir.path().join("no-ledger-here");
     let reason = storage::audit_chain(&missing).unwrap_err().into_ax();
-    let halt = storage::ChainHalt::default();
+    let halt = storage::ChainHalt::awaiting_proof();
 
-    report_audit(&missing, &halt, Seq::FIRST, Diagnostics::off());
+    report_proof(
+        ChainUnderAudit {
+            halt: halt.clone(),
+            ledger_dir: missing.clone(),
+            at: Seq::FIRST,
+            records: storage::ProofRecords::read_only(&dir.path().join("records")),
+        },
+        Diagnostics::off(),
+        monotonic_now(),
+    );
 
-    assert_eq!(halt.reason(), Some(&reason));
+    assert_eq!(halt.reason(), Some(reason));
+}
+
+/// A served worker answers a command that arrives before the proof of its
+/// history with `E_HISTORY_UNPROVEN` and writes nothing, and takes the
+/// same command once the proof is whole (sprawling-SPEC.md 8-90).
+#[test]
+fn a_served_worker_takes_commands_once_its_history_is_proved() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        Diagnostics::off(),
+        hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
+    let create = |name: &str| wire::Command::CreateBuilding {
+        addr: Address::parse(name).unwrap(),
+        template: wire::TemplateName::parse("minimal").unwrap(),
+        idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),
+    };
+    let watch = worker.chain_under_audit();
+
+    let before = worker
+        .handle(create("lab"))
+        .map_err(|refused| *refused.code());
+    audit_in_background(watch, Diagnostics::off(), monotonic_now())
+        .unwrap()
+        .join()
+        .unwrap();
+    let after = worker.handle(create("lab")).map(|_| ());
+
+    assert_eq!(
+        (before.err(), after),
+        (Some(AxCode::HistoryUnproven), Ok(()))
+    );
 }

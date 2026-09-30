@@ -3,41 +3,55 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The halt a background chain audit trips, attached to this worker's
-//! writer (sprawling-SPEC.md 8-90).
+//! The verdict a background proof of the history sets, attached to this
+//! worker's writer (sprawling-SPEC.md 8-90, 8-122).
 //!
-//! The audit itself runs on a thread the assembly root starts
+//! The proof itself runs on a thread the assembly root starts
 //! (`bin::assembly::chain_watch`); what it needs from the worker is
 //! this value, so the thread never holds the writer.
 
 use std::path::PathBuf;
 
 use kernel::Seq;
+use kernel::layout::CityLayout;
 
 use super::RunWorker;
+use crate::views::snapshot::start::proof_dir;
 
-/// What an audit of this city's chain needs, and nothing of the writer:
-/// the halt now attached to it, where the ledger is, and the position
-/// the audit starts from.
+/// What a proof of this city's chain needs, and nothing of the writer:
+/// the halt now attached to it, where the ledger is, the position the
+/// proof starts from, and the records it reads and may write.
 pub struct ChainUnderAudit {
     pub halt: storage::ChainHalt,
     pub ledger_dir: PathBuf,
     pub at: Seq,
+    pub records: storage::ProofRecords,
 }
 
 impl RunWorker {
-    /// Attaches a fresh halt to this worker's writer and hands back what
-    /// an audit of the chain needs.
+    /// Attaches a halt that awaits the proof to this worker's writer and
+    /// hands back what a proof of the chain needs.
     ///
-    /// From the moment the audit trips the halt, every append is refused
-    /// with the audit's own reason.
+    /// From this moment until the proof sets its verdict, every append
+    /// is refused with `E_HISTORY_UNPROVEN`; after a broken verdict,
+    /// with the proof's own reason. The records are writable because
+    /// this worker's ledger holds the writer lock.
     pub fn chain_under_audit(&mut self) -> ChainUnderAudit {
-        let halt = storage::ChainHalt::default();
+        let halt = storage::ChainHalt::awaiting_proof();
         self.ledger.halt_on(halt.clone());
         ChainUnderAudit {
             halt,
-            ledger_dir: kernel::layout::CityLayout::new(&self.city_root).ledger(),
+            ledger_dir: CityLayout::new(&self.city_root).ledger(),
             at: self.ledger.position(),
+            records: self.ledger.proof_records(&proof_dir(&self.city_root)),
         }
+    }
+
+    /// Waits until the proof this worker's writer awaits has a verdict;
+    /// at once for a writer that awaits none. A city closing before its
+    /// proof finishes writes its handoff after the verdict, rather than
+    /// having it refused (sprawling-SPEC.md 8-90).
+    pub fn await_proof(&self) {
+        self.ledger.await_verdict();
     }
 }

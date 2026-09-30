@@ -95,6 +95,7 @@ pub use snapshot::StoredSnapshot;
 pub use snapshot::WholeFold;
 pub use snapshot::read_snapshot;
 pub use snapshot::start_from_snapshot;
+pub use snapshot::tail_after;
 pub use snapshot::write_snapshot;
 
 mod digest_cache;

@@ -112,6 +112,10 @@ pub fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
                 ))
             }
             DeskWait::Close(why) => {
+                // A city closed before the proof of its history finished
+                // writes its handoff once the proof has a verdict, rather
+                // than having it refused (sprawling-SPEC.md 8-90).
+                worker.await_proof();
                 // The lanes are waited for rather than abandoned: a lane
                 // left blocked on an append loses lines this city had
                 // already told it were durable.

@@ -304,7 +304,7 @@ fn line_check_rules_pin_the_verdicts_of_a_fixed_fixture() {
     let digest = kernel::B3Hash::digest(&fixture).to_string();
     assert_eq!(
         crate::verified_prefix::LINE_CHECK_RULES,
-        format!("line-check-{}", &digest[..16]),
+        format!("line-check-{}", digest.get(..16).unwrap()),
         "the per-line check changed what it accepts: set LINE_CHECK_RULES to this value"
     );
 }

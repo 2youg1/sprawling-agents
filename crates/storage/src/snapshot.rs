@@ -24,7 +24,7 @@ use crate::vfs::Vfs;
 
 mod start;
 
-pub use start::{SnapshotStart, WholeFold, start_from_snapshot};
+pub use start::{SnapshotStart, WholeFold, start_from_snapshot, tail_after};
 
 const MAGIC: &[u8; 8] = b"SPRSNAP1";
 const FILE: &str = "chain.snap";
@@ -83,6 +83,12 @@ impl ChainSnapshot {
 
     pub fn views(&self) -> &[u8] {
         &self.views
+    }
+
+    /// Whether `other` was cut at the same line of the same ledger: the
+    /// same seq and the same chain hash, whatever each fold holds.
+    pub fn same_line(&self, other: &ChainSnapshot) -> bool {
+        self.seq == other.seq && self.line_hash == other.line_hash
     }
 
     /// Judge the raw line a positioned read found at [`Self::seq`].

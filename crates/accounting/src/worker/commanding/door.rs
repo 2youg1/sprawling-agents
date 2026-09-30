@@ -35,6 +35,7 @@ impl RunWorker {
     /// and propagates the failure of landing whatever the command
     /// started.
     pub fn handle(&mut self, command: wire::Command) -> Result<(), AxError> {
+        self.history_admits(&command)?;
         let carried = self.carry_out(command, wire::Reply::nowhere());
         // The lanes are landed even when the command was refused: a
         // refusal raised after take-off leaves a run driving, and this
@@ -70,6 +71,13 @@ impl RunWorker {
     /// (`commanding::entrance`, sprawling-SPEC.md 8-41).
     pub(in crate::worker) fn serve_one(&mut self, posted: Posted) {
         let Posted { command, reply } = posted;
+        // Before the key is judged, so the same frame sent again once
+        // the history is proved is carried out rather than answered
+        // with this refusal.
+        if let Err(err) = self.history_admits(&command) {
+            self.hand_back(&reply, err);
+            return;
+        }
         let key = command.idem().copied();
         if let Some(first) = key.and_then(|key| self.doorstep.entrance.answered(&key)) {
             let said = super::entrance::repeated(command.name());
@@ -96,6 +104,26 @@ impl RunWorker {
         if let Err(err) = outcome {
             self.hand_back(&reply, err);
         }
+    }
+
+    /// Refuses `command` before it has any effect while the writer takes
+    /// no line: before the proof of a served city's history, with
+    /// `E_HISTORY_UNPROVEN`, and after a broken chain, with the proof's
+    /// reason (sprawling-SPEC.md 8-90). A command refused only at its
+    /// first append would already have written its files.
+    ///
+    /// # Errors
+    /// That refusal, which is also written to the diagnostic log.
+    fn history_admits(&mut self, command: &wire::Command) -> Result<(), AxError> {
+        let refused = self.ledger.admits().map_err(storage::StorageError::into_ax);
+        if let Err(err) = &refused {
+            self.note(
+                runtime::diagnostics::Level::Refuse,
+                "accounting::worker",
+                &format!("{} refused: {err}; {}", command.name(), err.recovery()),
+            );
+        }
+        refused
     }
 
     /// Hands a refusal to whoever asked for the command.
