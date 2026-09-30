@@ -4086,33 +4086,33 @@ pub(in crate::assembly) struct Flight {
 
 **`pursuits` 由 `plans` 直接改写，且只在 `pursuit_changed` 落账之后改**：宣布、暂停、恢复、撤下一个 pursuit 时，`plans` 先判定（有没有计划、有没有正在追的目标）、铸出要宣布的 `Pursuit` 并算出要写的 `goal`，追加 `pursuit_changed`，追加成功后才改 `Planning::pursuits`。追加失败时进程里的 pursuit 不变，与重启从账本折出的一致。被否：先改表再追加——追加一失败，活着的 worker 就持有一个账本从未记下的 pursuit。被否：让 `Planning::absorb` 折这一行、由记录铸回 `Pursuit`——铸造要经深度零的 `Delegator`，把它交给折叠会让每个折叠点都能宣布目标。
 
-### 8-92 assembly 与 serving、views、doctor 之间的依赖只朝一个方向
+### 8-92 装配根与 serving、doctor 之间的依赖只朝一个方向
 
-`bin::assembly` 是唯一知道所有具体类型的地方，别的模块不应当反过来知道它（ARCHITECTURE.md §3）。一条从 views、serving 或 doctor 指回 assembly 的边，意味着改 assembly 的内部可能改坏一个读面，而读面本来只该依赖它读的那份事实的权威。
+`bin::assembly` 是 `sprawling` 里唯一知道所有具体类型的地方，别的模块不应当反过来知道它（ARCHITECTURE.md §3）。一条从 serving 或 doctor 指回装配根的边，意味着改装配根的内部可能改坏一个读面，而读面本来只该依赖它读的那份事实的权威。城的唯一写者与读面都住 `accounting` 之后，装配根只剩自由函数与直接碰主机的生产适配器（accounting-SPEC.md 8-11、§12-12）：`production`（`SystemClock`、`hands`、`init_city`、`form_city`）、`listening`（占端口、开写者）、`attending`（起写者线程）、`chain_watch`（起审计线程）与 `dropping`（拖进对话框的文件）。
 
-**账本在哪，由 `kernel::layout::CityLayout::ledger` 一处回答。** 每个读账本的地方直接调用 `CityLayout::new(city_root).ledger()`，装配点不另设转发函数：转发只给同一件事换了名字，却会让 views 的历史读面与 serving 为了一个路径去依赖 assembly。
+**账本在哪，由 `kernel::layout::CityLayout::ledger` 一处回答。** 每个读账本的地方直接调用 `CityLayout::new(city_root).ledger()`，装配点不另设转发函数：转发只给同一件事换了名字，却会让读面与 serving 为了一个路径去依赖装配点。
 
-**从账本重建视图是视图自己的事。** 一次性的读经 `Views::rebuild(ledger_dir)`（`accounting::views::asking`）起步：先经 `snapshot::start_audited` 同步审计整条链，再从合适的快照起步、只折尾部（8-91）。服务中的城由 `accounting::worker::folds::fold_city` 一遍折完：`Views::over(ledger_dir)` 造出空视图，`Views` 与 `StandingFolds` 在 `runtime::replay::fold_ledger_dir` 的同一遍里各折每一条记录，这一遍返回的账本索引经 `Views::hold_index(index, ledger_dir)` 交给视图。assembly 从 views 取用这些函数，方向与「组装点知道读面」一致。
+**从账本重建视图是视图自己的事。** 一次性的读经 `Views::rebuild(ledger_dir)`（`accounting::views::asking`）起步：先经 `snapshot::start_audited` 同步审计整条链，再从合适的快照起步、只折尾部（8-91）。服务中的城由 `accounting::worker::folds::fold_city` 一遍折完：`Views::over(ledger_dir)` 造出空视图，`Views` 与 `StandingFolds` 在 `runtime::replay::fold_ledger_dir` 的同一遍里各折每一条记录，这一遍返回的账本索引经 `Views::hold_index(index, ledger_dir)` 交给视图。打开账本的时刻由 `listening` 读 `SystemClock` 交进来，`fold_city` 自己不读钟。
 
-**写者线程与驱动 run 的机器属于装配点，serving 只留造城之前与通往外面的东西。** 写者线程（`assembly::attending`）、命令等在其上的命令台（`accounting::worker::desk`）、驱动 run 的 lane（`accounting::worker::pool`）、lane 写回账本的中继（`accounting::worker::relay`）与调用时判定计划认领的 `accounting::worker::booking`（8-42-8）都在造 `RunWorker`、驱动 `RunWorker`，所以住在 assembly；占端口并开写者的 `listen` 与它返回的 `Listening`（`assembly::listening`）也在这里，因为开写者就是造 `RunWorker`。`relay` 持有 `pool::Arrival`，`desk` 持有 `relay::Wake`，它们住在一处，serving 与 assembly 之间才没有反向边。serving 留下的是：门上的钥匙与金库（`door`）、一次 serve 由调用方填好的那个值（`serve::Serving`）、进程日志的出口（`journal`）、写者旁边折叠视图的线程（`folding`）、核心线程站的档位与单调钟（`standing`，8-93），以及还在跑的命令已写出的字节（`output_ring`，8-115）。serving 的产品代码不写出 `crate::assembly`。
+**写者与驱动 run 的机器属于 `accounting::worker`，起线程的一半留在装配根。** 命令等在其上的命令台（`accounting::worker::desk`）、驱动 run 的 lane（`accounting::worker::pool`）、lane 写回账本的中继（`accounting::worker::relay`）、记账线程的循环（`accounting::worker::attend`）与调用时判定计划认领的 `accounting::worker::booking`（8-42-8）都在驱动 `RunWorker`，所以与它同住；`relay` 持有 `pool::Arrival`，`desk` 持有 `relay::Wake`，它们住在一处才没有反向边。起写者线程的 `assembly::attending`、占端口并开写者的 `listen` 与它返回的 `Listening`（`assembly::listening`）留在装配根，它们只经 `accounting::worker` 的 `pub` 面碰写者。serving 留下的是：门上的钥匙与金库（`door`）、一次 serve 由调用方填好的那个值（`serve::Serving`）、进程日志的出口（`journal`）、写者旁边折叠视图的线程（`folding`）、核心线程站的档位与单调钟（`standing`，8-93），以及还在跑的命令已写出的字节（`output_ring`，8-115）。serving 的产品代码不写出 `crate::assembly`，也不写出 `accounting::worker`。
 
-**serving 不往命令台投命令，所以不需要句柄。** 投命令的是 `listen` 交给 socket 的那几个闭包、控制台与 ACP 入站；前一个随 `listen` 住在 assembly，后两个本来就在 serving 之外。另一种做法是把 `listen` 拆成传输的一半（留在 serving，持一个 serving 自己定义的命令发送端）与写者的一半（进 assembly）；它多出一个类型和一条通道，换来的只是 `listen` 住在 serving 里，而 `listen` 的次序（8-88）恰好是「先占端口，再开写者」这一件事，拆开后这个次序要由两边共同守。
+**serving 不往命令台投命令，所以不需要句柄。** 投命令的是 `listen` 交给 socket 的那几个闭包、控制台与 ACP 入站；前一个随 `listen` 住在装配根，后两个本来就在 serving 之外。另一种做法是把 `listen` 拆成传输的一半（留在 serving，持一个 serving 自己定义的命令发送端）与写者的一半（进装配根）；它多出一个类型和一条通道，换来的只是 `listen` 住在 serving 里，而 `listen` 的次序（8-88）恰好是「先占端口，再开写者」这一件事，拆开后这个次序要由两边共同守。
 
-**日志行的时间由构造者交进来。** `Journal::new` 收一个 `serving::journal::Clock`，即 `Arc<dyn accounting::Clock + Send + Sync>`；`main::city` 交的是 `assembly::SystemClock`，墙钟只在它那里采样（8-63，accounting-SPEC.md 8-3）。
+**日志行的时间由构造者交进来。** `Journal::new` 收一个 `serving::journal::Clock`，即 `Arc<dyn accounting::Clock + Send + Sync>`；`main::city` 交的是 `assembly::SystemClock`，墙钟只在 `bin::assembly::production` 采样（8-63，accounting-SPEC.md 8-3）。
 
-反方向是组装点应有的方向，保留：assembly 用 serving 的 `random_token`、`open_vault`、`Serving`、`folding`、`output_ring::OutputRing`、`standing::monotonic_now`，用 views 的 `Governance`、`Views`、`Published`、`answer_outside_the_lock`、`pursued`、`building_page`、`snapshot`，用 doctor 的 `ThisMachine`、`Platform`、`PATIENCE`、`Presence`、`host`、`recipe_for`、`screen`。
+反方向是组装点应有的方向，保留：装配根用 serving 的 `open_vault`、`Serving`、`folding`、`output_ring::OutputRing`、`standing::monotonic_now`，用 doctor 的 `ThisMachine`、`Platform`、`PATIENCE`、`host`、`recipe_for`，用 `accounting::worker` 的 `RunWorker`、`CommandDesk`、`Hands`、`genesis::form` 与 `folds::start_served_views`。
 
-**方向由门守。** ARCHITECTURE.md 的 `directions` 块逐个模块写下它的产品代码永不写出的路径，`cargo xtask depmap` 读它（xtask-SPEC 8-33）。块里有两行：doctor 与 serving，两者的产品代码都不写出 `crate::assembly`。读面搬进 `accounting` 之后，它指不回装配点由编译器保证：`accounting` 不依赖 `sprawling`。城有没有历史由 `city::has_history` 回答（city-SPEC 8-29），doctor 与装配点都从那里取用。
+**方向由门守。** ARCHITECTURE.md 的 `directions` 块逐个模块写下它的产品代码永不写出的路径，`cargo xtask depmap` 读它（xtask-SPEC 8-33）。块里有三行：`accounting` 的 views 不写出 `crate::worker`；doctor 与 serving 不写出 `crate::assembly` 与 `accounting::worker`。读面与写者同住 `accounting` 之后，「写者知道读面、读面不知道写者」由第一行守；`accounting` 不依赖 `sprawling`，读面与写者指回装配根由编译器拒绝。城有没有历史由 `city::has_history` 回答（city-SPEC 8-29），doctor 与写者都从那里取用。
 
-读面用到的五样东西各归其主，装配点从那里取用：
+读面用到的五样东西各归其主，worker 从那里取用：
 
 | 事实 | 住处 | 理由 |
 |---|---|---|
 | 一个居民或房间叫什么 | `kernel::Address::name`（kernel-SPEC `Address`） | 地址的最后一段是地址自己的事实；城的名册与楼的页面都从这里读 |
 | 一栋楼的页面、`DOC_BYTES_MAX` | `accounting::views::building_page` | 页面是一个读面：按问的那一刻读盘，不持有第二份 |
 | 一台 MCP server 经哪种传输到达（`McpLink`） | `agent_protocols::mcp::link` | 三种传输（`agent_protocols::mcp` 下的 `stdio`、`http`、`sse`）与把它们合成 `agent_protocols::Outbound` 的那个枚举同住 `agent_protocols`；读面与装配点都经 `agent_protocols` 的握手与列工具说话 |
-| broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `accounting::toolkit_broker`（accounting-SPEC.md 8-9） | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是装配点的 |
-| 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `accounting::held_vault`（accounting-SPEC.md 8-9） | 装配点、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
+| broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `accounting::toolkit_broker`（accounting-SPEC.md 8-9） | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是 worker 的 |
+| 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `accounting::held_vault`（accounting-SPEC.md 8-9） | worker、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
 
 
 ### 8-112 保温的门：run 的模型调用经 `Warmed` 走，落地后留在 `RunWorker` 上（`accounting::worker::keeping_warm`，形状 1 数据）

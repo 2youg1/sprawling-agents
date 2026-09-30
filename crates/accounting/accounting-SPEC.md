@@ -23,11 +23,11 @@
 | `lineage` | 每个 run 怎样折成一行，带上它的父指针 | 8-10 |
 | `worker` | 城的唯一写者 `RunWorker`：它持有的状态、它执行的命令、它驱动的 run | 8-11 |
 
-worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` 共用的四个叶子模块 `home`、`person`、`held_vault`、`toolkit_broker`，已在本 crate；`views` 与 `lineage` 也在本 crate。`RunWorker` 与它的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例还住 `crates/sprawling/src/assembly`，按 §3 的次序搬进来。
+表里的模块全部在本 crate。`RunWorker` 与它的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例住 `worker`；它经构造时收下的一个 `Hands` 碰这台电脑，生产的那一份由二进制的装配根 `bin::assembly::production::hands` 造出（8-11）。
 
 ## 2 验收标准
 
-九条断言。前三条在 `crates/sprawling/tests/model_factory.rs`，都驱动一个接收了脚本 `ModelFactory` 的 `RunWorker`：
+九条断言。前三条在 `crates/sprawling/tests/model_factory.rs`，都驱动一个由 `bin::assembly::hands` 造出、再接收脚本 `ModelFactory` 的 `accounting::worker::RunWorker`：
 
 | 测试 | 它钉住的事 |
 |---|---|
@@ -41,7 +41,7 @@ worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` �
 
 第六条在 `crates/sprawling/tests/machine.rs`：`a_refresh_counts_the_items_the_machine_it_was_handed_answered`。worker 接收一个脚本 `Machine`，它的回答只有一个条目；`DoctorRefresh` 之后 worker 在诊断里报的条目数是 1。一个自己去问主机的 worker 报的是需求表的全部条目数。测试从 `DoctorRefresh` 进而不从 `DoctorInstall` 进：对着一个绕过端口自己动手的 worker，后者会在宿主上真的启动包管理器。
 
-第七至第九条是验收覆盖，在 `crates/sprawling/tests/acceptance/`，一个测试二进制（nextest 过滤器 `binary(acceptance)`）。它们同样驱动一个接收了脚本 `ModelFactory` 的 `RunWorker`；脚本只替模型说话，工作台、效果层、检查点、账本与书架都是生产件。
+第七至第九条是验收覆盖，在 `crates/sprawling/tests/acceptance/`，一个测试二进制（nextest 过滤器 `binary(acceptance)`）。它们同样驱动一个由 `bin::assembly::hands` 造出、再接收脚本 `ModelFactory` 的 `accounting::worker::RunWorker`；脚本只替模型说话，工作台、效果层、检查点、账本与书架都是生产件。
 
 | 测试 | 它钉住的事 |
 |---|---|
@@ -53,10 +53,8 @@ worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` �
 
 ## 3 假设与歧义
 
-- `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，所以 citysim 的场景库仍驱动不了一次 dispatch：citysim 的 bench 二进制依赖 `sprawling`，场景库只经 `runtime::run::drive` 驱动一次 run，从不造 worker。归属由 §7 的表与 §12-9 至 §12-12 定下，§12-13 至 §12-16 补上 `views` 那一半。还没做的按这个次序：
-  1. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）。`views` 的测试此前经 `views::tests::founded` 造城，它只写创世的两行、立起市政厅、写一份 `City.md`；worker 搬进来以后它们改回真正的创世，`founded` 随之删去（§12-16）。快照折叠的 trait `views::snapshot::start::SnapshotFold` 在此之前有两个实现分住两个 crate（`Views` 与 `accounting::worker::folds::standing_start` 的 `StandingFolds`），所以是 ARCHITECTURE.md §4 缝表里的一行；worker 搬进来以后两个实现同住本 crate，它收回 `pub(crate)`，那一行随之删去。
-  2. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活，不在本次迁移里。
-  3. 模块搬走时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`accounting::worker::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）。8-7、8-8、8-9 是早先整节搬进来的，保持原样。
+- citysim 的场景库还驱动不了一次 dispatch：场景库只经 `runtime::run::drive` 驱动一次 run，从不造 worker；citysim 的 bench 二进制依赖 `sprawling`，只为计时产品自己的启动与查询。worker 已经只经 `Hands` 与四个端口碰外面（8-11），所以剩下的一步是一个场景造一份脚本的 `Hands`、经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活。能定下它的证据是那个场景在 citysim 里逐字节重放。
+- 模块从 `sprawling` 搬过来时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）；8-7、8-8、8-9 是早先整节搬进来的，保持原样。未定的只有 S4 的切分：哪几节归 `views`、哪几节归 `worker`，按 `architecture.toml` 里各行的 `spec` 锚点定。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 
 ## 4 现状分析

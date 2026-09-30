@@ -213,9 +213,10 @@ Below the binary each crate that holds a domain uses at most two others:
 `kernel` and `gateway` (an MCP server reached over HTTP gets its client
 from `gateway::client_for`, the one place a client is built). The `depmap`
 block also lets `runtime` use `gateway`, and the code does not take that
-edge. `accounting` uses eight, because it holds the views every page is
-answered from and declares the ports the one writer reaches outside
-itself through, and those carry the other crates' types; `sprawling` uses every crate. A crate may **use**
+edge. `accounting` uses eight, because it holds the city's one writer,
+the views every page is answered from, and the ports the writer reaches
+outside itself through, and those carry the other crates' types;
+`sprawling` uses every crate. A crate may **use**
 the interfaces of what it depends on and nothing more; the moment a
 module starts passing concrete types between two of them, that edge
 moves up into the assembly layer.
@@ -223,18 +224,17 @@ moves up into the assembly layer.
 `xtask` and `citysim` are workspace members outside the product graph.
 **citysim drives the turn loop a second time**: `runtime::run::drive` with
 simulated adapters — a scripted model, scripted tools, an in-memory Ledger
-— which is how a script reproduces a run. It stops below `bin::assembly`:
-`RunWorker` receives its model adapters through `accounting::ModelFactory`,
-its MCP servers through `accounting::Connectors`, its time through
-`accounting::Clock` and the machine it runs on through
-`accounting::Machine`, and integration tests
-drive a dispatch against scripted ones by the same door `wire::server`
-uses, but the worker itself still lives in `sprawling`. citysim
-depends on `sprawling` only for its two bench binaries, which time the
-product's own startup and queries; its scenario library drives
-`runtime::run::drive` and never builds a worker. A scripted scenario
-that reproduces a whole dispatch needs the worker moved into
-`accounting`.
+— which is how a script reproduces a run. The worker a script would drive
+to reproduce a whole dispatch lives in `accounting`:
+`accounting::worker::RunWorker` receives this machine through one
+`Hands` value, its model adapters through `accounting::ModelFactory` and
+its MCP servers through `accounting::Connectors`, and
+`bin::assembly::production::hands` is the one place the production value
+is made. Integration tests drive a dispatch against scripted ports by the
+same door `wire::server` uses. citysim depends on `sprawling` only for
+its two bench binaries, which time the product's own startup and queries;
+its scenario library drives `runtime::run::drive`, and no scenario hands
+the worker a scripted `Hands` yet.
 
 ## 4 Seams
 
@@ -255,10 +255,10 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `agent_protocols::mcp` | crates/agent_protocols/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
 | `accounting::models` | crates/accounting/src/models.rs | `accounting::worker::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
-| `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::SystemClock`: the wall clock, the one sampling point | the stopped clock in `crates/sprawling/tests/clock.rs` |
+| `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::production::SystemClock`: the wall clock, the one sampling point, handed in through `Hands.clock` | the stopped clock in `crates/sprawling/tests/clock.rs` |
 | `accounting::connectors` | crates/accounting/src/connectors.rs | `accounting::worker::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
-| `accounting::machine` | crates/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner | the scripted machine in `crates/sprawling/tests/machine.rs` |
-| `accounting::views::snapshot::start` | crates/accounting/src/views/snapshot/start.rs | `accounting::views::Views`: the fold every page is answered from | `accounting::worker::folds::standing_start`: the standing a worker judges from, until the worker moves into `accounting` (accounting-SPEC.md §3) |
+| `accounting::machine` | crates/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner, handed in through `Hands.machine` | the scripted machine in `crates/sprawling/tests/machine.rs` |
+| `accounting::views::snapshot::start` | crates/accounting/src/views/snapshot/start.rs | `accounting::views::Views`: the fold every page is answered from | `accounting::worker::folds::standing_start`: the standing a worker judges from |
 
 The *second adapter* column has no checker: a seam whose double was
 deleted would still read as real here. That is a known hole, not a
@@ -569,7 +569,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review. A library crate starts a thread in five places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::stdio` and `agent_protocols::mcp::sse` give each MCP connection one reader that ends when the connection closes; and `agent_protocols::harness::reading` gives each harness session one reader that ends when the harness closes its output or the session drops the channel. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the driving lanes in `accounting::worker::pool`, the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, the console, first run, and the doctor's probes |
+| 3 | One spawn point | review. A library crate starts a thread in six places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::stdio` and `agent_protocols::mcp::sse` give each MCP connection one reader that ends when the connection closes; `agent_protocols::harness::reading` gives each harness session one reader that ends when the harness closes its output or the session drops the channel; and `accounting::worker::pool` gives each run one lane that ends when the run comes home. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, the console, first run, and the doctor's probes |
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -635,9 +635,9 @@ rather than a gate. The isometric city compares
 display lists rather than bitmaps: the preconditions for bitmap comparison
 are paid for — placement is a pure function of the id, painter order is
 total, projection and its inverse are exact — but there is no rasteriser.
-V6 stops below `bin::assembly` (§3): a scripted scenario reproduces a run,
-not a dispatch, because `RunWorker` still lives in `sprawling` rather than in
-`accounting`; what holds the dispatch policy is that module's own tests,
+V6 stops at the worker (§3): a scripted scenario reproduces a run, not a
+dispatch, because no scenario yet hands `accounting::worker::RunWorker` a
+scripted `Hands`; what holds the dispatch policy is the worker's own tests,
 plus the integration tests that hand the worker a scripted
 `accounting::ModelFactory`. And the tree
 holds 3 kani harnesses, all of which CI proves in under a minute each — a
