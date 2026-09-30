@@ -113,7 +113,8 @@ fn a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end() {
     }
     std::fs::create_dir_all(&path).unwrap();
     let scratch = tempfile::tempdir().unwrap();
-    let confined = Confined::with_arm(Confinement::CopiedTree, Some(scratch.path().to_path_buf()));
+    let mut confined =
+        Confined::with_arm(Confinement::CopiedTree, Some(scratch.path().to_path_buf()));
     let err = match confined.place(std::process::Command::new("cmd"), source.path()) {
         Err(err) => err,
         Ok(_) => panic!("a tree with no bottom must be refused"),
@@ -163,7 +164,10 @@ fn a_sandbox_copy_is_synced_rather_than_made_again() {
             "the first command's copy at {files} files"
         );
         confined.settled(first);
-        assert!(copy.is_dir(), "the copy is kept for the tool's next command");
+        assert!(
+            copy.is_dir(),
+            "the copy is kept for the tool's next command"
+        );
 
         std::fs::write(copy.join("src").join("file-0000.txt"), b"a command wrote").unwrap();
         std::fs::write(copy.join("src").join("stray.txt"), b"a command left").unwrap();
@@ -235,4 +239,47 @@ fn a_sandbox_copy_goes_with_the_tool() {
     assert_eq!(copies(), 1, "one copy is kept for the next command");
     drop(confined);
     assert_eq!(copies(), 0, "the copies go with the tool");
+}
+
+/// A read-only file in the working directory is copied read-only, and a
+/// sync that has to replace it still can: the copy's entry is removed
+/// and made again, and the removal is not stopped by the flag.
+#[test]
+#[allow(
+    clippy::permissions_set_readonly_false,
+    reason = "the working directory's file is changed between two commands"
+)]
+fn a_read_only_file_is_synced_like_any_other() {
+    let scratch = tempfile::tempdir().unwrap();
+    let source = source_tree(1);
+    let file = source.path().join("src").join("file-0000.txt");
+    let set_read_only = |read_only: bool| {
+        let mut bits = std::fs::metadata(&file).unwrap().permissions();
+        bits.set_readonly(read_only);
+        std::fs::set_permissions(&file, bits).unwrap();
+    };
+    set_read_only(true);
+    let mut confined =
+        Confined::with_arm(Confinement::CopiedTree, Some(scratch.path().to_path_buf()));
+    let (command, first) = confined
+        .place(std::process::Command::new("cmd"), source.path())
+        .unwrap();
+    let copy = command
+        .get_current_dir()
+        .unwrap()
+        .join("src")
+        .join("file-0000.txt");
+    confined.settled(first);
+    set_read_only(false);
+    std::fs::write(&file, b"sixteen bytes !!").unwrap();
+    set_read_only(true);
+
+    let (_, second) = confined
+        .place(std::process::Command::new("cmd"), source.path())
+        .unwrap();
+    set_read_only(false);
+    assert_eq!(
+        (second.work().rewritten, std::fs::read(&copy).unwrap()),
+        (1, b"sixteen bytes !!".to_vec())
+    );
 }

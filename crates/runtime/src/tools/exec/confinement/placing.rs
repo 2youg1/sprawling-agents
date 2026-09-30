@@ -3,9 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The adapter that places a command: a fresh copy of the working tree,
-//! the platform's wrapper where the arm has one, and the budget that
-//! keeps a copy from growing without a bound.
+//! The adapter that places a command: a copy of the working tree synced
+//! to it, the platform's wrapper where the arm has one, and the budget
+//! that keeps a copy from growing without a bound.
 //!
 //! Where a command runs is the caller's choice and one of two words
 //! ([`Placement`]); what runs there is the arm's, and the arm's promises
@@ -56,21 +56,30 @@ pub fn parse_placement(args: &Map<String, Value>) -> Result<Placement, AxError> 
     }
 }
 
-/// The arm in use, and the copies it has outstanding.
+/// The arm in use, the copy kept for the next command, and the copies
+/// commands still hold.
 ///
-/// The copy of a command that settled is removed as soon as its wait
-/// ends. A command handed to the backlog keeps its copy until the member
-/// reports its ending, because the process is still in it.
+/// The copy of a command that settled is kept for the next command,
+/// which syncs it rather than making another (runtime-SPEC 12.10). A
+/// command handed to the backlog keeps its copy until the member reports
+/// its ending, because the process is still in it.
 pub struct Confined {
     arm: Confinement,
     scratch: Option<PathBuf>,
-    outstanding: BTreeMap<BacklogId, PathBuf>,
+    idle: Option<Mirror>,
+    outstanding: BTreeMap<BacklogId, Mirror>,
 }
 
-/// Where one command was put, so that whoever ends the wait can end the
-/// copy too.
+/// One copy, and the working directory it mirrors.
+struct Mirror {
+    of: PathBuf,
+    at: PathBuf,
+}
+
+/// Where one command was put, so that whoever ends the wait can hand
+/// the copy back.
 pub struct Placed {
-    copy: Option<PathBuf>,
+    copy: Option<Mirror>,
     work: storage::FileWork,
 }
 
@@ -89,6 +98,7 @@ impl Confined {
         Confined {
             arm: Confinement::choose(&offered),
             scratch: offered.scratch,
+            idle: None,
             outstanding: BTreeMap::new(),
         }
     }
@@ -99,6 +109,7 @@ impl Confined {
         Confined {
             arm,
             scratch,
+            idle: None,
             outstanding: BTreeMap::new(),
         }
     }
@@ -113,57 +124,47 @@ impl Confined {
         self.arm.statement()
     }
 
-    /// Places one command under this machine's arm: a copy of `workdir`
-    /// for the command to run in, wrapped in the platform's isolation
-    /// where the arm is one that has a wrapper.
+    /// Places one command under this machine's arm: the tool's copy of
+    /// `workdir`, synced to it, for the command to run in, wrapped in the
+    /// platform's isolation where the arm is one that has a wrapper.
     ///
     /// # Errors
     /// `E_SANDBOX_DENIED` when this machine has no arm, when the arm
     /// cannot be given by any build of this crate, or when the working
     /// tree is too large or too deep to copy.
     pub fn place(
-        &self,
+        &mut self,
         mut command: Command,
         workdir: &Path,
     ) -> Result<(Command, Placed), AxError> {
-        match &self.arm {
-            Confinement::Unavailable { missing } => Err(no_arm(*missing)),
-            Confinement::WindowsJobObject => Err(no_job_object()),
-            Confinement::LinuxNamespaces { wrapper } => {
-                let (copy, work) = self.copy_of(workdir)?;
-                let wrapped = namespaced(wrapper, &copy, workdir, &command);
-                Ok((
-                    wrapped,
-                    Placed {
-                        copy: Some(copy),
-                        work,
-                    },
-                ))
+        let wrapper = match &self.arm {
+            Confinement::Unavailable { missing } => return Err(no_arm(*missing)),
+            Confinement::WindowsJobObject => return Err(no_job_object()),
+            Confinement::LinuxNamespaces { wrapper } => Some(wrapper.clone()),
+            Confinement::CopiedTree => None,
+        };
+        let (copy, work) = self.synced(workdir)?;
+        let command = match wrapper {
+            Some(wrapper) => namespaced(&wrapper, &copy.at, workdir, &command),
+            None => {
+                command.current_dir(&copy.at);
+                command
             }
-            Confinement::CopiedTree => {
-                let (copy, work) = self.copy_of(workdir)?;
-                command.current_dir(&copy);
-                Ok((
-                    command,
-                    Placed {
-                        copy: Some(copy),
-                        work,
-                    },
-                ))
-            }
-        }
+        };
+        Ok((
+            command,
+            Placed {
+                copy: Some(copy),
+                work,
+            },
+        ))
     }
 
-    /// The wait ended and the command is over: its copy goes now.
-    ///
-    /// A copy that cannot be removed costs disk space rather than the
-    /// answer, so the command's ending is not turned into a failure of
-    /// the tool: the judgment is `backlog/member.rs`'s about the place
-    /// a child's output was written, and it is recorded here rather than
-    /// repeated there.
-    pub fn settled(&self, placed: Placed) {
+    /// The wait ended and the command is over: its copy is kept for the
+    /// next command, or goes when one is kept already.
+    pub fn settled(&mut self, placed: Placed) {
         if let Some(copy) = placed.copy {
-            drop(std::fs::remove_dir_all(copy));
+            self.keep(copy);
         }
     }
 
@@ -175,40 +176,70 @@ impl Confined {
         }
     }
 
-    /// Copies whose member has reported go now.
+    /// Copies whose member has reported are kept for the next command,
+    /// or go.
     pub fn reaped(&mut self, finished: &[Finished]) {
         for member in finished {
             if let Some(copy) = self.outstanding.remove(&member.id) {
-                drop(std::fs::remove_dir_all(copy));
+                self.keep(copy);
             }
         }
     }
 
-    /// A fresh copy of the working tree.
-    fn copy_of(&self, workdir: &Path) -> Result<(PathBuf, storage::FileWork), AxError> {
+    /// Keeps `copy` for the next command when no copy is kept yet, and
+    /// removes it otherwise.
+    ///
+    /// A copy that cannot be removed costs disk space rather than the
+    /// answer, so the command's ending is not turned into a failure of
+    /// the tool: the judgment is `backlog/member.rs`'s about the place
+    /// a child's output was written, and it is recorded here rather than
+    /// repeated there.
+    fn keep(&mut self, copy: Mirror) {
+        match self.idle {
+            None => self.idle = Some(copy),
+            Some(_) => remove(&copy.at),
+        }
+    }
+
+    /// The copy kept for the next command, or a fresh one, brought to
+    /// what `workdir` holds.
+    fn synced(&mut self, workdir: &Path) -> Result<(Mirror, storage::FileWork), AxError> {
         let root = self
             .scratch
             .as_deref()
             .ok_or_else(|| no_arm(Missing::ScratchDirectory))?;
-        let copy = fresh(root)?;
+        let copy = match self.idle.take() {
+            Some(kept) if kept.of == workdir => kept,
+            Some(other) => {
+                remove(&other.at);
+                Mirror {
+                    of: workdir.to_path_buf(),
+                    at: fresh(root)?,
+                }
+            }
+            None => Mirror {
+                of: workdir.to_path_buf(),
+                at: fresh(root)?,
+            },
+        };
         let mut budget = Budget::new();
-        match copy_into(
+        match mirror(
             &Stage {
                 from: workdir,
-                into: &copy,
-                copy: &copy,
+                into: &copy.at,
+                copy: &copy.at,
             },
             0,
             &mut budget,
         ) {
             Ok(()) => Ok((copy, budget.work())),
             Err(fault) => {
-                // The half copy goes before the refusal is returned: a
-                // scratch root that grew a tree per refusal would be a
-                // leak nothing reports. A removal that fails here is the
-                // secondary failure and stays unstated rather than
-                // replacing the one that caused it.
-                remove(&copy);
+                // The half-synced copy goes before the refusal is
+                // returned: a scratch root that grew a tree per refusal
+                // would be a leak nothing reports. A removal that fails
+                // here is the secondary failure and stays unstated rather
+                // than replacing the one that caused it.
+                remove(&copy.at);
                 Err(fault)
             }
         }
@@ -217,12 +248,13 @@ impl Confined {
 
 impl Drop for Confined {
     fn drop(&mut self) {
-        // A copy left by a command that was still running when the tool
-        // ended. There is no caller left to tell, and the alternative is
-        // a panic, which this crate forbids: the directories stay behind
-        // in the scratch root, where an operating system clears them.
-        for copy in self.outstanding.values() {
-            drop(std::fs::remove_dir_all(copy));
+        // The copy kept for a next command that will not come, and those
+        // of commands still running when the tool ended. There is no
+        // caller left to tell, and the alternative is a panic, which this
+        // crate forbids: a directory that will not go stays behind in the
+        // scratch root, where an operating system clears it.
+        for copy in self.idle.iter().chain(self.outstanding.values()) {
+            remove(&copy.at);
         }
     }
 }
@@ -257,7 +289,7 @@ fn no_job_object() -> AxError {
 
 mod copy;
 
-use copy::{Budget, Stage, copy_into, fresh, remove};
+use copy::{Budget, Stage, fresh, mirror, remove};
 
 /// The command as the platform's wrapper runs it: the whole machine
 /// readable, the copy bound over the working directory, and every

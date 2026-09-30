@@ -20,9 +20,9 @@
 //! description before it acts; a report that said only "sandboxed" would
 //! send it into a box whose network is open.
 //!
-//! A placement is a copy of the working tree, made one command at a
-//! time, so a command that ruins it ruins nothing of the person's. The
-//! copy is bounded and lives in
+//! A placement is a copy of the working tree, synced to it before each
+//! command, so a command that ruins it ruins nothing of the person's and
+//! nothing the next command sees. The copy is bounded and lives in
 //! [`placing::copy`](crate::tools::Confinement); a tree over the bound is
 //! refused by name rather than half-copied, because a sandbox that
 //! silently answers for files it did not carry is the failure this
