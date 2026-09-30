@@ -225,9 +225,10 @@ pub(crate) fn table() -> Vec<ToolCard> {
             description: "Start or stop recording one named window: an mp4 when ffmpeg is on \
                  this machine's PATH, otherwise a directory of PNG frames. `start` answers with \
                  a `recording` id, and `stop` takes that id back, because a window's title can \
-                 change while it is being recorded. The scope file has to switch recording on. \
-                 A recording ends itself after ten minutes. It does not edit, transcode or \
-                 upload anything, and it does not record sound."
+                 change while it is being recorded; it also says how many frames were written, \
+                 and why, if the recording ended before it was stopped. The scope file has to \
+                 switch recording on. A recording ends itself after ten minutes. It does not \
+                 edit, transcode or upload anything, and it does not record sound."
                 .to_owned(),
             schema: json!({
                 "type": "object",

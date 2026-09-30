@@ -157,7 +157,7 @@ impl Recordings {
         self.begun = self.begun.saturating_add(1);
         let id = RecordingId(self.begun);
         let into = somewhere(&window.named.title, self.begun)?;
-        let written_by = Sink::open(&window.named.title, window.handle, window.bounds, &into);
+        let written_by = Sink::open(window.handle, window.bounds, &into)?;
         let answer = json!({
             "state": "started",
             "recording": id.0,
@@ -191,13 +191,21 @@ impl Recordings {
                  was never started, or that already ended, has nothing to stop",
             ));
         };
-        Ok(json!({
+        let closed = running.written_by.close();
+        let mut answer = json!({
             "state": "stopped",
             "recording": id.0,
             "title": running.title,
             "into": running.into.display().to_string(),
-            "as": running.written_by.close(),
-        }))
+            "as": closed.kind,
+            "frames": closed.frames,
+        });
+        // A recording that stopped before it was asked to says why, so
+        // a caller does not read a short file as the whole of it.
+        if let (Some(object), Some(early)) = (answer.as_object_mut(), closed.cut_short) {
+            object.insert("ended_early".to_owned(), json!(early.summary()));
+        }
+        Ok(answer)
     }
 }
 

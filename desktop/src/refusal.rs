@@ -127,8 +127,9 @@ impl Refusal {
         }
     }
 
-    /// The one-line summary both answers open with.
-    fn summary(&self) -> String {
+    /// The one-line summary both answers open with, and what a
+    /// recording that ended early reports as its reason.
+    pub(crate) fn summary(&self) -> String {
         format!(
             "{}: cannot {} — {}",
             self.code.as_str(),

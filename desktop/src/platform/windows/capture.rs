@@ -12,7 +12,9 @@
 //! it. Desktop Duplication would copy an entire output, and building a
 //! per-window permission on top of a whole-screen mechanism is how the
 //! door §8.5 of the SPEC closed gets opened from behind
-//! (desktop-SPEC.md §8.6, first pair).
+//! (desktop-SPEC.md §8.6, first pair). A recording takes every frame
+//! through [`window`] as well, so what holds for a screenshot holds for
+//! each frame of a recording (desktop-SPEC.md section 12.7).
 //!
 //! `PW_RENDERFULLCONTENT` is what makes a hardware-composited window —
 //! most browsers, most editors — render into the bitmap instead of

@@ -3,14 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where one recording's bytes go, and what writes them: ffmpeg when
-//! this machine has it, and this package's one thread when it does not.
+//! Where one recording's bytes go, and what writes them: this package's
+//! one thread captures every frame through `capture::window`, and hands
+//! it to ffmpeg's stdin when this machine has ffmpeg, or writes it as a
+//! PNG when it does not (desktop-SPEC.md section 12.7).
 //!
-//! **This file holds the only `std::thread::spawn` in the package**, and
-//! it is here because the frame-sequence path is the only thing that
-//! has to happen while the read loop is waiting for the next request.
-//! It is stopped by one flag and joined by [`Sink::close`], so a
-//! recording cannot outlive the connection that started it.
+//! **This file holds the only `std::thread::spawn` in the package.** It
+//! is stopped by one flag and joined by [`Sink::close`], so a recording
+//! cannot outlive the connection that started it.
+//!
+//! ffmpeg is never told which window to record. Told a title, it finds
+//! a window on its own, by title alone, with a different pixel source
+//! and none of this package's checks; handed frames on stdin, it can
+//! only encode what `capture::window` already took from the window a
+//! caller named. A frame that cannot be taken or written ends the
+//! recording, and `stop` says how many frames there are and why it
+//! ended early.
 //!
 //! The caller above decides *whether* a recording may begin; this file
 //! decides *how* one is written and where it lands. Neither choice
@@ -23,11 +31,13 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use windows::Win32::Foundation::HWND;
 
+use super::super::capture;
 use super::super::geometry::Bounds;
 use crate::refusal::{Refusal, RefusalCode};
 
@@ -72,49 +82,191 @@ const POLL_EVERY: std::time::Duration = std::time::Duration::from_millis(50);
 /// would not be the fix.
 const NAMES_TRIED: u32 = 1_000;
 
-/// What is writing one recording.
-pub(super) enum Sink {
-    /// ffmpeg, with its stdin held so it can be asked to finish
-    /// cleanly. Killing it instead would leave an mp4 with no index,
-    /// which is a file nothing plays.
-    Ffmpeg { child: std::process::Child },
-    /// This package's own thread, and the flag that stops it. The
-    /// thread also stops itself at `MOST_FRAMES`, so a caller that
-    /// never says stop still gets a recording that ends.
-    Frames {
-        stopping: Arc<AtomicBool>,
-        thread: std::thread::JoinHandle<u64>,
-    },
+/// One recording being written: the thread that writes it, the flag that
+/// stops it, and which of the two kinds of file it is.
+pub(super) struct Sink {
+    stopping: Arc<AtomicBool>,
+    thread: std::thread::JoinHandle<Ended>,
+    kind: &'static str,
+}
+
+/// What a recording came to once it stopped.
+pub(super) struct Closed {
+    /// `mp4` or `frames`.
+    pub(super) kind: &'static str,
+    pub(super) frames: u64,
+    /// Why the recording stopped before anyone asked it to, if it did.
+    pub(super) cut_short: Option<Refusal>,
+}
+
+/// What the writing thread hands back when it ends.
+struct Ended {
+    frames: u64,
+    cut_short: Option<Refusal>,
+}
+
+/// Where the frames go.
+enum Writer {
+    /// ffmpeg, reading raw frames from the stdin this holds. Closing
+    /// that stdin is what asks it to finish: it writes the index an mp4
+    /// needs once its input ends, and a killed ffmpeg leaves a file
+    /// nothing plays.
+    Mp4 { child: Child, stdin: ChildStdin },
+    /// One PNG per frame, numbered, in this directory.
+    Frames { into: PathBuf },
 }
 
 impl Sink {
     /// Starts writing one window into `into`.
     ///
-    /// Infallible by construction: a machine without ffmpeg gets the
-    /// frame sequence, and a window that draws nothing yields a shorter
-    /// sequence rather than an error. What can fail is laying out the
-    /// directory, and that has already happened by the time this is
-    /// called.
-    pub(super) fn open(window: &str, handle: HWND, bounds: Bounds, into: &Path) -> Sink {
-        match ffmpeg(window, bounds, into) {
-            Some(child) => Sink::Ffmpeg { child },
-            None => frames(handle, bounds, into),
+    /// # Errors
+    /// Refuses when ffmpeg is on this machine and will not start. A
+    /// machine without ffmpeg gets the frame sequence instead.
+    pub(super) fn open(handle: HWND, bounds: Bounds, into: &Path) -> Result<Sink, Refusal> {
+        let writer = match Command::new("ffmpeg")
+            .args(command_line(bounds, into))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            Ok(mut child) => match child.stdin.take() {
+                Some(stdin) => Writer::Mp4 { child, stdin },
+                None => {
+                    let _killed = child.kill();
+                    let _reaped = child.wait();
+                    return Err(unstartable("it gave no stdin to write frames into"));
+                }
+            },
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Writer::Frames {
+                into: into.to_path_buf(),
+            },
+            Err(err) => return Err(unstartable(&err.to_string())),
+        };
+        let kind = match writer {
+            Writer::Mp4 { .. } => "mp4",
+            Writer::Frames { .. } => "frames",
+        };
+        let stopping = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&stopping);
+        // An `HWND` is a token rather than a pointer into this process's
+        // memory, so it travels as its address and is rebuilt on the
+        // other side. Win32 documents the drawing calls this thread makes
+        // as usable from any thread with the window's handle.
+        let carried = handle.0.expose_provenance();
+        let thread = std::thread::spawn(move || {
+            let handle = HWND(std::ptr::with_exposed_provenance_mut(carried));
+            recorded(handle, bounds, writer, &flag)
+        });
+        Ok(Sink {
+            stopping,
+            thread,
+            kind,
+        })
+    }
+
+    /// Stops writing, and says what was written.
+    pub(super) fn close(self) -> Closed {
+        self.stopping.store(true, Ordering::Release);
+        let Ended { frames, cut_short } = self.thread.join().unwrap_or_else(|_panicked| Ended {
+            frames: 0,
+            cut_short: Some(Refusal::new(
+                RefusalCode::ToolUnavailable,
+                "record a window",
+                "the thread writing this recording stopped unexpectedly",
+                "look at what landed before relying on it, and record again",
+            )),
+        });
+        Closed {
+            kind: self.kind,
+            frames,
+            cut_short,
+        }
+    }
+}
+
+/// The refusal for an ffmpeg that is installed and will not start.
+fn unstartable(why: &str) -> Refusal {
+    Refusal::new(
+        RefusalCode::ToolUnavailable,
+        "record a window",
+        format!("ffmpeg is on this machine and would not start: {why}"),
+        "repair or remove the ffmpeg on this machine's PATH; without one, a recording is \
+         written as a sequence of PNG frames",
+    )
+}
+
+/// The writing thread: one frame every `FRAME_EVERY` until it is told to
+/// stop, reaches `MOST_FRAMES`, or cannot take or write a frame.
+fn recorded(handle: HWND, bounds: Bounds, mut writer: Writer, stopping: &AtomicBool) -> Ended {
+    let mut frames: u64 = 0;
+    let mut cut_short = None;
+    while !stopping.load(Ordering::Acquire) && frames < MOST_FRAMES {
+        // The frame is taken at the size the recording started with,
+        // which is the size ffmpeg was told to expect.
+        match capture::window(handle, bounds).and_then(|frame| writer.put(&frame, frames)) {
+            Ok(()) => frames = frames.saturating_add(1),
+            Err(refusal) => {
+                cut_short = Some(refusal);
+                break;
+            }
+        }
+        // A fixed rest between frames rather than a deadline measured
+        // from the frame's start: this package reads no clock. What that
+        // costs is stated rather than hidden — a window that is slow to
+        // draw yields a sparser recording, so `FRAME_EVERY` is the
+        // shortest gap between frames and not a promised rate.
+        std::thread::sleep(FRAME_EVERY);
+    }
+    writer.finish();
+    Ended { frames, cut_short }
+}
+
+impl Writer {
+    /// Writes the `nth` frame.
+    fn put(&mut self, frame: &image::RgbaImage, nth: u64) -> Result<(), Refusal> {
+        match self {
+            Writer::Mp4 { stdin, .. } => stdin.write_all(frame.as_raw()).map_err(|err| {
+                Refusal::new(
+                    RefusalCode::ToolUnavailable,
+                    "record a window",
+                    format!("ffmpeg stopped taking frames: {err}"),
+                    "look at what landed; ffmpeg ended the recording before it was stopped",
+                )
+            }),
+            Writer::Frames { into } => frame
+                .save(into.join(format!("frame-{nth:06}.png")))
+                .map_err(|err| {
+                    Refusal::new(
+                        RefusalCode::ToolUnavailable,
+                        "record a window",
+                        format!("a frame could not be written: {err}"),
+                        "free space in this machine's temporary directory, then record again",
+                    )
+                }),
         }
     }
 
-    /// Stops writing, and says which of the two kinds of file was
-    /// written.
-    pub(super) fn close(self) -> &'static str {
+    /// Ends the file: ffmpeg's input is closed and it is given
+    /// `FFMPEG_FINISH_POLLS` polls to write its index and exit.
+    fn finish(self) {
         match self {
-            Sink::Ffmpeg { child } => {
-                finish(child);
-                "mp4"
+            Writer::Mp4 { mut child, stdin } => {
+                drop(stdin);
+                for _poll in 0..FFMPEG_FINISH_POLLS {
+                    match child.try_wait() {
+                        Ok(Some(_ended)) => return,
+                        Ok(None) => std::thread::sleep(POLL_EVERY),
+                        Err(_unknowable) => break,
+                    }
+                }
+                // It was given its end of input and twenty seconds. What
+                // is left is a partial file rather than a process nobody
+                // can stop.
+                let _killed = child.kill();
+                let _reaped = child.wait();
             }
-            Sink::Frames { stopping, thread } => {
-                stopping.store(true, Ordering::Release);
-                let _frames = thread.join();
-                "frames"
-            }
+            Writer::Frames { .. } => {}
         }
     }
 }
@@ -173,92 +325,42 @@ pub(super) fn somewhere(window: &str, nth: u64) -> Result<PathBuf, Refusal> {
     ))
 }
 
-/// ffmpeg started on this window, or `None` when this machine has none.
+/// The arguments ffmpeg is started with: raw RGBA frames of the
+/// recording's size on stdin, one mp4 out.
 ///
-/// `gdigrab` names the window by its title, which is the same handle on
-/// the window a caller used to name it — so a recording cannot reach a
-/// window the scope file left out by going around it.
-fn ffmpeg(window: &str, bounds: Bounds, into: &Path) -> Option<std::process::Child> {
-    std::process::Command::new("ffmpeg")
-        .args(command_line(window, bounds, into))
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .ok()
-}
-
-/// The arguments ffmpeg is started with.
-fn command_line(window: &str, _bounds: Bounds, into: &Path) -> Vec<String> {
+/// The `pad` filter rounds an odd width or height up to even, which the
+/// yuv420p an ordinary player reads cannot do without.
+fn command_line(bounds: Bounds, into: &Path) -> Vec<String> {
     let mut line: Vec<String> = [
         "-hide_banner",
         "-loglevel",
         "error",
         "-f",
-        "gdigrab",
-        "-framerate",
+        "rawvideo",
+        "-pixel_format",
+        "rgba",
+        "-video_size",
     ]
     .map(str::to_owned)
     .to_vec();
-    line.push(FRAMES_A_SECOND.to_string());
-    line.extend(["-i".to_owned(), format!("title={window}")]);
+    line.push(format!("{}x{}", bounds.width(), bounds.height()));
+    line.extend(["-framerate".to_owned(), FRAMES_A_SECOND.to_string()]);
+    line.extend(["-i".to_owned(), "-".to_owned()]);
     // ffmpeg stops itself at the same ceiling the frame thread holds,
     // and writes the index for what it recorded.
-    line.extend(["-t".to_owned(), MOST_SECONDS.to_string(), "-y".to_owned()]);
+    line.extend(["-t".to_owned(), MOST_SECONDS.to_string()]);
+    line.extend(
+        [
+            "-vf",
+            "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+            "-pix_fmt",
+            "yuv420p",
+            "-y",
+        ]
+        .map(str::to_owned),
+    );
     line.push(into.join("recording.mp4").display().to_string());
     line
-}
-
-/// Asks ffmpeg to finish, which is what writes the index an mp4 needs.
-fn finish(mut child: std::process::Child) {
-    if let Some(stdin) = child.stdin.as_mut() {
-        let _asked = stdin.write_all(b"q\n");
-        let _flushed = stdin.flush();
-    }
-    drop(child.stdin.take());
-    for _poll in 0..FFMPEG_FINISH_POLLS {
-        match child.try_wait() {
-            Ok(Some(_ended)) => return,
-            Ok(None) => std::thread::sleep(POLL_EVERY),
-            Err(_unknowable) => break,
-        }
-    }
-    // It was asked politely and given twenty seconds. What is left is a
-    // partial file rather than a process nobody can stop.
-    let _killed = child.kill();
-    let _reaped = child.wait();
-}
-
-/// The frame-sequence path: this package's one thread.
-fn frames(handle: HWND, bounds: Bounds, into: &Path) -> Sink {
-    let stopping = Arc::new(AtomicBool::new(false));
-    let flag = Arc::clone(&stopping);
-    let into = into.to_path_buf();
-    // An `HWND` is a token rather than a pointer into this process's
-    // memory, so it travels as its address and is rebuilt on the other
-    // side. Win32 documents the drawing calls this thread makes as
-    // usable from any thread with the window's handle.
-    let carried = handle.0.expose_provenance();
-    let thread = std::thread::spawn(move || {
-        let handle = HWND(std::ptr::with_exposed_provenance_mut(carried));
-        let mut written: u64 = 0;
-        while !flag.load(Ordering::Acquire) && written < MOST_FRAMES {
-            if let Ok(pixels) = super::super::capture::window(handle, bounds) {
-                let at = into.join(format!("frame-{written:06}.png"));
-                if pixels.save(&at).is_ok() {
-                    written = written.saturating_add(1);
-                }
-            }
-            // A fixed rest between frames rather than a deadline measured
-            // from the frame's start: this package reads no clock. What
-            // that costs is stated rather than hidden — a window that is
-            // slow to draw yields a sparser sequence, so `FRAME_EVERY` is
-            // the shortest gap between frames and not a promised rate.
-            std::thread::sleep(FRAME_EVERY);
-        }
-        written
-    });
-    Sink::Frames { stopping, thread }
 }
 
 #[cfg(test)]
@@ -278,7 +380,7 @@ mod tests {
     #[test]
     fn a_recording_hands_ffmpeg_frames_rather_than_a_window_title() {
         let bounds = Bounds::from_corners(0, 0, 640, 480).unwrap();
-        let line = command_line("a — Notepad", bounds, Path::new("recorded"));
+        let line = command_line(bounds, Path::new("recorded"));
         let adjacent = |first: &str, second: &str| {
             line.windows(2)
                 .any(|pair| pair[0] == first && pair[1] == second)
