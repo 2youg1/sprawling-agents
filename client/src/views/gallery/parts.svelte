@@ -145,7 +145,7 @@
         id: "calls",
         label: "talk_calls",
         rows: [
-          { id: "call-11", label: "exec: cargo test -p kernel", chosen: true },
+          { id: "call-11", label: "exec: cargo test -p sprawling-kernel", chosen: true },
           { id: "call-10", label: "edit: crates/kernel/src/gate/door.rs" },
           { id: "call-4", label: "search: GateOutcome" },
         ],

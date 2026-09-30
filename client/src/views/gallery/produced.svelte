@@ -82,8 +82,8 @@
     call(7, "search", "may_answer", null),
     call(8, "edit", "crates/kernel/src/gate/door.rs", null),
     call(9, "exec", "cargo fmt --all", null),
-    call(10, "exec", "cargo clippy -p kernel --all-targets", null),
-    call(11, "exec", "cargo test -p kernel --lib gate", null),
+    call(10, "exec", "cargo clippy -p sprawling-kernel --all-targets", null),
+    call(11, "exec", "cargo test -p sprawling-kernel --lib gate", null),
     call(12, "exec", "cargo xtask specalign", null),
   ];
 
@@ -136,7 +136,7 @@ A door answers *Allow* or *Deny*.
   const A_TERMINAL: Call = call(
     3,
     "exec",
-    "cargo clippy -p kernel --all-targets -- -D warnings",
+    "cargo clippy -p sprawling-kernel --all-targets -- -D warnings",
     said(
       `    Checking kernel v0.0.5 (C:\\sprawling\\crates\\kernel)
     Finished \`dev\` profile [unoptimized + debuginfo] in 4.12s
