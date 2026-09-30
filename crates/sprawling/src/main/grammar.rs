@@ -120,12 +120,12 @@ pub(super) fn parse(words: &[String]) -> Result<Invocation, LineError> {
         return Ok(Invocation::FirstScreen);
     };
     let (named, rest) = match first.as_str() {
-        "help" => match rest.first() {
-            Some(verb) => return Ok(Invocation::Help(find(verb)?.verb)),
+        "help" => match rest.split_first() {
+            Some((verb, after)) => return Ok(Invocation::Help(find(verb, after)?.0.verb)),
             None => return Ok(Invocation::Overview),
         },
         "--help" | "-h" => return Ok(Invocation::Overview),
-        verb => (find(verb)?, rest),
+        verb => find(verb, rest)?,
     };
     if asks_help {
         return Ok(Invocation::Help(named.verb));
@@ -133,13 +133,52 @@ pub(super) fn parse(words: &[String]) -> Result<Invocation, LineError> {
     arguments(named, rest).map(|arguments| Invocation::Run(named.verb, arguments))
 }
 
-fn find(word: &str) -> Result<&'static Row, LineError> {
-    VERBS
+/// The row `first` names, or `first` and the word after it name, and the
+/// words left after the name. A row whose name is two words
+/// (`playback export`) is named by two; every other row by one
+/// (sprawling-SPEC.md 8-126).
+fn find<'words>(
+    first: &str,
+    rest: &'words [String],
+) -> Result<(&'static Row, &'words [String]), LineError> {
+    if let Some(row) = VERBS
         .iter()
-        .find(|row| row.name == word || row.aliases.contains(&word))
+        .find(|row| row.name == first || row.aliases.contains(&first))
+    {
+        return Ok((row, rest));
+    }
+    let under: Vec<&'static Row> = VERBS
+        .iter()
+        .filter(|row| {
+            row.name
+                .split_once(' ')
+                .is_some_and(|(head, _)| head == first)
+        })
+        .collect();
+    if under.is_empty() {
+        return Err(LineError::UnknownVerb {
+            given: first.to_owned(),
+            nearest: nearest(first, VERBS.iter().map(|row| row.name)),
+        });
+    }
+    let second = rest.split_first();
+    second
+        .and_then(|(second, after)| {
+            under
+                .iter()
+                .find(|row| {
+                    row.name
+                        .split_once(' ')
+                        .is_some_and(|(_, tail)| tail == second)
+                })
+                .map(|row| (*row, after))
+        })
         .ok_or_else(|| LineError::UnknownVerb {
-            given: word.to_owned(),
-            nearest: nearest(word, VERBS.iter().map(|row| row.name)),
+            given: second.map_or_else(
+                || first.to_owned(),
+                |(second, _)| format!("{first} {second}"),
+            ),
+            nearest: under.iter().map(|row| row.name).collect(),
         })
 }
 
