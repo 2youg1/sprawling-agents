@@ -158,6 +158,10 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 | `E_GATE_DENIED` | confidential 楼构造出站工具 | **能**：构造点即拒，于是「它存在过」这件事不成立 |
 | `E_OUTSIDE_WRITE_DOMAIN` | 入站地址落 reserved prefix | 能：判定在 `admit`，无第二条入口 |
 
+**五家的版本钉子只有一个家：`Harness::launch`（§8-19）。** 本 SPEC 写怎么选版本（读 registry、钉死、跟正式版），不写五家的包名与版本号。两处都写时没有门把它们绑在一起，上游每发一次版要改两个文件，漏改的那一份读起来仍然像真的。被否的方案是在 §8-19 保留五个版本号作说明，这正是会漏改的那一份。
+
+**跟 `agent.json` 的 `distribution`，不跟 `preview`（§8-19）。** registry 为同一家同时给出正式版（`distribution`）与预览版（`preview`），本城钉正式版：预览版比正式版发得勤，每发一次看守就开一个 issue，而它还没有被发布方当作正式版交出。被否的方案是跟 `preview`，它只让本城更早拿到发布方自己还没定稿的适配器。
+
 ## 13 依赖选型
 
 `kernel`＋`serde_json`＋`gateway`＋`reqwest`。HTTP 客户端只在 `gateway::client_for` 一处构造，本 crate 取它构造好的 builder，只加 user agent 与整请求时限（`mcp::http::WholeRequest`）；`secret:realm/name` 引用经 `gateway::SecretResolver` 兑付。**恒不引入**异步运行时与任何一家服务商的 SDK：前者会让一次同步的工具调用变成异步库，后者会把「本体不认识任何一家」这条承诺作废。
@@ -304,7 +308,7 @@ pub enum StopReason { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
 ```
 
 - **名单是定规**：Codex、Claude Code、Grok Build、Kimi Code、Pi 五家是人认可的全部 harness。增一家要人另定，不因为 ACP registry 里多了一行就跟着加。
-- **怎么起一家，读 ACP registry**（<https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json>，逐家的 `agent.json` 在 `agentclientprotocol/registry`，被看路径见 docs/third-party.md §1）：Claude Code 与 Codex 各经官方适配器（`npx -y @agentclientprotocol/claude-agent-acp@0.84.0`、`npx -y @agentclientprotocol/codex-acp@2.0.0`），Grok Build 经它自己的包（`npx -y @xai-official/grok@1.0.45 agent stdio`），Kimi Code 是人装好的 `kimi acp`，Pi 经 `npx -y pi-acp@0.0.34`。**版本钉死**：`npx` 不带版本会在每次起进程时向 npm 取最新的包，一个没人看过的版本就进了城。
+- **怎么起一家，读 ACP registry**（<https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json>，逐家的 `agent.json` 在 `agentclientprotocol/registry`，被看路径见 docs/third-party.md §1）：Claude Code 与 Codex 各经 registry 组织发布的适配器包，Pi 经第三方的适配器包，Grok Build 经它自己的包并带 `agent stdio` 两个参数，这四家都由 `npx -y <包>@<版本>` 起；Kimi Code 是人装好的 `kimi acp`。包名、版本与参数只写在 `Harness::launch`，取 `agent.json` 里 `distribution` 那一项（§12）。**版本钉死**：`npx` 不带版本会在每次起进程时向 npm 取最新的包，一个没人看过的版本就进了城；`every_package_a_harness_is_fetched_as_is_pinned_to_a_version` 要求每个 `npx` 包都带版本。
 - **登录是人在 harness 里做的**：本城不起登录流程、不读 harness 的凭据文件。`docs` 是每家自己写的登录说明，页面只把它交给人。
 - **本城不向 harness 提供文件与终端**：`initialize` 声明 `fs.readTextFile`、`fs.writeTextFile`、`terminal` 全为 `false`，harness 用它自己的工具。ACP 规格里工具由 agent 自己执行，`session/request_permission` 是 agent 可以不发的请求，工具名 "do not advertise a capability or grant authorization"（<https://agentclientprotocol.com/protocol/tool-calls>）；本城因此只能**记录**一家 harness 做了什么，不能**管辖**它。harness 发来的其余请求（`fs/*`、`terminal/*`）以 JSON-RPC `-32601` 回答，不静默。
 - **一条消息的上限与 MCP 同一个**：`read_one_message` 与 `MESSAGE_CEILING`（§8-15）。ACP 与 MCP 同是按行分帧的 JSON-RPC，一个图片加信封的上限对两者是同一个事实。
