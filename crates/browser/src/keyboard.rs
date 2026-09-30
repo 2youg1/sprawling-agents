@@ -204,6 +204,7 @@ pub fn key_frame(
         ])
         .chain(
             held.iter()
+                .rev()
                 .map(|value| json!({ "type": "keyUp", "value": value })),
         )
         .collect();
