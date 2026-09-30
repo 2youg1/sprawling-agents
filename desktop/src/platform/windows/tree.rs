@@ -221,7 +221,7 @@ mod tests {
             .into_iter()
             .find(|window| window.named.title == title)
             .unwrap();
-        let nodes = read(window.handle, 2).unwrap();
+        let nodes = read(window.raw(), 2).unwrap();
         let named: Vec<(&str, u32)> = nodes
             .iter()
             .map(|node| (node.name.as_str(), node.depth))

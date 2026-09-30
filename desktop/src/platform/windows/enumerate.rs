@@ -17,16 +17,19 @@
 //! out rather than reported with a blank**: a caller cannot name a
 //! window it has no title for, and a row of empty strings would only
 //! look like something it could name.
+//!
+//! **This is where a window handle is minted, and the only place.** The
+//! enumeration itself goes through the `windows` binding, because
+//! `winsafe`'s `EnumWindows` is not admitted (desktop-SPEC.md section
+//! 12.9); each handle it hands the callback becomes a `winsafe::HWND`
+//! there, and everything after that — visibility, title, process,
+//! rectangle, and every other module's use of the window — goes through
+//! `winsafe`'s safe calls (section 8-11).
 
-use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, MAX_PATH, RECT};
-use windows::Win32::System::Threading::{
-    OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
-};
-use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
-    IsWindowVisible,
-};
-use windows::core::{BOOL, PWSTR};
+use windows::Win32::Foundation::{HWND, LPARAM};
+use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
+use windows::core::BOOL;
+use winsafe::co;
 
 use super::fault;
 use super::geometry::Bounds;
@@ -38,7 +41,17 @@ use crate::refusal::Refusal;
 pub(crate) struct Window {
     pub(crate) named: Named,
     pub(crate) bounds: Bounds,
-    pub(crate) handle: HWND,
+    pub(crate) handle: winsafe::HWND,
+}
+
+impl Window {
+    /// The handle as the `windows` binding spells it, for the calls that
+    /// still go through that binding (desktop-SPEC.md section 8-11).
+    /// Taking the address out of a `winsafe::HWND` needs no `unsafe`;
+    /// only putting one in does, and that happens in `collect` alone.
+    pub(crate) fn raw(&self) -> HWND {
+        HWND(self.handle.ptr())
+    }
 }
 
 /// Every visible, titled top-level window on this desktop.
@@ -52,7 +65,7 @@ pub(crate) struct Window {
     reason = "EnumWindows is a callback API, so the list it fills has to travel to the callback as an address"
 )]
 pub(crate) fn desktop() -> Result<Vec<Window>, Refusal> {
-    let mut handles: Vec<HWND> = Vec::new();
+    let mut handles: Vec<winsafe::HWND> = Vec::new();
     // The address travels as a number because that is the only thing an
     // `LPARAM` is. `expose_provenance` is the spelling that says so, and
     // it pairs with the `with_exposed_provenance_mut` in the callback:
@@ -92,113 +105,67 @@ pub(crate) fn desktop() -> Result<Vec<Window>, Refusal> {
 /// stopping early would make the listing depend on enumeration order.
 #[expect(
     unsafe_code,
-    reason = "this is the callback EnumWindows drives; recovering the list it was given is the one thing it does"
+    reason = "this is the callback EnumWindows drives; recovering the list it was given, and minting the handle it was handed, are the two things it does"
 )]
 extern "system" fn collect(handle: HWND, into: LPARAM) -> BOOL {
     let Ok(address) = usize::try_from(into.0) else {
         return BOOL(1);
     };
-    let into = std::ptr::with_exposed_provenance_mut::<Vec<HWND>>(address);
+    let into = std::ptr::with_exposed_provenance_mut::<Vec<winsafe::HWND>>(address);
     // SAFETY: `into` is the address `desktop` passed to `EnumWindows` in
     // this same call, and `EnumWindows` passes it through unchanged, so
-    // it addresses that function's live `Vec<HWND>` with that vector's
-    // own provenance. Nothing else in this package registers this
-    // callback, so there is no other provenance it could arrive with,
-    // and `EnumWindows` drives the callback on the calling thread before
-    // it returns, so this is the only reference to that vector alive.
+    // it addresses that function's live `Vec` with that vector's own
+    // provenance. Nothing else in this package registers this callback,
+    // so there is no other provenance it could arrive with, and
+    // `EnumWindows` drives the callback on the calling thread before it
+    // returns, so this is the only reference to that vector alive.
     let handles = unsafe { into.as_mut() };
     if let Some(handles) = handles {
-        handles.push(handle);
+        // SAFETY: `handle` is a top-level window handle `EnumWindows`
+        // handed this callback, so the pointer has the type a
+        // `winsafe::HWND` wraps. `winsafe::HWND` neither owns nor closes
+        // what it wraps, so a window that closes later leaves a stale
+        // value that every later call answers with a failure.
+        handles.push(unsafe { winsafe::HWND::from_ptr(handle.0) });
     }
     BOOL(1)
 }
 
 /// One handle, answered for — or dropped, when it will not answer.
-#[expect(
-    unsafe_code,
-    reason = "whether a window is visible is a question only the FFI entry point answers"
-)]
-fn described(handle: HWND) -> Option<Window> {
-    // SAFETY: `handle` came from `EnumWindows` in this same call.
-    // `IsWindowVisible` takes any HWND, including one whose window has
-    // closed since, and answers false for it rather than misbehaving.
-    if !unsafe { IsWindowVisible(handle) }.as_bool() {
+///
+/// A title that cannot be read is dropped like an empty one: a caller
+/// cannot name a window by a title nobody could read.
+fn described(handle: winsafe::HWND) -> Option<Window> {
+    if !handle.IsWindowVisible() {
         return None;
     }
-    let title = title(handle)?;
+    let title = handle.GetWindowText().ok()?;
     if title.is_empty() {
         return None;
     }
     Some(Window {
         named: Named {
             title,
-            process: process(handle)?,
+            process: process(&handle)?,
         },
-        bounds: rectangle(handle).ok()?,
+        bounds: rectangle(&handle).ok()?,
         handle,
     })
 }
 
-/// The window's title, or `None` when it has none this call can read.
-#[expect(
-    unsafe_code,
-    reason = "a window title is read into a caller-provided buffer, which is an FFI convention with no safe wrapper"
-)]
-fn title(handle: HWND) -> Option<String> {
-    // SAFETY: `handle` is an HWND from this call's enumeration.
-    // `GetWindowTextLengthW` reads only the window it names and returns
-    // zero for one that has closed; it writes nothing.
-    let length = unsafe { GetWindowTextLengthW(handle) };
-    let length = usize::try_from(length).ok()?.checked_add(1)?;
-    let mut text: Vec<u16> = vec![0; length];
-    // SAFETY: `text` is a live, uniquely owned buffer of exactly
-    // `length` `u16`s, and the binding takes it as a slice, so the
-    // length Win32 is told is the length that exists. Win32 writes at
-    // most that many units and terminates within them.
-    let written = unsafe { GetWindowTextW(handle, &mut text) };
-    let written = usize::try_from(written).ok()?;
-    text.get(..written).map(String::from_utf16_lossy)
-}
-
 /// The file name of the process that owns the window.
-#[expect(
-    unsafe_code,
-    reason = "the owning process is found by opening it and asking for its image name, both FFI entry points"
-)]
-fn process(handle: HWND) -> Option<String> {
-    let mut owner: u32 = 0;
-    // SAFETY: `handle` is an HWND from this call's enumeration, and
-    // `owner` is a live local `u32` that outlives the call, so the
-    // pointer Win32 writes one `u32` through is valid and uniquely ours.
-    unsafe { GetWindowThreadProcessId(handle, Some(std::ptr::from_mut(&mut owner))) };
-    // SAFETY: this asks for the narrowest right that answers the
-    // question — `PROCESS_QUERY_LIMITED_INFORMATION` cannot read the
-    // process's memory. `owner` is a process id read immediately above;
-    // a process that has since exited makes this fail, which is the
-    // `.ok()?` below rather than undefined behaviour.
-    let opened = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, owner) }.ok()?;
-    let mut path: Vec<u16> = vec![0; usize::try_from(MAX_PATH).ok()?];
-    let mut length = u32::try_from(path.len()).ok()?;
-    // SAFETY: `opened` is a handle this function owns and closes below.
-    // `path` holds `length` `u16`s and is uniquely owned here, and
-    // `length` is that same count, so Win32 writes inside the buffer; it
-    // writes the count it used back through `length`, which is a live
-    // local.
-    let queried = unsafe {
-        QueryFullProcessImageNameW(
-            opened,
-            PROCESS_NAME_WIN32,
-            PWSTR(path.as_mut_ptr()),
-            std::ptr::from_mut(&mut length),
-        )
-    };
-    // SAFETY: `opened` is the handle `OpenProcess` returned above and
-    // has not been closed; this is its one close, and nothing borrows it
-    // afterwards.
-    let _closed = unsafe { CloseHandle(opened) };
-    queried.ok()?;
-    let full = path.get(..usize::try_from(length).ok()?)?;
-    let full = String::from_utf16_lossy(full);
+///
+/// This asks for the narrowest right that answers the question —
+/// `PROCESS_QUERY_LIMITED_INFORMATION` cannot read the process's memory
+/// — and the guard closes the process handle when it goes.
+fn process(handle: &winsafe::HWND) -> Option<String> {
+    let (_thread, owner) = handle.GetWindowThreadProcessId();
+    let opened =
+        winsafe::HPROCESS::OpenProcess(co::PROCESS::QUERY_LIMITED_INFORMATION, false, owner)
+            .ok()?;
+    let full = opened
+        .QueryFullProcessImageName(co::PROCESS_NAME::WIN32)
+        .ok()?;
     // The scope file lists `notepad.exe`, not a path: a person writing
     // an allowlist should not have to know where a program was installed.
     Some(
@@ -210,21 +177,12 @@ fn process(handle: HWND) -> Option<String> {
 }
 
 /// Where the window is on the virtual screen.
-#[expect(
-    unsafe_code,
-    reason = "a window rectangle is written back through an out-pointer, which is an FFI convention with no safe wrapper"
-)]
-fn rectangle(handle: HWND) -> Result<Bounds, Refusal> {
-    let mut rect = RECT::default();
-    // SAFETY: `handle` is an HWND from this call's enumeration, and
-    // `rect` is a live, uniquely owned local of exactly the type Win32
-    // writes through this pointer. A window that closed makes the call
-    // fail, which the `?` below turns into a refusal.
-    unsafe { GetWindowRect(handle, std::ptr::from_mut(&mut rect)) }.map_err(|err| {
-        fault::win32(
+fn rectangle(handle: &winsafe::HWND) -> Result<Bounds, Refusal> {
+    let rect = handle.GetWindowRect().map_err(|err| {
+        fault::system(
             "measure where the window is",
             "call `desktop.windows` again; the window may have closed since it was named",
-            &err,
+            err,
         )
     })?;
     Bounds::from_corners(rect.left, rect.top, rect.right, rect.bottom)

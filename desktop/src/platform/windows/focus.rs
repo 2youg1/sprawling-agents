@@ -30,10 +30,7 @@
 
 use std::time::Duration;
 
-use windows::Win32::Foundation::{HWND, POINT};
-use windows::Win32::UI::WindowsAndMessaging::{
-    GA_ROOT, GetAncestor, GetForegroundWindow, SetForegroundWindow, WindowFromPoint,
-};
+use winsafe::co;
 
 use super::geometry::Point;
 use crate::refusal::{Refusal, RefusalCode};
@@ -58,8 +55,12 @@ const BETWEEN_READS: Duration = Duration::from_millis(20);
 pub(super) struct Aim(pub(super) usize);
 
 impl Aim {
-    pub(super) fn of(window: HWND) -> Aim {
-        Aim(window.0.addr())
+    /// What a read that found no window compares as: no real window has
+    /// a null handle, so it is never the window a call named.
+    const NOWHERE: Aim = Aim(0);
+
+    pub(super) fn of(window: &winsafe::HWND) -> Aim {
+        Aim(window.ptr().addr())
     }
 }
 
@@ -72,7 +73,7 @@ impl Aim {
 /// Refuses when another window holds the keyboard and will not give it
 /// up, and when another window covers the point this action aims at.
 /// Nothing has been sent when either refusal is returned.
-pub(super) fn hold(window: HWND, at: Option<Point>) -> Result<(), Refusal> {
+pub(super) fn hold(window: &winsafe::HWND, at: Option<Point>) -> Result<(), Refusal> {
     let intended = Aim::of(window);
     if foreground() != intended {
         ask_for(window);
@@ -112,16 +113,8 @@ fn settled(intended: Aim, holder: Aim, under_pointer: Option<Aim>) -> Result<(),
 }
 
 /// Which window has the keyboard at this instant.
-#[expect(
-    unsafe_code,
-    reason = "the foreground window is process-wide state, readable only through the FFI entry point"
-)]
 fn foreground() -> Aim {
-    // SAFETY: `GetForegroundWindow` reads one system-wide handle, takes
-    // no argument and writes nothing, so there is no state this call
-    // can be handed in a shape it does not accept. A handle that has
-    // since closed is compared as a number here and never dereferenced.
-    Aim::of(unsafe { GetForegroundWindow() })
+    winsafe::HWND::GetForegroundWindow().map_or(Aim::NOWHERE, |held| Aim::of(&held))
 }
 
 /// The top-level window under one screen point.
@@ -129,17 +122,10 @@ fn foreground() -> Aim {
 /// The ancestor rather than the hit itself: a click lands on a button
 /// or a text box, and the question this module asks is which *window*
 /// would receive it.
-#[expect(
-    unsafe_code,
-    reason = "hit-testing the desktop and walking to a window's root are FFI entry points with no safe Rust equivalent"
-)]
 fn under(at: Point) -> Aim {
-    // SAFETY: both calls take values rather than pointers — a `POINT`
-    // by value, and a handle that `WindowFromPoint` itself returned —
-    // and neither writes through anything this process owns. A point on
-    // no window answers a null handle, which compares unequal to every
-    // real window and is never dereferenced here.
-    Aim::of(unsafe { GetAncestor(WindowFromPoint(POINT { x: at.x, y: at.y }), GA_ROOT) })
+    winsafe::HWND::WindowFromPoint(winsafe::POINT::with(at.x, at.y))
+        .and_then(|hit| hit.GetAncestor(co::GA::ROOT))
+        .map_or(Aim::NOWHERE, |root| Aim::of(&root))
 }
 
 /// Asks the desktop to put one window in front.
@@ -149,16 +135,8 @@ fn under(at: Point) -> Aim {
 /// either way — read the foreground back and refuse if it is not the
 /// window this call named. Acting on the return value would put the
 /// decision in two places.
-#[expect(
-    unsafe_code,
-    reason = "raising a window is an FFI entry point; the outcome is read back rather than trusted"
-)]
-fn ask_for(window: HWND) {
-    // SAFETY: the handle was returned by this module's own enumeration
-    // a moment ago, and a handle that has closed since makes this call
-    // fail rather than act on another window — which the read-back
-    // below then reports as a refusal.
-    let _asked = unsafe { SetForegroundWindow(window) };
+fn ask_for(window: &winsafe::HWND) {
+    let _asked: bool = window.SetForegroundWindow();
 }
 
 /// Waits, bounded, for the desktop to finish handing the keyboard over.

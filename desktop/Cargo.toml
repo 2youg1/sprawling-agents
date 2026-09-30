@@ -43,6 +43,10 @@ windows = { version = "0.62", features = [
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
 ] }
+# Safe Rust over the Win32 calls admitted operation by operation
+# (desktop-SPEC.md sections 8-11 and 12.9): input and the facts of a
+# window. `user` is those calls and nothing of the GUI layer above them.
+winsafe = { version = "0.0.29", features = ["user"] }
 
 [dev-dependencies]
 tempfile = "3"

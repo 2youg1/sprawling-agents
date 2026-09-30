@@ -26,10 +26,23 @@ use crate::refusal::{Refusal, RefusalCode};
 /// `doing` names the operation in a caller's vocabulary rather than the
 /// API's — "read the window's title", not "GetWindowTextW".
 pub(crate) fn win32(doing: &str, recovery: &str, err: &windows::core::Error) -> Refusal {
+    refused(doing, recovery, &err.message())
+}
+
+/// What the operating system said through `winsafe`, as a refusal.
+///
+/// The same sentence as [`win32`]: which binding carried the call is
+/// this server's business, and the caller reads the machine's words.
+pub(crate) fn system(doing: &str, recovery: &str, err: winsafe::co::ERROR) -> Refusal {
+    refused(doing, recovery, &err.to_string())
+}
+
+/// The one sentence every machine failure is told in.
+fn refused(doing: &str, recovery: &str, said: &str) -> Refusal {
     Refusal::new(
         RefusalCode::ToolUnavailable,
         "use the desktop",
-        format!("this machine refused to {doing}: {}", err.message()),
+        format!("this machine refused to {doing}: {said}"),
         recovery,
     )
 }

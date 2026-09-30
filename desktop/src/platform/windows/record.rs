@@ -144,7 +144,7 @@ impl Recordings {
     /// Refuses a second recording of the same window and a place on
     /// this machine that cannot be written to.
     pub(crate) fn start(&mut self, window: &Window) -> Result<Value, Refusal> {
-        let of = window.handle.0.addr();
+        let of = window.handle.ptr().addr();
         if let Some(already) = self.running.values().find(|running| running.of == of) {
             return Err(Refusal::new(
                 RefusalCode::GateDenied,
@@ -157,7 +157,7 @@ impl Recordings {
         self.begun = self.begun.saturating_add(1);
         let id = RecordingId(self.begun);
         let into = somewhere(&window.named.title, self.begun)?;
-        let written_by = Sink::open(window.handle, window.bounds, &into)?;
+        let written_by = Sink::open(window.raw(), window.bounds, &into)?;
         let answer = json!({
             "state": "started",
             "recording": id.0,
@@ -232,10 +232,13 @@ impl Drop for Recordings {
 mod tests {
     use super::*;
     use crate::platform::windows::target::Named;
-    use windows::Win32::Foundation::HWND;
 
     /// A window with a handle no recording thread can draw from, which
     /// is what makes these tests about the bookkeeping alone.
+    #[expect(
+        unsafe_code,
+        reason = "test code names windows that do not exist by made-up handles"
+    )]
     fn window(title: &str, handle: usize) -> Window {
         Window {
             named: Named {
@@ -243,7 +246,11 @@ mod tests {
                 process: "test.exe".to_owned(),
             },
             bounds: super::super::geometry::Bounds::from_corners(0, 0, 32, 32).unwrap(),
-            handle: HWND(std::ptr::without_provenance_mut(handle)),
+            // SAFETY: `winsafe::HWND` neither dereferences nor closes what
+            // it wraps, and the one call that hands this made-up handle to
+            // Win32, the recording thread's capture, refuses it as a
+            // window that does not exist.
+            handle: unsafe { winsafe::HWND::from_ptr(std::ptr::without_provenance_mut(handle)) },
         }
     }
 

@@ -110,7 +110,7 @@ impl Desk {
     fn snapshot(&mut self, arguments: &Value) -> Result<Value, Refusal> {
         let window = resolved(arguments)?;
         let depth = whole(arguments, "depth")?.unwrap_or(DEFAULT_DEPTH);
-        let nodes = tree::read(window.handle, depth)?;
+        let nodes = tree::read(window.raw(), depth)?;
         let described: Vec<Value> = nodes
             .iter()
             .map(|node| {
@@ -151,7 +151,7 @@ impl Desk {
         // `SendInput` follows the keyboard rather than the decision.
         // The window named here is the window the events reach, or
         // nothing is sent (desktop-SPEC.md section 8.6, sixth pair).
-        focus::hold(window.handle, action.lands_at())?;
+        focus::hold(&window.handle, action.lands_at())?;
         act::perform(&action, &modifiers)?;
         Ok(json!({
             "title": window.named.title,
@@ -292,7 +292,7 @@ fn listing(arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>
 /// `desktop.screenshot`: one window, or a region of it.
 fn screenshot(arguments: &Value) -> Result<Answer, Refusal> {
     let window = resolved(arguments)?;
-    let whole = capture::window(window.handle, window.bounds)?;
+    let whole = capture::window(window.raw(), window.bounds)?;
     let pixels = match region(arguments)? {
         Some((left, top, width, height)) => {
             if left.saturating_add(width) > whole.width()
@@ -362,7 +362,7 @@ fn use_clipboard(arguments: &Value) -> Result<Value, Refusal> {
 /// A window as the snapshot record keys and judges it.
 fn sight(window: &enumerate::Window) -> views::Sight {
     views::Sight {
-        aim: focus::Aim::of(window.handle),
+        aim: focus::Aim::of(&window.handle),
         bounds: window.bounds,
     }
 }

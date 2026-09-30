@@ -253,9 +253,9 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 | 操作 | 模块 | 调用 | 实现 | 准入 | 契约测试 |
 |---|---|---|---|---|---|
-| 枚举顶层窗口，铸出句柄 | `enumerate` | `EnumWindows` 与它的回调 | `windows`（FFI） | 无 | `a_window_this_process_opens_is_listed_by_its_title_process_and_bounds` |
-| 一扇窗口的事实：可见、标题、进程映像名、外框 | `enumerate` | `IsWindowVisible`、`GetWindowText`、`GetWindowThreadProcessId`、`OpenProcess`＋`QueryFullProcessImageName`、`GetWindowRect` | `windows`（FFI） | `winsafe` | 同上 |
-| 前台与落点 | `focus` | `GetForegroundWindow`、`WindowFromPoint`、`GetAncestor`、`SetForegroundWindow` | `windows`（FFI） | `winsafe` | `the_window_under_a_point_is_the_window_drawn_there` |
+| 枚举顶层窗口，铸出句柄 | `enumerate` | `EnumWindows` 与它的回调；回调里把系统交来的值包成 `winsafe::HWND` | `windows`（FFI） | 无 | `a_window_this_process_opens_is_listed_by_its_title_process_and_bounds` |
+| 一扇窗口的事实：可见、标题、进程映像名、外框 | `enumerate` | `IsWindowVisible`、`GetWindowText`、`GetWindowThreadProcessId`、`OpenProcess`＋`QueryFullProcessImageName`、`GetWindowRect` | `winsafe` | `winsafe` | 同上 |
+| 前台与落点 | `focus` | `GetForegroundWindow`、`WindowFromPoint`、`GetAncestor`、`SetForegroundWindow` | `winsafe` | `winsafe` | `the_window_under_a_point_is_the_window_drawn_there` |
 | 输入 | `act` | `SendInput`、`GetSystemMetrics` | `windows`（FFI） | `winsafe` | `each_stroke_becomes_the_event_it_names` |
 | 可访问性树 | `tree` | UIA 的 automation 对象、control view walker、元素属性；COM 公寓 | `windows`（FFI） | `uiautomation`，公寓经 `winsafe` | `a_windows_tree_names_the_control_inside_it` |
 | 按窗口捕获 | `capture` | `GetDC`／`ReleaseDC`、`CreateCompatibleDC`、`CreateCompatibleBitmap`、`SelectObject`、`PrintWindow`、`GetDIBits` | `windows`（FFI） | 无 | `the_failing_path_releases_what_it_took` |
