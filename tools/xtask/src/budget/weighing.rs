@@ -25,10 +25,12 @@ use crate::report::XtaskError;
 /// included.
 ///
 /// The one home for that count. `docnum`'s `dependency_count` fact
-/// quotes this reading into the documents that state it, and the
-/// register row below prices it, so the number a reader meets in
+/// quotes this reading into the documents that state it, and
+/// `cargo xtask budget` prints it beside the register's
+/// `[dependency_count]` row, so the number a reader meets in
 /// `ARCHITECTURE.md`, the number `docs/third-party.md` states and the
-/// number the ratchet refuses growth past are one reading taken once.
+/// number the report prints are one reading taken once. No count is
+/// refused (xtask-SPEC.md section 8-25).
 ///
 /// # Errors
 /// Refuses a lockfile it cannot read, and one that resolves no package
@@ -124,9 +126,9 @@ mod tests {
     use super::*;
 
     /// The lockfile is counted once, and both the document fact and
-    /// the register row read that one count.
+    /// the report read that one count.
     #[test]
-    fn the_lockfile_is_counted_once_for_the_document_and_the_ratchet() {
+    fn the_lockfile_is_counted_once_for_the_document_and_the_report() {
         let root = crate::root::this_checkout();
         let counted = lockfile_packages(root).unwrap();
         assert!(counted > 0, "this workspace resolves packages");

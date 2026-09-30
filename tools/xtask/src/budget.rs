@@ -11,9 +11,12 @@
 //! cannot check says what it needs; an entry that quietly vanished
 //! because nobody could measure it is how a budget stops existing.
 //!
-//! Only what a machine measures the same way twice is gated here. Sizes
-//! qualify. Wall-clock figures do not: gating them would turn a busy
-//! runner into a defect report, and the register says so per row.
+//! Only what a machine measures the same way twice, and what an
+//! engineer can act on when it grows, is gated here: the bytes of a
+//! built artifact. Wall-clock figures are not gated, because gating them
+//! would turn a busy runner into a defect report, and the register says
+//! so per row. The lockfile's package count is read and printed and
+//! refused by nothing (xtask-SPEC.md section 8-25).
 
 use std::path::Path;
 
@@ -27,56 +30,21 @@ use carried::CLIENT_MARK;
 pub(crate) use carried::{carries_client, carries_engine};
 pub(crate) use weighing::{lockfile_packages, measure};
 
-/// What a gated row counts, and therefore which keys state its budget
-/// and how a finding spells a reading.
-///
-/// Two units, because the register holds two kinds of fact a machine
-/// measures the same way twice: how large a built artifact is, and how
-/// many of something a resolved manifest names. A wall-clock figure is
-/// never a unit here — the register says, per row, why the speed of the
-/// machine that took a reading is recorded and not gated.
-#[derive(Clone, Copy)]
-enum Unit {
-    Bytes,
-    Packages,
-}
-
-impl Unit {
-    /// The three keys a gated row of this unit states its budget, its
-    /// best reading and its slack under.
-    ///
-    /// The suffix is the unit's name, so a row says what it counts
-    /// without a second field repeating it, and a row that states bytes
-    /// cannot be read as a row that states packages.
-    fn keys(self) -> [&'static str; 3] {
-        match self {
-            Unit::Bytes => ["budget_bytes", "best_bytes", "slack_bytes"],
-            Unit::Packages => ["budget_packages", "best_packages", "slack_packages"],
-        }
-    }
-
-    /// One reading, in the words a finding uses.
-    fn spell(self, reading: u64) -> String {
-        match self {
-            Unit::Bytes => format!("{reading} B"),
-            Unit::Packages => format!("{reading} packages"),
-        }
-    }
-}
-
-/// Every unit a gated row may be stated in, walked when the register is
-/// read. A unit added to the enum and left out here would be a unit no
-/// row can use, so the array is beside the enum it enumerates.
-const UNITS: [Unit; 2] = [Unit::Bytes, Unit::Packages];
+/// The key a gated row states its budget under, in bytes.
+const BUDGET_KEY: &str = "budget_bytes";
+/// The key a gated row states its best recorded reading under, in bytes.
+const BEST_KEY: &str = "best_bytes";
+/// The key a gated row states how far a reading may drift back past its
+/// best, in bytes.
+const SLACK_KEY: &str = "slack_bytes";
 
 /// The release optimisation level the register's size reading was taken
 /// with. One word, and the reason the check above exists at all.
 const PROFILE: &str = "z";
 
-/// The register, as the gate reads it.
+/// A gated row of the register, in bytes.
 struct Row {
     name: String,
-    unit: Unit,
     budget: u64,
     best: u64,
     slack: u64,
@@ -130,16 +98,12 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             // people learn to run with less.
             continue;
         };
-        let reading = row.unit.spell(measured);
         if measured > row.budget {
             violations.push(Violation {
                 gate: "budget",
-                location: format!("{} is {reading}", row.name),
+                location: format!("{} is {measured} B", row.name),
                 rule: "a reading stays inside the budget the design states".to_owned(),
-                violation: format!(
-                    "{reading} exceeds the {} budget",
-                    row.unit.spell(row.budget)
-                ),
+                violation: format!("{measured} B exceeds the {} B budget", row.budget),
                 alternative:
                     "bring the reading back, or change the budget in the design and say why in \
                      the same change-set"
@@ -151,12 +115,11 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         if row.best > 0 && measured > ceiling {
             violations.push(Violation {
                 gate: "budget",
-                location: format!("{} is {reading}", row.name),
+                location: format!("{} is {measured} B", row.name),
                 rule: "a number may improve freely and drift only within its slack".to_owned(),
                 violation: format!(
-                    "{reading} is more than {} worse than the best recorded {}",
-                    row.unit.spell(row.slack),
-                    row.unit.spell(row.best)
+                    "{measured} B is more than {} B worse than the best recorded {} B",
+                    row.slack, row.best
                 ),
                 alternative:
                     "recover the reading, or record the new one in tools/xtask/budgets.toml \
@@ -171,20 +134,20 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 /// Reports every row: what it is, what it costs today, and what it is
 /// allowed to cost. A gate that only speaks when it is unhappy leaves a
 /// person guessing whether it measured anything at all.
+///
+/// A row outside the gated table is printed with its reading when
+/// `measure` knows how to take one, and with its status alone when it
+/// does not: a number nobody could measure is not printed as zero.
 pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
     let parsed = register(root)?;
-    let mut out = String::from(
-        "budget                 reading      best      budget
-",
-    );
+    let mut out = String::from("budget                 reading      best      budget\n");
     for row in gated_rows(&parsed) {
         let reading = match measure(root, &row.name)? {
             Some(bytes) => bytes.to_string(),
             None => "not built".to_owned(),
         };
         out.push_str(&format!(
-            "{:<22} {:>9}  {:>9}  {:>10}
-",
+            "{:<22} {:>9}  {:>9}  {:>10}\n",
             row.name, reading, row.best, row.budget
         ));
     }
@@ -210,16 +173,13 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
             .get("budget_lines")
             .and_then(toml::Value::as_integer)
             .map_or_else(String::new, |lines| format!("{lines} lines, "));
-        out.push_str(&format!(
-            "{name}: {stated}{status}
-"
-        ));
+        let reading =
+            measure(root, name)?.map_or_else(String::new, |reading| format!("{reading} \u{2014} "));
+        out.push_str(&format!("{name}: {reading}{stated}{status}\n"));
     }
     Ok(out)
 }
 
-/// The rows a machine can weigh: those marked gated that state a
-/// budget, a best reading and a slack in one of the units above.
 /// The release profile is the one the register's reading was taken with.
 ///
 /// **A size is a fact about the linker that produced it**, so a reading
@@ -270,38 +230,31 @@ fn release_profile(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             "`opt-level` is `{said}`, so the linked binary is not the one the register weighed"
         ),
         alternative: format!(
-            "set `opt-level = \"{PROFILE}\"`, or re-weigh the binary and move the register's              reading in the same commit"
+            "set `opt-level = \"{PROFILE}\"`, or re-weigh the binary and move the register's \
+             reading in the same commit"
         ),
     }])
 }
 
+/// The rows a machine can weigh: those marked gated that state a
+/// budget, a best reading and a slack in bytes.
 fn gated_rows(parsed: &toml::Value) -> Vec<Row> {
-    let mut rows = Vec::new();
     let Some(table) = parsed.as_table() else {
-        return rows;
+        return Vec::new();
     };
-    for (name, value) in table {
-        if value.get("status").and_then(toml::Value::as_str) != Some("gated") {
-            continue;
-        }
-        let number = |key: &str| value.get(key).and_then(toml::Value::as_integer);
-        for unit in UNITS {
-            let [budget_key, best_key, slack_key] = unit.keys();
-            let (Some(budget), Some(best), Some(slack)) =
-                (number(budget_key), number(best_key), number(slack_key))
-            else {
-                continue;
-            };
-            rows.push(Row {
+    table
+        .iter()
+        .filter(|(_, value)| value.get("status").and_then(toml::Value::as_str) == Some("gated"))
+        .filter_map(|(name, value)| {
+            let number = |key: &str| value.get(key).and_then(toml::Value::as_integer);
+            Some(Row {
                 name: name.clone(),
-                unit,
-                budget: budget.unsigned_abs(),
-                best: best.unsigned_abs(),
-                slack: slack.unsigned_abs(),
-            });
-        }
-    }
-    rows
+                budget: number(BUDGET_KEY)?.unsigned_abs(),
+                best: number(BEST_KEY)?.unsigned_abs(),
+                slack: number(SLACK_KEY)?.unsigned_abs(),
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -340,26 +293,6 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "gated_one");
         assert_eq!(rows[0].budget, 100);
-    }
-
-    /// A row counting something other than bytes is gated on the same
-    /// three questions, and its findings are spelled in its own unit.
-    #[test]
-    fn a_row_counted_in_packages_is_weighed_and_reported_in_packages() {
-        let register: toml::Value = toml::from_str(
-            r#"
-            [dependency_count]
-            budget_packages = 420
-            best_packages = 389
-            slack_packages = 16
-            status = "gated"
-            "#,
-        )
-        .unwrap();
-        let rows = gated_rows(&register);
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].budget, 420);
-        assert_eq!(rows[0].unit.spell(390), "390 packages");
     }
 
     /// The package count is printed beside its row with its reading,

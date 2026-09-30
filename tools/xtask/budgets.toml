@@ -578,35 +578,19 @@ status = "measured, not gated: p50 4.796 ms, p95 5.574, p99 7.230; floor 4.051, 
 #
 # **One count, three readers.** `budget::lockfile_packages` takes it;
 # `docnum`'s `dependency_count` fact quotes it into `ARCHITECTURE.md`
-# and `docs/third-party.md`; this row prices it. The number used to sit
-# in four documents at four different values, none of them right, which
-# is the whole reason it is measured rather than written.
+# and `docs/third-party.md`; `cargo xtask budget` prints it beside this
+# row. The number used to sit in four documents at four different
+# values, none of them right, which is the whole reason it is measured
+# rather than written.
 #
-# Gated, and the only gated row here that needs nothing built: a
-# lockfile is in every checkout. The budget is a decision rather than a
-# measurement, and the decision is that this graph may grow by about
-# one substantial dependency's transitive closure before somebody has
-# to say why in writing. The slack is about what one small crate brings
-# with it, so a routine addition is recorded rather than refused, and a
-# wave of them is refused rather than recorded.
-# The resource-bottleneck work added one such wave on purpose: sysinfo
-# for the measured memory and core count the heavy-command pool is sized
-# from, thread-priority for the core's own scheduling class, cpu-time and
-# memory-stats for the performance monitor's own readings, cap-std for
-# installing a skill package through directory handles, and crossterm
-# for the terminal views. Each
-# is the safe-Rust face of a platform call the code would otherwise make
-# through `unsafe`, which the workspace forbids; together they bring 52
-# packages, most of them the Windows bindings two of them share. The
-# budget moves to hold them with the same headroom it had before; the
-# slack is unchanged.
+# **Reported, never gated (the person's ruling).** Dependencies are
+# welcome; they are worth cutting where a cut makes the project less of
+# a black box, and a ceiling on the count cannot tell which cut that is.
+# xtask-SPEC.md section 8-25 holds the reasoning and what would reopen it.
 [dependency_count]
 what = "packages in Cargo.lock once every transitive dependency is resolved, workspace members included"
-budget_packages = 472
-best_packages = 441
-slack_packages = 16
 measured_by = "cargo xtask budget (budget::lockfile_packages, counting [[package]] in Cargo.lock)"
-status = "gated"
+status = "reported, not gated: the dependency count is read and printed, and no count is refused (xtask-SPEC.md section 8-25)"
 
 # T13: where the two latency tiers are stated. One latency metric in two
 # stages: the first is p95 inside one frame's budget (a person sees no
