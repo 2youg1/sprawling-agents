@@ -178,3 +178,7 @@ pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
     }
     Ok(stated)
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests;
