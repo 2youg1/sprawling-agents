@@ -81,7 +81,7 @@ pub(crate) fn call_completed_by(frames: &[Value]) -> Result<Option<ToolCall>, Ax
 /// `None` when the block at `at` is not a tool call.
 ///
 /// What a caller may do with the call before the answer settles is fixed
-/// by `tools/adversary/design/Speculating.lean`: start it only when it reads and
+/// by `crates/runtime/spec/Turn/Speculation.lean`: start it only when it reads and
 /// no writing call precedes it, keep its result out of the ledger until
 /// the answer settles, and discard it when the answer is cut.
 ///

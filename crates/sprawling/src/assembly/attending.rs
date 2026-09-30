@@ -20,7 +20,7 @@
 //! Which properties the loop must hold - every message served in
 //! finitely many steps, append order equal to seq order, no wake
 //! without work - is decided by the Lean model
-//! `tools/adversary/design/Attending.lean`; this loop polls and so does not
+//! `crates/sprawling/spec/Assembly/Attending.lean`; this loop polls and so does not
 //! yet hold the third (sprawling-SPEC.md 8-42-4).
 
 use std::sync::Arc;
@@ -251,7 +251,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
 /// The thread sleeps on the one queue and on nothing else, so a relay
 /// request, a run home, a posted command and a close each wake it the
 /// moment they are queued; an idle city wakes only at the schedule's
-/// deadline (`tools/adversary/design/Attending.lean`).
+/// deadline (`crates/sprawling/spec/Assembly/Attending.lean`).
 ///
 /// A function of its own rather than the body of the thread's closure,
 /// because the instruments that time a relay round trip and the gap two

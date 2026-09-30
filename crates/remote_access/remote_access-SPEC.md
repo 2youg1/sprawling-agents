@@ -22,12 +22,12 @@
 
 ## 2 验收标准
 
-- **door**：`tools/adversary/design/RemoteDoor.lean` 证明的六条性质在 Rust 门上各有一个场景测试：关着的门什么都不放；关门结束每一个会话，再开也带不回来；配对码只用一次、只在自己的纪元、只在过期之前；撤销的设备不持有会话也开不了新的；会话不比门活得久；远程会话永远够不到只限本地的动词。另加一条：门拒绝在它所在的纪元里重开。`cargo nextest run -p sprawling-remote-access` 全绿，且每条性质的测试在对应实现被故意改坏时转红。
+- **door**：`crates/remote_access/spec/Door.lean` 证明的六条性质在 Rust 门上各有一个场景测试：关着的门什么都不放；关门结束每一个会话，再开也带不回来；配对码只用一次、只在自己的纪元、只在过期之前；撤销的设备不持有会话也开不了新的；会话不比门活得久；远程会话永远够不到只限本地的动词。另加一条：门拒绝在它所在的纪元里重开。`cargo nextest run -p sprawling-remote-access` 全绿，且每条性质的测试在对应实现被故意改坏时转红。
 - **pairing**：铸出的码按人重新抄写（大小写、空格、连字符）读回同一个码；码的正文是 16 字节熵的 RFC 4648 base32（26 个符号）；两份熵给出两个码。
 - **keys**：同一个种子给出同一把公钥，两个种子给出两把；签名只在两半都成立时成立，换掉任一半即不成立；错误长度的线形式被拒。
 - **handshake**：两端握手后，一端封的帧另一端打得开，两个方向都是；设备拒绝一个它没有钉住的城；城拒绝一台持有别的密钥的设备；途中被改过的回复被拒；一次握手的 Finish 完不成另一次握手。
 - **seal**：帧按封的次序打开；被重放、被丢掉前一帧、被改过、方向不对的帧都打不开。
-- **Lean**：`just models` 构建 `Design`，`RemoteDoor` 无 `sorry`、无 `admit`、无 `axiom`。
+- **Lean**：`just models` 构建 `Spec`，`crates/remote_access/spec/Door.lean` 无 `sorry`、无 `admit`、无 `axiom`。
 
 ## 3 假设与歧义
 
@@ -46,7 +46,7 @@
 
 ## 5 权威信源
 
-- 门的性质：`tools/adversary/design/RemoteDoor.lean`（本 crate 是它的实现，它是性质的权威）。
+- 门的性质：`crates/remote_access/spec/Door.lean`（本 crate 是它的实现，它是性质的权威）。
 - base32：RFC 4648 §6，测试向量取自 §10（`"foobar"` → `MZXW6YTBOI======`）。
 - ML-KEM：FIPS 203；ML-DSA：FIPS 204；X25519：RFC 7748；Ed25519：RFC 8032；HKDF：RFC 5869；AES-GCM：NIST SP 800-38D。
 - 后量子混合密钥交换 `X25519MLKEM768` 已是 TLS 的默认候选：`cloudflared` 到 Cloudflare 边缘的连接在日志里报出这一曲线偏好（2026.9.3），Cloudflare 的 1.1.1.1 以 ML-DSA-44 验证 DNSSEC。
@@ -224,7 +224,7 @@ impl Opener { pub fn open(&mut self, sealed: &[u8]) -> Result<Vec<u8>, AxError>;
 ## 15 影响面
 
 - 新增 crate `remote_access`：根 `Cargo.toml` 的 members、`ARCHITECTURE.md` §3 的 depmap、`architecture.toml` 的模块图与 family 表。
-- `tools/adversary/lakefile.toml` 的 `Design` 库多一个根 `RemoteDoor`。
+- `crates/remote_access/spec/Door.lean` 由根 `lakefile.toml` 的 `Spec` 库按 glob 收进构建，不必登记。
 - 1a 没有调用方，产品二进制行为不变。
 
 ## 16 测试与约束

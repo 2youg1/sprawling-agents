@@ -4,7 +4,6 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import Sprawling.Frame
-import Sprawling.Chain
 import Sprawling.Door
 import Sprawling.Ground
 import Sprawling.Check
@@ -13,13 +12,11 @@ import Sprawling.Provider
 import Sprawling.Layer
 import Sprawling.Person
 import Sprawling.Regression
-import Sprawling.Snapshot
 
 /-! The library index. It holds no logic; every rule lives in the module that
 owns it, and the dependency order is the one `adversary-SPEC.md` section 7
 draws: `Model` → `Door` → `Frame`, `Model` → `Ground` → `Door`, `Provider` →
 `Ground` for the second world, `Layer` → `Ground` with `Check` for the third,
-`Person` on `Layer` for the fourth, and `Chain` on `Frame` alone — it reasons
-about a ledger the wire describes and reaches no city. `Snapshot` imports
-nothing: it states that a snapshot plus the tail after it is the whole fold, for
-every fold. -/
+`Person` on `Layer` for the fourth. The checker imports no specification: the
+chain and snapshot theorems it cites in comments live in
+`crates/kernel/spec/Ledger.lean` and `crates/storage/spec/Snapshot.lean`. -/

@@ -9,7 +9,7 @@
 //! A projection, never history: a start that finds no snapshot, a
 //! damaged one, or one whose line hash does not match the line on disk
 //! folds the whole ledger, as it did before snapshots existed. That
-//! resuming is sound at all is `tools/adversary/src/Sprawling/Snapshot.lean`'s
+//! resuming is sound at all is `crates/storage/spec/Snapshot.lean`'s
 //! `resumeIsWhole`.
 
 use std::path::Path;

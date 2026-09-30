@@ -7,7 +7,7 @@
 //!
 //! The reads a turn started while the model was still generating
 //! (`super::speculation`) are accounted here like every other call, each
-//! taking its cached result; `tools/adversary/design/Speculating.lean` is the
+//! taking its cached result; `crates/runtime/spec/Turn/Speculation.lean` is the
 //! authority on why that leaves the Ledger serial execution writes.
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};

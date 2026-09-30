@@ -7,7 +7,7 @@
 //! still pending, the devices paired, and the sessions they hold
 //! (remote_access-SPEC.md §8-1).
 //!
-//! Specified by `tools/adversary/design/RemoteDoor.lean`, which proves the six
+//! Specified by `crates/remote_access/spec/Door.lean`, which proves the six
 //! properties this module keeps: a closed door admits nothing, closing
 //! ends every session, a code is used once in its own epoch before it
 //! expires, a revoked device holds nothing, a session never outlives the

@@ -39,7 +39,7 @@ pub(crate) struct RelayRequest {
 ///
 /// One queue, because a thread blocks on one thing at a time: a queue
 /// per mouth is polled with timeouts that every request waits out
-/// (sprawling-SPEC.md 8-42-4, `tools/adversary/design/Attending.lean`).
+/// (sprawling-SPEC.md 8-42-4, `crates/sprawling/spec/Assembly/Attending.lean`).
 pub(crate) enum Wake {
     /// A lane's append, waiting for its answer.
     Relay(RelayRequest),

@@ -164,7 +164,7 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 
 一个房间的居民可以是五家官方 harness 之一（agent_protocols-SPEC §8-19）。派活到这样的房间时，城起那一家的进程，在房间自己的 worktree 里开一场 ACP 会话，把它汇报的东西记进账本，在它答出停止原因时结束这次 run。
 
-**性质的权威是 `tools/adversary/design/HarnessRun.lean`**，四组定理：
+**性质的权威是 `crates/agent_protocols/spec/Harness/Session.lean`**，四组定理：
 
 - **汇报恒不是准入历史**（`a_report_is_never_admitted`）：一次 harness run 的准入记录只有它的开始、它对城那次 prompt 的回答与冻结，中间汇报多少、汇报什么都不改变这一点。
 - **停摆先变成取消**（`a_halt_is_a_cancel_before_anything_else`、`a_second_halt_sends_nothing`）：城观察到一个罩住这个房间的停摆之后，run 发出的下一件事就是 `session/cancel`，此后的汇报排在它后面；第二次停摆什么也不发。
@@ -1879,8 +1879,8 @@ provider 的并发上限），配置值是人写的。取小的那个：比天�
 准入计数住在记账线程上：它是「同时有几轮活在跑」的唯一权威，而唯一权威必须在唯一写者那一侧，
 否则两条线程各数各的，就有了两个答案。
 
-**这条循环必须成立的三条性质由 Lean 模型定**：`tools/adversary/design/Attending.lean`（`lake build Design`，
-在 `tools/adversary/` 下跑）。三张嘴与关门都送进同一条队列，线程阻塞在第一条消息上，醒来后把已经排在后面的
+**这条循环必须成立的三条性质由 Lean 模型定**：`crates/sprawling/spec/Assembly/Attending.lean`（`just models`
+证明它）。三张嘴与关门都送进同一条队列，线程阻塞在第一条消息上，醒来后把已经排在后面的
 一次取尽，按到达次序服务。模型证明：醒来时在等的每条消息都在这一次醒来里被服务（于是到达的消息在下一次
 醒来里被服务）；追加的次序就是 seq 的次序；没有消息、也没有到期的排程截止时刻时线程不醒，而每次醒来都
 消耗掉至少一件工作，所以醒来的次数以消息数加截止时刻数为上界。模型只管追加了几条记录，一条消息落地时

@@ -26,12 +26,6 @@ debug.skipKernelTC = false
 name = "Spec"
 globs = ["crates.+"]
 
-# Until the design models reach their crates' `spec/` in the next change.
-[[lean_lib]]
-name = "Design"
-srcDir = "tools/adversary/design"
-roots = ["Attending", "Durability", "GoingBack", "HarnessRun", "RemoteDoor", "Speculating"]
-
 # The adversarial checker (tools/adversary/adversary-SPEC.md). It imports no
 # specification: it judges the binary from outside and must not import a
 # restatement of the rules it is judging.

@@ -21,7 +21,7 @@
 //!
 //! What a run over this session must keep - a report is never admitted
 //! history, a halt is a cancel before anything else, a frozen run emits
-//! nothing - is proved in `tools/adversary/design/HarnessRun.lean`.
+//! nothing - is proved in `crates/agent_protocols/spec/Harness/Session.lean`.
 
 use std::io::Write;
 use std::path::Path;
@@ -214,7 +214,7 @@ impl<W: Write> AcpSession<W> {
             let heard = self.lines.next(Duration::from_millis(HALT_TICK_MS))?;
             // Before anything the agent said is handled, and after every
             // silent wait: a halt becomes a cancel ahead of the next
-            // report (tools/adversary/design/HarnessRun.lean).
+            // report (crates/agent_protocols/spec/Harness/Session.lean).
             self.heed_halt(listener)?;
             let line = match heard {
                 Heard::Message(line) => line,

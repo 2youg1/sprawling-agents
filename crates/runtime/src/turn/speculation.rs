@@ -6,7 +6,7 @@
 //! Read-only tool calls started while the model is still generating,
 //! and the cache that holds what they returned until the answer settles.
 //!
-//! `tools/adversary/design/Speculating.lean` is the authority on what may start
+//! `crates/runtime/spec/Turn/Speculation.lean` is the authority on what may start
 //! early and in which order the results reach the Ledger: only the reads
 //! before the answer's first writing call, cached by position, recorded
 //! in emission order, and a failed answer's cache discarded whole.

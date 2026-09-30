@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The six properties `tools/adversary/design/RemoteDoor.lean` proves, held
+//! The six properties `crates/remote_access/spec/Door.lean` proves, held
 //! against the Rust door one scenario each.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]

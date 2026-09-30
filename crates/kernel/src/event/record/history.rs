@@ -6,7 +6,7 @@
 //! The two steps of the unified history that write a tree: going back to
 //! a point, and taking one file back from a point.
 //!
-//! `tools/adversary/design/GoingBack.lean` requires that each step appends
+//! `crates/storage/spec/Worktree/Back.lean` requires that each step appends
 //! exactly one record and that an undo is one of them, never a removal;
 //! these are those records. The tree is named by its worktree name, as
 //! in `worktree_opened`, and never by its path on disk, because a

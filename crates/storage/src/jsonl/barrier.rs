@@ -6,7 +6,7 @@
 //! The durability barrier's state: whether the ledger's in-memory
 //! position still names what the disk holds (storage-SPEC 8-1).
 //!
-//! `tools/adversary/design/Durability.lean` states the property this holds -
+//! `crates/storage/spec/Jsonl/Barrier.lean` states the property this holds -
 //! every seq a handle answered `Ok` for survives a reopen - and proves it
 //! for any run of waves, with the counterexample for a handle that keeps
 //! writing after a failed wave.

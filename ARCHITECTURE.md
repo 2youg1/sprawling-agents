@@ -1011,7 +1011,7 @@ sequenceDiagram
 `crates/runtime/src/turn/wave.rs` (`ConcurrentInvoke`),
 `crates/runtime/src/run/checkpoint.rs`, `crates/storage/src/checkpoint.rs`;
 what may start early and in which order results reach the Ledger is
-`tools/adversary/design/Speculating.lean`.
+`crates/runtime/spec/Turn/Speculation.lean`.
 
 ### 13.7 A run's life
 

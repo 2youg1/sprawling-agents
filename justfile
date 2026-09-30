@@ -287,13 +287,12 @@ gates-artifacts: build-web
 
 # The Lean specifications: every module under `crates/`, each a part of a
 # crate's specification (ARCHITECTURE.md section 11, "Specifications in
-# Lean"), and the design models under `tools/adversary/design/` until they
-# reach their crates. `lakefile.toml` sets `warningAsError`, so a `sorry` or
-# an `admit`, which Lean reports as a warning, fails the build; an `axiom`
-# raises no warning at all, so it is refused here by its shape, since no
-# specification in this tree has an axiom anybody reviewed. The checker
-# under `tools/adversary/` is not built here: it attacks the binary and
-# stays out of every required check.
+# Lean"). `lakefile.toml` sets `warningAsError`, so a `sorry` or an `admit`,
+# which Lean reports as a warning, fails the build; an `axiom` raises no
+# warning at all, so it is refused here by its shape, since no specification
+# in this tree has an axiom anybody reviewed. The checker under
+# `tools/adversary/` is not built here: it attacks the binary and stays out
+# of every required check.
 #
 # Lean is a required tool (`just prereqs`). Where `lake` is absent this
 # recipe fails and says how to install it, because a proof nobody ran is not
@@ -305,11 +304,11 @@ models:
         echo "models: lake is absent, so no specification was proved; \`just prereqs\` prints the lines that install elan and the toolchain lean-toolchain pins" >&2
         exit 1
     fi
-    if grep -rnE --include='*.lean' '^[[:space:]]*(private[[:space:]]+)?axiom[[:space:]]' crates tools/adversary/design; then
+    if grep -rnE --include='*.lean' '^[[:space:]]*(private[[:space:]]+)?axiom[[:space:]]' crates; then
         echo "models: an axiom above is a proof obligation nobody discharged; prove it as a theorem"
         exit 1
     fi
-    lake build Spec Design
+    lake build Spec
 
 # Every commit subject and ruling trailer in a range of history
 # (xtask-SPEC.md section 8-35). Not in `check`, because a tree has no

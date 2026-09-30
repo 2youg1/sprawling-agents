@@ -314,9 +314,9 @@ pub enum StopReason { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
 - **一条消息的上限与 MCP 同一个**：`read_one_message` 与 `MESSAGE_CEILING`（§8-15）。ACP 与 MCP 同是按行分帧的 JSON-RPC，一个图片加信封的上限对两者是同一个事实。
 - **`prompt` 在对方答出 `StopReason` 时返回**；读到输入结束而没有答，是 `E_PROVIDER` 并标 `Retry::Unknown`：对方也许已经做了事。`StopReason` 未知的词拒而不猜。
 - **停摆在对侧沉默时也要变成取消**：`BufRead` 的读没有期限，一家在跑长命令的 harness 可以几分钟一行不写，而一次停摆不能等它开口。所以读端在自己的线程上（`Lines::over`），把行交进通道；`prompt` 每次最多等 `HALT_TICK_MS` 就回头问一次 `halted`。线程在对侧关闭输出（子进程被杀）或会话丢掉通道时结束，不会泄漏。ARCHITECTURE §10 规则 3 把它列为库 crate 起线程的一处。
-- **取消的次序是 `tools/adversary/design/HarnessRun.lean` 定的**：`halted` 头一次答真，先调 `cancelling`（调用方在这里把 `cancel_received` 落账），再发 `session/cancel`，此后的汇报排在它后面；第二次答真什么也不发。取消之后 agent 再问 permission，一律答 `cancelled`（ACP 要求客户端这样答取消后的每一个 permission 请求），不再问调用方。
+- **取消的次序是 `crates/agent_protocols/spec/Harness/Session.lean` 定的**：`halted` 头一次答真，先调 `cancelling`（调用方在这里把 `cancel_received` 落账），再发 `session/cancel`，此后的汇报排在它后面；第二次答真什么也不发。取消之后 agent 再问 permission，一律答 `cancelled`（ACP 要求客户端这样答取消后的每一个 permission 请求），不再问调用方。
 - **`Answer.text` 是 agent 这一回合对城说的话**：`agent_message_chunk` 依次拼起来，每一块同时照常交给 `report`。它是城那次请求的回答，汇报是一路上的事，两者由调用方分别记（sprawling-SPEC §8-4e 第 8 条）。
 - **`HarnessProcess::start` 起 `Launch` 的程序与参数**：程序名由搜索路径补（`Program::name`），工作目录是调用方给的那棵 worktree，stderr 丢弃（与 `mcp::stdio` 同理：那是它的诊断，不是答案）。起不来答 `E_TOOL_UNAVAILABLE`，恢复语给出这家自己的 `docs()`。进程句柄落地时杀掉并收尸，所以「谁回收它」不需要第二份名单。
 - **测试走同一扇门**：测试用 `Lines::over` 读一条内存管道，在另一头用一条线程扮演 agent，与生产读子进程的输出是同一段代码，不另立 trait。
 
-**尚未做到的（本节接口的当前状态）**：一个 harness 居民的 run 还没有接线：派活到这样的居民时起它的进程、在房间的 worktree 里开会话、把 `Update` 写进账本、把停摆译成 `session/cancel`、confidential 楼拒绝构造它。它必须守住的性质已在 `tools/adversary/design/HarnessRun.lean` 证明，设计写在 sprawling-SPEC §8-4e；本 crate 这一侧（`Harness::parse`、`harness::process`、`harness::reading` 与 `session/cancel`）已落地，接线欠在 kernel、city 与 sprawling 三处。在接线之前，设置页的 harness 页只说明五家在这台电脑上够不够得着、怎么起、去哪里登录。
+**尚未做到的（本节接口的当前状态）**：一个 harness 居民的 run 还没有接线：派活到这样的居民时起它的进程、在房间的 worktree 里开会话、把 `Update` 写进账本、把停摆译成 `session/cancel`、confidential 楼拒绝构造它。它必须守住的性质已在 `crates/agent_protocols/spec/Harness/Session.lean` 证明，设计写在 sprawling-SPEC §8-4e；本 crate 这一侧（`Harness::parse`、`harness::process`、`harness::reading` 与 `session/cancel`）已落地，接线欠在 kernel、city 与 sprawling 三处。在接线之前，设置页的 harness 页只说明五家在这台电脑上够不够得着、怎么起、去哪里登录。

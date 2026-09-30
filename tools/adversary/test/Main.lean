@@ -468,7 +468,7 @@ suite had been changing.
 
 `tampering` flips a byte in the oldest record and is right to: that is the one
 position no city process races. But the chain covers every record a later record
-has hashed — `Sprawling.Chain`'s `aCoveredLineCannotChangeUnnoticed` — so
+has hashed — `crates/kernel/spec/Ledger.lean`'s `aCoveredLineCannotChangeUnnoticed` — so
 detection at one position is detection at one position and no more. This walks
 them all, oldest first, and puts the city's own bytes back before each attempt: a
 file still carrying the previous attempt's damage would refuse for that reason,

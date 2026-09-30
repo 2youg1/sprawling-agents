@@ -52,7 +52,7 @@ pub type Increments<'a> = &'a mut dyn FnMut(&Increment);
 /// [`ModelReturn`] after the call settles; when the call fails, a caller
 /// discards whatever it derived from these. What a caller may start, and
 /// in which order it records the results, is fixed by
-/// `tools/adversary/design/Speculating.lean`.
+/// `crates/runtime/spec/Turn/Speculation.lean`.
 pub type EarlyCalls<'a> = &'a mut dyn FnMut(&ToolCall);
 
 /// The model port. Production adapter: gateway::endpoint;
