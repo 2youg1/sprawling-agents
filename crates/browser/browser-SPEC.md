@@ -25,7 +25,7 @@
 - **假设**：起进程归 `bin::browser_bidi`；本库恒不拉起浏览器进程、恒不持套接字、恒不下载驱动。
 - **假设（附着）**：连一个已经开着的浏览器也归装配层——本库只把帧交给缝。装配层的 `AttachedBrowser` 与 `LazyEngine` 是同一缝上的第二个实现：前者只连、不启动、不结束进程；后者的 `running`／`Drop` 假定进程归自己，两者因此不能合成一个类型。
 - **协议形状**：`input.performActions` 的 `pointer`／`wheel` 源动作字段与元素 origin 的 `SharedReference` 据 W3C 草案写成；`script.evaluate` 回复里 `sharedId` 的位置、空能力集、`image/png` 拼写已对 Gecko 真会话核过（§19-7）。`input::shared_id_of` 在回复里按有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`。
-- **未定**：`-headless` 这一位由哪一面提供（楼的 `CONFIG.toml` 还是派活帧的一个字段）；某个具体 Firefox fork 是否接受本 crate 的启动参数与会话形态；行容器的交叉轴怎么扫（§19-10）；`fetch` 的脚本在 Gecko 上是否读出与 Chromium 相同的文字（§19-7 记的是 Chromium 那一次）；画出来的一对颜色是否可读：接进 `xtask::color` 的对比度模型要把它开放给本 crate，另写一条对比度公式就是第二个权威（`survey::legibility`）。
+- **未定**：`-headless` 这一位由哪一面提供（楼的 `CONFIG.toml` 还是派活帧的一个字段）；某个具体 Firefox fork 是否接受本 crate 的启动参数与会话形态；行容器的交叉轴怎么扫（§19-10）；`fetch` 的脚本在 Gecko 上是否读出与 Chromium 相同的文字（§19-7 记的是 Chromium 那一次）；usersbrowser 披露给模型的参数表（`crates/sprawling/src/browser_tool/person.rs` 的 `kind` 枚举）还没有 `press`、`key`、`modifiers`，解析器是权威，模型照样调得通，但披露与解析应在同一个变更集里（§19-6），这一处归装配层的 `browser_tool`；画出来的一对颜色是否可读：接进 `xtask::color` 的对比度模型要把它开放给本 crate，另写一条对比度公式就是第二个权威（`survey::legibility`）。
 - **歧义已定**：BiDi 的 `session.new` 能力集合本版本只请求空能力＋按需 `network` 事件；更多能力等到有消费者再加，因为每一项能力都是远端因此获得的一项许可。
 
 ## 4 现状分析
@@ -102,7 +102,8 @@ pub enum Origin { Reference(String), Point(Point) }               // 拖拽从�
 pub enum Action { Click { reference: String }, Type { reference: String, text: String },
                   Read { reference: String },
                   Drag { from: Origin, to: Point, steps: u32 },   // input.performActions
-                  Scroll { at: Option<Point>, by: Point } }       // 滚轮，by 为 CSS 像素增量
+                  Scroll { at: Option<Point>, by: Point },        // 滚轮，by 为 CSS 像素增量
+                  Press { key: Key, modifiers: BTreeSet<Modifier> } }  // 按一个键，落在页面此刻的焦点上（§19-11）
 pub const STEPS_MAX: u32 = 32;
 impl Action { pub fn reference(&self) -> Option<&str>; pub fn resolves_element(&self) -> bool; }
 pub fn frame_for(session: &mut Session, context: &ContextId, snapshot: &PageSnapshot,
@@ -298,6 +299,7 @@ impl Shot { pub fn read(reply: &Value, media: ImageType) -> Result<Shot, AxError
 | shot | 同一段 PNG 字节两次读出同一尺寸；非 PNG 不猜尺寸；quality 不引入浮点变量；`clip` 与 `ref` 同时给出即拒，`ref` 没有世代即拒；两张捕获帧都带上界，且上界按字节读出的两侧判；矩形臂传入句柄即拒 |
 | diff | 尺寸不同即拒；全同两图为 0；一个像素变化的框恰好含那个像素；解码字节短于头部时拒绝语点名是哪一张 |
 | input | 指针拖拽恒是 pointerMove→pointerDown→pointerMove×n→pointerUp；元素 origin 有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`；滚轮增量可为负 |
+| keyboard | 一次按键恒是一帧 `input.performActions` 的 `key` 源：修饰键按固定次序按下、键按下又放开、修饰键逆序放开；键名与修饰键名只在 `keyboard` 的表里拼写；未知的名字在读参时即拒 |
 | usersbrowser | 工具名取 `ToolName::USER_BROWSER` 一个权威；未声明地址的楼每次调用都得到门的问题；声明了地址的楼其 effect 带该主机；`usersbrowser` 与 `browser` 是两个设置；confidential 楼在 `city::policy` 即拒 |
 
 
@@ -340,3 +342,26 @@ BiDi 的 `input` 是 `script` 之外的另一个协议模块，本 crate 之前�
 - **答一个字符串，不拆成载荷**。`survey` 动作的结果是 tagged 形态的整份报告（一个 `<edit>` 一处修复、一个 `<at>` 一个落点）。把它拆成结构化载荷等于给同一份报告第二种渲染。
 - **量具的两条规则**：容差 `SLACK`（1 px）在每一次缘比较上都加；群体先从几何读出容器的堆叠方向，只比容器不分发的那一轴，因为一行里并排的盒子右缘近似相等纯属巧合。
 - **行容器的交叉轴不扫**：一行把子元素约束在一条带里，但带里的位置由 `align-items` 决定，本库到处用居中，于是两个不同行高的子元素**按设计**就有不同顶缘；按左右缘的读法去扫会报出一批假阳性。要正确读它得比较顶／中／底里多数实际持有的那一个，这把尺子还没有这个读数（§3）。
+
+### 19-11 `browser::keyboard`：按一个键（形状 1 判定）
+
+一个 run 要能在页面上按键：Tab 换焦点、方向键在列表里走、Enter 提交、Escape 关掉弹层、Ctrl+K 打开命令面板。客户端的键表（`client/client-SPEC.md` §7）因此有了一个机器读者：本产品的 `browser` 工具能按下那张表里的每一个键，验收可以由本产品驱动本产品。
+
+```rust
+pub enum NamedKey { Enter, Tab, Escape, Backspace, Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
+                    Home, End, PageUp, PageDown }
+pub enum Key { Named(NamedKey), Char(char) }
+pub enum Modifier { Control, Shift, Alt, Meta }                // 声明次序就是按下的次序
+impl Key { pub fn parse(name: &str) -> Result<Key, AxError>; }
+impl Modifier { pub fn parse(name: &str) -> Result<Modifier, AxError>; }
+pub fn key_frame(session: &mut Session, context: &ContextId, key: Key,
+                 modifiers: &BTreeSet<Modifier>) -> Result<Frame, AxError>;
+```
+
+- **拼写只有一处**：键名与修饰键名取 DOM `KeyboardEvent.key` 的值（`Enter`、`ArrowDown`、`Control`），一个字符键就写那个字符（`k`、`/`，空格写一个空格）。名字、WebDriver 码位（`Enter` 是 U+E007）与枚举三者在 `keyboard` 的一张表里对应，`Key::parse`、`Modifier::parse` 与 `key_frame` 都读这张表；`verb::read` 经这两个 `parse` 取值，不另写名单。
+- **一帧**：`input.performActions` 带一个 `key` 源，修饰键按枚举次序逐个 `keyDown`，然后这个键 `keyDown`、`keyUp`，最后修饰键按相反次序 `keyUp`。修饰键是集合，同一个写两次只按一次，按下的次序由枚举给出而不由调用方给出，所以同一次按键恒是同一串字节。
+- **按键落在焦点上**：`Press` 不带 ref，`Action::reference()` 答 `None`，不需要第二帧。要先让某个元素得到焦点，是先做一次 `click`，这是两次动作。
+- **没看过的页面不按**：与别的 act 同一条规则（§19-2），没有快照即拒；没有 ref，所以不核 generation。
+- **不换算大小写**：`K` 送出的就是 `K`，`Shift` 另是一个修饰键。BiDi 不会因为按着 Shift 把 `k` 改成 `K`，替它换算就是给同一个字符第二种拼法。
+- **读参**：`kind` 为 `press`，`key` 必填，`modifiers` 可选、是字符串数组。未知的键名、多于一个字符而又不是键名的串、未知的修饰键，各以 `E_INVALID_ARGS` 拒绝，恢复语列出能用的名字。
+- **被否决的备选**：在 `Type` 的文字里夹转义（例如用换行表示 Enter）——同一个字符串既是文字又是键，读者分不清是哪一种；写一个 `"Ctrl+K"` 形式的小语言——那是键名之外的第二套文法，要自己的解析器与自己的拒绝语。
