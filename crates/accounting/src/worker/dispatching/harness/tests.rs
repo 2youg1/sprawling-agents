@@ -345,6 +345,7 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
             EventKind::HarnessAnswered,
             EventKind::HandoffWritten,
             EventKind::RunFrozen,
+            EventKind::PrOpened,
         ]
     );
     let answer = run
@@ -352,8 +353,12 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
         .find(|record| record.kind() == EventKind::HarnessAnswered)
         .unwrap()
         .to_ref();
+    let frozen = run
+        .iter()
+        .find(|record| record.kind() == EventKind::RunFrozen)
+        .unwrap();
     assert_eq!(
-        run.last().unwrap().data(),
+        frozen.data(),
         &Payload::of(&RunFrozen::of(&Completion::Done(
             Evidence::new(vec![answer]).unwrap()
         )))

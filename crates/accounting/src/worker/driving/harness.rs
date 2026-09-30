@@ -123,6 +123,9 @@ pub(in crate::worker) struct HarnessHalf {
     pub(in crate::worker) command: Option<kernel::IdemKey>,
     /// This run's place in the backlog, when somebody handed it down.
     pub(in crate::worker) member: Option<runtime::BacklogId>,
+    /// How long the turn may take, from the moment the run starts: the
+    /// building's `harness_minutes` (sprawling-SPEC.md 8-124).
+    pub(in crate::worker) ceiling_ms: u64,
     pub(in crate::worker) notes: Notes,
     /// Where the ledger stood when the dispatch was staged, which a
     /// diagnostic line written here is anchored at.
@@ -170,18 +173,20 @@ pub(crate) fn drive_harness<L: Ledger>(
 /// than invented (`storage::ModelChoice`).
 pub(in crate::worker) fn harness_provenance(
     city: kernel::B3Hash,
-    chartered: &Chartered,
+    run: RunId,
+    addr: &Address,
+    predecessor: Option<RunId>,
 ) -> storage::Provenance {
     let signed = storage::Provenance::new(
-        chartered.run,
-        chartered.addr.clone(),
+        run,
+        addr.clone(),
         city,
         storage::ModelChoice {
             id: String::new(),
             effort: None,
         },
     );
-    match chartered.predecessor {
+    match predecessor {
         Some(predecessor) => signed.succeeding(predecessor),
         None => signed,
     }
@@ -201,7 +206,12 @@ fn drive_turn<L: Ledger>(
     context: &DriveContext,
 ) -> Result<Completion, AxError> {
     let clock = &*context.clock;
-    let of = harness_provenance(half.city, &half.chartered);
+    let of = harness_provenance(
+        half.city,
+        half.chartered.run,
+        &half.chartered.addr,
+        half.chartered.predecessor,
+    );
     let tree = lend_tree(
         &Lending {
             addr: &half.chartered.addr,
@@ -227,9 +237,11 @@ fn drive_turn<L: Ledger>(
     let mut prompting = (half.start)(half.harness, &root)?;
     let mut now = || clock.now();
     let run = HarnessRun::open(half.chartered.charter(), &mut *ledger, &mut now)?;
+    let deadline = TimeMs::new(clock.now()?.value().saturating_add(half.ceiling_ms));
     let turning = Turning {
         run,
         ledger: &mut *ledger,
+        deadline,
         failed: None,
     };
     let (run, prompted, failed) = take_the_turn(half, turning, &mut prompting, context);
@@ -277,7 +289,8 @@ fn take_the_turn<'a, L: Ledger>(
     let clock = &*context.clock;
     let turning = RefCell::new(turning);
     let pending = Cell::new(None);
-    let mut halted = || match cut_now(half, context) {
+    let deadline = turning.borrow().deadline;
+    let mut halted = || match cut_now(half, context, deadline) {
         Some(cut) => {
             pending.set(Some(cut));
             true
@@ -325,6 +338,8 @@ fn take_the_turn<'a, L: Ledger>(
 struct Turning<'a, 'l, L> {
     run: HarnessRun<'a>,
     ledger: &'l mut L,
+    /// When the building's ceiling cuts the turn.
+    deadline: TimeMs,
     /// The first line a callback that cannot fail could not book.
     failed: Option<AxError>,
 }
@@ -364,13 +379,22 @@ impl<L: Ledger> Turning<'_, '_, L> {
     }
 }
 
-/// Whether the turn is cut now, and why: a stopping scope and a
-/// person's cancel are a halt.
+/// Whether the turn is cut now, and why: the ceiling first, because a
+/// run that ran out of time hit something; then a stopping scope and a
+/// person's cancel, which are a halt. A clock that cannot be read says
+/// nothing about the ceiling, and the next tick asks again.
 ///
 /// A steer is taken and not delivered: ACP gives a client nothing to
 /// send an agent in the middle of a turn, so the line says it went
 /// nowhere rather than letting it vanish (sprawling-SPEC.md 8-124).
-fn cut_now(half: &HarnessHalf, context: &DriveContext) -> Option<Cut> {
+fn cut_now(half: &HarnessHalf, context: &DriveContext, deadline: TimeMs) -> Option<Cut> {
+    if context
+        .clock
+        .now()
+        .is_ok_and(|now| now.value() >= deadline.value())
+    {
+        return Some(Cut::Deadline);
+    }
     if scope_stopping(&context.backlog, half.member) {
         return Some(Cut::Halt);
     }

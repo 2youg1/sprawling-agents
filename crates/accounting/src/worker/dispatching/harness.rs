@@ -15,7 +15,9 @@
 
 use kernel::{AxError, Completion, TimeMs};
 
-use super::super::driving::harness::{Chartered, HarnessDriven, HarnessHalf};
+use super::super::driving::harness::{Chartered, HarnessDriven, HarnessHalf, harness_provenance};
+use super::super::reviewing::Offering;
+use super::super::workbench::tree_scope;
 use super::super::{Landed, Owing, RunWorker};
 use super::preparing::Staged;
 use super::running::Continuation;
@@ -40,7 +42,7 @@ impl RunWorker {
     ) -> Result<(Staged, Continuation), AxError> {
         let HarnessSeat {
             building,
-            rules: _unread,
+            rules,
             harness,
         } = seat;
         let who = city::Identity::load(&self.city_root, &at.addr)?.who();
@@ -98,6 +100,7 @@ impl RunWorker {
             city: self.city_hash()?,
             command: self.doorstep.entrance.carrying(),
             member,
+            ceiling_ms: u64::from(rules.harness_minutes()).saturating_mul(MINUTE_MS),
             notes: self.log.clone(),
             staged_at: self.ledger.position(),
         };
@@ -127,19 +130,35 @@ impl RunWorker {
         let HarnessDriven {
             run,
             who,
-            building: _offered_in,
-            city: _signed_by,
+            building,
+            city,
             member,
             lease,
             outcome,
         } = driven;
         // Both loans go back before either failure is propagated, for the
-        // reason a model run's landing gives (sprawling-SPEC.md 8-46-9).
+        // reason a model run's landing gives (sprawling-SPEC.md 8-46-9);
+        // a run frozen done first offers the tree it worked in.
         let left = member.map_or(Ok(()), |id| self.flight.backlog.leave(id));
+        let offered = match (&outcome, &lease) {
+            (Ok(Completion::Done(_)), Some(tree)) => self.offer_for_harness(
+                &Offering {
+                    tree: tree.path(),
+                    scopes: &tree_scope(&building),
+                    of: &harness_provenance(city, run, &at.addr, at.predecessor()),
+                    who: &who,
+                    addr: &at.addr,
+                    run_id: run,
+                },
+                tree.name().as_str(),
+            ),
+            (Ok(_) | Err(_), _) => Ok(()),
+        };
         let returned = self.give_tree_back(lease);
         left?;
+        offered?;
         returned?;
-        let completion: Completion = outcome?;
+        let completion = outcome?;
         self.note(
             runtime::diagnostics::Level::Effect,
             "runtime::run",
@@ -159,6 +178,38 @@ impl RunWorker {
         Ok(landed)
     }
 }
+
+impl RunWorker {
+    /// Opens the request a harness run cannot open itself: harness
+    /// residents reach none of the city's tools (sprawling-SPEC.md 8-4e
+    /// rule 7). A branch that already has a request waiting keeps it,
+    /// and the verifier judges the branch as it now stands.
+    ///
+    /// # Errors
+    /// Propagates [`RunWorker::offer`]'s refusals.
+    fn offer_for_harness(&mut self, offering: &Offering<'_>, branch: &str) -> Result<(), AxError> {
+        if self
+            .collaborating
+            .requests
+            .iter()
+            .any(|waiting| waiting.branch == branch)
+        {
+            self.note(
+                runtime::diagnostics::Level::Effect,
+                "collab::pr",
+                &format!(
+                    "{} already has a request waiting; {} added to it",
+                    branch, offering.run_id
+                ),
+            );
+            return Ok(());
+        }
+        self.offer(offering, branch.to_owned())
+    }
+}
+
+/// A minute on the city's clock.
+const MINUTE_MS: u64 = 60_000;
 
 #[cfg(test)]
 mod tests;
