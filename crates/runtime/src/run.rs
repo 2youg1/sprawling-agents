@@ -26,8 +26,13 @@ use crate::prefix::FrozenPrefix;
 use crate::reminder::ContextGauge;
 use crate::turn::{CallShape, Interrupt};
 
+mod charter;
 mod checkpoint;
+mod harness;
 mod lifecycle;
+
+pub use charter::Charter;
+pub use harness::{Conclusion, Cut, HarnessRun};
 
 /// Everything constant about one run. Assembled by the caller, because
 /// what a prefix contains and which tools exist are decisions of the city

@@ -6,11 +6,8 @@
 //! What an active run does on the ledger: the dispatch pair that brings
 //! it into existence, one turn, and the freeze that is its only exit.
 
-use kernel::event::Who;
-use kernel::event::record::{CheckpointCommitted, RunFrozen, RunStarted};
 use kernel::{
-    AxCode, AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, Payload, RunId,
-    StopReason, TimeMs,
+    AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, Payload, StopReason,
 };
 
 use crate::conversation::Conversation;
@@ -59,7 +56,9 @@ fn concluded(report: &TurnReport) -> Result<Completion, AxError> {
 impl Run<Active> {
     /// The dispatch pair: the job pin lands first, then the run exists.
     /// Two ledger lines, two clock samples — the pin is a fact about the
-    /// city and the start is a fact about the run.
+    /// city and the start is a fact about the run. Written by the plan's
+    /// charter, the one author of every run's opening (runtime-SPEC.md
+    /// 8-52).
     ///
     /// # Errors
     /// Propagates whatever the ledger says; nothing else here can fail.
@@ -68,39 +67,7 @@ impl Run<Active> {
         ledger: &mut dyn Ledger,
         hooks: &mut RunHooks<'_>,
     ) -> Result<Run<Active>, AxError> {
-        let pin_t = (hooks.now)()?;
-        let pin = CheckpointCommitted::JobPinned {
-            job: plan.job.clone(),
-        };
-        ledger.append(EventDraft {
-            run: RunId::CITY,
-            t: pin_t,
-            who: Who::City.to_string(),
-            addr: Some(plan.addr.clone()),
-            kind: EventKind::CheckpointCommitted,
-            data: Payload::of(&pin)?,
-            ig: false,
-        })?;
-
-        let start_t = (hooks.now)()?;
-        let started = RunStarted {
-            task: plan.task.clone(),
-            goal: plan.goal.clone(),
-            job: Some(plan.job.clone()),
-            parent: plan.parent,
-            predecessor: plan.predecessor,
-            skills: plan.skills.clone(),
-            dispatched_by: Some(plan.dispatched_by.clone()),
-        };
-        ledger.append(EventDraft {
-            run: plan.run,
-            t: start_t,
-            who: Who::City.to_string(),
-            addr: Some(plan.addr.clone()),
-            kind: EventKind::RunStarted,
-            data: Payload::of(&started)?,
-            ig: false,
-        })?;
+        plan.charter().open(ledger, &mut *hooks.now)?;
 
         let mut conversation = Conversation::new();
         // A branch opens with the conversation it branched from, and then
@@ -296,28 +263,7 @@ impl Run<Active> {
             (Completion::Cancelled, Some(turn_t)) => turn_t,
             _ => (hooks.now)()?,
         };
-        ledger.append(EventDraft {
-            run: self.plan.run,
-            t,
-            who: self.plan.who.clone(),
-            addr: None,
-            kind: EventKind::HandoffWritten,
-            data: handoff.payload()?,
-            ig: false,
-        })?;
-        let closing = t.value().checked_add(1).ok_or_else(|| {
-            AxError::failure(AxCode::InvalidArgs, "stamp run_frozen", "u64 overflow")
-                .with_recovery("check the clock the caller injected")
-        })?;
-        ledger.append(EventDraft {
-            run: self.plan.run,
-            t: TimeMs::new(closing),
-            who: self.plan.who.clone(),
-            addr: None,
-            kind: EventKind::RunFrozen,
-            data: Payload::of(&RunFrozen::of(&completion))?,
-            ig: false,
-        })?;
+        self.plan.charter().close(ledger, handoff, &completion, t)?;
         let turns = self.state.turns;
         Ok(Run {
             plan: self.plan,
