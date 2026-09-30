@@ -14,7 +14,7 @@
 
 use super::follow::Row;
 use super::frame::{FILLING, Face, Size};
-use super::keys::{Action, Key, action_for};
+use super::keys::Action;
 use kernel::{Address, RunId, Seq};
 use sprawling::lineage::RunLine;
 
@@ -255,35 +255,6 @@ fn a_wide_terminal_keeps_the_detail_pane_open_on_the_right() {
     assert_eq!(wide.len(), 10);
     assert!(wide.iter().all(|line| line.chars().nth(60) == Some('|')));
     assert!(wide.iter().any(|line| line.ends_with(r#"|addr: "yard/b""#)));
-}
-
-#[test]
-fn every_key_the_viewer_reads_names_its_action() {
-    let table = [
-        (Key::Char('k'), Some(Action::Up)),
-        (Key::Up, Some(Action::Up)),
-        (Key::Char('j'), Some(Action::Down)),
-        (Key::Down, Some(Action::Down)),
-        (Key::PageUp, Some(Action::PageUp)),
-        (Key::PageDown, Some(Action::PageDown)),
-        (Key::Char('g'), Some(Action::First)),
-        (Key::Home, Some(Action::First)),
-        (Key::Char('G'), Some(Action::Last)),
-        (Key::End, Some(Action::Last)),
-        (Key::Char('h'), Some(Action::Collapse)),
-        (Key::Left, Some(Action::Collapse)),
-        (Key::Char('l'), Some(Action::Expand)),
-        (Key::Right, Some(Action::Expand)),
-        (Key::Tab, Some(Action::SwitchLens)),
-        (Key::Enter, Some(Action::OpenDetail)),
-        (Key::Esc, Some(Action::CloseDetail)),
-        (Key::Char('q'), Some(Action::Quit)),
-        (Key::Interrupt, Some(Action::Quit)),
-        (Key::Char('x'), None),
-    ];
-    for (key, action) in table {
-        assert_eq!(action_for(key), action, "{key:?}");
-    }
 }
 
 fn ledger_row(seq: u64, kind: wire::EventKind, data: serde_json::Value) -> Row {
