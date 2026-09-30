@@ -115,6 +115,46 @@ fn the_schema_hash_covers_every_event_kind_name() {
 /// names, so any change to the protocol surface lands here first.
 const WIRE_SCHEMA_GOLDEN: &str = "95e42860107174f073491d7a2995233ff7351a6659e34497be815c351a3c8276";
 
+/// The schema hash reads names only, so a field added under names that
+/// stay leaves it where it was. This digest reads the whole shape with the
+/// prose taken out: it turns red on every shape change, and the person who
+/// sees it decides whether this change is the one that raises `WIRE_V`.
+#[cfg(feature = "schema")]
+#[test]
+fn the_wire_shape_is_pinned_so_a_change_meets_the_version_rule() {
+    let mut shape = wire::wire_schema();
+    strip_prose(&mut shape);
+    let digest = kernel::B3Hash::digest(&serde_json::to_vec(&shape).unwrap());
+    assert_eq!(
+        digest.to_string(),
+        WIRE_SHAPE_GOLDEN,
+        "the wire changed shape. If no shape change has landed since the last push, raise \
+         WIRE_V in this commit (wire-SPEC 12.1); then set WIRE_SHAPE_GOLDEN to the digest above"
+    );
+}
+
+/// Removes every doc string the schema carries, so an edited comment
+/// leaves the digest alone. Only string values go: a field that happens to
+/// be called `description` is an object under `properties` and stays.
+#[cfg(feature = "schema")]
+fn strip_prose(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            map.retain(|key, held| !((key == "description" || key == "title") && held.is_string()));
+            map.values_mut().for_each(strip_prose);
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(strip_prose),
+        serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::String(_) => {}
+    }
+}
+
+/// The digest of `wire_schema()` with its prose removed.
+#[cfg(feature = "schema")]
+const WIRE_SHAPE_GOLDEN: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+
 // -------------------------------------------------------------- binding face
 
 #[cfg(feature = "server")]
