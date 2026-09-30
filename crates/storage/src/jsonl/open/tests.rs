@@ -191,18 +191,7 @@ fn a_line_below_the_first_version_is_refused_for_its_version_not_its_chain() {
             rewritten[unversioned_line].contains("\"v\":0"),
             "the fixture must actually declare v0"
         );
-        fs::write(
-            &seg,
-            format!(
-                "{}
-",
-                rewritten.join(
-                    "
-"
-                )
-            ),
-        )
-        .unwrap();
+        fs::write(&seg, format!("{}\n", rewritten.join("\n"))).unwrap();
 
         let err = JsonlLedger::open(dir.path(), TimeMs::new(3))
             .err()
