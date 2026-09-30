@@ -278,16 +278,16 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
     );
     assert!(matches!(frozen.completion(), Completion::Done(_)));
     assert_eq!(frozen.turns(), 2);
-    // Dispatch takes two stamps, each turn one, and the freeze one more
-    // with run_frozen derived from it: two ledger lines, one event. The
-    // shape line rides its turn's stamp; it samples nothing of its own.
-    let stamps = ledger.stamps();
-    assert_eq!(stamps[0], 0);
-    assert_eq!(stamps[1], 1);
-    assert_eq!(stamps[2], 2);
-    assert_eq!(stamps[8], 3);
-    assert_eq!(stamps[11], 4);
-    assert_eq!(stamps[12], 5);
+    // Dispatch takes two readings (0, 1). Turn one opens at 2, and the
+    // assembly and shape lines ride that stamp; the model attempt is sent
+    // at 3 and its reply is whole at 4; the tool call starts at 5 and
+    // answers at 6. Turn two opens at 7 with its shape line; sent at 8,
+    // whole at 9. The freeze reads 10 for handoff_written, and run_frozen
+    // takes 11 from it: two ledger lines, one event.
+    assert_eq!(
+        ledger.stamps(),
+        vec![0, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    );
 }
 
 /// There is no ceiling to reach, so a run goes on until its
