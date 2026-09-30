@@ -22,6 +22,10 @@ const TABLES: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependenci
 
 const RULE: &str = "every dependency a manifest declares is named by the code that compiles against it (xtask-SPEC.md section 8-37)";
 
+/// Where a manifest lists the dependencies it declares only to constrain
+/// resolution, which no source is expected to name.
+const PINS: &str = "[package.metadata.unused] pins";
+
 /// Every declared dependency no source of its package names, then every
 /// workspace dependency no package inherits.
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -31,23 +35,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         .into_iter()
         .map(|member| member.dir)
     {
-        let declared = declared(root, &package)?;
-        let sources = sources(&root.join(&package))?;
-        for (table, key) in declared {
-            let ident = key.replace('-', "_");
-            if !names(&sources, &ident) {
-                violations.push(Violation {
-                    gate: "unused",
-                    location: format!("{package}/Cargo.toml"),
-                    rule: RULE.to_owned(),
-                    violation: format!(
-                        "`[{table}]` declares `{key}`, and no `.rs` file under `{package}` names `{ident}`"
-                    ),
-                    alternative: format!("remove `{key}` from `{package}/Cargo.toml`"),
-                });
-            }
-            inherited.insert(key);
-        }
+        violations.extend(package_findings(root, &package, &mut inherited)?);
     }
     let manifest = facts::root_manifest(root)?;
     let workspace_keys = manifest
@@ -70,22 +58,77 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// `(table, key)` for every dependency the package's manifest declares,
-/// in manifest order, `[target.*]` tables after the top-level ones.
-fn declared(root: &Path, package: &str) -> Result<Vec<(&'static str, String)>, XtaskError> {
+/// One package's findings: a declared key no source names unless its
+/// manifest pins it, a pin some source names after all, and a pin no
+/// dependency table declares. Every declared key is added to
+/// `inherited`, which the workspace half of the gate reads.
+fn package_findings(
+    root: &Path,
+    package: &str,
+    inherited: &mut BTreeSet<String>,
+) -> Result<Vec<Violation>, XtaskError> {
+    let manifest = manifest(root, package)?;
+    let declared = declared(&manifest);
+    let pins = pins(&manifest, package)?;
+    let sources = sources(&root.join(package))?;
+    let finding = |violation: String, alternative: String| Violation {
+        gate: "unused",
+        location: format!("{package}/Cargo.toml"),
+        rule: RULE.to_owned(),
+        violation,
+        alternative,
+    };
+    let mut violations = Vec::new();
+    for (table, key) in &declared {
+        let ident = key.replace('-', "_");
+        match (names(&sources, &ident), pins.contains(key)) {
+            (false, false) => violations.push(finding(
+                format!(
+                    "`[{table}]` declares `{key}`, and no `.rs` file under `{package}` names `{ident}`"
+                ),
+                format!("remove `{key}` from `{package}/Cargo.toml`"),
+            )),
+            (true, true) => violations.push(finding(
+                format!(
+                    "`{PINS}` lists `{key}`, and a `.rs` file under `{package}` names `{ident}`, so the exemption is no longer needed"
+                ),
+                format!("remove `{key}` from `pins`"),
+            )),
+            (true, false) | (false, true) => {}
+        }
+        inherited.insert(key.clone());
+    }
+    for pin in pins
+        .iter()
+        .filter(|pin| !declared.iter().any(|(_, key)| key == *pin))
+    {
+        violations.push(finding(
+            format!("`{PINS}` lists `{pin}`, and no dependency table of `{package}` declares it"),
+            format!("declare `{pin}`, or remove it from `pins`"),
+        ));
+    }
+    Ok(violations)
+}
+
+/// The package's manifest, parsed.
+fn manifest(root: &Path, package: &str) -> Result<toml::Table, XtaskError> {
     let file = format!("{package}/Cargo.toml");
-    let manifest: toml::Table =
-        toml::from_str(&walk::read_text(&root.join(&file))?).map_err(|err| XtaskError::Doc {
-            file: file.clone(),
-            msg: format!("the manifest does not parse: {err}"),
-        })?;
+    toml::from_str(&walk::read_text(&root.join(&file))?).map_err(|err| XtaskError::Doc {
+        file,
+        msg: format!("the manifest does not parse: {err}"),
+    })
+}
+
+/// `(table, key)` for every dependency the manifest declares, in
+/// manifest order, `[target.*]` tables after the top-level ones.
+fn declared(manifest: &toml::Table) -> Vec<(&'static str, String)> {
     let targets = manifest
         .get("target")
         .and_then(toml::Value::as_table)
         .into_iter()
         .flat_map(toml::Table::values)
         .filter_map(toml::Value::as_table);
-    Ok(std::iter::once(&manifest)
+    std::iter::once(manifest)
         .chain(targets)
         .flat_map(|scope| {
             TABLES.into_iter().flat_map(move |table| {
@@ -96,7 +139,34 @@ fn declared(root: &Path, package: &str) -> Result<Vec<(&'static str, String)>, X
                     .flat_map(move |deps| deps.keys().map(move |key| (table, key.clone())))
             })
         })
-        .collect())
+        .collect()
+}
+
+/// The keys the manifest pins, in the order it lists them; none when the
+/// manifest has no `pins`.
+///
+/// # Errors
+/// Refuses a `pins` that is not an array of strings, because a pin the
+/// gate cannot read is an exemption nobody can check.
+fn pins(manifest: &toml::Table, package: &str) -> Result<Vec<String>, XtaskError> {
+    let Some(listed) = manifest
+        .get("package")
+        .and_then(|table| table.get("metadata"))
+        .and_then(|table| table.get("unused"))
+        .and_then(|table| table.get("pins"))
+    else {
+        return Ok(Vec::new());
+    };
+    let unreadable = || XtaskError::Doc {
+        file: format!("{package}/Cargo.toml"),
+        msg: format!("`{PINS}` is not an array of dependency keys"),
+    };
+    listed
+        .as_array()
+        .ok_or_else(unreadable)?
+        .iter()
+        .map(|pin| pin.as_str().map(str::to_owned).ok_or_else(unreadable))
+        .collect()
 }
 
 /// Every `.rs` file under the package directory, joined into one text.
