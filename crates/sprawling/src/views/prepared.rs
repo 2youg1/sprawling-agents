@@ -239,7 +239,10 @@ impl Prepared {
             // through the registry a served city handed the views.
             Self::Release(Some(newest)) => wire::Answer::Release(Box::new(newest())),
             Self::Release(None) => unavailable("NewestRelease".to_owned()),
-            Self::Harnesses(_find) => harnesses_answer(),
+            // Read after the views are released, because it walks the
+            // search path (sprawling-SPEC.md 8-100).
+            Self::Harnesses(Some(find)) => harnesses_answer(find),
+            Self::Harnesses(None) => unavailable("Harnesses".to_owned()),
             Self::Upstream {
                 ask: Some(newest),
                 item,

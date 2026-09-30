@@ -165,6 +165,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // made here from the first (sprawling-SPEC.md 8-99).
     rebuilt.ask_the_registry_through(crate::release::answer);
     rebuilt.ask_upstream_through(crate::doctor::newest);
+    rebuilt.find_programs_through(crate::doctor::host::find_program);
     let spare = rebuilt.twin()?;
     cost.lap(Phase::Twin);
     // This machine is not asked here (sprawling-SPEC.md 8-54): the

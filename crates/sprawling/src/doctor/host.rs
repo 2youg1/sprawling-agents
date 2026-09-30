@@ -86,6 +86,12 @@ pub(crate) fn search_path() -> OsString {
     }
 }
 
+/// Where this machine's search path finds `program`: the one reading
+/// the harness page and the doctor share (accounting-SPEC.md 8-10).
+pub(crate) fn find_program(program: &str) -> Option<PathBuf> {
+    super::on_search_path(&search_path(), program)
+}
+
 /// The file one item's install writes its output to, fresh for every
 /// install (sprawling-SPEC.md section 8-64).
 ///

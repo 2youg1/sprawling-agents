@@ -22,7 +22,7 @@
 //! queue answers by being consumed and a view that consumed what it
 //! showed would change the thing it reports on.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use kernel::event::record::{AssetArchived, DiscardRestored, FileDiscarded};
 use kernel::{Address, AxError, EventRecord, RunId};
@@ -158,11 +158,10 @@ pub(crate) fn known_hosts_answer() -> wire::Answer {
 }
 
 /// The harness page: every official harness in the roster, the command
-/// that starts it, and whether this machine finds that command's
-/// program on the same search path the doctor reads
-/// (wire-SPEC.md 8-52).
-pub(crate) fn harnesses_answer() -> wire::Answer {
-    let search_path = crate::doctor::host::search_path();
+/// that starts it, and whether the search the served city handed in
+/// finds that command's program (wire-SPEC.md 8-52, accounting-SPEC.md
+/// 8-10).
+pub(crate) fn harnesses_answer(find: fn(&str) -> Option<PathBuf>) -> wire::Answer {
     wire::Answer::Harnesses(wire::HarnessesAnswer {
         harnesses: agent_protocols::Harness::ALL
             .iter()
@@ -174,8 +173,7 @@ pub(crate) fn harnesses_answer() -> wire::Answer {
                         .chain(launch.args.iter().copied())
                         .map(str::to_owned)
                         .collect(),
-                    found: crate::doctor::on_search_path(&search_path, launch.program.name())
-                        .is_some(),
+                    found: find(launch.program.name()).is_some(),
                     docs: harness.docs().to_owned(),
                 }
             })
