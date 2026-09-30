@@ -48,6 +48,7 @@ worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` �
   2. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）。`views` 的测试此前经 `views::tests::founded` 造城，它只写创世的两行、立起市政厅、写一份 `City.md`；worker 搬进来以后它们改回真正的创世，`founded` 随之删去（§12-16）。快照折叠的 trait `views::snapshot::start::SnapshotFold` 在此之前有两个实现分住两个 crate（`Views` 与 `bin::assembly::folds::standing_start` 的 `StandingFolds`），所以是 ARCHITECTURE.md §4 缝表里的一行；worker 搬进来以后两个实现同住本 crate，它收回 `pub(crate)`，那一行随之删去。
   3. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活，不在本次迁移里。
   4. 模块搬走时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）。8-7、8-8、8-9 是早先整节搬进来的，保持原样。
+- worker 的产品代码用到 `wire` 里只在 `server` feature 之后才有的四个类型：`Reply` 与 `Delivered`（`commanding::door`、`commanding::routing`、`desk`、`driving::owing`、`mcp`），`Pairing` 与 `AcpProgress`（`dispatching::agreeing`）。本 crate 依赖 `wire` 时关掉默认 feature，因为 `server` 带进 tokio 与 axum，而本 crate 只要 wire 的词汇。四个都只是词汇：`Reply` 包一个 `Fn(AxError) -> Delivered`，另外三个是普通的枚举与结构体，都不持有 tokio 的东西。未定的是它们搬出 `server`（wire 的改动，写进 wire-SPEC）还是另有做法；定下之前，§3 第 2 步搬不了。能定下它的证据是 wire 的 SPEC 把这四个类型划在词汇的一侧还是监听的一侧。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 
 ## 4 现状分析
@@ -82,14 +83,15 @@ ModelFactory｜Connectors｜Clock｜Machine｜Recipe｜Runnable｜accounting thr
 | `serving::standing::CorePriority` | 随 `person` 搬进本 crate | 偏好里核心线程抬不抬高的那个值 | 它是 `person` 读出来的值；真去抬高线程的 `raise_this_thread` 留在 `serving` |
 | `held_vault` | 搬进本 crate | 把一个锁着的 vault 变成解析器，锁中毒时的拒绝 | 纯函数，只碰已经打开的 vault |
 | `toolkit_broker` | 搬进本 crate | 一个外部应用的 broker 钥匙登记在哪 | 纯函数，`views::toolkits` 与连接动作读同一组事实 |
-| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经端口：看与装经 `Machine`，需求表的查法经 `RunWorker.recipe_for`（sprawling-SPEC.md 中 `doctor_install` 那一节） | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文）；`views::lines::harnesses_answer` 找一条命令的程序经 `Views.programs`，生产交的是 `bin::doctor::host::find_program`（8-10） |
-| `monitor::memory::read`、`monitor::volume::read` | 经端口：`DrivingPool` 的 `read_memory` 与 `RunWorker` 的 `read_volume`，都是 `fn` 指针（sprawling-SPEC.md 8-46-3、8-94） | 新工作进门时读内存与卷的余量 | 读主机的计数器；`read_volume` 已经这样交进来 |
+| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经端口：看与装经 `Machine`，需求表的查法经 `RunWorker.recipe_for`（sprawling-SPEC.md 中 `doctor_install` 那一节） | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文）；`views::lines::harnesses_answer` 找一条命令的程序经 `Views.programs`，生产交的是 `bin::doctor::host::find_program`（8-10）；exec 的主机半经 `Hands.exec_host`（8-11） |
+| `monitor::memory::read`、`monitor::volume::read` | 经 `Hands`：`read_memory` 与 `read_volume`，都是 `fn` 指针（sprawling-SPEC.md 8-46-3、8-94；8-11） | 新工作进门时读内存与卷的余量 | 读主机的计数器；读数的类型 `Memory` 与记账线程的计数 `Health` 随 worker 搬进本 crate，读数的做法留在 `bin::monitor` |
 | `revealing` | 经端口：`RunWorker` 的 `reveal` 字段，一个 `fn` 指针（sprawling-SPEC.md 8-60） | `Reveal` 在主机的文件管理器里打开一个地址 | 启动主机的一个程序 |
 | `browser_tool` | 经端口：`RunWorker::with_browsers` 交进来的 `fn` 指针（sprawling-SPEC.md 8-45-2） | 按楼的规则给 run 的浏览器工具 | 启动浏览器，经 BiDi 说话 |
 | `release` | 经端口：`Views.registry`，一个由 `views::served` 放进来的 `fn` 指针（sprawling-SPEC.md 中 `Views.machine` 旁的那一条） | `views` 回答 `NewestRelease` 查询 | 向 npm 注册表发请求 |
 | `console` | 留在装配根 | — | 只有 `listening` 用它；它是终端，不是 worker |
-| `serving` 的其余部分（`folding`、`output_ring`、`Serving`、`open_vault`） | 留在装配根 | — | 只有 `attending`、`listening` 与 `genesis` 用它们 |
-| `assembly` 的 `listening`、`attending`、`chain_watch`、`genesis`、`models`、`mcp::Residents`、`SystemClock` | 留在装配根 | — | 起线程、绑端口、造城的目录、生产适配器：§12-1 与 §12-12 |
+| `serving` 的其余部分（`folding`、`output_ring`、`Serving`、`open_vault`） | 留在装配根 | — | 只有 `attending`、`listening` 与 `production` 用它们 |
+| `assembly` 的 `production`（`SystemClock`、`hands`、`init_city`、`form_city`）、`listening`、`attending` 的起线程那一半（`spawn_worker`）、`chain_watch` 的起审计线程那一半、`dropping` | 留在装配根 | — | 起线程、绑端口、造生产的手：§12-17、§12-18 |
+| `models::GatewayModels`、`mcp::Residents` | 随 worker 搬进本 crate | 新 worker 默认的模型工厂与 MCP 连接表 | 它们只经 `gateway` 与 `agent_protocols` 伸手，而 worker 本来就经这两个 crate 探端点、读 MCP 健康（§12-18） |
 
 ## 8 接口先行
 
@@ -413,9 +415,72 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 - **`lineage` 与 `views` 同住本 crate，因为读者跨两处。** `sprawling view` 的 run 列表在二进制里，playback 的共享投影在本 crate 的读面里；二进制够得到本 crate，本 crate 够不到二进制。
 - **依赖**：`views` 折叠 `storage::HotView`、`storage::Attribution` 与 `storage::LedgerIndex`，快照起步经 `runtime::replay::fold_ledger_dir`，所以本 crate 依赖 `storage` 与 `runtime`（ARCHITECTURE.md §3 的 `depmap`，§12-14）。
 
+### 8-11 accounting::worker：城的唯一写者，和它从外面收下的手（形状 1 数据 + 形状 4 适配器）
+
+```rust
+// accounting::worker::hands（形状 1 数据）
+/// worker 伸向这台电脑的每一只手，构造时一次交进来。
+pub struct Hands {
+    pub vault: gateway::Custodian,                       // 生产：Custodian::probe 打开的那一个；脚本：Custodian::in_memory()
+    pub clock: Arc<dyn Clock + Send + Sync>,             // 8-3
+    pub machine: Box<dyn Machine + Send>,                // 8-4
+    pub read_memory: fn() -> Memory,                     // sprawling-SPEC.md 8-46-3
+    pub read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,   // sprawling-SPEC.md 8-116
+    pub reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,         // sprawling-SPEC.md 8-60
+    pub browsers: Browsers,                              // sprawling-SPEC.md 8-45-2
+    pub desktop_program: DesktopProgram,                 // sprawling-SPEC.md 8-4d
+    pub recipe_for: fn(&str) -> Result<&'static Recipe, AxError>,
+    pub exec_host: ExecHost,
+}
+/// exec 工具取自这台电脑的三件事。
+pub struct ExecHost {
+    pub python_wasm: fn() -> Option<PathBuf>,            // 可用的那一份，坏的不算
+    pub shell: fn() -> Option<PathBuf>,
+    pub engine: fn() -> Result<Box<dyn runtime::Sandbox>, AxError>,
+}
+pub type Browsers = fn(&Path, &storage::BlockOrigin, &city::BuildingRules) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
+pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;
+
+// accounting::worker::pool
+pub struct Memory { pub physical: u64, pub available: u64 }
+// accounting::worker::health
+pub struct Health(/* 私有 */);   // 记账线程的两个计数，别的线程可读（sprawling-SPEC.md 8-98）
+
+// accounting::worker
+pub struct RunWorker { /* 私有 */ }
+impl RunWorker {
+    pub fn new(city_root: &Path, log: Diagnostics, hands: Hands) -> Result<RunWorker, AxError>;
+    pub fn over(city_root: &Path, log: Diagnostics, hands: Hands, opened: (JsonlLedger, OpenReport)) -> Result<RunWorker, AxError>;
+    pub fn holding(city_root: &Path, log: Diagnostics, hands: Hands, held: (JsonlLedger, OpenReport, Standing)) -> Result<RunWorker, AxError>;
+    // 换掉其中一只手的门照旧：with_models、with_connectors、with_clock、with_machine、with_browsers、with_desktop_program
+}
+// accounting::worker::genesis
+pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, AxError>;
+// accounting::worker::attend
+pub fn attend(worker: &mut RunWorker, desk: &CommandDesk);
+// accounting::worker::chain_halt
+impl RunWorker { pub fn chain_under_audit(&mut self) -> ChainUnderAudit; }   // 挂上 halt，交回审计线程要的 halt、账本目录与位置
+```
+
+```rust
+// bin::assembly::production（形状 4 适配器，留在 sprawling）
+pub struct SystemClock;                                  // 墙钟，唯一被许可的采样点
+pub fn hands(vault: gateway::Custodian) -> accounting::worker::Hands;
+pub fn init_city(city_root: &Path) -> Result<InitReport, AxError>;          // form(city_root, Adopt::Nothing, hands(Custodian::probe))
+pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
+```
+
+- **`Hands` 只装直接碰这台电脑的东西。** 墙钟、doctor、内存与卷的计数器、文件管理器、浏览器、正在运行的可执行文件、需求表、exec 的解释器与引擎，以及 vault。它们各自的生产实现住在 `sprawling`，由 `bin::assembly::production::hands` 一处装好。`ModelFactory` 与 `Connectors` 的生产实现不在里面：`GatewayModels` 与 `Residents` 随 worker 住在本 crate，由 `new` 装上（§12-18）。
+- **构造器收一个值，不收九个参数。** 生产的调用方写 `RunWorker::new(root, log, bin::assembly::hands(vault))`；换掉一只手写 `Hands { clock: …, ..hands(vault) }`，或者构造之后调原有的 `with_*` 门。
+- **worker 读的每一个时刻都经 `hands.clock`**，包括打开账本、`holding` 为 `last_tick` 取起点、`form` 写创世两行的时刻（8-3）。
+- **exec 的判定留在 worker，读数来自主机。** `limits.shell` 为假时 worker 根本不问 `exec_host.shell`；「坏掉的不交给 run」是 doctor 的判定，所以 `ExecHost` 的两个路径函数只交可用的那一份（`bin::doctor::host::usable_python_wasm`、`usable_shell`），引擎按本构建带不带 `sandbox` feature 由 `bin::doctor::host::execution_engine` 选。
+- **装配根只留自由函数与直接碰主机的生产适配器。** `bin::assembly` 里剩下：`production`（上面四项）、`listening`（占端口、开写者）、`attending`（起写者线程、接上视图折叠线程与广播，交回 vault 与 `Health`）、`chain_watch`（起审计线程并报告）、`dropping`（拖进对话框的文件）。它们只经本节与 8-10 列出的 `pub` 面碰 worker。
+- **失败**：构造器与 `form` 原样传账本、CAS、`city` 与 `Standing::fold` 的 `AxError`，本节不另造错误码。
+- **测试的手**：`accounting::worker::fixture::hands()` 交一份不碰主机的 `Hands`——内存里的 vault、读墙钟的测试钟、一台什么都没有的机器、宽裕的内存与卷、拒绝的文件管理器、空的浏览器表、拒绝的桌面程序、拒绝的需求表、没有解释器与 shell、`runtime::AbsentSandbox`。要真的某一只手的测试，自己换上那一只。
+
 ## 12 决策
 
-1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。
+1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。`GatewayModels` 在 worker 搬进来时一同搬进本 crate，理由见 §12-18；本条对 `SystemClock`、`ThisMachine` 这样直接碰主机的生产适配器仍然成立。
 2. **`with_models` 是一个消费 `self` 的方法，而不是 `new` 的第四个参数。** 理由：生产只有一种工厂，`new` 的每个调用方（serve、doctor、测试）都会写同一个 `GatewayModels`；换工厂的只有 citysim 与测试。被否决的做法：`new` 加参数——四个调用点重复同一个值，而这个值只有一个权威。
 3. **端口参数是 `Chosen` 与 `Redemption`，不含 dialect 头。** 理由：dialect 头由 `Chosen` 的 dialect 决定，把它交给调用方算，两个调用点就各有一份拼法。被否决的做法：照抄 `gateway::adapter_for` 的三参数签名。
 4. **`Connectors` 交回整条连接（握手之后的工具与握手结果），而不是一个裸的 `agent_protocols::Outbound`。** 理由：一个 server 的每个工具各持有同一条链接的一份克隆，而 `Outbound` 是 trait object，不能克隆；交回裸链接，worker 就得再要一个「造链接」的工厂。被否决的做法：端口只负责 `McpLink::open`——那要多一个端口，而握手的说法本来就归 `agent_protocols`，不归 worker。
@@ -426,8 +491,14 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 9. **worker 的决定与读面搬进本 crate，通往主机、网络或终端的做法留在 `sprawling`、经端口交进来（§7 归属表）。** 理由：端口正是 citysim 插第二实现的地方；把一个适配器搬进来，它碰主机的那一步就跟着进了 citysim 驱动的 crate，脚本场景会真的起浏览器、读内存、打开文件管理器。被否决的做法：全部搬进来——本 crate 就要依赖 `thread-priority`、`sysinfo`、浏览器与终端，citysim 换不掉其中任何一个；把 `views` 留在 `sprawling`、经端口交给 worker——`Governance` 由读侧拥有，写侧在写下记录之前就要同步地从它作决定（sprawling-SPEC.md 8-92），端口会把一个 trait 放到决定路径上，并把一份折叠的权威分到两个 crate。
 10. **没有状态的主机读写经构造时交进来的 `fn` 指针进来，和 `read_volume` 一样；只有持有状态的适配器（`Machine`、`Connectors`）才是 trait。** 理由：一个只包一个函数的 trait 没有第二个方法可换，脚本场景交一个自己的 `fn` 就够了，而且 `fn` 指针不装箱、不经虚表。被否决的做法：一个把内存、卷、随机令牌、打开文件管理器与浏览器捆在一起的 `Host` trait——这些做法的失败各不相同，脚本为了换掉其中一个就得实现全部。
 11. **`relay`、`pool`、`desk` 与 `drive_run` 和 `RunWorker` 在同一次改动里搬。** 理由：它们成环——`relay` 经 worker 的账本写，`pool` 的每条车道跑 `drive_run`，`drive_run` 经 `relay` 写回，`desk` 为 worker 排队命令；先搬其中任何一个，都要一个指回留在 `sprawling` 的 worker 的临时端口，而下一次改动就会删掉它。被否决的做法：一个一个搬、中间架临时端口——每个临时适配器都是一个只活一次改动的第二权威。
-12. **装配根留在 `bin::assembly`：`listening`、`attending`、`chain_watch`、`genesis`、生产适配器（`models::GatewayModels`、`mcp::Residents`、`SystemClock`、`doctor::ThisMachine`）与把它们装上 worker 的构造。** 理由：它们起线程、绑端口、打开 vault、造城的目录，是 ARCHITECTURE.md §3 说的知道每个具体类型的那一层；worker 搬走之后，它们对本 crate 的依赖是朝内的。被否决的做法：把 `genesis` 当作 worker 的用例搬进来——它在任何 worker 存在之前造城，并经 `serving::open_vault` 打开 vault，搬进来就要为一次性的建城多开一个端口。
+12. **装配根留在 `bin::assembly`：只留自由函数与直接碰主机的生产适配器。** `listening`、`attending` 的起线程那一半、`chain_watch` 的起审计线程那一半、`dropping` 与 `production`（`SystemClock`、`hands`、`init_city`、`form_city`）。理由：它们起线程、绑端口、造城的目录、装生产的手，是 ARCHITECTURE.md §3 说的知道每个具体类型的那一层；worker 搬走之后，它们对本 crate 的依赖是朝内的。`impl RunWorker` 的块一个也不留（§12-17）。被否决的做法：把 `genesis` 整个留在装配根——它的三个方法是 worker 的用例，而 worker 自己的测试要经它造城（§12-19）。
 13. **harness 页找程序经 `Views.programs` 这个 `fn` 指针，不经 `Machine`，也不在开城时算好。** 理由：这一问读的是此刻的搜索路径，与 `registry`、`upstream` 同形——没有状态、服务中的城交一次、`None` 就答 `Unavailable`（§12-10）；它不启动任何程序，所以不必等 `DoctorRefresh`。被否决的做法：给 `Machine` 加一个方法——`Machine` 属于 worker，读面拿不到它，而且 doctor 的逐项查法已经在 `bin::doctor::Machine::look` 里，再加一个方法就是第二条查法；在开城时把 harness 的有无算进 `DoctorAnswer`——那是一个线上的形状改动，而且人在 harness 页上装完一个程序，要等到下一次 `DoctorRefresh` 才看得到它。
 14. **`views` 搬进来时，本 crate 加 `storage` 与 `runtime` 两条边。** 理由：`views` 折叠的就是 `storage` 的 `HotView`、`Attribution`、`LedgerIndex`，快照起步与 worker 的 `Standing` 共用 `runtime::replay::fold_ledger_dir` 的同一遍；worker 搬过来后本来也要这两条边（§12-11）。被否决的做法：把这两处读经端口交进来——端口会把一份折叠的权威分到两个 crate，与 §12-9 否决的是同一件事；把 `fold_ledger_dir` 挪进 `storage`——那改的是 `runtime` 的公开面，与这次迁移无关。
 15. **sprawling-SPEC.md 里写这些模块的节不随模块搬，只改模块路径的拼写；S4 迁 `Spec.lean` 时一次搬进本 crate 的规格。** 理由：两处都是 Markdown 时，搬一次、S4 再改写一次，是两遍约两千行的重写；两份 SPEC 的节号相撞（sprawling 的 8-3、8-6 与本 SPEC 的 8-3、8-6），sprawling-SPEC 自己也有重号，逐节搬要先重新编号，而代码与文档里引用 `sprawling-SPEC.md 8-xx` 的地方都得跟着改。被否决的做法：照 §3 早先的第 5 步逐节搬——8-7、8-8、8-9 那样的小节可以，几十节不行。
 16. **`views` 搬进本 crate 之后、worker 搬进来之前，`views` 的测试用 `views::tests::founded` 造城。** 理由：真正的创世（`genesis`）经 `RunWorker` 立起市政厅，worker 搬进来之前它还在 `sprawling`，本 crate 够不到它；`founded` 只写那些测试读到的东西，worker 搬进来时删掉。被否决的做法：把这些测试留在 `sprawling`——它们读 `Views` 的私有字段（`index`）与只在测试里存在的 `Views::answer`，留下就得为测试开公开的门。
+17. **`impl RunWorker` 的块全部住本 crate；装配根里混着两种东西的三个文件先拆开再搬。** 理由：Rust 只允许在定义类型的 crate 里写固有 `impl`，而 `attending`、`chain_watch`、`genesis` 各有一半读 worker 的私有字段。拆法按「谁起线程、谁碰主机」：循环 `attend`、挂 halt 的 `chain_under_audit`、造城的 `form` 与三个造楼方法随 worker 走；`spawn_worker`、审计线程、`init_city`/`form_city` 两个生产入口留下。被否决的做法：在 `sprawling` 里用扩展 trait 给 `RunWorker` 加方法——调用方要先把 trait 引进作用域，而 trait 方法仍然碰不到私有字段，只能再开公开的门。
+18. **`GatewayModels` 与 `Residents` 随 worker 搬进本 crate，`Hands` 只装直接碰这台电脑的东西。** 理由：worker 自己的测试有上百处经生产的 `GatewayModels` 对一个回环地址上的假 provider 说话，经 `Residents` 连一个 conformance 子进程；两者留在 `sprawling`，测试就得在本 crate 再写一份 dialect 头加 `gateway::adapter_for`，那是「一个 `Chosen` 怎样变成适配器」的第二个权威。它们自己不碰主机：出网在 `gateway` 的适配器里，起进程在 `agent_protocols` 的链接里，worker 探端点、读 MCP 健康时本来就经这两个 crate 伸手。被否决的做法：把模型工厂与连接表也放进 `Hands`——测试的手要么复制生产实现，要么换成脚本，后者会改变几百条测试测的东西。
+19. **worker 的测试经 `worker::genesis::form` 与 `fixture::hands()` 造城。** 理由：`init_city` 在 worker 的测试里被调用一百多次，它必须在本 crate 里可达；`form` 需要的时钟与 vault 本来就是交进来的手。`bin::assembly::production::init_city` 只把生产的 `Hands`（`Custodian::probe` 打开的 vault）交给同一个 `form`。被否决的做法：测试继续经 `sprawling` 造城——本 crate 不能依赖 `sprawling`，dev-dependency 成环会链接两份 `accounting`，类型对不上。
+20. **宿主的手是一个值 `Hands`，由构造器收下。** 理由：搬过来以后 `new` 叫不出 `sprawling` 里的适配器，生产的那一份只能从外面来；九样东西总是一起到、一起用，是一个值（AGENTS.md）；参数上限是四个。换一只手有两种写法：结构体更新语法，或者构造之后的 `with_*` 门。被否决的做法：`Host` trait——§12-10 已否决，理由不变（脚本为换一只手要实现全部）；`fn` 指针组成的结构体没有这个代价。九个参数——超出 4 的上限，而且每个调用点都要把九样东西排一遍。
+21. **vault 也放进 `Hands`。** 理由：生产的 vault 打开的是这台电脑的凭据服务（`Custodian::probe`），脚本给的是内存里的一份，它与其余几只手一样是构造时从外面交进来的；放进去以后三个构造器都不超过四个参数。被否决的做法：把 `vault` 与 `log` 捆成一个值——两者没有共同的意思，捆起来只是为了凑参数个数。
+22. **驾驶 lane 的线程从 `accounting::worker::pool` 起。** 理由：`pool` 与 `relay`、`drive_run`、`RunWorker` 成环，必须一起搬（§12-11）；lane 的寿命仍然恰好是它驾驶的那个 run。ARCHITECTURE.md 的确定性规则 3 因此把它列为库 crate 起线程的第六处。被否决的做法：经 `Hands` 交一个起线程的 `fn`——它只有一个实现，而且只是把 `std::thread::Builder` 换个名字。
