@@ -44,8 +44,7 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // Thirty commands, thirty-five queries. The count is not a style
-    // choice - it is the wire's closed surface.
+    // The counts are the wire's closed surface, not a style choice.
     assert_eq!(COMMAND_NAMES.len(), 29, "command table");
     assert_eq!(QUERY_NAMES.len(), 38, "query table");
 
@@ -81,9 +80,9 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     assert_eq!(schema_hash(), schema_hash(), "hash is a pure function");
     // Golden: this pins the current wire. Changing a variant changes the hash,
     // which forces the SPEC to move in the same change set (apisync gate).
-    // `WIRE_V` stays where it is because a name changed: the version rises
-    // only for a grammar reshaped with the names held (§298), and a new
-    // name already moves the hash that the handshake compares.
+    // A changed name moves the hash the handshake compares; `WIRE_V` rises
+    // only for a shape change under names that stay, once between two
+    // pushes (wire-SPEC §12.1).
     assert_eq!(
         schema_hash().to_string(),
         WIRE_SCHEMA_GOLDEN,
@@ -91,7 +90,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     );
     assert_eq!(
         WIRE_V, 44,
-        "the version rises when the grammar changes shape without a name changing"
+        "WIRE_V rises once between two pushes, for a shape change under names that stay (wire-SPEC 12.1)"
     );
 }
 

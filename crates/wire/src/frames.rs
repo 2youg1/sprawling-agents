@@ -27,8 +27,9 @@
 use kernel::{Address, AxError, B3Hash, EventKind, EventRecord, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
-/// Wire format version. Bumped whenever the frame grammar changes shape in a
-/// way the schema hash alone would not explain to a human reading a log.
+/// Wire format version. Rises by one between two pushes, in the first commit
+/// that changes a frame's shape while every frame and kind name stays
+/// (wire-SPEC §12.1); a changed name moves [`schema_hash`] on its own.
 pub const WIRE_V: u32 = 44;
 mod ask;
 mod monitor;
