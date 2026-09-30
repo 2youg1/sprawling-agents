@@ -33,7 +33,7 @@ const FORCED_COLOURS: &str = "--force-high-contrast";
 
 /// How long the engine is given to reach the moment the probe measures
 /// at, in the same virtual time the probe's own wait is counted in.
-pub(super) const BUDGET_MS: u32 = 8000;
+pub(crate) const BUDGET_MS: u32 = 8000;
 
 /// How often an opening's engine is asked whether it has finished.
 const POLL: Duration = Duration::from_millis(100);
@@ -58,7 +58,7 @@ const CHROMIUM: &str = include_str!("../../../../crates/sprawling/src/doctor/fam
 /// Each tier is an authority that already exists. The gate does not keep
 /// a list of its own, and it does not probe for what `doctor` already
 /// knows.
-pub(super) fn browser() -> Option<PathBuf> {
+pub(crate) fn browser() -> Option<PathBuf> {
     if let Some(named) = std::env::var_os("SPRAWLING_BROWSER") {
         let path = PathBuf::from(named);
         if path.is_file() {
@@ -271,7 +271,7 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
 /// that wait never ended. So the dump is read as it arrives, the browser's
 /// own exit is what ends the wait, and an engine that does not exit within
 /// the patience is killed and reported rather than waited on.
-fn dump(mut command: Command, cmd: &str) -> Result<Vec<u8>, XtaskError> {
+pub(crate) fn dump(mut command: Command, cmd: &str) -> Result<Vec<u8>, XtaskError> {
     let failed = |msg: String| XtaskError::Cmd {
         cmd: cmd.to_owned(),
         msg,
@@ -346,7 +346,7 @@ fn sink<'a>(dom: &'a str, id: &str) -> Option<&'a str> {
 /// the document load, which does hold virtual time; the later `import()`
 /// then finds the module already fetched. Only the gate's copy carries
 /// these links, so the shipped page stays lazy.
-fn preloads<'a>(body: &str, chunks: impl IntoIterator<Item = &'a str>) -> String {
+pub(crate) fn preloads<'a>(body: &str, chunks: impl IntoIterator<Item = &'a str>) -> String {
     chunks
         .into_iter()
         .filter(|chunk| !body.contains(&format!("./assets/{chunk}")))
@@ -378,7 +378,7 @@ fn instrument(body: &str, preloaded: &str, pass: &Pass) -> String {
 }
 
 /// A `file://` URL for a path, in the form every engine accepts.
-fn url_of(path: &Path) -> String {
+pub(crate) fn url_of(path: &Path) -> String {
     let absolute = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let text = absolute.display().to_string();
     let cleaned = text

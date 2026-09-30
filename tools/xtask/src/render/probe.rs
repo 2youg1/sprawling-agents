@@ -29,10 +29,10 @@ use super::pass::Pass;
 /// for as long as the page is open. A file-served chunk does not hold the engine's
 /// virtual time, so without this wait the probe raced the chunk and
 /// measured a page with no first heading.
-const PENDING: &str = "[data-pending]";
+pub(crate) const PENDING: &str = "[data-pending]";
 
 /// How often the probe asks again whether a view is still pending.
-const POLL_MS: u32 = 100;
+pub(crate) const POLL_MS: u32 = 100;
 
 /// Where the walk writes what it read.
 pub(super) const SINK: &str = "sprawling-render";

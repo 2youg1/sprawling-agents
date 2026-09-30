@@ -53,10 +53,10 @@ use browser::survey::{self, Deviation, Standing};
 use crate::report::{Violation, XtaskError};
 
 mod announced;
-mod engine;
+pub(crate) mod engine;
 mod marks;
 mod pass;
-mod probe;
+pub(crate) mod probe;
 mod room;
 mod sources;
 

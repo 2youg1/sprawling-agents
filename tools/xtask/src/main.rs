@@ -47,6 +47,7 @@ mod repro;
 mod root;
 mod sbom;
 mod secret;
+mod shots;
 mod spec;
 mod specalign;
 mod unused;
@@ -207,6 +208,14 @@ fn main() -> ExitCode {
             }
         },
         Some("release") => report::finish("release", release::check(&root)),
+        // Not a gate: a person reads what it writes (section 12-10).
+        Some("shots") => match shots::run(&root, args.get(1..).unwrap_or(&[])) {
+            Ok(message) => {
+                print!("{message}");
+                ExitCode::SUCCESS
+            }
+            Err(err) => report::internal_failure(&err),
+        },
         Some("spec") => match spec::run(&root, args.get(1).map(String::as_str)) {
             Ok(message) => {
                 println!("{message}");
@@ -269,7 +278,7 @@ struct Tool {
 /// Everything `cargo xtask` answers that is not a gate, plus the flags
 /// that change what a gate does. The dispatcher above and this array are
 /// read together, so a command that grows a flag is printed with it.
-const TOOLS: [Tool; 15] = [
+const TOOLS: [Tool; 16] = [
     Tool {
         call: "gates [<gate>...]",
         gives: "every gate, or only the named ones",
@@ -329,6 +338,10 @@ const TOOLS: [Tool; 15] = [
     Tool {
         call: "budget",
         gives: "every budget, what it costs today, and what is gated",
+    },
+    Tool {
+        call: "shots [--origin <url>]",
+        gives: "every page at 1440 and 1920, dark and light, as PNG files and an index in target/shots",
     },
 ];
 
