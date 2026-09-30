@@ -37,6 +37,16 @@ pub(crate) fn system(doing: &str, recovery: &str, err: winsafe::co::ERROR) -> Re
     refused(doing, recovery, &err.to_string())
 }
 
+/// What COM said when this thread asked to join an apartment.
+pub(crate) fn com(doing: &str, recovery: &str, err: winsafe::co::HRESULT) -> Refusal {
+    refused(doing, recovery, &err.to_string())
+}
+
+/// What UI Automation said, as a refusal.
+pub(crate) fn automation(doing: &str, recovery: &str, err: &uiautomation::Error) -> Refusal {
+    refused(doing, recovery, err.message())
+}
+
 /// The one sentence every machine failure is told in.
 fn refused(doing: &str, recovery: &str, said: &str) -> Refusal {
     Refusal::new(

@@ -195,7 +195,7 @@ pub(crate) fn perform(tool: ToolName, arguments: &Value, admitted: &Admitted<'_>
 
 ```rust
 // 8-6 platform（形状 4 适配器；cfg 二选一，无 trait）
-pub(crate) struct Desk { /* 私有：views／recordings／pixels */ }
+pub(crate) struct Desk { /* 私有：views／recordings／pixels／reader */ }
 impl Desk {
     pub(crate) fn new() -> Desk;
     // 路由对 ToolName 穷尽，unknown 臂已删：未知名字在 ToolName::parse 止步。
@@ -216,7 +216,7 @@ impl Desk {
 | `windows::enumerate` | `EnumWindows`：这台桌面上有哪些顶层窗口，各自的 title／process／bounds | 4 适配器 | **是** |
 | `windows::target` | 从一串窗口里按 title／process 挑出**恰好一个** | 1 判定 | 否 |
 | `windows::views` | 一次快照铸了哪些 ref、一扇窗口（按句柄）现在是第几代、快照时它的矩形，以及一个动作该不该被这一代接受 | 1 判定 | 否 |
-| `windows::tree` | UIA `IUIAutomation` 树：role／name／ref／bounds | 4 适配器 | **是** |
+| `windows::tree` | UIA 树：role／name／ref／bounds，经 `uiautomation`；一张桌子读树用的公寓与 automation 对象（`Reader`） | 4 适配器 | **是** |
 | `windows::keys` | 键名到虚拟键码的那张表 | 6 数据 | 否 |
 | `windows::strokes` | 一个动作是哪几个事件（键、Unicode 单元、指针）；一批只被收下前 k 个时哪些键与鼠标键还按着，以及那句拒词 | 1 判定 | 否 |
 | `windows::focus` | 键盘现在在谁手里、一个屏幕点下面是哪个窗口，以及两者都不是它时的那句拒词 | 1 判定 | **是**（两次只读，加一次置前）|
@@ -257,7 +257,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 | 一扇窗口的事实：可见、标题、进程映像名、外框 | `enumerate` | `IsWindowVisible`、`GetWindowText`、`GetWindowThreadProcessId`、`OpenProcess`＋`QueryFullProcessImageName`、`GetWindowRect` | `winsafe` | `winsafe` | 同上 |
 | 前台与落点 | `focus` | `GetForegroundWindow`、`WindowFromPoint`、`GetAncestor`、`SetForegroundWindow` | `winsafe` | `winsafe` | `the_window_under_a_point_is_the_window_drawn_there` |
 | 输入 | `act` | `SendInput`、`GetSystemMetrics` | `winsafe` | `winsafe` | `each_stroke_becomes_the_event_it_names` |
-| 可访问性树 | `tree` | UIA 的 automation 对象、control view walker、元素属性；COM 公寓 | `windows`（FFI） | `uiautomation`，公寓经 `winsafe` | `a_windows_tree_names_the_control_inside_it` |
+| 可访问性树 | `tree` | UIA 的 automation 对象、control view walker、元素属性；COM 公寓 | `uiautomation`，公寓经 `winsafe` | `uiautomation`，公寓经 `winsafe` | `a_windows_tree_names_the_control_inside_it` |
 | 按窗口捕获 | `capture` | `GetDC`／`ReleaseDC`、`CreateCompatibleDC`、`CreateCompatibleBitmap`、`SelectObject`、`PrintWindow`、`GetDIBits` | `windows`（FFI） | 无 | `the_failing_path_releases_what_it_took` |
 | 剪贴板文本 | `clipboard` | owner 窗口、`OpenClipboard`、`GetClipboardData`、`GlobalSize`／`GlobalLock`、`GlobalAlloc`、`EmptyClipboard`、`SetClipboardData` | `windows`（FFI） | 无 | `a_clipboard_block_that_will_not_lock_is_a_refusal_not_an_empty_clipboard` |
 | DPI 感知 | `dpi` | `SetProcessDpiAwareness`、`GetProcessDpiAwareness` | `windows`（FFI） | 无 | `a_desk_reads_this_desktop_in_physical_pixels` |
@@ -395,7 +395,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 ### 12.10 树经 `uiautomation`，COM 公寓每张桌子进一次
 
-- **决定**：`tree` 经 `uiautomation` 0.25.1（关默认 feature）读树，只用 `UIAutomation::new_direct`、`element_from_handle`、control view walker 与元素的三项属性（role、name、外框）。COM 公寓由 `Desk` 在第一次 snapshot 时进入一次，用多线程公寓（MTA），经 `winsafe::CoInitializeEx` 的守卫；automation 对象与 walker 同这个守卫一起住在桌子里，字段的析构次序保证先放 COM 对象、后退出公寓。元素仍只活在一次 snapshot 之内（§8.6 第二对）。walker 答「没有这个元素」（错误码 0）是这一层到头；答别的错误是 provider 出了故障，遍历在那里停下，而不是当作到头。
+- **决定**：`tree` 经 `uiautomation` 0.25.1 读树，默认 feature 关掉，只开 `input`（它的 core 模块不开 `input` 编不过），只用 `UIAutomation::new_direct`、`element_from_handle`、control view walker 与元素的三项属性（role、name、外框）。COM 公寓由 `Desk` 在第一次 snapshot 时进入一次，用多线程公寓（MTA），经 `winsafe::CoInitializeEx` 的守卫；automation 对象与 walker 同这个守卫一起住在桌子里，字段的析构次序保证先放 COM 对象、后退出公寓。元素仍只活在一次 snapshot 之内（§8.6 第二对）。walker 答「没有这个元素」（错误码 0）是这一层到头；答别的错误是 provider 出了故障，遍历在那里停下，而不是当作到头。
 - **理由**：微软对不开窗口的 UIA 工作线程推荐 MTA；进一次、配对退出，公寓的生存期就是连接的生存期。旧写法每次 snapshot 都以 STA 进入而从不退出，并且每次新建 automation 对象；`uiautomation::UIAutomation::new()` 同样每次进入而不退出，故不用它。把 provider 的故障读成「到头了」，模型拿到的是一棵看起来完整、其实缺了一块的树。
 - **剩余限制**（写明，不当作已解决）：`winsafe` 的 `CoUninitializeGuard` 在进入公寓答 `RPC_E_CHANGED_MODE` 时也会调 `CoUninitialize`；本 package 的读循环线程不进入任何别的公寓，这条路走不到。剪贴板走的是 Win32 剪贴板而不是 OLE 剪贴板，同一线程上的 MTA 与它无关。
 - **击败的备选**：保留经 `windows` 绑定手写的 COM 调用（九个 `unsafe` 块）；让 UIA 也回答窗口事实（UIA 根的子元素、`IsOffscreen` 与 `EnumWindows`、`WS_VISIBLE` 不是同一个定义，安全判断会跟着 provider 的实现走）。
@@ -409,7 +409,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 |---|---|---|
 | `windows` 0.62 | 还没有合格安全接口的那几组 Win32 调用（枚举、捕获、剪贴板、DPI，§8-11）与绑定里的常量 | `windows-sys` 只有裸函数；`uiautomation` 本身也链接同一版 `windows`，锁里不多一个包 |
 | `winsafe` 0.0.29（只开 `user`、`ole`） | 输入与窗口事实的安全接口，以及 COM 公寓的守卫（§12.9、§12.10） | 没有 Cargo 依赖；它的 `EnumWindows` 与剪贴板写法不准入，理由在 §12.9 |
-| `uiautomation` 0.25.1（`default-features = false`） | UIA 树的安全封装：automation 对象、walker、元素属性（§12.10） | 关掉默认特性，于是它的输入、截图、剪贴板与控件匹配都不进来；手写 COM 调用是被它换掉的那九个 `unsafe` 块 |
+| `uiautomation` 0.25.1（`default-features = false`，只开 `input`） | UIA 树的安全封装：automation 对象、walker、元素属性（§12.10） | 关掉默认特性，于是它的截图、剪贴板与控件匹配都不进来；`input` 只因它的 core 模块不开就编不过而开着，本 package 不调它；手写 COM 调用是被它换掉的那九个 `unsafe` 块 |
 | `image` 0.25（`default-features = false`，只开 `png`／`jpeg`／`webp`） | `desktop.screenshot` 点名的三种编码，以及缩放 | 关掉默认特性是因为本 package 只编码、从不解码，也不碰另外十种格式 |
 | `base64` 0.23 | image content 的 `data` 那一层编码，只在 `answer` 里编 | 与 workspace 的 `gateway::dialect::images` 同一条版本线，`xtask guard` 比对版本 |
 

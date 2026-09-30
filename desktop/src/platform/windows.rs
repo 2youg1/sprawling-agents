@@ -70,6 +70,10 @@ pub(crate) struct Desk {
     /// that could not make it so refuses every call rather than mix two
     /// kinds of coordinate (desktop-SPEC.md section 12.6).
     pixels: Result<dpi::PhysicalPixels, Refusal>,
+    /// What this desk reads trees with, started by the first snapshot:
+    /// a connection that never asks for a tree never enters COM
+    /// (desktop-SPEC.md section 12.10).
+    reader: Option<tree::Reader>,
 }
 
 impl Desk {
@@ -78,6 +82,7 @@ impl Desk {
             pixels: dpi::declare(),
             views: Views::new(),
             recordings: record::Recordings::new(),
+            reader: None,
         }
     }
 
@@ -110,7 +115,13 @@ impl Desk {
     fn snapshot(&mut self, arguments: &Value) -> Result<Value, Refusal> {
         let window = resolved(arguments)?;
         let depth = whole(arguments, "depth")?.unwrap_or(DEFAULT_DEPTH);
-        let nodes = tree::read(window.raw(), depth)?;
+        let reader = match self.reader.take() {
+            Some(started) => started,
+            None => tree::Reader::start()?,
+        };
+        let read = reader.read(&window.handle, depth);
+        self.reader = Some(reader);
+        let nodes = read?;
         let described: Vec<Value> = nodes
             .iter()
             .map(|node| {
