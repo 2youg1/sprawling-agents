@@ -494,6 +494,13 @@ module = [
   { name = "remote_access::handshake::tests", file = "crates/remote_access/src/handshake/tests.rs", owns = "that both sides agree, and that an impostor city, a thief's key, a changed reply and an old finish each fail", shape = "test", since = "V0.0.8", status = "built", spec = "remote_access-SPEC.md#8-4" },
   { name = "remote_access::seal", file = "crates/remote_access/src/seal.rs", owns = "every frame of a remote session sealed end to end, opened only in the order it was sealed", shape = "state machine", since = "V0.0.8", status = "built", spec = "remote_access-SPEC.md#8-5" },
   { name = "remote_access::pairing", file = "crates/remote_access/src/pairing.rs", owns = "the one-time code that pairs a device: minted from entropy, shown once, read back however it was retyped", shape = "value", since = "V0.0.8", status = "built", spec = "remote_access-SPEC.md#8-2" },
+  { name = "remote_access::handshake::pairing", file = "crates/remote_access/src/handshake/pairing.rs", owns = "a device's first connection: a handshake only the city signs, the pairing code sealed inside it, and the claim the city opens", shape = "state machine", since = "V0.0.8", status = "planned", spec = "remote_access-SPEC.md#8-6" },
+  { name = "remote_access::handshake::pairing::tests", file = "crates/remote_access/src/handshake/pairing/tests.rs", owns = "that an honest pairing agrees, and that a wrong fingerprint, a changed or foreign claim and a claim signed by another key each fail", shape = "test", since = "V0.0.8", status = "planned", spec = "remote_access-SPEC.md#8-6" },
+  { name = "remote_access::route", file = "crates/remote_access/src/route.rs", owns = "the route seam: open until reachable, close, and the https address and its permanence an open answers", shape = "port", since = "V0.0.8", status = "planned", spec = "remote_access-SPEC.md#8-7" },
+  { name = "remote_access::route::cloudflare", file = "crates/remote_access/src/route/cloudflare.rs", owns = "a locally managed Cloudflare named tunnel, run for as long as the route is open and ready once its metrics say so", shape = "adapter", since = "V0.0.8", status = "planned", spec = "remote_access-SPEC.md#8-8" },
+  { name = "remote_access::route::command", file = "crates/remote_access/src/route/command.rs", owns = "a command the person wrote, run for as long as the route is open, and the address line it prints", shape = "adapter", since = "V0.0.8", status = "planned", spec = "remote_access-SPEC.md#8-9" },
+  { name = "remote_access::route::scripted", file = "crates/remote_access/src/route/scripted.rs", owns = "a route that answers a fixed address and records the order it was opened and closed in", shape = "adapter", since = "V0.0.8", status = "planned", spec = "remote_access-SPEC.md#8-7" },
+  { name = "remote_access::route::tests", file = "crates/remote_access/src/route/tests.rs", owns = "which addresses a route may answer, that a command route answers what the scripted route answers, and that closing is always safe", shape = "test", since = "V0.0.8", status = "planned", spec = "remote_access-SPEC.md#8-7" },
   { name = "wire::frames", file = "crates/wire/src/frames.rs", owns = "the envelope both sides speak: the frames, the version and its hash", shape = "value", since = "S4", status = "built", spec = "wire-SPEC.md#8-1" },
   { name = "wire::named_frames", file = "crates/wire/src/named_frames.rs", owns = "one declaration of a frame family, from which the enum, each variant's wire name and the schema-hash table are all generated", shape = "grammar", since = "P1", status = "built", spec = "wire-SPEC.md#8-1" },
   { name = "wire::preference", file = "crates/wire/src/preference.rs", owns = "what one person set for themselves, as the wire carries it", shape = "value type", since = "V0.0.6", status = "built", spec = "wire-SPEC.md#8-1" },
@@ -1017,7 +1024,7 @@ duty = "space, identity, and the documents a building keeps"
 duty = "the process boundary"
 
 [family.remote_access]
-duty = "the remote door, and nothing that depends on the route that reaches it"
+duty = "the remote door, and the routes that carry its bytes and decide nothing"
 
 [family.browser]
 duty = "a browser driven over WebDriver BiDi, and what a model may see of a page and do to it"
