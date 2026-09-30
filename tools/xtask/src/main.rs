@@ -30,6 +30,7 @@ mod docnum;
 mod gates;
 mod guard;
 mod header;
+mod lean;
 mod length;
 mod lexicon;
 mod mem;

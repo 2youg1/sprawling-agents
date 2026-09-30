@@ -3,31 +3,40 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Gate: kernel enums and the kernel-SPEC tables agree variant by
+//! Gate: kernel enums and the kernel's specification agree variant by
 //! variant (C8), and every module's `Spec` anchor resolves. The gate
 //! consumes the real enums — `AxCode::ALL` and `EventKind::ALL` — and
-//! reads the SPEC as data, so "the table drifted" and "the enum grew
-//! silently" are the same red. Asserts: every AxCode appears exactly
-//! once in the 8-1 table with its declared carrier; every EventKind
-//! exactly once in the 8-4 table with its window class; every other
-//! `pub enum` body in the SPEC holds the variants the kernel compiles
-//! (`enums`); and the seventh module-table column names a SPEC section
-//! that is on disk.
+//! reads the specification as data, so "the table drifted" and "the enum
+//! grew silently" are the same red. Asserts: every AxCode appears exactly
+//! once in the carrier table with its declared carrier; every EventKind
+//! exactly once in the window table with its window class; every other
+//! enum roster in the specification holds the variants the kernel
+//! compiles; and the seventh module-table column names where the module
+//! is specified (`anchors`).
+//!
+//! Until the kernel migrates, the tables are the 8-1 and 8-4 tables of
+//! `kernel-SPEC.md` and the rosters its Rust fences (`enums`); once
+//! `crates/kernel/Spec.lean` exists, they are the Lean shapes `tables`
+//! reads (xtask-SPEC.md section 8-43). Which one is read is decided by
+//! that one file, so the kernel never answers from both.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use kernel::{AxCode, Carrier, EventKind, WindowClass};
 
-use crate::members;
-use crate::modmap;
+use crate::lean;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
+mod anchors;
 mod enums;
+mod tables;
 
+/// The kernel's package directory, where `Spec.lean` decides which of
+/// the two specifications is read.
+const KERNEL_DIR: &str = "crates/kernel";
 const SPEC_PATH: &str = "crates/kernel/kernel-SPEC.md";
-use crate::modmap::MAP;
 
 fn violation(rule: &str, violation: String, alternative: &str) -> Violation {
     Violation {
@@ -76,141 +85,19 @@ fn spec_carrier(cell: &str) -> String {
     }
 }
 
-/// What a `<crate>-SPEC.md` cell finds on disk, looked for in every
-/// package directory (xtask-SPEC.md section 8-10). The file name is the
-/// whole address: which directory holds it is cargo's answer, never a
-/// path spelled here.
-enum Spec {
-    Text(String),
-    Unreadable(String),
-    Missing,
-    Ambiguous(Vec<String>),
-}
-
-impl Spec {
-    fn find(root: &Path, dirs: &[String], file: &str) -> Self {
-        let holders: Vec<String> = dirs
-            .iter()
-            .map(|dir| format!("{dir}/{file}"))
-            .filter(|path| root.join(path).is_file())
-            .collect();
-        match holders.as_slice() {
-            [] => Self::Missing,
-            [path] => match walk::read_text(&root.join(path)) {
-                Ok(text) => Self::Text(text),
-                Err(err) => Self::Unreadable(err.to_string()),
-            },
-            [..] => Self::Ambiguous(holders.clone()),
-        }
-    }
-}
-
-/// True when `section` labels a section of `spec`.
-///
-/// A SPEC's section 8 is written one of two ways, and both are the real
-/// shape of this tree: a `### 8-N …` heading, or a `// 8-N …` line inside
-/// the one interface fence that is section 8 (browser, protocol, desktop
-/// and parts of web and runtime write it that way). Accepting both is not
-/// a widening — accepting only headings would redden six crates for how
-/// their SPEC has always been written.
-pub(crate) fn section_present(spec: &str, section: &str) -> bool {
-    spec.lines().any(|line| {
-        let trimmed = line.trim_start();
-        let body = trimmed
-            .trim_start_matches('#')
-            .strip_prefix(" ")
-            .or_else(|| trimmed.strip_prefix("// "));
-        let Some(body) = body else { return false };
-        if trimmed.starts_with('#') && !trimmed.starts_with("##") {
-            return false;
-        }
-        body.strip_prefix(section)
-            .is_some_and(|tail| !tail.starts_with(|c: char| c.is_ascii_digit()))
-    })
-}
-
-/// Every module row's seventh cell resolves to a SPEC section on disk.
-///
-/// The cell is `<crate>-SPEC.md#8-N`. Existence is asserted, uniqueness is
-/// not: section numbers repeat inside several SPECs because successive
-/// cards numbered independently, and renumbering them is its own work
-/// (xtask-SPEC.md section 8-10 records the condition for tightening this).
-fn check_anchors(root: &Path, violations: &mut Vec<Violation>) -> Result<(), XtaskError> {
-    let dirs: Vec<String> = members::members(root)?
-        .into_iter()
-        .map(|member| member.dir)
-        .collect();
-    let mut loaded: BTreeMap<String, Spec> = BTreeMap::new();
-    for anchor in modmap::anchors(root)? {
-        let at = format!("{MAP}: {}", anchor.module);
-        let Some((file, section)) = anchor.spec.split_once('#') else {
-            violations.push(anchored(
-                at,
-                "the Spec column is `<crate>-SPEC.md#8-N` (xtask-SPEC.md section 8-10)",
-                format!("{}: {:?} has no section", anchor.module, anchor.spec),
-                "write the SPEC file and the section it is specified in",
-            ));
-            continue;
-        };
-        if !file.ends_with("-SPEC.md") {
-            violations.push(anchored(
-                at,
-                "the Spec column names a crate SPEC (xtask-SPEC.md section 8-10)",
-                format!("{}: {file:?} is not a `<crate>-SPEC.md`", anchor.module),
-                "name the SPEC of the crate the module lives in",
-            ));
-            continue;
-        }
-        let spec = &*loaded
-            .entry(file.to_owned())
-            .or_insert_with(|| Spec::find(root, &dirs, file));
-        let exists = "the Spec column points at a SPEC that exists (xtask-SPEC.md section 8-10)";
-        let problem = match spec {
-            Spec::Text(text) if section_present(text, section) => None,
-            Spec::Text(_) => Some((
-                "the Spec anchor names a section that exists (xtask-SPEC.md section 8-10)",
-                format!("{}: {file} has no section {section}", anchor.module),
-                "write that section, or point the row at the section that does specify this module",
-            )),
-            Spec::Unreadable(why) => Some((
-                exists,
-                format!("{}: {file} is not readable: {why}", anchor.module),
-                "correct the crate name, or write that SPEC",
-            )),
-            Spec::Missing => Some((
-                exists,
-                format!("{}: no package directory holds {file}", anchor.module),
-                "correct the crate name, or write that SPEC",
-            )),
-            Spec::Ambiguous(paths) => Some((
-                "a SPEC file name belongs to one package (xtask-SPEC.md section 8-10)",
-                format!("{}: {file} is at {}", anchor.module, paths.join(" and ")),
-                "keep one of the files, so the anchor names one SPEC",
-            )),
-        };
-        if let Some((rule, violation, alternative)) = problem {
-            violations.push(anchored(at, rule, violation, alternative));
-        }
-    }
-    Ok(())
-}
-
-/// One finding about a module row's anchor, located at that row.
-fn anchored(at: String, rule: &str, violation: String, alternative: &str) -> Violation {
-    Violation {
-        gate: "specalign",
-        location: at,
-        rule: rule.to_owned(),
-        violation,
-        alternative: alternative.to_owned(),
-    }
-}
-
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
+    let mut violations = Vec::new();
+    markdown(root, &mut violations)?;
+    anchors::check(root, &mut violations)?;
+    Ok(violations)
+}
+
+/// The kernel's two tables and its enum rosters, read out of
+/// `kernel-SPEC.md` while the kernel's specification is Markdown.
+fn markdown(root: &Path, violations: &mut Vec<Violation>) -> Result<(), XtaskError> {
     let text = walk::read_text(&root.join(SPEC_PATH))?;
     let mut ax_rows: BTreeMap<String, String> = BTreeMap::new();
     let mut kind_rows: BTreeMap<String, String> = BTreeMap::new();
-    let mut violations = Vec::new();
 
     for line in text.lines() {
         let Some(row) = cells(line) else { continue };
@@ -319,16 +206,13 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         ));
     }
 
-    enums::check(root, &text, SPEC_PATH, &mut violations)?;
-    check_anchors(root, &mut violations)?;
-
-    Ok(violations)
+    enums::check(root, &text, SPEC_PATH, violations)
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {
-    use super::{cells, section_present, spec_carrier, unticked};
+    use super::{cells, spec_carrier, unticked};
 
     #[test]
     fn table_rows_split_and_untick() {
@@ -343,33 +227,5 @@ mod tests {
     fn carrier_cells_normalize() {
         assert_eq!(spec_carrier("`gate_denied`"), "gate_denied");
         assert_eq!(spec_carrier("装载期（无 carrier）"), "loadtime");
-    }
-
-    #[test]
-    fn a_section_is_found_as_a_heading_or_as_a_fence_marker() {
-        assert!(section_present("### 8-27 kernel::gate", "8-27"));
-        assert!(section_present("// 8-1 port（形状 3）", "8-1"));
-        assert!(section_present("## 8-48 `kernel::node_id`", "8-48"));
-        assert!(!section_present("### 8-27 kernel::gate", "8-2"));
-        assert!(!section_present("### 8-7 six tools", "8-70"));
-        assert!(!section_present("a paragraph mentioning 8-27", "8-27"));
-    }
-
-    /// A module row under tools/ is read, and its anchor resolves in the SPEC
-    /// beside its package, which has no section 8-9.
-    #[test]
-    fn a_relocated_package_has_its_anchors_checked() {
-        let root = crate::root::fixture::relocated("specalign");
-        crate::root::fixture::write(&root, "tools/k/k-SPEC.md", "# k\n\n### 8-1 a\n");
-        let mut found = Vec::new();
-        let ran = super::check_anchors(&root, &mut found);
-        std::fs::remove_dir_all(&root).unwrap();
-        assert!(
-            ran.is_ok()
-                && found
-                    .iter()
-                    .any(|v| v.violation.contains("k-SPEC.md has no section 8-9")),
-            "{ran:?} {found:?}"
-        );
     }
 }

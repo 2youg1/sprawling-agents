@@ -40,6 +40,10 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 const SPEC: &str = "crates/wire/wire-SPEC.md";
+/// The wire crate's directory, where `Spec.lean` decides whether the
+/// reach table is read from `SPEC` or from the Lean specification
+/// (xtask-SPEC.md section 8-43).
+const WIRE_CRATE: &str = "crates/wire";
 const WIRE_DIR: &str = "crates/wire/src";
 /// The package the city's one writer lives in, whose `src` is searched.
 /// A package rather than a file: the gate wants the declaration of
@@ -59,7 +63,7 @@ use crate::walk::CLIENT_SRC as CLIENT;
 /// Exhaustive rather than a pair of flags: a verb has exactly one way in,
 /// and two booleans would make "drawn and pushed" spellable when it is
 /// not a thing.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Reach {
     /// A person's verb. The client draws it and the city performs it.
     Client,
@@ -317,5 +321,27 @@ mod tests {
         // column, must not be read as verbs.
         assert!(Reach::parse("value").is_none());
         assert!(Reach::parse("").is_none());
+    }
+
+    /// Once the wire crate has a `Spec.lean`, the reach of each verb is an
+    /// arm of its `def Command.reach` (xtask-SPEC.md section 8-43).
+    #[test]
+    fn a_migrated_wire_specification_answers_the_reach_of_each_verb() {
+        let root = crate::root::fixture::relocated("wiring-lean");
+        crate::root::fixture::write(
+            &root,
+            "crates/wire/Spec.lean",
+            "/-! the reach -/\ndef Command.reach : Command → Reach\n  -- a person's verb\n  \
+             | .Pursue => .client\n  | .Hello => .handshake\n\ndef other := 1\n",
+        );
+        let read = declared(&root);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(
+            read.map_err(|err| err.to_string()),
+            Ok(std::collections::BTreeMap::from([
+                ("Hello".to_owned(), Reach::Handshake),
+                ("Pursue".to_owned(), Reach::Client),
+            ]))
+        );
     }
 }

@@ -100,6 +100,8 @@ struct Row {
 /// a structured file, and a name does not move when the file is reordered.
 pub(crate) struct Anchor {
     pub(crate) module: String,
+    /// The row's file, which says which package the row belongs to.
+    pub(crate) file: String,
     pub(crate) spec: String,
 }
 
@@ -125,6 +127,7 @@ pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
             .into_iter()
             .map(|row| Anchor {
                 module: row.module,
+                file: row.path,
                 spec: row.spec,
             })
             .collect(),

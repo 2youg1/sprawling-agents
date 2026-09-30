@@ -103,7 +103,7 @@ fn mismatch(at: &str, violation: String, alternative: &str) -> Violation {
 /// Every enum the kernel compiles, by name, with its variant names.
 /// Enums inside a `#[cfg(test)]` module are left out: a fixture enum is
 /// not part of the interface the SPEC settles.
-fn compiled(root: &Path) -> Result<BTreeMap<String, BTreeSet<String>>, XtaskError> {
+pub(super) fn compiled(root: &Path) -> Result<BTreeMap<String, BTreeSet<String>>, XtaskError> {
     let mut out = BTreeMap::new();
     for file in walk::files_with_ext(&root.join(KERNEL_SRC), &RUST)? {
         let text = walk::read_text(&file)?;

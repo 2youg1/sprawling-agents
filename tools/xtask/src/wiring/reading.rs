@@ -13,9 +13,13 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use super::{Reach, SPEC, WIRE_DIR};
+use super::{Reach, SPEC, WIRE_CRATE, WIRE_DIR};
+use crate::lean;
 use crate::report::XtaskError;
 use crate::walk;
+
+/// The `def` a migrated wire specification writes the reach table as.
+const REACH: &str = "Command.reach";
 
 /// The variants of an enum, read out of the source that declares it.
 ///
@@ -67,8 +71,55 @@ pub(super) fn variants(root: &Path, enum_name: &str) -> Result<Vec<String>, Xtas
     })
 }
 
-/// What the SPEC's reach table says, variant by variant.
+/// What the SPEC's reach table says, variant by variant: the arms of
+/// `def Command.reach` once the wire crate's specification is Lean, the
+/// Markdown table until then.
 pub(super) fn declared(root: &Path) -> Result<BTreeMap<String, Reach>, XtaskError> {
+    markdown_reach(root)
+}
+
+/// The arms of `def Command.reach`, each right-hand side one of the four
+/// reaches with a leading dot (xtask-SPEC.md section 8-43).
+///
+/// # Errors
+/// When no file holds the `def`, or an arm answers something that is not
+/// a reach: either would otherwise pass every verb unclassified.
+fn lean_reach(sources: &[lean::Source]) -> Result<BTreeMap<String, Reach>, XtaskError> {
+    let (path, table) = sources
+        .iter()
+        .find_map(|source| {
+            lean::arms(&lean::code(&source.text), REACH).map(|table| (&source.path, table))
+        })
+        .ok_or_else(|| XtaskError::Doc {
+            file: WIRE_CRATE.to_owned(),
+            msg: format!(
+                "no `def {REACH}` written one arm per line in the Lean specification; write it, \
+                 so every verb has a reach"
+            ),
+        })?;
+    table
+        .arms
+        .into_iter()
+        .map(|arm| {
+            let reach = arm
+                .value
+                .strip_prefix('.')
+                .and_then(Reach::parse)
+                .ok_or_else(|| XtaskError::Doc {
+                    file: format!("{path}:{}", arm.line),
+                    msg: format!(
+                        "`{}` answers `{}`, which is not one of .client, .push, .handshake, \
+                         .sealed",
+                        arm.pattern, arm.value
+                    ),
+                })?;
+            Ok((arm.pattern, reach))
+        })
+        .collect()
+}
+
+/// The reach table of the Markdown SPEC.
+fn markdown_reach(root: &Path) -> Result<BTreeMap<String, Reach>, XtaskError> {
     let text = walk::read_text(&root.join(SPEC))?;
     let mut out = BTreeMap::new();
     for line in text.lines() {
