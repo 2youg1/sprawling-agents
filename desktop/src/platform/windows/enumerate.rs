@@ -239,7 +239,41 @@ fn rectangle(handle: HWND) -> Result<Bounds, Refusal> {
     reason = "test code"
 )]
 mod tests {
+    use super::super::fixture::Opened;
     use super::*;
+
+    /// The contract desktop-SPEC.md section 8-11 holds this row to,
+    /// whichever interface answers it: a window this process opens is
+    /// listed once, by the title it was given, the file name of this
+    /// process, and the rectangle it occupies. The window sits off every
+    /// monitor, so the person at this desktop does not see it.
+    #[test]
+    fn a_window_this_process_opens_is_listed_by_its_title_process_and_bounds() {
+        let title = format!("sprawling contract enumerate {}", std::process::id());
+        let opened = Opened::at(&title, -20_000, -20_000, None);
+        let this_process = std::env::current_exe()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let listed: Vec<(Named, Bounds)> = desktop()
+            .unwrap()
+            .into_iter()
+            .filter(|window| window.named.title == title)
+            .map(|window| (window.named, window.bounds))
+            .collect();
+        assert_eq!(
+            listed,
+            vec![(
+                Named {
+                    title,
+                    process: this_process
+                },
+                opened.bounds()
+            )]
+        );
+    }
 
     /// What can be asserted on a machine with no desktop of its own —
     /// a build server, say — is that enumerating answers rather than

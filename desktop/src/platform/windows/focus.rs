@@ -182,6 +182,18 @@ fn wait_for(intended: Aim) {
 mod tests {
     use super::*;
 
+    /// The contract desktop-SPEC.md section 8-11 holds the hit test to,
+    /// whichever interface answers it: the window under a point is the
+    /// top-level window drawn there. The window is this test's own, kept
+    /// on top of every other and never given the keyboard.
+    #[test]
+    fn the_window_under_a_point_is_the_window_drawn_there() {
+        let title = format!("sprawling contract focus {}", std::process::id());
+        let opened = super::super::fixture::Opened::at(&title, 0, 0, None);
+        let centre = opened.bounds().centre().unwrap();
+        assert_eq!(under(centre), Aim(opened.address()));
+    }
+
     const NAMED: Aim = Aim(0x1000);
     const ANOTHER: Aim = Aim(0x2000);
 

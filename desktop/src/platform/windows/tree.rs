@@ -203,7 +203,31 @@ fn described(element: &IUIAutomationElement, level: u32, minted: usize) -> Optio
     reason = "test code"
 )]
 mod tests {
+    use super::super::enumerate;
+    use super::super::fixture::Opened;
     use super::*;
+
+    /// The contract desktop-SPEC.md section 8-11 holds the tree to,
+    /// whichever interface reads it: a window's tree starts at the window,
+    /// named by its title, and names the control inside it one level
+    /// down. Roles are not compared, because they are a word this server
+    /// chooses rather than a fact the window reports.
+    #[test]
+    fn a_windows_tree_names_the_control_inside_it() {
+        let title = format!("sprawling contract tree {}", std::process::id());
+        let _opened = Opened::at(&title, -20_000, -20_000, Some("Press"));
+        let window = enumerate::desktop()
+            .unwrap()
+            .into_iter()
+            .find(|window| window.named.title == title)
+            .unwrap();
+        let nodes = read(window.handle, 2).unwrap();
+        let named: Vec<(&str, u32)> = nodes
+            .iter()
+            .map(|node| (node.name.as_str(), node.depth))
+            .collect();
+        assert_eq!(named, vec![(title.as_str(), 0), ("Press", 1)]);
+    }
 
     /// A window that is not there has no tree, and that is a refusal
     /// naming a next step rather than a crash. This is the one thing

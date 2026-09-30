@@ -32,6 +32,15 @@ mod dpi;
 mod encode;
 mod enumerate;
 mod fault;
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod fixture;
 mod focus;
 mod geometry;
 mod keys;
