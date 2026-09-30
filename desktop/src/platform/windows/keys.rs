@@ -18,8 +18,12 @@
 //!
 //! The codes are Microsoft's own
 //! (<https://learn.microsoft.com/windows/win32/inputdev/virtual-key-codes>),
-//! written as their documented hexadecimal so a reader can check a row
-//! against that page without arithmetic.
+//! written as the names `winsafe` gives them, which are that page's names
+//! without the `VK_` prefix. A named constant rather than a number,
+//! because the event `super::act` builds takes a `co::VK`, and making
+//! one from a bare number is the one door into it that needs `unsafe`.
+
+use winsafe::co;
 
 use crate::refusal::{Refusal, RefusalCode};
 
@@ -52,12 +56,12 @@ impl Modifier {
         }
     }
 
-    pub(crate) fn code(self) -> u16 {
+    pub(crate) fn code(self) -> co::VK {
         match self {
-            Modifier::Ctrl => 0x11,
-            Modifier::Alt => 0x12,
-            Modifier::Shift => 0x10,
-            Modifier::Win => 0x5B,
+            Modifier::Ctrl => co::VK::CONTROL,
+            Modifier::Alt => co::VK::MENU,
+            Modifier::Shift => co::VK::SHIFT,
+            Modifier::Win => co::VK::LWIN,
         }
     }
 }
@@ -65,43 +69,43 @@ impl Modifier {
 /// Every key name, with the virtual-key code it is. Matched without
 /// regard to ASCII case, because `Enter` and `enter` are one key and a
 /// refusal over capitalisation teaches nothing.
-const TABLE: [(&str, u16); 36] = [
-    ("backspace", 0x08),
-    ("tab", 0x09),
-    ("enter", 0x0D),
-    ("escape", 0x1B),
-    ("space", 0x20),
-    ("pageup", 0x21),
-    ("pagedown", 0x22),
-    ("end", 0x23),
-    ("home", 0x24),
-    ("left", 0x25),
-    ("up", 0x26),
-    ("right", 0x27),
-    ("down", 0x28),
-    ("insert", 0x2D),
-    ("delete", 0x2E),
-    ("f1", 0x70),
-    ("f2", 0x71),
-    ("f3", 0x72),
-    ("f4", 0x73),
-    ("f5", 0x74),
-    ("f6", 0x75),
-    ("f7", 0x76),
-    ("f8", 0x77),
-    ("f9", 0x78),
-    ("f10", 0x79),
-    ("f11", 0x7A),
-    ("f12", 0x7B),
-    ("f13", 0x7C),
-    ("f14", 0x7D),
-    ("f15", 0x7E),
-    ("f16", 0x7F),
-    ("f17", 0x80),
-    ("f18", 0x81),
-    ("f19", 0x82),
-    ("f20", 0x83),
-    ("f21", 0x84),
+const TABLE: [(&str, co::VK); 36] = [
+    ("backspace", co::VK::BACK),
+    ("tab", co::VK::TAB),
+    ("enter", co::VK::RETURN),
+    ("escape", co::VK::ESCAPE),
+    ("space", co::VK::SPACE),
+    ("pageup", co::VK::PRIOR),
+    ("pagedown", co::VK::NEXT),
+    ("end", co::VK::END),
+    ("home", co::VK::HOME),
+    ("left", co::VK::LEFT),
+    ("up", co::VK::UP),
+    ("right", co::VK::RIGHT),
+    ("down", co::VK::DOWN),
+    ("insert", co::VK::INSERT),
+    ("delete", co::VK::DELETE),
+    ("f1", co::VK::F1),
+    ("f2", co::VK::F2),
+    ("f3", co::VK::F3),
+    ("f4", co::VK::F4),
+    ("f5", co::VK::F5),
+    ("f6", co::VK::F6),
+    ("f7", co::VK::F7),
+    ("f8", co::VK::F8),
+    ("f9", co::VK::F9),
+    ("f10", co::VK::F10),
+    ("f11", co::VK::F11),
+    ("f12", co::VK::F12),
+    ("f13", co::VK::F13),
+    ("f14", co::VK::F14),
+    ("f15", co::VK::F15),
+    ("f16", co::VK::F16),
+    ("f17", co::VK::F17),
+    ("f18", co::VK::F18),
+    ("f19", co::VK::F19),
+    ("f20", co::VK::F20),
+    ("f21", co::VK::F21),
 ];
 
 /// The spellings this table also answers to, each pointing at the row
@@ -120,7 +124,7 @@ const ALIASES: [(&str, &str); 5] = [
 /// # Errors
 /// Refuses a name this table does not hold, listing every name it does.
 /// A model that guessed once will otherwise guess again.
-pub(crate) fn code(named: &str) -> Result<u16, Refusal> {
+pub(crate) fn code(named: &str) -> Result<co::VK, Refusal> {
     let lowered = named.to_ascii_lowercase();
     let canonical = ALIASES
         .iter()
@@ -165,7 +169,7 @@ mod tests {
 
     #[test]
     fn every_name_in_the_table_presses_something_and_no_two_share_a_code() {
-        let mut seen: Vec<u16> = Vec::new();
+        let mut seen: Vec<co::VK> = Vec::new();
         for (name, expected) in TABLE {
             assert_eq!(code(name).unwrap(), expected, "{name}");
             assert!(!seen.contains(&expected), "{name} repeats a code");
@@ -181,7 +185,7 @@ mod tests {
         assert_eq!(code("Enter").unwrap(), code("enter").unwrap());
         assert_eq!(code("ENTER").unwrap(), code("return").unwrap());
         assert_eq!(code("Esc").unwrap(), code("escape").unwrap());
-        assert_eq!(code("F5").unwrap(), 0x74);
+        assert_eq!(code("F5").unwrap(), co::VK::F5);
         for (spelling, row) in ALIASES {
             assert_eq!(code(spelling).unwrap(), code(row).unwrap(), "{spelling}");
         }
@@ -228,7 +232,7 @@ mod tests {
         );
         // Four modifiers, four distinct codes: two that shared one
         // would hold down the wrong key and nothing would say so.
-        let mut codes: Vec<u16> = [
+        let mut codes: Vec<co::VK> = [
             Modifier::Ctrl,
             Modifier::Alt,
             Modifier::Shift,

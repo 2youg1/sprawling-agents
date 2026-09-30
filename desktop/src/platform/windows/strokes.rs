@@ -14,6 +14,7 @@
 //! stroke into the event Win32 wants and sends the batch.
 
 use windows::Win32::UI::WindowsAndMessaging::WHEEL_DELTA;
+use winsafe::co;
 
 use super::geometry::Point;
 use super::keys::Modifier;
@@ -30,7 +31,7 @@ pub(crate) enum Action {
     Drag { from: Point, to: Point },
     Scroll { at: Point, notches: i32 },
     Type { text: String },
-    Key { code: u16 },
+    Key { code: co::VK },
 }
 
 impl Action {
@@ -78,7 +79,7 @@ pub(crate) enum Motion {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Stroke {
     /// A virtual key.
-    Key { code: u16, edge: Edge },
+    Key { code: co::VK, edge: Edge },
     /// One UTF-16 unit typed as itself, whatever the keyboard layout.
     Unicode { unit: u16, edge: Edge },
     /// The pointer at an absolute place on the virtual screen.
@@ -251,7 +252,7 @@ pub(crate) fn left_held(strokes: &[Stroke], accepted: usize) -> Vec<Stroke> {
 /// was, which is where the desktop still has it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Held {
-    Key(u16),
+    Key(co::VK),
     Unicode(u16),
     Left,
     Right,
@@ -360,7 +361,12 @@ mod tests {
                 },
             ]
         );
-        assert_eq!(counted(&Action::Key { code: 0x0D }), 2);
+        assert_eq!(
+            counted(&Action::Key {
+                code: co::VK::RETURN
+            }),
+            2
+        );
     }
 
     /// One character is one press and one release, so a string is
@@ -399,7 +405,13 @@ mod tests {
             .lands_at(),
             None
         );
-        assert_eq!(Action::Key { code: 0x0D }.lands_at(), None);
+        assert_eq!(
+            Action::Key {
+                code: co::VK::RETURN
+            }
+            .lands_at(),
+            None
+        );
     }
 
     /// A modifier is pressed before the action and released after it,
@@ -407,18 +419,20 @@ mod tests {
     /// hand does and what an application watching the order expects.
     #[test]
     fn modifiers_wrap_the_action_and_come_off_in_the_reverse_order() {
-        let key = |code: u16, edge: Edge| Stroke::Key { code, edge };
+        let key = |code: co::VK, edge: Edge| Stroke::Key { code, edge };
         assert_eq!(
             of(
-                &Action::Key { code: 0x0D },
+                &Action::Key {
+                    code: co::VK::RETURN
+                },
                 &[Modifier::Ctrl, Modifier::Shift]
             )
             .unwrap(),
             vec![
                 key(Modifier::Ctrl.code(), Edge::Down),
                 key(Modifier::Shift.code(), Edge::Down),
-                key(0x0D, Edge::Down),
-                key(0x0D, Edge::Up),
+                key(co::VK::RETURN, Edge::Down),
+                key(co::VK::RETURN, Edge::Up),
                 key(Modifier::Shift.code(), Edge::Up),
                 key(Modifier::Ctrl.code(), Edge::Up),
             ]
@@ -430,16 +444,18 @@ mod tests {
     /// the keys, not the rest of the action.
     #[test]
     fn a_batch_cut_short_leaves_nothing_held_that_it_pressed() {
-        let key = |code: u16, edge: Edge| Stroke::Key { code, edge };
+        let key = |code: co::VK, edge: Edge| Stroke::Key { code, edge };
         let all = of(
-            &Action::Key { code: 0x0D },
+            &Action::Key {
+                code: co::VK::RETURN,
+            },
             &[Modifier::Ctrl, Modifier::Shift],
         )
         .unwrap();
         assert_eq!(
             left_held(&all, 3),
             vec![
-                key(0x0D, Edge::Up),
+                key(co::VK::RETURN, Edge::Up),
                 key(Modifier::Shift.code(), Edge::Up),
                 key(Modifier::Ctrl.code(), Edge::Up),
             ]
