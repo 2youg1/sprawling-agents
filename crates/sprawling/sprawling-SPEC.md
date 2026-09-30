@@ -1045,6 +1045,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **不从别的工具的配置里读 provider 表（人的决定）**。`bin::import` 的五个文件读 Codex 的 `~/.codex/config.toml` 与 pi 的 `models.json`，把其中的 provider 折成本城的词汇；但没有任何 `mod` 声明过它们，所以它们从没被编译，clippy 与测试也从没看过它们，模块图却把它们记为 built。本城删去这五个文件，首次上手的第 1 步由人手填端点，或选一个已知主机。理由：没有调用点的代码是一份没人维护的第二文法，它记下的 Codex 与 pi 键名会随上游改版静默过时。**被否**：接上它，作为首次上手第 1 步「从别的工具已写好的配置读入」的候选来源——那要在 wire 上加一条 Query、在设置页加一行，属于线协议与页面的改动，本版不做。**重开参数**：首次上手要给出「别的工具已配置的 provider」这一步时，从 git 历史取回这两种文法，先在 `lib.rs` 声明模块，让测试与 clippy 看见它们，再接 Query。
 
+**`view` 在终端前给每一行标上它的链哈希，不加字段，也不给 agent 看**（8-105、8-117）。人要一个能记下来、以后拿来对照某一行的值，账本每一行已经有一个：`kernel::ledger::chain_hash` 对这一行规范字节算出的 BLAKE3，下一行的 `prev` 存的就是它，它覆盖整行，`t` 与载荷都在内。在载荷里或旁边再存一份同源的哈希，就是同一件事有两个权威。哈希从盘上的字节现算：一行一次 BLAKE3，比解析这一行便宜，交互界面又只给屏上的行算，四十万行的账本也不多付。谁要哈希仍按 8-105 决定 1 的 TTY 规则分：管道与文件里仍是账本原行，agent 解析的字节不变。哈希放在行前而不是行后，因为定宽的一列在终端折行后仍然对齐，而交互界面按栏宽截行，行后的哈希根本画不出来；列表只放前 12 位，因为 64 位会在半屏宽的列表里挤掉整行，完整的值在详情栏第一行。12 位是 48 bit，四十万行里出现一对同前缀的行的机会约为万分之三，所以前缀只用来凭眼睛找行，要记下来就用完整的值。**被否掉的**：每行后面接哈希，理由见上；`Row` 在折叠时就带上哈希，整遍折叠要给每一行多算一次、多存 32 字节，而人一次只看一屏；加一个 `--hash` 参数，人坐在终端前就要哈希，参数只是让人多敲一次。条件变了就重议：常见的 agent 宿主改在伪终端里跑命令、并解析 `view` 的输出时，TTY 就分不开两个主人，那时改为显式参数。
+
 ## 13 依赖选型
 
 依赖以 `crates/sprawling/Cargo.toml` 为准；每个依赖旁的注释写它为哪一节而在。
@@ -3849,7 +3851,11 @@ pub(super) fn written(err: &AxError, form: Form) -> String;
 // bin::main::view
 pub(super) fn verb(read: &Arguments) -> ExitCode;
 pub(super) struct Selection { tail: Option<usize>, from: Option<Seq>, run: Option<RunId>, kind: Option<EventKind>, who: Option<String>, grep: Option<String> }
-pub(super) fn write_records(dir: &Path, chosen: &Selection, out: &mut impl Write) -> Result<(), ViewError>;
+pub(super) enum Audience { Agent, Person }  // 谁读 stdout：管道或文件后面的 agent，终端前的人
+pub(super) fn write_records(dir: &Path, chosen: &Selection, audience: Audience, out: &mut impl Write) -> Result<(), ViewError>;
+enum HashWidth { Whole, Glance }             // 64 位，或前 GLANCE_DIGITS 位
+const GLANCE_DIGITS: usize;                  // 12
+fn chain_label(line: &[u8], width: HashWidth) -> String; // 十六进制位，后接两个空格
 // sprawling::lineage
 pub struct RunLine { run, addr, session, parent, forked_at, predecessor, first_seq, last_seq, state, unanswered }
 pub struct Lineage;                       // fold：apply(&EventRecord) -> Result<(), AxError>
@@ -3858,6 +3864,8 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 ```
 
 **`records` 透镜（非终端时的输出）。** 输出账本原行，逐字节相同，每行一个 `\n`，按 seq 升序。条件同时成立才选中：`--from <seq>`（含）、`--run <id>`（走 `LedgerIndex::run_seqs_before`，不读别的 run 的行）、`--kind <k>`（信封的 `kind`）、`--who <addr前缀>`（信封 `addr` 以它开头；没有 `addr` 的行不中）、`--grep <子串>`（原行按字节含这个子串，不是正则，glossary 的搜索规则）。`--tail N` 最后作用：只留选中的最后 N 行，从尾部倒着找，找够就停。信封只借用解析 `run`、`kind`、`addr` 三个字段。
+
+**终端前的 `records` 透镜。** 谁读 stdout 只在 `verb` 里判一次（`Audience::of_stdout`）：stdout 是终端就是 `Person`，否则是 `Agent`。`Person` 而命令行一个过滤参数都没带时进 8-117 的交互界面；带了过滤参数，`write_records` 按上一段的规则选行，每个选中的行写成：这一行的链哈希、两个空格、原行、一个 `\n`。链哈希是 `kernel::ledger::chain_hash` 对这一行在盘上的字节（不含行尾 `\n`）算出的 BLAKE3，64 位小写十六进制；链完好时它就是下一行的 `prev`。`view` 不核对链，打出来的只是这行字节的哈希，链断没断由 `sprawling replay` 核对。哈希前缀与两个空格只由 `chain_label` 写出，交互界面的列表调同一个函数，只取前 `GLANCE_DIGITS` 位（8-117）。`Agent` 时的输出与上一段逐字节相同。测试不经过终端，直接把 `Audience` 交给 `write_records`。
 
 **`--runs`（`tree` 透镜给 agent 的画法）。** 每个 run 一行 JSON：`run`、`addr`、`session`、`parent`、`forked_at`、`predecessor`、`first_seq`、`last_seq`、`state`、`unanswered`，按 `first_seq` 升序。`parent` 是 `run_forked.from`，没有分叉记录时是 `run_started.parent`；`forked_at` 是 `run_forked.at_seq`；`predecessor` 是 `run_started.predecessor`；`session` 是这个 run 开始前、同一地址上最近一条 `session_opened` 的 seq（这段 stretch 的名字），没有就是 `null`。`state` 取自 `storage::HotView` 的 `RunPhase`（`active`、`frozen`），与 Views 的 run 列表同一份折叠，不另算。`unanswered` 是这个 run 提出、还没有 `approval_resolved` 答复的 `approval_requested` 条数：请求按它的 `id` 记在提出它的 run 名下，答复按同一个 `id` 销掉，不管答复落在哪个 run 上；两种记录的 payload 都经 kernel 的类型读（`ApprovalItem`、`ApprovalResolved`），读不了就拒，与 `views::governance` 同一条规则（8-74）。父指针都在行里，agent 不需要第二次查询就能拼出树。
 
@@ -4318,7 +4326,7 @@ kernel-SPEC 8-74 的 `degradation::admit_work` 判定卷低于地板时不接新
 **本节接口的当前状态。** `Wake` 等不经人的入口尚未接入；事实条与 doctor 尚不显示降级；盘慢、内存紧、CPU 被占满三种状态还没有生产的读数（kernel-SPEC 8-74）。
 ## 8-117 `sprawling view`：给人的一面（`bin::main::view::keys`、`bin::main::view::arrange`、`bin::main::view::rounds`、`bin::main::view::frame`、`bin::main::view::detail`、`bin::main::view::follow`、`bin::main::view::terminal`）
 
-**形状。** 五个纯模块，不碰终端也不碰盘。`keys` 是 decision：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`rounds` 是 projection：把一个 run 在 `records` 里的行经 `sprawling::turns`（`views::rounds::turns` 的公开投影，与 Views 的回合页同一份折叠）折成回合，再把回合与其中的调用排成那个 run 下面的 `Entry`。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。`follow` 是 adapter：`open` 经 `storage::TailLines` 只读账本最新的 `FIRST_WINDOW_LINES` 行，折出窗口里的 lineage 与 `records` 行，同时在一条后台线程上跑整遍的 `LedgerIndex::rebuild` 与 lineage 折叠；`poll` 在整遍折完之前只看它到了没有，到了就交出整份（`Polled::Filled`），此后持有常驻的 `LedgerIndex` 与 lineage，只折上次之后追加的行（`Polled::Appended`）。`terminal` 是 adapter：stdout 是终端且没有任何过滤参数时，`view` 用 `follow` 读城，进 raw 模式与备用屏，读键、调 `apply`、画 `frame()`，退出时无论成败都把终端还原。它不做任何决定。`list` 是 projection：哪些树行可见、每行标什么、滚到光标可见的那一屏。尚未做的：T8–T12 的 `ttyprobe` 验收。
+**形状。** 五个纯模块，不碰终端也不碰盘。`keys` 是 decision：一个按键对应哪个 `Action`。`arrange` 是 projection：把 `sprawling::lineage` 的 `RunLine` 排成一棵树，按显示顺序平铺成 `Entry`，每个 `Entry` 记着深度和父的下标。`rounds` 是 projection：把一个 run 在 `records` 里的行经 `sprawling::turns`（`views::rounds::turns` 的公开投影，与 Views 的回合页同一份折叠）折成回合，再把回合与其中的调用排成那个 run 下面的 `Entry`。`frame` 是 state machine：`Face` 持有两个透镜共用的选中物、展开集合与详情模式，`apply(Action)` 改状态，`frame()` 按当前尺寸画出一帧文本行。`detail` 是 projection：任何记录都画成同一种缩进 JSON 树。`follow` 是 adapter：`open` 经 `storage::TailLines` 只读账本最新的 `FIRST_WINDOW_LINES` 行，折出窗口里的 lineage 与 `records` 行，同时在一条后台线程上跑整遍的 `LedgerIndex::rebuild` 与 lineage 折叠；`poll` 在整遍折完之前只看它到了没有，到了就交出整份（`Polled::Filled`），此后持有常驻的 `LedgerIndex` 与 lineage，只折上次之后追加的行（`Polled::Appended`）。`terminal` 是 adapter：stdout 是终端且没有任何过滤参数时，`view` 用 `follow` 读城，进 raw 模式与备用屏，读键、调 `apply`、画 `frame()`，退出时无论成败都把终端还原。它不做任何决定。`list` 是 projection：哪些树行可见、每行标什么、滚到光标可见的那一屏，以及账本透镜落在这一屏上的行。尚未做的：T8–T12 的 `ttyprobe` 验收。
 
 ```rust
 // bin::main::view::keys
@@ -4333,6 +4341,7 @@ pub(super) fn arrange(runs: &[RunLine], rounds: &Rounds) -> Vec<Entry>;
 pub(super) fn visible(entries: &[Entry], expanded: &BTreeSet<usize>) -> Vec<usize>;
 pub(super) fn tree_lines(entries: &[Entry], shown: &[usize], expanded: &BTreeSet<usize>, rounds: &Rounds) -> Vec<String>;
 pub(super) fn scrolled(lines: Vec<String>, cursor: usize, rows: usize) -> Vec<String>;
+pub(super) fn record_lines(records: &[Row], cursor: usize, rows: usize) -> Vec<String>; // 只给这一屏的行算哈希
 // bin::main::view::rounds
 pub(super) type Rounds = BTreeMap<RunId, Result<Vec<wire::Turn>, AxError>>;
 pub(super) fn fold(run: RunId, rows: &[Row]) -> Result<Vec<wire::Turn>, AxError>;
@@ -4366,7 +4375,7 @@ impl Follow {
 }
 // bin::main::view::detail
 pub(super) fn json_lines(value: &serde_json::Value) -> Vec<String>;
-pub(super) fn line_lines(line: &str) -> Vec<String>; // 不是 JSON 的行画成一个字符串
+pub(super) fn line_lines(line: &str) -> Vec<String>; // 第一行 chain_hash，其后是 JSON 树；不是 JSON 的行画成一个字符串
 // bin::main::view::terminal
 pub(super) fn show(dir: &Path) -> Result<(), ViewError>;
 ```
@@ -4383,7 +4392,7 @@ pub(super) fn show(dir: &Path) -> Result<(), ViewError>;
 
 **跟随。** 查看器开着时，`terminal` 等键最多 `FOLLOW_TICK`（100 ms）；没等到就 `poll` 一次：`LedgerIndex::refresh` 说没变就什么都不做，有追加就把新行折进 lineage 并交给 `Face::follow`。所以服务中的城里新开的 run 最迟一个 tick 加一次折叠之后出现在树上，远在 250 ms 之内。`Face::follow` 换上新的树、把新行接到 `records` 末尾，并保持：选中的仍是同一个节点（按 `NodeKey` 找回；它不在了就是城），展开过的仍展开，此前不在树上的 run 展开它的祖先，让人看得见它。账本行的光标不动。
 
-**帧。** 宽度 ≥ `SIDE_PANE_MIN_WIDTH`（110 列）时右侧常驻详情栏，左右各占一半，中间一列 `|`；窄时只画当前透镜，`Enter` 进全屏详情。全屏详情在任何宽度下都占满整屏。每行按字符截到栏宽；光标行以 `>` 开头；列表滚动到光标恰好可见。树行是缩进 + `+`（有子、折叠）/`-`（展开）/空格 + 标签；还没折过回合的 run 也标 `+`，因为它有没有回合要到第一次展开时才知道（决定 6），标空格会告诉人那里什么都没有；账本行是原行。详情对 run 节点画 `RunLine::to_json()`，对账本行画解析后的 JSON，解析不了就画原文字符串。
+**帧。** 宽度 ≥ `SIDE_PANE_MIN_WIDTH`（110 列）时右侧常驻详情栏，左右各占一半，中间一列 `|`；窄时只画当前透镜，`Enter` 进全屏详情。全屏详情在任何宽度下都占满整屏。每行按字符截到栏宽；光标行以 `>` 开头；列表滚动到光标恰好可见。树行是缩进 + `+`（有子、折叠）/`-`（展开）/空格 + 标签；还没折过回合的 run 也标 `+`，因为它有没有回合要到第一次展开时才知道（决定 6），标空格会告诉人那里什么都没有。账本行是这一行链哈希的前 `GLANCE_DIGITS`（12）位、两个空格、原行，前缀由 8-105 的 `chain_label` 写出。`record_lines` 先按 `scrolled` 的同一个公式定出这一屏从哪一行起，只给这一屏的行算哈希，所以一帧的代价跟屏高走，不跟账本长度走。哈希按 `Row.line` 的字节算：`follow` 只收解析成功的行，JSON 必是 UTF-8，`Row.line` 的字节与盘上一致；`Row` 以后若收未解析的行，哈希要改为从原字节算。详情对 run 节点画 `RunLine::to_json()`；对账本行先画一行 `chain_hash: <64 位十六进制>`，再画解析后的 JSON，解析不了就画原文字符串。
 
 **决定。**
 
