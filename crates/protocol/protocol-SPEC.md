@@ -292,4 +292,4 @@ pub enum StopReason { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
 - **`prompt` 在对方答出 `StopReason` 时返回**；读到输入结束而没有答，是 `E_PROVIDER` 并标 `Retry::Unknown`：对方也许已经做了事。`StopReason` 未知的词拒而不猜。
 - **测试走同一扇门**：`AcpSession` 对任何 `BufRead + Write` 成立，测试用一条线程在内存管道另一头扮演 agent，不另立 trait。
 
-**尚未做到的（本节接口的当前状态）**：一个 harness 居民的 run——派活到这样的居民时起它的进程、在房间的 worktree 里开会话、把 `Update` 写进账本、把 `Halt` 译成 `session/cancel`、confidential 楼拒绝构造它、经 `session/new` 的 `mcpServers` 把城的工具交给它——还没有接线。它先在 `adversary/design/` 用 Lean 建模「汇报过的效果不进准入历史」，再写 sprawling-SPEC 的一节，再接线；在那之前，设置页的 harness 页只说明五家在这台电脑上够不够得着、怎么起、去哪里登录。
+**尚未做到的（本节接口的当前状态）**：一个 harness 居民的 run 还没有接线：派活到这样的居民时起它的进程、在房间的 worktree 里开会话、把 `Update` 写进账本、把停摆译成 `session/cancel`、confidential 楼拒绝构造它。它必须守住的性质已在 `adversary/design/HarnessRun.lean` 证明，已定与未定的设计写在 sprawling-SPEC §8-4e；本 crate 在那里还欠两样：起进程的那一半，以及 `session/cancel` 这一条通知。在接线之前，设置页的 harness 页只说明五家在这台电脑上够不够得着、怎么起、去哪里登录。

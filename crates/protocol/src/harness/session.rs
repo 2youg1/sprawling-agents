@@ -18,6 +18,10 @@
 //! records a harness and never governs it. A request this client never
 //! advertised (`fs/*`, `terminal/*`) is answered `-32601` rather than
 //! left unanswered, which would hang the agent.
+//!
+//! What a run over this session must keep - a report is never admitted
+//! history, a halt is a cancel before anything else, a frozen run emits
+//! nothing - is proved in `adversary/design/HarnessRun.lean`.
 
 use std::io::{BufRead, Write};
 use std::path::Path;
