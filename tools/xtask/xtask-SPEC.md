@@ -31,7 +31,7 @@
 | docnum | 文档里的数字由 `docnum::FACTS` 生成并由 `--write` 回写；区段陈旧、事实未知、标记不闭合各自即红（§8-16） |
 | wire-ts | `client/src/wire.ts` 由 `wire::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH`、`CITY_RUN`（§8-21）与 `BODY_PX`（§8-36）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
 | gates（命令） | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；聚合报告，任一违规即退出码 1（§12 第 2 条） |
-| spec（命令） | 生成 `<名>-SPEC.md` 骨架，写进那个包的目录；名字是包的 lib 名，没有 lib 的包用包名（`just spec`，§8-39） |
+| spec（命令） | 在那个包的目录下新建 `Spec.lean` 骨架；名字是包的 lib 名，没有 lib 的包用包名（`just spec`，§8-39、§8-41） |
 | members（命令） | 包在哪：`--owning` 答一组路径属于哪些工作区包，`--dir` 答一个包住在哪个目录；`justfile` 用它，不再从路径里推包名（§8-39） |
 | apisync（命令） | 不在门名册里：`cargo xtask apisync` 只判两条跨 crate 的缝 kernel 与 wire 的基线是否新鲜——用 `tools/xtask/public-api.txt` 钉住的渲染器算出实时面，与已提交基线逐行比对；夜间作业跑它（§8-32、§12-6） |
 
@@ -184,7 +184,7 @@ serde 与 serde_json（cargo metadata 解析；工作区已钉）；toml（`lexi
 
 行数与参数预算都**不**硬编码在门里，它们是 `tools/xtask/budgets.toml` 的行（`[function_length]`、`[argument_count]` 与 `[file_length]`，后者带子表 `[file_length.predating]`）——那份登记表持着设计所声明的每一项预算，包括非字节的（百分比、毫秒）。数字的来历写在那一行的注释里；改它是门机械的改动，与被判源码分开提交。
 
-MPL 头四行（通告三行加版权一行，`header::EXPECTED`），判据是「整份文件只出现一次」而不是「前四行相等」——只比前四行时，一个由两份文件拼起来的模块可以带着第二份头与半段属于别处的 rustdoc 过关；门机械的路径清单（`tools/xtask/`、`.github/`、`deny.toml`、`Cargo.toml`、`rust-toolchain.toml`、`clippy.toml`、`justfile`）；`boundary` 的 `FUZZ`（`tools/fuzz/` 自成一个工作区，不是任何包的成员或依赖，`members` 看不见它，故以一个具名常量写明它整个是测试代码）；两份数据文件的仓库相对路径 `budget::REGISTER` 与 `lexicon::PATH`，拼路径与报错都用这两个常量；模块状态四值。各随其权威变更而改。
+MPL 头四行（通告三行加版权一行）的文字只写在 `header::NOTICE`，不带注释引导符；`header::notice(Leader)` 按 Rust 的 `//` 或 Lean 的 `--` 拼出整行，`header` 门与 `spec` 骨架都从这里取；判据是「整份文件只出现一次」而不是「前四行相等」——只比前四行时，一个由两份文件拼起来的模块可以带着第二份头与半段属于别处的 rustdoc 过关；门机械的路径清单（`tools/xtask/`、`.github/`、`deny.toml`、`Cargo.toml`、`rust-toolchain.toml`、`clippy.toml`、`justfile`）；`boundary` 的 `FUZZ`（`tools/fuzz/` 自成一个工作区，不是任何包的成员或依赖，`members` 看不见它，故以一个具名常量写明它整个是测试代码）；两份数据文件的仓库相对路径 `budget::REGISTER` 与 `lexicon::PATH`，拼路径与报错都用这两个常量；模块状态四值。各随其权威变更而改。
 
 `docnum` 的两个标记文本（两句 HTML 注释，内容分别是 `xtask:begin <fact>` 与 `xtask:end`）硬编码在 `docnum.rs`，因为它们是文档与门之间的语法本身，没有第二个读者；改它们要把树上全部受管区段同集改掉。**事实清单不硬编码在任何文档里**：它是 `docnum::FACTS` 那张数组。带冒号的键（`dep_version:toml`、`budget_reading:frontend_artifact`）把参数写在文档里，故一个生成器服务一族事实，而不是一族事实各占一行。
 
@@ -830,7 +830,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>; /
 | `proof` | `in_product_graph` 的包；`cargo kani -p` 取 `package` |
 | `boundary` | 一个文件归哪个包，那个包是什么角色 |
 | `apisync` | `SEAM_CRATES` 写 lib 名，经 `find` 取那个包的 `package` 作 `-p` |
-| `spec` | 参数经 `find` 找包，骨架写进它的 `dir`，文件名取参数 |
+| `spec` | 参数经 `find` 找包，`Spec.lean` 骨架写进它的 `dir` |
 | `unused`、`docnum` 的逐包计数 | 全部包的目录 |
 | `justfile` 的 `check-branch` 与 `branch-tests` | `members` 子命令 |
 
@@ -871,5 +871,34 @@ pub(crate) fn parse_block(text: &str) -> Result<BTreeMap<String, BTreeSet<String
 **判据**：它是 docnum 的一个事实，判据就是 §8-16 那三条：区段不等于读数即红，恢复语 `cargo xtask docnum --write`。一次改名、搬目录、加一条依赖边或改一句 duty，同集跑一次 `--write`。
 
 **败给的方案**：README 里手写这张表（第三份职责清单，下一次改名就会漏改一格）；按 `crates/*` 的目录列行（包在哪已收成 `members` 一处，按目录推导就退回了 §8-39 要拆掉的那种读者）。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-41 `spec`：给一个 crate 新建 `Spec.lean` 骨架（形状 2 值）
+
+`cargo xtask spec <lib>`（`just spec <lib>`）在 `members` 给出的该包目录下新建 `Spec.lean`：开头是 Lean 注释形式的 MPL 头四行，接着一段写明 crate 名的模块文档，然后是 `skills/sdd` 的十七节，每节一个编号的 section comment（`/-! ## <n> <标题>`），标题依次是：需求分解、验收标准、假设与歧义、现状分析、权威信源、命名统一、模块边界、接口先行、工作流程、实现逻辑、边界枚举、错误处理、依赖选型、硬编码声明、影响面、测试与约束、文档关系。
+
+```rust
+// xtask::spec
+pub(crate) fn run(root: &Path, lib: Option<&str>) -> Result<String, XtaskError>;
+fn skeleton(lib: &str) -> String;            // 纯函数：骨架全文
+const SECTIONS: [&str; 17];                  // 十七节的中文标题，按 sdd 的次序
+// xtask::header
+pub(crate) const NOTICE: [&str; 4];          // MPL 通告三行加版权一行，不带注释引导符
+pub(crate) enum Leader { Rust, Lean }        // `//` 与 `--`
+pub(crate) fn notice(leader: Leader) -> [String; 4];
+```
+
+- **只新建，不覆盖**：目录里已有 `Spec.lean` 时原样留下，答 `already exists, left untouched: <path>`。骨架之外的每一行都是施工者写下的规格，重写就会抹掉决定。
+- **不看 `<lib>-SPEC.md` 在不在**：迁移中的 crate 先有候选 `Spec.lean`，旧 SPEC 在同一个 change-set 里删除（`skills/sdd` 迁移第 4、5 步）。「一个 crate 只有一份生效规格」不由生成器判。
+- **不再生成 Markdown SPEC**：新 crate 从 `Spec.lean` 起步；尚未迁移的 `<lib>-SPEC.md` 由人改，迁移时整份换掉。
+- **骨架只有标题，没有每节该写什么**：每节写什么由 `skills/sdd` 规定，抄进骨架就是第二份定义。旧 Markdown 的 §8.5、§12、§17、§18 迁到哪里，由 ARCHITECTURE.md §11「Specifications in Lean」规定。
+- **头四行只有一处文字**：`header::NOTICE` 不带注释引导符，`notice(Leader::Rust)` 给 `header` 门，`notice(Leader::Lean)` 给骨架。Lean 文件的头由哪道门判，不在本节。
+
+**失败**：缺 `<lib>` 时 `XtaskError::Doc`（`usage: cargo xtask spec <lib>`）；members 里没有这个 lib 时沿用 `members::find` 的 `unknown-package`；写盘失败 `XtaskError::Io { path }`。
+
+**测试**：`spec::tests::the_skeleton_opens_with_the_notice_and_numbers_the_seventeen_sections_in_order`：骨架前四行等于 `header::notice(Leader::Lean)`，以 `/-! ## ` 开头的行依次编号 1 到 17。`spec::tests::a_relocated_package_gets_its_spec_skeleton_in_its_own_directory`：骨架落在 `members` 给的目录里。骨架能被 Lean 编译，由生成一份、`lake build Spec`、再删掉来确认，不写成测试。
+
+**败给的方案**：生成器照旧写 Markdown，由迁移者手转 Lean——十七节的 Lean 形式就没有一处权威，每个迁移者各写一种。
 
 **本节属门禁机具，与产品代码分开提交。**

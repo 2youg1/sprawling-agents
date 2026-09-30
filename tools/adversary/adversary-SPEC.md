@@ -21,7 +21,7 @@
 
 **不负责**：任何规则的再实现（链哈希、`IdemKey` 派生、写域判定、份额守恒）；任何 Rust 侧的构建闸门；任何随产品交付的东西。三者中任何一条被违反，本目录应当被删除而不是被修补。
 
-**`design/` 不是检验器的一部分。** 它是另一个 `lean_lib`（`Design`），放 Rust 模块的设计模型：每个模型写明它规定的 Rust 模块，证明那个模块必须守住的性质，而不去驱动二进制。它借用本目录的工具链，不借用本目录的职责——`Sprawling` 库不 import 它，于是检验器依旧不含任何规则的再实现。`lake build Design` 证明它们；`just adversary` 不碰它们。
+**本目录只有检验器。** 规定某个 Rust 模块必须守住哪些性质的 Lean 模型住在该 crate 的 `spec/` 下（ARCHITECTURE.md §11「Specifications in Lean」），由 `just models` 证明。Lean 包的三个文件（`lakefile.toml`、`lean-toolchain`、`lake-manifest.json`）在仓库根，本目录是其中两个目标：`Sprawling` 库（`src/`）与 `adversary` 可执行文件（`test/`）。它们只 import `Sprawling.*` 与 Lean 工具链自带的库，不 import 任何规格，所以检验器里没有任何规则的再实现；`just adversary` 与夜间任务构建它们，`just models` 不碰它们。
 
 **U6 是本目录相对一次性 CLI 检验器的增量**，理由在产品而不在方法：一座城把**一条全序的历史**写在磁盘上，于是「任意轨迹之后历史仍然自洽」是一条可以对着随机轨迹反复问的性质，而不只是一次定点检查。
 
@@ -30,7 +30,7 @@
 1. `just adversary` 全绿：树里每一条检查都通过，`0 failed`。**条数没有第二个家**——它是 `test/Main.lean` 的叶子数，今天 23 条。
 
    **曾经不是全绿**：U7 的五条里有三条红（等价类一条、上限两条），红在产品而不在检查。两处修复都落在 `crates/` 下——`Entered::resolved` 成为打字地址变成被调用地址的唯一一处，`select_model` 经 `OutputCeiling::resolve` 取上限——三条随之转绿（实测见 §4 第四、第五个发现）。反例按 §9 第 4 步渲染进 `crates/sprawling/tests/from_adversary.rs`，本目录不再留着它们。
-2. 没有 Lean 的机器上 `just check` 的行为与本目录不存在时**逐字节相同**；`just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
+2. `just check` 不读本目录的任何文件：删掉 `tools/adversary/` 后 `just check` 的每一步不变。没有 Lean 的机器上 `just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
 3. 模型不预测任何哈希、`seq`、时间戳或 `IdemKey`。凡断言只谈**两条轨迹之间的关系**，或**门对调用方的承诺**（稳定错误码）。
 4. U5 渲染出的 Rust 源码与 `crates/sprawling/tests/from_adversary.rs` 逐字节相同。渲染器是那个文件的唯一权威：文件里的三条测试、两个辅助函数与每一行注释都从 `Regression.lean` 出，而 URL 的那五种拼法、中转站的名字与那个模型 id 从 `Provider.lean` 出。
 5. **咬得动的证据**：把 `Model.lean` 的 `refusal` 里 `work` 那条停摆守卫摘掉后，`a halted city takes no work until it is released` 必须失败。一个永远为真的性质与没有性质等价。
@@ -128,7 +128,7 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 
 **它对检查的约束有两条，都是本目录自己欠的账。** 一是测**检测**的检查必须落在被覆盖的记录上：`Ground.corrupt` 今天挑最老那条是为了确定性（没有城进程在竞写它），而 `a change to any record but the last is refused` 把整段走完，因为一格通过只说明一格；二是**不许把这一格写成需要修的东西**：谁若把「改一条记录必被拒」写成对所有记录成立，他写的是一条产品不欠的断言，而修它的唯一办法是在文件里放一个自指的摘要——那是伪证，不是校验。
 
-**`Sprawling.Chain` 把这四件事写成了定理，连同它们各自的价格**：字节 ⇒ 声索是免费的（同余，不假设摘要函数）；声索 ⇒ 字节（头一格除外）要买，价钱是摘函数的单射性，而那条假设写在定理自己的语句里，并有一个反模型（常函数）证明它不省得掉；头一格落在所有这一切之外，且不需要任何假设就能证。
+**kernel 的规格 `crates/kernel/spec/Ledger.lean` 把这四件事写成了定理，连同它们各自的价格**：字节 ⇒ 声索是免费的（同余，不假设摘要函数）；声索 ⇒ 字节（头一格除外）要买，价钱是摘函数的单射性，而那条假设写在定理自己的语句里，并有一个反模型（常函数）证明它不省得掉；头一格落在所有这一切之外，且不需要任何假设就能证。
 
 ## 5 权威信源
 
@@ -141,21 +141,20 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 | Command 与 Query 的全集 | `crates/wire/src/command/kind.rs`、`crates/wire/src/frames/query.rs` |
 | 稳定错误码的全集 | `crates/kernel/src/error.rs` 的 `AxCode::ALL` |
 | `IdemKey` 与模板名的形状 | 门的拒绝原文，实测 |
-| 链的链接规则（每条记录携带的 `prev` 就是上一行的摘要） | `crates/kernel/src/ledger.rs:31` 的 `chain_hash` 与 `:26` 的 `GENESIS_PREV` 决定值；写的一侧在 `crates/storage/src/jsonl/append.rs:74`，读的一侧在 `crates/runtime/src/replay.rs:106-118`、`crates/storage/src/jsonl/open.rs:254` 与 `crates/storage/src/bundle/files.rs:30-40` | 本目录比较读数，从不计算摘要：`Sprawling.Chain` 把摘要函数当参数，名字都不提 blake3。仓库改成别的摘要函数时，那里每一条语句一字不变 |
-| 摘要函数的**单射性**（碰撞抵抗） | 不是本仓的事实，也不是本目录能证的事实：它是对所依赖摘要函数的假设 | `Sprawling.Chain` 把它作为定理假设写在语句里，并用一个反模型（常函数）证明去掉它结论就假；需要一个比它更强的保证的人，从这里知道自己在换什么 |
+| 链的链接规则（每条记录携带的 `prev` 就是上一行的摘要） | `crates/kernel/src/ledger.rs:31` 的 `chain_hash` 与 `:26` 的 `GENESIS_PREV` 决定值；写的一侧在 `crates/storage/src/jsonl/append.rs:74`，读的一侧在 `crates/runtime/src/replay.rs:106-118`、`crates/storage/src/jsonl/open.rs:254` 与 `crates/storage/src/bundle/files.rs:30-40` | 本目录比较读数，从不计算摘要：链的规则由 `crates/kernel/spec/Ledger.lean` 以摘要函数为参数陈述，名字都不提 blake3。仓库改成别的摘要函数时，那里每一条语句一字不变 |
+| 摘要函数的**单射性**（碰撞抵抗） | 不是本仓的事实，也不是本目录能证的事实：它是对所依赖摘要函数的假设 | `crates/kernel/spec/Ledger.lean` 把它作为定理假设写在语句里，并用一个反模型（常函数）证明去掉它结论就假；需要一个比它更强的保证的人，从这里知道自己在换什么 |
 
 **门讲六类帧**（`ServerFrame`）。`Frame.lean` 认得全部六类，并对第七类当场报错——一个未知的帧类意味着线格式变了形，而把新形状当成一次拒绝会把红的测成绿的。其中 `log` 只被解析、不被断言：它没有自己的账本序号，两行可以共用一个位置，漏掉一行什么也没丢；它被解析仅仅因为城在这条通道上**也**叙述它的拒绝，而一个读失败报告的人想看到那句话。
 
 ## 6 命名统一
 
-`Address`、`Building`、`Run`、`Ledger`、`Seq`、`Refusal` 一律沿用 `docs/glossary.md` 与 `ARCHITECTURE.md` 的词表，本目录不得另起名字。本目录只新增五个词，各自只指一件事：
+`Address`、`Building`、`Run`、`Ledger`、`Seq`、`Refusal` 一律沿用 `docs/glossary.md` 与 `ARCHITECTURE.md` 的词表，本目录不得另起名字。本目录只新增四个词，各自只指一件事：
 
 | 词 | 它是什么 |
 |---|---|
 | **Door** | 已构建二进制的 `call` 门面，唯一知道有个可执行文件存在的地方 |
 | **Ground** | 一次性的场地：一座被端起来的城、它的端口、它的账本目录，以及磁盘可以施加的敌意 |
 | **Trace** | 一串动作及其观察结果，是本目录唯一的断言对象 |
-| **Chained**（和它算的那串 `required`） | 一条账本，其每条记录携带的 `prev` 正是它欠的那串声索。这两个名字只指 `storage::jsonl::open` 开城时验的那一条规则，没有第二个意思：`Ledger`、`EventRecord`、`prev`、`seq` 都沿用城的词 |
 | **putBack** | 把一个账本目录按一份读数写回去：本目录撤掉自己造成的伤，好让同一个场地回答第二个位置的问题 |
 
 第三种世界的模块叫 `Layer`，这个词不是本目录新起的：它就是 `city::config_layers::Layer`——配置梯子上的一级。
@@ -163,11 +162,7 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 ## 7 模块边界
 
 ```
-lakefile.toml                工程定义；不被任何 Rust 构建读到
-../../lean-toolchain         编译它的工具链版本（仓库根，doctor 与 CI 读同一个）
-lake-manifest.json           依赖清单，`"packages": []`
 src/Sprawling/Frame.lean     线格式的代数镜像。只解析，不判断
-src/Sprawling/Chain.lean     账本这条链证什么、不证什么。不算摘要，也不碰城
 src/Sprawling/Door.lean      唯一知道二进制存在的地方
 src/Sprawling/Ground.lean    一次性场地，以及磁盘的敌意
 src/Sprawling/Check.lean     抽样、收缩、检查树。不知道城是什么
@@ -183,7 +178,7 @@ test/Main.lean               入口与检查树
 
 `Ground` 依赖 `Door` 而不是自己起进程：**「二进制在哪」只允许有一个答案**，而场地要用它做三件事（`init`、`serve`、探活）。
 
-**`Chain` 只 import `Frame`，而且不被任何模块 import。** 它的载体是线上那个 `Record`（因为 `prev` 就是它上面的一个字段），它的摘函数是一个参数；它不读城、不读盘、不参与任何检查树，于是它不可能成为产品那条规则的第二个权威：它证的是**如果账本满足这条规则，什么必定成立**，而“账本就是满足这条规则”这件事只有产品的验证器有权说（检查要判定时就问 `Door.verify`）。本目录其余模块都为一个检查或一个世界服务，它只为一串声明服务。
+**检验器不 import 规格。** `src/` 与 `test/` 下每一条 `import` 只指向 `Sprawling.*` 或 Lean 工具链自带的库。链与快照的定理在 kernel 与 storage 的规格里（`crates/kernel/spec/Ledger.lean`、`crates/storage/spec/Snapshot.lean`），检验器只在注释里引用它们。一条规则因此只有一处权威：规格陈述它，产品实现它，检验器从门外问产品守没守住。
 
 ## 8 接口先行
 
@@ -196,19 +191,6 @@ inductive Frame
 structure Complaint where code : Code; action, subject, recovery, retry : String
 def decodeFrame  : String → Except String Frame
 def cityBuildings : Json → Option (List String)
-
--- Chain.lean —— 链证什么、不证什么。摘函数是参数，这里不算任何摘要
-def required : (String → String) → String → List String → List String
-  -- 一条账本欠的那串 `prev`：第一条欠 genesis，以后每条欠上一行的摘要
-def Chained  : (String → String) → String → List String → List Record → Prop
-  -- 记录携带的 `prev` 正是它欠的那串
-Theorems（各自把价格写在语句里）：
-  theCoveredLinesDecideTheClaims        -- 字节 ⇒ 声索：免费，不假设摘函数
-  theClaimsDecideTheCoveredLines        -- 声索 ⇒ 字节（头一格除外）：假设单射
-  aCoveredLineCannotChangeUnnoticed     -- 上一条的逆否：被覆盖的改动必定被读出
-  theLastLineIsNotCertified             -- 头一格谁也没哈希过，任何摘函数都救不了
-  aCoveredLineHidesWithoutInjectivity   -- 去掉单射，被覆盖的那格同样能藏
-  appendingALineMovesNoClaim            -- 追加只在 `required` 末尾加一项，已欠的不动
 
 -- Door.lean —— 怎么问
 structure Door where binary : System.FilePath
@@ -371,7 +353,7 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 
 ## 13 依赖选型
 
-**一个外部依赖都不引入。** `lake-manifest.json` 的 `"packages": []` 是这条的机器形式。
+**一个外部依赖都不引入。** 仓库根 `lake-manifest.json` 的 `"packages": []` 是这条的机器形式。
 
 | 需要的东西 | 由谁提供 |
 |---|---|
@@ -434,8 +416,9 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 2. `ARCHITECTURE.md` §11 的验证层表——本目录是 V9 之外的一层，记为 V10，并写明它不是门。
 3. `AGENTS.md` 的命令表（`just adversary` 一行）与边界那一节。
 4. `justfile` 的 `adversary` 配方。
-5. `.gitignore` 的 `/adversary/.lake`，以及 `tools/xtask/src/walk.rs` 的 `SKIP_DIRS`。
+5. `.gitignore` 的 `/.lake`（Lean 包在仓库根），以及 `tools/xtask/src/walk.rs` 的 `SKIP_DIRS`。
 6. `.github/workflows/adversary.yml`——定时任务，永远不进 `check`。
+7. 仓库根的 `lakefile.toml`：本目录的两个目标在那里定义。
 
 ---
 

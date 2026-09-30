@@ -1041,6 +1041,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id**（wire-SPEC §8-25）。`Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `client/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `client/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
 
+**Lean 是开发这份代码必需的工具**（§8-58）。各 crate 的规格正从 `<crate>-SPEC.md` 迁成 `Spec.lean`（ARCHITECTURE.md §11「Specifications in Lean」），`just check` 里的 `models` 一步是这些规格在本地被证明过的唯一证据。Lean 列为可选时，没装 Lean 的机器上 `models` 静默通过，本地的绿就不再说明规格被证明过，只有 CI 知道。所以 `elan` 与 `lean` 两行是 `required`：缺了它们，`just prereqs` 在编译之前报出来并给出装法，`just models` 自己也报错而不是跳过。被否决的备选：保持可选、只靠 CI 的 `models` job 证明——那样每次本地验证都得另外说明「规格没有证过」，而这句话没有哪道门会替人说。
+
 **不从别的工具的配置里读 provider 表（人的决定）**。`bin::import` 的五个文件读 Codex 的 `~/.codex/config.toml` 与 pi 的 `models.json`，把其中的 provider 折成本城的词汇；但没有任何 `mod` 声明过它们，所以它们从没被编译，clippy 与测试也从没看过它们，模块图却把它们记为 built。本城删去这五个文件，首次上手的第 1 步由人手填端点，或选一个已知主机。理由：没有调用点的代码是一份没人维护的第二文法，它记下的 Codex 与 pi 键名会随上游改版静默过时。**被否**：接上它，作为首次上手第 1 步「从别的工具已写好的配置读入」的候选来源——那要在 wire 上加一条 Query、在设置页加一行，属于线协议与页面的改动，本版不做。**重开参数**：首次上手要给出「别的工具已配置的 provider」这一步时，从 git 历史取回这两种文法，先在 `lib.rs` 声明模块，让测试与 clippy 看见它们，再接 Query。
 
 ## 13 依赖选型
@@ -2959,7 +2961,7 @@ pub(crate) fn prereqs() -> String;            // Develop 档渲染成 prereqs.ts
 ```
 
 - **表是权威，`just prereqs` 读它的渲染**：`crates/sprawling/src/doctor/table/prereqs.tsv` 每行 `class<TAB>name<TAB>program<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`，由 `table::prereqs()` 从 Develop 档渲染；测试 `the_prereqs_file_is_the_develop_tier_rendered` 要求文件逐字等于渲染结果，不等时把应有的全文印出来。`just prereqs` 在编译之前跑，只能读文件而不能问二进制，所以读的是这份渲染而不是另一张清单；`command -v <program>` 是它的探测，`program` 为 `-` 的行（浏览器家族）归 doctor 与 render 门自己去找。被否决的备选：justfile 当权威、doctor 在编译期读它——justfile 不写三平台的装法，doctor 就得再拼一遍。
-- **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、rustup、rust、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、elan、lean、uv、python，以及 cargo-mutants、cargo-fuzz、cargo-public-api、kani）。于是没装 Lean 的机器上 `just check` 仍与没有 `tools/adversary/` 时一样，而页面的「全部安装」照样把 Lean 装上。
+- **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、rustup、rust、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器、elan、lean），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、uv、python，以及 cargo-mutants、cargo-fuzz、cargo-public-api、kani）。elan 与 lean 为什么必需，见 §12「Lean 是开发这份代码必需的工具」。
 - **行序就是安装顺序**：后一行的装法用到前一行装出的程序——rustup 之后才有 `rustup component add` 与 `cargo install`，elan 之后才有 `elan toolchain install`，uv 之后才有 `uv python install`。页面的「全部安装」按表序逐项跑，所以顺序写在表里而不是写在页面上。
 - **Lean 的版本只写在 `lean-toolchain`**：`LEAN_PIN` 是那个文件的 `include_str!`（`str::trim_ascii_end` 在 const 里去掉换行），装法是 `elan toolchain install <pin>`，探测是 `elan toolchain list` 里有以 pin 开头的一行。换 Lean 版本只改那一个文件。
 - **Windows 上能用 winget 的都用 winget，且按用户装**：Git、just、bun、uv、ffmpeg 的 winget 清单都有用户级安装程序，配方带 `--scope user`，于是装的时候不弹 UAC——§8-40「恒不提权」在 winget 上就是这个参数。rustup 的清单没有 scope 字段，而 rustup-init 本来就只写这个人的 profile，所以不带（带了 winget 答「找不到适用的安装程序」）；Chrome 的清单只有机器级安装程序，而每台 Windows 都有 Edge，Chromium 一族在 Windows 上由 Edge 答上，Chrome 那条配方很少被走到。
