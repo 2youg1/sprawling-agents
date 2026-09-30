@@ -10,9 +10,12 @@
 //! than the port opening, because a person sees the page, and a server
 //! that accepts a connection it cannot answer yet is still closed to
 //! them. Each sample serves on a port borrowed from the system a moment
-//! before and is stopped as soon as its byte arrives. What that serve
-//! wrote to standard error is kept in the log file the caller names, so
-//! the phases the product timed for itself sit beside the reading.
+//! before and is stopped once its byte has arrived and the serve has said
+//! whether it proved the history it opened from. What that serve wrote
+//! to standard error is kept in the log file the caller names, so the
+//! phases the product timed for itself - the opening line and the proof
+//! line, the moment commands are taken (sprawling-SPEC.md 8-122) - sit
+//! beside the reading.
 
 use std::io::{Read as _, Write as _};
 use std::net::{SocketAddr, TcpStream};
@@ -78,13 +81,51 @@ fn one(binary: &Path, city: &Path, log: &Path) -> Result<Duration, AxError> {
         })?;
     let answered = first_answer(&mut child, SocketAddr::from(([127, 0, 0, 1], port)));
     let took = boundary.elapsed();
+    let settled = match &answered {
+        Ok(()) => proof_settled(&mut child, log),
+        Err(_) => Ok(()),
+    };
     let stopped = child
         .kill()
         .and_then(|()| child.wait())
         .map_err(|err| refused("stop the served city", &binary.display().to_string(), &err));
     answered?;
+    settled?;
     stopped?;
     Ok(took)
+}
+
+/// The lines a served city writes when the proof of its history ends:
+/// whole, or the ledger stopped (sprawling-SPEC.md 8-90).
+const PROOF_ENDS: [&str; 2] = ["the history is proved", "the ledger stopped taking writes"];
+
+/// Waits until the serve's log says how the proof of its history ended,
+/// so the log a reader is pointed at carries the moment commands were
+/// taken; the first byte is already timed.
+fn proof_settled(child: &mut Child, log: &Path) -> Result<(), AxError> {
+    let started = stamp();
+    while started.elapsed() < WITHIN {
+        let said = std::fs::read_to_string(log)
+            .map_err(|err| refused("read the serve's log", &log.display().to_string(), &err))?;
+        if PROOF_ENDS.iter().any(|end| said.contains(end)) {
+            return Ok(());
+        }
+        if let Ok(Some(status)) = child.try_wait() {
+            return Err(AxError::failure(
+                AxCode::ToolUnavailable,
+                "serve the fixture city",
+                format!("the server exited before it proved its history, {status}"),
+            )
+            .with_recovery("read the serve's log beside the fixture city"));
+        }
+        std::thread::sleep(POLL);
+    }
+    Err(AxError::failure(
+        AxCode::ToolUnavailable,
+        "serve the fixture city",
+        "the proof of the history said nothing within 300 s",
+    )
+    .with_recovery("read the serve's log beside the fixture city"))
 }
 
 /// Polls until the page's first byte arrives.
