@@ -255,11 +255,12 @@ impl Cadence {
 
     /// The record a snapshot is due at now, when one is and the fold is
     /// not more than [`CUT_WAITS_ABOVE`] records behind the writer.
-    fn due(&self, _backlog: u64) -> Option<EventRecord> {
+    fn due(&self, backlog: u64) -> Option<EventRecord> {
         let spent_enough = self
             .last_cut_cost
             .is_none_or(|cut| self.folded_since_cut >= cut.saturating_mul(CUT_SHARE_INVERSE));
-        self.uncut().filter(|_| spent_enough)
+        let caught_up = backlog <= CUT_WAITS_ABOVE;
+        self.uncut().filter(|_| spent_enough && caught_up)
     }
 
     /// The last record folded since the last cut, while cutting is open.

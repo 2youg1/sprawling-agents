@@ -128,7 +128,7 @@ impl JsonlLedger {
     /// is not a city's, and for one that already handed them off
     /// (storage-SPEC 8-24).
     pub fn hand_off_session_slices(&mut self) -> Option<crate::sessions::Sessions> {
-        None
+        self.sessions.take()
     }
 
     /// The position a record written now would take.
