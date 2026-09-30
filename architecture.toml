@@ -807,11 +807,6 @@ module = [
   { name = "bin::browser_tool::tests", file = "crates/sprawling/src/browser_tool/tests.rs", owns = "one conversation with a browser, replayed without one", shape = "adapter", since = "V4", status = "built", spec = "sprawling-SPEC.md#8-45" },
   { name = "bin::browser_tool::tests::recordings", file = "crates/sprawling/src/browser_tool/tests/recordings.rs", owns = "the conversations these tests replay, and the two ports that answer them", shape = "adapter", since = "V0.0.6", status = "built", spec = "sprawling-SPEC.md#8-45" },
   { name = "bin::firstrun", file = "crates/sprawling/src/firstrun.rs", owns = "the first screen, where a city goes when nobody said, and handing a URL to the desktop", shape = "adapter", since = "P7", status = "built", spec = "sprawling-SPEC.md#8-8" },
-  { name = "bin::import", file = "crates/sprawling/src/import.rs", owns = "reading a provider table out of another tool's configuration, once", shape = "adapter", since = "V0.0.6", status = "built", spec = "sprawling-SPEC.md#8-72" },
-  { name = "bin::import::codex", file = "crates/sprawling/src/import/codex.rs", owns = "the grammar of `~/.codex/config.toml`, as this city reads it", shape = "grammar", since = "V0.0.6", status = "built", spec = "sprawling-SPEC.md#8-72" },
-  { name = "bin::import::machine", file = "crates/sprawling/src/import/machine.rs", owns = "where another tool's configuration lives on this machine", shape = "adapter", since = "V0.0.6", status = "built", spec = "sprawling-SPEC.md#8-72" },
-  { name = "bin::import::pi", file = "crates/sprawling/src/import/pi.rs", owns = "the grammar of pi's `models.json`, as this city reads it", shape = "grammar", since = "V0.0.6", status = "built", spec = "sprawling-SPEC.md#8-72" },
-  { name = "bin::import::provider", file = "crates/sprawling/src/import/provider.rs", owns = "one imported provider, in this city's own vocabulary", shape = "value type", since = "V0.0.6", status = "built", spec = "sprawling-SPEC.md#8-72" },
   { name = "bin::release", file = "crates/sprawling/src/release.rs", owns = "which release this binary is, and the one registry read that says whether a newer one exists", shape = "adapter", since = "V5", status = "built", spec = "sprawling-SPEC.md#8-68" },
   { name = "bin::monitor::volume", file = "crates/sprawling/src/monitor/volume.rs", owns = "which disk holds the city, and its free space and capacity", shape = "adapter", since = "S5", status = "built", spec = "sprawling-SPEC.md#8-116" },
   { name = "bin::monitor::volume::tests", file = "crates/sprawling/src/monitor/volume/tests.rs", owns = "a city opened by a relative path reads the disk that holds it", shape = "test", since = "S5", status = "built", spec = "sprawling-SPEC.md#8-116" },
@@ -973,8 +968,20 @@ duty = "the process boundary"
 [family.remote_access]
 duty = "the remote door, and nothing that depends on the route that reaches it"
 
+[family.browser]
+duty = "a browser driven over WebDriver BiDi, and what a model may see of a page and do to it"
+
+[family.agent_protocols]
+duty = "MCP out to a server, ACP in from an editor, and ACP out to a harness"
+
 [family.accounting]
 duty = "the city's one writer, and the ports it reaches outside itself through"
 
+[family.bin]
+duty = "the assembly root: every concrete type, the one clock, the one spawn point, and the command line"
+
 [family.desktop]
 duty = "out of tree: this Windows desktop, offered as an MCP server"
+
+[family.citysim]
+duty = "out of product: scripted scenarios on a counted clock, and the benches that time the product"
