@@ -8,7 +8,7 @@
 //! selection is the intersection of every condition given, bounded by
 //! the cutoff the walk stops at.
 
-use kernel::{Address, AxError, RunId, Seq};
+use kernel::{Address, AxCode, AxError, EventRecord, RunId, Seq};
 
 use super::document::{Chosen, Decimal};
 
@@ -47,12 +47,39 @@ impl Selection {
         run: Option<RunId>,
         building: Option<Address>,
     ) -> Result<Selection, AxError> {
+        if let (Some(first), Some(last)) = (first, last)
+            && first > last
+        {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "select a playback range",
+                format!("from {} through {}", first.value(), last.value()),
+            )
+            .with_recovery("give --from a seq no later than --through"));
+        }
         Ok(Selection {
             first,
             last,
             run,
             building,
         })
+    }
+
+    /// Whether `record` is in the selection. The cutoff is the walk's to
+    /// enforce: no line after it is ever offered here.
+    pub(super) fn admits(&self, record: &EventRecord) -> bool {
+        self.holds_seq(record.seq())
+            && self.run.is_none_or(|run| record.run() == run)
+            && self
+                .building
+                .as_ref()
+                .is_none_or(|building| record.addr().is_some_and(|addr| addr.is_within(building)))
+    }
+
+    /// Whether `seq` lies in the closed range; the one condition a line
+    /// of an unknown kind can be judged by.
+    pub(super) fn holds_seq(&self, seq: Seq) -> bool {
+        self.first.is_none_or(|first| seq >= first) && self.last.is_none_or(|last| seq <= last)
     }
 
     /// The selection as the bundle's `source` records it.

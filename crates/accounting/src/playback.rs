@@ -18,13 +18,18 @@ use std::path::Path;
 use kernel::layout::CityLayout;
 use kernel::{AxCode, AxError, Seq};
 
-use document::{Costs, CutoffLine, Decimal, Document, Source, Withheld};
+use document::{CutoffLine, Decimal, Document, Source};
+use project::Projection;
+use reader::Readership;
 
 mod check;
 mod document;
 mod encode;
+mod links;
+mod project;
 mod reader;
 mod select;
+mod walk;
 
 pub use check::{Against, Report, Verdict, check};
 pub use encode::Bundle;
@@ -90,40 +95,34 @@ enum Projected {
     EndsAt(Option<Seq>),
 }
 
-fn project(_city_root: &Path, request: &Request) -> Result<Projected, AxError> {
+fn project(city_root: &Path, request: &Request) -> Result<Projected, AxError> {
+    let ledger = CityLayout::new(city_root).ledger();
+    let city = storage::Provenance::city_of(&ledger).map_err(storage::StorageError::into_ax)?;
+    let readership = Readership::new(city_root, request.reader.clone());
+    let mut projection = Projection::new(&request.selection, readership);
+    let tip = walk::walk(&ledger, request.cutoff, |raw, walked| {
+        projection.apply(raw, walked)
+    })?;
+    let reached = match (tip, request.cutoff) {
+        (Some(tip), Cutoff::Latest) => tip,
+        (Some(tip), Cutoff::At(end)) if tip.seq == end => tip,
+        (tip, Cutoff::Latest | Cutoff::At(_)) => {
+            return Ok(Projected::EndsAt(tip.map(|tip| tip.seq)));
+        }
+    };
     let source = Source {
-        city: kernel::GENESIS_PREV,
+        city,
         selection: request.selection.chosen(),
         cutoff: CutoffLine {
-            seq: Decimal(0),
-            chain_hash: kernel::GENESIS_PREV,
+            seq: Decimal(reached.seq.value()),
+            chain_hash: reached.chain_hash,
         },
         rules: PROJECTION_RULES,
         reader: request.reader.name(),
     };
-    Ok(Projected::Whole(Box::new(Document {
-        schema: SCHEMA.to_owned(),
-        source,
-        events: Vec::new(),
-        context: Vec::new(),
-        unknown: Vec::new(),
-        runs: Vec::new(),
-        moments: Vec::new(),
-        messages: Vec::new(),
-        checkpoints: Vec::new(),
-        costs: Costs {
-            billed_usd_micros: Decimal(0),
-            by_run: Vec::new(),
-            unpriced_calls: Decimal(0),
-            unpriced_tokens: Decimal(0),
-        },
-        withheld: Withheld {
-            events: Decimal(0),
-            kinds: Vec::new(),
-            buildings: Vec::new(),
-            credential: Decimal(0),
-        },
-    })))
+    projection
+        .finish(source)
+        .map(|document| Projected::Whole(Box::new(document)))
 }
 
 #[cfg(test)]

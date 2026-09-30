@@ -47,3 +47,74 @@ impl Reader {
         }
     }
 }
+
+/// What one line is to the reader.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Sight {
+    Open,
+    /// The first building, in address order, that closed the line.
+    Closed(Address, Reason),
+}
+
+/// The reader's verdict on each building, asked once per export from
+/// the city's rules as they stand now.
+pub(super) struct Readership {
+    reader: Reader,
+    rules: city::RulesCache,
+    verdicts: BTreeMap<Address, Option<Reason>>,
+}
+
+impl Readership {
+    pub(super) fn new(city_root: &Path, reader: Reader) -> Readership {
+        Readership {
+            reader,
+            rules: city::RulesCache::new(city_root),
+            verdicts: BTreeMap::new(),
+        }
+    }
+
+    /// What a line touching `buildings` is to the reader: open only when
+    /// every one of them is.
+    pub(super) fn sight(&mut self, buildings: &BTreeSet<Address>) -> Sight {
+        for building in buildings {
+            if let Some(reason) = self.closes(building) {
+                return Sight::Closed(building.clone(), reason);
+            }
+        }
+        Sight::Open
+    }
+
+    /// Whether the reader is closed out of `building`, and why.
+    pub(super) fn closes(&mut self, building: &Address) -> Option<Reason> {
+        if let Some(known) = self.verdicts.get(building) {
+            return *known;
+        }
+        let verdict = match &self.reader {
+            Reader::Person(Confidential::Included) => ReadVerdict::Open,
+            Reader::Person(Confidential::Withheld) => match self.confidential(building) {
+                Ok(false) => ReadVerdict::Open,
+                Ok(true) => ReadVerdict::Confidential,
+                Err(unread) => ReadVerdict::RulesUnreadable(unread),
+            },
+            Reader::Resident(home) => {
+                kernel::address::may_read(home, building, || self.confidential(building))
+            }
+        };
+        let reason = match verdict {
+            ReadVerdict::Open => None,
+            ReadVerdict::Confidential => Some(Reason::Confidential),
+            ReadVerdict::RulesUnreadable(_) => Some(Reason::RulesUnreadable),
+        };
+        self.verdicts.insert(building.clone(), reason);
+        reason
+    }
+
+    /// Whether the rules of the building holding `target` say it is
+    /// confidential, as the read bound asks it.
+    fn confidential(&self, target: &Address) -> Result<bool, AxError> {
+        let holder = city::Building::of(target)?;
+        self.rules
+            .load(holder.addr())
+            .map(|rules| rules.policy().confidential)
+    }
+}
