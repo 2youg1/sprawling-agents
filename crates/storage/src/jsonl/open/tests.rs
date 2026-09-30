@@ -175,12 +175,13 @@ fn a_line_below_the_first_version_is_refused_for_its_version_not_its_chain() {
         // Same byte count, so every prev in the chain still holds: what
         // the line declares is the only thing that changed.
         let text = fs::read_to_string(&seg).unwrap();
+        let current = format!("\"v\":{}", kernel::consts_external::EVENT_LOG_V);
         let rewritten: Vec<String> = text
             .lines()
             .enumerate()
             .map(|(index, line)| {
                 if index == unversioned_line {
-                    line.replacen("\"v\":1", "\"v\":0", 1)
+                    line.replacen(&current, "\"v\":0", 1)
                 } else {
                     line.to_owned()
                 }
