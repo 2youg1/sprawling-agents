@@ -731,7 +731,9 @@ impl Tool for ExecTool { /* meta：name=exec、effect=Write{domain}、temporal=T
 pub struct EditTool { /* city_root、writable: WriteDomain —— 私有 */ }
 impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Diff、temporal=Timeless */ }
 // new(city_root, addr, writable: WriteDomain)：writable＝该 Run 的写域（rules.write_domain()）。
-// 每次调用先判路径后碰盘：Address::parse 杀穿越（..／绝对路径／空段），WriteDomain::admits 杀域外与
+// 每次调用先判路径后碰盘，三道依次：within_city（§8-30-1）把本平台的绝对路径换成城里的拼写，落在城外＝
+// E_GATE_DENIED，恢复语指向 `exec`（什么算绝对路径由本平台判，§12.4）；Address::parse 杀穿越（..／前导
+// 斜杠／空段，E_INVALID_ARGS）；WriteDomain::admits 杀域外与
 // reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。工具静态声明的 Effect 只说它会写，
 // 模型选的 path 要在这里判——判定住权威处，而不是 bench 里的第二份判定。
 // args：{path, base_version, old, new}；version＝内容 B3Hash 前 16 hex；check_base 拒即 E_VERSION_CONFLICT；
@@ -1032,6 +1034,12 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 - **重开的参数**：`Host` 放置成为后台命令的常态、且其对宿主树的副作用本身就是人要的产物时，run 的结束不再是「没人要」的证据，这条规则应重新论证。
 - **未决**：被终止的命令不在账本里留下一行：把「结束时终止了 N 条后台命令」写进账本需要 kernel 事件表多一种，归 kernel-SPEC 的事件表。
 
+### 12.4 定规：一条路径算不算绝对路径，由本平台判定
+- **决定**：`within_city` 只接手标准库 `Path::is_absolute` 在本平台答「是」的路径。于是同一个拼写 `/abs.txt` 在 Unix 上是城外的绝对路径，`read`、`search`、`edit` 答 `E_GATE_DENIED`，恢复语指向 `exec`；在 Windows 上它没有盘符，不是绝对路径，照旧交给文法，答 `E_INVALID_ARGS`。两个平台给出两个码。
+- **理由**：模型照抄的是 serve 所在的系统给它看的路径——拖进来的文件、`exec` 的输出、日志——而这些路径都按本平台的规则写成。判定跟着 `Path::is_absolute` 走，仓库里就没有第二份「什么算绝对路径」的规则。Windows 上 `/x` 与 `\x` 指向进程当前盘的根，当前盘由启动 serve 的方式决定，不是城的属性。
+- **击败的备选**：在 Windows 上把根相对路径按当前盘补全后再判。这要给 `within_city` 加一条只在 Windows 上存在的分支，而且同一条路径会随进程的当前盘落到不同地方。
+- **重开的参数**：某个页面或 harness 在 Windows 上以根相对的形式给出城内文件的路径，模型照抄后被文法拒绝。
+
 ## 13 依赖选型
 
 kernel、storage（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
@@ -1126,7 +1134,7 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 | 文件 | 管什么 |
 |---|---|
 | `tools/edit.rs` | `EditTool` 与 `version_of`／`CREATES`：`new` 的参数模式声明、`Tool::invoke` 的判定次序（工具身份→地址→写域→版本→匹配数→落盘），创建臂 `create`，以及 `unified_diff`／`common_prefix`／`common_suffix` |
-| `tools/edit/tests.rs` | edit 拒绝什么、回显什么：版本相符的落盘与 diff、陈旧版本、创建臂两种冲突、写域外与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
+| `tools/edit/tests.rs` | edit 拒绝什么、回显什么：版本相符的落盘与 diff、陈旧版本、创建臂两种冲突、写域外、城外的本平台绝对路径（`E_GATE_DENIED`，盘上不留文件）与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
 
 ### 8-23 runtime::run 目录化
 
@@ -1600,7 +1608,7 @@ pub(crate) enum Located { Present(PathBuf), Absent(PathBuf) }
 // 其下不存在的段原样接上——不存在的段不可能是链接。接上的段不是普通名字（`..` 在内）＝E_GATE_DENIED；
 // 路上某个存在的条目解析不了（目标已不在的链接在内）＝E_STORAGE_FATAL。
 pub(crate) fn real_location(written: &Path, action: &'static str, subject: &str) -> Result<Located, AxError>;
-// 模型写下的路径在城里的拼写。不是绝对路径的原样交回；绝对路径解开真实位置（real_location）后落在
+// 模型写下的路径在城里的拼写。本平台不算绝对路径的（`Path::is_absolute`，§12.4）原样交回；绝对路径解开真实位置（real_location）后落在
 // 城根的真实位置之下，交回它相对城根的拼写（段以 `/` 相连，城根本身交回空串）；落在城外＝E_GATE_DENIED，
 // 恢复语说出 `read`／`search`／`edit` 只到城内、城外的文件经 `exec` 读。它不判保留区与读界：交回的拼写
 // 照旧过 admit 与 land。
