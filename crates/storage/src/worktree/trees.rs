@@ -12,9 +12,9 @@ use kernel::{ByteLen, consts_policy::WORKTREE_MAX_BYTES};
 use crate::error::StorageError;
 
 use super::landing::{CheckoutRun, Landing, PlannedMerge, check_out};
-use super::lease::WorktreeLease;
+use super::lease::{FileWork, WorktreeLease};
 use super::name::WorktreeName;
-use super::weight::measure;
+use super::weight::{Weight, measure, written};
 use kept::Standing;
 
 mod kept;
@@ -94,7 +94,7 @@ impl Worktrees {
 
     /// Places a new tree for `name`, locked from the moment it exists.
     fn place(&self, name: &WorktreeName) -> Result<WorktreeLease, StorageError> {
-        self.refuse_oversized(name)?;
+        let city = self.refuse_oversized(name)?;
         if self.repo.head().is_err() {
             return Err(StorageError::Worktree {
                 op: "branch a worktree",
@@ -119,36 +119,39 @@ impl Worktrees {
                 });
             }
         };
-        self.add_tree(name, branch.as_ref().map(git2::Branch::get))
+        self.add_tree(name, branch.as_ref().map(git2::Branch::get), &city)
     }
 
     /// Refuses a tree before it exists when the city working tree it
-    /// copies is over the ceiling.
-    pub(super) fn refuse_oversized(&self, name: &WorktreeName) -> Result<(), StorageError> {
+    /// copies is over the ceiling, and otherwise answers what that
+    /// working tree weighed.
+    pub(super) fn refuse_oversized(&self, name: &WorktreeName) -> Result<Weight, StorageError> {
         let source = self.repo.workdir().ok_or_else(|| StorageError::Worktree {
             op: "find the city working tree",
             detail: "the repository is bare".to_owned(),
         })?;
-        let size = measure(source)?;
-        if size.get() > self.ceiling.get() {
+        let city = measure(source)?;
+        if city.bytes.get() > self.ceiling.get() {
             return Err(StorageError::WorktreeBusy {
                 name: name.as_str().to_owned(),
                 detail: format!(
                     "the city working tree is {} bytes and the ceiling is {}",
-                    size.get(),
+                    city.bytes.get(),
                     self.ceiling.get()
                 ),
             });
         }
-        Ok(())
+        Ok(city)
     }
 
     /// Checks out the tree for `name` on `reference` when one is given
-    /// and on a new branch from the trunk otherwise.
+    /// and on a new branch from the trunk otherwise. `city` is the walk
+    /// the ceiling was judged on, counted into the lease's work.
     pub(super) fn add_tree(
         &self,
         name: &WorktreeName,
         reference: Option<&git2::Reference<'_>>,
+        city: &Weight,
     ) -> Result<WorktreeLease, StorageError> {
         std::fs::create_dir_all(&self.home).map_err(|source| StorageError::Io {
             op: "create the worktree home",
@@ -162,16 +165,24 @@ impl Worktrees {
         let mut opts = git2::WorktreeAddOptions::new();
         opts.lock(true);
         opts.reference(reference);
-        self.repo
+        let tree = self
+            .repo
             .worktree(name.as_str(), &path, Some(&opts))
             .map_err(|err| StorageError::Worktree {
                 op: "add a worktree",
                 detail: format!("{}: {err}", name.as_str()),
             })?;
+        let checked_out = written(&tree)?;
+        let weight = measure(&path)?;
         Ok(WorktreeLease {
             name: name.clone(),
-            disk: measure(&path)?,
+            disk: weight.bytes,
             path,
+            work: FileWork {
+                created: checked_out.files,
+                walked: city.walked.saturating_add(weight.walked),
+                ..FileWork::default()
+            },
         })
     }
 

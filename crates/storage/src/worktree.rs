@@ -31,6 +31,6 @@ mod trees;
 mod weight;
 
 pub use landing::{Landing, PlannedMerge};
-pub use lease::WorktreeLease;
+pub use lease::{FileWork, WorktreeLease};
 pub use name::WorktreeName;
 pub use trees::Worktrees;

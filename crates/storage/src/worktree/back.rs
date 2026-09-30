@@ -46,7 +46,7 @@ impl Worktrees {
         if self.live()?.contains(name) {
             return Err(busy("a live tree holds this name"));
         }
-        self.refuse_oversized(name)?;
+        let city = self.refuse_oversized(name)?;
         let commit = self.commit_at(point)?;
         // Never forced: an existing branch is a line of work, and
         // replacing it would drop somebody's writes.
@@ -63,7 +63,7 @@ impl Worktrees {
                     }
                 }
             })?;
-        match self.add_tree(name, Some(branch.get())) {
+        match self.add_tree(name, Some(branch.get()), &city) {
             Ok(lease) => Ok(lease),
             Err(refusal) => {
                 // The branch was made for this tree alone; left behind, it

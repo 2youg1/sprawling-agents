@@ -87,7 +87,7 @@ fn the_city_s_own_bookkeeping_does_not_count_against_the_ceiling() {
     std::fs::write(ledger.join("ledger-0.jsonl"), &bulk).unwrap();
 
     let source = trees.repo.workdir().unwrap().to_path_buf();
-    let measured = super::measure(&source).unwrap();
+    let measured = super::measure(&source).unwrap().bytes;
     assert!(
         measured.get() < 4096,
         "the ledger is not somebody's working tree: {} bytes",

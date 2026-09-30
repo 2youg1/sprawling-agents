@@ -95,6 +95,7 @@ pub use digest_cache::DigestCache;
 
 mod worktree;
 
+pub use worktree::FileWork;
 pub use worktree::Landing;
 pub use worktree::PlannedMerge;
 pub use worktree::WorktreeLease;

@@ -6,7 +6,7 @@
 //! A tree kept for its node between runs: whether somebody holds it,
 //! and how it is taken back into use.
 
-use super::super::lease::WorktreeLease;
+use super::super::lease::{FileWork, WorktreeLease};
 use super::super::name::WorktreeName;
 use super::super::weight::measure;
 use super::Worktrees;
@@ -144,19 +144,35 @@ impl Worktrees {
                 .and_then(|()| index.write())
                 .map_err(|err| refuse("reset a kept worktree's index", err))?;
         }
+        let mut work = FileWork::default();
         let mut checkout = git2::build::CheckoutBuilder::new();
-        checkout.force().remove_untracked(true);
+        checkout
+            .force()
+            .remove_untracked(true)
+            .notify_on(
+                git2::CheckoutNotificationType::UPDATED | git2::CheckoutNotificationType::UNTRACKED,
+            )
+            .notify(|kind, _, _, target, workdir| {
+                count_change(&mut work, kind, (target.is_some(), workdir.is_some()));
+                true
+            });
         for spec in crate::checkpoint::scan::pathspec::of(scopes) {
             checkout.path(spec);
         }
         repo.checkout_head(Some(&mut checkout))
             .map_err(|err| refuse("reset a kept worktree", err))?;
+        drop(checkout);
         tree.lock(Some(LEASE_REASON))
             .map_err(|err| refuse("lock a worktree", err))?;
+        let weight = measure(tree.path())?;
         Ok(WorktreeLease {
             name: name.clone(),
             path: tree.path().to_path_buf(),
-            disk: measure(tree.path())?,
+            disk: weight.bytes,
+            work: FileWork {
+                walked: weight.walked,
+                ..work
+            },
         })
     }
 
@@ -198,6 +214,24 @@ impl Worktrees {
     }
 }
 
+/// Counts one change a reattaching checkout announced before making it
+/// (storage-SPEC 8-31). `present` says whether the branch head holds the
+/// path and whether the disk does: a tracked file the head lacks is
+/// removed, one the disk lacks is created, and any other is rewritten;
+/// an untracked entry is removed.
+fn count_change(work: &mut FileWork, kind: git2::CheckoutNotificationType, present: (bool, bool)) {
+    let count = if kind.contains(git2::CheckoutNotificationType::UNTRACKED) {
+        &mut work.removed
+    } else {
+        match present {
+            (false, _) => &mut work.removed,
+            (true, false) => &mut work.created,
+            (true, true) => &mut work.rewritten,
+        }
+    };
+    *count = count.saturating_add(1);
+}
+
 /// Writes the tree `index` holds into the object store and says whether
 /// it is `tree`.
 ///
@@ -214,9 +248,15 @@ fn index_writes_tree(index: &mut git2::Index, tree: git2::Oid) -> Result<bool, g
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::arithmetic_side_effects,
+    reason = "test code"
+)]
 mod tests {
+    use super::super::super::lease::FileWork;
     use super::super::Landing;
+    use super::super::Worktrees;
     use super::super::tests::{city, name, owner};
     use crate::checkpoint::Checkpoint;
     use kernel::TimeMs;
@@ -224,6 +264,80 @@ mod tests {
 
     fn read(path: &Path) -> String {
         std::fs::read_to_string(path).unwrap()
+    }
+
+    /// A city of `files` small files under `bulk/`, committed.
+    fn bulk_city(dir: &Path, files: u64) -> Worktrees {
+        let bulk = dir.join("bulk");
+        std::fs::create_dir_all(&bulk).unwrap();
+        for i in 0..files {
+            std::fs::write(bulk.join(format!("file-{i:04}.txt")), b"sixteen bytes ..").unwrap();
+        }
+        Checkpoint::open(dir)
+            .unwrap()
+            .ensure_base(&["bulk".to_owned()], TimeMs::new(1_000), &owner())
+            .unwrap();
+        Worktrees::open(dir).unwrap()
+    }
+
+    /// How many entries a directory and its `bulk/` hold between them.
+    fn entries(root: &Path) -> u64 {
+        let count = |dir: &Path| u64::try_from(std::fs::read_dir(dir).unwrap().count()).unwrap();
+        count(root) + count(&root.join("bulk"))
+    }
+
+    /// storage-SPEC 8-31: a placement writes the tree's files once and walks
+    /// the city once; a reclaim writes what the last run changed in its
+    /// scope and nothing else. Judged at two sizes, so a cost that grows
+    /// with the tree where it should not is a failure here rather than a
+    /// slower reading somewhere else.
+    #[test]
+    fn claiming_a_tree_costs_what_it_places_and_restores() {
+        for files in [32, 64] {
+            let dir = tempfile::tempdir().unwrap();
+            let trees = bulk_city(dir.path(), files);
+            let scope = ["bulk".to_owned()];
+            let city = entries(dir.path());
+
+            let placed = trees.claim(&name("node-1"), &scope).unwrap();
+            let tree = placed.path().to_path_buf();
+            assert_eq!(
+                placed.work(),
+                FileWork {
+                    created: files,
+                    rewritten: 0,
+                    removed: 0,
+                    walked: city,
+                },
+                "a placement at {files} files"
+            );
+
+            std::fs::write(tree.join("bulk").join("file-0000.txt"), b"changed by a run").unwrap();
+            std::fs::write(tree.join("bulk").join("stray.txt"), b"left by a run").unwrap();
+            trees.release(placed).unwrap();
+            let restored = trees.claim(&name("node-1"), &scope).unwrap();
+            assert_eq!(
+                restored.work(),
+                FileWork {
+                    created: 0,
+                    rewritten: 1,
+                    removed: 1,
+                    walked: entries(&tree),
+                },
+                "a reclaim after a run at {files} files"
+            );
+
+            trees.release(restored).unwrap();
+            let unchanged = trees.claim(&name("node-1"), &scope).unwrap();
+            assert_eq!(
+                unchanged.work(),
+                FileWork {
+                    walked: entries(&tree),
+                    ..FileWork::default()
+                },
+                "a reclaim with nothing to restore at {files} files"
+            );
+        }
     }
 
     /// A kept tree claimed again writes only its scope, and what the node

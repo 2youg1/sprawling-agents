@@ -20,6 +20,29 @@ pub struct WorktreeLease {
     pub(crate) name: WorktreeName,
     pub(crate) path: PathBuf,
     pub(crate) disk: ByteLen,
+    pub(crate) work: FileWork,
+}
+
+/// What putting a tree in place cost the filesystem, counted by the code
+/// that did the work (storage-SPEC 8-31).
+///
+/// A wall-clock reading of the same work moves with the machine and its
+/// real-time scanner, which waits on every file created; these four
+/// numbers do not, so they, and not the clock, are what a regression is
+/// judged by. Directories made along the way are not counted: the
+/// scanner waits on files.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FileWork {
+    /// Files written where no file stood.
+    pub created: u64,
+    /// Files written over because they differed from what the tree
+    /// should hold.
+    pub rewritten: u64,
+    /// Entries taken away because the tree should not hold them; a
+    /// directory counts once, with whatever it held.
+    pub removed: u64,
+    /// Directory entries read.
+    pub walked: u64,
 }
 
 impl WorktreeLease {
@@ -39,6 +62,12 @@ impl WorktreeLease {
     #[must_use]
     pub fn disk(&self) -> ByteLen {
         self.disk
+    }
+
+    /// What claiming this tree cost the filesystem.
+    #[must_use]
+    pub fn work(&self) -> FileWork {
+        self.work
     }
 
     /// The `worktree_opened` payload: a name and a size, no path. An

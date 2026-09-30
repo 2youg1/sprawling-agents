@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a working tree weighs, for the ceiling a claim is judged
-//! against.
+//! against, and what a checkout that has just finished wrote.
 
 use std::path::Path;
 
@@ -12,6 +12,54 @@ use kernel::ByteLen;
 
 use crate::error::StorageError;
 use crate::reserved::outside_reserved;
+
+/// What a walk under a directory found: the bytes, and how many
+/// directory entries it read to find them.
+pub(super) struct Weight {
+    pub(super) bytes: ByteLen,
+    pub(super) walked: u64,
+}
+
+/// What a checkout wrote into a new tree, read back from the index it
+/// wrote.
+pub(super) struct Written {
+    pub(super) files: u64,
+    pub(super) bytes: ByteLen,
+}
+
+/// The mode git gives a submodule's entry: a commit, not a file the
+/// checkout writes.
+const GITLINK: u32 = 0o160_000;
+
+/// Reads back what the checkout of a new tree wrote, from the index it
+/// wrote: libgit2 lstats every file it writes and records the size in
+/// that file's entry, so the sum is a measure of the disk rather than
+/// an estimate, and no walk of the tree is needed to find it
+/// (storage-SPEC 8-31). A submodule's entry is a commit, not a file.
+///
+/// # Errors
+/// Propagates a tree whose repository or index cannot be opened.
+pub(super) fn written(tree: &git2::Worktree) -> Result<Written, StorageError> {
+    let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
+        op,
+        detail: format!("{}: {err}", tree.path().display()),
+    };
+    let repo = git2::Repository::open_from_worktree(tree)
+        .map_err(|err| refuse("open a new worktree", err))?;
+    let index = repo
+        .index()
+        .map_err(|err| refuse("read a new worktree's index", err))?;
+    let mut files: u64 = 0;
+    let mut bytes: u64 = 0;
+    for entry in index.iter().filter(|entry| entry.mode != GITLINK) {
+        files = files.saturating_add(1);
+        bytes = bytes.saturating_add(u64::from(entry.file_size));
+    }
+    Ok(Written {
+        files,
+        bytes: ByteLen::new(bytes),
+    })
+}
 
 /// Bytes of the work a person did under a directory: git's own
 /// bookkeeping and the city's reserved subtree both excluded.
@@ -29,8 +77,9 @@ use crate::reserved::outside_reserved;
 /// Propagates a directory that exists and cannot be read. A directory
 /// that is not there weighs nothing, which is what a tree not yet
 /// created weighs.
-pub(super) fn measure(root: &Path) -> Result<ByteLen, StorageError> {
+pub(super) fn measure(root: &Path) -> Result<Weight, StorageError> {
     let mut total: u64 = 0;
+    let mut walked: u64 = 0;
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
         let entries = match std::fs::read_dir(&dir) {
@@ -45,6 +94,7 @@ pub(super) fn measure(root: &Path) -> Result<ByteLen, StorageError> {
             }
         };
         for entry in entries.flatten() {
+            walked = walked.saturating_add(1);
             let path = entry.path();
             let Ok(kind) = entry.file_type() else {
                 continue;
@@ -68,5 +118,8 @@ pub(super) fn measure(root: &Path) -> Result<ByteLen, StorageError> {
             }
         }
     }
-    Ok(ByteLen::new(total))
+    Ok(Weight {
+        bytes: ByteLen::new(total),
+        walked,
+    })
 }
