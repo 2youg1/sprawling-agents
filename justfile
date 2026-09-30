@@ -438,7 +438,7 @@ product_features := "sprawling/sandbox"
 # (sprawling-SPEC.md 8-84).
 bench:
     cargo run --release -p citysim --features {{product_features}} --bin bench
-    cargo nextest run -p sprawling --release --features {{product_features}} --run-ignored only -E 'test(/::instrument_/)' --no-capture
+    cargo nextest run -p sprawling -p sprawling-accounting --release --features {{product_features}} --run-ignored only -E 'test(/::instrument_/)' --no-capture
 
 # The four-action pressure reading (citysim-SPEC.md 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.

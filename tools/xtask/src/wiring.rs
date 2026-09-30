@@ -12,7 +12,7 @@
 //! Drawing a control the city cannot perform is loud: somebody clicks it
 //! and gets a refusal. v0.0.3 shipped three of those - `Takeover`,
 //! `Rollback` and `CreatePolicy` were on the wire, drawn in the client,
-//! and executable by nothing - and `assembly::not_built` already carried
+//! and executable by nothing - and `accounting::worker::not_built` already carried
 //! the rule in its own rustdoc: "A verb answered here must not appear as
 //! a control in the client." Nothing was reading it.
 //!
@@ -27,7 +27,7 @@
 //!
 //! **Three sources, no copies.** The variants come from the real `enum
 //! Command` parsed out of whichever `wire` module declares it; whether
-//! the city can perform one comes from `assembly::run_command`'s arms;
+//! the city can perform one comes from `accounting::worker::run_command`'s arms;
 //! whether a person can ask for one comes from `client/src`. The SPEC
 //! contributes the one fact none of the three can state - which side is
 //! *supposed* to reach it - and the gate reads it as data, so "the table
@@ -41,13 +41,16 @@ use crate::walk;
 
 const SPEC: &str = "crates/wire/wire-SPEC.md";
 const WIRE_DIR: &str = "crates/wire/src";
-/// Where the assembly point lives. A directory rather than a file: the
-/// gate wants the declaration of `run_command`, not its address, and
-/// pinning the address meant that splitting the assembly point moved the
-/// arms out from under the gate while leaving the gate green about it.
-const WORKER_DIR: &str = "crates/sprawling/src";
+/// The package the city's one writer lives in, whose `src` is searched.
+/// A package rather than a file: the gate wants the declaration of
+/// `run_command`, not its address, and pinning the address meant that
+/// splitting the worker moved the arms out from under the gate while
+/// leaving the gate green about it. Its directory is asked of `members`,
+/// the one reader of where a package lives, so moving the package moves
+/// the search with it.
+const WORKER: &str = "sprawling-accounting";
 /// Where the client's controls live. A directory for the same reason
-/// `WORKER_DIR` is one, and `walk`'s spelling of it because five gates
+/// `WORKER` names a package, and `walk`'s spelling of it because five gates
 /// asked this question and five gates answered it.
 use crate::walk::CLIENT_SRC as CLIENT;
 
@@ -99,8 +102,12 @@ fn violation(rule: &str, subject: String, alternative: &str) -> Violation {
 /// An arm answering with `not_built` is on the wire and has no executor,
 /// which is exactly the state the client may not draw a control for.
 fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError> {
+    let worker_src = format!(
+        "{}/src",
+        crate::members::find(&crate::members::members(root)?, WORKER)?.dir
+    );
     let mut found = None;
-    for file in walk::files_with_ext(&root.join(WORKER_DIR), &["rs"])? {
+    for file in walk::files_with_ext(&root.join(&worker_src), &["rs"])? {
         let text = walk::read_text(&file)?;
         if let Some(start) = text.find("fn run_command") {
             found = Some(text.get(start..).unwrap_or_default().to_owned());
@@ -109,7 +116,7 @@ fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError
     }
     let Some(body) = found else {
         return Err(XtaskError::Doc {
-            file: WORKER_DIR.to_owned(),
+            file: worker_src,
             msg: "no `run_command` under here to read the arms of".to_owned(),
         });
     };

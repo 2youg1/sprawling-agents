@@ -26,7 +26,7 @@
 //!
 //! **What is measured is direction, not mechanism.** The first cut of
 //! this gate looked for sockets and subprocesses in test code, and it
-//! convicted `assembly::driving` three times over: that test stands up a
+//! convicted `accounting::worker::driving` three times over: that test stands up a
 //! fake model provider and speaks HTTP to it, which is the test playing
 //! **the outside world** rather than consuming this product. Three
 //! waivers in one file is a gate saying its predicate is wrong, and the
@@ -374,7 +374,7 @@ mod tests {
                     drop(std::net::TcpStream::connect(&url).unwrap());\n\
                 }\n\
             }\n";
-        assert!(found("crates/sprawling/src/assembly/driving.rs", source).is_empty());
+        assert!(found("crates/accounting/src/worker/driving.rs", source).is_empty());
     }
 
     /// Reaching the binary this repository builds is standing outside it,
