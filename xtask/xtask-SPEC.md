@@ -16,7 +16,7 @@
 | guard | 墙外那份 `desktop/` 的 lint 表、包元数据与共享依赖版本与工作区逐键相等 |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名；生成的文件由它的生成器作证 |
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17 与 §8-38 |
-| wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（`wire.rs` 的 `enum Command`、`run_command` 的臂、`client/src`），wire-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
+| wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | secret | 全仓加夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
 | specalign | kernel 枚举 ↔ kernel-SPEC 逐 variant：§8-1／§8-4 两表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，计数、归属、carrier／窗类逐项同；SPEC 围栏里其余每一处 `pub enum` 体与 syn 解出的同名枚举双向对账（§8-10） |
 | budget | `xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
