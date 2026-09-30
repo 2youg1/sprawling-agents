@@ -18,7 +18,7 @@ Calling a face this city did not invent requires knowing the shape of the reques
 | [openai/openai-openapi](https://github.com/openai/openai-openapi) | MIT | the request and answer of the embeddings face, which every compatible server copied | `openapi.yaml` | `b6059fc737ac` |
 | [huggingface/text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) | Apache-2.0 | the request and answer of the rerank face, which has no OpenAI shape to copy | `docs/openapi.json` | `d246fbf17cc7` |
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Claude Code is started as an ACP agent: the adapter package and its version | `claude-acp/` | `4b785db2d336` |
-| [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Codex is started as an ACP agent: the adapter package and its version | `codex-acp/` | `9bd56ff1ce3a` |
+| [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Codex is started as an ACP agent: the adapter package and its version | `codex-acp/` | `7c3079219894` |
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Grok Build is started as an ACP agent: its package, version and arguments | `grok-build/` | `e20536b4ffaf` |
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Kimi Code is started as an ACP agent: its binary and arguments | `kimi/` | `a3f02fa2243b` |
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Pi is started as an ACP agent: the adapter package and its version | `pi-acp/` | `6a8a2f424c47` |
