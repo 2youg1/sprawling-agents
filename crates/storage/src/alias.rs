@@ -14,9 +14,9 @@
 //! opens.
 //!
 //! The rule this module owns: **the alias family is refused whole** -
-//! junction, symlink and hard link alike - literally where the link
-//! count is readable, and by landing the write in a fresh entry where it
-//! is not. The alternative, skipping an alias and counting it, lands
+//! junction, symlink and hard link alike - literally where this crate
+//! reads the link count, and by landing the write in a fresh entry where
+//! it does not yet. The alternative, skipping an alias and counting it, lands
 //! part of a write and breaks the all-or-nothing contract the restore
 //! face is built on.
 
@@ -28,9 +28,9 @@ use crate::error::StorageError;
 /// link are both reparse points and `file_type().is_symlink()` answers
 /// true for either, which is why they share a variant: refusing the
 /// family is one rule, not one rule per reparse tag. The third member
-/// of the family - the hard link - is classified where the platform
-/// reports a link count (Unix `nlink`) and is answered by the write
-/// mechanics where it cannot (Windows; storage-SPEC 8-25).
+/// of the family - the hard link - is classified where this crate reads
+/// a link count (Unix `nlink`) and is answered by the write mechanics
+/// where it does not yet (Windows; storage-SPEC 8-25 and §3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AliasKind {
     /// A symbolic link or a directory junction: the name leads
@@ -57,9 +57,10 @@ impl std::fmt::Display for AliasKind {
 /// asked with `symlink_metadata`, so a dangling link answers `Link`
 /// rather than disappearing. A hard link is one inode under two names,
 /// and a write at one name changes the other; Unix reports the link
-/// count on the metadata, Windows reports it only through the unstable
-/// `windows_by_handle` feature, so there the write faces answer it by
-/// landing a fresh entry instead (storage-SPEC 8-25, §3).
+/// count on the metadata; std reports it on Windows only through the
+/// unstable `windows_by_handle` feature and the safe third-party reader
+/// is not adopted (storage-SPEC §3), so there the write faces answer it
+/// by landing a fresh entry instead (storage-SPEC 8-25, §3).
 pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError> {
     let meta = match std::fs::symlink_metadata(path) {
         Ok(meta) => meta,
@@ -76,8 +77,8 @@ pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError> {
         return Ok(Some(AliasKind::Link));
     }
     // Only a regular file counts: a directory's link count measures its
-    // subdirectories, not aliasing, and the workspace forbids the FFI
-    // that would read the count on Windows.
+    // subdirectories, not aliasing, and Windows is answered by the write
+    // faces instead (storage-SPEC §3).
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
