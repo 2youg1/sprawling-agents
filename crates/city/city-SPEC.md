@@ -105,6 +105,7 @@ impl BuildingRules {
     pub fn model_pool(&self) -> ModelPool;
     pub fn usersbrowser(&self) -> Option<&UserBrowser>;
     pub fn write_domain(&self) -> Result<WriteDomain, AxError>;
+    pub fn harness_minutes(&self) -> u32;             // harness run 的墙钟上限；缺这一行读作 60
 }
 pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError>;
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
@@ -116,6 +117,8 @@ impl RulesCache {
     pub fn load(&self, addr: &Address) -> Result<Arc<BuildingRules>, AxError>;
 }
 ```
+
+**`harness_minutes`**：一次 harness run 在这栋楼里最多跑多少分钟（sprawling-SPEC §8-124），正整数；缺这一行读作 `HARNESS_MINUTES_DEFAULT`（60）。`0` 由 serde 在解析时拒（`NonZeroU32`）：一个到点即停的上限是笔误。它只管 harness：模型 run 的每一回合都经城自己的安全点，停一件事是 `cancel`、停一片是 `halt`，而 harness 的回合在城之外走完，一个既不说话也不结束的 harness 没有别的路让出车道（§12.8 (b)）。
 
 `RulesCache`（`policy/cache.rs`，形状 1 判定）：一个 run 一份，读界的闭包持有它。`load` 先对 `RULES.toml` 做一次 stat，(mtime, len) 与上次读到的相同就交回留着的规则，不同或第一次就走 `load` 读盘求值并按这次 stat 的戳留下。文件不存在或 stat 失败时不留任何东西、每次都走 `load`，于是「没有 RULES.toml」与「被替代的旧文档」两条的答案与不缓存时逐字相同。锁中毒时同样退回 `load`。失败与 `load` 相同，失败不留。决定见 §12.3。
 
@@ -695,6 +698,16 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 **被否**：梯子自己按错误种类挑恢复语——那是恢复语的第二个家，拒词加一种它就要跟一种。
 
 **重开参数**：梯子开始读 `ConfigLayer::parse` 以外的来源（例如人层 `~/.sprawling/config.toml`），而那个来源的拒词不带恢复语时。
+
+**(b) harness 的墙钟上限是楼规的一键，缺省 60 分钟。**
+
+**决定**：`RULES.toml` 的 `harness_minutes` 给一栋楼里每次 harness run 的墙钟上限，缺省 `HARNESS_MINUTES_DEFAULT = 60`，`0` 在解析时拒。
+
+**理由**：上限回答的是「这栋楼肯让一个外来居民占一条车道多久」，与 `review`、`confidential` 同是楼对它的居民立的规矩，而楼规由人写、run 改不了（§12.1）。放在 `CONFIG.toml` 的 `[resident]` 表里，它会爬城／楼／房间的梯子，一间房自己的那一层就能把上限写大，而那一层是会话写记录的地方。缺省给一个值而不是「不限」：不限时一个卡住的 harness 占着车道直到人发现，60 分钟够一次大的改动做完。
+
+**被否**：①`[resident] minutes` 与 `harness` 并列：见上，房间一层能改楼的上限；②缺省不限、只靠停摆：卡住的 harness 要人来发现。
+
+**重开参数**：车道数（sprawling-SPEC §8-46-3）变得不再稀缺，或 harness 能在回合中间报告进度、城能分辨「在做事」与「卡住了」时。
 
 ## 13 依赖选型
 
