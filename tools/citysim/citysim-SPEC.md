@@ -1,7 +1,7 @@
 # citysim-SPEC.md
 
 > 工作区成员：`citysim`（dev-only，第二个 Main，不占产品拓扑）。本 SPEC 先于代码存在。
-> 内容：内存 Ledger 与链检查器（§8）、剧本设施与薄执行器（§8-2）、真适配器换入（§8-3）、两个测量二进制（§8-5、§8-6）与评估仪器（§8-7、§8-8）。
+> 内容：内存 Ledger 与链检查器（§8）、剧本设施与薄执行器（§8-2）、真适配器换入（§8-3）、两个测量二进制（§8-5、§8-6）、评估仪器（§8-7、§8-8）与替身 provider（§8-10）。
 
 ## 1 需求分解
 
@@ -18,6 +18,8 @@
 | `bin/bench` | 负载场景与读数行（§8-6） |
 | `bin/bench_startup` | 四个动作的冷启动测量（§8-5） |
 | `long_turn`、`bin/long_turn` | 长回合：一个 run 连续读一个在变的文件，逐次记下模型请求的字节上界；内存读数经 `just mem long-turn`（§8-9） |
+| `wire_script` | provider 线上 JSON 的脚本，与在回环地址上逐条回放它、把每次交换记进文件的替身（§8-10） |
+| `bin/provider` | 替身的进程：绑一个回环端口，印出 `SPRAWLING_PROVIDER=<url>`，然后回放（§8-10） |
 
 ## 2 验收标准
 
@@ -79,6 +81,15 @@ fx 的一次修复之前，一个长回合每一步都留着整份恢复重建�
 **RSS 是读数，不是门。** 进程的计数器随机器与分配器变。`just mem long-turn <steps>` 构建 release 的 `long_turn`，它每走完 100 步停一次，打印一行 `step <k> pid <pid>`，等一行输入再走；配方在每次停顿时调 `cargo xtask mem <pid>`——进程计数器的唯一读者（xtask-SPEC §8-30）——再放它走。最后一次停顿的 peak private 就是整个 run 的峰值；相邻两次的 private 之差除以步数，就是每步的增长。模拟器自己的 `MemLedger` 把每一行都留在内存里；跑完的那一行 `done <completion> steps <n> window <bytes> ledger <bytes>` 给出它的字节数与最后一次请求的窗口，每一步的账本行一样长，读者按步数把它从每次停顿的 private 里减掉。峰值的上限由整合者按读数登记进 `tools/xtask/budgets.toml`，写 MiB，照 fx 的做法是 500 步的峰值上限。本配方不带 `product_features`：`long_turn` 直接驱动 `runtime::run::drive`，被量的回合路径与 `sandbox` feature 无关，带上它只会把用不到的执行引擎编进被量的进程。
 
 被否：计数型全局分配器（要 `unsafe impl GlobalAlloc`，workspace 的 `unsafe_code` 是 forbid）；`long_turn` 自己读自己的计数器（Windows 上要么写 FFI，要么像 xtask 那样起一个 PowerShell，于是计数器有了第二个读者）。**重开参数**：出现安全的分配计数接口时，把每步分配的字节也做成门；runtime 给回合窗口一个默认的上界（压缩）时，断言从「增量处处相同」改成「窗口不超过上界」。
+### 3-11 决定：进程外的替身 provider 是 citysim 的一个二进制，脚本就是 `ScriptModel` 的那种线上 JSON
+
+黑盒验收要让发行件去调一个会应答的 provider，而三条已有的规则各挡住一个位置：黑盒检查写在 Lean 里（`xtask boundary`），`tools/adversary/` 不自带 HTTP 服务端（adversary-SPEC §13：一个假 provider 会让那个目录变成第二个 gateway 实现），为测试写的东西不进人下载的二进制（`xtask artifact`）。剩下的位置是这里：`bin/provider` 是测试工具，由 justfile 拉起，URL 经环境变量 `SPRAWLING_PROVIDER` 交给调用它的检查，与对抗器经 `SPRAWLING_BIN` 接收二进制是同一个形状。
+
+脚本的格式只有一种：一份 JSON 写明兼容格式（`face`，拼法取 `kernel::DialectKind` 的 serde 形）、`/models` 列出的模型 id，以及按到达顺序回放的回复，每条回复就是那个兼容格式的 provider 会发的线上 JSON。`WireScript::parse` 把每条回复经 `ScriptModel::from_wire` 读一遍，那里走的是 `gateway::response_from_wire`，与城读真 provider 的回复是同一个函数，所以一份替身能回放的脚本也是 `ScriptModel` 能回放的脚本，写错一个键在解析时就被拒，而不是在城里变成一条 `E_WIRE_MISMATCH`。
+
+**替身不生成任何文字**（产品里不内置模型）：它只回放脚本，脚本用尽就拒绝。
+
+被否：①把 `bin::assembly::fixture::FakeProvider` 提出来复用——它挂在 `#[cfg(test)]` 下，是 crate 内部回答 HTTP 细节的替身，脚本是散落在测试里的字符串，而且用尽后重复最后一条，黑盒检查因此看不出城多调了一次；②第三种脚本格式——替身与 `ScriptModel` 各读一种，同一段对话就要写两遍。**重开参数**：一份脚本要同时驱动两个并发的 run 时（多日小镇的确定性版本），到达顺序由机器决定，脚本加上按请求内容选路的一支，形状照 `FakeProvider` 的 `Routed`；一条检查要让城收到一条读不懂的回复时，脚本加上一种不经 `parse` 验证的条目。
 
 ## 4 现状分析
 
@@ -454,6 +465,49 @@ pub fn long_turn(steps: u32, pauses: Pauses) -> Result<TurnReading, AxError>;
 - `Pauses::Every` 在第 `steps` 的每个整数倍次 `read` 之后调 `at(k)`：`bin/long_turn` 在那里打印一行并等一行输入（§3-10），测试传 `Pauses::Never`。
 - `bin/long_turn <steps> [every]`：缺省每 100 步停一次；跑完打印 `done <completion> steps <n> window <bytes> ledger <bytes>`。
 - 测试：`long_turn::tests` 的 `a_long_turn_grows_its_window_by_one_step_at_a_time` 在 40 步与 80 步上断言结局、调用次数与增量处处相同。
+### 8-10 替身 provider：回放一份线上脚本，记下每一次交换（`citysim::wire_script`、`bin/provider`）
+
+形状：`wire_script` 是 decision 加一个 adapter——哪一个请求得到哪一个回答由 `Replay` 判，套接字与记录文件的读写在 `wire_script::exchange`；`bin/provider` 是 adapter。决定见 §3-11。
+
+```rust
+// citysim::wire_script
+pub struct WireScript { /* face: DialectKind, models: Vec<String>, replies: Vec<Value> */ }
+impl WireScript {
+    /// `{"face": "open_ai", "models": ["…"], "replies": [<线上 JSON>, …]}`；每条回复经
+    /// `ScriptModel::from_wire` 读一遍。
+    pub fn parse(text: &str) -> Result<WireScript, AxError>;   // E_CONFIG_INVALID，subject 写键路径
+}
+pub struct ScriptedProvider { /* listener, replay, record */ }
+impl ScriptedProvider {
+    /// 记录文件在这里被清空：一次回放一份记录。
+    pub fn open(listener: TcpListener, script: WireScript, record: &Path) -> Result<ScriptedProvider, AxError>;
+    pub fn url(&self) -> Result<String, AxError>;               // http://127.0.0.1:<port>/v1
+    /// 接一条连接，读完一个请求，答它，把这次交换追加进记录。
+    pub fn answer_one(&mut self) -> Result<(), AxError>;
+}
+```
+
+**一个请求得到什么**（`Replay`，按方法分，不按路径分：路径属于兼容格式，只有 gateway 的 `chat_path` 知道它，替身再写一份就是第二个权威，而城只会用 GET 取模型列表、用 POST 发对话）：
+
+| 请求 | 回答 |
+|---|---|
+| `GET` 任意路径，脚本列了模型 | 200，`{"data":[{"id":…},…]}` |
+| `GET`，脚本没列模型 | 404，码 `no_model_list`：一个不提供列表的网关，城要按人写下的 id 挂它 |
+| `POST`，脚本还有回复 | 200，下一条回复，`content-type: application/json`——城要的是流时也照读（gateway 按媒体类型认出整段回复） |
+| `POST`，脚本已用尽 | 410，码 `script_exhausted` |
+| 其他方法 | 405，码 `method_unanswered` |
+
+拒绝的正文是 `{"error":{"type":"<码>","message":"<一句话>"}}`，OpenAI 与 Anthropic 两种兼容格式的错误都是这个形状。410 与 405 都不在 gateway 的「可重试」之列（408、429、5xx），所以城把用尽读成一次不会自己好的拒绝，而不是一直重发。**用尽要拒，不重复最后一条**：黑盒检查要看得见城比脚本多调了一次。
+
+**什么算一个请求，只在读的那一处定**：头读到空行，再按 `content-length`（缺省为 0）读完正文，才是一个请求；连接在那之前断了，不回答、不记录、不花掉脚本里的一条，否则之后的每一轮都在答前一轮的问题。一条连接一个请求，回答带 `connection: close`；连接一条接一条地答，顺序就是到达顺序。
+
+**记录**：每次交换一行 JSON，追加进 `record`：`seq`（从 1 起）、`method`、`target`、`headers`（到达顺序，名字小写，值原样）、`body`（请求正文的文字）、`status`、`answer`（回答的正文）。同一份脚本收到同样的请求字节，记录逐字节相同。**凭据头的值不落盘**：名字是 `authorization`、`proxy-authorization` 或以 `api-key` 结尾的头，值写成 `redacted`。检查要的是「带了凭据」，不是凭据本身，而人在测试时填的 key 不能出现在任何文件里。
+
+**`bin/provider`**：`provider <script.json> <record.jsonl> [<listen>]`，`listen` 缺省 `127.0.0.1:0`，不是回环地址就拒（`E_INVALID_ARGS`）。绑定之后先在标准输出印一行 `SPRAWLING_PROVIDER=<url>` 再开始回放，调用它的配方读这一行拿到 URL。一次交换失败（连接断了、答不出去）写到标准错误，替身接着答下一条；记录写不进去（`E_STORAGE_FATAL`）时退出非零，因为之后的检查读的正是那份记录。
+
+**失败**：`parse` 以 `E_CONFIG_INVALID` 拒一份读不懂的脚本（subject 是键路径，如 `replies[2]`，recovery 指回那一条）；套接字的失败是 `E_TOOL_UNAVAILABLE`；记录文件写不进去是 `E_STORAGE_FATAL`。
+
+**红**：`wire_script::tests::the_same_request_twice_is_recorded_byte_for_byte_alike`——两个替身各回放同一份脚本，各收一次同样的模型列表请求与对话请求，两份记录逐字节相同且各有两行；`wire_script::tests::an_exhausted_script_is_refused_with_its_code`——一条回复的脚本收到第二次对话请求，回答是 410 与码 `script_exhausted`。
 
 ## 9–16 工作流程／实现／边界／错误／依赖／硬编码／影响面／测试
 
