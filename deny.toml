@@ -24,12 +24,6 @@ allow = [
     # that MIT leaves unsaid. A development dependency of the client's
     # lint step, which reaches no user.
     "BlueOak-1.0.0",
-    # CC-BY-4.0: caniuse-lite, the browser-support data table browserslist
-    # reads at build time, reached through @babel/helper-compilation-targets
-    # from vite-plugin-solid. Attribution for a data set, the same shape as
-    # CDLA-Permissive-2.0 above, and the bill of materials `just dist`
-    # writes is where that attribution lands.
-    "CC-BY-4.0",
 ]
 
 [bans]

@@ -8,6 +8,10 @@
 //! one lockfile produce identical bytes. Release三件 item two's file
 //! half; the embedded half is the dependency list build.rs bakes into
 //! the binary (`sprawling status --deps`).
+//!
+//! The npm packages the client bundles are not components here; their
+//! names, versions and licence texts ship inside the binary as the
+//! client's `THIRD-PARTY-NOTICES.txt` (client-SPEC 12-13).
 
 use std::path::Path;
 use std::process::Command;

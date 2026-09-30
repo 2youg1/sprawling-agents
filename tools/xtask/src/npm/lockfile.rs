@@ -205,21 +205,70 @@ pub(super) fn permitted(text: &str) -> Result<BTreeSet<String>, XtaskError> {
 /// imposes all of them, so every branch must be permitted. This is how
 /// `cargo-deny` reads the same expression, and two readers that
 /// disagreed would let one side of the tree carry what the other bans.
+/// Precedence is SPDX's: parentheses first, then `WITH`, which binds an
+/// exception to one licence and is looked up as that whole phrase, then
+/// `AND`, then `OR`. An expression that does not parse, the empty one
+/// included, is a licence nobody stated, and is not permitted.
 pub(super) fn allowed(expression: &str, permitted: &BTreeSet<String>) -> bool {
-    let cleaned = expression.replace(['(', ')'], " ");
-    let trimmed = cleaned.trim();
-    if trimmed.is_empty() {
-        return false;
+    let spaced = expression.replace('(', " ( ").replace(')', " ) ");
+    let mut spdx = Spdx {
+        tokens: spaced.split_whitespace().peekable(),
+        permitted,
+    };
+    let verdict = spdx.any_of();
+    verdict == Some(true) && spdx.tokens.next().is_none()
+}
+
+/// A recursive-descent reading of one SPDX expression. Each step answers
+/// `None` when the text stops being an expression, so a dangling
+/// operator or an unclosed parenthesis is refused rather than guessed at.
+struct Spdx<'a> {
+    tokens: std::iter::Peekable<std::str::SplitWhitespace<'a>>,
+    permitted: &'a BTreeSet<String>,
+}
+
+impl Spdx<'_> {
+    /// `all_of ("OR" all_of)*`: permitted when any branch is.
+    fn any_of(&mut self) -> Option<bool> {
+        let mut verdict = self.all_of()?;
+        while self.tokens.next_if_eq(&"OR").is_some() {
+            verdict = self.all_of()? || verdict;
+        }
+        Some(verdict)
     }
-    if trimmed.contains(" OR ") {
-        return trimmed
-            .split(" OR ")
-            .any(|branch| allowed(branch, permitted));
+
+    /// `licence ("AND" licence)*`: permitted when every branch is.
+    fn all_of(&mut self) -> Option<bool> {
+        let mut verdict = self.licence()?;
+        while self.tokens.next_if_eq(&"AND").is_some() {
+            verdict = self.licence()? && verdict;
+        }
+        Some(verdict)
     }
-    if trimmed.contains(" AND ") {
-        return trimmed
-            .split(" AND ")
-            .all(|branch| allowed(branch, permitted));
+
+    /// `"(" any_of ")"`, or an identifier with an optional `WITH`
+    /// exception, looked up on the allowlist as written.
+    fn licence(&mut self) -> Option<bool> {
+        match self.tokens.next()? {
+            "(" => {
+                let verdict = self.any_of()?;
+                self.tokens.next_if_eq(&")")?;
+                Some(verdict)
+            }
+            ")" | "AND" | "OR" | "WITH" => None,
+            identifier => {
+                if self.tokens.next_if_eq(&"WITH").is_none() {
+                    return Some(self.permitted.contains(identifier));
+                }
+                let exception = self
+                    .tokens
+                    .next()
+                    .filter(|word| !matches!(*word, "(" | ")" | "AND" | "OR" | "WITH"))?;
+                Some(
+                    self.permitted
+                        .contains(&format!("{identifier} WITH {exception}")),
+                )
+            }
+        }
     }
-    permitted.contains(trimmed)
 }
