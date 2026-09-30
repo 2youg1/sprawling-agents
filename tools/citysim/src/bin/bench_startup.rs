@@ -140,8 +140,13 @@ first byte: `serve` spawned to the first byte of GET /, fixture cities in {}",
         cities.display()
     );
     println!(
-        "{:<8} {:>8} {:>10} {:>10} {:>10}",
-        "city", "samples", "floor ms", "p50 ms", "peak ms"
+        "two readings compare only when their fixture digests are equal; each serve's \
+         standard error is kept beside its city, and its `opened the city in` line is the \
+         product's own split of the same opening (sprawling-SPEC.md 8-121)"
+    );
+    println!(
+        "{:<8} {:>8} {:>10} {:>10} {:>10}   {:<16}   serve log",
+        "city", "samples", "floor ms", "p50 ms", "peak ms", "fixture"
     );
     for (name, history, samples) in [
         ("empty", History::Empty, 20),
@@ -149,12 +154,16 @@ first byte: `serve` spawned to the first byte of GET /, fixture cities in {}",
         ("l400k", History::Runs(8_000), 3),
     ] {
         let city = actions::history::fixture_city(&cities, name, history)?;
-        let taken = actions::first_byte::first_byte(binary, &city, samples)?;
+        let fixture = citysim::ledger_digest(&kernel::layout::CityLayout::new(&city).ledger())?;
+        let log = cities.join(format!("{name}.serve.log"));
+        let taken = actions::first_byte::first_byte(binary, &city, samples, &log)?;
         println!(
-            "{name:<8} {samples:>8} {:>10.3} {:>10.3} {:>10.3}",
+            "{name:<8} {samples:>8} {:>10.3} {:>10.3} {:>10.3}   {:<16}   {}",
             ms(taken.floor()),
             ms(taken.p(Share::P50)),
-            ms(taken.peak())
+            ms(taken.peak()),
+            citysim::fixture_label(&fixture),
+            log.display()
         );
     }
     Ok(())

@@ -10,7 +10,9 @@
 //! than the port opening, because a person sees the page, and a server
 //! that accepts a connection it cannot answer yet is still closed to
 //! them. Each sample serves on a port borrowed from the system a moment
-//! before and is stopped as soon as its byte arrives.
+//! before and is stopped as soon as its byte arrives. What that serve
+//! wrote to standard error is kept in the log file the caller names, so
+//! the phases the product timed for itself sit beside the reading.
 
 use std::io::{Read as _, Write as _};
 use std::net::{SocketAddr, TcpStream};
@@ -30,20 +32,29 @@ const POLL: Duration = Duration::from_millis(2);
 /// tens of seconds on a slow disk.
 const WITHIN: Duration = Duration::from_secs(300);
 
-/// `samples` spawns of `serve` over `city`, each timed to its first byte.
+/// `samples` spawns of `serve` over `city`, each timed to its first byte;
+/// each sample's standard error replaces the last one's in `log`.
 ///
 /// # Errors
 /// Refuses a sample whose server exited or never answered, and
-/// propagates the operating system's refusal to spawn or stop it.
-pub fn first_byte(binary: &Path, city: &Path, samples: usize) -> Result<Samples, AxError> {
-    let head = one(binary, city)?;
+/// propagates the operating system's refusal to spawn or stop it, or to
+/// open `log`.
+pub fn first_byte(
+    binary: &Path,
+    city: &Path,
+    samples: usize,
+    log: &Path,
+) -> Result<Samples, AxError> {
+    let head = one(binary, city, log)?;
     let tail = (1..samples)
-        .map(|_| one(binary, city))
+        .map(|_| one(binary, city, log))
         .collect::<Result<Vec<Duration>, AxError>>()?;
     Ok(Samples::of(head, tail))
 }
 
-fn one(binary: &Path, city: &Path) -> Result<Duration, AxError> {
+fn one(binary: &Path, city: &Path, log: &Path) -> Result<Duration, AxError> {
+    let said = std::fs::File::create(log)
+        .map_err(|err| refused("keep the serve's log", &log.display().to_string(), &err))?;
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .and_then(|listener| listener.local_addr())
         .map_err(|err| refused("borrow a loopback port", "127.0.0.1:0", &err))?
@@ -56,7 +67,7 @@ fn one(binary: &Path, city: &Path) -> Result<Duration, AxError> {
         .args(["--no-console", "--no-open"])
         .env("SPRAWLING_OPEN", "never")
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::from(said))
         .spawn()
         .map_err(|err| {
             refused(
