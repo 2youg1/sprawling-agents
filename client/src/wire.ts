@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 44 as const;
+export const WIRE_V = 45 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "ad03359603da70f40dfe6ab481076a84f13bee627ea7cdd5563572848aed41a9" as const;
+export const WIRE_HASH = "046ff264f692eb93d76f15267f31b986a139f9b6829b877e27211e863e76ebc8" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -592,6 +592,15 @@ export const CityAnswer = Schema.Struct({
 export type CityAnswer = typeof CityAnswer.Type;
 
 /**
+ * A commit, and where in the one history the line announcing it sits.
+ */
+export const CommitAt = Schema.Struct({
+  oid: GitOid,
+  seq: Seq,
+}).annotations({ identifier: "CommitAt" });
+export type CommitAt = typeof CommitAt.Type;
+
+/**
  * How hard the provider should think before answering, ordered from
  * least to most. Both dialects accept every level; they disagree only
  * on where `None` is written (an effort value on one wire, a separate
@@ -630,6 +639,8 @@ export const CommitAnswer = Schema.Struct({
   lineage: Schema.Array(RunId),
   model: Schema.String,
   oid: GitOid,
+  parents: Schema.optional(Schema.NullOr(Schema.Array(GitOid))),
+  previous: Schema.optional(Schema.NullOr(CommitAt)),
   run: RunId,
   seq: Seq,
   session: Schema.optional(Schema.NullOr(SessionName)),
@@ -1642,7 +1653,7 @@ export type ListingAnswer = typeof ListingAnswer.Type;
 /**
  * One of the closed set of error codes, as `AxCode::as_str` spells it.
  */
-export const AxCode = Schema.Literal("E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING").annotations({ identifier: "AxCode" });
+export const AxCode = Schema.Literal("E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_HISTORY_UNPROVEN", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING").annotations({ identifier: "AxCode" });
 export type AxCode = typeof AxCode.Type;
 
 /**
@@ -2069,6 +2080,33 @@ export const Opening = Schema.Struct({
 export type Opening = typeof Opening.Type;
 
 /**
+ * What kind of boundary a call crosses — this field routes the call to
+ * its gate; it is machine input, not documentation.
+ */
+export const Effect = Schema.Union(
+  Schema.Literal("read", "spend"),
+  Schema.Struct({
+    write: Schema.Struct({
+      domain: Address,
+    }),
+  }),
+  Schema.Literal("egress"),
+  Schema.Struct({
+    connector: Schema.Struct({
+      label: Schema.String,
+    }),
+  }),
+  Schema.Literal("spawn"),
+  Schema.Literal("govern"),
+  Schema.Struct({
+    attach_user_browser: Schema.Struct({
+      address: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  }),
+).annotations({ identifier: "Effect" });
+export type Effect = typeof Effect.Type;
+
+/**
  * What a tool call has come to so far.
  * 
  * Three states rather than a `bool` and an `Option`: a call still
@@ -2094,8 +2132,36 @@ export type Outcome = typeof Outcome.Type;
 export const Output = Schema.Struct({
   cut: Schema.Int,
   head: Schema.String,
+  pinned: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotations({ identifier: "Output" });
 export type Output = typeof Output.Type;
+
+/**
+ * Presentation intent; per-call `locations` are a pure function of args
+ * (tool side). Meta-level declarations use an empty list.
+ */
+export const RenderIntent = Schema.Union(
+  Schema.Literal("generic", "terminal"),
+  Schema.Struct({
+    diff: Schema.Struct({
+      locations: Schema.Array(Address),
+    }),
+  }),
+).annotations({ identifier: "RenderIntent" });
+export type RenderIntent = typeof RenderIntent.Type;
+
+/**
+ * Whether the span between two times on a row is a measurement.
+ * 
+ * Two values because a page does one of two things with a row: draw
+ * how long it took, or draw no duration at all. The times themselves
+ * travel either way; they still give the row its order.
+ */
+export const Timing = Schema.Union(
+  Schema.Literal("measured"),
+  Schema.Literal("unmeasured"),
+).annotations({ identifier: "Timing" });
+export type Timing = typeof Timing.Type;
 
 /**
  * One tool call inside a turn.
@@ -2105,9 +2171,12 @@ export const Call = Schema.Struct({
   arguments: Schema.optional(Schema.NullOr(Output)),
   at: Seq,
   called: TimeMs,
+  effect: Schema.optional(Schema.NullOr(Effect)),
   outcome: Outcome,
   output: Schema.optional(Schema.NullOr(Output)),
+  render: Schema.optional(Schema.NullOr(RenderIntent)),
   subject: Schema.optional(Schema.NullOr(Schema.String)),
+  timing: Timing,
   tool: Schema.String,
 }).annotations({ identifier: "Call" });
 export type Call = typeof Call.Type;
@@ -2129,7 +2198,7 @@ export const Note = Schema.Union(
     }),
   }),
   Schema.Struct({
-    fenced: Schema.Struct({
+    checkpointed: Schema.Struct({
       at: Seq,
       oid: GitOid,
     }),
@@ -2183,6 +2252,7 @@ export type Used = typeof Used.Type;
  */
 export const Turn = Schema.Struct({
   calls: Schema.Array(Call),
+  first_at: Schema.optional(Schema.NullOr(TimeMs)),
   model: Schema.optional(Schema.NullOr(Schema.String)),
   notes: Schema.Array(Note),
   number: Schema.Int,
@@ -2192,6 +2262,7 @@ export const Turn = Schema.Struct({
   stopped: Schema.optional(Schema.NullOr(Schema.String)),
   t: TimeMs,
   thought: Schema.optional(Schema.NullOr(Schema.String)),
+  timing: Timing,
   used: Schema.optional(Schema.NullOr(Used)),
 }).annotations({ identifier: "Turn" });
 export type Turn = typeof Turn.Type;
