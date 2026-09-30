@@ -655,7 +655,7 @@ than typed.
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
 | Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->578,422 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->3.6×<!-- xtask:end --> headroom | yes |
-| The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->12,857,344 B<!-- xtask:end -->, client included | yes |
+| The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->13,159,936 B<!-- xtask:end -->, client included | yes |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:resident_empty_idle -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:resident_empty_idle -->2,469,888 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_ms -->5<!-- xtask:end --> ms, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_ms -->20<!-- xtask:end --> ms | `[ledger_append]`, with its machine class | no |
 | Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->2,759<!-- xtask:end --> ms for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
