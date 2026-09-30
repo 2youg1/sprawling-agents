@@ -75,7 +75,9 @@ pub(crate) struct Driving {
 
 /// What the sieve needs from the city for one run: a store to pin the
 /// original in, the room the model reads the rest from, the
-/// filter table frozen with the run, and what this run already saw.
+/// filter table frozen with the run, and what this run already saw;
+/// and what decides a command result's clock line: the run's gate and
+/// the driver's latest reading (sprawling-SPEC 8-125).
 pub(crate) struct Sieving {
     /// The store the lanes share, taken for the length of one package.
     pub cas: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
@@ -85,18 +87,30 @@ pub(crate) struct Sieving {
     pub origin: storage::BlockOrigin,
     pub table: runtime::FilterTable,
     pub history: runtime::SieveHistory,
+    /// Whether a result carries the clock line, built from the run's
+    /// frozen `[clock]`.
+    pub stamps: runtime::StampGate,
+    /// What the driver read last. The drive's clock hook keeps every
+    /// reading here, so a stamp names a moment the ledger records and
+    /// the run still has one sampling point.
+    pub clock: runtime::ClockReading,
 }
 
 impl Sieving {
     /// What the model reads of one command's output, decided by the
     /// pipeline under the command's own key with the original pinned
-    /// first. The stamp is `None` because the turn already stamps a
-    /// result where the frozen configuration asks for one.
+    /// first, and its clock line where the run's gate asks for one.
+    /// Before the driver has read its clock there is nothing to stamp.
     fn package(
         &mut self,
         call: &kernel::ToolCall,
         outcome: kernel::ToolOutcome,
+        temporal: kernel::Temporal,
     ) -> Result<kernel::ToolOutcome, AxError> {
+        let stamp = match self.clock.latest() {
+            Some(at) => self.stamps.observe(at, temporal)?,
+            None => None,
+        };
         let mut cas = super::held(&self.cas, "take the lanes' store")?;
         package_exec(
             call,
@@ -111,7 +125,7 @@ impl Sieving {
                 table: &self.table,
                 history: &mut self.history,
             },
-            None,
+            stamp,
         )
     }
 }
@@ -184,6 +198,11 @@ impl Sieving {
             },
             table: site.filters.clone(),
             history: runtime::SieveHistory::default(),
+            stamps: runtime::StampGate::new(
+                site.config.clock_stamp,
+                site.config.clock_zones.clone(),
+            ),
+            clock: site.clock.clone(),
         }
     }
 }

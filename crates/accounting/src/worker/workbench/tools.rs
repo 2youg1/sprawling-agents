@@ -366,6 +366,7 @@ impl Laying {
         // The thirteenth line: what this run started and left running.
         Ok(tool
             .reporting(self.backlog.clone())
-            .metering(reach.context.clone()))
+            .metering(reach.context.clone())
+            .clocked(site.clock.clone()))
     }
 }

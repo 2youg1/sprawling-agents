@@ -13,7 +13,9 @@
 
 use std::cell::RefCell;
 
-use kernel::{AxError, Effect, IdemKey, RunId, Seq, TimeMs, Tool, ToolCall, ToolOutcome, Writes};
+use kernel::{
+    AxError, Effect, IdemKey, RunId, Seq, Temporal, TimeMs, Tool, ToolCall, ToolOutcome, Writes,
+};
 use runtime::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
 use runtime::{Admitted, ConcurrentInvoke};
 
@@ -129,6 +131,14 @@ impl<'f> Placing<'f> {
         }
     }
 
+    /// Whether the call's tool says its results are about now. A tool
+    /// the bench does not know claims nothing, which is `Timeless`.
+    fn temporal_of(&self, call: &ToolCall) -> Temporal {
+        self.bench
+            .meta_of(&call.name)
+            .map_or(Temporal::Timeless, |meta| meta.temporal)
+    }
+
     /// What the model reads back for what the bench decided.
     fn answered(&mut self, call: &ToolCall, decided: BenchOutcome) -> Result<ToolOutcome, AxError> {
         match decided {
@@ -162,7 +172,7 @@ impl<'f> Placing<'f> {
                 } else {
                     self.ran.0 = self.ran.0.saturating_add(1);
                 }
-                self.sieving.package(call, outcome)
+                self.sieving.package(call, outcome, self.temporal_of(call))
             }
             BenchOutcome::Refused { refusal } => Err(*refusal),
             // A replay is answered with what the first call answered,
@@ -171,7 +181,7 @@ impl<'f> Placing<'f> {
             // command counters are not touched: nothing ran this time.
             BenchOutcome::Duplicate { outcome } => {
                 if call.name.as_str() == kernel::ToolName::EXEC {
-                    self.sieving.package(call, outcome)
+                    self.sieving.package(call, outcome, self.temporal_of(call))
                 } else {
                     self.unsieved(call, outcome)
                 }

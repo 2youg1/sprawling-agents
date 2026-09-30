@@ -196,9 +196,12 @@ pub const IMAGE_QUALITY: crate::policy_limit::ImageQuality =
 /// run is read off the account rather than guessed at.
 pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;
 
-/// Off by default: zero window bytes until a Building opts in.
+/// Every `Timestamped` result carries the clock line, and a `Timeless`
+/// one at most once a minute, until a layer writes `[clock] stamp`: a
+/// model that cannot tell when a command ran cannot tell a stale answer
+/// from a fresh one (runtime-SPEC 12.8).
 pub const CLOCK_STAMP_DEFAULT: crate::config::ClockStampGranularity =
-    crate::config::ClockStampGranularity::Off;
+    crate::config::ClockStampGranularity::Minute;
 
 /// Who reads the Approval Inbox in a city nobody has configured: the
 /// person, because the inbox holds design questions and a design

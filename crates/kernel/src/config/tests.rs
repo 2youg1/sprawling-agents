@@ -56,7 +56,7 @@ fn absence_everywhere_takes_the_policy_default() {
         &LayeredValue::default(),
     );
     assert_eq!(frozen.clock_stamp, CLOCK_STAMP_DEFAULT);
-    assert_eq!(frozen.clock_stamp, ClockStampGranularity::Off);
+    assert_eq!(frozen.clock_stamp, ClockStampGranularity::Minute);
     assert!(frozen.clock_zones.is_empty());
     assert_eq!(
         frozen.effort, None,

@@ -265,6 +265,7 @@ impl RunWorker {
             write_root: self.city_root.clone(),
             branch: None,
             filters,
+            clock: runtime::ClockReading::default(),
             retries,
         })
     }

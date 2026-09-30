@@ -164,6 +164,9 @@ pub(super) struct Site {
     /// city's and the building's `FILTERS.toml` and frozen with the run
     /// (sprawling-SPEC 8-43).
     pub(super) filters: runtime::FilterTable,
+    /// The moment this run's driver read its clock last, which `status`
+    /// and a command's clock line report (sprawling-SPEC 8-125).
+    pub(super) clock: runtime::ClockReading,
     /// Carried from the endpoint this run was given, frozen with
     /// everything else the run was set up with.
     pub(super) retries: kernel::Retries,

@@ -214,7 +214,10 @@ pub(crate) fn drive_run<L: Ledger>(
         checkpoint_gate,
         clock,
     } = context;
-    let mut now = || clock.now();
+    // Every reading the driver takes is kept where a command's clock
+    // line and `status` read it, so neither needs a clock of its own.
+    let reading = sieving.clock.clone();
+    let mut now = || clock.now().inspect(|at| reading.keep(*at));
     let declared = bench.declared_writes();
     let mut checkpoint_handle =
         storage::Checkpoint::open(&write_root).map_err(storage::StorageError::into_ax)?;

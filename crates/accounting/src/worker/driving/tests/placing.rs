@@ -97,6 +97,8 @@ fn placing<'f>(
         },
         table: runtime::FilterTable::builtin(),
         history: runtime::SieveHistory::default(),
+        stamps: runtime::StampGate::new(kernel::ClockStampGranularity::Off, Vec::new()),
+        clock: runtime::ClockReading::default(),
     };
     Placing::new(bench, sieving, RunId::CITY, checkpointing)
 }
