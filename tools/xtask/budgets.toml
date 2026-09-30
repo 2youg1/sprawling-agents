@@ -122,7 +122,7 @@ budget_bytes = 134217728
 # choice to link it here.
 best_bytes = 13159936
 slack_bytes = 1048576
-measured_by = "just build-web, cargo build --release, then just gates, on windows-x86_64"
+measured_by = "just build-web, just dist, then just gates, on windows-x86_64"
 status = "gated"
 
 # The unit is a production function because the alternative was measured:
@@ -347,7 +347,7 @@ what = "append plus fsync, p50 and p99"
 budget_p50_ms = 5
 budget_p99_ms = 20
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 0.562 ms / p99 0.838 ms on windows-x86_64 NVMe (2026-09-02, after the segment stopped being reopened per write; 1.047 / 1.879 ms before it); batched append_all moves about 335k records/s. A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: p50 0.568 ms / p99 1.600 ms (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30); batched append_all moves 116,003 records/s. The two readings the register used to carry (about 335k records/s batched, run_history 3.3 ms) were re-read on the two trees either side of 2ff1859b: its parent gives 206,501 records/s and 4.177 ms, 2ff1859b itself 135,831 records/s and 6.429 ms, so most of the later drop is the bench load changing shape in 2ff1859b, not the product; the parent itself sits below the old figures, a gap that is either in 2feeb2d6..2ff1859b^ or the machine and has not been bisected. A wall-clock figure is the machine's, so it is recorded, never gated"
 
 # What one durability barrier costs per record as the batch under
 # it grows. The absolute figures belong to the disk class they were
@@ -364,7 +364,7 @@ status = "measured, not gated: p50 0.562 ms / p99 0.838 ms on windows-x86_64 NVM
 [durability_barrier]
 what = "one fsync barrier, amortised over the records under it"
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: 562.4 us/record at one record per barrier, 57.3 at ten, 17.0 at fifty (windows-x86_64 NVMe, 2026-09-02, 200 waves per row). Of the 562 us, 2.5 us is the write and the rest is the barrier itself. A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: 582.9 us/record at one record per barrier, 57.9 at ten, 15.9 at fifty (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). A wall-clock figure is the machine's, so it is recorded, never gated"
 
 # Opening yesterday's session: the whole of what `bin::assembly`'s
 # `run_history` does, over the same public faces it calls - refresh the
@@ -383,7 +383,7 @@ status = "measured, not gated: 562.4 us/record at one record per barrier, 57.3 a
 [run_history]
 what = "one session's newest 500 records, out of a ledger holding eight sessions"
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 3.311 ms against 27.6 ms before the index (windows-x86_64 NVMe, 2026-09-02, 50,000 records, 50 rounds). A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: p50 4.172 ms (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30), against 6.009 ms on the same fixture before the run's sequences were taken lazily, and 27.6 ms before the index. The registered 3.3 ms is explained under ledger_append. A wall-clock figure is the machine's, so it is recorded, never gated"
 
 [prefix_assembly]
 what = "assembling one frozen prefix"
@@ -497,10 +497,10 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 what = "milliseconds to rebuild every view, per megabyte of ledger folded"
 measured_by = "just bench (citysim bench bin, release), over a ledger large enough that the fold rather than the open dominates: the bench writes 50,000 records into a scratch city and drives the whole production rebuild through `sprawling::ask`, which verifies the chain, parses every line and folds it into every view before answering one CityView"
 fold_records = 50000
-best_p50_ms = 2759
-best_p95_ms = 3765
-best_p99_ms = 3765
-status = "measured, not gated: windows-x86_64, 16 cores, NVMe, release, 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`). The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
+best_p50_ms = 1222
+best_p95_ms = 1225
+best_p99_ms = 1225
+status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), p50 1221.938 ms, p95 and p99 1224.078 ms, the best_* fields rounded up to whole milliseconds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30); 1265.980 ms on the same fixture before the whole fold streamed the ledger. The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
 
 # What a dispatch spends before the model is called: opening the room,
 # writing the brief, standing the run up, and assembling the tools -
@@ -555,22 +555,27 @@ status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2
 [install]
 what = "the archive in place to the unpacked executable answering `version`: digest, unpack, launch"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples, p50/p95/p99 nearest-rank over all of them"
-status = "measured, not gated: p50 2500.477 ms, p95 8143.716, p99 12877.433; floor 1440.964, peak 14654.704; 13 of 200 above three times the middle, at #38 #44 #58 #65 #66 #71 #72 #73 #74 #77 #78 #79 #80 (windows-x86_64, 16 cores, NVMe, 2026-09-24). Four orders of magnitude outside the second tier. **Dominant: `launch`**, 2330.106 ms of the 2500.477 ms middle, because the unpacked 6,886,400 B executable is a file the on-access scanner has never seen - so this boundary prices the scanner as much as the install. The product's half is 155 ms of the same middle: 147.052 ms to inflate the 3,646,091 B archive and write its member, 8.117 ms to SHA-256 those bytes. One process and one file per sample, no barriers"
+status = "measured, not gated: p50 1375.792 ms, p95 1392.718, p99 1417.450; floor 1333.937, peak 1572.503; none of the 200 above three times the middle (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). **Dominant: `launch`**, 1252.052 ms, against 116.960 ms to unpack and 6.171 ms to SHA-256 the 6,444,519 B archive: the first launch of an unpacked executable prices the on-access scanner as much as the install. One process and one file per sample, no barriers"
 
 [startup]
 what = "`CreateProcess` sent to the light command's exit observed: create, run"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples"
-status = "measured, not gated: p50 26.290 ms, p95 29.840, p99 31.298; floor 22.412, peak 1031.043; 1 of 200 above three times the middle, at #0 (windows-x86_64, 16 cores, NVMe, 2026-09-24). Thirty times outside the second tier and the tightest tail of the four. **Dominant: `run`**, 20.686 ms of the 26.290 ms middle against 5.343 ms for the spawn call itself. The one suspicious sample is the first: a cold 6,886,400 B image costs 1031.043 ms where the warm floor is 22.412 ms, so on this machine the first start of an installed binary is forty-six times the steady state and the second start is not. One process per sample, no files, no barriers"
+status = "measured, not gated: p50 15.586 ms, p95 16.201, p99 16.775; floor 14.791, peak 26.498; none of the 200 above three times the middle (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). **Dominant: `run`**, 13.498 ms against 2.041 ms for the spawn call. One process per sample, no files, no barriers"
 
 [raise_city]
 what = "`assembly::init_city` called to the genesis record on disk, its barrier included"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples"
-status = "measured, not gated: p50 94.570 ms, p95 106.497, p99 115.862; floor 62.545, peak 175.839; none of the 200 above three times the middle (windows-x86_64, 16 cores, NVMe, 2026-09-24). A hundred times outside the second tier. No sub-step split: one would have to be instrumented inside the product, and T14 prices the path a person walks rather than one built for the bench, so the dominant cost is **attributed rather than measured**. One sample writes 9 files and 3 barriers, and 3 barriers at the `durability_barrier` row's 562.4 us/record floor is about 1.7 ms of the 94.570 ms middle. The other 93 ms is creating the tree and reading the config layers, which is where a second reading should look. 0 processes per sample"
+status = "measured, not gated: p50 36.774 ms, p95 40.794, p99 46.569; floor 25.573, peak 60.448; none of the 200 above three times the middle (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). No sub-step split, so the dominant cost is attributed rather than measured: one sample writes 12 files and 3 barriers, and 3 barriers at the durability_barrier floor are about 1.7 ms of the middle; the rest is creating the tree and reading the config layers. 0 processes per sample"
 
 [open_session]
 what = "`Command::OpenSession` arriving to the call returning, `session_opened` on disk"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples"
-status = "measured, not gated: p50 4.796 ms, p95 5.574, p99 7.230; floor 4.051, peak 27.509; 1 of 200 above three times the middle, at #0 (windows-x86_64, 16 cores, NVMe, 2026-09-24). Seven times outside the second tier, and the closest of the four to it - which is what the plan predicted before anything was measured. No sub-step split, so the dominant cost is attributed rather than measured: one sample writes 2 files and 1 barrier, and that barrier is about 0.6 ms of the 4.796 ms middle, so the cost sits in the room rather than in fsync. 0 processes per sample"
+status = "measured, not gated: p50 1.540 ms, p95 1.735, p99 1.984; floor 1.358, peak 7.968; 1 of 200 above three times the middle, at #0 (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). No sub-step split: one sample writes 2 files and 1 barrier, and that barrier is about 0.6 ms of the middle. 0 processes per sample"
+
+[first_byte]
+what = "`serve` spawned to the first byte of GET /, over the three fixture cities, with the product's own split of the opening"
+measured_by = "just bench-startup first-byte"
+status = "measured, not gated: floor / p50 / peak in ms - empty 40.919 / 43.093 / 57.556 over 20 samples (city fixture 7e6fda8b5653dd7f), l100k 2248.671 / 2259.331 / 2261.092 over 5 (6615c4052f604f8c), l400k 7811.298 / 7821.137 / 7835.193 over 3 (99909ec1f02d58fc) (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). The l400k serve says: opened the city in 7787.559 ms - bind 2.195, open the ledger 650.988, verify and fold 400003 lines 6705.686 (folding 1022.619 of it), cut the standing snapshot 9.841, cut the views snapshot 164.404, copy the views 248.619, start the worker 5.823. Verifying the chain is the dominant phase; a reading in seconds is lane F's work"
 
 # How large this tree's dependency graph is, counted off the resolved
 # lockfile rather than off any manifest: a manifest states what was
@@ -623,6 +628,11 @@ status = "staged targets, not gated: a wall-clock figure is the machine's. Basel
 what = "one relay append from a lane to the accounting thread and back, while a run is in flight, with `attend` as the city runs it"
 measured_by = "cargo nextest run -p sprawling --run-ignored only -E 'test(/::instrument_relay/)' --no-capture (crates/sprawling/src/assembly/driving/tests/instruments.rs, sprawling-SPEC.md 8-84), 200 samples per store"
 status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized build, windows-x86_64, 16 cores, three other builds running beside it. Polling loop before the one queue: store=disk p50 31198 us, store=memory p50 31313 us, both the two timed waits. The one queue: store=memory p50 45 us against 29 us for the store's own append with no crossing; store=disk p50 2351 us, floor 1458 us, which is the device's fsync, a physical floor. The release reading and the 10 us memory target are not yet taken"
+
+[view_backlog]
+what = "how far the view fold falls behind a burst of 2,000 records while readers keep asking"
+measured_by = "just bench (instrument_view_backlog, crates/sprawling/src/serving/folding/tests/instruments.rs)"
+status = "measured, not gated: 2,003 records in a 14.949 ms burst, 73 reader questions; a record waits floor 193 us, p50 5547 us, p99 10659 us, max 10717 us for its broadcast, and at most 1,888 records wait at once (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30)"
 
 # The wall time of a tool wave whose leading calls only read. The
 # concurrent-wave test judges the behaviour (every read of the wave in
