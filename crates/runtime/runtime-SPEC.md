@@ -629,7 +629,7 @@ pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob)
 - **失败不得以默认值擦除**（rust-hardening Gate 5）：`try_into_inner()` 取不回管道、`get_fuel()` 报不出余量、退出码超 WASI 范围——三者均属**宿主故障**，恒返 `Err`；若以 `unwrap_or_default()`／`unwrap_or(1)` 兑成「空输出」「未耗尽」，就是把猜测冒充事实。
 - **feature 内藏是必要的**：开 `wasm` feature 后 runtime 的依赖面增加一百多个 crate，debug 构建的 wasmtime-wasi 单件以百 MiB 计。`just clippy` 带 `--all-features`，所以内藏的代码同样过零警告门。
 
-- wasmtime 钉 48（含 GHSA-2r75-cxrj-cmph（path_open TRUNCATE 绕过，修于 44.0.2/45.0.0）与 CVE-2026-58494（hard-link/rename FilePerms 绕过，修于 45.0.3/46.0.1）两处修复——「钉版恒含权限绕过修复」的依据实例）。
+- wasmtime 与 wasmtime-wasi 钉在 48 线，下限 48.0.3。48 是上游的 LTS（逢 12 的倍数的版本支持 24 个月，其余只支持 2 个月），而本 crate 只用 wasip1 与燃料计量，49 以后带来的东西用不上。48.0.3 清掉 RUSTSEC-2026-0314／0315／0316 三条公告；这条线还含 GHSA-2r75-cxrj-cmph（path_open TRUNCATE 绕过，修于 44.0.2／45.0.0）与 CVE-2026-58494（hard-link/rename FilePerms 绕过，修于 45.0.3／46.0.1）两处修复——「钉版恒含权限绕过修复」的依据实例。下限写在清单里而不只在锁里，所以修复是一条声明出来的要求，一次 `cargo update` 退不回去。**重开参数**：上游发出下一个 LTS（60），或 48 线停止维护。
 
 **sandbox 增**：`AbsentSandbox` —— 未带执行引擎的构建在缝上的产品实现，逐次以 `E_TOOL_UNAVAILABLE` 拒并携替代臂。它存在的理由是**缺席要是一个判词而不是一个替身**：Echo 放在这个位置会对一个从未运行的 guest 回答「成功」，而第一个察觉的人是相信了那份输出的人。
 
@@ -1043,7 +1043,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 ## 13 依赖选型
 
 kernel、storage（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
-`wasmtime = "48"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
+`wasmtime`／`wasmtime-wasi = "48.0.3"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
 
 ## 14 硬编码声明
 

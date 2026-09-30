@@ -20,13 +20,17 @@ serde_json.workspace = true
 # The sieve's filter table is a TOML file in the reserved
 # subtree, and its shape has one reader.
 toml.workspace = true
-# Execution boundary. Pinned at 48: carries the
-# path_open TRUNCATE bypass fix (GHSA-2r75-cxrj-cmph) and the
-# hard-link/rename FilePerms bypass fix (CVE-2026-58494). wasip1 only —
-# there is no socket host implementation, which is the Python arm's
-# mechanical proof that it cannot reach the network.
-wasmtime = { version = "48", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
-wasmtime-wasi = { version = "48", optional = true }
+# Execution boundary, on the 48 LTS line (upstream supports every twelfth
+# release for 24 months and the others for two), no older than 48.0.3:
+# that patch clears RUSTSEC-2026-0314, -0315 and -0316, and the line
+# already carries the path_open TRUNCATE bypass fix (GHSA-2r75-cxrj-cmph)
+# and the hard-link/rename FilePerms bypass fix (CVE-2026-58494). The
+# floor is stated here rather than left to the lockfile, so no update can
+# step back below it (runtime-SPEC 8-13). wasip1 only - there is no
+# socket host implementation, which is the Python arm's mechanical proof
+# that it cannot reach the network.
+wasmtime = { version = "48.0.3", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
+wasmtime-wasi = { version = "48.0.3", optional = true }
 
 # One Job Object per run, so a run's whole process tree can be read
 # (runtime-SPEC 8-13-3); the crate's public surface is safe.
