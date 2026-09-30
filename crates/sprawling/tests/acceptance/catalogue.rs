@@ -10,6 +10,8 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use sprawling::assembly::RunWorker;
+
 use crate::city::{self, History};
 use crate::episodes::{self, Episode, Observed, Setup};
 use crate::script;
@@ -18,68 +20,7 @@ use crate::script;
 /// tree of its own, so `pr` has something to offer.
 const REVIEWED: &str = "confidential = false\nwrite = \"everything\"\nreview = true\n";
 
-#[test]
-fn every_tool_a_builder_is_offered_is_called_and_answered() {
-    let dir = tempfile::tempdir().unwrap();
-    let setup = &episodes::LAB;
-    let episodes = episodes::for_builders(setup);
-    let (factory, offered, _) = script::scripted(steps_of(&episodes));
-    let (mut worker, ledger) = city::city_with_a_model(dir.path(), factory);
-    city::raise(&mut worker, setup.building, "minimal");
-    city::rules(dir.path(), setup.building, REVIEWED);
-    stand_up(dir.path(), setup);
-    let dispatched = city::dispatch(&mut worker, setup.room);
-
-    let offered = offered.lock().unwrap().clone();
-    assert_eq!(
-        covered(
-            dir.path(),
-            setup,
-            &offered,
-            &History::read(&ledger),
-            &episodes
-        ),
-        Vec::<String>::new(),
-        "offered {offered:?}; the dispatch answered {dispatched:?}"
-    );
-}
-
-#[test]
-fn every_tool_city_hall_is_offered_is_called_and_answered() {
-    let dir = tempfile::tempdir().unwrap();
-    let setup = &episodes::HALL;
-    let episodes = episodes::for_city_hall(setup);
-    let (factory, offered, _) = script::scripted(steps_of(&episodes));
-    let (mut worker, ledger) = city::city_with_a_model(dir.path(), factory);
-    stand_up(dir.path(), setup);
-    let dispatched = city::dispatch(&mut worker, setup.room);
-
-    let offered = offered.lock().unwrap().clone();
-    assert_eq!(
-        covered(
-            dir.path(),
-            setup,
-            &offered,
-            &History::read(&ledger),
-            &episodes
-        ),
-        Vec::<String>::new(),
-        "offered {offered:?}; the dispatch answered {dispatched:?}"
-    );
-}
-
-/// Gives the building a resident beside the lead's room, and a plan
-/// with one node ready to claim.
-fn stand_up(dir: &Path, setup: &Setup) {
-    city::move_in(dir, setup.room);
-    city::move_in(dir, setup.neighbour);
-    std::fs::write(
-        ::city::roadmap_path(dir, &kernel::Address::parse(setup.building).unwrap()),
-        PLAN,
-    )
-    .unwrap();
-}
-
+/// One plan node ready to claim.
 const PLAN: &str = "\
 # Roadmap
 
@@ -87,6 +28,71 @@ const PLAN: &str = "\
 |---|------|--------|-------|--------|----------|
 | 1 | wire the kiln | 1 |  | Not started |  |
 ";
+
+#[test]
+fn every_tool_a_builder_is_offered_is_called_and_answered() {
+    let setup = &episodes::LAB;
+    let (short, context) = run_the_script(setup, &episodes::for_builders(setup), |worker, dir| {
+        city::raise(worker, setup.building, "minimal");
+        city::rules(dir, setup.building, REVIEWED);
+    });
+
+    assert_eq!(short, Vec::<String>::new(), "{context}");
+}
+
+#[test]
+fn every_tool_city_hall_is_offered_is_called_and_answered() {
+    let setup = &episodes::HALL;
+    // The founding raised City Hall; nothing more to raise.
+    let (short, context) = run_the_script(setup, &episodes::for_city_hall(setup), |_, _| {});
+
+    assert_eq!(short, Vec::<String>::new(), "{context}");
+}
+
+/// Everything the script's run left behind that a verdict reads.
+struct Landing<'a> {
+    city: &'a Path,
+    setup: &'a Setup,
+    offered: &'a [String],
+    history: &'a History,
+    rules_before: &'a [u8],
+}
+
+/// Founds a city, lets `raise` build what the setup needs, sends the
+/// lead's room its task, and answers every shortfall of the coverage,
+/// with what the model was offered and what the dispatch answered.
+fn run_the_script(
+    setup: &Setup,
+    episodes: &[Episode],
+    raise: impl FnOnce(&mut RunWorker, &Path),
+) -> (Vec<String>, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let (factory, offered, _) = script::scripted(steps_of(episodes));
+    let (mut worker, ledger) = city::city_with_a_model(dir.path(), factory);
+    raise(&mut worker, dir.path());
+    let building = kernel::Address::parse(setup.building).unwrap();
+    city::move_in(dir.path(), setup.room);
+    city::move_in(dir.path(), setup.neighbour);
+    std::fs::write(::city::roadmap_path(dir.path(), &building), PLAN).unwrap();
+    let rules_before = std::fs::read(::city::rules_path(dir.path(), &building)).unwrap_or_default();
+    let dispatched = city::dispatch(&mut worker, setup.room);
+
+    let offered = offered.lock().unwrap().clone();
+    let short = covered(
+        &Landing {
+            city: dir.path(),
+            setup,
+            offered: &offered,
+            history: &History::read(&ledger),
+            rules_before: &rules_before,
+        },
+        episodes,
+    );
+    (
+        short,
+        format!("offered {offered:?}; the dispatch answered {dispatched:?}"),
+    )
+}
 
 fn steps_of(episodes: &[Episode]) -> Vec<script::Step> {
     episodes
@@ -101,19 +107,15 @@ fn steps_of(episodes: &[Episode]) -> Vec<script::Step> {
 /// Every way the lead's run fell short of the coverage, all at once:
 /// a tool offered and never called, a call without exactly one result,
 /// and each verdict that did not hold, prefixed with its tool.
-fn covered(
-    dir: &Path,
-    setup: &Setup,
-    offered: &[String],
-    history: &History,
-    episodes: &[Episode],
-) -> Vec<String> {
+fn covered(landing: &Landing<'_>, episodes: &[Episode]) -> Vec<String> {
+    let history = landing.history;
     let Some(lead) = history.started().first().map(|started| started.run) else {
         return vec!["no run started".to_owned()];
     };
     let calls = history.calls_of(lead);
     let called: BTreeSet<&str> = calls.iter().map(|call| call.called.name.as_str()).collect();
-    let never: Vec<&str> = offered
+    let never: Vec<&str> = landing
+        .offered
         .iter()
         .map(String::as_str)
         .filter(|name| !called.contains(name))
@@ -142,10 +144,11 @@ fn covered(
             continue;
         };
         let seen = Observed {
-            setup,
-            city: dir,
+            setup: landing.setup,
+            city: landing.city,
             history,
             lead,
+            rules_before: landing.rules_before,
             answer: &result.answer,
         };
         if let Err(why) = (episode.holds)(&seen) {

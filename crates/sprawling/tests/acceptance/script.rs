@@ -114,7 +114,7 @@ impl Model for Lead {
         let Some(step) = self.steps.get(self.next) else {
             return says("every tool has answered");
         };
-        self.next += 1;
+        self.next = self.next.saturating_add(1);
         let id = call_id(self.next);
         let name = ToolName::parse(step.tool)?;
         let args = kernel::Payload::new(step.args.as_object().cloned().unwrap())?;
