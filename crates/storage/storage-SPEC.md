@@ -607,6 +607,9 @@ pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
 pub enum Head   { Commit(GitOid), WorkingTree }
 pub fn between(city_root: &Path, base: GitOid, head: Head)
     -> Result<Vec<FileChange>, StorageError>;
+/// 每个 oid 的父提交，按提交对象自己记的次序；仓库里没有的 oid 答 None。仓库只开一次。
+pub fn parents_of(city_root: &Path, oids: &[GitOid])
+    -> Result<Vec<Option<Vec<GitOid>>>, StorageError>;
 ```
 
 **写入侧早就是 git 原生的，缺的是整个读出侧。** 每一次工具浪前 `wave_pre` 都落一个真 commit，

@@ -2883,6 +2883,12 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **`commits_answer(building, before, limit)`**：在 `commit_seqs` 上从 `before` 的独占上界（`None` 即尾）向前走，按 `actor` 地址前缀过滤（`actor == building` 或以 `<building>/` 起头；`None` 不过滤），取 `limit.clamp(1, HISTORY_MAX)` 条；再多走一步得 `more`。每条经 `CommitFacts::answer` 与 `lineage_of` 成 `CommitAnswer`，故列举与反查答同一形状。
 - **验收**（`views::commits::tests`）：三条不同 seq 的 `checkpoint_committed`（两条在 `lab/room1`、一条在 `hall/mayor`）折入后，按 `lab` 列举答两条且 seq 递减、`more == false`；`limit: 1` 答一条且 `more == true`；以那条的 seq 作 `before` 再问答下一条；按 `hall` 列举不含 `lab` 的提交；`None` 答三条。
 
+## 8-128 一次提交带出同一次 run 的上一个提交，与它的父提交（`accounting::views::commits`；wire-SPEC §8-54）
+
+- **`CommitFacts.previous: Option<wire::CommitAt>`**，`fold_commit` 写入：`Views.last_commit: BTreeMap<RunId, CommitAt>` 记每次 run 最近宣告的那个提交，一条记录宣告提交时，先把这张表里同一 run 的那一项取作 `previous`，再换成本提交。同一个 oid 被宣告第二次时不拿自己当 `previous`，沿用第一次折出的那个。折叠从快照起步也一样：`last_commit` 随视图进快照，`VIEWS_FOLD_RULES` 随编码变。
+- **`parents` 不进视图。** `Query::Commit` 与 `Query::Commits` 在锁内由视图答出其余各字段，交给 `Prepared::Commits(CommitsAsk)`；锁放开之后 `CommitsAsk::read` 经 `storage::changes::parents_of` 一次开仓库读这一页每个 oid 的父提交。读不到仓库时 `parents` 全为 `None`，答复照样发出：父提交是这一行多出的一格，不是它成立的条件。8-41 说的「没有一个字段是从 git 读的」指 trailer 能答的那几项；父提交 trailer 答不出，它的权威是提交对象本身。
+- **验收**（`views::commits::tests`）：同一 run 的两条检查点之间夹着另一 run 的一条，第二条的 `previous` 指向第一条（oid 与 seq），另一 run 的那条与第一条的 `previous` 为 `None`；一个真仓库里的两个提交经 `CommitsAsk::read` 答出后一个的父提交是前一个，前一个是根提交（`Some(vec![])`），不在仓库里的 oid 答 `None`。
+
 ## 8-54 运行中的机器有什么，页面从城那里问（`bin::doctor::report`、`accounting::views::holding`；wire-SPEC §8-25）
 
 首跑屏的第一步原本只是一条可以复制的命令，没有任何办法知道它跑过没有、跑成了没有。本节让那一步答得出来。

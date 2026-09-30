@@ -54,7 +54,7 @@
 
 公开面见 `tools/xtask/api-baselines/wire.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 
-**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；页面读到的历史已证明到哪一条 `seq`；`CommitAnswer` 的 `previous`、`parents` 与提交说明；`Call.effect`、`Call.render`；`Output.pinned`；`Dispatch.mode` 收成 `chat`／`work`，以及运行策略、写入限制 `Create`、准入证据的字段；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）、`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
+**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；页面读到的历史已证明到哪一条 `seq`；`CommitAnswer` 带出提交说明；`Call.effect`、`Call.render`；`Output.pinned`；`Dispatch.mode` 收成 `chat`／`work`，以及运行策略、写入限制 `Create`、准入证据的字段；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）、`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
 
 ## 5 权威信源
 
@@ -445,6 +445,12 @@ WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionNam
 **理由**：一个事实一个家。时刻语义的权威是 kernel-SPEC §8-4 与 `EventRecord::moment`；首字耗时是两个时刻之差，页面手里已有这两个数。
 
 **被否**：①线上带一个 `ttft` 时长：派生值在线上有了第二个家，而且 `t` 未量时它要答一个答不了的数；②`Timing` 三值（量过、回合时间戳、城补的）：页面对后两种做同一件事——不画用时——第三个值只会逼每个读者多写一臂；要分辨时，`Call.outcome` 与答复内容已经说明那是城补的。
+
+(b) `CommitAnswer.previous` 由账本折出；`CommitAnswer.parents` 在答问时读 git。
+
+**理由**：「同一次 run 的上一个提交」是账本上两行的关系，折叠已经按 `seq` 看过每一行。父提交是提交对象的一部分，oid 就是对它的哈希，账本从未记过它。
+
+**被否**：①在 `checkpoint_committed` 里记下父提交：检查点的写方要多记一个字段，评审落地的合并提交由另一处写，这个键出现之前的每一行都没有它，而这三种情形 git 都答得出；②`previous` 只带 oid：一段的另一端还要一个 `seq`，才能不扫账本就往回读调用；③读 git 在锁内做：一页五百个提交各开一次仓库，别的问题都在等这把锁。
 
 ## 13 依赖选型
 
@@ -1531,6 +1537,21 @@ pub enum Note {
 - **`Turn.timing` 只说 `t`**：回合在线上只有这一个时刻；`first_at` 在场即量过，缺席即没有。`Call.timing` 说 `called` 与 `answered` 两个：一次调用的两条记录由同一个构建写下时两者同为量过或同为未量，城补上的答复例外，所以一个值够用。
 - **`Checkpointed`**：fence 与 checkpoint 曾是一个概念的两个名字，checkpoint 留下（glossary）。`Note` 不进名字表，改它的标签不动 schema 哈希，所以它随本节的进位落地。
 - **进位**：本节的提交是 §12.1 意义上上一次推送之后第一个名字不变而改形的提交，`WIRE_V` 44 → 45；§8-53 至 §8-58 共用 45。
+
+### 8-54 一次提交带出同一次 run 的上一个提交，与它在 git 里的父提交
+
+```rust
+pub struct CommitAnswer {
+    // …既有字段…
+    pub previous: Option<CommitAt>,     // 同一次 run 在它之前宣告的最后一个提交；这是那次 run 的第一个时为 None
+    pub parents: Option<Vec<GitOid>>,   // 提交对象自己记的父提交，按 git 的次序；读不到时为 None
+}
+pub struct CommitAt { pub oid: GitOid, pub seq: Seq }
+```
+
+- **`previous` 由账本折出。** 两条宣告提交的记录（`checkpoint_committed` 的提交一支与 `pr_merged`）按 `seq` 折进视图时，同一次 run 上一次宣告的那个提交就是它的 `previous`（sprawling-SPEC 8-128）。它与本提交围出一段：`Query::Changes { base: previous.oid, head: Some(oid) }` 答这次提交相对上一个检查点改了哪些文件，`Query::RunHistory { run, before: Some(seq) }` 往回读到 `previous.seq` 为止，答这一段里这次 run 发出的调用。这一段是候选，不是原因：同一栋楼里别的 run 与人也可能在这一段里写过文件。
+- **`parents` 读自 git，在答问时读。** 提交对象自己记着它的父提交，账本记下的 oid 就是这个对象（连同父提交）的哈希，所以这里读的是权威本身，不是投影；五条 trailer 才是投影，本节不读它们。`Some(vec![])` 是根提交；`None` 是这座城没有仓库、仓库里没有这个对象，或者读失败——一座导出后在别处恢复、身边没有 `.git` 的城，其余各字段照答，只是画不出这一格。读 git 在快照的锁放开之后做（sprawling-SPEC 8-100），一页提交只开一次仓库。
+- **提交说明另成一项**，仍在 §4 的清单里。
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 
