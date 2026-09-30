@@ -66,7 +66,7 @@ pub use sandbox::assert_sandbox_conformance;
 mod watchdog;
 
 pub use catalog::{Catalog, CatalogEntry, Expansion, SkillPin};
-pub use clock::{ClockStamp, StampGate, ZoneEntry, stamp};
+pub use clock::{ClockReading, ClockStamp, StampGate, ZoneEntry, stamp};
 pub use conversation::Opening;
 pub use digest::{Breaker, BreakerVerdict, Digest, DigestOutcome, StructureNode};
 pub use digest::{digest_once, structure_of};

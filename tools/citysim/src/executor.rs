@@ -174,7 +174,7 @@ pub fn run_scenario_on(
         steer,
         mut sieve,
     } = scenario;
-    let mut stamps = StampGate::new(config.clock_stamp);
+    let mut stamps = StampGate::new(config.clock_stamp, config.clock_zones.clone());
     let job = job_locator(&addr, &job_md)?;
 
     // The scenario clock: ticks are handed out in the order the driver
@@ -253,7 +253,7 @@ pub fn run_scenario_on(
             BenchOutcome::Ran { outcome, .. } | BenchOutcome::Duplicate { outcome } => {
                 // The envelope is the caller's to hang: a clock line when
                 // one is due, inside this result's byte budget.
-                let stamp = stamps.observe(t, temporal, &config.clock_zones)?;
+                let stamp = stamps.observe(t, temporal)?;
                 if let Some(world) = sieve.as_mut()
                     && call.name.as_str() == kernel::ToolName::EXEC
                 {

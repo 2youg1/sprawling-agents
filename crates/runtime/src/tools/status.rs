@@ -19,17 +19,19 @@
 //!
 //! Nothing here samples. The snapshot is frozen at dispatch, and what
 //! moves while the run goes on - its children, its backlog, its context
-//! used - is read from the one place that records it; a tool that read
-//! the clock itself would make two calls in one turn disagree about "now".
+//! used, the time - is read from the one place that records it. The
+//! time is the driver's latest reading (runtime-SPEC 8-53): a tool that
+//! read a clock of its own would be a second sampling point in the run,
+//! and its "now" could name a moment no line of the ledger records.
 
 use kernel::{
     Address, AxCode, AxError, ByteLen, CostTier, DelegateKind, Effect, Payload, RenderIntent,
-    Temporal, Tokens, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    Temporal, TimeMs, Tokens, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
 use crate::backlog::{Backlog, Standing};
-use crate::clock::ClockStamp;
+use crate::clock::{ClockReading, iso};
 use crate::reminder::ContextReading;
 use kernel::Mode;
 
@@ -66,9 +68,10 @@ pub struct ChildStatus {
     pub kind: DelegateKind,
 }
 
-/// The frozen fields. `backlog` is read live from the table and the
-/// context used from the run's reading rather than frozen here, for the
-/// reason `children` is a closure: both change while the run goes on.
+/// The frozen fields. `backlog` is read live from the table, and the
+/// context used and the time from the run's readings, rather than
+/// frozen here, for the reason `children` is a closure: they change
+/// while the run goes on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatusSnapshot {
     pub who: String,
@@ -81,7 +84,6 @@ pub struct StatusSnapshot {
     pub worktree_path: String,
     pub worktree_disk: ByteLen,
     pub signals_pending: u32,
-    pub now: Option<ClockStamp>,
     pub provider_mode: ProviderMode,
     /// How many residents this run can reach, itself excluded. A count
     /// rather than a list: the list grows with the building's population
@@ -104,6 +106,9 @@ pub struct StatusTool {
     /// The run's context reading. A tool built without one reports zero,
     /// which is true of a run that has made no call.
     context: ContextReading,
+    /// The driver's latest clock reading. A tool built without one
+    /// reports `not stamped`: nothing has told it what time it is.
+    clock: ClockReading,
     meta: ToolMeta,
 }
 
@@ -139,6 +144,7 @@ impl StatusTool {
             children,
             backlog: None,
             context: ContextReading::default(),
+            clock: ClockReading::default(),
             meta: ToolMeta {
                 name: ToolName::parse("status")?,
                 disclosure:
@@ -163,6 +169,17 @@ impl StatusTool {
     #[must_use]
     pub fn metering(mut self, context: ContextReading) -> StatusTool {
         self.context = context;
+        self
+    }
+
+    /// The reading the run's clock hook keeps, which the `now` line
+    /// reports (runtime-SPEC 8-53). It reports the time whatever the
+    /// run's stamp granularity: `now` is a field of this tool's answer,
+    /// not an envelope attachment, and a city that turned stamps off
+    /// has not asked its model to stop knowing the time.
+    #[must_use]
+    pub fn clocked(mut self, clock: ClockReading) -> StatusTool {
+        self.clock = clock;
         self
     }
 
@@ -194,7 +211,13 @@ impl StatusSnapshot {
     /// sorts its keys, so "the frozen order" would silently become
     /// alphabetical. Order is a property of what the model reads, so it
     /// is expressed where the model reads it.
-    pub fn render(&self, used: Tokens, children: &[ChildStatus], standing: &[Standing]) -> String {
+    pub fn render(
+        &self,
+        used: Tokens,
+        now: Option<TimeMs>,
+        children: &[ChildStatus],
+        standing: &[Standing],
+    ) -> String {
         let locks = if self.locks.is_empty() {
             "none".to_owned()
         } else {
@@ -202,10 +225,7 @@ impl StatusSnapshot {
         };
         let children = render_children(children);
         let backlog = render_standing(standing);
-        let now = match &self.now {
-            Some(stamp) => stamp.render(),
-            None => "not stamped".to_owned(),
-        };
+        let now = now.map_or_else(|| "not stamped".to_owned(), iso);
         [
             format!("who: {}", self.who),
             format!("addr: {}", self.addr),
@@ -280,6 +300,7 @@ impl Tool for StatusTool {
             "text".to_owned(),
             Value::String(self.snapshot.render(
                 self.context.tokens(),
+                self.clock.latest(),
                 &(self.children)(),
                 &self.standing(),
             )),

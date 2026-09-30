@@ -383,7 +383,6 @@ pub(super) fn status_snapshot(situation: Situation<'_>) -> runtime::StatusSnapsh
         worktree_path: situation.worktree.display().to_string(),
         worktree_disk: kernel::ByteLen::default(),
         signals_pending: situation.signals_pending,
-        now: None,
         provider_mode: runtime::ProviderMode::Normal,
         neighbours: situation.neighbours,
     }

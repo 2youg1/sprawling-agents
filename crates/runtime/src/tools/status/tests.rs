@@ -25,7 +25,6 @@ fn snapshot() -> StatusSnapshot {
         worktree_path: "/city/work".to_owned(),
         worktree_disk: ByteLen::new(4096),
         signals_pending: 2,
-        now: None,
         provider_mode: ProviderMode::Normal,
         neighbours: 3,
     }
@@ -125,4 +124,25 @@ fn a_call_for_another_tool_is_refused() {
         .code(),
         AxCode::InvalidArgs
     );
+}
+
+/// The `now` line was frozen with the snapshot and never filled, so a
+/// model that asked what time it was read `not stamped` in every city.
+#[test]
+fn the_now_line_reports_the_drivers_latest_reading_in_iso_utc() {
+    let clock = ClockReading::default();
+    let tool = StatusTool::new(snapshot()).unwrap().clocked(clock.clone());
+    let now_line = |tool: &StatusTool| {
+        let value = serde_json::to_value(&tool.invoke(&call()).unwrap().result).unwrap();
+        value["text"]
+            .as_str()
+            .unwrap()
+            .lines()
+            .find(|line| line.starts_with("now:"))
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(now_line(&tool), "now: not stamped");
+    clock.keep(TimeMs::new(1_785_585_607_000));
+    assert_eq!(now_line(&tool), "now: 2026-08-01T12:00:07Z");
 }

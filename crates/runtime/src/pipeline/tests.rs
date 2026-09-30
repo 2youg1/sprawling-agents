@@ -202,9 +202,9 @@ fn an_exec_result_is_sieved_before_it_is_packaged() {
 
 #[test]
 fn the_three_attachments_ride_in_order_and_off_means_zero_bytes() {
-    let mut gate = crate::clock::StampGate::new(ClockStampGranularity::Minute);
+    let mut gate = crate::clock::StampGate::new(ClockStampGranularity::Minute, Vec::new());
     let stamp = gate
-        .observe(TimeMs::new(90_000), Temporal::Timestamped, &[])
+        .observe(TimeMs::new(90_000), Temporal::Timestamped)
         .unwrap();
     let out = package(
         b"done",
@@ -226,9 +226,9 @@ fn the_three_attachments_ride_in_order_and_off_means_zero_bytes() {
     assert!(lines[2].starts_with("[net] "));
     assert_eq!(lines[3], "user: wrap up");
     // Off gate: byte-identical to the featureless envelope (A18).
-    let mut off = crate::clock::StampGate::new(ClockStampGranularity::Off);
+    let mut off = crate::clock::StampGate::new(ClockStampGranularity::Off, Vec::new());
     let none = off
-        .observe(TimeMs::new(90_000), Temporal::Timestamped, &[])
+        .observe(TimeMs::new(90_000), Temporal::Timestamped)
         .unwrap();
     let plain = package(
         b"done",

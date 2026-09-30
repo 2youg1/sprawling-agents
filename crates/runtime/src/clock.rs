@@ -4,19 +4,34 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! ClockStamp: pure formatting of an injected instant against
-//! already-resolved zone offsets. Nothing here samples
-//! a clock; the calendar is integer arithmetic so replay and live share
-//! one algorithm and no tz database.
+//! already-resolved zone offsets, and the one spelling of a moment a
+//! person or a model reads: ISO 8601, UTC, to the second. Nothing here
+//! samples a clock; the calendar is integer arithmetic so replay and
+//! live share one algorithm and no tz database.
 //!
 //! Emission (`StampGate`): `Off` emits never (A18 zero-byte); the first
 //! result of a run emits once; `Timestamped` tools emit every result;
-//! `Timeless` tools emit only when the granularity bucket changed.
+//! `Timeless` tools emit only when the granularity bucket changed. The
+//! bucket decides how often, never what a stamp says: a stamp always
+//! carries the reading it was given.
+//!
+//! [`ClockReading`] is how a tool face learns what time it is without a
+//! clock of its own (runtime-SPEC 8-53).
+
+use std::sync::{Arc, Mutex, PoisonError};
 
 use kernel::consts_policy::CLOCK_ZONES_MAX;
 use kernel::{AxCode, AxError, ClockStampGranularity, ClockZone, Temporal, TimeMs};
 
-/// One rendered zone row: the offset it was computed from and the local
-/// wall time "YYYY-MM-DD HH:MM".
+/// One instant in ISO 8601, UTC, to the second:
+/// `2026-05-14T09:31:07Z`. The clock line and `status` both write a
+/// moment through this; a reader that parses one back belongs beside it.
+pub fn iso(at: TimeMs) -> String {
+    format_at(at, 0)
+}
+
+/// One configured zone's row: the offset it was computed from and the
+/// same second in that zone, `2026-05-14T18:31:07+09:00`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ZoneEntry {
     pub id: String,
@@ -24,10 +39,9 @@ pub struct ZoneEntry {
     pub local: String,
 }
 
-/// The stamp value shared by `status.now` and the result envelope.
-/// `utc_ms` is truncated to the granularity bucket, so two stamps inside
-/// one bucket are byte-identical (which is what makes Timeless dedup mean
-/// something).
+/// The stamp a result envelope carries: the reading itself, and the
+/// rows of the zones the run was frozen with (none, in a real city:
+/// the city refuses `[clock] zones`, city-SPEC 12.7).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClockStamp {
     pub utc_ms: TimeMs,
@@ -35,9 +49,10 @@ pub struct ClockStamp {
 }
 
 impl ClockStamp {
-    /// The one text form both envelope and human surfaces use.
+    /// The envelope's clock line: `clock: 2026-05-14T09:31:07Z;`, then
+    /// ` <id> <local>;` for each zone.
     pub fn render(&self) -> String {
-        let mut out = String::from("clock:");
+        let mut out = format!("clock: {};", iso(self.utc_ms));
         for zone in &self.zones {
             out.push(' ');
             out.push_str(&zone.id);
@@ -61,11 +76,11 @@ fn bucket_ms(granularity: ClockStampGranularity) -> Option<u64> {
 /// Civil date from days since 1970-01-01 (era-based integer algorithm).
 #[expect(
     clippy::arithmetic_side_effects,
-    reason = "era arithmetic on i64: inputs are bounded by u64 milliseconds / 86_400_000 \
-              (about 2e14 days), far inside i64; every divisor is a positive constant, so \
-              neither overflow nor division by zero is reachable"
+    reason = "era arithmetic on i128: the input is u64 milliseconds plus an i32 offset in \
+              minutes, divided down to days, far inside i128; every divisor is a positive \
+              constant, so neither overflow nor division by zero is reachable"
 )]
-fn civil_from_days(days: i64) -> (i64, i64, i64) {
+fn civil_from_days(days: i128) -> (i128, i128, i128) {
     let z = days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 }.div_euclid(146_097);
     let doe = z - era * 146_097;
@@ -79,70 +94,72 @@ fn civil_from_days(days: i64) -> (i64, i64, i64) {
     (year, m, d)
 }
 
+/// `at` in the zone `offset_min` minutes east of UTC, to the second,
+/// with `Z` for UTC itself and `+HH:MM` or `-HH:MM` otherwise.
 #[expect(
     clippy::arithmetic_side_effects,
-    reason = "div_euclid/rem_euclid by positive constants on i128 values bounded by \
-              u64 ms plus an i32 offset in minutes; i128::MIN is unreachable"
+    reason = "i128 values bounded by u64 milliseconds plus an i32 offset in minutes times \
+              60_000; div_euclid and rem_euclid by positive constants, so i128::MIN and \
+              division by zero are unreachable"
 )]
-fn format_local(utc_ms: u64, offset_min: i32) -> Result<String, AxError> {
-    let offset_ms = i128::from(offset_min) * 60_000;
-    let shifted = i128::from(utc_ms) + offset_ms;
-    let minutes_total = shifted.div_euclid(60_000);
-    let days = minutes_total.div_euclid(1_440);
-    let minute_of_day = minutes_total.rem_euclid(1_440);
-    let day_i64 = i64::try_from(days).map_err(|_| {
-        AxError::failure(
-            AxCode::InvalidArgs,
-            "format local time",
-            "date out of range",
-        )
-        .with_recovery(
-            "correct this zone's `offset_min` in `[clock]`: the stamp plus the offset \
-             lands outside the years a calendar date can name",
-        )
-    })?;
-    let (year, month, day) = civil_from_days(day_i64);
-    let hour = minute_of_day.div_euclid(60);
-    let minute = minute_of_day.rem_euclid(60);
-    Ok(format!(
-        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}"
-    ))
+fn format_at(at: TimeMs, offset_min: i32) -> String {
+    let shifted = i128::from(at.value()) + i128::from(offset_min) * 60_000;
+    let seconds = shifted.div_euclid(1_000);
+    let (year, month, day) = civil_from_days(seconds.div_euclid(86_400));
+    let second_of_day = seconds.rem_euclid(86_400);
+    let (hour, minute, second) = (
+        second_of_day / 3_600,
+        second_of_day % 3_600 / 60,
+        second_of_day % 60,
+    );
+    format!(
+        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}{}",
+        offset_suffix(offset_min)
+    )
 }
 
-/// Formats one stamp: UTC row first (always), then every configured zone.
+fn offset_suffix(offset_min: i32) -> String {
+    if offset_min == 0 {
+        return "Z".to_owned();
+    }
+    let sign = if offset_min < 0 { '-' } else { '+' };
+    let whole = offset_min.unsigned_abs();
+    format!("{sign}{:02}:{:02}", whole / 60, whole % 60)
+}
+
+/// Formats one stamp of the reading `now` and every configured zone.
 /// Zones beyond `CLOCK_ZONES_MAX` are refused, not silently dropped.
 pub fn stamp(now: TimeMs, zones: &[ClockZone]) -> Result<ClockStamp, AxError> {
     CLOCK_ZONES_MAX.admit(zones.len())?;
-    let mut rows = Vec::with_capacity(zones.len().saturating_add(1));
-    rows.push(ZoneEntry {
-        id: "utc".to_owned(),
-        offset_min: 0,
-        local: format_local(now.value(), 0)?,
-    });
-    for zone in zones {
-        rows.push(ZoneEntry {
-            id: zone.id.clone(),
-            offset_min: zone.offset_min,
-            local: format_local(now.value(), zone.offset_min)?,
-        });
-    }
     Ok(ClockStamp {
         utc_ms: now,
-        zones: rows,
+        zones: zones
+            .iter()
+            .map(|zone| ZoneEntry {
+                id: zone.id.clone(),
+                offset_min: zone.offset_min,
+                local: format_at(now, zone.offset_min),
+            })
+            .collect(),
     })
 }
 
-/// Decides, per tool result, whether a stamp rides the envelope.
+/// Decides, per tool result, whether a stamp rides the envelope. One
+/// per run, built from the run's frozen configuration.
 #[derive(Debug)]
 pub struct StampGate {
     granularity: ClockStampGranularity,
+    zones: Vec<ClockZone>,
     last_bucket: Option<u64>,
 }
 
 impl StampGate {
-    pub fn new(granularity: ClockStampGranularity) -> StampGate {
+    /// `granularity` and `zones` are the run's `FrozenConfig`
+    /// `clock_stamp` and `clock_zones`.
+    pub fn new(granularity: ClockStampGranularity, zones: Vec<ClockZone>) -> StampGate {
         StampGate {
             granularity,
+            zones,
             last_bucket: None,
         }
     }
@@ -152,7 +169,6 @@ impl StampGate {
         &mut self,
         now: TimeMs,
         temporal: Temporal,
-        zones: &[ClockZone],
     ) -> Result<Option<ClockStamp>, AxError> {
         let Some(width) = bucket_ms(self.granularity) else {
             return Ok(None);
@@ -176,14 +192,37 @@ impl StampGate {
             return Ok(None);
         }
         self.last_bucket = Some(bucket);
-        let truncated = bucket.checked_mul(width).ok_or_else(|| {
-            AxError::failure(AxCode::InvalidArgs, "bucket clock stamp", "bucket overflow")
-                .with_recovery(
-                    "choose a finer granularity in `[clock]`: truncating this stamp to \
-                     the current bucket overflows the time this city counts in",
-                )
-        })?;
-        stamp(TimeMs::new(truncated), zones).map(Some)
+        stamp(now, &self.zones).map(Some)
+    }
+}
+
+/// The moment a run's driver read its clock last, shared with the tool
+/// faces that report the time (runtime-SPEC 8-53).
+///
+/// The driver's clock hook is the one sampling point of a run, and a
+/// tool face receives readings rather than sampling: the hook `keep`s
+/// each reading before handing it on, and a command's stamp or
+/// `status`'s `now:` line reads `latest`. What they report is therefore
+/// always some line's `t`. Cloned, it is one cell.
+///
+/// "Not read yet" is a state of its own rather than an integer standing
+/// for one. The lock holds one `Copy` value replaced whole, so a thread
+/// that panicked while holding it cannot have left half a value behind,
+/// and a poisoned lock is read like any other.
+#[derive(Debug, Clone, Default)]
+pub struct ClockReading(Arc<Mutex<Option<TimeMs>>>);
+
+impl ClockReading {
+    /// Records one reading the driver took.
+    pub fn keep(&self, at: TimeMs) {
+        *self.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(at);
+    }
+
+    /// The last reading kept; `None` before the driver has read its
+    /// clock.
+    #[must_use]
+    pub fn latest(&self) -> Option<TimeMs> {
+        *self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
@@ -258,34 +297,32 @@ mod tests {
 
     #[test]
     fn off_emits_never_even_for_timestamped_tools() {
-        let mut gate = StampGate::new(ClockStampGranularity::Off);
+        let mut gate = StampGate::new(ClockStampGranularity::Off, Vec::new());
         for t in [1u64, 60_001, 3_600_001] {
-            let out = gate
-                .observe(TimeMs::new(t), Temporal::Timestamped, &[])
-                .unwrap();
+            let out = gate.observe(TimeMs::new(t), Temporal::Timestamped).unwrap();
             assert!(out.is_none(), "A18: Off must cost zero bytes");
         }
     }
 
     #[test]
     fn first_result_emits_once_then_timeless_deduplicates_within_a_bucket() {
-        let mut gate = StampGate::new(ClockStampGranularity::Minute);
+        let mut gate = StampGate::new(ClockStampGranularity::Minute, Vec::new());
         // First result of the run always stamps (even Timeless).
         assert!(
-            gate.observe(TimeMs::new(1_000), Temporal::Timeless, &[])
+            gate.observe(TimeMs::new(1_000), Temporal::Timeless)
                 .unwrap()
                 .is_some()
         );
         // Same minute bucket: no stamp.
         assert!(
-            gate.observe(TimeMs::new(30_000), Temporal::Timeless, &[])
+            gate.observe(TimeMs::new(30_000), Temporal::Timeless)
                 .unwrap()
                 .is_none()
         );
         // Next minute: stamps again, with the reading itself - the
         // bucket decides how often, never what the stamp says.
         let s = gate
-            .observe(TimeMs::new(61_000), Temporal::Timeless, &[])
+            .observe(TimeMs::new(61_000), Temporal::Timeless)
             .unwrap()
             .unwrap();
         assert_eq!(s.utc_ms, TimeMs::new(61_000));
@@ -293,13 +330,13 @@ mod tests {
 
     #[test]
     fn timestamped_emits_every_result_with_its_own_reading() {
-        let mut gate = StampGate::new(ClockStampGranularity::Hour);
+        let mut gate = StampGate::new(ClockStampGranularity::Hour, Vec::new());
         let a = gate
-            .observe(TimeMs::new(1_000), Temporal::Timestamped, &[])
+            .observe(TimeMs::new(1_000), Temporal::Timestamped)
             .unwrap()
             .unwrap();
         let b = gate
-            .observe(TimeMs::new(2_000), Temporal::Timestamped, &[])
+            .observe(TimeMs::new(2_000), Temporal::Timestamped)
             .unwrap()
             .unwrap();
         assert_eq!(a.render(), "clock: 1970-01-01T00:00:01Z;");

@@ -249,7 +249,6 @@ fn status_reports_the_count_of_the_call_that_asked() {
         worktree_path: "lab/room1".to_owned(),
         worktree_disk: kernel::ByteLen::new(0),
         signals_pending: 0,
-        now: None,
         provider_mode: runtime::ProviderMode::Normal,
         neighbours: 0,
     })
