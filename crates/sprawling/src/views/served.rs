@@ -56,10 +56,17 @@ impl Views {
     pub(crate) fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream) {
         self.upstream = Some(newest);
     }
+
+    /// Takes the one way this city asks its search path for a program,
+    /// so the harness page reads this machine only through what the
+    /// served city handed in (accounting-SPEC.md 8-10).
+    pub(crate) fn find_programs_through(&mut self, find: fn(&str) -> Option<std::path::PathBuf>) {
+        self.programs = Some(find);
+    }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, reason = "test code")]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 mod tests {
     use super::Views;
     use kernel::{AxCode, AxError};
@@ -81,6 +88,47 @@ mod tests {
         assert_eq!(
             views.prepare(&wire::Query::NewestRelease).finish(),
             wire::Answer::Release(Box::new(scripted()))
+        );
+    }
+
+    /// How many programs the scripted search was asked for.
+    static ASKED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+    /// A search that finds every program, and counts the asking.
+    fn found_everywhere(program: &str) -> Option<std::path::PathBuf> {
+        ASKED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Some(std::path::PathBuf::from(program))
+    }
+
+    #[test]
+    fn a_harness_is_looked_for_through_the_search_the_views_were_handed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut views = Views::new(dir.path());
+        views.find_programs_through(found_everywhere);
+
+        let wire::Answer::Harnesses(page) = views.prepare(&wire::Query::Harnesses).finish() else {
+            panic!("Harnesses answers with the harness page");
+        };
+        let found: Vec<bool> = page.harnesses.iter().map(|line| line.found).collect();
+        assert_eq!(
+            (found, ASKED.load(std::sync::atomic::Ordering::Relaxed)),
+            (
+                vec![true; agent_protocols::Harness::ALL.len()],
+                agent_protocols::Harness::ALL.len()
+            ),
+        );
+    }
+
+    #[test]
+    fn a_harness_page_nobody_served_answers_unavailable() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(
+            Views::new(dir.path())
+                .prepare(&wire::Query::Harnesses)
+                .finish(),
+            wire::Answer::Unavailable {
+                query: "Harnesses".to_owned()
+            },
         );
     }
 }

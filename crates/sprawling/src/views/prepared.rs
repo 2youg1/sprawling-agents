@@ -25,6 +25,7 @@ use super::git_status::GitStatusAsk;
 use super::hunks::hunks_answer;
 use super::lines::buildings_of;
 use super::lines::config_answer;
+use super::lines::harnesses_answer;
 use super::listing::listing_answer;
 use super::prefix::{PrefixAsk, content_answer};
 use super::skills::{SkillPins, skills_answer};
@@ -63,6 +64,8 @@ pub(crate) enum Prepared {
     Config { city_root: PathBuf, addr: Address },
     /// The release page, which leaves this machine.
     Release(Option<fn() -> wire::ReleaseAnswer>),
+    /// The harness page, which walks this machine's search path.
+    Harnesses(Option<fn(&str) -> Option<PathBuf>>),
     /// One item's publisher, which leaves this machine too.
     Upstream {
         ask: Option<fn(&str) -> wire::DoctorUpstream>,
@@ -236,6 +239,7 @@ impl Prepared {
             // through the registry a served city handed the views.
             Self::Release(Some(newest)) => wire::Answer::Release(Box::new(newest())),
             Self::Release(None) => unavailable("NewestRelease".to_owned()),
+            Self::Harnesses(_find) => harnesses_answer(),
             Self::Upstream {
                 ask: Some(newest),
                 item,
