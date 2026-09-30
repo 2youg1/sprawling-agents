@@ -48,6 +48,8 @@ just check                    # the whole check: fmt, source gates, Lean specifi
 | `just build-web` | the client bundle, built into `target/web-dist` |
 | `just dist` | the whole deliverable: client, binary, bill of materials |
 | `just sim` | the citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
+| `just provider <script> <record>` | the stand-in provider: a wire script played on a loopback port, every exchange recorded, `SPRAWLING_PROVIDER=<url>` printed first |
+| `just shots` | every page at 1440 and 1920, dark and light, as PNG files and an index in `target/shots`; a person reads them, no gate does |
 | `cargo xtask docnum [--write]` | every number and generated section a document carries, checked against the code that decides it; `--write` rewrites them |
 | `cargo xtask apisync [--write]` | the public API of `kernel` and `wire` against its baseline in `tools/xtask/api-baselines/`, rendered by the nightly rustdoc and the cargo-public-api release that `tools/xtask/public-api.txt` pins; a nightly job reads it, and a change to either surface rewrites the baseline in the same change-set |
 | `just adversary` | the out-of-tree property checker that attacks the binary through the wire; never a gate, and a no-op without Lean |
