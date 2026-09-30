@@ -11,6 +11,7 @@ use std::path::Path;
 use kernel::layout::CONFIG_FILE;
 use kernel::{AxCode, AxError, RESERVED_PREFIX};
 
+use super::resident::{HARNESS_KEY, MODEL_NAME_KEY};
 use super::shelves::SHELVES_KEY;
 
 /// What a person does when a key or a value is not one this build reads.
@@ -60,6 +61,22 @@ pub(super) fn skills_below_city(file: &Path) -> AxError {
     .with_recovery(format!(
         "move `{SHELVES_KEY}` into the city root's `{RESERVED_PREFIX}/{CONFIG_FILE}`: \
          a shelf is mounted for every building at once"
+    ))
+}
+
+/// The refusal for one layer that names a model and a harness.
+///
+/// The model is the record a session wrote at this address, and `/new`
+/// forgets it; the harness is a person's setting. Which of the two the
+/// layer meant is not a reader's to guess.
+pub(super) fn two_residents(model: &str, harness: &str) -> AxError {
+    AxError::failure(
+        AxCode::ConfigInvalid,
+        "read a configuration layer",
+        format!("{MODEL_NAME_KEY} = \"{model}\" beside {HARNESS_KEY} = \"{harness}\""),
+    )
+    .with_recovery(format!(
+        "keep one: `/new` forgets the model a session wrote here, or take {HARNESS_KEY} out"
     ))
 }
 

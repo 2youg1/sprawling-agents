@@ -32,6 +32,7 @@ mod cache;
 mod context;
 mod ladder;
 mod refuse;
+mod resident;
 mod session;
 mod settled;
 mod shelves;
@@ -39,6 +40,7 @@ mod write;
 
 pub use cache::keep_warm;
 pub use ladder::Layer;
+pub use resident::settled_harness;
 pub(crate) use session::forget as forget_session;
 pub use session::{own_layer, write_session};
 pub use settled::{settled_effort, settled_second};
@@ -66,6 +68,8 @@ pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, A
 pub struct ConfigLayer {
     /// The model a scope froze, written once when a session opens.
     model: Option<String>,
+    /// The harness this scope names as the resident of its rooms, as written.
+    harness: Option<String>,
     effort: Option<Effort>,
     sandbox: Option<SandboxLimits>,
     mcp: Option<Vec<McpServer>>,
@@ -200,12 +204,14 @@ impl ConfigLayer {
                 "`[model] name` is empty: leave the key out to state no model".to_owned(),
             ));
         }
+        let harness = file.resident.and_then(|section| section.harness);
         let second_threshold = file
             .context
             .map(|section| SecondThreshold::parse(section.second_threshold))
             .transpose()?;
         Ok(ConfigLayer {
             model,
+            harness,
             effort: file.model.effort,
             sandbox,
             mcp,
@@ -309,6 +315,8 @@ pub(crate) struct ConfigFile {
     cache: Option<CacheSection>,
     #[serde(default)]
     skills: Option<SkillsSection>,
+    #[serde(default)]
+    resident: Option<resident::ResidentSection>,
 }
 
 /// The `[skills]` table: the directories outside the city this city

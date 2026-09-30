@@ -133,3 +133,26 @@ fn a_credential_in_a_command_environment_is_refused_too() {
         err.subject()
     );
 }
+
+/// An address that is its own building has one file for both rungs, so
+/// a session record written into a building that names a harness would
+/// leave a file every reader refuses. The write is refused instead, and
+/// the file keeps the bytes it had.
+#[test]
+fn a_write_the_reader_would_refuse_is_not_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let lab = Address::parse("lab").unwrap();
+    let file = path(dir.path(), &lab, Layer::Resident).unwrap();
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    let original = "[resident]\nharness = \"pi\"\n";
+    std::fs::write(&file, original).unwrap();
+
+    assert_eq!(
+        super::super::write_session(dir.path(), &lab, "m-local", None),
+        Err(refuse_file(
+            &file,
+            super::super::refuse::two_residents("m-local", "pi").subject()
+        ))
+    );
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
+}
