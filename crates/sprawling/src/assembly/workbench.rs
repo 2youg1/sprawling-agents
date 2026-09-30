@@ -48,6 +48,7 @@ pub(in crate::assembly) struct Laying {
     /// Where the desktop server a building's rules ask for is started
     /// from (`RunWorker::desktop_program`).
     desktop_program: super::DesktopProgram,
+    exec_host: super::hands::ExecHost,
     backlog: runtime::Backlog,
     /// The city's one checkpoint at a time (`driving::lane::DriveContext`).
     pub(in crate::assembly) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
@@ -103,6 +104,7 @@ impl super::RunWorker {
             connectors: std::sync::Arc::clone(&self.connectors),
             browsers: self.browsers,
             desktop_program: self.desktop_program,
+            exec_host: self.exec_host,
             backlog: self.flight.backlog.clone(),
             checkpoint_gate: std::sync::Arc::clone(&self.flight.checkpoint_gate),
             store: std::sync::Arc::clone(&self.lane_store),

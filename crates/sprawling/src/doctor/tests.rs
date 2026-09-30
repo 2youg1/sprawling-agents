@@ -7,6 +7,7 @@ mod browsers;
 mod city;
 mod consent;
 mod faults;
+mod host;
 mod reading;
 
 use std::collections::BTreeSet;

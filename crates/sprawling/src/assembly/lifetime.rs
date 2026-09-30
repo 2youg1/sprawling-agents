@@ -222,6 +222,11 @@ impl RunWorker {
             browsers: crate::browser_tool::for_rules,
             desktop_program: std::env::current_exe,
             recipe_for: crate::doctor::recipe_for,
+            exec_host: super::hands::ExecHost {
+                python_wasm: crate::doctor::host::usable_python_wasm,
+                shell: crate::doctor::host::usable_shell,
+                engine: crate::doctor::host::execution_engine,
+            },
         };
         worker.sweep_abandoned_trees();
         Ok(worker)

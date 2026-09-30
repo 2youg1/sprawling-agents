@@ -140,6 +140,27 @@ pub(crate) fn shell() -> Presence {
     look(SHELL)
 }
 
+/// The CPython-WASI component a run may be handed: a present one, and
+/// never a broken one (accounting-SPEC.md 8-11).
+pub(crate) fn usable_python_wasm() -> Option<PathBuf> {
+    usable_path(&python_wasm())
+}
+
+/// The shell a run may be handed: a present one, and never a broken one
+/// (accounting-SPEC.md 8-11).
+pub(crate) fn usable_shell() -> Option<PathBuf> {
+    usable_path(&shell())
+}
+
+/// The path of an item a run may be handed. A broken one is `None`,
+/// because the exec tool could not tell it from a working one.
+fn usable_path(presence: &Presence) -> Option<PathBuf> {
+    if !presence.usable() {
+        return None;
+    }
+    presence.at().map(std::path::Path::to_path_buf)
+}
+
 /// The sandbox this build carries, if it carries one.
 ///
 /// # Errors

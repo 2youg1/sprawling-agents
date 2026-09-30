@@ -46,6 +46,7 @@ mod dropping;
 mod folds;
 mod freezing;
 mod genesis;
+mod hands;
 pub(crate) mod health;
 mod keeping_warm;
 mod lifetime;
@@ -319,6 +320,10 @@ pub struct RunWorker {
     /// requirement table stays with the doctor (sprawling-SPEC.md,
     /// `doctor_install`).
     recipe_for: fn(&str) -> Result<&'static accounting::Recipe, AxError>,
+    /// Where the exec tool's interpreter, shell and engine come from
+    /// (`bin::doctor::host`). Received rather than asked, because each
+    /// reads this machine (accounting-SPEC.md 8-11).
+    exec_host: hands::ExecHost,
 }
 
 impl RunWorker {

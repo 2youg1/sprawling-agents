@@ -294,7 +294,7 @@ impl Laying {
     /// Propagates a build with no execution engine and whatever the
     /// tool says about its own construction.
     fn exec_tool(&self, site: &Site, addr: &Address) -> Result<ExecTool, AxError> {
-        let machine = machine_half(&site.config.sandbox)?;
+        let machine = machine_half(&site.config.sandbox, &self.exec_host)?;
         ExecTool::new(
             runtime::ExecSetup {
                 workdir: site.write_root.join(addr.as_str()),
