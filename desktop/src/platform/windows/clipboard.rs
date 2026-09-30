@@ -132,7 +132,7 @@ pub(crate) fn read() -> Result<Option<String>, Refusal> {
             &err,
         )
     })?;
-    Ok(locked(handle))
+    locked(handle)
 }
 
 /// The text behind a clipboard handle, copied out before the lock is
@@ -141,7 +141,7 @@ pub(crate) fn read() -> Result<Option<String>, Refusal> {
     unsafe_code,
     reason = "a clipboard handle is global memory, and reading it means locking it and walking to its terminator"
 )]
-fn locked(handle: HANDLE) -> Option<String> {
+fn locked(handle: HANDLE) -> Result<Option<String>, Refusal> {
     let memory = HGLOBAL(handle.0);
     // SAFETY: `handle` is the clipboard's own handle for
     // `CF_UNICODETEXT`, which is documented to be global memory, so
@@ -150,7 +150,7 @@ fn locked(handle: HANDLE) -> Option<String> {
     // below reads.
     let text = unsafe { GlobalLock(memory) }.cast::<u16>();
     if text.is_null() {
-        return None;
+        return Ok(None);
     }
     let mut units: Vec<u16> = Vec::new();
     let mut at: usize = 0;
@@ -171,7 +171,7 @@ fn locked(handle: HANDLE) -> Option<String> {
     // SAFETY: `memory` is the handle locked immediately above, and this
     // is that lock's one release. Nothing reads `text` after this point.
     let _unlocked = unsafe { GlobalUnlock(memory) };
-    Some(String::from_utf16_lossy(&units))
+    Ok(Some(String::from_utf16_lossy(&units)))
 }
 
 /// Replaces what is on the clipboard.
@@ -296,6 +296,23 @@ mod tests {
             }
         }
         panic!("still contended after the last attempt: {last:?}");
+    }
+
+    /// A block that will not lock is a refusal to retry, never an empty
+    /// clipboard, which would send a caller off to try something else.
+    /// `GlobalLock` of no block needs no desktop and fails the same way.
+    #[test]
+    fn a_clipboard_block_that_will_not_lock_is_a_refusal_not_an_empty_clipboard() {
+        use crate::refusal::RefusalCode;
+        assert_eq!(
+            locked(HANDLE(std::ptr::null_mut())),
+            Err(Refusal::new(
+                RefusalCode::ToolUnavailable,
+                "use the clipboard",
+                "the clipboard's text could not be locked for reading",
+                "try again; another program may be changing the clipboard",
+            ))
+        );
     }
 
     /// This one really does touch the machine running the tests, and it
