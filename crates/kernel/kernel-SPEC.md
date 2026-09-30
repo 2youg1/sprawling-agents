@@ -557,7 +557,9 @@ pub struct HarnessAnswered { pub stop: HarnessStop, pub text: String }   // text
 pub enum HarnessStop { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
 
 pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
-                        pub subject: Option<String> }   // 键缺席读作 None
+                        pub subject: Option<String>,      // 键缺席读作 None
+                        pub effect: Option<Effect>,       // 调用那一刻的登记（§8-75）；缺席即省略
+                        pub render: Option<RenderIntent> }
 pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
                         #[serde(flatten)] pub answer: ToolAnswer }
 #[serde(untagged)]
@@ -1862,6 +1864,18 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 **重开参数**：出现第二种需要逐行区分的时间含义时重开本条，例如回合里其余的行也改记自己的时刻。
 
+### 12.11 一次调用的效果与呈现，在调用那一刻从登记读出、记进 `tool_called`
+
+**决定**：`ToolCalled` 多记两个可缺席的键 `effect` 与 `render`，由回合的工具波从工具面的登记照录（§8-75(b)）；线上的 `Call.effect`、`Call.render` 读这两个键。
+
+**理由**：一件工具是什么，权威是它的 `ToolMeta`；这份登记只在一次 run 的工具台上存在，折叠账本的读面够不到它，而楼的 MCP 工具与内置工具的登记每次 run 都可能不同。写在调用那一行上，读面读到的就是那一刻的事实，一件新工具进来不需要任何读者多写一臂。
+
+**被否**：①读面按工具名穷尽匹配出呈现：每加一件工具都要改这个匹配，MCP 工具的名字读面根本不知道；②读面持一份工具登记，在折叠时查：登记随楼与 run 变，旧行会被今天的登记重新解释；③线上自定一个不含地址的投影枚举：同一规则的第二个权威（wire-SPEC §8-0）。
+
+**代价**：经工具台写下的每条 `tool_called` 多二三十个字节。
+
+**重开参数**：有了每次调用由参数算出位置的函数时，`render` 的 `Diff.locations` 改记那次调用的位置。
+
 ## 13 依赖选型
 
 `serde`＋`serde_json`（规范字节与载荷）；`thiserror`（Display/Error derive）；`blake3`（唯一哈希）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）；`secrecy`＋`zeroize`（Sealed）。版本由根 `Cargo.toml` 与 `Cargo.lock` 给出。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
@@ -2289,3 +2303,22 @@ pub struct ModelReturned {
 - **读数来自回合的钟**：`runtime::turn` 在它包住的增量汇点里读第一段非空内容到达的那一刻（runtime-SPEC §8-50）。kernel 不采样，gateway 也不采样：`kernel::Model` 的实现从不读钟。
 - **缺席有三种情形，都不是零**：回复从一扇到齐之前什么也不报的门回来（阻塞门、没有流的适配器、流式解析失败之后换阻塞门重发修好的那一次）；回复在流上只带工具调用，没有一段文字或推理（首个内容的定义与理由见 runtime-SPEC §12.6）；这把键出现之前写下的每一行。三种都读作「没有量到」，页面不画首字耗时，不猜。
 - **字节不动**：缺席即省略（`skip_serializing_if`），旧行与今天没量到的行字节相同；读宽（`default`）。账本版本不为此进位：`v` 为 2 的行里这一格可以缺席，读者不从版本推断它在不在。
+
+**(b) `tool_called` 记下这件工具的登记：`effect` 与 `render`**
+
+```rust
+pub struct ToolCalled {
+    // …既有字段…
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effect: Option<Effect>,          // 调用那一刻这件工具登记的效果
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render: Option<RenderIntent>,    // 调用那一刻这件工具登记的呈现
+}
+// Effect 与 RenderIntent 在 feature `schema` 下派生 JsonSchema：线上 Call 直接携它们（wire-SPEC §8-55）
+```
+
+- **写方只有回合的工具波**：`runtime::turn::wave` 写 `tool_called` 时，从工具面的 `ConcurrentInvoke::meta_of` 取这件工具的 `ToolMeta`，照录其中两项（runtime-SPEC §8-51）。工具面不认识这个名字时两者缺席——一次调用了没登记的工具，是一个真实状态。
+- **记的是调用那一刻的登记**：一件工具以后换了效果或呈现，旧行仍说它当时是什么；折叠不去问今天的登记。新加一件内置工具不需要改任何读者：它的登记随它第一次被调用写进账本。
+- **`Diff.locations` 照录登记**：登记层面的声明是空表（§8-23），每次调用的位置是工具一侧由参数算出的纯函数，今天还没有这个函数，所以账上的 `locations` 恒为空；一次编辑调用改的是哪个文件，读者读 `subject`。
+- **不进模型的字节**：`tool_called` 是入窗种类，但窗口从 `model_returned` 的消息重建工具调用，从不读 `tool_called` 的载荷（`runtime::fork` 的逐种类表把它列在「不是对话」一侧），所以这两个键不改变任何请求。
+- **字节不动**：缺席即省略，读宽；旧行两键都缺，读作「没有记下」。

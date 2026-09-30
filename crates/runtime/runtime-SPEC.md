@@ -2020,6 +2020,21 @@ pub(super) struct Settled {
 3. **属于落账的那一次尝试**：流式尝试失败、换阻塞门重发（`BlockingResend`）修好的回复，`first_at` 缺席。那次重发之前写下的 `model_called` 是它的起点，而它没有流；把失败那次的读数挂到它上面，读者算出的首字耗时量的是另一次请求。
 4. **读钟失败即回合失败**：与 `model_returned` 自己那一刻同一只钟、同一种失败。汇点不能失败（`kernel::Increments` 没有返回值），所以读数先存下，模型调用返回之后再抛出。
 
+### 8-51 一次调用在账上带出它的登记，与它被裁掉的原文在哪（`turn::wave`、`pipeline`）
+
+**(a) 工具面交出整份登记**
+
+```rust
+pub trait ConcurrentInvoke {
+    /// 这次调用那件工具的登记；None 是工具台不认识的名字（它不是只读的）。
+    fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
+    // ahead、admit、tool、account 不变
+}
+```
+
+- `meta_of` 取代原来的 `effect_of`：工具波判只读前缀、推测门判能否提前起跑，读的都是登记里的 `effect`；`tool_called` 还要照录 `effect` 与 `render`（kernel-SPEC §8-75(b)）。一个方法交出整份登记，三处读同一个答案；两个方法各交一项，就是两处各自去查同一份登记。
+- 闭包工具面（citysim 与测试）答 `None`：它的调用写 `tool_called` 时两键缺席，与它今天不声明效果、波次恒串行是同一件事。
+
 ### 8-43 重试上限住 kernel
 
 两个 crate 互不依赖，而 gateway 决定要不要再发一次请求、`Watchdog` 决定要不要冻结这次运行，读的是同一个事实——所以 `Retries` 住 `kernel::retries`，两边都直接用 `kernel::Retries`，不导出别名：别名让读者以为有两个类型，调用点于是写出一个两臂恒等的 `match` 去「转换」它们。
