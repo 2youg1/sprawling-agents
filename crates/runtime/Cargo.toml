@@ -23,7 +23,7 @@ toml.workspace = true
 # there is no socket host implementation, which is the Python arm's
 # mechanical proof that it cannot reach the network.
 wasmtime = { version = "48", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
-wasmtime-wasi = { version = "48", optional = true }
+wasmtime-wasi = { version = "49", optional = true }
 
 # One Job Object per run, so a run's whole process tree can be read
 # (runtime-SPEC 8-13-3); the crate's public surface is safe.
