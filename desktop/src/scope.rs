@@ -104,6 +104,13 @@ pub(crate) struct Allowance {
 /// of through a second copy of it.
 #[derive(Debug)]
 pub(crate) struct Admitted<'a> {
+    #[cfg_attr(
+        not(any(windows, test)),
+        expect(
+            dead_code,
+            reason = "only the Windows arm reports windows, so only it reads the allowlist back (desktop-SPEC.md section 12.1)"
+        )
+    )]
     allowance: &'a Allowance,
 }
 
@@ -116,6 +123,7 @@ impl Admitted<'_> {
     /// judges the identifiers a call *gave*; here the identifiers are
     /// the window's own. An empty allowlist therefore shows nothing,
     /// which is the same reading that makes it admit nothing.
+    #[cfg(any(windows, test))]
     pub(crate) fn visible(&self, title: &str, process: &str) -> bool {
         self.allowance.visible(title, process)
     }
@@ -223,6 +231,7 @@ impl Allowance {
     /// Whether one window on this desktop is one this scope's caller
     /// could name, which is what makes it one this caller may be told
     /// about.
+    #[cfg(any(windows, test))]
     fn visible(&self, title: &str, process: &str) -> bool {
         self.windows.iter().any(|glob| glob.matches(title))
             || self.processes.iter().any(|glob| glob.matches(process))
