@@ -94,7 +94,7 @@ pub(crate) const REGISTERED: Fixture = Fixture {
     tree_file_bytes: 16_384,
     placements: 4,
     forward_events: 2_000,
-    pinned: "0000000000000000000000000000000000000000000000000000000000000000",
+    pinned: "1dc560ad5766de65f16ac021f4a5b9cf2dd089cfae4cfc1378cb142e05b6ed28",
 };
 
 /// Runs every load scenario and returns its readings.
