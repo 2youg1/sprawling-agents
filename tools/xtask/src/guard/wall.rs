@@ -27,33 +27,18 @@
 //! for a file that came back under budget: an exception nobody needs is
 //! an exception nobody decided to keep granting.
 //!
-//! Two facts beyond the manifest are compared for the same reason. The
-//! protocol revision this server speaks is `agent_protocols::PROTOCOL_VERSION`
-//! written a second time, because the two ends must agree to talk at
-//! all; and every `E_` code the package spells is required to be one
-//! `kernel` already defines, which is the boundary section 8.5 drew
-//! around that duplication — the package may quote the city's spelling
-//! and may never mint a code of its own.
+//! The facts the package quotes from source files inside the wall — the
+//! protocol revision, the effect-unknown key, the error codes and the
+//! quality domain — are compared for the same reason, in `quoted`.
 
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 
+mod quoted;
+
 const ROOT_MANIFEST: &str = "Cargo.toml";
 const DESKTOP_MANIFEST: &str = "desktop/Cargo.toml";
-/// Where the protocol revision is decided, and where it is copied.
-const PROTOCOL_HOME: &str = "crates/agent_protocols/src/mcp/handshake.rs";
-const PROTOCOL_COPY: &str = "desktop/src/rpc.rs";
-/// Where the city's error codes are defined, and where the out-of-tree
-/// package quotes them.
-const CODE_HOME: &str = "crates/kernel/src/error/code.rs";
-const CODE_QUOTE: &str = "desktop/src/refusal.rs";
-/// The quality domain, stated in the city and copied into the
-/// out-of-tree package, which sits outside the workspace and cannot read
-/// the kernel's constant.
-const QUALITY_HOME: &str = "crates/kernel/src/consts_policy.rs";
-const QUALITY_QUOTE: &str = "desktop/src/platform/windows/encode.rs";
-
 /// The package metadata every workspace member inherits from
 /// `[workspace.package]` and this package restates by hand.
 const SHARED_METADATA: [&str; 5] = ["version", "edition", "license", "rust-version", "publish"];
@@ -95,8 +80,7 @@ pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     metadata(&workspace, &desktop, &mut violations);
     lints(&workspace, &desktop, &mut violations);
     dependencies(&workspace, &desktop, &mut violations);
-    quoted(root, &mut violations)?;
-    quality_domain(root, &mut violations)?;
+    quoted::check(root, &mut violations)?;
     Ok(violations)
 }
 
@@ -238,114 +222,6 @@ fn required(held: &toml::Value) -> Option<&str> {
         toml::Value::String(line) => Some(line),
         other => other.get("version").and_then(toml::Value::as_str),
     }
-}
-
-/// The quality domain the city states and the package copies.
-///
-/// The package cannot read `kernel::consts_policy::IMAGE_QUALITY`, so the two numbers are compared as text, the way the protocol revision is.
-fn quality_domain(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskError> {
-    let decided = number_after(root, QUALITY_HOME, "ImageQuality::new(")?;
-    let copied = number_after(root, QUALITY_QUOTE, "QUALITY_MAX: u8 =")?;
-    if decided != copied {
-        out.push(diverged(
-            QUALITY_QUOTE.to_owned(),
-            "a value outside the quality domain is refused by whoever parses it, so both sides must refuse at the same number",
-            format!("`{copied}` against `{decided}` in {QUALITY_HOME}"),
-            format!("set `QUALITY_MAX` in {QUALITY_QUOTE} to `{decided}`; an encoder asked for a quality the city would have refused must not answer as if it were asked for something it has"),
-        ));
-    }
-    Ok(())
-}
-
-/// The first run of digits after `needle` on the line that states it.
-fn number_after(root: &Path, rel: &str, needle: &str) -> Result<String, XtaskError> {
-    let text = crate::walk::read_text(&root.join(rel))?;
-    text.lines()
-        .find_map(|line| {
-            let after = line.split_once(needle)?.1;
-            let digits: String = after
-                .trim_start()
-                .chars()
-                .take_while(char::is_ascii_digit)
-                .collect();
-            (!digits.is_empty()).then_some(digits)
-        })
-        .ok_or_else(|| XtaskError::Doc {
-            file: rel.to_owned(),
-            msg: format!(
-                "this file no longer states `{needle}`, which is the shape the quality domain \
-                 is compared in"
-            ),
-        })
-}
-
-/// The two facts the out-of-tree package quotes from inside the wall:
-/// the protocol revision, and the spelling of every error code.
-fn quoted(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskError> {
-    let decided = revision(root, PROTOCOL_HOME)?;
-    let copied = revision(root, PROTOCOL_COPY)?;
-    if decided != copied {
-        out.push(diverged(
-            PROTOCOL_COPY.to_owned(),
-            "both ends of this protocol name one revision, so the two constants hold one value",
-            format!("`{copied}` against `{decided}` in {PROTOCOL_HOME}"),
-            format!(
-                "set `PROTOCOL_VERSION` in {PROTOCOL_COPY} to `{decided}`; a server and a \
-                 client that disagree here do not finish a handshake"
-            ),
-        ));
-    }
-    let defined = codes(root, CODE_HOME)?;
-    for minted in codes(root, CODE_QUOTE)?
-        .into_iter()
-        .filter(|code| !defined.contains(code))
-    {
-        out.push(diverged(
-            CODE_QUOTE.to_owned(),
-            "the out-of-tree package quotes the city's error codes and mints none of its own \
-             (desktop-SPEC.md section 8.5, first pair)",
-            format!("`{minted}` is spelled here and defined nowhere in {CODE_HOME}"),
-            format!(
-                "add the code to `kernel::AxCode` first, where every consumer of it can read \
-                 it, then quote that spelling in {CODE_QUOTE}"
-            ),
-        ));
-    }
-    Ok(())
-}
-
-/// The protocol revision one file states.
-fn revision(root: &Path, rel: &str) -> Result<String, XtaskError> {
-    let text = crate::walk::read_text(&root.join(rel))?;
-    text.lines()
-        .find_map(|line| {
-            let after = line.split_once("PROTOCOL_VERSION: &str =")?;
-            quotes(after.1).next()
-        })
-        .ok_or_else(|| XtaskError::Doc {
-            file: rel.to_owned(),
-            msg: "this file no longer states `PROTOCOL_VERSION: &str = \"…\"`, which is the \
-                  shape both ends of the protocol are compared in"
-                .to_owned(),
-        })
-}
-
-/// Every `E_` code one file spells.
-fn codes(root: &Path, rel: &str) -> Result<std::collections::BTreeSet<String>, XtaskError> {
-    let text = crate::walk::read_text(&root.join(rel))?;
-    Ok(text
-        .lines()
-        .flat_map(quotes)
-        .filter(|found| found.starts_with("E_"))
-        .collect())
-}
-
-/// Every double-quoted string on one line.
-fn quotes(line: &str) -> impl Iterator<Item = String> + '_ {
-    line.split('"')
-        .skip(1)
-        .step_by(2)
-        .map(std::borrow::ToOwned::to_owned)
 }
 
 /// One manifest, read as a value.

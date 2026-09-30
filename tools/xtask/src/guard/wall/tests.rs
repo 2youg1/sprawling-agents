@@ -147,23 +147,3 @@ fn a_shared_dependency_is_held_to_one_version_and_a_private_one_is_not() {
         "a dependency the workspace does not name is this package's own"
     );
 }
-
-/// Both copied constants are read out of real source, so the reader is
-/// the shape the source is written in rather than a regular expression
-/// somebody hoped would match it.
-#[test]
-fn the_quoted_facts_are_read_out_of_the_files_that_hold_them() {
-    let root = repository();
-    assert_eq!(
-        revision(&root, PROTOCOL_HOME).unwrap(),
-        revision(&root, PROTOCOL_COPY).unwrap()
-    );
-    let defined = codes(&root, CODE_HOME).unwrap();
-    let quoted = codes(&root, CODE_QUOTE).unwrap();
-    assert!(quoted.contains("E_GATE_DENIED"), "{quoted:?}");
-    assert!(quoted.is_subset(&defined), "{quoted:?}");
-}
-
-fn repository() -> std::path::PathBuf {
-    crate::root::this_checkout().to_path_buf()
-}
