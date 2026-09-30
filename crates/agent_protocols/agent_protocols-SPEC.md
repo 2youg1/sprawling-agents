@@ -91,6 +91,9 @@ impl McpTool {
 }
 // Tool::invoke 取 &self：Rpc 的 id 与它编号的连接是同一把锁，
 // 答案从请求出去的那条连接上读回，所以同一台 server 的两次调用轮流走。
+// tools/call 的答复（§8-1c）：`isError: true` 的结果是一次失败，不是一份答案
+pub(crate) const EFFECT_META_KEY: &str = "sprawling/effect-unknown";
+pub(crate) const ERROR_TEXT_CAP_BYTES: usize = 4_096;
 pub struct ScriptedOutbound { /* 私有 */ }                                          // 第二适配器
 
 // 8-1b 外部输入的消息上限（形状 1 判定；见 §8-15）
@@ -119,6 +122,19 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 ### 入向浮点：治我们发的，适应我们收的
 
 `digits_for_floats` 把对侧答案里的小数**原样写成字符串**。搜索类 server 的答案常带相关度分之类的小数；Ledger 不收浮点，照搬就会让每一次调用都以 `E_INVALID_ARGS` 失败。三条理由：① 禁浮点是 **Ledger 的**规矩（确定性第 6 条），不得放松；② 拒掉整个答案等于声明本城接不了任何真实的搜索 server；③ 丢掉该字段是隐形地删别人的数据。写成字符串**不丢一位数字、不做任何算术**，且在 Ledger 里看得见（带引号的数）。与 `call_tool` 拒掉携浮点的**入参**并不矛盾：本城治自己发出去的，适应自己收回来的。
+
+### 8-1c 一次 `tools/call` 的答复
+
+MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容块数组；`isError` 为真时，这是工具自己报的错。规格要求工具的错误放进结果、置 `isError`，不回协议层的 JSON-RPC error。`McpTool::invoke` 按这条读：
+
+- `isError` 不为真：`result` 经 `digits_for_floats` 成为 `ToolOutcome.result`。窗口怎么装它，归 `runtime::pipeline::connector`（runtime-SPEC 8-27-10）。
+- `isError` 为真：这是一次失败，`invoke` 回 `Err`。subject 是 `<remote> reported a failure: <文字>`，文字是全部 `type: "text"` 块按原顺序以换行连起；超过 `ERROR_TEXT_CAP_BYTES` 时在字符边界截断，并写明截掉了多少字节；非文字块不进 subject，只报个数。码是 `E_TOOL_UNAVAILABLE`，`Retry::No`。
+- `isError` 为真且 `_meta` 里有 `sprawling/effect-unknown`、值不是 `false`：码是 `E_TOOL_OUTCOME_UNKNOWN`，标 `effect_unknown`（`Retry::Unknown`）。这个键说的是「这次调用交出去了一部分，桌面或别处是否已经生效不知道」。值写错也按「不知道」读：错读成「没生效」，模型会把一次可能已经落地的动作再做一遍。
+- 协议层的 JSON-RPC error 照旧由 `Rpc::read` 读成 `E_TOOL_UNAVAILABLE`，只取 `code` 与 `message`，不读 `data`：`data` 的形状各家自定，城只认规格定过的东西。
+
+键名 `sprawling/effect-unknown` 合 `_meta` 的键名格式：前缀是一个以字母开头的标签加斜杠，不落在 `mcp`／`modelcontextprotocol` 的保留前缀里。它的唯一定义是 `mcp::tools::EFFECT_META_KEY`；墙外的 `desktop/` 抄一份，由 `xtask guard` 比对。
+
+**决定**：工具报的错成为 `Err`（选中）vs 原样当成一份答案交给窗口（落选）。落选那条让模型读到的 `is_error` 为假，账本记成 `Answered`，一次失败看起来像一个古怪的结果。4 KiB 的上限是我们的选择：一句拒词加一句恢复写得下；更长的错误文字多半是 server 把堆栈或整页内容塞了进来，而这条路上没有 CAS 可以把它存下再分窗，窗口与账本为它付的代价比它能告诉模型的多。**被否**：读 JSON-RPC error 的 `data.code`、`data.recovery`、`data.retry`——规格外的约定，城要为每一家 server 猜一次形状。
 
 ## 8.5 两个设计
 
@@ -153,8 +169,9 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 |---|---|---|
 | `E_INVALID_ARGS` | 浮点入参、入站字段缺失、路由错工具 | 部分能：浮点由模型给出，故在出口拒并指位置 |
 | `E_WIRE_MISMATCH` | 答案或列表形状读不出；一条消息超过 `MESSAGE_CEILING`；流在消息中途断掉；消息不是 UTF-8 | 不能：对侧写多少字节不由本库决定，fail closed；超限恒是整条拒，恒不截断后解析 |
-| `E_TOOL_UNAVAILABLE` | server 返回 error、重放缺答案 | 不能：外部世界的事实 |
-| `E_TIMEOUT` | 期限内未答 | 不能：对侧多久回答不由本库决定；拒词同时是子进程被回收的那一刻 |
+| `E_TOOL_UNAVAILABLE` | server 返回 JSON-RPC error；`tools/call` 答 `isError: true`；stdio 对侧在作答前关了输出、SSE 流在作答前断了（后两者带 `Retry::Unknown`）；重放缺答案 | 不能：外部世界的事实 |
+| `E_TIMEOUT` | 期限内未答；请求已交出，带 `Retry::Unknown` | 不能：对侧多久回答不由本库决定；拒词同时是子进程被回收的那一刻 |
+| `E_TOOL_OUTCOME_UNKNOWN` | `tools/call` 答 `isError: true`，且 `_meta` 带 `sprawling/effect-unknown` | 不能：server 自己说不知道 |
 | `E_GATE_DENIED` | confidential 楼构造出站工具 | **能**：构造点即拒，于是「它存在过」这件事不成立 |
 | `E_OUTSIDE_WRITE_DOMAIN` | 入站地址落 reserved prefix | 能：判定在 `admit`，无第二条入口 |
 
@@ -172,13 +189,15 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 `HALT_TICK_MS = 200`（`harness::session`）：我们的选择。它是人按下停摆到 harness 收到 `session/cancel` 的上限；比一次按键的反应慢不了多少，又不至于让一条等着 harness 的车道每秒醒几十次。
 
+`EFFECT_META_KEY = "sprawling/effect-unknown"`：我们的约定，理由见 §8-1c；改它要同时改 `desktop/src/refusal.rs` 的抄本，`xtask guard` 会指出没跟上的那一边。`ERROR_TEXT_CAP_BYTES = 4_096`：我们的选择，理由见 §8-1c。
+
 ## 15 影响面
 
 改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/sprawling` 的 `assembly::mcp`、`assembly::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `wire::auth` 的配对比对。
 
 ## 16 测试与约束
 
-逐模块 `#[cfg(test)]`；「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言，再加「恰在上限内的消息照常解析」「超限的消息被整条拒且拒词报出上限与是哪台 server」两条（§8-15）。**约束**：本 crate 恒不出现 `async`、恒不持文件句柄、恒不内置任何服务商名字。
+逐模块 `#[cfg(test)]`；「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言，再加「恰在上限内的消息照常解析」「超限的消息被整条拒且拒词报出上限与是哪台 server」两条（§8-15），以及「`isError` 读成失败」「`_meta` 效果未知」「stdio 超时与断流、SSE 断流标效果未知」三条。**约束**：本 crate 恒不出现 `async`、恒不持文件句柄、恒不内置任何服务商名字。
 
 ## 17 模型体验
 
@@ -234,7 +253,7 @@ pub fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>); //
 - **HTTP 与 SSE 共用一个客户端构造**（`mcp::http::client_for`）：代理规则、user agent 与构造失败的拒词只写一处。两者唯一的差别是整请求时限，作为参数 `WholeRequest` 递进去：HTTP 取 `DefaultTimeout`（一次 post 与它的回答），SSE 取 `Unbounded`，因为 SSE 的 body 就是整段对话，reqwest 的整请求时限会把流掐断。被否：SSE 自留一份构造只为多一行 `timeout(None)`——两份构造一旦有一份改了代理规则，另一份就静默地走另一条出网路径。
 - **子进程回收逻辑原样搬移**：期限到即杀子进程，理由见 `mcp::stdio` 的模块文档。
 - **`echoing` 在 `conformance` 后面**：装配层的测试要起同一个假 server；产品二进制不带它（`xtask artifact`）。
-- **调用发出之后丢了答，效果未知，不可重试**：SSE 的 POST 被对侧收下（2xx）之后，流上在期限内没有答案——server 已经拿到那条消息，可能已经做了，再发一次同一调用就可能把一次写做两遍。故这一刻抬 `E_TIMEOUT` 并标 `effect_unknown`（`Retry::Unknown`，kernel-SPEC 的三态），由看得见这次调用的人决定要不要再问。POST 本身失败时对侧没有收下，照旧按 `unreachable`／`refused` 的口径。
+- **请求交出之后丢了答，效果未知，不可重试**：请求已经完整交给对侧之后——stdio 是那一行写完并 flush，SSE 是 POST 得到 2xx——期限内没有答案（`E_TIMEOUT`），或对侧在作答前关了输出、流断了（`E_TOOL_UNAVAILABLE`），都标 `effect_unknown`（`Retry::Unknown`，kernel-SPEC 的三态）：server 可能已经做了，再发一次同一调用可能把一次写做两遍，由看得见这次调用的人决定要不要再问。请求还没交出去时的失败（stdio 写管道失败、POST 本身失败）按对侧没收下读，照旧 `Retry::No`。剩余情形：stdio 的行体写完、换行没写出去时管道断了，对侧可能在输入结束时把没有换行的最后一行当作一条消息读；这一刻本 crate 分不出，按没收下报。
 - 失败码不变：各传输沿用 §12 的 `E_TIMEOUT`／`E_WIRE_MISMATCH`／`E_TOOL_UNAVAILABLE`，HTTP 与 SSE 在 401／403 抬 `E_CREDENTIAL_MISSING`，客户端构造不成抬 `E_CONFIG_INVALID`。
 
 ### 8-18 外包 OAuth 的 broker（形状 4 适配器；三个调用，别无其它）

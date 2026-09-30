@@ -1396,12 +1396,13 @@ pub const CONNECTOR_CAP_BYTES: u64 = 16_384;
 pub fn package_connector(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Result<ToolOutcome, AxError>;
 ```
 
-- 文本合计不超过 `CONNECTOR_CAP_BYTES`，或回答没有 `content` 数组：原样返回，一个字节不动。
+- **图片块进 CAS，窗口里只留引用**：`type: "image"` 的块在文本那一步之后、在它原来的位置上处理，所以替它的那行字不并入被存下分窗的文本，模型不用翻页就读得到。`mimeType` 是 `image/png`、`data` 解得开 base64、字节不超过 `IMAGE_MAX_BYTES`、PNG 头读得出宽高，四条都成立时，字节以 `put_for` 存进 CAS，`ToolOutcome.attachments` 多一张 `ImageRef`（与浏览器截图同一种形状），块换成一个文本块 `[picture attached: image/png <宽>x<高>, <locator>]`。任一条不成立，块换成一个说明为什么没带图的文本块（`[picture left out: <原因>]`）。base64 恒不进窗口，也恒不进账本。其余非文本块（音频、资源）照旧按原顺序留在其后。
+- 回答没有 `content` 数组，或没有图片块且文本合计不超过 `CONNECTOR_CAP_BYTES`：原样返回，一个字节不动。
 - 超过：全部文本块按原顺序以换行连成一份，交 `package`（`sieve: None`，带落盘处）；`content` 换成**一个**文本块，装 `package` 给出的替身（开头一段加 `read` 可分窗读的路径），非文本块（图片等）按原顺序留在其后；`package` 记下的 `ResultOffloaded` 放进结果的 `offload` 字段，与 `exec` 的 `sieve` 字段同一种账。
 - 替身是什么由 `package` 一处决定，本模块不另判：`Markup`（Markdown 一类）按 8-7 走节标题骨架而不入 store，故一份转换出来的长 Markdown 进窗口的是骨架，没有可翻的路径，`offload` 为空表；其余文本按 `OFFLOAD_MIN_BYTES` 入 store。
 - 失败只有 `package` 自己的失败（`E_INVALID_ARGS`，原样上抛）。
 
-**上限与 `exec` 同值、各有其名**：两者今天取同一个数，是因为窗口里一件工具答案的代价与来源无关；分开命名，是因为改其中一个不该悄悄改另一个。**决定**：交 `package` 而不是在这里另写一套截法——截多少、存不存由它一处决定，连接器答案与 `exec` 答案在窗口里守同一条规则；不包装时一次回答可以把整整 `MESSAGE_CEILING`（8 MiB）送进窗口。备选「让 `agent_protocols::McpTool` 自己截」被否：协议层没有 CAS 也没有 room，落盘处只有装配层有。调用点只有一个：`bin::assembly` 的 `Placing` 对 effect 为 `Connector` 的调用（首答与重放同样）调它。
+**上限与 `exec` 同值、各有其名**：两者今天取同一个数，是因为窗口里一件工具答案的代价与来源无关；分开命名，是因为改其中一个不该悄悄改另一个。**决定**：交 `package` 而不是在这里另写一套截法——截多少、存不存由它一处决定，连接器答案与 `exec` 答案在窗口里守同一条规则；不包装时一次回答可以把整整 `MESSAGE_CEILING`（8 MiB）送进窗口。备选「让 `agent_protocols::McpTool` 自己截」被否：协议层没有 CAS 也没有 room，落盘处只有装配层有。调用点只有一个：`bin::assembly` 的 `Placing` 对 effect 为 `Connector` 的调用（首答与重放同样）调它。图片在这一步进 CAS，理由与截长文本相同：协议层没有 CAS 也没有 room。只量 PNG 的理由与浏览器相同：别的格式要第二个解码器才量得出边长，一个量错的边长比没有更糟；不是 PNG 的图片以一句话告诉模型改要 png。
 
 ### 8-28 runtime::backlog（形状 4 适配器＋形状 6 数据面）
 
