@@ -165,6 +165,8 @@ sprawling up ~/cities/first
 
 要在已有的项目上干活，就在装着这些项目的文件夹里建城，或者把项目挪进城的文件夹，再用 `sprawling adopt ~/cities/first myproject` 把它收为一栋楼。收编不覆盖任何文件：它在你的工作旁边放下城的表单，并加一条 `.gitignore`，让城的笔记不进你项目的历史。
 
+`sprawling doctor` 分两层检查运行它的电脑。第一层是城要用的东西，比如浏览器工具要的浏览器引擎。第二层是改这份代码要的工具，`just prereqs` 读的就是这一层：一台没有管理员权限的新机器，这一层的必需项全部就位，开发环境就算装齐。Windows 上其中一项是 bash，`just` 的每一个配方都在 bash 里跑。请在 Git Bash 里运行 `just`，因为别的终端先找到的 `bash` 可能是 `C:\Windows\System32\bash.exe`，它启动的是 WSL，不是 shell。
+
 ## 3 接一家 provider
 
 城还没有能调用的模型时，打开的是 **欢迎** 页；第一张卡 **接上一家供应商** 通往 **设置** → **账户与供应方**。

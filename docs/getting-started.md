@@ -165,6 +165,8 @@ This raises the city if the directory does not hold one, serves it on `127.0.0.1
 
 To work on projects you already have, raise the city in the folder that holds them, or move a project into the city's folder, and take it in as a building with `sprawling adopt ~/cities/first myproject`. Adopting overwrites no file; it adds the city's forms beside your work and a `.gitignore` entry that keeps the city's notes out of your project's history.
 
+`sprawling doctor` checks this machine in two tiers. The first is what a city uses, such as a browser engine for the browser tool. The second is what changing this code takes, and it is the list `just prereqs` reads: on a new machine without administrator rights, the development setup is complete when every required row of that tier answers. On Windows one of those rows is bash, which every `just` recipe runs in. Run `just` from Git Bash, because the `bash` another terminal finds first can be `C:\Windows\System32\bash.exe`, which starts WSL rather than a shell.
+
 ## 3 Connect a provider
 
 A city with no model to call opens on **welcome**, whose first card, **connect a provider**, leads to **settings** → **accounts and providers**.
