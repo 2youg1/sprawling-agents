@@ -2035,6 +2035,20 @@ pub trait ConcurrentInvoke {
 - `meta_of` 取代原来的 `effect_of`：工具波判只读前缀、推测门判能否提前起跑，读的都是登记里的 `effect`；`tool_called` 还要照录 `effect` 与 `render`（kernel-SPEC §8-75(b)）。一个方法交出整份登记，三处读同一个答案；两个方法各交一项，就是两处各自去查同一份登记。
 - 闭包工具面（citysim 与测试）答 `None`：它的调用写 `tool_called` 时两键缺席，与它今天不声明效果、波次恒串行是同一件事。
 
+**(b) 被裁掉的结果，原文在哪**
+
+```rust
+// runtime::pipeline
+pub(crate) const EXEC_ACCOUNTS: &str = "sieve";         // exec 结果里账目住的键
+pub(crate) const CONNECTOR_ACCOUNTS: &str = "offload";  // 外包服务答复里账目住的键
+/// 一次工具结果里第一笔离窗账目的 original；结果里没有账目时为 None。
+pub fn pinned_original(result: &serde_json::Value) -> Option<Locator>;
+```
+
+- **账目随它裁掉的那个结果走。** `package_exec` 把 `package` 记下的 `ResultOffloaded` 放进结果的 `sieve` 键，`package_connector` 放进 `offload` 键（§8-27、connector 一节）；这个结果写进 `tool_result`，而 `tool_result` 带着它所答那次调用的 `tool_use_id`。所以一笔账目属于哪次调用，由它所在的那一行说出，账目自己不另记调用 id：多记一份就是同一个 id 的第二个家，而且这个结果整份进模型的字节。今天没有任何写方单独写 `result_offloaded` 行。
+- **第一笔就是原文**：同一个结果先经 sieve 裁、裁后仍大再被普通搬运存一次时，账目按管线次序排——sieve 的那笔在前，它的 `original` 是命令写出的全部字节；后一笔的 `original` 是 sieve 留下的替身。读者要的是命令原本说了什么，所以取第一笔。
+- 键名的权威是这两个常量；读它们的是 `pinned_original`，写它们的是两扇 `package_*` 门。
+
 ### 8-43 重试上限住 kernel
 
 两个 crate 互不依赖，而 gateway 决定要不要再发一次请求、`Watchdog` 决定要不要冻结这次运行，读的是同一个事实——所以 `Retries` 住 `kernel::retries`，两边都直接用 `kernel::Retries`，不导出别名：别名让读者以为有两个类型，调用点于是写出一个两臂恒等的 `match` 去「转换」它们。

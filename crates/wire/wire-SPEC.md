@@ -54,7 +54,7 @@
 
 公开面见 `tools/xtask/api-baselines/wire.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 
-**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；页面读到的历史已证明到哪一条 `seq`；`CommitAnswer` 带出提交说明；`Output.pinned`；`Dispatch.mode` 收成 `chat`／`work`，以及运行策略、写入限制 `Create`、准入证据的字段；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）、`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
+**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；页面读到的历史已证明到哪一条 `seq`；`CommitAnswer` 带出提交说明；`Dispatch.mode` 收成 `chat`／`work`，以及运行策略、写入限制 `Create`、准入证据的字段；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）、`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
 
 ## 5 权威信源
 
@@ -457,6 +457,12 @@ WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionNam
 **理由**：登记只在 run 的工具台上存在，读面够不到；记在调用那一行，读面读的是那一刻的事实（kernel-SPEC §12.11）。
 
 **被否**：读面按工具名匹配出呈现：每加一件工具都要改这个匹配，楼的 MCP 工具读面不认识。
+
+(d) `Output.pinned` 读自结果里第一笔离窗账目，账目不另记调用 id。
+
+**理由**：账目住在它裁掉的那个结果里，那个结果写在带着 `tool_use_id` 的 `tool_result` 行上，所以调用身份已经由行给出。
+
+**被否**：给 `ResultOffloaded` 加 `tool_use_id`：同一个 id 的第二个家，而这份账目随结果整份进模型的请求字节，多出的键会让每一次被裁的调用多付这些 token。
 
 ## 13 依赖选型
 
@@ -1572,6 +1578,19 @@ pub struct Call {
 - **照录 `tool_called` 的两个键**，读不出或缺席即 `None`：这件工具没登记，或这一行写在这两个键出现之前。页面据 `render` 选画法（终端、差异、通用），据 `effect` 说这次调用越过了哪一种边界；两者都是 `None` 时按通用画。
 - **携 kernel 的类型本身**，不在线上另立枚举（§8-0）：`Effect::Write` 带它的写域地址，`Connector` 带服务器的标签，都是登记写下的事实。
 - **`Diff.locations` 今天恒为空**：账上记的是登记层面的声明；一次编辑调用改的是哪个文件，读 `subject`。
+
+### 8-56 被裁掉的输出指向它的原文
+
+```rust
+pub struct Output {
+    // …既有字段…
+    pub pinned: Option<Locator>,   // 这次调用的输出离窗时，原文存在哪；未离窗、旧行或读不出时为 None
+}
+```
+
+- **只在调用的输出上有值**：`Call.output` 的 `pinned` 读自配对上的 `tool_result` 结果里第一笔离窗账目（`runtime::pipeline::pinned_original`，runtime-SPEC §8-51(b)）；`Call.arguments` 也是 `Output`，它的 `pinned` 恒为 `None`——参数从不离窗。
+- **原文是命令原本写出的字节**：结果先被 sieve 裁、再被普通搬运存一次时，指的是第一笔账目的原文，不是 sieve 留下的替身。页面拿它经 `Query::Content` 读全文，`cut` 仍只说这个视图裁了几行。
+- **旧行明确缺席**：结果里没有账目（没离窗、或写在账目进结果之前）即 `None`，不按相邻的行去猜。
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 
