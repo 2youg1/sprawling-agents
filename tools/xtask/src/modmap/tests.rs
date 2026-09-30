@@ -49,9 +49,9 @@ fn product() -> [Member; 1] {
     }]
 }
 
-/// A tool's files are not the product's, and this gate never walks to
-/// them. The map still carries them for a reader, and carrying them may
-/// not turn into judging them.
+/// An entry outside the packages this gate judges is not walked to: the
+/// map may carry it for a reader, and carrying it may not turn into
+/// judging it.
 #[test]
 fn an_entry_outside_the_product_is_carried_but_not_judged() {
     let mut violations = Vec::new();
@@ -88,4 +88,31 @@ fn index_name_requires_registered_children() {
     assert!(is_index_name("crates/runtime/src/tools.rs", &dirs));
     assert!(is_index_name("crates/kernel/src/lib.rs", &dirs));
     assert!(!is_index_name("crates/kernel/src/util.rs", &dirs));
+}
+
+/// A tool package other than the gates' own is judged as a product is:
+/// a file its map does not register is a finding.
+#[test]
+fn a_tool_package_other_than_the_gates_is_judged() {
+    let root = crate::root::fixture::relocated("modmap-tool");
+    crate::root::fixture::write(
+        &root,
+        "tools/k/Cargo.toml",
+        "[package]\nname = \"sprawling-k\"\nversion = \"0.0.0\"\nedition = \"2024\"\n\n\
+         [lib]\nname = \"k\"\n\n[package.metadata.sprawling]\nrole = \"tool\"\n",
+    );
+    crate::root::fixture::write(&root, "tools/k/src/lib.rs", "mod a;\n");
+    crate::root::fixture::write(&root, "tools/k/src/b.rs", "");
+    let found = check(&root).map(|all| {
+        all.into_iter()
+            .map(|v| format!("{}: {}", v.location, v.violation))
+            .collect::<Vec<_>>()
+    });
+    std::fs::remove_dir_all(&root).unwrap();
+    assert_eq!(
+        found.map_err(|err| err.to_string()),
+        Ok(vec![
+            "tools/k/src/b.rs: file is not registered in the module map".to_owned()
+        ])
+    );
 }
