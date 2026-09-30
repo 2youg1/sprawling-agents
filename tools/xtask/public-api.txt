@@ -1,0 +1,9 @@
+# The renderer every baseline in tools/xtask/api-baselines/ is written
+# with (xtask-SPEC.md section 12-6). A baseline is a rendering: the same
+# source printed by another nightly's rustdoc or another cargo-public-api
+# release can differ line by line. `cargo xtask apisync` renders with
+# exactly this pair and refuses any other; the nightly workflow installs
+# exactly this pair. Moving either value rewrites the baselines in the
+# same change-set.
+PUBLIC_API_RUSTDOC=nightly-2026-09-29
+PUBLIC_API_VERSION=0.52.0

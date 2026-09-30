@@ -25,28 +25,48 @@ permissions:
   contents: read
 
 jobs:
+  # The public surface of the two seam crates, kernel and wire, against
+  # its committed baseline (xtask-SPEC.md section 8-32). It is not a gate:
+  # whether an interface change belongs in a SPEC is the reviewer's call,
+  # and a drift here is read the next morning.
+  #
+  # A baseline is a rendering, and the renderer is part of it: the same
+  # source printed by another nightly's rustdoc can differ line by line.
+  # So the job installs exactly the pair `tools/xtask/public-api.txt`
+  # names - a dated nightly and a cargo-public-api release - and
+  # `cargo xtask apisync` refuses any other (xtask-SPEC.md section 12-6).
+  # cargo-public-api is built from that version rather than taken from an
+  # install action, whose `tool:` line would carry a second copy of it.
+  apisync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: read the renderer the baselines are written with
+        shell: bash
+        run: grep -E '^PUBLIC_API_[A-Z]+=' tools/xtask/public-api.txt >> "$GITHUB_ENV"
+      - name: install the pinned toolchain and the pinned nightly
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup show
+          rustup toolchain install "$PUBLIC_API_RUSTDOC" --profile minimal
+      - uses: actions/cache@v6
+        id: public-api-cache
+        with:
+          path: ~/.cargo/bin/cargo-public-api
+          key: cargo-public-api-${{ runner.os }}-${{ env.PUBLIC_API_VERSION }}
+      - name: install the pinned cargo-public-api
+        if: steps.public-api-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: cargo install --locked "cargo-public-api@$PUBLIC_API_VERSION"
+      - name: apisync
+        run: cargo xtask apisync
+
   # V4: hostile bytes against the three parse surfaces. A new draw of
   # random input every night is what makes this a schedule rather than a
   # push gate; sixty seconds a target is a smoke length, and a real
   # campaign belongs on a dedicated runner rather than in a CI slot.
-  # The public surface of the two seam crates, kernel and wire,
-  # against its committed baseline (xtask-SPEC.md section 8-32). It is
-  # not a gate: whether an interface change belongs in a SPEC is the
-  # reviewer's call, and a drift here is read the next morning.
-  apisync:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - name: install pinned toolchain and nightly
-        run: |
-          rustup show
-          rustup toolchain install nightly --profile minimal
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-public-api
-      - name: apisync
-        run: cargo xtask apisync
   fuzz-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 45

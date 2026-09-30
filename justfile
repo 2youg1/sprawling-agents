@@ -405,7 +405,9 @@ sim:
 spec crate:
     cargo xtask spec {{crate}}
 
-# Regenerate public-api baselines (`just prereqs` names cargo-public-api and nightly).
+# Regenerate the public-api baselines with the renderer
+# `tools/xtask/public-api.txt` pins; `cargo xtask apisync` names the
+# install line for whichever half is missing.
 api-baseline:
     cargo xtask apisync --write
 
