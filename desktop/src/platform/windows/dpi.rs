@@ -8,12 +8,56 @@
 //! A process that declares nothing is given scaled coordinates on a
 //! scaled monitor by `GetWindowRect` and `GetSystemMetrics`, while UI
 //! Automation reports physical ones, and a click placed from one lands
-//! somewhere else in the other (desktop-SPEC.md section 12.6).
+//! somewhere else in the other (desktop-SPEC.md section 12.6). So the
+//! desk declares per-monitor awareness when it opens, before it reads
+//! any coordinate, and holds the proof that it did.
 
-use windows::Win32::UI::HiDpi::{GetProcessDpiAwareness, PROCESS_PER_MONITOR_DPI_AWARE};
+use windows::Win32::UI::HiDpi::{
+    GetProcessDpiAwareness, PROCESS_PER_MONITOR_DPI_AWARE, SetProcessDpiAwareness,
+};
 
 use super::fault;
-use crate::refusal::Refusal;
+use crate::refusal::{Refusal, RefusalCode};
+
+/// Proof that this process reads the desktop in physical pixels. Only
+/// [`declare`] makes one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct PhysicalPixels(());
+
+/// Makes this process read every monitor in physical pixels.
+///
+/// A process whose awareness was already set elsewhere cannot change
+/// it; that is accepted when what was set is per-monitor awareness.
+///
+/// # Errors
+/// Refuses when this process is left reading scaled coordinates.
+#[expect(
+    unsafe_code,
+    reason = "a process declares its DPI awareness only through the FFI entry point"
+)]
+pub(super) fn declare() -> Result<PhysicalPixels, Refusal> {
+    // SAFETY: the call takes one enum value by value and lends it no
+    // memory of ours; what it changes is this process's awareness, and
+    // the desk calls it before this process has read any coordinate.
+    let declared = unsafe { SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE) };
+    let Err(refused) = declared else {
+        return Ok(PhysicalPixels(()));
+    };
+    match current()? {
+        Awareness::PerMonitor => Ok(PhysicalPixels(())),
+        Awareness::Other => Err(Refusal::new(
+            RefusalCode::ToolUnavailable,
+            "use the desktop",
+            format!(
+                "this process reads the desktop in scaled coordinates and could not switch to \
+                 per-monitor physical pixels: {}",
+                refused.message()
+            ),
+            "start the connector as its own process, `sprawling desktop`, which declares this \
+             before anything else runs",
+        )),
+    }
+}
 
 /// How this process reads the desktop's coordinates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

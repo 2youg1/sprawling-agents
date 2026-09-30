@@ -54,15 +54,19 @@ use strokes::Action;
 use views::{DEFAULT_DEPTH, Views};
 
 /// What one connection remembers between calls.
-#[derive(Default)]
 pub(crate) struct Desk {
     views: Views,
     recordings: record::Recordings,
+    /// Whether this process reads the desktop in physical pixels. A desk
+    /// that could not make it so refuses every call rather than mix two
+    /// kinds of coordinate (desktop-SPEC.md section 12.6).
+    pixels: Result<dpi::PhysicalPixels, Refusal>,
 }
 
 impl Desk {
     pub(crate) fn new() -> Desk {
         Desk {
+            pixels: dpi::declare(),
             views: Views::new(),
             recordings: record::Recordings::new(),
         }
@@ -81,6 +85,7 @@ impl Desk {
         arguments: &Value,
         admitted: &Admitted<'_>,
     ) -> Result<Answer, Refusal> {
+        self.pixels.as_ref().map_err(Clone::clone)?;
         match tool {
             ToolName::Windows => listing(arguments, admitted).map(|facts| Answer::facts(&facts)),
             ToolName::Snapshot => self.snapshot(arguments).map(|facts| Answer::facts(&facts)),
