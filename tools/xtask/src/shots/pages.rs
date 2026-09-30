@@ -121,10 +121,14 @@ pub(super) fn shots_of(route: &str, frame: Frame, folds: &[Vec<String>]) -> Vec<
 }
 
 /// The pictures of `shots` that `dir` does not hold, or holds empty.
+/// An engine that exits without writing its picture leaves no file, and
+/// one that fails half way can leave an empty one; both are missing.
 pub(super) fn missing(dir: &Path, shots: &[Shot]) -> Vec<String> {
-    let _ = dir;
-    let _ = shots;
-    Vec::new()
+    shots
+        .iter()
+        .map(Shot::file)
+        .filter(|file| !std::fs::metadata(dir.join(file)).is_ok_and(|meta| meta.len() > 0))
+        .collect()
 }
 
 /// The index a person reads the pictures through, one row per picture.
