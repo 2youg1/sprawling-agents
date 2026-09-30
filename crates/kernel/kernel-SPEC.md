@@ -384,6 +384,9 @@ impl EventRecord {
     pub fn parse_line(raw: &[u8]) -> Result<Self, AxError>;  // 读侧：逐字段复验
     pub fn seq(&self) -> Seq;  pub fn kind(&self) -> EventKind;  pub fn v(&self) -> u32;
 }
+// event::moment：一行的 t 记的是不是它自己那一刻（见下「信封 t 记的是什么」）
+impl EventKind { pub fn records_a_moment(&self) -> bool; }   // model_called、model_returned、tool_called、tool_result
+impl EventRecord { pub fn moment(&self) -> Option<TimeMs>; }  // 记时刻的种类且 v ≥ 2 → Some(t)；其余 None
 pub struct EventRef { seq: Seq, kind: EventKind }   // 字段私有；无公开构造子
 ```
 
@@ -626,6 +629,15 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 需要新 `EventKind` 与账本版本，故记录在此而不在此处做。
 
 - 序列化细节：`addr` 为 None 与 `ig` 为 false 时省略键；其余八键恒在；键序＝声明序 `v,run,seq,prev,t,who,addr,kind,data,ig`。此即 V8 跨平台字节一致的规范。
+
+**信封 `t` 记的是什么。** 本段是时间语义的唯一权威；读者经 `EventRecord::moment` 取用，不从导出它的构建、也不从相邻行的 `t` 推断。
+- `t` 是写方经注入的时钟采到的 UTC 整数毫秒，kernel 从不采样。
+- `v` 为 2 起，`model_called`、`model_returned`、`tool_called`、`tool_result` 四种行记这一行自己那件事的时刻：一次模型尝试发出、一次回复到齐、一次工具调用开始（放行之后、工具起跑之前）、一次调用答复。`EventKind::records_a_moment` 是这四种的名册，`moment` 对这样的行答 `Some(t)`。
+- `v` 为 1 的行里，这四种带的是它所在回合的时间戳，同一回合的行同值。`moment` 答 `None`，意思是「这一刻没有量过」，不是零耗时。
+- 其余种类的 `t` 是写方为这一行采的一次读数；一个回合里的其余行沿用回合时间戳（runtime-SPEC §8-15）。
+- `t` 不随 `seq` 单调：并行只读调用的开始可以早于前一条调用的答复，壁钟也会回拨。次序以 `seq` 为准。
+- 重启之后由 `runtime::replay::outcome_unknown_draft` 补上的 `tool_result`（错误码 `E_TOOL_OUTCOME_UNKNOWN`）记的是城补上它的时刻，不是工具答复的时刻；量工具用时的读者跳过这样的行。
+
 - 铸造纪律：`EventRef` 唯二铸造路径＝Ledger append 流程（适配器持刚组装的 EventRecord 调 `to_ref`）与 replay 验链后逐条 `to_ref`。字段私有，所以在 crate 外写不出 `EventRef` 的字面量。
 - `parse_line` 是读侧唯一入口：serde 反序列化＋Payload 复验；未知 kind 在此报错（呈现语义见 runtime::replay 章——携 `ig` 的行例外）。
 
@@ -763,7 +775,7 @@ serde：字符串形。动作规范化（action_canonical 的构造规则）属�
 ```rust
 pub const CACHE_BREAKPOINTS_MAX: u32 = 4;
 pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
-pub const EVENT_LOG_V: u32 = 1;                  // EventRecord.v 的唯一来源
+pub const EVENT_LOG_V: u32 = 2;                  // EventRecord.v 的唯一来源；2：四种等来的时刻各记各的（§8-4、§12.10）
 pub enum LogVersion { Current, Older, Ahead, NotAVersion }
 pub fn readable_log_v(v: u64) -> LogVersion;     // 「哪些账本版本读得开」的唯一权威
 pub const L0_TOOLS: [&str; 3] = ["exec", "edit", "status"];
@@ -1837,6 +1849,18 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 **理由**：账本一旦写下，拼写就不能再改（§8-4 三条不变量的第一条），ACP 的词却跟着上游走，两边只是今天恰好相同。把 ACP 的类型搬进 kernel，上游改一个词时要么改坏已落盘的行，要么让协议层读不懂新版本。映射是穷尽 `match`，上游多出一种汇报时，编译停在映射处，而不是静默丢掉。
 
 **被否**：①载荷只记变体名与一段文字（`update: String`、`text: String`）：读「harness 说了什么」的视图要再解析一次字符串，工具调用的标题与状态会混成一段；②`agent_protocols` 直接改用 kernel 的类型：理由同上；③`InputKinds`、`ModelFacts` 那样把类型归 kernel、协议层再导出：那两者的值来自本城自己的读法，这里的值来自上游规格。
+
+### 12.10 信封 `t` 记这一行等来的时刻，`EVENT_LOG_V` 因此为 2
+
+**决定**：四种等来的行的 `t` 记各自那一刻（runtime-SPEC §12.5），账本版本随之从 1 进到 2；`EventRecord::moment` 读 `v` 与种类，答这一行的 `t` 是不是量出来的时刻。
+
+**理由**：`v` 是每一行自带的版本，读者据它区分两种含义，不用猜。一个 `t` 同时服务结果上的戳、时间窗与调用用时，不在载荷里另加时刻字段。
+
+**被否**：①载荷加时刻字段：一行两个时间；②不进版本，让读者按导出构建或相邻行的 `t` 是否相等推断：同一回合里真的零毫秒的两次调用与旧行分不开；③在 `run_started` 记一个时间语义标记：一次跨越二进制升级继续的 run 会让两种行落在同一个标记之下（推断：`resume` 路径能让 run 跨重启继续）。
+
+**代价**：0.0.7 的构建读到 `v` 为 2 的行，按 `LogVersion::Ahead` 拒开整座城（`E_LOG_VERSION_UNSUPPORTED`，说出方向）。本版新增的事件种类已经让它打不开，所以人看到的结果不变，只是拒因改说版本。
+
+**重开参数**：出现第二种需要逐行区分的时间含义时重开本条，例如回合里其余的行也改记自己的时刻。
 
 ## 13 依赖选型
 

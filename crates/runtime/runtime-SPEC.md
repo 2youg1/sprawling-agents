@@ -167,7 +167,7 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 - 根重导出：`runtime::Opening` 在根上；`ToolBench` 只经 `runtime::bench`。
 
 ```rust
-pub struct Turn<S> { /* journal（run、who、t、refs、redacted）、state —— 全私有；相内数据在别的相不可表示 */ }
+pub struct Turn<'h, S> { /* journal（run、who、t、钟、refs、redacted）、state —— 全私有；相内数据在别的相不可表示 */ }
 pub struct Assembling(/* 私有 */);  pub struct Calling { /* prefix 哈希 */ }
 pub struct ToolWave { /* calls */ }   pub struct Recording { /* refs */ }
 
@@ -177,17 +177,18 @@ pub enum PhaseOutcome<Next> { Advanced(Next), Cancelled(TurnCancelled) }
 pub struct TurnCancelled { /* refs：含 cancel_received —— 私有，getter 取 */ }
 pub struct TurnReport { /* refs、model_returned_ref、wave_len —— getter 取 */ }
 
-impl Turn<Assembling> {
-    pub fn begin(run: RunId, who: String, t: TimeMs) -> Turn<Assembling>;
+impl<'h> Turn<'h, Assembling> {
+    pub fn begin(run: RunId, who: String, t: TimeMs, now: &'h mut dyn FnMut() -> Result<TimeMs, AxError>)
+        -> Turn<'h, Assembling>;   // t 是回合时间戳；now 只给四种等来的时刻采样
     /// Boundary 1 (组装前). Cancel here consumes before any model bytes.
     pub fn assemble<'c>(self, interrupt: Interrupt, ledger: &mut dyn Ledger, prompt: RunPrompt<'_>, …)
-        -> Result<PhaseOutcome<Turn<Calling>>, AxError>;          // 每 run 一条 prompt_assembled（§8-39 第 5 条）
+        -> Result<PhaseOutcome<Turn<'h, Calling>>, AxError>;      // 每 run 一条 prompt_assembled（§8-39 第 5 条）
 }
-impl Turn<Calling> {
+impl Turn<'_, Calling> {
     /// Boundary 2 (provider 调用前).
     pub fn call(self, interrupt: Interrupt, ledger: &mut dyn Ledger, model: &mut dyn Model,
                 policy: &BuildingPolicy, generating: Generating<'_, '_>)
-        -> Result<PhaseOutcome<Turn<ToolWave>>, AxError>;         // 产 model_called＋model_returned
+        -> Result<PhaseOutcome<Turn<'_, ToolWave>>, AxError>;     // 产 model_called＋model_returned
 }
 /// 模型还在生成时，谁据它的回答行动：走哪扇门由这里一处定。
 /// 生产路径（run::lifecycle）每回合都传 Speculating，没有页面在看时 deltas 为 None；
@@ -233,10 +234,10 @@ impl Turn<Recording> {
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。
 - **前缀冻结是运行时不变量，不只是测试。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名一条走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
 - **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
-- **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行段与并行段共用，所以账本字节与串行执行完全一致（`tests/run_driver.rs` 与 `turn/tests/concurrent.rs` 对拍）。第一条非只读调用就是 checkpoint：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
-- **`ConcurrentInvoke` 是三段，不是一个闭包。** 放行（`admit`，`&mut`，按调用序）、执行（`tool` 借出 `&dyn Tool`，`&self`，各条在 scope 线程上调它的 `invoke`）、记账（`account`，`&mut`，按调用序）。一个包着 bench 的闭包表达不了这个次序：放行与记账写同一张去重表与同一份 taint，而 bench 不是 `Sync`（checkpoint 持有 git 仓库句柄），工具是（`kernel::Tool: Send + Sync`，`invoke(&self)`；有内部状态的工具把状态放在自己的锁后）。三个闭包也不行：三者要借同一个 bench，一个要 `&`、两个要 `&mut`。所以它是 trait——第二实现在缝上已经存在：闭包的全覆盖实现（放行即作答，不报效果，于是 citysim 与脚本化工具的测试走串行、字节不动），与装配层 `bin::assembly::driving::placing` 的 bench 实现（sprawling-SPEC §8-31）。只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；`IdemKey` 的位置在放行时按调用序定下，exec 计数与 checkpoint 记录在记账时按调用序累加，所以它们与串行波逐字相同。落选的是「lane 把整个 bench 放进锁、闭包取 `Sync`」：锁把三条读排成一条队，并行只剩名字。生产路径由 `tests/run_driver.rs` 的三读测试守着：`drive` 走 `lifecycle` 到 `execute_concurrent`，三条读彼此重叠，账本与串行逐行相同。
+- **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行段与并行段共用，所以事件的次序与载荷与串行执行一致；各行的时刻是量出来的，并行时本就不同（§8-15）。`tests/run_driver.rs` 与 `turn/tests/concurrent.rs` 在停住的时钟下对拍，逐字节相同。第一条非只读调用就是 checkpoint：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
+- **`ConcurrentInvoke` 是三段，不是一个闭包。** 放行（`admit`，`&mut`，按调用序）、执行（`tool` 借出 `&dyn Tool`，`&self`，各条在 scope 线程上调它的 `invoke`）、记账（`account`，`&mut`，按调用序）。一个包着 bench 的闭包表达不了这个次序：放行与记账写同一张去重表与同一份 taint，而 bench 不是 `Sync`（checkpoint 持有 git 仓库句柄），工具是（`kernel::Tool: Send + Sync`，`invoke(&self)`；有内部状态的工具把状态放在自己的锁后）。三个闭包也不行：三者要借同一个 bench，一个要 `&`、两个要 `&mut`。所以它是 trait——第二实现在缝上已经存在：闭包的全覆盖实现（放行即作答，不报效果，于是 citysim 与脚本化工具的测试走串行、字节不动），与装配层 `bin::assembly::driving::placing` 的 bench 实现（sprawling-SPEC §8-31）。只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；`IdemKey` 的位置在放行时按调用序定下，exec 计数与 checkpoint 记录在记账时按调用序累加，所以它们与串行波逐字相同。落选的是「lane 把整个 bench 放进锁、闭包取 `Sync`」：锁把三条读排成一条队，并行只剩名字。生产路径由 `tests/run_driver.rs` 的三读测试守着：`drive` 走 `lifecycle` 到 `execute_concurrent`，三条读彼此重叠，次序与载荷与串行逐行相同。
 
-- **生成中起跑只读调用（`runtime::turn::speculation`，形状 2 值：按位置的缓存 `Speculated`）。** `Generating::Speculating` 让 `call` 走 `Model::call_speculating`；模型每交出一条调用，只要它排在本回答第一条非只读调用之前、`effect_of` 答 `Effect::Read`、`ahead` 借得出工具，它就在一个 `std::thread::scope` 线程上起跑，scope 在模型调用返回前 join 全部线程，于是一回合的墙钟约等于 max(工具, 生成)，而不是两者之和。结果按调用在回答中的位置缓存进 `Turn<ToolWave>`，连同起跑时的那条调用；入账时仍按调用序先 `admit`，放行（`Cleared`）且该位置缓存的调用与结算后那条逐字段相等，才用缓存结果，否则照常执行——所以 `tool_called`／`tool_result` 的字节、顺序与串行波相同，推测结果本身不是事件。回答失败（流被切断、恢复段重发）时整份缓存随那次尝试丢弃；取消落在 k 处时 k 之后的缓存随 `Turn` 丢弃；`admit` 自己作答（重放、门拒绝）时该位置的缓存丢弃。哪些调用可以提前、缓存按什么序入账，权威是 `tools/adversary/design/Speculating.lean`：越过第一条写调用推测会让读看到写之前的世界（`speculating_past_a_write_changes_the_ledger`）。**起跑不问 `still_going`**：一个已立的取消挡不住早读，它们的结果随 `Turn` 丢弃；代价是被停的 run 仍做完这些读，模型调用失败时也要等它们 join 才返回，而它们都无副作用，所以不越过任何门。**起跑先于放行**：放行写去重表与 taint，被截断的回答得把它们撤回，而只读调用的结果在放行前算出、放行后才用，被拒的那条结果从不到达模型与账本。落选的是「推测时就 `admit`」：它要为截断与取消各写一条撤销路径。`ahead` 有默认 `None`，闭包的全覆盖实现因此不提前起跑，citysim 字节不动；bench 的实现按名借出（`ToolBench::tool_named`，与 `tool_for` 同一张表）。
+- **生成中起跑只读调用（`runtime::turn::speculation`，形状 2 值：按位置的缓存 `Speculated`）。** `Generating::Speculating` 让 `call` 走 `Model::call_speculating`；模型每交出一条调用，只要它排在本回答第一条非只读调用之前、`effect_of` 答 `Effect::Read`、`ahead` 借得出工具，它就在一个 `std::thread::scope` 线程上起跑，scope 在模型调用返回前 join 全部线程，于是一回合的墙钟约等于 max(工具, 生成)，而不是两者之和。结果按调用在回答中的位置缓存进 `Turn<ToolWave>`，连同起跑时的那条调用；入账时仍按调用序先 `admit`，放行（`Cleared`）且该位置缓存的调用与结算后那条逐字段相等，才用缓存结果，否则照常执行——所以 `tool_called`／`tool_result` 的载荷与顺序与串行波相同，时刻按 §8-15 的时点采，推测结果本身不是事件。回答失败（流被切断、恢复段重发）时整份缓存随那次尝试丢弃；取消落在 k 处时 k 之后的缓存随 `Turn` 丢弃；`admit` 自己作答（重放、门拒绝）时该位置的缓存丢弃。哪些调用可以提前、缓存按什么序入账，权威是 `crates/runtime/spec/Turn/Speculation.lean`：越过第一条写调用推测会让读看到写之前的世界（`speculating_past_a_write_changes_the_ledger`）。**起跑不问 `still_going`**：一个已立的取消挡不住早读，它们的结果随 `Turn` 丢弃；代价是被停的 run 仍做完这些读，模型调用失败时也要等它们 join 才返回，而它们都无副作用，所以不越过任何门。**起跑先于放行**：放行写去重表与 taint，被截断的回答得把它们撤回，而只读调用的结果在放行前算出、放行后才用，被拒的那条结果从不到达模型与账本。落选的是「推测时就 `admit`」：它要为截断与取消各写一条撤销路径。`ahead` 有默认 `None`，闭包的全覆盖实现因此不提前起跑，citysim 字节不动；bench 的实现按名借出（`ToolBench::tool_named`，与 `tool_for` 同一张表）。
 
 ### 8-4 runtime::prefix（形状 5＋2）
 
@@ -905,7 +906,7 @@ pub enum SafePoint { BeforeAssemble{turn:u32}, BeforeCall{turn:u32}, BeforeWave{
 pub enum Advance { Turned, Concluded(Completion) }        // 穷尽；新结局逼每个调用方表态
 
 pub struct RunHooks<'a> {            // 闭包，不是 trait：本模块只有一个消费者形式；invoke 除外
-    pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,        // 时间入参，本模块恒不采样
+    pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,        // 时钟由调用方注入；驱动只在自己的线程、串行阶段按「时间纪律」的时点调用它
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,       // 安全点由我定，信号由你答
     pub checkpoint: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,  // 波前 checkpoint
     pub writes: &'a dyn Fn(&ToolCall) -> Writes,                    // 这条调用会不会写（§8-45）
@@ -927,7 +928,8 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
 
 - **为什么要这个模块**：「Dispatch → N 回合 → 冻结」的事件序只有这一处。citysim 与真城各写一遍就是两个权威，而两者一旦漂开，**仿真继续绿而真城错**——仿真的全部价值恰好建立在它跑的是同一份代码上。故 citysim 是本模块的调用方，每个剧本直接验证生产回路。
 - **`run_started.parent`**：只在派生开的 Run 上出现。「两行相邻」不是一个可查询的事实；写进载荷之后，前端折得出树，离线重放也折得出同一棵树。
-- **时间纪律**：dispatch 采两次（checkpoint、run_started），每回合一次；**结束时 freeze 再采一次**，handoff 用它、run_frozen 用它＋1（两行同一件事，不值两次采样）；**取消时 freeze 沿用被打断那个回合的时间戳**，因为这次冻结属于那个回合而不是一件新事。三条合起来使一个计数器闭包（citysim）与一个壁钟闭包（真城）在同一驱动下各自正确。
+- **时间纪律**：时钟只经 `RunHooks::now` 进来，只由驱动在自己的线程上、在串行阶段调用；工具面（`ConcurrentInvoke` 的实现、装配层的 bench、citysim 的闭包）恒不采样，只收读数，`admit` 收的仍是回合时间戳。采样点：dispatch 两次（checkpoint、run_started）；每回合开头一次，得回合时间戳；每次模型尝试发出之前一次（`model_called`），回复到齐之后一次（`model_returned`）；每条工具调用放行之后、工具起跑之前一次（`tool_called`），它的答复入账之前一次（`tool_result`）；provider 失败而冻结时一次；结束时 freeze 一次，handoff 用它、run_frozen 用它＋1；取消时 freeze 沿用被打断那个回合的时间戳，因为这次冻结属于那个回合。回合里其余的行（`prompt_assembled`、`prompt_shape_compared`、`steer_received`、`cancel_received`、波前的 `checkpoint_committed`）带回合时间戳。哪几种行记自己的时刻，只由 `turn::ledger` 的 `Authored`／`Carried` 变体定一次：那四个变体不带读数就造不出来。计数器闭包（citysim）下采样的次数与次序是剧本的函数，所以字节照样可重放。这四种行的 `t` 怎么读，以 kernel-SPEC §8-4「信封 `t` 记的是什么」为准。
+- **开头只读段的时刻**：各条在放行之后逐条采开始；全部 join 之后按调用序逐条入账，入账前采答复，所以一条的答复时刻是「这一波在调用序上轮到它入账的时刻」，不早于它真正答完，不晚于最慢那条答完。生成中提前起跑的读，开始时刻记成它被放行的那一刻：这两行量的是这一波为它花了多久。重开参数：出现声明 `Effect::Read` 而常超过 1 s 的工具时，改在工作线程上采样，那要一个 `Sync` 的时钟。
 - **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
 - **第四种结束：回合中途的失败。** **两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件**：带 `Carrier::Event` 的码先写载体事件，`Carrier::Loadtime` 的码直接冻结。理由：「账本自身就是受害者时，没有什么真实的东西可写」对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立——供应方把兑换格式写错与账本健否无关；而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抛，这比预先判定「写不进去」更诚实。一次没有冻结的 run 在账本上只剩 `run_started`，重启后仍报 `frozen: false`，页面就把每条消息都当 `steer` 发。冻结后**原错误仍然向上抛**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
 - **Conversation 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
@@ -1040,6 +1042,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 - **击败的备选**：在 Windows 上把根相对路径按当前盘补全后再判。这要给 `within_city` 加一条只在 Windows 上存在的分支，而且同一条路径会随进程的当前盘落到不同地方。
 - **重开的参数**：某个页面或 harness 在 Windows 上以根相对的形式给出城内文件的路径，模型照抄后被文法拒绝。
 
+### 12.5 一回合里等来的四个时刻各采各的，钟交给回合的账本门
+
+**决定**：`model_called`、`model_returned`、`tool_called`、`tool_result` 的信封 `t` 记各自那一刻，每条工具调用采开始与答复两次。时钟在 `Turn::begin` 交给 `turn::ledger::Journal`；`Authored::ModelCalled`、`Carried::ModelReturned`、`Carried::ToolCalled`、`Carried::ToolResult` 四个变体各带一个读数，其余变体只能带回合时间戳。
+
+**理由**：结果上的 UTC 戳（§8-10）、`view --since/--until` 的时间窗与 run 页的调用用时读的是同一个值，一行只有一个时间。只采答复不采开始，调用用时只能推算，会把准入里的检查点提交算进工具用时。钟放在 `Journal` 里，`call` 与 `execute_concurrent` 的参数表不动，采样只发生在回合自己那一道账本门后面。
+
+**被否**：①`ToolResult` 载荷加 `returned_ms`：一行两个时间，读者要知道信哪一个；②时钟随 `Generating` 进 `call`，再与工具面、`still_going` 合成一个值进 `execute_concurrent`：同一只钟两个入口，而 `call` 的参数已按 `budgets.toml` 钉在 5；③只采答复：两条并行对拍测试可以原样保留，但用时量不出来。
+
+**代价**：同一 run 内 `t` 不再随 `seq` 单调，次序以 `seq` 为准；并行对拍测试改用停住的时钟比字节；`golden-p0` 重生成一次。
+
 ## 13 依赖选型
 
 kernel、storage（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
@@ -1096,11 +1108,12 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 | `turn/prompt.rs` | 一次 run 的 prompt 材料 `RunPrompt`，`assemble` 的入参 |
 | `turn/speculation.rs` | 生成中起跑只读调用的门与缓存（§8-3） |
 | `turn/wave.rs` | 边界 3：`impl Turn<ToolWave>` 的工具波，只读前缀并行执行，按调用序入账 |
-| `turn/ledger.rs` | 本模块通往账本的唯一一道门：`Journal`、`Authored`、`Carried`（§8-41） |
+| `turn/wave/reorder.rs` | 开头只读段同时起跑、按调用序交回答案的重排缓冲：`all_at_once` 与 `lost_answer` |
+| `turn/ledger.rs` | 本模块通往账本的唯一一道门：`Journal`、`Authored`、`Carried`，以及四种等来的时刻从哪只钟读（§8-41、§8-15） |
 | `turn/tests.rs` | 纯索引 |
 | `turn/tests/helpers.rs` | 三处共用的夹具：`TestLedger`、`OneShotModel`、`prefix`／`run_id`／`shape`／`advance`／`probe_call` |
 | `turn/tests/phases.rs` | 四个边界跑在真账本链上 |
-| `turn/tests/concurrent.rs` | 只读前缀并行：波内停下只起跑停点之前的调用，steer 落在串行波写它的位置，两者账本字节与串行一致 |
+| `turn/tests/concurrent.rs` | 只读前缀并行：波内停下只起跑停点之前的调用，steer 落在串行波写它的位置；停住的时钟下两者账本字节与串行一致 |
 | `turn/tests/window.rs` | 开场白与 steer 在窗口里留下什么 |
 | `turn/tests/redaction.rs` | 工具参数与工具结果里的密钥进不了账本，其余字段完好 |
 

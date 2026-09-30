@@ -36,7 +36,7 @@
 
 - `JsonlLedger` 过 kernel conformance 六断言（含确定性双灌对拍）。
 - proptest：任意 draft 序列落盘后，尾部任意字节级破坏（截断/追加垃圾）→ 重开＝最长合法前缀＋一条 `log_truncated`，链续可验，续写不断链。
-- 读 `tools/fixtures/ledger-v2/` 高版本夹具 → 方向感知拒绝（报「由更新版本写成」＋原始路径），恒不部分解读。
+- 读 `tools/fixtures/ledger-ahead/` 高版本夹具 → 方向感知拒绝（报「由更新版本写成」＋原始路径），恒不部分解读。
 - 断电于 EventRecord 落账与断电于 CAS rename 各恢复一次（FaultFs 点阵驱动）。
 - CAS：put→get 往返；范围取回（L/B 两式）；去重（同内容二次 put 不二次物化）；断电只留 `tmp/` 半成品，已命名对象恒完好。
 - 形状 7 的 proptest 骨架一次两实例化：index 损坏即重建且查询结果不变；hot 折同一条流两次得同一份读数。
