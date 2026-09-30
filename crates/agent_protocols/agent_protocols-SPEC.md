@@ -168,7 +168,7 @@ MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容�
 | 码 | 何时 | 能否让它不可能发生 |
 |---|---|---|
 | `E_INVALID_ARGS` | 浮点入参、入站字段缺失、路由错工具 | 部分能：浮点由模型给出，故在出口拒并指位置 |
-| `E_WIRE_MISMATCH` | 答案或列表形状读不出；一条消息超过 `MESSAGE_CEILING`；流在消息中途断掉；消息不是 UTF-8 | 不能：对侧写多少字节不由本库决定，fail closed；超限恒是整条拒，恒不截断后解析 |
+| `E_WIRE_MISMATCH` | 答案或列表形状读不出；一条消息超过 `MESSAGE_CEILING`；流在消息中途断掉；消息不是 UTF-8（后三者发生在一次调用的答案上时带 `Retry::Unknown`，§8-15） | 不能：对侧写多少字节不由本库决定，fail closed；超限恒是整条拒，恒不截断后解析 |
 | `E_TOOL_UNAVAILABLE` | server 返回 JSON-RPC error；`tools/call` 答 `isError: true`；stdio 对侧在作答前关了输出、SSE 流在作答前断了（后两者带 `Retry::Unknown`）；重放缺答案 | 不能：外部世界的事实 |
 | `E_TIMEOUT` | 期限内未答；请求已交出，带 `Retry::Unknown` | 不能：对侧多久回答不由本库决定；拒词同时是子进程被回收的那一刻 |
 | `E_TOOL_OUTCOME_UNKNOWN` | `tools/call` 答 `isError: true`，且 `_meta` 带 `sprawling/effect-unknown` | 不能：server 自己说不知道 |
@@ -197,7 +197,7 @@ MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容�
 
 ## 16 测试与约束
 
-逐模块 `#[cfg(test)]`；「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言，再加「恰在上限内的消息照常解析」「超限的消息被整条拒且拒词报出上限与是哪台 server」两条（§8-15），以及「`isError` 读成失败」「`_meta` 效果未知」「stdio 超时与断流、SSE 断流标效果未知」三条。**约束**：本 crate 恒不出现 `async`、恒不持文件句柄、恒不内置任何服务商名字。
+逐模块 `#[cfg(test)]`；「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言，再加「恰在上限内的消息照常解析」「超限的消息被整条拒且拒词报出上限与是哪台 server」「stdio 与 SSE 的 server 答出超限的一条时，那次调用被拒且标效果未知」三条（§8-15），以及「`isError` 读成失败」「`_meta` 效果未知」「stdio 超时与断流、SSE 断流标效果未知」三条。**约束**：本 crate 恒不出现 `async`、恒不持文件句柄、恒不内置任何服务商名字。
 
 ## 17 模型体验
 
@@ -209,15 +209,20 @@ MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容�
 
 ### 8-15 外部输入通道的消息上限
 
-**缺陷所在**：stdio reader 用 `BufReader::lines()`，遇到换行前无限增长一个 `String`；承载答案的 `mpsc::channel()` 又是无界的。MCP server 是 `CONFIG.toml` 指进来的外部方，其输出是不受信任的输入，而读它的进程同时是这座城**唯一的写者**——内存耗尽等于历史中断，不是一次工具调用失败。
+**为什么要上限**：stdio 与 SSE 都按换行分帧，一台不写换行的 server 会让读端在遇到换行前无限增长一块缓冲；读端与调用方之间的队列若无界，读端又会在调用方慢的时候把读到的消息全攒在内存里。MCP server 是 `CONFIG.toml` 指进来的外部方，其输出是不受信任的输入，而读它的进程同时是这座城**唯一的写者**——内存耗尽等于历史中断，不是一次工具调用失败。
 
-三条决定：
+四条决定：
+
 
 1. **上限不是参数。** 签名是 `read_one_message(source, server)`，上限取自 `MESSAGE_CEILING`，不由调用方传入。理由：一个可以由调用方选的上限，就是每个传输各选一个的上限，而拒词必须对每一台 server 报出同一个数字。测试用真实大小的输入压两边边界，不靠注入一个小上限。
 2. **数值是推导来的，不是拍的。** `IMAGE_MAX_BYTES` 是 2 MiB，base64 后 2,796,203 B；8 MiB 让一次工具答案装得下这样一张图、它的文字与 JSON-RPC 信封，对本城已接受的最大载荷留 3 倍余量。读数与推导记在 `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]`，值本身只有 `MESSAGE_CEILING` 一个家。
 3. **拒绝是终止性的，不是跳过一条。** 超限消息未读完的尾巴与下一条消息在字节上无从分辨，所以拒绝之后调用方**恒不**再从同一个 source 读；传输回收子进程。`Received` 是穷尽枚举而非 `Option<String>`：「对侧关了输出」是调用方要据以停读的状态，用缺席表示它就等于让每个调用点各自重推一遍。
 
-**同集的另一半住传输**（`mcp::stdio`、`mcp::http`、`mcp::sse`）：reader 线程改调 `read_one_message`，`mpsc::channel()` 换 `sync_channel(N)`——无界队列在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态；HTTP 那条用 `take(MESSAGE_CEILING)` 包住响应体。
+4. **读端不排队。** `mcp::stdio` 与 `mcp::sse` 的 reader 线程每读一条都调 `read_one_message`，读到的交给 `sync_channel(0)`：reader 等调用方取走这一条才读下一条，于是一条连接在内存里至多握着一条读完待取的消息与一条正在读的，上界是两倍 `MESSAGE_CEILING`；再往后的字节留在子进程的管道或 TCP 的接收窗口里，那是对侧的缓冲，不是本城的。被否：`sync_channel(N)`（N > 0）多买到的只是 reader 能先读 N 条，而一次调用只取一条答案，多读的那几条只会多占 N 倍上限的内存；无界的 `channel()` 在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态。`harness::reading`（§8-19）的 reader 是同一种读法。
+
+**两条传输怎么用它**：reader 读到 `Received::EndOfInput` 就停，调用方看见的是连接断开；读到拒词（超限、不是 UTF-8、流在消息中途断掉、读不出）就把它交给正在等的那次调用，然后停读（决定 3）。这次调用拿到的拒词带 `Retry::Unknown`：请求已经交出，server 也答了，只是这份答案本城不读，它做没做事与 §8-17 丢了答的情形一样不可知。stdio 随即回收子进程，`has_ended` 为真，持有者下一次派活重开；SSE 的 reader 停读即放下这条流，之后的调用读到流已断。SSE 的一行是一个 `data:` 帧、一个事件名或一行注释，`read_one_message` 按换行分帧，所以每一行受同一个上限。
+
+**HTTP 这条还欠**：`mcp::http` 今天以 `response.text()` 读整个响应体，没有上限；按上限读它（`take(MESSAGE_CEILING)` 或同等的读法）是这一节在 `mcp::http` 那一侧的现状。
 
 ### 8-16 常驻连接
 
