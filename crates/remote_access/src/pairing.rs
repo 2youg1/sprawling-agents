@@ -60,18 +60,28 @@ impl PairingCode {
     /// pairing, and the door answers that, so this cannot fail.
     #[must_use]
     pub fn read(typed: &str) -> Self {
-        let canonical: String = typed
-            .chars()
-            .filter(|each| !each.is_whitespace() && *each != '-')
-            .flat_map(char::to_lowercase)
-            .collect();
-        Self(B3Hash::digest(canonical.as_bytes()))
+        Self(B3Hash::digest(canonical(typed).as_bytes()))
     }
+}
+
+/// A code as a person typed it, in the one form it was minted in: case,
+/// spaces and dashes removed. The pairing handshake carries this form.
+pub(crate) fn canonical(typed: &str) -> String {
+    typed
+        .chars()
+        .filter(|each| !each.is_whitespace() && *each != '-')
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+/// Whether `byte` is one of the 32 symbols the canonical text is made of.
+pub(crate) fn is_symbol(byte: u8) -> bool {
+    ALPHABET.contains(&byte)
 }
 
 /// Base32 without padding. Every chunk of five bits becomes one symbol;
 /// the last symbol carries the leftover bits in its high end.
-fn encode(bytes: &[u8]) -> String {
+pub(crate) fn encode(bytes: &[u8]) -> String {
     let mut out = String::new();
     let mut buffer: u32 = 0;
     let mut held: u32 = 0;
@@ -88,6 +98,31 @@ fn encode(bytes: &[u8]) -> String {
         push_symbol(&mut out, buffer << SYMBOL_BITS.saturating_sub(held));
     }
     out
+}
+
+/// Base32 back to bytes, or `None` at the first character outside the
+/// alphabet. Leftover bits at the end are dropped, so several texts read
+/// as the same bytes; a caller that accepts only the one canonical text
+/// encodes the bytes again and compares.
+pub(crate) fn decode(text: &str) -> Option<Vec<u8>> {
+    let mut out = Vec::new();
+    let mut buffer: u32 = 0;
+    let mut held: u32 = 0;
+    for symbol in text.bytes() {
+        let value = ALPHABET
+            .iter()
+            .zip(0u32..)
+            .find_map(|(each, value)| (*each == symbol).then_some(value))?;
+        buffer = (buffer << SYMBOL_BITS) | value;
+        held = held.saturating_add(SYMBOL_BITS);
+        if held >= 8 {
+            held = held.saturating_sub(8);
+            let [.., byte] = (buffer >> held).to_be_bytes();
+            out.push(byte);
+        }
+        buffer &= (1u32 << held).wrapping_sub(1);
+    }
+    Some(out)
 }
 
 fn push_symbol(out: &mut String, value: u32) {
@@ -122,6 +157,14 @@ mod tests {
         assert_eq!(encode(b"foobar"), "mzxw6ytboi");
         let (_, shown) = PairingCode::mint([0xff; CODE_BYTES]);
         assert_eq!(shown.chars().filter(|each| *each != '-').count(), 26);
+    }
+
+    #[test]
+    fn base32_decodes_what_it_encodes() {
+        assert_eq!(
+            [decode("mzxw6ytboi"), decode("mzxw6ytbo1")],
+            [Some(b"foobar".to_vec()), None]
+        );
     }
 
     #[test]

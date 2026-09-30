@@ -20,18 +20,22 @@
 //! use: it cannot sign as either side, and the session keys need both an
 //! X25519 and an ML-KEM secret it never held.
 
-use aws_lc_rs::agreement::{self, PrivateKey, UnparsedPublicKey, X25519};
-use aws_lc_rs::digest::{SHA256, digest};
-use aws_lc_rs::hkdf::{HKDF_SHA256, Salt};
-use aws_lc_rs::kem::{Ciphertext, DecapsulationKey, EncapsulationKey, ML_KEM_768};
 use kernel::{AxCode, AxError};
 
 use crate::door::DeviceId;
-use crate::keys::{Length, SIGNATURE_BYTES, Signature, SigningKey, VerifyingKey, crypto_failure};
-use crate::seal::{Direction, Opener, Sealer};
+use crate::keys::{SIGNATURE_BYTES, Signature, SigningKey, VerifyingKey};
+use crate::seal::{Opener, Sealer};
+use agreement::{Answer, Ephemeral, Keys, record, signed};
 
+mod agreement;
+mod pairing;
 #[cfg(test)]
 mod tests;
+
+pub use pairing::{CLAIM_BYTES, CODE_TEXT_BYTES, FINGERPRINT_BYTES};
+pub use pairing::{CityFingerprint, CityPairing, Claim, Claimed, DevicePairing, Invitation};
+pub use pairing::{PAIR_HELLO_BYTES, PAIR_REPLY_BYTES, PairHello, PairReply};
+pub use pairing::{city_pair_reply, device_pair_hello};
 
 /// Bytes in an X25519 public key.
 const X25519_BYTES: usize = 32;
@@ -84,8 +88,7 @@ pub struct Session {
 /// A device's side after it sent [`Hello`].
 pub struct DeviceWaiting {
     hello: Hello,
-    x25519: PrivateKey,
-    ml_kem: DecapsulationKey,
+    ephemeral: Ephemeral,
 }
 
 /// The city's side after it sent [`Reply`].
@@ -93,11 +96,6 @@ pub struct CityWaiting {
     device: DeviceId,
     transcript: [u8; 32],
     keys: Keys,
-}
-
-struct Keys {
-    device_to_city: [u8; 32],
-    city_to_device: [u8; 32],
 }
 
 impl Hello {
@@ -185,26 +183,11 @@ impl Finish {
 /// # Errors
 /// Fails only when the cryptographic library refuses to generate a key.
 pub fn device_hello(device: DeviceId, nonce: [u8; NONCE_BYTES]) -> Result<DeviceWaiting, AxError> {
-    let x25519 =
-        PrivateKey::generate(&X25519).map_err(|_| crypto_failure("generate an X25519 key"))?;
-    let ml_kem = DecapsulationKey::generate(&ML_KEM_768)
-        .map_err(|_| crypto_failure("generate an ML-KEM key"))?;
-    let x_public = x25519
-        .compute_public_key()
-        .map_err(|_| crypto_failure("derive an X25519 public key"))?;
-    let kem_public = ml_kem
-        .encapsulation_key()
-        .and_then(|key| key.key_bytes())
-        .map_err(|_| crypto_failure("derive an ML-KEM encapsulation key"))?;
-    let mut bytes = Vec::with_capacity(HELLO_BYTES);
-    bytes.extend_from_slice(device.as_bytes());
-    bytes.extend_from_slice(x_public.as_ref());
-    bytes.extend_from_slice(kem_public.as_ref());
-    bytes.extend_from_slice(&nonce);
+    let (ephemeral, public) = Ephemeral::generate()?;
+    let bytes = [device.as_bytes().as_slice(), &public, &nonce].concat();
     Ok(DeviceWaiting {
         hello: Hello::from_bytes(&bytes)?,
-        x25519,
-        ml_kem,
+        ephemeral,
     })
 }
 
@@ -226,24 +209,15 @@ impl DeviceWaiting {
         city: &VerifyingKey,
         device_key: &SigningKey,
     ) -> Result<(Finish, Session), AxError> {
-        let transcript = transcript(&self.hello, reply);
+        let transcript = record(PROTOCOL, self.hello.as_bytes(), reply.unsigned());
         let (x_peer, ciphertext, signature) = reply.parts();
         city.verify(
-            &signed(CITY_SIGNS, &transcript),
+            &signed(PROTOCOL, CITY_SIGNS, &transcript),
             &Signature::from_bytes(signature)?,
         )?;
-        let x_secret = agree(&self.x25519, x_peer)?;
-        let kem_secret = self
-            .ml_kem
-            .decapsulate(Ciphertext::from(ciphertext))
-            .map_err(|_| refused("open the city's ML-KEM ciphertext"))?;
-        let keys = derive(&transcript, &x_secret, kem_secret.as_ref())?;
-        let finish = Finish(device_key.sign(&signed(DEVICE_SIGNS, &transcript))?);
-        let session = Session {
-            sealer: Sealer::new(&keys.device_to_city, Direction::DeviceToCity)?,
-            opener: Opener::new(&keys.city_to_device, Direction::CityToDevice)?,
-        };
-        Ok((finish, session))
+        let keys = self.ephemeral.keys(&transcript, x_peer, ciphertext)?;
+        let finish = Finish(device_key.sign(&signed(PROTOCOL, DEVICE_SIGNS, &transcript))?);
+        Ok((finish, keys.device_session()?))
     }
 }
 
@@ -258,33 +232,16 @@ pub fn city_reply(
     nonce: [u8; NONCE_BYTES],
 ) -> Result<(Reply, CityWaiting), AxError> {
     let (x_peer, kem_peer) = hello.parts();
-    let x25519 =
-        PrivateKey::generate(&X25519).map_err(|_| crypto_failure("generate an X25519 key"))?;
-    let x_public = x25519
-        .compute_public_key()
-        .map_err(|_| crypto_failure("derive an X25519 public key"))?;
-    let x_secret = agree(&x25519, x_peer)?;
-    let (ciphertext, kem_secret) = EncapsulationKey::new(&ML_KEM_768, kem_peer)
-        .map_err(|_| refused("read the device's ML-KEM key"))?
-        .encapsulate()
-        .map_err(|_| crypto_failure("encapsulate to the device's ML-KEM key"))?;
-    let mut bytes = Vec::with_capacity(REPLY_BYTES);
-    bytes.extend_from_slice(x_public.as_ref());
-    bytes.extend_from_slice(ciphertext.as_ref());
-    bytes.extend_from_slice(&nonce);
-    bytes.resize(REPLY_BYTES, 0);
-    let unsigned = Reply::from_bytes(&bytes)?;
-    let transcript = transcript(hello, &unsigned);
-    let signature = city.sign(&signed(CITY_SIGNS, &transcript))?;
-    bytes.truncate(UNSIGNED_REPLY_BYTES);
-    bytes.extend_from_slice(signature.as_bytes());
-    let keys = derive(&transcript, &x_secret, kem_secret.as_ref())?;
+    let answer = Answer::new(x_peer, kem_peer)?;
+    let unsigned = [answer.public.as_slice(), &nonce].concat();
+    let transcript = record(PROTOCOL, hello.as_bytes(), &unsigned);
+    let signature = city.sign(&signed(PROTOCOL, CITY_SIGNS, &transcript))?;
     Ok((
-        Reply::from_bytes(&bytes)?,
+        Reply::from_bytes(&[unsigned.as_slice(), signature.as_bytes()].concat())?,
         CityWaiting {
             device: hello.device(),
             transcript,
-            keys,
+            keys: answer.keys(&transcript)?,
         },
     ))
 }
@@ -301,55 +258,9 @@ impl CityWaiting {
     /// # Errors
     /// Refuses a finish that key did not sign.
     pub fn accept(self, finish: &Finish, device_key: &VerifyingKey) -> Result<Session, AxError> {
-        device_key.verify(&signed(DEVICE_SIGNS, &self.transcript), &finish.0)?;
-        Ok(Session {
-            sealer: Sealer::new(&self.keys.city_to_device, Direction::CityToDevice)?,
-            opener: Opener::new(&self.keys.device_to_city, Direction::DeviceToCity)?,
-        })
+        device_key.verify(&signed(PROTOCOL, DEVICE_SIGNS, &self.transcript), &finish.0)?;
+        self.keys.city_session()
     }
-}
-
-/// SHA-256 of the protocol label, the hello and the reply without its
-/// signature. SHA-256 rather than the city's BLAKE3, because the other end
-/// is a browser, whose WebCrypto has SHA-256 and HKDF and no BLAKE3.
-fn transcript(hello: &Hello, reply: &Reply) -> [u8; 32] {
-    let input = [PROTOCOL, hello.as_bytes().as_slice(), reply.unsigned()].concat();
-    let mut out = [0u8; 32];
-    out.copy_from_slice(digest(&SHA256, &input).as_ref());
-    out
-}
-
-fn signed(role: &[u8], transcript: &[u8; 32]) -> Vec<u8> {
-    [PROTOCOL, role, transcript].concat()
-}
-
-fn agree(mine: &PrivateKey, peer: &[u8]) -> Result<[u8; 32], AxError> {
-    agreement::agree(mine, UnparsedPublicKey::new(&X25519, peer), (), |secret| {
-        let mut out = [0u8; 32];
-        if secret.len() != out.len() {
-            return Err(());
-        }
-        out.copy_from_slice(secret);
-        Ok(out)
-    })
-    .map_err(|()| refused("agree an X25519 secret"))
-}
-
-/// Both session keys from both secrets, under the transcript as salt.
-fn derive(transcript: &[u8; 32], x_secret: &[u8; 32], kem_secret: &[u8]) -> Result<Keys, AxError> {
-    let prk =
-        Salt::new(HKDF_SHA256, transcript).extract(&[x_secret.as_slice(), kem_secret].concat());
-    let expand = |label: &'static [u8]| -> Result<[u8; 32], AxError> {
-        let mut out = [0u8; 32];
-        prk.expand(&[label], Length(32))
-            .and_then(|okm| okm.fill(&mut out))
-            .map_err(|_| crypto_failure("derive a session key"))?;
-        Ok(out)
-    };
-    Ok(Keys {
-        device_to_city: expand(b"device to city")?,
-        city_to_device: expand(b"city to device")?,
-    })
 }
 
 fn fixed<const N: usize>(bytes: &[u8], action: &str) -> Result<[u8; N], AxError> {
@@ -363,9 +274,4 @@ fn fixed<const N: usize>(bytes: &[u8], action: &str) -> Result<[u8; N], AxError>
             "this message is {N} bytes; the device and the city are on different versions"
         ))
     })
-}
-
-fn refused(action: &str) -> AxError {
-    AxError::failure(AxCode::GateDenied, action, "the other side's key material")
-        .with_recovery("start the connection again; if it repeats, pair the device again")
 }
