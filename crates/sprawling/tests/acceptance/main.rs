@@ -26,3 +26,4 @@ mod catalogue;
 mod city;
 mod episodes;
 mod script;
+mod skills;
