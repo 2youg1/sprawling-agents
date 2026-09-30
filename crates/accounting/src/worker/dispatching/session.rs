@@ -62,13 +62,19 @@ pub(super) fn session_for(
     session: Option<SessionName>,
     task: &str,
 ) -> Result<Option<SessionName>, AxError> {
-    // An address with a room in it is already a session: this is the
-    // shape a second dispatch into an open session takes, and naming
-    // it again would open a room inside a room.
     match session {
-        None if !addr.as_str().contains('/') => rule_name(task).map(Some),
+        None if opens_a_room(addr, None) => rule_name(task).map(Some),
         None | Some(_) => Ok(session),
     }
+}
+
+/// Whether a dispatch to `addr` opens a room of its own: it named a
+/// session, or it was sent to a building. An address with a room in it
+/// is already a session: this is the shape a second dispatch into an
+/// open session takes, and naming it again would open a room inside a
+/// room.
+pub(super) fn opens_a_room(addr: &Address, session: Option<&SessionName>) -> bool {
+    session.is_some() || !addr.as_str().contains('/')
 }
 
 /// The room name a task earns: its first four ASCII words, lowercased,

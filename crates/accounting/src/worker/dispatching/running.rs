@@ -12,7 +12,7 @@ use super::super::{
     Desks, Driven, Ending, Landed, Owing, QueueTenure, RunWorker, Settling, Site, Sweep, held,
 };
 use super::preparing::{Flown, LaneHalf, Staged};
-use super::{Assignment, Given};
+use super::{Assignment, Seat};
 
 /// What the city built for a dispatch before the drive, and needs
 /// again once the drive is home.
@@ -22,7 +22,16 @@ use super::{Assignment, Given};
 /// where a lane runs it, it waits in the pursuit that started it until
 /// that run comes home (sprawling-SPEC.md 8-46-2). Either way there is
 /// one per run, and nothing in it is shared.
-pub(in crate::worker) struct Continuation {
+pub(in crate::worker) enum Continuation {
+    /// A model run's desks, lent out on this thread.
+    Model(Lent),
+    /// A harness run borrows nothing on this thread: everything it gives
+    /// back comes home with the drive (sprawling-SPEC.md 8-124).
+    Harness,
+}
+
+/// What a model run was lent on the accounting thread.
+pub(in crate::worker) struct Lent {
     desks: Desks,
     job_locator: Locator,
     /// This run's place in the backlog, given back where the run ends.
@@ -59,7 +68,7 @@ impl RunWorker {
         // Nothing is written before the city agrees to take the work:
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
-        let agreed = self.agree_to_work(&at)?;
+        let seat = self.agree_to_work(&at)?;
         // A key pasted into the work goes to the vault before the text
         // is sent to be named, written to a room or recorded.
         let task = self.take_custody(task)?;
@@ -67,12 +76,21 @@ impl RunWorker {
         // What this run will stand under reaches the history before it
         // governs anybody, and only once the city has agreed: a refused
         // dispatch still writes nothing (sprawling-SPEC.md 8-40).
-        self.book_rules(&agreed.building)?;
+        self.book_rules(seat.building())?;
         let session = super::session::session_for(&at.addr, at.session.take(), &task)?;
         // The first thing this city writes for a dispatch, and the line
         // where `addr` stops being where the work was sent and becomes
         // where the run works.
         at.addr = self.room_for(at.addr, session.as_ref())?;
+        let agreed = match seat {
+            Seat::Model(agreed) => agreed,
+            // A harness freezes no model and no effort into the room: it
+            // chooses its own, so the session shape below is a model's.
+            Seat::Harness(seat) => {
+                let given = self.give(&at, task, goal)?;
+                return self.stage_harness(at, seat, given, began);
+            }
+        };
         // What this session already froze, and the one dispatch that is
         // allowed to choose: the model and the effort are written into
         // the room's own layer at its first run and only read back at
@@ -82,33 +100,7 @@ impl RunWorker {
         // before the brief is written, so a refusal leaves the session
         // exactly as it was.
         self.choose_shape(&at, &agreed.model)?;
-        // The task file exists first, then the run exists: the job on
-        // disk is what the agent reads, and the copy in the store is
-        // what the history keeps, so editing one cannot rewrite the
-        // other.
-        let brief = city::write_brief(
-            &self.city_root,
-            &at.addr,
-            &city::JobBrief {
-                task: &task,
-                goal: &goal,
-            },
-        )?;
-        // What the run was given, pinned whichever arm it is: for a
-        // session nobody assigned, the pin holds the words that said so,
-        // so the ledger's `job` locator resolves to the bytes the run
-        // segment actually carried rather than to a file that was never
-        // written.
-        let job_hash = self
-            .cas
-            .put(brief.segment_text().as_bytes())
-            .map_err(storage::StorageError::into_ax)?;
-        let given = Given {
-            job: Locator::cas(job_hash),
-            brief,
-            task,
-            goal,
-        };
+        let given = self.give(&at, task, goal)?;
         // Kept for the post-drive sweep: an escalation names the work it
         // interrupted, and by then the plan has consumed the original.
         let job_locator = given.job.clone();
@@ -168,12 +160,12 @@ impl RunWorker {
             &format!("prepare_dispatch took {spent} ms for {}", at.addr.as_str()),
         );
         Ok((
-            Staged::new(at, site, lane),
-            Continuation {
+            Staged::Model { at, site, lane },
+            Continuation::Model(Lent {
                 desks,
                 job_locator,
                 member,
-            },
+            }),
         ))
     }
 
@@ -204,16 +196,27 @@ impl RunWorker {
         owing: Owing,
         open_claims: &mut crate::worker::booking::OpenClaims,
     ) -> Result<Landed, AxError> {
-        let Continuation {
+        let (lent, at, mut site, driven) = match (continuation, flown) {
+            (Continuation::Model(lent), Flown::Model { at, site, driven }) => {
+                (lent, at, site, driven)
+            }
+            (Continuation::Harness, Flown::Harness { at, driven }) => {
+                return self.land_harness(at, driven, owing);
+            }
+            (Continuation::Harness, Flown::Model { mut site, .. }) => {
+                self.release_lease(&mut site)?;
+                return Err(crossed_continuation());
+            }
+            (Continuation::Model(_), Flown::Harness { driven, .. }) => {
+                self.give_tree_back(driven.lease)?;
+                return Err(crossed_continuation());
+            }
+        };
+        let Lent {
             desks,
             job_locator,
             member,
-        } = continuation;
-        let Flown {
-            at,
-            mut site,
-            driven,
-        } = flown;
+        } = lent;
         // Read before the obligation moves on: this run's place in the
         // conversation is what a signal it sends carries forward, and
         // `settle_desks` below is where those signals are spoken.
@@ -344,7 +347,19 @@ impl RunWorker {
     /// # Errors
     /// Propagates a repository that will not give the tree back.
     fn release_lease(&mut self, site: &mut Site) -> Result<(), AxError> {
-        let Some(held) = site.lease.take() else {
+        self.give_tree_back(site.lease.take())
+    }
+
+    /// Gives a borrowed tree back to the city's worktree table; a run
+    /// that borrowed none gives nothing.
+    ///
+    /// # Errors
+    /// Propagates a repository that will not give the tree back.
+    pub(super) fn give_tree_back(
+        &mut self,
+        lease: Option<storage::WorktreeLease>,
+    ) -> Result<(), AxError> {
+        let Some(held) = lease else {
             return Ok(());
         };
         storage::Worktrees::open(&self.city_root)
@@ -352,4 +367,15 @@ impl RunWorker {
             .release(held)
             .map_err(storage::StorageError::into_ax)
     }
+}
+
+/// The refusal for a drive landed against another run's continuation,
+/// which one dispatch path cannot produce.
+fn crossed_continuation() -> AxError {
+    AxError::failure(
+        kernel::AxCode::ConfigInvalid,
+        "land a run",
+        "the drive and what the city lent for it name two different residents",
+    )
+    .with_recovery("report this: one dispatch stages one resident and lands it")
 }

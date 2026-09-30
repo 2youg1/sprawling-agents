@@ -235,6 +235,7 @@ impl RunWorker {
             reveal,
             browsers,
             desktop_program,
+            harnesses: super::driving::harness::on_this_machine(),
             recipe_for,
             exec_host,
         };
@@ -359,6 +360,16 @@ impl RunWorker {
     pub fn with_desktop_program(self, program: super::DesktopProgram) -> RunWorker {
         RunWorker {
             desktop_program: program,
+            ..self
+        }
+    }
+
+    /// The same worker, starting the harness a room's resident names
+    /// through `start` instead of on this host (sprawling-SPEC.md 8-124).
+    #[must_use]
+    pub(crate) fn with_harnesses(self, start: super::driving::harness::StartHarness) -> RunWorker {
+        RunWorker {
+            harnesses: start,
             ..self
         }
     }

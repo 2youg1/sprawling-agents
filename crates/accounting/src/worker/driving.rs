@@ -17,6 +17,7 @@ use super::{RunWorker, Site};
 
 mod entering;
 pub mod flight;
+pub(in crate::worker) mod harness;
 pub mod lane;
 pub(in crate::worker) mod owing;
 mod placing;

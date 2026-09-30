@@ -265,6 +265,11 @@ pub struct RunWorker {
     /// from (`std::env::current_exe`). Received rather than asked,
     /// because it starts a program on the host (sprawling-SPEC.md 8-4d).
     desktop_program: DesktopProgram,
+    /// Starts the official harness a room's resident names, in the room's
+    /// tree (`HarnessProcess::start`). Received as a value the tests
+    /// replace, because it starts a program on the host
+    /// (sprawling-SPEC.md 8-124).
+    harnesses: driving::harness::StartHarness,
     /// How this build installs one named item on this platform
     /// (`doctor::recipe_for`). Received rather than read, because the
     /// requirement table stays with the doctor (sprawling-SPEC.md,

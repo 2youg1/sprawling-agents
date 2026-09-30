@@ -224,7 +224,9 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         0,
         "the queue is out with the run that is driving"
     );
-    let crate::worker::dispatching::preparing::Staged { at, site, .. } = staged;
+    let crate::worker::dispatching::preparing::Staged::Model { at, site, .. } = staged else {
+        panic!("a model dispatch stages a model run");
+    };
 
     let failed = kernel::AxError::failure(
         kernel::AxCode::StorageFatal,
@@ -236,7 +238,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
     let err = worker
         .land(
             continuation,
-            crate::worker::dispatching::preparing::Flown {
+            crate::worker::dispatching::preparing::Flown::Model {
                 at,
                 site,
                 driven: Err(failed),

@@ -19,7 +19,7 @@ impl RunWorker {
     ///
     /// # Errors
     /// Propagates a handback the parent's room will not take.
-    pub(super) fn discharge(
+    pub(in crate::worker) fn discharge(
         &mut self,
         owing: Owing,
         at: &Assignment,

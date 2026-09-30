@@ -5,7 +5,7 @@
 
 //! Who gets woken, and where the work lands.
 
-use kernel::{Address, Locator, RunId};
+use kernel::{Address, AxError, Locator, RunId};
 
 /// A resident who was signalled and has no run open.
 ///
@@ -114,6 +114,49 @@ pub(super) struct Given {
     pub(super) job: Locator,
 }
 
+impl super::RunWorker {
+    /// Writes what the run was given: the brief on disk and its bytes
+    /// pinned in the store.
+    ///
+    /// The task file exists first, then the run exists: the job on disk
+    /// is what the agent reads, and the copy in the store is what the
+    /// history keeps, so editing one cannot rewrite the other.
+    ///
+    /// # Errors
+    /// Propagates a room that will not take the brief and a store that
+    /// will not take its bytes.
+    pub(super) fn give(
+        &mut self,
+        at: &Assignment,
+        task: String,
+        goal: String,
+    ) -> Result<Given, AxError> {
+        let brief = city::write_brief(
+            &self.city_root,
+            &at.addr,
+            &city::JobBrief {
+                task: &task,
+                goal: &goal,
+            },
+        )?;
+        // What the run was given, pinned whichever arm it is: for a
+        // session nobody assigned, the pin holds the words that said so,
+        // so the ledger's `job` locator resolves to the bytes the run
+        // segment actually carried rather than to a file that was never
+        // written.
+        let job_hash = self
+            .cas
+            .put(brief.segment_text().as_bytes())
+            .map_err(storage::StorageError::into_ax)?;
+        Ok(Given {
+            job: Locator::cas(job_hash),
+            brief,
+            task,
+            goal,
+        })
+    }
+}
+
 /// What the city agreed to before it wrote anything for this dispatch.
 ///
 /// Every refusal a dispatch can owe cheaply is answered to produce this
@@ -135,6 +178,35 @@ pub(super) struct Agreed {
     /// person set it on the endpoint that was chosen. Read here, where
     /// the endpoint is chosen, because nothing downstream sees the book.
     pub(super) retries: kernel::Retries,
+}
+
+/// Who the city agreed to seat in the room: decided once, in
+/// `agree_to_work`, before anything is written (sprawling-SPEC.md 8-124).
+///
+/// Every later phase that differs between the two residents matches
+/// this, and nothing downstream asks the configuration again.
+pub(super) enum Seat {
+    /// A model this city calls, chosen and credentialed.
+    Model(Agreed),
+    /// An official harness that takes the turn itself.
+    Harness(HarnessSeat),
+}
+
+/// What the city agreed to for a room whose resident is a harness.
+pub(super) struct HarnessSeat {
+    pub(super) building: city::Building,
+    pub(super) rules: city::BuildingRules,
+    pub(super) harness: agent_protocols::Harness,
+}
+
+impl Seat {
+    /// The building the run stands in, whoever its resident is.
+    pub(super) fn building(&self) -> &city::Building {
+        match self {
+            Seat::Model(agreed) => &agreed.building,
+            Seat::Harness(seat) => &seat.building,
+        }
+    }
 }
 
 pub(super) struct Knock {
@@ -163,6 +235,7 @@ pub(crate) struct Dispatched {
 pub(super) mod agreeing;
 pub(super) mod custody;
 pub(super) mod handback;
+pub(super) mod harness;
 pub(super) mod preparing;
 pub(super) mod running;
 pub(super) mod session;

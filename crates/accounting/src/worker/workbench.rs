@@ -27,7 +27,7 @@ mod servers;
 mod standing;
 mod tools;
 
-pub(super) use standing::Placing;
+pub(super) use standing::{Lending, Placing, lend_tree};
 
 /// What laying out a run's bench reads from the city: handles that
 /// clone, and values read when the dispatch was staged, so the bench is
@@ -282,7 +282,7 @@ impl Site {
 /// The tree is claimed, checkpointed and offered over this one scope, so a
 /// claim that checked out less than the checkpoint stages, or an offer that
 /// staged more than the claim checked out, cannot happen.
-fn tree_scope(building: &city::Building) -> Vec<String> {
+pub(in crate::worker) fn tree_scope(building: &city::Building) -> Vec<String> {
     vec![building.addr().as_str().to_owned()]
 }
 

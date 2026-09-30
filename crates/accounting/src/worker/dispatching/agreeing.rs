@@ -15,7 +15,7 @@ use kernel::{Locator, RunId, TimeMs};
 use crate::worker::CommandDesk;
 
 use super::super::RunWorker;
-use super::{Agreed, Assignment};
+use super::{Agreed, Assignment, HarnessSeat, Seat};
 
 /// A run's identity, derived rather than drawn: the same job dispatched
 /// at the same millisecond to the same address is the same run, and no
@@ -112,12 +112,13 @@ impl RunWorker {
     /// recovery line is the third part of what an `AxError` promises.
     ///
     /// # Errors
-    /// Refuses a halted scope, the reserved subtree, rules that will not
-    /// load, a room whose resident is a harness, which this build reads
-    /// but does not start yet, a tag with no model behind it, an endpoint
-    /// that is no longer attached, and a confidential building whose
-    /// model would leave this machine.
-    pub(super) fn agree_to_work(&mut self, at: &Assignment) -> Result<Agreed, AxError> {
+    /// Refuses a halted scope, the reserved subtree, and rules that will
+    /// not load; for a room whose resident is a harness, a spelling that
+    /// names none of the five, a confidential building and a dispatch
+    /// that names a model; otherwise a tag with no model behind it, an
+    /// endpoint that is no longer attached, and a confidential building
+    /// whose model would leave this machine.
+    pub(super) fn agree_to_work(&mut self, at: &Assignment) -> Result<Seat, AxError> {
         let addr = &at.addr;
         if let Some(scope) = self.halted_by(addr) {
             return Err(AxError::failure(
@@ -126,21 +127,25 @@ impl RunWorker {
                 addr.as_str().to_owned(),
             )
             .with_recovery(format!(
-                "{scope} is halted; release it to let work in again. Runs already going are \
-                 unaffected - stopping one is `cancel`"
+                "{scope} is halted; release it to let work in again. Runs already going are                  unaffected - stopping one is `cancel`"
             )));
         }
         // The building's own rules decide which models this run may
         // reach, so they are read before one is chosen.
         let building = city::Building::of(addr)?;
         let rules = city::load(&self.city_root, building.addr())?;
-        // Read before a model is chosen: a room a harness runs does not
-        // need one. Until the harness drive is wired (sprawling-SPEC
-        // 8-4e), a key read and then ignored is the state city-SPEC 8-4
-        // refuses unknown keys to avoid.
-        if let Some((harness, layer)) = city::settled_harness(&self.city_root, addr)? {
-            let file = city::config_path(&self.city_root, addr, layer)?;
-            return Err(not_driven_yet(addr, &harness, &file));
+        // Read before a model is chosen: a room a harness runs needs
+        // none. A dispatch that opens a room is judged at its building,
+        // because the new room's own layer is empty and the address's
+        // own session record belongs to another room.
+        let judged = if super::session::opens_a_room(addr, at.session.as_ref()) {
+            building.addr()
+        } else {
+            addr
+        };
+        if let Some((word, layer)) = city::settled_harness(&self.city_root, judged)? {
+            let file = city::config_path(&self.city_root, judged, layer)?;
+            return Err(not_driven_yet(addr, &word, &file));
         }
         let own = city::own_layer(&self.city_root, addr)?;
         let tag = self.tag_for(at.model.as_deref(), own.model())?;
@@ -158,14 +163,14 @@ impl RunWorker {
             Box::new(move || clock.now()),
         );
         let retries = chosen.endpoint.tuning.request_max_retries;
-        Ok(Agreed {
+        Ok(Seat::Model(Agreed {
             building,
             rules,
             model,
             provider,
             adapter,
             retries,
-        })
+        }))
     }
 
     /// Books what a run is about to stand under: the city's
@@ -268,20 +273,56 @@ impl RunWorker {
     }
 }
 
-/// The refusal for a room whose resident is a harness, while this build
-/// reads the key and does not start the harness: the file that names it
-/// is the one a person edits to dispatch to a model instead.
-fn not_driven_yet(addr: &Address, harness: &str, file: &std::path::Path) -> AxError {
-    AxError::failure(
-        AxCode::ToolUnavailable,
-        "dispatch work",
-        format!("{}: {harness}", addr.as_str()),
-    )
-    .with_recovery(format!(
-        "this build reads `[resident] harness` but does not start a harness yet; \
-         take the key out of {} to dispatch to a model here",
-        file.display()
-    ))
+/// The harness a room's configuration names, or the refusal a dispatch
+/// to it is owed before anything is written: a spelling that names none
+/// of the five, a confidential building, and a dispatch that named a
+/// model (sprawling-SPEC.md 8-124). `file` is the layer that named it,
+/// which is where a person changes it.
+fn seated_harness(
+    at: &Assignment,
+    word: &str,
+    rules: &city::BuildingRules,
+    file: &std::path::Path,
+) -> Result<agent_protocols::Harness, AxError> {
+    let subject = |named: &str| format!("{}: {named}", at.addr.as_str());
+    let Some(harness) = agent_protocols::Harness::parse(word) else {
+        return Err(
+            AxError::failure(AxCode::ConfigInvalid, "dispatch work", subject(word))
+                .with_nearby(
+                    agent_protocols::Harness::ALL
+                        .iter()
+                        .map(|known| known.as_str().to_owned())
+                        .collect(),
+                )
+                .with_recovery(format!(
+                    "write one of the five official harnesses under `[resident] harness` in {}",
+                    file.display()
+                )),
+        );
+    };
+    if rules.policy().confidential {
+        return Err(AxError::failure(
+            AxCode::GateDenied,
+            "dispatch work",
+            subject(harness.as_str()),
+        )
+        .with_recovery(format!(
+            "a harness sends the room to its own vendor and a confidential building's data              does not leave; take `[resident] harness` out of {}, or drop `confidential = true`",
+            file.display()
+        )));
+    }
+    if let Some(model) = at.model.as_deref() {
+        return Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "dispatch work",
+            subject(&format!("{model} into a room whose resident is {}", harness.as_str())),
+        )
+        .with_recovery(format!(
+            "dispatch without naming a model, or take `[resident] harness` out of {} to run              {model} here",
+            file.display()
+        )));
+    }
+    Ok(harness)
 }
 
 /// A document a run would stand under that this process cannot read.
@@ -294,4 +335,19 @@ fn unreadable(path: &std::path::Path, err: &std::io::Error) -> AxError {
     .with_recovery(
         "fix the file's permissions; a dispatch stands a run under these documents and          will not guess what they say",
     )
+}
+
+/// The refusal for a room whose resident is a harness, while this build
+/// reads the key and does not start the harness.
+fn not_driven_yet(addr: &Address, harness: &str, file: &std::path::Path) -> AxError {
+    AxError::failure(
+        AxCode::ToolUnavailable,
+        "dispatch work",
+        format!("{}: {harness}", addr.as_str()),
+    )
+    .with_recovery(format!(
+        "this build reads `[resident] harness` but does not start a harness yet; \
+         take the key out of {} to dispatch to a model here",
+        file.display()
+    ))
 }

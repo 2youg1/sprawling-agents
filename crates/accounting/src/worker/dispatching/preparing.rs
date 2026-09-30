@@ -12,16 +12,27 @@
 use kernel::{AxCode, AxError, Ledger, Locator, RunId};
 
 use super::super::driving::Sieving;
+use super::super::driving::harness::{HarnessDriven, HarnessHalf, drive_harness};
 use super::super::workbench::{BenchDesks, Laying, Placing, held};
 use super::super::{Assignment, DriveContext, Driven, Driving, Given, Site, Stamping, drive_run};
 
 /// One dispatch the accounting thread has decided, on its way to a
-/// lane: what was asked, where the run stands, and everything the lane
-/// half reads, owned so the value can leave the thread.
-pub(in crate::worker) struct Staged {
-    pub(in crate::worker) at: Assignment,
-    pub(in crate::worker) site: Site,
-    lane: LaneHalf,
+/// lane: what was asked, and everything the lane reads, owned so the
+/// value can leave the thread. One arm per resident, decided once by
+/// `agree_to_work` (sprawling-SPEC.md 8-124).
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one value per run in flight, moved a handful of times on its way to a lane; a box buys nothing a run would notice"
+)]
+pub(in crate::worker) enum Staged {
+    /// A model run: where it stands, and the half the lane prepares.
+    Model {
+        at: Assignment,
+        site: Site,
+        lane: LaneHalf,
+    },
+    /// A harness run: the half the lane drives.
+    Harness { at: Assignment, half: HarnessHalf },
 }
 
 /// What only the lane half reads.
@@ -41,21 +52,30 @@ pub(in crate::worker) struct LaneHalf {
 }
 
 /// What a lane carries home, whether its preparation held or not: the
-/// assignment and the site go back to `land`, which gives back the tree
-/// the site may hold before it reads how the drive went.
-pub(crate) struct Flown {
-    pub at: Assignment,
-    pub site: Site,
-    pub driven: Result<Driven, AxError>,
+/// assignment and what the run borrowed go back to `land`, which gives
+/// back the tree the run may hold before it reads how the drive went.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one value per run coming home, moved once from the lane to its landing; a box buys nothing a run would notice"
+)]
+pub(crate) enum Flown {
+    Model {
+        at: Assignment,
+        site: Site,
+        driven: Result<Driven, AxError>,
+    },
+    Harness {
+        at: Assignment,
+        driven: HarnessDriven,
+    },
 }
 
 impl Staged {
-    pub(in crate::worker) fn new(at: Assignment, site: Site, lane: LaneHalf) -> Staged {
-        Staged { at, site, lane }
-    }
-
     pub(crate) fn run_id(&self) -> RunId {
-        self.site.run_id
+        match self {
+            Staged::Model { site, .. } => site.run_id,
+            Staged::Harness { half, .. } => half.chartered.run,
+        }
     }
 
     /// Prepares the run in this lane and drives it.
@@ -64,11 +84,18 @@ impl Staged {
     /// writes through its relay, and a test on the accounting thread
     /// writes through the city's own ledger.
     pub(crate) fn fly<L: Ledger>(self, ledger: &mut L, context: DriveContext) -> Flown {
-        let Staged { at, mut site, lane } = self;
-        let driven = lane
-            .prepare(&at, &mut site, ledger, &context)
-            .and_then(|driving| drive_run(driving, ledger, context));
-        Flown { at, site, driven }
+        match self {
+            Staged::Model { at, mut site, lane } => {
+                let driven = lane
+                    .prepare(&at, &mut site, ledger, &context)
+                    .and_then(|driving| drive_run(driving, ledger, context));
+                Flown::Model { at, site, driven }
+            }
+            Staged::Harness { at, half } => Flown::Harness {
+                at,
+                driven: drive_harness(half, ledger, context),
+            },
+        }
     }
 }
 

@@ -103,13 +103,9 @@ impl Interrupting {
     }
 
     /// A stopped scope outranks anything a person or a neighbour still
-    /// has to say to the run. A backlog that cannot answer counts as
-    /// stopped: it cannot promise the scope is still open, and a run
-    /// that carried on would be running inside a scope a person may
-    /// already have shut (sprawling-SPEC.md 8-73).
+    /// has to say to the run.
     fn scope_stopping(&self) -> bool {
-        self.member
-            .is_some_and(|id| self.backlog.stopping(id).unwrap_or(true))
+        scope_stopping(&self.backlog, self.member)
     }
 
     fn ask(&mut self) -> Interrupt {
@@ -148,6 +144,20 @@ impl Interrupting {
             Err(_) => Interrupt::None,
         }
     }
+}
+
+/// Whether the scope a run's backlog member sits in is being stopped,
+/// for a model run and a harness run alike (sprawling-SPEC.md 8-124).
+///
+/// A backlog that cannot answer counts as stopped: it cannot promise the
+/// scope is still open, and a run that carried on would be running
+/// inside a scope a person may already have shut (sprawling-SPEC.md
+/// 8-73).
+pub(super) fn scope_stopping(
+    backlog: &runtime::Backlog,
+    member: Option<runtime::BacklogId>,
+) -> bool {
+    member.is_some_and(|id| backlog.stopping(id).unwrap_or(true))
 }
 
 /// A lock nobody can take, as a refusal rather than a panic.

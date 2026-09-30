@@ -144,32 +144,77 @@ impl Site {
                 effort: self.config.effort,
             },
         );
-        let turn = super::held(placing.checkpoint_gate, "take the checkpoint gate")?;
-        storage::Checkpoint::open(placing.city_root)
-            .map_err(storage::StorageError::into_ax)?
-            .ensure_base(&[addr.as_str().to_owned()], placing.clock.now()?, &of)
-            .map_err(storage::StorageError::into_ax)?;
-        drop(turn);
-        let claimed = storage::Worktrees::open(placing.city_root)
-            .map_err(storage::StorageError::into_ax)?
-            .claim(&tree_of(addr)?, &super::tree_scope(&self.building))
-            .map_err(storage::StorageError::into_ax)?;
-        lines.record_for(
-            self.run_id,
-            effect::Line {
-                who: self.who.clone(),
-                addr: addr.clone(),
-                kind: EventKind::WorktreeOpened,
-                data: claimed
-                    .opened_payload()
-                    .map_err(storage::StorageError::into_ax)?,
+        let claimed = lend_tree(
+            &Lending {
+                addr,
+                building: &self.building,
+                run_id: self.run_id,
+                who: &self.who,
+                of: &of,
             },
+            placing,
+            lines,
         )?;
         self.write_root = claimed.path().to_path_buf();
         self.branch = Some(claimed.name().as_str().to_owned());
         self.lease = Some(claimed);
         Ok(())
     }
+}
+
+/// Whom a room's tree is lent to: the room, the building whose subtree
+/// it checks out, the run the `worktree_opened` line is written for,
+/// and what the base commit is signed with.
+pub(in crate::worker) struct Lending<'a> {
+    pub(in crate::worker) addr: &'a Address,
+    pub(in crate::worker) building: &'a city::Building,
+    pub(in crate::worker) run_id: RunId,
+    pub(in crate::worker) who: &'a str,
+    pub(in crate::worker) of: &'a storage::Provenance,
+}
+
+/// Lends a room its tree, kept between the room's runs: the city's
+/// base commit first, because a worktree branches from a commit, then
+/// the claim and the line that records it. A review building's run and
+/// a harness run take their tree here alike (sprawling-SPEC.md 8-124).
+///
+/// # Errors
+/// Propagates whatever the checkpoint or the worktree says about lending
+/// a tree out, and the ledger's refusal of the line that records it.
+pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
+    lending: &Lending<'_>,
+    placing: &Placing<'_>,
+    lines: &mut Stamping<'_, L>,
+) -> Result<storage::WorktreeLease, AxError> {
+    let turn = super::held(placing.checkpoint_gate, "take the checkpoint gate")?;
+    storage::Checkpoint::open(placing.city_root)
+        .map_err(storage::StorageError::into_ax)?
+        .ensure_base(
+            &[lending.addr.as_str().to_owned()],
+            placing.clock.now()?,
+            lending.of,
+        )
+        .map_err(storage::StorageError::into_ax)?;
+    drop(turn);
+    let claimed = storage::Worktrees::open(placing.city_root)
+        .map_err(storage::StorageError::into_ax)?
+        .claim(
+            &tree_of(lending.addr)?,
+            &super::tree_scope(lending.building),
+        )
+        .map_err(storage::StorageError::into_ax)?;
+    lines.record_for(
+        lending.run_id,
+        effect::Line {
+            who: lending.who.to_owned(),
+            addr: lending.addr.clone(),
+            kind: EventKind::WorktreeOpened,
+            data: claimed
+                .opened_payload()
+                .map_err(storage::StorageError::into_ax)?,
+        },
+    )?;
+    Ok(claimed)
 }
 
 impl Site {

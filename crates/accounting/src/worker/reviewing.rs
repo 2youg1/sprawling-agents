@@ -35,8 +35,6 @@ impl RunWorker {
         let (addr, who, run_id, mode) = (&at.addr, site.who.as_str(), site.run_id, at.mode);
         let write_root = site.write_root.as_path();
         let scopes = site.checkpoint_scope()?;
-        let checkpoint_scope = scopes.join(" ");
-        let checkpoint_scope = checkpoint_scope.as_str();
         // What the run asked of the request register. Opening commits
         // the run's own tree first, because the record names the commit
         // a verifier will be judging; checking merges, because that is
@@ -52,37 +50,17 @@ impl RunWorker {
                 .map_err(storage::StorageError::into_ax)?;
             for effect in pr_effects {
                 match effect {
-                    collab::PrEffect::Opened { branch } => {
-                        // Landed rather than checkpointed: what a verifier
-                        // judges has to be on the run's own branch, and
-                        // a wave checkpoint is a dangling commit nobody can
-                        // merge (storage-SPEC 8-8).
-                        let at = storage::Checkpoint::open(write_root)
-                            .map_err(storage::StorageError::into_ax)?
-                            .land(
-                                &scopes,
-                                self.clock.now()?,
-                                &of,
-                                &format!("offer: {checkpoint_scope}"),
-                            )
-                            .map_err(storage::StorageError::into_ax)?;
-                        let request = collab::OpenRequest {
-                            node: collab::NodeId::parse(&branch)?,
-                            implementer: who.to_owned(),
-                            branch,
-                            commit: at,
-                        };
-                        self.record_for(
+                    collab::PrEffect::Opened { branch } => self.offer(
+                        &Offering {
+                            tree: write_root,
+                            scopes: &scopes,
+                            of: &of,
+                            who,
+                            addr,
                             run_id,
-                            effect::Line {
-                                who: who.to_owned(),
-                                addr: addr.clone(),
-                                kind: EventKind::PrOpened,
-                                data: request.payload()?,
-                            },
-                        )?;
-                        self.collaborating.requests.push(request);
-                    }
+                        },
+                        branch,
+                    )?,
                     collab::PrEffect::Merged { request, by } => {
                         // The last gate before work becomes the
                         // building's. Verification says a person other
@@ -174,6 +152,59 @@ impl RunWorker {
                 }
             }
         }
+        Ok(())
+    }
+}
+
+/// What a request is offered from: the tree it is committed in, the
+/// scope that commit stages, and the run it is written for.
+pub(super) struct Offering<'a> {
+    pub(super) tree: &'a std::path::Path,
+    pub(super) scopes: &'a [String],
+    pub(super) of: &'a storage::Provenance,
+    pub(super) who: &'a str,
+    pub(super) addr: &'a kernel::Address,
+    pub(super) run_id: kernel::RunId,
+}
+
+impl RunWorker {
+    /// Commits a run's tree onto its branch and records the request.
+    ///
+    /// Landed rather than checkpointed: what a verifier judges has to be
+    /// on the run's own branch, and a wave checkpoint is a dangling
+    /// commit nobody can merge (storage-SPEC 8-8). The one place a
+    /// request is opened, whether a resident asked with `pr open` or the
+    /// city offers a harness run's work (sprawling-SPEC.md 8-124).
+    ///
+    /// # Errors
+    /// Propagates a tree that will not commit, a branch that is not a
+    /// node id, and the ledger's refusal of the line.
+    pub(super) fn offer(&mut self, offering: &Offering<'_>, branch: String) -> Result<(), AxError> {
+        let commit = storage::Checkpoint::open(offering.tree)
+            .map_err(storage::StorageError::into_ax)?
+            .land(
+                offering.scopes,
+                self.clock.now()?,
+                offering.of,
+                &format!("offer: {}", offering.scopes.join(" ")),
+            )
+            .map_err(storage::StorageError::into_ax)?;
+        let request = collab::OpenRequest {
+            node: collab::NodeId::parse(&branch)?,
+            implementer: offering.who.to_owned(),
+            branch,
+            commit,
+        };
+        self.record_for(
+            offering.run_id,
+            effect::Line {
+                who: offering.who.to_owned(),
+                addr: offering.addr.clone(),
+                kind: EventKind::PrOpened,
+                data: request.payload()?,
+            },
+        )?;
+        self.collaborating.requests.push(request);
         Ok(())
     }
 }
