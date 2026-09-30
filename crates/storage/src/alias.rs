@@ -221,6 +221,51 @@ pub(crate) mod tests {
         WriteTarget::at("write a file", &root.join("work").join("new.txt")).unwrap();
     }
 
+    /// The hard-link arm is judged by the link count on every platform:
+    /// both names of a file with two are hard links, and a file that is
+    /// only read-only, or held open by another handle that shares
+    /// nothing, is not an alias - the count is read without asking for
+    /// any access that could collide with either.
+    #[test]
+    #[allow(
+        clippy::permissions_set_readonly_false,
+        reason = "the temporary directory cannot be removed around a read-only file on Windows"
+    )]
+    fn a_second_name_is_a_hard_link_and_nothing_else_is() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let first = root.join("first.txt");
+        let second = root.join("second.txt");
+        std::fs::write(&first, b"one inode").unwrap();
+        std::fs::hard_link(&first, &second).unwrap();
+        let read_only = root.join("read-only.txt");
+        std::fs::write(&read_only, b"kept").unwrap();
+        let mut bits = std::fs::metadata(&read_only).unwrap().permissions();
+        bits.set_readonly(true);
+        std::fs::set_permissions(&read_only, bits.clone()).unwrap();
+        let held = root.join("held.txt");
+        std::fs::write(&held, b"held").unwrap();
+        let mut open = std::fs::OpenOptions::new();
+        open.read(true).write(true);
+        #[cfg(windows)]
+        std::os::windows::fs::OpenOptionsExt::share_mode(&mut open, 0);
+        let holder = open.open(&held).unwrap();
+
+        let judged = [&first, &second, &read_only, &held].map(|path| kind_at(path).unwrap());
+        drop(holder);
+        bits.set_readonly(false);
+        std::fs::set_permissions(&read_only, bits).unwrap();
+        assert_eq!(
+            judged,
+            [
+                Some(AliasKind::HardLink),
+                Some(AliasKind::HardLink),
+                None,
+                None
+            ]
+        );
+    }
+
     /// The link arm of the alias family: at the name or above it, a
     /// junction or symlink refuses the write whole.
     #[test]
