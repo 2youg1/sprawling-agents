@@ -122,24 +122,117 @@ fn a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end() {
     assert!(err.subject().contains("nests deeper"), "{err}");
 }
 
-/// The copy is removed when the command that ran in it has ended: a
-/// scratch root that grew one tree per command would be a leak nothing
-/// reports.
-#[test]
-fn a_settled_sandbox_command_leaves_no_copy_behind() {
-    let scratch = tempfile::tempdir().unwrap();
+/// A tree of `files` files of sixteen bytes under `src/`.
+fn source_tree(files: u64) -> tempfile::TempDir {
     let source = tempfile::tempdir().unwrap();
-    std::fs::write(source.path().join("a.txt"), b"one\n").unwrap();
-    let confined = Confined::with_arm(Confinement::CopiedTree, Some(scratch.path().to_path_buf()));
-    let (_, placed) = confined
+    std::fs::create_dir(source.path().join("src")).unwrap();
+    for i in 0..files {
+        std::fs::write(
+            source.path().join("src").join(format!("file-{i:04}.txt")),
+            b"sixteen bytes ..",
+        )
+        .unwrap();
+    }
+    source
+}
+
+/// runtime-SPEC 8-13-2 and 12.10: the second command of a tool gets the
+/// copy the first one used, brought back to the working directory, so
+/// what it writes is what the first command and the person changed, not
+/// the whole tree again. Judged at two sizes: a copy made afresh would
+/// create as many files as the tree holds.
+#[test]
+fn a_sandbox_copy_is_synced_rather_than_made_again() {
+    for files in [32, 64] {
+        let scratch = tempfile::tempdir().unwrap();
+        let source = source_tree(files);
+        let mut confined =
+            Confined::with_arm(Confinement::CopiedTree, Some(scratch.path().to_path_buf()));
+        let (command, first) = confined
+            .place(std::process::Command::new("cmd"), source.path())
+            .unwrap();
+        let copy = command.get_current_dir().unwrap().to_path_buf();
+        assert_eq!(
+            first.work(),
+            storage::FileWork {
+                created: files,
+                rewritten: 0,
+                removed: 0,
+                walked: files + 1,
+            },
+            "the first command's copy at {files} files"
+        );
+        confined.settled(first);
+        assert!(copy.is_dir(), "the copy is kept for the tool's next command");
+
+        std::fs::write(copy.join("src").join("file-0000.txt"), b"a command wrote").unwrap();
+        std::fs::write(copy.join("src").join("stray.txt"), b"a command left").unwrap();
+        std::fs::write(
+            source.path().join("src").join("file-0001.txt"),
+            b"sixteen bytes !!",
+        )
+        .unwrap();
+        let (command, second) = confined
+            .place(std::process::Command::new("cmd"), source.path())
+            .unwrap();
+        assert_eq!(command.get_current_dir(), Some(copy.as_path()));
+        assert_eq!(
+            second.work(),
+            storage::FileWork {
+                created: 0,
+                rewritten: 2,
+                removed: 1,
+                walked: 2 * (files + 1) + 1,
+            },
+            "the second command's copy at {files} files"
+        );
+        confined.settled(second);
+
+        let (_, third) = confined
+            .place(std::process::Command::new("cmd"), source.path())
+            .unwrap();
+        assert_eq!(
+            (
+                third.work(),
+                std::fs::read(copy.join("src").join("file-0000.txt")).unwrap(),
+                std::fs::read(copy.join("src").join("file-0001.txt")).unwrap(),
+                copy.join("src").join("stray.txt").exists(),
+            ),
+            (
+                storage::FileWork {
+                    walked: 2 * (files + 1),
+                    ..storage::FileWork::default()
+                },
+                b"sixteen bytes ..".to_vec(),
+                b"sixteen bytes !!".to_vec(),
+                false,
+            ),
+            "an unchanged tree writes nothing, and the copy holds the working directory at {files} files"
+        );
+    }
+}
+
+/// The copy of a command that ended is kept for the tool's next command,
+/// a second copy exists only while two commands hold one each, and every
+/// copy goes when the tool does: a scratch root that grew one tree per
+/// command would be a leak nothing reports.
+#[test]
+fn a_sandbox_copy_goes_with_the_tool() {
+    let scratch = tempfile::tempdir().unwrap();
+    let source = source_tree(2);
+    let copies = || std::fs::read_dir(scratch.path()).unwrap().count();
+    let mut confined =
+        Confined::with_arm(Confinement::CopiedTree, Some(scratch.path().to_path_buf()));
+    let (_, first) = confined
         .place(std::process::Command::new("cmd"), source.path())
         .unwrap();
-    let copies = std::fs::read_dir(scratch.path()).unwrap().count();
-    assert_eq!(copies, 1, "one command, one copy");
-    confined.settled(placed);
-    assert_eq!(
-        std::fs::read_dir(scratch.path()).unwrap().count(),
-        0,
-        "the copy goes when the wait ends"
-    );
+    let (_, second) = confined
+        .place(std::process::Command::new("cmd"), source.path())
+        .unwrap();
+    assert_eq!(copies(), 2, "two commands at once, two copies");
+    confined.settled(first);
+    confined.settled(second);
+    assert_eq!(copies(), 1, "one copy is kept for the next command");
+    drop(confined);
+    assert_eq!(copies(), 0, "the copies go with the tool");
 }

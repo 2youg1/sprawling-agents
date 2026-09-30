@@ -94,11 +94,21 @@ pub(super) fn fresh(root: &Path) -> Result<PathBuf, AxError> {
 pub(super) struct Budget {
     files: u64,
     bytes: u64,
+    work: storage::FileWork,
 }
 
 impl Budget {
     pub(super) fn new() -> Budget {
-        Budget { files: 0, bytes: 0 }
+        Budget {
+            files: 0,
+            bytes: 0,
+            work: storage::FileWork::default(),
+        }
+    }
+
+    /// What making the copy cost the filesystem.
+    pub(super) fn work(&self) -> storage::FileWork {
+        self.work
     }
 
     pub(super) fn take(&mut self, bytes: u64) -> Result<(), AxError> {
@@ -149,6 +159,7 @@ pub(super) fn copy_into(stage: &Stage<'_>, depth: u32, budget: &mut Budget) -> R
         if source == copy {
             continue;
         }
+        budget.work.walked = budget.work.walked.saturating_add(1);
         let target = into.join(entry.file_name());
         let metadata = std::fs::metadata(&source)
             .map_err(|err| copy_fault(&source.display().to_string(), &err))?;
@@ -168,6 +179,7 @@ pub(super) fn copy_into(stage: &Stage<'_>, depth: u32, budget: &mut Budget) -> R
             budget.take(metadata.len())?;
             std::fs::copy(&source, &target)
                 .map_err(|err| copy_fault(&source.display().to_string(), &err))?;
+            budget.work.created = budget.work.created.saturating_add(1);
         } else {
             return Err(AxError::failure(
                 AxCode::SandboxDenied,

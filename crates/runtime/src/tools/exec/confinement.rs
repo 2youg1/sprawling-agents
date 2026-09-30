@@ -334,6 +334,7 @@ pub use placing::{Confined, Placed, Placement, parse_placement};
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
     reason = "test code"
 )]
 mod tests;

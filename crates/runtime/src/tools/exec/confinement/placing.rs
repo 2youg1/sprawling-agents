@@ -71,6 +71,15 @@ pub struct Confined {
 /// copy too.
 pub struct Placed {
     copy: Option<PathBuf>,
+    work: storage::FileWork,
+}
+
+impl Placed {
+    /// What putting the copy in place cost the filesystem (storage-SPEC
+    /// 8-31).
+    pub fn work(&self) -> storage::FileWork {
+        self.work
+    }
 }
 
 impl Confined {
@@ -121,14 +130,26 @@ impl Confined {
             Confinement::Unavailable { missing } => Err(no_arm(*missing)),
             Confinement::WindowsJobObject => Err(no_job_object()),
             Confinement::LinuxNamespaces { wrapper } => {
-                let copy = self.copy_of(workdir)?;
+                let (copy, work) = self.copy_of(workdir)?;
                 let wrapped = namespaced(wrapper, &copy, workdir, &command);
-                Ok((wrapped, Placed { copy: Some(copy) }))
+                Ok((
+                    wrapped,
+                    Placed {
+                        copy: Some(copy),
+                        work,
+                    },
+                ))
             }
             Confinement::CopiedTree => {
-                let copy = self.copy_of(workdir)?;
+                let (copy, work) = self.copy_of(workdir)?;
                 command.current_dir(&copy);
-                Ok((command, Placed { copy: Some(copy) }))
+                Ok((
+                    command,
+                    Placed {
+                        copy: Some(copy),
+                        work,
+                    },
+                ))
             }
         }
     }
@@ -164,7 +185,7 @@ impl Confined {
     }
 
     /// A fresh copy of the working tree.
-    fn copy_of(&self, workdir: &Path) -> Result<PathBuf, AxError> {
+    fn copy_of(&self, workdir: &Path) -> Result<(PathBuf, storage::FileWork), AxError> {
         let root = self
             .scratch
             .as_deref()
@@ -180,7 +201,7 @@ impl Confined {
             0,
             &mut budget,
         ) {
-            Ok(()) => Ok(copy),
+            Ok(()) => Ok((copy, budget.work())),
             Err(fault) => {
                 // The half copy goes before the refusal is returned: a
                 // scratch root that grew a tree per refusal would be a
