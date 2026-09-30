@@ -86,7 +86,20 @@ impl super::holding::Views {
     /// name a commit - because the line that opens a dispatch is a
     /// `checkpoint_committed` that checkpoints nothing.
     pub(super) fn fold_commit(&mut self, record: &EventRecord) {
-        if let Some((oid, facts)) = commit_facts(record) {
+        if let Some((oid, mut facts)) = commit_facts(record) {
+            facts.previous = match self.commits.get(&oid) {
+                // The same commit announced again keeps the previous one
+                // it was first folded with, rather than naming itself.
+                Some(first) => first.previous,
+                None => self.last_commit.get(&facts.run).copied(),
+            };
+            self.last_commit.insert(
+                facts.run,
+                wire::CommitAt {
+                    oid,
+                    seq: facts.seq,
+                },
+            );
             self.commit_seqs.insert(facts.seq, oid);
             self.commits.insert(oid, facts);
         }
@@ -262,10 +275,31 @@ enum Settled {
 impl CommitsAsk {
     /// The answer, each commit with the parents git states for it.
     pub(super) fn read(self) -> wire::Answer {
-        match self.settled {
-            Settled::One(commit) => wire::Answer::Commit(commit),
-            Settled::Page(page) => wire::Answer::Commits(page),
+        let CommitsAsk { city_root, settled } = self;
+        match settled {
+            Settled::One(mut commit) => {
+                give_parents(&city_root, std::slice::from_mut(&mut commit));
+                wire::Answer::Commit(commit)
+            }
+            Settled::Page(mut page) => {
+                give_parents(&city_root, &mut page.commits);
+                wire::Answer::Commits(page)
+            }
         }
+    }
+}
+
+/// Gives each commit the parents git states for it, from one opening of
+/// the repository. A repository that cannot be opened or read leaves
+/// every `parents` at `None`: the parents are one more fact on the row,
+/// not a condition of it, and the rest of the answer stands without them.
+fn give_parents(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
+    let oids: Vec<GitOid> = commits.iter().map(|commit| commit.oid).collect();
+    let Ok(parents) = storage::parents_of(city_root, &oids) else {
+        return;
+    };
+    for (commit, stated) in commits.iter_mut().zip(parents) {
+        commit.parents = stated;
     }
 }
 

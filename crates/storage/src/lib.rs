@@ -116,6 +116,6 @@ mod hunks;
 mod status;
 
 pub use blob::blob_at;
-pub use changes::{Head, between};
+pub use changes::{Head, between, parents_of};
 pub use hunks::{FilePatch, PatchLine, Withheld, of_file};
 pub use status::{Drift, WorkingStatus, working_status};

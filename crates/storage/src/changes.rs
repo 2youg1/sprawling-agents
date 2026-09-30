@@ -92,6 +92,42 @@ pub fn between(
     collect(&diff)
 }
 
+/// Each commit's parents, in the order the commit object states them;
+/// `None` for an oid the repository does not hold. The repository is
+/// opened once for the whole list.
+///
+/// # Errors
+/// Propagates whatever opening the repository or reading a commit that
+/// is there reports.
+pub fn parents_of(
+    city_root: &Path,
+    oids: &[GitOid],
+) -> Result<Vec<Option<Vec<GitOid>>>, StorageError> {
+    let repo = git2::Repository::open(city_root).map_err(git_err("open the city repository"))?;
+    oids.iter()
+        .map(|oid| {
+            let parsed =
+                git2::Oid::from_str(&oid.to_string()).map_err(git_err("parse a commit"))?;
+            let commit = match repo.find_commit(parsed) {
+                Ok(commit) => commit,
+                Err(absent) if absent.code() == git2::ErrorCode::NotFound => return Ok(None),
+                Err(failed) => return Err(git_err("find a commit")(failed)),
+            };
+            commit
+                .parent_ids()
+                .map(|id| {
+                    let spelled = id.to_string();
+                    GitOid::parse(&spelled).ok_or_else(|| StorageError::Checkpoint {
+                        op: "read a commit's parents",
+                        detail: format!("git named a parent {spelled}, which is not 40 hex digits"),
+                    })
+                })
+                .collect::<Result<Vec<GitOid>, StorageError>>()
+                .map(Some)
+        })
+        .collect()
+}
+
 /// Reads one prepared diff into rows.
 ///
 /// Separate from [`between`] because everything above is git and
