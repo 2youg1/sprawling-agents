@@ -14,8 +14,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::completion::{CITABLE, citable_words};
 use crate::error::{AxCode, AxError};
-use crate::event::{EventKind, EventRef};
+use crate::event::EventRef;
 use crate::locator::Locator;
 
 /// Non-empty resident identity; the `role@building.n` grammar tightens
@@ -48,7 +49,7 @@ pub struct Claim {
 }
 
 /// A verified product. Private fields: the only constructor demands
-/// in-window verification evidence.
+/// verification evidence of a kind in `completion::CITABLE`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Artifact {
     locator: Locator,
@@ -56,31 +57,25 @@ pub struct Artifact {
 }
 
 impl Artifact {
-    /// Player–referee in the type: evidence must be a `tool_result` or
-    /// `model_returned` ref, else `E_EVIDENCE_MISSING`.
+    /// Sole constructor: player–referee in the type. Verification evidence
+    /// must cite a kind in `completion::CITABLE`, else E_EVIDENCE_MISSING.
     pub fn verify(claim: Claim, evidence: EventRef) -> Result<Artifact, AxError> {
-        // The two kinds that carry evidence are named; the other sixty
-        // are one answer, and spelling them would be a second copy of
-        // `EventKind` that the next event has to be added to twice.
-        #[expect(
-            clippy::wildcard_enum_match_arm,
-            reason = "every kind but the two named is refused, and the refusal quotes it"
-        )]
-        match evidence.kind() {
-            EventKind::ToolResult | EventKind::ModelReturned => Ok(Artifact {
+        if CITABLE.contains(&evidence.kind()) {
+            return Ok(Artifact {
                 locator: claim.locator,
                 verified_by: evidence,
-            }),
-            other => Err(AxError::failure(
-                AxCode::EvidenceMissing,
-                "verify claim",
-                claim.locator.to_string(),
-            )
-            .with_recovery(format!(
-                "evidence must be a tool_result or model_returned ref, got {other:?}; \
-                 run the verification and cite its result"
-            ))),
+            });
         }
+        Err(AxError::failure(
+            AxCode::EvidenceMissing,
+            "verify claim",
+            claim.locator.to_string(),
+        )
+        .with_recovery(format!(
+            "evidence must be a {} ref, got {:?}; run the verification and cite its result",
+            citable_words()?,
+            evidence.kind()
+        )))
     }
 
     pub fn locator(&self) -> &Locator {
@@ -186,7 +181,7 @@ impl Registry {
 )]
 mod tests {
     use super::*;
-    use crate::event::{EventDraft, EventRecord, Payload, RunId, Seq, TimeMs};
+    use crate::event::{EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
     use crate::ledger::GENESIS_PREV;
 
     fn evidence(kind: EventKind) -> EventRef {
@@ -214,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn verification_accepts_only_in_window_result_kinds() {
+    fn verification_accepts_only_citable_kinds() {
         assert!(Artifact::verify(claim(), evidence(EventKind::ToolResult)).is_ok());
         assert!(Artifact::verify(claim(), evidence(EventKind::ModelReturned)).is_ok());
         let err = Artifact::verify(claim(), evidence(EventKind::RunStarted)).unwrap_err();

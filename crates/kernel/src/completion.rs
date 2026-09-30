@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Completion and progress. Claiming done makes
-//! nothing done: `Completion::Done` cannot be built without in-window
-//! evidence (the runtime checks depth). Progress
+//! nothing done: `Completion::Done` cannot be built without evidence the
+//! city recorded itself (the runtime checks depth). Progress
 //! is honest in the type: only a planned run owns a ratio method —
 //! an unplanned run has nothing to ask a percentage from.
 
@@ -16,7 +16,17 @@ use crate::budget::BudgetUse;
 use crate::error::{AxCode, AxError};
 use crate::event::{EventKind, EventRef};
 
-/// Non-empty, and every ref is a `tool_result` or `model_returned`.
+/// The kinds evidence may cite: the records the city wrote itself of an
+/// answer to a request it sent. [`Evidence::new`] and
+/// `registry::Artifact::verify` both read this one table, and a refusal
+/// names its kinds from here.
+pub(crate) const CITABLE: [EventKind; 3] = [
+    EventKind::ToolResult,
+    EventKind::ModelReturned,
+    EventKind::HarnessAnswered,
+];
+
+/// Non-empty, and every ref kind is in `CITABLE`.
 /// There is no other constructor and no Deserialize anywhere in the
 /// chain — history cannot be claimed, only cited.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,18 +40,15 @@ impl Evidence {
                 "construct evidence",
                 "empty ref list",
             )
-            .with_recovery("cite at least one tool_result or model_returned event"));
+            .with_recovery(format!("cite at least one {} event", citable_words()?)));
         }
-        if let Some(bad) = refs
-            .iter()
-            .find(|r| !matches!(r.kind(), EventKind::ToolResult | EventKind::ModelReturned))
-        {
+        if let Some(bad) = refs.iter().find(|r| !CITABLE.contains(&r.kind())) {
             return Err(AxError::failure(
                 AxCode::EvidenceMissing,
                 "construct evidence",
                 format!("ref kind {:?}", bad.kind()),
             )
-            .with_recovery("evidence kinds are tool_result and model_returned only"));
+            .with_recovery(format!("evidence kinds are {} only", citable_words()?)));
         }
         Ok(Evidence(refs))
     }
@@ -49,6 +56,30 @@ impl Evidence {
     pub fn refs(&self) -> &[EventRef] {
         &self.0
     }
+}
+
+/// The [`CITABLE`] kinds as the Ledger spells them, joined for the
+/// recovery of a refusal.
+pub(crate) fn citable_words() -> Result<String, AxError> {
+    let words = CITABLE
+        .iter()
+        .map(|kind| {
+            serde_json::to_value(kind)
+                .map(|word| word.to_string())
+                .map_err(|err| {
+                    AxError::failure(
+                        AxCode::InvalidArgs,
+                        "spell a citable event kind",
+                        format!("{kind:?}"),
+                    )
+                    .with_recovery(format!(
+                        "JSON refused this event kind ({err}); cite an event whose kind \
+                         `sprawling replay` prints"
+                    ))
+                })
+        })
+        .collect::<Result<Vec<String>, AxError>>()?;
+    Ok(words.join(", "))
 }
 
 /// The three endings; a fourth cannot be represented (frozen surface,
