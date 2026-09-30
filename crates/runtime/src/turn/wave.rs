@@ -22,6 +22,11 @@ use crate::compaction::Exchange;
 
 use super::{Carried, Interrupt, PhaseOutcome, Recording, ToolWave, Turn};
 
+mod reorder;
+
+use reorder::all_at_once;
+pub(super) use reorder::lost_answer;
+
 /// What the model reads back as the text of a tool result: the same
 /// payload the ledger keeps, printed once so the two cannot disagree.
 fn printed(payload: &Payload, action: &'static str) -> Result<String, AxError> {
@@ -314,56 +319,4 @@ fn alone(
             tools.account(call, ticket, ran)
         }
     }
-}
-
-/// Runs the tool of every cleared call that holds no answer from while
-/// the model was generating, all at once, and answers in call order, one
-/// answer per such call: the reorder buffer. The first runs on this
-/// thread, so a wave of one read starts no thread at all. The scope is
-/// this module's exception to the one spawn point (ARCHITECTURE §10
-/// rule 3): every thread it starts is joined before it returns.
-fn all_at_once(
-    tools: &dyn ConcurrentInvoke,
-    calls: &[&ToolCall],
-    admitted: &[Admitted],
-    early: &[Option<Result<ToolOutcome, AxError>>],
-) -> Vec<Result<ToolOutcome, AxError>> {
-    let running: Vec<(&ToolCall, Result<&dyn Tool, AxError>)> = calls
-        .iter()
-        .zip(admitted)
-        .zip(early)
-        .filter_map(|((call, admission), cached)| match (admission, cached) {
-            (Admitted::Cleared(ticket), None) => Some((*call, tools.tool(ticket))),
-            (Admitted::Cleared(_), Some(_)) | (Admitted::Answered(_), _) => None,
-        })
-        .collect();
-    let run = |(call, tool): &(&ToolCall, Result<&dyn Tool, AxError>)| match tool {
-        Ok(tool) => tool.invoke(call),
-        Err(unheld) => Err(unheld.clone()),
-    };
-    let Some((first, rest)) = running.split_first() else {
-        return Vec::new();
-    };
-    std::thread::scope(|scope| {
-        let others: Vec<_> = rest
-            .iter()
-            .map(|job| scope.spawn(move || run(job)))
-            .collect();
-        std::iter::once(run(first))
-            .chain(
-                others
-                    .into_iter()
-                    .map(|worker| worker.join().unwrap_or_else(|_| Err(lost_answer()))),
-            )
-            .collect()
-    })
-}
-
-pub(super) fn lost_answer() -> AxError {
-    AxError::failure(
-        AxCode::ToolUnavailable,
-        "run a read-only tool call",
-        "the tool stopped its thread without an answer",
-    )
-    .with_recovery("call the tool again; report it when it stops a second time")
 }
