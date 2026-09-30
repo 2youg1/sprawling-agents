@@ -1097,6 +1097,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 **重开参数**：run 页画首字耗时时，只带工具调用的回合多到让那一列大半空白。
 
+### 12.7 定规：run 的开篇与收尾归 `Charter`，harness run 不借 `RunPlan`
+
+**决定**：开篇两行与收尾两行由 `run::charter::Charter` 写，`Run::dispatch`、`Run::freeze` 与 `run::harness::HarnessRun` 都经它；`Charter` 是从 `RunPlan` 借出的视图（`RunPlan::charter`），harness 一侧从它自己的值借出同一个形状。harness run 的行序与结局判定住 `run::harness`，不住装配层。
+
+**理由**：harness run 与模型 run 的开篇、收尾是同一件事：同样的 JobPinned、同样的 `run_started` 载荷、同样的冻结对与 1 ms 间隔。两处各写一遍，`run_started` 多一个键时（例如 `mode`）两份会各改各的。结局判定放在本 crate，是因为 `lifecycle::concluded` 已经是「一答冻成什么」的家，空回答冻成 `Limit` 这一条两边必须同一个读法。
+
+**被否**：①给 harness 填一份 `RunPlan`：`CallShape` 与 `FrozenPrefix` 是城没有的事实，窗口、提醒与 `transcript` 都会读它们；②装配层直接 append 这些行：run 生命周期的行就有了两个作者，JobPinned 的次序与冻结对的 `t`/`t + 1` 规则各写一份；③把 `RunPlan` 拆成 `Charter` 加模型部分：每个构造 `RunPlan` 的地方（citysim、装配层、测试）与每个读 `plan.run`／`plan.who` 的地方都要改，借出的视图给出同一条映射而不动它们。
+
+**重开参数**：`RunPlan` 的开篇字段与 `Charter` 的字段不再一一对应（例如 `run_started` 多一个只有模型 run 才有的键），视图要带 `Option` 时，改为 `RunPlan` 持有一个 `Charter` 值。
+
 ### 12.8 戳从驱动最近的读数渲染，到秒，默认每分钟
 
 **决定**：结果上的时钟行渲染成 ISO 8601 UTC、到秒（`clock: 2026-05-14T09:31:07Z;`）；读数取自 `ClockReading`，即驱动在工具面打包之前最后一次读到的那一刻（§8-53）；`CLOCK_STAMP_DEFAULT` 是 `Minute`，于是 `Timestamped` 工具每条结果都带戳，`Timeless` 工具只在分钟桶变了时带；`Off` 仍逐字节等于没有这个功能。
@@ -1219,7 +1229,9 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 | 文件 | 管什么 |
 |---|---|
 | `run.rs` | 一个 Run 的常量与状态类型（`RunPlan`／`SafePoint`／`Advance`／`RunHooks`／`Active`／`Frozen`／`Run<S>`）、`impl Run<Frozen>` 的三个读法、载荷构造 `payload`，以及驱动循环 `drive`。`drive` 带 `argument_count` 豁免，故留在原路径 |
-| `run/lifecycle.rs` | 一个活着的 Run 在账本上做的三件事：`dispatch` 的调度对（job pin＋run_started）、`advance` 的一回合（四个安全点、波前检查点、报告前推入窗），以及唯一出口 `freeze`（handoff_written＋run_frozen）；连同只有 `advance` 用得上的 `fold_steer` |
+| `run/lifecycle.rs` | 一个活着的 Run 在账本上做的三件事：`dispatch` 的调度对（job pin＋run_started）、`advance` 的一回合（四个安全点、波前检查点、报告前推入窗），以及唯一出口 `freeze`（handoff_written＋run_frozen）；连同只有 `advance` 用得上的 `fold_steer`。调度对与收尾对的字节由 `run/charter.rs` 写 |
+| `run/charter.rs` | 一个 run 的开篇两行与收尾两行，模型 run 与 harness run 同一个作者（§8-52） |
+| `run/harness.rs` | 回合由 harness 自己走完的 run：它在账本上写的每一行，与回答冻成哪一种 `Completion`（§8-52） |
 
 **`impl Run<Active>` 保持为一整块，不按 dispatch／advance／freeze 三分**：`cargo public-api` 按 impl 块计数，三分会让公开面输出多出四行而规范路径不变。
 
@@ -2152,3 +2164,51 @@ impl Conversation {
 - **一条回复没有任何调用时**：run 就此结束（8-37），待投文字不再有下一次组装；它已由 `steer_received` 入账，账本仍是它的来历。
 - **fork 的切点落在一波之内时**：这一波整波丢弃（半个交换没有 provider 接受），分支只继承 `messages()`，待投槽里的文字不随分支走。待投文字只在「组装之后、这一波结果之前」存在，所以它针对的正是被丢弃的那一波；分支从没看到那一波，把它接到分支的第一条消息里，模型会读到一句指向不存在的上下文的话。这段文字已由 `steer_received` 入账，母 run 的账本仍是它的来历。被否：让 `Inherited` 带上待投文字——分支的首条 User 消息会以一句针对别人那一波的 steer 开头。
 - **被否**：①在已发出的 User 消息之后另开一条 User 消息——两条相邻的 User 消息正是本模块入口不变量要排除的形状；②由执行器在工具结果之后再调一次 `push_steer`——待投状态会住在 `Conversation` 之外，`fork` 要复刻第二份同样的记忆，两个家会漂移。
+
+### 8-52 runtime::run::charter 与 runtime::run::harness（形状 5 typestate；**harness run 事件序的唯一权威**）
+
+```rust
+// run::charter —— 一个 run 的开篇两行与收尾两行；模型 run 与 harness run 同一个作者
+pub struct Charter<'a> {
+    pub run: RunId, pub who: &'a str, pub addr: &'a Address,
+    pub task: &'a str, pub goal: &'a str, pub job: &'a Locator,
+    pub parent: Option<RunId>, pub predecessor: Option<RunId>,
+    pub dispatched_by: &'a Who, pub skills: &'a [SkillPin],
+}
+impl RunPlan { pub fn charter(&self) -> Charter<'_>; }      // 模型 run 的那一份，从它自己的常量借出
+
+// run::harness —— 回合由 harness 自己走完的 run
+pub enum Cut { Halt, Deadline }                  // 城为什么截断这一回合：罩住房间的停摆（人取消这个 run 也是），或楼规的墙钟上限
+pub struct Conclusion<'c> {
+    pub committed: Payload,                      // storage::Checkpoint::wave_pre 交回的 checkpoint_committed 载荷
+    pub answered: HarnessAnswered,               // 停止原因与这一回合对城说的话
+    pub handoff: &'c Handoff,
+}
+pub struct HarnessRun<'a> { /* charter、cut —— 私有 */ }
+impl<'a> HarnessRun<'a> {
+    pub fn open(charter: Charter<'a>, ledger: &mut dyn Ledger,
+                now: &mut dyn FnMut() -> Result<TimeMs, AxError>) -> Result<HarnessRun<'a>, AxError>;
+    pub fn report(&self, ledger: &mut dyn Ledger, reported: &HarnessReported, t: TimeMs) -> Result<(), AxError>;
+    pub fn cancel(&mut self, ledger: &mut dyn Ledger, cut: Cut, t: TimeMs) -> Result<(), AxError>;
+    pub fn conclude(self, ledger: &mut dyn Ledger, conclusion: Conclusion<'_>, t: TimeMs) -> Result<Completion, AxError>;
+    pub fn abandon(self, ledger: &mut dyn Ledger, handoff: &Handoff, t: TimeMs) -> Result<Completion, AxError>;
+}
+```
+
+- **为什么要这两个模块**：`Run::dispatch` 收整份 `RunPlan`，而 `CallShape` 与 `FrozenPrefix` 是模型的事实：harness 自己选模型、自己拼上下文，给它填一份就是写下一件城不知道的事，窗口与上下文提醒还会读它。所以一个 run 的开篇两行（`checkpoint_committed` 的 `JobPinned` 与 `run_started`）与收尾两行（`handoff_written` 与 `run_frozen`）由 `Charter` 写：`Run::dispatch` 与 `Run::freeze` 经 `RunPlan::charter` 写它们，字节不变；`HarnessRun` 经同一个 `Charter` 写。run 生命周期的行仍只有本 crate 一个作者，JobPinned 在前、`run_frozen` 比 `handoff_written` 晚 1 ms 这两条也只写在一处。
+- **次序是 `crates/agent_protocols/spec/Harness/Session.lean` 定的，类型守住它**：`open` → 任意条 `report` → 至多一次生效的 `cancel` → `conclude` 或 `abandon`。`conclude` 依次写 `checkpoint_committed`、`harness_answered`、`handoff_written`、`run_frozen`（`nothing_follows_the_stop_reason`：树先提交，再记回答，再冻结）；`abandon` 只写收尾两行，冻成 `Cancelled`，不记 harness 没给过的回答（`a_lost_session_freezes_cancelled_with_no_answer`）。两者都消费 `self`，冻结之后没有值能再写一行；第二次 `cancel` 什么也不写，记住的是头一次的 `Cut`（`a_second_halt_sends_nothing`）。
+- **回答冻成哪一种 `Completion`，只在 `harness::ending` 一处判**（`Session.lean` 的 `ending`）：
+
+  | 停止原因 | 头一次的截断 | 结局 |
+  |---|---|---|
+  | `end_turn`，回答去掉首尾空白后非空 | 任意 | `Done`，证据是刚写下的 `harness_answered` 那一行 |
+  | `end_turn`，回答为空 | 任意 | `Limit` |
+  | `cancelled` | `Deadline` | `Limit` |
+  | `cancelled` | `Halt` 或没有 | `Cancelled` |
+  | `max_tokens`、`max_turn_requests`、`refusal` | 任意 | `Limit` |
+
+  空回答冻成 `Limit`，与 `lifecycle::concluded` 对空模型回复的判法相同。撞上墙钟上限的 run 是撞上了什么而停，所以是 `Limit`；人或停摆取消的才是 `Cancelled`（`a_deadline_never_freezes_cancelled`）。截断之后 harness 仍答出 `end_turn` 并说了话，活已做完，照 `Done` 记：账本上 `cancel_received` 在前、`harness_answered` 在后，两件事都在。
+- **时间**：`open` 与 `Run::dispatch` 一样采两次 `now`（JobPinned 一次、`run_started` 一次）；其余每一行的 `t` 由调用方给，调用方在自己的线程上读同一只钟。收尾两行用给的 `t` 与 `t + 1`，`t` 已到 `u64` 顶时答 `E_INVALID_ARGS`，与 `Run::freeze` 同一句。
+- **每一行的 `who` 与 `addr`**：`who` 恒为 `Charter::who`（房间的居民）；开篇、汇报、取消、检查点与回答带 `Charter::addr`；收尾两行不带地址，与 `Run::freeze` 相同。
+- **载荷**：`report` 写 kernel 的 `HarnessReported`，`conclude` 写 `HarnessAnswered`（kernel-SPEC §8-4，两者都是 record-only）；`cancel_received` 的载荷是空对象，与回合里的那一条相同，截断的缘由不进账本（kernel 事件表不为它加键），由冻结的 `Limit` 与 `Cancelled` 分开。检查点的载荷由调用方从 `storage::Checkpoint::wave_pre` 取来，本 crate 不开仓库，理由与 `RunHooks::checkpoint` 相同。
+- **失败**：任何一行写不进账本，原错误向上抛，run 停在它写到的那一行；这与 `Run::freeze` 自己的 append 失败时相同：账本自身就是受害者时没有真实的东西可写。
