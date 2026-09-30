@@ -57,6 +57,8 @@ instead of the one behind `main`. It uses the exit codes `call` uses.
 `sprawling view <dir>` reads a city's Ledger from disk and needs no served
 city: the lines byte for byte, narrowed by `--tail`, `--from`, `--run`,
 `--kind`, `--who` and `--grep`, or with `--runs` one JSON line per run.
+The lines are byte for byte when stdout is a pipe or a file; at a terminal
+each line is led by its chain hash and two spaces.
 
 ## The frames
 
