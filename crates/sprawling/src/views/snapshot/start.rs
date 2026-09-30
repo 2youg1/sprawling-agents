@@ -92,13 +92,7 @@ pub(crate) fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, Ax
             Ok(folded) => resume(folded, &snapshot, tail),
             Err(undecodable) => whole(ledger_dir, WholeFold::Damaged(undecodable.to_string())),
         },
-        // The lines are folded again as a stream rather than held: a
-        // whole history in memory at once is what the streaming fold
-        // exists to avoid.
-        SnapshotStart::Whole { lines, because } => {
-            drop(lines);
-            whole(ledger_dir, because)
-        }
+        SnapshotStart::Whole(because) => whole(ledger_dir, because),
     }
 }
 

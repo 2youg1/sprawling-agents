@@ -13,11 +13,12 @@ use kernel::Seq;
 
 use super::{ChainSnapshot, SnapshotFit, StoredSnapshot, read_snapshot};
 use crate::error::{StorageError, io_err};
-use crate::jsonl::{complete_lines, ledger_segments_at, read_raw_lines_at, segment_first_seq};
+use crate::jsonl::{complete_lines, ledger_segments_at, segment_first_seq};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
-/// The lines a start folds, and the state it folds them onto.
+/// Where a start folds from: the state after a snapshot and the lines
+/// past it, or genesis and the reason no snapshot served.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SnapshotStart {
     /// The snapshot fits: fold `tail`, the lines after its seq, onto its views.
@@ -25,11 +26,9 @@ pub enum SnapshotStart {
         snapshot: ChainSnapshot,
         tail: Vec<Vec<u8>>,
     },
-    /// Fold every complete line from genesis.
-    Whole {
-        lines: Vec<Vec<u8>>,
-        because: WholeFold,
-    },
+    /// Fold from genesis. The lines are not carried: the caller streams
+    /// them a segment at a time rather than holding the whole ledger.
+    Whole(WholeFold),
 }
 
 /// Why a start could not resume from the snapshot.
@@ -77,10 +76,7 @@ pub fn start_from_snapshot(
             },
         },
     };
-    Ok(SnapshotStart::Whole {
-        lines: read_raw_lines_at(ledger_dir)?,
-        because,
-    })
+    Ok(SnapshotStart::Whole(because))
 }
 
 /// The line a snapshot was cut at, and the lines after it.

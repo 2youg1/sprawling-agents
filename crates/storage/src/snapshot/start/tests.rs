@@ -54,10 +54,7 @@ fn a_snapshot_that_cannot_resume_folds_the_whole_ledger_and_says_why() {
     let (ledger, snapshots) = (tmp.path().join("ledger"), tmp.path().join("snapshot"));
     let (ours, theirs) = (chain(8, 0), chain(8, 1_000));
     lay_out(&ledger, &ours, &[0, 4]);
-    let whole = |because| SnapshotStart::Whole {
-        lines: ours.clone(),
-        because,
-    };
+    let whole = SnapshotStart::Whole;
     let start_after = |snapshot: &ChainSnapshot, fold_version| {
         write_snapshot(&snapshots, snapshot).unwrap();
         start_from_snapshot(&ledger, &snapshots, fold_version).unwrap()
