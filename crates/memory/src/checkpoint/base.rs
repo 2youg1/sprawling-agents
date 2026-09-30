@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A building's base fence, written as one pack.
+//! A building's base checkpoint, written as one pack.
 
 use std::io::Write;
 
@@ -11,16 +11,16 @@ use kernel::{Payload, TimeMs};
 
 use crate::error::StorageError;
 
-use super::fence::{Checkpoint, committed, fence_ref, git_err, subject_of};
+use super::commit::{Checkpoint, checkpoint_ref, committed, git_err, subject_of};
 use super::provenance::Provenance;
 use super::scan::CommitPlan;
 
-/// How far a base fence has got, reported as each step lands.
+/// How far a base checkpoint has got, reported as each step lands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BaseProgress {
     /// The building's files are in the index and their blobs in memory.
     Staged { files: usize },
-    /// The one pack holding every object the fence wrote is on disk.
+    /// The one pack holding every object the checkpoint wrote is on disk.
     Packed { bytes: usize },
 }
 
@@ -30,16 +30,16 @@ impl Checkpoint {
     ///
     /// Takes the handle by value: the in-memory store is installed on
     /// this handle's object database and cannot be taken off again, so
-    /// the handle goes with it, and no later fence can write an object
+    /// the handle goes with it, and no later checkpoint can write an object
     /// into a store nobody dumps (storage-SPEC 8-8).
     ///
     /// The commit moves HEAD when the city has none, and is otherwise
-    /// filed under `refs/sprawling/runs/<run>/<oid>` like a wave fence.
+    /// filed under `refs/sprawling/runs/<run>/<oid>` like a wave checkpoint.
     ///
     /// # Errors
     /// Propagates staging, the staged-secret scan, the commit, a pack the
     /// object database refuses, and a reference it will not write.
-    pub fn base_fence(
+    pub fn base_checkpoint(
         mut self,
         scopes: &[String],
         t: TimeMs,
@@ -52,7 +52,7 @@ impl Checkpoint {
             detail: format!("{} is not valid UTF-8", objects.display()),
         })?;
         // The disk store is an alternate, and libgit2 writes to no
-        // alternate: every object this fence makes lands in memory.
+        // alternate: every object this checkpoint makes lands in memory.
         let odb = git2::Odb::new().map_err(git_err("open an in-memory object store"))?;
         let held = odb
             .add_new_mempack_backend(1)
@@ -61,7 +61,7 @@ impl Checkpoint {
             .map_err(git_err("read the object store"))?;
         self.repo
             .set_odb(&odb)
-            .map_err(git_err("hold the base fence in memory"))?;
+            .map_err(git_err("hold the base checkpoint in memory"))?;
 
         let files = self.stage_scopes_held(scopes)?;
         progress(BaseProgress::Staged { files: files.len() });
@@ -78,22 +78,22 @@ impl Checkpoint {
 
         let mut pack = git2::Buf::new();
         held.dump(&self.repo, &mut pack)
-            .map_err(git_err("dump the base fence"))?;
+            .map_err(git_err("dump the base checkpoint"))?;
         let disk =
             git2::Repository::open(self.repo.path()).map_err(git_err("open the object store"))?;
         let disk_odb = disk.odb().map_err(git_err("open the object store"))?;
         let mut writer = disk_odb
             .packwriter()
-            .map_err(git_err("write the base fence pack"))?;
+            .map_err(git_err("write the base checkpoint pack"))?;
         writer
             .write_all(&pack)
             .map_err(|err| StorageError::Checkpoint {
-                op: "write the base fence pack",
+                op: "write the base checkpoint pack",
                 detail: err.to_string(),
             })?;
         writer
             .commit()
-            .map_err(git_err("write the base fence pack"))?;
+            .map_err(git_err("write the base checkpoint pack"))?;
         progress(BaseProgress::Packed { bytes: pack.len() });
 
         // Only now are the objects on disk, so only now may the index and
@@ -110,16 +110,17 @@ impl Checkpoint {
                 })?
                 .map(str::to_owned)
                 .ok_or_else(|| StorageError::Checkpoint {
-                    op: "move HEAD to the base fence",
+                    op: "move HEAD to the base checkpoint",
                     detail: "HEAD names no branch".to_owned(),
                 })?
         } else {
-            fence_ref(of, oid)
+            checkpoint_ref(of, oid)
         };
         self.repo
-            .reference(&name, oid, true, "sprawling: a base fence")
-            .map_err(git_err("file a base fence"))?;
-        held.reset().map_err(git_err("release the base fence"))?;
+            .reference(&name, oid, true, "sprawling: a base checkpoint")
+            .map_err(git_err("file a base checkpoint"))?;
+        held.reset()
+            .map_err(git_err("release the base checkpoint"))?;
         committed(oid, of, scopes, files)
     }
 }

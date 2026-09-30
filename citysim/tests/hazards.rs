@@ -126,7 +126,7 @@ fn a_delete_with_a_checkpoint_behind_it_is_allowed() {
 #[test]
 fn the_forecaster_is_advisory_and_the_checkpoint_is_the_defence() {
     // A forecast hit routes conservatively
-    // - it forces the checkpoint fence up first - rather than refusing every
+    // - it forces the checkpoint up first - rather than refusing every
     // command containing `rm`. Refusing outright would break the tool for
     // honest use and still not stop a determined one.
     //

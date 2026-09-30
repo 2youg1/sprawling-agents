@@ -22,7 +22,7 @@ impl RunWorker {
     /// (section 8-30).
     ///
     /// # Errors
-    /// Propagates a worktree that will not open, a fence that will not
+    /// Propagates a worktree that will not open, a checkpoint that will not
     /// commit, a merge the trunk has moved past, and any line the ledger
     /// refuses.
     pub(super) fn settle_requests(
@@ -34,9 +34,9 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let (addr, who, run_id, mode) = (&at.addr, site.who.as_str(), site.run_id, at.mode);
         let write_root = site.write_root.as_path();
-        let scopes = site.fence_scope()?;
-        let fence_scope = scopes.join(" ");
-        let fence_scope = fence_scope.as_str();
+        let scopes = site.checkpoint_scope()?;
+        let checkpoint_scope = scopes.join(" ");
+        let checkpoint_scope = checkpoint_scope.as_str();
         // What the run asked of the request register. Opening commits
         // the run's own tree first, because the record names the commit
         // a verifier will be judging; checking merges, because that is
@@ -53,9 +53,9 @@ impl RunWorker {
             for effect in pr_effects {
                 match effect {
                     collab::PrEffect::Opened { branch } => {
-                        // Landed rather than fenced: what a verifier
+                        // Landed rather than checkpointed: what a verifier
                         // judges has to be on the run's own branch, and
-                        // a wave fence is a dangling commit nobody can
+                        // a wave checkpoint is a dangling commit nobody can
                         // merge (storage-SPEC 8-8).
                         let at = storage::Checkpoint::open(write_root)
                             .map_err(storage::StorageError::into_ax)?
@@ -63,7 +63,7 @@ impl RunWorker {
                                 &scopes,
                                 self.clock.now()?,
                                 &of,
-                                &format!("offer: {fence_scope}"),
+                                &format!("offer: {checkpoint_scope}"),
                             )
                             .map_err(storage::StorageError::into_ax)?;
                         let request = collab::OpenRequest {

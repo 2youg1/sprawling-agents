@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a checkpoint records: the job a dispatch pinned, or the commit
-//! a fence raised.
+//! a checkpoint raised.
 
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +16,7 @@ use crate::model::Effort;
 /// and this enum states which one a line holds instead of leaving a
 /// reader to infer it from which keys are absent.
 ///
-/// A dispatch opens a run by pinning the job it came out of; a fence
+/// A dispatch opens a run by pinning the job it came out of; a checkpoint
 /// raises a git commit before a wave. Both were written under this one
 /// kind before these structs existed, and re-spelling a ledger already
 /// on disk is not available, so the two shapes stay under one kind and
@@ -37,7 +37,7 @@ pub enum CheckpointCommitted {
         #[cfg_attr(feature = "schema", schemars(with = "String"))]
         job: Locator,
     },
-    /// A fence or a landing: the commit, and the facts the record
+    /// A checkpoint or a landing: the commit, and the facts the record
     /// cannot state for itself.
     Committed(Commit),
 }
@@ -45,7 +45,7 @@ pub enum CheckpointCommitted {
 /// Which session made a commit, as the ledger states it.
 ///
 /// One fact with one home, carried by both kinds of record that name a
-/// commit: `checkpoint_committed` from a fence and `pr_merged` from a
+/// commit: `checkpoint_committed` from a checkpoint and `pr_merged` from a
 /// review. The run and the actor are the record's own identity and are
 /// not repeated here; the model and the effort are, because until they
 /// are written here they exist only on the git commit's trailers, and
@@ -59,7 +59,7 @@ pub struct CommitAttribution {
     #[serde(default)]
     pub model: String,
     /// Absent leaves the choice to the provider, which is not the same
-    /// fact as [`Effort::None`] asking it not to think. A fence writes
+    /// fact as [`Effort::None`] asking it not to think. A checkpoint writes
     /// `Effort::None` for both, because that is the word its git
     /// trailer has always carried.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -78,7 +78,7 @@ pub struct Commit {
     pub oid: GitOid,
     #[serde(flatten)]
     pub by: CommitAttribution,
-    /// Which parts of the city the fence staged, empty for the whole of
+    /// Which parts of the city the checkpoint staged, empty for the whole of
     /// it. Written even when empty, as the hand-written writer did.
     #[serde(default)]
     pub scope: Vec<String>,

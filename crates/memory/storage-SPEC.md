@@ -30,7 +30,7 @@
 | `blob` | 4 适配器 | 一次提交里一个文件的字节，从不读工作树 |
 | `changes` | 4 适配器 | 两个 checkpoint 之间动了什么：路径与计数，不含补丁文本 |
 | `hunks` | 4 适配器 | 两个 checkpoint 之间一个文件的补丁文本，凭证形状的行被扣下并点名 |
-| `status` | 4 适配器 | 还没被栅栏收走的改动：分支、它与上游的差距、与某次提交不同的文件 |
+| `status` | 4 适配器 | 还没被检查点收走的改动：分支、它与上游的差距、与某次提交不同的文件 |
 
 ## 2 验收标准
 
@@ -41,7 +41,7 @@
 - CAS：put→get 往返；范围取回（L/B 两式）；去重（同内容二次 put 不二次物化）；断电只留 `tmp/` 半成品，已命名对象恒完好。
 - 形状 7 的 proptest 骨架一次两实例化：index 损坏即重建且查询结果不变；hot 折同一条流两次得同一份读数。
 - 各维度归因之和恒等于同期权威计费额之和（逐维度断言，整数精确无余无溢）。
-- 栅栏：波前 checkpoint_committed 携 oid；波后删除逐条补记 file_discarded{restoration=Tracked(波前 oid)}；含 secret shape 的 staged diff 拒提交（E_SECRET_EGRESS，恒不回显字节）；queue 去重先于副作用＋shed 不丢已入队项；digest_cache 同哈希二次 put 幂等。
+- 检查点：波前 checkpoint_committed 携 oid；波后删除逐条补记 file_discarded{restoration=Tracked(波前 oid)}；含 secret shape 的 staged diff 拒提交（E_SECRET_EGRESS，恒不回显字节）；queue 去重先于副作用＋shed 不丢已入队项；digest_cache 同哈希二次 put 幂等。
 
 ## 3 假设与歧义
 
@@ -53,7 +53,7 @@
 6. **`first_seen` 的那一次折叠放在哪里未定。** 现在它在本进程第一次遇到缺文件的切片时整段读取各段（8-24），所以启动后的第一次新 room 派活仍付一遍全账本读与一段大小的瞬时内存。候选是并进启动时 `verify_ledger_dir` 已有的那一遍，或放到 lane 上预先折好；判定它的证据是 94 MB 账本上启动时长与首次派活时延的同仪表读数。
 7. **合并的检出先于干线的比较并交换。** `worktree::trees` 的 `apply` 先把节点的树写进城的工作目录，再用 `reference_matching` 移动干线；两步之间干线若被别处移动，比较并交换失败，工作目录却已是节点的树，下一次 checkpoint 会把这份差读成人的编辑。开城时账本的独占锁（8-1）使同一座城只有一个写者，所以窗口只在一个进程内的两次合并之间打开。候选是先做比较并交换、再以旧干线为显式基线检出（`CheckoutBuilder` 的 baseline），或比较并交换失败时撤回检出；判定它的证据是一个在两次合并之间移动干线的 citysim 场景。
 8. **取回一个文件抄的是被替换文件的权限，不是 point 上那一项的 `filemode`。** `worktree::back` 的 `restore_file` 经 `bundle::landing::land`（`Bits::OfReplaced`）落盘，所以在 Unix 上，point 上可执行、树里此刻不可执行的文件取回后仍不可执行；被删后再取回的文件取新建默认值。Windows 没有可执行位，不受影响。改法是由 `entry.filemode()` 推出权限，需要给 `landing::Bits` 添一臂；判定它的证据是一个 Unix 上取回脚本的场景。
-9. **`checkpoint::fence` 的 family 1 只做了一部分。** `file_discarded` 的载荷仍由 fence 手工拼成 `Map`，`taint_promoted`、`cross_building_transfer`、`secret_egress_blocked` 三种还没有各自的结构体。未定的是这些结构体住在 kernel 的事件表旁边还是 storage 里；判定它的证据是它们的第二个写者出现在哪个 crate。
+9. **`checkpoint::commit` 的 family 1 只做了一部分。** `file_discarded` 的载荷仍由 checkpoint 手工拼成 `Map`，`taint_promoted`、`cross_building_transfer`、`secret_egress_blocked` 三种还没有各自的结构体。未定的是这些结构体住在 kernel 的事件表旁边还是 storage 里；判定它的证据是它们的第二个写者出现在哪个 crate。
 
 ## 4 现状分析
 
@@ -384,10 +384,10 @@ pub const RECENT_FROZEN: usize = 32;
 ```
 
 - **热视图只留活跃的跑和最近冻结的 `RECENT_FROZEN` 个**：一次跑冻结后，若留着的冻结跑超过 `RECENT_FROZEN`，`last_seq` 最小的那个被逐出，只留一块墓碑（它的 RunId）。所以 `runs()` 本身就是一页城景该带的那几次跑，城景的大小只随活跃数增长，热视图的内存也一样（墓碑每次跑 16 字节）；更早的冻结跑经分页的 `History`／`RunHistory` 读，`frozen_count` 把墓碑也数进去，页面知道列表之外还有多少。每次冻结至多逐出一个，找最小 `last_seq` 扫一遍留着的跑，O(活跃＋N)，不另建按 seq 排的索引。`RECENT_FROZEN` 是线上答复的大小上界，不随机器变，所以是常量；它只在这里定义一次。
-- **落在墓碑上的记录归冷的一侧**：冻结在热视图里是终态，被逐出的跑不会再活跃，所以一条记录的 RunId 在墓碑里时，`apply` 什么也不改——那条记录在账本里，分页的历史读得到它。没有墓碑的话，一条没有开场的尾巴会被当成一次新跑的栅栏，把旧跑重新记成活跃的（活跃数多一，城景多一行）。
+- **落在墓碑上的记录归冷的一侧**：冻结在热视图里是终态，被逐出的跑不会再活跃，所以一条记录的 RunId 在墓碑里时，`apply` 什么也不改——那条记录在账本里，分页的历史读得到它。没有墓碑的话，一条没有开场的尾巴会被当成一次新跑的检查点，把旧跑重新记成活跃的（活跃数多一，城景多一行）。
 
 - 界面查询在此命中不读盘；run_started→Active，run_frozen→Frozen；其余事件只推进 last_seq/last_kind。
-- **`addr` 与 `started` 从 `run_started` 记下**：`record.addr()` 是这次跑的房间，`record.t()` 是它开始的时刻；二者只在这一种记录上赋值，其余记录不动它们，所以一次跑的房间不会被后来的城市级记录改写。`Option`，因为热视图可能在 `run_started` 之前先看到同一次跑的 `checkpoint_committed`（栅栏先于开场落账），也可能只看到一段没有开场的尾巴——**看不到的事不猜**。理由：`RunSummary.who` 是首条记录的作者、恒为 `city`，单靠它无法把一次跑归到 `hall/mayor` 这个房间，「与 Mayor 的对话」就在线上拼不出来。
+- **`addr` 与 `started` 从 `run_started` 记下**：`record.addr()` 是这次跑的房间，`record.t()` 是它开始的时刻；二者只在这一种记录上赋值，其余记录不动它们，所以一次跑的房间不会被后来的城市级记录改写。`Option`，因为热视图可能在 `run_started` 之前先看到同一次跑的 `checkpoint_committed`（检查点先于开场落账），也可能只看到一段没有开场的尾巴——**看不到的事不猜**。理由：`RunSummary.who` 是首条记录的作者、恒为 `city`，单靠它无法把一次跑归到 `hall/mayor` 这个房间，「与 Mayor 的对话」就在线上拼不出来。
 - **`completion`、`pr`、`ask` 各从一种记录记下**：`run_frozen` 的 `completion` 字段；`pr_opened` 的 `branch` 字段（后一条覆盖前一条）；`approval_requested` 的 `action_desc` 字段，且只活到这次跑的下一条记录——任何别的记录清掉它，所以 `ask` 有值当且仅当 `last_kind` 是 `approval_requested`，页面据 `last_kind` 判「在等」，据 `ask` 写「等什么」，两者同源。按键读字段而不整条 `Payload::read`：热视图每条记录都折，整条反序列化要复制整个 map；字段缺失记 `None`，同 `addr` 的口径，看不到的事不猜。
 - **`task` 与 `goal` 从 `run_started` 记下**：那条记录的同名两个字段，与 `addr`、`started` 同一处赋值、同一个口径——只在这一种记录上写，其余记录不动它们；字段缺失或是空串记 `None`，因为一句空的任务不是一个名字。理由：run 板以它们给一行 run 起名，而重载后的页面只有 `RunSummary`（wire-SPEC §8-48e）。
 - **城市级记录不进 run 表**：`RunId::CITY`（nil）标记的是属于城而不属于任何 Run 的记录——创世记录、`building_created`。把它们折进 run 表会让 `active_count()` 在一座**从未派过活的城**里返回 1：城市页读服务端的这个数、写「1 run in flight」，而总览页折同一条流写「什么都没在跑」——**一个问题两个答案，而错的那个是服务端的**。
@@ -500,17 +500,17 @@ impl Checkpoint {
     pub fn open(city_root: &Path) -> Result<Checkpoint, StorageError>;      // 无仓即 init（创世提交由 ensure_base 产）
     /// Commits once when the repository has no HEAD, and never otherwise.
     /// A worktree branches from a commit, so a city that was never
-    /// fenced cannot lend a tree; committing on every dispatch instead
+    /// checkpointed cannot lend a tree; committing on every dispatch instead
     /// would move the trunk under every request already waiting.
     pub fn ensure_base(&mut self, scope: &str, t: TimeMs, of: &Provenance) -> Result<Option<Payload>, StorageError>;
-    /// Pre-wave fence: add -A within scope, then a **dangling** commit
+    /// Pre-wave checkpoint: add -A within scope, then a **dangling** commit
     /// pointed at by refs/sprawling/runs/<run>/<oid>. HEAD does not move.
     /// Returns the checkpoint_committed payload
     /// {oid, scope, files, model, effort} (the last two: §8-18).
-    /// `files` 只列这一次 fence 改动了的路径（新增、修改、删除），按字节序：
+    /// `files` 只列这一次 checkpoint 改动了的路径（新增、修改、删除），按字节序：
     /// 比的是暂存前后两份 index 的 (路径, blob) 对。列全部已跟踪路径会让
     /// 5,000 个文件的楼每一波往账本里写 5,000 条路径，而读者要的是
-    /// 这一波碰过什么。首个 fence 与 `ensure_base`
+    /// 这一波碰过什么。首个 checkpoint 与 `ensure_base`
     /// 面对空 index，所以照旧列出它们提交的每一个文件。
     /// `scopes` 的每一项可以是目录前缀，也可以是一个文件：lane 在只知道
     /// 这一波写了哪些文件时只把它们交进来（runtime-SPEC §8-45）。工作区里是
@@ -521,16 +521,16 @@ impl Checkpoint {
     /// pathspec 里每项仍是**字面路径**：地址文法允许 `[` `]` `*` `?`，所以这些
     /// 字节各自包进单字符类（`[[]`）再交给 libgit2，否则 `notes[1]` 会匹配 `notes1`。
     pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, StorageError>;
-    /// 一栋楼的基线 fence（`checkpoint::base`）：暂存 `scopes`、扫描、提交，
+    /// 一栋楼的基线 checkpoint（`checkpoint::base`）：暂存 `scopes`、扫描、提交，
     /// 全部对象先写进内存里的对象库（mempack），最后作为**一个 pack** 落盘。
-    /// 无 HEAD 时提交移动 HEAD（等于 `ensure_base`），否则与 wave fence 同样
+    /// 无 HEAD 时提交移动 HEAD（等于 `ensure_base`），否则与 wave checkpoint 同样
     /// 悬空并挂在 `refs/sprawling/runs/<run>/<oid>`。`progress` 依次收到
     /// `Staged { files }` 与 `Packed { bytes }`。取 `self` 的所有权：mempack 装在
-    /// 这个 handle 的对象库上，handle 一放下它就跟着消失，之后的 fence 不会
-    /// 把对象写进一个再也不落盘的内存库。index 与 HEAD（或 fence ref）只在
+    /// 这个 handle 的对象库上，handle 一放下它就跟着消失，之后的 checkpoint 不会
+    /// 把对象写进一个再也不落盘的内存库。index 与 HEAD（或 checkpoint ref）只在
     /// pack 落盘之后才写：之前任何一步失败（staged secret、pack 被拒、崩溃），
     /// 盘上的 index 与引用都保持原样，不会指向从未落盘的对象。
-    pub fn base_fence(self, scopes: &[String], t: TimeMs, of: &Provenance, progress: &mut dyn FnMut(BaseProgress)) -> Result<Payload, StorageError>;
+    pub fn base_checkpoint(self, scopes: &[String], t: TimeMs, of: &Provenance, progress: &mut dyn FnMut(BaseProgress)) -> Result<Payload, StorageError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
     pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, StorageError>;
@@ -551,7 +551,7 @@ impl Checkpoint {
 }
 ```
 
-- **工具波的栅栏离开 HEAD。**
+- **工具波的检查点离开 HEAD。**
   城是围绕人已有的文件夹形成的，而每一次工具波往人自己的分支历史里写一个
   `checkpoint:` 提交时，一个被采纳的仓库每波长一格。`wave_pre` 因此写一个
   **dangling commit**（`update_ref = None`，父为当前 HEAD 提交，无 HEAD 时无父），
@@ -562,23 +562,23 @@ impl Checkpoint {
   地址是 `Address::is_reserved` 的（`.sprawling/`、`.git/` 等受保护子树）即拒绝，先于任何盘上动作：还原的 `restoration` 来自线上，城不拿它比对账本，而受保护子树只经 spine 与治理写门写入——与 `sessions` 跳过保留地址是同一条规则。
   `Address` 只管路径的拼写，不管盘上把它解析到哪（kernel 把链接解析交给效应层），所以路径上工作区根以下已存在的任一段是符号链接或 junction 就拒绝（`StorageError::Alias`），不跟随——这条问的是 `alias::WriteTarget::within`，写落在它放行的那个值上，与其它写门同一条链接规则；
   目标处已有文件且字节与 blob 不同时拒绝（恢复：把现有文件挪开再还原），字节相同即视为已还原；写用 `create_new`，不覆盖在检查之后出现的文件。
-  还原不持 `fence_gate`：与同一栋楼里正在跑的波并发时，由上面的 `create_new` 拒绝而不是覆盖。
+  还原不持 `checkpoint_gate`：与同一栋楼里正在跑的波并发时，由上面的 `create_new` 拒绝而不是覆盖。
   提交能被找到，靠的是上一条的引用；没有它，`git gc` 之后 `restore` 答「找不到提交」。
-- **被否的另一条路：把栅栏留在 HEAD。** 它让人的历史被机器的簿记淹没——一天的工作里
+- **被否的另一条路：把检查点留在 HEAD。** 它让人的历史被机器的簿记淹没——一天的工作里
   几百个 `checkpoint:` 行，人自己的提交夹在中间找不到。留在 HEAD 唯一买到的是
   「不用写引用」，而写一个引用是一行。
 - **引用名是提交自己的 oid：`refs/sprawling/runs/<run>/<oid>`，不设计数器。** 一个 run 经
-  不止一个 handle 升栅栏——lane 自己的栅栏点与 `runtime::bench` 的预测网各开一个 `Checkpoint`，
+  不止一个 handle 升检查点——lane 自己的检查点句柄与 `runtime::bench` 的预测网各开一个 `Checkpoint`，
   而 `file_discarded` 的还原指向哪个 handle 升起的那一道都可能。引用是这道提交**唯一的钉子**：
   账本里的 oid 不让 git 保留任何对象，`git gc` 回收一切没有引用可达的提交，回收站随之失效。
-  以 oid 为名，名字的唯一性由提交本身担保，不再有第二个计数权威；同一道栅栏（同树、同父、同刻）
+  以 oid 为名，名字的唯一性由提交本身担保，不再有第二个计数权威；同一个检查点（同树、同父、同刻）
   就是同一个提交、同一个引用，重写它是幂等的。被否：每个 handle 各自计数（两个 handle 同从 0 起，
   后写的引用强制覆盖前一个，前一道提交从此无钉）；跨 handle 共享一个计数器或借用账本 seq（都要把
   一个位置穿进拿不到它的闭包，多一条耦合，而名字只需要唯一，不需要有序——顺序由账本给）。
-  **翻案条件**：哪一天引用需要表达顺序（例如按先后清理旧栅栏），顺序仍应读账本，而不是回到计数器。
-- **基线 fence 在收楼时做，写成一个 pack**：一栋 5,000 个文件的楼，第一次派活的第一道 fence 要给每个文件求哈希并写 5,000 个松散对象，每个都是一次建文件；这笔钱挪到 `sprawling adopt`（以及开城时的 `Adopt::EveryFolder`）付，写法是 mempack：对象库换成「内存库在前、盘上的对象目录作只读备用」，暂存与提交产生的对象全进内存，`Mempack::dump` 出一个 pack，经仓库自己的对象库 `packwriter` 落盘（它同时写 `.idx`）。之后 run 的第一道 fence 面对的是一份暖 index：libgit2 按 stat 跳过没变的文件，只剩一次目录遍历。**被否**：收楼时直接调 `wave_pre`——每个 blob 一个松散对象，在旋转盘上是 5,000 次随机写，而 pack 是一次顺序写。**被否**：把 mempack 长期装在城的 handle 上——装上就卸不掉，之后每道 fence 的对象都会留在一个没人 dump 的内存库里，进程一退就丢。
+  **翻案条件**：哪一天引用需要表达顺序（例如按先后清理旧检查点），顺序仍应读账本，而不是回到计数器。
+- **基线 checkpoint 在收楼时做，写成一个 pack**：一栋 5,000 个文件的楼，第一次派活的第一道 checkpoint 要给每个文件求哈希并写 5,000 个松散对象，每个都是一次建文件；这笔钱挪到 `sprawling adopt`（以及开城时的 `Adopt::EveryFolder`）付，写法是 mempack：对象库换成「内存库在前、盘上的对象目录作只读备用」，暂存与提交产生的对象全进内存，`Mempack::dump` 出一个 pack，经仓库自己的对象库 `packwriter` 落盘（它同时写 `.idx`）。之后 run 的第一道 checkpoint 面对的是一份暖 index：libgit2 按 stat 跳过没变的文件，只剩一次目录遍历。**被否**：收楼时直接调 `wave_pre`——每个 blob 一个松散对象，在旋转盘上是 5,000 次随机写，而 pack 是一次顺序写。**被否**：把 mempack 长期装在城的 handle 上——装上就卸不掉，之后每道 checkpoint 的对象都会留在一个没人 dump 的内存库里，进程一退就丢。
 - **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。
-- **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，栅栏不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让栅栏静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
+- **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，检查点不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让检查点静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
 - **提交时间是注入时刻的整秒**：`TimeMs` 是 `u64` 毫秒，除以 1000 后恒落在 `i64` 内，换算仍走 `i64::try_from` 且失败时报 `Checkpoint { op: "stamp the commit" }`，而不是写成 1970。
 
 - **扫改动过的 blob，不扫整棵树**：遍历 git index 里的**每一个** blob、对**整份内容**跑 `kernel::secret::scan` 且**每一次工具波都跑一遍**时，每波都付整棵树的扫描与 zlib 解压——**改了一个文件的波，付整棵树的钱**。
@@ -588,12 +588,12 @@ impl Checkpoint {
   - **一个被收窄的东西，明写在此**：`kernel::secret::scan` 将来多认一种形状时，**已经提交进树的内容不会被回头重扫**——新形状从此刻起作用于所有到来的改动，但不追溯。追溯要的是一次全树重扫，而那正是这里不再每波支付的开销；真要重扫时，删掉 `.git` 让下一次波成为基线是现成的路。
 
 - **`wave_post` 只问存在性，不问内容**：sweep 要的是「pre 提交树里的哪个 blob 从工作区消失了」，而这是一个存在问题——对树里的每个 blob 做一次 `symlink_metadata`，`NotFound` 即删除。**不碰 `diff_tree_to_workdir`**：它为每一个与树对上号的路径求哈希（libgit2 的 `git_diff__oid_for_entry`），而工作区里有城自己刚写完又改动的文件（session 投影，以及任何还开着写句柄的文件）；Windows 的目录枚举尺寸对这样的文件可以落后于句柄里的真实长度，libgit2 拿这个过期尺寸去 `git_odb__hashfd`，读到比声明尺寸多的字节使剩余计数下溢，最后把整次 sweep 拒成 `E_WORKTREE_BUSY`——写路径完全正确，读路径却对城市自己的写入过敏。
-  - 被否：每波走 `diff_tree_to_workdir`。它省的是「每一波付整棵树的钱」，而那棵树是**这次栅栏自己的写域**（`wave_pre` 刚逐文件走过一遍），不是全城；sweep 只报 `Deleted`，而 `Deleted` 是存在问题不是内容问题。被否：`Path::exists()`——它跟随软链，一个悬空软链会被当成删除，`symlink_metadata` 不会。
+  - 被否：每波走 `diff_tree_to_workdir`。它省的是「每一波付整棵树的钱」，而那棵树是**这次检查点自己的写域**（`wave_pre` 刚逐文件走过一遍），不是全城；sweep 只报 `Deleted`，而 `Deleted` 是存在问题不是内容问题。被否：`Path::exists()`——它跟随软链，一个悬空软链会被当成删除，`symlink_metadata` 不会。
   - 输出仍然在本模块排序而不信 walk 的顺序：**这批行落账的顺序是重放要复现的东西**。
-- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存只用一次 `add_all`：libgit2 把 index 与工作区比一遍（按 stat 跳过没变的文件），新增、修改、删除都在这一遍里暂存；再跑一遍 `update_all` 是把同一个写域重走一次，5,000 个文件的写域上稳态 fence 的中位数因此从 104 ms 降到 71–78 ms（未优化构建，16 核、SSD，同一仪表交错测三次）。暂存规则只写在 `wave_pre` 的文档里（点名文件的 scope 走字面 `add_path`/`remove_path`，点名前缀的 scope 走字面 glob 加 `<glob>/*`）；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `StorageError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
+- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存只用一次 `add_all`：libgit2 把 index 与工作区比一遍（按 stat 跳过没变的文件），新增、修改、删除都在这一遍里暂存；再跑一遍 `update_all` 是把同一个写域重走一次，5,000 个文件的写域上稳态 checkpoint 的中位数因此从 104 ms 降到 71–78 ms（未优化构建，16 核、SSD，同一仪表交错测三次）。暂存规则只写在 `wave_pre` 的文档里（点名文件的 scope 走字面 `add_path`/`remove_path`，点名前缀的 scope 走字面 glob 加 `<glob>/*`）；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `StorageError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
-- 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何栅栏——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
-- **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `storage::alias`：任一链接使**整波拒绝**（`StorageError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在栅栏侧是**跳过**而非拒绝（`storage::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。
+- 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何检查点——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
+- **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `storage::alias`：任一链接使**整波拒绝**（`StorageError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在检查点侧是**跳过**而非拒绝（`storage::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。
 
 ### 8-13 storage::changes（形状 4 适配器；git2）
 
@@ -612,7 +612,7 @@ pub fn between(city_root: &Path, base: GitOid, head: Head)
 
 **它天然只含写域。** `stage_scopes` 为写域的**每一个**前缀各暂存 `<prefix>/*`，所以两个检查点之间的差异不可能包含
 会话只读过的文件——其他 harness 正在为这件事头痛（一个会话的 diff 把读过的文件也算进去），
-而这个设计因为栅栏就是写域而白得。
+而这个设计因为检查点就是写域而白得。
 
 **`Lines` 是穷举枚而不是两个数。** 二进制文件没有行数，把它画成 `+0 −0` 是界面在说假话；
 同理 `How::Renamed` 与「删一个加一个」是两件事。
@@ -636,7 +636,7 @@ pub struct Worktrees { /* repo、home、ceiling —— 私有 */ }
 pub struct WorktreeLease { /* name、path、disk —— 私有 */ }
 impl Worktrees {
     pub fn open(city_root: &Path) -> Result<Worktrees, StorageError>;
-    /// `scopes` 是这棵树的写域（与栅栏同一组 pathspec，空即整棵）：再领时只检出它。
+    /// `scopes` 是这棵树的写域（与检查点同一组 pathspec，空即整棵）：再领时只检出它。
     pub fn claim(&self, name: &WorktreeName, scopes: &[String]) -> Result<WorktreeLease, StorageError>;
     pub fn release(&self, lease: WorktreeLease) -> Result<(), StorageError>;   // 解锁，不删树
     /// 城的唯一写者（借出的 `JsonlLedger` 即凭证）打开时调用：之前的写者没还的锁全部解开。无仓库即无事可做。
@@ -683,7 +683,7 @@ impl WorktreeLease {
   索引写成的树不是分支头的树时再把索引整份重读成分支头的树，然后只在 `scopes` 之下强制检出到分支头并删掉未跟踪文件（`CheckoutBuilder::path`，每个 scope 一条 pathspec），最后加锁——
   一个节点在一次服务里付一次全量检出，而不是每次 run 付一次、再付一次整目录删除；再领写的是 scope 里的差量，scope 之外的文件一个也不写。
   scope 里未提交的改动与未跟踪文件在再领时消失：没提交的从来不是这个节点的活。scope 之外盘上的文件停在上一次放置或上一次 run 留下的样子，读它的 run 读到的可能落后于干线；
-  它们不进提交，因为 `land` 与栅栏只按 `scopes` 暂存，scope 之外的索引项就是分支头，提交的树在 scope 之外与分支头逐项相同。
+  它们不进提交，因为 `land` 与检查点只按 `scopes` 暂存，scope 之外的索引项就是分支头，提交的树在 scope 之外与分支头逐项相同。
   索引与分支头一致是这条的关键：路径收窄的检出只改 scope 内的索引项，scope 外的索引项若留在上一次 run 的提交上（分支刚随干线快进），下一次按 scope 暂存的提交会把干线在别处的改动悄悄退回去；若是某次 run 在 scope 外暂存过、却没有献出的路径，它会搭下一次献出进提交。所以重读的条件是「索引写成的树不是分支头的树」，而不是「分支动过」：后者漏掉第二种。先比后读，因为整份重读要走整棵树，而分支与索引都停在上一次 run 留下之处的再领最常见；比较用 `Index::write_tree`，索引的树缓存完整时它不必哈希就给出根。
   否决 skip-worktree 位：所用 git2 版本所带的 libgit2 在 `Index::update_all` 里不认这一位，置了位、盘上又没有的文件会被记成删除。
   否决首次放置也只检出 scope：`Worktree::add` 总做一次全量检出，所用 git2 版本没有把 `checkout_options` 暴露成安全接口，而本 crate 禁 `unsafe`；重开的条件是 git2 暴露它。
@@ -696,7 +696,7 @@ impl WorktreeLease {
   `sweep_abandoned` 收三样，每样只收城自己造的：登记的路径在盘上解析后恰是本城的 `.sprawling/worktrees/<name>`（公共 git 目录列出共用它的每座城与每个链接检出的树，只比路径尾部会把别处 `.sprawling/worktrees/<name>` 下的树连文件一起删掉；人用 `git worktree add` 加的树在别处，不碰；树目录已被删时解析它的父目录）；
   `.sprawling/worktrees/` 下没有登记的目录（整个子树是城的机器）；与被收登记同名、且尖端已被 HEAD 包含的分支——尖端带着 HEAD 没有的提交时，
   那是一轮已经 land 的活（PR 的 commit 就在它上面），分支留下；人把它检出成当前分支时，它已是人的，也留下。`held` 里的名字一概不动，那是活着的 run 手里的树。
-  `refs/sprawling/runs/` 下的栅栏引用不在清扫范围里：回收站靠它们让被删文件的提交躲过 `git gc`（§8-8）。
+  `refs/sprawling/runs/` 下的检查点引用不在清扫范围里：回收站靠它们让被删文件的提交躲过 `git gc`（§8-8）。
   清扫在开城时做，因为账本的独占锁（§8-1）保证那一刻没有别的进程在用这座城——这把锁只罩本城，所以别城的树靠上面的精确路径比较排除，不靠锁；被否：在 `claim` 里顺手清——`claim` 只遇得到它要领的那个名字，别的节点留下的树它碰不到。
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`storage::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是一台机器自己的事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
@@ -964,14 +964,14 @@ pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
 2. **同一次凭证判定**，不是第二份。`checkpoint::scan_staged` 用 `kernel::scan` 判一个 staged blob，本模块判每一行补丁文本用的是同一个函数。命中的行**不回显**，只报行号与命中原因（provider 名，或熵判定）——理由与 `scan_staged` 对自己的命中说的同一句：把字节打出来以证明泄漏，本身就是泄漏。
 3. **两端都是 commit 时，答可永久缓存**（同 `changes` 的理由）；`Head::WorkingTree` 答的是此刻的工作树，那是一波还没提交完的样子，也正是审阅进行中的改动时人看的那一份。
 
-- **一个两次 fence 之间没动过的文件答空补丁**，而不是报错：「它没动」是一个答案。「这座城没写过这个 oid」是另一个答案，由调用方（`bin::views`）答 `Unavailable`——只有调用方知道人问的是什么。
-- **测试用工作树而不是第二次 fence**：checkpoint 根本不肯提交带凭证的 blob（`scan_staged` 拒），所以那一行只可能存在于盘上的树里。这条约束本身就是本模块的扫描不是多余的一层的证据：字节到不了 commit，但到得了 socket。
+- **一个两次 checkpoint 之间没动过的文件答空补丁**，而不是报错：「它没动」是一个答案。「这座城没写过这个 oid」是另一个答案，由调用方（`bin::views`）答 `Unavailable`——只有调用方知道人问的是什么。
+- **测试用工作树而不是第二次 checkpoint**：checkpoint 根本不肯提交带凭证的 blob（`scan_staged` 拒），所以那一行只可能存在于盘上的树里。这条约束本身就是本模块的扫描不是多余的一层的证据：字节到不了 commit，但到得了 socket。
 
 ### 8-20 重启后凭证扫描的比较基准
 
-进程重启后 `Checkpoint::last` 为空，`scan_staged` 退回按 HEAD 比较，而这**漏扫不了重启之前的改动**：wave fence 恒不移动 HEAD，故 HEAD 只可能是 `ensure_base` 或 `land` 写下的提交——它必是最后一次 fence 的**祖先**。拿祖先做基准，diff 出来的路径集是拿 fence 做基准那一集的**超集**：读得更多，不会更少。代价是把已经放行过的 blob 再读一遍，安全上一分不让。
+进程重启后 `Checkpoint::last` 为空，`scan_staged` 退回按 HEAD 比较，而这**漏扫不了重启之前的改动**：wave checkpoint 恒不移动 HEAD，故 HEAD 只可能是 `ensure_base` 或 `land` 写下的提交——它必是最后一次 checkpoint 的**祖先**。拿祖先做基准，diff 出来的路径集是拿 checkpoint 做基准那一集的**超集**：读得更多，不会更少。代价是把已经放行过的 blob 再读一遍，安全上一分不让。
 
-**一条断言守着它**：`a_change_made_before_a_restart_is_still_read_after_it`——立城、fence 一次、写入一份带凭证的文件、丢掉 handle、重开 `Checkpoint`、再 fence，第二次 fence 必须以 `SecretEgress` 拒绝并报出路径而不回显字节。**翻案条件**：哪一天有一条路径能在不经扫描的情况下移动 HEAD（今天 `ensure_base`／`land` 都先扫后提交，合并提交用的是节点已扫过的树），这条推理的前提就没了，届时基准必须改回记住的 fence。
+**一条断言守着它**：`a_change_made_before_a_restart_is_still_read_after_it`——立城、checkpoint 一次、写入一份带凭证的文件、丢掉 handle、重开 `Checkpoint`、再 checkpoint，第二次 checkpoint 必须以 `SecretEgress` 拒绝并报出路径而不回显字节。**翻案条件**：哪一天有一条路径能在不经扫描的情况下移动 HEAD（今天 `ensure_base`／`land` 都先扫后提交，合并提交用的是节点已扫过的树），这条推理的前提就没了，届时基准必须改回记住的 checkpoint。
 
 ### 8-21 `bundle` 的城夹具住一处（`storage::bundle::fixture`）
 
@@ -979,7 +979,7 @@ pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
 
 **一个夹具一处**：`crates/memory/src/bundle/fixture.rs`，`#[cfg(test)]` 编译，由 `bundle.rs` 以 `#[cfg(test)] mod fixture;` 挂上，三个测试模块 `use super::super::fixture::city_with;`。形状 4 适配器（它造的是被测代码之外的一个真实环境）。**不放进 `bundle.rs` 自身**：索引文件不持逻辑，而夹具是逻辑。
 
-### 8-22 `storage::status`：还没被栅栏收走的那些改动，以及仓库此刻站在哪
+### 8-22 `storage::status`：还没被检查点收走的那些改动，以及仓库此刻站在哪
 
 `between` 比的是调用方已经握着的两个点，答不出仓库自己站在哪：哪个分支被检出、它有没有上游、它跑出上游多远——这三件是人在问「哪些文件动了」之前先问的。
 
@@ -993,7 +993,7 @@ pub fn working_status(city_root: &Path, scope: Option<&str>, base: Option<GitOid
 
 **四条口径：**
 
-1. **`base` 由调用方点名，因为栅栏不动 HEAD。** `checkpoint::wave_pre` 把提交挂在 `refs/sprawling/` 之下，HEAD 停在基提交或上一次落地处；照 HEAD 比会把这座城跑过的每一次 wave 都报成「未提交」。`None` 退回 HEAD，那是一座还没立过栅栏的城所拥有的全部。
+1. **`base` 由调用方点名，因为检查点不动 HEAD。** `checkpoint::wave_pre` 把提交挂在 `refs/sprawling/` 之下，HEAD 停在基提交或上一次落地处；照 HEAD 比会把这座城跑过的每一次 wave 都报成「未提交」。`None` 退回 HEAD，那是一座还没立过检查点的城所拥有的全部。
 2. **未跟踪文件照样成行。** 一个 agent 写下又从未入暂存的文件，恰恰是人要找的那个;只列已跟踪改动的清单会把一个新模块报成什么都没发生。为此 `changes::collect` 的 `Untracked` 归入 `How::Added`——工作树有而没有任何提交有的文件，就是这次加出来的。
 3. **`scope` 是一条 pathspec 而不是事后过滤。** 楼页问的是它自己那些文件，让 git 在走差异时就收窄，比走完全城再筛一遍少一趟盘。
 4. **`drift` 整个可缺席。** 没有上游、上游被删、以及处在游离头上，对读者而言是同一件可做的事（没有可比的对象），而与「和上游齐平」不是一回事。
@@ -1017,9 +1017,9 @@ impl Sessions {
 pub(crate) const SLICE_MAGIC: &str = "slices v1";
 ```
 
-**账本不拆链。** 一条链、一个写者、一本完整历史（`docs/glossary.md` 的 one Ledger 与 one writer）一个字不改；工作区里出现的是一份**从账本投影出来、可删可重建的切片**：一个 room 一个文件，落在它所属 Building 的 `.sprawling/sessions/` 下，地址的嵌套就是文件的嵌套。**城自己的那条记录（地址即城名）不落任何切片**：那个地址是城，不是城里的 Building，给它落一份就会在城根里造一个与城同名的目录（kernel-SPEC 8-56 的 `city_address`）。路径由本模块的私有函数 `session_slice` 从 `CityLayout::root` 推出，目录名 `SESSIONS_DIR` 也是私有常量；crate 内唯一对外的是谓词 `pub(crate) fn is_session_projection(relative: &Path) -> bool`，供栅栏判断一条路径是不是切片。可见性就是这句话的守卫：别的模块写不出切片的路径，也就写不出切片的读者。被击败的替代是把路径留在 `kernel::layout` 再用文本扫描拦住别的调用点——扫描只认拼写，绕开一次别名就放行。
+**账本不拆链。** 一条链、一个写者、一本完整历史（`docs/glossary.md` 的 one Ledger 与 one writer）一个字不改；工作区里出现的是一份**从账本投影出来、可删可重建的切片**：一个 room 一个文件，落在它所属 Building 的 `.sprawling/sessions/` 下，地址的嵌套就是文件的嵌套。**城自己的那条记录（地址即城名）不落任何切片**：那个地址是城，不是城里的 Building，给它落一份就会在城根里造一个与城同名的目录（kernel-SPEC 8-56 的 `city_address`）。路径由本模块的私有函数 `session_slice` 从 `CityLayout::root` 推出，目录名 `SESSIONS_DIR` 也是私有常量；crate 内唯一对外的是谓词 `pub(crate) fn is_session_projection(relative: &Path) -> bool`，供检查点判断一条路径是不是切片。可见性就是这句话的守卫：别的模块写不出切片的路径，也就写不出切片的读者。被击败的替代是把路径留在 `kernel::layout` 再用文本扫描拦住别的调用点——扫描只认拼写，绕开一次别名就放行。
 
-**只有账务线程写，而且写在账本落盘之后。** 入口是 `JsonlLedger::append_all`：一段 wave 全部 `sync_data` 之后才逐条 `absorb`。投影写失败不改变账本的返回值——历史已经在盘上，可弃物不得让它的调用方吃到一次假失败——但拒绝被报出（一行 `eprintln!`）而不是被吞掉。**投影永不进栅栏。** `checkpoint::stage_scopes` 跳过任何 `sessions` 下的路径（`is_session_projection`）：它还在被账务线程追加，而 git 的暂存要读它以为已经知道的文件；一个仍在长的文件会把整波拒成 `E_WORKTREE_BUSY`（8-8）。可弃物因此从不进历史，也不进任何 diff 的读者面。
+**只有账务线程写，而且写在账本落盘之后。** 入口是 `JsonlLedger::append_all`：一段 wave 全部 `sync_data` 之后才逐条 `absorb`。投影写失败不改变账本的返回值——历史已经在盘上，可弃物不得让它的调用方吃到一次假失败——但拒绝被报出（一行 `eprintln!`）而不是被吞掉。**投影永不进检查点。** `checkpoint::stage_scopes` 跳过任何 `sessions` 下的路径（`is_session_projection`）：它还在被账务线程追加，而 git 的暂存要读它以为已经知道的文件；一个仍在长的文件会把整波拒成 `E_WORKTREE_BUSY`（8-8）。可弃物因此从不进历史，也不进任何 diff 的读者面。
 
 **头部是唯一的疑点。** 每份切片首行是 `slices v1 <first_seq>`，即该文件第一条记录的 seq。魔数不符、或首行 seq 与头部不符 → 整份重建：扫账本、按地址过滤、按账本序写下，不写迁移代码。文件不存在时先问常驻的 `first_seen`（地址 → 账本里它的第一条 seq）：第一条就是正在 absorb 的这条，账本里没有更早的行，切片就从这一条落下，一个段也不读；否则按上一句整份重建。进程重启后接上已有文件时，先校验头部与内容，再从账本把漏掉的尾巴补齐；段名带首 seq，故不可能含新记录的段不打开。断在半行的尾巴先截掉再续，与账本自己的 tail recovery 同一条读法。
 

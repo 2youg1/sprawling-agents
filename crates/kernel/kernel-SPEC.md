@@ -600,7 +600,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 3. **值保留 kernel 类型。** run 是 `RunId` 而非 `String`，job 是 `Locator`；
    手写 `Serialize` 的类型挂 `schemars(with = "String")` 说明其 wire 形状。
 
-一处记录在案的形状债：`checkpoint_committed` 同时承载「派工钉住的 job」与「围栏提交」
+一处记录在案的形状债：`checkpoint_committed` 同时承载「派工钉住的 job」与「检查点提交」
 两件不同的事，`CheckpointCommitted` 把这件事说出口而不是让读方从缺键推断；拆成两个 kind
 需要新 `EventKind` 与账本版本，故记录在此而不在此处做。
 
@@ -1366,7 +1366,7 @@ pub trait Tool: Send + Sync {
 pub enum Writes { Nothing, Paths(Vec<Address>), Domain }
 // Tool::writes 的返回：一条跑完的调用可能写了城里树上的哪些路径，由工具自己的文法读出来。
 // `Paths` 只给确知自己写了哪些文件的工具（`edit` 答它的 `path`）；说不清的（`exec`、协作桌、改规则）答 `Domain`，
-// fence 于是扫整个写域。默认实现不猜：只有声明 `Effect::Read` 的工具答 `Nothing`。
+// checkpoint 于是扫整个写域。默认实现不猜：只有声明 `Effect::Read` 的工具答 `Nothing`。
 // `Writes::and` 合并两条答案：`Domain` 吸收一切，`Nothing` 是单位元，两组 `Paths` 取并集。
 #[cfg(feature = "conformance")]
 pub fn assert_tool_conformance<T: Tool>(tool: &mut T);   // 八字段完备＋name 文法＋错名调用拒收
@@ -1541,7 +1541,7 @@ pub fn forecast(arm: &ExecArm) -> DiscardForecast;
 
 - **decide 表**：Unplanned → Deny{NoRestoration}（无还原不可构造，使 Planned 恒有 plan）；Planned 且 taint 非空 → Deny{Tainted}（恒，无视规模）；余 Allow。判序固定，确定可重放。
 - **规模与归属不改答（§12「默认 YOLO」）**：一次 Planned 删除恒带 `Restoration`，因此恒可回滚；文件数、字节数、别人登记过的 asset 都不让删除停下来问人。删除的上界另有家：write domain 决定一个 resident 够得到哪些文件，registry 保存把 asset 放回去所需的凭据。
-- **forecast 三臂预判力递减**：Program 读 `(path, args)` 整体——basename ∈ {rm, rmdir, del} 或 git 携 reset --hard/clean 或 find 携 -delete；Python/Shell 子串表（rm 、rmdir、-delete、git reset --hard、git clean、os.remove、shutil.rmtree、os.unlink；Shell 另含 `>` 截断重定向）——可被混淆绕过，恒保守；git 栅栏兜底（`storage::checkpoint`）。子串表是 pub(crate) 数据面。
+- **forecast 三臂预判力递减**：Program 读 `(path, args)` 整体——basename ∈ {rm, rmdir, del} 或 git 携 reset --hard/clean 或 find 携 -delete；Python/Shell 子串表（rm 、rmdir、-delete、git reset --hard、git clean、os.remove、shutil.rmtree、os.unlink；Shell 另含 `>` 截断重定向）——可被混淆绕过，恒保守；git 检查点兜底（`storage::checkpoint`）。子串表是 pub(crate) 数据面。
 - 同文件 `#[test]` 守 Discard 门 fail-closed：Unplanned 恒 Deny；Tainted 恒 Deny（kani 不接手，理由见 §2）。
 
 ### 8-27 kernel::gate
@@ -1683,7 +1683,7 @@ pub const PROTECTED_METADATA: [&str; 2] = [RESERVED_PREFIX, GIT_METADATA];
 pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCII 大小写不敏感）
 ```
 
-- **验收标准是「写某路径即提权」。** `.git` 里放着 hooks（写下一个 hook 就是在下一次 git 操作时执行自己的代码）、config（`core.fsmonitor` 等键即执行）、refs（栅栏引用 `refs/sprawling/runs/<run>/<seq>` 是 run 自己的记账）与对象库（`file_discarded` 的恢复地址指向的对象）。一个写得了 `.git` 的 run 既能提权也能改自己的账，与 `.sprawling` 同罪，故同门。
+- **验收标准是「写某路径即提权」。** `.git` 里放着 hooks（写下一个 hook 就是在下一次 git 操作时执行自己的代码）、config（`core.fsmonitor` 等键即执行）、refs（检查点引用 `refs/sprawling/runs/<run>/<seq>` 是 run 自己的记账）与对象库（`file_discarded` 的恢复地址指向的对象）。一个写得了 `.git` 的 run 既能提权也能改自己的账，与 `.sprawling` 同罪，故同门。
 - **并入保留谓词，不另立写目标名单。** 写域构造（`WriteDomain::new`）、写域判定（`admits`／`reaches`）、读路径（`runtime::tools::chosen_path`）、`SessionName`、`storage::reserved` 全部已经问这一个谓词（或这一个名单），名单一扩即全体收紧；另立一份「写目标名单」就是给同一个问题两个家。
 - **读面一并收紧，这是有意的。** `is_reserved` 是只许多拒的门（8-28）：`read`／`search` 对 `.git` 由可读变拒读，只多拒不错放；`search` 不再另写一行跳过 `.git` 的字面量。
 - **`SessionName` 的保留名判定问 `is_reserved`**：逐字节比较会让 `.SPRAWLING` 当房间名建出 Windows 别名目录；问 `is_reserved`，名单与 ASCII 折叠就与地址谓词同源。
@@ -1739,13 +1739,13 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 `Verdict: user-approved`
 
-**决定**：回滚不设动词。回到过去的两条路都是既有的：对话走**分支**（`OpenSession { from }` 从另一条线的某一行开新的一段），文件走 **git 还原**（工具波前后的栅栏提交在 `refs/sprawling/runs/` 之下，可读、可 revert）。`Command::Rollback`／`Command::Takeover` 两帧与 `rollback_applied`／`takeover_started` 两个事件词删除；「人接管一条在跑的线」由既有干预动词（Steer／Cancel）承担。
+**决定**：回滚不设动词。回到过去的两条路都是既有的：对话走**分支**（`OpenSession { from }` 从另一条线的某一行开新的一段），文件走 **git 还原**（工具波前后的检查点提交在 `refs/sprawling/runs/` 之下，可读、可 revert）。`Command::Rollback`／`Command::Takeover` 两帧与 `rollback_applied`／`takeover_started` 两个事件词删除；「人接管一条在跑的线」由既有干预动词（Steer／Cancel）承担。
 
 **理由**：两帧自上线起没有执行者（装配层以 `not_built` 作答），两个事件词没有生产者——一个拼得出、执行不了的动词是对客户端的假承诺，事件词则是账本文法里的一段空文法。补齐执行面要引入文件快照库或改写账本：账本 append-only 不动，文件快照库被两案共同拒绝。没有它们，「回到检查点」就是让城去做 git 已经会做的事，并为它编一段没有载体的历史。
 
-**被否**：补执行面（地址预验一个函数、回滚全成或全拒、Takeover 恒以 Handoff 收尾）——它把承诺补实，代价却是文件快照库与第二份文件历史，与「git 栅栏是文件的唯一还原载体」冲突。
+**被否**：补执行面（地址预验一个函数、回滚全成或全拒、Takeover 恒以 Handoff 收尾）——它把承诺补实，代价却是文件快照库与第二份文件历史，与「git 检查点是文件的唯一还原载体」冲突。
 
-**重开参数**：出现「栅栏提交不足以还原」的实据——例如跨楼多工作树需要一次原子还原，或人要在页面上单键回到某条栅栏。重开时先回答「还原的是文件还是对话」：两者各自的载体今天都在（git／分支），缺的只是入口，而不是机制。
+**重开参数**：出现「检查点提交不足以还原」的实据——例如跨楼多工作树需要一次原子还原，或人要在页面上单键回到某条检查点。重开时先回答「还原的是文件还是对话」：两者各自的载体今天都在（git／分支），缺的只是入口，而不是机制。
 
 ### 12.3 定规：上限类政策值的拒因句式从类型给出，调用方拼不出第二种拒因
 
@@ -1982,7 +1982,7 @@ pub fn reaches_the_undoable(call: &ConnectorCall<'_>) -> bool;
 pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &TaintSet) -> GateOutcome;
 ```
 
-**问题**：城里每一条「会造成后果」的路径都配了一条回头路——`Discard` 没有 `Restoration` 就构造不出来，工具波前后各有一个 git fence，写域外的写会被拒。桌面连接器一条都对不上：`desktop.act` 在这个人自己的机器上按下的键，`desktop.clipboard` 覆盖掉的那段文本，城里没有任何一处存过它们的旧值，也没有任何一处能把它们放回去。
+**问题**：城里每一条「会造成后果」的路径都配了一条回头路——`Discard` 没有 `Restoration` 就构造不出来，工具波前后各有一个 git checkpoint，写域外的写会被拒。桌面连接器一条都对不上：`desktop.act` 在这个人自己的机器上按下的键，`desktop.clipboard` 覆盖掉的那段文本，城里没有任何一处存过它们的旧值，也没有任何一处能把它们放回去。
 
 **所以答案取自楼层事先写下的信任，而不是当场问人**（§12.1「默认 YOLO」）：`CONFIG.toml` 的 `[sandbox] trusted` 列了这个连接器就放行，没列就拒（`E_GATE_DENIED`，替代路径指向那张表）。一条写在配置里的信任是人看得见整张表时做的决定。**taint 压过信任**：参数来自外来内容的调用恒拒，因为楼层信任的是连接器，不是一张网页借它按下的键。
 

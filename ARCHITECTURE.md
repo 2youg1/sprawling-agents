@@ -321,8 +321,8 @@ than any diagram of boxes.
    model repeated does not become permanent.
 10. **Tools run behind gates.** `kernel::gate` answers with an exhaustive
     verdict — allowed, refused in three parts, or escalated to a person.
-    `runtime::run::fence` decides whether a wave needs a git fence first,
-    `storage::checkpoint` commits the fence and scans the worktree after the
+    `runtime::run::checkpoint` decides whether a wave needs a git checkpoint first,
+    `storage::checkpoint` commits the checkpoint and scans the worktree after the
     wave, and anything that disappeared becomes a `file_discarded` event
     carrying the way back.
 11. **The result comes back shaped.** `runtime::pipeline` builds the result
@@ -928,7 +928,7 @@ sequenceDiagram
     alt the answer failed
         K-->>L: every early result discarded
     end
-    L->>R: a fence first, when runtime::run::fence asks for one
+    L->>R: a checkpoint first, when runtime::run::checkpoint asks for one
     L->>G: tool wave: each call admitted in call order
     K-->>L: an early result answers the call equal to it
     L->>L: the remaining leading reads run at once
@@ -938,7 +938,7 @@ sequenceDiagram
 `crates/gateway/src/endpoint/stream.rs`,
 `crates/runtime/src/turn/speculation.rs` (`Generating`),
 `crates/runtime/src/turn/wave.rs` (`ConcurrentInvoke`),
-`crates/runtime/src/run/fence.rs`, `crates/memory/src/checkpoint.rs`;
+`crates/runtime/src/run/checkpoint.rs`, `crates/memory/src/checkpoint.rs`;
 what may start early and in which order results reach the Ledger is
 `adversary/design/Speculating.lean`.
 

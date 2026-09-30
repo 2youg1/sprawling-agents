@@ -139,11 +139,11 @@ export function artifactsIn(turns: readonly Turn[]): Artifacts {
   return { read, wrote, terminal };
 }
 
-// The tree the run last fenced, searched backwards from the last turn,
-// or nothing when it never fenced one. The run page and the room's
+// The tree the run last checkpointed, searched backwards from the last turn,
+// or nothing when it never checkpointed one. The run page and the room's
 // produced line both measure "what the run changed" up to here, so
 // neither counts an edit made after the run by someone else.
-export function lastFenceIn(turns: readonly Turn[]): GitOid | null {
+export function lastCheckpointIn(turns: readonly Turn[]): GitOid | null {
   for (let at = turns.length - 1; at >= 0; at -= 1) {
     for (const note of turns[at]?.notes ?? []) {
       if ("fenced" in note) return note.fenced.oid;

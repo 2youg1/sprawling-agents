@@ -194,8 +194,8 @@ fn a_checkpoint_inside_a_turn_names_the_commit_it_made() {
         record(
             2,
             EventKind::CheckpointCommitted,
-            // `scope` is the list of paths a fence staged; this line
-            // spelled it as a bare string while the fence has always
+            // `scope` is the list of paths a checkpoint staged; this line
+            // spelled it as a bare string while the checkpoint has always
             // written an array.
             serde_json::json!({ "oid": spelled, "scope": ["lab"], "files": [] }),
         ),

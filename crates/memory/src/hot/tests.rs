@@ -48,7 +48,7 @@ fn the_fold_tracks_phase_and_progress_per_run() {
 fn the_room_and_the_start_come_from_run_started_only() {
     let mut view = HotView::new();
     let run = RunId::from_bytes([4u8; 16]);
-    // A fence lands before the opening, and carries no address.
+    // A checkpoint lands before the opening, and carries no address.
     view.apply(&record(run, 0, EventKind::CheckpointCommitted))
         .unwrap();
     assert_eq!(view.get(&run).unwrap().addr, None);
@@ -95,7 +95,7 @@ fn the_room_and_the_start_come_from_run_started_only() {
 
 /// A city that ran thousands of times held a row for every run it
 /// ever froze; only the active runs and the recent few stay, and a
-/// late record on an evicted run is its tail, not a new run's fence.
+/// late record on an evicted run is its tail, not a new run's checkpoint.
 #[test]
 fn frozen_runs_beyond_the_recent_few_leave_a_tombstone() {
     let mut view = HotView::new();

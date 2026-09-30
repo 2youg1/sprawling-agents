@@ -8,7 +8,7 @@
 //!
 //! Every consequential path in this city ships with a way back. A
 //! `Discard` cannot be constructed without a `Restoration`; a tool wave
-//! sits between two git fences; a write outside the domain is refused.
+//! sits between two git checkpoints; a write outside the domain is refused.
 //! The desktop connector matches none of that. The key `desktop.act`
 //! presses on somebody's own machine, and the text `desktop.clipboard`
 //! replaces, are not values this city ever held — so there is nothing
@@ -117,7 +117,7 @@ pub fn undoable(
         .collect();
     let alternative = if trusted.is_empty() {
         "this floor trusts no connector with the machine it runs on; do the work with \
-         files in the city, which a fence can put back"
+         files in the city, which a checkpoint can put back"
             .to_owned()
     } else {
         format!("connectors this floor trusts: {}", trusted.join(", "))

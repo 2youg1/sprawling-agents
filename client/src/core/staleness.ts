@@ -86,7 +86,7 @@ export function reachOf(name: string, kind: EventKind): Reach {
     case "skills":
       return reached(kind === "building_configured" || kind === "run_started");
     // The working tree moves whenever a wave writes, and every wave
-    // ends in a fence.
+    // ends in a checkpoint.
     case "git_status":
       return reached(kind === "checkpoint_committed" || kind === "pr_merged");
     case "commits":

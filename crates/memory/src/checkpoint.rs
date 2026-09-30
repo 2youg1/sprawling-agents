@@ -3,13 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Checkpoint fences around a tool wave.
+//! Checkpoints around a tool wave.
 //!
 //! Before the wave, everything inside the write domain is committed;
 //! after it, every file the wave deleted is recorded as discarded with
 //! that commit as its restoration address. The order is the whole
 //! point — a deletion recorded against a commit that does not yet exist
-//! is not restorable, so the fence goes up first and the accounting
+//! is not restorable, so the checkpoint goes up first and the accounting
 //! follows.
 //!
 //! Two boundaries are hard. The scope is the write domain and nothing
@@ -22,19 +22,19 @@
 //! the commit and reports positions only; echoing the matched bytes to
 //! prove a secret leaked would be the leak.
 //!
-//! **A wave fence leaves HEAD alone**. The city forms around
+//! **A wave checkpoint leaves HEAD alone**. The city forms around
 //! a person's own folder, so a commit per tool wave on their branch
-//! buries their history under the machine's bookkeeping. The fence is a
+//! buries their history under the machine's bookkeeping. The checkpoint is a
 //! dangling commit, filed under `refs/sprawling/runs/<run>/<oid>`, and
 //! everything downstream works from the oid as it always did. Only
 //! `ensure_base` and `land` move HEAD, because a worktree branches from
 //! a commit and offered work has to be on a branch.
 
 mod base;
-pub(crate) mod fence;
+pub(crate) mod commit;
 mod provenance;
 pub(crate) mod scan;
 
 pub use base::BaseProgress;
-pub use fence::Checkpoint;
+pub use commit::Checkpoint;
 pub use provenance::{ModelChoice, Provenance, effort_word, recorded_effort};

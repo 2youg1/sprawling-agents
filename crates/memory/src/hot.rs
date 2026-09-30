@@ -35,7 +35,7 @@ pub struct RunHot {
     pub last_kind: EventKind,
     pub who: String,
     /// The room this run works in, as its `run_started` record named
-    /// it. `None` until that record is seen: a fence can land before
+    /// it. `None` until that record is seen: a checkpoint can land before
     /// the opening, and a window may hold only a tail.
     pub addr: Option<Address>,
     /// When the run began, from the same record.
@@ -122,7 +122,7 @@ pub struct HotView {
     runs: BTreeMap<RunId, RunHot>,
     /// Frozen runs pushed out of `runs`, by id alone. Freezing is
     /// terminal, so a later record on one of these is the tail of an old
-    /// run, never the fence of a new one.
+    /// run, never the checkpoint of a new one.
     evicted: BTreeSet<RunId>,
 }
 

@@ -102,7 +102,7 @@ fn a_dispatch_writes_two_lines_and_samples_the_clock_twice() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| crate::NextCall::Allowed,

@@ -19,7 +19,7 @@ use kernel::{RunId, TimeMs};
 use runtime::run::{RunHooks, SafePoint, drive};
 use runtime::{Interrupt, NextCall};
 
-use super::placing::{Fencing, Placing};
+use super::placing::{Checkpointing, Placing};
 use super::{Driven, Driving};
 
 /// What one drive takes from the city, in handles rather than in loans.
@@ -41,11 +41,11 @@ pub(crate) struct DriveContext {
     /// What is still running while the runs go on, so a halt on a scope
     /// reaches a run inside it.
     pub(crate) backlog: runtime::Backlog,
-    /// One fence at a time per city.
+    /// One checkpoint at a time per city.
     ///
-    /// **A repository has one index, and a fence stages and commits it.**
+    /// **A repository has one index, and a checkpoint stages and commits it.**
     /// Two nodes of one ready set drive at once by design
-    /// (`assembly::plans::pursuing`), so their fences can overlap, and
+    /// (`assembly::plans::pursuing`), so their checkpoints can overlap, and
     /// libgit2's `.git/index.lock` refuses the second one: a run that lost
     /// that race ended as cancelled and its node was handed back as
     /// though its own done check had failed. The gate is the width of the
@@ -56,7 +56,7 @@ pub(crate) struct DriveContext {
     /// `storage::checkpoint::scan::write_index` still waits out a lock,
     /// and that is a different contender: another sprawling process on
     /// the same city, which no mutex here can see.
-    pub(crate) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    pub(crate) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// The worker's own clock, so a run's lines and the worker's are
     /// read from one time (accounting-SPEC.md 8-3).
     pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
@@ -159,7 +159,7 @@ impl Interrupting {
 fn poison(what: &str) -> AxError {
     AxError::failure(
         kernel::AxCode::StorageFatal,
-        "take the fence gate",
+        "take the checkpoint gate",
         what.to_owned(),
     )
     .with_recovery("restart this city: a lock left by a dead thread cannot be trusted")
@@ -169,9 +169,9 @@ fn poison(what: &str) -> AxError {
 ///
 /// The three hooks live here because they are the only code that
 /// touches the ledger while the driver owns it: one interrupt source
-/// merging the person and the residents, one fence going up before each
+/// merging the person and the residents, one checkpoint going up before each
 /// wave, and one tool face placing each call's key by its position.
-/// Everything they collect - the commits a wave fenced against, what
+/// Everything they collect - the commits a wave checkpointed against, what
 /// the run's own commands did, and the items a gate raised - is theirs
 /// only for the length of the drive, so it comes back as one value
 /// rather than as four cells the caller has to keep in step.
@@ -198,7 +198,7 @@ pub(crate) fn drive_run<L: Ledger>(
         bench,
         signals,
         write_root,
-        fence_scope,
+        checkpoint_scope,
         run_id,
         of,
         sieving,
@@ -211,18 +211,18 @@ pub(crate) fn drive_run<L: Ledger>(
         watching,
         person,
         backlog,
-        fence_gate,
+        checkpoint_gate,
         clock,
     } = context;
     let mut now = || clock.now();
     let declared = bench.declared_writes();
-    let mut fence_point =
+    let mut checkpoint_handle =
         storage::Checkpoint::open(&write_root).map_err(storage::StorageError::into_ax)?;
-    // What the wave fence and the bench fenced, in the order they went
+    // What the wave checkpoint and the bench checkpointed, in the order they went
     // up, so the sweep afterwards knows which commit a deleted file can
-    // be restored from; and what the calls since the last fence said they
-    // wrote, which is what the next fence stages.
-    let fencing = Fencing::opened();
+    // be restored from; and what the calls since the last checkpoint said they
+    // wrote, which is what the next checkpoint stages.
+    let checkpointing = Checkpointing::opened();
     let asking = std::cell::RefCell::new(Interrupting {
         run_id,
         member,
@@ -251,15 +251,15 @@ pub(crate) fn drive_run<L: Ledger>(
             }
             std::thread::sleep(std::time::Duration::from_millis(left.min(HALT_SLICE_MS)));
         };
-        let mut placing = Placing::new(bench, sieving, run_id, &fencing);
-        let mut fence = |t: TimeMs| {
+        let mut placing = Placing::new(bench, sieving, run_id, &checkpointing);
+        let mut checkpoint = |t: TimeMs| {
             // Held for the whole of `wave_pre`: staging, committing and
             // reading back are one act over one index.
-            let _one_at_a_time = fence_gate
+            let _one_at_a_time = checkpoint_gate
                 .lock()
-                .map_err(|_| poison("this city's fence gate"))?;
-            let scope = fencing.take_scope(&fence_scope);
-            let payload = fence_point
+                .map_err(|_| poison("this city's checkpoint gate"))?;
+            let scope = checkpointing.take_scope(&checkpoint_scope);
+            let payload = checkpoint_handle
                 .wave_pre(&scope, t, &of)
                 .map_err(storage::StorageError::into_ax)?;
             if let Some(oid) = payload
@@ -267,7 +267,7 @@ pub(crate) fn drive_run<L: Ledger>(
                 .get("oid")
                 .and_then(serde_json::Value::as_str)
             {
-                fencing.fenced.borrow_mut().push(oid.to_owned());
+                checkpointing.checkpointed.borrow_mut().push(oid.to_owned());
             }
             Ok(payload)
         };
@@ -287,7 +287,7 @@ pub(crate) fn drive_run<L: Ledger>(
         let mut hooks = RunHooks {
             now: &mut now,
             interrupt: &mut interrupt,
-            fence: Some(&mut fence),
+            checkpoint: Some(&mut checkpoint),
             writes: &|call: &kernel::ToolCall| declared.of(call),
             invoke: &mut placing,
             wait: &mut wait,
@@ -299,7 +299,7 @@ pub(crate) fn drive_run<L: Ledger>(
     Ok(Driven {
         outcome: driven,
         adapter,
-        fenced: fencing.fenced.into_inner(),
+        checkpointed: checkpointing.checkpointed.into_inner(),
         ran,
         // Nothing a door answers reaches a person any more: a door
         // answers Allow or Deny. The sweep is the one thing that still

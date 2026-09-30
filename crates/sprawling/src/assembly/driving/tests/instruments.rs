@@ -168,7 +168,7 @@ fn instrument_dispatch_gap() {
     // Dispatching B into a bare building must not stall A. The bound is
     // the held naming call rather than a few
     // milliseconds, because A's widest gap also holds its own turns'
-    // fences, which are A's work and not a stall B caused.
+    // checkpoints, which are A's work and not a stall B caused.
     let widest = gaps.last().copied().unwrap_or(0);
     let naming = u64::try_from(NAMING.as_millis()).unwrap();
     assert!(

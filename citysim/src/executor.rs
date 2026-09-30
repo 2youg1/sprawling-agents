@@ -57,8 +57,8 @@ pub struct Scenario {
     /// its granularity and zone ladder from here, never from a sample.
     pub config: FrozenConfig,
     /// The checkpoint net, when the scenario runs against a real tree.
-    /// The fence is per wave, not per suspicious command: the
-    /// fence goes up before every wave, so anything a wave deletes has a
+    /// The checkpoint is per wave, not per suspicious command: the
+    /// checkpoint goes up before every wave, so anything a wave deletes has a
     /// commit to come back from. An unchanged wave still commits — a
     /// chain that rebuilds is worth more than a saved object.
     pub checkpoint: Option<(Checkpoint, Vec<String>)>,
@@ -296,7 +296,7 @@ pub fn run_scenario_on(
 
     let frozen = match checkpoint.as_mut() {
         Some((net, scope)) => {
-            // A fence is signed by the session that raised it. The
+            // A checkpoint is signed by the session that raised it. The
             // scenario has no endpoint, so the model id is the
             // scripted one and no effort was asked for.
             let of = storage::Provenance::new(
@@ -308,14 +308,14 @@ pub fn run_scenario_on(
                     effort: None,
                 },
             );
-            let mut fence = |t: TimeMs| {
+            let mut checkpoint = |t: TimeMs| {
                 net.wave_pre(scope, t, &of)
                     .map_err(storage::StorageError::into_ax)
             };
             let mut hooks = RunHooks {
                 now: &mut now,
                 interrupt: &mut interrupt,
-                fence: Some(&mut fence),
+                checkpoint: Some(&mut checkpoint),
                 writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
                 invoke: &mut invoke,
                 wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -327,7 +327,7 @@ pub fn run_scenario_on(
             let mut hooks = RunHooks {
                 now: &mut now,
                 interrupt: &mut interrupt,
-                fence: None,
+                checkpoint: None,
                 writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
                 invoke: &mut invoke,
                 wait: &mut |_: TimeMs| runtime::NextCall::Allowed,

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The bytes these variants write are the bytes
-//! `storage::checkpoint::fence::committed` and
+//! `storage::checkpoint::commit::committed` and
 //! `runtime::run::lifecycle::dispatch` wrote by hand, including the
 //! `effort` word an unasked effort was recorded under.
 
@@ -69,7 +69,7 @@ fn commit(effort: Option<Effort>, predecessor: Option<RunId>, scope: &[&str]) ->
 }
 
 #[test]
-fn a_fence_writes_the_bytes_the_hand_written_map_wrote() {
+fn a_checkpoint_writes_the_bytes_the_hand_written_map_wrote() {
     let old = hand_written_commit("high", None, &["lab"]);
     let new = Payload::of(&CheckpointCommitted::Committed(commit(
         Some(Effort::High),
@@ -84,7 +84,7 @@ fn a_fence_writes_the_bytes_the_hand_written_map_wrote() {
 fn an_unasked_effort_is_still_written_as_the_word_none() {
     // `effort_word(None)` produced "none", and so does `Effort::None`.
     // The two facts have been one word on this ledger since the first
-    // fence, and this test is what keeps that true through the change.
+    // checkpoint, and this test is what keeps that true through the change.
     let old = hand_written_commit("none", None, &[]);
     let new = Payload::of(&CheckpointCommitted::Committed(commit(
         Some(Effort::None),

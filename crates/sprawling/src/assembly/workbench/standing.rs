@@ -100,10 +100,10 @@ pub(in crate::assembly) struct Placing<'a> {
     pub(in crate::assembly) city: kernel::B3Hash,
     /// What time it is, for the base commit a first placement makes.
     pub(in crate::assembly) clock: &'a (dyn accounting::Clock + Send + Sync),
-    /// The city's one fence at a time: a first placement commits the
-    /// city's index, which every fence also stages and commits
+    /// The city's one checkpoint at a time: a first placement commits the
+    /// city's index, which every checkpoint also stages and commits
     /// (sprawling-SPEC.md 8-46-13).
-    pub(in crate::assembly) fence_gate: &'a std::sync::Mutex<()>,
+    pub(in crate::assembly) checkpoint_gate: &'a std::sync::Mutex<()>,
 }
 
 impl Site {
@@ -112,7 +112,7 @@ impl Site {
     /// it writes is visible until somebody else checks it. A building
     /// that asks for no review is left writing in the city.
     ///
-    /// The fence goes up first: a worktree branches from a commit, so
+    /// The checkpoint goes up first: a worktree branches from a commit, so
     /// the city needs one before it can lend anything out.
     ///
     /// `worktree_opened` carries the command's key: for a review dispatch
@@ -144,7 +144,7 @@ impl Site {
                 effort: self.config.effort,
             },
         );
-        let turn = super::held(placing.fence_gate, "take the fence gate")?;
+        let turn = super::held(placing.checkpoint_gate, "take the checkpoint gate")?;
         storage::Checkpoint::open(placing.city_root)
             .map_err(storage::StorageError::into_ax)?
             .ensure_base(&[addr.as_str().to_owned()], placing.clock.now()?, &of)

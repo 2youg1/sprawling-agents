@@ -55,7 +55,7 @@
   import River from "./run/river.svelte";
   import Composer from "./talk/composer.svelte";
   import Thread from "./talk/thread.svelte";
-  import { lastFenceIn } from "./talk/trace";
+  import { lastCheckpointIn } from "./talk/trace";
 
   interface Props {
     readonly run: RunId;
@@ -117,8 +117,8 @@
   const shown = $derived(summary === null ? mine : adopted(summary, mine));
 
   const turns = $derived(rounds?.turns ?? []);
-  const fence = $derived(rounds?.opened_at ?? null);
-  const lastFence = $derived(lastFenceIn(turns));
+  const checkpoint = $derived(rounds?.opened_at ?? null);
+  const lastCheckpoint = $derived(lastCheckpointIn(turns));
 
   // The evidence question exists only while its lens is open: a
   // watched answer is refreshed when stale, and nobody is looking at
@@ -135,11 +135,11 @@
   const spent = $derived(figuresOf(turns).usd);
   const live = $derived(shown !== undefined && shown.doing.kind !== "frozen");
   const room = $derived(shown?.addr ?? null);
-  // Where the changes lens stops. A live run that has not fenced past
+  // Where the changes lens stops. A live run that has not checkpointed past
   // its opening is read against the working tree, which is where its
-  // edits are; a closed run stops at its last fence, or at its opening
-  // when it never fenced, so edits made after it ended are not counted.
-  const changedTo = $derived(live ? (lastFence === fence ? null : lastFence) : (lastFence ?? fence));
+  // edits are; a closed run stops at its last checkpoint, or at its opening
+  // when it never checkpointed, so edits made after it ended are not counted.
+  const changedTo = $derived(live ? (lastCheckpoint === checkpoint ? null : lastCheckpoint) : (lastCheckpoint ?? checkpoint));
 
   // The run's clock as the page knows it: from the opening (or the
   // first turn) to the closing, or to now while the run is live.
@@ -320,10 +320,10 @@
       </section>
     </div>
   {:else if eye.id === "changes"}
-    {#if fence !== null}
-      <Changes base={fence} head={changedTo} />
+    {#if checkpoint !== null}
+      <Changes base={checkpoint} head={changedTo} />
     {:else}
-      <EmptyState missing="run_no_fence" />
+      <EmptyState missing="run_no_checkpoint" />
     {/if}
   {:else if eye.id === "evidence"}
     {#if evidenceRead.kind === "unavailable"}

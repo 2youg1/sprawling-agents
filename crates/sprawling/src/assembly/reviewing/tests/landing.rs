@@ -9,7 +9,7 @@ use crate::assembly::*;
 
 /// A building under review lends every run its own tree so that
 /// nothing it produces is the building's until somebody else checks
-/// it. This asks whether the shelf is inside that fence.
+/// it. This asks whether the shelf is inside that checkpoint.
 #[test]
 fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
     let dir = tempfile::tempdir().unwrap();
@@ -62,7 +62,7 @@ fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
         "a run under review reached the building's shelf without being checked: {before:?}"
     );
 
-    // The other half of the same rule: fencing it must not lose it.
+    // The other half of the same rule: checkpointing it must not lose it.
     // A shelf entry nobody can ever reach is a worse answer than one
     // that arrived too early.
     let branch = branch_opened(&report.ledger_dir);

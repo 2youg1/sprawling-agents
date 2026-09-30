@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Checkpoint fences: base, wave pre/post.
+//! Checkpoints: base, wave pre/post.
 
 use std::path::Path;
 
@@ -17,8 +17,8 @@ use crate::error::StorageError;
 use super::provenance::Provenance;
 use super::scan::CommitPlan;
 
-/// How a fence names itself in a commit subject. The whole set, because
-/// a fence that showed one of several prefixes would read like a fence
+/// How a checkpoint names itself in a commit subject. The whole set, because
+/// a checkpoint that showed one of several prefixes would read like a checkpoint
 /// that staged one of them.
 pub(super) fn subject_of(scopes: &[String]) -> String {
     if scopes.is_empty() {
@@ -27,17 +27,17 @@ pub(super) fn subject_of(scopes: &[String]) -> String {
     format!("checkpoint: {}", scopes.join(" "))
 }
 
-/// Where a wave fence is filed: under `refs/sprawling/`, which no
+/// Where a wave checkpoint is filed: under `refs/sprawling/`, which no
 /// branch listing, push or `git log` walks by accident, and named by the
-/// commit itself. A run fences through more than one handle - the lane's
+/// commit itself. A run checkpoints through more than one handle - the lane's
 /// own and the bench's forecast net - and the reference is the only thing
-/// that keeps a fence from `git gc`, so its name cannot come from a count
+/// that keeps a checkpoint from `git gc`, so its name cannot come from a count
 /// that a second handle also keeps.
-pub(super) fn fence_ref(of: &Provenance, oid: git2::Oid) -> String {
+pub(super) fn checkpoint_ref(of: &Provenance, oid: git2::Oid) -> String {
     format!("refs/sprawling/runs/{}/{oid}", of.run())
 }
 
-/// The `checkpoint_committed` payload, in one place so a fence and a
+/// The `checkpoint_committed` payload, in one place so a checkpoint and a
 /// base commit cannot describe themselves differently.
 ///
 /// It carries what the commit's own trailers carry that the record
@@ -65,8 +65,8 @@ pub(super) fn committed(
 
 pub struct Checkpoint {
     pub(crate) repo: git2::Repository,
-    /// The last commit this handle made, fence or landing. The scan
-    /// compares against it, because a fence does not move HEAD.
+    /// The last commit this handle made, checkpoint or landing. The scan
+    /// compares against it, because a checkpoint does not move HEAD.
     pub(crate) last: Option<git2::Oid>,
 }
 
@@ -103,7 +103,7 @@ impl Checkpoint {
     /// Makes sure the city has one commit, and makes no more than that.
     ///
     /// A worktree branches from a commit, so a city that has never been
-    /// fenced cannot lend a tree. Committing on every dispatch would
+    /// checkpointed cannot lend a tree. Committing on every dispatch would
     /// move the trunk under every request already waiting. Returns the
     /// commit it made, or `None` when there already was one.
     ///
@@ -120,7 +120,7 @@ impl Checkpoint {
         }
         let files = self.stage_scopes(scopes)?;
         self.scan_staged()?;
-        // The one fence that moves the branch: a worktree branches from a
+        // The one checkpoint that moves the branch: a worktree branches from a
         // commit, and a city that has none can lend no tree.
         let oid = self.commit(&CommitPlan {
             t,
@@ -131,14 +131,14 @@ impl Checkpoint {
         committed(oid, of, scopes, files).map(Some)
     }
 
-    /// The pre-wave fence: stage everything under `scopes`, scan it, and
+    /// The pre-wave checkpoint: stage everything under `scopes`, scan it, and
     /// commit at the injected time. Returns the `checkpoint_committed`
     /// payload.
     ///
     /// **`scopes` is the run's write domain, not its room** (storage-SPEC
     /// section 8-18). The two were allowed to differ once, and every
     /// file a resident wrote between them - a building's own documents,
-    /// a second declared prefix - was staged by no fence, reported by no
+    /// a second declared prefix - was staged by no checkpoint, reported by no
     /// `changes` query, and restorable from no `file_discarded` record.
     ///
     /// **The branch does not move**: the commit is written
@@ -166,8 +166,13 @@ impl Checkpoint {
             onto_head: false,
         })?;
         self.repo
-            .reference(&fence_ref(of, oid), oid, true, "sprawling: a wave fence")
-            .map_err(git_err("file a wave fence"))?;
+            .reference(
+                &checkpoint_ref(of, oid),
+                oid,
+                true,
+                "sprawling: a wave checkpoint",
+            )
+            .map_err(git_err("file a wave checkpoint"))?;
         committed(oid, of, scopes, files)
     }
 
@@ -180,12 +185,12 @@ impl Checkpoint {
     /// not there is a deletion. Asking git for the tree-to-workdir diff
     /// instead would hash every path the tree and the worktree agree on,
     /// and the city itself keeps writing some of those paths after the
-    /// fence (a room's session projection, a worktree under a lease); a
+    /// checkpoint (a room's session projection, a worktree under a lease); a
     /// hash taken through a Windows directory entry that trails the open
     /// handle refuses the whole sweep. A sweep needs `Deleted` deltas,
     /// and a deletion is answered without reading any content.
     ///
-    /// **The tree is the fence's own write domain**, not the whole city:
+    /// **The tree is the checkpoint's own write domain**, not the whole city:
     /// `wave_pre` walked exactly these paths before the wave began, so
     /// the walk costs what staging already cost.
     ///
@@ -262,7 +267,7 @@ impl Checkpoint {
     /// followed or overwritten.
     ///
     /// # Errors
-    /// A commit the repository no longer holds (the fence reference is
+    /// A commit the repository no longer holds (the checkpoint reference is
     /// what keeps one), a path that commit does not hold as a file, a
     /// bare repository, an address in the protected metadata subtree
     /// (`Address::is_reserved`), and a write the file system refuses;

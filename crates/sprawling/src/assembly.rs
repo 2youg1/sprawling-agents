@@ -215,7 +215,7 @@ pub struct RunWorker {
     city_root: PathBuf,
     /// Which city this is, as the genesis line hashes. Read from the
     /// ledger the first time a commit needs signing and remembered, so
-    /// no fence, landing or merge re-reads the front of the history for
+    /// no checkpoint, landing or merge re-reads the front of the history for
     /// it (sprawling-SPEC.md 8-51). Lazy rather than read on
     /// open, because a worker over a city with no genesis line yet is a
     /// legal state.
@@ -267,7 +267,7 @@ pub struct RunWorker {
     pub(in crate::assembly) origins: SessionOrigins,
     /// Every run in a lane right now, the crossing those lanes write
     /// history through, what the city owes each one when it comes home,
-    /// the one fence they take turns at, and the commands they left
+    /// the one checkpoint they take turns at, and the commands they left
     /// running. One per city, so the number of runs a city drives at once
     /// has one answer (sprawling-SPEC.md 8-46-2).
     flight: Flight,

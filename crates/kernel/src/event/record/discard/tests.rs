@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The golden lines: the bytes `storage::checkpoint::fence` and
+//! The golden lines: the bytes `storage::checkpoint::commit` and
 //! `sprawling::effect::Landing::shelf` wrote by hand, which the ledgers
 //! a city already holds are made of.
 
@@ -23,7 +23,7 @@ fn line(golden: &str) -> Payload {
 }
 
 #[test]
-fn a_swept_file_writes_the_bytes_the_fence_wrote() {
+fn a_swept_file_writes_the_bytes_the_checkpoint_wrote() {
     let tracked =
         Locator::parse("file:work/doomed.txt@0123456789abcdef0123456789abcdef01234567").unwrap();
     let typed = FileDiscarded {

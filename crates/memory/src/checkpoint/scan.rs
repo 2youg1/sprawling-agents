@@ -12,7 +12,7 @@ use kernel::secret::scan;
 
 use crate::error::StorageError;
 
-use super::fence::{Checkpoint, git_err};
+use super::commit::{Checkpoint, git_err};
 use super::provenance::Provenance;
 
 pub(crate) mod pathspec;
@@ -29,7 +29,7 @@ pub(crate) struct CommitPlan<'a> {
     pub(crate) t: TimeMs,
     pub(crate) of: &'a Provenance,
     pub(crate) subject: &'a str,
-    /// Whether the branch follows this commit. A wave fence says no: it
+    /// Whether the branch follows this commit. A wave checkpoint says no: it
     /// is filed under its own reference so a person's `git log` does not
     /// grow a line per tool wave. A base commit and a landing
     /// say yes, because a worktree branches from a branch and offered
@@ -90,10 +90,10 @@ impl Checkpoint {
     }
 
     /// The tree the last checkpoint committed, or `None` when this city
-    /// has never been fenced. An unborn HEAD is a state, not a failure -
+    /// has never been checkpointed. An unborn HEAD is a state, not a failure -
     /// it is what an empty repository looks like.
     ///
-    /// A wave fence does not move HEAD, so the last
+    /// A wave checkpoint does not move HEAD, so the last
     /// checkpoint is remembered here rather than read off the branch. A
     /// process that has just opened this repository remembers nothing
     /// and falls back to HEAD, which is older: the scan then re-reads
@@ -120,7 +120,7 @@ impl Checkpoint {
     ///
     /// Only an unborn branch and a missing reference mean "none yet";
     /// anything else that stops HEAD being read is an error, because
-    /// reading it as "none" would turn the next fence into a parentless
+    /// reading it as "none" would turn the next checkpoint into a parentless
     /// root commit cut off from the history before it (storage-SPEC 8-17).
     fn head_commit(repo: &git2::Repository) -> Result<Option<git2::Commit<'_>>, StorageError> {
         match repo.head() {
@@ -150,7 +150,7 @@ impl Checkpoint {
     ///
     /// **A session slice is never staged.** It is a disposable
     /// projection the city's own accounting thread appends to while the
-    /// wave runs, and a fence that staged it would ask git to read a
+    /// wave runs, and a checkpoint that staged it would ask git to read a
     /// workdir file it believes it already knows; a file still growing
     /// under an open handle makes that read refuse the whole wave
     /// (storage-SPEC 8-8, 8-24). Nor does one ever stage protected
@@ -158,7 +158,7 @@ impl Checkpoint {
     ///
     /// Returns the paths whose staged blob this call added, changed or
     /// removed, in byte order: the difference between the index it found
-    /// and the index it wrote, which is what the fence touched and not
+    /// and the index it wrote, which is what the checkpoint touched and not
     /// what the city holds.
     pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, StorageError> {
         let files = self.stage_scopes_held(scopes)?;
@@ -169,7 +169,7 @@ impl Checkpoint {
     /// Stages `scopes` into the repository's index in memory and leaves
     /// the file on disk as it was, for a caller whose objects are not on
     /// disk yet: an index written before them names blobs a failure
-    /// would drop, and later fences skip those entries by their stat data.
+    /// would drop, and later checkpoints skip those entries by their stat data.
     pub(crate) fn stage_scopes_held(
         &mut self,
         scopes: &[String],
@@ -294,13 +294,13 @@ impl Checkpoint {
     /// Puts this tree on the branch, under the session that produced it.
     ///
     /// This is what a reviewing run does when it offers its work: the
-    /// wave fences behind it are dangling commits nobody merges, and
+    /// wave checkpoints behind it are dangling commits nobody merges, and
     /// what a verifier judges has to be a commit on the run's own
     /// branch. Time stays a parameter here as everywhere else — the
     /// signature carries the injected instant, so the same script lands
     /// the same oid.
     ///
-    /// Only `scopes` is staged, as a fence stages it: a kept tree is
+    /// Only `scopes` is staged, as a checkpoint stages it: a kept tree is
     /// checked out again over its scope alone, so its files outside the
     /// scope may trail the branch, and staging them would take back
     /// what the trunk changed there (storage-SPEC 8-9). Entries outside

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The fence admission rule for one staged path: what enters, what is
+//! The checkpoint admission rule for one staged path: what enters, what is
 //! skipped, and what refuses the wave (storage-SPEC 8-8 and 8-25).
 
 use crate::error::StorageError;
@@ -16,14 +16,14 @@ pub(super) fn workdir(repo: &git2::Repository) -> Result<&std::path::Path, Stora
     })
 }
 
-/// The fence's admission rule for one staged path: what enters a
-/// fence, what is skipped, and what refuses the wave (storage-SPEC 8-8).
+/// The checkpoint's admission rule for one staged path: what enters a
+/// checkpoint, what is skipped, and what refuses the wave (storage-SPEC 8-8).
 ///
 /// git asks with 1 for skip and 0 for stage, and hands over paths
 /// relative to the repository's working tree - so the alias question is
 /// asked of the joined path, or it asks about the process's directory
 /// instead of the city's. Session projections and protected metadata
-/// are skipped - their bytes have another home and a fence has no
+/// are skipped - their bytes have another home and a checkpoint has no
 /// business carrying them. A link is never skipped: one anywhere in the
 /// scope refuses the whole wave, because a name that leads into a
 /// reserved file would capture reserved bytes under a lying name, and

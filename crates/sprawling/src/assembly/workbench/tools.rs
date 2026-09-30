@@ -139,13 +139,13 @@ impl Laying {
         let succession = Arc::new(Mutex::new(runtime::SuccessionDesk::new()));
         let succeed = runtime::SucceedTool::new(Arc::clone(&succession))?;
         // The net, not the forecast, is the defence (semantic authority
-        // 4.4). Two handles on one repository: the bench fences a
-        // command its forecast suspects, and the driver fences every
+        // 4.4). Two handles on one repository: the bench checkpoints a
+        // command its forecast suspects, and the driver checkpoints every
         // wave, so whatever a wave deletes has a commit to come back
         // from. Both stand where the run writes, which is its own tree
         // when the building asks for review.
         // One reading of the write domain feeds both: what the bench
-        // admits and what its fence stages are the same set by
+        // admits and what its checkpoint stages are the same set by
         // definition (storage-SPEC section 8-18), and taking them from
         // one call is what keeps them that way.
         let domain = site.rules.write_domain()?;

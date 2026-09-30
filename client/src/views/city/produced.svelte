@@ -10,7 +10,7 @@
   // and hands them to that same line; only the rows drawn ask, which the
   // city's `FIRST` cut keeps to a handful.
   import Produced from "../talk/produced.svelte";
-  import { lastFenceIn } from "../talk/trace";
+  import { lastCheckpointIn } from "../talk/trace";
   import { ui } from "../../ui";
   import type { RunId } from "../../wire";
 
@@ -26,7 +26,7 @@
     const held = $asked;
     if (held === undefined || !("rounds" in held)) return null;
     const base = held.rounds.opened_at ?? null;
-    const head = lastFenceIn(held.rounds.turns);
+    const head = lastCheckpointIn(held.rounds.turns);
     return base === null ? null : { base, head: head === base ? null : head };
   });
 </script>

@@ -104,7 +104,7 @@
         </button>
         {#if open === file.path}
           {#if head === null}
-            <p class="pb-base text-text-faint">{say($lang, "run_patch_needs_fence")}</p>
+            <p class="pb-base text-text-faint">{say($lang, "run_patch_needs_checkpoint")}</p>
           {:else if patchRead.kind === "unavailable" && patchQuestion !== null}
             <Unanswered query={patchRead.query} asked={patchQuestion} />
           {:else if patch === undefined}

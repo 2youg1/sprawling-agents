@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a fence stages, scans and commits: the scope boundary, the
+//! What a checkpoint stages, scans and commits: the scope boundary, the
 //! staged-secret refusal, and the boundary an empty scope means.
 
 use super::super::provenance::{ModelChoice, Provenance};
@@ -94,9 +94,9 @@ fn every_commit_the_city_makes_names_the_session_that_made_it() {
 }
 
 /// A restart must not open a window a credential can walk through.
-/// A new process remembers no fence, so the scan compares against
-/// HEAD - which a wave fence deliberately does not move, and which is
-/// therefore an ancestor of the last fence. Comparing against an
+/// A new process remembers no checkpoint, so the scan compares against
+/// HEAD - which a wave checkpoint deliberately does not move, and which is
+/// therefore an ancestor of the last checkpoint. Comparing against an
 /// ancestor reads more, never less, so what changed before the
 /// restart is still read.
 #[test]
@@ -153,10 +153,10 @@ fn a_wave_whose_scope_crosses_a_link_is_refused() {
 }
 
 /// A HEAD that cannot be read is not an empty city. Read as "no
-/// history", it would make the fence a parentless root commit and cut
+/// history", it would make the checkpoint a parentless root commit and cut
 /// the Ledger's oid off from everything before it, with nobody told.
 #[test]
-fn a_head_that_cannot_be_read_refuses_the_fence_instead_of_orphaning_it() {
+fn a_head_that_cannot_be_read_refuses_the_checkpoint_instead_of_orphaning_it() {
     let tmp = tempfile::tempdir().unwrap();
     write(tmp.path(), "work/note.md", "a line");
     let mut first = Checkpoint::open(tmp.path()).unwrap();

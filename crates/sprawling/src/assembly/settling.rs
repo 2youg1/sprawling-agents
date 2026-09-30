@@ -18,7 +18,7 @@ use kernel::Locator;
 /// sweep adds to it: a discard a person has to answer is raised here
 /// rather than during the drive.
 pub(super) struct Sweep<'a> {
-    pub(super) fenced: &'a [String],
+    pub(super) checkpointed: &'a [String],
     pub(super) raised: &'a mut Vec<kernel::ApprovalItem>,
     pub(super) job_locator: &'a Locator,
 }

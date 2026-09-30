@@ -54,7 +54,7 @@ Fork 三规则；重放/分叉/幂等；at_seq 越界、未知 kind、崩溃恢�
 
 ## 6 命名统一
 
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政（`storage::checkpoint::Checkpoint` 住 `fence` 同例）。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政（`storage::checkpoint::Checkpoint` 住 `checkpoint` 同例）。
 
 replay、verify、VerifiedLedger、VerifiedLine、fork prefix、`at_seq`。不引入「重播/回放/复演」等同义词。
 
@@ -233,8 +233,8 @@ impl Turn<Recording> {
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。
 - **前缀冻结是运行时不变量，不只是测试。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名一条走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
 - **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
-- **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行段与并行段共用，所以账本字节与串行执行完全一致（`tests/run_driver.rs` 与 `turn/tests/concurrent.rs` 对拍）。第一条非只读调用就是 fence：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
-- **`ConcurrentInvoke` 是三段，不是一个闭包。** 放行（`admit`，`&mut`，按调用序）、执行（`tool` 借出 `&dyn Tool`，`&self`，各条在 scope 线程上调它的 `invoke`）、记账（`account`，`&mut`，按调用序）。一个包着 bench 的闭包表达不了这个次序：放行与记账写同一张去重表与同一份 taint，而 bench 不是 `Sync`（checkpoint 持有 git 仓库句柄），工具是（`kernel::Tool: Send + Sync`，`invoke(&self)`；有内部状态的工具把状态放在自己的锁后）。三个闭包也不行：三者要借同一个 bench，一个要 `&`、两个要 `&mut`。所以它是 trait——第二实现在缝上已经存在：闭包的全覆盖实现（放行即作答，不报效果，于是 citysim 与脚本化工具的测试走串行、字节不动），与装配层 `bin::assembly::driving::placing` 的 bench 实现（sprawling-SPEC §8-31）。只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；`IdemKey` 的位置在放行时按调用序定下，exec 计数与 fence 记录在记账时按调用序累加，所以它们与串行波逐字相同。落选的是「lane 把整个 bench 放进锁、闭包取 `Sync`」：锁把三条读排成一条队，并行只剩名字。生产路径由 `tests/run_driver.rs` 的三读测试守着：`drive` 走 `lifecycle` 到 `execute_concurrent`，三条读彼此重叠，账本与串行逐行相同。
+- **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行段与并行段共用，所以账本字节与串行执行完全一致（`tests/run_driver.rs` 与 `turn/tests/concurrent.rs` 对拍）。第一条非只读调用就是 checkpoint：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
+- **`ConcurrentInvoke` 是三段，不是一个闭包。** 放行（`admit`，`&mut`，按调用序）、执行（`tool` 借出 `&dyn Tool`，`&self`，各条在 scope 线程上调它的 `invoke`）、记账（`account`，`&mut`，按调用序）。一个包着 bench 的闭包表达不了这个次序：放行与记账写同一张去重表与同一份 taint，而 bench 不是 `Sync`（checkpoint 持有 git 仓库句柄），工具是（`kernel::Tool: Send + Sync`，`invoke(&self)`；有内部状态的工具把状态放在自己的锁后）。三个闭包也不行：三者要借同一个 bench，一个要 `&`、两个要 `&mut`。所以它是 trait——第二实现在缝上已经存在：闭包的全覆盖实现（放行即作答，不报效果，于是 citysim 与脚本化工具的测试走串行、字节不动），与装配层 `bin::assembly::driving::placing` 的 bench 实现（sprawling-SPEC §8-31）。只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；`IdemKey` 的位置在放行时按调用序定下，exec 计数与 checkpoint 记录在记账时按调用序累加，所以它们与串行波逐字相同。落选的是「lane 把整个 bench 放进锁、闭包取 `Sync`」：锁把三条读排成一条队，并行只剩名字。生产路径由 `tests/run_driver.rs` 的三读测试守着：`drive` 走 `lifecycle` 到 `execute_concurrent`，三条读彼此重叠，账本与串行逐行相同。
 
 - **生成中起跑只读调用（`runtime::turn::speculation`，形状 2 值：按位置的缓存 `Speculated`）。** `Generating::Speculating` 让 `call` 走 `Model::call_speculating`；模型每交出一条调用，只要它排在本回答第一条非只读调用之前、`effect_of` 答 `Effect::Read`、`ahead` 借得出工具，它就在一个 `std::thread::scope` 线程上起跑，scope 在模型调用返回前 join 全部线程，于是一回合的墙钟约等于 max(工具, 生成)，而不是两者之和。结果按调用在回答中的位置缓存进 `Turn<ToolWave>`，连同起跑时的那条调用；入账时仍按调用序先 `admit`，放行（`Cleared`）且该位置缓存的调用与结算后那条逐字段相等，才用缓存结果，否则照常执行——所以 `tool_called`／`tool_result` 的字节、顺序与串行波相同，推测结果本身不是事件。回答失败（流被切断、恢复段重发）时整份缓存随那次尝试丢弃；取消落在 k 处时 k 之后的缓存随 `Turn` 丢弃；`admit` 自己作答（重放、门拒绝）时该位置的缓存丢弃。哪些调用可以提前、缓存按什么序入账，权威是 `adversary/design/Speculating.lean`：越过第一条写调用推测会让读看到写之前的世界（`speculating_past_a_write_changes_the_ledger`）。**起跑不问 `still_going`**：一个已立的取消挡不住早读，它们的结果随 `Turn` 丢弃；代价是被停的 run 仍做完这些读，模型调用失败时也要等它们 join 才返回，而它们都无副作用，所以不越过任何门。**起跑先于放行**：放行写去重表与 taint，被截断的回答得把它们撤回，而只读调用的结果在放行前算出、放行后才用，被拒的那条结果从不到达模型与账本。落选的是「推测时就 `admit`」：它要为截断与取消各写一条撤销路径。`ahead` 有默认 `None`，闭包的全覆盖实现因此不提前起跑，citysim 字节不动；bench 的实现按名借出（`ToolBench::tool_named`，与 `tool_for` 同一张表）。
 
@@ -823,8 +823,8 @@ impl ToolBench {
     pub fn invoke(&mut self, call: &ToolCall, key: &IdemKey, now: TimeMs)
         -> Result<BenchOutcome, AxError>;
     // invoke 是下面三段按序串起来的一条调用，三段各自公开，供并行的工具波分开用：
-    /// 串行的放行：去重、各道门、exec 的 forecast fence。答得出的（重放、门拒、门问）当场答，
-    /// 否则交出放行单 `Ticket`（键、工具名、效果、fence 的 oid —— 私有）。
+    /// 串行的放行：去重、各道门、exec 的 forecast checkpoint。答得出的（重放、门拒、门问）当场答，
+    /// 否则交出放行单 `Ticket`（键、工具名、效果、checkpoint 的 oid —— 私有）。
     pub fn clear(&mut self, call: &ToolCall, key: &IdemKey, now: TimeMs) -> Result<Clearance, AxError>;
     pub enum Clearance { Answered(BenchOutcome), Cleared(Ticket) }
     /// 可并行的执行：交出放行单指向的工具本身，调用方在任意线程上调它的 `invoke`，
@@ -849,13 +849,13 @@ impl ToolBench {
     fn crossed(&mut self, outcome: EgressOutcome) -> Option<BenchOutcome>;
     /// 包信封的调用者要读 `temporal` 才知道时钟行该不该发。
     pub fn meta_of(&self, name: &ToolName) -> Option<&ToolMeta>;
-    /// 栅栏署名随网一起交给 bench。一个没有 `Provenance` 的栅栏
-    /// 写不出 `Sprawling-Run:`，而预测栅栏恰恰是在一个拿不到运行上下文的
+    /// 检查点署名随网一起交给 bench。一个没有 `Provenance` 的检查点
+    /// 写不出 `Sprawling-Run:`，而预测检查点恰恰是在一个拿不到运行上下文的
     /// 闭包里升起的，所以它在装配时就被交下。
     pub fn with_checkpoint(self, net: CheckpointNet) -> ToolBench;
-    /// 栅栏的三件东西恒同行：仓、它盖住的范围、写它的人。
+    /// 检查点的三件东西恒同行：仓、它盖住的范围、写它的人。
     pub struct CheckpointNet { pub checkpoint: Checkpoint, pub scope: Vec<String>, pub of: Provenance }
-    // `scope` 是这次 run 的**写域全部前缀**，不是它的房间：栅栏窄于写域，
+    // `scope` 是这次 run 的**写域全部前缀**，不是它的房间：检查点窄于写域，
     // 两者之间写下的文件就进不了任何检查点（storage-SPEC §8-18）。
     /// 本 bench 服务的那份活。Spawn 门要铸一个人答得出的条目，
     /// 条目要有 actor（问谁）与 artifact（看什么）；两者都不在一次工具调用里。
@@ -865,11 +865,11 @@ impl ToolBench {
 ```
 
 - L0 三件恒列 prefix（City.md 只放这一级）；catalog 只收 L2——L0 不进 catalog（名字即文档）但 tool_defs 恒含三件（wire 面要 schema）。
-- **否决「Suspected → Discard 门」**：它与 kernel 既有设计冲突，以 kernel 为准。理由：`DiscardRequest` 只有 `Planned`／`Unplanned` 两变体，而 `decide` 对 `Unplanned` **恒判 Deny(NoRestoration)**——把 forecast 的预判包成 Unplanned 送进门，等于让任何含 `rm ` 的 exec 调用全被拒。`kernel::discard` 的注释早已写明正确意图：「text prediction is obfuscatable by design — hits route conservatively, and the git checkpoint net (S3) is the honest backstop」。故 **Suspected 不拒而围栏**：强制 `checkpoint.wave_pre` 先行再放行，删掉的东西因而可回档；**无 checkpoint 网时才拒**（`E_TOOL_UNAVAILABLE`），因为「无保护地跑」是唯一没人选择的结局。此路由使 A14 的先行半链在 exec 臂上机械成立。
+- **否决「Suspected → Discard 门」**：它与 kernel 既有设计冲突，以 kernel 为准。理由：`DiscardRequest` 只有 `Planned`／`Unplanned` 两变体，而 `decide` 对 `Unplanned` **恒判 Deny(NoRestoration)**——把 forecast 的预判包成 Unplanned 送进门，等于让任何含 `rm ` 的 exec 调用全被拒。`kernel::discard` 的注释早已写明正确意图：「text prediction is obfuscatable by design — hits route conservatively, and the git checkpoint net (S3) is the honest backstop」。故 **Suspected 不拒而先立检查点**：强制 `checkpoint.wave_pre` 先行再放行，删掉的东西因而可回档；**无 checkpoint 网时才拒**（`E_TOOL_UNAVAILABLE`），因为「无保护地跑」是唯一没人选择的结局。此路由使 A14 的先行半链在 exec 臂上机械成立。
 - ToolBench 持 `Option<Checkpoint>` 具体类型而非新 trait：checkpoint 只有一个实现，为尚不存在的第二实现引缝会造空抽象（AGENTS.md：trait 只在已有第二实现的缝上引入）。
 - **`BenchOutcome` 穷尽**：它是判定输出，下游必须穷尽匹配三臂——新增一种答案而不回答它就不编译（§7）；本 crate 的枚举全部如此，没有 `#[non_exhaustive]`，也没有通配臂。
 - **三条规则各有一处**：`GateOutcome` 对本 bench 意味着什么只住 `settled`（Allow 放行、Deny 与 Ask 都以 `Refused` 回流），「首次公开出网要记下来」只住 `crossed`，参数的秘密扫描只序列化一次；`admit` 是那个 `match effect` 自己的名字。一份规则在几处各有一份实现，就是几个可以各自漂走的权威。
-- `BenchOutcome` 三态：`Ran{outcome, fenced}`（fenced 携围栏 oid，供波后补记）／`Refused{refusal}`（回流不终止回合；门的提问也走这一臂）／`Duplicate{outcome}`。dedup 先于任何副作用；**key 在工具答过之后才记入 `seen`**，故被门拒的调用重试不算重放。**判重是 `seen` 上的一次 O(log n) 查找**，不抄键、不另立一张「领过权」的集合：第二张集合记的是 `seen` 键集的同一个事实，两份拷贝迟早分叉。工具按 `ToolName` 登记，`invoke` 以调用自带的名字查表，路由一次调用不分配。
+- `BenchOutcome` 三态：`Ran{outcome, checkpointed}`（checkpointed 携检查点 oid，供波后补记）／`Refused{refusal}`（回流不终止回合；门的提问也走这一臂）／`Duplicate{outcome}`。dedup 先于任何副作用；**key 在工具答过之后才记入 `seen`**，故被门拒的调用重试不算重放。**判重是 `seen` 上的一次 O(log n) 查找**，不抄键、不另立一张「领过权」的集合：第二张集合记的是 `seen` 键集的同一个事实，两份拷贝迟早分叉。工具按 `ToolName` 登记，`invoke` 以调用自带的名字查表，路由一次调用不分配。
 - status 的 result 是**按冻结序渲染的文本**而非 JSON 对象：`serde_json::Map` 对键排序，JSON 对象没有读者可依赖的序，「冻结序」会悄悄变成字母序。序是「模型读到的东西」的属性，故落在模型读到的地方。
 - 声明 `Egress` 的生产工具是浏览器工具（`bin::browser_tool`）；声明 `Spend` 的工具本构建没有，那扇门以测试替身驱动。
 
@@ -905,7 +905,7 @@ pub enum Advance { Turned, Concluded(Completion) }        // 穷尽；新结局�
 pub struct RunHooks<'a> {            // 闭包，不是 trait：本模块只有一个消费者形式；invoke 除外
     pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,        // 时间入参，本模块恒不采样
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,       // 安全点由我定，信号由你答
-    pub fence: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,  // 波前 checkpoint
+    pub checkpoint: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,  // 波前 checkpoint
     pub writes: &'a dyn Fn(&ToolCall) -> Writes,                    // 这条调用会不会写（§8-45）
     pub invoke: &'a mut dyn ConcurrentInvoke,   // 一波的工具，三段（§8-3）；回合时间戳随 admit 行
     pub wait: &'a mut dyn FnMut(TimeMs) -> NextCall,               // 等到 Watchdog 给的 until；途中来了 Halt 就立刻答 Halted
@@ -929,7 +929,7 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
 - **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
 - **第四种结束：回合中途的失败。** **两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件**：带 `Carrier::Event` 的码先写载体事件，`Carrier::Loadtime` 的码直接冻结。理由：「账本自身就是受害者时，没有什么真实的东西可写」对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立——供应方把兑换格式写错与账本健否无关；而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抛，这比预先判定「写不进去」更诚实。一次没有冻结的 run 在账本上只剩 `run_started`，重启后仍报 `frozen: false`，页面就把每条消息都当 `steer` 发。冻结后**原错误仍然向上抛**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
 - **Conversation 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
-- **闭包而非 trait，`invoke` 除外**：`now`／`interrupt`／`fence`／`wait` 的第二实现尚不存在，而本库的纪律是 trait 只在已有第二实现的缝上引入；`invoke` 是 §8-3 的 `ConcurrentInvoke`，它的第二实现已在缝上。`RunHooks` 自身只是引用的容器，不持策略。
+- **闭包而非 trait，`invoke` 除外**：`now`／`interrupt`／`checkpoint`／`wait` 的第二实现尚不存在，而本库的纪律是 trait 只在已有第二实现的缝上引入；`invoke` 是 §8-3 的 `ConcurrentInvoke`，它的第二实现已在缝上。`RunHooks` 自身只是引用的容器，不持策略。
 ### 8-16 runtime::digest（形状 1 判定＋形状 2 值类型）
 
 ```rust
@@ -1102,7 +1102,7 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 |---|---|
 | `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_storage` |
 | `bench/admit.rs` | 门：`admit` 按 `Effect` 分派到 Write／Connector／Egress／Spawn／Govern 各门，`settled`／`crossed` 把一次判定翻译成 `BenchOutcome`，`scanned` 为两扇朝外的门备好密钥扫描的字节 |
-| `bench/tests.rs` | 去重、门、taint、fence 与注册冲突的夹具 |
+| `bench/tests.rs` | 去重、门、taint、checkpoint 与注册冲突的夹具 |
 
 ### 8-20 runtime::replay 目录化
 
@@ -1133,7 +1133,7 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 | 文件 | 管什么 |
 |---|---|
 | `run.rs` | 一个 Run 的常量与状态类型（`RunPlan`／`SafePoint`／`Advance`／`RunHooks`／`Active`／`Frozen`／`Run<S>`）、`impl Run<Frozen>` 的三个读法、载荷构造 `payload`，以及驱动循环 `drive`。`drive` 带 `argument_count` 豁免，故留在原路径 |
-| `run/lifecycle.rs` | 一个活着的 Run 在账本上做的三件事：`dispatch` 的调度对（job pin＋run_started）、`advance` 的一回合（四个安全点、波前围栏、报告前推入窗），以及唯一出口 `freeze`（handoff_written＋run_frozen）；连同只有 `advance` 用得上的 `fold_steer` |
+| `run/lifecycle.rs` | 一个活着的 Run 在账本上做的三件事：`dispatch` 的调度对（job pin＋run_started）、`advance` 的一回合（四个安全点、波前检查点、报告前推入窗），以及唯一出口 `freeze`（handoff_written＋run_frozen）；连同只有 `advance` 用得上的 `fold_steer` |
 
 **`impl Run<Active>` 保持为一整块，不按 dispatch／advance／freeze 三分**：`cargo public-api` 按 impl 块计数，三分会让公开面输出多出四行而规范路径不变。
 
@@ -1777,11 +1777,11 @@ impl ContextReminder { pub fn render(&self) -> String; }
 
 ```rust
 seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>   // ToolBench 私有
-pub enum BenchOutcome { …, Duplicate { outcome: ToolOutcome } }   // 调用方回第一次的 ToolOutcome，fenced 为空
+pub enum BenchOutcome { …, Duplicate { outcome: ToolOutcome } }   // 调用方回第一次的 ToolOutcome，checkpointed 为空
 ```
 
 - **写入点**：键与答在工具答过之后一起写入（`account`），失败的答也记下；被门拒的调用不入表，所以被门拒后的重试不算重放。
-- **`Duplicate` 仍是一个独立变体而不是并进 `Ran`**：`fenced` 对重放恒为空，而 `Ran` 的调用方要按 `fenced` 决定波后清扫；把两者合并会让「这一波要不要扫」多出一个恒空的分支。
+- **`Duplicate` 仍是一个独立变体而不是并进 `Ran`**：`checkpointed` 对重放恒为空，而 `Ran` 的调用方要按 `checkpointed` 决定波后清扫；把两者合并会让「这一波要不要扫」多出一个恒空的分支。
 - **代价写在明处**：一次运行期间每个成功调用的结果都留在内存里。这与 `seen` 本来就要活到运行结束是同一条寿命，多出来的是 payload 的字节；一次运行的工具调用数以百计而非以百万计。
 
 ### 8-38 sink 收到的是一条 entry，不是一行文本（形状 2 值类型）
@@ -1966,31 +1966,31 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 - **唯一的失败**：`Exchange::compact` 在一段文本计不进 `u64` 时以 `E_INVALID_ARGS` 报（动作＝压缩这一回合的 exchange，主体＝那段文本，recovery 指向本模块）——这是「没有人解析得了的窗口字节」，不是可恢复的压缩结果。live 路径（`record`）与回放路径（`fold_run`）在同一个值上走同一次判定，故同一段文本两边同样拒，回放不会因为压缩而少一条分支。
 - **数字一个家**：预算只住 `consts_policy::EXCHANGE_BUDGET_BYTES`，本文件不复写它的值。
 
-### 8-45 runtime::run::fence（形状 1 判定；**一波前立不立 fence 的唯一权威**）
+### 8-45 runtime::run::checkpoint（形状 1 判定；**一波前立不立 checkpoint 的唯一权威**）
 
 ```rust
-pub(crate) enum Fence { Skip, Stage }
+pub(crate) enum WaveCheckpoint { Skip, Stage }
 pub(crate) enum Wave { Empty, ReadOnly, MayWrite }  // 由 RunHooks::writes 逐个调用读出
-enum SinceFence { Unfenced, Fenced, Changed }   // 相对本 run 上一次 fence 的树
-pub(crate) struct FencePolicy { since: SinceFence }
-impl FencePolicy {
-    pub(crate) fn opening() -> Self;                                   // Unfenced
-    pub(crate) fn for_wave(&self, wave: Wave) -> Fence;                // 只读
-    pub(crate) fn record_wave(&mut self, fence: Fence, wave: Wave);    // 只改状态
+enum SinceCheckpoint { NotYet, Checkpointed, Changed }   // 相对本 run 上一次 checkpoint 的树
+pub(crate) struct CheckpointPolicy { since: SinceCheckpoint }
+impl CheckpointPolicy {
+    pub(crate) fn opening() -> Self;                                   // NotYet
+    pub(crate) fn for_wave(&self, wave: Wave) -> WaveCheckpoint;                // 只读
+    pub(crate) fn record_wave(&mut self, checkpoint: WaveCheckpoint, wave: Wave);    // 只改状态
 }
 // RunHooks 上：
 pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes;   // 按声明的 Effect 答（Writes::of），未注册的名字答 Domain
 ```
 
-- **fence 做两件事**：一是给这一波可能删改的东西留一个能回退的提交；二是把上一波写下的文件带进一个提交——否则那些写既进不了 diff，也还原不回来。所以判定看两样：这一波要调用什么，以及上一次 fence 之后有没有调用跑过。
+- **checkpoint 做两件事**：一是给这一波可能删改的东西留一个能回退的提交；二是把上一波写下的文件带进一个提交——否则那些写既进不了 diff，也还原不回来。所以判定看两样：这一波要调用什么，以及上一次 checkpoint 之后有没有调用跑过。
 - **波的分类**：没有调用 → `Empty`；每个调用的 `RunHooks::writes` 都答 `Nothing` → `ReadOnly`；否则 `MayWrite`。
-- **判定表**：`Changed`（上次 fence 后跑过可能写的调用）→ `Stage`，空波与只读波也一样；`Unfenced` 且 `MayWrite` → `Stage`；`Unfenced` 且 `Empty`／`ReadOnly` → `Skip`（树就是 run 开张时那棵）；`Fenced`（fence 之后没有可能写的调用跑过）→ `Skip`，上一个提交已经是这棵树。
-- **状态转移**：`MayWrite` → `Changed`（被取消打断的波也算，它的部分调用可能已经跑了）；`Empty`／`ReadOnly` 且立了 fence → `Fenced`；`Empty`／`ReadOnly` 且跳过 → 不变。只读波不改树，所以它既不需要自己的 fence，也不让下一波的 fence 多出一次提交。`Run<Active>` 持一个 `FencePolicy`，`advance` 只在 `Stage` 时调用 `RunHooks::fence` 并写 `checkpoint_committed`。
-- **为什么是一个模块**：「这一波要不要 fence」是一个判定，后面两条规则（只读波、按写过的路径 stage）都只改这一处。
-- **`Stage` 带什么由调用方定**：`RunHooks::fence` 仍只收时刻；stage 哪些路径，由持有 `ToolBench` 的一侧决定，因为只有 bench 知道每个调用的工具。`ToolBench::invoke` 在 `BenchOutcome::Ran.wrote` 里交回工具的 `Tool::writes`（kernel-SPEC `Writes`）；sprawling 的 lane 把上次 fence 以来各调用的 `wrote` 用 `Writes::and` 并起来，下一次 fence 只 stage 这些路径，并在 fence 后清零。run 的第一次 fence、以及并出来是 `Domain` 或 `Nothing` 的那次，stage 整个写域：第一次之前的树没有任何本 run 的提交担保；`Nothing` 出现在 run 的第一道 fence：那时还没有调用跑过。**失败的调用并入 `Domain`**：`ToolBench::invoke` 答 `Err` 时没有 `wrote`，而工具可能写到一半才失败，它自己对写了什么的说法不再可信；lane 于是把 `Domain` 并进去，下一次 fence stage 整个写域。只丢掉它、留下同波其他调用的 `Paths`，会让那半截写不进任何提交。**被否**：`RunHooks::fence` 收一个范围参数——run 驱动拿不到工具的 `Effect`，这个参数只能由 lane 填，等于把同一个并集在两层各拼一次。
+- **判定表**：`Changed`（上次 checkpoint 后跑过可能写的调用）→ `Stage`，空波与只读波也一样；`NotYet` 且 `MayWrite` → `Stage`；`NotYet` 且 `Empty`／`ReadOnly` → `Skip`（树就是 run 开张时那棵）；`Checkpointed`（checkpoint 之后没有可能写的调用跑过）→ `Skip`，上一个提交已经是这棵树。
+- **状态转移**：`MayWrite` → `Changed`（被取消打断的波也算，它的部分调用可能已经跑了）；`Empty`／`ReadOnly` 且立了 checkpoint → `Checkpointed`；`Empty`／`ReadOnly` 且跳过 → 不变。只读波不改树，所以它既不需要自己的 checkpoint，也不让下一波的 checkpoint 多出一次提交。`Run<Active>` 持一个 `CheckpointPolicy`，`advance` 只在 `Stage` 时调用 `RunHooks::checkpoint` 并写 `checkpoint_committed`。
+- **为什么是一个模块**：「这一波要不要 checkpoint」是一个判定，后面两条规则（只读波、按写过的路径 stage）都只改这一处。
+- **`Stage` 带什么由调用方定**：`RunHooks::checkpoint` 仍只收时刻；stage 哪些路径，由持有 `ToolBench` 的一侧决定，因为只有 bench 知道每个调用的工具。`ToolBench::invoke` 在 `BenchOutcome::Ran.wrote` 里交回工具的 `Tool::writes`（kernel-SPEC `Writes`）；sprawling 的 lane 把上次 checkpoint 以来各调用的 `wrote` 用 `Writes::and` 并起来，下一次 checkpoint 只 stage 这些路径，并在 checkpoint 后清零。run 的第一次 checkpoint、以及并出来是 `Domain` 或 `Nothing` 的那次，stage 整个写域：第一次之前的树没有任何本 run 的提交担保；`Nothing` 出现在 run 的第一道 checkpoint：那时还没有调用跑过。**失败的调用并入 `Domain`**：`ToolBench::invoke` 答 `Err` 时没有 `wrote`，而工具可能写到一半才失败，它自己对写了什么的说法不再可信；lane 于是把 `Domain` 并进去，下一次 checkpoint stage 整个写域。只丢掉它、留下同波其他调用的 `Paths`，会让那半截写不进任何提交。**被否**：`RunHooks::checkpoint` 收一个范围参数——run 驱动拿不到工具的 `Effect`，这个参数只能由 lane 填，等于把同一个并集在两层各拼一次。
 - **调用可能不可能写，由 `RunHooks::writes` 答**：`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里，所以 lane 在把 bench 借给 `invoke` 之前取出 `ToolBench::declared_writes`（名字到 `Writes::of(effect)` 的表），`writes` 查这张表。它按声明答，不按参数答：判定发生在波跑之前，而 `Tool::writes` 读的是一条跑完的调用。**被否**：`RunPlan` 带名字到 `Effect` 的表——`RunPlan` 是冻结的 run 描述，进账本的重放读它，而工具的 `Effect` 是 bench 注册时的事实，不该在两处各记一份。
-- **否决「空波一律跳过」**：结束回合的空波前那次 fence，是把上一波的写带进提交的唯一时机；跳过它，run 写下的文件就没有任何提交持有。
-- **否决「每波都 fence」**：一个没跑过任何调用的 run，提交的是一棵没变的树，却多付一次 stage 与 commit。
+- **否决「空波一律跳过」**：结束回合的空波前那次 checkpoint，是把上一波的写带进提交的唯一时机；跳过它，run 写下的文件就没有任何提交持有。
+- **否决「每波都 checkpoint」**：一个没跑过任何调用的 run，提交的是一棵没变的树，却多付一次 stage 与 commit。
 
 ### 8-46 runtime::bench::outside（形状 1 判定；**外来内容进 run 的唯一入口**）
 

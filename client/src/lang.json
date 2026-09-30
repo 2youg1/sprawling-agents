@@ -2167,9 +2167,9 @@
     "en": "no evidence",
     "zh": "没有证据"
   },
-  "run_no_fence": {
+  "run_no_checkpoint": {
     "en": "no checkpoint",
-    "zh": "没有栅栏"
+    "zh": "没有检查点"
   },
   "run_no_prompt": {
     "en": "this run has no prompt on record",
@@ -2183,9 +2183,9 @@
     "en": "output",
     "zh": "输出"
   },
-  "run_patch_needs_fence": {
-    "en": "after the next fence",
-    "zh": "下一道栅栏后"
+  "run_patch_needs_checkpoint": {
+    "en": "after the next checkpoint",
+    "zh": "下一个检查点后"
   },
   "run_prompt": {
     "en": "prompt",

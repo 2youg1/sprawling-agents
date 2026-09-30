@@ -19,7 +19,7 @@ use crate::prefix::shape::PromptShape;
 use crate::reminder::ContextGauge;
 use crate::turn::{Generating, Interrupt, PhaseOutcome, RunPrompt, Turn, TurnReport};
 
-use super::fence::{Fence, FencePolicy, Wave};
+use super::checkpoint::{CheckpointPolicy, Wave, WaveCheckpoint};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 
 /// A steer changes what the model reads next, so the driver folds it into
@@ -121,7 +121,7 @@ impl Run<Active> {
                 gauge,
                 prior_shape: None,
                 prompt: crate::turn::PromptRecord::default(),
-                fence: FencePolicy::opening(),
+                checkpoint: CheckpointPolicy::opening(),
             },
         })
     }
@@ -207,12 +207,12 @@ impl Run<Active> {
         if let Some(usage) = turn.usage() {
             self.plan.context.record(usage.input_tokens);
         }
-        // The fence goes up before the wave, not before a suspicious call:
+        // The checkpoint goes up before the wave, not before a suspicious call:
         // anything the wave deletes then has a commit to come back from.
         let touches = Wave::of(turn.calls(), hooks.writes);
-        let decided = self.state.fence.for_wave(touches);
-        if let (Fence::Stage, Some(fence)) = (decided, hooks.fence.as_mut()) {
-            let committed = fence(t)?;
+        let decided = self.state.checkpoint.for_wave(touches);
+        if let (WaveCheckpoint::Stage, Some(checkpoint)) = (decided, hooks.checkpoint.as_mut()) {
+            let committed = checkpoint(t)?;
             ledger.append(EventDraft {
                 run: self.plan.run,
                 t,
@@ -224,7 +224,7 @@ impl Run<Active> {
             })?;
         }
 
-        self.state.fence.record_wave(decided, touches);
+        self.state.checkpoint.record_wave(decided, touches);
 
         let wave = (hooks.interrupt)(SafePoint::BeforeWave { turn: index });
         fold_steer(&mut self.state.conversation, &wave);

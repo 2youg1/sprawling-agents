@@ -276,7 +276,7 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
 /// The symptom this pins came out of a live city: the Mayor wrote a
 /// document beside its own room, the file sat in the working tree, and
 /// asking git's whole history for that path answered nothing. Every
-/// fence had staged the room, while the door that admitted the
+/// checkpoint had staged the room, while the door that admitted the
 /// write judges it against the building. Anything written in that gap
 /// reached no checkpoint, so `Query::Changes` was empty for a city that
 /// had been writing all along, and `file_discarded` had nothing to
@@ -285,7 +285,7 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
 /// Through the production path, because the claim is about what the
 /// repository ends up holding rather than about one function's return.
 #[test]
-fn a_fence_carries_what_the_run_may_write_and_not_only_its_room() {
+fn a_checkpoint_carries_what_the_run_may_write_and_not_only_its_room() {
     let dir = tempfile::tempdir().unwrap();
     let repo = a_note_beside_the_hall(dir.path());
 
@@ -293,7 +293,7 @@ fn a_fence_carries_what_the_run_may_write_and_not_only_its_room() {
     // building the Mayor's domain covers.
     assert!(
         dir.path().join("hall").join("note.md").exists(),
-        "the write has to land before a fence can be asked to carry it"
+        "the write has to land before a checkpoint can be asked to carry it"
     );
     let note = std::path::Path::new("hall/note.md");
     let carried: Vec<String> = repo
@@ -314,14 +314,14 @@ fn a_fence_carries_what_the_run_may_write_and_not_only_its_room() {
     );
 }
 
-/// The fence after a wave stages the paths that wave's calls said they
+/// The checkpoint after a wave stages the paths that wave's calls said they
 /// wrote, not the whole write domain: `edit` knows its one file, so the
-/// closing fence has no reason to walk the building for it
-/// (runtime-SPEC section 8-45). The first fence of the run still takes
+/// closing checkpoint has no reason to walk the building for it
+/// (runtime-SPEC section 8-45). The first checkpoint of the run still takes
 /// the whole domain, because no commit of this run vouches for the tree
 /// before it.
 #[test]
-fn the_fence_after_an_edit_stages_the_edited_path_and_not_the_domain() {
+fn the_checkpoint_after_an_edit_stages_the_edited_path_and_not_the_domain() {
     let dir = tempfile::tempdir().unwrap();
     let repo = a_note_beside_the_hall(dir.path());
     let mut subjects: Vec<String> = repo
@@ -373,7 +373,7 @@ fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
 
 /// The city's genesis hash is read from the ledger once and remembered:
 /// it is the one fact about a city that cannot change without the city
-/// being a different one, so no fence, landing or merge re-reads the
+/// being a different one, so no checkpoint, landing or merge re-reads the
 /// front of the history to learn it (sprawling-SPEC.md 8-51).
 #[test]
 fn the_citys_genesis_hash_is_read_once_and_survives_the_ledger_going_away() {

@@ -69,7 +69,7 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
     way_back.insert(
         "tracked".to_owned(),
         // A real checkpoint oid, because the plan is parsed rather
-        // than copied: `wave_post` writes the commit it fenced, and
+        // than copied: `wave_post` writes the commit it checkpointed, and
         // a locator that does not parse is not a way back.
         serde_json::Value::String(format!("file:lab/room1/notes.md@{}", "ab".repeat(20))),
     );

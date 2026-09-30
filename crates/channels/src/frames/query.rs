@@ -84,13 +84,13 @@ pub enum Query {
     /// The caller names both ends because it already knows them - a
     /// checkpoint's oid is in the `checkpoint_committed` payload the
     /// client folded - and computing the pair a second time on the
-    /// server would be a second answer to "which fences belong to this
+    /// server would be a second answer to "which checkpoints belong to this
     /// session". Both oids are immutable, so the answer is cacheable
     /// forever by anybody who wants to.
     ///
     /// `head` absent means the working tree: a wave still running has
     /// written files no checkpoint holds yet, and a list that ignored
-    /// them would describe the session as it was one fence ago.
+    /// them would describe the session as it was one checkpoint ago.
     Changes {
         base: GitOid,
         head: Option<GitOid>,
@@ -277,12 +277,12 @@ pub enum Query {
     },
     /// What is uncommitted in one building right now: the branch, how
     /// far it has drifted from its upstream, the files that moved, and
-    /// the last checkpoint the city fenced there.
+    /// the last checkpoint the city checkpointed there.
     ///
     /// Read from git at the moment of asking, which is the one answer
     /// here that is about the disk rather than about the history: a
     /// working tree is what a person is looking at, and the Ledger
-    /// records fences rather than edits. The checkpoint beside it comes
+    /// records checkpoints rather than edits. The checkpoint beside it comes
     /// from the history, for the reason [`Query::Commit`] gives.
     GitStatus {
         building: Address,

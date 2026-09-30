@@ -104,7 +104,7 @@ impl LaneHalf {
                 city_root: &laying.city_root,
                 city: laying.city,
                 clock,
-                fence_gate: &laying.fence_gate,
+                checkpoint_gate: &laying.checkpoint_gate,
             },
             &mut Stamping {
                 ledger,
@@ -134,7 +134,7 @@ impl LaneHalf {
                 },
             )?;
         }
-        let fence_scope = site.fence_scope()?;
+        let checkpoint_scope = site.checkpoint_scope()?;
         let sieving = Sieving::for_run(&laying.store, site, &at.addr);
         let bench = workbench.take_bench()?;
         // The adapter moves into the drive and comes home in `Driven`,
@@ -152,7 +152,7 @@ impl LaneHalf {
             bench,
             signals: std::sync::Arc::clone(&desks.signals),
             write_root: site.write_root.clone(),
-            fence_scope,
+            checkpoint_scope,
             run_id: site.run_id,
             of: site.provenance(laying.city, &at.addr),
             sieving,

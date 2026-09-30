@@ -103,7 +103,7 @@ fn a_write_outside_the_domain_flows_back_as_a_refusal_not_a_dead_turn() {
 }
 
 #[test]
-fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_fenced() {
+fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_checkpointed() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(tmp.path().join("work")).unwrap();
     std::fs::write(tmp.path().join("work/doomed.txt"), "bye").unwrap();
@@ -151,19 +151,20 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_fenced() {
     };
     assert_eq!(*err.code(), AxCode::ToolUnavailable);
 
-    // With a net: the wave is fenced first, and the outcome carries
+    // With a net: the wave is checkpointed first, and the outcome carries
     // the commit the sweep will restore from.
     let checkpoint = Checkpoint::open(tmp.path()).unwrap();
-    let mut fenced_bench = ToolBench::new(domain).with_checkpoint(crate::bench::CheckpointNet {
-        checkpoint,
-        scope: vec!["work".to_owned()],
-        of: probe_provenance(),
-    });
-    fenced_bench.register(exec_tool()).unwrap();
+    let mut checkpointed_bench =
+        ToolBench::new(domain).with_checkpoint(crate::bench::CheckpointNet {
+            checkpoint,
+            scope: vec!["work".to_owned()],
+            of: probe_provenance(),
+        });
+    checkpointed_bench.register(exec_tool()).unwrap();
     // The shell arm is unconfigured, so the tool itself refuses —
-    // but only after the fence went up, which is what we assert.
-    let _ = fenced_bench.invoke(&exec_call("rm -rf work"), &key(4), now());
-    // The fence went up before the command was allowed to run: a
+    // but only after the checkpoint went up, which is what we assert.
+    let _ = checkpointed_bench.invoke(&exec_call("rm -rf work"), &key(4), now());
+    // The checkpoint went up before the command was allowed to run: a
     // repository now exists with a commit to restore from.
     assert!(
         tmp.path().join(".git").exists(),
@@ -181,7 +182,10 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_fenced() {
         .as_str()
         .unwrap()
         .to_owned();
-    assert!(!oid.is_empty(), "the fence has a commit to restore from");
+    assert!(
+        !oid.is_empty(),
+        "the checkpoint has a commit to restore from"
+    );
 }
 
 #[test]
@@ -215,7 +219,7 @@ fn a_second_tool_claiming_a_taken_name_is_refused() {
     assert_eq!(*err.code(), AxCode::InvalidArgs);
 }
 
-/// Who a fence in this test file is signed as.
+/// Who a checkpoint in this test file is signed as.
 fn probe_provenance() -> storage::Provenance {
     storage::Provenance::new(
         kernel::RunId::CITY,

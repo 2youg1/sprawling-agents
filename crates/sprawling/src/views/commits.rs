@@ -13,7 +13,7 @@
 //! machine, with no `.git` beside it, still answers from here.
 //!
 //! **Two kinds of record make a commit, and one impostor looks like
-//! one.** A tool wave's fence and a base commit arrive as
+//! one.** A tool wave's checkpoint and a base commit arrive as
 //! `checkpoint_committed` under the key `oid`; the merge a review lands
 //! arrives as `pr_merged` under the key `commit`. The line that opens a
 //! dispatch is also a `checkpoint_committed`, but it pins a job rather
@@ -76,7 +76,7 @@ impl super::holding::Views {
     ///
     /// Both kinds of record are asked the same question - does this one
     /// name a commit - because the line that opens a dispatch is a
-    /// `checkpoint_committed` that fences nothing.
+    /// `checkpoint_committed` that checkpoints nothing.
     pub(super) fn fold_commit(&mut self, record: &EventRecord) {
         if let Some((oid, facts)) = commit_facts(record) {
             self.commit_seqs.insert(facts.seq, oid);
@@ -260,7 +260,7 @@ mod tests {
         EventRecord::from_draft(draft, Seq::new(seq), B3Hash::digest(b""))
     }
 
-    fn fenced(seq: u64, addr: &str) -> EventRecord {
+    fn checkpointed(seq: u64, addr: &str) -> EventRecord {
         let mut data = serde_json::Map::new();
         data.insert(
             "oid".to_owned(),
@@ -278,9 +278,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut views = super::super::holding::Views::new(dir.path());
         for record in [
-            fenced(3, "lab/room1"),
-            fenced(5, "hall/mayor"),
-            fenced(8, "lab"),
+            checkpointed(3, "lab/room1"),
+            checkpointed(5, "hall/mayor"),
+            checkpointed(8, "lab"),
         ] {
             views.fold_commit(&record);
         }
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn the_line_that_pins_a_job_is_not_a_commit() {
         // The first thing a dispatch writes is a `checkpoint_committed`
-        // naming the job it pinned. It fences nothing, so a fold that
+        // naming the job it pinned. It checkpoints nothing, so a fold that
         // asked only for the kind would file a commit that does not
         // exist.
         let mut pin = serde_json::Map::new();

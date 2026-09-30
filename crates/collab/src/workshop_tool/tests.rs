@@ -133,7 +133,7 @@ fn one_run_lays_out_one_graph() {
     assert!(err.recovery().contains("one graph per session"));
 }
 
-/// The join's fence, reached through the tool: an answer that could
+/// The join's checkpoint, reached through the tool: an answer that could
 /// have been written without opening anything is refused.
 #[test]
 fn the_join_will_not_take_a_verdict_from_somebody_who_read_nothing() {

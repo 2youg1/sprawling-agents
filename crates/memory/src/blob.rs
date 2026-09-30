@@ -13,7 +13,7 @@ use std::path::Path;
 use kernel::{Address, GitOid};
 
 use crate::StorageError;
-use crate::checkpoint::fence::git_err;
+use crate::checkpoint::commit::git_err;
 
 /// The blob at `addr` in the tree of commit `oid`, or `None` when that
 /// place in the commit is not a file (a directory, a submodule, nothing).

@@ -37,8 +37,8 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
             effort: None,
         },
     );
-    let mut fence = storage::Checkpoint::open(root).unwrap();
-    let pre = fence
+    let mut checkpoint = storage::Checkpoint::open(root).unwrap();
+    let pre = checkpoint
         .wave_pre(&["lab".to_owned()], kernel::TimeMs::new(1_000), &of)
         .unwrap();
     let pre_oid = serde_json::to_value(&pre).unwrap()["oid"]
@@ -46,7 +46,7 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
         .unwrap()
         .to_owned();
     std::fs::remove_file(&doomed).unwrap();
-    let swept = fence.wave_post(&pre_oid).unwrap();
+    let swept = checkpoint.wave_post(&pre_oid).unwrap();
     let restoration: kernel::Restoration =
         serde_json::from_value(serde_json::to_value(&swept[0]).unwrap()["restoration"].clone())
             .unwrap();
@@ -64,7 +64,7 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
     assert_eq!(
         std::fs::read_to_string(&doomed).ok().as_deref(),
         Some("the words a wave deleted"),
-        "the bytes the fence held are back at their path"
+        "the bytes the checkpoint held are back at their path"
     );
     let wire::Answer::Discards(bin) = crate::views::ask(root, &wire::Query::DiscardView).unwrap()
     else {

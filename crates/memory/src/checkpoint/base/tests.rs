@@ -20,12 +20,12 @@ fn resident() -> Provenance {
     )
 }
 
-/// A base fence over a city that already has a HEAD leaves the branch
-/// alone and files its commit, and a wave fence on a fresh handle
+/// A base checkpoint over a city that already has a HEAD leaves the branch
+/// alone and files its commit, and a wave checkpoint on a fresh handle
 /// afterwards still writes to disk: the in-memory store left with the
 /// handle that held it.
 #[test]
-fn a_base_fence_beside_history_is_filed_and_leaves_later_fences_on_disk() {
+fn a_base_checkpoint_beside_history_is_filed_and_leaves_later_checkpoints_on_disk() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(tmp.path().join("shop")).unwrap();
     std::fs::write(tmp.path().join("shop").join("a.md"), "a").unwrap();
@@ -42,7 +42,7 @@ fn a_base_fence_beside_history_is_filed_and_leaves_later_fences_on_disk() {
     let mut seen = Vec::new();
     let payload = Checkpoint::open(tmp.path())
         .unwrap()
-        .base_fence(
+        .base_checkpoint(
             &["shop".to_owned()],
             TimeMs::new(2_000),
             &resident(),
@@ -76,11 +76,11 @@ fn a_base_fence_beside_history_is_filed_and_leaves_later_fences_on_disk() {
     );
 }
 
-/// A base fence refused by the staged-secret scan leaves the disk as it
+/// A base checkpoint refused by the staged-secret scan leaves the disk as it
 /// found it: no index entry and no HEAD names an object that only the
-/// in-memory store held, so a wave fence over the cleaned folder commits.
+/// in-memory store held, so a wave checkpoint over the cleaned folder commits.
 #[test]
-fn a_refused_base_fence_leaves_no_reference_to_objects_it_never_wrote() {
+fn a_refused_base_checkpoint_leaves_no_reference_to_objects_it_never_wrote() {
     let tmp = tempfile::tempdir().unwrap();
     let shop = tmp.path().join("shop");
     std::fs::create_dir_all(&shop).unwrap();
@@ -88,7 +88,7 @@ fn a_refused_base_fence_leaves_no_reference_to_objects_it_never_wrote() {
     let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
     std::fs::write(shop.join("key.env"), format!("KEY={token}")).unwrap();
 
-    let refused = Checkpoint::open(tmp.path()).unwrap().base_fence(
+    let refused = Checkpoint::open(tmp.path()).unwrap().base_checkpoint(
         &["shop".to_owned()],
         TimeMs::new(1_000),
         &resident(),

@@ -121,7 +121,7 @@ sprawling help [<verb>]               # every command, or one explained
 
 ## History in git
 
-A city usually works inside a git repository that is yours, and it leaves your history the shape you left it. Before each wave of tool calls it commits what is there, so anything that disappears has a commit to come back from, but those fences are commits nobody's `HEAD` points at, kept under `refs/sprawling/runs/`. Only two things move a branch: the first commit of a repository that had none, and the merge that lands a reviewed piece of work.
+A city usually works inside a git repository that is yours, and it leaves your history the shape you left it. Before each wave of tool calls it commits what is there, so anything that disappears has a commit to come back from, but those checkpoints are commits nobody's `HEAD` points at, kept under `refs/sprawling/runs/`. Only two things move a branch: the first commit of a repository that had none, and the merge that lands a reviewed piece of work.
 
 Every commit the city makes names the resident that made it, and carries git trailers that `git interpret-trailers --parse` reads without help:
 
@@ -139,7 +139,7 @@ The trailers are a projection for readers outside the city; where a trailer and 
 
 **It listens on loopback only by default.** To let another machine on the same network connect, bind a non-loopback address. Such an address always needs a pairing key: the city adopts `SPRAWLING_PAIRING_TOKEN` when it is set, and otherwise mints a key for this serve and prints the address to open with it. The port is never open without one. This repository ships neither a tunnel nor a relay, because each carries its own trust model, and choosing one for you would be a security decision made on your behalf.
 
-**Credential plaintext never enters a file, an event, or a log.** Keys go into the OS credential store, and configuration keeps only `secret:realm/name`. What a model says passes a secret scan before it becomes a Ledger payload, the log passes the same scan, and content staged for a git fence is scanned before it is committed, so a key the model happens to echo never becomes permanent history.
+**Credential plaintext never enters a file, an event, or a log.** Keys go into the OS credential store, and configuration keeps only `secret:realm/name`. What a model says passes a secret scan before it becomes a Ledger payload, the log passes the same scan, and content staged for a git checkpoint is scanned before it is committed, so a key the model happens to echo never becomes permanent history.
 
 **Everything stays on your machine.** There is no account, no telemetry and no hosted service. A **confidential** building stops a run before any call to a remote provider and starts no outside tool server, so paired with a local model it can work on private data.
 

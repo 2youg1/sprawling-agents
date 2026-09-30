@@ -227,11 +227,11 @@ fn the_bytes_stay_addressable_because_every_call_carries_its_seq() {
     assert_eq!(turns(&events)[0].calls[0].at, Seq::new(9));
 }
 
-/// The base a change list is addressed by is the session's first fence,
+/// The base a change list is addressed by is the session's first checkpoint,
 /// not its latest one.
 #[test]
-fn the_change_base_is_the_first_fence_of_the_session() {
-    let fence = |seq: u64, oid: &str| {
+fn the_change_base_is_the_first_checkpoint_of_the_session() {
+    let checkpoint = |seq: u64, oid: &str| {
         record(
             seq,
             EventKind::CheckpointCommitted,
@@ -240,7 +240,12 @@ fn the_change_base_is_the_first_fence_of_the_session() {
     };
     let first = "a".repeat(40);
     let second = "b".repeat(40);
-    let events = [asked(1), fence(2, &first), asked(3), fence(4, &second)];
+    let events = [
+        asked(1),
+        checkpoint(2, &first),
+        asked(3),
+        checkpoint(4, &second),
+    ];
     let folded = turns(&events);
     assert_eq!(
         opened_at(&folded).map(|oid| oid.to_string()),

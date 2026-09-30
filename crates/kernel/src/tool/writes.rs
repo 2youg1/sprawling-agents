@@ -9,9 +9,9 @@
 use super::Effect;
 use crate::Address;
 
-/// What one call, or every call since the last fence, may have written.
+/// What one call, or every call since the last checkpoint, may have written.
 ///
-/// A fence stages what this names (runtime-SPEC section 8-45), so an
+/// A checkpoint stages what this names (runtime-SPEC section 8-45), so an
 /// answer narrower than the truth leaves a write no commit carries. Only
 /// a tool that knows every file it wrote answers `Paths`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,7 +20,7 @@ pub enum Writes {
     Nothing,
     /// Exactly these files.
     Paths(Vec<Address>),
-    /// Somewhere in the run's write domain, which the fence then walks.
+    /// Somewhere in the run's write domain, which the checkpoint then walks.
     Domain,
 }
 

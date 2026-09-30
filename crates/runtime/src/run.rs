@@ -26,7 +26,7 @@ use crate::prefix::FrozenPrefix;
 use crate::reminder::ContextGauge;
 use crate::turn::{CallShape, Interrupt};
 
-mod fence;
+mod checkpoint;
 mod lifecycle;
 
 /// Everything constant about one run. Assembled by the caller, because
@@ -142,12 +142,12 @@ pub struct RunHooks<'a> {
     pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,
     /// Answers what arrived at a safe point.
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,
-    /// The pre-wave checkpoint fence. `None` runs without a net, which
+    /// The pre-wave checkpoint. `None` runs without a net, which
     /// the tool layer refuses for anything that can delete.
-    pub fence: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,
+    pub checkpoint: Option<&'a mut dyn FnMut(TimeMs) -> Result<Payload, AxError>>,
     /// What a call may write, by its declared effect, asked before the
     /// wave runs: a wave whose every call answers `Nothing` changes no
-    /// file, so it needs no fence of its own (§8-45).
+    /// file, so it needs no checkpoint of its own (§8-45).
     pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes,
     /// Runs a wave's tool calls in three stages (see
     /// [`crate::ConcurrentInvoke`]). The turn's stamp rides along because
@@ -189,8 +189,8 @@ pub struct Active {
     /// The `prompt_assembled` payload this run wrote last, which a turn
     /// does not write again (runtime-SPEC.md section 8-39, item 5).
     prompt: crate::turn::PromptRecord,
-    /// Whether the next wave needs a fence (§8-45).
-    fence: fence::FencePolicy,
+    /// Whether the next wave needs a checkpoint (§8-45).
+    checkpoint: checkpoint::CheckpointPolicy,
 }
 
 /// A frozen run. There is no method back to [`Active`]: waking an old run

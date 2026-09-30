@@ -197,7 +197,7 @@ mod tests {
         registered: Vec<String>,
         dirs: Vec<String>,
         branches: Vec<String>,
-        fences: Vec<String>,
+        checkpoints: Vec<String>,
     }
 
     fn left(city_root: &Path) -> Left {
@@ -226,17 +226,17 @@ mod tests {
             .map(|branch| branch.unwrap().0.name().unwrap().unwrap().to_owned())
             .collect();
         branches.sort();
-        let mut fences: Vec<String> = repo
+        let mut checkpoints: Vec<String> = repo
             .references_glob("refs/sprawling/runs/*")
             .unwrap()
             .map(|reference| reference.unwrap().name().unwrap().to_owned())
             .collect();
-        fences.sort();
+        checkpoints.sort();
         Left {
             registered,
             dirs,
             branches,
-            fences,
+            checkpoints,
         }
     }
 
@@ -267,14 +267,14 @@ mod tests {
                     registered: vec![],
                     dirs: vec![],
                     branches: vec![trunk(dir.path())],
-                    fences: vec![],
+                    checkpoints: vec![],
                 }
             )
         );
     }
 
     #[test]
-    fn a_fence_ref_survives_the_sweep() {
+    fn a_checkpoint_ref_survives_the_sweep() {
         let dir = tempfile::tempdir().unwrap();
         let trees = city(dir.path());
         drop(trees.claim(&name("run-1"), &[]).unwrap());
@@ -284,14 +284,14 @@ mod tests {
             .unwrap()
             .wave_pre(&["lab".to_owned()], TimeMs::new(2_000), &owner())
             .unwrap();
-        let fences = left(dir.path()).fences;
-        assert_eq!(fences.len(), 1, "the fixture fences once");
+        let checkpoints = left(dir.path()).checkpoints;
+        assert_eq!(checkpoints.len(), 1, "the fixture checkpoints once");
 
         let swept = Worktrees::sweep_abandoned(dir.path(), &[]).unwrap();
 
         assert_eq!(
-            (swept, left(dir.path()).fences),
-            (vec![name("run-1")], fences)
+            (swept, left(dir.path()).checkpoints),
+            (vec![name("run-1")], checkpoints)
         );
     }
 
@@ -341,7 +341,7 @@ mod tests {
                     registered: vec!["mine".to_owned(), "run-1".to_owned()],
                     dirs: vec!["run-1".to_owned()],
                     branches,
-                    fences: vec![],
+                    checkpoints: vec![],
                 },
                 true
             )

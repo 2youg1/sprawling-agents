@@ -49,8 +49,8 @@ pub struct CommitAnswer {
     /// What the run that wrote this commit has been billed, whole.
     ///
     /// The run's total rather than this commit's share: a commit is a
-    /// fence and nothing prices a fence, so dividing the run's spend
-    /// between its fences would be a number nobody measured. Zero for
+    /// checkpoint and nothing prices a checkpoint, so dividing the run's spend
+    /// between its checkpoints would be a number nobody measured. Zero for
     /// a run no priced call is attributed to.
     pub spent: UsdMicros,
 }

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The git pathspecs a fence stages its scopes through.
+//! The git pathspecs a checkpoint stages its scopes through.
 
 /// Two git pathspecs per scope, the scope itself and everything
 /// under it, because a scope is a prefix the run may write under or,
@@ -15,7 +15,7 @@
 /// run legitimately wrote outside every checkpoint.
 ///
 /// No prefixes at all means the whole tree rather than nothing: the
-/// caller that passes an empty set fences the whole city, and has no
+/// caller that passes an empty set checkpoints the whole city, and has no
 /// resident to take a domain from.
 ///
 /// A scope is a literal path: the address grammar admits `[`, `]`,

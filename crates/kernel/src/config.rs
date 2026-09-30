@@ -228,7 +228,7 @@ pub struct SandboxLimits {
     ///
     /// Named server by server, and empty by default, for the reason
     /// `env_passthrough` is: a run that presses keys on somebody's
-    /// keyboard is doing something no fence puts back, so the floor
+    /// keyboard is doing something no checkpoint puts back, so the floor
     /// says which connector may, in the one file a person edits.
     #[serde(default)]
     pub trusted: Vec<ServerLabel>,

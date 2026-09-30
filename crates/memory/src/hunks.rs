@@ -193,9 +193,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write(root, "lab/lex.rs", "one\ntwo\n");
-        let mut fence = Checkpoint::open(root).unwrap();
+        let mut checkpoint = Checkpoint::open(root).unwrap();
         let base = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(1_000), &resident())
                 .unwrap(),
         );
@@ -235,22 +235,22 @@ mod tests {
         );
     }
 
-    /// A file nobody touched between the two fences has an empty patch
+    /// A file nobody touched between the two checkpoints has an empty patch
     /// rather than a failure: "it did not move" is an answer.
     #[test]
     fn a_file_that_did_not_move_answers_with_an_empty_patch() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write(root, "lab/keep.rs", "unchanged\n");
-        let mut fence = Checkpoint::open(root).unwrap();
+        let mut checkpoint = Checkpoint::open(root).unwrap();
         let base = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(1_000), &resident())
                 .unwrap(),
         );
         write(root, "lab/moved.rs", "new\n");
         let head = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(2_000), &resident())
                 .unwrap(),
         );

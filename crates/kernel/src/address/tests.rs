@@ -144,7 +144,7 @@ fn a_reserved_subtree_is_reserved_at_whatever_depth_it_sits() {
 fn protected_metadata_is_reserved_at_whatever_depth_it_sits() {
     // Writing `.git` is privilege escalation: a hook is code that runs
     // at the next git operation, the config keys execute programs,
-    // and the fence references and the restoration objects live in
+    // and the checkpoint references and the restoration objects live in
     // there too. One predicate guards both names, at any depth.
     for reserved in [
         ".git",

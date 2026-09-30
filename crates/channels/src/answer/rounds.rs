@@ -67,7 +67,7 @@ pub enum Note {
     /// interface has one place where a refusal becomes the three parts a
     /// person needs; taking it apart here would be the second.
     Refused { error: AxError, at: Seq },
-    /// A checkpoint fence went up, and this is the commit it made. It is
+    /// A checkpoint went up, and this is the commit it made. It is
     /// what a change list is addressed by.
     Fenced { oid: GitOid, at: Seq },
     /// This turn stopped for a person. What waits and who answers is the
@@ -239,7 +239,7 @@ pub struct RoundsAnswer {
     pub run: RunId,
     pub turns: Vec<Turn>,
     /// The checkpoint this session's changes are measured from: its
-    /// first fence, because that is the tree as the work found it.
+    /// first checkpoint, because that is the tree as the work found it.
     /// Measuring from the latest one would answer "what moved in the
     /// last wave", which is a different question.
     pub opened_at: Option<GitOid>,

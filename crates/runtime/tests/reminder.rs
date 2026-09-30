@@ -148,7 +148,7 @@ fn windows_for(reported: Vec<u64>) -> Vec<String> {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -213,7 +213,7 @@ fn a_model_with_no_stated_window_is_never_reminded() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -280,7 +280,7 @@ fn status_reports_the_count_of_the_call_that_asked() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         invoke: &mut invoke,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,

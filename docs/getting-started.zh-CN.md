@@ -225,7 +225,7 @@ Mayor 先读每一栋楼的 `Roadmap.md`、`Memo.md`、`Handoff.md`。它用 `pl
 要落地的活在城内走 pull request，而写这份活的居民不能验证它：没有别人验证过的请求，根本没有「合并」这个方法。按这个顺序读：
 
 1. run 的 **改动** 视图：动过的文件一行一个，点开一行给出那个文件的补丁。被凭证扫描命中的行只报行号与理由，不回显原文。
-2. 那栋楼里的 `git log`。城在每一波工具调用前写的围栏，是没有任何 `HEAD` 指向的提交，挂在 `refs/sprawling/runs/` 下，所以你的历史仍是你离开时的形状。
+2. 那栋楼里的 `git log`。城在每一波工具调用前写的检查点，是没有任何 `HEAD` 指向的提交，挂在 `refs/sprawling/runs/` 下，所以你的历史仍是你离开时的形状。
 3. 合并提交的 trailer——`Sprawling-Run`、`Sprawling-Actor`、`Sprawling-Model`、`Sprawling-Effort`、`Sprawling-City`，接替另一次 run 的还多一条 `Sprawling-Predecessor`。你复核过的合并另带 `Reviewed-by`，前提是这个仓库的 git config 里有 `user.name` 与 `user.email`。
 4. `sprawling whose ~/cities/first <commit>` 从账本反过来回答同一个问题，要给完整的四十位提交 id。退出码 1 表示这座城没有写过那个提交的记录。
 

@@ -287,20 +287,20 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
             record.kind() == EventKind::CheckpointCommitted
                 && record.data().as_map().contains_key("oid")
         })
-        .expect("a tool wave fences a commit");
+        .expect("a tool wave checkpoints a commit");
     let oid = kernel::GitOid::parse(
         announced.data().as_map()["oid"]
             .as_str()
-            .expect("a fence names its commit"),
+            .expect("a checkpoint names its commit"),
     )
-    .expect("the fence oid is forty hex digits");
+    .expect("the checkpoint oid is forty hex digits");
 
     let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let wire::Answer::Commit(said) = views.answer(&wire::Query::Commit { oid }) else {
         panic!("a commit this city made answers which run wrote it");
     };
     assert_eq!(said.oid, oid);
-    assert_eq!(said.run, announced.run(), "the run that fenced it");
+    assert_eq!(said.run, announced.run(), "the run that checkpointed it");
     assert_eq!(said.seq, announced.seq(), "where the history says so");
     assert_eq!(said.actor.as_str(), "lab/room1");
     assert_eq!(said.model, "m-local", "the model the trailers carry");

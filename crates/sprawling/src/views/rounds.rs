@@ -77,7 +77,7 @@ impl LedgerAsk {
 
 /// The checkpoint a session's changes are measured from.
 ///
-/// The first fence of the session, because that is the tree as the work
+/// The first checkpoint of the session, because that is the tree as the work
 /// found it; measuring from the latest one would answer "what moved in
 /// the last wave", which is a different question and not the one a
 /// person opening a session is asking.

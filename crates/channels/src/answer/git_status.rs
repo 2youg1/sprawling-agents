@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What is uncommitted in one building, and the last fence behind it.
+//! What is uncommitted in one building, and the last checkpoint behind it.
 //!
 //! The rows are [`FileChange`], the same shape `Changes` answers with:
 //! "which files moved and how much" is one question whether the far end
@@ -41,8 +41,8 @@ pub struct GitStatusAnswer {
     /// Files under this building that differ from the last commit,
     /// untracked ones included, in path order.
     pub files: Vec<FileChange>,
-    /// The newest commit this city fenced at this building, from the
+    /// The newest commit this city checkpointed at this building, from the
     /// history rather than from git, for the reason `Query::Commit`
-    /// gives. Absent when the city has fenced nothing here.
+    /// gives. Absent when the city has checkpointed nothing here.
     pub checkpoint: Option<CommitAnswer>,
 }

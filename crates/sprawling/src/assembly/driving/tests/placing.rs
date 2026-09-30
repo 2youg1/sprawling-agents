@@ -17,7 +17,7 @@ use kernel::{AxError, Effect, Payload, RunId, TimeMs, Tool, ToolCall, ToolName, 
 use runtime::{Admitted, ConcurrentInvoke};
 
 use super::super::Sieving;
-use super::super::placing::{Fencing, Placing};
+use super::super::placing::{Checkpointing, Placing};
 
 const READS: u32 = 3;
 
@@ -66,7 +66,7 @@ impl Tool for MeetingRead {
 fn placing<'f>(
     meeting: Option<Arc<Meeting>>,
     dir: &std::path::Path,
-    fencing: &'f Fencing,
+    checkpointing: &'f Checkpointing,
 ) -> Placing<'f> {
     let domain = kernel::WriteDomain::new(vec![kernel::Address::parse("lab").unwrap()]).unwrap();
     let mut bench = runtime::bench::ToolBench::new(domain);
@@ -98,7 +98,7 @@ fn placing<'f>(
         table: runtime::FilterTable::builtin(),
         history: runtime::SieveHistory::default(),
     };
-    Placing::new(bench, sieving, RunId::CITY, fencing)
+    Placing::new(bench, sieving, RunId::CITY, checkpointing)
 }
 
 fn reads() -> Vec<ToolCall> {
@@ -113,7 +113,7 @@ fn reads() -> Vec<ToolCall> {
 }
 
 /// The served city's tool face names its reads as reads, so a wave runs
-/// them at once, and the answers, the fence list and the command counts
+/// them at once, and the answers, the checkpoint list and the command counts
 /// it leaves are those the same calls leave one after another.
 #[test]
 fn a_served_citys_reads_run_at_once_and_leave_what_they_leave_in_turn() {
@@ -121,8 +121,8 @@ fn a_served_citys_reads_run_at_once_and_leave_what_they_leave_in_turn() {
     let calls = reads();
     let t = TimeMs::new(1);
 
-    let serial_fencing = Fencing::opened();
-    let mut one_by_one = placing(None, dir.path(), &serial_fencing);
+    let serial_checkpointing = Checkpointing::opened();
+    let mut one_by_one = placing(None, dir.path(), &serial_checkpointing);
     let serial: Vec<ToolOutcome> = calls
         .iter()
         .map(|call| match one_by_one.admit(call, t) {
@@ -139,8 +139,8 @@ fn a_served_citys_reads_run_at_once_and_leave_what_they_leave_in_turn() {
         arrived: Condvar::new(),
         fewest_seen: Mutex::new(u32::MAX),
     });
-    let fencing = Fencing::opened();
-    let mut lane = placing(Some(Arc::clone(&meeting)), dir.path(), &fencing);
+    let checkpointing = Checkpointing::opened();
+    let mut lane = placing(Some(Arc::clone(&meeting)), dir.path(), &checkpointing);
     assert!(
         calls
             .iter()
@@ -178,10 +178,13 @@ fn a_served_citys_reads_run_at_once_and_leave_what_they_leave_in_turn() {
     drop((lane, one_by_one));
     let domain = ["lab".to_owned()];
     assert_eq!(
-        (fencing.take_scope(&domain), fencing.fenced.into_inner()),
         (
-            serial_fencing.take_scope(&domain),
-            serial_fencing.fenced.into_inner()
+            checkpointing.take_scope(&domain),
+            checkpointing.checkpointed.into_inner()
+        ),
+        (
+            serial_checkpointing.take_scope(&domain),
+            serial_checkpointing.checkpointed.into_inner()
         )
     );
 }

@@ -13,7 +13,7 @@
   // asks only for its own runs.
   import Glyph from "../parts/glyph.svelte";
   import Produced from "./produced.svelte";
-  import { lastFenceIn } from "./trace";
+  import { lastCheckpointIn } from "./trace";
   import { OUTCOME_GLYPH, OUTCOME_INK } from "../shared/outcome";
   import { fill, say } from "../../core/lang";
   import type { RunBelief } from "../../core/belief";
@@ -38,7 +38,7 @@
   });
   const quote = $derived([...(rounds?.turns ?? [])].reverse().find((turn) => (turn.said ?? "") !== "")?.said ?? null);
   const base = $derived(rounds?.opened_at ?? null);
-  const head = $derived(rounds === null ? null : lastFenceIn(rounds.turns));
+  const head = $derived(rounds === null ? null : lastCheckpointIn(rounds.turns));
   const committed = $derived(base !== null && head !== null && head !== base);
   // Every part of the closing line after the first is set off by a dot,
   // drawn by the stylesheet so a screen reader reads the parts alone.

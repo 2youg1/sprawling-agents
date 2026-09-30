@@ -43,7 +43,7 @@ fn tool_tables(bodies: &[String]) -> Vec<Vec<String>> {
 
 /// Three successions, no person in the loop. The successor's tool table
 /// equals its predecessor's name for name — `delegate` included, because
-/// succession conserves depth — and the commit the fourth run fences
+/// succession conserves depth — and the commit the fourth run checkpoints
 /// answers a lineage of four.
 #[test]
 fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
@@ -79,7 +79,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
             completion("over to you", None),
             probed(),
             probed(),
-            // A call that may write, because only such a wave is fenced
+            // A call that may write, because only such a wave is checkpointed
             // (runtime-SPEC 8-45): a read-only one changes no file.
             tool_completion(
                 "noting",
@@ -148,15 +148,15 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
         "the successor's tools equal its predecessor's, name for name"
     );
 
-    let fenced = records
+    let checkpointed = records
         .iter()
         .find(|record| {
             record.kind() == EventKind::CheckpointCommitted
                 && record.data().as_map().contains_key("oid")
                 && record.run() == started[3].run()
         })
-        .expect("the fourth run's wave fences a commit");
-    let oid = kernel::GitOid::parse(fenced.data().as_map()["oid"].as_str().unwrap()).unwrap();
+        .expect("the fourth run's wave checkpoints a commit");
+    let oid = kernel::GitOid::parse(checkpointed.data().as_map()["oid"].as_str().unwrap()).unwrap();
     let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let wire::Answer::Commit(said) = views.answer(&wire::Query::Commit { oid }) else {
         panic!("a commit this city made answers which run wrote it");

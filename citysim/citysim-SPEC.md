@@ -133,7 +133,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 | 模型 | `ScriptModel` 登录 wire 形：剧本写 Anthropic wire JSON，经 `gateway::dialect::response_from_wire` 解成 canonical 再出 ModelReturn（翻译面进链路） |
 | 时钟／配置 | 逐步 +1ms，加 `FrozenConfig` 求值（clock_stamp 三层覆盖）接入 `StampGate` |
 
-门路由归 `ToolBench`，写域住 bench 内，executor 不手写 domain 门。`ScriptToolSet` 是 `kernel::tool` 缝的第二适配器（已登记的 conformance 证据），**注册进真 ToolBench**，于是脚本工具与真 L0 工具走同一条门路由。波前的检查点是**每波一次**而非只在 exec forecast 命中时：`ToolBench` 内的 forecast 围栏是它在 exec 臂上的加强，两者不互相替代。空波仍提交（同树 oid），因为链可重建优于省一次提交。tool_result 的信封由 executor 挂（`pipeline::package` 加 `StampGate`），与 serve 同位。
+门路由归 `ToolBench`，写域住 bench 内，executor 不手写 domain 门。`ScriptToolSet` 是 `kernel::tool` 缝的第二适配器（已登记的 conformance 证据），**注册进真 ToolBench**，于是脚本工具与真 L0 工具走同一条门路由。波前的检查点是**每波一次**而非只在 exec forecast 命中时：`ToolBench` 内的 forecast 检查点是它在 exec 臂上的加强，两者不互相替代。空波仍提交（同树 oid），因为链可重建优于省一次提交。tool_result 的信封由 executor 挂（`pipeline::package` 加 `StampGate`），与 serve 同位。
 
 事件序断言：edit 成功的波携 `checkpoint_committed`（波前，断言形：每个 `tool_called` 之前最近的 `checkpoint_committed` 晚于最近的 `model_returned`）；tool_result 信封可携 ClockStamp（非 Off 时）；越域写被 domain 门拒且 refusal 以 tool_result 回流；链恒可验；双跑字节对拍。gateway 进 sim 的只有 dialect 翻译面（纯函数，确定性保持）；endpoint 的 HTTP 面不入 sim（网络即非确定），其验证住 gateway 自身的回环假服务测试（gateway-SPEC §2）。
 

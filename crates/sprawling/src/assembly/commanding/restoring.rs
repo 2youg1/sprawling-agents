@@ -49,7 +49,7 @@ impl RunWorker {
         // Disk first, ledger second: the history never says a file came
         // back that the disk does not hold.
         storage::Checkpoint::open(&self.city_root)
-            .and_then(|fence| fence.restore(address, oid))
+            .and_then(|checkpoint| checkpoint.restore(address, oid))
             .map_err(storage::StorageError::into_ax)?;
         // The same shape as the `file_discarded` it closes, so one
         // reader folds both (§8-107).

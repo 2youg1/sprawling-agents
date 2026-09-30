@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What has not been fenced yet: the branch, its drift from the
+//! What has not been checkpointed yet: the branch, its drift from the
 //! upstream it tracks, and the files that differ from the last commit.
 //!
 //! **Why this is not [`crate::between`] with a different far end.**
@@ -19,12 +19,12 @@
 //! exactly the file a person is looking for, and a list that showed
 //! only tracked changes would report a new module as nothing at all.
 //!
-//! **A fence does not move the head.** `checkpoint::wave_pre` files its
+//! **A checkpoint does not move the head.** `checkpoint::wave_pre` files its
 //! commit under `refs/sprawling/`, so the head is the base commit or
 //! the last landing, and a comparison against it would report every
-//! wave since as uncommitted. The caller therefore names the fence it
+//! wave since as uncommitted. The caller therefore names the checkpoint it
 //! wants compared against; the head is the fallback for a city that has
-//! fenced nothing.
+//! checkpointed nothing.
 
 use std::path::Path;
 
@@ -67,12 +67,12 @@ fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
 /// `scope` is a repository-relative directory: a building is a directory
 /// and the question a building's page asks is about its own files, so
 /// filtering here costs one pathspec rather than a second pass over the
-/// answer. `base` is the fence to compare against; absent falls back to
-/// the head, which is what a city that has fenced nothing has.
+/// answer. `base` is the checkpoint to compare against; absent falls back to
+/// the head, which is what a city that has checkpointed nothing has.
 ///
 /// A repository with no commit at all answers every file as added
 /// rather than failing: a city initialised this minute has a working
-/// tree and no head, and "none of this is fenced" is what a reader
+/// tree and no head, and "none of this is checkpointed" is what a reader
 /// needs to be told.
 ///
 /// # Errors
@@ -208,13 +208,13 @@ mod tests {
     /// The file a person is looking for is the one an agent wrote and
     /// never staged, so an untracked file is a row like any other.
     #[test]
-    fn a_file_written_since_the_last_fence_is_listed_untracked_included() {
+    fn a_file_written_since_the_last_checkpoint_is_listed_untracked_included() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write(root, "lab/lex.rs", "one\n");
-        let mut fence = Checkpoint::open(root).unwrap();
+        let mut checkpoint = Checkpoint::open(root).unwrap();
         let base = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
                 .unwrap(),
         );
@@ -235,9 +235,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write(root, "lab/lex.rs", "one\n");
-        let mut fence = Checkpoint::open(root).unwrap();
+        let mut checkpoint = Checkpoint::open(root).unwrap();
         let base = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
                 .unwrap(),
         );
@@ -267,8 +267,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write(root, "lab/lex.rs", "one\n");
-        let mut fence = Checkpoint::open(root).unwrap();
-        fence
+        let mut checkpoint = Checkpoint::open(root).unwrap();
+        checkpoint
             .ensure_base(&["lab".to_owned()], TimeMs::new(1), &resident())
             .unwrap();
         let status = working_status(root, None, None).unwrap();
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(status.drift, None);
     }
 
-    /// A city fenced nothing yet still has a working tree, and every
+    /// A city checkpointed nothing yet still has a working tree, and every
     /// file in it is work no commit holds.
     #[test]
     fn a_city_with_no_commit_reports_its_files_rather_than_failing() {

@@ -86,7 +86,7 @@ impl Provenance {
     ///
     /// Only the first line of the first segment is read. A city's whole
     /// history can be tens of megabytes, and reading it to learn one
-    /// hash would make every fence pay for the length of the city's
+    /// hash would make every checkpoint pay for the length of the city's
     /// life.
     ///
     /// # Errors
@@ -118,7 +118,7 @@ impl Provenance {
     }
 
     /// The run this commit belongs to, which names the reference a wave
-    /// fence is filed under.
+    /// checkpoint is filed under.
     pub fn run(&self) -> RunId {
         self.run
     }
@@ -172,7 +172,7 @@ const CITY_PREFIX_HEX: usize = 12;
 ///
 /// The distinction `Option` draws — the provider chose, against we asked
 /// it not to think — has never reached the git trailer or the ledger,
-/// both of which have written `none` for either since the first fence.
+/// both of which have written `none` for either since the first checkpoint.
 /// Every output that has to pick a word goes through here, so one place
 /// decides it and a record written today still reads back the way a
 /// year-old build wrote it.

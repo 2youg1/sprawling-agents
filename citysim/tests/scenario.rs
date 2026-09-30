@@ -475,15 +475,15 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
     // has a commit to come back from.
     for (i, kind) in ks.iter().enumerate() {
         if kind == "tool_called" {
-            let fence = ks
+            let checkpoint = ks
                 .get(..i)
                 .and_then(|before| before.iter().rposition(|k| k == "checkpoint_committed"));
             let model_returned = ks
                 .get(..i)
                 .and_then(|before| before.iter().rposition(|k| k == "model_returned"));
             assert!(
-                fence > model_returned,
-                "the fence must go up after the model asked and before the tool ran: {ks:?}"
+                checkpoint > model_returned,
+                "the checkpoint must go up after the model asked and before the tool ran: {ks:?}"
             );
         }
     }

@@ -36,17 +36,17 @@ use storage::{Checkpoint, Provenance};
 mod admit;
 mod outside;
 
-/// The checkpoint net a run works under: the repository, what a fence
+/// The checkpoint net a run works under: the repository, what a checkpoint
 /// covers, and who is signing it.
 ///
-/// Three values that are meaningless apart - a fence with no scope
-/// stages what the run never held, and a fence with no provenance
+/// Three values that are meaningless apart - a checkpoint with no scope
+/// stages what the run never held, and a checkpoint with no provenance
 /// commits under nobody's name - so they are handed over together
 /// rather than assembled inside the bench.
 pub struct CheckpointNet {
     pub checkpoint: Checkpoint,
-    /// The prefixes a fence stages, which are the run's write domain and
-    /// not its room. A fence narrower than the domain leaves whatever
+    /// The prefixes a checkpoint stages, which are the run's write domain and
+    /// not its room. A checkpoint narrower than the domain leaves whatever
     /// the run wrote in between outside every checkpoint, and therefore
     /// outside `changes` and outside restoration.
     pub scope: Vec<String>,
@@ -72,7 +72,7 @@ pub struct ToolBench {
     /// The checkpoint net. A command the forecast suspects of deleting
     /// things does not get refused — text prediction is obfuscatable, so
     /// refusing on a substring would be security theatre that also
-    /// blocks honest work. It gets fenced instead: commit first, then
+    /// blocks honest work. It gets checkpointed instead: commit first, then
     /// run, so whatever it deletes is restorable. Absent a net, such a
     /// command is refused, because running it unprotected is the one
     /// outcome nobody chose.
@@ -90,14 +90,14 @@ pub struct ToolBench {
 /// What the bench decided, alongside what the tool produced.
 #[derive(Debug)]
 pub enum BenchOutcome {
-    /// The tool ran; this is its result. `fenced` carries the commit
-    /// the wave was fenced against when the forecast suspected a
+    /// The tool ran; this is its result. `checkpointed` carries the commit
+    /// the wave was checkpointed against when the forecast suspected a
     /// discard, so the post-wave sweep knows what to restore from.
     /// `wrote` is the tool's own account of what the call may have
-    /// written, which the next fence stages (runtime-SPEC 8-45).
+    /// written, which the next checkpoint stages (runtime-SPEC 8-45).
     Ran {
         outcome: ToolOutcome,
-        fenced: Option<String>,
+        checkpointed: Option<String>,
         wrote: kernel::Writes,
     },
     /// A gate refused, or asked. Either way the answer travels back as
@@ -118,7 +118,7 @@ pub struct DeclaredWrites(BTreeMap<ToolName, kernel::Writes>);
 impl DeclaredWrites {
     /// A name the bench does not hold answers `Domain`: the call will be
     /// refused, and a guess that it writes nothing is the one guess that
-    /// could leave a write outside every fence.
+    /// could leave a write outside every checkpoint.
     pub fn of(&self, call: &ToolCall) -> kernel::Writes {
         self.0
             .get(&call.name)
@@ -183,7 +183,7 @@ impl ToolBench {
 
     /// What each registered tool may write, read off its declared
     /// effect alone, taken out before the bench is lent to the run so the
-    /// fence policy can ask it while a wave waits (runtime-SPEC 8-45).
+    /// checkpoint policy can ask it while a wave waits (runtime-SPEC 8-45).
     pub fn declared_writes(&self) -> DeclaredWrites {
         DeclaredWrites(
             self.tools
@@ -221,7 +221,7 @@ impl ToolBench {
         }
     }
 
-    /// Dedup, the doors, and the discard forecast's fence: everything
+    /// Dedup, the doors, and the discard forecast's checkpoint: everything
     /// that decides whether a call may run, and reads or writes what
     /// the calls before it left. A concurrent wave clears its calls one
     /// at a time, in call order.
@@ -266,8 +266,8 @@ impl ToolBench {
             return Ok(Clearance::Answered(answered));
         }
 
-        // exec is forecast first. A hit does not refuse: it fences.
-        let mut fenced = None;
+        // exec is forecast first. A hit does not refuse: it checkpoints.
+        let mut checkpointed = None;
         if name == ToolName::EXEC
             && let Ok(arm) = crate::tools::parse_arm(call.args.as_map())
             && let DiscardForecast::Suspected { pattern } = kernel::discard::forecast(&arm)
@@ -286,7 +286,7 @@ impl ToolBench {
                 .checkpoint
                 .wave_pre(&net.scope, now, &net.of)
                 .map_err(kernel_error_from_storage)?;
-            fenced = payload
+            checkpointed = payload
                 .as_map()
                 .get("oid")
                 .and_then(Value::as_str)
@@ -300,7 +300,7 @@ impl ToolBench {
             key: *key,
             name: call.name.clone(),
             effect,
-            fenced,
+            checkpointed,
             wrote,
         }))
     }
@@ -363,7 +363,7 @@ impl ToolBench {
         let outcome = answered?;
         Ok(BenchOutcome::Ran {
             outcome,
-            fenced: ticket.fenced,
+            checkpointed: ticket.checkpointed,
             wrote: ticket.wrote,
         })
     }
@@ -386,8 +386,8 @@ pub struct Ticket {
     key: IdemKey,
     name: ToolName,
     effect: Effect,
-    /// The commit the discard forecast fenced this call against.
-    fenced: Option<String>,
+    /// The commit the discard forecast checkpointed this call against.
+    checkpointed: Option<String>,
     /// What the tool says the call may write, asked while the bench
     /// still holds the tool; `account` hands it on in the outcome.
     wrote: kernel::Writes,

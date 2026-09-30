@@ -52,9 +52,9 @@ impl RunWorker {
         // The sweep the forecast cannot replace. A command can be
         // obfuscated past a text prediction; what is missing from the
         // working tree cannot be talked out of. The base is the first
-        // fence of this drive, so everything the whole drive deleted is
+        // checkpoint of this drive, so everything the whole drive deleted is
         // reported once rather than once per wave.
-        let sweep_base = sweep.fenced.first().cloned();
+        let sweep_base = sweep.checkpointed.first().cloned();
         if let Some(base) = sweep_base {
             let discarded = storage::Checkpoint::open(write_root)
                 .map_err(storage::StorageError::into_ax)?
@@ -146,7 +146,7 @@ impl RunWorker {
             }
         }
         // What the run asked the building to remember, filed after the
-        // drive like every other effect - and inside the fence. A
+        // drive like every other effect - and inside the checkpoint. A
         // building under review is not the owner of what a run decided
         // until somebody checks it, and a shelf entry is exactly the
         // kind of thing a later run reads as the building's settled

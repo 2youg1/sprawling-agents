@@ -55,7 +55,7 @@ pub(crate) struct LiveAsk {
 pub(crate) enum Prepared {
     /// Answered from the views alone.
     Held(wire::Answer),
-    /// The working tree of one building against its last fence.
+    /// The working tree of one building against its last checkpoint.
     GitStatus(GitStatusAsk),
     /// The person's own settings file.
     Preferences,

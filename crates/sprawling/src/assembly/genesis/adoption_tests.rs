@@ -5,12 +5,12 @@
 
 use crate::assembly::*;
 
-/// Adopting a folder fences it at once, as one pack: the first dispatch
+/// Adopting a folder checkpoints it at once, as one pack: the first dispatch
 /// into a building of thousands of files would otherwise hash every one
 /// of them and write each as a loose object before its first tool call
-/// (storage-SPEC 8-8, the base fence).
+/// (storage-SPEC 8-8, the base checkpoint).
 #[test]
-fn adopting_a_folder_fences_it_as_one_pack_before_any_dispatch() {
+fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
     let dir = tempfile::tempdir().unwrap();
     for name in ["a.md", "b.md", "c.md"] {
         std::fs::create_dir_all(dir.path().join("shop")).unwrap();

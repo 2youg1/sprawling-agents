@@ -43,11 +43,11 @@ fn files_of(payload: &Payload) -> Vec<String> {
 }
 
 #[test]
-fn a_fence_covers_every_prefix_it_is_given_and_nothing_else() {
-    // The defect this pins: a run's fence used to be its room, while the
+fn a_checkpoint_covers_every_prefix_it_is_given_and_nothing_else() {
+    // The defect this pins: a run's checkpoint used to be its room, while the
     // write domain it is judged against is the building and whatever
     // else that building declares. Anything the run was allowed to write
-    // and the fence did not stage was invisible to `changes`, and
+    // and the checkpoint did not stage was invisible to `changes`, and
     // `wave_post` could not restore it either.
     let tmp = tempfile::tempdir().unwrap();
     write(tmp.path(), "work/resident/in-room.txt", "a");
@@ -83,7 +83,7 @@ fn a_fence_covers_every_prefix_it_is_given_and_nothing_else() {
 }
 
 #[test]
-fn a14_the_fence_precedes_the_deletion_it_restores() {
+fn a14_the_checkpoint_precedes_the_deletion_it_restores() {
     let tmp = tempfile::tempdir().unwrap();
     write(tmp.path(), "work/keep.txt", "kept");
     write(tmp.path(), "work/doomed.txt", "about to go");
@@ -148,7 +148,7 @@ fn a_wave_pays_for_what_it_changed_rather_than_for_the_whole_tree() {
         .commit(&crate::checkpoint::scan::CommitPlan {
             t: TimeMs::new(1_000),
             of: &resident(),
-            subject: "past the fence",
+            subject: "past the checkpoint",
             onto_head: true,
         })
         .unwrap();
@@ -190,7 +190,7 @@ fn an_unchanged_wave_still_commits_so_the_chain_rebuilds() {
             .wave_pre(&["work".to_owned()], TimeMs::new(2_000), &resident())
             .unwrap(),
     );
-    assert_ne!(first, second, "each fence is its own commit");
+    assert_ne!(first, second, "each checkpoint is its own commit");
     assert!(checkpoint.wave_post(&second).unwrap().is_empty());
 }
 
@@ -218,10 +218,10 @@ fn the_same_script_at_the_same_time_produces_the_same_commit() {
     );
 }
 
-/// Three tool waves leave three fences a run can restore from, and
+/// Three tool waves leave three checkpoints a run can restore from, and
 /// leave `git log HEAD` exactly as long as it was.
 #[test]
-fn three_waves_leave_three_fences_and_a_history_that_did_not_grow() {
+fn three_waves_leave_three_checkpoints_and_a_history_that_did_not_grow() {
     let tmp = tempfile::tempdir().unwrap();
     write(tmp.path(), "work/steady.txt", "unchanged");
     let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
@@ -231,19 +231,19 @@ fn three_waves_leave_three_fences_and_a_history_that_did_not_grow() {
         .unwrap();
     let before = head_len(tmp.path());
 
-    let mut fences = Vec::new();
+    let mut checkpoints = Vec::new();
     for step in 0..3u64 {
         write(tmp.path(), "work/steady.txt", &format!("wave {step}"));
         let payload = checkpoint
             .wave_pre(&["work".to_owned()], TimeMs::new(2_000 + step), &of)
             .unwrap();
-        fences.push(oid_of(&payload));
+        checkpoints.push(oid_of(&payload));
     }
 
     assert_eq!(
         head_len(tmp.path()),
         before,
-        "a wave fence does not land on the branch"
+        "a wave checkpoint does not land on the branch"
     );
 
     let repo = git2::Repository::open(tmp.path()).unwrap();
@@ -257,13 +257,16 @@ fn three_waves_leave_three_fences_and_a_history_that_did_not_grow() {
         .map(str::to_owned)
         .collect();
     filed.sort();
-    let mut expected: Vec<String> = fences.iter().map(|oid| format!("{prefix}{oid}")).collect();
+    let mut expected: Vec<String> = checkpoints
+        .iter()
+        .map(|oid| format!("{prefix}{oid}"))
+        .collect();
     expected.sort();
     assert_eq!(filed, expected);
 
-    // Each fence still checks out: a dangling commit reachable through
+    // Each checkpoint still checks out: a dangling commit reachable through
     // its reference is not collected.
-    for (step, oid) in fences.iter().enumerate() {
+    for (step, oid) in checkpoints.iter().enumerate() {
         let tree = repo
             .find_commit(git2::Oid::from_str(oid).unwrap())
             .unwrap()
@@ -283,21 +286,21 @@ fn head_len(root: &Path) -> usize {
     walk.count()
 }
 
-/// A run fences through two handles - the lane's own and the bench's
+/// A run checkpoints through two handles - the lane's own and the bench's
 /// forecast net - and a `file_discarded` restoration points into
-/// whichever of them raised the fence. Each fence stays pinned, so a
+/// whichever of them raised the checkpoint. Each checkpoint stays pinned, so a
 /// `git gc` that prunes every unreachable object keeps them both.
 #[test]
-fn every_fence_a_run_raises_survives_git_gc_whichever_handle_raised_it() {
+fn every_checkpoint_a_run_raises_survives_git_gc_whichever_handle_raised_it() {
     let tmp = tempfile::tempdir().unwrap();
     let of = resident();
     let scope = ["work".to_owned()];
-    let mut fences = Vec::new();
+    let mut checkpoints = Vec::new();
     for (step, body) in ["lane", "bench"].iter().enumerate() {
         write(tmp.path(), "work/doomed.txt", body);
         let mut handle = Checkpoint::open(tmp.path()).unwrap();
         let t = TimeMs::new(1_000 + u64::try_from(step).unwrap());
-        fences.push(oid_of(&handle.wave_pre(&scope, t, &of).unwrap()));
+        checkpoints.push(oid_of(&handle.wave_pre(&scope, t, &of).unwrap()));
     }
 
     let gc = std::process::Command::new("git")
@@ -308,11 +311,11 @@ fn every_fence_a_run_raises_survives_git_gc_whichever_handle_raised_it() {
     assert!(gc.success());
 
     let repo = git2::Repository::open(tmp.path()).unwrap();
-    let survivors: Vec<&String> = fences
+    let survivors: Vec<&String> = checkpoints
         .iter()
         .filter(|oid| repo.find_commit(git2::Oid::from_str(oid).unwrap()).is_ok())
         .collect();
-    assert_eq!(survivors, fences.iter().collect::<Vec<_>>());
+    assert_eq!(survivors, checkpoints.iter().collect::<Vec<_>>());
 }
 
 #[test]
@@ -326,14 +329,14 @@ fn a_file_scope_is_a_literal_path_and_not_a_glob() {
 
     write(tmp.path(), "hall/notes[1].md", "written");
     write(tmp.path(), "hall/notes1.md", "decoy changed");
-    let fence = checkpoint
+    let checkpoint = checkpoint
         .wave_pre(
             &["hall/notes[1].md".to_owned()],
             TimeMs::new(2_000),
             &resident(),
         )
         .unwrap();
-    assert_eq!(files_of(&fence), ["hall/notes[1].md"]);
+    assert_eq!(files_of(&checkpoint), ["hall/notes[1].md"]);
 }
 
 /// The address grammar admits a leading `!`, which a git pathspec reads
@@ -368,7 +371,7 @@ fn a_file_scope_with_a_leading_bang_is_that_file_and_not_a_negation() {
 }
 
 #[test]
-fn a_fence_lists_only_the_paths_it_changed() {
+fn a_checkpoint_lists_only_the_paths_it_changed() {
     let tmp = tempfile::tempdir().unwrap();
     write(tmp.path(), "work/kept.txt", "kept");
     write(tmp.path(), "work/gone.txt", "gone");
@@ -388,7 +391,7 @@ fn a_fence_lists_only_the_paths_it_changed() {
     assert_eq!(
         files_of(&second),
         ["work/edited.txt", "work/fresh.txt", "work/gone.txt"],
-        "an untouched file is not this fence's news"
+        "an untouched file is not this checkpoint's news"
     );
     let third = checkpoint
         .wave_pre(&scope, TimeMs::new(3_000), &resident())

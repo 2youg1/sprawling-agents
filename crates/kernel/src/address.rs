@@ -34,7 +34,7 @@ pub const RESERVED_PREFIX: &str = ".sprawling";
 
 /// git's own metadata directory (kernel-SPEC 8-73). Writing it is
 /// privilege escalation: a hook is code that runs at the next git
-/// operation, a config key can start a program, and the fence
+/// operation, a config key can start a program, and the checkpoint
 /// references and the restoration objects a `file_discarded` names all
 /// live in there.
 pub const GIT_METADATA: &str = ".git";

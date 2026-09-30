@@ -25,8 +25,8 @@ mod placing;
 /// runs as.
 ///
 /// Values that arrive together and are meaningless apart - a bench
-/// without the resident that invokes it derives the wrong key, a fence
-/// scope without the tree it fences covers the wrong files. They were
+/// without the resident that invokes it derives the wrong key, a checkpoint
+/// scope without the tree it checkpoints covers the wrong files. They were
 /// seven parameters, and `#[expect(clippy::too_many_arguments)]` sat
 /// above them saying so.
 ///
@@ -50,11 +50,11 @@ pub(crate) struct Driving {
     /// The tree the run writes in: its own worktree under review, the
     /// city itself otherwise.
     pub(crate) write_root: PathBuf,
-    /// What a checkpoint fence covers, from [`Site::fence_scope`]:
+    /// What a checkpoint covers, from [`Site::checkpoint_scope`]:
     /// every prefix of the run's write domain, not just its room.
-    pub(crate) fence_scope: Vec<String>,
+    pub(crate) checkpoint_scope: Vec<String>,
     pub(crate) run_id: RunId,
-    /// What every fence this drive raises is signed with.
+    /// What every checkpoint this drive raises is signed with.
     pub(crate) of: storage::Provenance,
     /// Where a command's output is pinned before it is cut, and what
     /// decides the cut (sprawling-SPEC 8-43).
@@ -146,9 +146,9 @@ pub(crate) struct Driven {
     /// The adapter, home from the drive. The caller takes it apart back
     /// into the site it came from: a `Site` gains and loses no field.
     pub(crate) adapter: super::keeping_warm::Door,
-    /// The commits each wave fenced against; the first is what the sweep
+    /// The commits each wave checkpointed against; the first is what the sweep
     /// restores a discarded file from.
-    pub(crate) fenced: Vec<String>,
+    pub(crate) checkpointed: Vec<String>,
     /// The run's own commands, as (passed, failed).
     pub(crate) ran: (u32, u32),
     /// What the drive raised for a person. Empty today: every door
@@ -205,7 +205,7 @@ impl RunWorker {
                 .serving
                 .as_ref()
                 .map(|at| std::sync::Arc::clone(&at.interrupts)),
-            fence_gate: std::sync::Arc::clone(&self.flight.fence_gate),
+            checkpoint_gate: std::sync::Arc::clone(&self.flight.checkpoint_gate),
             backlog: self.flight.backlog.clone(),
             clock: std::sync::Arc::clone(&self.clock),
         }

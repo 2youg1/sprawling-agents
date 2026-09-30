@@ -239,7 +239,7 @@ impl RunWorker {
         let Driven {
             outcome: driven,
             adapter: home,
-            fenced,
+            checkpointed,
             ran,
             mut raised,
             workbench,
@@ -251,7 +251,7 @@ impl RunWorker {
             &desks,
             Settling {
                 sweep: Sweep {
-                    fenced: &fenced,
+                    checkpointed: &checkpointed,
                     raised: &mut raised,
                     job_locator: &job_locator,
                 },
@@ -338,7 +338,7 @@ impl RunWorker {
     /// Later than the queue on purpose. The queue is a value this
     /// worker holds and comes home on every path; the worktree is a
     /// directory on disk that the sweep still has to diff against its
-    /// own fence, and releasing it first turns that diff into "object
+    /// own checkpoint, and releasing it first turns that diff into "object
     /// not found".
     ///
     /// # Errors

@@ -225,7 +225,7 @@ A run has its own page, with seven lenses: **time** (where the time went, turn b
 Work that is meant to land goes through a pull request inside the city, and the resident who wrote the work cannot verify it: a request that nobody else verified has no method that merges it. Read, in order:
 
 1. The run's **changes** lens: one row per file that moved, and the patch of a file when you open its row. A line the credential scan matched is reported by its line number and reason, never echoed.
-2. `git log` in the building. The fences the city writes before each wave of tool calls are commits no `HEAD` points at, kept under `refs/sprawling/runs/`, so your history keeps the shape you left it.
+2. `git log` in the building. The checkpoints the city writes before each wave of tool calls are commits no `HEAD` points at, kept under `refs/sprawling/runs/`, so your history keeps the shape you left it.
 3. The merge commit's trailers — `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`, `Sprawling-Effort`, `Sprawling-City`, and `Sprawling-Predecessor` for a run that replaced another. A merge you reviewed also carries `Reviewed-by`, when this repository's git config holds `user.name` and `user.email`.
 4. `sprawling whose ~/cities/first <commit>` answers the same question backwards from the Ledger, given the full forty-digit commit id. Exit code 1 means this city has no record of writing that commit.
 

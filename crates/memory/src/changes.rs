@@ -6,7 +6,7 @@
 //! What changed between two checkpoints, as paths and counts.
 //!
 //! The write side of this city is git-native — every tool wave is
-//! fenced by a real commit — and nothing anywhere could read
+//! checkpointed by a real commit — and nothing anywhere could read
 //! two of those commits back and say what moved between them. This is
 //! that read.
 //!
@@ -14,7 +14,7 @@
 //! stages `<scope>/*` and nothing wider, so the difference between two of
 //! them cannot contain a file the Run merely read. Other harnesses report
 //! a session diff that includes everything the session opened, and their
-//! users cannot tell what the agent actually wrote; the fence being the
+//! users cannot tell what the agent actually wrote; the checkpoint being the
 //! write domain is what spares this one that.
 //!
 //! **Counts, never patch text.** `checkpoint::scan_staged` refuses to
@@ -234,7 +234,7 @@ mod tests {
         GitOid::parse(&raw).expect("a checkpoint names a git object")
     }
 
-    /// Two fences, and what a person wants to know about the wave between
+    /// Two checkpoints, and what a person wants to know about the wave between
     /// them: which files, and how much of each.
     #[test]
     fn two_checkpoints_report_the_files_between_them_and_how_much_moved() {
@@ -242,9 +242,9 @@ mod tests {
         let root = dir.path();
         write(root, "lab/lex.rs", "one\ntwo\nthree\n");
         write(root, "lab/keep.rs", "unchanged\n");
-        let mut fence = Checkpoint::open(root).unwrap();
+        let mut checkpoint = Checkpoint::open(root).unwrap();
         let base = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(1_000), &resident())
                 .unwrap(),
         );
@@ -253,7 +253,7 @@ mod tests {
         write(root, "lab/new.rs", "fresh\n");
         std::fs::remove_file(root.join("lab/keep.rs")).unwrap();
         let head = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(2_000), &resident())
                 .unwrap(),
         );
@@ -281,14 +281,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write(root, "lab/lex.rs", "one\n");
-        let mut fence = Checkpoint::open(root).unwrap();
+        let mut checkpoint = Checkpoint::open(root).unwrap();
         let base = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
                 .unwrap(),
         );
         let head = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(2), &resident())
                 .unwrap(),
         );
@@ -298,15 +298,15 @@ mod tests {
     /// What the person is looking at is the tree on disk. A wave still
     /// running has written files that no checkpoint holds yet, and a
     /// change list that ignored them would describe the session as it was
-    /// one fence ago.
+    /// one checkpoint ago.
     #[test]
-    fn work_not_yet_fenced_still_counts_against_the_working_tree() {
+    fn work_not_yet_checkpointed_still_counts_against_the_working_tree() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write(root, "lab/lex.rs", "one\n");
-        let mut fence = Checkpoint::open(root).unwrap();
+        let mut checkpoint = Checkpoint::open(root).unwrap();
         let base = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
                 .unwrap(),
         );
@@ -332,9 +332,9 @@ mod tests {
         let root = dir.path();
         std::fs::create_dir_all(root.join("lab")).unwrap();
         std::fs::write(root.join("lab/blob.bin"), [0u8, 1, 2, 0, 3]).unwrap();
-        let mut fence = Checkpoint::open(root).unwrap();
+        let mut checkpoint = Checkpoint::open(root).unwrap();
         let base = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
                 .unwrap(),
         );
@@ -353,9 +353,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write(root, "lab/lex.rs", "one\n");
-        let mut fence = Checkpoint::open(root).unwrap();
+        let mut checkpoint = Checkpoint::open(root).unwrap();
         let base = oid_of(
-            &fence
+            &checkpoint
                 .wave_pre(&["lab".to_owned()], TimeMs::new(1), &resident())
                 .unwrap(),
         );

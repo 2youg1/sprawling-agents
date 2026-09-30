@@ -296,7 +296,7 @@ fn a_session_slice_is_out_of_every_write_domain() {
 }
 
 #[test]
-fn a_fence_can_tell_a_session_slice_from_a_promise() {
+fn a_checkpoint_can_tell_a_session_slice_from_a_promise() {
     for spelled in [
         "lab/.sprawling/sessions/room1.jsonl",
         "lab/room1/.sprawling/sessions/room1.jsonl",

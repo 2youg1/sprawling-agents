@@ -15,7 +15,7 @@
 //! checks it against the digest, so an answer can only come from having
 //! opened it. A digest-derived answer would not do: the question has to
 //! name the artifact's `cas:b3-…` locator, and that locator spells the
-//! digest. This is a fence rather than a proof - one read is not
+//! digest. This is a checkpoint rather than a proof - one read is not
 //! all reading - and the honest claim is the narrow one: a judgment
 //! passed without opening anything is refused.
 

@@ -5,10 +5,10 @@
 
 //! A run's bench as the tool face a wave drives in three stages
 //! (runtime-SPEC.md 8-3): each call's key is placed by its position when
-//! it is admitted, and the commits it was fenced against, what it says
+//! it is admitted, and the commits it was checkpointed against, what it says
 //! it wrote and the commands that ran are counted when it is accounted.
 //! Both happen in call order, so a wave whose reads ran at once leaves
-//! the same keys, the same fence list, the same next fence and the same
+//! the same keys, the same checkpoint list, the same next checkpoint and the same
 //! counts as one that ran them in turn.
 
 use std::cell::RefCell;
@@ -19,33 +19,33 @@ use runtime::{Admitted, ConcurrentInvoke};
 
 use super::Sieving;
 
-/// What a run's calls leave for the fences around them. Shared between
-/// the tool face and the wave fence, which the turn driver holds at once.
-pub(super) struct Fencing {
-    /// The commits the run was fenced against, in the order they went
-    /// up. The wave fence and the bench both add to it, so the sweep
+/// What a run's calls leave for the checkpoints around them. Shared between
+/// the tool face and the wave checkpoint, which the turn driver holds at once.
+pub(super) struct Checkpointing {
+    /// The commits the run was checkpointed against, in the order they went
+    /// up. The wave checkpoint and the bench both add to it, so the sweep
     /// afterwards reads the first commit a deleted file can be restored
     /// from.
-    pub(super) fenced: RefCell<Vec<String>>,
-    /// What the calls since the last fence said they wrote, which is
-    /// what the next fence stages (runtime-SPEC 8-45).
+    pub(super) checkpointed: RefCell<Vec<String>>,
+    /// What the calls since the last checkpoint said they wrote, which is
+    /// what the next checkpoint stages (runtime-SPEC 8-45).
     wrote: RefCell<Writes>,
 }
 
-impl Fencing {
-    /// A run's fencing before its first call. What it wrote opens as the
+impl Checkpointing {
+    /// A run's checkpointing before its first call. What it wrote opens as the
     /// whole domain: no commit of this run vouches yet for the tree it
     /// opened on.
-    pub(super) fn opened() -> Fencing {
-        Fencing {
-            fenced: RefCell::new(Vec::new()),
+    pub(super) fn opened() -> Checkpointing {
+        Checkpointing {
+            checkpointed: RefCell::new(Vec::new()),
             wrote: RefCell::new(Writes::Domain),
         }
     }
 
-    /// What the next fence stages: the paths the calls since the last
-    /// fence said they wrote, or the whole write domain when one of them
-    /// could not say. Taken, so the fence after it starts from what the
+    /// What the next checkpoint stages: the paths the calls since the last
+    /// checkpoint said they wrote, or the whole write domain when one of them
+    /// could not say. Taken, so the checkpoint after it starts from what the
     /// calls after this one say. `Nothing` stages the domain as well:
     /// staging less than the domain is safe only on the calls' own
     /// account of what they wrote, and there is none to go by.
@@ -62,7 +62,7 @@ impl Fencing {
     }
 
     /// A call that failed may have failed partway through its writes, and
-    /// its own account of them no longer holds, so the next fence walks
+    /// its own account of them no longer holds, so the next checkpoint walks
     /// the whole domain (runtime-SPEC 8-45).
     fn widen(&self) {
         self.add(Writes::Domain);
@@ -85,7 +85,7 @@ pub(super) struct Placing<'f> {
     /// evidence of "the tests passed" the city can observe without being
     /// told, and being told is what a mode is supposed to check.
     ran: (u32, u32),
-    fencing: &'f Fencing,
+    checkpointing: &'f Checkpointing,
 }
 
 impl<'f> Placing<'f> {
@@ -93,7 +93,7 @@ impl<'f> Placing<'f> {
         bench: ToolBench,
         sieving: Sieving,
         run: RunId,
-        fencing: &'f Fencing,
+        checkpointing: &'f Checkpointing,
     ) -> Placing<'f> {
         Placing {
             bench,
@@ -101,7 +101,7 @@ impl<'f> Placing<'f> {
             run,
             next: 0,
             ran: (0, 0),
-            fencing,
+            checkpointing,
         }
     }
 
@@ -134,13 +134,13 @@ impl<'f> Placing<'f> {
         match decided {
             BenchOutcome::Ran {
                 outcome,
-                fenced,
+                checkpointed,
                 wrote,
             } => {
-                if let Some(oid) = fenced {
-                    self.fencing.fenced.borrow_mut().push(oid);
+                if let Some(oid) = checkpointed {
+                    self.checkpointing.checkpointed.borrow_mut().push(oid);
                 }
-                self.fencing.add(wrote);
+                self.checkpointing.add(wrote);
                 if call.name.as_str() != kernel::ToolName::EXEC {
                     return self.unsieved(call, outcome);
                 }
@@ -202,7 +202,7 @@ impl ConcurrentInvoke for Placing<'_> {
             Ok(Clearance::Cleared(ticket)) => Admitted::Cleared(ticket),
             Ok(Clearance::Answered(decided)) => Admitted::Answered(self.answered(call, decided)),
             Err(refused) => {
-                self.fencing.widen();
+                self.checkpointing.widen();
                 Admitted::Answered(Err(refused))
             }
         }
@@ -225,7 +225,7 @@ impl ConcurrentInvoke for Placing<'_> {
         let decided = self
             .bench
             .account(ticket, answered)
-            .inspect_err(|_| self.fencing.widen())?;
+            .inspect_err(|_| self.checkpointing.widen())?;
         self.answered(call, decided)
     }
 }

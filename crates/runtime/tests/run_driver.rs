@@ -249,7 +249,7 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -315,7 +315,7 @@ fn a_retriable_failure_is_made_again_up_to_the_number_the_person_set() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -362,7 +362,7 @@ fn a_ceiling_that_is_reached_ends_the_run() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -399,7 +399,7 @@ fn a_run_ends_when_its_work_runs_out_rather_than_at_a_ceiling() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -436,7 +436,7 @@ fn a_cancel_at_a_safe_point_freezes_inside_the_interrupted_turn() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -459,7 +459,7 @@ fn a_cancel_at_a_safe_point_freezes_inside_the_interrupted_turn() {
 }
 
 #[test]
-fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
+fn a_checkpoint_runs_before_the_wave_and_carries_the_turns_stamp() {
     let mut ledger = RecordingLedger::new();
     let mut model = ScriptedModel {
         seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
@@ -473,16 +473,16 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
             attachments: Vec::new(),
         })
     };
-    let mut fenced: Vec<u64> = Vec::new();
-    let mut fence = |t: TimeMs| {
-        fenced.push(t.value());
+    let mut checkpointed: Vec<u64> = Vec::new();
+    let mut checkpoint = |t: TimeMs| {
+        checkpointed.push(t.value());
         Ok(Payload::empty())
     };
     {
         let mut hooks = RunHooks {
             now: &mut now,
             interrupt: &mut interrupt,
-            fence: Some(&mut fence),
+            checkpoint: Some(&mut checkpoint),
             writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
             invoke: &mut invoke,
             wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -491,18 +491,18 @@ fn a_fence_runs_before_the_wave_and_carries_the_turns_stamp() {
         let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
         assert!(matches!(frozen.completion(), Completion::Done(_)));
     }
-    // The fence goes up before the wave that calls something, and again
+    // The checkpoint goes up before the wave that calls something, and again
     // before the closing turn's empty wave: that one has nothing to come
     // back from, but it is what carries the first wave's writes into a
     // commit.
-    assert_eq!(fenced, vec![2, 3]);
+    assert_eq!(checkpointed, vec![2, 3]);
     let kinds = ledger.kinds();
     assert_eq!(kinds[6], "checkpoint_committed");
     assert_eq!(kinds[7], "tool_called");
 }
 
 #[test]
-fn a_run_that_calls_nothing_puts_up_no_fence() {
+fn a_run_that_calls_nothing_puts_up_no_checkpoint() {
     let mut ledger = RecordingLedger::new();
     let mut model = ScriptedModel {
         seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
@@ -516,16 +516,16 @@ fn a_run_that_calls_nothing_puts_up_no_fence() {
             attachments: Vec::new(),
         })
     };
-    let mut fenced: Vec<u64> = Vec::new();
-    let mut fence = |t: TimeMs| {
-        fenced.push(t.value());
+    let mut checkpointed: Vec<u64> = Vec::new();
+    let mut checkpoint = |t: TimeMs| {
+        checkpointed.push(t.value());
         Ok(Payload::empty())
     };
     {
         let mut hooks = RunHooks {
             now: &mut now,
             interrupt: &mut interrupt,
-            fence: Some(&mut fence),
+            checkpoint: Some(&mut checkpoint),
             writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
             invoke: &mut invoke,
             wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -535,13 +535,13 @@ fn a_run_that_calls_nothing_puts_up_no_fence() {
         assert!(matches!(frozen.completion(), Completion::Done(_)));
     }
     // Nothing ran and nothing will: the tree is the one the run opened on.
-    assert_eq!(fenced, Vec::<u64>::new());
+    assert_eq!(checkpointed, Vec::<u64>::new());
 }
 
-/// A wave whose every call only reads changes no file: it needs no fence
+/// A wave whose every call only reads changes no file: it needs no checkpoint
 /// before it, and the closing turn after it has no writes to carry.
 #[test]
-fn a_read_only_wave_puts_up_no_fence() {
+fn a_read_only_wave_puts_up_no_checkpoint() {
     let mut ledger = RecordingLedger::new();
     let mut model = ScriptedModel {
         seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
@@ -555,16 +555,16 @@ fn a_read_only_wave_puts_up_no_fence() {
             attachments: Vec::new(),
         })
     };
-    let mut fenced: Vec<u64> = Vec::new();
-    let mut fence = |t: TimeMs| {
-        fenced.push(t.value());
+    let mut checkpointed: Vec<u64> = Vec::new();
+    let mut checkpoint = |t: TimeMs| {
+        checkpointed.push(t.value());
         Ok(Payload::empty())
     };
     {
         let mut hooks = RunHooks {
             now: &mut now,
             interrupt: &mut interrupt,
-            fence: Some(&mut fence),
+            checkpoint: Some(&mut checkpoint),
             writes: &|_: &kernel::ToolCall| kernel::Writes::Nothing,
             invoke: &mut invoke,
             wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -573,7 +573,7 @@ fn a_read_only_wave_puts_up_no_fence() {
         let frozen = drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
         assert!(matches!(frozen.completion(), Completion::Done(_)));
     }
-    assert_eq!(fenced, Vec::<u64>::new());
+    assert_eq!(checkpointed, Vec::<u64>::new());
 }
 
 #[test]
@@ -594,7 +594,7 @@ fn advance_reports_each_turn_so_a_caller_can_stop_between_them() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -643,7 +643,7 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -695,7 +695,7 @@ fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts()
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -746,7 +746,7 @@ fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -799,7 +799,7 @@ fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -849,7 +849,7 @@ fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut wait,
@@ -915,7 +915,7 @@ fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -1096,7 +1096,7 @@ fn three_reads_driven(invoke: &mut dyn runtime::ConcurrentInvoke) -> RecordingLe
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -1154,7 +1154,7 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke: &mut invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
@@ -1256,7 +1256,7 @@ fn one_read_while_generating(
     let mut hooks = RunHooks {
         now: &mut now,
         interrupt: &mut interrupt,
-        fence: None,
+        checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
         invoke,
         wait: &mut |_: TimeMs| runtime::NextCall::Allowed,

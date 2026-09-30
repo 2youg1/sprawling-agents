@@ -39,7 +39,7 @@ pub(super) use standing::Placing;
 /// the worker read them before the bench moved into the lane.
 pub(in crate::assembly) struct Laying {
     pub(in crate::assembly) city_root: PathBuf,
-    /// The city's genesis line, which signs every fence.
+    /// The city's genesis line, which signs every checkpoint.
     pub(in crate::assembly) city: kernel::B3Hash,
     vault: std::sync::Arc<std::sync::Mutex<gateway::Custodian>>,
     connectors: std::sync::Arc<dyn accounting::Connectors + Send + Sync>,
@@ -49,8 +49,8 @@ pub(in crate::assembly) struct Laying {
     /// from (`RunWorker::desktop_program`).
     desktop_program: super::DesktopProgram,
     backlog: runtime::Backlog,
-    /// The city's one fence at a time (`driving::lane::DriveContext`).
-    pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    /// The city's one checkpoint at a time (`driving::lane::DriveContext`).
+    pub(in crate::assembly) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// The store the lanes share (`RunWorker::lane_store`).
     pub(in crate::assembly) store: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     notes: super::recording::Notes,
@@ -72,17 +72,17 @@ impl Laying {
         self.notes.write(level, self.staged_at, module, message);
     }
 
-    /// Opens the checkpoint a run's writes are fenced in.
+    /// Opens the checkpoint a run's writes are checkpointed in.
     ///
     /// The first open in a city creates its repository, and two lanes
     /// creating one race on its config lock, so the open takes the gate
-    /// a fence takes (sprawling-SPEC.md 8-46-13).
+    /// a checkpoint takes (sprawling-SPEC.md 8-46-13).
     ///
     /// # Errors
     /// Propagates a gate a dead thread left, and a repository that will
     /// not open.
     fn open_checkpoint(&self, root: &std::path::Path) -> Result<storage::Checkpoint, AxError> {
-        let turn = held(&self.fence_gate, "take the fence gate")?;
+        let turn = held(&self.checkpoint_gate, "take the checkpoint gate")?;
         let opened = storage::Checkpoint::open(root).map_err(storage::StorageError::into_ax);
         drop(turn);
         opened
@@ -104,7 +104,7 @@ impl super::RunWorker {
             browsers: self.browsers,
             desktop_program: self.desktop_program,
             backlog: self.flight.backlog.clone(),
-            fence_gate: std::sync::Arc::clone(&self.flight.fence_gate),
+            checkpoint_gate: std::sync::Arc::clone(&self.flight.checkpoint_gate),
             store: std::sync::Arc::clone(&self.lane_store),
             notes: self.log.clone(),
             clock: std::sync::Arc::clone(&self.clock),
@@ -150,7 +150,7 @@ pub(super) struct Site {
     pub(super) who: String,
     pub(super) run_id: RunId,
     /// The run this one replaces, when a resident succeeded itself.
-    /// Signed into every fence this run raises, so a commit can be
+    /// Signed into every checkpoint this run raises, so a commit can be
     /// asked for its lineage.
     pub(super) predecessor: Option<RunId>,
     /// Some when the building asks for review: the tree this run writes
@@ -241,26 +241,26 @@ impl Workbench {
 }
 
 impl Site {
-    /// What a checkpoint fence covers for this run.
+    /// What a checkpoint covers for this run.
     ///
     /// Under review the worktree is this run's alone, so everything that
     /// changed inside it is this run's to offer - the shelf entries it
     /// filed included, which sit at the building rather than in the
     /// room.
     ///
-    /// Without a lease the fence is **the run's write domain**, which is
+    /// Without a lease the checkpoint is **the run's write domain**, which is
     /// the building's own subtree plus whatever else its `RULES.toml`
     /// declares, as storage-SPEC section 8-18 states. The room would be
     /// narrower than the gate: `city::policy::write_domain` defaults to
     /// the whole building, and City Hall's residents reach every document
-    /// under theirs. Anything a run wrote outside a room-sized fence would
-    /// be staged by no fence, reach no `changes` answer, and have no
+    /// under theirs. Anything a run wrote outside a room-sized checkpoint would
+    /// be staged by no checkpoint, reach no `changes` answer, and have no
     /// `file_discarded` record that could restore it.
     ///
     /// # Errors
     /// Propagates a building whose declared prefixes its own rules
     /// refuse.
-    pub(super) fn fence_scope(&self) -> Result<Vec<String>, AxError> {
+    pub(super) fn checkpoint_scope(&self) -> Result<Vec<String>, AxError> {
         if self.lease.is_some() {
             return Ok(tree_scope(&self.building));
         }
@@ -274,8 +274,8 @@ impl Site {
 }
 
 /// What a building under review writes in its tree: its own subtree.
-/// The tree is claimed, fenced and offered over this one scope, so a
-/// claim that checked out less than the fence stages, or an offer that
+/// The tree is claimed, checkpointed and offered over this one scope, so a
+/// claim that checked out less than the checkpoint stages, or an offer that
 /// staged more than the claim checked out, cannot happen.
 fn tree_scope(building: &city::Building) -> Vec<String> {
     vec![building.addr().as_str().to_owned()]
