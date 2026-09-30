@@ -20,6 +20,16 @@
 //! of it; it is refused, and the caller looks again. `browser::act`
 //! holds the same line for a page, and the reason is the same one.
 //!
+//! A generation belongs to one window, named by its handle rather than
+//! its title, so two windows that share a title keep two records. It
+//! holds only while that window's rectangle is the one the snapshot saw:
+//! a window that moved or changed size refuses its old generation, since
+//! every ref of it now points at where the window used to be. What this
+//! does not catch is written down rather than hidden (desktop-SPEC.md
+//! section 12.5): a window that rearranges its inside while its outline
+//! stays put, and a handle reused by a new window that happens to take
+//! the same rectangle.
+//!
 //! A `point` carries no generation check, because a point did not come
 //! from a snapshot: the caller measured it against the window's own
 //! edges, and `geometry::Bounds::at` is what judges it.
@@ -110,8 +120,9 @@ impl Views {
     ///
     /// # Errors
     /// Refuses a window nobody has snapshotted, a generation that is not
-    /// this window's current one, and a ref that generation did not
-    /// mint.
+    /// this window's current one, a window that moved or changed size
+    /// since that generation was taken, and a ref that generation did
+    /// not mint.
     pub(crate) fn resolve(
         &self,
         sight: Sight,
@@ -128,6 +139,11 @@ impl Views {
                 "`{reference}` was decided against generation {generation}, and this window is \
                  now on generation {}",
                 seen.generation
+            )));
+        }
+        if seen.bounds != sight.bounds {
+            return Err(stale(format!(
+                "this window has moved or changed size since generation {generation} was taken"
             )));
         }
         seen.nodes.get(reference).ok_or_else(|| {

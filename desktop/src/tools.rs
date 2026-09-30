@@ -118,8 +118,9 @@ pub(crate) fn table() -> Vec<ToolCard> {
         ToolCard {
             name: ToolName::Snapshot,
             description: "Read the accessibility tree of one named window: role, name, ref and \
-                 bounds per node, with a generation number that `desktop.act` carries back. It \
-                 does not return pixels, it does not expose native handles, and it does not read \
+                 bounds per node, with a generation number that `desktop.act` carries back, \
+                 which stops being accepted once the window is snapshotted again, moves or \
+                 changes size. It does not return pixels, it does not expose native handles, and it does not read \
                  a window the scope file leaves out."
                 .to_owned(),
             schema: json!({
@@ -136,7 +137,7 @@ pub(crate) fn table() -> Vec<ToolCard> {
             description: "Do one thing to one window: click, double, right, drag, scroll, type or \
                  key, at a ref from a snapshot or at a point. `generation` is the snapshot the \
                  action was decided against, and an action decided against an older view is \
-                 refused. The named window must hold the keyboard when the action is sent, and \
+                 refused, and so is one decided before the window moved or changed size. The named window must hold the keyboard when the action is sent, and \
                  must be the window under the point it lands on; otherwise nothing is sent. If \
                  the desktop takes only part of the action, the answer says how much and \
                  releases any key or button that part left held; it does not send the rest. It \
