@@ -2177,6 +2177,8 @@ pub const HANDOFF_FILE: &str = "Handoff.md";
 pub const URBANITE_FILE: &str = "URBANITE.md";
 pub const TRANSCRIPT_EXT: &str = "jsonl";                            // 一次 run 的对话记录：房间里的 `<run>.jsonl`
 pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";   // `RunId` 显示形的 git 忽略模式，一个字符一个 `?`
+pub const REMOTE_DIR: &str = "remote";                               // 远程门的状态，城的保留子树下（§8-76）
+pub const DEVICES_FILE: &str = "devices.toml";                       // 配对过的设备表
 
 pub struct CityLayout { /* root —— 私有 */ }
 impl CityLayout {
@@ -2196,6 +2198,7 @@ impl CityLayout {
     pub fn job(&self, addr: &Address) -> PathBuf;               // <scope>/JOB.md
     pub fn handoff(&self, room: &Address) -> PathBuf;           // <scope>/Handoff.md
     pub fn urbanite(&self, addr: &Address) -> PathBuf;          // <scope>/URBANITE.md
+    pub fn devices(&self) -> PathBuf;                           // root/.sprawling/remote/devices.toml（§8-76）
     pub fn city_address(&self) -> Option<Address>;             // 城自己的名字：根目录名，能拼成地址时
     pub fn of_ledger(dir: &Path) -> Option<CityLayout>;         // ledger() 的逆：从账本目录取回城根
 }
@@ -2322,3 +2325,17 @@ pub struct ToolCalled {
 - **`Diff.locations` 照录登记**：登记层面的声明是空表（§8-23），每次调用的位置是工具一侧由参数算出的纯函数，今天还没有这个函数，所以账上的 `locations` 恒为空；一次编辑调用改的是哪个文件，读者读 `subject`。
 - **不进模型的字节**：`tool_called` 是入窗种类，但窗口从 `model_returned` 的消息重建工具调用，从不读 `tool_called` 的载荷（`runtime::fork` 的逐种类表把它列在「不是对话」一侧），所以这两个键不改变任何请求。
 - **字节不动**：缺席即省略，读宽；旧行两键都缺，读作「没有记下」。
+
+### 8-76 远程门的设备表在城的保留子树里（`kernel::layout`，形状 2 值）
+
+```rust
+pub const REMOTE_DIR: &str = "remote";
+pub const DEVICES_FILE: &str = "devices.toml";
+impl CityLayout {
+    pub fn devices(&self) -> PathBuf;   // root/.sprawling/remote/devices.toml
+}
+```
+
+- **它治理的是谁能从外面够到这座城**，所以按 §8-56 第 3 条落在城的保留子树里：没有任何写域够得到它，一个 agent 改不了哪台设备配对过、各有什么权限。表里每台设备一行：id、人给的名字、权限与公钥；表的格式、读写与跨重启的持久化归远程门的装配层（remote_access-SPEC §3「装配未落」一段），本模块只回答它在哪。
+- **`remote/` 一个目录，而不是保留子树根下一个文件**：远程门落盘的状态都归这一个目录，于是撤掉远程门在盘上留下的一切就是删掉一个目录，不必逐个认文件。城密钥不在这里，它进 vault。
+- 第一个读者是远程门的装配；在它之前，这个路径没有调用方，由 `layout` 的单元测试核它的摆放。

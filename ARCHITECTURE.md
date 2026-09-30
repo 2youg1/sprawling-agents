@@ -406,6 +406,8 @@ stale.
 │  ├─ worktrees/               one git worktree per reviewing run, objects shared
 │  ├─ library/                 skills more than one building admits
 │  ├─ snapshot/                what an open resumes the views from, so it folds only the tail
+│  ├─ remote/                  the remote gate's own state
+│  │  └─ devices.toml         the devices paired to reach this city from outside the machine
 │  ├─ CONFIG.toml              city layer of the three-layer configuration
 │  └─ FILTERS.toml             what this scope keeps out of a transcript
 └─ <building>/                 one building, one line of business
