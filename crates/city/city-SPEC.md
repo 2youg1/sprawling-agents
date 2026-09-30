@@ -245,7 +245,7 @@ impl Ladder {
 - **文件名只有一份，层级由位置决定**：City 层住 `<city>/.sprawling/CONFIG.toml`（reserved prefix 内，因此任何 Resident 的写域都永远叠不上它——「Agent 改不了自己的配置」因此是判定而非推理）；Building 层住 `<city>/<building>/.sprawling/CONFIG.toml`；Resident 层住 `<city>/<addr>/.sprawling/CONFIG.toml`（§8-11）。三处同名，读者认一次就认得完。
 - **地址就是楼时只有两级**：`addr` 与它的 building 相同时，下两级指向同一个文件，只读一次并放在 Building 级。同一份文件在两级各算一次不改变结果，却会让读者以为它能覆盖自己。
 - **缺文件不是错，读不动才是**（同 `resident`）：未声明即每级 `None`，落到 `kernel::consts_policy` 的缺省；一份存在却读不出的配置报 `E_STORAGE_FATAL`。
-- **不认的键即拒**（`deny_unknown_fields`）：静默忽略一个拼错的键，会产生「我设了 effort 而什么也没发生」这个无从诊断的状态。本版读哪些键，由 `ConfigFile` 的字段给出，此处不复述；拒绝文字也不复述这张键表——serde 的报错点名不认识的键、列出该表接受的键，恢复语只从原文里取出报错所在的那张表头（`[model]`、`[[mcp]]`）并说改哪一节。`[clock]` 等到它在真城里有消费者时再受理，在那之前写它得到的是一句拒绝而不是一份沉默。
+- **不认的键即拒**（`deny_unknown_fields`）：静默忽略一个拼错的键，会产生「我设了 effort 而什么也没发生」这个无从诊断的状态。本版读哪些键，由 `ConfigFile` 的字段给出，此处不复述；拒绝文字也不复述这张键表——serde 的报错点名不认识的键、列出该表接受的键，恢复语只从原文里取出报错所在的那张表头（`[model]`、`[[mcp]]`）并说改哪一节。`[clock]` 只受理 `stamp` 一个键（§8-31）；`zones` 仍拒，写它得到的是 serde 点名这个键的那句拒绝而不是一份沉默。
 - **梯子不在本模块重建**：下层胜上层由 `kernel::LayeredValue::resolve` 给，冻结由 `kernel::freeze` 给；本模块只回答「哪三份文件、怎么读」。一条规则一个权威。
 - **effort 属 `FrozenConfig` 而非 `LiveConfig`**：改它会作废 message cache breakpoints，因此改动只影响下一个 Run（理由已写在 `kernel::config`，此处不重述只遵守）。
 
@@ -986,6 +986,21 @@ pub fn check(city_root: &Path) -> Result<Report, AxError>;
 **接口**：`pub enum History { Absent, Present }`；`pub fn has_history(city_root: &Path) -> Result<History, AxError>`。账本目录由 `kernel::layout::CityLayout::ledger` 回答；目录不存在或为空是 `Absent`，有一个条目是 `Present`；目录在却列不出来是 `StorageFatal`，恢复提示「让账本目录可读，或换一个城目录」——把列不出来当 `Absent` 会让 `init` 在一座只是读不到的城上再写一次创世。
 
 **决定**：这件事住在 `city`，与其余读城在盘上布局的函数（`buildings`、`survey`）同层。`init` 与 `up` 在装配点问它，doctor 也问它；doctor 是读面，读面不依赖装配点（sprawling-SPEC 8-92），而 `city` 是 doctor 本来就依赖的一层。**败给的方案**：放进 `kernel::layout`——kernel 不做文件 I/O；放进 `storage`——`storage` 读的是账本的行，这里只问目录里有没有东西，而问它的三个地方都已依赖 `city`。
+
+### 8-31 `[clock]`：一层说结果多久带一次时钟行（`config_layers::clock`，形状 1 判定）
+
+**接口**：`CONFIG.toml` 的 `[clock]` 表，一个键：
+
+```toml
+[clock]
+stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
+```
+
+值的拼法是 `kernel::ClockStampGranularity` 的 serde 拼法，本模块不另写一份；`ConfigLayer::clock_stamp() -> Option<ClockStampGranularity>` 报这一层说了什么，`load` 用 `ladder.resolve(ConfigLayer::clock_stamp)` 把三级求成 `FrozenConfig.clock_stamp`，谁也没说时落到 `kernel::consts_policy::CLOCK_STAMP_DEFAULT`（`Minute`）。时区梯仍传空的 `LayeredValue`。
+
+**拒什么**：`[clock]` 表 `deny_unknown_fields`。`zones` 与任何别的键、拼不出的值（`"minutes"`）都在解析时拒，走本模块既有的那一种拒法（`refuse::unreadable`）：主体是 serde 点名的键或值与它接受的集合，恢复语是「under `[clock]`, change the value the message names, or take that key out」。
+
+**读者**：粒度只在 `runtime::clock::StampGate` 里起作用（runtime-SPEC §8-10）；生产的每一跑由装配层按冻结下来的值造一个 `StampGate`（sprawling-SPEC 8-125）。
 
 ## 模板的写法：格式标注的是「该多小心」（`docs/templates/`）
 

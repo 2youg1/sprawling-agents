@@ -828,7 +828,7 @@ pub const PREFIX_SLOTS: NonZeroU64 = 4;                              // 整份 p
 pub const SANDBOX_FUEL_DEFAULT: u64 = 200_000_000;                   // §8-22 沙箱限额的缺省燃料
 pub const CREDENTIAL_NAME_MARKERS: [&str; 11];                       // §8-22 凭据形状名字的标记词
 pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;                       // messages 面输出上限梯的最后一档（token；gateway-SPEC §8-17）
-pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Off;
+pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Minute;   // runtime-SPEC §12.8
 pub const AUTONOMY_DEFAULT: Autonomy = Autonomy::Owner;
 pub const DEFAULT_AT: &str = "127.0.0.1:8787";                       // 服务缺省监听地址
 ```
@@ -1322,7 +1322,7 @@ pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>, clock_zones: &L
 ```
 
 - **无字段交集可机械判**：单测将两型缺省值 serde 成 JSON，断言键集交集为空；新增字段自动入判。
-- `CLOCK_STAMP_DEFAULT: ClockStampGranularity = Off` 落 consts_policy。
+- `CLOCK_STAMP_DEFAULT: ClockStampGranularity = Minute` 落 consts_policy：没有一级写 `[clock] stamp` 的城，`Timestamped` 结果每条带戳，`Timeless` 结果每分钟至多一条（runtime-SPEC §12.8）。
 
 **时钟分区（config）**：`ClockZone { id, offset_min }`（已解析偏移，恒不记时区名——重解会随时区库版本分叉重放历史）；`FrozenConfig.clock_zones` 由 `freeze` 的同名梯解析；zones 梯整表覆盖（下层写即替换上层全表）。本段属 kernel::config（§8-22），就近登记于此避免拆章。
 
@@ -1889,7 +1889,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 - `SECRET_SHAPES` 条目（公开 provider 令牌前缀，随外界增补）：`sk-ant-`（Anthropic）、`sk-proj-`（OpenAI）、`ghp_`/`gho_`（GitHub）、`AKIA`（AWS AccessKeyId）、`glpat-`（GitLab）、`xoxb-`（Slack）、`AIza`（Google API key）、`sk-or-v1-`（OpenRouter）、`sk-ai-v1-`（zenmux）、`gsk_`（Groq）。字符集与长度按各 provider 公开文档；条目形状见 §8-7。
 - **聚合型转发商的令牌体是纯小写十六进制，故它们必须有形状条目而不能依赖熵侦测器**。熵侦测器的 `mixed_alphabet` 要求同时出现大写、小写与数字，这一条件本身是对的（城自己的 blake3 十六进制与 uuid 均单一大小写，否则每一行账本都会亮），但它使 `sk-or-v1-` 与 `sk-ai-v1-` 这类 64 位小写十六进制令牌两道侦测器都不响——形状表是它们唯一的网。S2 模块头早已写明「全小写的密钥避开本侦测器」，本条是那句话的具体后果。
 
-- `AUTONOMY_DEFAULT = Autonomy::Owner`、`CLOCK_STAMP_DEFAULT = ClockStampGranularity::Off`（直写，随类型落位）。
+- `AUTONOMY_DEFAULT = Autonomy::Owner`、`CLOCK_STAMP_DEFAULT = ClockStampGranularity::Minute`（直写，随类型落位）。
 - 定点 log2 小数位数 10（熵判定内部事务）；`ENTROPY_SPAN_MIN_BYTES = 20`（熵侦测器最短跨度：主流 API key 最短约 20 字符；pub(crate)，改动随本 SPEC）。
 - `HEX_SPAN_MIN_BYTES = 32`、`HEX_ENTROPY_MIN_MILLIBITS = 3100`（hex 侦测器，pub(crate)，改动随本 SPEC）。证据：以固定种子的 splitmix 生成每档长度各 1000 个随机小写 hex 样本，以产品的 `entropy_millibits_per_char` 读数（最小／均值／最大，millibit）：28 字符 2952／3553／3922；32 字符 3144／3610／3929；40 字符 3307／3691／3933；48 字符 3404／3751／3933；64 字符 3544／3819／3970。32 是常见密钥最短的 128 bit；3100 让 32 字符及以上的全部样本通过，又高于 8 个符号均匀出现的 3000（如 `0f1e2d3c` 重复），把有规律的 hex 挡在外面。
 

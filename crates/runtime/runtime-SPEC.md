@@ -13,7 +13,7 @@
 | `handoff` | 五段构造点＋resume 消费 Handoff 产新 Run 种子；形状 2 |
 | 完备化 | prefix 四段全量（封顶＋截断标注＋跨段去重＋跳过入账）＋断点 ≤4＋Steer 边界消费＋窗口组装入 Assembling 相 |
 | `pipeline`＋`offload` | 结果信封三附件＋offload 四不变量（独占有损可还原）＋截断定序 |
-| `clock`＋`catalog`＋`mode` | ClockStamp 纯格式化＋渐进披露三类条目＋五 mode 枚举 |
+| `clock`＋`catalog`＋`mode` | ISO UTC 的唯一拼法＋ClockStamp 与它的发放规则＋ClockReading（§8-10、§8-53）＋渐进披露三类条目＋五 mode 枚举 |
 | `watchdog` | 处置面分级（纠正 Steer→停滞→冻结）；依据只从 kernel::stall 来 |
 | `sandbox` | 缝（trait）＋wasmtime fuel 生产适配器＋直通/故障两替身；A10 三断言 |
 | `tools/` | exec 三臂／edit 乐观并发／read 区间读／search／status／succeed，与模型选路的唯一判定 `chosen_path`（§8-14、§8-29–§8-33） |
@@ -42,6 +42,7 @@
 1. **verify 的规范复验**：v1 无升级器链，故对每行断言 `canonical_line(parse_line(raw)) == raw`（写方规范性质）。未来 v>1 经升级器读入后此断言只对原版字节成立——届时随升级器一并改约（本文更新）。
 2. **fork 的 run_forked 落账**：事件写入母城 Ledger 由调用方（runtime 回合层／citysim）执行；fork 只产 EventDraft 与前缀，不持 Ledger 句柄——保持纯函数形。
 3. **同一套重建器**：A15 与 A19 共用 verify 输出；重建器＝verified 行序列本身。
+5. **命令结果的戳是它开始的时刻，不是它答复的时刻**：生产的 `exec` 在 `Placing::account` 里打包、打戳，而回合读答复时刻（`tool_result` 的 `t`）是在 `account` 返回之后（`turn::wave` 的 `account`），所以工具面在打戳那一刻读得到的最新读数是这条调用放行后的开始时刻（§8-53、§12.8）。一条跑两分钟的命令，模型读到的戳早两分钟。要戳等于答复时刻，回合须在调用工具面的 `account` 之前读答复时刻；那时 `ClockReading` 里就是它，工具面一行不改。定下这一点的证据：`turn::wave` 把答复读数挪到 `tools.account` 之前后，`driving/tests/sieving` 的戳测试改为比 `tool_result` 的 `t` 仍绿，并行对拍测试不动。
 4. **前缀续期未接线**：`prefix::warmth` 的 `Warmed` 与记账已在（§8-4-2），而 run 结束后按 `next_due` 醒来发续期的那条循环还没有；接上它要先定续期的 usage 记成哪一种事件。
 
 ## 4 现状分析
@@ -542,25 +543,45 @@ impl Watchdog {
 ### 8-10 runtime::clock（形状 1；纯格式化不采样）
 
 ```rust
-// 关切时区的权威住 kernel::config::ClockZone（[clock] zones 属三层配置）：
-// FrozenConfig 增 clock_zones: Vec<ClockZone>，freeze 增梯入参；本模块只消费不定义（一个权威）。
-pub struct ZoneEntry { pub id: String, pub offset_min: i32, pub local: String }   // local＝"YYYY-MM-DD HH:MM"
-pub struct ClockStamp { pub utc_ms: TimeMs, pub zones: Vec<ZoneEntry> }           // utc_ms 已按桶截断
-impl ClockStamp { pub fn render(&self) -> String }   // 信封与人读共用的唯一文本形："clock: utc …; <id> …;"
-pub fn stamp(now: TimeMs, zones: &[ClockZone]) -> Result<ClockStamp, AxError>;   // zones > CLOCK_ZONES_MAX → E_INVALID_ARGS；UTC 行恒首；空表即只报 UTC
+// 关切时区的权威住 kernel::config::ClockZone（[clock] zones 属三层配置，city 仍拒写它，city-SPEC §8-31）：
+// FrozenConfig 携 clock_zones: Vec<ClockZone>；本模块只消费不定义（一个权威）。
+pub fn iso(at: TimeMs) -> String;   // ISO 8601，UTC，到秒："2026-05-14T09:31:07Z"；一刻给人或模型读时的唯一拼法
+pub struct ZoneEntry { pub id: String, pub offset_min: i32, pub local: String }   // local＝同一刻带偏移："2026-05-14T18:31:07+09:00"
+pub struct ClockStamp { pub utc_ms: TimeMs, pub zones: Vec<ZoneEntry> }           // utc_ms＝读数本身，不按桶截；zones 只含配置的时区
+impl ClockStamp { pub fn render(&self) -> String }   // 信封的时钟行："clock: 2026-05-14T09:31:07Z;"，其后每个时区 " <id> <local>;"
+pub fn stamp(now: TimeMs, zones: &[ClockZone]) -> Result<ClockStamp, AxError>;   // zones > CLOCK_ZONES_MAX → E_INVALID_ARGS；空表即只报 UTC
 
-pub struct StampGate { /* granularity、last_bucket: Option<u64> —— 私有；last_bucket 兼任首发标记 */ }
+pub struct StampGate { /* granularity、zones、last_bucket: Option<u64> —— 私有；last_bucket 兼任首发标记 */ }
 impl StampGate {
-    pub fn new(granularity: ClockStampGranularity) -> StampGate;
+    pub fn new(granularity: ClockStampGranularity, zones: Vec<ClockZone>) -> StampGate;   // 两值都取自这一跑的 FrozenConfig
     /// Emission rule: Off -> never; first result of the
     /// run -> once; Timestamped -> every result; Timeless -> only when the
     /// granularity bucket changed since the last emission.
-    pub fn observe(&mut self, now: TimeMs, temporal: Temporal, zones: &[ClockZone])
-        -> Result<Option<ClockStamp>, AxError>;
+    pub fn observe(&mut self, now: TimeMs, temporal: Temporal) -> Result<Option<ClockStamp>, AxError>;
 }
 ```
 
-- 历法纯整数（civil-from-days，无 chrono 依赖；界证明携 `#[expect]`）；戳内容按 granularity 桶截断（同桶同字节，Timeless 去重因此有义）。A18 零字节：Off 时 observe 恒 None。
+- 历法纯整数（civil-from-days，无 chrono 依赖）：全程在 `i128` 上算，`u64` 毫秒加 `i32` 分钟偏移落不出它的界，所以格式化不会失败，`iso` 与 `render` 不带 `Result`；界证明携 `#[expect]`。**精度与频率分开**：戳一律到秒，粒度只决定 `Timeless` 工具多久带一次戳——同桶里第二条 `Timeless` 结果不带戳，`Timestamped` 每条都带。A18 零字节：Off 时 observe 恒 None。
+- `iso` 是本 crate 里一刻的唯一文字形：时钟行、`status` 的 `now:` 行都经它；按 ISO 读回一刻（`view --since/--until`）的解析放在它旁边，同一模块、同一精度。
+- 时区行仍在：`FrozenConfig.clock_zones` 在真城里恒空（城配置拒 `[clock] zones`），剧本仍可冻结出非空表，所以格式化保留，偏移写成 `+HH:MM`／`-HH:MM`。
+
+### 8-53 runtime::clock::ClockReading：一跑的驱动最近读到的那一刻（形状 2 值类型）
+
+```rust
+#[derive(Debug, Clone, Default)]
+pub struct ClockReading(/* Arc<Mutex<Option<TimeMs>>> —— 私有 */);
+impl ClockReading {
+    pub fn keep(&self, at: TimeMs);          // 驱动的时钟钩子每读一次就记一次
+    pub fn latest(&self) -> Option<TimeMs>;  // 最近记下的读数；还没读过为 None
+}
+// tools/status.rs
+impl StatusTool { pub fn clocked(self, clock: ClockReading) -> StatusTool; }   // `now:` 行从它现读
+```
+
+- **为什么要它**：`RunHooks::now` 是一跑里唯一的采样点，工具面不采样只收读数（§8-15 时间纪律），而 `ConcurrentInvoke` 与 `Tool::invoke` 的签名不带读数。装配层把 `now` 包一层，读到的每个值先 `keep` 再交给驱动；要报时的工具面（命令结果的戳、`status` 的 `now:`）读 `latest`。这样工具面报出的时刻恒是账本某一行的 `t`，不是第二个钟给出的另一个值。
+- **读到的是哪一刻**：工具起跑之前驱动最后一次读钟是这条调用的开始时刻（§8-15），所以串行的一条调用读到自己的开始；开头只读段里读到的是这一段最后一条的开始。答复时刻不在其中，见 §3 第 5 条。
+- **`status` 的 `now:` 行**：`now: 2026-05-14T09:31:07Z`，没有读数时是 `now: not stamped`。它不看粒度：`now` 是 `status` 自己报的一栏，不是信封附件，关掉戳不该让模型问不出时间。`StatusSnapshot` 不再有 `now` 字段——快照在派发时冻结，冻结下来的时刻整跑都不动，而这一栏要的正是调用那一刻。
+- 与 `ContextReading` 同形同理：一跑一个、克隆共享、写者一个。用 `Mutex<Option<TimeMs>>` 而不是原子整数：「还没读过」是一个状态，不该拿某个整数冒充；锁里只放一个 `Copy` 值、整值替换，所以中毒不留半写的值，读写都取锁里的值照常走。
 
 ### 8-11 runtime::catalog（形状 6＋渲染）
 
@@ -768,7 +789,7 @@ impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render
 pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode,
     pub ctx_limit: Tokens, pub trust: String,
     pub write_domain: String, pub locks: Vec<String>, pub worktree_path: String, pub worktree_disk: ByteLen,
-    pub signals_pending: u32, pub now: Option<ClockStamp>,
+    pub signals_pending: u32,
     pub provider_mode: ProviderMode, pub neighbours: u32 }   // neighbours 在末尾，渲染序与声明序同一
 pub enum ProviderMode { Normal, Degraded, LocalOnly }
 pub struct ChildStatus { pub room: Address, pub kind: DelegateKind }
@@ -777,6 +798,7 @@ impl StatusTool {
     pub fn watching(snapshot: StatusSnapshot, children: Box<dyn Fn() -> Vec<ChildStatus> + Send>) -> Result<StatusTool, AxError>;
     pub fn reporting(self, backlog: Backlog) -> StatusTool;   // §8-28-2：末行 `backlog:` 从表里现读，与 children 同一理由
     pub fn metering(self, context: ContextReading) -> StatusTool;   // `ctx:` 行的用量从运行的读数现读
+    pub fn clocked(self, clock: ClockReading) -> StatusTool;        // `now:` 行从驱动最近的读数现读（§8-53）
 }
 impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timestamped、render=Generic；渲染序末尾追加 backlog 一行 */ }
 
@@ -1074,6 +1096,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 **被否**：①gateway 在流里采样，再随 `ModelReturn` 交回：模型口多一个读钟的实现，citysim 的脚本模型也要学会造一个时刻；②给 `kernel::Increment` 加一种「工具调用开始了」的片段：增量随 `ServerFrame::Delta` 上线，那是一次线协议改形，每个读增量的页面都要多一臂，为的只是只带工具调用的那类回复；③把提前交出的完整工具调用（`EarlyCalls`）算作首个内容：只有 Anthropic 的流交出它，而它到的时刻是那一块的结束，不是开始，同一个字段在两种兼容格式里会量两种东西。
 
 **重开参数**：run 页画首字耗时时，只带工具调用的回合多到让那一列大半空白。
+
+### 12.8 戳从驱动最近的读数渲染，到秒，默认每分钟
+
+**决定**：结果上的时钟行渲染成 ISO 8601 UTC、到秒（`clock: 2026-05-14T09:31:07Z;`）；读数取自 `ClockReading`，即驱动在工具面打包之前最后一次读到的那一刻（§8-53）；`CLOCK_STAMP_DEFAULT` 是 `Minute`，于是 `Timestamped` 工具每条结果都带戳，`Timeless` 工具只在分钟桶变了时带；`Off` 仍逐字节等于没有这个功能。
+
+**理由**：模型要知道一条命令是什么时候跑的，靠回合的时间戳说不出来，一回合可以跨几分钟。读数经 `ClockReading` 来，一跑仍只有 `RunHooks::now` 一个采样点，戳上的秒数恒等于账本里某一行的 `t`；ISO 形状是人读、模型读与 `view` 解析共用的一种写法，到秒是因为分钟在一回合之内分不出先后。
+
+**被否**：①工具面自己读一次钟打戳——那是一跑里的第二个采样点，戳上的秒数可以与它 `tool_result` 的 `t` 差一秒，计数时钟下的剧本也会多出采样而改变字节；②用 `admit` 收到的回合时间戳——一条命令的戳会早于模型给出这条调用的那一刻；③在回合的 `account` 里打戳，读答复时刻——这是更准的一处，但要 `turn::wave` 把打包移出工具面，本次不动回合；§3 第 5 条写明了从这里走到那一处的那一步。
+
+**重开参数**：回合在调用工具面的 `account` 之前读答复时刻时，戳自动变成答复时刻，本条改写为「答复时刻」；出现要本地时间的读者、且城配置开始受理 `[clock] zones` 时，时区行与偏移格式重议。
 
 ### 12.10 沙箱副本按工具一份、每条命令前同步，而不是每条命令新建一份
 

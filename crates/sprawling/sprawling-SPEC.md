@@ -1043,6 +1043,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id**（wire-SPEC §8-25）。`Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `client/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `client/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
 
+**一条命令的戳从驱动最近的读数渲染，不给工具面一个钟**（8-125，runtime-SPEC §12.8）。`drive_run` 把它交给驱动的 `now` 包一层，每个读数先记进这一跑的 `ClockReading`；`Sieving` 打包时读最新的那个。于是戳上的秒数恒是账本某一行的 `t`，一跑仍只有一个采样点，计数时钟下的剧本字节不变。**被否掉的**：`Sieving` 打包时自己读 `hands.clock`——戳才是答复时刻，但一跑多了一个采样点，戳与它 `tool_result` 的 `t` 可以差一秒；把戳挪进回合的 `account`——那是 runtime 的 `turn` 的事，不是装配层的。条件变了就重议：回合在调用工具面的 `account` 之前读答复时刻时，这里不改一行，戳就是答复时刻。
+
 **Lean 是开发这份代码必需的工具**（§8-58）。各 crate 的规格正从 `<crate>-SPEC.md` 迁成 `Spec.lean`（ARCHITECTURE.md §11「Specifications in Lean」），`just check` 里的 `models` 一步是这些规格在本地被证明过的唯一证据。Lean 列为可选时，没装 Lean 的机器上 `models` 静默通过，本地的绿就不再说明规格被证明过，只有 CI 知道。所以 `elan` 与 `lean` 两行是 `required`：缺了它们，`just prereqs` 在编译之前报出来并给出装法，`just models` 自己也报错而不是跳过。被否决的备选：保持可选、只靠 CI 的 `models` job 证明——那样每次本地验证都得另外说明「规格没有证过」，而这句话没有哪道门会替人说。
 
 **不从别的工具的配置里读 provider 表（人的决定）**。`bin::import` 的五个文件读 Codex 的 `~/.codex/config.toml` 与 pi 的 `models.json`，把其中的 provider 折成本城的词汇；但没有任何 `mod` 声明过它们，所以它们从没被编译，clippy 与测试也从没看过它们，模块图却把它们记为 built。本城删去这五个文件，首次上手的第 1 步由人手填端点，或选一个已知主机。理由：没有调用点的代码是一份没人维护的第二文法，它记下的 Codex 与 pi 键名会随上游改版静默过时。**被否**：接上它，作为首次上手第 1 步「从别的工具已写好的配置读入」的候选来源——那要在 wire 上加一条 Query、在设置页加一行，属于线协议与页面的改动，本版不做。**重开参数**：首次上手要给出「别的工具已配置的 provider」这一步时，从 git 历史取回这两种文法，先在 `lib.rs` 声明模块，让测试与 clippy 看见它们，再接 Query。
@@ -2136,7 +2138,7 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 
 `Cas` 开第二个句柄而不借工人的：CAS 按内容寻址、经临时文件写入，同一目录开两次是同一个库；而 §8-42 的池线程不能借工人的任何东西，这一份句柄正是它以后要带走的。
 
-**`stamp` 传 `None`**：时钟戳由 `runtime::turn` 既有路径打在结果尾部（`FrozenConfig.clock_stamp`），不在第二处打。
+**`stamp` 由这一跑的 `StampGate` 给**：`Sieving` 持有它与这一跑的 `ClockReading`，打包前问一次（8-125）；citysim 的闭包工具面按同一扇门自己问它的那一个。
 
 ### 验收
 
@@ -4242,6 +4244,23 @@ impl OutputRing {
 - **上界 `KEPT_BYTES_PER_RUN = 64 KiB`**，等于 runtime 一秒钟最多读出的字节（`READ_BYTES_PER_MS = 64`），也就够页面按 `LIVE_LINES = 400` 行画满两条流（每行约八十字节）。超过就从最旧的一块丢起，但最新的一块总留着，哪怕它自己超过上界。每个 run 的内存因此有上界，没有 run 在跑命令时表是空的。
 - **喂与清在记账线程上同步发生**：`attending` 装给 `Serving::outputs` 的闭包先 `keep` 再广播；装给 `worker.observe` 的观察者先 `settle` 再交给视图折叠。块在这次调用的结果落账之前读出，所以同一线程上的次序保证清空之后不会再收到这次调用的块。
 - **决定**：缓冲住在装配层而不是 `wire`。清空要认出 `tool_result` 这一行，而记账线程的观察者就在这里；放进 `wire` 要让它为这件事再订阅一次事件流。被否的另一种是让每个会话自己记：那只能记它打开之后的块，正好漏掉这个缓冲要补的那一段。
+
+## 8-125 生产的命令结果带时钟行，`status` 报这一刻（`accounting::worker::driving`、`accounting::worker::workbench`；runtime-SPEC §8-10、§8-53）
+
+**接线**：
+
+| 东西 | 谁持有 | 何时定 |
+|---|---|---|
+| `runtime::ClockReading` | `Site.clock` | `stand_up` 造一个空的；这一跑的 `status` 工具（`StatusTool::clocked`）与 `Sieving` 各拿一份克隆 |
+| `runtime::StampGate` | `Sieving.stamps` | `Sieving::for_run` 按 `Site.config` 的 `clock_stamp` 与 `clock_zones` 造，一跑一个 |
+| 写读数 | `drive_run` 交给 `RunHooks` 的 `now` | 每读一次墙钟，先 `keep` 进 `Sieving.clock` 再交给驱动 |
+
+`Sieving::package` 打包一份 `exec` 结果之前，拿 `ClockReading::latest` 与这条调用的工具声明的 `Temporal` 问 `StampGate::observe`，得到的戳交给 `runtime::package_exec`，戳成为结果 `content` 的附件行。驱动在工具起跑前最后一次读钟，所以一条命令的戳是它开始的那一秒，与账本里它那一行 `tool_called` 的 `t` 同一个读数（runtime-SPEC §3 第 5 条）。
+
+- **只有 `exec` 的结果挂戳**：`status` 自己有 `now:` 一栏，连接器与浏览器的结果不经 `package_exec`，它们的时钟行要一种挂在 JSON 结果上的形状，本节未定；它们不经 `StampGate`，所以「一跑的第一条结果带一次戳」在生产里是「第一条命令结果」。
+- **不给工具面一个钟**：`Placing` 与 `Sieving` 手里只有读数。换成工具面自己读 `hands.clock` 会让一跑有第二个采样点，这是 runtime-SPEC §12.8 否掉的那一条。
+
+**验收**：`driving/tests/sieving` 的 `a_served_command_result_ends_with_the_second_its_call_started`：一次真实派活，城里没写 `[clock]`，`exec` 的结果在账本上以 `clock: <ISO>;` 结尾，秒数等于它那一行 `tool_called` 的 `t`。
 
 ## 8-93 核心线程站在正常档之上，空转就降回（`bin::serving::standing`，形状：状态机）
 
