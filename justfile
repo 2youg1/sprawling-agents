@@ -289,8 +289,8 @@ gates-artifacts: build-web
 # crate's specification (ARCHITECTURE.md section 11, "Specifications in
 # Lean"). `lakefile.toml` sets `warningAsError`, so a `sorry` or an `admit`,
 # which Lean reports as a warning, fails the build; an `axiom` raises no
-# warning at all, so it is refused here by its shape, since no specification
-# in this tree has an axiom anybody reviewed. The checker under
+# warning at all, so the `spec` gate refuses it by its shape, where Lean is
+# not needed to see it (tools/xtask/xtask-SPEC.md section 8-42). The checker under
 # `tools/adversary/` is not built here: it attacks the binary and stays out
 # of every required check.
 #
@@ -302,10 +302,6 @@ models:
     set -euo pipefail
     if ! command -v lake >/dev/null 2>&1; then
         echo "models: lake is absent, so no specification was proved; \`just prereqs\` prints the lines that install elan and the toolchain lean-toolchain pins" >&2
-        exit 1
-    fi
-    if grep -rnE --include='*.lean' '^[[:space:]]*(private[[:space:]]+)?axiom[[:space:]]' crates; then
-        echo "models: an axiom above is a proof obligation nobody discharged; prove it as a theorem"
         exit 1
     fi
     lake build Spec

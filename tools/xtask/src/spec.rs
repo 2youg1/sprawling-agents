@@ -50,8 +50,11 @@ const SECTIONS: [&str; 17] = [
 /// naming a SPEC the tree lacks, the import discipline, no `sorry`,
 /// `admit` or `axiom`, and every path a specification cites on disk.
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let _ = root;
-    Ok(Vec::new())
+    let mut violations = Vec::new();
+    effective::one_per_package(root, &mut violations)?;
+    effective::no_dangling_names(root, &mut violations)?;
+    source::check(root, &mut violations)?;
+    Ok(violations)
 }
 
 pub(crate) fn run(root: &Path, lib: Option<&str>) -> Result<String, XtaskError> {

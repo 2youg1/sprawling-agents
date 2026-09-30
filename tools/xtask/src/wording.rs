@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Wording gate: a word a reader is given comes from the phrase table
-//! (web-SPEC.md section 8-61).
+//! (xtask-SPEC.md, the `wording` section).
 //!
 //! **The two assertions in `web::lang` both read what a view *asks* the
 //! table for.** One walks every phrase and demands some view name it;
