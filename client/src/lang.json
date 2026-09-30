@@ -4627,6 +4627,10 @@
     "en": "Another sprawling process holds this city's ledger; stop it, then start this one.",
     "zh": "另一个 sprawling 进程占着这座城的账本；先停下它，再启动这一个。"
   },
+  "recover_e_history_unproven": {
+    "en": "The city is still proving the history it opened from; send it again once the log says the history is proved.",
+    "zh": "城还在证明它打开时读到的历史；等日志说历史已证明，再发一次。"
+  },
   "recover_e_secret_egress": {
     "en": "Keep the key in the vault and pass it as a secret: reference instead of its value.",
     "zh": "把密钥留在钥匙库里，传 secret: 引用而不是它的值。"
