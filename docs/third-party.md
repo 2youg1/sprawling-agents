@@ -97,6 +97,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [futures-util](https://crates.io/crates/futures-util) | MIT OR Apache-2.0 |
 | [getrandom](https://crates.io/crates/getrandom) | MIT OR Apache-2.0 |
 | [git2](https://crates.io/crates/git2) | MIT OR Apache-2.0 |
+| [idna_adapter](https://crates.io/crates/idna_adapter) | Apache-2.0 OR MIT |
 | [insta](https://crates.io/crates/insta) | Apache-2.0 |
 | [keyring](https://crates.io/crates/keyring) | MIT OR Apache-2.0 |
 | [memory-stats](https://crates.io/crates/memory-stats) | MIT OR Apache-2.0 |

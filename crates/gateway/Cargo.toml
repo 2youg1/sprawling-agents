@@ -16,6 +16,9 @@ serde_json.workspace = true
 # the transport does not (gateway-SPEC 8.5). Blocking: the turn loop is
 # synchronous, and one HTTP call must not asyncify the library.
 reqwest = { workspace = true }
+# Chooses the Unicode backend of the `idna` crate reqwest's URL parser
+# uses (gateway-SPEC section 13); no code names it.
+idna_adapter.workspace = true
 # Custody: platform credential service binding + zeroizing storage
 # (never self-written encrypted files).
 #
@@ -47,3 +50,8 @@ proptest.workspace = true
 
 [lints]
 workspace = true
+
+[package.metadata.unused]
+# idna_adapter chooses idna's Unicode backend by its version line; no
+# code names it (xtask-SPEC.md section 8-37).
+pins = ["idna_adapter"]
