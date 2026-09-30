@@ -348,8 +348,8 @@ fn the_citys_genesis_hash_is_read_once_and_survives_the_ledger_going_away() {
     let report = init_city(dir.path()).unwrap();
     let worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
 

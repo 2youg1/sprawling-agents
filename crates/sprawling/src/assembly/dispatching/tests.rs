@@ -108,8 +108,8 @@ fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let refused = worker
@@ -158,8 +158,8 @@ harness = \"pi\"
     .unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
 
@@ -320,7 +320,6 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
     let sink = std::sync::Arc::clone(&written);
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::new(
             runtime::diagnostics::Level::Trace,
             Box::new(move |entry: runtime::diagnostics::Entry<'_>| {
@@ -329,6 +328,7 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
                     .push(runtime::diagnostics::render(entry));
             }),
         ),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker

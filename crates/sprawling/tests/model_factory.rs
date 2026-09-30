@@ -102,8 +102,8 @@ fn city_on(
     let raised = assembly::init_city(dir).unwrap();
     let mut worker = assembly::RunWorker::new(
         dir,
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap()
     .with_models(Box::new(factory));

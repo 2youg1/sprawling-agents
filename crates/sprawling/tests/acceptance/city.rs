@@ -25,8 +25,8 @@ const MODEL: &str = "scripted";
 pub(crate) fn open_worker(dir: &Path, factory: Scripted) -> assembly::RunWorker {
     assembly::RunWorker::new(
         dir,
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap()
     .with_models(Box::new(factory))

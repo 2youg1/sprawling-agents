@@ -32,8 +32,8 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
     // credential service would write to the machine running it.
     let mut worker = assembly::RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap();
 
@@ -96,8 +96,8 @@ fn every_spelling_of_one_endpoint_is_registered_as_one_url() {
     // credential service would write to the machine running it.
     let mut worker = assembly::RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap();
 
@@ -134,8 +134,8 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
     // credential service would write to the machine running it.
     let mut worker = assembly::RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap();
 

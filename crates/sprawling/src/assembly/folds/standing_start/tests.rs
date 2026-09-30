@@ -34,8 +34,8 @@ fn a_standing_after_a_cut_folds_only_the_tail_into_the_same_bytes() {
     let ledger = init_city(dir.path()).unwrap().ledger_dir;
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     raise(&mut worker, 0..3);
@@ -79,8 +79,8 @@ fn a_worker_refuses_a_line_rewritten_before_the_snapshot_in_a_sealed_segment() {
     let open = || {
         RunWorker::new(
             dir.path(),
-            gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
+            crate::assembly::fixture::hands(),
         )
     };
     raise(&mut open().unwrap(), 0..3);

@@ -209,8 +209,8 @@ private def cityAndWorker (named : Bool) : List String :=
   , "    // credential service would write to the machine running it."
   , "    let mut worker = assembly::RunWorker::new("
   , "        dir.path(),"
-  , "        gateway::Custodian::in_memory(),"
   , "        runtime::diagnostics::Diagnostics::off(),"
+  , "        assembly::hands(gateway::Custodian::in_memory()),"
   , "    )"
   , "    .unwrap();"
   , "" ]

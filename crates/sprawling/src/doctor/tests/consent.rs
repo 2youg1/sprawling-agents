@@ -106,3 +106,24 @@ fn the_default_checks_and_installs_nothing() {
         "the default asks nothing: {shown}"
     );
 }
+
+/// A name the requirement table does not carry is refused, and the
+/// refusal says where a working name comes from: the items this machine
+/// answered with.
+#[test]
+fn a_name_the_table_does_not_carry_says_where_a_working_name_comes_from() {
+    let refused = crate::doctor::recipe_for("curl | sh")
+        .map(|_recipe| ())
+        .unwrap_err();
+    assert_eq!(
+        (
+            *refused.code(),
+            refused
+                .recovery()
+                .contains("install one of the items it answered with")
+        ),
+        (kernel::AxCode::InvalidArgs, true),
+        "the refusal says where a working name comes from: {}",
+        refused.recovery()
+    );
+}

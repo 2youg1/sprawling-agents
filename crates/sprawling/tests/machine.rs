@@ -74,9 +74,13 @@ fn a_refresh_counts_the_items_the_machine_it_was_handed_answered() {
         runtime::diagnostics::Level::Effect,
         Box::new(move |entry| heard.lock().unwrap().push(entry.message.to_owned())),
     );
-    let mut worker = assembly::RunWorker::new(dir.path(), gateway::Custodian::in_memory(), log)
-        .unwrap()
-        .with_machine(Box::new(OneItem));
+    let mut worker = assembly::RunWorker::new(
+        dir.path(),
+        log,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap()
+    .with_machine(Box::new(OneItem));
 
     worker
         .handle(wire::Command::DoctorRefresh {
@@ -149,9 +153,13 @@ fn an_install_hands_the_table_command_to_the_machine_it_was_handed() {
         Box::new(move |entry| heard.lock().unwrap().push(entry.message.to_owned())),
     );
     let installs = Arc::new(Mutex::new(Vec::new()));
-    let mut worker = assembly::RunWorker::new(dir.path(), gateway::Custodian::in_memory(), log)
-        .unwrap()
-        .with_machine(Box::new(Recording(Arc::clone(&installs))));
+    let mut worker = assembly::RunWorker::new(
+        dir.path(),
+        log,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap()
+    .with_machine(Box::new(Recording(Arc::clone(&installs))));
 
     let outcome = worker.handle(wire::Command::DoctorInstall {
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"install"),

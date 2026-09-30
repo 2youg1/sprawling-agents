@@ -136,8 +136,8 @@ fn a_served_city_hands_a_running_commands_output_to_the_page() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));

@@ -378,8 +378,8 @@ pub(super) fn resume(dir: Option<&String>) -> ExitCode {
     let (vault, _notice) = serving::open_vault();
     let outcome = assembly::RunWorker::new(
         std::path::Path::new(dir),
-        vault,
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(vault),
     )
     .and_then(|mut worker| worker.startup_scan());
     match outcome {

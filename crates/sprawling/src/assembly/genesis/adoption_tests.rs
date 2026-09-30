@@ -154,8 +154,8 @@ fn opening_a_city_gives_an_older_building_the_rules_it_lacks() {
 
     RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
 

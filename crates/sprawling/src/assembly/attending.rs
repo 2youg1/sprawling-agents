@@ -150,7 +150,8 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let worker_thread = std::thread::Builder::new()
         .name("sprawling-runs".to_owned())
         .spawn(move || {
-            let mut worker = match RunWorker::holding(&worker_root, vault, log, held) {
+            let mut worker = match RunWorker::holding(&worker_root, log, super::hands(vault), held)
+            {
                 Ok(mut worker) => {
                     // Before the banner, so a torn tail is the first
                     // thing the person running the city reads.

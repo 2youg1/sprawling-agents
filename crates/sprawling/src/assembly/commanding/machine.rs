@@ -156,11 +156,11 @@ mod tests {
     fn worker(city_root: &std::path::Path) -> RunWorker {
         RunWorker::over(
             city_root,
-            gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
+            crate::assembly::fixture::hands(),
             storage::JsonlLedger::open(
                 &kernel::layout::CityLayout::new(city_root).ledger(),
-                accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
+                accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
             )
             .unwrap(),
         )
@@ -302,17 +302,27 @@ mod tests {
         assert_eq!(told, Err((kernel::AxCode::ToolUnavailable, true)));
     }
 
+    /// A name the table the worker was handed does not carry is refused
+    /// before the machine is asked to install anything. What the refusal
+    /// tells a person is the requirement table's wording, pinned beside
+    /// the table (`doctor::tests::consent`).
     #[test]
     fn an_item_the_table_does_not_carry_starts_nothing() {
         let dir = tempfile::tempdir().unwrap();
-        let refused = worker(dir.path()).doctor_install("curl | sh").unwrap_err();
-        assert_eq!(refused.code(), &kernel::AxCode::InvalidArgs);
-        assert!(
-            refused
-                .recovery()
-                .contains("install one of the items it answered with"),
-            "the refusal says where a working name comes from: {}",
-            refused.recovery()
+        let installed = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let mut worker = worker(dir.path()).with_machine(Box::new(Recording(
+            std::sync::Arc::clone(&installed),
+            Finds::WhatWasInstalled,
+        )));
+        worker.recipe_for_with(scripted_table);
+
+        let told = worker
+            .doctor_install("curl | sh")
+            .map_err(|refusal| *refusal.code());
+
+        assert_eq!(
+            (told, installed.lock().unwrap().clone()),
+            (Err(kernel::AxCode::InvalidArgs), Vec::new())
         );
     }
 }

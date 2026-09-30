@@ -8,11 +8,66 @@
 //!
 //! Only what touches this machine is here. The judgement over it stays
 //! with the worker: whether a run is handed a shell at all is the frozen
-//! configuration's answer, and this module only says where one is.
+//! configuration's answer, and this module only says where one is. The
+//! model factory and the MCP connections are not hands: the worker builds
+//! its own from `gateway` and `agent_protocols` (accounting-SPEC.md 12-18).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use kernel::AxError;
+
+use super::pool::Memory;
+
+/// What the worker takes from this machine, as one value.
+///
+/// The hands always arrive together and are used together, so they
+/// travel as one value rather than as a constructor's nine parameters
+/// (accounting-SPEC.md 12-20). A caller that needs one hand of its own
+/// writes `Hands { clock, ..hands }`, or calls the matching `with_*`
+/// door after the worker is built.
+pub struct Hands {
+    /// Where this city's credentials are kept: the one the process
+    /// opened, or an in-memory one.
+    pub(crate) vault: gateway::Custodian,
+    /// What time it is, for the worker and every lane it drives, from
+    /// the first line it opens with (accounting-SPEC.md 8-3).
+    pub(crate) clock: Arc<dyn accounting::Clock + Send + Sync>,
+    /// Looks at this machine and installs onto it (accounting-SPEC.md 8-4).
+    pub(crate) machine: Box<dyn accounting::Machine + Send>,
+    /// Reads this machine's memory at the door new work enters by
+    /// (sprawling-SPEC.md 8-46-3).
+    pub(crate) read_memory: fn() -> Memory,
+    /// Reads the city's volume at the same door (sprawling-SPEC.md 8-116).
+    pub(crate) read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
+    /// Hands one of this city's paths to the desktop's file manager
+    /// (sprawling-SPEC.md 8-60).
+    pub(crate) reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,
+    /// Builds the browser tools a building's rules ask for
+    /// (sprawling-SPEC.md 8-45-2).
+    pub(crate) browsers: Browsers,
+    /// Where the desktop server a building's rules ask for is started
+    /// from (sprawling-SPEC.md 8-4d).
+    pub(crate) desktop_program: DesktopProgram,
+    /// How this build installs one named item on this platform: the
+    /// requirement table stays with the doctor (sprawling-SPEC.md,
+    /// `doctor_install`).
+    pub(crate) recipe_for: fn(&str) -> Result<&'static accounting::Recipe, AxError>,
+    /// Where the exec tool's interpreter, shell and engine come from.
+    pub(crate) exec_host: ExecHost,
+}
+
+/// The browser tools a building's rules ask for: its own browser, then
+/// the person's when they declared one (sprawling-SPEC.md 8-45-2).
+pub type Browsers = fn(
+    &Path,
+    &storage::BlockOrigin,
+    &city::BuildingRules,
+) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
+
+/// Where the desktop server this binary carries is started from: the
+/// running executable in production (sprawling-SPEC.md 8-4d).
+pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;
 
 /// What the exec tool takes from this machine: the python component and
 /// the shell, each only where it is usable, and the engine this build

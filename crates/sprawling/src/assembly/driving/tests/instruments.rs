@@ -207,8 +207,8 @@ fn relay_round_trips(store: Store) -> Vec<Duration> {
         Store::Memory => attach_provider(
             RunWorker::over(
                 dir.path(),
-                gateway::Custodian::in_memory(),
                 runtime::diagnostics::Diagnostics::off(),
+                crate::assembly::fixture::hands(),
                 in_memory_ledger(&kernel::layout::CityLayout::new(dir.path()).ledger()),
             )
             .unwrap(),
@@ -262,7 +262,7 @@ fn in_memory_ledger(dir: &std::path::Path) -> (storage::JsonlLedger, storage::Op
     storage::JsonlLedger::open_faulty(
         fs,
         dir,
-        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
+        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
     )
     .unwrap()
 }
@@ -304,7 +304,7 @@ fn nowhere() -> wire::Reply {
 fn marker() -> kernel::EventDraft {
     kernel::EventDraft {
         run: RunId::CITY,
-        t: accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
+        t: accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
         who: "city".to_owned(),
         addr: None,
         kind: kernel::EventKind::CityInitialized,

@@ -8,9 +8,9 @@
 //! Ledger handle, clock source, RNG seed and spawn points are injected
 //! from here and nowhere else; citysim is the second Main.
 //!
-//! The clock is sampled *here only* (determinism rule 2): every callee
-//! takes time as a parameter, and the sample stays in this file so that
-//! the rule keeps naming one place.
+//! The clock is sampled in `production` only (determinism rule 2), and
+//! a worker receives it, with every other hand it reaches this machine
+//! through, as one `Hands` value when it is built.
 //!
 //! **This file holds the worker and the modules below hold its methods.**
 //! `RunWorker` is declared here, so its private fields are
@@ -58,6 +58,7 @@ mod opening_cost;
 mod plans;
 mod pool;
 mod probing;
+mod production;
 mod recording;
 mod registering;
 mod relay;
@@ -87,6 +88,7 @@ use folds::start_served_views;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 use genesis::city_segment;
 pub use genesis::{Adopt, InitReport, form_city, init_city};
+use hands::{Browsers, DesktopProgram, Hands};
 pub(crate) use lifetime::Closing;
 use lifetime::LedgerOpening;
 pub use listening::{Listening, listen};
@@ -96,6 +98,7 @@ use naming::{building_of, governed_of, not_built, scope_of};
 use plans::Reporter;
 use plans::held::{PlanHolders, Planning};
 pub(crate) use pool::Memory;
+pub use production::{SystemClock, hands};
 use recording::Stamping;
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
@@ -104,61 +107,15 @@ use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use kernel::{AxCode, AxError, EventRecord, RunId, TimeMs};
+use kernel::{AxError, EventRecord, RunId, TimeMs};
 // What the test fixtures below reach through `super::*`, now that the
 // lines this worker appends live in `recording`.
 #[cfg(test)]
 use accounting::effect;
 #[cfg(test)]
-use kernel::{Address, EventDraft, EventKind, Payload};
+use kernel::{Address, AxCode, EventDraft, EventKind, Payload};
 use runtime::Interrupt;
 use storage::{Cas, JsonlLedger};
-
-/// The wall clock: the single sanctioned sampling point (clippy.toml
-/// disallowed-methods), and the production `accounting::Clock`
-/// (accounting-SPEC.md 8-3). Everything below it takes `TimeMs` as a
-/// parameter or reads the clock it was handed; what samples it outside
-/// this module is handed it at construction, as the process log is.
-pub struct SystemClock;
-
-impl accounting::Clock for SystemClock {
-    fn now(&self) -> Result<TimeMs, AxError> {
-        #[expect(
-            clippy::disallowed_methods,
-            reason = "the one sampling point: Main injects time"
-        )]
-        let elapsed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|err| {
-                AxError::failure(AxCode::ConfigInvalid, "sample wall clock", err.to_string())
-                    .with_recovery("fix the system clock; it reads before the unix epoch")
-            })?;
-        let millis = u64::try_from(elapsed.as_millis()).map_err(|_| {
-            AxError::failure(
-                AxCode::ConfigInvalid,
-                "sample wall clock",
-                "beyond u64 millis",
-            )
-            .with_recovery(
-                "set this machine's clock to the present day; it reads more than half a \
-                 billion years after the unix epoch",
-            )
-        })?;
-        Ok(TimeMs::new(millis))
-    }
-}
-
-/// The browser tools a building's rules ask for: its own browser, then
-/// the person's when they declared one (sprawling-SPEC.md 8-45-2).
-pub type Browsers = fn(
-    &Path,
-    &storage::BlockOrigin,
-    &city::BuildingRules,
-) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
-
-/// Where the desktop server this binary carries is started from: the
-/// running executable in production (sprawling-SPEC.md 8-4d).
-pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;
 
 /// What the startup scan found and repaired.
 pub struct ScanReport {

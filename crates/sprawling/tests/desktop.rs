@@ -49,8 +49,8 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
     let offered = Arc::new(Mutex::new(Vec::new()));
     let mut worker = assembly::RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap()
     .with_models(Box::new(Listeners(Arc::clone(&offered))))

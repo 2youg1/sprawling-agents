@@ -201,8 +201,8 @@ pub fn open_session(city: &Path) -> Result<Action, AxError> {
     sprawling::assembly::init_city(city)?;
     let mut worker = sprawling::assembly::RunWorker::new(
         city,
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        sprawling::assembly::hands(gateway::Custodian::in_memory()),
     )?;
     worker.handle(wire::Command::CreateBuilding {
         addr: Address::parse("lab")?,

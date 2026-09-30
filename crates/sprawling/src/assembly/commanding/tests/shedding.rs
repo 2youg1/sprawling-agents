@@ -35,8 +35,8 @@ fn a_volume_below_its_floor_refuses_a_dispatch_before_anything_is_written() {
     .unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker.read_volume_with(close_to_full);

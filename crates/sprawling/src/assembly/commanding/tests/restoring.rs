@@ -20,8 +20,8 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
     init_city(root).unwrap();
     let mut worker = RunWorker::new(
         root,
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
 
@@ -88,8 +88,8 @@ fn a_way_back_the_bin_does_not_write_is_refused_in_one_readable_sentence() {
     init_city(root).unwrap();
     let mut worker = RunWorker::new(
         root,
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let stored = kernel::Locator::cas(kernel::B3Hash::digest(b"a stored object"));

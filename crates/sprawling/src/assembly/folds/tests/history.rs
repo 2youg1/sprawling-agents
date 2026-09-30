@@ -16,8 +16,8 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     for n in 0..6u8 {
@@ -86,8 +86,8 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     for n in 0..6u8 {
@@ -149,8 +149,8 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     for n in 0..6u8 {

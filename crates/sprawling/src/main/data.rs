@@ -187,8 +187,8 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
     };
     let outcome = assembly::RunWorker::new(
         std::path::Path::new(dir),
-        vault,
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(vault),
     )
     .and_then(|mut worker| {
         worker.handle(wire::Command::OpenSession {
@@ -223,8 +223,8 @@ pub(super) fn adopt(dir: Option<&String>, addr: Option<&String>) -> ExitCode {
     let (vault, _notice) = serving::open_vault();
     let outcome = assembly::RunWorker::new(
         std::path::Path::new(dir),
-        vault,
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(vault),
     )
     .and_then(|mut worker| worker.adopt_building(addr.clone()));
     match outcome {

@@ -131,11 +131,11 @@ fn settled(live: &Live, key: &str, city_root: &Path) -> Result<RunWorker, AxErro
     let endpoint = wire::ProviderName::parse(ENDPOINT)?;
     let mut worker = RunWorker::new(
         city_root,
+        runtime::diagnostics::Diagnostics::off(),
         // The in-session vault: a gate that reached the platform
         // credential service would write a key into the machine running
         // it and leave it there.
-        gateway::Custodian::in_memory(),
-        runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )?;
     worker.handle(wire::Command::PutSecret {
         realm: secret.realm().to_owned(),

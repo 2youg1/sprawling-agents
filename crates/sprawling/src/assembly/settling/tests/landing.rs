@@ -25,7 +25,7 @@ fn speaking_signal(id: &str, room: &Address) -> collab::Signal {
         room.clone(),
         kernel::Version::new(1),
         kernel::Payload::empty(),
-        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
+        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
     )
     .unwrap()
 }
@@ -145,7 +145,7 @@ fn a_half_filed_shelf_is_unwound() {
         effects,
         dir.path(),
         &building,
-        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
+        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
         &Address::parse("lab").unwrap(),
         "potter",
     )

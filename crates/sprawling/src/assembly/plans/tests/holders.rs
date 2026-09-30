@@ -14,8 +14,8 @@ fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let claim = kernel::event::record::RoadmapMoved {
@@ -64,8 +64,8 @@ fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let (building, room) = (
@@ -77,7 +77,7 @@ fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands
         room: room.clone(),
         run: RunId::from_bytes([7; 16]),
         who: "potter@lab.7".to_owned(),
-        clock: std::sync::Arc::new(SystemClock),
+        clock: std::sync::Arc::new(crate::assembly::fixture::WallClock),
     };
     let desk = collab::ClaimDesk::new(
         "potter@lab.7".to_owned(),
@@ -311,8 +311,8 @@ fn a_split_closes_the_claim_on_its_parent() {
     // reads the ledger directory.
     let worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();

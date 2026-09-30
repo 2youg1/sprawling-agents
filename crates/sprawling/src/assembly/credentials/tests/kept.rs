@@ -26,8 +26,8 @@ fn an_empty_key_keeps_the_credential_this_city_has_archived() {
     let (base_url, provider) = fake_openai(&["m-key"], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker

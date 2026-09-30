@@ -157,8 +157,8 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
     let (base_url, _provider) = fake_openai(&["m-small", "m-large"], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
 
@@ -301,8 +301,8 @@ fn a_ledger_an_older_build_wrote_with_a_subscription_login_still_folds() {
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let line = |text: &str| kernel::Payload::new(serde_json::from_str(text).unwrap()).unwrap();

@@ -99,13 +99,13 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
     let opened = storage::JsonlLedger::open_faulty(
         fs,
         &kernel::layout::CityLayout::new(dir.path()).ledger(),
-        accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
+        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
     )
     .unwrap();
     let mut checker = RunWorker::over(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
         opened,
     )
     .unwrap();

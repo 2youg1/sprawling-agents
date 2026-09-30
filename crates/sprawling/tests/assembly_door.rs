@@ -38,8 +38,8 @@ fn a_command_reaches_the_ledger_through_the_door_the_wire_uses() {
     // running it.
     let mut worker = assembly::RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap();
 

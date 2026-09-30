@@ -13,8 +13,8 @@ fn an_enrolled_credential_leaves_only_a_reference_in_the_history() {
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     // Assembled at runtime: a credential-shaped literal is what the

@@ -44,8 +44,8 @@ fn a_worker_stamps_its_lines_with_the_clock_it_was_handed() {
         .len();
     let mut worker = assembly::RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap()
     .with_clock(Arc::new(Stopped));

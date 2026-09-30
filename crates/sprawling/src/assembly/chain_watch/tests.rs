@@ -30,8 +30,8 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     break_the_first_line(dir.path());

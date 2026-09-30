@@ -19,8 +19,8 @@ fn a_city_whose_norms_cannot_be_read_refuses_to_say_it_wrote_them_down() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let norms = dir.path().join(city::CITY_FILE);
@@ -62,7 +62,7 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
         let dir = dir.as_path();
         let report = init_city(dir).unwrap();
         let base_url = base_url.clone();
-        let mut worker = RunWorker::new(dir, gateway::Custodian::in_memory(), log).unwrap();
+        let mut worker = RunWorker::new(dir, log, crate::assembly::fixture::hands()).unwrap();
         worker
             .handle(wire::Command::AttachEndpoint {
                 name: wire::ProviderName::parse("house").unwrap(),
@@ -177,8 +177,8 @@ fn a_building_created_from_the_control_surface_is_read_back_by_the_city() {
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let create = |name: &str| wire::Command::CreateBuilding {
@@ -274,8 +274,8 @@ fn a_city_that_is_closed_says_so_before_it_stops() {
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker.close_city(&Closing::Chosen).unwrap();
@@ -316,8 +316,8 @@ fn the_startup_scan_closes_dangling_calls_once_and_reports_the_rest() {
     let raised = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     // A process death mid-call: tool_called with no tool_result.
@@ -374,8 +374,8 @@ fn a_new_city_delegates_its_approvals_to_the_clerk_on_the_record() {
     init_city(dir.path()).unwrap();
     let worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     assert_eq!(

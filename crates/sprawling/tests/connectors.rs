@@ -139,8 +139,8 @@ fn a_run_is_offered_the_tools_the_worker_was_handed() {
     let offered = Arc::new(Mutex::new(Vec::new()));
     let mut worker = assembly::RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap()
     .with_models(Box::new(Listeners(Arc::clone(&offered))))
@@ -303,8 +303,8 @@ fn a_long_connector_answer_reaches_the_model_packaged() {
     let read = Arc::new(Mutex::new(Vec::new()));
     let mut worker = assembly::RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap()
     .with_models(Box::new(Callers(Arc::clone(&read))))

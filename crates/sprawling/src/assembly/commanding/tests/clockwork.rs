@@ -138,8 +138,8 @@ fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let desk = CommandDesk::new();

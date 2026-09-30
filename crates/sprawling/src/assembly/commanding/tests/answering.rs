@@ -69,8 +69,8 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
 
@@ -131,8 +131,8 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
 
@@ -213,8 +213,8 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     drop(worker);
     let restarted = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     assert!(restarted.governance.pending.is_empty());
@@ -326,8 +326,8 @@ fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
 

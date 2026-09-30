@@ -79,8 +79,8 @@ fn two_runs_registering_one_ground_side_by_side_leave_one_holder() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let tool = |run: u8, room: &str| {

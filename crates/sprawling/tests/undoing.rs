@@ -33,8 +33,8 @@ fn a_city(dir: &std::path::Path) -> assembly::RunWorker {
     assembly::init_city(dir).unwrap();
     assembly::RunWorker::new(
         dir,
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap()
 }

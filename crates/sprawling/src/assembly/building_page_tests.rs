@@ -105,8 +105,8 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker
@@ -174,8 +174,8 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let lab = Address::parse("lab").unwrap();
@@ -287,8 +287,8 @@ fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker

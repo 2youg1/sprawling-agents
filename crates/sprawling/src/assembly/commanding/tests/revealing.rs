@@ -35,8 +35,8 @@ fn a_reveal_reaches_the_file_manager_the_worker_was_handed() {
     init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker.reveal_with(scripted);

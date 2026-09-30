@@ -176,8 +176,8 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
     // opened here would be refused the city's writer lock.
     let mut worker = RunWorker::over(
         city_root,
-        vault,
         runtime::diagnostics::Diagnostics::off(),
+        super::hands(vault),
         (ledger, report),
     )?;
     let plan = city::CityPlan::new(None)?;

@@ -224,7 +224,7 @@ mod tests {
             room: Address::parse("lab/room1").unwrap(),
             run: RunId::from_bytes([run; 16]),
             who: format!("potter@lab.{run}"),
-            clock: std::sync::Arc::new(crate::assembly::SystemClock),
+            clock: std::sync::Arc::new(crate::assembly::fixture::WallClock),
         }
     }
 

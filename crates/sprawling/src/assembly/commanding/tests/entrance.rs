@@ -110,8 +110,8 @@ fn a_repeat_is_answered_with_what_the_first_ask_was_answered() {
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
 
@@ -184,8 +184,8 @@ fn a_key_already_in_the_history_is_recognised_after_a_restart() {
     {
         let mut worker = RunWorker::new(
             dir.path(),
-            gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
+            crate::assembly::fixture::hands(),
         )
         .unwrap();
         worker.serve_one(Posted {
@@ -195,8 +195,8 @@ fn a_key_already_in_the_history_is_recognised_after_a_restart() {
     }
     let mut restarted = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     restarted.serve_one(Posted {

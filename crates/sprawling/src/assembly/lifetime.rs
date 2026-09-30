@@ -13,10 +13,9 @@
 //! leave" is asking one question from two ends.
 
 use super::{
-    Collaborating, Credentials, Doorstep, Flight, GatewayModels, Planning, RoomQueues, RunWorker,
-    Standing, SystemClock, city_segment,
+    Collaborating, Credentials, Doorstep, Flight, GatewayModels, Hands, Planning, RoomQueues,
+    RunWorker, Standing, city_segment,
 };
-use crate::doctor::{PATIENCE, Platform, ThisMachine};
 use std::path::Path;
 
 use kernel::{AxError, EventKind, Locator};
@@ -91,21 +90,24 @@ impl Closing {
 }
 
 impl RunWorker {
+    /// Opens the city's ledger at the time `hands.clock` reads, and
+    /// builds the worker over it with `hands` (accounting-SPEC.md 8-11).
+    ///
     /// # Errors
     /// Propagates whatever opening the ledger or the store reports, and
     /// whatever the ledger says about its own chain: a worker that
     /// cannot read the city's history cannot know what is attached.
     pub fn new(
         city_root: &Path,
-        vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
+        hands: Hands,
     ) -> Result<Self, AxError> {
         let opened = JsonlLedger::open(
             &kernel::layout::CityLayout::new(city_root).ledger(),
-            accounting::Clock::now(&SystemClock)?,
+            accounting::Clock::now(&*hands.clock)?,
         )
         .map_err(storage::StorageError::into_ax)?;
-        RunWorker::over(city_root, vault, log, opened)
+        RunWorker::over(city_root, log, hands, opened)
     }
 
     /// Builds a worker around a ledger somebody else opened, together
@@ -125,24 +127,36 @@ impl RunWorker {
     /// city's history cannot know what is attached.
     pub(crate) fn over(
         city_root: &Path,
-        vault: gateway::Custodian,
         log: runtime::diagnostics::Diagnostics,
+        hands: Hands,
         (ledger, report): (JsonlLedger, OpenReport),
     ) -> Result<Self, AxError> {
         let standing = Standing::fold(&kernel::layout::CityLayout::new(city_root).ledger())?;
-        RunWorker::holding(city_root, vault, log, (ledger, report, standing))
+        RunWorker::holding(city_root, log, hands, (ledger, report, standing))
     }
 
     /// `holding` takes a ledger already opened, its writer lock held, and
     /// what opening it repaired, and the standing folded from it under
-    /// that lock.
+    /// that lock. The schedule starts from the time `hands.clock` reads.
     pub(crate) fn holding(
         city_root: &Path,
-        vault: gateway::Custodian,
         mut log: runtime::diagnostics::Diagnostics,
+        hands: Hands,
         (ledger, report, standing): (JsonlLedger, OpenReport, Standing),
     ) -> Result<Self, AxError> {
-        let now = accounting::Clock::now(&SystemClock)?;
+        let Hands {
+            vault,
+            clock,
+            machine,
+            read_memory,
+            read_volume,
+            reveal,
+            browsers,
+            desktop_program,
+            recipe_for,
+            exec_host,
+        } = hands;
+        let now = accounting::Clock::now(&*clock)?;
         // Holding the one writer is what makes every worktree lock a
         // lock nobody alive holds (storage-SPEC 8-9).
         storage::Worktrees::lift_abandoned_leases(city_root, &ledger)
@@ -210,23 +224,19 @@ impl RunWorker {
             log: super::recording::Notes::over(log),
             doorstep: Doorstep::opened(entrance),
             origins,
-            flight: Flight::open(crate::monitor::memory::read),
+            flight: Flight::open(read_memory),
             index: storage::LedgerIndex::empty(),
             warm: super::keeping_warm::Kept::default(),
             models: Box::new(GatewayModels),
             connectors: std::sync::Arc::new(super::mcp::Residents::default()),
-            machine: Box::new(ThisMachine::new(Platform::current(), PATIENCE)),
-            clock: std::sync::Arc::new(SystemClock),
-            read_volume: crate::monitor::volume::read,
-            reveal: crate::revealing::reveal,
-            browsers: crate::browser_tool::for_rules,
-            desktop_program: std::env::current_exe,
-            recipe_for: crate::doctor::recipe_for,
-            exec_host: super::hands::ExecHost {
-                python_wasm: crate::doctor::host::usable_python_wasm,
-                shell: crate::doctor::host::usable_shell,
-                engine: crate::doctor::host::execution_engine,
-            },
+            machine,
+            clock,
+            read_volume,
+            reveal,
+            browsers,
+            desktop_program,
+            recipe_for,
+            exec_host,
         };
         worker.sweep_abandoned_trees();
         Ok(worker)
@@ -324,7 +334,7 @@ impl RunWorker {
     /// The door citysim and the tests drive a worker through: when
     /// things happen is theirs to script, while what the worker writes
     /// at those times stays its own. The ledger was opened before this
-    /// door, at the wall clock's time.
+    /// door, at the time the clock in the worker's `Hands` read.
     #[must_use]
     pub fn with_clock(
         self,
@@ -382,8 +392,8 @@ mod tests {
 
         let mut worker = RunWorker::new(
             dir.path(),
-            gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
+            crate::assembly::fixture::hands(),
         )
         .unwrap();
         let summary = worker.startup_scan().unwrap().summary();
@@ -430,8 +440,8 @@ mod tests {
         drop(
             RunWorker::new(
                 dir.path(),
-                gateway::Custodian::in_memory(),
                 runtime::diagnostics::Diagnostics::off(),
+                crate::assembly::fixture::hands(),
             )
             .unwrap(),
         );

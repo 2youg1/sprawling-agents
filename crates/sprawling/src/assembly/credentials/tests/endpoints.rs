@@ -34,8 +34,8 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
     let (base_url, _provider) = fake_openai(&[], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker
@@ -81,8 +81,8 @@ fn an_endpoint_with_neither_a_model_list_nor_a_declared_id_is_refused() {
     let (base_url, _provider) = fake_openai(&[], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let err = worker
@@ -113,8 +113,8 @@ fn a_dispatch_without_a_provider_fails_saying_what_to_configure() {
     // exactly the person who does not know that is the missing step.
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let err = worker
@@ -143,8 +143,8 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
     let (base_url, provider) = fake_openai(&["m-key"], vec![completion("done", None)]);
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker
@@ -214,8 +214,8 @@ fn a_store_that_will_not_open_refuses_the_adapter_rather_than_the_first_picture(
     init_city(dir.path()).unwrap();
     let worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     assert!(
@@ -247,8 +247,8 @@ fn a_probe_that_reaches_nothing_records_where_it_stopped_rather_than_refusing() 
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker
@@ -286,8 +286,8 @@ fn a_probe_carries_the_facts_each_model_row_stated() {
     let (base_url, _provider) = fake_openai(&["m-small", "m-large"], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     worker
@@ -331,8 +331,8 @@ fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
     let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     let attached = kernel::event::record::EndpointAttached {

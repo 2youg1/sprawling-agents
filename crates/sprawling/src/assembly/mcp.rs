@@ -365,8 +365,8 @@ mod tests {
         write_server_table(dir.path(), "lab", &command, &args);
         let worker = RunWorker::new(
             dir.path(),
-            gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
+            crate::assembly::fixture::hands(),
         )
         .unwrap();
         let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
@@ -482,8 +482,8 @@ mod tests {
         write_server_table(dir.path(), "lab", &command, &args);
         let worker = RunWorker::new(
             dir.path(),
-            gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
+            crate::assembly::fixture::hands(),
         )
         .unwrap();
         let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();

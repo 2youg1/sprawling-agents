@@ -37,8 +37,8 @@ fn cut_then_raise(city: &Path, more: std::ops::Range<u8>) -> (PathBuf, RunWorker
     let ledger = init_city(city).unwrap().ledger_dir;
     let mut worker = RunWorker::new(
         city,
-        gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
+        crate::assembly::fixture::hands(),
     )
     .unwrap();
     raise(&mut worker, 0..3);
