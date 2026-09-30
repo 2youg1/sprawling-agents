@@ -245,6 +245,7 @@ impl Ladder {
 - **文件名只有一份，层级由位置决定**：City 层住 `<city>/.sprawling/CONFIG.toml`（reserved prefix 内，因此任何 Resident 的写域都永远叠不上它——「Agent 改不了自己的配置」因此是判定而非推理）；Building 层住 `<city>/<building>/.sprawling/CONFIG.toml`；Resident 层住 `<city>/<addr>/.sprawling/CONFIG.toml`（§8-11）。三处同名，读者认一次就认得完。
 - **地址就是楼时只有两级**：`addr` 与它的 building 相同时，下两级指向同一个文件，只读一次并放在 Building 级。同一份文件在两级各算一次不改变结果，却会让读者以为它能覆盖自己。
 - **缺文件不是错，读不动才是**（同 `resident`）：未声明即每级 `None`，落到 `kernel::consts_policy` 的缺省；一份存在却读不出的配置报 `E_STORAGE_FATAL`。
+- **梯子上的拒词带着文件，其余照解析器说的**：`ladder::stated` 读一份解析不了的文件时，把文件路径加在 subject 前面，码、action、nearby 与恢复语都照 `ConfigLayer::parse` 给的原样交出。恢复语是写拒词的那一处按它的场合写的（`two_residents` 指向 `/new` 或删键，`unreadable` 指向报错所在的那张表），梯子只知道「哪份文件」，不知道「怎么改」（§12.8 (a)）。
 - **不认的键即拒**（`deny_unknown_fields`）：静默忽略一个拼错的键，会产生「我设了 effort 而什么也没发生」这个无从诊断的状态。本版读哪些键，由 `ConfigFile` 的字段给出，此处不复述；拒绝文字也不复述这张键表——serde 的报错点名不认识的键、列出该表接受的键，恢复语只从原文里取出报错所在的那张表头（`[model]`、`[[mcp]]`）并说改哪一节。`[clock]` 只受理 `stamp` 一个键（§8-31）；`zones` 仍拒，写它得到的是 serde 点名这个键的那句拒绝而不是一份沉默。
 - **梯子不在本模块重建**：下层胜上层由 `kernel::LayeredValue::resolve` 给，冻结由 `kernel::freeze` 给；本模块只回答「哪三份文件、怎么读」。一条规则一个权威。
 - **effort 属 `FrozenConfig` 而非 `LiveConfig`**：改它会作废 message cache breakpoints，因此改动只影响下一个 Run（理由已写在 `kernel::config`，此处不重述只遵守）。
@@ -682,6 +683,18 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 **被否**：①梯子上的 harness 压过会话记录：改了楼层下一次派活就换居民，一段会话前后两截的记录说的是两种居民；②把两个键收成一个枚举字段：一个是城写下的记录、只读本层，一个是人写下的设定、爬梯子，合成一个值会暗示两者按同一条规则求值，而私有字段加唯一构造点已经让两键并存的值构造不出来；③写路径只靠派活路径先分流、自己不复读：分流住在另一个 crate，一处疏漏的代价是一整栋楼。
 
 **重开参数**：harness 的会话也要冻下一条房间层的记录时（例如一段 harness 会话要跨 run 续上），房间层的记录要能说 harness，同层互斥与记录优先要一起重议。
+
+### 12.8 定规：拒词的恢复语归写拒词的那一处
+
+**(a) 梯子只加文件，不改恢复语。**
+
+**决定**：`ladder::stated` 包一个解析拒词时只在 subject 前加上文件路径；码、action、nearby 与恢复语照 `ConfigLayer::parse` 交出的原样保留。
+
+**理由**：派活、设置页与 `sprawling check` 都经梯子读配置，而恢复语是写拒词的那一处按场合写的：一层同时写了 `[model] name` 与 `[resident] harness` 时，`two_residents` 说「`/new` 忘掉会话写下的模型，或删掉 harness 那一行」，这正是人要做的那一步。梯子把它换成通用的「改掉消息点名的值，或删掉那个键」，派活路径上的人就读不到 `/new` 这条出口，而 `sprawling check` 与写路径读到的却是完整的拒词：同一份文件的同一个错，两条路给出两句话。
+
+**被否**：梯子自己按错误种类挑恢复语——那是恢复语的第二个家，拒词加一种它就要跟一种。
+
+**重开参数**：梯子开始读 `ConfigLayer::parse` 以外的来源（例如人层 `~/.sprawling/config.toml`），而那个来源的拒词不带恢复语时。
 
 ## 13 依赖选型
 
