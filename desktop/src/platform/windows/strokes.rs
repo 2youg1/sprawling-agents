@@ -171,6 +171,48 @@ fn spelled(action: &Action) -> Result<Vec<Stroke>, Refusal> {
     })
 }
 
+/// What became of the presses a batch cut short left held down.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Released {
+    /// The part the desktop took pressed nothing it did not release.
+    NothingWasHeld,
+    /// Every release sent afterwards was taken.
+    All { presses: usize },
+    /// The releases were cut short too, after `accepted` of `sent`.
+    Partly { sent: usize, accepted: usize },
+}
+
+/// What to do after a batch of which the desktop took nothing.
+const NOTHING_SENT_RECOVERY: &str =
+    "check the window with `desktop.screenshot` and try again once it is in the foreground";
+
+/// What to do after a batch the desktop took only part of.
+const PART_SENT_RECOVERY: &str = "look at the window with `desktop.screenshot` before acting \
+                                  again, and do not repeat this action unchanged: part of it \
+                                  may already have landed";
+
+/// The releases for what the first `accepted` strokes of `strokes`
+/// pressed and did not release, in the reverse of the order they were
+/// pressed.
+pub(crate) fn left_held(strokes: &[Stroke], accepted: usize) -> Vec<Stroke> {
+    let _ = (strokes, accepted);
+    Vec::new()
+}
+
+/// The refusal for a batch the desktop took `accepted` of `sent` events
+/// of.
+pub(crate) fn cut_short(accepted: usize, sent: usize, released: Released) -> Refusal {
+    let _ = (accepted, sent, released);
+    Refusal::new(
+        RefusalCode::ToolUnavailable,
+        "act on a window",
+        "the desktop is not accepting input",
+        "this desktop is not accepting input right now — a lock screen or an elevated window \
+         blocks it. Nothing was half-done: check the window with `desktop.screenshot` and try \
+         again once it is in the foreground",
+    )
+}
+
 /// How far `notches` turn the wheel, counted in `WHEEL_DELTA`.
 ///
 /// The product is taken in `i64`, where it always fits, and then has to
@@ -296,6 +338,107 @@ mod tests {
                 key(Modifier::Shift.code(), Edge::Up),
                 key(Modifier::Ctrl.code(), Edge::Up),
             ]
+        );
+    }
+
+    /// A batch the desktop took only part of releases exactly what that
+    /// part pressed and left down, and nothing else: a hand lifted off
+    /// the keys, not the rest of the action.
+    #[test]
+    fn a_batch_cut_short_leaves_nothing_held_that_it_pressed() {
+        let key = |code: u16, edge: Edge| Stroke::Key { code, edge };
+        let all = of(
+            &Action::Key { code: 0x0D },
+            &[Modifier::Ctrl, Modifier::Shift],
+        )
+        .unwrap();
+        assert_eq!(
+            left_held(&all, 3),
+            vec![
+                key(0x0D, Edge::Up),
+                key(Modifier::Shift.code(), Edge::Up),
+                key(Modifier::Ctrl.code(), Edge::Up),
+            ]
+        );
+        assert_eq!(left_held(&all, 0), vec![]);
+        assert_eq!(left_held(&all, 6), vec![]);
+        let from = Point { x: 10, y: 20 };
+        let dragged = of(
+            &Action::Drag {
+                from,
+                to: Point { x: 99, y: 99 },
+            },
+            &[],
+        )
+        .unwrap();
+        assert_eq!(
+            left_held(&dragged, 2),
+            vec![Stroke::Pointer {
+                at: from,
+                motion: Motion::LeftUp
+            }]
+        );
+        let typed = of(
+            &Action::Type {
+                text: "ab".to_owned(),
+            },
+            &[],
+        )
+        .unwrap();
+        assert_eq!(
+            left_held(&typed, 3),
+            vec![Stroke::Unicode {
+                unit: 0x62,
+                edge: Edge::Up
+            }]
+        );
+    }
+
+    /// A batch that stopped part way is reported as part done, with an
+    /// effect nobody can see, and never as the nothing it was not.
+    #[test]
+    fn a_batch_cut_short_is_reported_as_partly_done_not_as_nothing() {
+        assert_eq!(
+            cut_short(3, 6, Released::All { presses: 3 }),
+            Refusal::new(
+                RefusalCode::ToolUnavailable,
+                "act on a window",
+                "the desktop took 3 of the 6 input events of this action and then stopped \
+                 accepting input, so the action may have partly happened; the 3 presses it \
+                 left held were released",
+                PART_SENT_RECOVERY,
+            )
+            .effect_unknown()
+        );
+        assert_eq!(
+            cut_short(
+                2,
+                6,
+                Released::Partly {
+                    sent: 2,
+                    accepted: 1
+                }
+            ),
+            Refusal::new(
+                RefusalCode::ToolUnavailable,
+                "act on a window",
+                "the desktop took 2 of the 6 input events of this action and then stopped \
+                 accepting input, so the action may have partly happened; releasing the 2 \
+                 presses it left held also stopped after 1, so a key or button may still be \
+                 held down",
+                PART_SENT_RECOVERY,
+            )
+            .effect_unknown()
+        );
+        assert_eq!(
+            cut_short(0, 6, Released::NothingWasHeld),
+            Refusal::new(
+                RefusalCode::ToolUnavailable,
+                "act on a window",
+                "the desktop took none of the 6 input events: a lock screen or an elevated \
+                 window holds the input",
+                NOTHING_SENT_RECOVERY,
+            )
         );
     }
 
