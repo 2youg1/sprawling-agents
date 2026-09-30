@@ -3,8 +3,6 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import Sprawling.Frame
-
 /-!
 # What a ledger's chain certifies, and what it does not.
 
@@ -33,7 +31,7 @@ direction suits them, so both are proved here rather than described:
   same conclusion is false — so the hypothesis is not decoration.
 * The **last** line is outside all of it. Nothing after it hashed it, so a
   chained ledger's head is whatever the disk says it is;
-  `theLastLineIsNotCertified` exhibits one list of records consistent with two
+  `theLastLineIsNotCertified` exhibits one list of prevs consistent with two
   ledgers that differ at their last line. No injectivity hypothesis closes that,
   and the theorem assumes none. Two consequences follow, and both are about code
   rather than about arithmetic: a check that means to test detection must aim at
@@ -51,8 +49,8 @@ is at stake here is the reach of a rule.
 **Why this does not become a second authority.** It restates no rule of the
 product's: no code consults the predicate below, no digest value appears anywhere
 in it, and its carriers are the ones the tree already has, read as the disk holds
-them — the file's lines as text, and the `Record` the wire and the reader agree
-on. Where a verdict is needed, a check asks the product (`Door.verify` runs the
+them — the file's lines as text, and the `prev` each record carries, in the
+order a reader parses them. Where a verdict is needed, a check asks the product (`Door.verify` runs the
 product's own offline verification) rather than this module. Each statement names
 the Rust line it corresponds to.
 -/
@@ -81,25 +79,23 @@ def required (hash : String → String) (genesis : String) (lines : List String)
 /-- A ledger is chained when the claims its records carry are the claims its
 lines owe.
 
-The two arguments are the two halves of one file as this machine holds it: the
-lines as text, in order, and the records a reader parses out of them. They are
+The two arguments are the two halves of one file: the lines as text, in order,
+and the `prev` each record carries, in the order a reader parses them. They are
 not independent — the equation below forces the two lists to the same length —
-and a ledger whose records do not line up with its lines is not a chained ledger
+and a list of prevs that does not line up with the lines is not a chained ledger
 but a parse that disagreed with the file.
+
+Any list of prevs will do, so the statements below hold for whatever a reader
+parses a record into; the checker's `Record` is one such reader, and this module
+does not import it.
 
 The digest function and the genesis digest are parameters because neither is this
 directory's fact: `chain_hash` lives in `crates/kernel/src/ledger.rs`, and its
 value and `GENESIS_PREV` are read from the product. A copy of either here would
 be the second home `adversary-SPEC.md` section 5 forbids. -/
 def Chained (hash : String → String) (genesis : String) (lines : List String)
-    (records : List Record) : Prop :=
-  records.map Record.prev = required hash genesis lines
-
-/-- A record carrying `prev` and nothing else this module reads.
-
-The witnesses below vary the claim and the line's bytes, because those are what a
-chain is about; every other field is the fixture's. -/
-private def carrying (prev : String) : Record := { (default : Record) with prev }
+    (prevs : List String) : Prop :=
+  prevs = required hash genesis lines
 
 /-- **The covered lines decide the claims, and this direction is free.**
 
@@ -114,10 +110,10 @@ and every turn restates. The number of lines is part of the hypothesis because a
 reading includes it — a file of no lines and a file of one line have the same
 `dropLast`, and only the count tells them apart. -/
 theorem theCoveredLinesDecideTheClaims (hash : String → String) (genesis : String)
-    {lines lines' : List String} {records records' : List Record}
-    (chained : Chained hash genesis lines records) (chained' : Chained hash genesis lines' records')
+    {lines lines' : List String} {prevs prevs' : List String}
+    (chained : Chained hash genesis lines prevs) (chained' : Chained hash genesis lines' prevs')
     (same : lines.dropLast = lines'.dropLast) (counted : lines.length = lines'.length) :
-    records.map Record.prev = records'.map Record.prev := by
+    prevs = prevs' := by
   have owed : required hash genesis lines = required hash genesis lines' := by
     cases lines with
     | nil =>
@@ -176,9 +172,9 @@ What this theorem says is that the oldest line is not the only position worth
 attacking — every line with a successor is covered — so a check that tests
 detection at one position has tested one position. -/
 theorem aCoveredLineCannotChangeUnnoticed (hash : String → String) (genesis : String)
-    (injective : Function.Injective hash) {lines lines' : List String} {records : List Record}
-    (chained : Chained hash genesis lines records) (moved : lines.dropLast ≠ lines'.dropLast) :
-    records.map Record.prev ≠ required hash genesis lines' := by
+    (injective : Function.Injective hash) {lines lines' : List String} {prevs : List String}
+    (chained : Chained hash genesis lines prevs) (moved : lines.dropLast ≠ lines'.dropLast) :
+    prevs ≠ required hash genesis lines' := by
   intro agrees
   unfold Chained at chained
   have same : required hash genesis lines = required hash genesis lines' := by
@@ -187,7 +183,7 @@ theorem aCoveredLineCannotChangeUnnoticed (hash : String → String) (genesis : 
 
 /-- **The last line is outside the chain, and no digest function brings it in.**
 
-One list of records, two ledgers, both chained, differing at their last line: for
+One list of prevs, two ledgers, both chained, differing at their last line: for
 two different byte strings a digest function of any strength may give whatever it
 likes, because nothing after them ever hashed them. `hash` is the identity here,
 so this holds under the strongest digest function there is rather than under a
@@ -200,19 +196,19 @@ to test detection would be testing the recovery path. It is also why no reader
 may treat the chain as evidence about its head: what the head says is what the
 disk says. -/
 theorem theLastLineIsNotCertified (genesis a b c : String) (different : b ≠ c) :
-    ∃ lines lines' records,
-      lines ≠ lines' ∧ Chained id genesis lines records ∧ Chained id genesis lines' records := by
-  refine ⟨[a, b], [a, c], [carrying genesis, carrying a], ?_, ?_, ?_⟩
+    ∃ lines lines' prevs,
+      lines ≠ lines' ∧ Chained id genesis lines prevs ∧ Chained id genesis lines' prevs := by
+  refine ⟨[a, b], [a, c], [genesis, a], ?_, ?_, ?_⟩
   · intro same
     injection same with _ rest
     injection rest with bytes _
     exact different bytes
-  · simp [Chained, required, carrying, List.dropLast_eq_take]
-  · simp [Chained, required, carrying, List.dropLast_eq_take]
+  · simp [Chained, required, List.dropLast_eq_take]
+  · simp [Chained, required, List.dropLast_eq_take]
 
 /-- **Without injectivity a covered line hides as well as the head does.**
 
-One list of records, two ledgers, both chained, differing at the line a successor
+One list of prevs, two ledgers, both chained, differing at the line a successor
 hashed — for a digest function that maps every line to the same string. This is
 the case `theClaimsDecideTheCoveredLines` and `aCoveredLineCannotChangeUnnoticed`
 exclude by hypothesis, and it is not a corner case: it is what "the assumption
@@ -225,15 +221,15 @@ which of its promises rest on it, which `adversary-SPEC.md` section 5 does — s
 the next reader who needs a stronger guarantee knows what they are changing
 rather than discovering a hole. -/
 theorem aCoveredLineHidesWithoutInjectivity (genesis a z b : String) (different : a ≠ z) :
-    ∃ lines lines' records,
-      lines ≠ lines' ∧ Chained (fun _ => "") genesis lines records
-        ∧ Chained (fun _ => "") genesis lines' records := by
-  refine ⟨[a, b], [z, b], [carrying genesis, carrying ""], ?_, ?_, ?_⟩
+    ∃ lines lines' prevs,
+      lines ≠ lines' ∧ Chained (fun _ => "") genesis lines prevs
+        ∧ Chained (fun _ => "") genesis lines' prevs := by
+  refine ⟨[a, b], [z, b], [genesis, ""], ?_, ?_, ?_⟩
   · intro same
     injection same with first _
     exact different first
-  · simp [Chained, required, carrying, List.dropLast_eq_take]
-  · simp [Chained, required, carrying, List.dropLast_eq_take]
+  · simp [Chained, required, List.dropLast_eq_take]
+  · simp [Chained, required, List.dropLast_eq_take]
 
 /-- A ledger's head survives dropping the last line, in the only shape the
 proofs below need: a list of two or more elements loses its last one and keeps
