@@ -16,11 +16,11 @@ use crate::worker::*;
 #[test]
 fn a_city_whose_norms_cannot_be_read_refuses_to_say_it_wrote_them_down() {
     let dir = tempfile::tempdir().unwrap();
-    crate::worker::fixture::init_city(dir.path()).unwrap();
+    init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::worker::fixture::hands(),
+        hands(),
     )
     .unwrap();
     let norms = dir.path().join(city::CITY_FILE);
@@ -60,9 +60,9 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
         let dir = held.path().join("kiln");
         std::fs::create_dir_all(&dir).unwrap();
         let dir = dir.as_path();
-        let report = crate::worker::fixture::init_city(dir).unwrap();
+        let report = init_city(dir).unwrap();
         let base_url = base_url.clone();
-        let mut worker = RunWorker::new(dir, log, crate::worker::fixture::hands()).unwrap();
+        let mut worker = RunWorker::new(dir, log, hands()).unwrap();
         worker
             .handle(wire::Command::AttachEndpoint {
                 name: wire::ProviderName::parse("house").unwrap(),
@@ -142,7 +142,7 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
 #[test]
 fn a_registration_survives_the_process_that_made_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let report = init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-small", "m-large"], Vec::new());
     let worker = worker_with_provider(dir.path(), &base_url, "m-large").unwrap();
 
@@ -174,11 +174,11 @@ fn a_registration_survives_the_process_that_made_it() {
 #[test]
 fn a_building_created_from_the_control_surface_is_read_back_by_the_city() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::worker::fixture::hands(),
+        hands(),
     )
     .unwrap();
     let create = |name: &str| wire::Command::CreateBuilding {
@@ -232,12 +232,7 @@ fn a_folder_somebody_already_works_in_becomes_a_city_around_that_work() {
     std::fs::create_dir_all(dir.path().join("notes")).unwrap();
     std::fs::write(dir.path().join("README.md"), "# my work\n").unwrap();
 
-    let report = crate::worker::genesis::form(
-        dir.path(),
-        Adopt::EveryFolder,
-        crate::worker::fixture::hands(),
-    )
-    .unwrap();
+    let report = crate::worker::genesis::form(dir.path(), Adopt::EveryFolder, hands()).unwrap();
     let city::Standing::Work { adoptable, loose } = &report.standing else {
         panic!("a folder with work in it is not an empty one");
     };
@@ -266,12 +261,7 @@ fn a_folder_somebody_already_works_in_becomes_a_city_around_that_work() {
     }
 
     // Forming a city over a city is refused: history starts once.
-    let err = crate::worker::genesis::form(
-        dir.path(),
-        Adopt::EveryFolder,
-        crate::worker::fixture::hands(),
-    )
-    .unwrap_err();
+    let err = crate::worker::genesis::form(dir.path(), Adopt::EveryFolder, hands()).unwrap_err();
     assert_eq!(err.code(), &AxCode::ConfigInvalid);
 }
 
@@ -281,11 +271,11 @@ fn a_folder_somebody_already_works_in_becomes_a_city_around_that_work() {
 #[test]
 fn a_city_that_is_closed_says_so_before_it_stops() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let report = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::worker::fixture::hands(),
+        hands(),
     )
     .unwrap();
     worker.close_city(&Closing::Chosen).unwrap();
@@ -310,24 +300,24 @@ fn a_city_that_is_closed_says_so_before_it_stops() {
 #[test]
 fn init_writes_genesis_and_refuses_a_second_birth() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let report = init_city(dir.path()).unwrap();
     assert_eq!(report.genesis.seq(), kernel::Seq::FIRST);
     assert_eq!(report.genesis.kind(), EventKind::CityInitialized);
     // The chain verifies offline (A2 face).
     runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     // Genesis happens once.
-    let err = crate::worker::fixture::init_city(dir.path()).unwrap_err();
+    let err = init_city(dir.path()).unwrap_err();
     assert_eq!(err.code(), &AxCode::ConfigInvalid);
 }
 
 #[test]
 fn the_startup_scan_closes_dangling_calls_once_and_reports_the_rest() {
     let dir = tempfile::tempdir().unwrap();
-    let raised = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let raised = init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::worker::fixture::hands(),
+        hands(),
     )
     .unwrap();
     // A process death mid-call: tool_called with no tool_result.
@@ -381,11 +371,11 @@ fn the_startup_scan_closes_dangling_calls_once_and_reports_the_rest() {
 #[test]
 fn a_new_city_delegates_its_approvals_to_the_clerk_on_the_record() {
     let dir = tempfile::tempdir().unwrap();
-    crate::worker::fixture::init_city(dir.path()).unwrap();
+    init_city(dir.path()).unwrap();
     let worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::worker::fixture::hands(),
+        hands(),
     )
     .unwrap();
     assert_eq!(
