@@ -348,3 +348,39 @@ fn the_prereqs_file_is_the_develop_tier_rendered() {
         path.display()
     );
 }
+
+/// Every recipe of this repository runs in the shell the `justfile`
+/// names, so that program is a required row of the develop tier. The
+/// shell is read out of the `justfile` rather than written here, so a
+/// recipe file that moves to another shell turns this red until the
+/// table follows it (sprawling-SPEC.md 8-130).
+#[test]
+fn the_shell_every_recipe_runs_in_is_a_required_develop_row() {
+    let justfile = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../justfile"),
+    )
+    .unwrap();
+    let shell = justfile
+        .lines()
+        .find_map(|line| line.strip_prefix("set shell := [\""))
+        .and_then(|rest| rest.split('"').next())
+        .unwrap();
+    let answering: Vec<&str> = REQUIREMENTS
+        .iter()
+        .filter(|row| row.tier == Tier::Develop && row.need == Need::Required)
+        .filter(|row| match &row.detect {
+            Detection::Program { program, .. } | Detection::Listed { program, .. } => {
+                *program == shell
+            }
+            Detection::Component { .. }
+            | Detection::Interpreter { .. }
+            | Detection::Built { .. }
+            | Detection::Family(_) => false,
+        })
+        .map(|row| row.name)
+        .collect();
+    assert!(
+        !answering.is_empty(),
+        "every recipe runs in `{shell}`, and no required develop row looks for it"
+    );
+}
