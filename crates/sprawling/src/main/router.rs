@@ -74,6 +74,7 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
         Verb::Up => up(read, args),
         Verb::Install => install(args),
         Verb::Doctor => sprawling::doctor::verb(args),
+        Verb::Desktop => super::desktop::verb(nth(1).map(String::as_str)),
         Verb::Call => call(args).into(),
         Verb::Dispatch => super::dispatch::verb(read),
         Verb::Top => top(args),

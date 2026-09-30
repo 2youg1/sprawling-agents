@@ -943,10 +943,6 @@
     "en": "the exec tool's shell arm, where a building's CONFIG.toml asks for it",
     "zh": "exec 工具的 shell 一支，用于 CONFIG.toml 要求它的楼"
   },
-  "machine_enables_sprawling_desktop": {
-    "en": "optional: an MCP server that lets agents see and operate this Windows desktop; it is not the WebUI, and the city runs without it",
-    "zh": "可选：一个 MCP server，让 agent 看见并操作这台 Windows 的桌面；它不是 WebUI，没有它城照样跑"
-  },
   "machine_enables_webkit": {
     "en": "the browser tool against Safari, experimentally: BiDi support is partial and safaridriver --enable has to be run once",
     "zh": "对 Safari 使用浏览器工具，尚属试验：BiDi 支持不全，且须先运行一次 safaridriver --enable"

@@ -156,7 +156,7 @@ impl BuildingRules {
     }
 
     /// Whether a resident of this building may reach this machine's own
-    /// desktop, through the connector `sprawling-desktop` offers.
+    /// desktop, through the desktop server this binary carries.
     ///
     /// Absent the line, no — the same reading `browser` gets, and for a
     /// stronger reason: what `desktop.act` presses on somebody's own

@@ -48,13 +48,12 @@ pub(crate) fn visit(city_root: &Path) -> Result<Vec<Visited>, AxError> {
         .collect())
 }
 
-/// The two rule bits and the one configuration bit of a building.
+/// The rule bit and the configuration bit of a building.
 fn bits_of(city_root: &Path, building: &Address) -> Result<Bits, AxError> {
     let rules = city::load(city_root, building)?;
     let config = city::load_config(city_root, building)?;
     Ok(Bits {
         browser: rules.browser(),
-        desktop: rules.desktop(),
         shell: config.sandbox.shell,
     })
 }

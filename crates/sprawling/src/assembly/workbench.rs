@@ -21,6 +21,7 @@ use runtime::bench::ToolBench;
 use kernel::event::record::autonomy_word;
 
 mod desks;
+mod desktop;
 mod engine;
 mod servers;
 mod standing;
@@ -44,6 +45,9 @@ pub(in crate::assembly) struct Laying {
     connectors: std::sync::Arc<dyn accounting::Connectors + Send + Sync>,
     /// The browser tools a building's rules ask for (`RunWorker::browsers`).
     browsers: super::Browsers,
+    /// Where the desktop server a building's rules ask for is started
+    /// from (`RunWorker::desktop_program`).
+    desktop_program: super::DesktopProgram,
     backlog: runtime::Backlog,
     /// The city's one fence at a time (`driving::lane::DriveContext`).
     pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
@@ -98,6 +102,7 @@ impl super::RunWorker {
             vault: self.vault_handle(),
             connectors: std::sync::Arc::clone(&self.connectors),
             browsers: self.browsers,
+            desktop_program: self.desktop_program,
             backlog: self.flight.backlog.clone(),
             fence_gate: std::sync::Arc::clone(&self.flight.fence_gate),
             store: std::sync::Arc::clone(&self.lane_store),

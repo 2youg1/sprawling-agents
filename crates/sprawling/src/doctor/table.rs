@@ -44,7 +44,6 @@ pub(crate) const MSEDGEDRIVER: &str = "msedgedriver";
 pub(crate) const PYTHON_WASI: &str = "python-wasi";
 pub(crate) const SHELL: &str = "shell";
 pub(crate) const SANDBOX_ENGINE: &str = "sandbox-engine";
-pub(crate) const SPRAWLING_DESKTOP: &str = "sprawling-desktop";
 pub(crate) const FFMPEG: &str = "ffmpeg";
 
 /// How this build installs `item` on this platform: the table's own
@@ -267,26 +266,6 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         pack: None,
     },
     Requirement {
-        name: SPRAWLING_DESKTOP,
-        tier: Tier::Use,
-        need: Need::Optional,
-        enables: "an optional MCP server that lets agents see and operate this Windows desktop; not the WebUI",
-        detect: Detection::Program {
-            program: "sprawling-desktop",
-            version_arg: "--version",
-            places: NOWHERE,
-        },
-        homepage: None,
-        recipe: PerPlatform {
-            windows: DESKTOP_BY_HAND,
-            macos: DESKTOP_BY_HAND,
-            linux: DESKTOP_BY_HAND,
-        },
-        pin: Pin::Unpinned,
-        upstream: Upstream::Unread(DoctorUnread::ThisProject),
-        pack: None,
-    },
-    Requirement {
         name: FFMPEG,
         tier: Tier::Use,
         need: Need::Optional,
@@ -342,8 +321,3 @@ const PYTHON_WASI_BY_HAND: Recipe =
 /// machine.
 const ENGINE_BY_BUILD: Recipe =
     Recipe::Manual("install a build of sprawling with the `sandbox` feature");
-
-/// The connector is built from this repository's `desktop/` package.
-const DESKTOP_BY_HAND: Recipe = Recipe::Manual(
-    "build `desktop/` from this repository and put sprawling-desktop on the search path",
-);

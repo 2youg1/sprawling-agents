@@ -33,7 +33,6 @@ fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
     ]));
     let bits = Bits {
         browser: true,
-        desktop: false,
         shell: false,
     };
     let lacking = lacks(&lab(), &bits, &findings);
@@ -57,7 +56,6 @@ fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
     );
     let nothing_asked = Bits {
         browser: false,
-        desktop: false,
         shell: false,
     };
     assert!(lacks(&lab(), &nothing_asked, &findings).is_empty());
@@ -112,7 +110,6 @@ fn a_building_whose_rules_will_not_read_is_reported_not_skipped() {
         lab_bits,
         Some(Bits {
             browser: true,
-            desktop: false,
             shell: false,
         })
     );

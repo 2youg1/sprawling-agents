@@ -183,7 +183,6 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         "python-wasi",
         "sandbox-engine",
         "shell",
-        "sprawling-desktop",
         "ffmpeg",
     ] {
         assert!(named.contains(needed), "the table does not carry {needed}");

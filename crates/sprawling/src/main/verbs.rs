@@ -31,6 +31,7 @@ pub(super) enum Verb {
     Export,
     Restore,
     Doctor,
+    Desktop,
     Install,
     Status,
 }
@@ -366,6 +367,15 @@ pub(super) const VERBS: &[Row] = &[
         ],
         says: "what this machine has against what a city needs",
         effect: Effect::ReadsOnly,
+    },
+    Row {
+        verb: Verb::Desktop,
+        name: "desktop",
+        aliases: &[],
+        positionals: &[("scope", Optional)],
+        flags: &[],
+        says: "serve this machine's desktop as an MCP server on stdin and stdout, within the windows <scope> allows",
+        effect: Effect::Changes,
     },
     Row {
         verb: Verb::Install,

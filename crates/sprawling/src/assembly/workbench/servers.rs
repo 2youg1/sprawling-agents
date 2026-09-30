@@ -23,11 +23,11 @@ impl Laying {
     /// service is down today is still a building that can work today.
     pub(in crate::assembly) fn mcp_tools(
         &self,
-        config: &kernel::FrozenConfig,
+        servers: &[kernel::McpServer],
         write_root: &std::path::Path,
         confidential: bool,
     ) -> Vec<protocol::McpTool> {
-        if confidential && !config.mcp.is_empty() {
+        if confidential && !servers.is_empty() {
             // Process lifetime is this layer's own business, and an MCP
             // server is a program that may reach the network the moment
             // it starts. Nothing is started here. The tool-level refusal
@@ -50,7 +50,7 @@ impl Laying {
         let began = self.clock.now();
         let mut offered = Vec::new();
         let resolve = accounting::held_vault::resolving(std::sync::Arc::clone(&self.vault));
-        for server in &config.mcp {
+        for server in servers {
             // The module a reader is sent to is the transport that
             // failed, not whichever one was written first.
             let site = protocol::McpLink::site(&server.transport);
@@ -95,7 +95,7 @@ impl Laying {
                     "bin::assembly",
                     &format!(
                         "mcp_tools took {spent} ms over {} declared server(s), offering {} tool(s)",
-                        config.mcp.len(),
+                        servers.len(),
                         offered.len()
                     ),
                 );

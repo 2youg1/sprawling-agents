@@ -103,7 +103,7 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = "z"`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `"z"` rather than `3` because it is much smaller and no slower to start; the criterion and both arms' readings sit beside the setting in `Cargo.toml`. |
-| Dependency count | <!-- xtask:begin dependency_count -->443<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->453<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof

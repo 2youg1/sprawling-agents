@@ -369,7 +369,7 @@ mod tests {
         let offered = worker
             .laying("")
             .unwrap()
-            .mcp_tools(&config, dir.path(), false);
+            .mcp_tools(&config.mcp, dir.path(), false);
         assert_eq!(offered.len(), 1);
         assert_eq!(kernel::Tool::meta(&offered[0]).name.as_str(), "apps_ping");
         assert_eq!(offered[0].remote(), "ping");
@@ -378,7 +378,7 @@ mod tests {
             worker
                 .laying("")
                 .unwrap()
-                .mcp_tools(&config, dir.path(), true)
+                .mcp_tools(&config.mcp, dir.path(), true)
                 .is_empty(),
             "a confidential building holds no outbound tool, and starts nothing to hold one"
         );
@@ -389,7 +389,7 @@ mod tests {
             worker
                 .laying("")
                 .unwrap()
-                .mcp_tools(&config, dir.path(), false)
+                .mcp_tools(&config.mcp, dir.path(), false)
                 .is_empty(),
             "a service that is down today does not stop the building from working today"
         );
@@ -483,12 +483,12 @@ mod tests {
         let first = worker
             .laying("")
             .unwrap()
-            .mcp_tools(&config, dir.path(), false);
+            .mcp_tools(&config.mcp, dir.path(), false);
         drop(first);
         let second = worker
             .laying("")
             .unwrap()
-            .mcp_tools(&config, dir.path(), false);
+            .mcp_tools(&config.mcp, dir.path(), false);
 
         assert_eq!(
             second.len(),

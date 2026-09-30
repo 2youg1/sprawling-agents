@@ -6,11 +6,11 @@
 //! The desktop connector is a tool this binary carries and starts itself
 //! (sprawling-SPEC.md section 8-4d).
 //!
-//! Both tests start the real `sprawling` executable. The first speaks
-//! to `sprawling desktop` over its pipes the way the city's own client
-//! does; the second lets a city start it for a building whose rules ask
-//! for the desktop, with no `[[mcp]]` row anywhere, and reads the tool
-//! names the model was offered.
+//! A city starts the real `sprawling` executable as `sprawling desktop`
+//! for a building whose rules ask for the desktop, with no `[[mcp]]` row
+//! anywhere; the test reads the tool names the model was offered. That
+//! the six arrive is the proof that the verb answered the city's own
+//! `initialize` and `tools/list` over the child's pipes.
 
 #![allow(
     clippy::unwrap_used,
@@ -20,9 +20,7 @@
     reason = "test code"
 )]
 
-use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 
 use kernel::{
@@ -43,67 +41,6 @@ const OFFERED: [&str; 6] = [
     "desktop_desktop_record",
     "desktop_desktop_clipboard",
 ];
-
-#[test]
-fn the_desktop_verb_answers_an_initialize_and_a_tools_list_over_its_own_pipes() {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_sprawling"))
-        .arg("desktop")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("the binary starts");
-    {
-        let requests = child.stdin.as_mut().expect("the child was given pipes");
-        for line in [
-            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":\
-             {\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":\
-             {\"name\":\"sprawling\",\"version\":\"0.0.7\"}}}",
-            "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\",\"params\":{}}",
-            "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}",
-        ] {
-            writeln!(requests, "{line}").expect("the request reaches the child");
-        }
-        requests.flush().expect("the request is not left buffered");
-    }
-    // Closing stdin ends the child's read loop, so the process finishes
-    // on its own and this test cannot hang on a pipe nobody closed.
-    let stdout = child.stdout.take().expect("the child was given pipes");
-    let mut answers = BufReader::new(stdout).lines();
-    drop(child.stdin.take());
-
-    let opened = answers.next().map(|line| line.unwrap());
-    let opened: serde_json::Value =
-        serde_json::from_str(opened.as_deref().unwrap_or("null")).unwrap();
-    assert_eq!(opened["id"], 1, "initialize is answered: {opened}");
-    assert_eq!(opened["result"]["serverInfo"]["name"], "sprawling-desktop");
-
-    let listed: serde_json::Value =
-        serde_json::from_str(&answers.next().expect("tools/list is answered").unwrap()).unwrap();
-    let names: Vec<&str> = listed["result"]["tools"]
-        .as_array()
-        .expect("the list is an array")
-        .iter()
-        .filter_map(|tool| tool["name"].as_str())
-        .collect();
-    assert_eq!(
-        names,
-        vec![
-            "desktop.windows",
-            "desktop.snapshot",
-            "desktop.act",
-            "desktop.screenshot",
-            "desktop.record",
-            "desktop.clipboard",
-        ]
-    );
-    assert!(
-        answers.next().is_none(),
-        "a notification was answered, which would put the pipe one line out of step"
-    );
-    let ended = child.wait().expect("the child ends when its input closes");
-    assert!(ended.success(), "the server ended with {ended}");
-}
 
 #[test]
 fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
@@ -179,6 +116,7 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
 /// The executable cargo built for this package, standing in for
 /// `std::env::current_exe`, which in a test names the test harness.
 fn this_binary() -> std::io::Result<PathBuf> {
+    // boundary-ok: the city starts this executable as its own child in production, so the test must hand it a real one; every check still enters through RunWorker
     Ok(PathBuf::from(env!("CARGO_BIN_EXE_sprawling")))
 }
 

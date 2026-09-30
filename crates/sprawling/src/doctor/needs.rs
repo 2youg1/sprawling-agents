@@ -13,16 +13,16 @@
 use kernel::Address;
 
 use super::family::{GECKO, WEBKIT};
-use super::table::{CHROMEDRIVER, MSEDGEDRIVER, SHELL, SPRAWLING_DESKTOP};
+use super::table::{CHROMEDRIVER, MSEDGEDRIVER, SHELL};
 use super::{Finding, Presence};
 
-/// The bits a building declares. Two live in `RULES.toml`, one in the
+/// The bits a building declares. One lives in `RULES.toml`, one in the
 /// building's frozen `CONFIG.toml`; they are one value here because a
-/// building is judged whole.
+/// building is judged whole. `desktop` is not among them: everything it
+/// needs is in this binary (sprawling-SPEC.md 8-4d).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Bits {
     pub(crate) browser: bool,
-    pub(crate) desktop: bool,
     pub(crate) shell: bool,
 }
 
@@ -30,13 +30,11 @@ pub(crate) struct Bits {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Capability {
     Browser,
-    Desktop,
     Shell,
 }
 
 impl Capability {
-    pub(crate) const ALL: [Capability; 3] =
-        [Capability::Browser, Capability::Desktop, Capability::Shell];
+    pub(crate) const ALL: [Capability; 2] = [Capability::Browser, Capability::Shell];
 
     /// The items of which any one satisfies this capability, first
     /// choice first. The Gecko family leads because it needs no driver;
@@ -45,7 +43,6 @@ impl Capability {
     pub(crate) fn any_of(self) -> &'static [&'static str] {
         match self {
             Capability::Browser => &[GECKO, CHROMEDRIVER, MSEDGEDRIVER, WEBKIT],
-            Capability::Desktop => &[SPRAWLING_DESKTOP],
             Capability::Shell => &[SHELL],
         }
     }
@@ -63,7 +60,6 @@ impl Capability {
     pub(crate) fn declared_as(self) -> &'static str {
         match self {
             Capability::Browser => "browser = true",
-            Capability::Desktop => "desktop = true",
             Capability::Shell => "sandbox.shell = true",
         }
     }
@@ -71,7 +67,6 @@ impl Capability {
     fn asked_by(self, bits: &Bits) -> bool {
         match self {
             Capability::Browser => bits.browser,
-            Capability::Desktop => bits.desktop,
             Capability::Shell => bits.shell,
         }
     }

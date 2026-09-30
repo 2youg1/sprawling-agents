@@ -39,6 +39,11 @@ toml = { workspace = true }
 # (sprawling-SPEC.md 8-93).
 thread-priority = "3.1"
 zeroize = { workspace = true }
+# The desktop server this binary runs as `sprawling desktop`, a child
+# the city starts for a building whose rules ask for the desktop
+# (sprawling-SPEC.md 8-4d). A path to the package outside the
+# workspace, which keeps its own lint table for the Win32 boundary.
+sprawling-desktop = { path = "../../desktop" }
 
 [features]
 # The execution engine, off by default. `AbsentSandbox` refuses tool

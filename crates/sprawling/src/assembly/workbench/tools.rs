@@ -250,11 +250,12 @@ impl Laying {
             &site.rules,
         )?;
         // External tools, for a building whose configuration names a
-        // server. They join the table here, before the catalogue is
-        // rendered, because the tool table is frozen with the run: what
-        // the model is told exists is decided once.
+        // server or whose rules ask for this machine's desktop. They join
+        // the table here, before the catalogue is rendered, because the
+        // tool table is frozen with the run: what the model is told
+        // exists is decided once.
         for server in self.mcp_tools(
-            &site.config,
+            &self.servers(site),
             &site.write_root,
             site.rules.policy().confidential,
         ) {
