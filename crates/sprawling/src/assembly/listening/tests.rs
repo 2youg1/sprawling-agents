@@ -83,6 +83,78 @@ fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
     drop(held);
 }
 
+/// The phases of opening a served city, in the order `listen` does them
+/// (sprawling-SPEC.md 8-121); a city `init` just formed holds three lines.
+const OPENING_PHASES: [&str; 7] = [
+    "bind",
+    "open the ledger",
+    "verify and fold 3 lines",
+    "cut the standing snapshot",
+    "cut the views snapshot",
+    "copy the views",
+    "start the worker",
+];
+
+/// A listening city says in one line, at the effect floor and through the
+/// same sink as every other diagnostic, what each phase of opening it
+/// cost, so the first byte a person waits for can be split by the product
+/// itself rather than inferred from outside.
+#[test]
+fn a_listening_city_says_what_opening_it_cost() {
+    let city = tempfile::tempdir().expect("a temporary directory");
+    crate::assembly::init_city(city.path()).expect("a city forms");
+    let journal = crate::serving::Journal::new(std::sync::Arc::new(crate::assembly::SystemClock));
+    let mut heard = journal.lines().subscribe();
+    let addr = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|probe| probe.local_addr())
+        .expect("a free port");
+    let serving = super::Serving {
+        log: runtime::diagnostics::Diagnostics::new(
+            runtime::diagnostics::Level::Effect,
+            journal.sink(),
+        ),
+        journal,
+        ..serving_at(city.path(), addr)
+    };
+    let executor = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("a runtime");
+
+    let listening = executor
+        .block_on(super::listen(serving))
+        .expect("the city listens");
+
+    let mut opening = Vec::new();
+    while let Ok(line) = heard.try_recv() {
+        if line.level == wire::LogLevel::Effect && line.line.starts_with("opened the city in ") {
+            opening.push(line.line);
+        }
+    }
+    // Where each phase's name falls in the line, so the durations, which
+    // differ on every run, stay out of the comparison.
+    let named_in_order = |line: &str| -> Vec<&'static str> {
+        let mut found: Vec<(usize, &'static str)> = OPENING_PHASES
+            .iter()
+            .filter_map(|phase| line.find(phase).map(|at| (at, *phase)))
+            .collect();
+        found.sort_unstable();
+        found.into_iter().map(|(_, phase)| phase).collect()
+    };
+    assert_eq!(
+        (
+            opening.len(),
+            opening
+                .first()
+                .map(|line| named_in_order(line.as_str()))
+                .unwrap_or_default()
+        ),
+        (1, OPENING_PHASES.to_vec()),
+        "the opening lines heard: {opening:?}"
+    );
+    drop(listening);
+}
+
 fn serving_at(city_root: &std::path::Path, addr: std::net::SocketAddr) -> super::Serving {
     super::Serving {
         city_root: city_root.to_path_buf(),
