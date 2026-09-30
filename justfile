@@ -285,7 +285,7 @@ gates-sources:
 gates-artifacts: build-web
     cargo xtask gates {{artifact_gates}}
 
-# The Lean design models under `adversary/design/`: each proves what the
+# The Lean design models under `tools/adversary/design/`: each proves what the
 # Rust module it names must hold (the formal-models rule in AGENTS.md).
 # `lakefile.toml` sets `warningAsError`, so a `sorry` or an `admit`, which
 # Lean reports as a warning, fails the build; an `axiom` raises no warning
@@ -296,17 +296,17 @@ gates-artifacts: build-web
 #
 # Without Lean this recipe prints nothing and succeeds, so `just check` on
 # a machine without Lean reads byte for byte as it does where
-# `adversary/` is absent; CI's `models` job asks `lake --version` first,
+# `tools/adversary/` is absent; CI's `models` job asks `lake --version` first,
 # so there the skip cannot happen.
 models:
     #!/usr/bin/env bash
     set -euo pipefail
-    command -v lake >/dev/null 2>&1 && [ -d adversary/design ] || exit 0
-    if grep -nE '^[[:space:]]*(private[[:space:]]+)?axiom[[:space:]]' adversary/design/*.lean; then
+    command -v lake >/dev/null 2>&1 && [ -d tools/adversary/design ] || exit 0
+    if grep -nE '^[[:space:]]*(private[[:space:]]+)?axiom[[:space:]]' tools/adversary/design/*.lean; then
         echo "models: an axiom above is a proof obligation nobody discharged; prove it as a theorem"
         exit 1
     fi
-    cd adversary && lake build Design
+    cd tools/adversary && lake build Design
 
 # Every commit subject and ruling trailer in a range of history
 # (xtask-SPEC.md section 8-35). Not in `check`, because a tree has no
@@ -411,10 +411,10 @@ api-baseline:
 
 # Requires cargo-fuzz + nightly; `nightly.yml` runs the smoke batch.
 fuzz target:
-    cargo fuzz run {{target}} --fuzz-dir fuzz
+    cargo fuzz run {{target}} --fuzz-dir tools/fuzz
 
 # Requires cargo-mutants. The threshold lives in
-# xtask/budgets.toml; it is enforced here rather than in `just check` because a
+# tools/xtask/budgets.toml; it is enforced here rather than in `just check` because a
 # full mutation run is minutes, and a gate nobody waits for is a gate nobody runs.
 mutants:
     cargo mutants --package sprawling-kernel --minimum-test-timeout 60 --error-value 'kernel::AxError::failure(kernel::AxCode::InvalidArgs, "mutant", "mutant")'
@@ -491,9 +491,9 @@ mem *args:
     {{ if args =~ '^[0-9]+$' { "true" } else { "cargo build --release -p sprawling --locked" } }}
     cargo xtask mem {{args}}
 
-# The adversarial property checker in `adversary/`, which lives outside the
+# The adversarial property checker in `tools/adversary/`, which lives outside the
 # workspace, outside the release, and outside `just check`
-# (adversary/adversary-SPEC.md section 2). It is never a gate: on a machine with
+# (tools/adversary/adversary-SPEC.md section 2). It is never a gate: on a machine with
 # no Lean toolchain this prints one line and succeeds, so `just check` behaves
 # exactly as it does where the directory is absent.
 #
@@ -515,7 +515,7 @@ adversary *args:
     # nothing outside that shell resolves; `cygpath -m` turns it back into
     # `C:/...` and is absent everywhere it is not needed.
     ! command -v cygpath >/dev/null 2>&1 || binary="$(cygpath -m "$binary")"
-    cd adversary && SPRAWLING_BIN="$binary" lake exe adversary {{args}}
+    cd tools/adversary && SPRAWLING_BIN="$binary" lake exe adversary {{args}}
 
 # The acceptance gate for a real endpoint (never a gate in `just
 # check`; without credentials it prints one line and succeeds).

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The relayout probe (xtask/budgets.toml `stream_relayout`): what one
+// The relayout probe (tools/xtask/budgets.toml `stream_relayout`): what one
 // streamed token costs the page in script plus forced layout, for the
 // raw shape a live turn used to draw and the block shape
 // `talk/saying.svelte` draws now, and how far the turn jumps when the

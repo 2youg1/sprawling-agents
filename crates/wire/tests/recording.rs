@@ -9,7 +9,7 @@
 //! Driven in process through `tower::ServiceExt::oneshot`, for the same
 //! reason the enrolment route is: this is a white-box check of the
 //! router, and a check that raised the product's server and wrote HTTP
-//! by hand would be standing outside, which is `adversary/`'s ground
+//! by hand would be standing outside, which is `tools/adversary/`'s ground
 //! (`xtask boundary`).
 
 #![cfg(feature = "server")]

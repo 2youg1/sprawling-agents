@@ -4,7 +4,7 @@
 >
 > It does not tell you how to install anything ([`getting-started.md`](getting-started.md)), how to run work day to day ([`operating.md`](operating.md)), or why the code has the shape it has ([`../ARCHITECTURE.md`](../ARCHITECTURE.md)).
 >
-> **This file says which word to use. Which words to avoid has its own single authority** — `xtask/lexicon.toml`, consumed directly by the `lexicon` gate in CI. Read that file to check whether a phrasing is retired; keeping the list in one place is what stops a second authority from forming.
+> **This file says which word to use. Which words to avoid has its own single authority** — `tools/xtask/lexicon.toml`, consumed directly by the `lexicon` gate in CI. Read that file to check whether a phrasing is retired; keeping the list in one place is what stops a second authority from forming.
 
 ## How the pieces explain each other
 

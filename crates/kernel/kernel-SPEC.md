@@ -281,7 +281,7 @@ impl Address {
 - 同一性按字节：`Eq`、`Ord` 与 `is_within` 在所有平台上逐字节比较，大小写不同的两个地址因而是两个地址；`is_within` 自反（`a.is_within(a)`）。**只有 `is_reserved` 折叠 ASCII 大小写**，因为它是一道只允许多拒的门，而它守的目录名在文件系统那边是大小写不敏感的（8-55）。
 - 符号链接 canonicalize 属效果面（write_domain 的适配层）；本原语只对已规范化相对路径作证。
 - 解析拒绝的 AxError：`action="parse address"`、`subject=原串`、recovery 指出违规成分与合法形态。
-- 判例表只有一份：`fixtures/address.jsonl`，每行一个拼写与它的判决（`accepted`／`refused`，拒绝行附所违规则）。`Address::parse` 的测试、`schema` 给客户端的 `ADDRESS_PATTERN`、客户端 `address.test.ts` 对生成出的 schema，三个读者读同一个文件；表放在两种语言之外，是因为放在任何一边都会让另一边抄一份，而抄本的条数会各自漂移。
+- 判例表只有一份：`tools/fixtures/address.jsonl`，每行一个拼写与它的判决（`accepted`／`refused`，拒绝行附所违规则）。`Address::parse` 的测试、`schema` 给客户端的 `ADDRESS_PATTERN`、客户端 `address.test.ts` 对生成出的 schema，三个读者读同一个文件；表放在两种语言之外，是因为放在任何一边都会让另一边抄一份，而抄本的条数会各自漂移。
 
 **读界**（city-SPEC §8-2 confidential 的第四条；形状 1 判定）：
 
@@ -595,7 +595,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 1. **字节不动。** 字段名即旧写方用的键；旧写方省略的键写 `skip_serializing_if`，
    旧写方无条件写出的键（含空数组）无条件写出。键序由 `serde_json` 的 BTreeMap 定，
    与此处声明序无关。每族一组逐字节对拍测试守住这条。
-2. **读宽写严。** 旧构建可能不写的字段一律 `#[serde(default)]`——`fixtures/golden-s1`
+2. **读宽写严。** 旧构建可能不写的字段一律 `#[serde(default)]`——`tools/fixtures/golden-s1`
    里就有一条 `data` 为 `{}` 的 `run_started`；未知键忽略而不拒。
 3. **值保留 kernel 类型。** run 是 `RunId` 而非 `String`，job 是 `Locator`；
    手写 `Serialize` 的类型挂 `schemars(with = "String")` 说明其 wire 形状。
@@ -917,7 +917,7 @@ pub struct BudgetUse { pub usd: UsdMicros, pub tokens: Tokens }    // serde（Pr
 
 - **理由是刹车只留一个**：`Halt` 停一个范围并终止该范围内的后台成员（`runtime::backlog::halt` 是承兑点）。一座必须停下的城由人说停，而不是由一个没人能在事前算准的上限替他说停。
 - **留下的是记账而不是闸**：`BudgetUse` 与 `storage::attribution` 的五路归因、成本页原样保留。**报告花了多少**与**事前不许花**是两件事，kernel 只做前者。
-- **不在此列**：`xtask/budgets.toml`（门的价目册，同名异物）与 `Fuel`（wasm 客的停机保证）。
+- **不在此列**：`tools/xtask/budgets.toml`（门的价目册，同名异物）与 `Fuel`（wasm 客的停机保证）。
 - `BudgetUse` 保留 serde，因为它是 `Progress::Unplanned` 与 `Completion::Evidence` 的载荷字段，账本里已有历史行读得回去。
 - kani：`admit_spend` 的 harness 随函数删除；`crates/kernel` 的 harness 总数与 CI 所证条数因此各少一条，被证的 `budget` 一条随函数一起消失（ARCHITECTURE §11 的数字同集更新）。**这里记的是那次变更当时的读数，不是今天的基数**；今天树上有几条、CI 证哪几条，以 `cargo xtask proof --list` 为准。
 
@@ -1877,7 +1877,7 @@ fn call_speculating(&mut self, req: &ModelRequest, onto: Increments<'_>, early: 
 
 **它与 `Increments` 分开，因为它是要据以执行的。** 增量只供人看，谁都不得据它分支；提前交出的调用恰恰要据以启动工具。并进同一个 sink 就是让「看的东西」变成「决定的东西」。
 
-**提前交出的调用不是历史。** 账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，这扇门返回失败，调用方把据提前交出的调用得出的结果一并丢弃。调用方能据它做什么由 `adversary/design/Speculating.lean` 定：只提前启动排在第一个写调用之前的只读调用，结果按调用位置缓存，结算后按发出顺序记账。
+**提前交出的调用不是历史。** 账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，这扇门返回失败，调用方把据提前交出的调用得出的结果一并丢弃。调用方能据它做什么由 `tools/adversary/design/Speculating.lean` 定：只提前启动排在第一个写调用之前的只读调用，结果按调用位置缓存，结算后按发出顺序记账。
 
 **默认实现落回 `call_streaming`、什么也不提前交出。** 这对没有流、或其兼容格式在结算前说不出一个调用何时完整的适配器是诚实的：调用方只是没有提前量，拿到的 `ModelReturn` 不变。落选的是给 `call_streaming` 加第三个参数：那会让每个适配器与每个调用点都改签名，而只有一个兼容格式说得出块何时结束。
 

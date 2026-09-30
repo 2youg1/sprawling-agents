@@ -9,7 +9,7 @@
 #
 #   fast      fmt of both trees, the gates that read sources, the commit
 #             messages; compiles only xtask, so it answers first
-#   models    the Lean design models under `adversary/design/`
+#   models    the Lean design models under `tools/adversary/design/`
 #   clippy    the zero-warning build of every target and feature, and the
 #             feature combinations `just features` runs
 #   test      the suite
@@ -91,8 +91,8 @@ jobs:
           filters: |
             proof:
               - 'crates/kernel/**'
-              - 'xtask/src/proof.rs'
-              - 'xtask/src/proof/**'
+              - 'tools/xtask/src/proof.rs'
+              - 'tools/xtask/src/proof/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/kani-version.txt'
 
@@ -153,7 +153,7 @@ jobs:
           echo "judging $range"
           just commits "$range"
 
-  # The Lean design models. The checker in `adversary/` is not built here:
+  # The Lean design models. The checker in `tools/adversary/` is not built here:
   # it attacks the binary from outside and stays out of every required
   # check (`adversary.yml` runs it nightly).
   models:
@@ -367,6 +367,6 @@ jobs:
         run: cargo kani --version
       # `cargo xtask proof`, which is the whole of `just proof`, spelled
       # out because the `proof` gate reads this job for exactly that
-      # command (xtask/src/proof.rs).
+      # command (tools/xtask/src/proof.rs).
       - name: the proofs
         run: cargo xtask proof

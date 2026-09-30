@@ -246,7 +246,7 @@ fn two_jobs_at_one_millisecond_get_two_run_ids() {
     );
 }
 
-/// The instrument `xtask/budgets.toml [prepare_dispatch_ms]` names.
+/// The instrument `tools/xtask/budgets.toml [prepare_dispatch_ms]` names.
 ///
 /// It pins that the reading is taken and said out loud, not what the
 /// reading is: a wall-clock figure belongs to the machine that ran it,

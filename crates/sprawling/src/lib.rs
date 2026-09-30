@@ -16,7 +16,7 @@
 //! `pub` so that `bin::assembly` keeps the name ARCHITECTURE.md section
 //! 12 gives it; the items inside stay `pub(crate)` unless the binary or
 //! an integration test enters through them, and `cargo xtask apisync`
-//! holds the result against `xtask/api-baselines/sprawling.txt`.
+//! holds the result against `tools/xtask/api-baselines/sprawling.txt`.
 
 pub mod assembly;
 pub mod console;

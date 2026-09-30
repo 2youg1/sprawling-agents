@@ -93,7 +93,7 @@ every week.
 | Inbound WebSocket | `axum` with its `ws` feature (`crates/wire/Cargo.toml`) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (wire-SPEC section 8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
-| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `xtask/src/npm.rs`: Svelte, Effect and the `@lezer` highlighters, and no framework runtime beyond them. Svelte compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
+| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `tools/xtask/src/npm.rs`: Svelte, Effect and the `@lezer` highlighters, and no framework runtime beyond them. Svelte compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
@@ -491,7 +491,7 @@ the part worth knowing before starting, not after.
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a file with no entry, and an entry whose file is gone |
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
 | the page | `client/` + client-SPEC | its own lint, typecheck and tests; the bundle is measured against a byte budget |
-| a gate itself | `xtask/` + xtask-SPEC | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
+| a gate itself | `tools/xtask/` + xtask-SPEC | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
 
 Two documents sit beside this one rather than inside it: operating a
 city — swapping a provider, pointing at another MCP server, running a
@@ -604,16 +604,16 @@ do not overlap: overlapping verification reads as more coverage than it is.
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
 | V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2579<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md section 8.6) |
-| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `fuzz/fuzz_targets` |
+| V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
 | V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->8<!-- xtask:end --> scenario files, failures replayed from their script |
 | V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |
-| V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `fixtures/` |
+| V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `tools/fixtures/` |
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |
-| V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
+| V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `tools/adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
 
 **V10 is not a gate, and the difference is load-bearing.** §1 says the wire
-is the whole API and that a second client writes against it; `adversary/`
+is the whole API and that a second client writes against it; `tools/adversary/`
 exercises that permission by writing a third one outside the workspace, in
 another language, to attack rather than to use. It is reached by
 `just adversary` and by a schedule, never by `just check` — on a machine
@@ -623,7 +623,7 @@ What it buys that V2 cannot is quantification over traces: V2 proves that
 the paths we thought of hold, and V10 asks whether the door's stable error
 codes survive any prefix, one halt, and any suffix. What it has found, and
 what each finding cost to fix, is recorded in
-`adversary/adversary-SPEC.md` section 4 — beside the mechanism rather than
+`tools/adversary/adversary-SPEC.md` section 4 — beside the mechanism rather than
 here, so that retiring the mechanism retires its record.
 
 **Four gaps, named rather than hidden.** V9 needs a real city served by a
@@ -651,7 +651,7 @@ Sizes are gated because a byte count does not depend on how busy the
 machine was. Wall-clock figures are measured, reported with the machine
 that produced them, and never gated: a slow runner is not a defect, and a
 gate that says it is teaches people to ignore gates. **The full register is
-`xtask/budgets.toml`**, which is the authority; `cargo xtask budget` prints
+`tools/xtask/budgets.toml`**, which is the authority; `cargo xtask budget` prints
 it, and the readings below are written here by `cargo xtask docnum` rather
 than typed.
 
@@ -665,7 +665,7 @@ than typed.
 | Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_ms -->1<!-- xtask:end --> ms | `[prefix_assembly]`, with its machine class | no |
 | Runs driving at once | `DRIVING_LANES` in `bin::assembly::pool` | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
 | Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
-| Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
+| Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `tools/xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
 
 The four load scenarios — multi-run parallel, large-ledger fold,
 large-worktree placement, and long-session streaming forward — are re-measured
@@ -673,13 +673,13 @@ by `just bench`, one reading line per scenario and sub-metric, every line
 carrying its machine class. Multi-run parallel is read by
 `instrument_relay_round_trip`, which drives the accounting loop the city runs
 (sprawling-SPEC.md 8-84); its readings and their machine class sit in
-`xtask/budgets.toml` `[relay_round_trip]`. The other three are
+`tools/xtask/budgets.toml` `[relay_round_trip]`. The other three are
 citysim's bench scenarios. The large-ledger fold has a register row, quoted
 below; the large-worktree placement and long-session forwarding readings are
 printed by `just bench` and have no register row, so no figure for them is
 quoted here. The two
 latency tiers and the ratchet that governs these readings live in
-`xtask/budgets.toml` `[local_latency]`; a reading under the registered load
+`tools/xtask/budgets.toml` `[local_latency]`; a reading under the registered load
 only goes down.
 
 | Load scenario, sub-metric | Baseline (p50 / p95 / p99) | Machine class |
@@ -943,7 +943,7 @@ sequenceDiagram
 `crates/runtime/src/turn/wave.rs` (`ConcurrentInvoke`),
 `crates/runtime/src/run/checkpoint.rs`, `crates/storage/src/checkpoint.rs`;
 what may start early and in which order results reach the Ledger is
-`adversary/design/Speculating.lean`.
+`tools/adversary/design/Speculating.lean`.
 
 ### 13.7 A run's life
 

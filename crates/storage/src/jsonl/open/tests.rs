@@ -123,7 +123,7 @@ fn higher_version_fixture_is_refused_with_direction_and_path() {
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")
-        .join("fixtures")
+        .join("tools/fixtures")
         .join("ledger-v2");
     let segment = "ledger-00000000000000000000.jsonl";
     let before = fs::read(fixture.join(segment)).unwrap();

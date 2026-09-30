@@ -8,7 +8,7 @@
 
 - `client/` 在 cargo workspace **之外**，由 bun 驱动；产物落工作区根下的 `target/web-dist/`，不随 `CARGO_TARGET_DIR` 移动（`index.html` 在该目录根，其余在 `assets/`），`crates/sprawling/build.rs` 递归嵌入该目录，并以 `index.html` 与 `assets/` 的存在判「完整」。
 - **两种范式不叠**：Effect 只做一件事——用生成的 `Schema` 读帧（`core/frames.ts`；`event` 与 `delta` 两种热帧先走由同一份 schema 导出的窄校验，见 4-6）。socket 阶梯、asking、belief 都是纯 TS 状态机加 `svelte/store`，视图只见 Svelte。
-- 运行时依赖的名单只有一个家：`xtask/src/npm.rs` 的 `RUNTIME`，本文件不抄它的条目与数目。名单上除了 `svelte` 与 `effect`，还有 `@lezer/highlight` 与各语言的 `@lezer` 语法，因为代码视图按语法上色，而高亮器与每种语法都是按需加载的分块（4-26），不进首屏。hash 路由手写，不引路由库；不引 UI kit（§7 判定）。`xtask npm` 门守三件事：锁文件与清单逐条同、运行时依赖恰为 `RUNTIME`、许可证在 `deny.toml` 的清单上。
+- 运行时依赖的名单只有一个家：`tools/xtask/src/npm.rs` 的 `RUNTIME`，本文件不抄它的条目与数目。名单上除了 `svelte` 与 `effect`，还有 `@lezer/highlight` 与各语言的 `@lezer` 语法，因为代码视图按语法上色，而高亮器与每种语法都是按需加载的分块（4-26），不进首屏。hash 路由手写，不引路由库；不引 UI kit（§7 判定）。`xtask npm` 门守三件事：锁文件与清单逐条同、运行时依赖恰为 `RUNTIME`、许可证在 `deny.toml` 的清单上。
 - Firefox 是第一浏览器：每个屏幕先在 Firefox 里验收。
 - `trustedDependencies` 留空：bun 默认不跑生命周期脚本，任何包的 postinstall 都不执行。
 
@@ -93,7 +93,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **4-3 hash 路由，不用 path 路由。** 片段不发给服务端，书签、后退、深链成立，且不动 `ClientAssets::lookup` 那道安全判定。
 - **4-4 身份值只由生成的 `Schema` 产出，`as` 全库禁用。** `Address` 与 `RunId` 是 `wire.ts` 里带 pattern 的 brand，判合法只有一条路：`Schema.decodeOption`，非法值答 `None`，与 Rust 的 `Result` 同形（`core/run_id.ts` 是 run id 那条判定的唯一家）。`as` 全库禁用（`as const` 除外），所以「新类型」只能由构造器产出；`make` 是 brand 的构造器，供本文已经写对的字面量用（`MAYOR` 与夹具），它不查 pattern。
 - **4-5 eslint 配置用 ESLint 自己的 `defineConfig()`，三条补充各有一个原因。** eslint-plugin-svelte 在 `defineConfig` 里定型通过，所以不需要 typescript-eslint 的 `tseslint.config` 定型桥。补充一：typescript-eslint 的 `eslint-recommended` 块（以类型检查器代管 `no-undef`／`no-unused-vars`）扩到 `**/*.svelte`——Svelte 的 script 就是 TS，在那里手写禁用是同一规则的第二个家。补充二：模板表达式无处写类型，`settings.svelte.ignoreWarnings` 只在模板里静默 `no-unsafe-assignment`／`no-unsafe-member-access`，script 里的同一规则照报。补充三：被 lint 的每个文件都必须在 tsconfig 工程里，故 `svelte.config.ts` 取 `.ts` 而非 `.js` 并进 `include`；`.svelte-check/`（svelte-check 写盘的生成物）进 `ignores` 与 `.gitignore`。否决「把配置文件排除在 typecheck 与 lint 之外」：那会让全库唯一不受 `as` 禁令保护的文件恰好是定义禁令的文件。
-- **4-6 Effect 只做 wire 解码。** `core/frames.ts` 用生成的 `Schema` 读每一帧（`Schema.decodeUnknownEither(ServerFrame)`），这是 Effect 在运行时唯一出现的地方。热帧例外：`event` 帧（每条 ledger 记录一帧）与 `delta` 帧（每个 token 一帧）先走 `JSON.parse` 加窄校验，窄校验的每条规则都取自生成的 schema——事件种类集合取自 `EventKind` 的字面量，`RunId`／`B3Hash`／`Address` 直接调各自 refinement 的 filter；窄校验不收的帧仍交给 Effect，所以它只能让帧变快，不能放进 schema 拒绝的帧。理由：完整 Effect 解码的开销大半在解析器机器本身，event 帧一帧要 16–28 µs，热路径 2–4 µs（`client/scripts/frame_cost.ts` 交错测两条路径的下限，读数记在 `xtask/budgets.toml` 的 `client_frame_decode` 行）。这个读数不是测试：墙钟读数属于机器，一台满载的机器不是缺陷，`frames.test.ts` 只判热路径与 schema 读出同样的帧、拒绝同样的帧。理由：`Link` 是一个纯状态机，用 Stream／Fiber 包它买不到任何东西，却让每个视图多一层范式。
+- **4-6 Effect 只做 wire 解码。** `core/frames.ts` 用生成的 `Schema` 读每一帧（`Schema.decodeUnknownEither(ServerFrame)`），这是 Effect 在运行时唯一出现的地方。热帧例外：`event` 帧（每条 ledger 记录一帧）与 `delta` 帧（每个 token 一帧）先走 `JSON.parse` 加窄校验，窄校验的每条规则都取自生成的 schema——事件种类集合取自 `EventKind` 的字面量，`RunId`／`B3Hash`／`Address` 直接调各自 refinement 的 filter；窄校验不收的帧仍交给 Effect，所以它只能让帧变快，不能放进 schema 拒绝的帧。理由：完整 Effect 解码的开销大半在解析器机器本身，event 帧一帧要 16–28 µs，热路径 2–4 µs（`client/scripts/frame_cost.ts` 交错测两条路径的下限，读数记在 `tools/xtask/budgets.toml` 的 `client_frame_decode` 行）。这个读数不是测试：墙钟读数属于机器，一台满载的机器不是缺陷，`frames.test.ts` 只判热路径与 schema 读出同样的帧、拒绝同样的帧。理由：`Link` 是一个纯状态机，用 Stream／Fiber 包它买不到任何东西，却让每个视图多一层范式。
 - **4-7 首屏即对话。** `#/` ＝ 与 `hall/mayor` 的对话；同一房间的每次 dispatch 是一段线程；live 时 Enter 是 `steer`，冻结后 Enter 是新的 `dispatch { addr: room, session: null }`（`room_for` 对含 `/` 的地址不再开子房间）。等人的事以卡片插进对话流，不另开一页。
 - **4-8 按钮全在左栏。** `views/rail.svelte` 收起时只有字形，展开（hover／`[`／`?`）才出现名字与快捷键——`g m`／`g c`／`g s`／`g w`／`g r`／`g $`、Ctrl-K。页面其余部分没有按钮。
 - **4-9 两层可视化。** `#/city` 是 SVG 画的城；`#/building/<addr>` 是目录树（`Query::Listing` 逐层）＋文件原文（`Query::Document`）＋计划表＋提交列表；`#/run/<id>` 四透镜。
@@ -138,7 +138,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 
 **宽度按内容种类分档，不按页面封顶。** `setup/groups.ts` 的 `WIDTH` 是这张表的唯一权威：`accounts`、`tools`、`skills` 是 `page`（表与卡片网格），其余七组是 `measure`（段落与分段控件）。**账户组有两个例外，两个都是内容种类给的**：供应商表单占 `talk`（760）而不是 `measure`，因为那里贴的是 base URL 与密钥、常常六十多字符，520 会把它们截断；`等价的 config.toml` 在 `@wide/page:`（≥1120）下挪到表单右侧的 `w-tree` 列，因为校对材料该在被校对的东西旁边，窄容器下它回到正文之后。**一个名字隔阱记在 `theme.css` 里**：`max-w-wide` 取的是间距档 `--spacing-wide`（24 px）而不是 `--container-wide`（1120），页面上任何 `max-w-wide` 都会把整列压成 24 px；能安全指名的只有 `page`、`measure`、`talk`。
-- **4-37 字栈不指名任何 CJK 面，也不随包发一个。** 汉字落到这台设备自己有的面上，因为那正是引擎对一个指名面都没有的字形会做的事，而平台自己的选择是唯一按本项目能接受的条件拿得到的一个。**两条条件各自单独就足以定下来**：许可上，这条字栈只能指名客户端可以再分发的面（`fonts/OFL.txt`、`docs/third-party.md` 第 4 节），而 Windows 与 macOS 上人真正有的中文面是它们厂商的；尺寸上，一个值得指名的面按厂商原样是 17,773,244 B、过 `gzip -9` 是 11,266,972 B，是 `xtask/budgets.toml` 给整个前端产物那一档（`frontend_artifact`）的数倍。**代价很小**：回退面的基线与 x-height 与随包面不同，而这只在一行里同时出现拉丁字与汉字时看得出来；指名一个 CJK 面并不能取消这件事——它只会让结果取决于那台机器恰好装了哪些字体。**中文的尺寸与行高照旧另计**（`theme.css` 的 `:root:lang(zh)`）：注释步不再减 1 px、行高 1.6、字距归零——那三条说的是同一个字号下汉字比拉丁字密得多，与用哪个面无关。
+- **4-37 字栈不指名任何 CJK 面，也不随包发一个。** 汉字落到这台设备自己有的面上，因为那正是引擎对一个指名面都没有的字形会做的事，而平台自己的选择是唯一按本项目能接受的条件拿得到的一个。**两条条件各自单独就足以定下来**：许可上，这条字栈只能指名客户端可以再分发的面（`fonts/OFL.txt`、`docs/third-party.md` 第 4 节），而 Windows 与 macOS 上人真正有的中文面是它们厂商的；尺寸上，一个值得指名的面按厂商原样是 17,773,244 B、过 `gzip -9` 是 11,266,972 B，是 `tools/xtask/budgets.toml` 给整个前端产物那一档（`frontend_artifact`）的数倍。**代价很小**：回退面的基线与 x-height 与随包面不同，而这只在一行里同时出现拉丁字与汉字时看得出来；指名一个 CJK 面并不能取消这件事——它只会让结果取决于那台机器恰好装了哪些字体。**中文的尺寸与行高照旧另计**（`theme.css` 的 `:root:lang(zh)`）：注释步不再减 1 px、行高 1.6、字距归零——那三条说的是同一个字号下汉字比拉丁字密得多，与用哪个面无关。
 - **4-39 「用我的编辑器打开」只列厂商自己的文档或源码读得懂 `文件:行` 链接的编辑器，编辑器与城的文件夹由这个浏览器保管。** 猜来的协议会静默失败——浏览器去找一个没人装的程序，或者把文件开在第一行——所以每一项都要有出处。VS Code 的 <https://code.visualstudio.com/docs/configure/command-line>（“Opening VS Code with URLs”一节）写明 `vscode://file/{full path to file}:line:column`，并写明 Insiders 版的前缀是 `vscode-insiders://`。这个处理器在 VS Code 源码 `src/vs/code/electron-main/app.ts` 的 `getWindowOpenableFromProtocolUrl` 里，按 URL 的 authority 是 `file` 来认，协议名是构建在 `product.json` 的 `urlProtocol` 里注册的那个；所以继承它的构建用同一形状、换自己的协议名：VSCodium 的 `prepare_vscode.sh` 把 `urlProtocol` 设为 `vscodium`；Cursor 的工作人员在论坛帖 <https://forum.cursor.com/t/remote-uri-opens-a-new-window-every-time/166093> 里称本地的 `cursor://file/...` 链接照常工作；Windsurf 没有公开这一处的文档，它注册 `windsurf` 协议，LocatorJS 等工具按同一形状生成 `windsurf://file/...:行:列`；这是七项里出处最弱的一项，一旦证明它不按这个形状打开就删掉。Zed 的文档（<https://zed.dev/docs/reference/cli>）只写了命令行的 `文件:行`，读 `zed://file` 的是源码 `crates/zed/src/zed/open_listener.rs`：去掉 `zed://file` 前缀、解码后按 `路径:行:列` 打开。**Zed 在 Windows 上要换一种写法**：去掉前缀后剩下 `/C:/...`，Windows 拒收这个名字（os error 123）；`//?/C:/...` 是同一路径的设备形式，Zed 能打开，其中 `?` 写成 `%3F`，免得浏览器把它读成查询串。这一条在 Windows 上的 Zed Preview 1.22 实测过。JetBrains 系不列：`idea://open?file=` 这类协议只在 macOS 上注册，Toolbox 的 `jetbrains://<工具>/navigate/reference` 要项目名而不是路径；Sublime Text 没有自带协议。哪天这些编辑器自己支持「文件:行」链接，在 `EDITORS` 加一项、在这里补上出处。选择控件是原生下拉列表而不是分段控件：七个选项放不进设置卡片里一条等宽的轨道。**保管在浏览器而不是城的 `config.toml`**：装了哪个编辑器、城在那台机器的哪个文件夹，是浏览器所在机器的事实，同一座城从另一台机器打开时这两个值不同；而线协议不带任何机器上的绝对路径（`wire.ts` 里 `Address` 之外不传路径）。代价是人要在设置里填一次城的文件夹。重开参数：线协议给页面城在浏览器所在机器上的根路径时，`cityFolder` 改读它并删掉这一行存储。**只有城里的路径得到链接，而这条判断是字面的**：路径按生成的 `Address` 语法判，文件夹须是绝对路径、不是 UNC 共享（`//host/share` 的主机不是文件夹，当成文件夹会把链接指到另一个文件）、不含 `.` 与 `..`；磁盘上指向城外的符号链接不跟随，因为浏览器看不到磁盘，城也不启动任何东西。
 - **4-40 重连按水位续传，差距大才整页重问。** `socket.ts` 记下本页折过的最大 `seq`（全城水位）。welcome 的 `resume_from` 是服务端账本头的 `seq`：水位已知、头在水位之后、差距不超过 `RESUME_PAGES × GAP_PAGE`（两页，400 条）时，缺口 `水位+1..头` 排进 `gaps`，走 `HistoryRange` 逐页补拉，补回的每条记录经 `asking.invalidate` 只失效它影响的答案，`asking.resumed()` 只重发断线时在途的问题；水位未知、`resume_from` 缺席或差距超过两页时回退到快照，即 `asking.reconnected()` 把每个答案标旧重问。阈值两页（`RESUME_PAGES`）是估计，不是读数：两页以内补拉的字节估计少于把一页上所有被看着的问题重问一遍，超过两页时一次快照估计比逐页补拉更快到达当前状态。能定下它的读数是同一座城上一次快照重问的字节数与一页 `HistoryRange` 的字节数之比（§3-4）。welcome 的 `epoch`（创世记录的链哈希）与本页上次见到的不同时，水位属于另一份账本：`belief.forget()` 丢弃全部折叠、水位与缺口清空，再按快照重问，因为旧水位在新账本里指向的是别的记录。
 
@@ -180,7 +180,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `appearance.ts` | 2 值 | `Appearance { lighting, sans, mono, sansStack, monoStack, body, density, chroma, motion }` 与各项的词表（`LIGHTINGS`、`FACES`、`DENSITIES`、`CHROMAS`、`MOTIONS`，按选择器画出的顺序）、`STACK_SHAPE`：一条外观记录怎样才算合法；`prefs.ts` 负责存取，`prefs_city.ts` 负责带到城 |
 | `sizing.ts` | 1 判定 | `BODY_PX`、`sizingOf(text) -> Sizing`（`cleared` \| `sized { px }` \| `refused`）：人写进字号框的一串字读成什么；偏好的读取与外观组共用这一处。 |
 | `editor.ts` | 1 判定 | `Editor = "none" \| "vscode" \| "vscode-insiders" \| "vscodium" \| "cursor" \| "windsurf" \| "zed"`、`EDITORS`、`editorLink(Opening { editor, folder, path, line }) -> string \| null`：「在我的编辑器里打开 文件:行」的唯一拼法，各编辑器的链接前缀由同文件的 `fileUrl` 给出（4-39），监视器的改动块拿它当 `href`，由浏览器把链接交给浏览器所在机器上注册了该协议的编辑器，服务端不启动任何程序。`path` 用生成的 `Address` 判（城内相对路径，无 `..`、无盘符、无反斜杠），`folder` 须是绝对路径且无 `.`／`..` 段，`line` 须是正整数；任何一条不成立答 `null`，页面不画这个链接。编辑器与城在浏览器所在机器上的文件夹由 `prefs.ts` 的 `editor()` 与 `setEditor` 保管 |
-| `results.ts` | 1 判定 | `Showing = whole \| results`、`drawsCalls(showing)`（房间在 `results` 下不挂载 `calls.svelte` 与推理折叠）、`Outcome = waiting \| failed \| done \| ended`、`outcomeOf(run)`、`resultsOf(runs, first) -> Group { outcome, first, total }[]`（一遍分四类，每类按 `started` 新到旧只留前 `first` 条，`FIRST = 5`）；`bandsOf(runs, now) -> Band { recency, runs }[]`（城在 `results` 下按时间读：新到旧，切成最近十分钟、这一小时、更早三段，空段不画；没有 `started` 的 run 落在「更早」末尾）；`producedOf(files) -> Produced { files, added, removed }`（房间在 `results` 下结局分隔线之下的产出一行：改了几个文件、共加减几行；二进制文件计入文件数、不计行数，因为 `Lines::binary` 没有行数可加）；只看结果模式「画什么」的唯一判定处。200 个 run 的夹具城分类耗时由 `results.test.ts` 判定并打印 `city_results` 行，登记于 `xtask/budgets.toml` |
+| `results.ts` | 1 判定 | `Showing = whole \| results`、`drawsCalls(showing)`（房间在 `results` 下不挂载 `calls.svelte` 与推理折叠）、`Outcome = waiting \| failed \| done \| ended`、`outcomeOf(run)`、`resultsOf(runs, first) -> Group { outcome, first, total }[]`（一遍分四类，每类按 `started` 新到旧只留前 `first` 条，`FIRST = 5`）；`bandsOf(runs, now) -> Band { recency, runs }[]`（城在 `results` 下按时间读：新到旧，切成最近十分钟、这一小时、更早三段，空段不画；没有 `started` 的 run 落在「更早」末尾）；`producedOf(files) -> Produced { files, added, removed }`（房间在 `results` 下结局分隔线之下的产出一行：改了几个文件、共加减几行；二进制文件计入文件数、不计行数，因为 `Lines::binary` 没有行数可加）；只看结果模式「画什么」的唯一判定处。200 个 run 的夹具城分类耗时由 `results.test.ts` 判定并打印 `city_results` 行，登记于 `tools/xtask/budgets.toml` |
 | `prose.ts` | 1 判定 | `blocks(text) -> Block[]`, `inline(text) -> Inline[]`：Markdown 读成数据，永不 innerHTML；`closedUpTo(text) -> number`：流式文字里已经闭合、可以按块画出的前缀长度 |
 | `route.ts` | 1 判定 | 见 §3-2 |
 | `lang.ts` | 6 数据 | 见 §3-1 |
@@ -221,7 +221,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 > **这是规格，不是描述。** 表里写的是部件欠使用者什么；今天的代码欠而未还的十二处，逐条点名在 7-8。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
 
-**判定：不引入任何 UI 库依赖。** `xtask/src/npm.rs:64` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表列出的 `effect`、`svelte` 与画代码颜色的 `@lezer` 高亮器（它不是控件，见 4-26），要加一个组件库就得先改那一行，而**一道专为阻止依赖蔓延而设的闸，第一次例外就是它失效的开始**。理由不是保守：`parts/dialog.svelte` 已经把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，四件都是平台承担的，见设计 4-20），`parts/tip.svelte` 已经把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）。**这些正是一个组件库存在的理由，而平台现在自己提供了**；引一个库会让同一件事有两个提供者。判定失效的条件写在 7-9，一个字都不留给临时判断。
+**判定：不引入任何 UI 库依赖。** `tools/xtask/src/npm.rs:64` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表列出的 `effect`、`svelte` 与画代码颜色的 `@lezer` 高亮器（它不是控件，见 4-26），要加一个组件库就得先改那一行，而**一道专为阻止依赖蔓延而设的闸，第一次例外就是它失效的开始**。理由不是保守：`parts/dialog.svelte` 已经把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，四件都是平台承担的，见设计 4-20），`parts/tip.svelte` 已经把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）。**这些正是一个组件库存在的理由，而平台现在自己提供了**；引一个库会让同一件事有两个提供者。判定失效的条件写在 7-9，一个字都不留给临时判断。
 
 ### 7-1 不收键的部件
 
@@ -349,13 +349,13 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 ### 7-10 这张表的机器读者
 
-**`#/gallery` 的夹具断言本节的键表**，这是让规格不止有人类读者的那一步：每个收键部件在那条路由上有一份夹具，夹具按「初始焦点 ＋ 一串按键 → 焦点落点、`aria-*` 取值、回调是否发生」逐行断言 7-2 至 7-6。夹具与断言的实现属于 `client/src/views/gallery.svelte` 与 `xtask/src/render/`，本节只定内容。
+**`#/gallery` 的夹具断言本节的键表**，这是让规格不止有人类读者的那一步：每个收键部件在那条路由上有一份夹具，夹具按「初始焦点 ＋ 一串按键 → 焦点落点、`aria-*` 取值、回调是否发生」逐行断言 7-2 至 7-6。夹具与断言的实现属于 `client/src/views/gallery.svelte` 与 `tools/xtask/src/render/`，本节只定内容。
 
 今天的 `xtask render` 读的是画出来的盒子与它们的名字（`xtask-SPEC.md` 8-13），**一次按键都没有进过真引擎**——在这第二个读数落地之前，本节的键表没有机器读者，这一点如实记在 §8 的「未验的」里。
 
 ## 7A 表面角色：一个面「是干什么的」只有一个家
 
-**十一档灰阶是值的权威，角色是用途的权威，两层不重叠。** `--color-g0…g10` 与 `xtask/src/color.rs:164` 的「十一档」硬断言一个字不改；本节新增的是它们之上的一层**角色**。
+**十一档灰阶是值的权威，角色是用途的权威，两层不重叠。** `--color-g0…g10` 与 `tools/xtask/src/color.rs:164` 的「十一档」硬断言一个字不改；本节新增的是它们之上的一层**角色**。
 
 改前的缺陷不是缺档位，是**「什么样的面算一个抬起的控件」这个事实有两百三十六个家**——`client/src/views/` 里每一处手写的 `bg-g2` 与 `border-g3` 都是一个家，没有一个是权威，两个家不一致时谁也看不见。
 
@@ -365,11 +365,11 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 --color-raised: var(--color-g2);
 ```
 
-**不许写字面量。** 一个抄在档位旁边的 `oklch()` 立刻成为那个值的第二个家，档位一动就要手工重调；一个十六进制别名更糟——`xtask/src/color/tables.rs` 只保留值能解析成 `oklch()` 的声明，所以它**会被静默忽略而不是被拒绝**。单跳还让一份声明同时服务两种打光：浅色块重述每一档，指向档位的角色跟着走，不必在那里再声明一次。
+**不许写字面量。** 一个抄在档位旁边的 `oklch()` 立刻成为那个值的第二个家，档位一动就要手工重调；一个十六进制别名更糟——`tools/xtask/src/color/tables.rs` 只保留值能解析成 `oklch()` 的声明，所以它**会被静默忽略而不是被拒绝**。单跳还让一份声明同时服务两种打光：浅色块重述每一档，指向档位的角色跟着走，不必在那里再声明一次。
 
 ### 7A-2 封闭词汇
 
-角色名住 `xtask/src/color/roles.rs` 的 `ROLES`，共 21 个：四档表面（`page` / `chrome` / `raised` / `raised-hover`）、三种非导航填充（`speech` / `track` / `disabled`）、一种标记填充（`mark`）、三档边（`edge` / `edge-panel` / `edge-input`）、一种覆在彩色实心上的墨（`on-accent`），以及城市插画自己的九档（`drawn-*`）。
+角色名住 `tools/xtask/src/color/roles.rs` 的 `ROLES`，共 21 个：四档表面（`page` / `chrome` / `raised` / `raised-hover`）、三种非导航填充（`speech` / `track` / `disabled`）、一种标记填充（`mark`）、三档边（`edge` / `edge-panel` / `edge-input`）、一种覆在彩色实心上的墨（`on-accent`），以及城市插画自己的九档（`drawn-*`）。
 
 **加一行是一次设计决定。** 只有当一个人能用一句不提档位的话说出它回答什么问题时，这个角色才配有名字——草稿里 `inert` 与 `resting` 相隔一档，没有读者说得出某个圆点是哪一个，它们现在是一个 `mark`。
 
@@ -384,7 +384,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 ### 7A-4 图底关系：外壳上浮，不是内容下沉
 
-参考图把代码窗格画得比页面更暗，本仓不能照做——`xtask/src/color.rs:60-64` 有「g0 是页」的契约，ramp 两端被硬断言。**同一个读数从另一侧取到**：内容留在 `page`，而框住工作的东西（左栏、事实条、视图头）升到 `chrome`。屏幕上最深的一片仍然是工作，契约一个字没改。
+参考图把代码窗格画得比页面更暗，本仓不能照做——`tools/xtask/src/color.rs:60-64` 有「g0 是页」的契约，ramp 两端被硬断言。**同一个读数从另一侧取到**：内容留在 `page`，而框住工作的东西（左栏、事实条、视图头）升到 `chrome`。屏幕上最深的一片仍然是工作，契约一个字没改。
 
 要紧的距离是 `page` → `raised`，深色页上 100 个千分点：一个控件必须不靠边框就看得出可以按。`page` → `chrome` 只有一半，是有意的——一个宣告自己的框会跟它框住的工作抢注意力，而且它另有一条 `edge`。
 
@@ -550,6 +550,6 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 ### 12-12 视图栈是 Svelte 5，打包器是 Vite；对手是 Solid
 
 - **决策**（换栈由人选定）：视图写成 Svelte 5 组件，由 Vite 与 `@sveltejs/vite-plugin-svelte` 打包。
-- **理由**：参数是构建产物的大小与每个 token 的更新开销，因为一个流式对话客户端在每个 token 上都要更新页面。Svelte 5 与 Solid 在这两件事上是同一类设计——响应式编译进产物、没有虚拟 DOM、一次更新只重算碰过的信号——所以两者只能由读数分高下，分类分不出来。仓库里的读数都是 Svelte 一臂：整个客户端（含随包字体与 `#/gallery` 夹具）gzip 后 <!-- xtask:begin budget_reading:frontend_artifact -->578,422 B<!-- xtask:end -->（`xtask/budgets.toml` 的 `frontend_artifact`，`just build-web` 之后称整个 dist 目录）；R = 1e4、一帧 50 个 delta、一个读全表的订阅者时，每帧折叠约 30–40 µs（12-2，`belief/fold_cost.test.ts`）。Solid 一臂的两个读数还没有（§3-4）。在读数出来之前，选择由两件已有的事定：`.svelte` 组件与 `core/` 的 `$state` 模块（`belief/runs.svelte.ts`）由同一个编译器处理，测试经 `scripts/runes.ts` 走同一条编译路径；4-1 的类型车道与 4-5 的 eslint 配置都按 `.svelte` 定型，换成 Solid 的 JSX 要换掉这两条车道。**组件生态不是参数**：`parts/` 的控件全部自绘（§7 判定），平台已给 `<dialog>`、Popover 与提示语义。Vite 保留的理由是产物：`@sveltejs/vite-plugin-svelte` 支持当前的 Vite 主版本，换打包器不改变一个产物字节，却要动 `crates/sprawling/build.rs` 读取的输出契约。
+- **理由**：参数是构建产物的大小与每个 token 的更新开销，因为一个流式对话客户端在每个 token 上都要更新页面。Svelte 5 与 Solid 在这两件事上是同一类设计——响应式编译进产物、没有虚拟 DOM、一次更新只重算碰过的信号——所以两者只能由读数分高下，分类分不出来。仓库里的读数都是 Svelte 一臂：整个客户端（含随包字体与 `#/gallery` 夹具）gzip 后 <!-- xtask:begin budget_reading:frontend_artifact -->578,422 B<!-- xtask:end -->（`tools/xtask/budgets.toml` 的 `frontend_artifact`，`just build-web` 之后称整个 dist 目录）；R = 1e4、一帧 50 个 delta、一个读全表的订阅者时，每帧折叠约 30–40 µs（12-2，`belief/fold_cost.test.ts`）。Solid 一臂的两个读数还没有（§3-4）。在读数出来之前，选择由两件已有的事定：`.svelte` 组件与 `core/` 的 `$state` 模块（`belief/runs.svelte.ts`）由同一个编译器处理，测试经 `scripts/runes.ts` 走同一条编译路径；4-1 的类型车道与 4-5 的 eslint 配置都按 `.svelte` 定型，换成 Solid 的 JSX 要换掉这两条车道。**组件生态不是参数**：`parts/` 的控件全部自绘（§7 判定），平台已给 `<dialog>`、Popover 与提示语义。Vite 保留的理由是产物：`@sveltejs/vite-plugin-svelte` 支持当前的 Vite 主版本，换打包器不改变一个产物字节，却要动 `crates/sprawling/build.rs` 读取的输出契约。
 - **被击败的备选**：Solid（`solid-js` 与 `vite-plugin-solid`）。它输在上面两件编译与车道的事上，不是输在一个读数上。
 - **重开参数**：§3-4 的两个读数量出来以后，同一仪表、同一机器上 Solid 一臂的产物不到 Svelte 一臂的一半，或每帧折叠开销不到一半，就重新论证本条。出现第一个真正需要组件库的需求时，先过 §7 的 `RUNTIME` 判定与 7-9。

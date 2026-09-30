@@ -32,7 +32,7 @@ const bySchema = (text: string): ServerFrame | null => {
 };
 
 // What the hot decoder costs is a reading, not a verdict: the
-// `client_frame_decode` row of xtask/budgets.toml, taken by
+// `client_frame_decode` row of tools/xtask/budgets.toml, taken by
 // client/scripts/frame_cost.ts.
 test("the hot frames read exactly what the schema reads", () => {
   expect(decodeFrame(eventText)).toEqual(bySchema(eventText));

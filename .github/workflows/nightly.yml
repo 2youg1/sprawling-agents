@@ -85,10 +85,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          targets=$(cargo +nightly fuzz list --fuzz-dir fuzz)
+          targets=$(cargo +nightly fuzz list --fuzz-dir tools/fuzz)
           test -n "$targets"
           for target in $targets; do
-            timeout 20m cargo +nightly fuzz run "$target" --fuzz-dir fuzz \
+            timeout 20m cargo +nightly fuzz run "$target" --fuzz-dir tools/fuzz \
               --target x86_64-unknown-linux-gnu -- -max_total_time=60
           done
 

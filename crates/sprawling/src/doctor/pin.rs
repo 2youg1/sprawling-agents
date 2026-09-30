@@ -17,7 +17,7 @@ pub(crate) enum Pin {
     Unpinned,
     /// `rust-toolchain.toml`, the `channel` rustup reads.
     RustToolchain,
-    /// `adversary/lean-toolchain`, the toolchain elan reads.
+    /// `lean-toolchain`, the toolchain elan reads.
     LeanToolchain,
 }
 
@@ -25,8 +25,7 @@ const RUST_TOOLCHAIN: &str = include_str!("../../../../rust-toolchain.toml");
 
 /// The whole line elan reads, `leanprover/lean4:v<version>`; the table
 /// installs and detects by it.
-pub(crate) const LEAN_TOOLCHAIN: &str =
-    include_str!("../../../../adversary/lean-toolchain").trim_ascii_end();
+pub(crate) const LEAN_TOOLCHAIN: &str = include_str!("../../../../lean-toolchain").trim_ascii_end();
 
 /// The version `pin` names, as a dotted number; `None` for an unpinned
 /// item, or for a file whose shape no longer carries one.

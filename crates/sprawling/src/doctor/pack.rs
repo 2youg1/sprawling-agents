@@ -180,7 +180,7 @@ mod tests {
         let root = repository();
         let mut files = vec![root.join("justfile")];
         files_under(&root.join(".github"), &[".yml"], &mut files);
-        files_under(&root.join("xtask/src"), &[".rs"], &mut files);
+        files_under(&root.join("tools/xtask/src"), &[".rs"], &mut files);
         files_under(&root.join("docs"), &[".md"], &mut files);
         let mut called = BTreeSet::new();
         for file in &files {

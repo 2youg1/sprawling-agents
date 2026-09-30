@@ -22,7 +22,7 @@
 
 ## 2 验收标准
 
-- **door**：`adversary/design/RemoteDoor.lean` 证明的六条性质在 Rust 门上各有一个场景测试：关着的门什么都不放；关门结束每一个会话，再开也带不回来；配对码只用一次、只在自己的纪元、只在过期之前；撤销的设备不持有会话也开不了新的；会话不比门活得久；远程会话永远够不到只限本地的动词。另加一条：门拒绝在它所在的纪元里重开。`cargo nextest run -p sprawling-remote-access` 全绿，且每条性质的测试在对应实现被故意改坏时转红。
+- **door**：`tools/adversary/design/RemoteDoor.lean` 证明的六条性质在 Rust 门上各有一个场景测试：关着的门什么都不放；关门结束每一个会话，再开也带不回来；配对码只用一次、只在自己的纪元、只在过期之前；撤销的设备不持有会话也开不了新的；会话不比门活得久；远程会话永远够不到只限本地的动词。另加一条：门拒绝在它所在的纪元里重开。`cargo nextest run -p sprawling-remote-access` 全绿，且每条性质的测试在对应实现被故意改坏时转红。
 - **pairing**：铸出的码按人重新抄写（大小写、空格、连字符）读回同一个码；码的正文是 16 字节熵的 RFC 4648 base32（26 个符号）；两份熵给出两个码。
 - **keys**：同一个种子给出同一把公钥，两个种子给出两把；签名只在两半都成立时成立，换掉任一半即不成立；错误长度的线形式被拒。
 - **handshake**：两端握手后，一端封的帧另一端打得开，两个方向都是；设备拒绝一个它没有钉住的城；城拒绝一台持有别的密钥的设备；途中被改过的回复被拒；一次握手的 Finish 完不成另一次握手。
@@ -46,7 +46,7 @@
 
 ## 5 权威信源
 
-- 门的性质：`adversary/design/RemoteDoor.lean`（本 crate 是它的实现，它是性质的权威）。
+- 门的性质：`tools/adversary/design/RemoteDoor.lean`（本 crate 是它的实现，它是性质的权威）。
 - base32：RFC 4648 §6，测试向量取自 §10（`"foobar"` → `MZXW6YTBOI======`）。
 - ML-KEM：FIPS 203；ML-DSA：FIPS 204；X25519：RFC 7748；Ed25519：RFC 8032；HKDF：RFC 5869；AES-GCM：NIST SP 800-38D。
 - 后量子混合密钥交换 `X25519MLKEM768` 已是 TLS 的默认候选：`cloudflared` 到 Cloudflare 边缘的连接在日志里报出这一曲线偏好（2026.9.3），Cloudflare 的 1.1.1.1 以 ML-DSA-44 验证 DNSSEC。
@@ -214,7 +214,7 @@ impl Opener { pub fn open(&mut self, sealed: &[u8]) -> Result<Vec<u8>, AxError>;
 ## 13 依赖选型
 
 - 1a 只依赖 kernel（`B3Hash`、`TimeMs`、`AxError`）。
-- 1b 选 **aws-lc-rs**（已在依赖图里，经 rustls 引入）：它在稳定接口上提供 ML-KEM-768、ML-DSA-44、X25519、Ed25519、HKDF 与 AES-GCM，是一个带 FIPS 验证历史的库，比拼接几个各自维护的 RustCrypto crate 少一个信任面。浏览器侧：X25519、Ed25519、HKDF、AES-GCM 用 WebCrypto；ML-KEM 与 ML-DSA 需要一个纯 JS 实现，候选 `@noble/post-quantum`（MIT），加入它要改 `xtask/src/npm.rs` 的 `RUNTIME` 表，是一次门的改动，按 AGENTS.md 单独提交。
+- 1b 选 **aws-lc-rs**（已在依赖图里，经 rustls 引入）：它在稳定接口上提供 ML-KEM-768、ML-DSA-44、X25519、Ed25519、HKDF 与 AES-GCM，是一个带 FIPS 验证历史的库，比拼接几个各自维护的 RustCrypto crate 少一个信任面。浏览器侧：X25519、Ed25519、HKDF、AES-GCM 用 WebCrypto；ML-KEM 与 ML-DSA 需要一个纯 JS 实现，候选 `@noble/post-quantum`（MIT），加入它要改 `tools/xtask/src/npm.rs` 的 `RUNTIME` 表，是一次门的改动，按 AGENTS.md 单独提交。
 
 ## 14 硬编码声明
 
@@ -224,7 +224,7 @@ impl Opener { pub fn open(&mut self, sealed: &[u8]) -> Result<Vec<u8>, AxError>;
 ## 15 影响面
 
 - 新增 crate `remote_access`：根 `Cargo.toml` 的 members、`ARCHITECTURE.md` §3 的 depmap、`architecture.toml` 的模块图与 family 表。
-- `adversary/lakefile.toml` 的 `Design` 库多一个根 `RemoteDoor`。
+- `tools/adversary/lakefile.toml` 的 `Design` 库多一个根 `RemoteDoor`。
 - 1a 没有调用方，产品二进制行为不变。
 
 ## 16 测试与约束

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The instrument behind the `client_frame_decode` row of xtask/budgets.toml:
+// The instrument behind the `client_frame_decode` row of tools/xtask/budgets.toml:
 // what the page pays to read one event frame off the socket, by the hot
 // decoder and by the Effect schema it stands in for, interleaved on the
 // same machine. It prints a reading and judges nothing, because a

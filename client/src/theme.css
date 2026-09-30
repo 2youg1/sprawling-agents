@@ -262,7 +262,7 @@
    * their vendors' and not ours to prefer. A size: the first family a
    * stack would sensibly name is 17,773,244 B as its vendor ships it and
    * 11,266,972 B through `gzip -9` (windows-x86_64, 2026-09), against a
-   * 2,097,152 B budget in `xtask/budgets.toml` for a client that is
+   * 2,097,152 B budget in `tools/xtask/budgets.toml` for a client that is
    * 322,687 B gzipped today, so shipping one is not a close call.
    *
    * What is given up is small: the fallback face's baseline and x-height

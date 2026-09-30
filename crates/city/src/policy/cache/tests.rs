@@ -62,7 +62,7 @@ fn a_changed_length_is_read_again() {
     assert!(cache.load(&addr).unwrap().policy().confidential);
 }
 
-/// The instrument behind the `rules_lookup` row of `xtask/budgets.toml`:
+/// The instrument behind the `rules_lookup` row of `tools/xtask/budgets.toml`:
 /// one rules lookup the way the read bound made it before this cache
 /// (a fresh `load`) against the way it makes it now, in alternating
 /// rounds so both arms see the same machine state.

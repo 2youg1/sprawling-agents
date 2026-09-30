@@ -35,7 +35,7 @@ use std::path::{Path, PathBuf};
 /// to disagree: the bundle is bun's output, not cargo's, so it stays under
 /// the workspace whatever `CARGO_TARGET_DIR` says. The location lives here
 /// rather than in the tooling because this is the only reader that has to
-/// work in the published tree, which carries no `xtask/`; `xtask` reads
+/// work in the published tree, which carries no `tools/xtask/`; `xtask` reads
 /// this constant out of this file, and its artifact gate refuses a client
 /// build script or a justfile that spells the path differently.
 const BUNDLE_DIR: &str = "target/web-dist";

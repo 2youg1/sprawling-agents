@@ -952,8 +952,8 @@
     "zh": "cargo xtask apisync，夜间任务会跑它；它还要一个 nightly 的 rustdoc"
   },
   "machine_enables_lean": {
-    "en": "just models, the Lean design models, at the version adversary/lean-toolchain pins",
-    "zh": "just models 跑的 Lean 设计模型，版本是 adversary/lean-toolchain 钉住的那个"
+    "en": "just models, the Lean design models, at the version lean-toolchain pins",
+    "zh": "just models 跑的 Lean 设计模型，版本是 lean-toolchain 钉住的那个"
   },
   "machine_enables_python": {
     "en": "Python for the probes and data transforms, installed and managed by uv",

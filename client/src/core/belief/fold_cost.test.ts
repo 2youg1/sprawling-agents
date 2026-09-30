@@ -64,7 +64,7 @@ describe("fold cost", () => {
     expect(large).toBeLessThanOrEqual((small ?? 0) * SLOWER);
   });
 
-  // Prints the reading per city size for `xtask/budgets.toml`'s
+  // Prints the reading per city size for `tools/xtask/budgets.toml`'s
   // `client_fold` row, and holds the count every machine agrees on: the
   // subscriber reads the table once when it subscribes, empty, and once
   // for the city's answer, and never for a token.

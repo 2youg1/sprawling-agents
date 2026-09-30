@@ -131,7 +131,7 @@ fn the_golden_fixture_line_reads_back_and_writes_itself_again() {
 
 #[test]
 fn an_empty_payload_reads_as_a_run_that_said_nothing() {
-    // `fixtures/golden-s1` holds exactly this line. A reader that
+    // `tools/fixtures/golden-s1` holds exactly this line. A reader that
     // refused it would refuse a ledger this repository ships.
     let read: RunStarted = Payload::empty().read().unwrap();
     assert_eq!(read, RunStarted::default());

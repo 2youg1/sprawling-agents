@@ -166,7 +166,7 @@ fn over_ceiling(server: &str, held: usize) -> AxError {
     .with_recovery(
         "the connection was dropped rather than a fragment parsed; \
          have this server answer in smaller messages, \
-         or raise agent_protocols::mcp::MESSAGE_CEILING and its row in xtask/budgets.toml",
+         or raise agent_protocols::mcp::MESSAGE_CEILING and its row in tools/xtask/budgets.toml",
     )
 }
 

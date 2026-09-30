@@ -9,7 +9,7 @@
 //! Driven in process through `tower::ServiceExt::oneshot`, for the same
 //! reason the recording route is: this is a white-box check of the
 //! router, and a check that raised the product's server would be
-//! standing outside, which is `adversary/`'s ground (`xtask boundary`).
+//! standing outside, which is `tools/adversary/`'s ground (`xtask boundary`).
 
 #![cfg(feature = "server")]
 #![allow(

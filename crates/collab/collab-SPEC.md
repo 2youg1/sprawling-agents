@@ -42,7 +42,7 @@
 
 ## 6 命名统一
 
-Signal｜Inbox｜Steer｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitration｜Triage。概念名一律英文原词；该用什么词见 `docs/glossary.md`，不该用什么词见 `xtask/lexicon.toml`。
+Signal｜Inbox｜Steer｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitration｜Triage。概念名一律英文原词；该用什么词见 `docs/glossary.md`，不该用什么词见 `tools/xtask/lexicon.toml`。
 
 ## 7 模块边界
 

@@ -15,7 +15,7 @@ pub(crate) enum Verdict {
     Refused,
 }
 
-/// One line of `fixtures/address.jsonl`.
+/// One line of `tools/fixtures/address.jsonl`.
 #[derive(serde::Deserialize)]
 pub(crate) struct Spelling {
     pub(crate) address: String,
@@ -28,7 +28,7 @@ pub(crate) struct Spelling {
 /// client's `address.test.ts` applies the generated schema to them, so a
 /// case added there is judged by all three.
 pub(crate) static TABLE: std::sync::LazyLock<Vec<Spelling>> = std::sync::LazyLock::new(|| {
-    include_str!("../../../../fixtures/address.jsonl")
+    include_str!("../../../../tools/fixtures/address.jsonl")
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())
         .collect()

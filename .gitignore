@@ -1,6 +1,6 @@
 /target
 /local
-/adversary/.lake
+/tools/adversary/.lake
 # `just mutants` writes its report and the previous run's beside the
 # workspace root.
 /mutants.out/

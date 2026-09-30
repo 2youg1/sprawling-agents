@@ -13,8 +13,8 @@ members = [
     "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
-    "xtask",
-    "citysim",
+    "tools/xtask",
+    "tools/citysim",
 ]
 # `desktop` is its own package on purpose (desktop/desktop-SPEC.md §8.5): it sits
 # outside this lint wall so the Win32 boundary may relax `unsafe_code` at one
@@ -33,8 +33,8 @@ default-members = [
     "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
-    "xtask",
-    "citysim",
+    "tools/xtask",
+    "tools/citysim",
 ]
 
 [workspace.package]

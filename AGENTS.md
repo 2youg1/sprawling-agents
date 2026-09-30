@@ -16,7 +16,7 @@ Read this file to the end before the first edit, and then read what the change t
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — the crate topology, the seams, the module map, the seven shapes and the determinism rules. Its `depmap` block and its module map are machine authorities.
 - `crates/<crate>/<crate>-SPEC.md` — the crate's interfaces and decisions, written before its code.
-- [`docs/glossary.md`](docs/glossary.md) — one name for each concept, enforced by the `lexicon` gate through `xtask/lexicon.toml`.
+- [`docs/glossary.md`](docs/glossary.md) — one name for each concept, enforced by the `lexicon` gate through `tools/xtask/lexicon.toml`.
 - The tests beside the code you are about to change, and the neighbouring modules.
 - The official documentation of each tool you use, and the vendor's agent guide or skill when one exists.
 
@@ -42,14 +42,14 @@ just check                    # the whole check: fmt, source gates, Lean models,
 | `just gates` | the machine gates, then the supply-chain read |
 | `cargo xtask gates <name>...` | the named gates only; `cargo xtask gates --list` prints the roster, one name per line |
 | `just commits <base>..<tip>` | every commit subject and `Verdict:` trailer in the range, judged against *Commits*; CI runs it on the change-set, and `just check` cannot, because a tree has no range |
-| `just models` | the Lean design models under `adversary/design/`, built with no `sorry`, `admit` or `axiom`; silent where Lean is absent |
+| `just models` | the Lean design models under `tools/adversary/design/`, built with no `sorry`, `admit` or `axiom`; silent where Lean is absent |
 | `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `wire` without `server` |
 | `just check-client` | the client's lint, typecheck and tests |
 | `just build-web` | the client bundle, built into `target/web-dist` |
 | `just dist` | the whole deliverable: client, binary, bill of materials |
 | `just sim` | the citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
 | `cargo xtask docnum [--write]` | every number and generated section a document carries, checked against the code that decides it; `--write` rewrites them |
-| `cargo xtask apisync [--write]` | the public API of `kernel` and `wire` against its baseline in `xtask/api-baselines/`; a nightly job reads it, and a change to either surface rewrites the baseline in the same change-set |
+| `cargo xtask apisync [--write]` | the public API of `kernel` and `wire` against its baseline in `tools/xtask/api-baselines/`; a nightly job reads it, and a change to either surface rewrites the baseline in the same change-set |
 | `just adversary` | the out-of-tree property checker that attacks the binary through the wire; never a gate, and a no-op without Lean |
 | `just proof` | the kernel propositions kani holds against real MIR; never a gate, and a no-op without kani, which has no Windows host; `cargo xtask proof --list` prints the roster |
 | `just --list` | every other recipe — SPEC skeletons, ledger replay, measurements, fuzzing, mutation testing — with the comment that says what it does |
@@ -82,7 +82,7 @@ just check                    # the whole check: fmt, source gates, Lean models,
 ## Where code goes
 
 - One module is one file, named for what it owns. Register the file in the module map, then create it. Keep `lib.rs` and index files free of logic, and give this repository no `utils`, `helpers` or `common` module.
-- Keep a function within 200 lines and 4 parameters, and a file within 400 production lines; the lines a top-level `#[cfg(test)]` item spans are not counted. `xtask/budgets.toml` pins each older file that exceeds a cap at the length it had when the cap moved: a pinned file may not grow past its pin, and its entry is struck once it fits the cap.
+- Keep a function within 200 lines and 4 parameters, and a file within 400 production lines; the lines a top-level `#[cfg(test)]` item spans are not counted. `tools/xtask/budgets.toml` pins each older file that exceeds a cap at the length it had when the cap moved: a pinned file may not grow past its pin, and its entry is struck once it fits the cap.
 - Every register in `budgets.toml` is a ratchet. A number may improve freely and drift only within its slack, so a regression cannot arrive one commit at a time. Record the new reading and its reason beside it, and keep the slack where it is.
 - Prefer a new module over growing an existing one. When you extract from a large module, move its tests and type docs with it, so the invariants stay next to what owns them.
 - Call an API directly rather than through a wrapper that only renames it, and inline a helper that has one caller.
@@ -113,14 +113,14 @@ just check                    # the whole check: fmt, source gates, Lean models,
 - Test what types and the Lean models leave open, and a regression that has actually occurred. A test of a statically defined value, or a negative test for logic that was removed, restates the code and doubles its maintenance.
 - Test a gate on fixtures its tests build. The gate run already judges this repository's tree, and a test that reruns the gate on it only repeats that walk.
 - A citysim failure replays byte for byte from its scenario, a fixed script on a counted clock with no random source; when it does not, the defect is the determinism.
-- A check that enters through the crates' public faces is Rust, beside the code it judges. A check that enters the way a stranger does — spawning the binary, opening a socket to a served city, speaking the wire from outside — is Lean under `adversary/`, which takes its names from `docs/glossary.md`. `xtask boundary` holds the line.
-- When the adversary finds a defect, a person writes the failing case as a Rust test under `crates/sprawling/tests/`, and `adversary/`, which quantifies over traces, keeps no copy.
-- A change to the wire — a frame renamed, a field made nonzero, an exit code moved — updates `adversary/src/Sprawling/Door.lean` and the renderer in `adversary/src/Sprawling/Regression.lean` in the same change-set, and `just adversary` confirms it where Lean is installed. The nightly adversary run is otherwise the first place the drift shows.
-- `just check` on a machine without Lean behaves byte for byte as it does where `adversary/` is absent, so nothing in `just check` depends on it.
+- A check that enters through the crates' public faces is Rust, beside the code it judges. A check that enters the way a stranger does — spawning the binary, opening a socket to a served city, speaking the wire from outside — is Lean under `tools/adversary/`, which takes its names from `docs/glossary.md`. `xtask boundary` holds the line.
+- When the adversary finds a defect, a person writes the failing case as a Rust test under `crates/sprawling/tests/`, and `tools/adversary/`, which quantifies over traces, keeps no copy.
+- A change to the wire — a frame renamed, a field made nonzero, an exit code moved — updates `tools/adversary/src/Sprawling/Door.lean` and the renderer in `tools/adversary/src/Sprawling/Regression.lean` in the same change-set, and `just adversary` confirms it where Lean is installed. The nightly adversary run is otherwise the first place the drift shows.
+- `just check` on a machine without Lean behaves byte for byte as it does where `tools/adversary/` is absent, so nothing in `just check` depends on it.
 
 ## The machine gates
 
-A violation turns the check red with a message that names the rule, the violation, and an alternative. The roster is the array in `xtask/src/gates.rs`, which `cargo xtask gates --list` prints; nothing compares that array with this table, so a commit that adds or removes a gate changes both.
+A violation turns the check red with a message that names the rule, the violation, and an alternative. The roster is the array in `tools/xtask/src/gates.rs`, which `cargo xtask gates --list` prints; nothing compares that array with this table, so a commit that adds or removes a gate changes both.
 
 | Rule | Held by |
 |---|---|
@@ -128,11 +128,11 @@ A violation turns the check red with a message that names the rule, the violatio
 | The MPL-2.0 notice, then the copyright line, at the top of every `.rs` file. | `xtask header` |
 | One name per concept, taken from the glossary. | `xtask lexicon` |
 | Module map registered; functions within 200 lines and 4 parameters, files within 400 production lines. | `xtask modmap`, `xtask length` |
-| A white-box check written in Rust beside the code it judges; a check that enters the way a stranger does written in Lean under `adversary/`. | `xtask boundary` |
+| A white-box check written in Rust beside the code it judges; a check that enters the way a stranger does written in Lean under `tools/adversary/`. | `xtask boundary` |
 | Nothing written for a test compiled into the binary a person downloads. | `xtask artifact` |
 | `pub(crate)` by default; `pub` traits only on the seam list. | `xtask depmap` |
 | Every dependency a manifest declares named by the code of its package, and every workspace dependency inherited by some package. | `xtask unused` |
-| The client's lockfile in step with its manifest, its runtime dependencies exactly the list `RUNTIME` in `xtask/src/npm.rs` names (`svelte`, `effect`, and the `@lezer` highlighter), every licence on the list `deny.toml` permits. | `xtask npm` |
+| The client's lockfile in step with its manifest, its runtime dependencies exactly the list `RUNTIME` in `tools/xtask/src/npm.rs` names (`svelte`, `effect`, and the `@lezer` highlighter), every licence on the list `deny.toml` permits. | `xtask npm` |
 | Credentials as `secret:realm/name` references; plaintext reaches the vault and nowhere else. | `xtask secret` |
 | Colour taken from the `@theme` block in `client/src/theme.css`, expressed as a ratio of the gamut limit. | `xtask color` |
 | Every word a reader is given taken from `client/src/lang.json`. | `xtask wording` |
@@ -147,7 +147,7 @@ A violation turns the check red with a message that names the rule, the violatio
 | `desktop/`'s copy of the workspace lint table, package metadata and dependency versions equal to the workspace's own. | `xtask guard` |
 
 - Fix the cause when a gate goes red. Loosening a gate in the change the gate is failing requires an explicit ruling from the person, recorded as the commit's `Verdict: user-approved` trailer; the wording of the ruling stays with the person, and the trailer records that there was one. Review holds this rule rather than a gate, because a gate that read commit history made every run depend on the range its caller passed.
-- Put a change to gate machinery — `xtask/`, `justfile`, `.github/`, `flake.nix`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges, so review sees whether the gate moved to admit it. Re-pricing a rule in a commit of its own is ordinary work and needs no ruling.
+- Put a change to gate machinery — `tools/xtask/`, `justfile`, `.github/`, `flake.nix`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `tools/xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges, so review sees whether the gate moved to admit it. Re-pricing a rule in a commit of its own is ordinary work and needs no ruling.
 - Every rule that excludes an architecture carries the parameter that made it right, and when that parameter moves, re-argue the rule instead of obeying it. Rules that exclude a defect — the panic bans, the arithmetic bans, the determinism rules — carry no such condition, because nothing about them expires.
 
 ## The view layer

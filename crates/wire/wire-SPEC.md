@@ -52,7 +52,7 @@
 
 ## 4 现状分析
 
-公开面见 `xtask/api-baselines/channels.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
+公开面见 `tools/xtask/api-baselines/channels.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 
 ## 5 权威信源
 
@@ -1007,7 +1007,7 @@ pub enum ReleaseAnswer {
 2. **问 npm，不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release——它对本仓库答 404。看上去最像的那个端点恰是错的那个；npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西。
 3. **三态穷尽，而第三态携拒绝。** 「你跑的是某个发布版，它站在这里」「你自己从源码构建的，没有可比的对象」「注册表读不到」是人接下来要做的三件不同的事。第三态不走 `Answer::Unavailable`：城是可用的、注册表不可用，页面必须能说清是哪一个，而拒绝里带的是 `kernel::reach` 已经定义的分阶段读数——名字没解析、连不上、握手失败、对方答了什么状态。
 4. **判定在 Rust，页面只画字符串。** `ReleaseLine` 携两个已渲染好的串，谁比谁新由 `kernel::Release` 的 `Ord` 判——版本在前、日期在后，与 npm 对同样两个串的排序一致。客户端因此没有第二套排序规则可以漂掉。**败给的方案**：把六个数字发给页面自己比——那是把一条领域规则复制到另一门语言里。
-5. **什么都不更新。** 归档路径归 `sprawling install`，npm 路径归 npm，第三方去覆写其中任何一条，就是「这个二进制住在哪」有了第二个权威（`npm/shim.js` 已立此规）。因此终端与页面都只把该跑的命令印出来就停。
+5. **什么都不更新。** 归档路径归 `sprawling install`，npm 路径归 npm，第三方去覆写其中任何一条，就是「这个二进制住在哪」有了第二个权威（`tools/xtask/src/channel/shim.js` 已立此规）。因此终端与页面都只把该跑的命令印出来就停。
 
 ### 8-37 读不出的那一帧不是一次断线（`reception::inbound`）
 
@@ -1318,7 +1318,7 @@ pub enum Query { /* … */ NewestRelease }   // 线上拼作 "newest_release"
 
 - **名字说出答的是什么**：这条查询回答「这座城是哪一版、npm 上最新的是哪一版」（§8-36 的五条口径不变）。它原来叫 `Release`，与释放一个关停范围的 `Command::Release` 同名；控制台把 socket 能带的动词与查询列在一处，一个人看到两个 `release`，分不清哪个放开关停、哪个去问注册表。
 - **只改查询，不改答复**：`Answer::Release` 与 `ReleaseAnswer` 保持原名。答复不出现在人能输入的地方，没有同名的歧义；改它只会多一次无人受益的线上换形。
-- **`WIRE_V` 不动**：变体名进 `QUERY_NAMES`，名字一变 §8-1 的 golden 就变，旧页面在握手时被拒，而不是发出一条城不认识的查询；`WIRE_V` 只为「名字没换而语法换形」而升（§298），改名不属于那一类。新名字登记在 `docs/glossary.md` §6；旧拼法不进 `xtask/lexicon.toml`，因为已发布版本的 `CHANGELOG.md` 如实记着它当时的名字，子串禁令会误伤那段历史。
+- **`WIRE_V` 不动**：变体名进 `QUERY_NAMES`，名字一变 §8-1 的 golden 就变，旧页面在握手时被拒，而不是发出一条城不认识的查询；`WIRE_V` 只为「名字没换而语法换形」而升（§298），改名不属于那一类。新名字登记在 `docs/glossary.md` §6；旧拼法不进 `tools/xtask/lexicon.toml`，因为已发布版本的 `CHANGELOG.md` 如实记着它当时的名字，子串禁令会误伤那段历史。
 - **被否：保留 `release` 作别名**。一条查询两个拼法，就是同一个名字有两个家；握手已经把旧页面挡在门外，别名没有读者。
 
 ### 8-47g 性能监视器的一对帧（`wire::frames::monitor`，形状：值类型）

@@ -6,7 +6,7 @@
 // The address grammar is `kernel::Address::parse`, stated as a pattern
 // in `kernel::schema` and carried into `wire.ts` by `cargo xtask
 // wire-ts`. This client no longer spells it; what it holds is that the
-// generated schema gives every spelling in `fixtures/address.jsonl` the
+// generated schema gives every spelling in `tools/fixtures/address.jsonl` the
 // verdict the Rust constructor gives it. That file is the one table both
 // test suites read, so a case added there is judged on both sides.
 
@@ -25,7 +25,7 @@ const Spelling = Schema.parseJson(
   }),
 );
 
-const table = (await Bun.file(new URL("../../../fixtures/address.jsonl", import.meta.url)).text())
+const table = (await Bun.file(new URL("../../../tools/fixtures/address.jsonl", import.meta.url)).text())
   .split("\n")
   .filter((line) => line.length > 0)
   .map((line) => Schema.decodeUnknownSync(Spelling)(line));

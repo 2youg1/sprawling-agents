@@ -15,7 +15,7 @@
 //!
 //! **Nothing here updates anything either.** Where a binary lives
 //! belongs to whoever installed it - `sprawling install` owns the
-//! archive path, npm and bun own theirs (`npm/shim.js`) - so this
+//! archive path, npm and bun own theirs (`tools/xtask/src/channel/shim.js`) - so this
 //! reports and stops. The answer names the command to run, which keeps
 //! the person who chose an install channel in charge of it.
 //!

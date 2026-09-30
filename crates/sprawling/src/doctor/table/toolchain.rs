@@ -251,7 +251,7 @@ pub(super) const RENDER_BROWSER: Requirement = row(
 /// once the person presses install, because a fresh machine has to
 /// finish in one pass; the Linux line stays printed (sprawling-SPEC.md
 /// section 8-58). `-DefaultToolchain none` leaves the Lean version to
-/// the `lean` row, which installs the one `adversary/` pins.
+/// the `lean` row, which installs the one `tools/adversary/` pins.
 pub(super) const ELAN: Requirement = row(
     "elan",
     Need::Optional,
@@ -285,7 +285,7 @@ pub(super) const ELAN: Requirement = row(
 pub(super) const LEAN: Requirement = row(
     "lean",
     Need::Optional,
-    "`just models`, the Lean design models, at the version adversary/lean-toolchain pins",
+    "`just models`, the Lean design models, at the version lean-toolchain pins",
     Detection::Listed {
         program: "elan",
         args: &["toolchain", "list"],

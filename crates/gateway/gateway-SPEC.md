@@ -31,7 +31,7 @@
 - **本地推理**＝指向回环地址的 OpenAI 兼容服务（llama.cpp/ollama 一类），与远端同走 `Endpoint`（§8-3）。本地引擎进程管理不属本 crate。
 - **tokio 不引入**：turn 是同步函数面，endpoint 用 `reqwest::blocking`（内部自管运行时线程，不出接口），为一个 HTTP 调用把 async 传染到全库不值。
 - 线格式 JSON 允许浮点（temperature 等 provider 字段）：dialect 是翻译面不是判定路径；判定路径（cost／market 价目）恒整数。
-- **只有 Anthropic 兼容格式在结算前交出调用。** `Endpoint` 经 `Model::call_speculating`（kernel SPEC「模型端口第三扇门」）在 `content_block_stop` 到达时交出完整调用，消费方是 `runtime::turn::speculation`（runtime-SPEC §8-3），它守的性质由 `adversary/design/Speculating.lean` 证明。OpenAI 两种兼容格式在结算前不交出调用：它们的调用在哪一帧完整，线上没有一帧明说。
+- **只有 Anthropic 兼容格式在结算前交出调用。** `Endpoint` 经 `Model::call_speculating`（kernel SPEC「模型端口第三扇门」）在 `content_block_stop` 到达时交出完整调用，消费方是 `runtime::turn::speculation`（runtime-SPEC §8-3），它守的性质由 `tools/adversary/design/Speculating.lean` 证明。OpenAI 两种兼容格式在结算前不交出调用：它们的调用在哪一帧完整，线上没有一帧明说。
 - **加密金库文件还没有探针选它**：`Custodian::probe` 只试平台服务，何时向人要口令、口令从哪里来未定（§8-21）。
 
 ## 4 现状分析
@@ -169,7 +169,7 @@ impl kernel::Model for Endpoint { /* call：ChatRequest（req.chat）→dialect�
 - **半流中断**：SSE 流截断（连接断／不完整事件）＝`E_PROVIDER`，恒不产部分 ModelReturn；流式读法见 §8-13。
 - **无暗重试**：重试是 watchdog 的决策（上限的唯一表示是 `Retries`，§8-16），endpoint 一次调用恰一次 HTTP 往返；幂等由调用方 IdemKey dedup 看守。
 - base_url＝完整端点 URL（逐字段哲学，不拼路径）；`EndpointConfig.pricing: Option<ModelEntry>` 让结算在适配器内完成，`ModelReturn` 因此携 usage／stop／billed 入账（kernel-SPEC §8-24；权威额线上无标准槽位，现行恒 PriceSheet 源）；TLS 取 reqwest 0.13 的 `rustls` feature。
-- `.expose(` 白名单（`xtask/src/secret.rs` 的 `EXPOSE_WHITELIST`，全表以它为准）：gateway 侧的合法出现点只有 `endpoint/call.rs`（端点调用）。**两种凭证在同一句里写上线**：`authorize` 既写注册带的那条，也写人在自定义头里放的 `HeaderValue::Redeemed`；三个请求写入点（`call`、`stream`、`list_models`）都只调它，谁都不自己遍历 `extra_headers`。
+- `.expose(` 白名单（`tools/xtask/src/secret.rs` 的 `EXPOSE_WHITELIST`，全表以它为准）：gateway 侧的合法出现点只有 `endpoint/call.rs`（端点调用）。**两种凭证在同一句里写上线**：`authorize` 既写注册带的那条，也写人在自定义头里放的 `HeaderValue::Redeemed`；三个请求写入点（`call`、`stream`、`list_models`）都只调它，谁都不自己遍历 `extra_headers`。
 - **`Endpoint` 的字段不出 `endpoint/`**：`config`／`client`／`redemption` 是 `pub(super)`；`transcribe` 走 `post_bytes` 与 `model()`。于是「一次 POST 如何发出、非 2xx 如何变成 `AxError`、对侧正文如何不被回显」在本 crate 里只有一份答案。转写面仍保留它自己那句恢复语（`rewrite_recovery`）：线上出了什么事是端点的事，人接下来能做什么是设施的事。
 
 **图的兑付面与两句拒绝**
@@ -484,7 +484,7 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 
 **一个工具调用在它的 `content_block_stop` 到达时就是完整的，解码器在那一刻交出它。** `anthropic::stream::completed_call(frames, at) -> Result<Option<ToolCall>, AxError>`：`frames` 是迄今收到的帧，`at` 是刚收到 `content_block_stop` 的那个 index。块是 `tool_use` 则答 `Some(ToolCall)`，别的块答 `None`；参数停在一个值的中间照旧是 `E_PROVIDER`（同 `settled_tool_arguments`）。**重装只有一处**：`settled` 与 `completed_call` 都经 `rebuilt` 把帧按 index 拼回块，再由 `block_from` 读成 `ContentBlock`——提前交出的调用与结算后 `ModelReturn` 里那一条逐字段相等，这由测试钉住。**交出的不是 `Increment`**：`Increment` 在线协议上、只供人看、不许任何下游据以决策（kernel `Increments` 的约定），而一次提前交出的调用恰恰是要据以执行的；把它塞进 `Increment` 既要动 `WIRE_V`，又会让「看的东西」变成「决定的东西」。`Endpoint::stream` 每收到一帧就问 `dialect::call_completed_by(kind, frames)`：Anthropic 兼容格式在最后一帧是 `content_block_stop` 时经 `completed_call` 作答，别的兼容格式恒答 `None`；答出的调用交给 `call_speculating` 的 `early`。
 
-**提前交出的调用不是历史**：账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，提前交出的调用与据它得出的结果一并丢弃。这两句与「只提前启动第一个写调用之前的只读调用」由 `adversary/design/Speculating.lean` 证明：`speculation_is_not_an_event`、`speculation_keeps_serial_order`、`a_cut_answer_discards_its_cache`；`speculating_past_a_write_changes_the_ledger` 给出落选设计（写调用之后的读也提前启动）的反例——提前启动的读看到的是写之前的世界。
+**提前交出的调用不是历史**：账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，提前交出的调用与据它得出的结果一并丢弃。这两句与「只提前启动第一个写调用之前的只读调用」由 `tools/adversary/design/Speculating.lean` 证明：`speculation_is_not_an_event`、`speculation_keeps_serial_order`、`a_cut_answer_discards_its_cache`；`speculating_past_a_write_changes_the_ledger` 给出落选设计（写调用之后的读也提前启动）的反例——提前启动的读看到的是写之前的世界。
 
 **认不出的帧跳过，缺失的结算帧不跳过。** provider 会加新的事件类型，一个人不该因为其中一个是新的就丢掉整次调用；但流在说明「为什么停」的那一帧之前结束，是 `Provider` 失败并且可重试——它和一个被截断的 body 是同一种失败，刻意不允许「保留已收到的增量」来补救：把不完整的回复当成完整的呈现出去，是这里唯一不能有的结局。
 

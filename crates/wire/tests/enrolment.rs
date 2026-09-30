@@ -23,7 +23,7 @@
 //! process, through `tower::ServiceExt::oneshot`, with the peer address
 //! supplied the way axum supplies it for tests. Nothing here raises the
 //! product's server or writes an HTTP request by hand - a check that did
-//! would be standing outside, and outside is `adversary/`'s ground
+//! would be standing outside, and outside is `tools/adversary/`'s ground
 //! (`xtask boundary`).
 
 // The route this file drives exists only in a build with the listener.
