@@ -250,6 +250,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `runtime::sandbox` | crates/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
 | `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `accounting::worker::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
+| `remote_access::route` | crates/remote_access/src/route.rs | `route::cloudflare`: a locally managed Cloudflare named tunnel; `route::command`: a command the person wrote | `route::scripted`: a fixed address, and the order it was opened and closed in |
 | `agent_protocols::mcp` | crates/agent_protocols/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
 | `accounting::models` | crates/accounting/src/models.rs | `accounting::worker::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
 | `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::production::SystemClock`: the wall clock, the one sampling point, handed in through `Hands.clock` | the stopped clock in `crates/sprawling/tests/clock.rs` |

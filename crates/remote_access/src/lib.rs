@@ -9,11 +9,13 @@
 //!
 //! A route that makes the door reachable carries bytes and nothing else,
 //! so every decision here is taken on the city's own machine and none of
-//! them names a route. A caller reaches a decision through the module
-//! that owns it, so the module name says which authority answered.
+//! the door's decisions names a route; [`route`] holds the routes
+//! themselves. A caller reaches a decision through the module that owns
+//! it, so the module name says which authority answered.
 
 pub mod door;
 pub mod handshake;
 pub mod keys;
 pub mod pairing;
+pub mod route;
 pub mod seal;
