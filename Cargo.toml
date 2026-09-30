@@ -136,7 +136,8 @@ aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sy
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 reqwest = { version = "0.13", default-features = false, features = [
     "blocking",
-    "rustls",
+    # The backend is installed by gateway::reach::tls (gateway-SPEC 8-15).
+    "rustls-no-provider",
     "json",
     "http2",
     # A machine reaches a provider through whatever its owner already
