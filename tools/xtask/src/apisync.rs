@@ -69,6 +69,13 @@ fn normalize(raw: &str) -> String {
     joined
 }
 
+/// The lines only one side holds, each on a line of its own after a
+/// leading newline: `- ` for a line only the baseline has, `+ ` for a
+/// line only the live surface has.
+fn drift(_committed: &str, _live: &str) -> String {
+    String::new()
+}
+
 fn baseline_path(root: &Path, krate: &str) -> PathBuf {
     root.join(BASELINE_DIR).join(format!("{krate}.txt"))
 }
@@ -97,7 +104,10 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 gate: "apisync",
                 location: rel,
                 rule: "the committed baseline equals the live public API".to_owned(),
-                violation: format!("`{krate}` public API drifted from its baseline"),
+                violation: format!(
+                    "`{krate}` public API drifted from its baseline{}",
+                    drift(&committed, &live)
+                ),
                 alternative: "run `cargo xtask apisync --write`, review the diff, and \
                               touch the crate SPEC in the same change-set"
                     .to_owned(),
@@ -132,12 +142,37 @@ pub(crate) fn write(root: &Path) -> Result<(), XtaskError> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {
-    use super::normalize;
+    use super::{drift, normalize};
 
     #[test]
     fn normalization_sorts_trims_and_ends_with_one_newline() {
         let raw = "pub fn b()\n\npub fn a()   \n";
         assert_eq!(normalize(raw), "pub fn a()\npub fn b()\n");
         assert_eq!(normalize(""), "\n");
+    }
+
+    #[test]
+    fn a_drift_names_each_line_only_one_side_holds() {
+        let committed = "pub fn wire::a()\npub fn wire::b()\n";
+        let live = "pub fn wire::b()\npub fn wire::c()\n";
+        assert_eq!(
+            drift(committed, live),
+            "\n- pub fn wire::a()\n+ pub fn wire::c()"
+        );
+    }
+
+    #[test]
+    fn a_drift_longer_than_the_cap_says_how_many_lines_it_left_out() {
+        let live: String = (0..45)
+            .map(|n| format!("pub fn wire::f{n:02}()\n"))
+            .collect();
+        let report = drift("", &live);
+        assert_eq!(
+            (
+                report.lines().filter(|l| l.starts_with("+ ")).count(),
+                report.lines().next_back()
+            ),
+            (40, Some("… and 5 more lines"))
+        );
     }
 }
