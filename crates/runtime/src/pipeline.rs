@@ -46,8 +46,11 @@ pub(crate) const CONNECTOR_ACCOUNTS: &str = "offload";
 /// carries no account this build can read.
 #[must_use]
 pub fn pinned_original(result: &serde_json::Value) -> Option<Locator> {
-    let _ = (result, EXEC_ACCOUNTS, CONNECTOR_ACCOUNTS);
-    None
+    [EXEC_ACCOUNTS, CONNECTOR_ACCOUNTS]
+        .into_iter()
+        .find_map(|key| result.get(key)?.as_array()?.first())
+        .and_then(|first| <ResultOffloaded as serde::Deserialize>::deserialize(first).ok())
+        .map(|account| account.original)
 }
 
 /// Attachments beyond this many bytes are cut with the truncation

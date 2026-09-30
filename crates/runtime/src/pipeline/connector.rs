@@ -139,7 +139,7 @@ fn windowed(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Result<ToolOutcom
         })?;
     let mut result = outcome.result.as_map().clone();
     result.insert("content".to_owned(), Value::Array(content));
-    result.insert("offload".to_owned(), Value::Array(accounts));
+    result.insert(super::CONNECTOR_ACCOUNTS.to_owned(), Value::Array(accounts));
     Ok(ToolOutcome {
         result: Payload::new(result)?,
         attachments: outcome.attachments,
