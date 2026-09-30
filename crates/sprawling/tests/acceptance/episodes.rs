@@ -494,3 +494,194 @@ fn answered_text(answer: &ToolAnswer) -> Result<&str, String> {
         .and_then(Value::as_str)
         .ok_or_else(|| "the result carries no text".to_owned())
 }
+
+// The transcription tool (sprawling-SPEC.md 8-131). It is offered only to
+// a city that chose an endpoint to transcribe, and the two catalogue
+// tests choose none, so the tool is covered here by cities of its own.
+
+/// What the scripted transcription endpoint hears in every recording.
+const HEARD: &str = "fire the kiln at dawn";
+
+/// The model the person chose to transcribe.
+const EARS: &str = "whisper-1";
+
+/// Rules for the lab that leave it open and writing where it works.
+const OPEN_LAB: &str = "confidential = false\nwrite = \"everything\"\n";
+
+#[test]
+fn a_run_hears_a_recording_through_the_endpoint_chosen_to_transcribe() {
+    let dir = tempfile::tempdir().unwrap();
+    let (url, served) = transcription_endpoint();
+    let (factory, _, _) = crate::script::scripted(vec![Step {
+        tool: "transcribe",
+        args: json!({ "path": format!("{}/voice.wav", LAB.room) }),
+    }]);
+    let (mut worker, ledger) = crate::city::city_with_a_model(dir.path(), factory);
+    choose_to_transcribe(&mut worker, &url);
+    crate::city::raise(&mut worker, LAB.building, "minimal");
+    crate::city::rules(dir.path(), LAB.building, OPEN_LAB);
+    crate::city::move_in(dir.path(), LAB.room);
+    std::fs::write(
+        dir.path().join("lab").join("lead").join("voice.wav"),
+        b"RIFF-a-spoken-sentence",
+    )
+    .unwrap();
+
+    let dispatched = crate::city::dispatch(&mut worker, LAB.room);
+
+    let history = History::read(&ledger);
+    let lead = history.started().first().map(|started| started.run);
+    let calls = lead.map(|run| history.calls_of(run)).unwrap_or_default();
+    let heard = calls
+        .iter()
+        .find(|call| call.called.name.as_str() == "transcribe")
+        .and_then(|call| call.results.first())
+        .map(|result| answered_text(&result.answer));
+    assert_eq!(
+        heard,
+        Some(Ok(HEARD)),
+        "the dispatch answered {dispatched:?}"
+    );
+    let request = served.join().unwrap();
+    assert!(
+        request.starts_with("POST /v1/audio/transcriptions"),
+        "{request}"
+    );
+    assert!(
+        request.contains(&format!("name=\"model\"\r\n\r\n{EARS}")),
+        "the endpoint was not asked for the model the person chose: {request}"
+    );
+    assert!(request.contains("RIFF-a-spoken-sentence"), "{request}");
+}
+
+/// The same question the composer's microphone asks, under the rules of
+/// the building the run stands in: a confidential building is never
+/// offered an endpoint off this machine.
+#[test]
+fn a_confidential_building_is_not_offered_a_transcription_endpoint_off_this_machine() {
+    let dir = tempfile::tempdir().unwrap();
+    let (factory, offered, _) = crate::script::scripted(Vec::new());
+    let (mut worker, _) = crate::city::city_with_a_model(dir.path(), factory);
+    // A name that never resolves (RFC 2606): not this machine, and the
+    // model list attaching it asks for fails at once.
+    choose_to_transcribe(&mut worker, "http://transcribe.invalid/v1");
+    crate::city::raise(&mut worker, LAB.building, "minimal");
+    crate::city::rules(
+        dir.path(),
+        LAB.building,
+        "confidential = true\nwrite = \"everything\"\n",
+    );
+    crate::city::move_in(dir.path(), LAB.room);
+
+    let dispatched = crate::city::dispatch(&mut worker, LAB.room);
+
+    let offered = offered.lock().unwrap().clone();
+    assert!(
+        !offered.is_empty(),
+        "the run was offered nothing: {dispatched:?}"
+    );
+    assert!(
+        offered.iter().all(|name| name != "transcribe"),
+        "{offered:?}"
+    );
+}
+
+/// Attaches an endpoint at `base_url` and chooses its one model to
+/// transcribe, as a person does on the settings page.
+fn choose_to_transcribe(worker: &mut accounting::worker::RunWorker, base_url: &str) {
+    let endpoint = wire::ProviderName::parse("ears").unwrap();
+    let idem = |what: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, what);
+    worker
+        .handle(wire::Command::AttachEndpoint {
+            name: endpoint.clone(),
+            base_url: base_url.to_owned(),
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            admit: vec![EARS.to_owned()],
+            // One brief try, so an endpoint that is not there fails the
+            // model list at once rather than retrying into it.
+            tuning: wire::EndpointTuning {
+                timeout_ms: Some(2_000),
+                request_max_retries: Some(0),
+                ..wire::EndpointTuning::default()
+            },
+            idem: idem(b"attach ears"),
+        })
+        .unwrap();
+    worker
+        .handle(wire::Command::SelectModel {
+            endpoint,
+            model: EARS.to_owned(),
+            tag: kernel::ModelTag::Transcribe,
+            context_tokens: kernel::Window::new(131_072),
+            max_output_tokens: kernel::Ceiling::new(4_096),
+            idem: idem(b"select ears"),
+        })
+        .unwrap();
+}
+
+/// A transcription endpoint on loopback that answers a transcription with
+/// [`HEARD`] and hands back the request that asked for it. Whatever it is
+/// asked before that, the model list attaching it reads, names [`EARS`].
+fn transcription_endpoint() -> (String, std::thread::JoinHandle<String>) {
+    use std::io::Write as _;
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/v1", listener.local_addr().unwrap());
+    let served = std::thread::spawn(move || {
+        loop {
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            let transcription = request.starts_with("POST /v1/audio/transcriptions");
+            let body = if transcription {
+                json!({ "text": HEARD })
+            } else {
+                json!({ "data": [{ "id": EARS }] })
+            }
+            .to_string();
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\
+                 connection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+            if transcription {
+                return request;
+            }
+        }
+    });
+    (url, served)
+}
+
+/// One HTTP request: its head, then as many body bytes as it declared.
+fn read_request(stream: &mut std::net::TcpStream) -> String {
+    use std::io::Read as _;
+    let mut seen = Vec::new();
+    let mut chunk = [0u8; 4096];
+    loop {
+        let read = stream.read(&mut chunk).unwrap();
+        if read == 0 {
+            break;
+        }
+        seen.extend_from_slice(&chunk[..read]);
+        let text = String::from_utf8_lossy(&seen);
+        let Some((head, _)) = text.split_once("\r\n\r\n") else {
+            continue;
+        };
+        let declared: usize = head
+            .lines()
+            .find_map(|line| {
+                line.to_ascii_lowercase()
+                    .strip_prefix("content-length:")
+                    .map(|length| length.trim().parse().unwrap())
+            })
+            .unwrap_or(0);
+        // The head is ASCII, so its length is the same count of bytes in
+        // what was read as in its lossy reading.
+        if seen.len() >= head.len().saturating_add(4).saturating_add(declared) {
+            break;
+        }
+    }
+    String::from_utf8_lossy(&seen).into_owned()
+}
