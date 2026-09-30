@@ -185,9 +185,9 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 
 8. **`end_turn` 由城自己的记录作证**：`session/prompt` 答出 `end_turn` 之后，城先把这棵 worktree 提交成自己的检查点（`checkpoint_committed`，harness 改了什么由城记下），再写一条新的 record-only 种类 `harness_answered`：载荷携停止原因，与这一回合 harness 回答城的那段文字（`agent_message_chunk` 依次拼起来）。run 冻成 `Completion::Done`，证据引这一行，`kernel::completion::Evidence` 因此在 `tool_result`、`model_returned` 之外多收一种。这与模型 run 的证据同一个标准：模型的 run 以它最后那条 `model_returned` 作证（`runtime::run::lifecycle::concluded`），harness 的 run 以它对城那次请求的回答作证。回答是空的，冻成 `Limit`，与 `concluded` 对空回复的判法相同。**被否**：给 `Completion` 加一个「harness 自称完成」的变体（动 kernel 的公开面与每一个按结局分支的读者）；在 bench 上立一件「harness」工具，把 prompt 包成 `tool_called`／`tool_result`（那是一件没有模型调用过、也没有门判过的工具）。
 9. **permission 一律答它给出的第一个 `allow_once`（定规）**：没有 `allow_once` 就答第一个 `reject_once`，两者都没有就答 `cancelled`。恒不答 `allow_always`：那是替以后的调用做决定。问与答各记成一条 `harness_reported`。理由：城不能按工具名授权（ACP 规格），能兜住的是这棵 worktree（第 5 条）；一律拒绝会让默认要问的 harness 什么都做不成；交给人则要让 Approval Inbox 收动作，而它今天只收设计问题，且一次挂起的 prompt 占着一条车道。**重开参数**：Approval Inbox 开始收动作。
-10. **房间用 `CONFIG.toml` 的 `[resident] harness` 点名它的 harness（定规）**：值是 `agent_protocols::Harness::as_str` 的五个拼写之一，按城／楼／房间的梯子读，与 `[model] name` 同一架梯子。`city` 只把它当字符串读进来，理由与 `[model] name` 相同：`city` 只见 `kernel`，五个拼写的权威在 `agent_protocols::harness::roster`。`agree_to_work` 在写任何东西之前用 `agent_protocols::Harness::parse` 判它，不认识的拼写答 `E_CONFIG_INVALID` 并列出五个。同一层同时写 `[model] name` 与 `[resident] harness` 在解析时即拒：一个房间的居民是模型还是 harness，要读者去猜就是配置写错了。**被否**：派活帧上加一个字段，那要动 wire，而居民是一个站着的身份（词汇表 Resident），不是每次派活现选的。
+10. **房间的 harness 由 `CONFIG.toml` 的 `[resident] harness` 点名（定规）**：值是 `agent_protocols::Harness::as_str` 的五个拼写之一，在城／楼／房间的梯子上取最近一级（`city::settled_harness`，city-SPEC §8-4）。房间在派活时才开，所以这个键实际写在楼层或城层。`city` 只把它当字符串读进来：`city` 只见 `kernel`，五个拼写的权威在 `agent_protocols::harness::roster`。`agree_to_work` 在写任何东西之前用 `agent_protocols::Harness::parse` 判它，不认识的拼写答 `E_CONFIG_INVALID` 并列出五个。`[model] name` 不在梯子上，它是房间自己那一层的会话记录（city-SPEC §8-14）；房间有这条记录时，这段会话以模型走完，harness 从 `/new` 开的下一段会话起生效。同一层同时写 `[model] name` 与 `[resident] harness` 在解析时即拒：一个房间的居民是模型还是 harness，要读者去猜就是配置写错了；城自己的写路径也写不出这样一份文件（city-SPEC §8-4b）。**被否**：派活帧上加一个字段，那要动 wire，而居民是一个站着的身份（词汇表 Resident），不是每次派活现选的；梯子上的 harness 压过会话记录，那会让一段会话中途换居民（city-SPEC §12.6）。
 
-**接线分四段，各自红转绿**：①`agent_protocols`：`Harness::parse`、`AcpSession::cancel` 与起进程的那一半；②`kernel`：`harness_reported`、`harness_answered` 两个种类与 `Evidence` 多收的一种；③`city`：`[resident] harness`；④本 crate：派活路径上的 harness run。
+**接线分四段，各自红转绿**：①`agent_protocols`：`Harness::parse`、`AcpSession::cancel` 与起进程的那一半；②`kernel`：`harness_reported`、`harness_answered` 两个种类与 `Evidence` 多收的一种；③`city`：`[resident] harness`；④本 crate：派活路径上的 harness run。④ 接上之前，派活落到一个 harness 房间时（`city::settled_harness` 答出一家），`agree_to_work` 在写任何东西之前答 `E_TOOL_UNAVAILABLE`，恢复语给出点名它的那份 `CONFIG.toml`：一个读得进来却什么都不发生的键，正是 city-SPEC §8-4 拒绝未知键要防的状态。
 
 ## 8-5 订阅额度走 harness，不走登录
 
@@ -1223,7 +1223,7 @@ the work: a halted city that laid a job file down would leave a task in a room n
 **一次派活在城答应之前不写任何东西；城一答应，第一件被写下的就是房间。**
 
 「城答应」由一处回答，穷尽如下，且每一条都只读不写：保留子树（`Building::of`）、停摆
-（`halted_by`）、楼的规矩读得出（`city::load`）、tag 后面有模型且端点还在且不违反 confidential
+（`halted_by`）、楼的规矩读得出（`city::load`）、房间的居民不是 harness（`city::settled_harness`；§8-4e 的第 ④ 段接上之前答出一家即拒）、tag 后面有模型且端点还在且不违反 confidential
 （`Router::select`）、适配器造得出（`adapter_for`）。
 
 **留在答应之后的两条拒绝，各有其理由，写在这里而不是被含糊过去**：
