@@ -26,6 +26,7 @@
 
 mod identity;
 mod kind;
+mod moment;
 mod payload;
 pub mod record;
 mod scope;
