@@ -104,12 +104,16 @@ pub enum StorageError {
     #[error("the ledger at {} lost its barrier at seq {}", dir.display(), at.value())]
     LedgerBroken { dir: PathBuf, at: kernel::Seq },
     /// A whole-chain audit found a broken line, so this writer stopped
-    /// taking new lines; `source` is the audit's own reason (8-27).
+    /// taking new lines; `source` is the audit's own reason (8-30).
     #[error("the ledger stopped taking writes because its chain failed verification")]
     ChainHalted {
         #[source]
         source: AxError,
     },
+    /// This writer waits for the proof of the history it opened from, and
+    /// writes nothing until the proof is whole (8-30).
+    #[error("the ledger takes no line until the history it opened from is proved")]
+    Unproven,
     /// The disk refused a snapshot read or write. A snapshot is a cache
     /// the Ledger rebuilds, so its advice differs from `Io`'s (8-26).
     #[error("{op} failed at {path}: {source}")]
@@ -151,6 +155,14 @@ impl StorageError {
                 "non-tail damage cannot be auto-repaired ({source}); inspect the segment"
             )),
             StorageError::Draft { source } | StorageError::ChainHalted { source } => source,
+            StorageError::Unproven => AxError::failure(
+                AxCode::HistoryUnproven,
+                "append to the ledger",
+                "the history this city opened from is still being proved",
+            )
+            .with_recovery(
+                "the city is still proving the history it opened from; send it again once the log says the history is proved",
+            ),
             StorageError::Worktree { op, detail } => {
                 AxError::failure(AxCode::StorageFatal, op, detail).with_recovery(
                     "the repository or the filesystem refused; fix that, then claim again",

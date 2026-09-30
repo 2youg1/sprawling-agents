@@ -76,7 +76,15 @@ mod chain_audit;
 
 pub use chain_audit::ChainAudit;
 pub use chain_audit::ChainHalt;
+pub use chain_audit::ProofCount;
+pub use chain_audit::Proven;
 pub use chain_audit::audit_chain;
+pub use chain_audit::prove_chain;
+
+mod verified_prefix;
+
+pub use verified_prefix::ProofRecords;
+pub use verified_prefix::line_check_version;
 
 mod snapshot;
 

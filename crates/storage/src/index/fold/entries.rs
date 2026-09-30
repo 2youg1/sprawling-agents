@@ -36,6 +36,7 @@ const HOLE: u64 = u64::MAX;
 /// more than the lines do.
 const MIN_REACH: usize = 64;
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(super) struct Entries {
     base: Seq,
     column: Vec<u64>,

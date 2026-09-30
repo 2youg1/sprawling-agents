@@ -51,11 +51,22 @@ pub enum WholeFold {
 /// snapshot in `snapshot_dir` and the fold rules' `fold_version`.
 ///
 /// Only the segment holding the snapshot's seq and the segments after
-/// it are read; the whole chain is `audit_chain`'s to walk.
+/// it are read; the whole chain is `prove_chain`'s to walk.
 ///
 /// # Errors
 /// `StorageError::Io` when a segment or the snapshot cannot be read.
 pub fn start_from_snapshot(
+    ledger_dir: &Path,
+    snapshot_dir: &Path,
+    fold_version: u32,
+) -> Result<SnapshotStart, StorageError> {
+    start_through(&RealFs::new(), ledger_dir, snapshot_dir, fold_version)
+}
+
+/// [`start_from_snapshot`], reading segments through `vfs`: the seam a
+/// test counts what an opening reads through.
+pub(crate) fn start_through(
+    vfs: &dyn Vfs,
     ledger_dir: &Path,
     snapshot_dir: &Path,
     fold_version: u32,
@@ -68,7 +79,8 @@ pub fn start_from_snapshot(
                 found: snapshot.fold_version(),
             }
         }
-        StoredSnapshot::Present(snapshot) => match lines_from_cut(ledger_dir, snapshot.seq())? {
+        StoredSnapshot::Present(snapshot) => match lines_from_cut(vfs, ledger_dir, snapshot.seq())?
+        {
             None => WholeFold::Missing,
             Some(Cut { line_at_seq, tail }) => match snapshot.fit(&line_at_seq) {
                 SnapshotFit::Fits => return Ok(SnapshotStart::Resume { snapshot, tail }),
@@ -88,7 +100,7 @@ struct Cut {
 /// The line at `seq` and every complete line after it, read from the
 /// segment whose name claims `seq` onward; `None` when no line sits at
 /// `seq`.
-fn lines_from_cut(dir: &Path, seq: Seq) -> Result<Option<Cut>, StorageError> {
+fn lines_from_cut(vfs: &dyn Vfs, dir: &Path, seq: Seq) -> Result<Option<Cut>, StorageError> {
     let segments = ledger_segments_at(dir)?;
     let Some((at, first)) = segments.iter().enumerate().rev().find_map(|(at, segment)| {
         first_seq_of(segment)
@@ -99,7 +111,7 @@ fn lines_from_cut(dir: &Path, seq: Seq) -> Result<Option<Cut>, StorageError> {
     };
     // Past the address space the line cannot be in memory either: skip all.
     let mut skip = usize::try_from(seq.value().saturating_sub(first.value())).unwrap_or(usize::MAX);
-    let (vfs, mut line_at_seq, mut tail) = (RealFs::new(), None, Vec::new());
+    let (mut line_at_seq, mut tail) = (None, Vec::new());
     for segment in segments.iter().skip(at) {
         let bytes = vfs.read(segment).map_err(io_err("read segment", segment))?;
         for line in complete_lines(&bytes)

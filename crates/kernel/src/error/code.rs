@@ -53,7 +53,7 @@ pub enum AxCode {
     TaintedAction,
     RepairBusy,
     DelegationDepth,
-    // Governance and facilities (14).
+    // Governance and facilities (15).
     ApprovalPending,
     ApprovalDenied,
     CrossBuildingDenied,
@@ -76,6 +76,11 @@ pub enum AxCode {
     /// Another process holds this city's Ledger for writing. Loadtime,
     /// because the process it refuses is the one that may not write.
     LedgerHeld,
+    /// A served city is still proving the history it opened from, and
+    /// its writer takes no line until the proof is whole. Loadtime for
+    /// the same reason as `LedgerHeld`: the refused process may not write
+    /// yet (storage-SPEC 8-30).
+    HistoryUnproven,
     // Privacy and Discard (2).
     SecretEgress,
     DiscardIrreversible,
@@ -94,7 +99,7 @@ pub enum AxCode {
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
     /// `xtask specalign`.
-    pub const ALL: [AxCode; 40] = [
+    pub const ALL: [AxCode; 41] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
         AxCode::ToolUnavailable,
@@ -130,6 +135,7 @@ impl AxCode {
         AxCode::WireMismatch,
         AxCode::LogVersionUnsupported,
         AxCode::LedgerHeld,
+        AxCode::HistoryUnproven,
         AxCode::SecretEgress,
         AxCode::DiscardIrreversible,
         AxCode::BackpressureShed,
@@ -175,6 +181,7 @@ impl AxCode {
             AxCode::WireMismatch => "E_WIRE_MISMATCH",
             AxCode::LogVersionUnsupported => "E_LOG_VERSION_UNSUPPORTED",
             AxCode::LedgerHeld => "E_LEDGER_HELD",
+            AxCode::HistoryUnproven => "E_HISTORY_UNPROVEN",
             AxCode::SecretEgress => "E_SECRET_EGRESS",
             AxCode::BackpressureShed => "E_BACKPRESSURE_SHED",
             AxCode::DiscardIrreversible => "E_DISCARD_IRREVERSIBLE",
@@ -214,7 +221,8 @@ impl AxCode {
             | AxCode::StorageFatal
             | AxCode::WireMismatch
             | AxCode::LogVersionUnsupported
-            | AxCode::LedgerHeld => Carrier::Loadtime,
+            | AxCode::LedgerHeld
+            | AxCode::HistoryUnproven => Carrier::Loadtime,
             AxCode::PathNotFound
             | AxCode::ToolUnknown
             | AxCode::ToolUnavailable
@@ -335,9 +343,9 @@ mod tests {
         // The length is the close of the table, so it is stated once:
         // a code added without a spelling, or two codes sharing one,
         // fails here rather than at a caller.
-        assert_eq!(AxCode::ALL.len(), 40);
+        assert_eq!(AxCode::ALL.len(), 41);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
-        assert_eq!(spellings.len(), 40);
+        assert_eq!(spellings.len(), 41);
         for s in &spellings {
             assert!(s.starts_with("E_"));
         }

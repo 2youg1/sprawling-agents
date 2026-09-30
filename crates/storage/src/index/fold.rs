@@ -6,12 +6,13 @@
 //! The folded index: seq to (segment, byte offset), and what indexing
 //! one line means.
 //!
-//! Nothing here is persisted. The maps are rebuilt from the segments
-//! whenever a reader opens them, and [`crate::index::LedgerIndex`] keeps
-//! them for the life of a process so a query costs one directory listing
-//! plus the bytes appended since the last look. Nothing on disk carries
-//! the same maps, because a second copy is a second answer waiting to
-//! disagree.
+//! The maps are built from the segments, and [`crate::index::LedgerIndex`]
+//! keeps them for the life of a process so a query costs one directory
+//! listing plus the bytes appended since the last look. They are
+//! persisted only inside the views snapshot, as a projection: `scanned`
+//! says how far each segment was folded, so a segment that shrank or
+//! vanished since rebuilds them rather than being trusted
+//! (storage-SPEC 8-4).
 //!
 //! The storage is one implicit-seq column over lines and a span table
 //! over runs ([`Entries`], [`RunTable`]). The public queries are the
@@ -26,6 +27,7 @@ use kernel::{RunId, Seq};
 mod entries;
 use entries::{Entries, Seqs};
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct Folded {
     pub(crate) scanned: BTreeMap<String, u64>,
     entries: Entries,
@@ -124,6 +126,7 @@ impl Folded {
 /// line. Spans hold only values both endpoints were seen at — two spans
 /// merge exactly when the gap between them has been written too — so a
 /// span never claims a seq nobody wrote.
+#[derive(serde::Serialize, serde::Deserialize)]
 struct RunTable {
     /// Sorted by run, so one lookup is one binary search.
     runs: Vec<RunSpans>,
@@ -131,13 +134,14 @@ struct RunTable {
 
 /// One run's spans: ascending, disjoint, and never adjacent, because
 /// adjacent spans merge the moment they touch.
+#[derive(serde::Serialize, serde::Deserialize)]
 struct RunSpans {
     run: RunId,
     spans: Vec<Span>,
 }
 
 /// An inclusive span of seq values, `start..=end`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 struct Span {
     start: Seq,
     end: Seq,
