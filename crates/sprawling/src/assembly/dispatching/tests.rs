@@ -136,6 +136,63 @@ fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
     );
 }
 
+/// A room whose resident is a harness is refused before anything is
+/// written, until the harness drive is wired (sprawling-SPEC 8-4e).
+///
+/// The worker has no model attached on purpose: the harness refusal
+/// comes before a model is chosen, so a harness room is not refused
+/// for having no model.
+#[test]
+fn a_room_whose_resident_is_a_harness_is_refused_before_anything_is_written() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    let file = city::config_path(dir.path(), &room, city::Layer::Building).unwrap();
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::write(
+        &file,
+        "[resident]
+harness = \"pi\"
+",
+    )
+    .unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+
+    let refused = worker
+        .handle(wire::Command::Dispatch {
+            addr: room.clone(),
+            task: "say something".to_owned(),
+            goal: "an answer".to_owned(),
+            mode: kernel::Mode::PlanGoal,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .err();
+
+    assert_eq!(
+        refused,
+        Some(
+            AxError::failure(AxCode::ToolUnavailable, "dispatch work", "lab/room1: pi")
+                .with_recovery(format!(
+                    "this build reads `[resident] harness` but does not start a harness yet; \
+                     take the key out of {} to dispatch to a model here",
+                    file.display()
+                ))
+        )
+    );
+    assert!(
+        !dir.path().join("lab").join("room1").exists(),
+        "a refused dispatch opened the room"
+    );
+}
+
 /// A dispatch that never says when to stop is a conversation, and the
 /// prefix says so instead of handing over a form with its one
 /// irreplaceable field blank.
