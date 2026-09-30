@@ -163,7 +163,7 @@ proptest! {
             let run = run_id(byte);
             for before in [None, Some(Seq::FIRST), Some(Seq::new(3)), Some(Seq::new(4000))] {
                 prop_assert_eq!(
-                    folded.run_seqs_before(run, before),
+                    folded.run_seqs_before(run, before).collect::<Vec<_>>(),
                     oracle.run_seqs_before(run, before)
                 );
             }

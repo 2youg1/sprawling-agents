@@ -228,8 +228,11 @@ impl LedgerIndex {
     ///
     /// A run this index never saw yields nothing, which is the truth and
     /// needs no separate answer.
+    ///
+    /// The walk is lazy: taking `n` values costs `n` steps, not the
+    /// length of the run.
     pub fn run_seqs_before(&self, run: RunId, before: Option<Seq>) -> impl Iterator<Item = Seq> {
-        self.folded.run_seqs_before(run, before).into_iter()
+        self.folded.run_seqs_before(run, before)
     }
 
     /// Every seq the index holds, ascending: the walk a reader takes

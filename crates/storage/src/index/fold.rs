@@ -91,7 +91,11 @@ impl Folded {
     }
 
     /// The seq values one run wrote, newest first, below `before`.
-    pub(crate) fn run_seqs_before(&self, run: RunId, before: Option<Seq>) -> Vec<Seq> {
+    pub(crate) fn run_seqs_before(
+        &self,
+        run: RunId,
+        before: Option<Seq>,
+    ) -> impl Iterator<Item = Seq> {
         self.runs.seqs_before(run, before)
     }
 
@@ -164,40 +168,32 @@ impl RunTable {
         }
     }
 
-    fn seqs_before(&self, run: RunId, before: Option<Seq>) -> Vec<Seq> {
-        let found = self
+    /// Lazy, span by span from the newest: a caller that takes `n`
+    /// values walks `n` values, however long the run is.
+    fn seqs_before(&self, run: RunId, before: Option<Seq>) -> impl Iterator<Item = Seq> {
+        let spans: &[Span] = match self
             .runs
             .binary_search_by(|held| held.run.cmp(&run))
             .ok()
-            .and_then(|at| self.runs.get(at));
-        let Some(held) = found else {
-            return Vec::new();
+            .and_then(|at| self.runs.get(at))
+        {
+            Some(held) => &held.spans,
+            None => &[],
         };
-        let mut newest_first = Vec::new();
-        for span in held.spans.iter().rev() {
-            let mut at = span.end;
-            if let Some(before) = before
-                && before <= at
-            {
-                let Some(below) = before.value().checked_sub(1).map(Seq::new) else {
-                    // `before` is the first seq there is: nothing
-                    // sits below it, and no earlier span can either.
-                    return newest_first;
-                };
-                at = below;
-            }
-            loop {
-                if at < span.start {
-                    break;
-                }
-                newest_first.push(at);
-                let Some(below) = at.value().checked_sub(1).map(Seq::new) else {
-                    break;
-                };
-                at = below;
-            }
-        }
-        newest_first
+        // The highest value a caller may be answered; `None` when
+        // `before` is the first seq there is, so nothing sits below it.
+        let ceiling = match before {
+            None => Some(u64::MAX),
+            Some(before) => before.value().checked_sub(1),
+        };
+        spans
+            .iter()
+            .rev()
+            .filter_map(move |span| {
+                let top = ceiling?.min(span.end.value());
+                (top >= span.start.value()).then_some((span.start.value(), top))
+            })
+            .flat_map(|(low, top)| (low..=top).rev().map(Seq::new))
     }
 }
 
