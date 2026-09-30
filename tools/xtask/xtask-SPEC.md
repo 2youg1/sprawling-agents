@@ -349,7 +349,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 **三条断言，各修一种真实的漂移**：
 
 1. **锁文件在盘上，且与清单逐条同。** `client/bun.lock` 的 `workspaces` 块记着 bun 上次解算时看见的 `dependencies` 与 `devDependencies`；`package.json` 记着今天要的那份。一处不同就说明有人改了清单而没有重解，于是一台开发机装出来的东西与 CI 装出来的东西不是同一棵树。依据是**两张表逐键逐值相等**，缺、多、值不同各报一条。
-2. **运行时依赖恰为 `svelte` 与 `effect`。** 这是 client-SPEC §1 已经写下的那条界线的机器面：devDependencies 随工具链自由变动，而进到用户浏览器里的东西是一张封闭的两行表。**恰为**而不是**至少**——一个只查白名单不查缺失的门，会放过「svelte 被误删」这一半。
+2. **运行时依赖恰为 `RUNTIME` 所列。** 这是 client-SPEC §1 已经写下的那条界线的机器面：devDependencies 随工具链自由变动，而进到用户浏览器里的东西是一张封闭的表，名单只写在 `tools/xtask/src/npm.rs` 的 `RUNTIME`，本节不抄它的条目与数目。**恰为**而不是**至少**——一个只查白名单不查缺失的门，会放过「svelte 被误删」这一半。
 3. **树上每个包的许可证都在准许表内。** 准许表**不是本门新写的**，它就是 `deny.toml` 的 `[licenses] allow`：一个仓库对许可证只应有一个立场，工作区那一侧已经把它写下来了，本门读同一张表。许可证从 `client/node_modules/<包>/package.json` 的 `license` 字段读得——锁文件不带许可证，而已装的树带。
 
 **`node_modules` 不在树上时，第三条 skip 并说出理由，前两条照判。** `node_modules` 是 `.gitignore` 里的名字，一台没有跑过 `bun install` 的机器上它不存在，而**这不是缺陷**；门在自己打印的那一行里说它没看，与 `render` 缺浏览器时同一口径。前两条只读入库文件，故在任何机器上都判得动——**一道会因为环境而整体沉默的门，就是一道在 CI 之外不再存在的门**。
@@ -362,13 +362,13 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 | `tools/xtask/src/npm/lockfile.rs` | 两份清单怎么读成同一种形状：`bun.lock` 是带尾逗号与注释的 JSONC，故先归一再交给 `serde_json`（`read_jsonc`、`Manifest`、`manifest_of`、`lock_of`）；`deny.toml` 的准许表怎么读（`permitted`） |
 | `tools/xtask/src/npm/tests.rs` | 尾逗号与注释被归一掉；清单与锁文件不同即报；运行时依赖多一个或少一个各报一条；不在准许表上的许可证被点名；`node_modules` 缺席时第三条不产出违规 |
 
-**`license` 字段的两种形状都认**：一个字符串（`"MIT"`），或一条 SPDX 表达式里的 `OR`／`AND` 分支（`"(MIT OR Apache-2.0)"`）。表达式按 `OR` 拆开，任一分支在准许表内即通过——这与 `cargo-deny` 对同一种表达式的判法一致，故两侧不会对同一个包各执一词。旧包偶尔写 `licenses: [{type: ...}]`，本门**不认**并按「没有说」处理：报出来让人去看，比猜一个字段的历史写法安全。
+**`license` 字段按 SPDX 表达式读**：一个标识符（`"MIT"`），或带 `AND`、`OR`、`WITH` 与括号的表达式。优先级与 SPDX 规范一致：括号先算，`WITH` 最紧（`Apache-2.0 WITH LLVM-exception` 作为一个整体在准许表里查），`AND` 次之，`OR` 最松。`OR` 任一分支准许即准许，`AND` 每一支都准许才准许，与 `cargo-deny` 对同一表达式的判法一致，所以两侧不会对同一个包各执一词。**写坏的表达式**——括号不配对、操作符悬空、空串——按「没有说」处理并被点名。旧包偶尔写 `licenses: [{type: ...}]`，本门**不认**，同样按「没有说」处理：报出来让人去看，比猜一个字段的历史写法安全。**被否的读法**：先抹掉括号再按 ` OR ` 切——`(MIT OR GPL-3.0) AND X` 会读成以 `MIT` 开头的一串 `OR`，第一支就放行，`X` 没有被判。
 
-**两条传递进来的许可证在准许表上**：`caniuse-lite` 的 `CC-BY-4.0` 与 `minimatch` 的 `BlueOak-1.0.0`，各一行写在 `deny.toml` 的 `[licenses] allow` 里，理由跟在行旁。依据三条：两者都由 devDependencies 传递带入，到不了用户的浏览器；`CDLA-Permissive-2.0` 为一份证书清单入表是同一形状的先例，`caniuse-lite` 同样是一张数据表，而 `just dist` 写出的物料清单正是 `CC-BY-4.0` 要求的署名落点；`BlueOak-1.0.0` 经 OSI 审议通过，宽松，且授予 MIT 未言明的专利权。
+**一条传递进来的许可证在准许表上**：`minimatch` 的 `BlueOak-1.0.0`，写在 `deny.toml` 的 `[licenses] allow` 里，理由跟在行旁：它由 devDependencies 传递带入，到不了用户的浏览器；它经 OSI 审议通过，宽松，且授予 MIT 未言明的专利权。**`CC-BY-4.0` 不在表上**：它曾为 `caniuse-lite` 入表，那条来路随 Solid 编译链一起消失，今天 `bun.lock` 与 cargo 的依赖图里都没有一个 `CC-BY-4.0` 的包；一条没有持有者的准许，是一处没人看守的放宽。
 
-**另一条路——换掉 minimatch——走不通，已逐条走查**：`minimatch ^10` 由 `eslint` 自身、`@eslint/config-array` 与 `@typescript-eslint/typescript-estree` 三处同时要求（`10` 之前的 `minimatch` 是 `ISC`，但降版就是降掉 eslint 10），它落在冻结的前端工具链上。`caniuse-lite` 的来路已随 Solid 编译链一并消失（`bun.lock` 里既无 `browserslist` 也无 `caniuse-lite`）：准许行只为安装树的旧残留而在，安装树重装后按 re-pricing 流程删行，单独提交。
+**另一条路——换掉 minimatch——走不通，已逐条走查**：`minimatch ^10` 由 `eslint` 自身、`@eslint/config-array` 与 `@typescript-eslint/typescript-estree` 三处同时要求（`10` 之前的 `minimatch` 是 `ISC`，但降版就是降掉 eslint 10），它落在冻结的前端工具链上。
 
-**翻案条件**：删掉 `deny.toml` 那两行，红的就是本节这道门——放宽写在它自己的提交里，不在门正卡着的那一次改动里，这是 AGENTS.md 的 `guard` 行区分的两件事。
+**翻案条件**：删掉 `deny.toml` 的 `BlueOak-1.0.0` 那一行，红的就是本节这道门——放宽写在它自己的提交里，不在门正卡着的那一次改动里，这是 AGENTS.md 的 `guard` 行区分的两件事。
 
 **本节属门禁机具，与产品代码分开提交。**
 
@@ -554,6 +554,8 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 **归档里那个可执行文件叫什么，向平台表要**（§8-19）：那张表有 `binary` 一列，打包器不另用 `cfg!(windows)` 或「三元组里含不含 `windows`」再判一次。打包器按即将写下的归档名 `-<label>.zip` 向 `platform::with_suffix` 取行；**本次发布不出这份归档的目标被拒绝**，这正是平台表为自己写下的政策。
 
 **发布二进制必须带执行引擎**：`AbsentSandbox` 的恢复语让人去装一个带执行引擎的构建，而下载发布档的人开不了任何 feature。判法与 `budget::carries_client` 同形——`budget::carries_engine` 读产物的字节，找只有 wasmtime 会写下的那句燃料陷阱文案（默认 feature 集下这棵树一个 wasm crate 都没有，故别处写不出它）。`sandbox` feature 在 `crates/sprawling/Cargo.toml` 里默认关闭，发布构建（`justfile` 的 release 构建行）显式打开它；`package` 在打包前拒绝一个不带引擎的二进制。
+
+**发行归档还不带 cargo 包的许可原文。** 归档带 `LICENSE`（本仓库的 MPL-2.0）与 CycloneDX 物料清单；清单列出每个 cargo 包的名字、版本与 SPDX 标识，不带 MIT 与 Apache-2.0 要求随分发附上的版权与许可原文。npm 那一半由客户端产物里的 `THIRD-PARTY-NOTICES.txt` 随二进制发出（client-SPEC 12-13）。cargo 这一半缺的是：一个从 `cargo metadata` 的 `manifest_path` 旁读许可文件、按正文去重后写出的步骤，与 `Packaged` 里带着它的一个变体。
 
 **本节属门禁机具，与产品代码分开提交。**
 
