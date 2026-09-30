@@ -205,49 +205,41 @@ mod tests {
         }
     }
 
+    fn rendered(at: u64, zones: &[ClockZone]) -> String {
+        stamp(TimeMs::new(at), zones).unwrap().render()
+    }
+
     #[test]
-    fn the_integer_calendar_matches_known_instants() {
-        assert_eq!(format_local(0, 0).unwrap(), "1970-01-01 00:00");
+    fn a_stamp_reads_as_iso_utc_to_the_second() {
+        assert_eq!(rendered(0, &[]), "clock: 1970-01-01T00:00:00Z;");
         assert_eq!(
-            format_local(1_709_251_140_000, 0).unwrap(),
-            "2024-02-29 23:59"
+            rendered(1_709_251_199_999, &[]),
+            "clock: 2024-02-29T23:59:59Z;"
         );
         assert_eq!(
-            format_local(1_785_585_600_000, 0).unwrap(),
-            "2026-08-01 12:00"
+            rendered(1_785_585_607_000, &[]),
+            "clock: 2026-08-01T12:00:07Z;"
         );
         assert_eq!(
-            format_local(978_287_400_000, 0).unwrap(),
-            "2000-12-31 18:30"
+            rendered(978_287_400_000, &[]),
+            "clock: 2000-12-31T18:30:00Z;"
         );
     }
 
     #[test]
-    fn offsets_shift_across_midnight_both_ways() {
-        // 2026-08-01 12:00 UTC at +540 is 21:00 the same day; at -780 it
-        // crosses back to 23:00 of July 31.
+    fn a_zone_row_is_the_same_second_with_its_offset_across_midnight_both_ways() {
+        // 2026-08-01 12:00:07 UTC at +540 is 21:00:07 the same day; at
+        // -780 it crosses back to 23:00:07 of July 31.
+        let west = ClockZone {
+            id: "west".to_owned(),
+            offset_min: -780,
+        };
         assert_eq!(
-            format_local(1_785_585_600_000, 540).unwrap(),
-            "2026-08-01 21:00"
+            rendered(1_785_585_607_000, &[tokyo(), west]),
+            "clock: 2026-08-01T12:00:07Z; tokyo 2026-08-01T21:00:07+09:00; \
+             west 2026-07-31T23:00:07-13:00;"
         );
-        assert_eq!(
-            format_local(1_785_585_600_000, -780).unwrap(),
-            "2026-07-31 23:00"
-        );
-    }
-
-    #[test]
-    fn utc_row_is_always_first_and_empty_zones_report_utc_only() {
-        let s = stamp(TimeMs::new(0), &[]).unwrap();
-        assert_eq!(s.zones.len(), 1);
-        assert_eq!(s.zones[0].id, "utc");
-        let s = stamp(TimeMs::new(0), &[tokyo()]).unwrap();
-        assert_eq!(s.zones.len(), 2);
-        assert_eq!(s.zones[1].local, "1970-01-01 09:00");
-        assert_eq!(
-            s.render(),
-            "clock: utc 1970-01-01 00:00; tokyo 1970-01-01 09:00;"
-        );
+        assert!(stamp(TimeMs::new(0), &[]).unwrap().zones.is_empty());
     }
 
     #[test]
@@ -290,27 +282,27 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
-        // Next minute: stamps again, truncated to the bucket start.
+        // Next minute: stamps again, with the reading itself - the
+        // bucket decides how often, never what the stamp says.
         let s = gate
             .observe(TimeMs::new(61_000), Temporal::Timeless, &[])
             .unwrap()
             .unwrap();
-        assert_eq!(s.utc_ms, TimeMs::new(60_000));
+        assert_eq!(s.utc_ms, TimeMs::new(61_000));
     }
 
     #[test]
-    fn timestamped_emits_every_result_with_bucket_truncation() {
+    fn timestamped_emits_every_result_with_its_own_reading() {
         let mut gate = StampGate::new(ClockStampGranularity::Hour);
         let a = gate
-            .observe(TimeMs::new(10), Temporal::Timestamped, &[])
+            .observe(TimeMs::new(1_000), Temporal::Timestamped, &[])
             .unwrap()
             .unwrap();
         let b = gate
-            .observe(TimeMs::new(20), Temporal::Timestamped, &[])
+            .observe(TimeMs::new(2_000), Temporal::Timestamped, &[])
             .unwrap()
             .unwrap();
-        assert_eq!(a.utc_ms, TimeMs::new(0));
-        assert_eq!(b.utc_ms, TimeMs::new(0));
-        assert_eq!(a.render(), b.render());
+        assert_eq!(a.render(), "clock: 1970-01-01T00:00:01Z;");
+        assert_eq!(b.render(), "clock: 1970-01-01T00:00:02Z;");
     }
 }

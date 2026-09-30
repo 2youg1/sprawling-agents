@@ -222,7 +222,7 @@ fn the_three_attachments_ride_in_order_and_off_means_zero_bytes() {
     .unwrap();
     let lines: Vec<&str> = out.content.lines().collect();
     assert_eq!(lines[0], "done");
-    assert!(lines[1].starts_with("clock: utc 1970-01-01 00:01"));
+    assert_eq!(lines[1], "clock: 1970-01-01T00:01:30Z;");
     assert!(lines[2].starts_with("[net] "));
     assert_eq!(lines[3], "user: wrap up");
     // Off gate: byte-identical to the featureless envelope (A18).
