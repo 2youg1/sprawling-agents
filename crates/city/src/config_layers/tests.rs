@@ -138,8 +138,18 @@ fn a_key_this_version_does_not_read_is_refused_rather_than_ignored() {
     assert_eq!(err.code(), &AxCode::ConfigInvalid);
     assert!(err.recovery().contains("[model]"));
 
-    let err = ConfigLayer::parse("[clock]\nstamp = \"minute\"\n").unwrap_err();
+    let err = ConfigLayer::parse("[clock]\nzones = []\n").unwrap_err();
     assert_eq!(err.code(), &AxCode::ConfigInvalid);
+}
+
+#[test]
+fn a_layer_states_how_often_results_carry_the_clock() {
+    let dir = tempfile::tempdir().unwrap();
+    let room = addr("lab/room1");
+    let file = path(dir.path(), &room, Layer::Building).unwrap();
+    write(&file, "[clock]\nstamp = \"hour\"\n");
+    let frozen = load(dir.path(), &room).map(|frozen| frozen.clock_stamp);
+    assert_eq!(frozen.ok(), Some(kernel::ClockStampGranularity::Hour));
 }
 
 #[test]
