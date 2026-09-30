@@ -199,7 +199,7 @@ pub(crate) fn perform(tool: ToolName, arguments: &Value, admitted: &Admitted<'_>
 | `desktop.snapshot` | 一个窗口的 accessibility tree，折成一段文字（`outline`）：每个元素一行，写它的 ref、role 与 name，按深度缩进；另一块文字写 title、process 与 generation；bounds 只留在 `Views` 里，由 `desktop.act` 按 ref 取 | 不给像素、不给控件的内部句柄、不读被遮挡的内容 |
 | `desktop.act` | ref 或 point ＋ 动作（click／double／right／drag／scroll／type／key，带 modifiers），携 snapshot 的 generation；**发事件前先核对前台窗口**；桌面只收下一部分时如实报数，并补发它留下按住的键与鼠标键的抬起 | 不合成整段脚本、不重试、不在 generation 过期或窗口挪动后改打别处、不在别的窗口拿着键盘时把按键发出去 |
 | `desktop.screenshot` | window／region，format png\|jpeg\|webp，quality、scale；答一块 image content（`data` 是 base64，`mimeType`）和一块写着 title／width／height／lossless 的文字 | 不做 OCR、不做比对、不落盘 |
-| `desktop.record` | start／stop：本 package 唯一那条线程经 `capture::window` 抓帧，PATH 上有 ffmpeg 就经它的 stdin 编成 mp4，否则写成一个 PNG 序列目录；audio 可选 | 不做剪辑、不做转码、不在没说 stop 时自己停（十分钟上限除外） |
+| `desktop.record` | start／stop：本 package 唯一那条线程经 `capture::window` 抓帧，PATH 上有 ffmpeg 就经它的 stdin 编成 mp4，否则写成一个 PNG 序列目录；`audio: true` 被拒（声音将怎样录，见 §12.11） | 不做剪辑、不做转码、不在没说 stop 时自己停（十分钟上限除外） |
 | `desktop.clipboard` | get／set 文本 | 不碰图片与文件列表、不保留历史 |
 
 `desktop.act` 携 generation 是照抄 `browser::act` 的那一条：**对着一份快照做的决定，恒不落到另一份快照上**——过期就拒，而不是打到那时挪过去的东西上。
@@ -301,7 +301,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 **第三对（`desktop.windows` 报的 ref 是什么）**：让它成为 `snapshot`／`act` 也接受的第二种指名方式（落选）vs 只作为这条连接内一个窗口的**稳定叫法**（选中）。scope 判定读的是 `title` 与 `process`（`Reach`），一个绕过它们的 ref 就是同一份许可的第二道门——而两道门里一定有一道最后没人看。工具表是定死的，`snapshot`／`act` 的 schema 里本来也没有窗口 ref 这一项；本节记下的是**为什么不去加它**。ref 里恒不含 `HWND` 的数值：句柄是运行中的机器的内部事实，模型没有一处用得上它。
 
-**第四对（没有 ffmpeg 时录什么）**：宣告录制不可用（落选）vs 自己抓一列 PNG 帧（选中）。工具卡片明写了「有 ffmpeg 出 mp4，没有则出帧序列」，而帧序列要一个**在读循环之外**跑的东西——本 package 因此有且只有一个 `std::thread::spawn`，在 `record::sink`：这条线程抓帧，交给 ffmpeg 的 stdin，或写成 PNG，由一个 `AtomicBool` 停下，`stop` 恒 join 它。这是本 package 唯一一处并发，写在这里是为了下一个读者不必去找第二处。声音（`audio: true`）恒被拒：选一个录音设备要知道运行中的机器上它叫什么，而这台 server 没有任何一处知道；假装录了而没录，比拒绝贵。
+**第四对（没有 ffmpeg 时录什么）**：宣告录制不可用（落选）vs 自己抓一列 PNG 帧（选中）。工具卡片明写了「有 ffmpeg 出 mp4，没有则出帧序列」，而帧序列要一个**在读循环之外**跑的东西——本 package 因此有且只有一个 `std::thread::spawn`，在 `record::sink`：这条线程抓帧，交给 ffmpeg 的 stdin，或写成 PNG，由一个 `AtomicBool` 停下，`stop` 恒 join 它。这是本 package 唯一一处并发，写在这里是为了下一个读者不必去找第二处。声音（`audio: true`）恒被拒：选一个录音设备要知道运行中的机器上它叫什么，而这台 server 没有任何一处知道；假装录了而没录，比拒绝贵。能知道它的只有人，所以设备名只从 scope 文件来（§12.11）。
 
 **第五对（错误码的第二份拼写怎么收）**：§8.5 第一对接受了「同一拼写、两处定义」，而这里收成一处可检查的引用：`xtask guard` 的 wall 读 `refusal.rs` 里每个 `E_` 字符串，要求它是 `kernel::error::code` 定义过的拼写；`_meta` 的键 `sprawling/effect-unknown` 也由它与 `agent_protocols::mcp::tools` 的那一份比对。集合包含只证明拼写存在，不证明本 package 的每个变体映到了语义对的那个 kernel 码；后一件靠 §12 的码表与评审。结论不变：不能靠共享依赖消除这份重复（§8.5 第一对），能做到的是让漂移**可见**——两处定义，一处权威，一道门在城里那侧盯着。
 
@@ -422,6 +422,13 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 - **(b) 击败的备选**：继续回每个节点的 JSON（答复是现在的四五倍长，bounds 占去一半）；另造一套平台无关的 role 词（在只有一个平台的今天，它只是一层没有第二个读者的翻译）。
 - **(b) 重开的参数**：macOS 臂落地时 AX 的 role 映不进这张词表。
 
+### 12.11 声音：ffmpeg 的 `dshow` 录 scope 文件点名的那一个设备
+
+- **决定**：`desktop.record` 的 `audio: true` 录的是人写在 scope 文件里的那一个 DirectShow 音频设备，键为 `sound = "<设备名>"`，与 `record`、`clipboard` 同样缺省不写。设备名只从 scope 文件来：调用方的参数里没有它，本 server 也不枚举设备。scope 文件写了 `record = true` 而没写 `sound` 时，`audio: true` 以 `E_GATE_DENIED` 拒，恢复语说出去哪里查设备名（`ffmpeg -hide_banner -list_devices true -f dshow -i dummy`）与写进哪一键。声音由第二个 ffmpeg 进程录，`-f dshow -i audio=<设备名>`，写成录制目录里的一个 16 kHz 单声道 wav，与画面各成一个文件；没有 ffmpeg 时，有声音的录制以 `E_TOOL_UNAVAILABLE` 拒，因为帧序列那一支录不了声音。
+- **理由**：主线 ffmpeg 在 Windows 上的音频输入是 `dshow`（`ffmpeg -devices` 列得出），不加依赖、不加 `unsafe`。dshow 设备的名字是驱动起的，随机器而变，城里没有一处知道；替人挑一个，就是替人授权录下一个他没点名的声音源，而麦克风是比一扇窗口更重的授权。人写下名字，就是人授权了这一个设备，与 `windows` 列表授权窗口是同一种读法。画面与声音分成两个进程、两个文件：画面从 stdin 进（§12.7），声音是 ffmpeg 自己的输入，放进一个进程就要对齐两条时钟；wav 是 `gateway::AudioType` 认得、城的 `transcribe` 工具直接收得下的容器（sprawling-SPEC 8-131），16 kHz 单声道一分钟约 1.9 MB。
+- **击败的备选**：WASAPI 回环（能录机器正在放的任何声音，但要新依赖或新 `unsafe`）；枚举设备取第一个（替人选了授权对象）；由调用方在参数里给设备名（模型给出授权对象，scope 文件就不再是授权的唯一处）；把声音混进 mp4（两条时钟，而没有 ffmpeg 的那一支本来就没有声音可混）。
+- **重开的参数**：主线 ffmpeg 在 Windows 上有了 WASAPI 输入；或者 scope 文件要按窗口给不同的设备。
+
 ## 13 依赖选型
 
 八个依赖。`serde`、`serde_json`、`toml` 三个与 workspace 同版本线，只做协议与 scope 文件的读写；另外五个各自买到什么，写在下表，后三个只在 Windows 上链接。**恒不引入**：workspace 内任何 crate（理由见 §8.5 第一对）、async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
@@ -483,7 +490,7 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 **还欠的**，都是这条接口的当前状态：
 
 2. **OCR**：一张截图经人接入的 OCR 端点变成文字，给 accessibility tree 读不到字的窗口（画在画布上的界面、远程桌面）。端点的形状与 `gateway` 里的哪一面还没有定。
-3. **ASR**：`gateway` 的 `transcribe`（OpenAI 兼容的 `audio/transcriptions`）已经在；桌面这一侧还没有把录下的声音交给它，`desktop.record` 的 `audio: true` 仍被拒。
+3. **ASR**：城给 run 的 `transcribe` 工具已经在（sprawling-SPEC 8-131），它经人为 `ModelTag::Transcribe` 选的端点，把 run 自己这座楼里的一个录音文件变成字。桌面这一侧，§12.11 定下的形状还没有落，`desktop.record` 的 `audio: true` 仍被拒：scope 文件还没有 `sound` 这一键（`scope.rs`）；`platform::windows` 还没有把 scope 放行的设备交给 `record::Recordings::start`；`record::sink` 还没有 dshow 那一支。录下的 wav 也还到不了 `transcribe`：它落在临时目录（§14），而工具只读本楼的文件；交回城里要一条路，或者连接器把 MCP 的 audio 块存进城里（`runtime::pipeline::connector` 今天只存 png），或者录音落进这座楼。
 4. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
 
 
