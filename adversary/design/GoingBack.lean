@@ -6,11 +6,11 @@
 /-!
 # Going back, and the write domains of parallel runs.
 
-Specifies `crates/memory/src/worktree/back.rs`, the tree a run opens when a
+Specifies `crates/storage/src/worktree/back.rs`, the tree a run opens when a
 person goes back to a point in the city's history, together with the two
 steps that share its write domain: a run writing a file in its own tree
-(`crates/memory/src/worktree/trees.rs`) and a file restored from a point into
-that tree (`crates/memory/src/worktree/back.rs`). The Rust code is the
+(`crates/storage/src/worktree/trees.rs`) and a file restored from a point into
+that tree (`crates/storage/src/worktree/back.rs`). The Rust code is the
 authority on how these properties hold; this model is the authority on which
 properties must hold (storage-SPEC.md 8-27).
 

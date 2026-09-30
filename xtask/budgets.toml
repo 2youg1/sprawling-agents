@@ -277,7 +277,7 @@ status = "gated, with a register of the files that predate the rule"
 # in a language with none of this repository's vocabulary, so it can
 # testify about a client that shares none of its assumptions.
 #
-# Nothing predates the rule any longer. `crates/channels/tests/enrolment.rs`
+# Nothing predates the rule any longer. `crates/wire/tests/enrolment.rs`
 # used to stand up the enrolment endpoint on a loopback port and write
 # the HTTP request out by hand; what it checks - three fates of one
 # credential, told apart by a worker the test stands in for - is a

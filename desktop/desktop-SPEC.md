@@ -9,7 +9,7 @@
 
 拆成三件可独立验收的事：
 
-- **协议壳（`rpc` ＋ `session`）**：一台按行说话的 MCP server，握手与 `tools/call` 的形状与 `crates/protocol/src/mcp/*` 所写的客户端逐字对齐，于是城把它当一台普通的 stdio MCP server 连：一栋楼的 `RULES.toml` 写 `desktop = true`，城就以 `sprawling desktop <DESKTOP.toml>` 起自己这个二进制（sprawling-SPEC §8-4d），之后走的是与任何 `[[mcp]]` 相同的那条路。
+- **协议壳（`rpc` ＋ `session`）**：一台按行说话的 MCP server，握手与 `tools/call` 的形状与 `crates/agent_protocols/src/mcp/*` 所写的客户端逐字对齐，于是城把它当一台普通的 stdio MCP server 连：一栋楼的 `RULES.toml` 写 `desktop = true`，城就以 `sprawling desktop <DESKTOP.toml>` 起自己这个二进制（sprawling-SPEC §8-4d），之后走的是与任何 `[[mcp]]` 相同的那条路。
 - **工具表（`tools`）**：六件工具的名字、说明与入参 schema **定死**。每条说明都写明这件工具**不做**什么。
 - **拒绝故事（`scope` ＋ `platform`）**：越界与未实现都回一个带稳定错误码与恢复句的 JSON-RPC error。没有 scope 文件＝全拒。
 
@@ -39,7 +39,7 @@
 
 ## 4 现状分析
 
-`crates/protocol` 已经是这套协议的**客户端**权威：`Rpc::initialize`／`initialized`／`list_tools`／`call_tool`／`read` 定死了城里说出去的每一行，`agent_protocols::mcp::stdio` 定死了字节怎么走（子进程、按行、消息内无换行、超时即回收子进程）。本 package 是那一端的**对侧**，因此它的形状不是设计出来的，是**读出来的**。
+`crates/agent_protocols` 已经是这套协议的**客户端**权威：`Rpc::initialize`／`initialized`／`list_tools`／`call_tool`／`read` 定死了城里说出去的每一行，`agent_protocols::mcp::stdio` 定死了字节怎么走（子进程、按行、消息内无换行、超时即回收子进程）。本 package 是那一端的**对侧**，因此它的形状不是设计出来的，是**读出来的**。
 
 ## 5 权威信源
 
@@ -49,8 +49,8 @@
 | stdio 传输：子进程、按行、消息内无换行 | <https://modelcontextprotocol.io/specification/2025-06-18/basic/transports> |
 | `tools/list`／`tools/call` 的 `name`／`description`／`inputSchema` 三字段 | <https://modelcontextprotocol.io/specification/2025-06-18/server/tools> |
 | JSON-RPC 2.0 的保留错误码区间与 `-32000` 起的实现自定义区 | <https://www.jsonrpc.org/specification#error_object> |
-| 城里客户端实际发出的行 | `crates/protocol/src/mcp/handshake.rs`、`crates/protocol/src/mcp/tools.rs` |
-| 城里字节怎么走、超时怎么算 | `crates/protocol/src/mcp/stdio.rs` |
+| 城里客户端实际发出的行 | `crates/agent_protocols/src/mcp/handshake.rs`、`crates/agent_protocols/src/mcp/tools.rs` |
+| 城里字节怎么走、超时怎么算 | `crates/agent_protocols/src/mcp/stdio.rs` |
 | `CONFIG.toml` 的 `[[mcp]]` 与 `McpTransport::Stdio { command, args }` | `crates/kernel/src/config.rs` |
 
 ## 6 命名统一

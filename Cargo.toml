@@ -2,15 +2,15 @@
 resolver = "3"
 members = [
     "crates/kernel",
-    "crates/memory",
+    "crates/storage",
     "crates/gateway",
     "crates/runtime",
     "crates/collab",
     "crates/city",
-    "crates/channels",
-    "crates/remote",
+    "crates/wire",
+    "crates/remote_access",
     "crates/browser",
-    "crates/protocol",
+    "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
     "xtask",
@@ -22,15 +22,15 @@ members = [
 exclude = ["desktop"]
 default-members = [
     "crates/kernel",
-    "crates/memory",
+    "crates/storage",
     "crates/gateway",
     "crates/runtime",
     "crates/collab",
     "crates/city",
-    "crates/channels",
-    "crates/remote",
+    "crates/wire",
+    "crates/remote_access",
     "crates/browser",
-    "crates/protocol",
+    "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
     "xtask",
@@ -177,7 +177,7 @@ schemars = { version = "1", features = ["uuid1"] }
 # exactly, because a path dependency without one cannot be published;
 # Cargo refuses to resolve a pin that disagrees with it.
 kernel = { package = "sprawling-kernel", path = "crates/kernel", version = "=0.0.7" }
-storage = { package = "sprawling-storage", path = "crates/memory", version = "=0.0.7" }
+storage = { package = "sprawling-storage", path = "crates/storage", version = "=0.0.7" }
 gateway = { package = "sprawling-gateway", path = "crates/gateway", version = "=0.0.7" }
 runtime = { package = "sprawling-runtime", path = "crates/runtime", version = "=0.0.7" }
 collab = { package = "sprawling-collab", path = "crates/collab", version = "=0.0.7" }
@@ -185,9 +185,9 @@ city = { package = "sprawling-city", path = "crates/city", version = "=0.0.7" }
 # `wire` turns its default features off here because accounting and
 # xtask take it without its listener; sprawling and citysim name `server`
 # themselves, so a feature later added to its default reaches neither.
-wire = { package = "sprawling-wire", path = "crates/channels", version = "=0.0.7", default-features = false }
+wire = { package = "sprawling-wire", path = "crates/wire", version = "=0.0.7", default-features = false }
 browser = { package = "sprawling-browser", path = "crates/browser", version = "=0.0.7" }
-agent_protocols = { package = "sprawling-agent-protocols", path = "crates/protocol", version = "=0.0.7" }
+agent_protocols = { package = "sprawling-agent-protocols", path = "crates/agent_protocols", version = "=0.0.7" }
 accounting = { package = "sprawling-accounting", path = "crates/accounting", version = "=0.0.7" }
 sprawling = { path = "crates/sprawling", version = "=0.0.7" }
 sprawling-desktop = { path = "desktop", version = "=0.0.7" }

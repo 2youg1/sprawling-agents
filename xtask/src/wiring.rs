@@ -39,8 +39,8 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-const SPEC: &str = "crates/channels/wire-SPEC.md";
-const WIRE_DIR: &str = "crates/channels/src";
+const SPEC: &str = "crates/wire/wire-SPEC.md";
+const WIRE_DIR: &str = "crates/wire/src";
 /// Where the assembly point lives. A directory rather than a file: the
 /// gate wants the declaration of `run_command`, not its address, and
 /// pinning the address meant that splitting the assembly point moved the

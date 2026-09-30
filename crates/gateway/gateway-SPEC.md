@@ -408,7 +408,7 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 
 **为何 `Recording` 是值而不是一对参数**：字节与它的格式永远同行，且两条不变量（非空、不超 `RECORDING_MAX_BYTES`）只在 `new` 一处守；无 setter。**为何 `wire` 与 `transcriber` 分家**：「这段多部分请求体长什么样」是纯数据的判定、可逐字节断言，「怎么把它发出去并兑付凭据」要一个 socket——两件事变化的理由不同。
 
-**线上的入口是 `wire` 的 `POST /transcribe`**（`crates/channels/src/reception/admission.rs`），经 `TranscribeSink` 交到这里；它不是 `Command` 的变体。
+**线上的入口是 `wire` 的 `POST /transcribe`**（`crates/wire/src/reception/admission.rs`），经 `TranscribeSink` 交到这里；它不是 `Command` 的变体。
 
 ## 8.5 两个设计（crate 级）
 

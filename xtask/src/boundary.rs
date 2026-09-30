@@ -402,8 +402,8 @@ mod tests {
     #[test]
     fn a_file_under_tests_is_test_code_by_where_it_lives() {
         let source = "fn helper() {\n    let _ = axum::serve(listener, app);\n}\n";
-        assert_eq!(found("crates/channels/tests/enrolment.rs", source).len(), 1);
-        assert!(found("crates/channels/src/server.rs", source).is_empty());
+        assert_eq!(found("crates/wire/tests/enrolment.rs", source).len(), 1);
+        assert!(found("crates/wire/src/server.rs", source).is_empty());
     }
 
     /// The waiver is read on the line and on the line above, which is

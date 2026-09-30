@@ -42,7 +42,7 @@ use crate::report::{Violation, XtaskError};
 const ROOT_MANIFEST: &str = "Cargo.toml";
 const DESKTOP_MANIFEST: &str = "desktop/Cargo.toml";
 /// Where the protocol revision is decided, and where it is copied.
-const PROTOCOL_HOME: &str = "crates/protocol/src/mcp/handshake.rs";
+const PROTOCOL_HOME: &str = "crates/agent_protocols/src/mcp/handshake.rs";
 const PROTOCOL_COPY: &str = "desktop/src/rpc.rs";
 /// Where the city's error codes are defined, and where the out-of-tree
 /// package quotes them.

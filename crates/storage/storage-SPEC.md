@@ -977,7 +977,7 @@ pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
 
 `city_with(records, root)`——立一座有 N 条记录的城、写两个文件、开一次 CAS——在 `bundle/export.rs`、`bundle/files.rs`、`bundle/manifest.rs` 的测试模块里**逐字节重复三遍**。三份拷贝就是三个「一座城长什么样」的权威：改其中一份，另外两份的断言仍在对着旧形状作证。
 
-**一个夹具一处**：`crates/memory/src/bundle/fixture.rs`，`#[cfg(test)]` 编译，由 `bundle.rs` 以 `#[cfg(test)] mod fixture;` 挂上，三个测试模块 `use super::super::fixture::city_with;`。形状 4 适配器（它造的是被测代码之外的一个真实环境）。**不放进 `bundle.rs` 自身**：索引文件不持逻辑，而夹具是逻辑。
+**一个夹具一处**：`crates/storage/src/bundle/fixture.rs`，`#[cfg(test)]` 编译，由 `bundle.rs` 以 `#[cfg(test)] mod fixture;` 挂上，三个测试模块 `use super::super::fixture::city_with;`。形状 4 适配器（它造的是被测代码之外的一个真实环境）。**不放进 `bundle.rs` 自身**：索引文件不持逻辑，而夹具是逻辑。
 
 ### 8-22 `storage::status`：还没被检查点收走的那些改动，以及仓库此刻站在哪
 
@@ -1000,7 +1000,7 @@ pub fn working_status(city_root: &Path, scope: Option<&str>, base: Option<GitOid
 
 ### 8-23 `storage::cas::ranges`：Locator 范围文法住一处（形状 4 适配器）
 
-`get_range` 的文法——`B` 0 起闭区间、`L` 1 起闭区间、行间 `\n` 保留、末行终止符不返回、越界拒不夹取——是一套读法，不是 CAS 的存取。它因此住 `crates/memory/src/cas/ranges.rs`，`Cas::get_range` 只解析对象路径、判定存在，再把 `&dyn Vfs` 与路径交给 `of_object`。
+`get_range` 的文法——`B` 0 起闭区间、`L` 1 起闭区间、行间 `\n` 保留、末行终止符不返回、越界拒不夹取——是一套读法，不是 CAS 的存取。它因此住 `crates/storage/src/cas/ranges.rs`，`Cas::get_range` 只解析对象路径、判定存在，再把 `&dyn Vfs` 与路径交给 `of_object`。
 
 **块长 64 KiB 是本模块的内部事务**（`SCAN_CHUNK_BYTES`）：`L` 式要知道第几行从哪开始，只能从对象开头扫换行，于是代价与**答案之前**的字节同阶，而与对象大小无关——一份 200 MB 的 offload 取第二行，读的是 64 KiB。`B` 式一次定位读即可，不必扫。
 

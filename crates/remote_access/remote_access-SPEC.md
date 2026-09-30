@@ -229,9 +229,9 @@ impl Opener { pub fn open(&mut self, sealed: &[u8]) -> Result<Vec<u8>, AxError>;
 
 ## 16 测试与约束
 
-- `crates/remote/src/door/tests.rs`：§2 的七个场景，每个对应 Lean 模型的一组定理。
-- `crates/remote/src/pairing.rs` 内的测试：读回、RFC 4648 向量、两份熵两个码。
-- `crates/remote/src/keys.rs`、`crates/remote/src/seal.rs` 内的测试与 `crates/remote/src/handshake/tests.rs`：§2 对 keys、handshake、seal 的各条；每条验证步骤被故意拿掉时，对应测试转红。
+- `crates/remote_access/src/door/tests.rs`：§2 的七个场景，每个对应 Lean 模型的一组定理。
+- `crates/remote_access/src/pairing.rs` 内的测试：读回、RFC 4648 向量、两份熵两个码。
+- `crates/remote_access/src/keys.rs`、`crates/remote_access/src/seal.rs` 内的测试与 `crates/remote_access/src/handshake/tests.rs`：§2 对 keys、handshake、seal 的各条；每条验证步骤被故意拿掉时，对应测试转红。
 - 约束：零 I/O，零 `unsafe`；时间与熵从参数来，唯一例外是握手的临时密钥（§8-4）。
 
 ## 17 模型体验

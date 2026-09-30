@@ -45,13 +45,13 @@ const EXPOSE_WHITELIST: [&str; 4] = [
     // Listed rather than redeemed one layer up, because the
     // alternative put plaintext in the composition root, which is what this
     // list exists to prevent.
-    "crates/protocol/src/mcp/redeeming.rs",
+    "crates/agent_protocols/src/mcp/redeeming.rs",
     // The broker that holds an outside application's OAuth is reached
     // with a project key in an `x-api-key` header, which is the same
     // last slot before the wire as the redemption points above. The
     // alternative was handing the broker a plaintext key from the
     // assembly, which is the thing this list exists to prevent.
-    "crates/protocol/src/mcp/broker.rs",
+    "crates/agent_protocols/src/mcp/broker.rs",
 ];
 
 /// Exact literals the detector flags that are not credentials.

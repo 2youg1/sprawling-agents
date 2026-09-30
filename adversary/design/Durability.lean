@@ -6,7 +6,7 @@
 /-!
 # A ledger's answer and what the reopened disk holds.
 
-Specifies `crates/memory/src/jsonl/barrier.rs`, the state `Barrier` that
+Specifies `crates/storage/src/jsonl/barrier.rs`, the state `Barrier` that
 `append_all` consults before a wave and mends after its last sync. The Rust
 code is the authority on how the ledger holds the property; this model is the
 authority on which property must hold (storage-SPEC.md 8-1).

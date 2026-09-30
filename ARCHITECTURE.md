@@ -90,7 +90,7 @@ every week.
 |---|---|---|
 | Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, the oldest supported compiler in `Cargo.toml`'s `rust-version` | The invariants this design cares about are expressible as types, and `#![forbid(unsafe_code)]` holds workspace-wide. Cost: compile times, and a client that has to be built before the binary that embeds it. |
 | Async runtime | `tokio`, only in `wire` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
-| Inbound WebSocket | `axum` with its `ws` feature (`crates/channels/Cargo.toml`) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
+| Inbound WebSocket | `axum` with its `ws` feature (`crates/wire/Cargo.toml`) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (wire-SPEC section 8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
 | Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `xtask/src/npm.rs`: Svelte, Effect and the `@lezer` highlighters, and no framework runtime beyond them. Svelte compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
@@ -253,7 +253,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `runtime::sandbox` | crates/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
 | `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `bin::assembly::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
-| `agent_protocols::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
+| `agent_protocols::mcp` | crates/agent_protocols/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
 | `accounting::models` | crates/accounting/src/models.rs | `bin::assembly::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
 | `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::SystemClock`: the wall clock, the one sampling point | the stopped clock in `crates/sprawling/tests/clock.rs` |
 | `accounting::connectors` | crates/accounting/src/connectors.rs | `bin::assembly::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
@@ -817,15 +817,15 @@ sequenceDiagram
     S-->>W: the event, folded into the Snapshot
 ```
 
-`crates/channels/src/server/socket.rs` (`session`),
-`crates/channels/src/reception/admission.rs` (`decide_admission`),
+`crates/wire/src/server/socket.rs` (`session`),
+`crates/wire/src/reception/admission.rs` (`decide_admission`),
 `crates/sprawling/src/assembly/desk.rs` (`post`),
 `crates/sprawling/src/assembly/relay.rs` (`Wake`),
 `crates/sprawling/src/assembly/attending.rs` (`attend`),
 `crates/sprawling/src/assembly/dispatching/agreeing.rs` (`agree_to_work`),
 `crates/sprawling/src/assembly/pool.rs`,
 `crates/runtime/src/run/lifecycle.rs`,
-`crates/memory/src/jsonl/append.rs` (`append_all`),
+`crates/storage/src/jsonl/append.rs` (`append_all`),
 `crates/sprawling/src/serving/folding.rs`, `client/src/core/socket.ts`.
 
 ### 13.3 A turn, and where a cancel is heard
@@ -876,9 +876,9 @@ flowchart TD
 
 `crates/sprawling/src/assembly/relay.rs` (`Wake`),
 `crates/sprawling/src/assembly/attending.rs` (`attend`),
-`crates/memory/src/jsonl/append.rs`,
+`crates/storage/src/jsonl/append.rs`,
 `crates/sprawling/src/serving/folding.rs` (`spawn_folding`),
-`crates/channels/src/server/socket.rs`.
+`crates/wire/src/server/socket.rs`.
 
 ### 13.5 Opening a city
 
@@ -905,9 +905,9 @@ sequenceDiagram
 definition of this order, sprawling-SPEC.md 8-88),
 `crates/sprawling/src/views/snapshot/start.rs`,
 `crates/sprawling/src/assembly/attending.rs` (`spawn_worker`),
-`crates/memory/src/jsonl.rs` (`open`),
+`crates/storage/src/jsonl.rs` (`open`),
 `crates/sprawling/src/assembly/chain_watch.rs`,
-`crates/memory/src/chain_audit.rs` (`ChainHalt`).
+`crates/storage/src/chain_audit.rs` (`ChainHalt`).
 
 ### 13.6 A streaming turn
 
@@ -941,7 +941,7 @@ sequenceDiagram
 `crates/gateway/src/endpoint/stream.rs`,
 `crates/runtime/src/turn/speculation.rs` (`Generating`),
 `crates/runtime/src/turn/wave.rs` (`ConcurrentInvoke`),
-`crates/runtime/src/run/checkpoint.rs`, `crates/memory/src/checkpoint.rs`;
+`crates/runtime/src/run/checkpoint.rs`, `crates/storage/src/checkpoint.rs`;
 what may start early and in which order results reach the Ledger is
 `adversary/design/Speculating.lean`.
 

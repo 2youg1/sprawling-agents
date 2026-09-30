@@ -6,7 +6,7 @@
 /-!
 # The remote door: who may reach a city from outside its machine, and closesAt when.
 
-Specifies `crates/remote/src/door.rs`, the state a city keeps about its remote
+Specifies `crates/remote_access/src/door.rs`, the state a city keeps about its remote
 door: whether it is open and in which epoch, the pairing codes that are still
 live, the devices that were paired, and the sessions those devices hold. The
 Rust code is the authority on how these properties hold; this model is the

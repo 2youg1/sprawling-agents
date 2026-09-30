@@ -124,7 +124,7 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 
 **第七个发现是量出来的，而且它不是缺陷。** 把一条四行账本记为 0…3，逐格改掉中间的一位（每次先把城自己那份字节写回去，所以每次问的都是干净的账本），问 `sprawling replay`：记录 0 到 2 的改动每一次都被拒，改记录 3 时 `replay` 报 `chain verified`（实测：`a change inside record 4 of 4 was believed: the chain still verified, with tail seq 3`）。
 
-**为什么这不奇怪，以及为什么值得写下来。** 每条记录的 `prev` 是上一行的摘要，所以被改的那一格由**它的下一条**作证；最后一条后面没有记录，便没有东西哈希过它——校验的射程正好比文件短一格。这是追加式哈希链本身的样子，不是 `open.rs` 少写了一句：要覆盖头一格，锚必须住在账本**之外**（本仓已经有这样的锚：`storage::bundle` 的清单把链头写进 `head`，`crates/memory/src/bundle/manifest.rs:20,49`），而一个只会读账本目录的 `replay` 看不到它。改动的可观测面还要窄一层：命中引号、花括号这类字节时，拒绝来自解析（`verify_lines:90`）或来自“字节不是写者规范拼写”（`:127`），“被相信”这一档要求改动后的行仍然可解析且仍是规范拼写。
+**为什么这不奇怪，以及为什么值得写下来。** 每条记录的 `prev` 是上一行的摘要，所以被改的那一格由**它的下一条**作证；最后一条后面没有记录，便没有东西哈希过它——校验的射程正好比文件短一格。这是追加式哈希链本身的样子，不是 `open.rs` 少写了一句：要覆盖头一格，锚必须住在账本**之外**（本仓已经有这样的锚：`storage::bundle` 的清单把链头写进 `head`，`crates/storage/src/bundle/manifest.rs:20,49`），而一个只会读账本目录的 `replay` 看不到它。改动的可观测面还要窄一层：命中引号、花括号这类字节时，拒绝来自解析（`verify_lines:90`）或来自“字节不是写者规范拼写”（`:127`），“被相信”这一档要求改动后的行仍然可解析且仍是规范拼写。
 
 **它对检查的约束有两条，都是本目录自己欠的账。** 一是测**检测**的检查必须落在被覆盖的记录上：`Ground.corrupt` 今天挑最老那条是为了确定性（没有城进程在竞写它），而 `a change to any record but the last is refused` 把整段走完，因为一格通过只说明一格；二是**不许把这一格写成需要修的东西**：谁若把「改一条记录必被拒」写成对所有记录成立，他写的是一条产品不欠的断言，而修它的唯一办法是在文件里放一个自指的摘要——那是伪证，不是校验。
 
@@ -136,12 +136,12 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 
 | 事实 | 权威所在 |
 |---|---|
-| 线格式版本、握手内容 | `crates/channels/src/frames.rs` 的 `WIRE_V` 与 `Welcome` |
-| 服务端帧类的全集 | `crates/channels/src/frames.rs` 的 `ServerFrame` |
-| Command 与 Query 的全集 | `crates/channels/src/command/kind.rs`、`crates/channels/src/frames/query.rs` |
+| 线格式版本、握手内容 | `crates/wire/src/frames.rs` 的 `WIRE_V` 与 `Welcome` |
+| 服务端帧类的全集 | `crates/wire/src/frames.rs` 的 `ServerFrame` |
+| Command 与 Query 的全集 | `crates/wire/src/command/kind.rs`、`crates/wire/src/frames/query.rs` |
 | 稳定错误码的全集 | `crates/kernel/src/error.rs` 的 `AxCode::ALL` |
 | `IdemKey` 与模板名的形状 | 门的拒绝原文，实测 |
-| 链的链接规则（每条记录携带的 `prev` 就是上一行的摘要） | `crates/kernel/src/ledger.rs:31` 的 `chain_hash` 与 `:26` 的 `GENESIS_PREV` 决定值；写的一侧在 `crates/memory/src/jsonl/append.rs:74`，读的一侧在 `crates/runtime/src/replay.rs:106-118`、`crates/memory/src/jsonl/open.rs:254` 与 `crates/memory/src/bundle/files.rs:30-40` | 本目录比较读数，从不计算摘要：`Sprawling.Chain` 把摘要函数当参数，名字都不提 blake3。仓库改成别的摘要函数时，那里每一条语句一字不变 |
+| 链的链接规则（每条记录携带的 `prev` 就是上一行的摘要） | `crates/kernel/src/ledger.rs:31` 的 `chain_hash` 与 `:26` 的 `GENESIS_PREV` 决定值；写的一侧在 `crates/storage/src/jsonl/append.rs:74`，读的一侧在 `crates/runtime/src/replay.rs:106-118`、`crates/storage/src/jsonl/open.rs:254` 与 `crates/storage/src/bundle/files.rs:30-40` | 本目录比较读数，从不计算摘要：`Sprawling.Chain` 把摘要函数当参数，名字都不提 blake3。仓库改成别的摘要函数时，那里每一条语句一字不变 |
 | 摘要函数的**单射性**（碰撞抵抗） | 不是本仓的事实，也不是本目录能证的事实：它是对所依赖摘要函数的假设 | `Sprawling.Chain` 把它作为定理假设写在语句里，并用一个反模型（常函数）证明去掉它结论就假；需要一个比它更强的保证的人，从这里知道自己在换什么 |
 
 **门讲六类帧**（`ServerFrame`）。`Frame.lean` 认得全部六类，并对第七类当场报错——一个未知的帧类意味着线格式变了形，而把新形状当成一次拒绝会把红的测成绿的。其中 `log` 只被解析、不被断言：它没有自己的账本序号，两行可以共用一个位置，漏掉一行什么也没丢；它被解析仅仅因为城在这条通道上**也**叙述它的拒绝，而一个读失败报告的人想看到那句话。

@@ -233,7 +233,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 ### 命令 `wire-ts`：线的 TS 面由 Rust 面生成
 
-**它关掉的门是「手写第二份线」。** `client/` 用 TypeScript 说 `crates/channels` 的语言，而一份手写的 `wire.ts` 就是同一形状的第二个权威，它漂了也要到握手之后才被发现。故 TS 面由 Rust 面生成，且生成物入库、门盯着它：`cargo xtask wire-ts --write` 写 `client/src/wire.ts`，`cargo xtask wire-ts` 只比对——盘上文件与当场生成的文本逐字节不同即红，拒词点名文件与第一处不同的行号并给出 `--write`。与 `apisync` 同一口径：生成物由门自己写、由门自己校验。
+**它关掉的门是「手写第二份线」。** `client/` 用 TypeScript 说 `crates/wire` 的语言，而一份手写的 `wire.ts` 就是同一形状的第二个权威，它漂了也要到握手之后才被发现。故 TS 面由 Rust 面生成，且生成物入库、门盯着它：`cargo xtask wire-ts --write` 写 `client/src/wire.ts`，`cargo xtask wire-ts` 只比对——盘上文件与当场生成的文本逐字节不同即红，拒词点名文件与第一处不同的行号并给出 `--write`。与 `apisync` 同一口径：生成物由门自己写、由门自己校验。
 
 | 文件 | 它回答什么 |
 |---|---|
