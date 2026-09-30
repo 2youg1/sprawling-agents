@@ -87,7 +87,10 @@ fn spec_carrier(cell: &str) -> String {
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    markdown(root, &mut violations)?;
+    match lean::specification(root, KERNEL_DIR)? {
+        Some(sources) => tables::check(root, &sources, &mut violations)?,
+        None => markdown(root, &mut violations)?,
+    }
     anchors::check(root, &mut violations)?;
     Ok(violations)
 }

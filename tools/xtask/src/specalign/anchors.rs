@@ -92,7 +92,7 @@ pub(super) fn check(root: &Path, violations: &mut Vec<Violation>) -> Result<(), 
         let owner = found.iter().find(|member| member.holds(&anchor.file));
         let migrated = owner.is_some_and(|member| lean::migrated(root, &member.dir));
         let markdown = anchor.spec.contains('#') || anchor.spec.ends_with(".md");
-        let problem = match (false, true, owner) {
+        let problem = match (migrated, markdown, owner) {
             (true, false, Some(member)) => lean_part(root, &anchor, member),
             (true, true, _) => Some((
                 "a migrated crate's rows name the Lean part that specifies them \

@@ -75,7 +75,10 @@ pub(super) fn variants(root: &Path, enum_name: &str) -> Result<Vec<String>, Xtas
 /// `def Command.reach` once the wire crate's specification is Lean, the
 /// Markdown table until then.
 pub(super) fn declared(root: &Path) -> Result<BTreeMap<String, Reach>, XtaskError> {
-    markdown_reach(root)
+    match lean::specification(root, WIRE_CRATE)? {
+        Some(sources) => lean_reach(&sources),
+        None => markdown_reach(root),
+    }
 }
 
 /// The arms of `def Command.reach`, each right-hand side one of the four
