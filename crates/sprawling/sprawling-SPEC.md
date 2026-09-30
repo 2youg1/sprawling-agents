@@ -528,7 +528,7 @@ let on_disk = std::fs::read_to_string(&plan_path).unwrap_or_default();          
 pub(crate) struct Standing { pub(crate) book: gateway::EndpointBook, governance: views::Governance, collaboration: Collaboration }
 impl Standing { pub(crate) fn fold(ledger_dir: &Path) -> Result<Standing, AxError>; }
 // serve 的那一遍：同一份已验证记录，逐条先给 Views 再给 Standing
-pub(crate) fn fold_city(ledger_dir: &Path) -> Result<(Views, (JsonlLedger, Standing)), AxError>;
+pub(crate) fn fold_city(ledger_dir: &Path, cost: &mut OpeningCost) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError>; // cost 见 8-121
 impl RunWorker { pub(crate) fn holding(city_root: &Path, vault: Custodian, log: Diagnostics, held: (JsonlLedger, Standing)) -> Result<RunWorker, AxError>; }
 
 // views/governance.rs —— 判定面与读面共用的那一个定义
@@ -3563,6 +3563,8 @@ impl Views { pub(crate) fn twin(&self) -> Result<Views, AxError>; } // 经快照
 
 **两份视图轮换，读者拿快照。** 折叠线程持有备用的一份 `Views`，`Published` 持有发布出去的那份 `Arc<Views>`。每一批：折进备用份，用 `replace` 把它发布，广播这批记录，再收回换下来的那份（`Arc::try_unwrap`；读者还拿着就让出时间片再试），把同一批折进去，它成为下一批的备用份。读者用 `snapshot` 拷一只 `Arc`，锁只罩住这一次指针拷贝；`answer_outside_the_lock` 在快照上 `prepare`，放下快照再 `finish`。于是读者之间不互等，读者不等折叠，折叠在广播之前不等任何读者，收回时只等在换下之前拿到快照、还在做纯内存 `prepare` 的读者。`prepare` 因此只做纯内存的事：连时间也要花在读盘、git 或网络上的查询在快照里只拷走它要的小数据，`finish` 在快照放下后才去读；`McpHealth` 的握手（每台服务器最多等 `HANDSHAKE_PATIENCE`）与 `Toolkits` 的中介书架都是这样，拷走的是 `LiveAsk`（城根、城地址、保管人的 `Arc`）。在快照里握手会让收回一直自旋到握手超时，其间没有一批能折叠或广播。第二份由 `Views::twin` 在 `start_served_views` 折完之后经快照编码（8-91）复制出来，不再读一遍历史；两份共用同一只账本索引与计划缓存的 `Arc`，所以多出的内存只是折叠本身的一份。计划缓存在快照里按它自己编码，锁不进快照。被拒：每批克隆一份整的视图发布——每条记录一次整份拷贝，而且 `storage::HotView` 与 `storage::Attribution` 不是 `Clone`；`RwLock<Views>`——折叠的写锁要等每个在读的读者，新读者又排在写锁后面。代价是折叠常驻两份，每条记录折两次。
 
+**积压的读数是一件仪表。** `serving::folding::tests::instruments` 的 `instrument_view_backlog`（`#[ignore]`，`just bench` 按名字跑它，与 8-84 的两件同一个过滤器）起一个真实的 `spawn_folding`：一条线程经 `observer` 连续送入 2,000 条记录，一条读者线程在其间反复拿快照做一次 `answer_outside_the_lock`，测试线程从 `to_clients` 收广播。读数一行：每条记录从 `send` 到广播收到的时延（`samples`、`floor_us`、`p50_us`、`p99_us`、`max_us`），突发中已送出未广播的最大条数（`max_backlog`），整次突发用时（`burst_ms`），行尾带 `machine=<os>-<arch>, <n> core(s)`，与 8-84 的仪表同一形。它量的是视图线程在突发下落后多少，不加断言：墙钟因机器而异。**被否：在视图线程里写诊断或加原子计数。** 前者在服务中的城上每批一行、淹没别的日志；后者要一个线上字段才有读者，而线格式归一批一进的纪元。
+
 **广播排在发布之后。** 客户端收到一条记录再去查询，拿到的快照已经含有这条记录。
 
 **没有读者能毒化的视图锁。** 读者只读不可变的快照，恐慌不会撕坏它。`Published` 的锁里只有一次 `Arc` 拷贝或交换，没有会恐慌的操作，换下来的那份在锁外交回；即便锁中毒，锁里仍是一只完整的 `Arc`，所以照取不误（`PoisonError::into_inner`）。视图拒绝折叠的记录照旧写一条诊断到标准错误后跳过；折叠线程自己恐慌则线程结束，观察者此后每次 `send` 失败都说出这条记录到不了视图，恢复办法是重启服务，视图从 Ledger 重建。
@@ -3656,7 +3658,7 @@ impl RunWorker {
 
 **一次调用，接上停机再起线程。** 它新建一个 `storage::ChainHalt`，先经 `JsonlLedger::halt_on` 接到这个 worker 的写者上，再在名为 `sprawling-chain-audit` 的线程上跑 `storage::audit_chain`（storage-SPEC 8-27）。线程只持有账本目录、停机值和自己的 `Diagnostics`，不碰写者，所以写线程从不等审计。`serve` 的写线程在 `open_for_service` 之后调用它；起不来的线程与起不来的写线程一样，让 `serve` 失败。citysim 与测试不走这条路，所以它们的时序里没有第二个线程。
 
-**结果作为诊断推给页面。** 审计线程的 `Diagnostics` 与写者的那一份同一个落点（`serving::Journal` 的 sink）、同一个级别下限，所以页面在日志里读到这一行：`Whole` 写一条 `Effect`，给出核对过的行数；`Broken(reason)` 先 `trip(reason)`，再写一条 `Refuse`，内容就是审计的原因与恢复办法；读账本本身失败（`StorageError`）同样先 `trip`，原因是那次读取的失败，再写一条 `Refuse`：没读完的审计没有证明链断了，但也没有证明它完好，而视图从快照起步（8-91）时，快照之前的行只有这次审计会看；写在一条未经证明的链后面的行，与写在断链后面的行一样收不回来。**被否：读失败只报告不停写。** 那是视图全量核对起步时的规则，那时启动本身已经证明过整条链。
+**结果作为诊断推给页面。** 审计线程的 `Diagnostics` 与写者的那一份同一个落点（`serving::Journal` 的 sink）、同一个级别下限，所以页面在日志里读到这一行：`Whole` 写一条 `Effect`，给出核对过的行数与这一遍的用时：`the whole ledger chain verified: <n> lines in <ms> ms`，毫秒由 `opening_cost::millis` 渲染（8-121），时长是线程开头与结尾两次 `serving::standing::monotonic_now` 之差（8-93 的单调采样点）；`Broken(reason)` 先 `trip(reason)`，再写一条 `Refuse`，内容就是审计的原因与恢复办法；读账本本身失败（`StorageError`）同样先 `trip`，原因是那次读取的失败，再写一条 `Refuse`：没读完的审计没有证明链断了，但也没有证明它完好，而视图从快照起步（8-91）时，快照之前的行只有这次审计会看；写在一条未经证明的链后面的行，与写在断链后面的行一样收不回来。**被否：读失败只报告不停写。** 那是视图全量核对起步时的规则，那时启动本身已经证明过整条链。
 
 **视图不需要第二个停机值。** 视图只折写者已经写下的记录（8-99），写者停了，视图也就不再有新工作；给视图再接一个 `ChainHalt` 会让「这座城还收不收工作」有两处定义。被拒的命令经写者的 `StorageError::ChainHalted` 回到页面，说的与诊断是同一句话。
 
@@ -3697,8 +3699,8 @@ impl Views { pub(crate) fn rebuild(ledger_dir: &Path) -> Result<Views, AxError>;
 impl Views { pub(crate) fn cut_snapshot_at(&self, record: &EventRecord) -> Result<(), AxError>; } // 在已折的最后一条记录处切，行是它的 canonical_line
 
 // bin::assembly::folds::views_start —— shape: projection
-pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics)
-    -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError>; // fold_city 的错误原样返回；切快照的失败只进 log
+pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics, cost: &mut OpeningCost)
+    -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError>; // fold_city 的错误原样返回；切快照的失败只进 log；cost 见 8-121
 ```
 
 **起步路径放在视图一侧。** `snapshot::start` 由 `views` 持有：一次性查询经 `Views::rebuild` 从这里起步，而 `views` 的生产代码不点名 `crate::assembly`（8-92 的方向块）；`Standing` 的起步（`assembly::folds::standing_start`）从 assembly 指向 views，方向与 assembly 取用 `views::Governance` 相同。**被否：留在 `assembly::folds`，由 `assembly` 提供 `Views::rebuild`。** 那让读面为了一次性查询重新点名组装点，正是方向块拒绝的边。
@@ -3741,6 +3743,52 @@ pub(in crate::assembly) fn from_json_text<'de, T: DeserializeOwned, D: Deseriali
 **`fold_version`**：blake3(`CARGO_PKG_VERSION` ‖ `STANDING_FOLD_RULES`) 的前四字节（LE）；同一版本内改了折叠规则或 `StandingFolds` 的字段，改 `STANDING_FOLD_RULES`。这条规则由 `assembly::folds::standing_start::tests` 机器核对：常量写成 `standing-fold-<16 位十六进制>`，后缀是一份固定夹具（两条手写记录，一条信号入队、一条认领，填进协作折叠的信号队列与计划持有表；时间与序号都是常数）折出的 `StandingFolds` 的 postcard 编码的 blake3 摘要前 16 位，编码一变测试就给出新值。
 
 **本节接口的当前状态**：夹具只填了协作折叠；另外四个折叠（`EndpointBook`、`Governance`、`Entrance`、`SessionOrigins`）在夹具里是空的，摘要只钉住它们空时的编码。其中一个在非空时改了编码（字段顺序不变、含义变了）而忘了改常量，同一版本的二进制仍会接受旧快照；给夹具补上这四个折叠各自的一条记录即可合上。
+
+### 8-121 开一座服务中的城，每一段花了多少（`bin::assembly::opening_cost`，形状：value）
+
+```rust
+// bin::assembly::opening_cost —— shape: value
+pub(crate) enum Phase {
+    Bind,                           // 拿端口
+    OpenLedger,                     // 取写者锁、探版本、恢复尾段
+    VerifyAndFold { lines: usize }, // 从创世逐行核对，同时折 Views 与 Standing、建索引
+    CutStanding,                    // 切 Standing 快照
+    CutViews,                       // 切视图快照
+    Twin,                           // 经快照编码复制第二份视图（8-99）
+    StartWorker,                    // 起写者线程
+}
+pub(crate) struct OpeningCost { /* 私有：钟、起点、上一记、各段 (Phase, Duration)、折叠累计 */ }
+impl OpeningCost {
+    pub(crate) fn begin(clock: fn() -> Instant) -> OpeningCost;   // 钟由 bin::assembly 交进来
+    pub(crate) fn lap(&mut self, phase: Phase);                    // 记下上一记到此刻这一段
+    pub(crate) fn folding<R>(&mut self, work: impl FnOnce() -> R) -> R; // 量 work 的用时，计入「其中折叠」
+    pub(crate) fn line(&self) -> String;                           // 唯一的渲染
+}
+/// 一段时长的毫秒写法：整数微秒换算出三位小数，不经浮点；超出 u64 微秒的饱和到 u64::MAX。
+pub(crate) fn millis(span: Duration) -> String;
+// bin::assembly::folds
+pub(crate) fn fold_city(ledger_dir: &Path, cost: &mut OpeningCost)
+    -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError>;
+// bin::assembly::folds::views_start
+pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics, cost: &mut OpeningCost)
+    -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError>;
+```
+
+**要什么。** 首字节之前 `listen` 做的每件事各花多少，由产品自己说出来，不靠从外面拿首字节减来减去推算。`listen` 在拿端口之前 `begin(serving::standing::monotonic_now)`，之后每做完一段 `lap` 一次；`fold_city` 与 `start_served_views` 在自己做的那几段后 `lap`；`fold_ledger_dir` 交给每条记录的折叠经 `folding` 计时，所以核对与折叠这一段还能拆出其中折叠占多少。写者线程起好之后，`listen` 在与 `serve` 其余诊断同一个落点、同一个下限上写一条 `Effect`：
+
+`opened the city in <总> ms: bind <a> ms, open the ledger <b> ms, verify and fold <n> lines <c> ms (folding <f> ms of it), cut the standing snapshot <d> ms, cut the views snapshot <e> ms, copy the views <g> ms, start the worker <h> ms`
+
+毫秒由 `millis` 渲染。下限为 `off` 时不写。后台整链审计（8-90）在首字节之后才结束，另写它自己那一行，毫秒同样经 `millis`。
+
+**时间从哪来。** `OpeningCost` 不自己读钟：钟是 `begin` 收下的函数指针，与 `spawn_folding` 的 `clock`（8-99）同一种交法，采样仍只发生在 8-93 那一个单调采样点上。一段的长度是两次单调采样之差，墙钟被人调过也不会让它变成负数。
+
+**决定。**
+1. 一行，不是七行。七段是同一次开城的七个部分，读的人要看的是它们之间的比例。被否：每段一条 `Trace`——默认下限看不见它们，打开 `trace` 又会被别的行淹没。
+2. 读数是诊断，不是账本记录。开城用了多久是运行这座城的主机在那一刻的事实，不属于城的历史（`docs/logging.md` §2）。被否：写一条账本事件——同一段历史在两台机器上就不再逐字节相同。
+3. `line()` 是唯一的渲染，没有读者解析它。要逐段比较的人读 `bench_startup` 留在夹具城旁边的日志（citysim-SPEC 8-5-1），那一行与首字节读数出自同一次开城。
+4. 派活不在这里拆段。派活的两次读数已在 `prepare_dispatch` 那一行（`[prepare_dispatch_ms]`），它走城钟、按毫秒；把 `stage_dispatch` 内部拆成微秒级的段，要一个能在 accounting 里取单调时间的端口，那是记账线程长任务那一项自己的工作。
+
+**测试。** `assembly::listening::tests::a_listening_city_says_what_opening_it_cost`：在一座刚 `init` 的城上 `listen`，`log` 取 `Effect` 下限、sink 是同一个 `Journal`，事先订阅 `Journal::lines()`；收到恰好一条以 `opened the city in ` 开头的 `Effect`，七个段名按上面的次序出现，并含 `verify and fold 3 lines`。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 

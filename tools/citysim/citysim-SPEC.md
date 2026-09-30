@@ -57,6 +57,18 @@ citysim 的模块登记在 `architecture.toml`，但 `modmap` 只判 `crates/` �
 
 `CancelPoint` 三个变体（`BeforeAssemble`、`BeforeCall`、`BeforeWave`，各带 `turn`）对应 `runtime::run::SafePoint` 里按回合编号的三个；`SafePoint` 另有 `BeforeToolCall` 与 `BeforeSpawn`，它们在一个回合里被问很多次，剧本按回合编号够不到它们，执行器在这两处恒答 `Interrupt::None`（`executor::answer_at`）。被击败的备选：给 `CancelPoint` 补齐五个变体——那要给回合内的每一次问询编号，而剧本只写回合。**重开参数**：一条剧本需要在一波中途取消时，`CancelPoint` 加一个带调用序号的变体。
 
+### 3-8 决定：读数带着它所量字节的摘要，登记的夹具钉住这个摘要
+
+两条读数只在量的是同一份字节时可比。bench 共用的 `draft` 是写在代码里的负载形状，`Fixture` 的字段说不出它：改了 `draft`，同一张登记表里前后两条读数量的就是两份负载，而读数行本身看不出差别。所以登记的夹具有一个摘要：`draft` 的前 `PINNED_DRAFTS`（1,000）行经 `storage::JsonlLedger` 写成一本账，取这本账的 `ledger_digest`，再把这 32 字节与 `Fixture` 各数值字段的小端字节拼在一起取一次摘要。这个值钉在 `REGISTERED.pinned`。bench 在量任何东西之前先算一遍，与钉住的值不等就拒绝测量；`scenarios/tests.rs` 的 `the_registered_fixture_writes_the_bytes_its_digest_pins` 在 `just check` 里做同一件事。改 `draft` 或改一个字段的提交因此必须同时改钉住的值，并且单独成一个提交，与 `[local_latency]` 行「加胖夹具单独提交」是同一条纪律。每条 `perf` 读数行带 `fixture=<摘要的前 16 位十六进制>`，这 16 位只由 `citysim::fixture_label` 拼出。
+
+`bench_startup` 的夹具城不钉：`init_city` 用真实时钟写创世行，每次生成的字节都不同，而后面每一行的 `prev` 都接着它。它的读数照样带那座城账本的 `ledger_digest`，两条首字节读数只在摘要相等时可比；夹具城在构建档目录旁复用，所以同一台机器上前后两次读数通常量的是同一份字节。
+
+被否：摘要只打印、不钉。打印出来的值要靠人去比，而在 `just check` 里变红的测试不需要谁记得去比。被否：给 `init_city` 加一个时钟参数，好让夹具城也能钉住。那是为 bench 给产品的创城入口开一个参数，而复用同一座夹具城已经让同一台机器上的读数可比。**重开参数**：需要跨机器比较首字节读数时，夹具城改为从一份检入的账本复制，而不是在量它的主机上生成。
+
+### 3-9 决定：被量的产品 feature 集只写在 justfile 一处
+
+人下载的二进制带执行引擎（`sprawling` 包的 `sandbox` feature）。justfile 的变量 `product_features` 是这套 feature 的唯一写法：`dist`、`bench`、`bench-startup`、`mem` 四个 recipe 都用它构建，所以 install 解包的、startup 拉起的、首字节服务的、内存读数量到的，与人下载的是同一个二进制，`bench` 里的场景与仪表也在同一套 feature 下编译。被否：每个 recipe 自己写 `--features`。漏写的那个 recipe 量的是一个没人下载的二进制，而读数本身看不出它漏了。**重开参数**：`sandbox` 成为 `sprawling` 包的默认 feature 时，这个变量与它的四处引用一起删去。
+
 ## 4 现状分析
 
 `just sim` 跑全部场景测试，单线程、无 I/O 等待，耗时由编译主导。测量二进制（§8-5、§8-6）的读数写在 `tools/xtask/budgets.toml` 各自的行里，只入册不入门。
@@ -210,12 +222,14 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str>;
 
 **夹具城留在 `<构建档目录>/../bench-cities/<名>`**，下次复用：40 万条是 376 MB，每次重写要付的时间比量它还多。复用只看那座城在不在；`xtask mem --city` 读的就是同一座城（xtask-SPEC §8-30），于是首字节与启动峰值出自同一份历史。
 
+**每座夹具城的读数旁打印它账本的摘要**（`citysim::ledger_digest`，§3-8），两条首字节读数只在摘要相等时可比。每个样本那次 `serve` 的标准错误写进 `<构建档目录>/../bench-cities/<名>.serve.log`（后一个样本覆盖前一个），报告里打印这个路径。其中以 `opened the city in` 开头的那一行是产品自己拆出的开城各段耗时（sprawling-SPEC 8-121）：本族不解析它，只把它和首字节读数放在同一次开城旁边给人读。
+
 ```rust
 // tools/citysim/src/bin/bench_startup/actions/history.rs —— shape: adapter（一座有历史的夹具城：init 之后经产品的 Ledger 写入）
 pub enum History { Empty, Runs(u32) }
 pub fn fixture_city(cities: &Path, name: &str, history: History) -> Result<PathBuf, AxError>;
 // tools/citysim/src/bin/bench_startup/actions/first_byte.rs —— shape: adapter
-pub fn first_byte(binary: &Path, city: &Path, samples: usize) -> Result<Samples, AxError>;
+pub fn first_byte(binary: &Path, city: &Path, samples: usize, log: &Path) -> Result<Samples, AxError>;
 ```
 
 **红**：`samples.rs` 的 nearest-rank 分位、可疑标注、第二档判定三个测试先行，跑一次见红再实现。`footprint` 三条（计数只数文件不数目录、按名找文件不论深度且不认目录、账行按行数而非按文件数）与 `actions` 一条（主导子步取中位最大者，无子步切分答 `None`）守的是**读数本身**：数错一个文件或指错一个主导件，报告就在说假话。
@@ -235,9 +249,11 @@ pub fn first_byte(binary: &Path, city: &Path, samples: usize) -> Result<Samples,
 pub enum MachineClass { General }   // 参照类属：盘、内存、CPU 均为一般水平
 pub enum Load { LargeLedgerFold, LargeWorktreePlacement, KeptWorktreeReclaim, LongSessionForwarding }
 pub enum SubMetric { Harness, Whole }
-pub struct Reading { /* load, sub, machine, samples, p50, p95, p99 */ }
+/// 一条读数在什么条件下量的：机器类属与所量字节的摘要。两者总是一起走，所以是一个值。
+pub struct Taken { pub machine: MachineClass, pub fixture: B3Hash }
+pub struct Reading { /* load, sub, taken, samples, p50, p95, p99 */ }
 impl Reading {
-    pub fn of(load: Load, sub: SubMetric, machine: MachineClass,
+    pub fn of(load: Load, sub: SubMetric, taken: Taken,
               samples: Vec<std::time::Duration>) -> Result<Reading, String>;
     pub fn line(&self) -> String;   // 唯一渲染家，键序固定
 }
@@ -245,7 +261,9 @@ impl Reading {
 
 一行读数的文法（`Reading::line` 是唯一权威，测试按字节对拍）：
 
-`perf load=<load> sub=<sub> machine_class=<general> samples=<n> floor_us=<n> p50_us=<n> p95_us=<n> p99_us=<n>`
+`perf load=<load> sub=<sub> machine_class=<general> fixture=<16 位十六进制> samples=<n> floor_us=<n> p50_us=<n> p95_us=<n> p99_us=<n>`
+
+`fixture` 取登记夹具摘要（§3-8）的前 16 位十六进制，由 `citysim::fixture_label` 拼出；完整的 64 位写在 `REGISTERED.pinned`。
 
 `floor_us` 是最小样本：机器安静时这条路径本身要花多少。它与 `p50_us` 并列，因为两者回答的不是一个问题——floor 贴着设计的下限，p50 带着机器的其余负载——而挂钟读数不设棘轮，两者就都得留在读数里，下一个读者才分得清一次回归是设计变慢了还是机器变忙了。
 
@@ -259,12 +277,25 @@ impl Reading {
 场景（`bench::scenarios`，shape 4 adapter，套在产品公共面上，无自有政策）：
 
 ```rust
-pub struct Fixture { /* fold_records, fold_rounds,
-                       tree_files, tree_file_bytes, placements, forward_events */ }
+pub struct Fixture { /* fold_records, fold_rounds, tree_files, tree_file_bytes,
+                       placements, forward_events, pinned: &'static str（64 位十六进制） */ }
 pub const REGISTERED: Fixture = Fixture { … };   // 既定负载：读数只在该 fixture 内可比，只降不升
-pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
-    -> Result<Vec<Reading>, String>;
+pub const PINNED_DRAFTS: u64 = 1_000;
+impl Fixture {
+    /// `draft` 的前 PINNED_DRAFTS 行写进 `scratch` 下一本新账，取它的 `ledger_digest`，
+    /// 再与各数值字段（不含 `pinned`）的小端字节拼接后取一次摘要。
+    pub fn digest(&self, scratch: &Path) -> Result<B3Hash, String>;
+}
+pub fn all(scratch: &Path, fixture: &Fixture, taken: Taken) -> Result<Vec<Reading>, String>;
+// tools/citysim/src/fixture_digest.rs —— shape: value；两个 bench 族共用
+/// 一本账的字节摘要：按 `storage::ledger_segments_at` 的顺序，每段取 `B3Hash::digest(段字节)`，
+/// 32 字节依次拼接后再取一次。一次持一段字节。
+pub fn ledger_digest(ledger_dir: &Path) -> Result<B3Hash, AxError>;
+/// 读数行与报告点名一份夹具用的 16 位十六进制：摘要的前 16 位。
+pub fn fixture_label(digest: &B3Hash) -> String;
 ```
+
+bench Main 在第一项读数之前算 `REGISTERED.digest`：与 `pinned` 不等即以 `bench failed:` 加一个三段式错误退出非零（`InvalidArgs`，主体是算出的 64 位摘要，recovery 说「在一个单独的提交里把 `REGISTERED.pinned` 重钉为这个值，并重取登记册里受影响的行」）；相等则先打印一行 `fixture <16 位>`，之后每条 `perf` 行的 `Taken.fixture` 都是它。
 
 | 场景 | 驱动的公共面 | 子指标 |
 |---|---|---|
@@ -281,7 +312,7 @@ pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
 
 **B（落选）：像体积那样把延迟读数设门（超标即 CI 红）。** 落选理由：同一处定规写着「gating them would make a busy runner look like a defect」（budgets.toml 头注与 ARCHITECTURE §11 同句）；读数回归由棘轮纪律与单独提交的放宽手续治理，不由 CI 红绿治理。
 
-**红**：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 字段；`every_load_scenario_reruns_and_emits_the_stable_format`——本 crate 的每个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）。
+**红**：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 与 `fixture` 字段；`a_reading_line_carries_its_floor_beside_the_middle`——同一文法下 floor 与 p50 并列；`every_load_scenario_reruns_and_emits_the_stable_format`——本 crate 的每个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）；`the_registered_fixture_writes_the_bytes_its_digest_pins`——`REGISTERED.digest` 等于 `REGISTERED.pinned`（§3-8）。
 
 **多 run 并行不在本 crate 里量。** relay、`serve_flight` 与 desk 都是 `sprawling` 的 `pub(crate)`，本 crate 够不到，这里的场景只能抄一份 relay 的形状：数条 lane 经 mpsc 汇到一条线程，计时只包住那条线程上的一次 `append`。抄件量的是抄件：它的 `harness` 是 MemLedger 一次追加（5 µs 量级），而一次往返的代价取决于生产循环怎么等，抄件没有那份等法，也就量不到它；它的 `persist` 每条一道屏障，生产的 `append_all` 一批一道；盘的份额由那件仪表 `store=disk` 与 `store=memory` 两行之差读出，所以 `SubMetric` 没有 `persist`。**败给的方案**：给 `sprawling` 开一扇公共门让本 crate 驱动 `serve_flight`。那扇门没有生产调用者，而仪表放在 crate 内已经能驱动生产循环本身（sprawling-SPEC 8-84 的决定）。
 
