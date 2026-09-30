@@ -212,6 +212,24 @@ fn a_refresh_reads_the_appended_tail_rather_than_the_segment() {
     assert_eq!(index.refresh(tmp.path()).unwrap(), Refreshed::Rebuilt);
 }
 
+/// A folded segment that is no longer listed holds offsets into bytes
+/// that are gone, so the refresh rebuilds rather than keeps them.
+#[test]
+fn a_segment_that_vanished_rebuilds_the_index() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_ledger_rolling(tmp.path(), 6, 3);
+    let mut index = LedgerIndex::rebuild(tmp.path()).unwrap();
+    std::fs::remove_file(tmp.path().join("ledger-00000000000000000003.jsonl")).unwrap();
+    assert_eq!(
+        (
+            index.refresh(tmp.path()).unwrap(),
+            index.len(),
+            index.tail_seq()
+        ),
+        (Refreshed::Rebuilt, 3, Some(Seq::new(2)))
+    );
+}
+
 /// Writes `count` records that cycle through `runs`, so no run owns a
 /// contiguous stretch of the ledger. Returns the seqs each run wrote.
 #[test]
