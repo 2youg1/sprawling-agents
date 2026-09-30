@@ -284,14 +284,17 @@ pub(super) fn verified_chain(dir: &std::path::Path) -> Result<String, kernel::Ax
              rather than at the city that contains it",
         ));
     }
-    let verified = runtime::replay::verify_ledger_dir(dir)?;
-    Ok(format!(
-        "chain verified: {} line(s), tail seq {}",
-        verified.raw_lines().len(),
-        verified
-            .tail_seq()
-            .map_or_else(|| "none".to_string(), |s| s.value().to_string())
-    ))
+    // Seqs run from 0 without a gap on a whole chain, so the tail seq is
+    // the line count less one.
+    match storage::audit_chain(dir).map_err(storage::StorageError::into_ax)? {
+        storage::ChainAudit::Whole { lines } => Ok(format!(
+            "chain verified: {lines} line(s), tail seq {}",
+            lines
+                .checked_sub(1)
+                .map_or_else(|| "none".to_owned(), |tail| tail.to_string())
+        )),
+        storage::ChainAudit::Broken(reason) => Err(reason),
+    }
 }
 
 pub(super) fn status(args: &[String]) -> ExitCode {
