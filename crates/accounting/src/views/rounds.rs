@@ -192,7 +192,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     number,
                     opened: record.seq(),
                     t: record.t(),
-                    timing: wire::Timing::Measured,
+                    timing: timing_of(record),
                     first_at: None,
                     model: wire::text(record.data().as_map().get("model")),
                     said: None,
@@ -221,7 +221,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     output: None,
                     called: record.t(),
                     answered: None,
-                    timing: wire::Timing::Measured,
+                    timing: timing_of(record),
                 };
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;
@@ -247,6 +247,10 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     .map(UsdMicros::new);
                 turn.used = map.get("usage").and_then(wire::used_in);
                 turn.stopped = wire::text(map.get("stop"));
+                turn.first_at = map
+                    .get("first_at")
+                    .and_then(serde_json::Value::as_u64)
+                    .map(kernel::TimeMs::new);
             }
             EventKind::ToolResult => {
                 let map = record.data().as_map();
@@ -268,6 +272,11 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     call.outcome = outcome;
                     call.output = said.and_then(wire::output_in);
                     call.answered = Some(record.t());
+                    if supplied_by_the_city(map.get("error")) {
+                        call.timing = wire::Timing::Unmeasured;
+                    } else if let wire::Timing::Measured = call.timing {
+                        call.timing = timing_of(record);
+                    }
                 }
             }
             kind => {
@@ -283,4 +292,22 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
         }
     }
     folded
+}
+
+/// Whether this line's `t` is the moment its own event happened
+/// (kernel-SPEC 8-4, "what the envelope `t` records").
+fn timing_of(record: &EventRecord) -> wire::Timing {
+    match record.moment() {
+        Some(_) => wire::Timing::Measured,
+        None => wire::Timing::Unmeasured,
+    }
+}
+
+/// Whether an answer is the one the city wrote itself after a restart,
+/// which records when the city wrote it rather than when the tool
+/// answered. Read through `AxError` itself, so the code is spelled once.
+fn supplied_by_the_city(error: Option<&serde_json::Value>) -> bool {
+    error
+        .and_then(|value| <kernel::AxError as serde::Deserialize>::deserialize(value).ok())
+        .is_some_and(|refused| *refused.code() == kernel::AxCode::ToolOutcomeUnknown)
 }

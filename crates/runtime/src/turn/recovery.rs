@@ -51,6 +51,34 @@ pub(super) struct Settled {
     pub(super) first_at: Option<TimeMs>,
 }
 
+/// Whether an attempt has reported content yet, and the reading taken
+/// the moment it first did.
+enum FirstContent {
+    Unseen,
+    Read(Result<TimeMs, AxError>),
+}
+
+impl FirstContent {
+    /// Reads the clock for the first non-empty piece of prose or
+    /// reasoning, and for nothing after it.
+    fn note(&mut self, held: &Increment, journal: &mut Journal<'_>) {
+        let content = match held {
+            Increment::Said(text) | Increment::Thought(text) => !text.is_empty(),
+        };
+        if content && let FirstContent::Unseen = self {
+            *self = FirstContent::Read(journal.read_clock());
+        }
+    }
+
+    /// When the first content arrived; `None` when none did.
+    fn moment(self) -> Result<Option<TimeMs>, AxError> {
+        match self {
+            FirstContent::Unseen => Ok(None),
+            FirstContent::Read(reading) => reading.map(Some),
+        }
+    }
+}
+
 /// One provider call being recovered: what was sent, which door it went
 /// out of, and the only way to ask again — which records the attempt
 /// before it is made, so no repair can leave a silent repeat behind.
@@ -115,27 +143,48 @@ impl<'a, 'h> ModelCall<'a, 'h> {
     ) -> Result<Settled, AxError> {
         self.record()?;
         let settled = |value| (value, Speculated::default());
-        let (streamed, first) = match generating {
-            Generating::Unwatched => (false, self.model.call(self.request).map(settled)),
-            Generating::Watched(sink) => (
-                true,
-                self.model.call_streaming(self.request, sink).map(settled),
-            ),
-            Generating::Speculating { deltas, tools } => (
-                true,
-                match deltas {
-                    Some(sink) => call_ahead(self.model, self.request, sink, tools),
-                    None => call_ahead(self.model, self.request, &mut |_: &Increment| {}, tools),
-                },
-            ),
+        let mut first = FirstContent::Unseen;
+        let (streamed, attempt) = {
+            let (journal, model, request) = (&mut *self.journal, &mut *self.model, self.request);
+            let mut noted = |held: &Increment| first.note(held, journal);
+            match generating {
+                Generating::Unwatched => (false, model.call(request).map(settled)),
+                Generating::Watched(sink) => (
+                    true,
+                    model
+                        .call_streaming(request, &mut |held: &Increment| {
+                            noted(held);
+                            sink(held);
+                        })
+                        .map(settled),
+                ),
+                Generating::Speculating { deltas, tools } => (
+                    true,
+                    match deltas {
+                        Some(sink) => call_ahead(
+                            model,
+                            request,
+                            &mut |held: &Increment| {
+                                noted(held);
+                                sink(held);
+                            },
+                            tools,
+                        ),
+                        None => call_ahead(model, request, &mut noted, tools),
+                    },
+                ),
+            }
         };
         self.streamed = streamed;
-        match first {
+        match attempt {
             Ok((returned, speculated)) => Ok(Settled {
                 returned,
                 speculated,
-                first_at: None,
+                first_at: first.moment()?,
             }),
+            // The failed attempt's first content, and any failure to read
+            // the clock for it, belong to no record: the repair's return
+            // came through a door with no stream (runtime-SPEC 8-50).
             Err(failure) => match recover(segments, self, failure) {
                 SegmentOutcome::Recovered(returned) => Ok(Settled {
                     returned,
