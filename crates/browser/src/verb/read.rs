@@ -14,7 +14,10 @@
 use kernel::{AxCode, AxError, Payload};
 use serde_json::Value;
 
+use std::collections::BTreeSet;
+
 use crate::act::{Action, Origin, Point, STEPS_MAX};
+use crate::keyboard::{Key, Modifier};
 
 pub(super) fn missing(field: &str) -> AxError {
     AxError::failure(
@@ -95,13 +98,41 @@ pub(super) fn read_action(args: &Payload) -> Result<Action, AxError> {
             at: optional_point(args, "at")?,
             by: point_of(args, "to")?,
         }),
+        "press" => Ok(Action::Press {
+            key: Key::parse(&text_of(args, "key")?)?,
+            modifiers: modifiers_of(args)?,
+        }),
         other => Err(AxError::failure(
             AxCode::InvalidArgs,
             "read a browser action",
             other.to_owned(),
         )
-        .with_recovery("one of click, type, read, drag, scroll")),
+        .with_recovery("one of click, type, read, drag, scroll, press")),
     }
+}
+
+/// The modifiers a press holds, by their DOM names. Absent is none held;
+/// a set, so naming one twice holds it once.
+fn modifiers_of(args: &Payload) -> Result<BTreeSet<Modifier>, AxError> {
+    let Some(raw) = args.as_map().get("modifiers") else {
+        return Ok(BTreeSet::new());
+    };
+    let names = raw.as_array().ok_or_else(|| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "read a browser action",
+            "`modifiers` that is not a list",
+        )
+        .with_recovery("pass a list of names, such as [\"Control\"]")
+    })?;
+    names
+        .iter()
+        .map(|name| {
+            name.as_str()
+                .ok_or_else(|| missing("modifiers"))
+                .and_then(Modifier::parse)
+        })
+        .collect()
 }
 
 /// Where a drag starts: a reference, or a point, and never both and

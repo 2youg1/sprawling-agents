@@ -291,3 +291,47 @@ fn a_fetch_is_one_frame_from_the_page_and_names_its_host() {
         );
     }
 }
+
+#[test]
+fn a_press_reads_its_key_and_modifiers_and_is_one_input_frame() {
+    let verb = Verb::read(&args(json!({
+        "action": "act", "generation": 3, "kind": "press",
+        "key": "Enter", "modifiers": ["Control", "Control"],
+    })))
+    .expect("a press reads");
+    let Verb::Act { action, .. } = &verb else {
+        panic!("an act reads back as an act");
+    };
+    let frames = verb
+        .frames(&mut Session::new(), &context(), Some(&page()))
+        .unwrap();
+    let methods: Vec<&str> = frames.iter().map(Frame::method).collect();
+    assert_eq!(
+        (
+            action.clone(),
+            action.reference(),
+            action.resolves_element(),
+            methods
+        ),
+        (
+            Action::Press {
+                key: crate::keyboard::Key::Named(crate::keyboard::NamedKey::Enter),
+                modifiers: std::collections::BTreeSet::from([crate::keyboard::Modifier::Control]),
+            },
+            None,
+            false,
+            vec!["input.performActions"]
+        )
+    );
+    for bad in [
+        json!({ "action": "act", "generation": 3, "kind": "press" }),
+        json!({ "action": "act", "generation": 3, "kind": "press", "key": "Return" }),
+        json!({ "action": "act", "generation": 3, "kind": "press", "key": "k",
+                "modifiers": "Control" }),
+    ] {
+        assert!(
+            Verb::read(&args(bad)).is_err(),
+            "a press names one known key"
+        );
+    }
+}

@@ -180,6 +180,15 @@ impl Verb {
                 }
                 crate::input::wheel_frame(session, context, *at, *by)
             }
+            Verb::Act {
+                action: Action::Press { key, modifiers },
+                ..
+            } => {
+                if origin.is_some() {
+                    return Err(origin_mismatch());
+                }
+                crate::keyboard::key_frame(session, context, *key, modifiers)
+            }
             Verb::Open { .. }
             | Verb::Snapshot
             | Verb::Act { .. }
@@ -192,10 +201,10 @@ impl Verb {
             | Verb::Close => Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "act on a page",
-                "this action is not a pointer action",
+                "this action is not an input action",
             )
             .with_recovery(
-                "report this against browser::verb: only drag and scroll have input frames",
+                "report this against browser::verb: only drag, scroll and press have input frames",
             )),
         }
     }
@@ -262,7 +271,7 @@ impl Verb {
             ]),
             Verb::Snapshot => Ok(vec![session.evaluate(context, &tree_script())?]),
             Verb::Act { generation, action } => match action {
-                Action::Drag { .. } | Action::Scroll { .. } => {
+                Action::Drag { .. } | Action::Scroll { .. } | Action::Press { .. } => {
                     let looked = looked_at(snapshot, "act on a page")?;
                     if action.resolves_element() {
                         let Some(reference) = action.reference() else {

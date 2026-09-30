@@ -11,6 +11,9 @@
 //! decided against one view of a page is refused against another rather
 //! than landing on whatever moved into that position.
 
+use std::collections::BTreeSet;
+
+use crate::keyboard::{Key, Modifier};
 use crate::port::Frame;
 use crate::session::{ContextId, Session};
 use crate::snapshot::PageSnapshot;
@@ -69,6 +72,12 @@ pub enum Action {
         at: Option<Point>,
         by: Point,
     },
+    /// One key pressed on whatever the page has focused, with
+    /// `modifiers` held around it (browser-SPEC.md section 19-11).
+    Press {
+        key: Key,
+        modifiers: BTreeSet<Modifier>,
+    },
 }
 
 /// How many intermediate pointer moves one drag may make. A ceiling on
@@ -92,7 +101,8 @@ impl Action {
                 from: Origin::Point(_),
                 ..
             }
-            | Action::Scroll { .. } => None,
+            | Action::Scroll { .. }
+            | Action::Press { .. } => None,
         }
     }
 
@@ -133,11 +143,11 @@ fn quote(raw: &str) -> String {
 /// Builds the frame that performs `action` against the page `snapshot`
 /// describes.
 ///
-/// Pointer actions ([`Action::Drag`], [`Action::Scroll`]) do not come
-/// through here: they are BiDi `input.performActions`, which is a
-/// different module of the protocol, and they are built by
-/// [`crate::input`]. The refusal below is a guard against a caller that
-/// routes one here, not a state a run reaches.
+/// Input actions ([`Action::Drag`], [`Action::Scroll`], [`Action::Press`])
+/// do not come through here: they are BiDi `input.performActions`, which
+/// is a different module of the protocol, and they are built by
+/// [`crate::input`] and [`crate::keyboard`]. The refusal below is a guard
+/// against a caller that routes one here, not a state a run reaches.
 ///
 /// # Errors
 /// Refuses a reference the snapshot did not mint, one minted against
@@ -164,14 +174,15 @@ pub fn frame_for(
         Action::Read { reference } => {
             format!("({}).textContent", selector_of(snapshot, reference)?)
         }
-        Action::Drag { .. } | Action::Scroll { .. } => {
+        Action::Drag { .. } | Action::Scroll { .. } | Action::Press { .. } => {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "act on a page",
-                "a pointer action is not a script",
+                "an input action is not a script",
             )
             .with_recovery(
-                "report this against browser::act: pointer actions are built by browser::input",
+                "report this against browser::act: input actions are built by browser::input \
+                 and browser::keyboard",
             ));
         }
     };
