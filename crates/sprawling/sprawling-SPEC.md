@@ -195,7 +195,7 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 
 - **旧账本照样折得回**：旧版本写过的 `login_started` 仍是一个事件种类，没有读者；`secret_captured` 行里的 `expires_at` 与 `<provider>-subscription`／`<provider>-renewal` 来源读入时照收，本城不再据此续期。
 - **旧快照不接**：`StandingFolds` 少了到期表，`STANDING_FOLD_RULES` 随之换值，旧快照按版本不符从创世重折（8-101）。
-- **harness 页读名单与这台电脑**：`views::lines::harnesses_answer` 把 `agent_protocols::Harness::ALL` 逐家抄成 `wire::HarnessLine`，`found` 经 doctor 的搜索路径（`doctor::host::search_path` 与 `doctor::probe::on_search_path`）查那条命令的程序，与 doctor 找程序是同一个答案（wire-SPEC §8-52）。
+- **harness 页读名单与这台电脑**：`bin::views::lines::harnesses_answer` 把 `agent_protocols::Harness::ALL` 逐家抄成 `wire::HarnessLine`，`found` 经 `Views.programs` 问服务中的城交进来的查找（accounting-SPEC.md 8-10）；生产的查找是 `bin::doctor::host::find_program`，与 doctor 找程序读同一条搜索路径（wire-SPEC §8-52）。
 - **provider 页先给厂商表**：`views::lines::known_hosts_answer` 把 `gateway::known_hosts` 逐行抄成 `wire::KnownHostsAnswer`，不加不减（wire-SPEC §8-51）。
 
 ## 8-6 五个视图不再答 unavailable
@@ -2885,6 +2885,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **`bin::doctor::report`**：`answer(machine: &dyn Machine) -> wire::DoctorAnswer` 问一次交给它的机器并折成答案。机器是参数，所以一个测试交一台假机器，就说出机器答了什么而不必有那样一台机器；生产的调用方是 `ThisMachine` 实现的 `accounting::Machine::report`。**它不判断任何事**——哪一项在这里、一个档次缺什么，权威在 `doctor` 与 `table`；这里只换一种说法。`screen` 把同一批 findings 折成一台机器的散文，两者从同一处折出。
 - **`Views.machine: Option<wire::DoctorAnswer>`**，由 `found_on_this_machine` 从外面放进来，**不由任何记录折出**：这是本文件里唯一一个关于机器而非关于历史的答案，所以重建账本不碰它。`None` 答 `Unavailable`。
 - **`Views.registry: Option<fn() -> wire::ReleaseAnswer>`**，由 `views::served` 的 `ask_the_registry_through` 从外面放进来，与 `machine`、`vault` 同形：serve 一座城时装配根交 `bin::release::answer`，`twin` 把它带到另一份。`NewestRelease` 在快照放开之后调它（它要出网）；`None` 是一份没人 serve 的 views（重建、测试），答 `Unavailable` 而不去问注册表。views 因此不直接碰 `bin::release`，搬进 `accounting` 时 `release` 留在 `sprawling`（accounting-SPEC.md §7）。钉住它的测试是 `a_newest_release_is_asked_of_the_registry_the_views_were_handed`。
+- **`Views.programs: Option<fn(&str) -> Option<PathBuf>>`**，由 `find_programs_through` 从外面放进来，与 `registry` 同形：serve 一座城时装配根交 `bin::doctor::host::find_program`。`Query::Harnesses` 在快照放开之后调它；`None` 答 `Unavailable`（accounting-SPEC.md 8-10、§12-13）。
 - **探测只由 `DoctorRefresh` 触发，服务一座城时一次也不跑**：表从 12 行长到 32 行，其中大半是起一个进程问它的版本（六件 cargo 子命令各起一次 cargo），windows-x86_64 暖缓存四核一档机器上量得 3.3–4.1 s。先前的决定把它放在开门之前，给出的参数是「12 项约 2 秒」，**两个数都已经移动**：项数翻了一倍有余，而问它的那一屏不再是第一屏（`#/` 是对话，机器那一屏在设置页的「依赖项安装」组里）。它当时否决后台探测的理由是「要多一条『还没答上来』的状态」，而那条状态今天已经存在、有夹具、也有它的动作（`MachineSkeleton` 与 `MachineUnchecked`）——那笔代价早已付过。服务因此不再为一个没人问的答案把套接字关着几秒。
 - **客户端**：`client/src/views/machine.svelte` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏每次打开都发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有的答案先画出来，探完的那一份到了再换上（§8-120）。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。

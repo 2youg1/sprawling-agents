@@ -19,8 +19,11 @@
 | `person` | 这个人自己定下的那一层：偏好与核心线程的档位 | 8-8 |
 | `held_vault` | 一个锁着的 vault 怎样变成解析器，锁中毒时怎样拒绝 | 8-9 |
 | `toolkit_broker` | 一个外部应用的 broker 钥匙登记在哪，这座城对它是谁 | 8-9 |
+| `views` | 页面问的每个问题，怎样从折叠的记录里答 | 8-10 |
+| `lineage` | 每个 run 怎样折成一行，带上它的父指针 | 8-10 |
+| `worker` | 城的唯一写者 `RunWorker`：它持有的状态、它执行的命令、它驱动的 run | 8-11 |
 
-worker 的两个读写面 `effect` 与 `plan_view`、以及 worker 与 `views` 共用的四个叶子模块 `home`、`person`、`held_vault`、`toolkit_broker` 已在本 crate；`RunWorker` 的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例与 `views` 仍在 `crates/sprawling/src/assembly` 与 `crates/sprawling/src/views`，按 §7 的归属表搬。
+worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` 共用的四个叶子模块 `home`、`person`、`held_vault`、`toolkit_broker`，已在本 crate。`views` 与 `lineage` 在第 2 步搬进来，此前住 `crates/sprawling/src/views` 与 `crates/sprawling/src/lineage.rs`；`RunWorker` 与它的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例在第 3 步搬进来，此前住 `crates/sprawling/src/assembly`（§3）。
 
 ## 2 验收标准
 
@@ -40,12 +43,12 @@ worker 的两个读写面 `effect` 与 `plan_view`、以及 worker 与 `views` �
 
 ## 3 假设与歧义
 
-- `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，`views` 还在 `crates/sprawling/src/views`，所以 citysim 的剧本仍驱动不了一次 dispatch：citysim 依赖 `sprawling` 只是为了让 bench 的两个二进制给产品的启动与查询计时，剧本库只经 `runtime::run::drive` 驱动，从不造 worker。归属由 §7 的表和 §12-9 至 §12-12 定下；还没做的按这个次序：
-  1. 还缺的端口。`revealing`（`RunWorker.reveal`）、`monitor::memory`（`DrivingPool` 的 `read_memory`）、`monitor::volume`（`RunWorker.read_volume`）、`release`（`Views.registry`）、`browser_tool`（`RunWorker.browsers`）与需求表的查法（`RunWorker.recipe_for`）已经是交进来的 `fn` 指针；还直接碰 `bin` 的只剩 `workbench::engine` 读的 `doctor::host` 与 `Presence`。
-  2. `views` 搬进本 crate。它的测试里有一部分造一个 worker（`views/tests.rs` 经 `crate::assembly` 的 fixture，`document`、`listing`、`skills` 的测试调 `init_city`），它们要么随 worker 搬、要么先留在 `sprawling` 经 `views` 的公开面测。
-  3. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）；`genesis`、`listening`、`attending`、`chain_watch` 与生产适配器留在装配根（§12-12）。
-  4. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。
-  5. 每搬走一个模块，它在 sprawling-SPEC.md 里的那一节就搬进本 SPEC（8-7、8-8、8-9 就是这样来的）。
+- `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，所以 citysim 的场景库仍驱动不了一次 dispatch：citysim 的 bench 二进制依赖 `sprawling`，场景库只经 `runtime::run::drive` 驱动一次 run，从不造 worker。归属由 §7 的表与 §12-9 至 §12-12 定下，§12-13 至 §12-16 补上 `views` 那一半。还没做的按这个次序：
+  1. 还缺的端口。`views::lines::harnesses_answer` 找 harness 的程序时直接读 `doctor::host::search_path` 与 `doctor::on_search_path`；它改经 `Views.programs`（8-10、§12-13）。`revealing`（`RunWorker.reveal`）、`monitor::memory`（`DrivingPool` 的 `read_memory`）、`monitor::volume`（`RunWorker.read_volume`）、`release`（`Views.registry`）、`browser_tool`（`RunWorker.browsers`）与需求表的查法（`RunWorker.recipe_for`）已经是交进来的 `fn` 指针；worker 这边还直接碰 `bin` 的是 `workbench::engine` 读的 `doctor::host` 与 `Presence`，以及 `relay`、`pool`、`driving::flight` 用到的 `monitor::health::Health`、`monitor::memory::Memory` 两个类型。
+  2. `views` 与 `lineage` 搬进本 crate，本 crate 因此依赖 `storage` 与 `runtime`（§12-14）。`views` 的测试里有十几处经 `bin::assembly::init_city` 造城；搬过来之后、第 3 步之前，它们改用 `views::tests::founded`，它只写创世的两行、立起市政厅、写一份 `City.md`；第 3 步之后改回真正的创世，`founded` 随之删去。经 worker 的命令造楼的那一条测试随 `building_page_tests` 走。
+  3. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）。
+  4. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活，不在本次迁移里。
+  5. 模块搬走时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）。8-7、8-8、8-9 是早先整节搬进来的，保持原样。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 
 ## 4 现状分析
@@ -74,14 +77,14 @@ ModelFactory｜Connectors｜Clock｜Machine｜Recipe｜Runnable｜accounting thr
 | `bin` 里的东西 | 归属 | worker 或 `views` 用它做什么 | 依据 |
 |---|---|---|---|
 | `views` | 搬进本 crate | `Views`、`Published`、`Governance`、`pursued`、`snapshot::start` | worker 的读面；`Governance` 由读侧拥有，写侧从那里取用（sprawling-SPEC.md 8-92） |
+| `lineage` | 搬进本 crate | `sprawling view` 的 run 列表，以及 playback 的共享投影 | 它只折记录，与 `views` 同形（形状 7）；二进制的 `main::view` 与本 crate 的读面都够得到它 |
 | `home` | 搬进本 crate | 阅览室与 `views::skills` 取这个人的家目录 | 只读一个环境变量、拼路径，不启动任何东西；`person` 与 `views` 都从它取路径 |
 | `person` | 搬进本 crate | `PutPreferences` 写、`Preferences` 查询读 | 人的那一层是一份文件，读写它和读写城的文件同类，不是主机的能力 |
 | `serving::standing::CorePriority` | 随 `person` 搬进本 crate | 偏好里核心线程抬不抬高的那个值 | 它是 `person` 读出来的值；真去抬高线程的 `raise_this_thread` 留在 `serving` |
 | `held_vault` | 搬进本 crate | 把一个锁着的 vault 变成解析器，锁中毒时的拒绝 | 纯函数，只碰已经打开的 vault |
 | `toolkit_broker` | 搬进本 crate | 一个外部应用的 broker 钥匙登记在哪 | 纯函数，`views::toolkits` 与连接动作读同一组事实 |
-| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经端口：看与装经 `Machine`，需求表的查法经 `RunWorker.recipe_for`（sprawling-SPEC.md 中 `doctor_install` 那一节） | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文） |
+| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经端口：看与装经 `Machine`，需求表的查法经 `RunWorker.recipe_for`（sprawling-SPEC.md 中 `doctor_install` 那一节） | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文）；`views::lines::harnesses_answer` 找一条命令的程序经 `Views.programs`，生产交的是 `bin::doctor::host::find_program`（8-10） |
 | `monitor::memory::read`、`monitor::volume::read` | 经端口：`DrivingPool` 的 `read_memory` 与 `RunWorker` 的 `read_volume`，都是 `fn` 指针（sprawling-SPEC.md 8-46-3、8-94） | 新工作进门时读内存与卷的余量 | 读主机的计数器；`read_volume` 已经这样交进来 |
-| `serving::door::random_token` | 随 `credentials` 搬进本 crate | OAuth 登录的 verifier 与 state | 它的熵必须不可预测：一个第三方能预测的 verifier 就是一个第三方能完成的登录，所以没有哪个脚本场景可以换掉它，端口在这里只会开一个让它变得可预测的门；它经 `getrandom` 这个安全接口取熵，不启动任何东西 |
 | `revealing` | 经端口：`RunWorker` 的 `reveal` 字段，一个 `fn` 指针（sprawling-SPEC.md 8-60） | `Reveal` 在主机的文件管理器里打开一个地址 | 启动主机的一个程序 |
 | `browser_tool` | 经端口：`RunWorker::with_browsers` 交进来的 `fn` 指针（sprawling-SPEC.md 8-45-2） | 按楼的规则给 run 的浏览器工具 | 启动浏览器，经 BiDi 说话 |
 | `release` | 经端口：`Views.registry`，一个由 `views::served` 放进来的 `fn` 指针（sprawling-SPEC.md 中 `Views.machine` 旁的那一条） | `views` 回答 `NewestRelease` 查询 | 向 npm 注册表发请求 |
@@ -367,6 +370,50 @@ pub fn broker_for(/* toolkit 地址、城根、vault */) -> Result<Option<(agent
 - **一个锁着的 vault 的解析器与锁中毒时的拒绝各只有一处**：装配点、读面与 serving 都要一次性的解析器，拒绝的措辞只写一次。
 - **broker 的钥匙登记在哪、这座城对 broker 是谁，页面与命令读同一组事实**：连接动作 `connect_toolkit` 仍是 worker 的。
 
+### 8-10 accounting::views 与 accounting::lineage：页面问的每个问题，从折叠里答（形状 7 投影）
+
+```rust
+// accounting::views
+pub struct Views { /* 折叠状态，私有 */ }
+impl Views {
+    pub fn new(city_root: &Path) -> Views;
+    pub fn over(ledger_dir: &Path) -> Views;
+    /// 先审计整条链，再从合适的快照起步、只折尾部（sprawling-SPEC.md 8-91）。
+    pub fn rebuild(ledger_dir: &Path) -> Result<Views, AxError>;
+    pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
+    /// 锁内只取小数据；读盘、读库、出网在 `Prepared::finish` 里做（sprawling-SPEC.md 8-100）。
+    pub fn prepare(&self, query: &wire::Query) -> Prepared;
+    pub fn twin(&self) -> Result<Views, AxError>;
+
+    // 服务中的城从外面交进来的五样东西（`views::served`）。都不由记录折出，重建不碰它们，`twin` 把它们带到另一份。
+    pub fn found_on_this_machine(&mut self, report: wire::DoctorAnswer);
+    pub fn lend_the_vault(&mut self, vault: Arc<Mutex<gateway::Custodian>>);
+    pub fn ask_the_registry_through(&mut self, newest: fn() -> wire::ReleaseAnswer);
+    pub fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream);
+    pub fn find_programs_through(&mut self, find: fn(&str) -> Option<PathBuf>);
+}
+pub enum Prepared { /* 锁放开之后还要做的那一步 */ }
+impl Prepared { pub fn finish(self) -> wire::Answer; }
+pub struct Published { /* 私有 */ }
+pub fn answer_outside_the_lock(views: &Published, query: &wire::Query) -> (Seq, Result<wire::Answer, AxError>);
+/// 不 serve 一座城，只从它自己的历史答一问。
+pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxError>;
+pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire::Turn>;
+pub struct Governance { /* 读侧那一份治理折叠 */ }
+pub fn pursued(record: &EventRecord) -> Result<Address, AxError>;
+
+// accounting::lineage
+pub struct Lineage { /* … */ }
+pub struct RunLine { /* 公开字段不变 */ }
+pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
+```
+
+- **读面对这台电脑只有五个入口，都经 `views::served` 交进来。** `machine` 是城启动后 doctor 看到的那一眼；`vault` 是 worker 打开的那一个；`registry` 与 `upstream` 各问一次网络；`programs` 回答「这台电脑的搜索路径上有没有这个程序」。五个都是服务中的城交的，所以一份没人 serve 的 `Views`（重建、`ask`、测试）对它们一律答 `Unavailable`，不去碰这台电脑。
+- **harness 页经 `Views.programs` 找程序。** `Query::Harnesses` 在快照放开之后作答：`Some(find)` 时对 `agent_protocols::Harness::ALL` 里每一家的启动程序调一次 `find`，`found` 是它有没有交回一条路径；`None` 时答 `Unavailable { query: "Harnesses" }`。生产交的是 `bin::doctor::host::find_program`，它读的是 doctor 读的同一条搜索路径（`host::search_path` 加 `probe::on_search_path`），所以 harness 页与 doctor 对同一个程序给同一个答案。钉住它的测试是 `a_harness_is_looked_for_through_the_search_the_views_were_handed` 与 `a_harness_page_nobody_served_answers_unavailable`（`accounting::views::served::tests`）。
+- **对 `sprawling` 公开的是这一节列出的面。** 模块在 `sprawling` 里时 `pub(crate)` 的条目，搬过来以后是 `pub`：装配根、服务面与二进制照原样读它们。`Views::answer` 仍只在本 crate 的测试里存在；`sprawling` 的测试写 `prepare(&query).finish()`，那是生产走的同一条路。
+- **`lineage` 与 `views` 同住本 crate，因为读者跨两处。** `sprawling view` 的 run 列表在二进制里，playback 的共享投影在本 crate 的读面里；二进制够得到本 crate，本 crate 够不到二进制。
+- **依赖**：`views` 折叠 `storage::HotView`、`storage::Attribution` 与 `storage::LedgerIndex`，快照起步经 `runtime::replay::fold_ledger_dir`，所以本 crate 依赖 `storage` 与 `runtime`（ARCHITECTURE.md §3 的 `depmap`，§12-14）。
+
 ## 12 决策
 
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。
@@ -381,3 +428,7 @@ pub fn broker_for(/* toolkit 地址、城根、vault */) -> Result<Option<(agent
 10. **没有状态的主机读写经构造时交进来的 `fn` 指针进来，和 `read_volume` 一样；只有持有状态的适配器（`Machine`、`Connectors`）才是 trait。** 理由：一个只包一个函数的 trait 没有第二个方法可换，脚本场景交一个自己的 `fn` 就够了，而且 `fn` 指针不装箱、不经虚表。被否决的做法：一个把内存、卷、随机令牌、打开文件管理器与浏览器捆在一起的 `Host` trait——这些做法的失败各不相同，脚本为了换掉其中一个就得实现全部。
 11. **`relay`、`pool`、`desk` 与 `drive_run` 和 `RunWorker` 在同一次改动里搬。** 理由：它们成环——`relay` 经 worker 的账本写，`pool` 的每条车道跑 `drive_run`，`drive_run` 经 `relay` 写回，`desk` 为 worker 排队命令；先搬其中任何一个，都要一个指回留在 `sprawling` 的 worker 的临时端口，而下一次改动就会删掉它。被否决的做法：一个一个搬、中间架临时端口——每个临时适配器都是一个只活一次改动的第二权威。
 12. **装配根留在 `bin::assembly`：`listening`、`attending`、`chain_watch`、`genesis`、生产适配器（`models::GatewayModels`、`mcp::Residents`、`SystemClock`、`doctor::ThisMachine`）与把它们装上 worker 的构造。** 理由：它们起线程、绑端口、打开 vault、造城的目录，是 ARCHITECTURE.md §3 说的知道每个具体类型的那一层；worker 搬走之后，它们对本 crate 的依赖是朝内的。被否决的做法：把 `genesis` 当作 worker 的用例搬进来——它在任何 worker 存在之前造城，并经 `serving::open_vault` 打开 vault，搬进来就要为一次性的建城多开一个端口。
+13. **harness 页找程序经 `Views.programs` 这个 `fn` 指针，不经 `Machine`，也不在开城时算好。** 理由：这一问读的是此刻的搜索路径，与 `registry`、`upstream` 同形——没有状态、服务中的城交一次、`None` 就答 `Unavailable`（§12-10）；它不启动任何程序，所以不必等 `DoctorRefresh`。被否决的做法：给 `Machine` 加一个方法——`Machine` 属于 worker，读面拿不到它，而且 doctor 的逐项查法已经在 `bin::doctor::Machine::look` 里，再加一个方法就是第二条查法；在开城时把 harness 的有无算进 `DoctorAnswer`——那是一个线上的形状改动，而且人在 harness 页上装完一个程序，要等到下一次 `DoctorRefresh` 才看得到它。
+14. **`views` 搬进来时，本 crate 加 `storage` 与 `runtime` 两条边。** 理由：`views` 折叠的就是 `storage` 的 `HotView`、`Attribution`、`LedgerIndex`，快照起步与 worker 的 `Standing` 共用 `runtime::replay::fold_ledger_dir` 的同一遍；worker 搬过来后本来也要这两条边（§12-11）。被否决的做法：把这两处读经端口交进来——端口会把一份折叠的权威分到两个 crate，与 §12-9 否决的是同一件事；把 `fold_ledger_dir` 挪进 `storage`——那改的是 `runtime` 的公开面，与这次迁移无关。
+15. **sprawling-SPEC.md 里写这些模块的节不随模块搬，只改模块路径的拼写；S4 迁 `Spec.lean` 时一次搬进本 crate 的规格。** 理由：两处都是 Markdown 时，搬一次、S4 再改写一次，是两遍约两千行的重写；两份 SPEC 的节号相撞（sprawling 的 8-3、8-6 与本 SPEC 的 8-3、8-6），sprawling-SPEC 自己也有重号，逐节搬要先重新编号，而代码与文档里引用 `sprawling-SPEC.md 8-xx` 的地方都得跟着改。被否决的做法：照 §3 早先的第 5 步逐节搬——8-7、8-8、8-9 那样的小节可以，几十节不行。
+16. **`views` 的测试在第 2 步与第 3 步之间用 `views::tests::founded` 造城。** 理由：真正的创世（`genesis`）经 `RunWorker` 立起市政厅，第 3 步之前它还在 `sprawling`，本 crate 够不到它；`founded` 只写那些测试读到的东西，第 3 步删掉。被否决的做法：把这些测试留在 `sprawling`——它们读 `Views` 的私有字段（`index`）与只在测试里存在的 `Views::answer`，留下就得为测试开公开的门。
