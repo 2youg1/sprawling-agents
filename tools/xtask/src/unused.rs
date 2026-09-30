@@ -178,4 +178,42 @@ mod tests {
             ]
         );
     }
+
+    /// A dependency declared only to constrain resolution is exempt from
+    /// naming when its manifest lists it under `pins`, and a pin that
+    /// points at nothing or is no longer needed is itself a finding
+    /// (xtask-SPEC.md section 8-37).
+    #[test]
+    fn a_dependency_declared_to_pin_a_resolution_is_listed_in_its_manifest() {
+        let root = std::env::temp_dir().join(format!("xtask-unused-pins-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        write(&root, "Cargo.toml", "[workspace]\nmembers = [\"a\"]\n");
+        write(
+            &root,
+            "a/Cargo.toml",
+            "[package]\nname = \"a\"\n\n[dependencies]\npinned = \"1\"\nnamed = \"1\"\n\n[package.metadata.unused]\npins = [\"pinned\", \"ghost\", \"named\"]\n",
+        );
+        write(&root, "a/src/lib.rs", "use named as _;\n");
+
+        let found: Vec<(String, String)> = check(&root)
+            .unwrap()
+            .into_iter()
+            .map(|v| (v.location, v.violation))
+            .collect();
+        std::fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(
+            found,
+            vec![
+                (
+                    "a/Cargo.toml".to_owned(),
+                    "`[package.metadata.unused] pins` lists `named`, and a `.rs` file under `a` names `named`, so the exemption is no longer needed".to_owned()
+                ),
+                (
+                    "a/Cargo.toml".to_owned(),
+                    "`[package.metadata.unused] pins` lists `ghost`, and no dependency table of `a` declares it".to_owned()
+                ),
+            ]
+        );
+    }
 }
