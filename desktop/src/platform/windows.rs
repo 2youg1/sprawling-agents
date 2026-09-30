@@ -108,7 +108,7 @@ impl Desk {
                 })
             })
             .collect();
-        let generation = self.views.mint(&window.named.title, nodes);
+        let generation = self.views.mint(sight(&window), nodes);
         Ok(json!({
             "title": window.named.title,
             "process": window.named.process,
@@ -141,7 +141,7 @@ impl Desk {
         Ok(json!({
             "title": window.named.title,
             "action": named,
-            "generation": self.views.generation(&window.named.title),
+            "generation": self.views.generation(sight(&window).aim),
         }))
     }
 
@@ -210,9 +210,7 @@ impl Desk {
                      it the action could land on whatever moved into that position",
                 )
             })?;
-            let node = self
-                .views
-                .resolve(&window.named.title, generation, reference)?;
+            let node = self.views.resolve(sight(window), generation, reference)?;
             return Ok(node.bounds.centre());
         }
         let Some(inset) = inset(arguments, field) else {
@@ -343,6 +341,14 @@ fn use_clipboard(arguments: &Value) -> Result<Value, Refusal> {
             format!("`{other}` is neither get nor set"),
             "send `operation: get` or `operation: set`",
         )),
+    }
+}
+
+/// A window as the snapshot record keys and judges it.
+fn sight(window: &enumerate::Window) -> views::Sight {
+    views::Sight {
+        aim: focus::Aim::of(window.handle),
+        bounds: window.bounds,
     }
 }
 

@@ -54,11 +54,11 @@ const BETWEEN_READS: Duration = Duration::from_millis(20);
 /// An address rather than the handle itself, so the comparison this
 /// module exists for is a comparison of plain values and can be
 /// asserted on a machine with no desktop at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Aim(usize);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Aim(pub(super) usize);
 
 impl Aim {
-    fn of(window: HWND) -> Aim {
+    pub(super) fn of(window: HWND) -> Aim {
         Aim(window.0.addr())
     }
 }

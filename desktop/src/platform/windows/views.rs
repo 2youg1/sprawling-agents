@@ -27,6 +27,7 @@
 use crate::refusal::{Refusal, RefusalCode};
 use std::collections::BTreeMap;
 
+use super::focus::Aim;
 use super::geometry::Bounds;
 
 /// How many refs one snapshot mints before it stops walking. A tree a
@@ -46,21 +47,29 @@ pub(crate) struct Node {
     pub(crate) depth: u32,
 }
 
+/// One window as a snapshot or an action sees it: which window it is,
+/// and where it is on the screen at that moment.
+///
+/// The window is its handle rather than its title, so two windows that
+/// share a title are two windows here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Sight {
+    pub(crate) aim: Aim,
+    pub(crate) bounds: Bounds,
+}
+
 /// What one window's last snapshot left behind.
 #[derive(Debug, Clone)]
 struct Seen {
     generation: u64,
+    bounds: Bounds,
     nodes: BTreeMap<String, Node>,
 }
 
-/// Every window this connection has looked at.
-///
-/// Keyed by the window's title, which is what the caller names it by, so
-/// a window renamed between two calls is a window this table has not
-/// seen — which is the honest answer rather than a stale one.
+/// Every window this connection has looked at, by handle.
 #[derive(Debug, Default)]
 pub(crate) struct Views {
-    windows: BTreeMap<String, Seen>,
+    windows: BTreeMap<Aim, Seen>,
 }
 
 impl Views {
@@ -77,17 +86,23 @@ impl Views {
     /// cannot have it come back around: `saturating_add` stops rather
     /// than wraps, and a connection that took eighteen quintillion
     /// snapshots has a problem this counter is not it.
-    pub(crate) fn mint(&mut self, window: &str, nodes: Vec<Node>) -> u64 {
+    pub(crate) fn mint(&mut self, sight: Sight, nodes: Vec<Node>) -> u64 {
         let generation = self
             .windows
-            .get(window)
+            .get(&sight.aim)
             .map_or(1, |seen| seen.generation.saturating_add(1));
         let nodes = nodes
             .into_iter()
             .map(|node| (node.reference.clone(), node))
             .collect();
-        self.windows
-            .insert(window.to_owned(), Seen { generation, nodes });
+        self.windows.insert(
+            sight.aim,
+            Seen {
+                generation,
+                bounds: sight.bounds,
+                nodes,
+            },
+        );
         generation
     }
 
@@ -99,33 +114,33 @@ impl Views {
     /// mint.
     pub(crate) fn resolve(
         &self,
-        window: &str,
+        sight: Sight,
         generation: u64,
         reference: &str,
     ) -> Result<&Node, Refusal> {
-        let Some(seen) = self.windows.get(window) else {
+        let Some(seen) = self.windows.get(&sight.aim) else {
             return Err(stale(format!(
-                "nothing has been snapshotted for `{window}`, so `{reference}` names nothing"
+                "nothing has been snapshotted for this window, so `{reference}` names nothing"
             )));
         };
         if seen.generation != generation {
             return Err(stale(format!(
-                "`{reference}` was decided against generation {generation}, and `{window}` is \
+                "`{reference}` was decided against generation {generation}, and this window is \
                  now on generation {}",
                 seen.generation
             )));
         }
         seen.nodes.get(reference).ok_or_else(|| {
             stale(format!(
-                "generation {generation} of `{window}` minted no `{reference}`"
+                "generation {generation} of this window minted no `{reference}`"
             ))
         })
     }
 
     /// The generation a window is on, for a caller that asks what it is
     /// holding.
-    pub(crate) fn generation(&self, window: &str) -> Option<u64> {
-        self.windows.get(window).map(|seen| seen.generation)
+    pub(crate) fn generation(&self, aim: Aim) -> Option<u64> {
+        self.windows.get(&aim).map(|seen| seen.generation)
     }
 }
 
@@ -152,6 +167,17 @@ fn stale(because: String) -> Refusal {
 mod tests {
     use super::*;
 
+    /// Two windows, which may share a title; here they are two handles.
+    const CALCULATOR: Aim = Aim(0x1000);
+    const NOTEPAD: Aim = Aim(0x2000);
+
+    fn at(aim: Aim, left: i32) -> Sight {
+        Sight {
+            aim,
+            bounds: Bounds::from_corners(left, 0, left.saturating_add(400), 300).unwrap(),
+        }
+    }
+
     fn node(reference: &str, left: i32) -> Node {
         Node {
             reference: reference.to_owned(),
@@ -165,9 +191,9 @@ mod tests {
     #[test]
     fn a_ref_from_the_current_generation_resolves_to_where_it_was_seen() {
         let mut views = Views::new();
-        let generation = views.mint("a.txt — Notepad", vec![node("e1", 100), node("e2", 200)]);
+        let generation = views.mint(at(NOTEPAD, 0), vec![node("e1", 100), node("e2", 200)]);
         assert_eq!(generation, 1);
-        let found = views.resolve("a.txt — Notepad", 1, "e2").unwrap();
+        let found = views.resolve(at(NOTEPAD, 0), 1, "e2").unwrap();
         assert_eq!(found.bounds.width(), 80);
         assert_eq!(found.role, "Button");
     }
@@ -178,11 +204,11 @@ mod tests {
     #[test]
     fn an_action_decided_against_an_older_view_is_refused_not_relocated() {
         let mut views = Views::new();
-        views.mint("Calculator", vec![node("e1", 100)]);
-        let second = views.mint("Calculator", vec![node("e1", 900)]);
+        views.mint(at(CALCULATOR, 0), vec![node("e1", 100)]);
+        let second = views.mint(at(CALCULATOR, 0), vec![node("e1", 900)]);
         assert_eq!(second, 2);
         let refusal = views
-            .resolve("Calculator", 1, "e1")
+            .resolve(at(CALCULATOR, 0), 1, "e1")
             .expect_err("generation 1 is spent");
         let error = refusal.as_error();
         assert_eq!(error["data"]["code"], "E_INVALID_ARGS");
@@ -200,7 +226,7 @@ mod tests {
         );
         // The current generation still resolves, and to the new place.
         assert_eq!(
-            views.resolve("Calculator", 2, "e1").unwrap().bounds,
+            views.resolve(at(CALCULATOR, 0), 2, "e1").unwrap().bounds,
             Bounds::from_corners(900, 0, 980, 30).unwrap()
         );
     }
@@ -208,17 +234,17 @@ mod tests {
     #[test]
     fn a_window_nobody_looked_at_and_a_ref_nobody_minted_are_both_refused() {
         let mut views = Views::new();
-        assert!(views.generation("Calculator").is_none());
-        let unseen = views.resolve("Calculator", 1, "e1").unwrap_err();
+        assert!(views.generation(CALCULATOR).is_none());
+        let unseen = views.resolve(at(CALCULATOR, 0), 1, "e1").unwrap_err();
         assert!(
             unseen.as_error()["data"]["subject"]
                 .as_str()
                 .unwrap()
                 .contains("nothing has been snapshotted")
         );
-        views.mint("Calculator", vec![node("e1", 100)]);
-        assert_eq!(views.generation("Calculator"), Some(1));
-        let unminted = views.resolve("Calculator", 1, "e99").unwrap_err();
+        views.mint(at(CALCULATOR, 0), vec![node("e1", 100)]);
+        assert_eq!(views.generation(CALCULATOR), Some(1));
+        let unminted = views.resolve(at(CALCULATOR, 0), 1, "e99").unwrap_err();
         assert!(
             unminted.as_error()["data"]["subject"]
                 .as_str()
@@ -232,11 +258,25 @@ mod tests {
     #[test]
     fn each_window_carries_its_own_generation() {
         let mut views = Views::new();
-        views.mint("Calculator", vec![node("e1", 0)]);
-        views.mint("a.txt — Notepad", vec![node("e1", 0)]);
-        views.mint("a.txt — Notepad", vec![node("e1", 0)]);
-        assert_eq!(views.generation("Calculator"), Some(1));
-        assert_eq!(views.generation("a.txt — Notepad"), Some(2));
-        assert!(views.resolve("Calculator", 1, "e1").is_ok());
+        views.mint(at(CALCULATOR, 0), vec![node("e1", 0)]);
+        views.mint(at(NOTEPAD, 0), vec![node("e1", 0)]);
+        views.mint(at(NOTEPAD, 0), vec![node("e1", 0)]);
+        assert_eq!(views.generation(CALCULATOR), Some(1));
+        assert_eq!(views.generation(NOTEPAD), Some(2));
+        assert!(views.resolve(at(CALCULATOR, 0), 1, "e1").is_ok());
+    }
+
+    /// A ref is a place on the screen, so a window that moved or changed
+    /// size since its snapshot has no ref at that place any more.
+    #[test]
+    fn a_window_that_moved_since_its_snapshot_refuses_the_old_generation() {
+        let mut views = Views::new();
+        views.mint(at(CALCULATOR, 0), vec![node("e1", 100)]);
+        assert_eq!(
+            views.resolve(at(CALCULATOR, 50), 1, "e1").cloned(),
+            Err(stale(
+                "this window has moved or changed size since generation 1 was taken".to_owned()
+            ))
+        );
     }
 }
