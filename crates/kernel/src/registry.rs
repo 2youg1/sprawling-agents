@@ -222,6 +222,16 @@ mod tests {
     }
 
     #[test]
+    fn a_harness_answer_verifies_a_claim() {
+        let verified = Artifact::verify(claim(), evidence(EventKind::HarnessAnswered));
+        assert!(verified.is_ok(), "{verified:?}");
+        assert_eq!(
+            verified.unwrap().verified_by().kind(),
+            EventKind::HarnessAnswered
+        );
+    }
+
+    #[test]
     fn promotion_requires_prior_registration() {
         let mut registry = Registry::new();
         let err = registry.promote_asset(&locator()).unwrap_err();

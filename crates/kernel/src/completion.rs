@@ -201,6 +201,17 @@ mod tests {
     }
 
     #[test]
+    fn a_harness_answer_is_evidence() {
+        assert!(Evidence::new(vec![evidence_ref(EventKind::HarnessAnswered)]).is_ok());
+        let err = Evidence::new(vec![evidence_ref(EventKind::HarnessReported)]).unwrap_err();
+        assert_eq!(err.code(), &AxCode::EvidenceMissing);
+        let recovery = err.recovery();
+        let at = |word: &str| recovery.find(word).unwrap();
+        assert!(at("tool_result") < at("model_returned"));
+        assert!(at("model_returned") < at("harness_answered"));
+    }
+
+    #[test]
     fn done_payload_cites_its_evidence() {
         let done =
             Completion::Done(Evidence::new(vec![evidence_ref(EventKind::ModelReturned)]).unwrap());
